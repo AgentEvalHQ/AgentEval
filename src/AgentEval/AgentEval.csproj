@@ -9,6 +9,12 @@
     <Description>The first .NET-native AI agent testing, evaluation, and benchmarking framework. Supports Microsoft Agent Framework (MAF), with extensible adapters for other frameworks.</Description>
     <PackageTags>ai;agent;testing;evaluation;benchmarking;maf;llm;openai;azure</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>
+    
+    <!-- SourceLink: enables stepping into source code during debugging -->
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <EmbedUntrackedSources>true</EmbedUntrackedSources>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
   </PropertyGroup>
 
   <ItemGroup>
@@ -17,6 +23,8 @@
     <PackageReference Include="Microsoft.Extensions.AI.Evaluation.Quality" />
     <PackageReference Include="Azure.AI.OpenAI" />
     <PackageReference Include="System.Numerics.Tensors" />
+    <!-- SourceLink -->
+    <PackageReference Include="Microsoft.SourceLink.GitHub" PrivateAssets="All" />
   </ItemGroup>
 
   <ItemGroup>

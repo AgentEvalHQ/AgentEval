@@ -7,12 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+---
+
+## [0.1.1-alpha] - 2026-01-03
+
 ### Added
-- Repository restructuring with standard .NET layout
-- GitHub Actions CI/CD workflows for build, test, and NuGet publishing
+- SourceLink support for debugging into source code
+- Symbol packages (.snupkg) published to NuGet.org
+- NuGet package icon (AgentEvalNugetLogoAE.png)
+- Azure OpenAI environment variables in CI/CD workflows
+
+### Changed
+- Repository restructured to standard .NET layout (src/, samples/, tests/, docs/)
 - Central package management with `Directory.Packages.props`
 - Shared build configuration with `Directory.Build.props`
+- GitHub Actions CI now tests on .NET 8, 9, and 10 across Ubuntu and Windows
+- CI workflow optimized with NuGet caching and fail-fast disabled
+
+### Infrastructure
+- GitHub Actions CI workflow for automated build and test
+- GitHub Actions release workflow for NuGet publishing
 - DocFX documentation scaffolding
+- EditorConfig for consistent code style
 
 ---
 
@@ -86,5 +102,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `AgentEval.Tracing` (OTel + run artifacts) - planned
 - `AgentEval.Studio` (workflow visualizer / time-travel UI) - future
 
-[Unreleased]: https://github.com/joslat/AgentEval/compare/v0.1.0-alpha...HEAD
+[Unreleased]: https://github.com/joslat/AgentEval/compare/v0.1.1-alpha...HEAD
+[0.1.1-alpha]: https://github.com/joslat/AgentEval/compare/v0.1.0-alpha...v0.1.1-alpha
 [0.1.0-alpha]: https://github.com/joslat/AgentEval/releases/tag/v0.1.0-alpha
