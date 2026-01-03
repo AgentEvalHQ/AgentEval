@@ -1,7 +1,7 @@
 # AgentEval
 
 <p align="center">
-  <img src="assets/AgentEvalLogo.png" alt="AgentEval Logo" width="200" />
+  <img src="assets/AgentEval_bounded.png" alt="AgentEval Logo" width="450" />
 </p>
 
 <p align="center">
