@@ -19,12 +19,12 @@
     <PackageProjectUrl>https://github.com/joslat/AgentEval</PackageProjectUrl>
     <Copyright>Copyright © 2025-2026 Jose Luis Latorre</Copyright>
     
-    <!-- Package icon - requires resized logo under 1MB for NuGet -->
-    <!-- <PackageIcon>AgentEvalLogo.png</PackageIcon> -->
+    <!-- Package icon for NuGet -->
+    <PackageIcon>AgentEvalNugetLogoAE.png</PackageIcon>
   </PropertyGroup>
 
-  <!-- Uncomment when logo is resized under 1MB for NuGet packages -->
-  <!-- <ItemGroup>
-    <None Include="$(MSBuildThisFileDirectory)assets\AgentEvalLogo.png" Pack="true" PackagePath="\" Visible="false" />
-  </ItemGroup> -->
+  <!-- Include logo for NuGet packages -->
+  <ItemGroup>
+    <None Include="$(MSBuildThisFileDirectory)assets\AgentEvalNugetLogoAE.png" Pack="true" PackagePath="\" Visible="false" />
+  </ItemGroup>
 </Project>

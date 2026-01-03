@@ -36,6 +36,9 @@ jobs:
 
     - name: Test
       run: dotnet test --configuration Release --no-build --verbosity normal
+      env:
+        AZURE_OPENAI_ENDPOINT: ${{ secrets.AZURE_OPENAI_ENDPOINT }}
+        AZURE_OPENAI_API_KEY: ${{ secrets.AZURE_OPENAI_API_KEY }}
 
     - name: Determine version
       id: version
