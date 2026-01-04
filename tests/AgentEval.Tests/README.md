@@ -24,11 +24,17 @@ This project contains the automated tests for AgentEval. It lives at `tests/Agen
 | `RetryPolicyTests.cs` | Retry/backoff logic for evaluations |
 | `AgentEvalLoggerTests.cs` | Logging adapter behavior and sinks |
 | `FailureReportTests.cs` | Structured failure reports and summaries |
-| `ToolUsageReportTests.cs` / `ToolUsageAssertionsTests.cs` | Tool tracking and fluent assertions |
-| `ToolCallRecordTests.cs` / `ToolCallTimelineTests.cs` / `ToolCallAssertionTests.cs` | Tool call modeling, timelines, and assertion chaining |
+| `ToolUsageReportTests.cs` | Tool tracking data shape and aggregation |
+| `ToolUsageAssertionsTests.cs` | Fluent assertions over tool usage |
+| `ToolCallRecordTests.cs` | Tool call record modeling |
+| `ToolCallTimelineTests.cs` | Tool call timeline ordering and derivations |
+| `ToolCallAssertionTests.cs` | Assertion chaining for individual tool calls |
 | `PerformanceMetricsTests.cs` | Performance metrics calculations and assertions (TTFT, tokens, cost) |
-| `FaithfulnessMetricTests.cs` / `ToolSelectionMetricTests.cs` / `ToolSuccessMetricTests.cs` | RAG and agentic metric scoring with fakes |
-| `EmbeddingSimilarityTests.cs` / `ScoreNormalizerTests.cs` | Embedding and score normalization helpers |
+| `FaithfulnessMetricTests.cs` | RAG faithfulness scoring with fakes |
+| `ToolSelectionMetricTests.cs` | Tool selection accuracy scoring |
+| `ToolSuccessMetricTests.cs` | Tool success/failure scoring |
+| `EmbeddingSimilarityTests.cs` | Embedding-based similarity helpers |
+| `ScoreNormalizerTests.cs` | Score normalization utilities |
 | `ModelPricingTests.cs` | Model price tables, case-insensitive lookup, and custom pricing |
 
 ## Relationship to samples
