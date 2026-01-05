@@ -1,6 +1,6 @@
 # AgentEval CLI Reference
 
-The AgentEval CLI provides command-line tools for running evaluations, benchmarks, and tests in CI/CD pipelines.
+The AgentEval CLI provides command-line tools for running evaluations and managing configurations in CI/CD pipelines.
 
 ## Installation
 
@@ -16,7 +16,7 @@ dotnet tool install AgentEval.Cli
 
 ### eval
 
-Run evaluations against a dataset of test cases.
+Run evaluations against an AI agent.
 
 ```bash
 agenteval eval [options]
@@ -24,13 +24,15 @@ agenteval eval [options]
 
 **Options:**
 
-| Option | Description | Default |
-|--------|-------------|---------|
-| `--project <path>` | Path to the project directory | Current directory |
-| `--dataset <path>` | Path to dataset file (JSON, JSONL, CSV, YAML) | - |
-| `--format <format>` | Output format (console, json, junit, markdown) | console |
-| `--output <path>` | Output file path | stdout |
-| `--verbose` | Enable verbose output | false |
+| Option | Alias | Description | Default |
+|--------|-------|-------------|---------|
+| `--config <path>` | `-c` | Path to evaluation configuration file (YAML or JSON) | - |
+| `--dataset <path>` | `-d` | Path to dataset file (JSON, JSONL, CSV, YAML) | - |
+| `--output <path>` | `-o` | Output file path for results | stdout |
+| `--format <format>` | `-f` | Output format (json, junit, markdown, trx) | json |
+| `--baseline <path>` | `-b` | Baseline file for regression comparison | - |
+| `--fail-on-regression` | | Exit with code 1 if regressions detected | false |
+| `--pass-threshold <n>` | | Minimum score to pass (0-100) | 70 |
 
 **Examples:**
 
@@ -38,67 +40,68 @@ agenteval eval [options]
 # Run evaluation with JSON dataset
 agenteval eval --dataset testcases.json --format junit --output results.xml
 
-# Run with JSONL dataset and markdown report
-agenteval eval --dataset cases.jsonl --format markdown --output report.md
+# Run with config file and YAML dataset
+agenteval eval --config agent-config.json --dataset cases.yaml --format markdown
 
-# Verbose console output
-agenteval eval --dataset data.yaml --verbose
-```
-
-### benchmark
-
-Run performance benchmarks against your agent.
-
-```bash
-agenteval benchmark [options]
-```
-
-**Options:**
-
-| Option | Description | Default |
-|--------|-------------|---------|
-| `--type <type>` | Benchmark type (latency, throughput, cost) | latency |
-| `--iterations <n>` | Number of iterations | 10 |
-| `--warmup <n>` | Warmup iterations | 2 |
-| `--format <format>` | Output format | console |
-| `--output <path>` | Output file path | stdout |
-
-**Examples:**
-
-```bash
-# Run latency benchmark
-agenteval benchmark --type latency --iterations 100
-
-# Run throughput benchmark with JSON output
-agenteval benchmark --type throughput --format json --output bench.json
-```
-
-### test
-
-Run test suites with optional baseline comparison.
-
-```bash
-agenteval test [options]
-```
-
-**Options:**
-
-| Option | Description | Default |
-|--------|-------------|---------|
-| `--project <path>` | Path to test project | Current directory |
-| `--baseline <path>` | Baseline file for regression testing | - |
-| `--fail-on-regression` | Fail if results regress from baseline | false |
-| `--format <format>` | Output format | console |
-| `--output <path>` | Output file path | stdout |
-
-**Examples:**
-
-```bash
-# Run tests with JUnit output for CI
-agenteval test --format junit --output results.xml
+# Set custom pass threshold
+agenteval eval --dataset data.jsonl --pass-threshold 80
 
 # Compare against baseline
-agenteval test --baseline baseline.json --fail-on-regression
+agenteval eval --dataset tests.json --baseline baseline.json --fail-on-regression
+```
+
+### init
+
+Create a starter evaluation configuration file.
+
+```bash
+agenteval init [options]
+```
+
+**Options:**
+
+| Option | Alias | Description | Default |
+|--------|-------|-------------|---------|
+| `--output <path>` | `-o` | Output path for configuration file | agenteval.json |
+| `--format <format>` | `-f` | Configuration format (json, yaml) | json |
+
+**Examples:**
+
+```bash
+# Create JSON configuration
+agenteval init
+
+# Create YAML configuration
+agenteval init --format yaml --output agenteval.yaml
+```
+
+### list
+
+List available metrics, assertions, and formats.
+
+```bash
+agenteval list <subcommand>
+```
+
+**Subcommands:**
+
+| Subcommand | Description |
+|------------|-------------|
+| `metrics` | List all available evaluation metrics |
+| `assertions` | List all available assertion types |
+| `formats` | List available output formats |
+
+**Examples:**
+
+```bash
+# List available metrics
+agenteval list metrics
+
+# List assertion types
+agenteval list assertions
+
+# List output formats
+agenteval list formats
 ```
 
 ## Dataset Formats
@@ -265,19 +268,27 @@ steps:
 
 ## Programmatic Usage
 
-You can also use the exporters and loaders programmatically:
+You can also use the exporters and loaders programmatically from the main AgentEval library:
 
 ```csharp
-using AgentEval.Cli.Exporters;
-using AgentEval.Cli.DataLoaders;
+using AgentEval.DataLoaders;
+using AgentEval.Exporters;
 
-// Load test cases
-var loader = DatasetLoaderFactory.CreateFromExtension(".jsonl");
-var testCases = await loader.LoadAsync("testcases.jsonl");
+// Load test cases from various formats
+var jsonlLoader = DatasetLoaderFactory.CreateFromExtension(".jsonl");
+var testCases = await jsonlLoader.LoadAsync("testcases.jsonl");
 
-// Export results
-var exporter = ExporterFactory.Create("junit");
-await exporter.ExportAsync(results, "results.xml");
+// Or create by format name
+var yamlLoader = DatasetLoaderFactory.Create("yaml");
+var yamlCases = await yamlLoader.LoadAsync("testcases.yaml");
+
+// Export results to various formats
+var report = new EvaluationReport { /* ... */ };
+var exporter = ResultExporterFactory.Create(ExportFormat.JUnit);
+await exporter.ExportAsync(report, "results.xml");
+
+// Register custom loaders
+DatasetLoaderFactory.Register(".custom", () => new JsonlDatasetLoader());
 ```
 
 ## See Also

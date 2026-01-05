@@ -17,14 +17,14 @@ Multi-turn conversation testing allows you to:
 ```csharp
 using AgentEval.Testing;
 
-// Build a conversation test case
-var testCase = new ConversationalTestCaseBuilder()
-    .WithName("Customer Support Flow")
+// Build a conversation test case using the fluent builder
+var testCase = ConversationalTestCase.Create("Customer Support Flow")
+    .WithDescription("Tests a complete customer support interaction")
     .WithSystemPrompt("You are a helpful customer service agent.")
     .AddUserTurn("I need to return a product")
     .AddAssistantTurn("I'd be happy to help with your return!")
     .AddUserTurn("Order #12345")
-    .WithExpectedTools("LookupOrder", "ProcessReturn")
+    .ExpectTools("LookupOrder", "ProcessReturn")
     .WithMaxDuration(TimeSpan.FromSeconds(30))
     .Build();
 
@@ -51,25 +51,22 @@ var assistantTurn = Turn.Assistant("The weather is sunny and 72°F");
 // System turn - system message injection
 var systemTurn = Turn.System("You are a weather assistant");
 
-// Tool turn - tool result injection
-var toolTurn = Turn.Tool("get_weather", "{\"temp\": 72, \"condition\": \"sunny\"}");
+// Tool turn - tool result injection (with tool call ID)
+var toolTurn = Turn.Tool("{\"temp\": 72, \"condition\": \"sunny\"}", "call_123");
 ```
 
 ### Turn with Tool Calls
 
-You can specify expected tool calls for any turn:
+You can specify expected tool calls for assistant turns:
 
 ```csharp
-var turnWithTools = Turn.User(
-    "Book a flight to Paris",
-    new[]
+var turnWithTools = Turn.Assistant(
+    "Let me search for flights to Paris",
+    new ToolCallInfo("search_flights", new Dictionary<string, object?>
     {
-        new ToolCallInfo("search_flights", new Dictionary<string, object?>
-        {
-            ["destination"] = "Paris"
-        }),
-        new ToolCallInfo("book_flight", null)
-    }
+        ["destination"] = "Paris"
+    }),
+    new ToolCallInfo("book_flight")
 );
 ```
 
@@ -78,36 +75,33 @@ var turnWithTools = Turn.User(
 Use the fluent `ConversationalTestCaseBuilder`:
 
 ```csharp
-var testCase = new ConversationalTestCaseBuilder()
-    // Basic metadata
-    .WithName("Flight Booking Conversation")
+var testCase = ConversationalTestCase.Create("Flight Booking Conversation")
+    // Add description and category
     .WithDescription("Tests the complete flight booking flow")
+    .InCategory("Booking")
     
     // System prompt
     .WithSystemPrompt("You are a travel booking assistant.")
     
-    // Add turns
+    // Add user and assistant turns
     .AddUserTurn("I want to book a flight to Paris")
     .AddAssistantTurn("I'd be happy to help you book a flight to Paris!")
     .AddUserTurn("Departing from New York on December 15th")
-    .AddToolTurn("search_flights", @"{""flights"": [{""id"": 1, ""price"": 450}]}")
+    .AddToolResponse(@"{""flights"": [{""id"": 1, ""price"": 450}]}", "call_search_001")
     .AddAssistantTurn("I found several flights. The best option is $450.")
     .AddUserTurn("Book the first one")
     
-    // Add custom turns
-    .AddTurn(Turn.User("Confirm the booking", new[]
-    {
-        new ToolCallInfo("book_flight", new Dictionary<string, object?>
-        {
-            ["flightId"] = 1
-        })
-    }))
-    
     // Expected tools across the conversation
-    .WithExpectedTools("search_flights", "book_flight", "send_confirmation")
+    .ExpectTools("search_flights", "book_flight", "send_confirmation")
+    
+    // Expected outcome
+    .ExpectOutcome("Flight successfully booked")
     
     // Timing constraints
     .WithMaxDuration(TimeSpan.FromMinutes(2))
+    
+    // Custom metadata
+    .WithMetadata("priority", "high")
     
     .Build();
 ```
@@ -223,10 +217,9 @@ public async Task BookingConversation_CompletesSuccessfully()
 ### Conditional Tool Calls
 
 ```csharp
-var testCase = new ConversationalTestCaseBuilder()
-    .WithName("Conditional Booking")
+var testCase = ConversationalTestCase.Create("Conditional Booking")
     .AddUserTurn("Book if price is under $500")
-    .WithExpectedTools("search_flights") // Only search is always expected
+    .ExpectTools("search_flights") // Only search is always expected
     .Build();
 
 // After execution, conditionally check booking
@@ -239,8 +232,7 @@ if (result.TurnResults.Any(t => t.Response?.Contains("under $500") == true))
 ### Error Handling
 
 ```csharp
-var testCase = new ConversationalTestCaseBuilder()
-    .WithName("Error Recovery")
+var testCase = ConversationalTestCase.Create("Error Recovery")
     .AddUserTurn("Book flight to invalid destination")
     .AddAssistantTurn("I'm sorry, I couldn't find that destination.")
     .Build();
@@ -255,8 +247,7 @@ Assert.Empty(result.Errors);
 ### Timeout Handling
 
 ```csharp
-var testCase = new ConversationalTestCaseBuilder()
-    .WithName("Timeout Test")
+var testCase = ConversationalTestCase.Create("Timeout Test")
     .WithMaxDuration(TimeSpan.FromSeconds(5))
     .AddUserTurn("Complex multi-step task...")
     .Build();

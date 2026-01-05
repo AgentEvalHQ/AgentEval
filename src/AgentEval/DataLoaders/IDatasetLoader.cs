@@ -81,6 +81,8 @@ public static class DatasetLoaderFactory
         [".json"] = () => new JsonDatasetLoader(),
         [".csv"] = () => new CsvDatasetLoader(),
         [".tsv"] = () => new CsvDatasetLoader('\t'),
+        [".yaml"] = () => new YamlDatasetLoader(),
+        [".yml"] = () => new YamlDatasetLoader(),
     };
     
     /// <summary>
@@ -103,6 +105,7 @@ public static class DatasetLoaderFactory
         "jsonl" => new JsonlDatasetLoader(),
         "json" => new JsonDatasetLoader(),
         "csv" => new CsvDatasetLoader(),
+        "yaml" => new YamlDatasetLoader(),
         _ => throw new ArgumentException($"Unknown format: {format}", nameof(format))
     };
     

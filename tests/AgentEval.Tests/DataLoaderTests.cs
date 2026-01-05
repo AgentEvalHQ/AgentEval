@@ -32,6 +32,8 @@ public class DataLoaderTests : IDisposable
     [InlineData(".json", "json")]
     [InlineData(".csv", "csv")]
     [InlineData(".tsv", "csv")]
+    [InlineData(".yaml", "yaml")]
+    [InlineData(".yml", "yaml")]
     public void Factory_CreateFromExtension_ReturnsCorrectLoader(string extension, string expectedFormat)
     {
         var loader = DatasetLoaderFactory.CreateFromExtension(extension);
@@ -42,6 +44,7 @@ public class DataLoaderTests : IDisposable
     [InlineData("jsonl")]
     [InlineData("json")]
     [InlineData("csv")]
+    [InlineData("yaml")]
     public void Factory_Create_ReturnsCorrectLoader(string format)
     {
         var loader = DatasetLoaderFactory.Create(format);
@@ -564,6 +567,160 @@ public class DataLoaderTests : IDisposable
 
         Assert.Single(results);
         Assert.Equal("Question 1", results[0].Input);
+    }
+
+    #endregion
+
+    #region YAML Loader Tests
+
+    [Fact]
+    public async Task YamlLoader_LoadAsync_ParsesArrayFormat()
+    {
+        var filePath = Path.Combine(_testDir, "test.yaml");
+        File.WriteAllText(filePath, """
+            - id: test1
+              input: What is 2+2?
+              expected: "4"
+            - id: test2
+              input: Hello
+              expected: Hi there
+            """);
+
+        var loader = new YamlDatasetLoader();
+        var results = await loader.LoadAsync(filePath);
+
+        Assert.Equal(2, results.Count);
+        Assert.Equal("test1", results[0].Id);
+        Assert.Equal("What is 2+2?", results[0].Input);
+        Assert.Equal("4", results[0].ExpectedOutput);
+        Assert.Equal("test2", results[1].Id);
+    }
+
+    [Fact]
+    public async Task YamlLoader_LoadAsync_ParsesObjectWithTestCases()
+    {
+        var filePath = Path.Combine(_testDir, "test.yaml");
+        File.WriteAllText(filePath, """
+            metadata:
+              version: 1.0
+            test_cases:
+              - id: test1
+                input: What is AI?
+                expected: Artificial Intelligence
+            """);
+
+        var loader = new YamlDatasetLoader();
+        var results = await loader.LoadAsync(filePath);
+
+        Assert.Single(results);
+        Assert.Equal("test1", results[0].Id);
+        Assert.Equal("What is AI?", results[0].Input);
+    }
+
+    [Fact]
+    public async Task YamlLoader_LoadAsync_HandlesAlternativeFieldNames()
+    {
+        var filePath = Path.Combine(_testDir, "test.yaml");
+        File.WriteAllText(filePath, """
+            - question: What is ML?
+              answer: Machine Learning
+            - prompt: Explain AI
+              response: AI stands for Artificial Intelligence
+            """);
+
+        var loader = new YamlDatasetLoader();
+        var results = await loader.LoadAsync(filePath);
+
+        Assert.Equal(2, results.Count);
+        Assert.Equal("What is ML?", results[0].Input);
+        Assert.Equal("Machine Learning", results[0].ExpectedOutput);
+        Assert.Equal("Explain AI", results[1].Input);
+        Assert.Equal("AI stands for Artificial Intelligence", results[1].ExpectedOutput);
+    }
+
+    [Fact]
+    public async Task YamlLoader_LoadAsync_ParsesContextAndTools()
+    {
+        var filePath = Path.Combine(_testDir, "test.yaml");
+        File.WriteAllText(filePath, """
+            - id: rag_test
+              input: What is the capital?
+              context:
+                - France is a country in Europe
+                - Paris is the capital of France
+              expected_tools:
+                - search
+                - lookup
+            """);
+
+        var loader = new YamlDatasetLoader();
+        var results = await loader.LoadAsync(filePath);
+
+        Assert.Single(results);
+        Assert.Equal(2, results[0].Context!.Count);
+        Assert.Equal(2, results[0].ExpectedTools!.Count);
+        Assert.Contains("search", results[0].ExpectedTools);
+    }
+
+    [Fact]
+    public async Task YamlLoader_LoadAsync_ParsesGroundTruth()
+    {
+        var filePath = Path.Combine(_testDir, "test.yaml");
+        File.WriteAllText(filePath, """
+            - id: func_test
+              input: Book a flight to Paris
+              ground_truth:
+                name: book_flight
+                arguments:
+                  destination: Paris
+            """);
+
+        var loader = new YamlDatasetLoader();
+        var results = await loader.LoadAsync(filePath);
+
+        Assert.Single(results);
+        Assert.NotNull(results[0].GroundTruth);
+        Assert.Equal("book_flight", results[0].GroundTruth!.Name);
+        Assert.Equal("Paris", results[0].GroundTruth.Arguments["destination"]);
+    }
+
+    [Fact]
+    public async Task YamlLoader_LoadStreamingAsync_YieldsItems()
+    {
+        var filePath = Path.Combine(_testDir, "test.yaml");
+        File.WriteAllText(filePath, """
+            - id: test1
+              input: Question 1
+            - id: test2
+              input: Question 2
+            """);
+
+        var loader = new YamlDatasetLoader();
+        var count = 0;
+        await foreach (var item in loader.LoadStreamingAsync(filePath))
+        {
+            count++;
+        }
+
+        Assert.Equal(2, count);
+    }
+
+    [Fact]
+    public async Task YamlLoader_LoadAsync_ThrowsForMissingFile()
+    {
+        var loader = new YamlDatasetLoader();
+        await Assert.ThrowsAsync<FileNotFoundException>(() => 
+            loader.LoadAsync(Path.Combine(_testDir, "nonexistent.yaml")));
+    }
+
+    [Fact]
+    public async Task YamlLoader_LoadAsync_ThrowsForInvalidFormat()
+    {
+        var filePath = Path.Combine(_testDir, "test.yaml");
+        File.WriteAllText(filePath, "just a plain string");
+
+        var loader = new YamlDatasetLoader();
+        await Assert.ThrowsAsync<InvalidDataException>(() => loader.LoadAsync(filePath));
     }
 
     #endregion

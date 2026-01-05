@@ -17,14 +17,18 @@ Snapshot testing allows you to:
 
 ```csharp
 using AgentEval.Snapshots;
+using System.Text.RegularExpressions;
 
 // Configure snapshot comparison
 var options = new SnapshotOptions
 {
-    IgnoreFields = new[] { "timestamp", "requestId" },
-    ScrubPatterns = new Dictionary<string, string>
+    IgnoreFields = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
     {
-        { @"\d{4}-\d{2}-\d{2}", "[DATE]" }
+        "timestamp", "requestId"
+    },
+    ScrubPatterns = new List<(Regex Pattern, string Replacement)>
+    {
+        (new Regex(@"\d{4}-\d{2}-\d{2}"), "[DATE]")
     }
 };
 
@@ -51,41 +55,47 @@ else
 Configure how snapshots are compared:
 
 ```csharp
+using System.Text.RegularExpressions;
+
 var options = new SnapshotOptions
 {
-    // Fields to completely ignore (by JSON path)
-    IgnoreFields = new[]
+    // Fields to completely ignore (case-insensitive HashSet)
+    IgnoreFields = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
     {
         "timestamp",
         "requestId",
-        "metadata.processedAt",
-        "response.headers.date"
+        "duration",
+        "elapsed"
     },
     
-    // Patterns to scrub (regex → replacement)
-    ScrubPatterns = new Dictionary<string, string>
+    // Patterns to scrub (Regex, Replacement) tuples
+    ScrubPatterns = new List<(Regex Pattern, string Replacement)>
     {
         // Dates
-        { @"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}", "[DATETIME]" },
-        { @"\d{4}-\d{2}-\d{2}", "[DATE]" },
+        (new Regex(@"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}"), "[DATETIME]"),
+        (new Regex(@"\d{4}-\d{2}-\d{2}"), "[DATE]"),
         
         // IDs
-        { @"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}", "[GUID]" },
-        { @"id_[a-zA-Z0-9]+", "[ID]" },
+        (new Regex(@"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"), "[GUID]"),
+        (new Regex(@"id_[a-zA-Z0-9]+"), "[ID]"),
         
         // Secrets
-        { @"sk-[a-zA-Z0-9]+", "[API_KEY]" }
+        (new Regex(@"sk-[a-zA-Z0-9]+"), "[API_KEY]")
     },
     
-    // Fields to compare semantically (uses Jaccard similarity)
-    SemanticFields = new[]
+    // Enable semantic similarity comparison for text fields
+    UseSemanticComparison = true,
+    
+    // Fields to compare semantically (case-insensitive HashSet)
+    SemanticFields = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
     {
-        "response.content",
+        "response",
+        "content",
         "summary"
     },
     
     // Similarity threshold for semantic comparison (0.0 - 1.0)
-    SemanticThreshold = 0.8
+    SemanticThreshold = 0.85
 };
 ```
 
@@ -101,47 +111,46 @@ var result = comparer.Compare(expectedJson, actualJson);
 
 // Access results
 Console.WriteLine($"Match: {result.IsMatch}");
-Console.WriteLine($"Similarity: {result.Similarity:P0}");
 Console.WriteLine($"Differences: {result.Differences.Count}");
+Console.WriteLine($"Ignored Fields: {result.IgnoredFields.Count}");
+Console.WriteLine($"Semantic Results: {result.SemanticResults.Count}");
+
+// Apply scrubbing to a value
+var scrubbed = comparer.ApplyScrubbing(rawValue);
 ```
 
 ### Comparison Result
 
 ```csharp
-public record SnapshotComparisonResult
+public class SnapshotComparisonResult
 {
     // Whether the snapshots match
-    public bool IsMatch { get; }
-    
-    // Overall similarity score (0.0 - 1.0)
-    public double Similarity { get; }
+    public bool IsMatch { get; set; }
     
     // List of differences found
-    public IReadOnlyList<SnapshotDifference> Differences { get; }
+    public List<SnapshotDifference> Differences { get; set; }
+    
+    // Fields that were ignored during comparison
+    public List<string> IgnoredFields { get; set; }
+    
+    // Results of semantic comparisons
+    public List<SemanticComparisonResult> SemanticResults { get; set; }
 }
 
-public record SnapshotDifference
-{
-    // JSON path to the difference
-    public string Path { get; }
-    
-    // Expected value
-    public string? Expected { get; }
-    
-    // Actual value
-    public string? Actual { get; }
-    
-    // Type of difference
-    public DifferenceType Type { get; }
-}
+public record SnapshotDifference(
+    string Path,      // JSON path to the difference
+    string Expected,  // Expected value
+    string Actual,    // Actual value
+    string Message    // Description of the difference
+);
 
-public enum DifferenceType
-{
-    ValueMismatch,
-    MissingField,
-    ExtraField,
-    TypeMismatch
-}
+public record SemanticComparisonResult(
+    string Path,      // JSON path
+    string Expected,  // Expected value  
+    string Actual,    // Actual value
+    double Similarity, // Computed similarity score
+    bool Passed       // Whether it met the threshold
+);
 ```
 
 ## SnapshotStore
@@ -151,32 +160,31 @@ Persist and retrieve snapshots from disk:
 ```csharp
 var store = new SnapshotStore("./snapshots");
 
-// Save a snapshot
+// Save a snapshot (async)
 var response = await agent.GetResponseAsync("What is 2+2?");
-store.Save("math-test", response);
+await store.SaveAsync("math-test", response);
 
-// Load a snapshot
-var baseline = store.Load("math-test");
+// Save with a suffix for variants
+await store.SaveAsync("math-test", response, "v2");
+
+// Load a snapshot (async)
+var baseline = await store.LoadAsync<MyResponseType>("math-test");
+
+// Load with suffix
+var baselineV2 = await store.LoadAsync<MyResponseType>("math-test", "v2");
 
 // Check if snapshot exists
 if (store.Exists("math-test"))
 {
-    var baseline = store.Load("math-test");
-    var result = comparer.Compare(baseline, newResponse);
+    var baseline = await store.LoadAsync<MyResponseType>("math-test");
+    var result = comparer.Compare(
+        JsonSerializer.Serialize(baseline), 
+        JsonSerializer.Serialize(newResponse));
 }
 
-// Update a snapshot
-store.Save("math-test", newResponse); // Overwrites existing
-
-// Delete a snapshot
-store.Delete("math-test");
-
-// List all snapshots
-var snapshots = store.List();
-foreach (var name in snapshots)
-{
-    Console.WriteLine(name);
-}
+// Get the file path for a snapshot
+var path = store.GetSnapshotPath("math-test");
+var pathWithSuffix = store.GetSnapshotPath("math-test", "v2");
 ```
 
 ### File Structure
@@ -186,6 +194,7 @@ Snapshots are stored as JSON files:
 ```
 ./snapshots/
   ├── math-test.json
+  ├── math-test.v2.json
   ├── booking-flow.json
   └── error-handling.json
 ```
@@ -201,7 +210,10 @@ public async Task Agent_Response_MatchesSnapshot()
     var store = new SnapshotStore("./snapshots");
     var comparer = new SnapshotComparer(new SnapshotOptions
     {
-        IgnoreFields = new[] { "timestamp" }
+        IgnoreFields = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "timestamp"
+        }
     });
     
     var response = await _agent.GetResponseAsync("What is the capital of France?");
@@ -210,16 +222,16 @@ public async Task Agent_Response_MatchesSnapshot()
     if (!store.Exists("capital-france"))
     {
         // First run - save the snapshot
-        store.Save("capital-france", responseJson);
+        await store.SaveAsync("capital-france", response);
         Assert.True(true, "Snapshot created");
         return;
     }
     
-    var baseline = store.Load("capital-france");
-    var result = comparer.Compare(baseline, responseJson);
+    var baselineJson = await File.ReadAllTextAsync(store.GetSnapshotPath("capital-france"));
+    var result = comparer.Compare(baselineJson, responseJson);
     
     Assert.True(result.IsMatch, 
-        $"Response differs from snapshot:\n{string.Join("\n", result.Differences)}");
+        $"Response differs from snapshot:\n{string.Join("\n", result.Differences.Select(d => $"{d.Path}: {d.Message}"))}");
 }
 ```
 
@@ -233,18 +245,18 @@ public async Task Agent_Response_UpdateSnapshot()
     
     var store = new SnapshotStore("./snapshots");
     var response = await _agent.GetResponseAsync("...");
-    var responseJson = JsonSerializer.Serialize(response);
     
     if (updateSnapshots)
     {
-        store.Save("my-test", responseJson);
+        await store.SaveAsync("my-test", response);
         Assert.True(true, "Snapshot updated");
         return;
     }
     
     // Normal comparison
-    var baseline = store.Load("my-test");
-    var result = new SnapshotComparer().Compare(baseline, responseJson);
+    var baselineJson = await File.ReadAllTextAsync(store.GetSnapshotPath("my-test"));
+    var responseJson = JsonSerializer.Serialize(response);
+    var result = new SnapshotComparer().Compare(baselineJson, responseJson);
     Assert.True(result.IsMatch);
 }
 ```
@@ -258,7 +270,11 @@ For fields where exact matching is too strict, use semantic comparison:
 ```csharp
 var options = new SnapshotOptions
 {
-    SemanticFields = new[] { "response", "summary", "explanation" },
+    UseSemanticComparison = true,
+    SemanticFields = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+    {
+        "response", "summary", "explanation"
+    },
     SemanticThreshold = 0.7  // 70% similarity required
 };
 
@@ -311,24 +327,26 @@ public class AgentSnapshotTests
 ### Scrubbing Dynamic Data
 
 ```csharp
+using System.Text.RegularExpressions;
+
 var options = new SnapshotOptions
 {
-    ScrubPatterns = new Dictionary<string, string>
+    ScrubPatterns = new List<(Regex Pattern, string Replacement)>
     {
         // ISO timestamps
-        { @"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})?", "[TIMESTAMP]" },
+        (new Regex(@"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})?"), "[TIMESTAMP]"),
         
         // GUIDs
-        { @"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}", "[GUID]" },
+        (new Regex(@"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"), "[GUID]"),
         
         // Email addresses
-        { @"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}", "[EMAIL]" },
+        (new Regex(@"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}"), "[EMAIL]"),
         
         // Phone numbers
-        { @"\+?\d{1,3}[-.\s]?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}", "[PHONE]" },
+        (new Regex(@"\+?\d{1,3}[-.\s]?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}"), "[PHONE]"),
         
         // IP addresses
-        { @"\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}", "[IP]" }
+        (new Regex(@"\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}"), "[IP]")
     }
 };
 ```

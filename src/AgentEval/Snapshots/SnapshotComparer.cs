@@ -392,9 +392,14 @@ public class SnapshotStore
         return File.Exists(GetSnapshotPath(testName, suffix));
     }
 
+    // Characters that should be sanitized for cross-platform file name compatibility
+    // Path.GetInvalidFileNameChars() returns different sets on Windows vs Linux
+    private static readonly HashSet<char> s_invalidFileNameChars = new(
+        Path.GetInvalidFileNameChars()
+            .Concat(new[] { ':', '\\', '/', '*', '?', '"', '<', '>', '|' }));
+
     private static string SanitizeFileName(string name)
     {
-        var invalid = Path.GetInvalidFileNameChars();
-        return new string(name.Select(c => invalid.Contains(c) ? '_' : c).ToArray());
+        return new string(name.Select(c => s_invalidFileNameChars.Contains(c) ? '_' : c).ToArray());
     }
 }
