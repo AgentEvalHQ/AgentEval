@@ -1,0 +1,48 @@
+# Travel Agent Evaluation Dataset
+# Tests tool selection and ground truth for a travel booking agent
+
+data:
+  - id: book_flight_paris
+    category: Agentic
+    input: Book a flight to Paris for next Monday
+    expected: I'll book a flight to Paris for next Monday.
+    ground_truth:
+      name: book_flight
+      arguments:
+        destination: Paris
+        date: next Monday
+    expected_tools:
+      - book_flight
+      - check_availability
+
+  - id: book_hotel_madrid
+    category: Agentic
+    input: Book a hotel in Madrid for 3 nights starting Friday
+    expected: I'll book a hotel in Madrid for 3 nights.
+    function: book_hotel
+    arguments:
+      city: Madrid
+      nights: 3
+      check_in: Friday
+    expected_tools:
+      - book_hotel
+      - search_hotels
+
+  - id: weather_check
+    category: General
+    question: What's the weather like in Tokyo?
+    answer: I'll check the current weather in Tokyo for you.
+    expected_tools:
+      - get_weather
+
+  - id: trip_planning
+    category: Agentic
+    prompt: Plan a 5-day trip to Italy including flights and hotels
+    response: I'll help you plan a comprehensive 5-day trip to Italy.
+    expected_tools:
+      - search_flights
+      - search_hotels
+      - create_itinerary
+    metadata:
+      complexity: high
+      requires_multi_step: true

@@ -618,6 +618,51 @@ public class DataLoaderTests : IDisposable
     }
 
     [Fact]
+    public async Task YamlLoader_LoadAsync_ParsesObjectWithData()
+    {
+        var filePath = Path.Combine(_testDir, "test.yaml");
+        File.WriteAllText(filePath, "data:\n  - id: data1\n    input: From data\n    expected: Value 1\n");
+
+        var loader = new YamlDatasetLoader();
+        var results = await loader.LoadAsync(filePath);
+
+        Assert.Single(results);
+        Assert.Equal("data1", results[0].Id);
+        Assert.Equal("From data", results[0].Input);
+        Assert.Equal("Value 1", results[0].ExpectedOutput);
+    }
+
+    [Fact]
+    public async Task YamlLoader_LoadAsync_ParsesObjectWithExamples()
+    {
+        var filePath = Path.Combine(_testDir, "test.yaml");
+        File.WriteAllText(filePath, "examples:\n  - id: ex1\n    input: From examples\n    expected: Value 2\n");
+
+        var loader = new YamlDatasetLoader();
+        var results = await loader.LoadAsync(filePath);
+
+        Assert.Single(results);
+        Assert.Equal("ex1", results[0].Id);
+        Assert.Equal("From examples", results[0].Input);
+        Assert.Equal("Value 2", results[0].ExpectedOutput);
+    }
+
+    [Fact]
+    public async Task YamlLoader_LoadAsync_ParsesObjectWithSamples()
+    {
+        var filePath = Path.Combine(_testDir, "test.yaml");
+        File.WriteAllText(filePath, "samples:\n  - id: samp1\n    input: From samples\n    expected: Value 3\n");
+
+        var loader = new YamlDatasetLoader();
+        var results = await loader.LoadAsync(filePath);
+
+        Assert.Single(results);
+        Assert.Equal("samp1", results[0].Id);
+        Assert.Equal("From samples", results[0].Input);
+        Assert.Equal("Value 3", results[0].ExpectedOutput);
+    }
+
+    [Fact]
     public async Task YamlLoader_LoadAsync_HandlesAlternativeFieldNames()
     {
         var filePath = Path.Combine(_testDir, "test.yaml");
@@ -682,6 +727,53 @@ public class DataLoaderTests : IDisposable
         Assert.NotNull(results[0].GroundTruth);
         Assert.Equal("book_flight", results[0].GroundTruth!.Name);
         Assert.Equal("Paris", results[0].GroundTruth.Arguments["destination"]);
+    }
+
+    [Fact]
+    public async Task YamlLoader_LoadAsync_ParsesFunctionArgumentsGroundTruth()
+    {
+        var filePath = Path.Combine(_testDir, "test.yaml");
+        File.WriteAllText(filePath, """
+            - id: func_args_test
+              input: Book a hotel
+              function: book_hotel
+              arguments:
+                city: Madrid
+                nights: 3
+            """);
+
+        var loader = new YamlDatasetLoader();
+        var results = await loader.LoadAsync(filePath);
+
+        Assert.Single(results);
+        Assert.NotNull(results[0].GroundTruth);
+        Assert.Equal("book_hotel", results[0].GroundTruth!.Name);
+        Assert.Equal("Madrid", results[0].GroundTruth.Arguments["city"]);
+        Assert.Equal("3", results[0].GroundTruth.Arguments["nights"]?.ToString());
+    }
+
+    [Fact]
+    public async Task YamlLoader_LoadAsync_ParsesMetadata()
+    {
+        var filePath = Path.Combine(_testDir, "test.yaml");
+        File.WriteAllText(filePath, """
+            - id: meta_test
+              input: With metadata
+              expected: ok
+              metadata:
+                priority: high
+                tags:
+                  - a
+                  - b
+            """);
+
+        var loader = new YamlDatasetLoader();
+        var results = await loader.LoadAsync(filePath);
+
+        Assert.Single(results);
+        Assert.True(results[0].Metadata.ContainsKey("priority"));
+        Assert.Equal("high", results[0].Metadata["priority"]);
+        Assert.True(results[0].Metadata.ContainsKey("tags"));
     }
 
     [Fact]
