@@ -542,28 +542,44 @@ public class PerformanceMetrics
 }
 ```
 
-### Cost Estimation
+### Cost Estimation (ModelPricing)
+
+> **Note:** The actual implementation uses `ModelPricing` (not `CostEstimator`) with 
+> `ConcurrentDictionary` for thread-safety. See [PerformanceMetrics.cs](Models/PerformanceMetrics.cs).
 
 ```csharp
-public static class CostEstimator
+public static class ModelPricing
 {
-    private static readonly Dictionary<string, (decimal InputPer1K, decimal OutputPer1K)> Pricing = new()
+    private static readonly ConcurrentDictionary<string, (decimal InputPer1K, decimal OutputPer1K)> _pricing = 
+        new(StringComparer.OrdinalIgnoreCase)
     {
+        // OpenAI models
         ["gpt-4o"] = (0.005m, 0.015m),
         ["gpt-4o-mini"] = (0.00015m, 0.0006m),
         ["gpt-4-turbo"] = (0.01m, 0.03m),
         ["gpt-3.5-turbo"] = (0.0005m, 0.0015m),
+        ["o1"] = (0.015m, 0.06m),
+        ["o3-mini"] = (0.00165m, 0.0066m),
+        
+        // Anthropic models
         ["claude-3-5-sonnet"] = (0.003m, 0.015m),
         ["claude-3-opus"] = (0.015m, 0.075m),
+        ["claude-3-haiku"] = (0.00025m, 0.00125m),
     };
     
-    public static decimal EstimateCost(string model, int inputTokens, int outputTokens)
+    public static decimal? EstimateCost(string? modelName, int inputTokens, int outputTokens)
     {
-        if (!Pricing.TryGetValue(model.ToLower(), out var price))
-            return 0m;
-            
-        return (inputTokens / 1000m * price.InputPer1K) + 
-               (outputTokens / 1000m * price.OutputPer1K);
+        if (string.IsNullOrEmpty(modelName)) return null;
+        var pricing = GetPricing(modelName);
+        if (pricing == null) return null;
+        return (inputTokens / 1000m * pricing.Value.InputPer1K) + 
+               (outputTokens / 1000m * pricing.Value.OutputPer1K);
+    }
+    
+    public static void SetPricing(string modelName, decimal inputPer1K, decimal outputPer1K)
+    {
+        _pricing.AddOrUpdate(modelName.ToLowerInvariant(), 
+            (inputPer1K, outputPer1K), (_, _) => (inputPer1K, outputPer1K));
     }
 }
 ```

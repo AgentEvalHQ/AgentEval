@@ -10,10 +10,16 @@
     href: architecture.md
   - name: Benchmarks
     href: benchmarks.md
+  - name: CLI Reference
+    href: cli.md
+  - name: Conversations
+    href: conversations.md
   - name: Embedding Metrics
     href: embedding-metrics.md
   - name: Extensibility
     href: extensibility.md
+  - name: Snapshots
+    href: snapshots.md
 - name: API Reference
   href: api/
 - name: GitHub

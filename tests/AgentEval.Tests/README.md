@@ -12,31 +12,44 @@ This project contains the automated tests for AgentEval. It lives at `tests/Agen
 ## What’s covered (by area)
 - **Core runner & plugins:** `AgentEvalBuilderTests`, `MetricRegistryTests`, `RetryPolicyTests` validate plugin lifecycle, registry behavior, transformers, and retry policies.
 - **Logging & reporting:** `AgentEvalLoggerTests` and `FailureReportTests` ensure structured logging and failure summaries stay stable.
-- **Models & fluent assertions:** `ToolUsageReportTests`, `ToolUsageAssertionsTests`, `ToolCallRecordTests`, `ToolCallTimelineTests`, and `ToolCallAssertionTests` cover tool tracking and assertion chaining. `PerformanceMetricsTests` (which also houses the `PerformanceAssertions` cases) covers latency/cost assertions.
+- **Models & fluent assertions:** `ToolUsageReportTests`, `ToolUsageAssertionsTests`, `ToolCallRecordTests`, `ToolCallTimelineTests`, and `ToolCallAssertionTests` cover tool tracking and assertion chaining. `PerformanceMetricsTests` (which also houses the `PerformanceAssertions` cases) covers latency/cost assertions. `ResponseAssertionsTests` covers response content assertions.
 - **Metrics & scoring:** `FaithfulnessMetricTests`, `ToolSelectionMetricTests`, `ToolSuccessMetricTests`, `EmbeddingSimilarityTests`, `ScoreNormalizerTests`, and related files validate scoring logic for RAG and agentic metrics using fake responses.
 - **Cost awareness:** `ModelPricingTests` checks price tables and custom pricing hooks.
+- **Multi-turn conversations:** `ConversationalTestCaseTests` and `ConversationRunnerTests` cover the fluent conversation builder, turn handling, and conversation execution.
+- **Snapshot testing:** `SnapshotComparerTests` validates JSON comparison, field ignoring, pattern scrubbing, and semantic similarity.
+- **CLI components:** `DataLoaderTests` and `ExporterTests` cover dataset loading (JSON, JSONL, CSV, YAML) and result exporting (JSON, JUnit, Markdown).
 
 ## File-by-file map
 
 | File | Focus |
 | --- | --- |
 | `AgentEvalBuilderTests.cs` | Builder API, plugin lifecycle, transformers, and evaluation flow |
-| `MetricRegistryTests.cs` | Metric registration and lookup behaviors |
-| `RetryPolicyTests.cs` | Retry/backoff logic for evaluations |
-| `AgentEvalLoggerTests.cs` | Logging adapter behavior and sinks |
+| `AgenticBenchmarkTests.cs` | Agentic benchmark execution and metrics |
+| `ConcurrencyTests.cs` | Concurrent evaluation safety |
+| `ConversationalTestCaseTests.cs` | Multi-turn conversation builder and metric |
+| `ConversationRunnerTests.cs` | Conversation execution against IChatClient |
+| `DataLoaderTests.cs` | JSON, JSONL, CSV, YAML dataset loading |
+| `EmbeddingSimilarityTests.cs` | Embedding-based similarity helpers |
+| `ExporterTests.cs` | JSON, JUnit XML, Markdown export |
 | `FailureReportTests.cs` | Structured failure reports and summaries |
-| `ToolUsageReportTests.cs` | Tool tracking data shape and aggregation |
-| `ToolUsageAssertionsTests.cs` | Fluent assertions over tool usage |
+| `FaithfulnessMetricTests.cs` | RAG faithfulness scoring with fakes |
+| `FakeChatClientTests.cs` | Fake chat client behavior |
+| `MAFTestHarnessTests.cs` | MAF integration and test harness |
+| `MetricRegistryTests.cs` | Metric registration and lookup behaviors |
+| `ModelPricingTests.cs` | Model price tables, case-insensitive lookup, and custom pricing |
+| `PerformanceMetricsTests.cs` | Performance metrics calculations and assertions (TTFT, tokens, cost) |
+| `ResponseAssertionsTests.cs` | Fluent response content assertions |
+| `RetryPolicyTests.cs` | Retry/backoff logic for evaluations |
+| `ScoreNormalizerTests.cs` | Score normalization utilities |
+| `SerializationTests.cs` | JSON serialization of models |
+| `SnapshotComparerTests.cs` | Snapshot comparison with scrubbing and semantic similarity |
+| `ToolCallAssertionTests.cs` | Assertion chaining for individual tool calls |
 | `ToolCallRecordTests.cs` | Tool call record modeling |
 | `ToolCallTimelineTests.cs` | Tool call timeline ordering and derivations |
-| `ToolCallAssertionTests.cs` | Assertion chaining for individual tool calls |
-| `PerformanceMetricsTests.cs` | Performance metrics calculations and assertions (TTFT, tokens, cost) |
-| `FaithfulnessMetricTests.cs` | RAG faithfulness scoring with fakes |
 | `ToolSelectionMetricTests.cs` | Tool selection accuracy scoring |
 | `ToolSuccessMetricTests.cs` | Tool success/failure scoring |
-| `EmbeddingSimilarityTests.cs` | Embedding-based similarity helpers |
-| `ScoreNormalizerTests.cs` | Score normalization utilities |
-| `ModelPricingTests.cs` | Model price tables, case-insensitive lookup, and custom pricing |
+| `ToolUsageAssertionsTests.cs` | Fluent assertions over tool usage |
+| `ToolUsageReportTests.cs` | Tool tracking data shape and aggregation |
 
 ## Running the suite
 From the repo root:

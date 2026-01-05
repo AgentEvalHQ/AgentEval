@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
+    
+    <!-- Pack as .NET Global Tool -->
+    <PackAsTool>true</PackAsTool>
+    <ToolCommandName>agenteval</ToolCommandName>
+    
+    <!-- NuGet Package Info -->
+    <PackageId>AgentEval.Cli</PackageId>
+    <Version>0.1.0-alpha</Version>
+    <Description>CLI tool for AgentEval - run AI agent evaluations from the command line. Integrates with CI/CD pipelines via JUnit XML, Markdown, and JSON output formats.</Description>
+    <PackageTags>ai;agent;testing;evaluation;cli;cicd;devops</PackageTags>
+    
+    <!-- Suppress XML doc warnings for CLI -->
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="System.CommandLine" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\AgentEval\AgentEval.csproj" />
+  </ItemGroup>
+
+</Project>

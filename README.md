@@ -43,6 +43,12 @@ AgentEval answers the questions engineering teams need to ship reliably:
 
 ## Key Features
 
+### ✅ Multi-turn conversation testing
+- Fluent conversation builder with Turn records
+- ConversationRunner for executing against any IChatClient
+- ConversationCompletenessMetric for scoring conversations
+- Per-turn tool call tracking and assertions
+
 ### ✅ Fluent assertions for agent behavior
 - Tool usage assertions (called/not called, order, arguments, results, errors, duration)
 - Response assertions (contains, patterns, length, etc.)
@@ -64,6 +70,14 @@ AgentEval answers the questions engineering teams need to ship reliably:
 
 ### ✅ Run artifacts (“time travel”)
 Store run inputs/outputs, tool calls, timings, and scores as artifacts so failures are explainable and inspectable.
+### ✅ Snapshot testing
+Compare agent responses against saved baselines with JSON diff and semantic similarity support.
+
+### ✅ CLI tool for CI/CD
+Full command-line interface for running evaluations, benchmarks, and tests:
+- Multiple output formats (Console, JSON, JUnit XML, Markdown)
+- Dataset loaders (JSON, JSONL, CSV, YAML)
+- Configurable via command-line options
 ### ✅ Standard benchmark support
 - **BFCL** (Berkeley Function Calling Leaderboard) - tool selection accuracy
 - **GAIA** (General AI Assistants) - multi-step reasoning
@@ -82,9 +96,11 @@ Store run inputs/outputs, tool calls, timings, and scores as artifacts so failur
 | **Fluent assertions** | ✅ | ❌ | ❌ | ❌ |
 | **RAG metrics** | ✅ | ✅ | ✅ | ✅ |
 | **BFCL benchmark** | ✅ | ✅ | ❌ | ❌ |
-| **Multi-turn testing** | 🚧 Planned | ✅ | ✅ | ❌ |
-| **CLI for CI/CD** | 🚧 Planned | ✅ | ✅ | ❌ |
-| **Result exporters** | 🚧 Planned | ✅ JSON | ✅ Multiple | ❌ |
+| **Multi-turn testing** | ✅ | ✅ | ✅ | ❌ |
+| **CLI for CI/CD** | ✅ | ✅ | ✅ | ❌ |
+| **Result exporters** | ✅ JSON/JUnit/MD | ✅ JSON | ✅ Multiple | ❌ |
+| **Dataset loaders** | ✅ JSON/JSONL/CSV/YAML | ✅ | ✅ | ❌ |
+| **Snapshot testing** | ✅ | ❌ | ❌ | ❌ |
 
 **AgentEval's niche:** Native .NET + deep agentic visibility + benchmark compatibility.
 ---
@@ -174,20 +190,36 @@ Console.WriteLine($"P90 Latency: {latency.P90Latency.TotalMilliseconds}ms");
 
 ---
 
-## CI/CD Integration (Planned)
+## CLI Tool
+
+AgentEval includes a full CLI tool for CI/CD integration:
 
 ```bash
-# Install as .NET tool (coming soon)
-dotnet tool install -g agenteval-cli
+# Install as .NET tool
+dotnet tool install -g AgentEval.Cli
 
-# Run tests and export JUnit XML for CI
-agenteval test --project ./tests --output results.xml --format junit
+# Run evaluation with a dataset
+agenteval eval --project ./tests --dataset testcases.jsonl --format junit --output results.xml
+
+# Run benchmarks
+agenteval benchmark --type latency --iterations 10
 
 # Compare against baseline
 agenteval test --baseline baseline.json --fail-on-regression
 ```
 
-**GitHub Actions** (planned):
+### Supported Formats
+
+| Format | Export | Import |
+|--------|--------|--------|
+| JSON | ✅ | ✅ |
+| JSONL | ✅ | ✅ |
+| JUnit XML | ✅ | - |
+| Markdown | ✅ | - |
+| CSV | - | ✅ |
+| YAML | - | ✅ |
+
+**GitHub Actions**:
 ```yaml
 - name: Run Agent Tests
   run: agenteval test --format junit --output results.xml
@@ -202,25 +234,100 @@ agenteval test --baseline baseline.json --fail-on-regression
 
 ---
 
+## Multi-Turn Conversations
+
+Test complex multi-turn agent conversations:
+
+```csharp
+using AgentEval.Testing;
+
+// Build a conversation test case
+var testCase = new ConversationalTestCaseBuilder()
+    .WithName("Customer Support Flow")
+    .WithSystemPrompt("You are a helpful customer service agent.")
+    .AddUserTurn("I need to return a product")
+    .AddAssistantTurn("I'd be happy to help with your return!")
+    .AddUserTurn("Order #12345")
+    .WithExpectedTools("LookupOrder", "ProcessReturn")
+    .WithMaxDuration(TimeSpan.FromSeconds(30))
+    .Build();
+
+// Run the conversation
+var runner = new ConversationRunner(chatClient);
+var result = await runner.RunAsync(testCase);
+
+// Evaluate completeness
+var metric = new ConversationCompletenessMetric();
+var score = metric.Evaluate(result);
+Console.WriteLine($"Completeness: {score.Score:P0}");
+```
+
+---
+
+## Snapshot Testing
+
+Compare agent responses against saved baselines:
+
+```csharp
+using AgentEval.Snapshots;
+
+// Configure snapshot comparison
+var options = new SnapshotOptions
+{
+    IgnoreFields = new[] { "timestamp", "requestId" },
+    ScrubPatterns = new Dictionary<string, string>
+    {
+        { @"\d{4}-\d{2}-\d{2}", "[DATE]" }
+    }
+};
+
+// Compare responses
+var comparer = new SnapshotComparer(options);
+var result = comparer.Compare(expectedJson, actualJson);
+
+if (!result.IsMatch)
+{
+    Console.WriteLine($"Differences found:");
+    foreach (var diff in result.Differences)
+    {
+        Console.WriteLine($"  {diff.Path}: {diff.Expected} → {diff.Actual}");
+    }
+}
+
+// Store and retrieve snapshots
+var store = new SnapshotStore("./snapshots");
+store.Save("my-test", actualResponse);
+var baseline = store.Load("my-test");
+```
+
+---
+
 ## Documentation
 
 | Document | Description |
 |----------|-------------|
 | [Architecture](docs/architecture.md) | Component diagrams, metric hierarchy |
 | [Benchmarks](docs/benchmarks.md) | BFCL, GAIA, ToolBench guides |
+| [CLI Reference](docs/cli.md) | Command-line tool usage |
+| [Conversations](docs/conversations.md) | Multi-turn testing guide |
 | [Embedding Metrics](docs/embedding-metrics.md) | Semantic similarity metrics |
 | [Extensibility](docs/extensibility.md) | Custom metrics, plugins, adapters |
+| [Snapshots](docs/snapshots.md) | Snapshot testing guide |
 | [Plan Forward](src/AgentEval/AgentEval-plan-forward.md) | Roadmap and strategic direction |
 
 ---
 
 ## Test Coverage
 
-AgentEval has **384 tests** covering:
+AgentEval has **554 tests** covering:
 - Tool call assertions and reporting
+- Multi-turn conversation testing
+- Snapshot comparison and storage
 - RAG metrics (faithfulness, relevance, correctness)
 - Agentic metrics (tool selection, efficiency, success)
 - Performance tracking (TTFT, latency, cost)
+- CLI exporters (JSON, JUnit, Markdown)
+- Dataset loaders (JSON, JSONL, CSV, YAML)
 - Embedding similarity utilities
 - Serialization and error handling
 
