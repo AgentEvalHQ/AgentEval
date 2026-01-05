@@ -199,14 +199,40 @@ AgentEval includes a full CLI tool for CI/CD integration:
 dotnet tool install -g AgentEval.Cli
 
 # Run evaluation with a dataset
-agenteval eval --project ./tests --dataset testcases.jsonl --format junit --output results.xml
+agenteval eval --dataset samples/datasets/travel-agent.yaml --format markdown
 
-# Run benchmarks
-agenteval benchmark --type latency --iterations 10
+# Run with custom threshold and output file
+agenteval eval --dataset tests.yaml --pass-threshold 80 --output results.json
 
-# Compare against baseline
-agenteval test --baseline baseline.json --fail-on-regression
+# Export as JUnit XML for CI/CD
+agenteval eval --dataset tests.yaml --format junit --output results.xml
+
+# Initialize a new configuration file
+agenteval init --format yaml --output agenteval.yaml
+
+# List available metrics
+agenteval list metrics
+
+# List available assertions
+agenteval list assertions
+
+# List output formats
+agenteval list formats
 ```
+
+### Sample Datasets
+
+AgentEval includes sample datasets to help you get started:
+
+```bash
+# Agentic evaluation with tool usage
+samples/datasets/travel-agent.yaml
+
+# RAG evaluation with context documents  
+samples/datasets/rag-qa.yaml
+```
+
+See [samples/datasets/README.md](samples/datasets/README.md) for dataset format documentation.
 
 ### Supported Formats
 
@@ -319,7 +345,7 @@ var baseline = store.Load("my-test");
 
 ## Test Coverage
 
-AgentEval has **554 tests** covering:
+AgentEval has **570 tests** (1710 total across 3 target frameworks) covering:
 - Tool call assertions and reporting
 - Multi-turn conversation testing
 - Snapshot comparison and storage

@@ -3,8 +3,8 @@
 > **The first .NET-native AI agent testing and evaluation framework**
 
 **Version:** 1.0.0-alpha  
-**Last Updated:** January 2, 2026  
-**Status:** ✅ Core Implementation Complete
+**Last Updated:** January 6, 2026  
+**Status:** ✅ Core + Production Infrastructure Complete
 
 ## Executive Summary
 
@@ -20,6 +20,9 @@ AgentEval is a comprehensive testing, evaluation, and benchmarking framework des
 | No tool call visibility | Full tool tracking with assertions | ✅ Implemented |
 | Manual evaluation | AI-powered response evaluation | ✅ Implemented |
 | No streaming metrics | Real-time performance tracking | ✅ Implemented |
+| No CLI for CI/CD | `agenteval eval` with JUnit/Markdown export | ✅ Implemented |
+| Manual dataset management | YAML/JSON/JSONL/CSV loaders | ✅ Implemented |
+| No regression testing | Snapshot comparison with SnapshotComparer | ✅ Implemented |
 
 ### Relationship to Other .NET Evaluation Libraries
 
@@ -50,9 +53,16 @@ AgentEval is a comprehensive testing, evaluation, and benchmarking framework des
 | **Cost Estimation** | ModelPricing with ConcurrentDictionary, 8+ models (GPT-4o, Claude, etc.), SetPricing for custom models | ✅ |
 | **RAG Metrics** | FaithfulnessMetric, RelevanceMetric, ContextPrecisionMetric, ContextRecallMetric, AnswerCorrectnessMetric | ✅ (7 tests) |
 | **Agentic Metrics** | ToolSelectionMetric, ToolArgumentsMetric, ToolSuccessMetric, TaskCompletionMetric, ToolEfficiencyMetric | ✅ (17 tests) |
+| **Embedding Metrics** | AnswerSimilarityMetric, ResponseContextSimilarityMetric, QueryContextSimilarityMetric | ✅ |
 | **Benchmarks** | PerformanceBenchmark (latency, throughput, cost), AgenticBenchmark (tool accuracy, task completion, multi-step) | ✅ |
 | **MAF Integration** | MAFAgentAdapter, MAFTestHarness with streaming support, trace-first failure reporting | ✅ |
 | **Testing Infrastructure** | FakeChatClient for mocking IChatClient without external dependencies | ✅ |
+| **CLI Tool** | AgentEval.Cli with eval, init, list commands; cross-platform with NO_COLOR support | ✅ |
+| **Result Exporters** | JSON, JUnit XML, Markdown, TRX formats via IResultExporter | ✅ |
+| **Dataset Loaders** | JSON, JSONL, CSV, YAML with field aliasing via IDatasetLoader | ✅ |
+| **Snapshot Testing** | SnapshotComparer, SnapshotStore with JSON diff and regex scrubbing | ✅ |
+| **Multi-turn Testing** | ConversationRunner, ConversationalTestCase, ConversationCompletenessMetric | ✅ |
+| **Sample Datasets** | travel-agent.yaml (agentic), rag-qa.yaml (RAG) with documentation | ✅ |
 
 ---
 

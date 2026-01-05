@@ -7,6 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **CLI eval command** with real dataset validation
+  - Loads datasets from YAML, JSON, JSONL, and CSV files
+  - Validates test case completeness, ground truth, expected tools, and context
+  - Outputs results in JSON, JUnit XML, Markdown, or TRX formats
+  - Cross-platform color support with NO_COLOR environment variable respect
+- **Sample datasets** for quick start
+  - `samples/datasets/travel-agent.yaml` - agentic evaluation with tool usage
+  - `samples/datasets/rag-qa.yaml` - RAG evaluation with context documents
+  - `samples/datasets/README.md` - comprehensive dataset format documentation
+- **YAML dataset loader** with flexible field aliasing
+  - Supports both `expected_output` and `expectedOutput` naming conventions
+  - Supports `ground_truth`, `expected_tools`, and `context` fields
+  - Full YAML 1.2 compliance via YamlDotNet
+
+### Changed
+- **Test project reorganization** into logical folder structure:
+  - `Core/` - AgentEvalBuilder, Logger, MetricRegistry, Retry, Normalizer, Concurrency tests
+  - `Metrics/RAG/` - Faithfulness, Relevance, Context Precision/Recall, Answer Correctness
+  - `Metrics/Agentic/` - Tool Selection, Arguments, Success, Efficiency, Task Completion
+  - `DataLoaders/` - Dataset loader and serialization tests
+  - `Exporters/` - Result exporter tests
+  - `Testing/` - FakeChatClient, ConversationRunner, ConversationalTestCase tests
+  - `Assertions/` - Tool usage and response assertion tests
+  - `Models/` - Domain model tests
+  - `Benchmarks/` - Performance and agentic benchmark tests
+  - `MAF/` - Microsoft Agent Framework integration tests
+- **CLI ConsoleHelper** for improved cross-platform terminal support
+  - Detects NO_COLOR environment variable
+  - Detects TERM=dumb terminals
+  - Gracefully handles output redirection (piping to files)
+
+### Fixed
+- YAML loader tests now use correct 4-space indentation matching YAML standards
+
 ---
 
 ## [0.1.2-alpha] - 2026-01-04

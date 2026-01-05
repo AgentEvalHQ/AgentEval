@@ -9,6 +9,61 @@ using AgentEval.Exporters;
 namespace AgentEval.Cli.Commands;
 
 /// <summary>
+/// Helper for cross-platform console output.
+/// </summary>
+internal static class ConsoleHelper
+{
+    /// <summary>
+    /// Gets whether the current terminal supports ANSI colors.
+    /// </summary>
+    public static bool SupportsColor { get; } = DetectColorSupport();
+
+    private static bool DetectColorSupport()
+    {
+        // Check for NO_COLOR environment variable (https://no-color.org/)
+        if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("NO_COLOR")))
+            return false;
+
+        // Check for TERM=dumb
+        var term = Environment.GetEnvironmentVariable("TERM");
+        if (string.Equals(term, "dumb", StringComparison.OrdinalIgnoreCase))
+            return false;
+
+        // Check if we're redirected (piping to file)
+        if (Console.IsOutputRedirected)
+            return false;
+
+        return true;
+    }
+
+    /// <summary>
+    /// Writes colored text if supported, otherwise plain text.
+    /// </summary>
+    public static void WriteColored(string text, ConsoleColor color)
+    {
+        if (SupportsColor)
+        {
+            Console.ForegroundColor = color;
+            Console.Write(text);
+            Console.ResetColor();
+        }
+        else
+        {
+            Console.Write(text);
+        }
+    }
+
+    /// <summary>
+    /// Writes a colored line if supported.
+    /// </summary>
+    public static void WriteLineColored(string text, ConsoleColor color)
+    {
+        WriteColored(text, color);
+        Console.WriteLine();
+    }
+}
+
+/// <summary>
 /// The 'eval' command - runs evaluations from a configuration file.
 /// </summary>
 public static class EvalCommand
@@ -155,9 +210,7 @@ public static class EvalCommand
                 // Print progress
                 var symbol = result.Passed ? "✓" : "✗";
                 var color = result.Passed ? ConsoleColor.Green : ConsoleColor.Red;
-                Console.ForegroundColor = color;
-                Console.Write($"  [{symbol}] ");
-                Console.ResetColor();
+                ConsoleHelper.WriteColored($"  [{symbol}] ", color);
                 Console.WriteLine($"{result.Name}: {result.Score:F1}% - {result.Category}");
             }
             Console.WriteLine();
@@ -165,10 +218,8 @@ public static class EvalCommand
         else
         {
             // No dataset provided - show usage hint
-            Console.ForegroundColor = ConsoleColor.Yellow;
-            Console.WriteLine("ℹ️  No dataset provided. Use --dataset to evaluate test cases.");
-            Console.WriteLine("    Example: agenteval eval --dataset tests.yaml --format markdown");
-            Console.ResetColor();
+            ConsoleHelper.WriteLineColored("ℹ️  No dataset provided. Use --dataset to evaluate test cases.", ConsoleColor.Yellow);
+            ConsoleHelper.WriteLineColored("    Example: agenteval eval --dataset tests.yaml --format markdown", ConsoleColor.Yellow);
             Console.WriteLine();
 
             // Create minimal report
