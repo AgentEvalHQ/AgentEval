@@ -167,8 +167,8 @@ public class MAFTestHarnessTests
         
         // Assert
         Assert.NotNull(result.Performance);
-        Assert.NotNull(result.Performance.StartTime);
-        Assert.NotNull(result.Performance.EndTime);
+        // StartTime and EndTime are DateTimeOffset value types (never null)
+        Assert.True(result.Performance.EndTime >= result.Performance.StartTime);
     }
     
     [Fact]

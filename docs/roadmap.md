@@ -56,20 +56,31 @@ AgentEval is in **alpha** with all core features complete and ready for producti
 
 ## 📋 Planned Features
 
-### Short-term (Q1 2025)
+### Short-term (Q1 2026)
+- [ ] Workflow assertions P0 enhancements (`because`, structured exceptions)
+- [ ] Visual assertion reports (ASCII diagrams)
 - [ ] GitHub Actions workflow templates
 - [ ] Visual Studio test integration
 - [ ] Additional framework adapters (Semantic Kernel)
 
-### Medium-term (Q2 2025)
+### Medium-term (Q2 2026)
+- [ ] Multi-agent orchestration contracts
+- [ ] Assertion telemetry (local storage)
+- [ ] Self-healing assertions (rule-based)
 - [ ] Record/Replay for deterministic testing
 - [ ] Experiment management and A/B testing
 - [ ] Baseline comparison dashboard
 
-### Long-term
+### Long-term (Q3-Q4 2026)
+- [ ] Visual assertion reports (HTML/interactive) — *Premium*
+- [ ] Assertion telemetry (cloud dashboard) — *Premium*
+- [ ] Self-healing assertions (LLM-powered) — *Premium*
+- [ ] Assertion-driven prompt optimization — *Premium*
 - [ ] Red-teaming and safety testing
 - [ ] Synthetic dataset generation
 - [ ] AgentEval Studio (visual workflow editor)
+
+> 📖 See [New Features Exploration](strategy/new-features-exploration.md) for detailed feature specifications.
 
 ---
 

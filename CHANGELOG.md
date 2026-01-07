@@ -8,6 +8,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Enhanced Fluent Assertions** - Improved xUnit assertion failure experience inspired by FluentAssertions/Shouldly
+  - **`because` parameter** on all assertions for documenting test intent (e.g., `HaveCalledTool("SearchTool", because: "user query requires search")`)
+  - **`AgentEvalScope`** for collecting multiple assertion failures into a single exception with all failures listed
+  - **Rich structured error messages** with Expected/Actual values, context, tool timeline, and actionable suggestions
+  - **`[StackTraceHidden]`** attribute on assertion methods for cleaner failure stack traces
+  - **`CallerArgumentExpression`** for automatic subject name capture in ResponseAssertions
+  - New `AgentEvalScopeException` for batch failure reporting
+  - Comprehensive [assertions documentation](docs/assertions.md) with examples
 - **CLI eval command** with real dataset validation
   - Loads datasets from YAML, JSON, JSONL, and CSV files
   - Validates test case completeness, ground truth, expected tools, and context

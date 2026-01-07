@@ -23,7 +23,7 @@ public class AgenticBenchmarkTests
         var mockAgent = new MockTestableAgent(
             name: "TestAgent",
             responseText: "Weather checked!",
-            toolCalls: new[] { ("GetWeather", new Dictionary<string, object?> { ["city"] = "Paris" }) }
+            toolCalls: [("GetWeather", new Dictionary<string, object?> { ["city"] = "Paris" })]
         );
         var benchmark = new AgenticBenchmark(mockAgent, options: new AgenticBenchmarkOptions { Verbose = false });
         
@@ -54,7 +54,7 @@ public class AgenticBenchmarkTests
         var mockAgent = new MockTestableAgent(
             name: "TestAgent",
             responseText: "Done!",
-            toolCalls: Array.Empty<(string, Dictionary<string, object?>)>() // No tools called
+            toolCalls: [] // No tools called
         );
         var benchmark = new AgenticBenchmark(mockAgent, options: new AgenticBenchmarkOptions { Verbose = false });
         
@@ -85,7 +85,7 @@ public class AgenticBenchmarkTests
         var mockAgent = new MockTestableAgent(
             name: "TestAgent",
             responseText: "Done!",
-            toolCalls: new[] { ("ExpectedTool", (Dictionary<string, object?>?)null), ("UnexpectedTool", (Dictionary<string, object?>?)null) }
+            toolCalls: [("ExpectedTool", new Dictionary<string, object?>()), ("UnexpectedTool", new Dictionary<string, object?>())]
         );
         var benchmark = new AgenticBenchmark(mockAgent, options: new AgenticBenchmarkOptions { Verbose = false });
         
@@ -116,7 +116,7 @@ public class AgenticBenchmarkTests
         var mockAgent = new MockTestableAgent(
             name: "TestAgent",
             responseText: "Done!",
-            toolCalls: new[] { ("SendEmail", new Dictionary<string, object?> { ["to"] = "test@test.com" }) } // Missing subject
+            toolCalls: [("SendEmail", new Dictionary<string, object?> { ["to"] = "test@test.com" })] // Missing subject
         );
         var benchmark = new AgenticBenchmark(mockAgent, options: new AgenticBenchmarkOptions { Verbose = false });
         
@@ -146,7 +146,7 @@ public class AgenticBenchmarkTests
         var mockAgent = new MockTestableAgent(
             name: "TestAgent",
             responseText: "Done!",
-            toolCalls: new[] { ("ToolA", (Dictionary<string, object?>?)null) }
+            toolCalls: [("ToolA", new Dictionary<string, object?>())]
         );
         var benchmark = new AgenticBenchmark(mockAgent, options: new AgenticBenchmarkOptions { Verbose = false });
         
@@ -186,12 +186,12 @@ public class AgenticBenchmarkTests
         var mockAgent = new MockTestableAgent(
             name: "TestAgent",
             responseText: "Done!",
-            toolCalls: new[] 
-            { 
-                ("Step1Tool", (Dictionary<string, object?>?)null), 
-                ("Step2Tool", (Dictionary<string, object?>?)null),
-                ("Step3Tool", (Dictionary<string, object?>?)null)
-            }
+            toolCalls:
+            [
+                ("Step1Tool", new Dictionary<string, object?>()),
+                ("Step2Tool", new Dictionary<string, object?>()),
+                ("Step3Tool", new Dictionary<string, object?>())
+            ]
         );
         var benchmark = new AgenticBenchmark(mockAgent, options: new AgenticBenchmarkOptions { Verbose = false });
         
@@ -228,12 +228,12 @@ public class AgenticBenchmarkTests
         var mockAgent = new MockTestableAgent(
             name: "TestAgent",
             responseText: "Partial!",
-            toolCalls: new[] 
-            { 
-                ("Step1Tool", (Dictionary<string, object?>?)null), 
-                ("Step2Tool", (Dictionary<string, object?>?)null)
+            toolCalls:
+            [
+                ("Step1Tool", new Dictionary<string, object?>()),
+                ("Step2Tool", new Dictionary<string, object?>())
                 // Missing Step3Tool
-            }
+            ]
         );
         var benchmark = new AgenticBenchmark(mockAgent, options: new AgenticBenchmarkOptions { Verbose = false });
         
@@ -341,14 +341,14 @@ public class AgenticBenchmarkTests
 internal class MockTestableAgent : ITestableAgent
 {
     private readonly string _responseText;
-    private readonly (string Name, Dictionary<string, object?>? Args)[] _toolCalls;
+    private readonly (string Name, Dictionary<string, object?> Args)[] _toolCalls;
     
     public string Name { get; }
     
     public MockTestableAgent(
         string name, 
         string responseText, 
-        params (string Name, Dictionary<string, object?>? Args)[] toolCalls)
+        params (string Name, Dictionary<string, object?> Args)[] toolCalls)
     {
         Name = name;
         _responseText = responseText;

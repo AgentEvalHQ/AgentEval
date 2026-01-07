@@ -129,8 +129,9 @@ public class DataLoaderTests : IDisposable
 
         Assert.Single(results);
         Assert.NotNull(results[0].Context);
-        Assert.Single(results[0].Context);
-        Assert.Equal("The sky is blue on clear days.", results[0].Context[0]);
+        var context = results[0].Context!;
+        Assert.Single(context);
+        Assert.Equal("The sky is blue on clear days.", context[0]);
     }
 
     [Fact]
@@ -147,8 +148,8 @@ public class DataLoaderTests : IDisposable
 
         Assert.Single(results);
         Assert.NotNull(results[0].ExpectedTools);
-        Assert.Equal(2, results[0].ExpectedTools.Count);
-        Assert.Equal("get_weather", results[0].ExpectedTools[0]);
+        Assert.Equal(2, results[0].ExpectedTools!.Count);
+        Assert.Equal("get_weather", results[0].ExpectedTools![0]);
     }
 
     [Fact]
@@ -165,8 +166,8 @@ public class DataLoaderTests : IDisposable
 
         Assert.Single(results);
         Assert.NotNull(results[0].GroundTruth);
-        Assert.Equal("get_weather", results[0].GroundTruth.Name);
-        Assert.Equal("Seattle", results[0].GroundTruth.Arguments["city"]);
+        Assert.Equal("get_weather", results[0].GroundTruth!.Name);
+        Assert.Equal("Seattle", results[0].GroundTruth!.Arguments["city"]);
     }
 
     [Fact]
@@ -183,8 +184,8 @@ public class DataLoaderTests : IDisposable
 
         Assert.Single(results);
         Assert.NotNull(results[0].GroundTruth);
-        Assert.Equal("web_search", results[0].GroundTruth.Name);
-        Assert.Equal("pizza", results[0].GroundTruth.Arguments["query"]);
+        Assert.Equal("web_search", results[0].GroundTruth!.Name);
+        Assert.Equal("pizza", results[0].GroundTruth!.Arguments["query"]);
     }
 
     [Fact]
@@ -460,9 +461,9 @@ public class DataLoaderTests : IDisposable
 
         Assert.Single(results);
         Assert.NotNull(results[0].ExpectedTools);
-        Assert.Equal(2, results[0].ExpectedTools.Count);
-        Assert.Equal("get_weather", results[0].ExpectedTools[0]);
-        Assert.Equal("format_response", results[0].ExpectedTools[1]);
+        Assert.Equal(2, results[0].ExpectedTools!.Count);
+        Assert.Equal("get_weather", results[0].ExpectedTools![0]);
+        Assert.Equal("format_response", results[0].ExpectedTools![1]);
     }
 
     [Fact]
@@ -704,7 +705,7 @@ public class DataLoaderTests : IDisposable
         Assert.Single(results);
         Assert.Equal(2, results[0].Context!.Count);
         Assert.Equal(2, results[0].ExpectedTools!.Count);
-        Assert.Contains("search", results[0].ExpectedTools);
+        Assert.Contains("search", results[0].ExpectedTools!);
     }
 
     [Fact]
@@ -726,7 +727,7 @@ public class DataLoaderTests : IDisposable
         Assert.Single(results);
         Assert.NotNull(results[0].GroundTruth);
         Assert.Equal("book_flight", results[0].GroundTruth!.Name);
-        Assert.Equal("Paris", results[0].GroundTruth.Arguments["destination"]);
+        Assert.Equal("Paris", results[0].GroundTruth!.Arguments["destination"]);
     }
 
     [Fact]
@@ -748,8 +749,8 @@ public class DataLoaderTests : IDisposable
         Assert.Single(results);
         Assert.NotNull(results[0].GroundTruth);
         Assert.Equal("book_hotel", results[0].GroundTruth!.Name);
-        Assert.Equal("Madrid", results[0].GroundTruth.Arguments["city"]);
-        Assert.Equal("3", results[0].GroundTruth.Arguments["nights"]?.ToString());
+        Assert.Equal("Madrid", results[0].GroundTruth!.Arguments["city"]);
+        Assert.Equal("3", results[0].GroundTruth!.Arguments["nights"]?.ToString());
     }
 
     [Fact]

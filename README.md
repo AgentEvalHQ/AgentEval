@@ -53,6 +53,9 @@ AgentEval answers the questions engineering teams need to ship reliably:
 - Tool usage assertions (called/not called, order, arguments, results, errors, duration)
 - Response assertions (contains, patterns, length, etc.)
 - Performance assertions (latency, TTFT, tokens, estimated cost, tool count)
+- **Rich failure messages** with Expected/Actual, context, and actionable suggestions
+- **"Because" parameter** on all assertions for documenting test intent
+- **AgentEvalScope** for collecting multiple assertion failures into a single report
 
 ### ✅ Streaming performance & observability
 - Real-time metrics tracking (TTFT, total duration)
@@ -161,7 +164,7 @@ var result = await harness.RunTestAsync(adapter, testCase, new TestOptions
 // Assert tool behavior
 result.ToolUsage!
     .Should()
-    .HaveCalledTool("FeatureTool")
+    .HaveCalledTool("FeatureTool", because: "feature planning requires the feature tool")
         .BeforeTool("SecurityTool")
     .And()
     .HaveNoErrors();
@@ -169,9 +172,9 @@ result.ToolUsage!
 // Assert performance budgets
 result.Performance!
     .Should()
-    .HaveTotalDurationUnder(TimeSpan.FromSeconds(10))
+    .HaveTotalDurationUnder(TimeSpan.FromSeconds(10), because: "feature planning should complete quickly")
     .HaveTimeToFirstTokenUnder(TimeSpan.FromSeconds(2))
-    .HaveEstimatedCostUnder(0.10m);
+    .HaveEstimatedCostUnder(0.10m, because: "stay within budget for this operation");
 ```
 
 ---
@@ -346,6 +349,7 @@ var baseline = store.Load("my-test");
 | Document | Description |
 |----------|-------------|
 | [Architecture](docs/architecture.md) | Component diagrams, metric hierarchy |
+| [Fluent Assertions](docs/assertions.md) | Complete assertion guide with AgentEvalScope, "because", rich messages |
 | [Benchmarks](docs/benchmarks.md) | BFCL, GAIA, ToolBench guides |
 | [CLI Reference](docs/cli.md) | Command-line tool usage |
 | [Conversations](docs/conversations.md) | Multi-turn testing guide |

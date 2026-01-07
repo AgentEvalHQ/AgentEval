@@ -12,6 +12,8 @@
   items:
   - name: Architecture
     href: architecture.md
+  - name: Fluent Assertions
+    href: assertions.md
   - name: Benchmarks
     href: benchmarks.md
   - name: CLI Reference

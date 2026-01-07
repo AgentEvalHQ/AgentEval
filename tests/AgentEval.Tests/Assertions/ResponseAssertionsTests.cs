@@ -81,7 +81,7 @@ public class ResponseAssertionsTests
         var ex = Assert.Throws<ResponseAssertionException>(() =>
             "The quick brown fox".Should().ContainAll("quick", "lazy"));
         Assert.Contains("lazy", ex.Message);
-        Assert.Contains("missing", ex.Message);
+        Assert.Contains("Missing:", ex.Message);
     }
 
     [Fact]
@@ -108,7 +108,7 @@ public class ResponseAssertionsTests
     {
         var ex = Assert.Throws<ResponseAssertionException>(() =>
             "Hello World".Should().ContainAny("Goodbye", "Moon"));
-        Assert.Contains("none found", ex.Message);
+        Assert.Contains("None found", ex.Message);
     }
 
     #endregion
@@ -157,7 +157,7 @@ public class ResponseAssertionsTests
     {
         var ex = Assert.Throws<ResponseAssertionException>(() =>
             "No numbers here".Should().MatchPattern(@"\d+"));
-        Assert.Contains("match pattern", ex.Message);
+        Assert.Contains("Matches pattern", ex.Message);
     }
 
     [Fact]
@@ -194,7 +194,7 @@ public class ResponseAssertionsTests
     {
         var ex = Assert.Throws<ResponseAssertionException>(() =>
             "Hi".Should().HaveLengthBetween(5, 10));
-        Assert.Contains("length between", ex.Message);
+        Assert.Contains("Length between", ex.Message);
     }
 
     [Fact]
@@ -215,7 +215,8 @@ public class ResponseAssertionsTests
     {
         var ex = Assert.Throws<ResponseAssertionException>(() =>
             "Hi".Should().HaveLengthAtLeast(10));
-        Assert.Contains("at least 10", ex.Message);
+        Assert.Contains("Length", ex.Message);
+        Assert.Contains("10", ex.Message);
     }
 
     #endregion

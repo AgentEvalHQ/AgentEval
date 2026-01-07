@@ -9,8 +9,40 @@ using Xunit;
 
 namespace AgentEval.Tests;
 
+/// <summary>
+/// Tests for AgentEvalLogger implementations.
+/// Uses a collection to prevent parallel execution since tests modify Console.Out.
+/// </summary>
+[Collection("ConsoleTests")]
 public class AgentEvalLoggerTests
 {
+    private static readonly object ConsoleLock = new();
+    
+    /// <summary>
+    /// Helper to capture console output safely, ensuring proper lifecycle management.
+    /// </summary>
+    private static string CaptureConsoleOutput(Action<ConsoleAgentEvalLogger> action, LogLevel minimumLevel = LogLevel.Information)
+    {
+        lock (ConsoleLock)
+        {
+            var originalOut = Console.Out;
+            var sw = new StringWriter();
+            try
+            {
+                Console.SetOut(sw);
+                var logger = new ConsoleAgentEvalLogger(minimumLevel, useColors: false);
+                action(logger);
+                sw.Flush();
+                return sw.ToString();
+            }
+            finally
+            {
+                Console.SetOut(originalOut);
+                sw.Dispose();
+            }
+        }
+    }
+
     [Fact]
     public void ConsoleLogger_IsEnabled_RespectsMinimumLevel()
     {
@@ -48,272 +80,164 @@ public class AgentEvalLoggerTests
     [Fact]
     public void ConsoleLogger_Log_WritesToConsole()
     {
-        var originalOut = Console.Out;
-        try
+        var output = CaptureConsoleOutput(logger =>
         {
-            using var sw = new StringWriter();
-            Console.SetOut(sw);
-
-            var logger = new ConsoleAgentEvalLogger(LogLevel.Information, useColors: false);
             logger.Log(LogLevel.Information, "Test message");
+        });
 
-            var output = sw.ToString();
-            Assert.Contains("Test message", output);
-            Assert.Contains("[Information]", output);
-        }
-        finally
-        {
-            Console.SetOut(originalOut);
-        }
+        Assert.Contains("Test message", output);
+        Assert.Contains("[Information]", output);
     }
 
     [Fact]
     public void ConsoleLogger_LogWithException_IncludesExceptionInfo()
     {
-        var originalOut = Console.Out;
-        try
+        var output = CaptureConsoleOutput(logger =>
         {
-            using var sw = new StringWriter();
-            Console.SetOut(sw);
-
-            var logger = new ConsoleAgentEvalLogger(LogLevel.Debug, useColors: false);
             var exception = new InvalidOperationException("Test exception");
             logger.Log(LogLevel.Error, exception, "An error occurred");
+        }, LogLevel.Debug);
 
-            var output = sw.ToString();
-            Assert.Contains("An error occurred", output);
-            Assert.Contains("InvalidOperationException", output);
-            Assert.Contains("Test exception", output);
-        }
-        finally
-        {
-            Console.SetOut(originalOut);
-        }
+        Assert.Contains("An error occurred", output);
+        Assert.Contains("InvalidOperationException", output);
+        Assert.Contains("Test exception", output);
     }
 
     [Fact]
     public void ConsoleLogger_LogWithProperties_IncludesProperties()
     {
-        var originalOut = Console.Out;
-        try
+        var output = CaptureConsoleOutput(logger =>
         {
-            using var sw = new StringWriter();
-            Console.SetOut(sw);
-
-            var logger = new ConsoleAgentEvalLogger(LogLevel.Information, useColors: false);
             logger.Log(LogLevel.Information, "Test message", ("Key1", "Value1"), ("Key2", 42));
+        });
 
-            var output = sw.ToString();
-            Assert.Contains("Test message", output);
-            Assert.Contains("Key1=Value1", output);
-            Assert.Contains("Key2=42", output);
-        }
-        finally
-        {
-            Console.SetOut(originalOut);
-        }
+        Assert.Contains("Test message", output);
+        Assert.Contains("Key1=Value1", output);
+        Assert.Contains("Key2=42", output);
     }
 
     [Fact]
     public void ConsoleLogger_LogMetricResult_FormatsCorrectly()
     {
-        var originalOut = Console.Out;
-        try
+        var output = CaptureConsoleOutput(logger =>
         {
-            using var sw = new StringWriter();
-            Console.SetOut(sw);
-
-            var logger = new ConsoleAgentEvalLogger(LogLevel.Information, useColors: false);
             var result = MetricResult.Pass("TestMetric", 0.85, "Good result");
-
             logger.LogMetricResult(result);
+        });
 
-            var output = sw.ToString();
-            Assert.Contains("TestMetric", output);
-            Assert.Contains("0.85", output);
-            Assert.Contains("✓", output);
-        }
-        finally
-        {
-            Console.SetOut(originalOut);
-        }
+        Assert.Contains("TestMetric", output);
+        Assert.Contains("0.85", output);
+        Assert.Contains("✓", output);
     }
 
     [Fact]
     public void ConsoleLogger_LogMetricResult_FailedMetric()
     {
-        var originalOut = Console.Out;
-        try
+        var output = CaptureConsoleOutput(logger =>
         {
-            using var sw = new StringWriter();
-            Console.SetOut(sw);
-
-            var logger = new ConsoleAgentEvalLogger(LogLevel.Information, useColors: false);
             var result = MetricResult.Fail("TestMetric", "Score below threshold", 0.3);
-
             logger.LogMetricResult(result);
+        });
 
-            var output = sw.ToString();
-            Assert.Contains("TestMetric", output);
-            Assert.Contains("✗", output);
-        }
-        finally
-        {
-            Console.SetOut(originalOut);
-        }
+        Assert.Contains("TestMetric", output);
+        Assert.Contains("✗", output);
     }
 
     [Fact]
     public void ConsoleLogger_BeginScope_ReturnsDisposable()
     {
-        var logger = new ConsoleAgentEvalLogger(LogLevel.Debug, useColors: false);
+        var output = CaptureConsoleOutput(logger =>
+        {
+            using (var scope = logger.BeginScope("TestScope", ("Id", "123")))
+            {
+                Assert.NotNull(scope);
+            }
+        }, LogLevel.Debug);
 
-        using var scope = logger.BeginScope("TestScope", ("Id", "123"));
-
-        Assert.NotNull(scope);
+        // Verify scope enter/exit messages were logged
+        Assert.Contains("TestScope", output);
     }
 
     [Fact]
     public void ExtensionMethods_Work()
     {
-        var originalOut = Console.Out;
-        try
+        var output = CaptureConsoleOutput(logger =>
         {
-            using var sw = new StringWriter();
-            Console.SetOut(sw);
-
-            var logger = new ConsoleAgentEvalLogger(LogLevel.Trace, useColors: false);
-
             logger.LogTrace("Trace message");
             logger.LogDebug("Debug message");
             logger.LogInformation("Info message");
             logger.LogWarning("Warning message");
             logger.LogError("Error message");
             logger.LogCritical("Critical message");
+        }, LogLevel.Trace);
 
-            var output = sw.ToString();
-            Assert.Contains("Trace message", output);
-            Assert.Contains("Debug message", output);
-            Assert.Contains("Info message", output);
-            Assert.Contains("Warning message", output);
-            Assert.Contains("Error message", output);
-            Assert.Contains("Critical message", output);
-        }
-        finally
-        {
-            Console.SetOut(originalOut);
-        }
+        Assert.Contains("Trace message", output);
+        Assert.Contains("Debug message", output);
+        Assert.Contains("Info message", output);
+        Assert.Contains("Warning message", output);
+        Assert.Contains("Error message", output);
+        Assert.Contains("Critical message", output);
     }
 
     [Fact]
     public void LogMetricStart_AtDebugLevel()
     {
-        var originalOut = Console.Out;
-        try
+        var output = CaptureConsoleOutput(logger =>
         {
-            using var sw = new StringWriter();
-            Console.SetOut(sw);
-
-            var logger = new ConsoleAgentEvalLogger(LogLevel.Debug, useColors: false);
             logger.LogMetricStart("TestMetric");
+        }, LogLevel.Debug);
 
-            var output = sw.ToString();
-            Assert.Contains("Starting metric evaluation", output);
-            Assert.Contains("TestMetric", output);
-        }
-        finally
-        {
-            Console.SetOut(originalOut);
-        }
+        Assert.Contains("Starting metric evaluation", output);
+        Assert.Contains("TestMetric", output);
     }
 
     [Fact]
     public void LogMetricComplete_FormatsCorrectly()
     {
-        var originalOut = Console.Out;
-        try
+        var output = CaptureConsoleOutput(logger =>
         {
-            using var sw = new StringWriter();
-            Console.SetOut(sw);
-
-            var logger = new ConsoleAgentEvalLogger(LogLevel.Information, useColors: false);
             logger.LogMetricComplete("TestMetric", 0.95, TimeSpan.FromMilliseconds(150));
+        });
 
-            var output = sw.ToString();
-            Assert.Contains("TestMetric", output);
-            Assert.Contains("0.95", output);
-            Assert.Contains("150ms", output);
-        }
-        finally
-        {
-            Console.SetOut(originalOut);
-        }
+        Assert.Contains("TestMetric", output);
+        Assert.Contains("0.95", output);
+        Assert.Contains("150ms", output);
     }
 
     [Fact]
     public void LogToolCall_Success()
     {
-        var originalOut = Console.Out;
-        try
+        var output = CaptureConsoleOutput(logger =>
         {
-            using var sw = new StringWriter();
-            Console.SetOut(sw);
-
-            var logger = new ConsoleAgentEvalLogger(LogLevel.Debug, useColors: false);
             logger.LogToolCall("search", success: true, TimeSpan.FromMilliseconds(200));
+        }, LogLevel.Debug);
 
-            var output = sw.ToString();
-            Assert.Contains("search", output);
-            Assert.Contains("succeeded", output);
-            Assert.Contains("200ms", output);
-        }
-        finally
-        {
-            Console.SetOut(originalOut);
-        }
+        Assert.Contains("search", output);
+        Assert.Contains("succeeded", output);
+        Assert.Contains("200ms", output);
     }
 
     [Fact]
     public void LogToolCall_Failure()
     {
-        var originalOut = Console.Out;
-        try
+        var output = CaptureConsoleOutput(logger =>
         {
-            using var sw = new StringWriter();
-            Console.SetOut(sw);
-
-            var logger = new ConsoleAgentEvalLogger(LogLevel.Debug, useColors: false);
             logger.LogToolCall("calculator", success: false, TimeSpan.FromMilliseconds(50), "Division by zero");
+        }, LogLevel.Debug);
 
-            var output = sw.ToString();
-            Assert.Contains("calculator", output);
-            Assert.Contains("failed", output);
-            Assert.Contains("Division by zero", output);
-        }
-        finally
-        {
-            Console.SetOut(originalOut);
-        }
+        Assert.Contains("calculator", output);
+        Assert.Contains("failed", output);
+        Assert.Contains("Division by zero", output);
     }
 
     [Fact]
     public void ConsoleLogger_LevelBelowMinimum_DoesNotLog()
     {
-        var originalOut = Console.Out;
-        try
+        var output = CaptureConsoleOutput(logger =>
         {
-            using var sw = new StringWriter();
-            Console.SetOut(sw);
-
-            var logger = new ConsoleAgentEvalLogger(LogLevel.Error, useColors: false);
             logger.Log(LogLevel.Information, "This should not appear");
+        }, LogLevel.Error);
 
-            var output = sw.ToString();
-            Assert.Empty(output);
-        }
-        finally
-        {
-            Console.SetOut(originalOut);
-        }
+        Assert.Empty(output);
     }
 }
