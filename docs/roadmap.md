@@ -76,11 +76,13 @@ AgentEval is in **alpha** with all core features complete and ready for producti
 - [ ] Assertion telemetry (cloud dashboard) — *Premium*
 - [ ] Self-healing assertions (LLM-powered) — *Premium*
 - [ ] Assertion-driven prompt optimization — *Premium*
+- [ ] Self-hosted dashboard & baseline comparison — *Enterprise Self-Host*
+- [ ] AgentEval Studio (self-hosted option) — *Enterprise Self-Host*
 - [ ] Red-teaming and safety testing
 - [ ] Synthetic dataset generation
 - [ ] AgentEval Studio (visual workflow editor)
 
-> 📖 See [New Features Exploration](strategy/new-features-exploration.md) for detailed feature specifications.
+> 📖 See [New Features Exploration](strategy/new-features-exploration.md) for detailed feature specifications and premium strategy.
 
 ---
 

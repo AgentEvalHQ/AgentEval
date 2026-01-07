@@ -30,6 +30,10 @@
     href: workflows.md
 - name: Roadmap
   href: roadmap.md
+- name: Strategy
+  items:
+  - name: New Features Exploration
+    href: strategy/new-features-exploration.md
 - name: API Reference
   href: api/
 - name: Community

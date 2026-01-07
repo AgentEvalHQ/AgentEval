@@ -138,15 +138,18 @@ public static class Sample03_AgentWithMultipleTools
         {
             try
             {
-                // Advanced assertions for multi-tool scenarios
+                // Advanced assertions with 'because' for self-documenting tests
                 result.ToolUsage
                     .Should()
-                    .HaveCalledTool("SearchTool")
-                        .BeforeTool("SummarizeTool")  // Order assertion!
+                    .HaveCalledTool("SearchTool",
+                        because: "research must start with information gathering")
+                        .BeforeTool("SummarizeTool",
+                            because: "can't summarize without data")  // Order assertion!
                         .WithoutError()
                     .And()
-                    .HaveCallCountAtLeast(2)
-                    .HaveNoErrors();
+                    .HaveCallCountAtLeast(2,
+                        because: "workflow requires at least search and summarize")
+                    .HaveNoErrors(because: "all tools must succeed for quality output");
 
                 Console.ForegroundColor = ConsoleColor.Green;
                 Console.WriteLine("   ✅ All assertions passed!");
@@ -155,12 +158,14 @@ public static class Sample03_AgentWithMultipleTools
    ┌─────────────────────────────────────────────────────────────┐
    │  result.ToolUsage                                           │
    │      .Should()                                              │
-   │      .HaveCalledTool(""SearchTool"")                          │
-   │          .BeforeTool(""SummarizeTool"")  // Order assertion!  │
+   │      .HaveCalledTool(""SearchTool"",                          │
+   │          because: ""research starts with search"")           │
+   │          .BeforeTool(""SummarizeTool"",                       │
+   │              because: ""can't summarize without data"")      │
    │          .WithoutError()                                    │
    │      .And()                                                 │
    │      .HaveCallCountAtLeast(2)                               │
-   │      .HaveNoErrors();                                       │
+   │      .HaveNoErrors(because: ""all must succeed"");           │
    └─────────────────────────────────────────────────────────────┘
 ");
                 Console.ResetColor();

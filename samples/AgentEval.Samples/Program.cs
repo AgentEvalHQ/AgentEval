@@ -87,6 +87,12 @@ public static class Program
                 case 10:
                     await Sample10_DatasetsAndExport.RunAsync();
                     break;
+                case 11:
+                    await Sample11_BecauseAssertions.RunAsync();
+                    break;
+                case 12:
+                    await Sample12_PolicySafetyTesting.RunAsync();
+                    break;
                 default:
                     Console.WriteLine($"❌ Sample {sampleNumber} not found.\n");
                     break;
@@ -141,6 +147,8 @@ public static class Program
         Console.WriteLine("│  8. 💬 Conversations      - Multi-turn testing              │");
         Console.WriteLine("│  9. 🔀 Workflow Testing   - Multi-agent orchestration       │");
         Console.WriteLine("│ 10. 📂 Datasets & Export  - Batch testing, JUnit export     │");
+        Console.WriteLine("│ 11. 📝 Because Assertions - Self-documenting tests          │");
+        Console.WriteLine("│ 12. 🛡️ Policy & Safety    - Enterprise guardrails           │");
         
         Console.ForegroundColor = ConsoleColor.Green;
         Console.WriteLine("├─────────────────────────────────────────────────────────────┤");

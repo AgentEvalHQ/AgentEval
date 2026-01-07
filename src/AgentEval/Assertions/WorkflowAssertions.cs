@@ -1,6 +1,7 @@
 // Copyright (c) 2025-2026 AgentEval Contributors
 // Licensed under the MIT License.
 
+using System.Diagnostics;
 using AgentEval.Models;
 
 namespace AgentEval.Assertions;
@@ -41,7 +42,8 @@ public static class WorkflowAssertionsExtensions
 public class WorkflowAssertionBuilder
 {
     private readonly WorkflowExecutionResult _result;
-    private readonly List<string> _failures = [];
+    private readonly List<(string Message, string? Because)> _failures = [];
+    private string? _currentBecause;
 
     /// <summary>
     /// Creates a new assertion builder for a workflow result.
@@ -55,11 +57,14 @@ public class WorkflowAssertionBuilder
     /// Assert the workflow has a specific number of executor steps.
     /// </summary>
     /// <param name="expected">Expected number of steps.</param>
-    public WorkflowAssertionBuilder HaveStepCount(int expected)
+    /// <param name="because">Optional reason for the assertion.</param>
+    [StackTraceHidden]
+    public WorkflowAssertionBuilder HaveStepCount(int expected, string? because = null)
     {
+        _currentBecause = because;
         if (_result.Steps.Count != expected)
         {
-            _failures.Add($"Expected {expected} steps but found {_result.Steps.Count}");
+            AddFailure($"Expected {expected} steps but found {_result.Steps.Count}");
         }
         return this;
     }
@@ -68,11 +73,14 @@ public class WorkflowAssertionBuilder
     /// Assert the workflow has at least a minimum number of steps.
     /// </summary>
     /// <param name="minimum">Minimum number of steps.</param>
-    public WorkflowAssertionBuilder HaveAtLeastSteps(int minimum)
+    /// <param name="because">Optional reason for the assertion.</param>
+    [StackTraceHidden]
+    public WorkflowAssertionBuilder HaveAtLeastSteps(int minimum, string? because = null)
     {
+        _currentBecause = because;
         if (_result.Steps.Count < minimum)
         {
-            _failures.Add($"Expected at least {minimum} steps but found {_result.Steps.Count}");
+            AddFailure($"Expected at least {minimum} steps but found {_result.Steps.Count}");
         }
         return this;
     }
@@ -81,11 +89,14 @@ public class WorkflowAssertionBuilder
     /// Assert a specific executor was invoked.
     /// </summary>
     /// <param name="executorId">The executor ID to check.</param>
-    public WorkflowAssertionBuilder HaveInvokedExecutor(string executorId)
+    /// <param name="because">Optional reason for the assertion.</param>
+    [StackTraceHidden]
+    public WorkflowAssertionBuilder HaveInvokedExecutor(string executorId, string? because = null)
     {
+        _currentBecause = because;
         if (!_result.Steps.Any(s => s.ExecutorId.Equals(executorId, StringComparison.OrdinalIgnoreCase)))
         {
-            _failures.Add($"Expected executor '{executorId}' was not invoked. " +
+            AddFailure($"Expected executor '{executorId}' was not invoked. " +
                           $"Invoked executors: [{string.Join(", ", _result.Steps.Select(s => s.ExecutorId))}]");
         }
         return this;
@@ -95,13 +106,24 @@ public class WorkflowAssertionBuilder
     /// Assert executors were invoked in a specific order.
     /// </summary>
     /// <param name="executorIds">Expected executor order.</param>
+    [StackTraceHidden]
     public WorkflowAssertionBuilder HaveExecutedInOrder(params string[] executorIds)
+        => HaveExecutedInOrderBecause(null, executorIds);
+
+    /// <summary>
+    /// Assert executors were invoked in a specific order with reason.
+    /// </summary>
+    /// <param name="because">Optional reason for the assertion.</param>
+    /// <param name="executorIds">Expected executor order.</param>
+    [StackTraceHidden]
+    public WorkflowAssertionBuilder HaveExecutedInOrderBecause(string? because, params string[] executorIds)
     {
+        _currentBecause = because;
         var actualOrder = _result.Steps.Select(s => s.ExecutorId).ToList();
 
         if (actualOrder.Count != executorIds.Length)
         {
-            _failures.Add($"Expected executor order [{string.Join(" → ", executorIds)}] " +
+            AddFailure($"Expected executor order [{string.Join(" → ", executorIds)}] " +
                           $"but found [{string.Join(" → ", actualOrder)}] (different count)");
             return this;
         }
@@ -110,7 +132,7 @@ public class WorkflowAssertionBuilder
         {
             if (!actualOrder[i].Equals(executorIds[i], StringComparison.OrdinalIgnoreCase))
             {
-                _failures.Add($"Expected executor order [{string.Join(" → ", executorIds)}] " +
+                AddFailure($"Expected executor order [{string.Join(" → ", executorIds)}] " +
                               $"but found [{string.Join(" → ", actualOrder)}]");
                 break;
             }
@@ -122,11 +144,14 @@ public class WorkflowAssertionBuilder
     /// Assert the workflow completed within a time limit.
     /// </summary>
     /// <param name="maxDuration">Maximum acceptable duration.</param>
-    public WorkflowAssertionBuilder HaveCompletedWithin(TimeSpan maxDuration)
+    /// <param name="because">Optional reason for the assertion.</param>
+    [StackTraceHidden]
+    public WorkflowAssertionBuilder HaveCompletedWithin(TimeSpan maxDuration, string? because = null)
     {
+        _currentBecause = because;
         if (_result.TotalDuration > maxDuration)
         {
-            _failures.Add($"Expected completion within {maxDuration.TotalSeconds:F1}s " +
+            AddFailure($"Expected completion within {maxDuration.TotalSeconds:F1}s " +
                           $"but took {_result.TotalDuration.TotalSeconds:F1}s");
         }
         return this;
@@ -135,11 +160,14 @@ public class WorkflowAssertionBuilder
     /// <summary>
     /// Assert the workflow had no errors.
     /// </summary>
-    public WorkflowAssertionBuilder HaveNoErrors()
+    /// <param name="because">Optional reason for the assertion.</param>
+    [StackTraceHidden]
+    public WorkflowAssertionBuilder HaveNoErrors(string? because = null)
     {
+        _currentBecause = because;
         if (_result.Errors?.Any() == true)
         {
-            _failures.Add($"Expected no errors but found {_result.Errors.Count}: " +
+            AddFailure($"Expected no errors but found {_result.Errors.Count}: " +
                           $"{string.Join(", ", _result.Errors.Select(e => $"[{e.ExecutorId}] {e.Message}"))}");
         }
         return this;
@@ -148,12 +176,15 @@ public class WorkflowAssertionBuilder
     /// <summary>
     /// Assert the workflow completed successfully.
     /// </summary>
-    public WorkflowAssertionBuilder HaveSucceeded()
+    /// <param name="because">Optional reason for the assertion.</param>
+    [StackTraceHidden]
+    public WorkflowAssertionBuilder HaveSucceeded(string? because = null)
     {
+        _currentBecause = because;
         if (!_result.IsSuccess)
         {
             var errorMsg = _result.Errors?.FirstOrDefault()?.Message ?? "Unknown error";
-            _failures.Add($"Expected workflow to succeed but it failed: {errorMsg}");
+            AddFailure($"Expected workflow to succeed but it failed: {errorMsg}");
         }
         return this;
     }
@@ -163,12 +194,15 @@ public class WorkflowAssertionBuilder
     /// </summary>
     /// <param name="expected">Expected substring.</param>
     /// <param name="caseSensitive">Whether comparison is case-sensitive.</param>
-    public WorkflowAssertionBuilder HaveFinalOutputContaining(string expected, bool caseSensitive = false)
+    /// <param name="because">Optional reason for the assertion.</param>
+    [StackTraceHidden]
+    public WorkflowAssertionBuilder HaveFinalOutputContaining(string expected, bool caseSensitive = false, string? because = null)
     {
+        _currentBecause = because;
         var comparison = caseSensitive ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase;
         if (!_result.FinalOutput.Contains(expected, comparison))
         {
-            _failures.Add($"Expected final output to contain '{expected}' " +
+            AddFailure($"Expected final output to contain '{expected}' " +
                           $"but output was: \"{Truncate(_result.FinalOutput, 100)}\"");
         }
         return this;
@@ -178,11 +212,14 @@ public class WorkflowAssertionBuilder
     /// Assert the final output matches a pattern.
     /// </summary>
     /// <param name="pattern">Regex pattern to match.</param>
-    public WorkflowAssertionBuilder HaveFinalOutputMatching(string pattern)
+    /// <param name="because">Optional reason for the assertion.</param>
+    [StackTraceHidden]
+    public WorkflowAssertionBuilder HaveFinalOutputMatching(string pattern, string? because = null)
     {
+        _currentBecause = because;
         if (!System.Text.RegularExpressions.Regex.IsMatch(_result.FinalOutput, pattern))
         {
-            _failures.Add($"Expected final output to match pattern '{pattern}' " +
+            AddFailure($"Expected final output to match pattern '{pattern}' " +
                           $"but output was: \"{Truncate(_result.FinalOutput, 100)}\"");
         }
         return this;
@@ -191,11 +228,14 @@ public class WorkflowAssertionBuilder
     /// <summary>
     /// Assert the final output is not empty.
     /// </summary>
-    public WorkflowAssertionBuilder HaveNonEmptyOutput()
+    /// <param name="because">Optional reason for the assertion.</param>
+    [StackTraceHidden]
+    public WorkflowAssertionBuilder HaveNonEmptyOutput(string? because = null)
     {
+        _currentBecause = because;
         if (string.IsNullOrWhiteSpace(_result.FinalOutput))
         {
-            _failures.Add("Expected non-empty final output but output was empty");
+            AddFailure("Expected non-empty final output but output was empty");
         }
         return this;
     }
@@ -207,11 +247,14 @@ public class WorkflowAssertionBuilder
     /// <summary>
     /// Assert the workflow has a graph structure.
     /// </summary>
-    public WorkflowAssertionBuilder HaveGraphStructure()
+    /// <param name="because">Optional reason for the assertion.</param>
+    [StackTraceHidden]
+    public WorkflowAssertionBuilder HaveGraphStructure(string? because = null)
     {
+        _currentBecause = because;
         if (_result.Graph == null)
         {
-            _failures.Add("Expected workflow to have graph structure but Graph was null");
+            AddFailure("Expected workflow to have graph structure but Graph was null");
         }
         return this;
     }
@@ -221,14 +264,17 @@ public class WorkflowAssertionBuilder
     /// </summary>
     /// <param name="sourceExecutorId">Source executor ID.</param>
     /// <param name="targetExecutorId">Target executor ID.</param>
-    public WorkflowAssertionBuilder HaveTraversedEdge(string sourceExecutorId, string targetExecutorId)
+    /// <param name="because">Optional reason for the assertion.</param>
+    [StackTraceHidden]
+    public WorkflowAssertionBuilder HaveTraversedEdge(string sourceExecutorId, string targetExecutorId, string? because = null)
     {
+        _currentBecause = because;
         var traversedEdges = _result.Graph?.TraversedEdges;
         if (traversedEdges == null || !traversedEdges.Any(e =>
             e.SourceExecutorId.Equals(sourceExecutorId, StringComparison.OrdinalIgnoreCase) &&
             e.TargetExecutorId.Equals(targetExecutorId, StringComparison.OrdinalIgnoreCase)))
         {
-            _failures.Add($"Expected edge '{sourceExecutorId}' → '{targetExecutorId}' to be traversed but it was not. " +
+            AddFailure($"Expected edge '{sourceExecutorId}' → '{targetExecutorId}' to be traversed but it was not. " +
                           $"Traversed edges: [{string.Join(", ", traversedEdges?.Select(e => $"{e.SourceExecutorId}→{e.TargetExecutorId}") ?? [])}]");
         }
         return this;
@@ -238,12 +284,15 @@ public class WorkflowAssertionBuilder
     /// Assert a specific edge type was used.
     /// </summary>
     /// <param name="edgeType">Expected edge type.</param>
-    public WorkflowAssertionBuilder HaveUsedEdgeType(EdgeType edgeType)
+    /// <param name="because">Optional reason for the assertion.</param>
+    [StackTraceHidden]
+    public WorkflowAssertionBuilder HaveUsedEdgeType(EdgeType edgeType, string? because = null)
     {
+        _currentBecause = because;
         var traversedEdges = _result.Graph?.TraversedEdges;
         if (traversedEdges == null || !traversedEdges.Any(e => e.EdgeType == edgeType))
         {
-            _failures.Add($"Expected edge type '{edgeType}' to be used but it was not. " +
+            AddFailure($"Expected edge type '{edgeType}' to be used but it was not. " +
                           $"Used edge types: [{string.Join(", ", traversedEdges?.Select(e => e.EdgeType.ToString()).Distinct() ?? [])}]");
         }
         return this;
@@ -252,11 +301,14 @@ public class WorkflowAssertionBuilder
     /// <summary>
     /// Assert the workflow used conditional routing.
     /// </summary>
-    public WorkflowAssertionBuilder HaveConditionalRouting()
+    /// <param name="because">Optional reason for the assertion.</param>
+    [StackTraceHidden]
+    public WorkflowAssertionBuilder HaveConditionalRouting(string? because = null)
     {
+        _currentBecause = because;
         if (!_result.HasConditionalRouting)
         {
-            _failures.Add("Expected workflow to have conditional routing but it did not");
+            AddFailure("Expected workflow to have conditional routing but it did not");
         }
         return this;
     }
@@ -264,11 +316,14 @@ public class WorkflowAssertionBuilder
     /// <summary>
     /// Assert the workflow had parallel execution.
     /// </summary>
-    public WorkflowAssertionBuilder HaveParallelExecution()
+    /// <param name="because">Optional reason for the assertion.</param>
+    [StackTraceHidden]
+    public WorkflowAssertionBuilder HaveParallelExecution(string? because = null)
     {
+        _currentBecause = because;
         if (!_result.HasParallelExecution)
         {
-            _failures.Add("Expected workflow to have parallel execution but it did not");
+            AddFailure("Expected workflow to have parallel execution but it did not");
         }
         return this;
     }
@@ -277,12 +332,15 @@ public class WorkflowAssertionBuilder
     /// Assert the workflow has a specific number of parallel branches.
     /// </summary>
     /// <param name="expectedCount">Expected number of parallel branches.</param>
-    public WorkflowAssertionBuilder HaveParallelBranchCount(int expectedCount)
+    /// <param name="because">Optional reason for the assertion.</param>
+    [StackTraceHidden]
+    public WorkflowAssertionBuilder HaveParallelBranchCount(int expectedCount, string? because = null)
     {
+        _currentBecause = because;
         var actualCount = _result.Graph?.ParallelBranches?.Count ?? 0;
         if (actualCount != expectedCount)
         {
-            _failures.Add($"Expected {expectedCount} parallel branches but found {actualCount}");
+            AddFailure($"Expected {expectedCount} parallel branches but found {actualCount}");
         }
         return this;
     }
@@ -292,14 +350,17 @@ public class WorkflowAssertionBuilder
     /// </summary>
     /// <param name="deciderExecutorId">The executor that made the decision.</param>
     /// <param name="selectedEdgeId">The edge that was selected.</param>
-    public WorkflowAssertionBuilder HaveRoutingDecision(string deciderExecutorId, string selectedEdgeId)
+    /// <param name="because">Optional reason for the assertion.</param>
+    [StackTraceHidden]
+    public WorkflowAssertionBuilder HaveRoutingDecision(string deciderExecutorId, string selectedEdgeId, string? because = null)
     {
+        _currentBecause = because;
         var decisions = _result.RoutingDecisions;
         if (decisions == null || !decisions.Any(d =>
             d.DeciderExecutorId.Equals(deciderExecutorId, StringComparison.OrdinalIgnoreCase) &&
             d.SelectedEdgeId.Equals(selectedEdgeId, StringComparison.OrdinalIgnoreCase)))
         {
-            _failures.Add($"Expected routing decision from '{deciderExecutorId}' selecting '{selectedEdgeId}' " +
+            AddFailure($"Expected routing decision from '{deciderExecutorId}' selecting '{selectedEdgeId}' " +
                           $"but it was not found");
         }
         return this;
@@ -309,27 +370,41 @@ public class WorkflowAssertionBuilder
     /// Assert the workflow execution path matches expected sequence.
     /// </summary>
     /// <param name="expectedPath">Expected executor ID sequence.</param>
+    [StackTraceHidden]
     public WorkflowAssertionBuilder HaveExecutionPath(params string[] expectedPath)
     {
         var actualPath = _result.GetExecutionPath().ToList();
         
         if (!actualPath.SequenceEqual(expectedPath, StringComparer.OrdinalIgnoreCase))
         {
-            _failures.Add($"Expected execution path [{string.Join(" → ", expectedPath)}] " +
+            AddFailure($"Expected execution path [{string.Join(" → ", expectedPath)}] " +
                           $"but actual path was [{string.Join(" → ", actualPath)}]");
         }
         return this;
     }
 
     /// <summary>
+    /// Assert the workflow execution path matches expected sequence.
+    /// </summary>
+    /// <param name="because">Optional reason for the assertion.</param>
+    /// <param name="expectedPath">Expected executor ID sequence.</param>
+    [StackTraceHidden]
+    public WorkflowAssertionBuilder HaveExecutionPathBecause(string? because, params string[] expectedPath)
+    {
+        _currentBecause = because;
+        return HaveExecutionPath(expectedPath);
+    }
+
+    /// <summary>
     /// Assert the workflow contains specific nodes.
     /// </summary>
     /// <param name="nodeIds">Expected node IDs.</param>
+    [StackTraceHidden]
     public WorkflowAssertionBuilder HaveNodes(params string[] nodeIds)
     {
         if (_result.Graph == null)
         {
-            _failures.Add("Cannot check nodes: workflow has no graph structure");
+            AddFailure("Cannot check nodes: workflow has no graph structure");
             return this;
         }
 
@@ -338,25 +413,40 @@ public class WorkflowAssertionBuilder
         
         if (missingNodes.Count > 0)
         {
-            _failures.Add($"Expected nodes [{string.Join(", ", missingNodes)}] not found in graph. " +
+            AddFailure($"Expected nodes [{string.Join(", ", missingNodes)}] not found in graph. " +
                           $"Available nodes: [{string.Join(", ", graphNodeIds)}]");
         }
         return this;
     }
 
     /// <summary>
+    /// Assert the workflow contains specific nodes.
+    /// </summary>
+    /// <param name="because">Optional reason for the assertion.</param>
+    /// <param name="nodeIds">Expected node IDs.</param>
+    [StackTraceHidden]
+    public WorkflowAssertionBuilder HaveNodesBecause(string? because, params string[] nodeIds)
+    {
+        _currentBecause = because;
+        return HaveNodes(nodeIds);
+    }
+
+    /// <summary>
     /// Assert the workflow graph has a specific entry point.
     /// </summary>
     /// <param name="entryNodeId">Expected entry node ID.</param>
-    public WorkflowAssertionBuilder HaveEntryPoint(string entryNodeId)
+    /// <param name="because">Optional reason for the assertion.</param>
+    [StackTraceHidden]
+    public WorkflowAssertionBuilder HaveEntryPoint(string entryNodeId, string? because = null)
     {
+        _currentBecause = because;
         if (_result.Graph == null)
         {
-            _failures.Add("Cannot check entry point: workflow has no graph structure");
+            AddFailure("Cannot check entry point: workflow has no graph structure");
         }
         else if (!_result.Graph.EntryNodeId.Equals(entryNodeId, StringComparison.OrdinalIgnoreCase))
         {
-            _failures.Add($"Expected entry point '{entryNodeId}' but found '{_result.Graph.EntryNodeId}'");
+            AddFailure($"Expected entry point '{entryNodeId}' but found '{_result.Graph.EntryNodeId}'");
         }
         return this;
     }
@@ -397,12 +487,22 @@ public class WorkflowAssertionBuilder
     /// Validate all assertions and throw if any failed.
     /// </summary>
     /// <exception cref="WorkflowAssertionException">Thrown if any assertions failed.</exception>
+    [StackTraceHidden]
     public void Validate()
     {
         if (_failures.Count > 0)
         {
-            throw new WorkflowAssertionException(
-                $"Workflow assertion failed ({_failures.Count} issue(s)):\n  • {string.Join("\n  • ", _failures)}");
+            var failureMessages = _failures.Select(f => f.Message).ToList();
+            var becauseClause = _failures.FirstOrDefault(f => !string.IsNullOrEmpty(f.Because)).Because;
+            
+            throw WorkflowAssertionException.Create(
+                $"Workflow assertion failed ({_failures.Count} issue(s))",
+                failures: failureMessages,
+                expected: "(see failures list)",
+                actual: "(see failures list)",
+                context: _result.ToString(),
+                suggestions: GetSuggestions(),
+                because: becauseClause);
         }
     }
 
@@ -414,9 +514,31 @@ public class WorkflowAssertionBuilder
     /// <summary>
     /// Get the list of failure messages.
     /// </summary>
-    public IReadOnlyList<string> Failures => _failures;
+    public IReadOnlyList<string> Failures => _failures.Select(f => f.Message).ToList();
 
-    internal void AddFailure(string failure) => _failures.Add(failure);
+    /// <summary>
+    /// Get the list of failure details including 'because' context.
+    /// </summary>
+    public IReadOnlyList<(string Message, string? Because)> FailureDetails => _failures;
+
+    internal void AddFailure(string failure) => _failures.Add((failure, _currentBecause));
+
+    private IReadOnlyList<string>? GetSuggestions()
+    {
+        var suggestions = new List<string>();
+        
+        foreach (var (message, _) in _failures)
+        {
+            if (message.Contains("not found"))
+                suggestions.Add("Verify the executor or node ID matches the workflow configuration");
+            if (message.Contains("took") && message.Contains("expected under"))
+                suggestions.Add("Consider increasing timeout or optimizing executor performance");
+            if (message.Contains("execution path"))
+                suggestions.Add("Check workflow routing logic and edge conditions");
+        }
+        
+        return suggestions.Count > 0 ? suggestions.Distinct().ToList() : null;
+    }
 
     private static string Truncate(string text, int maxLength)
     {
@@ -434,6 +556,7 @@ public class ExecutorStepAssertionBuilder
     private readonly WorkflowAssertionBuilder _parent;
     private readonly ExecutorStep? _step;
     private readonly string _executorId;
+    private string? _currentBecause;
 
     internal ExecutorStepAssertionBuilder(WorkflowAssertionBuilder parent, ExecutorStep? step, string executorId)
     {
@@ -443,22 +566,45 @@ public class ExecutorStepAssertionBuilder
     }
 
     /// <summary>
+    /// Set a 'because' reason for the next assertion.
+    /// </summary>
+    /// <param name="because">The reason for the assertion.</param>
+    public ExecutorStepAssertionBuilder Because(string because)
+    {
+        _currentBecause = because;
+        return this;
+    }
+
+    private void AddFailure(string message)
+    {
+        // Append because to message if available
+        var fullMessage = !string.IsNullOrEmpty(_currentBecause) 
+            ? $"{message} because {_currentBecause}"
+            : message;
+        _parent.AddFailure(fullMessage);
+        _currentBecause = null; // Reset after use
+    }
+
+    /// <summary>
     /// Assert the executor's output contains a string.
     /// </summary>
     /// <param name="expected">Expected substring.</param>
     /// <param name="caseSensitive">Whether comparison is case-sensitive.</param>
-    public ExecutorStepAssertionBuilder HaveOutputContaining(string expected, bool caseSensitive = false)
+    /// <param name="because">Optional reason for the assertion.</param>
+    [StackTraceHidden]
+    public ExecutorStepAssertionBuilder HaveOutputContaining(string expected, bool caseSensitive = false, string? because = null)
     {
+        if (because != null) _currentBecause = because;
         if (_step == null)
         {
-            _parent.AddFailure($"Executor '{_executorId}' was not found");
+            AddFailure($"Executor '{_executorId}' was not found");
         }
         else
         {
             var comparison = caseSensitive ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase;
             if (!_step.Output.Contains(expected, comparison))
             {
-                _parent.AddFailure($"Executor '{_executorId}' output does not contain '{expected}'. " +
+                AddFailure($"Executor '{_executorId}' output does not contain '{expected}'. " +
                                    $"Actual output: \"{Truncate(_step.Output, 80)}\"");
             }
         }
@@ -469,15 +615,18 @@ public class ExecutorStepAssertionBuilder
     /// Assert the executor completed within a time limit.
     /// </summary>
     /// <param name="maxDuration">Maximum acceptable duration.</param>
-    public ExecutorStepAssertionBuilder HaveCompletedWithin(TimeSpan maxDuration)
+    /// <param name="because">Optional reason for the assertion.</param>
+    [StackTraceHidden]
+    public ExecutorStepAssertionBuilder HaveCompletedWithin(TimeSpan maxDuration, string? because = null)
     {
+        if (because != null) _currentBecause = because;
         if (_step == null)
         {
-            _parent.AddFailure($"Executor '{_executorId}' was not found");
+            AddFailure($"Executor '{_executorId}' was not found");
         }
         else if (_step.Duration > maxDuration)
         {
-            _parent.AddFailure($"Executor '{_executorId}' took {_step.Duration.TotalMilliseconds:F0}ms, " +
+            AddFailure($"Executor '{_executorId}' took {_step.Duration.TotalMilliseconds:F0}ms, " +
                                $"expected under {maxDuration.TotalMilliseconds:F0}ms");
         }
         return this;
@@ -487,16 +636,19 @@ public class ExecutorStepAssertionBuilder
     /// Assert the executor called a specific tool.
     /// </summary>
     /// <param name="toolName">Name of the expected tool.</param>
-    public ExecutorStepAssertionBuilder HaveCalledTool(string toolName)
+    /// <param name="because">Optional reason for the assertion.</param>
+    [StackTraceHidden]
+    public ExecutorStepAssertionBuilder HaveCalledTool(string toolName, string? because = null)
     {
+        if (because != null) _currentBecause = because;
         if (_step == null)
         {
-            _parent.AddFailure($"Executor '{_executorId}' was not found");
+            AddFailure($"Executor '{_executorId}' was not found");
         }
         else if (_step.ToolCalls?.Any(t => t.Name.Equals(toolName, StringComparison.OrdinalIgnoreCase)) != true)
         {
             var calledTools = _step.ToolCalls?.Select(t => t.Name).ToList() ?? [];
-            _parent.AddFailure($"Executor '{_executorId}' did not call tool '{toolName}'. " +
+            AddFailure($"Executor '{_executorId}' did not call tool '{toolName}'. " +
                                $"Called tools: [{string.Join(", ", calledTools)}]");
         }
         return this;
@@ -506,18 +658,21 @@ public class ExecutorStepAssertionBuilder
     /// Assert the executor made a specific number of tool calls.
     /// </summary>
     /// <param name="expected">Expected number of tool calls.</param>
-    public ExecutorStepAssertionBuilder HaveToolCallCount(int expected)
+    /// <param name="because">Optional reason for the assertion.</param>
+    [StackTraceHidden]
+    public ExecutorStepAssertionBuilder HaveToolCallCount(int expected, string? because = null)
     {
+        if (because != null) _currentBecause = because;
         if (_step == null)
         {
-            _parent.AddFailure($"Executor '{_executorId}' was not found");
+            AddFailure($"Executor '{_executorId}' was not found");
         }
         else
         {
             var actual = _step.ToolCalls?.Count ?? 0;
             if (actual != expected)
             {
-                _parent.AddFailure($"Executor '{_executorId}' made {actual} tool calls, expected {expected}");
+                AddFailure($"Executor '{_executorId}' made {actual} tool calls, expected {expected}");
             }
         }
         return this;
@@ -526,15 +681,18 @@ public class ExecutorStepAssertionBuilder
     /// <summary>
     /// Assert the executor has non-empty output.
     /// </summary>
-    public ExecutorStepAssertionBuilder HaveNonEmptyOutput()
+    /// <param name="because">Optional reason for the assertion.</param>
+    [StackTraceHidden]
+    public ExecutorStepAssertionBuilder HaveNonEmptyOutput(string? because = null)
     {
+        if (because != null) _currentBecause = because;
         if (_step == null)
         {
-            _parent.AddFailure($"Executor '{_executorId}' was not found");
+            AddFailure($"Executor '{_executorId}' was not found");
         }
         else if (string.IsNullOrWhiteSpace(_step.Output))
         {
-            _parent.AddFailure($"Executor '{_executorId}' produced empty output");
+            AddFailure($"Executor '{_executorId}' produced empty output");
         }
         return this;
     }
@@ -546,15 +704,18 @@ public class ExecutorStepAssertionBuilder
     /// <summary>
     /// Assert the executor was reached via conditional routing.
     /// </summary>
-    public ExecutorStepAssertionBuilder HaveBeenConditionallyRouted()
+    /// <param name="because">Optional reason for the assertion.</param>
+    [StackTraceHidden]
+    public ExecutorStepAssertionBuilder HaveBeenConditionallyRouted(string? because = null)
     {
+        if (because != null) _currentBecause = because;
         if (_step == null)
         {
-            _parent.AddFailure($"Executor '{_executorId}' was not found");
+            AddFailure($"Executor '{_executorId}' was not found");
         }
         else if (!_step.WasConditionallyRouted)
         {
-            _parent.AddFailure($"Executor '{_executorId}' was not reached via conditional routing");
+            AddFailure($"Executor '{_executorId}' was not reached via conditional routing");
         }
         return this;
     }
@@ -562,15 +723,18 @@ public class ExecutorStepAssertionBuilder
     /// <summary>
     /// Assert the executor is part of a parallel branch.
     /// </summary>
-    public ExecutorStepAssertionBuilder BeInParallelBranch()
+    /// <param name="because">Optional reason for the assertion.</param>
+    [StackTraceHidden]
+    public ExecutorStepAssertionBuilder BeInParallelBranch(string? because = null)
     {
+        if (because != null) _currentBecause = because;
         if (_step == null)
         {
-            _parent.AddFailure($"Executor '{_executorId}' was not found");
+            AddFailure($"Executor '{_executorId}' was not found");
         }
         else if (!_step.IsParallelBranch)
         {
-            _parent.AddFailure($"Executor '{_executorId}' is not part of a parallel branch");
+            AddFailure($"Executor '{_executorId}' is not part of a parallel branch");
         }
         return this;
     }
@@ -579,15 +743,18 @@ public class ExecutorStepAssertionBuilder
     /// Assert the executor is part of a specific parallel branch.
     /// </summary>
     /// <param name="branchId">Expected branch ID.</param>
-    public ExecutorStepAssertionBuilder BeInParallelBranch(string branchId)
+    /// <param name="because">Optional reason for the assertion.</param>
+    [StackTraceHidden]
+    public ExecutorStepAssertionBuilder BeInParallelBranch(string branchId, string? because = null)
     {
+        if (because != null) _currentBecause = because;
         if (_step == null)
         {
-            _parent.AddFailure($"Executor '{_executorId}' was not found");
+            AddFailure($"Executor '{_executorId}' was not found");
         }
         else if (!string.Equals(_step.ParallelBranchId, branchId, StringComparison.OrdinalIgnoreCase))
         {
-            _parent.AddFailure($"Executor '{_executorId}' expected branch '{branchId}' but was in '{_step.ParallelBranchId ?? "(none)"}'");
+            AddFailure($"Executor '{_executorId}' expected branch '{branchId}' but was in '{_step.ParallelBranchId ?? "(none)"}'");
         }
         return this;
     }
@@ -595,15 +762,18 @@ public class ExecutorStepAssertionBuilder
     /// <summary>
     /// Assert the executor has an incoming edge.
     /// </summary>
-    public ExecutorStepAssertionBuilder HaveIncomingEdge()
+    /// <param name="because">Optional reason for the assertion.</param>
+    [StackTraceHidden]
+    public ExecutorStepAssertionBuilder HaveIncomingEdge(string? because = null)
     {
+        if (because != null) _currentBecause = because;
         if (_step == null)
         {
-            _parent.AddFailure($"Executor '{_executorId}' was not found");
+            AddFailure($"Executor '{_executorId}' was not found");
         }
         else if (_step.IncomingEdge == null)
         {
-            _parent.AddFailure($"Executor '{_executorId}' has no incoming edge");
+            AddFailure($"Executor '{_executorId}' has no incoming edge");
         }
         return this;
     }
@@ -612,22 +782,25 @@ public class ExecutorStepAssertionBuilder
     /// Assert the executor has outgoing edges.
     /// </summary>
     /// <param name="expectedCount">Optional expected count of outgoing edges.</param>
-    public ExecutorStepAssertionBuilder HaveOutgoingEdges(int? expectedCount = null)
+    /// <param name="because">Optional reason for the assertion.</param>
+    [StackTraceHidden]
+    public ExecutorStepAssertionBuilder HaveOutgoingEdges(int? expectedCount = null, string? because = null)
     {
+        if (because != null) _currentBecause = because;
         if (_step == null)
         {
-            _parent.AddFailure($"Executor '{_executorId}' was not found");
+            AddFailure($"Executor '{_executorId}' was not found");
         }
         else
         {
             var actualCount = _step.OutgoingEdges?.Count ?? 0;
             if (actualCount == 0)
             {
-                _parent.AddFailure($"Executor '{_executorId}' has no outgoing edges");
+                AddFailure($"Executor '{_executorId}' has no outgoing edges");
             }
             else if (expectedCount.HasValue && actualCount != expectedCount.Value)
             {
-                _parent.AddFailure($"Executor '{_executorId}' expected {expectedCount} outgoing edges but had {actualCount}");
+                AddFailure($"Executor '{_executorId}' expected {expectedCount} outgoing edges but had {actualCount}");
             }
         }
         return this;
@@ -637,19 +810,22 @@ public class ExecutorStepAssertionBuilder
     /// Assert the executor's incoming edge is of a specific type.
     /// </summary>
     /// <param name="expectedType">Expected edge type.</param>
-    public ExecutorStepAssertionBuilder HaveIncomingEdgeOfType(EdgeType expectedType)
+    /// <param name="because">Optional reason for the assertion.</param>
+    [StackTraceHidden]
+    public ExecutorStepAssertionBuilder HaveIncomingEdgeOfType(EdgeType expectedType, string? because = null)
     {
+        if (because != null) _currentBecause = because;
         if (_step == null)
         {
-            _parent.AddFailure($"Executor '{_executorId}' was not found");
+            AddFailure($"Executor '{_executorId}' was not found");
         }
         else if (_step.IncomingEdge == null)
         {
-            _parent.AddFailure($"Executor '{_executorId}' has no incoming edge");
+            AddFailure($"Executor '{_executorId}' has no incoming edge");
         }
         else if (_step.IncomingEdge.EdgeType != expectedType)
         {
-            _parent.AddFailure($"Executor '{_executorId}' incoming edge expected type '{expectedType}' but was '{_step.IncomingEdge.EdgeType}'");
+            AddFailure($"Executor '{_executorId}' incoming edge expected type '{expectedType}' but was '{_step.IncomingEdge.EdgeType}'");
         }
         return this;
     }
@@ -670,20 +846,121 @@ public class ExecutorStepAssertionBuilder
 /// <summary>
 /// Exception thrown when workflow assertions fail.
 /// </summary>
-public class WorkflowAssertionException : Exception
+public class WorkflowAssertionException : AgentEvalAssertionException
 {
+    /// <summary>
+    /// Gets the list of all failures when multiple assertions failed.
+    /// </summary>
+    public IReadOnlyList<string> Failures { get; init; } = [];
+
     /// <summary>
     /// Creates a new workflow assertion exception.
     /// </summary>
     /// <param name="message">Failure message.</param>
-    public WorkflowAssertionException(string message) : base(message) { }
+    public WorkflowAssertionException(string message) 
+        : base(message) 
+    {
+    }
 
     /// <summary>
     /// Creates a new workflow assertion exception with inner exception.
     /// </summary>
     /// <param name="message">Failure message.</param>
     /// <param name="inner">Inner exception.</param>
-    public WorkflowAssertionException(string message, Exception inner) : base(message, inner) { }
+    public WorkflowAssertionException(string message, Exception inner) 
+        : base(message, inner) 
+    {
+    }
+
+    /// <summary>
+    /// Creates a workflow assertion exception with full context.
+    /// </summary>
+    public static WorkflowAssertionException Create(
+        string message,
+        IReadOnlyList<string>? failures = null,
+        string? expected = null,
+        string? actual = null,
+        string? context = null,
+        IReadOnlyList<string>? suggestions = null,
+        string? because = null)
+    {
+        var formattedMessage = FormatWorkflowMessage(message, failures, expected, actual, context, suggestions, because);
+        
+        return new WorkflowAssertionException(formattedMessage)
+        {
+            Failures = failures ?? [],
+            Expected = expected,
+            Actual = actual,
+            Context = context,
+            Suggestions = suggestions,
+            Because = because
+        };
+    }
+
+    private static string FormatWorkflowMessage(
+        string message,
+        IReadOnlyList<string>? failures,
+        string? expected,
+        string? actual,
+        string? context,
+        IReadOnlyList<string>? suggestions,
+        string? because)
+    {
+        var sb = new System.Text.StringBuilder();
+        
+        // Main message with optional "because" reason
+        sb.Append(message);
+        if (!string.IsNullOrWhiteSpace(because))
+        {
+            sb.Append($" because {because}");
+        }
+        sb.AppendLine();
+
+        // Failures list
+        if (failures?.Count > 0)
+        {
+            sb.AppendLine();
+            sb.AppendLine("Failures:");
+            foreach (var failure in failures)
+            {
+                sb.AppendLine($"  • {failure}");
+            }
+        }
+
+        // Expected vs Actual
+        if (expected != null || actual != null)
+        {
+            sb.AppendLine();
+            if (expected != null)
+                sb.AppendLine($"Expected: {expected}");
+            if (actual != null)
+                sb.AppendLine($"Actual:   {actual}");
+        }
+
+        // Additional context
+        if (!string.IsNullOrWhiteSpace(context))
+        {
+            sb.AppendLine();
+            sb.AppendLine("Context:");
+            foreach (var line in context.Split('\n'))
+            {
+                sb.AppendLine($"  {line.TrimEnd()}");
+            }
+        }
+
+        // Suggestions
+        if (suggestions?.Count > 0)
+        {
+            sb.AppendLine();
+            sb.AppendLine("Suggestions:");
+            foreach (var suggestion in suggestions)
+            {
+                sb.AppendLine($"  → {suggestion}");
+            }
+        }
+
+        return sb.ToString().TrimEnd();
+    }
 }
 
 /// <summary>
@@ -695,6 +972,7 @@ public class EdgeAssertionBuilder
     private readonly EdgeExecution? _edge;
     private readonly string _sourceId;
     private readonly string _targetId;
+    private string? _currentBecause;
 
     internal EdgeAssertionBuilder(WorkflowAssertionBuilder parent, EdgeExecution? edge, string sourceId, string targetId)
     {
@@ -705,13 +983,35 @@ public class EdgeAssertionBuilder
     }
 
     /// <summary>
+    /// Set a 'because' reason for the next assertion.
+    /// </summary>
+    /// <param name="because">The reason for the assertion.</param>
+    public EdgeAssertionBuilder Because(string because)
+    {
+        _currentBecause = because;
+        return this;
+    }
+
+    private void AddFailure(string message)
+    {
+        var fullMessage = !string.IsNullOrEmpty(_currentBecause) 
+            ? $"{message} because {_currentBecause}"
+            : message;
+        _parent.AddFailure(fullMessage);
+        _currentBecause = null;
+    }
+
+    /// <summary>
     /// Assert the edge exists.
     /// </summary>
-    public EdgeAssertionBuilder Exist()
+    /// <param name="because">Optional reason for the assertion.</param>
+    [StackTraceHidden]
+    public EdgeAssertionBuilder Exist(string? because = null)
     {
+        if (because != null) _currentBecause = because;
         if (_edge == null)
         {
-            _parent.AddFailure($"Edge '{_sourceId}' → '{_targetId}' was not traversed");
+            AddFailure($"Edge '{_sourceId}' → '{_targetId}' was not traversed");
         }
         return this;
     }
@@ -720,15 +1020,18 @@ public class EdgeAssertionBuilder
     /// Assert the edge is of a specific type.
     /// </summary>
     /// <param name="expectedType">Expected edge type.</param>
-    public EdgeAssertionBuilder BeOfType(EdgeType expectedType)
+    /// <param name="because">Optional reason for the assertion.</param>
+    [StackTraceHidden]
+    public EdgeAssertionBuilder BeOfType(EdgeType expectedType, string? because = null)
     {
+        if (because != null) _currentBecause = because;
         if (_edge == null)
         {
-            _parent.AddFailure($"Edge '{_sourceId}' → '{_targetId}' was not found");
+            AddFailure($"Edge '{_sourceId}' → '{_targetId}' was not found");
         }
         else if (_edge.EdgeType != expectedType)
         {
-            _parent.AddFailure($"Edge '{_sourceId}' → '{_targetId}' expected type '{expectedType}' but was '{_edge.EdgeType}'");
+            AddFailure($"Edge '{_sourceId}' → '{_targetId}' expected type '{expectedType}' but was '{_edge.EdgeType}'");
         }
         return this;
     }
@@ -737,15 +1040,18 @@ public class EdgeAssertionBuilder
     /// Assert the conditional edge had a specific result.
     /// </summary>
     /// <param name="expectedResult">Expected condition result.</param>
-    public EdgeAssertionBuilder HaveConditionResult(bool expectedResult)
+    /// <param name="because">Optional reason for the assertion.</param>
+    [StackTraceHidden]
+    public EdgeAssertionBuilder HaveConditionResult(bool expectedResult, string? because = null)
     {
+        if (because != null) _currentBecause = because;
         if (_edge == null)
         {
-            _parent.AddFailure($"Edge '{_sourceId}' → '{_targetId}' was not found");
+            AddFailure($"Edge '{_sourceId}' → '{_targetId}' was not found");
         }
         else if (_edge.ConditionResult != expectedResult)
         {
-            _parent.AddFailure($"Edge '{_sourceId}' → '{_targetId}' expected condition result '{expectedResult}' " +
+            AddFailure($"Edge '{_sourceId}' → '{_targetId}' expected condition result '{expectedResult}' " +
                                $"but was '{_edge.ConditionResult}'");
         }
         return this;
@@ -755,15 +1061,18 @@ public class EdgeAssertionBuilder
     /// Assert the switch edge matched a specific label.
     /// </summary>
     /// <param name="expectedLabel">Expected switch label.</param>
-    public EdgeAssertionBuilder HaveMatchedSwitchLabel(string expectedLabel)
+    /// <param name="because">Optional reason for the assertion.</param>
+    [StackTraceHidden]
+    public EdgeAssertionBuilder HaveMatchedSwitchLabel(string expectedLabel, string? because = null)
     {
+        if (because != null) _currentBecause = because;
         if (_edge == null)
         {
-            _parent.AddFailure($"Edge '{_sourceId}' → '{_targetId}' was not found");
+            AddFailure($"Edge '{_sourceId}' → '{_targetId}' was not found");
         }
         else if (!string.Equals(_edge.MatchedSwitchLabel, expectedLabel, StringComparison.OrdinalIgnoreCase))
         {
-            _parent.AddFailure($"Edge '{_sourceId}' → '{_targetId}' expected switch label '{expectedLabel}' " +
+            AddFailure($"Edge '{_sourceId}' → '{_targetId}' expected switch label '{expectedLabel}' " +
                                $"but was '{_edge.MatchedSwitchLabel}'");
         }
         return this;
@@ -773,15 +1082,18 @@ public class EdgeAssertionBuilder
     /// Assert the edge transferred specific data.
     /// </summary>
     /// <param name="expectedData">Expected data substring.</param>
-    public EdgeAssertionBuilder HaveTransferredDataContaining(string expectedData)
+    /// <param name="because">Optional reason for the assertion.</param>
+    [StackTraceHidden]
+    public EdgeAssertionBuilder HaveTransferredDataContaining(string expectedData, string? because = null)
     {
+        if (because != null) _currentBecause = because;
         if (_edge == null)
         {
-            _parent.AddFailure($"Edge '{_sourceId}' → '{_targetId}' was not found");
+            AddFailure($"Edge '{_sourceId}' → '{_targetId}' was not found");
         }
         else if (_edge.TransferredData == null || !_edge.TransferredData.Contains(expectedData, StringComparison.OrdinalIgnoreCase))
         {
-            _parent.AddFailure($"Edge '{_sourceId}' → '{_targetId}' expected data containing '{expectedData}' " +
+            AddFailure($"Edge '{_sourceId}' → '{_targetId}' expected data containing '{expectedData}' " +
                                $"but transferred: '{_edge.TransferredData ?? "(null)"}'");
         }
         return this;

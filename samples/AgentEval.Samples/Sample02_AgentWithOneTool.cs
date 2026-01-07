@@ -102,13 +102,14 @@ public static class Sample02_AgentWithOneTool
         {
             try
             {
-                // This is the key feature - fluent tool assertions!
+                // Fluent tool assertions with 'because' for self-documenting tests!
                 result.ToolUsage
                     .Should()
-                    .HaveCalledTool("CalculatorTool")
-                        .WithoutError()
+                    .HaveCalledTool("CalculatorTool",
+                        because: "agent must use calculator for math operations")
+                        .WithoutError(because: "calculation errors should be caught")
                     .And()
-                    .HaveNoErrors();
+                    .HaveNoErrors(because: "all tool calls must succeed");
 
                 Console.ForegroundColor = ConsoleColor.Green;
                 Console.WriteLine("   ✅ All assertions passed!");
@@ -117,10 +118,11 @@ public static class Sample02_AgentWithOneTool
    ┌─────────────────────────────────────────────────────────────┐
    │  result.ToolUsage                                           │
    │      .Should()                                              │
-   │      .HaveCalledTool(""CalculatorTool"")                      │
-   │          .WithoutError()                                    │
+   │      .HaveCalledTool(""CalculatorTool"",                      │
+   │          because: ""agent must use calculator for math"")    │
+   │          .WithoutError(because: ""calculations must succeed"")│
    │      .And()                                                 │
-   │      .HaveNoErrors();                                       │
+   │      .HaveNoErrors(because: ""all tool calls must succeed""); │
    └─────────────────────────────────────────────────────────────┘
 ");
                 Console.ResetColor();
@@ -151,6 +153,7 @@ public static class Sample02_AgentWithOneTool
         Console.WriteLine("   • .HaveCalledTool(\"Name\") verifies a tool was called");
         Console.WriteLine("   • .WithoutError() verifies no exceptions occurred");
         Console.WriteLine("   • .HaveNoErrors() verifies ALL tools completed successfully");
+        Console.WriteLine("   • 💡 Use 'because:' to document WHY assertions matter!");
         
         Console.WriteLine("\n🔗 NEXT: Run Sample 03 to see multi-tool ordering!\n");
     }

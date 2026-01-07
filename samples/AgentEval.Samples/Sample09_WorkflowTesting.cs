@@ -52,10 +52,11 @@ public static class Sample09_WorkflowTesting
         try
         {
             workflowResult.Should()
-                .HaveStepCount(4)
+                .HaveStepCount(4, because: "content pipeline requires 4 stages")
                 .HaveExecutedInOrder("planner", "researcher", "writer", "editor")
-                .HaveCompletedWithin(TimeSpan.FromSeconds(5))
-                .HaveNoErrors()
+                .HaveCompletedWithin(TimeSpan.FromSeconds(5),
+                    because: "SLA requires completion under 5 seconds")
+                .HaveNoErrors(because: "partial execution is not acceptable")
                 .HaveNonEmptyOutput()
                 .HaveFinalOutputContaining("article")
                 .Validate();
@@ -81,8 +82,10 @@ public static class Sample09_WorkflowTesting
             workflowResult.Should()
                 .ForExecutor("researcher")
                     .HaveOutputContaining("research")
-                    .HaveCompletedWithin(TimeSpan.FromSeconds(2))
-                    .HaveCalledTool("search_web")
+                    .HaveCompletedWithin(TimeSpan.FromSeconds(2),
+                        because: "research phase has strict timeout")
+                    .HaveCalledTool("search_web",
+                        because: "researcher must use search for data")
                     .And()
                 .ForExecutor("writer")
                     .HaveNonEmptyOutput()
@@ -111,7 +114,8 @@ public static class Sample09_WorkflowTesting
             workflowResult.Should()
                 .HaveGraphStructure()
                 .HaveNodes("planner", "researcher", "writer", "editor")
-                .HaveEntryPoint("planner")
+                .HaveEntryPoint("planner",
+                    because: "planner must be the starting point")
                 .HaveTraversedEdge("researcher", "writer")
                 .HaveUsedEdgeType(EdgeType.Sequential)
                 .HaveExecutionPath("planner", "researcher", "writer", "editor")
