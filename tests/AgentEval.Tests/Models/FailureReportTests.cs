@@ -81,7 +81,7 @@ public class FailureReportTests
         var report = new FailureReport
         {
             WhyItFailed = "Tool 'search' failed",
-            MetricName = "ToolSuccess",
+            MetricName = "code_tool_success",
             Score = 0.0
         }
         .AddReason("ToolError", "Search API returned 500")
@@ -91,7 +91,7 @@ public class FailureReportTests
 
         Assert.Contains("FAILURE REPORT", formatted);
         Assert.Contains("Tool 'search' failed", formatted);
-        Assert.Contains("ToolSuccess", formatted);
+        Assert.Contains("code_tool_success", formatted);
         Assert.Contains("Failure Reasons", formatted);
         Assert.Contains("ToolError", formatted);
         Assert.Contains("Suggested Fixes", formatted);
@@ -104,7 +104,7 @@ public class FailureReportTests
         var report = new FailureReport
         {
             WhyItFailed = "Evaluation failed",
-            MetricName = "Faithfulness"
+            MetricName = "llm_faithfulness"
         }
         .AddReason("ValidationFailed", "Score below threshold");
 
@@ -112,7 +112,7 @@ public class FailureReportTests
 
         Assert.DoesNotContain("\n", summary);
         Assert.Contains("FAILED", summary);
-        Assert.Contains("Faithfulness", summary);
+        Assert.Contains("llm_faithfulness", summary);
         Assert.Contains("1 reason", summary);
     }
 
@@ -128,10 +128,10 @@ public class FailureReportTests
             ErrorMessage = "API timeout"
         };
 
-        var report = FailureReport.FromToolCallFailure(failedTool, "ToolSuccess");
+        var report = FailureReport.FromToolCallFailure(failedTool, "code_tool_success");
 
         Assert.Contains("search", report.WhyItFailed);
-        Assert.Equal("ToolSuccess", report.MetricName);
+        Assert.Equal("code_tool_success", report.MetricName);
         Assert.Equal(0.0, report.Score);
         Assert.Single(report.Reasons);
         Assert.Equal("ToolError", report.Reasons[0].Category);
@@ -158,11 +158,11 @@ public class FailureReportTests
     {
         var report = FailureReport.FromValidationFailure(
             "Response contained hallucinated facts",
-            "Faithfulness",
+            "llm_faithfulness",
             score: 0.3);
 
         Assert.Equal("Response contained hallucinated facts", report.WhyItFailed);
-        Assert.Equal("Faithfulness", report.MetricName);
+        Assert.Equal("llm_faithfulness", report.MetricName);
         Assert.Equal(0.3, report.Score);
         Assert.Single(report.Reasons);
     }

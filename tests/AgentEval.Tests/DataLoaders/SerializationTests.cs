@@ -26,7 +26,7 @@ public class SerializationTests
     {
         // Arrange
         var result = MetricResult.Pass(
-            "Faithfulness", 
+            "llm_faithfulness", 
             85.5, 
             "Response is faithful to context",
             new Dictionary<string, object> { ["claimsVerified"] = 5 });
@@ -48,7 +48,7 @@ public class SerializationTests
     {
         // Arrange
         var result = MetricResult.Fail(
-            "Relevance",
+            "llm_relevance",
             "Response did not address the question",
             25.0,
             new Dictionary<string, object> { ["issue"] = "off-topic" });

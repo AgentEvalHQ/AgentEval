@@ -18,6 +18,7 @@ This project contains the automated tests for AgentEval. It lives at `tests/Agen
 - **Multi-turn conversations:** `ConversationalTestCaseTests` and `ConversationRunnerTests` cover the fluent conversation builder, turn handling, and conversation execution.
 - **Snapshot testing:** `SnapshotComparerTests` validates JSON comparison, field ignoring, pattern scrubbing, and semantic similarity.
 - **CLI components:** `DataLoaderTests` and `ExporterTests` cover dataset loading (JSON, JSONL, CSV, YAML) and result exporting (JSON, JUnit, Markdown).
+- **Tracing & replay:** `TraceRecordingAndReplayTests`, `ChatExecutionResultTests`, and `WorkflowTraceTests` cover trace recording, serialization, and deterministic replay for single-agent, multi-turn chat, and workflow executions including streaming support.
 
 ## File-by-file map
 
@@ -50,6 +51,9 @@ This project contains the automated tests for AgentEval. It lives at `tests/Agen
 | `ToolSuccessMetricTests.cs` | Tool success/failure scoring |
 | `ToolUsageAssertionsTests.cs` | Fluent assertions over tool usage |
 | `ToolUsageReportTests.cs` | Tool tracking data shape and aggregation |
+| `Tracing/TraceRecordingAndReplayTests.cs` | Single-agent trace recording and replay, streaming support |
+| `Tracing/ChatExecutionResultTests.cs` | Multi-turn chat trace recording |
+| `Tracing/WorkflowTraceTests.cs` | Workflow trace recording and replay |
 
 ## Running the suite
 From the repo root:

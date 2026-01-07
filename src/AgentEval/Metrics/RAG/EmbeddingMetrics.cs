@@ -133,7 +133,7 @@ public abstract class EmbeddingBasedMetric : IRAGMetric
 public class AnswerSimilarityMetric : EmbeddingBasedMetric
 {
     /// <inheritdoc />
-    public override string Name => "AnswerSimilarity";
+    public override string Name => "embed_answer_similarity";
     
     /// <inheritdoc />
     public override string Description => "Measures semantic similarity between the answer and ground truth using embeddings (fast, no LLM call).";
@@ -191,7 +191,7 @@ public class AnswerSimilarityMetric : EmbeddingBasedMetric
 public class ResponseContextSimilarityMetric : EmbeddingBasedMetric
 {
     /// <inheritdoc />
-    public override string Name => "ResponseContextSimilarity";
+    public override string Name => "embed_response_context";
     
     /// <inheritdoc />
     public override string Description => "Measures how semantically similar the response is to the retrieved context (grounding check).";
@@ -240,7 +240,7 @@ public class ResponseContextSimilarityMetric : EmbeddingBasedMetric
 public class QueryContextSimilarityMetric : EmbeddingBasedMetric
 {
     /// <inheritdoc />
-    public override string Name => "QueryContextSimilarity";
+    public override string Name => "embed_query_context";
     
     /// <inheritdoc />
     public override string Description => "Measures how semantically relevant the retrieved context is to the query.";

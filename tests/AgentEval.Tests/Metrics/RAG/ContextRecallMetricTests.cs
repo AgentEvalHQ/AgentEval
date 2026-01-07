@@ -40,7 +40,7 @@ public class ContextRecallMetricTests
         var result = await metric.EvaluateAsync(context);
         
         // Assert
-        Assert.Equal("ContextRecall", result.MetricName);
+        Assert.Equal("llm_context_recall", result.MetricName);
         Assert.Equal(100, result.Score);
         Assert.True(result.Passed);
     }
@@ -157,7 +157,7 @@ public class ContextRecallMetricTests
         var metric = new ContextRecallMetric(fakeChatClient);
         
         // Assert
-        Assert.Equal("ContextRecall", metric.Name);
+        Assert.Equal("llm_context_recall", metric.Name);
         Assert.True(metric.RequiresContext);
         Assert.True(metric.RequiresGroundTruth);
     }

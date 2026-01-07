@@ -15,7 +15,7 @@ public class ToolSelectionMetric : IAgenticMetric
     private readonly IReadOnlyList<string> _expectedTools;
     private readonly bool _strictOrder;
     
-    public string Name => "ToolSelection";
+    public string Name => "code_tool_selection";
     public string Description => "Measures whether the agent selected the correct tools for the task.";
     public bool RequiresToolUsage => true;
     
@@ -129,7 +129,7 @@ public class ToolArgumentsMetric : IAgenticMetric
 {
     private readonly Dictionary<string, HashSet<string>> _requiredArgumentsByTool;
     
-    public string Name => "ToolArguments";
+    public string Name => "code_tool_arguments";
     public string Description => "Measures whether tool arguments are valid and complete.";
     public bool RequiresToolUsage => true;
     
@@ -218,7 +218,7 @@ public class ToolArgumentsMetric : IAgenticMetric
 /// </summary>
 public class ToolSuccessMetric : IAgenticMetric
 {
-    public string Name => "ToolSuccess";
+    public string Name => "code_tool_success";
     public string Description => "Measures the success rate of tool executions.";
     public bool RequiresToolUsage => true;
     
@@ -264,7 +264,7 @@ public class TaskCompletionMetric : IAgenticMetric
     private readonly IChatClient _chatClient;
     private readonly IReadOnlyList<string> _completionCriteria;
     
-    public string Name => "TaskCompletion";
+    public string Name => "llm_task_completion";
     public string Description => "Measures whether the agent effectively completed the requested task.";
     public bool RequiresToolUsage => false;
     
@@ -355,7 +355,7 @@ public class ToolEfficiencyMetric : IAgenticMetric
     private readonly int _maxExpectedCalls;
     private readonly TimeSpan _maxExpectedDuration;
     
-    public string Name => "ToolEfficiency";
+    public string Name => "code_tool_efficiency";
     public string Description => "Measures the efficiency of tool usage in terms of call count and duration.";
     public bool RequiresToolUsage => true;
     

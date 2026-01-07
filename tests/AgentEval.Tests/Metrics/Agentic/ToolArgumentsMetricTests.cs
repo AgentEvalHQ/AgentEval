@@ -49,7 +49,7 @@ public class ToolArgumentsMetricTests
         var result = await metric.EvaluateAsync(context);
         
         // Assert
-        Assert.Equal("ToolArguments", result.MetricName);
+        Assert.Equal("code_tool_arguments", result.MetricName);
         Assert.Equal(100, result.Score);
         Assert.True(result.Passed);
     }
@@ -228,7 +228,7 @@ public class ToolArgumentsMetricTests
         var metric = new ToolArgumentsMetric(new Dictionary<string, IEnumerable<string>>());
         
         // Assert
-        Assert.Equal("ToolArguments", metric.Name);
+        Assert.Equal("code_tool_arguments", metric.Name);
         Assert.True(metric.RequiresToolUsage);
     }
     

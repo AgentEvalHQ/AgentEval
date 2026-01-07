@@ -41,7 +41,7 @@ public class TaskCompletionMetricTests
         var result = await metric.EvaluateAsync(context);
         
         // Assert
-        Assert.Equal("TaskCompletion", result.MetricName);
+        Assert.Equal("llm_task_completion", result.MetricName);
         Assert.Equal(95, result.Score);
         Assert.True(result.Passed);
     }
@@ -165,7 +165,7 @@ public class TaskCompletionMetricTests
         var metric = new TaskCompletionMetric(fakeChatClient);
         
         // Assert
-        Assert.Equal("TaskCompletion", metric.Name);
+        Assert.Equal("llm_task_completion", metric.Name);
         Assert.False(metric.RequiresToolUsage);
     }
 

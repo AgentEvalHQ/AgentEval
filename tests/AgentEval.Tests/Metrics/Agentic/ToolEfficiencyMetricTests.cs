@@ -32,7 +32,7 @@ public class ToolEfficiencyMetricTests
         var result = await metric.EvaluateAsync(context);
         
         // Assert
-        Assert.Equal("ToolEfficiency", result.MetricName);
+        Assert.Equal("code_tool_efficiency", result.MetricName);
         Assert.Equal(100, result.Score);
         Assert.True(result.Passed);
     }
@@ -191,7 +191,7 @@ public class ToolEfficiencyMetricTests
         var metric = new ToolEfficiencyMetric();
         
         // Assert
-        Assert.Equal("ToolEfficiency", metric.Name);
+        Assert.Equal("code_tool_efficiency", metric.Name);
         Assert.True(metric.RequiresToolUsage);
     }
     

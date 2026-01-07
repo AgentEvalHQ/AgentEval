@@ -39,7 +39,7 @@ public class ContextPrecisionMetricTests
         var result = await metric.EvaluateAsync(context);
         
         // Assert
-        Assert.Equal("ContextPrecision", result.MetricName);
+        Assert.Equal("llm_context_precision", result.MetricName);
         Assert.Equal(95, result.Score);
         Assert.True(result.Passed);
     }
@@ -148,7 +148,7 @@ public class ContextPrecisionMetricTests
         var metric = new ContextPrecisionMetric(fakeChatClient);
         
         // Assert
-        Assert.Equal("ContextPrecision", metric.Name);
+        Assert.Equal("llm_context_precision", metric.Name);
         Assert.True(metric.RequiresContext);
         Assert.False(metric.RequiresGroundTruth);
     }

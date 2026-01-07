@@ -31,7 +31,7 @@ public class ToolSelectionMetricTests
         var result = await metric.EvaluateAsync(context);
         
         // Assert
-        Assert.Equal("ToolSelection", result.MetricName);
+        Assert.Equal("code_tool_selection", result.MetricName);
         Assert.Equal(100, result.Score);
         Assert.True(result.Passed);
     }
@@ -179,7 +179,7 @@ public class ToolSelectionMetricTests
         var metric = new ToolSelectionMetric(new[] { "Tool" });
         
         // Assert
-        Assert.Equal("ToolSelection", metric.Name);
+        Assert.Equal("code_tool_selection", metric.Name);
         Assert.True(metric.RequiresToolUsage);
     }
     

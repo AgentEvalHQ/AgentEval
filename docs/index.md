@@ -93,6 +93,7 @@ Full command-line interface for CI/CD integration with multiple output formats (
 | [Embedding Metrics](embedding-metrics.md) | Semantic similarity metrics |
 | [Extensibility](extensibility.md) | Custom metrics, plugins, adapters |
 | [Snapshots](snapshots.md) | Snapshot testing guide |
+| [Tracing & Record/Replay](tracing.md) | Deterministic testing with trace capture |
 | [Workflow Testing](workflows.md) | Multi-agent orchestration testing |
 | [Roadmap](roadmap.md) | Future development plans |
 
@@ -106,7 +107,7 @@ API documentation is auto-generated from XML comments. See the [API Reference](a
 
 ## Test Coverage
 
-AgentEval has **707 tests** (2,121 across 3 target frameworks) covering all major features.
+AgentEval has **763 tests** (2,289 across 3 target frameworks) covering all major features.
 
 ---
 

@@ -14,7 +14,7 @@ public class FaithfulnessMetric : IRAGMetric
 {
     private readonly IChatClient _chatClient;
     
-    public string Name => "Faithfulness";
+    public string Name => "llm_faithfulness";
     public string Description => "Measures if the response is grounded in and faithful to the provided context (no hallucinations).";
     public bool RequiresContext => true;
     public bool RequiresGroundTruth => false;
@@ -107,7 +107,7 @@ public class RelevanceMetric : IRAGMetric
 {
     private readonly IChatClient _chatClient;
     
-    public string Name => "Relevance";
+    public string Name => "llm_relevance";
     public string Description => "Measures how relevant and on-topic the response is to the user's question.";
     public bool RequiresContext => false;
     public bool RequiresGroundTruth => false;
@@ -189,7 +189,7 @@ public class ContextPrecisionMetric : IRAGMetric
 {
     private readonly IChatClient _chatClient;
     
-    public string Name => "ContextPrecision";
+    public string Name => "llm_context_precision";
     public string Description => "Measures how much of the retrieved context is relevant and useful for answering the question.";
     public bool RequiresContext => true;
     public bool RequiresGroundTruth => false;
@@ -275,7 +275,7 @@ public class ContextRecallMetric : IRAGMetric
 {
     private readonly IChatClient _chatClient;
     
-    public string Name => "ContextRecall";
+    public string Name => "llm_context_recall";
     public string Description => "Measures whether the retrieved context contains all information needed to answer the question correctly.";
     public bool RequiresContext => true;
     public bool RequiresGroundTruth => true;
@@ -372,7 +372,7 @@ public class AnswerCorrectnessMetric : IRAGMetric
 {
     private readonly IChatClient _chatClient;
     
-    public string Name => "AnswerCorrectness";
+    public string Name => "llm_answer_correctness";
     public string Description => "Measures how correct the answer is compared to the expected ground truth.";
     public bool RequiresContext => false;
     public bool RequiresGroundTruth => true;

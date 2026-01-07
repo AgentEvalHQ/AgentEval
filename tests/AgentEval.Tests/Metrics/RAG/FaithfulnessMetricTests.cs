@@ -39,7 +39,7 @@ public class FaithfulnessMetricTests
         var result = await metric.EvaluateAsync(context);
         
         // Assert
-        Assert.Equal("Faithfulness", result.MetricName);
+        Assert.Equal("llm_faithfulness", result.MetricName);
         Assert.Equal(95, result.Score);
         Assert.True(result.Passed);
         Assert.Single(fakeChatClient.ReceivedMessages);
@@ -177,7 +177,7 @@ public class FaithfulnessMetricTests
         var metric = new FaithfulnessMetric(fakeChatClient);
         
         // Assert
-        Assert.Equal("Faithfulness", metric.Name);
+        Assert.Equal("llm_faithfulness", metric.Name);
         Assert.True(metric.RequiresContext);
         Assert.False(metric.RequiresGroundTruth);
     }

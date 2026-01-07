@@ -40,7 +40,7 @@ public class AnswerCorrectnessMetricTests
         var result = await metric.EvaluateAsync(context);
         
         // Assert
-        Assert.Equal("AnswerCorrectness", result.MetricName);
+        Assert.Equal("llm_answer_correctness", result.MetricName);
         Assert.Equal(100, result.Score);
         Assert.True(result.Passed);
     }
@@ -206,7 +206,7 @@ public class AnswerCorrectnessMetricTests
         var metric = new AnswerCorrectnessMetric(fakeChatClient);
         
         // Assert
-        Assert.Equal("AnswerCorrectness", metric.Name);
+        Assert.Equal("llm_answer_correctness", metric.Name);
         Assert.False(metric.RequiresContext);
         Assert.True(metric.RequiresGroundTruth);
     }

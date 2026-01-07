@@ -76,6 +76,14 @@ Store run inputs/outputs, tool calls, timings, and scores as artifacts so failur
 ### ✅ Snapshot testing
 Compare agent responses against saved baselines with JSON diff and semantic similarity support.
 
+### ✅ Trace Record & Replay
+Capture agent executions and replay them deterministically for testing without LLM calls:
+- `TraceRecordingAgent` for capturing single-agent executions
+- `ChatTraceRecorder` for multi-turn conversations
+- `WorkflowTraceRecorder` for multi-agent workflows
+- JSON serialization for storing and sharing traces
+- Time-travel debugging and regression testing
+
 ### ✅ CLI tool for CI/CD
 Full command-line interface for running evaluations, benchmarks, and tests:
 - Multiple output formats (Console, JSON, JUnit XML, Markdown)
@@ -356,16 +364,18 @@ var baseline = store.Load("my-test");
 | [Embedding Metrics](docs/embedding-metrics.md) | Semantic similarity metrics |
 | [Extensibility](docs/extensibility.md) | Custom metrics, plugins, adapters |
 | [Snapshots](docs/snapshots.md) | Snapshot testing guide |
+| [Tracing & Record/Replay](docs/tracing.md) | Deterministic testing with trace capture |
 | [Roadmap](docs/roadmap.md) | Future development plans |
 
 ---
 
 ## Test Coverage
 
-AgentEval has **707 tests** (2121 total across 3 target frameworks) covering:
+AgentEval has **763 tests** (2289 total across 3 target frameworks) covering:
 - Tool call assertions and reporting
 - Multi-turn conversation testing
 - Snapshot comparison and storage
+- Trace record & replay (single-agent, chat, workflow)
 - RAG metrics (faithfulness, relevance, correctness)
 - Agentic metrics (tool selection, efficiency, success)
 - Performance tracking (TTFT, latency, cost)

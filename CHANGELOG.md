@@ -8,6 +8,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Trace Record & Replay (Phase 8)** - Deterministic testing and time-travel debugging
+  - `TraceRecordingAgent` - Wraps any agent to capture all executions with full fidelity
+  - `TraceReplayingAgent` - Replays recorded traces deterministically without LLM calls
+  - `ChatTraceRecorder` - Records multi-turn conversations with turn tracking
+  - `ChatExecutionResult` - Complete conversation result with aggregate performance
+  - `WorkflowTraceRecorder` - Records multi-agent workflow orchestrations
+  - `WorkflowTraceReplayingAgent` - Replays workflow traces step-by-step
+  - `TraceSerializer` / `WorkflowTraceSerializer` - JSON serialization for traces
+  - `AgentTrace`, `WorkflowTrace` - Rich trace models with metadata and performance
+  - `TraceEntry`, `WorkflowTraceStep` - Detailed per-invocation/step records
+  - `TraceTokenUsage`, `TraceToolCall`, `TraceError` - Supporting models
+  - Streaming support for recording/replaying chunked responses
+  - 168 new tests covering all tracing functionality
+  - Comprehensive [tracing documentation](docs/tracing.md)
+  - Sample 13: Trace Record & Replay demonstration
 - **Enhanced Fluent Assertions** - Improved xUnit assertion failure experience inspired by FluentAssertions/Shouldly
   - **`because` parameter** on all assertions for documenting test intent (e.g., `HaveCalledTool("SearchTool", because: "user query requires search")`)
   - **`AgentEvalScope`** for collecting multiple assertion failures into a single exception with all failures listed

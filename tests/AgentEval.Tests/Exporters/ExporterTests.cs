@@ -24,9 +24,9 @@ public class ExporterTests
         Agent = new AgentInfo { Name = "TestAgent", Model = "gpt-4o" },
         TestResults = new List<TestResultSummary>
         {
-            new() { Name = "ToolSelection", Score = 95.0, Passed = true, DurationMs = 1200, Category = "Agentic" },
-            new() { Name = "Faithfulness", Score = 88.0, Passed = true, DurationMs = 2300, Category = "RAG" },
-            new() { Name = "TaskCompletion", Score = 45.0, Passed = false, DurationMs = 3100, Category = "Agentic", Error = "Incomplete reasoning" }
+            new() { Name = "code_tool_selection", Score = 95.0, Passed = true, DurationMs = 1200, Category = "Agentic" },
+            new() { Name = "llm_faithfulness", Score = 88.0, Passed = true, DurationMs = 2300, Category = "RAG" },
+            new() { Name = "llm_task_completion", Score = 45.0, Passed = false, DurationMs = 3100, Category = "Agentic", Error = "Incomplete reasoning" }
         }
     };
 
@@ -125,9 +125,9 @@ public class ExporterTests
 
         var json = await exporter.ExportToStringAsync(report);
         
-        Assert.Contains("ToolSelection", json);
-        Assert.Contains("Faithfulness", json);
-        Assert.Contains("TaskCompletion", json);
+        Assert.Contains("code_tool_selection", json);
+        Assert.Contains("llm_faithfulness", json);
+        Assert.Contains("llm_task_completion", json);
         Assert.Contains("Incomplete reasoning", json);
     }
 
@@ -269,7 +269,7 @@ public class ExporterTests
         var md = exporter.ExportToString(report);
         
         Assert.Contains("### ❌ Failures", md);
-        Assert.Contains("**TaskCompletion**", md);
+        Assert.Contains("**llm\\_task\\_completion**", md);  // Underscores escaped in markdown
         Assert.Contains("Incomplete reasoning", md);
     }
 

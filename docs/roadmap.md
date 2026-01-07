@@ -57,13 +57,19 @@ AgentEval is in **alpha** with all core features complete and ready for producti
 ## 📋 Planned Features
 
 ### Short-term (Q1 2026)
-- [ ] Workflow assertions P0 enhancements (`because`, structured exceptions)
+- [x] Workflow assertions P0 enhancements (`because`, structured exceptions)
+- [ ] CLI `summary` command — tabular view of runs in directory
+- [ ] CLI `diff` command — side-by-side answer comparison
+- [ ] Standardized result directory structure (eval_results.jsonl, summary.json)
+- [ ] Console visualization enhancements (Spectre.Console tables, progress)
 - [ ] Visual assertion reports (ASCII diagrams)
 - [ ] GitHub Actions workflow templates
 - [ ] Visual Studio test integration
 - [ ] Additional framework adapters (Semantic Kernel)
 
 ### Medium-term (Q2 2026)
+- [ ] Code metrics (ResponseLength, HasCitation, CitationMatch)
+- [ ] Refusal quality metric ("dontknowness" for unanswerable questions)
 - [ ] Multi-agent orchestration contracts
 - [ ] Assertion telemetry (local storage)
 - [ ] Self-healing assertions (rule-based)

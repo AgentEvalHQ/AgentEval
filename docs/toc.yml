@@ -26,6 +26,8 @@
     href: extensibility.md
   - name: Snapshots
     href: snapshots.md
+  - name: Tracing & Record/Replay
+    href: tracing.md
   - name: Workflow Testing
     href: workflows.md
 - name: Roadmap
@@ -34,6 +36,22 @@
   items:
   - name: New Features Exploration
     href: strategy/new-features-exploration.md
+  - name: Competitor Analysis
+    href: strategy/competitor-analysis.md
+- name: Architecture Decisions
+  items:
+  - name: Overview
+    href: adr/README.md
+  - name: ADR-001 Metric Naming Prefixes
+    href: adr/001-metric-naming-prefixes.md
+  - name: ADR-002 Result Directory Structure
+    href: adr/002-result-directory-structure.md
+  - name: ADR-003 CLI Review Commands
+    href: adr/003-cli-review-commands.md
+- name: Reference
+  items:
+  - name: Naming Conventions
+    href: naming-conventions.md
 - name: API Reference
   href: api/
 - name: Community

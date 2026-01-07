@@ -39,7 +39,7 @@ public class RelevanceMetricTests
         var result = await metric.EvaluateAsync(context);
         
         // Assert
-        Assert.Equal("Relevance", result.MetricName);
+        Assert.Equal("llm_relevance", result.MetricName);
         Assert.Equal(95, result.Score);
         Assert.True(result.Passed);
         Assert.Single(fakeChatClient.ReceivedMessages);
@@ -127,7 +127,7 @@ public class RelevanceMetricTests
         var metric = new RelevanceMetric(fakeChatClient);
         
         // Assert
-        Assert.Equal("Relevance", metric.Name);
+        Assert.Equal("llm_relevance", metric.Name);
         Assert.False(metric.RequiresContext);
         Assert.False(metric.RequiresGroundTruth);
     }

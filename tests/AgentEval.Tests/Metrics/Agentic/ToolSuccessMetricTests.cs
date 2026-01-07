@@ -35,7 +35,7 @@ public class ToolSuccessMetricTests
         var result = await metric.EvaluateAsync(context);
         
         // Assert
-        Assert.Equal("ToolSuccess", result.MetricName);
+        Assert.Equal("code_tool_success", result.MetricName);
         Assert.Equal(100, result.Score);
         Assert.True(result.Passed);
     }
@@ -196,7 +196,7 @@ public class ToolSuccessMetricTests
         var metric = new ToolSuccessMetric();
         
         // Assert
-        Assert.Equal("ToolSuccess", metric.Name);
+        Assert.Equal("code_tool_success", metric.Name);
         Assert.True(metric.RequiresToolUsage);
     }
     
