@@ -3,8 +3,8 @@
 > **The first .NET-native AI agent testing and evaluation framework**
 
 **Version:** 1.0.0-alpha  
-**Last Updated:** January 7, 2026  
-**Status:** ✅ Launch Ready (707 tests, 10 samples)  
+**Last Updated:** January 8, 2026  
+**Status:** ✅ Launch Ready (820+ tests, 16 samples)  
 **NuGet:** https://www.nuget.org/packages/AgentEval
 
 ## Executive Summary
@@ -63,6 +63,7 @@ AgentEval is a comprehensive testing, evaluation, and benchmarking framework des
 | **Dataset Loaders** | JSON, JSONL, CSV, YAML with field aliasing via IDatasetLoader | ✅ |
 | **Snapshot Testing** | SnapshotComparer, SnapshotStore with JSON diff and regex scrubbing | ✅ |
 | **Multi-turn Testing** | ConversationRunner, ConversationalTestCase, ConversationCompletenessMetric | ✅ |
+| **Table Output** | TableFormatter, OutputOptions for configurable console output | ✅ |
 | **Sample Datasets** | travel-agent.yaml (agentic), rag-qa.yaml (RAG) with documentation | ✅ |
 
 ---
@@ -147,6 +148,11 @@ AgentEval/                        # ✅ Implemented as single project
 │   ├── ToolUsageAssertions.cs    # Tool assertions + ToolCallAssertion
 │   ├── PerformanceAssertions.cs  # Performance/cost/timing assertions
 │   └── ResponseAssertions.cs     # String content assertions
+│
+├── Output/                       # ✅ Table output formatting
+│   ├── OutputOptions.cs          # Configurable column visibility
+│   ├── TableFormatter.cs         # Static methods for table printing
+│   └── StochasticResultExtensions.cs  # Extension methods (PrintTable, ToTableString)
 │
 ├── Metrics/                      # ✅ Evaluation metrics
 │   ├── RAG/
@@ -977,6 +983,95 @@ var taskCompletion = new TaskCompletionMetric(chatClient, new[]
     "The feature was successfully created",
     "Security measures were applied"
 });
+```
+
+---
+
+## Table Output Formatting
+
+AgentEval provides built-in table formatting for stochastic and model comparison results, similar to ai-rag-chat-evaluator output.
+
+### OutputOptions
+
+Configure which columns appear in output tables:
+
+```csharp
+// Available presets
+var options = OutputOptions.Default;   // Score, PassRate, Duration, Tokens, Cost, Tools
+var options = OutputOptions.Minimal;   // Score, PassRate, Duration only
+var options = OutputOptions.Full;      // All columns including TTFT, CI, token breakdown
+
+// Custom configuration
+var options = new OutputOptions
+{
+    ShowScore = true,
+    ShowPassRate = true,
+    ShowDuration = true,
+    ShowTimeToFirstToken = false,  // Opt-in
+    ShowTokens = true,
+    ShowPromptTokens = false,      // Opt-in
+    ShowCompletionTokens = false,  // Opt-in
+    ShowCost = true,
+    ShowToolCalls = true,
+    ShowToolSuccess = true,
+    ShowMetrics = true,            // RAG/evaluation metrics
+    ShowConfidenceInterval = false // Opt-in
+};
+```
+
+### Fluent Extension Methods
+
+Print tables directly from results:
+
+```csharp
+// Stochastic result table
+var result = await runner.RunStochasticTestAsync(agent, testCase, options);
+result
+    .PrintSummary()               // ✅ PASSED: 8/10 runs passed
+    .PrintTable("Metrics")        // Min/Max/Mean table
+    .PrintToolSummary("Tool1")    // Tool usage details
+    .PrintPerformanceSummary();   // Fastest/Slowest runs
+
+// Model comparison table
+var modelResults = new List<(string, StochasticResult)> { ... };
+modelResults.PrintComparisonTable();  // Side-by-side comparison
+
+// Get table as string (for logging/export)
+var tableStr = result.ToTableString();
+```
+
+### Table Output Example
+
+```
+   📊 Stochastic Results
+   ────────────────────────────────────────────────────────────────────────────────
+   Metric                         Min        Max       Mean    Samples
+   ────────────────────────────────────────────────────────────────────────────────
+   Score                           70         90       80.5         10
+   Pass Rate                        -          -        80%         10
+   Duration (ms)                  156        432        245         10
+   Total Tokens                   180        220        195         10
+   Cost ($)                  0.000180   0.000220   0.000195         10
+   Tool Calls/Run                   1          2        1.2         10
+   ────────────────────────────────────────────────────────────────────────────────
+
+   📊 Model Comparison Results
+   ════════════════════════════════════════════════════════════════════════════════════════════════════
+   Model             │ Pass% │ Score │  Dur(ms) │ Tokens │   Cost($) │ ToolOK%
+   ────────────────────────────────────────────────────────────────────────────────────────────────────
+   GPT-4o            │  100% │  85.0 │      245 │    195 │   0.00195 │    100%
+   GPT-3.5-Turbo     │   70% │  72.3 │      180 │    150 │   0.00015 │     90%
+   ════════════════════════════════════════════════════════════════════════════════════════════════════
+```
+
+### Dynamic Metric Columns
+
+When evaluation metrics are present, they appear as additional columns:
+
+```csharp
+// Metrics like Faithfulness, Relevance, Coherence appear automatically
+   Model      │ Pass% │ Score │ Faith │ Relev │ Coher
+   GPT-4o     │  100% │  85.0 │  0.92 │  0.88 │  0.95
 ```
 
 ---

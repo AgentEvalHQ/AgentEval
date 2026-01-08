@@ -1,0 +1,193 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2025-2026 AgentEval Contributors
+
+using Azure.AI.OpenAI;
+using Microsoft.Agents.AI;
+using Microsoft.Extensions.AI;
+using AgentEval.MAF;
+using AgentEval.Models;
+using AgentEval.Comparison;
+using AgentEval.Core;
+using AgentEval.Output;
+using System.ComponentModel;
+using ChatOptions = Microsoft.Extensions.AI.ChatOptions;
+
+namespace AgentEval.Samples;
+
+/// <summary>
+/// Sample 14: Stochastic Testing - Run tests multiple times for reliability
+/// 
+/// This demonstrates:
+/// - Running the same test N times to measure consistency
+/// - Performance metrics in a clean table format
+/// - Tool usage tracking across runs
+/// - Statistical analysis with min/max/mean display
+/// 
+/// ⏱️ Time to understand: 5 minutes
+/// </summary>
+public static class Sample14_StochasticTesting
+{
+    public static async Task RunAsync()
+    {
+        PrintHeader();
+        
+        if (!AIConfig.IsConfigured)
+        {
+            AIConfig.PrintMissingCredentialsWarning();
+            Console.WriteLine("   ⚠️  This sample requires Azure OpenAI credentials.\n");
+            return;
+        }
+        
+        // Print endpoint for verification
+        Console.WriteLine($"   🔗 Endpoint: {AIConfig.Endpoint}");
+        Console.WriteLine($"   🤖 Model: {AIConfig.ModelDeployment} (GPT-5 Mini)\n");
+        
+        // ═══════════════════════════════════════════════════════════════
+        // STEP 1: Create agent with calculator tool
+        // ═══════════════════════════════════════════════════════════════
+        Console.WriteLine("📝 Step 1: Creating agent with calculator tool...\n");
+        
+        var agent = CreateAgentWithCalculator();
+        Console.WriteLine($"   ✓ Agent created with CalculatorTool\n");
+        
+        // ═══════════════════════════════════════════════════════════════
+        // STEP 2: Set up stochastic runner
+        // ═══════════════════════════════════════════════════════════════
+        Console.WriteLine("📝 Step 2: Setting up stochastic runner...\n");
+        
+        var harness = new MAFTestHarness(verbose: false);
+        var stochasticRunner = new StochasticRunner(harness, new TestOptions
+        {
+            TrackTools = true,
+            TrackPerformance = true
+        });
+        Console.WriteLine("   ✓ Stochastic runner ready\n");
+        
+        // ═══════════════════════════════════════════════════════════════
+        // STEP 3: Run stochastic test (10 runs)
+        // ═══════════════════════════════════════════════════════════════
+        Console.WriteLine("📝 Step 3: Running stochastic test (10 runs)...\n");
+        
+        var testCase = new TestCase
+        {
+            Name = "Calculator Test",
+            Input = "What is 42 multiplied by 17? Use the calculator tool.",
+            ExpectedOutputContains = "714",
+            ExpectedTools = ["CalculatorTool"]
+        };
+        
+        var options = new StochasticOptions(
+            Runs: 10,
+            SuccessRateThreshold: 0.8,
+            EnableStatisticalAnalysis: true,
+            MaxParallelism: 1
+        );
+        
+        Console.WriteLine($"   Test: {testCase.Name}");
+        Console.WriteLine($"   Runs: {options.Runs}, Threshold: {options.SuccessRateThreshold:P0}\n");
+        
+        var result = await stochasticRunner.RunStochasticTestAsync(agent, testCase, options);
+        
+        // ═══════════════════════════════════════════════════════════════
+        // STEP 4: Display results in table format
+        // ═══════════════════════════════════════════════════════════════
+        Console.WriteLine("📝 Step 4: Results\n");
+        Console.WriteLine($"   {result.Summary}\n");
+        
+        // Main metrics table (using extension method)
+        result.PrintTable("Performance Metrics");
+        
+        // Tool usage summary
+        result.PrintToolSummary("CalculatorTool");
+        
+        // Performance extremes (fastest/slowest)
+        result.PrintPerformanceSummary();
+        
+        // ═══════════════════════════════════════════════════════════════
+        // STEP 5: Assertions
+        // ═══════════════════════════════════════════════════════════════
+        Console.WriteLine("\n📝 Step 5: Assertions\n");
+        
+        try
+        {
+            result.Should()
+                .HavePassRateAtLeast(0.7)
+                .HaveMeanScoreAtLeast(60)
+                .HaveStandardDeviationAtMost(25);
+            
+            Console.WriteLine("   ✅ All assertions passed!\n");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"   ❌ Assertion failed: {ex.Message}\n");
+        }
+        
+        PrintFooter(result.Passed);
+    }
+    
+    private static ITestableAgent CreateAgentWithCalculator()
+    {
+        var azureClient = new AzureOpenAIClient(AIConfig.Endpoint, AIConfig.KeyCredential);
+        var chatClient = azureClient
+            .GetChatClient(AIConfig.ModelDeployment)
+            .AsIChatClient();
+        
+        var agent = new ChatClientAgent(
+            chatClient,
+            new ChatClientAgentOptions
+            {
+                Name = "Calculator Agent",
+                Instructions = "You are a math assistant. Always use the CalculatorTool for calculations.",
+                ChatOptions = new ChatOptions
+                {
+                    Tools = [AIFunctionFactory.Create(CalculatorTool)]
+                }
+            });
+        
+        return new MAFAgentAdapter(agent);
+    }
+    
+    [Description("Performs basic arithmetic operations")]
+    private static string CalculatorTool(
+        [Description("First operand")] double a,
+        [Description("Operation: add, subtract, multiply, divide")] string operation,
+        [Description("Second operand")] double b)
+    {
+        var result = operation.ToLowerInvariant() switch
+        {
+            "add" or "+" or "plus" => a + b,
+            "subtract" or "-" or "minus" => a - b,
+            "multiply" or "*" or "x" or "times" => a * b,
+            "divide" or "/" => b != 0 ? a / b : double.NaN,
+            _ => throw new ArgumentException($"Unknown operation: {operation}")
+        };
+        return $"{a} {operation} {b} = {result}";
+    }
+    
+    private static void PrintHeader()
+    {
+        Console.WriteLine("""
+
+        ╔═══════════════════════════════════════════════════════════════╗
+        ║  Sample 14: Stochastic Testing                                ║
+        ║  Run tests multiple times for reliability measurement         ║
+        ╚═══════════════════════════════════════════════════════════════╝
+
+        """);
+    }
+    
+    private static void PrintFooter(bool passed)
+    {
+        Console.WriteLine(passed
+            ? """
+              ╔═══════════════════════════════════════════════════════════════╗
+              ║  ✅ Stochastic Test PASSED                                    ║
+              ╚═══════════════════════════════════════════════════════════════╝
+              """
+            : """
+              ╔═══════════════════════════════════════════════════════════════╗
+              ║  ⚠️  Stochastic Test FAILED                                   ║
+              ╚═══════════════════════════════════════════════════════════════╝
+              """);
+    }
+}

@@ -1,0 +1,22 @@
+// Copyright (c) 2025-2026 AgentEval Contributors
+// Licensed under the MIT License.
+
+using AgentEval.Assertions;
+
+namespace AgentEval.Comparison;
+
+/// <summary>
+/// Extension methods for stochastic testing.
+/// </summary>
+public static class StochasticExtensions
+{
+    /// <summary>
+    /// Start fluent assertions on a stochastic result.
+    /// </summary>
+    /// <param name="result">The stochastic result to assert on.</param>
+    /// <returns>Fluent assertions for the result.</returns>
+    public static StochasticAssertions Should(this StochasticResult result)
+    {
+        return new StochasticAssertions(result);
+    }
+}

@@ -96,6 +96,15 @@ public static class Program
                 case 13:
                     await Sample13_TraceRecordReplay.RunAsync();
                     break;
+                case 14:
+                    await Sample14_StochasticTesting.RunAsync();
+                    break;
+                case 15:
+                    await Sample15_ModelComparison.RunAsync();
+                    break;
+                case 16:
+                    await Sample16_CombinedStochasticComparison.RunAsync();
+                    break;
                 default:
                     Console.WriteLine($"❌ Sample {sampleNumber} not found.\n");
                     break;
@@ -153,6 +162,9 @@ public static class Program
         Console.WriteLine("│ 11. 📝 Because Assertions - Self-documenting tests          │");
         Console.WriteLine("│ 12. 🛡️ Policy & Safety    - Enterprise guardrails           │");
         Console.WriteLine("│ 13. 🔄 Trace Record/Replay - Deterministic testing          │");
+        Console.WriteLine("│ 14. 🎲 Stochastic Testing - Multi-run reliability           │");
+        Console.WriteLine("│ 15. ⚖️ Model Comparison   - Compare & rank models           │");
+        Console.WriteLine("│ 16. 🔀 Combined Test      - Stochastic + Model Comparison   │");
         
         Console.ForegroundColor = ConsoleColor.Green;
         Console.WriteLine("├─────────────────────────────────────────────────────────────┤");

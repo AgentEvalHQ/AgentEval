@@ -33,7 +33,17 @@ public static class AIConfig
     public static AzureKeyCredential KeyCredential => s_values.Value?.KeyCredential 
         ?? throw new InvalidOperationException("AZURE_OPENAI_API_KEY not configured");
     
-    public static string ModelDeployment => "gpt-4o";
+    public static string ModelDeployment => "gpt-5-mini";
+    
+    /// <summary>
+    /// Secondary model deployment name for comparison testing.
+    /// </summary>
+    public static string SecondaryModelDeployment => "gpt-4o";
+    
+    /// <summary>
+    /// Tertiary model deployment name for comparison testing.
+    /// </summary>
+    public static string TertiaryModelDeployment => "gpt-4.1";
 
     public static void PrintMissingCredentialsWarning()
     {
