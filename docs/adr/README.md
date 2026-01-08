@@ -25,6 +25,7 @@ Each ADR follows this structure:
 | [002](002-result-directory-structure.md) | Result Directory Structure | Proposed | 2026-01-07 |
 | [003](003-cli-review-commands.md) | CLI Review Commands | Proposed | 2026-01-07 |
 | [004](004-trace-recording-replay.md) | Trace Recording and Replay | Accepted | 2026-01-07 |
+| [005](005-model-comparison-stochastic.md) | Model Comparison and Stochastic Testing Architecture | Accepted | 2026-01-08 |
 
 ---
 
