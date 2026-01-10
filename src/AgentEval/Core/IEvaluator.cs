@@ -124,7 +124,12 @@ public class ChatClientEvaluator : IEvaluator
     {
         try
         {
-            var json = ExtractJson(responseText);
+            var json = LlmJsonParser.ExtractJson(responseText);
+            if (json == null)
+            {
+                return new EvaluationResult { OverallScore = 50, Summary = "Failed to parse evaluation - no JSON found" };
+            }
+
             var result = System.Text.Json.JsonSerializer.Deserialize<EvaluationResultDto>(json,
                 new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
             
@@ -153,25 +158,6 @@ public class ChatClientEvaluator : IEvaluator
                 Summary = "Evaluation completed but result parsing had issues"
             };
         }
-    }
-
-    private static string ExtractJson(string text)
-    {
-        if (text.Contains("```json"))
-        {
-            var start = text.IndexOf("```json") + 7;
-            var end = text.IndexOf("```", start);
-            if (end > start)
-                return text[start..end].Trim();
-        }
-        else if (text.Contains("```"))
-        {
-            var start = text.IndexOf("```") + 3;
-            var end = text.IndexOf("```", start);
-            if (end > start)
-                return text[start..end].Trim();
-        }
-        return text.Trim();
     }
 
     // DTO for JSON deserialization
