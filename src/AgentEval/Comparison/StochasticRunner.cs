@@ -47,17 +47,34 @@ public interface IStochasticRunner
 public class StochasticRunner : IStochasticRunner
 {
     private readonly ITestHarness _harness;
+    private readonly IStatisticsCalculator _statisticsCalculator;
     private readonly TestOptions? _testOptions;
     
     /// <summary>
-    /// Creates a new stochastic runner.
+    /// Creates a new stochastic runner with dependency injection.
+    /// </summary>
+    /// <param name="harness">The test harness to use for running individual tests.</param>
+    /// <param name="statisticsCalculator">Optional statistics calculator. If null, uses default.</param>
+    /// <param name="testOptions">Optional test options for each run.</param>
+    public StochasticRunner(
+        ITestHarness harness, 
+        IStatisticsCalculator? statisticsCalculator = null,
+        TestOptions? testOptions = null)
+    {
+        _harness = harness ?? throw new ArgumentNullException(nameof(harness));
+        _statisticsCalculator = statisticsCalculator ?? DefaultStatisticsCalculator.Instance;
+        _testOptions = testOptions;
+    }
+    
+    /// <summary>
+    /// Creates a new stochastic runner (legacy constructor for backward compatibility).
     /// </summary>
     /// <param name="harness">The test harness to use for running individual tests.</param>
     /// <param name="testOptions">Optional test options for each run.</param>
-    public StochasticRunner(ITestHarness harness, TestOptions? testOptions = null)
+    [Obsolete("Use constructor with IStatisticsCalculator parameter for better testability. This constructor will be removed in a future version.")]
+    public StochasticRunner(ITestHarness harness, TestOptions? testOptions)
+        : this(harness, null, testOptions)
     {
-        _harness = harness ?? throw new ArgumentNullException(nameof(harness));
-        _testOptions = testOptions;
     }
     
     /// <inheritdoc/>
@@ -143,7 +160,7 @@ public class StochasticRunner : IStochasticRunner
         var passResults = results.Select(r => r.Passed).ToList();
         
         var statistics = options.EnableStatisticalAnalysis
-            ? StatisticsCalculator.CreateStatistics(scores, passResults, options.ConfidenceLevel)
+            ? _statisticsCalculator.CreateStatistics(scores, passResults, options.ConfidenceLevel)
             : CreateMinimalStatistics(scores, passResults);
         
         bool passed = statistics.PassRate >= options.SuccessRateThreshold;
@@ -182,16 +199,16 @@ public class StochasticRunner : IStochasticRunner
         }
     }
     
-    private static StochasticStatistics CreateMinimalStatistics(
+    private StochasticStatistics CreateMinimalStatistics(
         IReadOnlyList<int> scores,
         IReadOnlyList<bool> passResults)
     {
         var doubleScores = scores.Select(s => (double)s).ToList();
         
         return new StochasticStatistics(
-            PassRate: StatisticsCalculator.CalculatePassRate(passResults),
-            MeanScore: StatisticsCalculator.Mean(doubleScores),
-            MedianScore: StatisticsCalculator.Median(doubleScores),
+            PassRate: _statisticsCalculator.CalculatePassRate(passResults),
+            MeanScore: _statisticsCalculator.Mean(doubleScores),
+            MedianScore: _statisticsCalculator.Median(doubleScores),
             StandardDeviation: 0,
             MinScore: scores.Count > 0 ? scores.Min() : 0,
             MaxScore: scores.Count > 0 ? scores.Max() : 0,

@@ -45,18 +45,26 @@ public interface IModelComparer
 /// </summary>
 public class ModelComparer : IModelComparer
 {
-    private readonly ITestHarness _harness;
-    private readonly TestOptions? _testOptions;
+    private readonly IStochasticRunner _stochasticRunner;
     
     /// <summary>
-    /// Creates a new model comparer.
+    /// Creates a new model comparer with a stochastic runner dependency.
+    /// </summary>
+    /// <param name="stochasticRunner">The stochastic runner to use for running tests.</param>
+    public ModelComparer(IStochasticRunner stochasticRunner)
+    {
+        _stochasticRunner = stochasticRunner ?? throw new ArgumentNullException(nameof(stochasticRunner));
+    }
+    
+    /// <summary>
+    /// Creates a new model comparer (legacy constructor for backward compatibility).
     /// </summary>
     /// <param name="harness">The test harness to use.</param>
     /// <param name="testOptions">Optional test options for each run.</param>
+    [Obsolete("Use constructor with IStochasticRunner for better testability. This constructor will be removed in a future version.")]
     public ModelComparer(ITestHarness harness, TestOptions? testOptions = null)
+        : this(new StochasticRunner(harness, testOptions))
     {
-        _harness = harness ?? throw new ArgumentNullException(nameof(harness));
-        _testOptions = testOptions;
     }
     
     /// <inheritdoc/>
@@ -72,7 +80,6 @@ public class ModelComparer : IModelComparer
         options ??= ModelComparisonOptions.Default;
         options.Validate();
         
-        var stochasticRunner = new StochasticRunner(_harness, _testOptions);
         var stochasticOptions = new StochasticOptions(
             Runs: options.RunsPerModel,
             EnableStatisticalAnalysis: options.EnableStatistics,
@@ -87,7 +94,7 @@ public class ModelComparer : IModelComparer
         {
             cancellationToken.ThrowIfCancellationRequested();
             
-            var stochasticResult = await stochasticRunner.RunStochasticTestAsync(
+            var stochasticResult = await _stochasticRunner.RunStochasticTestAsync(
                 factory, 
                 testCase, 
                 stochasticOptions, 
