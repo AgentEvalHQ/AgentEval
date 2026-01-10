@@ -3,6 +3,7 @@
 
 using AgentEval.Core;
 using AgentEval.Models;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace AgentEval.Comparison;
 
@@ -51,6 +52,7 @@ public class ModelComparer : IModelComparer
     /// Creates a new model comparer with a stochastic runner dependency.
     /// </summary>
     /// <param name="stochasticRunner">The stochastic runner to use for running tests.</param>
+    [ActivatorUtilitiesConstructor]
     public ModelComparer(IStochasticRunner stochasticRunner)
     {
         _stochasticRunner = stochasticRunner ?? throw new ArgumentNullException(nameof(stochasticRunner));

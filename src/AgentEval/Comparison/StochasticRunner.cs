@@ -3,6 +3,7 @@
 
 using AgentEval.Core;
 using AgentEval.Models;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace AgentEval.Comparison;
 
@@ -56,6 +57,7 @@ public class StochasticRunner : IStochasticRunner
     /// <param name="harness">The test harness to use for running individual tests.</param>
     /// <param name="statisticsCalculator">Optional statistics calculator. If null, uses default.</param>
     /// <param name="testOptions">Optional test options for each run.</param>
+    [ActivatorUtilitiesConstructor]
     public StochasticRunner(
         ITestHarness harness, 
         IStatisticsCalculator? statisticsCalculator = null,
