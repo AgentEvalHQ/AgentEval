@@ -54,11 +54,11 @@ public static class TableFormatter
         // Pass Rate
         if (options.ShowPassRate)
         {
-            writer.WriteLine($"{indent}{{0,-25}} {{1,10}} {{2,10}} {{3,10:P0}} {{4,10}} {{5,10}}",
+            writer.WriteLine($"{indent}{{0,-25}} {{1,10}} {{2,10}} {{3,10}} {{4,10}} {{5,10}}",
                 "Pass Rate",
                 "-",
                 "-",
-                result.Statistics.PassRate,
+                $"{result.Statistics.PassRate * 100:F0}%",
                 "-",
                 result.Statistics.SampleSize);
         }
@@ -184,8 +184,8 @@ public static class TableFormatter
         
         writer.WriteLine($"\n{indent}🔧 Tool: {summary.ToolName}");
         writer.WriteLine($"{indent}" + new string('─', 50));
-        writer.WriteLine($"{indent}{{0,-20}} {{1}}", "Call Rate:", $"{summary.CallRate:P0} ({summary.RunsWithTool}/{summary.CallCountStats.SampleSize} runs)");
-        writer.WriteLine($"{indent}{{0,-20}} {{1}}", "Error Rate:", $"{summary.ErrorRate:P0}");
+        writer.WriteLine($"{indent}{{0,-20}} {{1}}", "Call Rate:", $"{summary.CallRate * 100:F0}% ({summary.RunsWithTool}/{summary.CallCountStats.SampleSize} runs)");
+        writer.WriteLine($"{indent}{{0,-20}} {{1}}", "Error Rate:", $"{summary.ErrorRate * 100:F0}%");
         writer.WriteLine($"{indent}{{0,-20}} {{1}}", "Total Calls:", summary.TotalCalls);
         
         var statusIcon = options.UseColors 
@@ -302,7 +302,7 @@ public static class TableFormatter
             if (options.ShowPassRate)
             {
                 sb.Append(" | ");
-                sb.Append($"{result.Statistics.PassRate:P0}".PadLeft(6));
+                sb.Append($"{result.Statistics.PassRate * 100:F0}%".PadLeft(6));
             }
             
             if (options.ShowScore)
@@ -365,7 +365,7 @@ public static class TableFormatter
             {
                 sb.Append(" | ");
                 var toolSuccess = GetToolSuccessRate(result);
-                sb.Append(toolSuccess.HasValue ? $"{toolSuccess:P0}".PadLeft(7) : "N/A".PadLeft(7));
+                sb.Append(toolSuccess.HasValue ? $"{toolSuccess.Value * 100:F0}%".PadLeft(7) : "N/A".PadLeft(7));
             }
             
             // Metric values

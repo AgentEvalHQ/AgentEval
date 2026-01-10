@@ -44,8 +44,8 @@ public record StochasticResult(
     /// Gets a summary message for display.
     /// </summary>
     public string Summary => Passed
-        ? $"✅ PASSED: {PassedCount}/{IndividualResults.Count} runs passed ({Statistics.PassRate:P1} >= {Options.SuccessRateThreshold:P0} threshold)"
-        : $"❌ FAILED: {PassedCount}/{IndividualResults.Count} runs passed ({Statistics.PassRate:P1} < {Options.SuccessRateThreshold:P0} threshold)";
+        ? $"✅ PASSED: {PassedCount}/{IndividualResults.Count} runs passed ({Statistics.PassRate * 100:F1}% >= {Options.SuccessRateThreshold * 100:F0}% threshold)"
+        : $"❌ FAILED: {PassedCount}/{IndividualResults.Count} runs passed ({Statistics.PassRate * 100:F1}% < {Options.SuccessRateThreshold * 100:F0}% threshold)";
 
     /// <summary>Aggregate duration statistics (ms).</summary>
     public DistributionStatistics DurationStats => StatisticsCalculator.CreateDistribution(GetDurations());
@@ -224,5 +224,5 @@ public record ConfidenceInterval(double Lower, double Upper, double Level)
     /// <summary>
     /// Gets a formatted string representation.
     /// </summary>
-    public override string ToString() => $"[{Lower:F2}, {Upper:F2}] ({Level:P0} CI)";
+    public override string ToString() => $"[{Lower:F2}, {Upper:F2}] ({Level * 100:F0}% CI)";
 }
