@@ -8,18 +8,39 @@ using Microsoft.Extensions.DependencyInjection;
 namespace AgentEval.Comparison;
 
 /// <summary>
-/// Interface for running stochastic tests.
+/// Interface for running stochastic (repeated, randomized) tests on agents.
+/// Enables statistical analysis of agent behavior across multiple runs.
 /// </summary>
+/// <remarks>
+/// Stochastic testing runs the same test case multiple times to:
+/// - Measure reliability and consistency
+/// - Identify flaky behaviors
+/// - Calculate statistical confidence in results
+/// - Compare performance distributions across runs
+/// 
+/// Implementations should support concurrent test execution for performance
+/// and provide detailed statistics including mean, median, confidence intervals,
+/// and pass rate analysis.
+/// </remarks>
 public interface IStochasticRunner
 {
     /// <summary>
-    /// Run a test case multiple times with stochastic options.
+    /// Runs a test case multiple times against the same agent instance.
+    /// Use this method when testing stateful agents or when you want to reuse
+    /// the same agent instance across all runs.
     /// </summary>
-    /// <param name="agent">The agent to test.</param>
-    /// <param name="testCase">The test case to run.</param>
-    /// <param name="options">Stochastic testing options.</param>
-    /// <param name="cancellationToken">Cancellation token.</param>
-    /// <returns>Stochastic test result with statistics.</returns>
+    /// <param name="agent">The agent to test. Cannot be null.</param>
+    /// <param name="testCase">The test case to run repeatedly. Cannot be null.</param>
+    /// <param name="options">
+    /// Stochastic testing options (number of runs, parallelism, success threshold, etc.).
+    /// If null, uses <see cref="StochasticOptions.Default"/>.
+    /// </param>
+    /// <param name="cancellationToken">Token to cancel the stochastic test run.</param>
+    /// <returns>
+    /// Stochastic test result containing individual run results, aggregate statistics,
+    /// and pass/fail determination based on the success rate threshold.
+    /// </returns>
+    /// <exception cref="ArgumentNullException">Thrown when agent or testCase is null.</exception>
     Task<StochasticResult> RunStochasticTestAsync(
         ITestableAgent agent,
         TestCase testCase,
@@ -27,14 +48,22 @@ public interface IStochasticRunner
         CancellationToken cancellationToken = default);
     
     /// <summary>
-    /// Run a test case multiple times using an agent factory.
-    /// Creates a fresh agent for each run.
+    /// Runs a test case multiple times, creating a fresh agent for each run.
+    /// Use this method when you need isolated, independent runs without state carryover.
+    /// This is the recommended approach for most stochastic testing scenarios.
     /// </summary>
-    /// <param name="factory">Factory to create agents.</param>
-    /// <param name="testCase">The test case to run.</param>
-    /// <param name="options">Stochastic testing options.</param>
-    /// <param name="cancellationToken">Cancellation token.</param>
-    /// <returns>Stochastic test result with statistics.</returns>
+    /// <param name="factory">Factory to create fresh agent instances. Cannot be null.</param>
+    /// <param name="testCase">The test case to run repeatedly. Cannot be null.</param>
+    /// <param name="options">
+    /// Stochastic testing options (number of runs, parallelism, success threshold, etc.).
+    /// If null, uses <see cref="StochasticOptions.Default"/>.
+    /// </param>
+    /// <param name="cancellationToken">Token to cancel the stochastic test run.</param>
+    /// <returns>
+    /// Stochastic test result containing individual run results, aggregate statistics,
+    /// and pass/fail determination based on the success rate threshold.
+    /// </returns>
+    /// <exception cref="ArgumentNullException">Thrown when factory or testCase is null.</exception>
     Task<StochasticResult> RunStochasticTestAsync(
         IAgentFactory factory,
         TestCase testCase,

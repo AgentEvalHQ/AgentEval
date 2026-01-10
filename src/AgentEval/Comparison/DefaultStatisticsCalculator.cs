@@ -4,15 +4,26 @@
 namespace AgentEval.Comparison;
 
 /// <summary>
-/// Default implementation of IStatisticsCalculator that delegates to StatisticsCalculator static methods.
-/// This allows dependency injection while maintaining backward compatibility with existing static usage.
+/// Default implementation of <see cref="IStatisticsCalculator"/> that delegates to <see cref="StatisticsCalculator"/> static methods.
+/// This adapter allows dependency injection while maintaining backward compatibility with existing static usage.
 /// </summary>
-public class DefaultStatisticsCalculator : IStatisticsCalculator
+/// <remarks>
+/// This implementation is stateless and thread-safe. The singleton instance can be shared across
+/// the application. For custom statistical implementations, implement <see cref="IStatisticsCalculator"/> directly.
+/// </remarks>
+public sealed class DefaultStatisticsCalculator : IStatisticsCalculator
 {
     /// <summary>
     /// Singleton instance for use in dependency injection.
+    /// Using a singleton is safe because the implementation is stateless.
     /// </summary>
     public static IStatisticsCalculator Instance { get; } = new DefaultStatisticsCalculator();
+
+    /// <summary>
+    /// Public constructor for dependency injection container.
+    /// For most scenarios, prefer using the <see cref="Instance"/> singleton.
+    /// </summary>
+    public DefaultStatisticsCalculator() { }
 
     /// <inheritdoc />
     public double Mean(IReadOnlyList<double> values) 
@@ -47,5 +58,17 @@ public class DefaultStatisticsCalculator : IStatisticsCalculator
 
     /// <inheritdoc />
     public DistributionStatistics CreateDistribution(IReadOnlyList<double> values) 
+        => StatisticsCalculator.CreateDistribution(values);
+    
+    /// <inheritdoc />
+    public DistributionStatistics CreateDistribution(IReadOnlyList<TimeSpan> values) 
+        => StatisticsCalculator.CreateDistribution(values);
+    
+    /// <inheritdoc />
+    public DistributionStatistics CreateDistribution(IReadOnlyList<int> values) 
+        => StatisticsCalculator.CreateDistribution(values);
+    
+    /// <inheritdoc />
+    public DistributionStatistics CreateDistribution(IReadOnlyList<decimal> values) 
         => StatisticsCalculator.CreateDistribution(values);
 }

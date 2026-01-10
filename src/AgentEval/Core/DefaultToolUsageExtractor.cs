@@ -6,15 +6,26 @@ using AgentEval.Models;
 namespace AgentEval.Core;
 
 /// <summary>
-/// Default implementation of IToolUsageExtractor that delegates to ToolUsageExtractor static methods.
-/// This allows dependency injection while maintaining backward compatibility with existing static usage.
+/// Default implementation of <see cref="IToolUsageExtractor"/> that delegates to <see cref="ToolUsageExtractor"/> static methods.
+/// This adapter allows dependency injection while maintaining backward compatibility with existing static usage.
 /// </summary>
-public class DefaultToolUsageExtractor : IToolUsageExtractor
+/// <remarks>
+/// This implementation is stateless and thread-safe. The singleton instance can be shared across
+/// the application. For custom extraction logic, implement <see cref="IToolUsageExtractor"/> directly.
+/// </remarks>
+public sealed class DefaultToolUsageExtractor : IToolUsageExtractor
 {
     /// <summary>
     /// Singleton instance for use in dependency injection.
+    /// Using a singleton is safe because the implementation is stateless.
     /// </summary>
     public static IToolUsageExtractor Instance { get; } = new DefaultToolUsageExtractor();
+
+    /// <summary>
+    /// Public constructor for dependency injection container.
+    /// For most scenarios, prefer using the <see cref="Instance"/> singleton.
+    /// </summary>
+    public DefaultToolUsageExtractor() { }
 
     /// <inheritdoc />
     public ToolUsageReport Extract(IReadOnlyList<object>? rawMessages) 
