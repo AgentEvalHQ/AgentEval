@@ -34,19 +34,23 @@ public static class AgentEvalServiceCollectionExtensions
         services.TryAddSingleton<IToolUsageExtractor, DefaultToolUsageExtractor>();
 
         // Register runners and comparers with appropriate lifetimes
+        // Use factory for ModelComparer to avoid ambiguous constructor issues
         switch (options.ServiceLifetime)
         {
             case ServiceLifetime.Singleton:
                 services.TryAddSingleton<IStochasticRunner, StochasticRunner>();
-                services.TryAddSingleton<IModelComparer, ModelComparer>();
+                services.TryAddSingleton<IModelComparer>(sp => 
+                    new ModelComparer(sp.GetRequiredService<IStochasticRunner>()));
                 break;
             case ServiceLifetime.Scoped:
                 services.TryAddScoped<IStochasticRunner, StochasticRunner>();
-                services.TryAddScoped<IModelComparer, ModelComparer>();
+                services.TryAddScoped<IModelComparer>(sp => 
+                    new ModelComparer(sp.GetRequiredService<IStochasticRunner>()));
                 break;
             case ServiceLifetime.Transient:
                 services.TryAddTransient<IStochasticRunner, StochasticRunner>();
-                services.TryAddTransient<IModelComparer, ModelComparer>();
+                services.TryAddTransient<IModelComparer>(sp => 
+                    new ModelComparer(sp.GetRequiredService<IStochasticRunner>()));
                 break;
         }
 
