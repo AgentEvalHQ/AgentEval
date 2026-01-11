@@ -151,11 +151,11 @@ public class ChatClientEvaluator : IEvaluator
         }
         catch
         {
-            // Default to failure score when parsing fails
+            // Return failure score when evaluation parsing fails to indicate evaluation system error
             return new EvaluationResult
             {
                 OverallScore = EvaluationDefaults.DefaultFailureScore,
-                Summary = "Evaluation completed but result parsing had issues"
+                Summary = "Failed to parse evaluation result"
             };
         }
     }
