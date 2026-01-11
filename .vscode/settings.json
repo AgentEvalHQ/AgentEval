@@ -1,6 +1,20 @@
 {
     "chat.agent.maxRequests": 45,
     
+    // Enable custom instruction files for GitHub Copilot
+    "github.copilot.chat.codeGeneration.useInstructionFiles": true,
+    
+    // Enable AGENTS.md file support
+    "chat.useAgentsMdFile": true,
+    
+    // Enable nested AGENTS.md files (experimental)
+    "chat.useNestedAgentsMdFiles": true,
+    
+    // Custom instructions file locations
+    "chat.instructionsFilesLocations": [
+        ".github/instructions"
+    ],
+    
     // YAML schema validation - suppress false positives in GitHub Actions workflows
     // The CODECOV_TOKEN context access and github-pages environment warnings
     // work correctly at runtime in GitHub Actions
