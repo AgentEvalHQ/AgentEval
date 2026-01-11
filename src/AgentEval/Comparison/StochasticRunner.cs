@@ -104,7 +104,7 @@ public class StochasticRunner : IStochasticRunner
     /// <param name="testOptions">Optional test options for each run.</param>
     [Obsolete("Use constructor with IStatisticsCalculator parameter for better testability. This constructor will be removed in a future version.")]
     public StochasticRunner(ITestHarness harness, TestOptions? testOptions)
-        : this(harness, null, testOptions)
+        : this(harness, statisticsCalculator: null, testOptions: testOptions)
     {
     }
     
