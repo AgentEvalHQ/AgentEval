@@ -59,12 +59,12 @@ internal static class JsonParsingHelper
         {
             return element.EnumerateArray()
                 .Where(e => e.ValueKind == JsonValueKind.String)
-                .Select(e => e.GetString()!)
+                .Select(e => e.GetString() ?? string.Empty)
                 .ToList();
         }
         if (element.ValueKind == JsonValueKind.String)
         {
-            return new[] { element.GetString()! };
+            return new[] { element.GetString() ?? string.Empty };
         }
         return null;
     }
