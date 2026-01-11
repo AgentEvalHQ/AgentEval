@@ -12,14 +12,32 @@ internal static class LlmJsonParser
 {
     /// <summary>
     /// Extracts JSON from a potentially decorated LLM response (with markdown, etc.).
+    /// Handles markdown code blocks (```json and ```).
     /// </summary>
     /// <param name="response">The LLM response text.</param>
-    /// <returns>The extracted JSON string, or null if no JSON found.</returns>
+    /// <returns>The extracted JSON string, or the original text if no markdown wrapper found.</returns>
     public static string? ExtractJson(string? response)
     {
         if (string.IsNullOrEmpty(response))
             return null;
         
+        // Try to extract from markdown code blocks first
+        if (response.Contains("```json"))
+        {
+            var start = response.IndexOf("```json") + 7;
+            var end = response.IndexOf("```", start);
+            if (end > start)
+                return response[start..end].Trim();
+        }
+        else if (response.Contains("```"))
+        {
+            var start = response.IndexOf("```") + 3;
+            var end = response.IndexOf("```", start);
+            if (end > start)
+                return response[start..end].Trim();
+        }
+        
+        // If no markdown wrapper, try to extract raw JSON by finding braces
         var jsonStart = response.IndexOf('{');
         var jsonEnd = response.LastIndexOf('}');
         
@@ -28,7 +46,8 @@ internal static class LlmJsonParser
             return response[jsonStart..(jsonEnd + 1)];
         }
         
-        return null;
+        // Return trimmed original text as fallback
+        return response.Trim();
     }
     
     /// <summary>

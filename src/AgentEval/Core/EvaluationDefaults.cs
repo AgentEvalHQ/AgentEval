@@ -15,6 +15,12 @@ public static class EvaluationDefaults
     public const int DefaultPassingScore = 70;
     
     /// <summary>
+    /// Default score assigned when evaluation parsing fails (0-100 scale).
+    /// This indicates a failure in the evaluation process itself.
+    /// </summary>
+    public const int DefaultFailureScore = 50;
+    
+    /// <summary>
     /// Penalty percentage applied per extra (unexpected) tool call.
     /// </summary>
     public const double ExtraToolPenaltyPercent = 10.0;

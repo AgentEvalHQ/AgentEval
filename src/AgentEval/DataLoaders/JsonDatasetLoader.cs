@@ -151,46 +151,40 @@ public class JsonDatasetLoader : IDatasetLoader
 
         var testCase = new DatasetTestCase
         {
-            Id = GetStringOrDefault(element, "id", $"item_{index}"),
-            Category = GetStringOrNull(element, "category"),
-            Input = GetStringOrDefault(element, "input", 
-                GetStringOrDefault(element, "question", 
-                GetStringOrDefault(element, "prompt", 
-                GetStringOrDefault(element, "query", "")))),
-            ExpectedOutput = GetStringOrNull(element, "expected") 
-                ?? GetStringOrNull(element, "expected_output") 
-                ?? GetStringOrNull(element, "answer")
-                ?? GetStringOrNull(element, "response"),
+            Id = JsonParsingHelper.GetStringOrDefault(element, "id", $"item_{index}"),
+            Category = JsonParsingHelper.GetStringOrNull(element, "category"),
+            Input = JsonParsingHelper.GetInput(element),
+            ExpectedOutput = JsonParsingHelper.GetExpectedOutput(element),
         };
 
         // Parse context
         if (element.TryGetProperty("context", out var contextProp))
         {
-            testCase.Context = ParseStringArray(contextProp);
+            testCase.Context = JsonParsingHelper.ParseStringArray(contextProp);
         }
         else if (element.TryGetProperty("contexts", out var contextsProp))
         {
-            testCase.Context = ParseStringArray(contextsProp);
+            testCase.Context = JsonParsingHelper.ParseStringArray(contextsProp);
         }
         else if (element.TryGetProperty("documents", out var docsProp))
         {
-            testCase.Context = ParseStringArray(docsProp);
+            testCase.Context = JsonParsingHelper.ParseStringArray(docsProp);
         }
 
         // Parse expected tools
         if (element.TryGetProperty("expected_tools", out var toolsProp))
         {
-            testCase.ExpectedTools = ParseStringArray(toolsProp);
+            testCase.ExpectedTools = JsonParsingHelper.ParseStringArray(toolsProp);
         }
         else if (element.TryGetProperty("tools", out var toolsProp2))
         {
-            testCase.ExpectedTools = ParseStringArray(toolsProp2);
+            testCase.ExpectedTools = JsonParsingHelper.ParseStringArray(toolsProp2);
         }
 
         // Parse ground truth
         if (element.TryGetProperty("ground_truth", out var gtProp))
         {
-            testCase.GroundTruth = ParseGroundTruth(gtProp);
+            testCase.GroundTruth = JsonParsingHelper.ParseGroundTruth(gtProp);
         }
         else if (element.TryGetProperty("function", out var funcProp) &&
                  element.TryGetProperty("arguments", out var argsProp))
@@ -198,7 +192,7 @@ public class JsonDatasetLoader : IDatasetLoader
             testCase.GroundTruth = new GroundTruthToolCall
             {
                 Name = funcProp.GetString() ?? "",
-                Arguments = ParseArguments(argsProp)
+                Arguments = JsonParsingHelper.ParseArguments(argsProp)
             };
         }
 
@@ -206,93 +200,12 @@ public class JsonDatasetLoader : IDatasetLoader
         foreach (var prop in element.EnumerateObject())
         {
             var name = prop.Name.ToLowerInvariant();
-            if (!IsKnownProperty(name))
+            if (!JsonParsingHelper.IsKnownProperty(name))
             {
-                testCase.Metadata[prop.Name] = GetJsonValue(prop.Value);
+                testCase.Metadata[prop.Name] = JsonParsingHelper.GetJsonValue(prop.Value);
             }
         }
 
         return testCase;
     }
-
-    private static bool IsKnownProperty(string name) => name switch
-    {
-        "id" or "category" => true,
-        "input" or "question" or "prompt" or "query" => true,
-        "expected" or "expected_output" or "answer" or "response" => true,
-        "context" or "contexts" or "documents" => true,
-        "expected_tools" or "tools" => true,
-        "ground_truth" or "function" or "arguments" => true,
-        _ => false
-    };
-
-    private static string GetStringOrDefault(JsonElement element, string propertyName, string defaultValue)
-    {
-        return element.TryGetProperty(propertyName, out var prop) && prop.ValueKind == JsonValueKind.String
-            ? prop.GetString() ?? defaultValue
-            : defaultValue;
-    }
-
-    private static string? GetStringOrNull(JsonElement element, string propertyName)
-    {
-        return element.TryGetProperty(propertyName, out var prop) && prop.ValueKind == JsonValueKind.String
-            ? prop.GetString()
-            : null;
-    }
-
-    private static IReadOnlyList<string>? ParseStringArray(JsonElement element)
-    {
-        if (element.ValueKind == JsonValueKind.Array)
-        {
-            return element.EnumerateArray()
-                .Where(e => e.ValueKind == JsonValueKind.String)
-                .Select(e => e.GetString()!)
-                .ToList();
-        }
-        if (element.ValueKind == JsonValueKind.String)
-        {
-            return new[] { element.GetString()! };
-        }
-        return null;
-    }
-
-    private static GroundTruthToolCall? ParseGroundTruth(JsonElement element)
-    {
-        if (element.ValueKind != JsonValueKind.Object)
-        {
-            return null;
-        }
-
-        var name = GetStringOrDefault(element, "name", GetStringOrDefault(element, "function", ""));
-        var args = element.TryGetProperty("arguments", out var argsProp)
-            ? ParseArguments(argsProp)
-            : new Dictionary<string, object?>();
-
-        return new GroundTruthToolCall { Name = name, Arguments = args };
-    }
-
-    private static Dictionary<string, object?> ParseArguments(JsonElement element)
-    {
-        var args = new Dictionary<string, object?>();
-        if (element.ValueKind == JsonValueKind.Object)
-        {
-            foreach (var prop in element.EnumerateObject())
-            {
-                args[prop.Name] = GetJsonValue(prop.Value);
-            }
-        }
-        return args;
-    }
-
-    private static object? GetJsonValue(JsonElement element) => element.ValueKind switch
-    {
-        JsonValueKind.String => element.GetString(),
-        JsonValueKind.Number => element.TryGetInt64(out var l) ? l : element.GetDouble(),
-        JsonValueKind.True => true,
-        JsonValueKind.False => false,
-        JsonValueKind.Null => null,
-        JsonValueKind.Array => element.EnumerateArray().Select(GetJsonValue).ToList(),
-        JsonValueKind.Object => element.EnumerateObject().ToDictionary(p => p.Name, p => GetJsonValue(p.Value)),
-        _ => element.GetRawText()
-    };
 }

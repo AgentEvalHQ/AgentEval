@@ -124,12 +124,17 @@ public class ChatClientEvaluator : IEvaluator
     {
         try
         {
-            var json = ExtractJson(responseText);
+            var json = LlmJsonParser.ExtractJson(responseText);
+            if (json == null)
+            {
+                return new EvaluationResult { OverallScore = EvaluationDefaults.DefaultFailureScore, Summary = "Failed to parse evaluation - no JSON found" };
+            }
+
             var result = System.Text.Json.JsonSerializer.Deserialize<EvaluationResultDto>(json,
                 new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
             
             if (result == null)
-                return new EvaluationResult { OverallScore = 50, Summary = "Failed to parse evaluation" };
+                return new EvaluationResult { OverallScore = EvaluationDefaults.DefaultFailureScore, Summary = "Failed to parse evaluation" };
 
             return new EvaluationResult
             {
@@ -146,32 +151,13 @@ public class ChatClientEvaluator : IEvaluator
         }
         catch
         {
-            // Default to passing score when parsing fails but evaluation completed
+            // Return failure score when evaluation parsing fails to indicate evaluation system error
             return new EvaluationResult
             {
-                OverallScore = EvaluationDefaults.DefaultPassingScore,
-                Summary = "Evaluation completed but result parsing had issues"
+                OverallScore = EvaluationDefaults.DefaultFailureScore,
+                Summary = "Failed to parse evaluation result"
             };
         }
-    }
-
-    private static string ExtractJson(string text)
-    {
-        if (text.Contains("```json"))
-        {
-            var start = text.IndexOf("```json") + 7;
-            var end = text.IndexOf("```", start);
-            if (end > start)
-                return text[start..end].Trim();
-        }
-        else if (text.Contains("```"))
-        {
-            var start = text.IndexOf("```") + 3;
-            var end = text.IndexOf("```", start);
-            if (end > start)
-                return text[start..end].Trim();
-        }
-        return text.Trim();
     }
 
     // DTO for JSON deserialization
