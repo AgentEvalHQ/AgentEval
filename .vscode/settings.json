@@ -22,5 +22,9 @@
         "https://json.schemastore.org/github-workflow.json": ".github/workflows/*.yml"
     },
     "yaml.validate": true,
-    "yaml.schemaStore.enable": true
+    "yaml.schemaStore.enable": true,
+    "chat.tools.terminal.autoApprove": {
+        "Move-Item": true,
+        "Out-File": true
+    }
 }
