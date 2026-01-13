@@ -50,7 +50,7 @@ jobs:
       run: dotnet build --configuration Release --no-restore
 
     - name: Test
-      run: dotnet test --configuration Release --no-build --verbosity normal --collect:"XPlat Code Coverage" --results-directory ./coverage --logger "trx;LogFileName=test-results.trx"
+      run: dotnet test --configuration Release --no-build --verbosity normal --collect:"XPlat Code Coverage" --results-directory ./TestResults --logger "trx;LogFileName=test-results.trx"
       env:
         AZURE_OPENAI_ENDPOINT: ${{ secrets.AZURE_OPENAI_ENDPOINT }}
         AZURE_OPENAI_API_KEY: ${{ secrets.AZURE_OPENAI_API_KEY }}
@@ -59,7 +59,7 @@ jobs:
       if: matrix.dotnet-version == '10.0.x'
       uses: codecov/codecov-action@v4
       with:
-        directory: ./coverage
+        directory: ./TestResults
         fail_ci_if_error: false
       env:
         CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
@@ -70,7 +70,7 @@ jobs:
       with:
         name: test-results-linux-${{ matrix.dotnet-version }}
         path: |
-          **/coverage/**/*.trx
+          **/TestResults/**/*.trx
           **/TestResults/traces/**
         retention-days: 7
 
