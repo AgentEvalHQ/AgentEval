@@ -32,7 +32,7 @@ public static AIAgent CreateMyAgent()
     // Connect to Azure OpenAI
     var azureClient = new AzureOpenAIClient(
         new Uri(Environment.GetEnvironmentVariable("AZURE_OPENAI_ENDPOINT")!),
-        new Azure.AzureKeyCredential(Environment.GetEnvironmentVariable("AZURE_OPENAI_KEY")!));
+        new Azure.AzureKeyCredential(Environment.GetEnvironmentVariable("AZURE_OPENAI_API_KEY")!));
 
     var chatClient = azureClient
         .GetChatClient("gpt-4o")  // Your deployment name
@@ -58,7 +58,7 @@ public static AIAgent CreateWeatherAgent()
 {
     var azureClient = new AzureOpenAIClient(
         new Uri(Environment.GetEnvironmentVariable("AZURE_OPENAI_ENDPOINT")!),
-        new Azure.AzureKeyCredential(Environment.GetEnvironmentVariable("AZURE_OPENAI_KEY")!));
+        new Azure.AzureKeyCredential(Environment.GetEnvironmentVariable("AZURE_OPENAI_API_KEY")!));
 
     var chatClient = azureClient
         .GetChatClient("gpt-4o")
@@ -127,7 +127,7 @@ public class MyAgentTests
     {
         var azureClient = new AzureOpenAIClient(
             new Uri(Environment.GetEnvironmentVariable("AZURE_OPENAI_ENDPOINT")!),
-            new Azure.AzureKeyCredential(Environment.GetEnvironmentVariable("AZURE_OPENAI_KEY")!));
+            new Azure.AzureKeyCredential(Environment.GetEnvironmentVariable("AZURE_OPENAI_API_KEY")!));
 
         var chatClient = azureClient
             .GetChatClient("gpt-4o")
@@ -178,7 +178,7 @@ private static AIAgent CreateWeatherAgent()
 {
     var azureClient = new AzureOpenAIClient(
         new Uri(Environment.GetEnvironmentVariable("AZURE_OPENAI_ENDPOINT")!),
-        new Azure.AzureKeyCredential(Environment.GetEnvironmentVariable("AZURE_OPENAI_KEY")!));
+        new Azure.AzureKeyCredential(Environment.GetEnvironmentVariable("AZURE_OPENAI_API_KEY")!));
 
     var chatClient = azureClient
         .GetChatClient("gpt-4o")
@@ -251,7 +251,7 @@ public class AdvancedAgentTests
         // Create an evaluator (any IChatClient implementation)
         var client = new AzureOpenAIClient(
             new Uri(Environment.GetEnvironmentVariable("AZURE_OPENAI_ENDPOINT")!),
-            new Azure.AzureKeyCredential(Environment.GetEnvironmentVariable("AZURE_OPENAI_KEY")!));
+            new Azure.AzureKeyCredential(Environment.GetEnvironmentVariable("AZURE_OPENAI_API_KEY")!));
         
         _evaluator = client.GetChatClient("gpt-4o").AsIChatClient();
     }
@@ -283,7 +283,7 @@ public class AdvancedAgentTests
     {
         var azureClient = new AzureOpenAIClient(
             new Uri(Environment.GetEnvironmentVariable("AZURE_OPENAI_ENDPOINT")!),
-            new Azure.AzureKeyCredential(Environment.GetEnvironmentVariable("AZURE_OPENAI_KEY")!));
+            new Azure.AzureKeyCredential(Environment.GetEnvironmentVariable("AZURE_OPENAI_API_KEY")!));
 
         var chatClient = azureClient
             .GetChatClient("gpt-4o")
@@ -349,7 +349,7 @@ private static AIAgent CreateMyAgent()
 {
     var azureClient = new AzureOpenAIClient(
         new Uri(Environment.GetEnvironmentVariable("AZURE_OPENAI_ENDPOINT")!),
-        new Azure.AzureKeyCredential(Environment.GetEnvironmentVariable("AZURE_OPENAI_KEY")!));
+        new Azure.AzureKeyCredential(Environment.GetEnvironmentVariable("AZURE_OPENAI_API_KEY")!));
 
     var chatClient = azureClient
         .GetChatClient("gpt-4o")

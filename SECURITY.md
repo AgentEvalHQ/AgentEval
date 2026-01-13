@@ -65,7 +65,7 @@ var client = new AzureOpenAIClient(
 
 // ✅ DO: Use environment variables or configuration
 var endpoint = new Uri(Environment.GetEnvironmentVariable("AZURE_OPENAI_ENDPOINT")!);
-var credential = new AzureKeyCredential(Environment.GetEnvironmentVariable("AZURE_OPENAI_KEY")!);
+var credential = new AzureKeyCredential(Environment.GetEnvironmentVariable("AZURE_OPENAI_API_KEY")!);
 var client = new AzureOpenAIClient(endpoint, credential);
 ```
 
@@ -94,7 +94,7 @@ Use secrets management in CI/CD:
 # GitHub Actions
 - name: Run Tests
   env:
-    AZURE_OPENAI_KEY: ${{ secrets.AZURE_OPENAI_KEY }}
+    AZURE_OPENAI_API_KEY: ${{ secrets.AZURE_OPENAI_API_KEY }}
     AZURE_OPENAI_ENDPOINT: ${{ secrets.AZURE_OPENAI_ENDPOINT }}
   run: dotnet test
 ```

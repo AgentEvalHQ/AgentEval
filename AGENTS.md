@@ -116,6 +116,6 @@ var response = await replayer.ReplayNextAsync();
 For samples/integration tests:
 ```
 AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.com/
-AZURE_OPENAI_KEY=your-api-key
+AZURE_OPENAI_API_KEY=your-api-key
 AZURE_OPENAI_DEPLOYMENT=gpt-4o
 ```

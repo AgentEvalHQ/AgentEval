@@ -96,7 +96,7 @@ jobs:
         run: dotnet test --logger "trx;LogFileName=test-results.trx"
         env:
           AZURE_OPENAI_ENDPOINT: ${{ secrets.AZURE_OPENAI_ENDPOINT }}
-          AZURE_OPENAI_KEY: ${{ secrets.AZURE_OPENAI_KEY }}
+          AZURE_OPENAI_API_KEY: ${{ secrets.AZURE_OPENAI_API_KEY }}
       
       - name: Upload Test Results
         uses: actions/upload-artifact@v4
@@ -153,7 +153,7 @@ jobs:
         run: dotnet test --filter "Category=ModelComparison"
         env:
           AZURE_OPENAI_ENDPOINT: ${{ secrets.AZURE_OPENAI_ENDPOINT }}
-          AZURE_OPENAI_KEY: ${{ secrets.AZURE_OPENAI_KEY }}
+          AZURE_OPENAI_API_KEY: ${{ secrets.AZURE_OPENAI_API_KEY }}
       
       - name: Upload Model Traces
         uses: actions/upload-artifact@v4
@@ -249,7 +249,7 @@ steps:
       arguments: '--logger trx --results-directory $(Build.ArtifactStagingDirectory)/TestResults'
     env:
       AZURE_OPENAI_ENDPOINT: $(AZURE_OPENAI_ENDPOINT)
-      AZURE_OPENAI_KEY: $(AZURE_OPENAI_KEY)
+      AZURE_OPENAI_API_KEY: $(AZURE_OPENAI_API_KEY)
 
   - task: PublishTestResults@2
     displayName: 'Publish Test Results'
@@ -314,7 +314,7 @@ jobs:
           arguments: '--filter "Category=Stochastic" --logger trx'
         env:
           AZURE_OPENAI_ENDPOINT: $(AZURE_OPENAI_ENDPOINT)
-          AZURE_OPENAI_KEY: $(AZURE_OPENAI_KEY)
+          AZURE_OPENAI_API_KEY: $(AZURE_OPENAI_API_KEY)
           STOCHASTIC_RUNS: $(STOCHASTIC_RUNS)
 
       - task: PublishBuildArtifacts@1

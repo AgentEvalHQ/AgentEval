@@ -24,7 +24,7 @@ AgentEval/
 Required environment variables for samples and integration tests:
 ```powershell
 $env:AZURE_OPENAI_ENDPOINT = "https://your-resource.openai.azure.com/"
-$env:AZURE_OPENAI_KEY = "your-api-key"
+$env:AZURE_OPENAI_API_KEY = "your-api-key"
 # Optional: Secondary models for comparison
 $env:AZURE_OPENAI_DEPLOYMENT = "gpt-4o"           # Primary model
 $env:AZURE_OPENAI_DEPLOYMENT_2 = "gpt-4o-mini"    # Secondary model

@@ -1,4 +1,4 @@
-﻿---
+---
 description: AI agent for AgentEval development tasks - code implementation, review, and debugging
 name: AgentEval Dev
 tools: ['codebase', 'terminal', 'search', 'fetch', 'findTestFiles', 'runTests']

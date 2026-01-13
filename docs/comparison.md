@@ -1,4 +1,4 @@
-﻿# Migration Guide
+# Migration Guide
 
 > **Coming from another evaluation framework?** This guide helps you transition to AgentEval with code examples and pattern translations.
 

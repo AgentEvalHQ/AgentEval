@@ -333,7 +333,7 @@ jobs:
       - name: Run Stochastic Tests
         env:
           AZURE_OPENAI_ENDPOINT: ${{ secrets.AZURE_OPENAI_ENDPOINT }}
-          AZURE_OPENAI_KEY: ${{ secrets.AZURE_OPENAI_KEY }}
+          AZURE_OPENAI_API_KEY: ${{ secrets.AZURE_OPENAI_API_KEY }}
           STOCHASTIC_RUNS: 10
           SUCCESS_THRESHOLD: 0.8
         run: |

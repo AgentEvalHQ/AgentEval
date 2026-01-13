@@ -49,7 +49,7 @@ using Microsoft.Extensions.AI;
 // First, create your MAF agent
 var azureClient = new AzureOpenAIClient(
     new Uri(Environment.GetEnvironmentVariable("AZURE_OPENAI_ENDPOINT")!),
-    new Azure.AzureKeyCredential(Environment.GetEnvironmentVariable("AZURE_OPENAI_KEY")!));
+    new Azure.AzureKeyCredential(Environment.GetEnvironmentVariable("AZURE_OPENAI_API_KEY")!));
 
 var chatClient = azureClient
     .GetChatClient("gpt-4o")
@@ -247,7 +247,7 @@ using System.ComponentModel;
 // ═══════════════════════════════════════════════════════════════
 var azureClient = new AzureOpenAIClient(
     new Uri(Environment.GetEnvironmentVariable("AZURE_OPENAI_ENDPOINT")!),
-    new Azure.AzureKeyCredential(Environment.GetEnvironmentVariable("AZURE_OPENAI_KEY")!));
+    new Azure.AzureKeyCredential(Environment.GetEnvironmentVariable("AZURE_OPENAI_API_KEY")!));
 
 var chatClient = azureClient
     .GetChatClient("gpt-4o")
@@ -362,7 +362,7 @@ public class TravelAgentTests
         // Setup agent once per test class
         var azureClient = new AzureOpenAIClient(
             new Uri(Environment.GetEnvironmentVariable("AZURE_OPENAI_ENDPOINT")!),
-            new Azure.AzureKeyCredential(Environment.GetEnvironmentVariable("AZURE_OPENAI_KEY")!));
+            new Azure.AzureKeyCredential(Environment.GetEnvironmentVariable("AZURE_OPENAI_API_KEY")!));
 
         var chatClient = azureClient
             .GetChatClient("gpt-4o")

@@ -49,7 +49,7 @@ using Microsoft.Extensions.AI;
 
 var azureClient = new AzureOpenAIClient(
     new Uri(Environment.GetEnvironmentVariable("AZURE_OPENAI_ENDPOINT")!),
-    new Azure.AzureKeyCredential(Environment.GetEnvironmentVariable("AZURE_OPENAI_KEY")!));
+    new Azure.AzureKeyCredential(Environment.GetEnvironmentVariable("AZURE_OPENAI_API_KEY")!));
 
 var chatClient = azureClient
     .GetChatClient("gpt-4o")
@@ -485,7 +485,7 @@ jobs:
       - name: Run Benchmarks
         env:
           AZURE_OPENAI_ENDPOINT: ${{ secrets.AZURE_OPENAI_ENDPOINT }}
-          AZURE_OPENAI_KEY: ${{ secrets.AZURE_OPENAI_KEY }}
+          AZURE_OPENAI_API_KEY: ${{ secrets.AZURE_OPENAI_API_KEY }}
         run: |
           dotnet run --project benchmarks/AgentBenchmarks.csproj \
             --output results.json \

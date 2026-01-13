@@ -10,6 +10,16 @@ After enabling rich test output, you'll have:
 2. **JSON trace files** that capture the complete execution for post-mortem debugging
 3. **CI/CD integration** with automatic artifact collection for failed tests
 
+> **🚧 Coming Soon: Visual Time-Travel UI**
+> 
+> Currently, trace files are viewed as JSON or analyzed programmatically. We're building a **visual time-travel debugger** that will allow you to:
+> - Step through agent executions visually
+> - See conversation history with syntax highlighting
+> - Click through tool calls in a timeline view
+> - Compare traces side-by-side for regression analysis
+> 
+> This feature is planned for a future release. For now, you can use the JSON traces with any JSON viewer or the programmatic APIs shown in this guide.
+
 ## Quick Start (2 Minutes)
 
 ### Step 1: Set Environment Variables
@@ -375,7 +385,7 @@ jobs:
         run: dotnet test --logger trx
         env:
           AZURE_OPENAI_ENDPOINT: ${{ secrets.AZURE_OPENAI_ENDPOINT }}
-          AZURE_OPENAI_KEY: ${{ secrets.AZURE_OPENAI_KEY }}
+          AZURE_OPENAI_API_KEY: ${{ secrets.AZURE_OPENAI_API_KEY }}
       
       # Always upload traces, even on success
       - name: Upload Traces
@@ -415,7 +425,7 @@ steps:
       arguments: '--logger trx'
     env:
       AZURE_OPENAI_ENDPOINT: $(AZURE_OPENAI_ENDPOINT)
-      AZURE_OPENAI_KEY: $(AZURE_OPENAI_KEY)
+      AZURE_OPENAI_API_KEY: $(AZURE_OPENAI_API_KEY)
 
   - task: PublishBuildArtifacts@1
     condition: always()

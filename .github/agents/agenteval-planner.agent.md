@@ -1,4 +1,4 @@
-﻿---
+---
 description: Planning agent for AgentEval feature development - generates implementation plans without making code changes
 name: AgentEval Planner
 tools: ['search', 'search/codebase', 'fetch']

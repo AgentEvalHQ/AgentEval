@@ -75,7 +75,7 @@ public class GPT4oAgentFactory : IAgentFactory
     {
         var chatClient = new AzureOpenAIChatClient(
             new Uri(Environment.GetEnvironmentVariable("AZURE_OPENAI_ENDPOINT")!),
-            new AzureKeyCredential(Environment.GetEnvironmentVariable("AZURE_OPENAI_KEY")!),
+            new AzureKeyCredential(Environment.GetEnvironmentVariable("AZURE_OPENAI_API_KEY")!),
             "gpt-4o"
         );
         
@@ -92,7 +92,7 @@ public class GPT4oMiniAgentFactory : IAgentFactory
     {
         var chatClient = new AzureOpenAIChatClient(
             new Uri(Environment.GetEnvironmentVariable("AZURE_OPENAI_ENDPOINT")!),
-            new AzureKeyCredential(Environment.GetEnvironmentVariable("AZURE_OPENAI_KEY")!),
+            new AzureKeyCredential(Environment.GetEnvironmentVariable("AZURE_OPENAI_API_KEY")!),
             "gpt-4o-mini"
         );
         
@@ -436,7 +436,7 @@ jobs:
       - name: Run Model Comparison
         env:
           AZURE_OPENAI_ENDPOINT: ${{ secrets.AZURE_OPENAI_ENDPOINT }}
-          AZURE_OPENAI_KEY: ${{ secrets.AZURE_OPENAI_KEY }}
+          AZURE_OPENAI_API_KEY: ${{ secrets.AZURE_OPENAI_API_KEY }}
         run: |
           dotnet run --project tools/ModelComparison \
             --output comparison-results.json \

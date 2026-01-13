@@ -270,7 +270,7 @@ Use replay in CI pipelines without API credentials:
 ```yaml
 - name: Run Agent Tests
   run: dotnet test --filter "Category=Replay"
-  # No AZURE_OPENAI_KEY needed!
+  # No AZURE_OPENAI_API_KEY needed!
 ```
 
 ### 4. Golden Master Testing

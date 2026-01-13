@@ -1,4 +1,4 @@
-﻿# AgentEval
+# AgentEval
 
 <p align="center">
   <img src="assets/AgentEval_bounded.png" alt="AgentEval Logo" width="450" />
@@ -156,14 +156,14 @@ modelResults.PrintComparisonTable();
 
 **Output:**
 ```
-┌──────────────────────────────────────────────────────────────────────────────┐
-│                     Model Comparison (5 runs each)                           │
-├──────────────┬─────────────┬────────────┬──────────┬────────────────────────┤
-│ Model        │ Pass Rate   │ Mean Score │ Std Dev  │ Recommendation         │
-├──────────────┼─────────────┼────────────┼──────────┼────────────────────────┤
-│ GPT-4o       │ 100%        │ 92.4       │ 3.2      │ 🏆 Best Quality        │
-│ GPT-4o Mini  │ 80%         │ 84.1       │ 8.7      │ 💰 Best Value          │
-└──────────────┴─────────────┴────────────┴──────────┴────────────────────────┘
++------------------------------------------------------------------------------+
+�                     Model Comparison (5 runs each)                           �
++-----------------------------------------------------------------------------�
+� Model        � Pass Rate   � Mean Score � Std Dev  � Recommendation         �
++--------------+-------------+------------+----------+------------------------�
+� GPT-4o       � 100%        � 92.4       � 3.2      � ?? Best Quality        �
+� GPT-4o Mini  � 80%         � 84.1       � 8.7      � ?? Best Value          �
++-----------------------------------------------------------------------------+
 ```
 
 ---
@@ -210,6 +210,60 @@ if (faithfulness.Score < 70)
 
 ---
 
+### Rich Test Output: Debug CI Failures Like a Pro
+
+Configure verbosity levels via environment variables�no code changes needed:
+
+```bash
+# In CI/CD pipeline
+AGENTEVAL_VERBOSITY=Detailed     # None, Summary, Detailed, Full
+AGENTEVAL_SAVE_TRACES=true       # Auto-save on test failure
+AGENTEVAL_TRACE_DIR=./traces     # Where to save
+```
+
+**Time-Travel Traces:** Captured JSON files show every step of execution:
+
+```json
+{
+  "schemaVersion": "1.0",
+  "traceId": "booking-test-2026-01-24",
+  "steps": [
+    { "type": "UserInput", "data": { "input": "Book a flight to Paris" } },
+    { "type": "LlmRequest", "duration": "00:00:00.450", "data": { "model": "gpt-4o" } },
+    { "type": "ToolCall", "data": { "name": "SearchFlights", "args": { "destination": "Paris" } } },
+    { "type": "ToolResult", "data": { "success": true, "flights": 5 } },
+    { "type": "AgentResponse", "data": { "output": "Found 5 flights..." } }
+  ]
+}
+```
+
+**Optional Base Class for Auto-Tracing Tests:**
+
+```csharp
+public class MyAgentTests : AgentEvalTestBase
+{
+    public MyAgentTests(ITestOutputHelper output) 
+        : base(new XUnitTextWriter(output)) { }
+    
+    [Fact]
+    public async Task BookFlight_WithValidInput_ShouldSucceed()
+    {
+        var result = /* ... run agent ... */;
+        
+        // Automatically records results with configured verbosity
+        RecordResult(result);
+        
+        // Saves trace file on failure (configurable)
+        if (!result.Passed)
+            SaveTrace("booking-failure", result);
+    }
+}
+```
+
+**?? See:** [docs/rich-test-output-guide.md](docs/rich-test-output-guide.md) for the complete step-by-step guide.
+
+---
+
 ## Why AgentEval?
 
 | Challenge | How AgentEval Solves It |
@@ -221,6 +275,7 @@ if (faithfulness.Score < 70)
 | "Is my RAG hallucinating?" | **Faithfulness metrics** - grounding verification |
 | "What's the latency/cost?" | **Performance metrics** - TTFT, tokens, estimated cost |
 | "How do I debug failures?" | **Trace recording** - capture executions for step-by-step analysis |
+| "CI tests pass locally but fail in CI?" | **Rich test output** - detailed logs and trace artifacts |
 
 ---
 
@@ -246,11 +301,17 @@ if (faithfulness.Score < 70)
 - Calibrated judging - multi-model consensus evaluation
 - Trace recording - capture executions for debugging and reproduction
 
+### Developer Experience
+- Rich test output - configurable verbosity (None/Summary/Detailed/Full)
+- Time-travel traces - step-by-step execution capture in JSON
+- Trace artifacts - auto-save traces for failed tests
+- AgentEvalTestBase - optional base class for auto-tracing tests
+
 ### Enterprise Ready
-- CI/CD integration - JUnit XML, Markdown, JSON export
+- CI/CD integration - JUnit XML, Markdown, JSON export, trace artifacts
 - CLI tool - agenteval eval, agenteval init
 - Benchmarks - custom patterns with dataset loaders (JSON, YAML, CSV, JSONL)
-- 800+ tests (×3 TFMs) - production quality
+- 1,000+ tests (�3 TFMs) - production quality
 
 ---
 
@@ -397,9 +458,9 @@ We welcome contributions! Please see:
 ## Forever Open Source
 
 AgentEval is **MIT licensed** and will remain open source forever. We believe in:
-- 🔓 **No license changes** - MIT today, MIT forever
-- 🚫 **No "open core"** - All features are open source, no proprietary tiers
-- 🤝 **Community first** - Built for and with the .NET AI community
+- ?? **No license changes** - MIT today, MIT forever
+- ?? **No "open core"** - All features are open source, no proprietary tiers
+- ?? **Community first** - Built for and with the .NET AI community
 
 ---
 
