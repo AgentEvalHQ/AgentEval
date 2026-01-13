@@ -10,10 +10,6 @@ env:
   DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
   DOTNET_CLI_TELEMETRY_OPTOUT: true
   DOTNET_NOLOGO: true
-  # AgentEval output configuration
-  AGENTEVAL_VERBOSITY: ${{ github.event_name == 'pull_request' && 'Detailed' || 'Summary' }}
-  AGENTEVAL_SAVE_TRACES: true
-  AGENTEVAL_TRACE_DIR: TestResults/traces
 
 jobs:
   build:
@@ -50,7 +46,7 @@ jobs:
       run: dotnet build --configuration Release --no-restore
 
     - name: Test
-      run: dotnet test --configuration Release --no-build --verbosity normal --collect:"XPlat Code Coverage" --results-directory ./TestResults --logger "trx;LogFileName=test-results.trx"
+      run: dotnet test --configuration Release --no-build --verbosity normal --collect:"XPlat Code Coverage" --results-directory ./coverage
       env:
         AZURE_OPENAI_ENDPOINT: ${{ secrets.AZURE_OPENAI_ENDPOINT }}
         AZURE_OPENAI_API_KEY: ${{ secrets.AZURE_OPENAI_API_KEY }}
@@ -59,28 +55,10 @@ jobs:
       if: matrix.dotnet-version == '10.0.x'
       uses: codecov/codecov-action@v4
       with:
-        directory: ./TestResults
+        directory: ./coverage
         fail_ci_if_error: false
       env:
         CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
-
-    - name: Upload Test Results
-      uses: actions/upload-artifact@v4
-      if: always()
-      with:
-        name: test-results-linux-${{ matrix.dotnet-version }}
-        path: |
-          **/TestResults/**/*.trx
-          **/TestResults/traces/**
-        retention-days: 7
-
-    - name: Upload Failure Traces
-      uses: actions/upload-artifact@v4
-      if: failure()
-      with:
-        name: failure-traces-linux-${{ matrix.dotnet-version }}
-        path: TestResults/traces/
-        retention-days: 30
 
   build-windows:
     runs-on: windows-latest
@@ -116,25 +94,9 @@ jobs:
       run: dotnet build --configuration Release --no-restore
 
     - name: Test
-      run: dotnet test --configuration Release --no-build --verbosity normal --logger "trx;LogFileName=test-results.trx" --results-directory ./TestResults
+      run: dotnet test --configuration Release --no-build --verbosity normal
       env:
         AZURE_OPENAI_ENDPOINT: ${{ secrets.AZURE_OPENAI_ENDPOINT }}
         AZURE_OPENAI_API_KEY: ${{ secrets.AZURE_OPENAI_API_KEY }}
 
-    - name: Upload Test Results
-      uses: actions/upload-artifact@v4
-      if: always()
-      with:
-        name: test-results-windows-${{ matrix.dotnet-version }}
-        path: |
-          **/TestResults/**/*.trx
-          **/TestResults/traces/**
-        retention-days: 7
 
-    - name: Upload Failure Traces
-      uses: actions/upload-artifact@v4
-      if: failure()
-      with:
-        name: failure-traces-windows-${{ matrix.dotnet-version }}
-        path: TestResults/traces/
-        retention-days: 30
