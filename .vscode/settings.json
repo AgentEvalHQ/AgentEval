@@ -27,6 +27,7 @@
         "Move-Item": true,
         "Out-File": true,
         "dotnet build": true,
-        "dotnet test": true
+        "dotnet test": true,
+        "Set-Content": true
     }
 }

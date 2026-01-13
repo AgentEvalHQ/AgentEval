@@ -1,4 +1,4 @@
-# AgentEval
+﻿# AgentEval
 
 <p align="center">
   <img src="assets/AgentEval_bounded.png" alt="AgentEval Logo" width="450" />
@@ -18,297 +18,316 @@
   <a href="https://github.com/joslat/AgentEval/blob/main/LICENSE">
     <img src="https://img.shields.io/github/license/joslat/AgentEval.svg" alt="License" />
   </a>
+  <img src="https://img.shields.io/badge/tests-800%2B%20x%203%20TFMs-brightgreen" alt="Test Count" />
 </p>
 
 ---
 
-AgentEval is a .NET-native testing, evaluation, and benchmarking toolkit for AI agents—built first for **Microsoft Agent Framework (MAF)**. It focuses on what agentic systems actually need: **tool-call visibility**, **streaming performance metrics (TTFT)**, **cost awareness**, **benchmarks**, and **run artifacts** you can inspect and “time-travel” during debugging.
+AgentEval is a **.NET-native testing, evaluation, and benchmarking toolkit for AI agents**  built first for **Microsoft Agent Framework (MAF)**. It brings the testing experience you know and love from .NET to the world of agentic AI.
 
-> AgentEval turns agent runs into test artifacts—and agent expectations into assertions.
+> **For years, agentic developers have imagined writing tests like this. Today, they can.**
+
+---
+
+## The Code You Have Been Dreaming Of
+
+### Compare Models, Get a Winner, Ship with Confidence
+
+```csharp
+var comparer = new ModelComparer(harness);
+
+var result = await comparer.CompareModelsAsync(
+    factories: new IAgentFactory[]
+    {
+        new AzureModelFactory("gpt-4o", "GPT-4o"),
+        new AzureModelFactory("gpt-4o-mini", "GPT-4o Mini"),  
+        new AzureModelFactory("gpt-35-turbo", "GPT-3.5 Turbo")
+    },
+    testCases: agenticTestSuite,
+    metrics: new[] { new ToolSuccessMetric(), new RelevanceMetric(evaluator) },
+    options: new ComparisonOptions(RunsPerModel: 5));
+
+Console.WriteLine(result.ToMarkdown());
+```
+
+**Output:**
+```markdown
+## Model Comparison Results
+
+| Rank | Model         | Tool Accuracy | Relevance | Mean Latency | Cost/1K Req |
+|------|---------------|---------------|-----------|--------------|-------------|
+| 1    | GPT-4o        | 94.2%         | 91.5      | 1,234ms      | $0.0150     |
+| 2    | GPT-4o Mini   | 87.5%         | 84.2      | 456ms        | $0.0003     |
+| 3    | GPT-3.5 Turbo | 72.1%         | 68.9      | 312ms        | $0.0005     |
+
+**Recommendation:** GPT-4o - Highest tool accuracy (94.2%)
+**Best Value:** GPT-4o Mini - 87.5% accuracy at 50x lower cost
+```
+
+---
+
+### Assert on Tool Chains Like You Have Always Imagined
+
+```csharp
+result.ToolUsage!.Should()
+    .HaveCalledTool("SearchFlights", because: "must search before booking")
+        .WithArgument("destination", "Paris")
+        .WithDurationUnder(TimeSpan.FromSeconds(2))
+    .And()
+    .HaveCalledTool("BookFlight", because: "booking follows search")
+        .AfterTool("SearchFlights")
+        .WithArgument("flightId", "AF1234")
+    .And()
+    .HaveCallOrder("SearchFlights", "BookFlight", "SendConfirmation")
+    .HaveNoErrors();
+```
+
+---
+
+### Stochastic Testing: Because LLMs Are Non-Deterministic
+
+LLMs don't return the same output every time. Run tests multiple times and analyze statistics:
+
+```csharp
+var result = await stochasticRunner.RunStochasticTestAsync(
+    agent, testCase,
+    new StochasticOptions
+    {
+        Runs = 20,                    // Run 20 times
+        SuccessRateThreshold = 0.85,  // 85% must pass
+        ScoreThreshold = 75           // Min score to count as "pass"
+    });
+
+// Understanding the statistics:
+// - Mean: Average score across all 20 runs (higher = better overall quality)
+// - StandardDeviation: How much scores vary run-to-run (lower = more consistent)
+// - SuccessRate: % of runs where score >= ScoreThreshold (75 in this case)
+
+result.Statistics.Mean.Should().BeGreaterThan(80);            // Avg quality
+result.Statistics.StandardDeviation.Should().BeLessThan(10);  // Consistency
+
+// The test that never flakes - pass/fail based on rate, not single run
+Assert.True(result.PassedThreshold, 
+    $"Success rate {result.SuccessRate:P0} below 85% threshold");
+```
+
+**Why this matters:** A single test run might pass 70% of the time due to LLM randomness. Stochastic testing tells you the *actual* reliability.
+
+---
+
+### Performance SLAs as Executable Tests
+
+```csharp
+result.Performance!.Should()
+    .HaveTotalDurationUnder(TimeSpan.FromSeconds(5), 
+        because: "UX requires sub-5s responses")
+    .HaveTimeToFirstTokenUnder(TimeSpan.FromMilliseconds(500),
+        because: "streaming responsiveness matters")
+    .HaveEstimatedCostUnder(0.05m, 
+        because: "stay within $0.05/request budget")
+    .HaveTokenCountUnder(2000);
+```
+
+---
+
+### Combined: Stochastic + Model Comparison
+
+The most powerful pattern - compare models with statistical rigor (see Sample16):
+
+```csharp
+var factories = new IAgentFactory[]
+{
+    new AzureModelFactory("gpt-4o", "GPT-4o"),
+    new AzureModelFactory("gpt-4o-mini", "GPT-4o Mini")
+};
+
+var modelResults = new List<(string ModelName, StochasticResult Result)>();
+
+foreach (var factory in factories)
+{
+    var result = await stochasticRunner.RunStochasticTestAsync(
+        factory, testCase, 
+        new StochasticOptions(Runs: 5, SuccessRateThreshold: 0.8));
+    modelResults.Add((factory.ModelName, result));
+}
+
+modelResults.PrintComparisonTable();
+```
+
+**Output:**
+```
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                     Model Comparison (5 runs each)                           │
+├──────────────┬─────────────┬────────────┬──────────┬────────────────────────┤
+│ Model        │ Pass Rate   │ Mean Score │ Std Dev  │ Recommendation         │
+├──────────────┼─────────────┼────────────┼──────────┼────────────────────────┤
+│ GPT-4o       │ 100%        │ 92.4       │ 3.2      │ 🏆 Best Quality        │
+│ GPT-4o Mini  │ 80%         │ 84.1       │ 8.7      │ 💰 Best Value          │
+└──────────────┴─────────────┴────────────┴──────────┴────────────────────────┘
+```
+
+---
+
+### Behavioral Policy Guardrails (Compliance as Code)
+
+```csharp
+result.ToolUsage!.Should()
+    // PCI-DSS: Never expose card numbers
+    .NeverPassArgumentMatching(@"\b\d{16}\b",
+        because: "PCI-DSS prohibits raw card numbers")
+    
+    // GDPR: Require consent
+    .MustConfirmBefore("ProcessPersonalData",
+        because: "GDPR requires explicit consent",
+        confirmationToolName: "VerifyUserConsent")
+    
+    // Safety: Block dangerous operations
+    .NeverCallTool("DeleteAllCustomers",
+        because: "mass deletion requires manual approval");
+```
+
+---
+
+### RAG Quality: Is Your Agent Hallucinating?
+
+```csharp
+var context = new EvaluationContext
+{
+    Input = "What are the return policy terms?",
+    Output = agentResponse,
+    Context = retrievedDocuments,
+    GroundTruth = "30-day return policy with receipt"
+};
+
+var faithfulness = await new FaithfulnessMetric(evaluator).EvaluateAsync(context);
+var relevance = await new RelevanceMetric(evaluator).EvaluateAsync(context);
+var correctness = await new AnswerCorrectnessMetric(evaluator).EvaluateAsync(context);
+
+// Detect hallucinations
+if (faithfulness.Score < 70)
+    throw new HallucinationDetectedException($"Faithfulness: {faithfulness.Score}");
+```
 
 ---
 
 ## Why AgentEval?
 
-Traditional LLM eval tooling often answers: “Was the final response good?”  
-AgentEval answers the questions engineering teams need to ship reliably:
-
-- **What tools were called? In what order? With which arguments? Did they fail?**
-- **How long did it take? What was TTFT? Which tool was slow?**
-- **Did the agent stay within token/cost budgets?**
-- **Did this PR regress behavior compared to baseline?**
-- **Can we inspect exactly what happened without rerunning the agent?**
+| Challenge | How AgentEval Solves It |
+|-----------|------------------------|
+| "What tools did my agent call?" | **Full tool timeline** with arguments, results, timing |
+| "Tests fail randomly!" | **Stochastic testing** - assert on pass *rate*, not pass/fail |
+| "Which model should I use?" | **Model comparison** with cost/quality recommendations |
+| "Is my agent compliant?" | **Behavioral policies** - guardrails as code |
+| "Is my RAG hallucinating?" | **Faithfulness metrics** - grounding verification |
+| "What's the latency/cost?" | **Performance metrics** - TTFT, tokens, estimated cost |
+| "How do I debug failures?" | **Trace recording** - capture executions for step-by-step analysis |
 
 ---
 
 ## Key Features
 
-### ✅ Multi-turn conversation testing
-- Fluent conversation builder with Turn records
-- ConversationRunner for executing against any IChatClient
-- ConversationCompletenessMetric for scoring conversations
-- Per-turn tool call tracking and assertions
+### Testing and Assertions
+- Fluent tool assertions - order, arguments, results, duration
+- Performance assertions - latency, TTFT, tokens, cost
+- Response assertions - contains, patterns, length
+- Behavioral policies - NeverCallTool, MustConfirmBefore, NeverPassArgumentMatching
+- Multi-turn conversations - full conversation flow testing
+- Snapshot testing - regression detection with semantic similarity
 
-### ✅ Fluent assertions for agent behavior
-- Tool usage assertions (called/not called, order, arguments, results, errors, duration)
-- Response assertions (contains, patterns, length, etc.)
-- Performance assertions (latency, TTFT, tokens, estimated cost, tool count)
-- **Rich failure messages** with Expected/Actual, context, and actionable suggestions
-- **"Because" parameter** on all assertions for documenting test intent
-- **AgentEvalScope** for collecting multiple assertion failures into a single report
+### Evaluation and Metrics  
+- RAG metrics - faithfulness, relevance, context precision/recall, correctness
+- Agentic metrics - tool selection, arguments, success, efficiency
+- Embedding metrics - semantic similarity (100x cheaper than LLM)
+- Custom metrics - extensible for your domain
 
-### ✅ Streaming performance & observability
-- Real-time metrics tracking (TTFT, total duration)
-- Per-tool timing and execution waterfall data
-- Designed to align with OpenTelemetry (OTel) workflows
+### Reliability and Confidence
+- Stochastic testing - run N times, analyze statistics (mean, std dev, p90)
+- Model comparison - compare across models with recommendations
+- Calibrated judging - multi-model consensus evaluation
+- Trace recording - capture executions for debugging and reproduction
 
-### ✅ Benchmarks
-- Latency / throughput / cost benchmarks
-- Agentic benchmarks (tool accuracy, task completion, multi-step quality)
-- Percentiles (p50/p90/p95/p99) and summary statistics
+### Enterprise Ready
+- CI/CD integration - JUnit XML, Markdown, JSON export
+- CLI tool - agenteval eval, agenteval init
+- Benchmarks - custom patterns with dataset loaders (JSON, YAML, CSV, JSONL)
+- 800+ tests (×3 TFMs) - production quality
 
-### ✅ Evaluation metrics
-- RAG metrics (faithfulness, relevance, context precision/recall, correctness)
-- Agentic metrics (tool selection, tool arguments, tool success, efficiency, task completion)
-
-### ✅ Run artifacts (“time travel”)
-Store run inputs/outputs, tool calls, timings, and scores as artifacts so failures are explainable and inspectable.
-### ✅ Snapshot testing
-Compare agent responses against saved baselines with JSON diff and semantic similarity support.
-
-### ✅ Trace Record & Replay
-Capture agent executions and replay them deterministically for testing without LLM calls:
-- `TraceRecordingAgent` for capturing single-agent executions
-- `ChatTraceRecorder` for multi-turn conversations
-- `WorkflowTraceRecorder` for multi-agent workflows
-- JSON serialization for storing and sharing traces
-- Time-travel debugging and regression testing
-
-### ✅ CLI tool for CI/CD
-Full command-line interface for running evaluations, benchmarks, and tests:
-- Multiple output formats (Console, JSON, JUnit XML, Markdown)
-- Dataset loaders (JSON, JSONL, CSV, YAML)
-- Configurable via command-line options
-### ✅ Standard benchmark support
-- **BFCL** (Berkeley Function Calling Leaderboard) - tool selection accuracy
-- **GAIA** (General AI Assistants) - multi-step reasoning
-- **ToolBench** - complex API tool workflows
-
----
-
-## Framework Comparison
-
-| Feature | AgentEval | DeepEval | Promptfoo | MS.Extensions.AI.Eval |
-|---------|-----------|----------|-----------|----------------------|
-| **Language** | .NET | Python | Node.js | .NET |
-| **Tool call tracking** | ✅ Full timeline | ⚠️ Basic | ⚠️ Basic | ❌ |
-| **TTFT/streaming** | ✅ | ❌ | ❌ | ⚠️ Partial |
-| **Cost estimation** | ✅ | ✅ | ✅ | ❌ |
-| **Fluent assertions** | ✅ | ❌ | ❌ | ❌ |
-| **RAG metrics** | ✅ | ✅ | ✅ | ✅ |
-| **BFCL benchmark** | ✅ | ✅ | ❌ | ❌ |
-| **Multi-turn testing** | ✅ | ✅ | ✅ | ❌ |
-| **CLI for CI/CD** | ✅ | ✅ | ✅ | ❌ |
-| **Result exporters** | ✅ JSON/JUnit/MD | ✅ JSON | ✅ Multiple | ❌ |
-| **Dataset loaders** | ✅ JSON/JSONL/CSV/YAML | ✅ | ✅ | ❌ |
-| **Snapshot testing** | ✅ | ❌ | ❌ | ❌ |
-
-**AgentEval's niche:** Native .NET + deep agentic visibility + benchmark compatibility.
 ---
 
 ## Installation
-
-Install from NuGet:
 
 ```bash
 dotnet add package AgentEval --prerelease
 ```
 
-Or via Package Manager:
-
-```powershell
-Install-Package AgentEval -Pre
-```
-
-**NuGet Package:** https://www.nuget.org/packages/AgentEval
-
 **Supported Frameworks:** .NET 8.0, 9.0, 10.0
-
-### Future Packages (Planned)
-
-- `AgentEval.TestKit` (fixtures/builders/helpers)
-- `AgentEval.Tracing` (OTel + run artifacts)
-- `AgentEval.Studio` (future: workflow visualizer / time-travel UI)
 
 ---
 
-## Quick Start (MAF)
+## Quick Start
 
 ```csharp
-using Azure.AI.OpenAI;
-using Microsoft.Agents.AI;
-using Microsoft.Extensions.AI;
 using AgentEval.MAF;
 using AgentEval.Models;
 
-// ═══════════════════════════════════════════════════════════════
-// Step 1: Create your Microsoft Agent Framework (MAF) agent
-// ═══════════════════════════════════════════════════════════════
-
-// Connect to Azure OpenAI
-var azureClient = new AzureOpenAIClient(
-    new Uri(Environment.GetEnvironmentVariable("AZURE_OPENAI_ENDPOINT")!),
-    new Azure.AzureKeyCredential(Environment.GetEnvironmentVariable("AZURE_OPENAI_KEY")!));
-
-var chatClient = azureClient
-    .GetChatClient("gpt-4o")  // Your deployment name
-    .AsIChatClient();
-
-// Create a MAF agent with tools
-var myAgent = new ChatClientAgent(
-    chatClient,
-    new ChatClientAgentOptions
-    {
-        Name = "FeaturePlannerAgent",
-        Instructions = """
-            You are a software feature planning assistant.
-            Use FeatureTool to plan features and SecurityTool for security analysis.
-            """,
-        Tools = [new FeatureTool(), new SecurityTool()]  // Your AIFunction tools
-    });
-
-// ═══════════════════════════════════════════════════════════════
-// Step 2: Test the agent with AgentEval
-// ═══════════════════════════════════════════════════════════════
-
-// Create test harness
-var harness = new MAFTestHarness(verbose: true);
-
-// Wrap your MAF agent
-var adapter = new MAFAgentAdapter(myAgent);
-
-// Define a test case
-var testCase = new TestCase
+// 1. Create your MAF agent
+var agent = new ChatClientAgent(chatClient, new ChatClientAgentOptions
 {
-    Name = "Feature Planning Test",
-    Input = "Plan a user authentication feature",
-    EvaluationCriteria = new[] { "Should include security considerations" },
-    ExpectedTools = new[] { "FeatureTool", "SecurityTool" },
-    PassingScore = 70
-};
-
-// Run
-var result = await harness.RunTestAsync(adapter, testCase, new TestOptions
-{
-    TrackTools = true,
-    TrackPerformance = true,
-    EvaluateResponse = true
+    Name = "TravelAgent",
+    Instructions = "You are a travel booking assistant.",
+    Tools = [AIFunctionFactory.Create(SearchFlights), AIFunctionFactory.Create(BookFlight)]
 });
 
-// Assert tool behavior
-result.ToolUsage!
-    .Should()
-    .HaveCalledTool("FeatureTool", because: "feature planning requires the feature tool")
-        .BeforeTool("SecurityTool")
-    .And()
+// 2. Wrap and test
+var harness = new MAFTestHarness();
+var adapter = new MAFAgentAdapter(agent);
+
+var testCase = new TestCase
+{
+    Name = "Book Flight to Paris",
+    Input = "Book me a flight to Paris for March 15th",
+    ExpectedTools = ["SearchFlights", "BookFlight"]
+};
+
+var result = await harness.RunTestAsync(adapter, testCase);
+
+// 3. Assert on everything
+result.ToolUsage!.Should()
+    .HaveCalledTool("SearchFlights")
+    .BeforeTool("BookFlight")
     .HaveNoErrors();
 
-// Assert performance budgets
-result.Performance!
-    .Should()
-    .HaveTotalDurationUnder(TimeSpan.FromSeconds(10), because: "feature planning should complete quickly")
-    .HaveTimeToFirstTokenUnder(TimeSpan.FromSeconds(2))
-    .HaveEstimatedCostUnder(0.10m, because: "stay within budget for this operation");
+result.Performance!.Should()
+    .HaveTotalDurationUnder(TimeSpan.FromSeconds(10))
+    .HaveEstimatedCostUnder(0.10m);
+
+Assert.True(result.Passed);
 ```
-
----
-
-## Benchmarks
-
-Run industry-standard benchmarks to compare your agent against published models:
-
-```csharp
-using AgentEval.Benchmarks;
-
-var benchmark = new AgenticBenchmark(agent);
-
-// Tool accuracy (BFCL-style)
-var toolResults = await benchmark.RunToolAccuracyBenchmarkAsync(testCases);
-Console.WriteLine($"Tool Accuracy: {toolResults.OverallAccuracy:P1}");
-
-// Multi-step reasoning (ToolBench-style)
-var stepResults = await benchmark.RunMultiStepReasoningBenchmarkAsync(multiStepCases);
-Console.WriteLine($"Step Completion: {stepResults.AverageStepCompletion:P1}");
-
-// Performance benchmarks
-var perfBenchmark = new PerformanceBenchmark(agent);
-var latency = await perfBenchmark.RunLatencyBenchmarkAsync(testCases, iterations: 10);
-Console.WriteLine($"P90 Latency: {latency.P90Latency.TotalMilliseconds}ms");
-```
-
-📖 See [docs/benchmarks.md](docs/benchmarks.md) for BFCL, GAIA, and ToolBench guides.
 
 ---
 
 ## CLI Tool
 
-AgentEval includes a full CLI tool for CI/CD integration:
-
 ```bash
-# Install as .NET tool
+# Install globally
 dotnet tool install -g AgentEval.Cli
 
-# Run evaluation with a dataset
-agenteval eval --dataset samples/datasets/travel-agent.yaml --format markdown
-
-# Run with custom threshold and output file
-agenteval eval --dataset tests.yaml --pass-threshold 80 --output results.json
-
-# Export as JUnit XML for CI/CD
+# Run evaluations
 agenteval eval --dataset tests.yaml --format junit --output results.xml
 
-# Initialize a new configuration file
+# Initialize project
 agenteval init --format yaml --output agenteval.yaml
 
 # List available metrics
 agenteval list metrics
-
-# List available assertions
-agenteval list assertions
-
-# List output formats
-agenteval list formats
 ```
 
-### Sample Datasets
+### CI/CD Integration
 
-AgentEval includes sample datasets to help you get started:
-
-```bash
-# Agentic evaluation with tool usage
-samples/datasets/travel-agent.yaml
-
-# RAG evaluation with context documents  
-samples/datasets/rag-qa.yaml
-```
-
-See [samples/datasets/README.md](samples/datasets/README.md) for dataset format documentation.
-
-### Supported Formats
-
-| Format | Export | Import |
-|--------|--------|--------|
-| JSON | ✅ | ✅ |
-| JSONL | ✅ | ✅ |
-| JUnit XML | ✅ | - |
-| Markdown | ✅ | - |
-| CSV | - | ✅ |
-| YAML | - | ✅ |
-
-**GitHub Actions**:
 ```yaml
+# GitHub Actions
 - name: Run Agent Tests
-  run: agenteval test --format junit --output results.xml
+  run: agenteval eval --dataset tests.yaml --format junit -o results.xml
   
 - name: Publish Results
   uses: dorny/test-reporter@v1
@@ -320,119 +339,82 @@ See [samples/datasets/README.md](samples/datasets/README.md) for dataset format 
 
 ---
 
-## Multi-Turn Conversations
-
-Test complex multi-turn agent conversations:
-
-```csharp
-using AgentEval.Testing;
-
-// Build a conversation test case
-var testCase = new ConversationalTestCaseBuilder()
-    .WithName("Customer Support Flow")
-    .WithSystemPrompt("You are a helpful customer service agent.")
-    .AddUserTurn("I need to return a product")
-    .AddAssistantTurn("I'd be happy to help with your return!")
-    .AddUserTurn("Order #12345")
-    .WithExpectedTools("LookupOrder", "ProcessReturn")
-    .WithMaxDuration(TimeSpan.FromSeconds(30))
-    .Build();
-
-// Run the conversation
-var runner = new ConversationRunner(chatClient);
-var result = await runner.RunAsync(testCase);
-
-// Evaluate completeness
-var metric = new ConversationCompletenessMetric();
-var score = metric.Evaluate(result);
-Console.WriteLine($"Completeness: {score.Score:P0}");
-```
-
----
-
-## Snapshot Testing
-
-Compare agent responses against saved baselines:
-
-```csharp
-using AgentEval.Snapshots;
-
-// Configure snapshot comparison
-var options = new SnapshotOptions
-{
-    IgnoreFields = new[] { "timestamp", "requestId" },
-    ScrubPatterns = new Dictionary<string, string>
-    {
-        { @"\d{4}-\d{2}-\d{2}", "[DATE]" }
-    }
-};
-
-// Compare responses
-var comparer = new SnapshotComparer(options);
-var result = comparer.Compare(expectedJson, actualJson);
-
-if (!result.IsMatch)
-{
-    Console.WriteLine($"Differences found:");
-    foreach (var diff in result.Differences)
-    {
-        Console.WriteLine($"  {diff.Path}: {diff.Expected} → {diff.Actual}");
-    }
-}
-
-// Store and retrieve snapshots
-var store = new SnapshotStore("./snapshots");
-store.Save("my-test", actualResponse);
-var baseline = store.Load("my-test");
-```
-
----
-
 ## Documentation
 
-| Document | Description |
-|----------|-------------|
-| [Architecture](docs/architecture.md) | Component diagrams, metric hierarchy |
-| [Fluent Assertions](docs/assertions.md) | Complete assertion guide with AgentEvalScope, "because", rich messages |
-| [Benchmarks](docs/benchmarks.md) | BFCL, GAIA, ToolBench guides |
-| [CLI Reference](docs/cli.md) | Command-line tool usage |
-| [Conversations](docs/conversations.md) | Multi-turn testing guide |
-| [Embedding Metrics](docs/embedding-metrics.md) | Semantic similarity metrics |
-| [Extensibility](docs/extensibility.md) | Custom metrics, plugins, adapters |
-| [Snapshots](docs/snapshots.md) | Snapshot testing guide |
-| [Tracing & Record/Replay](docs/tracing.md) | Deterministic testing with trace capture |
-| [Roadmap](docs/roadmap.md) | Future development plans |
+| Guide | Description |
+|-------|-------------|
+| [Getting Started](docs/getting-started.md) | Your first agent test in 5 minutes |
+| [Fluent Assertions](docs/assertions.md) | Complete assertion guide |
+| [Stochastic Testing](docs/stochastic-testing.md) | Handle LLM non-determinism |
+| [Model Comparison](docs/model-comparison.md) | Compare models with confidence |
+| [Benchmarks](docs/benchmarks.md) | Benchmark patterns and best practices |
+| [Tracing](docs/tracing.md) | Record and Replay patterns |
+| [Migration Guide](docs/comparison.md) | Coming from Python/Node.js frameworks |
+| [Code Gallery](docs/showcase/code-gallery.md) | Stunning code examples |
 
 ---
 
-## Test Coverage
+## Samples
 
-AgentEval has **763 tests** (2289 total across 3 target frameworks) covering:
-- Tool call assertions and reporting
-- Multi-turn conversation testing
-- Snapshot comparison and storage
-- Trace record & replay (single-agent, chat, workflow)
-- RAG metrics (faithfulness, relevance, correctness)
-- Agentic metrics (tool selection, efficiency, success)
-- Performance tracking (TTFT, latency, cost)
-- CLI exporters (JSON, JUnit, Markdown)
-- Dataset loaders (JSON, JSONL, CSV, YAML)
-- Embedding similarity utilities
-- Serialization and error handling
+Run all 18 included samples:
+
+```bash
+dotnet run --project samples/AgentEval.Samples
+```
+
+| Sample | Description | Time |
+|--------|-------------|------|
+| **01: Hello World** | The simplest possible agent test | 2 min |
+| **02: Agent with One Tool** | Tool tracking and fluent assertions | 5 min |
+| **03: Agent with Multiple Tools** | Tool ordering, timing, and timeline | 7 min |
+| **04: Performance Metrics** | Latency, cost, TTFT, and token tracking | 5 min |
+| **05: RAG Evaluation** | Faithfulness, relevance, precision, recall, correctness | 8 min |
+| **06: Benchmarks** | Performance and agentic benchmark patterns | 5 min |
+| **07: Snapshot Testing** | Regression detection with baselines | 5 min |
+| **08: Conversation Testing** | Multi-turn agent interactions | 5 min |
+| **09: Workflow Testing** | Multi-agent orchestration and routing | 10 min |
+| **10: Datasets and Export** | Batch testing with JSON/YAML/CSV/JSONL | 5 min |
+| **11: Because Assertions** | Self-documenting tests with intent clarity | 5 min |
+| **12: Policy & Safety Testing** | Enterprise guardrails (NeverCallTool, MustConfirmBefore) | 8 min |
+| **13: Trace Record & Replay** | Capture executions for deterministic testing | 8 min |
+| **14: Stochastic Testing** | Run tests N times for statistical confidence | 5 min |
+| **15: Model Comparison** | Compare multiple models on the same task | 8 min |
+| **16: Combined Stochastic + Comparison** | Stochastic tests across multiple models | 10 min |
+| **17: Quality & Safety Metrics** | Groundedness, coherence, fluency evaluation | 5 min |
+| **18: Judge Calibration** | Multi-model consensus for reliable LLM-as-judge | 8 min |
 
 ---
 
 ## Contributing
 
-Contributions are welcome! Please see:
-- [CONTRIBUTING.md](CONTRIBUTING.md) - Contribution guidelines
-- [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) - Community standards
-- [SECURITY.md](SECURITY.md) - Security policy
+We welcome contributions! Please see:
+- [CONTRIBUTING.md](CONTRIBUTING.md)
+- [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)
+- [SECURITY.md](SECURITY.md)
 
-For bug reports and feature requests, use our [GitHub issue templates](.github/ISSUE_TEMPLATE/).
+---
+
+## Forever Open Source
+
+AgentEval is **MIT licensed** and will remain open source forever. We believe in:
+- 🔓 **No license changes** - MIT today, MIT forever
+- 🚫 **No "open core"** - All features are open source, no proprietary tiers
+- 🤝 **Community first** - Built for and with the .NET AI community
 
 ---
 
 ## License
 
 MIT License. See [LICENSE](LICENSE) for details.
+
+---
+
+<p align="center">
+  <strong>Built with love for the .NET AI community</strong>
+</p>
+
+<p align="center">
+  <a href="https://github.com/joslat/AgentEval">Star us on GitHub</a> |
+  <a href="https://www.nuget.org/packages/AgentEval">NuGet</a> |
+  <a href="https://github.com/joslat/AgentEval/issues">Issues</a>
+</p>

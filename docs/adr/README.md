@@ -29,6 +29,7 @@ Each ADR follows this structure:
 | [006](006-service-based-architecture-di.md) | Service-Based Architecture & DI | Accepted | 2026-01-09 |
 | [007](007-metrics-taxonomy.md) | Metrics Taxonomy | Accepted | 2026-01-10 |
 | [008](008-calibrated-judge-multi-model.md) | Calibrated Judge for Multi-Model LLM Evaluation | Accepted | 2026-01-12 |
+| [009](009-benchmark-strategy.md) | Benchmark Strategy | Accepted | 2026-01-13 |
 
 ---
 

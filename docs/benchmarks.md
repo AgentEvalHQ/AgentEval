@@ -1,30 +1,52 @@
 # Benchmarks Guide
 
-> **Running standard AI benchmarks and creating custom benchmark suites with AgentEval**
+> **Running industry-standard AI benchmarks and creating custom benchmark suites with AgentEval**
 
 ---
 
-## Overview
+## Implementation Status
 
-AgentEval supports running industry-standard AI agent benchmarks to:
+| Feature | Status | Description |
+|---------|--------|-------------|
+| **Custom benchmark suites** | ✅ Available | Create your own domain-specific benchmarks |
+| **Performance benchmarks** | ✅ Available | Latency, throughput, cost measurement |
+| **Manual BFCL-style tests** | ✅ Available | Create test cases following BFCL patterns |
+| **Manual GAIA-style tests** | ✅ Available | Create task completion test cases |
+| **BFCL dataset loader** | 🚧 Planned Q1 2026 | Auto-download from HuggingFace |
+| **GAIA dataset loader** | 🚧 Planned Q1 2026 | Auto-download from HuggingFace |
+| **ToolBench loader** | 🚧 Planned Q2 2026 | Auto-download from GitHub |
+| **HumanEval** | ❌ Out of Scope | Requires code execution sandbox |
+| **WebArena** | ❌ Out of Scope | Requires browser simulation |
 
-- Compare your agent against published models
-- Track performance regressions across versions
-- Identify specific capability gaps
-- Generate credible performance reports
+> 📖 See [ADR-009: Benchmark Strategy](adr/009-benchmark-strategy.md) for rationale.
+
+---
+
+## Quick Reference: What You Can Do Today
+
+### ✅ Create Custom Benchmarks
+Write your own benchmark test suites for your domain.
+
+### ✅ Run Performance Benchmarks
+Measure latency, throughput, and cost across your agents.
+
+### ✅ Manual Benchmark-Style Tests
+Create tests following BFCL/GAIA patterns and compare against published leaderboards.
+
+### 🚧 Coming Soon: Dataset Loaders
+One-line download and run of BFCL, GAIA, ToolBench benchmarks.
 
 ---
 
 ## Prerequisites
 
-All benchmark examples in this guide assume you have created a MAF agent. Here's the pattern:
+All benchmark examples assume you have created a MAF agent:
 
 ```csharp
 using Azure.AI.OpenAI;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
 
-// Create your agent with the tools it needs
 var azureClient = new AzureOpenAIClient(
     new Uri(Environment.GetEnvironmentVariable("AZURE_OPENAI_ENDPOINT")!),
     new Azure.AzureKeyCredential(Environment.GetEnvironmentVariable("AZURE_OPENAI_KEY")!));
@@ -52,10 +74,10 @@ var evaluator = azureClient.GetChatClient("gpt-4o").AsIChatClient();
 
 | Benchmark | Focus | Status | What It Tests |
 |-----------|-------|--------|---------------|
-| **BFCL** | Function Calling | ✅ Ready | Tool selection, arguments, multi-turn |
-| **GAIA** | General AI Assistants | ✅ Ready | Multi-step reasoning, tool use |
-| **ToolBench** | API Tool Use | ✅ Ready | Complex API workflows |
-| **MINT** | Multi-turn Interaction | ⚠️ Partial | Conversation handling |
+| **BFCL** | Function Calling | ✅ Manual / 🚧 Loader | Tool selection, arguments, multi-turn |
+| **GAIA** | General AI Assistants | ✅ Manual / 🚧 Loader | Multi-step reasoning, tool use |
+| **ToolBench** | API Tool Use | ✅ Manual / 🚧 Loader | Complex API workflows |
+| **MINT** | Multi-turn Interaction | ✅ Manual | Conversation handling |
 | **HumanEval** | Code Generation | ❌ Out of Scope | Requires code execution |
 | **WebArena** | Web Browsing | ❌ Out of Scope | Requires browser simulation |
 
@@ -65,86 +87,14 @@ var evaluator = azureClient.GetChatClient("gpt-4o").AsIChatClient();
 
 BFCL is the industry standard for evaluating function/tool calling accuracy.
 
-### Categories
+### What You Can Do Today ✅
 
-| Category | Description | AgentEval Support |
-|----------|-------------|-------------------|
-| `simple_python` | Single function calls | `ToolAccuracyTestCase` |
-| `parallel` | Multiple independent calls | `ToolAccuracyTestCase` with multi-tool |
-| `multiple` | Sequential dependent calls | `MultiStepTestCase` |
-| `multi_turn_base` | Multi-turn conversations | `ConversationalTestCase` (planned) |
-| `live_*` | Real-world API scenarios | `ToolAccuracyTestCase` |
-
-### Dataset Structure
-
-BFCL test cases follow this JSON structure:
-
-```json
-{
-  "id": "simple_python_001",
-  "question": "Calculate the factorial of 5",
-  "function": {
-    "name": "calculate_factorial",
-    "description": "Calculate factorial of a number",
-    "parameters": {
-      "type": "object",
-      "properties": {
-        "n": {"type": "integer", "description": "The number"}
-      },
-      "required": ["n"]
-    }
-  },
-  "ground_truth": {
-    "name": "calculate_factorial",
-    "arguments": {"n": 5}
-  }
-}
-```
-
-### Running BFCL with AgentEval
-
-```csharp
-using AgentEval.Benchmarks;
-using AgentEval.Core;
-
-// 1. Load BFCL dataset (when BfclDatasetLoader is available)
-var loader = new BfclDatasetLoader();
-var bfclCases = await loader.LoadBenchmarkAsync("bfcl/simple_python.json");
-
-// 2. Convert to AgentEval test cases
-var testCases = bfclCases.Select(bc => new ToolAccuracyTestCase
-{
-    Name = bc.Id,
-    Prompt = bc.Question,
-    ExpectedTools = new[]
-    {
-        new ExpectedTool
-        {
-            Name = bc.GroundTruth.Name,
-            RequiredParameters = bc.GroundTruth.Arguments.Keys.ToList()
-        }
-    },
-    AllowExtraTools = false  // Strict mode for benchmarking
-}).ToList();
-
-// 3. Run benchmark
-var benchmark = new AgenticBenchmark(agent);
-var results = await benchmark.RunToolAccuracyBenchmarkAsync(testCases);
-
-// 4. Report results
-Console.WriteLine($"BFCL Simple Python Results");
-Console.WriteLine($"  Accuracy: {results.OverallAccuracy:P1}");
-Console.WriteLine($"  Passed: {results.PassedTests}/{results.TotalTests}");
-```
-
-### Manual BFCL Test Cases
-
-If you don't have the full dataset, create representative test cases:
+Create BFCL-style test cases manually:
 
 ```csharp
 var bfclTests = new List<ToolAccuracyTestCase>
 {
-    // Simple function call
+    // Simple function call (BFCL simple_python category)
     new ToolAccuracyTestCase
     {
         Name = "simple_math",
@@ -155,7 +105,7 @@ var bfclTests = new List<ToolAccuracyTestCase>
         }
     },
     
-    // Parallel calls (multiple independent tools)
+    // Parallel calls (BFCL parallel category)
     new ToolAccuracyTestCase
     {
         Name = "parallel_weather",
@@ -167,7 +117,7 @@ var bfclTests = new List<ToolAccuracyTestCase>
         }
     },
     
-    // Multiple steps (sequential dependent calls)
+    // Sequential calls (BFCL multiple category)
     new ToolAccuracyTestCase
     {
         Name = "sequential_booking",
@@ -179,11 +129,29 @@ var bfclTests = new List<ToolAccuracyTestCase>
         }
     }
 };
+
+// Run and measure
+var benchmark = new AgenticBenchmark(agent);
+var results = await benchmark.RunToolAccuracyBenchmarkAsync(bfclTests);
+
+Console.WriteLine($"BFCL-Style Results");
+Console.WriteLine($"  Accuracy: {results.OverallAccuracy:P1}");
+Console.WriteLine($"  Passed: {results.PassedTests}/{results.TotalTests}");
 ```
 
-### Comparing Against Leaderboard
+### Coming Soon: Auto-Download 🚧
 
-BFCL publishes scores for major models. Compare your agent:
+```csharp
+// PLANNED - Not yet implemented
+var loader = new BfclDatasetLoader();
+var dataset = await loader.LoadAsync(BfclCategory.SimplePython);
+var benchmark = new BfclBenchmark(dataset);
+var result = await benchmark.RunAsync(agent, options);
+```
+
+### Compare Against Published Leaderboard
+
+BFCL publishes scores for major models. Run your tests and compare:
 
 | Model | Simple | Parallel | Multiple | Multi-turn | Overall |
 |-------|--------|----------|----------|------------|---------|
@@ -198,20 +166,12 @@ BFCL publishes scores for major models. Compare your agent:
 
 GAIA tests multi-step reasoning and real-world task completion.
 
-### Difficulty Levels
-
-| Level | Description | Example |
-|-------|-------------|---------|
-| Level 1 | Simple, few steps | "What's the capital of France?" |
-| Level 2 | Moderate complexity | "Find the CEO's email from their website" |
-| Level 3 | Complex multi-step | "Research and compare two products, then recommend" |
-
-### Running GAIA Benchmarks
+### What You Can Do Today ✅
 
 ```csharp
-// GAIA uses task completion benchmarks
 var gaiaCases = new List<TaskCompletionTestCase>
 {
+    // Level 1: Simple
     new TaskCompletionTestCase
     {
         Name = "gaia_level1_001",
@@ -225,6 +185,7 @@ var gaiaCases = new List<TaskCompletionTestCase>
         PassingScore = 70
     },
     
+    // Level 2: Moderate
     new TaskCompletionTestCase
     {
         Name = "gaia_level2_015",
@@ -236,84 +197,44 @@ var gaiaCases = new List<TaskCompletionTestCase>
             "Explains how to reach support"
         },
         PassingScore = 70
+    },
+    
+    // Level 3: Complex
+    new TaskCompletionTestCase
+    {
+        Name = "gaia_level3_042",
+        Prompt = "Research the top 3 electric vehicle manufacturers by market cap and compare their 2024 revenue",
+        CompletionCriteria = new[]
+        {
+            "Identifies 3 companies correctly",
+            "Provides market cap figures",
+            "Provides revenue figures",
+            "Makes a coherent comparison"
+        },
+        PassingScore = 80
     }
 };
 
 var benchmark = new AgenticBenchmark(agent, evaluator);
 var results = await benchmark.RunTaskCompletionBenchmarkAsync(gaiaCases);
 
-Console.WriteLine($"GAIA Results");
+Console.WriteLine($"GAIA-Style Results");
 Console.WriteLine($"  Average Score: {results.AverageScore:F1}/100");
 Console.WriteLine($"  Pass Rate: {(double)results.PassedTests / results.TotalTests:P1}");
 ```
 
 ---
 
-## ToolBench
-
-ToolBench tests complex API tool usage across 16,000+ scenarios.
-
-### Categories
-
-- **Single-tool**: One API call
-- **Intra-category**: Multiple tools from same category
-- **Intra-collection**: Tools from same provider
-- **Inter-collection**: Tools across providers
-
-### Running ToolBench Scenarios
-
-```csharp
-// Multi-step reasoning benchmark for ToolBench
-var toolbenchCases = new List<MultiStepTestCase>
-{
-    new MultiStepTestCase
-    {
-        Name = "toolbench_weather_trip",
-        Prompt = "I'm planning a trip. Check the weather in Paris for next week, then find hotels if it's sunny.",
-        ExpectedSteps = new List<ExpectedStep>
-        {
-            new ExpectedStep { ToolName = "weather_api" },
-            new ExpectedStep { ToolName = "hotel_search", DependsOnStep = 0 }
-        },
-        RequireSequentialExecution = true
-    },
-    
-    new MultiStepTestCase
-    {
-        Name = "toolbench_research_task",
-        Prompt = "Research the top 3 competitors of Tesla and summarize their market caps",
-        ExpectedSteps = new List<ExpectedStep>
-        {
-            new ExpectedStep { ToolName = "company_search" },
-            new ExpectedStep { ToolName = "financial_data" },
-            new ExpectedStep { ToolName = "summarize" }
-        }
-    }
-};
-
-var benchmark = new AgenticBenchmark(agent);
-var results = await benchmark.RunMultiStepReasoningBenchmarkAsync(toolbenchCases);
-
-Console.WriteLine($"ToolBench Multi-Step Results");
-Console.WriteLine($"  Step Completion: {results.AverageStepCompletion:P1}");
-Console.WriteLine($"  Full Success: {results.PassedTests}/{results.TotalTests}");
-```
-
----
-
 ## Performance Benchmarks
 
-Beyond accuracy, measure speed and cost:
+### Latency Benchmark ✅
 
 ```csharp
-using AgentEval.Benchmarks;
-
 var benchmark = new PerformanceBenchmark(agent);
 
-// Run latency benchmark
 var latencyResults = await benchmark.RunLatencyBenchmarkAsync(
     testCases,
-    iterations: 10,  // Run each test 10 times
+    iterations: 10,
     warmupIterations: 2);
 
 Console.WriteLine($"Latency Benchmark");
@@ -321,21 +242,27 @@ Console.WriteLine($"  P50: {latencyResults.P50Latency.TotalMilliseconds:F0}ms");
 Console.WriteLine($"  P90: {latencyResults.P90Latency.TotalMilliseconds:F0}ms");
 Console.WriteLine($"  P99: {latencyResults.P99Latency.TotalMilliseconds:F0}ms");
 Console.WriteLine($"  Avg: {latencyResults.AverageLatency.TotalMilliseconds:F0}ms");
+```
 
-// Run throughput benchmark
+### Throughput Benchmark ✅
+
+```csharp
 var throughputResults = await benchmark.RunThroughputBenchmarkAsync(
     testCases,
     durationSeconds: 60,
     maxConcurrency: 10);
 
-Console.WriteLine($"\nThroughput Benchmark");
+Console.WriteLine($"Throughput Benchmark");
 Console.WriteLine($"  Requests/sec: {throughputResults.RequestsPerSecond:F1}");
 Console.WriteLine($"  Success Rate: {throughputResults.SuccessRate:P1}");
+```
 
-// Run cost benchmark
+### Cost Benchmark ✅
+
+```csharp
 var costResults = await benchmark.RunCostBenchmarkAsync(testCases);
 
-Console.WriteLine($"\nCost Benchmark");
+Console.WriteLine($"Cost Benchmark");
 Console.WriteLine($"  Total Cost: ${costResults.TotalCost:F4}");
 Console.WriteLine($"  Avg per Request: ${costResults.AverageCostPerRequest:F6}");
 Console.WriteLine($"  Total Tokens: {costResults.TotalTokens}");
@@ -345,7 +272,7 @@ Console.WriteLine($"  Total Tokens: {costResults.TotalTokens}");
 
 ## Creating Custom Benchmark Suites
 
-### Define a Benchmark Suite
+### Define Your Domain Benchmark ✅
 
 ```csharp
 public class CustomerSupportBenchmark
@@ -359,40 +286,34 @@ public class CustomerSupportBenchmark
         _evaluator = evaluator;
     }
     
-    public async Task<BenchmarkReport> RunFullSuiteAsync(CancellationToken ct = default)
+    public async Task<BenchmarkReport> RunFullSuiteAsync()
     {
         var report = new BenchmarkReport
         {
             BenchmarkName = "CustomerSupport-v1",
             AgentName = _agent.Name,
-            ModelVersion = "gpt-4o-2024-11-20",
             RunDate = DateTimeOffset.UtcNow
         };
         
         var benchmark = new AgenticBenchmark(_agent, _evaluator);
         var perfBenchmark = new PerformanceBenchmark(_agent);
         
-        // Tool accuracy
+        // Category 1: Tool accuracy
         var toolResults = await benchmark.RunToolAccuracyBenchmarkAsync(GetToolTestCases());
         report.CategoryScores["ToolAccuracy"] = toolResults.OverallAccuracy * 100;
         
-        // Task completion
+        // Category 2: Task completion
         var taskResults = await benchmark.RunTaskCompletionBenchmarkAsync(GetTaskTestCases());
         report.CategoryScores["TaskCompletion"] = taskResults.AverageScore;
         
-        // Multi-step reasoning
-        var stepResults = await benchmark.RunMultiStepReasoningBenchmarkAsync(GetMultiStepCases());
-        report.CategoryScores["MultiStep"] = stepResults.AverageStepCompletion * 100;
-        
-        // Latency
+        // Category 3: Latency
         var latencyResults = await perfBenchmark.RunLatencyBenchmarkAsync(GetToolTestCases());
-        report.CategoryScores["P90Latency"] = latencyResults.P90Latency.TotalMilliseconds;
+        report.CategoryScores["P90LatencyMs"] = latencyResults.P90Latency.TotalMilliseconds;
         
-        // Overall score (weighted average)
+        // Overall score (weighted)
         report.OverallScore = 
-            report.CategoryScores["ToolAccuracy"] * 0.3 +
-            report.CategoryScores["TaskCompletion"] * 0.4 +
-            report.CategoryScores["MultiStep"] * 0.3;
+            report.CategoryScores["ToolAccuracy"] * 0.4 +
+            report.CategoryScores["TaskCompletion"] * 0.6;
         
         return report;
     }
@@ -411,7 +332,6 @@ public class CustomerSupportBenchmark
             Prompt = "Where is my order #12345?",
             ExpectedTools = new[] { new ExpectedTool { Name = "track_order" } }
         }
-        // ... more cases
     };
     
     private List<TaskCompletionTestCase> GetTaskTestCases() => new()
@@ -423,27 +343,10 @@ public class CustomerSupportBenchmark
             CompletionCriteria = new[]
             {
                 "Acknowledges the refund request",
-                "Asks for or retrieves order details",
+                "Retrieves order details",
                 "Explains refund policy or timeline"
             }
         }
-        // ... more cases
-    };
-    
-    private List<MultiStepTestCase> GetMultiStepCases() => new()
-    {
-        new MultiStepTestCase
-        {
-            Name = "complex_order_issue",
-            Prompt = "My order arrived damaged. I want a replacement or refund.",
-            ExpectedSteps = new List<ExpectedStep>
-            {
-                new ExpectedStep { ToolName = "lookup_order" },
-                new ExpectedStep { ToolName = "check_return_eligibility" },
-                new ExpectedStep { ToolName = "create_return_request" }
-            }
-        }
-        // ... more cases
     };
 }
 ```
@@ -458,7 +361,6 @@ Console.WriteLine($"\n{'=',-60}");
 Console.WriteLine($"BENCHMARK REPORT: {report.BenchmarkName}");
 Console.WriteLine($"{'=',-60}");
 Console.WriteLine($"Agent: {report.AgentName}");
-Console.WriteLine($"Model: {report.ModelVersion}");
 Console.WriteLine($"Date: {report.RunDate:yyyy-MM-dd HH:mm}");
 Console.WriteLine();
 Console.WriteLine("Category Scores:");
@@ -477,17 +379,44 @@ Output:
 BENCHMARK REPORT: CustomerSupport-v1
 ============================================================
 Agent: CustomerSupportAgent
-Model: gpt-4o-2024-11-20
-Date: 2026-01-05 14:30
+Date: 2026-01-13 14:30
 
 Category Scores:
   ToolAccuracy         92.5  ██████████████████
   TaskCompletion       88.2  █████████████████
-  MultiStep            85.0  █████████████████
-  P90Latency          1250  (ms)
+  P90LatencyMs        1250  (ms)
 
-OVERALL SCORE: 88.5/100
+OVERALL SCORE: 90.0/100
 ```
+
+---
+
+## Benchmark Roadmap
+
+### Phase 1: Core Infrastructure (Current)
+- ✅ Manual BFCL/GAIA-style test cases
+- ✅ Performance benchmarks (latency, throughput, cost)
+- ✅ Custom benchmark suites
+- ✅ Result aggregation and reporting
+
+### Phase 2: Dataset Loaders (Q1 2026)
+- 🚧 `BfclDatasetLoader` - Download from HuggingFace
+- 🚧 `GaiaDatasetLoader` - Download from HuggingFace
+- 🚧 Local caching with version management
+- 🚧 Subset selection for quick validation
+
+### Phase 3: Additional Benchmarks (Q2 2026)
+- 🚧 `ToolBenchDatasetLoader` - Download from GitHub
+- 🚧 CLI integration: `agenteval benchmark bfcl --model gpt-4o`
+- 🚧 Leaderboard submission format export
+- 🚧 Regression tracking across versions
+
+### Phase 4: Future Considerations
+- ❓ HumanEval (requires secure code execution sandbox)
+- ❓ SWE-bench (requires git/code editing capabilities)
+- ❓ WebArena (requires browser automation)
+
+> 📖 See [Implementation Plan: Benchmarks](../strategy/Implementation-Plan-Benchmarks.md) for detailed implementation guidance.
 
 ---
 
@@ -526,10 +455,6 @@ if (regressions.Any())
     }
     Environment.ExitCode = 1;  // Fail CI/CD
 }
-else
-{
-    Console.WriteLine("✅ No regressions detected");
-}
 ```
 
 ---
@@ -555,11 +480,12 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '8.0.x'
+          dotnet-version: '9.0.x'
       
       - name: Run Benchmarks
         env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          AZURE_OPENAI_ENDPOINT: ${{ secrets.AZURE_OPENAI_ENDPOINT }}
+          AZURE_OPENAI_KEY: ${{ secrets.AZURE_OPENAI_KEY }}
         run: |
           dotnet run --project benchmarks/AgentBenchmarks.csproj \
             --output results.json \
@@ -571,35 +497,31 @@ jobs:
         with:
           name: benchmark-results
           path: results.json
-      
-      - name: Comment on PR
-        if: github.event_name == 'pull_request'
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const results = require('./results.json');
-            const body = `## Benchmark Results
-            
-            | Category | Score | Change |
-            |----------|-------|--------|
-            ${Object.entries(results.categoryScores).map(([k,v]) => 
-              `| ${k} | ${v.toFixed(1)} | ${results.deltas[k] || 'N/A'} |`
-            ).join('\n')}
-            
-            **Overall: ${results.overallScore.toFixed(1)}/100**`;
-            
-            github.rest.issues.createComment({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: context.issue.number,
-              body
-            });
 ```
+
+---
+
+## Why HumanEval is Out of Scope
+
+HumanEval requires executing LLM-generated code, which presents:
+
+1. **Security risks**: Untrusted code could be malicious
+2. **Sandboxing complexity**: Requires Docker, process isolation, resource limits
+3. **Language dependencies**: Python runtime, package management
+4. **Maintenance burden**: Keeping sandbox secure is ongoing work
+
+If you need HumanEval support, consider:
+- [OpenAI's official human-eval](https://github.com/openai/human-eval)
+- [Evalplus](https://github.com/evalplus/evalplus)
+- Building your own Docker-based sandbox
+
+> 📖 See [ADR-009](adr/009-benchmark-strategy.md) for full rationale and future considerations.
 
 ---
 
 ## See Also
 
-- [Architecture Overview](architecture.md) - Understanding AgentEval structure
+- [ADR-009: Benchmark Strategy](adr/009-benchmark-strategy.md) - Architecture decision
+- [Stochastic Testing](stochastic-testing.md) - Statistical testing for benchmarks
+- [Model Comparison](model-comparison.md) - Compare models on benchmarks
 - [Extensibility Guide](extensibility.md) - Creating custom metrics
-- [Embedding Metrics](embedding-metrics.md) - Fast similarity evaluation

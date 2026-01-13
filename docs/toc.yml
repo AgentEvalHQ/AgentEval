@@ -1,5 +1,7 @@
 - name: Home
   href: index.md
+- name: Why AgentEval?
+  href: why-agenteval.md
 - name: Getting Started
   items:
   - name: Installation
@@ -8,12 +10,22 @@
     href: getting-started.md
   - name: Walkthrough
     href: walkthrough.md
-- name: Guides
+- name: Core Guides
+  items:
+  - name: Fluent Assertions
+    href: assertions.md
+  - name: Stochastic Testing
+    href: stochastic-testing.md
+  - name: Model Comparison
+    href: model-comparison.md
+  - name: Trace Recording
+    href: tracing.md
+  - name: Metrics Reference
+    href: metrics-reference.md
+- name: Advanced Guides
   items:
   - name: Architecture
     href: architecture.md
-  - name: Fluent Assertions
-    href: assertions.md
   - name: Benchmarks
     href: benchmarks.md
   - name: CLI Reference
@@ -26,12 +38,18 @@
     href: extensibility.md
   - name: Snapshots
     href: snapshots.md
-  - name: Tracing & Record/Replay
-    href: tracing.md
   - name: Workflow Testing
     href: workflows.md
   - name: Evaluation Guide
     href: evaluation-guide.md
+- name: Showcase
+  items:
+  - name: Code Gallery
+    href: showcase/code-gallery.md
+- name: Migrate
+  items:
+  - name: Migration Guide
+    href: comparison.md
 - name: Roadmap
   href: roadmap.md
 - name: Strategy
