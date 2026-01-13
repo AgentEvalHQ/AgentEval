@@ -218,11 +218,17 @@ public class TraceArtifactManager
 
     private static string SanitizeFileName(string name)
     {
-        var invalid = Path.GetInvalidFileNameChars();
+        // Use cross-platform invalid characters (Windows is most restrictive)
+        // This ensures consistent filenames across all platforms
+        var crossPlatformInvalid = new HashSet<char>(Path.GetInvalidFileNameChars())
+        {
+            ':', '*', '?', '"', '<', '>', '|', '/', '\\'
+        };
+        
         var sanitized = new string(name
             .Replace(' ', '_')
             .Replace('.', '_')
-            .Where(c => !invalid.Contains(c))
+            .Where(c => !crossPlatformInvalid.Contains(c))
             .ToArray());
         
         // Limit length to avoid path issues
