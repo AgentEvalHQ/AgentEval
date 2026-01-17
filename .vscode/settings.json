@@ -29,6 +29,15 @@
         "dotnet build": true,
         "dotnet test": true,
         "Set-Content": true,
-        "git add": true
+        "git add": true,
+        "git commit": true,
+        "git push": true,
+        ".\\scripts\\build-documentation.ps1": true,
+        "dotnet tool": true,
+        "docfx": true,
+        "start": true,
+        "Copy-Item": true,
+        "Test-Path": true,
+        "New-Item": true
     }
 }

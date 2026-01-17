@@ -16,7 +16,7 @@ AgentEval is a .NET-native AI agent testing framework for Microsoft Agent Framew
 ### Build & Test
 ```powershell
 dotnet build                    # Build all projects
-dotnet test                     # Run 763+ tests (×3 TFMs)
+dotnet test                     # Run 1,000+ tests (×3 TFMs)
 dotnet run --project samples/AgentEval.Samples
 ```
 

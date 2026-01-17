@@ -218,7 +218,7 @@ dotnet test
 | Stage | Without AgentEval | With AgentEval |
 |-------|-------------------|----------------|
 | **Development** | Manual testing, hope for the best | Fluent assertions, immediate feedback |
-| **PR Review** | "Did you test it?" | CI runs 763+ tests automatically |
+| **PR Review** | "Did you test it?" | CI runs 1,000+ tests automatically |
 | **Model Upgrade** | 🙏 Fingers crossed | Stochastic tests show 85% → 72% success rate |
 | **Production** | Users report bugs | Regressions caught before deployment |
 | **Cost Management** | Surprise bills | Cost SLAs in every test |

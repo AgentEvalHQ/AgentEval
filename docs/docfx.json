@@ -17,7 +17,7 @@
     "content": [
       {
         "files": ["**/*.md", "**/*.yml"],
-        "exclude": ["_site/**"]
+        "exclude": ["_site/**", "templates/**"]
       }
     ],
     "resource": [
@@ -26,12 +26,21 @@
       }
     ],
     "output": "_site",
-    "template": ["default", "modern"],
+    "template": ["default", "modern", "templates/modern"],
     "globalMetadata": {
       "_appTitle": "AgentEval",
       "_appName": "AgentEval",
-      "_appFooter": "AgentEval - .NET Agent Testing Framework",
-      "_enableSearch": true
-    }
+      "_appFooter": "<span>AgentEval &copy; 2025-2026 | .NET-Native AI Agent Testing Framework</span>",
+      "_appLogoPath": "images/logo.png",
+      "_appFaviconPath": "images/favicon.png",
+      "_enableSearch": true,
+      "_enableNewTab": true,
+      "_disableContribution": false,
+      "_gitContribute": {
+        "repo": "https://github.com/joslat/AgentEval",
+        "branch": "main"
+      }
+    },
+    "postProcessors": ["ExtractSearchIndex"]
   }
 }

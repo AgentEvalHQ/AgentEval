@@ -107,7 +107,7 @@ API documentation is auto-generated from XML comments. See the [API Reference](a
 
 ## Test Coverage
 
-AgentEval has **763 tests** (2,289 across 3 target frameworks) covering all major features.
+AgentEval has **1,000+ tests** (3,000+ across 3 target frameworks) covering all major features.
 
 ---
 

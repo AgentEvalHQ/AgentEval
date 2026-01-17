@@ -18,7 +18,7 @@
   <a href="https://github.com/joslat/AgentEval/blob/main/LICENSE">
     <img src="https://img.shields.io/github/license/joslat/AgentEval.svg" alt="License" />
   </a>
-  <img src="https://img.shields.io/badge/tests-800%2B%20x%203%20TFMs-brightgreen" alt="Test Count" />
+  <img src="https://img.shields.io/badge/tests-1000%2B%20x%203%20TFMs-brightgreen" alt="Test Count" />
 </p>
 
 ---
@@ -157,12 +157,12 @@ modelResults.PrintComparisonTable();
 **Output:**
 ```
 +------------------------------------------------------------------------------+
-¦                     Model Comparison (5 runs each)                           ¦
-+-----------------------------------------------------------------------------¦
-¦ Model        ¦ Pass Rate   ¦ Mean Score ¦ Std Dev  ¦ Recommendation         ¦
-+--------------+-------------+------------+----------+------------------------¦
-¦ GPT-4o       ¦ 100%        ¦ 92.4       ¦ 3.2      ¦ ?? Best Quality        ¦
-¦ GPT-4o Mini  ¦ 80%         ¦ 84.1       ¦ 8.7      ¦ ?? Best Value          ¦
+ï¿½                     Model Comparison (5 runs each)                           ï¿½
++-----------------------------------------------------------------------------ï¿½
+ï¿½ Model        ï¿½ Pass Rate   ï¿½ Mean Score ï¿½ Std Dev  ï¿½ Recommendation         ï¿½
++--------------+-------------+------------+----------+------------------------ï¿½
+ï¿½ GPT-4o       ï¿½ 100%        ï¿½ 92.4       ï¿½ 3.2      ï¿½ ?? Best Quality        ï¿½
+ï¿½ GPT-4o Mini  ï¿½ 80%         ï¿½ 84.1       ï¿½ 8.7      ï¿½ ?? Best Value          ï¿½
 +-----------------------------------------------------------------------------+
 ```
 
@@ -212,7 +212,7 @@ if (faithfulness.Score < 70)
 
 ### Rich Test Output: Debug CI Failures Like a Pro
 
-Configure verbosity levels via environment variables—no code changes needed:
+Configure verbosity levels via environment variablesï¿½no code changes needed:
 
 ```bash
 # In CI/CD pipeline
@@ -311,7 +311,7 @@ public class MyAgentTests : AgentEvalTestBase
 - CI/CD integration - JUnit XML, Markdown, JSON export, trace artifacts
 - CLI tool - agenteval eval, agenteval init
 - Benchmarks - custom patterns with dataset loaders (JSON, YAML, CSV, JSONL)
-- 1,000+ tests (×3 TFMs) - production quality
+- 1,000+ tests (ï¿½3 TFMs) - production quality
 
 ---
 

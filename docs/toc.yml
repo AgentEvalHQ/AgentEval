@@ -1,90 +1,73 @@
+# AgentEval Documentation - Navigation (6 top-level items max)
+
 - name: Home
   href: index.md
-- name: Why AgentEval?
-  href: why-agenteval.md
+
 - name: Getting Started
   items:
+  - name: Why AgentEval?
+    href: why-agenteval.md
   - name: Installation
     href: installation.md
   - name: Quick Start
     href: getting-started.md
-  - name: Walkthrough
+  - name: Step-by-Step Walkthrough
     href: walkthrough.md
-- name: Core Guides
+
+- name: Features
   items:
   - name: Fluent Assertions
     href: assertions.md
   - name: Stochastic Testing
     href: stochastic-testing.md
+  - name: Conversations
+    href: conversations.md
+  - name: Workflow Testing
+    href: workflows.md
+  - name: Snapshots
+    href: snapshots.md
+  - name: Evaluation Guide
+    href: evaluation-guide.md
+  - name: Metrics Reference
+    href: metrics-reference.md
+  - name: Embedding Metrics
+    href: embedding-metrics.md
   - name: Model Comparison
     href: model-comparison.md
   - name: Trace Recording
     href: tracing.md
-  - name: Rich Test Output
-    href: rich-test-output-guide.md
-  - name: Metrics Reference
-    href: metrics-reference.md
-- name: Advanced Guides
-  items:
-  - name: Architecture
-    href: architecture.md
   - name: Benchmarks
     href: benchmarks.md
+
+- name: Integration
+  items:
   - name: CI/CD Integration
     href: ci-cd-integration.md
   - name: CLI Reference
     href: cli.md
-  - name: Conversations
-    href: conversations.md
-  - name: Embedding Metrics
-    href: embedding-metrics.md
-  - name: Extensibility
-    href: extensibility.md
-  - name: Snapshots
-    href: snapshots.md
-  - name: Workflow Testing
-    href: workflows.md
-  - name: Evaluation Guide
-    href: evaluation-guide.md
-- name: Showcase
-  items:
-  - name: Code Gallery
-    href: showcase/code-gallery.md
-- name: Migrate
-  items:
-  - name: Migration Guide
-    href: comparison.md
-- name: Roadmap
-  href: roadmap.md
-- name: Strategy
-  items:
-  - name: New Features Exploration
-    href: strategy/new-features-exploration.md
-- name: Architecture Decisions
-  items:
-  - name: Overview
-    href: adr/README.md
-  - name: ADR-001 Metric Naming Prefixes
-    href: adr/001-metric-naming-prefixes.md
-  - name: ADR-002 Result Directory Structure
-    href: adr/002-result-directory-structure.md
-  - name: ADR-003 CLI Review Commands
-    href: adr/003-cli-review-commands.md
-  - name: ADR-007 Metrics Taxonomy
-    href: adr/007-metrics-taxonomy.md
-- name: Reference
-  items:
-  - name: Metrics Reference
-    href: metrics-reference.md
-  - name: Naming Conventions
-    href: naming-conventions.md
+  - name: Rich Test Output
+    href: rich-test-output-guide.md
+
 - name: API Reference
   href: api/
-- name: Community
+
+- name: Resources
   items:
-  - name: GitHub
+  - name: Architecture Overview
+    href: architecture.md
+  - name: Extensibility
+    href: extensibility.md
+  - name: Naming Conventions
+    href: naming-conventions.md
+  - name: Migration Guide
+    href: comparison.md
+  - name: Code Gallery
+    href: showcase/code-gallery.md
+  - name: Architecture Decisions
+    href: adr/README.md
+  - name: Roadmap
+    href: roadmap.md
+  - name: GitHub Repository
     href: https://github.com/joslat/AgentEval
-  - name: NuGet
-    href: https://www.nuget.org/packages/AgentEval
   - name: Contributing
     href: https://github.com/joslat/AgentEval/blob/main/CONTRIBUTING.md

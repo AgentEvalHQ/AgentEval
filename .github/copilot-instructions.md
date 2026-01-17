@@ -16,7 +16,7 @@ AgentEval/
 │   ├── Tracing/            # TraceRecordingAgent, ChatTraceRecorder, WorkflowTraceRecorder
 │   └── Testing/            # FakeChatClient for mocking IChatClient
 ├── tests/AgentEval.Tests/  # xUnit tests, mirrors src/ structure
-└── samples/AgentEval.Samples/  # 16 runnable samples (Sample01_HelloWorld, etc.)
+└── samples/AgentEval.Samples/  # 18 runnable samples (Sample01_HelloWorld, etc.)
 ```
 
 ## Environment Setup
@@ -34,7 +34,7 @@ $env:AZURE_OPENAI_DEPLOYMENT_2 = "gpt-4o-mini"    # Secondary model
 
 ```powershell
 dotnet build                 # Build all projects
-dotnet test                  # Run all 763+ tests (×3 TFMs = 2289 total)
+dotnet test                  # Run all 1,000+ tests (×3 TFMs = 3,000+ total)
 dotnet run --project samples/AgentEval.Samples  # Run samples
 dotnet pack src/AgentEval   # Create NuGet package
 ```
