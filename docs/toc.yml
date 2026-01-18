@@ -57,6 +57,8 @@
   items:
   - name: Architecture Overview
     href: architecture.md
+  - name: Building Documentation
+    href: building-docs.md
   - name: Extensibility
     href: extensibility.md
   - name: Naming Conventions

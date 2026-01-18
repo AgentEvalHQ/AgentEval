@@ -1,7 +1,7 @@
 # Security Scanning & Hardening Guide
 
 > **Last Updated:** January 18, 2026  
-> **Version:** 0.1.3-alpha  
+> **Version:** 0.2.0-beta  
 > **Status:** Production Security Hardening Complete
 
 ---
@@ -439,4 +439,3 @@ jobs:
 
 - [SECURITY.md](https://github.com/joslat/AgentEval/blob/main/SECURITY.md) - Vulnerability reporting process
 - [CONTRIBUTING.md](https://github.com/joslat/AgentEval/blob/main/CONTRIBUTING.md) - Contribution guidelines
-
