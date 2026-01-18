@@ -67,8 +67,9 @@ jobs:
       with:
         directory: coverage
         fail_ci_if_error: false
-      env:
-        CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+        # CODECOV_TOKEN is configured as a repository secret
+        # See: Repository Settings > Secrets and variables > Actions
+        token: ${{ secrets.CODECOV_TOKEN }}
 
   build-windows:
     runs-on: windows-latest

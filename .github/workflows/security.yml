@@ -32,6 +32,8 @@ jobs:
       run: dotnet restore
 
     - name: Run Security DevSkim Analyzer
+      # Using v1 tag which tracks latest v1.x release (currently v1.0.16)
+      # See: https://github.com/microsoft/DevSkim-Action/releases
       uses: microsoft/DevSkim-Action@v1
       with:
         directory-to-scan: .

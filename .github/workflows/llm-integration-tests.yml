@@ -39,6 +39,13 @@ on:
     tags:
       - 'v*'
 
+# Required permissions for test-reporter to create check runs
+# See: https://github.com/dorny/test-reporter#recommended-setup-for-public-repositories
+permissions:
+  contents: read
+  actions: read
+  checks: write
+
 env:
   DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
   DOTNET_CLI_TELEMETRY_OPTOUT: true
