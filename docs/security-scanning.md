@@ -1,7 +1,7 @@
 # Security Scanning & Hardening Guide
 
 > **Last Updated:** January 18, 2026  
-> **Version:** 0.1.3-alpha  
+> **Version:** 0.2.0-beta  
 > **Status:** Production Security Hardening Complete
 
 ---
