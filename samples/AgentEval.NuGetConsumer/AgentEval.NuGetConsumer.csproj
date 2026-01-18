@@ -1,0 +1,35 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>preview</LangVersion>
+    
+    <!-- Exclude from Central Package Management - standalone consumer sample -->
+    <ManagePackageVersionsCentrally>false</ManagePackageVersionsCentrally>
+    
+    <!-- This is intentionally NOT included in the main solution -->
+    <!-- It tests the NuGet package as an external consumer would -->
+  </PropertyGroup>
+
+  <!--
+    NOTE: Designed to reference AgentEval from NuGet (not project reference).
+    This validates that the published package works correctly.
+    
+    FOR DEVELOPMENT: Uses local project reference while package isn't published.
+    FOR VALIDATION: Change to PackageReference after publishing:
+      <PackageReference Include="AgentEval" Version="0.1.3-alpha" />
+  -->
+  <ItemGroup>
+    <!-- LOCAL: During development, use project reference -->
+    <ProjectReference Include="../../src/AgentEval/AgentEval.csproj" />
+    
+    <!-- Supporting packages with explicit versions (CPM disabled) -->
+    <PackageReference Include="Azure.AI.OpenAI" Version="2.5.0-beta.1" />
+    <PackageReference Include="Microsoft.Agents.AI" Version="1.0.0-preview.251110.2" />
+    <PackageReference Include="Microsoft.Extensions.AI" Version="10.0.0" />
+  </ItemGroup>
+
+</Project>

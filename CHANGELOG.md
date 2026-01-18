@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Codecov Badge** - Coverage visibility in README.md
+- **NuGet Consumer Sample** (`samples/AgentEval.NuGetConsumer/`) - Standalone project showcasing all major features
+  - Tool chain assertions (HaveCalledTool, WithArgument, BeforeTool, AfterTool)
+  - Performance assertions (Duration, TTFT, Cost, Token limits)
+  - Behavioral policies (NeverCallTool, MustConfirmBefore, NeverPassArgumentMatching)
+  - Response assertions (Contain, NotContain, length validation)
+  - Mock testing with FakeChatClient
+  - Stochastic testing examples
+  - Model comparison patterns
+  - Agentic metrics overview
+  - Works offline with mock data - no Azure OpenAI required
+
+### Changed
+- Updated README test count badge to 3000+ (reflecting 1000+ tests × 3 TFMs)
+
 ### Planned
 - CodeQL integration for advanced code analysis
 - NuGet package signing

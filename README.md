@@ -12,13 +12,16 @@
   <a href="https://github.com/joslat/AgentEval/actions/workflows/ci.yml">
     <img src="https://github.com/joslat/AgentEval/actions/workflows/ci.yml/badge.svg" alt="CI Status" />
   </a>
+  <a href="https://codecov.io/gh/joslat/AgentEval">
+    <img src="https://codecov.io/gh/joslat/AgentEval/graph/badge.svg" alt="Code Coverage" />
+  </a>
   <a href="https://www.nuget.org/packages/AgentEval">
     <img src="https://img.shields.io/nuget/v/AgentEval.svg" alt="NuGet Version" />
   </a>
   <a href="https://github.com/joslat/AgentEval/blob/main/LICENSE">
     <img src="https://img.shields.io/github/license/joslat/AgentEval.svg" alt="License" />
   </a>
-  <img src="https://img.shields.io/badge/tests-1000%2B%20x%203%20TFMs-brightgreen" alt="Test Count" />
+  <img src="https://img.shields.io/badge/tests-3000%2B%20across%203%20TFMs-brightgreen" alt="Test Count" />
 </p>
 
 ---
