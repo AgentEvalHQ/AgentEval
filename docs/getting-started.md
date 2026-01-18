@@ -4,11 +4,39 @@
 
 This guide walks you through installing AgentEval and writing your first AI agent test.
 
+## Quick Path
+
+| Time | Step |
+|------|------|
+| **1 min** | Install NuGet package |
+| **2 min** | Create a MAF agent |
+| **2 min** | Write your first test |
+
 ## Prerequisites
 
-- .NET 8.0 or later
+- .NET 8.0, 9.0, or 10.0 SDK
 - An xUnit, NUnit, or MSTest test project
-- (Optional) Azure OpenAI or OpenAI API access for AI-powered evaluation
+- Azure OpenAI or OpenAI API access
+
+### Required Environment Variables
+
+Set these before running tests:
+
+```powershell
+# PowerShell
+$env:AZURE_OPENAI_ENDPOINT = "https://your-resource.openai.azure.com/"
+$env:AZURE_OPENAI_API_KEY = "your-api-key"
+$env:AZURE_OPENAI_DEPLOYMENT = "gpt-4o"  # Your deployment name
+```
+
+```bash
+# Bash/Linux/macOS
+export AZURE_OPENAI_ENDPOINT="https://your-resource.openai.azure.com/"
+export AZURE_OPENAI_API_KEY="your-api-key"
+export AZURE_OPENAI_DEPLOYMENT="gpt-4o"
+```
+
+> **Tip:** Add these to your `.bashrc`, `.zshrc`, or Windows user environment variables for persistence.
 
 ## Installation
 
@@ -34,8 +62,9 @@ public static AIAgent CreateMyAgent()
         new Uri(Environment.GetEnvironmentVariable("AZURE_OPENAI_ENDPOINT")!),
         new Azure.AzureKeyCredential(Environment.GetEnvironmentVariable("AZURE_OPENAI_API_KEY")!));
 
+    var deployment = Environment.GetEnvironmentVariable("AZURE_OPENAI_DEPLOYMENT") ?? "gpt-4o";
     var chatClient = azureClient
-        .GetChatClient("gpt-4o")  // Your deployment name
+        .GetChatClient(deployment)
         .AsIChatClient();
 
     // Create a MAF ChatClientAgent
@@ -60,8 +89,9 @@ public static AIAgent CreateWeatherAgent()
         new Uri(Environment.GetEnvironmentVariable("AZURE_OPENAI_ENDPOINT")!),
         new Azure.AzureKeyCredential(Environment.GetEnvironmentVariable("AZURE_OPENAI_API_KEY")!));
 
+    var deployment = Environment.GetEnvironmentVariable("AZURE_OPENAI_DEPLOYMENT") ?? "gpt-4o";
     var chatClient = azureClient
-        .GetChatClient("gpt-4o")
+        .GetChatClient(deployment)
         .AsIChatClient();
 
     return new ChatClientAgent(
@@ -129,8 +159,9 @@ public class MyAgentTests
             new Uri(Environment.GetEnvironmentVariable("AZURE_OPENAI_ENDPOINT")!),
             new Azure.AzureKeyCredential(Environment.GetEnvironmentVariable("AZURE_OPENAI_API_KEY")!));
 
+        var deployment = Environment.GetEnvironmentVariable("AZURE_OPENAI_DEPLOYMENT") ?? "gpt-4o";
         var chatClient = azureClient
-            .GetChatClient("gpt-4o")
+            .GetChatClient(deployment)
             .AsIChatClient();
 
         return new ChatClientAgent(
@@ -180,8 +211,9 @@ private static AIAgent CreateWeatherAgent()
         new Uri(Environment.GetEnvironmentVariable("AZURE_OPENAI_ENDPOINT")!),
         new Azure.AzureKeyCredential(Environment.GetEnvironmentVariable("AZURE_OPENAI_API_KEY")!));
 
+    var deployment = Environment.GetEnvironmentVariable("AZURE_OPENAI_DEPLOYMENT") ?? "gpt-4o";
     var chatClient = azureClient
-        .GetChatClient("gpt-4o")
+        .GetChatClient(deployment)
         .AsIChatClient();
 
     return new ChatClientAgent(
@@ -253,7 +285,8 @@ public class AdvancedAgentTests
             new Uri(Environment.GetEnvironmentVariable("AZURE_OPENAI_ENDPOINT")!),
             new Azure.AzureKeyCredential(Environment.GetEnvironmentVariable("AZURE_OPENAI_API_KEY")!));
         
-        _evaluator = client.GetChatClient("gpt-4o").AsIChatClient();
+        var deployment = Environment.GetEnvironmentVariable("AZURE_OPENAI_DEPLOYMENT") ?? "gpt-4o";
+        _evaluator = client.GetChatClient(deployment).AsIChatClient();
     }
 
     [Fact]
@@ -285,8 +318,9 @@ public class AdvancedAgentTests
             new Uri(Environment.GetEnvironmentVariable("AZURE_OPENAI_ENDPOINT")!),
             new Azure.AzureKeyCredential(Environment.GetEnvironmentVariable("AZURE_OPENAI_API_KEY")!));
 
+        var deployment = Environment.GetEnvironmentVariable("AZURE_OPENAI_DEPLOYMENT") ?? "gpt-4o";
         var chatClient = azureClient
-            .GetChatClient("gpt-4o")
+            .GetChatClient(deployment)
             .AsIChatClient();
 
         return new ChatClientAgent(
@@ -351,8 +385,9 @@ private static AIAgent CreateMyAgent()
         new Uri(Environment.GetEnvironmentVariable("AZURE_OPENAI_ENDPOINT")!),
         new Azure.AzureKeyCredential(Environment.GetEnvironmentVariable("AZURE_OPENAI_API_KEY")!));
 
+    var deployment = Environment.GetEnvironmentVariable("AZURE_OPENAI_DEPLOYMENT") ?? "gpt-4o";
     var chatClient = azureClient
-        .GetChatClient("gpt-4o")
+        .GetChatClient(deployment)
         .AsIChatClient();
 
     return new ChatClientAgent(
@@ -431,6 +466,94 @@ result.ActualOutput!.Should()
 | `Performance.Should()` | Assert latency, cost, tokens |
 | `ConversationRunner` | Multi-turn testing |
 | `SnapshotComparer` | Regression testing |
+
+---
+
+## Troubleshooting
+
+### DeploymentNotFound (HTTP 404)
+
+**Symptom:** `DeploymentNotFound` error when running tests
+
+**Cause:** The deployment name doesn't match your Azure OpenAI resource
+
+**Solution:**
+```powershell
+# Verify your deployment exists in Azure Portal
+# Set the correct deployment name:
+$env:AZURE_OPENAI_DEPLOYMENT = "your-actual-deployment-name"
+```
+
+### Environment Variables Not Set
+
+**Symptom:** `NullReferenceException` or empty configuration
+
+**Cause:** Missing required environment variables
+
+**Solution:** Ensure all three are set:
+```powershell
+$env:AZURE_OPENAI_ENDPOINT    # Required: https://xxx.openai.azure.com/
+$env:AZURE_OPENAI_API_KEY     # Required: Your API key
+$env:AZURE_OPENAI_DEPLOYMENT  # Required: Your deployment name (e.g., gpt-4o)
+```
+
+### Rate Limiting (HTTP 429)
+
+**Symptom:** `TooManyRequests` error during batch tests
+
+**Solution:** Add delays between tests:
+```csharp
+var options = new TestRunOptions
+{
+    DelayBetweenTests = TimeSpan.FromSeconds(1)
+};
+```
+
+### Timeout Errors
+
+**Symptom:** Tests timeout waiting for response
+
+**Solution:** Increase timeout in test configuration:
+```csharp
+var testCase = new TestCase
+{
+    Name = "Long Running Test",
+    Input = "Generate a detailed report...",
+    TimeoutSeconds = 60  // Default is 30
+};
+```
+
+### Inconsistent Tool Calls
+
+**Symptom:** Tool sometimes called, sometimes not
+
+**Causes:**
+- Prompt is ambiguous
+- Temperature too high
+
+**Solution:** Use more specific prompts:
+```csharp
+// ❌ Ambiguous
+var testCase = new TestCase { Input = "What's the weather?" };
+
+// ✅ Specific
+var testCase = new TestCase 
+{ 
+    Input = "What is the current temperature in Seattle, WA in Fahrenheit?" 
+};
+```
+
+### High Variance in LLM Scores
+
+**Symptom:** Quality scores vary widely between runs
+
+**Solution:** Use [Stochastic Testing](stochastic-testing.md) to run multiple times and analyze statistics:
+```csharp
+var stochasticRunner = new StochasticRunner(harness, testOptions);
+var result = await stochasticRunner.RunStochasticTestAsync(
+    agent, testCase, 
+    new StochasticOptions(Runs: 10, SuccessRateThreshold: 0.8));
+```
 
 ---
 

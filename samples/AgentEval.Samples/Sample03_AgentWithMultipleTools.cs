@@ -377,12 +377,30 @@ internal class MockResearchChatClient : IChatClient
         return Task.FromResult(new ChatResponse(response));
     }
 
-    public IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(
+    public async IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(
         IEnumerable<ChatMessage> chatMessages,
         ChatOptions? options = null,
-        CancellationToken cancellationToken = default)
+        [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
-        throw new NotImplementedException();
+        // For mock mode, just call non-streaming and yield as single update
+        var response = await GetResponseAsync(chatMessages, options, cancellationToken);
+        var update = new ChatResponseUpdate
+        {
+            Role = response.Messages.LastOrDefault()?.Role ?? ChatRole.Assistant,
+            FinishReason = response.FinishReason
+        };
+        
+        // Add content or tool calls from the response
+        var lastMessage = response.Messages.LastOrDefault();
+        if (lastMessage?.Contents != null)
+        {
+            foreach (var content in lastMessage.Contents)
+            {
+                update.Contents.Add(content);
+            }
+        }
+        
+        yield return update;
     }
 
     public object? GetService(Type serviceType, object? key = null) => null;

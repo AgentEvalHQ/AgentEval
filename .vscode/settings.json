@@ -42,6 +42,14 @@
         "gh": true,
         "dotnet pack": true,
         "git check-ignore": true,
-        "git tag": true
+        "git tag": true,
+        "/^dotnet run --project samples/AgentEval\\.NuGetConsumer$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "dotnet run": true,
+        "2..18": true,
+        "1..18": true,
+        "ForEach-Object": true
     }
 }
