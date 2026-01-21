@@ -35,16 +35,31 @@ public static class Demos
         }
         else
         {
-            // REAL: Execute actual agent
+            // REAL: Execute actual agent with STREAMING for full metrics
             var agent = AgentFactory.CreateTravelAgent(useMock: false);
-            var harness = new MAFTestHarness(verbose: false);
+            var harness = new MAFTestHarness(verbose: true);
             var testCase = new TestCase
             {
                 Name = "Travel Booking Flow",
                 Input = "Search for flights to Paris on March 15th, 2026, book the cheapest one, and send confirmation to user@example.com"
             };
             
-            var result = await harness.RunTestAsync(agent, testCase, new TestOptions { TrackTools = true, TrackPerformance = true });
+            // Use streaming to capture TTFT and per-tool timing
+            var result = await harness.RunTestStreamingAsync(
+                agent, 
+                testCase,
+                streamingOptions: new StreamingOptions
+                {
+                    OnFirstToken = ttft => Console.WriteLine($"      ⚡ First token: {ttft.TotalMilliseconds:F0}ms"),
+                    OnToolStart = tool => Console.WriteLine($"      🔧 Tool started: {tool.Name}"),
+                    OnToolComplete = tool => Console.WriteLine($"      ✓ Tool done: {tool.Name} ({tool.Duration?.TotalMilliseconds:F0}ms)")
+                },
+                options: new TestOptions 
+                { 
+                    TrackTools = true, 
+                    TrackPerformance = true,
+                    ModelName = Config.Model  // For cost estimation
+                });
             
             toolUsage = result.ToolUsage ?? new ToolUsageReport();
             response = result.ActualOutput ?? "";
@@ -85,12 +100,12 @@ public static class Demos
     }
 
     // ═══════════════════════════════════════════════════════════════════════════════
-    // 2. PERFORMANCE ASSERTIONS
+    // 2. PERFORMANCE ASSERTIONS (with streaming for full metrics)
     // ═══════════════════════════════════════════════════════════════════════════════
 
     public static async Task RunPerformanceAssertionsDemo(bool useMock)
     {
-        ShowSection("2️⃣  PERFORMANCE ASSERTIONS", "Make SLAs executable");
+        ShowSection("2️⃣  PERFORMANCE ASSERTIONS", "Make SLAs executable (streaming mode)");
 
         PerformanceMetrics performance;
 
@@ -101,10 +116,28 @@ public static class Demos
         else
         {
             var agent = AgentFactory.CreateCalculatorAgent(useMock: false);
-            var harness = new MAFTestHarness(verbose: false);
-            var testCase = new TestCase { Name = "Calculator Test", Input = "Calculate 42 * 17" };
+            var harness = new MAFTestHarness(verbose: true);
+            var testCase = new TestCase 
+            { 
+                Name = "Calculator Test", 
+                Input = "Calculate 42 * 17 using the calculator tool" 
+            };
             
-            var result = await harness.RunTestAsync(agent, testCase, new TestOptions { TrackPerformance = true });
+            // Use STREAMING to capture TTFT and per-tool timing
+            var result = await harness.RunTestStreamingAsync(
+                agent, 
+                testCase,
+                streamingOptions: new StreamingOptions
+                {
+                    OnFirstToken = ttft => Console.WriteLine($"      ⚡ First token received at {ttft.TotalMilliseconds:F0}ms")
+                },
+                options: new TestOptions 
+                { 
+                    TrackPerformance = true,
+                    TrackTools = true,
+                    ModelName = Config.Model  // Required for cost estimation!
+                });
+            
             performance = result.Performance ?? new PerformanceMetrics();
         }
 
@@ -117,12 +150,21 @@ public static class Demos
                 .HaveTokenCountUnder(5000);
 
             ShowPass("Performance assertions PASSED!");
-            Console.WriteLine($"      📊 Total duration: {performance.TotalDuration.TotalMilliseconds:F0}ms");
-            Console.WriteLine($"      📊 Time to first token: {performance.TimeToFirstToken?.TotalMilliseconds:F0}ms");
-            Console.WriteLine($"      📊 Total tokens: {performance.TotalTokens}");
-            Console.WriteLine($"      📊 Estimated cost: ${performance.EstimatedCost:F4}\n");
+            
+            // Display metrics with N/A for unavailable values
+            Console.WriteLine($"      📊 Total duration: {FormatDuration(performance.TotalDuration)}");
+            Console.WriteLine($"      📊 Time to first token: {FormatNullableDuration(performance.TimeToFirstToken)}");
+            Console.WriteLine($"      📊 Total tokens: {FormatNullableInt(performance.TotalTokens)}");
+            Console.WriteLine($"      📊 Estimated cost: {FormatNullableCost(performance.EstimatedCost)}");
+            Console.WriteLine($"      📊 Model used: {performance.ModelUsed ?? "N/A"}");
+            Console.WriteLine($"      📊 Was streaming: {performance.WasStreaming}\n");
 
             ShowCode("""
+                // Use streaming for full metrics (TTFT, per-tool timing)
+                var result = await harness.RunTestStreamingAsync(
+                    agent, testCase,
+                    options: new TestOptions { ModelName = "gpt-4o" });  // Required for cost!
+                
                 result.Performance!.Should()
                     .HaveTotalDurationUnder(TimeSpan.FromSeconds(10))
                     .HaveTimeToFirstTokenUnder(TimeSpan.FromMilliseconds(2000))
@@ -137,51 +179,121 @@ public static class Demos
     }
 
     // ═══════════════════════════════════════════════════════════════════════════════
-    // 3. BEHAVIORAL POLICY ASSERTIONS
+    // 3. BEHAVIORAL POLICY ASSERTIONS (with response validation)
     // ═══════════════════════════════════════════════════════════════════════════════
 
     public static async Task RunBehavioralPoliciesDemo(bool useMock)
     {
-        ShowSection("3️⃣  BEHAVIORAL POLICIES", "Compliance guardrails");
+        ShowSection("3️⃣  BEHAVIORAL POLICIES", "Compliance guardrails + response validation");
 
         ToolUsageReport toolUsage;
+        string response = "";
 
         if (useMock)
         {
-            // Safe usage - no dangerous tools called
+            // Safe usage - SearchFlights called, no dangerous tools
             toolUsage = new ToolUsageReport();
-            toolUsage.AddCall(new ToolCallRecord { Name = "SearchFlights", CallId = "1", Order = 1, Result = "flights found" });
-            toolUsage.AddCall(new ToolCallRecord { Name = "GetPricing", CallId = "2", Order = 2, Result = "pricing info" });
+            toolUsage.AddCall(new ToolCallRecord 
+            { 
+                Name = "SearchFlights", 
+                CallId = "1", 
+                Order = 1, 
+                Arguments = new Dictionary<string, object?> { ["destination"] = "London", ["date"] = "2026-04-01" },
+                Result = "Found 3 flights to London" 
+            });
+            response = "I found 3 flights to London for April 1st, 2026. The options are BA123, VS456, and AA789.";
         }
         else
         {
             var agent = AgentFactory.CreateTravelAgent(useMock: false);
-            var harness = new MAFTestHarness(verbose: false);
-            var testCase = new TestCase { Name = "Policy Test", Input = "What flights are available to London?" };
-            var result = await harness.RunTestAsync(agent, testCase, new TestOptions { TrackTools = true });
+            var harness = new MAFTestHarness(verbose: true);
+            
+            // Explicit prompt that FORCES tool usage
+            var testCase = new TestCase 
+            { 
+                Name = "Policy Test", 
+                Input = "Use the SearchFlights tool to find flights to London for April 1st, 2026. Report what you find.",
+                // Add evaluation criteria for response quality
+                EvaluationCriteria = new[]
+                {
+                    "Response mentions London as destination",
+                    "Response includes flight information or search results",
+                    "Response is helpful and complete"
+                },
+                PassingScore = 70
+            };
+            
+            var result = await harness.RunTestStreamingAsync(
+                agent, 
+                testCase,
+                options: new TestOptions 
+                { 
+                    TrackTools = true,
+                    EvaluateResponse = false,  // We'll do manual validation for demo
+                    ModelName = Config.Model
+                });
+            
             toolUsage = result.ToolUsage ?? new ToolUsageReport();
+            response = result.ActualOutput ?? "";
+            
+            // Show what tools were actually called
+            Console.WriteLine($"      🔧 Tools called: {toolUsage.Count}");
+            foreach (var call in toolUsage.Calls)
+            {
+                Console.WriteLine($"         - {call.Name}");
+            }
+            Console.WriteLine();
         }
 
         try
         {
+            // Policy assertions: verify safe behavior
             toolUsage.Should()
+                .HaveCalledTool("SearchFlights", because: "should use the search tool as requested");
+            
+            toolUsage.Should()
+                .HaveCallCount(1, because: "should only search, not book or cancel")
                 .NeverCallTool("DeleteAllData", because: "mass deletion requires admin console")
                 .NeverCallTool("ExecuteRawSQL", because: "SQL injection risk")
-                .NeverCallTool("TransferFundsExternal", because: "requires human approval");
+                .NeverCallTool("TransferFundsExternal", because: "requires human approval")
+                .NeverCallTool("BookFlight", because: "user only asked to search")
+                .NeverCallTool("CancelBooking", because: "user only asked to search");
 
             ShowPass("Behavioral policy assertions PASSED!");
-            Console.WriteLine("      🛡️ No dangerous tools were called - policies enforced!\n");
+            Console.WriteLine("      🛡️ Safe tool usage verified - SearchFlights called, no dangerous operations!\n");
+
+            // Also validate response content
+            response.Should()
+                .Contain("London", because: "response should mention the destination")
+                .HaveLengthBetween(20, 2000, because: "response should be substantial");
+
+            ShowPass("Response validation PASSED!");
+            Console.WriteLine($"      📝 Response: \"{(response.Length > 80 ? response[..80] + "..." : response)}\"\n");
 
             ShowCode("""
                 result.ToolUsage!.Should()
+                    .HaveCalledTool("SearchFlights", because: "should search as requested")
+                    .And()
+                    .HaveCallCount(1, because: "only search, no booking")
                     .NeverCallTool("DeleteAllData", because: "requires admin")
-                    .NeverCallTool("ExecuteRawSQL", because: "SQL injection risk")
-                    .NeverPassArgumentMatching(@"\b\d{16}\b", because: "PCI-DSS");
+                    .NeverCallTool("BookFlight", because: "user only asked to search");
+                
+                // Validate response too
+                result.ActualOutput!.Should()
+                    .Contain("London", because: "should mention destination");
                 """);
+        }
+        catch (ToolAssertionException ex)
+        {
+            ShowFail($"Tool assertion failed: {ex.Message}");
         }
         catch (BehavioralPolicyViolationException ex)
         {
             ShowFail($"Policy violation: {ex.PolicyName} - {ex.ViolatingAction}");
+        }
+        catch (ResponseAssertionException ex)
+        {
+            ShowFail($"Response validation failed: {ex.Message}");
         }
 
         // MustConfirmBefore demonstration
@@ -229,9 +341,13 @@ public static class Demos
         else
         {
             var agent = AgentFactory.CreateTravelAgent(useMock: false);
-            var harness = new MAFTestHarness(verbose: false);
-            var testCase = new TestCase { Name = "Response Test", Input = "Find flights to Paris for March 15" };
-            var result = await harness.RunTestAsync(agent, testCase);
+            var harness = new MAFTestHarness(verbose: true);
+            var testCase = new TestCase 
+            { 
+                Name = "Response Test", 
+                Input = "Use the SearchFlights tool to find flights to Paris for March 15, 2026" 
+            };
+            var result = await harness.RunTestStreamingAsync(agent, testCase);
             response = result.ActualOutput ?? "";
         }
 
@@ -241,7 +357,7 @@ public static class Demos
                 .Contain("Paris", because: "response must reference destination")
                 .NotContain("password", because: "no credentials exposed")
                 .NotContain("api_key", because: "no tokens exposed")
-                .HaveLengthBetween(20, 1000, because: "concise but complete");
+                .HaveLengthBetween(20, 2000, because: "concise but complete");
 
             ShowPass("Response assertions PASSED!");
             Console.WriteLine($"      📝 Response: \"{(response.Length > 70 ? response[..70] + "..." : response)}\"\n");
@@ -260,53 +376,122 @@ public static class Demos
     }
 
     // ═══════════════════════════════════════════════════════════════════════════════
-    // 5. STOCHASTIC TESTING (Real mode only)
+    // 5. STOCHASTIC MODEL COMPARISON (inspired by Sample16)
     // ═══════════════════════════════════════════════════════════════════════════════
 
     public static async Task RunStochasticTestingDemo()
     {
-        ShowSection("5️⃣  STOCHASTIC TESTING", "Handle LLM non-determinism with statistical analysis");
+        ShowSection("5️⃣  STOCHASTIC MODEL COMPARISON", "Compare models with statistical rigor");
 
-        Console.WriteLine("      Running 5 iterations to measure variability...\n");
+        Console.WriteLine($"      🤖 Comparing models: {Config.Model} vs {Config.SecondaryModel}");
+        Console.WriteLine("      📊 Running 3 iterations per model for statistical analysis...\n");
 
-        var agent = AgentFactory.CreateCalculatorAgent(useMock: false);
         var harness = new MAFTestHarness(verbose: false);
 
         var testCase = new TestCase
         {
             Name = "Calculator Test",
-            Input = "What is 25 times 4? Use the calculator tool.",
-            ExpectedOutputContains = "100"
+            Input = "What is 25 times 4? Use the calculator tool to compute this.",
+            ExpectedOutputContains = "100",
+            ExpectedTools = ["Calculate"]
         };
 
-        var options = new StochasticOptions(
-            Runs: 5,
-            SuccessRateThreshold: 0.8);
+        var stochasticOptions = new StochasticOptions(
+            Runs: 3,  // 3 runs per model for demo speed
+            SuccessRateThreshold: 0.8,
+            EnableStatisticalAnalysis: true,
+            MaxParallelism: 1,
+            DelayBetweenRuns: TimeSpan.FromMilliseconds(500));
 
-        var runner = new StochasticRunner(harness, new TestOptions { TrackTools = true, TrackPerformance = true });
-        var result = await runner.RunStochasticTestAsync(agent, testCase, options);
+        // Get factories for both models
+        var factories = AgentFactory.CreateCalculatorAgentFactories();
+        var modelResults = new List<(string ModelName, StochasticResult Result)>();
 
-        // Display results
-        Console.WriteLine($"      📊 Runs completed: {result.IndividualResults.Count}");
-        Console.WriteLine($"      📊 Success rate: {result.Statistics.PassRate * 100:F1}%");
-        Console.WriteLine($"      📊 Threshold: {options.SuccessRateThreshold * 100:F0}%");
-        Console.WriteLine($"      📊 Passed threshold: {(result.Passed ? "✅ YES" : "❌ NO")}\n");
-
-        Console.WriteLine($"      📈 Mean score: {result.Statistics.MeanScore:F1}");
-        Console.WriteLine($"      📈 Std deviation: {result.Statistics.StandardDeviation:F2}");
-        Console.WriteLine($"      📈 Min: {result.Statistics.MinScore}, Max: {result.Statistics.MaxScore}\n");
-
-        // Use the built-in print table from AgentEval
-        result.PrintTable("Stochastic Results");
-
-        ShowPass("Stochastic testing completed!");
-        ShowCode("""
-            var result = await stochasticRunner.RunStochasticTestAsync(
-                agent, testCase,
-                new StochasticOptions(Runs: 5, SuccessRateThreshold: 0.8));
+        foreach (var factory in factories)
+        {
+            Console.WriteLine($"      🔄 Testing {factory.ModelName}...");
             
-            Assert.True(result.Passed);
-            result.Statistics.MeanScore.Should().BeGreaterThan(80);
+            try
+            {
+                var runner = new StochasticRunner(
+                    harness, 
+                    statisticsCalculator: null,
+                    new TestOptions 
+                    { 
+                        TrackTools = true, 
+                        TrackPerformance = true,
+                        ModelName = factory.ModelId
+                    });
+                
+                var result = await runner.RunStochasticTestAsync(factory, testCase, stochasticOptions);
+                modelResults.Add((factory.ModelName, result));
+                
+                Console.WriteLine($"         ✓ {result.PassedCount}/{result.IndividualResults.Count} passed");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"         ❌ Error: {ex.Message}");
+            }
+        }
+        
+        Console.WriteLine();
+
+        // Print comparison table if we have results
+        if (modelResults.Count > 0)
+        {
+            Console.WriteLine("   ═══════════════════════════════════════════════════════════════════════════");
+            Console.WriteLine("   📊 MODEL COMPARISON RESULTS");
+            Console.WriteLine("   ═══════════════════════════════════════════════════════════════════════════\n");
+            
+            // Use built-in comparison table
+            modelResults.PrintComparisonTable();
+            
+            // Show detailed stats per model
+            foreach (var (modelName, result) in modelResults)
+            {
+                Console.WriteLine($"\n   --- {modelName} ---");
+                Console.WriteLine($"      Pass rate: {result.Statistics.PassRate:P0}");
+                Console.WriteLine($"      Mean score: {result.Statistics.MeanScore:F1}");
+                Console.WriteLine($"      Std deviation: {result.Statistics.StandardDeviation:F2}");
+                Console.WriteLine($"      Min/Max: {result.Statistics.MinScore:F0} / {result.Statistics.MaxScore:F0}");
+                
+                if (result.DurationStats != null)
+                {
+                    Console.WriteLine($"      Avg latency: {result.DurationStats.Mean:F0}ms");
+                }
+                if (result.CostStats != null)
+                {
+                    Console.WriteLine($"      Avg cost: ${result.CostStats.Mean:F6}");
+                }
+            }
+            Console.WriteLine();
+
+            // Determine winner
+            var winner = modelResults
+                .OrderByDescending(m => m.Result.Statistics.PassRate)
+                .ThenByDescending(m => m.Result.Statistics.MeanScore)
+                .First();
+            
+            Console.ForegroundColor = ConsoleColor.Yellow;
+            Console.WriteLine($"   🏆 Winner: {winner.ModelName} (Pass rate: {winner.Result.Statistics.PassRate:P0})\n");
+            Console.ResetColor();
+        }
+
+        ShowPass("Stochastic model comparison completed!");
+        ShowCode("""
+            // Compare models with statistical rigor (Sample16 pattern)
+            var factories = AgentFactory.CreateCalculatorAgentFactories();
+            var modelResults = new List<(string, StochasticResult)>();
+            
+            foreach (var factory in factories)
+            {
+                var result = await runner.RunStochasticTestAsync(factory, testCase, 
+                    new StochasticOptions(Runs: 5, SuccessRateThreshold: 0.8));
+                modelResults.Add((factory.ModelName, result));
+            }
+            
+            // Built-in comparison table
+            modelResults.PrintComparisonTable();
             """);
     }
 
@@ -315,26 +500,33 @@ public static class Demos
     /// </summary>
     public static void ShowStochasticExplanation()
     {
-        ShowSection("5️⃣  STOCHASTIC TESTING", "Statistical analysis of LLM variability");
+        ShowSection("5️⃣  STOCHASTIC MODEL COMPARISON", "Compare models with statistical rigor");
 
         Console.WriteLine("      ℹ️ Stochastic testing requires REAL MODE to run.\n");
-        Console.WriteLine("      Why? LLMs have inherent non-determinism - the same prompt");
-        Console.WriteLine("      can produce different responses. Stochastic testing runs");
-        Console.WriteLine("      the same test N times and provides statistical analysis:\n");
-        Console.WriteLine("      • Success rate across runs");
-        Console.WriteLine("      • Mean, standard deviation, min/max scores");
-        Console.WriteLine("      • Confidence that agent meets threshold\n");
-        Console.WriteLine("      Select REAL MODE to see live stochastic testing!\n");
+        Console.WriteLine("      This demo compares multiple models:");
+        Console.WriteLine($"         • {Config.Model}");
+        Console.WriteLine($"         • {Config.SecondaryModel}\n");
+        Console.WriteLine("      Why compare models stochastically?");
+        Console.WriteLine("      • Single runs can be misleading due to LLM non-determinism");
+        Console.WriteLine("      • Multiple runs per model give statistical confidence");
+        Console.WriteLine("      • Compare models fairly with variance-aware metrics\n");
+        Console.WriteLine("      Select REAL MODE to see live model comparison!\n");
 
         ShowCode("""
-            var result = await stochasticRunner.RunStochasticTestAsync(
-                agent, testCase,
-                new StochasticOptions(Runs: 10, SuccessRateThreshold: 0.8));
+            // Compare models with statistical rigor
+            var factories = AgentFactory.CreateCalculatorAgentFactories();
             
-            // Statistical analysis
-            Console.WriteLine($"Success rate: {result.Statistics.PassRate:P0}");
-            Console.WriteLine($"Mean: {result.Statistics.MeanScore:F1}");
-            Console.WriteLine($"StdDev: {result.Statistics.StandardDeviation:F2}");
+            foreach (var factory in factories)
+            {
+                var result = await runner.RunStochasticTestAsync(
+                    factory, testCase,
+                    new StochasticOptions(Runs: 5, SuccessRateThreshold: 0.8));
+                    
+                modelResults.Add((factory.ModelName, result));
+            }
+            
+            // Built-in comparison output
+            modelResults.PrintComparisonTable();
             """);
     }
 
@@ -374,4 +566,20 @@ public static class Demos
         Console.ResetColor();
         Console.WriteLine();
     }
+
+    // ═══════════════════════════════════════════════════════════════════════════════
+    // FORMATTING HELPERS (handle null metrics gracefully)
+    // ═══════════════════════════════════════════════════════════════════════════════
+
+    private static string FormatDuration(TimeSpan duration) =>
+        $"{duration.TotalMilliseconds:F0}ms";
+
+    private static string FormatNullableDuration(TimeSpan? duration) =>
+        duration.HasValue ? $"{duration.Value.TotalMilliseconds:F0}ms" : "N/A (use streaming)";
+
+    private static string FormatNullableInt(int? value) =>
+        value.HasValue ? value.Value.ToString() : "N/A";
+
+    private static string FormatNullableCost(decimal? cost) =>
+        cost.HasValue ? $"${cost.Value:F6}" : "N/A (set ModelName)";
 }

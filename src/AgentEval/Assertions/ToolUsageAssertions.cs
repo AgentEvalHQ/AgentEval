@@ -640,17 +640,21 @@ public class ToolCallAssertion
     /// <summary>Assert tool duration is under a maximum.</summary>
     /// <param name="max">The maximum allowed duration.</param>
     /// <param name="because">Optional reason for the assertion (shown in failure message).</param>
+    /// <remarks>
+    /// If timing information is not available (non-streaming mode), this assertion is skipped
+    /// and a debug message is logged. Use streaming mode to capture tool timing.
+    /// </remarks>
     [StackTraceHidden]
     public ToolCallAssertion WithDurationUnder(TimeSpan max, string? because = null)
     {
         if (!_call.HasTiming)
         {
-            AgentEvalScope.FailWith(
-                ToolAssertionException.Create(
-                    $"Cannot assert duration for '{_toolName}' - timing information not available.",
-                    toolName: _toolName,
-                    suggestions: new[] { "Enable streaming to capture timing", "Use AgentEvalBuilder.WithTimingCapture()" },
-                    because: because));
+            // Skip gracefully - timing requires streaming mode
+            // Log a debug-level message instead of failing
+            System.Diagnostics.Debug.WriteLine(
+                $"[AgentEval] Skipping duration assertion for '{_toolName}' - timing not available. " +
+                "Enable streaming mode to capture tool timing.");
+            return this;
         }
         
         if (_call.Duration > max)

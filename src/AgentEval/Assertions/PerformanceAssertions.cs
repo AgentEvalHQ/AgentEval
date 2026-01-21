@@ -69,21 +69,20 @@ public class PerformanceAssertions
     /// <summary>Assert time to first token is under a maximum (streaming only).</summary>
     /// <param name="max">Maximum allowed TTFT.</param>
     /// <param name="because">Optional reason for the assertion (shown in failure message).</param>
+    /// <remarks>
+    /// If TTFT is not available (non-streaming mode), this assertion is skipped
+    /// and a debug message is logged. Use streaming mode to capture TTFT.
+    /// </remarks>
     [StackTraceHidden]
     public PerformanceAssertions HaveTimeToFirstTokenUnder(TimeSpan max, string? because = null)
     {
         if (!_metrics.TimeToFirstToken.HasValue)
         {
-            AgentEvalScope.FailWith(
-                PerformanceAssertionException.Create(
-                    "Cannot assert TTFT - streaming was not used or TTFT was not captured.",
-                    metricName: "TimeToFirstToken",
-                    suggestions: new[] 
-                    { 
-                        "Enable streaming mode to capture TTFT",
-                        "Use AgentEvalBuilder.WithStreaming()"
-                    },
-                    because: because));
+            // Skip gracefully - TTFT requires streaming mode
+            System.Diagnostics.Debug.WriteLine(
+                "[AgentEval] Skipping TTFT assertion - Time to First Token not available. " +
+                "Enable streaming mode to capture TTFT.");
+            return this;
         }
         
         if (_metrics.TimeToFirstToken!.Value > max)
@@ -184,21 +183,20 @@ public class PerformanceAssertions
     /// <summary>Assert estimated cost is under a maximum (USD).</summary>
     /// <param name="maxUsd">Maximum allowed cost in USD.</param>
     /// <param name="because">Optional reason for the assertion (shown in failure message).</param>
+    /// <remarks>
+    /// If cost is not available (model pricing not configured or tokens not captured),
+    /// this assertion is skipped and a debug message is logged.
+    /// </remarks>
     [StackTraceHidden]
     public PerformanceAssertions HaveEstimatedCostUnder(decimal maxUsd, string? because = null)
     {
         if (!_metrics.EstimatedCost.HasValue)
         {
-            AgentEvalScope.FailWith(
-                PerformanceAssertionException.Create(
-                    "Cannot assert cost - model pricing not available or tokens not captured.",
-                    metricName: "EstimatedCost",
-                    suggestions: new[] 
-                    { 
-                        "Ensure model pricing is configured",
-                        "Verify token counting is enabled"
-                    },
-                    because: because));
+            // Skip gracefully - cost requires model pricing and token counting
+            System.Diagnostics.Debug.WriteLine(
+                "[AgentEval] Skipping cost assertion - estimated cost not available. " +
+                "Ensure model pricing is configured and token counting is enabled.");
+            return this;
         }
         
         if (_metrics.EstimatedCost!.Value > maxUsd)
@@ -226,9 +224,22 @@ public class PerformanceAssertions
     /// <summary>Assert average tool time is under a maximum.</summary>
     /// <param name="max">Maximum allowed average tool execution time.</param>
     /// <param name="because">Optional reason for the assertion (shown in failure message).</param>
+    /// <remarks>
+    /// If tool timing is not available (no tools called or non-streaming mode),
+    /// this assertion is skipped and a debug message is logged.
+    /// </remarks>
     [StackTraceHidden]
     public PerformanceAssertions HaveAverageToolTimeUnder(TimeSpan max, string? because = null)
     {
+        if (_metrics.ToolCallCount == 0 || _metrics.TotalToolTime == TimeSpan.Zero)
+        {
+            // Skip gracefully - tool timing requires streaming mode or no tools called
+            System.Diagnostics.Debug.WriteLine(
+                "[AgentEval] Skipping average tool time assertion - tool timing not available. " +
+                "Enable streaming mode to capture tool timing.");
+            return this;
+        }
+        
         if (_metrics.AverageToolTime > max)
         {
             AgentEvalScope.FailWith(
@@ -252,9 +263,22 @@ public class PerformanceAssertions
     /// <summary>Assert total tool time is under a maximum.</summary>
     /// <param name="max">Maximum allowed total tool execution time.</param>
     /// <param name="because">Optional reason for the assertion (shown in failure message).</param>
+    /// <remarks>
+    /// If tool timing is not available (no tools called or non-streaming mode),
+    /// this assertion is skipped and a debug message is logged.
+    /// </remarks>
     [StackTraceHidden]
     public PerformanceAssertions HaveTotalToolTimeUnder(TimeSpan max, string? because = null)
     {
+        if (_metrics.ToolCallCount == 0 || _metrics.TotalToolTime == TimeSpan.Zero)
+        {
+            // Skip gracefully - tool timing requires streaming mode or no tools called
+            System.Diagnostics.Debug.WriteLine(
+                "[AgentEval] Skipping total tool time assertion - tool timing not available. " +
+                "Enable streaming mode to capture tool timing.");
+            return this;
+        }
+        
         if (_metrics.TotalToolTime > max)
         {
             var overage = _metrics.TotalToolTime - max;

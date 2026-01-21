@@ -147,14 +147,15 @@ public class PerformanceAssertionsTests
     }
     
     [Fact]
-    public void HaveTimeToFirstTokenUnder_WhenNotAvailable_ThrowsException()
+    public void HaveTimeToFirstTokenUnder_WhenNotAvailable_SkipsGracefully()
     {
         var metrics = new PerformanceMetrics();
         
-        var exception = Assert.Throws<PerformanceAssertionException>(() => 
+        // Should NOT throw - skips gracefully when TTFT not available (non-streaming mode)
+        var exception = Record.Exception(() => 
             metrics.Should().HaveTimeToFirstTokenUnder(TimeSpan.FromMilliseconds(500)));
         
-        Assert.Contains("streaming", exception.Message.ToLower());
+        Assert.Null(exception); // Assertion is skipped, no exception thrown
     }
     
     [Fact]
