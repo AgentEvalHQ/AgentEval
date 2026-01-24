@@ -19,7 +19,7 @@ Install-Package AgentEval -Pre
 ### PackageReference
 
 ```xml
-<PackageReference Include="AgentEval" Version="0.2.0-beta" />
+<PackageReference Include="AgentEval" Version="0.2.1-beta" />
 ```
 
 **NuGet Gallery:** https://www.nuget.org/packages/AgentEval

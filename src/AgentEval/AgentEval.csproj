@@ -5,7 +5,7 @@
     
     <!-- NuGet Package Info -->
     <PackageId>AgentEval</PackageId>
-    <Version>0.2.0-beta</Version>
+    <Version>0.2.1-beta</Version>
     <Description>The .NET evaluation toolkit for AI agents—tool usage validation, RAG quality metrics, stochastic testing, and model comparison. Built for Microsoft Agent Framework (MAF) with fluent assertion APIs.</Description>
     <PackageTags>ai;agent;evaluation;testing;benchmarking;maf;llm;openai;azure;rag;agentic</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>

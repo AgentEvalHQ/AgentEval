@@ -15,7 +15,59 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [0.2.0-beta] - 2026-01-25
+## [0.2.1-beta] - 2026-01-24
+
+**Features + Documentation & Messaging Refresh** 🚀📝
+
+This release adds new features (enhanced token tracking, Sample 19) and updates AgentEval's positioning to better reflect its core value as an **evaluation toolkit** for AI agents.
+
+### Added (Features)
+- **Enhanced Token Usage Tracking** - Improved token usage extraction and cost estimation in `MAFTestHarness` and `PerformanceMetrics`
+  - More accurate cost calculation across streaming and async scenarios
+  - Better handling of model pricing for cost estimation
+- **Sample 19: Streaming vs Async Performance Comparison** - New sample demonstrating:
+  - Side-by-side streaming vs async performance measurement
+  - Time-to-first-token (TTFT) tracking for streaming scenarios
+  - Token usage comparison between execution modes
+- **Interactive Demo Menu** - Enhanced samples with interactive selection and demo inputs
+- **NuGetConsumer Sample Project Enhancements** - Additional demos and offline testing patterns
+
+### Added (Documentation)
+- **"Who Is AgentEval For?"** section to README.md and docs/index.md
+  - .NET Teams Building AI Agents
+  - Microsoft Agent Framework (MAF) Developers
+  - ML Engineers Evaluating LLM Quality
+- **".NET Advantage"** comparison table to README.md showing AgentEval vs Python alternatives
+- **CLI Tool & Samples** section to docs/index.md
+- License badge to docs/index.md
+
+### Changed
+- **New Positioning:** "The .NET Evaluation Toolkit for AI Agents" (previously "testing framework")
+  - Evaluation leads (50% of codebase), followed by testing (25%) and benchmarking (25%)
+  - Clearer differentiation vs Python alternatives (RAGAS, DeepEval)
+- Updated test count badge to **3000+** across 3 TFMs
+- Fixed version references from 1.0.0-alpha to 0.2.0-beta in all documentation
+- Updated NuGet tags: added `rag` and `agentic` keywords
+- Simplified `docs/roadmap.md` - removed internal planning details, shows only shipped features and general direction
+
+### Removed
+- `src/AgentEval/AgentEval-Design.md` - Internal design document with outdated information
+- `docs/why-agenteval.md` - Content merged into docs/index.md for unified landing page
+
+### Fixed
+- Removed inaccurate "Native xUnit/NUnit/MSTest support" claim (AgentEval works WITH test frameworks, doesn't provide native integration)
+- Removed fabricated testimonials from documentation
+- Fixed trace replay description accuracy
+- Documentation site toc.yml updated for removed files
+
+### Documentation
+- All 18+ documentation files updated with consistent messaging
+- NuGet README now shows correct positioning tagline
+- Strategy documents aligned with new positioning
+
+---
+
+## [0.2.0-beta] - 2026-01-24
 
 **AgentEval Public Beta Release** 🎉
 
@@ -310,7 +362,8 @@ This release marks the transition from alpha to beta. The framework is now featu
 - `AgentEval.Tracing` (OTel + run artifacts) - planned
 - `AgentEval.Studio` (workflow visualizer / time-travel UI) - future
 
-[Unreleased]: https://github.com/joslat/AgentEval/compare/v0.2.0-beta...HEAD
+[Unreleased]: https://github.com/joslat/AgentEval/compare/v0.2.1-beta...HEAD
+[0.2.1-beta]: https://github.com/joslat/AgentEval/compare/v0.2.0-beta...v0.2.1-beta
 [0.2.0-beta]: https://github.com/joslat/AgentEval/compare/v0.1.3-alpha...v0.2.0-beta
 [0.1.3-alpha]: https://github.com/joslat/AgentEval/compare/v0.1.2-alpha...v0.1.3-alpha
 [0.1.2-alpha]: https://github.com/joslat/AgentEval/compare/v0.1.1-alpha...v0.1.2-alpha
