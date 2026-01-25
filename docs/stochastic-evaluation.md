@@ -1,4 +1,4 @@
-# stochastic evaluation Guide
+# Stochastic Evaluation Guide
 
 > **LLMs are non-deterministic. Your tests should account for that.**
 
@@ -22,7 +22,7 @@ Traditional unit testing assumes determinism. LLM testing requires **statistical
 
 ---
 
-## The Solution: stochastic evaluation
+## The Solution: Stochastic Evaluation
 
 AgentEval's `StochasticRunner` handles LLM non-determinism properly:
 
@@ -227,7 +227,7 @@ foreach (var run in result.IndividualRuns)
 
 ## Advanced Patterns
 
-### stochastic evaluation Across Test Cases
+### Stochastic Evaluation Across Test Cases
 
 ```csharp
 var testCases = new[]
@@ -396,9 +396,9 @@ Console.WriteLine($"Success Rate: {stats.SuccessRate:P0}");
 
 ---
 
-## When to Use stochastic evaluation
+## When to Use Stochastic Evaluation
 
-### ✅ Use stochastic evaluation For:
+### ✅ Use Stochastic Evaluation For:
 
 | Scenario | Why |
 |----------|-----|
@@ -408,7 +408,7 @@ Console.WriteLine($"Success Rate: {stats.SuccessRate:P0}");
 | A/B testing agents | Compare with proper statistics |
 | SLA validation | "95% of requests succeed" needs measurement |
 
-### ❌ Don't Use stochastic evaluation For:
+### ❌ Don't Use Stochastic Evaluation For:
 
 | Scenario | Why |
 |----------|-----|
