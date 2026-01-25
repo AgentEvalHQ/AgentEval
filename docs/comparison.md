@@ -11,7 +11,7 @@ If you're a .NET team evaluating AI agents, you may have started with a Python o
 - **Native .NET** - No Python interop, no Node.js subprocess
 - **Fluent assertions** - Express complex agent behavior tests naturally
 - **Tool-aware testing** - First-class support for agentic tool calls
-- **Stochastic testing** - Built-in statistics for LLM non-determinism
+- **stochastic evaluation** - Built-in statistics for LLM non-determinism
 - **Trace record/replay** - Deterministic CI without API costs
 
 ---
@@ -80,7 +80,7 @@ result.Performance!.Should()
     .HaveTotalDurationUnder(TimeSpan.FromSeconds(5))
     .HaveEstimatedCostUnder(0.10m);
 
-// Stochastic testing - statistical confidence
+// stochastic evaluation - statistical confidence
 var stochasticResult = await stochasticRunner.RunStochasticTestAsync(
     agent, testCase, new StochasticOptions(Runs: 10, SuccessRateThreshold: 0.8));
 ```
@@ -122,7 +122,7 @@ var testCase = new TestCase
     ExpectedContains = new[] { "booking confirmed" }
 };
 
-var result = await harness.RunTestAsync(agent, testCase);
+var result = await harness.RunEvaluationAsync(agent, testCase);
 
 // Assertions
 result.ActualOutput.Should().Contain("booking confirmed");
@@ -153,7 +153,7 @@ var testCases = await DatasetLoader.LoadAsync("tests.csv", new LoaderOptions
 // Run batch evaluation
 foreach (var testCase in testCases)
 {
-    var result = await harness.RunTestAsync(agent, testCase);
+    var result = await harness.RunEvaluationAsync(agent, testCase);
     // Collect results...
 }
 ```
@@ -192,8 +192,8 @@ var evaluator = new ChatClientEvaluator(chatClient);
 var score = await evaluator.EvaluateAsync(response, criteria);
 
 // AgentEval - builds on this with agent-specific features
-var harness = new MAFTestHarness();
-var result = await harness.RunTestAsync(agent, testCase);
+var harness = new MAFEvaluationHarness();
+var result = await harness.RunEvaluationAsync(agent, testCase);
 ```
 
 ### What AgentEval Adds
@@ -203,7 +203,7 @@ var result = await harness.RunTestAsync(agent, testCase);
 | Basic evaluation | Yes | Yes |
 | Tool call tracking | No | Full timeline |
 | Tool ordering assertions | No | Yes |
-| Stochastic testing | Manual | Built-in |
+| stochastic evaluation | Manual | Built-in |
 | Model comparison | Manual | With recommendations |
 | Trace record/replay | No | Yes |
 | Behavioral policies | No | NeverCallTool, etc. |
@@ -215,7 +215,7 @@ var result = await harness.RunTestAsync(agent, testCase);
 var score = await evaluator.EvaluateAsync(response, "Is this helpful?");
 
 // You can add AgentEval for agent-specific testing:
-var result = await harness.RunTestAsync(agent, testCase);
+var result = await harness.RunEvaluationAsync(agent, testCase);
 
 // Get RAG scores (like MS.Extensions.AI.Eval)
 var faithfulness = await new FaithfulnessMetric(evaluator).EvaluateAsync(context);
@@ -253,7 +253,7 @@ result.ToolUsage!.Should()
 
 | Pattern | CLI Tools | AgentEval |
 |---------|-----------|-----------|
-| Single test | CLI command | `harness.RunTestAsync()` |
+| Single test | CLI command | `harness.RunEvaluationAsync()` |
 | Batch testing | YAML dataset | `DatasetLoader` + loop |
 | Parallel | Varies | `Parallel.ForEachAsync()` |
 | CI/CD output | Various formats | JUnit XML, Markdown, JSON |
@@ -283,8 +283,8 @@ var testCase = new TestCase
 };
 
 // Run test
-var harness = new MAFTestHarness();
-var result = await harness.RunTestAsync(agent, testCase);
+var harness = new MAFEvaluationHarness();
+var result = await harness.RunEvaluationAsync(agent, testCase);
 
 // Assert (familiar patterns, more expressive)
 Assert.True(result.Passed);
@@ -310,7 +310,7 @@ result.Performance!.Should()
 ### Step 4: Handle LLM Non-Determinism
 
 ```csharp
-// Stochastic testing - run multiple times, analyze statistics
+// stochastic evaluation - run multiple times, analyze statistics
 var stochasticResult = await stochasticRunner.RunStochasticTestAsync(
     agent, testCase, 
     new StochasticOptions

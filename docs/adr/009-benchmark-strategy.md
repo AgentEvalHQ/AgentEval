@@ -91,7 +91,7 @@ public interface IBenchmark
 {
     string Name { get; }
     string Version { get; }
-    Task<BenchmarkResult> RunAsync(ITestableAgent agent, BenchmarkOptions options);
+    Task<BenchmarkResult> RunAsync(IEvaluableAgent agent, BenchmarkOptions options);
 }
 
 public interface IBenchmarkDataset
@@ -187,4 +187,4 @@ src/AgentEval/
 - [GAIA Benchmark](https://huggingface.co/datasets/gaia-benchmark/GAIA)
 - [ToolBench](https://github.com/OpenBMB/ToolBench)
 - [HumanEval](https://github.com/openai/human-eval)
-- ADR-005: Model Comparison & Stochastic Testing
+- ADR-005: Model Comparison & stochastic evaluation

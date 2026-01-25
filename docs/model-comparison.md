@@ -24,7 +24,7 @@ You have options:
 ## Model Comparison in 60 Seconds
 
 ```csharp
-var comparer = new ModelComparer(harness, testOptions);
+var comparer = new ModelComparer(harness, EvaluationOptions);
 
 var comparison = await comparer.CompareModelsAsync(
     new[] { gpt4oFactory, gpt4oMiniFactory, claudeFactory },
@@ -71,7 +71,7 @@ public class GPT4oAgentFactory : IAgentFactory
     public string ModelId => "gpt-4o";
     public string ModelName => "GPT-4o";
     
-    public ITestableAgent CreateAgent()
+    public IEvaluableAgent CreateAgent()
     {
         var chatClient = new AzureOpenAIChatClient(
             new Uri(Environment.GetEnvironmentVariable("AZURE_OPENAI_ENDPOINT")!),
@@ -88,7 +88,7 @@ public class GPT4oMiniAgentFactory : IAgentFactory
     public string ModelId => "gpt-4o-mini";
     public string ModelName => "GPT-4o Mini";
     
-    public ITestableAgent CreateAgent()
+    public IEvaluableAgent CreateAgent()
     {
         var chatClient = new AzureOpenAIChatClient(
             new Uri(Environment.GetEnvironmentVariable("AZURE_OPENAI_ENDPOINT")!),
@@ -105,7 +105,7 @@ public class ClaudeAgentFactory : IAgentFactory
     public string ModelId => "claude-3.5-sonnet";
     public string ModelName => "Claude 3.5 Sonnet";
     
-    public ITestableAgent CreateAgent()
+    public IEvaluableAgent CreateAgent()
     {
         // Your Claude client setup
         return new MAFAgentAdapter(new AIAgent(claudeClient, tools));
@@ -153,7 +153,7 @@ var metrics = new IMetric[]
 ### Step 4: Run Comparison
 
 ```csharp
-var comparer = new ModelComparer(harness, testOptions);
+var comparer = new ModelComparer(harness, EvaluationOptions);
 
 var comparison = await comparer.CompareModelsAsync(
     factories: new[] { gpt4oFactory, gpt4oMiniFactory, claudeFactory },
@@ -652,7 +652,7 @@ var weights = new ComparisonWeights
 
 ## Next Steps
 
-- [Stochastic Testing](stochastic-testing.md) - The foundation for model comparison
+- [stochastic evaluation](stochastic-testing.md) - The foundation for model comparison
 - [Trace Record & Replay](tracing.md) - Reduce comparison costs
 - [Code Gallery](showcase/code-gallery.md) - More examples
 

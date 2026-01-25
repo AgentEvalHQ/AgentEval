@@ -7,7 +7,7 @@ This file provides instructions for AI agents working with the AgentEval codebas
 AgentEval is **the comprehensive .NET evaluation toolkit for AI agents**, built first for Microsoft Agent Framework (MAF). What RAGAS and DeepEval do for Python, AgentEval does for .NET:
 - Tool usage validation with fluent assertions
 - RAG quality metrics (faithfulness, relevance, groundedness)
-- Stochastic testing and statistical model comparison
+- stochastic evaluation and statistical model comparison
 - Behavioral policies (NeverCallTool, MustConfirmBefore)
 - Trace record/replay for deterministic CI testing
 - CLI tool for CI/CD integration
@@ -29,8 +29,8 @@ dotnet run --project samples/AgentEval.Samples
 
 ### Core Interfaces
 - `IMetric` → `IRAGMetric`, `IAgenticMetric`
-- `ITestableAgent` → `IStreamableAgent`
-- `ITestHarness` → `MAFTestHarness`
+- `IEvaluableAgent` → `IStreamableAgent`
+- `IEvaluationHarness` → `MAFEvaluationHarness`
 
 ### Metric Naming
 - `llm_*` = LLM-evaluated (API cost)

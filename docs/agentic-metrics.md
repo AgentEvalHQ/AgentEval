@@ -450,9 +450,9 @@ if (Random.Shared.NextDouble() < sampleRate)
 AgentEval automatically captures tool calls when using MAF integration:
 
 ```csharp
-// MAFTestHarness captures all tool calls automatically
-var harness = new MAFTestHarness(agent);
-var result = await harness.RunTestAsync(testCase);
+// MAFEvaluationHarness captures all tool calls automatically
+var harness = new MAFEvaluationHarness(agent);
+var result = await harness.RunEvaluationAsync(testCase);
 
 // Tool calls available in result
 foreach (var tool in result.ToolUsage!.ToolCalls)

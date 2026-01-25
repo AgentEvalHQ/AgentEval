@@ -20,7 +20,7 @@
 
 ## The .NET Evaluation Toolkit for AI Agents
 
-AgentEval is **the comprehensive .NET toolkit for AI agent evaluation**—tool usage validation, RAG quality metrics, stochastic testing, and model comparison—built for **Microsoft Agent Framework (MAF)**. What RAGAS and DeepEval do for Python, AgentEval does for .NET.
+AgentEval is **the comprehensive .NET toolkit for AI agent evaluation**—tool usage validation, RAG quality metrics, stochastic evaluation, and model comparison—built for **Microsoft Agent Framework (MAF)**. What RAGAS and DeepEval do for Python, AgentEval does for .NET.
 
 > **For years, agentic developers have imagined writing tests like this. Today, they can.**
 
@@ -57,7 +57,7 @@ result.Performance!.Should()
 
 **Know before production if your agent is too slow or too expensive.**
 
-### Stochastic Testing: Because LLMs Aren't Deterministic
+### stochastic evaluation: Because LLMs Aren't Deterministic
 
 ```csharp
 var result = await stochasticRunner.RunStochasticTestAsync(
@@ -124,10 +124,10 @@ dotnet add package AgentEval --prerelease
 [Fact]
 public async Task Agent_ShouldHandleBookingRequest()
 {
-    var harness = new MAFTestHarness();
+    var harness = new MAFEvaluationHarness();
     var testCase = new TestCase { Input = "Book a flight to Paris" };
 
-    var result = await harness.RunTestAsync(agent, testCase);
+    var result = await harness.RunEvaluationAsync(agent, testCase);
 
     result.ToolUsage!.Should()
         .HaveCalledTool("SearchFlights")
@@ -156,7 +156,7 @@ dotnet test
 | Challenge | How AgentEval Solves It |
 |-----------|------------------------|
 | "What tools did my agent call?" | **Full tool timeline** with arguments, results, timing |
-| "Tests fail randomly!" | **Stochastic testing** - assert on pass *rate*, not single run |
+| "Tests fail randomly!" | **stochastic evaluation** - assert on pass *rate*, not single run |
 | "Which model should I use?" | **Model comparison** with cost/quality recommendations |
 | "Is my agent compliant?" | **Behavioral policies** - guardrails as code |
 | "Is my RAG hallucinating?" | **Faithfulness metrics** - grounding verification |
@@ -176,7 +176,7 @@ dotnet test
     
     TTFT, latency, tokens, cost estimation with 8+ model pricing
 
--   **🔬 Stochastic Testing**
+-   **🔬 stochastic evaluation**
     
     Run N times, get statistics, assert on pass rates
 
@@ -236,7 +236,7 @@ agenteval eval --dataset tests.yaml --format junit -o results.xml
 
 | Getting Started | Features | Advanced |
 |-----------------|----------|----------|
-| [Installation](installation.md) | [Assertions](assertions.md) | [Stochastic Testing](stochastic-testing.md) |
+| [Installation](installation.md) | [Assertions](assertions.md) | [stochastic evaluation](stochastic-testing.md) |
 | [Quick Start](getting-started.md) | [Metrics Reference](metrics-reference.md) | [Model Comparison](model-comparison.md) |
 | [Walkthrough](walkthrough.md) | [Benchmarks](benchmarks.md) | [Trace Record/Replay](tracing.md) |
 | [CLI Tool](cli.md) | [Workflows](workflows.md) | [Architecture](architecture.md) |

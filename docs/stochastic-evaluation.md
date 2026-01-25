@@ -1,4 +1,4 @@
-# Stochastic Testing Guide
+# stochastic evaluation Guide
 
 > **LLMs are non-deterministic. Your tests should account for that.**
 
@@ -22,12 +22,12 @@ Traditional unit testing assumes determinism. LLM testing requires **statistical
 
 ---
 
-## The Solution: Stochastic Testing
+## The Solution: stochastic evaluation
 
 AgentEval's `StochasticRunner` handles LLM non-determinism properly:
 
 ```csharp
-var stochasticRunner = new StochasticRunner(harness, testOptions);
+var stochasticRunner = new StochasticRunner(harness, EvaluationOptions);
 
 var result = await stochasticRunner.RunStochasticTestAsync(
     agent, 
@@ -58,8 +58,8 @@ using AgentEval.Core;
 public async Task Agent_ShouldHaveHighSuccessRate()
 {
     // Arrange
-    var harness = new MAFTestHarness(chatClient, tools, testOptions);
-    var stochasticRunner = new StochasticRunner(harness, testOptions);
+    var harness = new MAFEvaluationHarness(chatClient, tools, EvaluationOptions);
+    var stochasticRunner = new StochasticRunner(harness, EvaluationOptions);
     
     var testCase = new TestCase
     {
@@ -227,7 +227,7 @@ foreach (var run in result.IndividualRuns)
 
 ## Advanced Patterns
 
-### Stochastic Testing Across Test Cases
+### stochastic evaluation Across Test Cases
 
 ```csharp
 var testCases = new[]
@@ -396,9 +396,9 @@ Console.WriteLine($"Success Rate: {stats.SuccessRate:P0}");
 
 ---
 
-## When to Use Stochastic Testing
+## When to Use stochastic evaluation
 
-### ✅ Use Stochastic Testing For:
+### ✅ Use stochastic evaluation For:
 
 | Scenario | Why |
 |----------|-----|
@@ -408,7 +408,7 @@ Console.WriteLine($"Success Rate: {stats.SuccessRate:P0}");
 | A/B testing agents | Compare with proper statistics |
 | SLA validation | "95% of requests succeed" needs measurement |
 
-### ❌ Don't Use Stochastic Testing For:
+### ❌ Don't Use stochastic evaluation For:
 
 | Scenario | Why |
 |----------|-----|
@@ -514,7 +514,7 @@ toolCallRates.Should().BeGreaterThan(0.9,
 
 ## Summary
 
-| Concept | Traditional Testing | Stochastic Testing |
+| Concept | Traditional Testing | stochastic evaluation |
 |---------|--------------------|--------------------|
 | Question | "Did it pass?" | "How often does it pass?" |
 | Result | Boolean | Statistics |
@@ -522,15 +522,15 @@ toolCallRates.Should().BeGreaterThan(0.9,
 | Confidence | Low (1 sample) | High (N samples) |
 | Cost | 1 API call | N API calls |
 
-**Stochastic testing transforms LLM testing from "hope it works" to "know how often it works."**
+**stochastic evaluation transforms LLM testing from "hope it works" to "know how often it works."**
 
 ---
 
 ## Next Steps
 
-- [Model Comparison](model-comparison.md) - Compare models with stochastic testing
+- [Model Comparison](model-comparison.md) - Compare models with stochastic evaluation
 - [Trace Record & Replay](tracing.md) - Reduce API costs in stochastic tests
-- [Code Gallery](showcase/code-gallery.md) - See stochastic testing examples
+- [Code Gallery](showcase/code-gallery.md) - See stochastic evaluation examples
 
 ---
 

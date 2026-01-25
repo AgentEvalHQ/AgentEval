@@ -29,9 +29,9 @@
 | ToolUsageExtractor | `IToolUsageExtractor` | Extract tool usage | ❌ No - single responsibility |
 | StochasticRunner | `IStochasticRunner` | Run stochastic tests | ❌ No - well-defined scope |
 | ModelComparer | `IModelComparer` | Compare models | ❌ No - focused responsibility |
-| TestHarness | `ITestHarness`, `IStreamingTestHarness` | Execute tests | ❌ No - interface segregation applied |
+| TestHarness | `IEvaluationHarness`, `IStreamingEvaluationHarness` | Execute tests | ❌ No - interface segregation applied |
 | Evaluator | `IEvaluator` | Evaluate responses | ❌ No - clean abstraction |
-| Agent Adapters | `ITestableAgent`, `IWorkflowTestableAgent` | Wrap agents | ❌ No - interface segregation applied |
+| Agent Adapters | `IEvaluableAgent`, `IWorkflowEvaluableAgent` | Wrap agents | ❌ No - interface segregation applied |
 
 **Analysis**: All core services have clear, focused responsibilities. No service exhibits "fat interface" characteristics that would justify splitting.
 
@@ -159,7 +159,7 @@ All exporters implement `IResultExporter`:
 ### IStochasticRunner - Split Analysis
 
 **Current Methods**:
-- `RunStochasticTestAsync(ITestableAgent agent, ...)`
+- `RunStochasticTestAsync(IEvaluableAgent agent, ...)`
 - `RunStochasticTestAsync(IAgentFactory factory, ...)`
 
 **Decision**: ❌ **Do NOT split**
@@ -191,7 +191,7 @@ All exporters implement `IResultExporter`:
 #### 1. Separate "StatisticsAggregator" Service?
 **Idea**: Extract aggregation logic from StochasticRunner
 **Decision**: ❌ No
-**Reason**: Aggregation is core to stochastic testing - splitting would make StochasticRunner incomplete
+**Reason**: Aggregation is core to stochastic evaluation - splitting would make StochasticRunner incomplete
 
 #### 2. Separate "ResultFormatter" Service?
 **Idea**: Extract formatting from runners/comparers
@@ -232,7 +232,7 @@ public class StochasticRunner : IStochasticRunner
 {
     private readonly IStatisticsCalculator _statisticsCalculator;
     
-    public StochasticRunner(ITestHarness harness, IStatisticsCalculator? statisticsCalculator = null)
+    public StochasticRunner(IEvaluationHarness harness, IStatisticsCalculator? statisticsCalculator = null)
     {
         _statisticsCalculator = statisticsCalculator ?? DefaultStatisticsCalculator.Instance;
     }

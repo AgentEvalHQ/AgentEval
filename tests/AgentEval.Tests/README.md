@@ -35,7 +35,7 @@ This project contains the automated tests for AgentEval. It lives at `tests/Agen
 | `FailureReportTests.cs` | Structured failure reports and summaries |
 | `FaithfulnessMetricTests.cs` | RAG faithfulness scoring with fakes |
 | `FakeChatClientTests.cs` | Fake chat client behavior |
-| `MAFTestHarnessTests.cs` | MAF integration and test harness |
+| `MAFTestHarnessTests.cs` | MAF integration and evaluation harness |
 | `MetricRegistryTests.cs` | Metric registration and lookup behaviors |
 | `ModelPricingTests.cs` | Model price tables, case-insensitive lookup, and custom pricing |
 | `PerformanceMetricsTests.cs` | Performance metrics calculations and assertions (TTFT, tokens, cost) |

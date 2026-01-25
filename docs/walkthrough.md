@@ -6,7 +6,7 @@ This walkthrough guides you through testing an AI agent with AgentEval, from set
 
 ## What You'll Learn
 
-1. Setting up a test harness
+1. Setting up a evaluation harness
 2. Wrapping an agent for testing
 3. Running a test and capturing results
 4. Asserting on tool usage
@@ -23,15 +23,15 @@ This walkthrough guides you through testing an AI agent with AgentEval, from set
 
 ---
 
-## Step 1: Create a Test Harness
+## Step 1: Create a evaluation harness
 
-The test harness runs your agent and captures all the data needed for assertions.
+The evaluation harness runs your agent and captures all the data needed for assertions.
 
 ```csharp
 using AgentEval.MAF;
 
-// Create a test harness with optional verbose logging
-var harness = new MAFTestHarness(verbose: true);
+// Create a evaluation harness with optional verbose logging
+var harness = new MAFEvaluationHarness(verbose: true);
 ```
 
 ---
@@ -121,7 +121,7 @@ Execute the test and capture results:
 using AgentEval.Core;
 
 // Run the test - tool tracking and performance metrics are captured automatically
-var result = await harness.RunTestAsync(adapter, testCase);
+var result = await harness.RunEvaluationAsync(adapter, testCase);
 
 // Check if the test passed
 Console.WriteLine($"Passed: {result.Passed}");
@@ -267,9 +267,9 @@ var myAgent = new ChatClientAgent(
     });
 
 // ═══════════════════════════════════════════════════════════════
-// 2. Setup test harness and adapter
+// 2. Setup evaluation harness and adapter
 // ═══════════════════════════════════════════════════════════════
-var harness = new MAFTestHarness(verbose: true);
+var harness = new MAFEvaluationHarness(verbose: true);
 var adapter = new MAFAgentAdapter(myAgent);
 
 // ═══════════════════════════════════════════════════════════════
@@ -286,7 +286,7 @@ var testCase = new TestCase
 // ═══════════════════════════════════════════════════════════════
 // 4. Run test
 // ═══════════════════════════════════════════════════════════════
-var result = await harness.RunTestAsync(adapter, testCase);
+var result = await harness.RunEvaluationAsync(adapter, testCase);
 
 // ═══════════════════════════════════════════════════════════════
 // 5. Assert
@@ -382,7 +382,7 @@ public class TravelAgentTests
     public async Task Agent_ShouldPlanTrip_WithCorrectTools()
     {
         // Arrange
-        var harness = new MAFTestHarness();
+        var harness = new MAFEvaluationHarness();
         var adapter = new MAFAgentAdapter(_agent);
         var testCase = new TestCase
         {
@@ -392,7 +392,7 @@ public class TravelAgentTests
         };
 
         // Act
-        var result = await harness.RunTestAsync(adapter, testCase);
+        var result = await harness.RunEvaluationAsync(adapter, testCase);
 
         // Assert
         result.ToolUsage!

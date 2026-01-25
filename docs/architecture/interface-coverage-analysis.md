@@ -21,11 +21,11 @@
 |---------|-----------|----------------|------------|--------|
 | **Statistics Calculation** | `IStatisticsCalculator` | `DefaultStatisticsCalculator` | ✅ | Complete |
 | **Tool Extraction** | `IToolUsageExtractor` | `DefaultToolUsageExtractor` | ✅ | Complete |
-| **Stochastic Testing** | `IStochasticRunner` | `StochasticRunner` | ✅ | Complete |
+| **stochastic evaluation** | `IStochasticRunner` | `StochasticRunner` | ✅ | Complete |
 | **Model Comparison** | `IModelComparer` | `ModelComparer` | ✅ | Complete |
-| **Test Harness** | `ITestHarness`, `IStreamingTestHarness` | `MAFTestHarness` | ✅ | Complete |
+| **evaluation harness** | `IEvaluationHarness`, `IStreamingEvaluationHarness` | `MAFEvaluationHarness` | ✅ | Complete |
 | **Agent Evaluation** | `IEvaluator` | `ChatClientEvaluator` | ✅ | Complete |
-| **Testable Agents** | `ITestableAgent`, `IWorkflowTestableAgent` | Multiple adapters | ✅ | Complete |
+| **Testable Agents** | `IEvaluableAgent`, `IWorkflowEvaluableAgent` | Multiple adapters | ✅ | Complete |
 
 ### ✅ Data Loading (Fully Covered)
 
@@ -79,7 +79,7 @@ public class StochasticRunner : IStochasticRunner
     
     [ActivatorUtilitiesConstructor]
     public StochasticRunner(
-        ITestHarness harness, 
+        IEvaluationHarness harness, 
         IStatisticsCalculator? statisticsCalculator = null)
     {
         _statisticsCalculator = statisticsCalculator ?? DefaultStatisticsCalculator.Instance;
@@ -144,7 +144,7 @@ All implementations are **fully substitutable**:
 ### ✅ Interface Segregation Principle
 **No fat interfaces** - each is minimal and focused:
 - Clients only depend on methods they actually use
-- `ITestHarness` vs `IStreamingTestHarness` - specialized interfaces
+- `IEvaluationHarness` vs `IStreamingEvaluationHarness` - specialized interfaces
 - No forced dependencies on unused functionality
 
 ### ✅ Dependency Inversion Principle

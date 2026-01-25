@@ -212,9 +212,9 @@ This release marks the transition from alpha to beta. The framework is now featu
 - **Workflow Testing Support (Phase 6B)** - Per-executor visibility for multi-agent workflows
   - `WorkflowExecutionResult` - Captures per-executor output, timing, and tool calls
   - `ExecutorStep` and `WorkflowError` models for detailed workflow analysis
-  - `IWorkflowTestableAgent` - Extended interface for workflow-aware agents
+  - `IWorkflowEvaluableAgent` - Extended interface for workflow-aware agents
   - `MAFWorkflowAdapter` - Adapter for MAF Workflows with streaming event capture
-  - `WorkflowTestHarness` - Test harness for workflow testing with assertions
+  - `WorkflowEvaluationHarness` - evaluation harness for workflow testing with assertions
   - `WorkflowAssertions` - Fluent assertion API for workflow execution results
   - Supports executor order validation, step timing, tool call tracking
   - 71 new tests for workflow components

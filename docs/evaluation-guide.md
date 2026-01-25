@@ -131,7 +131,7 @@ if (IsProductionSample())
 
 ---
 
-### 4. Stochastic Testing
+### 4. stochastic evaluation
 
 **Goal:** Account for LLM non-determinism.
 
@@ -326,7 +326,7 @@ var compositeScore = scores.Average(s => s.Score);
 
 - [RAG Metrics](rag-metrics.md) - Complete RAG evaluation guide
 - [Metrics Reference](metrics-reference.md) - Complete metric catalog
-- [Stochastic Testing](stochastic-testing.md) - Handle LLM variability
+- [stochastic evaluation](stochastic-testing.md) - Handle LLM variability
 - [Model Comparison](model-comparison.md) - Compare models
 
 ---

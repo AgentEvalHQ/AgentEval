@@ -26,7 +26,7 @@
 
 ---
 
-AgentEval is **the comprehensive .NET toolkit for AI agent evaluation**—tool usage validation, RAG quality metrics, stochastic testing, and model comparison—built first for **Microsoft Agent Framework (MAF)**. What RAGAS and DeepEval do for Python, AgentEval does for .NET, with the fluent assertion APIs .NET developers expect.
+AgentEval is **the comprehensive .NET toolkit for AI agent evaluation**—tool usage validation, RAG quality metrics, stochastic evaluation, and model comparison—built first for **Microsoft Agent Framework (MAF)**. What RAGAS and DeepEval do for Python, AgentEval does for .NET, with the fluent assertion APIs .NET developers expect.
 
 > **For years, agentic developers have imagined writing tests like this. Today, they can.**
 
@@ -87,7 +87,7 @@ result.ToolUsage!.Should()
 
 ---
 
-### Stochastic Testing: Because LLMs Are Non-Deterministic
+### stochastic evaluation: Because LLMs Are Non-Deterministic
 
 LLMs don't return the same output every time. Run tests multiple times and analyze statistics:
 
@@ -114,7 +114,7 @@ Assert.True(result.PassedThreshold,
     $"Success rate {result.SuccessRate:P0} below 85% threshold");
 ```
 
-**Why this matters:** A single test run might pass 70% of the time due to LLM randomness. Stochastic testing tells you the *actual* reliability.
+**Why this matters:** A single test run might pass 70% of the time due to LLM randomness. stochastic evaluation tells you the *actual* reliability.
 
 ---
 
@@ -272,7 +272,7 @@ public class MyAgentTests : AgentEvalTestBase
 | Challenge | How AgentEval Solves It |
 |-----------|------------------------|
 | "What tools did my agent call?" | **Full tool timeline** with arguments, results, timing |
-| "Tests fail randomly!" | **Stochastic testing** - assert on pass *rate*, not pass/fail |
+| "Tests fail randomly!" | **stochastic evaluation** - assert on pass *rate*, not pass/fail |
 | "Which model should I use?" | **Model comparison** with cost/quality recommendations |
 | "Is my agent compliant?" | **Behavioral policies** - guardrails as code |
 | "Is my RAG hallucinating?" | **Faithfulness metrics** - grounding verification |
@@ -322,7 +322,7 @@ public class MyAgentTests : AgentEvalTestBase
 - Custom metrics - extensible for your domain
 
 ### Reliability and Confidence
-- Stochastic testing - run N times, analyze statistics (mean, std dev, p90)
+- stochastic evaluation - run N times, analyze statistics (mean, std dev, p90)
 - Model comparison - compare across models with recommendations
 - Calibrated judging - multi-model consensus evaluation
 - Trace recording - capture executions for debugging and reproduction
@@ -366,7 +366,7 @@ var agent = new ChatClientAgent(chatClient, new ChatClientAgentOptions
 });
 
 // 2. Wrap and test
-var harness = new MAFTestHarness();
+var harness = new MAFEvaluationHarness();
 var adapter = new MAFAgentAdapter(agent);
 
 var testCase = new TestCase
@@ -376,7 +376,7 @@ var testCase = new TestCase
     ExpectedTools = ["SearchFlights", "BookFlight"]
 };
 
-var result = await harness.RunTestAsync(adapter, testCase);
+var result = await harness.RunEvaluationAsync(adapter, testCase);
 
 // 3. Assert on everything
 result.ToolUsage!.Should()
@@ -432,7 +432,7 @@ agenteval list metrics
 |-------|-------------|
 | [Getting Started](docs/getting-started.md) | Your first agent test in 5 minutes |
 | [Fluent Assertions](docs/assertions.md) | Complete assertion guide |
-| [Stochastic Testing](docs/stochastic-testing.md) | Handle LLM non-determinism |
+| [stochastic evaluation](docs/stochastic-testing.md) | Handle LLM non-determinism |
 | [Model Comparison](docs/model-comparison.md) | Compare models with confidence |
 | [Benchmarks](docs/benchmarks.md) | Benchmark patterns and best practices |
 | [Tracing](docs/tracing.md) | Record and Replay patterns |
@@ -464,7 +464,7 @@ dotnet run --project samples/AgentEval.Samples
 | **11: Because Assertions** | Self-documenting tests with intent clarity | 5 min |
 | **12: Policy & Safety Testing** | Enterprise guardrails (NeverCallTool, MustConfirmBefore) | 8 min |
 | **13: Trace Record & Replay** | Capture executions for deterministic testing | 8 min |
-| **14: Stochastic Testing** | Run tests N times for statistical confidence | 5 min |
+| **14: stochastic evaluation** | Run tests N times for statistical confidence | 5 min |
 | **15: Model Comparison** | Compare multiple models on the same task | 8 min |
 | **16: Combined Stochastic + Comparison** | Stochastic tests across multiple models | 10 min |
 | **17: Quality & Safety Metrics** | Groundedness, coherence, fluency evaluation | 5 min |

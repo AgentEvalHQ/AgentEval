@@ -243,7 +243,7 @@ public async Task MyAgent_Test()
     };
     
     var output = new StringWriter();
-    var writer = new TestOutputWriter(settings, output);
+    var writer = new EvaluationOutputWriter(settings, output);
     
     // Run your test...
     var result = new TestResult
@@ -290,7 +290,7 @@ var trace = new TimeTravelTrace
 {
     TraceId = Guid.NewGuid().ToString(),
     ExecutionType = ExecutionType.SingleAgent,
-    Test = new TestMetadata
+    Test = new EvaluationMetadata
     {
         TestName = "DetailedTest",
         StartTime = DateTimeOffset.UtcNow.AddSeconds(-5),

@@ -16,8 +16,8 @@
   items:
   - name: Fluent Assertions
     href: assertions.md
-  - name: Stochastic Testing
-    href: stochastic-testing.md
+  - name: Stochastic Evaluation
+    href: stochastic-evaluation.md
   - name: Model Comparison
     href: model-comparison.md
   - name: Conversations

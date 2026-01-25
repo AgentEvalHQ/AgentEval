@@ -55,7 +55,7 @@ We evaluated existing patterns and standards:
 
 ### 2. Trace Recording via Wrapping Pattern
 
-**TraceRecorder wraps `ITestableAgent`** and intercepts all calls, recording them to an `AgentTrace` object.
+**TraceRecorder wraps `IEvaluableAgent`** and intercepts all calls, recording them to an `AgentTrace` object.
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
@@ -78,14 +78,14 @@ We evaluated existing patterns and standards:
 ```
 
 **Why wrapping, not middleware:**
-- Works with any `ITestableAgent` implementation
+- Works with any `IEvaluableAgent` implementation
 - No changes required to test code
-- Transparent to the test harness
+- Transparent to the evaluation harness
 - Consistent with existing adapter patterns (ChatClientAgentAdapter)
 
 ### 3. Trace Replay via Mock Agent
 
-**TraceReplayingAgent implements `ITestableAgent`** and returns recorded responses.
+**TraceReplayingAgent implements `IEvaluableAgent`** and returns recorded responses.
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
@@ -128,7 +128,7 @@ We evaluated existing patterns and standards:
 │  DURING EXECUTION                    AFTER EXECUTION                    │
 │  ─────────────────                   ─────────────────                  │
 │  TraceRecorder                       IResultExporter                    │
-│  ├─ Wraps ITestableAgent             ├─ JsonExporter                    │
+│  ├─ Wraps IEvaluableAgent             ├─ JsonExporter                    │
 │  ├─ Records requests/responses       ├─ JUnitXmlExporter                │
 │  └─ Outputs: .trace.json             ├─ MarkdownExporter                │
 │                                      └─ TrxExporter                     │
@@ -229,7 +229,7 @@ agenteval trace show ./traces/weather_test.trace.json
 - Tests: 17 tests in [TraceRecordingAndReplayTests.cs](https://github.com/joslat/AgentEval/blob/main/tests/AgentEval.Tests/Tracing/TraceRecordingAndReplayTests.cs)
 
 ### Phase 2: Integration (Pending)
-- Test harness integration (`TestOptions.TraceRecorder`)
+- evaluation harness integration (`EvaluationOptions.TraceRecorder`)
 - CLI commands (`agenteval test --record/--replay`)
 
 ### Phase 3: Advanced Features (Pending)

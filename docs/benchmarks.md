@@ -277,10 +277,10 @@ Console.WriteLine($"  Total Tokens: {costResults.TotalTokens}");
 ```csharp
 public class CustomerSupportBenchmark
 {
-    private readonly ITestableAgent _agent;
+    private readonly IEvaluableAgent _agent;
     private readonly IEvaluator _evaluator;
     
-    public CustomerSupportBenchmark(ITestableAgent agent, IEvaluator evaluator)
+    public CustomerSupportBenchmark(IEvaluableAgent agent, IEvaluator evaluator)
     {
         _agent = agent;
         _evaluator = evaluator;
@@ -522,6 +522,6 @@ If you need HumanEval support, consider:
 ## See Also
 
 - [ADR-009: Benchmark Strategy](adr/009-benchmark-strategy.md) - Architecture decision
-- [Stochastic Testing](stochastic-testing.md) - Statistical testing for benchmarks
+- [stochastic evaluation](stochastic-testing.md) - Statistical testing for benchmarks
 - [Model Comparison](model-comparison.md) - Compare models on benchmarks
 - [Extensibility Guide](extensibility.md) - Creating custom metrics

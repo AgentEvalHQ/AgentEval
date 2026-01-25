@@ -1,4 +1,4 @@
-﻿# Roadmap
+# Roadmap
 
 AgentEval is actively developed. This page outlines completed features and what's coming next.
 
@@ -11,9 +11,9 @@ AgentEval is in **beta** with all core features complete and ready for productio
 ## What's Shipped
 
 ### Core Evaluation & Testing
-- **Test harness** for AI agents (`MAFTestHarness`, `ITestHarness`)
+- **evaluation harness** for AI agents (`MAFEvaluationHarness`, `IEvaluationHarness`)
 - **Fluent assertions** for tool usage, performance, and responses
-- **Stochastic testing** - run N times, assert on pass rates
+- **stochastic evaluation** - run N times, assert on pass rates
 - **Model comparison** with statistical significance
 - **Multi-turn conversation testing** (`ConversationRunner`)
 - **Workflow testing** for multi-agent orchestration
@@ -75,7 +75,7 @@ We prioritize based on community needs and contributions.
 
 | Version | Date | Highlights |
 |---------|------|------------|
-| 0.2.0-beta | Jan 2026 | Evaluation toolkit, stochastic testing, model comparison, trace replay |
+| 0.2.0-beta | Jan 2026 | Evaluation toolkit, stochastic evaluation, model comparison, trace replay |
 | 0.1.x-alpha | Jan 2026 | Initial alpha releases |
 
 See [CHANGELOG.md](https://github.com/joslat/AgentEval/blob/main/CHANGELOG.md) for detailed release notes.

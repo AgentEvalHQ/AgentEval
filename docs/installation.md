@@ -77,8 +77,8 @@ using AgentEval.MAF;
 using AgentEval.Models;
 using Microsoft.Extensions.AI;
 
-// 1. Create a test harness
-var harness = new MAFTestHarness(verbose: true);
+// 1. Create a evaluation harness
+var harness = new MAFEvaluationHarness(verbose: true);
 
 // 2. Create a mock agent for testing
 // (In real usage, wrap your actual agent with MAFAgentAdapter)
@@ -95,7 +95,7 @@ var testCase = new TestCase
 };
 
 // 4. Run the test
-var result = await harness.RunTestAsync(adapter, testCase);
+var result = await harness.RunEvaluationAsync(adapter, testCase);
 
 // 5. Check results
 Console.WriteLine($"✅ AgentEval installed successfully!");

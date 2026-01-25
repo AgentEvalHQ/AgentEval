@@ -496,7 +496,7 @@ Traces can grow large. Keep failure traces longer than success artifacts:
     retention-days: 30  # Keep failure data for analysis
 ```
 
-### 5. Use Stochastic Testing in Nightly Builds
+### 5. Use stochastic evaluation in Nightly Builds
 
 LLMs are non-deterministic. Run stochastic tests on a schedule:
 

@@ -204,7 +204,7 @@ Automatically learn judge weights from historical accuracy.
 ## Related ADRs
 
 - [ADR-001: Metric Naming Prefixes](001-metric-naming-prefixes.md) - `llm_` prefix for judge-based metrics
-- [ADR-005: Model Comparison & Stochastic Testing](005-model-comparison-stochastic.md) - Related multi-run testing
+- [ADR-005: Model Comparison & stochastic evaluation](005-model-comparison-stochastic.md) - Related multi-run testing
 - [ADR-006: Service-Based Architecture & DI](006-service-based-architecture-di.md) - DI patterns
 
 ---

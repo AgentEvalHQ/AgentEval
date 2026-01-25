@@ -1,4 +1,4 @@
-# ADR-005: Model Comparison and Stochastic Testing Architecture
+# ADR-005: Model Comparison and stochastic evaluation Architecture
 
 > **Status:** Accepted  
 > **Date:** January 8, 2026  
@@ -43,14 +43,14 @@ public interface IAgentFactory
 {
     string ModelId { get; }
     string ModelName { get; }
-    ITestableAgent CreateAgent();
+    IEvaluableAgent CreateAgent();
     ModelConfiguration? Configuration { get; }
 }
 ```
 
 ### Secondary Decision: Additive Interface for Model Identification
 
-To avoid breaking existing `ITestableAgent` implementations, we introduce a separate optional interface:
+To avoid breaking existing `IEvaluableAgent` implementations, we introduce a separate optional interface:
 
 ```csharp
 public interface IModelIdentifiable
@@ -64,7 +64,7 @@ Adapters that know their model can implement this interface. Existing implementa
 
 ### Tertiary Decision: Unified Stochastic/Comparison Architecture
 
-Stochastic testing and model comparison share the same result aggregation infrastructure:
+stochastic evaluation and model comparison share the same result aggregation infrastructure:
 
 ```
 Test Cases → Stochastic Runner → Statistical Aggregation → Results
@@ -126,16 +126,16 @@ Test Cases → Stochastic Runner → Statistical Aggregation → Results
 
 **Decision:** Rejected — Not suitable for programmatic comparison.
 
-### Alternative 4: Extend ITestableAgent with ModelId
+### Alternative 4: Extend IEvaluableAgent with ModelId
 
-**Approach:** Add `string? ModelId` property directly to `ITestableAgent`.
+**Approach:** Add `string? ModelId` property directly to `IEvaluableAgent`.
 
 **Pros:**
 - Single interface
 - All agents must report their model
 
 **Cons:**
-- Breaking change for all existing `ITestableAgent` implementations
+- Breaking change for all existing `IEvaluableAgent` implementations
 - Many agents don't know their model (generic adapters)
 - Violates Interface Segregation Principle
 
@@ -148,7 +148,7 @@ Test Cases → Stochastic Runner → Statistical Aggregation → Results
 ### Positive
 
 1. **Framework Agnostic** — Factory pattern works with any agent framework, not just MAF
-2. **Non-Breaking** — Existing `ITestableAgent` implementations continue to work
+2. **Non-Breaking** — Existing `IEvaluableAgent` implementations continue to work
 3. **Testable** — Easy to create mock factories for unit testing
 4. **Clear Separation** — Agent logic is separated from model configuration
 5. **Extensible** — New providers (Anthropic, Google) just need new factory implementations
@@ -192,7 +192,7 @@ public interface IAgentFactory
 {
     string ModelId { get; }
     string ModelName { get; }
-    ITestableAgent CreateAgent();
+    IEvaluableAgent CreateAgent();
 }
 
 // Optional: Agents can report their model
@@ -206,7 +206,7 @@ public interface IModelIdentifiable
 public interface IStochasticRunner
 {
     Task<StochasticResult> RunAsync(
-        ITestableAgent agent,
+        IEvaluableAgent agent,
         TestCase testCase,
         StochasticOptions? options = null);
 }
@@ -237,8 +237,8 @@ This decision will be validated by:
 ## Related Documents
 
 - [Model Comparison Guide](../model-comparison.md)
-- [Stochastic Testing Guide](../stochastic-testing.md)
-- [Sample14: Stochastic Testing](https://github.com/joslat/AgentEval/blob/main/samples/AgentEval.Samples/Sample14_StochasticTesting.cs)
+- [stochastic evaluation Guide](../stochastic-testing.md)
+- [Sample14: stochastic evaluation](https://github.com/joslat/AgentEval/blob/main/samples/AgentEval.Samples/Sample14_StochasticTesting.cs)
 - [Sample15: Model Comparison](https://github.com/joslat/AgentEval/blob/main/samples/AgentEval.Samples/Sample15_ModelComparison.cs)
 
 ---

@@ -42,7 +42,7 @@ Console.WriteLine(result.ToMarkdown());
 
 ---
 
-## Stochastic Testing with Statistics
+## stochastic evaluation with Statistics
 
 LLMs are non-deterministic. Run tests multiple times and analyze statistics:
 
@@ -279,7 +279,7 @@ turn3.ToolUsage!.Should()
 
 ## See Also
 
-- [Stochastic Testing Guide](../stochastic-testing.md) - Full statistical testing documentation
+- [stochastic evaluation Guide](../stochastic-testing.md) - Full statistical testing documentation
 - [Model Comparison Guide](../model-comparison.md) - Comparing models in depth
 - [Assertions Reference](../assertions.md) - Complete assertion API
 - [Sample 16](https://github.com/joslat/AgentEval/blob/main/samples/AgentEval.Samples/Sample16_CombinedStochasticComparison.cs) - Full working example

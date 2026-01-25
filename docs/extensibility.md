@@ -330,7 +330,7 @@ var score = NormalizeScore(7.5, 0, 10);  // Returns 75.0
 
 ## Creating Plugins
 
-Plugins extend the test harness with custom behavior:
+Plugins extend the evaluation harness with custom behavior:
 
 ```csharp
 public interface IAgentEvalPlugin

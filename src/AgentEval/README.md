@@ -20,7 +20,7 @@ using AgentEval;
 using AgentEval.MAF;
 using AgentEval.Assertions;
 
-// Create test harness
+// Create evaluation harness
 var harness = new MAFTestHarness(evaluatorClient);
 
 // Run test with tool tracking

@@ -79,7 +79,7 @@ AgentEval is designed with a layered architecture that separates concerns and en
 │  ├────────────────────────────────────────────────────────────────────────┤ │
 │  │                                                                         │ │
 │  │  ┌─────────────────┐  ┌────────────────────────┐  ┌─────────────────┐   │ │
-│  │  │  MAFTestHarness │  │MicrosoftEvaluatorAdapter│ │ChatClientAdapter│   │ │
+│  │  │  MAFEvaluationHarness │  │MicrosoftEvaluatorAdapter│ │ChatClientAdapter│   │ │
 │  │  │  (MAF support)  │  │(MS.Extensions.AI.Eval) │  │ (Generic)       │   │ │
 │  │  └─────────────────┘  └────────────────────────┘  └─────────────────┘   │ │
 │  │                                                                         │ │
@@ -151,7 +151,7 @@ IMetric (base interface)
 
 ```
 ┌─────────────┐    ┌──────────────┐    ┌─────────────┐    ┌──────────────┐
-│  Test Case  │───▶│ ITestHarness │───▶│ Agent Under │───▶│   Response   │
+│  Test Case  │───▶│ IEvaluationHarness │───▶│ Agent Under │───▶│   Response   │
 │   (Input)   │    │              │    │    Test     │    │   (Output)   │
 └─────────────┘    └──────────────┘    └─────────────┘    └──────────────┘
                           │                                       │
@@ -310,8 +310,8 @@ public interface IAgenticMetric : IMetric
 Enables integration with different frameworks:
 
 ```csharp
-// Adapt any IChatClient to ITestableAgent
-public class ChatClientAgentAdapter : ITestableAgent
+// Adapt any IChatClient to IEvaluableAgent
+public class ChatClientAgentAdapter : IEvaluableAgent
 {
     private readonly IChatClient _chatClient;
     
@@ -386,8 +386,8 @@ foreach (var metric in registry.GetAll())
 AgentEval/
 ├── Core/                    # Core interfaces and utilities
 │   ├── IMetric.cs
-│   ├── ITestableAgent.cs
-│   ├── ITestHarness.cs
+│   ├── IEvaluableAgent.cs
+│   ├── IEvaluationHarness.cs
 │   ├── IEvaluator.cs
 │   ├── IAgentEvalLogger.cs
 │   ├── MetricRegistry.cs
@@ -423,7 +423,7 @@ AgentEval/
 │   └── MicrosoftEvaluatorAdapter.cs
 │
 ├── MAF/                     # Microsoft Agent Framework
-│   └── MAFTestHarness.cs
+│   └── MAFEvaluationHarness.cs
 │
 ├── Embeddings/              # Embedding utilities
 │   ├── IAgentEvalEmbeddings.cs

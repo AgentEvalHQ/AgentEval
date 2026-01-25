@@ -7,10 +7,10 @@ AgentEval is **the comprehensive .NET evaluation toolkit for AI agents**, built 
 ```
 AgentEval/
 ├── src/AgentEval/          # Main library (multi-target: net8.0, net9.0, net10.0)
-│   ├── Core/               # Interfaces: IMetric, ITestableAgent, ITestHarness
+│   ├── Core/               # Interfaces: IMetric, IEvaluableAgent, IEvaluationHarness
 │   ├── Assertions/         # Fluent assertions: ToolUsageAssertions, PerformanceAssertions
 │   ├── Comparison/         # StochasticRunner, IAgentFactory, ModelComparer
-│   ├── MAF/                # Microsoft Agent Framework: MAFTestHarness, MAFAgentAdapter
+│   ├── MAF/                # Microsoft Agent Framework: MAFEvaluationHarness, MAFAgentAdapter
 │   ├── Metrics/            # RAG/ (Faithfulness, Relevance) + Agentic/ (ToolSelection, etc.)
 │   ├── Models/             # TestCase, TestResult, ToolCallRecord, PerformanceMetrics
 │   ├── Tracing/            # TraceRecordingAgent, ChatTraceRecorder, WorkflowTraceRecorder
@@ -115,11 +115,11 @@ workflowRecorder.RecordStep(new WorkflowTraceStep { ... });
 WorkflowTraceSerializer.Save(workflowRecorder.GetTrace(), "workflow.json");
 ```
 
-## Stochastic Testing & Model Comparison
+## stochastic evaluation & Model Comparison
 
 Handle LLM non-determinism by running tests multiple times:
 ```csharp
-var stochasticRunner = new StochasticRunner(harness, testOptions);
+var stochasticRunner = new StochasticRunner(harness, EvaluationOptions);
 var result = await stochasticRunner.RunStochasticTestAsync(
     agent, testCase, 
     new StochasticOptions(Runs: 10, SuccessRateThreshold: 0.8));
@@ -132,7 +132,7 @@ Compare models using Agent Factory pattern:
 public interface IAgentFactory {
     string ModelId { get; }
     string ModelName { get; }
-    ITestableAgent CreateAgent();
+    IEvaluableAgent CreateAgent();
 }
 
 // Run same test across multiple models
@@ -148,7 +148,7 @@ modelResults.PrintComparisonTable();
 
 ### MAF Integration
 - `MAFAgentAdapter` wraps MAF's `AIAgent` → implements `IStreamableAgent`
-- `MAFTestHarness` orchestrates tests with streaming, tool tracking, performance metrics
+- `MAFEvaluationHarness` orchestrates tests with streaming, tool tracking, performance metrics
 - Token usage extracted from `AgentRunResponse.Usage` property
 
 ### FakeChatClient for Testing
@@ -199,7 +199,7 @@ This codebase strictly follows architectural best practices. See `docs/adr/006-s
 - **Single Responsibility**: Each service has one focused purpose (e.g., `IStatisticsCalculator` only does statistics)
 - **Open/Closed**: Extend via interfaces (`IMetric`, `IResultExporter`) without modifying existing code
 - **Liskov Substitution**: All interface implementations are interchangeable
-- **Interface Segregation**: Separate interfaces for distinct capabilities (`ITestableAgent` vs `IStreamableAgent`)
+- **Interface Segregation**: Separate interfaces for distinct capabilities (`IEvaluableAgent` vs `IStreamableAgent`)
 - **Dependency Inversion**: All core services depend on abstractions (interfaces), not concretions
 
 ### DRY (Don't Repeat Yourself)

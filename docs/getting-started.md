@@ -136,7 +136,7 @@ public class MyAgentTests
         // Arrange: Create your MAF agent
         var agent = CreateGreetingAgent();
         var adapter = new MAFAgentAdapter(agent);
-        var harness = new MAFTestHarness();
+        var harness = new MAFEvaluationHarness();
 
         // Arrange: Define the test case
         var testCase = new TestCase
@@ -147,7 +147,7 @@ public class MyAgentTests
         };
 
         // Act: Run the test
-        var result = await harness.RunTestAsync(adapter, testCase);
+        var result = await harness.RunEvaluationAsync(adapter, testCase);
 
         // Assert: Check results
         Assert.True(result.Passed, result.FailureReason);
@@ -186,7 +186,7 @@ public async Task Agent_ShouldUseWeatherTool()
     // Arrange: Create agent with weather tool
     var agent = CreateWeatherAgent();
     var adapter = new MAFAgentAdapter(agent);
-    var harness = new MAFTestHarness();
+    var harness = new MAFEvaluationHarness();
 
     var testCase = new TestCase
     {
@@ -195,7 +195,7 @@ public async Task Agent_ShouldUseWeatherTool()
     };
 
     // Act
-    var result = await harness.RunTestAsync(adapter, testCase);
+    var result = await harness.RunEvaluationAsync(adapter, testCase);
 
     // Assert: Fluent tool assertions
     result.ToolUsage!.Should()
@@ -244,7 +244,7 @@ public async Task Agent_ShouldMeetPerformanceSLAs()
     // Arrange: Reuse your agent creation method
     var agent = CreateGreetingAgent();
     var adapter = new MAFAgentAdapter(agent);
-    var harness = new MAFTestHarness();
+    var harness = new MAFEvaluationHarness();
 
     var testCase = new TestCase
     {
@@ -253,7 +253,7 @@ public async Task Agent_ShouldMeetPerformanceSLAs()
     };
 
     // Act
-    var result = await harness.RunTestAsync(adapter, testCase);
+    var result = await harness.RunEvaluationAsync(adapter, testCase);
 
     // Assert: Performance metrics
     result.Performance!.Should()
@@ -293,7 +293,7 @@ public class AdvancedAgentTests
     public async Task Agent_ShouldProvideHelpfulResponse()
     {
         // Arrange: Use evaluator for AI-powered scoring
-        var harness = new MAFTestHarness(_evaluator);
+        var harness = new MAFEvaluationHarness(_evaluator);
         var agent = CreateHelpDeskAgent();
         var adapter = new MAFAgentAdapter(agent);
 
@@ -305,7 +305,7 @@ public class AdvancedAgentTests
         };
 
         // Act
-        var result = await harness.RunTestAsync(adapter, testCase);
+        var result = await harness.RunEvaluationAsync(adapter, testCase);
 
         // Assert: AI-evaluated quality
         Assert.True(result.Passed, result.Details);
@@ -369,7 +369,7 @@ public async Task Agent_ShouldPassAllDatasetTests()
 
     // Create agent and harness
     var agent = CreateMyAgent();
-    var harness = new MAFTestHarness(_evaluator);
+    var harness = new MAFEvaluationHarness(_evaluator);
     var adapter = new MAFAgentAdapter(agent);
 
     // Run all test cases
@@ -547,9 +547,9 @@ var testCase = new TestCase
 
 **Symptom:** Quality scores vary widely between runs
 
-**Solution:** Use [Stochastic Testing](stochastic-testing.md) to run multiple times and analyze statistics:
+**Solution:** Use [stochastic evaluation](stochastic-testing.md) to run multiple times and analyze statistics:
 ```csharp
-var stochasticRunner = new StochasticRunner(harness, testOptions);
+var stochasticRunner = new StochasticRunner(harness, EvaluationOptions);
 var result = await stochasticRunner.RunStochasticTestAsync(
     agent, testCase, 
     new StochasticOptions(Runs: 10, SuccessRateThreshold: 0.8));

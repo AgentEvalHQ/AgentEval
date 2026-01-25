@@ -9,14 +9,14 @@
 ## Context
 
 The current AgentEval architecture has a mix of:
-1. **Interfaces with implementations** (e.g., `IStochasticRunner`, `IModelComparer`, `ITestHarness`)
+1. **Interfaces with implementations** (e.g., `IStochasticRunner`, `IModelComparer`, `IEvaluationHarness`)
 2. **Static utility classes** (e.g., `StatisticsCalculator`, `ToolUsageExtractor`)
 3. **Concrete class dependencies** (e.g., `ModelComparer` instantiates `new StochasticRunner()`)
 4. **Wrapper interfaces over static utilities** (recent addition: `IStatisticsCalculator`, `IToolUsageExtractor`)
 
 ### Current Architecture Issues
 
-1. **Mixed Patterns**: Some services are injectable (`ITestHarness`), others are static utilities
+1. **Mixed Patterns**: Some services are injectable (`IEvaluationHarness`), others are static utilities
 2. **Tight Coupling**: `ModelComparer` directly instantiates `StochasticRunner` instead of using dependency injection
 3. **Limited Testability**: Concrete dependencies make unit testing difficult without integration tests
 4. **Inconsistent Design**: No clear pattern for when to use interfaces vs static classes
@@ -27,12 +27,12 @@ The current AgentEval architecture has a mix of:
 ```csharp
 public class ModelComparer : IModelComparer
 {
-    private readonly ITestHarness _harness;
+    private readonly IEvaluationHarness _harness;
     
-    public ModelComparer(ITestHarness harness, TestOptions? testOptions = null)
+    public ModelComparer(IEvaluationHarness harness, EvaluationOptions? EvaluationOptions = null)
     {
         _harness = harness;
-        _testOptions = testOptions;
+        _testOptions = EvaluationOptions;
     }
     
     public async Task<ModelComparisonResult> CompareModelsAsync(...)
@@ -49,8 +49,8 @@ public class ModelComparer : IModelComparer
 ✅ **Good**: The codebase already has interfaces defined:
 - `IStochasticRunner` ✓
 - `IModelComparer` ✓
-- `ITestHarness` ✓
-- `ITestableAgent` ✓
+- `IEvaluationHarness` ✓
+- `IEvaluableAgent` ✓
 - `IAgentFactory` ✓
 - `IStatisticsCalculator` ✓ (recently added)
 - `IToolUsageExtractor` ✓ (recently added)
@@ -81,13 +81,13 @@ public class ModelComparer : IModelComparer
 // BEFORE (Current)
 public class ModelComparer : IModelComparer
 {
-    private readonly ITestHarness _harness;
-    private readonly TestOptions? _testOptions;
+    private readonly IEvaluationHarness _harness;
+    private readonly EvaluationOptions? _testOptions;
     
-    public ModelComparer(ITestHarness harness, TestOptions? testOptions = null)
+    public ModelComparer(IEvaluationHarness harness, EvaluationOptions? EvaluationOptions = null)
     {
         _harness = harness;
-        _testOptions = testOptions;
+        _testOptions = EvaluationOptions;
     }
     
     public async Task<ModelComparisonResult> CompareModelsAsync(...)
@@ -122,30 +122,30 @@ public class ModelComparer : IModelComparer
 // CURRENT (Already good)
 public class StochasticRunner : IStochasticRunner
 {
-    private readonly ITestHarness _harness;  // ✅ Already using interface
+    private readonly IEvaluationHarness _harness;  // ✅ Already using interface
     
-    public StochasticRunner(ITestHarness harness, TestOptions? testOptions = null)
+    public StochasticRunner(IEvaluationHarness harness, EvaluationOptions? EvaluationOptions = null)
     {
         _harness = harness ?? throw new ArgumentNullException(nameof(harness));
-        _testOptions = testOptions;
+        _testOptions = EvaluationOptions;
     }
 }
 
 // PROPOSED: Add IStatisticsCalculator dependency
 public class StochasticRunner : IStochasticRunner
 {
-    private readonly ITestHarness _harness;
+    private readonly IEvaluationHarness _harness;
     private readonly IStatisticsCalculator _statisticsCalculator;
-    private readonly TestOptions? _testOptions;
+    private readonly EvaluationOptions? _testOptions;
     
     public StochasticRunner(
-        ITestHarness harness, 
+        IEvaluationHarness harness, 
         IStatisticsCalculator? statisticsCalculator = null,
-        TestOptions? testOptions = null)
+        EvaluationOptions? EvaluationOptions = null)
     {
         _harness = harness ?? throw new ArgumentNullException(nameof(harness));
         _statisticsCalculator = statisticsCalculator ?? DefaultStatisticsCalculator.Instance;
-        _testOptions = testOptions;
+        _testOptions = EvaluationOptions;
     }
 }
 ```
@@ -173,7 +173,7 @@ public static class AgentEvalServiceCollectionExtensions
         services.AddScoped<IStochasticRunner, StochasticRunner>();
         services.AddScoped<IModelComparer, ModelComparer>();
         
-        // Register test harness (user must provide or use default)
+        // Register evaluation harness (user must provide or use default)
         if (options.TestHarness != null)
         {
             services.AddSingleton(options.TestHarness);
@@ -193,9 +193,9 @@ public sealed class AgentEvalBuilder
 {
     private readonly ServiceCollection _services = new();
     
-    public AgentEvalBuilder WithTestHarness<T>() where T : class, ITestHarness
+    public AgentEvalBuilder WithTestHarness<T>() where T : class, IEvaluationHarness
     {
-        _services.AddSingleton<ITestHarness, T>();
+        _services.AddSingleton<IEvaluationHarness, T>();
         return this;
     }
     
