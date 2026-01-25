@@ -19,17 +19,16 @@
     This validates that the published package works correctly.
     
     FOR DEVELOPMENT: Uses local project reference while package isn't published.
-    FOR VALIDATION: Change to PackageReference after publishing:
-      <PackageReference Include="AgentEval" Version="0.2.0-beta" />
+    FOR VALIDATION: Change to PackageReference after publishing.
       
   -->
   <ItemGroup>
-    <!-- LOCAL: During development, use project reference -->
+    <!-- LOCAL: During development, use project reference
     <ProjectReference Include="../../src/AgentEval/AgentEval.csproj" />
-    
-    <!-- NUGET: For validation, uncomment this and comment out ProjectReference above
-    <PackageReference Include="AgentEval" Version="0.2.0-beta" />
     -->
+    
+    <!-- NUGET: For validation (0.3.0-beta published with brand-aligned APIs) -->
+    <PackageReference Include="AgentEval" Version="0.3.0-beta" />
     
     <!-- Supporting packages with explicit versions (CPM disabled) -->
     <PackageReference Include="Azure.AI.OpenAI" Version="2.5.0-beta.1" />

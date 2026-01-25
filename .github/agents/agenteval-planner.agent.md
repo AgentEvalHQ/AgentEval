@@ -5,7 +5,7 @@ tools: ['read', 'search', 'web', 'todo']
 model: Claude Sonnet 4
 handoffs:
   - label: Start Implementation
-    agent: agenteval-dev
+    agent: AgentEval Dev
     prompt: Implement the plan outlined above following AgentEval conventions and SOLID principles.
     send: true
   - label: Research More

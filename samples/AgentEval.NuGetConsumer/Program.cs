@@ -217,7 +217,7 @@ static void ShowSummary(bool useMock)
     ║                         ✅ ADVANCED AGENTEVAL FEATURES!                       ║
     ╠════════════════════════════════════════════════════════════════════════════════╣
     ║                                                                                ║
-    ║   🎯 Complete Example         - ALL TestCase, EvaluationOptions, StreamingOptions    ║
+    ║   🎯 Complete Example         - TestCase, EvaluationOptions, StreamingOptions        ║
     ║   🧑‍⚖️  LLM-as-a-Judge           - Behavioral policies + evaluation criteria    ║
     """);
     

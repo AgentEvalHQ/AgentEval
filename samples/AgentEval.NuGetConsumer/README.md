@@ -50,7 +50,7 @@ The definitive AgentEval showcase using **ALL** available features:
 | Component | Features Used |
 |-----------|---------------|
 | **TestCase** | Name, Input, ExpectedTools, EvaluationCriteria, PassingScore, GroundTruth, Tags, Metadata |
-| **TestOptions** | TrackTools, TrackPerformance, EvaluateResponse, Verbose (FIXED!), ModelName |
+| **EvaluationOptions** | TrackTools, TrackPerformance, EvaluateResponse, Verbose (FIXED!), ModelName |
 | **StreamingOptions** | OnFirstToken, OnToolStart, OnToolComplete, OnTextChunk, OnMetricsUpdate |
 | **Result Analysis** | Tool usage, Performance metrics, Timeline, LLM evaluation, Suggestions |
 | **Best Practices** | ExpectedTools validation + Fluent assertions combined |
@@ -115,10 +115,10 @@ var testCase = new TestCase
 
 // Harness with evaluator for LLM-as-a-judge + FIXED verbose logging
 var evaluatorClient = AgentFactory.CreateEvaluatorChatClient();
-var harness = new MAFTestHarness(evaluatorClient, verbose: true);
+var harness = new MAFEvaluationHarness(evaluatorClient, verbose: true);
 
-// ALL TestOptions + ALL StreamingOptions
-var result = await harness.RunTestStreamingAsync(agent, testCase,
+// ALL EvaluationOptions + ALL StreamingOptions
+var result = await harness.RunEvaluationStreamingAsync(agent, testCase,
     streamingOptions: new StreamingOptions {
         OnFirstToken = ttft => Console.WriteLine($"⚡ TTFT: {ttft.TotalMilliseconds}ms"),
         OnToolStart = tool => Console.WriteLine($"🔧 Tool starting: {tool.Name}"),
@@ -126,7 +126,7 @@ var result = await harness.RunTestStreamingAsync(agent, testCase,
         OnTextChunk = chunk => { /* Real-time streaming display */ },
         OnMetricsUpdate = metrics => { /* Live performance updates */ }
     },
-    options: new TestOptions {
+    options: new EvaluationOptions {
         TrackTools = true,          // → result.ToolUsage 
         TrackPerformance = true,    // → result.Performance
         EvaluateResponse = true,    // → result.CriteriaResults
@@ -219,7 +219,7 @@ result.ToolUsage!.Should()
 
 ## 🏅 Best Practices Demonstrated
 
-✅ **Always use streaming** (`RunTestStreamingAsync`) for complete metrics  
+✅ **Always use streaming** (`RunEvaluationStreamingAsync`) for complete metrics  
 ✅ **Always set ModelName** for cost estimation and tracking  
 ✅ **Combine validation approaches**: ExpectedTools + fluent assertions  
 ✅ **Use built-in formatting**: `PrintComparisonTable()` vs custom  

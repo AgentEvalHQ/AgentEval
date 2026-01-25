@@ -407,10 +407,10 @@ public static class Demos
             
             // Show individual tool calls
             Console.WriteLine("      🔍 Individual Tool Calls:");
-            foreach (var call in result.ToolUsage.Calls)
+            foreach (var call in result.ToolUsage!.Calls)
             {
                 Console.WriteLine($"         {call.Order}. {call.Name} ({call.Duration?.TotalMilliseconds:F0}ms)");
-                if (call.Arguments.Count > 0)
+                if (call.Arguments?.Count > 0)
                 {
                     var args = string.Join(", ", call.Arguments.Select(kv => $"{kv.Key}={kv.Value}"));
                     Console.WriteLine($"            Args: {args}");

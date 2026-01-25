@@ -13,7 +13,7 @@ handoffs:
     prompt: Generate or update documentation based on the code changes discussed. Follow the documentation.instructions.md guidelines.
     send: false
   - label: Plan Feature
-    agent: agenteval-planner
+    agent: AgentEval Planner
     prompt: Create an implementation plan for the feature we discussed before implementing.
     send: false
 ---
