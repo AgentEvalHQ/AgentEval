@@ -8,7 +8,7 @@ using AgentEval.Models;
 namespace AgentEval.MAF;
 
 /// <summary>
-/// Test harness for Microsoft Agent Framework (MAF) agents.
+/// evaluation harness for Microsoft Agent Framework (MAF) agents.
 /// Provides comprehensive testing, evaluation, and metrics collection.
 /// </summary>
 public class MAFEvaluationHarness : IStreamingEvaluationHarness
@@ -17,7 +17,7 @@ public class MAFEvaluationHarness : IStreamingEvaluationHarness
     private readonly IAgentEvalLogger _logger;
     
     /// <summary>
-    /// Create a test harness without AI-powered evaluation using console logging.
+    /// Create a evaluation harness without AI-powered evaluation using console logging.
     /// </summary>
     public MAFEvaluationHarness(bool verbose = true)
         : this(evaluator: null, verbose ? new ConsoleAgentEvalLogger(LogLevel.Debug) : NullAgentEvalLogger.Instance)
@@ -25,7 +25,7 @@ public class MAFEvaluationHarness : IStreamingEvaluationHarness
     }
     
     /// <summary>
-    /// Create a test harness with AI-powered evaluation.
+    /// Create a evaluation harness with AI-powered evaluation.
     /// </summary>
     /// <param name="evaluatorClient">Chat client to use for AI evaluation.</param>
     /// <param name="verbose">Whether to print verbose output.</param>
@@ -35,7 +35,7 @@ public class MAFEvaluationHarness : IStreamingEvaluationHarness
     }
     
     /// <summary>
-    /// Create a test harness with a custom evaluator and logger.
+    /// Create a evaluation harness with a custom evaluator and logger.
     /// </summary>
     public MAFEvaluationHarness(IEvaluator? evaluator, IAgentEvalLogger logger)
     {
@@ -44,7 +44,7 @@ public class MAFEvaluationHarness : IStreamingEvaluationHarness
     }
     
     /// <summary>
-    /// Create a test harness with a custom evaluator (uses console logger).
+    /// Create a evaluation harness with a custom evaluator (uses console logger).
     /// </summary>
     public MAFEvaluationHarness(IEvaluator evaluator, bool verbose = true)
         : this(evaluator, verbose ? new ConsoleAgentEvalLogger(LogLevel.Debug) : NullAgentEvalLogger.Instance)

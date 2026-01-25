@@ -39,7 +39,7 @@ public static class Sample04_PerformanceMetrics
         // ═══════════════════════════════════════════════════════════════
         // STEP 2: Create harness with performance tracking
         // ═══════════════════════════════════════════════════════════════
-        Console.WriteLine("📝 Step 2: Creating test harness with performance tracking...\n");
+        Console.WriteLine("📝 Step 2: Creating evaluation harness with performance tracking...\n");
         
         var harness = new MAFEvaluationHarness(verbose: true);
 

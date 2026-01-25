@@ -8,7 +8,7 @@ using AgentEval.Models;
 namespace AgentEval.MAF;
 
 /// <summary>
-/// Test harness specifically designed for workflow/multi-agent testing.
+/// evaluation harness specifically designed for workflow/multi-agent testing.
 /// Provides visibility into individual executor steps and workflow-level assertions.
 /// </summary>
 /// <remarks>
@@ -29,7 +29,7 @@ public class WorkflowEvaluationHarness
     private readonly IAgentEvalLogger _logger;
 
     /// <summary>
-    /// Creates a workflow test harness without AI evaluation.
+    /// Creates a workflow evaluation harness without AI evaluation.
     /// </summary>
     /// <param name="verbose">Whether to output verbose logging.</param>
     public WorkflowEvaluationHarness(bool verbose = false)
@@ -38,7 +38,7 @@ public class WorkflowEvaluationHarness
     }
 
     /// <summary>
-    /// Creates a workflow test harness with AI evaluation support.
+    /// Creates a workflow evaluation harness with AI evaluation support.
     /// </summary>
     /// <param name="evaluator">Evaluator for AI-based assessment.</param>
     /// <param name="logger">Logger for output.</param>

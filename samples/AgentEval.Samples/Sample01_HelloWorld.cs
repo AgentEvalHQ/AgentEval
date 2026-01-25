@@ -34,13 +34,13 @@ public static class Sample01_HelloWorld
         Console.WriteLine($"   ✓ Agent '{agent.Name}' created\n");
 
         // ═══════════════════════════════════════════════════════════════
-        // STEP 2: Create a test harness
+        // STEP 2: Create a evaluation harness
         // ═══════════════════════════════════════════════════════════════
-        Console.WriteLine("📝 Step 2: Creating test harness...\n");
+        Console.WriteLine("📝 Step 2: Creating evaluation harness...\n");
         
         // Simple harness without AI evaluation (for this hello world)
         var harness = new MAFEvaluationHarness(verbose: true);
-        Console.WriteLine("   ✓ Test harness ready\n");
+        Console.WriteLine("   ✓ evaluation harness ready\n");
 
         // ═══════════════════════════════════════════════════════════════
         // STEP 3: Define a test case

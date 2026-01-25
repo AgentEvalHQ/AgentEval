@@ -119,7 +119,7 @@ public class ServiceCollectionExtensionsTests
     }
 
     [Fact]
-    public void AddAgentEval_WithTestHarnessFactory_RegistersTestHarness()
+    public void AddAgentEval_WithEvaluationHarnessFactory_RegistersTestHarness()
     {
         // Arrange
         var services = new ServiceCollection();
@@ -128,7 +128,7 @@ public class ServiceCollectionExtensionsTests
         // Act
         services.AddAgentEval(options =>
         {
-            options.TestHarnessFactory = _ => mockHarness;
+            options.EvaluationHarnessFactory = _ => mockHarness;
         });
         var provider = services.BuildServiceProvider();
 

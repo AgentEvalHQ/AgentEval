@@ -54,10 +54,10 @@ public static class AgentEvalServiceCollectionExtensions
                 break;
         }
 
-        // Register test harness if provided
-        if (options.TestHarnessFactory != null)
+        // Register evaluation harness if provided
+        if (options.EvaluationHarnessFactory != null)
         {
-            services.TryAddSingleton(options.TestHarnessFactory);
+            services.TryAddSingleton(options.EvaluationHarnessFactory);
         }
 
         // Register logger if provided

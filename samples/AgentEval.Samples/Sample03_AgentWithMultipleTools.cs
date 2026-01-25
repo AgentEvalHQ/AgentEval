@@ -42,9 +42,9 @@ public static class Sample03_AgentWithMultipleTools
         Console.WriteLine("      • FactCheckTool - Verifies claims\n");
 
         // ═══════════════════════════════════════════════════════════════
-        // STEP 2: Create test harness
+        // STEP 2: Create evaluation harness
         // ═══════════════════════════════════════════════════════════════
-        Console.WriteLine("📝 Step 2: Creating test harness...\n");
+        Console.WriteLine("📝 Step 2: Creating evaluation harness...\n");
         
         var harness = new MAFEvaluationHarness(verbose: true);
 

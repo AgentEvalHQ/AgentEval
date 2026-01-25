@@ -38,12 +38,12 @@ public static class Sample02_AgentWithOneTool
         Console.WriteLine("   🔧 Tool: CalculatorTool - Performs basic math\n");
 
         // ═══════════════════════════════════════════════════════════════
-        // STEP 2: Create test harness with tool tracking
+        // STEP 2: Create evaluation harness with tool tracking
         // ═══════════════════════════════════════════════════════════════
-        Console.WriteLine("📝 Step 2: Creating test harness with tool tracking...\n");
+        Console.WriteLine("📝 Step 2: Creating evaluation harness with tool tracking...\n");
         
         var harness = new MAFEvaluationHarness(verbose: true);
-        Console.WriteLine("   ✓ Test harness ready\n");
+        Console.WriteLine("   ✓ evaluation harness ready\n");
 
         // ═══════════════════════════════════════════════════════════════
         // STEP 3: Define test case expecting tool usage

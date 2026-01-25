@@ -6,7 +6,7 @@ using AgentEval.Models;
 namespace AgentEval.Core;
 
 /// <summary>
-/// Test harness for running agent tests.
+/// evaluation harness for running agent tests.
 /// </summary>
 public interface IEvaluationHarness
 {

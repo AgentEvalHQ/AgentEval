@@ -83,7 +83,7 @@ public class StochasticRunner : IStochasticRunner
     /// <summary>
     /// Creates a new stochastic runner with dependency injection.
     /// </summary>
-    /// <param name="harness">The test harness to use for running individual tests.</param>
+    /// <param name="harness">The evaluation harness to use for running individual tests.</param>
     /// <param name="statisticsCalculator">Optional statistics calculator. If null, uses default.</param>
     /// <param name="EvaluationOptions">Optional test options for each run.</param>
     [ActivatorUtilitiesConstructor]
@@ -100,7 +100,7 @@ public class StochasticRunner : IStochasticRunner
     /// <summary>
     /// Creates a new stochastic runner (legacy constructor for backward compatibility).
     /// </summary>
-    /// <param name="harness">The test harness to use for running individual tests.</param>
+    /// <param name="harness">The evaluation harness to use for running individual tests.</param>
     /// <param name="EvaluationOptions">Optional test options for each run.</param>
     [Obsolete("Use constructor with IStatisticsCalculator parameter for better testability. This constructor will be removed in a future version.")]
     public StochasticRunner(IEvaluationHarness harness, EvaluationOptions? EvaluationOptions)
