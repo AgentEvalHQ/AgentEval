@@ -54,6 +54,9 @@
 
 - name: API Reference
   href: api/
+  items:
+  - name: Browse API Documentation
+    href: api/
 
 - name: Resources
   items:

@@ -15,6 +15,98 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.3.0-beta] - 2026-01-25
+
+**Brand Alignment: Evaluation-First Naming** 🎯
+
+This release implements comprehensive renamed APIs to better reflect AgentEval's primary identity as an **AI Agent Evaluation Toolkit**. All "Test" terminology in public APIs has been renamed to "Evaluation" to align with the framework's positioning.
+
+### ⚠️ BREAKING CHANGES
+
+#### Interface Renames
+| Old Name | New Name |
+|----------|----------|
+| `ITestHarness` | `IEvaluationHarness` |
+| `IStreamingTestHarness` | `IStreamingEvaluationHarness` |
+| `ITestableAgent` | `IEvaluableAgent` |
+| `IWorkflowTestableAgent` | `IWorkflowEvaluableAgent` |
+
+#### Class Renames
+| Old Name | New Name |
+|----------|----------|
+| `MAFTestHarness` | `MAFEvaluationHarness` |
+| `WorkflowTestHarness` | `WorkflowEvaluationHarness` |
+| `TestOptions` | `EvaluationOptions` |
+| `TestOutputWriter` | `EvaluationOutputWriter` |
+| `TestMetadata` | `EvaluationMetadata` |
+
+#### Method Renames
+| Old Name | New Name |
+|----------|----------|
+| `RunTestAsync()` | `RunEvaluationAsync()` |
+| `RunTestStreamingAsync()` | `RunEvaluationStreamingAsync()` |
+| `RunTestSuiteAsync()` | `RunEvaluationSuiteAsync()` |
+| `TestHarnessFactory` property | `EvaluationHarnessFactory` property |
+
+#### File Renames
+| Old Name | New Name |
+|----------|----------|
+| `ITestHarness.cs` | `IEvaluationHarness.cs` |
+| `ITestableAgent.cs` | `IEvaluableAgent.cs` |
+| `MAFTestHarness.cs` | `MAFEvaluationHarness.cs` |
+| `WorkflowTestHarness.cs` | `WorkflowEvaluationHarness.cs` |
+| `TestModels.cs` | `EvaluationModels.cs` |
+| `TestOutputWriter.cs` | `EvaluationOutputWriter.cs` |
+| `stochastic-testing.md` | `stochastic-evaluation.md` |
+| `Sample14_StochasticTesting.cs` | `Sample14_StochasticEvaluation.cs` |
+
+### Unchanged (Universal Terminology)
+The following names are **intentionally kept** as they represent universal industry terminology:
+- `TestCase` - Standard testing terminology used across all frameworks
+- `TestResult` - Conflict resolution with existing `Core.EvaluationResult` type
+- `TestSummary` - Consistent with TestResult
+- `AgentEvalTestBase` - xUnit integration base class
+- `StochasticRunner` - Neutral name, not test-specific
+- `*Tests.cs` files - xUnit naming convention
+
+### Changed
+- **Terminology:** "stochastic testing" → "stochastic evaluation" throughout codebase and documentation
+- **Terminology:** "test harness" → "evaluation harness" throughout codebase and documentation
+- **XML Documentation:** Updated all public API comments with evaluation-first language
+- **C# Naming Conventions:** Fixed parameter names to use camelCase (`evaluationOptions` instead of `EvaluationOptions`)
+- **Documentation:** Title case capitalization fixes in markdown headers
+- **Documentation:** Fixed all broken links to `stochastic-testing.md` (now `stochastic-evaluation.md`)
+- **TOC:** API Reference section now renders consistently with other menu items
+
+### Migration Guide
+
+Update your code to use the new names:
+
+```csharp
+// Before (0.2.x)
+var harness = new MAFTestHarness(evaluatorClient);
+var result = await harness.RunTestAsync(agent, testCase, options);
+
+// After (0.3.0)
+var harness = new MAFEvaluationHarness(evaluatorClient);
+var result = await harness.RunEvaluationAsync(agent, testCase, options);
+```
+
+```csharp
+// Before (0.2.x)
+public class MyAgent : ITestableAgent { }
+
+// After (0.3.0)
+public class MyAgent : IEvaluableAgent { }
+```
+
+### Documentation
+- Brand Positioning Guidelines created at `strategy/plans/Implementation-Plan-Brand-Positioning-Guidelines.md`
+- All documentation files updated with evaluation-first messaging
+- Code examples in documentation updated to use new API names
+
+---
+
 ## [0.2.1-beta] - 2026-01-24
 
 **Features + Documentation & Messaging Refresh** 🚀📝
@@ -362,7 +454,8 @@ This release marks the transition from alpha to beta. The framework is now featu
 - `AgentEval.Tracing` (OTel + run artifacts) - planned
 - `AgentEval.Studio` (workflow visualizer / time-travel UI) - future
 
-[Unreleased]: https://github.com/joslat/AgentEval/compare/v0.2.1-beta...HEAD
+[Unreleased]: https://github.com/joslat/AgentEval/compare/v0.3.0-beta...HEAD
+[0.3.0-beta]: https://github.com/joslat/AgentEval/compare/v0.2.1-beta...v0.3.0-beta
 [0.2.1-beta]: https://github.com/joslat/AgentEval/compare/v0.2.0-beta...v0.2.1-beta
 [0.2.0-beta]: https://github.com/joslat/AgentEval/compare/v0.1.3-alpha...v0.2.0-beta
 [0.1.3-alpha]: https://github.com/joslat/AgentEval/compare/v0.1.2-alpha...v0.1.3-alpha
