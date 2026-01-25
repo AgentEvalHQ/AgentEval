@@ -17,7 +17,7 @@ public class ServiceCollectionExtensionsTests
     {
         // Arrange
         var services = new ServiceCollection();
-        services.AddSingleton<ITestHarness, FakeTestHarness>(); // Required dependency
+        services.AddSingleton<IEvaluationHarness, FakeTestHarness>(); // Required dependency
 
         // Act
         services.AddAgentEval();
@@ -35,7 +35,7 @@ public class ServiceCollectionExtensionsTests
     {
         // Arrange
         var services = new ServiceCollection();
-        services.AddSingleton<ITestHarness, FakeTestHarness>(); // Required dependency
+        services.AddSingleton<IEvaluationHarness, FakeTestHarness>(); // Required dependency
 
         // Act
         services.AddAgentEvalScoped();
@@ -66,7 +66,7 @@ public class ServiceCollectionExtensionsTests
     {
         // Arrange
         var services = new ServiceCollection();
-        services.AddSingleton<ITestHarness, FakeTestHarness>(); // Required dependency
+        services.AddSingleton<IEvaluationHarness, FakeTestHarness>(); // Required dependency
 
         // Act
         services.AddAgentEvalSingleton();
@@ -84,7 +84,7 @@ public class ServiceCollectionExtensionsTests
     {
         // Arrange
         var services = new ServiceCollection();
-        services.AddSingleton<ITestHarness, FakeTestHarness>(); // Required dependency
+        services.AddSingleton<IEvaluationHarness, FakeTestHarness>(); // Required dependency
 
         // Act
         services.AddAgentEvalTransient();
@@ -102,7 +102,7 @@ public class ServiceCollectionExtensionsTests
     {
         // Arrange
         var services = new ServiceCollection();
-        services.AddSingleton<ITestHarness, FakeTestHarness>(); // Required dependency
+        services.AddSingleton<IEvaluationHarness, FakeTestHarness>(); // Required dependency
 
         // Act
         services.AddAgentEval(options =>
@@ -133,7 +133,7 @@ public class ServiceCollectionExtensionsTests
         var provider = services.BuildServiceProvider();
 
         // Assert
-        var harness = provider.GetService<ITestHarness>();
+        var harness = provider.GetService<IEvaluationHarness>();
         Assert.NotNull(harness);
         Assert.Same(mockHarness, harness);
     }
@@ -143,7 +143,7 @@ public class ServiceCollectionExtensionsTests
     {
         // Arrange
         var services = new ServiceCollection();
-        services.AddSingleton<ITestHarness, FakeTestHarness>(); // Required dependency
+        services.AddSingleton<IEvaluationHarness, FakeTestHarness>(); // Required dependency
 
         // Act
         services.AddAgentEvalScoped(); // Even with scoped, utilities should be singleton
@@ -164,7 +164,7 @@ public class ServiceCollectionExtensionsTests
     {
         // Arrange
         var services = new ServiceCollection();
-        services.AddSingleton<ITestHarness, FakeTestHarness>(); // Required dependency
+        services.AddSingleton<IEvaluationHarness, FakeTestHarness>(); // Required dependency
         services.AddAgentEval();
         var provider = services.BuildServiceProvider();
 
@@ -181,7 +181,7 @@ public class ServiceCollectionExtensionsTests
     {
         // Arrange
         var services = new ServiceCollection();
-        services.AddSingleton<ITestHarness, FakeTestHarness>(); // Required dependency
+        services.AddSingleton<IEvaluationHarness, FakeTestHarness>(); // Required dependency
         services.AddAgentEval();
         var provider = services.BuildServiceProvider();
 
@@ -194,12 +194,12 @@ public class ServiceCollectionExtensionsTests
     }
 
     // Fake test harness for testing
-    private class FakeTestHarness : ITestHarness
+    private class FakeTestHarness : IEvaluationHarness
     {
-        public Task<TestResult> RunTestAsync(
-            ITestableAgent agent,
+        public Task<TestResult> RunEvaluationAsync(
+            IEvaluableAgent agent,
             TestCase testCase,
-            TestOptions? options = null,
+            EvaluationOptions? options = null,
             CancellationToken cancellationToken = default)
         {
             throw new NotImplementedException();

@@ -11,7 +11,7 @@ namespace AgentEval.Core;
 /// </summary>
 /// <remarks>
 /// <para>
-/// While <see cref="ITestableAgent"/> treats agents as black boxes (prompt → response),
+/// While <see cref="IEvaluableAgent"/> treats agents as black boxes (prompt → response),
 /// this interface exposes the internal workflow structure, enabling:
 /// </para>
 /// <list type="bullet">
@@ -25,7 +25,7 @@ namespace AgentEval.Core;
 /// or any multi-agent orchestration pattern.
 /// </para>
 /// </remarks>
-public interface IWorkflowTestableAgent : ITestableAgent
+public interface IWorkflowEvaluableAgent : IEvaluableAgent
 {
     /// <summary>
     /// Executes the workflow and returns detailed per-executor results.

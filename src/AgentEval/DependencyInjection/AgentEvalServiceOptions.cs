@@ -21,7 +21,7 @@ public class AgentEvalServiceOptions
     /// Gets or sets a factory for creating test harness instances.
     /// If null, no test harness is registered.
     /// </summary>
-    public Func<IServiceProvider, ITestHarness>? TestHarnessFactory { get; set; }
+    public Func<IServiceProvider, IEvaluationHarness>? TestHarnessFactory { get; set; }
 
     /// <summary>
     /// Gets or sets a factory for creating logger instances.

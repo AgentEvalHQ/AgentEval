@@ -11,7 +11,7 @@ namespace AgentEval.Core;
 /// This follows the Interface Segregation Principle - only the minimal
 /// methods needed for testing are required.
 /// </remarks>
-public interface ITestableAgent
+public interface IEvaluableAgent
 {
     /// <summary>
     /// Gets the name of the agent for identification in reports.
@@ -30,7 +30,7 @@ public interface ITestableAgent
 /// <summary>
 /// Extended interface for agents that support streaming.
 /// </summary>
-public interface IStreamableAgent : ITestableAgent
+public interface IStreamableAgent : IEvaluableAgent
 {
     /// <summary>
     /// Invokes the agent with streaming response.

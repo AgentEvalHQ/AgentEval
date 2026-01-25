@@ -42,7 +42,7 @@ public static class Sample02_AgentWithOneTool
         // ═══════════════════════════════════════════════════════════════
         Console.WriteLine("📝 Step 2: Creating test harness with tool tracking...\n");
         
-        var harness = new MAFTestHarness(verbose: true);
+        var harness = new MAFEvaluationHarness(verbose: true);
         Console.WriteLine("   ✓ Test harness ready\n");
 
         // ═══════════════════════════════════════════════════════════════
@@ -67,7 +67,7 @@ public static class Sample02_AgentWithOneTool
         Console.WriteLine("📝 Step 4: Running test with tool tracking...\n");
         
         var adapter = new MAFAgentAdapter(agent);
-        var result = await harness.RunTestAsync(adapter, testCase, new TestOptions
+        var result = await harness.RunEvaluationAsync(adapter, testCase, new EvaluationOptions
         {
             TrackTools = true,  // Enable tool tracking
             TrackPerformance = true
@@ -147,7 +147,7 @@ public static class Sample02_AgentWithOneTool
         // Summary
         // ═══════════════════════════════════════════════════════════════
         Console.WriteLine("\n💡 KEY TAKEAWAYS:");
-        Console.WriteLine("   • Set TrackTools = true in TestOptions to track tool calls");
+        Console.WriteLine("   • Set TrackTools = true in EvaluationOptions to track tool calls");
         Console.WriteLine("   • result.ToolUsage contains all tool call information");
         Console.WriteLine("   • .Should() starts fluent assertions");
         Console.WriteLine("   • .HaveCalledTool(\"Name\") verifies a tool was called");

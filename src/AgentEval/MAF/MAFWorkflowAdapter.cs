@@ -22,7 +22,7 @@ namespace AgentEval.MAF;
 /// For agents that are not MAF Workflows, use <see cref="MAFAgentAdapter"/> instead.
 /// </para>
 /// </remarks>
-public class MAFWorkflowAdapter : IWorkflowTestableAgent
+public class MAFWorkflowAdapter : IWorkflowEvaluableAgent
 {
     private readonly Func<string, CancellationToken, IAsyncEnumerable<WorkflowEvent>> _workflowExecutor;
     private readonly List<string> _executorIds;

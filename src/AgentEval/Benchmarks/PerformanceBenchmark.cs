@@ -11,10 +11,10 @@ namespace AgentEval.Benchmarks;
 /// </summary>
 public class PerformanceBenchmark
 {
-    private readonly ITestableAgent _agent;
+    private readonly IEvaluableAgent _agent;
     private readonly PerformanceBenchmarkOptions _options;
     
-    public PerformanceBenchmark(ITestableAgent agent, PerformanceBenchmarkOptions? options = null)
+    public PerformanceBenchmark(IEvaluableAgent agent, PerformanceBenchmarkOptions? options = null)
     {
         _agent = agent ?? throw new ArgumentNullException(nameof(agent));
         _options = options ?? new PerformanceBenchmarkOptions();

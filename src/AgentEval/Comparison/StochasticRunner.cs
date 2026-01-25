@@ -42,7 +42,7 @@ public interface IStochasticRunner
     /// </returns>
     /// <exception cref="ArgumentNullException">Thrown when agent or testCase is null.</exception>
     Task<StochasticResult> RunStochasticTestAsync(
-        ITestableAgent agent,
+        IEvaluableAgent agent,
         TestCase testCase,
         StochasticOptions? options = null,
         CancellationToken cancellationToken = default);
@@ -76,41 +76,41 @@ public interface IStochasticRunner
 /// </summary>
 public class StochasticRunner : IStochasticRunner
 {
-    private readonly ITestHarness _harness;
+    private readonly IEvaluationHarness _harness;
     private readonly IStatisticsCalculator _statisticsCalculator;
-    private readonly TestOptions? _testOptions;
+    private readonly EvaluationOptions? _testOptions;
     
     /// <summary>
     /// Creates a new stochastic runner with dependency injection.
     /// </summary>
     /// <param name="harness">The test harness to use for running individual tests.</param>
     /// <param name="statisticsCalculator">Optional statistics calculator. If null, uses default.</param>
-    /// <param name="testOptions">Optional test options for each run.</param>
+    /// <param name="EvaluationOptions">Optional test options for each run.</param>
     [ActivatorUtilitiesConstructor]
     public StochasticRunner(
-        ITestHarness harness, 
+        IEvaluationHarness harness, 
         IStatisticsCalculator? statisticsCalculator = null,
-        TestOptions? testOptions = null)
+        EvaluationOptions? EvaluationOptions = null)
     {
         _harness = harness ?? throw new ArgumentNullException(nameof(harness));
         _statisticsCalculator = statisticsCalculator ?? DefaultStatisticsCalculator.Instance;
-        _testOptions = testOptions;
+        _testOptions = EvaluationOptions;
     }
     
     /// <summary>
     /// Creates a new stochastic runner (legacy constructor for backward compatibility).
     /// </summary>
     /// <param name="harness">The test harness to use for running individual tests.</param>
-    /// <param name="testOptions">Optional test options for each run.</param>
+    /// <param name="EvaluationOptions">Optional test options for each run.</param>
     [Obsolete("Use constructor with IStatisticsCalculator parameter for better testability. This constructor will be removed in a future version.")]
-    public StochasticRunner(ITestHarness harness, TestOptions? testOptions)
-        : this(harness, statisticsCalculator: null, testOptions: testOptions)
+    public StochasticRunner(IEvaluationHarness harness, EvaluationOptions? EvaluationOptions)
+        : this(harness, statisticsCalculator: null, EvaluationOptions: EvaluationOptions)
     {
     }
     
     /// <inheritdoc/>
     public Task<StochasticResult> RunStochasticTestAsync(
-        ITestableAgent agent,
+        IEvaluableAgent agent,
         TestCase testCase,
         StochasticOptions? options = null,
         CancellationToken cancellationToken = default)
@@ -137,7 +137,7 @@ public class StochasticRunner : IStochasticRunner
     }
     
     private async Task<StochasticResult> RunStochasticTestInternalAsync(
-        Func<ITestableAgent> agentProvider,
+        Func<IEvaluableAgent> agentProvider,
         TestCase testCase,
         StochasticOptions options,
         CancellationToken cancellationToken)
@@ -155,7 +155,7 @@ public class StochasticRunner : IStochasticRunner
                 cancellationToken.ThrowIfCancellationRequested();
                 
                 var agent = agentProvider();
-                var result = await _harness.RunTestAsync(agent, testCase, _testOptions, cancellationToken);
+                var result = await _harness.RunEvaluationAsync(agent, testCase, _testOptions, cancellationToken);
                 results.Add(result);
                 
                 if (options.DelayBetweenRuns.HasValue && options.DelayBetweenRuns.Value > TimeSpan.Zero)
@@ -205,7 +205,7 @@ public class StochasticRunner : IStochasticRunner
     }
     
     private async Task<TestResult> RunSingleTestWithThrottlingAsync(
-        Func<ITestableAgent> agentProvider,
+        Func<IEvaluableAgent> agentProvider,
         TestCase testCase,
         SemaphoreSlim semaphore,
         TimeSpan? delay,
@@ -215,7 +215,7 @@ public class StochasticRunner : IStochasticRunner
         try
         {
             var agent = agentProvider();
-            var result = await _harness.RunTestAsync(agent, testCase, _testOptions, cancellationToken);
+            var result = await _harness.RunEvaluationAsync(agent, testCase, _testOptions, cancellationToken);
             
             if (delay.HasValue && delay.Value > TimeSpan.Zero)
             {

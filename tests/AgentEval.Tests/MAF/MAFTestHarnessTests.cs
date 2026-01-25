@@ -10,7 +10,7 @@ using Xunit;
 namespace AgentEval.Tests;
 
 /// <summary>
-/// Tests for MAFTestHarness.
+/// Tests for MAFEvaluationHarness.
 /// </summary>
 public class MAFTestHarnessTests
 {
@@ -20,7 +20,7 @@ public class MAFTestHarnessTests
     public void Constructor_DefaultVerbose_CreatesHarness()
     {
         // Act
-        var harness = new MAFTestHarness(verbose: true);
+        var harness = new MAFEvaluationHarness(verbose: true);
         
         // Assert
         Assert.NotNull(harness);
@@ -30,7 +30,7 @@ public class MAFTestHarnessTests
     public void Constructor_NonVerbose_CreatesHarness()
     {
         // Act
-        var harness = new MAFTestHarness(verbose: false);
+        var harness = new MAFEvaluationHarness(verbose: false);
         
         // Assert
         Assert.NotNull(harness);
@@ -43,7 +43,7 @@ public class MAFTestHarnessTests
         var fakeChatClient = new FakeChatClient();
         
         // Act
-        var harness = new MAFTestHarness(fakeChatClient, verbose: false);
+        var harness = new MAFEvaluationHarness(fakeChatClient, verbose: false);
         
         // Assert
         Assert.NotNull(harness);
@@ -57,7 +57,7 @@ public class MAFTestHarnessTests
         var logger = NullAgentEvalLogger.Instance;
         
         // Act
-        var harness = new MAFTestHarness(evaluator, logger);
+        var harness = new MAFEvaluationHarness(evaluator, logger);
         
         // Assert
         Assert.NotNull(harness);
@@ -65,13 +65,13 @@ public class MAFTestHarnessTests
 
     #endregion
 
-    #region RunTestAsync Tests
+    #region RunEvaluationAsync Tests
 
     [Fact]
     public async Task RunTestAsync_SimpleTest_ReturnsResult()
     {
         // Arrange
-        var harness = new MAFTestHarness(verbose: false);
+        var harness = new MAFEvaluationHarness(verbose: false);
         var mockAgent = new SimpleTestableAgent("TestAgent", "Hello, World!");
         var testCase = new TestCase
         {
@@ -80,7 +80,7 @@ public class MAFTestHarnessTests
         };
         
         // Act
-        var result = await harness.RunTestAsync(mockAgent, testCase);
+        var result = await harness.RunEvaluationAsync(mockAgent, testCase);
         
         // Assert
         Assert.Equal("Simple Test", result.TestName);
@@ -92,7 +92,7 @@ public class MAFTestHarnessTests
     public async Task RunTestAsync_EmptyOutput_Fails()
     {
         // Arrange
-        var harness = new MAFTestHarness(verbose: false);
+        var harness = new MAFEvaluationHarness(verbose: false);
         var mockAgent = new SimpleTestableAgent("TestAgent", "");
         var testCase = new TestCase
         {
@@ -101,7 +101,7 @@ public class MAFTestHarnessTests
         };
         
         // Act
-        var result = await harness.RunTestAsync(mockAgent, testCase);
+        var result = await harness.RunEvaluationAsync(mockAgent, testCase);
         
         // Assert
         Assert.False(result.Passed);
@@ -112,7 +112,7 @@ public class MAFTestHarnessTests
     public async Task RunTestAsync_WithExpectedOutputContains_PassesWhenContains()
     {
         // Arrange
-        var harness = new MAFTestHarness(verbose: false);
+        var harness = new MAFEvaluationHarness(verbose: false);
         var mockAgent = new SimpleTestableAgent("TestAgent", "The capital of France is Paris.");
         var testCase = new TestCase
         {
@@ -122,7 +122,7 @@ public class MAFTestHarnessTests
         };
         
         // Act
-        var result = await harness.RunTestAsync(mockAgent, testCase);
+        var result = await harness.RunEvaluationAsync(mockAgent, testCase);
         
         // Assert
         Assert.True(result.Passed);
@@ -132,7 +132,7 @@ public class MAFTestHarnessTests
     public async Task RunTestAsync_WithExpectedOutputContains_FailsWhenMissing()
     {
         // Arrange
-        var harness = new MAFTestHarness(verbose: false);
+        var harness = new MAFEvaluationHarness(verbose: false);
         var mockAgent = new SimpleTestableAgent("TestAgent", "The capital is unknown.");
         var testCase = new TestCase
         {
@@ -142,7 +142,7 @@ public class MAFTestHarnessTests
         };
         
         // Act
-        var result = await harness.RunTestAsync(mockAgent, testCase);
+        var result = await harness.RunEvaluationAsync(mockAgent, testCase);
         
         // Assert
         Assert.False(result.Passed);
@@ -153,17 +153,17 @@ public class MAFTestHarnessTests
     public async Task RunTestAsync_WithPerformanceTracking_CapturesMetrics()
     {
         // Arrange
-        var harness = new MAFTestHarness(verbose: false);
+        var harness = new MAFEvaluationHarness(verbose: false);
         var mockAgent = new SimpleTestableAgent("TestAgent", "Done!");
         var testCase = new TestCase
         {
             Name = "Performance Test",
             Input = "Do something"
         };
-        var options = new TestOptions { TrackPerformance = true };
+        var options = new EvaluationOptions { TrackPerformance = true };
         
         // Act
-        var result = await harness.RunTestAsync(mockAgent, testCase, options);
+        var result = await harness.RunEvaluationAsync(mockAgent, testCase, options);
         
         // Assert
         Assert.NotNull(result.Performance);
@@ -175,7 +175,7 @@ public class MAFTestHarnessTests
     public async Task RunTestAsync_AgentThrowsException_CapturesError()
     {
         // Arrange
-        var harness = new MAFTestHarness(verbose: false);
+        var harness = new MAFEvaluationHarness(verbose: false);
         var mockAgent = new ThrowingTestableAgent("ThrowingAgent", new InvalidOperationException("Test error"));
         var testCase = new TestCase
         {
@@ -184,7 +184,7 @@ public class MAFTestHarnessTests
         };
         
         // Act
-        var result = await harness.RunTestAsync(mockAgent, testCase);
+        var result = await harness.RunEvaluationAsync(mockAgent, testCase);
         
         // Assert
         Assert.False(result.Passed);
@@ -198,17 +198,17 @@ public class MAFTestHarnessTests
     public async Task RunTestAsync_WithToolTracking_ExtractsToolUsage()
     {
         // Arrange
-        var harness = new MAFTestHarness(verbose: false);
+        var harness = new MAFEvaluationHarness(verbose: false);
         var mockAgent = new AgentWithToolCalls("ToolAgent", "Result", new[] { "Tool1", "Tool2" });
         var testCase = new TestCase
         {
             Name = "Tool Tracking Test",
             Input = "Use tools"
         };
-        var options = new TestOptions { TrackTools = true };
+        var options = new EvaluationOptions { TrackTools = true };
         
         // Act
-        var result = await harness.RunTestAsync(mockAgent, testCase, options);
+        var result = await harness.RunEvaluationAsync(mockAgent, testCase, options);
         
         // Assert
         Assert.True(result.Passed);
@@ -218,13 +218,13 @@ public class MAFTestHarnessTests
 
     #endregion
 
-    #region RunTestSuiteAsync Tests
+    #region RunEvaluationSuiteAsync Tests
 
     [Fact]
     public async Task RunTestSuiteAsync_MultipleTests_ReturnsSummary()
     {
         // Arrange
-        var harness = new MAFTestHarness(verbose: false);
+        var harness = new MAFEvaluationHarness(verbose: false);
         var mockAgent = new SimpleTestableAgent("TestAgent", "Done!");
         var testCases = new[]
         {
@@ -234,7 +234,7 @@ public class MAFTestHarnessTests
         };
         
         // Act
-        var summary = await harness.RunTestSuiteAsync("Test Suite", mockAgent, testCases);
+        var summary = await harness.RunEvaluationSuiteAsync("Test Suite", mockAgent, testCases);
         
         // Assert
         Assert.Equal("Test Suite", summary.SuiteName);
@@ -248,7 +248,7 @@ public class MAFTestHarnessTests
     public async Task RunTestSuiteAsync_MixedResults_CalculatesCorrectly()
     {
         // Arrange
-        var harness = new MAFTestHarness(verbose: false);
+        var harness = new MAFEvaluationHarness(verbose: false);
         var alternatingAgent = new AlternatingTestableAgent();
         var testCases = new[]
         {
@@ -257,7 +257,7 @@ public class MAFTestHarnessTests
         };
         
         // Act
-        var summary = await harness.RunTestSuiteAsync("Mixed Suite", alternatingAgent, testCases);
+        var summary = await harness.RunEvaluationSuiteAsync("Mixed Suite", alternatingAgent, testCases);
         
         // Assert
         Assert.Equal(2, summary.TotalCount);
@@ -271,7 +271,7 @@ public class MAFTestHarnessTests
 
 #region Test Helpers
 
-internal class SimpleTestableAgent : ITestableAgent
+internal class SimpleTestableAgent : IEvaluableAgent
 {
     private readonly string _responseText;
     
@@ -289,7 +289,7 @@ internal class SimpleTestableAgent : ITestableAgent
     }
 }
 
-internal class ThrowingTestableAgent : ITestableAgent
+internal class ThrowingTestableAgent : IEvaluableAgent
 {
     private readonly Exception _exception;
     
@@ -307,7 +307,7 @@ internal class ThrowingTestableAgent : ITestableAgent
     }
 }
 
-internal class AgentWithToolCalls : ITestableAgent
+internal class AgentWithToolCalls : IEvaluableAgent
 {
     private readonly string _responseText;
     private readonly string[] _toolNames;
@@ -356,7 +356,7 @@ internal class AgentWithToolCalls : ITestableAgent
     }
 }
 
-internal class AlternatingTestableAgent : ITestableAgent
+internal class AlternatingTestableAgent : IEvaluableAgent
 {
     public string Name => "AlternatingAgent";
     
@@ -370,13 +370,13 @@ internal class AlternatingTestableAgent : ITestableAgent
 
 internal class MockEvaluator : IEvaluator
 {
-    public Task<EvaluationResult> EvaluateAsync(
+    public Task<AgentEval.Core.EvaluationResult> EvaluateAsync(
         string input, 
         string output, 
         IEnumerable<string> criteria, 
         CancellationToken cancellationToken = default)
     {
-        return Task.FromResult(new EvaluationResult
+        return Task.FromResult(new AgentEval.Core.EvaluationResult
         {
             OverallScore = 100,
             Summary = "Mock evaluation passed"

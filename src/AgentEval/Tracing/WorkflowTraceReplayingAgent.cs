@@ -7,7 +7,7 @@ using AgentEval.Models;
 namespace AgentEval.Tracing;
 
 /// <summary>
-/// Replays a recorded WorkflowTrace as a mock IWorkflowTestableAgent.
+/// Replays a recorded WorkflowTrace as a mock IWorkflowEvaluableAgent.
 /// Enables deterministic, fast, and cost-free test execution of multi-agent workflows.
 /// </summary>
 /// <example>
@@ -21,7 +21,7 @@ namespace AgentEval.Tracing;
 /// result.Steps.Should().HaveCount(3);
 /// </code>
 /// </example>
-public sealed class WorkflowTraceReplayingAgent : IWorkflowTestableAgent
+public sealed class WorkflowTraceReplayingAgent : IWorkflowEvaluableAgent
 {
     private readonly WorkflowTrace _trace;
     private readonly WorkflowTraceReplayOptions _options;

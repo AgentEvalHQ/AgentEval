@@ -77,7 +77,7 @@ public class TimeTravelTraceTests
     [Fact]
     public void TestMetadata_ContainsRequiredFields()
     {
-        var metadata = new TestMetadata
+        var metadata = new EvaluationMetadata
         {
             TestName = "MyTest",
             StartTime = DateTimeOffset.UtcNow.AddSeconds(-1),
@@ -302,7 +302,7 @@ public class TimeTravelTraceTests
         {
             TraceId = "trace_123",
             ExecutionType = ExecutionType.SingleAgent,
-            Test = new TestMetadata
+            Test = new EvaluationMetadata
             {
                 TestName = "WeatherAgentTest",
                 StartTime = startTime,

@@ -11,7 +11,7 @@ namespace AgentEval.Output;
 /// </summary>
 public abstract class AgentEvalTestBase : IDisposable
 {
-    private readonly TestOutputWriter _outputWriter;
+    private readonly EvaluationOutputWriter _outputWriter;
     private readonly TraceArtifactManager _artifactManager;
     private readonly TextWriter? _externalOutput;
     private readonly StringWriter _capturedOutput;
@@ -43,7 +43,7 @@ public abstract class AgentEvalTestBase : IDisposable
         Settings = settings ?? new VerbositySettings { Level = VerbosityConfiguration.Current };
         
         _capturedOutput = new StringWriter();
-        _outputWriter = new TestOutputWriter(Settings, _capturedOutput);
+        _outputWriter = new EvaluationOutputWriter(Settings, _capturedOutput);
         _artifactManager = new TraceArtifactManager(Settings.TraceOutputDirectory ?? VerbosityConfiguration.TraceDirectory);
     }
 

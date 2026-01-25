@@ -38,7 +38,7 @@ public interface IAgentFactory
     /// Each call should return a new instance to ensure test isolation.
     /// </summary>
     /// <returns>A new testable agent instance.</returns>
-    ITestableAgent CreateAgent();
+    IEvaluableAgent CreateAgent();
     
     /// <summary>
     /// Optional model-specific configuration.

@@ -338,7 +338,7 @@ public class AgenticBenchmarkTests
 /// <summary>
 /// Mock testable agent for testing.
 /// </summary>
-internal class MockTestableAgent : ITestableAgent
+internal class MockTestableAgent : IEvaluableAgent
 {
     private readonly string _responseText;
     private readonly (string Name, Dictionary<string, object?> Args)[] _toolCalls;

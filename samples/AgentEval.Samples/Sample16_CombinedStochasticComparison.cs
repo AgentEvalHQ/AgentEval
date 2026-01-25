@@ -65,8 +65,8 @@ public static class Sample16_CombinedStochasticComparison
         // ═══════════════════════════════════════════════════════════════
         Console.WriteLine("📝 Step 2: Setting up test infrastructure...\n");
         
-        var harness = new MAFTestHarness(verbose: false);
-        var stochasticRunner = new StochasticRunner(harness, new TestOptions
+        var harness = new MAFEvaluationHarness(verbose: false);
+        var stochasticRunner = new StochasticRunner(harness, new EvaluationOptions
         {
             TrackTools = true,
             TrackPerformance = true,
@@ -193,7 +193,7 @@ public static class Sample16_CombinedStochasticComparison
         };
     }
     
-    private static ITestableAgent CreateAgentWithTool(
+    private static IEvaluableAgent CreateAgentWithTool(
         AzureOpenAIClient client,
         string deployment,
         string modelName)

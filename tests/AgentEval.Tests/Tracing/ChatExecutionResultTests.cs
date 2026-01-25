@@ -348,7 +348,7 @@ public class ChatExecutionResultTests
 
     #region Mock Agent
 
-    private class MockTestableAgent : ITestableAgent
+    private class MockTestableAgent : IEvaluableAgent
     {
         private readonly Func<string> _responseFactory;
         private readonly TokenUsage? _tokenUsage;

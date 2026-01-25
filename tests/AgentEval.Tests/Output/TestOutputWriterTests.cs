@@ -12,7 +12,7 @@ public class TestOutputWriterTests
     [Fact]
     public void Constructor_WithDefaultSettings_DoesNotThrow()
     {
-        var writer = new TestOutputWriter();
+        var writer = new EvaluationOutputWriter();
         Assert.NotNull(writer);
     }
 
@@ -20,26 +20,26 @@ public class TestOutputWriterTests
     public void Constructor_WithSettings_DoesNotThrow()
     {
         var settings = new VerbositySettings { Level = VerbosityLevel.Full };
-        var writer = new TestOutputWriter(settings);
+        var writer = new EvaluationOutputWriter(settings);
         Assert.NotNull(writer);
     }
 
     [Fact]
     public void Constructor_WithNullSettings_Throws()
     {
-        Assert.Throws<ArgumentNullException>(() => new TestOutputWriter(null!, Console.Out));
+        Assert.Throws<ArgumentNullException>(() => new EvaluationOutputWriter(null!, Console.Out));
     }
 
     [Fact]
     public void Constructor_WithNullOutput_Throws()
     {
-        Assert.Throws<ArgumentNullException>(() => new TestOutputWriter(new VerbositySettings(), null!));
+        Assert.Throws<ArgumentNullException>(() => new EvaluationOutputWriter(new VerbositySettings(), null!));
     }
 
     [Fact]
     public void WriteTestResult_NullResult_Throws()
     {
-        var writer = new TestOutputWriter();
+        var writer = new EvaluationOutputWriter();
         Assert.Throws<ArgumentNullException>(() => writer.WriteTestResult(null!));
     }
 
@@ -48,7 +48,7 @@ public class TestOutputWriterTests
     {
         var output = new StringWriter();
         var settings = new VerbositySettings { Level = VerbosityLevel.None };
-        var writer = new TestOutputWriter(settings, output);
+        var writer = new EvaluationOutputWriter(settings, output);
         var result = CreatePassingResult();
 
         writer.WriteTestResult(result);
@@ -63,7 +63,7 @@ public class TestOutputWriterTests
     {
         var output = new StringWriter();
         var settings = new VerbositySettings { Level = VerbosityLevel.None };
-        var writer = new TestOutputWriter(settings, output);
+        var writer = new EvaluationOutputWriter(settings, output);
         var result = CreateFailingResult();
 
         writer.WriteTestResult(result);
@@ -78,7 +78,7 @@ public class TestOutputWriterTests
     {
         var output = new StringWriter();
         var settings = new VerbositySettings { Level = VerbosityLevel.Summary };
-        var writer = new TestOutputWriter(settings, output);
+        var writer = new EvaluationOutputWriter(settings, output);
         var result = CreatePassingResult();
 
         writer.WriteTestResult(result);
@@ -92,7 +92,7 @@ public class TestOutputWriterTests
     {
         var output = new StringWriter();
         var settings = new VerbositySettings { Level = VerbosityLevel.Summary };
-        var writer = new TestOutputWriter(settings, output);
+        var writer = new EvaluationOutputWriter(settings, output);
         var result = CreateResultWithTools();
 
         writer.WriteTestResult(result);
@@ -106,7 +106,7 @@ public class TestOutputWriterTests
     {
         var output = new StringWriter();
         var settings = new VerbositySettings { Level = VerbosityLevel.Detailed };
-        var writer = new TestOutputWriter(settings, output);
+        var writer = new EvaluationOutputWriter(settings, output);
         var result = CreateResultWithPerformance();
 
         writer.WriteTestResult(result);
@@ -121,7 +121,7 @@ public class TestOutputWriterTests
     {
         var output = new StringWriter();
         var settings = new VerbositySettings { Level = VerbosityLevel.Detailed };
-        var writer = new TestOutputWriter(settings, output);
+        var writer = new EvaluationOutputWriter(settings, output);
         var result = CreateResultWithTools();
 
         writer.WriteTestResult(result);
@@ -136,7 +136,7 @@ public class TestOutputWriterTests
     {
         var output = new StringWriter();
         var settings = new VerbositySettings { Level = VerbosityLevel.Detailed };
-        var writer = new TestOutputWriter(settings, output);
+        var writer = new EvaluationOutputWriter(settings, output);
         var result = CreateResultWithMetrics();
 
         writer.WriteTestResult(result);
@@ -151,7 +151,7 @@ public class TestOutputWriterTests
     {
         var output = new StringWriter();
         var settings = new VerbositySettings { Level = VerbosityLevel.Detailed };
-        var writer = new TestOutputWriter(settings, output);
+        var writer = new EvaluationOutputWriter(settings, output);
         var result = CreateResultWithError();
 
         writer.WriteTestResult(result);
@@ -166,7 +166,7 @@ public class TestOutputWriterTests
     {
         var output = new StringWriter();
         var settings = new VerbositySettings { Level = VerbosityLevel.Full };
-        var writer = new TestOutputWriter(settings, output);
+        var writer = new EvaluationOutputWriter(settings, output);
         var result = CreatePassingResult();
 
         writer.WriteTestResult(result);
@@ -187,7 +187,7 @@ public class TestOutputWriterTests
             Level = VerbosityLevel.Detailed,
             IncludeToolArguments = false
         };
-        var writer = new TestOutputWriter(settings, output);
+        var writer = new EvaluationOutputWriter(settings, output);
         var result = CreateResultWithTools();
 
         writer.WriteTestResult(result);
@@ -206,7 +206,7 @@ public class TestOutputWriterTests
             Level = VerbosityLevel.Detailed,
             IncludeToolResults = false
         };
-        var writer = new TestOutputWriter(settings, output);
+        var writer = new EvaluationOutputWriter(settings, output);
         var result = CreateResultWithTools();
 
         writer.WriteTestResult(result);
@@ -225,7 +225,7 @@ public class TestOutputWriterTests
             Level = VerbosityLevel.Detailed,
             IncludePerformanceMetrics = false
         };
-        var writer = new TestOutputWriter(settings, output);
+        var writer = new EvaluationOutputWriter(settings, output);
         var result = CreateResultWithPerformance();
 
         writer.WriteTestResult(result);
@@ -334,7 +334,7 @@ public class TestOutputWriterTests
 }
 
 /// <summary>
-/// Additional edge case tests for TestOutputWriter.
+/// Additional edge case tests for EvaluationOutputWriter.
 /// </summary>
 public class TestOutputWriterEdgeCaseTests
 {
@@ -343,7 +343,7 @@ public class TestOutputWriterEdgeCaseTests
     {
         var output = new StringWriter();
         var settings = new VerbositySettings { Level = VerbosityLevel.Detailed };
-        var writer = new TestOutputWriter(settings, output);
+        var writer = new EvaluationOutputWriter(settings, output);
         
         var failure = new FailureReport
         {
@@ -373,7 +373,7 @@ public class TestOutputWriterEdgeCaseTests
     {
         var output = new StringWriter();
         var settings = new VerbositySettings { Level = VerbosityLevel.Detailed };
-        var writer = new TestOutputWriter(settings, output);
+        var writer = new EvaluationOutputWriter(settings, output);
         
         var result = new TestResult
         {
@@ -394,7 +394,7 @@ public class TestOutputWriterEdgeCaseTests
     {
         var output = new StringWriter();
         var settings = new VerbositySettings { Level = VerbosityLevel.Detailed };
-        var writer = new TestOutputWriter(settings, output);
+        var writer = new EvaluationOutputWriter(settings, output);
         
         var result = new TestResult
         {
@@ -427,7 +427,7 @@ public class TestOutputWriterEdgeCaseTests
     {
         var output = new StringWriter();
         var settings = new VerbositySettings { Level = VerbosityLevel.Summary };
-        var writer = new TestOutputWriter(settings, output);
+        var writer = new EvaluationOutputWriter(settings, output);
         
         var result = new TestResult
         {
@@ -454,7 +454,7 @@ public class TestOutputWriterEdgeCaseTests
     {
         var output = new StringWriter();
         var settings = new VerbositySettings { Level = VerbosityLevel.Detailed };
-        var writer = new TestOutputWriter(settings, output);
+        var writer = new EvaluationOutputWriter(settings, output);
         
         var result = new TestResult
         {
@@ -480,7 +480,7 @@ public class TestOutputWriterEdgeCaseTests
     {
         var output = new StringWriter();
         var settings = new VerbositySettings { Level = VerbosityLevel.Full };
-        var writer = new TestOutputWriter(settings, output);
+        var writer = new EvaluationOutputWriter(settings, output);
         
         var result = new TestResult
         {
@@ -517,7 +517,7 @@ public class TestOutputWriterEdgeCaseTests
             Level = VerbosityLevel.Detailed,
             IncludeToolResults = true
         };
-        var writer = new TestOutputWriter(settings, output);
+        var writer = new EvaluationOutputWriter(settings, output);
         
         var longResult = new string('X', 500);  // 500 characters
         var result = new TestResult
@@ -556,7 +556,7 @@ public class TestOutputWriterEdgeCaseTests
             Level = VerbosityLevel.Detailed,
             IncludeToolResults = true
         };
-        var writer = new TestOutputWriter(settings, output);
+        var writer = new EvaluationOutputWriter(settings, output);
         
         var result = new TestResult
         {
@@ -588,7 +588,7 @@ public class TestOutputWriterEdgeCaseTests
     {
         var output = new StringWriter();
         var settings = new VerbositySettings { Level = VerbosityLevel.Detailed };
-        var writer = new TestOutputWriter(settings, output);
+        var writer = new EvaluationOutputWriter(settings, output);
         
         var result = new TestResult
         {
@@ -615,7 +615,7 @@ public class TestOutputWriterEdgeCaseTests
     {
         var output = new StringWriter();
         var settings = new VerbositySettings { Level = VerbosityLevel.Detailed };
-        var writer = new TestOutputWriter(settings, output);
+        var writer = new EvaluationOutputWriter(settings, output);
         
         var result = new TestResult
         {

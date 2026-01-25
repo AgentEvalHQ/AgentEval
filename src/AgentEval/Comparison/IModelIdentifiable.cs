@@ -5,7 +5,7 @@ namespace AgentEval.Comparison;
 
 /// <summary>
 /// Interface for agents that can identify which model they are using.
-/// This is an optional extension to ITestableAgent for model comparison scenarios.
+/// This is an optional extension to IEvaluableAgent for model comparison scenarios.
 /// </summary>
 public interface IModelIdentifiable
 {

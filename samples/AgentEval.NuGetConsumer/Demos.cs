@@ -30,7 +30,7 @@ public static class Demos
 
         ToolUsageReport toolUsage;
         string response = "";
-        EvaluationResult? llmEvaluation = null;
+        Core.EvaluationResult? llmEvaluation = null;
 
         if (useMock)
         {
@@ -47,8 +47,7 @@ public static class Demos
             response = "I found 3 flights to London for April 1st, 2026. The options are BA123, VS456, and AA789.";
             
             // Mock LLM evaluation result
-            llmEvaluation = new EvaluationResult
-            {
+            llmEvaluation = new Core.EvaluationResult {
                 OverallScore = 92,
                 Summary = "Response correctly identifies London as destination and lists flights.",
                 Improvements = new[] { "Could include pricing information" },
@@ -66,7 +65,7 @@ public static class Demos
             
             // Create harness WITH evaluator for LLM-as-a-judge
             var evaluatorClient = AgentFactory.CreateEvaluatorChatClient();
-            var harness = new MAFTestHarness(evaluatorClient, verbose: true);
+            var harness = new MAFEvaluationHarness(evaluatorClient, verbose: true);
             
             // Explicit prompt that FORCES tool usage  
             var testCase = new TestCase 
@@ -85,10 +84,10 @@ public static class Demos
                 PassingScore = 70
             };
             
-            var result = await harness.RunTestStreamingAsync(
+            var result = await harness.RunEvaluationStreamingAsync(
                 agent, 
                 testCase,
-                options: new TestOptions 
+                options: new EvaluationOptions 
                 { 
                     TrackTools = true,
                     EvaluateResponse = true,  // Enable LLM-as-a-judge!
@@ -101,8 +100,7 @@ public static class Demos
             // Extract LLM evaluation if available
             if (result.CriteriaResults?.Count > 0)
             {
-                llmEvaluation = new EvaluationResult
-                {
+                llmEvaluation = new Core.EvaluationResult {
                     OverallScore = result.Score,
                     Summary = result.Details ?? "",
                     Improvements = result.Suggestions ?? new List<string>(),
@@ -172,7 +170,7 @@ public static class Demos
 
             ShowCode("""
                 // Create harness with evaluator for LLM-as-a-judge
-                var harness = new MAFTestHarness(evaluatorClient, verbose: true);
+                var harness = new MAFEvaluationHarness(evaluatorClient, verbose: true);
                 
                 var testCase = new TestCase {
                     Input = "...",
@@ -184,8 +182,8 @@ public static class Demos
                     PassingScore = 70
                 };
                 
-                var result = await harness.RunTestStreamingAsync(agent, testCase,
-                    options: new TestOptions { EvaluateResponse = true });
+                var result = await harness.RunEvaluationStreamingAsync(agent, testCase,
+                    options: new EvaluationOptions { EvaluateResponse = true });
                 
                 // Tool assertions - fully chained with .And()
                 result.ToolUsage!.Should()
@@ -246,14 +244,14 @@ public static class Demos
 
     public static async Task RunCompleteExample(bool useMock)
     {
-        ShowSection("🎯 COMPLETE AGENTEVAL EXAMPLE", "Showcases ALL features: TestCase, TestOptions, TestResult, Assertions");
+        ShowSection("🎯 COMPLETE AGENTEVAL EXAMPLE", "Showcases ALL features: TestCase, EvaluationOptions, TestResult, Assertions");
 
         if (useMock)
         {
             Console.WriteLine("      ℹ️  Complete example requires REAL MODE for full feature demonstration.\n");
             Console.WriteLine("      This example showcases:\n");
             Console.WriteLine("      📋 TestCase: ALL properties (ExpectedTools, EvaluationCriteria, GroundTruth, etc.)");
-            Console.WriteLine("      ⚙️  TestOptions: ALL flags (TrackTools, TrackPerformance, EvaluateResponse, etc.)");
+            Console.WriteLine("      ⚙️  EvaluationOptions: ALL flags (TrackTools, TrackPerformance, EvaluateResponse, etc.)");
             Console.WriteLine("      📊 TestResult: Complete breakdown with LLM-as-a-judge");
             Console.WriteLine("      🔧 Both ExpectedTools validation AND fluent assertions");
             Console.WriteLine("      📈 Performance metrics with cost estimation");
@@ -267,7 +265,7 @@ public static class Demos
         // === CREATE AGENT & EVALUATOR ===
         var agent = AgentFactory.CreateTravelAgent(useMock: false);
         var evaluatorClient = AgentFactory.CreateEvaluatorChatClient();
-        var harness = new MAFTestHarness(evaluatorClient, verbose: true);  // Now with working verbose!
+        var harness = new MAFEvaluationHarness(evaluatorClient, verbose: true);  // Now with working verbose!
 
         // === COMPLETE TESTCASE - ALL PROPERTIES ===
         var testCase = new TestCase
@@ -275,7 +273,7 @@ public static class Demos
             // Core properties
             Name = "Complete Travel Booking Demo",
             Input = "Search for flights to Tokyo for March 20, 2026, book the cheapest one under $800, and send confirmation. Do not ask me the email, the tool already knows it, not needed.",
-            // Note: Model for cost calculation is set in TestOptions.ModelName (not here!)
+            // Note: Model for cost calculation is set in EvaluationOptions.ModelName (not here!)
             
             // Quick validations (no LLM cost)
             ExpectedOutputContains = "Tokyo",
@@ -312,8 +310,8 @@ public static class Demos
         Console.WriteLine("         • GroundTruth for RAG metrics");
         Console.WriteLine("         • Tags and Metadata for extensibility\n");
 
-        // === COMPLETE TESTOPTIONS - ALL FLAGS ===
-        var options = new TestOptions
+        // === COMPLETE EvaluationOptions - ALL FLAGS ===
+        var options = new EvaluationOptions
         {
             TrackTools = true,         // → result.ToolUsage, result.ToolsWereCalled
             TrackPerformance = true,   // → result.Performance with timing/tokens
@@ -327,7 +325,7 @@ public static class Demos
                                       //   Cost = (InputTokens × InputRate) + (OutputTokens × OutputRate)
         };
 
-        Console.WriteLine("      ⚙️  TestOptions configured with ALL flags:");
+        Console.WriteLine("      ⚙️  EvaluationOptions configured with ALL flags:");
         Console.WriteLine("         • TrackTools = true (captures tool usage)");
         Console.WriteLine("         • TrackPerformance = true (timing + cost)");
         Console.WriteLine("         • EvaluateResponse = true (LLM-as-a-judge)"); 
@@ -337,7 +335,7 @@ public static class Demos
         // === RUN WITH STREAMING + FULL CALLBACKS ===
         Console.WriteLine("      🌊 Running with STREAMING for maximum metrics...\n");
         
-        var result = await harness.RunTestStreamingAsync(
+        var result = await harness.RunEvaluationStreamingAsync(
             agent, 
             testCase,
             streamingOptions: new StreamingOptions
@@ -361,7 +359,7 @@ public static class Demos
 
         Console.WriteLine();
 
-        // === COMPLETE TESTRESULT BREAKDOWN ===
+        // === COMPLETE TestResult BREAKDOWN ===
         Console.WriteLine("   ═══════════════════════════════════════════════════════════════════════════");
         Console.WriteLine("   📊 COMPLETE TEST RESULT BREAKDOWN");
         Console.WriteLine("   ═══════════════════════════════════════════════════════════════════════════\n");
@@ -512,11 +510,11 @@ public static class Demos
             
             // === AUTOMATIC AGENTEVAL OUTPUT ===
             Console.WriteLine("   ═══════════════════════════════════════════════════════════════════════════════");
-            Console.WriteLine("   📋 AUTOMATIC OUTPUT (Built-in TestOutputWriter)");
+            Console.WriteLine("   📋 AUTOMATIC OUTPUT (Built-in EvaluationOutputWriter)");
             Console.WriteLine("   ═══════════════════════════════════════════════════════════════════════════════\n");
             Console.WriteLine("   This is what AgentEval generates automatically - no manual formatting needed!\n");
             
-            var writer = new TestOutputWriter(new VerbositySettings { Level = VerbosityLevel.Detailed });
+            var writer = new EvaluationOutputWriter(new VerbositySettings { Level = VerbosityLevel.Detailed });
             writer.WriteTestResult(result);
             
         }
@@ -544,8 +542,8 @@ public static class Demos
                 Metadata = { ["key"] = "value" }              // Custom data
             };
             
-            // 2. Complete TestOptions with ALL flags
-            var options = new TestOptions {
+            // 2. Complete EvaluationOptions with ALL flags
+            var options = new EvaluationOptions {
                 TrackTools = true,        // → result.ToolUsage
                 TrackPerformance = true,  // → result.Performance 
                 EvaluateResponse = true,  // → result.CriteriaResults
@@ -554,7 +552,7 @@ public static class Demos
             };
             
             // 3. Streaming execution with callbacks
-            var result = await harness.RunTestStreamingAsync(agent, testCase,
+            var result = await harness.RunEvaluationStreamingAsync(agent, testCase,
                 streamingOptions: new StreamingOptions {
                     OnFirstToken = ttft => Console.WriteLine($"TTFT: {ttft.TotalMilliseconds}ms"),
                     OnToolStart = tool => Console.WriteLine($"Tool: {tool.Name}"),
@@ -589,7 +587,7 @@ public static class Demos
         Console.WriteLine($"      🤖 Comparing models: {Config.Model} vs {Config.SecondaryModel}");
         Console.WriteLine("      📊 Running 3 iterations per model for statistical analysis...\n");
 
-        var harness = new MAFTestHarness(verbose: true);
+        var harness = new MAFEvaluationHarness(verbose: true);
 
         var testCase = new TestCase
         {
@@ -619,7 +617,7 @@ public static class Demos
                 var runner = new StochasticRunner(
                     harness, 
                     statisticsCalculator: null,
-                    new TestOptions 
+                    new EvaluationOptions 
                     { 
                         TrackTools = true, 
                         TrackPerformance = true,

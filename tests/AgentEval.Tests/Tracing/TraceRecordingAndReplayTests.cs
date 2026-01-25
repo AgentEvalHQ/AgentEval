@@ -673,7 +673,7 @@ public class TraceRecordingAndReplayTests
 
     #region Mock Agent
 
-    private class MockTestableAgent : ITestableAgent
+    private class MockTestableAgent : IEvaluableAgent
     {
         private readonly Func<string> _responseFactory;
         private readonly TokenUsage? _tokenUsage;
@@ -706,7 +706,7 @@ public class TraceRecordingAndReplayTests
 
     #region Mock Streaming Agent
 
-    private class MockStreamingAgent : ITestableAgent, IStreamableAgent
+    private class MockStreamingAgent : IEvaluableAgent, IStreamableAgent
     {
         private readonly string[] _chunks;
         private readonly int _chunkDelay;

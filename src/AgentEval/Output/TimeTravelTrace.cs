@@ -25,7 +25,7 @@ public class TimeTravelTrace
 
     /// <summary>Test metadata.</summary>
     [JsonPropertyName("test")]
-    public required TestMetadata Test { get; init; }
+    public required EvaluationMetadata Test { get; init; }
 
     /// <summary>Execution timeline - every step in order.</summary>
     [JsonPropertyName("steps")]
@@ -59,7 +59,7 @@ public enum ExecutionType
 /// <summary>
 /// Metadata about the test that generated this trace.
 /// </summary>
-public class TestMetadata
+public class EvaluationMetadata
 {
     /// <summary>Name of the test.</summary>
     [JsonPropertyName("testName")]

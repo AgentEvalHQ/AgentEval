@@ -6,7 +6,7 @@ using AgentEval.Core;
 namespace AgentEval.Tracing;
 
 /// <summary>
-/// Replays a recorded AgentTrace as a mock ITestableAgent.
+/// Replays a recorded AgentTrace as a mock IEvaluableAgent.
 /// Enables deterministic, fast, and cost-free test execution.
 /// </summary>
 /// <example>
@@ -19,7 +19,7 @@ namespace AgentEval.Tracing;
 /// // Response is from the trace, not from the actual agent
 /// </code>
 /// </example>
-public sealed class TraceReplayingAgent : ITestableAgent, IStreamableAgent
+public sealed class TraceReplayingAgent : IEvaluableAgent, IStreamableAgent
 {
     private readonly AgentTrace _trace;
     private readonly TraceReplayOptions _options;

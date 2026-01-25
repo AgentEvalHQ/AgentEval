@@ -7,7 +7,7 @@ using AgentEval.Core;
 namespace AgentEval.Tracing;
 
 /// <summary>
-/// Wraps an ITestableAgent to record all invocations for later replay.
+/// Wraps an IEvaluableAgent to record all invocations for later replay.
 /// This enables deterministic, fast, and cost-free test execution.
 /// </summary>
 /// <example>
@@ -22,9 +22,9 @@ namespace AgentEval.Tracing;
 /// await recorder.SaveAsync("./traces/weather_test.trace.json");
 /// </code>
 /// </example>
-public sealed class TraceRecordingAgent : ITestableAgent, IStreamableAgent, IAsyncDisposable
+public sealed class TraceRecordingAgent : IEvaluableAgent, IStreamableAgent, IAsyncDisposable
 {
-    private readonly ITestableAgent _inner;
+    private readonly IEvaluableAgent _inner;
     private readonly IStreamableAgent? _innerStreaming;
     private readonly AgentTrace _trace;
     private readonly Stopwatch _sessionStopwatch;
@@ -38,7 +38,7 @@ public sealed class TraceRecordingAgent : ITestableAgent, IStreamableAgent, IAsy
     /// <param name="inner">The agent to wrap and record.</param>
     /// <param name="traceName">Human-readable name for this trace.</param>
     /// <param name="options">Optional recording options.</param>
-    public TraceRecordingAgent(ITestableAgent inner, string traceName, TraceRecordingOptions? options = null)
+    public TraceRecordingAgent(IEvaluableAgent inner, string traceName, TraceRecordingOptions? options = null)
     {
         _inner = inner ?? throw new ArgumentNullException(nameof(inner));
         _innerStreaming = inner as IStreamableAgent;

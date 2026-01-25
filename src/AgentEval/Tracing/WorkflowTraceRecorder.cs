@@ -9,7 +9,7 @@ using AgentEval.Models;
 namespace AgentEval.Tracing;
 
 /// <summary>
-/// Wraps an IWorkflowTestableAgent to record all workflow executions for later replay.
+/// Wraps an IWorkflowEvaluableAgent to record all workflow executions for later replay.
 /// This enables deterministic, fast, and cost-free test execution of multi-agent workflows.
 /// </summary>
 /// <example>
@@ -24,9 +24,9 @@ namespace AgentEval.Tracing;
 /// await recorder.SaveAsync("./traces/research_workflow.trace.json");
 /// </code>
 /// </example>
-public sealed class WorkflowTraceRecorder : IWorkflowTestableAgent, IAsyncDisposable
+public sealed class WorkflowTraceRecorder : IWorkflowEvaluableAgent, IAsyncDisposable
 {
-    private readonly IWorkflowTestableAgent _inner;
+    private readonly IWorkflowEvaluableAgent _inner;
     private readonly WorkflowTrace _trace;
     private readonly Stopwatch _sessionStopwatch;
     private readonly WorkflowTraceRecorderOptions _options;
@@ -39,7 +39,7 @@ public sealed class WorkflowTraceRecorder : IWorkflowTestableAgent, IAsyncDispos
     /// <param name="traceName">Human-readable name for this trace.</param>
     /// <param name="options">Optional recording options.</param>
     public WorkflowTraceRecorder(
-        IWorkflowTestableAgent inner,
+        IWorkflowEvaluableAgent inner,
         string traceName,
         WorkflowTraceRecorderOptions? options = null)
     {

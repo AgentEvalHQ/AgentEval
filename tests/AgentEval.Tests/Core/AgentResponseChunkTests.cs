@@ -112,7 +112,7 @@ public class AgentResponseChunkTests
             }
         };
         
-        // This simulates what MAFTestHarness does when extracting usage
+        // This simulates what MAFEvaluationHarness does when extracting usage
         Assert.True(finalChunk.IsComplete);
         Assert.NotNull(finalChunk.Usage);
         Assert.Equal(700, finalChunk.Usage.TotalTokens);

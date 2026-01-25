@@ -17,7 +17,7 @@ namespace AgentEval.Samples;
 /// - Running the SAME test with streaming and non-streaming (async)
 /// - Comparing performance metrics between both approaches
 /// - Understanding token/cost tracking in each mode
-/// - Using TestOptions.ModelName for accurate cost calculation
+/// - Using EvaluationOptions.ModelName for accurate cost calculation
 /// 
 /// ⏱️ Time to understand: 8 minutes
 /// </summary>
@@ -51,10 +51,10 @@ public static class Sample19_StreamingVsAsyncPerformance
         // Create agent
         var agent = CreateAgent(endpoint, apiKey, deployment);
         var adapter = new MAFAgentAdapter(agent);
-        var harness = new MAFTestHarness(verbose: true);
+        var harness = new MAFEvaluationHarness(verbose: true);
 
-        // TestOptions with ModelName (KEY for cost calculation!)
-        var options = new TestOptions 
+        // EvaluationOptions with ModelName (KEY for cost calculation!)
+        var options = new EvaluationOptions 
         { 
             TrackPerformance = true,
             ModelName = deployment  // ← KEY: Enables accurate cost calculation!
@@ -66,7 +66,7 @@ public static class Sample19_StreamingVsAsyncPerformance
             Input = "Explain in 2-3 sentences why software testing is important.",
         };
 
-        Console.WriteLine($"   📋 TestOptions.ModelName = '{options.ModelName}'\n");
+        Console.WriteLine($"   📋 EvaluationOptions.ModelName = '{options.ModelName}'\n");
 
         // ═══════════════════════════════════════════════════════════════
         // PART 1: NON-STREAMING (Async)
@@ -75,7 +75,7 @@ public static class Sample19_StreamingVsAsyncPerformance
         Console.WriteLine("   ⏳ PART 1: NON-STREAMING (Async) Mode");
         Console.WriteLine("═══════════════════════════════════════════════════════════════\n");
 
-        var asyncResult = await harness.RunTestAsync(adapter, testCase, options);
+        var asyncResult = await harness.RunEvaluationAsync(adapter, testCase, options);
 
         PrintResults("ASYNC", asyncResult);
 
@@ -89,7 +89,7 @@ public static class Sample19_StreamingVsAsyncPerformance
         Console.Write("   Response: ");
         Console.ForegroundColor = ConsoleColor.DarkGray;
 
-        var streamingResult = await harness.RunTestStreamingAsync(adapter, testCase,
+        var streamingResult = await harness.RunEvaluationStreamingAsync(adapter, testCase,
             streamingOptions: new StreamingOptions
             {
                 OnTextChunk = chunk => Console.Write(chunk),
@@ -193,7 +193,7 @@ public static class Sample19_StreamingVsAsyncPerformance
         Console.WriteLine("\n💡 KEY INSIGHTS:");
         Console.WriteLine("   ✅ Both methods now capture token usage and costs!");
         Console.WriteLine("   ✅ Streaming provides Time-to-First-Token (TTFT)");
-        Console.WriteLine("   ✅ TestOptions.ModelName enables cost calculation");
+        Console.WriteLine("   ✅ EvaluationOptions.ModelName enables cost calculation");
         if (ap?.TokensAreEstimated == true || sp?.TokensAreEstimated == true)
         {
             Console.WriteLine("   ℹ️  Tokens estimated (~4 chars/token) since provider didn't return usage");
@@ -228,7 +228,7 @@ public static class Sample19_StreamingVsAsyncPerformance
         Console.WriteLine("   This sample demonstrates:");
         Console.WriteLine("   • Running the same test with streaming AND non-streaming");
         Console.WriteLine("   • Comparing token/cost capture between methods");
-        Console.WriteLine("   • Using TestOptions.ModelName for accurate cost calculation");
+        Console.WriteLine("   • Using EvaluationOptions.ModelName for accurate cost calculation");
         Console.WriteLine();
     }
 }

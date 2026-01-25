@@ -41,7 +41,7 @@ public static class Sample04_PerformanceMetrics
         // ═══════════════════════════════════════════════════════════════
         Console.WriteLine("📝 Step 2: Creating test harness with performance tracking...\n");
         
-        var harness = new MAFTestHarness(verbose: true);
+        var harness = new MAFEvaluationHarness(verbose: true);
 
         // ═══════════════════════════════════════════════════════════════
         // STEP 3: Run test with streaming (for TTFT measurement)
@@ -63,7 +63,7 @@ public static class Sample04_PerformanceMetrics
         DateTimeOffset? firstTokenTime = null;
         var startTime = DateTimeOffset.UtcNow;
         
-        var result = await harness.RunTestStreamingAsync(adapter, testCase, 
+        var result = await harness.RunEvaluationStreamingAsync(adapter, testCase, 
             streamingOptions: new StreamingOptions
             {
                 OnTextChunk = chunk =>
@@ -80,7 +80,7 @@ public static class Sample04_PerformanceMetrics
                     // This callback fires when first token arrives
                 }
             },
-            options: new TestOptions
+            options: new EvaluationOptions
             {
                 TrackPerformance = true
             });

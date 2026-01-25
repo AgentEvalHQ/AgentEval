@@ -97,10 +97,10 @@ public class ModelComparer : IModelComparer
     /// Creates a new model comparer (legacy constructor for backward compatibility).
     /// </summary>
     /// <param name="harness">The test harness to use.</param>
-    /// <param name="testOptions">Optional test options for each run.</param>
+    /// <param name="EvaluationOptions">Optional test options for each run.</param>
     [Obsolete("Use constructor with IStochasticRunner for better testability. This constructor will be removed in a future version.")]
-    public ModelComparer(ITestHarness harness, TestOptions? testOptions = null)
-        : this(new StochasticRunner(harness, testOptions))
+    public ModelComparer(IEvaluationHarness harness, EvaluationOptions? EvaluationOptions = null)
+        : this(new StochasticRunner(harness, EvaluationOptions))
     {
     }
     

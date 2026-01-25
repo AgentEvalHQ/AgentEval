@@ -46,7 +46,7 @@ public static class Sample03_AgentWithMultipleTools
         // ═══════════════════════════════════════════════════════════════
         Console.WriteLine("📝 Step 2: Creating test harness...\n");
         
-        var harness = new MAFTestHarness(verbose: true);
+        var harness = new MAFEvaluationHarness(verbose: true);
 
         // ═══════════════════════════════════════════════════════════════
         // STEP 3: Define test case expecting specific tool order
@@ -72,7 +72,7 @@ public static class Sample03_AgentWithMultipleTools
         var adapter = new MAFAgentAdapter(agent);
         
         // Use streaming to see real-time tool calls
-        var result = await harness.RunTestStreamingAsync(adapter, testCase, 
+        var result = await harness.RunEvaluationStreamingAsync(adapter, testCase, 
             streamingOptions: new StreamingOptions
             {
                 OnToolStart = toolInfo =>
@@ -89,7 +89,7 @@ public static class Sample03_AgentWithMultipleTools
                     Console.ResetColor();
                 }
             },
-            options: new TestOptions
+            options: new EvaluationOptions
             {
                 TrackTools = true,
                 TrackPerformance = true

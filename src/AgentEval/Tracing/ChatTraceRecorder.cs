@@ -33,7 +33,7 @@ namespace AgentEval.Tracing;
 /// </example>
 public sealed class ChatTraceRecorder : IAsyncDisposable
 {
-    private readonly ITestableAgent _agent;
+    private readonly IEvaluableAgent _agent;
     private readonly string _conversationId;
     private readonly ChatTraceRecorderOptions _options;
     private readonly List<ChatTurn> _turns = new();
@@ -51,7 +51,7 @@ public sealed class ChatTraceRecorder : IAsyncDisposable
     /// <param name="conversationId">Optional ID for this conversation.</param>
     /// <param name="options">Optional recording options.</param>
     public ChatTraceRecorder(
-        ITestableAgent agent,
+        IEvaluableAgent agent,
         string? conversationId = null,
         ChatTraceRecorderOptions? options = null)
     {

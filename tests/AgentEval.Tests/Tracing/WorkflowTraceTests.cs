@@ -529,7 +529,7 @@ public class WorkflowTraceTests
 
     #region Helper Classes
 
-    private class MockWorkflowAgent : IWorkflowTestableAgent
+    private class MockWorkflowAgent : IWorkflowEvaluableAgent
     {
         private readonly WorkflowExecutionResult _result;
 

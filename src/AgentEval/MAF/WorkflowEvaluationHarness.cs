@@ -13,8 +13,8 @@ namespace AgentEval.MAF;
 /// </summary>
 /// <remarks>
 /// <para>
-/// Unlike <see cref="MAFTestHarness"/> which treats agents as black boxes,
-/// <see cref="WorkflowTestHarness"/> captures per-executor details:
+/// Unlike <see cref="MAFEvaluationHarness"/> which treats agents as black boxes,
+/// <see cref="WorkflowEvaluationHarness"/> captures per-executor details:
 /// </para>
 /// <list type="bullet">
 ///   <item>Individual executor outputs</item>
@@ -23,7 +23,7 @@ namespace AgentEval.MAF;
 ///   <item>Workflow orchestration order</item>
 /// </list>
 /// </remarks>
-public class WorkflowTestHarness
+public class WorkflowEvaluationHarness
 {
     private readonly IEvaluator? _evaluator;
     private readonly IAgentEvalLogger _logger;
@@ -32,7 +32,7 @@ public class WorkflowTestHarness
     /// Creates a workflow test harness without AI evaluation.
     /// </summary>
     /// <param name="verbose">Whether to output verbose logging.</param>
-    public WorkflowTestHarness(bool verbose = false)
+    public WorkflowEvaluationHarness(bool verbose = false)
         : this(null, verbose ? new ConsoleAgentEvalLogger() : NullAgentEvalLogger.Instance)
     {
     }
@@ -42,7 +42,7 @@ public class WorkflowTestHarness
     /// </summary>
     /// <param name="evaluator">Evaluator for AI-based assessment.</param>
     /// <param name="logger">Logger for output.</param>
-    public WorkflowTestHarness(IEvaluator? evaluator, IAgentEvalLogger logger)
+    public WorkflowEvaluationHarness(IEvaluator? evaluator, IAgentEvalLogger logger)
     {
         _evaluator = evaluator;
         _logger = logger ?? NullAgentEvalLogger.Instance;
@@ -57,7 +57,7 @@ public class WorkflowTestHarness
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>Detailed test result with per-executor information.</returns>
     public async Task<WorkflowTestResult> RunWorkflowTestAsync(
-        IWorkflowTestableAgent workflow,
+        IWorkflowEvaluableAgent workflow,
         WorkflowTestCase testCase,
         WorkflowTestOptions? options = null,
         CancellationToken cancellationToken = default)
@@ -250,7 +250,7 @@ public class WorkflowTestHarness
     /// <returns>Summary of all test results.</returns>
     public async Task<WorkflowTestSummary> RunWorkflowTestSuiteAsync(
         string suiteName,
-        IWorkflowTestableAgent workflow,
+        IWorkflowEvaluableAgent workflow,
         IEnumerable<WorkflowTestCase> testCases,
         WorkflowTestOptions? options = null,
         CancellationToken cancellationToken = default)

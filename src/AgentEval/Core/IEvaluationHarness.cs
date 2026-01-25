@@ -8,7 +8,7 @@ namespace AgentEval.Core;
 /// <summary>
 /// Test harness for running agent tests.
 /// </summary>
-public interface ITestHarness
+public interface IEvaluationHarness
 {
     /// <summary>
     /// Run a single test case against an agent.
@@ -18,33 +18,33 @@ public interface ITestHarness
     /// <param name="options">Optional test options.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The test result.</returns>
-    Task<TestResult> RunTestAsync(
-        ITestableAgent agent,
+    Task<TestResult> RunEvaluationAsync(
+        IEvaluableAgent agent,
         TestCase testCase,
-        TestOptions? options = null,
+        EvaluationOptions? options = null,
         CancellationToken cancellationToken = default);
 }
 
 /// <summary>
 /// Extended harness that supports streaming tests.
 /// </summary>
-public interface IStreamingTestHarness : ITestHarness
+public interface IStreamingEvaluationHarness : IEvaluationHarness
 {
     /// <summary>
     /// Run a test with streaming for detailed timing metrics.
     /// </summary>
-    Task<TestResult> RunTestStreamingAsync(
+    Task<TestResult> RunEvaluationStreamingAsync(
         IStreamableAgent agent,
         TestCase testCase,
         StreamingOptions? streamingOptions = null,
-        TestOptions? options = null,
+        EvaluationOptions? options = null,
         CancellationToken cancellationToken = default);
 }
 
 /// <summary>
 /// Options for test execution.
 /// </summary>
-public class TestOptions
+public class EvaluationOptions
 {
     /// <summary>Whether to track tool/function calls.</summary>
     public bool TrackTools { get; init; } = true;

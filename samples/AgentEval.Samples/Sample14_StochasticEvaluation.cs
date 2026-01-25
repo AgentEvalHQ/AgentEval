@@ -55,8 +55,8 @@ public static class Sample14_StochasticTesting
         // ═══════════════════════════════════════════════════════════════
         Console.WriteLine("📝 Step 2: Setting up stochastic runner...\n");
         
-        var harness = new MAFTestHarness(verbose: false);
-        var stochasticRunner = new StochasticRunner(harness, new TestOptions
+        var harness = new MAFEvaluationHarness(verbose: false);
+        var stochasticRunner = new StochasticRunner(harness, new EvaluationOptions
         {
             TrackTools = true,
             TrackPerformance = true,
@@ -123,7 +123,7 @@ public static class Sample14_StochasticTesting
         PrintFooter(result.Passed);
     }
     
-    private static ITestableAgent CreateAgentWithCalculator()
+    private static IEvaluableAgent CreateAgentWithCalculator()
     {
         var azureClient = new AzureOpenAIClient(AIConfig.Endpoint, AIConfig.KeyCredential);
         var chatClient = azureClient

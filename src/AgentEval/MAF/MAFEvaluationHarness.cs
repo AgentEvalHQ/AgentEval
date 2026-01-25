@@ -11,7 +11,7 @@ namespace AgentEval.MAF;
 /// Test harness for Microsoft Agent Framework (MAF) agents.
 /// Provides comprehensive testing, evaluation, and metrics collection.
 /// </summary>
-public class MAFTestHarness : IStreamingTestHarness
+public class MAFEvaluationHarness : IStreamingEvaluationHarness
 {
     private readonly IEvaluator? _evaluator;
     private readonly IAgentEvalLogger _logger;
@@ -19,7 +19,7 @@ public class MAFTestHarness : IStreamingTestHarness
     /// <summary>
     /// Create a test harness without AI-powered evaluation using console logging.
     /// </summary>
-    public MAFTestHarness(bool verbose = true)
+    public MAFEvaluationHarness(bool verbose = true)
         : this(evaluator: null, verbose ? new ConsoleAgentEvalLogger(LogLevel.Debug) : NullAgentEvalLogger.Instance)
     {
     }
@@ -29,7 +29,7 @@ public class MAFTestHarness : IStreamingTestHarness
     /// </summary>
     /// <param name="evaluatorClient">Chat client to use for AI evaluation.</param>
     /// <param name="verbose">Whether to print verbose output.</param>
-    public MAFTestHarness(IChatClient evaluatorClient, bool verbose = true)
+    public MAFEvaluationHarness(IChatClient evaluatorClient, bool verbose = true)
         : this(new ChatClientEvaluator(evaluatorClient), verbose ? new ConsoleAgentEvalLogger(LogLevel.Debug) : NullAgentEvalLogger.Instance)
     {
     }
@@ -37,7 +37,7 @@ public class MAFTestHarness : IStreamingTestHarness
     /// <summary>
     /// Create a test harness with a custom evaluator and logger.
     /// </summary>
-    public MAFTestHarness(IEvaluator? evaluator, IAgentEvalLogger logger)
+    public MAFEvaluationHarness(IEvaluator? evaluator, IAgentEvalLogger logger)
     {
         _evaluator = evaluator;
         _logger = logger ?? NullAgentEvalLogger.Instance;
@@ -46,19 +46,19 @@ public class MAFTestHarness : IStreamingTestHarness
     /// <summary>
     /// Create a test harness with a custom evaluator (uses console logger).
     /// </summary>
-    public MAFTestHarness(IEvaluator evaluator, bool verbose = true)
+    public MAFEvaluationHarness(IEvaluator evaluator, bool verbose = true)
         : this(evaluator, verbose ? new ConsoleAgentEvalLogger(LogLevel.Debug) : NullAgentEvalLogger.Instance)
     {
     }
     
     /// <inheritdoc/>
-    public async Task<TestResult> RunTestAsync(
-        ITestableAgent agent,
+    public async Task<TestResult> RunEvaluationAsync(
+        IEvaluableAgent agent,
         TestCase testCase,
-        TestOptions? options = null,
+        EvaluationOptions? options = null,
         CancellationToken cancellationToken = default)
     {
-        options ??= new TestOptions();
+        options ??= new EvaluationOptions();
         var result = new TestResult { TestName = testCase.Name };
         var metrics = options.TrackPerformance ? new PerformanceMetrics { WasStreaming = false } : null;
         var timeline = ToolCallTimeline.Create(testCase.Name);
@@ -208,14 +208,14 @@ public class MAFTestHarness : IStreamingTestHarness
     }
     
     /// <inheritdoc/>
-    public async Task<TestResult> RunTestStreamingAsync(
+    public async Task<TestResult> RunEvaluationStreamingAsync(
         IStreamableAgent agent,
         TestCase testCase,
         StreamingOptions? streamingOptions = null,
-        TestOptions? options = null,
+        EvaluationOptions? options = null,
         CancellationToken cancellationToken = default)
     {
-        options ??= new TestOptions();
+        options ??= new EvaluationOptions();
         var result = new TestResult { TestName = testCase.Name };
         var metrics = new PerformanceMetrics { WasStreaming = true, ModelUsed = options.ModelName };
         var toolCalls = new Dictionary<string, ToolCallRecord>();
@@ -416,11 +416,11 @@ public class MAFTestHarness : IStreamingTestHarness
     /// <summary>
     /// Run multiple test cases against an agent.
     /// </summary>
-    public async Task<TestSummary> RunTestSuiteAsync(
+    public async Task<TestSummary> RunEvaluationSuiteAsync(
         string suiteName,
-        ITestableAgent agent,
+        IEvaluableAgent agent,
         IEnumerable<TestCase> testCases,
-        TestOptions? options = null,
+        EvaluationOptions? options = null,
         CancellationToken cancellationToken = default)
     {
         LogSuiteHeader(suiteName);
@@ -431,7 +431,7 @@ public class MAFTestHarness : IStreamingTestHarness
             _logger.LogInformation($"\n🧪 Test: {testCase.Name}");
             _logger.LogDebug(new string('-', 60));
 
-            var result = await RunTestAsync(agent, testCase, options, cancellationToken);
+            var result = await RunEvaluationAsync(agent, testCase, options, cancellationToken);
             results.Add(result);
 
             LogTestResult(result);

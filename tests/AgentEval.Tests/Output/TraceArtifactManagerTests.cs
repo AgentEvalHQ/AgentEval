@@ -385,7 +385,7 @@ public class TraceArtifactManagerTests : IDisposable
         {
             TraceId = "trace_" + Guid.NewGuid().ToString("N")[..8],
             ExecutionType = ExecutionType.SingleAgent,
-            Test = new TestMetadata
+            Test = new EvaluationMetadata
             {
                 TestName = "SampleTest",
                 StartTime = startTime,

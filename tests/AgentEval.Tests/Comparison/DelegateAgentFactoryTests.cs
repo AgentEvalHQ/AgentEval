@@ -64,7 +64,7 @@ public class DelegateAgentFactoryTests
         Assert.Null(factory.Configuration);
     }
     
-    private class FakeAgent : ITestableAgent
+    private class FakeAgent : IEvaluableAgent
     {
         public string Name => "FakeAgent";
         

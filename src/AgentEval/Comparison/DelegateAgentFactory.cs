@@ -20,7 +20,7 @@ namespace AgentEval.Comparison;
 /// </example>
 public class DelegateAgentFactory : IAgentFactory
 {
-    private readonly Func<ITestableAgent> _createAgent;
+    private readonly Func<IEvaluableAgent> _createAgent;
     
     /// <summary>
     /// Creates a factory using a delegate for agent creation.
@@ -32,7 +32,7 @@ public class DelegateAgentFactory : IAgentFactory
     public DelegateAgentFactory(
         string modelId,
         string modelName,
-        Func<ITestableAgent> createAgent,
+        Func<IEvaluableAgent> createAgent,
         ModelConfiguration? configuration = null)
     {
         ModelId = modelId ?? throw new ArgumentNullException(nameof(modelId));
@@ -51,5 +51,5 @@ public class DelegateAgentFactory : IAgentFactory
     public ModelConfiguration? Configuration { get; }
     
     /// <inheritdoc/>
-    public ITestableAgent CreateAgent() => _createAgent();
+    public IEvaluableAgent CreateAgent() => _createAgent();
 }

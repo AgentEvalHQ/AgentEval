@@ -11,11 +11,11 @@ namespace AgentEval.Benchmarks;
 /// </summary>
 public class AgenticBenchmark
 {
-    private readonly ITestableAgent _agent;
+    private readonly IEvaluableAgent _agent;
     private readonly IEvaluator? _evaluator;
     private readonly AgenticBenchmarkOptions _options;
     
-    public AgenticBenchmark(ITestableAgent agent, IEvaluator? evaluator = null, AgenticBenchmarkOptions? options = null)
+    public AgenticBenchmark(IEvaluableAgent agent, IEvaluator? evaluator = null, AgenticBenchmarkOptions? options = null)
     {
         _agent = agent ?? throw new ArgumentNullException(nameof(agent));
         _evaluator = evaluator;
@@ -90,7 +90,7 @@ public class AgenticBenchmark
                     }
                 }
                 
-                var testResult = new ToolAccuracyTestResult
+                var TestResult = new ToolAccuracyTestResult
                 {
                     TestCaseName = testCase.Name,
                     Passed = !toolsMissed.Any() && !parameterErrors.Any() && !unexpectedTools.Any(),
@@ -101,7 +101,7 @@ public class AgenticBenchmark
                     TotalToolsCalled = toolUsage.Count
                 };
                 
-                results.Add(testResult);
+                results.Add(TestResult);
             }
             catch (Exception ex)
             {
@@ -164,17 +164,17 @@ public class AgenticBenchmark
                     evaluationCriteria,
                     cancellationToken);
                 
-                var testResult = new TaskCompletionTestResult
+                var TestResult = new TaskCompletionTestResult
                 {
                     TestCaseName = testCase.Name,
                     Passed = evaluation.OverallScore >= testCase.PassingScore,
                     Score = evaluation.OverallScore,
                     ActualOutput = response.Text,
-                    EvaluationSummary = evaluation.Summary,
+                    TestSummary = evaluation.Summary,
                     CriteriaResults = evaluation.CriteriaResults.ToList()
                 };
                 
-                results.Add(testResult);
+                results.Add(TestResult);
             }
             catch (Exception ex)
             {
@@ -256,7 +256,7 @@ public class AgenticBenchmark
                     previousStepPassed = stepPassed;
                 }
                 
-                var testResult = new MultiStepTestResult
+                var TestResult = new MultiStepTestResult
                 {
                     TestCaseName = testCase.Name,
                     Passed = stepResults.All(s => s.Passed),
@@ -265,7 +265,7 @@ public class AgenticBenchmark
                     StepResults = stepResults
                 };
                 
-                results.Add(testResult);
+                results.Add(TestResult);
             }
             catch (Exception ex)
             {
@@ -408,7 +408,7 @@ public class TaskCompletionTestResult
     public bool Passed { get; init; }
     public double? Score { get; init; }
     public string? ActualOutput { get; init; }
-    public string? EvaluationSummary { get; init; }
+    public string? TestSummary { get; init; }
     public IReadOnlyList<CriterionResult> CriteriaResults { get; init; } = [];
     public string? Error { get; init; }
 }

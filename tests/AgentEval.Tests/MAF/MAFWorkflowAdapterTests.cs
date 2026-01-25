@@ -210,7 +210,7 @@ public class MAFWorkflowAdapterTests
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
-    // ITESTABLEAGENT INTERFACE
+    // IEvaluableAgent INTERFACE
     // ═══════════════════════════════════════════════════════════════════════════
 
     [Fact]

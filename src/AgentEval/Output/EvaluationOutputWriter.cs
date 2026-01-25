@@ -11,7 +11,7 @@ namespace AgentEval.Output;
 /// <summary>
 /// Writes test results to console with formatting based on verbosity level.
 /// </summary>
-public class TestOutputWriter
+public class EvaluationOutputWriter
 {
     private static readonly JsonSerializerOptions s_jsonOptions = new()
     {
@@ -23,26 +23,26 @@ public class TestOutputWriter
     private readonly TextWriter _output;
 
     /// <summary>
-    /// Creates a new TestOutputWriter with default settings writing to Console.Out.
+    /// Creates a new EvaluationOutputWriter with default settings writing to Console.Out.
     /// </summary>
-    public TestOutputWriter() : this(new VerbositySettings(), Console.Out)
+    public EvaluationOutputWriter() : this(new VerbositySettings(), Console.Out)
     {
     }
 
     /// <summary>
-    /// Creates a new TestOutputWriter with specified settings writing to Console.Out.
+    /// Creates a new EvaluationOutputWriter with specified settings writing to Console.Out.
     /// </summary>
     /// <param name="settings">Verbosity settings.</param>
-    public TestOutputWriter(VerbositySettings settings) : this(settings, Console.Out)
+    public EvaluationOutputWriter(VerbositySettings settings) : this(settings, Console.Out)
     {
     }
 
     /// <summary>
-    /// Creates a new TestOutputWriter with specified settings and output destination.
+    /// Creates a new EvaluationOutputWriter with specified settings and output destination.
     /// </summary>
     /// <param name="settings">Verbosity settings.</param>
     /// <param name="output">Where to write output.</param>
-    public TestOutputWriter(VerbositySettings settings, TextWriter output)
+    public EvaluationOutputWriter(VerbositySettings settings, TextWriter output)
     {
         _settings = settings ?? throw new ArgumentNullException(nameof(settings));
         _output = output ?? throw new ArgumentNullException(nameof(output));

@@ -9,7 +9,7 @@ using AgentEval.Core;
 namespace AgentEval.Tests.MAF;
 
 /// <summary>
-/// Unit tests for WorkflowTestHarness.
+/// Unit tests for WorkflowEvaluationHarness.
 /// </summary>
 public class WorkflowTestHarnessTests
 {
@@ -20,7 +20,7 @@ public class WorkflowTestHarnessTests
     [Fact]
     public async Task RunWorkflowTestAsync_SimpleWorkflow_ReturnsResult()
     {
-        var harness = new WorkflowTestHarness(verbose: false);
+        var harness = new WorkflowEvaluationHarness(verbose: false);
         var workflow = MAFWorkflowAdapter.FromSteps(
             "TestWorkflow",
             ("executor1", "output1"),
@@ -43,7 +43,7 @@ public class WorkflowTestHarnessTests
     [Fact]
     public async Task RunWorkflowTestAsync_CapturesExecutionResult()
     {
-        var harness = new WorkflowTestHarness(verbose: false);
+        var harness = new WorkflowEvaluationHarness(verbose: false);
         var workflow = MAFWorkflowAdapter.FromSteps(
             "TestWorkflow",
             ("step1", "output1"),
@@ -69,7 +69,7 @@ public class WorkflowTestHarnessTests
     [Fact]
     public async Task RunWorkflowTestAsync_ExpectedExecutors_AllPresent_Passes()
     {
-        var harness = new WorkflowTestHarness(verbose: false);
+        var harness = new WorkflowEvaluationHarness(verbose: false);
         var workflow = MAFWorkflowAdapter.FromSteps(
             "TestWorkflow",
             ("researcher", "research output"),
@@ -91,7 +91,7 @@ public class WorkflowTestHarnessTests
     [Fact]
     public async Task RunWorkflowTestAsync_ExpectedExecutors_MissingExecutor_Fails()
     {
-        var harness = new WorkflowTestHarness(verbose: false);
+        var harness = new WorkflowEvaluationHarness(verbose: false);
         var workflow = MAFWorkflowAdapter.FromSteps(
             "TestWorkflow",
             ("writer", "article output"));
@@ -112,7 +112,7 @@ public class WorkflowTestHarnessTests
     [Fact]
     public async Task RunWorkflowTestAsync_StrictOrder_CorrectOrder_Passes()
     {
-        var harness = new WorkflowTestHarness(verbose: false);
+        var harness = new WorkflowEvaluationHarness(verbose: false);
         var workflow = MAFWorkflowAdapter.FromSteps(
             "TestWorkflow",
             ("step1", "out1"),
@@ -135,7 +135,7 @@ public class WorkflowTestHarnessTests
     [Fact]
     public async Task RunWorkflowTestAsync_StrictOrder_WrongOrder_Fails()
     {
-        var harness = new WorkflowTestHarness(verbose: false);
+        var harness = new WorkflowEvaluationHarness(verbose: false);
         var workflow = MAFWorkflowAdapter.FromSteps(
             "TestWorkflow",
             ("step2", "out2"),
@@ -162,7 +162,7 @@ public class WorkflowTestHarnessTests
     [Fact]
     public async Task RunWorkflowTestAsync_ExpectedOutputContains_Matches_Passes()
     {
-        var harness = new WorkflowTestHarness(verbose: false);
+        var harness = new WorkflowEvaluationHarness(verbose: false);
         var workflow = MAFWorkflowAdapter.FromSteps(
             "TestWorkflow",
             ("executor", "The final polished article"));
@@ -182,7 +182,7 @@ public class WorkflowTestHarnessTests
     [Fact]
     public async Task RunWorkflowTestAsync_ExpectedOutputContains_Missing_Fails()
     {
-        var harness = new WorkflowTestHarness(verbose: false);
+        var harness = new WorkflowEvaluationHarness(verbose: false);
         var workflow = MAFWorkflowAdapter.FromSteps(
             "TestWorkflow",
             ("executor", "Some other output"));
@@ -207,7 +207,7 @@ public class WorkflowTestHarnessTests
     [Fact]
     public async Task RunWorkflowTestAsync_MaxDuration_WithinLimit_Passes()
     {
-        var harness = new WorkflowTestHarness(verbose: false);
+        var harness = new WorkflowEvaluationHarness(verbose: false);
         var workflow = MAFWorkflowAdapter.FromSteps(
             "TestWorkflow",
             ("executor", "output"));
@@ -231,7 +231,7 @@ public class WorkflowTestHarnessTests
     [Fact]
     public async Task RunWorkflowTestAsync_WorkflowError_Fails()
     {
-        var harness = new WorkflowTestHarness(verbose: false);
+        var harness = new WorkflowEvaluationHarness(verbose: false);
         var workflow = new MAFWorkflowAdapter(
             "ErrorWorkflow",
             (prompt, ct) => ExecuteWithError());
@@ -259,7 +259,7 @@ public class WorkflowTestHarnessTests
     [Fact]
     public async Task RunWorkflowTestAsync_WorkflowException_Fails()
     {
-        var harness = new WorkflowTestHarness(verbose: false);
+        var harness = new WorkflowEvaluationHarness(verbose: false);
         var workflow = new MAFWorkflowAdapter(
             "ThrowingWorkflow",
             (prompt, ct) => ThrowingWorkflow());
@@ -295,7 +295,7 @@ public class WorkflowTestHarnessTests
     [Fact]
     public async Task RunWorkflowTestSuiteAsync_RunsAllTests()
     {
-        var harness = new WorkflowTestHarness(verbose: false);
+        var harness = new WorkflowEvaluationHarness(verbose: false);
         var workflow = MAFWorkflowAdapter.FromSteps(
             "TestWorkflow",
             ("executor", "output"));
@@ -318,7 +318,7 @@ public class WorkflowTestHarnessTests
     [Fact]
     public async Task RunWorkflowTestSuiteAsync_CalculatesPassRate()
     {
-        var harness = new WorkflowTestHarness(verbose: false);
+        var harness = new WorkflowEvaluationHarness(verbose: false);
         var workflow = MAFWorkflowAdapter.FromSteps(
             "TestWorkflow",
             ("executor", "output"));
@@ -340,7 +340,7 @@ public class WorkflowTestHarnessTests
     [Fact]
     public async Task RunWorkflowTestSuiteAsync_ContinueOnFailure_RunsAllTests()
     {
-        var harness = new WorkflowTestHarness(verbose: false);
+        var harness = new WorkflowEvaluationHarness(verbose: false);
         var workflow = MAFWorkflowAdapter.FromSteps(
             "TestWorkflow",
             ("executor", "output"));
@@ -361,7 +361,7 @@ public class WorkflowTestHarnessTests
     [Fact]
     public async Task RunWorkflowTestSuiteAsync_StopOnFailure_StopsAtFirstFailure()
     {
-        var harness = new WorkflowTestHarness(verbose: false);
+        var harness = new WorkflowEvaluationHarness(verbose: false);
         var workflow = MAFWorkflowAdapter.FromSteps(
             "TestWorkflow",
             ("executor", "output"));
@@ -385,7 +385,7 @@ public class WorkflowTestHarnessTests
     [Fact]
     public async Task RunWorkflowTestAsync_Timeout_Fails()
     {
-        var harness = new WorkflowTestHarness(verbose: false);
+        var harness = new WorkflowEvaluationHarness(verbose: false);
         var workflow = new MAFWorkflowAdapter(
             "SlowWorkflow",
             (prompt, ct) => SlowWorkflow(ct));
@@ -420,7 +420,7 @@ public class WorkflowTestHarnessTests
     [Fact]
     public async Task RunWorkflowTestAsync_RecordsAssertionResults()
     {
-        var harness = new WorkflowTestHarness(verbose: false);
+        var harness = new WorkflowEvaluationHarness(verbose: false);
         var workflow = MAFWorkflowAdapter.FromSteps(
             "TestWorkflow",
             ("step1", "out1"),
@@ -445,7 +445,7 @@ public class WorkflowTestHarnessTests
     [Fact]
     public async Task RunWorkflowTestAsync_AllPassed_ReturnsTrue()
     {
-        var harness = new WorkflowTestHarness(verbose: false);
+        var harness = new WorkflowEvaluationHarness(verbose: false);
         var workflow = MAFWorkflowAdapter.FromSteps(
             "TestWorkflow",
             ("executor", "output"));
@@ -464,7 +464,7 @@ public class WorkflowTestHarnessTests
     [Fact]
     public async Task RunWorkflowTestAsync_AnyFailed_AllPassedReturnsFalse()
     {
-        var harness = new WorkflowTestHarness(verbose: false);
+        var harness = new WorkflowEvaluationHarness(verbose: false);
         var workflow = MAFWorkflowAdapter.FromSteps(
             "TestWorkflow",
             ("executor", "output"));

@@ -338,7 +338,7 @@ public static class Sample13_TraceRecordReplay
     /// <summary>
     /// Mock agent that simulates tool calls.
     /// </summary>
-    private class MockToolAgent : ITestableAgent
+    private class MockToolAgent : IEvaluableAgent
     {
         private int _callCount;
 
@@ -369,7 +369,7 @@ public static class Sample13_TraceRecordReplay
     /// <summary>
     /// Mock streaming agent.
     /// </summary>
-    private class MockStreamingAgent : ITestableAgent, IStreamableAgent
+    private class MockStreamingAgent : IEvaluableAgent, IStreamableAgent
     {
         public string Name => "MockStreamingAgent";
 
@@ -403,7 +403,7 @@ public static class Sample13_TraceRecordReplay
     /// <summary>
     /// Mock workflow agent.
     /// </summary>
-    private class MockWorkflowAgent : IWorkflowTestableAgent
+    private class MockWorkflowAgent : IWorkflowEvaluableAgent
     {
         public string Name => "MockWorkflowAgent";
         public IReadOnlyList<string> ExecutorIds => new[] { "researcher", "summarizer" };

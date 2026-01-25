@@ -128,7 +128,7 @@ public class AgentEvalTestBaseTests : IDisposable
         
         var result = new TestResult
         {
-            TestName = "TestOutputWriter",
+            TestName = "EvaluationOutputWriter",
             Passed = true,
             Score = 100
         };
@@ -137,7 +137,7 @@ public class AgentEvalTestBaseTests : IDisposable
         
         var output = stringWriter.ToString();
         Assert.NotEmpty(output);
-        Assert.Contains("TestOutputWriter", output);
+        Assert.Contains("EvaluationOutputWriter", output);
     }
 
     [Fact]
@@ -391,7 +391,7 @@ public class AgentEvalTestBaseTests : IDisposable
         {
             TraceId = "trace_" + Guid.NewGuid().ToString("N")[..8],
             ExecutionType = ExecutionType.SingleAgent,
-            Test = new TestMetadata
+            Test = new EvaluationMetadata
             {
                 TestName = "SampleTest",
                 StartTime = startTime,
