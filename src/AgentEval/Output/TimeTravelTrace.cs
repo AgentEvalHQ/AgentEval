@@ -23,7 +23,7 @@ public class TimeTravelTrace
     [JsonPropertyName("executionType")]
     public required ExecutionType ExecutionType { get; init; }
 
-    /// <summary>Test metadata.</summary>
+    /// <summary>Evaluation metadata.</summary>
     [JsonPropertyName("test")]
     public required EvaluationMetadata Test { get; init; }
 
@@ -57,7 +57,7 @@ public enum ExecutionType
 }
 
 /// <summary>
-/// Metadata about the test that generated this trace.
+/// Metadata about the evaluation that generated this trace.
 /// </summary>
 public class EvaluationMetadata
 {
@@ -81,7 +81,7 @@ public class EvaluationMetadata
     [JsonPropertyName("passed")]
     public bool Passed { get; init; }
 
-    /// <summary>Failure message if test failed.</summary>
+    /// <summary>Failure message if evaluation failed.</summary>
     [JsonPropertyName("failureMessage")]
     public string? FailureMessage { get; init; }
 
