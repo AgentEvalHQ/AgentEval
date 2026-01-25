@@ -9,7 +9,7 @@ using AgentEval.Models;
 namespace AgentEval.Output;
 
 /// <summary>
-/// Writes test results to console with formatting based on verbosity level.
+/// Writes evaluation results to console with formatting based on verbosity level.
 /// </summary>
 public class EvaluationOutputWriter
 {
@@ -49,9 +49,9 @@ public class EvaluationOutputWriter
     }
 
     /// <summary>
-    /// Writes a test result based on the configured verbosity level.
+    /// Writes an evaluation result based on the configured verbosity level.
     /// </summary>
-    /// <param name="result">The test result to output.</param>
+    /// <param name="result">The evaluation result to output.</param>
     public void WriteTestResult(TestResult result)
     {
         ArgumentNullException.ThrowIfNull(result);

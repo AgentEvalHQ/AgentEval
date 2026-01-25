@@ -6,18 +6,18 @@ using AgentEval.Models;
 namespace AgentEval.Core;
 
 /// <summary>
-/// evaluation harness for running agent tests.
+/// Evaluation harness for running agent evaluations.
 /// </summary>
 public interface IEvaluationHarness
 {
     /// <summary>
-    /// Run a single test case against an agent.
+    /// Run a single evaluation case against an agent.
     /// </summary>
-    /// <param name="agent">The agent to test.</param>
+    /// <param name="agent">The agent to evaluate.</param>
     /// <param name="testCase">The test case to run.</param>
-    /// <param name="options">Optional test options.</param>
+    /// <param name="options">Optional evaluation options.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
-    /// <returns>The test result.</returns>
+    /// <returns>The evaluation result.</returns>
     Task<TestResult> RunEvaluationAsync(
         IEvaluableAgent agent,
         TestCase testCase,
@@ -26,12 +26,12 @@ public interface IEvaluationHarness
 }
 
 /// <summary>
-/// Extended harness that supports streaming tests.
+/// Extended harness that supports streaming evaluations.
 /// </summary>
 public interface IStreamingEvaluationHarness : IEvaluationHarness
 {
     /// <summary>
-    /// Run a test with streaming for detailed timing metrics.
+    /// Run an evaluation with streaming for detailed timing metrics.
     /// </summary>
     Task<TestResult> RunEvaluationStreamingAsync(
         IStreamableAgent agent,
@@ -42,7 +42,7 @@ public interface IStreamingEvaluationHarness : IEvaluationHarness
 }
 
 /// <summary>
-/// Options for test execution.
+/// Options for evaluation execution.
 /// </summary>
 public class EvaluationOptions
 {
@@ -63,7 +63,7 @@ public class EvaluationOptions
 }
 
 /// <summary>
-/// Options for streaming test execution.
+/// Options for streaming evaluation execution.
 /// </summary>
 public class StreamingOptions
 {

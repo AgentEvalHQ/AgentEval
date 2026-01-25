@@ -6,7 +6,7 @@ using System.Diagnostics;
 namespace AgentEval.Assertions;
 
 /// <summary>
-/// Fluent assertions for stochastic test results.
+/// Fluent assertions for stochastic evaluation results.
 /// </summary>
 public class StochasticAssertions
 {

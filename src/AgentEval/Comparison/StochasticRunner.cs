@@ -8,7 +8,7 @@ using Microsoft.Extensions.DependencyInjection;
 namespace AgentEval.Comparison;
 
 /// <summary>
-/// Interface for running stochastic (repeated, randomized) tests on agents.
+/// Interface for running stochastic (repeated, randomized) evaluations on agents.
 /// Enables statistical analysis of agent behavior across multiple runs.
 /// </summary>
 /// <remarks>
@@ -18,7 +18,7 @@ namespace AgentEval.Comparison;
 /// - Calculate statistical confidence in results
 /// - Compare performance distributions across runs
 /// 
-/// Implementations should support concurrent test execution for performance
+/// Implementations should support concurrent evaluation execution for performance
 /// and provide detailed statistics including mean, median, confidence intervals,
 /// and pass rate analysis.
 /// </remarks>
@@ -26,18 +26,18 @@ public interface IStochasticRunner
 {
     /// <summary>
     /// Runs a test case multiple times against the same agent instance.
-    /// Use this method when testing stateful agents or when you want to reuse
+    /// Use this method when evaluating stateful agents or when you want to reuse
     /// the same agent instance across all runs.
     /// </summary>
-    /// <param name="agent">The agent to test. Cannot be null.</param>
+    /// <param name="agent">The agent to evaluate. Cannot be null.</param>
     /// <param name="testCase">The test case to run repeatedly. Cannot be null.</param>
     /// <param name="options">
     /// stochastic evaluation options (number of runs, parallelism, success threshold, etc.).
     /// If null, uses <see cref="StochasticOptions.Default"/>.
     /// </param>
-    /// <param name="cancellationToken">Token to cancel the stochastic test run.</param>
+    /// <param name="cancellationToken">Token to cancel the stochastic evaluation run.</param>
     /// <returns>
-    /// Stochastic test result containing individual run results, aggregate statistics,
+    /// Stochastic evaluation result containing individual run results, aggregate statistics,
     /// and pass/fail determination based on the success rate threshold.
     /// </returns>
     /// <exception cref="ArgumentNullException">Thrown when agent or testCase is null.</exception>
@@ -58,9 +58,9 @@ public interface IStochasticRunner
     /// stochastic evaluation options (number of runs, parallelism, success threshold, etc.).
     /// If null, uses <see cref="StochasticOptions.Default"/>.
     /// </param>
-    /// <param name="cancellationToken">Token to cancel the stochastic test run.</param>
+    /// <param name="cancellationToken">Token to cancel the stochastic evaluation run.</param>
     /// <returns>
-    /// Stochastic test result containing individual run results, aggregate statistics,
+    /// Stochastic evaluation result containing individual run results, aggregate statistics,
     /// and pass/fail determination based on the success rate threshold.
     /// </returns>
     /// <exception cref="ArgumentNullException">Thrown when factory or testCase is null.</exception>
@@ -83,9 +83,9 @@ public class StochasticRunner : IStochasticRunner
     /// <summary>
     /// Creates a new stochastic runner with dependency injection.
     /// </summary>
-    /// <param name="harness">The evaluation harness to use for running individual tests.</param>
+    /// <param name="harness">The evaluation harness to use for running individual evaluations.</param>
     /// <param name="statisticsCalculator">Optional statistics calculator. If null, uses default.</param>
-    /// <param name="evaluationOptions">Optional test options for each run.</param>
+    /// <param name="evaluationOptions">Optional evaluation options for each run.</param>
     [ActivatorUtilitiesConstructor]
     public StochasticRunner(
         IEvaluationHarness harness, 
@@ -100,8 +100,8 @@ public class StochasticRunner : IStochasticRunner
     /// <summary>
     /// Creates a new stochastic runner (legacy constructor for backward compatibility).
     /// </summary>
-    /// <param name="harness">The evaluation harness to use for running individual tests.</param>
-    /// <param name="evaluationOptions">Optional test options for each run.</param>
+    /// <param name="harness">The evaluation harness to use for running individual evaluations.</param>
+    /// <param name="evaluationOptions">Optional evaluation options for each run.</param>
     [Obsolete("Use constructor with IStatisticsCalculator parameter for better testability. This constructor will be removed in a future version.")]
     public StochasticRunner(IEvaluationHarness harness, EvaluationOptions? evaluationOptions)
         : this(harness, statisticsCalculator: null, evaluationOptions: evaluationOptions)
