@@ -1,6 +1,8 @@
-# Embedding-Based Metrics
+# Implementing Embeddings
 
-> **Fast, cost-effective semantic similarity evaluation without LLM calls**
+> **Technical guide for implementing `IAgentEvalEmbeddings` and using embedding utilities**
+
+> **Looking for when to use embedding metrics?** See [RAG Metrics Guide](rag-metrics.md)
 
 ---
 

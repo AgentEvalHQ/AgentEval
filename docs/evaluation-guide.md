@@ -11,6 +11,9 @@ What are you evaluating?
 │
 ├─► RAG System (retrieval + generation)
 │   │
+│   ├─► Is retrieval finding relevant documents?
+│   │   └─► Use: code_recall_at_k, code_mrr (FREE!)
+│   │
 │   ├─► Is the response grounded in context?
 │   │   └─► Use: llm_faithfulness, embed_response_context
 │   │
@@ -75,16 +78,35 @@ public async Task TravelAgent_BookFlight_SelectsCorrectTools()
 
 **Recommended Metrics:**
 
-| Phase | Metric | Purpose |
-|-------|--------|---------|
-| Retrieval | `llm_context_precision` | Is retrieved content relevant? |
-| Retrieval | `llm_context_recall` | Is all needed info retrieved? |
-| Generation | `llm_faithfulness` | Is response grounded in context? |
-| Generation | `llm_answer_correctness` | Is the answer factually correct? |
+| Phase | Metric | Purpose | Cost |
+|-------|--------|---------|------|
+| Retrieval | `code_recall_at_k` | Are relevant docs found? | **Free** |
+| Retrieval | `code_mrr` | Is relevant doc ranked first? | **Free** |
+| Retrieval | `llm_context_precision` | Is retrieved content relevant? | LLM |
+| Retrieval | `llm_context_recall` | Is all needed info retrieved? | LLM |
+| Generation | `llm_faithfulness` | Is response grounded in context? | LLM |
+| Generation | `llm_answer_correctness` | Is the answer factually correct? | LLM |
 
-**Cost-Optimized Alternative:**
-- Use `embed_response_context` instead of `llm_faithfulness` for volume testing
-- Use `embed_answer_similarity` instead of `llm_answer_correctness` for similarity checks
+**Cost-Optimized Strategy:**
+1. **CI/CD (Free):** Use `code_recall_at_k` and `code_mrr` for retrieval testing
+2. **Volume Testing ($):** Use `embed_response_context` and `embed_answer_similarity`
+3. **Production Sampling ($$):** Use `llm_faithfulness` and `llm_answer_correctness`
+
+**Example: Retrieval Testing (FREE)**
+```csharp
+// Test retrieval quality without any API calls
+var recallMetric = new RecallAtKMetric(k: 5);
+var mrrMetric = new MRRMetric();
+
+var context = new EvaluationContext
+{
+    RelevantDocumentIds = ["doc1", "doc2", "doc3"],
+    RetrievedDocumentIds = ["doc1", "doc4", "doc2", "doc5", "doc6"]
+};
+
+var recall = await recallMetric.EvaluateAsync(context); // 67% (2/3 found)
+var mrr = await mrrMetric.EvaluateAsync(context);       // 100% (first relevant at rank 1)
+```
 
 ---
 
@@ -157,6 +179,7 @@ results.PrintComparisonTable();
 | Query + Response + Ground Truth | `llm_answer_correctness`, `embed_answer_similarity` |
 | Query + Response + Context + Ground Truth | All RAG metrics |
 | Query + Response + Tool Calls | All agentic metrics |
+| Retrieved + Relevant Document IDs | `code_recall_at_k`, `code_mrr` (**FREE!**) |
 
 ---
 
@@ -174,17 +197,19 @@ Accuracy ▲
      70% │        ▲ embed_answer_similarity
          │        ▲ embed_response_context
      60% │
-         │            ■ code_tool_selection
-     50% │            ■ code_tool_success
+         │            ■ code_recall_at_k  ■ code_mrr
+     50% │            ■ code_tool_selection
+         │            ■ code_tool_success
          │
          └───────────────────────────────────► Cost
               Free    $0.01   $0.05   $0.10
          
-Legend: ★ LLM metrics  ▲ Embedding metrics  ■ Code metrics
+Legend: ★ LLM metrics  ▲ Embedding metrics  ■ Code metrics (FREE!)
 ```
 
 **Guidance:**
-- Use code metrics for CI/CD (free, fast)
+- Use code metrics for CI/CD (free, fast, deterministic)
+- Use IR metrics (`code_recall_at_k`, `code_mrr`) for retrieval testing (free!)
 - Use embedding metrics for volume testing (cheap, good accuracy)
 - Use LLM metrics for production sampling (expensive, highest accuracy)
 
@@ -216,6 +241,10 @@ var metrics = new IMetric[]
 ```csharp
 var metrics = new IMetric[]
 {
+    // Information Retrieval (FREE)
+    new RecallAtKMetric(k: 10),
+    new MRRMetric(),
+    
     // RAG Quality
     new FaithfulnessMetric(chatClient),
     new ContextPrecisionMetric(chatClient),
@@ -295,6 +324,7 @@ var compositeScore = scores.Average(s => s.Score);
 
 ## See Also
 
+- [RAG Metrics](rag-metrics.md) - Complete RAG evaluation guide
 - [Metrics Reference](metrics-reference.md) - Complete metric catalog
 - [Stochastic Testing](stochastic-testing.md) - Handle LLM variability
 - [Model Comparison](model-comparison.md) - Compare models

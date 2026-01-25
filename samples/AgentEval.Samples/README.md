@@ -24,7 +24,7 @@ You'll see an interactive menu to run each sample.
 | **02 - Agent + One Tool** | Tool tracking, fluent assertions | 5 min |
 | **03 - Agent + Multi Tools** | **Tool ordering, timeline visualization** ⭐ | 7 min |
 | **04 - Performance Metrics** | **Latency, cost, TTFT, token tracking** ⭐ | 5 min |
-| **05 - RAG Evaluation** | All 5 RAG metrics: Faithfulness, Relevance, Precision, Recall, Correctness | 8 min |
+| **05 - Comprehensive RAG** | **Complete RAG: Build, Retrieve, Evaluate (8 metrics + IR)** ⭐⭐ | 15 min |
 | **06 - Benchmarks** | PerformanceBenchmark, AgenticBenchmark | 7 min |
 | **07 - Snapshot Testing** | Regression testing, JSON diff, scrubbing | 5 min |
 | **08 - Conversation Testing** | Multi-turn, ConversationRunner | 7 min |
@@ -112,34 +112,57 @@ result.Performance
     .HaveEstimatedCostUnder(0.10m);
 ```
 
-### Sample 05: RAG Evaluation
-Complete RAG evaluation with all 5 metrics.
+### Sample 05: Comprehensive RAG
+**Complete RAG system: Build → Retrieve → Generate → Evaluate** with all 8 metrics.
 
 ```csharp
-var context = new EvaluationContext
-{
-    Input = "What is the capital of France?",
-    Context = "France's capital is Paris...",
-    Output = "The capital of France is Paris.",
-    GroundTruth = "Paris is the capital of France."
-};
+// PART 1: Build RAG system with MemoryVectorStore
+var vectorStore = new MemoryVectorStore();
+var embeddings = await embeddingClient.GetEmbeddingsAsync(chunks);
+foreach (var (chunk, embedding) in chunks.Zip(embeddings))
+    vectorStore.Add(chunk.Id, chunk.Text, embedding);
 
-// All 5 RAG metrics
-var metrics = new IMetric[]
+// PART 2: RAG Pipeline - Query → Retrieve → Generate
+var queryEmbedding = await embeddingClient.GetEmbeddingAsync(query);
+var results = vectorStore.Search(queryEmbedding, topK: 3);
+var context = string.Join("\n", results.Select(r => r.Text));
+var response = await chatClient.GetResponseAsync(BuildRAGPrompt(query, context));
+
+// PART 3: LLM-Based Evaluation (5 metrics)
+var llmMetrics = new IMetric[]
 {
     new FaithfulnessMetric(client),      // No hallucinations
-    new RelevanceMetric(client),          // Addresses the question
-    new ContextPrecisionMetric(client),   // Retrieved context was useful
-    new ContextRecallMetric(client),      // All needed info retrieved
+    new RelevanceMetric(client),          // Addresses question
+    new ContextPrecisionMetric(client),   // Retrieved context useful
+    new ContextRecallMetric(client),      // All needed context retrieved
     new AnswerCorrectnessMetric(client)   // Matches ground truth
 };
 
-foreach (var metric in metrics)
+// PART 4: Embedding-Based Evaluation (3 metrics - 10-100x cheaper!)
+var embedMetrics = new IMetric[]
 {
-    var result = await metric.EvaluateAsync(context);
-    Console.WriteLine($"{metric.Name}: {result.Score}/100");
-}
+    new AnswerSimilarityMetric(embeddings),         // Semantic correctness
+    new ResponseContextSimilarityMetric(embeddings), // Grounding check
+    new QueryContextSimilarityMetric(embeddings)     // Retrieval relevance
+};
+
+// PART 5: Information Retrieval Metrics (code-based - FREE!)
+context.SetProperty("RetrievedDocumentIds", results.Select(r => r.Id).ToList());
+context.SetProperty("RelevantDocumentIds", groundTruthDocIds);
+
+var irMetrics = new IMetric[]
+{
+    new RecallAtKMetric(k: 3),  // Are relevant docs in top K?
+    new MRRMetric()             // Rank of first relevant doc
+};
 ```
+
+**Cost Optimization Table:**
+| Type | Cost/Eval | Latency | Use Case |
+|------|-----------|---------|----------|
+| LLM-based | ~$0.01 | ~2-5s | Quality gates, pre-prod |
+| Embedding | ~$0.0001 | ~0.1s | Dev/CI, scale testing |
+| Code-based | FREE | ~1ms | Retrieval tuning |
 
 ### Sample 17: Quality & Safety Metrics
 Evaluate response quality beyond RAG accuracy.
@@ -228,6 +251,22 @@ var replayer = new TraceReplayingAgent(trace);
 var replayed = await replayer.ReplayNextAsync();
 Assert.Equal(response, replayed);  // Identical response every time
 ```
+
+## 💡 Structured LLM Scoring vs Traditional
+
+AgentEval's evaluation approach is fundamentally superior to basic "rate 1-10" LLM scoring:
+
+| Approach | AgentEval | Traditional LLM Scoring |
+|----------|-----------|-------------------------|
+| **Structured Evaluation** | ✅ JSON schema, specific criteria | ❌ Free-form scoring |
+| **Detailed Breakdown** | ✅ factsCorrect, factsIncorrect, factsMissing | ❌ Just a number |
+| **Actionable Feedback** | ✅ Explanations, suggestions | ❌ Score only |
+| **Consistency** | ✅ Prompt engineering for reliability | ❌ Variable |
+| **Debuggability** | ✅ `.Details` with structured data | ❌ Opaque score |
+
+This structured approach gives you actionable insights, not just numbers.
+
+---
 
 ## 🎯 Key Concepts
 

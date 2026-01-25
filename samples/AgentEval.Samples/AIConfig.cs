@@ -59,6 +59,19 @@ public static class AIConfig
     /// </summary>
     public static string TertiaryModelDeployment => 
         Environment.GetEnvironmentVariable("AZURE_OPENAI_DEPLOYMENT_3") ?? "gpt-4.1";
+    
+    /// <summary>
+    /// Embedding model deployment name for RAG and similarity metrics.
+    /// Reads from AZURE_OPENAI_EMBEDDING_DEPLOYMENT or defaults to "text-embedding-ada-002".
+    /// </summary>
+    public static string EmbeddingDeployment => 
+        Environment.GetEnvironmentVariable("AZURE_OPENAI_EMBEDDING_DEPLOYMENT") ?? "text-embedding-ada-002";
+    
+    /// <summary>
+    /// Returns true if embedding model is configured (endpoint + key + embedding deployment).
+    /// </summary>
+    public static bool IsEmbeddingConfigured => 
+        IsConfigured && !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("AZURE_OPENAI_EMBEDDING_DEPLOYMENT"));
 
     public static void PrintMissingCredentialsWarning()
     {

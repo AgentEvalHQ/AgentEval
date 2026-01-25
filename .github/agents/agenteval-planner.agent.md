@@ -1,7 +1,7 @@
 ---
 description: Planning agent for AgentEval feature development - generates implementation plans without making code changes
 name: AgentEval Planner
-tools: ['search', 'search/codebase', 'fetch']
+tools: ['read', 'search', 'web', 'todo']
 model: Claude Sonnet 4
 handoffs:
   - label: Start Implementation

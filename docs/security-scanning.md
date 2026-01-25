@@ -21,7 +21,7 @@ AgentEval implements comprehensive automated security scanning to protect agains
 | **Secret Scanner** | Hardcoded credential detection | All file types | ✅ Active |
 | **SARIF Integration** | GitHub Security tab integration | Unified reporting | ✅ Active |
 | **GitHub CodeQL** | Advanced semantic code analysis | C# source code | 🔲 Planned |
-| **Codecov** | Code coverage tracking & reporting | Test coverage | 🔲 Setup Required |
+| **Codecov** | Code coverage tracking & reporting | Test coverage | ✅ Active (67%+) |
 
 ---
 
@@ -85,37 +85,20 @@ docker run -v $(pwd):/src mcr.microsoft.com/devskim analyze --source-code /src
 
 [Codecov](https://codecov.io) is a code coverage reporting service that integrates with GitHub to show which lines of code are covered by tests. It provides PR comments, coverage badges, and trend analysis.
 
-**Current Status:** 🔲 **Setup Required**
+**Current Status:** ✅ **Active** - Coverage at 67%+
 
-Codecov requires a `CODECOV_TOKEN` to authenticate uploads. This token is not yet configured for the AgentEval repository.
+Codecov is fully configured and running on the AgentEval repository. Coverage reports are available at [codecov.io/gh/joslat/AgentEval](https://app.codecov.io/gh/joslat/AgentEval).
 
-#### How to Set Up Codecov
+**Coverage Reports Show:**
+- Overall project coverage percentage (currently 67%+)
+- Per-file coverage breakdown  
+- Coverage changes on each PR
+- Historical coverage trends
+- Uncovered lines highlighted in PR diffs
 
-**Step 1: Sign Up for Codecov**
+#### Configuration Reference
 
-1. Go to [codecov.io/signup](https://app.codecov.io/signup)
-2. Sign in with your GitHub account
-3. Install the [Codecov GitHub App](https://github.com/apps/codecov) for your organization/account
-4. Grant access to the `joslat/AgentEval` repository
-
-**Step 2: Get Your Repository Token**
-
-1. Go to [app.codecov.io](https://app.codecov.io)
-2. Select the `joslat/AgentEval` repository
-3. Click "Setup repo" or navigate to Settings → General
-4. Copy the **Repository Upload Token**
-
-**Step 3: Add Token to GitHub Secrets**
-
-1. Go to GitHub → `joslat/AgentEval` → Settings → Secrets and variables → Actions
-2. Click "New repository secret"
-3. Name: `CODECOV_TOKEN`
-4. Value: (paste the token from Step 2)
-5. Click "Add secret"
-
-**Step 4: Add Codecov to CI Workflow**
-
-Once the token is configured, add to `.github/workflows/ci.yml`:
+The CI workflow includes:
 
 ```yaml
 - name: Run tests with coverage

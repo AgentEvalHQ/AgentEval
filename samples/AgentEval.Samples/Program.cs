@@ -70,7 +70,7 @@ public static class Program
                     await Sample04_PerformanceMetrics.RunAsync();
                     break;
                 case 5:
-                    await Sample05_RAGEvaluation.RunAsync();
+                    await Sample05_ComprehensiveRAG.RunAsync();
                     break;
                 case 6:
                     await Sample06_Benchmarks.RunAsync();
@@ -162,7 +162,7 @@ public static class Program
         Console.WriteLine("│  2. 🔧 Agent + One Tool   - Tool tracking assertions        │");
         Console.WriteLine("│  3. 🔧 Agent + Multi Tool - Tool ordering & timeline        │");
         Console.WriteLine("│  4. ⚡ Performance        - Latency, cost, TTFT metrics     │");
-        Console.WriteLine("│  5. 📊 RAG Evaluation     - All 5 RAG metrics demo        │");
+        Console.WriteLine("│  5. 📊 Comprehensive RAG  - Build & evaluate RAG system    │");
         Console.WriteLine("│  6. 📈 Benchmarks         - Performance & agentic benchmarks│");
         Console.WriteLine("│  7. 📸 Snapshot Testing   - Regression detection            │");
         Console.WriteLine("│  8. 💬 Conversations      - Multi-turn testing              │");

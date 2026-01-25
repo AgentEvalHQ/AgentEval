@@ -301,6 +301,100 @@ Metrics for multi-turn conversation evaluation.
 
 ---
 
+## Information Retrieval Metrics
+
+Code-based metrics for evaluating retrieval quality in RAG systems. These are **FREE** (no API calls) and fast.
+
+### code_recall_at_k
+
+**Purpose:** Measures what proportion of relevant documents were found in the top K retrieved results.
+
+| Property | Value |
+|----------|-------|
+| Interface | `IRAGMetric` |
+| Requires Context | ❌ No |
+| Requires Ground Truth | ❌ No |
+| Requires Document IDs | ✅ Yes (`RelevantDocumentIds`, `RetrievedDocumentIds`) |
+| Cost | Free (code-based) |
+| Formula | `Recall@K = |Relevant ∩ Retrieved@K| / |Relevant|` |
+
+**When to Use:**
+- Evaluating retrieval coverage in RAG pipelines
+- CI/CD testing of vector search
+- Optimizing retrieval parameters (K value)
+- High-volume testing (free - no API costs)
+
+**Parameters:**
+- `k` - Number of top results to consider (default: 10)
+- `passThreshold` - Minimum score to pass (default: 0.7 = 70%)
+
+**Example:**
+```csharp
+var metric = new RecallAtKMetric(k: 5);
+var result = await metric.EvaluateAsync(new EvaluationContext
+{
+    RelevantDocumentIds = ["doc1", "doc2", "doc3"],
+    RetrievedDocumentIds = ["doc1", "doc4", "doc2", "doc5", "doc6"]
+});
+// Score: 67 (2 of 3 relevant docs found in top 5)
+```
+
+**AdditionalData:**
+- `k` - K value used
+- `relevant_count` - Total relevant documents
+- `retrieved_at_k` - Documents retrieved at K
+- `relevant_found_at_k` - Relevant documents found
+
+---
+
+### code_mrr
+
+**Purpose:** Mean Reciprocal Rank - measures how early the first relevant document appears in results.
+
+| Property | Value |
+|----------|-------|
+| Interface | `IRAGMetric` |
+| Requires Context | ❌ No |
+| Requires Ground Truth | ❌ No |
+| Requires Document IDs | ✅ Yes (`RelevantDocumentIds`, `RetrievedDocumentIds`) |
+| Cost | Free (code-based) |
+| Formula | `MRR = 1 / rank_of_first_relevant` |
+
+**When to Use:**
+- Evaluating retrieval ranking quality
+- User experience optimization (users want relevant docs first)
+- Search result quality assessment
+- CI/CD testing of ranking algorithms
+
+**Parameters:**
+- `maxRank` - Maximum rank to consider (default: unlimited, 0 = unlimited)
+- `passThreshold` - Minimum score to pass (default: 0.33 = first relevant in top 3)
+
+**Scoring:**
+- First relevant at rank 1 → Score = 100 (1/1)
+- First relevant at rank 2 → Score = 50 (1/2)
+- First relevant at rank 3 → Score = 33 (1/3)
+- First relevant at rank 10 → Score = 10 (1/10)
+- No relevant found → Score = 0
+
+**Example:**
+```csharp
+var metric = new MRRMetric(maxRank: 10);
+var result = await metric.EvaluateAsync(new EvaluationContext
+{
+    RelevantDocumentIds = ["doc1", "doc2"],
+    RetrievedDocumentIds = ["docA", "docB", "doc1", "docC"]  // doc1 at rank 3
+});
+// Score: 33 (1/3 = 0.333)
+```
+
+**AdditionalData:**
+- `first_relevant_rank` - Position of first relevant doc (0 if none found)
+- `max_rank` - Maximum rank considered (0 = unlimited)
+- `reciprocal_rank` - The 1/rank value
+
+---
+
 ## Quick Reference Table
 
 | Metric | Category | Context | Ground Truth | Tool Usage | Cost |
@@ -313,6 +407,8 @@ Metrics for multi-turn conversation evaluation.
 | `embed_answer_similarity` | Embedding | ❌ | ✅ | ❌ | Embed |
 | `embed_response_context` | Embedding | ✅ | ❌ | ❌ | Embed |
 | `embed_query_context` | Embedding | ✅ | ❌ | ❌ | Embed |
+| `code_recall_at_k` | IR | ❌ | ❌ | ❌ | Free |
+| `code_mrr` | IR | ❌ | ❌ | ❌ | Free |
 | `code_tool_selection` | Agentic | ❌ | ❌ | ✅ | Free |
 | `code_tool_arguments` | Agentic | ❌ | ❌ | ✅ | Free |
 | `code_tool_success` | Agentic | ❌ | ❌ | ✅ | Free |
@@ -323,6 +419,7 @@ Metrics for multi-turn conversation evaluation.
 
 ## See Also
 
+- [RAG Metrics](rag-metrics.md) - Complete RAG evaluation guide
 - [Evaluation Guide](evaluation-guide.md) - How to choose the right metrics
 - [Naming Conventions](naming-conventions.md) - Metric naming standards
 - [Architecture](architecture.md) - System design

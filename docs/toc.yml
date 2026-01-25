@@ -32,7 +32,9 @@
     href: evaluation-guide.md
   - name: Metrics Reference
     href: metrics-reference.md
-  - name: Embedding Metrics
+  - name: RAG Metrics
+    href: rag-metrics.md
+  - name: Implementing Embeddings
     href: embedding-metrics.md
   - name: Benchmarks
     href: benchmarks.md
