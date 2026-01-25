@@ -237,10 +237,10 @@ main.container-xxl {
 .sidetoc .nav .nav,
 #toc .nav.level2,
 .toc .nav.level2 {
-    margin-left: 0.75rem;
+    margin-left: 1.25rem;
     margin-top: 4px;
-    padding-left: 0.75rem;
-    border-left: 2px solid var(--ae-border);
+    padding-left: 0.5rem;
+    border-left: 2px solid var(--ae-primary-light);
 }
 
 .sidetoc .nav .nav > li > a,

@@ -28,8 +28,8 @@ You **implement code changes** in the AgentEval codebase. You write production c
 
 ## Your Expertise
 
-- **AgentEval Architecture**: Core interfaces (IMetric, ITestableAgent, ITestHarness), fluent assertions, MAF integration
-- **Testing Patterns**: FakeChatClient for mocking, Trace Record/Replay, stochastic testing
+- **AgentEval Architecture**: Core interfaces (IMetric, IEvaluableAgent, IEvaluationHarness), fluent assertions, MAF integration
+- **Evaluation Patterns**: FakeChatClient for mocking, Trace Record/Replay, Stochastic Evaluation
 - **C# Best Practices**: Preview features, nullable types, file-scoped namespaces, primary constructors
 - **.NET Testing**: xUnit, multi-target frameworks (net8.0, net9.0, net10.0)
 - **DI/IOC**: Interface-first development, AddAgentEval() registration per ADR-006
@@ -39,7 +39,7 @@ You **implement code changes** in the AgentEval codebase. You write production c
 ### SOLID Principles
 - **Single Responsibility**: One focused purpose per class
 - **Open/Closed**: Extend via interfaces, not modification
-- **Dependency Inversion**: Depend on abstractions (IMetric, ITestHarness)
+- **Dependency Inversion**: Depend on abstractions (IMetric, IEvaluationHarness)
 
 ### Metric Naming
 Always use prefixes: `llm_` (LLM-evaluated), `code_` (computed), `embed_` (embedding-based)
