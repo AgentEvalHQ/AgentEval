@@ -20,10 +20,16 @@ namespace AgentEval.Samples;
 /// This demonstrates:
 /// - Using agent factories to swap models
 /// - Comparing models on quality, speed, cost, and reliability
+/// - Weighted scoring profiles (Quality, Speed, Cost, Reliability focused)
+/// - Cost analysis and winner recommendation
+/// - Export to Markdown, GitHub PR comments
 /// - Table format output like ai-rag-chat-evaluator
-/// - Tool usage tracking in comparison
 /// 
-/// ⏱️ Time to understand: 8 minutes
+/// ⏱️ Time to understand: 10 minutes
+/// 
+/// Related samples:
+/// - Sample14_StochasticEvaluation: Foundation for statistical analysis
+/// - Sample10_DatasetsAndExport: Export formats (JUnit, JSON)
 /// </summary>
 public static class Sample15_ModelComparison
 {
@@ -57,23 +63,53 @@ public static class Sample15_ModelComparison
         Console.WriteLine();
         
         // ═══════════════════════════════════════════════════════════════
-        // STEP 2: Set up stochastic runner for each model
+        // STEP 2: Understand Scoring Weight Profiles
         // ═══════════════════════════════════════════════════════════════
-        Console.WriteLine("📝 Step 2: Setting up test infrastructure...\n");
+        Console.WriteLine("📝 Step 2: Scoring Weight Profiles\n");
+        
+        Console.WriteLine("   AgentEval supports different scoring profiles to optimize for your priority:");
+        Console.WriteLine();
+        Console.ForegroundColor = ConsoleColor.Cyan;
+        Console.WriteLine("   Profile          │ Quality │ Speed │ Cost │ Reliability");
+        Console.WriteLine("   ─────────────────┼─────────┼───────┼──────┼────────────");
+        Console.WriteLine("   Default          │   40%   │  20%  │ 20%  │    20%");
+        Console.WriteLine("   QualityFocused   │   60%   │  15%  │ 10%  │    15%");
+        Console.WriteLine("   SpeedFocused     │   25%   │  50%  │ 10%  │    15%");
+        Console.WriteLine("   CostFocused      │   25%   │  10%  │ 50%  │    15%");
+        Console.WriteLine("   ReliabilityFocused│  30%   │  15%  │ 15%  │    40%");
+        Console.ResetColor();
+        Console.WriteLine();
+        Console.WriteLine("   💡 Using QualityFocused for this comparison\n");
+        
+        // ═══════════════════════════════════════════════════════════════
+        // STEP 3: Set up ModelComparer with options
+        // ═══════════════════════════════════════════════════════════════
+        Console.WriteLine("📝 Step 3: Setting up ModelComparer...\n");
         
         var harness = new MAFEvaluationHarness(verbose: false);
-        var stochasticRunner = new StochasticRunner(harness, new EvaluationOptions
+        var stochasticRunner = new StochasticRunner(harness, statisticsCalculator: null, new EvaluationOptions
         {
             TrackTools = true,
             TrackPerformance = true,
-            ModelName = AIConfig.ModelDeployment // Will be overridden by factory
+            ModelName = AIConfig.ModelDeployment
         });
-        Console.WriteLine("   ✓ Test runner ready\n");
+        var comparer = new ModelComparer(stochasticRunner);
+        
+        var comparisonOptions = new ModelComparisonOptions(
+            RunsPerModel: 3,
+            ScoringWeights: ScoringWeights.QualityFocused,
+            EnableCostAnalysis: true,
+            EnableStatistics: true,
+            MaxParallelism: 1
+        );
+        Console.WriteLine($"   ✓ Runs per model: {comparisonOptions.RunsPerModel} (reduced for demo speed)");
+        Console.WriteLine($"   ✓ Scoring weights: QualityFocused");
+        Console.WriteLine($"   ✓ Cost analysis: Enabled\n");
         
         // ═══════════════════════════════════════════════════════════════
-        // STEP 3: Define test case (same as Sample 14 for consistency)
+        // STEP 4: Define test case
         // ═══════════════════════════════════════════════════════════════
-        Console.WriteLine("📝 Step 3: Defining test case...\n");
+        Console.WriteLine("📝 Step 4: Defining test case...\n");
         
         var testCase = new TestCase
         {
@@ -86,106 +122,106 @@ public static class Sample15_ModelComparison
         Console.WriteLine($"   Expected: Contains '714', uses CalculatorTool\n");
         
         // ═══════════════════════════════════════════════════════════════
-        // STEP 4: Run stochastic tests for each model
+        // STEP 5: Run comparison
         // ═══════════════════════════════════════════════════════════════
-        Console.WriteLine("📝 Step 4: Running comparison (5 runs per model)...\n");
+        Console.WriteLine("📝 Step 5: Running model comparison (3 runs per model)...\n");
         
-        var stochasticOptions = new StochasticOptions(
-            Runs: 5,
-            SuccessRateThreshold: 0.6,
-            EnableStatisticalAnalysis: true,
-            MaxParallelism: 1
-        );
-        
-        var modelResults = new List<(string ModelName, StochasticResult Result)>();
-        
-        foreach (var factory in factories)
+        ModelComparisonResult result;
+        try
         {
-            Console.WriteLine($"   🔄 Testing {factory.ModelName}...");
-            try
-            {
-                var result = await stochasticRunner.RunStochasticTestAsync(
-                    factory,
-                    testCase,
-                    stochasticOptions);
-                
-                modelResults.Add((factory.ModelName, result));
-                Console.WriteLine($"      ✓ {result.PassedCount}/{result.IndividualResults.Count} passed");
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"      ❌ Error: {ex.Message}");
-            }
+            result = await comparer.CompareModelsAsync(factories, testCase, comparisonOptions);
         }
-        Console.WriteLine();
-        
-        // ═══════════════════════════════════════════════════════════════
-        // STEP 5: Display comparison table
-        // ═══════════════════════════════════════════════════════════════
-        Console.WriteLine("📝 Step 5: Model Comparison Results\n");
-        
-        // Use extension method for fluent printing
-        modelResults.PrintComparisonTable();
-        
-        // ═══════════════════════════════════════════════════════════════
-        // STEP 6: Determine winner
-        // ═══════════════════════════════════════════════════════════════
-        Console.WriteLine("\n📝 Step 6: Winner\n");
-        
-        var winner = modelResults
-            .Where(m => m.Result.Passed)
-            .OrderByDescending(m => m.Result.Statistics.MeanScore)
-            .ThenBy(m => m.Result.DurationStats.Mean)
-            .FirstOrDefault();
-        
-        if (winner.ModelName != null)
+        catch (Exception ex)
         {
-            Console.WriteLine($"   🏆 Best Model: {winner.ModelName}");
-            Console.WriteLine($"      Pass Rate: {winner.Result.Statistics.PassRate:P0}");
-            Console.WriteLine($"      Mean Score: {winner.Result.Statistics.MeanScore:F1}");
-            Console.WriteLine($"      Avg Duration: {winner.Result.DurationStats.Mean:F0}ms\n");
-        }
-        else
-        {
-            Console.WriteLine("   ⚠️ No models passed the success threshold\n");
+            Console.ForegroundColor = ConsoleColor.Red;
+            Console.WriteLine($"   ❌ Comparison failed: {ex.Message}");
+            Console.ResetColor();
+            return;
         }
         
-        // ═══════════════════════════════════════════════════════════════
-        // STEP 7: Export to Markdown (NEW!)
-        // ═══════════════════════════════════════════════════════════════
-        Console.WriteLine("📝 Step 7: Export comparison to Markdown...\n");
+        Console.WriteLine($"   ✓ Compared {result.ModelResults.Count} models\n");
         
-        // Show a preview of what ToMarkdown() produces
-        Console.WriteLine("   📄 Markdown export preview (ToGitHubComment()):\n");
+        // ═══════════════════════════════════════════════════════════════
+        // STEP 6: Display rankings
+        // ═══════════════════════════════════════════════════════════════
+        Console.WriteLine("📝 Step 6: Rankings (by composite score)\n");
+        
         Console.ForegroundColor = ConsoleColor.Cyan;
-        Console.WriteLine("   ### 🤖 Model Comparison Results");
-        Console.WriteLine($"   **Test:** {testCase.Name}");
-        if (winner.ModelName != null)
-        {
-            Console.WriteLine($"   **Winner:** 🏆 {winner.ModelName} (Score: {winner.Result.Statistics.MeanScore:F1})");
-        }
-        Console.WriteLine();
-        Console.WriteLine("   | Model | Pass Rate | Mean Score | Avg Duration |");
-        Console.WriteLine("   |-------|-----------|------------|--------------||");
-        foreach (var (name, res) in modelResults.OrderByDescending(m => m.Result.Statistics.MeanScore))
-        {
-            Console.WriteLine($"   | {name} | {res.Statistics.PassRate:P0} | {res.Statistics.MeanScore:F1} | {res.DurationStats.Mean:F0}ms |");
-        }
+        Console.WriteLine("   Rank │ Model       │ Composite │ Quality │ Speed │ Cost │ Reliability");
+        Console.WriteLine("   ─────┼─────────────┼───────────┼─────────┼───────┼──────┼────────────");
         Console.ResetColor();
+        
+        foreach (var ranking in result.Ranking)
+        {
+            var medal = ranking.Rank switch { 1 => "🥇", 2 => "🥈", 3 => "🥉", _ => $"#{ranking.Rank}" };
+            Console.WriteLine($"   {medal,-4} │ {ranking.ModelName,-11} │ {ranking.CompositeScore,9:F1} │ {ranking.QualityScore,7:F1} │ {ranking.SpeedScore,5:F1} │ {ranking.CostScore,4:F1} │ {ranking.ReliabilityScore,8:F1}");
+        }
         Console.WriteLine();
         
-        Console.WriteLine("   💡 Full Markdown export methods available:");
+        // ═══════════════════════════════════════════════════════════════
+        // STEP 7: Cost Analysis
+        // ═══════════════════════════════════════════════════════════════
+        Console.WriteLine("📝 Step 7: Cost Analysis\n");
+        
+        Console.ForegroundColor = ConsoleColor.Cyan;
+        Console.WriteLine("   Model       │ Avg Cost/Call │ Total Cost │ Pass Rate │ Avg Latency");
+        Console.WriteLine("   ────────────┼───────────────┼────────────┼───────────┼────────────");
+        Console.ResetColor();
+        
+        foreach (var modelResult in result.ModelResults.OrderBy(m => m.AverageCost ?? decimal.MaxValue))
+        {
+            var avgCost = modelResult.AverageCost.HasValue ? $"${modelResult.AverageCost:F4}" : "N/A";
+            var totalCost = modelResult.TotalCost.HasValue ? $"${modelResult.TotalCost:F4}" : "N/A";
+            Console.WriteLine($"   {modelResult.ModelName,-11} │ {avgCost,13} │ {totalCost,10} │ {modelResult.PassRate,9:P0} │ {modelResult.AverageLatency.TotalMilliseconds,8:F0}ms");
+        }
+        Console.WriteLine();
+        
+        // ═══════════════════════════════════════════════════════════════
+        // STEP 8: Winner Recommendation
+        // ═══════════════════════════════════════════════════════════════
+        Console.WriteLine("📝 Step 8: Winner Recommendation\n");
+        
+        Console.ForegroundColor = ConsoleColor.Green;
+        Console.WriteLine($"   🏆 Recommended Model: {result.Winner.ModelName}");
+        Console.ResetColor();
+        Console.WriteLine();
+        Console.WriteLine($"   Composite Score: {result.Winner.CompositeScore:F1} / 100");
+        Console.WriteLine($"   ├─ Quality:     {result.Winner.QualityScore:F1} (weight: 60%)");
+        Console.WriteLine($"   ├─ Speed:       {result.Winner.SpeedScore:F1} (weight: 15%)");
+        Console.WriteLine($"   ├─ Cost:        {result.Winner.CostScore:F1} (weight: 10%)");
+        Console.WriteLine($"   └─ Reliability: {result.Winner.ReliabilityScore:F1} (weight: 15%)");
+        Console.WriteLine();
+        
+        // ═══════════════════════════════════════════════════════════════
+        // STEP 9: Export to Markdown
+        // ═══════════════════════════════════════════════════════════════
+        Console.WriteLine("📝 Step 9: Export to Markdown\n");
+        
+        // Show GitHub PR comment format
+        Console.WriteLine("   📋 GitHub PR Comment (collapsible):\n");
         Console.ForegroundColor = ConsoleColor.DarkGray;
-        Console.WriteLine("      • result.ToMarkdown()           - Full report with all sections");
-        Console.WriteLine("      • result.ToRankingsTable()      - Compact rankings table");
-        Console.WriteLine("      • result.ToDetailedMetricsTable() - Pass rate, latency, cost");
-        Console.WriteLine("      • result.ToStatisticsTable()    - Mean, median, percentiles");
-        Console.WriteLine("      • result.ToGitHubComment()      - Collapsible PR comment");
-        Console.WriteLine("      • result.SaveToMarkdownAsync()  - Save to file");
+        Console.WriteLine(result.ToGitHubComment());
         Console.ResetColor();
         Console.WriteLine();
         
-        PrintFooter(winner.ModelName ?? "None");
+        // Save full report
+        var reportPath = Path.Combine(Path.GetTempPath(), "model-comparison-report.md");
+        await result.SaveToMarkdownAsync(reportPath);
+        Console.WriteLine($"   ✅ Full report saved to: {reportPath}");
+        Console.WriteLine();
+        
+        Console.WriteLine("   💡 Export methods available:");
+        Console.ForegroundColor = ConsoleColor.DarkGray;
+        Console.WriteLine("      • result.ToMarkdown()             - Full report with all sections");
+        Console.WriteLine("      • result.ToRankingsTable()        - Compact rankings table");
+        Console.WriteLine("      • result.ToDetailedMetricsTable() - Pass rate, latency, cost");
+        Console.WriteLine("      • result.ToStatisticsTable()      - Mean, median, percentiles");
+        Console.WriteLine("      • result.ToGitHubComment()        - Collapsible PR comment");
+        Console.WriteLine("      • result.SaveToMarkdownAsync()    - Save to file");
+        Console.ResetColor();
+        Console.WriteLine();
+        
+        PrintFooter(result.Winner.ModelName);
     }
     
     private static List<IAgentFactory> CreateFactories()

@@ -5,6 +5,7 @@ using AgentEval.Calibration;
 using AgentEval.Core;
 using AgentEval.Metrics.RAG;
 using AgentEval.Testing;
+using Azure.AI.OpenAI;
 using Microsoft.Extensions.AI;
 
 namespace AgentEval.Samples;
@@ -43,27 +44,63 @@ public static class Sample18_JudgeCalibration
    ✓ Providing graceful degradation if individual judges fail
 ");
 
+        // Judge calibration REQUIRES real LLM evaluation - mocking defeats the purpose
+        if (!AIConfig.IsConfigured)
+        {
+            Console.ForegroundColor = ConsoleColor.Yellow;
+            Console.WriteLine("   ⚠️  SKIPPING JUDGE CALIBRATION - No Azure credentials configured\n");
+            Console.ResetColor();
+            Console.WriteLine(@"
+   ┌─────────────────────────────────────────────────────────────────────────────┐
+   │  🔒 REAL EVALUATION REQUIRED                                                │
+   ├─────────────────────────────────────────────────────────────────────────────┤
+   │  Judge calibration cannot be meaningfully demonstrated with mocks!          │
+   │  Mocking judge scores defeats the entire purpose of multi-model consensus.  │
+   │                                                                             │
+   │  With Azure credentials, this sample would demonstrate:                     │
+   │                                                                             │
+   │  • Running the same evaluation with 3 judge instances                       │
+   │  • Real score variance from LLM non-determinism                             │
+   │  • Median, Mean, Weighted, and Unanimous voting strategies                  │
+   │  • Agreement scores and confidence intervals                                │
+   │  • Why consensus matters for reliable AI evaluation                         │
+   │                                                                             │
+   │  Set these environment variables to enable:                                 │
+   │    AZURE_OPENAI_ENDPOINT                                                    │
+   │    AZURE_OPENAI_API_KEY                                                     │
+   │    AZURE_OPENAI_DEPLOYMENT                                                  │
+   └─────────────────────────────────────────────────────────────────────────────┘
+");
+            PrintKeyTakeaways();
+            return;
+        }
+
         // ═══════════════════════════════════════════════════════════════
-        // STEP 2: Create Fake Judges for Demo
+        // STEP 2: Create Real Judges Using Azure OpenAI
         // ═══════════════════════════════════════════════════════════════
-        Console.WriteLine("📝 Step 2: Creating mock judges for demonstration...\n");
+        Console.WriteLine("📝 Step 2: Creating real LLM judges using Azure OpenAI...\n");
         
-        // Simulate 3 different judges with slightly different scoring patterns
-        var gpt4oClient = new FakeChatClient("""{"score": 85, "explanation": "Good faithfulness, well grounded in context."}""");
-        var claudeClient = new FakeChatClient("""{"score": 88, "explanation": "Response accurately reflects source material."}""");
-        var geminiClient = new FakeChatClient("""{"score": 82, "explanation": "Mostly faithful with minor unsupported claims."}""");
+        // Create 3 independent client instances for parallel judge execution
+        // Note: In production, you might use different models (GPT-4o, Claude, Gemini)
+        // Here we use the same model 3 times to demonstrate variance within one model
+        var azureClient = new AzureOpenAIClient(AIConfig.Endpoint, AIConfig.KeyCredential);
+        
+        var judge1Client = azureClient.GetChatClient(AIConfig.ModelDeployment).AsIChatClient();
+        var judge2Client = azureClient.GetChatClient(AIConfig.ModelDeployment).AsIChatClient();
+        var judge3Client = azureClient.GetChatClient(AIConfig.ModelDeployment).AsIChatClient();
         
         // Create named judge dictionary for the factory pattern
         var judges = new Dictionary<string, IChatClient>
         {
-            ["GPT-4o"] = gpt4oClient,
-            ["Claude-3.5"] = claudeClient,
-            ["Gemini-Pro"] = geminiClient
+            ["Judge-A"] = judge1Client,
+            ["Judge-B"] = judge2Client,
+            ["Judge-C"] = judge3Client
         };
         
-        Console.WriteLine("   ✓ GPT-4o judge (will score ~85)");
-        Console.WriteLine("   ✓ Claude-3.5 judge (will score ~88)");
-        Console.WriteLine("   ✓ Gemini-Pro judge (will score ~82)\n");
+        Console.WriteLine($"   ✓ Judge-A ({AIConfig.ModelDeployment})");
+        Console.WriteLine($"   ✓ Judge-B ({AIConfig.ModelDeployment})");
+        Console.WriteLine($"   ✓ Judge-C ({AIConfig.ModelDeployment})");
+        Console.WriteLine("   💡 Using same model 3x to demonstrate score variance\n");
 
         // ═══════════════════════════════════════════════════════════════
         // STEP 3: Create CalibratedJudge with Median Strategy
@@ -71,9 +108,9 @@ public static class Sample18_JudgeCalibration
         Console.WriteLine("📝 Step 3: Creating CalibratedJudge with Median voting...\n");
         
         var calibratedJudge = CalibratedJudge.Create(
-            ("GPT-4o", gpt4oClient),
-            ("Claude-3.5", claudeClient),
-            ("Gemini-Pro", geminiClient));
+            ("Judge-A", judge1Client),
+            ("Judge-B", judge2Client),
+            ("Judge-C", judge3Client));
         
         Console.WriteLine($"   Judges: {string.Join(", ", calibratedJudge.JudgeNames)}");
         Console.WriteLine($"   Strategy: {calibratedJudge.Options.Strategy}");
@@ -128,14 +165,14 @@ public static class Sample18_JudgeCalibration
         
         // Mean strategy
         var meanJudge = new CalibratedJudge(
-            [("GPT-4o", gpt4oClient), ("Claude-3.5", claudeClient), ("Gemini-Pro", geminiClient)],
+            [("Judge-A", judge1Client), ("Judge-B", judge2Client), ("Judge-C", judge3Client)],
             new CalibratedJudgeOptions { Strategy = VotingStrategy.Mean });
         
         var meanResult = await meanJudge.EvaluateAsync(context, jn => new FaithfulnessMetric(judges[jn]));
         
         // Unanimous strategy (requires consensus)
         var unanimousJudge = new CalibratedJudge(
-            [("GPT-4o", gpt4oClient), ("Claude-3.5", claudeClient), ("Gemini-Pro", geminiClient)],
+            [("Judge-A", judge1Client), ("Judge-B", judge2Client), ("Judge-C", judge3Client)],
             new CalibratedJudgeOptions { Strategy = VotingStrategy.Unanimous, ConsensusTolerance = 10 });
         
         CalibratedResult? unanimousResult = null;
@@ -167,26 +204,26 @@ public static class Sample18_JudgeCalibration
         // ═══════════════════════════════════════════════════════════════
         // STEP 6: Weighted Strategy
         // ═══════════════════════════════════════════════════════════════
-        Console.WriteLine("📝 Step 6: Weighted voting (trust GPT-4o more)...\n");
+        Console.WriteLine("📝 Step 6: Weighted voting (trust Judge-A more)...\n");
         
         var weightedJudge = new CalibratedJudge(
-            [("GPT-4o", gpt4oClient), ("Claude-3.5", claudeClient), ("Gemini-Pro", geminiClient)],
+            [("Judge-A", judge1Client), ("Judge-B", judge2Client), ("Judge-C", judge3Client)],
             new CalibratedJudgeOptions
             {
                 Strategy = VotingStrategy.Weighted,
                 JudgeWeights = new Dictionary<string, double>
                 {
-                    ["GPT-4o"] = 2.0,      // Trust GPT-4o twice as much
-                    ["Claude-3.5"] = 1.0,
-                    ["Gemini-Pro"] = 1.0
+                    ["Judge-A"] = 2.0,      // Trust Judge-A twice as much
+                    ["Judge-B"] = 1.0,
+                    ["Judge-C"] = 1.0
                 }
             });
         
         var weightedResult = await weightedJudge.EvaluateAsync(context, jn => new FaithfulnessMetric(judges[jn]));
         
         Console.WriteLine($"   Weighted Score: {weightedResult.Score:F1}");
-        Console.WriteLine("   Weights: GPT-4o=2.0, Claude=1.0, Gemini=1.0");
-        Console.WriteLine($"   (Biased toward GPT-4o's score of {result.JudgeScores["GPT-4o"]:F1})\n");
+        Console.WriteLine("   Weights: Judge-A=2.0, Judge-B=1.0, Judge-C=1.0");
+        Console.WriteLine($"   (Biased toward Judge-A's score of {result.JudgeScores["Judge-A"]:F1})\n");
 
         // ═══════════════════════════════════════════════════════════════
         // STEP 7: Real-World Usage Pattern

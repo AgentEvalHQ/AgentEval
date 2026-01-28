@@ -1,7 +1,24 @@
 // Copyright (c) 2025-2026 AgentEval Contributors
 // Licensed under the MIT License.
 
+using AgentEval.Models;
+
 namespace AgentEval.Comparison;
+
+/// <summary>
+/// Progress information for stochastic evaluation runs.
+/// </summary>
+/// <param name="CurrentRun">1-based index of the current run (1 to TotalRuns).</param>
+/// <param name="TotalRuns">Total number of runs configured.</param>
+/// <param name="LastResult">Result of the just-completed run, or null if starting.</param>
+/// <param name="Elapsed">Total elapsed time since the start of evaluation.</param>
+/// <param name="EstimatedRemaining">Estimated time remaining based on average run time, or null if unknown.</param>
+public record StochasticProgress(
+    int CurrentRun,
+    int TotalRuns,
+    TestResult? LastResult,
+    TimeSpan Elapsed,
+    TimeSpan? EstimatedRemaining);
 
 /// <summary>
 /// Configuration options for stochastic evaluation.
@@ -13,6 +30,7 @@ namespace AgentEval.Comparison;
 /// <param name="DelayBetweenRuns">Delay between runs to avoid rate limiting. Default: TimeSpan.Zero.</param>
 /// <param name="EnableStatisticalAnalysis">Whether to compute detailed statistics. Default: true.</param>
 /// <param name="ConfidenceLevel">Confidence level for statistical intervals (0.0-1.0). Default: 0.95 (95%).</param>
+/// <param name="OnProgress">Optional callback invoked after each run completes, providing progress information.</param>
 public record StochasticOptions(
     int Runs = 10,
     double SuccessRateThreshold = 0.8,
@@ -20,7 +38,8 @@ public record StochasticOptions(
     int MaxParallelism = 1,
     TimeSpan? DelayBetweenRuns = null,
     bool EnableStatisticalAnalysis = true,
-    double ConfidenceLevel = 0.95)
+    double ConfidenceLevel = 0.95,
+    Action<StochasticProgress>? OnProgress = null)
 {
     /// <summary>
     /// Default options with 10 runs and 80% success threshold.

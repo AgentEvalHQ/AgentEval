@@ -66,7 +66,7 @@ public static class Sample16_CombinedStochasticComparison
         Console.WriteLine("📝 Step 2: Setting up test infrastructure...\n");
         
         var harness = new MAFEvaluationHarness(verbose: false);
-        var stochasticRunner = new StochasticRunner(harness, new EvaluationOptions
+        var stochasticRunner = new StochasticRunner(harness, statisticsCalculator: null, new EvaluationOptions
         {
             TrackTools = true,
             TrackPerformance = true,
@@ -90,12 +90,12 @@ public static class Sample16_CombinedStochasticComparison
         Console.WriteLine($"   ✓ Expected result: 579\n");
         
         // ═══════════════════════════════════════════════════════════════
-        // STEP 4: Configure stochastic options (5 runs per model)
+        // STEP 4: Configure stochastic options (3 runs per model for demo speed)
         // ═══════════════════════════════════════════════════════════════
-        Console.WriteLine("📝 Step 4: Configuring stochastic options (5 runs per model)...\n");
+        Console.WriteLine("📝 Step 4: Configuring stochastic options (3 runs per model)...\n");
         
         var stochasticOptions = new StochasticOptions(
-            Runs: 5,                         // 5 runs per model for demo
+            Runs: 3,                         // 3 runs per model for demo speed
             SuccessRateThreshold: 0.8,       // 80% must pass
             EnableStatisticalAnalysis: true,
             MaxParallelism: 1,               // Sequential to avoid rate limiting
@@ -116,21 +116,34 @@ public static class Sample16_CombinedStochasticComparison
             
             try
             {
+                // Create options with progress callback for this model
+                var optionsWithProgress = new StochasticOptions(
+                    Runs: stochasticOptions.Runs,
+                    SuccessRateThreshold: stochasticOptions.SuccessRateThreshold,
+                    EnableStatisticalAnalysis: stochasticOptions.EnableStatisticalAnalysis,
+                    MaxParallelism: stochasticOptions.MaxParallelism,
+                    DelayBetweenRuns: stochasticOptions.DelayBetweenRuns,
+                    OnProgress: progress =>
+                    {
+                        var status = progress.LastResult?.Passed == true ? "✅" : "❌";
+                        Console.WriteLine($"      {status} Run {progress.CurrentRun}/{progress.TotalRuns} - Score: {progress.LastResult?.Score ?? 0}/100");
+                    }
+                );
+                
                 var result = await stochasticRunner.RunStochasticTestAsync(
                     factory, 
                     testCase, 
-                    stochasticOptions);
+                    optionsWithProgress);
                 
                 modelResults.Add((factory.ModelName, result));
-                Console.WriteLine($"      ✓ Completed: {result.PassedCount}/{result.IndividualResults.Count} passed");
+                Console.WriteLine($"      ✓ Completed: {result.PassedCount}/{result.IndividualResults.Count} passed\n");
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"      ❌ Error: {ex.Message}");
+                Console.WriteLine($"      ❌ Error: {ex.Message}\n");
                 // Skip this model if it fails completely
             }
         }
-        Console.WriteLine();
         
         // ═══════════════════════════════════════════════════════════════
         // STEP 6: Compare models side-by-side using table

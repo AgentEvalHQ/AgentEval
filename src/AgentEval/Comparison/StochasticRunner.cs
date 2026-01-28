@@ -4,6 +4,7 @@
 using AgentEval.Core;
 using AgentEval.Models;
 using Microsoft.Extensions.DependencyInjection;
+using System.Diagnostics;
 
 namespace AgentEval.Comparison;
 
@@ -146,6 +147,7 @@ public class StochasticRunner : IStochasticRunner
         
         var results = new List<TestResult>();
         var random = options.Seed.HasValue ? new Random(options.Seed.Value) : new Random();
+        var stopwatch = Stopwatch.StartNew();
         
         if (options.MaxParallelism == 1)
         {
@@ -157,6 +159,20 @@ public class StochasticRunner : IStochasticRunner
                 var agent = agentProvider();
                 var result = await _harness.RunEvaluationAsync(agent, testCase, _testOptions, cancellationToken);
                 results.Add(result);
+                
+                // Report progress if callback is provided
+                if (options.OnProgress != null)
+                {
+                    var avgDuration = stopwatch.Elapsed / (i + 1);
+                    var remaining = TimeSpan.FromTicks(avgDuration.Ticks * (options.Runs - i - 1));
+                    
+                    options.OnProgress(new StochasticProgress(
+                        CurrentRun: i + 1,
+                        TotalRuns: options.Runs,
+                        LastResult: result,
+                        Elapsed: stopwatch.Elapsed,
+                        EstimatedRemaining: remaining));
+                }
                 
                 if (options.DelayBetweenRuns.HasValue && options.DelayBetweenRuns.Value > TimeSpan.Zero)
                 {
@@ -182,8 +198,34 @@ public class StochasticRunner : IStochasticRunner
                     cancellationToken));
             }
             
-            var completedResults = await Task.WhenAll(tasks);
-            results.AddRange(completedResults);
+            // For parallel execution, report progress as tasks complete
+            if (options.OnProgress != null)
+            {
+                var completedCount = 0;
+                while (completedCount < tasks.Count)
+                {
+                    var completed = await Task.WhenAny(tasks);
+                    completedCount++;
+                    var result = await completed;
+                    results.Add(result);
+                    tasks.Remove(completed);
+                    
+                    var avgDuration = stopwatch.Elapsed / completedCount;
+                    var remaining = TimeSpan.FromTicks(avgDuration.Ticks * (options.Runs - completedCount));
+                    
+                    options.OnProgress(new StochasticProgress(
+                        CurrentRun: completedCount,
+                        TotalRuns: options.Runs,
+                        LastResult: result,
+                        Elapsed: stopwatch.Elapsed,
+                        EstimatedRemaining: remaining));
+                }
+            }
+            else
+            {
+                var completedResults = await Task.WhenAll(tasks);
+                results.AddRange(completedResults);
+            }
         }
         
         // Calculate statistics

@@ -51,7 +51,7 @@ public static class Sample05_ComprehensiveRAG
 
         // Create clients
         IChatClient chatClient = CreateChatClient();
-        IChatClient evaluatorClient = CreateEvaluatorClient();
+        IChatClient? evaluatorClient = CreateEvaluatorClient();
         IAgentEvalEmbeddings embeddingClient = CreateEmbeddingClient();
 
         // ═══════════════════════════════════════════════════════════════
@@ -173,10 +173,9 @@ public static class Sample05_ComprehensiveRAG
         Console.WriteLine("📊 PART 3: LLM-BASED EVALUATION (5 Metrics)");
         Console.WriteLine("═══════════════════════════════════════════════════════════════\n");
 
-        Console.WriteLine("   💡 LLM-based metrics use GPT to evaluate quality with nuanced understanding.");
-        Console.WriteLine("   💰 Cost: ~$0.002-0.01 per evaluation | ⏱️ Latency: ~2-5 seconds each\n");
+        var llmResults = new List<(string Name, MetricResult Result)>();
 
-        // Create evaluation context
+        // Create evaluation context for all metrics (used by PART 3 and PART 4)
         var evalContext = new EvaluationContext
         {
             Input = userQuery,
@@ -185,49 +184,81 @@ public static class Sample05_ComprehensiveRAG
             GroundTruth = groundTruth
         };
 
-        var llmResults = new List<(string Name, MetricResult Result)>();
+        // LLM-based evaluation REQUIRES real credentials - we don't mock this!
+        if (evaluatorClient == null)
+        {
+            Console.ForegroundColor = ConsoleColor.Yellow;
+            Console.WriteLine("   ⚠️  SKIPPING LLM-BASED EVALUATION - No Azure credentials configured\n");
+            Console.ResetColor();
+            Console.WriteLine("   💡 LLM-based metrics use GPT to evaluate quality with nuanced understanding.");
+            Console.WriteLine("   💰 Cost: ~$0.002-0.01 per evaluation | ⏱️ Latency: ~2-5 seconds each\n");
+            Console.WriteLine(@"
+   ┌─────────────────────────────────────────────────────────────────────────────┐
+   │  🔒 REAL EVALUATION REQUIRED                                                │
+   ├─────────────────────────────────────────────────────────────────────────────┤
+   │  LLM-based evaluation cannot be mocked - that would defeat the purpose!    │
+   │                                                                             │
+   │  With Azure credentials, this section would run:                            │
+   │    • Faithfulness      - Detect hallucinations vs grounded claims           │
+   │    • Relevance         - Does response address the question?                │
+   │    • Context Precision - Was all retrieved context useful?                  │
+   │    • Context Recall    - Did we retrieve enough information?                │
+   │    • Answer Correctness - Does response match ground truth?                 │
+   │                                                                             │
+   │  Set these environment variables to enable:                                 │
+   │    AZURE_OPENAI_ENDPOINT                                                    │
+   │    AZURE_OPENAI_API_KEY                                                     │
+   │    AZURE_OPENAI_DEPLOYMENT                                                  │
+   └─────────────────────────────────────────────────────────────────────────────┘
+");
+        }
+        else
+        {
+            Console.WriteLine("   💡 LLM-based metrics use GPT to evaluate quality with nuanced understanding.");
+            Console.WriteLine("   💰 Cost: ~$0.002-0.01 per evaluation | ⏱️ Latency: ~2-5 seconds each\n");
 
-        // 3.1 Faithfulness - Hallucination Detection
-        Console.WriteLine("   📝 3.1 FAITHFULNESS (Hallucination Detection)");
-        Console.WriteLine("      ❓ Is the response grounded in the provided context?\n");
-        var faithfulness = new FaithfulnessMetric(evaluatorClient);
-        var faithResult = await faithfulness.EvaluateAsync(evalContext);
-        PrintMetricResult(faithResult, "Faithfulness");
-        llmResults.Add(("Faithfulness", faithResult));
+            // 3.1 Faithfulness - Hallucination Detection
+            Console.WriteLine("   📝 3.1 FAITHFULNESS (Hallucination Detection)");
+            Console.WriteLine("      ❓ Is the response grounded in the provided context?\n");
+            var faithfulness = new FaithfulnessMetric(evaluatorClient);
+            var faithResult = await faithfulness.EvaluateAsync(evalContext);
+            PrintMetricResult(faithResult, "Faithfulness");
+            llmResults.Add(("Faithfulness", faithResult));
 
-        // 3.2 Relevance - Response Quality
-        Console.WriteLine("\n   📝 3.2 RELEVANCE (Response Quality)");
-        Console.WriteLine("      ❓ Does the response address the user's question?\n");
-        var relevance = new RelevanceMetric(evaluatorClient);
-        var relevResult = await relevance.EvaluateAsync(evalContext);
-        PrintMetricResult(relevResult, "Relevance");
-        llmResults.Add(("Relevance", relevResult));
+            // 3.2 Relevance - Response Quality
+            Console.WriteLine("\n   📝 3.2 RELEVANCE (Response Quality)");
+            Console.WriteLine("      ❓ Does the response address the user's question?\n");
+            var relevance = new RelevanceMetric(evaluatorClient);
+            var relevResult = await relevance.EvaluateAsync(evalContext);
+            PrintMetricResult(relevResult, "Relevance");
+            llmResults.Add(("Relevance", relevResult));
 
-        // 3.3 Context Precision - Retrieval Quality
-        Console.WriteLine("\n   📝 3.3 CONTEXT PRECISION (Retrieval Quality)");
-        Console.WriteLine("      ❓ Was all retrieved context actually useful?\n");
-        var precision = new ContextPrecisionMetric(evaluatorClient);
-        var precisionResult = await precision.EvaluateAsync(evalContext);
-        PrintMetricResult(precisionResult, "Context Precision");
-        llmResults.Add(("Context Precision", precisionResult));
+            // 3.3 Context Precision - Retrieval Quality
+            Console.WriteLine("\n   📝 3.3 CONTEXT PRECISION (Retrieval Quality)");
+            Console.WriteLine("      ❓ Was all retrieved context actually useful?\n");
+            var precision = new ContextPrecisionMetric(evaluatorClient);
+            var precisionResult = await precision.EvaluateAsync(evalContext);
+            PrintMetricResult(precisionResult, "Context Precision");
+            llmResults.Add(("Context Precision", precisionResult));
 
-        // 3.4 Context Recall - Retrieval Coverage
-        Console.WriteLine("\n   📝 3.4 CONTEXT RECALL (Retrieval Coverage)");
-        Console.WriteLine("      ❓ Did we retrieve all the information needed to answer?\n");
-        var recall = new ContextRecallMetric(evaluatorClient);
-        var recallResult = await recall.EvaluateAsync(evalContext);
-        PrintMetricResult(recallResult, "Context Recall");
-        llmResults.Add(("Context Recall", recallResult));
+            // 3.4 Context Recall - Retrieval Coverage
+            Console.WriteLine("\n   📝 3.4 CONTEXT RECALL (Retrieval Coverage)");
+            Console.WriteLine("      ❓ Did we retrieve all the information needed to answer?\n");
+            var recall = new ContextRecallMetric(evaluatorClient);
+            var recallResult = await recall.EvaluateAsync(evalContext);
+            PrintMetricResult(recallResult, "Context Recall");
+            llmResults.Add(("Context Recall", recallResult));
 
-        // 3.5 Answer Correctness - Ground Truth Comparison
-        Console.WriteLine("\n   📝 3.5 ANSWER CORRECTNESS (Ground Truth Comparison)");
-        Console.WriteLine("      ❓ Does the response match the expected answer?\n");
-        var correctness = new AnswerCorrectnessMetric(evaluatorClient);
-        var correctnessResult = await correctness.EvaluateAsync(evalContext);
-        PrintMetricResult(correctnessResult, "Answer Correctness");
-        llmResults.Add(("Answer Correctness", correctnessResult));
+            // 3.5 Answer Correctness - Ground Truth Comparison
+            Console.WriteLine("\n   📝 3.5 ANSWER CORRECTNESS (Ground Truth Comparison)");
+            Console.WriteLine("      ❓ Does the response match the expected answer?\n");
+            var correctness = new AnswerCorrectnessMetric(evaluatorClient);
+            var correctnessResult = await correctness.EvaluateAsync(evalContext);
+            PrintMetricResult(correctnessResult, "Answer Correctness");
+            llmResults.Add(("Answer Correctness", correctnessResult));
 
-        PrintSectionComplete($"LLM-based evaluation complete! Average: {llmResults.Average(r => r.Result.Score):F1}/100");
+            PrintSectionComplete($"LLM-based evaluation complete! Average: {llmResults.Average(r => r.Result.Score):F1}/100");
+        }
 
         // ═══════════════════════════════════════════════════════════════
         // PART 4: EMBEDDING-BASED EVALUATION (3 Metrics)
@@ -297,10 +328,19 @@ public static class Sample05_ComprehensiveRAG
         Console.WriteLine("   ┌─────────────────────────────────────────────────────────────┐");
         Console.WriteLine("   │  LLM-BASED METRICS              │  SCORE  │  STATUS        │");
         Console.WriteLine("   ├─────────────────────────────────────────────────────────────┤");
-        foreach (var (name, result) in llmResults)
+        if (llmResults.Count == 0)
         {
-            var status = result.Passed ? "✅ PASSED" : "❌ FAILED";
-            Console.WriteLine($"   │  {name,-30} │  {result.Score,5:F1}  │  {status,-13} │");
+            Console.ForegroundColor = ConsoleColor.Yellow;
+            Console.WriteLine("   │  (skipped - configure Azure credentials to see scores)    │");
+            Console.ResetColor();
+        }
+        else
+        {
+            foreach (var (name, result) in llmResults)
+            {
+                var status = result.Passed ? "✅ PASSED" : "❌ FAILED";
+                Console.WriteLine($"   │  {name,-30} │  {result.Score,5:F1}  │  {status,-13} │");
+            }
         }
         Console.WriteLine("   └─────────────────────────────────────────────────────────────┘\n");
 
@@ -456,7 +496,7 @@ public static class Sample05_ComprehensiveRAG
         return new FakeChatClient("Mock response - Configure Azure credentials for real responses.");
     }
 
-    private static IChatClient CreateEvaluatorClient()
+    private static IChatClient? CreateEvaluatorClient()
     {
         if (AIConfig.IsConfigured)
         {
@@ -464,56 +504,10 @@ public static class Sample05_ComprehensiveRAG
             return azureClient.GetChatClient(AIConfig.ModelDeployment).AsIChatClient();
         }
 
-        Console.WriteLine("   ℹ️  Using FakeChatClient for evaluation (no Azure credentials configured)\n");
-
-        // Return fake responses for each metric evaluation in order
-        return new FakeChatClient()
-            // Faithfulness
-            .WithResponse("""
-            {
-                "score": 92,
-                "explanation": "The response is well-grounded in the provided context. It correctly states Paris is the capital and mentions the Eiffel Tower and Louvre from the context.",
-                "faithfulClaims": ["Paris is the capital of France", "Eiffel Tower built for 1889 World's Fair", "Louvre is the world's largest art museum"],
-                "hallucinatedClaims": []
-            }
-            """)
-            // Relevance
-            .WithResponse("""
-            {
-                "score": 95,
-                "explanation": "The response directly addresses the question about the capital of France and famous landmarks, providing specific examples.",
-                "addressesQuestion": true,
-                "staysOnTopic": true
-            }
-            """)
-            // Context Precision
-            .WithResponse("""
-            {
-                "score": 88,
-                "explanation": "Most retrieved context is directly relevant to answering the question about Paris and landmarks.",
-                "relevantParts": ["Paris capital info", "Eiffel Tower details", "Louvre Museum info"],
-                "irrelevantParts": []
-            }
-            """)
-            // Context Recall
-            .WithResponse("""
-            {
-                "score": 75,
-                "explanation": "Retrieved context covers Paris, Eiffel Tower, and Louvre but might be missing other famous landmarks like Versailles.",
-                "informationPresent": ["Paris is capital", "Eiffel Tower", "Louvre Museum"],
-                "informationMissing": ["Versailles"]
-            }
-            """)
-            // Answer Correctness
-            .WithResponse("""
-            {
-                "score": 85,
-                "explanation": "Response correctly identifies Paris as capital and mentions key landmarks. Matches ground truth well though doesn't mention Versailles.",
-                "factsCorrect": ["Paris is capital", "Eiffel Tower", "Louvre"],
-                "factsIncorrect": [],
-                "factsMissing": ["Versailles"]
-            }
-            """);
+        // NOTE: We intentionally return null when credentials are not configured.
+        // LLM-based evaluation (PART 3) REQUIRES real LLM calls - mocking defeats the purpose
+        // of demonstrating AI-powered evaluation. The sample will skip PART 3 gracefully.
+        return null;
     }
 
     private static IAgentEvalEmbeddings CreateEmbeddingClient()

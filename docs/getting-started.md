@@ -16,7 +16,22 @@ This guide walks you through installing AgentEval and writing your first AI agen
 
 - .NET 8.0, 9.0, or 10.0 SDK
 - An xUnit, NUnit, or MSTest test project
-- Azure OpenAI or OpenAI API access
+- Azure OpenAI or OpenAI API access (for LLM-as-judge evaluation)
+
+### Mock vs Real Mode
+
+AgentEval follows the principle: **"Evaluation Always Real, Structure Optionally Mock"**
+
+| Component | Mock Mode | Real Mode |
+|-----------|-----------|-----------|
+| Tool tracking & assertions | ✅ Works | ✅ Works |
+| Performance metrics | ✅ Simulated | ✅ Real timing |
+| Conversation flows | ✅ Works | ✅ Works |
+| LLM-as-judge evaluation | ❌ Skipped | ✅ Real scores |
+| RAG quality metrics | ❌ Skipped | ✅ Real evaluation |
+| Model comparison | ❌ Skipped | ✅ Real comparison |
+
+**Without credentials:** Samples 1-13 work fully; samples 14-19 gracefully skip evaluation parts.
 
 ### Required Environment Variables
 
@@ -37,6 +52,18 @@ export AZURE_OPENAI_DEPLOYMENT="gpt-4o"
 ```
 
 > **Tip:** Add these to your `.bashrc`, `.zshrc`, or Windows user environment variables for persistence.
+
+### Running Without Credentials (Mock Mode)
+
+If you just want to explore AgentEval's API without Azure credentials:
+
+```bash
+# Run the samples project
+cd samples/AgentEval.Samples
+dotnet run
+```
+
+You'll see samples 1-13 demonstrate tool tracking, performance metrics, conversations, workflows, and more—all without real LLM calls. Samples 14-19 will show informative "credentials required" messages.
 
 ## Installation
 

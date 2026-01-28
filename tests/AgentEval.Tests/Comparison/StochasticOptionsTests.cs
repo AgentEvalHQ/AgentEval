@@ -102,4 +102,24 @@ public class StochasticOptionsTests
         
         Assert.Null(exception);
     }
+    
+    [Fact]
+    public void OnProgress_CanBeSet()
+    {
+        var progressReports = new List<StochasticProgress>();
+        
+        var options = new StochasticOptions(
+            Runs: 5,
+            OnProgress: progress => progressReports.Add(progress));
+        
+        Assert.NotNull(options.OnProgress);
+    }
+    
+    [Fact]
+    public void OnProgress_DefaultIsNull()
+    {
+        var options = StochasticOptions.Default;
+        
+        Assert.Null(options.OnProgress);
+    }
 }

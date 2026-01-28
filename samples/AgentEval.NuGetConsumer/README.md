@@ -7,9 +7,38 @@ This sample showcases **advanced, production-ready usage patterns** for AI agent
 ## 🚀 Quick Start
 
 ```bash
-# Run the sample
+# Interactive mode (prompts for choices)
 dotnet run --project samples/AgentEval.NuGetConsumer
+
+# Automated mode - run with command-line arguments
+dotnet run --project samples/AgentEval.NuGetConsumer -- --mock --demo all
 ```
+
+### Command-Line Arguments
+
+| Argument | Short | Description |
+|----------|-------|-------------|
+| `--help` | `-h` | Show usage information |
+| `--mock` | `-m` | Use mock mode (no API keys required) |
+| `--real` | `-r` | Use real mode (requires Azure OpenAI credentials) |
+| `--demo <N>` | `-d <N>` | Run specific demo (0, 1, 2, 3, or `all`) |
+
+**Examples:**
+```bash
+# Show help
+dotnet run --project samples/AgentEval.NuGetConsumer -- --help
+
+# Run all demos in mock mode
+dotnet run --project samples/AgentEval.NuGetConsumer -- --mock --demo all
+
+# Run complete example (demo 0) in real mode
+dotnet run --project samples/AgentEval.NuGetConsumer -- --real --demo 0
+
+# Quick validation in CI/CD
+dotnet run --project samples/AgentEval.NuGetConsumer -- -m -d all
+```
+
+### Interactive Mode
 
 Interactive menu with **focused, advanced demos**:
 

@@ -2,7 +2,16 @@
 
 > **📚 Comprehensive Learning Library - Get started with AgentEval in 5 minutes!**
 
-This project contains **18 focused, educational samples** demonstrating all major AgentEval features. Perfect for learning step-by-step.
+This project contains **19 focused, educational samples** demonstrating all major AgentEval features. Perfect for learning step-by-step.
+
+## ⚡ Core Principle
+
+**"Evaluation Always Real, Structure Optionally Mock"**
+
+- **Evaluation** (LLM-as-judge scores, metrics) → Always real or gracefully skipped
+- **Structure** (tool ordering, workflows, conversations) → Can be demonstrated with mock data
+
+This means samples 1-13 work fully without credentials, while samples 14-19 require Azure OpenAI for meaningful results.
 
 
 
@@ -38,23 +47,57 @@ You'll see an interactive menu to run each sample.
 | **16 - Combined Test** | Stochastic + Model Comparison together | 5 min |
 | **17 - Quality & Safety Metrics** | Groundedness, Coherence, Fluency metrics | 5 min |
 | **18 - Judge Calibration** | Multi-model consensus voting for reliable evaluations | 8 min |
+| **19 - Streaming vs Async** | Compare streaming and non-streaming performance | 5 min |
 
 > **⭐ Samples 03 & 04** provide the foundational knowledge for tool chain and performance assertions that advanced users can find in comprehensive form in the **AgentEval.NuGetConsumer** project.
 
 ## 🔧 Prerequisites
 
 ### With Azure OpenAI (Full Experience)
-Set environment variables:
-```bash
-set AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.com/
-set AZURE_OPENAI_API_KEY=your-api-key
+
+Set environment variables (**recommended for samples 14-19**):
+
+```powershell
+# PowerShell
+$env:AZURE_OPENAI_ENDPOINT = "https://your-resource.openai.azure.com/"
+$env:AZURE_OPENAI_API_KEY = "your-api-key"
+$env:AZURE_OPENAI_DEPLOYMENT = "gpt-4o"  # Or your deployment name
+
+# Optional: For embedding-based metrics (Sample05)
+$env:AZURE_OPENAI_EMBEDDING_DEPLOYMENT = "text-embedding-ada-002"
 ```
 
-### Without Azure (Demo Mode)
-Samples work without credentials using mock responses. You'll see:
+```bash
+# Bash/Linux/macOS
+export AZURE_OPENAI_ENDPOINT="https://your-resource.openai.azure.com/"
+export AZURE_OPENAI_API_KEY="your-api-key"
+export AZURE_OPENAI_DEPLOYMENT="gpt-4o"
 ```
-⚠️ Azure OpenAI credentials not configured
-Some samples will run in mock mode without real AI.
+
+### Without Azure (Mock Mode - Samples 1-13)
+
+Samples 1-13 work fully without credentials, demonstrating:
+- Tool tracking and assertions
+- Performance metrics
+- Conversation flows
+- Workflow testing
+- Snapshot testing
+- Trace record/replay
+
+You'll see this banner:
+```
+╔══════════════════════════════════════════════════════════════╗
+║  ⚠️  Azure OpenAI credentials not configured                  ║
+║  All samples will run in MOCK MODE without real AI.          ║
+╚══════════════════════════════════════════════════════════════╝
+```
+
+Samples 14-19 require credentials and will show:
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  🔒 REAL EVALUATION REQUIRED                                                │
+│  Set AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_API_KEY, AZURE_OPENAI_DEPLOYMENT   │
+└─────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ## 📖 Sample Details

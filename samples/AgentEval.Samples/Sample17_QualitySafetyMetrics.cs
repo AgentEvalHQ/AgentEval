@@ -49,7 +49,52 @@ public static class Sample17_QualitySafetyMetrics
    Groundedness catches: invented statistics, fake citations, false confidence
 ");
 
-        IChatClient evaluatorClient = CreateEvaluatorClient();
+        IChatClient? evaluatorClient = CreateEvaluatorClient();
+
+        // Quality & Safety metrics REQUIRE real LLM evaluation
+        if (evaluatorClient == null)
+        {
+            Console.ForegroundColor = ConsoleColor.Yellow;
+            Console.WriteLine("   ⚠️  SKIPPING QUALITY & SAFETY EVALUATION - No Azure credentials configured\n");
+            Console.ResetColor();
+            Console.WriteLine(@"
+   ┌─────────────────────────────────────────────────────────────────────────────┐
+   │  🔒 REAL EVALUATION REQUIRED                                                │
+   ├─────────────────────────────────────────────────────────────────────────────┤
+   │  Quality & Safety metrics require real LLM evaluation.                      │
+   │  Mocking these would defeat the purpose of demonstrating AI assessment!     │
+   │                                                                             │
+   │  With Azure credentials, this sample would evaluate:                        │
+   │                                                                             │
+   │  PART 1: GROUNDEDNESS (Safety)                                              │
+   │    • Test 1: Properly sourced response - should PASS                        │
+   │    • Test 2: Response with fabricated stats/sources - should FAIL           │
+   │                                                                             │
+   │  PART 2: COHERENCE (Quality)                                                │
+   │    • Test 3: Logical flow response - should PASS                            │
+   │    • Test 4: Self-contradictory response - should FAIL                      │
+   │                                                                             │
+   │  PART 3: FLUENCY (Quality)                                                  │
+   │    • Test 5: Well-written response - should PASS                            │
+   │    • Test 6: Grammar errors response - should FAIL                          │
+   │                                                                             │
+   │  Set these environment variables to enable:                                 │
+   │    AZURE_OPENAI_ENDPOINT                                                    │
+   │    AZURE_OPENAI_API_KEY                                                     │
+   │    AZURE_OPENAI_DEPLOYMENT                                                  │
+   └─────────────────────────────────────────────────────────────────────────────┘
+
+💡 KEY TAKEAWAYS:
+   • Groundedness = Safety check for fabricated content
+   • Coherence = Quality check for logical consistency
+   • Fluency = Quality check for language/grammar
+   • Use Categories property to understand metric classification
+   • Combine with RAG metrics for comprehensive evaluation
+
+🎉 Sample complete! Configure credentials to see real evaluation results.
+");
+            return;
+        }
 
         // ═══════════════════════════════════════════════════════════════
         // PART 1: GroundednessMetric - Detecting Fabricated Content
@@ -266,7 +311,7 @@ public static class Sample17_QualitySafetyMetrics
         Console.WriteLine("\n🎉 Sample complete! See Sample 05 for RAG metrics.\n");
     }
 
-    private static IChatClient CreateEvaluatorClient()
+    private static IChatClient? CreateEvaluatorClient()
     {
         if (AIConfig.IsConfigured)
         {
@@ -274,105 +319,10 @@ public static class Sample17_QualitySafetyMetrics
             return azureClient.GetChatClient(AIConfig.ModelDeployment).AsIChatClient();
         }
         
-        Console.WriteLine("   ℹ️  Using FakeChatClient (no Azure credentials configured)\n");
-        
-        // Provide fake responses for each test case in order
-        var fake = new FakeChatClient()
-            // Test 1: Grounded response
-            .WithResponse("""
-            {
-                "score": 92,
-                "groundedClaims": [
-                    "Green tea contains antioxidants called catechins",
-                    "May support heart health",
-                    "Contains caffeine for alertness",
-                    "FDA hasn't approved specific health claims"
-                ],
-                "ungroundedClaims": [],
-                "fabricatedElements": [],
-                "uncertaintyAcknowledged": true,
-                "reasoning": "Response properly cites context and acknowledges uncertainty with 'may support' and 'some studies suggest'."
-            }
-            """)
-            // Test 2: Fabricated response
-            .WithResponse("""
-            {
-                "score": 15,
-                "groundedClaims": [],
-                "ungroundedClaims": [
-                    "47% cancer risk reduction",
-                    "12 year lifespan extension"
-                ],
-                "fabricatedElements": [
-                    "2023 Harvard Medical School study (no such study in context)",
-                    "WHO recommendation of 5 cups daily",
-                    "Clinical trials with 50,000 participants",
-                    "Dr. James Chen (invented expert)"
-                ],
-                "uncertaintyAcknowledged": false,
-                "reasoning": "Response fabricates multiple sources, statistics, and an expert that do not exist in the context."
-            }
-            """)
-            // Test 3: Coherent response
-            .WithResponse("""
-            {
-                "score": 95,
-                "hasLogicalFlow": true,
-                "hasContradictions": false,
-                "contradictions": [],
-                "structureQuality": "excellent",
-                "reasoning": "Clear logical progression from light absorption → water splitting → glucose creation → oxygen release. Each step follows naturally."
-            }
-            """)
-            // Test 4: Contradictory response
-            .WithResponse("""
-            {
-                "score": 25,
-                "hasLogicalFlow": false,
-                "hasContradictions": true,
-                "contradictions": [
-                    "Claims remote work is 'definitely more productive' then says it 'decreases productivity significantly'",
-                    "Says employees are 'always more focused at home' but also 'constantly distracted'",
-                    "Recommends mandating remote work while calling in-office 'clearly superior'"
-                ],
-                "structureQuality": "poor",
-                "reasoning": "Response contains multiple direct contradictions, making it logically incoherent and unhelpful."
-            }
-            """)
-            // Test 5: Fluent response
-            .WithResponse("""
-            {
-                "score": 94,
-                "grammarErrors": [],
-                "awkwardPhrases": [],
-                "readabilityLevel": "moderate",
-                "overallQuality": "excellent",
-                "reasoning": "Well-structured sentences with proper grammar, good vocabulary variety, and clear technical explanation accessible to general audience."
-            }
-            """)
-            // Test 6: Poor fluency response
-            .WithResponse("""
-            {
-                "score": 32,
-                "grammarErrors": [
-                    "'it is when computer they learns' - incorrect subject-verb agreement",
-                    "'by themselfs' - misspelling of 'themselves'",
-                    "'make decide' - missing noun 'decisions'",
-                    "'it's own' - incorrect use of possessive",
-                    "'many thing' - singular/plural disagreement",
-                    "'diagnose the medical' - incomplete phrase"
-                ],
-                "awkwardPhrases": [
-                    "Very useful for many thing",
-                    "Without explicit programming it work automatically learn"
-                ],
-                "readabilityLevel": "poor",
-                "overallQuality": "poor",
-                "reasoning": "Multiple grammar errors, awkward sentence structure, and unclear phrasing make this difficult to understand."
-            }
-            """);
-        
-        return fake;
+        // NOTE: We intentionally return null when credentials are not configured.
+        // Quality & Safety evaluation REQUIRES real LLM calls - mocking defeats the purpose
+        // of demonstrating AI-powered quality assessment.
+        return null;
     }
 
     private static void PrintMetricResult(MetricResult result, string testName, bool expectFail = false)

@@ -56,7 +56,7 @@ public static class Sample14_StochasticEvaluation
         Console.WriteLine("📝 Step 2: Setting up stochastic runner...\n");
         
         var harness = new MAFEvaluationHarness(verbose: false);
-        var stochasticRunner = new StochasticRunner(harness, new EvaluationOptions
+        var stochasticRunner = new StochasticRunner(harness, statisticsCalculator: null, new EvaluationOptions
         {
             TrackTools = true,
             TrackPerformance = true,
@@ -65,9 +65,9 @@ public static class Sample14_StochasticEvaluation
         Console.WriteLine("   ✓ Stochastic runner ready\n");
         
         // ═══════════════════════════════════════════════════════════════
-        // STEP 3: Run stochastic test (10 runs)
+        // STEP 3: Run stochastic test (3 runs for demo speed)
         // ═══════════════════════════════════════════════════════════════
-        Console.WriteLine("📝 Step 3: Running stochastic test (10 runs)...\n");
+        Console.WriteLine("📝 Step 3: Running stochastic test (3 runs)...\n");
         
         var testCase = new TestCase
         {
@@ -78,16 +78,25 @@ public static class Sample14_StochasticEvaluation
         };
         
         var options = new StochasticOptions(
-            Runs: 10,
+            Runs: 3,
             SuccessRateThreshold: 0.8,
             EnableStatisticalAnalysis: true,
-            MaxParallelism: 1
+            MaxParallelism: 1,
+            OnProgress: progress =>
+            {
+                var status = progress.LastResult?.Passed == true ? "✅" : "❌";
+                var remaining = progress.EstimatedRemaining?.TotalSeconds ?? 0;
+                Console.WriteLine($"   {status} Run {progress.CurrentRun}/{progress.TotalRuns} - " +
+                    $"Score: {progress.LastResult?.Score ?? 0}/100 " +
+                    $"({progress.Elapsed.TotalSeconds:F1}s elapsed, ~{remaining:F0}s remaining)");
+            }
         );
         
         Console.WriteLine($"   Test: {testCase.Name}");
         Console.WriteLine($"   Runs: {options.Runs}, Threshold: {options.SuccessRateThreshold:P0}\n");
         
         var result = await stochasticRunner.RunStochasticTestAsync(agent, testCase, options);
+        Console.WriteLine(); // Extra line after progress
         
         // ═══════════════════════════════════════════════════════════════
         // STEP 4: Display results in table format

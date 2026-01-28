@@ -319,6 +319,82 @@ var compositeScore = scores.Average(s => s.Score);
 | Ignore stochasticity | Run multiple times, analyze statistics |
 | Test with same data as training | Use held-out test sets |
 | Skip ground truth when available | Use `llm_answer_correctness` |
+| Mock evaluation LLM responses | Always use real LLM for evaluation metrics |
+
+---
+
+## Evaluation Always Real Principle
+
+When building demos, samples, or tests, there's an important distinction between what should use real LLM calls versus what can be mocked.
+
+### Core Principle
+
+> **"Evaluation Always Real, Structure Optionally Mock"**
+
+### What This Means
+
+| Category | Mock OK? | Why |
+|----------|----------|-----|
+| **Agent responses** | ✅ Yes | Structure demos can show flows without real AI |
+| **Tool call results** | ✅ Yes | Validates tool handling logic |
+| **Conversation flows** | ✅ Yes | Tests multi-turn patterns |
+| **Evaluation metrics** | ❌ No | Defeats the purpose of showing AI assessment |
+| **LLM-as-a-Judge** | ❌ No | Hardcoded scores aren't real evaluation |
+| **Consensus voting** | ❌ No | Multiple judges should have real variance |
+
+### Acceptable vs Unacceptable Patterns
+
+**❌ Silent Mocking (Bad)**
+```csharp
+// WRONG - User thinks they're seeing real evaluation
+private IChatClient CreateEvaluatorClient()
+{
+    return new FakeChatClient("""{"score": 92, "explanation": "Mock"}""");
+}
+```
+
+**✅ Explicit User Choice (Good)**
+```csharp
+// CORRECT - User explicitly chooses mock mode
+Console.WriteLine("Select mode:");
+Console.WriteLine("[1] MOCK MODE - Demo structure only");
+Console.WriteLine("[2] REAL MODE - Full AI evaluation");
+
+if (userChoice == "1")
+    return CreateMockClient();  // User understands the trade-off
+```
+
+**✅ Graceful Skip (Good)**
+```csharp
+// CORRECT - Skip with explanation when not configured
+if (!AIConfig.IsConfigured)
+{
+    Console.WriteLine("⚠️ LLM-as-a-Judge requires Azure OpenAI credentials.");
+    Console.WriteLine("   Configure AZURE_OPENAI_ENDPOINT and AZURE_OPENAI_API_KEY");
+    return null; // Caller handles gracefully
+}
+return CreateRealClient();
+```
+
+### When Testing Metrics Themselves
+
+For **unit testing your metric implementations**, `FakeChatClient` is appropriate:
+
+```csharp
+// This is FINE - testing the metric code, not demonstrating evaluation
+[Fact]
+public async Task FaithfulnessMetric_ParsesLLMResponse_Correctly()
+{
+    var fakeClient = new FakeChatClient("""{"score": 85, "explanation": "Test"}""");
+    var metric = new FaithfulnessMetric(fakeClient);
+    
+    var result = await metric.EvaluateAsync(context);
+    
+    Assert.Equal(85, result.Score);
+}
+```
+
+The distinction: **Testing metric code** vs **Demonstrating evaluation capabilities**.
 
 ---
 

@@ -2,6 +2,7 @@
 // Copyright (c) 2025-2026 AgentEval Contributors
 
 using System.Text.Json;
+using AgentEval.Exporters;
 
 namespace AgentEval.Samples;
 
@@ -12,9 +13,14 @@ namespace AgentEval.Samples;
 /// - Loading test datasets from JSON, JSONL, CSV, YAML
 /// - Field aliasing for different data formats
 /// - Running batch evaluations
-/// - Exporting results to JUnit XML for CI/CD
+/// - Multi-format export (JUnit, Markdown, JSON, TRX)
+/// - GitHub PR comment format
+/// - CI/CD integration patterns
 /// 
-/// ⏱️ Time to understand: 5 minutes
+/// ⏱️ Time to understand: 7 minutes
+/// 
+/// Related samples:
+/// - Sample15_ModelComparison: Uses ToGitHubComment() for model results
 /// </summary>
 public static class Sample10_DatasetsAndExport
 {
@@ -164,30 +170,112 @@ public static class Sample10_DatasetsAndExport
         Console.ResetColor();
 
         // ═══════════════════════════════════════════════════════════════
-        // STEP 5: Other export formats
+        // STEP 5: Multi-Format Export Demo
         // ═══════════════════════════════════════════════════════════════
-        Console.WriteLine("\n📝 Step 5: Other export formats...\n");
+        Console.WriteLine("\n📝 Step 5: Multi-Format Export Demo...\n");
         
-        Console.WriteLine("   AgentEval supports multiple export formats:\n");
+        // Build an EvaluationReport from our results
+        var report = new EvaluationReport
+        {
+            Name = "Batch Evaluation Demo",
+            StartTime = DateTimeOffset.UtcNow.AddSeconds(-results.Sum(r => r.Duration.TotalSeconds)),
+            EndTime = DateTimeOffset.UtcNow,
+            TotalTests = results.Count,
+            PassedTests = results.Count(r => r.Passed),
+            FailedTests = results.Count(r => !r.Passed),
+            OverallScore = results.Average(r => r.Score),
+            Agent = new AgentInfo { Name = "Demo Agent", Model = "gpt-4o-mini" },
+            TestResults = results.Select(r => new TestResultSummary
+            {
+                Name = r.TestName,
+                Score = r.Score,
+                Passed = r.Passed,
+                DurationMs = (long)r.Duration.TotalMilliseconds,
+                Output = r.ActualOutput
+            }).ToList()
+        };
         
-        Console.WriteLine("   📄 JSON     - Machine-readable results");
-        Console.WriteLine("   📄 JUnit    - CI/CD integration (GitHub Actions, Azure DevOps)");
-        Console.WriteLine("   📄 TRX      - Visual Studio Test Results");
-        Console.WriteLine("   📄 Markdown - Human-readable reports\n");
+        // Export to multiple formats using real exporters
+        var outputDir = Path.Combine(Path.GetTempPath(), "agenteval-export-demo");
+        Directory.CreateDirectory(outputDir);
         
+        Console.WriteLine("   Exporting to multiple formats:\n");
+        
+        // JUnit XML
+        var junitPath = Path.Combine(outputDir, "results.xml");
+        var junitExporter = new JUnitXmlExporter();
+        await using (var junitStream = File.Create(junitPath))
+        {
+            await junitExporter.ExportAsync(report, junitStream);
+        }
+        Console.WriteLine($"   ✅ JUnit XML:  {junitPath}");
+        
+        // Markdown
+        var mdPath = Path.Combine(outputDir, "results.md");
+        var mdExporter = new MarkdownExporter();
+        await using (var mdStream = File.Create(mdPath))
+        {
+            await mdExporter.ExportAsync(report, mdStream);
+        }
+        Console.WriteLine($"   ✅ Markdown:   {mdPath}");
+        
+        // JSON
+        var jsonPath = Path.Combine(outputDir, "results.json");
+        var jsonExporter = new JsonExporter();
+        await using (var jsonStream = File.Create(jsonPath))
+        {
+            await jsonExporter.ExportAsync(report, jsonStream);
+        }
+        Console.WriteLine($"   ✅ JSON:       {jsonPath}");
+        
+        // TRX (Visual Studio)
+        var trxPath = Path.Combine(outputDir, "results.trx");
+        var trxExporter = new TrxExporter();
+        await using (var trxStream = File.Create(trxPath))
+        {
+            await trxExporter.ExportAsync(report, trxStream);
+        }
+        Console.WriteLine($"   ✅ TRX:        {trxPath}");
+        
+        Console.WriteLine($"\n   📁 All files saved to: {outputDir}\n");
+        
+        // Show Markdown preview
+        Console.WriteLine("   📋 Markdown output preview:\n");
         Console.ForegroundColor = ConsoleColor.Cyan;
-        Console.WriteLine(@"   // Code usage
-   var exporter = new JUnitExporter();
-   await exporter.ExportAsync(summary, ""results.xml"");
-   
-   var mdExporter = new MarkdownExporter();
-   await mdExporter.ExportAsync(summary, ""report.md"");");
+        var mdContent = await File.ReadAllTextAsync(mdPath);
+        foreach (var line in mdContent.Split('\n').Take(20))
+        {
+            Console.WriteLine($"   {line}");
+        }
+        if (mdContent.Split('\n').Length > 20) Console.WriteLine("   ...");
         Console.ResetColor();
+        Console.WriteLine();
+        
+        // ═══════════════════════════════════════════════════════════════
+        // STEP 6: GitHub PR Comment Format
+        // ═══════════════════════════════════════════════════════════════
+        Console.WriteLine("\n📝 Step 6: GitHub PR Comment Format...\n");
+        
+        Console.WriteLine("   For model comparisons, use result.ToGitHubComment() for collapsible PR comments.");
+        Console.WriteLine("   (See Sample15_ModelComparison for full demo)\n");
+        
+        Console.WriteLine("   For batch results, Markdown export can be posted as PR comments:\n");
+        Console.ForegroundColor = ConsoleColor.DarkGray;
+        Console.WriteLine(@"   # GitHub Actions workflow snippet:
+   - name: Run AgentEval
+     run: agenteval eval --dataset tests.jsonl --export markdown --output evaluation.md
+   
+   - name: Post PR Comment
+     uses: marocchino/sticky-pull-request-comment@v2
+     with:
+       path: evaluation.md");
+        Console.ResetColor();
+        Console.WriteLine();
 
         // ═══════════════════════════════════════════════════════════════
-        // STEP 6: CLI usage
+        // STEP 7: CLI usage
         // ═══════════════════════════════════════════════════════════════
-        Console.WriteLine("\n📝 Step 6: CLI usage for batch evaluation...\n");
+        Console.WriteLine("📝 Step 7: CLI usage for batch evaluation...\n");
         
         Console.ForegroundColor = ConsoleColor.Cyan;
         Console.WriteLine(@"   # Initialize a test project
@@ -270,7 +358,8 @@ public static class Sample10_DatasetsAndExport
 ║   • Load test datasets from JSON, JSONL, CSV, YAML                            ║
 ║   • Use field aliasing for different data formats                             ║
 ║   • Run batch evaluations on datasets                                         ║
-║   • Export to JUnit XML for CI/CD integration                                 ║
+║   • Export to multiple formats (JUnit, Markdown, JSON, TRX)                   ║
+║   • Integrate with CI/CD pipelines and GitHub PR comments                     ║
 ║                                                                               ║
 ╚═══════════════════════════════════════════════════════════════════════════════╝
 ");
@@ -292,18 +381,18 @@ public static class Sample10_DatasetsAndExport
 │  2. Field aliasing for flexibility:                                             │
 │     new DatasetOptions { FieldAliases = { [""question""] = ""input"" } }           │
 │                                                                                 │
-│  3. Export formats for CI/CD:                                                   │
-│     - JUnit XML: GitHub Actions, Azure DevOps, Jenkins                          │
-│     - TRX: Visual Studio Test Results                                           │
-│     - JSON: Custom dashboards                                                   │
-│     - Markdown: Human-readable reports                                          │
+│  3. Multi-format export (use real exporters):                                   │
+│     - JUnitXmlExporter: CI/CD (GitHub Actions, Azure DevOps, Jenkins)           │
+│     - MarkdownExporter: PR comments and documentation                           │
+│     - JsonExporter:     Custom dashboards and tooling                           │
+│     - TrxExporter:      Visual Studio Test Results                              │
 │                                                                                 │
 │  4. CLI for automation:                                                         │
-│     agenteval eval --dataset tests.jsonl --export junit                         │
+│     agenteval eval --dataset tests.jsonl --export junit,markdown,json           │
 │                                                                                 │
-│  5. Integrate with CI pipelines:                                                │
-│     GitHub Actions: dorny/test-reporter@v1                                      │
-│     Azure DevOps: PublishTestResults@2                                          │
+│  5. GitHub PR Comments:                                                         │
+│     - Use MarkdownExporter output with sticky-pull-request-comment action       │
+│     - For model comparison: result.ToGitHubComment() (see Sample15)             │
 │                                                                                 │
 └─────────────────────────────────────────────────────────────────────────────────┘
 ");
