@@ -215,7 +215,7 @@ if (faithfulness.Score < 70)
 
 ### Red Team Security Testing: Find Vulnerabilities Before Production
 
-AgentEval includes comprehensive red team security testing with OWASP/MITRE mapping:
+AgentEval includes comprehensive red team security testing with **177 probes across 9 attack types**, covering **6/10 OWASP LLM Top 10** categories and **6 MITRE ATLAS** techniques:
 
 ```csharp
 // Sample20: Basic RedTeam testing
@@ -225,7 +225,9 @@ var result = await redTeam.RunAsync(agent, new RedTeamOptions
     AttackTypes = new[] { 
         AttackType.PromptInjection, 
         AttackType.Jailbreak, 
-        AttackType.PIILeakage 
+        AttackType.PIILeakage,
+        AttackType.ExcessiveAgency,  // LLM08
+        AttackType.InsecureOutput    // LLM02
     },
     Intensity = AttackIntensity.Quick,
     ShowFailureDetails = true  // Show actual attack probes (for analysis)
@@ -245,14 +247,18 @@ result.Should()
 ├─────────────────────────────────────────────────────────────────┤
 │  Overall Score: 88.2% ✅                                       │
 │  Verdict: PARTIAL_PASS                                         │
+│  OWASP Coverage: 6/10 (60%)                                    │
 │                                                                 │
-│  Attack Results:                                                │
-│    ✅ Prompt Injection: 16/17 resisted (94.1%)                │
-│    ❌ Jailbreak: 14/17 resisted (82.4%)                       │
-│    ✅ PII/Data Leakage: 8/8 resisted (100%)                   │
+│  Attack Results (9 types, 177 total probes):                   │
+│    ✅ Prompt Injection: 25/27 resisted (92.6%)                │
+│    ✅ Jailbreak: 22/24 resisted (91.7%)                       │
+│    ✅ PII Leakage: 19/19 resisted (100%)                      │
+│    ✅ Excessive Agency: 14/15 resisted (93.3%)                │
+│    ❌ Insecure Output: 15/18 resisted (83.3%)                 │
 │                                                                 │
 │  OWASP Compliance:                                              │
-│    ❌ LLM01 (Prompt Injection): 2 vulnerabilities found        │
+│    ✅ LLM01, LLM06, LLM07, LLM08 compliant                    │
+│    ❌ LLM02 (Insecure Output): 3 vulnerabilities found        │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -260,7 +266,8 @@ result.Should()
 - **JSON** for automation and tooling
 - **Markdown** for human-readable reports  
 - **JUnit XML** for CI/CD integration
-- **SARIF** for security analysis tools
+- **SARIF** for GitHub Security tab integration
+- **PDF** for executive/board-level reporting
 
 **✅ See Samples:** [Sample20_RedTeamBasic.cs](samples/AgentEval.Samples/Sample20_RedTeamBasic.cs) • [Sample21_RedTeamAdvanced.cs](samples/AgentEval.Samples/Sample21_RedTeamAdvanced.cs) • [docs/redteam.md](docs/redteam.md)
 

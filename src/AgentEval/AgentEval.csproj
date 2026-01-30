@@ -28,6 +28,8 @@
     <PackageReference Include="Azure.AI.OpenAI" />
     <PackageReference Include="System.Numerics.Tensors" />
     <PackageReference Include="YamlDotNet" />
+    <!-- PDF Generation (MIT License) -->
+    <PackageReference Include="PdfSharp-MigraDoc" />
     <!-- SourceLink -->
     <PackageReference Include="Microsoft.SourceLink.GitHub" PrivateAssets="All" />
   </ItemGroup>

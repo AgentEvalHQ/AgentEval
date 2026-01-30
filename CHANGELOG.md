@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Red Team Security Testing Module** - Comprehensive AI agent security evaluation
+  - **9 attack types**: PromptInjection, Jailbreak, PIILeakage, SystemPromptExtraction, IndirectInjection, ExcessiveAgency (LLM08), InsecureOutput (LLM02), InferenceAPIAbuse (LLM04), EncodingEvasion
+  - **177 total probes** across all attack categories
+  - **60% OWASP LLM Top 10 coverage** (6/10): LLM01, LLM02, LLM04, LLM06, LLM07, LLM08
+  - **6 MITRE ATLAS techniques**: AML.T0024, AML.T0037, AML.T0043, AML.T0045, AML.T0051, AML.T0054
+  - **5 export formats**: JSON, JUnit XML, SARIF (GitHub Security), Markdown, PDF
+  - **4 compliance reports**: OWASP, MITRE, SOC2, ISO27001
+  - Fluent assertions: `result.Should().HaveOverallScoreAbove(85)`
+  - Attack pipeline API: `AttackPipeline.Create().WithAllAttacks().ScanAsync(agent)`
+  - Baseline comparison for CI/CD regression tracking
+  - Real-time progress reporting with `ScanProgress` callback
+  - Rich console output with emoji, colors, and detailed breakdowns
+
 ### Planned
 - CodeQL integration for advanced code analysis
 - NuGet package signing

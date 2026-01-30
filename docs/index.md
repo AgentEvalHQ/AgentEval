@@ -193,11 +193,11 @@ dotnet test
     
     NeverCallTool, MustConfirmBefore, PII detection
 
--   **� Red Team Security**
+-   **🔴 Red Team Security**
     
-    OWASP/MITRE mapped security testing, vulnerability detection
+    177 probes, 9 attack types, 60% OWASP LLM Top 10 coverage, MITRE ATLAS mapping
 
--   **�📊 RAG Metrics**
+-   **📊 RAG Metrics**
     
     Faithfulness, Relevance, Context Precision/Recall
 

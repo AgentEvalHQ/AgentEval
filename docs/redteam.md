@@ -12,7 +12,7 @@ AgentEval RedTeam is built on two foundational cybersecurity taxonomies that pro
 - **Source**: [OWASP LLM Top 10 Project](https://owasp.org/www-project-top-10-for-large-language-model-applications/)
 - **License**: Creative Commons Attribution-ShareAlike 4.0 International (CC BY-SA 4.0)
 - **Why**: The de facto standard for LLM security risks, covering 10 critical vulnerability categories
-- **Coverage**: AgentEval MVP covers **3 of top 5 risks** (LLM01, LLM06, LLM07) representing 60% of highest-priority threats
+- **Coverage**: AgentEval covers **6 of top 10 risks** (LLM01, LLM02, LLM04, LLM06, LLM07, LLM08) representing **60% of OWASP LLM Top 10**
 - **Attribution**: *Based on OWASP Top 10 for Large Language Model Applications. © OWASP Foundation. Licensed under CC BY-SA 4.0.*
 
 #### MITRE ATLAS (Adversarial Threat Landscape for AI Systems)
@@ -24,7 +24,7 @@ AgentEval RedTeam is built on two foundational cybersecurity taxonomies that pro
 
 ### AgentEval's Approach: Original Implementation with Taxonomy Mapping
 
-1. **Original Authorship**: All 106 attack probes are **originally written** for AgentEval
+1. **Original Authorship**: All 177 attack probes are **originally written** for AgentEval
 2. **Taxonomy Mapping**: Every attack maps to OWASP ID + MITRE ATLAS techniques for compliance
 3. **Inspiration Sources**: General LLM security research, public jailbreak patterns (DAN, STAN)
 4. **Not Copied From**: We do NOT copy prompts from garak, PyRIT, or specific papers
@@ -54,15 +54,15 @@ result.Should()
 The MVP includes **9 core attack types** covering the most critical OWASP LLM vulnerabilities:
 
 | Attack | OWASP ID | MITRE ATLAS | Description | Probes |
-|--------|-----------|-----------|-----------|--------|
+|--------|-----------|-------------|-------------|--------|
 | **PromptInjection** | LLM01 | AML.T0051 | Direct instruction override attempts | 27 |
-| **Jailbreak** | LLM01 | AML.T0054 | Roleplay, DAN, hypothetical bypasses | 24 |
+| **Jailbreak** | LLM01 | AML.T0051, AML.T0054 | Roleplay, DAN, hypothetical bypasses | 24 |
 | **PIILeakage** | LLM06 | AML.T0024, AML.T0037 | Data extraction and memorization probes | 19 |
 | **SystemPromptExtraction** | LLM07 | AML.T0043 | Attempts to reveal system instructions | 19 |
 | **IndirectInjection** | LLM01 | AML.T0051 | Injection via documents, tools, RAG | 17 |
-| **InferenceAPIAbuse** | LLM04 | AML.T0045 | ML inference API abuse and resource exhaustion | 15 |
 | **ExcessiveAgency** | LLM08 | AML.T0051, AML.T0054 | Scope expansion, privilege escalation, unauthorized actions | 15 |
 | **InsecureOutput** | LLM02 | AML.T0051 | XSS, SQL, command injection in outputs | 18 |
+| **InferenceAPIAbuse** | LLM04 | AML.T0045 | ML inference API abuse and resource exhaustion | 15 |
 | **EncodingEvasion** | LLM01 | AML.T0051 | Encoded/obfuscated payload delivery | 23 |
 
 ### Detailed Coverage by Category
@@ -83,11 +83,11 @@ The MVP includes **9 core attack types** covering the most critical OWASP LLM vu
 - **Instruction Extraction**: Formatting tricks, language conversion
 - **Developer Impersonation**: Fake admin/audit requests
 
-#### LLM04: Model Denial of Service (15 probes)
+#### LLM04: Model Denial of Service / Inference API Abuse (15 probes)
 - **Resource Exhaustion**: Token flooding, excessive content generation
 - **API Parameter Abuse**: Hyperparameter manipulation, rate limiting bypass
-- **Model Fingerprinting**: Information disclosure attempts
-- **Advanced Exploitation**: Streaming abuse, function calling exploitation
+- **Rate Limit Bypass**: Circumventing rate limiting protections
+- **Batch Extraction**: Exploiting batch inference APIs
 
 #### LLM08: Excessive Agency (15 probes)
 - **Authority Escalation**: Fake admin/manager authority claims
@@ -99,10 +99,11 @@ The MVP includes **9 core attack types** covering the most critical OWASP LLM vu
 - **XSS Injection**: Script tags, event handlers in output
 - **SQL Injection**: SQL code in responses
 - **Command Injection**: Shell commands in output
-- **Code Injection**: Executable code patterns
-- **Format Injection**: CSV formula, log forging, email headers
+- **Path Traversal**: File path manipulation in output
+- **SSRF Vectors**: Server-side request forgery URLs
+- **Template Injection**: Server-side template injection patterns
 
-**Total MVP Coverage**: **177 probes** across 6 OWASP categories (LLM01, LLM02, LLM04, LLM06, LLM07, LLM08)
+**Total Coverage**: **177 probes** across **9 attack types** covering **6 OWASP categories** (LLM01, LLM02, LLM04, LLM06, LLM07, LLM08)
 
 ## Intensity Levels
 
