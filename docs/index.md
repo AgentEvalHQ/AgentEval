@@ -22,7 +22,7 @@
 
 AgentEval is **the comprehensive .NET toolkit for AI agent evaluation**—tool usage validation, RAG quality metrics, stochastic evaluation, and model comparison—built for **Microsoft Agent Framework (MAF)**. What RAGAS and DeepEval do for Python, AgentEval does for .NET.
 
-> **For years, agentic developers have imagined writing tests like this. Today, they can.**
+> **For years, agentic developers have imagined writing evaluations like this. Today, they can.**
 
 ---
 
@@ -44,7 +44,7 @@ result.ToolUsage!.Should()
 
 **No more regex parsing logs. No more "did it call that function?"**
 
-### Performance SLAs as Executable Tests
+### Performance SLAs as Executable Evaluations
 
 ```csharp
 result.Performance!.Should()
@@ -68,7 +68,7 @@ result.Statistics.SuccessRate.Should().BeGreaterThan(0.85);
 result.Statistics.StandardDeviation.Should().BeLessThan(10);
 ```
 
-**Run the same test 10 times. Know your actual success rate, not your lucky-run rate.**
+**Run the same evaluation 10 times. Know your actual success rate, not your lucky-run rate.**
 
 ### Compare Models, Get a Winner
 
@@ -106,48 +106,45 @@ var replayer = new TraceReplayingAgent(trace);
 var response = await replayer.ReplayNextAsync();  // Identical every time
 ```
 
-**Save API costs. Run tests in CI. Get consistent results.**
+**Save API costs. Run evaluations in CI. Get consistent results.**
 
 ---
 
-## 60-Second Quick Start
+## Red Team Security Evaluation
 
-### 1. Install
-
-```bash
-dotnet add package AgentEval --prerelease
-```
-
-### 2. Write Your First Test
+**Is your AI agent secure?** AgentEval's Red Team module evaluates against **192 attack probes** covering **6 OWASP LLM Top 10 vulnerabilities** (60% coverage) with **MITRE ATLAS** technique mapping.
 
 ```csharp
-[Fact]
-public async Task Agent_ShouldHandleBookingRequest()
-{
-    var harness = new MAFEvaluationHarness();
-    var testCase = new TestCase { Input = "Book a flight to Paris" };
+// One-line security scan
+var result = await agent.QuickRedTeamScanAsync();
 
-    var result = await harness.RunEvaluationAsync(agent, testCase);
+Console.WriteLine($"Security Score: {result.OverallScore}%");
+Console.WriteLine($"Verdict: {result.Verdict}");
 
-    result.ToolUsage!.Should()
-        .HaveCalledTool("SearchFlights")
-        .And()
-        .HaveCalledTool("CreateBooking");
-
-    result.Performance!.Should()
-        .HaveTotalDurationUnder(TimeSpan.FromSeconds(10));
-}
+// Use with fluent assertions
+result.Should()
+    .HavePassed()
+    .And()
+    .HaveMinimumScore(80);
 ```
 
-### 3. Run
+**Attack types included:** Prompt Injection, Jailbreaks, PII Leakage, System Prompt Extraction, Indirect Injection, Excessive Agency, Insecure Output Handling, API Abuse, Encoding Evasion.
 
-```bash
-dotnet test
+```csharp
+// Advanced: Full pipeline control
+var result = await AttackPipeline
+    .Create()
+    .WithAttack(Attack.PromptInjection)
+    .WithAttack(Attack.Jailbreak)
+    .WithAttack(Attack.PIILeakage)
+    .WithIntensity(Intensity.Comprehensive)
+    .ScanAsync(agent);
+
+// Export compliance reports
+await result.ExportAsync("security-report.pdf", ExportFormat.Pdf);
 ```
 
-**That's it.** No complex setup. No external services. No Python.
-
-[Get Started →](getting-started.md)
+[Red Team Evaluation →](redteam.md)
 
 ---
 
@@ -156,7 +153,7 @@ dotnet test
 | Challenge | How AgentEval Solves It |
 |-----------|------------------------|
 | "What tools did my agent call?" | **Full tool timeline** with arguments, results, timing |
-| "Tests fail randomly!" | **stochastic evaluation** - assert on pass *rate*, not single run |
+| "Evaluations fail randomly!" | **stochastic evaluation** - assert on pass *rate*, not single run |
 | "Which model should I use?" | **Model comparison** with cost/quality recommendations |
 | "Is my agent compliant?" | **Behavioral policies** - guardrails as code |
 | "Is my agent secure?" | **Red team evaluation** - 192 OWASP LLM 2025 security probes |
@@ -188,7 +185,7 @@ dotnet test
 
 -   **🎬 Trace Record/Replay**
     
-    Deterministic tests without API calls
+    Deterministic evaluations without API calls
 
 -   **🛡️ Behavioral Policies**
     

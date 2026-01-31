@@ -35,7 +35,7 @@ AgentEval follows the principle: **"Evaluation Always Real, Structure Optionally
 
 ### Required Environment Variables
 
-Set these before running tests:
+Set these before running evaluations:
 
 ```powershell
 # PowerShell
@@ -107,7 +107,7 @@ public static AIAgent CreateMyAgent()
 
 ### Adding Tools to Your Agent
 
-Agents with tools are more powerful and testable:
+Agents with tools are more powerful and evaluable:
 
 ```csharp
 public static AIAgent CreateWeatherAgent()

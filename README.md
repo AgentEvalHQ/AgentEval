@@ -28,7 +28,7 @@
 
 AgentEval is **the comprehensive .NET toolkit for AI agent evaluation**—tool usage validation, RAG quality metrics, stochastic evaluation, and model comparison—built first for **Microsoft Agent Framework (MAF)**. What RAGAS and DeepEval do for Python, AgentEval does for .NET, with the fluent assertion APIs .NET developers expect.
 
-> **For years, agentic developers have imagined writing tests like this. Today, they can.**
+> **For years, agentic developers have imagined writing evaluations like this. Today, they can.**
 
 ---
 
@@ -89,7 +89,7 @@ result.ToolUsage!.Should()
 
 ### stochastic evaluation: Because LLMs Are Non-Deterministic
 
-LLMs don't return the same output every time. Run tests multiple times and analyze statistics:
+LLMs don't return the same output every time. Run evaluations multiple times and analyze statistics:
 
 ```csharp
 var result = await stochasticRunner.RunStochasticTestAsync(
@@ -109,16 +109,16 @@ var result = await stochasticRunner.RunStochasticTestAsync(
 result.Statistics.Mean.Should().BeGreaterThan(80);            // Avg quality
 result.Statistics.StandardDeviation.Should().BeLessThan(10);  // Consistency
 
-// The test that never flakes - pass/fail based on rate, not single run
+// The evaluation that never flakes - pass/fail based on rate, not single run
 Assert.True(result.PassedThreshold, 
     $"Success rate {result.SuccessRate:P0} below 85% threshold");
 ```
 
-**Why this matters:** A single test run might pass 70% of the time due to LLM randomness. stochastic evaluation tells you the *actual* reliability.
+**Why this matters:** A single evaluation run might pass 70% of the time due to LLM randomness. stochastic evaluation tells you the *actual* reliability.
 
 ---
 
-### Performance SLAs as Executable Tests
+### Performance SLAs as Executable Evaluations
 
 ```csharp
 result.Performance!.Should()
@@ -213,12 +213,12 @@ if (faithfulness.Score < 70)
 
 ---
 
-### Red Team Security Testing: Find Vulnerabilities Before Production
+### Red Team Security Evaluation: Find Vulnerabilities Before Production
 
-AgentEval includes comprehensive red team security testing with **192 probes across 9 attack types**, covering **6/10 OWASP LLM Top 10 2025** categories and **6 MITRE ATLAS** techniques:
+AgentEval includes comprehensive red team security evaluation with **192 probes across 9 attack types**, covering **6/10 OWASP LLM Top 10 2025** categories and **6 MITRE ATLAS** techniques:
 
 ```csharp
-// Sample20: Basic RedTeam testing
+// Sample20: Basic RedTeam evaluation
 var redTeam = new RedTeamRunner();
 var result = await redTeam.RunAsync(agent, new RedTeamOptions
 {
@@ -276,7 +276,7 @@ result.Should()
 
 ### Responsible AI: Content Safety Metrics
 
-Complementing security testing, AgentEval's ResponsibleAI namespace provides **content safety evaluation**:
+Complementing security evaluation, AgentEval's ResponsibleAI namespace provides **content safety evaluation**:
 
 ```csharp
 using AgentEval.ResponsibleAI;
@@ -301,7 +301,7 @@ misInfoResult.Should().HavePassed();
 ```
 
 | Metric | Type | Detects |
-|--------|------|---------||
+|--------|------|--------|
 | **ToxicityMetric** | Hybrid | Hate speech, violence, harassment |
 | **BiasMetric** | LLM | Stereotyping, differential treatment |
 | **MisinformationMetric** | LLM | Unsupported claims, false confidence |
@@ -310,73 +310,18 @@ misInfoResult.Should().HavePassed();
 
 ---
 
-### Rich Test Output: Debug CI Failures Like a Pro
-
-Configure verbosity levels via environment variables�no code changes needed:
-
-```bash
-# In CI/CD pipeline
-AGENTEVAL_VERBOSITY=Detailed     # None, Summary, Detailed, Full
-AGENTEVAL_SAVE_TRACES=true       # Auto-save on test failure
-AGENTEVAL_TRACE_DIR=./traces     # Where to save
-```
-
-**Time-Travel Traces:** Captured JSON files show every step of execution:
-
-```json
-{
-  "schemaVersion": "1.0",
-  "traceId": "booking-test-2026-01-24",
-  "steps": [
-    { "type": "UserInput", "data": { "input": "Book a flight to Paris" } },
-    { "type": "LlmRequest", "duration": "00:00:00.450", "data": { "model": "gpt-4o" } },
-    { "type": "ToolCall", "data": { "name": "SearchFlights", "args": { "destination": "Paris" } } },
-    { "type": "ToolResult", "data": { "success": true, "flights": 5 } },
-    { "type": "AgentResponse", "data": { "output": "Found 5 flights..." } }
-  ]
-}
-```
-
-**Optional Base Class for Auto-Tracing Tests:**
-
-```csharp
-public class MyAgentTests : AgentEvalTestBase
-{
-    public MyAgentTests(ITestOutputHelper output) 
-        : base(new XUnitTextWriter(output)) { }
-    
-    [Fact]
-    public async Task BookFlight_WithValidInput_ShouldSucceed()
-    {
-        var result = /* ... run agent ... */;
-        
-        // Automatically records results with configured verbosity
-        RecordResult(result);
-        
-        // Saves trace file on failure (configurable)
-        if (!result.Passed)
-            SaveTrace("booking-failure", result);
-    }
-}
-```
-
-**?? See:** [docs/rich-test-output-guide.md](docs/rich-test-output-guide.md) for the complete step-by-step guide.
-
----
-
 ## Why AgentEval?
 
 | Challenge | How AgentEval Solves It |
 |-----------|------------------------|
 | "What tools did my agent call?" | **Full tool timeline** with arguments, results, timing |
-| "Tests fail randomly!" | **stochastic evaluation** - assert on pass *rate*, not pass/fail |
+| "Evaluations fail randomly!" | **stochastic evaluation** - assert on pass *rate*, not pass/fail |
 | "Which model should I use?" | **Model comparison** with cost/quality recommendations |
 | "Is my agent compliant?" | **Behavioral policies** - guardrails as code |
 | "Is my RAG hallucinating?" | **Faithfulness metrics** - grounding verification |
 | "What's the latency/cost?" | **Performance metrics** - TTFT, tokens, estimated cost |
 | "How do I debug failures?" | **Trace recording** - capture executions for step-by-step analysis |
-| "CI tests pass locally but fail in CI?" | **Rich test output** - detailed logs and trace artifacts |
-| "Is my agent secure?" | **Red Team testing** - 192 probes, OWASP LLM 2025 coverage |
+| "Is my agent secure?" | **Red Team evaluation** - 192 probes, OWASP LLM 2025 coverage |
 | "Is content safe and unbiased?" | **ResponsibleAI metrics** - toxicity, bias, misinformation |
 
 ---
@@ -406,13 +351,13 @@ public class MyAgentTests : AgentEvalTestBase
 
 ## Key Features
 
-### Testing and Assertions
+### Evaluation and Assertions
 - Fluent tool assertions - order, arguments, results, duration
 - Performance assertions - latency, TTFT, tokens, cost
 - Response assertions - contains, patterns, length
 - Behavioral policies - NeverCallTool, MustConfirmBefore, NeverPassArgumentMatching
-- Multi-turn conversations - full conversation flow testing
-- Snapshot testing - regression detection with semantic similarity
+- Multi-turn conversations - full conversation flow evaluation
+- Snapshot evaluation - regression detection with semantic similarity
 
 ### Evaluation and Metrics  
 - RAG metrics - faithfulness, relevance, context precision/recall, correctness
@@ -427,10 +372,10 @@ public class MyAgentTests : AgentEvalTestBase
 - Trace recording - capture executions for debugging and reproduction
 
 ### Developer Experience
-- Rich test output - configurable verbosity (None/Summary/Detailed/Full)
+- Rich output - configurable verbosity (None/Summary/Detailed/Full)
 - Time-travel traces - step-by-step execution capture in JSON
-- Trace artifacts - auto-save traces for failed tests
-- AgentEvalTestBase - optional base class for auto-tracing tests
+- Trace artifacts - auto-save traces for failed evaluations
+- AgentEvalTestBase - optional base class for auto-tracing
 
 ### Enterprise Ready
 - CI/CD integration - JUnit XML, Markdown, JSON export, trace artifacts
@@ -452,76 +397,7 @@ dotnet add package AgentEval --prerelease
 
 ## Quick Start
 
-```csharp
-using AgentEval.MAF;
-using AgentEval.Models;
-
-// 1. Create your MAF agent
-var agent = new ChatClientAgent(chatClient, new ChatClientAgentOptions
-{
-    Name = "TravelAgent",
-    Instructions = "You are a travel booking assistant.",
-    Tools = [AIFunctionFactory.Create(SearchFlights), AIFunctionFactory.Create(BookFlight)]
-});
-
-// 2. Wrap and test
-var harness = new MAFEvaluationHarness();
-var adapter = new MAFAgentAdapter(agent);
-
-var testCase = new TestCase
-{
-    Name = "Book Flight to Paris",
-    Input = "Book me a flight to Paris for March 15th",
-    ExpectedTools = ["SearchFlights", "BookFlight"]
-};
-
-var result = await harness.RunEvaluationAsync(adapter, testCase);
-
-// 3. Assert on everything
-result.ToolUsage!.Should()
-    .HaveCalledTool("SearchFlights")
-    .BeforeTool("BookFlight")
-    .HaveNoErrors();
-
-result.Performance!.Should()
-    .HaveTotalDurationUnder(TimeSpan.FromSeconds(10))
-    .HaveEstimatedCostUnder(0.10m);
-
-Assert.True(result.Passed);
-```
-
----
-
-## CLI Tool
-
-```bash
-# Install globally
-dotnet tool install -g AgentEval.Cli
-
-# Run evaluations
-agenteval eval --dataset tests.yaml --format junit --output results.xml
-
-# Initialize project
-agenteval init --format yaml --output agenteval.yaml
-
-# List available metrics
-agenteval list metrics
-```
-
-### CI/CD Integration
-
-```yaml
-# GitHub Actions
-- name: Run Agent Tests
-  run: agenteval eval --dataset tests.yaml --format junit -o results.xml
-  
-- name: Publish Results
-  uses: dorny/test-reporter@v1
-  with:
-    name: Agent Tests
-    path: results.xml
-    reporter: java-junit
-```
+See the **[Getting Started Guide](docs/getting-started.md)** for a complete walkthrough with code examples.
 
 ---
 
@@ -529,7 +405,7 @@ agenteval list metrics
 
 | Guide | Description |
 |-------|-------------|
-| [Getting Started](docs/getting-started.md) | Your first agent test in 5 minutes |
+| [Getting Started](docs/getting-started.md) | Your first agent evaluation in 5 minutes |
 | [Fluent Assertions](docs/assertions.md) | Complete assertion guide |
 | [stochastic evaluation](docs/stochastic-evaluation.md) | Handle LLM non-determinism |
 | [Model Comparison](docs/model-comparison.md) | Compare models with confidence |
@@ -550,22 +426,22 @@ dotnet run --project samples/AgentEval.Samples
 
 | Sample | Description | Time |
 |--------|-------------|------|
-| **01: Hello World** | The simplest possible agent test | 2 min |
+| **01: Hello World** | The simplest possible agent evaluation | 2 min |
 | **02: Agent with One Tool** | Tool tracking and fluent assertions | 5 min |
 | **03: Agent with Multiple Tools** | Tool ordering, timing, and timeline | 7 min |
 | **04: Performance Metrics** | Latency, cost, TTFT, and token tracking | 5 min |
 | **05: RAG Evaluation** | Faithfulness, relevance, precision, recall, correctness | 8 min |
 | **06: Benchmarks** | Performance and agentic benchmark patterns | 5 min |
-| **07: Snapshot Testing** | Regression detection with baselines | 5 min |
-| **08: Conversation Testing** | Multi-turn agent interactions | 5 min |
-| **09: Workflow Testing** | Multi-agent orchestration and routing | 10 min |
-| **10: Datasets and Export** | Batch testing with JSON/YAML/CSV/JSONL | 5 min |
-| **11: Because Assertions** | Self-documenting tests with intent clarity | 5 min |
-| **12: Policy & Safety Testing** | Enterprise guardrails (NeverCallTool, MustConfirmBefore) | 8 min |
-| **13: Trace Record & Replay** | Capture executions for deterministic testing | 8 min |
-| **14: stochastic evaluation** | Run tests N times for statistical confidence | 5 min |
+| **07: Snapshot Evaluation** | Regression detection with baselines | 5 min |
+| **08: Conversation Evaluation** | Multi-turn agent interactions | 5 min |
+| **09: Workflow Evaluation** | Multi-agent orchestration and routing | 10 min |
+| **10: Datasets and Export** | Batch evaluation with JSON/YAML/CSV/JSONL | 5 min |
+| **11: Because Assertions** | Self-documenting evaluations with intent clarity | 5 min |
+| **12: Policy & Safety Evaluation** | Enterprise guardrails (NeverCallTool, MustConfirmBefore) | 8 min |
+| **13: Trace Record & Replay** | Capture executions for deterministic evaluation | 8 min |
+| **14: stochastic evaluation** | Run evaluations N times for statistical confidence | 5 min |
 | **15: Model Comparison** | Compare multiple models on the same task | 8 min |
-| **16: Combined Stochastic + Comparison** | Stochastic tests across multiple models | 10 min |
+| **16: Combined Stochastic + Comparison** | Stochastic evaluations across multiple models | 10 min |
 | **17: Quality & Safety Metrics** | Groundedness, coherence, fluency evaluation | 5 min |
 | **18: Judge Calibration** | Multi-model consensus for reliable LLM-as-judge | 8 min |
 

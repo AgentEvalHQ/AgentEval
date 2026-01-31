@@ -110,6 +110,6 @@ If this runs without errors and shows "Passed: True", AgentEval is correctly ins
 
 ## Next Steps
 
-- [Quick Start](getting-started.md) - Run your first agent test
+- [Quick Start](getting-started.md) - Run your first agent evaluation
 - [Walkthrough](walkthrough.md) - Step-by-step tutorial
 - [Architecture](architecture.md) - Understand the framework design

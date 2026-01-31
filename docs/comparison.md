@@ -268,7 +268,7 @@ result.ToolUsage!.Should()
 dotnet add package AgentEval --prerelease
 ```
 
-### Step 2: Translate Your First Test
+### Step 2: Translate Your First Evaluation
 
 ```csharp
 using AgentEval.MAF;
