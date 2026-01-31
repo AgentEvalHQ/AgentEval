@@ -92,6 +92,75 @@ header.bg-body {
     color: transparent;
 }
 
+/* ─────────────────────────────────────────────────────────────────────────────
+   GITHUB REPOSITORY WIDGET (like MkDocs Material)
+   ───────────────────────────────────────────────────────────────────────────── */
+.github-widget {
+    display: flex;
+    align-items: center;
+    margin-left: auto;
+    margin-right: 1rem;
+}
+
+.github-widget-link {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.4rem 0.75rem;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 6px;
+    color: #fff !important;
+    text-decoration: none !important;
+    font-size: 0.85rem;
+    font-weight: 500;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+}
+
+.github-widget-link:hover {
+    background: rgba(255, 255, 255, 0.2);
+    border-color: rgba(255, 255, 255, 0.3);
+    text-decoration: none !important;
+}
+
+.github-icon {
+    flex-shrink: 0;
+}
+
+.github-widget-name {
+    font-weight: 600;
+}
+
+.github-widget-version {
+    background: rgba(255, 255, 255, 0.15);
+    padding: 0.15rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-family: "Cascadia Code", Consolas, monospace;
+}
+
+.github-widget-stats {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    margin-left: 0.25rem;
+    padding-left: 0.6rem;
+    border-left: 1px solid rgba(255, 255, 255, 0.25);
+}
+
+.github-stat {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-size: 0.8rem;
+    opacity: 0.9;
+}
+
+.github-stat svg {
+    opacity: 0.8;
+}
+
 /* ─── SEARCH BOX ─── */
 #search {
     margin-left: auto;
@@ -631,6 +700,11 @@ footer a {
     .navbar-brand::after {
         font-size: 1.3rem;
     }
+    
+    /* Hide stats on tablets */
+    .github-widget-stats {
+        display: none;
+    }
 }
 
 @media (max-width: 576px) {
@@ -657,6 +731,21 @@ footer a {
     
     h2 {
         font-size: 1.4rem;
+    }
+    
+    /* Minimal widget on mobile */
+    .github-widget {
+        margin-right: 0.5rem;
+    }
+    
+    .github-widget-name,
+    .github-widget-version,
+    .github-widget-stats {
+        display: none;
+    }
+    
+    .github-widget-link {
+        padding: 0.4rem;
     }
 }
 
