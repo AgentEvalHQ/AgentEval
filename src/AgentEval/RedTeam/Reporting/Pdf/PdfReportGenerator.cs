@@ -14,6 +14,9 @@ public class PdfReportGenerator : IReportExporter
 {
     private readonly RiskScoreCalculator _riskCalculator = new();
 
+    // Ensure cross-platform font resolver is registered (required for Linux/macOS)
+    static PdfReportGenerator() => CrossPlatformFontResolver.Register();
+
     /// <inheritdoc />
     public string FormatName => "PDF";
 
