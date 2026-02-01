@@ -22,9 +22,9 @@ AgentEval is designed with a layered architecture that separates concerns and en
 │  ├────────────────────────────────────────────────────────────────────────┤ │
 │  │                                                                         │ │
 │  │  Interfaces:                                                            │ │
-│  │  ┌─────────────┐  ┌──────────────┐  ┌─────────────┐  ┌──────────────┐  │ │
-│  │  │   IMetric   │  │ITestableAgent│  │ ITestHarness│  │  IEvaluator  │  │ │
-│  │  └─────────────┘  └──────────────┘  └─────────────┘  └──────────────┘  │ │
+│  │  ┌─────────────┐  ┌───────────────┐  ┌──────────────────┐  ┌──────────┐│ │
+│  │  │   IMetric   │  │IEvaluableAgent│  │IEvaluationHarness│  │IEvaluator│ │ │
+│  │  └─────────────┘  └───────────────┘  └──────────────────┘  └──────────┘│ │
 │  │                                                                         │ │
 │  │  Utilities:                                                             │ │
 │  │  ┌─────────────┐  ┌──────────────┐  ┌─────────────┐  ┌──────────────┐  │ │
@@ -86,12 +86,17 @@ AgentEval is designed with a layered architecture that separates concerns and en
 │  └────────────────────────────────────────────────────────────────────────┘ │
 │                                                                              │
 │  ┌────────────────────────────────────────────────────────────────────────┐ │
-│  │                   Production Infrastructure (Planned)                   │ │
+│  │                    Production Infrastructure                            │ │
 │  ├────────────────────────────────────────────────────────────────────────┤ │
 │  │                                                                         │ │
 │  │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐    │ │
-│  │  │IResultExporter│ │IDatasetLoader│ │SnapshotTest │  │AgentEval.CLI│   │ │
-│  │  │ JUnit/MD/JSON│ │JSONL/BFCL   │  │  Harness    │  │dotnet tool  │    │ │
+│  │  │IResultExporter│ │IDatasetLoader│ │  Tracing/   │  │AgentEval.CLI│   │ │
+│  │  │JUnit/MD/JSON │  │JSONL/YAML/CSV │  │Record+Replay│  │dotnet tool  │    │ │
+│  │  └─────────────┘  └─────────────┘  └─────────────┘  └─────────────┘    │ │
+│  │                                                                         │ │
+│  │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐    │ │
+│  │  │  RedTeam/   │  │ResponsibleAI│  │ Calibration │  │ Comparison  │    │ │
+│  │  │ Attack+Eval │  │Safety Metrics│  │Multi-Judge  │  │Stochastic   │    │ │
 │  │  └─────────────┘  └─────────────┘  └─────────────┘  └─────────────┘    │ │
 │  │                                                                         │ │
 │  └────────────────────────────────────────────────────────────────────────┘ │
@@ -390,9 +395,15 @@ AgentEval/
 │   ├── IEvaluationHarness.cs
 │   ├── IEvaluator.cs
 │   ├── IAgentEvalLogger.cs
+│   ├── IAgentEvalPlugin.cs
+│   ├── IToolUsageExtractor.cs
+│   ├── IWorkflowEvaluableAgent.cs
+│   ├── AgentEvalBuilder.cs
+│   ├── ChatClientAgentAdapter.cs
 │   ├── MetricRegistry.cs
 │   ├── ScoreNormalizer.cs
 │   ├── RetryPolicy.cs
+│   ├── LlmJsonParser.cs
 │   └── EvaluationDefaults.cs
 │
 ├── Models/                  # Data models
@@ -407,8 +418,13 @@ AgentEval/
 │   ├── RAG/
 │   │   ├── RAGMetrics.cs    # Faithfulness, Relevance, etc.
 │   │   └── EmbeddingMetrics.cs
-│   └── Agentic/
-│       └── AgenticMetrics.cs # ToolSelection, ToolSuccess, etc.
+│   ├── Agentic/
+│   │   └── AgenticMetrics.cs # ToolSelection, ToolSuccess, etc.
+│   ├── Retrieval/
+│   │   ├── MRRMetric.cs
+│   │   └── RecallAtKMetric.cs
+│   └── Safety/
+│       └── SafetyMetrics.cs
 │
 ├── Assertions/              # Fluent assertions
 │   ├── ToolUsageAssertions.cs
@@ -419,15 +435,81 @@ AgentEval/
 │   ├── PerformanceBenchmark.cs
 │   └── AgenticBenchmark.cs
 │
+├── Calibration/             # Multi-judge calibration
+│   ├── ICalibratedJudge.cs
+│   ├── CalibratedJudge.cs
+│   ├── CalibratedJudgeOptions.cs
+│   ├── CalibratedResult.cs
+│   └── VotingStrategy.cs
+│
+├── Comparison/              # Stochastic & model comparison
+│   ├── IAgentFactory.cs
+│   ├── IStatisticsCalculator.cs
+│   ├── StochasticRunner.cs
+│   ├── StochasticOptions.cs
+│   ├── StochasticResult.cs
+│   ├── ModelComparer.cs
+│   └── ModelComparisonResult.cs
+│
+├── Tracing/                 # Trace record & replay
+│   ├── AgentTrace.cs
+│   ├── TraceRecordingAgent.cs
+│   ├── TraceReplayingAgent.cs
+│   ├── TraceSerializer.cs
+│   ├── ChatTraceRecorder.cs
+│   └── WorkflowTraceRecorder.cs
+│
 ├── Adapters/                # Framework integrations
 │   └── MicrosoftEvaluatorAdapter.cs
 │
 ├── MAF/                     # Microsoft Agent Framework
-│   └── MAFEvaluationHarness.cs
+│   ├── MAFAgentAdapter.cs
+│   ├── MAFIdentifiableAgentAdapter.cs
+│   ├── MAFEvaluationHarness.cs
+│   ├── MAFWorkflowAdapter.cs
+│   └── WorkflowEvaluationHarness.cs
 │
 ├── Embeddings/              # Embedding utilities
 │   ├── IAgentEvalEmbeddings.cs
 │   └── EmbeddingSimilarity.cs
+│
+├── Exporters/               # Result exporters
+│   ├── IResultExporter.cs
+│   ├── JUnitXmlExporter.cs
+│   ├── MarkdownExporter.cs
+│   ├── JsonExporter.cs
+│   └── TrxExporter.cs
+│
+├── DataLoaders/             # Dataset loaders
+│   ├── IDatasetLoader.cs
+│   ├── JsonlDatasetLoader.cs
+│   ├── JsonDatasetLoader.cs
+│   ├── YamlDatasetLoader.cs
+│   └── CsvDatasetLoader.cs
+│
+├── Snapshots/               # Snapshot comparison
+│   └── SnapshotComparer.cs
+│
+├── Output/                  # Output formatting utilities
+│   ├── TableFormatter.cs
+│   ├── EvaluationOutputWriter.cs
+│   └── StochasticResultExtensions.cs
+│
+├── RedTeam/                 # Red team security evaluation
+│   ├── RedTeamRunner.cs
+│   ├── AttackPipeline.cs
+│   ├── RedTeamAssertions.cs
+│   ├── Attacks/             # Attack strategies
+│   └── Evaluators/          # Attack evaluators
+│
+├── ResponsibleAI/           # Responsible AI metrics
+│   ├── ToxicityMetric.cs
+│   ├── BiasMetric.cs
+│   └── MisinformationMetric.cs
+│
+├── DependencyInjection/     # DI registration
+│   ├── AgentEvalServiceCollectionExtensions.cs
+│   └── AgentEvalServiceOptions.cs
 │
 └── Testing/                 # Test utilities
     └── FakeChatClient.cs
@@ -435,37 +517,17 @@ AgentEval/
 
 ---
 
-## Future Architecture (Planned)
+## CLI Tool Structure
 
-### Production Infrastructure
+The CLI is implemented at `src/AgentEval.Cli/`:
 
 ```
-AgentEval/
-├── ... (existing)
-│
-├── Exporters/               # Result exporters (planned)
-│   ├── IResultExporter.cs
-│   ├── JUnitXmlExporter.cs
-│   ├── MarkdownExporter.cs
-│   └── JsonExporter.cs
-│
-├── DataLoaders/             # Dataset loaders (planned)
-│   ├── IDatasetLoader.cs
-│   ├── JsonLinesLoader.cs
-│   └── BfclDatasetLoader.cs
-│
-└── Snapshots/               # Snapshot testing (planned)
-    ├── SnapshotTestHarness.cs
-    └── PropertyMatchers.cs
-
-AgentEval.Cli/               # CLI tool (planned)
+AgentEval.Cli/
 ├── Program.cs
 ├── Commands/
 │   ├── EvalCommand.cs
-│   ├── SnapshotCommand.cs
-│   └── CompareCommand.cs
-└── Configuration/
-    └── YamlConfigLoader.cs
+│   └── InitCommand.cs
+└── AgentEval.Cli.csproj
 ```
 
 ---
