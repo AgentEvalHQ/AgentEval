@@ -16,6 +16,10 @@ handoffs:
     agent: AgentEval Planner
     prompt: Create an implementation plan for the feature we discussed before implementing.
     send: false
+  - label: Review Sample
+    agent: AgentEval Samples
+    prompt: Review the sample code to ensure it follows AgentEval patterns and demonstrates features effectively.
+    send: false
 ---
 
 # AgentEval Development Agent

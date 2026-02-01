@@ -12,6 +12,10 @@ handoffs:
     agent: AgentEval Planner
     prompt: Create a plan for the documentation restructuring or new content we discussed.
     send: false
+  - label: Review Samples
+    agent: AgentEval Samples
+    prompt: Review the samples to ensure they align with the documentation and demonstrate features correctly.
+    send: false
 ---
 
 # AgentEval Documentation Agent

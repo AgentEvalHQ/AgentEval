@@ -12,6 +12,10 @@ handoffs:
     agent: agent
     prompt: Research the codebase further to gather more context for the plan.
     send: false
+  - label: Plan Sample
+    agent: AgentEval Samples
+    prompt: Review and plan improvements for the samples based on this feature plan.
+    send: false
 ---
 
 # AgentEval Feature Planner
