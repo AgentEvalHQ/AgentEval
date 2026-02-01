@@ -1,0 +1,61 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   AgentEval DocFX Theme - Minimal Customization
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+:root {
+  --ae-primary: #0284c7;
+  --ae-primary-dark: #0369a1;
+}
+
+/* NAVBAR - Blue gradient */
+nav.navbar {
+  background: linear-gradient(135deg, #0c4a6e 0%, #0369a1 100%) !important;
+}
+
+/* NAVBAR LOGO - 64px height */
+.navbar-brand > img {
+  height: 64px !important;
+  width: auto !important;
+  max-height: 64px !important;
+  object-fit: contain !important;
+  margin-right: 12px !important;
+}
+
+/* Hide only the nav links menu, keep search and theme toggle */
+.navbar-nav {
+  display: none !important;
+}
+
+/* Navbar text - white */
+.navbar-brand { color: #fff !important; }
+nav.navbar .bi { color: rgba(255,255,255,0.9); }
+
+/* Search input styling */
+nav.navbar .form-control {
+  background: rgba(255,255,255,0.15) !important;
+  border-color: rgba(255,255,255,0.25) !important;
+  color: #fff !important;
+  min-width: 200px;
+}
+
+nav.navbar .form-control::placeholder {
+  color: rgba(255,255,255,0.6);
+}
+
+/* Active TOC item */
+.toc .nav-link.active {
+  background-color: var(--ae-primary) !important;
+  color: #fff !important;
+  border-radius: 4px;
+}
+
+/* H1 styling */
+article h1 {
+  color: var(--ae-primary-dark);
+  border-bottom: 2px solid var(--ae-primary);
+  padding-bottom: 0.5rem;
+}
+
+/* Links */
+article a { color: var(--ae-primary); }
+article a:hover { color: var(--ae-primary-dark); }
