@@ -14,7 +14,7 @@ using AgentEval.Models.Serialization;
 namespace AgentEval.Samples;
 
 /// <summary>
-/// Sample 09B: Real MAF Workflow Evaluation — WorkflowBuilder + InProcessExecution
+/// Sample 09: Real MAF Workflow Evaluation — WorkflowBuilder + InProcessExecution
 /// 
 /// This demonstrates:
 /// - Building a real MAF Workflow using <see cref="WorkflowBuilder"/>
@@ -23,13 +23,13 @@ namespace AgentEval.Samples;
 /// - Evaluating a genuine MAF workflow with the AgentEval harness
 /// - Graph extraction from actual MAF edge reflection
 /// 
-/// Unlike Sample09 (which uses mocks), this sample executes real LLM calls through
-/// the MAF workflow engine. Azure OpenAI credentials are required.
+/// Azure OpenAI credentials are required — this sample executes real LLM calls
+/// through the MAF workflow engine.
 /// 
 /// ⏱️ Time to understand: 15 minutes
 /// ⏱️ Time to run: ~30–90 seconds (4 sequential LLM calls)
 /// </summary>
-public static class Sample09B_WorkflowEvaluationReal
+public static class Sample09_WorkflowEvaluationReal
 {
     public static async Task RunAsync()
     {
@@ -42,7 +42,7 @@ public static class Sample09B_WorkflowEvaluationReal
         {
             Console.ForegroundColor = ConsoleColor.Yellow;
             Console.WriteLine("  ⚠️  Azure OpenAI credentials are not configured.");
-            Console.WriteLine("      Sample 09B requires real Azure OpenAI credentials. Skipping.");
+            Console.WriteLine("      Sample 09 requires real Azure OpenAI credentials. Skipping.");
             Console.WriteLine();
             Console.WriteLine("      Set the following environment variables:");
             Console.WriteLine("        AZURE_OPENAI_ENDPOINT     = https://your-resource.openai.azure.com/");
@@ -370,7 +370,7 @@ public static class Sample09B_WorkflowEvaluationReal
         Console.WriteLine(@"
 ╔═══════════════════════════════════════════════════════════════════════════════╗
 ║                                                                               ║
-║          Sample 09B: Real MAF Workflow Evaluation                            ║
+║          Sample 09: Real MAF Workflow Evaluation                             ║
 ║          (WorkflowBuilder + InProcessExecution)                              ║
 ║                                                                               ║
 ║   Learn how to:                                                               ║
@@ -416,9 +416,9 @@ public static class Sample09B_WorkflowEvaluationReal
 │     result.Should().HaveStepCount(4).HaveExecutedInOrder(...)                  │
 │     The evaluation harness abstracts away the execution mode                   │
 │                                                                                 │
-│  6. Compare with Sample09:                                                      │
-│     Sample09  → Mock data, instant, deterministic (CI/CD friendly)             │
-│     Sample09B → Real LLM calls, genuine MAF engine (validates behavior)        │
+│  6. See also Sample09B for workflow with tools:                                 │
+│     Sample09  → Content pipeline (plan → research → write → edit)              │
+│     Sample09B → TripPlanner with tools (tools tracked per executor)            │
 │                                                                                 │
 └─────────────────────────────────────────────────────────────────────────────────┘
 ");

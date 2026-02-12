@@ -50,6 +50,76 @@ public record WorkflowExecutionResult
     public bool IsSuccess => Errors == null || Errors.Count == 0;
 
     /// <summary>
+    /// Aggregated tool usage across all workflow steps.
+    /// Returns null if no tools were called.
+    /// </summary>
+    public ToolUsageReport? ToolUsage
+    {
+        get
+        {
+            var allCalls = Steps
+                .Where(s => s.HasToolCalls)
+                .SelectMany(s => s.ToolCalls!)
+                .ToList();
+
+            if (allCalls.Count == 0) return null;
+
+            var report = new ToolUsageReport();
+            int globalOrder = 1;
+            foreach (var call in allCalls)
+            {
+                report.AddCall(new ToolCallRecord
+                {
+                    Name = call.Name,
+                    CallId = call.CallId,
+                    Arguments = call.Arguments,
+                    Result = call.Result,
+                    Exception = call.Exception,
+                    Order = globalOrder++,
+                    ExecutorId = call.ExecutorId,
+                    StartTime = call.StartTime,
+                    EndTime = call.EndTime
+                });
+            }
+            return report;
+        }
+    }
+
+    /// <summary>
+    /// Unified tool call timeline across all workflow steps.
+    /// Returns null if no tools were called.
+    /// </summary>
+    public ToolCallTimeline? Timeline
+    {
+        get
+        {
+            var hasAnyTools = Steps.Any(s => s.HasToolCalls);
+            if (!hasAnyTools) return null;
+
+            var timeline = ToolCallTimeline.Create();
+            timeline.TotalDuration = TotalDuration;
+
+            foreach (var step in Steps.Where(s => s.HasToolCalls))
+            {
+                foreach (var tc in step.ToolCalls!)
+                {
+                    timeline.AddInvocation(new ToolInvocation
+                    {
+                        ToolName = $"{step.ExecutorId}/{tc.Name}",
+                        StartTime = step.StartOffset + (tc.Duration ?? TimeSpan.Zero),
+                        Duration = tc.Duration ?? TimeSpan.Zero,
+                        Succeeded = !tc.HasError,
+                        ErrorMessage = tc.Exception?.Message,
+                        Arguments = tc.GetArgumentsAsJson(),
+                        Result = tc.Result?.ToString()
+                    });
+                }
+            }
+            return timeline;
+        }
+    }
+
+    /// <summary>
     /// Whether this workflow used conditional routing.
     /// </summary>
     public bool HasConditionalRouting => Graph?.HasConditionalRouting ?? false;

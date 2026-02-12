@@ -204,6 +204,83 @@ public class WorkflowEvaluationHarness
                 });
                 failureMessages.Add($"Workflow errors: {executionResult.Errors.Count}");
             }
+
+            // Check expected tools (across all executors)
+            if (testCase.ExpectedTools?.Any() == true)
+            {
+                var allToolCalls = executionResult.Steps
+                    .Where(s => s.HasToolCalls)
+                    .SelectMany(s => s.ToolCalls!)
+                    .ToList();
+                var allToolNames = allToolCalls
+                    .Select(tc => tc.Name)
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+
+                var missingTools = testCase.ExpectedTools
+                    .Where(t => !allToolNames.Contains(t, StringComparer.OrdinalIgnoreCase))
+                    .ToList();
+
+                var toolCheckPassed = missingTools.Count == 0;
+                assertionResults.Add(new WorkflowAssertionResult
+                {
+                    AssertionName = "Expected Tools",
+                    Passed = toolCheckPassed,
+                    FailureMessage = toolCheckPassed ? null :
+                        $"Missing tools: [{string.Join(", ", missingTools)}]. Called tools: [{string.Join(", ", allToolNames)}]"
+                });
+
+                if (!toolCheckPassed)
+                {
+                    failureMessages.Add($"Missing expected tools: {string.Join(", ", missingTools)}");
+                }
+            }
+
+            // Check per-executor expected tools
+            if (testCase.PerExecutorExpectedTools?.Any() == true)
+            {
+                foreach (var (executorId, expectedTools) in testCase.PerExecutorExpectedTools)
+                {
+                    var step = executionResult.Steps.FirstOrDefault(s =>
+                        s.ExecutorId.Equals(executorId, StringComparison.OrdinalIgnoreCase));
+
+                    if (step == null)
+                    {
+                        assertionResults.Add(new WorkflowAssertionResult
+                        {
+                            AssertionName = $"Per-Executor Tools ({executorId})",
+                            Passed = false,
+                            FailureMessage = $"Executor '{executorId}' was not found"
+                        });
+                        failureMessages.Add($"Executor '{executorId}' not found for tool check");
+                        continue;
+                    }
+
+                    var stepToolNames = (step.ToolCalls ?? [])
+                        .Select(tc => tc.Name)
+                        .Distinct(StringComparer.OrdinalIgnoreCase)
+                        .ToList();
+                    
+                    var missing = expectedTools
+                        .Where(t => !stepToolNames.Contains(t, StringComparer.OrdinalIgnoreCase))
+                        .ToList();
+
+                    var passed2 = missing.Count == 0;
+                    assertionResults.Add(new WorkflowAssertionResult
+                    {
+                        AssertionName = $"Per-Executor Tools ({executorId})",
+                        Passed = passed2,
+                        FailureMessage = passed2 ? null :
+                            $"Executor '{executorId}' missing tools: [{string.Join(", ", missing)}]. " +
+                            $"Called: [{string.Join(", ", stepToolNames)}]"
+                    });
+
+                    if (!passed2)
+                    {
+                        failureMessages.Add($"Executor '{executorId}' missing tools: {string.Join(", ", missing)}");
+                    }
+                }
+            }
         }
 
         // Determine overall pass/fail
@@ -303,9 +380,15 @@ public class WorkflowEvaluationHarness
         _logger.LogDebug($"   Duration: {result.TotalDuration.TotalMilliseconds:F0}ms");
         _logger.LogDebug($"   Steps: {result.Steps.Count}");
         
+        // Log aggregated tool usage if available
+        if (result.ToolUsage != null)
+        {
+            _logger.LogDebug($"   Tool calls: {result.ToolUsage.Count} ({string.Join(", ", result.ToolUsage.UniqueToolNames)})");
+        }
+
         foreach (var step in result.Steps)
         {
-            var toolInfo = step.HasToolCalls ? $" [🔧 {step.ToolCalls!.Count} tools]" : "";
+            var toolInfo = step.HasToolCalls ? $" [🔧 {step.ToolCalls!.Count} tools: {string.Join(", ", step.ToolCalls.Select(t => t.Name))}]" : "";
             _logger.LogDebug($"     [{step.StepIndex}] {step.ExecutorId}: {step.Duration.TotalMilliseconds:F0}ms{toolInfo}");
             
             if (!string.IsNullOrEmpty(step.Output) && step.Output.Length <= 100)

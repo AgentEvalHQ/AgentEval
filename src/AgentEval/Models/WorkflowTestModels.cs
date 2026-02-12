@@ -44,6 +44,16 @@ public record WorkflowTestCase
     public TimeSpan? MaxDuration { get; init; }
 
     /// <summary>
+    /// Tools that must be called during workflow execution (across all executors).
+    /// </summary>
+    public IReadOnlyList<string>? ExpectedTools { get; init; }
+
+    /// <summary>
+    /// Per-executor expected tools. Key is executor ID, value is list of expected tool names.
+    /// </summary>
+    public IReadOnlyDictionary<string, IReadOnlyList<string>>? PerExecutorExpectedTools { get; init; }
+
+    /// <summary>
     /// Tags for filtering and categorization.
     /// </summary>
     public IReadOnlyList<string>? Tags { get; init; }

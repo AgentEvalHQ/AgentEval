@@ -245,6 +245,92 @@ public class WorkflowAssertionBuilder
     // ═══════════════════════════════════════════════════════════════════════════
 
     /// <summary>
+    /// Assert that a tool was called by any executor in the workflow.
+    /// </summary>
+    /// <param name="toolName">Name of the expected tool.</param>
+    /// <param name="because">Optional reason for the assertion.</param>
+    [StackTraceHidden]
+    public WorkflowAssertionBuilder HaveAnyExecutorCalledTool(string toolName, string? because = null)
+    {
+        _currentBecause = because;
+        var allToolCalls = _result.Steps
+            .Where(s => s.HasToolCalls)
+            .SelectMany(s => s.ToolCalls!)
+            .ToList();
+
+        if (!allToolCalls.Any(tc => tc.Name.Equals(toolName, StringComparison.OrdinalIgnoreCase)))
+        {
+            var calledTools = allToolCalls.Select(tc => tc.Name).Distinct().ToList();
+            AddFailure($"Expected tool '{toolName}' to be called by some executor, " +
+                          $"but it was not. Tools called: [{string.Join(", ", calledTools)}]");
+        }
+        return this;
+    }
+
+    /// <summary>
+    /// Assert the total number of tool calls across the entire workflow.
+    /// </summary>
+    /// <param name="expected">Expected total tool call count.</param>
+    /// <param name="because">Optional reason for the assertion.</param>
+    [StackTraceHidden]
+    public WorkflowAssertionBuilder HaveTotalToolCallCount(int expected, string? because = null)
+    {
+        _currentBecause = because;
+        var actual = _result.Steps
+            .Where(s => s.HasToolCalls)
+            .Sum(s => s.ToolCalls!.Count);
+
+        if (actual != expected)
+        {
+            AddFailure($"Expected {expected} total tool calls across all executors but found {actual}");
+        }
+        return this;
+    }
+
+    /// <summary>
+    /// Assert the total tool call count is at least a minimum.
+    /// </summary>
+    /// <param name="minimum">Minimum expected total tool call count.</param>
+    /// <param name="because">Optional reason for the assertion.</param>
+    [StackTraceHidden]
+    public WorkflowAssertionBuilder HaveAtLeastTotalToolCalls(int minimum, string? because = null)
+    {
+        _currentBecause = because;
+        var actual = _result.Steps
+            .Where(s => s.HasToolCalls)
+            .Sum(s => s.ToolCalls!.Count);
+
+        if (actual < minimum)
+        {
+            AddFailure($"Expected at least {minimum} total tool calls but found {actual}");
+        }
+        return this;
+    }
+
+    /// <summary>
+    /// Assert no tool calls across the entire workflow resulted in errors.
+    /// </summary>
+    /// <param name="because">Optional reason for the assertion.</param>
+    [StackTraceHidden]
+    public WorkflowAssertionBuilder HaveNoToolErrors(string? because = null)
+    {
+        _currentBecause = because;
+        var errors = _result.Steps
+            .Where(s => s.HasToolCalls)
+            .SelectMany(s => s.ToolCalls!)
+            .Where(tc => tc.HasError)
+            .ToList();
+
+        if (errors.Count > 0)
+        {
+            var errorDetails = string.Join(", ", errors.Select(e =>
+                $"[{e.ExecutorId ?? "?"}] {e.Name}: {e.Exception?.Message ?? "(unknown)"}"));
+            AddFailure($"Expected no tool errors across workflow but found {errors.Count}: {errorDetails}");
+        }
+        return this;
+    }
+
+    /// <summary>
     /// Assert the workflow has a graph structure.
     /// </summary>
     /// <param name="because">Optional reason for the assertion.</param>
@@ -586,6 +672,11 @@ public class ExecutorStepAssertionBuilder
     }
 
     /// <summary>
+    /// Adds a failure message from a child assertion builder (e.g., ExecutorToolCallAssertionBuilder).
+    /// </summary>
+    internal void AddFailureFromChild(string message) => _parent.AddFailure(message);
+
+    /// <summary>
     /// Assert the executor's output contains a string.
     /// </summary>
     /// <param name="expected">Expected substring.</param>
@@ -679,6 +770,52 @@ public class ExecutorStepAssertionBuilder
     }
 
     /// <summary>
+    /// Assert the executor called a tool with a specific argument value.
+    /// </summary>
+    /// <param name="toolName">Name of the expected tool.</param>
+    /// <param name="argumentName">Name of the expected argument.</param>
+    /// <param name="argumentValue">Expected argument value (case-insensitive substring match).</param>
+    /// <param name="because">Optional reason for the assertion.</param>
+    [StackTraceHidden]
+    public ExecutorStepAssertionBuilder HaveCalledToolWithArgument(
+        string toolName, string argumentName, string argumentValue, string? because = null)
+    {
+        if (because != null) _currentBecause = because;
+        if (_step == null)
+        {
+            AddFailure($"Executor '{_executorId}' was not found");
+        }
+        else
+        {
+            var matchingCalls = _step.ToolCalls?
+                .Where(t => t.Name.Equals(toolName, StringComparison.OrdinalIgnoreCase))
+                .ToList() ?? [];
+
+            if (matchingCalls.Count == 0)
+            {
+                var calledTools = _step.ToolCalls?.Select(t => t.Name).ToList() ?? [];
+                AddFailure($"Executor '{_executorId}' did not call tool '{toolName}'. " +
+                                   $"Called tools: [{string.Join(", ", calledTools)}]");
+            }
+            else
+            {
+                var hasMatchingArg = matchingCalls.Any(tc =>
+                    tc.Arguments != null &&
+                    tc.Arguments.Any(a =>
+                        a.Key.Equals(argumentName, StringComparison.OrdinalIgnoreCase) &&
+                        a.Value?.ToString()?.Contains(argumentValue, StringComparison.OrdinalIgnoreCase) == true));
+
+                if (!hasMatchingArg)
+                {
+                    AddFailure($"Executor '{_executorId}' called '{toolName}' but not with argument " +
+                                       $"'{argumentName}' containing '{argumentValue}'");
+                }
+            }
+        }
+        return this;
+    }
+
+    /// <summary>
     /// Assert the executor has non-empty output.
     /// </summary>
     /// <param name="because">Optional reason for the assertion.</param>
@@ -695,6 +832,81 @@ public class ExecutorStepAssertionBuilder
             AddFailure($"Executor '{_executorId}' produced empty output");
         }
         return this;
+    }
+
+    /// <summary>
+    /// Assert the executor had no tool call errors.
+    /// </summary>
+    /// <param name="because">Optional reason for the assertion.</param>
+    [StackTraceHidden]
+    public ExecutorStepAssertionBuilder HaveNoToolErrors(string? because = null)
+    {
+        if (because != null) _currentBecause = because;
+        if (_step == null)
+        {
+            AddFailure($"Executor '{_executorId}' was not found");
+        }
+        else
+        {
+            var errors = _step.ToolCalls?.Where(tc => tc.HasError).ToList() ?? [];
+            if (errors.Count > 0)
+            {
+                var errorDetails = string.Join(", ", errors.Select(e =>
+                    $"{e.Name}: {e.Exception?.Message ?? "(unknown error)"}"));
+                AddFailure($"Executor '{_executorId}' had {errors.Count} tool error(s): {errorDetails}");
+            }
+        }
+        return this;
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // RICH TOOL CALL ASSERTIONS (ForToolCall sub-builder)
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// Get a rich assertion builder for a specific tool call within this executor.
+    /// Enables fluent chaining: <c>.ForToolCall("X").BeforeTool("Y").WithoutError().And()</c>
+    /// </summary>
+    /// <param name="toolName">The name of the tool to assert on.</param>
+    /// <param name="because">Optional reason for the assertion.</param>
+    /// <returns>A tool call assertion builder scoped to this executor's tool calls.</returns>
+    /// <example>
+    /// <code>
+    /// result.Should()
+    ///     .ForExecutor("FlightReservation")
+    ///         .ForToolCall("SearchFlights")
+    ///             .BeforeTool("BookFlight", because: "must search before booking")
+    ///             .WithoutError()
+    ///         .And()
+    ///         .ForToolCall("BookFlight")
+    ///             .WithoutError()
+    ///         .And()
+    ///     .And()
+    ///     .Validate();
+    /// </code>
+    /// </example>
+    public ExecutorToolCallAssertionBuilder ForToolCall(string toolName, string? because = null)
+    {
+        if (because != null) _currentBecause = because;
+
+        ToolCallRecord? call = null;
+        if (_step == null)
+        {
+            AddFailure($"Executor '{_executorId}' was not found");
+        }
+        else
+        {
+            call = _step.ToolCalls?.FirstOrDefault(t =>
+                t.Name.Equals(toolName, StringComparison.OrdinalIgnoreCase));
+            if (call == null)
+            {
+                var calledTools = _step.ToolCalls?.Select(t => t.Name).Distinct().ToList() ?? [];
+                AddFailure($"Executor '{_executorId}' did not call tool '{toolName}'. " +
+                           $"Called tools: [{string.Join(", ", calledTools)}]");
+            }
+        }
+
+        return new ExecutorToolCallAssertionBuilder(this, _step, call, toolName, _executorId);
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -834,6 +1046,278 @@ public class ExecutorStepAssertionBuilder
     /// Return to the parent builder for continued chaining.
     /// </summary>
     public WorkflowAssertionBuilder And() => _parent;
+
+    private static string Truncate(string text, int maxLength)
+    {
+        if (string.IsNullOrEmpty(text)) return "(empty)";
+        if (text.Length <= maxLength) return text;
+        return text[..(maxLength - 3)] + "...";
+    }
+}
+
+/// <summary>
+/// Fluent assertion builder for a specific tool call within an executor step.
+/// Enables rich per-tool assertions: ordering, error checking, argument validation.
+/// </summary>
+/// <remarks>
+/// <para>
+/// Use <see cref="ExecutorStepAssertionBuilder.ForToolCall"/> to create instances.
+/// Chain assertions and call <c>.And()</c> to return to the executor builder.
+/// </para>
+/// <code>
+/// result.Should()
+///     .ForExecutor("FlightReservation")
+///         .ForToolCall("SearchFlights")
+///             .BeforeTool("BookFlight", because: "can't book without search results")
+///             .WithoutError()
+///         .And()
+///     .And()
+///     .Validate();
+/// </code>
+/// </remarks>
+public class ExecutorToolCallAssertionBuilder
+{
+    private readonly ExecutorStepAssertionBuilder _parent;
+    private readonly ExecutorStep? _step;
+    private readonly ToolCallRecord? _call;
+    private readonly string _toolName;
+    private readonly string _executorId;
+
+    internal ExecutorToolCallAssertionBuilder(
+        ExecutorStepAssertionBuilder parent,
+        ExecutorStep? step,
+        ToolCallRecord? call,
+        string toolName,
+        string executorId)
+    {
+        _parent = parent;
+        _step = step;
+        _call = call;
+        _toolName = toolName;
+        _executorId = executorId;
+    }
+
+    /// <summary>
+    /// Assert this tool was called before another tool within the same executor.
+    /// </summary>
+    /// <param name="otherToolName">The tool that should have been called after.</param>
+    /// <param name="because">Optional reason for the assertion.</param>
+    [StackTraceHidden]
+    public ExecutorToolCallAssertionBuilder BeforeTool(string otherToolName, string? because = null)
+    {
+        if (_call == null || _step == null) return this; // Already reported missing
+
+        var otherCall = _step.ToolCalls?.FirstOrDefault(t =>
+            t.Name.Equals(otherToolName, StringComparison.OrdinalIgnoreCase));
+
+        if (otherCall == null)
+        {
+            AddFailure(
+                $"Expected '{_toolName}' to be called before '{otherToolName}' in executor '{_executorId}', " +
+                $"but '{otherToolName}' was never called.",
+                because);
+        }
+        else if (_call.Order >= otherCall.Order)
+        {
+            AddFailure(
+                $"Expected '{_toolName}' (#{_call.Order}) to be called before '{otherToolName}' (#{otherCall.Order}) " +
+                $"in executor '{_executorId}'.",
+                because);
+        }
+        return this;
+    }
+
+    /// <summary>
+    /// Assert this tool was called after another tool within the same executor.
+    /// </summary>
+    /// <param name="otherToolName">The tool that should have been called before.</param>
+    /// <param name="because">Optional reason for the assertion.</param>
+    [StackTraceHidden]
+    public ExecutorToolCallAssertionBuilder AfterTool(string otherToolName, string? because = null)
+    {
+        if (_call == null || _step == null) return this;
+
+        var otherCall = _step.ToolCalls?.FirstOrDefault(t =>
+            t.Name.Equals(otherToolName, StringComparison.OrdinalIgnoreCase));
+
+        if (otherCall == null)
+        {
+            AddFailure(
+                $"Expected '{_toolName}' to be called after '{otherToolName}' in executor '{_executorId}', " +
+                $"but '{otherToolName}' was never called.",
+                because);
+        }
+        else if (_call.Order <= otherCall.Order)
+        {
+            AddFailure(
+                $"Expected '{_toolName}' (#{_call.Order}) to be called after '{otherToolName}' (#{otherCall.Order}) " +
+                $"in executor '{_executorId}'.",
+                because);
+        }
+        return this;
+    }
+
+    /// <summary>
+    /// Assert this tool completed without error.
+    /// </summary>
+    /// <param name="because">Optional reason for the assertion.</param>
+    [StackTraceHidden]
+    public ExecutorToolCallAssertionBuilder WithoutError(string? because = null)
+    {
+        if (_call == null) return this;
+
+        if (_call.HasError)
+        {
+            AddFailure(
+                $"Expected '{_toolName}' in executor '{_executorId}' to complete without error, " +
+                $"but got: {_call.Exception?.Message ?? "(unknown error)"}",
+                because);
+        }
+        return this;
+    }
+
+    /// <summary>
+    /// Assert a specific argument value (equality).
+    /// </summary>
+    /// <param name="paramName">The parameter name to check.</param>
+    /// <param name="expectedValue">The expected value.</param>
+    /// <param name="because">Optional reason for the assertion.</param>
+    [StackTraceHidden]
+    public ExecutorToolCallAssertionBuilder WithArgument(string paramName, object expectedValue, string? because = null)
+    {
+        if (_call == null) return this;
+
+        object? actualValue = null;
+        var hasArgument = _call.Arguments?.TryGetValue(paramName, out actualValue) ?? false;
+
+        if (!hasArgument)
+        {
+            var available = _call.Arguments?.Keys.Any() == true
+                ? string.Join(", ", _call.Arguments.Keys)
+                : "(none)";
+            AddFailure(
+                $"Expected '{_toolName}' in executor '{_executorId}' to have argument '{paramName}', " +
+                $"but available arguments: [{available}]",
+                because);
+        }
+        else
+        {
+            var actualStr = actualValue is System.Text.Json.JsonElement je
+                ? je.GetRawText().Trim('"')
+                : actualValue?.ToString();
+            var expectedStr = expectedValue?.ToString();
+
+            if (!string.Equals(actualStr, expectedStr, StringComparison.Ordinal))
+            {
+                AddFailure(
+                    $"Expected '{_toolName}' in executor '{_executorId}' argument '{paramName}' = \"{expectedValue}\" " +
+                    $"but was \"{actualValue}\"",
+                    because);
+            }
+        }
+        return this;
+    }
+
+    /// <summary>
+    /// Assert an argument contains a substring (case-insensitive).
+    /// </summary>
+    /// <param name="paramName">The parameter name to check.</param>
+    /// <param name="substring">The substring that should be contained.</param>
+    /// <param name="because">Optional reason for the assertion.</param>
+    [StackTraceHidden]
+    public ExecutorToolCallAssertionBuilder WithArgumentContaining(string paramName, string substring, string? because = null)
+    {
+        if (_call == null) return this;
+
+        object? actualValue = null;
+        var hasArgument = _call.Arguments?.TryGetValue(paramName, out actualValue) ?? false;
+
+        if (!hasArgument)
+        {
+            AddFailure(
+                $"Expected '{_toolName}' in executor '{_executorId}' to have argument '{paramName}' containing " +
+                $"'{substring}', but argument was not found.",
+                because);
+        }
+        else
+        {
+            var actualStr = actualValue is System.Text.Json.JsonElement je
+                ? je.GetString()
+                : actualValue?.ToString();
+
+            if (actualStr == null || !actualStr.Contains(substring, StringComparison.OrdinalIgnoreCase))
+            {
+                AddFailure(
+                    $"Expected '{_toolName}' in executor '{_executorId}' argument '{paramName}' to contain " +
+                    $"'{substring}' but was \"{Truncate(actualStr ?? "(null)", 100)}\"",
+                    because);
+            }
+        }
+        return this;
+    }
+
+    /// <summary>
+    /// Assert the tool result contains a substring (case-insensitive).
+    /// </summary>
+    /// <param name="substring">The substring that should be in the result.</param>
+    /// <param name="because">Optional reason for the assertion.</param>
+    [StackTraceHidden]
+    public ExecutorToolCallAssertionBuilder WithResultContaining(string substring, string? because = null)
+    {
+        if (_call == null) return this;
+
+        var resultStr = _call.Result?.ToString();
+        if (resultStr == null || !resultStr.Contains(substring, StringComparison.OrdinalIgnoreCase))
+        {
+            AddFailure(
+                $"Expected '{_toolName}' in executor '{_executorId}' result to contain '{substring}' " +
+                $"but was \"{Truncate(resultStr ?? "(null)", 100)}\"",
+                because);
+        }
+        return this;
+    }
+
+    /// <summary>
+    /// Assert tool duration is under a maximum.
+    /// If timing information is not available, the assertion is skipped.
+    /// </summary>
+    /// <param name="max">The maximum allowed duration.</param>
+    /// <param name="because">Optional reason for the assertion.</param>
+    [StackTraceHidden]
+    public ExecutorToolCallAssertionBuilder WithDurationUnder(TimeSpan max, string? because = null)
+    {
+        if (_call == null) return this;
+
+        if (!_call.HasTiming)
+        {
+            System.Diagnostics.Debug.WriteLine(
+                $"[AgentEval] Skipping duration assertion for '{_toolName}' in executor '{_executorId}' " +
+                "- timing not available.");
+            return this;
+        }
+
+        if (_call.Duration > max)
+        {
+            AddFailure(
+                $"Expected '{_toolName}' in executor '{_executorId}' duration under {max.TotalMilliseconds:F0}ms " +
+                $"but was {_call.Duration!.Value.TotalMilliseconds:F0}ms",
+                because);
+        }
+        return this;
+    }
+
+    /// <summary>
+    /// Return to the parent executor step builder for continued chaining.
+    /// </summary>
+    public ExecutorStepAssertionBuilder And() => _parent;
+
+    private void AddFailure(string message, string? because)
+    {
+        var fullMessage = !string.IsNullOrEmpty(because)
+            ? $"{message} because {because}"
+            : message;
+        _parent.AddFailureFromChild(fullMessage);
+    }
 
     private static string Truncate(string text, int maxLength)
     {

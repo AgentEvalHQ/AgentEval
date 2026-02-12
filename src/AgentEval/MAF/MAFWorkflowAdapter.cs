@@ -204,7 +204,8 @@ public class MAFWorkflowAdapter : IWorkflowEvaluableAgent
                             Result = toolEvent.Result,
                             StartTime = DateTimeOffset.UtcNow - toolEvent.Duration,
                             EndTime = DateTimeOffset.UtcNow,
-                            Order = currentToolCalls.Count + 1
+                            Order = currentToolCalls.Count + 1,
+                            ExecutorId = currentExecutorId
                         });
                         break;
 

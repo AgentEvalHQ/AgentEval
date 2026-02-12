@@ -82,7 +82,7 @@ public static class Program
                     await Sample08_ConversationEvaluation.RunAsync();
                     break;
                 case 9:
-                    await Sample09_WorkflowEvaluation.RunAsync();
+                    await Sample09_WorkflowEvaluationReal.RunAsync();
                     break;
                 case 10:
                     await Sample10_DatasetsAndExport.RunAsync();
@@ -121,7 +121,7 @@ public static class Program
                     await Sample21_RedTeamAdvanced.RunAsync();
                     break;
                 case 22:
-                    await Sample09B_WorkflowEvaluationReal.RunAsync();
+                    await Sample09B_WorkflowWithTools.RunAsync();
                     break;
                 case 23:
                     await StandaloneWorkflowTest.RunAsync();
@@ -178,7 +178,7 @@ public static class Program
         Console.WriteLine("│  6. 📈 Benchmarks         - Performance & agentic benchmarks│");
         Console.WriteLine("│  7. 📸 Snapshot Testing   - Regression detection            │");
         Console.WriteLine("│  8. 💬 Conversations      - Multi-turn evaluation            │");
-        Console.WriteLine("│  9. 🔀 Workflow Evaluation - Multi-agent orchestration       │");
+        Console.WriteLine("│  9. 🔀 Workflow Evaluation - Real MAF workflow pipeline       │");
         Console.WriteLine("│ 10. 📂 Datasets & Export  - Batch evaluation, JUnit export   │");
         Console.WriteLine("│ 11. 📝 Because Assertions - Self-documenting evaluation      │");
         Console.WriteLine("│ 12. 🛡️ Policy & Safety    - Enterprise guardrails           │");
@@ -191,7 +191,7 @@ public static class Program
         Console.WriteLine("│ 19. ⚡ Streaming vs Async - Performance comparison          │");
         Console.WriteLine("│ 20. 🛡️ Red Team Basic    - Security vulnerability scan       │");
         Console.WriteLine("│ 21. 🛡️ Red Team Advanced - Pipeline, reports, compliance    │");
-        Console.WriteLine("│ 22. 🔀 Real MAF Workflow  - WorkflowBuilder + InProcessExecution     │");
+        Console.WriteLine("│ 22. 🔀 Workflow + Tools   - TripPlanner with tool tracking     │");
         
         Console.ForegroundColor = ConsoleColor.Green;
         Console.WriteLine("├─────────────────────────────────────────────────────────────┤");

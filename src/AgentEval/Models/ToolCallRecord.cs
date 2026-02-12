@@ -28,6 +28,9 @@ public class ToolCallRecord
     /// <summary>Order in which this tool was called (1-based).</summary>
     public int Order { get; init; }
     
+    /// <summary>The executor/agent that made this tool call (workflow context).</summary>
+    public string? ExecutorId { get; set; }
+    
     /// <summary>When tool execution started (streaming only).</summary>
     public DateTimeOffset? StartTime { get; set; }
     
