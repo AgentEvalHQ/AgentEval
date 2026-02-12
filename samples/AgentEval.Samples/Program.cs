@@ -120,6 +120,12 @@ public static class Program
                 case 21:
                     await Sample21_RedTeamAdvanced.RunAsync();
                     break;
+                case 22:
+                    await Sample09B_WorkflowEvaluationReal.RunAsync();
+                    break;
+                case 23:
+                    await StandaloneWorkflowTest.RunAsync();
+                    break;
                 default:
                     Console.WriteLine($"❌ Sample {sampleNumber} not found.\n");
                     break;
@@ -185,6 +191,7 @@ public static class Program
         Console.WriteLine("│ 19. ⚡ Streaming vs Async - Performance comparison          │");
         Console.WriteLine("│ 20. 🛡️ Red Team Basic    - Security vulnerability scan       │");
         Console.WriteLine("│ 21. 🛡️ Red Team Advanced - Pipeline, reports, compliance    │");
+        Console.WriteLine("│ 22. 🔀 Real MAF Workflow  - WorkflowBuilder + InProcessExecution     │");
         
         Console.ForegroundColor = ConsoleColor.Green;
         Console.WriteLine("├─────────────────────────────────────────────────────────────┤");

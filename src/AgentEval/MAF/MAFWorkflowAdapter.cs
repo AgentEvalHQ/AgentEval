@@ -5,6 +5,7 @@ using System.Diagnostics;
 using System.Text;
 using AgentEval.Core;
 using AgentEval.Models;
+using MAFWorkflows = Microsoft.Agents.AI.Workflows;
 
 namespace AgentEval.MAF;
 
@@ -422,6 +423,96 @@ public class MAFWorkflowAdapter : IWorkflowEvaluableAgent
             (prompt, ct) => ExecuteStepsWithEdges(steps, edges),
             steps.Select(s => s.executorId).Distinct(),
             "Conditional");
+    }
+
+    /// <summary>
+    /// Creates a workflow adapter from a real MAF Workflow built with
+    /// <see cref="MAFWorkflows.WorkflowBuilder"/>.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Uses <see cref="MAFWorkflows.InProcessExecution"/> to stream events and
+    /// <see cref="MAFWorkflowEventBridge"/> to translate MAF's class-based events
+    /// to AgentEval's record-based events.
+    /// </para>
+    /// <para>
+    /// The <paramref name="executorIds"/> must be provided explicitly because
+    /// <c>Workflow.ExecutorBindings</c> is internal to the MAF assembly.
+    /// </para>
+    /// </remarks>
+    /// <param name="workflow">The built MAF Workflow.</param>
+    /// <param name="name">Human-readable name for this workflow.</param>
+    /// <param name="executorIds">
+    /// Ordered list of executor IDs in the workflow. Required because
+    /// <c>Workflow.ExecutorBindings</c> is internal.
+    /// </param>
+    /// <param name="workflowType">Optional workflow pattern type (e.g., "PromptChaining").</param>
+    /// <returns>A workflow adapter wrapping real MAF workflow execution.</returns>
+    public static MAFWorkflowAdapter FromMAFWorkflow(
+        MAFWorkflows.Workflow workflow,
+        string name,
+        IEnumerable<string> executorIds,
+        string? workflowType = null)
+    {
+        ArgumentNullException.ThrowIfNull(workflow);
+        ArgumentNullException.ThrowIfNull(name);
+        ArgumentNullException.ThrowIfNull(executorIds);
+
+        var cleanNames = executorIds.ToList();
+
+        // Discover real MAF executor IDs from ReflectEdges + StartExecutorId.
+        // MAF generates IDs in the form "Name_<32hexGuid>" (via GetDescriptiveId).
+        // We build a mapping from full MAF ID → user-provided clean name.
+        var reflectedEdges = workflow.ReflectEdges();
+        var allMafIds = new HashSet<string>(reflectedEdges.Keys);
+
+        // Also add sink IDs from edges (targets may not appear as source keys)
+        foreach (var edgeInfos in reflectedEdges.Values)
+        {
+            foreach (var edgeInfo in edgeInfos)
+            {
+                foreach (var sinkId in edgeInfo.Connection.SinkIds)
+                    allMafIds.Add(sinkId);
+                foreach (var sourceId in edgeInfo.Connection.SourceIds)
+                    allMafIds.Add(sourceId);
+            }
+        }
+
+        // Include the start executor ID
+        if (!string.IsNullOrEmpty(workflow.StartExecutorId))
+            allMafIds.Add(workflow.StartExecutorId);
+
+        // Build fullId → cleanName mapping by matching prefix
+        var idMap = new Dictionary<string, string>();
+        foreach (var fullId in allMafIds)
+        {
+            foreach (var cleanName in cleanNames)
+            {
+                // MAF format: "{Name}_{Guid32hex}" — match by prefix
+                if (string.Equals(fullId, cleanName, StringComparison.Ordinal)
+                    || fullId.StartsWith(cleanName + "_", StringComparison.Ordinal))
+                {
+                    idMap[fullId] = cleanName;
+                    break;
+                }
+            }
+
+            // If no clean name matched, map to itself (passthrough)
+            if (!idMap.ContainsKey(fullId))
+                idMap[fullId] = fullId;
+        }
+
+        // Use real MAF IDs for graph extraction (they match ReflectEdges keys),
+        // but pass the mapping so node/edge IDs are translated to clean names.
+        var realMafIds = allMafIds.ToList();
+        var graph = MAFGraphExtractor.ExtractGraph(workflow, realMafIds, idMap);
+
+        return new MAFWorkflowAdapter(
+            name,
+            (prompt, ct) => MAFWorkflowEventBridge.StreamAsAgentEvalEvents(workflow, prompt, ct, idMap),
+            cleanNames,
+            workflowType,
+            graph);
     }
 
     private static async IAsyncEnumerable<WorkflowEvent> ExecuteSteps(

@@ -18,7 +18,11 @@
 //
 // ═══════════════════════════════════════════════════════════════════════════════
 
+using System.Text;
 using AgentEval.NuGetConsumer;
+
+// Ensure Unicode characters (emoji, box-drawing, etc.) render correctly on Windows
+Console.OutputEncoding = Encoding.UTF8;
 
 // Parse command-line arguments for non-interactive mode
 var (cliMode, cliDemo) = ParseArguments(args);

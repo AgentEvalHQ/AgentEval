@@ -7,6 +7,7 @@
     <!-- Microsoft Agent Framework -->
     <PackageVersion Include="Microsoft.Agents.AI" Version="1.0.0-preview.251110.2" />
     <PackageVersion Include="Microsoft.Agents.AI.OpenAI" Version="1.0.0-preview.251110.2" />
+    <PackageVersion Include="Microsoft.Agents.AI.Workflows" Version="1.0.0-preview.251110.2" />
     
     <!-- Microsoft Extensions AI -->
     <PackageVersion Include="Microsoft.Extensions.AI" Version="10.0.0" />

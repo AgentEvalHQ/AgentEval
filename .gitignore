@@ -426,3 +426,6 @@ nupkgs/
 
 # Strategy documents (internal - do not publish)
 strategy/
+
+# MAF source reference (local only - not for distribution)
+MAF/
