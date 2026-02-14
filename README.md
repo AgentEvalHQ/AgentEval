@@ -272,7 +272,7 @@ result.Should()
 Complementing security evaluation, AgentEval's ResponsibleAI namespace provides **content safety evaluation**:
 
 ```csharp
-using AgentEval.ResponsibleAI;
+using AgentEval.Metrics.ResponsibleAI;
 
 // Toxicity detection (pattern + LLM hybrid)
 var toxicity = new ToxicityMetric(chatClient, useLlmFallback: true);

@@ -258,7 +258,7 @@ result.ToolUsage!.Should()
 
 ## 📖 Related Resources
 
-- **Basic Learning**: AgentEval.Samples project (18 focused examples)
+- **Basic Learning**: AgentEval.Samples project (23 focused examples)
 - **Full Documentation**: [GitHub.com/joslat/AgentEval](https://github.com/joslat/AgentEval)  
 - **Assertions Guide**: [docs/assertions.md](https://github.com/joslat/AgentEval/blob/main/docs/assertions.md)
 - **LLM-as-a-Judge**: [docs/evaluation-guide.md](https://github.com/joslat/AgentEval/blob/main/docs/evaluation-guide.md)

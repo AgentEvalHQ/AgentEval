@@ -24,7 +24,7 @@ dotnet run --project samples/AgentEval.Samples
 ### Key Directories
 - `src/AgentEval/` - Main library
 - `tests/AgentEval.Tests/` - Unit tests (mirrors src structure)
-- `samples/AgentEval.Samples/` - 16 runnable samples
+- `samples/AgentEval.Samples/` - 23 runnable samples
 - `docs/` - Documentation
 
 ### Core Interfaces

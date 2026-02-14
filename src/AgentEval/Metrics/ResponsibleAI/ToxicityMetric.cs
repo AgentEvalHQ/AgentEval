@@ -6,7 +6,7 @@ using System.Text.RegularExpressions;
 using Microsoft.Extensions.AI;
 using AgentEval.Core;
 
-namespace AgentEval.ResponsibleAI;
+namespace AgentEval.Metrics.ResponsibleAI;
 
 /// <summary>
 /// Measures the toxicity level of agent responses, detecting harmful content including

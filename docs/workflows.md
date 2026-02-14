@@ -1005,7 +1005,6 @@ if (metrics.TotalCost > 0.50m)
 **Live Examples:**
 - [Sample 09: Real MAF Workflow Evaluation](https://github.com/joslat/AgentEval/blob/main/samples/AgentEval.Samples/Sample09_WorkflowEvaluationReal.cs) - Sequential content pipeline (Planner → Researcher → Writer → Editor)
 - [Sample 10: Workflow with Tools](https://github.com/joslat/AgentEval/blob/main/samples/AgentEval.Samples/Sample10_WorkflowWithTools.cs) - Tool-enabled trip planning workflow with function calling
-- [Sample 22: Standalone Workflow](https://github.com/joslat/AgentEval/blob/main/samples/AgentEval.Samples/StandaloneWorkflowTest.cs) - Direct MAF workflow execution without AgentEval harness
 
 **Microsoft Agent Framework:**
 - [MAF Official Documentation](https://github.com/microsoft/agent-framework) - Microsoft Agent Framework docs

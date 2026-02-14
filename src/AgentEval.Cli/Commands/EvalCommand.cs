@@ -85,7 +85,7 @@ public static class EvalCommand
         var formatOption = new Option<ExportFormat>(
             ["--format", "-f"],
             () => ExportFormat.Json,
-            "Output format: json, junit, markdown, trx");
+            "Output format: json, junit, markdown, trx, csv");
 
         var baselineOption = new Option<FileInfo?>(
             ["--baseline", "-b"],

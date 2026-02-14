@@ -168,7 +168,7 @@ AgentEval/
 │       ├── Assertions/      # Fluent assertion API
 │       ├── Benchmarks/      # Benchmark runners
 │       ├── Core/            # Core abstractions
-│       ├── Exporters/       # Output formatters (JSON, JUnit, Markdown)
+│       ├── Exporters/       # Output formatters (JSON, JUnit, Markdown, CSV)
 │       ├── MAF/             # Microsoft Agent Framework integration
 │       ├── Metrics/         # Evaluation metrics
 │       ├── Models/          # Data models

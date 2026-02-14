@@ -13,17 +13,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **192 total probes** across all attack categories (expanded InsecureOutput from 18→33)
   - **60% OWASP LLM Top 10 2025 coverage** (6/10): LLM01, LLM02, LLM05, LLM06, LLM07, LLM10
   - **6 MITRE ATLAS techniques**: AML.T0024, AML.T0037, AML.T0043, AML.T0045, AML.T0051, AML.T0054
-  - **5 export formats**: JSON, JUnit XML, SARIF (GitHub Security), Markdown, PDF
+  - **6 export formats**: JSON, JUnit XML, SARIF (GitHub Security), Markdown, PDF, CSV
   - **4 compliance reports**: OWASP, MITRE, SOC2, ISO27001
   - Fluent assertions: `result.Should().HaveOverallScoreAbove(85)`
   - Attack pipeline API: `AttackPipeline.Create().WithAllAttacks().ScanAsync(agent)`
   - Baseline comparison for CI/CD regression tracking
   - Real-time progress reporting with `ScanProgress` callback
   - Rich console output with emoji, colors, and detailed breakdowns
-- **Responsible AI Metrics** (`AgentEval.ResponsibleAI` namespace)
+- **Responsible AI Metrics** (`AgentEval.Metrics.ResponsibleAI` namespace)
   - `ToxicityMetric` - Pattern + LLM hybrid toxicity detection
   - `BiasMetric` - LLM-based bias detection with counterfactual testing
   - `MisinformationMetric` - Claim verification and calibration assessment
+- **CSV Export Format** - New `CsvExporter` for Excel and business intelligence tools
+- **Sample 23: Responsible AI** - Toxicity, bias, misinformation metrics with counterfactual testing
+- **Sample 24: Benchmark System** - Performance, agentic, standard, and cost benchmarks with comparative analysis
 
 ### Planned
 - CodeQL integration for advanced code analysis

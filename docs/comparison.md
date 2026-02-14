@@ -330,7 +330,7 @@ stochasticResult.Statistics.Mean.Should().BeGreaterThan(75);
 
 - [Getting Started Guide](getting-started.md) - Full tutorial
 - [Code Gallery](showcase/code-gallery.md) - Real examples
-- [Samples](https://github.com/joslat/AgentEval/tree/main/samples) - 18 runnable samples
+- [Samples](https://github.com/joslat/AgentEval/tree/main/samples) - 23 runnable samples
 - [Issues](https://github.com/joslat/AgentEval/issues) - Report problems or ask questions
 
 ---

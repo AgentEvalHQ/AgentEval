@@ -18,7 +18,10 @@ public enum ExportFormat
     Markdown,
     
     /// <summary>Visual Studio TRX format for .NET tooling.</summary>
-    Trx
+    Trx,
+    
+    /// <summary>CSV format for Excel and business intelligence tools.</summary>
+    Csv
 }
 
 /// <summary>
@@ -56,6 +59,7 @@ public static class ResultExporterFactory
         ExportFormat.Junit => new JUnitXmlExporter(),
         ExportFormat.Markdown => new MarkdownExporter(),
         ExportFormat.Trx => new TrxExporter(),
+        ExportFormat.Csv => new CsvExporter(),
         _ => throw new ArgumentOutOfRangeException(nameof(format), format, "Unknown export format")
     };
     

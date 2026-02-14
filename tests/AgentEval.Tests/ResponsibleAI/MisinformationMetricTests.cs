@@ -3,7 +3,7 @@
 namespace AgentEval.Tests.ResponsibleAI;
 
 using AgentEval.Core;
-using AgentEval.ResponsibleAI;
+using AgentEval.Metrics.ResponsibleAI;
 using AgentEval.Testing;
 
 public class MisinformationMetricTests

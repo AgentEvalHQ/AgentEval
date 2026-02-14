@@ -29,7 +29,7 @@ agenteval eval [options]
 | `--config <path>` | `-c` | Path to evaluation configuration file (YAML or JSON) | - |
 | `--dataset <path>` | `-d` | Path to dataset file (JSON, JSONL, CSV, YAML) | - |
 | `--output <path>` | `-o` | Output file path for results | stdout |
-| `--format <format>` | `-f` | Output format (json, junit, markdown, trx) | json |
+| `--format <format>` | `-f` | Output format (json, junit, markdown, trx, csv) | json |
 | `--baseline <path>` | `-b` | Baseline file for regression comparison | - |
 | `--fail-on-regression` | | Exit with code 1 if regressions detected | false |
 | `--pass-threshold <n>` | | Minimum score to pass (0-100) | 70 |

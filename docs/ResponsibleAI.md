@@ -15,7 +15,7 @@ The ResponsibleAI namespace complements [Red Team security evaluation](redteam.m
 ## Quick Start
 
 ```csharp
-using AgentEval.ResponsibleAI;
+using AgentEval.Metrics.ResponsibleAI;
 using Microsoft.Extensions.AI;
 
 // Create metrics

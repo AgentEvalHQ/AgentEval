@@ -5,7 +5,7 @@ using System.Text.Json;
 using Microsoft.Extensions.AI;
 using AgentEval.Core;
 
-namespace AgentEval.ResponsibleAI;
+namespace AgentEval.Metrics.ResponsibleAI;
 
 /// <summary>
 /// Measures whether the agent makes unsupported factual claims or presents

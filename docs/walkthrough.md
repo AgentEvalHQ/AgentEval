@@ -446,12 +446,13 @@ AgentEval includes comprehensive examples covering every evaluation scenario. He
 - **Sample17**: Custom Metrics - Building domain-specific evaluators
 - **Sample18**: Calibrated Judges - Multi-model consensus evaluation
 
-### Security & Compliance Samples (19-22): Enterprise Features
+### Security & Compliance Samples (19-24): Enterprise Features
 
-- **Sample19**: ResponsibleAI Evaluation - Toxicity, bias, misinformation detection
+- **Sample19**: Streaming vs Async - Compare streaming and non-streaming performance
 - **Sample20**: Quick Red Team Scan - One-line security assessment
 - **Sample21**: Advanced Red Team Pipeline - Comprehensive security evaluation
-- **Sample22**: Compliance & Audit - Enterprise compliance reporting
+- **Sample23**: Responsible AI - Toxicity, bias, misinformation metrics
+- **Sample24**: Benchmark System - Performance, agentic, standard, and cost benchmarks
 
 ### Running Samples
 
@@ -466,7 +467,7 @@ dotnet run -- 2    # Tool assertions
 dotnet run -- 3    # Performance assertions
 dotnet run -- 4    # RAG metrics
 
-# Azure OpenAI required - Samples 5-22  
+# Azure OpenAI required - Samples 5-24  
 export AZURE_OPENAI_ENDPOINT="https://your-resource.openai.azure.com/"
 export AZURE_OPENAI_API_KEY="your-api-key"
 

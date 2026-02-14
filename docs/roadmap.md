@@ -49,7 +49,7 @@ AgentEval is in **beta** with all core features complete and ready for productio
 ### CI/CD Integration
 - **CLI tool** (`agenteval eval`, `agenteval init`, `agenteval list`)
 - **Workflow CLI commands** (`agenteval workflow-eval`, `workflow-init`, `workflow-validate`)
-- **Result exporters:** JSON, JUnit XML, Markdown, TRX, Mermaid (workflow graphs)
+- **Result exporters:** JSON, JUnit XML, Markdown, TRX, CSV, Mermaid (workflow graphs)
 - **Dataset loaders:** JSON, JSONL, CSV, YAML (including workflow test cases)
 - **Rich test output** with verbosity levels and trace artifacts
 

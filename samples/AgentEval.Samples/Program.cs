@@ -124,8 +124,11 @@ public static class Program
                     await Sample21_RedTeamAdvanced.RunAsync();
                     break;
 
-                case 22:
-                    await StandaloneWorkflowTest.RunAsync();
+                case 23:
+                    await Sample23_ResponsibleAI.RunAsync();
+                    break;
+                case 24:
+                    await Sample24_BenchmarkSystem.RunAsync();
                     break;
                 default:
                     Console.WriteLine($"❌ Sample {sampleNumber} not found.\n");
@@ -193,7 +196,8 @@ public static class Program
         Console.WriteLine("│ 19. ⚡ Streaming vs Async - Performance comparison          │");
         Console.WriteLine("│ 20. 🛡️ Red Team Basic    - Security vulnerability scan       │");
         Console.WriteLine("│ 21. 🛡️ Red Team Advanced - Pipeline, reports, compliance    │");
-        Console.WriteLine("│ 22. 🔬 Workflow Diagnostic - Standalone MAF workflow test    │");
+        Console.WriteLine("│ 23. 🛡️ ResponsibleAI     - Content safety, bias, misinfo   │");
+        Console.WriteLine("│ 24. 📊 Benchmark System  - Performance, agentic & standard  │");
         
         Console.ForegroundColor = ConsoleColor.Green;
         Console.WriteLine("├─────────────────────────────────────────────────────────────┤");

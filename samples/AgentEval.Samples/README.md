@@ -2,7 +2,7 @@
 
 > **📚 Comprehensive Learning Library - Get started with AgentEval in 5 minutes!**
 
-This project contains **22 focused, educational samples** demonstrating all major AgentEval features. Each sample covers a distinct capability, ensuring features are exhaustively demonstrated.
+This project contains **23 focused, educational samples** demonstrating all major AgentEval features. Each sample covers a distinct capability, ensuring features are exhaustively demonstrated.
 
 ## ⚡ Core Principle
 
@@ -11,7 +11,7 @@ This project contains **22 focused, educational samples** demonstrating all majo
 - **Evaluation** (LLM-as-judge scores, metrics) → Always real or gracefully skipped
 - **Structure** (tool ordering, workflows, conversations) → Can be demonstrated with mock data
 
-This means samples 1-4 work fully without credentials (mock mode), while samples 5-22 require Azure OpenAI for meaningful results.
+This means samples 1-4 work fully without credentials (mock mode), while samples 5-24 require Azure OpenAI for meaningful results.
 
 
 
@@ -50,7 +50,8 @@ You'll see an interactive menu to run each sample.
 | 19 | **Streaming vs Async** | Compare streaming and non-streaming performance, TTFT | Yes | 8 min |
 | 20 | **Red Team Basic** | **Security scan, OWASP LLM probes, attack resistance** 🛡️ | Yes | 5 min |
 | 21 | **Red Team Advanced** | **Custom pipeline, OWASP compliance, export, baseline comparison** 🛡️ | Yes | 10 min |
-| 22 | **Standalone Diagnostic** | MAF workflow diagnostic — runs workflow directly (no harness) | Yes | 2 min |
+| 23 | **Responsible AI** | **Toxicity, bias, misinformation metrics with counterfactual testing** 🛡️ | Yes | 5 min |
+| 24 | **Benchmark System** | **Performance, agentic, standard, cost benchmarks with comparison** | Yes | 5 min |
 
 > **⭐ Samples 03 & 04** provide the foundational knowledge for tool chain and performance assertions.
 > **🛡️ Samples 20 & 21** demonstrate AgentEval's red team security scanning capabilities.
@@ -60,7 +61,7 @@ You'll see an interactive menu to run each sample.
 
 ### With Azure OpenAI (Full Experience)
 
-Set environment variables (**recommended for samples 5-22**):
+Set environment variables (**recommended for samples 5-24**):
 
 ```powershell
 # PowerShell
@@ -100,7 +101,7 @@ You'll see this banner:
 ╚══════════════════════════════════════════════════════════════╝
 ```
 
-Samples 5-22 require credentials and will show:
+Samples 5-24 require credentials and will show:
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │  ⚠️  SKIPPING SAMPLE XX - Azure OpenAI Credentials Required                │
