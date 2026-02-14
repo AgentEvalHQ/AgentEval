@@ -1,17 +1,28 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2025-2026 AgentEval Contributors
 
+using Azure.AI.OpenAI;
+using Microsoft.Agents.AI;
+using Microsoft.Extensions.AI;
+using AgentEval.MAF;
+using AgentEval.Models;
+using AgentEval.Core;
+using System.ComponentModel;
+using System.Diagnostics;
+using ChatOptions = Microsoft.Extensions.AI.ChatOptions;
+
 namespace AgentEval.Samples;
 
 /// <summary>
-/// Sample 06: Benchmarks - Running performance and agentic benchmarks
+/// Sample 06: Benchmarks - Real performance and agentic benchmarks
 /// 
 /// This demonstrates:
-/// - Using PerformanceBenchmark concepts for latency/throughput testing
-/// - Using AgenticBenchmark concepts for tool accuracy evaluation
-/// - Statistical analysis (mean, p50, p90, p99)
-/// - Comparing benchmark results
+/// - Running real prompts through an agent and collecting latency data
+/// - Computing statistical percentiles (p50, p90, p99) from actual measurements
+/// - Evaluating tool selection accuracy against expected tool calls
+/// - Performance tracking with token usage and cost estimation
 /// 
+/// Requires: AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_API_KEY, AZURE_OPENAI_DEPLOYMENT
 /// ⏱️ Time to understand: 5 minutes
 /// </summary>
 public static class Sample06_Benchmarks
@@ -20,169 +31,168 @@ public static class Sample06_Benchmarks
     {
         PrintHeader();
 
-        // ═══════════════════════════════════════════════════════════════
-        // STEP 1: Performance Benchmark Demonstration
-        // ═══════════════════════════════════════════════════════════════
-        Console.WriteLine("📝 Step 1: Performance Benchmark Concepts...\n");
-        
-        await DemonstratePerformanceBenchmark();
+        if (!AIConfig.IsConfigured)
+        {
+            PrintMissingCredentialsBox();
+            return;
+        }
 
-        // ═══════════════════════════════════════════════════════════════
-        // STEP 2: Agentic Benchmark Demonstration
-        // ═══════════════════════════════════════════════════════════════
-        Console.WriteLine("\n📝 Step 2: Agentic Benchmark Concepts...\n");
-        
-        await DemonstrateAgenticBenchmark();
+        Console.WriteLine($"   🔗 Endpoint: {AIConfig.Endpoint}");
+        Console.WriteLine($"   🤖 Model: {AIConfig.ModelDeployment}\n");
 
-        // ═══════════════════════════════════════════════════════════════
-        // STEP 3: Show the actual code patterns
-        // ═══════════════════════════════════════════════════════════════
-        Console.WriteLine("\n📝 Step 3: Code patterns for benchmarking...\n");
-        
-        ShowCodePatterns();
+        var agent = CreateAgentWithTools();
+        var harness = new MAFEvaluationHarness(verbose: false);
+        var adapter = new MAFAgentAdapter(agent);
 
-        // ═══════════════════════════════════════════════════════════════
-        // KEY TAKEAWAYS
-        // ═══════════════════════════════════════════════════════════════
+        await RunPerformanceBenchmark(harness, adapter);
+        await RunAgenticBenchmark(harness, adapter);
         PrintKeyTakeaways();
     }
 
-    private static async Task DemonstratePerformanceBenchmark()
+    private static async Task RunPerformanceBenchmark(MAFEvaluationHarness harness, MAFAgentAdapter adapter)
     {
-        // Simulate benchmark results (in real usage, you'd use PerformanceBenchmark class)
+        Console.WriteLine("📊 PART 1: PERFORMANCE BENCHMARK\n");
+
         var prompts = new[]
         {
             "What is 2 + 2?",
-            "Explain quantum computing in one sentence.",
+            "Explain software testing in one sentence.",
             "List three benefits of exercise.",
             "What is the capital of France?",
-            "Summarize the plot of Romeo and Juliet."
+            "Summarize the concept of recursion."
         };
 
-        Console.WriteLine($"   Running {prompts.Length} prompts, 3 iterations each...\n");
-        
-        // Simulate running benchmarks
+        Console.WriteLine($"   Running {prompts.Length} prompts with performance tracking...\n");
+
         var latencies = new List<double>();
-        var random = new Random(42);
-        
-        for (int i = 0; i < prompts.Length * 3; i++)
+        int totalPromptTokens = 0, totalCompletionTokens = 0;
+
+        foreach (var prompt in prompts)
         {
-            await Task.Delay(10); // Simulate work
-            latencies.Add(50 + random.NextDouble() * 100); // 50-150ms
+            var testCase = new TestCase { Name = "Bench", Input = prompt };
+            var sw = Stopwatch.StartNew();
+            var result = await harness.RunEvaluationAsync(adapter, testCase,
+                new EvaluationOptions { TrackPerformance = true });
+            sw.Stop();
+
+            latencies.Add(sw.Elapsed.TotalMilliseconds);
+            if (result.Performance != null)
+            {
+                totalPromptTokens += result.Performance.PromptTokens ?? 0;
+                totalCompletionTokens += result.Performance.CompletionTokens ?? 0;
+            }
+            Console.WriteLine($"      ✅ \"{Truncate(prompt, 40)}\" — {sw.Elapsed.TotalMilliseconds:F0}ms");
         }
 
         latencies.Sort();
-        
-        var totalRuns = latencies.Count;
-        var meanLatency = TimeSpan.FromMilliseconds(latencies.Average());
-        var p50Latency = TimeSpan.FromMilliseconds(latencies[(int)(latencies.Count * 0.50)]);
-        var p90Latency = TimeSpan.FromMilliseconds(latencies[(int)(latencies.Count * 0.90)]);
-        var p99Latency = TimeSpan.FromMilliseconds(latencies[Math.Min(latencies.Count - 1, (int)(latencies.Count * 0.99))]);
-        var totalTokens = 2500;
-        var tokensPerSecond = 312.5;
-        var estimatedCost = 0.0125m;
+        PrintPerformanceResults(latencies, totalPromptTokens, totalCompletionTokens);
+    }
 
-        // Display results
-        Console.WriteLine("   ┌─────────────────────────────────────────────────────────┐");
+    private static void PrintPerformanceResults(List<double> latencies, int promptTokens, int completionTokens)
+    {
+        var mean = latencies.Average();
+        var p50 = Percentile(latencies, 0.50);
+        var p90 = Percentile(latencies, 0.90);
+        var p99 = Percentile(latencies, 0.99);
+
+        Console.WriteLine("\n   ┌─────────────────────────────────────────────────────────┐");
         Console.WriteLine("   │              PERFORMANCE BENCHMARK RESULTS              │");
         Console.WriteLine("   ├─────────────────────────────────────────────────────────┤");
-        Console.WriteLine($"   │  Total Runs:           {totalRuns,30} │");
-        Console.WriteLine($"   │  Mean Latency:         {meanLatency.TotalMilliseconds,27:F1} ms │");
-        Console.WriteLine($"   │  P50 Latency:          {p50Latency.TotalMilliseconds,27:F1} ms │");
-        Console.WriteLine($"   │  P90 Latency:          {p90Latency.TotalMilliseconds,27:F1} ms │");
-        Console.WriteLine($"   │  P99 Latency:          {p99Latency.TotalMilliseconds,27:F1} ms │");
-        Console.WriteLine($"   │  Total Tokens:         {totalTokens,30} │");
-        Console.WriteLine($"   │  Tokens/Second:        {tokensPerSecond,27:F1} t/s │");
-        Console.WriteLine($"   │  Estimated Cost:       ${estimatedCost,28:F4} │");
-        Console.WriteLine("   └─────────────────────────────────────────────────────────┘");
+        Console.WriteLine($"   │  Total Runs:           {latencies.Count,30} │");
+        Console.WriteLine($"   │  Mean Latency:         {mean,27:F1} ms │");
+        Console.WriteLine($"   │  P50 Latency:          {p50,27:F1} ms │");
+        Console.WriteLine($"   │  P90 Latency:          {p90,27:F1} ms │");
+        Console.WriteLine($"   │  P99 Latency:          {p99,27:F1} ms │");
+        Console.WriteLine($"   │  Total Prompt Tokens:  {promptTokens,30} │");
+        Console.WriteLine($"   │  Total Compl. Tokens:  {completionTokens,30} │");
+        Console.WriteLine("   └─────────────────────────────────────────────────────────┘\n");
     }
 
-    private static async Task DemonstrateAgenticBenchmark()
+    private static async Task RunAgenticBenchmark(MAFEvaluationHarness harness, MAFAgentAdapter adapter)
     {
-        // Define test cases
-        var testCases = new[]
+        Console.WriteLine("📊 PART 2: AGENTIC BENCHMARK (Tool Accuracy)\n");
+
+        var testCases = new (string Name, string Prompt, string[] ExpectedTools)[]
         {
-            ("Weather Query", "What's the weather in Seattle?", new[] { "get_weather" }),
-            ("Flight Search", "Find flights from NYC to LA", new[] { "search_flights" }),
-            ("Multi-Step Task", "Book a hotel and check weather in Paris", new[] { "search_hotels", "get_weather" })
+            ("Weather Query", "What is the weather in Seattle?", ["GetWeather"]),
+            ("Math Calculation", "Calculate 15 * 7 + 3", ["Calculate"]),
+            ("Multi-Step", "What is the weather in Paris and also calculate 100 / 4?", ["GetWeather", "Calculate"])
         };
 
-        Console.WriteLine($"   Running {testCases.Length} agentic test cases...\n");
+        int passed = 0;
+        int totalExpected = 0, totalMatched = 0;
 
-        // Simulate running tests
-        await Task.Delay(50);
+        foreach (var (name, prompt, expectedTools) in testCases)
+        {
+            var testCase = new TestCase { Name = name, Input = prompt };
+            var result = await harness.RunEvaluationAsync(adapter, testCase,
+                new EvaluationOptions { TrackPerformance = true });
 
-        var totalTests = 3;
-        var passedTests = 3;
-        var toolSelectionAccuracy = 0.95;
-        var argumentAccuracy = 0.88;
-        var taskCompletionRate = 1.0;
-        var meanToolCalls = 1.67;
+            var actualTools = result.ToolUsage?.Calls?.Select(t => t.Name).ToHashSet() 
+                ?? new HashSet<string>();
 
-        // Display results
-        Console.WriteLine("   ┌─────────────────────────────────────────────────────────┐");
+            int matched = expectedTools.Count(t => actualTools.Contains(t));
+            totalExpected += expectedTools.Length;
+            totalMatched += matched;
+
+            bool allFound = matched == expectedTools.Length;
+            if (allFound) passed++;
+
+            var icon = allFound ? "✅" : "⚠️";
+            Console.WriteLine($"      {icon} {name}: expected [{string.Join(", ", expectedTools)}] → got [{string.Join(", ", actualTools)}]");
+        }
+
+        var accuracy = totalExpected > 0 ? (double)totalMatched / totalExpected * 100 : 0;
+        PrintAgenticResults(testCases.Length, passed, accuracy);
+    }
+
+    private static void PrintAgenticResults(int total, int passed, double accuracy)
+    {
+        Console.WriteLine("\n   ┌─────────────────────────────────────────────────────────┐");
         Console.WriteLine("   │               AGENTIC BENCHMARK RESULTS                 │");
         Console.WriteLine("   ├─────────────────────────────────────────────────────────┤");
-        Console.WriteLine($"   │  Total Tests:          {totalTests,30} │");
-        Console.WriteLine($"   │  Passed:               {passedTests,30} │");
-        Console.WriteLine($"   │  Tool Accuracy:        {toolSelectionAccuracy * 100,27:F1}% │");
-        Console.WriteLine($"   │  Argument Accuracy:    {argumentAccuracy * 100,27:F1}% │");
-        Console.WriteLine($"   │  Task Completion:      {taskCompletionRate * 100,27:F1}% │");
-        Console.WriteLine($"   │  Mean Tool Calls:      {meanToolCalls,27:F1} │");
-        Console.WriteLine("   └─────────────────────────────────────────────────────────┘");
-
-        // Show per-test details
-        Console.WriteLine("\n   📋 Per-Test Results:");
-        foreach (var (name, _, tools) in testCases)
-        {
-            Console.WriteLine($"      ✅ {name}: {tools.Length} tools, ~85ms");
-        }
+        Console.WriteLine($"   │  Total Tests:          {total,30} │");
+        Console.WriteLine($"   │  Passed:               {passed,30} │");
+        Console.WriteLine($"   │  Tool Accuracy:        {accuracy,27:F1}% │");
+        Console.WriteLine("   └─────────────────────────────────────────────────────────┘\n");
     }
 
-    private static void ShowCodePatterns()
+    private static AIAgent CreateAgentWithTools()
     {
-        Console.ForegroundColor = ConsoleColor.Cyan;
-        Console.WriteLine(@"   // ════════════════════════════════════════════════════════════
-   // PERFORMANCE BENCHMARK PATTERN
-   // ════════════════════════════════════════════════════════════
-   
-   var benchmark = new PerformanceBenchmark();
-   var results = await benchmark.RunAsync(
-       chatClient: myClient,
-       prompts: testPrompts,
-       iterations: 10,
-       warmupIterations: 2);
+        var azureClient = new AzureOpenAIClient(AIConfig.Endpoint, AIConfig.KeyCredential);
+        var chatClient = azureClient.GetChatClient(AIConfig.ModelDeployment).AsIChatClient();
 
-   // Access statistical metrics
-   Console.WriteLine($""Mean: {results.MeanLatency}"");
-   Console.WriteLine($""P90:  {results.P90Latency}"");
-   Console.WriteLine($""P99:  {results.P99Latency}"");
-   Console.WriteLine($""Cost: ${results.EstimatedTotalCost}"");
-
-   // ════════════════════════════════════════════════════════════
-   // AGENTIC BENCHMARK PATTERN  
-   // ════════════════════════════════════════════════════════════
-   
-   var benchmark = new AgenticBenchmark();
-   var results = await benchmark.RunAsync(myAgent, testCases);
-
-   // Evaluate tool accuracy
-   Assert.True(results.ToolSelectionAccuracy >= 0.9);
-   Assert.True(results.TaskCompletionRate >= 0.95);
-
-   // ════════════════════════════════════════════════════════════
-   // CI/CD REGRESSION PATTERN
-   // ════════════════════════════════════════════════════════════
-   
-   var current = await benchmark.RunAsync(agent, testCases);
-   var baseline = await LoadBaseline(""benchmark-baseline.json"");
-
-   // Fail if latency regressed more than 20%
-   Assert.True(current.P90Latency <= baseline.P90Latency * 1.2,
-       $""Latency regressed: {current.P90Latency} vs {baseline.P90Latency}"");
-");
-        Console.ResetColor();
+        return new ChatClientAgent(chatClient, new ChatClientAgentOptions
+        {
+            Name = "BenchmarkAgent",
+            Instructions = "You are a helpful assistant. Use the available tools when appropriate to answer questions.",
+            ChatOptions = new ChatOptions
+            {
+                Tools = [AIFunctionFactory.Create(GetWeather), AIFunctionFactory.Create(Calculate)]
+            }
+        });
     }
+
+    [Description("Get the current weather for a city")]
+    private static string GetWeather([Description("City name")] string city)
+    {
+        return $"The weather in {city} is 18°C and partly cloudy.";
+    }
+
+    [Description("Calculate a math expression and return the result")]
+    private static string Calculate([Description("Math expression to evaluate")] string expression)
+    {
+        return $"Result: {expression} = (calculated)";
+    }
+
+    private static double Percentile(List<double> sorted, double p)
+    {
+        int index = Math.Min(sorted.Count - 1, (int)(sorted.Count * p));
+        return sorted[index];
+    }
+
+    private static string Truncate(string text, int max) =>
+        text.Length <= max ? text : text[..max] + "...";
 
     private static void PrintHeader()
     {
@@ -190,44 +200,40 @@ public static class Sample06_Benchmarks
         Console.WriteLine(@"
 ╔═══════════════════════════════════════════════════════════════════════════════╗
 ║                                                                               ║
-║              Sample 06: Performance & Agentic Benchmarks                      ║
-║                                                                               ║
-║   Learn how to:                                                               ║
-║   • Run latency and throughput benchmarks                                     ║
-║   • Measure tool selection accuracy                                           ║
-║   • Get statistical analysis (p50, p90, p99)                                  ║
-║   • Compare benchmark results across runs                                     ║
+║   📊 SAMPLE 06: PERFORMANCE & AGENTIC BENCHMARKS                             ║
+║   Real latency measurement, percentiles, and tool accuracy                    ║
 ║                                                                               ║
 ╚═══════════════════════════════════════════════════════════════════════════════╝
 ");
         Console.ResetColor();
     }
 
-    private static void PrintKeyTakeaways()
+    private static void PrintMissingCredentialsBox()
     {
         Console.ForegroundColor = ConsoleColor.Yellow;
         Console.WriteLine(@"
-┌─────────────────────────────────────────────────────────────────────────────────┐
-│                              🎯 KEY TAKEAWAYS                                   │
-├─────────────────────────────────────────────────────────────────────────────────┤
-│                                                                                 │
-│  1. PerformanceBenchmark measures latency, throughput, and cost                 │
-│     var results = await benchmark.RunAsync(client, prompts, iterations: 10);    │
-│                                                                                 │
-│  2. AgenticBenchmark measures tool accuracy and task completion                 │
-│     var results = await benchmark.RunAsync(agent, testCases);                   │
-│                                                                                 │
-│  3. Statistical analysis provides p50, p90, p99 percentiles                     │
-│     results.P90Latency  // 90th percentile latency                              │
-│                                                                                 │
-│  4. Use benchmarks for:                                                         │
-│     • Baseline establishment before changes                                     │
-│     • Regression detection in CI/CD                                             │
-│     • Model comparison (GPT-4 vs Claude vs Gemini)                              │
-│     • Cost optimization                                                         │
-│                                                                                 │
-└─────────────────────────────────────────────────────────────────────────────────┘
+   ┌─────────────────────────────────────────────────────────────────────────────┐
+   │  ⚠️  SKIPPING SAMPLE 06 - Azure OpenAI Credentials Required               │
+   ├─────────────────────────────────────────────────────────────────────────────┤
+   │  This sample runs real prompts to measure actual latency and tool accuracy. │
+   │                                                                             │
+   │  Set these environment variables:                                           │
+   │    AZURE_OPENAI_ENDPOINT     - Your Azure OpenAI endpoint                   │
+   │    AZURE_OPENAI_API_KEY      - Your API key                                 │
+   │    AZURE_OPENAI_DEPLOYMENT   - Chat model (e.g., gpt-4o)                    │
+   └─────────────────────────────────────────────────────────────────────────────┘
 ");
         Console.ResetColor();
     }
+
+    private static void PrintKeyTakeaways()
+    {
+        Console.WriteLine("💡 KEY TAKEAWAYS:");
+        Console.WriteLine("   • Measure real latency — never fake benchmark data");
+        Console.WriteLine("   • Use p50/p90/p99 percentiles for SLA enforcement");
+        Console.WriteLine("   • Compare expected vs actual tool calls for agentic accuracy");
+        Console.WriteLine("   • Track token usage to estimate and control costs");
+        Console.WriteLine("\n🔗 NEXT: Run Sample 07 to see snapshot testing!\n");
+    }
 }
+

@@ -25,54 +25,46 @@ public static class Sample01_HelloWorld
     {
         PrintHeader();
 
-        // ═══════════════════════════════════════════════════════════════
-        // STEP 1: Create a simple agent
-        // ═══════════════════════════════════════════════════════════════
-        Console.WriteLine("📝 Step 1: Creating a simple greeting agent...\n");
-        
         var agent = CreateGreetingAgent();
-        Console.WriteLine($"   ✓ Agent '{agent.Name}' created\n");
+        PrintStepComplete("Step 1", $"Agent '{agent.Name}' created");
 
-        // ═══════════════════════════════════════════════════════════════
-        // STEP 2: Create a evaluation harness
-        // ═══════════════════════════════════════════════════════════════
-        Console.WriteLine("📝 Step 2: Creating evaluation harness...\n");
-        
-        // Simple harness without AI evaluation (for this hello world)
         var harness = new MAFEvaluationHarness(verbose: true);
-        Console.WriteLine("   ✓ evaluation harness ready\n");
+        PrintStepComplete("Step 2", "Evaluation harness ready");
 
-        // ═══════════════════════════════════════════════════════════════
-        // STEP 3: Define a test case
-        // ═══════════════════════════════════════════════════════════════
-        Console.WriteLine("📝 Step 3: Defining test case...\n");
-        
-        // NOTE: This sample uses ExpectedOutputContains for simple validation.
-        // EvaluationCriteria requires an AI evaluator (IChatClient) to be passed
-        // to MAFEvaluationHarness for AI-powered evaluation. Without an evaluator,
-        // the test passes if the output is non-empty and contains the expected substring.
-        var testCase = new TestCase
+        var testCase = CreateGreetingTestCase();
+        PrintTestCaseDetails(testCase);
+
+        var adapter = new MAFAgentAdapter(agent);
+        var result = await harness.RunEvaluationAsync(adapter, testCase);
+        PrintResults(result);
+        PrintKeyTakeaways();
+    }
+
+    private static TestCase CreateGreetingTestCase()
+    {
+        return new TestCase
         {
             Name = "Greeting Test",
             Input = "Hello, my name is Alice!",
-            ExpectedOutputContains = "Alice"  // Simple substring check (no AI evaluator needed)
+            ExpectedOutputContains = "Alice"
         };
-        
+    }
+
+    private static void PrintStepComplete(string step, string message)
+    {
+        Console.WriteLine($"📝 {step}: {message}\n");
+    }
+
+    private static void PrintTestCaseDetails(TestCase testCase)
+    {
+        Console.WriteLine($"📝 Step 3: Test case defined");
         Console.WriteLine($"   Test: {testCase.Name}");
         Console.WriteLine($"   Input: \"{testCase.Input}\"");
         Console.WriteLine($"   Expected: Output should contain \"{testCase.ExpectedOutputContains}\"\n");
+    }
 
-        // ═══════════════════════════════════════════════════════════════
-        // STEP 4: Run the test
-        // ═══════════════════════════════════════════════════════════════
-        Console.WriteLine("📝 Step 4: Running test...\n");
-        
-        var adapter = new MAFAgentAdapter(agent);
-        var result = await harness.RunEvaluationAsync(adapter, testCase);
-
-        // ═══════════════════════════════════════════════════════════════
-        // STEP 5: Check results
-        // ═══════════════════════════════════════════════════════════════
+    private static void PrintResults(TestResult result)
+    {
         Console.WriteLine("\n📊 RESULTS:");
         Console.WriteLine(new string('─', 60));
         
@@ -98,15 +90,16 @@ public static class Sample01_HelloWorld
         }
 
         Console.WriteLine(new string('─', 60));
-        
-        // ═══════════════════════════════════════════════════════════════
-        // Summary
-        // ═══════════════════════════════════════════════════════════════
+    }
+
+    private static void PrintKeyTakeaways()
+    {
         Console.WriteLine("\n💡 KEY TAKEAWAYS:");
         Console.WriteLine("   • MAFEvaluationHarness is the main entry point for evaluation");
         Console.WriteLine("   • TestCase defines what to evaluate and what to expect");
         Console.WriteLine("   • MAFAgentAdapter wraps MAF agents for evaluation");
         Console.WriteLine("   • TestResult contains pass/fail status, score, and output");
+        Console.WriteLine("   • For AI-judged evaluation, see Sample 05 (RAG) and Sample 17 (Quality Metrics)");
         
         Console.WriteLine("\n🔗 NEXT: Run Sample 02 to see tool tracking in action!\n");
     }
@@ -170,40 +163,41 @@ public static class Sample01_HelloWorld
             return text;
         return text[..maxLength] + "...";
     }
-}
 
-/// <summary>
-/// Simple mock chat client for demos without Azure credentials.
-/// </summary>
-internal class MockChatClient : IChatClient
-{
-    private readonly string _response;
-
-    public MockChatClient(string response)
+    /// <summary>
+    /// Simple mock chat client for tutorial demos without Azure credentials.
+    /// Private to Sample01 to avoid naming collisions.
+    /// </summary>
+    private class MockChatClient : IChatClient
     {
-        _response = response;
+        private readonly string _response;
+
+        public MockChatClient(string response)
+        {
+            _response = response;
+        }
+
+        public ChatClientMetadata Metadata => new("MockChatClient");
+
+        public Task<ChatResponse> GetResponseAsync(
+            IEnumerable<ChatMessage> chatMessages,
+            ChatOptions? options = null,
+            CancellationToken cancellationToken = default)
+        {
+            var message = new ChatMessage(ChatRole.Assistant, _response);
+            return Task.FromResult(new ChatResponse(message));
+        }
+
+        public IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(
+            IEnumerable<ChatMessage> chatMessages,
+            ChatOptions? options = null,
+            CancellationToken cancellationToken = default)
+        {
+            throw new NotImplementedException("Streaming not implemented in mock");
+        }
+
+        public object? GetService(Type serviceType, object? key = null) => null;
+
+        public void Dispose() { }
     }
-
-    public ChatClientMetadata Metadata => new("MockChatClient");
-
-    public Task<ChatResponse> GetResponseAsync(
-        IEnumerable<ChatMessage> chatMessages,
-        ChatOptions? options = null,
-        CancellationToken cancellationToken = default)
-    {
-        var message = new ChatMessage(ChatRole.Assistant, _response);
-        return Task.FromResult(new ChatResponse(message));
-    }
-
-    public IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(
-        IEnumerable<ChatMessage> chatMessages,
-        ChatOptions? options = null,
-        CancellationToken cancellationToken = default)
-    {
-        throw new NotImplementedException("Streaming not implemented in mock");
-    }
-
-    public object? GetService(Type serviceType, object? key = null) => null;
-    
-    public void Dispose() { }
 }

@@ -26,9 +26,6 @@ public static class Sample17_QualitySafetyMetrics
     {
         PrintHeader();
 
-        // ═══════════════════════════════════════════════════════════════
-        // Understanding Quality &amp; Safety Metrics
-        // ═══════════════════════════════════════════════════════════════
         Console.WriteLine(@"
    📖 QUALITY & SAFETY METRICS EXPLAINED
    
@@ -96,12 +93,7 @@ public static class Sample17_QualitySafetyMetrics
             return;
         }
 
-        // ═══════════════════════════════════════════════════════════════
-        // PART 1: GroundednessMetric - Detecting Fabricated Content
-        // ═══════════════════════════════════════════════════════════════
-        Console.WriteLine("═══════════════════════════════════════════════════════════════");
-        Console.WriteLine("📝 PART 1: GROUNDEDNESS METRIC (Safety)");
-        Console.WriteLine("═══════════════════════════════════════════════════════════════\n");
+        Console.WriteLine("📝 PART 1: GROUNDEDNESS METRIC (Safety)\n");
 
         var groundednessMetric = new GroundednessMetric(evaluatorClient);
         Console.WriteLine($"   Metric: {groundednessMetric.Name}");
@@ -159,12 +151,7 @@ public static class Sample17_QualitySafetyMetrics
         var result2 = await groundednessMetric.EvaluateAsync(fabricatedContext);
         PrintMetricResult(result2, "Fabricated Response", expectFail: true);
 
-        // ═══════════════════════════════════════════════════════════════
-        // PART 2: CoherenceMetric - Logical Flow & Consistency
-        // ═══════════════════════════════════════════════════════════════
-        Console.WriteLine("\n═══════════════════════════════════════════════════════════════");
-        Console.WriteLine("📝 PART 2: COHERENCE METRIC (Quality)");
-        Console.WriteLine("═══════════════════════════════════════════════════════════════\n");
+        Console.WriteLine("\n📝 PART 2: COHERENCE METRIC (Quality)\n");
 
         var coherenceMetric = new CoherenceMetric(evaluatorClient);
         Console.WriteLine($"   Metric: {coherenceMetric.Name}");
@@ -214,12 +201,7 @@ public static class Sample17_QualitySafetyMetrics
         var result4 = await coherenceMetric.EvaluateAsync(contradictoryContext);
         PrintMetricResult(result4, "Contradictory Response", expectFail: true);
 
-        // ═══════════════════════════════════════════════════════════════
-        // PART 3: FluencyMetric - Grammar & Readability
-        // ═══════════════════════════════════════════════════════════════
-        Console.WriteLine("\n═══════════════════════════════════════════════════════════════");
-        Console.WriteLine("📝 PART 3: FLUENCY METRIC (Quality)");
-        Console.WriteLine("═══════════════════════════════════════════════════════════════\n");
+        Console.WriteLine("\n📝 PART 3: FLUENCY METRIC (Quality)\n");
 
         var fluencyMetric = new FluencyMetric(evaluatorClient);
         Console.WriteLine($"   Metric: {fluencyMetric.Name}");
@@ -266,12 +248,7 @@ public static class Sample17_QualitySafetyMetrics
         var result6 = await fluencyMetric.EvaluateAsync(poorFluencyContext);
         PrintMetricResult(result6, "Poor Fluency Response", expectFail: true);
 
-        // ═══════════════════════════════════════════════════════════════
-        // Summary: When to Use Each Metric
-        // ═══════════════════════════════════════════════════════════════
-        Console.WriteLine("\n═══════════════════════════════════════════════════════════════");
-        Console.WriteLine("📊 METRIC SELECTION GUIDE");
-        Console.WriteLine("═══════════════════════════════════════════════════════════════");
+        Console.WriteLine("\n📝 METRIC SELECTION GUIDE\n");
         Console.WriteLine(@"
    ┌───────────────────────────────────────────────────────────────────────┐
    │  USE THIS METRIC    │ WHEN YOU WANT TO CHECK                         │

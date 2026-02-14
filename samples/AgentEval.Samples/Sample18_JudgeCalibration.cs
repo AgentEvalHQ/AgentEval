@@ -27,9 +27,6 @@ public static class Sample18_JudgeCalibration
     {
         PrintHeader();
         
-        // ═══════════════════════════════════════════════════════════════
-        // STEP 1: Why Calibrated Judges?
-        // ═══════════════════════════════════════════════════════════════
         Console.WriteLine("📝 Step 1: Why use CalibratedJudge?\n");
         
         Console.WriteLine(@"   LLM-as-judge evaluations have inherent variance:
@@ -75,19 +72,22 @@ public static class Sample18_JudgeCalibration
             return;
         }
 
-        // ═══════════════════════════════════════════════════════════════
-        // STEP 2: Create Real Judges Using Azure OpenAI
-        // ═══════════════════════════════════════════════════════════════
         Console.WriteLine("📝 Step 2: Creating real LLM judges using Azure OpenAI...\n");
         
-        // Create 3 independent client instances for parallel judge execution
-        // Note: In production, you might use different models (GPT-4o, Claude, Gemini)
-        // Here we use the same model 3 times to demonstrate variance within one model
         var azureClient = new AzureOpenAIClient(AIConfig.Endpoint, AIConfig.KeyCredential);
         
-        var judge1Client = azureClient.GetChatClient(AIConfig.ModelDeployment).AsIChatClient();
-        var judge2Client = azureClient.GetChatClient(AIConfig.ModelDeployment).AsIChatClient();
-        var judge3Client = azureClient.GetChatClient(AIConfig.ModelDeployment).AsIChatClient();
+        // Use different models when available, same model otherwise
+        var model1 = AIConfig.ModelDeployment;
+        var model2 = !string.IsNullOrEmpty(AIConfig.SecondaryModelDeployment) && 
+                     AIConfig.SecondaryModelDeployment != model1 
+            ? AIConfig.SecondaryModelDeployment : model1;
+        var model3 = !string.IsNullOrEmpty(AIConfig.TertiaryModelDeployment) && 
+                     AIConfig.TertiaryModelDeployment != model1 
+            ? AIConfig.TertiaryModelDeployment : model1;
+        
+        var judge1Client = azureClient.GetChatClient(model1).AsIChatClient();
+        var judge2Client = azureClient.GetChatClient(model2).AsIChatClient();
+        var judge3Client = azureClient.GetChatClient(model3).AsIChatClient();
         
         // Create named judge dictionary for the factory pattern
         var judges = new Dictionary<string, IChatClient>
@@ -97,14 +97,14 @@ public static class Sample18_JudgeCalibration
             ["Judge-C"] = judge3Client
         };
         
-        Console.WriteLine($"   ✓ Judge-A ({AIConfig.ModelDeployment})");
-        Console.WriteLine($"   ✓ Judge-B ({AIConfig.ModelDeployment})");
-        Console.WriteLine($"   ✓ Judge-C ({AIConfig.ModelDeployment})");
-        Console.WriteLine("   💡 Using same model 3x to demonstrate score variance\n");
+        Console.WriteLine($"   ✓ Judge-A ({model1})");
+        Console.WriteLine($"   ✓ Judge-B ({model2})");
+        Console.WriteLine($"   ✓ Judge-C ({model3})");
+        if (model1 == model2 && model2 == model3)
+            Console.WriteLine("   💡 Using same model 3x to demonstrate score variance from LLM non-determinism\n");
+        else
+            Console.WriteLine("   💡 Using different models for cross-model consensus\n");
 
-        // ═══════════════════════════════════════════════════════════════
-        // STEP 3: Create CalibratedJudge with Median Strategy
-        // ═══════════════════════════════════════════════════════════════
         Console.WriteLine("📝 Step 3: Creating CalibratedJudge with Median voting...\n");
         
         var calibratedJudge = CalibratedJudge.Create(
@@ -117,9 +117,6 @@ public static class Sample18_JudgeCalibration
         Console.WriteLine($"   Max Parallel: {calibratedJudge.Options.MaxParallelJudges}");
         Console.WriteLine($"   Timeout: {calibratedJudge.Options.Timeout.TotalSeconds}s\n");
 
-        // ═══════════════════════════════════════════════════════════════
-        // STEP 4: Run Calibrated Evaluation
-        // ═══════════════════════════════════════════════════════════════
         Console.WriteLine("📝 Step 4: Running calibrated evaluation...\n");
         
         var context = new EvaluationContext
@@ -158,9 +155,6 @@ public static class Sample18_JudgeCalibration
         }
         Console.WriteLine();
 
-        // ═══════════════════════════════════════════════════════════════
-        // STEP 5: Different Voting Strategies
-        // ═══════════════════════════════════════════════════════════════
         Console.WriteLine("📝 Step 5: Comparing voting strategies...\n");
         
         // Mean strategy
@@ -201,9 +195,6 @@ public static class Sample18_JudgeCalibration
         }
         Console.WriteLine("   └─────────────┴─────────┴───────────┘\n");
 
-        // ═══════════════════════════════════════════════════════════════
-        // STEP 6: Weighted Strategy
-        // ═══════════════════════════════════════════════════════════════
         Console.WriteLine("📝 Step 6: Weighted voting (trust Judge-A more)...\n");
         
         var weightedJudge = new CalibratedJudge(
@@ -225,9 +216,6 @@ public static class Sample18_JudgeCalibration
         Console.WriteLine("   Weights: Judge-A=2.0, Judge-B=1.0, Judge-C=1.0");
         Console.WriteLine($"   (Biased toward Judge-A's score of {result.JudgeScores["Judge-A"]:F1})\n");
 
-        // ═══════════════════════════════════════════════════════════════
-        // STEP 7: Real-World Usage Pattern
-        // ═══════════════════════════════════════════════════════════════
         Console.WriteLine("📝 Step 7: Real-world usage pattern...\n");
         
         ShowCodeExample();

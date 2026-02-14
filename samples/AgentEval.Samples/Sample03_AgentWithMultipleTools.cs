@@ -329,80 +329,88 @@ public static class Sample03_AgentWithMultipleTools
 ");
         Console.ResetColor();
     }
-}
 
-/// <summary>
-/// Mock chat client for multi-tool demo without Azure.
-/// </summary>
-internal class MockResearchChatClient : IChatClient
-{
-    private int _callCount = 0;
-
-    public ChatClientMetadata Metadata => new("MockResearchClient");
-
-    public Task<ChatResponse> GetResponseAsync(
-        IEnumerable<ChatMessage> chatMessages,
-        ChatOptions? options = null,
-        CancellationToken cancellationToken = default)
+    /// <summary>
+    /// Mock chat client for multi-tool tutorial demo without Azure.
+    /// Private to Sample03 to avoid naming collisions.
+    /// </summary>
+    private class MockResearchChatClient : IChatClient
     {
-        _callCount++;
-        
-        // Call 1: SearchTool
-        if (_callCount == 1)
+        private int _callCount = 0;
+
+        public ChatClientMetadata Metadata => new("MockResearchClient");
+
+        public Task<ChatResponse> GetResponseAsync(
+            IEnumerable<ChatMessage> chatMessages,
+            ChatOptions? options = null,
+            CancellationToken cancellationToken = default)
         {
-            var toolCall = new FunctionCallContent("call_1", "SearchTool", 
-                new Dictionary<string, object?> { ["query"] = "renewable energy benefits" });
-            var message = new ChatMessage(ChatRole.Assistant, [toolCall]);
-            return Task.FromResult(new ChatResponse(message) { FinishReason = ChatFinishReason.ToolCalls });
-        }
-        
-        // Call 2: SummarizeTool
-        if (_callCount == 2)
-        {
-            var toolCall = new FunctionCallContent("call_2", "SummarizeTool", 
-                new Dictionary<string, object?> { ["content"] = "Renewable energy info..." });
-            var message = new ChatMessage(ChatRole.Assistant, [toolCall]);
-            return Task.FromResult(new ChatResponse(message) { FinishReason = ChatFinishReason.ToolCalls });
-        }
-        
-        // Call 3: Final response
-        var response = new ChatMessage(ChatRole.Assistant, """
-            Based on my research, renewable energy offers significant benefits including:
-            - **Environmental**: Reduced carbon emissions and pollution
-            - **Economic**: Lower long-term energy costs and job creation
-            - **Health**: Cleaner air and water for communities
+            _callCount++;
             
-            Solar and wind are the fastest-growing renewable sources globally.
-            """);
-        return Task.FromResult(new ChatResponse(response));
-    }
-
-    public async IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(
-        IEnumerable<ChatMessage> chatMessages,
-        ChatOptions? options = null,
-        [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
-    {
-        // For mock mode, just call non-streaming and yield as single update
-        var response = await GetResponseAsync(chatMessages, options, cancellationToken);
-        var update = new ChatResponseUpdate
-        {
-            Role = response.Messages.LastOrDefault()?.Role ?? ChatRole.Assistant,
-            FinishReason = response.FinishReason
-        };
-        
-        // Add content or tool calls from the response
-        var lastMessage = response.Messages.LastOrDefault();
-        if (lastMessage?.Contents != null)
-        {
-            foreach (var content in lastMessage.Contents)
+            if (_callCount == 1)
             {
-                update.Contents.Add(content);
+                var toolCall = new FunctionCallContent("call_1", "SearchTool", 
+                    new Dictionary<string, object?> { ["query"] = "renewable energy benefits" });
+                var message = new ChatMessage(ChatRole.Assistant, [toolCall]);
+                return Task.FromResult(new ChatResponse(message) { FinishReason = ChatFinishReason.ToolCalls });
+            }
+            
+            if (_callCount == 2)
+            {
+                var toolCall = new FunctionCallContent("call_2", "SummarizeTool", 
+                    new Dictionary<string, object?> { ["content"] = "Renewable energy info..." });
+                var message = new ChatMessage(ChatRole.Assistant, [toolCall]);
+                return Task.FromResult(new ChatResponse(message) { FinishReason = ChatFinishReason.ToolCalls });
+            }
+            
+            var response = new ChatMessage(ChatRole.Assistant, """
+                Based on my research, renewable energy offers significant benefits including:
+                - **Environmental**: Reduced carbon emissions and pollution
+                - **Economic**: Lower long-term energy costs and job creation
+                - **Health**: Cleaner air and water for communities
+                
+                Solar and wind are the fastest-growing renewable sources globally.
+                """);
+            return Task.FromResult(new ChatResponse(response));
+        }
+
+        public async IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(
+            IEnumerable<ChatMessage> chatMessages,
+            ChatOptions? options = null,
+            [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
+        {
+            _callCount++;
+
+            if (_callCount <= 2)
+            {
+                await Task.Delay(100, cancellationToken);
+                var toolName = _callCount == 1 ? "SearchTool" : "SummarizeTool";
+                var args = _callCount == 1
+                    ? new Dictionary<string, object?> { ["query"] = "renewable energy benefits" }
+                    : new Dictionary<string, object?> { ["content"] = "Renewable energy info..." };
+                
+                yield return new ChatResponseUpdate
+                {
+                    Role = ChatRole.Assistant,
+                    Contents = [new FunctionCallContent($"call_{_callCount}", toolName, args)],
+                    FinishReason = ChatFinishReason.ToolCalls
+                };
+                yield break;
+            }
+
+            var words = "Based on my research, renewable energy offers significant benefits.".Split(' ');
+            foreach (var word in words)
+            {
+                await Task.Delay(50, cancellationToken);
+                yield return new ChatResponseUpdate
+                {
+                    Role = ChatRole.Assistant,
+                    Contents = [new TextContent(word + " ")]
+                };
             }
         }
-        
-        yield return update;
-    }
 
-    public object? GetService(Type serviceType, object? key = null) => null;
-    public void Dispose() { }
+        public object? GetService(Type serviceType, object? key = null) => null;
+        public void Dispose() { }
+    }
 }

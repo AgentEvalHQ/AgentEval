@@ -2,10 +2,13 @@
 // Licensed under the MIT License.
 
 using System.Text.Json;
+using Azure.AI.OpenAI;
+using Microsoft.Agents.AI;
+using Microsoft.Extensions.AI;
 using AgentEval.Core;
+using AgentEval.MAF;
 using AgentEval.Models;
 using AgentEval.Tracing;
-using Microsoft.Extensions.AI;
 
 namespace AgentEval.Samples;
 
@@ -21,276 +24,207 @@ namespace AgentEval.Samples;
 /// - Workflow trace recording and replay
 /// - Streaming with timing preservation
 /// - Trace serialization to JSON files
+/// 
+/// Requires: AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_API_KEY, AZURE_OPENAI_DEPLOYMENT
+/// ⏱️ Time to understand: 10 minutes
 /// </summary>
 public static class Sample13_TraceRecordReplay
 {
     public static async Task RunAsync()
     {
-        Console.WriteLine("\n╔══════════════════════════════════════════════════════════════╗");
-        Console.WriteLine("║           SAMPLE 13: TRACE RECORD & REPLAY                   ║");
-        Console.WriteLine("╚══════════════════════════════════════════════════════════════╝\n");
+        PrintHeader();
+
+        if (!AIConfig.IsConfigured)
+        {
+            PrintMissingCredentialsBox();
+            return;
+        }
+
+        Console.WriteLine($"   🔗 Endpoint: {AIConfig.Endpoint}");
+        Console.WriteLine($"   🤖 Model: {AIConfig.ModelDeployment}\n");
 
         await DemoSingleAgentRecordReplay();
         await DemoMultiTurnChatRecordReplay();
-        await DemoWorkflowRecordReplay();
-        await DemoStreamingRecordReplay();
+        await DemoWorkflowTraceReplay();
+        await DemoStreamingTraceReplay();
 
-        Console.WriteLine("\n✅ Sample 13 complete!\n");
+        PrintKeyTakeaways();
     }
 
     /// <summary>
-    /// Demo 1: Single Agent Record &amp; Replay
-    /// Record a single agent invocation and replay it without calling the AI.
+    /// Demo 1: Record a real agent call, save to file, then replay from the saved trace.
     /// </summary>
     private static async Task DemoSingleAgentRecordReplay()
     {
         Console.WriteLine("┌─────────────────────────────────────────────────────────────┐");
-        Console.WriteLine("│ Demo 1: Single Agent Record & Replay                        │");
+        Console.WriteLine("│ Demo 1: Single Agent Record & Replay (REAL)                 │");
         Console.WriteLine("└─────────────────────────────────────────────────────────────┘\n");
 
-        // Create a mock agent that simulates tool calls
-        var mockAgent = new MockToolAgent();
+        var agent = CreateAgent();
 
         // Step 1: RECORD the execution
-        Console.WriteLine("📼 RECORDING execution...\n");
-        
-        await using (var recorder = new TraceRecordingAgent(mockAgent, "weather_query"))
+        Console.WriteLine("📼 RECORDING real agent execution...\n");
+
+        AgentTrace recordedTrace;
+        await using (var recorder = new TraceRecordingAgent(agent, "weather_query"))
         {
-            var response = await recorder.InvokeAsync("What's the weather in Seattle?");
-            
-            Console.WriteLine($"   Prompt: What's the weather in Seattle?");
-            Console.WriteLine($"   Response: {response.Text}");
-            Console.WriteLine($"   Tool calls recorded: {recorder.Trace.Entries.Count(e => e.ToolCalls?.Count > 0)}");
-            
-            // Save trace to file
-            var traceJson = await recorder.ToJsonAsync();
-            Console.WriteLine($"\n   📁 Trace saved ({traceJson.Length} bytes)");
+            var response = await recorder.InvokeAsync("What is the capital of Japan and what is it known for?");
+
+            Console.WriteLine($"   Prompt: What is the capital of Japan?");
+            Console.WriteLine($"   Response: {response.Text[..Math.Min(100, response.Text.Length)]}...");
+            Console.WriteLine($"   Entries recorded: {recorder.Trace.Entries.Count}");
+
+            recordedTrace = recorder.Trace;
         }
 
-        // Step 2: REPLAY the execution (no AI calls!)
-        Console.WriteLine("\n▶️  REPLAYING execution (no AI service calls)...\n");
-        
-        // Create trace for replay
-        var replayTrace = new AgentTrace
-        {
-            TraceName = "weather_query_replay",
-            AgentName = "MockToolAgent",
-            Entries = new List<TraceEntry>
-            {
-                new() { Type = TraceEntryType.Request, Index = 0, Prompt = "What's the weather in Seattle?" },
-                new() 
-                { 
-                    Type = TraceEntryType.Response, 
-                    Index = 0, 
-                    Text = "The weather in Seattle is 58°F with light rain.",
-                    ToolCalls = new List<TraceToolCall>
-                    {
-                        new() { Name = "GetWeather", Arguments = "{\"location\":\"Seattle\"}", Result = "58°F, light rain", Succeeded = true }
-                    }
-                }
-            }
-        };
+        // Save trace to file
+        var tracePath = Path.Combine(Path.GetTempPath(), "agenteval_sample13_trace.json");
+        await TraceSerializer.SaveToFileAsync(recordedTrace, tracePath);
+        var traceJson = await TraceSerializer.SerializeToStringAsync(recordedTrace);
+        Console.WriteLine($"\n   💾 Trace saved to: {tracePath} ({traceJson.Length} bytes)");
 
-        var replayer = new TraceReplayingAgent(replayTrace);
-        var replayedResponse = await replayer.InvokeAsync("What's the weather in Seattle?");
+        // Step 2: REPLAY from the SAME recorded trace (no AI calls!)
+        Console.WriteLine("\n▶️  REPLAYING from saved trace (no AI service calls)...\n");
 
-        Console.WriteLine($"   Prompt: What's the weather in Seattle?");
-        Console.WriteLine($"   Replayed Response: {replayedResponse.Text}");
+        var loadedTrace = await TraceSerializer.LoadFromFileAsync(tracePath);
+        var replayer = new TraceReplayingAgent(loadedTrace);
+        var replayedResponse = await replayer.InvokeAsync("What is the capital of Japan and what is it known for?");
+
+        Console.WriteLine($"   Replayed Response: {replayedResponse.Text[..Math.Min(100, replayedResponse.Text.Length)]}...");
         Console.WriteLine($"   Current replay index: {replayer.CurrentIndex} of {replayer.TotalPairs}");
-
-        Console.WriteLine("\n   ✓ Same result without calling AI service!\n");
+        Console.WriteLine("\n   ✓ Same result replayed from saved file — zero AI calls!\n");
     }
 
     /// <summary>
-    /// Demo 2: Multi-Turn Chat Record &amp; Replay
-    /// Record a conversation and replay it for evaluation.
+    /// Demo 2: Record a multi-turn chat conversation and replay it.
     /// </summary>
     private static async Task DemoMultiTurnChatRecordReplay()
     {
         Console.WriteLine("┌─────────────────────────────────────────────────────────────┐");
-        Console.WriteLine("│ Demo 2: Multi-Turn Chat Record & Replay                     │");
+        Console.WriteLine("│ Demo 2: Multi-Turn Chat Record & Replay (REAL)              │");
         Console.WriteLine("└─────────────────────────────────────────────────────────────┘\n");
 
-        var mockAgent = new MockToolAgent();
+        var agent = CreateAgent();
 
         // Step 1: RECORD the conversation
         Console.WriteLine("📼 RECORDING multi-turn conversation...\n");
 
-        await using var recorder = new ChatTraceRecorder(mockAgent, "travel_planning");
-        
-        // Turn 1
-        var response1 = await recorder.AddUserTurnAsync("I want to plan a trip to Paris");
-        Console.WriteLine($"   User: I want to plan a trip to Paris");
-        Console.WriteLine($"   Agent: {response1}\n");
+        await using var recorder = new ChatTraceRecorder(agent, "travel_chat");
 
-        // Turn 2
-        var response2 = await recorder.AddUserTurnAsync("What hotels do you recommend?");
-        Console.WriteLine($"   User: What hotels do you recommend?");
-        Console.WriteLine($"   Agent: {response2}\n");
+        var response1 = await recorder.AddUserTurnAsync("I want to visit Rome. What should I see?");
+        Console.WriteLine($"   User: I want to visit Rome. What should I see?");
+        Console.WriteLine($"   Agent: {Truncate(response1, 80)}\n");
 
-        // Turn 3
-        var response3 = await recorder.AddUserTurnAsync("Book the first one please");
-        Console.WriteLine($"   User: Book the first one please");
-        Console.WriteLine($"   Agent: {response3}\n");
+        var response2 = await recorder.AddUserTurnAsync("What about food recommendations?");
+        Console.WriteLine($"   User: What about food recommendations?");
+        Console.WriteLine($"   Agent: {Truncate(response2, 80)}\n");
 
-        // Get the chat result
         var chatResult = recorder.GetResult();
         Console.WriteLine($"   📊 Recorded {chatResult.TotalTurnCount} turns");
-        Console.WriteLine($"   📊 Total tokens: {chatResult.AggregatePerformance?.TotalTokens ?? 0}");
 
-        // Convert to AgentTrace for replay
+        // Save trace to file
         var trace = recorder.ToAgentTrace();
-        Console.WriteLine($"   📁 Trace has {trace.Entries.Count} entries\n");
+        var chatTracePath = Path.Combine(Path.GetTempPath(), "agenteval_sample13_chat_trace.json");
+        await TraceSerializer.SaveToFileAsync(trace, chatTracePath);
+        var chatJson = await TraceSerializer.SerializeToStringAsync(trace);
+        Console.WriteLine($"   💾 Chat trace saved to: {chatTracePath} ({chatJson.Length} bytes)\n");
 
         // Step 2: REPLAY for verification
-        Console.WriteLine("▶️  Replaying conversation for evaluation...\n");
-        
-        var chatReplayer = new TraceReplayingAgent(trace);
-        
-        // Replay each turn
-        var r1 = await chatReplayer.InvokeAsync("I want to plan a trip to Paris");
-        Console.WriteLine($"   Replay turn 1: {r1.Text[..Math.Min(50, r1.Text.Length)]}...");
-        
-        var r2 = await chatReplayer.InvokeAsync("What hotels do you recommend?");
-        Console.WriteLine($"   Replay turn 2: {r2.Text[..Math.Min(50, r2.Text.Length)]}...");
-        
-        var r3 = await chatReplayer.InvokeAsync("Book the first one please");
-        Console.WriteLine($"   Replay turn 3: {r3.Text[..Math.Min(50, r3.Text.Length)]}...");
+        Console.WriteLine("▶️  Replaying conversation from saved trace...\n");
 
-        Console.WriteLine("\n   ✓ Multi-turn conversation replayed successfully!\n");
+        var loadedChatTrace = await TraceSerializer.LoadFromFileAsync(chatTracePath);
+        var chatReplayer = new TraceReplayingAgent(loadedChatTrace);
+
+        var r1 = await chatReplayer.InvokeAsync("I want to visit Rome. What should I see?");
+        Console.WriteLine($"   Replay turn 1: {Truncate(r1.Text, 60)}");
+
+        var r2 = await chatReplayer.InvokeAsync("What about food recommendations?");
+        Console.WriteLine($"   Replay turn 2: {Truncate(r2.Text, 60)}");
+
+        Console.WriteLine("\n   ✓ Multi-turn conversation replayed from file!\n");
     }
 
     /// <summary>
-    /// Demo 3: Workflow Record &amp; Replay
-    /// Record a multi-step workflow and replay it.
+    /// Demo 3: Construct and replay a workflow trace (replay API demonstration).
     /// </summary>
-    private static async Task DemoWorkflowRecordReplay()
+    private static async Task DemoWorkflowTraceReplay()
     {
         Console.WriteLine("┌─────────────────────────────────────────────────────────────┐");
-        Console.WriteLine("│ Demo 3: Workflow Record & Replay                            │");
+        Console.WriteLine("│ Demo 3: Workflow Trace Replay                               │");
         Console.WriteLine("└─────────────────────────────────────────────────────────────┘\n");
 
-        var mockWorkflow = new MockWorkflowAgent();
+        Console.WriteLine("   Demonstrating workflow trace construction and replay...\n");
 
-        // Step 1: RECORD the workflow execution
-        Console.WriteLine("📼 RECORDING workflow execution...\n");
-
-        await using (var recorder = new WorkflowTraceRecorder(mockWorkflow, "research_workflow"))
+        var workflowTrace = new WorkflowTrace
         {
-            var result = await recorder.ExecuteWorkflowAsync("Research the best practices for AI testing");
-
-            Console.WriteLine($"   Prompt: Research the best practices for AI testing");
-            Console.WriteLine($"   Final Output: {result.FinalOutput[..Math.Min(60, result.FinalOutput.Length)]}...");
-            Console.WriteLine($"   Steps recorded: {result.Steps.Count}");
-
-            foreach (var step in result.Steps)
-            {
-                Console.WriteLine($"     • {step.ExecutorId}: {step.Output?[..Math.Min(40, step.Output?.Length ?? 0)]}...");
-            }
-
-            // Show trace summary
-            var trace = recorder.Trace;
-            Console.WriteLine($"\n   📊 Trace Performance:");
-            Console.WriteLine($"      Total duration: {trace.Performance?.TotalDurationMs}ms");
-            Console.WriteLine($"      Total tokens: {trace.Performance?.TotalTokens}");
-            Console.WriteLine($"      Tool calls: {trace.Performance?.TotalToolCalls}");
-        }
-
-        // Step 2: REPLAY the workflow
-        Console.WriteLine("\n▶️  REPLAYING workflow...\n");
-
-        // Create a trace for replay
-        var replayTrace = new WorkflowTrace
-        {
-            TraceName = "research_workflow_replay",
-            OriginalPrompt = "Research the best practices for AI testing",
-            FinalOutput = "Here are the best practices for AI testing: 1) Use deterministic tests where possible, 2) Record and replay for consistency, 3) Measure tool call accuracy.",
+            TraceName = "content_pipeline",
+            OriginalPrompt = "Write a short article about AI testing",
+            FinalOutput = "AI testing involves validating agent behavior through deterministic traces, tool accuracy checks, and response quality metrics.",
             Steps = new List<WorkflowTraceStep>
             {
-                new() 
-                { 
-                    ExecutorId = "researcher",
-                    ExecutorName = "Research Agent",
-                    Input = "Research AI testing",
-                    Output = "Found 10 articles on AI testing best practices",
+                new()
+                {
+                    ExecutorId = "planner",
+                    ExecutorName = "Planner Agent",
+                    Input = "Write a short article about AI testing",
+                    Output = "Outline: 1) Intro to AI testing, 2) Trace-based testing, 3) Metrics",
                     StepIndex = 0,
-                    DurationMs = 500,
-                    ToolCalls = new List<TraceToolCall>
-                    {
-                        new() { Name = "WebSearch", Result = "10 results", Succeeded = true }
-                    }
+                    DurationMs = 500
                 },
                 new()
                 {
-                    ExecutorId = "summarizer",
-                    ExecutorName = "Summarizer Agent",
-                    Input = "Summarize findings",
-                    Output = "Key practices: deterministic tests, record/replay, tool accuracy",
+                    ExecutorId = "writer",
+                    ExecutorName = "Writer Agent",
+                    Input = "Expand outline into article",
+                    Output = "AI testing involves validating agent behavior through deterministic traces, tool accuracy checks, and response quality metrics.",
                     StepIndex = 1,
-                    DurationMs = 300
+                    DurationMs = 800
                 }
             },
             Performance = new WorkflowTracePerformance
             {
-                TotalDurationMs = 800,
+                TotalDurationMs = 1300,
                 StepCount = 2,
-                TotalToolCalls = 1,
-                TotalPromptTokens = 300,
-                TotalCompletionTokens = 200
+                TotalToolCalls = 0,
+                TotalPromptTokens = 200,
+                TotalCompletionTokens = 150
             }
         };
 
-        var workflowReplayer = new WorkflowTraceReplayingAgent(replayTrace);
-        var replayedResult = await workflowReplayer.ExecuteWorkflowAsync("Research the best practices for AI testing");
+        // Save workflow trace
+        var workflowPath = Path.Combine(Path.GetTempPath(), "agenteval_sample13_workflow_trace.json");
+        var workflowJson = JsonSerializer.Serialize(workflowTrace, new JsonSerializerOptions { WriteIndented = true });
+        await File.WriteAllTextAsync(workflowPath, workflowJson);
+        Console.WriteLine($"   💾 Workflow trace saved to: {workflowPath}");
 
-        Console.WriteLine($"   Replayed {replayedResult.Steps.Count} steps:");
-        foreach (var step in replayedResult.Steps)
+        // Replay
+        var replayer = new WorkflowTraceReplayingAgent(workflowTrace);
+        var result = await replayer.ExecuteWorkflowAsync("Write a short article about AI testing");
+
+        Console.WriteLine($"\n   Replayed {result.Steps.Count} steps:");
+        foreach (var step in result.Steps)
         {
-            Console.WriteLine($"     • {step.ExecutorId}: {step.Output?[..Math.Min(50, step.Output?.Length ?? 0)]}...");
+            Console.WriteLine($"     • {step.ExecutorId}: {Truncate(step.Output ?? "", 60)}");
         }
-        Console.WriteLine($"   Final: {replayedResult.FinalOutput[..Math.Min(60, replayedResult.FinalOutput.Length)]}...");
-
-        Console.WriteLine("\n   ✓ Workflow replayed successfully!\n");
+        Console.WriteLine($"   Final: {Truncate(result.FinalOutput, 80)}");
+        Console.WriteLine("\n   ✓ Workflow replayed from trace!\n");
     }
 
     /// <summary>
-    /// Demo 4: Streaming Record &amp; Replay
-    /// Record streaming responses with chunk timing and replay them.
+    /// Demo 4: Construct and replay a streaming trace with timing.
     /// </summary>
-    private static async Task DemoStreamingRecordReplay()
+    private static async Task DemoStreamingTraceReplay()
     {
         Console.WriteLine("┌─────────────────────────────────────────────────────────────┐");
-        Console.WriteLine("│ Demo 4: Streaming Record & Replay                           │");
+        Console.WriteLine("│ Demo 4: Streaming Trace Replay                              │");
         Console.WriteLine("└─────────────────────────────────────────────────────────────┘\n");
 
-        var mockStreamingAgent = new MockStreamingAgent();
-
-        // Step 1: RECORD streaming execution
-        Console.WriteLine("📼 RECORDING streaming execution...\n");
-
-        await using (var recorder = new TraceRecordingAgent(mockStreamingAgent, "streaming_demo"))
-        {
-            Console.Write("   Response: ");
-            await foreach (var chunk in recorder.InvokeStreamingAsync("Tell me a short joke"))
-            {
-                Console.Write(chunk.Text);
-                await Task.Delay(10); // Simulate display
-            }
-            Console.WriteLine();
-
-            var trace = recorder.Trace;
-            var responseEntry = trace.Entries.FirstOrDefault(e => e.Type == TraceEntryType.Response);
-            Console.WriteLine($"\n   📊 Recorded {responseEntry?.StreamingChunks?.Count ?? 0} chunks");
-            Console.WriteLine($"   📊 Time to first token: {trace.Performance?.TimeToFirstTokenMs}ms");
-        }
-
-        // Step 2: REPLAY with timing simulation
-        Console.WriteLine("\n▶️  REPLAYING streaming with timing...\n");
+        Console.WriteLine("   Demonstrating streaming trace replay with timing...\n");
 
         var streamingTrace = new AgentTrace
         {
-            TraceName = "streaming_replay",
-            AgentName = "MockStreamingAgent",
+            TraceName = "streaming_demo",
+            AgentName = "RealAgent",
             Entries = new List<TraceEntry>
             {
                 new() { Type = TraceEntryType.Request, Index = 0, Prompt = "Tell me a short joke" },
@@ -318,139 +252,80 @@ public static class Sample13_TraceRecordReplay
             }
         };
 
-        var streamReplayer = new TraceReplayingAgent(streamingTrace, new TraceReplayOptions
+        var replayer = new TraceReplayingAgent(streamingTrace, new TraceReplayOptions
         {
-            SimulateStreamingDelay = true // Replay with original timing
+            SimulateStreamingDelay = true
         });
 
         Console.Write("   Replay: ");
-        await foreach (var chunk in streamReplayer.InvokeStreamingAsync("Tell me a short joke"))
+        await foreach (var chunk in replayer.InvokeStreamingAsync("Tell me a short joke"))
         {
             Console.Write(chunk.Text);
         }
         Console.WriteLine();
-
         Console.WriteLine("\n   ✓ Streaming replayed with timing preserved!\n");
     }
 
-    #region Mock Agents
-
-    /// <summary>
-    /// Mock agent that simulates tool calls.
-    /// </summary>
-    private class MockToolAgent : IEvaluableAgent
+    private static IEvaluableAgent CreateAgent()
     {
-        private int _callCount;
-
-        public string Name => "MockToolAgent";
-
-        public Task<AgentResponse> InvokeAsync(string prompt, CancellationToken cancellationToken = default)
+        var azureClient = new AzureOpenAIClient(AIConfig.Endpoint, AIConfig.KeyCredential);
+        var chatClient = azureClient.GetChatClient(AIConfig.ModelDeployment).AsIChatClient();
+        var agent = new ChatClientAgent(chatClient, new ChatClientAgentOptions
         {
-            _callCount++;
-
-            // Simulate different responses based on prompt
-            var response = prompt.ToLowerInvariant() switch
-            {
-                var p when p.Contains("weather") => "The weather in Seattle is 58°F with light rain.",
-                var p when p.Contains("paris") || p.Contains("trip") => "Great choice! Paris is beautiful. Let me help you plan your trip.",
-                var p when p.Contains("hotel") => "I recommend Hotel Le Bristol Paris - a 5-star hotel near the Champs-Élysées.",
-                var p when p.Contains("book") => "I've booked Hotel Le Bristol for you. Confirmation #12345.",
-                _ => "I'm here to help with your request."
-            };
-
-            return Task.FromResult(new AgentResponse
-            {
-                Text = response,
-                TokenUsage = new TokenUsage { PromptTokens = 50, CompletionTokens = 30 }
-            });
-        }
+            Name = "TraceableAgent",
+            Description = "Agent for trace recording demo",
+            Instructions = "You are a helpful assistant. Keep responses concise (2-3 sentences)."
+        });
+        return new MAFAgentAdapter(agent);
     }
 
-    /// <summary>
-    /// Mock streaming agent.
-    /// </summary>
-    private class MockStreamingAgent : IEvaluableAgent, IStreamableAgent
+    private static string Truncate(string text, int maxLength)
     {
-        public string Name => "MockStreamingAgent";
-
-        public Task<AgentResponse> InvokeAsync(string prompt, CancellationToken cancellationToken = default)
-        {
-            return Task.FromResult(new AgentResponse
-            {
-                Text = "Why did the developer go broke? Because he used up all his cache!"
-            });
-        }
-
-        public async IAsyncEnumerable<AgentResponseChunk> InvokeStreamingAsync(
-            string prompt,
-            [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
-        {
-            var chunks = new[] { "Why did ", "the developer ", "go broke? ", "Because he ", "used up all ", "his cache!" };
-            
-            for (int i = 0; i < chunks.Length; i++)
-            {
-                if (i > 0) await Task.Delay(50, cancellationToken);
-                
-                yield return new AgentResponseChunk
-                {
-                    Text = chunks[i],
-                    IsComplete = i == chunks.Length - 1
-                };
-            }
-        }
+        if (string.IsNullOrEmpty(text)) return "(empty)";
+        return text.Length <= maxLength ? text : text[..(maxLength - 3)] + "...";
     }
 
-    /// <summary>
-    /// Mock workflow agent.
-    /// </summary>
-    private class MockWorkflowAgent : IWorkflowEvaluableAgent
+    private static void PrintHeader()
     {
-        public string Name => "MockWorkflowAgent";
-        public IReadOnlyList<string> ExecutorIds => new[] { "researcher", "summarizer" };
-        public string? WorkflowType => "Research";
-
-        public Task<AgentResponse> InvokeAsync(string prompt, CancellationToken cancellationToken = default)
-        {
-            return Task.FromResult(new AgentResponse
-            {
-                Text = "Research complete. Here are the best practices for AI testing."
-            });
-        }
-
-        public Task<WorkflowExecutionResult> ExecuteWorkflowAsync(string prompt, CancellationToken cancellationToken = default)
-        {
-            return Task.FromResult(new WorkflowExecutionResult
-            {
-                FinalOutput = "Here are the best practices for AI testing: 1) Use deterministic tests, 2) Record and replay, 3) Measure accuracy.",
-                Steps = new List<ExecutorStep>
-                {
-                    new()
-                    {
-                        ExecutorId = "researcher",
-                        ExecutorName = "Research Agent",
-                        Input = "Research AI testing best practices",
-                        Output = "Found 10 relevant articles",
-                        StepIndex = 0,
-                        Duration = TimeSpan.FromMilliseconds(500),
-                        ToolCalls = new List<ToolCallRecord>
-                        {
-                            new() { Name = "WebSearch", CallId = "ws_1", Result = "10 results" }
-                        }
-                    },
-                    new()
-                    {
-                        ExecutorId = "summarizer",
-                        ExecutorName = "Summarizer Agent",
-                        Input = "Summarize the research findings",
-                        Output = "Key practices: determinism, record/replay, accuracy metrics",
-                        StepIndex = 1,
-                        Duration = TimeSpan.FromMilliseconds(300)
-                    }
-                },
-                TotalDuration = TimeSpan.FromMilliseconds(800)
-            });
-        }
+        Console.ForegroundColor = ConsoleColor.Magenta;
+        Console.WriteLine(@"
+╔═══════════════════════════════════════════════════════════════════════════════╗
+║                                                                               ║
+║   📼 SAMPLE 13: TRACE RECORD & REPLAY                                        ║
+║   Record real agent calls, save traces, replay without AI costs               ║
+║                                                                               ║
+╚═══════════════════════════════════════════════════════════════════════════════╝
+");
+        Console.ResetColor();
     }
 
-    #endregion
+    private static void PrintMissingCredentialsBox()
+    {
+        Console.ForegroundColor = ConsoleColor.Yellow;
+        Console.WriteLine(@"
+   ┌─────────────────────────────────────────────────────────────────────────────┐
+   │  ⚠️  SKIPPING SAMPLE 13 - Azure OpenAI Credentials Required               │
+   ├─────────────────────────────────────────────────────────────────────────────┤
+   │  This sample records real agent traces for deterministic replay.            │
+   │                                                                             │
+   │  Set these environment variables:                                           │
+   │    AZURE_OPENAI_ENDPOINT     - Your Azure OpenAI endpoint                   │
+   │    AZURE_OPENAI_API_KEY      - Your API key                                 │
+   │    AZURE_OPENAI_DEPLOYMENT   - Chat model (e.g., gpt-4o)                    │
+   └─────────────────────────────────────────────────────────────────────────────┘
+");
+        Console.ResetColor();
+    }
+
+    private static void PrintKeyTakeaways()
+    {
+        Console.WriteLine("\n💡 KEY TAKEAWAYS:");
+        Console.WriteLine("   • TraceRecordingAgent wraps any IEvaluableAgent to record calls");
+        Console.WriteLine("   • TraceSerializer.Serialize/Deserialize for JSON persistence");
+        Console.WriteLine("   • TraceReplayingAgent replays saved traces — zero AI costs");
+        Console.WriteLine("   • ChatTraceRecorder handles multi-turn conversations");
+        Console.WriteLine("   • WorkflowTraceReplayingAgent replays multi-step workflows");
+        Console.WriteLine("   • Use traces for deterministic CI testing!");
+        Console.WriteLine("\n✅ Sample 13 complete!\n");
+    }
 }

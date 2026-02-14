@@ -33,27 +33,12 @@ public static class Sample10_WorkflowWithTools
     {
         PrintHeader();
 
-        // ═══════════════════════════════════════════════════════════════
-        // STEP 0: Credential check
-        // ═══════════════════════════════════════════════════════════════
         if (!AIConfig.IsConfigured)
         {
-            Console.ForegroundColor = ConsoleColor.Yellow;
-            Console.WriteLine("  ⚠️  Azure OpenAI credentials are not configured.");
-            Console.WriteLine("      Sample 10 requires real Azure OpenAI credentials. Skipping.");
-            Console.WriteLine();
-            Console.WriteLine("      Set the following environment variables:");
-            Console.WriteLine("        AZURE_OPENAI_ENDPOINT     = https://your-resource.openai.azure.com/");
-            Console.WriteLine("        AZURE_OPENAI_API_KEY      = your-api-key");
-            Console.WriteLine("        AZURE_OPENAI_DEPLOYMENT   = gpt-4o");
-            Console.ResetColor();
-            Console.WriteLine();
+            PrintMissingCredentialsBox();
             return;
         }
 
-        // ═══════════════════════════════════════════════════════════════
-        // STEP 1: Build the TripPlanner MAF Workflow
-        // ═══════════════════════════════════════════════════════════════
         Console.WriteLine("📝 Step 1: Building TripPlanner MAF Workflow with tools...\n");
 
         var (workflow, executorIds) = CreateTripPlannerWorkflow();
@@ -64,9 +49,6 @@ public static class Sample10_WorkflowWithTools
         Console.WriteLine($"   Mode          : 🚀 REAL (Azure OpenAI — {AIConfig.ModelDeployment})");
         Console.WriteLine($"   Tools         : GetInfoAbout, SearchFlights, BookFlight, BookHotel\n");
 
-        // ═══════════════════════════════════════════════════════════════
-        // STEP 2: Create MAFWorkflowAdapter
-        // ═══════════════════════════════════════════════════════════════
         Console.WriteLine("📝 Step 2: Creating MAFWorkflowAdapter.FromMAFWorkflow()...\n");
 
         var workflowAdapter = MAFWorkflowAdapter.FromMAFWorkflow(
@@ -81,9 +63,6 @@ public static class Sample10_WorkflowWithTools
         Console.WriteLine($"   Entry node     : {workflowAdapter.GraphDefinition?.EntryNodeId}");
         Console.WriteLine($"   Exit node(s)   : {string.Join(", ", workflowAdapter.GraphDefinition?.ExitNodeIds ?? [])}\n");
 
-        // ═══════════════════════════════════════════════════════════════
-        // STEP 3: Create test case
-        // ═══════════════════════════════════════════════════════════════
         Console.WriteLine("📝 Step 3: Creating workflow test case...\n");
 
         var testCase = new WorkflowTestCase
@@ -103,9 +82,6 @@ public static class Sample10_WorkflowWithTools
         Console.WriteLine($"   Flow     : {string.Join(" → ", testCase.ExpectedExecutors!)}");
         Console.WriteLine($"   Timeout  : {testCase.MaxDuration!.Value.TotalSeconds}s\n");
 
-        // ═══════════════════════════════════════════════════════════════
-        // STEP 4: Run workflow test
-        // ═══════════════════════════════════════════════════════════════
         Console.WriteLine("📝 Step 4: Running TripPlanner workflow...\n");
         Console.WriteLine("   ⏳ Executing real LLM calls with tool invocations...\n");
 
@@ -131,9 +107,6 @@ public static class Sample10_WorkflowWithTools
             return;
         }
 
-        // ═══════════════════════════════════════════════════════════════
-        // STEP 5: Display detailed results
-        // ═══════════════════════════════════════════════════════════════
         Console.WriteLine("\n📊 DETAILED WORKFLOW RESULTS:");
         Console.WriteLine(new string('═', 80));
 
@@ -164,9 +137,6 @@ public static class Sample10_WorkflowWithTools
             }
         }
 
-        // ═══════════════════════════════════════════════════════════════
-        // STEP 6: Display harness-level tool tracking
-        // ═══════════════════════════════════════════════════════════════
         Console.WriteLine("\n🔧 HARNESS-LEVEL TOOL TRACKING:");
         Console.WriteLine(new string('─', 80));
 
@@ -215,9 +185,6 @@ public static class Sample10_WorkflowWithTools
             }
         }
 
-        // ═══════════════════════════════════════════════════════════════
-        // STEP 7: Workflow assertions
-        // ═══════════════════════════════════════════════════════════════
         Console.WriteLine("\n📝 Step 7: Workflow assertions...\n");
 
         if (testResult.ExecutionResult != null)
@@ -318,9 +285,6 @@ public static class Sample10_WorkflowWithTools
             }
         }
 
-        // ═══════════════════════════════════════════════════════════════
-        // STEP 8: Visualization
-        // ═══════════════════════════════════════════════════════════════
         Console.WriteLine("📝 Step 8: Generating workflow visualization...\n");
 
         if (testResult.ExecutionResult != null)
@@ -343,9 +307,7 @@ public static class Sample10_WorkflowWithTools
         PrintKeyTakeaways();
     }
 
-    // ═══════════════════════════════════════════════════════════════
-    // WORKFLOW CREATION
-    // ═══════════════════════════════════════════════════════════════
+    // ── WORKFLOW CREATION ──
 
     /// <summary>
     /// Builds the TripPlanner MAF Workflow:
@@ -467,16 +429,14 @@ public static class Sample10_WorkflowWithTools
         return (workflow, ["TripPlanner", "FlightReservation", "HotelReservation", "Presenter"]);
     }
 
-    // ═══════════════════════════════════════════════════════════════
-    // TOOLS
-    // ═══════════════════════════════════════════════════════════════
+    // ── TOOLS ──
 
     [Description("Gets information about a city including attractions, culture, weather, and travel tips.")]
-    public static string GetInfoAbout(
+    public static async Task<string> GetInfoAbout(
         [Description("The name of the city to get information about")] string city)
     {
         Console.WriteLine($"   🌍 GetInfoAbout(\"{city}\")");
-        Thread.Sleep(100); // Simulate API latency
+        await Task.Delay(100); // Simulate API latency
 
         var result = city.ToLowerInvariant() switch
         {
@@ -511,13 +471,13 @@ public static class Sample10_WorkflowWithTools
     }
 
     [Description("Searches for available flights between two cities on a given date.")]
-    public static string SearchFlights(
+    public static async Task<string> SearchFlights(
         [Description("The departure city")] string fromCity,
         [Description("The destination city")] string toCity,
         [Description("The travel date (e.g., '2025-03-15')")] string date)
     {
         Console.WriteLine($"   ✈️ SearchFlights(\"{fromCity}\" → \"{toCity}\", {date})");
-        Thread.Sleep(150); // Simulate search time
+        await Task.Delay(150); // Simulate search time
 
         var result = $"""
             Available flights from {fromCity} to {toCity} on {date}:
@@ -533,12 +493,12 @@ public static class Sample10_WorkflowWithTools
     }
 
     [Description("Books a specific flight. Returns a confirmation number.")]
-    public static string BookFlight(
+    public static async Task<string> BookFlight(
         [Description("The flight number to book (e.g., 'AE-205')")] string flightNumber,
         [Description("Number of passengers")] int passengers = 1)
     {
         Console.WriteLine($"   🎫 BookFlight(\"{flightNumber}\", passengers={passengers})");
-        Thread.Sleep(100); // Simulate booking
+        await Task.Delay(100); // Simulate booking
 
         var confirmationCode = $"CONF-{flightNumber}-{Random.Shared.Next(10000, 99999)}";
         var result = $"""
@@ -553,14 +513,14 @@ public static class Sample10_WorkflowWithTools
     }
 
     [Description("Books a hotel in the specified city for given dates. Returns confirmation details.")]
-    public static string BookHotel(
+    public static async Task<string> BookHotel(
         [Description("The city to book a hotel in")] string city,
         [Description("Check-in date (e.g., '2025-03-15')")] string checkIn,
         [Description("Check-out date (e.g., '2025-03-18')")] string checkOut,
         [Description("Number of guests")] int guests = 1)
     {
         Console.WriteLine($"   🏨 BookHotel(\"{city}\", {checkIn} → {checkOut}, guests={guests})");
-        Thread.Sleep(100); // Simulate booking
+        await Task.Delay(100); // Simulate booking
 
         var hotelName = city.ToLowerInvariant() switch
         {
@@ -591,9 +551,7 @@ public static class Sample10_WorkflowWithTools
         return result;
     }
 
-    // ═══════════════════════════════════════════════════════════════
-    // UI HELPERS
-    // ═══════════════════════════════════════════════════════════════
+    // ── UI HELPERS ──
 
     private static void PrintHeader()
     {
@@ -601,20 +559,28 @@ public static class Sample10_WorkflowWithTools
         Console.WriteLine(@"
 ╔═══════════════════════════════════════════════════════════════════════════════╗
 ║                                                                               ║
-║          Sample 10: Workflow With Tools — TripPlanner Pipeline               ║
-║                                                                               ║
-║   Learn how to:                                                               ║
-║   • Build MAF Workflows where agents use tools (function calling)            ║
-║   • Track tool invocations across workflow executors                          ║
-║   • Evaluate workflows with tool-calling agents                              ║
-║   • Assert on workflow structure and execution path                          ║
-║                                                                               ║
-║   Pipeline: TripPlanner → FlightReservation → HotelReservation → Presenter  ║
-║   Tools: GetInfoAbout, SearchFlights, BookFlight, BookHotel                  ║
-║                                                                               ║
-║   ⚠️  Requires Azure OpenAI credentials (no mock fallback)                   ║
+║   🧳 SAMPLE 10: WORKFLOW WITH TOOLS — TripPlanner Pipeline                   ║
+║   TripPlanner → FlightReservation → HotelReservation → Presenter             ║
 ║                                                                               ║
 ╚═══════════════════════════════════════════════════════════════════════════════╝
+");
+        Console.ResetColor();
+    }
+
+    private static void PrintMissingCredentialsBox()
+    {
+        Console.ForegroundColor = ConsoleColor.Yellow;
+        Console.WriteLine(@"
+   ┌─────────────────────────────────────────────────────────────────────────────┐
+   │  ⚠️  SKIPPING SAMPLE 10 - Azure OpenAI Credentials Required               │
+   ├─────────────────────────────────────────────────────────────────────────────┤
+   │  This sample runs a real TripPlanner MAF workflow with tool-calling agents. │
+   │                                                                             │
+   │  Set these environment variables:                                           │
+   │    AZURE_OPENAI_ENDPOINT     - Your Azure OpenAI endpoint                   │
+   │    AZURE_OPENAI_API_KEY      - Your API key                                 │
+   │    AZURE_OPENAI_DEPLOYMENT   - Chat model (e.g., gpt-4o)                    │
+   └─────────────────────────────────────────────────────────────────────────────┘
 ");
         Console.ResetColor();
     }

@@ -19,9 +19,16 @@ public static class StandaloneWorkflowTest
 {
     public static async Task RunAsync()
     {
-        Console.WriteLine("═══════════════════════════════════════════════════");
-        Console.WriteLine("  STANDALONE MAF WORKFLOW TEST (no AgentEval)");
-        Console.WriteLine("═══════════════════════════════════════════════════\n");
+        Console.ForegroundColor = ConsoleColor.DarkYellow;
+        Console.WriteLine(@"
+╔═══════════════════════════════════════════════════════════════════════════════╗
+║                                                                               ║
+║   🔬 STANDALONE MAF WORKFLOW DIAGNOSTIC                                       ║
+║   Runs a MAF workflow directly — no AgentEval harness — to verify events      ║
+║                                                                               ║
+╚═══════════════════════════════════════════════════════════════════════════════╝
+");
+        Console.ResetColor();
 
         if (!AIConfig.IsConfigured)
         {

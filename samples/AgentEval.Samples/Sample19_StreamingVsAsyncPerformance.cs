@@ -27,37 +27,26 @@ public static class Sample19_StreamingVsAsyncPerformance
     {
         PrintHeader();
 
-        var endpoint = Environment.GetEnvironmentVariable("AZURE_OPENAI_ENDPOINT");
-        var apiKey = Environment.GetEnvironmentVariable("AZURE_OPENAI_API_KEY");
-        var deployment = Environment.GetEnvironmentVariable("AZURE_OPENAI_DEPLOYMENT") ?? "gpt-4o";
-
-        if (string.IsNullOrEmpty(endpoint) || string.IsNullOrEmpty(apiKey))
+        if (!AIConfig.IsConfigured)
         {
-            Console.ForegroundColor = ConsoleColor.Yellow;
-            Console.WriteLine("⚠️  This sample requires Azure OpenAI configuration.");
-            Console.WriteLine("    Set AZURE_OPENAI_ENDPOINT and AZURE_OPENAI_API_KEY\n");
-            Console.ResetColor();
-            RunMockDemo();
+            PrintMissingCredentialsBox();
             return;
         }
 
-        await RunRealDemo(endpoint, apiKey, deployment);
-    }
+        Console.WriteLine($"   🔗 Endpoint: {AIConfig.Endpoint}");
+        Console.WriteLine($"   🤖 Model: {AIConfig.ModelDeployment}\n");
 
-    private static async Task RunRealDemo(string endpoint, string apiKey, string deployment)
-    {
         Console.WriteLine("🚀 Running with REAL Azure OpenAI...\n");
 
         // Create agent
-        var agent = CreateAgent(endpoint, apiKey, deployment);
+        var agent = CreateAgent();
         var adapter = new MAFAgentAdapter(agent);
         var harness = new MAFEvaluationHarness(verbose: true);
 
-        // EvaluationOptions with ModelName (KEY for cost calculation!)
         var options = new EvaluationOptions 
         { 
             TrackPerformance = true,
-            ModelName = deployment  // ← KEY: Enables accurate cost calculation!
+            ModelName = AIConfig.ModelDeployment
         };
 
         var testCase = new TestCase
@@ -68,23 +57,13 @@ public static class Sample19_StreamingVsAsyncPerformance
 
         Console.WriteLine($"   📋 EvaluationOptions.ModelName = '{options.ModelName}'\n");
 
-        // ═══════════════════════════════════════════════════════════════
-        // PART 1: NON-STREAMING (Async)
-        // ═══════════════════════════════════════════════════════════════
-        Console.WriteLine("═══════════════════════════════════════════════════════════════");
-        Console.WriteLine("   ⏳ PART 1: NON-STREAMING (Async) Mode");
-        Console.WriteLine("═══════════════════════════════════════════════════════════════\n");
+        Console.WriteLine("   ⏳ PART 1: NON-STREAMING (Async) Mode\n");
 
         var asyncResult = await harness.RunEvaluationAsync(adapter, testCase, options);
 
         PrintResults("ASYNC", asyncResult);
 
-        // ═══════════════════════════════════════════════════════════════
-        // PART 2: STREAMING
-        // ═══════════════════════════════════════════════════════════════
-        Console.WriteLine("═══════════════════════════════════════════════════════════════");
-        Console.WriteLine("   🌊 PART 2: STREAMING Mode");
-        Console.WriteLine("═══════════════════════════════════════════════════════════════\n");
+        Console.WriteLine("   🌊 PART 2: STREAMING Mode\n");
 
         Console.Write("   Response: ");
         Console.ForegroundColor = ConsoleColor.DarkGray;
@@ -102,25 +81,54 @@ public static class Sample19_StreamingVsAsyncPerformance
 
         PrintResults("STREAMING", streamingResult);
 
-        // ═══════════════════════════════════════════════════════════════
-        // PART 3: COMPARISON
-        // ═══════════════════════════════════════════════════════════════
         PrintComparison(asyncResult, streamingResult);
     }
 
-    private static void RunMockDemo()
+    private static string Fmt(TimeSpan? t) => t.HasValue ? $"{t.Value.TotalMilliseconds:F0}ms" : "N/A";
+    private static string FmtCost(decimal? c) => c > 0 ? $"${c:F6}" : "N/A";
+
+    private static AIAgent CreateAgent()
     {
-        Console.WriteLine("📊 MOCK DATA DEMONSTRATION\n");
-        Console.WriteLine("┌──────────────────┬───────────────┬───────────────┐");
-        Console.WriteLine("│ Metric           │ Non-Streaming │ Streaming     │");
-        Console.WriteLine("├──────────────────┼───────────────┼───────────────┤");
-        Console.WriteLine("│ Duration         │ ~1500ms       │ ~1800ms       │");
-        Console.WriteLine("│ Time to First    │ N/A           │ ~350ms        │");
-        Console.WriteLine("│ Input Tokens     │ ✓ Captured    │ ✓ Captured    │");
-        Console.WriteLine("│ Output Tokens    │ ✓ Captured    │ ✓ Captured    │");
-        Console.WriteLine("│ Estimated Cost   │ ✓ Calculated  │ ✓ Calculated  │");
-        Console.WriteLine("└──────────────────┴───────────────┴───────────────┘");
-        Console.WriteLine("\n💡 BOTH methods now capture tokens and costs!\n");
+        var azureClient = new AzureOpenAIClient(AIConfig.Endpoint, AIConfig.KeyCredential);
+        var chatClient = azureClient.GetChatClient(AIConfig.ModelDeployment).AsIChatClient();
+
+        return new ChatClientAgent(chatClient, new ChatClientAgentOptions
+        {
+            Name = "PerformanceTestAgent",
+            Instructions = "You are a helpful assistant. Answer concisely."
+        });
+    }
+
+    private static void PrintHeader()
+    {
+        Console.ForegroundColor = ConsoleColor.Magenta;
+        Console.WriteLine(@"
+╔═══════════════════════════════════════════════════════════════════════════════╗
+║                                                                               ║
+║   🌊 SAMPLE 19: STREAMING VS NON-STREAMING PERFORMANCE                       ║
+║   Compare token/cost capture between streaming and async modes                ║
+║                                                                               ║
+╚═══════════════════════════════════════════════════════════════════════════════╝
+");
+        Console.ResetColor();
+    }
+
+    private static void PrintMissingCredentialsBox()
+    {
+        Console.ForegroundColor = ConsoleColor.Yellow;
+        Console.WriteLine(@"
+   ┌─────────────────────────────────────────────────────────────────────────────┐
+   │  ⚠️  SKIPPING SAMPLE 19 - Azure OpenAI Credentials Required               │
+   ├─────────────────────────────────────────────────────────────────────────────┤
+   │  This sample compares streaming vs non-streaming performance metrics.       │
+   │                                                                             │
+   │  Set these environment variables:                                           │
+   │    AZURE_OPENAI_ENDPOINT     - Your Azure OpenAI endpoint                   │
+   │    AZURE_OPENAI_API_KEY      - Your API key                                 │
+   │    AZURE_OPENAI_DEPLOYMENT   - Chat model (e.g., gpt-4o)                    │
+   └─────────────────────────────────────────────────────────────────────────────┘
+");
+        Console.ResetColor();
     }
 
     private static void PrintResults(string mode, TestResult result)
@@ -169,9 +177,7 @@ public static class Sample19_StreamingVsAsyncPerformance
 
     private static void PrintComparison(TestResult asyncResult, TestResult streamingResult)
     {
-        Console.WriteLine("═══════════════════════════════════════════════════════════════");
-        Console.WriteLine("   📊 COMPARISON TABLE");
-        Console.WriteLine("═══════════════════════════════════════════════════════════════\n");
+        Console.WriteLine("   📊 COMPARISON TABLE\n");
 
         var ap = asyncResult.Performance;
         var sp = streamingResult.Performance;
@@ -198,37 +204,5 @@ public static class Sample19_StreamingVsAsyncPerformance
         {
             Console.WriteLine("   ℹ️  Tokens estimated (~4 chars/token) since provider didn't return usage");
         }
-    }
-
-    private static string Fmt(TimeSpan? t) => t.HasValue ? $"{t.Value.TotalMilliseconds:F0}ms" : "N/A";
-    private static string FmtCost(decimal? c) => c > 0 ? $"${c:F6}" : "N/A";
-
-    private static AIAgent CreateAgent(string endpoint, string apiKey, string deployment)
-    {
-        var azureClient = new AzureOpenAIClient(
-            new Uri(endpoint),
-            new System.ClientModel.ApiKeyCredential(apiKey));
-
-        var chatClient = azureClient.GetChatClient(deployment).AsIChatClient();
-
-        return new ChatClientAgent(chatClient, new ChatClientAgentOptions
-        {
-            Name = "PerformanceTestAgent",
-            Instructions = "You are a helpful assistant. Answer concisely."
-        });
-    }
-
-    private static void PrintHeader()
-    {
-        Console.WriteLine();
-        Console.WriteLine("═══════════════════════════════════════════════════════════════");
-        Console.WriteLine("   Sample 19: Streaming vs Non-Streaming Performance");
-        Console.WriteLine("═══════════════════════════════════════════════════════════════");
-        Console.WriteLine();
-        Console.WriteLine("   This sample demonstrates:");
-        Console.WriteLine("   • Running the same test with streaming AND non-streaming");
-        Console.WriteLine("   • Comparing token/cost capture between methods");
-        Console.WriteLine("   • Using EvaluationOptions.ModelName for accurate cost calculation");
-        Console.WriteLine();
     }
 }

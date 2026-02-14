@@ -45,12 +45,10 @@ public static class Sample16_CombinedStochasticComparison
         
         // Print endpoint for verification
         Console.WriteLine($"   🔗 Endpoint: {AIConfig.Endpoint}");
-        Console.WriteLine($"   🤖 Model 1: {AIConfig.ModelDeployment} (GPT-5 Mini)");
-        Console.WriteLine($"   🤖 Model 2: {AIConfig.TertiaryModelDeployment} (GPT-4.1)\n");
+        Console.WriteLine($"   🤖 Model 1: {AIConfig.ModelDeployment}");
+        Console.WriteLine($"   🤖 Model 2: {AIConfig.TertiaryModelDeployment}\n");
         
-        // ═══════════════════════════════════════════════════════════════
-        // STEP 1: Create agent factories for 2 models
-        // ═══════════════════════════════════════════════════════════════
+
         Console.WriteLine("📝 Step 1: Creating agent factories for 2 models...\n");
         
         var factories = CreateFactories();
@@ -60,9 +58,6 @@ public static class Sample16_CombinedStochasticComparison
         }
         Console.WriteLine();
         
-        // ═══════════════════════════════════════════════════════════════
-        // STEP 2: Set up test infrastructure
-        // ═══════════════════════════════════════════════════════════════
         Console.WriteLine("📝 Step 2: Setting up test infrastructure...\n");
         
         var harness = new MAFEvaluationHarness(verbose: false);
@@ -74,9 +69,6 @@ public static class Sample16_CombinedStochasticComparison
         });
         Console.WriteLine("   ✓ Stochastic runner ready\n");
         
-        // ═══════════════════════════════════════════════════════════════
-        // STEP 3: Define test case
-        // ═══════════════════════════════════════════════════════════════
         Console.WriteLine("📝 Step 3: Defining test case...\n");
         
         var testCase = new TestCase
@@ -89,9 +81,6 @@ public static class Sample16_CombinedStochasticComparison
         Console.WriteLine($"   ✓ Test: {testCase.Name}");
         Console.WriteLine($"   ✓ Expected result: 579\n");
         
-        // ═══════════════════════════════════════════════════════════════
-        // STEP 4: Configure stochastic options (3 runs per model for demo speed)
-        // ═══════════════════════════════════════════════════════════════
         Console.WriteLine("📝 Step 4: Configuring stochastic options (3 runs per model)...\n");
         
         var stochasticOptions = new StochasticOptions(
@@ -103,9 +92,6 @@ public static class Sample16_CombinedStochasticComparison
         );
         Console.WriteLine($"   ✓ {stochasticOptions.Runs} runs per model\n");
         
-        // ═══════════════════════════════════════════════════════════════
-        // STEP 5: Run stochastic tests for each model
-        // ═══════════════════════════════════════════════════════════════
         Console.WriteLine("📝 Step 5: Running stochastic tests for each model...\n");
         
         var modelResults = new List<(string ModelName, StochasticResult Result)>();
@@ -145,9 +131,6 @@ public static class Sample16_CombinedStochasticComparison
             }
         }
         
-        // ═══════════════════════════════════════════════════════════════
-        // STEP 6: Compare models side-by-side using table
-        // ═══════════════════════════════════════════════════════════════
         Console.WriteLine("📝 Step 6: Comparing models side-by-side...\n");
         
         if (modelResults.Count == 0)
@@ -159,9 +142,6 @@ public static class Sample16_CombinedStochasticComparison
         // Use extension method for comparison table
         modelResults.PrintComparisonTable();
         
-        // ═══════════════════════════════════════════════════════════════
-        // STEP 7: Detailed metrics per model
-        // ═══════════════════════════════════════════════════════════════
         Console.WriteLine("📝 Step 7: Detailed metrics per model...\n");
         
         foreach (var (modelName, result) in modelResults)
@@ -176,9 +156,6 @@ public static class Sample16_CombinedStochasticComparison
             Console.WriteLine();
         }
         
-        // ═══════════════════════════════════════════════════════════════
-        // STEP 8: Determine winner
-        // ═══════════════════════════════════════════════════════════════
         Console.WriteLine("📝 Step 8: Determining winner...\n");
         
         var winner = DetermineWinner(modelResults);
@@ -190,26 +167,29 @@ public static class Sample16_CombinedStochasticComparison
     {
         var azureClient = new AzureOpenAIClient(AIConfig.Endpoint, AIConfig.KeyCredential);
         
-        return new List<IAgentFactory>
+        var factories = new List<IAgentFactory>
         {
-            // Factory 1: GPT-5 Mini
             new DelegateAgentFactory(
                 AIConfig.ModelDeployment,
-                "GPT-5 Mini",
-                () => CreateAgentWithTool(azureClient, AIConfig.ModelDeployment, "GPT-5 Mini")),
-            
-            // Factory 2: GPT-4.1
-            new DelegateAgentFactory(
-                AIConfig.TertiaryModelDeployment,
-                "GPT-4.1",
-                () => CreateAgentWithTool(azureClient, AIConfig.TertiaryModelDeployment, "GPT-4.1"))
+                AIConfig.ModelDeployment,
+                () => CreateAgentWithTool(azureClient, AIConfig.ModelDeployment))
         };
+        
+        if (!string.IsNullOrEmpty(AIConfig.TertiaryModelDeployment) && 
+            AIConfig.TertiaryModelDeployment != AIConfig.ModelDeployment)
+        {
+            factories.Add(new DelegateAgentFactory(
+                AIConfig.TertiaryModelDeployment,
+                AIConfig.TertiaryModelDeployment,
+                () => CreateAgentWithTool(azureClient, AIConfig.TertiaryModelDeployment)));
+        }
+        
+        return factories;
     }
     
     private static IEvaluableAgent CreateAgentWithTool(
         AzureOpenAIClient client,
-        string deployment,
-        string modelName)
+        string deployment)
     {
         var chatClient = client
             .GetChatClient(deployment)
@@ -219,7 +199,7 @@ public static class Sample16_CombinedStochasticComparison
             chatClient,
             new ChatClientAgentOptions
             {
-                Name = $"Calculator Agent ({modelName})",
+                Name = $"Calculator Agent ({deployment})",
                 Instructions = "You are a math assistant. Always use the CalculatorTool for calculations.",
                 ChatOptions = new ChatOptions
                 {
@@ -282,7 +262,7 @@ public static class Sample16_CombinedStochasticComparison
 
         ╔═══════════════════════════════════════════════════════════════╗
         ║  Sample 16: Combined Stochastic + Model Comparison            ║
-        ║  Compare models with statistical rigor (5 runs each)          ║
+        ║  Compare models with statistical rigor (3 runs each)          ║
         ╚═══════════════════════════════════════════════════════════════╝
 
         """);

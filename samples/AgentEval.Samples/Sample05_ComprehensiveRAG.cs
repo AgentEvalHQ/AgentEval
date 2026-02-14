@@ -6,7 +6,6 @@ using Microsoft.Extensions.AI;
 using AgentEval.Core;
 using AgentEval.Metrics.RAG;
 using AgentEval.Metrics.Retrieval;
-using AgentEval.Testing;
 using AgentEval.Embeddings;
 
 namespace AgentEval.Samples;
@@ -49,17 +48,17 @@ public static class Sample05_ComprehensiveRAG
     {
         PrintHeader();
 
-        // Create clients
+        if (!AIConfig.IsConfigured || !AIConfig.IsEmbeddingConfigured)
+        {
+            PrintMissingCredentialsBox();
+            return;
+        }
+
         IChatClient chatClient = CreateChatClient();
-        IChatClient? evaluatorClient = CreateEvaluatorClient();
+        IChatClient evaluatorClient = CreateEvaluatorClient();
         IAgentEvalEmbeddings embeddingClient = CreateEmbeddingClient();
 
-        // ═══════════════════════════════════════════════════════════════
-        // PART 1: BUILD THE RAG SYSTEM
-        // ═══════════════════════════════════════════════════════════════
-        Console.WriteLine("═══════════════════════════════════════════════════════════════");
-        Console.WriteLine("🏗️ PART 1: BUILDING THE RAG SYSTEM");
-        Console.WriteLine("═══════════════════════════════════════════════════════════════\n");
+        Console.WriteLine("\n🏗️ PART 1: BUILDING THE RAG SYSTEM\n");
 
         Console.WriteLine("   📚 Step 1.1: Loading knowledge base documents...\n");
         foreach (var (id, text) in KnowledgeBase.Take(3))
@@ -96,12 +95,7 @@ public static class Sample05_ComprehensiveRAG
 
         PrintSectionComplete("RAG system built successfully!");
 
-        // ═══════════════════════════════════════════════════════════════
-        // PART 2: RAG QUERY PIPELINE
-        // ═══════════════════════════════════════════════════════════════
-        Console.WriteLine("\n═══════════════════════════════════════════════════════════════");
-        Console.WriteLine("🔍 PART 2: RAG QUERY PIPELINE");
-        Console.WriteLine("═══════════════════════════════════════════════════════════════\n");
+        Console.WriteLine("\n🔍 PART 2: RAG QUERY PIPELINE\n");
 
         var userQuery = "What is the capital of France and what famous landmarks are there?";
         var groundTruth = "Paris is the capital of France. Famous landmarks include the Eiffel Tower, the Louvre Museum, and the Palace of Versailles.";
@@ -133,7 +127,6 @@ public static class Sample05_ComprehensiveRAG
         var retrievedContext = string.Join("\n\n", searchResults.Select(r => r.Text));
         Console.WriteLine($"\n      ✅ Retrieved {searchResults.Count} documents for context\n");
 
-        // Step 2.3: Generate response using LLM
         Console.WriteLine("   🤖 Step 2.3: Generating response with LLM...");
         var ragPrompt = $"""
             Answer the following question using ONLY the provided context. 
@@ -147,17 +140,8 @@ public static class Sample05_ComprehensiveRAG
             Answer:
             """;
 
-        string generatedResponse;
-        if (AIConfig.IsConfigured)
-        {
-            var response = await chatClient.GetResponseAsync(ragPrompt);
-            generatedResponse = response.Text;
-        }
-        else
-        {
-            // Mock response for demo without credentials
-            generatedResponse = "Paris is the capital of France. Famous landmarks in Paris include the Eiffel Tower, which was built for the 1889 World's Fair, and the Louvre Museum, which is the world's largest art museum.";
-        }
+        var llmResponse = await chatClient.GetResponseAsync(ragPrompt);
+        var generatedResponse = llmResponse.Text;
 
         Console.ForegroundColor = ConsoleColor.Cyan;
         Console.WriteLine($"\n      📝 Generated Response:");
@@ -166,16 +150,10 @@ public static class Sample05_ComprehensiveRAG
 
         PrintSectionComplete("RAG pipeline executed successfully!");
 
-        // ═══════════════════════════════════════════════════════════════
-        // PART 3: LLM-BASED EVALUATION (5 Metrics)
-        // ═══════════════════════════════════════════════════════════════
-        Console.WriteLine("\n═══════════════════════════════════════════════════════════════");
-        Console.WriteLine("📊 PART 3: LLM-BASED EVALUATION (5 Metrics)");
-        Console.WriteLine("═══════════════════════════════════════════════════════════════\n");
+        Console.WriteLine("\n📊 PART 3: LLM-BASED EVALUATION (5 Metrics)\n");
 
         var llmResults = new List<(string Name, MetricResult Result)>();
 
-        // Create evaluation context for all metrics (used by PART 3 and PART 4)
         var evalContext = new EvaluationContext
         {
             Input = userQuery,
@@ -184,88 +162,47 @@ public static class Sample05_ComprehensiveRAG
             GroundTruth = groundTruth
         };
 
-        // LLM-based evaluation REQUIRES real credentials - we don't mock this!
-        if (evaluatorClient == null)
-        {
-            Console.ForegroundColor = ConsoleColor.Yellow;
-            Console.WriteLine("   ⚠️  SKIPPING LLM-BASED EVALUATION - No Azure credentials configured\n");
-            Console.ResetColor();
-            Console.WriteLine("   💡 LLM-based metrics use GPT to evaluate quality with nuanced understanding.");
-            Console.WriteLine("   💰 Cost: ~$0.002-0.01 per evaluation | ⏱️ Latency: ~2-5 seconds each\n");
-            Console.WriteLine(@"
-   ┌─────────────────────────────────────────────────────────────────────────────┐
-   │  🔒 REAL EVALUATION REQUIRED                                                │
-   ├─────────────────────────────────────────────────────────────────────────────┤
-   │  LLM-based evaluation cannot be mocked - that would defeat the purpose!    │
-   │                                                                             │
-   │  With Azure credentials, this section would run:                            │
-   │    • Faithfulness      - Detect hallucinations vs grounded claims           │
-   │    • Relevance         - Does response address the question?                │
-   │    • Context Precision - Was all retrieved context useful?                  │
-   │    • Context Recall    - Did we retrieve enough information?                │
-   │    • Answer Correctness - Does response match ground truth?                 │
-   │                                                                             │
-   │  Set these environment variables to enable:                                 │
-   │    AZURE_OPENAI_ENDPOINT                                                    │
-   │    AZURE_OPENAI_API_KEY                                                     │
-   │    AZURE_OPENAI_DEPLOYMENT                                                  │
-   └─────────────────────────────────────────────────────────────────────────────┘
-");
-        }
-        else
-        {
-            Console.WriteLine("   💡 LLM-based metrics use GPT to evaluate quality with nuanced understanding.");
-            Console.WriteLine("   💰 Cost: ~$0.002-0.01 per evaluation | ⏱️ Latency: ~2-5 seconds each\n");
+        Console.WriteLine("   💡 LLM-based metrics use GPT to evaluate quality with nuanced understanding.");
+        Console.WriteLine("   💰 Cost: ~$0.002-0.01 per evaluation | ⏱️ Latency: ~2-5 seconds each\n");
 
-            // 3.1 Faithfulness - Hallucination Detection
-            Console.WriteLine("   📝 3.1 FAITHFULNESS (Hallucination Detection)");
-            Console.WriteLine("      ❓ Is the response grounded in the provided context?\n");
-            var faithfulness = new FaithfulnessMetric(evaluatorClient);
-            var faithResult = await faithfulness.EvaluateAsync(evalContext);
-            PrintMetricResult(faithResult, "Faithfulness");
-            llmResults.Add(("Faithfulness", faithResult));
+        Console.WriteLine("   📝 3.1 FAITHFULNESS (Hallucination Detection)");
+        Console.WriteLine("      ❓ Is the response grounded in the provided context?\n");
+        var faithfulness = new FaithfulnessMetric(evaluatorClient);
+        var faithResult = await faithfulness.EvaluateAsync(evalContext);
+        PrintMetricResult(faithResult, "Faithfulness");
+        llmResults.Add(("Faithfulness", faithResult));
 
-            // 3.2 Relevance - Response Quality
-            Console.WriteLine("\n   📝 3.2 RELEVANCE (Response Quality)");
-            Console.WriteLine("      ❓ Does the response address the user's question?\n");
-            var relevance = new RelevanceMetric(evaluatorClient);
-            var relevResult = await relevance.EvaluateAsync(evalContext);
-            PrintMetricResult(relevResult, "Relevance");
-            llmResults.Add(("Relevance", relevResult));
+        Console.WriteLine("\n   📝 3.2 RELEVANCE (Response Quality)");
+        Console.WriteLine("      ❓ Does the response address the user's question?\n");
+        var relevance = new RelevanceMetric(evaluatorClient);
+        var relevResult = await relevance.EvaluateAsync(evalContext);
+        PrintMetricResult(relevResult, "Relevance");
+        llmResults.Add(("Relevance", relevResult));
 
-            // 3.3 Context Precision - Retrieval Quality
-            Console.WriteLine("\n   📝 3.3 CONTEXT PRECISION (Retrieval Quality)");
-            Console.WriteLine("      ❓ Was all retrieved context actually useful?\n");
-            var precision = new ContextPrecisionMetric(evaluatorClient);
-            var precisionResult = await precision.EvaluateAsync(evalContext);
-            PrintMetricResult(precisionResult, "Context Precision");
-            llmResults.Add(("Context Precision", precisionResult));
+        Console.WriteLine("\n   📝 3.3 CONTEXT PRECISION (Retrieval Quality)");
+        Console.WriteLine("      ❓ Was all retrieved context actually useful?\n");
+        var precision = new ContextPrecisionMetric(evaluatorClient);
+        var precisionResult = await precision.EvaluateAsync(evalContext);
+        PrintMetricResult(precisionResult, "Context Precision");
+        llmResults.Add(("Context Precision", precisionResult));
 
-            // 3.4 Context Recall - Retrieval Coverage
-            Console.WriteLine("\n   📝 3.4 CONTEXT RECALL (Retrieval Coverage)");
-            Console.WriteLine("      ❓ Did we retrieve all the information needed to answer?\n");
-            var recall = new ContextRecallMetric(evaluatorClient);
-            var recallResult = await recall.EvaluateAsync(evalContext);
-            PrintMetricResult(recallResult, "Context Recall");
-            llmResults.Add(("Context Recall", recallResult));
+        Console.WriteLine("\n   📝 3.4 CONTEXT RECALL (Retrieval Coverage)");
+        Console.WriteLine("      ❓ Did we retrieve all the information needed to answer?\n");
+        var recall = new ContextRecallMetric(evaluatorClient);
+        var recallResult = await recall.EvaluateAsync(evalContext);
+        PrintMetricResult(recallResult, "Context Recall");
+        llmResults.Add(("Context Recall", recallResult));
 
-            // 3.5 Answer Correctness - Ground Truth Comparison
-            Console.WriteLine("\n   📝 3.5 ANSWER CORRECTNESS (Ground Truth Comparison)");
-            Console.WriteLine("      ❓ Does the response match the expected answer?\n");
-            var correctness = new AnswerCorrectnessMetric(evaluatorClient);
-            var correctnessResult = await correctness.EvaluateAsync(evalContext);
-            PrintMetricResult(correctnessResult, "Answer Correctness");
-            llmResults.Add(("Answer Correctness", correctnessResult));
+        Console.WriteLine("\n   📝 3.5 ANSWER CORRECTNESS (Ground Truth Comparison)");
+        Console.WriteLine("      ❓ Does the response match the expected answer?\n");
+        var correctness = new AnswerCorrectnessMetric(evaluatorClient);
+        var correctnessResult = await correctness.EvaluateAsync(evalContext);
+        PrintMetricResult(correctnessResult, "Answer Correctness");
+        llmResults.Add(("Answer Correctness", correctnessResult));
 
-            PrintSectionComplete($"LLM-based evaluation complete! Average: {llmResults.Average(r => r.Result.Score):F1}/100");
-        }
+        PrintSectionComplete($"LLM-based evaluation complete! Average: {llmResults.Average(r => r.Result.Score):F1}/100");
 
-        // ═══════════════════════════════════════════════════════════════
-        // PART 4: EMBEDDING-BASED EVALUATION (3 Metrics)
-        // ═══════════════════════════════════════════════════════════════
-        Console.WriteLine("\n═══════════════════════════════════════════════════════════════");
-        Console.WriteLine("⚡ PART 4: EMBEDDING-BASED EVALUATION (3 Metrics)");
-        Console.WriteLine("═══════════════════════════════════════════════════════════════\n");
+        Console.WriteLine("\n⚡ PART 4: EMBEDDING-BASED EVALUATION (3 Metrics)\n");
 
         Console.WriteLine("   💡 Embedding-based metrics use vector similarity - much faster and cheaper!");
         Console.WriteLine("   💰 Cost: ~$0.0001 per evaluation | ⏱️ Latency: ~0.1 seconds each\n");
@@ -298,12 +235,7 @@ public static class Sample05_ComprehensiveRAG
 
         PrintSectionComplete($"Embedding-based evaluation complete! Average: {embedResults.Average(r => r.Result.Score):F1}/100");
 
-        // ═══════════════════════════════════════════════════════════════
-        // PART 5: COST OPTIMIZATION - LLM vs Embedding Metrics
-        // ═══════════════════════════════════════════════════════════════
-        Console.WriteLine("\n═══════════════════════════════════════════════════════════════");
-        Console.WriteLine("💰 PART 5: COST OPTIMIZATION COMPARISON");
-        Console.WriteLine("═══════════════════════════════════════════════════════════════\n");
+        Console.WriteLine("\n💰 PART 5: COST OPTIMIZATION COMPARISON\n");
 
         Console.WriteLine(@"
    ┌──────────────────────────────────────────────────────────────────────┐
@@ -328,19 +260,10 @@ public static class Sample05_ComprehensiveRAG
         Console.WriteLine("   ┌─────────────────────────────────────────────────────────────┐");
         Console.WriteLine("   │  LLM-BASED METRICS              │  SCORE  │  STATUS        │");
         Console.WriteLine("   ├─────────────────────────────────────────────────────────────┤");
-        if (llmResults.Count == 0)
+        foreach (var (name, result) in llmResults)
         {
-            Console.ForegroundColor = ConsoleColor.Yellow;
-            Console.WriteLine("   │  (skipped - configure Azure credentials to see scores)    │");
-            Console.ResetColor();
-        }
-        else
-        {
-            foreach (var (name, result) in llmResults)
-            {
-                var status = result.Passed ? "✅ PASSED" : "❌ FAILED";
-                Console.WriteLine($"   │  {name,-30} │  {result.Score,5:F1}  │  {status,-13} │");
-            }
+            var status = result.Passed ? "✅ PASSED" : "❌ FAILED";
+            Console.WriteLine($"   │  {name,-30} │  {result.Score,5:F1}  │  {status,-13} │");
         }
         Console.WriteLine("   └─────────────────────────────────────────────────────────────┘\n");
 
@@ -373,12 +296,7 @@ public static class Sample05_ComprehensiveRAG
       reserve LLM metrics for critical checkpoints and deep analysis.
 ");
 
-        // ═══════════════════════════════════════════════════════════════
-        // PART 6: Information Retrieval Metrics (Code-Based - Free!)
-        // ═══════════════════════════════════════════════════════════════
-        Console.WriteLine("═══════════════════════════════════════════════════════════════");
-        Console.WriteLine("📊 PART 6: INFORMATION RETRIEVAL METRICS (CODE-BASED - FREE!)");
-        Console.WriteLine("═══════════════════════════════════════════════════════════════\n");
+        Console.WriteLine("📊 PART 6: INFORMATION RETRIEVAL METRICS (CODE-BASED - FREE!)\n");
 
         Console.WriteLine("   These metrics evaluate retrieval quality without any API calls!\n");
 
@@ -436,12 +354,7 @@ public static class Sample05_ComprehensiveRAG
       complete retrieval quality assessment. They're FREE to compute!
 ");
 
-        // ═══════════════════════════════════════════════════════════════
-        // Summary and Key Takeaways
-        // ═══════════════════════════════════════════════════════════════
-        Console.WriteLine("═══════════════════════════════════════════════════════════════");
         Console.WriteLine("📋 SUMMARY: RAG EVALUATION METRICS REFERENCE");
-        Console.WriteLine("═══════════════════════════════════════════════════════════════");
         Console.WriteLine(@"
    ┌─────────────────────────────────────────────────────────────────────┐
    │  METRIC                │ WHAT IT MEASURES          │ REQUIRES       │
@@ -486,43 +399,41 @@ public static class Sample05_ComprehensiveRAG
 
     private static IChatClient CreateChatClient()
     {
-        if (AIConfig.IsConfigured)
-        {
-            var azureClient = new AzureOpenAIClient(AIConfig.Endpoint, AIConfig.KeyCredential);
-            return azureClient.GetChatClient(AIConfig.ModelDeployment).AsIChatClient();
-        }
-
-        Console.WriteLine("   ℹ️  Using FakeChatClient for generation (no Azure credentials configured)\n");
-        return new FakeChatClient("Mock response - Configure Azure credentials for real responses.");
+        var azureClient = new AzureOpenAIClient(AIConfig.Endpoint, AIConfig.KeyCredential);
+        return azureClient.GetChatClient(AIConfig.ModelDeployment).AsIChatClient();
     }
 
-    private static IChatClient? CreateEvaluatorClient()
+    private static IChatClient CreateEvaluatorClient()
     {
-        if (AIConfig.IsConfigured)
-        {
-            var azureClient = new AzureOpenAIClient(AIConfig.Endpoint, AIConfig.KeyCredential);
-            return azureClient.GetChatClient(AIConfig.ModelDeployment).AsIChatClient();
-        }
-
-        // NOTE: We intentionally return null when credentials are not configured.
-        // LLM-based evaluation (PART 3) REQUIRES real LLM calls - mocking defeats the purpose
-        // of demonstrating AI-powered evaluation. The sample will skip PART 3 gracefully.
-        return null;
+        var azureClient = new AzureOpenAIClient(AIConfig.Endpoint, AIConfig.KeyCredential);
+        return azureClient.GetChatClient(AIConfig.ModelDeployment).AsIChatClient();
     }
 
     private static IAgentEvalEmbeddings CreateEmbeddingClient()
     {
-        if (AIConfig.IsEmbeddingConfigured)
-        {
-            Console.WriteLine($"   ℹ️  Using Azure OpenAI embeddings: {AIConfig.EmbeddingDeployment}\n");
-            var azureClient = new AzureOpenAIClient(AIConfig.Endpoint, AIConfig.KeyCredential);
-            var embeddingClient = azureClient.GetEmbeddingClient(AIConfig.EmbeddingDeployment);
-            return new MEAIEmbeddingAdapter(embeddingClient.AsIEmbeddingGenerator());
-        }
+        Console.WriteLine($"   ℹ️  Using Azure OpenAI embeddings: {AIConfig.EmbeddingDeployment}\n");
+        var azureClient = new AzureOpenAIClient(AIConfig.Endpoint, AIConfig.KeyCredential);
+        var embeddingClient = azureClient.GetEmbeddingClient(AIConfig.EmbeddingDeployment);
+        return new MEAIEmbeddingAdapter(embeddingClient.AsIEmbeddingGenerator());
+    }
 
-        Console.WriteLine("   ℹ️  Using FakeEmbeddings (no embedding deployment configured)\n");
-        Console.WriteLine("   💡 Set AZURE_OPENAI_EMBEDDING_DEPLOYMENT for real embeddings\n");
-        return new FakeEmbeddings();
+    private static void PrintMissingCredentialsBox()
+    {
+        Console.ForegroundColor = ConsoleColor.Yellow;
+        Console.WriteLine(@"
+   ┌─────────────────────────────────────────────────────────────────────────────┐
+   │  ⚠️  SKIPPING SAMPLE 05 - Credentials Required                            │
+   ├─────────────────────────────────────────────────────────────────────────────┤
+   │  This sample requires both chat and embedding Azure OpenAI deployments.    │
+   │                                                                             │
+   │  Set these environment variables:                                           │
+   │    AZURE_OPENAI_ENDPOINT              - Your Azure OpenAI endpoint          │
+   │    AZURE_OPENAI_API_KEY               - Your API key                        │
+   │    AZURE_OPENAI_DEPLOYMENT            - Chat model (e.g., gpt-4o)           │
+   │    AZURE_OPENAI_EMBEDDING_DEPLOYMENT  - Embedding model (e.g., ada-002)     │
+   └─────────────────────────────────────────────────────────────────────────────┘
+");
+        Console.ResetColor();
     }
 
     #endregion

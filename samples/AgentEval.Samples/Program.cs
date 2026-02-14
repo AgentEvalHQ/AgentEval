@@ -10,6 +10,8 @@ namespace AgentEval.Samples;
 /// </summary>
 public static class Program
 {
+    private static bool _interactive = true;
+
     public static async Task Main(string[] args)
     {
         Console.OutputEncoding = Encoding.UTF8;
@@ -23,6 +25,7 @@ public static class Program
 
         if (args.Length > 0 && int.TryParse(args[0], out var sampleNumber))
         {
+            _interactive = false;
             await RunSample(sampleNumber);
             return;
         }
@@ -121,7 +124,7 @@ public static class Program
                     await Sample21_RedTeamAdvanced.RunAsync();
                     break;
 
-                case 23:
+                case 22:
                     await StandaloneWorkflowTest.RunAsync();
                     break;
                 default:
@@ -137,7 +140,8 @@ public static class Program
         }
 
         Console.WriteLine("\nPress any key to continue...");
-        Console.ReadKey(true);
+        if (_interactive)
+            Console.ReadKey(true);
     }
 
     private static void PrintBanner()
@@ -189,6 +193,7 @@ public static class Program
         Console.WriteLine("│ 19. ⚡ Streaming vs Async - Performance comparison          │");
         Console.WriteLine("│ 20. 🛡️ Red Team Basic    - Security vulnerability scan       │");
         Console.WriteLine("│ 21. 🛡️ Red Team Advanced - Pipeline, reports, compliance    │");
+        Console.WriteLine("│ 22. 🔬 Workflow Diagnostic - Standalone MAF workflow test    │");
         
         Console.ForegroundColor = ConsoleColor.Green;
         Console.WriteLine("├─────────────────────────────────────────────────────────────┤");

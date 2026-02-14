@@ -46,13 +46,10 @@ public static class Sample15_ModelComparison
         
         // Print endpoint for verification
         Console.WriteLine($"   🔗 Endpoint: {AIConfig.Endpoint}");
-        Console.WriteLine($"   🤖 Model 1: {AIConfig.ModelDeployment} (GPT-5 Mini)");
-        Console.WriteLine($"   🤖 Model 2: {AIConfig.SecondaryModelDeployment} (GPT-4o)");
-        Console.WriteLine($"   🤖 Model 3: {AIConfig.TertiaryModelDeployment} (GPT-4.1)\n");
+        Console.WriteLine($"   🤖 Model 1: {AIConfig.ModelDeployment}");
+        Console.WriteLine($"   🤖 Model 2: {AIConfig.SecondaryModelDeployment}");
+        Console.WriteLine($"   🤖 Model 3: {AIConfig.TertiaryModelDeployment}\n");
         
-        // ═══════════════════════════════════════════════════════════════
-        // STEP 1: Create agent factories
-        // ═══════════════════════════════════════════════════════════════
         Console.WriteLine("📝 Step 1: Creating agent factories...\n");
         
         var factories = CreateFactories();
@@ -62,9 +59,6 @@ public static class Sample15_ModelComparison
         }
         Console.WriteLine();
         
-        // ═══════════════════════════════════════════════════════════════
-        // STEP 2: Understand Scoring Weight Profiles
-        // ═══════════════════════════════════════════════════════════════
         Console.WriteLine("📝 Step 2: Scoring Weight Profiles\n");
         
         Console.WriteLine("   AgentEval supports different scoring profiles to optimize for your priority:");
@@ -81,9 +75,6 @@ public static class Sample15_ModelComparison
         Console.WriteLine();
         Console.WriteLine("   💡 Using QualityFocused for this comparison\n");
         
-        // ═══════════════════════════════════════════════════════════════
-        // STEP 3: Set up ModelComparer with options
-        // ═══════════════════════════════════════════════════════════════
         Console.WriteLine("📝 Step 3: Setting up ModelComparer...\n");
         
         var harness = new MAFEvaluationHarness(verbose: false);
@@ -106,9 +97,6 @@ public static class Sample15_ModelComparison
         Console.WriteLine($"   ✓ Scoring weights: QualityFocused");
         Console.WriteLine($"   ✓ Cost analysis: Enabled\n");
         
-        // ═══════════════════════════════════════════════════════════════
-        // STEP 4: Define test case
-        // ═══════════════════════════════════════════════════════════════
         Console.WriteLine("📝 Step 4: Defining test case...\n");
         
         var testCase = new TestCase
@@ -121,9 +109,6 @@ public static class Sample15_ModelComparison
         Console.WriteLine($"   Test: {testCase.Name}");
         Console.WriteLine($"   Expected: Contains '714', uses CalculatorTool\n");
         
-        // ═══════════════════════════════════════════════════════════════
-        // STEP 5: Run comparison
-        // ═══════════════════════════════════════════════════════════════
         Console.WriteLine("📝 Step 5: Running model comparison (3 runs per model)...\n");
         
         ModelComparisonResult result;
@@ -141,9 +126,6 @@ public static class Sample15_ModelComparison
         
         Console.WriteLine($"   ✓ Compared {result.ModelResults.Count} models\n");
         
-        // ═══════════════════════════════════════════════════════════════
-        // STEP 6: Display rankings
-        // ═══════════════════════════════════════════════════════════════
         Console.WriteLine("📝 Step 6: Rankings (by composite score)\n");
         
         Console.ForegroundColor = ConsoleColor.Cyan;
@@ -158,9 +140,6 @@ public static class Sample15_ModelComparison
         }
         Console.WriteLine();
         
-        // ═══════════════════════════════════════════════════════════════
-        // STEP 7: Cost Analysis
-        // ═══════════════════════════════════════════════════════════════
         Console.WriteLine("📝 Step 7: Cost Analysis\n");
         
         Console.ForegroundColor = ConsoleColor.Cyan;
@@ -176,9 +155,6 @@ public static class Sample15_ModelComparison
         }
         Console.WriteLine();
         
-        // ═══════════════════════════════════════════════════════════════
-        // STEP 8: Winner Recommendation
-        // ═══════════════════════════════════════════════════════════════
         Console.WriteLine("📝 Step 8: Winner Recommendation\n");
         
         Console.ForegroundColor = ConsoleColor.Green;
@@ -192,9 +168,6 @@ public static class Sample15_ModelComparison
         Console.WriteLine($"   └─ Reliability: {result.Winner.ReliabilityScore:F1} (weight: 15%)");
         Console.WriteLine();
         
-        // ═══════════════════════════════════════════════════════════════
-        // STEP 9: Export to Markdown
-        // ═══════════════════════════════════════════════════════════════
         Console.WriteLine("📝 Step 9: Export to Markdown\n");
         
         // Show GitHub PR comment format
@@ -228,26 +201,33 @@ public static class Sample15_ModelComparison
     {
         var azureClient = new AzureOpenAIClient(AIConfig.Endpoint, AIConfig.KeyCredential);
         
-        return new List<IAgentFactory>
+        var factories = new List<IAgentFactory>
         {
-            // Model 1: gpt-5-mini
             new DelegateAgentFactory(
                 AIConfig.ModelDeployment,
-                "GPT-5 Mini",
-                () => CreateAgentWithTool(azureClient, AIConfig.ModelDeployment)),
-            
-            // Model 2: gpt-4o
-            new DelegateAgentFactory(
-                AIConfig.SecondaryModelDeployment,
-                "GPT-4o",
-                () => CreateAgentWithTool(azureClient, AIConfig.SecondaryModelDeployment)),
-            
-            // Model 3: gpt-4.1
-            new DelegateAgentFactory(
-                AIConfig.TertiaryModelDeployment,
-                "GPT-4.1",
-                () => CreateAgentWithTool(azureClient, AIConfig.TertiaryModelDeployment))
+                AIConfig.ModelDeployment,
+                () => CreateAgentWithTool(azureClient, AIConfig.ModelDeployment))
         };
+        
+        if (!string.IsNullOrEmpty(AIConfig.SecondaryModelDeployment) && 
+            AIConfig.SecondaryModelDeployment != AIConfig.ModelDeployment)
+        {
+            factories.Add(new DelegateAgentFactory(
+                AIConfig.SecondaryModelDeployment,
+                AIConfig.SecondaryModelDeployment,
+                () => CreateAgentWithTool(azureClient, AIConfig.SecondaryModelDeployment)));
+        }
+        
+        if (!string.IsNullOrEmpty(AIConfig.TertiaryModelDeployment) && 
+            AIConfig.TertiaryModelDeployment != AIConfig.ModelDeployment)
+        {
+            factories.Add(new DelegateAgentFactory(
+                AIConfig.TertiaryModelDeployment,
+                AIConfig.TertiaryModelDeployment,
+                () => CreateAgentWithTool(azureClient, AIConfig.TertiaryModelDeployment)));
+        }
+        
+        return factories;
     }
     
     private static IEvaluableAgent CreateAgentWithTool(AzureOpenAIClient client, string deployment)

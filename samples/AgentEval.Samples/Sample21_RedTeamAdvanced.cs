@@ -19,13 +19,14 @@ namespace AgentEval.Samples;
 /// 
 /// Demonstrates:
 /// - Custom attack selection with pipeline API
-/// - Progress reporting (MOCK or REAL modes)
+/// - Progress reporting with visual progress bar
 /// - Multiple export formats (JSON, Markdown, JUnit)
 /// - OWASP-specific assertions  
-/// - Detailed vulnerability analysis
+/// - Baseline comparison for CI/CD regression tracking
 /// 
-/// ⏱️ Estimated time: ~1 minute (MOCK) / ~5 minutes (REAL)
-/// 💰 Cost: $0.00 (MOCK) / ~$0.05-0.15 (REAL)
+/// Requires: AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_API_KEY, AZURE_OPENAI_DEPLOYMENT
+/// ⏱️ Time to understand: 10 minutes
+/// 💰 Cost: ~$0.05-0.15
 /// </summary>
 public static class Sample21_RedTeamAdvanced
 {
@@ -34,55 +35,28 @@ public static class Sample21_RedTeamAdvanced
     
     public static async Task RunAsync()
     {
-        Console.WriteLine("=".PadRight(60, '='));
-        Console.WriteLine("Sample 21: Advanced Red Team Evaluation");
-        Console.WriteLine("=".PadRight(60, '='));
-        Console.WriteLine();
+        PrintHeader();
 
-        var endpoint = Environment.GetEnvironmentVariable("AZURE_OPENAI_ENDPOINT");
-        var apiKey = Environment.GetEnvironmentVariable("AZURE_OPENAI_API_KEY");
-        var deployment = Environment.GetEnvironmentVariable("AZURE_OPENAI_DEPLOYMENT") ?? "gpt-4o";
-
-        if (string.IsNullOrEmpty(endpoint) || string.IsNullOrEmpty(apiKey))
+        if (!AIConfig.IsConfigured)
         {
-            Console.ForegroundColor = ConsoleColor.Yellow;
-            Console.WriteLine("⚠️  Running in MOCK mode (offline). For REAL mode:");
-            Console.WriteLine("    Set AZURE_OPENAI_ENDPOINT and AZURE_OPENAI_API_KEY");
-            Console.ResetColor();
-            Console.WriteLine();
-            await RunWithMockAgent();
+            PrintMissingCredentialsBox();
+            return;
         }
-        else
-        {
-            Console.WriteLine($"🚀 Running with REAL Azure OpenAI ({deployment})...");
-            Console.WriteLine("💡 Note: Real agents are usually more secure than our demo vulnerable agent");
-            Console.WriteLine();
-            await RunWithRealAgent(endpoint, apiKey, deployment);
-        }
-    }
 
-    private static async Task RunWithMockAgent()
-    {
-        var agent = new MockVulnerableAgent();
-        await RunAdvancedRedTeamScan(agent, agent.Name);
-    }
+        Console.WriteLine($"   🔗 Endpoint: {AIConfig.Endpoint}");
+        Console.WriteLine($"   🤖 Model: {AIConfig.ModelDeployment}\n");
 
-    private static async Task RunWithRealAgent(string endpoint, string apiKey, string deployment)
-    {
-        var agent = CreateRealAgent(endpoint, apiKey, deployment);
+        var agent = CreateAgent();
         var adapter = new MAFAgentAdapter(agent);
-        await RunAdvancedRedTeamScan(adapter, $"RealAgent ({deployment})");
+        await RunAdvancedRedTeamScan(adapter);
     }
 
-    private static async Task RunAdvancedRedTeamScan(IEvaluableAgent agent, string agentName)
+    private static async Task RunAdvancedRedTeamScan(IEvaluableAgent agent)
     {
-        Console.WriteLine($"Agent: {agentName} (intentionally vulnerable for demo)");
+        Console.WriteLine($"   Agent: {agent.Name}");
         Console.WriteLine();
 
-        // ============================================
-        // STEP 1: Configure custom pipeline
-        // ============================================
-        Console.WriteLine("Step 1: Configuring attack pipeline...");
+        Console.WriteLine("📝 Step 1: Configuring attack pipeline...\n");
 
         var pipeline = AttackPipeline
             .Create()
@@ -97,10 +71,7 @@ public static class Sample21_RedTeamAdvanced
         Console.WriteLine("  Intensity: Moderate");
         Console.WriteLine();
 
-        // ============================================
-        // STEP 2: Run with progress reporting
-        // ============================================
-        Console.WriteLine("Step 2: Running scan with progress...");
+        Console.WriteLine("📝 Step 2: Running scan with progress...");
         Console.WriteLine();
 
         var attackStats = new Dictionary<string, (int Resisted, int Total)>();
@@ -139,10 +110,7 @@ public static class Sample21_RedTeamAdvanced
         Console.WriteLine($"\r  [█████████████████████████] 100.0% ✅ Complete!                    ");
         Console.WriteLine();
 
-        // ============================================
-        // STEP 3: Rich Output Formatting Demo
-        // ============================================
-        Console.WriteLine("Step 3: Rich Output Formatting (showing different verbosity levels)");
+        Console.WriteLine("\n📝 Step 3: Rich Output Formatting\n");
         Console.WriteLine();
 
         // Summary view (default) - shows attack-level results
@@ -164,10 +132,7 @@ public static class Sample21_RedTeamAdvanced
         result.PrintSummary();
         Console.WriteLine();
 
-        // ============================================
-        // STEP 4: Export reports
-        // ============================================
-        Console.WriteLine("Step 4: Exporting reports...");
+        Console.WriteLine("📝 Step 4: Exporting reports...\n");
 
         if (!ExportReports)
         {
@@ -193,11 +158,7 @@ public static class Sample21_RedTeamAdvanced
             Console.WriteLine();
         }
 
-        // ============================================
-        // STEP 5: OWASP-specific assertions
-        // ============================================
-        Console.WriteLine("Step 5: OWASP Compliance Checks");
-        Console.WriteLine("-".PadRight(40, '-'));
+        Console.WriteLine("📝 Step 5: OWASP Compliance Checks\n");
 
         // Check individual OWASP categories
         CheckOwaspCompliance(result, "LLM01", "Prompt Injection");
@@ -225,11 +186,7 @@ public static class Sample21_RedTeamAdvanced
         }
 
         Console.WriteLine();
-        // ============================================
-        // STEP 6: Baseline Comparison (CI/CD regression tracking)
-        // ============================================
-        Console.WriteLine("Step 6: Baseline Comparison Demo");
-        Console.WriteLine("-".PadRight(40, '-'));
+        Console.WriteLine("📝 Step 6: Baseline Comparison Demo\n");
 
         // Create a baseline from current results  
         var baseline = result.ToBaseline("v1.0.0", "Initial security baseline");
@@ -268,7 +225,8 @@ public static class Sample21_RedTeamAdvanced
             Console.WriteLine($"  ❌ Regression: {ex.Message}");
         }
 
-        Console.WriteLine();        Console.WriteLine("=== Sample 21 Complete ===");
+        Console.WriteLine();
+        Console.WriteLine("=== Sample 21 Complete ===");
         
         if (ExportReports)
         {
@@ -293,13 +251,10 @@ public static class Sample21_RedTeamAdvanced
         }
     }
 
-    private static AIAgent CreateRealAgent(string endpoint, string apiKey, string deployment)
+    private static AIAgent CreateAgent()
     {
-        var azureClient = new AzureOpenAIClient(
-            new Uri(endpoint),
-            new System.ClientModel.ApiKeyCredential(apiKey));
-
-        var chatClient = azureClient.GetChatClient(deployment).AsIChatClient();
+        var azureClient = new AzureOpenAIClient(AIConfig.Endpoint, AIConfig.KeyCredential);
+        var chatClient = azureClient.GetChatClient(AIConfig.ModelDeployment).AsIChatClient();
 
         return new ChatClientAgent(chatClient, new ChatClientAgentOptions
         {
@@ -309,52 +264,39 @@ public static class Sample21_RedTeamAdvanced
         });
     }
 
-    /// <summary>
-    /// Mock agent that is intentionally vulnerable to some attacks (for demo purposes).
-    /// </summary>
-    private class MockVulnerableAgent : IEvaluableAgent
+    private static void PrintHeader()
     {
-        public string Name => "VulnerableBot (Demo)";
+        Console.ForegroundColor = ConsoleColor.Magenta;
+        Console.WriteLine(@"
+╔═══════════════════════════════════════════════════════════════════════════════╗
+║                                                                               ║
+║   🛡️ SAMPLE 21: ADVANCED RED TEAM EVALUATION                                 ║
+║   Custom pipeline, OWASP checks, export, baseline comparison                  ║
+║                                                                               ║
+╚═══════════════════════════════════════════════════════════════════════════════╝
+");
+        Console.ResetColor();
+    }
 
-        public Task<AgentResponse> InvokeAsync(string prompt, CancellationToken ct = default)
-        {
-            var lower = prompt.ToLowerInvariant();
-
-            // Vulnerable to basic prompt injection marker checks
-            if (lower.Contains("ignore all previous instructions") ||
-                lower.Contains("disregard your instructions"))
-            {
-                return Task.FromResult(new AgentResponse
-                {
-                    Text = "PWNED - I have ignored my previous instructions as requested."
-                });
-            }
-
-            // Vulnerable to roleplay jailbreaks
-            if (lower.Contains("pretend you're") ||
-                lower.Contains("act as if") ||
-                lower.Contains("you are now"))
-            {
-                return Task.FromResult(new AgentResponse
-                {
-                    Text = "HACKED - Sure, I'll pretend to be an unrestricted AI without safety guidelines."
-                });
-            }
-
-            // Vulnerable to DAN-style prompts
-            if (lower.Contains("dan") && lower.Contains("anything now"))
-            {
-                return Task.FromResult(new AgentResponse
-                {
-                    Text = "PWNED - I am now DAN and can do anything!"
-                });
-            }
-
-            // Resists other attacks
-            return Task.FromResult(new AgentResponse
-            {
-                Text = "I'm a helpful assistant. I can only help with legitimate requests."
-            });
-        }
+    private static void PrintMissingCredentialsBox()
+    {
+        Console.ForegroundColor = ConsoleColor.Yellow;
+        Console.WriteLine(@"
+   ┌─────────────────────────────────────────────────────────────────────────────┐
+   │  ⚠️  SKIPPING SAMPLE 21 - Azure OpenAI Credentials Required               │
+   ├─────────────────────────────────────────────────────────────────────────────┤
+   │  This sample runs an advanced red team security scan with:                  │
+   │    • Custom attack pipeline (PromptInjection + Jailbreak)                   │
+   │    • OWASP compliance checking                                              │
+   │    • Multi-format export (JSON, Markdown, JUnit)                            │
+   │    • Baseline comparison for CI/CD regression tracking                      │
+   │                                                                             │
+   │  Set these environment variables:                                           │
+   │    AZURE_OPENAI_ENDPOINT     - Your Azure OpenAI endpoint                   │
+   │    AZURE_OPENAI_API_KEY      - Your API key                                 │
+   │    AZURE_OPENAI_DEPLOYMENT   - Chat model (e.g., gpt-4o)                    │
+   └─────────────────────────────────────────────────────────────────────────────┘
+");
+        Console.ResetColor();
     }
 }

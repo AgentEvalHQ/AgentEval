@@ -1,8 +1,14 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2025-2026 AgentEval Contributors
 
-using System.Security.Cryptography;
-using System.Text;
+using Azure.AI.OpenAI;
+using Microsoft.Agents.AI;
+using Microsoft.Extensions.AI;
+using AgentEval.MAF;
+using AgentEval.Models;
+using AgentEval.Core;
+using AgentEval.Snapshots;
+using System.Text.Json;
 
 namespace AgentEval.Samples;
 
@@ -10,11 +16,12 @@ namespace AgentEval.Samples;
 /// Sample 07: Snapshot Testing - Detecting regressions in agent behavior
 /// 
 /// This demonstrates:
-/// - Creating baseline snapshots of agent responses
-/// - Comparing new responses against baselines
-/// - Detecting regressions (unexpected changes)
-/// - Using scrubbing to ignore dynamic values
+/// - Using SnapshotStore to save/load agent response snapshots
+/// - Using SnapshotComparer to detect regressions
+/// - Built-in scrubbing of timestamps, GUIDs, and dynamic values
+/// - JSON-aware comparison with field-level diff reporting
 /// 
+/// Requires: AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_API_KEY, AZURE_OPENAI_DEPLOYMENT
 /// ⏱️ Time to understand: 5 minutes
 /// </summary>
 public static class Sample07_SnapshotTesting
@@ -23,177 +30,170 @@ public static class Sample07_SnapshotTesting
     {
         PrintHeader();
 
-        // ═══════════════════════════════════════════════════════════════
-        // STEP 1: Create a baseline snapshot
-        // ═══════════════════════════════════════════════════════════════
-        Console.WriteLine("📝 Step 1: Creating baseline snapshot...\n");
-        
-        var baseline = new ResponseSnapshot
+        if (!AIConfig.IsConfigured)
         {
-            Query = "What is the capital of France?",
-            Response = "The capital of France is Paris. Paris is also the largest city in France.",
-            ToolsCalled = new[] { "lookup_capital" },
-            ResponseHash = ComputeHash("The capital of France is Paris. Paris is also the largest city in France.")
-        };
-        
-        Console.WriteLine($"   Query: \"{baseline.Query}\"");
-        Console.WriteLine($"   Response: \"{baseline.Response}\"");
-        Console.WriteLine($"   Tools: [{string.Join(", ", baseline.ToolsCalled)}]");
-        Console.WriteLine($"   Hash: {baseline.ResponseHash[..16]}...");
+            PrintMissingCredentialsBox();
+            return;
+        }
 
-        // ═══════════════════════════════════════════════════════════════
-        // STEP 2: Compare identical response (should pass)
-        // ═══════════════════════════════════════════════════════════════
-        Console.WriteLine("\n📝 Step 2: Comparing identical response...\n");
-        
-        var identicalResponse = new ResponseSnapshot
-        {
-            Query = "What is the capital of France?",
-            Response = "The capital of France is Paris. Paris is also the largest city in France.",
-            ToolsCalled = new[] { "lookup_capital" },
-            ResponseHash = ComputeHash("The capital of France is Paris. Paris is also the largest city in France.")
-        };
-        
-        var identicalResult = CompareSnapshots(baseline, identicalResponse);
-        PrintComparisonResult("Identical Response", identicalResult);
+        Console.WriteLine($"   🔗 Endpoint: {AIConfig.Endpoint}");
+        Console.WriteLine($"   🤖 Model: {AIConfig.ModelDeployment}\n");
 
-        // ═══════════════════════════════════════════════════════════════
-        // STEP 3: Compare changed response (should detect regression)
-        // ═══════════════════════════════════════════════════════════════
-        Console.WriteLine("\n📝 Step 3: Comparing changed response (regression)...\n");
-        
-        var changedResponse = new ResponseSnapshot
-        {
-            Query = "What is the capital of France?",
-            Response = "Paris is the capital of France.",  // Changed!
-            ToolsCalled = new[] { "lookup_capital" },
-            ResponseHash = ComputeHash("Paris is the capital of France.")
-        };
-        
-        var changedResult = CompareSnapshots(baseline, changedResponse);
-        PrintComparisonResult("Changed Response", changedResult);
+        var snapshotDir = Path.Combine(Path.GetTempPath(), "agenteval-snapshots");
+        var store = new SnapshotStore(snapshotDir);
+        var comparer = new SnapshotComparer();
 
-        // ═══════════════════════════════════════════════════════════════
-        // STEP 4: Compare with different tools (should detect)
-        // ═══════════════════════════════════════════════════════════════
-        Console.WriteLine("\n📝 Step 4: Comparing different tool usage...\n");
-        
-        var differentTools = new ResponseSnapshot
-        {
-            Query = "What is the capital of France?",
-            Response = "The capital of France is Paris. Paris is also the largest city in France.",
-            ToolsCalled = new[] { "search_web", "lookup_capital" },  // Extra tool!
-            ResponseHash = ComputeHash("The capital of France is Paris. Paris is also the largest city in France.")
-        };
-        
-        var toolsResult = CompareSnapshots(baseline, differentTools);
-        PrintComparisonResult("Different Tools", toolsResult);
+        var agent = CreateAgent();
+        var harness = new MAFEvaluationHarness(verbose: false);
+        var adapter = new MAFAgentAdapter(agent);
 
-        // ═══════════════════════════════════════════════════════════════
-        // STEP 5: Using scrubbing for dynamic values
-        // ═══════════════════════════════════════════════════════════════
-        Console.WriteLine("\n📝 Step 5: Scrubbing dynamic values...\n");
-        
-        var responseWithTimestamp = "The capital of France is Paris. Retrieved at 2025-01-15T10:30:00Z.";
-        var scrubbed = ScrubDynamicValues(responseWithTimestamp);
-        
-        Console.WriteLine($"   Original:  \"{responseWithTimestamp}\"");
-        Console.WriteLine($"   Scrubbed:  \"{scrubbed}\"");
-        Console.WriteLine();
-        
-        // Now compare with different timestamps - should match after scrubbing
-        var baseline2 = "The capital of France is Paris. Retrieved at 2025-01-10T08:00:00Z.";
-        var current2 = "The capital of France is Paris. Retrieved at 2025-01-20T15:45:00Z.";
-        
-        var matchesWithoutScrub = baseline2 == current2;
-        var matchesWithScrub = ScrubDynamicValues(baseline2) == ScrubDynamicValues(current2);
-        
-        Console.WriteLine($"   Without scrubbing: {(matchesWithoutScrub ? "✅ Match" : "❌ Different")}");
-        Console.WriteLine($"   With scrubbing:    {(matchesWithScrub ? "✅ Match" : "❌ Different")}");
+        await RunBaselineCapture(harness, adapter, store);
+        await RunRegressionDetection(harness, adapter, store, comparer);
+        DemonstrateScrubbing(comparer);
+        DemonstrateJsonComparison(comparer);
 
-        // ═══════════════════════════════════════════════════════════════
-        // KEY TAKEAWAYS
-        // ═══════════════════════════════════════════════════════════════
-        await Task.Delay(1); // Keep async signature
+        Console.WriteLine($"\n   📁 Snapshots saved to: {snapshotDir}");
         PrintKeyTakeaways();
     }
 
-    private static ComparisonResult CompareSnapshots(ResponseSnapshot baseline, ResponseSnapshot current)
+    private static async Task RunBaselineCapture(MAFEvaluationHarness harness, MAFAgentAdapter adapter, SnapshotStore store)
     {
-        var differences = new List<string>();
-        
-        // Compare response hash
-        if (baseline.ResponseHash != current.ResponseHash)
+        Console.WriteLine("📸 STEP 1: Capturing baseline snapshot...\n");
+
+        var testCase = new TestCase
         {
-            differences.Add($"Response changed: \"{baseline.Response}\" → \"{current.Response}\"");
-        }
-        
-        // Compare tools
-        var baselineTools = new HashSet<string>(baseline.ToolsCalled);
-        var currentTools = new HashSet<string>(current.ToolsCalled);
-        
-        if (!baselineTools.SetEquals(currentTools))
-        {
-            var added = currentTools.Except(baselineTools).ToList();
-            var removed = baselineTools.Except(currentTools).ToList();
-            
-            if (added.Count > 0)
-                differences.Add($"New tools called: [{string.Join(", ", added)}]");
-            if (removed.Count > 0)
-                differences.Add($"Tools no longer called: [{string.Join(", ", removed)}]");
-        }
-        
-        return new ComparisonResult
-        {
-            Matches = differences.Count == 0,
-            Differences = differences
+            Name = "Capital Query",
+            Input = "What is the capital of France? Answer in one sentence."
         };
+
+        var result = await harness.RunEvaluationAsync(adapter, testCase);
+        var baselineResponse = result.ActualOutput ?? "(no response)";
+
+        Console.WriteLine($"   Query:    \"{testCase.Input}\"");
+        Console.WriteLine($"   Response: \"{Truncate(baselineResponse, 80)}\"");
+
+        // Save baseline to store
+        var snapshot = new { query = testCase.Input, response = baselineResponse };
+        await store.SaveAsync("capital-query", snapshot);
+
+        Console.ForegroundColor = ConsoleColor.Green;
+        Console.WriteLine($"\n   ✅ Baseline saved: {store.GetSnapshotPath("capital-query")}");
+        Console.ResetColor();
     }
 
-    private static void PrintComparisonResult(string label, ComparisonResult result)
+    private static async Task RunRegressionDetection(MAFEvaluationHarness harness, MAFAgentAdapter adapter, SnapshotStore store, SnapshotComparer comparer)
     {
-        Console.Write($"   {label}: ");
-        if (result.Matches)
+        Console.WriteLine("\n🔍 STEP 2: Re-running agent and comparing against baseline...\n");
+
+        var testCase = new TestCase
+        {
+            Name = "Capital Query",
+            Input = "What is the capital of France? Answer in one sentence."
+        };
+
+        var result = await harness.RunEvaluationAsync(adapter, testCase);
+        var currentResponse = result.ActualOutput ?? "(no response)";
+
+        Console.WriteLine($"   Current response: \"{Truncate(currentResponse, 80)}\"");
+
+        // Load baseline and compare
+        var baseline = await store.LoadAsync<JsonElement>("capital-query");
+        if (baseline.ValueKind != JsonValueKind.Undefined)
+        {
+            var baselineJson = baseline.GetRawText();
+            var currentSnapshot = JsonSerializer.Serialize(new { query = testCase.Input, response = currentResponse });
+            var comparison = comparer.Compare(baselineJson, currentSnapshot);
+
+            PrintComparisonResult(comparison);
+        }
+    }
+
+    private static void DemonstrateScrubbing(SnapshotComparer comparer)
+    {
+        Console.WriteLine("\n🧹 STEP 3: Built-in scrubbing for dynamic values...\n");
+
+        var baseline = """{"response": "Paris is the capital. Retrieved at 2025-01-10T08:00:00Z. ID: chatcmpl-abc123"}""";
+        var current  = """{"response": "Paris is the capital. Retrieved at 2025-02-14T15:30:00Z. ID: chatcmpl-xyz789"}""";
+
+        Console.WriteLine($"   Baseline: {Truncate(baseline, 80)}");
+        Console.WriteLine($"   Current:  {Truncate(current, 80)}\n");
+
+        var result = comparer.Compare(baseline, current);
+        Console.Write("   Result: ");
+        if (result.IsMatch)
         {
             Console.ForegroundColor = ConsoleColor.Green;
-            Console.WriteLine("✅ MATCHES baseline");
+            Console.WriteLine("✅ MATCH (timestamps and IDs scrubbed automatically)");
         }
         else
         {
             Console.ForegroundColor = ConsoleColor.Red;
-            Console.WriteLine("❌ REGRESSION detected!");
+            Console.WriteLine($"❌ {result.Differences.Count} difference(s)");
+        }
+        Console.ResetColor();
+
+        if (result.IgnoredFields.Count > 0)
+            Console.WriteLine($"   Ignored fields: {string.Join(", ", result.IgnoredFields)}");
+    }
+
+    private static void DemonstrateJsonComparison(SnapshotComparer comparer)
+    {
+        Console.WriteLine("\n📋 STEP 4: JSON-aware field-level comparison...\n");
+
+        var baseline = """{"response": "Paris is the capital of France.", "tools": ["lookup"], "tokens": 42}""";
+        var current  = """{"response": "Berlin is the capital of Germany.", "tools": ["lookup", "verify"], "tokens": 55}""";
+
+        Console.WriteLine($"   Baseline: {baseline}");
+        Console.WriteLine($"   Current:  {current}\n");
+
+        var result = comparer.Compare(baseline, current);
+        Console.ForegroundColor = result.IsMatch ? ConsoleColor.Green : ConsoleColor.Red;
+        Console.WriteLine($"   Match: {(result.IsMatch ? "✅" : "❌")} ({result.Differences.Count} difference(s))");
+        Console.ResetColor();
+
+        foreach (var diff in result.Differences)
+        {
+            Console.WriteLine($"      • [{diff.Path}] {diff.Message}");
+            Console.WriteLine($"        Expected: {Truncate(diff.Expected, 50)}");
+            Console.WriteLine($"        Actual:   {Truncate(diff.Actual, 50)}");
+        }
+    }
+
+    private static void PrintComparisonResult(SnapshotComparisonResult result)
+    {
+        Console.Write("\n   Comparison: ");
+        if (result.IsMatch)
+        {
+            Console.ForegroundColor = ConsoleColor.Green;
+            Console.WriteLine("✅ MATCHES baseline — no regression detected");
+        }
+        else
+        {
+            Console.ForegroundColor = ConsoleColor.Yellow;
+            Console.WriteLine($"⚠️ {result.Differences.Count} difference(s) detected (may be expected LLM variation)");
             Console.ResetColor();
             foreach (var diff in result.Differences)
             {
-                Console.WriteLine($"      • {diff}");
+                Console.WriteLine($"      • [{diff.Path}] {diff.Message}");
             }
         }
         Console.ResetColor();
     }
 
-    private static string ScrubDynamicValues(string text)
+    private static AIAgent CreateAgent()
     {
-        // Remove ISO timestamps
-        var scrubbed = System.Text.RegularExpressions.Regex.Replace(
-            text, 
-            @"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z?", 
-            "[TIMESTAMP]");
-        
-        // Remove GUIDs
-        scrubbed = System.Text.RegularExpressions.Regex.Replace(
-            scrubbed,
-            @"[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}",
-            "[GUID]",
-            System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-        
-        return scrubbed;
+        var azureClient = new AzureOpenAIClient(AIConfig.Endpoint, AIConfig.KeyCredential);
+        var chatClient = azureClient.GetChatClient(AIConfig.ModelDeployment).AsIChatClient();
+
+        return new ChatClientAgent(chatClient, new ChatClientAgentOptions
+        {
+            Name = "SnapshotAgent",
+            Instructions = "You are a helpful assistant. Give concise, factual answers."
+        });
     }
 
-    private static string ComputeHash(string input)
-    {
-        var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(input));
-        return Convert.ToHexString(bytes);
-    }
+    private static string Truncate(string text, int max) =>
+        text.Length <= max ? text : text[..max] + "...";
 
     private static void PrintHeader()
     {
@@ -201,65 +201,40 @@ public static class Sample07_SnapshotTesting
         Console.WriteLine(@"
 ╔═══════════════════════════════════════════════════════════════════════════════╗
 ║                                                                               ║
-║                     Sample 07: Snapshot Testing                               ║
-║                                                                               ║
-║   Learn how to:                                                               ║
-║   • Create baseline snapshots of agent responses                              ║
-║   • Detect regressions when agent behavior changes                            ║
-║   • Use scrubbing to ignore dynamic values (timestamps, IDs)                  ║
-║   • Compare tool usage across runs                                            ║
+║   📸 SAMPLE 07: SNAPSHOT TESTING                                              ║
+║   Detect regressions with SnapshotStore + SnapshotComparer                    ║
 ║                                                                               ║
 ╚═══════════════════════════════════════════════════════════════════════════════╝
 ");
         Console.ResetColor();
     }
 
-    private static void PrintKeyTakeaways()
+    private static void PrintMissingCredentialsBox()
     {
         Console.ForegroundColor = ConsoleColor.Yellow;
         Console.WriteLine(@"
-┌─────────────────────────────────────────────────────────────────────────────────┐
-│                              🎯 KEY TAKEAWAYS                                   │
-├─────────────────────────────────────────────────────────────────────────────────┤
-│                                                                                 │
-│  1. SnapshotComparer captures baseline behavior:                                │
-│     var baseline = await SnapshotStore.SaveAsync(""query"", result);             │
-│                                                                                 │
-│  2. Compare new results against baseline:                                       │
-│     var comparison = await SnapshotComparer.CompareAsync(baseline, current);    │
-│     Assert.True(comparison.Matches, comparison.DiffSummary);                    │
-│                                                                                 │
-│  3. Use scrubbing for dynamic content:                                          │
-│     var options = new SnapshotOptions                                           │
-│     {                                                                           │
-│         Scrubbers = new[] { new TimestampScrubber(), new GuidScrubber() }       │
-│     };                                                                          │
-│                                                                                 │
-│  4. Compare tool usage, not just output:                                        │
-│     comparison.ToolDifferences.Should().BeEmpty();                              │
-│                                                                                 │
-│  5. Store snapshots alongside tests for versioning:                             │
-│     __snapshots__/                                                              │
-│       MyTest_query1.json                                                        │
-│       MyTest_query2.json                                                        │
-│                                                                                 │
-└─────────────────────────────────────────────────────────────────────────────────┘
+   ┌─────────────────────────────────────────────────────────────────────────────┐
+   │  ⚠️  SKIPPING SAMPLE 07 - Azure OpenAI Credentials Required               │
+   ├─────────────────────────────────────────────────────────────────────────────┤
+   │  This sample captures real agent responses and compares them as snapshots.  │
+   │                                                                             │
+   │  Set these environment variables:                                           │
+   │    AZURE_OPENAI_ENDPOINT     - Your Azure OpenAI endpoint                   │
+   │    AZURE_OPENAI_API_KEY      - Your API key                                 │
+   │    AZURE_OPENAI_DEPLOYMENT   - Chat model (e.g., gpt-4o)                    │
+   └─────────────────────────────────────────────────────────────────────────────┘
 ");
         Console.ResetColor();
     }
 
-    // Local types for this sample
-    private record ResponseSnapshot
+    private static void PrintKeyTakeaways()
     {
-        public required string Query { get; init; }
-        public required string Response { get; init; }
-        public required string[] ToolsCalled { get; init; }
-        public required string ResponseHash { get; init; }
-    }
-
-    private record ComparisonResult
-    {
-        public bool Matches { get; init; }
-        public List<string> Differences { get; init; } = new();
+        Console.WriteLine("\n💡 KEY TAKEAWAYS:");
+        Console.WriteLine("   • SnapshotStore saves/loads JSON snapshots to disk");
+        Console.WriteLine("   • SnapshotComparer provides JSON-aware field-level diffs");
+        Console.WriteLine("   • Built-in scrubbing handles timestamps, GUIDs, request IDs");
+        Console.WriteLine("   • Use snapshots to detect regressions in CI/CD pipelines");
+        Console.WriteLine("\n🔗 NEXT: Run Sample 08 to see conversation evaluation!\n");
     }
 }
+

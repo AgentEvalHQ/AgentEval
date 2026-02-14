@@ -57,6 +57,7 @@
             "approve": true,
             "matchCommandLine": true
         },
-        "dotnet clean": true
+        "dotnet clean": true,
+        "Get-Item": true
     }
 }

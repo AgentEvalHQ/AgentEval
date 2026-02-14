@@ -28,54 +28,53 @@ public static class Sample02_AgentWithOneTool
     {
         PrintHeader();
 
-        // ═══════════════════════════════════════════════════════════════
-        // STEP 1: Create an agent with a tool
-        // ═══════════════════════════════════════════════════════════════
-        Console.WriteLine("📝 Step 1: Creating agent with a calculator tool...\n");
-        
         var agent = CreateCalculatorAgent();
-        Console.WriteLine($"   ✓ Agent '{agent.Name}' created");
-        Console.WriteLine("   🔧 Tool: CalculatorTool - Performs basic math\n");
+        PrintAgentCreated(agent);
 
-        // ═══════════════════════════════════════════════════════════════
-        // STEP 2: Create evaluation harness with tool tracking
-        // ═══════════════════════════════════════════════════════════════
-        Console.WriteLine("📝 Step 2: Creating evaluation harness with tool tracking...\n");
-        
         var harness = new MAFEvaluationHarness(verbose: true);
-        Console.WriteLine("   ✓ evaluation harness ready\n");
+        Console.WriteLine("📝 Step 2: Evaluation harness ready\n");
 
-        // ═══════════════════════════════════════════════════════════════
-        // STEP 3: Define test case expecting tool usage
-        // ═══════════════════════════════════════════════════════════════
-        Console.WriteLine("📝 Step 3: Defining test case...\n");
-        
-        var testCase = new TestCase
-        {
-            Name = "Calculator Tool Test",
-            Input = "What is 42 multiplied by 17?",
-            ExpectedTools = ["CalculatorTool"]  // We expect this tool to be called
-        };
-        
-        Console.WriteLine($"   Test: {testCase.Name}");
-        Console.WriteLine($"   Input: \"{testCase.Input}\"");
-        Console.WriteLine($"   Expected Tool: {string.Join(", ", testCase.ExpectedTools!)}\n");
+        var testCase = CreateCalculatorTestCase();
+        PrintTestCaseDetails(testCase);
 
-        // ═══════════════════════════════════════════════════════════════
-        // STEP 4: Run test with tool tracking enabled
-        // ═══════════════════════════════════════════════════════════════
-        Console.WriteLine("📝 Step 4: Running test with tool tracking...\n");
-        
         var adapter = new MAFAgentAdapter(agent);
         var result = await harness.RunEvaluationAsync(adapter, testCase, new EvaluationOptions
         {
-            TrackTools = true,  // Enable tool tracking
+            TrackTools = true,
             TrackPerformance = true
         });
 
-        // ═══════════════════════════════════════════════════════════════
-        // STEP 5: Display results
-        // ═══════════════════════════════════════════════════════════════
+        PrintResults(result);
+        RunFluentAssertions(result);
+        PrintKeyTakeaways();
+    }
+
+    private static void PrintAgentCreated(AIAgent agent)
+    {
+        Console.WriteLine($"📝 Step 1: Agent '{agent.Name}' created");
+        Console.WriteLine("   🔧 Tool: CalculatorTool - Performs basic math\n");
+    }
+
+    private static TestCase CreateCalculatorTestCase()
+    {
+        return new TestCase
+        {
+            Name = "Calculator Tool Test",
+            Input = "What is 42 multiplied by 17?",
+            ExpectedTools = ["CalculatorTool"]
+        };
+    }
+
+    private static void PrintTestCaseDetails(TestCase testCase)
+    {
+        Console.WriteLine($"📝 Step 3: Test case defined");
+        Console.WriteLine($"   Test: {testCase.Name}");
+        Console.WriteLine($"   Input: \"{testCase.Input}\"");
+        Console.WriteLine($"   Expected Tool: {string.Join(", ", testCase.ExpectedTools!)}\n");
+    }
+
+    private static void PrintResults(TestResult result)
+    {
         Console.WriteLine("\n📊 RESULTS:");
         Console.WriteLine(new string('─', 60));
         
@@ -92,17 +91,16 @@ public static class Sample02_AgentWithOneTool
                 Console.WriteLine($"      {status} {tool.Name} ({duration})");
             }
         }
+    }
 
-        // ═══════════════════════════════════════════════════════════════
-        // STEP 6: Demonstrate fluent assertions
-        // ═══════════════════════════════════════════════════════════════
+    private static void RunFluentAssertions(TestResult result)
+    {
         Console.WriteLine("\n📝 Step 6: Running fluent assertions...\n");
         
         if (result.ToolUsage != null)
         {
             try
             {
-                // Fluent tool assertions with 'because' for self-documenting tests!
                 result.ToolUsage
                     .Should()
                     .HaveCalledTool("CalculatorTool",
@@ -142,10 +140,10 @@ public static class Sample02_AgentWithOneTool
         }
 
         Console.WriteLine(new string('─', 60));
+    }
 
-        // ═══════════════════════════════════════════════════════════════
-        // Summary
-        // ═══════════════════════════════════════════════════════════════
+    private static void PrintKeyTakeaways()
+    {
         Console.WriteLine("\n💡 KEY TAKEAWAYS:");
         Console.WriteLine("   • Set TrackTools = true in EvaluationOptions to track tool calls");
         Console.WriteLine("   • result.ToolUsage contains all tool call information");
@@ -250,46 +248,67 @@ public static class Sample02_AgentWithOneTool
         }
         Console.ResetColor();
     }
-}
 
-/// <summary>
-/// Mock chat client that simulates tool calling for demo without Azure.
-/// </summary>
-internal class MockCalculatorChatClient : IChatClient
-{
-    private int _callCount = 0;
-
-    public ChatClientMetadata Metadata => new("MockCalculatorClient");
-
-    public Task<ChatResponse> GetResponseAsync(
-        IEnumerable<ChatMessage> chatMessages,
-        ChatOptions? options = null,
-        CancellationToken cancellationToken = default)
+    /// <summary>
+    /// Mock chat client that simulates tool calling for tutorial demo without Azure.
+    /// Private to Sample02 to avoid naming collisions.
+    /// </summary>
+    private class MockCalculatorChatClient : IChatClient
     {
-        _callCount++;
-        
-        // First call: return tool call request
-        if (_callCount == 1)
+        private int _callCount = 0;
+
+        public ChatClientMetadata Metadata => new("MockCalculatorClient");
+
+        public Task<ChatResponse> GetResponseAsync(
+            IEnumerable<ChatMessage> chatMessages,
+            ChatOptions? options = null,
+            CancellationToken cancellationToken = default)
         {
-            var toolCall = new FunctionCallContent("call_1", "CalculatorTool", 
-                new Dictionary<string, object?> { ["a"] = 42, ["b"] = 17, ["operation"] = "multiply" });
-            var message = new ChatMessage(ChatRole.Assistant, [toolCall]);
-            return Task.FromResult(new ChatResponse(message) { FinishReason = ChatFinishReason.ToolCalls });
+            _callCount++;
+            
+            if (_callCount == 1)
+            {
+                var toolCall = new FunctionCallContent("call_1", "CalculatorTool", 
+                    new Dictionary<string, object?> { ["a"] = 42, ["b"] = 17, ["operation"] = "multiply" });
+                var message = new ChatMessage(ChatRole.Assistant, [toolCall]);
+                return Task.FromResult(new ChatResponse(message) { FinishReason = ChatFinishReason.ToolCalls });
+            }
+            
+            var response = new ChatMessage(ChatRole.Assistant, "42 multiplied by 17 equals **714**.");
+            return Task.FromResult(new ChatResponse(response));
         }
-        
-        // Second call: return final response after tool result
-        var response = new ChatMessage(ChatRole.Assistant, "42 multiplied by 17 equals **714**.");
-        return Task.FromResult(new ChatResponse(response));
-    }
 
-    public IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(
-        IEnumerable<ChatMessage> chatMessages,
-        ChatOptions? options = null,
-        CancellationToken cancellationToken = default)
-    {
-        throw new NotImplementedException();
-    }
+        public async IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(
+            IEnumerable<ChatMessage> chatMessages,
+            ChatOptions? options = null,
+            [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
+        {
+            _callCount++;
 
-    public object? GetService(Type serviceType, object? key = null) => null;
-    public void Dispose() { }
+            if (_callCount == 1)
+            {
+                yield return new ChatResponseUpdate
+                {
+                    Role = ChatRole.Assistant,
+                    Contents = [new FunctionCallContent("call_1", "CalculatorTool",
+                        new Dictionary<string, object?> { ["a"] = 42, ["b"] = 17, ["operation"] = "multiply" })],
+                    FinishReason = ChatFinishReason.ToolCalls
+                };
+                yield break;
+            }
+
+            foreach (var word in "42 multiplied by 17 equals **714**.".Split(' '))
+            {
+                await Task.Delay(50, cancellationToken);
+                yield return new ChatResponseUpdate
+                {
+                    Role = ChatRole.Assistant,
+                    Contents = [new TextContent(word + " ")]
+                };
+            }
+        }
+
+        public object? GetService(Type serviceType, object? key = null) => null;
+        public void Dispose() { }
+    }
 }

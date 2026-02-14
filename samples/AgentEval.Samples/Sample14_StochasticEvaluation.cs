@@ -40,19 +40,13 @@ public static class Sample14_StochasticEvaluation
         
         // Print endpoint for verification
         Console.WriteLine($"   🔗 Endpoint: {AIConfig.Endpoint}");
-        Console.WriteLine($"   🤖 Model: {AIConfig.ModelDeployment} (GPT-5 Mini)\n");
+        Console.WriteLine($"   🤖 Model: {AIConfig.ModelDeployment}\n");
         
-        // ═══════════════════════════════════════════════════════════════
-        // STEP 1: Create agent with calculator tool
-        // ═══════════════════════════════════════════════════════════════
         Console.WriteLine("📝 Step 1: Creating agent with calculator tool...\n");
         
         var agent = CreateAgentWithCalculator();
         Console.WriteLine($"   ✓ Agent created with CalculatorTool\n");
         
-        // ═══════════════════════════════════════════════════════════════
-        // STEP 2: Set up stochastic runner
-        // ═══════════════════════════════════════════════════════════════
         Console.WriteLine("📝 Step 2: Setting up stochastic runner...\n");
         
         var harness = new MAFEvaluationHarness(verbose: false);
@@ -64,9 +58,6 @@ public static class Sample14_StochasticEvaluation
         });
         Console.WriteLine("   ✓ Stochastic runner ready\n");
         
-        // ═══════════════════════════════════════════════════════════════
-        // STEP 3: Run stochastic test (3 runs for demo speed)
-        // ═══════════════════════════════════════════════════════════════
         Console.WriteLine("📝 Step 3: Running stochastic test (3 runs)...\n");
         
         var testCase = new TestCase
@@ -98,9 +89,6 @@ public static class Sample14_StochasticEvaluation
         var result = await stochasticRunner.RunStochasticTestAsync(agent, testCase, options);
         Console.WriteLine(); // Extra line after progress
         
-        // ═══════════════════════════════════════════════════════════════
-        // STEP 4: Display results in table format
-        // ═══════════════════════════════════════════════════════════════
         Console.WriteLine("📝 Step 4: Results\n");
         Console.WriteLine($"   {result.Summary}\n");
         
@@ -110,9 +98,6 @@ public static class Sample14_StochasticEvaluation
         // Tool usage summary
         result.PrintToolSummary("CalculatorTool");
         
-        // ═══════════════════════════════════════════════════════════════
-        // STEP 5: Assertions
-        // ═══════════════════════════════════════════════════════════════
         Console.WriteLine("\n📝 Step 5: Assertions\n");
         
         try

@@ -35,27 +35,12 @@ public static class Sample09_WorkflowEvaluationReal
     {
         PrintHeader();
 
-        // ═══════════════════════════════════════════════════════════════
-        // STEP 0: Credential check — this sample requires real LLM calls
-        // ═══════════════════════════════════════════════════════════════
         if (!AIConfig.IsConfigured)
         {
-            Console.ForegroundColor = ConsoleColor.Yellow;
-            Console.WriteLine("  ⚠️  Azure OpenAI credentials are not configured.");
-            Console.WriteLine("      Sample 09 requires real Azure OpenAI credentials. Skipping.");
-            Console.WriteLine();
-            Console.WriteLine("      Set the following environment variables:");
-            Console.WriteLine("        AZURE_OPENAI_ENDPOINT     = https://your-resource.openai.azure.com/");
-            Console.WriteLine("        AZURE_OPENAI_API_KEY      = your-api-key");
-            Console.WriteLine("        AZURE_OPENAI_DEPLOYMENT   = gpt-4o");
-            Console.ResetColor();
-            Console.WriteLine();
+            PrintMissingCredentialsBox();
             return;
         }
 
-        // ═══════════════════════════════════════════════════════════════
-        // STEP 1: Build the real MAF Workflow
-        // ═══════════════════════════════════════════════════════════════
         Console.WriteLine("📝 Step 1: Building real MAF Workflow with WorkflowBuilder...\n");
 
         var (workflow, executorIds) = CreateWorkflow();
@@ -65,9 +50,6 @@ public static class Sample09_WorkflowEvaluationReal
         Console.WriteLine($"   Executors     : {string.Join(" → ", executorIds)}");
         Console.WriteLine($"   Mode          : 🚀 REAL (Azure OpenAI — {AIConfig.ModelDeployment})\n");
 
-        // ═══════════════════════════════════════════════════════════════
-        // STEP 2: Create MAFWorkflowAdapter from the real workflow
-        // ═══════════════════════════════════════════════════════════════
         Console.WriteLine("📝 Step 2: Creating MAFWorkflowAdapter.FromMAFWorkflow()...\n");
 
         var workflowAdapter = MAFWorkflowAdapter.FromMAFWorkflow(
@@ -83,9 +65,6 @@ public static class Sample09_WorkflowEvaluationReal
         Console.WriteLine($"   Entry node     : {workflowAdapter.GraphDefinition?.EntryNodeId}");
         Console.WriteLine($"   Exit node(s)   : {string.Join(", ", workflowAdapter.GraphDefinition?.ExitNodeIds ?? [])}\n");
 
-        // ═══════════════════════════════════════════════════════════════
-        // STEP 3: Create test case
-        // ═══════════════════════════════════════════════════════════════
         Console.WriteLine("📝 Step 3: Creating workflow test case...\n");
 
         var testCase = new WorkflowTestCase
@@ -105,23 +84,35 @@ public static class Sample09_WorkflowEvaluationReal
         Console.WriteLine($"   Flow     : {string.Join(" → ", testCase.ExpectedExecutors!)}");
         Console.WriteLine($"   Timeout  : {testCase.MaxDuration!.Value.TotalSeconds}s\n");
 
-        // ═══════════════════════════════════════════════════════════════
-        // STEP 4: Run workflow test with harness
-        // ═══════════════════════════════════════════════════════════════
         Console.WriteLine("📝 Step 4: Running workflow test with full evaluation...\n");
         Console.WriteLine("   ⏳ Executing real LLM calls — this may take 30–90 seconds...\n");
 
         var harness = new WorkflowEvaluationHarness(verbose: true);
         var testOptions = new WorkflowTestOptions
         {
-            Timeout = TimeSpan.FromMinutes(3),
+            Timeout = TimeSpan.FromMinutes(5),
             Verbose = true
         };
 
         WorkflowTestResult testResult;
         try
         {
-            testResult = await harness.RunWorkflowTestAsync(workflowAdapter, testCase, testOptions);
+            // Hard timeout wrapper — MAF's InProcessExecution may not honor
+            // cancellation tokens during active LLM calls, so we enforce a
+            // ceiling via Task.WhenAny to prevent indefinite hangs.
+            var workflowTask = harness.RunWorkflowTestAsync(workflowAdapter, testCase, testOptions);
+            var hardTimeout = Task.Delay(TimeSpan.FromMinutes(5));
+
+            if (await Task.WhenAny(workflowTask, hardTimeout) == hardTimeout)
+            {
+                Console.ForegroundColor = ConsoleColor.Yellow;
+                Console.WriteLine("   ⏱️ Workflow exceeded 5-minute hard timeout — moving on.");
+                Console.ResetColor();
+                Console.WriteLine("   💡 This can happen with slow LLM backends or long content-generation chains.");
+                return;
+            }
+
+            testResult = await workflowTask;
         }
         catch (Exception ex)
         {
@@ -133,9 +124,6 @@ public static class Sample09_WorkflowEvaluationReal
             return;
         }
 
-        // ═══════════════════════════════════════════════════════════════
-        // STEP 5: Display detailed results
-        // ═══════════════════════════════════════════════════════════════
         Console.WriteLine("\n📊 DETAILED WORKFLOW RESULTS:");
         Console.WriteLine(new string('═', 80));
 
@@ -168,9 +156,6 @@ public static class Sample09_WorkflowEvaluationReal
             }
         }
 
-        // ═══════════════════════════════════════════════════════════════
-        // STEP 6: Workflow assertions
-        // ═══════════════════════════════════════════════════════════════
         Console.WriteLine("📝 Step 6: Workflow assertions...\n");
 
         if (testResult.ExecutionResult != null)
@@ -232,9 +217,6 @@ public static class Sample09_WorkflowEvaluationReal
             }
         }
 
-        // ═══════════════════════════════════════════════════════════════
-        // STEP 7: Workflow visualization
-        // ═══════════════════════════════════════════════════════════════
         Console.WriteLine("📝 Step 7: Generating workflow visualization...\n");
 
         if (testResult.ExecutionResult != null)
@@ -249,16 +231,17 @@ public static class Sample09_WorkflowEvaluationReal
                     Console.WriteLine($"      {line}");
             }
             Console.ResetColor();
-            Console.WriteLine("\n   💡 Copy the full diagram to https://mermaid.live for visualization!");
+
+            var mermaidPath = Path.Combine(Path.GetTempPath(), "agenteval_sample09_workflow.mmd");
+            await File.WriteAllTextAsync(mermaidPath, mermaid);
+            Console.WriteLine($"\n   💾 Full Mermaid diagram saved to: {mermaidPath}");
+            Console.WriteLine("   💡 Open at https://mermaid.live or paste into any Mermaid-compatible viewer!");
 
             // Timeline JSON
             var timeline = WorkflowSerializer.ToTimelineJson(testResult.ExecutionResult);
             Console.WriteLine($"\n   📊 Timeline JSON generated: {timeline.Length} characters\n");
         }
 
-        // ═══════════════════════════════════════════════════════════════
-        // KEY TAKEAWAYS
-        // ═══════════════════════════════════════════════════════════════
         PrintKeyTakeaways();
     }
 
@@ -370,19 +353,28 @@ public static class Sample09_WorkflowEvaluationReal
         Console.WriteLine(@"
 ╔═══════════════════════════════════════════════════════════════════════════════╗
 ║                                                                               ║
-║          Sample 09: Real MAF Workflow Evaluation                             ║
-║          (WorkflowBuilder + InProcessExecution)                              ║
-║                                                                               ║
-║   Learn how to:                                                               ║
-║   • Build real MAF Workflows with WorkflowBuilder                            ║
-║   • Bind ChatClientAgent instances via BindAsExecutor(emitEvents: true)      ║
-║   • Stream events through MAFWorkflowAdapter.FromMAFWorkflow()               ║
-║   • Evaluate genuine workflow execution with the AgentEval harness           ║
-║   • Extract and validate graph structure from MAF edge reflection            ║
-║                                                                               ║
-║   ⚠️  Requires Azure OpenAI credentials (no mock fallback)                   ║
+║   🔄 SAMPLE 09: REAL MAF WORKFLOW EVALUATION                                 ║
+║   WorkflowBuilder + InProcessExecution                                        ║
 ║                                                                               ║
 ╚═══════════════════════════════════════════════════════════════════════════════╝
+");
+        Console.ResetColor();
+    }
+
+    private static void PrintMissingCredentialsBox()
+    {
+        Console.ForegroundColor = ConsoleColor.Yellow;
+        Console.WriteLine(@"
+   ┌─────────────────────────────────────────────────────────────────────────────┐
+   │  ⚠️  SKIPPING SAMPLE 09 - Azure OpenAI Credentials Required               │
+   ├─────────────────────────────────────────────────────────────────────────────┤
+   │  This sample runs a real 4-agent MAF workflow pipeline.                     │
+   │                                                                             │
+   │  Set these environment variables:                                           │
+   │    AZURE_OPENAI_ENDPOINT     - Your Azure OpenAI endpoint                   │
+   │    AZURE_OPENAI_API_KEY      - Your API key                                 │
+   │    AZURE_OPENAI_DEPLOYMENT   - Chat model (e.g., gpt-4o)                    │
+   └─────────────────────────────────────────────────────────────────────────────┘
 ");
         Console.ResetColor();
     }

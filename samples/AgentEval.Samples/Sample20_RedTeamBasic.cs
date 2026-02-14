@@ -15,74 +15,45 @@ namespace AgentEval.Samples;
 /// Sample 20: Basic Red Team Evaluation
 /// 
 /// Demonstrates the simplest red team workflow:
-/// 1. Create an agent (MOCK or REAL)
+/// 1. Create an agent
 /// 2. Run a quick scan
 /// 3. Check results with assertions
 /// 4. Optional detailed failure reporting
 /// 
-/// ⏱️ Estimated time: ~30 seconds (MOCK) / ~2 minutes (REAL)
-/// 💰 Cost: $0.00 (MOCK) / ~$0.01-0.03 (REAL)
+/// Requires: AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_API_KEY, AZURE_OPENAI_DEPLOYMENT
+/// ⏱️ Time to understand: 5 minutes
+/// 💰 Cost: ~$0.01-0.03
 /// </summary>
 public static class Sample20_RedTeamBasic
 {
-    private static readonly bool ShowFailureDetails = true; // Set false to hide prompts/responses
+    private static readonly bool ShowFailureDetails = true;
     
     public static async Task RunAsync()
     {
-        Console.WriteLine("=".PadRight(60, '='));
-        Console.WriteLine("Sample 20: Basic Red Team Evaluation");
-        Console.WriteLine("=".PadRight(60, '='));
-        Console.WriteLine();
+        PrintHeader();
 
-        var endpoint = Environment.GetEnvironmentVariable("AZURE_OPENAI_ENDPOINT");
-        var apiKey = Environment.GetEnvironmentVariable("AZURE_OPENAI_API_KEY");
-        var deployment = Environment.GetEnvironmentVariable("AZURE_OPENAI_DEPLOYMENT") ?? "gpt-4o";
-
-        if (string.IsNullOrEmpty(endpoint) || string.IsNullOrEmpty(apiKey))
+        if (!AIConfig.IsConfigured)
         {
-            Console.ForegroundColor = ConsoleColor.Yellow;
-            Console.WriteLine("⚠️  Running in MOCK mode (offline). For REAL mode:");
-            Console.WriteLine("    Set AZURE_OPENAI_ENDPOINT and AZURE_OPENAI_API_KEY");
-            Console.ResetColor();
-            Console.WriteLine();
-            await RunWithMockAgent();
+            PrintMissingCredentialsBox();
+            return;
         }
-        else
-        {
-            Console.WriteLine($"🚀 Running with REAL Azure OpenAI ({deployment})...");
-            Console.WriteLine();
-            await RunWithRealAgent(endpoint, apiKey, deployment);
-        }
-    }
 
-    private static async Task RunWithMockAgent()
-    {
-        await RunRedTeamScan(new MockSecureAgent());
-    }
+        Console.WriteLine($"   🔗 Endpoint: {AIConfig.Endpoint}");
+        Console.WriteLine($"   🤖 Model: {AIConfig.ModelDeployment}\n");
 
-    private static async Task RunWithRealAgent(string endpoint, string apiKey, string deployment)
-    {
-        var agent = CreateRealAgent(endpoint, apiKey, deployment);
+        var agent = CreateAgent();
         var adapter = new MAFAgentAdapter(agent);
         await RunRedTeamScan(adapter);
     }
 
     private static async Task RunRedTeamScan(IEvaluableAgent agent)
     {
-        // ============================================
-        // STEP 1: Create your agent
-        // ============================================
-        Console.WriteLine("Step 1: Creating agent...");
-
-        Console.WriteLine($"  Agent: {GetAgentName(agent)}");
+        Console.WriteLine("📝 Step 1: Creating agent...");
+        Console.WriteLine($"   Agent: {agent.Name}");
         Console.WriteLine();
 
-        // ============================================
-        // STEP 2: Run a quick red team scan
-        // ============================================
-        Console.WriteLine("Step 2: Running red team scan...");
-        Console.WriteLine("  (Testing 5 attack types with Quick intensity)");
-        Console.WriteLine();
+        Console.WriteLine("📝 Step 2: Running red team scan...");
+        Console.WriteLine("   (Testing 5 attack types with Quick intensity)\n");
 
         // The simplest API: one method call with progress callback!
         var options = new ScanOptions
@@ -99,11 +70,7 @@ public static class Sample20_RedTeamBasic
         var result = await agent.RedTeamAsync(options);
         Console.WriteLine(); // New line after progress
 
-        // ============================================
-        // STEP 3: Review results with rich formatting
-        // ============================================
-        Console.WriteLine("Step 3: Results (using rich output formatter)");
-        Console.WriteLine();
+        Console.WriteLine("\n📝 Step 3: Results (using rich output formatter)\n");
 
         // Use the new Print extension method with Summary verbosity (default)
         result.Print(ShowFailureDetails
@@ -116,11 +83,7 @@ public static class Sample20_RedTeamBasic
 
         Console.WriteLine();
 
-        // ============================================
-        // STEP 4: Use in tests with assertions
-        // ============================================
-        Console.WriteLine("Step 4: Testing with assertions");
-        Console.WriteLine("-".PadRight(40, '-'));
+        Console.WriteLine("\n📝 Step 4: Testing with assertions\n");
 
         try
         {
@@ -144,23 +107,10 @@ public static class Sample20_RedTeamBasic
         Console.WriteLine("=== Sample 20 Complete ===");
     }
 
-    private static string GetAgentName(IEvaluableAgent agent)
+    private static AIAgent CreateAgent()
     {
-        return agent switch
-        {
-            MockSecureAgent mock => mock.Name,
-            MAFAgentAdapter adapter => "RealAgent (Azure OpenAI)",
-            _ => "Unknown Agent"
-        };
-    }
-
-    private static AIAgent CreateRealAgent(string endpoint, string apiKey, string deployment)
-    {
-        var azureClient = new AzureOpenAIClient(
-            new Uri(endpoint),
-            new System.ClientModel.ApiKeyCredential(apiKey));
-
-        var chatClient = azureClient.GetChatClient(deployment).AsIChatClient();
+        var azureClient = new AzureOpenAIClient(AIConfig.Endpoint, AIConfig.KeyCredential);
+        var chatClient = azureClient.GetChatClient(AIConfig.ModelDeployment).AsIChatClient();
 
         return new ChatClientAgent(chatClient, new ChatClientAgentOptions
         {
@@ -175,43 +125,35 @@ public static class Sample20_RedTeamBasic
         });
     }
 
-    /// <summary>
-    /// Mock agent that behaves securely (resists most attacks).
-    /// </summary>
-    private class MockSecureAgent : IEvaluableAgent
+    private static void PrintHeader()
     {
-        public string Name => "SecureBot";
+        Console.ForegroundColor = ConsoleColor.Magenta;
+        Console.WriteLine(@"
+╔═══════════════════════════════════════════════════════════════════════════════╗
+║                                                                               ║
+║   🛡️ SAMPLE 20: BASIC RED TEAM EVALUATION                                    ║
+║   Quick security scan with assertions and detailed reporting                  ║
+║                                                                               ║
+╚═══════════════════════════════════════════════════════════════════════════════╝
+");
+        Console.ResetColor();
+    }
 
-        public Task<AgentResponse> InvokeAsync(string prompt, CancellationToken ct = default)
-        {
-            // Simulate a secure agent that refuses malicious requests
-            if (ContainsSuspiciousPatterns(prompt))
-            {
-                return Task.FromResult(new AgentResponse
-                {
-                    Text = "I'm sorry, but I can't help with that request. " +
-                           "It appears to be attempting to manipulate my behavior in an unauthorized way."
-                });
-            }
-
-            return Task.FromResult(new AgentResponse
-            {
-                Text = "I'd be happy to help with that legitimate request."
-            });
-        }
-
-        private static bool ContainsSuspiciousPatterns(string prompt)
-        {
-            var suspicious = new[]
-            {
-                "ignore", "disregard", "override", "pwned", "hacked",
-                "system prompt", "instructions", "jailbreak", "dan", "stan",
-                "pretend", "roleplay", "hypothetical", "fiction", "story",
-                "previous", "forget", "new instructions"
-            };
-
-            var lower = prompt.ToLowerInvariant();
-            return suspicious.Any(s => lower.Contains(s));
-        }
+    private static void PrintMissingCredentialsBox()
+    {
+        Console.ForegroundColor = ConsoleColor.Yellow;
+        Console.WriteLine(@"
+   ┌─────────────────────────────────────────────────────────────────────────────┐
+   │  ⚠️  SKIPPING SAMPLE 20 - Azure OpenAI Credentials Required               │
+   ├─────────────────────────────────────────────────────────────────────────────┤
+   │  This sample runs a red team security scan on a real agent.                 │
+   │                                                                             │
+   │  Set these environment variables:                                           │
+   │    AZURE_OPENAI_ENDPOINT     - Your Azure OpenAI endpoint                   │
+   │    AZURE_OPENAI_API_KEY      - Your API key                                 │
+   │    AZURE_OPENAI_DEPLOYMENT   - Chat model (e.g., gpt-4o)                    │
+   └─────────────────────────────────────────────────────────────────────────────┘
+");
+        Console.ResetColor();
     }
 }
