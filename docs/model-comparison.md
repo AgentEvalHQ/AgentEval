@@ -24,7 +24,8 @@ You have options:
 ## Model Comparison in 60 Seconds
 
 ```csharp
-var comparer = new ModelComparer(harness, EvaluationOptions);
+var stochasticRunner = new StochasticRunner(harness, statisticsCalculator: null, EvaluationOptions);
+var comparer = new ModelComparer(stochasticRunner);
 
 var comparison = await comparer.CompareModelsAsync(
     new[] { gpt4oFactory, gpt4oMiniFactory, claudeFactory },
@@ -153,7 +154,8 @@ var metrics = new IMetric[]
 ### Step 4: Run Comparison
 
 ```csharp
-var comparer = new ModelComparer(harness, EvaluationOptions);
+var stochasticRunner = new StochasticRunner(harness, statisticsCalculator: null, EvaluationOptions);
+var comparer = new ModelComparer(stochasticRunner);
 
 var comparison = await comparer.CompareModelsAsync(
     factories: new[] { gpt4oFactory, gpt4oMiniFactory, claudeFactory },

@@ -155,7 +155,7 @@ if (IsProductionSample())
 **Approach:** Run same evaluation multiple times, analyze statistics.
 
 ```csharp
-var runner = new StochasticRunner(harness, options);
+var runner = new StochasticRunner(harness, statisticsCalculator: null, options);
 var result = await runner.RunStochasticTestAsync(
     agent, testCase,
     new StochasticOptions(Runs: 10, SuccessRateThreshold: 0.8));
@@ -173,7 +173,8 @@ result.Statistics.StandardDeviation.Should().BeLessThan(15);
 
 **Approach:**
 ```csharp
-var comparer = new ModelComparer(harness);
+var stochasticRunner = new StochasticRunner(harness);
+var comparer = new ModelComparer(stochasticRunner);
 var results = await comparer.CompareModelsAsync(
     factories: [gpt4Factory, gpt35Factory, claudeFactory],
     testCases: testSuite,

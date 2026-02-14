@@ -93,16 +93,7 @@ public class ModelComparer : IModelComparer
         _stochasticRunner = stochasticRunner ?? throw new ArgumentNullException(nameof(stochasticRunner));
     }
     
-    /// <summary>
-    /// Creates a new model comparer (legacy constructor for backward compatibility).
-    /// </summary>
-    /// <param name="harness">The evaluation harness to use.</param>
-    /// <param name="evaluationOptions">Optional evaluation options for each run.</param>
-    [Obsolete("Use constructor with IStochasticRunner for better testability. This constructor will be removed in a future version.")]
-    public ModelComparer(IEvaluationHarness harness, EvaluationOptions? evaluationOptions = null)
-        : this(new StochasticRunner(harness, evaluationOptions))
-    {
-    }
+
     
     /// <inheritdoc/>
     public async Task<ModelComparisonResult> CompareModelsAsync(

@@ -576,7 +576,7 @@ var testCase = new TestCase
 
 **Solution:** Use [stochastic evaluation](stochastic-evaluation.md) to run multiple times and analyze statistics:
 ```csharp
-var stochasticRunner = new StochasticRunner(harness, EvaluationOptions);
+var stochasticRunner = new StochasticRunner(harness, statisticsCalculator: null, EvaluationOptions);
 var result = await stochasticRunner.RunStochasticTestAsync(
     agent, testCase, 
     new StochasticOptions(Runs: 10, SuccessRateThreshold: 0.8));

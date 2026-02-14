@@ -285,7 +285,7 @@ var replayed = await replayer.ReplayNextAsync(); // Identical response
 Run the same test multiple times to measure reliability and consistency.
 
 ```csharp
-var runner = new StochasticRunner(harness, options);
+var runner = new StochasticRunner(harness, statisticsCalculator: null, options);
 var result = await runner.RunStochasticTestAsync(agent, testCase,
     new StochasticOptions(Runs: 10, SuccessRateThreshold: 0.8));
 result.PrintTable("Metrics"); // Min/max/mean statistics

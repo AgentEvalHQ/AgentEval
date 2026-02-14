@@ -30,7 +30,8 @@ AgentEval is **the comprehensive .NET toolkit for AI agent evaluation**—tool u
 ### Compare Models, Get a Winner, Ship with Confidence
 
 ```csharp
-var comparer = new ModelComparer(harness);
+var stochasticRunner = new StochasticRunner(harness);
+var comparer = new ModelComparer(stochasticRunner);
 
 var result = await comparer.CompareModelsAsync(
     factories: new IAgentFactory[]

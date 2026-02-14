@@ -99,54 +99,71 @@ public static class StatisticsCalculator
     }
     
     /// <summary>
-    /// Gets the t-critical value for a given degrees of freedom and confidence level.
-    /// Uses approximation for common values.
+    /// Statistical constants for t-distribution critical values.
+    /// These are commonly used values for confidence intervals.
     /// </summary>
+    private static class TDistributionConstants
+    {
+        // Normal distribution approximation thresholds
+        public const int LargeSampleThreshold = 120;
+        
+        // Z-scores for normal distribution (large samples)
+        public const double ZScore99 = 2.576;  // 99% confidence
+        public const double ZScore95 = 1.96;   // 95% confidence  
+        public const double ZScore90 = 1.645;  // 90% confidence
+        public const double ZScoreDefault = 1.96;
+        
+        // T-values for 95% confidence level (two-tailed)
+        private static readonly Dictionary<int, double> TValues95 = new()
+        {
+            { 1, 12.706 }, { 2, 4.303 }, { 3, 3.182 }, { 4, 2.776 }, { 5, 2.571 },
+            { 6, 2.447 }, { 7, 2.365 }, { 8, 2.306 }, { 9, 2.262 }, { 10, 2.228 },
+            { 15, 2.131 }, { 20, 2.086 }, { 30, 2.042 }, { 60, 2.000 }
+        };
+        
+        public static double GetTValue95(int degreesOfFreedom)
+        {
+            if (TValues95.TryGetValue(degreesOfFreedom, out var exactValue))
+                return exactValue;
+            
+            // Approximation formula for degrees of freedom not in lookup table
+            return 2.0 + 0.5 / Math.Sqrt(degreesOfFreedom);
+        }
+    }
+    
+    /// <summary>
+    /// Gets the t-critical value for a given degrees of freedom and confidence level.
+    /// Uses Student's t-distribution for small samples and normal approximation for large samples.
+    /// </summary>
+    /// <param name="degreesOfFreedom">Degrees of freedom (sample size - 1).</param>
+    /// <param name="confidenceLevel">Confidence level (e.g., 0.95 for 95% confidence).</param>
+    /// <returns>The critical t-value for the specified confidence level.</returns>
+    /// <remarks>
+    /// For production use with diverse confidence levels, consider using a statistical library
+    /// like MathNet.Numerics for more precise t-distribution calculations.
+    /// </remarks>
     private static double GetTCriticalValue(int degreesOfFreedom, double confidenceLevel)
     {
-        // Common t-values for two-tailed tests
-        // For a full implementation, use a statistics library
-        
-        double alpha = 1 - confidenceLevel;
-        
-        // Approximation using normal distribution for large samples
-        if (degreesOfFreedom >= 120)
+        // Large sample approximation using normal distribution
+        if (degreesOfFreedom >= TDistributionConstants.LargeSampleThreshold)
         {
             return confidenceLevel switch
             {
-                >= 0.99 => 2.576,
-                >= 0.95 => 1.96,
-                >= 0.90 => 1.645,
-                _ => 1.96
+                >= 0.99 => TDistributionConstants.ZScore99,
+                >= 0.95 => TDistributionConstants.ZScore95,
+                >= 0.90 => TDistributionConstants.ZScore90,
+                _ => TDistributionConstants.ZScoreDefault
             };
         }
         
-        // Use a simplified lookup for smaller samples
-        // These are approximate values
+        // Small sample t-distribution values (currently only 95% confidence supported)
         if (confidenceLevel >= 0.95)
         {
-            return degreesOfFreedom switch
-            {
-                1 => 12.706,
-                2 => 4.303,
-                3 => 3.182,
-                4 => 2.776,
-                5 => 2.571,
-                6 => 2.447,
-                7 => 2.365,
-                8 => 2.306,
-                9 => 2.262,
-                10 => 2.228,
-                15 => 2.131,
-                20 => 2.086,
-                30 => 2.042,
-                60 => 2.000,
-                _ => 2.0 + 0.5 / Math.Sqrt(degreesOfFreedom)
-            };
+            return TDistributionConstants.GetTValue95(degreesOfFreedom);
         }
         
-        // Default fallback
-        return 1.96;
+        // Fallback to normal approximation for unsupported confidence levels
+        return TDistributionConstants.ZScoreDefault;
     }
     
     /// <summary>

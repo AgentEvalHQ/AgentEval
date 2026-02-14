@@ -59,7 +59,7 @@ public async Task Agent_ShouldHaveHighSuccessRate()
 {
     // Arrange
     var harness = new MAFEvaluationHarness(chatClient, tools, EvaluationOptions);
-    var stochasticRunner = new StochasticRunner(harness, EvaluationOptions);
+    var stochasticRunner = new StochasticRunner(harness, statisticsCalculator: null, EvaluationOptions);
     
     var testCase = new TestCase
     {

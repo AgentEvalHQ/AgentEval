@@ -119,7 +119,7 @@ WorkflowTraceSerializer.Save(workflowRecorder.GetTrace(), "workflow.json");
 
 Handle LLM non-determinism by running tests multiple times:
 ```csharp
-var stochasticRunner = new StochasticRunner(harness, EvaluationOptions);
+var stochasticRunner = new StochasticRunner(harness, statisticsCalculator: null, EvaluationOptions);
 var result = await stochasticRunner.RunStochasticTestAsync(
     agent, testCase, 
     new StochasticOptions(Runs: 10, SuccessRateThreshold: 0.8));

@@ -98,16 +98,7 @@ public class StochasticRunner : IStochasticRunner
         _testOptions = evaluationOptions;
     }
     
-    /// <summary>
-    /// Creates a new stochastic runner (legacy constructor for backward compatibility).
-    /// </summary>
-    /// <param name="harness">The evaluation harness to use for running individual evaluations.</param>
-    /// <param name="evaluationOptions">Optional evaluation options for each run.</param>
-    [Obsolete("Use constructor with IStatisticsCalculator parameter for better testability. This constructor will be removed in a future version.")]
-    public StochasticRunner(IEvaluationHarness harness, EvaluationOptions? evaluationOptions)
-        : this(harness, statisticsCalculator: null, evaluationOptions: evaluationOptions)
-    {
-    }
+
     
     /// <inheritdoc/>
     public Task<StochasticResult> RunStochasticTestAsync(

@@ -9,7 +9,8 @@
 Compare models across your evaluation suite and get actionable recommendations:
 
 ```csharp
-var comparer = new ModelComparer(harness);
+var stochasticRunner = new StochasticRunner(harness);
+var comparer = new ModelComparer(stochasticRunner);
 
 var result = await comparer.CompareModelsAsync(
     factories: new IAgentFactory[]
