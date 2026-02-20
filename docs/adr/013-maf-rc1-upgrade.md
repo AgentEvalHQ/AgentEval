@@ -30,9 +30,9 @@ Upgrade all MAF and Microsoft.Extensions.AI packages to their RC1-aligned versio
 | Package | From | To |
 |---------|------|----|
 | `Microsoft.Agents.AI` | `1.0.0-preview.251110.2` | `1.0.0-rc1` |
-| `Microsoft.Agents.AI.Abstractions` | `1.0.0-preview.251110.2` | `1.0.0-rc1` |
+| `Microsoft.Agents.AI.OpenAI` | `1.0.0-preview.251110.2` | `1.0.0-rc1` |
+| `Microsoft.Agents.AI.Workflows` | `1.0.0-preview.251110.2` | `1.0.0-rc1` |
 | `Microsoft.Extensions.AI` | `10.0.0` | `10.3.0` |
-| `Microsoft.Extensions.AI.Abstractions` | `10.0.0` | `10.3.0` |
 | `Microsoft.Extensions.AI.OpenAI` | `10.0.0-preview.1.25559.3` | `10.3.0` |
 | `Microsoft.Extensions.AI.Evaluation.Quality` | `9.5.0` | `10.3.0` |
 | `System.Numerics.Tensors` | `10.0.0` | `10.0.3` |
