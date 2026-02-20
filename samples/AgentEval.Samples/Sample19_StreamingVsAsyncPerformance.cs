@@ -95,7 +95,7 @@ public static class Sample19_StreamingVsAsyncPerformance
         return new ChatClientAgent(chatClient, new ChatClientAgentOptions
         {
             Name = "PerformanceTestAgent",
-            Instructions = "You are a helpful assistant. Answer concisely."
+            ChatOptions = new() { Instructions = "You are a helpful assistant. Answer concisely." }
         });
     }
 

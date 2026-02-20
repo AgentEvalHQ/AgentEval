@@ -19,7 +19,7 @@
 
 ---
 
-AgentEval is **the comprehensive .NET toolkit for AI agent evaluation**—tool usage validation, RAG quality metrics, stochastic evaluation, and model comparison—built first for **Microsoft Agent Framework (MAF)**. What RAGAS and DeepEval do for Python, AgentEval does for .NET, with the fluent assertion APIs .NET developers expect.
+AgentEval is **the comprehensive .NET toolkit for AI agent evaluation**—tool usage validation, RAG quality metrics, stochastic evaluation, and model comparison—built first for **Microsoft Agent Framework (MAF) `1.0.0-rc1`** with **Microsoft.Extensions.AI `10.3.0`**. What RAGAS and DeepEval do for Python, AgentEval does for .NET, with the fluent assertion APIs .NET developers expect.
 
 > **For years, agentic developers have imagined writing evaluations like this. Today, they can.**
 
@@ -412,7 +412,7 @@ See the **[Getting Started Guide](docs/getting-started.md)** for a complete walk
 
 ## Samples
 
-Run all 21 included samples:
+Run all 23 included samples:
 
 ```bash
 dotnet run --project samples/AgentEval.Samples
@@ -441,6 +441,8 @@ dotnet run --project samples/AgentEval.Samples
 | **19: Streaming vs Async Performance** | Performance comparison of different execution modes | 5 min |
 | **20: Red Team Basic** | Security evaluation with prompt injection and jailbreak | 8 min |
 | **21: Red Team Advanced** | Comprehensive security testing across all attack types | 10 min |
+| **22: Responsible AI** | Toxicity, bias, misinformation metrics with counterfactual testing | 8 min |
+| **23: Benchmark System** | Performance, agentic, standard, and cost benchmarks | 10 min |
 
 ---
 

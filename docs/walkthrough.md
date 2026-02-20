@@ -60,12 +60,15 @@ var myAgent = new ChatClientAgent(
     new ChatClientAgentOptions
     {
         Name = "TravelPlannerAgent",
-        Instructions = "You are a travel planning assistant.",
-        Tools = [
-            AIFunctionFactory.Create(SearchFlights),
-            AIFunctionFactory.Create(SearchHotels),
-            AIFunctionFactory.Create(GetWeather)
-        ]
+        ChatOptions = new ChatOptions
+        {
+            Instructions = "You are a travel planning assistant.",
+            Tools = [
+                AIFunctionFactory.Create(SearchFlights),
+                AIFunctionFactory.Create(SearchHotels),
+                AIFunctionFactory.Create(GetWeather)
+            ]
+        }
     });
 
 // Then wrap it for evaluation
@@ -258,12 +261,15 @@ var myAgent = new ChatClientAgent(
     new ChatClientAgentOptions
     {
         Name = "TravelPlannerAgent",
-        Instructions = "You are a travel planning assistant. Use tools to search for flights, hotels, and weather.",
-        Tools = [
-            AIFunctionFactory.Create(SearchFlights),
-            AIFunctionFactory.Create(SearchHotels),
-            AIFunctionFactory.Create(GetWeather)
-        ]
+        ChatOptions = new ChatOptions
+        {
+            Instructions = "You are a travel planning assistant. Use tools to search for flights, hotels, and weather.",
+            Tools = [
+                AIFunctionFactory.Create(SearchFlights),
+                AIFunctionFactory.Create(SearchHotels),
+                AIFunctionFactory.Create(GetWeather)
+            ]
+        }
     });
 
 // ═══════════════════════════════════════════════════════════════
@@ -373,8 +379,11 @@ public class TravelAgentTests
             new ChatClientAgentOptions
             {
                 Name = "TravelPlannerAgent",
-                Instructions = "You are a travel planning assistant.",
-                Tools = [AIFunctionFactory.Create(SearchFlights)]
+                ChatOptions = new ChatOptions
+                {
+                    Instructions = "You are a travel planning assistant.",
+                    Tools = [AIFunctionFactory.Create(SearchFlights)]
+                }
             });
     }
 

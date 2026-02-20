@@ -173,13 +173,13 @@ public static class Sample02_AgentWithOneTool
             new ChatClientAgentOptions
             {
                 Name = "MathAgent",
-                Instructions = """
-                    You are a helpful math assistant.
-                    When asked to perform calculations, ALWAYS use the CalculatorTool.
-                    Provide the result in a clear, conversational way.
-                    """,
                 ChatOptions = new ChatOptions
                 {
+                    Instructions = """
+                        You are a helpful math assistant.
+                        When asked to perform calculations, ALWAYS use the CalculatorTool.
+                        Provide the result in a clear, conversational way.
+                        """,
                     Tools = [AIFunctionFactory.Create(CalculatorTool)]
                 }
             });
@@ -193,9 +193,9 @@ public static class Sample02_AgentWithOneTool
             new ChatClientAgentOptions
             {
                 Name = "MathAgent (Mock)",
-                Instructions = "You are a math assistant.",
                 ChatOptions = new ChatOptions
                 {
+                    Instructions = "You are a math assistant.",
                     Tools = [AIFunctionFactory.Create(CalculatorTool)]
                 }
             });

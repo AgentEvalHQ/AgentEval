@@ -188,7 +188,7 @@ public static class Sample07_SnapshotTesting
         return new ChatClientAgent(chatClient, new ChatClientAgentOptions
         {
             Name = "SnapshotAgent",
-            Instructions = "You are a helpful assistant. Give concise, factual answers."
+            ChatOptions = new() { Instructions = "You are a helpful assistant. Give concise, factual answers." }
         });
     }
 

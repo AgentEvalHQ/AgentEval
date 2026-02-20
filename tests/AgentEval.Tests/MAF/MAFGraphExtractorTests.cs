@@ -144,7 +144,7 @@ public class MAFGraphExtractorTests
 
         var workflow = new MAFWorkflows.WorkflowBuilder(a)
             .AddFanOutEdge(a, [b, c])
-            .AddFanInEdge([b, c], d)
+            .AddFanInBarrierEdge([b, c], d)
             .Build();
 
         // Act

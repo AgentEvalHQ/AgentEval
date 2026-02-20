@@ -4,6 +4,7 @@
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
 using AgentEval.Core;
+using AgentResponse = AgentEval.Core.AgentResponse;
 
 namespace AgentEval.MAF;
 
@@ -13,17 +14,17 @@ namespace AgentEval.MAF;
 public class MAFAgentAdapter : IStreamableAgent
 {
     private readonly AIAgent _agent;
-    private AgentThread? _thread;
+    private AgentSession? _session;
     
     /// <summary>
     /// Create an adapter for an AIAgent.
     /// </summary>
     /// <param name="agent">The MAF agent to adapt.</param>
-    /// <param name="thread">Optional thread for conversation context. If null, a new thread is created per invocation.</param>
-    public MAFAgentAdapter(AIAgent agent, AgentThread? thread = null)
+    /// <param name="session">Optional session for conversation context. If null, a new session is created per invocation.</param>
+    public MAFAgentAdapter(AIAgent agent, AgentSession? session = null)
     {
         _agent = agent ?? throw new ArgumentNullException(nameof(agent));
-        _thread = thread;
+        _session = session;
     }
     
     /// <inheritdoc/>
@@ -32,10 +33,10 @@ public class MAFAgentAdapter : IStreamableAgent
     /// <inheritdoc/>
     public async Task<AgentResponse> InvokeAsync(string prompt, CancellationToken cancellationToken = default)
     {
-        var thread = _thread ?? _agent.GetNewThread();
-        var response = await _agent.RunAsync(prompt, thread, cancellationToken: cancellationToken);
+        var session = _session ?? await _agent.CreateSessionAsync(cancellationToken);
+        var response = await _agent.RunAsync(prompt, session, cancellationToken: cancellationToken);
         
-        // Extract token usage from AgentRunResponse.Usage property
+        // Extract token usage from AgentResponse.Usage property
         TokenUsage? tokenUsage = null;
         if (response.Usage != null)
         {
@@ -59,10 +60,10 @@ public class MAFAgentAdapter : IStreamableAgent
         string prompt, 
         [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
-        var thread = _thread ?? _agent.GetNewThread();
+        var session = _session ?? await _agent.CreateSessionAsync(cancellationToken);
         TokenUsage? capturedUsage = null;
         
-        await foreach (var update in _agent.RunStreamingAsync(prompt, thread, cancellationToken: cancellationToken))
+        await foreach (var update in _agent.RunStreamingAsync(prompt, session, cancellationToken: cancellationToken))
         {
             foreach (var content in update.Contents)
             {
@@ -112,15 +113,16 @@ public class MAFAgentAdapter : IStreamableAgent
     }
     
     /// <summary>
-    /// Reset the conversation thread.
+    /// Reset the conversation session.
     /// </summary>
-    public void ResetThread()
+    public async Task ResetSessionAsync(CancellationToken cancellationToken = default)
     {
-        _thread = _agent.GetNewThread();
+        _session = await _agent.CreateSessionAsync(cancellationToken);
     }
     
     /// <summary>
-    /// Get a new thread for fresh conversations.
+    /// Create a new session for fresh conversations.
     /// </summary>
-    public AgentThread GetNewThread() => _agent.GetNewThread();
+    public async Task<AgentSession> CreateSessionAsync(CancellationToken cancellationToken = default)
+        => await _agent.CreateSessionAsync(cancellationToken);
 }

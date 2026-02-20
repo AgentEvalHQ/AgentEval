@@ -9,7 +9,7 @@
 MAF workflows emit real-time events during execution, but present unique challenges for evaluation systems:
 
 1. **Event Volume**: Large workflows can generate thousands of events (Sample 09: 40+ events, Sample 21: hundreds with tool calls)
-2. **Streaming Nature**: Events arrive continuously during LLM processing via `AgentRunUpdateEvent` tokens
+2. **Streaming Nature**: Events arrive continuously during LLM processing via `AgentResponseUpdateEvent` tokens
 3. **Timeout Behavior**: MAF's `InProcessExecution` may not honor cancellation tokens during active LLM calls
 4. **Protocol Complexity**: ChatProtocol workflows require specific event sequencing (message accumulation → TurnToken → processing)
 
@@ -30,7 +30,7 @@ This creates issues for:
 
 ```csharp
 // This can hang indefinitely
-var run = await InProcessExecution.StreamAsync(workflow, input, cancellationToken);
+var run = await InProcessExecution.RunStreamingAsync(workflow, input, cancellationToken);
 await foreach (var evt in run.WatchStreamAsync(cancellationToken))
 {
     // Processing events - cancellationToken may be ignored during LLM calls
@@ -118,7 +118,7 @@ public class MAFWorkflowEventBridge
 
 #### 2. Streaming Token Aggregation
 
-`AgentRunUpdateEvent` tokens are aggregated into meaningful output chunks:
+`AgentResponseUpdateEvent` tokens are aggregated into meaningful output chunks:
 
 ```csharp
 public class StreamingTokenAggregator
@@ -126,7 +126,7 @@ public class StreamingTokenAggregator
     private readonly StringBuilder _currentOutput = new();
     private string _currentExecutorId = string.Empty;
     
-    public void ProcessStreamingToken(AgentRunUpdateEvent tokenEvent)
+    public void ProcessStreamingToken(AgentResponseUpdateEvent tokenEvent)
     {
         if (tokenEvent.ExecutorId != _currentExecutorId)
         {
@@ -338,7 +338,7 @@ private static readonly Dictionary<Type, Func<WorkflowEvent, WorkflowEvaluationE
     new()
     {
         [typeof(ExecutorInvokedEvent)] = evt => ConvertExecutorInvokedEvent((ExecutorInvokedEvent)evt),
-        [typeof(AgentRunUpdateEvent)] = evt => ConvertAgentRunUpdateEvent((AgentRunUpdateEvent)evt),
+        [typeof(AgentResponseUpdateEvent)] = evt => ConvertAgentResponseUpdateEvent((AgentResponseUpdateEvent)evt),
         // ... other mappings
     };
 ```

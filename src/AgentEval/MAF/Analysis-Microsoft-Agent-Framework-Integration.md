@@ -1,8 +1,9 @@
 # Analysis: Microsoft Agent Framework (MAF) Integration in AgentEval
 
-**Date:** February 17, 2026  
+**Date:** February 17, 2026 (originally); updated June 2025 for MAF RC1  
 **Scope:** Full review of MAF NuGet package usage, abstraction quality, interface isolation, and versioning strategy  
-**MAF Version:** `1.0.0-preview.251110.2` (Microsoft.Agents.AI, Microsoft.Agents.AI.Workflows, Microsoft.Agents.AI.OpenAI)
+**MAF Version:** `1.0.0-rc1` (Microsoft.Agents.AI, Microsoft.Agents.AI.Workflows, Microsoft.Agents.AI.OpenAI)  
+**See also:** [ADR-013](../../docs/adr/013-maf-rc1-upgrade.md) for the preview → RC1 upgrade decision and breaking changes
 
 ---
 
@@ -44,16 +45,16 @@ The recommended path forward is a **single-version tracking strategy** (no NuGet
 ### 2.2 Version Pinning (Directory.Packages.props)
 
 ```xml
-<PackageVersion Include="Microsoft.Agents.AI" Version="1.0.0-preview.251110.2" />
-<PackageVersion Include="Microsoft.Agents.AI.OpenAI" Version="1.0.0-preview.251110.2" />
-<PackageVersion Include="Microsoft.Agents.AI.Workflows" Version="1.0.0-preview.251110.2" />
+<PackageVersion Include="Microsoft.Agents.AI" Version="1.0.0-rc1" />
+<PackageVersion Include="Microsoft.Agents.AI.OpenAI" Version="1.0.0-rc1" />
+<PackageVersion Include="Microsoft.Agents.AI.Workflows" Version="1.0.0-rc1" />
 ```
 
-All three packages are centrally managed and locked to the same preview version, which is correct for consistency. The version string `1.0.0-preview.251110.2` indicates this is a pre-release SDK — meaning breaking changes should be **expected**.
+All three packages are centrally managed and locked to the same RC1 version, which is correct for consistency. The version string `1.0.0-rc1` indicates this is a release candidate — the API surface is near-final but breaking changes may still occur before GA.
 
 ### 2.3 Microsoft.Extensions.AI (Shared Dependency)
 
-A critical distinction: `Microsoft.Extensions.AI` (version `10.0.0`) provides foundational types used throughout AgentEval **and** by MAF:
+A critical distinction: `Microsoft.Extensions.AI` (version `10.3.0`) provides foundational types used throughout AgentEval **and** by MAF:
 - `IChatClient` — used by metrics, evaluators, and `FakeChatClient`
 - `ChatMessage`, `TextContent`, `FunctionCallContent`, `FunctionResultContent` — used by `ToolUsageExtractor` and MAF adapters
 - `UsageContent` — used for token tracking
@@ -68,8 +69,8 @@ This is a **shared dependency**, not a MAF-specific one. The `ToolUsageExtractor
 
 | File | LOC | MAF Types Used | Purpose |
 |------|-----|---------------|---------|
-| `MAFAgentAdapter.cs` | 122 | `AIAgent`, `AgentThread`, `AgentRunResponse` | Adapts single MAF agent → `IStreamableAgent` |
-| `MAFIdentifiableAgentAdapter.cs` | 120 | `AIAgent`, `AgentThread`, `AgentRunResponse` | Same + `IModelIdentifiable` for comparison |
+| `MAFAgentAdapter.cs` | 122 | `AIAgent`, `AgentSession`, `AgentResponse` | Adapts single MAF agent → `IStreamableAgent` |
+| `MAFIdentifiableAgentAdapter.cs` | 120 | `AIAgent`, `AgentSession`, `AgentResponse` | Same + `IModelIdentifiable` for comparison |
 | `MAFEvaluationHarness.cs` | 630 | None (only Core types) | Full evaluation harness implementing `IStreamingEvaluationHarness` |
 | `MAFWorkflowAdapter.cs` | 400 | `Workflow` (via static factory `FromMAFWorkflow`) | Adapts MAF Workflow → `IWorkflowEvaluableAgent` |
 | `MAFWorkflowEventBridge.cs` | 280 | `Workflow`, `StreamingRun`, `InProcessExecution`, `WorkflowEvent` subclasses, `TurnToken`, etc. | Bridges MAF events → AgentEval events |
@@ -132,7 +133,7 @@ These interfaces are in `AgentEval.Core` and `AgentEval.Comparison`, with **zero
 
 The MAF adapters correctly implement the Adapter pattern:
 
-- `MAFAgentAdapter` : `IStreamableAgent` — wraps `AIAgent`, translates `AgentRunResponse` → `AgentResponse`
+- `MAFAgentAdapter` : `IStreamableAgent` — wraps `AIAgent`, translates `AgentResponse` fields → `AgentEval.AgentResponse`
 - `MAFIdentifiableAgentAdapter` : `IStreamableAgent, IModelIdentifiable` — wraps `AIAgent` + model identity
 - `MAFWorkflowAdapter` : `IWorkflowEvaluableAgent` — wraps `Workflow` via event bridging
 
@@ -144,7 +145,7 @@ The `MAFWorkflowEventBridge` and `MAFWorkflowAdapter` demonstrate a well-designe
 MAF Events (class hierarchy)        AgentEval Events (records)
 ─────────────────────────────       ──────────────────────────
 ExecutorInvokedEvent           →    (state tracking)
-AgentRunUpdateEvent            →    ExecutorOutputEvent, ExecutorToolCallEvent
+AgentResponseUpdateEvent       →    ExecutorOutputEvent, ExecutorToolCallEvent
 ExecutorCompletedEvent         →    ExecutorOutputEvent
 ExecutorFailedEvent            →    ExecutorErrorEvent
 WorkflowOutputEvent            →    WorkflowCompleteEvent
@@ -178,11 +179,11 @@ These are the specific MAF types and methods the codebase depends on:
 | `AIAgent.Name` | Adapters | Low |
 | `AIAgent.RunAsync()` | Adapters | High — signature/return type changes |
 | `AIAgent.RunStreamingAsync()` | Adapters | High — signature/return type changes |
-| `AIAgent.GetNewThread()` | Adapters | Medium |
-| `AgentThread` | Adapters | Low — used as opaque handle |
-| `AgentRunResponse.Text` | Adapters | Medium |
-| `AgentRunResponse.Messages` | Adapters | Medium |
-| `AgentRunResponse.Usage` | Adapters | Medium |
+| `AIAgent.CreateSessionAsync()` | Adapters | Medium |
+| `AgentSession` | Adapters | Low — used as opaque handle |
+| `AgentResponse.Text` | Adapters | Medium |
+| `AgentResponse.Messages` | Adapters | Medium |
+| `AgentResponse.Usage` | Adapters | Medium |
 
 **From `Microsoft.Agents.AI.Workflows`:**
 | Type/Member | Used In | Breaking Change Risk |
@@ -191,7 +192,7 @@ These are the specific MAF types and methods the codebase depends on:
 | `Workflow.ReflectEdges()` | GraphExtractor | High — internal API surface |
 | `Workflow.StartExecutorId` | GraphExtractor | Medium |
 | `Workflow.DescribeProtocolAsync()` | EventBridge | Medium |
-| `InProcessExecution.StreamAsync()` | EventBridge | High |
+| `InProcessExecution.RunStreamingAsync()` | EventBridge | High |
 | `StreamingRun.WatchStreamAsync()` | EventBridge | High |
 | `StreamingRun.TrySendMessageAsync()` | EventBridge | High |
 | `TurnToken` | EventBridge | Medium |
@@ -227,7 +228,7 @@ These are the specific MAF types and methods the codebase depends on:
 
 <!-- Conditional MAF references -->
 <ItemGroup Condition="'$(TargetFramework)' == 'net8.0'">
-    <PackageReference Include="Microsoft.Agents.AI" Version="1.0.0-preview.1" />
+    <PackageReference Include="Microsoft.Agents.AI" Version="1.0.0-rc1" />
 </ItemGroup>
 <ItemGroup Condition="'$(TargetFramework)' == 'net10.0'">
     <PackageReference Include="Microsoft.Agents.AI" Version="2.0.0" />
@@ -261,7 +262,7 @@ With `#if` preprocessor directives for API differences:
 **How it would work:**
 ```
 AgentEval                    ← Core library, no MAF dependency
-AgentEval.MAF.v1             ← MAF 1.0.0-preview adapters
+AgentEval.MAF.v1             ← MAF 1.0.0-rc1 adapters
 AgentEval.MAF.v2             ← MAF 2.0.0 adapters (future)
 ```
 
@@ -276,12 +277,12 @@ AgentEval.MAF.v2             ← MAF 2.0.0 adapters (future)
 - Solution-level complexity grows
 - Two MAF packages can't coexist in the same project
 
-**Verdict: Over-engineering for current state.** MAF is still in preview. Maintaining separate packages for unreleased versions adds cost with no benefit.
+**Verdict: Over-engineering for current state.** MAF is in RC (release candidate). Maintaining separate packages for pre-GA versions adds cost with no benefit.
 
 ### 6.3 Option C: Single Package, Track Latest MAF (Recommended)
 
 **How it would work:**
-- AgentEval tracks the latest MAF preview/release
+- AgentEval tracks the latest MAF release (RC or stable)
 - Each AgentEval release states which MAF version it supports
 - When MAF makes breaking changes, AgentEval releases a new version
 - Optionally extract MAF code to `AgentEval.MAF` package later
@@ -344,7 +345,7 @@ The codebase already has strong protection against MAF breaking changes:
 
 1. **Scanning** — Dependabot reads your `Directory.Packages.props` (or `.csproj` files) daily (configurable) to find all package references and their pinned versions.
 2. **Checking NuGet feeds** — It queries `nuget.org` (or configured private feeds) to see if newer versions of those packages exist.
-3. **Creating PRs** — When it finds a newer version of `Microsoft.Agents.AI` (e.g., `1.0.0-preview.260215.1`), it automatically creates a pull request that bumps the version in `Directory.Packages.props` from the old pinned version to the new one.
+3. **Creating PRs** — When it finds a newer version of `Microsoft.Agents.AI` (e.g., `1.0.0-rc2` or `1.0.0`), it automatically creates a pull request that bumps the version in `Directory.Packages.props` from the old pinned version to the new one.
 4. **CI runs on the PR** — Your GitHub Actions workflow runs `dotnet restore`, `dotnet build`, and `dotnet test` on the PR. If everything passes, the new MAF version is API-compatible. If it fails, there's a breaking change.
 
 **Configuration** (add to `.github/dependabot.yml`):
@@ -354,7 +355,7 @@ updates:
   - package-ecosystem: "nuget"
     directory: "/"
     schedule:
-      interval: "weekly"         # Check weekly for new MAF previews
+      interval: "weekly"         # Check weekly for new MAF releases
     allow:
       - dependency-name: "Microsoft.Agents.*"   # Only monitor MAF packages
       - dependency-name: "Microsoft.Extensions.AI*"
@@ -380,7 +381,7 @@ The detection is simple: **if the code doesn't compile, the API broke.** The flo
 
 ```
 1. Dependabot updates Directory.Packages.props:
-     Microsoft.Agents.AI: 1.0.0-preview.251110.2 → 1.0.0-preview.260215.1
+     Microsoft.Agents.AI: 1.0.0-rc1 → 1.0.0-rc2
 
 2. CI pipeline runs on the PR:
      dotnet restore --force     ← Forces re-download of new package version
@@ -395,7 +396,7 @@ The detection is simple: **if the code doesn't compile, the API broke.** The flo
 
 **Why `dotnet restore --force`?** Normally, `dotnet restore` uses cached packages. The `--force` flag ensures it re-downloads from NuGet even if a cached version exists, guaranteeing you test against the exact new version.
 
-**Why are we "pinned" but still updating?** Being "pinned" means we don't use floating version ranges like `1.0.0-*` (which would silently pull new versions). Instead, we pin to an exact version (`1.0.0-preview.251110.2`) and only update via an **explicit PR** that we review and test. The pin is the default; the update is deliberate.
+**Why are we "pinned" but still updating?** Being "pinned" means we don't use floating version ranges like `1.0.0-*` (which would silently pull new versions). Instead, we pin to an exact version (`1.0.0-rc1`) and only update via an **explicit PR** that we review and test. The pin is the default; the update is deliberate.
 
 #### CI Integration
 
@@ -410,8 +411,8 @@ The detection is simple: **if the code doesn't compile, the API broke.** The flo
 
 Maintain a one-line compatibility note in each release's notes (see Section 8.3):
 ```
-AgentEval 0.2.1-beta → Compatible with MAF 1.0.0-preview.251110.2
-AgentEval 0.3.0-beta → Compatible with MAF 1.0.0-preview.260xxx.x
+AgentEval 0.2.1-beta → Compatible with MAF 1.0.0-rc1
+AgentEval 0.3.0-beta → Compatible with MAF 1.0.0-rc2 (future)
 AgentEval 1.0.0      → Compatible with MAF 1.0.0
 ```
 
@@ -420,7 +421,7 @@ AgentEval 1.0.0      → Compatible with MAF 1.0.0
 | Scenario | Files Affected | Mitigation |
 |----------|---------------|------------|
 | `AIAgent.RunAsync()` signature change | `MAFAgentAdapter`, `MAFIdentifiableAgentAdapter` | Update adapter, same `IEvaluableAgent` contract |
-| `AgentRunResponse` property renames | `MAFAgentAdapter` | Map new property names in adapter |
+| `AgentResponse` property renames | `MAFAgentAdapter` | Map new property names in adapter |
 | Workflow event hierarchy restructuring | `MAFWorkflowEventBridge` | Rewrite bridge, `WorkflowEvent` records unchanged |
 | `ReflectEdges()` removed or changed | `MAFGraphExtractor` | Adapt to new reflection API or use alternative |
 | `InProcessExecution` API change | `MAFWorkflowEventBridge` | Update execution method, event translation unchanged |
@@ -480,13 +481,13 @@ dotnet test
 
 #### Missing Test Coverage — What to Add
 
-The current suite has a gap: **no tests for `MAFAgentAdapter` or `MAFIdentifiableAgentAdapter`**. These are the adapters that wrap `AIAgent` (the single-agent scenario), and they use `AIAgent.RunAsync()`, `RunStreamingAsync()`, `GetNewThread()`, and `AgentRunResponse`.
+The current suite has a gap: **no tests for `MAFAgentAdapter` or `MAFIdentifiableAgentAdapter`**. These are the adapters that wrap `AIAgent` (the single-agent scenario), and they use `AIAgent.RunAsync()`, `RunStreamingAsync()`, `CreateSessionAsync()`, and `AgentResponse`.
 
 Recommended additions:
 
 | Test File to Create | What to Test | MAF Types Needed |
 |---------------------|-------------|------------------|
-| `MAFAgentAdapterTests.cs` | `InvokeAsync` returns correct `AgentResponse`, token usage extraction, `ResetThread()`, `GetNewThread()`, `Name` delegation | Requires mocking `AIAgent` or using a test double |
+| `MAFAgentAdapterTests.cs` | `InvokeAsync` returns correct `AgentResponse`, token usage extraction, `ResetSession()`, `CreateSessionAsync()`, `Name` delegation | Requires mocking `AIAgent` or using a test double |
 | `MAFIdentifiableAgentAdapterTests.cs` | Same as above + `ModelId`/`ModelDisplayName` from `IModelIdentifiable` | Same |
 
 **Challenge:** `AIAgent` may not be easily mockable (it's a concrete class, not an interface). Options:
@@ -500,7 +501,7 @@ Additional coverage to consider:
 |------|-----------------|-----|
 | `MAFAgentAdapter.InvokeAsync()` | None | Need basic invocation test |
 | `MAFAgentAdapter.InvokeStreamingAsync()` | None | Need streaming content type handling |
-| Token usage extraction (`AgentRunResponse.Usage`) | None | Need test with/without usage data |
+| Token usage extraction (`AgentResponse.Usage`) | None | Need test with/without usage data |
 | Error handling in adapters | Partial (workflow only) | Need adapter-level error scenarios |
 | `MAFWorkflowEventBridge` with complex workflows | Basic (single/sequential) | Could add parallel, conditional, error-during-stream |
 
@@ -540,7 +541,7 @@ AgentEval follows **independent SemVer versioning**. Each release includes a one
 |---------|---------|
 | **Independent evolution** | AgentEval adds 5 new metrics — deserves a bump. MAF didn't change. Version-matching would either skip AgentEval versions or assign meaningless MAF versions. |
 | **MAF patches** | MAF ships a patch `1.0.1` with zero API changes. AgentEval must release too, with no actual changes, just to keep numbers aligned. |
-| **Preview strings** | MAF uses `1.0.0-preview.251110.2` (date-encoded). AgentEval can't mirror this format without losing its own SemVer meaning. |
+| **Pre-release strings** | MAF uses `1.0.0-rc1` (release candidate). If MAF used date-encoded previews, AgentEval couldn't mirror that format without losing its own SemVer meaning. |
 | **SemVer meaning loss** | If AgentEval is `2.3.0` because MAF is `2.3.0`, does a consumer know if AgentEval had breaking changes? Only if they check MAF's changelog — defeating the purpose. |
 | **Precedent** | Entity Framework Core initially matched .NET versions, then stopped (EF Core 7 → 8 → 9 don't match .NET versions). The coupling was unsustainable. |
 
@@ -549,8 +550,8 @@ AgentEval follows **independent SemVer versioning**. Each release includes a one
 Each AgentEval release note includes one line:
 
 ```
-AgentEval 0.2.1-beta — Compatible with MAF 1.0.0-preview.251110.2
-AgentEval 0.3.0-beta — Compatible with MAF 1.0.0-preview.260215.1
+AgentEval 0.2.1-beta — Compatible with MAF 1.0.0-rc1
+AgentEval 0.3.0-beta — Compatible with MAF 1.0.0-rc2 (future)
 AgentEval 1.0.0      — Compatible with MAF 1.0.0
 AgentEval 1.1.0      — Compatible with MAF 1.0.0 (no MAF changes)
 AgentEval 1.2.0      — Compatible with MAF 1.1.0
@@ -565,7 +566,7 @@ The `Directory.Packages.props` file is the **source of truth** for which MAF ver
 2. **CI verification** — The PR triggers `dotnet restore --force && dotnet build && dotnet test` to detect API breaks immediately.
 3. **Pin exact versions** — Already done via `Directory.Packages.props`. Never use floating version ranges for MAF.
 
-**Update procedure when a new MAF preview ships:**
+**Update procedure when a new MAF release ships:**
 1. Dependabot creates PR bumping versions in `Directory.Packages.props`
 2. CI builds — if it passes, the API is compatible → merge
 3. CI fails → breaking change detected:
@@ -630,7 +631,7 @@ Until one of these triggers fires, the single package with independent versionin
 1. **Keep MAF code in `src/AgentEval/MAF/`** — The isolation at the directory level is excellent. Don't move files.
 2. **Keep the single `AgentEval.csproj`** — Don't create `AgentEval.MAF.csproj`.
 3. **Add Dependabot for MAF packages** — Automated PRs when MAF updates (see Section 7.2 for details).
-4. **Include one-line compatibility note in release notes** — e.g., "Compatible with MAF 1.0.0-preview.251110.2".
+4. **Include one-line compatibility note in release notes** — e.g., "Compatible with MAF 1.0.0-rc1".
 5. **Tag MAF-dependent tests** — Add `[Trait("Category", "MAFIntegration")]` to the 3 test classes that instantiate real MAF types (see Section 7.4 for details). Run with `dotnet test --filter "Category=MAFIntegration"` during MAF upgrades.
 6. **Add `MAFAgentAdapterTests`** — Currently no tests for `MAFAgentAdapter` or `MAFIdentifiableAgentAdapter` (see Section 7.4 gap analysis).
 7. **Create agent instructions for MAF updates** — `.github/instructions/maf-updates.instructions.md` with step-by-step procedures for detecting and adapting to MAF breaking changes.
@@ -663,8 +664,8 @@ src/AgentEval/
 ├── Comparison/
 │   └── IModelIdentifiable.cs       ← No MAF deps
 ├── MAF/
-│   ├── MAFAgentAdapter.cs          ← Microsoft.Agents.AI (AIAgent, AgentThread)
-│   ├── MAFIdentifiableAgentAdapter.cs ← Microsoft.Agents.AI (AIAgent, AgentThread)
+│   ├── MAFAgentAdapter.cs          ← Microsoft.Agents.AI (AIAgent, AgentSession)
+│   ├── MAFIdentifiableAgentAdapter.cs ← Microsoft.Agents.AI (AIAgent, AgentSession)
 │   ├── MAFEvaluationHarness.cs     ← NO MAF deps (AgentEval.Core only)
 │   ├── MAFWorkflowAdapter.cs       ← Microsoft.Agents.AI.Workflows (Workflow, via factory)
 │   ├── MAFWorkflowEventBridge.cs   ← Microsoft.Agents.AI.Workflows (heavy usage)
@@ -990,7 +991,7 @@ This allows `AgentEval` core to release patches independently while ensuring `Ag
 
 **Trigger conditions (any one):**
 
-1. **MAF reaches 1.0 stable** — The primary reason to defer is MAF's preview status. Extracting now means maintaining a separate package against a moving target. Once MAF stabilizes, the extraction becomes lower-risk.
+1. **MAF reaches 1.0 stable** — MAF is currently at RC1. Extracting now means maintaining a separate package against a near-final but potentially shifting target. Once MAF reaches GA, the extraction becomes lower-risk.
 
 2. **AgentEval reaches GA (1.0)** — A major version bump is the natural time to restructure packages without breaking semver promises.
 
@@ -999,7 +1000,7 @@ This allows `AgentEval` core to release patches independently while ensuring `Ag
 4. **MAF dependency causes real conflicts** — If a consumer reports version conflicts between AgentEval's MAF transitive deps and their own, extract immediately.
 
 **Do NOT extract if:**
-- MAF is still in rapid preview churn (current state)
+- MAF is still in RC churn (current state: RC1, GA expected soon)
 - No consumers have complained about the transitive dependency
 - The team is resource-constrained and working on higher-priority features
 

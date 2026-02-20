@@ -9,7 +9,7 @@ AgentEval provides first-class support for evaluating Microsoft Agent Framework 
 MAF workflows orchestrate multiple agents in sequential or complex execution patterns:
 - **Sequential pipelines**: One agent's output feeds the next (Planner → Researcher → Writer → Editor)
 - **Tool-enabled workflows**: Agents with function calling working together
-- **Event streaming**: Real-time execution monitoring with `AgentRunUpdateEvent`
+- **Event streaming**: Real-time execution monitoring with `AgentResponseUpdateEvent`
 - **Graph extraction**: Automatic workflow structure analysis
 
 AgentEval captures the complete workflow execution, enabling you to:
@@ -33,12 +33,12 @@ var chatClient = new AzureOpenAIClient(endpoint, credential)
 var planner = new ChatClientAgent(chatClient, new ChatClientAgentOptions
 {
     Name = "Planner", 
-    Instructions = "Create content plans"
+    ChatOptions = new() { Instructions = "Create content plans" }
 });
 var writer = new ChatClientAgent(chatClient, new ChatClientAgentOptions
 {
     Name = "Writer", 
-    Instructions = "Write content from plans"
+    ChatOptions = new() { Instructions = "Write content from plans" }
 });
 
 // Bind agents as executors with event emission
@@ -166,7 +166,7 @@ AgentEval captures these MAF workflow events:
 |-----------|----------|
 | `SuperStepStartedEvent` | Workflow superstep begins |
 | `ExecutorInvokedEvent` | Agent begins processing |
-| `AgentRunUpdateEvent` | Streaming token from LLM |
+| `AgentResponseUpdateEvent` | Streaming token from LLM |
 | `ExecutorCompletedEvent` | Agent finishes processing |
 | `SuperStepCompletedEvent` | Workflow superstep ends |
 
@@ -236,52 +236,64 @@ var planner = new ChatClientAgent(chatClient, new ChatClientAgentOptions
 {
     Name = "Planner",
     Description = "Plans content structure",
-    Instructions = """
-        You are a content planning specialist. Create structured plans with:
-        1. Logical outline with main sections
-        2. Key research points per section  
-        3. Target audience and tone
-        4. Suggested word count
-        """
+    ChatOptions = new ChatOptions
+    {
+        Instructions = """
+            You are a content planning specialist. Create structured plans with:
+            1. Logical outline with main sections
+            2. Key research points per section  
+            3. Target audience and tone
+            4. Suggested word count
+            """
+    }
 });
 
 var researcher = new ChatClientAgent(chatClient, new ChatClientAgentOptions
 {
     Name = "Researcher", 
     Description = "Researches topics based on a plan",
-    Instructions = """
-        You are a research specialist. Given a content plan:
-        1. Identify research needs for each section
-        2. Synthesize information into organized research notes
-        3. Include key facts, data points, and expert insights
-        4. Note current trends and credible sources
-        """
+    ChatOptions = new ChatOptions
+    {
+        Instructions = """
+            You are a research specialist. Given a content plan:
+            1. Identify research needs for each section
+            2. Synthesize information into organized research notes
+            3. Include key facts, data points, and expert insights
+            4. Note current trends and credible sources
+            """
+    }
 });
 
 var writer = new ChatClientAgent(chatClient, new ChatClientAgentOptions
 {
     Name = "Writer",
     Description = "Writes comprehensive articles from research", 
-    Instructions = """
-        You are an experienced technical writer. Transform research into:
-        1. Well-structured, flowing prose
-        2. Clear, accessible language with technical accuracy
-        3. Practical examples and actionable insights
-        4. Engaging introduction and strong conclusion
-        """
+    ChatOptions = new ChatOptions
+    {
+        Instructions = """
+            You are an experienced technical writer. Transform research into:
+            1. Well-structured, flowing prose
+            2. Clear, accessible language with technical accuracy
+            3. Practical examples and actionable insights
+            4. Engaging introduction and strong conclusion
+            """
+    }
 });
 
 var editor = new ChatClientAgent(chatClient, new ChatClientAgentOptions
 {
     Name = "Editor",
     Description = "Polishes and refines articles",
-    Instructions = """
-        You are a professional editor. Polish the draft for:
-        1. Clarity, flow, and engagement
-        2. Improved sentence structure and word choice
-        3. Consistent tone and style
-        4. Grammar, punctuation, and formatting
-        """
+    ChatOptions = new ChatOptions
+    {
+        Instructions = """
+            You are a professional editor. Polish the draft for:
+            1. Clarity, flow, and engagement
+            2. Improved sentence structure and word choice
+            3. Consistent tone and style
+            4. Grammar, punctuation, and formatting
+            """
+    }
 });
 
 // 2. Bind agents as MAF executors with event emission
@@ -335,20 +347,24 @@ var tripPlanner = new ChatClientAgent(chatClient, new ChatClientAgentOptions
 {
     Name = "TripPlanner",
     Description = "Gathers city information and plans trip itinerary",
-    Instructions = "Use GetInfoAbout tool for EACH city mentioned. Create day-by-day itinerary.",
-    ChatOptions = new ChatOptions { Tools = [AIFunctionFactory.Create(GetInfoAbout)] }
+    ChatOptions = new ChatOptions
+    {
+        Instructions = "Use GetInfoAbout tool for EACH city mentioned. Create day-by-day itinerary.",
+        Tools = [AIFunctionFactory.Create(GetInfoAbout)]
+    }
 });
 
 var flightAgent = new ChatClientAgent(chatClient, new ChatClientAgentOptions
 {
     Name = "FlightReservation", 
     Description = "Searches and books flights between cities",
-    Instructions = "Use SearchFlights first, then BookFlight for each journey leg.",
-    ChatOptions = new ChatOptions { 
+    ChatOptions = new ChatOptions
+    {
+        Instructions = "Use SearchFlights first, then BookFlight for each journey leg.",
         Tools = [
             AIFunctionFactory.Create(SearchFlights),
             AIFunctionFactory.Create(BookFlight)
-        ] 
+        ]
     }
 });
 
@@ -356,15 +372,18 @@ var hotelAgent = new ChatClientAgent(chatClient, new ChatClientAgentOptions
 {
     Name = "HotelReservation",
     Description = "Books hotels for each city in the trip", 
-    Instructions = "Use BookHotel for EACH city that needs accommodation.",
-    ChatOptions = new ChatOptions { Tools = [AIFunctionFactory.Create(BookHotel)] }
+    ChatOptions = new ChatOptions
+    {
+        Instructions = "Use BookHotel for EACH city that needs accommodation.",
+        Tools = [AIFunctionFactory.Create(BookHotel)]
+    }
 });
 
 var presenter = new ChatClientAgent(chatClient, new ChatClientAgentOptions
 {
     Name = "Presenter",
     Description = "Creates final trip presentation",
-    Instructions = "Summarize the complete trip with all bookings and confirmations."
+    ChatOptions = new() { Instructions = "Summarize the complete trip with all bookings and confirmations." }
 });
 
 // Build tool-enabled workflow
@@ -733,20 +752,23 @@ var planner = new ChatClientAgent(chatClient, new ChatClientAgentOptions
 {
     Name = "ContentPlanner",
     Description = "Plans article structure and research needs",
-    Instructions = """
-        Create a structured content plan with:
-        1. Clear outline with main sections and sub-topics
-        2. Specific research requirements for each section
-        3. Target audience and appropriate tone
-        4. Estimated word count and key messaging
-        """
+    ChatOptions = new ChatOptions
+    {
+        Instructions = """
+            Create a structured content plan with:
+            1. Clear outline with main sections and sub-topics
+            2. Specific research requirements for each section
+            3. Target audience and appropriate tone
+            4. Estimated word count and key messaging
+            """
+    }
 });
 
 // Avoid - generic names and vague instructions
 var agent1 = new ChatClientAgent(chatClient, new ChatClientAgentOptions
 {
     Name = "Agent1",
-    Instructions = "Do planning stuff"
+    ChatOptions = new() { Instructions = "Do planning stuff" }
 });
 ```
 

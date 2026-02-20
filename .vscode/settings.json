@@ -58,6 +58,10 @@
             "matchCommandLine": true
         },
         "dotnet clean": true,
-        "Get-Item": true
+        "Get-Item": true,
+        "/^\"9\" \\| Set-Content c:\\\\temp\\\\stdin\\.txt; Get-Content c:\\\\temp\\\\stdin\\.txt \\| dotnet run --project samples/AgentEval\\.Samples --no-build 2>\\$null \\| Tee-Object -Variable sampleOut \\| Out-Null; \\$sampleOut\\[-30\\.\\.-1\\]$/": {
+            "approve": true,
+            "matchCommandLine": true
+        }
     }
 }

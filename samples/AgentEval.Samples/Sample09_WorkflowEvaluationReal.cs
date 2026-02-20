@@ -260,7 +260,7 @@ public static class Sample09_WorkflowEvaluationReal
         {
             Name = "Planner",
             Description = "Plans content structure",
-            Instructions = """
+            ChatOptions = new() { Instructions = """
                 You are a content planning specialist. Given a writing request, create a clear, structured plan.
                 
                 Your output should include:
@@ -270,14 +270,14 @@ public static class Sample09_WorkflowEvaluationReal
                 4. Suggested structure and approximate word count
                 
                 Be concise and actionable — your plan will be passed to a researcher.
-                """
+                """ }
         });
 
         var researcher = new ChatClientAgent(chatClient, new ChatClientAgentOptions
         {
             Name = "Researcher",
             Description = "Researches topics based on a plan",
-            Instructions = """
+            ChatOptions = new() { Instructions = """
                 You are a research specialist. Given a content plan, gather comprehensive information.
                 
                 Your role:
@@ -287,14 +287,14 @@ public static class Sample09_WorkflowEvaluationReal
                 4. Note current trends and credible sources
                 
                 Organize your findings clearly — they will be passed to a content writer.
-                """
+                """ }
         });
 
         var writer = new ChatClientAgent(chatClient, new ChatClientAgentOptions
         {
             Name = "Writer",
             Description = "Writes comprehensive articles from research",
-            Instructions = """
+            ChatOptions = new() { Instructions = """
                 You are an experienced technical content writer. Given research findings, create an engaging article.
                 
                 Your approach:
@@ -305,14 +305,14 @@ public static class Sample09_WorkflowEvaluationReal
                 5. Use headings, lists, and formatting for readability
                 
                 Focus on practical applications and real-world relevance.
-                """
+                """ }
         });
 
         var editor = new ChatClientAgent(chatClient, new ChatClientAgentOptions
         {
             Name = "Editor",
             Description = "Polishes and refines articles",
-            Instructions = """
+            ChatOptions = new() { Instructions = """
                 You are a professional editor. Given a draft article, polish it for publication.
                 
                 Your responsibilities:
@@ -323,7 +323,7 @@ public static class Sample09_WorkflowEvaluationReal
                 5. Enhance transitions and logical flow between sections
                 
                 Deliver publication-ready content. Maintain the author's voice while elevating quality.
-                """
+                """ }
         });
 
         // ── Bind agents as workflow executors (emitEvents: true for streaming) ──
@@ -394,7 +394,7 @@ public static class Sample09_WorkflowEvaluationReal
 │                                                                                 │
 │  2. Agent binding with event emission:                                          │
 │     var binding = agent.BindAsExecutor(emitEvents: true);                      │
-│     Events: ExecutorInvoked, AgentRunUpdate, ExecutorCompleted, ...            │
+│     Events: ExecutorInvoked, AgentResponseUpdate, ExecutorCompleted, ...       │
 │                                                                                 │
 │  3. One-line adapter from real MAF Workflow:                                    │
 │     var adapter = MAFWorkflowAdapter.FromMAFWorkflow(                          │

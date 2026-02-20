@@ -71,7 +71,7 @@ private static AIAgent CreateMockAgent()
     return new ChatClientAgent(mockClient, new ChatClientAgentOptions
     {
         Name = "MockAgent",
-        Instructions = "You are a helpful assistant."
+        ChatOptions = new() { Instructions = "You are a helpful assistant." }
     });
 }
 ```

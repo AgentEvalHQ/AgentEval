@@ -79,14 +79,14 @@ public class MAFWorkflowEventBridge
         if (isChatProtocol)
         {
             // ChatClientAgent workflows: ChatMessage + TurnToken
-            run = await InProcessExecution.StreamAsync(_workflow, 
+            run = await InProcessExecution.RunStreamingAsync(_workflow, 
                 new ChatMessage(ChatRole.User, input), cancellationToken);
             await run.TrySendMessageAsync(new TurnToken(emitEvents: true));
         }
         else
         {
             // Function-based workflows: direct string input
-            run = await InProcessExecution.StreamAsync<string>(_workflow, input, cancellationToken);
+            run = await InProcessExecution.RunStreamingAsync<string>(_workflow, input, cancellationToken);
         }
         
         // Convert MAF events to AgentEval events
@@ -136,7 +136,7 @@ public static class MAFGraphExtractor
 |-----------|-----------------|---------|
 | `SuperStepStartedEvent` | WorkflowStepStartEvent | Workflow execution phase begins |
 | `ExecutorInvokedEvent` | ExecutorStartEvent | Agent begins processing |  
-| `AgentRunUpdateEvent` | StreamingTokenEvent | Real-time LLM token output |
+| `AgentResponseUpdateEvent` | StreamingTokenEvent | Real-time LLM token output |
 | `ExecutorCompletedEvent` | ExecutorCompleteEvent | Agent finishes processing |
 | `SuperStepCompletedEvent` | WorkflowStepCompleteEvent | Workflow execution phase ends |
 
@@ -159,12 +159,12 @@ var chatClient = azureClient.GetChatClient(deployment).AsIChatClient();
 var planner = new ChatClientAgent(chatClient, new ChatClientAgentOptions
 {
     Name = "Planner",
-    Instructions = "Create content plans..."
+    ChatOptions = new() { Instructions = "Create content plans..." }
 });
 var writer = new ChatClientAgent(chatClient, new ChatClientAgentOptions
 {
     Name = "Writer", 
-    Instructions = "Write content from plans..."
+    ChatOptions = new() { Instructions = "Write content from plans..." }
 });
 
 // 2. Bind as executors with event emission

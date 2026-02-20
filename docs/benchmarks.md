@@ -57,8 +57,11 @@ var agent = new ChatClientAgent(
     new ChatClientAgentOptions
     {
         Name = "BenchmarkAgent",
-        Instructions = "You are a helpful assistant with access to various tools.",
-        Tools = [/* Your tools here */]
+        ChatOptions = new ChatOptions
+        {
+            Instructions = "You are a helpful assistant with access to various tools.",
+            Tools = [/* Your tools here */]
+        }
     });
 
 // For AI-powered evaluation, create an evaluator client

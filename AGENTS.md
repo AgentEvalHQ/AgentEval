@@ -4,7 +4,7 @@ This file provides instructions for AI agents working with the AgentEval codebas
 
 ## Project Overview
 
-AgentEval is **the comprehensive .NET evaluation toolkit for AI agents**, built first for Microsoft Agent Framework (MAF). What RAGAS and DeepEval do for Python, AgentEval does for .NET:
+AgentEval is **the comprehensive .NET evaluation toolkit for AI agents**, built first for Microsoft Agent Framework (MAF) `1.0.0-rc1`. What RAGAS and DeepEval do for Python, AgentEval does for .NET:
 - Tool usage validation with fluent assertions
 - RAG quality metrics (faithfulness, relevance, groundedness)
 - stochastic evaluation and statistical model comparison

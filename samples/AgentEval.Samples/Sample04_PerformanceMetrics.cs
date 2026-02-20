@@ -190,7 +190,7 @@ public static class Sample04_PerformanceMetrics
             new ChatClientAgentOptions
             {
                 Name = "WriterAgent",
-                Instructions = "You are a helpful writing assistant. Keep responses concise but informative."
+                ChatOptions = new() { Instructions = "You are a helpful writing assistant. Keep responses concise but informative." }
             });
     }
 
@@ -202,7 +202,7 @@ public static class Sample04_PerformanceMetrics
             new ChatClientAgentOptions
             {
                 Name = "WriterAgent (Mock)",
-                Instructions = "You are a helpful writing assistant."
+                ChatOptions = new() { Instructions = "You are a helpful writing assistant." }
             });
     }
 

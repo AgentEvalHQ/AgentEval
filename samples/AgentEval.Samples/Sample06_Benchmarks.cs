@@ -165,9 +165,9 @@ public static class Sample06_Benchmarks
         return new ChatClientAgent(chatClient, new ChatClientAgentOptions
         {
             Name = "BenchmarkAgent",
-            Instructions = "You are a helpful assistant. Use the available tools when appropriate to answer questions.",
             ChatOptions = new ChatOptions
             {
+                Instructions = "You are a helpful assistant. Use the available tools when appropriate to answer questions.",
                 Tools = [AIFunctionFactory.Create(GetWeather), AIFunctionFactory.Create(Calculate)]
             }
         });

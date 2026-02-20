@@ -16,7 +16,7 @@ namespace AgentEval.MAF;
 /// </summary>
 /// <remarks>
 /// <para>
-/// MAF emits events as a class hierarchy (ExecutorInvokedEvent, AgentRunUpdateEvent,
+/// MAF emits events as a class hierarchy (ExecutorInvokedEvent, AgentResponseUpdateEvent,
 /// ExecutorCompletedEvent, etc.) via <see cref="MAFWorkflows.StreamingRun.WatchStreamAsync"/>.
 /// AgentEval expects record-based events (ExecutorOutputEvent, EdgeTraversedEvent, etc.)
 /// consumed by <see cref="MAFWorkflowAdapter"/>.
@@ -88,11 +88,11 @@ public static class MAFWorkflowEventBridge
             // AIAgentHostExecutor (from BindAsExecutor) requires ChatMessage input — plain strings
             // are silently dropped because ChatProtocolExecutor has no string handler by default.
             run = await MAFWorkflows.InProcessExecution
-                .StreamAsync(workflow, new ChatMessage(ChatRole.User, input), cancellationToken: cancellationToken)
+                .RunStreamingAsync(workflow, new ChatMessage(ChatRole.User, input), cancellationToken: cancellationToken)
                 .ConfigureAwait(false);
 
             // ChatProtocolExecutor uses a two-phase protocol: messages are accumulated first,
-            // then processed only when a TurnToken is received. StreamAsync does NOT auto-send
+            // then processed only when a TurnToken is received. RunStreamingAsync does NOT auto-send
             // a TurnToken (only RunAsync does). We must send it manually.
             // emitEvents: true ensures executor events are emitted regardless of binding defaults.
             // Subsequent executors receive the TurnToken automatically via downstream forwarding.
@@ -102,7 +102,7 @@ public static class MAFWorkflowEventBridge
         {
             // Function-based executors (Func<string, ValueTask<string>>) handle string input directly.
             run = await MAFWorkflows.InProcessExecution
-                .StreamAsync<string>(workflow, input, cancellationToken: cancellationToken)
+                .RunStreamingAsync<string>(workflow, input, cancellationToken: cancellationToken)
                 .ConfigureAwait(false);
         }
 
@@ -143,10 +143,10 @@ public static class MAFWorkflowEventBridge
                     currentExecutorId = normalizedInvokedId;
                     break;
 
-                case MAFWorkflows.ExecutorEvent executorEvent
-                    when executorEvent is MAFWorkflows.AgentRunUpdateEvent agentUpdate:
+                // ── Agent streaming update (RC: now inherits WorkflowOutputEvent, not ExecutorEvent) ──
+                case MAFWorkflows.AgentResponseUpdateEvent agentUpdate:
                     // Agent streaming update — inspect for tool calls AND text
-                    var updateExecutorId = NormalizeId(executorEvent.ExecutorId ?? currentExecutorId ?? "unknown");
+                    var updateExecutorId = NormalizeId(agentUpdate.ExecutorId ?? currentExecutorId ?? "unknown");
 
                     // Check for tool call invocations (FunctionCallContent)
                     foreach (var call in agentUpdate.Update.Contents.OfType<FunctionCallContent>())
@@ -190,9 +190,8 @@ public static class MAFWorkflowEventBridge
                 case MAFWorkflows.ExecutorEvent genericExecutorEvent
                     when genericExecutorEvent is not MAFWorkflows.ExecutorInvokedEvent
                     && genericExecutorEvent is not MAFWorkflows.ExecutorCompletedEvent
-                    && genericExecutorEvent is not MAFWorkflows.ExecutorFailedEvent
-                    && genericExecutorEvent is not MAFWorkflows.AgentRunUpdateEvent:
-                    // Catch remaining ExecutorEvent subtypes (non-AgentRunUpdateEvent)
+                    && genericExecutorEvent is not MAFWorkflows.ExecutorFailedEvent:
+                    // Catch remaining ExecutorEvent subtypes
                     // by extracting text from their Data property
                     var evtText = ExtractTextFromResult(genericExecutorEvent.Data);
                     if (!string.IsNullOrEmpty(evtText))

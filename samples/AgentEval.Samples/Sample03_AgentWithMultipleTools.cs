@@ -240,17 +240,17 @@ public static class Sample03_AgentWithMultipleTools
             new ChatClientAgentOptions
             {
                 Name = "ResearchAgent",
-                Instructions = """
-                    You are a research assistant.
-                    When researching a topic:
-                    1. FIRST use SearchTool to find information
-                    2. THEN use SummarizeTool to create a summary
-                    3. Optionally use FactCheckTool to verify claims
-                    
-                    Always follow this order for best results.
-                    """,
                 ChatOptions = new ChatOptions
                 {
+                    Instructions = """
+                        You are a research assistant.
+                        When researching a topic:
+                        1. FIRST use SearchTool to find information
+                        2. THEN use SummarizeTool to create a summary
+                        3. Optionally use FactCheckTool to verify claims
+                        
+                        Always follow this order for best results.
+                        """,
                     Tools = 
                     [
                         AIFunctionFactory.Create(SearchTool),
@@ -269,9 +269,9 @@ public static class Sample03_AgentWithMultipleTools
             new ChatClientAgentOptions
             {
                 Name = "ResearchAgent (Mock)",
-                Instructions = "You are a research assistant.",
                 ChatOptions = new ChatOptions
                 {
+                    Instructions = "You are a research assistant.",
                     Tools = 
                     [
                         AIFunctionFactory.Create(SearchTool),

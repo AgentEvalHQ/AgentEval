@@ -33,6 +33,7 @@ Each ADR follows this structure:
 | [010](010-maf-workflow-integration-architecture.md) | MAF Workflow Integration Architecture | Accepted | 2026-02-14 |
 | [011](011-workflow-event-processing-timeout-handling.md) | Workflow Event Processing and Timeout Handling | Accepted | 2026-02-14 |
 | [012](012-workflow-assertion-design.md) | Workflow Assertion Design | Accepted | 2026-02-14 |
+| [013](013-maf-rc1-upgrade.md) | Microsoft Agent Framework RC1 Upgrade | Accepted | 2026-02 |
 
 ---
 

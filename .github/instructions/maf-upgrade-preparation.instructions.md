@@ -45,9 +45,9 @@ Only diff MAF source files that AgentEval actually depends on. Do NOT diff the e
 ### From `Microsoft.Agents.AI/` (single-agent adapter surface)
 
 Find and diff the files containing these types:
-- `AIAgent` class — `RunAsync()`, `RunStreamingAsync()`, `GetNewThread()`, `Name`
-- `AgentThread` class
-- `AgentRunResponse` class — `.Text`, `.Messages`, `.Usage`
+- `AIAgent` class — `RunAsync()`, `RunStreamingAsync()`, `CreateSessionAsync()`, `Name`
+- `AgentSession` class
+- `AgentResponse` class — `.Text`, `.Messages`, `.Usage`
 
 ### From `Microsoft.Agents.AI.Workflows/` (workflow adapter surface)
 
@@ -55,7 +55,7 @@ Find and diff the files containing these types:
 |------|---------------------------|
 | `Workflow.cs` | `ReflectEdges()`, `StartExecutorId`, `DescribeProtocolAsync()` |
 | `WorkflowBuilder.cs` | Used in tests for workflow setup |
-| `InProcessExecution.cs` | `StreamAsync()` |
+| `InProcessExecution.cs` | `RunStreamingAsync()` |
 | `StreamingRun.cs` | `WatchStreamAsync()`, `TrySendMessageAsync()` |
 | `TurnToken.cs` | Used as parameter in event bridge |
 | `ExecutorBindingExtensions.cs` | `CreateFuncBinding` (tests) |
@@ -63,7 +63,7 @@ Find and diff the files containing these types:
 | `ExecutorInvokedEvent.cs` | Event bridge maps this |
 | `ExecutorCompletedEvent.cs` | Event bridge maps this |
 | `ExecutorFailedEvent.cs` | Event bridge maps this |
-| `AgentRunUpdateEvent.cs` | Event bridge maps this |
+| `AgentResponseUpdateEvent.cs` | Event bridge maps this |
 | `WorkflowOutputEvent.cs` | Event bridge maps this |
 | `ChatProtocol.cs` or related | `IsChatProtocol()` extension |
 
@@ -87,7 +87,7 @@ MAFvnext/dotnet/src/.../File.cs  (next)
 Look for:
 1. **Signature changes** — parameters added/removed/reordered, return types changed
 2. **Type renames or namespace moves** — class/interface/enum renamed or relocated
-3. **Property changes** — on `AgentRunResponse`, event types, `EdgeInfo`
+3. **Property changes** — on `AgentResponse`, event types, `EdgeInfo`
 4. **Removed APIs** — methods or types deleted entirely
 5. **New APIs** — methods or types added that AgentEval could benefit from
 6. **Behavioral indicators** — changes to method bodies suggesting different behavior (null vs empty, exception types, event ordering)
@@ -100,9 +100,9 @@ For each change found, identify which AgentEval adapter file(s) are affected:
 
 | AgentEval File | MAF APIs It Uses |
 |---------------|-----------------|
-| `src/AgentEval/MAF/MAFAgentAdapter.cs` | `AIAgent.RunAsync()`, `RunStreamingAsync()`, `GetNewThread()`, `AgentRunResponse.Text/Messages/Usage` |
+| `src/AgentEval/MAF/MAFAgentAdapter.cs` | `AIAgent.RunAsync()`, `RunStreamingAsync()`, `CreateSessionAsync()`, `AgentResponse.Text/Messages/Usage` |
 | `src/AgentEval/MAF/MAFIdentifiableAgentAdapter.cs` | Same as above |
-| `src/AgentEval/MAF/MAFWorkflowEventBridge.cs` | `Workflow`, `InProcessExecution.StreamAsync()`, `StreamingRun`, `TurnToken`, all `*Event` types, `ChatProtocol` |
+| `src/AgentEval/MAF/MAFWorkflowEventBridge.cs` | `Workflow`, `InProcessExecution.RunStreamingAsync()`, `StreamingRun`, `TurnToken`, all `*Event` types, `ChatProtocol` |
 | `src/AgentEval/MAF/MAFGraphExtractor.cs` | `Workflow.ReflectEdges()`, `EdgeKind`, `EdgeInfo`, `DirectEdgeInfo`, `Checkpointing` |
 | `src/AgentEval/MAF/MAFWorkflowAdapter.cs` | `Workflow` (only in `FromMAFWorkflow()` factory) |
 

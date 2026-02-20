@@ -274,7 +274,7 @@ public static class Sample13_TraceRecordReplay
         {
             Name = "TraceableAgent",
             Description = "Agent for trace recording demo",
-            Instructions = "You are a helpful assistant. Keep responses concise (2-3 sentences)."
+            ChatOptions = new() { Instructions = "You are a helpful assistant. Keep responses concise (2-3 sentences)." }
         });
         return new MAFAgentAdapter(agent);
     }

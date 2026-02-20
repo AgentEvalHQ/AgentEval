@@ -200,9 +200,9 @@ public static class Sample16_CombinedStochasticComparison
             new ChatClientAgentOptions
             {
                 Name = $"Calculator Agent ({deployment})",
-                Instructions = "You are a math assistant. Always use the CalculatorTool for calculations.",
                 ChatOptions = new ChatOptions
                 {
+                    Instructions = "You are a math assistant. Always use the CalculatorTool for calculations.",
                     Tools = [AIFunctionFactory.Create(CalculatorTool)]
                 }
             });

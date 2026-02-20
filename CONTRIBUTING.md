@@ -43,7 +43,7 @@ dotnet build
 dotnet test
 ```
 
-All 707 tests should pass across all three target frameworks (net8.0, net9.0, net10.0).
+All 2,100+ tests should pass across all three target frameworks (net8.0, net9.0, net10.0).
 
 ---
 
@@ -174,7 +174,7 @@ AgentEval/
 │       ├── Models/          # Data models
 │       └── Snapshots/       # Snapshot testing
 ├── samples/
-│   └── AgentEval.Samples/   # Sample code (10 samples)
+│   └── AgentEval.Samples/   # Sample code (23 samples)
 ├── tests/
 │   └── AgentEval.Tests/     # Unit tests
 └── docs/                    # DocFX documentation

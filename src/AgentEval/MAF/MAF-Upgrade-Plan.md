@@ -1,5 +1,27 @@
 # MAF Upgrade Plan — Release Candidate (`1.0.0-rc1`)
 
+> **Status: COMPLETED** — February 2026  
+> All 12 tasks implemented and verified. 6,300 tests passing. See [ADR-013](../../docs/adr/013-maf-rc1-upgrade.md) for the architectural decision record.
+
+## Implementation Tracking
+
+| # | Feature/Task | Description | Done | Reviewed | Notes |
+|---|---|---|---|---|---|
+| 001 | NuGet Version Bump | Update `Directory.Packages.props` — 5 MAF/M.E.AI packages + `System.Numerics.Tensors` transitive bump | 100% | ✅ | 7 version bumps: 3 MAF `preview→rc1`, M.E.AI `10.0.0→10.3.0`, M.E.AI.OpenAI `preview→10.3.0`, M.E.AI.Eval.Quality `9.5.0→10.3.0`, Tensors `10.0.0→10.0.3` |
+| 002 | Event Hierarchy Fix | Restructure switch in `MAFWorkflowEventBridge.cs` — CRITICAL §1.4 | 100% | ✅ | `case AgentResponseUpdateEvent agentUpdate:` standalone arm added before `WorkflowOutputEvent`. Catch-all simplified (removed `AgentRunUpdateEvent` exclusion). Verified: compiles, tests pass. |
+| 003 | Naming Conflict Fix | Add `using AgentResponse = AgentEval.Core.AgentResponse;` to both adapter files §1.2 | 100% | ✅ | Alias added to `MAFAgentAdapter.cs` and `MAFIdentifiableAgentAdapter.cs`. Per C# spec §14.5.3/14.5.4, alias takes precedence. |
+| 004 | Streaming Renames | `StreamAsync`→`RunStreamingAsync` in `MAFWorkflowEventBridge.cs` §1.5 | 100% | ✅ | 2 call sites updated (ChatProtocol branch + string branch). Comment also updated. |
+| 005 | Type Renames: MAFAgentAdapter | `AgentThread`→`AgentSession`, `GetNewThread`→`CreateSessionAsync` §4.1 | 100% | ✅ | Field `_thread→_session`, constructor param, `InvokeAsync`/`InvokeStreamingAsync` session creation, `ResetThread()→ResetSessionAsync()` (async), `GetNewThread()→CreateSessionAsync()` (async). |
+| 006 | Type Renames: MAFIdentifiableAgentAdapter | Same as 005 §4.2 | 100% | ✅ | Identical changes applied. Both adapters now use `AgentSession`, `CreateSessionAsync`. |
+| 007 | XML Comment Updates | Update event type references in `<remarks>` §4.3 | 100% | ✅ | `AgentRunUpdateEvent→AgentResponseUpdateEvent` in XML remarks of `MAFWorkflowEventBridge.cs`. |
+| 008 | Test: AddFanInEdge→AddFanInBarrierEdge | Update `MAFGraphExtractorTests.cs` §5.2 | 100% | ✅ | Line 147: `.AddFanInEdge([b, c], d)` → `.AddFanInBarrierEdge([b, c], d)`. |
+| 009 | Build Verification | `dotnet build` — zero errors | 100% | ✅ | 0 errors, 1 pre-existing warning (CS8602). All projects × all TFMs (net8.0/net9.0/net10.0). |
+| 010 | Test Verification | `dotnet test` — full suite ×3 TFMs | 100% | ✅ | **6,300 tests passed**, 0 failures, 0 skipped (2,100 tests × 3 TFMs). |
+| 011 | Documentation Updates | Update doc files with new type names §7 | 100% | ✅ | 9 replacements across 4 files: `docs/workflows.md` (2), `docs/adr/010-*` (2), `docs/adr/011-*` (4), `.github/copilot-instructions.md` (1). All `AgentRunUpdateEvent→AgentResponseUpdateEvent`, `StreamAsync→RunStreamingAsync`, `AgentRunResponse→AgentResponse` updated. |
+| 012 | **NEW**: Samples `Instructions` Fix | `ChatClientAgentOptions.Instructions` → `ChatOptions.Instructions` (plan missed this breaking change) | 100% | ✅ | 26 occurrences fixed across 14 sample files. **Plan §3/§6 was WRONG**: stated `ChatClientAgentOptions` was "backward compatible" — in reality `Instructions` was removed and moved to `ChatOptions.Instructions`. NuGetConsumer NOT updated (standalone project with own package refs). |
+
+---
+
 ## Executive Summary
 
 **From:** `Microsoft.Agents.AI` `1.0.0-preview.251110.2`  
@@ -286,7 +308,7 @@ Verified in `MAFvnext/dotnet/Directory.Packages.props`:
 | `Workflow.DescribeProtocolAsync()` | **Unchanged** ✅ |
 | `ExecutorInvokedEvent`, `ExecutorCompletedEvent`, `ExecutorFailedEvent` | **Unchanged** ✅ |
 | `WorkflowBuilder`, `.AddEdge()`, `.Build()` | **Unchanged** ✅ |
-| `ChatClientAgent`, `ChatClientAgentOptions` | **Backward compatible** ✅ — new optional `IServiceProvider? services` param on constructors; new `AIContextProviders` + `UseProvidedChatClientAsIs` on options. All optional with defaults — zero AgentEval changes needed |
+| `ChatClientAgent`, `ChatClientAgentOptions` | ~~**Backward compatible** ✅~~ **CORRECTION:** `ChatClientAgentOptions.Instructions` was **REMOVED** in RC1. Instructions moved to `ChatOptions.Instructions`. 26 sample files required fixes. See Task 012 in tracking table. |
 | `BindAsExecutor(bool emitEvents)` | **Still exists** ✅ (new `AIAgentHostOptions?` overload added alongside) |
 
 ---
@@ -393,9 +415,11 @@ Zero MAF SDK references.
 | `Sample09_WorkflowEvaluationReal.cs` | Verify `BindAsExecutor(emitEvents: true)` still works (yes — overload preserved). Uses `.AddEdge()` only (no `AddFanInEdge`). |
 | `Sample10_WorkflowWithTools.cs` | Same — uses `.AddEdge()` only (no `AddFanInEdge`). |
 
-### 6.3 Tier 2 — Agent Creation Samples (⚪ RE-VERIFY, 14 files)
+### 6.3 Tier 2 — Agent Creation Samples (🔴 REQUIRED CHANGES, 14 files)
 
-These samples create `ChatClientAgent` instances. `ChatClientAgent` and `ChatClientAgentOptions` are **unchanged** in the RC.
+~~These samples create `ChatClientAgent` instances. `ChatClientAgent` and `ChatClientAgentOptions` are **unchanged** in the RC.~~
+
+**CORRECTION:** `ChatClientAgentOptions.Instructions` was removed in RC1. All 14 sample files required migration from `Instructions = "..."` to `ChatOptions = new() { Instructions = "..." }` (or merging into existing `ChatOptions` when `Tools` was already set). 26 occurrences fixed.
 
 | File |
 |------|
@@ -414,7 +438,7 @@ These samples create `ChatClientAgent` instances. `ChatClientAgent` and `ChatCli
 | `Sample20_RedTeamBasic.cs` |
 | `Sample21_RedTeamAdvanced.cs` |
 
-**Changes needed:** None — **0 code changes required.** `new MAFAgentAdapter(agent)` constructor is unchanged. `ChatClientAgent`, `ChatClientAgentOptions`, `BindAsExecutor(emitEvents: true)`, `WorkflowBuilder.AddEdge()` are all backward-compatible. The adapter abstraction layer insulates all sample code from the internal MAF renames (`AgentThread→AgentSession`, `GetNewThread→CreateSessionAsync`, etc.). Verified by exhaustive grep: zero sample files reference `AgentThread`, `GetNewThread`, `ResetThread`, `AgentRunResponse`, or `StreamAsync` directly.
+~~**Changes needed:** None — **0 code changes required.**~~ **CORRECTION:** 26 `ChatClientAgentOptions.Instructions` → `ChatOptions.Instructions` changes were required. The adapter abstraction layer DID insulate samples from `AgentThread→AgentSession` and `GetNewThread→CreateSessionAsync` renames, but `ChatClientAgentOptions` itself had a breaking change not detected during plan preparation.
 
 ### 6.4 Tier 3 — Unused Import Only (🟢 LOW, 2 files)
 
@@ -429,7 +453,7 @@ These samples create `ChatClientAgent` instances. `ChatClientAgent` and `ChatCli
 
 ### 6.6 NuGet Consumer Project
 
-`AgentFactory.cs` uses `ChatClientAgent`, `ChatClientAgentOptions` — unchanged. `.csproj` needs MAF version bumped.
+`AgentFactory.cs` uses `ChatClientAgent`, `ChatClientAgentOptions`. `.csproj` has `ManagePackageVersionsCentrally=false` and references published AgentEval NuGet `0.3.0-beta` with old MAF versions. **NOT updated** — standalone validation project; will need update when new NuGet is published against RC1.
 
 ---
 

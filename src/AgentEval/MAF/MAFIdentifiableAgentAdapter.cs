@@ -5,6 +5,7 @@ using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
 using AgentEval.Core;
 using AgentEval.Comparison;
+using AgentResponse = AgentEval.Core.AgentResponse;
 
 namespace AgentEval.MAF;
 
@@ -15,7 +16,7 @@ namespace AgentEval.MAF;
 public class MAFIdentifiableAgentAdapter : IStreamableAgent, IModelIdentifiable
 {
     private readonly AIAgent _agent;
-    private AgentThread? _thread;
+    private AgentSession? _session;
     
     /// <summary>
     /// Create an adapter for an AIAgent with model identification.
@@ -23,17 +24,17 @@ public class MAFIdentifiableAgentAdapter : IStreamableAgent, IModelIdentifiable
     /// <param name="agent">The MAF agent to adapt.</param>
     /// <param name="modelId">Unique identifier for the model (e.g., "gpt-4o-2024-08-06").</param>
     /// <param name="modelDisplayName">Human-readable model name (e.g., "GPT-4o").</param>
-    /// <param name="thread">Optional thread for conversation context.</param>
+    /// <param name="session">Optional session for conversation context.</param>
     public MAFIdentifiableAgentAdapter(
         AIAgent agent, 
         string modelId,
         string modelDisplayName,
-        AgentThread? thread = null)
+        AgentSession? session = null)
     {
         _agent = agent ?? throw new ArgumentNullException(nameof(agent));
         ModelId = modelId ?? throw new ArgumentNullException(nameof(modelId));
         ModelDisplayName = modelDisplayName ?? throw new ArgumentNullException(nameof(modelDisplayName));
-        _thread = thread;
+        _session = session;
     }
     
     /// <inheritdoc/>
@@ -48,8 +49,8 @@ public class MAFIdentifiableAgentAdapter : IStreamableAgent, IModelIdentifiable
     /// <inheritdoc/>
     public async Task<AgentResponse> InvokeAsync(string prompt, CancellationToken cancellationToken = default)
     {
-        var thread = _thread ?? _agent.GetNewThread();
-        var response = await _agent.RunAsync(prompt, thread, cancellationToken: cancellationToken);
+        var session = _session ?? await _agent.CreateSessionAsync(cancellationToken);
+        var response = await _agent.RunAsync(prompt, session, cancellationToken: cancellationToken);
         
         return new AgentResponse
         {
@@ -63,10 +64,10 @@ public class MAFIdentifiableAgentAdapter : IStreamableAgent, IModelIdentifiable
         string prompt, 
         [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
-        var thread = _thread ?? _agent.GetNewThread();
+        var session = _session ?? await _agent.CreateSessionAsync(cancellationToken);
         TokenUsage? capturedUsage = null;
         
-        await foreach (var update in _agent.RunStreamingAsync(prompt, thread, cancellationToken: cancellationToken))
+        await foreach (var update in _agent.RunStreamingAsync(prompt, session, cancellationToken: cancellationToken))
         {
             foreach (var content in update.Contents)
             {
@@ -116,15 +117,16 @@ public class MAFIdentifiableAgentAdapter : IStreamableAgent, IModelIdentifiable
     }
     
     /// <summary>
-    /// Reset the conversation thread.
+    /// Reset the conversation session.
     /// </summary>
-    public void ResetThread()
+    public async Task ResetSessionAsync(CancellationToken cancellationToken = default)
     {
-        _thread = _agent.GetNewThread();
+        _session = await _agent.CreateSessionAsync(cancellationToken);
     }
     
     /// <summary>
-    /// Get a new thread for fresh conversations.
+    /// Create a new session for fresh conversations.
     /// </summary>
-    public AgentThread GetNewThread() => _agent.GetNewThread();
+    public async Task<AgentSession> CreateSessionAsync(CancellationToken cancellationToken = default)
+        => await _agent.CreateSessionAsync(cancellationToken);
 }

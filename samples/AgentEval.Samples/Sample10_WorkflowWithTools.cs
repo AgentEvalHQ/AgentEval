@@ -323,19 +323,19 @@ public static class Sample10_WorkflowWithTools
         {
             Name = "TripPlanner",
             Description = "Gathers city information and plans the trip itinerary",
-            Instructions = """
-                You are a trip planning specialist. Given a travel request:
-                
-                1. Use the GetInfoAbout tool to gather information about each city mentioned
-                2. Create a day-by-day itinerary outline based on the city information
-                3. Include key attractions, cultural tips, and logistics overview
-                4. Note the cities that need flights and hotel bookings
-                
-                Call GetInfoAbout for EACH city mentioned in the request.
-                Your output will be passed to the flight reservation agent.
-                """,
             ChatOptions = new ChatOptions
             {
+                Instructions = """
+                    You are a trip planning specialist. Given a travel request:
+                    
+                    1. Use the GetInfoAbout tool to gather information about each city mentioned
+                    2. Create a day-by-day itinerary outline based on the city information
+                    3. Include key attractions, cultural tips, and logistics overview
+                    4. Note the cities that need flights and hotel bookings
+                    
+                    Call GetInfoAbout for EACH city mentioned in the request.
+                    Your output will be passed to the flight reservation agent.
+                    """,
                 Tools =
                 [
                     AIFunctionFactory.Create(GetInfoAbout)
@@ -348,18 +348,18 @@ public static class Sample10_WorkflowWithTools
         {
             Name = "FlightReservation",
             Description = "Searches and books flights between cities",
-            Instructions = """
-                You are a flight reservation specialist. Given a trip plan:
-                
-                1. Use SearchFlights to find available flights between the cities
-                2. Select the best option and use BookFlight to make the reservation
-                3. Summarize the booked flights with times—prices—confirmation numbers
-                
-                Call SearchFlights first, then BookFlight for each leg of the journey.
-                Your output will be passed to the hotel reservation agent.
-                """,
             ChatOptions = new ChatOptions
             {
+                Instructions = """
+                    You are a flight reservation specialist. Given a trip plan:
+                    
+                    1. Use SearchFlights to find available flights between the cities
+                    2. Select the best option and use BookFlight to make the reservation
+                    3. Summarize the booked flights with times—prices—confirmation numbers
+                    
+                    Call SearchFlights first, then BookFlight for each leg of the journey.
+                    Your output will be passed to the hotel reservation agent.
+                    """,
                 Tools =
                 [
                     AIFunctionFactory.Create(SearchFlights),
@@ -373,18 +373,18 @@ public static class Sample10_WorkflowWithTools
         {
             Name = "HotelReservation",
             Description = "Books hotels for each city in the trip",
-            Instructions = """
-                You are a hotel reservation specialist. Given a trip plan with booked flights:
-                
-                1. Use BookHotel to reserve accommodation for each city
-                2. Choose appropriate dates based on the flight schedule
-                3. Summarize booked hotels with names, dates, and confirmation numbers
-                
-                Call BookHotel for EACH city that needs accommodation.
-                Your output will be passed to the trip presenter.
-                """,
             ChatOptions = new ChatOptions
             {
+                Instructions = """
+                    You are a hotel reservation specialist. Given a trip plan with booked flights:
+                    
+                    1. Use BookHotel to reserve accommodation for each city
+                    2. Choose appropriate dates based on the flight schedule
+                    3. Summarize booked hotels with names, dates, and confirmation numbers
+                    
+                    Call BookHotel for EACH city that needs accommodation.
+                    Your output will be passed to the trip presenter.
+                    """,
                 Tools =
                 [
                     AIFunctionFactory.Create(BookHotel)
@@ -397,7 +397,7 @@ public static class Sample10_WorkflowWithTools
         {
             Name = "Presenter",
             Description = "Presents the finalized trip plan in a nice format",
-            Instructions = """
+            ChatOptions = new() { Instructions = """
                 You are a professional trip presentation specialist. Given all the trip details
                 (city info, flights, hotels):
                 
@@ -407,7 +407,7 @@ public static class Sample10_WorkflowWithTools
                 4. Use clear formatting with sections, bullet points, and highlights
                 
                 Deliver a publication-ready travel itinerary document.
-                """
+                """ }
         });
 
         // ── Bind agents as workflow executors ──

@@ -122,11 +122,11 @@ public static class Sample01_HelloWorld
             new ChatClientAgentOptions
             {
                 Name = "GreetingAgent",
-                Instructions = """
+                ChatOptions = new() { Instructions = """
                     You are a friendly greeting assistant.
                     When someone introduces themselves, greet them warmly by name.
                     Keep responses brief and friendly.
-                    """
+                    """ }
             });
     }
 
@@ -139,7 +139,7 @@ public static class Sample01_HelloWorld
             new ChatClientAgentOptions
             {
                 Name = "GreetingAgent (Mock)",
-                Instructions = "You are a friendly greeting assistant."
+                ChatOptions = new() { Instructions = "You are a friendly greeting assistant." }
             });
     }
 

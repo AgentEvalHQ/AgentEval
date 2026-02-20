@@ -1,6 +1,6 @@
 # AgentEval - AI Coding Agent Instructions
 
-AgentEval is **the comprehensive .NET evaluation toolkit for AI agents**, built primarily for **Microsoft Agent Framework (MAF)**. What RAGAS and DeepEval do for Python, AgentEval does for .NET—plus tool chain evaluation, behavioral policies, and calibrated multi-judge scoring.
+AgentEval is **the comprehensive .NET evaluation toolkit for AI agents**, built primarily for **Microsoft Agent Framework (MAF) `1.0.0-rc1`** with **Microsoft.Extensions.AI `10.3.0`**. What RAGAS and DeepEval do for Python, AgentEval does for .NET—plus tool chain evaluation, behavioral policies, and calibrated multi-judge scoring.
 
 ## Architecture Overview
 
@@ -149,7 +149,7 @@ modelResults.PrintComparisonTable();
 ### MAF Integration
 - `MAFAgentAdapter` wraps MAF's `AIAgent` → implements `IStreamableAgent`
 - `MAFEvaluationHarness` orchestrates tests with streaming, tool tracking, performance metrics
-- Token usage extracted from `AgentRunResponse.Usage` property
+- Token usage extracted from `AgentResponse.Usage` property
 
 ### FakeChatClient for Testing
 Use `AgentEval.Testing.FakeChatClient` to test metrics without external LLM calls:

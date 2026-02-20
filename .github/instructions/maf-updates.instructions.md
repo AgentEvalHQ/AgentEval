@@ -46,6 +46,21 @@ Look for these three entries:
 
 All three MUST be updated to the same version simultaneously.
 
+Also update the Microsoft.Extensions.AI packages if the MAF release requires a newer version:
+```xml
+<PackageVersion Include="Microsoft.Extensions.AI" Version="..." />
+<PackageVersion Include="Microsoft.Extensions.AI.OpenAI" Version="..." />
+<PackageVersion Include="Microsoft.Extensions.AI.Evaluation.Quality" Version="..." />
+```
+
+**Current versions (as of RC1 upgrade):**
+- MAF packages: `1.0.0-rc1`
+- M.E.AI packages: `10.3.0`
+
+**Which projects reference which MAF packages:**
+- `src/AgentEval/AgentEval.csproj` → `Microsoft.Agents.AI`, `Microsoft.Agents.AI.Workflows`
+- `samples/AgentEval.Samples/AgentEval.Samples.csproj` → `Microsoft.Agents.AI.OpenAI`
+
 ## Step 1: Update the NuGet Version and Detect Breaking Changes
 
 When a Dependabot PR arrives (or when manually bumping MAF versions):
@@ -67,7 +82,7 @@ MAF-dependent code is confined to exactly these files in `src/AgentEval/MAF/`:
 
 | File | MAF APIs Used | Most Likely to Break |
 |------|--------------|---------------------|
-| `MAFAgentAdapter.cs` | `AIAgent`, `RunAsync()`, `RunStreamingAsync()`, `GetNewThread()`, `AgentRunResponse` | Method signatures, response shape |
+| `MAFAgentAdapter.cs` | `AIAgent`, `RunAsync()`, `RunStreamingAsync()`, `CreateSessionAsync()`, `AgentResponse` | Method signatures, response shape |
 | `MAFIdentifiableAgentAdapter.cs` | Same as above + `IModelIdentifiable` | Same as above |
 | `MAFWorkflowEventBridge.cs` | `Workflow`, `InProcessExecution`, `StreamingRun`, `WorkflowEvent` subclasses, `TurnToken` | Event hierarchy restructuring |
 | `MAFGraphExtractor.cs` | `Workflow.ReflectEdges()`, `EdgeKind`, `EdgeInfo`, `DirectEdgeInfo`, `Checkpointing` APIs | Reflection/edge API surface |
@@ -86,23 +101,37 @@ MAF-dependent code is confined to exactly these files in `src/AgentEval/MAF/`:
 
 ### Common breaking change patterns and how to fix:
 
-**`AIAgent.RunAsync()` signature changed:**
+**`AIAgent.RunAsync()` / `RunStreamingAsync()` signature changed:**
 - Fix in `MAFAgentAdapter.InvokeAsync()` and `MAFIdentifiableAgentAdapter.InvokeAsync()`
 - Map new parameters/return type to existing `AgentResponse` shape
 - The `IEvaluableAgent.InvokeAsync()` contract stays unchanged
 
-**`AgentRunResponse` properties renamed or restructured:**
+**`AgentResponse` properties renamed or restructured:**
 - Fix in `MAFAgentAdapter.InvokeAsync()` — map new property names
 - Key properties: `.Text`, `.Messages`, `.Usage`
+
+**`AgentSession` / `CreateSessionAsync()` changed:**
+- Fix in both adapters — session lifecycle is managed internally
+- Note: `CreateSessionAsync()` is async (changed from sync `GetNewThread()` in preview)
+
+**Agent configuration model changed (e.g., `ChatClientAgentOptions`):**
+- Fix in samples that create `ChatClientAgent` instances
+- Check if properties moved (like `Instructions` moved to `ChatOptions.Instructions` in RC1)
+- Also update code examples in documentation (`docs/*.md`)
 
 **Workflow event types changed:**
 - Fix in `MAFWorkflowEventBridge.cs` — update the event pattern matching
 - Map new MAF event types to existing AgentEval `WorkflowEvent` records
+- Watch for event hierarchy changes (e.g., `AgentResponseUpdateEvent` extends `WorkflowOutputEvent` in RC1)
 - AgentEval's own event records (`ExecutorOutputEvent`, `ExecutorToolCallEvent`, etc.) stay unchanged
 
 **`Workflow.ReflectEdges()` API changed:**
 - Fix in `MAFGraphExtractor.ExtractGraph()`
 - Map new edge model to existing `WorkflowGraphSnapshot`
+
+**`WorkflowBuilder` API changed (e.g., `AddFanInEdge` → `AddFanInBarrierEdge`):**
+- Fix in test files that build workflows for testing
+- No impact on production code (builder is only used in tests)
 
 **Streaming content model changed (`update.Contents`):**
 - Fix in `MAFAgentAdapter.InvokeStreamingAsync()`
@@ -184,8 +213,22 @@ Only 4 out of 7 files in `src/AgentEval/MAF/` actually import MAF types. The oth
 After a successful upgrade:
 
 1. If `src/AgentEval/MAF/MAF-Upgrade-Plan.md` exists, update its status to "Completed" with the date, or delete it
-2. If `/MAFvnext/` exists, tell the user to replace `/MAF/` contents with `/MAFvnext/` (so `/MAF/` reflects the new current version)
-3. Commit all changes with message: `deps: Update MAF to <new-version>`
+2. If `/MAFvnext/` exists, move its contents to `/MAF/` (so `/MAF/` reflects the new current version), then remove `/MAFvnext/`
+3. Update documentation:
+   - Check all code examples in `docs/*.md` for stale API patterns (especially `ChatClientAgentOptions` configuration)
+   - Update `.github/instructions/` files to reflect new API names
+   - Add or update the ADR if the upgrade involved significant breaking changes
+   - Update `CHANGELOG.md` with the upgrade entry
+4. Commit all changes with message: `deps: Update MAF to <new-version>`
+
+### Lessons Learned from the Preview → RC1 Upgrade
+
+The RC1 upgrade revealed that `ChatClientAgentOptions.Instructions` was removed (moved to `ChatOptions.Instructions`). This affected:
+- 14 sample files (26 occurrences)
+- 5+ documentation files with code examples
+- Instruction files with mock agent examples
+
+**Takeaway:** Always check sample files and documentation code examples, not just `src/` and `tests/`. Use `grep` to search for any API name that changed.
 
 ## Related Instructions
 

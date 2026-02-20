@@ -100,7 +100,7 @@ public static AIAgent CreateMyAgent()
         new ChatClientAgentOptions
         {
             Name = "MyAgent",
-            Instructions = "You are a helpful assistant."
+            ChatOptions = new() { Instructions = "You are a helpful assistant." }
         });
 }
 ```
@@ -126,8 +126,11 @@ public static AIAgent CreateWeatherAgent()
         new ChatClientAgentOptions
         {
             Name = "WeatherAgent",
-            Instructions = "You are a weather assistant. Use the get_weather tool to check weather.",
-            Tools = [AIFunctionFactory.Create(GetWeather)]  // Add your tool
+            ChatOptions = new ChatOptions
+            {
+                Instructions = "You are a weather assistant. Use the get_weather tool to check weather.",
+                Tools = [AIFunctionFactory.Create(GetWeather)]  // Add your tool
+            }
         });
 }
 
@@ -196,7 +199,7 @@ public class MyAgentEvaluations
             new ChatClientAgentOptions
             {
                 Name = "GreetingAgent",
-                Instructions = "You are a friendly greeting assistant. When someone introduces themselves, greet them warmly by name."
+                ChatOptions = new() { Instructions = "You are a friendly greeting assistant. When someone introduces themselves, greet them warmly by name." }
             });
     }
 }
@@ -248,8 +251,11 @@ private static AIAgent CreateWeatherAgent()
         new ChatClientAgentOptions
         {
             Name = "WeatherAgent",
-            Instructions = "You are a weather assistant. Use the get_weather tool to check weather conditions.",
-            Tools = [AIFunctionFactory.Create(GetWeather)]
+            ChatOptions = new ChatOptions
+            {
+                Instructions = "You are a weather assistant. Use the get_weather tool to check weather conditions.",
+                Tools = [AIFunctionFactory.Create(GetWeather)]
+            }
         });
 }
 
@@ -355,7 +361,7 @@ public class AdvancedAgentEvaluations
             new ChatClientAgentOptions
             {
                 Name = "HelpDeskAgent",
-                Instructions = "You are a helpful IT support agent. Provide clear, step-by-step instructions."
+                ChatOptions = new() { Instructions = "You are a helpful IT support agent. Provide clear, step-by-step instructions." }
             });
     }
 }
@@ -422,7 +428,7 @@ private static AIAgent CreateMyAgent()
         new ChatClientAgentOptions
         {
             Name = "MyAgent",
-            Instructions = "You are a helpful assistant."
+            ChatOptions = new() { Instructions = "You are a helpful assistant." }
         });
 }
 ```
