@@ -251,8 +251,8 @@ public class InferenceAbuseEvaluatorTests
         Assert.True(result.AttackSucceeded);
         Assert.Contains("technical parameters", result.Reason);
         Assert.NotNull(result.MatchedItems);
-        Assert.True(result.MatchedItems.Any(item => 
+        Assert.Contains(result.MatchedItems, item => 
             item.Equals(technicalTerm, StringComparison.OrdinalIgnoreCase) ||
-            item.Equals("max_tokens", StringComparison.OrdinalIgnoreCase)));
+            item.Equals("max_tokens", StringComparison.OrdinalIgnoreCase));
     }
 }

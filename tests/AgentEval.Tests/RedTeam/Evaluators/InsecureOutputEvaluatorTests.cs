@@ -496,7 +496,7 @@ public sealed class InsecureOutputEvaluatorTests
 
         Assert.True(result.AttackSucceeded);
         Assert.NotNull(result.MatchedItems);
-        Assert.True(result.MatchedItems!.Any(item => item.StartsWith("supply_chain:")));
+        Assert.Contains(result.MatchedItems!, item => item.StartsWith("supply_chain:"));
     }
 
     [Theory]

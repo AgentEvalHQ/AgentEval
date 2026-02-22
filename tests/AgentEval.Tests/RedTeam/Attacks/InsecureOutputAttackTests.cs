@@ -207,8 +207,8 @@ public sealed class InsecureOutputAttackTests
         var probes = _attack.GetProbes(Intensity.Quick);
         var xssPatterns = new[] { "<script", "onclick", "onerror", "onload", "svg" };
         Assert.All(probes, p => 
-            Assert.True(xssPatterns.Any(pattern => 
-                p.Prompt.Contains(pattern, StringComparison.OrdinalIgnoreCase))));
+            Assert.Contains(xssPatterns, pattern => 
+                p.Prompt.Contains(pattern, StringComparison.OrdinalIgnoreCase)));
     }
 
     // === SQL Probe Content Tests ===
@@ -222,8 +222,8 @@ public sealed class InsecureOutputAttackTests
         
         var sqlPatterns = new[] { "OR", "DROP", "UPDATE", "UNION", "--" };
         Assert.All(probes, p => 
-            Assert.True(sqlPatterns.Any(pattern => 
-                p.Prompt.Contains(pattern, StringComparison.OrdinalIgnoreCase))));
+            Assert.Contains(sqlPatterns, pattern => 
+                p.Prompt.Contains(pattern, StringComparison.OrdinalIgnoreCase)));
     }
 
     // === Command Injection Probe Content Tests ===
@@ -237,8 +237,8 @@ public sealed class InsecureOutputAttackTests
         
         var cmdPatterns = new[] { "rm", "cat", "wget", "cmd.exe", "$(", "`" };
         Assert.All(probes, p => 
-            Assert.True(cmdPatterns.Any(pattern => 
-                p.Prompt.Contains(pattern, StringComparison.OrdinalIgnoreCase))));
+            Assert.Contains(cmdPatterns, pattern => 
+                p.Prompt.Contains(pattern, StringComparison.OrdinalIgnoreCase)));
     }
 
     // === SSRF Injection Probe Tests ===
@@ -260,8 +260,8 @@ public sealed class InsecureOutputAttackTests
         
         var ssrfPatterns = new[] { "http://", "file://", "169.254.169.254", "internal", "metadata" };
         Assert.All(probes, p => 
-            Assert.True(ssrfPatterns.Any(pattern => 
-                p.Prompt.Contains(pattern, StringComparison.OrdinalIgnoreCase))));
+            Assert.Contains(ssrfPatterns, pattern => 
+                p.Prompt.Contains(pattern, StringComparison.OrdinalIgnoreCase)));
     }
 
     // === CSRF Injection Probe Tests ===
@@ -283,8 +283,8 @@ public sealed class InsecureOutputAttackTests
         
         var csrfPatterns = new[] { "form", "POST", "action", "submit", "hidden" };
         Assert.All(probes, p => 
-            Assert.True(csrfPatterns.Any(pattern => 
-                p.Prompt.Contains(pattern, StringComparison.OrdinalIgnoreCase))));
+            Assert.Contains(csrfPatterns, pattern => 
+                p.Prompt.Contains(pattern, StringComparison.OrdinalIgnoreCase)));
     }
 
     // === NoSQL Injection Probe Tests ===
@@ -306,8 +306,8 @@ public sealed class InsecureOutputAttackTests
         
         var nosqlPatterns = new[] { "$ne", "$gt", "MongoDB" };
         Assert.All(probes, p => 
-            Assert.True(nosqlPatterns.Any(pattern => 
-                p.Prompt.Contains(pattern, StringComparison.OrdinalIgnoreCase))));
+            Assert.Contains(nosqlPatterns, pattern => 
+                p.Prompt.Contains(pattern, StringComparison.OrdinalIgnoreCase)));
     }
 
     // === Deserialization Injection Probe Tests ===
@@ -329,8 +329,8 @@ public sealed class InsecureOutputAttackTests
         
         var deserPatterns = new[] { "pickle", "YAML", "!!python", "os.system" };
         Assert.All(probes, p => 
-            Assert.True(deserPatterns.Any(pattern => 
-                p.Prompt.Contains(pattern, StringComparison.OrdinalIgnoreCase))));
+            Assert.Contains(deserPatterns, pattern => 
+                p.Prompt.Contains(pattern, StringComparison.OrdinalIgnoreCase)));
     }
 
     // === Supply Chain Injection Probe Tests ===
@@ -352,8 +352,8 @@ public sealed class InsecureOutputAttackTests
         
         var supplyPatterns = new[] { "package", "npm", "Python" };
         Assert.All(probes, p => 
-            Assert.True(supplyPatterns.Any(pattern => 
-                p.Prompt.Contains(pattern, StringComparison.OrdinalIgnoreCase))));
+            Assert.Contains(supplyPatterns, pattern => 
+                p.Prompt.Contains(pattern, StringComparison.OrdinalIgnoreCase)));
     }
 
     // === HTTP Header Injection Probe Tests ===
@@ -375,8 +375,8 @@ public sealed class InsecureOutputAttackTests
         
         var headerPatterns = new[] { "\\r\\n", "Set-Cookie", "Content-Type", "header" };
         Assert.All(probes, p => 
-            Assert.True(headerPatterns.Any(pattern => 
-                p.Prompt.Contains(pattern, StringComparison.OrdinalIgnoreCase))));
+            Assert.Contains(headerPatterns, pattern => 
+                p.Prompt.Contains(pattern, StringComparison.OrdinalIgnoreCase)));
     }
 
     // === Privilege Escalation Probe Tests ===
@@ -398,7 +398,7 @@ public sealed class InsecureOutputAttackTests
         
         var privPatterns = new[] { "admin", "role", "JWT", "permissions" };
         Assert.All(probes, p => 
-            Assert.True(privPatterns.Any(pattern => 
-                p.Prompt.Contains(pattern, StringComparison.OrdinalIgnoreCase))));
+            Assert.Contains(privPatterns, pattern => 
+                p.Prompt.Contains(pattern, StringComparison.OrdinalIgnoreCase)));
     }
 }

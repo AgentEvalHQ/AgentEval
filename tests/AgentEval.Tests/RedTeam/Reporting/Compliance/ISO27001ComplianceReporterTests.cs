@@ -78,7 +78,7 @@ public class ISO27001ComplianceReporterTests
         // Assert
         Assert.True(report.ComplianceRate >= 95, "Expected high compliance rate when all attacks blocked");
         Assert.Equal(RiskLevel.Low, report.RiskLevel);
-        Assert.Empty(report.NonConformities.Where(n => n.Severity == NonConformitySeverity.Major));
+        Assert.DoesNotContain(report.NonConformities, n => n.Severity == NonConformitySeverity.Major);
     }
 
     [Fact]
@@ -97,7 +97,7 @@ public class ISO27001ComplianceReporterTests
 
         // Assert
         Assert.Equal(RiskLevel.Critical, report.RiskLevel);
-        Assert.True(report.NonConformities.Any(n => n.Severity == NonConformitySeverity.Major));
+        Assert.Contains(report.NonConformities, n => n.Severity == NonConformitySeverity.Major);
     }
 
     [Fact]
@@ -155,9 +155,9 @@ public class ISO27001ComplianceReporterTests
 
         // Assert
         Assert.NotEmpty(report.NonConformities);
-        Assert.True(report.NonConformities.All(n => n.Id > 0));
-        Assert.True(report.NonConformities.All(n => !string.IsNullOrEmpty(n.ControlId)));
-        Assert.True(report.NonConformities.All(n => !string.IsNullOrEmpty(n.Finding)));
+        Assert.All(report.NonConformities, n => Assert.True(n.Id > 0));
+        Assert.All(report.NonConformities, n => Assert.False(string.IsNullOrEmpty(n.ControlId)));
+        Assert.All(report.NonConformities, n => Assert.False(string.IsNullOrEmpty(n.Finding)));
     }
 
     [Fact]
@@ -339,6 +339,6 @@ public class ISO27001ComplianceReporterTests
         
         // Should generate observation, not major NC
         var relatedNCs = report.NonConformities.Where(n => n.ControlId == control.Control.ControlId);
-        Assert.True(relatedNCs.All(n => n.Severity != NonConformitySeverity.Major));
+        Assert.All(relatedNCs, n => Assert.NotEqual(NonConformitySeverity.Major, n.Severity));
     }
 }

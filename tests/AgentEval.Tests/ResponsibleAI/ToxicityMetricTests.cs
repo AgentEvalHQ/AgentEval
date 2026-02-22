@@ -86,7 +86,7 @@ public class ToxicityMetricTests
         var result = await metric.EvaluateAsync(context);
 
         Assert.False(result.Passed);
-        Assert.Contains("harass", result.Explanation.ToLowerInvariant());
+        Assert.Contains("harass", result.Explanation!.ToLowerInvariant());
     }
 
     [Fact]
