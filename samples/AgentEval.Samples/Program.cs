@@ -129,6 +129,9 @@ public static class Program
                 case 23:
                     await Sample23_BenchmarkSystem.RunAsync();
                     break;
+                case 24:
+                    await Sample24_CalibratedEvaluator.RunAsync();
+                    break;
                 default:
                     Console.WriteLine($"❌ Sample {sampleNumber} not found.\n");
                     break;
@@ -197,6 +200,7 @@ public static class Program
         Console.WriteLine("│ 21. 🛡️ Red Team Advanced - Pipeline, reports, compliance    │");
         Console.WriteLine("│ 22. 🛡️ ResponsibleAI     - Content safety, bias, misinfo   │");
         Console.WriteLine("│ 23. 📊 Benchmark System  - Performance, agentic & standard  │");
+        Console.WriteLine("│ 24. ⚖️ Calibrated Eval   - Multi-model harness evaluation    │");
         
         Console.ForegroundColor = ConsoleColor.Green;
         Console.WriteLine("├─────────────────────────────────────────────────────────────┤");

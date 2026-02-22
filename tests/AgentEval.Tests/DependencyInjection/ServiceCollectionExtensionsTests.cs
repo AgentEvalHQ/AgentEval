@@ -2,10 +2,13 @@
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 
+using AgentEval.Calibration;
 using AgentEval.Comparison;
 using AgentEval.Core;
 using AgentEval.DependencyInjection;
 using AgentEval.Models;
+using AgentEval.Testing;
+using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
@@ -192,6 +195,47 @@ public class ServiceCollectionExtensionsTests
         // Assert - Should successfully resolve with all dependencies
         Assert.NotNull(runner);
         Assert.IsType<StochasticRunner>(runner);
+    }
+
+    [Fact]
+    public void AddAgentEval_RegistersCalibratedJudgeFactory()
+    {
+        // Arrange
+        var services = new ServiceCollection();
+        services.AddAgentEval();
+        var provider = services.BuildServiceProvider();
+
+        // Act — resolve the factory delegate
+        var factory = provider.GetRequiredService<Func<IEnumerable<(string Name, IChatClient Client)>, CalibratedJudgeOptions?, ICalibratedJudge>>();
+
+        // Assert — factory creates a working CalibratedJudge
+        Assert.NotNull(factory);
+
+        var judges = new (string, IChatClient)[] { ("TestModel", new FakeChatClient("{}")) };
+        var judge = factory(judges, null);
+        Assert.NotNull(judge);
+        Assert.Single(judge.JudgeNames);
+        Assert.Equal("TestModel", judge.JudgeNames[0]);
+    }
+
+    [Fact]
+    public void AddAgentEval_RegistersCalibratedEvaluatorFactory()
+    {
+        // Arrange
+        var services = new ServiceCollection();
+        services.AddAgentEval();
+        var provider = services.BuildServiceProvider();
+
+        // Act — resolve the factory delegate (returns IEvaluator)
+        var factory = provider.GetRequiredService<Func<IEnumerable<(string Name, IChatClient Client)>, CalibratedJudgeOptions?, IEvaluator>>();
+
+        // Assert — factory creates a working CalibratedEvaluator
+        Assert.NotNull(factory);
+
+        var judges = new (string, IChatClient)[] { ("TestModel", new FakeChatClient("{}")) };
+        var evaluator = factory(judges, null);
+        Assert.NotNull(evaluator);
+        Assert.IsType<CalibratedEvaluator>(evaluator);
     }
 
     // Fake test harness for testing

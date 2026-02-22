@@ -16,6 +16,8 @@
   items:
   - name: Fluent Assertions
     href: assertions.md
+  - name: LLM as a Judge
+    href: llm-as-judge.md
   - name: Stochastic Evaluation
     href: stochastic-evaluation.md
   - name: Model Comparison

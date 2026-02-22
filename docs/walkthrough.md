@@ -443,7 +443,7 @@ AgentEval includes comprehensive examples covering every evaluation scenario. He
 - **Sample08**: Multi-Turn Conversations - Conversation flow evaluation
 - **Sample09**: **Sequential Workflows** - Multi-agent pipeline evaluation
 - **Sample10**: **Tool-Enabled Workflows** - Complex multi-agent tool chains
-- **Sample11**: LLM-as-Judge - Using LLMs for quality assessment
+- **Sample11**: Datasets and Export - Rich output formats and visual reports
 - **Sample12**: Embedding Metrics - Semantic similarity evaluation
 
 ### Advanced Evaluation Samples (13-18): Production Patterns
@@ -460,8 +460,9 @@ AgentEval includes comprehensive examples covering every evaluation scenario. He
 - **Sample19**: Streaming vs Async - Compare streaming and non-streaming performance
 - **Sample20**: Quick Red Team Scan - One-line security assessment
 - **Sample21**: Advanced Red Team Pipeline - Comprehensive security evaluation
-- **Sample23**: Responsible AI - Toxicity, bias, misinformation metrics
-- **Sample24**: Benchmark System - Performance, agentic, standard, and cost benchmarks
+- **Sample22**: Responsible AI - Toxicity, bias, misinformation metrics
+- **Sample23**: Benchmark System - Performance, agentic, standard, and cost benchmarks
+- **Sample24**: Calibrated Evaluator - Multi-model harness evaluation with criteria consensus
 
 ### Running Samples
 
@@ -484,6 +485,7 @@ dotnet run -- 9    # Sequential Workflows
 dotnet run -- 10   # Tool-Enabled Workflows  
 dotnet run -- 20   # Quick Red Team Scan
 dotnet run -- 21   # Advanced Red Team Pipeline
+dotnet run -- 24   # Calibrated Evaluator (multi-model consensus)
 ```
 
 ---
@@ -617,6 +619,7 @@ See [Workflows Documentation](workflows.md) for complete workflow evaluation gui
 ## Next Steps
 
 - [Architecture](architecture.md) - Understand the framework design
+- [LLM-as-a-Judge](llm-as-judge.md) - Multi-model consensus, calibrated evaluation, IEvaluator API
 - [Workflows](workflows.md) - Complete workflow evaluation guide
 - [Benchmarks](benchmarks.md) - Performance evaluation at scale
 - [Conversations](conversations.md) - Multi-turn evaluation

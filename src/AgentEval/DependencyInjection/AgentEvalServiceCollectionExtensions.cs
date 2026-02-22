@@ -2,8 +2,10 @@
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 
+using AgentEval.Calibration;
 using AgentEval.Comparison;
 using AgentEval.Core;
+using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
@@ -54,6 +56,14 @@ public static class AgentEvalServiceCollectionExtensions
                     new ModelComparer(sp.GetRequiredService<IStochasticRunner>()));
                 break;
         }
+
+        // Register CalibratedJudge factory (parameterized construction)
+        services.TryAddSingleton<Func<IEnumerable<(string Name, IChatClient Client)>, CalibratedJudgeOptions?, ICalibratedJudge>>(
+            _ => (judges, judgeOptions) => new CalibratedJudge(judges, judgeOptions));
+
+        // Register CalibratedEvaluator factory (parameterized construction — same pattern as CalibratedJudge)
+        services.TryAddSingleton<Func<IEnumerable<(string Name, IChatClient Client)>, CalibratedJudgeOptions?, IEvaluator>>(
+            _ => (judges, judgeOptions) => new CalibratedEvaluator(judges, judgeOptions));
 
         // Register evaluation harness if provided
         if (options.EvaluationHarnessFactory != null)

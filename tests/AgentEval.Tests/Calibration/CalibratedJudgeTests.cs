@@ -20,13 +20,15 @@ public class CalibratedJudgeTests
     #region VotingStrategy Tests
     
     [Fact]
-    public void VotingStrategy_HasExpectedValues()
+    public void VotingStrategy_ContainsAllExpectedMembers()
     {
-        // Assert all expected strategies exist
-        Assert.Equal(0, (int)VotingStrategy.Median);
-        Assert.Equal(1, (int)VotingStrategy.Mean);
-        Assert.Equal(2, (int)VotingStrategy.Unanimous);
-        Assert.Equal(3, (int)VotingStrategy.Weighted);
+        // Assert all 4 strategies exist by name (not ordinal — ordinals are an implementation detail)
+        var names = Enum.GetNames<VotingStrategy>();
+        Assert.Equal(4, names.Length);
+        Assert.Contains("Median", names);
+        Assert.Contains("Mean", names);
+        Assert.Contains("Unanimous", names);
+        Assert.Contains("Weighted", names);
     }
     
     #endregion
@@ -34,78 +36,70 @@ public class CalibratedJudgeTests
     #region CalibratedResult Tests
     
     [Fact]
-    public void CalibratedResult_CalculatesStatistics()
+    public void CalibratedResult_ComputedProperties_CalculateFromJudgeScores()
     {
-        // Arrange
-        var judgeScores = new Dictionary<string, double>
-        {
-            ["Judge1"] = 90,
-            ["Judge2"] = 92,
-            ["Judge3"] = 88
-        };
-        
-        // Act
+        // Arrange — set JudgeScores, verify computed properties derive correctly
         var result = new CalibratedResult
         {
             Score = 90,
-            Agreement = 95, // 0-100 scale
-            JudgeScores = judgeScores,
-            ConfidenceLower = 88.5,
-            ConfidenceUpper = 91.5,
+            Agreement = 95,
+            JudgeScores = new Dictionary<string, double>
+            {
+                ["Judge1"] = 90,
+                ["Judge2"] = 92,
+                ["Judge3"] = 88
+            },
             StandardDeviation = 2.0,
             Strategy = VotingStrategy.Median,
             HasConsensus = true
         };
         
-        // Assert
-        Assert.Equal(90, result.Score);
-        Assert.Equal(95, result.Agreement);
+        // Assert — JudgeCount and MeanScore are computed, not set
         Assert.Equal(3, result.JudgeCount);
+        Assert.Equal(90, result.MeanScore); // (90+92+88)/3 = 90
         Assert.True(result.HasConsensus);
     }
     
     [Fact]
-    public void CalibratedResult_JudgeCount_ReturnsCorrectCount()
+    public void CalibratedResult_WithEmptyScores_MeanScoreReturnsZero()
     {
-        // Arrange
+        // Arrange — edge case: no judges succeeded
         var result = new CalibratedResult
         {
-            Score = 85,
-            Agreement = 80,
-            JudgeScores = new Dictionary<string, double> 
-            { 
-                ["J1"] = 80, 
-                ["J2"] = 85, 
-                ["J3"] = 90 
-            },
+            Score = 0,
+            Agreement = 0,
+            JudgeScores = new Dictionary<string, double>(),
             Strategy = VotingStrategy.Mean,
-            HasConsensus = true
+            HasConsensus = false
         };
-        
+
         // Assert
-        Assert.Equal(3, result.JudgeCount);
+        Assert.Equal(0, result.JudgeCount);
+        Assert.Equal(0, result.MeanScore);
     }
-    
+
     [Fact]
-    public void CalibratedResult_MeanScore_CalculatesCorrectly()
+    public void CalibratedJudgeOptions_Validate_ThrowsOnInvalidValues()
     {
-        // Arrange
-        var result = new CalibratedResult
-        {
-            Score = 85,
-            Agreement = 80,
-            JudgeScores = new Dictionary<string, double> 
-            { 
-                ["J1"] = 80, 
-                ["J2"] = 85, 
-                ["J3"] = 90 
-            },
-            Strategy = VotingStrategy.Median,
-            HasConsensus = true
-        };
-        
-        // Assert
-        Assert.Equal(85, result.MeanScore);
+        // Negative ConsensusTolerance
+        Assert.Throws<ArgumentException>(() =>
+            new CalibratedJudgeOptions { ConsensusTolerance = -1 }.Validate());
+
+        // ConfidenceLevel out of range (> 1)
+        Assert.Throws<ArgumentException>(() =>
+            new CalibratedJudgeOptions { ConfidenceLevel = 1.5 }.Validate());
+
+        // ConfidenceLevel out of range (< 0)
+        Assert.Throws<ArgumentException>(() =>
+            new CalibratedJudgeOptions { ConfidenceLevel = -0.1 }.Validate());
+
+        // MaxParallelJudges < 1
+        Assert.Throws<ArgumentException>(() =>
+            new CalibratedJudgeOptions { MaxParallelJudges = 0 }.Validate());
+
+        // MinimumJudgesRequired < 1
+        Assert.Throws<ArgumentException>(() =>
+            new CalibratedJudgeOptions { MinimumJudgesRequired = 0 }.Validate());
     }
     
     #endregion
@@ -129,26 +123,27 @@ public class CalibratedJudgeTests
     }
     
     [Fact]
-    public void CalibratedJudgeOptions_CanBeCustomized()
+    public void Constructor_WithAutoNamedClients_AssignsSequentialNames()
     {
-        // Act
-        var options = new CalibratedJudgeOptions
+        // Arrange — use the IEnumerable<IChatClient> constructor (auto-naming)
+        var clients = new List<IChatClient>
         {
-            Strategy = VotingStrategy.Mean,
-            ConsensusTolerance = 5.0,
-            Timeout = TimeSpan.FromSeconds(60),
-            CalculateConfidenceInterval = false,
-            ConfidenceLevel = 0.99,
-            MaxParallelJudges = 5
+            new FakeChatClient("{}"),
+            new FakeChatClient("{}"),
+            new FakeChatClient("{}")
         };
-        
-        // Assert
-        Assert.Equal(VotingStrategy.Mean, options.Strategy);
-        Assert.Equal(5.0, options.ConsensusTolerance);
-        Assert.Equal(TimeSpan.FromSeconds(60), options.Timeout);
-        Assert.False(options.CalculateConfidenceInterval);
-        Assert.Equal(0.99, options.ConfidenceLevel);
-        Assert.Equal(5, options.MaxParallelJudges);
+
+        // Act
+        var judge = new CalibratedJudge(clients);
+
+        // Assert — auto-names are "Judge1", "Judge2", "Judge3"
+        Assert.Equal(3, judge.JudgeNames.Count);
+        Assert.Equal("Judge1", judge.JudgeNames[0]);
+        Assert.Equal("Judge2", judge.JudgeNames[1]);
+        Assert.Equal("Judge3", judge.JudgeNames[2]);
+
+        // Options default should be used
+        Assert.Equal(VotingStrategy.Median, judge.Options.Strategy);
     }
     
     #endregion
@@ -299,9 +294,12 @@ public class CalibratedJudgeTests
     }
     
     [Fact]
-    public async Task EvaluateAsync_WithConfidenceInterval_CalculatesBounds()
+    public async Task EvaluateAsync_WithConfidenceInterval_CalculatesCorrectBounds()
     {
-        // Arrange
+        // Arrange — 3 judges, df=2, 95% CI → t=4.303
+        // Scores: 85, 88, 92 → mean=88.333, stddev=3.512, SE=3.512/√3=2.028
+        // Margin = 4.303 * 2.028 = 8.726
+        // Lower = 88.333 - 8.726 = 79.607, Upper = 88.333 + 8.726 = 97.060
         var clients = new Dictionary<string, IChatClient>
         {
             ["Judge1"] = new FakeChatClient("""{"score": 85, "explanation": "Good"}"""),
@@ -309,7 +307,7 @@ public class CalibratedJudgeTests
             ["Judge3"] = new FakeChatClient("""{"score": 92, "explanation": "Good"}""")
         };
         var judges = clients.Select(kv => (kv.Key, kv.Value)).ToArray();
-        var options = new CalibratedJudgeOptions { CalculateConfidenceInterval = true };
+        var options = new CalibratedJudgeOptions { CalculateConfidenceInterval = true, ConfidenceLevel = 0.95 };
         var calibratedJudge = new CalibratedJudge(judges, options);
         
         var context = CreateSampleContext();
@@ -318,17 +316,18 @@ public class CalibratedJudgeTests
         var result = await calibratedJudge.EvaluateAsync(context,
             judgeName => new FaithfulnessMetric(clients[judgeName]));
         
-        // Assert
+        // Assert — verify t(df=2, 95%) = 4.303 produces correct CI bounds
         Assert.NotNull(result.ConfidenceLower);
         Assert.NotNull(result.ConfidenceUpper);
-        Assert.True(result.ConfidenceLower < result.Score);
-        Assert.True(result.ConfidenceUpper > result.Score);
+        Assert.InRange(result.ConfidenceLower!.Value, 79.0, 80.5);  // ~79.6
+        Assert.InRange(result.ConfidenceUpper!.Value, 96.0, 98.0);  // ~97.1
+        // The old buggy t=2.5 would have given CI [83.3, 93.4] — much too narrow
     }
     
     [Fact]
-    public async Task EvaluateAsync_CalculatesStandardDeviation()
+    public async Task EvaluateAsync_CalculatesStandardDeviation_ExactValue()
     {
-        // Arrange
+        // Arrange — scores 80, 90, 100 → mean=90, sample stddev = sqrt(((80-90)²+(90-90)²+(100-90)²)/2) = 10.0
         var clients = new Dictionary<string, IChatClient>
         {
             ["Judge1"] = new FakeChatClient("""{"score": 80, "explanation": "Good"}"""),
@@ -344,8 +343,8 @@ public class CalibratedJudgeTests
         var result = await calibratedJudge.EvaluateAsync(context,
             judgeName => new FaithfulnessMetric(clients[judgeName]));
         
-        // Assert - StandardDeviation should be positive for different scores
-        Assert.True(result.StandardDeviation > 0);
+        // Assert — exact sample standard deviation for [80, 90, 100]
+        Assert.Equal(10.0, result.StandardDeviation, precision: 1);
     }
     
     [Fact]
@@ -364,23 +363,274 @@ public class CalibratedJudgeTests
             new CalibratedJudge((IEnumerable<(string, IChatClient)>)null!));
     }
     
-    #endregion
-    
-    #region ICalibratedJudge Interface Tests
-    
     [Fact]
-    public void CalibratedJudge_ImplementsInterface()
+    public async Task EvaluateAsync_WithWeightedStrategy_AppliesWeightsCorrectly()
     {
         // Arrange
-        var judges = new List<IChatClient> { new FakeChatClient("{}") };
-        
+        var clients = new Dictionary<string, IChatClient>
+        {
+            ["Heavy"] = new FakeChatClient("""{"score": 100, "explanation": "Perfect"}"""),
+            ["Light"] = new FakeChatClient("""{"score": 50, "explanation": "Mediocre"}""")
+        };
+        var judges = clients.Select(kv => (kv.Key, kv.Value)).ToArray();
+        var options = new CalibratedJudgeOptions
+        {
+            Strategy = VotingStrategy.Weighted,
+            JudgeWeights = new Dictionary<string, double>
+            {
+                ["Heavy"] = 3.0,
+                ["Light"] = 1.0
+            }
+        };
+        var calibratedJudge = new CalibratedJudge(judges, options);
+        var context = CreateSampleContext();
+
         // Act
-        ICalibratedJudge judge = new CalibratedJudge(judges);
-        
-        // Assert
-        Assert.NotNull(judge);
+        var result = await calibratedJudge.EvaluateAsync(context,
+            judgeName => new FaithfulnessMetric(clients[judgeName]));
+
+        // Assert: Weighted (100*3 + 50*1) / (3+1) = 87.5
+        Assert.Equal(87.5, result.Score);
+        Assert.Equal(VotingStrategy.Weighted, result.Strategy);
     }
     
+    [Fact]
+    public async Task EvaluateAsync_WithWeightedStrategy_WhenFirstJudgeFails_AppliesCorrectWeights()
+    {
+        // Arrange
+        var failingClient = new FakeChatClient();
+        failingClient.ThrowOnNextCall = true;
+        failingClient.ThrowMessage = "API timeout";
+        
+        var clients = new Dictionary<string, IChatClient>
+        {
+            ["Failing"] = failingClient,
+            ["JudgeB"] = new FakeChatClient("""{"score": 80, "explanation": "Good"}"""),
+            ["JudgeC"] = new FakeChatClient("""{"score": 90, "explanation": "Great"}""")
+        };
+        var options = new CalibratedJudgeOptions
+        {
+            Strategy = VotingStrategy.Weighted,
+            MinimumJudgesRequired = 2,
+            JudgeWeights = new Dictionary<string, double>
+            {
+                ["Failing"] = 5.0,
+                ["JudgeB"] = 2.0,
+                ["JudgeC"] = 1.0
+            }
+        };
+        var judge = new CalibratedJudge(
+            clients.Select(kv => (kv.Key, kv.Value)).ToArray(), options);
+        var context = CreateSampleContext();
+
+        // Act
+        var result = await judge.EvaluateAsync(context,
+            jn => new FaithfulnessMetric(clients[jn]));
+
+        // Assert: Failing judge excluded. JudgeB=80*2, JudgeC=90*1 → (160+90)/3 = 83.33
+        Assert.Equal(2, result.JudgeCount);
+        Assert.InRange(result.Score, 83.0, 84.0);
+    }
+    
+    [Fact]
+    public async Task EvaluateAsync_WithUnanimousStrategy_DivergentScores_ThrowsInvalidOperation()
+    {
+        // Arrange
+        var clients = new Dictionary<string, IChatClient>
+        {
+            ["J1"] = new FakeChatClient("""{"score": 30, "explanation": "Bad"}"""),
+            ["J2"] = new FakeChatClient("""{"score": 90, "explanation": "Great"}""")
+        };
+        var options = new CalibratedJudgeOptions
+        {
+            Strategy = VotingStrategy.Unanimous,
+            ConsensusTolerance = 10
+        };
+        var judge = new CalibratedJudge(
+            clients.Select(kv => (kv.Key, kv.Value)).ToArray(), options);
+        var context = CreateSampleContext();
+
+        // Act & Assert
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            judge.EvaluateAsync(context, jn => new FaithfulnessMetric(clients[jn])));
+    }
+    
+    [Fact]
+    public async Task EvaluateAsync_WhenContinueOnJudgeFailureFalse_ThrowsOnFirstFailure()
+    {
+        // Arrange
+        var failingClient = new FakeChatClient();
+        failingClient.ThrowOnNextCall = true;
+        failingClient.ThrowMessage = "Judge API error";
+        
+        var successClient = new FakeChatClient("""{"score": 85, "explanation": "Good"}""");
+        
+        var judges = new (string, IChatClient)[]
+        {
+            ("Failing", failingClient),
+            ("Success", successClient)
+        };
+        var options = new CalibratedJudgeOptions { ContinueOnJudgeFailure = false };
+        var calibratedJudge = new CalibratedJudge(judges, options);
+        var context = CreateSampleContext();
+
+        // Act & Assert
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            calibratedJudge.EvaluateAsync(context, jn =>
+                new FaithfulnessMetric(jn == "Failing" ? failingClient : successClient)));
+    }
+    
+    [Fact]
+    public void CalibratedResult_Summary_And_JudgeBreakdown_FormatCorrectly()
+    {
+        // Arrange
+        var result = new CalibratedResult
+        {
+            Score = 85.0,
+            Agreement = 95.0,
+            JudgeScores = new Dictionary<string, double> { ["J1"] = 80, ["J2"] = 90 },
+            ConfidenceLower = 78.5,
+            ConfidenceUpper = 91.5,
+            StandardDeviation = 7.07,
+            Strategy = VotingStrategy.Median,
+            HasConsensus = true
+        };
+
+        // Assert Summary
+        Assert.Contains("85.0", result.Summary);
+        Assert.Contains("95%", result.Summary);
+        Assert.Contains("✅", result.Summary);
+        Assert.Contains("78.5", result.Summary);
+        Assert.Contains("91.5", result.Summary);
+        
+        // Assert JudgeBreakdown
+        Assert.Contains("J1", result.JudgeBreakdown);
+        Assert.Contains("J2", result.JudgeBreakdown);
+        Assert.Contains("80.0", result.JudgeBreakdown);
+        Assert.Contains("90.0", result.JudgeBreakdown);
+    }
+    
+    #endregion
+    
+    #region Factory & API Surface Tests
+
+    [Fact]
+    public void Create_StaticFactory_ReturnsConfiguredJudge()
+    {
+        // Arrange
+        var client1 = new FakeChatClient("{}");
+        var client2 = new FakeChatClient("{}");
+
+        // Act — test both Create() overloads
+        var judge1 = CalibratedJudge.Create(
+            ("ModelA", client1), ("ModelB", client2));
+
+        var customOptions = new CalibratedJudgeOptions { Strategy = VotingStrategy.Weighted };
+        var judge2 = CalibratedJudge.Create(customOptions,
+            ("ModelA", client1), ("ModelB", client2));
+
+        // Assert
+        Assert.Equal(2, judge1.JudgeNames.Count);
+        Assert.Contains("ModelA", judge1.JudgeNames);
+        Assert.Contains("ModelB", judge1.JudgeNames);
+        Assert.Equal(VotingStrategy.Median, judge1.Options.Strategy); // default
+
+        Assert.Equal(VotingStrategy.Weighted, judge2.Options.Strategy); // custom
+        Assert.Equal(2, judge2.Judges.Count);
+    }
+
+    [Fact]
+    public async Task EvaluateAsync_BelowMinimumJudges_ThrowsWithErrorDetails()
+    {
+        // Arrange — all judges fail but MinimumJudgesRequired = 2
+        var fail1 = new FakeChatClient();
+        fail1.ThrowOnNextCall = true;
+        fail1.ThrowMessage = "Model overloaded";
+        var fail2 = new FakeChatClient();
+        fail2.ThrowOnNextCall = true;
+        fail2.ThrowMessage = "Rate limited";
+
+        var judges = new (string, IChatClient)[] { ("A", fail1), ("B", fail2) };
+        var options = new CalibratedJudgeOptions { MinimumJudgesRequired = 2 };
+        var judge = new CalibratedJudge(judges, options);
+
+        // Act & Assert
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            judge.EvaluateAsync(CreateSampleContext(),
+                jn => new FaithfulnessMetric(jn == "A" ? fail1 : fail2)));
+
+        Assert.Contains("0 of 2", ex.Message);
+        Assert.Contains("2 are required", ex.Message);
+    }
+
+    [Fact]
+    public async Task EvaluateAsync_WithMedianStrategy_EvenJudges_AveragesMiddleTwo()
+    {
+        // Arrange — 4 judges: median of even count = average of middle 2
+        var clients = new Dictionary<string, IChatClient>
+        {
+            ["J1"] = new FakeChatClient("""{"score": 60, "explanation": "Low"}"""),
+            ["J2"] = new FakeChatClient("""{"score": 70, "explanation": "Lowish"}"""),
+            ["J3"] = new FakeChatClient("""{"score": 80, "explanation": "Good"}"""),
+            ["J4"] = new FakeChatClient("""{"score": 100, "explanation": "Perfect"}""")
+        };
+        var judges = clients.Select(kv => (kv.Key, kv.Value)).ToArray();
+        var options = new CalibratedJudgeOptions { Strategy = VotingStrategy.Median };
+        var judge = new CalibratedJudge(judges, options);
+
+        // Act
+        var result = await judge.EvaluateAsync(CreateSampleContext(),
+            jn => new FaithfulnessMetric(clients[jn]));
+
+        // Assert — median of [60,70,80,100] = (70+80)/2 = 75
+        Assert.Equal(75, result.Score);
+    }
+
+    [Fact]
+    public async Task EvaluateAsync_WithSingleJudge_ReturnsNullConfidenceInterval()
+    {
+        // Arrange — 1 judge, CI requires >= 2 scores
+        var client = new FakeChatClient("""{"score": 90, "explanation": "Great"}""");
+        var judges = new (string, IChatClient)[] { ("Solo", client) };
+        var options = new CalibratedJudgeOptions { CalculateConfidenceInterval = true };
+        var judge = new CalibratedJudge(judges, options);
+
+        // Act
+        var result = await judge.EvaluateAsync(CreateSampleContext(),
+            _ => new FaithfulnessMetric(client));
+
+        // Assert — CI should be null with only 1 score
+        Assert.Null(result.ConfidenceLower);
+        Assert.Null(result.ConfidenceUpper);
+        Assert.Equal(0, result.StandardDeviation);
+        Assert.Equal(100, result.Agreement); // single judge = 100% agreement
+    }
+
+    [Fact]
+    public async Task EvaluateAsync_WithWeightedStrategy_NoWeightsConfigured_FallsBackToAverage()
+    {
+        // Arrange — Weighted strategy but no JudgeWeights set → should fall back to simple average
+        var clients = new Dictionary<string, IChatClient>
+        {
+            ["J1"] = new FakeChatClient("""{"score": 80, "explanation": "Good"}"""),
+            ["J2"] = new FakeChatClient("""{"score": 100, "explanation": "Great"}""")
+        };
+        var judges = clients.Select(kv => (kv.Key, kv.Value)).ToArray();
+        var options = new CalibratedJudgeOptions
+        {
+            Strategy = VotingStrategy.Weighted,
+            JudgeWeights = null   // no weights
+        };
+        var judge = new CalibratedJudge(judges, options);
+
+        // Act
+        var result = await judge.EvaluateAsync(CreateSampleContext(),
+            jn => new FaithfulnessMetric(clients[jn]));
+
+        // Assert — no weights → simple average: (80+100)/2 = 90
+        Assert.Equal(90, result.Score);
+    }
+
     #endregion
     
     #region Helper Methods

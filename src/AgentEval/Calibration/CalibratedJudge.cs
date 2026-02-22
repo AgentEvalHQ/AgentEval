@@ -137,7 +137,7 @@ public class CalibratedJudge : ICalibratedJudge
         var errors = new List<(string Judge, Exception Error)>();
         
         // Run judges with parallelism limit
-        var semaphore = new SemaphoreSlim(_options.MaxParallelJudges);
+        using var semaphore = new SemaphoreSlim(_options.MaxParallelJudges);
         var tasks = _judges.Select(async judge =>
         {
             await semaphore.WaitAsync(cancellationToken);
@@ -153,6 +153,8 @@ public class CalibratedJudge : ICalibratedJudge
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
+                if (!_options.ContinueOnJudgeFailure)
+                    throw;
                 return (Judge: judge.Name, Score: (double?)null, Error: (Exception?)ex);
             }
             finally
@@ -187,7 +189,7 @@ public class CalibratedJudge : ICalibratedJudge
         
         // Calculate aggregated score
         var scores = judgeScores.Values.ToList();
-        var finalScore = CalculateFinalScore(scores);
+        var finalScore = CalculateFinalScore(scores, judgeScores);
         var stdDev = CalculateStandardDeviation(scores);
         var agreement = CalculateAgreement(scores, stdDev);
         var (ciLower, ciUpper) = CalculateConfidenceInterval(scores, stdDev);
@@ -206,7 +208,7 @@ public class CalibratedJudge : ICalibratedJudge
         };
     }
     
-    private double CalculateFinalScore(List<double> scores)
+    private double CalculateFinalScore(List<double> scores, Dictionary<string, double> judgeScores)
     {
         if (scores.Count == 0) return 0;
         
@@ -215,27 +217,27 @@ public class CalibratedJudge : ICalibratedJudge
             VotingStrategy.Median => CalculateMedian(scores),
             VotingStrategy.Mean => scores.Average(),
             VotingStrategy.Unanimous => CheckConsensus(scores) ? scores.Average() : throw new InvalidOperationException("Judges did not reach consensus."),
-            VotingStrategy.Weighted => CalculateWeightedScore(scores),
+            VotingStrategy.Weighted => CalculateWeightedScore(judgeScores),
             _ => throw new ArgumentOutOfRangeException()
         };
     }
     
-    private double CalculateWeightedScore(List<double> scores)
+    private double CalculateWeightedScore(Dictionary<string, double> judgeScores)
     {
         if (_options.JudgeWeights == null || _options.JudgeWeights.Count == 0)
-            return scores.Average();
+            return judgeScores.Values.Average();
         
         var totalWeight = 0.0;
         var weightedSum = 0.0;
         
-        for (int i = 0; i < _judges.Count && i < scores.Count; i++)
+        foreach (var (judgeName, score) in judgeScores)
         {
-            var weight = _options.JudgeWeights.GetValueOrDefault(_judges[i].Name, 1.0);
-            weightedSum += scores[i] * weight;
+            var weight = _options.JudgeWeights.GetValueOrDefault(judgeName, 1.0);
+            weightedSum += score * weight;
             totalWeight += weight;
         }
         
-        return totalWeight > 0 ? weightedSum / totalWeight : scores.Average();
+        return totalWeight > 0 ? weightedSum / totalWeight : judgeScores.Values.Average();
     }
     
     private static double CalculateMedian(List<double> scores)
@@ -278,22 +280,54 @@ public class CalibratedJudge : ICalibratedJudge
         
         var mean = scores.Average();
         var n = scores.Count;
+        var df = n - 1;
         
-        // Use t-distribution approximation for small samples
-        // For 95% CI and n >= 2, use approximate t-value
-        var tValue = _options.ConfidenceLevel switch
-        {
-            >= 0.99 => 3.5,  // Approximate for small n
-            >= 0.95 => 2.5,
-            >= 0.90 => 1.8,
-            _ => 1.5
-        };
+        var tValue = GetTValue(df, _options.ConfidenceLevel);
         
         var marginOfError = tValue * (stdDev / Math.Sqrt(n));
         var lower = Math.Max(0, mean - marginOfError);
         var upper = Math.Min(100, mean + marginOfError);
         
         return (lower, upper);
+    }
+    
+    /// <summary>
+    /// Returns the two-tailed t-distribution critical value for the given 
+    /// degrees of freedom and confidence level.
+    /// </summary>
+    private static double GetTValue(int degreesOfFreedom, double confidenceLevel)
+    {
+        if (confidenceLevel >= 0.99)
+        {
+            return degreesOfFreedom switch
+            {
+                1 => 63.657, 2 => 9.925, 3 => 5.841, 4 => 4.604,
+                5 => 4.032, 6 => 3.707, 7 => 3.499, 8 => 3.355,
+                9 => 3.250, 10 => 3.169,
+                <= 20 => 2.845, <= 30 => 2.756, _ => 2.576
+            };
+        }
+        if (confidenceLevel >= 0.95)
+        {
+            return degreesOfFreedom switch
+            {
+                1 => 12.706, 2 => 4.303, 3 => 3.182, 4 => 2.776,
+                5 => 2.571, 6 => 2.447, 7 => 2.365, 8 => 2.306,
+                9 => 2.262, 10 => 2.228,
+                <= 20 => 2.086, <= 30 => 2.045, _ => 1.960
+            };
+        }
+        if (confidenceLevel >= 0.90)
+        {
+            return degreesOfFreedom switch
+            {
+                1 => 6.314, 2 => 2.920, 3 => 2.353, 4 => 2.132,
+                5 => 2.015, 6 => 1.943, 7 => 1.895, 8 => 1.860,
+                9 => 1.833, 10 => 1.812,
+                <= 20 => 1.725, <= 30 => 1.699, _ => 1.645
+            };
+        }
+        return 1.5;
     }
     
     private bool CheckConsensus(List<double> scores)
