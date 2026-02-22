@@ -31,16 +31,16 @@ public static class AgentFactory
         var agent = new ChatClientAgent(chatClient, new ChatClientAgentOptions
         {
             Name = "TravelBookingAgent",
-            Instructions = """
-                You are a helpful travel booking assistant.
-                You MUST use the available tools to search for flights, book them, and send confirmations.
-                When asked about flights, ALWAYS use the SearchFlights tool first.
-                Always search for flights before booking.
-                After booking, always send a confirmation email.
-                Be concise and helpful.
-                """,
             ChatOptions = new ChatOptions
             {
+                Instructions = """
+                    You are a helpful travel booking assistant.
+                    You MUST use the available tools to search for flights, book them, and send confirmations.
+                    When asked about flights, ALWAYS use the SearchFlights tool first.
+                    Always search for flights before booking.
+                    After booking, always send a confirmation email.
+                    Be concise and helpful.
+                    """,
                 Tools =
                 [
                     AIFunctionFactory.Create(TravelTools.SearchFlights),
@@ -69,9 +69,9 @@ public static class AgentFactory
         var agent = new ChatClientAgent(chatClient, new ChatClientAgentOptions
         {
             Name = "CalculatorAgent",
-            Instructions = "You are a math assistant. Always use the Calculator tool for calculations.",
             ChatOptions = new ChatOptions
             {
+                Instructions = "You are a math assistant. Always use the Calculator tool for calculations.",
                 Tools = [AIFunctionFactory.Create(CalculatorTool.Calculate)]
             }
         });
