@@ -239,6 +239,26 @@ Include:
 
 By contributing to AgentEval, you agree that your contributions will be licensed under the [MIT License](LICENSE).
 
+If you use AI tools (such as GitHub Copilot, ChatGPT, or similar) to generate contributed code, you are responsible for:
+- Ensuring the generated code does not violate any third-party licenses or intellectual property rights.
+- Reviewing and understanding all AI-generated code before submitting it.
+- Disclosing significant AI-assisted contributions in your PR description.
+
+---
+
+## Release Process
+
+AgentEval is currently in **preview** (pre-1.0). The following rules apply to all releases:
+
+- All GitHub releases before 1.0 **must** be marked as "This is a pre-release."
+- Release notes **must** include the standard preview banner:
+
+> [!WARNING]
+> **This is a preview release.** APIs may change without notice. Not for production use.
+> See [DISCLAIMER.md](DISCLAIMER.md) for full details.
+
+- Breaking changes must be documented in the release notes.
+
 ---
 
 ## Recognition

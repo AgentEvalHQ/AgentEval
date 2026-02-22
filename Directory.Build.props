@@ -17,7 +17,7 @@
     <RepositoryType>git</RepositoryType>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageProjectUrl>https://github.com/joslat/AgentEval</PackageProjectUrl>
-    <Copyright>Copyright © 2025-2026 Jose Luis Latorre</Copyright>
+    <Copyright>Copyright © 2026 Jose Luis Latorre</Copyright>
     
     <!-- Package icon for NuGet -->
     <PackageIcon>AgentEvalNugetLogoAE.png</PackageIcon>

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2025-2026 AgentEval Contributors
+// Copyright (c) 2026 AgentEval Contributors
 
 using System.Text.Json;
 using Azure.AI.OpenAI;

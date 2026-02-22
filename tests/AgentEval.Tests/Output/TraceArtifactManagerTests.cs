@@ -1,4 +1,5 @@
-// Copyright (c) 2025-2026 AgentEval Contributors
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 
 using System.Text.Json;

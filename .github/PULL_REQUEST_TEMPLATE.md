@@ -45,6 +45,7 @@
 - [ ] All new and existing tests pass
 - [ ] My changes generate no new compiler warnings
 - [ ] I have checked for breaking changes
+- [ ] I agree that my contributions are licensed under the MIT License and I have the right to submit this work (see [CONTRIBUTING.md](CONTRIBUTING.md))
 
 ## Screenshots (if applicable)
 
