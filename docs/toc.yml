@@ -53,10 +53,6 @@
 
 - name: Integration
   items:
-  - name: CI/CD Integration
-    href: ci-cd-integration.md
-  - name: CLI Reference
-    href: cli.md
   - name: Rich Evaluation Output
     href: rich-evaluation-output-guide.md
   - name: Security Scanning

@@ -696,7 +696,7 @@ Extraction creates two NuGet packages:
 
 | Package | Contains | Dependencies |
 |---------|----------|-------------|
-| `AgentEval` | Core interfaces, metrics, assertions, models, tracing, DI, exporters, CLI | `Microsoft.Extensions.AI` (no MAF) |
+| `AgentEval` | Core interfaces, metrics, assertions, models, tracing, DI, exporters | `Microsoft.Extensions.AI` (no MAF) |
 | `AgentEval.MAF` | MAF adapters, event bridge, graph extractor | `AgentEval` + `Microsoft.Agents.AI` + `Microsoft.Agents.AI.Workflows` |
 
 Consumers who use MAF add both packages. Consumers who don't use MAF add only `AgentEval`.

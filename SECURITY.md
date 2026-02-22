@@ -117,7 +117,7 @@ AgentEval includes automated security scanning in CI/CD:
 - **Dependency Vulnerability Scanning**: Checks for known vulnerabilities in NuGet packages
 - **DevSkim Static Analysis**: Microsoft's security-focused static analysis tool
 - **Secret Detection**: Scans for hardcoded secrets and API keys
-- **Path Traversal Protection**: CLI validates file paths to prevent directory traversal attacks
+- **Path Traversal Protection**: File path inputs are validated to prevent directory traversal attacks
 
 ### Regular Security Reviews
 

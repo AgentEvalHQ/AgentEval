@@ -1,4 +1,5 @@
-// src/AgentEval/RedTeam/RedTeamIntegration.cs
+// Copyright (c) 2026 AgentEval Contributors
+// Licensed under the MIT License.
 using AgentEval.Core;
 using Microsoft.Extensions.DependencyInjection;
 

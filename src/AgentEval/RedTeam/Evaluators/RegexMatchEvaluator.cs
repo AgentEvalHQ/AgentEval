@@ -1,4 +1,5 @@
-// src/AgentEval/RedTeam/Evaluators/RegexMatchEvaluator.cs
+// Copyright (c) 2026 AgentEval Contributors
+// Licensed under the MIT License.
 using System.Text.RegularExpressions;
 
 namespace AgentEval.RedTeam.Evaluators;

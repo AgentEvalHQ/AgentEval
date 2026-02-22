@@ -226,15 +226,15 @@ Rigorous evaluation capabilities: RAG metrics (Faithfulness, Relevance, Context 
 
 ---
 
-## CLI Tool & Samples
+## Samples
 
-**CLI for CI/CD:**
+**23 detailed examples** included—from Hello World to advanced Multi-Agent Workflows and Red Team Security.
+
 ```bash
-dotnet tool install -g AgentEval.Cli
-agenteval eval --dataset tests.yaml --format junit -o results.xml
+dotnet run --project samples/AgentEval.Samples
 ```
 
-**Detailed examples** included—from Hello World to advanced Multi-Agent Workflows and Red Team Security. [View Examples →](https://github.com/joslat/AgentEval/tree/main/samples/AgentEval.Samples)
+[View Examples →](https://github.com/joslat/AgentEval/tree/main/samples/AgentEval.Samples)
 
 ---
 
@@ -246,7 +246,7 @@ agenteval eval --dataset tests.yaml --format junit -o results.xml
 | [Quick Start](getting-started.md) | [Red Team Security](redteam.md) | [Model Comparison](model-comparison.md) |
 |  | [Responsible AI](ResponsibleAI.md) |  |
 | [Walkthrough](walkthrough.md) | [Metrics Reference](metrics-reference.md) | [Trace Record/Replay](tracing.md) |
-| [CLI Tool](cli.md) | [Benchmarks](benchmarks.md) | [Architecture](architecture.md) |
+|  | [Benchmarks](benchmarks.md) | [Architecture](architecture.md) |
 |  | [Workflows](workflows.md) |  |
 
 ---

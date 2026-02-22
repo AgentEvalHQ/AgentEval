@@ -158,21 +158,6 @@ foreach (var testCase in testCases)
 }
 ```
 
-### CLI Usage
-
-AgentEval provides a CLI for CI/CD integration:
-
-```bash
-# Install the CLI tool
-dotnet tool install -g AgentEval.Cli
-
-# Run evaluation from dataset
-agenteval eval --dataset tests.yaml --format junit --output results.xml
-
-# Initialize a new project
-agenteval init --format yaml --output agenteval.yaml
-```
-
 ---
 
 ## Coming from Microsoft.Extensions.AI.Evaluation

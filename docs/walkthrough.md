@@ -617,7 +617,6 @@ See [Workflows Documentation](workflows.md) for complete workflow evaluation gui
 ## Next Steps
 
 - [Architecture](architecture.md) - Understand the framework design
-- [CLI Reference](cli.md) - Run evaluations from command line
 - [Workflows](workflows.md) - Complete workflow evaluation guide
 - [Benchmarks](benchmarks.md) - Performance evaluation at scale
 - [Conversations](conversations.md) - Multi-turn evaluation

@@ -1,4 +1,5 @@
-// src/AgentEval/RedTeam/Attack.cs
+// Copyright (c) 2026 AgentEval Contributors
+// Licensed under the MIT License.
 using AgentEval.RedTeam.Attacks;
 
 namespace AgentEval.RedTeam;

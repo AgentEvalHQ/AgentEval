@@ -1,4 +1,5 @@
-// src/AgentEval/RedTeam/Attacks/InsecureOutputAttack.cs
+// Copyright (c) 2026 AgentEval Contributors
+// Licensed under the MIT License.
 using AgentEval.RedTeam.Evaluators;
 
 namespace AgentEval.RedTeam.Attacks;
@@ -29,6 +30,16 @@ namespace AgentEval.RedTeam.Attacks;
 /// <item>Privilege escalation - Admin role/JWT claims injection</item>
 /// </list>
 /// </para>
+/// <para><b>Probe Attribution:</b></para>
+/// <para>All 33 probes are original implementations for AgentEval.</para>
+/// <para>Technique inspirations:</para>
+/// <list type="bullet">
+/// <item>XSS/SQL/command injection patterns: Standard OWASP Top 10 web security patterns — https://owasp.org/www-project-top-10/</item>
+/// <item>SSRF cloud metadata: AWS/GCP/Azure well-known metadata endpoints documentation</item>
+/// <item>Supply chain (package hallucination): Informed by garak probes.packagehallucination module (NVIDIA, Apache 2.0) — https://github.com/NVIDIA/garak</item>
+/// <item>Deserialization RCE: Standard insecure deserialization patterns from OWASP</item>
+/// <item>NoSQL injection: MongoDB security documentation and OWASP NoSQL Injection guide</item>
+/// </list>
 /// </remarks>
 public sealed class InsecureOutputAttack : IAttackType
 {

@@ -39,17 +39,6 @@ dotnet run --project samples/AgentEval.Samples  # Run samples
 dotnet pack src/AgentEval   # Create NuGet package
 ```
 
-## CLI Tool Commands
-
-```bash
-agenteval eval --dataset tests.yaml --format junit --output results.xml
-agenteval eval --dataset data.jsonl --pass-threshold 80
-agenteval init --format yaml --output agenteval.yaml
-agenteval list metrics      # List available metrics
-agenteval list assertions   # List assertion types
-agenteval list formats      # List output formats
-```
-
 ## Key Patterns & Conventions
 
 ### Metric Interface Hierarchy

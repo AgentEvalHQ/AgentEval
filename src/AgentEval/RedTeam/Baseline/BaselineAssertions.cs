@@ -1,4 +1,5 @@
-// src/AgentEval/RedTeam/Baseline/BaselineAssertions.cs
+// Copyright (c) 2026 AgentEval Contributors
+// Licensed under the MIT License.
 using System.Text;
 
 namespace AgentEval.RedTeam.Baseline;

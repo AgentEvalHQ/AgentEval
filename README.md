@@ -373,7 +373,6 @@ misInfoResult.Should().HavePassed();
 
 ### Integration
 - CI/CD integration - JUnit XML, Markdown, JSON, SARIF export
-- CLI tool - agenteval eval, agenteval init
 - Benchmarks - custom patterns with dataset loaders (JSON, YAML, CSV, JSONL)
 - 1,000+ tests (×3 TFMs) - production quality
 

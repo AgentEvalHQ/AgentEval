@@ -1,4 +1,5 @@
-// src/AgentEval/RedTeam/Evaluators/ExcessiveAgencyEvaluator.cs
+// Copyright (c) 2026 AgentEval Contributors
+// Licensed under the MIT License.
 namespace AgentEval.RedTeam.Evaluators;
 
 /// <summary>

@@ -17,7 +17,7 @@ This project contains the automated tests for AgentEval. It lives at `tests/Agen
 - **Cost awareness:** `ModelPricingTests` checks price tables and custom pricing hooks.
 - **Multi-turn conversations:** `ConversationalTestCaseTests` and `ConversationRunnerTests` cover the fluent conversation builder, turn handling, and conversation execution.
 - **Snapshot testing:** `SnapshotComparerTests` validates JSON comparison, field ignoring, pattern scrubbing, and semantic similarity.
-- **CLI components:** `DataLoaderTests` and `ExporterTests` cover dataset loading (JSON, JSONL, CSV, YAML) and result exporting (JSON, JUnit, Markdown, CSV).
+- **Data & Export:** `DataLoaderTests` and `ExporterTests` cover dataset loading (JSON, JSONL, CSV, YAML) and result exporting (JSON, JUnit, Markdown, CSV).
 - **Tracing & replay:** `TraceRecordingAndReplayTests`, `ChatExecutionResultTests`, and `WorkflowTraceTests` cover trace recording, serialization, and deterministic replay for single-agent, multi-turn chat, and workflow executions including streaming support.
 
 ## File-by-file map

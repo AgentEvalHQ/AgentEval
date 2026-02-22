@@ -1,6 +1,6 @@
 # Sample Datasets
 
-This directory contains example datasets for use with AgentEval CLI and library.
+This directory contains example datasets for use with the AgentEval library.
 
 ## Formats Supported
 
@@ -48,15 +48,18 @@ YAML/JSON files can use different root elements:
 
 ## Usage
 
-```bash
-# Validate a dataset
-agenteval eval --dataset travel-agent.yaml --format markdown
+```csharp
+using AgentEval.DataLoaders;
 
-# Run with specific threshold
-agenteval eval --dataset rag-qa.yaml --pass-threshold 80
+// Load from any supported format
+var loader = DatasetLoaderFactory.CreateFromExtension(".yaml");
+var testCases = await loader.LoadAsync("travel-agent.yaml");
 
-# Export results to file
-agenteval eval --dataset travel-agent.yaml --output results.json --format json
+// Use in evaluation
+foreach (var testCase in testCases)
+{
+    var result = await harness.RunEvaluationAsync(agent, testCase);
+}
 ```
 
 ## Creating Custom Datasets

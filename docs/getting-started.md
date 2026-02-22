@@ -367,21 +367,6 @@ public class AdvancedAgentEvaluations
 }
 ```
 
-## Running from CLI
-
-AgentEval includes a CLI for batch evaluation:
-
-```bash
-# Initialize a new evaluation project
-agenteval init
-
-# Run evaluations from a dataset
-agenteval eval --dataset tests.yaml --output results/
-
-# List available exporters
-agenteval list exporters
-```
-
 ## Dataset-Driven Evaluation
 
 Load evaluation cases from files:
@@ -453,7 +438,6 @@ Example `testcases.yaml`:
 
 - **[Architecture Guide](architecture.md)** — Understand AgentEval's component model
 - **[Benchmarks Guide](benchmarks.md)** — Run performance and agentic benchmarks
-- **[CLI Reference](cli.md)** — Full CLI command documentation
 - **[Conversations Guide](conversations.md)** — Evaluate multi-turn agent interactions
 - **[Extensibility Guide](extensibility.md)** — Create custom metrics and plugins
 

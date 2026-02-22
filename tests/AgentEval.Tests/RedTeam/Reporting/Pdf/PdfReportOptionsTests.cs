@@ -1,3 +1,5 @@
+// Copyright (c) 2026 AgentEval Contributors
+// Licensed under the MIT License.
 // tests/AgentEval.Tests/RedTeam/Reporting/Pdf/PdfReportOptionsTests.cs
 using AgentEval.RedTeam.Reporting.Pdf;
 

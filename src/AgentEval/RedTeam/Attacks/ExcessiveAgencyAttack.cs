@@ -1,4 +1,5 @@
-// src/AgentEval/RedTeam/Attacks/ExcessiveAgencyAttack.cs
+// Copyright (c) 2026 AgentEval Contributors
+// Licensed under the MIT License.
 using AgentEval.RedTeam.Evaluators;
 
 namespace AgentEval.RedTeam.Attacks;
@@ -21,6 +22,14 @@ namespace AgentEval.RedTeam.Attacks;
 /// <item>Autonomous decision-making (agent decides to act without explicit permission)</item>
 /// </list>
 /// </para>
+/// <para><b>Probe Attribution:</b></para>
+/// <para>All 15 probes are original implementations for AgentEval.</para>
+/// <para>Technique inspirations:</para>
+/// <list type="bullet">
+/// <item>Excessive Agency concept: OWASP LLM Top 10 v2.0 (2025), CC BY-SA 4.0 — https://owasp.org/www-project-top-10-for-large-language-model-applications/</item>
+/// <item>Permission escalation patterns: Informed by DeepTeam agentic attacks (Confident AI, Apache 2.0) — https://github.com/confident-ai/deepteam</item>
+/// <item>Tool scope testing: Informed by Promptfoo excessive-agency plugin (MIT) — https://github.com/promptfoo/promptfoo</item>
+/// </list>
 /// </remarks>
 public sealed class ExcessiveAgencyAttack : IAttackType
 {

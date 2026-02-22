@@ -1,3 +1,5 @@
+// Copyright (c) 2026 AgentEval Contributors
+// Licensed under the MIT License.
 // tests/AgentEval.Tests/RedTeam/Evaluators/CompositeEvaluatorTests.cs
 using AgentEval.RedTeam;
 using AgentEval.RedTeam.Evaluators;
@@ -165,5 +167,88 @@ public class CompositeEvaluatorTests
     {
         var composite = new CompositeEvaluator(new ContainsTokenEvaluator("TOKEN"));
         await Assert.ThrowsAsync<ArgumentNullException>(() => composite.EvaluateAsync(TestProbe, null!));
+    }
+
+    [Fact]
+    public async Task EvaluateAsync_AllEvaluatorsInconclusive_ReturnsInconclusive()
+    {
+        var composite = new CompositeEvaluator(
+            CompositeEvaluator.AggregationStrategy.Any,
+            new AlwaysInconclusiveEvaluator(),
+            new AlwaysInconclusiveEvaluator());
+
+        var result = await composite.EvaluateAsync(TestProbe, "some response");
+
+        Assert.True(result.IsInconclusive);
+        Assert.Contains("inconclusive", result.Reason, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(0.5, result.Confidence);
+    }
+
+    [Fact]
+    public async Task EvaluateAsync_AllStrategy_AllInconclusive_ReturnsInconclusive()
+    {
+        var composite = new CompositeEvaluator(
+            CompositeEvaluator.AggregationStrategy.All,
+            new AlwaysInconclusiveEvaluator(),
+            new AlwaysInconclusiveEvaluator(),
+            new AlwaysInconclusiveEvaluator());
+
+        var result = await composite.EvaluateAsync(TestProbe, "test");
+
+        Assert.True(result.IsInconclusive);
+    }
+
+    [Fact]
+    public async Task EvaluateAsync_MajorityStrategy_AllInconclusive_ReturnsInconclusive()
+    {
+        var composite = new CompositeEvaluator(
+            CompositeEvaluator.AggregationStrategy.Majority,
+            new AlwaysInconclusiveEvaluator(),
+            new AlwaysInconclusiveEvaluator());
+
+        var result = await composite.EvaluateAsync(TestProbe, "test");
+
+        Assert.True(result.IsInconclusive);
+    }
+
+    [Fact]
+    public async Task EvaluateAsync_MixOfInconclusiveAndResisted_ReturnsResisted()
+    {
+        // One inconclusive + one resisted → not all inconclusive, so normal logic applies
+        var composite = new CompositeEvaluator(
+            CompositeEvaluator.AggregationStrategy.Any,
+            new AlwaysInconclusiveEvaluator(),
+            new ContainsTokenEvaluator("NOT_PRESENT"));
+
+        var result = await composite.EvaluateAsync(TestProbe, "no match here");
+
+        // Neither succeeded → resisted via normal path
+        Assert.True(result.AttackResisted);
+    }
+
+    [Fact]
+    public async Task EvaluateAsync_InconclusiveAndSucceeded_ReturnsSucceeded()
+    {
+        // One inconclusive + one succeeded → attack succeeded (Any strategy)
+        var composite = new CompositeEvaluator(
+            CompositeEvaluator.AggregationStrategy.Any,
+            new AlwaysInconclusiveEvaluator(),
+            new ContainsTokenEvaluator("FOUND"));
+
+        var result = await composite.EvaluateAsync(TestProbe, "FOUND in response");
+
+        Assert.True(result.AttackSucceeded);
+    }
+
+    private class AlwaysInconclusiveEvaluator : IProbeEvaluator
+    {
+        public string Name => "AlwaysInconclusive";
+
+        public Task<EvaluationResult> EvaluateAsync(
+            AttackProbe probe, string response,
+            CancellationToken cancellationToken = default)
+        {
+            return Task.FromResult(EvaluationResult.Inconclusive("Test inconclusive"));
+        }
     }
 }

@@ -1,4 +1,5 @@
-// src/AgentEval/RedTeam/RedTeamRunner.cs
+// Copyright (c) 2026 AgentEval Contributors
+// Licensed under the MIT License.
 using System.Diagnostics;
 using AgentEval.Core;
 

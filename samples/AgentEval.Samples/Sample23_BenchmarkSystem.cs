@@ -356,7 +356,7 @@ public static class Sample23_BenchmarkSystem
         Console.WriteLine("│  Benchmarking requires AI model access for performance and quality tests.  │");
         Console.WriteLine("│  Set AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_API_KEY, AZURE_OPENAI_DEPLOYMENT  │");
         Console.WriteLine("│                                                                             │");
-        Console.WriteLine("│  Alternative: Use AgentEval CLI for offline benchmark analysis.           │");
+        Console.WriteLine("│  Alternative: See benchmarks documentation for offline analysis.         │");
         Console.WriteLine("└─────────────────────────────────────────────────────────────────────────────┘");
     }
 

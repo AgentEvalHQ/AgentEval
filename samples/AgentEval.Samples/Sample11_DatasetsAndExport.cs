@@ -264,7 +264,7 @@ public static class Sample11_DatasetsAndExport
         Console.WriteLine("   📋 Executive Summary:");
         Console.WriteLine("   ┌───────────────────────────────────────────────────────────────┐");
         Console.WriteLine($"   │ Dataset: {report.Name}     │");
-        Console.WriteLine($"   │ Agent Model: {report.Agent.Model}                    │");
+        Console.WriteLine($"   │ Agent Model: {report.Agent?.Model}                    │");
         Console.WriteLine($"   │ Total Tests: {report.TotalTests}                             │");
         Console.WriteLine($"   │ Success Rate: {(double)report.PassedTests / report.TotalTests:P1}                       │");
         Console.WriteLine($"   │ Average Score: {report.OverallScore:F1}%                     │");
@@ -364,24 +364,16 @@ public static class Sample11_DatasetsAndExport
         Console.WriteLine("📝 Step 5: CI/CD Integration Showcase...\n");
 
         Console.ForegroundColor = ConsoleColor.DarkGray;
-        Console.WriteLine(@"   # GitHub Actions (Multi-format support)
-   - name: Run AgentEval with rich output
-     run: |
-       agenteval eval --dataset tests.yaml --export junit,html,csv \
-         --output results --pass-threshold 80
-       
+        Console.WriteLine(@"   # GitHub Actions (using dotnet test)
+   - name: Run AgentEval Tests
+     run: dotnet test --logger trx --logger ""junit;LogFilePath=results.xml""
+
    - name: Publish Test Results  
      uses: dorny/test-reporter@v1
      with:
        name: AgentEval Results
        path: results.xml
        reporter: java-junit
-       
-   - name: Upload HTML Report
-     uses: actions/upload-artifact@v3
-     with:
-       name: evaluation-report
-       path: results.html
 
    # Azure DevOps (Visual Studio Integration)
    - task: PublishTestResults@2

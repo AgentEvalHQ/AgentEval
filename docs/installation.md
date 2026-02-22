@@ -53,25 +53,6 @@ AgentEval has minimal dependencies:
 
 ---
 
-## CLI Tool
-
-AgentEval includes a command-line tool for CI/CD integration:
-
-```bash
-# Install globally
-dotnet tool install -g AgentEval.Cli
-
-# Verify installation
-agenteval --version
-
-# Run evaluation
-agenteval eval --dataset tests.yaml --format junit --output results.xml
-```
-
-See [CLI Reference](cli.md) for full command documentation.
-
----
-
 ## Verify Installation
 
 Create a simple test to verify AgentEval is installed and working correctly:

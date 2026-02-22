@@ -1,4 +1,5 @@
-// src/AgentEval/RedTeam/Reporting/Compliance/ISO27001ComplianceReporter.cs
+// Copyright (c) 2026 AgentEval Contributors
+// Licensed under the MIT License.
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;

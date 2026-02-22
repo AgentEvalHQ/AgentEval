@@ -1,4 +1,5 @@
-// src/AgentEval/RedTeam/Attacks/InferenceAPIAbuseAttack.cs
+// Copyright (c) 2026 AgentEval Contributors
+// Licensed under the MIT License.
 using AgentEval.RedTeam.Evaluators;
 
 namespace AgentEval.RedTeam.Attacks;
@@ -25,6 +26,15 @@ namespace AgentEval.RedTeam.Attacks;
 /// <item>Function calling exploitation (tool safety bypass)</item>
 /// </list>
 /// </para>
+/// <para><b>Probe Attribution:</b></para>
+/// <para>All 15 probes are original implementations for AgentEval.</para>
+/// <para>Technique inspirations:</para>
+/// <list type="bullet">
+/// <item>MITRE ATLAS AML.T0045: MITRE ATLAS framework (Apache 2.0) — https://atlas.mitre.org/techniques/AML.T0045</item>
+/// <item>Resource exhaustion: Informed by garak probes.continuation module (NVIDIA, Apache 2.0) — https://github.com/NVIDIA/garak</item>
+/// <item>API parameter abuse: Informed by OpenAI/Azure API documentation for parameter boundaries</item>
+/// <item>Model fingerprinting: Informed by MITRE ATLAS ML Artifact Collection technique</item>
+/// </list>
 /// </remarks>
 public sealed class InferenceAPIAbuseAttack : IAttackType
 {

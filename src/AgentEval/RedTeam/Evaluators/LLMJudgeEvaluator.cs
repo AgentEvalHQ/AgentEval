@@ -1,4 +1,5 @@
-// src/AgentEval/RedTeam/Evaluators/LLMJudgeEvaluator.cs
+// Copyright (c) 2026 AgentEval Contributors
+// Licensed under the MIT License.
 using Microsoft.Extensions.AI;
 
 namespace AgentEval.RedTeam.Evaluators;

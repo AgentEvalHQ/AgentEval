@@ -1,4 +1,5 @@
-// src/AgentEval/RedTeam/AttackPipeline.cs
+// Copyright (c) 2026 AgentEval Contributors
+// Licensed under the MIT License.
 using AgentEval.Core;
 
 namespace AgentEval.RedTeam;

@@ -1,4 +1,5 @@
-// src/AgentEval/RedTeam/Attacks/EncodingEvasionAttack.cs
+// Copyright (c) 2026 AgentEval Contributors
+// Licensed under the MIT License.
 using AgentEval.RedTeam.Evaluators;
 
 namespace AgentEval.RedTeam.Attacks;
@@ -22,6 +23,16 @@ namespace AgentEval.RedTeam.Attacks;
 /// <item>Numeric: Binary, Octal, ASCII codes</item>
 /// </list>
 /// </para>
+/// <para><b>Probe Attribution:</b></para>
+/// <para>All 23 probes are original implementations for AgentEval.</para>
+/// <para>Technique inspirations:</para>
+/// <list type="bullet">
+/// <item>Encoding techniques: Informed by garak probes.encoding module (NVIDIA, Apache 2.0) — https://github.com/NVIDIA/garak</item>
+/// <item>Encoding converters: Informed by PyRIT converter classes (Microsoft, MIT) — https://github.com/Azure/PyRIT</item>
+/// <item>Leetspeak/ROT13/Base64: Standard encoding techniques, widely documented</item>
+/// <item>Homoglyph substitution: Informed by garak probes.badchars (NVIDIA, Apache 2.0) and Unicode Consortium confusables data</item>
+/// <item>NATO phonetic alphabet: International Telecommunication Union standard</item>
+/// </list>
 /// </remarks>
 public sealed class EncodingEvasionAttack : IAttackType
 {

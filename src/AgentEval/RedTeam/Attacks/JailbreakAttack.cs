@@ -1,4 +1,5 @@
-// src/AgentEval/RedTeam/Attacks/JailbreakAttack.cs
+// Copyright (c) 2026 AgentEval Contributors
+// Licensed under the MIT License.
 using AgentEval.RedTeam.Evaluators;
 
 namespace AgentEval.RedTeam.Attacks;
@@ -24,6 +25,17 @@ namespace AgentEval.RedTeam.Attacks;
 /// <item>Opposite instructions (reverse psychology)</item>
 /// </list>
 /// </para>
+/// <para><b>Probe Attribution:</b></para>
+/// <para>All 24 probes are original implementations for AgentEval, inspired by publicly known jailbreak patterns.</para>
+/// <para>Technique inspirations:</para>
+/// <list type="bullet">
+/// <item>DAN (Do Anything Now): Community-created jailbreak, public domain — originally shared on Reddit r/ChatGPT</item>
+/// <item>STAN variant: Community-derived DAN alternative, public domain</item>
+/// <item>Developer Mode: Community jailbreak pattern, public domain</item>
+/// <item>Grandma trick (JB-004): Popularized jailbreak pattern, public domain</item>
+/// <item>DAN/jailbreak patterns: Cataloged by garak probes.dan module (NVIDIA, Apache 2.0) — https://github.com/NVIDIA/garak</item>
+/// <item>Crescendo/gradual escalation: Informed by PyRIT CrescendoOrchestrator concept (Microsoft, MIT) — https://github.com/Azure/PyRIT</item>
+/// </list>
 /// </remarks>
 public sealed class JailbreakAttack : IAttackType
 {

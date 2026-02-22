@@ -1,4 +1,5 @@
-// src/AgentEval/RedTeam/Output/RedTeamConsoleTheme.cs
+// Copyright (c) 2026 AgentEval Contributors
+// Licensed under the MIT License.
 namespace AgentEval.RedTeam.Output;
 
 /// <summary>

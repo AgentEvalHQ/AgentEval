@@ -1,3 +1,5 @@
+// Copyright (c) 2026 AgentEval Contributors
+// Licensed under the MIT License.
 // tests/AgentEval.Tests/RedTeam/Models/EnumsTests.cs
 using AgentEval.RedTeam;
 

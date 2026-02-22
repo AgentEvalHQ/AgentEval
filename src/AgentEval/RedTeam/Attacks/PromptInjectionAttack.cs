@@ -1,4 +1,5 @@
-// src/AgentEval/RedTeam/Attacks/PromptInjectionAttack.cs
+// Copyright (c) 2026 AgentEval Contributors
+// Licensed under the MIT License.
 using AgentEval.RedTeam.Evaluators;
 
 namespace AgentEval.RedTeam.Attacks;
@@ -24,6 +25,15 @@ namespace AgentEval.RedTeam.Attacks;
 /// <item>Unicode smuggling (zero-width chars, homoglyphs, RTL override)</item>
 /// </list>
 /// </para>
+/// <para><b>Probe Attribution:</b></para>
+/// <para>All 27 probes are original implementations for AgentEval, inspired by general LLM security research.</para>
+/// <para>Technique inspirations:</para>
+/// <list type="bullet">
+/// <item>Delimiter injection patterns: Inspired by garak probes.encoding module (NVIDIA, Apache 2.0) — https://github.com/NVIDIA/garak</item>
+/// <item>Few-shot poisoning: Informed by Perez &amp; Ribeiro (2022) "Ignore This Title and HackAPrompt" research</item>
+/// <item>Unicode smuggling: Informed by garak probes.badchars (Apache 2.0) and MarkWiedmer's "Unicode Injection" research</item>
+/// <item>Encoded injection: Informed by PyRIT converters (Microsoft, MIT) — https://github.com/Azure/PyRIT</item>
+/// </list>
 /// </remarks>
 public sealed class PromptInjectionAttack : IAttackType
 {

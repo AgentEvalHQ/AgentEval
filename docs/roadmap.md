@@ -47,8 +47,6 @@ AgentEval is in **beta** with all core features complete and ready for productio
 - `MustConfirmBefore()` - require confirmation before sensitive operations
 
 ### CI/CD Integration
-- **CLI tool** (`agenteval eval`, `agenteval init`, `agenteval list`)
-- **Workflow CLI commands** (`agenteval workflow-eval`, `workflow-init`, `workflow-validate`)
 - **Result exporters:** JSON, JUnit XML, Markdown, TRX, CSV, Mermaid (workflow graphs)
 - **Dataset loaders:** JSON, JSONL, CSV, YAML (including workflow test cases)
 - **Rich test output** with verbosity levels and trace artifacts
@@ -67,8 +65,8 @@ AgentEval is in **beta** with all core features complete and ready for productio
 
 We're focused on making AgentEval the most comprehensive evaluation toolkit for AI agents in .NET. Upcoming areas include:
 
-- **CLI enhancements** - summary views, diff comparisons, visualization
-- **Additional framework adapters** - Semantic Kernel, LangChain.NET
+- **CLI tool** — command-line interface for config-driven evaluation (deferred from initial launch)
+- **Additional framework adapters** — Semantic Kernel, LangChain.NET
 - **Visual reporting** - HTML reports, interactive diagrams
 - **Experiment management** - A/B evaluation, baseline comparison
 - **Safety evaluation** - red-teaming, adversarial inputs
@@ -87,7 +85,7 @@ We prioritize based on community needs and contributions.
 
 | Version | Date | Highlights |
 |---------|------|------------|
-| 0.2.0-beta | Feb 2026 | Multi-agent workflow evaluation, comprehensive MAF integration, workflow performance benchmarks, CLI workflow commands |
+| 0.2.0-beta | Feb 2026 | Multi-agent workflow evaluation, comprehensive MAF integration, workflow performance benchmarks |
 | 0.1.x-alpha | Jan 2026 | Core evaluation toolkit, stochastic evaluation, model comparison, trace replay |
 
 See [CHANGELOG.md](https://github.com/joslat/AgentEval/blob/main/CHANGELOG.md) for detailed release notes.

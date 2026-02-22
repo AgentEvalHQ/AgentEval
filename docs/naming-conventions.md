@@ -132,31 +132,6 @@ Examples:
 
 ---
 
-## CLI Commands
-
-### Command Structure
-
-```
-agenteval <command> [subcommand] [options]
-```
-
-### Commands
-
-| Command | Purpose |
-|---------|---------|
-| `eval` | Run evaluation |
-| `init` | Initialize config |
-| `list` | List available items |
-| `summary` | View run summaries |
-| `diff` | Compare runs |
-
-### Options
-
-- Use `--kebab-case` for multi-word options
-- Use short forms for common options: `-o` (output), `-c` (config), `-v` (verbose)
-
----
-
 ## See Also
 
 - [Metrics Reference](metrics-reference.md) - Complete metric catalog with usage guidance

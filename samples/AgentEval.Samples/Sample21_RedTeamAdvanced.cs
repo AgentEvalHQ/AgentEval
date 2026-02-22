@@ -11,6 +11,8 @@ using AgentEval.RedTeam.Attacks;
 using AgentEval.RedTeam.Baseline;
 using AgentEval.RedTeam.Output;
 using AgentEval.RedTeam.Reporting;
+using AgentEval.RedTeam.Reporting.Compliance;
+using AgentEval.RedTeam.Reporting.Pdf;
 
 namespace AgentEval.Samples;
 
@@ -20,8 +22,9 @@ namespace AgentEval.Samples;
 /// Demonstrates:
 /// - Custom attack selection with pipeline API
 /// - Progress reporting with visual progress bar
-/// - Multiple export formats (JSON, Markdown, JUnit)
-/// - OWASP-specific assertions  
+/// - Multiple export formats (JSON, Markdown, JUnit, PDF)
+/// - PDF executive reports with branding options
+/// - OWASP compliance reporting + assertions  
 /// - Baseline comparison for CI/CD regression tracking
 /// 
 /// Requires: AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_API_KEY, AZURE_OPENAI_DEPLOYMENT
@@ -152,15 +155,31 @@ public static class Sample21_RedTeamAdvanced
             await new MarkdownReportExporter().ExportToFileAsync(result, mdPath);
             await new JUnitReportExporter().ExportToFileAsync(result, junitPath);
 
+            // PDF Executive Report with branding
+            var pdfPath = Path.Combine(outputDir, "report.pdf");
+            var pdfOptions = new PdfReportOptions
+            {
+                CompanyName = "Contoso",
+                AgentName = "SecurityTestAgent",
+                IncludeDetailedResults = true,
+                Branding = new BrandingOptions
+                {
+                    PrimaryColor = "#0078D4",
+                    FontFamily = "Arial"
+                }
+            };
+            await new PdfReportGenerator().SaveAsync(result, pdfPath, pdfOptions);
+
             Console.WriteLine($"  📄 JSON:     {jsonPath}");
             Console.WriteLine($"  📝 Markdown: {mdPath}");
             Console.WriteLine($"  🧪 JUnit:    {junitPath}");
+            Console.WriteLine($"  📊 PDF:      {pdfPath}");
             Console.WriteLine();
         }
 
         Console.WriteLine("📝 Step 5: OWASP Compliance Checks\n");
 
-        // Check individual OWASP categories
+        // Check individual OWASP categories via assertions
         CheckOwaspCompliance(result, "LLM01", "Prompt Injection");
 
         // Check high severity
@@ -183,6 +202,23 @@ public static class Sample21_RedTeamAdvanced
         catch (RedTeamAssertionException)
         {
             Console.WriteLine($"  ❌ ASR too high: {result.AttackSuccessRate:P1}");
+        }
+
+        // Generate full OWASP compliance report
+        Console.WriteLine();
+        var owaspReporter = new OWASPComplianceReporter();
+        var owaspReport = owaspReporter.GenerateReport(result);
+        Console.WriteLine($"  📋 OWASP LLM Top 10 Compliance Report:");
+        Console.WriteLine($"     Framework: {owaspReport.FrameworkName} v{owaspReport.FrameworkVersion}");
+        Console.WriteLine($"     Compliance Rate: {owaspReport.ComplianceRate:F1}%");
+        Console.WriteLine($"     Risk Level: {owaspReport.RiskLevel}");
+
+        if (ExportReports)
+        {
+            var complianceDir = Path.Combine(Path.GetTempPath(), "AgentEval-RedTeam");
+            var owaspPath = Path.Combine(complianceDir, "owasp-compliance.md");
+            await File.WriteAllTextAsync(owaspPath, owaspReport.ToMarkdown());
+            Console.WriteLine($"     Report saved: {owaspPath}");
         }
 
         Console.WriteLine();
@@ -271,7 +307,7 @@ public static class Sample21_RedTeamAdvanced
 ╔═══════════════════════════════════════════════════════════════════════════════╗
 ║                                                                               ║
 ║   🛡️ SAMPLE 21: ADVANCED RED TEAM EVALUATION                                 ║
-║   Custom pipeline, OWASP checks, export, baseline comparison                  ║
+║   Pipeline, OWASP compliance, PDF export, baseline comparison                 ║
 ║                                                                               ║
 ╚═══════════════════════════════════════════════════════════════════════════════╝
 ");
@@ -287,8 +323,8 @@ public static class Sample21_RedTeamAdvanced
    ├─────────────────────────────────────────────────────────────────────────────┤
    │  This sample runs an advanced red team security scan with:                  │
    │    • Custom attack pipeline (PromptInjection + Jailbreak)                   │
-   │    • OWASP compliance checking                                              │
-   │    • Multi-format export (JSON, Markdown, JUnit)                            │
+   │    • OWASP compliance reporting                                             │
+   │    • Multi-format export (JSON, Markdown, JUnit, PDF)                       │
    │    • Baseline comparison for CI/CD regression tracking                      │
    │                                                                             │
    │  Set these environment variables:                                           │

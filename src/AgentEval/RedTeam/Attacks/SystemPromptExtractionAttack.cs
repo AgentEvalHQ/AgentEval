@@ -1,9 +1,10 @@
-// src/AgentEval/RedTeam/Attacks/SystemPromptExtractionAttack.cs
+// Copyright (c) 2026 AgentEval Contributors
+// Licensed under the MIT License.
 namespace AgentEval.RedTeam.Attacks;
 
 /// <summary>
 /// System Prompt Extraction attacks - attempts to reveal system instructions.
-/// OWASP LLM07: Insecure Plugin Design / System Prompt Leakage
+/// OWASP LLM07: System Prompt Leakage
 /// </summary>
 /// <remarks>
 /// <para>
@@ -19,6 +20,14 @@ namespace AgentEval.RedTeam.Attacks;
 /// <item>Deceptive requests (developer impersonation)</item>
 /// </list>
 /// </para>
+/// <para><b>Probe Attribution:</b></para>
+/// <para>All 19 probes are original implementations for AgentEval.</para>
+/// <para>Technique inspirations:</para>
+/// <list type="bullet">
+/// <item>Formatting tricks: Common LLM security research patterns (JSON export, language conversion)</item>
+/// <item>Developer impersonation: Informed by Promptfoo prompt-extraction plugin (MIT) — https://github.com/promptfoo/promptfoo</item>
+/// <item>Diagnostic mode claims: Informed by garak probes.goodside module (NVIDIA, Apache 2.0) — https://github.com/NVIDIA/garak</item>
+/// </list>
 /// </remarks>
 public sealed class SystemPromptExtractionAttack : IAttackType
 {

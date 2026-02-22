@@ -8,6 +8,7 @@ using AgentEval.Core;
 using AgentEval.MAF;
 using AgentEval.RedTeam;
 using AgentEval.RedTeam.Output;
+using AgentEval.RedTeam.Reporting;
 
 namespace AgentEval.Samples;
 
@@ -15,10 +16,10 @@ namespace AgentEval.Samples;
 /// Sample 20: Basic Red Team Evaluation
 /// 
 /// Demonstrates the simplest red team workflow:
-/// 1. Create an agent
-/// 2. Run a quick scan
-/// 3. Check results with assertions
-/// 4. Optional detailed failure reporting
+/// 1. One-liner scan (QuickRedTeamScanAsync)
+/// 2. Check results with fluent assertions
+/// 3. Targeted attack resistance check (CanResistAsync)
+/// 4. Export results to Markdown
 /// 
 /// Requires: AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_API_KEY, AZURE_OPENAI_DEPLOYMENT
 /// ⏱️ Time to understand: 5 minutes
@@ -26,8 +27,6 @@ namespace AgentEval.Samples;
 /// </summary>
 public static class Sample20_RedTeamBasic
 {
-    private static readonly bool ShowFailureDetails = true;
-    
     public static async Task RunAsync()
     {
         PrintHeader();
@@ -48,46 +47,26 @@ public static class Sample20_RedTeamBasic
 
     private static async Task RunRedTeamScan(IEvaluableAgent agent)
     {
-        Console.WriteLine("📝 Step 1: Creating agent...");
-        Console.WriteLine($"   Agent: {agent.Name}");
-        Console.WriteLine();
+        // ── Step 1: One-liner scan ──────────────────────────────────
+        Console.WriteLine("📝 Step 1: Quick scan (one line of code!)\n");
+        Console.WriteLine("   var result = await agent.QuickRedTeamScanAsync();\n");
+        Console.WriteLine("   Scanning 9 attack types × Quick intensity...\n");
 
-        Console.WriteLine("📝 Step 2: Running red team scan...");
-        Console.WriteLine("   (Testing 5 attack types with Quick intensity)\n");
+        var result = await agent.QuickRedTeamScanAsync();
 
-        // The simplest API: one method call with progress callback!
-        var options = new ScanOptions
+        // Print results with detailed output
+        result.Print(new RedTeamOutputOptions
         {
-            Intensity = Intensity.Quick,
-            OnProgress = p =>
-            {
-                var remaining = p.EstimatedRemaining?.TotalSeconds ?? 0;
-                Console.Write($"\r  [{p.PercentComplete,3:F0}%] {p.StatusEmoji} {p.CurrentAttack}: " +
-                    $"{p.ResistedCount}/{p.CompletedProbes} resisted" +
-                    $"{(remaining > 0 ? $", ~{remaining:F0}s left" : "")}          ");
-            }
-        };
-        var result = await agent.RedTeamAsync(options);
-        Console.WriteLine(); // New line after progress
-
-        Console.WriteLine("\n📝 Step 3: Results (using rich output formatter)\n");
-
-        // Use the new Print extension method with Summary verbosity (default)
-        result.Print(ShowFailureDetails
-            ? new RedTeamOutputOptions
-            {
-                Verbosity = VerbosityLevel.Detailed,
-                ShowSensitiveContent = true
-            }
-            : RedTeamOutputOptions.Default);
-
+            Verbosity = VerbosityLevel.Detailed,
+            ShowSensitiveContent = true
+        });
         Console.WriteLine();
 
-        Console.WriteLine("\n📝 Step 4: Testing with assertions\n");
+        // ── Step 2: Fluent assertions ───────────────────────────────
+        Console.WriteLine("📝 Step 2: Fluent assertions\n");
 
         try
         {
-            // These assertions would typically be in your xUnit tests
             result.Should()
                 .HavePassed("Security scan should pass before deployment")
                 .And()
@@ -102,6 +81,27 @@ public static class Sample20_RedTeamBasic
             Console.WriteLine($"  ❌ Assertion failed:");
             Console.WriteLine($"     {ex.Message.Split('\n')[0]}");
         }
+        Console.WriteLine();
+
+        // ── Step 3: Targeted resistance check ───────────────────────
+        Console.WriteLine("📝 Step 3: Can the agent resist a specific attack?\n");
+
+        var resistsInjection = await agent.CanResistAsync(Attack.PromptInjection);
+        var resistsJailbreak = await agent.CanResistAsync(Attack.Jailbreak);
+
+        Console.WriteLine($"  Prompt Injection: {(resistsInjection ? "✅ Resisted" : "❌ Vulnerable")}");
+        Console.WriteLine($"  Jailbreak:        {(resistsJailbreak ? "✅ Resisted" : "❌ Vulnerable")}");
+        Console.WriteLine();
+
+        // ── Step 4: Export to Markdown ───────────────────────────────
+        Console.WriteLine("📝 Step 4: Export report\n");
+
+        var outputDir = Path.Combine(Path.GetTempPath(), "AgentEval-RedTeam");
+        Directory.CreateDirectory(outputDir);
+        var mdPath = Path.Combine(outputDir, "basic-report.md");
+
+        await new MarkdownReportExporter().ExportToFileAsync(result, mdPath);
+        Console.WriteLine($"  📝 Markdown report: {mdPath}");
 
         Console.WriteLine();
         Console.WriteLine("=== Sample 20 Complete ===");

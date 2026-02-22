@@ -1,4 +1,5 @@
-// src/AgentEval/RedTeam/Attacks/IndirectInjectionAttack.cs
+// Copyright (c) 2026 AgentEval Contributors
+// Licensed under the MIT License.
 using AgentEval.RedTeam.Evaluators;
 
 namespace AgentEval.RedTeam.Attacks;
@@ -22,6 +23,14 @@ namespace AgentEval.RedTeam.Attacks;
 /// <item>Hidden instructions (zero-width chars, CSS hiding)</item>
 /// </list>
 /// </para>
+/// <para><b>Probe Attribution:</b></para>
+/// <para>All 17 probes are original implementations for AgentEval.</para>
+/// <para>Technique inspirations:</para>
+/// <list type="bullet">
+/// <item>Indirect injection concept: Greshake et al. (2023) "Not what you've signed up for: Compromising Real-World LLM-Integrated Applications with Indirect Prompt Injection"</item>
+/// <item>RAG poisoning: Informed by garak probes.latentinjection module (NVIDIA, Apache 2.0) — https://github.com/NVIDIA/garak</item>
+/// <item>Hidden instructions (CSS/Unicode): Informed by MarkWiedmer's Unicode Injection research and garak probes.badchars</item>
+/// </list>
 /// </remarks>
 public sealed class IndirectInjectionAttack : IAttackType
 {

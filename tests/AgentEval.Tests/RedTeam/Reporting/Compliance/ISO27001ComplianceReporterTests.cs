@@ -1,3 +1,5 @@
+// Copyright (c) 2026 AgentEval Contributors
+// Licensed under the MIT License.
 // tests/AgentEval.Tests/RedTeam/Reporting/Compliance/ISO27001ComplianceReporterTests.cs
 using AgentEval.RedTeam;
 using AgentEval.RedTeam.Reporting.Compliance;

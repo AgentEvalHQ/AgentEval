@@ -10,7 +10,6 @@ AgentEval is **the comprehensive .NET evaluation toolkit for AI agents**, built 
 - stochastic evaluation and statistical model comparison
 - Behavioral policies (NeverCallTool, MustConfirmBefore)
 - Trace record/replay for deterministic CI testing
-- CLI tool for CI/CD integration
 
 ## Quick Reference
 

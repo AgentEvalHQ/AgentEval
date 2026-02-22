@@ -1,4 +1,5 @@
-// src/AgentEval/RedTeam/Reporting/Pdf/PdfReportGenerator.cs
+// Copyright (c) 2026 AgentEval Contributors
+// Licensed under the MIT License.
 using MigraDoc.DocumentObjectModel;
 using MigraDoc.DocumentObjectModel.Shapes;
 using MigraDoc.DocumentObjectModel.Tables;

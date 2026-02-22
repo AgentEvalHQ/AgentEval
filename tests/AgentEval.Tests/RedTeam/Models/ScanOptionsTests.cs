@@ -1,4 +1,7 @@
+// Copyright (c) 2026 AgentEval Contributors
+// Licensed under the MIT License.
 // tests/AgentEval.Tests/RedTeam/Models/ScanOptionsTests.cs
+#pragma warning disable CS0618 // Obsolete member usage (ScanOptions.Parallelism)
 using AgentEval.RedTeam;
 
 namespace AgentEval.Tests.RedTeam.Models;

@@ -1,4 +1,5 @@
-// src/AgentEval/RedTeam/Reporting/Pdf/CrossPlatformFontResolver.cs
+// Copyright (c) 2026 AgentEval Contributors
+// Licensed under the MIT License.
 using PdfSharp.Fonts;
 
 namespace AgentEval.RedTeam.Reporting.Pdf;

@@ -1,4 +1,5 @@
-// src/AgentEval/RedTeam/Attacks/PIILeakageAttack.cs
+// Copyright (c) 2026 AgentEval Contributors
+// Licensed under the MIT License.
 using System.Text.RegularExpressions;
 
 namespace AgentEval.RedTeam.Attacks;
@@ -23,6 +24,14 @@ namespace AgentEval.RedTeam.Attacks;
 /// <item>Indirect extraction (generated content with PII)</item>
 /// </list>
 /// </para>
+/// <para><b>Probe Attribution:</b></para>
+/// <para>All 19 probes are original implementations for AgentEval.</para>
+/// <para>Technique inspirations:</para>
+/// <list type="bullet">
+/// <item>Memorization probing: Informed by Carlini et al. (2021) "Extracting Training Data from Large Language Models"</item>
+/// <item>PII detection patterns: Informed by garak probes.leakreplay module (NVIDIA, Apache 2.0) — https://github.com/NVIDIA/garak</item>
+/// <item>Social engineering framing: Informed by PyRIT harm definitions (Microsoft, MIT) — https://github.com/Azure/PyRIT</item>
+/// </list>
 /// </remarks>
 public sealed class PIILeakageAttack : IAttackType
 {

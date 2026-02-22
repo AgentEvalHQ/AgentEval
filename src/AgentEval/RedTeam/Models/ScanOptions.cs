@@ -1,4 +1,5 @@
-// src/AgentEval/RedTeam/Models/ScanOptions.cs
+// Copyright (c) 2026 AgentEval Contributors
+// Licensed under the MIT License.
 namespace AgentEval.RedTeam;
 
 /// <summary>
@@ -39,6 +40,11 @@ public class ScanOptions
     /// Number of parallel probe executions.
     /// Default: 1 (sequential for easier debugging).
     /// </summary>
+    /// <remarks>
+    /// Parallel execution is not yet implemented. This property is reserved for future use.
+    /// Currently, probes are always executed sequentially regardless of this value.
+    /// </remarks>
+    [Obsolete("Parallel execution is not yet implemented. This property is reserved for future use.")]
     public int Parallelism { get; init; } = 1;
 
     /// <summary>
