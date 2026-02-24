@@ -310,4 +310,5 @@ See [Tracing](tracing.md) for complete Record & Replay documentation.
 - [Benchmarks](benchmarks.md) - Performance benchmarks for conversations
 - [Extensibility](extensibility.md) - Custom conversation metrics
 - [Tracing](tracing.md) - Record & Replay for deterministic conversation testing
+- [Snapshots](snapshots.md) - Snapshot regression testing for conversation outputs
 - [Sample 08](https://github.com/joslat/AgentEval/blob/main/samples/AgentEval.Samples/Sample08_ConversationEvaluation.cs) - Runnable conversation evaluation example

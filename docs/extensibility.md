@@ -615,3 +615,4 @@ public MyMetric(double threshold = 70)
 - [Architecture Overview](architecture.md) - Understanding the metric hierarchy
 - [Embedding Metrics](embedding-metrics.md) - Fast similarity evaluation
 - [Benchmarks Guide](benchmarks.md) - Performance benchmarking
+- [Snapshots](snapshots.md) - Snapshot comparison with `ISnapshotComparer` interface

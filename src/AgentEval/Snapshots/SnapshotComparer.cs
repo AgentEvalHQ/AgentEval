@@ -3,132 +3,78 @@
 // Licensed under the MIT License.
 
 using System.Text.Json;
-using System.Text.RegularExpressions;
 
 namespace AgentEval.Snapshots;
 
 /// <summary>
-/// Configuration for snapshot comparison.
-/// </summary>
-public class SnapshotOptions
-{
-    /// <summary>Fields to ignore during comparison.</summary>
-    public HashSet<string> IgnoreFields { get; set; } = new(StringComparer.OrdinalIgnoreCase)
-    {
-        "timestamp", "duration", "elapsed", "startTime", "endTime", "id", "requestId", "created"
-    };
-    
-    /// <summary>Patterns to scrub from string values.</summary>
-    public List<(Regex Pattern, string Replacement)> ScrubPatterns { get; set; } = new()
-    {
-        // OpenAI/Azure response IDs
-        (new Regex(@"chatcmpl-[a-zA-Z0-9]+"), "chatcmpl-[SCRUBBED]"),
-        (new Regex(@"resp_[a-zA-Z0-9]+"), "resp_[SCRUBBED]"),
-        
-        // Timestamps in various formats
-        (new Regex(@"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})?"), "[TIMESTAMP]"),
-        (new Regex(@"\d{2}/\d{2}/\d{4} \d{2}:\d{2}:\d{2}"), "[TIMESTAMP]"),
-        
-        // GUIDs
-        (new Regex(@"[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}"), "[GUID]"),
-        
-        // Durations in various formats
-        (new Regex(@"\d+(\.\d+)?\s*(ms|s|seconds|milliseconds)"), "[DURATION]"),
-    };
-    
-    /// <summary>Enable semantic similarity comparison for text fields.</summary>
-    public bool UseSemanticComparison { get; set; } = false;
-    
-    /// <summary>Similarity threshold for semantic comparison (0-1).</summary>
-    public double SemanticThreshold { get; set; } = 0.85;
-    
-    /// <summary>Fields to apply semantic comparison to.</summary>
-    public HashSet<string> SemanticFields { get; set; } = new(StringComparer.OrdinalIgnoreCase)
-    {
-        "response", "output", "content", "message", "answer", "text"
-    };
-}
-
-/// <summary>
-/// Result of a snapshot comparison.
-/// </summary>
-public class SnapshotComparisonResult
-{
-    /// <summary>Whether the snapshot matched.</summary>
-    public bool IsMatch { get; set; }
-    
-    /// <summary>Differences found.</summary>
-    public List<SnapshotDifference> Differences { get; set; } = new();
-    
-    /// <summary>Fields that were ignored.</summary>
-    public List<string> IgnoredFields { get; set; } = new();
-    
-    /// <summary>Fields that used semantic comparison.</summary>
-    public List<SemanticComparisonResult> SemanticResults { get; set; } = new();
-}
-
-/// <summary>
-/// A difference between expected and actual values.
-/// </summary>
-public record SnapshotDifference(
-    string Path,
-    string Expected,
-    string Actual,
-    string Message);
-
-/// <summary>
-/// Result of semantic similarity comparison.
-/// </summary>
-public record SemanticComparisonResult(
-    string Path,
-    string Expected,
-    string Actual,
-    double Similarity,
-    bool Passed);
-
-/// <summary>
 /// Compares agent responses against saved snapshots.
+/// <para>
+/// <b>Thread Safety:</b> Instances of <see cref="SnapshotComparer"/> are thread-safe for concurrent
+/// <see cref="Compare"/> calls as long as the <see cref="SnapshotOptions"/> are not modified after
+/// construction. The <see cref="ApplyScrubbing"/> method is also thread-safe under the same condition.
+/// </para>
 /// </summary>
-public class SnapshotComparer
+public class SnapshotComparer : ISnapshotComparer
 {
     private readonly SnapshotOptions _options;
 
     /// <summary>
     /// Initializes a new snapshot comparer.
     /// </summary>
+    /// <exception cref="ArgumentOutOfRangeException">
+    /// Thrown when <see cref="SnapshotOptions.SemanticThreshold"/> is outside the [0.0, 1.0] range.
+    /// </exception>
     public SnapshotComparer(SnapshotOptions? options = null)
     {
         _options = options ?? new SnapshotOptions();
+
+        if (_options.SemanticThreshold is < 0.0 or > 1.0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(options),
+                $"SemanticThreshold must be between 0.0 and 1.0, was {_options.SemanticThreshold}");
+        }
     }
 
     /// <summary>
     /// Compares two JSON objects, applying scrubbing and optional semantic comparison.
     /// </summary>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="expected"/> or <paramref name="actual"/> is null.</exception>
     public SnapshotComparisonResult Compare(string expected, string actual)
     {
-        var result = new SnapshotComparisonResult { IsMatch = true };
-        
+        ArgumentNullException.ThrowIfNull(expected);
+        ArgumentNullException.ThrowIfNull(actual);
+
+        var result = new SnapshotComparisonResult { IsMatchInternal = true };
+
         try
         {
             using var expectedDoc = JsonDocument.Parse(expected);
             using var actualDoc = JsonDocument.Parse(actual);
-            
-            CompareElements(expectedDoc.RootElement, actualDoc.RootElement, "$", result);
+
+            CompareElements(expectedDoc.RootElement, actualDoc.RootElement, "$", "$", result);
         }
         catch (JsonException)
         {
             // Fall back to string comparison
             var scrubbedExpected = ApplyScrubbing(expected);
             var scrubbedActual = ApplyScrubbing(actual);
-            
+
             if (!scrubbedExpected.Equals(scrubbedActual, StringComparison.Ordinal))
             {
-                result.IsMatch = false;
+                result.IsMatchInternal = false;
                 result.Differences.Add(new SnapshotDifference("$", scrubbedExpected, scrubbedActual, "String values differ"));
             }
         }
 
-        return result;
+        // Freeze result
+        return new SnapshotComparisonResult
+        {
+            IsMatch = result.IsMatchInternal,
+            Differences = result.Differences,
+            IgnoredFields = result.IgnoredFields,
+            SemanticResults = result.SemanticResults
+        };
     }
 
     /// <summary>
@@ -143,12 +89,8 @@ public class SnapshotComparer
         return value;
     }
 
-    private void CompareElements(JsonElement expected, JsonElement actual, string path, SnapshotComparisonResult result)
+    private void CompareElements(JsonElement expected, JsonElement actual, string path, string fieldName, SnapshotComparisonResult result)
     {
-        // Get field name from path
-        var fieldName = path.Contains('.') ? path.Split('.').Last() : path;
-        fieldName = fieldName.TrimStart('[').TrimEnd(']');
-        
         // Check if field should be ignored
         if (_options.IgnoreFields.Contains(fieldName))
         {
@@ -156,10 +98,12 @@ public class SnapshotComparer
             return;
         }
 
-        // Type mismatch
-        if (expected.ValueKind != actual.ValueKind)
+        // Type mismatch — treat True/False as compatible boolean types
+        if (expected.ValueKind != actual.ValueKind
+            && !(expected.ValueKind is JsonValueKind.True or JsonValueKind.False
+                 && actual.ValueKind is JsonValueKind.True or JsonValueKind.False))
         {
-            result.IsMatch = false;
+            result.IsMatchInternal = false;
             result.Differences.Add(new SnapshotDifference(
                 path,
                 expected.ValueKind.ToString(),
@@ -173,32 +117,24 @@ public class SnapshotComparer
             case JsonValueKind.Object:
                 CompareObjects(expected, actual, path, result);
                 break;
-                
+
             case JsonValueKind.Array:
                 CompareArrays(expected, actual, path, result);
                 break;
-                
+
             case JsonValueKind.String:
                 CompareStrings(expected.GetString()!, actual.GetString()!, path, fieldName, result);
                 break;
-                
+
             case JsonValueKind.Number:
-                if (expected.GetDouble() != actual.GetDouble())
-                {
-                    result.IsMatch = false;
-                    result.Differences.Add(new SnapshotDifference(
-                        path,
-                        expected.GetRawText(),
-                        actual.GetRawText(),
-                        "Number values differ"));
-                }
+                CompareNumbers(expected, actual, path, result);
                 break;
-                
+
             case JsonValueKind.True:
             case JsonValueKind.False:
                 if (expected.GetBoolean() != actual.GetBoolean())
                 {
-                    result.IsMatch = false;
+                    result.IsMatchInternal = false;
                     result.Differences.Add(new SnapshotDifference(
                         path,
                         expected.GetBoolean().ToString(),
@@ -206,13 +142,63 @@ public class SnapshotComparer
                         "Boolean values differ"));
                 }
                 break;
+
+            case JsonValueKind.Null:
+                // Both are null — match (type guard ensures both are Null here)
+                break;
+
+            case JsonValueKind.Undefined:
+                // Both undefined — match
+                break;
+        }
+    }
+
+    private void CompareNumbers(JsonElement expected, JsonElement actual, string path, SnapshotComparisonResult result)
+    {
+        // Try integer comparison first for exact integer values
+        if (expected.TryGetInt64(out var expectedLong) && actual.TryGetInt64(out var actualLong))
+        {
+            if (expectedLong != actualLong)
+            {
+                result.IsMatchInternal = false;
+                result.Differences.Add(new SnapshotDifference(
+                    path,
+                    expected.GetRawText(),
+                    actual.GetRawText(),
+                    "Number values differ"));
+            }
+            return;
+        }
+
+        // Fall back to double with epsilon comparison
+        var expectedDouble = expected.GetDouble();
+        var actualDouble = actual.GetDouble();
+        const double epsilon = 1e-10;
+
+        if (Math.Abs(expectedDouble - actualDouble) > epsilon)
+        {
+            result.IsMatchInternal = false;
+            result.Differences.Add(new SnapshotDifference(
+                path,
+                expected.GetRawText(),
+                actual.GetRawText(),
+                "Number values differ"));
         }
     }
 
     private void CompareObjects(JsonElement expected, JsonElement actual, string path, SnapshotComparisonResult result)
     {
-        var expectedProps = expected.EnumerateObject().ToDictionary(p => p.Name);
-        var actualProps = actual.EnumerateObject().ToDictionary(p => p.Name);
+        var expectedProps = new Dictionary<string, JsonProperty>();
+        foreach (var prop in expected.EnumerateObject())
+        {
+            expectedProps[prop.Name] = prop;
+        }
+
+        var actualProps = new Dictionary<string, JsonProperty>();
+        foreach (var prop in actual.EnumerateObject())
+        {
+            actualProps[prop.Name] = prop;
+        }
 
         // Check for missing properties
         foreach (var prop in expectedProps)
@@ -222,10 +208,10 @@ public class SnapshotComparer
                 result.IgnoredFields.Add($"{path}.{prop.Key}");
                 continue;
             }
-            
+
             if (!actualProps.ContainsKey(prop.Key))
             {
-                result.IsMatch = false;
+                result.IsMatchInternal = false;
                 result.Differences.Add(new SnapshotDifference(
                     $"{path}.{prop.Key}",
                     prop.Value.Value.GetRawText(),
@@ -234,17 +220,24 @@ public class SnapshotComparer
             }
             else
             {
-                CompareElements(prop.Value.Value, actualProps[prop.Key].Value, $"{path}.{prop.Key}", result);
+                CompareElements(prop.Value.Value, actualProps[prop.Key].Value, $"{path}.{prop.Key}", prop.Key, result);
             }
         }
 
-        // Check for extra properties (optional - may want to ignore)
-        foreach (var prop in actualProps.Where(p => !expectedProps.ContainsKey(p.Key)))
+        // Check for extra properties
+        if (_options.AllowExtraProperties == null)
         {
-            if (!_options.IgnoreFields.Contains(prop.Key))
+            foreach (var prop in actualProps)
             {
-                // Note: depending on use case, extra properties might be OK
-                // For now, we'll flag them as informational, not failures
+                if (!expectedProps.ContainsKey(prop.Key) && !_options.IgnoreFields.Contains(prop.Key))
+                {
+                    result.IsMatchInternal = false;
+                    result.Differences.Add(new SnapshotDifference(
+                        $"{path}.{prop.Key}",
+                        "(missing)",
+                        prop.Value.Value.GetRawText(),
+                        "Extra property in actual"));
+                }
             }
         }
     }
@@ -256,18 +249,19 @@ public class SnapshotComparer
 
         if (expectedArr.Count != actualArr.Count)
         {
-            result.IsMatch = false;
+            result.IsMatchInternal = false;
             result.Differences.Add(new SnapshotDifference(
                 path,
                 $"[{expectedArr.Count} items]",
                 $"[{actualArr.Count} items]",
                 "Array length differs"));
-            return;
+            // Continue comparing elements up to the shorter length (CODE-23 fix)
         }
 
-        for (int i = 0; i < expectedArr.Count; i++)
+        var minLength = Math.Min(expectedArr.Count, actualArr.Count);
+        for (int i = 0; i < minLength; i++)
         {
-            CompareElements(expectedArr[i], actualArr[i], $"{path}[{i}]", result);
+            CompareElements(expectedArr[i], actualArr[i], $"{path}[{i}]", $"[{i}]", result);
         }
     }
 
@@ -280,17 +274,16 @@ public class SnapshotComparer
         // Check if semantic comparison should be used
         if (_options.UseSemanticComparison && _options.SemanticFields.Contains(fieldName))
         {
-            // Placeholder for semantic comparison
-            // In real implementation, would use embedding similarity
             var similarity = ComputeSimpleSimilarity(scrubbedExpected, scrubbedActual);
             var passed = similarity >= _options.SemanticThreshold;
-            
+
+            // Store scrubbed values for consistency (CODE-33 fix)
             result.SemanticResults.Add(new SemanticComparisonResult(
-                path, expected, actual, similarity, passed));
-            
+                path, scrubbedExpected, scrubbedActual, similarity, passed));
+
             if (!passed)
             {
-                result.IsMatch = false;
+                result.IsMatchInternal = false;
                 result.Differences.Add(new SnapshotDifference(
                     path,
                     scrubbedExpected,
@@ -303,7 +296,7 @@ public class SnapshotComparer
             // Exact comparison after scrubbing
             if (!scrubbedExpected.Equals(scrubbedActual, StringComparison.Ordinal))
             {
-                result.IsMatch = false;
+                result.IsMatchInternal = false;
                 result.Differences.Add(new SnapshotDifference(
                     path,
                     scrubbedExpected,
@@ -314,93 +307,25 @@ public class SnapshotComparer
     }
 
     /// <summary>
-    /// Simple similarity measure (for demo - real implementation would use embeddings).
+    /// Simple similarity measure (for demo — real implementation would use embeddings).
     /// Uses Jaccard similarity on word sets.
     /// </summary>
-    private static double ComputeSimpleSimilarity(string a, string b)
+    internal static double ComputeSimpleSimilarity(string a, string b)
     {
+        // Split on all whitespace (CODE-32 fix), then lowercase for set comparison
         var wordsA = new HashSet<string>(
-            a.ToLowerInvariant().Split(' ', StringSplitOptions.RemoveEmptyEntries),
-            StringComparer.OrdinalIgnoreCase);
+            a.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries)
+             .Select(w => w.ToLowerInvariant()));
         var wordsB = new HashSet<string>(
-            b.ToLowerInvariant().Split(' ', StringSplitOptions.RemoveEmptyEntries),
-            StringComparer.OrdinalIgnoreCase);
+            b.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries)
+             .Select(w => w.ToLowerInvariant()));
 
         if (wordsA.Count == 0 && wordsB.Count == 0) return 1.0;
         if (wordsA.Count == 0 || wordsB.Count == 0) return 0.0;
 
         var intersection = wordsA.Intersect(wordsB).Count();
         var union = wordsA.Union(wordsB).Count();
-        
+
         return (double)intersection / union;
-    }
-}
-
-/// <summary>
-/// Manages saving and loading snapshots.
-/// </summary>
-public class SnapshotStore
-{
-    private readonly string _basePath;
-
-    /// <summary>
-    /// Initializes a new snapshot store.
-    /// </summary>
-    /// <param name="basePath">Base directory for snapshots.</param>
-    public SnapshotStore(string basePath)
-    {
-        _basePath = basePath;
-        Directory.CreateDirectory(basePath);
-    }
-
-    /// <summary>
-    /// Gets the path for a snapshot file.
-    /// </summary>
-    public string GetSnapshotPath(string testName, string suffix = "")
-    {
-        var sanitized = SanitizeFileName(testName);
-        var fileName = string.IsNullOrEmpty(suffix) ? $"{sanitized}.json" : $"{sanitized}.{suffix}.json";
-        return Path.Combine(_basePath, fileName);
-    }
-
-    /// <summary>
-    /// Saves a snapshot.
-    /// </summary>
-    public async Task SaveAsync<T>(string testName, T value, string suffix = "")
-    {
-        var path = GetSnapshotPath(testName, suffix);
-        var json = JsonSerializer.Serialize(value, new JsonSerializerOptions { WriteIndented = true });
-        await File.WriteAllTextAsync(path, json);
-    }
-
-    /// <summary>
-    /// Loads a snapshot if it exists.
-    /// </summary>
-    public async Task<T?> LoadAsync<T>(string testName, string suffix = "")
-    {
-        var path = GetSnapshotPath(testName, suffix);
-        if (!File.Exists(path)) return default;
-        
-        var json = await File.ReadAllTextAsync(path);
-        return JsonSerializer.Deserialize<T>(json);
-    }
-
-    /// <summary>
-    /// Checks if a snapshot exists.
-    /// </summary>
-    public bool Exists(string testName, string suffix = "")
-    {
-        return File.Exists(GetSnapshotPath(testName, suffix));
-    }
-
-    // Characters that should be sanitized for cross-platform file name compatibility
-    // Path.GetInvalidFileNameChars() returns different sets on Windows vs Linux
-    private static readonly HashSet<char> s_invalidFileNameChars = new(
-        Path.GetInvalidFileNameChars()
-            .Concat(new[] { ':', '\\', '/', '*', '?', '"', '<', '>', '|' }));
-
-    private static string SanitizeFileName(string name)
-    {
-        return new string(name.Select(c => s_invalidFileNameChars.Contains(c) ? '_' : c).ToArray());
     }
 }

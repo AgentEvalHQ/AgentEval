@@ -58,6 +58,10 @@
             "matchCommandLine": true
         },
         "dotnet clean": true,
-        "Get-Item": true
+        "Get-Item": true,
+        "/^dotnet --version$/": {
+            "approve": true,
+            "matchCommandLine": true
+        }
     }
 }

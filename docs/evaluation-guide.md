@@ -315,6 +315,49 @@ if (IsProductionSample())
 
 ---
 
+### 7. Snapshot / Regression Testing
+
+**Use when:** You want to detect regressions by comparing current agent responses against saved baselines.
+
+**Recommended Approach:**
+```csharp
+var store = new SnapshotStore("./snapshots");
+var comparer = new SnapshotComparer(new SnapshotOptions
+{
+    IgnoreFields = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+    {
+        "timestamp", "requestId", "duration"
+    },
+    UseSemanticComparison = true,
+    SemanticThreshold = 0.85
+});
+
+// Capture or compare
+var result = await harness.RunEvaluationAsync(adapter, testCase);
+var responseJson = JsonSerializer.Serialize(new { response = result.ActualOutput });
+
+if (!store.Exists("my-baseline"))
+{
+    await store.SaveAsync("my-baseline", new { response = result.ActualOutput });
+}
+else
+{
+    var baseline = await store.LoadAsync<JsonElement>("my-baseline");
+    var comparison = comparer.Compare(baseline.GetRawText(), responseJson);
+    Assert.True(comparison.IsMatch);
+}
+```
+
+**Cost-Optimized Snapshot Strategy:**
+1. **Scrub volatile data (FREE):** Timestamps, IDs, request IDs stripped automatically
+2. **Field-level diff (FREE):** JSON-aware comparison pinpoints exact changes
+3. **Semantic matching ($):** Use Jaccard similarity for natural language fields
+4. **CI-gated updates:** Only update baselines with `UPDATE_SNAPSHOTS=true`
+
+See [Snapshots](snapshots.md) for full documentation.
+
+---
+
 ## Metric Selection by Data Availability
 
 ### What data do you have?

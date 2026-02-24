@@ -633,7 +633,9 @@ AgentEval/
 │   └── CsvDatasetLoader.cs
 │
 ├── Snapshots/               # Snapshot comparison
-│   └── SnapshotComparer.cs
+│   ├── ISnapshotComparer.cs # Interface for DI
+│   ├── ISnapshotStore.cs    # Interface for DI
+│   └── SnapshotComparer.cs  # SnapshotComparer, SnapshotStore, Options, Results
 │
 ├── Output/                  # Output formatting utilities
 │   ├── TableFormatter.cs

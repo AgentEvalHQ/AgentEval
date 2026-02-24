@@ -258,6 +258,41 @@ var exporter = ResultExporterFactory.CreateFromExtension(".json");
 
 ---
 
+## Step 9: Snapshot Testing for Regression Detection
+
+Save agent responses as baselines and compare future responses to detect regressions:
+
+```csharp
+using AgentEval.Snapshots;
+using System.Text.Json;
+
+var store = new SnapshotStore("./snapshots");
+var comparer = new SnapshotComparer(new SnapshotOptions
+{
+    UseSemanticComparison = true,
+    SemanticThreshold = 0.85
+});
+
+// First run: capture baseline
+if (!store.Exists("travel-agent-test"))
+{
+    await store.SaveAsync("travel-agent-test", new { response = result.ActualOutput });
+}
+
+// Subsequent runs: compare against baseline
+var baseline = await store.LoadAsync<JsonElement>("travel-agent-test");
+var comparison = comparer.Compare(
+    baseline.GetRawText(),
+    JsonSerializer.Serialize(new { response = result.ActualOutput }));
+
+Assert.True(comparison.IsMatch,
+    $"Regression detected: {string.Join(", ", comparison.Differences.Select(d => d.Message))}");
+```
+
+See [Snapshots](snapshots.md) for complete documentation.
+
+---
+
 ## Complete Example
 
 Here's the full test in one file:

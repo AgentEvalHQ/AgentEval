@@ -13,6 +13,8 @@
     <PackageVersion Include="Microsoft.Extensions.AI" Version="10.3.0" />
     <PackageVersion Include="Microsoft.Extensions.AI.OpenAI" Version="10.3.0" />
     <PackageVersion Include="Microsoft.Extensions.AI.Evaluation.Quality" Version="10.3.0" />
+
+    <PackageVersion Include="AgentEval" Version="0.4.0-beta" />
     
     <!-- Azure -->
     <PackageVersion Include="Azure.AI.OpenAI" Version="2.5.0-beta.1" />

@@ -5,6 +5,7 @@
 using AgentEval.Calibration;
 using AgentEval.Comparison;
 using AgentEval.Core;
+using AgentEval.Snapshots;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -35,6 +36,9 @@ public static class AgentEvalServiceCollectionExtensions
         // Register core utilities as singletons (stateless)
         services.TryAddSingleton<IStatisticsCalculator, DefaultStatisticsCalculator>();
         services.TryAddSingleton<IToolUsageExtractor, DefaultToolUsageExtractor>();
+
+        // Register snapshot services as singletons (stateless comparers)
+        services.TryAddSingleton<ISnapshotComparer, SnapshotComparer>();
 
         // Register runners and comparers with appropriate lifetimes
         // Use factory for ModelComparer to avoid ambiguous constructor issues

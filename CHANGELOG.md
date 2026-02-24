@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **Snapshot Evaluation improvements:**
+  - Added `ISnapshotComparer` and `ISnapshotStore` interfaces with DI registration (ADR-006 compliance)
+  - Added `InternalsVisibleTo` for test project access to internal helpers
+  - Security: Sanitized suffix parameter in `GetSnapshotPath` to prevent path traversal (CODE-22)
+  - Fixed duration regex word boundaries to prevent false positives (CODE-15)
+  - Fixed `JsonValueKind.Null` handling in element comparison (CODE-12)
+  - Fixed boolean type guard treating `True`/`False` as compatible types (CODE-30)
+  - Added `SemanticThreshold` [0.0, 1.0] range validation (CODE-31)
+  - Fixed `ComputeSimpleSimilarity` to split on all whitespace (CODE-32)
+  - Fixed `SemanticComparisonResult` to store scrubbed values (CODE-33)
+  - Added `RegexOptions.Compiled` on all default patterns (CODE-13)
+  - Made `JsonSerializerOptions` static in `SnapshotStore` (CODE-14)
+  - Fixed `SanitizeFileName` collision resistance with SHA256 hash suffix (CODE-17)
+  - Fixed `CompareArrays` to continue comparing after length mismatch (CODE-23)
+  - Fixed `LoadAsync` TOCTOU with try/catch pattern (CODE-26/35)
+  - Added `CancellationToken` support on all async methods (CODE-7)
+  - Added `AllowExtraProperties` option (CODE-6)
+  - Added `Delete`, `ListSnapshots`, and `Count` to `SnapshotStore` (CODE-9/18)
+  - Added epsilon-based floating-point comparison (CODE-10)
+  - Fixed GUID regex word boundaries (CODE-16)
+  - Added `basePath` validation in `SnapshotStore` constructor (CODE-21)
+  - Added null guards on `Compare` method (TEST-12)
+  - Added thread safety documentation (CODE-19)
+  - Fixed field name passed as parameter through recursion (CODE-20/34)
+  - Moved tests from `Benchmarks/` to `Snapshots/` directory (TEST-1/7)
+  - Expanded test coverage from 23 to 51+ tests
+  - Documentation aligned with code defaults and APIs
+
 ---
 
 ## [0.4.0-beta] - 2026-02-22
