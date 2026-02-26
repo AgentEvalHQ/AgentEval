@@ -2,17 +2,16 @@
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 
-using AgentEval.RedTeam;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace AgentEval.DependencyInjection;
 
 /// <summary>
 /// Extension methods for registering all AgentEval services including RedTeam.
 /// This extension is provided by the umbrella package. Use
-/// <see cref="AgentEvalServiceCollectionExtensions.AddAgentEval"/> (Core) and
-/// <see cref="DataLoaderServiceCollectionExtensions.AddAgentEvalDataLoaders"/> (DataLoaders)
+/// <see cref="AgentEvalServiceCollectionExtensions.AddAgentEval"/> (Core),
+/// <see cref="DataLoaderServiceCollectionExtensions.AddAgentEvalDataLoaders"/> (DataLoaders), and
+/// <see cref="RedTeamServiceCollectionExtensions.AddAgentEvalRedTeam"/> (RedTeam)
 /// individually if you only need a subset.
 /// </summary>
 public static class AgentEvalFullServiceCollectionExtensions
@@ -37,9 +36,8 @@ public static class AgentEvalFullServiceCollectionExtensions
         // Register DataLoader and Exporter services
         services.AddAgentEvalDataLoaders();
 
-        // Register RedTeam services (moves to its own project in Phase 3)
-        services.TryAddSingleton<IAttackTypeRegistry>(sp =>
-            new AttackTypeRegistry(sp.GetServices<IAttackType>()));
+        // Register RedTeam services
+        services.AddAgentEvalRedTeam();
 
         return services;
     }

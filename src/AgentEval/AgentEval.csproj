@@ -5,14 +5,10 @@
     
     <!-- NuGet Package Info -->
     <PackageId>AgentEval</PackageId>
-    <Version>0.5.0-beta</Version>
-    <Description>The .NET evaluation toolkit for AI agents—tool usage validation, RAG quality metrics, stochastic evaluation, and model comparison. Built for Microsoft Agent Framework (MAF) with fluent assertion APIs.</Description>
-    <PackageTags>ai;agent;evaluation;testing;benchmarking;maf;llm;openai;azure;rag;agentic</PackageTags>
+    <Version>0.6.0-beta</Version>
+    <Description>The comprehensive .NET evaluation toolkit for AI agents—tool usage validation, RAG quality metrics, stochastic evaluation, model comparison, and red team security testing. Built for Microsoft Agent Framework (MAF) with fluent assertion APIs.</Description>
+    <PackageTags>ai;agent;evaluation;testing;benchmarking;maf;llm;openai;azure;rag;agentic;redteam;security</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    
-    <!-- XML Documentation -->
-    <GenerateDocumentationFile>true</GenerateDocumentationFile>
-    <NoWarn>$(NoWarn);CS1591</NoWarn>
     
     <!-- SourceLink: enables stepping into source code during debugging -->
     <PublishRepositoryUrl>true</PublishRepositoryUrl>
@@ -26,24 +22,16 @@
     <InternalsVisibleTo Include="AgentEval.Tests" />
   </ItemGroup>
 
+  <!-- All 5 sub-projects: types flow transitively to NuGet consumers -->
   <ItemGroup>
     <ProjectReference Include="../AgentEval.Abstractions/AgentEval.Abstractions.csproj" />
     <ProjectReference Include="../AgentEval.Core/AgentEval.Core.csproj" />
     <ProjectReference Include="../AgentEval.DataLoaders/AgentEval.DataLoaders.csproj" />
+    <ProjectReference Include="../AgentEval.MAF/AgentEval.MAF.csproj" />
+    <ProjectReference Include="../AgentEval.RedTeam/AgentEval.RedTeam.csproj" />
   </ItemGroup>
 
-  <!-- MAF-specific NuGet deps (move to AgentEval.MAF in Phase 3) -->
-  <ItemGroup>
-    <PackageReference Include="Microsoft.Agents.AI" />
-    <PackageReference Include="Microsoft.Agents.AI.Workflows" />
-  </ItemGroup>
-
-  <!-- RedTeam-specific NuGet deps (move to AgentEval.RedTeam in Phase 3) -->
-  <ItemGroup>
-    <PackageReference Include="PdfSharp-MigraDoc" />
-  </ItemGroup>
-
-  <!-- DI for umbrella extensions -->
+  <!-- DI for umbrella AddAgentEvalAll() convenience method -->
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
   </ItemGroup>
