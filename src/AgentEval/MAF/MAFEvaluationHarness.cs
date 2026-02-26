@@ -4,7 +4,6 @@
 
 using Microsoft.Extensions.AI;
 using AgentEval.Core;
-using AgentEval.DataLoaders;
 using AgentEval.Models;
 
 namespace AgentEval.MAF;

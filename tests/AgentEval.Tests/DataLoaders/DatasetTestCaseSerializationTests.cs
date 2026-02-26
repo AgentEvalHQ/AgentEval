@@ -4,6 +4,7 @@
 
 using System.Text.Json;
 using AgentEval.DataLoaders;
+using AgentEval.Models;
 using Xunit;
 
 namespace AgentEval.Tests.DataLoaders;

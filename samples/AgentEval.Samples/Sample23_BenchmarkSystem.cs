@@ -7,6 +7,7 @@ using Microsoft.Extensions.AI;
 using AgentEval.Benchmarks;
 using AgentEval.DataLoaders;
 using AgentEval.MAF;
+using AgentEval.Models;
 using System.ComponentModel;
 using ChatOptions = Microsoft.Extensions.AI.ChatOptions;
 
@@ -22,7 +23,7 @@ namespace AgentEval.Samples;
 /// 
 /// It demonstrates:
 ///   1. Loading all 3 JSONL dataset types (latency, cost, tool-accuracy)
-///   2. Converting <see cref="AgentEval.DataLoaders.DatasetTestCase"/> to benchmark types via bridge extensions
+///   2. Converting <see cref="AgentEval.Models.DatasetTestCase"/> to benchmark types via bridge extensions
 ///   3. Running a tool accuracy benchmark as the showcase (full JSONL → bridge → benchmark pipeline)
 /// 
 /// Only one benchmark type is executed to keep API costs low while still

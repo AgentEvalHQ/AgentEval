@@ -6,7 +6,9 @@ using Azure.AI.OpenAI;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
 using AgentEval.DataLoaders;
+using AgentEval.Core;
 using AgentEval.Exporters;
+using AgentEval.Models;
 
 namespace AgentEval.Samples;
 

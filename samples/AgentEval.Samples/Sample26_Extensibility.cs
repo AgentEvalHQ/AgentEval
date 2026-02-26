@@ -6,6 +6,7 @@ using AgentEval.Core;
 using AgentEval.DataLoaders;
 using AgentEval.DependencyInjection;
 using AgentEval.Exporters;
+using AgentEval.Models;
 using AgentEval.RedTeam;
 using Azure.AI.OpenAI;
 using Microsoft.Extensions.AI;

@@ -4,6 +4,7 @@
 
 using AgentEval.Benchmarks;
 using AgentEval.Core;
+using AgentEval.Models;
 
 namespace AgentEval.DataLoaders;
 

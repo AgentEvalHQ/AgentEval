@@ -7,6 +7,7 @@ using Microsoft.Extensions.AI;
 using AgentEval.MAF;
 using AgentEval.Models;
 using AgentEval.Comparison;
+using AgentEval.Assertions;
 using AgentEval.Core;
 using AgentEval.Output;
 using System.ComponentModel;

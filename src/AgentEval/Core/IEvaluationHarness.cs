@@ -2,7 +2,6 @@
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 
-using AgentEval.DataLoaders;
 using AgentEval.Models;
 
 namespace AgentEval.Core;

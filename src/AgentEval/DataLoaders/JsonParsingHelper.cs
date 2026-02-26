@@ -3,6 +3,7 @@
 // Licensed under the MIT License.
 
 using System.Text.Json;
+using AgentEval.Models;
 
 namespace AgentEval.DataLoaders;
 

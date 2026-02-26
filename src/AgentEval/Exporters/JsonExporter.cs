@@ -4,6 +4,8 @@
 
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using AgentEval.Core;
+using AgentEval.Models;
 
 namespace AgentEval.Exporters;
 

@@ -203,46 +203,40 @@ public static class StatisticsCalculator
     /// <summary>
     /// Creates distribution statistics from a list of values.
     /// </summary>
+    /// <remarks>
+    /// Delegates to <see cref="DistributionStatisticsFactory.Create(IReadOnlyList{double})"/>.
+    /// Retained for backward compatibility.
+    /// </remarks>
     public static DistributionStatistics CreateDistribution(IReadOnlyList<double> values)
-    {
-        if (values.Count == 0)
-        {
-            return new DistributionStatistics(0, 0, 0, 0, 0, 0, 0, 0);
-        }
-        
-        var sorted = values.OrderBy(v => v).ToList();
-        return new DistributionStatistics(
-            Min: sorted.First(),
-            Max: sorted.Last(),
-            Mean: Mean(values),
-            Median: Median(values),
-            Percentile25: Percentile(values, 25),
-            Percentile75: Percentile(values, 75),
-            Percentile95: Percentile(values, 95),
-            SampleSize: values.Count);
-    }
+        => DistributionStatisticsFactory.Create(values);
     
     /// <summary>
     /// Creates distribution statistics from a list of time spans (converted to milliseconds).
     /// </summary>
+    /// <remarks>
+    /// Delegates to <see cref="DistributionStatisticsFactory.Create(IReadOnlyList{TimeSpan})"/>.
+    /// Retained for backward compatibility.
+    /// </remarks>
     public static DistributionStatistics CreateDistribution(IReadOnlyList<TimeSpan> values)
-    {
-        return CreateDistribution(values.Select(v => v.TotalMilliseconds).ToList());
-    }
+        => DistributionStatisticsFactory.Create(values);
     
     /// <summary>
     /// Creates distribution statistics from integer values.
     /// </summary>
+    /// <remarks>
+    /// Delegates to <see cref="DistributionStatisticsFactory.Create(IReadOnlyList{int})"/>.
+    /// Retained for backward compatibility.
+    /// </remarks>
     public static DistributionStatistics CreateDistribution(IReadOnlyList<int> values)
-    {
-        return CreateDistribution(values.Select(v => (double)v).ToList());
-    }
+        => DistributionStatisticsFactory.Create(values);
     
     /// <summary>
     /// Creates distribution statistics from decimal values.
     /// </summary>
+    /// <remarks>
+    /// Delegates to <see cref="DistributionStatisticsFactory.Create(IReadOnlyList{decimal})"/>.
+    /// Retained for backward compatibility.
+    /// </remarks>
     public static DistributionStatistics CreateDistribution(IReadOnlyList<decimal> values)
-    {
-        return CreateDistribution(values.Select(v => (double)v).ToList());
-    }
+        => DistributionStatisticsFactory.Create(values);
 }

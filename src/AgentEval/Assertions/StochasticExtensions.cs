@@ -2,9 +2,9 @@
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 
-using AgentEval.Assertions;
+using AgentEval.Comparison;
 
-namespace AgentEval.Comparison;
+namespace AgentEval.Assertions;
 
 /// <summary>
 /// Extension methods for stochastic evaluation.

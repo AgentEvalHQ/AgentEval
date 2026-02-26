@@ -4,11 +4,10 @@
 
 using System.Text.Json;
 using AgentEval.Core;
-using AgentEval.DataLoaders;
 using AgentEval.Models;
 using Xunit;
 
-namespace AgentEval.Tests.DataLoaders;
+namespace AgentEval.Tests.Models;
 
 /// <summary>
 /// Tests for <see cref="DatasetTestCaseExtensions"/>.

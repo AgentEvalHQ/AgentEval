@@ -1,12 +1,15 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
+
+using AgentEval.Models;
+
 namespace AgentEval.RedTeam;
 
 /// <summary>
 /// Aggregate result of a red-team scan across all attacks.
 /// </summary>
-public class RedTeamResult
+public class RedTeamResult : IRedTeamResult
 {
     /// <summary>Name of the agent that was tested.</summary>
     public required string AgentName { get; init; }

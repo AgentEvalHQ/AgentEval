@@ -2,7 +2,7 @@
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 
-namespace AgentEval.Exporters;
+namespace AgentEval.Models;
 
 /// <summary>
 /// Summary of an evaluation run - the core data model for export.

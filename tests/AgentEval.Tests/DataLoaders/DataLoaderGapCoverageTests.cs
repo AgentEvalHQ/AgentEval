@@ -3,6 +3,7 @@
 // Licensed under the MIT License.
 
 using AgentEval.DataLoaders;
+using AgentEval.Models;
 using Xunit;
 
 namespace AgentEval.Tests.DataLoaders;

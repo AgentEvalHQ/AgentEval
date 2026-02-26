@@ -3,6 +3,7 @@
 // Licensed under the MIT License.
 
 using System.Runtime.CompilerServices;
+using AgentEval.Models;
 using YamlDotNet.Serialization;
 using YamlDotNet.Serialization.NamingConventions;
 

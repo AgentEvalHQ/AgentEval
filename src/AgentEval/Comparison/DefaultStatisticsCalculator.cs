@@ -59,17 +59,17 @@ public sealed class DefaultStatisticsCalculator : IStatisticsCalculator
 
     /// <inheritdoc />
     public DistributionStatistics CreateDistribution(IReadOnlyList<double> values) 
-        => StatisticsCalculator.CreateDistribution(values);
+        => DistributionStatisticsFactory.Create(values);
     
     /// <inheritdoc />
     public DistributionStatistics CreateDistribution(IReadOnlyList<TimeSpan> values) 
-        => StatisticsCalculator.CreateDistribution(values);
+        => DistributionStatisticsFactory.Create(values);
     
     /// <inheritdoc />
     public DistributionStatistics CreateDistribution(IReadOnlyList<int> values) 
-        => StatisticsCalculator.CreateDistribution(values);
+        => DistributionStatisticsFactory.Create(values);
     
     /// <inheritdoc />
     public DistributionStatistics CreateDistribution(IReadOnlyList<decimal> values) 
-        => StatisticsCalculator.CreateDistribution(values);
+        => DistributionStatisticsFactory.Create(values);
 }

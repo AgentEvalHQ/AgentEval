@@ -49,27 +49,27 @@ public record StochasticResult(
         : $"❌ FAILED: {PassedCount}/{IndividualResults.Count} runs passed ({Statistics.PassRate * 100:F1}% < {Options.SuccessRateThreshold * 100:F0}% threshold)";
 
     /// <summary>Aggregate duration statistics (ms).</summary>
-    public DistributionStatistics DurationStats => StatisticsCalculator.CreateDistribution(GetDurations());
+    public DistributionStatistics DurationStats => DistributionStatisticsFactory.Create(GetDurations());
 
     /// <summary>Aggregate time-to-first-token statistics (ms), null when unavailable.</summary>
     public DistributionStatistics? TimeToFirstTokenStats => GetTimeToFirstToken().Count == 0
         ? null
-        : StatisticsCalculator.CreateDistribution(GetTimeToFirstToken());
+        : DistributionStatisticsFactory.Create(GetTimeToFirstToken());
 
     /// <summary>Aggregate prompt token statistics.</summary>
-    public DistributionStatistics? PromptTokenStats => GetPromptTokens().Count == 0 ? null : StatisticsCalculator.CreateDistribution(GetPromptTokens());
+    public DistributionStatistics? PromptTokenStats => GetPromptTokens().Count == 0 ? null : DistributionStatisticsFactory.Create(GetPromptTokens());
 
     /// <summary>Aggregate completion token statistics.</summary>
-    public DistributionStatistics? CompletionTokenStats => GetCompletionTokens().Count == 0 ? null : StatisticsCalculator.CreateDistribution(GetCompletionTokens());
+    public DistributionStatistics? CompletionTokenStats => GetCompletionTokens().Count == 0 ? null : DistributionStatisticsFactory.Create(GetCompletionTokens());
 
     /// <summary>Aggregate total token statistics.</summary>
-    public DistributionStatistics? TotalTokenStats => GetTotalTokens().Count == 0 ? null : StatisticsCalculator.CreateDistribution(GetTotalTokens());
+    public DistributionStatistics? TotalTokenStats => GetTotalTokens().Count == 0 ? null : DistributionStatisticsFactory.Create(GetTotalTokens());
 
     /// <summary>Aggregate cost statistics (USD).</summary>
-    public DistributionStatistics? CostStats => GetCosts().Count == 0 ? null : StatisticsCalculator.CreateDistribution(GetCosts());
+    public DistributionStatistics? CostStats => GetCosts().Count == 0 ? null : DistributionStatisticsFactory.Create(GetCosts());
 
     /// <summary>Aggregate tool call count statistics across runs.</summary>
-    public DistributionStatistics ToolCallCountStats => StatisticsCalculator.CreateDistribution(GetToolCallCounts());
+    public DistributionStatistics ToolCallCountStats => DistributionStatisticsFactory.Create(GetToolCallCounts());
 
     /// <summary>Fastest run by total duration.</summary>
     public (TestResult Result, TimeSpan Duration)? FastestRun =>
@@ -111,7 +111,7 @@ public record StochasticResult(
             }
         }
         
-        var callStats = StatisticsCalculator.CreateDistribution(callCounts);
+        var callStats = DistributionStatisticsFactory.Create(callCounts);
         double callRate = sampleSize == 0 ? 0 : (double)runsWithTool / sampleSize;
         double errorRate = sampleSize == 0 ? 0 : (double)runsWithErrors / sampleSize;
         
@@ -175,7 +175,7 @@ public record StochasticResult(
             .GroupBy(m => m.MetricName, StringComparer.OrdinalIgnoreCase)
             .ToDictionary(
                 g => g.Key,
-                g => StatisticsCalculator.CreateDistribution(g.Select(m => m.Score).ToList()),
+                g => DistributionStatisticsFactory.Create(g.Select(m => m.Score).ToList()),
                 StringComparer.OrdinalIgnoreCase);
         
         return metrics;

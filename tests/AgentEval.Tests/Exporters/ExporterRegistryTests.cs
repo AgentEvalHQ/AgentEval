@@ -6,6 +6,7 @@ using System;
 using System.Linq;
 using AgentEval.Core;
 using AgentEval.Exporters;
+using AgentEval.Models;
 using Xunit;
 
 namespace AgentEval.Tests.Exporters;

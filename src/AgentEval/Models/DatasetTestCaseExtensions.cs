@@ -4,9 +4,8 @@
 
 using System.Text.Json;
 using AgentEval.Core;
-using AgentEval.Models;
 
-namespace AgentEval.DataLoaders;
+namespace AgentEval.Models;
 
 /// <summary>
 /// Extension methods for converting <see cref="DatasetTestCase"/> to execution models.

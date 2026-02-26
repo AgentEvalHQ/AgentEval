@@ -6,6 +6,7 @@ using System.Text.Json;
 using AgentEval.Benchmarks;
 using AgentEval.Core;
 using AgentEval.DataLoaders;
+using AgentEval.Models;
 using Xunit;
 
 namespace AgentEval.Tests.DataLoaders;

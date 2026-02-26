@@ -4,6 +4,7 @@
 
 using System.Runtime.CompilerServices;
 using System.Text.Json;
+using AgentEval.Models;
 
 namespace AgentEval.DataLoaders;
 

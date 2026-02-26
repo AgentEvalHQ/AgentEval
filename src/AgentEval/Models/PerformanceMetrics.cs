@@ -3,7 +3,6 @@
 // Licensed under the MIT License.
 
 using System.Collections.Concurrent;
-using AgentEval.Assertions;
 
 namespace AgentEval.Models;
 
@@ -55,9 +54,6 @@ public class PerformanceMetrics
     
     /// <summary>Indicates if token counts are estimated (true) vs actual from provider (false).</summary>
     public bool TokensAreEstimated { get; set; }
-    
-    /// <summary>Start fluent assertions.</summary>
-    public PerformanceAssertions Should() => new(this);
     
     public override string ToString()
     {

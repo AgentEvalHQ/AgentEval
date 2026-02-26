@@ -6,6 +6,8 @@ using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
 using System.Xml;
+using AgentEval.Core;
+using AgentEval.Models;
 
 namespace AgentEval.Exporters;
 

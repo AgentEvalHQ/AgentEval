@@ -399,7 +399,7 @@ public class AgentEvalTestBaseTests : IDisposable
                 EndTime = endTime,
                 Passed = true
             },
-            Agents = new List<AgentInfo>
+            Agents = new List<AgentEval.Output.AgentInfo>
             {
                 new()
                 {

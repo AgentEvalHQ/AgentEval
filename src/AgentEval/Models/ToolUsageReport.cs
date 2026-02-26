@@ -2,8 +2,6 @@
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 
-using AgentEval.Assertions;
-
 namespace AgentEval.Models;
 
 /// <summary>
@@ -46,9 +44,6 @@ public class ToolUsageReport
     /// <summary>Get the order position of a tool's first call (1-based, 0 if not called).</summary>
     public int GetToolOrder(string toolName) =>
         _calls.FirstOrDefault(c => c.Name.Equals(toolName, StringComparison.OrdinalIgnoreCase))?.Order ?? 0;
-    
-    /// <summary>Start fluent assertions on this report.</summary>
-    public ToolUsageAssertions Should() => new(this);
     
     public override string ToString()
     {

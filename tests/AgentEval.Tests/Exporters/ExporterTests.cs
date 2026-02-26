@@ -3,7 +3,9 @@
 // Licensed under the MIT License.
 
 using Xunit;
+using AgentEval.Core;
 using AgentEval.Exporters;
+using AgentEval.Models;
 
 namespace AgentEval.Tests;
 
