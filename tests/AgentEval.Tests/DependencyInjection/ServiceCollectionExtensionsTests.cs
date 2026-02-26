@@ -242,11 +242,11 @@ public class ServiceCollectionExtensionsTests
     }
 
     [Fact]
-    public void AddAgentEval_RegistersDatasetLoaderFactory()
+    public void AddAgentEvalDataLoaders_RegistersDatasetLoaderFactory()
     {
         // Arrange
         var services = new ServiceCollection();
-        services.AddAgentEval();
+        services.AddAgentEvalDataLoaders();
         var provider = services.BuildServiceProvider();
 
         // Act
@@ -319,11 +319,11 @@ public class ServiceCollectionExtensionsTests
     }
 
     [Fact]
-    public void AddAgentEval_RegistersExporterRegistry()
+    public void AddAgentEvalDataLoaders_RegistersExporterRegistry()
     {
         // Arrange
         var services = new ServiceCollection();
-        services.AddAgentEval();
+        services.AddAgentEvalDataLoaders();
         var provider = services.BuildServiceProvider();
 
         // Act
@@ -334,11 +334,11 @@ public class ServiceCollectionExtensionsTests
     }
 
     [Fact]
-    public void AddAgentEval_ExporterRegistry_ContainsBuiltInExporters()
+    public void AddAgentEvalDataLoaders_ExporterRegistry_ContainsBuiltInExporters()
     {
         // Arrange
         var services = new ServiceCollection();
-        services.AddAgentEval();
+        services.AddAgentEvalDataLoaders();
         var provider = services.BuildServiceProvider();
 
         // Act
@@ -353,12 +353,12 @@ public class ServiceCollectionExtensionsTests
     }
 
     [Fact]
-    public void AddAgentEval_ExporterRegistry_PopulatesFromDIRegisteredExporters()
+    public void AddAgentEvalDataLoaders_ExporterRegistry_PopulatesFromDIRegisteredExporters()
     {
         // Arrange
         var services = new ServiceCollection();
         services.AddSingleton<IResultExporter>(new FakeExporter("powerbi", ".pbix"));
-        services.AddAgentEval();
+        services.AddAgentEvalDataLoaders();
         var provider = services.BuildServiceProvider();
 
         // Act
@@ -370,11 +370,11 @@ public class ServiceCollectionExtensionsTests
     }
 
     [Fact]
-    public void AddAgentEval_RegistersAttackTypeRegistry()
+    public void AddAgentEvalAll_RegistersAttackTypeRegistry()
     {
         // Arrange
         var services = new ServiceCollection();
-        services.AddAgentEval();
+        services.AddAgentEvalAll();
         var provider = services.BuildServiceProvider();
 
         // Act
@@ -388,12 +388,12 @@ public class ServiceCollectionExtensionsTests
     }
 
     [Fact]
-    public void AddAgentEval_AttackTypeRegistry_PopulatesFromDIRegisteredAttacks()
+    public void AddAgentEvalAll_AttackTypeRegistry_PopulatesFromDIRegisteredAttacks()
     {
         // Arrange
         var services = new ServiceCollection();
         services.AddSingleton<IAttackType>(new FakeAttackType("CustomSqlInjection", "LLM99"));
-        services.AddAgentEval();
+        services.AddAgentEvalAll();
         var provider = services.BuildServiceProvider();
 
         // Act
@@ -405,14 +405,14 @@ public class ServiceCollectionExtensionsTests
     }
 
     [Fact]
-    public void AddAgentEval_ExistingExporterRegistry_NotOverridden()
+    public void AddAgentEvalDataLoaders_ExistingExporterRegistry_NotOverridden()
     {
-        // Arrange — register custom IExporterRegistry before AddAgentEval
+        // Arrange — register custom IExporterRegistry before AddAgentEvalDataLoaders
         var services = new ServiceCollection();
         var customRegistry = new ExporterRegistry();
         customRegistry.Register("custom", new FakeExporter("custom", ".custom"));
         services.AddSingleton<IExporterRegistry>(customRegistry);
-        services.AddAgentEval();
+        services.AddAgentEvalDataLoaders();
         var provider = services.BuildServiceProvider();
 
         // Act
@@ -424,14 +424,14 @@ public class ServiceCollectionExtensionsTests
     }
 
     [Fact]
-    public void AddAgentEval_ExistingAttackTypeRegistry_NotOverridden()
+    public void AddAgentEvalAll_ExistingAttackTypeRegistry_NotOverridden()
     {
-        // Arrange — register custom IAttackTypeRegistry before AddAgentEval
+        // Arrange — register custom IAttackTypeRegistry before AddAgentEvalAll
         var services = new ServiceCollection();
         var customRegistry = new AttackTypeRegistry();
         customRegistry.Register(new FakeAttackType("CustomOnly", "LLM99"));
         services.AddSingleton<IAttackTypeRegistry>(customRegistry);
-        services.AddAgentEval();
+        services.AddAgentEvalAll();
         var provider = services.BuildServiceProvider();
 
         // Act
@@ -443,13 +443,13 @@ public class ServiceCollectionExtensionsTests
     }
 
     [Fact]
-    public void AddAgentEval_DatasetLoaderFactory_AutoWiresDILoaders()
+    public void AddAgentEvalDataLoaders_DatasetLoaderFactory_AutoWiresDILoaders()
     {
         // Arrange
         var services = new ServiceCollection();
         var customLoader = new FakeDatasetLoader("parquet", [".parquet"]);
         services.AddSingleton<IDatasetLoader>(customLoader);
-        services.AddAgentEval();
+        services.AddAgentEvalDataLoaders();
         var provider = services.BuildServiceProvider();
 
         // Act
@@ -461,13 +461,13 @@ public class ServiceCollectionExtensionsTests
     }
 
     [Fact]
-    public void AddAgentEval_DatasetLoaderFactory_BuiltInsNotOverridden()
+    public void AddAgentEvalDataLoaders_DatasetLoaderFactory_BuiltInsNotOverridden()
     {
         // Arrange
         var services = new ServiceCollection();
         var customJsonLoader = new FakeDatasetLoader("json", [".json"]);
         services.AddSingleton<IDatasetLoader>(customJsonLoader);
-        services.AddAgentEval();
+        services.AddAgentEvalDataLoaders();
         var provider = services.BuildServiceProvider();
 
         // Act

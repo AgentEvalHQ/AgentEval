@@ -5,7 +5,7 @@
     
     <!-- NuGet Package Info -->
     <PackageId>AgentEval</PackageId>
-    <Version>0.4.0-beta</Version>
+    <Version>0.5.0-beta</Version>
     <Description>The .NET evaluation toolkit for AI agents—tool usage validation, RAG quality metrics, stochastic evaluation, and model comparison. Built for Microsoft Agent Framework (MAF) with fluent assertion APIs.</Description>
     <PackageTags>ai;agent;evaluation;testing;benchmarking;maf;llm;openai;azure;rag;agentic</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>
@@ -28,19 +28,27 @@
 
   <ItemGroup>
     <ProjectReference Include="../AgentEval.Abstractions/AgentEval.Abstractions.csproj" />
+    <ProjectReference Include="../AgentEval.Core/AgentEval.Core.csproj" />
+    <ProjectReference Include="../AgentEval.DataLoaders/AgentEval.DataLoaders.csproj" />
   </ItemGroup>
 
+  <!-- MAF-specific NuGet deps (move to AgentEval.MAF in Phase 3) -->
   <ItemGroup>
     <PackageReference Include="Microsoft.Agents.AI" />
     <PackageReference Include="Microsoft.Agents.AI.Workflows" />
-    <PackageReference Include="Microsoft.Extensions.AI" />
-    <PackageReference Include="Microsoft.Extensions.AI.Evaluation.Quality" />
-    <PackageReference Include="Azure.AI.OpenAI" />
-    <PackageReference Include="System.Numerics.Tensors" />
-    <PackageReference Include="YamlDotNet" />
-    <!-- PDF Generation (MIT License) -->
+  </ItemGroup>
+
+  <!-- RedTeam-specific NuGet deps (move to AgentEval.RedTeam in Phase 3) -->
+  <ItemGroup>
     <PackageReference Include="PdfSharp-MigraDoc" />
-    <!-- SourceLink -->
+  </ItemGroup>
+
+  <!-- DI for umbrella extensions -->
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="Microsoft.SourceLink.GitHub" PrivateAssets="All" />
   </ItemGroup>
 
