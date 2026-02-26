@@ -10,8 +10,8 @@ namespace AgentEval.DataLoaders;
 /// <remarks>
 /// <para>
 /// Use this interface via DI for testable, extensible loader resolution.
-/// The static <see cref="DatasetLoaderFactory"/> class delegates to a
-/// <see cref="DefaultDatasetLoaderFactory"/> internally and remains available
+/// The static <c>DatasetLoaderFactory</c> class delegates to a
+/// <c>DefaultDatasetLoaderFactory</c> internally and remains available
 /// for quick, non-DI usage.
 /// </para>
 /// <para>See ADR-006 and ADR-014 for architectural context.</para>
