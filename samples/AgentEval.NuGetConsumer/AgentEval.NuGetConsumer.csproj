@@ -28,12 +28,12 @@
     <ProjectReference Include="../../src/AgentEval/AgentEval.csproj" />
     -->
     
-    <!-- NUGET: For validation (0.5.1-beta published with MAF RC1 + security features) -->
-    <PackageReference Include="AgentEval" Version="0.5.1-beta" />
+    <!-- NUGET: For validation (0.5.2-beta published with MAF RC2) -->
+    <PackageReference Include="AgentEval" Version="0.5.2-beta" />
     
     <!-- Supporting packages with explicit versions (CPM disabled) -->
     <PackageReference Include="Azure.AI.OpenAI" Version="2.7.0-beta.2" />
-    <PackageReference Include="Microsoft.Agents.AI" Version="1.0.0-rc1" />
+    <PackageReference Include="Microsoft.Agents.AI" Version="1.0.0-rc2" />
     <PackageReference Include="Microsoft.Extensions.AI" Version="10.3.0" />
     <PackageReference Include="Microsoft.Extensions.AI.OpenAI" Version="10.3.0" />
     

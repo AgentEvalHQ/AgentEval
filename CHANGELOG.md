@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+---
+
+## [0.5.2-beta] - 2026-02-28
+
+**MAF RC2 Dependency Upgrade** ⬆️
+
+### Changed
+- **MAF upgraded from 1.0.0-rc1 to 1.0.0-rc2** — All three MAF package references (`Microsoft.Agents.AI`, `Microsoft.Agents.AI.OpenAI`, `Microsoft.Agents.AI.Workflows`) updated to 1.0.0-rc2. Zero public API breaking changes — every AgentEval dependency is byte-identical between RC1 and RC2. RC2 contains only internal telemetry restructuring (session-level OTel spans in Workflows), two internal resource leak fixes, and three new additive `[Experimental]` APIs (Agent Skills, builder-level context providers, stored-output-disabled client). Transitive `Microsoft.Agents.ObjectModel` bumped `2026.2.3.1 → 2026.2.4.1`. No AgentEval source code changes required. All 7,345 tests pass across 3 TFMs. See [MAF-Upgrade-Plan.md](src/AgentEval.MAF/MAF-Upgrade-Plan.md) for full diff analysis.
+
+---
+
+## [0.5.1-beta] - 2026-02-28
+
+**Modularization, Cross-Framework, CLI, DI & Extensibility** 🏗️🔌
+
+Major architectural release: monolith split into 6 sub-projects (ADR-016), universal IChatClient adapter, CLI tool, dependency injection architecture, rich evaluation output, extensibility framework, and 27 runnable samples. 7,345 tests × 3 TFMs passing.
+
 ### Added
 - **Monolith Modularization (ADR-016)** — Split single `src/AgentEval` project (~203 files, ~35K lines) into 6 internal sub-projects while shipping a single NuGet package. Resolves dependency coupling: non-MAF users no longer pull `Microsoft.Agents.AI`, non-RedTeam users no longer pull `PdfSharp-MigraDoc`. Compiler-enforced dependency direction: Abstractions → Core → DataLoaders/MAF/RedTeam → Umbrella.
   - `AgentEval.Abstractions` (~48 files) — Public contracts: `IMetric`, `IEvaluableAgent`, `IStreamableAgent`, models
@@ -69,7 +86,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Sample 26: Extensibility** — DI registries, custom metrics/exporters/loaders/attacks demonstrating all extension points.
 
 ### Changed
-- **MAF upgraded from 1.0.0-rc1 to 1.0.0-rc2** — All three MAF package references (`Microsoft.Agents.AI`, `Microsoft.Agents.AI.OpenAI`, `Microsoft.Agents.AI.Workflows`) updated to 1.0.0-rc2. Zero public API breaking changes — every AgentEval dependency is byte-identical between RC1 and RC2. RC2 contains only internal telemetry restructuring (session-level OTel spans in Workflows), two internal resource leak fixes, and three new additive `[Experimental]` APIs (Agent Skills, builder-level context providers, stored-output-disabled client). Transitive `Microsoft.Agents.ObjectModel` bumped `2026.2.3.1 → 2026.2.4.1`. No AgentEval source code changes required. All 7,345 tests pass across 3 TFMs. See [MAF-Upgrade-Plan.md](src/AgentEval.MAF/MAF-Upgrade-Plan.md) for full diff analysis.
 - **Snapshot Evaluation comprehensive review (28+ fixes)** — Major audit and hardening of the snapshot comparison and storage system:
   - *Interfaces & DI:* Added `ISnapshotComparer` and `ISnapshotStore` interfaces with DI registration (ADR-006 compliance). Added `InternalsVisibleTo` for test project access to internal helpers.
   - *Security:* Sanitized suffix parameter in `GetSnapshotPath` to prevent path traversal (CODE-22). Added `basePath` validation in `SnapshotStore` constructor (CODE-21). Fixed `SanitizeFileName` collision resistance with SHA256 hash suffix (CODE-17).
@@ -591,7 +607,9 @@ This release marks the transition from alpha to beta. The framework is now featu
 - `AgentEval.Tracing` (OTel + run artifacts) - planned
 - `AgentEval.Studio` (workflow visualizer / time-travel UI) - future
 
-[Unreleased]: https://github.com/joslat/AgentEval/compare/v0.4.0-beta...HEAD
+[Unreleased]: https://github.com/joslat/AgentEval/compare/v0.5.2-beta...HEAD
+[0.5.2-beta]: https://github.com/joslat/AgentEval/compare/v0.5.1-beta...v0.5.2-beta
+[0.5.1-beta]: https://github.com/joslat/AgentEval/compare/v0.4.0-beta...v0.5.1-beta
 [0.4.0-beta]: https://github.com/joslat/AgentEval/compare/v0.3.0-beta...v0.4.0-beta
 [0.3.0-beta]: https://github.com/joslat/AgentEval/compare/v0.2.1-beta...v0.3.0-beta
 [0.2.1-beta]: https://github.com/joslat/AgentEval/compare/v0.2.0-beta...v0.2.1-beta
