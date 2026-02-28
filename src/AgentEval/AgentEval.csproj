@@ -20,18 +20,7 @@
     <TargetsForTfmSpecificBuildOutput>$(TargetsForTfmSpecificBuildOutput);IncludeSubProjectDlls</TargetsForTfmSpecificBuildOutput>
   </PropertyGroup>
 
-  <!-- MSBuild target: embed all ProjectReference DLLs into the NuGet lib/ folder.
-       BuildProjectReferences=false prevents re-invoking the Build target on referenced
-       projects (which conflicts with --no-build / NoBuild=true). The Build step already
-       ran before pack, so the DLLs are already present on disk. -->
-  <Target Name="DisableBuildProjectReferencesWhenNoBuild"
-          BeforeTargets="ResolveReferences"
-          Condition="'$(NoBuild)' == 'true'">
-    <PropertyGroup>
-      <BuildProjectReferences>false</BuildProjectReferences>
-    </PropertyGroup>
-  </Target>
-
+  <!-- MSBuild target: embed all ProjectReference DLLs into the NuGet lib/ folder -->
   <Target Name="IncludeSubProjectDlls" DependsOnTargets="ResolveReferences">
     <ItemGroup>
       <BuildOutputInPackage Include="@(ReferenceCopyLocalPaths)"
