@@ -155,7 +155,7 @@ static async Task RunAutomated(bool useMock, string demoChoice)
                     Demos.ShowStochasticExplanation();
                 break;
             case "3":
-                await SemanticKernelDemo.RunAsync(useMock);
+                await SemanticKernelDemo.RunAsync();
                 break;
             case "4" or "all":
                 await Demos.RunCompleteExample(useMock);
@@ -167,7 +167,7 @@ static async Task RunAutomated(bool useMock, string demoChoice)
                 else
                     Demos.ShowStochasticExplanation();
                 Console.WriteLine("\n" + new string('═', 80) + "\n");
-                await SemanticKernelDemo.RunAsync(useMock);
+                await SemanticKernelDemo.RunAsync();
                 break;
             default:
                 Console.WriteLine($"Unknown demo: {demoChoice}. Use 0, 1, 2, 3, or 'all'");
@@ -241,7 +241,7 @@ static async Task ShowDemoMenu(bool useMock)
                     }
                     break;
                 case "3":
-                    await SemanticKernelDemo.RunAsync(useMock);
+                    await SemanticKernelDemo.RunAsync();
                     break;
                 case "4":
                     await Demos.RunCompleteExample(useMock);
@@ -254,7 +254,7 @@ static async Task ShowDemoMenu(bool useMock)
                     {
                         Demos.ShowStochasticExplanation();
                     }
-                    await SemanticKernelDemo.RunAsync(useMock);
+                    await SemanticKernelDemo.RunAsync();
                     ShowSummary(useMock);
                     return; // Exit menu after running all
                 case "Q":

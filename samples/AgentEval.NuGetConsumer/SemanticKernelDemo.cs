@@ -27,48 +27,15 @@ namespace AgentEval.NuGetConsumer;
 /// </summary>
 public static class SemanticKernelDemo
 {
-    public static async Task RunAsync(bool useMock)
+    public static async Task RunAsync()
     {
         ShowSection("✈️  SEMANTIC KERNEL FLIGHT AGENT",
             "Real SK [KernelFunction] plugins · Tool Assertions · LLM-as-Judge");
 
-        if (useMock || !Config.IsConfigured)
+        if (!Config.IsConfigured)
         {
-            Console.WriteLine("      ℹ️  This demo requires REAL MODE with Azure OpenAI credentials.\n");
-            Console.WriteLine("      What this demo shows:\n");
-            Console.WriteLine("      🔷 Real Semantic Kernel with [KernelFunction] plugin pattern");
-            Console.WriteLine("      🔷 Kernel.CreateBuilder() + AddAzureOpenAIChatCompletion()");
-            Console.WriteLine("      🔷 kernel.Plugins.AddFromType<FlightPlugin>()");
-            Console.WriteLine("      🔷 SK [KernelFunction] → AIFunctionFactory → AgentEval evaluation");
-            Console.WriteLine("      🔷 Fluent tool assertions: selection, ordering, arguments");
-            Console.WriteLine("      🔷 Code metrics (ToolSelectionMetric + ToolEfficiencyMetric)");
-            Console.WriteLine("      🔷 LLM-as-Judge (TaskCompletionMetric)\n");
-            Console.WriteLine("      Select REAL MODE to see the full demonstration!\n");
-
-            ShowCode("""
-                // Real Semantic Kernel agent with [KernelFunction] plugins
-                var kernel = Kernel.CreateBuilder()
-                    .AddAzureOpenAIChatCompletion(model, endpoint, key)
-                    .Build();
-                kernel.Plugins.AddFromType<FlightPlugin>();
-
-                // Bridge SK plugins to M.E.AI tools — same class, both frameworks!
-                var flightPlugin = new FlightPlugin();
-                var tools = new List<AITool> {
-                    AIFunctionFactory.Create(flightPlugin.SearchFlights),
-                    AIFunctionFactory.Create(flightPlugin.BookFlight)
-                };
-                var chatClient = azureClient.GetChatClient(model).AsIChatClient();
-                var agent = new ChatClientAgent(chatClient, new ChatClientAgentOptions {
-                    ChatOptions = new ChatOptions { Tools = tools }
-                });
-                var adapter = new MAFAgentAdapter(agent);
-
-                // Evaluate with AgentEval
-                var result = await harness.RunEvaluationAsync(adapter, testCase, evalOptions);
-                result.ToolUsage!.Should()
-                    .HaveCalledTool("SearchFlights").BeforeTool("BookFlight");
-                """);
+            Console.WriteLine("      ❌ This demo requires Azure OpenAI credentials.\n");
+            Console.WriteLine("      Set AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_API_KEY, and AZURE_OPENAI_DEPLOYMENT.\n");
             return;
         }
 
@@ -124,9 +91,9 @@ public static class SemanticKernelDemo
             {
                 Instructions = """
                     You are a flight booking assistant. You help users search for flights 
-                    and book them. Always search for available flights before booking.
-                    For multi-step requests (search + book), call SearchFlights first,
-                    then BookFlight with the best matching result.
+                    and book them. When the user provides a specific flight ID, book it
+                    directly using BookFlight. For open-ended requests (search + book),
+                    call SearchFlights first, then BookFlight with the best matching result.
                     """,
                 Tools = tools
             }
@@ -135,8 +102,8 @@ public static class SemanticKernelDemo
         var adapter = new MAFAgentAdapter(agent);
         Console.WriteLine($"      ✅ Agent '{agent.Name}' ready for evaluation\n");
 
-        // ─── Step 3: Define test cases ───────────────────────────────
-        Console.WriteLine("   📝 Step 3: Define test cases with expected tools\n");
+        // ─── Step 3: Define validation cases ─────────────────────────
+        Console.WriteLine("   📝 Step 3: Define validation cases with expected tools\n");
 
         var testCases = new List<TestCase>
         {
@@ -151,7 +118,7 @@ public static class SemanticKernelDemo
             new()
             {
                 Name = "Book a Specific Flight",
-                Input = "Book flight FL-123 for 2 passengers",
+                Input = "I already found flight FL-123. Book it for 2 passengers.",
                 ExpectedOutputContains = "FL-123",
                 ExpectedTools = ["BookFlight"],
                 PassingScore = 70
@@ -216,7 +183,7 @@ public static class SemanticKernelDemo
         // ─── Summary ─────────────────────────────────────────────────
         var summary = new TestSummary("SK FlightAgent Evaluation", results);
         Console.ForegroundColor = ConsoleColor.Green;
-        Console.WriteLine($"\n   📊 Total: {summary.TotalCount} tests — " +
+        Console.WriteLine($"\n   📊 Total: {summary.TotalCount} validations — " +
                           $"{summary.PassedCount} passed, {summary.FailedCount} failed, " +
                           $"avg score: {summary.AverageScore:F1}/100");
         Console.ResetColor();
@@ -253,7 +220,7 @@ public static class SemanticKernelDemo
 
     private static void RunFlightAssertions(List<TestResult> results)
     {
-        // Test 1: Search only — should call SearchFlights
+        // Validation 1: Search only — should call SearchFlights
         var searchResult = results[0];
         if (searchResult.ToolUsage != null)
         {
@@ -267,7 +234,7 @@ public static class SemanticKernelDemo
                     .And()
                     .HaveNoErrors();
 
-                PrintPass("Search test: SearchFlights called with destination=Paris");
+                PrintPass("Search validation: SearchFlights called with destination=Paris");
             }
             catch (ToolAssertionException ex)
             {
@@ -275,7 +242,7 @@ public static class SemanticKernelDemo
             }
         }
 
-        // Test 2: Book only — should call BookFlight
+        // Validation 2: Book only — should call BookFlight
         var bookResult = results[1];
         if (bookResult.ToolUsage != null)
         {
@@ -289,7 +256,7 @@ public static class SemanticKernelDemo
                     .And()
                     .HaveNoErrors();
 
-                PrintPass("Book test: BookFlight called with flightId=FL-123, passengers=2");
+                PrintPass("Book validation: BookFlight called with flightId=FL-123, passengers=2");
             }
             catch (ToolAssertionException ex)
             {
@@ -297,7 +264,7 @@ public static class SemanticKernelDemo
             }
         }
 
-        // Test 3: Multi-tool — SearchFlights BEFORE BookFlight
+        // Validation 3: Multi-tool — SearchFlights BEFORE BookFlight
         var multiResult = results[2];
         if (multiResult.ToolUsage != null)
         {
@@ -418,7 +385,7 @@ public static class SemanticKernelDemo
     private static void PrintPerformanceSummary(List<TestResult> results)
     {
         Console.WriteLine("      ┌─────────────────────────────┬──────────┬──────────┬──────────┐");
-        Console.WriteLine("      │ Test                        │ Latency  │ Tokens   │ Cost     │");
+        Console.WriteLine("      │ Validation                  │ Latency  │ Tokens   │ Cost     │");
         Console.WriteLine("      ├─────────────────────────────┼──────────┼──────────┼──────────┤");
         foreach (var r in results)
         {
