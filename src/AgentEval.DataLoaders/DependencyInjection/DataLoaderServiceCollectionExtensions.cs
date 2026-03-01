@@ -43,6 +43,7 @@ public static class DataLoaderServiceCollectionExtensions
             registry.Register("Markdown", new MarkdownExporter());
             registry.Register("Csv", new CsvExporter());
             registry.Register("Trx", new TrxExporter());
+            registry.Register("Directory", new DirectoryExporter());
             // Extension-registered exporters from DI
             foreach (var exporter in sp.GetServices<IResultExporter>())
             {

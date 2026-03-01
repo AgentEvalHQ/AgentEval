@@ -60,12 +60,12 @@ var llmMetrics = metrics.Where(m => m.Name.StartsWith("llm_"));
 
 ---
 
-## Result File Structure (Proposed)
+## Result File Structure
 
 > **ADR:** [002-result-directory-structure.md](adr/002-result-directory-structure.md)  
-> **Status:** Proposed — Not yet implemented
+> **Status:** Accepted — Implemented via `DirectoryExporter`
 
-When the `DirectoryExporter` is implemented, it will produce:
+The `DirectoryExporter` produces:
 
 | File | Purpose | Format |
 |------|---------|--------|
@@ -74,7 +74,15 @@ When the `DirectoryExporter` is implemented, it will produce:
 | `run.json` | Run metadata | JSON |
 | `config.json` | Original config copy | JSON |
 
-**Current state:** AgentEval exports single files via `JsonExporter`, `JUnitXmlExporter`, etc.
+**Usage:**
+
+```csharp
+var exporter = new DirectoryExporter();
+await exporter.ExportToDirectoryAsync(report, "./results/baseline");
+
+// Or via CLI:
+// agenteval eval --azure --model gpt-4o --dataset tests.yaml --output-dir ./results
+```
 
 ---
 

@@ -137,6 +137,8 @@ public class EvalCommandTests
     [InlineData("md")]
     [InlineData("trx")]
     [InlineData("csv")]
+    [InlineData("directory")]
+    [InlineData("dir")]
     public async Task ExportHandler_AllFormats_WriteToFile(string format)
     {
         // Arrange
@@ -290,11 +292,11 @@ public class EvalCommandTests
     }
 
     [Fact]
-    public void ExportHandler_SupportedFormats_Contains7Entries()
+    public void ExportHandler_SupportedFormats_Contains9Entries()
     {
-        // The format map should have all 7 aliases
+        // The format map should have all 9 aliases (including directory + dir)
         var formats = ExportHandler.SupportedFormats;
-        Assert.Equal(7, formats.Count);
+        Assert.Equal(9, formats.Count);
         Assert.Contains("json", formats);
         Assert.Contains("junit", formats);
         Assert.Contains("xml", formats);
@@ -302,6 +304,8 @@ public class EvalCommandTests
         Assert.Contains("md", formats);
         Assert.Contains("trx", formats);
         Assert.Contains("csv", formats);
+        Assert.Contains("directory", formats);
+        Assert.Contains("dir", formats);
     }
 
     [Fact]

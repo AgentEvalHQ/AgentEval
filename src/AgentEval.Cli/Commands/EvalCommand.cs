@@ -8,6 +8,7 @@ using AgentEval.Cli.Infrastructure;
 using AgentEval.Cli.Output;
 using AgentEval.Core;
 using AgentEval.DataLoaders;
+using AgentEval.Exporters;
 using AgentEval.MAF;
 using AgentEval.Models;
 using Microsoft.Extensions.AI;
@@ -55,8 +56,10 @@ internal static class EvalCommand
 
         // Output
         var formatOpt = new Option<string>("--format")
-            { DefaultValueFactory = _ => "json", Description = "Export format: json | junit | xml | markdown | md | trx | csv" };
+            { DefaultValueFactory = _ => "json", Description = "Export format: json | junit | xml | markdown | md | trx | csv | directory | dir" };
         var outputOpt = new Option<FileInfo?>("-o", "--output") { Description = "Output file (default: stdout)" };
+        var outputDirOpt = new Option<DirectoryInfo?>("--output-dir")
+            { Description = "Write structured results to a directory (ADR-002 format: results.jsonl + summary.json + run.json)" };
 
         // Verbosity
         var verboseFlag = new Option<bool>("--verbose") { Description = "Show detailed progress" };
@@ -75,6 +78,7 @@ internal static class EvalCommand
         command.Options.Add(judgeModelOpt);
         command.Options.Add(formatOpt);
         command.Options.Add(outputOpt);
+        command.Options.Add(outputDirOpt);
         command.Options.Add(verboseFlag);
         command.Options.Add(quietFlag);
 
@@ -95,6 +99,7 @@ internal static class EvalCommand
                 JudgeModel = parseResult.GetValue(judgeModelOpt),
                 Format = parseResult.GetValue(formatOpt)!,
                 Output = parseResult.GetValue(outputOpt),
+                OutputDir = parseResult.GetValue(outputDirOpt),
                 Verbose = parseResult.GetValue(verboseFlag),
                 Quiet = parseResult.GetValue(quietFlag),
             };
@@ -177,6 +182,16 @@ internal static class EvalCommand
             endpoint: opts.Endpoint ?? "azure");
         await ExportHandler.ExportAsync(report, opts.Format, opts.Output, ct);
 
+        // 7b. Directory export (ADR-002) — can coexist with single-file export
+        if (opts.OutputDir is not null)
+        {
+            var dirName = DirectoryExporter.GenerateDirectoryName(report);
+            var dirPath = new DirectoryInfo(Path.Combine(opts.OutputDir.FullName, dirName));
+            await ExportHandler.ExportToDirectoryAsync(report, dirPath, opts.Dataset.FullName, ct);
+            if (!opts.Quiet)
+                Console.Error.WriteLine($"  \U0001f4c1 Results written to: {dirPath.FullName}");
+        }
+
         // 8. Summary (unless --quiet)
         if (!opts.Quiet)
             ConsoleReporter.WriteSummary(summary);
@@ -202,6 +217,7 @@ internal sealed class EvalOptions
     public string? JudgeModel { get; init; }
     public required string Format { get; init; }
     public FileInfo? Output { get; init; }
+    public DirectoryInfo? OutputDir { get; init; }
     public bool Verbose { get; init; }
     public bool Quiet { get; init; }
 }

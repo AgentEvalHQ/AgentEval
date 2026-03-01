@@ -23,6 +23,8 @@ internal static class ExportHandler
         ["md"] = ExportFormat.Markdown,     // alias
         ["trx"] = ExportFormat.Trx,
         ["csv"] = ExportFormat.Csv,
+        ["directory"] = ExportFormat.Directory,
+        ["dir"] = ExportFormat.Directory,   // alias
     };
 
     /// <summary>
@@ -30,7 +32,7 @@ internal static class ExportHandler
     /// When <paramref name="outputFile"/> is null, writes to stdout for piping.
     /// </summary>
     /// <param name="report">The evaluation report to export.</param>
-    /// <param name="format">Format name (json, junit, xml, markdown, md, trx, csv).</param>
+    /// <param name="format">Format name (json, junit, xml, markdown, md, trx, csv, directory, dir).</param>
     /// <param name="outputFile">Optional output file. When null, writes to stdout.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <exception cref="ArgumentException">Thrown when format is unknown.</exception>
@@ -60,6 +62,24 @@ internal static class ExportHandler
             await using var stream = Console.OpenStandardOutput();
             await exporter.ExportAsync(report, stream, ct);
         }
+    }
+
+    /// <summary>
+    /// Exports the evaluation report to a structured directory (ADR-002 format).
+    /// Produces results.jsonl, summary.json, run.json, and optionally config.json.
+    /// </summary>
+    /// <param name="report">The evaluation report to export.</param>
+    /// <param name="outputDir">The directory to write results into.</param>
+    /// <param name="configFilePath">Optional config file path to copy for reproducibility.</param>
+    /// <param name="ct">Cancellation token.</param>
+    public static async Task ExportToDirectoryAsync(
+        EvaluationReport report,
+        DirectoryInfo outputDir,
+        string? configFilePath,
+        CancellationToken ct)
+    {
+        var exporter = new DirectoryExporter();
+        await exporter.ExportToDirectoryAsync(report, outputDir.FullName, configFilePath, ct);
     }
 
     /// <summary>

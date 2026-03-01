@@ -24,7 +24,13 @@ public enum ExportFormat
     Trx,
     
     /// <summary>CSV format for Excel and business intelligence tools.</summary>
-    Csv
+    Csv,
+    
+    /// <summary>
+    /// Structured directory format (ADR-002) producing results.jsonl, summary.json, run.json.
+    /// Enables cross-run comparison, reproducibility, and history tracking.
+    /// </summary>
+    Directory
 }
 
 /// <summary>

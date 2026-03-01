@@ -344,12 +344,13 @@ public class ServiceCollectionExtensionsTests
         // Act
         var registry = provider.GetRequiredService<IExporterRegistry>();
 
-        // Assert — 5 built-in exporters
+        // Assert — 6 built-in exporters (Json, Junit, Markdown, Csv, Trx, Directory)
         Assert.True(registry.Contains("Json"));
         Assert.True(registry.Contains("Junit"));
         Assert.True(registry.Contains("Markdown"));
         Assert.True(registry.Contains("Csv"));
         Assert.True(registry.Contains("Trx"));
+        Assert.True(registry.Contains("Directory"));
     }
 
     [Fact]
