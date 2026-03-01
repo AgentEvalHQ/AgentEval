@@ -53,10 +53,23 @@ public class MAFIdentifiableAgentAdapter : IStreamableAgent, IModelIdentifiable
         var session = _session ?? await _agent.CreateSessionAsync(cancellationToken).ConfigureAwait(false);
         var response = await _agent.RunAsync(prompt, session, cancellationToken: cancellationToken).ConfigureAwait(false);
         
+        // Extract token usage from AgentResponse.Usage property
+        TokenUsage? tokenUsage = null;
+        if (response.Usage != null)
+        {
+            tokenUsage = new TokenUsage
+            {
+                PromptTokens = (int)(response.Usage.InputTokenCount ?? 0),
+                CompletionTokens = (int)(response.Usage.OutputTokenCount ?? 0)
+            };
+        }
+        
         return new AgentResponse
         {
             Text = response.Text,
-            RawMessages = response.Messages.ToList()
+            RawMessages = response.Messages.ToList(),
+            TokenUsage = tokenUsage,
+            ModelId = ModelId
         };
     }
     
@@ -114,7 +127,7 @@ public class MAFIdentifiableAgentAdapter : IStreamableAgent, IModelIdentifiable
             }
         }
         
-        yield return new AgentResponseChunk { IsComplete = true, Usage = capturedUsage };
+        yield return new AgentResponseChunk { IsComplete = true, Usage = capturedUsage, ModelId = ModelId };
     }
     
     /// <summary>

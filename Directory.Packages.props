@@ -5,9 +5,9 @@
   
   <ItemGroup>
     <!-- Microsoft Agent Framework -->
-    <PackageVersion Include="Microsoft.Agents.AI" Version="1.0.0-rc1" />
-    <PackageVersion Include="Microsoft.Agents.AI.OpenAI" Version="1.0.0-rc1" />
-    <PackageVersion Include="Microsoft.Agents.AI.Workflows" Version="1.0.0-rc1" />
+    <PackageVersion Include="Microsoft.Agents.AI" Version="1.0.0-rc2" />
+    <PackageVersion Include="Microsoft.Agents.AI.OpenAI" Version="1.0.0-rc2" />
+    <PackageVersion Include="Microsoft.Agents.AI.Workflows" Version="1.0.0-rc2" />
     
     <!-- Microsoft Extensions AI -->
     <PackageVersion Include="Microsoft.Extensions.AI" Version="10.3.0" />
@@ -17,24 +17,26 @@
     <PackageVersion Include="AgentEval" Version="0.4.0-beta" />
     
     <!-- Azure -->
-    <PackageVersion Include="Azure.AI.OpenAI" Version="2.7.0-beta.2" />
-    <PackageVersion Include="Azure.Identity" Version="1.17.0" />
+    <PackageVersion Include="Azure.AI.OpenAI" Version="2.8.0-beta.1" />
+    <PackageVersion Include="Azure.Identity" Version="1.18.0" />
     
     <!-- Core -->
     <PackageVersion Include="System.Numerics.Tensors" Version="10.0.3" />
     <PackageVersion Include="System.CommandLine" Version="2.0.3" />
     <PackageVersion Include="YamlDotNet" Version="16.3.0" />
+    <!-- Intentionally 9.0.0 — supports net8.0/9.0/10.0 without forcing .NET 10 runtime deps.
+         MAF's transitive requirement is DependencyInjection.Abstractions (a different package). -->
     <PackageVersion Include="Microsoft.Extensions.DependencyInjection" Version="9.0.0" />
     <PackageVersion Include="Microsoft.Extensions.Hosting.Abstractions" Version="9.0.0" />
     
     <!-- PDF Generation (MIT License) -->
-    <PackageVersion Include="PdfSharp-MigraDoc" Version="6.1.1" />
+    <PackageVersion Include="PdfSharp-MigraDoc" Version="6.2.4" />
     
     <!-- Testing -->
-    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.12.0" />
-    <PackageVersion Include="xunit" Version="2.9.2" />
-    <PackageVersion Include="xunit.runner.visualstudio" Version="2.8.2" />
-    <PackageVersion Include="coverlet.collector" Version="6.0.2" />
+    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.3.0" />
+    <PackageVersion Include="xunit" Version="2.9.3" />
+    <PackageVersion Include="xunit.runner.visualstudio" Version="2.8.2" /><!-- Deferred: upgrade to 3.x requires xunit v3 migration (tracked issue) -->
+    <PackageVersion Include="coverlet.collector" Version="8.0.0" />
     <PackageVersion Include="Verify.Xunit" Version="28.8.1" />
     
     <!-- SourceLink for debugging support -->

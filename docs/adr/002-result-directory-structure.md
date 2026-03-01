@@ -1,7 +1,8 @@
 # ADR-002: Result Directory Structure
 
-**Status:** Proposed  
+**Status:** Accepted  
 **Date:** 2026-01-07  
+**Accepted:** 2026-03-06  
 **Decision Makers:** AgentEval Contributors
 
 ---

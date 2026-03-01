@@ -83,6 +83,11 @@ public class AgentResponseChunk
     /// Token usage information (typically only populated on the final/complete chunk).
     /// </summary>
     public TokenUsage? Usage { get; init; }
+    
+    /// <summary>
+    /// Model used for the response (typically only populated on the final/complete chunk).
+    /// </summary>
+    public string? ModelId { get; init; }
 }
 
 /// <summary>

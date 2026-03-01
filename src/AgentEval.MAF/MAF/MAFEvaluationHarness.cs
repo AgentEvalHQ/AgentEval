@@ -5,6 +5,7 @@
 using Microsoft.Extensions.AI;
 using AgentEval.Core;
 using AgentEval.Models;
+using AgentEval.Validation;
 
 namespace AgentEval.MAF;
 
@@ -59,6 +60,8 @@ public class MAFEvaluationHarness : IStreamingEvaluationHarness, IBatchEvaluatio
         EvaluationOptions? options = null,
         CancellationToken cancellationToken = default)
     {
+        TestCaseValidator.Validate(testCase);
+        
         options ??= new EvaluationOptions();
         var result = new TestResult { TestName = testCase.Name };
         var metrics = options.TrackPerformance ? new PerformanceMetrics { WasStreaming = false } : null;
@@ -216,6 +219,8 @@ public class MAFEvaluationHarness : IStreamingEvaluationHarness, IBatchEvaluatio
         EvaluationOptions? options = null,
         CancellationToken cancellationToken = default)
     {
+        TestCaseValidator.Validate(testCase);
+        
         options ??= new EvaluationOptions();
         var result = new TestResult { TestName = testCase.Name };
         var metrics = new PerformanceMetrics { WasStreaming = true, ModelUsed = options.ModelName };

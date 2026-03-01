@@ -25,6 +25,7 @@ var exporter = ResultExporterFactory.CreateFromExtension(".json");
 | **Markdown** | `.md` | PR comments, documentation, GitHub rendering | `text/markdown` |
 | **TRX** | `.trx` | Visual Studio Test Explorer, Azure DevOps | `application/xml` |
 | **CSV** | `.csv` | Excel, Power BI, business intelligence tools | `text/csv` |
+| **Directory** | *(dir)* | Cross-run comparison, history, reproducibility (ADR-002) | `application/x-directory` |
 
 ## Quick Start
 
@@ -146,6 +147,38 @@ Fixed columns: `RunId`, `TestName`, `Category`, `Score`, `Passed`, `Skipped`, `D
 
 Dynamic columns are appended for each unique key in `MetricScores` (e.g., `relevance`, `correctness`). Special characters (commas, quotes, newlines) are properly escaped per RFC 4180.
 
+### Directory (ADR-002)
+
+Structured directory format for cross-run comparison, history tracking, and reproducibility. Produces multiple files per run instead of a single file.
+
+> **ADR:** [002-result-directory-structure.md](adr/002-result-directory-structure.md)
+
+```csharp
+var exporter = new DirectoryExporter();
+await exporter.ExportToDirectoryAsync(report, "./results/baseline");
+
+// Or use the auto-generated directory name
+var dirName = DirectoryExporter.GenerateDirectoryName(report);
+// e.g., "2026-03-01_14-30-00_gpt-4o"
+await exporter.ExportToDirectoryAsync(report, $"./results/{dirName}");
+```
+
+**CLI usage:**
+```bash
+agenteval eval --azure --model gpt-4o --dataset tests.yaml --output-dir ./results
+```
+
+Each run produces a directory with:
+
+| File | Format | Purpose |
+|------|--------|---------|
+| `results.jsonl` | JSON Lines | One JSON line per test result (streaming-friendly, append-friendly) |
+| `summary.json` | JSON | Aggregate statistics with per-metric distribution (mean, min, max, stddev, percentiles) |
+| `run.json` | JSON | Run metadata: agent info, environment, timestamp, duration |
+| *(original filename)* | *(original format)* | Copy of original config/dataset file with filename preserved (when provided, for reproducibility) |
+
+The stream-based `ExportAsync` method writes `summary.json` content for `IResultExporter` compatibility. For full directory output, use `ExportToDirectoryAsync`.
+
 ## The IResultExporter Interface
 
 ```csharp
@@ -201,7 +234,7 @@ foreach (var format in registry.GetRegisteredFormats())
 }
 ```
 
-Built-in exporters (JSON, JUnit, Markdown, CSV, TRX) are pre-registered automatically. DI-registered exporters are added alongside them without overriding built-ins.
+Built-in exporters (JSON, JUnit, Markdown, CSV, TRX, Directory) are pre-registered automatically. DI-registered exporters are added alongside them without overriding built-ins.
 
 You can also register exporters manually at runtime:
 

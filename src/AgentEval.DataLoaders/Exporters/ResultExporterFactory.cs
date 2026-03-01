@@ -21,6 +21,7 @@ public static class ResultExporterFactory
         ExportFormat.Markdown => new MarkdownExporter(),
         ExportFormat.Trx => new TrxExporter(),
         ExportFormat.Csv => new CsvExporter(),
+        ExportFormat.Directory => new DirectoryExporter(),
         _ => throw new ArgumentOutOfRangeException(nameof(format), format, "Unknown export format")
     };
     

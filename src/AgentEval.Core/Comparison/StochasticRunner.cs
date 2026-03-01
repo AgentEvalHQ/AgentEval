@@ -4,6 +4,7 @@
 
 using AgentEval.Core;
 using AgentEval.Models;
+using AgentEval.Validation;
 using Microsoft.Extensions.DependencyInjection;
 using System.Diagnostics;
 
@@ -71,6 +72,7 @@ public class StochasticRunner : IStochasticRunner
         StochasticOptions options,
         CancellationToken cancellationToken)
     {
+        TestCaseValidator.Validate(testCase);
         options.Validate();
         
         var results = new List<TestResult>();

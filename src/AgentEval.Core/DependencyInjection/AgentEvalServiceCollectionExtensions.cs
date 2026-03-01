@@ -56,9 +56,21 @@ public static class AgentEvalServiceCollectionExtensions
         });
 
         // Register IAgentEvalEmbeddings: wraps IEmbeddingGenerator if available (G4)
-        services.TryAddSingleton<IAgentEvalEmbeddings>(sp =>
-            new MEAIEmbeddingAdapter(
-                sp.GetRequiredService<IEmbeddingGenerator<string, Embedding<float>>>()));
+        // Optionally wrapped with CachingEmbeddingsDecorator when EnableEmbeddingCaching is true
+        if (options.EnableEmbeddingCaching)
+        {
+            services.TryAddSingleton<IAgentEvalEmbeddings>(sp =>
+                new CachingEmbeddingsDecorator(
+                    new MEAIEmbeddingAdapter(
+                        sp.GetRequiredService<IEmbeddingGenerator<string, Embedding<float>>>()),
+                    options.EmbeddingCacheMaxSize));
+        }
+        else
+        {
+            services.TryAddSingleton<IAgentEvalEmbeddings>(sp =>
+                new MEAIEmbeddingAdapter(
+                    sp.GetRequiredService<IEmbeddingGenerator<string, Embedding<float>>>()));
+        }
 
         // Register IEvaluator: default ChatClientEvaluator using IChatClient (G9)
         services.TryAddSingleton<IEvaluator>(sp =>

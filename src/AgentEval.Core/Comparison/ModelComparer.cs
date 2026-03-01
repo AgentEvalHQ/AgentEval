@@ -4,6 +4,7 @@
 
 using AgentEval.Core;
 using AgentEval.Models;
+using AgentEval.Validation;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace AgentEval.Comparison;
@@ -36,6 +37,8 @@ public class ModelComparer : IModelComparer
     {
         if (factories == null || factories.Count == 0)
             throw new ArgumentException("At least one factory is required.", nameof(factories));
+        
+        TestCaseValidator.Validate(testCase);
         
         options ??= ModelComparisonOptions.Default;
         options.Validate();

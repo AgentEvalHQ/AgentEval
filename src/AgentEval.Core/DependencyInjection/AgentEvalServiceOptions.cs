@@ -29,4 +29,19 @@ public class AgentEvalServiceOptions
     /// If null, no logger is registered.
     /// </summary>
     public Func<IServiceProvider, IAgentEvalLogger>? LoggerFactory { get; set; }
+
+    /// <summary>
+    /// Gets or sets whether to enable in-memory caching for embedding generation.
+    /// When enabled, repeated calls with the same text return cached results,
+    /// which is beneficial for stochastic evaluation where reference texts are constant.
+    /// Default is <c>false</c> (opt-in).
+    /// </summary>
+    public bool EnableEmbeddingCaching { get; set; }
+
+    /// <summary>
+    /// Gets or sets the maximum number of embeddings to cache.
+    /// Only used when <see cref="EnableEmbeddingCaching"/> is <c>true</c>.
+    /// Default is 1000.
+    /// </summary>
+    public int EmbeddingCacheMaxSize { get; set; } = 1000;
 }

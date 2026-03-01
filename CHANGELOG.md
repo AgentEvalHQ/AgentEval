@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+---
+
+## [0.5.2-beta] - 2026-02-28
+
+**MAF RC2 Dependency Upgrade** ⬆️
+
+### Changed
+- **MAF upgraded from 1.0.0-rc1 to 1.0.0-rc2** — All three MAF package references (`Microsoft.Agents.AI`, `Microsoft.Agents.AI.OpenAI`, `Microsoft.Agents.AI.Workflows`) updated to 1.0.0-rc2. Zero public API breaking changes — every AgentEval dependency is byte-identical between RC1 and RC2. RC2 contains only internal telemetry restructuring (session-level OTel spans in Workflows), two internal resource leak fixes, and three new additive `[Experimental]` APIs (Agent Skills, builder-level context providers, stored-output-disabled client). Transitive `Microsoft.Agents.ObjectModel` bumped `2026.2.3.1 → 2026.2.4.1`. No AgentEval source code changes required. Full test suite passes across all 3 TFMs. See [MAF-Upgrade-Plan.md](src/AgentEval.MAF/MAF-Upgrade-Plan.md) for full diff analysis.
+
+---
+
+## [0.5.1-beta] - 2026-02-28
+
+**Modularization, Cross-Framework, CLI, DI & Extensibility** 🏗️🔌
+
+Major architectural release: monolith split into 6 sub-projects (ADR-016), universal IChatClient adapter, CLI tool, dependency injection architecture, rich evaluation output, extensibility framework, and runnable samples. Comprehensive test suite passing across all 3 TFMs.
+
 ### Added
 - **Monolith Modularization (ADR-016)** — Split single `src/AgentEval` project (~203 files, ~35K lines) into 6 internal sub-projects while shipping a single NuGet package. Resolves dependency coupling: non-MAF users no longer pull `Microsoft.Agents.AI`, non-RedTeam users no longer pull `PdfSharp-MigraDoc`. Compiler-enforced dependency direction: Abstractions → Core → DataLoaders/MAF/RedTeam → Umbrella.
   - `AgentEval.Abstractions` (~48 files) — Public contracts: `IMetric`, `IEvaluableAgent`, `IStreamableAgent`, models
@@ -82,7 +99,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **README updated** — Sample count corrected from 26 to 27 with Sample 27 row added. Test counts now use qualitative descriptions instead of hard-coded numbers. Added CLI, DI, and cross-framework to Key Features. Expanded documentation table.
 - **Roadmap updated** — Marked Red Team and CLI as shipped; added CLI Phase 2, MCP Server, Benchmark runner, and Verify.Xunit to "What's Next". Updated version history table through 0.6.0-beta.
 - **System.CommandLine upgraded from 2.0.0-beta4 to 2.0.3 stable** — Breaking API change: `SetHandler` → `SetAction`, `IsRequired` → `Required`, `AddOption()` → `Options.Add()`, `AddAlias()` → constructor aliases, `root.InvokeAsync(args)` → `root.Parse(args)` then `parseResult.InvokeAsync()`. Only affects the new CLI project; no existing code referenced System.CommandLine.
-- **Test count increased from 6,573 to 7,345** — 2,435 (net8.0) + 2,455 (net9.0) + 2,455 (net10.0). New tests for DI service registration, snapshot evaluation improvements, CLI commands, cross-framework adapter, and export pipeline bridging.
+- **Expanded test coverage** — New tests for DI service registration, snapshot evaluation improvements, CLI commands, cross-framework adapter, and export pipeline bridging across all 3 TFMs.
 
 ### Fixed
 - **Streaming tool extraction for ChatClientAgentAdapter** — `InvokeStreamingAsync` now yields `ToolCallStarted` and `ToolCallCompleted` chunks when the underlying `IChatClient` streams `FunctionCallContent`/`FunctionResultContent`. Previously, streaming evaluations via `RunEvaluationStreamingAsync` produced empty `ToolUsageReport` for all `IChatClient`-based agents. Non-streaming path was unaffected.
@@ -93,7 +110,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 **Security, Responsible AI & MAF RC1** 🛡️🤖
 
-Major feature release: Red Team security scanning, Responsible AI metrics, Calibrated multi-model evaluation, MAF RC1 upgrade, and comprehensive tracing improvements. 42 commits, 2,191 tests × 3 TFMs = **6,573 total tests passing**.
+Major feature release: Red Team security scanning, Responsible AI metrics, Calibrated multi-model evaluation, MAF RC1 upgrade, and comprehensive tracing improvements. Comprehensive test suite passing across all 3 TFMs.
 
 ### ⚠️ BREAKING CHANGES
 
@@ -273,7 +290,7 @@ This release adds new features (enhanced token tracking, Sample 19) and updates 
 - **New Positioning:** "The .NET Evaluation Toolkit for AI Agents" (previously "testing framework")
   - Evaluation leads (50% of codebase), followed by testing (25%) and benchmarking (25%)
   - Clearer differentiation vs Python alternatives (RAGAS, DeepEval)
-- Updated test count badge to **3000+** across 3 TFMs
+- Updated test count badge across 3 TFMs
 - Fixed version references from 1.0.0-alpha to 0.2.0-beta in all documentation
 - Updated NuGet tags: added `rag` and `agentic` keywords
 - Simplified `docs/roadmap.md` - removed internal planning details, shows only shipped features and general direction
@@ -575,7 +592,7 @@ This release marks the transition from alpha to beta. The framework is now featu
 - Designed for OpenTelemetry (OTel) integration
 
 ### Technical Details
-- 210+ unit tests with comprehensive coverage
+- Comprehensive unit test coverage across all target frameworks
 - Multi-target framework support: .NET 8.0, 9.0, 10.0
 - Zero-dependency core (optional integrations for MAF, Azure OpenAI)
 
@@ -590,7 +607,9 @@ This release marks the transition from alpha to beta. The framework is now featu
 - `AgentEval.Tracing` (OTel + run artifacts) - planned
 - `AgentEval.Studio` (workflow visualizer / time-travel UI) - future
 
-[Unreleased]: https://github.com/joslat/AgentEval/compare/v0.4.0-beta...HEAD
+[Unreleased]: https://github.com/joslat/AgentEval/compare/v0.5.2-beta...HEAD
+[0.5.2-beta]: https://github.com/joslat/AgentEval/compare/v0.5.1-beta...v0.5.2-beta
+[0.5.1-beta]: https://github.com/joslat/AgentEval/compare/v0.4.0-beta...v0.5.1-beta
 [0.4.0-beta]: https://github.com/joslat/AgentEval/compare/v0.3.0-beta...v0.4.0-beta
 [0.3.0-beta]: https://github.com/joslat/AgentEval/compare/v0.2.1-beta...v0.3.0-beta
 [0.2.1-beta]: https://github.com/joslat/AgentEval/compare/v0.2.0-beta...v0.2.1-beta
