@@ -1,4 +1,4 @@
-﻿// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: MIT
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 using PdfSharp.Fonts;
@@ -22,7 +22,7 @@ public sealed class CrossPlatformFontResolver : IFontResolver
 
     /// <summary>
     /// Registers this font resolver with PdfSharp if not already registered.
-    /// Must be called on all platforms â€” PdfSharp-MigraDoc 6.2+ no longer uses
+    /// Must be called on all platforms — PdfSharp-MigraDoc 6.2+ no longer uses
     /// GDI+ for automatic font resolution on Windows.
     /// </summary>
     public static void Register()
@@ -59,7 +59,7 @@ public sealed class CrossPlatformFontResolver : IFontResolver
             return new FontResolverInfo(winFace);
         }
 
-        // Linux / macOS â€” map to Liberation / DejaVu open-source fonts.
+        // Linux / macOS — map to Liberation / DejaVu open-source fonts.
         var crossFace = GetCrossPlatformFaceName(normalized, isBold, isItalic);
         return new FontResolverInfo(crossFace);
     }
@@ -88,12 +88,12 @@ public sealed class CrossPlatformFontResolver : IFontResolver
             return null;
         }
 
-        // Linux / macOS â€” search known font directories for Liberation/DejaVu
+        // Linux / macOS — search known font directories for Liberation/DejaVu
         var fontPath = FindFontFile(faceName);
         return fontPath != null ? File.ReadAllBytes(fontPath) : null;
     }
 
-    // â”€â”€ Windows font-name mappings â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── Windows font-name mappings ──────────────────────────────────────────
     // Maps CSS-style family + style to the Windows TTF file base-name (no extension).
     // Reference: https://learn.microsoft.com/en-us/typography/font-list/
 
@@ -145,7 +145,7 @@ public sealed class CrossPlatformFontResolver : IFontResolver
                :                      "arial"
         };
 
-    // â”€â”€ Cross-platform (Liberation / DejaVu) name mappings â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── Cross-platform (Liberation / DejaVu) name mappings ─────────────────
 
     private static string GetCrossPlatformFaceName(string normalized, bool isBold, bool isItalic)
     {
@@ -169,7 +169,7 @@ public sealed class CrossPlatformFontResolver : IFontResolver
         };
     }
 
-    // â”€â”€ File search (Linux / macOS) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── File search (Linux / macOS) ─────────────────────────────────────────
 
     private static string? FindFontFile(string faceName)
     {
@@ -200,7 +200,7 @@ public sealed class CrossPlatformFontResolver : IFontResolver
                         return file;
                 }
             }
-            catch { /* access denied or similar â€” skip */ }
+            catch { /* access denied or similar — skip */ }
         }
 
         return null;

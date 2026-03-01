@@ -175,7 +175,7 @@ Each run produces a directory with:
 | `results.jsonl` | JSON Lines | One JSON line per test result (streaming-friendly, append-friendly) |
 | `summary.json` | JSON | Aggregate statistics with per-metric distribution (mean, min, max, stddev, percentiles) |
 | `run.json` | JSON | Run metadata: agent info, environment, timestamp, duration |
-| `config.json` | JSON | Copy of original config file (when provided, for reproducibility) |
+| *(original filename)* | *(original format)* | Copy of original config/dataset file with filename preserved (when provided, for reproducibility) |
 
 The stream-based `ExportAsync` method writes `summary.json` content for `IResultExporter` compatibility. For full directory output, use `ExportToDirectoryAsync`.
 

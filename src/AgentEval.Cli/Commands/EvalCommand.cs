@@ -180,7 +180,18 @@ internal static class EvalCommand
             agentName: opts.Model,
             modelName: opts.Model,
             endpoint: opts.Endpoint ?? "azure");
-        await ExportHandler.ExportAsync(report, opts.Format, opts.Output, ct);
+
+        // Directory format is handled exclusively via --output-dir, not the stream-based export path
+        var isDirectoryFormat = opts.Format.Equals("directory", StringComparison.OrdinalIgnoreCase)
+            || opts.Format.Equals("dir", StringComparison.OrdinalIgnoreCase);
+
+        if (isDirectoryFormat && opts.OutputDir is null)
+            throw new InvalidOperationException(
+                "The 'directory' format produces a structured directory (results.jsonl, summary.json, run.json). " +
+                "Specify --output-dir <path> to write the directory output.");
+
+        if (!isDirectoryFormat)
+            await ExportHandler.ExportAsync(report, opts.Format, opts.Output, ct);
 
         // 7b. Directory export (ADR-002) — can coexist with single-file export
         if (opts.OutputDir is not null)

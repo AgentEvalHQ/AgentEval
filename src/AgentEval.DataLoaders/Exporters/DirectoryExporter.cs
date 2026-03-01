@@ -110,7 +110,7 @@ public sealed class DirectoryExporter : IResultExporter
     /// </param>
     /// <param name="configFilePath">
     /// Optional path to the original config/dataset file. If provided and the file exists,
-    /// it is copied as <c>config.json</c> for reproducibility.
+    /// it is copied into the directory with its original filename preserved for reproducibility.
     /// </param>
     /// <param name="ct">Cancellation token.</param>
     /// <exception cref="ArgumentNullException">Thrown when report or directoryPath is null.</exception>
