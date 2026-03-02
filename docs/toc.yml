@@ -1,4 +1,4 @@
-# AgentEval Documentation - Navigation
+﻿# AgentEval Documentation - Navigation
 
 - name: Home
   href: index.md
@@ -87,7 +87,9 @@
     href: showcase/code-gallery.md
   - name: Architecture Decisions
     href: adr/README.md
+  - name: Commercial & Enterprise
+    href: commercial.md
   - name: GitHub Repository
-    href: https://github.com/joslat/AgentEval
+    href: https://github.com/AgentEvalHQ/AgentEval
   - name: Contributing
-    href: https://github.com/joslat/AgentEval/blob/main/CONTRIBUTING.md
+    href: https://github.com/AgentEvalHQ/AgentEval/blob/main/CONTRIBUTING.md

@@ -1,4 +1,4 @@
-# Walkthrough: Evaluating Your First AI Agent
+﻿# Walkthrough: Evaluating Your First AI Agent
 
 This walkthrough guides you through evaluating an AI agent with AgentEval, from setup to assertions.
 
@@ -545,7 +545,7 @@ AgentEval includes comprehensive examples covering every evaluation scenario. He
 
 ```bash
 # Clone and run
-git clone https://github.com/joslat/AgentEval
+git clone https://github.com/AgentEvalHQ/AgentEval
 cd AgentEval/samples/AgentEval.Samples
 
 # Mock mode (no API keys required) - Samples 1-4

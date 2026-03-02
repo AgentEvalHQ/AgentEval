@@ -1,4 +1,4 @@
-# Security Policy
+﻿# Security Policy
 
 ## Supported Versions
 
@@ -126,7 +126,7 @@ The project undergoes security reviews:
 - Manual security audits before major releases
 - Community-driven vulnerability reporting via GitHub Security Advisories
 
-Check [Security Advisories](https://github.com/joslat/AgentEval/security/advisories) for updates.
+Check [Security Advisories](https://github.com/AgentEvalHQ/AgentEval/security/advisories) for updates.
 
 ## Security Features
 
@@ -148,7 +148,7 @@ Both are maintained by Microsoft with regular security updates.
 
 ## Questions?
 
-For security questions that aren't sensitive, open a [GitHub Discussion](https://github.com/joslat/AgentEval/discussions).
+For security questions that aren't sensitive, open a [GitHub Discussion](https://github.com/AgentEvalHQ/AgentEval/discussions).
 
 For private security matters, email: **joslat@gmail.com**
 

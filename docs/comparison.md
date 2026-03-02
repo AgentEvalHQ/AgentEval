@@ -1,4 +1,4 @@
-# Migration Guide
+﻿# Migration Guide
 
 > **Coming from another evaluation framework?** This guide helps you transition to AgentEval with code examples and pattern translations.
 
@@ -313,8 +313,8 @@ stochasticResult.Statistics.Mean.Should().BeGreaterThan(75);
 
 - [Getting Started Guide](getting-started.md) - Full tutorial
 - [Code Gallery](showcase/code-gallery.md) - Real examples
-- [Samples](https://github.com/joslat/AgentEval/tree/main/samples) - 26 runnable samples
-- [Issues](https://github.com/joslat/AgentEval/issues) - Report problems or ask questions
+- [Samples](https://github.com/AgentEvalHQ/AgentEval/tree/main/samples) - 26 runnable samples
+- [Issues](https://github.com/AgentEvalHQ/AgentEval/issues) - Report problems or ask questions
 
 ---
 
@@ -322,6 +322,6 @@ stochasticResult.Statistics.Mean.Should().BeGreaterThan(75);
 
 **Ready to get started?**
 
-[Get Started](getting-started.md) | [See All Samples](https://github.com/joslat/AgentEval/tree/main/samples)
+[Get Started](getting-started.md) | [See All Samples](https://github.com/AgentEvalHQ/AgentEval/tree/main/samples)
 
 </div>

@@ -1,4 +1,4 @@
-# AgentEval
+﻿# AgentEval
 
 <p align="center">
   <img src="images/AgentEval_bounded.png" alt="AgentEval Logo" width="400" />
@@ -246,7 +246,7 @@ Rigorous evaluation capabilities: RAG metrics (Faithfulness, Relevance, Context 
 dotnet run --project samples/AgentEval.Samples
 ```
 
-[View Examples →](https://github.com/joslat/AgentEval/tree/main/samples/AgentEval.Samples)
+[View Examples →](https://github.com/AgentEvalHQ/AgentEval/tree/main/samples/AgentEval.Samples)
 
 ---
 
@@ -276,20 +276,21 @@ dotnet run --project samples/AgentEval.Samples
 
 ---
 
-## Test Coverage
+## Quality Assurance
 
-AgentEval maintains a **comprehensive test suite** running across **multiple target frameworks**, ensuring reliability.
+AgentEval maintains a **comprehensive evaluation suite** running across **multiple target frameworks**, ensuring reliability.
 
-[![codecov](https://codecov.io/gh/joslat/AgentEval/graph/badge.svg?token=Y28TAK3LNH)](https://codecov.io/gh/joslat/AgentEval)
+[![codecov](https://codecov.io/gh/AgentEvalHQ/AgentEval/graph/badge.svg?token=Y28TAK3LNH)](https://codecov.io/gh/AgentEvalHQ/AgentEval)
 
 ---
 
 ## Community
 
-- **GitHub:** [github.com/joslat/AgentEval](https://github.com/joslat/AgentEval)
+- **GitHub:** [github.com/AgentEvalHQ/AgentEval](https://github.com/AgentEvalHQ/AgentEval)
 - **NuGet:** [nuget.org/packages/AgentEval](https://www.nuget.org/packages/AgentEval)
-- **Issues:** [Report bugs or request features](https://github.com/joslat/AgentEval/issues)
-- **Discussions:** [Ask questions](https://github.com/joslat/AgentEval/discussions)
+- **Issues:** [Report bugs or request features](https://github.com/AgentEvalHQ/AgentEval/issues)
+- **Discussions:** [Ask questions](https://github.com/AgentEvalHQ/AgentEval/discussions)
+- **Commercial & Enterprise (planned):** [Learn more](commercial.md)
 
 ---
 
@@ -297,9 +298,10 @@ AgentEval maintains a **comprehensive test suite** running across **multiple tar
 
 AgentEval is **MIT licensed** and will remain open source forever.
 
-- ✅ **No license changes** - MIT today, MIT forever
-- ✅ **No "open core"** - All features are open source
-- ✅ **Community first** - Built for the .NET AI community
+- ✅ **No license changes** — MIT today, MIT forever
+- ✅ **No bait-and-switch** — core stays MIT and fully usable
+- ✅ **Community first** — built with the .NET AI community
+- ℹ️ **Optional add-ons may exist separately** (if/when built)
 
 ---
 

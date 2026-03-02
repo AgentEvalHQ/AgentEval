@@ -1,4 +1,4 @@
-# ADR-004: Trace Recording and Replay for Time-Travelling Debugging
+﻿# ADR-004: Trace Recording and Replay for Time-Travelling Debugging
 
 **Status:** Accepted  
 **Date:** January 7, 2026  
@@ -221,14 +221,14 @@ agenteval trace show ./traces/weather_test.trace.json
 ## Implementation
 
 ### Phase 1: Core Classes ✅ IMPLEMENTED
-- `AgentTrace` — Data model for recorded traces ([AgentTrace.cs](https://github.com/joslat/AgentEval/blob/main/src/AgentEval/Tracing/AgentTrace.cs))
+- `AgentTrace` — Data model for recorded traces ([AgentTrace.cs](https://github.com/AgentEvalHQ/AgentEval/blob/main/src/AgentEval/Tracing/AgentTrace.cs))
 - `TraceEntry` — Individual request/response entry
-- `TraceRecordingAgent` — Wrapper that records ([TraceRecordingAgent.cs](https://github.com/joslat/AgentEval/blob/main/src/AgentEval/Tracing/TraceRecordingAgent.cs))
-- `TraceReplayingAgent` — Mock that replays ([TraceReplayingAgent.cs](https://github.com/joslat/AgentEval/blob/main/src/AgentEval/Tracing/TraceReplayingAgent.cs))
-- `TraceSerializer` — JSON serialization ([TraceSerializer.cs](https://github.com/joslat/AgentEval/blob/main/src/AgentEval/Tracing/TraceSerializer.cs))
-- `ChatTraceRecorder` — Multi-turn conversation recording ([ChatTraceRecorder.cs](https://github.com/joslat/AgentEval/blob/main/src/AgentEval/Tracing/ChatTraceRecorder.cs))
-- `WorkflowTraceRecorder` — Multi-agent workflow recording ([WorkflowTraceRecorder.cs](https://github.com/joslat/AgentEval/blob/main/src/AgentEval/Tracing/WorkflowTraceRecorder.cs))
-- `WorkflowTraceReplayingAgent` — Workflow replay ([WorkflowTraceReplayingAgent.cs](https://github.com/joslat/AgentEval/blob/main/src/AgentEval/Tracing/WorkflowTraceReplayingAgent.cs))
+- `TraceRecordingAgent` — Wrapper that records ([TraceRecordingAgent.cs](https://github.com/AgentEvalHQ/AgentEval/blob/main/src/AgentEval/Tracing/TraceRecordingAgent.cs))
+- `TraceReplayingAgent` — Mock that replays ([TraceReplayingAgent.cs](https://github.com/AgentEvalHQ/AgentEval/blob/main/src/AgentEval/Tracing/TraceReplayingAgent.cs))
+- `TraceSerializer` — JSON serialization ([TraceSerializer.cs](https://github.com/AgentEvalHQ/AgentEval/blob/main/src/AgentEval/Tracing/TraceSerializer.cs))
+- `ChatTraceRecorder` — Multi-turn conversation recording ([ChatTraceRecorder.cs](https://github.com/AgentEvalHQ/AgentEval/blob/main/src/AgentEval/Tracing/ChatTraceRecorder.cs))
+- `WorkflowTraceRecorder` — Multi-agent workflow recording ([WorkflowTraceRecorder.cs](https://github.com/AgentEvalHQ/AgentEval/blob/main/src/AgentEval/Tracing/WorkflowTraceRecorder.cs))
+- `WorkflowTraceReplayingAgent` — Workflow replay ([WorkflowTraceReplayingAgent.cs](https://github.com/AgentEvalHQ/AgentEval/blob/main/src/AgentEval/Tracing/WorkflowTraceReplayingAgent.cs))
 - Tests: 56+ tests across 3 test files
 
 ### Phase 2: Integration (Pending)

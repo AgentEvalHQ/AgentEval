@@ -1,4 +1,4 @@
-# AgentEval NuGet Consumer Sample
+﻿# AgentEval NuGet Consumer Sample
 
 > Demonstrates how to work with the **published AgentEval NuGet package** in real applications.
 
@@ -259,10 +259,10 @@ result.ToolUsage!.Should()
 ## 📖 Related Resources
 
 - **Basic Learning**: AgentEval.Samples project (23 focused examples)
-- **Full Documentation**: [GitHub.com/joslat/AgentEval](https://github.com/joslat/AgentEval)  
-- **Assertions Guide**: [docs/assertions.md](https://github.com/joslat/AgentEval/blob/main/docs/assertions.md)
-- **LLM-as-a-Judge**: [docs/evaluation-guide.md](https://github.com/joslat/AgentEval/blob/main/docs/evaluation-guide.md)
-- **Model Comparison**: [docs/model-comparison.md](https://github.com/joslat/AgentEval/blob/main/docs/model-comparison.md)
+- **Full Documentation**: [GitHub.com/AgentEvalHQ/AgentEval](https://github.com/AgentEvalHQ/AgentEval)  
+- **Assertions Guide**: [docs/assertions.md](https://github.com/AgentEvalHQ/AgentEval/blob/main/docs/assertions.md)
+- **LLM-as-a-Judge**: [docs/evaluation-guide.md](https://github.com/AgentEvalHQ/AgentEval/blob/main/docs/evaluation-guide.md)
+- **Model Comparison**: [docs/model-comparison.md](https://github.com/AgentEvalHQ/AgentEval/blob/main/docs/model-comparison.md)
 
 ---
 

@@ -1,4 +1,4 @@
-# Fluent Assertions Guide
+﻿# Fluent Assertions Guide
 
 AgentEval provides expressive fluent assertions inspired by [FluentAssertions](https://fluentassertions.com/). These assertions provide rich failure messages with context, suggestions, and structured output to make debugging test failures fast and intuitive.
 
@@ -531,6 +531,6 @@ result.ToolUsage!.Should().HaveCalledTool("RequiredTool");
 - [Getting Started](getting-started.md) — Quick introduction to AgentEval
 - [Architecture](architecture.md) — Understanding the component model
 - [Extensibility](extensibility.md) — Creating custom metrics
-- [Sample 02](https://github.com/joslat/AgentEval/blob/main/samples/AgentEval.Samples/Sample02_AgentWithOneTool.cs) - Tool tracking and fluent assertions
-- [Sample 03](https://github.com/joslat/AgentEval/blob/main/samples/AgentEval.Samples/Sample03_AgentWithMultipleTools.cs) - Tool ordering assertions
-- [Sample 12](https://github.com/joslat/AgentEval/blob/main/samples/AgentEval.Samples/Sample12_PolicySafetyEvaluation.cs) - Policy and safety assertions
+- [Sample 02](https://github.com/AgentEvalHQ/AgentEval/blob/main/samples/AgentEval.Samples/Sample02_AgentWithOneTool.cs) - Tool tracking and fluent assertions
+- [Sample 03](https://github.com/AgentEvalHQ/AgentEval/blob/main/samples/AgentEval.Samples/Sample03_AgentWithMultipleTools.cs) - Tool ordering assertions
+- [Sample 12](https://github.com/AgentEvalHQ/AgentEval/blob/main/samples/AgentEval.Samples/Sample12_PolicySafetyEvaluation.cs) - Policy and safety assertions

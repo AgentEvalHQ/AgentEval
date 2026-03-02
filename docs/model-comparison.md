@@ -1,4 +1,4 @@
-# Model Comparison Guide
+﻿# Model Comparison Guide
 
 > **Which model is best for your use case?** Let data answer that question.
 
@@ -657,8 +657,8 @@ var weights = new ComparisonWeights
 - [stochastic evaluation](stochastic-evaluation.md) - The foundation for model comparison
 - [Trace Record & Replay](tracing.md) - Reduce comparison costs
 - [Code Gallery](showcase/code-gallery.md) - More examples
-- [Sample 15](https://github.com/joslat/AgentEval/blob/main/samples/AgentEval.Samples/Sample15_ModelComparison.cs) - Runnable model comparison example
-- [Sample 16](https://github.com/joslat/AgentEval/blob/main/samples/AgentEval.Samples/Sample16_CombinedStochasticComparison.cs) - Combined stochastic + model comparison
+- [Sample 15](https://github.com/AgentEvalHQ/AgentEval/blob/main/samples/AgentEval.Samples/Sample15_ModelComparison.cs) - Runnable model comparison example
+- [Sample 16](https://github.com/AgentEvalHQ/AgentEval/blob/main/samples/AgentEval.Samples/Sample16_CombinedStochasticComparison.cs) - Combined stochastic + model comparison
 
 ---
 

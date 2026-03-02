@@ -1,10 +1,10 @@
-# Implementing Embeddings
+﻿# Implementing Embeddings
 
 > **Technical guide for implementing `IAgentEvalEmbeddings` and using embedding utilities**
 
 > **Looking for when to use embedding metrics?** See [RAG Metrics Guide](rag-metrics.md)
 
-> **Want to see embedding metrics in action?** Check out [Sample 12: Embedding Metrics](https://github.com/joslat/AgentEval/tree/main/samples/AgentEval.Samples) for semantic similarity evaluation examples.
+> **Want to see embedding metrics in action?** Check out [Sample 12: Embedding Metrics](https://github.com/AgentEvalHQ/AgentEval/tree/main/samples/AgentEval.Samples) for semantic similarity evaluation examples.
 
 ---
 
@@ -94,7 +94,7 @@ Console.WriteLine($"Passed: {result.Passed}");         // true
 Console.WriteLine($"Similarity: {result.Details["cosineSimilarity"]}");  // e.g., 0.925
 ```
 
-> **📖 Complete Example:** See [Sample 12: Embedding Metrics](https://github.com/joslat/AgentEval/tree/main/samples/AgentEval.Samples) for a complete implementation showing all three embedding metrics with real evaluation scenarios.
+> **📖 Complete Example:** See [Sample 12: Embedding Metrics](https://github.com/AgentEvalHQ/AgentEval/tree/main/samples/AgentEval.Samples) for a complete implementation showing all three embedding metrics with real evaluation scenarios.
 
 ### Result Details
 
@@ -374,7 +374,7 @@ Embedding metrics are **10-100x faster** than LLM-based metrics:
 | LLM-based (GPT-4) | 1-5 seconds | $0.01-0.05 |
 | Embedding-based | 50-200ms | $0.0001 |
 
-> **💡 Performance Tip:** [Sample 12](https://github.com/joslat/AgentEval/tree/main/samples/AgentEval.Samples) demonstrates batch processing and caching techniques for maximum performance.
+> **💡 Performance Tip:** [Sample 12](https://github.com/AgentEvalHQ/AgentEval/tree/main/samples/AgentEval.Samples) demonstrates batch processing and caching techniques for maximum performance.
 
 ### Batching
 
@@ -440,7 +440,7 @@ var fullResult = await faithfulnessMetric.EvaluateAsync(context);
 
 ## See Also
 
-- [Sample 12: Embedding Metrics](https://github.com/joslat/AgentEval/tree/main/samples/AgentEval.Samples) - Complete working example
+- [Sample 12: Embedding Metrics](https://github.com/AgentEvalHQ/AgentEval/tree/main/samples/AgentEval.Samples) - Complete working example
 - [Architecture Overview](architecture.md) - Understanding the metric hierarchy
 - [Extensibility Guide](extensibility.md) - Creating custom metrics
 - [Benchmarks Guide](benchmarks.md) - Performance evaluation

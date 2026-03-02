@@ -1,11 +1,11 @@
-blank_issues_enabled: false
+﻿blank_issues_enabled: false
 contact_links:
   - name: 💬 GitHub Discussions
-    url: https://github.com/joslat/AgentEval/discussions
+    url: https://github.com/AgentEvalHQ/AgentEval/discussions
     about: Ask questions, share ideas, or discuss AgentEval
   - name: 📖 Documentation
     url: https://agenteval.dev
     about: Read the comprehensive documentation
   - name: 🔒 Security Vulnerability
-    url: https://github.com/joslat/AgentEval/security/advisories/new
+    url: https://github.com/AgentEvalHQ/AgentEval/security/advisories/new
     about: Report a security vulnerability privately

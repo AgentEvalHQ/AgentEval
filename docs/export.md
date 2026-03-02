@@ -1,4 +1,4 @@
-# Export Formats
+﻿# Export Formats
 
 AgentEval includes a complete export system for evaluation results, designed for CI/CD integration, reporting, and analysis.
 
@@ -313,6 +313,6 @@ Computed properties:
 
 - [Step-by-Step Walkthrough](walkthrough.md) — Export results in Step 8
 - [Rich Evaluation Output](rich-evaluation-output-guide.md) — Verbosity levels and trace files
-- [Sample 11](https://github.com/joslat/AgentEval/blob/main/samples/AgentEval.Samples/Sample11_DatasetsAndExport.cs) — Complete export demo with all formats
+- [Sample 11](https://github.com/AgentEvalHQ/AgentEval/blob/main/samples/AgentEval.Samples/Sample11_DatasetsAndExport.cs) — Complete export demo with all formats
 - [Extensibility](extensibility.md) — Building custom plugins
-- [Sample 26: Extensibility](https://github.com/joslat/AgentEval/blob/main/samples/AgentEval.Samples/Sample26_Extensibility.cs) — Custom exporter registration via DI
+- [Sample 26: Extensibility](https://github.com/AgentEvalHQ/AgentEval/blob/main/samples/AgentEval.Samples/Sample26_Extensibility.cs) — Custom exporter registration via DI

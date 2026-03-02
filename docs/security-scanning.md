@@ -1,4 +1,4 @@
-# Security Scanning & Hardening Guide
+﻿# Security Scanning & Hardening Guide
 
 > **Last Updated:** January 2026  
 > **Status:** Production Security Hardening Complete
@@ -86,7 +86,7 @@ docker run -v $(pwd):/src mcr.microsoft.com/devskim analyze --source-code /src
 
 **Current Status:** ✅ **Active** - Coverage at 67%+
 
-Codecov is fully configured and running on the AgentEval repository. Coverage reports are available at [codecov.io/gh/joslat/AgentEval](https://app.codecov.io/gh/joslat/AgentEval).
+Codecov is fully configured and running on the AgentEval repository. Coverage reports are available at [codecov.io/gh/AgentEvalHQ/AgentEval](https://app.codecov.io/gh/AgentEvalHQ/AgentEval).
 
 **Coverage Reports Show:**
 - Overall project coverage percentage (currently 67%+)
@@ -121,7 +121,7 @@ For **private repositories**, badges require a graph token:
 3. Add this badge to README.md:
 
 ```markdown
-[![codecov](https://codecov.io/gh/joslat/AgentEval/graph/badge.svg?token=YOUR_GRAPH_TOKEN)](https://codecov.io/gh/joslat/AgentEval)
+[![codecov](https://codecov.io/gh/AgentEvalHQ/AgentEval/graph/badge.svg?token=YOUR_GRAPH_TOKEN)](https://codecov.io/gh/AgentEvalHQ/AgentEval)
 ```
 
 > **Note:** The graph token is different from `CODECOV_TOKEN`. It's safe to expose in README - it only allows reading the badge, not uploading data.
@@ -355,7 +355,7 @@ docker run -v $(pwd):/src mcr.microsoft.com/devskim analyze --source-code /src
 
 ### Security Bug in AgentEval Code
 
-1. Report via [SECURITY.md](https://github.com/joslat/AgentEval/blob/main/SECURITY.md) process
+1. Report via [SECURITY.md](https://github.com/AgentEvalHQ/AgentEval/blob/main/SECURITY.md) process
 2. Acknowledge within 24 hours
 3. Patch and release within 7 days (critical) or 30 days (moderate)
 
@@ -423,5 +423,5 @@ jobs:
 
 ## Related Documentation
 
-- [SECURITY.md](https://github.com/joslat/AgentEval/blob/main/SECURITY.md) - Vulnerability reporting process
-- [CONTRIBUTING.md](https://github.com/joslat/AgentEval/blob/main/CONTRIBUTING.md) - Contribution guidelines
+- [SECURITY.md](https://github.com/AgentEvalHQ/AgentEval/blob/main/SECURITY.md) - Vulnerability reporting process
+- [CONTRIBUTING.md](https://github.com/AgentEvalHQ/AgentEval/blob/main/CONTRIBUTING.md) - Contribution guidelines

@@ -1,4 +1,4 @@
-# Stochastic Evaluation Guide
+﻿# Stochastic Evaluation Guide
 
 > **LLMs are non-deterministic. Your evaluations should account for that.**
 
@@ -531,8 +531,8 @@ toolCallRates.Should().BeGreaterThan(0.9,
 - [Model Comparison](model-comparison.md) - Compare models with stochastic evaluation
 - [Trace Record & Replay](tracing.md) - Reduce API costs in stochastic evaluations
 - [Code Gallery](showcase/code-gallery.md) - See stochastic evaluation examples
-- [Sample 14](https://github.com/joslat/AgentEval/blob/main/samples/AgentEval.Samples/Sample14_StochasticEvaluation.cs) - Runnable stochastic evaluation example
-- [Sample 16](https://github.com/joslat/AgentEval/blob/main/samples/AgentEval.Samples/Sample16_CombinedStochasticComparison.cs) - Combined stochastic + model comparison
+- [Sample 14](https://github.com/AgentEvalHQ/AgentEval/blob/main/samples/AgentEval.Samples/Sample14_StochasticEvaluation.cs) - Runnable stochastic evaluation example
+- [Sample 16](https://github.com/AgentEvalHQ/AgentEval/blob/main/samples/AgentEval.Samples/Sample16_CombinedStochasticComparison.cs) - Combined stochastic + model comparison
 
 ---
 

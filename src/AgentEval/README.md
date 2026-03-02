@@ -1,4 +1,4 @@
-# AgentEval
+﻿# AgentEval
 
 > **The .NET Evaluation Toolkit for AI Agents**
 
@@ -89,10 +89,10 @@ var result = await comparer.CompareModelsAsync(
 Console.WriteLine(result.ToMarkdown());
 ```
 
-## Test Coverage
+## Quality Assurance
 
-- **Comprehensive test suite** across 3 TFMs (net8.0, net9.0, net10.0)
-- All tests passing ✅
+- **Comprehensive evaluation suite** targeting net8.0, net9.0, and net10.0
+- All evaluations passing ✅
 
 ## Installation
 
@@ -131,4 +131,4 @@ services.AddAgentEvalRedTeam();       // Red Team security testing
 
 ## License
 
-MIT License — See [LICENSE](https://github.com/joslat/AgentEval/blob/main/LICENSE) for details.
+MIT License — See [LICENSE](https://github.com/AgentEvalHQ/AgentEval/blob/main/LICENSE) for details.

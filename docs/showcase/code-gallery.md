@@ -1,4 +1,4 @@
-# Code Gallery
+﻿# Code Gallery
 
 > **The code you've been dreaming of.** Real examples of AgentEval in action.
 
@@ -283,5 +283,5 @@ turn3.ToolUsage!.Should()
 - [stochastic evaluation Guide](../stochastic-evaluation.md) - Full statistical evaluation documentation
 - [Model Comparison Guide](../model-comparison.md) - Comparing models in depth
 - [Assertions Reference](../assertions.md) - Complete assertion API
-- [Sample 16](https://github.com/joslat/AgentEval/blob/main/samples/AgentEval.Samples/Sample16_CombinedStochasticComparison.cs) - Full working example
+- [Sample 16](https://github.com/AgentEvalHQ/AgentEval/blob/main/samples/AgentEval.Samples/Sample16_CombinedStochasticComparison.cs) - Full working example
 

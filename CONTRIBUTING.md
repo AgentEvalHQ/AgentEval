@@ -1,4 +1,4 @@
-# Contributing to AgentEval
+﻿# Contributing to AgentEval
 
 Thank you for your interest in contributing to AgentEval! 🎉
 
@@ -6,12 +6,12 @@ AgentEval is **the .NET evaluation toolkit for AI agents**—evaluation, testing
 
 ## Ways to Contribute
 
-- 🐛 **Report Bugs** - Found an issue? [Open a bug report](https://github.com/joslat/AgentEval/issues/new?template=bug_report.md)
-- 💡 **Request Features** - Have an idea? [Submit a feature request](https://github.com/joslat/AgentEval/issues/new?template=feature_request.md)
+- 🐛 **Report Bugs** - Found an issue? [Open a bug report](https://github.com/AgentEvalHQ/AgentEval/issues/new?template=bug_report.md)
+- 💡 **Request Features** - Have an idea? [Submit a feature request](https://github.com/AgentEvalHQ/AgentEval/issues/new?template=feature_request.md)
 - 📖 **Improve Documentation** - Fix typos, clarify explanations, add examples
 - 🔧 **Submit Code** - Bug fixes, new features, refactoring
 - 🧪 **Write Tests** - Increase test coverage, add edge cases
-- 💬 **Answer Questions** - Help others in [GitHub Discussions](https://github.com/joslat/AgentEval/discussions)
+- 💬 **Answer Questions** - Help others in [GitHub Discussions](https://github.com/AgentEvalHQ/AgentEval/discussions)
 
 ---
 
@@ -109,7 +109,7 @@ Types: `feat`, `fix`, `docs`, `style`, `refactor`, `test`, `chore`
 git push origin feature/my-new-feature
 ```
 
-Then [create a Pull Request](https://github.com/joslat/AgentEval/compare) on GitHub.
+Then [create a Pull Request](https://github.com/AgentEvalHQ/AgentEval/compare) on GitHub.
 
 ---
 

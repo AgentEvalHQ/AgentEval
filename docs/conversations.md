@@ -1,4 +1,4 @@
-# Multi-Turn Conversation Evaluation
+﻿# Multi-Turn Conversation Evaluation
 
 AgentEval provides comprehensive support for evaluating multi-turn conversations with AI agents, including fluent builders, execution runners, and evaluation metrics.
 
@@ -311,4 +311,4 @@ See [Tracing](tracing.md) for complete Record & Replay documentation.
 - [Extensibility](extensibility.md) - Custom conversation metrics
 - [Tracing](tracing.md) - Record & Replay for deterministic conversation testing
 - [Snapshots](snapshots.md) - Snapshot regression testing for conversation outputs
-- [Sample 08](https://github.com/joslat/AgentEval/blob/main/samples/AgentEval.Samples/Sample08_ConversationEvaluation.cs) - Runnable conversation evaluation example
+- [Sample 08](https://github.com/AgentEvalHQ/AgentEval/blob/main/samples/AgentEval.Samples/Sample08_ConversationEvaluation.cs) - Runnable conversation evaluation example

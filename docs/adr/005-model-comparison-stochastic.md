@@ -1,4 +1,4 @@
-# ADR-005: Model Comparison and stochastic evaluation Architecture
+﻿# ADR-005: Model Comparison and stochastic evaluation Architecture
 
 > **Status:** Accepted  
 > **Date:** January 8, 2026  
@@ -238,8 +238,8 @@ This decision will be validated by:
 
 - [Model Comparison Guide](../model-comparison.md)
 - [stochastic evaluation Guide](../stochastic-evaluation.md)
-- [Sample14: stochastic evaluation](https://github.com/joslat/AgentEval/blob/main/samples/AgentEval.Samples/Sample14_StochasticEvaluation.cs)
-- [Sample15: Model Comparison](https://github.com/joslat/AgentEval/blob/main/samples/AgentEval.Samples/Sample15_ModelComparison.cs)
+- [Sample14: stochastic evaluation](https://github.com/AgentEvalHQ/AgentEval/blob/main/samples/AgentEval.Samples/Sample14_StochasticEvaluation.cs)
+- [Sample15: Model Comparison](https://github.com/AgentEvalHQ/AgentEval/blob/main/samples/AgentEval.Samples/Sample15_ModelComparison.cs)
 
 ---
 

@@ -58,7 +58,7 @@ All source code, tests, samples, and documentation updated to use RC1 APIs.
 
 ### Neutral
 
-- **No Behavioral Changes** — All 2,100+ tests pass identically across 3 TFMs (net8.0, net9.0, net10.0)
+- **No Behavioral Changes** — All tests pass identically across 3 TFMs (net8.0, net9.0, net10.0)
 - **Build Clean** — 0 errors, 0 warnings after upgrade
 
 ## Alternatives Considered

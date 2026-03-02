@@ -1,4 +1,4 @@
-# AgentEval
+﻿# AgentEval
 
 <p align="center">
   <img src="assets/AgentEval_bounded.png" alt="AgentEval Logo" width="450" />
@@ -9,12 +9,12 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/joslat/AgentEval/actions/workflows/ci.yml"><img src="https://github.com/joslat/AgentEval/actions/workflows/ci.yml/badge.svg" alt="Build" /></a>
-  <a href="https://github.com/joslat/AgentEval/actions/workflows/security.yml"><img src="https://github.com/joslat/AgentEval/actions/workflows/security.yml/badge.svg" alt="Security" /></a>
-  <a href="https://codecov.io/gh/joslat/AgentEval"><img src="https://codecov.io/gh/joslat/AgentEval/graph/badge.svg?token=Y28TAK3LNH" alt="Coverage" /></a>
+  <a href="https://github.com/AgentEvalHQ/AgentEval/actions/workflows/ci.yml"><img src="https://github.com/AgentEvalHQ/AgentEval/actions/workflows/ci.yml/badge.svg" alt="Build" /></a>
+  <a href="https://github.com/AgentEvalHQ/AgentEval/actions/workflows/security.yml"><img src="https://github.com/AgentEvalHQ/AgentEval/actions/workflows/security.yml/badge.svg" alt="Security" /></a>
+  <a href="https://codecov.io/gh/AgentEvalHQ/AgentEval"><img src="https://codecov.io/gh/AgentEvalHQ/AgentEval/graph/badge.svg?token=Y28TAK3LNH" alt="Coverage" /></a>
   <a href="https://joslat.github.io/AgentEval/"><img src="https://img.shields.io/badge/docs-GitHub%20Pages-blue" alt="Documentation" /></a>
   <a href="https://www.nuget.org/packages/AgentEval"><img src="https://img.shields.io/nuget/v/AgentEval.svg" alt="NuGet" /></a>
-  <a href="https://github.com/joslat/AgentEval/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="License" /></a>
+  <a href="https://github.com/AgentEvalHQ/AgentEval/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="License" /></a>
 </p>
 
 > [!WARNING]
@@ -395,7 +395,7 @@ misInfoResult.Should().HavePassed();
 ### Integration
 - CI/CD integration - JUnit XML, Markdown, JSON, SARIF export
 - Benchmarks - custom patterns with dataset loaders (JSON, YAML, CSV, JSONL)
-- Comprehensive multi-target test suite across all supported TFMs
+- Comprehensive multi-framework evaluation suite across all supported TFMs
 
 ---
 
@@ -491,9 +491,9 @@ dotnet run --project samples/AgentEval.Samples
 
 | Workflow | Status |
 |----------|--------|
-| Build & Test | [![Build](https://github.com/joslat/AgentEval/actions/workflows/ci.yml/badge.svg)](https://github.com/joslat/AgentEval/actions/workflows/ci.yml) |
-| Security Scan | [![Security](https://github.com/joslat/AgentEval/actions/workflows/security.yml/badge.svg)](https://github.com/joslat/AgentEval/actions/workflows/security.yml) |
-| Documentation | [![Docs](https://github.com/joslat/AgentEval/actions/workflows/docs.yml/badge.svg)](https://github.com/joslat/AgentEval/actions/workflows/docs.yml) |
+| Build & Test | [![Build](https://github.com/AgentEvalHQ/AgentEval/actions/workflows/ci.yml/badge.svg)](https://github.com/AgentEvalHQ/AgentEval/actions/workflows/ci.yml) |
+| Security Scan | [![Security](https://github.com/AgentEvalHQ/AgentEval/actions/workflows/security.yml/badge.svg)](https://github.com/AgentEvalHQ/AgentEval/actions/workflows/security.yml) |
+| Documentation | [![Docs](https://github.com/AgentEvalHQ/AgentEval/actions/workflows/docs.yml/badge.svg)](https://github.com/AgentEvalHQ/AgentEval/actions/workflows/docs.yml) |
 
 ---
 
@@ -506,12 +506,18 @@ We welcome contributions! Please see:
 
 ---
 
+## Commercial & Enterprise 
+AgentEval is MIT and community-driven. For enterprise inquiries, see: https://agenteval.dev/commercial.html
+
+---
+
 ## Forever Open Source
 
 AgentEval is **MIT licensed** and will remain open source forever. We believe in:
-- ✅ **No license changes** - MIT today, MIT forever
-- ✅ **No "open core"** - All features are open source, no proprietary tiers
-- ✅ **Community first** - Built for and with the .NET AI community
+- ✅ **No license changes** — MIT today, MIT forever
+- ✅ **No bait-and-switch** — core stays MIT and fully usable
+- ✅ **Community first** — built with the .NET AI community
+- ℹ️ **Optional add-ons may exist separately** (if/when built)
 
 ---
 
@@ -526,13 +532,13 @@ MIT License. See [LICENSE](LICENSE) for details.
 </p>
 
 <p align="center">
-  <a href="https://github.com/joslat/AgentEval">Star us on GitHub</a> |
+  <a href="https://github.com/AgentEvalHQ/AgentEval">Star us on GitHub</a> |
   <a href="https://www.nuget.org/packages/AgentEval">NuGet</a> |
-  <a href="https://github.com/joslat/AgentEval/issues">Issues</a>
+  <a href="https://github.com/AgentEvalHQ/AgentEval/issues">Issues</a>
 </p>
 
 ---
 
 ## Star History
 
-[![Star History Chart](https://api.star-history.com/svg?repos=joslat/AgentEval&type=Date)](https://star-history.com/#joslat/AgentEval&Date)
+[![Star History Chart](https://api.star-history.com/svg?repos=AgentEvalHQ/AgentEval&type=Date)](https://star-history.com/#AgentEvalHQ/AgentEval&Date)

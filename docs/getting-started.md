@@ -1,4 +1,4 @@
-# Getting Started with AgentEval
+﻿# Getting Started with AgentEval
 
 > **Time to complete:** 5 minutes
 
@@ -587,4 +587,4 @@ var result = await stochasticRunner.RunStochasticTestAsync(
 
 ---
 
-*Need help? Check the [samples](https://github.com/joslat/AgentEval/tree/main/samples) or open an issue on GitHub.*
+*Need help? Check the [samples](https://github.com/AgentEvalHQ/AgentEval/tree/main/samples) or open an issue on GitHub.*

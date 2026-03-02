@@ -1,4 +1,4 @@
-name: LLM Integration Tests (On-Demand)
+﻿name: LLM Integration Tests (On-Demand)
 
 # This workflow runs integration tests that require actual LLM API calls.
 # It's designed to be run on-demand (manually) or before releases to minimize costs.
@@ -59,7 +59,7 @@ jobs:
 
     # Only run if secrets are available
     # This prevents failures on forks that don't have API keys configured
-    if: github.repository == 'joslat/AgentEval'
+    if: github.repository == 'AgentEvalHQ/AgentEval'
 
     steps:
     - name: Checkout repository

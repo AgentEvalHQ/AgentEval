@@ -1,4 +1,4 @@
-# Agentic Metrics Guide
+﻿# Agentic Metrics Guide
 
 > **Comprehensive evaluation for AI agent tool usage and task completion**
 
@@ -494,8 +494,8 @@ var context = new EvaluationContext
 - [Metrics Reference](metrics-reference.md) - Quick reference for all metrics
 - [Evaluation Guide](evaluation-guide.md) - Choosing metrics for your use case
 - [Naming Conventions](naming-conventions.md) - Metric naming standards
-- [Sample 02](https://github.com/joslat/AgentEval/blob/main/samples/AgentEval.Samples/Sample02_AgentWithOneTool.cs) - Basic tool tracking
-- [Sample 03](https://github.com/joslat/AgentEval/blob/main/samples/AgentEval.Samples/Sample03_AgentWithMultipleTools.cs) - Multi-tool assertions
+- [Sample 02](https://github.com/AgentEvalHQ/AgentEval/blob/main/samples/AgentEval.Samples/Sample02_AgentWithOneTool.cs) - Basic tool tracking
+- [Sample 03](https://github.com/AgentEvalHQ/AgentEval/blob/main/samples/AgentEval.Samples/Sample03_AgentWithMultipleTools.cs) - Multi-tool assertions
 
 ---
 

@@ -1,4 +1,4 @@
-{
+﻿{
   "metadata": [
     {
       "src": [
@@ -41,7 +41,7 @@
       "_disableAffix": false,
       "_disableSideFilter": false,
       "_gitContribute": {
-        "repo": "https://github.com/joslat/AgentEval",
+        "repo": "https://github.com/AgentEvalHQ/AgentEval",
         "branch": "main"
       }
     },

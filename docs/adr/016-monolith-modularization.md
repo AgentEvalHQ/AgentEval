@@ -76,7 +76,7 @@ We chose **Option C: Internal Multi-Project, Single NuGet Package** — creating
 
 - **Zero namespace changes** — all public types remain accessible at the same namespaces
 - **Zero API surface changes** — consumers see no difference
-- **7,176 tests pass** (2,392 × 3 TFMs) — before and after
+- **All tests pass** across 3 TFMs — before and after
 - **18 DLLs in NuGet package** (6 per TFM × 3 TFMs)
 - **8 external NuGet dependencies** correctly declared per TFM
 

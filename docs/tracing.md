@@ -1,4 +1,4 @@
-# Trace Record & Replay
+﻿# Trace Record & Replay
 
 AgentEval provides powerful **Record & Replay** capabilities that enable deterministic evaluation of AI agents. This "time-travel debugging" feature allows you to capture agent executions once and replay them infinitely without calling the underlying LLM.
 
@@ -313,4 +313,4 @@ Assert.True(newDuration <= oldDuration * 1.1,
 
 ---
 
-See [Sample 13](https://github.com/joslat/AgentEval/blob/main/samples/AgentEval.Samples/Sample13_TraceRecordReplay.cs) for runnable examples of single-agent, multi-turn, workflow, and streaming traces.
+See [Sample 13](https://github.com/AgentEvalHQ/AgentEval/blob/main/samples/AgentEval.Samples/Sample13_TraceRecordReplay.cs) for runnable examples of single-agent, multi-turn, workflow, and streaming traces.

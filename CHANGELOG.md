@@ -1,4 +1,4 @@
-# Changelog
+﻿# Changelog
 
 All notable changes to this project will be documented in this file.
 
@@ -607,14 +607,14 @@ This release marks the transition from alpha to beta. The framework is now featu
 - `AgentEval.Tracing` (OTel + run artifacts) - planned
 - `AgentEval.Studio` (workflow visualizer / time-travel UI) - future
 
-[Unreleased]: https://github.com/joslat/AgentEval/compare/v0.5.2-beta...HEAD
-[0.5.2-beta]: https://github.com/joslat/AgentEval/compare/v0.5.1-beta...v0.5.2-beta
-[0.5.1-beta]: https://github.com/joslat/AgentEval/compare/v0.4.0-beta...v0.5.1-beta
-[0.4.0-beta]: https://github.com/joslat/AgentEval/compare/v0.3.0-beta...v0.4.0-beta
-[0.3.0-beta]: https://github.com/joslat/AgentEval/compare/v0.2.1-beta...v0.3.0-beta
-[0.2.1-beta]: https://github.com/joslat/AgentEval/compare/v0.2.0-beta...v0.2.1-beta
-[0.2.0-beta]: https://github.com/joslat/AgentEval/compare/v0.1.3-alpha...v0.2.0-beta
-[0.1.3-alpha]: https://github.com/joslat/AgentEval/compare/v0.1.2-alpha...v0.1.3-alpha
-[0.1.2-alpha]: https://github.com/joslat/AgentEval/compare/v0.1.1-alpha...v0.1.2-alpha
-[0.1.1-alpha]: https://github.com/joslat/AgentEval/compare/v0.1.0-alpha...v0.1.1-alpha
-[0.1.0-alpha]: https://github.com/joslat/AgentEval/releases/tag/v0.1.0-alpha
+[Unreleased]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.5.2-beta...HEAD
+[0.5.2-beta]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.5.1-beta...v0.5.2-beta
+[0.5.1-beta]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.4.0-beta...v0.5.1-beta
+[0.4.0-beta]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.3.0-beta...v0.4.0-beta
+[0.3.0-beta]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.2.1-beta...v0.3.0-beta
+[0.2.1-beta]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.2.0-beta...v0.2.1-beta
+[0.2.0-beta]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.1.3-alpha...v0.2.0-beta
+[0.1.3-alpha]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.1.2-alpha...v0.1.3-alpha
+[0.1.2-alpha]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.1.1-alpha...v0.1.2-alpha
+[0.1.1-alpha]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.1.0-alpha...v0.1.1-alpha
+[0.1.0-alpha]: https://github.com/AgentEvalHQ/AgentEval/releases/tag/v0.1.0-alpha
