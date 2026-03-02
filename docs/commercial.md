@@ -1,19 +1,16 @@
 # Commercial & Enterprise
 
-> **Status:** No commercial offerings are being sold today.  
-> This page describes **planned** options and how to engage if your team wants to help shape them.
+AgentEval is currently **100% open source** (MIT).  
+There are **no commercial products for sale** at this time.
 
 ## Open-source commitment
 
-AgentEval's core will remain:
+- The **core will remain MIT licensed**.
+- We do **not** plan license changes or retroactive restrictions.
+- The open-source version will remain **fully usable**.
 
-- **MIT licensed**
-- **publicly developed**
-- **community-driven**
 
-We do **not** plan license changes or retroactive restrictions.
-
-### Contribution policy (Model 1: inbound = outbound)
+## Contribution policy (Model 1: inbound = outbound)
 
 Contributions to the open-source repositories are accepted under **MIT**.
 
