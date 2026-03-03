@@ -2,6 +2,7 @@
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 
+using AgentEval.Core;
 using AgentEval.Testing;
 using Microsoft.Extensions.AI;
 using Xunit;
@@ -13,15 +14,15 @@ public class ConversationRunnerTests
     #region Constructor Tests
 
     [Fact]
-    public void Constructor_NullChatClient_Throws()
+    public void Constructor_NullAgent_Throws()
     {
-        Assert.Throws<ArgumentNullException>(() => new ConversationRunner(null!));
+        Assert.Throws<ArgumentNullException>(() => new ConversationRunner((IEvaluableAgent)null!));
     }
 
     [Fact]
     public void Constructor_WithOptions_DoesNotThrow()
     {
-        var client = new MockConversationChatClient();
+        var agent = new MockConversationAgent();
         var options = new ConversationRunnerOptions
         {
             TurnTimeout = TimeSpan.FromSeconds(60),
@@ -29,7 +30,7 @@ public class ConversationRunnerTests
             MaxRetries = 3
         };
 
-        var runner = new ConversationRunner(client, options);
+        var runner = new ConversationRunner(agent, options);
         Assert.NotNull(runner);
     }
 
@@ -40,8 +41,8 @@ public class ConversationRunnerTests
     [Fact]
     public async Task RunAsync_SimpleConversation_ReturnsResult()
     {
-        var client = new MockConversationChatClient("Hello! How can I help you?");
-        var runner = new ConversationRunner(client);
+        var agent = new MockConversationAgent("Hello! How can I help you?");
+        var runner = new ConversationRunner(agent);
 
         var testCase = ConversationalTestCase.Create("Simple Test")
             .AddUserTurn("Hello")
@@ -57,8 +58,8 @@ public class ConversationRunnerTests
     [Fact]
     public async Task RunAsync_UserTurn_GetsAssistantResponse()
     {
-        var client = new MockConversationChatClient("I'm doing great, thanks!");
-        var runner = new ConversationRunner(client);
+        var agent = new MockConversationAgent("I'm doing great, thanks!");
+        var runner = new ConversationRunner(agent);
 
         var testCase = ConversationalTestCase.Create("Test")
             .AddUserTurn("How are you?")
@@ -76,8 +77,8 @@ public class ConversationRunnerTests
     [Fact]
     public async Task RunAsync_SystemPrompt_IncludedInConversation()
     {
-        var client = new MockConversationChatClient("I am a weather assistant.");
-        var runner = new ConversationRunner(client);
+        var agent = new MockConversationAgent("I am a weather assistant.");
+        var runner = new ConversationRunner(agent);
 
         var testCase = ConversationalTestCase.Create("Test")
             .WithSystemPrompt("You are a helpful weather assistant.")
@@ -91,14 +92,17 @@ public class ConversationRunnerTests
         Assert.Equal("system", result.ActualTurns[0].Role);
         Assert.Equal("user", result.ActualTurns[1].Role);
         Assert.Equal("assistant", result.ActualTurns[2].Role);
+        // Agent only received one InvokeAsync call (user turn only)
+        Assert.Single(agent.ReceivedPrompts);
+        Assert.Equal("What do you do?", agent.ReceivedPrompts[0]);
     }
 
     [Fact]
     public async Task RunAsync_MultipleUserTurns_GetsMultipleResponses()
     {
         var responses = new Queue<string>(new[] { "Response 1", "Response 2" });
-        var client = new MockConversationChatClient(responses);
-        var runner = new ConversationRunner(client);
+        var agent = new MockConversationAgent(responses);
+        var runner = new ConversationRunner(agent);
 
         var testCase = ConversationalTestCase.Create("Multi-turn")
             .AddUserTurn("First question")
@@ -116,8 +120,8 @@ public class ConversationRunnerTests
     [Fact]
     public async Task RunAsync_ToolResponse_IncludedInConversation()
     {
-        var client = new MockConversationChatClient("The weather is sunny.");
-        var runner = new ConversationRunner(client);
+        var agent = new MockConversationAgent("The weather is sunny.");
+        var runner = new ConversationRunner(agent);
 
         var testCase = ConversationalTestCase.Create("Tool Test")
             .AddUserTurn("What's the weather?")
@@ -132,8 +136,8 @@ public class ConversationRunnerTests
     [Fact]
     public async Task RunAsync_RecordsTurnDurations()
     {
-        var client = new MockConversationChatClient("Response");
-        var runner = new ConversationRunner(client);
+        var agent = new MockConversationAgent("Response");
+        var runner = new ConversationRunner(agent);
 
         var testCase = ConversationalTestCase.Create("Test")
             .AddUserTurn("Question")
@@ -152,8 +156,16 @@ public class ConversationRunnerTests
     [Fact]
     public async Task RunAsync_ExpectedToolsCalled_PassesAssertion()
     {
-        var client = new MockConversationChatClient("Weather retrieved", "get_weather");
-        var runner = new ConversationRunner(client);
+        var toolCallMessages = new List<object>
+        {
+            new ChatMessage(ChatRole.Assistant, new List<AIContent>
+            {
+                new TextContent("Weather retrieved"),
+                new FunctionCallContent("get_weather", "get_weather", new Dictionary<string, object?>())
+            })
+        };
+        var agent = new MockConversationAgent("Weather retrieved", toolCallMessages);
+        var runner = new ConversationRunner(agent);
 
         var testCase = ConversationalTestCase.Create("Tool Test")
             .AddUserTurn("Get weather")
@@ -169,8 +181,8 @@ public class ConversationRunnerTests
     [Fact]
     public async Task RunAsync_MissingExpectedTools_FailsAssertion()
     {
-        var client = new MockConversationChatClient("I can't do that");
-        var runner = new ConversationRunner(client);
+        var agent = new MockConversationAgent("I can't do that");
+        var runner = new ConversationRunner(agent);
 
         var testCase = ConversationalTestCase.Create("Tool Test")
             .AddUserTurn("Get weather")
@@ -189,8 +201,8 @@ public class ConversationRunnerTests
     [Fact]
     public async Task RunAsync_WithinMaxDuration_PassesAssertion()
     {
-        var client = new MockConversationChatClient("Quick response");
-        var runner = new ConversationRunner(client);
+        var agent = new MockConversationAgent("Quick response");
+        var runner = new ConversationRunner(agent);
 
         var testCase = ConversationalTestCase.Create("Fast Test")
             .AddUserTurn("Quick question")
@@ -205,8 +217,8 @@ public class ConversationRunnerTests
     [Fact]
     public async Task RunAsync_ConversationCompleteness_ChecksResponses()
     {
-        var client = new MockConversationChatClient("Response");
-        var runner = new ConversationRunner(client);
+        var agent = new MockConversationAgent("Response");
+        var runner = new ConversationRunner(agent);
 
         var testCase = ConversationalTestCase.Create("Test")
             .AddUserTurn("Question")
@@ -222,10 +234,10 @@ public class ConversationRunnerTests
     #region Error Handling Tests
 
     [Fact]
-    public async Task RunAsync_ClientThrows_CapturesError()
+    public async Task RunAsync_AgentThrows_CapturesError()
     {
-        var client = new MockConversationChatClient(shouldThrow: true);
-        var runner = new ConversationRunner(client);
+        var agent = new MockConversationAgent(shouldThrow: true);
+        var runner = new ConversationRunner(agent);
 
         var testCase = ConversationalTestCase.Create("Error Test")
             .AddUserTurn("Trigger error")
@@ -240,8 +252,8 @@ public class ConversationRunnerTests
     [Fact]
     public async Task RunAsync_Cancellation_PropagatesException()
     {
-        var client = new MockConversationChatClient("Response");
-        var runner = new ConversationRunner(client);
+        var agent = new MockConversationAgent("Response");
+        var runner = new ConversationRunner(agent);
         var cts = new CancellationTokenSource();
         cts.Cancel();
 
@@ -260,8 +272,8 @@ public class ConversationRunnerTests
     [Fact]
     public async Task RunAllAsync_MultipleTestCases_RunsAll()
     {
-        var client = new MockConversationChatClient("Response");
-        var runner = new ConversationRunner(client);
+        var agent = new MockConversationAgent("Response");
+        var runner = new ConversationRunner(agent);
 
         var testCases = new[]
         {
@@ -279,8 +291,8 @@ public class ConversationRunnerTests
     [Fact]
     public async Task RunAllAsync_EmptyList_ReturnsEmpty()
     {
-        var client = new MockConversationChatClient("Response");
-        var runner = new ConversationRunner(client);
+        var agent = new MockConversationAgent("Response");
+        var runner = new ConversationRunner(agent);
 
         var results = await runner.RunAllAsync(Array.Empty<ConversationalTestCase>());
 
@@ -291,70 +303,47 @@ public class ConversationRunnerTests
 
     #region Helper Mock
 
-    private class MockConversationChatClient : IChatClient
+    private class MockConversationAgent : IEvaluableAgent
     {
         private readonly Queue<string> _responses;
-        private readonly string? _toolName;
         private readonly bool _shouldThrow;
+        private readonly IReadOnlyList<object>? _rawMessages;
 
-        public MockConversationChatClient(string response = "Mock response", string? toolName = null)
+        public string Name => "MockConversationAgent";
+        public List<string> ReceivedPrompts { get; } = new();
+
+        public MockConversationAgent(string response = "Mock response", IReadOnlyList<object>? rawMessages = null)
         {
             _responses = new Queue<string>(new[] { response });
-            _toolName = toolName;
-            _shouldThrow = false;
+            _rawMessages = rawMessages;
         }
 
-        public MockConversationChatClient(Queue<string> responses)
+        public MockConversationAgent(Queue<string> responses)
         {
             _responses = responses;
-            _toolName = null;
-            _shouldThrow = false;
+            _rawMessages = null;
         }
 
-        public MockConversationChatClient(bool shouldThrow)
+        public MockConversationAgent(bool shouldThrow)
         {
             _responses = new Queue<string>();
-            _toolName = null;
             _shouldThrow = shouldThrow;
         }
 
-        public void Dispose() { }
-
-        public ChatClientMetadata Metadata => new("MockConversation");
-
-        public TService? GetService<TService>(object? key = null) where TService : class => null;
-        
-        public object? GetService(Type serviceType, object? key = null) => null;
-
-        public Task<ChatResponse> GetResponseAsync(
-            IEnumerable<ChatMessage> chatMessages,
-            ChatOptions? options = null,
-            CancellationToken cancellationToken = default)
+        public Task<AgentResponse> InvokeAsync(string prompt, CancellationToken cancellationToken = default)
         {
+            ReceivedPrompts.Add(prompt);
+
             if (_shouldThrow)
-            {
-                throw new InvalidOperationException("Mock error");
-            }
+                throw new InvalidOperationException("Mock agent error");
 
             var responseText = _responses.Count > 0 ? _responses.Dequeue() : "Default response";
-            
-            var contents = new List<AIContent> { new TextContent(responseText) };
-            
-            if (_toolName != null)
+
+            return Task.FromResult(new AgentResponse
             {
-                contents.Add(new FunctionCallContent(_toolName, _toolName, new Dictionary<string, object?>()));
-            }
-
-            var message = new ChatMessage(ChatRole.Assistant, contents);
-            return Task.FromResult(new ChatResponse(message));
-        }
-
-        public IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(
-            IEnumerable<ChatMessage> chatMessages,
-            ChatOptions? options = null,
-            CancellationToken cancellationToken = default)
-        {
-            throw new NotImplementedException();
+                Text = responseText,
+                RawMessages = _rawMessages
+            });
         }
     }
 

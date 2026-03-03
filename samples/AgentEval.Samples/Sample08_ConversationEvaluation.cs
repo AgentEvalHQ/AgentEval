@@ -4,6 +4,8 @@
 using Azure.AI.OpenAI;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
+using AgentEval.Core;
+using AgentEval.MAF;
 using AgentEval.Testing;
 
 namespace AgentEval.Samples;
@@ -12,8 +14,9 @@ namespace AgentEval.Samples;
 /// Sample 08: Conversation Evaluation - Multi-turn agent interactions
 /// 
 /// This demonstrates:
+/// - Creating a MAF AIAgent (ChatClientAgent) and wrapping it with MAFAgentAdapter
 /// - Using ConversationalTestCase to define multi-turn scenarios
-/// - Using ConversationRunner to execute and validate conversations
+/// - Using ConversationRunner to execute and validate agent conversations
 /// - Fluent builder API for conversation test cases
 /// - Assertion results for tool usage, completeness, and duration
 /// 
@@ -35,8 +38,11 @@ public static class Sample08_ConversationEvaluation
         Console.WriteLine($"   🔗 Endpoint: {AIConfig.Endpoint}");
         Console.WriteLine($"   🤖 Model: {AIConfig.ModelDeployment}\n");
 
-        var chatClient = CreateChatClient();
-        var runner = new ConversationRunner(chatClient);
+        var agent = CreateConversationAgent();
+        var adapter = new MAFAgentAdapter(agent);
+        var runner = new ConversationRunner(adapter);
+
+        Console.WriteLine($"   🤖 Agent: {adapter.Name}\n");
 
         await RunSimpleConversation(runner);
         await RunConversationWithExpectations(runner);
@@ -139,10 +145,27 @@ public static class Sample08_ConversationEvaluation
         }
     }
 
-    private static IChatClient CreateChatClient()
+    /// <summary>
+    /// Creates a MAF ChatClientAgent for multi-turn conversation evaluation.
+    /// </summary>
+    private static AIAgent CreateConversationAgent()
     {
         var azureClient = new AzureOpenAIClient(AIConfig.Endpoint, AIConfig.KeyCredential);
-        return azureClient.GetChatClient(AIConfig.ModelDeployment).AsIChatClient();
+        var chatClient = azureClient
+            .GetChatClient(AIConfig.ModelDeployment)
+            .AsIChatClient();
+
+        return new ChatClientAgent(
+            chatClient,
+            new ChatClientAgentOptions
+            {
+                Name = "ConversationAgent",
+                ChatOptions = new() { Instructions = """
+                    You are a helpful, knowledgeable conversational assistant.
+                    Answer questions thoroughly but concisely.
+                    Remember context from earlier in the conversation.
+                    """ }
+            });
     }
 
     private static void PrintHeader()
@@ -166,7 +189,7 @@ public static class Sample08_ConversationEvaluation
    ┌─────────────────────────────────────────────────────────────────────────────┐
    │  ⚠️  SKIPPING SAMPLE 08 - Azure OpenAI Credentials Required               │
    ├─────────────────────────────────────────────────────────────────────────────┤
-   │  This sample runs real multi-turn conversations against an Azure agent.     │
+   │  This sample runs real multi-turn conversations against an AI agent.       │
    │                                                                             │
    │  Set these environment variables:                                           │
    │    AZURE_OPENAI_ENDPOINT     - Your Azure OpenAI endpoint                   │
@@ -180,8 +203,10 @@ public static class Sample08_ConversationEvaluation
     private static void PrintKeyTakeaways()
     {
         Console.WriteLine("\n💡 KEY TAKEAWAYS:");
+        Console.WriteLine("   • ChatClientAgent (MAF) creates the AI agent");
+        Console.WriteLine("   • MAFAgentAdapter wraps AIAgent → IEvaluableAgent for evaluation");
+        Console.WriteLine("   • ConversationRunner accepts any IEvaluableAgent");
         Console.WriteLine("   • ConversationalTestCase.Create() provides a fluent builder API");
-        Console.WriteLine("   • ConversationRunner sends user turns and captures agent responses");
         Console.WriteLine("   • Built-in assertions check tool usage, completeness, and duration");
         Console.WriteLine("   • Multi-turn tests catch context drift and memory issues");
         Console.WriteLine("\n🔗 NEXT: Run Sample 09 to see workflow evaluation!\n");

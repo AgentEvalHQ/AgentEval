@@ -9,24 +9,41 @@ Multi-turn conversation evaluation allows you to:
 - Define complex conversation flows with multiple turns
 - Specify expected tool calls per turn
 - Set timing constraints for the entire conversation
-- Execute conversations against any `IChatClient`
+- Execute conversations against any `IEvaluableAgent`
 - Evaluate conversation completeness and quality
 
 ## Quick Start
 
 ```csharp
+using AgentEval.Core;
+using AgentEval.MAF;
 using AgentEval.Testing;
 using Azure.AI.OpenAI;
+using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
 
-// First, create your IChatClient (any provider works)
+// Create a MAF AIAgent
 var azureClient = new AzureOpenAIClient(
     new Uri(Environment.GetEnvironmentVariable("AZURE_OPENAI_ENDPOINT")!),
     new Azure.AzureKeyCredential(Environment.GetEnvironmentVariable("AZURE_OPENAI_API_KEY")!));
 
 var chatClient = azureClient
-    .GetChatClient("gpt-4o")  // Your deployment name
+    .GetChatClient("gpt-4o")
     .AsIChatClient();
+
+var aiAgent = new ChatClientAgent(
+    chatClient,
+    new ChatClientAgentOptions
+    {
+        Name = "CustomerSupportAgent",
+        ChatOptions = new() { Instructions = """
+            You are a helpful customer service agent.
+            Look up orders and process returns when requested.
+            """ }
+    });
+
+// Wrap for evaluation
+var agent = new MAFAgentAdapter(aiAgent);
 
 // Build a conversation test case using the fluent builder
 var testCase = ConversationalTestCase.Create("Customer Support Flow")
@@ -40,7 +57,7 @@ var testCase = ConversationalTestCase.Create("Customer Support Flow")
     .Build();
 
 // Run the conversation
-var runner = new ConversationRunner(chatClient);
+var runner = new ConversationRunner(agent);
 var result = await runner.RunAsync(testCase);
 
 // Assert on the result
@@ -119,13 +136,17 @@ var testCase = ConversationalTestCase.Create("Flight Booking Conversation")
 
 ## Running Conversations
 
-The `ConversationRunner` executes conversations against an `IChatClient`:
+The `ConversationRunner` executes conversations against any `IEvaluableAgent`.
+Use `MAFAgentAdapter` to wrap a MAF `AIAgent`, or `ChatClientAgentAdapter` for a raw `IChatClient`:
 
 ```csharp
-using Microsoft.Extensions.AI;
+using AgentEval.Core;
+using AgentEval.MAF;
+using AgentEval.Testing;
 
-// Create runner with your chat client
-var runner = new ConversationRunner(chatClient);
+// Wrap your MAF agent
+var agent = new MAFAgentAdapter(aiAgent);
+var runner = new ConversationRunner(agent);
 
 // Run a single conversation
 var result = await runner.RunAsync(testCase);
@@ -202,7 +223,7 @@ Use the result for xUnit assertions:
 public async Task BookingConversation_CompletesSuccessfully()
 {
     var testCase = BuildBookingTestCase();
-    var runner = new ConversationRunner(_chatClient);
+    var runner = new ConversationRunner(_agent);
     
     var result = await runner.RunAsync(testCase);
     

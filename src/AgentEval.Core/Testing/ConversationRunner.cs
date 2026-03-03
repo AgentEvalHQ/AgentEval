@@ -3,6 +3,7 @@
 // Licensed under the MIT License.
 
 using Microsoft.Extensions.AI;
+using AgentEval.Core;
 
 namespace AgentEval.Testing;
 
@@ -42,21 +43,25 @@ public class ConversationResult
 public record AssertionResult(string Name, bool Passed, string? Message = null);
 
 /// <summary>
-/// Runs scripted multi-turn conversations against an agent.
+/// Runs scripted multi-turn conversations against an evaluable agent.
 /// </summary>
+/// <remarks>
+/// Accepts any <see cref="IEvaluableAgent"/> implementation. If you have an 
+/// <c>IChatClient</c>, wrap it with <see cref="ChatClientAgentAdapter"/> first.
+/// </remarks>
 public class ConversationRunner
 {
-    private readonly IChatClient _chatClient;
+    private readonly IEvaluableAgent _agent;
     private readonly ConversationRunnerOptions _options;
 
     /// <summary>
     /// Initializes a new conversation runner.
     /// </summary>
-    /// <param name="chatClient">The chat client to use for agent interactions.</param>
+    /// <param name="agent">The evaluable agent to converse with.</param>
     /// <param name="options">Optional configuration options.</param>
-    public ConversationRunner(IChatClient chatClient, ConversationRunnerOptions? options = null)
+    public ConversationRunner(IEvaluableAgent agent, ConversationRunnerOptions? options = null)
     {
-        _chatClient = chatClient ?? throw new ArgumentNullException(nameof(chatClient));
+        _agent = agent ?? throw new ArgumentNullException(nameof(agent));
         _options = options ?? new ConversationRunnerOptions();
     }
 
@@ -69,36 +74,29 @@ public class ConversationRunner
     {
         var result = new ConversationResult { TestCase = testCase };
         var startTime = DateTime.UtcNow;
-        var messages = new List<ChatMessage>();
 
         try
         {
             foreach (var turn in testCase.Turns)
             {
                 ct.ThrowIfCancellationRequested();
-                
                 var turnStart = DateTime.UtcNow;
 
                 switch (turn.Role.ToLowerInvariant())
                 {
                     case "system":
-                        messages.Add(new ChatMessage(ChatRole.System, turn.Content));
+                        // System prompts should be configured on the agent directly.
                         result.ActualTurns.Add(turn);
                         break;
 
                     case "user":
-                        messages.Add(new ChatMessage(ChatRole.User, turn.Content));
                         result.ActualTurns.Add(turn);
                         
-                        // Get agent response
-                        var response = await _chatClient.GetResponseAsync(messages, cancellationToken: ct);
+                        // Invoke the agent
+                        var agentResponse = await _agent.InvokeAsync(turn.Content, ct);
+                        var toolCalls = ExtractToolCalls(agentResponse);
                         
-                        // Process response
-                        var assistantContent = response.Text ?? "";
-                        var toolCalls = ExtractToolCalls(response);
-                        
-                        messages.Add(new ChatMessage(ChatRole.Assistant, assistantContent));
-                        result.ActualTurns.Add(Turn.Assistant(assistantContent, toolCalls.ToArray()));
+                        result.ActualTurns.Add(Turn.Assistant(agentResponse.Text, toolCalls.ToArray()));
                         
                         foreach (var tc in toolCalls)
                         {
@@ -107,14 +105,12 @@ public class ConversationRunner
                         break;
 
                     case "tool":
-                        // Tool responses are injected as-is (simulated tool execution)
-                        messages.Add(new ChatMessage(ChatRole.Tool, turn.Content));
+                        // Tool responses are handled internally by the agent.
                         result.ActualTurns.Add(turn);
                         break;
 
                     case "assistant":
-                        // Expected assistant turns are for validation, not sent to model
-                        // We just record them for comparison
+                        // Expected assistant turns are for validation, not sent to agent
                         break;
                 }
 
@@ -122,8 +118,6 @@ public class ConversationRunner
             }
 
             result.Duration = DateTime.UtcNow - startTime;
-            
-            // Run assertions
             RunAssertions(testCase, result);
             result.Success = result.Assertions.All(a => a.Passed);
         }
@@ -161,15 +155,18 @@ public class ConversationRunner
         return results;
     }
 
-    private static List<ToolCallInfo> ExtractToolCalls(ChatResponse response)
+    private static List<ToolCallInfo> ExtractToolCalls(AgentResponse response)
     {
         var toolCalls = new List<ToolCallInfo>();
         
-        foreach (var message in response.Messages)
+        if (response.RawMessages == null)
+            return toolCalls;
+
+        foreach (var rawMsg in response.RawMessages)
         {
-            if (message.Contents != null)
+            if (rawMsg is ChatMessage chatMessage && chatMessage.Contents != null)
             {
-                foreach (var content in message.Contents)
+                foreach (var content in chatMessage.Contents)
                 {
                     if (content is FunctionCallContent fcc)
                     {
