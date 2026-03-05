@@ -1088,6 +1088,5 @@ public async Task Agent_DoesNotRegress()
 ## See Also
 
 - [Assertions](assertions.md) - Fluent assertion API
-- [CI/CD Integration](ci-cd-integration.md) - Integrating evaluations into pipelines
-- [Sample 20](https://github.com/AgentEvalHQ/AgentEval/blob/main/samples/AgentEval.Samples/Sample20_RedTeamBasic.cs) - Basic red team scan with assertions
-- [Sample 21](https://github.com/AgentEvalHQ/AgentEval/blob/main/samples/AgentEval.Samples/Sample21_RedTeamAdvanced.cs) - Advanced pipeline, OWASP compliance, baseline comparison
+- [Sample 20](../samples/AgentEval.Samples/Sample20_RedTeamBasic.cs) - Basic red team scan with assertions
+- [Sample 21](../samples/AgentEval.Samples/Sample21_RedTeamAdvanced.cs) - Advanced pipeline, OWASP compliance, baseline comparison

@@ -296,8 +296,8 @@ Console.WriteLine($"  Estimated Cost: ${result.EstimatedCostUSD:F6}");
 > **🚧 Planned Feature** — `WorkflowPerformanceBenchmark` is planned for a future release.
 > Currently, use `PerformanceBenchmark` with individual agent adapters within your workflow,
 > or use `MAFEvaluationHarness` with `TrackPerformance = true` for end-to-end workflow timing.
-> See [Sample 09](../samples/AgentEval.Samples) (Sequential Workflows) and
-> [Sample 10](../samples/AgentEval.Samples) (Tool-Enabled Workflows) for workflow
+> See [Sample 09](../samples/AgentEval.Samples/Sample09_WorkflowEvaluationReal.cs) (Sequential Workflows) and
+> [Sample 10](../samples/AgentEval.Samples/Sample10_WorkflowWithTools.cs) (Tool-Enabled Workflows) for workflow
 > performance monitoring patterns.
 
 ---
@@ -492,8 +492,8 @@ jobs:
 
 ## See Also
 
-- [Sample 06](../samples/AgentEval.Samples) - Performance profiling with MAFEvaluationHarness
-- [Sample 23](../samples/AgentEval.Samples) - Benchmark system with JSONL data loading
+- [Sample 06](../samples/AgentEval.Samples/Sample06_PerformanceProfiling.cs) - Performance profiling with MAFEvaluationHarness
+- [Sample 23](../samples/AgentEval.Samples/Sample23_BenchmarkSystem.cs) - Benchmark system with JSONL data loading
 - [Stochastic Evaluation](stochastic-evaluation.md) - Statistical evaluation for benchmarks
 - [Model Comparison](model-comparison.md) - Compare models on benchmarks
 - [Extensibility Guide](extensibility.md) - Creating custom metrics
