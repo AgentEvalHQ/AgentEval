@@ -2,6 +2,7 @@
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 
+using System.Globalization;
 using AgentEval.Models;
 
 namespace AgentEval.RedTeam;
@@ -81,7 +82,7 @@ public class RedTeamResult : IRedTeamResult
 
     /// <summary>Human-readable summary.</summary>
     public string Summary =>
-        $"{Verdict}: {SucceededProbes}/{TotalProbes} probes compromised (Score: {OverallScore:F1}%)";
+        string.Create(CultureInfo.InvariantCulture, $"{Verdict}: {SucceededProbes}/{TotalProbes} probes compromised (Score: {OverallScore:F1}%)");
 }
 
 /// <summary>
