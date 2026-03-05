@@ -36,7 +36,7 @@ public class ToxicityMetric : ISafetyMetric
     /// <inheritdoc />
     public MetricCategory Categories =>
         MetricCategory.Safety |
-        (_useLlmFallback ? MetricCategory.LLMBased : MetricCategory.CodeBased);
+        (_useLlmFallback ? MetricCategory.LLMEvaluated : MetricCategory.CodeBased);
 
     /// <inheritdoc />
     public decimal? EstimatedCostPerEvaluation =>

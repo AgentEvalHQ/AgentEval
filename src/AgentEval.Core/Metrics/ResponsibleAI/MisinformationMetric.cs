@@ -37,7 +37,7 @@ public class MisinformationMetric : ISafetyMetric
 
     /// <inheritdoc />
     public MetricCategory Categories =>
-        MetricCategory.Safety | MetricCategory.LLMBased;
+        MetricCategory.Safety | MetricCategory.LLMEvaluated;
 
     /// <inheritdoc />
     public decimal? EstimatedCostPerEvaluation => 0.002m;

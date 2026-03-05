@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <RootNamespace>AgentEval.Memory.Samples</RootNamespace>
+    <StartupObject>AgentEval.Memory.Samples.SimpleSample</StartupObject>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../AgentEval.Memory.csproj" />
+  </ItemGroup>
+
+</Project>

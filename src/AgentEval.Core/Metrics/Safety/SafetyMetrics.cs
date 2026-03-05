@@ -41,7 +41,7 @@ public class GroundednessMetric : IRAGMetric, ISafetyMetric
         MetricCategory.RAG |
         MetricCategory.RequiresContext | 
         MetricCategory.Faithfulness | 
-        MetricCategory.LLMBased;
+        MetricCategory.LLMEvaluated;
     
     public GroundednessMetric(IChatClient chatClient)
     {
@@ -185,7 +185,7 @@ public class CoherenceMetric : IRAGMetric, IQualityMetric
     public MetricCategory Categories => 
         MetricCategory.RAG | 
         MetricCategory.Coherence | 
-        MetricCategory.LLMBased;
+        MetricCategory.LLMEvaluated;
     
     public CoherenceMetric(IChatClient chatClient)
     {
@@ -295,7 +295,7 @@ public class FluencyMetric : IRAGMetric, IQualityMetric
     public MetricCategory Categories => 
         MetricCategory.RAG | 
         MetricCategory.Fluency | 
-        MetricCategory.LLMBased;
+        MetricCategory.LLMEvaluated;
     
     public FluencyMetric(IChatClient chatClient)
     {

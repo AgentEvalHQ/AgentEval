@@ -25,7 +25,7 @@ public class FaithfulnessMetric : IRAGMetric, IQualityMetric
         MetricCategory.RAG | 
         MetricCategory.RequiresContext | 
         MetricCategory.Faithfulness | 
-        MetricCategory.LLMBased;
+        MetricCategory.LLMEvaluated;
     
     public FaithfulnessMetric(IChatClient chatClient)
     {
@@ -124,7 +124,7 @@ public class RelevanceMetric : IRAGMetric, IQualityMetric
     public MetricCategory Categories => 
         MetricCategory.RAG | 
         MetricCategory.Relevance | 
-        MetricCategory.LLMBased;
+        MetricCategory.LLMEvaluated;
     
     public RelevanceMetric(IChatClient chatClient)
     {

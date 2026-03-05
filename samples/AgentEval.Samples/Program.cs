@@ -141,6 +141,9 @@ public static class Program
                 case 27:
                     await Sample27_CrossFrameworkEvaluation.RunAsync();
                     break;
+                case 28:
+                    await Sample28_MemoryBasics.RunAsync();
+                    break;
                 default:
                     Console.WriteLine($"❌ Sample {sampleNumber} not found.\n");
                     break;
@@ -213,6 +216,7 @@ public static class Program
         Console.WriteLine("│ 25. 📂 Dataset Loaders   - Multi-format pipeline (offline)  │");
         Console.WriteLine("│ 26. 🔌 Extensibility     - DI registries & custom extensions │");
         Console.WriteLine("│ 27. 🌐 Cross-Framework   - Universal IChatClient adapter     │");
+        Console.WriteLine("│ 28. 🧠 Memory Basics     - Agent memory evaluation basics   │");
         
         Console.ForegroundColor = ConsoleColor.Green;
         Console.WriteLine("├─────────────────────────────────────────────────────────────┤");
