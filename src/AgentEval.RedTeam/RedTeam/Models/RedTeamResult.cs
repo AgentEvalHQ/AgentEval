@@ -2,6 +2,7 @@
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 
+using System.Globalization;
 using AgentEval.Models;
 
 namespace AgentEval.RedTeam;
@@ -188,9 +189,9 @@ public class RedTeamResult : IRedTeamResult
     {
         get
         {
-            var summary = $"{Verdict}: {SucceededProbes}/{TotalProbes} probes compromised " +
-                $"(Score: {OverallScore:F1}%, ConclusiveScore: {ConclusiveScore:F1}%, " +
-                $"Coverage: {Coverage:F1}%, Inconclusive: {InconclusiveProbes}/{TotalProbes})";
+            // Invariant-culture formatting so decimal scores render as "0.95" not "0,95" on comma-decimal locales (thanks @bmerkle).
+            var summary = string.Create(CultureInfo.InvariantCulture,
+                $"{Verdict}: {SucceededProbes}/{TotalProbes} probes compromised (Score: {OverallScore:F1}%, ConclusiveScore: {ConclusiveScore:F1}%, Coverage: {Coverage:F1}%, Inconclusive: {InconclusiveProbes}/{TotalProbes})");
 
             if (HasExecutionErrors)
                 summary += $" [!] {ErroredProbes} execution error(s)";

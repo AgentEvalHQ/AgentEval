@@ -2,6 +2,7 @@
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 
+using System.Globalization;
 using AgentEval.Models;
 
 namespace AgentEval.Core;
@@ -64,7 +65,7 @@ public sealed class ConsoleAgentEvalLogger : IAgentEvalLogger
         {
             var level = result.Passed ? LogLevel.Information : LogLevel.Warning;
             var icon = result.Passed ? "✓" : "✗";
-            WriteWithColor(level, $"[{DateTime.Now:HH:mm:ss}] {icon} {result.MetricName}: {result.Score:F2} - {result.Explanation}");
+            WriteWithColor(level, string.Create(CultureInfo.InvariantCulture, $"[{DateTime.Now:HH:mm:ss}] {icon} {result.MetricName}: {result.Score:F2} - {result.Explanation}"));
         }
     }
 
