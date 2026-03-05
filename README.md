@@ -15,7 +15,15 @@
   <a href="https://joslat.github.io/AgentEval/"><img src="https://img.shields.io/badge/docs-GitHub%20Pages-blue" alt="Documentation" /></a>
   <a href="https://www.nuget.org/packages/AgentEval"><img src="https://img.shields.io/nuget/v/AgentEval.svg" alt="NuGet" /></a>
   <a href="https://github.com/AgentEvalHQ/AgentEval/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="License" /></a>
+  <img src="https://img.shields.io/badge/MAF-1.0.0--rc3-blueviolet" alt="MAF 1.0.0-rc3" />
+  <img src="https://img.shields.io/badge/.NET-8.0%20|%209.0%20|%2010.0-512BD4" alt=".NET 8.0 | 9.0 | 10.0" />
 </p>
+
+---
+
+AgentEval is **the comprehensive .NET toolkit for AI agent evaluation**—tool usage validation, RAG quality metrics, stochastic evaluation, and model comparison—built first for **Microsoft Agent Framework (MAF)** and **Microsoft.Extensions.AI**. What RAGAS and DeepEval do for Python, AgentEval does for .NET, with the fluent assertion APIs .NET developers expect.
+
+> **For years, agentic developers have imagined writing evaluations like this. Today, they can.**
 
 > [!WARNING]
 > **Preview — Use at Your Own Risk**
@@ -27,12 +35,6 @@
 > Despite review, errors may exist — you are responsible for validating correctness, security, and compliance for your use case.
 >
 > Licensed under the **MIT License** — provided **"AS IS"** without warranty. See [LICENSE](LICENSE) and [DISCLAIMER.md](DISCLAIMER.md).
-
----
-
-AgentEval is **the comprehensive .NET toolkit for AI agent evaluation**—tool usage validation, RAG quality metrics, stochastic evaluation, and model comparison—built first for **Microsoft Agent Framework (MAF)** and **Microsoft.Extensions.AI**. What RAGAS and DeepEval do for Python, AgentEval does for .NET, with the fluent assertion APIs .NET developers expect.
-
-> **For years, agentic developers have imagined writing evaluations like this. Today, they can.**
 
 ---
 
@@ -404,6 +406,14 @@ misInfoResult.Should().HavePassed();
 ```bash
 dotnet add package AgentEval --prerelease
 ```
+
+**Compatibility:**
+
+| Dependency | Version |
+|------------|----------|
+| Microsoft Agent Framework (MAF) | `1.0.0-rc3` |
+| Microsoft.Extensions.AI | `10.3.0` |
+| .NET | 8.0, 9.0, 10.0 |
 
 **Single package, modular internals:**
 - `AgentEval.Abstractions` — Public contracts and interfaces

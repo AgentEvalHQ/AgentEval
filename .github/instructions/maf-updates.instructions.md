@@ -14,7 +14,7 @@ MAF upgrades follow two phases:
 ```
 Phase 1 (OPTIONAL):  maf-upgrade-preparation.instructions.md
                      Diff MAF source → produce plan document
-                     Output: src/AgentEval.MAF/MAF-Upgrade-Plan.md
+                     Output: MAF/MAF-Upgrade-Plan.md
 
 Phase 2 (THIS FILE): Update NuGet → fix breaks → run tests
                      Input: plan document (if available) OR compile errors
@@ -24,7 +24,7 @@ Phase 1 is recommended for major MAF version changes. For minor/patch updates or
 
 ## Step 0: Check for an Existing Upgrade Plan
 
-Before starting, check if `src/AgentEval.MAF/MAF-Upgrade-Plan.md` exists.
+Before starting, check if `MAF/MAF-Upgrade-Plan.md` exists.
 
 - **If it exists:** Read it first. It contains pre-analyzed breaking changes, behavioral changes, and concrete fix code snippets produced by Phase 1. Use it as a guide — you already know what will break and how to fix it.
 - **If it doesn't exist:** Proceed normally with build-error-driven detection (Step 1).
@@ -223,7 +223,7 @@ Only 4 out of 7 files in `src/AgentEval.MAF/MAF/` actually import MAF types. The
 
 After a successful upgrade:
 
-1. If `src/AgentEval.MAF/MAF-Upgrade-Plan.md` exists, update its status to "Completed" with the date, or delete it
+1. If `MAF/MAF-Upgrade-Plan.md` exists, update its status to "Completed" with the date, or delete it
 2. If `/MAFVnext/` exists, move its contents to `/MAF/` (so `/MAF/` reflects the new current version), then remove `/MAFVnext/`
 3. Update documentation:
    - Check all code examples in `docs/*.md` for stale API patterns (especially `ChatClientAgentOptions` configuration)

@@ -23,7 +23,7 @@ Phase 1 (this file):  Diff source → produce plan document
 Phase 2 (maf-updates.instructions.md):  Update NuGet → implement plan → run tests
 ```
 
-The output of Phase 1 is a markdown document (`src/AgentEval.MAF/MAF-Upgrade-Plan.md`) that serves as input to Phase 2.
+The output of Phase 1 is a markdown document (`MAF/MAF-Upgrade-Plan.md`) that serves as input to Phase 2.
 
 ## Prerequisites
 
@@ -155,7 +155,7 @@ Also check sample files and the umbrella project for MAF API usage:
 
 ## Step 5: Produce the Plan Document
 
-Create the file `src/AgentEval.MAF/MAF-Upgrade-Plan.md` with this structure:
+Create the file `MAF/MAF-Upgrade-Plan.md` with this structure:
 
 ```markdown
 # MAF Upgrade Plan: <current-version> → <new-version>
@@ -238,7 +238,7 @@ Changes in MAF areas AgentEval doesn't use (listed for completeness).
 After creating the plan document:
 
 1. Give the user a concise summary (not the full document): how many breaking changes, which files affected, overall risk
-2. Tell the user the plan is at `src/AgentEval.MAF/MAF-Upgrade-Plan.md`
+2. Tell the user the plan is at `MAF/MAF-Upgrade-Plan.md`
 3. Ask: "Ready to proceed with the upgrade? I'll follow `maf-updates.instructions.md` and use this plan."
 
 ## What Happens Next

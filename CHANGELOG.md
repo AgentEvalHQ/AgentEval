@@ -9,12 +9,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.6.0-beta] - 2026-03-05
+
+**MAF RC3 Compatibility** ⬆️
+
+### Changed
+- **MAF upgraded from 1.0.0-rc2 to 1.0.0-rc3** — All three MAF package references (`Microsoft.Agents.AI`, `Microsoft.Agents.AI.OpenAI`, `Microsoft.Agents.AI.Workflows`) updated to 1.0.0-rc3. Zero AgentEval source code changes required — all RC3 breaking changes (`StateKey` → `StateKeys`, provider constructor renames) are in provider base classes that AgentEval does not subclass. RC3 introduces a new REST-based agent-to-agent protocol (CopilotStudio, A2A), OpenAPI-described agent endpoints, `IAgentApplication` hosting model, and `AgentWorkerClient` transport layer. Transitive `Microsoft.Agents.ObjectModel` bumped to latest. Full test suite (2519 tests × 3 TFMs) passes with zero failures. See [MAF-Upgrade-Plan.md](MAF/MAF-Upgrade-Plan.md) for full diff analysis.
+- **THIRD-PARTY-NOTICES.md** — Synced all package versions to match `Directory.Packages.props` (MAF rc1→rc3 and 7 other stale versions corrected).
+- **README.md** — Added MAF compatibility badge, .NET TFM badge, and compatibility table in Installation section. Repositioned preview warning below value proposition.
+- **NuGet metadata** — Added `PackageReleaseNotes` property to umbrella package.
+- **docs/installation.md** — Added Compatibility section with MAF and .NET version requirements.
+
+---
+
 ## [0.5.2-beta] - 2026-02-28
 
 **MAF RC2 Dependency Upgrade** ⬆️
 
 ### Changed
-- **MAF upgraded from 1.0.0-rc1 to 1.0.0-rc2** — All three MAF package references (`Microsoft.Agents.AI`, `Microsoft.Agents.AI.OpenAI`, `Microsoft.Agents.AI.Workflows`) updated to 1.0.0-rc2. Zero public API breaking changes — every AgentEval dependency is byte-identical between RC1 and RC2. RC2 contains only internal telemetry restructuring (session-level OTel spans in Workflows), two internal resource leak fixes, and three new additive `[Experimental]` APIs (Agent Skills, builder-level context providers, stored-output-disabled client). Transitive `Microsoft.Agents.ObjectModel` bumped `2026.2.3.1 → 2026.2.4.1`. No AgentEval source code changes required. Full test suite passes across all 3 TFMs. See [MAF-Upgrade-Plan.md](src/AgentEval.MAF/MAF-Upgrade-Plan.md) for full diff analysis.
+- **MAF upgraded from 1.0.0-rc1 to 1.0.0-rc2** — All three MAF package references (`Microsoft.Agents.AI`, `Microsoft.Agents.AI.OpenAI`, `Microsoft.Agents.AI.Workflows`) updated to 1.0.0-rc2. Zero public API breaking changes — every AgentEval dependency is byte-identical between RC1 and RC2. RC2 contains only internal telemetry restructuring (session-level OTel spans in Workflows), two internal resource leak fixes, and three new additive `[Experimental]` APIs (Agent Skills, builder-level context providers, stored-output-disabled client). Transitive `Microsoft.Agents.ObjectModel` bumped `2026.2.3.1 → 2026.2.4.1`. No AgentEval source code changes required. Full test suite passes across all 3 TFMs. See [MAF-Upgrade-Plan.md](MAF/MAF-Upgrade-Plan.md) for full diff analysis.
 
 ---
 
@@ -607,7 +620,8 @@ This release marks the transition from alpha to beta. The framework is now featu
 - `AgentEval.Tracing` (OTel + run artifacts) - planned
 - `AgentEval.Studio` (workflow visualizer / time-travel UI) - future
 
-[Unreleased]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.5.2-beta...HEAD
+[Unreleased]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.6.0-beta...HEAD
+[0.6.0-beta]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.5.4-beta...v0.6.0-beta
 [0.5.2-beta]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.5.1-beta...v0.5.2-beta
 [0.5.1-beta]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.4.0-beta...v0.5.1-beta
 [0.4.0-beta]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.3.0-beta...v0.4.0-beta

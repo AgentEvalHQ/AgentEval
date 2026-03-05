@@ -9,6 +9,7 @@
     <Description>The comprehensive .NET evaluation toolkit for AI agents—tool usage validation, RAG quality metrics, stochastic evaluation, model comparison, and red team security testing. Built for Microsoft Agent Framework (MAF) with fluent assertion APIs.</Description>
     <PackageTags>ai;agent;evaluation;testing;benchmarking;maf;llm;openai;azure;rag;agentic;redteam;security</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageReleaseNotes>v0.6.0-beta: MAF 1.0.0-rc3 compatibility. Zero breaking changes to AgentEval APIs. See CHANGELOG.md for details.</PackageReleaseNotes>
     
     <!-- SourceLink: enables stepping into source code during debugging -->
     <PublishRepositoryUrl>true</PublishRepositoryUrl>
