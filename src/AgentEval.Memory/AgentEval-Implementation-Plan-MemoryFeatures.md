@@ -15,19 +15,19 @@
 | **Core Models & Abstractions** | MemoryTestScenario, MemoryQuery, MemoryFact, MemoryEvaluationResult | 100% | ✅ | EXCELLENT | Complete: All models with factory methods, validation, temporal support |
 | **F01: MemoryTestRunner** | Core orchestration engine for memory evaluation | 100% | ✅ | EXCELLENT | Complete: 3-phase orchestration with comprehensive error handling and performance tracking |  
 | **F02: MemoryJudge** | LLM-based fact verification and scoring | 100% | ✅ | EXCELLENT | Complete: Structured LLM prompting with JSON parsing and robust fallback mechanisms |
-| **F03: CanRemember Extensions** | One-liner memory testing API | 50% | ❌ | PARTIAL | Core functionality works but DI extensions disabled due to compilation errors |
+| **F03: CanRemember Extensions** | One-liner memory testing API | 100% | ✅ | EXCELLENT | Complete: DI extensions re-enabled, CanRememberExtensions fully functional |
 | **F04: Memory Fluent Assertions** | Fluent assertion chains for memory results | 100% | ✅ | EXCELLENT | Complete: Perfect AgentEval integration with structured exceptions and rich error messages |
 | **F05: Temporal Memory Evaluation** | Time-travel queries and temporal reasoning | 100% | ✅ | EXCELLENT | Complete: Advanced time-travel queries and fact evolution scenarios with proper temporal metadata |
 | **F07: Memory Scenario Library** | Built-in memory testing scenarios | 100% | ✅ | EXCELLENT | Complete: Comprehensive scenario collection including basic, chatty, cross-session, and temporal patterns |
-| **F09: Cross-Session Memory Tests** | Session boundary testing with ISessionResettableAgent | 25% | ❌ | PARTIAL | Interface defined, cross-session scenarios exist, but need framework adapters and session reset logic |
-| **F10: Memory Reducer Evaluation** | Information compression fidelity testing | 60% | ❌ | GOOD | MemoryReducerFidelityMetric implemented but needs full scenario integration and compression algorithms |
-| **F18: Memory Benchmark Suite** | Performance benchmarking and analysis | 0% | ❌ | - | Not started |
+| **F09: Cross-Session Memory Tests** | Session boundary testing with ISessionResettableAgent | 100% | ✅ | EXCELLENT | Complete: ICrossSessionEvaluator + CrossSessionEvaluator + CrossSessionResult models + DI registration + unit tests |
+| **F10: Memory Reducer Evaluation** | Information compression fidelity testing | 100% | ✅ | EXCELLENT | Complete: IReducerEvaluator + ReducerEvaluator + ReducerEvaluationResult models + DI registration + unit tests |
+| **F18: Memory Benchmark Suite** | Performance benchmarking and analysis | 100% | ✅ | EXCELLENT | Complete: IMemoryBenchmarkRunner + MemoryBenchmarkRunner + MemoryBenchmark presets (Quick/Standard/Full) + MemoryBenchmarkResult with grading + DI registration + unit tests |
 | **F26: Chatty Conversation Scenarios** | Noise-resilient memory testing | 100% | ✅ | EXCELLENT | Complete: ChattyConversationScenarios with buried facts, topic changes, emotional distractors |
-| **F27: Memory Reach-Back Testing** | Conversation depth and degradation analysis | 80% | ❌ | GOOD | MemoryReachBackMetric implemented but needs full scenario integration and depth analysis |
+| **F27: Memory Reach-Back Testing** | Conversation depth and degradation analysis | 100% | ✅ | EXCELLENT | Complete: IReachBackEvaluator + ReachBackEvaluator + ReachBackResult/DepthResult models + DI registration + unit tests |
 | **IMetric Implementations** | 5 memory-specific metrics (llm_*, code_*, embed_*) | 100% | ✅ | EXCELLENT | Complete: 5 metrics with proper AgentEval naming conventions, LLM integration, and cost estimation |
 | **Framework Adapters** | MEAI and MAF session reset adapters | 20% | ❌ | PARTIAL | ISessionResettableAgent interface created but concrete framework adapters missing |
-| **Test Infrastructure** | MockMemoryAgent, FakeChatClient patterns, unit tests | 10% | ❌ | STARTED | FakeChatClient created but full test suite missing |
-| **DI Registration** | Service registration and extensions | 80% | ❌ | GOOD | Core registration works but advanced extensions disabled due to compilation errors |
+| **Test Infrastructure** | MockMemoryAgent, FakeChatClient patterns, unit tests | 95% | ✅ | EXCELLENT | 75 tests per TFM (225 total). Covers engine, models, scenarios, temporal, DI, and all 4 evaluators. Remaining: integration tests with real agents |
+| **DI Registration** | Service registration and extensions | 100% | ✅ | EXCELLENT | Complete: All 5 registration methods working, all scenario/metric/service registrations verified |
 | **Sample Applications** | 5 sample apps demonstrating memory features | 20% | ❌ | STARTED | Basic demo created but in wrong location (should be in AgentEval.Samples) |
 
 ---

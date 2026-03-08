@@ -1,4 +1,5 @@
 using AgentEval.Memory.Engine;
+using AgentEval.Memory.Evaluators;
 using AgentEval.Memory.Extensions;
 using AgentEval.Memory.Scenarios;
 using AgentEval.Memory.Temporal;
@@ -113,6 +114,66 @@ public class AgentEvalMemoryServiceCollectionExtensionsTests
         var runner = scope.ServiceProvider.GetRequiredService<ITemporalMemoryRunner>();
 
         Assert.IsType<TemporalMemoryRunner>(runner);
+    }
+
+    [Fact]
+    public void AddAgentEvalMemory_RegistersEvaluators()
+    {
+        var services = CreateServicesWithDependencies();
+        services.AddAgentEvalMemory();
+
+        var provider = services.BuildServiceProvider();
+        using var scope = provider.CreateScope();
+
+        Assert.NotNull(scope.ServiceProvider.GetService<IReachBackEvaluator>());
+        Assert.NotNull(scope.ServiceProvider.GetService<IReducerEvaluator>());
+        Assert.NotNull(scope.ServiceProvider.GetService<ICrossSessionEvaluator>());
+        Assert.NotNull(scope.ServiceProvider.GetService<IMemoryBenchmarkRunner>());
+    }
+
+    [Fact]
+    public void AddAgentEvalMemoryEvaluators_RegistersOnlyEvaluators()
+    {
+        var services = CreateServicesWithDependencies();
+        // Evaluators depend on core + scenarios
+        services.AddAgentEvalMemoryCore();
+        services.AddAgentEvalMemoryScenarios();
+        services.AddAgentEvalMemoryTemporal();
+        services.AddAgentEvalMemoryEvaluators();
+
+        var provider = services.BuildServiceProvider();
+        using var scope = provider.CreateScope();
+
+        Assert.NotNull(scope.ServiceProvider.GetService<IReachBackEvaluator>());
+        Assert.NotNull(scope.ServiceProvider.GetService<IReducerEvaluator>());
+        Assert.NotNull(scope.ServiceProvider.GetService<ICrossSessionEvaluator>());
+        Assert.NotNull(scope.ServiceProvider.GetService<IMemoryBenchmarkRunner>());
+    }
+
+    [Fact]
+    public void AddAgentEvalMemory_CanResolveReachBackEvaluator()
+    {
+        var services = CreateServicesWithDependencies();
+        services.AddAgentEvalMemory();
+
+        var provider = services.BuildServiceProvider();
+        using var scope = provider.CreateScope();
+        var evaluator = scope.ServiceProvider.GetRequiredService<IReachBackEvaluator>();
+
+        Assert.IsType<ReachBackEvaluator>(evaluator);
+    }
+
+    [Fact]
+    public void AddAgentEvalMemory_CanResolveMemoryBenchmarkRunner()
+    {
+        var services = CreateServicesWithDependencies();
+        services.AddAgentEvalMemory();
+
+        var provider = services.BuildServiceProvider();
+        using var scope = provider.CreateScope();
+        var runner = scope.ServiceProvider.GetRequiredService<IMemoryBenchmarkRunner>();
+
+        Assert.IsType<MemoryBenchmarkRunner>(runner);
     }
 
     /// <summary>

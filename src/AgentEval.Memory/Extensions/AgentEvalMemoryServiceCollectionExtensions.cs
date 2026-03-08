@@ -1,4 +1,5 @@
 using AgentEval.Memory.Engine;
+using AgentEval.Memory.Evaluators;
 using AgentEval.Memory.Metrics;
 using AgentEval.Memory.Scenarios;
 using AgentEval.Memory.Temporal;
@@ -23,6 +24,12 @@ public static class AgentEvalMemoryServiceCollectionExtensions
         services.AddScoped<IMemoryTestRunner, MemoryTestRunner>();
         services.AddScoped<IMemoryJudge, MemoryJudge>();
         services.AddScoped<ITemporalMemoryRunner, TemporalMemoryRunner>();
+        
+        // Evaluators (Scoped - stateful per evaluation, depend on scoped runner/judge)
+        services.AddScoped<IReachBackEvaluator, ReachBackEvaluator>();
+        services.AddScoped<IReducerEvaluator, ReducerEvaluator>();
+        services.AddScoped<ICrossSessionEvaluator, CrossSessionEvaluator>();
+        services.AddScoped<IMemoryBenchmarkRunner, MemoryBenchmarkRunner>();
         
         // Scenario providers (Singleton - stateless factory services)
         services.AddSingleton<IMemoryScenarios, MemoryScenarios>();
@@ -98,6 +105,23 @@ public static class AgentEvalMemoryServiceCollectionExtensions
         services.AddScoped<ITemporalMemoryRunner, TemporalMemoryRunner>();
         services.AddSingleton<ITemporalMemoryScenarios, TemporalMemoryScenarios>();
         services.AddTransient<MemoryTemporalMetric>();
+        
+        return services;
+    }
+
+    /// <summary>
+    /// Registers advanced memory evaluators (reach-back, reducer, cross-session, benchmark).
+    /// Use when you need the full evaluation pipeline beyond basic memory testing.
+    /// Requires core services to be registered first.
+    /// </summary>
+    /// <param name="services">The service collection to add evaluator services to.</param>
+    /// <returns>The service collection for method chaining.</returns>
+    public static IServiceCollection AddAgentEvalMemoryEvaluators(this IServiceCollection services)
+    {
+        services.AddScoped<IReachBackEvaluator, ReachBackEvaluator>();
+        services.AddScoped<IReducerEvaluator, ReducerEvaluator>();
+        services.AddScoped<ICrossSessionEvaluator, CrossSessionEvaluator>();
+        services.AddScoped<IMemoryBenchmarkRunner, MemoryBenchmarkRunner>();
         
         return services;
     }
