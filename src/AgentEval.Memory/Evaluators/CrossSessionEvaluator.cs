@@ -76,7 +76,7 @@ public class CrossSessionEvaluator : ICrossSessionEvaluator
 
             foreach (var fact in facts)
             {
-                var question = $"What do you know about: {fact.Content.Split(' ').Take(4).Aggregate((a, b) => $"{a} {b}")}?";
+                var question = $"What do you know about: {string.Join(' ', fact.Content.Split(' ').Take(4))}?";
                 var response = await agent.InvokeAsync(question, cancellationToken);
 
                 var query = MemoryQuery.Create(question, fact);

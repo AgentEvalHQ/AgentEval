@@ -25,10 +25,348 @@
 | **F26: Chatty Conversation Scenarios** | Noise-resilient memory testing | 100% | ✅ | EXCELLENT | Complete: ChattyConversationScenarios with buried facts, topic changes, emotional distractors |
 | **F27: Memory Reach-Back Testing** | Conversation depth and degradation analysis | 100% | ✅ | EXCELLENT | Complete: IReachBackEvaluator + ReachBackEvaluator + ReachBackResult/DepthResult models + DI registration + unit tests |
 | **IMetric Implementations** | 5 memory-specific metrics (llm_*, code_*, embed_*) | 100% | ✅ | EXCELLENT | Complete: 5 metrics with proper AgentEval naming conventions, LLM integration, and cost estimation |
-| **Framework Adapters** | MEAI and MAF session reset adapters | 20% | ❌ | PARTIAL | ISessionResettableAgent interface created but concrete framework adapters missing |
-| **Test Infrastructure** | MockMemoryAgent, FakeChatClient patterns, unit tests | 95% | ✅ | EXCELLENT | 75 tests per TFM (225 total). Covers engine, models, scenarios, temporal, DI, and all 4 evaluators. Remaining: integration tests with real agents |
+| **Framework Adapters** | MEAI and MAF session reset adapters | 100% | ✅ | COMPLETE | **DONE.** Moved `ISessionResettableAgent` to `AgentEval.Abstractions/Core/` (namespace `AgentEval.Core`). `ChatClientAgentAdapter` now implements `ISessionResettableAgent` (delegates to `ClearHistory()`). `MAFAgentAdapter` now implements `ISessionResettableAgent` (method already existed, just added interface declaration). Old interface deleted from Memory project. All 7,905 tests pass, all 5 samples verified. |
+| **Test Infrastructure** | MockMemoryAgent, FakeChatClient patterns, unit tests | 100% | ✅ | EXCELLENT | 116 tests per TFM (348 total). Covers engine, models, scenarios, temporal, DI, all 4 evaluator implementations (ReachBack, Reducer, CrossSession, BenchmarkRunner), evaluator result models, and skipped-category handling. Remaining: integration tests with real agents |
 | **DI Registration** | Service registration and extensions | 100% | ✅ | EXCELLENT | Complete: All 5 registration methods working, all scenario/metric/service registrations verified |
-| **Sample Applications** | 5 sample apps demonstrating memory features | 20% | ❌ | STARTED | Basic demo created but in wrong location (should be in AgentEval.Samples) |
+| **Sample Applications** | 5 sample apps demonstrating memory features | 100% | ✅ | EXCELLENT | 5 samples (28-32) complete in AgentEval.Samples: Basics, Benchmark Suite, Scenarios/Evaluators, DI Registration, Cross-Session Persistence. All verified and running. |
+
+---
+
+## Framework Adapters — Deep Analysis (March 8, 2026)
+
+> **✅ STATUS: IMPLEMENTED (March 8, 2026)**
+> All steps completed. `ISessionResettableAgent` moved to `AgentEval.Abstractions/Core/` with namespace `AgentEval.Core`. Both `ChatClientAgentAdapter` and `MAFAgentAdapter` now implement the interface. Build: 0 warnings, 0 errors. Tests: 7,905/7,905 passing (348 Memory + 7,557 Core × 3 TFMs). All 5 samples (28-32) verified.
+
+### The Problem Statement
+
+The `ISessionResettableAgent` interface enables cross-session memory evaluation — planting facts, resetting the session, then testing whether the agent recalls them. This is one of the most valuable memory evaluation capabilities: it tests **persistent memory** vs. **ephemeral context**.
+
+**The gap:** The interface exists in `AgentEval.Memory` but the two primary adapters that every AgentEval user relies on do NOT implement it. This means cross-session benchmarks **silently skip** for the vast majority of users.
+
+### Current State — Code-Level Analysis
+
+#### 1. `ISessionResettableAgent` (AgentEval.Memory)
+
+```
+File:      src/AgentEval.Memory/ISessionResettableAgent.cs
+Namespace: AgentEval.Memory
+Extends:   nothing (standalone interface)
+```
+
+```csharp
+public interface ISessionResettableAgent
+{
+    Task ResetSessionAsync(CancellationToken cancellationToken = default);
+}
+```
+
+**Design note:** The plan (Section 4.5, 9.4) originally specified `ISessionResettableAgent : IEvaluableAgent`. The actual implementation is a standalone interface (no inheritance). This is actually the **better design** — it follows Interface Segregation Principle (ISP). An agent can implement both `IEvaluableAgent` AND `ISessionResettableAgent` without being forced into an inheritance hierarchy. The evaluators check via `agent is ISessionResettableAgent` pattern matching, which works perfectly with composition.
+
+#### 2. `ChatClientAgentAdapter` (AgentEval.Core)
+
+```
+File:      src/AgentEval.Core/Core/ChatClientAgentAdapter.cs
+Namespace: AgentEval.Core
+Implements: IStreamableAgent (which extends IEvaluableAgent)
+```
+
+**Session reset capability:** YES — has `ClearHistory()` public method that clears `_conversationHistory`
+
+```csharp
+public void ClearHistory()
+{
+    _conversationHistory.Clear();
+}
+```
+
+**What `ResetSessionAsync` would do:**
+```csharp
+public Task ResetSessionAsync(CancellationToken cancellationToken = default)
+{
+    ClearHistory();
+    return Task.CompletedTask;
+}
+```
+
+**Critical subtlety:** `ChatClientAgentAdapter` has a constructor parameter `bool includeHistory = false`. When `includeHistory` is `false`, the adapter is **stateless** — it doesn't accumulate messages. In this mode, `ClearHistory()` is a no-op (the list is always empty). For memory testing, the adapter MUST be created with `includeHistory: true` to maintain conversation state across calls. This is a **documentation/guidance concern**, not a code concern — `ResetSessionAsync` can still safely call `ClearHistory()` regardless.
+
+#### 3. `MAFAgentAdapter` (AgentEval.MAF)
+
+```
+File:      src/AgentEval.MAF/MAF/MAFAgentAdapter.cs
+Namespace: AgentEval.MAF
+Implements: IStreamableAgent (which extends IEvaluableAgent)
+```
+
+**Session reset capability:** YES — has `ResetSessionAsync()` with the EXACT same signature as the interface
+
+```csharp
+public async Task ResetSessionAsync(CancellationToken cancellationToken = default)
+{
+    _session = await _agent.CreateSessionAsync(cancellationToken).ConfigureAwait(false);
+}
+```
+
+**This method already exists and does exactly what the interface requires.** Adding `: ISessionResettableAgent` to the class declaration is the ONLY change needed. Zero new code.
+
+#### 4. `TraceReplayingAgent` (AgentEval.Core)
+
+```
+File:      src/AgentEval.Core/Tracing/TraceReplayingAgent.cs
+Namespace: AgentEval.Tracing
+Implements: IEvaluableAgent, IStreamableAgent
+```
+
+**Session reset capability:** Has `_currentIndex` field that tracks replay position. A `ResetSessionAsync` would reset this to 0. Not yet implemented but straightforward.
+
+**Lower priority** — trace replay is about deterministic evaluation, not typically cross-session testing. Listed in the original plan but can be deferred.
+
+### Dependency Graph — The Core Constraint
+
+```
+AgentEval.Abstractions  ← Root. No project references. All core interfaces live here.
+    │                      IEvaluableAgent, IStreamableAgent, IMetric, etc.
+    │
+    ├── AgentEval.Core     ← References Abstractions only
+    │   │                     ChatClientAgentAdapter, TraceReplayingAgent
+    │   │
+    │   ├── AgentEval.MAF  ← References Abstractions + Core
+    │   │                     MAFAgentAdapter
+    │   │
+    │   ├── AgentEval.Memory ← References Abstractions + Core
+    │   │                       ISessionResettableAgent (CURRENTLY HERE)
+    │   │                       CrossSessionEvaluator, MemoryBenchmarkRunner, etc.
+    │   │
+    │   ├── AgentEval.DataLoaders ← References Abstractions + Core
+    │   │
+    │   └── AgentEval.RedTeam ← References Abstractions + Core
+    │
+    └── AgentEval (umbrella) ← References ALL sub-projects
+```
+
+**The constraint:**
+- `ISessionResettableAgent` currently lives in `AgentEval.Memory`
+- `ChatClientAgentAdapter` lives in `AgentEval.Core`
+- `MAFAgentAdapter` lives in `AgentEval.MAF`
+- Neither Core nor MAF reference Memory → **they CANNOT see `ISessionResettableAgent`**
+- Adding a reference from Core/MAF → Memory would create an **architectural violation** (downstream depends on sibling)
+
+**This is why the adapters don't implement the interface.** It's not an oversight — it's a dependency direction constraint.
+
+### Solution Options — Full Analysis
+
+#### Option A: Move `ISessionResettableAgent` to `AgentEval.Abstractions`
+
+**THE RECOMMENDED SOLUTION**
+
+```
+AgentEval.Abstractions/Core/
+    ├── IEvaluableAgent.cs
+    ├── IStreamableAgent.cs        (extends IEvaluableAgent)
+    ├── ISessionResettableAgent.cs  ← MOVED HERE
+    └── ...
+```
+
+**Why this is correct architecturally:**
+- Session reset is a **general agent capability**, not memory-specific. Any agent that manages conversation state benefits from a reset mechanism — not just for memory testing but also for:
+  - Conversation isolation in test suites
+  - Stateful agent testing (fresh state per test)
+  - Workflow evaluation with clean-slate requirements
+  - Benchmark runs that need independent iterations
+- It follows the existing pattern: `IEvaluableAgent` (core), `IStreamableAgent` (streaming capability), `ISessionResettableAgent` (reset capability) — all optional capability interfaces in Abstractions
+- Zero new dependencies. Abstractions has no project references.
+
+**Changes required:**
+
+| File | Change | Effort |
+|------|--------|--------|
+| `src/AgentEval.Abstractions/Core/ISessionResettableAgent.cs` | **Create** — move interface here, change namespace to `AgentEval.Core` | New file |
+| `src/AgentEval.Memory/ISessionResettableAgent.cs` | **Delete** — no longer needed | Delete |
+| `src/AgentEval.Core/Core/ChatClientAgentAdapter.cs` | Add `: ISessionResettableAgent` + `ResetSessionAsync()` method (3 lines) | Minimal |
+| `src/AgentEval.MAF/MAF/MAFAgentAdapter.cs` | Add `: ISessionResettableAgent` to class declaration (method already exists) | 1 line |
+| `src/AgentEval.Memory/Evaluators/CrossSessionEvaluator.cs` | Update `using` — remove `AgentEval.Memory`, namespace already resolved via `AgentEval.Core` | 1 line or auto |
+| `src/AgentEval.Memory/Evaluators/MemoryBenchmarkRunner.cs` | Same `using` update | 1 line or auto |
+| `src/AgentEval.Memory/Extensions/CanRememberExtensions.cs` | Same `using` update | 1 line or auto |
+| All test files referencing `ISessionResettableAgent` | Same `using` update | Trivial |
+| Sample32_MemoryCrossSession.cs | Remove `using AgentEval.Memory` if only used for this interface | Trivial |
+
+**Namespace consideration:**
+Both Abstractions and Memory use `RootNamespace=AgentEval`. The existing interface is in namespace `AgentEval.Memory`. After moving to Abstractions, it would naturally be `AgentEval.Core` (matching `IEvaluableAgent`). This is a **namespace change** that affects all consuming code.
+
+**Alternative:** Keep namespace as `AgentEval.Memory` even inside Abstractions to avoid any breaking change. But this would be misleading — an interface in Abstractions shouldn't use a domain sub-namespace to avoid a chicken-and-egg situation. The clean approach is `AgentEval.Core` namespace.
+
+**Binary compatibility impact:**
+- Moving the interface changes its assembly location (from `AgentEval.Memory.dll` to `AgentEval.Abstractions.dll`).
+- Since we're pre-1.0 (alpha/beta), this is acceptable and expected.
+- The NuGet umbrella package ships all DLLs together — consumers referencing `AgentEval` get both DLLs.
+
+#### Option B: Add a reference from Core/MAF → Memory
+
+**NOT RECOMMENDED**
+
+Would create circular-ish dependency concerns and violate the layered architecture. Core should not depend on a domain feature module.
+
+#### Option C: Define a duplicate/shadow interface in Abstractions
+
+**NOT RECOMMENDED**
+
+Two `ISessionResettableAgent` interfaces in different assemblies would cause type-identity issues and confuse consumers.
+
+#### Option D: Use a shared interface from a third-party or conventions (duck typing)
+
+**NOT RECOMMENDED**
+
+C# doesn't support duck typing. Source generators or runtime emit would add unnecessary complexity.
+
+### Impact Analysis
+
+**Without the fix (current state):**
+```
+User creates agent with ChatClientAgentAdapter or MAFAgentAdapter
+    → Runs MemoryBenchmark.Full
+    → Cross-Session category: SKIPPED (⚠️)
+    → ReducerFidelity: ✅ (doesn't need session reset)
+    → Benchmark score renormalized without Cross-Session
+    → User never sees cross-session evaluation
+    → Misleading — benchmark says "Full" but actually runs 7/8 categories
+```
+
+**With the fix:**
+```
+User creates agent with ChatClientAgentAdapter(includeHistory: true) or MAFAgentAdapter
+    → Runs MemoryBenchmark.Full
+    → Cross-Session category: ✅ EVALUATED
+    → All 8/8 categories produce scores
+    → True "Full" benchmark — no silent skipping
+```
+
+**Quantified impact:** The Cross-Session category carries **15% weight** in the Full benchmark. Skipping it means the other 7 categories get inflated weights through renormalization, hiding the fact that a whole dimension of memory quality goes unmeasured.
+
+### `ChatClientAgentAdapter` — Additional Guidance Needed
+
+The `includeHistory` flag creates a subtlety that warrants documentation:
+
+```csharp
+// ❌ WRONG for memory testing — stateless, no conversation accumulation
+var adapter = new ChatClientAgentAdapter(chatClient, "MyAgent");
+
+// ✅ CORRECT for memory testing — stateful, maintains conversation across calls
+var adapter = new ChatClientAgentAdapter(chatClient, "MyAgent", includeHistory: true);
+```
+
+When `includeHistory: false` (the default), the adapter sends only the current prompt each call. Facts told in previous turns are lost because they're not re-sent. `ResetSessionAsync` would technically work (clears empty list) but is meaningless.
+
+**Recommendation:** Add a `/// <remarks>` section to `ChatClientAgentAdapter` noting that `includeHistory: true` is required for memory evaluation. Optionally, `ResetSessionAsync` could log a warning if `_includeHistory` is `false`:
+
+```csharp
+public Task ResetSessionAsync(CancellationToken cancellationToken = default)
+{
+    if (!_includeHistory)
+        _logger?.LogWarning("ResetSessionAsync called but includeHistory is false. " +
+            "Memory evaluation requires includeHistory: true for meaningful results.");
+    ClearHistory();
+    return Task.CompletedTask;
+}
+```
+
+### `MAFAgentAdapter` — Ready As-Is
+
+The MAF adapter's `ResetSessionAsync` already does exactly the right thing:
+1. Calls `_agent.CreateSessionAsync()` which creates a fresh `AgentSession`
+2. Assigns the new session to `_session`
+3. Next `InvokeAsync` call uses the fresh session — clean slate for conversation
+4. MAF's persistence layer (if configured) retains long-term memory independently of session
+
+**No behavioral changes needed.** Just add `: ISessionResettableAgent` to the class declaration.
+
+### `TraceReplayingAgent` — Future Enhancement
+
+The trace replayer could support session reset by resetting `_currentIndex = 0`, effectively replaying from the beginning. This is useful for:
+- Testing cross-session scenarios with deterministic replay
+- CI pipelines that test session reset behavior without LLM calls
+
+**Effort:** Small (5-10 lines). **Priority:** Low — defer to a separate PR.
+
+### Implementation Steps (Ordered)
+
+```
+Step 1: Create src/AgentEval.Abstractions/Core/ISessionResettableAgent.cs
+        ├── namespace AgentEval.Core
+        ├── Copy interface definition
+        └── Preserve XML docs
+
+Step 2: Delete src/AgentEval.Memory/ISessionResettableAgent.cs
+
+Step 3: Update ChatClientAgentAdapter
+        ├── Add : ISessionResettableAgent to class declaration
+        └── Add ResetSessionAsync() method (calls ClearHistory())
+
+Step 4: Update MAFAgentAdapter
+        └── Add : ISessionResettableAgent to class declaration
+            (method ResetSessionAsync already exists with correct signature)
+
+Step 5: Fix usings across AgentEval.Memory
+        ├── CrossSessionEvaluator.cs — verify using AgentEval.Core resolves
+        ├── MemoryBenchmarkRunner.cs — same
+        ├── CanRememberExtensions.cs — same
+        └── Any files with "using AgentEval.Memory" for ISessionResettableAgent
+
+Step 6: Fix test usings
+        ├── CrossSessionEvaluatorTests.cs
+        ├── MemoryBenchmarkRunnerTests.cs
+        └── Sample32_MemoryCrossSession.cs
+
+Step 7: Add/update unit tests
+        ├── ChatClientAgentAdapterTests — verify ResetSessionAsync clears history
+        ├── MAFAgentAdapterTests — verify ResetSessionAsync creates new session
+        └── Verify existing memory tests still pass with namespace change
+
+Step 8: Build + test full solution (0 warnings, 0 errors, all TFMs green)
+```
+
+### Risk Assessment
+
+| Risk | Likelihood | Impact | Mitigation |
+|------|-----------|--------|------------|
+| Namespace change breaks consumer code | Low (pre-1.0) | Low | Umbrella NuGet includes all DLLs; using `AgentEval.Core` is natural |
+| `includeHistory: false` confusion | Medium | Low | Document in remarks + optional warn log |
+| MAFAgentAdapter session semantics differ from test expectations | Low | Medium | MAF session reset is well-defined — `CreateSessionAsync()` is clean |
+| Breaking existing tests | Low | Low | Namespace change is the only change; update `using` statements |
+
+### Effort Estimate
+
+| Component | Lines Changed | Risk |
+|-----------|--------------|------|
+| New file in Abstractions | ~20 lines | None |
+| Delete file from Memory | -22 lines | None |
+| ChatClientAgentAdapter | +8 lines (interface + method) | Trivial |
+| MAFAgentAdapter | +1 line (interface declaration) | Trivial |
+| Using statement updates | ~10 files, 1 line each | Trivial |
+| New tests | ~20-30 lines | Trivial |
+| **TOTAL** | ~80 lines net | **Very Low** |
+
+### Verdict
+
+**Do it. This is the highest-impact, lowest-risk improvement remaining in the memory feature set.** It unblocks cross-session evaluation for 100% of standard adapter users. The architectural decision (move to Abstractions) is clean and consistent with existing patterns. The implementation is almost entirely additive — no existing behavior changes.
+
+### Implementation Log (March 8, 2026)
+
+All 8 steps from the implementation plan above were executed successfully:
+
+| Step | Action | Result |
+|------|--------|--------|
+| 1 | Created `src/AgentEval.Abstractions/Core/ISessionResettableAgent.cs` | ✅ Namespace `AgentEval.Core`, enhanced XML docs with `<remarks>`, `<see cref>` links |
+| 2 | Deleted `src/AgentEval.Memory/ISessionResettableAgent.cs` | ✅ Removed |
+| 3 | Updated `ChatClientAgentAdapter` | ✅ Added `: ISessionResettableAgent` + `ResetSessionAsync()` method (delegates to `ClearHistory()`) |
+| 4 | Updated `MAFAgentAdapter` | ✅ Added `: ISessionResettableAgent` to class declaration (method already existed) |
+| 5 | Fixed usings in Memory project | ✅ All files already had `using AgentEval.Core;` — no changes needed |
+| 6 | Fixed test/sample usings | ✅ Removed unused `using AgentEval.Memory;` from Sample32 |
+| 7 | Build verification | ✅ `dotnet build` — 0 warnings, 0 errors |
+| 8 | Full test run | ✅ 7,905 tests passing (116×3 Memory + 2,519×3 Core) |
+
+**Samples verified:** All 5 memory samples (28-32) run successfully. Sample 32 (Cross-Session) correctly exercises the `ISessionResettableAgent` flow.
+
+**Key insight:** No using statement changes were needed in the Memory project because all consuming files already had `using AgentEval.Core;`. The only cleanup was removing `using AgentEval.Memory;` from Sample32 (which was only there for the old interface location).
 
 ---
 

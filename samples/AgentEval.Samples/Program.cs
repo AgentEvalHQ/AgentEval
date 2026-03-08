@@ -144,6 +144,18 @@ public static class Program
                 case 28:
                     await Sample28_MemoryBasics.RunAsync();
                     break;
+                case 29:
+                    await Sample29_MemoryBenchmark.RunAsync();
+                    break;
+                case 30:
+                    await Sample30_MemoryScenarios.RunAsync();
+                    break;
+                case 31:
+                    await Sample31_MemoryDI.RunAsync();
+                    break;
+                case 32:
+                    await Sample32_MemoryCrossSession.RunAsync();
+                    break;
                 default:
                     Console.WriteLine($"❌ Sample {sampleNumber} not found.\n");
                     break;
@@ -217,6 +229,10 @@ public static class Program
         Console.WriteLine("│ 26. 🔌 Extensibility     - DI registries & custom extensions │");
         Console.WriteLine("│ 27. 🌐 Cross-Framework   - Universal IChatClient adapter     │");
         Console.WriteLine("│ 28. 🧠 Memory Basics     - Agent memory evaluation basics   │");
+        Console.WriteLine("│ 29. 🏆 Memory Benchmark  - Comprehensive memory scoring      │");
+        Console.WriteLine("│ 30. 🔬 Memory Scenarios  - Reach-back, reducer, scenarios     │");
+        Console.WriteLine("│ 31. 💉 Memory DI         - Dependency injection registration  │");
+        Console.WriteLine("│ 32. 🔄 Memory Cross-Sess - Cross-session memory persistence   │");
         
         Console.ForegroundColor = ConsoleColor.Green;
         Console.WriteLine("├─────────────────────────────────────────────────────────────┤");

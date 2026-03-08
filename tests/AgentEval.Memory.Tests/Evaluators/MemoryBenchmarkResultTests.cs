@@ -143,6 +143,62 @@ public class MemoryBenchmarkResultTests
         Assert.Equal(1.0, bench.Categories.Sum(c => c.Weight), 2);
     }
 
+    [Fact]
+    public void OverallScore_SkippedCategoriesExcluded_RenormalizesWeights()
+    {
+        var result = new MemoryBenchmarkResult
+        {
+            BenchmarkName = "Test",
+            Duration = TimeSpan.FromSeconds(5),
+            CategoryResults =
+            [
+                new BenchmarkCategoryResult { CategoryName = "Good", Score = 100, Weight = 0.5, ScenarioType = BenchmarkScenarioType.BasicRetention, Duration = TimeSpan.FromSeconds(1) },
+                new BenchmarkCategoryResult { CategoryName = "Skipped", Score = 0, Weight = 0.5, ScenarioType = BenchmarkScenarioType.CrossSession, Duration = TimeSpan.Zero, Skipped = true, SkipReason = "Not supported" }
+            ]
+        };
+
+        // Skipped excluded → only Good remains → renormalized weight 0.5/0.5 = 1.0 → score = 100
+        Assert.Equal(100, result.OverallScore);
+    }
+
+    [Fact]
+    public void WeakCategories_SkippedExcluded_NotListed()
+    {
+        var result = new MemoryBenchmarkResult
+        {
+            BenchmarkName = "Test",
+            Duration = TimeSpan.FromSeconds(5),
+            CategoryResults =
+            [
+                new BenchmarkCategoryResult { CategoryName = "Good", Score = 90, Weight = 0.5, ScenarioType = BenchmarkScenarioType.BasicRetention, Duration = TimeSpan.FromSeconds(1) },
+                new BenchmarkCategoryResult { CategoryName = "Skipped", Score = 0, Weight = 0.5, ScenarioType = BenchmarkScenarioType.CrossSession, Duration = TimeSpan.Zero, Skipped = true, SkipReason = "Not supported" }
+            ]
+        };
+
+        Assert.Empty(result.WeakCategories);
+        Assert.Single(result.SkippedCategories);
+        Assert.Equal("Skipped", result.SkippedCategories[0]);
+    }
+
+    [Fact]
+    public void Recommendations_SkippedCategories_NoteSkipReason()
+    {
+        var result = new MemoryBenchmarkResult
+        {
+            BenchmarkName = "Test",
+            Duration = TimeSpan.FromSeconds(5),
+            CategoryResults =
+            [
+                new BenchmarkCategoryResult { CategoryName = "Good", Score = 90, Weight = 0.5, ScenarioType = BenchmarkScenarioType.BasicRetention, Duration = TimeSpan.FromSeconds(1) },
+                new BenchmarkCategoryResult { CategoryName = "Cross-Session", Score = 0, Weight = 0.5, ScenarioType = BenchmarkScenarioType.CrossSession, Duration = TimeSpan.Zero, Skipped = true, SkipReason = "Agent does not implement ISessionResettableAgent" }
+            ]
+        };
+
+        // Should have 1 recommendation for the skipped category + 1 encouraging for the passing category
+        Assert.Contains(result.Recommendations, r => r.Contains("skipped", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(result.Recommendations, r => r.Contains("performing well", StringComparison.OrdinalIgnoreCase));
+    }
+
     // Helper: creates a benchmark result with a single category at the given score (weight=1.0)
     private static MemoryBenchmarkResult MakeBenchmarkResult(double score) => new()
     {

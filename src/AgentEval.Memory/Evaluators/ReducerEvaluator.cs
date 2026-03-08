@@ -82,7 +82,7 @@ public class ReducerEvaluator : IReducerEvaluator
         // Phase 3: Create queries for each fact
         var queries = facts.Select(fact =>
             MemoryQuery.Create(
-                $"Do you remember the information about: {fact.Content.Split(' ').Take(3).Aggregate((a, b) => $"{a} {b}")}?",
+                $"Do you remember the information about: {string.Join(' ', fact.Content.Split(' ').Take(3))}?",
                 fact)).ToList();
 
         var scenario = new MemoryTestScenario

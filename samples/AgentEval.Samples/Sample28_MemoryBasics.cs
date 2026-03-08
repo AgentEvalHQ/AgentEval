@@ -198,13 +198,14 @@ public static class Sample28_MemoryBasics
 
 /// <summary>
 /// Simple memory-enabled agent for demonstration.
-/// Stores facts in memory and retrieves them when asked.
+/// Stores facts in memory and retrieves them using keyword matching.
+/// Supports any fact format — stores the full text and matches against keywords in queries.
 /// </summary>
 public class SimpleMemoryAgent : IEvaluableAgent
 {
     public string Name => "Simple Memory Agent";
     
-    private readonly Dictionary<string, string> _memoryStore = new();
+    private readonly List<string> _facts = new();
 
     public Task<AgentResponse> InvokeAsync(string prompt, CancellationToken cancellationToken = default)
     {
@@ -215,7 +216,7 @@ public class SimpleMemoryAgent : IEvaluableAgent
             Text = response,
             TokenUsage = new TokenUsage
             {
-                PromptTokens = prompt.Length / 4, // Rough estimation
+                PromptTokens = prompt.Length / 4,
                 CompletionTokens = response.Length / 4
             }
         });
@@ -226,61 +227,89 @@ public class SimpleMemoryAgent : IEvaluableAgent
         var lowerPrompt = prompt.ToLowerInvariant();
         
         // Handle memory storage requests
-        if (lowerPrompt.Contains("remember") || lowerPrompt.Contains("my name is") || lowerPrompt.Contains("i work"))
+        if (lowerPrompt.Contains("remember") || lowerPrompt.Contains("please note") || lowerPrompt.Contains("important information"))
         {
             StoreFact(prompt);
             return "I'll remember that information for you.";
         }
+
+        // Handle confirmation requests
+        if (lowerPrompt.Contains("confirm") || lowerPrompt.Contains("noted"))
+        {
+            return $"Yes, I have {_facts.Count} pieces of information stored.";
+        }
         
         // Handle retrieval questions  
-        if (lowerPrompt.Contains('?'))
+        if (lowerPrompt.Contains('?') || lowerPrompt.Contains("what do you") || lowerPrompt.Contains("do you remember"))
         {
             return AnswerQuestion(lowerPrompt);
         }
         
-        return "Hello! I can remember facts and answer questions about them.";
+        // Handle noise/filler — respond but don't store
+        return "That's interesting! I'm here to help with whatever you need.";
     }
 
     private void StoreFact(string prompt)
     {
-        var lower = prompt.ToLowerInvariant();
+        // Extract the meaningful part after common prefixes
+        var content = prompt;
+        string[] prefixes = ["please remember this:", "please remember:", "remember:", 
+            "please remember this important information:", "please note:"];
         
-        if (lower.Contains("my name is"))
+        foreach (var prefix in prefixes)
         {
-            var name = ExtractAfter(prompt, "my name is");
-            _memoryStore["name"] = name.Trim();
+            var idx = content.IndexOf(prefix, StringComparison.OrdinalIgnoreCase);
+            if (idx >= 0)
+            {
+                content = content[(idx + prefix.Length)..].Trim();
+                break;
+            }
         }
-        else if (lower.Contains("i work as"))
-        {
-            var job = ExtractAfter(prompt, "i work as");
-            _memoryStore["job"] = job.Trim();
-        }
-        else if (lower.Contains("favorite programming language is") || lower.Contains("programming language do i prefer"))
-        {
-            var language = ExtractAfter(prompt, lower.Contains("favorite programming language is") ? "favorite programming language is" : "prefer");
-            _memoryStore["language"] = language.Trim();
-        }
+
+        if (!string.IsNullOrWhiteSpace(content))
+            _facts.Add(content);
     }
 
     private string AnswerQuestion(string question)
     {
-        if (question.Contains("name") && _memoryStore.ContainsKey("name"))
-            return $"Your name is {_memoryStore["name"]}.";
-        if (question.Contains("job") && _memoryStore.ContainsKey("job"))
-            return $"You work as {_memoryStore["job"]}.";
-        if ((question.Contains("programming") || question.Contains("language")) && _memoryStore.ContainsKey("language"))
-            return $"Your favorite programming language is {_memoryStore["language"]}.";
+        // Find all facts that match keywords in the question
+        var matchingFacts = _facts
+            .Where(fact => HasKeywordOverlap(question, fact.ToLowerInvariant()))
+            .ToList();
+
+        if (matchingFacts.Count > 0)
+            return string.Join(" ", matchingFacts);
+
+        // If no keyword match, return all remembered facts for broad questions
+        if (question.Contains("remember") || question.Contains("know about me") || question.Contains("what do you"))
+        {
+            if (_facts.Count > 0)
+                return "Here's what I remember: " + string.Join(". ", _facts);
+        }
             
-        return "I don't have that information stored in my memory.";
+        return "I don't have that specific information stored in my memory.";
     }
-    
-    private static string ExtractAfter(string text, string marker)
+
+    private static bool HasKeywordOverlap(string question, string fact)
     {
-        var index = text.IndexOf(marker, StringComparison.OrdinalIgnoreCase);
-        if (index == -1) return "";
-        
-        var start = index + marker.Length;
-        return text[start..].Trim().TrimEnd('.', '!', ',');
+        // Extract meaningful keywords (skip common/short words)
+        HashSet<string> stopWords = ["what", "is", "my", "do", "you", "the", "a", "an", "i", "me", 
+            "have", "any", "about", "know", "remember", "does", "can", "how", "where", "when", 
+            "who", "which", "that", "this", "are", "was", "were", "been", "being", "has", "had",
+            "did", "will", "would", "could", "should", "may", "might", "shall", "to", "of", "in",
+            "for", "on", "with", "at", "by", "from", "or", "and", "not", "no", "but", "if", "so",
+            "than", "too", "very", "just", "also", "there", "here", "all", "each", "every",
+            "information", "tell", "please"];
+
+        var questionWords = question.Split([' ', '?', '.', ',', '!', '\'', '"'], StringSplitOptions.RemoveEmptyEntries)
+            .Where(w => w.Length > 2 && !stopWords.Contains(w))
+            .ToHashSet();
+
+        var factWords = fact.Split([' ', '.', ',', '!', '\'', '"'], StringSplitOptions.RemoveEmptyEntries)
+            .Where(w => w.Length > 2 && !stopWords.Contains(w))
+            .ToHashSet();
+
+        return questionWords.Overlaps(factWords);
     }
 }
 

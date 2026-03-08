@@ -16,11 +16,19 @@ public class MemoryBenchmarkResult
     public required IReadOnlyList<BenchmarkCategoryResult> CategoryResults { get; init; }
 
     /// <summary>
-    /// Weighted overall score (0-100) across all categories.
+    /// Weighted overall score (0-100) across all non-skipped categories.
+    /// Skipped categories are excluded and weights are renormalized.
     /// </summary>
-    public double OverallScore => CategoryResults.Count > 0
-        ? CategoryResults.Sum(c => c.Score * c.Weight)
-        : 0;
+    public double OverallScore
+    {
+        get
+        {
+            var active = CategoryResults.Where(c => !c.Skipped).ToList();
+            if (active.Count == 0) return 0;
+            var totalWeight = active.Sum(c => c.Weight);
+            return totalWeight > 0 ? active.Sum(c => c.Score * c.Weight) / totalWeight * 1.0 : 0;
+        }
+    }
 
     /// <summary>
     /// Letter grade for the overall score.
@@ -57,11 +65,19 @@ public class MemoryBenchmarkResult
     public required TimeSpan Duration { get; init; }
 
     /// <summary>
-    /// Categories that need improvement (score below 70).
+    /// Categories that need improvement (score below 70, excluding skipped).
     /// </summary>
     public IReadOnlyList<string> WeakCategories => CategoryResults
-        .Where(c => c.Score < 70)
+        .Where(c => !c.Skipped && c.Score < 70)
         .OrderBy(c => c.Score)
+        .Select(c => c.CategoryName)
+        .ToList();
+
+    /// <summary>
+    /// Categories that were skipped (e.g., agent doesn't support the required capability).
+    /// </summary>
+    public IReadOnlyList<string> SkippedCategories => CategoryResults
+        .Where(c => c.Skipped)
         .Select(c => c.CategoryName)
         .ToList();
 
@@ -74,7 +90,16 @@ public class MemoryBenchmarkResult
     {
         var recommendations = new List<string>();
 
-        foreach (var cat in CategoryResults.Where(c => c.Score < 70).OrderBy(c => c.Score))
+        // Note skipped categories first
+        foreach (var cat in CategoryResults.Where(c => c.Skipped))
+        {
+            recommendations.Add($"{cat.CategoryName} was skipped: {cat.SkipReason ?? "not supported by this agent"}.");
+        }
+
+        var weakCategories = CategoryResults.Where(c => !c.Skipped && c.Score < 70).OrderBy(c => c.Score).ToList();
+
+        // Then recommendations for weak (non-skipped) categories
+        foreach (var cat in weakCategories)
         {
             recommendations.Add(cat.ScenarioType switch
             {
@@ -98,7 +123,7 @@ public class MemoryBenchmarkResult
             });
         }
 
-        if (recommendations.Count == 0)
+        if (weakCategories.Count == 0)
             recommendations.Add("All categories performing well! Consider running the Full benchmark for deeper analysis.");
 
         return recommendations;
