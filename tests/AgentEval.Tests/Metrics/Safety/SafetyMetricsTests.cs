@@ -110,7 +110,7 @@ public class GroundednessMetricTests
         Assert.True(metric.Categories.HasFlag(MetricCategory.Safety));
         Assert.True(metric.Categories.HasFlag(MetricCategory.RAG));
         Assert.True(metric.Categories.HasFlag(MetricCategory.RequiresContext));
-        Assert.True(metric.Categories.HasFlag(MetricCategory.LLMBased));
+        Assert.True(metric.Categories.HasFlag(MetricCategory.LLMEvaluated));
     }
 }
 
@@ -189,7 +189,7 @@ public class CoherenceMetricTests
         // Assert
         Assert.True(metric.Categories.HasFlag(MetricCategory.RAG));
         Assert.True(metric.Categories.HasFlag(MetricCategory.Coherence));
-        Assert.True(metric.Categories.HasFlag(MetricCategory.LLMBased));
+        Assert.True(metric.Categories.HasFlag(MetricCategory.LLMEvaluated));
         Assert.False(metric.Categories.HasFlag(MetricCategory.RequiresContext));
     }
 }
@@ -269,7 +269,7 @@ public class FluencyMetricTests
         // Assert
         Assert.True(metric.Categories.HasFlag(MetricCategory.RAG));
         Assert.True(metric.Categories.HasFlag(MetricCategory.Fluency));
-        Assert.True(metric.Categories.HasFlag(MetricCategory.LLMBased));
+        Assert.True(metric.Categories.HasFlag(MetricCategory.LLMEvaluated));
         Assert.False(metric.Categories.HasFlag(MetricCategory.RequiresContext));
         Assert.False(metric.Categories.HasFlag(MetricCategory.RequiresGroundTruth));
     }

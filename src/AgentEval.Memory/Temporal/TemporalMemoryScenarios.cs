@@ -6,16 +6,192 @@ namespace AgentEval.Memory.Temporal;
 /// Scenarios for testing temporal memory capabilities - understanding what was known when.
 /// Tests agent ability to reason about information in time context.
 /// </summary>
-public static class TemporalMemoryScenarios
+public class TemporalMemoryScenarios : ITemporalMemoryScenarios
 {
+    /// <inheritdoc />
+    public MemoryTestScenario CreateTimePointMemoryTest(
+        IEnumerable<DateTimeOffset> timePoints,
+        int eventsPerTimepoint = 3)
+    {
+        var timePointList = timePoints.ToArray();
+        var steps = new List<MemoryStep>();
+        var allFacts = new List<MemoryFact>();
+
+        foreach (var timePoint in timePointList)
+        {
+            for (int i = 0; i < eventsPerTimepoint; i++)
+            {
+                var fact = MemoryFact.Create(
+                    $"Event {i + 1} at {timePoint:yyyy-MM-dd HH:mm}",
+                    timePoint);
+                allFacts.Add(fact);
+                steps.Add(MemoryStep.Temporal(
+                    $"[{timePoint:yyyy-MM-dd HH:mm}] Event {i + 1} occurred",
+                    timePoint));
+            }
+        }
+
+        var queries = timePointList.Select(tp =>
+            MemoryQuery.CreateTemporal(
+                $"What events occurred at {tp:yyyy-MM-dd HH:mm}?",
+                tp,
+                allFacts.Where(f => f.Timestamp == tp).ToArray()
+            )).ToList();
+
+        return new MemoryTestScenario
+        {
+            Name = $"Time Point Memory ({timePointList.Length} points)",
+            Description = $"Tests memory of {eventsPerTimepoint} events at each of {timePointList.Length} time points",
+            Steps = steps,
+            Queries = queries,
+            Metadata = new Dictionary<string, object>
+            {
+                ["TemporalQuery"] = true,
+                ["TimePointCount"] = timePointList.Length
+            }
+        };
+    }
+
+    /// <inheritdoc />
+    public MemoryTestScenario CreateSequenceMemoryTest(
+        IEnumerable<MemoryFact> events,
+        bool shuffleQueries = true)
+    {
+        var eventList = events.ToArray();
+        var steps = eventList.Select(e =>
+            MemoryStep.Temporal(e.Content, e.Timestamp ?? DateTimeOffset.UtcNow)).ToList();
+
+        var orderedEvents = eventList
+            .OrderBy(e => e.Timestamp ?? DateTimeOffset.MaxValue)
+            .ToArray();
+
+        var queries = new List<MemoryQuery>
+        {
+            MemoryQuery.Create(
+                "What was the sequence of events in chronological order?",
+                orderedEvents)
+        };
+
+        if (shuffleQueries && eventList.Length >= 2)
+        {
+            var mid = eventList.Length / 2;
+            queries.Add(MemoryQuery.Create(
+                $"What happened after '{orderedEvents[mid - 1].Content}'?",
+                orderedEvents[mid]));
+        }
+
+        return new MemoryTestScenario
+        {
+            Name = $"Sequence Memory ({eventList.Length} events)",
+            Description = $"Tests temporal sequencing of {eventList.Length} events",
+            Steps = steps,
+            Queries = queries,
+            Metadata = new Dictionary<string, object>
+            {
+                ["TemporalQuery"] = true,
+                ["EventCount"] = eventList.Length
+            }
+        };
+    }
+
+    /// <inheritdoc />
+    public MemoryTestScenario CreateCausalReasoningTest(IEnumerable<IEnumerable<MemoryFact>> causalChains)
+    {
+        var chains = causalChains.Select(c => c.ToArray()).ToArray();
+        var allFacts = chains.SelectMany(c => c).ToArray();
+        var steps = new List<MemoryStep>();
+
+        foreach (var chain in chains)
+        {
+            for (int i = 0; i < chain.Length; i++)
+            {
+                var causeNote = i > 0 ? $" (caused by: {chain[i - 1].Content})" : "";
+                steps.Add(MemoryStep.Temporal(
+                    $"{chain[i].Content}{causeNote}",
+                    chain[i].Timestamp ?? DateTimeOffset.UtcNow.AddHours(i)));
+            }
+        }
+
+        var queries = new List<MemoryQuery>
+        {
+            MemoryQuery.Create("What are all the causal relationships you observed?", allFacts)
+        };
+
+        foreach (var chain in chains.Where(c => c.Length >= 2))
+        {
+            queries.Add(MemoryQuery.Create(
+                $"What caused '{chain.Last().Content}'?",
+                chain.Take(chain.Length - 1).ToArray()));
+        }
+
+        return new MemoryTestScenario
+        {
+            Name = $"Causal Reasoning ({chains.Length} chains)",
+            Description = $"Tests causal reasoning across {chains.Length} causal chain(s)",
+            Steps = steps,
+            Queries = queries,
+            Metadata = new Dictionary<string, object>
+            {
+                ["CausalReasoning"] = true,
+                ["ChainCount"] = chains.Length
+            }
+        };
+    }
+
+    /// <inheritdoc />
+    public MemoryTestScenario CreateOverlappingTimeWindowTest(
+        IEnumerable<MemoryFact> overlappingFacts,
+        (DateTimeOffset start, DateTimeOffset end) timeWindow)
+    {
+        var facts = overlappingFacts.ToArray();
+        var steps = facts.Select(f =>
+            MemoryStep.Temporal(f.Content, f.Timestamp ?? timeWindow.start)).ToList();
+
+        var withinWindow = facts
+            .Where(f => f.Timestamp >= timeWindow.start && f.Timestamp <= timeWindow.end)
+            .ToArray();
+
+        var queries = new List<MemoryQuery>
+        {
+            MemoryQuery.CreateTemporal(
+                $"What facts are relevant between {timeWindow.start:yyyy-MM-dd HH:mm} and {timeWindow.end:yyyy-MM-dd HH:mm}?",
+                timeWindow.start,
+                withinWindow)
+        };
+
+        return new MemoryTestScenario
+        {
+            Name = "Overlapping Time Windows",
+            Description = $"Tests memory within overlapping time window ({timeWindow.start:MM-dd} to {timeWindow.end:MM-dd})",
+            Steps = steps,
+            Queries = queries,
+            Metadata = new Dictionary<string, object>
+            {
+                ["TemporalQuery"] = true,
+                ["WindowStart"] = timeWindow.start,
+                ["WindowEnd"] = timeWindow.end
+            }
+        };
+    }
+
+    /// <inheritdoc />
+    public MemoryTestScenario CreateMemoryDegradationTest(IEnumerable<MemoryFact> facts)
+    {
+        var factsList = facts.ToArray();
+        var defaultIntervals = new[]
+        {
+            TimeSpan.FromHours(1),
+            TimeSpan.FromDays(1),
+            TimeSpan.FromDays(7)
+        };
+        return CreateMemoryDegradation(factsList, defaultIntervals);
+    }
+
     /// <summary>
     /// Creates a scenario where facts are established at different times,
     /// then queries test temporal understanding ("what did you know at time T?").
     /// </summary>
-    /// <param name="timedFacts">Facts with their establishment timestamps</param>
-    /// <param name="queryTime">Time point to query about</param>
-    /// <returns>Temporal memory scenario</returns>
-    public static MemoryTestScenario CreateTimeTravel(
+    public MemoryTestScenario CreateTimeTravel(
         IReadOnlyList<(MemoryFact fact, DateTimeOffset timestamp)> timedFacts,
         DateTimeOffset queryTime)
     {
@@ -86,7 +262,7 @@ public static class TemporalMemoryScenarios
     /// </summary>
     /// <param name="factEvolutions">Sequence of fact updates over time</param>
     /// <returns>Fact evolution memory scenario</returns>
-    public static MemoryTestScenario CreateFactEvolution(
+    public MemoryTestScenario CreateFactEvolution(
         IReadOnlyList<(string topic, string content, DateTimeOffset timestamp, bool supersedes)> factEvolutions)
     {
         var steps = new List<MemoryStep>();
@@ -151,7 +327,7 @@ public static class TemporalMemoryScenarios
     /// </summary>
     /// <param name="causalChain">Sequence of causally related events</param>
     /// <returns>Causal reasoning memory scenario</returns>
-    public static MemoryTestScenario CreateCausalReasoning(
+    public MemoryTestScenario CreateCausalReasoning(
         IReadOnlyList<(string eventDescription, DateTimeOffset timestamp, string[] causes, string[] effects)> causalChain)
     {
         var steps = new List<MemoryStep>();
@@ -223,7 +399,7 @@ public static class TemporalMemoryScenarios
     /// <param name="facts">Facts to test at different time intervals</param>
     /// <param name="timeIntervals">Time intervals to test (e.g., 1 hour, 1 day, 1 week)</param>
     /// <returns>Memory degradation scenario</returns>
-    public static MemoryTestScenario CreateMemoryDegradation(
+    public MemoryTestScenario CreateMemoryDegradation(
         IReadOnlyList<MemoryFact> facts,
         IReadOnlyList<TimeSpan> timeIntervals)
     {
@@ -275,6 +451,8 @@ public static class TemporalMemoryScenarios
     /// </summary>
     public static class CommonScenarios
     {
+        private static readonly TemporalMemoryScenarios Instance = new();
+
         /// <summary>
         /// Simple "what did you know yesterday" scenario.
         /// </summary>
@@ -283,7 +461,7 @@ public static class TemporalMemoryScenarios
             var yesterday = DateTimeOffset.UtcNow.AddDays(-1);
             var factTuples = facts.Select(f => (f, yesterday)).ToArray();
             
-            return CreateTimeTravel(factTuples, yesterday);
+            return Instance.CreateTimeTravel(factTuples, yesterday);
         }
         
         /// <summary>
@@ -302,7 +480,7 @@ public static class TemporalMemoryScenarios
                 (topic, newInfo, baseTime.Add(timeBetween), true)
             };
             
-            return CreateFactEvolution(evolutions);
+            return Instance.CreateFactEvolution(evolutions);
         }
         
         /// <summary>
@@ -320,7 +498,7 @@ public static class TemporalMemoryScenarios
                 (effect, baseTime.Add(timeBetween), new[] { cause }, Array.Empty<string>())
             };
             
-            return CreateCausalReasoning(events);
+            return Instance.CreateCausalReasoning(events);
         }
     }
 

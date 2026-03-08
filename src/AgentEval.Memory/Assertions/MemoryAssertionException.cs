@@ -16,31 +16,12 @@ public class MemoryAssertionException : AgentEvalAssertionException
         string? because = null)
         : base(BuildMessage(message, expected, actual, suggestions, because))
     {
+        // Set inherited init properties from AgentEvalAssertionException
         Expected = expected;
         Actual = actual;
         Suggestions = suggestions?.ToArray() ?? Array.Empty<string>();
         Because = because;
     }
-
-    /// <summary>
-    /// The expected condition that was not met.
-    /// </summary>
-    public string? Expected { get; }
-
-    /// <summary>
-    /// The actual condition that was encountered.
-    /// </summary>
-    public string? Actual { get; }
-
-    /// <summary>
-    /// Suggestions for resolving the assertion failure.
-    /// </summary>
-    public IReadOnlyList<string> Suggestions { get; }
-
-    /// <summary>
-    /// The reason provided for the assertion (if any).
-    /// </summary>
-    public string? Because { get; }
 
     private static string BuildMessage(
         string message,

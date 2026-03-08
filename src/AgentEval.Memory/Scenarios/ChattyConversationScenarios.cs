@@ -6,15 +6,72 @@ namespace AgentEval.Memory.Scenarios;
 /// Scenarios for testing memory retention in noisy, chatty conversations.
 /// These scenarios bury important facts among distracting conversation turns.
 /// </summary>
-public static class ChattyConversationScenarios
+public class ChattyConversationScenarios : IChattyConversationScenarios
 {
+    /// <inheritdoc />
+    public MemoryTestScenario CreateBuriedFactsScenario(IEnumerable<MemoryFact> importantFacts, double noiseRatio = 3.0)
+    {
+        return BuriedFacts(importantFacts.ToArray(), (int)noiseRatio);
+    }
+
+    /// <inheritdoc />
+    public MemoryTestScenario CreateTopicSwitchingScenario(IEnumerable<MemoryFact> facts, int topicChanges = 5)
+    {
+        return RapidTopicChanges(facts.ToArray(), topicChanges);
+    }
+
+    /// <inheritdoc />
+    public MemoryTestScenario CreateEmotionalDistractorScenario(IEnumerable<MemoryFact> facts, int emotionalIntensity = 5)
+    {
+        return EmotionalDistractors(facts.ToArray());
+    }
+
+    /// <inheritdoc />
+    public MemoryTestScenario CreateFalseInformationScenario(IEnumerable<MemoryFact> trueFacts, IEnumerable<MemoryFact> falseFacts)
+    {
+        var trueFactsList = trueFacts.ToArray();
+        var falseFactsList = falseFacts.ToArray();
+        var steps = new List<MemoryStep>();
+
+        // Interleave true and false facts
+        var maxCount = Math.Max(trueFactsList.Length, falseFactsList.Length);
+        for (int i = 0; i < maxCount; i++)
+        {
+            if (i < trueFactsList.Length)
+            {
+                steps.Add(MemoryStep.Fact($"Please remember: {trueFactsList[i].Content}"));
+            }
+            if (i < falseFactsList.Length)
+            {
+                steps.Add(MemoryStep.Noise($"Actually, I heard that {falseFactsList[i].Content}"));
+            }
+        }
+
+        // Add a correction step
+        steps.Add(MemoryStep.System("Note: some of the previous statements were incorrect. Only trust the facts I explicitly asked you to remember."));
+
+        var queries = new List<MemoryQuery>
+        {
+            MemoryQuery.Create(
+                "What are the facts I explicitly asked you to remember? Please only include information I specifically asked you to keep in mind.",
+                trueFactsList,
+                falseFactsList
+            )
+        };
+
+        return new MemoryTestScenario
+        {
+            Name = "False Information Filtering",
+            Description = $"Tests ability to distinguish {trueFactsList.Length} true facts from {falseFactsList.Length} false facts",
+            Steps = steps,
+            Queries = queries
+        };
+    }
+
     /// <summary>
     /// Creates a scenario where important facts are buried among distracting conversation.
     /// </summary>
-    /// <param name="facts">Important facts to remember</param>
-    /// <param name="noiseRatio">Number of noise turns per fact (default 5)</param>
-    /// <returns>Chatty memory scenario</returns>
-    public static MemoryTestScenario BuriedFacts(
+    public MemoryTestScenario BuriedFacts(
         IReadOnlyList<MemoryFact> facts,
         int noiseRatio = 5)
     {
@@ -81,7 +138,7 @@ public static class ChattyConversationScenarios
     /// <param name="facts">Facts to remember</param>
     /// <param name="topicCount">Number of different topics to discuss</param>
     /// <returns>Topic-switching memory scenario</returns>
-    public static MemoryTestScenario RapidTopicChanges(
+    public MemoryTestScenario RapidTopicChanges(
         IReadOnlyList<MemoryFact> facts,
         int topicCount = 10)
     {
@@ -129,7 +186,7 @@ public static class ChattyConversationScenarios
     /// </summary>
     /// <param name="facts">Facts to remember</param>
     /// <returns>Emotionally distracting memory scenario</returns>
-    public static MemoryTestScenario EmotionalDistractors(IReadOnlyList<MemoryFact> facts)
+    public MemoryTestScenario EmotionalDistractors(IReadOnlyList<MemoryFact> facts)
     {
         var steps = new List<MemoryStep>();
         var emotionalDistracters = GenerateEmotionalDistractors();

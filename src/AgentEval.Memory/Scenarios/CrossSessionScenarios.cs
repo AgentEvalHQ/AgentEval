@@ -6,16 +6,154 @@ namespace AgentEval.Memory.Scenarios;
 /// Scenarios for testing memory persistence across session boundaries.
 /// These scenarios require agents that implement ISessionResettableAgent.
 /// </summary>
-public static class CrossSessionScenarios
+public class CrossSessionScenarios : ICrossSessionScenarios
 {
+    /// <inheritdoc />
+    MemoryTestScenario ICrossSessionScenarios.CreateCrossSessionMemoryTest(
+        IEnumerable<MemoryFact> facts, int sessionCount, int sessionGapMinutes)
+    {
+        return CreateCrossSessionMemoryTest(facts.ToArray(), sessionCount, sessionGapMinutes);
+    }
+
+    /// <inheritdoc />
+    public MemoryTestScenario CreateRestartPersistenceTest(IEnumerable<MemoryFact> facts, int restartCount = 2)
+    {
+        var factsList = facts.ToArray();
+        var steps = new List<MemoryStep>();
+
+        // Session 1: Establish facts
+        steps.Add(MemoryStep.System("SESSION 1: Establishing facts before restart"));
+        foreach (var fact in factsList)
+        {
+            steps.Add(MemoryStep.Fact($"Please remember: {fact.Content}"));
+        }
+        steps.Add(MemoryStep.Conversation("Can you confirm you've noted all this information?"));
+
+        // Simulate restarts
+        for (int i = 0; i < restartCount; i++)
+        {
+            steps.Add(MemoryStep.System("[SESSION_RESET_POINT]"));
+            steps.Add(MemoryStep.System($"RESTART {i + 1}: Agent restarted"));
+            steps.Add(MemoryStep.Conversation("Hello, I'm back. Do you still remember our previous conversation?"));
+        }
+
+        var queries = new List<MemoryQuery>
+        {
+            MemoryQuery.Create(
+                "What do you remember from before the restart(s)?",
+                factsList)
+        };
+
+        return new MemoryTestScenario
+        {
+            Name = $"Restart Persistence ({restartCount} restarts)",
+            Description = $"Tests persistence of {factsList.Length} facts through {restartCount} agent restart(s)",
+            Steps = steps,
+            Queries = queries,
+            Metadata = new Dictionary<string, object>
+            {
+                ["RequiresSessionReset"] = true,
+                ["RestartCount"] = restartCount
+            }
+        };
+    }
+
+    /// <inheritdoc />
+    public MemoryTestScenario CreateIncrementalLearningTest(IEnumerable<IEnumerable<MemoryFact>> factsPerSession)
+    {
+        var sessions = factsPerSession.Select(s => s.ToArray()).ToArray();
+        var allFacts = sessions.SelectMany(s => s).ToArray();
+        var steps = new List<MemoryStep>();
+
+        for (int i = 0; i < sessions.Length; i++)
+        {
+            steps.Add(MemoryStep.System($"SESSION {i + 1}: Learning new facts"));
+            foreach (var fact in sessions[i])
+            {
+                steps.Add(MemoryStep.Fact($"Please remember: {fact.Content}"));
+            }
+
+            if (i < sessions.Length - 1)
+            {
+                steps.Add(MemoryStep.System("[SESSION_RESET_POINT]"));
+            }
+        }
+
+        var queries = new List<MemoryQuery>
+        {
+            MemoryQuery.Create(
+                "What do you remember from all our sessions combined?",
+                allFacts)
+        };
+
+        return new MemoryTestScenario
+        {
+            Name = $"Incremental Learning ({sessions.Length} sessions)",
+            Description = $"Tests gradual accumulation of {allFacts.Length} facts across {sessions.Length} sessions",
+            Steps = steps,
+            Queries = queries,
+            Metadata = new Dictionary<string, object>
+            {
+                ["RequiresSessionReset"] = true,
+                ["SessionCount"] = sessions.Length
+            }
+        };
+    }
+
+    /// <inheritdoc />
+    public MemoryTestScenario CreateContextSwitchingTest(
+        IEnumerable<IEnumerable<MemoryFact>> contextFacts,
+        IEnumerable<string> contextNames)
+    {
+        var contexts = contextFacts.Select(c => c.ToArray()).ToArray();
+        var names = contextNames.ToArray();
+        var allFacts = contexts.SelectMany(c => c).ToArray();
+        var steps = new List<MemoryStep>();
+
+        for (int i = 0; i < contexts.Length; i++)
+        {
+            var contextName = i < names.Length ? names[i] : $"Context {i + 1}";
+            steps.Add(MemoryStep.System($"CONTEXT: {contextName}"));
+
+            foreach (var fact in contexts[i])
+            {
+                steps.Add(MemoryStep.Fact($"In the context of {contextName}: {fact.Content}"));
+            }
+
+            if (i < contexts.Length - 1)
+            {
+                steps.Add(MemoryStep.System("[SESSION_RESET_POINT]"));
+            }
+        }
+
+        var queries = new List<MemoryQuery>();
+        for (int i = 0; i < contexts.Length; i++)
+        {
+            var contextName = i < names.Length ? names[i] : $"Context {i + 1}";
+            queries.Add(MemoryQuery.Create(
+                $"What do you remember about {contextName}?",
+                contexts[i]));
+        }
+
+        return new MemoryTestScenario
+        {
+            Name = $"Context Switching ({contexts.Length} contexts)",
+            Description = $"Tests memory across {contexts.Length} different conversation contexts",
+            Steps = steps,
+            Queries = queries,
+            Metadata = new Dictionary<string, object>
+            {
+                ["RequiresSessionReset"] = true,
+                ["ContextCount"] = contexts.Length
+            }
+        };
+    }
+
     /// <summary>
     /// Creates a basic cross-session memory scenario.
     /// Establishes facts, resets the session, then tests recall.
     /// </summary>
-    /// <param name="name">Name for the scenario</param>
-    /// <param name="facts">Facts that should persist across session reset</param>
-    /// <returns>Cross-session memory scenario</returns>
-    public static MemoryTestScenario CreateBasicCrossSession(
+    public MemoryTestScenario CreateBasicCrossSession(
         string name,
         IReadOnlyList<MemoryFact> facts)
     {
@@ -88,7 +226,7 @@ public static class CrossSessionScenarios
     /// <param name="sessionCount">Number of sessions</param>
     /// <param name="sessionGapMinutes">Gap between sessions in minutes</param>
     /// <returns>Cross-session memory scenario</returns>
-    public static MemoryTestScenario CreateCrossSessionMemoryTest(
+    public MemoryTestScenario CreateCrossSessionMemoryTest(
         IReadOnlyList<MemoryFact> facts,
         int sessionCount = 3,
         int sessionGapMinutes = 60)
@@ -146,7 +284,7 @@ public static class CrossSessionScenarios
     /// <param name="persistentFacts">Facts that should survive session reset</param>
     /// <param name="sessionFacts">Facts that should be forgotten after session reset</param>
     /// <returns>Selective cross-session memory scenario</returns>
-    public static MemoryTestScenario CreateSelectiveMemory(
+    public MemoryTestScenario CreateSelectiveMemory(
         IReadOnlyList<MemoryFact> persistentFacts,
         IReadOnlyList<MemoryFact> sessionFacts)
     {
@@ -216,7 +354,7 @@ public static class CrossSessionScenarios
     /// <param name="facts">Facts to establish across multiple sessions</param>
     /// <param name="sessionCount">Number of sessions to span</param>
     /// <returns>Multi-session memory scenario</returns>
-    public static MemoryTestScenario CreateMultiSession(
+    public MemoryTestScenario CreateMultiSession(
         IReadOnlyList<MemoryFact> facts,
         int sessionCount = 3)
     {
@@ -274,7 +412,7 @@ public static class CrossSessionScenarios
     /// <param name="originalFacts">Facts established in first session</param>
     /// <param name="interferingFacts">Potentially interfering facts in second session</param>
     /// <returns>Memory interference scenario</returns>
-    public static MemoryTestScenario CreateInterference(
+    public MemoryTestScenario CreateInterference(
         IReadOnlyList<MemoryFact> originalFacts,
         IReadOnlyList<MemoryFact> interferingFacts)
     {

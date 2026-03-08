@@ -10,12 +10,12 @@ namespace AgentEval.Memory.Temporal;
 /// Specialized runner for temporal memory scenarios that handles time-aware evaluation.
 /// Extends the basic MemoryTestRunner with temporal-specific capabilities.
 /// </summary>
-public class TemporalMemoryRunner
+public class TemporalMemoryRunner : ITemporalMemoryRunner
 {
-    private readonly MemoryTestRunner _baseRunner;
+    private readonly IMemoryTestRunner _baseRunner;
     private readonly ILogger<TemporalMemoryRunner> _logger;
 
-    public TemporalMemoryRunner(MemoryTestRunner baseRunner, ILogger<TemporalMemoryRunner> logger)
+    public TemporalMemoryRunner(IMemoryTestRunner baseRunner, ILogger<TemporalMemoryRunner> logger)
     {
         _baseRunner = baseRunner;
         _logger = logger;
@@ -204,5 +204,72 @@ public class TemporalMemoryRunner
             
         var timestamps = timestampedSteps.Select(s => s.Timestamp!.Value).ToArray();
         return (timestamps.Min(), timestamps.Max());
+    }
+
+    /// <inheritdoc />
+    public async Task<MemoryEvaluationResult> TestTimeTravelQueriesAsync(
+        IEvaluableAgent agent,
+        IEnumerable<string> conversationHistory,
+        IEnumerable<MemoryQuery> temporalQueries,
+        CancellationToken cancellationToken = default)
+    {
+        var history = conversationHistory.ToArray();
+        var queries = temporalQueries.ToArray();
+
+        _logger.LogInformation("Testing time-travel queries: {QueryCount} queries over {HistoryCount} history items",
+            queries.Length, history.Length);
+
+        // Build a scenario from the conversation history and temporal queries
+        var steps = history.Select(h => MemoryStep.Conversation(h)).ToList();
+
+        var scenario = new MemoryTestScenario
+        {
+            Name = "Time Travel Query Test",
+            Description = $"Tests {queries.Length} temporal queries over conversation history",
+            Steps = steps,
+            Queries = queries,
+            Metadata = new Dictionary<string, object>
+            {
+                ["TemporalQuery"] = true,
+                ["HistoryLength"] = history.Length
+            }
+        };
+
+        return await RunTemporalScenarioAsync(agent, scenario, cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public async Task<MemoryEvaluationResult> TestCausalReasoningAsync(
+        IEvaluableAgent agent,
+        IEnumerable<MemoryFact> causalChain,
+        IEnumerable<string> reasoningQueries,
+        CancellationToken cancellationToken = default)
+    {
+        var chain = causalChain.ToArray();
+        var queryStrings = reasoningQueries.ToArray();
+
+        _logger.LogInformation("Testing causal reasoning: {ChainLength} events, {QueryCount} queries",
+            chain.Length, queryStrings.Length);
+
+        var steps = chain.Select(f =>
+            MemoryStep.Temporal(f.Content, f.Timestamp ?? DateTimeOffset.UtcNow)).ToList();
+
+        var queries = queryStrings.Select(q =>
+            MemoryQuery.Create(q, chain)).ToArray();
+
+        var scenario = new MemoryTestScenario
+        {
+            Name = "Causal Reasoning Test",
+            Description = $"Tests causal reasoning across {chain.Length} events",
+            Steps = steps,
+            Queries = queries,
+            Metadata = new Dictionary<string, object>
+            {
+                ["CausalReasoning"] = true,
+                ["ChainLength"] = chain.Length
+            }
+        };
+
+        return await RunTemporalScenarioAsync(agent, scenario, cancellationToken);
     }
 }

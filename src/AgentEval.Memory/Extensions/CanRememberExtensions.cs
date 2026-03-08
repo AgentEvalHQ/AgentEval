@@ -152,7 +152,8 @@ public static class CanRememberExtensions
         }
 
         var memoryFacts = facts.Select(MemoryFact.Create).ToArray();
-        var scenario = CrossSessionScenarios.CreateCrossSessionMemoryTest(
+        var crossSessionScenarios = new CrossSessionScenarios();
+        var scenario = crossSessionScenarios.CreateCrossSessionMemoryTest(
             memoryFacts,
             sessionCount: 3,
             sessionGapMinutes: 60
