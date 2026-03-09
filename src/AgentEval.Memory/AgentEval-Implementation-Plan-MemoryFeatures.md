@@ -3323,6 +3323,33 @@ MARKET DRIVERS:
 
 > **The biggest opportunity is integrating memory providers with AgentEval's evaluation framework. This would be a unique differentiator — no Python framework (RAGAS, DeepEval) has comprehensive memory evaluation capabilities!**
 
+### What Does "Double Down on Agentic Evaluation" Mean?
+
+**In simple terms:** AgentEval should go all-in on evaluating the *behaviors* that make AI agents different from plain LLMs — specifically **memory, tool use, multi-turn reasoning, and session persistence**. These are "agentic" capabilities. "Double down" means: don't dabble, don't do a minimal version — invest deeply and make AgentEval THE definitive toolkit for testing these capabilities.
+
+**In detail:** Today's AI evaluation landscape is split between:
+- **RAG evaluators** (RAGAS, DeepEval) — they test retrieval quality but not agent behavior across turns
+- **LLM benchmarks** (MMLU, HumanEval) — they test raw model capability, not agent orchestration
+- **Observability tools** (LangSmith, Weights & Biases) — they show what happened, but don't tell you if it was *correct*
+
+The gap is: **nobody comprehensively tests what agents DO differently from plain LLMs**. Agents remember things across turns, call tools, manage sessions, reduce chat history, recall facts through noise. "Doubling down on agentic evaluation" means AgentEval becomes the authority on testing ALL of these agent-specific behaviors — starting with memory.
+
+### What Does "Integrating Memory Providers with AgentEval's Evaluation Framework" Mean?
+
+**In simple terms:** Make it so that any developer using MAF's memory providers (ChatHistoryProvider, Mem0, Foundry, vector stores) can test their memory behavior with one-liner assertions like `agent.CanRememberAsync("fact")`, fluent chains like `.Should().HaveRecalled("allergy")`, and benchmark suites — all using the same patterns they already know from AgentEval's tool and RAG evaluation.
+
+**In full detail, this means 4 concrete integration points:**
+
+1. **Black-box behavioral testing** — Wrap any `IEvaluableAgent` (regardless of which memory provider it uses) and test: "Did you remember this fact after N turns of noise?" This is the `MemoryTestRunner` + `MemoryJudge` pattern. The agent is a black box; we don't know if it uses InMemoryChat, Mem0, or Foundry — we just test if it *remembers*.
+
+2. **IMetric integration** — Memory evaluation produces `MetricResult` objects that flow through the same pipeline as tool metrics and RAG metrics. This means memory scores appear in the same benchmark tables, can be exported to the same formats (JSON, Markdown, JUnit), and participate in stochastic runs. Concretely: `llm_memory_retention`, `llm_memory_temporal_accuracy`, `code_memory_reach_back`, `code_memory_reducer_fidelity`, `embed_memory_similarity`.
+
+3. **Fluent assertion integration** — Memory results get `.Should()` extension methods that follow the exact same pattern as `result.ToolUsage!.Should().HaveCalledTool(...)`. For memory: `result.MemoryEvaluation!.Should().HaveRecalledFact("allergy").WithConfidence(0.8).AfterNTurns(25)`. Same assertion exceptions with Expected/Actual/Suggestions.
+
+4. **DI registration** — `services.AddAgentEvalMemory()` registers all memory services (runner, judge, evaluators, benchmark) into the same DI container. `services.AddAgentEvalAll()` includes memory automatically. All services inject via interfaces (`IMemoryTestRunner`, `IMemoryJudge`, `IMemoryBenchmarkRunner`).
+
+**What it is NOT:** We do NOT build memory providers, enhance MAF, implement new vector stores, or run Mem0 services. We ONLY build the evaluation/testing layer. The agent team builds memory → we tell them if it works.
+
 ### 17.1 The Strategic Opportunity 🎯
 
 **What's the opportunity?**  
@@ -3481,6 +3508,94 @@ When to split?
 • When Memory needs different contributors/governance
 • NOT in MVP — start together, split if needed
 ```
+
+#### 17.5.1 Deep Analysis: Single Repo + Separate NuGet Package — Pros and Cons
+
+> **Updated 2026-03-09:** Expanded with detailed pros/cons analysis, standalone viability assessment, and comparison with AgentEval.RedTeam.
+
+**The core question:** Should `AgentEval.Memory` be released as a **separately installable NuGet package** (while living in the same repo), or should it ONLY be consumed through the umbrella `AgentEval` package?
+
+**Current architecture already does this:** `AgentEval.RedTeam`, `AgentEval.MAF`, `AgentEval.DataLoaders`, and `AgentEval.Core` are all separate projects in the same repo. The umbrella `AgentEval` package is the only `IsPackable=true` project and bundles all 5 DLLs. So the question is really: **should we ALSO publish `AgentEval.Memory` as its own standalone NuGet package?**
+
+#### Pros vs Cons: Standalone `AgentEval.Memory` NuGet Package
+
+| | **Pros** | **Cons** |
+|---|---|---|
+| **Adoption** | Teams that only want memory evaluation don't need to install the full toolkit (smaller dependency footprint) | Most users will install the umbrella anyway — fragmented packages can confuse users ("which one do I need?") |
+| **Versioning** | Can version memory features independently (e.g., Memory v1.2 while Core stays v1.0) | Independent versioning creates **compatibility matrix hell** — which Memory version works with which Core version? Users get `DependencyResolutionException` at runtime |
+| **Release cadence** | Memory can ship hotfixes or new features without waiting for a full AgentEval release cycle | Separate release cadence means **double the release overhead** — separate changelogs, release notes, NuGet publish steps, and compatibility testing |
+| **Size/perf** | Smaller package for users who don't need RedTeam, DataLoaders, etc. | The entire AgentEval umbrella is <2MB — size is not a real problem |
+| **Marketing** | Standalone package is discoverable on NuGet.org ("I searched for memory evaluation and found AgentEval.Memory") | Dilutes brand — two NuGet listings instead of one. Users may install Memory alone and miss the full toolkit |
+| **Dependencies** | Memory has minimal deps (only needs AgentEval.Abstractions + Core) | Still must take a dependency on Core for shared infra (IMetric, FakeChatClient, assertions). Not truly standalone |
+| **Testing** | Can run Memory tests independently | Must still run cross-package integration tests (Memory + Core + MAF). Separate package doesn't reduce test burden |
+| **Governance** | Could have different maintainers/reviewers | In practice, same 1-3 people maintain everything. Separate governance adds ceremony without value at this scale |
+| **CI/CD** | Can have focused Memory CI pipeline | More CI configurations to maintain. Matrix testing (Memory x Core versions) adds complexity |
+
+#### Would AgentEval.Memory Work Standalone?
+
+**No, not truly standalone.** `AgentEval.Memory` depends on:
+- `AgentEval.Abstractions` — for `IEvaluableAgent`, `IMetric`, `MetricResult`, `EvaluationContext`
+- `AgentEval.Core` — for `FakeChatClient` (testing), assertion infrastructure, DI extensions
+- `Microsoft.Extensions.AI` — for `IChatClient`
+
+So even as a "standalone" NuGet, it would pull in `AgentEval.Abstractions` and `AgentEval.Core` as transitive dependencies. The user saves installing `AgentEval.RedTeam`, `AgentEval.DataLoaders`, and `AgentEval.MAF` — which collectively add maybe 200KB. **The savings are negligible.**
+
+#### When Would You Release It Separately?
+
+Reasons to split into a standalone NuGet would be:
+1. **Different audience** — Memory evaluation attracts users who would never use tool assertions or RAG metrics. (Unlikely — memory users are agent developers who need all of it.)
+2. **Massive codebase growth** — Memory becomes 50%+ of the total codebase with its own documentation site. (Possible long-term, not now.)
+3. **Different release cadence** — Memory needs weekly releases while Core is quarterly. (Not the case — both evolve together.)
+4. **External contributors** — A major contributor wants to own Memory independently. (No sign of this.)
+
+**Current verdict: None of these conditions are met.** Ship via umbrella only.
+
+#### If We Do AgentEval.Memory Standalone, Why Not AgentEval.RedTeam Too?
+
+**Exactly.** This is the slippery slope argument, and it's valid:
+
+| Package | Standalone case | Counter-argument |
+|---------|----------------|-----------------|
+| `AgentEval.Memory` | "I only want memory eval" | You'll want tool assertions too when your memory-enabled agent calls tools |
+| `AgentEval.RedTeam` | "I only want security scanning" | Security teams often need the full eval context to understand vulnerabilities |
+| `AgentEval.MAF` | "I only use MAF" | MAF users need Core metrics and assertions |
+| `AgentEval.DataLoaders` | "I only need data loading" | Loading data without evaluation is pointless |
+
+If we make Memory standalone, we have no principled reason to deny RedTeam standalone, then MAF standalone, and suddenly we're managing **5 independent NuGet packages** with a compatibility matrix, 5 release pipelines, and 5 changelogs. For a team of 1-3 maintainers, this is **unsustainable overhead with no user benefit**.
+
+#### The Recommendation
+
+**Ship everything through the umbrella. Period.**
+
+```
+RECOMMENDED: Single NuGet, all batteries included
+===================================================
+
+NuGet: AgentEval (v0.x.x)
+  ├── AgentEval.Abstractions.dll
+  ├── AgentEval.Core.dll
+  ├── AgentEval.Memory.dll        ← included automatically
+  ├── AgentEval.DataLoaders.dll
+  ├── AgentEval.RedTeam.dll
+  └── AgentEval.MAF.dll
+
+User experience:
+  dotnet add package AgentEval
+  // Done. Everything works. No compatibility questions.
+
+NOT recommended (for now):
+  dotnet add package AgentEval.Memory        ← separate NuGet
+  dotnet add package AgentEval.RedTeam       ← separate NuGet
+  // Creates: version compatibility issues, confused users, maintenance burden
+```
+
+**Revisit this decision when:**
+- Total package size exceeds 10MB (currently <2MB)
+- We have 3+ dedicated maintainers per sub-package
+- User research shows demand for granular packages
+- A specific sub-package has a fundamentally different release cadence
+
+**How it works in the same repo:** All sub-projects (`AgentEval.Memory`, `AgentEval.RedTeam`, etc.) remain as separate `.csproj` files in `src/`. They compile into separate DLLs. The umbrella `src/AgentEval/AgentEval.csproj` references all of them and is the only `IsPackable=true` project. `dotnet pack src/AgentEval` bundles all DLLs into one NuGet. This is exactly how it works today — Memory just becomes another DLL in the bundle.
 
 ### 17.6 Market Execution Plan
 
@@ -4593,7 +4708,7 @@ Now let's turn the amps to 11 and build it! 🎸⚡🤘
 
 **Author:** AgentEval Engineering  
 **Rock Level:** 11/10 🔊  
-**Last Updated:** 2026-03-07
+**Last Updated:** 2026-03-09
 
 ---
 
@@ -4613,3 +4728,520 @@ Now let's turn the amps to 11 and build it! 🎸⚡🤘
 | | — M3: Fixed `MemoryRetentionMetric` prefix from `code_` to `llm_` |
 | | — L2: Added MAF rc3 API verification note for F08 |
 | | — L4: Preserved `configure` parameter in `AddAgentEvalAll()` update |
+| 2026-03-09 | **Section 17 expanded:** Added detailed explanation of "Double Down on Agentic Evaluation" and "Integrating memory providers with evaluation framework" — simple + detailed explanations |
+| 2026-03-09 | **Section 17.5 expanded:** Added 17.5.1 "Deep Analysis" with pros/cons table for standalone NuGet, standalone viability assessment, AgentEval.RedTeam comparison, and clear recommendation to ship via umbrella only |
+| 2026-03-09 | **Added Annex A:** Full Feature List & Prioritization — all 29 features (F01-F29) ported from RC3 Feature Analysis with descriptions, requirements, scoring rationale, and tier assignments |
+
+---
+
+## Annex A: Full Feature List & Prioritization
+
+> **Source:** Section 21 and Section 34 of [AgentEval-Feature-Analysis-MemoryEvaluation-RC3.md](AgentEval-Feature-Analysis-MemoryEvaluation-RC3.md)  
+> **Scoring methodology:** Each feature rated on 3 axes: Relevance (30%), Developer Experience (30%), Quality Impact (40%). Quality Impact gets the highest weight because the ultimate purpose of evaluation is to make agents better.  
+> **Formula:** Final Score = (Relevance × 0.30) + (DevEx × 0.30) + (QualityImpact × 0.40)
+
+### Master Scoring Table
+
+| ID | Feature | Universal? | Relevance | DevEx | Quality Impact | Final Score | Tier |
+|----|---------|:----------:|:---------:|:-----:|:--------------:|:-----------:|:----:|
+| **F01** | Core Engine | ✅ | 10 | 8 | 9 | **9.0** | **S** |
+| **F02** | LLM-as-Judge for Memory | ✅ | 9 | 8 | 9 | **8.7** | **S** |
+| **F03** | CanRememberAsync One-Liner | ✅ | 8 | **10** | 7 | **8.2** | **S** |
+| **F04** | Fluent Memory Assertions | ✅ | 7 | **10** | 6 | **7.5** | **S** |
+| **F05** | Temporal Memory Evaluation | ✅ | 9 | 7 | **10** | **8.8** | **S** |
+| **F06** | Memory Result Export | ✅ | 6 | 8 | 4 | **5.8** | B |
+| **F07** | Built-in Scenario Library | ✅ | 8 | **9** | 8 | **8.3** | **S** |
+| **F08** | Scope Misconfiguration Detection | **MAF** | 7 | 9 | **9** | **8.4** | **S** ⬆ |
+| **F09** | Cross-Session Persistence Testing | ✅* | 9 | 7 | **9** | **8.4** | **S** ⬆ |
+| **F10** | Chat Reducer Evaluation | ✅ | 8 | 7 | **9** | **8.1** | **S** |
+| **F11** | Provider-Level Introspection | MAF | 7 | 6 | 8 | **7.1** | B+ |
+| **F12** | Memory Diff/Regression Testing | ✅ | 7 | 8 | 7 | **7.3** | B+ |
+| ~~**F13**~~ | ~~Scope Isolation Testing~~ | — | — | — | — | — | **REMOVED** |
+| **F14** | Memory Stress Testing | ✅ | 7 | 6 | **9** | **7.5** | A |
+| **F15** | Selective Forgetting / GDPR | ✅ | 8 | 6 | **10** | **8.2** | A |
+| **F16** | Adversarial Memory Attacks | ✅ | 8 | 5 | **10** | **7.9** | A |
+| **F17** | Memory Security Scan One-Liner | ✅ | 7 | **9** | 8 | **8.0** | A |
+| **F18** | Memory Benchmark Suite | ✅ | 8 | 8 | 7 | **7.6** | **S** |
+| **F19** | Memory Consistency Oracle | ✅ | 7 | 5 | **10** | **7.6** | A |
+| **F20** | Generative Scenario Generation | ✅ | 5 | 7 | 6 | **6.0** | B |
+| **F21** | Embedding Model Impact Analysis | ✅ | 6 | 6 | 7 | **6.4** | B |
+| **F22** | Memory State Visualization | ✅ | 4 | 8 | 3 | **4.8** | C |
+| **F23** | Emotional Memory Evaluation | ✅ | 5 | 5 | 6 | **5.4** | B- |
+| **F24** | Memory as Data Quality Testing | ✅ | 5 | 5 | 6 | **5.4** | C |
+| **F25** | Memory Time Machine | ✅ | 5 | 4 | 7 | **5.5** | C |
+| **F26** | Chatty Conversation Scenarios | ✅ | **9** | 8 | **10** | **9.1** | **S** |
+| **F27** | Reach-Back Depth Testing | ✅* | **9** | 7 | **10** | **8.8** | **S** |
+| **F28** | Token-Aware Context Evaluation | ✅ | **8** | 6 | **9** | **7.8** | A |
+| **F29** | Conversation Topology Testing | ✅ | 7 | 6 | **9** | **7.5** | A |
+
+`⬆` = Promoted from A to S tier. `*` = Requires `ISessionResettableAgent` for full capability.
+
+### Tier Summary
+
+| Tier | Score Range | Count | Features |
+|------|-----------|:-----:|----------|
+| **S** (Must-Have) | 7.5+ (curated) | 12 | F01, F02, F03, F04, F05, F07, F08, F09, F10, F18, F26, F27 |
+| **A** (High-Value) | 7.5 - 8.2 | 7 | F14, F15, F16, F17, F19, F28, F29 |
+| **B+** (Solid) | 7.0 - 7.4 | 2 | F11, F12 |
+| **B** (Nice-to-Have) | 5.5 - 6.9 | 3 | F06, F20, F21 |
+| **B-** | 5.4 | 2 | F23, F24 |
+| **C** (Low Priority) | < 5.5 | 3 | F22, F24, F25 |
+| **REMOVED** | — | 1 | F13 (isolated by MAF design) |
+
+---
+
+### Feature-by-Feature Descriptions
+
+#### F01: Core Engine (MemoryTestScenario, Runner, Result Model) — Tier S, Score 9.0
+
+**What it is:** The foundation of all memory evaluation. Provides `MemoryTestScenario` (define: steps to plant facts, queries to test recall), `MemoryTestRunner` (orchestrates: send messages → query → judge), and `MemoryEvaluationResult` (structured results with per-fact scores, pass/fail, timing).
+
+**What it provides:** A 3-phase execution model: (1) Seed facts via conversation turns, (2) Execute queries that test recall, (3) Judge responses with LLM-as-judge. Comprehensive result model with per-query scoring, aggregation, and performance tracking.
+
+**What it requires:** `IEvaluableAgent` (any agent), `IChatClient` (for LLM judging), scenario definition.
+
+**Scoring rationale:**
+- *Relevance (10)*: Without this, nothing else works. It IS the memory evaluation engine.
+- *DevEx (8)*: Scenario definition is straightforward but requires understanding the 3-phase model. Not a one-liner (that's F03).
+- *Quality Impact (9)*: Directly reveals whether agents remember facts. Catches retention failures, temporal errors, confusion.
+- *Tier S*: Foundation dependency for every other feature.
+
+---
+
+#### F02: LLM-as-Judge for Memory — Tier S, Score 8.7
+
+**What it is:** `MemoryJudge` — a structured LLM prompt that evaluates whether an agent's response demonstrates genuine recall of a planted fact. Uses `IChatClient` with JSON-structured output (score 0-100, explanation, confidence).
+
+**What it provides:** Reliable fact verification beyond keyword matching. Handles paraphrasing ("I'm José" → "Your name is José"), partial recall, and nuanced responses. Fallback parsing for malformed LLM responses.
+
+**What it requires:** `IChatClient` (LLM for judging — typically a separate, cheaper model than the agent under test). Costs ~$0.001-0.01 per judgment call.
+
+**Scoring rationale:**
+- *Relevance (9)*: Memory recall is inherently semantic — string matching is insufficient. LLM judging is the only reliable approach.
+- *DevEx (8)*: Transparent to the user — happens automatically inside `MemoryTestRunner`. Users see scores, not the judging internals.
+- *Quality Impact (9)*: Catches subtle recall failures (partial recall, confabulation, wrong context) that keyword matching would miss.
+- *Tier S*: Required by F01 for accurate scoring.
+
+---
+
+#### F03: CanRememberAsync One-Liner — Tier S, Score 8.2
+
+**What it is:** A single extension method: `await agent.CanRememberAsync("I told you I'm allergic to peanuts", "What are my food allergies?")`. Returns a `MemoryEvaluationResult` with pass/fail, score, and explanation.
+
+**What it provides:** The "Hello World" of memory evaluation. Zero ceremony — no scenario definition, no runner setup, no configuration. Tell the agent a fact, ask about it, get a result.
+
+**What it requires:** `IEvaluableAgent`, `IChatClient` (for judging). Optionally registered via DI.
+
+**Scoring rationale:**
+- *Relevance (8)*: Covers the most common use case (did the agent remember?) but lacks the power of full scenarios.
+- *DevEx (10)*: Perfect 10 — one line of code. Cannot be simpler. This is what hooks developers.
+- *Quality Impact (7)*: Tests basic retention only. Doesn't test temporal reasoning, cross-session, or noise resilience.
+- *Tier S*: The gateway drug that gets developers into memory evaluation.
+
+---
+
+#### F04: Fluent Memory Assertions — Tier S, Score 7.5
+
+**What it is:** `.Should()` extension methods on `MemoryEvaluationResult` following the existing AgentEval assertion pattern. Chains like `.Should().HavePassed().WithMinScore(0.8).WithFactRecalled("allergy")`.
+
+**What it provides:** Natural-language assertion chains that integrate with xUnit/NUnit test frameworks. Structured `MemoryAssertionException` with Expected/Actual/Suggestions/Because fields matching the AgentEval assertion pattern.
+
+**What it requires:** `MemoryEvaluationResult` from F01 or F03. Uses the `AgentEvalScope.FailWith()` pattern from Core.
+
+**Scoring rationale:**
+- *Relevance (7)*: Assertions are an ergonomic layer, not a capability layer. You can check results without fluent chains.
+- *DevEx (10)*: Perfect 10 — developers love fluent assertions. `.Should().HavePassed()` reads like English.
+- *Quality Impact (6)*: Doesn't find more bugs than checking result properties manually. But makes it much easier to express expectations.
+- *Tier S*: Consistency with AgentEval's existing assertion patterns is essential for a unified developer experience.
+
+---
+
+#### F05: Temporal Memory Evaluation — Tier S, Score 8.8
+
+**What it is:** Tests whether agents correctly reason about time-dependent facts. "I lived in Madrid until 2024, then moved to Copenhagen." Query: "Where do I live now?" The agent must understand that facts have temporal validity and that newer facts supersede older ones.
+
+**What it provides:** `TemporalMemoryScenario` with timestamped facts that evolve over time. Tests: fact supersession (old address → new address), time-bounded validity ("meeting at 3pm tomorrow" is irrelevant next week), temporal ordering (which happened first?).
+
+**What it requires:** `IEvaluableAgent`, `IChatClient` (for LLM judging with temporal awareness). `MemoryFact` model with `ValidFrom`/`ValidUntil` temporal metadata.
+
+**Scoring rationale:**
+- *Relevance (9)*: Every production agent has temporal facts. Address changes, preference updates, schedule changes — all temporal.
+- *DevEx (7)*: Temporal scenarios are more complex to define than basic retention. Requires understanding fact evolution.
+- *Quality Impact (10)*: Temporal bugs are the #1 production memory failure. Agent recommends your old restaurant, uses your old address, references expired plans. Catching these is critical.
+- *Tier S*: The hardest memory problem and the most impactful to test.
+
+---
+
+#### F06: Memory Result Export — Tier B, Score 5.8
+
+**What it is:** Export `MemoryEvaluationResult` to JSON, Markdown, CSV, and JUnit XML formats for CI/CD integration and reporting.
+
+**What it provides:** Machine-readable memory evaluation reports. CI pipeline integration (JUnit for Azure DevOps/GitHub Actions). Human-readable Markdown summaries.
+
+**What it requires:** `MemoryEvaluationResult`. Leverages existing `AgentEval.DataLoaders` export infrastructure.
+
+**Scoring rationale:**
+- *Relevance (6)*: Useful for CI/CD but not critical for discovering memory bugs.
+- *DevEx (8)*: Well-understood format. Developers know how to consume JSON/JUnit.
+- *Quality Impact (4)*: Export doesn't find bugs — it reports them. Low direct quality impact.
+- *Tier B*: Nice-to-have. Existing DataLoaders infrastructure makes this easy to add later.
+
+---
+
+#### F07: Built-in Scenario Library — Tier S, Score 8.3
+
+**What it is:** A curated collection of pre-built `MemoryTestScenario` instances covering common memory testing patterns: basic retention, fact updates, multi-fact recall, chatty conversations (F26), temporal evolution (F05).
+
+**What it provides:** `MemoryScenarios.BasicRetention()`, `MemoryScenarios.FactUpdate()`, `MemoryScenarios.ChattyConversation()`, etc. Saves developers from writing scenarios from scratch. Includes `MemoryStressSuite` for load testing.
+
+**What it requires:** F01 (Core Engine) for execution. No external dependencies.
+
+**Scoring rationale:**
+- *Relevance (8)*: Most developers don't know what to test. Built-in scenarios answer "what should I test?"
+- *DevEx (9)*: One-liner scenario selection. `MemoryScenarios.BasicRetention()` → done.
+- *Quality Impact (8)*: Curated scenarios are designed to catch real-world bugs. Better coverage than ad-hoc tests.
+- *Tier S*: Massive time-saver. Makes the framework immediately useful without scenario authoring expertise.
+
+---
+
+#### F08: Scope Misconfiguration Detection — Tier S, Score 8.4
+
+**What it is:** Static analysis of MAF memory provider scope configuration. Detects the #1 configuration bug: `SessionId` in `SearchScope` (which blocks cross-session recall). Also detects: dimension mismatch between StorageScope and SearchScope, missing user isolation, overly broad scopes.
+
+**What it provides:** `code_scope_misconfiguration` metric — zero LLM cost, instant results. Actionable warnings: "Your SearchScope includes SessionId — this prevents cross-session memory recall. Remove SessionId from SearchScope to enable cross-session search."
+
+**What it requires:** **MAF-only.** Needs `AIAgent` with `AIContextProviders` array. Inspects `ProviderSessionState<State>` for scope configuration. Lives in `AgentEval.MAF`, not `AgentEval.Memory`.
+
+**Scoring rationale:**
+- *Relevance (7)*: MAF-specific, so not universal. But for MAF users, this is the single most common config bug.
+- *DevEx (9)*: Zero-cost, instant feedback, actionable suggestions. "Run this, get warnings."
+- *Quality Impact (9)*: Catches a bug that causes hours of debugging. "Why doesn't my agent remember across sessions?" → "Your SearchScope has SessionId."
+- *Tier S*: Promoted from A-tier because it's free (no LLM cost), instant, and catches the most common MAF memory bug.
+
+---
+
+#### F09: Cross-Session Persistence Testing — Tier S, Score 8.4
+
+**What it is:** Tests whether an agent's memory survives session boundaries. Plant a fact in session 1, reset the session, query in session 2. If the agent recalls the fact, its memory is truly persistent (not just in-context).
+
+**What it provides:** `ICrossSessionEvaluator` + `CrossSessionEvaluator` that orchestrates: (1) seed facts, (2) reset session via `ISessionResettableAgent.ResetSessionAsync()`, (3) query in fresh session, (4) judge recall. `CrossSessionResult` with per-fact persistence scores.
+
+**What it requires:** `ISessionResettableAgent` interface for session reset capability. Both `ChatClientAgentAdapter` and `MAFAgentAdapter` implement this. Graceful degradation (skip cross-session tests) if agent doesn't implement the interface.
+
+**Scoring rationale:**
+- *Relevance (9)*: Cross-session persistence IS the value proposition of memory providers. Without this test, you're testing chat history, not memory.
+- *DevEx (7)*: Requires `ISessionResettableAgent` implementation. Slightly more setup than basic tests.
+- *Quality Impact (9)*: The #1 question for production agents: "Does memory actually persist across sessions?" This answers it definitively.
+- *Tier S*: Promoted from A-tier. The reason memory providers exist. If you can't test this, memory evaluation is incomplete.
+
+---
+
+#### F10: Chat Reducer Evaluation — Tier S, Score 8.1
+
+**What it is:** Evaluates the information loss caused by `IChatReducer` implementations (like `MessageCountingChatReducer`). Seeds N diverse facts in a conversation, applies a reducer, then tests which facts survive reduction.
+
+**What it provides:** `IReducerEvaluator` + `ReducerEvaluator` that measures: (1) fact survival rate (what % of facts are still recalled after reduction), (2) critical fact loss (were safety-critical facts like allergies lost?), (3) comparison across reducer configurations (keep-5 vs keep-10 vs keep-20).
+
+**What it requires:** `IEvaluableAgent` with a configured `IChatReducer`. `IChatClient` for LLM judging of recall quality.
+
+**Scoring rationale:**
+- *Relevance (8)*: Every agent with a ChatHistoryProvider uses a reducer. Nobody measures the quality impact.
+- *DevEx (7)*: Requires understanding reducers and configuring test scenarios. Not a one-liner.
+- *Quality Impact (9)*: **Nobody is measuring this properly.** The reducer silently loses information. Which facts survive is essentially random. This reveals a massive blind spot.
+- *Tier S*: A unique capability. No other framework measures reducer information loss.
+
+---
+
+#### F11: Provider-Level Introspection — Tier B+, Score 7.1
+
+**What it is:** White-box inspection of memory provider internals: what's stored in `ChatHistoryProvider`'s message list, what's in the vector store, what Mem0 has extracted. Uses `GetService<T>()` and direct provider APIs.
+
+**What it provides:** Direct visibility into provider state without going through LLM. "Show me exactly what the ChatHistoryMemoryProvider has stored." Debug facility for when black-box tests fail.
+
+**What it requires:** MAF-specific APIs: `provider.GetMessages(session)`, `GetService<T>()`. Not available for all provider types (Foundry extraction is opaque).
+
+**Scoring rationale:**
+- *Relevance (7)*: Useful for debugging but not a primary evaluation tool.
+- *DevEx (6)*: Requires provider-specific API knowledge. Each provider has different introspection APIs.
+- *Quality Impact (8)*: When black-box tests fail, introspection reveals WHY. Significantly reduces debugging time.
+- *Tier B+*: A debugging tool, not a primary evaluation feature. Valuable but not essential.
+
+---
+
+#### F12: Memory Diff/Regression Testing — Tier B+, Score 7.3
+
+**What it is:** Compare memory evaluation results across runs/versions/configurations. Detect regressions: "Version 2.1 recalls 95% of facts, version 2.2 only recalls 80% — regression!"
+
+**What it provides:** Baseline capture (save a "known good" result), comparison (diff against baseline), regression alerts (scores dropped by > threshold).
+
+**What it requires:** F01 (Core Engine) results from two runs. Storage for baseline results (file system or CI artifact).
+
+**Scoring rationale:**
+- *Relevance (7)*: Important for production CI but not for initial evaluation.
+- *DevEx (8)*: Straightforward compare-and-alert pattern. Developers understand regression testing.
+- *Quality Impact (7)*: Catches regressions but doesn't find new bugs. Preventive, not diagnostic.
+- *Tier B+*: Solid CI/CD feature for mature deployments. Not needed in MVP.
+
+---
+
+#### F13: Scope Isolation Testing — REMOVED
+
+**What it was:** Test that User A's memories are invisible to User B.
+
+**Why removed:** MAF enforces scope isolation by design. `StorageScope` and `SearchScope` have explicit dimensions (`UserId`, `SessionId`). There's no mechanism for cross-scope leakage unless the developer explicitly misconfigures scopes — which F08 already detects. Testing scope isolation would be testing MAF's guarantees, not the agent's memory quality.
+
+---
+
+#### F14: Memory Stress Testing — Tier A, Score 7.5
+
+**What it is:** Test memory behavior under extreme conditions: 100+ turns, 50+ facts, rapid-fire messages, mixed topics, long conversations. Measure recall degradation over time.
+
+**What it provides:** `MemoryStressSuite` with parameterized load profiles. Answers: "At what conversation length does memory start failing?" and "Which facts are lost first under stress?"
+
+**What it requires:** `IEvaluableAgent`, significant LLM cost for long conversations + judging (100+ turns × judge calls).
+
+**Scoring rationale:**
+- *Relevance (7)*: Important for production readiness but not the first thing to test.
+- *DevEx (6)*: Stress tests are slow (minutes, not seconds). Requires patience and budget.
+- *Quality Impact (9)*: Reveals degradation patterns invisible in short tests. Critical for production deployment decisions.
+- *Tier A*: High value but expensive to run. Phase 2 feature.
+
+---
+
+#### F15: Selective Forgetting / GDPR Compliance — Tier A, Score 8.2
+
+**What it is:** Test whether memory deletion APIs actually work. Seeds sensitive PII, calls `ClearStoredMemoriesAsync()` (Mem0) or `EnsureStoredMemoriesDeletedAsync()` (Foundry), then verifies the data is truly gone from responses AND provider state.
+
+**What it provides:** GDPR/CCPA compliance verification. Answers: "If a user requests deletion, is their data actually removed from agent memory?"
+
+**What it requires:** Agent with memory deletion API. Provider-specific: `Mem0Provider.ClearStoredMemoriesAsync()`, `FoundryMemoryProvider.EnsureStoredMemoriesDeletedAsync()`. Not all providers support deletion.
+
+**Scoring rationale:**
+- *Relevance (8)*: GDPR compliance is a legal requirement in EU markets. Critical for enterprise deployment.
+- *DevEx (6)*: Requires provider-specific deletion APIs. Not universal across all memory providers.
+- *Quality Impact (10)*: A failed deletion = legal liability. Extremely high impact when it fails.
+- *Tier A*: Critical for compliance but requires provider-specific APIs. Phase 2 feature.
+
+---
+
+#### F16: Adversarial Memory Attacks — Tier A, Score 7.9
+
+**What it is:** Six categories of memory-specific security attacks: memory poisoning, memory extraction, memory flooding, cross-scope probing, temporal manipulation, embedding inversion. Based on OWASP LLM Top 10 and MITRE ATLAS.
+
+**What it provides:** Specialized attack scenarios for memory systems. Tests beyond prompt injection — tests persistent attacks that survive across sessions. OWASP coverage jumps from 6/10 to 8/10 with memory attacks.
+
+**What it requires:** F01 (Core Engine) + F07 (Scenario Library). Attack scenarios are specialized `MemoryTestScenario` instances. LLM for judging attack success.
+
+**Scoring rationale:**
+- *Relevance (8)*: Memory is a persistent attack surface — the most dangerous kind. Attacks persist across sessions.
+- *DevEx (5)*: Security testing is inherently complex. Requires understanding attack categories and configuring scenarios.
+- *Quality Impact (10)*: A successful memory attack can poison ALL future responses. Catastrophic impact.
+- *Tier A*: High impact but complex to implement. Builds on F01/F07. Phase 2 with integration into AgentEval.RedTeam.
+
+---
+
+#### F17: Memory Security Scan One-Liner — Tier A, Score 8.0
+
+**What it is:** `await agent.QuickMemorySecurityScanAsync()` — packages all F16 attack categories into a single call. The memory equivalent of AgentEval.RedTeam's quick scan.
+
+**What it provides:** One-liner that runs all 6 attack categories (poisoning, extraction, flooding, cross-scope, temporal, embedding) and returns a structured security report with OWASP/MITRE mappings.
+
+**What it requires:** F16 (Adversarial Memory Attacks) must be implemented first. `IChatClient` for LLM judging.
+
+**Scoring rationale:**
+- *Relevance (7)*: Important but derivative of F16. The one-liner itself isn't the innovation — the attack categories are.
+- *DevEx (9)*: One line, full security scan. Extremely easy to adopt.
+- *Quality Impact (8)*: Same as F16 but through an accessible interface. More developers will actually run it.
+- *Tier A*: Depends on F16. Ship together as a Phase 2 security package.
+
+---
+
+#### F18: Memory Benchmark Suite — Tier S, Score 7.6
+
+**What it is:** `IMemoryBenchmarkRunner` that orchestrates a standardized battery of memory tests and produces a holistic quality score. Three presets: Quick (5 facts, basic recall), Standard (20 facts, temporal + noise), Full (50+ facts, cross-session + stress + chatty).
+
+**What it provides:** A single "memory quality score" comparable across agents, providers, and configurations. Graded results (A-F) with breakdown by category (retention, temporal, noise resilience, cross-session).
+
+**What it requires:** F01, F02, F05, F07, F09, F10, F26, F27 — it's an orchestrator that combines multiple features into one run.
+
+**Scoring rationale:**
+- *Relevance (8)*: "How good is my agent's memory?" answered in one number.
+- *DevEx (8)*: One call: `await runner.RunBenchmarkAsync(agent, MemoryBenchmark.Standard)`.
+- *Quality Impact (7)*: Comprehensive but broad. Individual features (F05 temporal, F27 reach-back) provide deeper insight.
+- *Tier S*: The "executive summary" that makes all other features accessible.
+
+---
+
+#### F19: Memory Consistency Oracle — Tier A, Score 7.6
+
+**What it is:** A ground-truth oracle that knows exactly which facts should be remembered at any point in the conversation. Fed a `FactSet` (all seeded facts with temporal metadata), it evaluates whether the agent's response is consistent with the known fact state.
+
+**What it provides:** Deterministic fact verification. Instead of asking "does the LLM think the agent remembered?" it checks "does the response match our ground-truth facts?" Detects contradictions, confabulations, and hallucinated memories.
+
+**What it requires:** `FactSet` definition (manual or generated from scenarios). `IChatClient` for LLM-based consistency checking.
+
+**Scoring rationale:**
+- *Relevance (7)*: Powerful for advanced evaluation but requires more setup than basic judging (F02).
+- *DevEx (5)*: Requires building a `FactSet` — more effort than simple scenarios.
+- *Quality Impact (10)*: The gold standard for memory accuracy. Catches confabulations that LLM-as-judge alone might miss.
+- *Tier A*: High quality impact but harder to use. Advanced feature for thorough evaluation.
+
+---
+
+#### F20: Generative Scenario Generation — Tier B, Score 6.0
+
+**What it is:** Use an LLM to automatically generate memory test scenarios based on a domain description. "Generate memory tests for a healthcare assistant" → produces scenarios about medications, allergies, appointments, etc.
+
+**What it provides:** Automated scenario creation. Reduces the manual effort of writing test scenarios for domain-specific agents.
+
+**What it requires:** `IChatClient` for scenario generation. Domain description text. LLM cost for generation (one-time per domain).
+
+**Scoring rationale:**
+- *Relevance (5)*: Useful but not essential. The built-in scenario library (F07) covers most common patterns.
+- *DevEx (7)*: Easy to use — provide a description, get scenarios. But generated scenarios need human review.
+- *Quality Impact (6)*: Generated scenarios may not cover edge cases that hand-crafted ones do. Useful for breadth, not depth.
+- *Tier B*: Nice automation for large-scale testing. Not critical for MVP.
+
+---
+
+#### F21: Embedding Model Impact Analysis — Tier B, Score 6.4
+
+**What it is:** Run the same memory evaluation scenarios against the same agent but with different embedding models (text-embedding-3-large vs text-embedding-3-small vs ada-002). Compare recall quality per model.
+
+**What it provides:** Data-driven embedding model selection. "text-embedding-3-large retrieves 95% of buried facts; text-embedding-3-small only 70%." Helps justify the cost of larger embedding models.
+
+**What it requires:** Multiple embedding model configurations. Same agent/scenario, only the embedding varies. Higher LLM/API cost (multiple embedding model invocations).
+
+**Scoring rationale:**
+- *Relevance (6)*: Important for teams choosing embedding models but a niche use case.
+- *DevEx (6)*: Requires configuring multiple embedding backends. Not trivial.
+- *Quality Impact (7)*: Reveals a hidden variable (embedding quality) that significantly affects memory recall.
+- *Tier B*: Valuable for teams optimizing memory infrastructure. Not needed for basic evaluation.
+
+---
+
+#### F22: Memory State Visualization — Tier C, Score 4.8
+
+**What it is:** Visual representation of the agent's memory state: what's in the chat history, what's in the vector store, what the agent "knows" at each point in the conversation.
+
+**What it provides:** Debug-oriented visualization. Memory timelines, fact graphs, retrieval path diagrams.
+
+**What it requires:** Provider introspection (F11). UI/rendering capabilities (CLI table output or file-based visualization).
+
+**Scoring rationale:**
+- *Relevance (4)*: Debugging aid, not an evaluation feature. Useful but peripheral.
+- *DevEx (8)*: Visualizations are intuitive and helpful.
+- *Quality Impact (3)*: Shows what's there but doesn't assess quality. Diagnostic, not evaluative.
+- *Tier C*: Low priority. The CLI/dashboard is in a separate repository scope.
+
+---
+
+#### F23: Emotional Memory Evaluation — Tier B-, Score 5.4
+
+**What it is:** Test whether agents correctly recall and respond to emotionally charged information. "My mother passed away last month" — does the agent remember and respond with appropriate empathy later?
+
+**What it provides:** Scenarios with emotional context. Tests both recall (did the agent remember?) and appropriateness (did it respond with empathy, not cheerfully?).
+
+**What it requires:** LLM judging with emotional tone evaluation. More nuanced judging prompts than factual recall.
+
+**Scoring rationale:**
+- *Relevance (5)*: Important for customer-facing agents but niche compared to factual recall.
+- *DevEx (5)*: Emotional evaluation is inherently subjective. Harder to score definitively.
+- *Quality Impact (6)*: An insensitive response to grief is a UX catastrophe, but the failure frequency is lower than factual errors.
+- *Tier B-*: Niche feature for specific use cases (healthcare, customer support with emotional intelligence).
+
+---
+
+#### F24: Memory as Data Quality Testing — Tier C, Score 5.4
+
+**What it is:** Treat the agent's memory as a data store and evaluate its data quality properties: completeness (all facts stored?), accuracy (stored facts match input?), freshness (stale data detected?), consistency (no contradictions?).
+
+**What it provides:** Data quality metrics applied to agent memory. Percentage-based scores for each data quality dimension.
+
+**What it requires:** Ground-truth fact set (similar to F19 Oracle). Analysis of stored memory state.
+
+**Scoring rationale:**
+- *Relevance (5)*: Data quality is a valid lens but overlaps heavily with F01 (retention) and F19 (oracle).
+- *DevEx (5)*: Requires data quality framework understanding. Not intuitive for most agent developers.
+- *Quality Impact (6)*: Valid approach but doesn't find bugs that F01/F19 wouldn't already catch.
+- *Tier C*: Too much overlap with existing features. Not a priority.
+
+---
+
+#### F25: Memory Time Machine — Tier C, Score 5.5
+
+**What it is:** Replay a conversation and query the agent's memory at any historical point. "What did the agent know after turn 15?" — without re-running turns 16-50.
+
+**What it provides:** Historical memory state inspection. Debug and analyze how memory evolved over a conversation.
+
+**What it requires:** Full conversation trace recording (like AgentEval's existing Trace Record/Replay). Session state snapshots at each turn.
+
+**Scoring rationale:**
+- *Relevance (5)*: Powerful debugging concept but heavy implementation.
+- *DevEx (4)*: Complex UX — requires understanding trace replay and session state snapshots.
+- *Quality Impact (7)*: When it works, it reveals exactly when and why memory degraded. High value for root cause analysis.
+- *Tier C*: Implementation cost outweighs benefit. Use F27 (Reach-Back) for depth testing instead.
+
+---
+
+#### F26: Chatty Conversation Scenarios — Tier S, Score 9.1
+
+**What it is:** Test scenarios where important facts are buried in realistic noisy conversations. 80%+ of messages are noise (pleasantries, small talk, topic changes), and the agent must still recall the 20% that contains real information. Directly inspired by Wes's feedback about production conversations.
+
+**What it provides:** `ChattyConversationScenarios` with configurable noise-to-signal ratios. Built-in noise generators: casual chit-chat, emotional responses ("That's so interesting!"), topic digressions, filler messages. Facts are randomly buried within the noise.
+
+**What it requires:** F01 (Core Engine) + F07 (Scenario Library). No additional external dependencies.
+
+**Scoring rationale:**
+- *Relevance (9)*: Real conversations are chatty. Clean test scenarios are unrealistic. This bridges the gap.
+- *DevEx (8)*: Pre-built chatty scenarios. `MemoryScenarios.ChattyConversation(factCount: 5, noiseRatio: 10)`.
+- *Quality Impact (10)*: The #1 reason agents fail in production: facts buried in noise. This catches exactly that failure mode.
+- *Tier S*: Elevated by Wes's expert feedback. Tests the hardest real-world memory problem.
+
+---
+
+#### F27: Reach-Back Depth Testing — Tier S, Score 8.8
+
+**What it is:** Parametric test that measures how far back in a conversation an agent can reliably recall facts through layers of noise. Plant a fact at turn T, fill N noise turns, query at turn T+N. Measure the maximum N where recall still succeeds.
+
+**What it provides:** `IReachBackEvaluator` + `ReachBackEvaluator` that produces a `ReachBackResult` with: maximum reliable depth, degradation curve (quality vs distance), failure point. A single number ("this agent can reach back 25 turns") that's immediately actionable.
+
+**What it requires:** `IEvaluableAgent`, `ISessionResettableAgent` (for fresh sessions per depth test), `IChatClient` (for LLM judging). Multiple test runs (one per depth point). Higher cost for deeper tests.
+
+**Scoring rationale:**
+- *Relevance (9)*: Directly measures the agent's "memory depth" — the most important characteristic of memory quality.
+- *DevEx (7)*: Requires configuring depth points and noise generators. Not a one-liner but well-structured.
+- *Quality Impact (10)*: The depth number is the single most actionable metric. "Your agent's memory fails at 25 turns." Teams immediately know their limit.
+- *Tier S*: Novel capability. No existing framework measures reach-back depth.
+
+---
+
+#### F28: Token-Aware Context Evaluation — Tier A, Score 7.8
+
+**What it is:** Evaluate memory context in tokens, not messages. A chatty "That's great!" is 3 tokens; "My SSN is 123-45-6789 and I'm allergic to shellfish" is 20 tokens. Message-counting reducers treat them the same — token-aware evaluation reveals the real information density.
+
+**What it provides:** Token-level analysis of memory context: signal-to-noise ratio in tokens, token budget recommendations per fact density, comparison of token-counting vs message-counting reducers.
+
+**What it requires:** Token estimation (tiktoken or model-specific tokenizer). `IChatClient` or tokenizer API. Extends F10 (Reducer Evaluation).
+
+**Scoring rationale:**
+- *Relevance (8)*: Token budget is the real constraint, not message count. This measures what actually matters.
+- *DevEx (6)*: Requires tokenizer integration. Adds complexity to reducer evaluation.
+- *Quality Impact (9)*: Reveals why reducers lose important facts: they count messages, not tokens. The "aha moment" for many teams.
+- *Tier A*: Important insight but builds on F10. Phase 2 enhancement.
+
+---
+
+#### F29: Conversation Topology Testing — Tier A, Score 7.5
+
+**What it is:** Test memory across different conversation shapes: linear (A→B→C), branching (topic digressions), interwoven (multi-topic), correction-heavy (user corrects facts repeatedly), debate-style (back-and-forth argumentation). Each topology has different memory challenges.
+
+**What it provides:** Scenario templates for each conversation shape. Identifies which topologies cause memory failures. "Your agent handles linear conversations fine but fails with topic digressions."
+
+**What it requires:** F01 (Core Engine) + F07 (Scenario Library). Topology-specific scenario generators.
+
+**Scoring rationale:**
+- *Relevance (7)*: Real conversations are not linear. Testing different shapes is realistic.
+- *DevEx (6)*: More complex scenario setup. Developers must understand topology concepts.
+- *Quality Impact (9)*: Different topologies stress different memory aspects. Branching conversations reveal context-switching failures. Corrections reveal temporal reasoning bugs.
+- *Tier A*: Advanced scenario design. Phase 2 feature extending F07.
