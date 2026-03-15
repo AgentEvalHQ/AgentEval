@@ -64,6 +64,12 @@ public class ReducerEvaluator : IReducerEvaluator
         _logger.LogInformation("Starting reducer fidelity evaluation with {FactCount} facts and {NoiseCount} noise turns",
             facts.Count, noiseCount);
 
+        // Reset agent state to ensure a clean evaluation
+        if (agent is ISessionResettableAgent resettable)
+        {
+            await resettable.ResetSessionAsync(cancellationToken);
+        }
+
         // Build scenario: establish facts → noise to trigger reducer → query each fact
         var steps = new List<MemoryStep>();
 
@@ -119,13 +125,16 @@ public class ReducerEvaluator : IReducerEvaluator
 
             stopwatch.Stop();
 
+            // PreReduction = total messages sent (steps + queries, each producing a request/response pair)
+            // PostReduction = not knowable without access to the reducer itself, so we report
+            // the number of fact queries that succeeded as a proxy for effective retained context
             var result = new ReducerEvaluationResult
             {
                 ScenarioName = scenario.Name,
                 FactResults = factResults,
                 Duration = stopwatch.Elapsed,
-                PreReductionMessageCount = steps.Count,
-                PostReductionMessageCount = steps.Count // Actual post-reduction count depends on reducer
+                PreReductionMessageCount = (steps.Count + queries.Count) * 2, // request + response per turn
+                PostReductionMessageCount = 0 // Unknown — depends on the agent's internal reducer
             };
 
             _logger.LogInformation("Reducer fidelity evaluation complete: {Retained}/{Total} facts retained ({Fidelity:F1}% fidelity), CriticalLoss={CriticalLoss}",

@@ -115,20 +115,39 @@ public class MemoryTestRunner : IMemoryTestRunner
 
     /// <summary>
     /// Executes the setup steps to establish facts in the agent's memory.
+    /// Recognizes [SESSION_RESET_POINT] markers and resets the agent's session
+    /// when the agent implements ISessionResettableAgent.
     /// </summary>
     private async Task ExecuteSetupStepsAsync(
-        IEvaluableAgent agent, 
-        IReadOnlyList<MemoryStep> steps, 
+        IEvaluableAgent agent,
+        IReadOnlyList<MemoryStep> steps,
         CancellationToken cancellationToken)
     {
         _logger.LogDebug("Executing {StepCount} setup steps", steps.Count);
-        
+
         foreach (var step in steps)
         {
+            // Handle session reset markers inserted by CrossSessionScenarios
+            if (step.Content.Contains("[SESSION_RESET_POINT]"))
+            {
+                if (agent is ISessionResettableAgent resettable)
+                {
+                    await resettable.ResetSessionAsync(cancellationToken);
+                    _logger.LogDebug("Session reset executed at [SESSION_RESET_POINT]");
+                }
+                else
+                {
+                    _logger.LogWarning(
+                        "Scenario requires session reset but agent does not implement ISessionResettableAgent. " +
+                        "Cross-session evaluation results may be unreliable.");
+                }
+                continue;
+            }
+
             try
             {
                 var response = await agent.InvokeAsync(step.Content, cancellationToken);
-                
+
                 // Optional: Validate expected response if specified
                 if (!string.IsNullOrEmpty(step.ExpectedResponse))
                 {
@@ -138,7 +157,7 @@ public class MemoryTestRunner : IMemoryTestRunner
                             step.ExpectedResponse, response.Text);
                     }
                 }
-                
+
                 _logger.LogTrace("Setup step executed: {StepType} - {Content}", step.Type, step.Content);
             }
             catch (Exception ex)
@@ -202,14 +221,15 @@ public class MemoryTestRunner : IMemoryTestRunner
         var allMissingFacts = queryResults.SelectMany(r => r.MissingFacts).Distinct().ToList();
         var allForbiddenFound = queryResults.SelectMany(r => r.ForbiddenFound).Distinct().ToList();
         
-        // Calculate overall score as weighted average
-        // Penalize for forbidden facts found
-        var baseScore = queryResults.Count > 0 ? queryResults.Average(r => r.Score) : 0;
-        var forbiddenPenalty = allForbiddenFound.Count * 10; // -10 points per forbidden fact
-        var overallScore = Math.Max(0, baseScore - forbiddenPenalty);
+        // Calculate overall score as average of per-query scores.
+        // Forbidden fact penalties are already applied by the LLM judge at the per-query level
+        // (the judge prompt instructs "Subtract 10-20 points per forbidden fact found").
+        // No additional penalty here — that would double-penalize.
+        var overallScore = queryResults.Count > 0 ? queryResults.Average(r => r.Score) : 0;
         
-        // Estimate cost (rough approximation - should be configurable)
-        var estimatedCost = totalTokens * 0.00001m; // $0.01 per 1K tokens (approximate)
+        // Cost estimation: $0.003 per 1K tokens (approximate, varies by model/provider).
+        // Users should compute exact costs from TokensUsed with their own pricing.
+        var estimatedCost = totalTokens * 0.003m / 1000m;
         
         return new MemoryEvaluationResult
         {

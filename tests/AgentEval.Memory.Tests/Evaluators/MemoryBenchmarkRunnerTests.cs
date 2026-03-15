@@ -80,7 +80,13 @@ public class MemoryBenchmarkRunnerTests
 
         Assert.All(result.CategoryResults, cat =>
         {
-            Assert.True(cat.Duration >= TimeSpan.Zero);
+            // Duration should be set (non-default) for all categories, even skipped ones
+            Assert.True(cat.Duration >= TimeSpan.Zero, $"Category '{cat.CategoryName}' has negative duration");
+            // Non-skipped categories should have measurable duration
+            if (!cat.Skipped)
+            {
+                Assert.True(cat.Duration > TimeSpan.Zero, $"Category '{cat.CategoryName}' has zero duration");
+            }
         });
     }
 
@@ -146,6 +152,28 @@ public class MemoryBenchmarkRunnerTests
         {
             Assert.True(cat.Score >= 0 && cat.Score <= 100);
         });
+    }
+
+    [Fact]
+    public async Task RunBenchmarkAsync_WithResettableAgent_ResetsSessionBetweenCategories()
+    {
+        var agent = new ResettableTestAgent();
+        var custom = new MemoryBenchmark
+        {
+            Name = "ResetTest",
+            Description = "Tests session reset between categories",
+            Categories =
+            [
+                new MemoryBenchmarkCategory { Name = "Cat1", Weight = 1.0, ScenarioType = BenchmarkScenarioType.BasicRetention },
+                new MemoryBenchmarkCategory { Name = "Cat2", Weight = 1.0, ScenarioType = BenchmarkScenarioType.MultiTopic },
+                new MemoryBenchmarkCategory { Name = "Cat3", Weight = 1.0, ScenarioType = BenchmarkScenarioType.NoiseResilience }
+            ]
+        };
+
+        await _runner.RunBenchmarkAsync(agent, custom);
+
+        // Agent should be reset once per category (3 categories = 3 resets)
+        Assert.Equal(3, agent.ResetCount);
     }
 
     [Fact]

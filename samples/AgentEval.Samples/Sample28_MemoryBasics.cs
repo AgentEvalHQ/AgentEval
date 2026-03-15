@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 AgentEval Contributors
 
+using Azure.AI.OpenAI;
 using AgentEval.Core;
+using AgentEval.Memory.Assertions;
 using AgentEval.Memory.Engine;
 using AgentEval.Memory.Models;
 using Microsoft.Extensions.AI;
@@ -11,13 +13,15 @@ namespace AgentEval.Samples;
 
 /// <summary>
 /// Sample 28: Memory Evaluation Basics - Testing if agents remember facts
-/// 
+///
 /// This demonstrates:
-/// - Setting up memory evaluation without complex DI
-/// - Testing basic fact recall with MemoryTestRunner
+/// - Setting up memory evaluation with a real LLM judge
+/// - Creating a real LLM-backed agent and testing its memory
 /// - Using MemoryJudge for LLM-based fact verification
 /// - Fluent memory assertions with detailed results
-/// 
+///
+/// Requires: AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_API_KEY, AZURE_OPENAI_DEPLOYMENT
+///
 /// ⏱️ Time to understand: 5 minutes
 /// </summary>
 public static class Sample28_MemoryBasics
@@ -26,78 +30,118 @@ public static class Sample28_MemoryBasics
     {
         PrintHeader();
 
-        try
+        if (!AIConfig.IsConfigured)
         {
-            // Step 1: Create memory evaluation components
-            var chatClient = new FakeChatClient();
-            var memoryJudge = new MemoryJudge(chatClient, NullLogger<MemoryJudge>.Instance);
-            var memoryRunner = new MemoryTestRunner(memoryJudge, NullLogger<MemoryTestRunner>.Instance);
-            PrintStepComplete("Step 1", "Memory evaluation components created");
-
-            // Step 2: Create a memory-enabled test agent
-            var agent = new SimpleMemoryAgent();
-            PrintStepComplete("Step 2", $"Memory agent '{agent.Name}' created");
-
-            // Step 3: Define facts to remember and test queries
-            var facts = new[]
-            {
-                MemoryFact.Create("My name is Alice Johnson"),
-                MemoryFact.Create("I work as a software engineer"),
-                MemoryFact.Create("My favorite programming language is C#")
-            };
-
-            var queries = new[]
-            {
-                MemoryQuery.Create("What is my name?", facts[0]),
-                MemoryQuery.Create("What is my job?", facts[1]),
-                MemoryQuery.Create("What programming language do I prefer?", facts[2])
-            };
-
-            PrintTestDetails(facts, queries);
-
-            // Step 4: Create memory test scenario
-            var scenario = CreateMemoryScenario(facts, queries);
-            PrintStepComplete("Step 4", "Memory test scenario prepared");
-
-            // Step 5: Run the memory evaluation
-            Console.WriteLine("📝 Step 5: Running memory evaluation...");
-            var result = await memoryRunner.RunAsync(agent, scenario);
-            
-            // Step 6: Display detailed results
-            PrintResults(result);
-            PrintKeyTakeaways();
+            AIConfig.PrintMissingCredentialsWarning();
+            Console.WriteLine("   This sample requires real Azure OpenAI credentials to evaluate memory.");
+            Console.WriteLine("   Memory evaluation uses an LLM judge — it cannot run in mock mode.\n");
+            return;
         }
-        catch (Exception ex)
+
+        // Step 1: Create the Azure OpenAI chat client
+        Console.WriteLine("📝 Step 1: Creating Azure OpenAI chat client...\n");
+
+        var azureClient = new AzureOpenAIClient(AIConfig.Endpoint, AIConfig.KeyCredential);
+        var chatClient = azureClient
+            .GetChatClient(AIConfig.ModelDeployment)
+            .AsIChatClient();
+
+        Console.WriteLine($"   Endpoint:   {AIConfig.Endpoint}");
+        Console.WriteLine($"   Deployment: {AIConfig.ModelDeployment}\n");
+
+        // Step 2: Create memory evaluation components using the real LLM
+        var memoryJudge = new MemoryJudge(chatClient, NullLogger<MemoryJudge>.Instance);
+        var memoryRunner = new MemoryTestRunner(memoryJudge, NullLogger<MemoryTestRunner>.Instance);
+        Console.WriteLine("📝 Step 2: Memory judge and test runner created (real LLM-backed)\n");
+
+        // Step 3: Create a real LLM agent with conversation history
+        var agent = chatClient.AsEvaluableAgent(
+            name: "Memory Agent",
+            systemPrompt: """
+                You are a helpful assistant with excellent memory.
+                Remember all facts the user tells you and recall them accurately when asked.
+                When asked about something you were told, include the specific details in your response.
+                Keep responses concise but accurate.
+                """,
+            includeHistory: true);
+        Console.WriteLine($"📝 Step 3: Agent '{agent.Name}' created (real LLM with conversation history)\n");
+
+        // Step 4: Define facts to remember and test queries
+        var facts = new[]
         {
-            Console.ForegroundColor = ConsoleColor.Red;
-            Console.WriteLine($"❌ Error during memory evaluation: {ex.Message}");
-            Console.ResetColor();
-            
-            if (ex.InnerException != null)
-            {
-                Console.WriteLine($"   Inner exception: {ex.InnerException.Message}");
-            }
-        }
-    }
+            MemoryFact.Create("My name is Alice Johnson"),
+            MemoryFact.Create("I work as a software engineer"),
+            MemoryFact.Create("My favorite programming language is C#")
+        };
 
-    private static MemoryTestScenario CreateMemoryScenario(MemoryFact[] facts, MemoryQuery[] queries)
-    {
-        var steps = facts.Select(fact => 
-            MemoryStep.Fact($"Please remember: {fact.Content}")
-        ).ToArray();
-        
-        return new MemoryTestScenario
+        var queries = new[]
+        {
+            MemoryQuery.Create("What is my name?", facts[0]),
+            MemoryQuery.Create("What is my job?", facts[1]),
+            MemoryQuery.Create("What programming language do I prefer?", facts[2])
+        };
+
+        PrintTestDetails(facts, queries);
+
+        // Step 5: Create memory test scenario
+        var scenario = new MemoryTestScenario
         {
             Name = "Basic Memory Recall Test",
             Description = "Tests if agent can remember and recall basic personal facts",
-            Steps = steps,
+            Steps = facts.Select(fact =>
+                MemoryStep.Fact($"Please remember: {fact.Content}")
+            ).ToArray(),
             Queries = queries
         };
+        Console.WriteLine("📝 Step 5: Memory test scenario prepared\n");
+
+        // Step 6: Run the memory evaluation
+        Console.WriteLine("📝 Step 6: Running memory evaluation against real LLM...\n");
+        var result = await memoryRunner.RunAsync(agent, scenario);
+
+        // Step 7: Display detailed results
+        PrintResults(result);
+
+        // Step 8: Fluent assertions — use these in your test suites
+        Console.WriteLine("\n📝 Step 8: Fluent memory assertions\n");
+        Console.WriteLine("   These assertions integrate with xUnit, NUnit, or MSTest:");
+        Console.WriteLine();
+
+        try
+        {
+            result.Should()
+                .HaveOverallScoreAtLeast(70, because: "basic fact recall should work for a well-prompted LLM")
+                .NotHaveRecalledForbiddenFacts(because: "no forbidden facts were defined")
+                .HaveCompletedWithin(TimeSpan.FromSeconds(60), because: "memory evaluation should be fast");
+
+            Console.ForegroundColor = ConsoleColor.Green;
+            Console.WriteLine("   ✅ All assertions passed!");
+            Console.ResetColor();
+        }
+        catch (MemoryAssertionException ex)
+        {
+            Console.ForegroundColor = ConsoleColor.Red;
+            Console.WriteLine($"   ❌ Assertion failed: {ex.Message}");
+            Console.ResetColor();
+        }
+
+        Console.WriteLine();
+        Console.ForegroundColor = ConsoleColor.DarkCyan;
+        Console.WriteLine("   // Example assertion code:");
+        Console.WriteLine("   result.Should()");
+        Console.WriteLine("       .HaveOverallScoreAtLeast(80)");
+        Console.WriteLine("       .HaveAllQueriesPassed()");
+        Console.WriteLine("       .NotHaveRecalledForbiddenFacts()");
+        Console.WriteLine("       .HaveCompletedWithin(TimeSpan.FromSeconds(30));");
+        Console.ResetColor();
+        Console.WriteLine();
+
+        PrintKeyTakeaways();
     }
 
     private static void PrintTestDetails(MemoryFact[] facts, MemoryQuery[] queries)
     {
-        Console.WriteLine("📝 Step 3: Memory test defined");
+        Console.WriteLine("📝 Step 4: Memory test defined");
         Console.WriteLine("   Facts to remember:");
         foreach (var fact in facts)
         {
@@ -111,39 +155,35 @@ public static class Sample28_MemoryBasics
         Console.WriteLine();
     }
 
-    private static void PrintStepComplete(string step, string message)
-    {
-        Console.WriteLine($"📝 {step}: {message}\n");
-    }
-
     private static void PrintResults(MemoryEvaluationResult result)
     {
         Console.WriteLine("\n📊 MEMORY EVALUATION RESULTS:");
         Console.WriteLine(new string('═', 70));
-        
+
         // Overall score with visual indicator
         Console.Write("   Overall Score: ");
-        var scoreColor = result.OverallScore >= 80 ? ConsoleColor.Green : 
+        var scoreColor = result.OverallScore >= 80 ? ConsoleColor.Green :
                         result.OverallScore >= 60 ? ConsoleColor.Yellow : ConsoleColor.Red;
         Console.ForegroundColor = scoreColor;
         Console.WriteLine($"{result.OverallScore:F1}% {GetScoreEmoji(result.OverallScore)}");
         Console.ResetColor();
 
+        Console.WriteLine($"   Duration: {result.Duration.TotalMilliseconds:F0}ms");
         Console.WriteLine($"   Facts Found: {result.FoundFacts.Count} | Facts Missing: {result.MissingFacts.Count}");
-        
+
         if (result.QueryResults.Any())
         {
             Console.WriteLine("\n   Detailed Query Results:");
             Console.WriteLine(new string('─', 50));
-            
+
             foreach (var queryResult in result.QueryResults)
             {
                 var status = queryResult.Score >= 80 ? "✅" : queryResult.Score >= 60 ? "⚠️" : "❌";
                 Console.WriteLine($"   {status} Query: \"{queryResult.Query.Question}\"");
                 Console.WriteLine($"      Score: {queryResult.Score:F1}%");
-                
+
                 // Show agent's response (truncated)
-                var response = queryResult.Response.Length > 100 
+                var response = queryResult.Response.Length > 100
                     ? queryResult.Response[..97] + "..."
                     : queryResult.Response;
                 Console.WriteLine($"      Response: \"{response}\"");
@@ -167,7 +207,7 @@ public static class Sample28_MemoryBasics
         return score switch
         {
             >= 90 => "🏆",
-            >= 80 => "✅", 
+            >= 80 => "✅",
             >= 70 => "👍",
             >= 60 => "⚠️",
             _ => "❌"
@@ -178,10 +218,11 @@ public static class Sample28_MemoryBasics
     {
         Console.WriteLine(new string('═', 70));
         Console.WriteLine("🎯 KEY TAKEAWAYS:");
-        Console.WriteLine("   • Memory evaluation tests fact retention across conversation");
-        Console.WriteLine("   • LLM judges evaluate whether facts are present in responses");
+        Console.WriteLine("   • Memory evaluation uses a real LLM judge to verify fact recall");
+        Console.WriteLine("   • The agent under test is a real LLM with conversation history");
+        Console.WriteLine("   • MemoryJudge analyzes responses for expected facts (not keyword matching)");
+        Console.WriteLine("   • Fluent assertions (result.Should()...) integrate with any test framework");
         Console.WriteLine("   • Scores above 80% indicate good memory performance");
-        Console.WriteLine("   • Use this pattern to test any IEvaluableAgent implementation");
         Console.WriteLine("   • Next: Try Sample29_MemoryBenchmark for comprehensive testing");
     }
 
@@ -194,166 +235,4 @@ public static class Sample28_MemoryBasics
         Console.WriteLine("Testing whether AI agents remember what you tell them...");
         Console.WriteLine();
     }
-}
-
-/// <summary>
-/// Simple memory-enabled agent for demonstration.
-/// Stores facts in memory and retrieves them using keyword matching.
-/// Supports any fact format — stores the full text and matches against keywords in queries.
-/// </summary>
-public class SimpleMemoryAgent : IEvaluableAgent
-{
-    public string Name => "Simple Memory Agent";
-    
-    private readonly List<string> _facts = new();
-
-    public Task<AgentResponse> InvokeAsync(string prompt, CancellationToken cancellationToken = default)
-    {
-        var response = ProcessPrompt(prompt);
-        
-        return Task.FromResult(new AgentResponse
-        {
-            Text = response,
-            TokenUsage = new TokenUsage
-            {
-                PromptTokens = prompt.Length / 4,
-                CompletionTokens = response.Length / 4
-            }
-        });
-    }
-
-    private string ProcessPrompt(string prompt)
-    {
-        var lowerPrompt = prompt.ToLowerInvariant();
-        
-        // Handle memory storage requests
-        if (lowerPrompt.Contains("remember") || lowerPrompt.Contains("please note") || lowerPrompt.Contains("important information"))
-        {
-            StoreFact(prompt);
-            return "I'll remember that information for you.";
-        }
-
-        // Handle confirmation requests
-        if (lowerPrompt.Contains("confirm") || lowerPrompt.Contains("noted"))
-        {
-            return $"Yes, I have {_facts.Count} pieces of information stored.";
-        }
-        
-        // Handle retrieval questions  
-        if (lowerPrompt.Contains('?') || lowerPrompt.Contains("what do you") || lowerPrompt.Contains("do you remember"))
-        {
-            return AnswerQuestion(lowerPrompt);
-        }
-        
-        // Handle noise/filler — respond but don't store
-        return "That's interesting! I'm here to help with whatever you need.";
-    }
-
-    private void StoreFact(string prompt)
-    {
-        // Extract the meaningful part after common prefixes
-        var content = prompt;
-        string[] prefixes = ["please remember this:", "please remember:", "remember:", 
-            "please remember this important information:", "please note:"];
-        
-        foreach (var prefix in prefixes)
-        {
-            var idx = content.IndexOf(prefix, StringComparison.OrdinalIgnoreCase);
-            if (idx >= 0)
-            {
-                content = content[(idx + prefix.Length)..].Trim();
-                break;
-            }
-        }
-
-        if (!string.IsNullOrWhiteSpace(content))
-            _facts.Add(content);
-    }
-
-    private string AnswerQuestion(string question)
-    {
-        // Find all facts that match keywords in the question
-        var matchingFacts = _facts
-            .Where(fact => HasKeywordOverlap(question, fact.ToLowerInvariant()))
-            .ToList();
-
-        if (matchingFacts.Count > 0)
-            return string.Join(" ", matchingFacts);
-
-        // If no keyword match, return all remembered facts for broad questions
-        if (question.Contains("remember") || question.Contains("know about me") || question.Contains("what do you"))
-        {
-            if (_facts.Count > 0)
-                return "Here's what I remember: " + string.Join(". ", _facts);
-        }
-            
-        return "I don't have that specific information stored in my memory.";
-    }
-
-    private static bool HasKeywordOverlap(string question, string fact)
-    {
-        // Extract meaningful keywords (skip common/short words)
-        HashSet<string> stopWords = ["what", "is", "my", "do", "you", "the", "a", "an", "i", "me", 
-            "have", "any", "about", "know", "remember", "does", "can", "how", "where", "when", 
-            "who", "which", "that", "this", "are", "was", "were", "been", "being", "has", "had",
-            "did", "will", "would", "could", "should", "may", "might", "shall", "to", "of", "in",
-            "for", "on", "with", "at", "by", "from", "or", "and", "not", "no", "but", "if", "so",
-            "than", "too", "very", "just", "also", "there", "here", "all", "each", "every",
-            "information", "tell", "please"];
-
-        var questionWords = question.Split([' ', '?', '.', ',', '!', '\'', '"'], StringSplitOptions.RemoveEmptyEntries)
-            .Where(w => w.Length > 2 && !stopWords.Contains(w))
-            .ToHashSet();
-
-        var factWords = fact.Split([' ', '.', ',', '!', '\'', '"'], StringSplitOptions.RemoveEmptyEntries)
-            .Where(w => w.Length > 2 && !stopWords.Contains(w))
-            .ToHashSet();
-
-        return questionWords.Overlaps(factWords);
-    }
-}
-
-/// <summary>
-/// Fake chat client that simulates LLM responses for memory judgment.
-/// In real scenarios, this would be a real OpenAI/Azure OpenAI client.
-/// </summary>
-public class FakeChatClient : IChatClient
-{
-    public ChatClientMetadata Metadata { get; } = new("fake-model-for-judgment", new Uri("http://localhost"));
-
-    public Task<ChatResponse> GetResponseAsync(
-        IEnumerable<ChatMessage> chatMessages, 
-        ChatOptions? options = null, 
-        CancellationToken cancellationToken = default)
-    {
-        // Simulate memory judgment - normally an LLM would analyze the response
-        var jsonResponse = """
-        {
-          "found_facts": ["My name is Alice Johnson", "I work as a software engineer", "My favorite programming language is C#"],
-          "missing_facts": [],
-          "forbidden_found": [],
-          "score": 90,
-          "explanation": "Agent correctly recalled all three facts when asked relevant questions."
-        }
-        """;
-        
-        var response = new ChatResponse([new ChatMessage(ChatRole.Assistant, jsonResponse)]) 
-        { 
-            ModelId = "fake-judgment-model"
-        };
-        
-        return Task.FromResult(response);
-    }
-
-    public IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(
-        IEnumerable<ChatMessage> chatMessages, 
-        ChatOptions? options = null, 
-        CancellationToken cancellationToken = default)
-    {
-        throw new NotImplementedException("Streaming not needed for memory judgment");
-    }
-
-    public TService? GetService<TService>(object? key = null) where TService : class => null;
-    public object? GetService(Type serviceType, object? key = null) => null;
-    public void Dispose() { }
 }

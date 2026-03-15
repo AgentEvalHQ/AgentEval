@@ -1,24 +1,29 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 AgentEval Contributors
 
+using Azure.AI.OpenAI;
+using AgentEval.Core;
 using AgentEval.Memory.Engine;
 using AgentEval.Memory.Evaluators;
 using AgentEval.Memory.Models;
 using AgentEval.Memory.Scenarios;
 using AgentEval.Memory.Temporal;
+using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace AgentEval.Samples;
 
 /// <summary>
 /// Sample 29: Memory Benchmark Suite - Comprehensive agent memory scoring
-/// 
+///
 /// This demonstrates:
 /// - Running the Quick/Standard/Full memory benchmark presets
 /// - Getting grades, stars, and actionable recommendations
 /// - Interpreting benchmark results for agent improvement
 /// - Using the benchmark runner with all evaluators
-/// 
+///
+/// Requires: AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_API_KEY, AZURE_OPENAI_DEPLOYMENT
+///
 /// ⏱️ Time to understand: 5 minutes
 /// </summary>
 public static class Sample29_MemoryBenchmark
@@ -27,67 +32,82 @@ public static class Sample29_MemoryBenchmark
     {
         PrintHeader();
 
-        try
+        if (!AIConfig.IsConfigured)
         {
-            // Step 1: Create all memory evaluation components
-            var chatClient = new FakeChatClient();
-            var judge = new MemoryJudge(chatClient, NullLogger<MemoryJudge>.Instance);
-            var runner = new MemoryTestRunner(judge, NullLogger<MemoryTestRunner>.Instance);
-
-            // Create scenario providers
-            var memoryScenarios = new MemoryScenarios();
-            var chattyScenarios = new ChattyConversationScenarios();
-            var temporalScenarios = new TemporalMemoryScenarios();
-
-            // Create evaluators
-            var reachBack = new ReachBackEvaluator(runner, judge, NullLogger<ReachBackEvaluator>.Instance);
-            var reducer = new ReducerEvaluator(runner, NullLogger<ReducerEvaluator>.Instance);
-            var crossSession = new CrossSessionEvaluator(judge, NullLogger<CrossSessionEvaluator>.Instance);
-
-            // Create the benchmark runner
-            var benchmarkRunner = new MemoryBenchmarkRunner(
-                runner, judge, reachBack, reducer, crossSession,
-                memoryScenarios, chattyScenarios, temporalScenarios,
-                NullLogger<MemoryBenchmarkRunner>.Instance);
-
-            PrintStepComplete("Step 1", "All memory evaluation components created");
-
-            // Step 2: Create the test agent
-            var agent = new SimpleMemoryAgent();
-            PrintStepComplete("Step 2", $"Test agent '{agent.Name}' ready");
-
-            // Step 3: Run the Quick benchmark
-            Console.WriteLine("📝 Step 3: Running Quick memory benchmark (3 categories)...\n");
-            var quickResult = await benchmarkRunner.RunBenchmarkAsync(agent, MemoryBenchmark.Quick);
-            PrintBenchmarkResult(quickResult);
-
-            // Step 4: Run the Standard benchmark
-            Console.WriteLine("\n📝 Step 4: Running Standard memory benchmark (6 categories)...\n");
-            var standardResult = await benchmarkRunner.RunBenchmarkAsync(agent, MemoryBenchmark.Standard);
-            PrintBenchmarkResult(standardResult);
-
-            // Step 5: Run the Full benchmark (includes cross-session)
-            Console.WriteLine("\n📝 Step 5: Running Full memory benchmark (8 categories)...\n");
-            var fullResult = await benchmarkRunner.RunBenchmarkAsync(agent, MemoryBenchmark.Full);
-            PrintBenchmarkResult(fullResult);
-
-            PrintKeyTakeaways();
+            AIConfig.PrintMissingCredentialsWarning();
+            Console.WriteLine("   This sample requires real Azure OpenAI credentials.");
+            Console.WriteLine("   Memory benchmarks use an LLM judge — they cannot run in mock mode.\n");
+            return;
         }
-        catch (Exception ex)
-        {
-            Console.ForegroundColor = ConsoleColor.Red;
-            Console.WriteLine($"❌ Error: {ex.Message}");
-            Console.ResetColor();
 
-            if (ex.InnerException != null)
-                Console.WriteLine($"   Inner: {ex.InnerException.Message}");
-        }
+        // Step 1: Create the Azure OpenAI chat client and all evaluation components
+        Console.WriteLine("📝 Step 1: Creating Azure OpenAI client and evaluation components...\n");
+
+        var azureClient = new AzureOpenAIClient(AIConfig.Endpoint, AIConfig.KeyCredential);
+        var chatClient = azureClient
+            .GetChatClient(AIConfig.ModelDeployment)
+            .AsIChatClient();
+
+        var judge = new MemoryJudge(chatClient, NullLogger<MemoryJudge>.Instance);
+        var runner = new MemoryTestRunner(judge, NullLogger<MemoryTestRunner>.Instance);
+
+        // Create scenario providers
+        var memoryScenarios = new MemoryScenarios();
+        var chattyScenarios = new ChattyConversationScenarios();
+        var temporalScenarios = new TemporalMemoryScenarios();
+
+        // Create evaluators
+        var reachBack = new ReachBackEvaluator(runner, judge, NullLogger<ReachBackEvaluator>.Instance);
+        var reducer = new ReducerEvaluator(runner, NullLogger<ReducerEvaluator>.Instance);
+        var crossSession = new CrossSessionEvaluator(judge, NullLogger<CrossSessionEvaluator>.Instance);
+
+        // Create the benchmark runner
+        var benchmarkRunner = new MemoryBenchmarkRunner(
+            runner, judge, reachBack, reducer, crossSession,
+            memoryScenarios, chattyScenarios, temporalScenarios,
+            NullLogger<MemoryBenchmarkRunner>.Instance);
+
+        Console.WriteLine($"   Endpoint:   {AIConfig.Endpoint}");
+        Console.WriteLine($"   Deployment: {AIConfig.ModelDeployment}");
+        Console.WriteLine("   Components: MemoryJudge, TestRunner, ReachBack, Reducer, CrossSession");
+        Console.WriteLine("   Scenarios:  Memory, Chatty, Temporal\n");
+
+        // Step 2: Create a real LLM agent to benchmark
+        var agent = chatClient.AsEvaluableAgent(
+            name: "Memory Agent",
+            systemPrompt: """
+                You are a helpful assistant with excellent memory.
+                Remember all facts the user tells you and recall them accurately when asked.
+                When asked about something you were told, include the specific details in your response.
+                Keep responses concise but accurate.
+                """,
+            includeHistory: true);
+        Console.WriteLine($"📝 Step 2: Agent '{agent.Name}' ready (real LLM with conversation history)\n");
+
+        // Step 3: Explain the benchmark tiers
+        Console.WriteLine("📝 Step 3: Available benchmark tiers\n");
+        Console.WriteLine("   ┌───────────┬────────────────────────────────────────────────────────────────┐");
+        Console.WriteLine("   │ Tier      │ Categories                                                   │");
+        Console.WriteLine("   ├───────────┼────────────────────────────────────────────────────────────────┤");
+        Console.WriteLine("   │ Quick (3) │ BasicRetention, TemporalReasoning, NoiseResilience            │");
+        Console.WriteLine("   │ Std   (6) │ + ReachBackDepth, FactUpdateHandling, MultiTopic              │");
+        Console.WriteLine("   │ Full  (8) │ + CrossSession, ReducerFidelity                               │");
+        Console.WriteLine("   └───────────┴────────────────────────────────────────────────────────────────┘");
+        Console.WriteLine();
+        Console.WriteLine("   Use Quick for CI, Standard for staging, Full for pre-release.\n");
+
+        // Step 4: Run uickthe Q benchmark (good balance of coverage vs speed)
+        Console.WriteLine("📝 Step 4: Running Quick memory benchmark (3 categories)...\n");
+        var result = await benchmarkRunner.RunBenchmarkAsync(agent, MemoryBenchmark.Quick);
+        PrintBenchmarkResult(result);
+
+        PrintKeyTakeaways();
     }
 
     private static void PrintBenchmarkResult(MemoryBenchmarkResult result)
     {
         Console.WriteLine($"   Benchmark: {result.BenchmarkName}");
-        Console.WriteLine($"   Duration:  {result.Duration.TotalMilliseconds:F0}ms");
+        Console.WriteLine($"   Duration:  {result.Duration.TotalSeconds:F1}s");
         Console.WriteLine();
 
         // Overall score with grade and stars
@@ -148,21 +168,15 @@ public static class Sample29_MemoryBenchmark
         }
     }
 
-    private static void PrintStepComplete(string step, string message)
-    {
-        Console.WriteLine($"📝 {step}: {message}\n");
-    }
-
     private static void PrintKeyTakeaways()
     {
         Console.WriteLine();
         Console.WriteLine(new string('═', 70));
         Console.WriteLine("🎯 KEY TAKEAWAYS:");
-        Console.WriteLine("   • Quick benchmark (3 cats) is ideal for CI pipelines");
-        Console.WriteLine("   • Standard benchmark (6 cats) covers core memory capabilities");
-        Console.WriteLine("   • Full benchmark (8 cats) includes cross-session and reducer tests");
-        Console.WriteLine("   • Skipped categories don't penalize the overall score");
-        Console.WriteLine("   • Recommendations are actionable and category-specific");
+        Console.WriteLine("   • Quick (3 cats) for CI, Standard (6) for staging, Full (8) for releases");
+        Console.WriteLine("   • All evaluations use a real LLM judge for accurate scoring");
+        Console.WriteLine("   • Grades (A-F), stars (1-5), and recommendations are automatic");
+        Console.WriteLine("   • Weak categories tell you exactly where to focus improvement");
         Console.WriteLine("   • Next: Try Sample30_MemoryScenarios for targeted testing");
     }
 

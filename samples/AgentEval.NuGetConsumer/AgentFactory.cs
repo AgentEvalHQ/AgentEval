@@ -56,6 +56,42 @@ public static class AgentFactory
     }
 
     /// <summary>
+    /// Creates a travel booking agent as a raw MAF <see cref="AIAgent"/> (no AgentEval wrapper).
+    /// </summary>
+    /// <param name="useMock">True for mock mode (no LLM calls), false for real Azure OpenAI.</param>
+    /// <param name="modelDeployment">Optional model deployment name (defaults to Config.Model).</param>
+    public static AIAgent CreateTravelAIAgent(bool useMock, string? modelDeployment = null)
+    {
+        var chatClient = useMock
+            ? CreateMockChatClient()
+            : CreateRealChatClient(modelDeployment);
+
+        return new ChatClientAgent(chatClient, new ChatClientAgentOptions
+        {
+            Name = "TravelBookingAgent",
+            ChatOptions = new ChatOptions
+            {
+                Instructions = """
+                    You are a helpful travel booking assistant.
+                    You MUST use the available tools to search for flights, book them, and send confirmations.
+                    When asked about flights, ALWAYS use the SearchFlights tool first.
+                    Always search for flights before booking.
+                    After booking, always send a confirmation email.
+                    Be concise and helpful.
+                    """,
+                Tools =
+                [
+                    AIFunctionFactory.Create(TravelTools.SearchFlights),
+                    AIFunctionFactory.Create(TravelTools.BookFlight),
+                    AIFunctionFactory.Create(TravelTools.SendConfirmation),
+                    AIFunctionFactory.Create(TravelTools.GetUserConfirmation),
+                    AIFunctionFactory.Create(TravelTools.CancelBooking)
+                ]
+            }
+        });
+    }
+
+    /// <summary>
     /// Creates a calculator agent with a single tool.
     /// </summary>
     /// <param name="useMock">True for mock mode, false for real Azure OpenAI.</param>

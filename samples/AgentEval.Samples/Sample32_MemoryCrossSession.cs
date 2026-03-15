@@ -1,23 +1,30 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 AgentEval Contributors
 
+using Azure.AI.OpenAI;
 using AgentEval.Core;
 using AgentEval.Memory.Engine;
 using AgentEval.Memory.Evaluators;
 using AgentEval.Memory.Models;
+using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace AgentEval.Samples;
 
 /// <summary>
 /// Sample 32: Cross-Session Memory - Testing fact persistence across session resets
-/// 
+///
 /// This demonstrates:
-/// - Implementing ISessionResettableAgent for session boundary testing
+/// - Using a real LLM agent that implements ISessionResettableAgent
 /// - Using CrossSessionEvaluator to verify memory survives resets
-/// - Comparing agents that do vs don't support cross-session memory
-/// - Understanding the difference between session context and long-term memory
-/// 
+/// - Comparing agents that do vs don't persist facts across sessions
+/// - Understanding the difference between conversation context and long-term memory
+///
+/// The key insight: a basic LLM agent with conversation history loses everything on session
+/// reset. An agent with separate long-term storage retains facts across sessions.
+///
+/// Requires: AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_API_KEY, AZURE_OPENAI_DEPLOYMENT
+///
 /// ⏱️ Time to understand: 5 minutes
 /// </summary>
 public static class Sample32_MemoryCrossSession
@@ -26,67 +33,78 @@ public static class Sample32_MemoryCrossSession
     {
         PrintHeader();
 
-        try
+        if (!AIConfig.IsConfigured)
         {
-            // Step 1: Create evaluator
-            Console.WriteLine("📝 Step 1: Creating cross-session evaluator...\n");
-
-            var chatClient = new FakeChatClient();
-            var judge = new MemoryJudge(chatClient, NullLogger<MemoryJudge>.Instance);
-            var evaluator = new CrossSessionEvaluator(judge, NullLogger<CrossSessionEvaluator>.Instance);
-            Console.WriteLine("   ✅ CrossSessionEvaluator ready\n");
-
-            // Step 2: Define facts to plant
-            Console.WriteLine("📝 Step 2: Defining facts for cross-session testing...\n");
-            
-            var facts = new List<MemoryFact>
-            {
-                MemoryFact.Create("Patient blood type is O-negative", "medical", 100),
-                MemoryFact.Create("Emergency contact is Jane Doe at 555-0199", "contacts", 90),
-                MemoryFact.Create("Allergic to penicillin and sulfa drugs", "medical", 100),
-                MemoryFact.Create("Preferred language is Spanish", "preferences", 70),
-            };
-
-            foreach (var fact in facts)
-            {
-                Console.WriteLine($"   📌 [{fact.Category ?? "general"}] {fact.Content} (importance: {fact.Importance})");
-            }
-            Console.WriteLine();
-
-            // Step 3: Test a non-resettable agent (should report "not supported")
-            Console.WriteLine("📝 Step 3: Testing non-resettable agent...\n");
-            
-            var basicAgent = new SimpleMemoryAgent();
-            var basicResult = await evaluator.EvaluateAsync(basicAgent, facts);
-            
-            PrintCrossSessionResult("SimpleMemoryAgent (no reset)", basicResult);
-
-            // Step 4: Test a resettable agent with persistent memory
-            Console.WriteLine("📝 Step 4: Testing resettable agent with persistent memory...\n");
-            
-            var persistentAgent = new PersistentMemoryAgent();
-            var persistentResult = await evaluator.EvaluateAsync(persistentAgent, facts);
-            
-            PrintCrossSessionResult("PersistentMemoryAgent (with reset)", persistentResult);
-
-            // Step 5: Show comparison
-            Console.WriteLine("📝 Step 5: Comparison Summary\n");
-            PrintComparison(basicResult, persistentResult);
-
-            PrintKeyTakeaways();
+            AIConfig.PrintMissingCredentialsWarning();
+            Console.WriteLine("   This sample requires real Azure OpenAI credentials.");
+            Console.WriteLine("   Cross-session evaluation uses an LLM judge — it cannot run in mock mode.\n");
+            return;
         }
-        catch (Exception ex)
+
+        // Step 1: Create evaluator with real LLM judge
+        Console.WriteLine("📝 Step 1: Creating cross-session evaluator with real LLM judge...\n");
+
+        var azureClient = new AzureOpenAIClient(AIConfig.Endpoint, AIConfig.KeyCredential);
+        var chatClient = azureClient
+            .GetChatClient(AIConfig.ModelDeployment)
+            .AsIChatClient();
+
+        var judge = new MemoryJudge(chatClient, NullLogger<MemoryJudge>.Instance);
+        var evaluator = new CrossSessionEvaluator(judge, NullLogger<CrossSessionEvaluator>.Instance);
+
+        Console.WriteLine($"   LLM: {AIConfig.ModelDeployment} at {AIConfig.Endpoint}");
+        Console.WriteLine("   ✅ CrossSessionEvaluator ready\n");
+
+        // Step 2: Define facts to plant
+        Console.WriteLine("📝 Step 2: Defining facts for cross-session testing...\n");
+
+        var facts = new List<MemoryFact>
         {
-            Console.ForegroundColor = ConsoleColor.Red;
-            Console.WriteLine($"❌ Error: {ex.Message}");
-            Console.ResetColor();
+            MemoryFact.Create("Patient blood type is O-negative", "medical", 100),
+            MemoryFact.Create("Emergency contact is Jane Doe at 555-0199", "contacts", 90),
+            MemoryFact.Create("Allergic to penicillin and sulfa drugs", "medical", 100),
+            MemoryFact.Create("Preferred language is Spanish", "preferences", 70),
+        };
+
+        foreach (var fact in facts)
+        {
+            Console.WriteLine($"   📌 [{fact.Category ?? "general"}] {fact.Content} (importance: {fact.Importance})");
         }
+        Console.WriteLine();
+
+        // Step 3: Test a basic LLM agent (conversation history only — will fail cross-session)
+        Console.WriteLine("📝 Step 3: Testing basic LLM agent (conversation history only)...\n");
+        Console.WriteLine("   This agent uses conversation history. On session reset, history is");
+        Console.WriteLine("   cleared, so all facts are lost. This is expected to fail.\n");
+
+        var basicAgent = chatClient.AsEvaluableAgent(
+            name: "Basic LLM Agent",
+            systemPrompt: "You are a helpful assistant. Remember everything the user tells you.",
+            includeHistory: true);
+
+        var basicResult = await evaluator.EvaluateAsync(basicAgent, facts);
+        PrintCrossSessionResult("Basic LLM Agent (history only)", basicResult);
+
+        // Step 4: Test an agent with persistent long-term memory
+        Console.WriteLine("📝 Step 4: Testing LLM agent with persistent long-term memory...\n");
+        Console.WriteLine("   This agent stores facts in a separate long-term memory store.");
+        Console.WriteLine("   On session reset, conversation history is cleared but facts persist.\n");
+
+        var persistentAgent = new LLMPersistentMemoryAgent(chatClient);
+        var persistentResult = await evaluator.EvaluateAsync(persistentAgent, facts);
+        PrintCrossSessionResult("LLM Persistent Memory Agent", persistentResult);
+
+        // Step 5: Show comparison
+        Console.WriteLine("📝 Step 5: Comparison Summary\n");
+        PrintComparison(basicResult, persistentResult);
+
+        PrintKeyTakeaways();
     }
 
     private static void PrintCrossSessionResult(string agentName, CrossSessionResult result)
     {
         Console.WriteLine($"   Agent: {agentName}");
-        Console.Write($"   Session Reset Supported: ");
+        Console.Write("   Session Reset Supported: ");
         Console.ForegroundColor = result.SessionResetSupported ? ConsoleColor.Green : ConsoleColor.Yellow;
         Console.WriteLine(result.SessionResetSupported ? "Yes" : "No");
         Console.ResetColor();
@@ -94,12 +112,12 @@ public static class Sample32_MemoryCrossSession
         if (!result.SessionResetSupported)
         {
             Console.WriteLine($"   ⚠️  {result.ErrorMessage ?? "Agent does not implement ISessionResettableAgent"}");
-            Console.WriteLine($"   Score: N/A (skipped)");
+            Console.WriteLine("   Score: N/A (skipped)");
             Console.WriteLine();
             return;
         }
 
-        Console.Write($"   Score: ");
+        Console.Write("   Score: ");
         Console.ForegroundColor = result.OverallScore >= 80 ? ConsoleColor.Green : ConsoleColor.Yellow;
         Console.Write($"{result.OverallScore:F1}%");
         Console.ResetColor();
@@ -121,12 +139,17 @@ public static class Sample32_MemoryCrossSession
 
     private static void PrintComparison(CrossSessionResult basic, CrossSessionResult persistent)
     {
+        var basicScore = basic.SessionResetSupported ? $"{basic.OverallScore:F1}%" : "N/A";
+        var basicRetained = basic.SessionResetSupported
+            ? $"{basic.RetainedCount}/{basic.FactResults.Count}"
+            : "N/A";
+
         Console.WriteLine("   ┌──────────────────────────┬──────────────┬──────────────┐");
         Console.WriteLine("   │ Feature                  │ Basic Agent  │ Persistent   │");
         Console.WriteLine("   ├──────────────────────────┼──────────────┼──────────────┤");
-        Console.WriteLine($"   │ Session Reset Support    │ {"No",-12} │ {"Yes",-12} │");
-        Console.WriteLine($"   │ Cross-Session Score      │ {"N/A",-12} │ {persistent.OverallScore:F1}%{"",-7} │");
-        Console.WriteLine($"   │ Facts Retained           │ {"N/A",-12} │ {persistent.RetainedCount + "/" + persistent.FactResults.Count,-12} │");
+        Console.WriteLine($"   │ Session Reset Support    │ {"Yes",-12} │ {"Yes",-12} │");
+        Console.WriteLine($"   │ Cross-Session Score      │ {basicScore,-12} │ {persistent.OverallScore:F1}%{"",-7} │");
+        Console.WriteLine($"   │ Facts Retained           │ {basicRetained,-12} │ {persistent.RetainedCount + "/" + persistent.FactResults.Count,-12} │");
         Console.WriteLine("   └──────────────────────────┴──────────────┴──────────────┘");
         Console.WriteLine();
     }
@@ -136,10 +159,10 @@ public static class Sample32_MemoryCrossSession
         Console.WriteLine(new string('═', 70));
         Console.WriteLine("🎯 KEY TAKEAWAYS:");
         Console.WriteLine("   • ISessionResettableAgent enables cross-session memory testing");
-        Console.WriteLine("   • ResetSessionAsync clears conversation but preserves long-term memory");
-        Console.WriteLine("   • Non-resettable agents are gracefully skipped (not errored)");
-        Console.WriteLine("   • Use successThreshold to control pass/fail sensitivity");
-        Console.WriteLine("   • Real agents: Chat history is context, learned facts are memory");
+        Console.WriteLine("   • Basic LLM agents lose all memory on session reset");
+        Console.WriteLine("   • Agents with separate long-term storage retain facts across sessions");
+        Console.WriteLine("   • This mirrors real-world architecture: chat history vs knowledge store");
+        Console.WriteLine("   • All scoring is done by a real LLM judge — no keyword tricks");
     }
 
     private static void PrintHeader()
@@ -154,110 +177,129 @@ public static class Sample32_MemoryCrossSession
 }
 
 /// <summary>
-/// An agent that supports session reset with persistent long-term memory.
-/// Conversation history is cleared on reset, but stored facts persist.
+/// An LLM-backed agent with separate long-term memory that persists across session resets.
+///
+/// Architecture:
+/// - Uses a real IChatClient for all responses (no keyword matching)
+/// - Stores extracted facts in a separate list (simulates a vector store / knowledge graph)
+/// - On session reset: conversation history is cleared, but long-term facts persist
+/// - Facts are injected into the system prompt so the LLM can reference them
+///
+/// This mirrors the real-world MAF pattern where ChatHistoryProvider (session context) and
+/// AIContextProvider (long-term memory) serve different purposes.
 /// </summary>
-internal class PersistentMemoryAgent : IEvaluableAgent, ISessionResettableAgent
+internal class LLMPersistentMemoryAgent : IEvaluableAgent, ISessionResettableAgent
 {
-    public string Name => "Persistent Memory Agent";
-    
+    private readonly IChatClient _chatClient;
     private readonly List<string> _longTermMemory = new();
-    private readonly List<string> _conversationHistory = new();
-    private int _resetCount;
+    private readonly List<ChatMessage> _conversationHistory = new();
 
-    public Task<AgentResponse> InvokeAsync(string prompt, CancellationToken cancellationToken = default)
+    public string Name => "LLM Persistent Memory Agent";
+
+    public LLMPersistentMemoryAgent(IChatClient chatClient)
     {
-        _conversationHistory.Add(prompt);
-        var response = ProcessPrompt(prompt);
-        
-        return Task.FromResult(new AgentResponse
+        _chatClient = chatClient;
+    }
+
+    public async Task<AgentResponse> InvokeAsync(string prompt, CancellationToken cancellationToken = default)
+    {
+        // Build messages with system prompt that includes long-term memory
+        var messages = new List<ChatMessage>();
+
+        var systemPrompt = BuildSystemPrompt();
+        messages.Add(new ChatMessage(ChatRole.System, systemPrompt));
+
+        // Add conversation history
+        messages.AddRange(_conversationHistory);
+
+        // Add current user message
+        messages.Add(new ChatMessage(ChatRole.User, prompt));
+
+        // Call the real LLM
+        var result = await _chatClient.GetResponseAsync(messages, cancellationToken: cancellationToken);
+        var responseText = result.Text ?? string.Empty;
+
+        // Store in conversation history
+        _conversationHistory.Add(new ChatMessage(ChatRole.User, prompt));
+        var lastMessage = result.Messages.LastOrDefault();
+        if (lastMessage != null)
         {
-            Text = response,
-            TokenUsage = new TokenUsage
-            {
-                PromptTokens = prompt.Length / 4,
-                CompletionTokens = response.Length / 4
-            }
-        });
+            _conversationHistory.Add(lastMessage);
+        }
+
+        // Extract facts from user messages that contain "remember" or look like fact statements
+        ExtractAndStoreFacts(prompt);
+
+        return new AgentResponse
+        {
+            Text = responseText,
+            ModelId = result.ModelId,
+            TokenUsage = result.Usage != null
+                ? new TokenUsage
+                {
+                    PromptTokens = (int)(result.Usage.InputTokenCount ?? 0),
+                    CompletionTokens = (int)(result.Usage.OutputTokenCount ?? 0)
+                }
+                : null
+        };
     }
 
     public Task ResetSessionAsync(CancellationToken cancellationToken = default)
     {
         // Clear conversation history but keep long-term memory
         _conversationHistory.Clear();
-        _resetCount++;
         return Task.CompletedTask;
     }
 
-    private string ProcessPrompt(string prompt)
+    private string BuildSystemPrompt()
     {
-        var lower = prompt.ToLowerInvariant();
+        var prompt = """
+            You are a helpful assistant with excellent memory.
+            Remember all facts the user tells you and recall them accurately when asked.
+            When asked about something you know, include the specific details in your response.
+            """;
 
+        if (_longTermMemory.Count > 0)
+        {
+            prompt += "\n\n## Long-Term Memory (facts from previous sessions)\n";
+            prompt += "The following facts were learned in previous conversations:\n";
+            foreach (var fact in _longTermMemory)
+            {
+                prompt += $"- {fact}\n";
+            }
+            prompt += "\nUse these facts to answer questions accurately.";
+        }
+
+        return prompt;
+    }
+
+    private void ExtractAndStoreFacts(string prompt)
+    {
+        // Store the user's message as a fact if it contains factual information.
+        // In a real system, this would use an LLM to extract facts (like Mem0 does),
+        // or store embeddings in a vector database.
+        var lower = prompt.ToLowerInvariant();
         if (lower.Contains("remember") || lower.Contains("please note") || lower.Contains("important"))
         {
-            StoreFact(prompt);
-            return "I've stored that in my long-term memory.";
-        }
+            // Extract content after common prefixes
+            var content = prompt;
+            string[] prefixes = ["please remember this:", "please remember:", "remember:",
+                "please remember this important information:", "please note:"];
 
-        if (lower.Contains('?') || lower.Contains("recall") || lower.Contains("what"))
-        {
-            return AnswerFromMemory(lower);
-        }
-
-        return "Understood.";
-    }
-
-    private void StoreFact(string prompt)
-    {
-        var content = prompt;
-        string[] prefixes = ["please remember this:", "please remember:", "remember:", 
-            "please remember this important information:", "please note:"];
-        
-        foreach (var prefix in prefixes)
-        {
-            var idx = content.IndexOf(prefix, StringComparison.OrdinalIgnoreCase);
-            if (idx >= 0)
+            foreach (var prefix in prefixes)
             {
-                content = content[(idx + prefix.Length)..].Trim();
-                break;
+                var idx = content.IndexOf(prefix, StringComparison.OrdinalIgnoreCase);
+                if (idx >= 0)
+                {
+                    content = content[(idx + prefix.Length)..].Trim();
+                    break;
+                }
+            }
+
+            if (!string.IsNullOrWhiteSpace(content) && !_longTermMemory.Contains(content))
+            {
+                _longTermMemory.Add(content);
             }
         }
-
-        if (!string.IsNullOrWhiteSpace(content))
-            _longTermMemory.Add(content);
-    }
-
-    private string AnswerFromMemory(string question)
-    {
-        var matching = _longTermMemory
-            .Where(fact => HasOverlap(question, fact.ToLowerInvariant()))
-            .ToList();
-
-        if (matching.Count > 0)
-            return string.Join(" ", matching);
-
-        if (_longTermMemory.Count > 0 && (question.Contains("remember") || question.Contains("know")))
-            return "Here's what I remember: " + string.Join(". ", _longTermMemory);
-
-        return "I don't have that information stored.";
-    }
-
-    private static bool HasOverlap(string question, string fact)
-    {
-        HashSet<string> stopWords = ["what", "is", "my", "do", "you", "the", "a", "an", "i", 
-            "me", "have", "any", "about", "know", "remember", "does", "can", "to", "of", "in",
-            "for", "on", "with", "at", "by", "from", "or", "and", "not", "no", "but", "if",
-            "are", "was", "were", "has", "had", "will", "would", "could", "should", "please",
-            "tell", "information", "this", "that"];
-
-        var qWords = question.Split([' ', '?', '.', ',', '!'], StringSplitOptions.RemoveEmptyEntries)
-            .Where(w => w.Length > 2 && !stopWords.Contains(w))
-            .ToHashSet();
-
-        var fWords = fact.Split([' ', '.', ',', '!'], StringSplitOptions.RemoveEmptyEntries)
-            .Where(w => w.Length > 2 && !stopWords.Contains(w))
-            .ToHashSet();
-
-        return qWords.Overlaps(fWords);
     }
 }

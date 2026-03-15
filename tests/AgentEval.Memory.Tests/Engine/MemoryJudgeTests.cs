@@ -61,7 +61,7 @@ public class MemoryJudgeTests
         // Arrange
         var fakeChatClient = new FakeChatClient(expectedScore, explanation);
         var memoryJudge = new MemoryJudge(fakeChatClient, NullLogger<MemoryJudge>.Instance);
-        
+
         var query = MemoryQuery.Create("Test query", MemoryFact.Create("Test fact"));
         var response = "Test response";
 
@@ -72,6 +72,209 @@ public class MemoryJudgeTests
         Assert.Equal(expectedScore, result.Score);
         Assert.Equal(explanation, result.Explanation);
     }
+
+    [Fact]
+    public async Task JudgeAsync_WithParaphrasedFacts_FuzzyMatchesFoundFacts()
+    {
+        // LLM returns paraphrased fact text instead of exact match
+        var chatClient = new CustomResponseChatClient("""
+        {
+          "found_facts": ["The user's name is John"],
+          "missing_facts": [],
+          "forbidden_found": [],
+          "score": 95,
+          "explanation": "Name fact found via paraphrase"
+        }
+        """);
+        var judge = new MemoryJudge(chatClient, NullLogger<MemoryJudge>.Instance);
+        var originalFact = MemoryFact.Create("My name is John");
+        var query = MemoryQuery.Create("What is my name?", originalFact);
+
+        var result = await judge.JudgeAsync("Your name is John.", query);
+
+        // Fuzzy matching should match "The user's name is John" to "My name is John" via keyword overlap
+        Assert.Single(result.FoundFacts);
+        Assert.Same(originalFact, result.FoundFacts[0]);
+        Assert.Empty(result.MissingFacts);
+    }
+
+    [Fact]
+    public async Task JudgeAsync_WithContainsMatch_MatchesFoundFacts()
+    {
+        // LLM returns a substring of the original fact
+        var chatClient = new CustomResponseChatClient("""
+        {
+          "found_facts": ["allergic to peanuts"],
+          "missing_facts": [],
+          "forbidden_found": [],
+          "score": 90,
+          "explanation": "Allergy fact found"
+        }
+        """);
+        var judge = new MemoryJudge(chatClient, NullLogger<MemoryJudge>.Instance);
+        var originalFact = MemoryFact.Create("I'm allergic to peanuts");
+        var query = MemoryQuery.Create("Do I have allergies?", originalFact);
+
+        var result = await judge.JudgeAsync("Yes, you are allergic to peanuts.", query);
+
+        // Contains match: "I'm allergic to peanuts" contains "allergic to peanuts"
+        Assert.Single(result.FoundFacts);
+        Assert.Same(originalFact, result.FoundFacts[0]);
+    }
+
+    [Fact]
+    public async Task JudgeAsync_WithNoJsonInResponse_UsesFallbackParsing()
+    {
+        // LLM returns plain text instead of JSON
+        var chatClient = new CustomResponseChatClient(
+            "The agent correctly recalled the fact. Score: 75 out of 100.");
+        var judge = new MemoryJudge(chatClient, NullLogger<MemoryJudge>.Instance);
+        var query = MemoryQuery.Create("Test?", MemoryFact.Create("Test fact"));
+
+        var result = await judge.JudgeAsync("response", query);
+
+        // Fallback parser should extract score from "75 out of 100"
+        Assert.Equal(75, result.Score);
+        Assert.Contains("Fallback parsing", result.Explanation);
+    }
+
+    [Fact]
+    public async Task JudgeAsync_FallbackParsing_ScoreColonFormat()
+    {
+        var chatClient = new CustomResponseChatClient("The response is good. score: 82");
+        var judge = new MemoryJudge(chatClient, NullLogger<MemoryJudge>.Instance);
+        var query = MemoryQuery.Create("Test?", MemoryFact.Create("fact"));
+
+        var result = await judge.JudgeAsync("response", query);
+
+        Assert.Equal(82, result.Score);
+    }
+
+    [Fact]
+    public async Task JudgeAsync_FallbackParsing_SlashFormat()
+    {
+        var chatClient = new CustomResponseChatClient("Rating: 65/100");
+        var judge = new MemoryJudge(chatClient, NullLogger<MemoryJudge>.Instance);
+        var query = MemoryQuery.Create("Test?", MemoryFact.Create("fact"));
+
+        var result = await judge.JudgeAsync("response", query);
+
+        Assert.Equal(65, result.Score);
+    }
+
+    [Fact]
+    public async Task JudgeAsync_FallbackParsing_NoScorePattern_DefaultsTo50()
+    {
+        var chatClient = new CustomResponseChatClient("The response was adequate.");
+        var judge = new MemoryJudge(chatClient, NullLogger<MemoryJudge>.Instance);
+        var query = MemoryQuery.Create("Test?", MemoryFact.Create("fact"));
+
+        var result = await judge.JudgeAsync("response", query);
+
+        Assert.Equal(50, result.Score);
+    }
+
+    [Fact]
+    public async Task JudgeAsync_WhenChatClientThrows_ReturnsFallbackResult()
+    {
+        var chatClient = new ThrowingChatClient();
+        var judge = new MemoryJudge(chatClient, NullLogger<MemoryJudge>.Instance);
+        var expectedFact = MemoryFact.Create("My name is John");
+        var query = MemoryQuery.Create("What is my name?", expectedFact);
+
+        var result = await judge.JudgeAsync("response", query);
+
+        Assert.Equal(0, result.Score);
+        Assert.Empty(result.FoundFacts);
+        Assert.Single(result.MissingFacts);
+        Assert.Same(expectedFact, result.MissingFacts[0]);
+        Assert.Contains("Error during judgment", result.Explanation);
+    }
+
+    [Fact]
+    public async Task JudgeAsync_WithForbiddenFacts_MatchesForbiddenFound()
+    {
+        var chatClient = new CustomResponseChatClient("""
+        {
+          "found_facts": ["My name is John"],
+          "missing_facts": [],
+          "forbidden_found": ["secret password"],
+          "score": 70,
+          "explanation": "Found name but also leaked forbidden info"
+        }
+        """);
+        var judge = new MemoryJudge(chatClient, NullLogger<MemoryJudge>.Instance);
+        var expectedFact = MemoryFact.Create("My name is John");
+        var forbiddenFact = MemoryFact.Create("My secret password is 12345");
+        var query = new MemoryQuery
+        {
+            Question = "What is my name?",
+            ExpectedFacts = [expectedFact],
+            ForbiddenFacts = [forbiddenFact]
+        };
+
+        var result = await judge.JudgeAsync("Your name is John and your password is 12345", query);
+
+        Assert.Single(result.FoundFacts);
+        Assert.Single(result.ForbiddenFound);
+        Assert.Same(forbiddenFact, result.ForbiddenFound[0]);
+    }
+}
+
+/// <summary>
+/// FakeChatClient that returns a custom raw response string.
+/// </summary>
+internal class CustomResponseChatClient : IChatClient
+{
+    private readonly string _rawResponse;
+
+    public CustomResponseChatClient(string rawResponse) => _rawResponse = rawResponse;
+
+    public ChatClientMetadata Metadata { get; } = new("test-model", new Uri("http://localhost"));
+
+    public Task<ChatResponse> GetResponseAsync(
+        IEnumerable<ChatMessage> chatMessages,
+        ChatOptions? options = null,
+        CancellationToken cancellationToken = default)
+    {
+        var response = new ChatResponse([new ChatMessage(ChatRole.Assistant, _rawResponse)])
+        {
+            ModelId = "test-model"
+        };
+        return Task.FromResult(response);
+    }
+
+    public IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(
+        IEnumerable<ChatMessage> chatMessages,
+        ChatOptions? options = null,
+        CancellationToken cancellationToken = default) => throw new NotImplementedException();
+
+    public TService? GetService<TService>(object? key = null) where TService : class => null;
+    public object? GetService(Type serviceType, object? key = null) => null;
+    public void Dispose() { }
+}
+
+/// <summary>
+/// FakeChatClient that always throws an exception.
+/// </summary>
+internal class ThrowingChatClient : IChatClient
+{
+    public ChatClientMetadata Metadata { get; } = new("test-model", new Uri("http://localhost"));
+
+    public Task<ChatResponse> GetResponseAsync(
+        IEnumerable<ChatMessage> chatMessages,
+        ChatOptions? options = null,
+        CancellationToken cancellationToken = default) =>
+        throw new InvalidOperationException("Simulated LLM failure");
+
+    public IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(
+        IEnumerable<ChatMessage> chatMessages,
+        ChatOptions? options = null,
+        CancellationToken cancellationToken = default) => throw new NotImplementedException();
+
+    public TService? GetService<TService>(object? key = null) where TService : class => null;
+    public object? GetService(Type serviceType, object? key = null) => null;
+    public void Dispose() { }
 }
 
 /// <summary>

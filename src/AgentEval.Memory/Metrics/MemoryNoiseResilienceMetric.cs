@@ -105,10 +105,12 @@ public class MemoryNoiseResilienceMetric : IMetric
     private static double CalculateNoiseResilience(MemoryEvaluationResult memoryResult)
     {
         var baseScore = memoryResult.OverallScore;
-        
+
         // Analyze factors that affect noise resilience
-        var factAccuracy = memoryResult.FoundFacts.Count / (double)(memoryResult.FoundFacts.Count + memoryResult.MissingFacts.Count);
-        var querySuccessRate = memoryResult.SuccessRate / 100.0;
+        var totalFacts = memoryResult.FoundFacts.Count + memoryResult.MissingFacts.Count;
+        var factAccuracy = totalFacts > 0
+            ? memoryResult.FoundFacts.Count / (double)totalFacts
+            : 0;
         
         // Penalty for false recalls (forbidden facts found)
         var falseRecallPenalty = memoryResult.ForbiddenFound.Count * 5; // -5% per false recall

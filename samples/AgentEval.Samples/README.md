@@ -445,7 +445,7 @@ result.Performance.Should()
 - Use `TrackTools = true` to capture tool calls
 - Use `TrackPerformance = true` to capture metrics
 - Use streaming (`RunTestStreamingAsync`) for TTFT measurement
-- Use `FakeChatClient` for testing metrics without real LLM calls
+- Memory samples (28-32) require Azure OpenAI credentials for real LLM evaluation
 
 ---
 

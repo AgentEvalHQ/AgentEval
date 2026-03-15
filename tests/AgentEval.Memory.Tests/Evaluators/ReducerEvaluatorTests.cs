@@ -61,8 +61,8 @@ public class ReducerEvaluatorTests
 
         var result = await _evaluator.EvaluateAsync(_agent, facts, noiseCount: 10);
 
-        // PreReductionMessageCount = facts.Count + noiseCount = 1 + 10 = 11
-        Assert.Equal(11, result.PreReductionMessageCount);
+        // PreReductionMessageCount = (facts + noise + queries) * 2 = (1 + 10 + 1) * 2 = 24
+        Assert.Equal(24, result.PreReductionMessageCount);
     }
 
     [Fact]
@@ -104,8 +104,19 @@ public class ReducerEvaluatorTests
 
         var result = await _evaluator.EvaluateAsync(_agent, facts);
 
-        // Default noise = 20, steps = 1 fact + 20 noise = 21
-        Assert.Equal(21, result.PreReductionMessageCount);
+        // Default noise = 20, steps = (1 fact + 20 noise + 1 query) * 2 = 44
+        Assert.Equal(44, result.PreReductionMessageCount);
+    }
+
+    [Fact]
+    public async Task EvaluateAsync_PostReductionMessageCount_IsZero()
+    {
+        var facts = new[] { MemoryFact.Create("test fact") };
+
+        var result = await _evaluator.EvaluateAsync(_agent, facts, noiseCount: 5);
+
+        // PostReductionMessageCount is unknown (depends on agent's internal reducer)
+        Assert.Equal(0, result.PostReductionMessageCount);
     }
 
     [Fact]

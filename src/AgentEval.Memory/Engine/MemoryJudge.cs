@@ -54,12 +54,15 @@ public class MemoryJudge : IMemoryJudge
                 cancellationToken: cancellationToken);
             
             var responseText = chatResponse.Text ?? "";
-            
+
+            // Extract actual token usage from the response when available
+            var actualTokens = ExtractTokenUsage(chatResponse);
+
             // Parse the structured response
             var judgmentData = ParseJudgmentResponse(responseText);
-            
+
             // Convert to our result format
-            var result = ConvertToJudgmentResult(judgmentData, query);
+            var result = ConvertToJudgmentResult(judgmentData, query, actualTokens);
             
             _logger.LogDebug("Memory judgment completed: {Score}% ({FoundCount} found, {MissingCount} missing)",
                 result.Score, result.FoundFacts.Count, result.MissingFacts.Count);
@@ -162,10 +165,21 @@ Be precise - only mark facts as ""found"" if they are clearly and specifically m
     /// </summary>
     private static JudgmentResponseData FallbackParseResponse(string responseText)
     {
-        // Simple heuristic: look for score patterns
-        var scoreMatch = System.Text.RegularExpressions.Regex.Match(responseText, @"\b(\d{1,3})\b");
-        var score = scoreMatch.Success ? int.Parse(scoreMatch.Groups[1].Value) : 50;
-        
+        // Look for explicit score patterns like "score: 85", "Score: 85%", "85/100", "85 out of 100"
+        var scoreMatch = System.Text.RegularExpressions.Regex.Match(
+            responseText,
+            @"(?:score\s*[:=]\s*(\d{1,3})|(\d{1,3})\s*[/]\s*100|(\d{1,3})\s*(?:out of|percent|%))",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+        var score = 50; // Default when no score pattern is found
+        if (scoreMatch.Success)
+        {
+            var matched = scoreMatch.Groups[1].Success ? scoreMatch.Groups[1].Value
+                        : scoreMatch.Groups[2].Success ? scoreMatch.Groups[2].Value
+                        : scoreMatch.Groups[3].Value;
+            score = int.Parse(matched);
+        }
+
         return new JudgmentResponseData
         {
             FoundFacts = Array.Empty<string>(),
@@ -177,18 +191,35 @@ Be precise - only mark facts as ""found"" if they are clearly and specifically m
     }
 
     /// <summary>
+    /// Extracts actual token usage from the ChatResponse when available.
+    /// </summary>
+    private static int ExtractTokenUsage(ChatResponse response)
+    {
+        if (response.Usage is { } usage)
+        {
+            var input = (int)(usage.InputTokenCount ?? 0);
+            var output = (int)(usage.OutputTokenCount ?? 0);
+            if (input > 0 || output > 0)
+                return input + output;
+        }
+        return 0;
+    }
+
+    /// <summary>
     /// Converts parsed LLM judgment data to our result format.
     /// </summary>
-    private MemoryJudgmentResult ConvertToJudgmentResult(JudgmentResponseData data, MemoryQuery query)
+    private MemoryJudgmentResult ConvertToJudgmentResult(JudgmentResponseData data, MemoryQuery query, int actualTokens)
     {
         // Match fact contents to original MemoryFact objects
         var foundFacts = MatchFactsByContent(data.FoundFacts, query.ExpectedFacts);
         var missingFacts = MatchFactsByContent(data.MissingFacts, query.ExpectedFacts);
         var forbiddenFound = MatchFactsByContent(data.ForbiddenFound, query.ForbiddenFacts);
-        
-        // Estimate token usage (rough approximation)
-        var estimatedTokens = EstimateTokenUsage(query, data.Explanation ?? "");
-        
+
+        // Use actual token counts when available, fall back to estimation
+        var tokensUsed = actualTokens > 0
+            ? actualTokens
+            : EstimateTokenUsage(query, data.Explanation ?? "");
+
         return new MemoryJudgmentResult
         {
             Score = data.Score,
@@ -196,31 +227,101 @@ Be precise - only mark facts as ""found"" if they are clearly and specifically m
             MissingFacts = missingFacts,
             ForbiddenFound = forbiddenFound,
             Explanation = data.Explanation,
-            TokensUsed = estimatedTokens
+            TokensUsed = tokensUsed
         };
     }
 
     /// <summary>
-    /// Matches fact content strings to original MemoryFact objects.
+    /// Matches fact content strings from LLM output to original MemoryFact objects.
+    /// Uses fuzzy matching because LLMs often paraphrase or slightly alter fact text
+    /// (e.g., "My name is John" might be returned as "The user's name is John").
     /// </summary>
     private static IReadOnlyList<MemoryFact> MatchFactsByContent(
-        IReadOnlyList<string> factContents, 
+        IReadOnlyList<string> factContents,
         IReadOnlyList<MemoryFact> originalFacts)
     {
         var matched = new List<MemoryFact>();
-        
+        var alreadyMatched = new HashSet<int>();
+
         foreach (var content in factContents)
         {
-            var matchedFact = originalFacts.FirstOrDefault(f => 
-                string.Equals(f.Content, content, StringComparison.OrdinalIgnoreCase));
-            
-            if (matchedFact != null)
+            // Try exact match first, then contains-based, then keyword overlap
+            var matchIndex = -1;
+
+            for (int i = 0; i < originalFacts.Count; i++)
             {
-                matched.Add(matchedFact);
+                if (alreadyMatched.Contains(i)) continue;
+
+                var fact = originalFacts[i];
+
+                // Exact match
+                if (string.Equals(fact.Content, content, StringComparison.OrdinalIgnoreCase))
+                {
+                    matchIndex = i;
+                    break;
+                }
+
+                // Contains match (either direction)
+                if (fact.Content.Contains(content, StringComparison.OrdinalIgnoreCase) ||
+                    content.Contains(fact.Content, StringComparison.OrdinalIgnoreCase))
+                {
+                    matchIndex = i;
+                    break;
+                }
+
+                // Keyword overlap: weaker signal, so record but keep looking for an exact/contains match
+                if (matchIndex < 0 && HasSignificantOverlap(content, fact.Content))
+                {
+                    matchIndex = i;
+                    // Don't break — a subsequent exact or contains match is preferred
+                }
+            }
+
+            if (matchIndex >= 0)
+            {
+                matched.Add(originalFacts[matchIndex]);
+                alreadyMatched.Add(matchIndex);
             }
         }
-        
+
         return matched;
+    }
+
+    /// <summary>
+    /// Stop words filtered out during keyword overlap matching.
+    /// Static to avoid allocating a new set on every call (called hundreds of times per benchmark).
+    /// </summary>
+    private static readonly HashSet<string> StopWords = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "the", "a", "an", "is", "are", "was", "were", "be", "been", "being",
+        "have", "has", "had", "do", "does", "did", "will", "would", "could",
+        "should", "may", "might", "shall", "can", "to", "of", "in", "for",
+        "on", "with", "at", "by", "from", "or", "and", "not", "no", "but",
+        "if", "that", "this", "it", "its", "my", "your", "user", "users"
+    };
+
+    /// <summary>
+    /// Checks whether two strings share enough significant keywords to be considered a match.
+    /// </summary>
+    private static bool HasSignificantOverlap(string text1, string text2)
+    {
+        var words1 = text1.Split([' ', ',', '.', '!', '?', ':', ';', '\'', '"'], StringSplitOptions.RemoveEmptyEntries)
+            .Where(w => w.Length > 2 && !StopWords.Contains(w))
+            .Select(w => w.ToLowerInvariant())
+            .ToHashSet();
+
+        var words2 = text2.Split([' ', ',', '.', '!', '?', ':', ';', '\'', '"'], StringSplitOptions.RemoveEmptyEntries)
+            .Where(w => w.Length > 2 && !StopWords.Contains(w))
+            .Select(w => w.ToLowerInvariant())
+            .ToHashSet();
+
+        if (words1.Count == 0 || words2.Count == 0) return false;
+
+        var overlap = words1.Intersect(words2).Count();
+        var smaller = Math.Min(words1.Count, words2.Count);
+
+        // Require at least 50% keyword overlap with the smaller set
+        return overlap >= Math.Max(1, smaller * 0.5);
     }
 
     /// <summary>

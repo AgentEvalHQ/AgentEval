@@ -1,23 +1,28 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 AgentEval Contributors
 
+using Azure.AI.OpenAI;
+using AgentEval.Core;
 using AgentEval.Memory.Engine;
 using AgentEval.Memory.Evaluators;
 using AgentEval.Memory.Models;
 using AgentEval.Memory.Scenarios;
+using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace AgentEval.Samples;
 
 /// <summary>
 /// Sample 30: Memory Scenarios - Targeted memory tests with evaluators
-/// 
+///
 /// This demonstrates:
 /// - Using ReachBackEvaluator to test recall depth through noise
 /// - Using ReducerEvaluator to test information retention under compression
-/// - Using built-in scenario libraries (chatty, temporal, priority)
+/// - Using built-in scenario libraries (chatty, priority, updates)
 /// - Interpreting detailed per-fact results
-/// 
+///
+/// Requires: AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_API_KEY, AZURE_OPENAI_DEPLOYMENT
+///
 /// ⏱️ Time to understand: 5 minutes
 /// </summary>
 public static class Sample30_MemoryScenarios
@@ -26,42 +31,56 @@ public static class Sample30_MemoryScenarios
     {
         PrintHeader();
 
-        try
+        if (!AIConfig.IsConfigured)
         {
-            // Create shared components
-            var chatClient = new FakeChatClient();
-            var judge = new MemoryJudge(chatClient, NullLogger<MemoryJudge>.Instance);
-            var runner = new MemoryTestRunner(judge, NullLogger<MemoryTestRunner>.Instance);
-            var agent = new SimpleMemoryAgent();
-
-            // Test 1: Reach-Back Depth
-            await RunReachBackTestAsync(runner, judge, agent);
-
-            // Test 2: Reducer Fidelity
-            await RunReducerTestAsync(runner, agent);
-
-            // Test 3: Built-in Scenario Library
-            await RunScenarioLibraryTestAsync(runner, agent);
-
-            PrintKeyTakeaways();
+            AIConfig.PrintMissingCredentialsWarning();
+            Console.WriteLine("   This sample requires real Azure OpenAI credentials.");
+            Console.WriteLine("   Memory evaluators use an LLM judge — they cannot run in mock mode.\n");
+            return;
         }
-        catch (Exception ex)
-        {
-            Console.ForegroundColor = ConsoleColor.Red;
-            Console.WriteLine($"❌ Error: {ex.Message}");
-            Console.ResetColor();
-        }
+
+        // Create shared components — all backed by a real LLM
+        var azureClient = new AzureOpenAIClient(AIConfig.Endpoint, AIConfig.KeyCredential);
+        var chatClient = azureClient
+            .GetChatClient(AIConfig.ModelDeployment)
+            .AsIChatClient();
+
+        var judge = new MemoryJudge(chatClient, NullLogger<MemoryJudge>.Instance);
+        var runner = new MemoryTestRunner(judge, NullLogger<MemoryTestRunner>.Instance);
+
+        Console.WriteLine($"   LLM: {AIConfig.ModelDeployment} at {AIConfig.Endpoint}\n");
+
+        // Test 1: Reach-Back Depth
+        await RunReachBackTestAsync(runner, judge, chatClient);
+
+        // Test 2: Reducer Fidelity
+        await RunReducerTestAsync(runner, chatClient);
+
+        // Test 3: Built-in Scenario Library
+        await RunScenarioLibraryTestAsync(runner, chatClient);
+
+        PrintKeyTakeaways();
     }
 
     private static async Task RunReachBackTestAsync(
-        MemoryTestRunner runner, MemoryJudge judge, SimpleMemoryAgent agent)
+        MemoryTestRunner runner, MemoryJudge judge, IChatClient chatClient)
     {
-        Console.WriteLine("🎸 TEST 1: Reach-Back Depth Evaluation");
+        Console.WriteLine("📏 TEST 1: Reach-Back Depth Evaluation");
         Console.WriteLine(new string('─', 55));
-        Console.WriteLine("   Testing how far back the agent can recall a fact");
-        Console.WriteLine("   through layers of conversational noise...\n");
+        Console.WriteLine("   Problem: As conversation grows, agents lose track of early facts.");
+        Console.WriteLine("   This test plants a fact, then adds N noise turns before asking.");
+        Console.WriteLine("   The depth where recall fails reveals the agent's effective memory.\n");
 
         var evaluator = new ReachBackEvaluator(runner, judge, NullLogger<ReachBackEvaluator>.Instance);
+
+        // Create a fresh agent for this test (clean conversation history)
+        var agent = chatClient.AsEvaluableAgent(
+            name: "ReachBack Agent",
+            systemPrompt: """
+                You are a helpful assistant. Remember everything the user tells you.
+                When asked a question, answer based on what you remember from the conversation.
+                """,
+            includeHistory: true);
 
         var fact = MemoryFact.Create("I'm severely allergic to peanuts", "medical", 100);
         var query = MemoryQuery.Create("Do I have any food allergies?", fact);
@@ -83,17 +102,34 @@ public static class Sample30_MemoryScenarios
             var icon = dr.Recalled ? "✅" : "❌";
             Console.WriteLine($"     {icon} Depth {dr.Depth,3}: {dr.Score,6:F1}%  ({dr.Duration.TotalMilliseconds:F0}ms)");
         }
+
+        Console.WriteLine();
+        Console.ForegroundColor = ConsoleColor.DarkGray;
+        Console.WriteLine("   Interpretation: Depth 5 = 5 noise turns between fact and query.");
+        Console.WriteLine("   Depth 10+ reliable = good. Depth 20+ = excellent context handling.");
+        Console.ResetColor();
         Console.WriteLine();
     }
 
     private static async Task RunReducerTestAsync(
-        MemoryTestRunner runner, SimpleMemoryAgent agent)
+        MemoryTestRunner runner, IChatClient chatClient)
     {
-        Console.WriteLine("🔧 TEST 2: Reducer Fidelity Evaluation");
+        Console.WriteLine("🗜️ TEST 2: Reducer Fidelity Evaluation");
         Console.WriteLine(new string('─', 55));
-        Console.WriteLine("   Testing information retention after context compression...\n");
+        Console.WriteLine("   Problem: Many agents compress/summarize old conversation history.");
+        Console.WriteLine("   This test checks if important facts survive that compression.\n");
 
         var evaluator = new ReducerEvaluator(runner, NullLogger<ReducerEvaluator>.Instance);
+
+        // Create a fresh agent for this test
+        var agent = chatClient.AsEvaluableAgent(
+            name: "Reducer Agent",
+            systemPrompt: """
+                You are a helpful assistant. Remember all facts the user shares with you,
+                especially medical information, schedules, and personal preferences.
+                When asked, recall these facts accurately.
+                """,
+            includeHistory: true);
 
         var facts = new[]
         {
@@ -130,7 +166,7 @@ public static class Sample30_MemoryScenarios
     }
 
     private static async Task RunScenarioLibraryTestAsync(
-        MemoryTestRunner runner, SimpleMemoryAgent agent)
+        MemoryTestRunner runner, IChatClient chatClient)
     {
         Console.WriteLine("📚 TEST 3: Built-in Scenario Library");
         Console.WriteLine(new string('─', 55));
@@ -145,7 +181,12 @@ public static class Sample30_MemoryScenarios
         var lowPriority = new[] { MemoryFact.Create("User likes jazz music", "preference", 30) };
         var priorityScenario = scenarios.CreatePriorityMemoryTest(highPriority, lowPriority);
 
-        var priorityResult = await runner.RunAsync(agent, priorityScenario);
+        var agentA = chatClient.AsEvaluableAgent(
+            name: "Priority Agent",
+            systemPrompt: "You are a helpful assistant. Remember everything the user tells you.",
+            includeHistory: true);
+
+        var priorityResult = await runner.RunAsync(agentA, priorityScenario);
         Console.WriteLine($"     Score: {priorityResult.OverallScore:F1}% | Found: {priorityResult.FoundFacts.Count} | Missing: {priorityResult.MissingFacts.Count}");
 
         // Scenario B: Buried facts in chatty conversation
@@ -157,7 +198,12 @@ public static class Sample30_MemoryScenarios
         };
         var buriedScenario = chattyScenarios.CreateBuriedFactsScenario(importantFacts, noiseRatio: 4.0);
 
-        var buriedResult = await runner.RunAsync(agent, buriedScenario);
+        var agentB = chatClient.AsEvaluableAgent(
+            name: "Buried Facts Agent",
+            systemPrompt: "You are a helpful assistant. Pay attention to important details in conversation and remember them.",
+            includeHistory: true);
+
+        var buriedResult = await runner.RunAsync(agentB, buriedScenario);
         Console.WriteLine($"     Score: {buriedResult.OverallScore:F1}% | Steps: {buriedScenario.Steps.Count} | Queries: {buriedScenario.Queries.Count}");
 
         // Scenario C: Fact Updates
@@ -166,7 +212,12 @@ public static class Sample30_MemoryScenarios
         var updated = new[] { MemoryFact.Create("Actually, my new phone number is 555-0200") };
         var updateScenario = scenarios.CreateMemoryUpdateTest(initial, updated);
 
-        var updateResult = await runner.RunAsync(agent, updateScenario);
+        var agentC = chatClient.AsEvaluableAgent(
+            name: "Update Agent",
+            systemPrompt: "You are a helpful assistant. When the user corrects information, update your understanding accordingly.",
+            includeHistory: true);
+
+        var updateResult = await runner.RunAsync(agentC, updateScenario);
         Console.WriteLine($"     Score: {updateResult.OverallScore:F1}% | Found: {updateResult.FoundFacts.Count} | Missing: {updateResult.MissingFacts.Count}");
 
         Console.WriteLine();
@@ -177,10 +228,11 @@ public static class Sample30_MemoryScenarios
         Console.WriteLine(new string('═', 70));
         Console.WriteLine("🎯 KEY TAKEAWAYS:");
         Console.WriteLine("   • ReachBackEvaluator shows degradation curve as context grows");
-        Console.WriteLine("   • ReducerEvaluator detects fact loss from context compression"); 
+        Console.WriteLine("   • ReducerEvaluator detects fact loss from context compression");
         Console.WriteLine("   • High-importance fact loss is flagged as 'critical'");
         Console.WriteLine("   • Built-in scenarios cover priority, noise, and update testing");
-        Console.WriteLine("   • All evaluators work with any IEvaluableAgent implementation");
+        Console.WriteLine("   • Each test gets a fresh agent to isolate evaluation");
+        Console.WriteLine("   • All scoring is done by a real LLM judge — no keyword hacks");
     }
 
     private static void PrintHeader()

@@ -72,6 +72,15 @@ public class ReachBackEvaluator : IReachBackEvaluator
         foreach (var depth in depths.OrderBy(d => d))
         {
             cancellationToken.ThrowIfCancellationRequested();
+
+            // Reset agent state between depth tests to prevent contamination.
+            // Without this, the agent accumulates conversation history from prior depths,
+            // seeing the fact multiple times and invalidating the degradation curve.
+            if (agent is ISessionResettableAgent resettable)
+            {
+                await resettable.ResetSessionAsync(cancellationToken);
+            }
+
             var depthResult = await EvaluateAtDepthAsync(agent, fact, query, depth, cancellationToken);
             depthResults.Add(depthResult);
 

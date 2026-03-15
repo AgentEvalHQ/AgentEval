@@ -65,6 +65,13 @@ public class MemoryBenchmarkRunner : IMemoryBenchmarkRunner
         {
             cancellationToken.ThrowIfCancellationRequested();
 
+            // Reset agent state between categories to prevent cross-contamination.
+            // Without this, facts planted in BasicRetention leak into subsequent categories.
+            if (agent is ISessionResettableAgent resettable)
+            {
+                await resettable.ResetSessionAsync(cancellationToken);
+            }
+
             _logger.LogDebug("Running benchmark category: {CategoryName}", category.Name);
 
             var catResult = await RunCategoryAsync(agent, category, cancellationToken);

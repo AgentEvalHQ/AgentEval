@@ -135,4 +135,22 @@ public class ReachBackEvaluatorTests
         await Assert.ThrowsAsync<OperationCanceledException>(
             () => _evaluator.EvaluateAsync(_agent, fact, query, [5, 10], cts.Token));
     }
+
+    [Fact]
+    public async Task EvaluateAsync_WithResettableAgent_ResetsSessionBetweenDepths()
+    {
+        var fakeChatClient = new FakeChatClient();
+        var judge = new MemoryJudge(fakeChatClient, NullLogger<MemoryJudge>.Instance);
+        var runner = new MemoryTestRunner(judge, NullLogger<MemoryTestRunner>.Instance);
+        var evaluator = new ReachBackEvaluator(runner, judge, NullLogger<ReachBackEvaluator>.Instance);
+        var agent = new ResettableTestAgent();
+
+        var fact = MemoryFact.Create("My name is Alice");
+        var query = MemoryQuery.Create("What is my name?", fact);
+
+        await evaluator.EvaluateAsync(agent, fact, query, [2, 5, 10]);
+
+        // Agent should be reset once per depth (3 depths = 3 resets)
+        Assert.Equal(3, agent.ResetCount);
+    }
 }

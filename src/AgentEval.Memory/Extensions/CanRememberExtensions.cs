@@ -145,7 +145,7 @@ public static class CanRememberExtensions
         IServiceProvider? serviceProvider = null,
         CancellationToken cancellationToken = default)
     {
-        if (agent is not ISessionResettableAgent resettableAgent)
+        if (agent is not ISessionResettableAgent)
         {
             throw new InvalidOperationException(
                 $"Agent {agent.GetType().Name} must implement ISessionResettableAgent for cross-session memory testing.");
@@ -158,7 +158,7 @@ public static class CanRememberExtensions
             sessionCount: 3,
             sessionGapMinutes: 60
         );
-        
+
         var runner = GetMemoryTestRunner(serviceProvider);
         return await runner.RunAsync(agent, scenario, cancellationToken);
     }

@@ -167,13 +167,15 @@ public class TemporalMemoryRunner : ITemporalMemoryRunner
             var temporalQueryResults = result.QueryResults
                 .Where(r => r.Query.QueryTime.HasValue)
                 .ToArray();
-                
+
             var temporalScore = temporalQueryResults.Length > 0
                 ? temporalQueryResults.Average(r => r.Score)
                 : result.OverallScore;
-                
+
             temporalMetadata["TemporalScore"] = temporalScore;
-            temporalMetadata["TemporalAccuracy"] = temporalQueryResults.Count(r => r.Passed) / (double)temporalQueryResults.Length * 100;
+            temporalMetadata["TemporalAccuracy"] = temporalQueryResults.Length > 0
+                ? temporalQueryResults.Count(r => r.Passed) / (double)temporalQueryResults.Length * 100
+                : 0;
         }
         
         return new MemoryEvaluationResult
