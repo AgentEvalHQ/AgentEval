@@ -6,11 +6,85 @@ using System.Text;
 namespace AgentEval.Samples;
 
 /// <summary>
-/// Main program - interactive menu to run samples.
+/// Main program — two-level interactive menu to browse and run samples by group.
 /// </summary>
 public static class Program
 {
     private static bool _interactive = true;
+
+    // ──────────────────────────────────────────────────────────
+    //  Sample catalogue — one record per group, samples in order
+    // ──────────────────────────────────────────────────────────
+
+    private record SampleEntry(string Name, string Description, Func<Task> Run);
+    private record SampleGroup(char Key, string Name, string Note, IReadOnlyList<SampleEntry> Samples);
+
+    private static readonly IReadOnlyList<SampleGroup> Groups =
+    [
+        new('A', "Getting Started", "★ no credentials needed",
+        [
+            new("Hello World",               "Minimal AgentEval test — TestCase, TestResult, pass/fail",               HelloWorld.RunAsync),
+            new("Agent + One Tool",          "Tool tracking and fluent assertions (HaveCalledTool, WithoutError)",      AgentWithOneTool.RunAsync),
+            new("Agent + Multiple Tools",    "Tool ordering, BeforeTool / AfterTool, visual timeline",                 AgentWithMultipleTools.RunAsync),
+            new("Performance Metrics",       "Latency, cost, TTFT, token budget assertions",                           PerformanceMetrics.RunAsync),
+        ]),
+
+        new('B', "Metrics & Quality", "",
+        [
+            new("Comprehensive RAG",         "Build & evaluate a full RAG system — 8 metrics + IR metrics",           ComprehensiveRAG.RunAsync),
+            new("Quality & Safety Metrics",  "Groundedness, Coherence, Fluency — beyond RAG accuracy",               QualitySafetyMetrics.RunAsync),
+            new("Judge Calibration",         "Multi-model consensus voting (Median, Mean, Weighted)",                 JudgeCalibration.RunAsync),
+            new("Responsible AI",            "Toxicity, bias, misinformation with counterfactual testing",            ResponsibleAI.RunAsync),
+            new("Calibrated Evaluator",      "Drop-in IEvaluator with per-criterion majority voting",                CalibratedEvaluatorDemo.RunAsync),
+        ]),
+
+        new('C', "Workflows & Conversations", "",
+        [
+            new("Conversation Evaluation",   "Multi-turn testing with ConversationRunner and fluent builder API",     ConversationEvaluation.RunAsync),
+            new("Real MAF Workflow",         "WorkflowBuilder + InProcessExecution: 4-agent pipeline",               WorkflowEvaluationReal.RunAsync),
+            new("Workflow + Tools",          "TripPlanner pipeline: 4 agents with tool call tracking",               WorkflowWithTools.RunAsync),
+        ]),
+
+        new('D', "Performance & Statistics", "",
+        [
+            new("Performance Profiling",     "Real latency: p50 / p90 / p99 percentiles, tool accuracy",             PerformanceProfiling.RunAsync),
+            new("Stochastic Evaluation",     "Run N times — assert on pass rate, not single pass/fail",              StochasticEvaluation.RunAsync),
+            new("Model Comparison",          "Compare and rank 3 models on quality, speed, cost, reliability",       ModelComparison.RunAsync),
+            new("Stochastic + Comparison",   "Stochastic rigor applied to side-by-side model comparison",           CombinedStochasticComparison.RunAsync),
+            new("Streaming vs Async",        "TTFT vs throughput — compare streaming and non-streaming modes",       StreamingVsAsyncPerformance.RunAsync),
+        ]),
+
+        new('E', "Safety & Security", "",
+        [
+            new("Policy & Safety",           "Enterprise guardrails — NeverCallTool, PII detection, MustConfirmBefore", PolicySafetyEvaluation.RunAsync),
+            new("Red Team Basic",            "One-liner security scan — 9 attack types, OWASP probes",               RedTeamBasic.RunAsync),
+            new("Red Team Advanced",         "Custom attack pipeline, OWASP compliance, PDF export, baselines",      RedTeamAdvanced.RunAsync),
+        ]),
+
+        new('F', "Data & Infrastructure", "",
+        [
+            new("Snapshot Testing",          "Regression detection — JSON diff, field scrubbing, semantic tolerance", SnapshotTesting.RunAsync),
+            new("Datasets & Export",         "Batch evaluation: YAML datasets → JUnit / Markdown / JSON / TRX",      DatasetsAndExport.RunAsync),
+            new("Trace Record & Replay",     "Capture executions, save to JSON, replay deterministically",            TraceRecordReplay.RunAsync),
+            new("Benchmark System",          "JSONL-loaded tool-accuracy benchmarks (BFCL, GAIA-style)",             BenchmarkSystem.RunAsync),
+            new("Dataset Loaders",           "Multi-format auto-detection: JSONL, JSON, YAML, CSV (offline)",        DatasetLoaders.RunAsync),
+            new("Extensibility",             "DI registries — custom metrics, exporters, loaders, attacks",          Extensibility.RunAsync),
+            new("Cross-Framework",           "Universal IChatClient.AsEvaluableAgent() for any AI provider",         CrossFrameworkEvaluation.RunAsync),
+        ]),
+
+        new('G', "Memory Evaluation", "",
+        [
+            new("Memory Basics",             "Test if agents remember facts — MemoryJudge, fluent assertions",        MemoryBasics.RunAsync),
+            new("Memory Benchmark",          "Comprehensive memory scoring — Quick / Standard / Full with grades",    MemoryBenchmarkDemo.RunAsync),
+            new("Memory Scenarios",          "ReachBackEvaluator (recall depth), ReducerEvaluator (compression)",    MemoryScenariosDemo.RunAsync),
+            new("Memory DI",                 "Production DI wiring — AddAgentEvalMemory(), CanRememberAsync()",      MemoryDI.RunAsync),
+            new("Cross-Session Memory",      "Fact persistence across session resets — compare with / without",      MemoryCrossSession.RunAsync),
+        ]),
+    ];
+
+    // ──────────────────────────────────────────────────────────
+    //  Entry point
+    // ──────────────────────────────────────────────────────────
 
     public static async Task Main(string[] args)
     {
@@ -19,159 +93,175 @@ public static class Program
         PrintBanner();
 
         if (!AIConfig.IsConfigured)
-        {
             AIConfig.PrintMissingCredentialsWarning();
-        }
 
-        if (args.Length > 0 && int.TryParse(args[0], out var sampleNumber))
+        // Legacy CLI: dotnet run -- <1-32>  (direct sample number, flattened in group order)
+        if (args.Length > 0 && int.TryParse(args[0], out var legacyNumber))
         {
             _interactive = false;
-            await RunSample(sampleNumber);
+            await RunLegacyNumber(legacyNumber);
             return;
         }
 
+        // Two-level interactive menu
         while (true)
         {
-            PrintMenu();
-            var input = Console.ReadLine()?.Trim();
+            var group = PromptForGroup();
+            if (group is null) break;           // 'Q' → exit
 
-            if (string.IsNullOrEmpty(input) || input.Equals("q", StringComparison.OrdinalIgnoreCase))
+            while (true)
             {
-                Console.WriteLine("\n👋 Goodbye!\n");
-                break;
-            }
+                var choice = PromptForSample(group);
 
-            if (int.TryParse(input, out var choice))
-            {
-                await RunSample(choice);
+                if (choice == "B") break;
+                if (choice == "Q") goto done;
+                if (choice == "A") { foreach (var s in group.Samples) await RunEntry(s); continue; }
+
+                if (int.TryParse(choice, out var idx) && idx >= 1 && idx <= group.Samples.Count)
+                    await RunEntry(group.Samples[idx - 1]);
             }
-            else
-            {
-                Console.WriteLine("❌ Invalid choice. Enter a number or 'q' to quit.\n");
-            }
+        }
+        done:
+
+        Console.WriteLine("\n👋 Goodbye!\n");
+    }
+
+    // ──────────────────────────────────────────────────────────
+    //  Prompt helpers
+    // ──────────────────────────────────────────────────────────
+
+    private static SampleGroup? PromptForGroup()
+    {
+        while (true)
+        {
+            PrintGroupMenu();
+            var raw = Console.ReadLine()?.Trim().ToUpperInvariant();
+
+            if (string.IsNullOrEmpty(raw) || raw == "Q") return null;
+
+            var group = Groups.FirstOrDefault(g => g.Key.ToString() == raw);
+            if (group is not null) return group;
+
+            Console.WriteLine("  Enter a letter A–G or Q to quit.\n");
         }
     }
 
-    private static async Task RunSample(int sampleNumber)
+    // Returns "B" (back), "Q" (quit), "A" (run all), or a digit string for a sample index.
+    private static string PromptForSample(SampleGroup group)
+    {
+        while (true)
+        {
+            PrintSampleMenu(group);
+            var raw = Console.ReadLine()?.Trim().ToUpperInvariant() ?? "";
+
+            if (raw == "" || raw == "B") return "B";
+            if (raw == "Q") return "Q";
+            if (raw == "A") return "A";
+
+            if (int.TryParse(raw, out var idx) && idx >= 1 && idx <= group.Samples.Count)
+                return raw;
+
+            Console.WriteLine($"  Enter 1–{group.Samples.Count}, A to run all, B to go back, or Q to quit.\n");
+        }
+    }
+
+    // ──────────────────────────────────────────────────────────
+    //  Menu rendering
+    // ──────────────────────────────────────────────────────────
+
+    private static void PrintGroupMenu()
     {
         Console.WriteLine();
-        
+        Console.ForegroundColor = ConsoleColor.Cyan;
+        Console.WriteLine("  ┌─────────────────────────────────────────────────────────────────┐");
+        Console.WriteLine("  │                     SELECT A GROUP                              │");
+        Console.WriteLine("  ├─────────────────────────────────────────────────────────────────┤");
+        Console.ResetColor();
+
+        foreach (var g in Groups)
+        {
+            var note = string.IsNullOrEmpty(g.Note) ? "" : $"  {g.Note}";
+            var count = $"({g.Samples.Count} samples)";
+            Console.WriteLine($"  │  [{g.Key}] {g.Name,-32} {count,-12}{note,-24}│");
+        }
+
+        Console.ForegroundColor = ConsoleColor.Cyan;
+        Console.WriteLine("  ├─────────────────────────────────────────────────────────────────┤");
+        Console.WriteLine("  │  [Q] Quit                                                       │");
+        Console.WriteLine("  └─────────────────────────────────────────────────────────────────┘");
+        Console.ResetColor();
+        Console.Write("\n  Group: ");
+    }
+
+    private static void PrintSampleMenu(SampleGroup group)
+    {
+        Console.WriteLine();
+        Console.ForegroundColor = ConsoleColor.Green;
+        var header = group.Name + (string.IsNullOrEmpty(group.Note) ? "" : "  " + group.Note);
+        Console.WriteLine($"  ┌─────────────────────────────────────────────────────────────────┐");
+        Console.WriteLine($"  │  {header,-65}│");
+        Console.WriteLine($"  ├─────────────────────────────────────────────────────────────────┤");
+        Console.ResetColor();
+
+        for (var i = 0; i < group.Samples.Count; i++)
+        {
+            var s = group.Samples[i];
+            Console.WriteLine($"  │  [{i + 1,2}] {s.Name,-28} {s.Description,-33}│");
+        }
+
+        Console.ForegroundColor = ConsoleColor.Green;
+        Console.WriteLine("  ├─────────────────────────────────────────────────────────────────┤");
+        Console.WriteLine("  │  [A] Run all in this group   [B] Back   [Q] Quit               │");
+        Console.WriteLine("  └─────────────────────────────────────────────────────────────────┘");
+        Console.ResetColor();
+        Console.Write("\n  Sample: ");
+    }
+
+    // ──────────────────────────────────────────────────────────
+    //  Runner
+    // ──────────────────────────────────────────────────────────
+
+    private static async Task RunEntry(SampleEntry entry)
+    {
+        Console.WriteLine();
+        Console.ForegroundColor = ConsoleColor.Yellow;
+        Console.WriteLine($"  ▶ Running: {entry.Name}");
+        Console.ResetColor();
+        Console.WriteLine();
+
         try
         {
-            switch (sampleNumber)
-            {
-                case 1:
-                    await Sample01_HelloWorld.RunAsync();
-                    break;
-                case 2:
-                    await Sample02_AgentWithOneTool.RunAsync();
-                    break;
-                case 3:
-                    await Sample03_AgentWithMultipleTools.RunAsync();
-                    break;
-                case 4:
-                    await Sample04_PerformanceMetrics.RunAsync();
-                    break;
-                case 5:
-                    await Sample05_ComprehensiveRAG.RunAsync();
-                    break;
-                case 6:
-                    await Sample06_PerformanceProfiling.RunAsync();
-                    break;
-                case 7:
-                    await Sample07_SnapshotTesting.RunAsync();
-                    break;
-                case 8:
-                    await Sample08_ConversationEvaluation.RunAsync();
-                    break;
-                case 9:
-                    await Sample09_WorkflowEvaluationReal.RunAsync();
-                    break;
-                case 10:
-                    await Sample10_WorkflowWithTools.RunAsync();
-                    break;
-                case 11:
-                    await Sample11_DatasetsAndExport.RunAsync();
-                    break;
-                case 12:
-                    await Sample12_PolicySafetyEvaluation.RunAsync();
-                    break;
-                case 13:
-                    await Sample13_TraceRecordReplay.RunAsync();
-                    break;
-                case 14:
-                    await Sample14_StochasticEvaluation.RunAsync();
-                    break;
-                case 15:
-                    await Sample15_ModelComparison.RunAsync();
-                    break;
-                case 16:
-                    await Sample16_CombinedStochasticComparison.RunAsync();
-                    break;
-                case 17:
-                    await Sample17_QualitySafetyMetrics.RunAsync();
-                    break;
-                case 18:
-                    await Sample18_JudgeCalibration.RunAsync();
-                    break;
-                case 19:
-                    await Sample19_StreamingVsAsyncPerformance.RunAsync();
-                    break;
-                case 20:
-                    await Sample20_RedTeamBasic.RunAsync();
-                    break;
-                case 21:
-                    await Sample21_RedTeamAdvanced.RunAsync();
-                    break;
-                case 22:
-                    await Sample22_ResponsibleAI.RunAsync();
-                    break;
-                case 23:
-                    await Sample23_BenchmarkSystem.RunAsync();
-                    break;
-                case 24:
-                    await Sample24_CalibratedEvaluator.RunAsync();
-                    break;
-                case 25:
-                    await Sample25_DatasetLoaders.RunAsync();
-                    break;
-                case 26:
-                    await Sample26_Extensibility.RunAsync();
-                    break;
-                case 27:
-                    await Sample27_CrossFrameworkEvaluation.RunAsync();
-                    break;
-                case 28:
-                    await Sample28_MemoryBasics.RunAsync();
-                    break;
-                case 29:
-                    await Sample29_MemoryBenchmark.RunAsync();
-                    break;
-                case 30:
-                    await Sample30_MemoryScenarios.RunAsync();
-                    break;
-                case 31:
-                    await Sample31_MemoryDI.RunAsync();
-                    break;
-                case 32:
-                    await Sample32_MemoryCrossSession.RunAsync();
-                    break;
-                default:
-                    Console.WriteLine($"❌ Sample {sampleNumber} not found.\n");
-                    break;
-            }
+            await entry.Run();
         }
         catch (Exception ex)
         {
             Console.ForegroundColor = ConsoleColor.Red;
-            Console.WriteLine($"\n❌ Error: {ex.Message}");
+            Console.WriteLine($"\n  ❌ Error: {ex.Message}");
             Console.ResetColor();
         }
 
-        Console.WriteLine("\nPress any key to continue...");
-        if (_interactive)
-            Console.ReadKey(true);
+        Console.WriteLine("\n  Press any key to continue...");
+        if (_interactive) Console.ReadKey(true);
     }
+
+    // ──────────────────────────────────────────────────────────
+    //  Legacy: dotnet run -- <1-32>
+    // ──────────────────────────────────────────────────────────
+
+    private static async Task RunLegacyNumber(int n)
+    {
+        var all = Groups.SelectMany(g => g.Samples).ToList();
+        if (n < 1 || n > all.Count)
+        {
+            Console.WriteLine($"  ❌ Sample {n} not found. Valid range: 1–{all.Count}");
+            return;
+        }
+        await RunEntry(all[n - 1]);
+    }
+
+    // ──────────────────────────────────────────────────────────
+    //  Banner
+    // ──────────────────────────────────────────────────────────
 
     private static void PrintBanner()
     {
@@ -191,55 +281,5 @@ public static class Program
 ╚═══════════════════════════════════════════════════════════════════════════════╝
 ");
         Console.ResetColor();
-    }
-
-    private static void PrintMenu()
-    {
-        Console.ForegroundColor = ConsoleColor.Green;
-        Console.WriteLine("┌─────────────────────────────────────────────────────────────┐");
-        Console.WriteLine("│                    📚 SAMPLES MENU                          │");
-        Console.WriteLine("├─────────────────────────────────────────────────────────────┤");
-        Console.ResetColor();
-        
-        Console.WriteLine("│  1. 🌍 Hello World        - Minimal AgentEval test          │");
-        Console.WriteLine("│  2. 🔧 Agent + One Tool   - Tool tracking assertions        │");
-        Console.WriteLine("│  3. 🔧 Agent + Multi Tool - Tool ordering & timeline        │");
-        Console.WriteLine("│  4. ⚡ Performance        - Latency, cost, TTFT metrics     │");
-        Console.WriteLine("│  5. 📊 Comprehensive RAG  - Build & evaluate RAG system    │");
-        Console.WriteLine("│  6. 📈 Profiling          - Latency, tokens, tool accuracy  │");
-        Console.WriteLine("│  7. 📸 Snapshot Testing   - Regression detection            │");
-        Console.WriteLine("│  8. 💬 Conversations      - Multi-turn evaluation            │");
-        Console.WriteLine("│  9. 🔀 Workflow Evaluation - Real MAF workflow pipeline       │");
-        Console.WriteLine("│ 10. � Workflow + Tools   - TripPlanner with tool tracking     │");
-        Console.WriteLine("│ 11. �📂 Datasets & Export  - Batch evaluation, JUnit export   │");
-        Console.WriteLine("│ 12. 🛡️ Policy & Safety    - Enterprise guardrails           │");
-        Console.WriteLine("│ 13. 🔄 Trace Record/Replay - Deterministic evaluation        │");
-        Console.WriteLine("│ 14. 🎲 Stochastic Evaluation - Multi-run reliability           │");
-        Console.WriteLine("│ 15. ⚖️ Model Comparison   - Compare & rank models           │");
-        Console.WriteLine("│ 16. 🔀 Combined Test      - Stochastic + Model Comparison   │");
-        Console.WriteLine("│ 17. 🛡️ Quality & Safety   - Groundedness, Coherence, Fluency│");
-        Console.WriteLine("│ 18. ⚖️ Judge Calibration  - Multi-model consensus voting   │");
-        Console.WriteLine("│ 19. ⚡ Streaming vs Async - Performance comparison          │");
-        Console.WriteLine("│ 20. 🛡️ Red Team Basic    - Security vulnerability scan       │");
-        Console.WriteLine("│ 21. 🛡️ Red Team Advanced - Pipeline, reports, compliance    │");
-        Console.WriteLine("│ 22. 🛡️ ResponsibleAI     - Content safety, bias, misinfo   │");
-        Console.WriteLine("│ 23. 📊 Benchmark System  - Performance, agentic & standard  │");
-        Console.WriteLine("│ 24. ⚖️ Calibrated Eval   - Multi-model harness evaluation    │");
-        Console.WriteLine("│ 25. 📂 Dataset Loaders   - Multi-format pipeline (offline)  │");
-        Console.WriteLine("│ 26. 🔌 Extensibility     - DI registries & custom extensions │");
-        Console.WriteLine("│ 27. 🌐 Cross-Framework   - Universal IChatClient adapter     │");
-        Console.WriteLine("│ 28. 🧠 Memory Basics     - Agent memory evaluation basics   │");
-        Console.WriteLine("│ 29. 🏆 Memory Benchmark  - Comprehensive memory scoring      │");
-        Console.WriteLine("│ 30. 🔬 Memory Scenarios  - Reach-back, reducer, scenarios     │");
-        Console.WriteLine("│ 31. 💉 Memory DI         - Dependency injection registration  │");
-        Console.WriteLine("│ 32. 🔄 Memory Cross-Sess - Cross-session memory persistence   │");
-        
-        Console.ForegroundColor = ConsoleColor.Green;
-        Console.WriteLine("├─────────────────────────────────────────────────────────────┤");
-        Console.WriteLine("│  q. Quit                                                    │");
-        Console.WriteLine("└─────────────────────────────────────────────────────────────┘");
-        Console.ResetColor();
-        
-        Console.Write("\nEnter your choice: ");
     }
 }

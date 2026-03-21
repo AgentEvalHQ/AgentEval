@@ -459,41 +459,25 @@ See the **[Getting Started Guide](docs/getting-started.md)** for a complete walk
 
 ## Samples
 
-Run all 27 included samples:
+Run all 32 included samples — organised into 7 groups:
 
 ```bash
 dotnet run --project samples/AgentEval.Samples
 ```
 
-| Sample | Description | Time |
-|--------|-------------|------|
-| **01: Hello World** | The simplest possible agent evaluation | 2 min |
-| **02: Agent with One Tool** | Tool tracking and fluent assertions | 5 min |
-| **03: Agent with Multiple Tools** | Tool ordering, timing, and timeline | 7 min |
-| **04: Performance Metrics** | Latency, cost, TTFT, and token tracking | 5 min |
-| **05: RAG Evaluation** | Faithfulness, relevance, precision, recall, correctness | 8 min |
-| **06: Performance Profiling** | Latency percentiles, token tracking, tool accuracy | 5 min |
-| **07: Snapshot Evaluation** | Regression detection with baselines | 5 min |
-| **08: Conversation Evaluation** | Multi-turn agent interactions | 5 min |
-| **09: Workflow Evaluation** | Multi-agent orchestration and routing | 10 min |
-| **10: Workflow with Tools** | Workflow agents with tool integration | 8 min |
-| **11: Datasets and Export** | Batch evaluation with JSON/YAML/CSV/JSONL | 5 min |
-| **12: Policy & Safety Evaluation** | Enterprise guardrails (NeverCallTool, MustConfirmBefore) | 8 min |
-| **13: Trace Record & Replay** | Capture executions for deterministic evaluation | 8 min |
-| **14: stochastic evaluation** | Run evaluations N times for statistical confidence | 5 min |
-| **15: Model Comparison** | Compare multiple models on the same task | 8 min |
-| **16: Combined Stochastic + Comparison** | Stochastic evaluations across multiple models | 10 min |
-| **17: Quality & Safety Metrics** | Groundedness, coherence, fluency evaluation | 5 min |
-| **18: Judge Calibration** | Multi-model consensus for reliable LLM-as-judge | 8 min |
-| **19: Streaming vs Async Performance** | Performance comparison of different execution modes | 5 min |
-| **20: Red Team Basic** | Security evaluation with prompt injection and jailbreak | 8 min |
-| **21: Red Team Advanced** | Comprehensive security testing across all attack types | 10 min |
-| **22: Responsible AI** | Toxicity, bias, misinformation metrics with counterfactual testing | 8 min |
-| **23: Benchmark System** | JSONL-loaded benchmarks: tool accuracy, latency, cost | 10 min |
-| **24: Calibrated Evaluator** | Multi-model consensus evaluation with calibrated scoring | 8 min |
-| **25: Dataset Loaders** | Multi-format dataset pipeline: JSONL, JSON, YAML, CSV | 5 min |
-| **26: Extensibility** | DI registries, custom metrics/exporters/loaders/attacks | 3 min |
-| **27: Cross-Framework** | Universal IChatClient adapter for any AI provider | 3 min |
+The interactive menu lets you select a **group** (A–G), then a **sample** within it.
+
+| Group | Focus | Samples |
+|-------|-------|---------|
+| **A — Getting Started** ★ no credentials | Hello World → tools → performance basics | 01–04 |
+| **B — Metrics & Quality** | RAG evaluation, quality metrics, judge calibration, responsible AI | 05, 17, 18, 22, 24 |
+| **C — Workflows & Conversations** | Multi-turn conversations, MAF workflows, tool-calling pipelines | 08–10 |
+| **D — Performance & Statistics** | Latency profiling, stochastic evaluation, model comparison | 06, 14–16, 19 |
+| **E — Safety & Security** | Policy guardrails, red team scanning, OWASP compliance | 12, 20–21 |
+| **F — Data & Infrastructure** | Snapshot testing, datasets, trace replay, benchmarks, extensibility | 07, 11, 13, 23, 25–27 |
+| **G — Memory Evaluation** | Memory basics, benchmarks, scenarios, DI, cross-session persistence | 28–32 |
+
+See [samples/AgentEval.Samples/README.md](samples/AgentEval.Samples/README.md) for the full sample listing with descriptions, timing, and credential requirements.
 
 ---
 

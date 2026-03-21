@@ -1,103 +1,138 @@
 # AgentEval Samples
 
-> **📚 Comprehensive Learning Library - Get started with AgentEval in 5 minutes!**
+> **32 focused, educational samples — browse by group, get started in 5 minutes.**
 
-This project contains **26 focused, educational samples** demonstrating all major AgentEval features. Each sample covers a distinct capability, ensuring features are exhaustively demonstrated.
-
-## ⚡ Core Principle
+## Core Principle
 
 **"Evaluation Always Real, Structure Optionally Mock"**
 
-- **Evaluation** (LLM-as-judge scores, metrics) → Always real or gracefully skipped
-- **Structure** (tool ordering, workflows, conversations) → Can be demonstrated with mock data
+- **Evaluation** (LLM-as-judge scores, metrics) → always real or gracefully skipped
+- **Structure** (tool ordering, workflows, conversations) → can be demonstrated with mock data
 
-This means samples 1-4, 25, and 26 work fully without credentials (mock/offline mode), while samples 5-24 require Azure OpenAI for meaningful results.
+Group A (samples 1–4) and Dataset Loaders / Extensibility in Group F run fully without credentials.
+All other samples require Azure OpenAI for meaningful results.
 
+---
 
-
-## 🚀 Quick Start
+## Quick Start
 
 ```bash
-# From the MAFPlayground folder:
-cd AgentEval.Samples
+cd samples/AgentEval.Samples
 dotnet run
 ```
 
-You'll see an interactive menu to run each sample.
+The interactive menu organises samples into **7 groups**. Select a group letter, then a sample number.
+You can also run a specific sample directly from the command line (legacy numbering 1–32):
 
-## 📚 Samples Overview
+```bash
+dotnet run -- 1    # Hello World
+dotnet run -- 20   # Red Team Basic
+```
+
+---
+
+## Sample Groups
+
+### A — Getting Started  ★ no credentials needed
+
+| # | Sample | What You'll Learn | Time |
+|---|--------|-------------------|------|
+| 1 | **Hello World** | Basic test setup, TestCase, TestResult, pass/fail | 2 min |
+| 2 | **Agent + One Tool** | Tool tracking, fluent assertions (`HaveCalledTool`, `WithoutError`) | 5 min |
+| 3 | **Agent + Multiple Tools** | Tool ordering (`BeforeTool`/`AfterTool`), visual timeline | 7 min |
+| 4 | **Performance Metrics** | Latency, cost, TTFT, token budget — basic assertions | 5 min |
+
+### B — Metrics & Quality
 
 | # | Sample | What You'll Learn | Azure? | Time |
 |---|--------|-------------------|--------|------|
-| 01 | **Hello World** | Basic test setup, TestCase, TestResult | No | 2 min |
-| 02 | **Agent + One Tool** | Tool tracking, fluent assertions | No | 5 min |
-| 03 | **Agent + Multi Tools** | **Tool ordering, timeline visualization** ⭐ | No | 7 min |
-| 04 | **Performance Metrics** | **Latency, cost, TTFT, token tracking** ⭐ | No | 5 min |
-| 05 | **Comprehensive RAG** | **Complete RAG: Build, Retrieve, Evaluate (8 metrics + IR)** ⭐⭐ | Yes + Embed | 15 min |
-| 06 | **Performance Profiling** | Latency percentiles, token tracking, tool accuracy via MAFEvaluationHarness | Yes | 5 min |
-| 07 | **Snapshot Testing** | Regression testing, JSON diff, scrubbing | Yes | 5 min |
-| 08 | **Conversation Evaluation** | Multi-turn testing, ConversationRunner, fluent builder API | Yes | 5 min |
-| 09 | **Workflow Evaluation** | **Real MAF workflow: WorkflowBuilder + InProcessExecution** ⭐ | Yes | 15 min |
-| 10 | **Workflow + Tools** | **TripPlanner pipeline: 4 agents with tool tracking** ⭐ | Yes | 15 min |
-| 11 | **Datasets & Export** | Batch evaluation, YAML datasets, JUnit/Markdown/JSON/TRX export | Yes | 7 min |
-| 12 | **Policy & Safety** | **NeverCallTool, PII detection, MustConfirmBefore, guardrails** 🛡️ | Yes | 8 min |
-| 13 | **Trace Record & Replay** | Deterministic evaluation, multi-turn & workflow traces, streaming replay | Yes | 10 min |
-| 14 | **Stochastic Evaluation** | Multi-run reliability, statistical analysis | Yes | 5 min |
-| 15 | **Model Comparison** | Compare & rank models on quality, speed, cost, reliability | Yes (×3) | 10 min |
-| 16 | **Combined Test** | Stochastic + Model Comparison with statistical rigor | Yes (×2) | 10 min |
-| 17 | **Quality & Safety Metrics** | Groundedness, Coherence, Fluency metrics | Yes | 5 min |
-| 18 | **Judge Calibration** | Multi-model consensus voting (Median, Mean, Weighted) | Yes (×3) | 8 min |
-| 19 | **Streaming vs Async** | Compare streaming and non-streaming performance, TTFT | Yes | 8 min |
-| 20 | **Red Team Basic** | **Security scan, OWASP LLM probes, attack resistance** 🛡️ | Yes | 5 min |
-| 21 | **Red Team Advanced** | **Custom pipeline, OWASP compliance, export, baseline comparison** 🛡️ | Yes | 10 min |
-| 22 | **Responsible AI** | **Toxicity, bias, misinformation metrics with counterfactual testing** 🛡️ | Yes | 5 min |
-| 23 | **Benchmark System** | **JSONL-loaded tool accuracy benchmarks via PerformanceBenchmark + AgenticBenchmark** ⭐ | Yes | 5 min |
-| 24 | **Calibrated Evaluator** | **Multi-model consensus evaluation with calibrated scoring** | Yes | 5 min |
-| 25 | **Dataset Loaders** | Multi-format dataset pipeline: JSONL, JSON, YAML, CSV (offline) | No | 5 min |
-| 26 | **Extensibility** | **DI registries, custom metrics/exporters/loaders/attacks** 🔌 | No* | 3 min |
+| 1 | **Comprehensive RAG** | Build & evaluate a full RAG system — 8 metrics + IR metrics ⭐ | Yes + Embed | 15 min |
+| 2 | **Quality & Safety Metrics** | Groundedness, Coherence, Fluency beyond RAG accuracy | Yes | 5 min |
+| 3 | **Judge Calibration** | Multi-model consensus voting (Median, Mean, Weighted) | Yes ×3 | 8 min |
+| 4 | **Responsible AI** | Toxicity, bias, misinformation with counterfactual testing 🛡️ | Yes | 5 min |
+| 5 | **Calibrated Evaluator** | Drop-in `IEvaluator` with per-criterion majority voting | Yes | 5 min |
 
-> **⭐ Samples 03 & 04** provide the foundational knowledge for tool chain and performance assertions.
-> **🛡️ Samples 20 & 21** demonstrate AgentEval's red team security scanning capabilities.
-> **🔌 Sample 26** Steps 1-6 run offline; Step 7 (optional live LLM demo) requires Azure credentials.
-> **Yes (×3)** means the sample uses 3 model deployments (`AZURE_OPENAI_DEPLOYMENT`, `_2`, `_3`).
+### C — Workflows & Conversations
 
-## 🔧 Prerequisites
+| # | Sample | What You'll Learn | Azure? | Time |
+|---|--------|-------------------|--------|------|
+| 1 | **Conversation Evaluation** | Multi-turn testing, `ConversationRunner`, fluent builder API | Yes | 5 min |
+| 2 | **Real MAF Workflow** | `WorkflowBuilder` + `InProcessExecution`: 4-agent pipeline ⭐ | Yes | 15 min |
+| 3 | **Workflow + Tools** | TripPlanner pipeline: 4 agents with tool call tracking ⭐ | Yes | 15 min |
 
-### With Azure OpenAI (Full Experience)
+### D — Performance & Statistics
 
-Set environment variables (**recommended for samples 5-24**):
+| # | Sample | What You'll Learn | Azure? | Time |
+|---|--------|-------------------|--------|------|
+| 1 | **Performance Profiling** | Real latency: p50 / p90 / p99 percentiles, tool accuracy | Yes | 5 min |
+| 2 | **Stochastic Evaluation** | Run N times — assert on pass rate, not single pass/fail | Yes | 5 min |
+| 3 | **Model Comparison** | Compare & rank 3 models on quality, speed, cost, reliability | Yes ×3 | 10 min |
+| 4 | **Stochastic + Comparison** | Statistical rigor applied to side-by-side model comparison | Yes ×2 | 10 min |
+| 5 | **Streaming vs Async** | TTFT vs throughput — compare streaming and non-streaming | Yes | 8 min |
+
+### E — Safety & Security
+
+| # | Sample | What You'll Learn | Azure? | Time |
+|---|--------|-------------------|--------|------|
+| 1 | **Policy & Safety** | Enterprise guardrails — `NeverCallTool`, PII detection, `MustConfirmBefore` 🛡️ | Yes | 8 min |
+| 2 | **Red Team Basic** | One-liner security scan — 9 attack types, OWASP probes 🛡️ | Yes | 5 min |
+| 3 | **Red Team Advanced** | Custom pipeline, OWASP compliance, PDF export, baseline tracking 🛡️ | Yes | 10 min |
+
+### F — Data & Infrastructure
+
+| # | Sample | What You'll Learn | Azure? | Time |
+|---|--------|-------------------|--------|------|
+| 1 | **Snapshot Testing** | Regression detection — JSON diff, field scrubbing, semantic tolerance | Yes | 5 min |
+| 2 | **Datasets & Export** | Batch evaluation: YAML datasets → JUnit / Markdown / JSON / TRX | Yes | 7 min |
+| 3 | **Trace Record & Replay** | Capture executions to JSON, replay deterministically | Yes | 10 min |
+| 4 | **Benchmark System** | JSONL-loaded tool-accuracy benchmarks (BFCL, GAIA-style) ⭐ | Yes | 5 min |
+| 5 | **Dataset Loaders** | Multi-format auto-detection: JSONL, JSON, YAML, CSV | No | 5 min |
+| 6 | **Extensibility** | DI registries — custom metrics, exporters, loaders, attacks 🔌 | No* | 3 min |
+| 7 | **Cross-Framework** | Universal `IChatClient.AsEvaluableAgent()` for any AI provider | Yes | 3 min |
+
+> *Steps 1–6 run offline; Step 7 (optional live LLM demo) requires Azure credentials.
+
+### G — Memory Evaluation
+
+| # | Sample | What You'll Learn | Azure? | Time |
+|---|--------|-------------------|--------|------|
+| 1 | **Memory Basics** | Test if agents remember facts — `MemoryJudge`, fluent assertions | Yes | 5 min |
+| 2 | **Memory Benchmark** | Comprehensive memory scoring — Quick / Standard / Full tiers with grades | Yes | 8 min |
+| 3 | **Memory Scenarios** | `ReachBackEvaluator` (recall depth), `ReducerEvaluator` (compression) | Yes | 8 min |
+| 4 | **Memory DI** | Production DI wiring — `AddAgentEvalMemory()`, `CanRememberAsync()` | Yes | 5 min |
+| 5 | **Cross-Session Memory** | Fact persistence across session resets — compare with / without memory | Yes | 8 min |
+
+---
+
+## Prerequisites
+
+### With Azure OpenAI (full experience)
 
 ```powershell
 # PowerShell
-$env:AZURE_OPENAI_ENDPOINT = "https://your-resource.openai.azure.com/"
-$env:AZURE_OPENAI_API_KEY = "your-api-key"
-$env:AZURE_OPENAI_DEPLOYMENT = "gpt-4o"  # Or your deployment name
+$env:AZURE_OPENAI_ENDPOINT   = "https://your-resource.openai.azure.com/"
+$env:AZURE_OPENAI_API_KEY    = "your-api-key"
+$env:AZURE_OPENAI_DEPLOYMENT = "gpt-4o"
 
-# Optional: For embedding-based metrics (Sample 05)
+# Optional: embedding-based metrics (B1 — Comprehensive RAG)
 $env:AZURE_OPENAI_EMBEDDING_DEPLOYMENT = "text-embedding-ada-002"
 
-# Optional: For multi-model samples (Samples 15, 16, 18)
-$env:AZURE_OPENAI_DEPLOYMENT_2 = "gpt-4o-mini"    # Secondary model
-$env:AZURE_OPENAI_DEPLOYMENT_3 = "gpt-4.1"         # Tertiary model
+# Optional: multi-model samples (B3 Judge Calibration, D3 Model Comparison, D4 Stochastic+Comparison)
+$env:AZURE_OPENAI_DEPLOYMENT_2 = "gpt-4o-mini"
+$env:AZURE_OPENAI_DEPLOYMENT_3 = "gpt-4.1"
 ```
 
 ```bash
-# Bash/Linux/macOS
+# Bash / Linux / macOS
 export AZURE_OPENAI_ENDPOINT="https://your-resource.openai.azure.com/"
 export AZURE_OPENAI_API_KEY="your-api-key"
 export AZURE_OPENAI_DEPLOYMENT="gpt-4o"
-export AZURE_OPENAI_DEPLOYMENT_2="gpt-4o-mini"     # Optional: multi-model samples
 ```
 
-### Without Azure (Mock Mode - Samples 1-4)
+### Without Azure (mock mode — Group A)
 
-Samples 1-4 work fully without credentials, demonstrating:
-- Basic test setup and evaluation
-- Tool tracking and fluent assertions
-- Tool ordering and timeline visualization
-- Performance metrics (simulated)
+Samples in Group A work fully without credentials. You'll see:
 
-You'll see this banner:
 ```
 ╔══════════════════════════════════════════════════════════════╗
 ║  ⚠️  Azure OpenAI credentials not configured                  ║
@@ -105,347 +140,112 @@ You'll see this banner:
 ╚══════════════════════════════════════════════════════════════╝
 ```
 
-Samples 5-24 require credentials and will show:
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│  ⚠️  SKIPPING SAMPLE XX - Azure OpenAI Credentials Required                │
-│  Set AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_API_KEY, AZURE_OPENAI_DEPLOYMENT   │
-└─────────────────────────────────────────────────────────────────────────────┘
-```
+Samples requiring credentials show a skip banner and return gracefully.
 
-## 📖 Sample Details
+---
 
-### Sample 01: Hello World
-The simplest possible test - create an agent, run a test, check if it passed.
+## Selected Code Highlights
 
+### Tool chain assertion (A2 / A3)
 ```csharp
-var harness = new MAFTestHarness(verbose: true);
-var testCase = new TestCase
-{
-    Name = "Greeting Test",
-    Input = "Hello, my name is Alice!",
-    ExpectedOutputContains = "Alice"
-};
-var result = await harness.RunTestAsync(adapter, testCase);
-Assert.True(result.Passed);
-```
-
-### Sample 02: Agent With One Tool
-Track tool calls and use fluent assertions.
-
-```csharp
-var result = await harness.RunTestAsync(adapter, testCase);
-
-result.ToolUsage!
-    .Should()
-    .HaveCalledTool("CalculatorTool")
-        .WithoutError()
+result.ToolUsage!.Should()
+    .HaveCalledTool("SearchFlights", because: "must search before booking")
+        .WithArgument("destination", "Paris")
     .And()
+    .HaveCalledTool("BookFlight")
+        .AfterTool("SearchFlights")
     .HaveNoErrors();
 ```
 
-### Sample 03: Agent With Multiple Tools
-Assert tool call order and view timeline.
-
+### Performance SLA (A4 / D1)
 ```csharp
-result.ToolUsage
-    .Should()
-    .HaveCalledTool("SearchTool")
-        .BeforeTool("SummarizeTool")  // Order assertion!
-        .WithoutError()
-    .And()
-    .HaveCallCountAtLeast(2);
+result.Performance!.Should()
+    .HaveTotalDurationUnder(TimeSpan.FromSeconds(5))
+    .HaveTimeToFirstTokenUnder(TimeSpan.FromMilliseconds(500))
+    .HaveEstimatedCostUnder(0.05m)
+    .HaveTokenCountUnder(2000);
 ```
 
-### Sample 04: Performance Metrics
-Track latency, tokens, cost, and TTFT.
-
+### RAG evaluation — 8 metrics (B1)
 ```csharp
-result.Performance
-    .Should()
-    .HaveTotalDurationUnder(TimeSpan.FromSeconds(10))
-    .HaveTokenCountUnder(2000)
-    .HaveEstimatedCostUnder(0.10m);
-```
-
-### Sample 05: Comprehensive RAG
-**Complete RAG system: Build → Retrieve → Generate → Evaluate** with all 8 metrics.
-
-```csharp
-// PART 1: Build RAG system with MemoryVectorStore
-var vectorStore = new MemoryVectorStore();
-var embeddings = await embeddingClient.GetEmbeddingsAsync(chunks);
-foreach (var (chunk, embedding) in chunks.Zip(embeddings))
-    vectorStore.Add(chunk.Id, chunk.Text, embedding);
-
-// PART 2: RAG Pipeline - Query → Retrieve → Generate
-var queryEmbedding = await embeddingClient.GetEmbeddingAsync(query);
-var results = vectorStore.Search(queryEmbedding, topK: 3);
-var context = string.Join("\n", results.Select(r => r.Text));
-var response = await chatClient.GetResponseAsync(BuildRAGPrompt(query, context));
-
-// PART 3: LLM-Based Evaluation (5 metrics)
 var llmMetrics = new IMetric[]
 {
-    new FaithfulnessMetric(client),      // No hallucinations
-    new RelevanceMetric(client),          // Addresses question
-    new ContextPrecisionMetric(client),   // Retrieved context useful
-    new ContextRecallMetric(client),      // All needed context retrieved
-    new AnswerCorrectnessMetric(client)   // Matches ground truth
+    new FaithfulnessMetric(client),      // no hallucinations
+    new RelevanceMetric(client),          // addresses the question
+    new ContextPrecisionMetric(client),   // retrieved context is useful
+    new ContextRecallMetric(client),      // all needed context retrieved
+    new AnswerCorrectnessMetric(client),  // matches ground truth
 };
-
-// PART 4: Embedding-Based Evaluation (3 metrics - 10-100x cheaper!)
-var embedMetrics = new IMetric[]
-{
-    new AnswerSimilarityMetric(embeddings),         // Semantic correctness
-    new ResponseContextSimilarityMetric(embeddings), // Grounding check
-    new QueryContextSimilarityMetric(embeddings)     // Retrieval relevance
-};
-
-// PART 5: Information Retrieval Metrics (code-based - FREE!)
-context.SetProperty("RetrievedDocumentIds", results.Select(r => r.Id).ToList());
-context.SetProperty("RelevantDocumentIds", groundTruthDocIds);
-
-var irMetrics = new IMetric[]
-{
-    new RecallAtKMetric(k: 3),  // Are relevant docs in top K?
-    new MRRMetric()             // Rank of first relevant doc
-};
+// + 3 embedding metrics (10–100× cheaper) + 2 IR metrics (free)
 ```
 
-**Cost Optimization Table:**
-| Type | Cost/Eval | Latency | Use Case |
-|------|-----------|---------|----------|
-| LLM-based | ~$0.01 | ~2-5s | Quality gates, pre-prod |
-| Embedding | ~$0.0001 | ~0.1s | Dev/CI, scale testing |
-| Code-based | FREE | ~1ms | Retrieval tuning |
-
-### Sample 09: Workflow Evaluation (Real MAF)
-Build and evaluate a real MAF workflow with WorkflowBuilder + InProcessExecution.
-
+### Stochastic evaluation (D2)
 ```csharp
-// Build a 4-agent pipeline: Planner → Researcher → Writer → Editor
-var workflow = WorkflowBuilder.Create()
-    .AddAgent(plannerAgent)
-    .AddAgent(researcherAgent)
-    .AddAgent(writerAgent)
-    .AddAgent(editorAgent)
-    .Build();
-
-var adapter = MAFWorkflowAdapter.FromMAFWorkflow(workflow, startAgent);
-var result = await harness.RunWorkflowTestAsync(adapter, testCase, options);
+var result = await runner.RunStochasticTestAsync(
+    agent, testCase,
+    new StochasticOptions(Runs: 10, SuccessRateThreshold: 0.85));
+result.Statistics.Mean.Should().BeGreaterThan(80);          // avg quality
+result.Statistics.StandardDeviation.Should().BeLessThan(10); // consistency
 ```
 
-### Sample 10: Workflow With Tools
-TripPlanner pipeline with 4 agents using function calling.
-
-```csharp
-// TripPlannerAgent → FlightReservationAgent → HotelReservationAgent → PresenterAgent
-// Each agent has its own tools (GetInfoAbout, SearchFlights, BookFlight, BookHotel)
-var result = await harness.RunWorkflowTestAsync(adapter, testCase, options);
-result.ToolUsage!.Should()
-    .HaveCalledTool("SearchFlights")
-    .And()
-    .HaveCalledTool("BookHotel");
-```
-
-### Sample 11: Datasets & Export
-Batch evaluation with YAML datasets and multi-format export.
-
-```csharp
-var loader = DatasetLoaderFactory.CreateFromExtension(".yaml");
-var dataset = await loader.LoadAsync("tests.yaml");
-var results = new List<TestResult>();
-foreach (var dc in dataset)
-{
-    var result = await harness.RunEvaluationAsync(adapter, dc.ToTestCase());
-    results.Add(result);
-}
-var summary = new TestSummary("Dataset Evaluation", results);
-await new JUnitXmlExporter().ExportAsync(summary, "results.xml");
-await new MarkdownExporter().ExportAsync(summary, "results.md");
-```
-
-### Sample 12: Policy & Safety Evaluation
-Enterprise guardrails with NeverCallTool, PII detection, MustConfirmBefore.
-
+### Policy guardrails (E1)
 ```csharp
 result.ToolUsage!.Should()
     .NeverCallTool("DeleteAccount")
-    .And()
     .NeverPassArgumentMatching("ssn", @"\d{3}-\d{2}-\d{4}")
-    .And()
     .MustConfirmBefore("TransferFunds");
 ```
 
-### Sample 13: Trace Record & Replay
-Record and replay agent executions for deterministic CI testing.
-
-```csharp
-// RECORD: Single agent, multi-turn chat, workflow, and streaming traces
-var recorder = new TraceRecordingAgent(realAgent);
-await recorder.ExecuteAsync("What tools do you have?");
-TraceSerializer.Save(recorder.GetTrace(), "trace.json");
-
-// REPLAY: Deterministic playback without LLM calls
-var replayer = new TraceReplayingAgent(trace);
-var replayed = await replayer.ReplayNextAsync(); // Identical response
-```
-
-### Sample 14: Stochastic Evaluation
-Run the same test multiple times to measure reliability and consistency.
-
-```csharp
-var runner = new StochasticRunner(harness, statisticsCalculator: null, options);
-var result = await runner.RunStochasticTestAsync(agent, testCase,
-    new StochasticOptions(Runs: 10, SuccessRateThreshold: 0.8));
-result.PrintTable("Metrics"); // Min/max/mean statistics
-```
-
-### Sample 15: Model Comparison
-Compare and rank multiple models on quality, speed, cost, and reliability.
-
-```csharp
-var factories = new IAgentFactory[] { gpt4oFactory, gpt4oMiniFactory, gpt41Factory };
-foreach (var factory in factories)
-{
-    var agent = factory.CreateAgent();
-    var result = await runner.RunStochasticTestAsync(agent, testCase, options);
-    modelResults.Add((factory.ModelName, result));
-}
-modelResults.PrintComparisonTable();
-```
-
-### Sample 17: Quality & Safety Metrics
-Evaluate response quality beyond RAG accuracy.
-
-```csharp
-var context = new EvaluationContext
-{
-    Input = "What are the benefits of green tea?",
-    Context = "Green tea contains antioxidants...",
-    Output = "Based on the available information, green tea contains..."
-};
-
-// Quality & Safety metrics
-var groundedness = new GroundednessMetric(client);  // ISafetyMetric - no fabrication
-var coherence = new CoherenceMetric(client);        // IQualityMetric - logical flow
-var fluency = new FluencyMetric(client);            // IQualityMetric - grammar
-
-// Groundedness catches fabricated sources, statistics, fake citations
-var result = await groundedness.EvaluateAsync(context);
-// result.Details["fabricatedElements"] shows any invented content
-```
-
-### Sample 18: Judge Calibration
-Multi-model consensus voting for reliable LLM-as-judge evaluations.
-
-```csharp
-// Create calibrated judge with multiple LLM models
-var judge = CalibratedJudge.Create(
-    ("GPT-4o", gpt4oClient),
-    ("Claude", claudeClient),
-    ("Gemini", geminiClient));
-
-// Factory pattern - each judge gets its own metric with its own client
-var result = await judge.EvaluateAsync(context, judgeName =>
-{
-    return new FaithfulnessMetric(judges[judgeName]);
-});
-
-Console.WriteLine($"Score: {result.Score:F1}");           // Median score
-Console.WriteLine($"Agreement: {result.Agreement:F0}%");  // How much judges agree
-Console.WriteLine($"95% CI: [{result.ConfidenceLower:F1}, {result.ConfidenceUpper:F1}]");
-```
-
-### Sample 20: Red Team Basic
-Quick security scan with assertions and detailed reporting.
-
+### Red Team (E2 / E3)
 ```csharp
 var result = await agent.RedTeamAsync(new ScanOptions { Intensity = Intensity.Quick });
-result.Print(VerbosityLevel.Detailed);
-
 result.Should()
     .HavePassed()
     .And().HaveMinimumScore(80)
     .And().HaveASRBelow(0.05);
 ```
 
-### Sample 21: Red Team Advanced
-Custom attack pipeline, OWASP compliance, export, and baseline comparison.
-
+### Memory evaluation (G1 / G2)
 ```csharp
-var pipeline = AttackPipeline.Create()
-    .WithAttack(Attack.PromptInjection)
-    .WithAttack(Attack.Jailbreak)
-    .WithIntensity(Intensity.Moderate);
-
-var result = await pipeline.ScanAsync(agent);
-await new JUnitReportExporter().ExportToFileAsync(result, "report.xml");
-result.Should().HaveNoCompromisesFor("LLM01"); // OWASP check
+var result = await runner.RunMemoryBenchmarkAsync(agent, MemoryBenchmark.Standard);
+result.Should()
+    .HaveOverallScoreAtLeast(70)
+    .HaveAllQueriesPassed()
+    .NotHaveRecalledForbiddenFacts();
 ```
-
-## 💡 Structured LLM Scoring vs Traditional
-
-AgentEval's evaluation approach is fundamentally superior to basic "rate 1-10" LLM scoring:
-
-| Approach | AgentEval | Traditional LLM Scoring |
-|----------|-----------|-------------------------|
-| **Structured Evaluation** | ✅ JSON schema, specific criteria | ❌ Free-form scoring |
-| **Detailed Breakdown** | ✅ factsCorrect, factsIncorrect, factsMissing | ❌ Just a number |
-| **Actionable Feedback** | ✅ Explanations, suggestions | ❌ Score only |
-| **Consistency** | ✅ Prompt engineering for reliability | ❌ Variable |
-| **Debuggability** | ✅ `.Details` with structured data | ❌ Opaque score |
-
-This structured approach gives you actionable insights, not just numbers.
 
 ---
 
-## 🎯 Key Concepts
+## Cost Optimisation Reference
 
-### TestCase
-Defines what to test:
-- `Name` - Test identifier
-- `Input` - Prompt to send to agent
-- `ExpectedOutputContains` - Substring check
-- `EvaluationCriteria` - AI evaluation criteria
-- `ExpectedTools` - Tools that should be called
+| Metric type | Cost / eval | Latency | Best for |
+|-------------|-------------|---------|----------|
+| LLM-based   | ~$0.01      | 2–5 s   | Quality gates, pre-prod |
+| Embedding   | ~$0.0001    | ~0.1 s  | Dev / CI, scale testing |
+| Code-based  | FREE        | ~1 ms   | Retrieval tuning |
 
-### TestResult
-What you get back:
-- `Passed` - Did it pass?
-- `Score` - 0-100 score
-- `ToolUsage` - All tool call details
-- `Performance` - Timing/cost metrics
-- `Failure` - Structured failure report
+---
 
-### Fluent Assertions
-Natural-language-like API:
+## Key Concepts
+
+**TestCase** — defines what to test: `Name`, `Input`, `ExpectedOutputContains`, `EvaluationCriteria`, `ExpectedTools`.
+
+**TestResult** — what you get back: `Passed`, `Score`, `ToolUsage`, `Performance`, `Failure`.
+
+**Fluent Assertions** — natural-language API:
 ```csharp
-result.ToolUsage.Should()
-    .HaveCalledTool("X")
-    .BeforeTool("Y")
-    .WithoutError();
-
-result.Performance.Should()
-    .HaveTotalDurationUnder(TimeSpan.FromSeconds(5));
+result.ToolUsage.Should().HaveCalledTool("X").BeforeTool("Y").WithoutError();
+result.Performance.Should().HaveTotalDurationUnder(TimeSpan.FromSeconds(5));
 ```
 
+---
 
+## Next Steps
 
-## 🔗 Next Steps
-
-1. Run all samples to understand the API: `dotnet run --project samples/AgentEval.Samples`
+1. Run Group A (no credentials) to understand the core API
 2. Copy patterns into your own test project
-3. Check [docs/](../../docs/) for full API reference and guides
+3. See [docs/](../../docs/) for the full API reference
 4. See [AgentEval.Tests](../../tests/AgentEval.Tests/) for more examples
-
-## 💡 Tips
-
-- Use `TrackTools = true` to capture tool calls
-- Use `TrackPerformance = true` to capture metrics
-- Use streaming (`RunTestStreamingAsync`) for TTFT measurement
-- Memory samples (28-32) require Azure OpenAI credentials for real LLM evaluation
 
 ---
 
