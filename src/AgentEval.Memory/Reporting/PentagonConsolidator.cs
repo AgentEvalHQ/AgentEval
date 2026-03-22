@@ -51,13 +51,18 @@ public static class PentagonConsolidator
         AddAveraged(scores, "Resilience", lookup,
             BenchmarkScenarioType.NoiseResilience, BenchmarkScenarioType.ReducerFidelity);
 
-        // Temporal = avg(TemporalReasoning, FactUpdateHandling)
-        AddAveraged(scores, "Temporal", lookup,
-            BenchmarkScenarioType.TemporalReasoning, BenchmarkScenarioType.FactUpdateHandling);
+        // Temporal = avg(TemporalReasoning, FactUpdateHandling, ConflictResolution)
+        {
+            var temporalScores = new List<double>();
+            if (lookup.TryGetValue(BenchmarkScenarioType.TemporalReasoning, out var temp)) temporalScores.Add(temp);
+            if (lookup.TryGetValue(BenchmarkScenarioType.FactUpdateHandling, out var upd)) temporalScores.Add(upd);
+            if (lookup.TryGetValue(BenchmarkScenarioType.ConflictResolution, out var conf)) temporalScores.Add(conf);
+            if (temporalScores.Count > 0) scores["Temporal"] = temporalScores.Average();
+        }
 
-        // Persistence = CrossSession (1:1)
-        if (lookup.TryGetValue(BenchmarkScenarioType.CrossSession, out var persistence))
-            scores["Persistence"] = persistence;
+        // Persistence = avg(CrossSession, MultiSessionReasoning)
+        AddAveraged(scores, "Persistence", lookup,
+            BenchmarkScenarioType.CrossSession, BenchmarkScenarioType.MultiSessionReasoning);
 
         // Organization = avg(MultiTopic, Abstention)
         AddAveraged(scores, "Organization", lookup,

@@ -1,0 +1,41 @@
+{
+  "schema_version": "1.0",
+  "category": "ConflictResolution",
+  "name": "Conflict Resolution",
+  "description": "Tests agent's ability to detect and resolve implicit contradictions — tracking which information is current vs outdated.",
+  "context_pressure": { "corpus": "context-small", "max_turns": 15 },
+  "presets": {
+    "quick": {
+      "facts": [
+        { "content": "I work as a software engineer at Microsoft", "category": "work", "importance": 80, "planted_as": "I work as a software engineer at Microsoft." },
+        { "content": "I live in a small apartment in downtown Seattle", "category": "personal", "importance": 70, "planted_as": "I live in a small apartment in downtown Seattle." },
+        { "content": "I just accepted a new position at Google — starting next month as a senior engineer", "category": "work", "importance": 90, "planted_as": "Big news — I just accepted a new position at Google! I'm starting next month as a senior engineer." },
+        { "content": "We're moving to a house in Mountain View next week", "category": "personal", "importance": 80, "planted_as": "We're moving to a house in Mountain View next week, closer to the new office." }
+      ],
+      "noise_between_facts": [
+        "The weather has been really unpredictable this month.",
+        "I need to cancel my gym membership before we move.",
+        "My team threw me a going-away party yesterday."
+      ],
+      "queries": [
+        { "question": "Where do I currently work?", "expected_facts": ["Google"], "forbidden_facts": ["Microsoft"], "difficulty": "direct" },
+        { "question": "Where am I living now?", "expected_facts": ["Mountain View"], "forbidden_facts": ["Seattle apartment"], "difficulty": "direct" },
+        { "question": "Can you tell me about my career history and current role?", "expected_facts": ["Microsoft", "Google", "senior engineer"], "difficulty": "synthesis" }
+      ]
+    },
+    "standard": {
+      "extends": "quick",
+      "context_pressure": { "corpus": "context-medium", "max_turns": 30 },
+      "facts": [
+        { "content": "I switched from an iPhone to a Samsung Galaxy last month", "category": "tech", "importance": 60, "planted_as": "I finally switched from my iPhone to a Samsung Galaxy last month. The camera is amazing." }
+      ],
+      "queries": [
+        { "question": "What phone do I use?", "expected_facts": ["Samsung", "Galaxy"], "forbidden_facts": ["iPhone"], "difficulty": "direct" }
+      ]
+    },
+    "full": {
+      "extends": "standard",
+      "context_pressure": { "corpus": "context-medium", "max_turns": 40 }
+    }
+  }
+}

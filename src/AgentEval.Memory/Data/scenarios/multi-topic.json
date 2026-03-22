@@ -1,0 +1,37 @@
+{
+  "schema_version": "1.0",
+  "category": "MultiTopic",
+  "name": "Multi-Topic Memory",
+  "description": "Tests memory across multiple conversation domains to check cross-contamination.",
+  "context_pressure": { "corpus": "context-small", "max_turns": 15 },
+  "presets": {
+    "quick": {
+      "facts": [
+        { "content": "My dog's name is Max", "category": "pets", "importance": 60, "planted_as": "My dog's name is Max." },
+        { "content": "I work at Contoso", "category": "work", "importance": 70, "planted_as": "I work at Contoso." },
+        { "content": "My birthday is March 15th", "category": "personal", "importance": 60, "planted_as": "My birthday is March 15th." },
+        { "content": "I speak Danish and English", "category": "languages", "importance": 50, "planted_as": "I speak Danish and English." },
+        { "content": "I take vitamin D supplements", "category": "health", "importance": 50, "planted_as": "I take vitamin D supplements daily." }
+      ],
+      "noise_between_facts": [
+        "The sunset was beautiful yesterday.",
+        "I tried a new restaurant last week.",
+        "My favorite season is autumn."
+      ],
+      "queries": [
+        { "question": "What do you know about my pet?", "expected_facts": ["Max", "dog"], "difficulty": "indirect" },
+        { "question": "Where do I work?", "expected_facts": ["Contoso"], "difficulty": "direct" },
+        { "question": "When is my birthday?", "expected_facts": ["March 15"], "difficulty": "direct" },
+        { "question": "What languages do I speak?", "expected_facts": ["Danish", "English"], "difficulty": "direct" }
+      ]
+    },
+    "standard": {
+      "extends": "quick",
+      "context_pressure": { "corpus": "context-medium", "max_turns": 30 }
+    },
+    "full": {
+      "extends": "standard",
+      "context_pressure": { "corpus": "context-medium", "max_turns": 40 }
+    }
+  }
+}

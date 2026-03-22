@@ -1,0 +1,43 @@
+{
+  "schema_version": "1.0",
+  "category": "NoiseResilience",
+  "name": "Noise Resilience",
+  "description": "Tests recall of facts buried in heavy conversational noise.",
+  "context_pressure": { "corpus": "context-small", "max_turns": 15 },
+  "presets": {
+    "quick": {
+      "facts": [
+        { "content": "I'm severely allergic to peanuts and tree nuts", "category": "allergy", "importance": 100, "planted_as": "Oh, I should mention — I'm severely allergic to peanuts and tree nuts." },
+        { "content": "My dentist appointment is next Tuesday at 2:30pm", "category": "schedule", "importance": 80, "planted_as": "By the way, my dentist appointment is next Tuesday at 2:30pm." },
+        { "content": "My WiFi password at home is BlueOcean42", "category": "credentials", "importance": 90, "planted_as": "My WiFi password at home is BlueOcean42, just in case." },
+        { "content": "My car is parked in lot B spot 247", "category": "location", "importance": 70, "planted_as": "My car is parked in lot B, spot 247." }
+      ],
+      "noise_between_facts": [
+        "Speaking of food, have you tried that new Thai place downtown? The pad thai is incredible.",
+        "I was reading about climate change impacts on agriculture yesterday. Fascinating and terrifying.",
+        "Do you think remote work will remain popular? I've been working from home for two years now.",
+        "The traffic this morning was absolutely terrible. Took me an hour to get here.",
+        "I need to remember to pick up groceries later. Running low on everything.",
+        "My neighbor just got a new puppy. It's so cute but barks all night.",
+        "Have you watched that new documentary on Netflix? Everyone's talking about it.",
+        "The gym near my office is having a sale on memberships. Might sign up.",
+        "I tried a new coffee shop yesterday. Their espresso was amazing.",
+        "My phone battery dies so fast. I think I need a new one."
+      ],
+      "queries": [
+        { "question": "What food allergies do I have that you should know about?", "expected_facts": ["peanuts", "tree nuts"], "difficulty": "indirect" },
+        { "question": "I forgot where I parked. Can you help?", "expected_facts": ["lot B", "spot 247"], "difficulty": "direct" },
+        { "question": "What's my WiFi password?", "expected_facts": ["BlueOcean42"], "difficulty": "direct" },
+        { "question": "Do I have any appointments coming up?", "expected_facts": ["dentist", "Tuesday", "2:30"], "difficulty": "indirect" }
+      ]
+    },
+    "standard": {
+      "extends": "quick",
+      "context_pressure": { "corpus": "context-medium", "max_turns": 30 }
+    },
+    "full": {
+      "extends": "standard",
+      "context_pressure": { "corpus": "context-medium", "max_turns": 40 }
+    }
+  }
+}

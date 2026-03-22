@@ -54,12 +54,12 @@ public class MemoryBenchmarkRunnerTests
     }
 
     [Fact]
-    public async Task RunBenchmarkAsync_FullPreset_Returns9Categories()
+    public async Task RunBenchmarkAsync_FullPreset_Returns11Categories()
     {
         var result = await _runner.RunBenchmarkAsync(_agent, MemoryBenchmark.Full);
 
         Assert.Equal("Full", result.BenchmarkName);
-        Assert.Equal(9, result.CategoryResults.Count);
+        Assert.Equal(11, result.CategoryResults.Count);
     }
 
     [Fact]
@@ -228,7 +228,7 @@ public class MemoryBenchmarkRunnerTests
     {
         var result = await _runner.RunBenchmarkAsync(_agent, MemoryBenchmark.Full);
 
-        Assert.Equal(9, result.CategoryResults.Count);
+        Assert.Equal(11, result.CategoryResults.Count);
         // Non-skipped categories should have valid scores
         Assert.All(result.CategoryResults.Where(c => !c.Skipped), c =>
         {

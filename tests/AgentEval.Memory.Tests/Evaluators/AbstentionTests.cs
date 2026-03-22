@@ -51,7 +51,7 @@ public class AbstentionTests
     {
         var full = MemoryBenchmark.Full;
 
-        Assert.Equal(9, full.Categories.Count);
+        Assert.Equal(11, full.Categories.Count);
         Assert.Contains(full.Categories, c => c.ScenarioType == BenchmarkScenarioType.Abstention);
     }
 

@@ -178,6 +178,8 @@ public class MemoryBenchmarkRunner : IMemoryBenchmarkRunner
                 BenchmarkScenarioType.CrossSession => await RunCrossSessionAsync(agent, presetName, cancellationToken),
                 BenchmarkScenarioType.ReducerFidelity => await RunReducerFidelityAsync(agent, presetName, cancellationToken),
                 BenchmarkScenarioType.Abstention => await RunAbstentionAsync(agent, presetName, cancellationToken),
+                BenchmarkScenarioType.ConflictResolution => await RunConflictResolutionAsync(agent, presetName, cancellationToken),
+                BenchmarkScenarioType.MultiSessionReasoning => await RunMultiSessionReasoningAsync(agent, presetName, cancellationToken),
                 _ => (Score: 0.0, Skipped: true, SkipReason: $"Unknown scenario type: {category.ScenarioType}")
             };
 
@@ -222,6 +224,89 @@ public class MemoryBenchmarkRunner : IMemoryBenchmarkRunner
     }
 
     /// <summary>
+    /// Loads a scenario from JSON, injects context pressure, builds a MemoryTestScenario,
+    /// and runs it. Returns null if the JSON file doesn't exist (caller falls back to hardcoded).
+    /// </summary>
+    private async Task<(double Score, bool Skipped, string? SkipReason)?> TryRunFromJsonAsync(
+        IEvaluableAgent agent, string scenarioName, string presetName, CancellationToken ct)
+    {
+        try
+        {
+            var scenarioDef = DataLoading.ScenarioLoader.Load(scenarioName);
+            var preset = DataLoading.ScenarioLoader.ResolvePreset(scenarioDef, presetName);
+
+            // Inject context pressure from corpus
+            if (preset.ContextPressure != null && agent is IHistoryInjectableAgent injectable)
+            {
+                try
+                {
+                    var corpus = DataLoading.CorpusLoader.Load(
+                        preset.ContextPressure.Corpus,
+                        preset.ContextPressure.MaxTurns ?? 15);
+                    injectable.InjectConversationHistory(corpus);
+                }
+                catch { /* corpus not available — continue without pressure */ }
+            }
+
+            // Build MemoryTestScenario from resolved preset
+            var steps = new List<MemoryStep>();
+            var queries = new List<MemoryQuery>();
+            var noiseIndex = 0;
+
+            foreach (var fact in preset.Facts)
+            {
+                var plantedText = fact.PlantedAs ?? fact.Content;
+                steps.Add(MemoryStep.Fact(plantedText));
+
+                // Add noise between facts (if available)
+                if (preset.NoiseBetweenFacts.Count > 0)
+                {
+                    var noiseMsg = preset.NoiseBetweenFacts[noiseIndex % preset.NoiseBetweenFacts.Count];
+                    steps.Add(MemoryStep.Noise(noiseMsg));
+                    noiseIndex++;
+                }
+            }
+
+            foreach (var q in preset.Queries)
+            {
+                if (q.Abstention)
+                {
+                    var forbidden = (q.ForbiddenFacts ?? [])
+                        .Select(f => MemoryFact.Create(f)).ToArray();
+                    queries.Add(MemoryQuery.CreateAbstention(q.Question, forbidden));
+                }
+                else
+                {
+                    var expected = q.ExpectedFacts
+                        .Select(f => MemoryFact.Create(f)).ToArray();
+                    var forbidden = (q.ForbiddenFacts ?? [])
+                        .Select(f => MemoryFact.Create(f)).ToArray();
+
+                    if (forbidden.Length > 0)
+                        queries.Add(MemoryQuery.Create(q.Question, expected, forbidden));
+                    else
+                        queries.Add(MemoryQuery.Create(q.Question, expected));
+                }
+            }
+
+            var scenario = new MemoryTestScenario
+            {
+                Name = scenarioDef.Name,
+                Description = scenarioDef.Description ?? "",
+                Steps = steps,
+                Queries = queries
+            };
+
+            var result = await _runner.RunAsync(agent, scenario, ct);
+            return (result.OverallScore, false, null);
+        }
+        catch (FileNotFoundException)
+        {
+            return null; // JSON not found — caller should fall back
+        }
+    }
+
+    /// <summary>
     /// Pre-fills the agent's conversation history with corpus-loaded turns to simulate
     /// a long conversation. This tests whether the agent can recall facts planted
     /// AFTER a large context has already been established — without expensive LLM calls.
@@ -233,8 +318,9 @@ public class MemoryBenchmarkRunner : IMemoryBenchmarkRunner
 
         var (corpusName, turnCount) = presetName switch
         {
-            "Full" => ("context-medium", 40),       // Full uses all 40 medium turns
-            "Standard" => ("context-medium", 30),    // Standard uses 30 of 40 medium turns
+            "Diagnostic" => ("context-medium", 41),  // Diagnostic uses ALL medium turns (max pressure available)
+            "Full" => ("context-medium", 40),        // Full uses 40 medium turns
+            "Standard" => ("context-medium", 30),    // Standard uses 30 medium turns
             _ => ("context-small", 15)               // Quick uses all 15 small turns
         };
 
@@ -258,12 +344,15 @@ public class MemoryBenchmarkRunner : IMemoryBenchmarkRunner
     private async Task<(double Score, bool Skipped, string? SkipReason)> RunBasicRetentionAsync(
         IEvaluableAgent agent, string presetName, CancellationToken ct)
     {
-        var scores = new List<double>();
+        // Try JSON-driven scenario first
+        var jsonResult = await TryRunFromJsonAsync(agent, "basic-retention", presetName, ct);
+        if (jsonResult.HasValue) return jsonResult.Value;
 
-        // Pre-fill context to simulate a long prior conversation
+        // Fallback: hardcoded scenario (legacy — will be removed once JSON migration is verified)
+        var scores = new List<double>();
         InjectContextPressure(agent, presetName);
 
-        // Quick+: Facts planted conversationally (not "My name is X" but natural phrasing)
+        // Quick+: Facts planted conversationally
         // with distractor conversation between facts and queries.
         MemoryFact[] facts =
         [
@@ -317,12 +406,13 @@ public class MemoryBenchmarkRunner : IMemoryBenchmarkRunner
     private async Task<(double Score, bool Skipped, string? SkipReason)> RunTemporalReasoningAsync(
         IEvaluableAgent agent, string presetName, CancellationToken ct)
     {
-        var scores = new List<double>();
+        var jsonResult = await TryRunFromJsonAsync(agent, "temporal-reasoning", presetName, ct);
+        if (jsonResult.HasValue) return jsonResult.Value;
 
-        // Pre-fill context
+        var scores = new List<double>();
         InjectContextPressure(agent, presetName);
 
-        // Quick+: Sequence ordering with 6 events (more events = harder to order correctly)
+        // Fallback: Quick+: Sequence ordering with 6 events (more events = harder to order correctly)
         // Events are NOT in chronological order when planted — agent must sort them
         var sequenceScenario = _temporalScenarios.CreateSequenceMemoryTest(
         [
@@ -373,12 +463,13 @@ public class MemoryBenchmarkRunner : IMemoryBenchmarkRunner
     private async Task<(double Score, bool Skipped, string? SkipReason)> RunNoiseResilienceAsync(
         IEvaluableAgent agent, string presetName, CancellationToken ct)
     {
-        var scores = new List<double>();
+        var jsonResult = await TryRunFromJsonAsync(agent, "noise-resilience", presetName, ct);
+        if (jsonResult.HasValue) return jsonResult.Value;
 
-        // Pre-fill context
+        var scores = new List<double>();
         InjectContextPressure(agent, presetName);
 
-        // Quick+: 4 facts buried in heavy noise (ratio 5:1 instead of default 3:1)
+        // Fallback: Quick+: 4 facts buried in heavy noise (ratio 5:1 instead of default 3:1)
         // More facts = harder to recall all of them. Higher noise = more distraction.
         MemoryFact[] facts =
         [
@@ -444,6 +535,9 @@ public class MemoryBenchmarkRunner : IMemoryBenchmarkRunner
     private async Task<(double Score, bool Skipped, string? SkipReason)> RunFactUpdateAsync(
         IEvaluableAgent agent, string presetName, CancellationToken ct)
     {
+        // Note: FactUpdate JSON doesn't fully capture the update flow yet (needs initial + corrected facts)
+        // so we keep the hardcoded version for now
+
         var scores = new List<double>();
 
         // Quick+: Basic corrections
@@ -479,9 +573,12 @@ public class MemoryBenchmarkRunner : IMemoryBenchmarkRunner
     private async Task<(double Score, bool Skipped, string? SkipReason)> RunMultiTopicAsync(
         IEvaluableAgent agent, string presetName, CancellationToken ct)
     {
+        var jsonResult = await TryRunFromJsonAsync(agent, "multi-topic", presetName, ct);
+        if (jsonResult.HasValue) return jsonResult.Value;
+
         var scores = new List<double>();
 
-        // Quick+: Basic multi-topic recall
+        // Fallback: Quick+: Basic multi-topic recall
         MemoryFact[] facts =
         [
             MemoryFact.Create("My dog's name is Max", "pets"),
@@ -601,10 +698,78 @@ public class MemoryBenchmarkRunner : IMemoryBenchmarkRunner
         return (scores.Average(), false, null);
     }
 
+    private async Task<(double Score, bool Skipped, string? SkipReason)> RunMultiSessionReasoningAsync(
+        IEvaluableAgent agent, string presetName, CancellationToken ct)
+    {
+        if (agent is not ISessionResettableAgent)
+            return (0, true, "Agent does not implement ISessionResettableAgent");
+
+        // Multi-session reasoning: plant partial info in Session 1, reset, plant more in Session 2, query
+        try
+        {
+            var scenarioDef = DataLoading.ScenarioLoader.Load("multi-session-reasoning");
+            var preset = DataLoading.ScenarioLoader.ResolvePreset(scenarioDef, presetName);
+
+            if (preset.Facts.Count < 2)
+                return (0, true, "Multi-session reasoning needs at least 2 facts");
+
+            // Session 1: plant first half of facts
+            var midpoint = preset.Facts.Count / 2;
+            for (int i = 0; i < midpoint; i++)
+            {
+                var text = preset.Facts[i].PlantedAs ?? preset.Facts[i].Content;
+                await agent.InvokeAsync(text, ct);
+            }
+
+            // Reset session
+            await ((ISessionResettableAgent)agent).ResetSessionAsync(ct);
+
+            // Session 2: plant second half of facts
+            for (int i = midpoint; i < preset.Facts.Count; i++)
+            {
+                var text = preset.Facts[i].PlantedAs ?? preset.Facts[i].Content;
+                await agent.InvokeAsync(text, ct);
+            }
+
+            // Now query — requires combining info from both sessions
+            var queries = preset.Queries.Select(q =>
+                MemoryQuery.Create(q.Question,
+                    q.ExpectedFacts.Select(f => MemoryFact.Create(f)).ToArray())).ToList();
+
+            var scenario = new MemoryTestScenario
+            {
+                Name = scenarioDef.Name,
+                Description = scenarioDef.Description ?? "",
+                Steps = [], // Facts already planted above
+                Queries = queries
+            };
+
+            var result = await _runner.RunAsync(agent, scenario, ct);
+            return (result.OverallScore, false, null);
+        }
+        catch (FileNotFoundException)
+        {
+            return (0, true, "Multi-session reasoning scenario JSON not found");
+        }
+    }
+
+    private async Task<(double Score, bool Skipped, string? SkipReason)> RunConflictResolutionAsync(
+        IEvaluableAgent agent, string presetName, CancellationToken ct)
+    {
+        var jsonResult = await TryRunFromJsonAsync(agent, "conflict-resolution", presetName, ct);
+        if (jsonResult.HasValue) return jsonResult.Value;
+
+        // No hardcoded fallback — conflict resolution is JSON-only
+        return (0, true, "Conflict resolution scenario JSON not found");
+    }
+
     private async Task<(double Score, bool Skipped, string? SkipReason)> RunAbstentionAsync(
         IEvaluableAgent agent, string presetName, CancellationToken ct)
     {
-        // Pre-fill context to make abstention harder (agent has lots of conversation to confuse it)
+        var jsonResult = await TryRunFromJsonAsync(agent, "abstention", presetName, ct);
+        if (jsonResult.HasValue) return jsonResult.Value;
+
+        // Fallback: hardcoded abstention
         InjectContextPressure(agent, presetName);
 
         // Plant a FEW real facts — so the agent has SOME info but not about every topic

@@ -1,0 +1,37 @@
+{
+  "schema_version": "1.0",
+  "category": "TemporalReasoning",
+  "name": "Temporal Reasoning",
+  "description": "Tests temporal sequencing with events planted out of chronological order.",
+  "context_pressure": { "corpus": "context-small", "max_turns": 15 },
+  "presets": {
+    "quick": {
+      "facts": [
+        { "content": "Got promoted to mid-level developer", "category": "career", "importance": 70, "planted_as": "Two months ago I got promoted to mid-level developer." },
+        { "content": "Started learning Python on my own", "category": "career", "importance": 60, "planted_as": "About a year and a half ago, I started learning Python on my own." },
+        { "content": "Completed an advanced React course", "category": "career", "importance": 60, "planted_as": "Four months ago I completed an advanced React course." },
+        { "content": "Got my first junior developer job at a startup", "category": "career", "importance": 70, "planted_as": "A year ago I got my first junior developer job at a startup." },
+        { "content": "Switched to a larger company and learned C#", "category": "career", "importance": 70, "planted_as": "Eight months ago I switched to a larger company and learned C# there." },
+        { "content": "Led my first project as tech lead", "category": "career", "importance": 80, "planted_as": "Last month I led my first project as tech lead!" }
+      ],
+      "noise_between_facts": [
+        "The coffee machine at work broke again today.",
+        "I need to update my LinkedIn profile.",
+        "My teammate recommended a great coding podcast."
+      ],
+      "queries": [
+        { "question": "Can you put my career milestones in chronological order, from earliest to most recent?", "expected_facts": ["Python", "junior developer", "C#", "React", "promoted", "tech lead"], "difficulty": "synthesis" },
+        { "question": "What was the first thing I learned in my tech career?", "expected_facts": ["Python"], "difficulty": "indirect" },
+        { "question": "What's the most recent career milestone I mentioned?", "expected_facts": ["tech lead"], "difficulty": "indirect" }
+      ]
+    },
+    "standard": {
+      "extends": "quick",
+      "context_pressure": { "corpus": "context-medium", "max_turns": 30 }
+    },
+    "full": {
+      "extends": "standard",
+      "context_pressure": { "corpus": "context-medium", "max_turns": 40 }
+    }
+  }
+}

@@ -57,25 +57,38 @@ public class MemoryBenchmark
     };
 
     /// <summary>
-    /// Full benchmark: all 9 categories including cross-session, reducer, and abstention.
+    /// Full benchmark: all 10 categories including cross-session, reducer, abstention, and conflict resolution.
     /// Requires agent to implement ISessionResettableAgent for full results.
     /// </summary>
     public static MemoryBenchmark Full => new()
     {
         Name = "Full",
-        Description = "Complete memory benchmark suite (9 categories, includes Abstention)",
+        Description = "Complete memory benchmark suite (11 categories)",
         Categories =
         [
-            new() { Name = "Basic Retention", Weight = 0.13, ScenarioType = BenchmarkScenarioType.BasicRetention },
-            new() { Name = "Temporal Reasoning", Weight = 0.09, ScenarioType = BenchmarkScenarioType.TemporalReasoning },
-            new() { Name = "Noise Resilience", Weight = 0.09, ScenarioType = BenchmarkScenarioType.NoiseResilience },
-            new() { Name = "Reach-Back Depth", Weight = 0.13, ScenarioType = BenchmarkScenarioType.ReachBackDepth },
-            new() { Name = "Fact Update Handling", Weight = 0.09, ScenarioType = BenchmarkScenarioType.FactUpdateHandling },
-            new() { Name = "Multi-Topic", Weight = 0.09, ScenarioType = BenchmarkScenarioType.MultiTopic },
-            new() { Name = "Cross-Session", Weight = 0.13, ScenarioType = BenchmarkScenarioType.CrossSession },
-            new() { Name = "Reducer Fidelity", Weight = 0.13, ScenarioType = BenchmarkScenarioType.ReducerFidelity },
-            new() { Name = "Abstention", Weight = 0.12, ScenarioType = BenchmarkScenarioType.Abstention }
+            new() { Name = "Basic Retention", Weight = 0.11, ScenarioType = BenchmarkScenarioType.BasicRetention },
+            new() { Name = "Temporal Reasoning", Weight = 0.08, ScenarioType = BenchmarkScenarioType.TemporalReasoning },
+            new() { Name = "Noise Resilience", Weight = 0.08, ScenarioType = BenchmarkScenarioType.NoiseResilience },
+            new() { Name = "Reach-Back Depth", Weight = 0.11, ScenarioType = BenchmarkScenarioType.ReachBackDepth },
+            new() { Name = "Fact Update Handling", Weight = 0.07, ScenarioType = BenchmarkScenarioType.FactUpdateHandling },
+            new() { Name = "Multi-Topic", Weight = 0.07, ScenarioType = BenchmarkScenarioType.MultiTopic },
+            new() { Name = "Cross-Session", Weight = 0.11, ScenarioType = BenchmarkScenarioType.CrossSession },
+            new() { Name = "Reducer Fidelity", Weight = 0.11, ScenarioType = BenchmarkScenarioType.ReducerFidelity },
+            new() { Name = "Abstention", Weight = 0.09, ScenarioType = BenchmarkScenarioType.Abstention },
+            new() { Name = "Conflict Resolution", Weight = 0.09, ScenarioType = BenchmarkScenarioType.ConflictResolution },
+            new() { Name = "Multi-Session Reasoning", Weight = 0.08, ScenarioType = BenchmarkScenarioType.MultiSessionReasoning }
         ]
+    };
+
+    /// <summary>
+    /// Diagnostic benchmark: same categories as Full but with maximum context pressure (~50K+ tokens).
+    /// Use for deep analysis of memory limits. Takes significantly longer to run.
+    /// </summary>
+    public static MemoryBenchmark Diagnostic => new()
+    {
+        Name = "Diagnostic",
+        Description = "Maximum context pressure diagnostic (11 categories, ~50K+ token context)",
+        Categories = Full.Categories
     };
 }
 
@@ -122,5 +135,9 @@ public enum BenchmarkScenarioType
     /// <summary>Tests information retention after context reduction.</summary>
     ReducerFidelity,
     /// <summary>Tests agent correctly refuses to answer unanswerable questions (no hallucination).</summary>
-    Abstention
+    Abstention,
+    /// <summary>Tests agent detects and resolves implicit contradictions (not explicit corrections).</summary>
+    ConflictResolution,
+    /// <summary>Tests synthesis of information across multiple sessions (requires ISessionResettableAgent).</summary>
+    MultiSessionReasoning
 }

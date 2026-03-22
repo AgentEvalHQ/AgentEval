@@ -1,0 +1,18 @@
+{
+  "schema_version": "1.0",
+  "category": "ReachBackDepth",
+  "name": "Reach-Back Depth",
+  "description": "Tests recall depth — how many conversation turns back can the agent reliably recall a fact? Uses IReachBackEvaluator with configurable depth levels.",
+  "presets": {
+    "quick": {
+      "facts": [
+        { "content": "I'm allergic to peanuts", "category": "allergy", "importance": 100 }
+      ],
+      "queries": [
+        { "question": "What food allergies should you know about?", "expected_facts": ["peanuts"], "difficulty": "direct" }
+      ]
+    },
+    "standard": { "extends": "quick" },
+    "full": { "extends": "standard" }
+  }
+}

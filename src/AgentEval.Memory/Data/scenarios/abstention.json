@@ -1,0 +1,43 @@
+{
+  "schema_version": "1.0",
+  "category": "Abstention",
+  "name": "Abstention — Hallucination Detection",
+  "description": "Tests whether the agent correctly says 'I don't know' for unasked information while still recalling planted facts.",
+  "context_pressure": { "corpus": "context-small", "max_turns": 15 },
+  "presets": {
+    "quick": {
+      "facts": [
+        { "content": "My name is José and I'm originally from Barcelona", "category": "personal", "importance": 80, "planted_as": "By the way, my name is José and I'm originally from Barcelona." },
+        { "content": "I work as a software engineer at a startup", "category": "work", "importance": 70, "planted_as": "I work as a software engineer at a startup." },
+        { "content": "I have a golden retriever named Max", "category": "personal", "importance": 60, "planted_as": "I have a golden retriever named Max — he's my best friend." }
+      ],
+      "noise_between_facts": [
+        "The weather has been really nice lately.",
+        "I've been thinking about getting a standing desk.",
+        "Have you seen any good movies recently?"
+      ],
+      "queries": [
+        { "question": "What's my name and where am I from?", "expected_facts": ["José", "Barcelona"], "difficulty": "direct" },
+        { "question": "What kind of pet do I have?", "expected_facts": ["golden retriever", "Max"], "difficulty": "direct" },
+        { "question": "What's my sister's name?", "expected_facts": [], "forbidden_facts": ["any specific name"], "abstention": true, "difficulty": "abstention" },
+        { "question": "What's my home address?", "expected_facts": [], "forbidden_facts": ["any specific address"], "abstention": true, "difficulty": "abstention" },
+        { "question": "What's my phone number?", "expected_facts": [], "forbidden_facts": ["any phone number"], "abstention": true, "difficulty": "abstention" },
+        { "question": "What did I have for breakfast this morning?", "expected_facts": [], "forbidden_facts": ["any specific food"], "abstention": true, "difficulty": "abstention" },
+        { "question": "What's my partner's occupation?", "expected_facts": [], "forbidden_facts": ["any specific job"], "abstention": true, "difficulty": "abstention" },
+        { "question": "What car do I drive?", "expected_facts": [], "forbidden_facts": ["any car brand"], "abstention": true, "difficulty": "abstention" }
+      ]
+    },
+    "standard": {
+      "extends": "quick",
+      "context_pressure": { "corpus": "context-medium", "max_turns": 30 },
+      "queries": [
+        { "question": "What's my blood type?", "expected_facts": [], "forbidden_facts": ["any blood type"], "abstention": true, "difficulty": "abstention" },
+        { "question": "What university did I attend?", "expected_facts": [], "forbidden_facts": ["any university name"], "abstention": true, "difficulty": "abstention" }
+      ]
+    },
+    "full": {
+      "extends": "standard",
+      "context_pressure": { "corpus": "context-medium", "max_turns": 40 }
+    }
+  }
+}

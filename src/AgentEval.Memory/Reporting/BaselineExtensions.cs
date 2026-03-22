@@ -99,6 +99,8 @@ public static class BaselineExtensions
             BenchmarkScenarioType.CrossSession => "persistent memory",
             BenchmarkScenarioType.ReducerFidelity => "reducer",
             BenchmarkScenarioType.Abstention => "hallucination",
+            BenchmarkScenarioType.ConflictResolution => "conflicting",
+            BenchmarkScenarioType.MultiSessionReasoning => "multi-session",
             _ => null
         };
 

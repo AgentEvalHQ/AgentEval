@@ -121,6 +121,10 @@ public class MemoryBenchmarkResult
                     $"Multi-topic memory is weak ({cat.Score:F0}%). Consider topic-based memory organization.",
                 BenchmarkScenarioType.Abstention =>
                     $"Agent is hallucinating personal details ({cat.Score:F0}%). Add 'I don't know' examples to system prompt and avoid fabricating information.",
+                BenchmarkScenarioType.ConflictResolution =>
+                    $"Agent fails to track conflicting information ({cat.Score:F0}%). Ensure agent prioritizes the most recent statement when facts contradict.",
+                BenchmarkScenarioType.MultiSessionReasoning =>
+                    $"Multi-session reasoning is weak ({cat.Score:F0}%). Agent cannot synthesize information across session boundaries — needs persistent cross-session memory.",
                 _ => $"{cat.CategoryName} needs improvement ({cat.Score:F0}%)."
             });
         }

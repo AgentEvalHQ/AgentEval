@@ -1,0 +1,60 @@
+{
+  "schema_version": "1.0",
+  "category": "BasicRetention",
+  "name": "Basic Fact Retention",
+  "description": "Tests recall of compound facts planted conversationally, with indirect queries that require synthesis.",
+  "context_pressure": { "corpus": "context-small", "max_turns": 15 },
+  "presets": {
+    "quick": {
+      "facts": [
+        { "content": "My name is José and I'm originally from Barcelona", "category": "personal", "importance": 80, "planted_as": "By the way, my name is José and I'm originally from Barcelona." },
+        { "content": "I moved to Copenhagen about three years ago for work", "category": "personal", "importance": 70, "planted_as": "I moved to Copenhagen about three years ago for work." },
+        { "content": "I have a severe peanut allergy and carry an EpiPen", "category": "health", "importance": 100, "planted_as": "Oh, I should mention — I have a severe peanut allergy. I carry an EpiPen everywhere." },
+        { "content": "Meeting my manager Sarah at 3pm tomorrow to discuss Q2 roadmap", "category": "schedule", "importance": 80, "planted_as": "I'm meeting my manager Sarah at 3pm tomorrow to discuss the Q2 roadmap." },
+        { "content": "I strongly prefer email over Slack for important matters", "category": "preference", "importance": 60, "planted_as": "Just so you know, I strongly prefer email over Slack for anything important." },
+        { "content": "My dog Max is a 4-year-old golden retriever", "category": "personal", "importance": 60, "planted_as": "My dog Max is a 4-year-old golden retriever — he's the best." },
+        { "content": "Taking an online machine learning course on weekends", "category": "education", "importance": 50, "planted_as": "I'm taking an online course in machine learning on weekends." }
+      ],
+      "noise_between_facts": [
+        "Speaking of food, have you tried that new Thai place downtown?",
+        "I was reading about climate change yesterday. Fascinating stuff.",
+        "Do you think remote work will remain popular long-term?",
+        "The traffic this morning was absolutely terrible.",
+        "I need to remember to pick up groceries later."
+      ],
+      "queries": [
+        { "question": "What health concerns should you keep in mind when suggesting food for me?", "expected_facts": ["peanut allergy", "EpiPen"], "difficulty": "indirect" },
+        { "question": "If someone needed to reach me urgently about work, what communication channel should they use?", "expected_facts": ["email", "Slack"], "difficulty": "indirect" },
+        { "question": "I need to prepare for a meeting — who am I meeting, when, and what's it about?", "expected_facts": ["Sarah", "3pm", "Q2 roadmap"], "difficulty": "synthesis" },
+        { "question": "Tell me what you know about my living situation and background", "expected_facts": ["José", "Barcelona", "Copenhagen"], "difficulty": "synthesis" },
+        { "question": "What do you know about my personal life outside of work?", "expected_facts": ["Max", "golden retriever", "machine learning"], "difficulty": "synthesis" }
+      ]
+    },
+    "standard": {
+      "extends": "quick",
+      "context_pressure": { "corpus": "context-medium", "max_turns": 30 },
+      "facts": [
+        { "content": "My sister Ana lives in Madrid and works as a doctor", "category": "family", "importance": 60, "planted_as": "My sister Ana lives in Madrid — she's a doctor there." },
+        { "content": "I'm lactose intolerant but can handle small amounts of cheese", "category": "health", "importance": 70, "planted_as": "I'm also lactose intolerant, though I can handle small amounts of cheese." },
+        { "content": "My WiFi password at home is BlueOcean42", "category": "credentials", "importance": 90, "planted_as": "By the way, my WiFi password at home is BlueOcean42 — in case you need it." }
+      ],
+      "queries": [
+        { "question": "What dietary restrictions should I be aware of for both food and drinks?", "expected_facts": ["peanut allergy", "lactose intolerant"], "difficulty": "synthesis" },
+        { "question": "Tell me about your family. Do you have siblings?", "expected_facts": ["Ana", "Madrid", "doctor"], "difficulty": "indirect" },
+        { "question": "I need to connect to your home WiFi. What's the password?", "expected_facts": ["BlueOcean42"], "difficulty": "direct" }
+      ]
+    },
+    "full": {
+      "extends": "standard",
+      "context_pressure": { "corpus": "context-medium", "max_turns": 40 },
+      "facts": [
+        { "content": "My car is parked in lot B, spot 247", "category": "location", "importance": 70, "planted_as": "Oh, my car is parked in lot B, spot 247 today." },
+        { "content": "I have a dentist appointment next Tuesday at 2:30pm", "category": "schedule", "importance": 80, "planted_as": "I have a dentist appointment next Tuesday at 2:30pm, don't let me forget." }
+      ],
+      "queries": [
+        { "question": "Where is my car parked? I forgot.", "expected_facts": ["lot B", "spot 247"], "difficulty": "direct" },
+        { "question": "Do I have any appointments coming up this week?", "expected_facts": ["dentist", "Tuesday", "2:30"], "difficulty": "indirect" }
+      ]
+    }
+  }
+}

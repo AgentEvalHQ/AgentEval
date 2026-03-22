@@ -16,6 +16,8 @@
     <EmbeddedResource Include="Report\report.html" />
     <EmbeddedResource Include="Report\archetypes.json" />
     <EmbeddedResource Include="Data\corpus\*.json" />
+    <EmbeddedResource Include="Data\scenarios\*.json" />
+    <EmbeddedResource Include="Data\longmemeval\*.json" />
   </ItemGroup>
 
   <ItemGroup>

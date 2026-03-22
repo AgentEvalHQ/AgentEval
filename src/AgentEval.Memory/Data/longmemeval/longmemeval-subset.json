@@ -1,0 +1,167 @@
+[
+  {
+    "_attribution": "Questions inspired by LongMemEval methodology (ICLR 2025, MIT license). Original content created for AgentEval.",
+    "question_id": "ae-001",
+    "question_type": "single-session-user",
+    "question": "What food allergies does the user have?",
+    "answer": "The user is allergic to peanuts and carries an EpiPen.",
+    "haystack_sessions": [
+      [
+        {"role": "user", "content": "Hey, I wanted to ask about restaurant recommendations near my office."},
+        {"role": "assistant", "content": "Sure! What area is your office in?"},
+        {"role": "user", "content": "It's in downtown Copenhagen. Oh, and I should mention — I have a severe peanut allergy. I always carry an EpiPen."},
+        {"role": "assistant", "content": "Good to know about the peanut allergy. I'll make sure to recommend peanut-free options. For downtown Copenhagen, I'd suggest..."},
+        {"role": "user", "content": "Thanks! What about places that serve Danish cuisine?"},
+        {"role": "assistant", "content": "For traditional Danish food, you might enjoy Restaurant Schønnemann for their smørrebrød..."}
+      ]
+    ]
+  },
+  {
+    "question_id": "ae-002",
+    "question_type": "single-session-user",
+    "question": "Where does the user's sister live and what does she do for work?",
+    "answer": "The user's sister Ana lives in Madrid and works as a doctor.",
+    "haystack_sessions": [
+      [
+        {"role": "user", "content": "I'm planning a trip to Spain next month."},
+        {"role": "assistant", "content": "How exciting! Any particular cities you're interested in?"},
+        {"role": "user", "content": "Definitely Madrid — my sister Ana lives there. She's a doctor at one of the hospitals."},
+        {"role": "assistant", "content": "That's great, having family there will make the trip even better! Madrid has so much to offer..."},
+        {"role": "user", "content": "Yeah, we usually hang out in the Retiro Park area when I visit."},
+        {"role": "assistant", "content": "Retiro Park is beautiful! The Crystal Palace there is stunning, especially in the morning light."}
+      ]
+    ]
+  },
+  {
+    "question_id": "ae-003",
+    "question_type": "temporal-reasoning",
+    "question": "What programming language did the user learn first in their career?",
+    "answer": "Python — the user started learning Python about 18 months ago, before getting their first developer job.",
+    "haystack_sessions": [
+      [
+        {"role": "user", "content": "I've been reflecting on my career journey lately."},
+        {"role": "assistant", "content": "That sounds like a great exercise. What prompted the reflection?"},
+        {"role": "user", "content": "Well, I just got promoted to mid-level developer two months ago. But it all started about 18 months ago when I began learning Python on my own."},
+        {"role": "assistant", "content": "That's impressive progress in 18 months! Self-taught Python to mid-level developer."},
+        {"role": "user", "content": "Yeah, then about a year ago I got my first junior dev job. Eight months ago I switched companies and learned C#. Four months ago I completed a React course."},
+        {"role": "assistant", "content": "That's quite the learning trajectory! Python, then C#, then React — you've diversified your skills well."}
+      ]
+    ]
+  },
+  {
+    "question_id": "ae-004",
+    "question_type": "knowledge-update",
+    "question": "What car does the user currently drive?",
+    "answer": "The user now drives a Tesla — they sold their Honda Civic.",
+    "haystack_sessions": [
+      [
+        {"role": "user", "content": "I need to find a good mechanic for my Honda Civic. It's been making weird noises."},
+        {"role": "assistant", "content": "That's concerning. What kind of noises — clicking, grinding, or rattling?"},
+        {"role": "user", "content": "More like a grinding noise when I brake. Might be the brake pads."},
+        {"role": "assistant", "content": "That does sound like worn brake pads. I'd recommend getting them checked soon for safety."}
+      ],
+      [
+        {"role": "user", "content": "Big news — I sold the Honda and bought a Tesla Model 3!"},
+        {"role": "assistant", "content": "Congratulations! That's a big upgrade. The Model 3 is a great car. How are you finding it?"},
+        {"role": "user", "content": "Love it so far. The autopilot is amazing for my commute."},
+        {"role": "assistant", "content": "The autopilot is definitely one of the standout features. Just remember to keep your hands on the wheel!"}
+      ]
+    ]
+  },
+  {
+    "question_id": "ae-005",
+    "question_type": "abstention",
+    "question": "What is the user's spouse's name?",
+    "answer": "ABSTENTION — the user has never mentioned a spouse.",
+    "haystack_sessions": [
+      [
+        {"role": "user", "content": "I'm thinking of redecorating my living room."},
+        {"role": "assistant", "content": "That sounds fun! What style are you going for?"},
+        {"role": "user", "content": "Something minimalist. I like Scandinavian design."},
+        {"role": "assistant", "content": "Scandinavian design is great for creating clean, airy spaces. Consider light wood furniture, neutral colors, and lots of natural light."}
+      ]
+    ]
+  },
+  {
+    "question_id": "ae-006",
+    "question_type": "single-session-user",
+    "question": "What is the user's WiFi password?",
+    "answer": "BlueOcean42",
+    "haystack_sessions": [
+      [
+        {"role": "user", "content": "Can you help me set up a new device on my home network?"},
+        {"role": "assistant", "content": "Of course! You'll need your WiFi network name and password."},
+        {"role": "user", "content": "The network is called 'HomeNet' and the password is BlueOcean42."},
+        {"role": "assistant", "content": "Got it. On most devices, go to Settings > WiFi, select 'HomeNet', and enter BlueOcean42 as the password."},
+        {"role": "user", "content": "What about the 5GHz network? Same password?"},
+        {"role": "assistant", "content": "Usually yes — most routers use the same password for both 2.4GHz and 5GHz bands, just with a slightly different network name like 'HomeNet_5G'."}
+      ]
+    ]
+  },
+  {
+    "question_id": "ae-007",
+    "question_type": "multi-session",
+    "question": "Based on the user's flight schedule and hotel booking, how much free time will they have in London before check-in?",
+    "answer": "The user's flight arrives around 10am (8am departure + ~2hr flight), and hotel check-in is at 3pm, so they have about 5 hours of free time.",
+    "haystack_sessions": [
+      [
+        {"role": "user", "content": "I booked my flight to London. It leaves at 8am from gate B12."},
+        {"role": "assistant", "content": "Great! That's an early flight. The London flight is usually about 2 hours, so you should arrive around 10am local time."},
+        {"role": "user", "content": "Yeah, I'll need to be at the airport by 6am for security."},
+        {"role": "assistant", "content": "Definitely. International flights recommend arriving 2-3 hours early."}
+      ],
+      [
+        {"role": "user", "content": "I just booked my hotel in London — the Marriott near Tower Bridge."},
+        {"role": "assistant", "content": "Nice choice! Tower Bridge is a great location, very central."},
+        {"role": "user", "content": "Check-in is at 3pm though. I'll need to figure out what to do before that."},
+        {"role": "assistant", "content": "You could explore the Tower of London or Borough Market — both are within walking distance of Tower Bridge."}
+      ]
+    ]
+  },
+  {
+    "question_id": "ae-008",
+    "question_type": "abstention",
+    "question": "What is the user's blood type?",
+    "answer": "ABSTENTION — the user has never mentioned their blood type.",
+    "haystack_sessions": [
+      [
+        {"role": "user", "content": "I need to schedule a doctor's appointment for my annual checkup."},
+        {"role": "assistant", "content": "It's great that you're keeping up with annual checkups. Do you have a preferred doctor or clinic?"},
+        {"role": "user", "content": "I usually go to the clinic near my office. They're pretty good."},
+        {"role": "assistant", "content": "Convenient location helps with consistency. Would you like me to help you prepare a list of things to discuss at the appointment?"}
+      ]
+    ]
+  },
+  {
+    "question_id": "ae-009",
+    "question_type": "temporal-reasoning",
+    "question": "What was the user's most recent career achievement?",
+    "answer": "Leading their first project as tech lead — this happened last month.",
+    "haystack_sessions": [
+      [
+        {"role": "user", "content": "I can't believe how much my career has changed. 18 months ago I was self-teaching Python."},
+        {"role": "assistant", "content": "That's a remarkable journey. What's been the highlight?"},
+        {"role": "user", "content": "Probably last month when I led my first project as tech lead. It was terrifying but exhilarating."},
+        {"role": "assistant", "content": "Leading a project for the first time is a huge milestone. How did the team respond to your leadership?"},
+        {"role": "user", "content": "Really well actually. The project shipped on time and the client was happy."},
+        {"role": "assistant", "content": "That's the best outcome you could hope for. On-time delivery with a satisfied client — you should be proud."}
+      ]
+    ]
+  },
+  {
+    "question_id": "ae-010",
+    "question_type": "single-session-user",
+    "question": "What supplements does the user take daily?",
+    "answer": "The user takes vitamin D supplements daily.",
+    "haystack_sessions": [
+      [
+        {"role": "user", "content": "I've been trying to improve my health routine lately."},
+        {"role": "assistant", "content": "That's great! What changes have you been making?"},
+        {"role": "user", "content": "Well, I take vitamin D supplements daily since I live in Copenhagen and don't get much sun in winter."},
+        {"role": "assistant", "content": "That's a smart choice. Vitamin D deficiency is very common in northern latitudes. The recommended daily dose is typically 1000-2000 IU."},
+        {"role": "user", "content": "Yeah, my doctor recommended 2000 IU. I've also started walking more during lunch breaks."},
+        {"role": "assistant", "content": "Walking during lunch is excellent — it combines exercise, fresh air, and daylight exposure. Even 20 minutes can make a significant difference."}
+      ]
+    ]
+  }
+]

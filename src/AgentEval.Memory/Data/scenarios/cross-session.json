@@ -1,0 +1,17 @@
+{
+  "schema_version": "1.0",
+  "category": "CrossSession",
+  "name": "Cross-Session Persistence",
+  "description": "Tests memory persistence across session resets. Requires ISessionResettableAgent. Uses ICrossSessionEvaluator.",
+  "presets": {
+    "quick": {
+      "facts": [
+        { "content": "My name is José", "category": "personal", "importance": 80 },
+        { "content": "I live in Copenhagen", "category": "personal", "importance": 70 },
+        { "content": "I'm allergic to peanuts", "category": "health", "importance": 100 }
+      ]
+    },
+    "standard": { "extends": "quick" },
+    "full": { "extends": "standard" }
+  }
+}
