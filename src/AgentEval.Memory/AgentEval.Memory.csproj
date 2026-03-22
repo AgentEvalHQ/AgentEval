@@ -9,6 +9,13 @@
   <ItemGroup>
     <InternalsVisibleTo Include="AgentEval" />
     <InternalsVisibleTo Include="AgentEval.Tests" />
+    <InternalsVisibleTo Include="AgentEval.Memory.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="Report\report.html" />
+    <EmbeddedResource Include="Report\archetypes.json" />
+    <EmbeddedResource Include="Data\corpus\*.json" />
   </ItemGroup>
 
   <ItemGroup>

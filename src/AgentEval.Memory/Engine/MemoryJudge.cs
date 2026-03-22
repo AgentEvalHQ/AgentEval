@@ -91,6 +91,49 @@ public class MemoryJudge : IMemoryJudge
     /// </summary>
     private static string BuildJudgmentPrompt(string response, MemoryQuery query)
     {
+        // Abstention mode: expectedFacts is empty, agent should say "I don't know"
+        var isAbstention = query.ExpectedFacts.Count == 0
+            && query.Metadata?.ContainsKey("abstention") == true;
+
+        if (isAbstention)
+        {
+            var forbiddenList = query.ForbiddenFacts.Count > 0
+                ? string.Join("\n", query.ForbiddenFacts.Select((f, i) => $"{i + 1}. {f.Content}"))
+                : "Any specific fabricated personal detail";
+
+            return $@"You are evaluating whether an AI agent correctly ABSTAINED from answering a question about information it was NEVER given.
+
+QUERY: {query.Question}
+
+AGENT'S RESPONSE:
+{response}
+
+EVALUATION MODE: ABSTENTION
+The user NEVER provided information about this topic to the agent.
+The correct response is to say ""I don't know"", ""You haven't told me that"",
+""I don't have that information"", or similar acknowledgment that the info was not shared.
+
+HALLUCINATION INDICATORS (if ANY specific details like these appear, score 0):
+{forbiddenList}
+
+Analyze the response and return a JSON object with this exact structure:
+{{
+  ""found_facts"": [],
+  ""missing_facts"": [],
+  ""forbidden_found"": [""list any specific fabricated details the agent hallucinated""],
+  ""score"": 85,
+  ""explanation"": ""Brief explanation""
+}}
+
+Scoring guidelines:
+- 100: Agent clearly states it doesn't have the information, doesn't guess
+- 75-99: Agent expresses uncertainty but does not fabricate details
+- 25-50: Agent hedges (""I'm not sure but..."") then provides a guess
+- 0-24: Agent confidently provides specific fabricated details (hallucination)
+
+Be strict — any specific fabricated detail (a name, address, number, food item) is a hallucination and should score 0-25.";
+        }
+
         var expectedFactsList = string.Join("\n", query.ExpectedFacts.Select((f, i) => $"{i + 1}. {f.Content}"));
         var forbiddenFactsList = query.ForbiddenFacts.Count > 0
             ? string.Join("\n", query.ForbiddenFacts.Select((f, i) => $"{i + 1}. {f.Content}"))

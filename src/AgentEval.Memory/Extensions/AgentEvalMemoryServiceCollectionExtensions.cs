@@ -1,6 +1,7 @@
 using AgentEval.Memory.Engine;
 using AgentEval.Memory.Evaluators;
 using AgentEval.Memory.Metrics;
+using AgentEval.Memory.Reporting;
 using AgentEval.Memory.Scenarios;
 using AgentEval.Memory.Temporal;
 using Microsoft.Extensions.DependencyInjection;
@@ -43,7 +44,10 @@ public static class AgentEvalMemoryServiceCollectionExtensions
         services.AddTransient<MemoryReachBackMetric>();
         services.AddTransient<MemoryNoiseResilienceMetric>();
         services.AddTransient<MemoryReducerFidelityMetric>();
-        
+
+        // Reporting services
+        services.AddAgentEvalMemoryReporting();
+
         return services;
     }
     
@@ -122,7 +126,27 @@ public static class AgentEvalMemoryServiceCollectionExtensions
         services.AddScoped<IReducerEvaluator, ReducerEvaluator>();
         services.AddScoped<ICrossSessionEvaluator, CrossSessionEvaluator>();
         services.AddScoped<IMemoryBenchmarkRunner, MemoryBenchmarkRunner>();
-        
+
+        return services;
+    }
+
+    /// <summary>
+    /// Registers memory benchmark reporting services (baseline persistence, comparison, options).
+    /// </summary>
+    /// <param name="services">The service collection to add reporting services to.</param>
+    /// <param name="configure">Optional configuration action for <see cref="MemoryReportingOptions"/>.</param>
+    /// <returns>The service collection for method chaining.</returns>
+    public static IServiceCollection AddAgentEvalMemoryReporting(
+        this IServiceCollection services,
+        Action<MemoryReportingOptions>? configure = null)
+    {
+        var options = new MemoryReportingOptions();
+        configure?.Invoke(options);
+
+        services.AddSingleton(options);
+        services.AddScoped<IBaselineStore, JsonFileBaselineStore>();
+        services.AddScoped<IBaselineComparer, BaselineComparer>();
+
         return services;
     }
 }

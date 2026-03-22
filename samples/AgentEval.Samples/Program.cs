@@ -79,6 +79,7 @@ public static class Program
             new("Memory Scenarios",          "ReachBackEvaluator (recall depth), ReducerEvaluator (compression)",    MemoryScenariosDemo.RunAsync),
             new("Memory DI",                 "Production DI wiring — AddAgentEvalMemory(), CanRememberAsync()",      MemoryDI.RunAsync),
             new("Cross-Session Memory",      "Fact persistence across session resets — compare with / without",      MemoryCrossSession.RunAsync),
+            new("Benchmark Reporting",       "Run benchmarks, save baselines, compare configs, HTML report",        MemoryBenchmarkReporting.RunAsync),
         ]),
     ];
 

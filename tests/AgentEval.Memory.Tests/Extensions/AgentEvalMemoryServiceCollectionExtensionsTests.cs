@@ -1,6 +1,7 @@
 using AgentEval.Memory.Engine;
 using AgentEval.Memory.Evaluators;
 using AgentEval.Memory.Extensions;
+using AgentEval.Memory.Reporting;
 using AgentEval.Memory.Scenarios;
 using AgentEval.Memory.Temporal;
 using Microsoft.Extensions.DependencyInjection;
@@ -174,6 +175,61 @@ public class AgentEvalMemoryServiceCollectionExtensionsTests
         var runner = scope.ServiceProvider.GetRequiredService<IMemoryBenchmarkRunner>();
 
         Assert.IsType<MemoryBenchmarkRunner>(runner);
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // Reporting DI Tests
+    // ═══════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void AddAgentEvalMemoryReporting_RegistersBaselineStore()
+    {
+        var services = new ServiceCollection();
+        services.AddAgentEvalMemoryReporting();
+        var provider = services.BuildServiceProvider();
+        using var scope = provider.CreateScope();
+        Assert.NotNull(scope.ServiceProvider.GetService<IBaselineStore>());
+    }
+
+    [Fact]
+    public void AddAgentEvalMemoryReporting_RegistersBaselineComparer()
+    {
+        var services = new ServiceCollection();
+        services.AddAgentEvalMemoryReporting();
+        var provider = services.BuildServiceProvider();
+        using var scope = provider.CreateScope();
+        Assert.NotNull(scope.ServiceProvider.GetService<IBaselineComparer>());
+    }
+
+    [Fact]
+    public void AddAgentEvalMemoryReporting_RegistersOptions()
+    {
+        var services = new ServiceCollection();
+        services.AddAgentEvalMemoryReporting();
+        var provider = services.BuildServiceProvider();
+        var options = provider.GetService<MemoryReportingOptions>();
+        Assert.NotNull(options);
+        Assert.Contains("{AgentName}", options.OutputPath);
+    }
+
+    [Fact]
+    public void AddAgentEvalMemoryReporting_CustomOptions_Applied()
+    {
+        var services = new ServiceCollection();
+        services.AddAgentEvalMemoryReporting(o => o.OutputPath = "/custom/{AgentName}");
+        var provider = services.BuildServiceProvider();
+        var options = provider.GetRequiredService<MemoryReportingOptions>();
+        Assert.Equal("/custom/{AgentName}", options.OutputPath);
+    }
+
+    [Fact]
+    public void AddAgentEvalMemory_ResolvesBaselineStore()
+    {
+        var services = CreateServicesWithDependencies();
+        services.AddAgentEvalMemory();
+        var provider = services.BuildServiceProvider();
+        using var scope = provider.CreateScope();
+        Assert.NotNull(scope.ServiceProvider.GetService<IBaselineStore>());
     }
 
     /// <summary>

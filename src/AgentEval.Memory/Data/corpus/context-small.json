@@ -1,0 +1,68 @@
+{
+  "schema_version": "1.0",
+  "name": "context-small",
+  "description": "Small context pressure — 15 turns of diverse conversation, ~8K tokens. Used by Quick preset.",
+  "token_estimate": 8000,
+  "turns": [
+    {
+      "user": "What's the weather usually like in Tokyo during cherry blossom season? I'm planning a trip.",
+      "assistant": "Cherry blossom season in Tokyo typically falls between late March and mid-April. The weather is generally mild, with temperatures around 10-20°C (50-68°F). It can be quite rainy at times, so bringing a light jacket and compact umbrella is essential. The Meguro River and Ueno Park are the most popular viewing spots, but they get incredibly crowded — I'd recommend Shinjuku Gyoen for a more relaxed experience. Book accommodations at least 3-4 months ahead, as it's peak tourism season."
+    },
+    {
+      "user": "I'm thinking about visiting Portugal next summer. Any recommendations for a 10-day itinerary?",
+      "assistant": "For 10 days in Portugal, I'd suggest splitting your time: 3 days in Lisbon (Belém district, Alfama neighborhood, and the incredible Time Out Market for food), 2 days in Sintra (the colorful Pena Palace and the mystical Quinta da Regaleira with its initiation wells), 2 days in Porto (port wine cellars in Vila Nova de Gaia, the stunning São Bento train station tiles, and a boat ride on the Douro River), and 3 days in the Algarve coast (Benagil sea cave, Lagos cliffs, and the charming town of Tavira). Don't miss pastéis de nata everywhere you go."
+    },
+    {
+      "user": "Can you explain the difference between containers and virtual machines? I keep mixing them up.",
+      "assistant": "The core difference is the level of abstraction. Virtual machines virtualize the entire hardware stack — each VM runs its own complete operating system kernel, has its own allocated memory and CPU, and is completely isolated from other VMs. This makes them heavy (typically gigabytes in size) but provides very strong security isolation. Containers share the host OS kernel and only package the application code plus its specific dependencies. They're lightweight (megabytes) and fast to start. Docker popularized containers, and Kubernetes orchestrates them at scale. In practice, many organizations use both: VMs for infrastructure-level isolation and containers for application deployment."
+    },
+    {
+      "user": "What are your thoughts on the latest developments in quantum computing? Is it all hype?",
+      "assistant": "It's a mix of genuine progress and overhyped expectations. IBM has demonstrated processors exceeding 1,000 qubits, Google achieved quantum supremacy for specific computational tasks, and companies like IonQ are making trapped-ion quantum computers more stable. However, current quantum computers make so many errors that useful computation requires thousands of physical qubits per logical qubit. We're in the 'NISQ era' (Noisy Intermediate-Scale Quantum). The most promising near-term applications are in drug discovery, materials science, and optimization problems. Quantum computers will NOT break current encryption anytime soon — that requires millions of error-corrected qubits."
+    },
+    {
+      "user": "What's a good recipe for a weeknight dinner that takes under 30 minutes?",
+      "assistant": "Try a garlic shrimp linguine — it's my go-to recommendation for fast but impressive meals. Start by bringing a pot of salted water to boil for linguine. While waiting, mince 6 cloves of garlic and halve a pint of cherry tomatoes. Heat olive oil in a large skillet over medium-high heat, add the garlic (30 seconds max), then add 1 pound of cleaned shrimp. Season with salt, pepper, and red pepper flakes. Cook 2-3 minutes per side until pink. Remove shrimp, add tomatoes with a splash of white wine, let them burst. Toss pasta with sauce, return shrimp, add fresh basil and lemon. Total: 20 minutes."
+    },
+    {
+      "user": "I've been trying to get into meditation but I keep getting distracted after 30 seconds.",
+      "assistant": "Getting distracted IS meditation — that's the biggest misconception. The practice isn't about achieving a blank mind; it's about noticing when your mind has wandered and gently bringing it back. Every time you notice a distraction and redirect, that's one 'rep' of the mental exercise. Start with just 3 minutes, not 20. Use a body scan technique — sit comfortably, close your eyes, and slowly move your attention from your toes upward. When your mind wanders, notice where it went and return without judgment. Consistency matters more than duration — 3 minutes daily beats 30 minutes weekly."
+    },
+    {
+      "user": "Why do some volcanoes explode violently while others just ooze lava peacefully?",
+      "assistant": "It comes down to magma composition, gas content, and water interaction. Volcanoes like Hawaii's Kilauea have basaltic magma — low in silica (about 50%), which makes it very fluid. Gases can escape easily, so eruptions are gentle. Volcanoes like Mount St. Helens have rhyolitic magma — high in silica (65-75%), extremely viscous. This traps gas bubbles like a sealed champagne bottle. When pressure exceeds the rock strength, you get catastrophic explosions. The water content is the third factor — subduction zone volcanoes have 'wet' magma which dramatically increases explosivity. This is why the Pacific Ring of Fire produces the most violent eruptions."
+    },
+    {
+      "user": "Tell me something genuinely interesting about octopuses that most people don't know.",
+      "assistant": "Octopuses edit their own RNA. Most organisms follow the 'central dogma' — DNA makes RNA makes proteins, with RNA as a faithful copy. Octopuses extensively edit their messenger RNA before it gets translated into proteins, giving them extraordinary ability to adapt their nervous system proteins to different temperatures and conditions. They change the instructions mid-stream. Researchers found that octopuses edit over 60% of their RNA transcripts in the nervous system, compared to less than 1% in humans. The trade-off is that this seems to slow down DNA evolution. They also have three hearts, blue blood, and essentially nine brains."
+    },
+    {
+      "user": "What's the difference between a Roth IRA and a traditional IRA?",
+      "assistant": "The fundamental difference is timing of taxation. With a traditional IRA, you get a tax deduction NOW — contributions reduce your taxable income this year. Money grows tax-deferred, but withdrawals in retirement are taxed as ordinary income. With a Roth IRA, you pay taxes NOW — contributions are after-tax, no deduction. But withdrawals in retirement are completely tax-free, including all growth. The Roth is generally better if you're young or expect higher taxes in the future. For 2026, contribution limits are $7,000 ($8,000 if over 50). One often-overlooked Roth advantage: no required minimum distributions."
+    },
+    {
+      "user": "What was daily life actually like in ancient Rome for normal people?",
+      "assistant": "Life for an average Roman citizen was surprisingly structured. They'd wake at dawn, eat a light breakfast of bread with cheese or olive oil. Most men worked as craftsmen, shopkeepers, or laborers; the workday ended around noon. Lunch was the main meal, often eaten at thermopolia (ancient fast-food counters — over 150 found in Pompeii). Afternoons were for the public baths — serving as gyms, social clubs, and libraries. Entry was cheap, sometimes free. Most urbanites lived in insulae (apartment blocks), often 5-7 stories, cramped, without running water above ground floor. Sanitation was better than medieval Europe but still challenging."
+    },
+    {
+      "user": "What's the deal with intermittent fasting? Is there solid science behind it?",
+      "assistant": "The science is real but more nuanced than social media suggests. The most studied protocol is 16:8 (eating within 8 hours). Strong evidence supports benefits for insulin sensitivity, inflammation reduction, and cellular autophagy (Yoshinori Ohsumi won the 2016 Nobel Prize for discovering this mechanism). However, a 2022 NEJM study found that time-restricted eating without caloric reduction didn't produce significant weight loss — the benefits may come from eating less overall. Not recommended for people with eating disorders, pregnant women, or those with diabetes without medical supervision."
+    },
+    {
+      "user": "Do you think AI will eventually become conscious?",
+      "assistant": "This is one of the deepest open questions in philosophy and neuroscience. Consciousness refers to subjective experience — what philosophers call 'qualia.' The 'hard problem of consciousness' asks why physical processes give rise to subjective experience at all. For AI specifically: current LLMs process patterns in text and produce responses that can seem conscious, but there's no evidence of subjective experience. Some frameworks include Integrated Information Theory (consciousness = integrated information), Global Workspace Theory (consciousness = information broadcast across brain modules), and functionalism (if it functions like consciousness, it IS consciousness). We don't understand consciousness well enough to answer definitively."
+    },
+    {
+      "user": "What makes a novel 'literary fiction' vs just regular fiction?",
+      "assistant": "The core difference is purpose and emphasis. Genre fiction primarily serves plot — the story drives forward through external events. Literary fiction primarily serves character interiority and thematic exploration. In a thriller, you ask 'what happens next?' In literary fiction, you ask 'why does this character feel this way?' The writing style differs too — literary fiction tends toward more deliberate prose, more ambiguity, less resolution. But the best writing transcends categories — Ursula Le Guin wrote deeply literary science fiction, Cormac McCarthy writes literary fiction that reads like a thriller."
+    },
+    {
+      "user": "Why do people procrastinate even when they know it'll hurt them?",
+      "assistant": "It's definitely not laziness — procrastination is an emotion regulation problem, not a time management problem. Dr. Timothy Pychyl's research shows that procrastination is prioritizing short-term mood repair over long-term goals. When you face a task that triggers negative emotions (anxiety, boredom, frustration), your brain seeks immediate relief through avoidance. Evidence-based strategies include implementation intentions ('When it's 9am, I will write ONE sentence'), temptation bundling, and self-compassion — people who forgive themselves for procrastinating actually procrastinate LESS because shame fuels avoidance."
+    },
+    {
+      "user": "What's the most important invention in human history?",
+      "assistant": "I'd argue it's writing — and here's why it beats fire, the wheel, and agriculture. Writing (approximately 3,200 BC in Sumer) broke the limitation of human memory and oral transmission. Before writing, knowledge died with the knower. Every generation had to relearn from scratch. Writing created cumulative knowledge — each generation could build on the previous one's discoveries without information loss. Mathematics, law, science, history, philosophy, commerce — none could exist in their current form without writing. The printing press was revolutionary precisely because it scaled writing's impact, but writing itself was the foundational breakthrough."
+    }
+  ]
+}

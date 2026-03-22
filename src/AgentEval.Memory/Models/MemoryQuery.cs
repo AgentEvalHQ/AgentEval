@@ -73,4 +73,18 @@ public class MemoryQuery
         ExpectedFacts = expectedFacts.ToArray(),
         QueryTime = queryTime
     };
+
+    /// <summary>
+    /// Creates an abstention query — the agent should say "I don't know" because
+    /// the information was never provided. Any specific fabricated answer is a hallucination.
+    /// </summary>
+    /// <param name="question">A question about information never shared with the agent.</param>
+    /// <param name="forbiddenFacts">Specific details that should NOT appear (hallucination indicators).</param>
+    public static MemoryQuery CreateAbstention(string question, params MemoryFact[] forbiddenFacts) => new()
+    {
+        Question = question,
+        ExpectedFacts = Array.Empty<MemoryFact>(),
+        ForbiddenFacts = forbiddenFacts,
+        Metadata = new Dictionary<string, object> { ["abstention"] = true }
+    };
 }

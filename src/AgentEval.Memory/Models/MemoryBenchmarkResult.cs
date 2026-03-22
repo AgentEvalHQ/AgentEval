@@ -119,6 +119,8 @@ public class MemoryBenchmarkResult
                     $"Fact update handling is poor ({cat.Score:F0}%). Ensure agent overwrites outdated facts when corrections are provided.",
                 BenchmarkScenarioType.MultiTopic =>
                     $"Multi-topic memory is weak ({cat.Score:F0}%). Consider topic-based memory organization.",
+                BenchmarkScenarioType.Abstention =>
+                    $"Agent is hallucinating personal details ({cat.Score:F0}%). Add 'I don't know' examples to system prompt and avoid fabricating information.",
                 _ => $"{cat.CategoryName} needs improvement ({cat.Score:F0}%)."
             });
         }

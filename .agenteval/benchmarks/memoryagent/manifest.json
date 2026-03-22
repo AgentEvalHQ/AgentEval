@@ -1,0 +1,46 @@
+{
+  "schema_version": "1.0",
+  "generated_at": "2026-03-22T02:05:43.6362035+00:00",
+  "generated_by": "AgentEval.Memory v1.0.0.0",
+  "agent": {
+    "name": "MemoryAgent"
+  },
+  "benchmarks": [
+    {
+      "benchmark_id": "memory-quick",
+      "preset": "Quick",
+      "categories": [
+        "Basic Retention",
+        "Temporal Reasoning",
+        "Noise Resilience"
+      ],
+      "baselines": [
+        {
+          "id": "bl-771fceac",
+          "file": "baselines/2026-03-22_minimal-prompt.json",
+          "name": "Minimal Prompt",
+          "configuration_id": "2D90A94C79DF",
+          "timestamp": "2026-03-22T02:03:30.0359289+00:00",
+          "overall_score": 90.70000000000002,
+          "grade": "A",
+          "tags": [
+            "config-a"
+          ]
+        },
+        {
+          "id": "bl-60a151a5",
+          "file": "baselines/2026-03-22_memory-optimized-prompt.json",
+          "name": "Memory-Optimized Prompt",
+          "configuration_id": "D87F43FCAB0E",
+          "timestamp": "2026-03-22T02:05:43.6308608+00:00",
+          "overall_score": 90.70000000000002,
+          "grade": "A",
+          "tags": [
+            "config-b"
+          ]
+        }
+      ]
+    }
+  ],
+  "archetypes": "archetypes.json"
+}
