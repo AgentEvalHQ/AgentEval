@@ -7,15 +7,15 @@ using static AgentEval.Memory.Models.MemoryBenchmarkResult;
 namespace AgentEval.Memory.Reporting;
 
 /// <summary>
-/// Maps 8 benchmark categories to 5 pentagon dimensions for radar visualization.
+/// Maps 11 benchmark categories to 5 pentagon dimensions for radar visualization.
 /// <para>
 /// Consolidation mapping:
 /// <list type="bullet">
 ///   <item>Recall = avg(BasicRetention, ReachBackDepth)</item>
 ///   <item>Resilience = avg(NoiseResilience, ReducerFidelity)</item>
-///   <item>Temporal = avg(TemporalReasoning, FactUpdateHandling)</item>
-///   <item>Persistence = CrossSession (1:1)</item>
-///   <item>Organization = MultiTopic (1:1)</item>
+///   <item>Temporal = avg(TemporalReasoning, FactUpdateHandling, ConflictResolution)</item>
+///   <item>Persistence = avg(CrossSession, MultiSessionReasoning)</item>
+///   <item>Organization = avg(MultiTopic, Abstention)</item>
 /// </list>
 /// </para>
 /// Handles gracefully when categories are skipped (uses available data only).

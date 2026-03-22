@@ -18,7 +18,9 @@ public class ScenarioLoaderTests
     [InlineData("cross-session")]
     [InlineData("reducer-fidelity")]
     [InlineData("abstention")]
-    public void Load_AllScenarios_DeserializeCorrectly(string scenarioName)
+    [InlineData("conflict-resolution")]
+    [InlineData("multi-session-reasoning")]
+    public void Load_All11Scenarios_DeserializeCorrectly(string scenarioName)
     {
         var scenario = ScenarioLoader.Load(scenarioName);
 
@@ -96,10 +98,31 @@ public class ScenarioLoaderTests
     }
 
     [Fact]
-    public void ListAvailable_Returns9Scenarios()
+    public void ConflictResolution_HasForbiddenFacts()
+    {
+        var scenario = ScenarioLoader.Load("conflict-resolution");
+        var resolved = ScenarioLoader.ResolvePreset(scenario, "quick");
+
+        var queriesWithForbidden = resolved.Queries.Where(q => q.ForbiddenFacts?.Count > 0).ToList();
+        Assert.True(queriesWithForbidden.Count >= 2,
+            "Conflict resolution should have queries with forbidden facts (outdated info)");
+    }
+
+    [Fact]
+    public void MultiSessionReasoning_HasFacts()
+    {
+        var scenario = ScenarioLoader.Load("multi-session-reasoning");
+        var resolved = ScenarioLoader.ResolvePreset(scenario, "quick");
+
+        Assert.True(resolved.Facts.Count >= 2, "Multi-session reasoning needs at least 2 facts to split across sessions");
+        Assert.True(resolved.Queries.Count >= 1, "Should have at least 1 cross-session query");
+    }
+
+    [Fact]
+    public void ListAvailable_Returns11Scenarios()
     {
         var available = ScenarioLoader.ListAvailable();
-        Assert.True(available.Count >= 9, $"Expected at least 9 scenarios, got {available.Count}");
+        Assert.True(available.Count >= 11, $"Expected at least 11 scenarios, got {available.Count}");
     }
 
     [Theory]

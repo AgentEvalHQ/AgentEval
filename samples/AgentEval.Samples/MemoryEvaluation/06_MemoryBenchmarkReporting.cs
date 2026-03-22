@@ -59,14 +59,15 @@ public static class MemoryBenchmarkReporting
         //  Step 2: Benchmark Config A — minimal system prompt
         // ──────────────────────────────────────────────────────────
 
-        Console.WriteLine("Step 2: Running Quick benchmark — Config A (minimal prompt)...\n");
+        Console.WriteLine("Step 2: Running Standard benchmark — Config A (minimal prompt)...\n");
+        Console.WriteLine("   Standard = 7 categories including Abstention (hallucination detection).\n");
 
         var agentA = chatClient.AsEvaluableAgent(
             name: "MemoryAgent",
             systemPrompt: "You are a helpful assistant. Answer questions concisely.",
             includeHistory: true);
 
-        var resultA = await benchmarkRunner.RunBenchmarkAsync(agentA, MemoryBenchmark.Quick);
+        var resultA = await benchmarkRunner.RunBenchmarkAsync(agentA, MemoryBenchmark.Standard);
         PrintResult("Config A (minimal)", resultA);
 
         var configA = new AgentBenchmarkConfig
@@ -85,7 +86,7 @@ public static class MemoryBenchmarkReporting
         //  Step 3: Benchmark Config B — memory-optimized prompt
         // ──────────────────────────────────────────────────────────
 
-        Console.WriteLine("Step 3: Running Quick benchmark — Config B (memory-optimized)...\n");
+        Console.WriteLine("Step 3: Running Standard benchmark — Config B (memory-optimized)...\n");
 
         var agentB = chatClient.AsEvaluableAgent(
             name: "MemoryAgent",
@@ -98,7 +99,7 @@ public static class MemoryBenchmarkReporting
                 """,
             includeHistory: true);
 
-        var resultB = await benchmarkRunner.RunBenchmarkAsync(agentB, MemoryBenchmark.Quick);
+        var resultB = await benchmarkRunner.RunBenchmarkAsync(agentB, MemoryBenchmark.Standard);
         PrintResult("Config B (memory-optimized)", resultB);
 
         var configB = new AgentBenchmarkConfig
@@ -216,8 +217,11 @@ public static class MemoryBenchmarkReporting
         Console.WriteLine("   * .ToBaseline(name, config) snapshots scores + full agent metadata");
         Console.WriteLine("   * ConfigurationId routes: same config -> timeline, different -> radar");
         Console.WriteLine("   * .ToEvaluationReport() bridges to all 6 AgentEval exporters");
-        Console.WriteLine("   * report.html shows pentagon overlay, score timeline, A/B comparison");
-        Console.WriteLine("   * Run multiple times to see the timeline build up");
+        Console.WriteLine("   * 11 categories in Full: Retention, Temporal, Noise, Depth, Updates,");
+        Console.WriteLine("     MultiTopic, CrossSession, Reducer, Abstention, Conflict, MultiSession");
+        Console.WriteLine("   * Abstention catches hallucinations — agent must say 'I don't know'");
+        Console.WriteLine("   * Scenarios loaded from JSON — edit without recompiling");
+        Console.WriteLine("   * LongMemEvalAdapter.LoadSubset() for cross-platform benchmarking");
         Console.WriteLine("   * In production, use DI: services.AddAgentEvalMemory()");
     }
 

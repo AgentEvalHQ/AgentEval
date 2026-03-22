@@ -127,6 +127,55 @@ public class PentagonConsolidatorTests
         Assert.Equal(50, result["Recall"]); // avg(0, 100) = 50
     }
 
+    [Fact]
+    public void Consolidate_ConflictResolution_FoldsIntoTemporal()
+    {
+        var categories = new List<BenchmarkCategoryResult>
+        {
+            Cat(BenchmarkScenarioType.TemporalReasoning, 80),
+            Cat(BenchmarkScenarioType.FactUpdateHandling, 70),
+            Cat(BenchmarkScenarioType.ConflictResolution, 60)
+        };
+
+        var result = PentagonConsolidator.Consolidate(categories);
+
+        Assert.True(result.ContainsKey("Temporal"));
+        Assert.Equal(70, result["Temporal"]); // avg(80, 70, 60) = 70
+    }
+
+    [Fact]
+    public void Consolidate_MultiSessionReasoning_FoldsIntoPersistence()
+    {
+        var categories = new List<BenchmarkCategoryResult>
+        {
+            Cat(BenchmarkScenarioType.CrossSession, 90),
+            Cat(BenchmarkScenarioType.MultiSessionReasoning, 50)
+        };
+
+        var result = PentagonConsolidator.Consolidate(categories);
+
+        Assert.True(result.ContainsKey("Persistence"));
+        Assert.Equal(70, result["Persistence"]); // avg(90, 50) = 70
+    }
+
+    [Fact]
+    public void Consolidate_All11Categories_Returns5Axes_Correct()
+    {
+        var categories = CreateAll11Categories(
+            retention: 90, temporal: 80, noise: 70, depth: 88,
+            updates: 73, multiTopic: 80, crossSession: 85, reducer: 68,
+            abstention: 60, conflictResolution: 55, multiSessionReasoning: 75);
+
+        var result = PentagonConsolidator.Consolidate(categories);
+
+        Assert.Equal(5, result.Count);
+        Assert.Equal((90 + 88) / 2.0, result["Recall"]);
+        Assert.Equal((70 + 68) / 2.0, result["Resilience"]);
+        Assert.Equal((80 + 73 + 55) / 3.0, result["Temporal"]); // 3-way avg with ConflictResolution
+        Assert.Equal((85 + 75) / 2.0, result["Persistence"]);   // avg with MultiSessionReasoning
+        Assert.Equal((80 + 60) / 2.0, result["Organization"]);  // avg with Abstention
+    }
+
     // --- Helpers ---
 
     private static BenchmarkCategoryResult Cat(BenchmarkScenarioType type, double score, bool skipped = false)
@@ -134,7 +183,7 @@ public class PentagonConsolidatorTests
         {
             CategoryName = type.ToString(),
             Score = score,
-            Weight = 0.125,
+            Weight = 0.09,
             ScenarioType = type,
             Duration = TimeSpan.FromSeconds(1),
             Skipped = skipped,
@@ -155,4 +204,16 @@ public class PentagonConsolidatorTests
             Cat(BenchmarkScenarioType.CrossSession, crossSession),
             Cat(BenchmarkScenarioType.ReducerFidelity, reducer)
         ];
+
+    private static List<BenchmarkCategoryResult> CreateAll11Categories(
+        double retention, double temporal, double noise, double depth,
+        double updates, double multiTopic, double crossSession, double reducer,
+        double abstention, double conflictResolution, double multiSessionReasoning)
+    {
+        var list = CreateAll8Categories(retention, temporal, noise, depth, updates, multiTopic, crossSession, reducer);
+        list.Add(Cat(BenchmarkScenarioType.Abstention, abstention));
+        list.Add(Cat(BenchmarkScenarioType.ConflictResolution, conflictResolution));
+        list.Add(Cat(BenchmarkScenarioType.MultiSessionReasoning, multiSessionReasoning));
+        return list;
+    }
 }
