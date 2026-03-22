@@ -327,4 +327,53 @@ public class MemoryBenchmarkRunnerTests
     {
         Assert.Throws<ArgumentNullException>(() => MemoryBenchmarkRunner.Create(null!));
     }
+
+    // ═══════════════════════════════════════════════════════════════
+    // New Category Tests (Abstention, ConflictResolution, MultiSessionReasoning)
+    // ═══════════════════════════════════════════════════════════════
+
+    [Fact]
+    public async Task RunBenchmarkAsync_StandardPreset_IncludesAbstention()
+    {
+        var result = await _runner.RunBenchmarkAsync(_agent, MemoryBenchmark.Standard);
+
+        var abstention = result.CategoryResults.FirstOrDefault(c =>
+            c.ScenarioType == BenchmarkScenarioType.Abstention);
+        Assert.NotNull(abstention);
+        Assert.False(abstention.Skipped);
+        Assert.InRange(abstention.Score, 0, 100);
+    }
+
+    [Fact]
+    public async Task RunBenchmarkAsync_FullPreset_IncludesConflictResolution()
+    {
+        var result = await _runner.RunBenchmarkAsync(_agent, MemoryBenchmark.Full);
+
+        var conflict = result.CategoryResults.FirstOrDefault(c =>
+            c.ScenarioType == BenchmarkScenarioType.ConflictResolution);
+        Assert.NotNull(conflict);
+        Assert.False(conflict.Skipped);
+    }
+
+    [Fact]
+    public async Task RunBenchmarkAsync_FullPreset_MultiSessionReasoningSkippedForNonResettable()
+    {
+        // TestMemoryAgent does NOT implement ISessionResettableAgent
+        var result = await _runner.RunBenchmarkAsync(_agent, MemoryBenchmark.Full);
+
+        var multiSession = result.CategoryResults.FirstOrDefault(c =>
+            c.ScenarioType == BenchmarkScenarioType.MultiSessionReasoning);
+        Assert.NotNull(multiSession);
+        Assert.True(multiSession.Skipped, "MultiSessionReasoning should be skipped for non-resettable agents");
+    }
+
+    [Fact]
+    public async Task RunBenchmarkAsync_DiagnosticPreset_HasSameCategoriesAsFull()
+    {
+        var full = MemoryBenchmark.Full;
+        var diagnostic = MemoryBenchmark.Diagnostic;
+
+        Assert.Equal(full.Categories.Count, diagnostic.Categories.Count);
+        Assert.Equal("Diagnostic", diagnostic.Name);
+    }
 }
