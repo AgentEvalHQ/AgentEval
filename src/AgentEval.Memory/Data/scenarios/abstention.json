@@ -29,15 +29,21 @@
     },
     "standard": {
       "extends": "quick",
-      "context_pressure": { "corpus": "context-medium", "max_turns": 30 },
+      "context_pressure": { "corpus": "context-medium", "max_turns": 40 },
       "queries": [
-        { "question": "What's my blood type?", "expected_facts": [], "forbidden_facts": ["any blood type"], "abstention": true, "difficulty": "abstention" },
-        { "question": "What university did I attend?", "expected_facts": [], "forbidden_facts": ["any university name"], "abstention": true, "difficulty": "abstention" }
+        { "question": "What's my blood type?", "expected_facts": [], "forbidden_facts": ["any blood type like A, B, O, AB"], "abstention": true, "difficulty": "abstention" },
+        { "question": "What university did I attend?", "expected_facts": [], "forbidden_facts": ["any university name"], "abstention": true, "difficulty": "abstention" },
+        { "question": "Is Max allergic to anything that you know of?", "expected_facts": [], "forbidden_facts": ["any specific allergy or food"], "abstention": true, "difficulty": "abstention" },
+        { "question": "What's the name of the startup where I work?", "expected_facts": [], "forbidden_facts": ["any company name"], "abstention": true, "difficulty": "abstention" },
+        { "question": "How many years of experience do I have as a software engineer?", "expected_facts": [], "forbidden_facts": ["any number of years"], "abstention": true, "difficulty": "abstention" },
+        { "question": "What programming languages do I know?", "expected_facts": [], "forbidden_facts": ["any language like Python, JavaScript, C++, Java"], "abstention": true, "difficulty": "abstention" },
+        { "question": "What's Max's age and weight?", "expected_facts": [], "forbidden_facts": ["any specific age or weight"], "abstention": true, "difficulty": "abstention" },
+        { "question": "Do I have any siblings and what are their names?", "expected_facts": [], "forbidden_facts": ["any specific name or sibling count"], "abstention": true, "difficulty": "abstention" }
       ]
     },
     "full": {
       "extends": "standard",
-      "context_pressure": { "corpus": "context-medium", "max_turns": 40 }
+      "context_pressure": { "corpus": "context-large", "max_turns": 80 }
     }
   }
 }

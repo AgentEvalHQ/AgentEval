@@ -33,7 +33,13 @@ public class MemoryBenchmarkResult
     /// <summary>
     /// Letter grade for the overall score.
     /// </summary>
-    public string Grade => OverallScore switch
+    public string Grade => ComputeGrade(OverallScore);
+
+    /// <summary>
+    /// Computes letter grade from a score: A (≥90), B (≥80), C (≥70), D (≥60), F (&lt;60).
+    /// Shared by all grade computations (overall, per-category, baselines).
+    /// </summary>
+    public static string ComputeGrade(double score) => score switch
     {
         >= 90 => "A",
         >= 80 => "B",

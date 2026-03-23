@@ -176,6 +176,68 @@ public class PentagonConsolidatorTests
         Assert.Equal((80 + 60) / 2.0, result["Organization"]);  // avg with Abstention
     }
 
+    // ═══════════════════════════════════════════════════════════════
+    // New category variation tests
+    // ═══════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void Consolidate_NewCategoriesAtExtremes_HandledCorrectly()
+    {
+        // All new categories at 0, old categories at 100
+        var categories = CreateAll11Categories(
+            retention: 100, temporal: 100, noise: 100, depth: 100,
+            updates: 100, multiTopic: 100, crossSession: 100, reducer: 100,
+            abstention: 0, conflictResolution: 0, multiSessionReasoning: 0);
+
+        var result = PentagonConsolidator.Consolidate(categories);
+
+        Assert.Equal(100, result["Recall"]);          // (100+100)/2
+        Assert.Equal(100, result["Resilience"]);       // (100+100)/2
+        Assert.Equal((100 + 100 + 0) / 3.0, result["Temporal"]);  // ConflictResolution=0 drags down
+        Assert.Equal((100 + 0) / 2.0, result["Persistence"]);     // MultiSession=0 drags down
+        Assert.Equal((100 + 0) / 2.0, result["Organization"]);    // Abstention=0 drags down
+    }
+
+    [Fact]
+    public void Consolidate_OnlyNewCategories_ReturnsPartialAxes()
+    {
+        // Only the 3 new categories present
+        var categories = new List<BenchmarkCategoryResult>
+        {
+            Cat(BenchmarkScenarioType.Abstention, 70),
+            Cat(BenchmarkScenarioType.ConflictResolution, 80),
+            Cat(BenchmarkScenarioType.MultiSessionReasoning, 60)
+        };
+
+        var result = PentagonConsolidator.Consolidate(categories);
+
+        // Should produce 3 axes: Organization (Abstention), Temporal (ConflictResolution), Persistence (MultiSession)
+        Assert.Equal(70, result["Organization"]);
+        Assert.Equal(80, result["Temporal"]);
+        Assert.Equal(60, result["Persistence"]);
+        // Recall and Resilience should NOT be present (no source categories)
+        Assert.False(result.ContainsKey("Recall"));
+        Assert.False(result.ContainsKey("Resilience"));
+    }
+
+    [Fact]
+    public void Consolidate_SkippedNewCategories_ExcludedFromAverage()
+    {
+        var categories = new List<BenchmarkCategoryResult>
+        {
+            Cat(BenchmarkScenarioType.MultiTopic, 80),
+            Cat(BenchmarkScenarioType.Abstention, 40, skipped: true), // Skipped — should not affect Organization
+            Cat(BenchmarkScenarioType.TemporalReasoning, 70),
+            Cat(BenchmarkScenarioType.FactUpdateHandling, 60),
+            Cat(BenchmarkScenarioType.ConflictResolution, 50, skipped: true) // Skipped
+        };
+
+        var result = PentagonConsolidator.Consolidate(categories);
+
+        Assert.Equal(80, result["Organization"]); // Only MultiTopic, Abstention is skipped
+        Assert.Equal((70 + 60) / 2.0, result["Temporal"]); // ConflictResolution is skipped
+    }
+
     // --- Helpers ---
 
     private static BenchmarkCategoryResult Cat(BenchmarkScenarioType type, double score, bool skipped = false)

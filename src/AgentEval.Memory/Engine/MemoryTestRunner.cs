@@ -115,19 +115,40 @@ public class MemoryTestRunner : IMemoryTestRunner
 
     /// <summary>
     /// Executes the setup steps to establish facts in the agent's memory.
-    /// Recognizes [SESSION_RESET_POINT] markers and resets the agent's session
-    /// when the agent implements ISessionResettableAgent.
+    /// When the agent supports history injection (IHistoryInjectableAgent), injects
+    /// facts and noise as synthetic conversation history — ZERO LLM calls.
+    /// Falls back to individual LLM calls only when history injection is not supported
+    /// or when session reset markers are present (cross-session scenarios).
     /// </summary>
     private async Task ExecuteSetupStepsAsync(
         IEvaluableAgent agent,
         IReadOnlyList<MemoryStep> steps,
         CancellationToken cancellationToken)
     {
+        if (steps.Count == 0) return;
+
         _logger.LogDebug("Executing {StepCount} setup steps", steps.Count);
+
+        // Check if any steps require session resets — if so, fall back to individual calls
+        var hasSessionResets = steps.Any(s => s.Content.Contains("[SESSION_RESET_POINT]"));
+
+        // Use efficient history injection when possible
+        if (!hasSessionResets && agent is IHistoryInjectableAgent injectable)
+        {
+            var history = BuildSyntheticHistory(steps);
+            if (history.Count > 0)
+            {
+                injectable.InjectConversationHistory(history);
+                _logger.LogDebug("Injected {TurnCount} turns as conversation history (0 LLM calls)", history.Count);
+                return;
+            }
+        }
+
+        // Fallback: individual LLM calls (needed for cross-session scenarios with resets)
+        _logger.LogDebug("Using individual LLM calls for setup steps (session resets detected or no history injection)");
 
         foreach (var step in steps)
         {
-            // Handle session reset markers inserted by CrossSessionScenarios
             if (step.Content.Contains("[SESSION_RESET_POINT]"))
             {
                 if (agent is ISessionResettableAgent resettable)
@@ -148,7 +169,6 @@ public class MemoryTestRunner : IMemoryTestRunner
             {
                 var response = await agent.InvokeAsync(step.Content, cancellationToken);
 
-                // Optional: Validate expected response if specified
                 if (!string.IsNullOrEmpty(step.ExpectedResponse))
                 {
                     if (!response.Text.Contains(step.ExpectedResponse, StringComparison.OrdinalIgnoreCase))
@@ -166,6 +186,30 @@ public class MemoryTestRunner : IMemoryTestRunner
                 throw;
             }
         }
+    }
+
+    /// <summary>
+    /// Converts scenario steps into synthetic conversation history pairs (user, assistant).
+    /// Facts become user messages, noise becomes user messages, and all get synthetic assistant responses.
+    /// </summary>
+    private static IReadOnlyList<(string UserMessage, string AssistantResponse)> BuildSyntheticHistory(
+        IReadOnlyList<MemoryStep> steps)
+    {
+        var history = new List<(string UserMessage, string AssistantResponse)>();
+
+        foreach (var step in steps)
+        {
+            var response = step.Type switch
+            {
+                MemoryStepType.Fact => "Got it, I'll remember that.",
+                MemoryStepType.Noise => "Interesting, thanks for sharing.",
+                _ => "I understand."
+            };
+
+            history.Add((step.Content, response));
+        }
+
+        return history;
     }
 
     /// <summary>

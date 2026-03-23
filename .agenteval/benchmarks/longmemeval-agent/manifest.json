@@ -1,0 +1,33 @@
+{
+  "schema_version": "1.0",
+  "generated_at": "2026-03-23T14:43:31.5256016+00:00",
+  "generated_by": "AgentEval.Memory v1.0.0.0",
+  "agent": {
+    "name": "LongMemEval-Agent"
+  },
+  "benchmarks": [
+    {
+      "benchmark_id": "memory-longmemeval",
+      "preset": "LongMemEval",
+      "categories": [
+        "single-session-user"
+      ],
+      "baselines": [
+        {
+          "id": "bl-9842f0b6",
+          "file": "baselines/2026-03-23_longmemeval-10q.json",
+          "name": "LongMemEval 10q",
+          "configuration_id": "E0549E44F8F1",
+          "timestamp": "2026-03-23T14:43:31.4613306+00:00",
+          "overall_score": 95.5,
+          "grade": "A",
+          "tags": [
+            "longmemeval",
+            "cross-platform"
+          ]
+        }
+      ]
+    }
+  ],
+  "archetypes": "archetypes.json"
+}

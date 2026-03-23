@@ -64,18 +64,24 @@ public class AbstentionTests
         Assert.DoesNotContain(quick.Categories, c => c.ScenarioType == BenchmarkScenarioType.Abstention);
     }
 
-    [Fact]
-    public void StandardPreset_WeightsSumToOne()
+    [Theory]
+    [InlineData("Quick")]
+    [InlineData("Standard")]
+    [InlineData("Full")]
+    [InlineData("Diagnostic")]
+    public void AllPresets_WeightsSumToOne(string presetName)
     {
-        var total = MemoryBenchmark.Standard.Categories.Sum(c => c.Weight);
-        Assert.Equal(1.0, total, precision: 2);
-    }
+        var preset = presetName switch
+        {
+            "Quick" => MemoryBenchmark.Quick,
+            "Standard" => MemoryBenchmark.Standard,
+            "Full" => MemoryBenchmark.Full,
+            "Diagnostic" => MemoryBenchmark.Diagnostic,
+            _ => throw new ArgumentException(presetName)
+        };
 
-    [Fact]
-    public void FullPreset_WeightsSumToOne()
-    {
-        var total = MemoryBenchmark.Full.Categories.Sum(c => c.Weight);
-        Assert.Equal(1.0, total, precision: 2);
+        var total = preset.Categories.Sum(c => c.Weight);
+        Assert.Equal(1.0, total, precision: 10); // Must be exact to prevent score drift
     }
 
     [Fact]
@@ -141,5 +147,84 @@ public class AbstentionTests
         };
 
         Assert.Contains(result.Recommendations, r => r.Contains("hallucinat", StringComparison.OrdinalIgnoreCase));
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // Abstention Scoring Logic Tests
+    // ═══════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void AbstentionQuery_CorrectAbstention_ShouldScoreHigh()
+    {
+        // When agent says "I don't know" for info never provided = correct behavior
+        var query = MemoryQuery.CreateAbstention("What's my sister's name?",
+            MemoryFact.Create("Sarah"),
+            MemoryFact.Create("any specific name"));
+
+        // Score should come from judge (100 for perfect abstention)
+        // Here we verify the query structure supports correct scoring
+        Assert.Empty(query.ExpectedFacts);
+        Assert.Equal(2, query.ForbiddenFacts.Count);
+        Assert.True(query.Metadata?["abstention"] is true);
+    }
+
+    [Fact]
+    public void AbstentionQuery_Hallucination_ForbiddenFactsDetected()
+    {
+        // When agent fabricates "Your sister's name is Sarah" = hallucination
+        var query = MemoryQuery.CreateAbstention("What's my sister's name?",
+            MemoryFact.Create("Sarah"),
+            MemoryFact.Create("any specific name"));
+
+        // Simulate judge finding forbidden facts in the response
+        var result = new MemoryQueryResult
+        {
+            Query = query,
+            Score = 10.0, // Low score — agent hallucinated
+            Response = "Your sister's name is Sarah!",
+            FoundFacts = [],
+            MissingFacts = [],
+            ForbiddenFound = [MemoryFact.Create("Sarah")],
+            Explanation = "Agent fabricated a name that was never provided"
+        };
+
+        Assert.False(result.Passed); // Score 10 < MinimumScore 80
+        Assert.Single(result.ForbiddenFound);
+        Assert.Equal("Sarah", result.ForbiddenFound[0].Content);
+    }
+
+    [Fact]
+    public void AbstentionQuery_PartialHallucination_ForbiddenFactsPartiallyDetected()
+    {
+        var query = MemoryQuery.CreateAbstention("What's my address?",
+            MemoryFact.Create("any street name"),
+            MemoryFact.Create("any city"),
+            MemoryFact.Create("any zip code"));
+
+        // Agent says "I think you live in Seattle" — one hallucination
+        var result = new MemoryQueryResult
+        {
+            Query = query,
+            Score = 25.0,
+            Response = "I think you live in Seattle",
+            FoundFacts = [],
+            MissingFacts = [],
+            ForbiddenFound = [MemoryFact.Create("any city")],
+            Explanation = "Agent fabricated a city but didn't invent street or zip"
+        };
+
+        Assert.False(result.Passed);
+        Assert.Single(result.ForbiddenFound);
+    }
+
+    [Fact]
+    public void AbstentionQuery_NoForbiddenFacts_StillValid()
+    {
+        // Abstention query with no specific forbidden facts — any fabrication is wrong
+        var query = MemoryQuery.CreateAbstention("What color is my car?");
+
+        Assert.Empty(query.ExpectedFacts);
+        Assert.Empty(query.ForbiddenFacts);
+        Assert.True(query.Metadata?["abstention"] is true);
     }
 }

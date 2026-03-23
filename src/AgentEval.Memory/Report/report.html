@@ -36,6 +36,15 @@ canvas{max-width:100%}
 .kpi:hover{border-color:var(--bbright)}
 .kpi .kl{font-size:10px;text-transform:uppercase;letter-spacing:.8px;color:var(--tm);margin-bottom:4px;font-weight:500}
 .kpi .kv{font-family:Anybody,sans-serif;font-size:30px;font-weight:800;color:var(--tb);line-height:1.1}
+.kpi .ks{font-size:10px;color:var(--tm);margin-top:6px;line-height:1.5;font-style:italic}
+.dim-expand{max-height:0;overflow:hidden;transition:max-height .25s ease,opacity .2s ease;opacity:0}
+.kpi:hover .dim-expand{max-height:300px;opacity:1}
+.dim-expand .de-desc{font-size:10px;color:var(--t);line-height:1.6;margin-top:8px;padding-top:8px;border-top:1px solid var(--border)}
+.dim-expand .de-cats{margin-top:8px}
+.dim-expand .de-cat{display:flex;justify-content:space-between;align-items:center;padding:4px 0;font-size:10px;border-bottom:1px solid rgba(26,37,56,.4)}
+.dim-expand .de-cat-name{color:var(--t)}
+.dim-expand .de-cat-desc{color:var(--tm);font-size:9px;margin-top:1px}
+.dim-expand .de-cat-score{font-family:Anybody,sans-serif;font-weight:600;font-size:11px}
 .kpi .kb{position:absolute;bottom:0;left:0;height:3px}
 .bg{background:var(--good)}.bw{background:var(--warn)}.bb{background:var(--bad)}
 .gh{display:flex;align-items:center;gap:28px;padding:24px 28px;background:var(--surface);border:1px solid var(--border);border-radius:10px;margin-bottom:24px;flex-wrap:wrap}
@@ -63,15 +72,27 @@ canvas{max-width:100%}
 .cmp-tbl td.r{text-align:right}
 .cmp-tbl .pos{color:var(--good);font-weight:600}
 .cmp-tbl .neg{color:var(--bad);font-weight:600}
+.tooltip{position:absolute;bottom:calc(100% + 8px);left:50%;transform:translateX(-50%);background:#1a2538;border:1px solid #243348;border-radius:6px;padding:12px 14px;z-index:1000;display:none;width:300px;pointer-events:none;box-shadow:0 4px 12px rgba(0,0,0,.4)}
+.tooltip.show{display:block;animation:ttFade .15s ease}
+.tooltip .tt-t{font-family:Anybody,sans-serif;font-size:11px;font-weight:600;color:var(--tb);margin-bottom:6px}
+.tooltip .tt-d{font-size:10px;color:var(--t);line-height:1.6;margin-bottom:8px}
+.tooltip .tt-v{font-size:10px;color:var(--tm);line-height:1.6;border-top:1px solid var(--border);padding-top:6px}
+@keyframes ttFade{from{opacity:0;transform:translateX(-50%) translateY(4px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
 </style>
 </head>
 <body>
 <div class="wrap">
 
 <div class="mast">
-  <div>
-    <h1>AgentEval <em>Memory Benchmark</em></h1>
-    <div class="mast-sub" id="mastSub"><span>Loading...</span></div>
+  <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
+    <div style="flex:1">
+      <h1>AgentEval <em>Memory Benchmark</em></h1>
+      <div class="mast-sub" id="mastSub"><span>Loading...</span></div>
+    </div>
+    <div id="reportSwitcher" style="display:none">
+      <div class="sel-label">Report</div>
+      <select class="sel" id="reportSelect" onchange="switchReport(this.value)"></select>
+    </div>
   </div>
 </div>
 
@@ -79,15 +100,19 @@ canvas{max-width:100%}
 
 <div class="sec on" id="sec-overview">
   <div class="gh" id="gradeHero"></div>
-  <div class="sh">Score Card</div>
+  <div class="sh">Dimensions</div>
+  <div class="sd">5 consolidated dimensions — hover for details and contributing categories.</div>
+  <div class="kpi-g" id="overviewDimGrid"></div>
+  <div class="sh" style="margin-top:28px">Categories</div>
   <div class="sd">Each category scored 0-100 by the benchmark runner.</div>
   <div class="kpi-g" id="kpiGrid"></div>
 </div>
 
 <div class="sec" id="sec-pentagon">
   <div class="sh">Pentagon — 5 Consolidated Dimensions</div>
-  <div class="sd">Select configurations below to overlay on the pentagon.</div>
+  <div class="sd">Select configurations below to overlay on the pentagon. Hover a dimension card for details.</div>
   <div class="cfg" id="cfgCards"></div>
+  <div class="kpi-g" id="dimKpiGrid" style="margin-top:8px"></div>
   <div class="row r2">
     <div class="card"><h4>Capability Pentagon</h4><div class="sub">Each shape is a config. Larger = stronger memory.</div><canvas id="pentChart" height="340"></canvas></div>
     <div class="card"><h4>Category Breakdown</h4><div class="sub">All raw categories side-by-side.</div><canvas id="catBars" height="340"></canvas></div>
@@ -96,8 +121,11 @@ canvas{max-width:100%}
 
 <div class="sec" id="sec-timeline">
   <div class="sh">Timeline</div>
-  <div class="sd">Score progression over time.</div>
-  <div class="row r1"><div class="card"><h4>Overall Score</h4><canvas id="overallLine" height="200"></canvas></div></div>
+  <div class="sd">Score progression over time across all baselines.</div>
+  <div class="row r1"><div class="card"><h4>Overall Score</h4><div class="sub">Weighted aggregate of all categories.</div><canvas id="overallLine" height="200"></canvas></div></div>
+  <div class="sh" style="margin-top:28px">Dimension Trends</div>
+  <div class="sd">Each dimension aggregates related categories into a single score.</div>
+  <div class="row r2" id="dimCharts"></div>
 </div>
 
 <div class="sec" id="sec-compare">
@@ -124,6 +152,19 @@ window.onerror=function(msg,src,line){
 
 const PENT=['Recall','Resilience','Temporal','Persistence','Organization'];
 const COLORS=['#34d399','#f472b6','#a78bfa','#60a5fa','#fb923c','#38bdf8','#facc15','#64748b'];
+const CAT_INFO={
+  'Basic Retention':{s:'Can the agent recall facts from conversation?',d:'Tests recall of compound facts planted conversationally, with indirect queries requiring cross-fact synthesis.',v:'KPIs: Fact recall accuracy, multi-hop synthesis. Measures: 20 facts planted across personal, health, schedule, education domains. 12 indirect/synthesis queries. Context: medium corpus, 40 turns.'},
+  'Temporal Reasoning':{s:'Can the agent reconstruct timelines?',d:'Tests temporal sequencing with events planted OUT of chronological order. Agent must reconstruct timelines and reason about durations.',v:'KPIs: Chronological ordering, duration estimation, gap calculation. Measures: 17 career milestones planted non-chronologically. 14 temporal queries. Context: medium corpus, 40 turns.'},
+  'Noise Resilience':{s:'Can facts survive heavy conversational noise?',d:'Tests recall of facts buried in heavy conversational noise, including deliberately confusing near-miss variations and conflicting statements.',v:'KPIs: Signal-to-noise separation, false-correction resistance. Measures: 14 facts buried in noise with conflicting variations (wrong passwords, wrong locations). 12 precision queries. Context: medium corpus, 40 turns.'},
+  'Reach-Back Depth':{s:'How far back can the agent recall?',d:'Tests recall depth — a single fact is planted, then N turns of noise are injected before querying. Measures how conversation length degrades recall.',v:'KPIs: Recall at depth 5, 10, 25, 50, 100 turns. Measures: 1 critical fact (peanut allergy), queried after increasing noise layers. Uses IReachBackEvaluator. No corpus injection.'},
+  'Fact Update Handling':{s:'Does the agent use the latest correction?',d:'Tests whether the agent overwrites old facts with newer corrections. Must recall the UPDATED version, not the original.',v:'KPIs: Correction adoption rate, old-fact suppression. Measures: 2 facts planted then corrected (color blue→green, Honda→Tesla). Queries must return new values, forbid old. No corpus injection.'},
+  'Multi-Topic':{s:'Can it recall across domains without mixing them up?',d:'Tests simultaneous recall across multiple independent fact categories (pets, work, health, languages) to check for cross-contamination.',v:'KPIs: Cross-domain accuracy, contamination detection. Measures: 17 facts spanning 6+ domains. 10 cross-domain synthesis queries. Context: medium corpus, 40 turns.'},
+  'Abstention':{s:'Does it say "I don\\\'t know" when it should?',d:'Tests whether the agent correctly refuses to answer questions about information it was never given. Hallucination detection — the agent must NOT invent details.',v:'KPIs: Hallucination rate, false-positive rate. Measures: 3 real facts planted, then 15 abstention queries about unmentioned details (sister name, address, phone). Agent must refuse. Context: medium corpus, 40 turns.'},
+  'Cross-Session':{s:'Do facts survive session resets?',d:'Tests memory persistence across session resets. Facts planted in one session should be retrievable after the session is cleared and a new one starts.',v:'KPIs: Post-reset retention rate. Measures: 3 facts planted, session reset via ISessionResettableAgent, then queried. Requires persistent memory store. No corpus injection.'},
+  'Reducer Fidelity':{s:'Do facts survive context compression?',d:'Tests information retention after context reduction/summarization. Critical facts (weighted by importance) must survive the compression step.',v:'KPIs: Post-reduction recall, importance-weighted fidelity. Measures: 3-5 facts with importance weights (50-100), 20-40 noise turns, then IReducerEvaluator compresses and queries. No corpus injection.'},
+  'Conflict Resolution':{s:'Can it detect implicit contradictions?',d:'Tests detection of implicit contradictions — not explicit corrections, but conflicting statements planted at different times. Agent must identify which info is current.',v:'KPIs: Recency detection, contradiction awareness. Measures: 5 facts with temporal conflicts (Microsoft→Google, Seattle→Mountain View). 5 queries testing current vs historical. Context: medium corpus, 40 turns.'},
+  'Multi-Session Reasoning':{s:'Can it synthesize across sessions?',d:'Tests synthesis of partial information across multiple sessions. Each session provides one piece; the query requires combining them all.',v:'KPIs: Cross-session synthesis accuracy. Measures: 2 facts split across sessions (flight 8am gate B12 + hotel Marriott 3pm). 1 synthesis query (calculate time gap). Requires ISessionResettableAgent. No corpus injection.'}
+};
 Chart.defaults.color='#64748b';
 Chart.defaults.font.family="'IBM Plex Mono',monospace";
 Chart.defaults.font.size=11;
@@ -143,6 +184,14 @@ function showTab(id){
   document.querySelectorAll('.nb').forEach((b,i)=>{b.classList.toggle('on',TABS[i].id===id)});
   document.querySelectorAll('.sec').forEach(s=>{s.classList.toggle('on',s.id==='sec-'+id)});
 }
+
+function showTT(el,name,desc,tests){
+  let tt=el.querySelector('.tooltip');
+  if(!tt){tt=document.createElement('div');tt.className='tooltip';el.appendChild(tt);}
+  tt.innerHTML=`<div class="tt-t">${name}</div><div class="tt-d">${desc}</div><div class="tt-v">${tests}</div>`;
+  tt.classList.add('show');
+}
+function hideTT(el){const tt=el.querySelector('.tooltip');if(tt)tt.classList.remove('show');}
 
 async function init(){
   document.getElementById('mastSub').innerHTML='<span>Loading manifest...</span>';
@@ -171,7 +220,7 @@ async function init(){
     `<span>${manifest.agent.name}</span>`+
     `<span class="pill">${group.preset} · ${group.categories.length} categories</span>`+
     `<span class="pill">${baselines.length} baselines</span>`;
-  renderOverview();renderCfgCards();renderPentChart();renderCatBars();renderTimeline();setupComparer();
+  renderOverview();renderCfgCards();renderDimKpis();renderPentChart();renderCatBars();renderTimeline();setupComparer();
 }
 
 function renderOverview(){
@@ -188,9 +237,11 @@ function renderOverview(){
   const cats=Object.entries(c.category_results);
   document.getElementById('kpiGrid').innerHTML=cats.map(([name,cat])=>{
     const s=cat.score;
-    return `<div class="kpi">
+    const info=CAT_INFO[name]||{s:name,d:name,v:'—'};
+    return `<div class="kpi" onmouseenter="showTT(this,'${name.replace(/'/g,"\\'")}','${info.d.replace(/'/g,"\\'")}','${info.v.replace(/'/g,"\\'")}')" onmouseleave="hideTT(this)">
       <div class="kl">${name}</div>
       <div class="kv" style="color:${cat.skipped?'var(--td)':gc(s)}">${cat.skipped?'SKIP':s.toFixed(0)+'%'}</div>
+      <div class="ks">${info.s}</div>
       <div class="kb ${gbc(s)}" style="width:${s}%"></div>
       ${cat.recommendation?`<div style="font-size:10px;color:var(--tm);margin-top:8px">${cat.recommendation}</div>`:''}
     </div>`;
@@ -206,7 +257,42 @@ function renderCfgCards(){
       <div class="cm">${b.agent_config?.model_id||'—'}<br>${b.agent_config?.reducer_strategy||'—'}</div>
     </div>`).join('');
 }
-function toggleCfg(i){selectedConfigs.has(i)?selectedConfigs.delete(i):selectedConfigs.add(i);renderCfgCards();renderPentChart();renderCatBars();}
+function toggleCfg(i){selectedConfigs.has(i)?selectedConfigs.delete(i):selectedConfigs.add(i);renderCfgCards();renderDimKpis();renderPentChart();renderCatBars();}
+
+function renderDimKpis(){
+  const html=buildDimKpiHtml();
+  document.getElementById('dimKpiGrid').innerHTML=html;
+  document.getElementById('overviewDimGrid').innerHTML=html;
+}
+function buildDimKpiHtml(){
+  const latest=baselines[baselines.length-1];
+  const prev=baselines.length>1?baselines[baselines.length-2]:null;
+  return PENT.map(dim=>{
+    const info=DIM_INFO[dim]||{s:dim,color:'#64748b',cats:[]};
+    const s=latest.dimension_scores?.[dim]??0;
+    const ps=prev?.dimension_scores?.[dim]??null;
+    const delta=ps!==null?s-ps:null;
+    const catRows=info.cats.map(catName=>{
+      const catInfo=CAT_INFO[catName]||{s:catName};
+      const catScore=latest.category_results?.[catName]?.score??null;
+      const scoreColor=catScore!==null?gc(catScore):'var(--td)';
+      return `<div class="de-cat">
+        <div><div class="de-cat-name">${catName}</div><div class="de-cat-desc">${catInfo.s}</div></div>
+        <div class="de-cat-score" style="color:${scoreColor}">${catScore!==null?catScore.toFixed(0)+'%':'—'}</div>
+      </div>`;
+    }).join('');
+    return `<div class="kpi" style="border-left:3px solid ${info.color}">
+      <div class="kl" style="display:flex;align-items:center;gap:6px"><span style="width:8px;height:8px;border-radius:50%;background:${info.color};display:inline-block"></span>${dim}</div>
+      <div class="kv" style="color:${gc(s)}">${s.toFixed(0)}%${delta!==null?`<span style="font-size:12px;margin-left:8px;color:${delta>=0?'var(--good)':'var(--bad)'}">${delta>0?'+':''}${delta.toFixed(1)}</span>`:''}</div>
+      <div class="ks">${info.s}</div>
+      <div class="dim-expand">
+        <div class="de-desc">This dimension aggregates ${info.cats.length} categories into a single score. A drop here signals regression in one of the contributing categories below.</div>
+        <div class="de-cats">${catRows}</div>
+      </div>
+      <div class="kb" style="width:${s}%;background:${info.color}"></div>
+    </div>`;
+  }).join('');
+}
 
 function renderPentChart(){
   const ctx=document.getElementById('pentChart').getContext('2d');
@@ -236,6 +322,14 @@ function renderCatBars(){
     plugins:{legend:{position:'bottom'},tooltip:{callbacks:{label:c=>`${c.dataset.label}: ${c.raw}%`}}}}});
 }
 
+const DIM_INFO={
+  'Recall':{s:'How accurately does the agent recall planted facts?',color:'#34d399',cats:['Basic Retention','Multi-Topic','Reach-Back Depth']},
+  'Resilience':{s:'Can the agent filter signal from noise?',color:'#f472b6',cats:['Noise Resilience','Reducer Fidelity']},
+  'Temporal':{s:'Can the agent reason about time and sequences?',color:'#a78bfa',cats:['Temporal Reasoning','Fact Update Handling','Conflict Resolution']},
+  'Persistence':{s:'Do facts survive session boundaries?',color:'#60a5fa',cats:['Cross-Session','Multi-Session Reasoning']},
+  'Organization':{s:'Does the agent know what it does and doesn\'t know?',color:'#fb923c',cats:['Abstention','Multi-Topic']}
+};
+
 function renderTimeline(){
   const labels=baselines.map(b=>b.name);
   new Chart(document.getElementById('overallLine').getContext('2d'),{type:'line',
@@ -244,6 +338,23 @@ function renderTimeline(){
     options:{responsive:true,scales:{x:{grid:{color:'#1a253800'}},y:{min:0,max:100,grid:{color:'#1a2538'},ticks:{callback:v=>v+'%'}}},
     plugins:{legend:{display:false},tooltip:{callbacks:{title:items=>baselines[items[0].dataIndex].name,
       label:c=>`Score: ${c.raw.toFixed(1)}% · Grade: ${baselines[c.dataIndex].grade}`}}}}});
+
+  // Dimension trend charts
+  const container=document.getElementById('dimCharts');
+  container.innerHTML='';
+  PENT.forEach(dim=>{
+    const info=DIM_INFO[dim]||{s:dim,color:'#64748b',cats:[]};
+    const card=document.createElement('div');
+    card.className='card';
+    card.innerHTML=`<h4>${dim}</h4><div class="sub">${info.s}<br><span style="font-size:9px;color:var(--td)">Categories: ${info.cats.join(', ')||'—'}</span></div><canvas id="dim-${dim}" height="200"></canvas>`;
+    container.appendChild(card);
+    const data=baselines.map(b=>b.dimension_scores?.[dim]??null);
+    new Chart(document.getElementById('dim-'+dim).getContext('2d'),{type:'line',
+      data:{labels,datasets:[{label:dim,data,borderColor:info.color,backgroundColor:info.color+'18',fill:true,borderWidth:2.5,pointRadius:4,pointBackgroundColor:info.color,tension:.3,spanGaps:true}]},
+      options:{responsive:true,scales:{x:{grid:{color:'#1a253800'}},y:{min:0,max:100,grid:{color:'#1a2538'},ticks:{callback:v=>v+'%'}}},
+        plugins:{legend:{display:false},tooltip:{callbacks:{title:items=>baselines[items[0].dataIndex].name,
+          label:c=>c.raw!==null?`${dim}: ${c.raw.toFixed(1)}%`:'No data'}}}}});
+  });
 }
 
 function setupComparer(){
@@ -282,7 +393,36 @@ function renderComparer(){
     }).join('')}</tbody></table>`;
 }
 
+// Report switcher — discover sibling agent reports
+async function discoverReports(){
+  try{
+    // Python http.server returns HTML directory listing for ../
+    const resp=await fetch('../');
+    if(!resp.ok)return;
+    const html=await resp.text();
+    // Parse links to subdirectories (Python http.server format: <a href="dirname/">)
+    const dirs=[...html.matchAll(/href="([^"]+?)\/"/g)].map(m=>m[1]).filter(d=>d!=='.');
+    const reports=[];
+    const currentDir=location.pathname.split('/').filter(Boolean).slice(-2,-1)[0]||'';
+    for(const dir of dirs){
+      try{
+        const mResp=await fetch('../'+dir+'/manifest.json');
+        if(!mResp.ok)continue;
+        const m=await mResp.json();
+        reports.push({dir,name:m.agent?.name||dir,current:dir===currentDir});
+      }catch(e){}
+    }
+    if(reports.length>1){
+      const sel=document.getElementById('reportSelect');
+      sel.innerHTML=reports.map(r=>`<option value="${r.dir}"${r.current?' selected':''}>${r.name}</option>`).join('');
+      document.getElementById('reportSwitcher').style.display='block';
+    }
+  }catch(e){}
+}
+function switchReport(dir){location.href='../'+dir+'/report.html';}
+
 init();
+discoverReports();
 </script>
 </body>
 </html>

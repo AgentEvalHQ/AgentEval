@@ -2,7 +2,7 @@
 // Copyright (c) 2026 AgentEval Contributors
 
 using AgentEval.Memory.Models;
-using static AgentEval.Memory.Models.MemoryBenchmarkResult;
+using static AgentEval.Memory.Models.MemoryBenchmarkResult; // ComputeGrade
 
 namespace AgentEval.Memory.Reporting;
 
@@ -68,18 +68,7 @@ public static class BaselineExtensions
         };
     }
 
-    /// <summary>
-    /// Computes letter grade from score using the SAME thresholds as
-    /// <see cref="MemoryBenchmarkResult.Grade"/>: A (≥90), B (≥80), C (≥70), D (≥60), F (&lt;60).
-    /// </summary>
-    internal static string ComputeGrade(double score) => score switch
-    {
-        >= 90 => "A",
-        >= 80 => "B",
-        >= 70 => "C",
-        >= 60 => "D",
-        _ => "F"
-    };
+    // ComputeGrade is imported via 'using static MemoryBenchmarkResult'
 
     private static string? FindRecommendation(
         IReadOnlyList<string> recommendations,

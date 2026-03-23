@@ -32,16 +32,44 @@
     },
     "standard": {
       "extends": "quick",
-      "context_pressure": { "corpus": "context-medium", "max_turns": 30 },
+      "context_pressure": { "corpus": "context-medium", "max_turns": 40 },
+      "noise_between_facts": [
+        "Speaking of food, have you tried that new Thai place downtown?",
+        "I was reading about climate change yesterday. Fascinating stuff.",
+        "Do you think remote work will remain popular long-term?",
+        "The traffic this morning was absolutely terrible.",
+        "I need to remember to pick up groceries later.",
+        "My neighbor just got a new puppy. It's so cute but barks constantly.",
+        "I've been thinking about redecorating my apartment, maybe some plants.",
+        "Did you catch that documentary on Netflix? Everyone's talking about it.",
+        "My gym is offering a discount on annual memberships this month.",
+        "The weather forecast says rain tomorrow, might need an umbrella.",
+        "I tried a new coffee shop last Tuesday, their espresso was perfect.",
+        "My phone has been acting weird lately, maybe a software update issue."
+      ],
       "facts": [
         { "content": "My sister Ana lives in Madrid and works as a doctor", "category": "family", "importance": 60, "planted_as": "My sister Ana lives in Madrid — she's a doctor there." },
         { "content": "I'm lactose intolerant but can handle small amounts of cheese", "category": "health", "importance": 70, "planted_as": "I'm also lactose intolerant, though I can handle small amounts of cheese." },
-        { "content": "My WiFi password at home is BlueOcean42", "category": "credentials", "importance": 90, "planted_as": "By the way, my WiFi password at home is BlueOcean42 — in case you need it." }
+        { "content": "My WiFi password at home is BlueOcean42", "category": "credentials", "importance": 90, "planted_as": "By the way, my WiFi password at home is BlueOcean42 — in case you need it." },
+        { "content": "I spend weekends rock climbing at the gym near Nørrebro", "category": "hobbies", "importance": 60, "planted_as": "On weekends I like to go rock climbing at the gym near Nørrebro, it's great exercise." },
+        { "content": "I graduated from Technical University of Denmark with a degree in Software Engineering", "category": "education", "importance": 65, "planted_as": "I studied at the Technical University of Denmark — got my degree in Software Engineering." },
+        { "content": "My best friend from Barcelona is named Pau and he works in marketing in London", "category": "personal", "importance": 55, "planted_as": "My best friend from Barcelona is named Pau. He moved to London for a marketing job." },
+        { "content": "My apartment is on the 4th floor of a building on Vesterbrogade street", "category": "personal", "importance": 50, "planted_as": "I live on the 4th floor of a building on Vesterbrogade — nice area but the stairs are brutal." },
+        { "content": "I'm training for the Copenhagen Half Marathon in September", "category": "fitness", "importance": 55, "planted_as": "I'm training for the Copenhagen Half Marathon in September. It'll be my first one." },
+        { "content": "My blood type is O negative and I donate regularly", "category": "health", "importance": 75, "planted_as": "By the way, my blood type is O negative. I try to donate blood regularly since it's universal." },
+        { "content": "My manager Sarah previously worked at Google before joining our startup", "category": "work", "importance": 60, "planted_as": "Fun fact — my manager Sarah actually worked at Google before joining our startup." },
+        { "content": "I'm allergic to penicillin but can take amoxicillin as an alternative", "category": "health", "importance": 85, "planted_as": "Oh, I should also mention — I'm allergic to penicillin, but my doctor says amoxicillin is fine as an alternative." },
+        { "content": "My passport expires in November 2026 and I need to renew it before a trip to Japan", "category": "travel", "importance": 65, "planted_as": "My passport expires in November 2026 and I need to renew it before my trip to Japan planned for December." },
+        { "content": "I use the Revolut bank card ending in 4738 as my primary payment method", "category": "financial", "importance": 80, "planted_as": "I primarily use my Revolut card — the one ending in 4738 — for everything." }
       ],
       "queries": [
-        { "question": "What dietary restrictions should I be aware of for both food and drinks?", "expected_facts": ["peanut allergy", "lactose intolerant"], "difficulty": "synthesis" },
+        { "question": "What dietary restrictions should I be aware of for both food and drinks?", "expected_facts": ["peanut allergy", "lactose intolerant", "cheese"], "difficulty": "synthesis" },
         { "question": "Tell me about your family. Do you have siblings?", "expected_facts": ["Ana", "Madrid", "doctor"], "difficulty": "indirect" },
-        { "question": "I need to connect to your home WiFi. What's the password?", "expected_facts": ["BlueOcean42"], "difficulty": "direct" }
+        { "question": "I need to connect to your home WiFi. What's the password?", "expected_facts": ["BlueOcean42"], "difficulty": "direct" },
+        { "question": "How do you spend your free time? Give me specific details about where and what activity.", "expected_facts": ["rock climbing", "gym", "Nørrebro", "machine learning"], "difficulty": "synthesis" },
+        { "question": "Where did you study and what was your field?", "expected_facts": ["Technical University", "Denmark", "Software Engineering"], "difficulty": "indirect" },
+        { "question": "Tell me about your closest friends — where are they from and what do they do?", "expected_facts": ["Pau", "Barcelona", "marketing", "London"], "difficulty": "synthesis" },
+        { "question": "Given your dietary restrictions and your meeting with Sarah tomorrow, what specific accommodations would be needed if the Q2 roadmap discussion happens over a working lunch?", "expected_facts": ["peanut allergy", "lactose intolerant", "Sarah", "3pm", "Q2 roadmap"], "difficulty": "synthesis" }
       ]
     },
     "full": {

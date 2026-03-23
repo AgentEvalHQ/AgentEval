@@ -85,4 +85,91 @@ public class CorpusLoaderTests
 
         Assert.True(medium.Count > small.Count);
     }
+
+    // ═══════════════════════════════════════════════════════════════
+    // Large and Stress corpus tests
+    // ═══════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void Load_ContextLarge_Returns100Turns()
+    {
+        var turns = CorpusLoader.Load("context-large");
+        Assert.Equal(100, turns.Count);
+    }
+
+    [Fact]
+    public void Load_ContextStress_Returns250Turns()
+    {
+        var turns = CorpusLoader.Load("context-stress");
+        Assert.Equal(250, turns.Count);
+    }
+
+    [Fact]
+    public void Load_ContextLarge_TurnsHaveContent()
+    {
+        var turns = CorpusLoader.Load("context-large");
+        Assert.All(turns, t =>
+        {
+            Assert.False(string.IsNullOrWhiteSpace(t.UserMessage));
+            Assert.False(string.IsNullOrWhiteSpace(t.AssistantResponse));
+        });
+    }
+
+    [Fact]
+    public void Load_ContextStress_TurnsHaveContent()
+    {
+        var turns = CorpusLoader.Load("context-stress");
+        Assert.All(turns, t =>
+        {
+            Assert.False(string.IsNullOrWhiteSpace(t.UserMessage));
+            Assert.False(string.IsNullOrWhiteSpace(t.AssistantResponse));
+        });
+    }
+
+    [Fact]
+    public void Load_ContextLarge_NoOverlapWithBenchmarkFacts()
+    {
+        var benchmarkPhrases = new[] { "José", "peanut allergy", "EpiPen", "golden retriever", "from Barcelona" };
+        var turns = CorpusLoader.Load("context-large");
+        var allContent = turns.SelectMany(t => new[] { t.UserMessage, t.AssistantResponse });
+
+        foreach (var content in allContent)
+        {
+            foreach (var phrase in benchmarkPhrases)
+            {
+                Assert.DoesNotContain(phrase, content, StringComparison.OrdinalIgnoreCase);
+            }
+        }
+    }
+
+    [Fact]
+    public void Load_GraduatedSizes_AreOrdered()
+    {
+        var small = CorpusLoader.Load("context-small");
+        var medium = CorpusLoader.Load("context-medium");
+        var large = CorpusLoader.Load("context-large");
+        var stress = CorpusLoader.Load("context-stress");
+
+        Assert.True(small.Count < medium.Count, "small < medium");
+        Assert.True(medium.Count < large.Count, "medium < large");
+        Assert.True(large.Count < stress.Count, "large < stress");
+    }
+
+    [Fact]
+    public void Load_WithMaxTurns_GreaterThanAvailable_ReturnsAll()
+    {
+        var turns = CorpusLoader.Load("context-small", maxTurns: 9999);
+        Assert.Equal(15, turns.Count); // Only 15 available
+    }
+
+    [Fact]
+    public void ListAvailable_IncludesAllFourCorpora()
+    {
+        var available = CorpusLoader.ListAvailable();
+        // ListAvailable returns resource names (may include namespace prefix)
+        Assert.Contains(available, n => n.Contains("context-small"));
+        Assert.Contains(available, n => n.Contains("context-medium"));
+        Assert.Contains(available, n => n.Contains("context-large"));
+        Assert.Contains(available, n => n.Contains("context-stress"));
+    }
 }

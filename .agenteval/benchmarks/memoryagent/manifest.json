@@ -1,39 +1,47 @@
 {
   "schema_version": "1.0",
-  "generated_at": "2026-03-22T02:05:43.6362035+00:00",
+  "generated_at": "2026-03-23T07:32:20.264601+00:00",
   "generated_by": "AgentEval.Memory v1.0.0.0",
   "agent": {
     "name": "MemoryAgent"
   },
   "benchmarks": [
     {
-      "benchmark_id": "memory-quick",
-      "preset": "Quick",
+      "benchmark_id": "memory-full",
+      "preset": "Full",
       "categories": [
         "Basic Retention",
         "Temporal Reasoning",
-        "Noise Resilience"
+        "Noise Resilience",
+        "Reach-Back Depth",
+        "Fact Update Handling",
+        "Multi-Topic",
+        "Cross-Session",
+        "Reducer Fidelity",
+        "Abstention",
+        "Conflict Resolution",
+        "Multi-Session Reasoning"
       ],
       "baselines": [
         {
-          "id": "bl-771fceac",
-          "file": "baselines/2026-03-22_minimal-prompt.json",
+          "id": "bl-ff78fe01",
+          "file": "baselines/2026-03-23_minimal-prompt.json",
           "name": "Minimal Prompt",
           "configuration_id": "2D90A94C79DF",
-          "timestamp": "2026-03-22T02:03:30.0359289+00:00",
-          "overall_score": 90.70000000000002,
-          "grade": "A",
+          "timestamp": "2026-03-23T07:25:50.4224279+00:00",
+          "overall_score": 86.62741251803753,
+          "grade": "B",
           "tags": [
             "config-a"
           ]
         },
         {
-          "id": "bl-60a151a5",
-          "file": "baselines/2026-03-22_memory-optimized-prompt.json",
+          "id": "bl-4ac464fb",
+          "file": "baselines/2026-03-23_memory-optimized-prompt.json",
           "name": "Memory-Optimized Prompt",
           "configuration_id": "D87F43FCAB0E",
-          "timestamp": "2026-03-22T02:05:43.6308608+00:00",
-          "overall_score": 90.70000000000002,
+          "timestamp": "2026-03-23T07:32:20.2562814+00:00",
+          "overall_score": 90.7080196886447,
           "grade": "A",
           "tags": [
             "config-b"

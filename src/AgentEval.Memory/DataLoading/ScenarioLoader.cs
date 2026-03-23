@@ -93,9 +93,9 @@ public static class ScenarioLoader
 
     /// <summary>
     /// External scenario directory path. Set this to load scenarios from filesystem
-    /// in addition to embedded resources.
+    /// in addition to embedded resources. Thread-safe via volatile.
     /// </summary>
-    public static string? ExternalScenarioPath { get; set; }
+    public static volatile string? ExternalScenarioPath;
 
     // --- Private helpers ---
 

@@ -318,10 +318,10 @@ public class MemoryBenchmarkRunner : IMemoryBenchmarkRunner
 
         var (corpusName, turnCount) = presetName switch
         {
-            "Diagnostic" => ("context-medium", 41),  // Diagnostic uses ALL medium turns (max pressure available)
-            "Full" => ("context-medium", 40),        // Full uses 40 medium turns
-            "Standard" => ("context-medium", 30),    // Standard uses 30 medium turns
-            _ => ("context-small", 15)               // Quick uses all 15 small turns
+            "Diagnostic" => ("context-stress", 250), // Diagnostic uses stress corpus (~120K tokens)
+            "Full" => ("context-large", 100),        // Full uses large corpus (~50K tokens)
+            "Standard" => ("context-medium", 30),    // Standard uses 30 medium turns (~15K tokens)
+            _ => ("context-small", 15)               // Quick uses all 15 small turns (~8K tokens)
         };
 
         try

@@ -33,11 +33,56 @@
     },
     "standard": {
       "extends": "quick",
-      "context_pressure": { "corpus": "context-medium", "max_turns": 30 }
+      "context_pressure": { "corpus": "context-medium", "max_turns": 40 },
+      "noise_between_facts": [
+        "Speaking of food, have you tried that new Thai place downtown? The pad thai is incredible.",
+        "I was reading about climate change impacts on agriculture yesterday. Fascinating and terrifying.",
+        "Do you think remote work will remain popular? I've been working from home for two years now.",
+        "The traffic this morning was absolutely terrible. Took me an hour to get here.",
+        "I need to remember to pick up groceries later. Running low on everything.",
+        "My neighbor just got a new puppy. It's so cute but barks all night.",
+        "Have you watched that new documentary on Netflix? Everyone's talking about it.",
+        "The gym near my office is having a sale on memberships. Might sign up.",
+        "I tried a new coffee shop yesterday. Their espresso was amazing.",
+        "My phone battery dies so fast. I think I need a new one.",
+        "Oh, my brother has a severe shellfish allergy, keep that in mind when planning family meals.",
+        "My appointment is actually next Thursday, not Tuesday. No wait, it was definitely Tuesday.",
+        "I sometimes use the password variations like BlueOcean41 or BlueOcean43 depending on which network.",
+        "I'm usually parked in lot C near the entrance, or sometimes lot A if it's crowded.",
+        "You know, my roommate's WiFi password is similar — something with Ocean in it too.",
+        "There was this other dentist I was considering, but I'm still going to Dr. Chen on Tuesday.",
+        "I think I mentioned my car is a blue sedan, parked somewhere in this general area.",
+        "The password might have been changed recently — someone mentioned needing to update it.",
+        "I've been meaning to move my car but haven't gotten around to it yet.",
+        "Actually, now that I think about it, I have multiple appointments scheduled for next week."
+      ],
+      "facts": [
+        { "content": "I also have a severe shellfish allergy on top of peanuts and tree nuts", "category": "allergy", "importance": 95, "planted_as": "Actually, I should also mention I have a severe shellfish allergy too — so basically all the major allergens for me." },
+        { "content": "My car is a blue Honda Civic sedan", "category": "personal", "importance": 65, "planted_as": "Oh, and my car is a blue Honda Civic — I drive a sedan." },
+        { "content": "My emergency contact is my sister Maria at 555-0147", "category": "emergency", "importance": 100, "planted_as": "If there's ever an emergency, contact my sister Maria — her number is 555-0147." },
+        { "content": "I take metformin 500mg twice daily for pre-diabetes", "category": "health", "importance": 95, "planted_as": "I should mention I take metformin, 500mg twice a day — I was diagnosed with pre-diabetes last year." },
+        { "content": "My home insurance policy number is HI-2847-CPH", "category": "financial", "importance": 80, "planted_as": "My home insurance policy number is HI-2847-CPH, just for the records." },
+        { "content": "I'm in apartment 4B at Vesterbrogade 127", "category": "location", "importance": 75, "planted_as": "My address is Vesterbrogade 127, apartment 4B." },
+        { "content": "My work laptop serial number is DL-X1C-88942", "category": "work", "importance": 70, "planted_as": "The IT team asked me to note my laptop serial: DL-X1C-88942." },
+        { "content": "My gym membership ID is CPH-GYM-3391", "category": "personal", "importance": 50, "planted_as": "My gym membership card number is CPH-GYM-3391 in case I lose it." },
+        { "content": "I have a follow-up blood test on March 28th at Rigshospitalet", "category": "health", "importance": 85, "planted_as": "I have a follow-up blood test on March 28th at Rigshospitalet for the pre-diabetes monitoring." },
+        { "content": "My bike lock combination is 7-23-41", "category": "credentials", "importance": 65, "planted_as": "Oh, and my bike lock combination is 7-23-41 — I always forget it." }
+      ],
+      "queries": [
+        { "question": "If you were ordering seafood for me, what specific allergies would be your biggest concern?", "expected_facts": ["peanuts", "tree nuts", "shellfish"], "difficulty": "synthesis" },
+        { "question": "My dentist appointment — what day and time is it exactly? And if someone needs to pick me up from the appointment, how do they identify my car?", "expected_facts": ["Tuesday", "2:30pm", "blue Honda Civic", "lot B", "247"], "difficulty": "synthesis" },
+        { "question": "What is the EXACT WiFi password — not a variation, the one I specifically told you?", "expected_facts": ["BlueOcean42"], "difficulty": "direct" },
+        { "question": "List ALL my food allergies you know about, in full.", "expected_facts": ["peanuts", "tree nuts", "shellfish"], "difficulty": "synthesis" },
+        { "question": "If I had a medical emergency, who should be contacted and what medications am I on?", "expected_facts": ["Maria", "555-0147", "metformin", "500mg", "EpiPen", "peanuts"], "difficulty": "synthesis" },
+        { "question": "What's my exact home address including apartment number?", "expected_facts": ["Vesterbrogade 127", "4B"], "difficulty": "direct" },
+        { "question": "I need to file an insurance claim — what's my policy number?", "expected_facts": ["HI-2847-CPH"], "difficulty": "direct" },
+        { "question": "I have two upcoming medical appointments — what are they and when?", "expected_facts": ["dentist", "Tuesday", "2:30", "blood test", "March 28", "Rigshospitalet"], "difficulty": "synthesis" },
+        { "question": "What credential numbers do I need to remember — WiFi, gym, bike lock, and laptop serial?", "expected_facts": ["BlueOcean42", "CPH-GYM-3391", "7-23-41", "DL-X1C-88942"], "difficulty": "synthesis" }
+      ]
     },
     "full": {
       "extends": "standard",
-      "context_pressure": { "corpus": "context-medium", "max_turns": 40 }
+      "context_pressure": { "corpus": "context-large", "max_turns": 80 }
     }
   }
 }

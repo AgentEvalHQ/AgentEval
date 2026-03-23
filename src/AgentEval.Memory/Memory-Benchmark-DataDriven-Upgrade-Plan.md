@@ -67,7 +67,7 @@ All 7 phases (Tier 1 + Tier 2) implemented, tested, and reviewed.
 
 | Metric | Before (start of plan) | After | Delta |
 |--------|----------------------|-------|-------|
-| Tests per TFM | 283 | **335** | +52 |
+| Tests per TFM | 283 | **348** | +65 |
 | Benchmark categories (Quick) | 3 | **3** | — |
 | Benchmark categories (Standard) | 6 | **7** | +1 (Abstention) |
 | Benchmark categories (Full) | 8 | **11** | +3 (Abstention, ConflictResolution, MultiSessionReasoning) |
@@ -97,11 +97,14 @@ All 7 phases (Tier 1 + Tier 2) implemented, tested, and reviewed.
 |------|---------|
 | `Models/MemoryBenchmark.cs` | +3 enum values (Abstention, ConflictResolution, MultiSessionReasoning), +Diagnostic preset, weight rebalancing |
 | `Models/MemoryQuery.cs` | +`CreateAbstention()` factory method |
-| `Models/MemoryBenchmarkResult.cs` | +3 recommendation entries |
+| `Models/MemoryBenchmarkResult.cs` | +3 recommendation entries, +`ComputeGrade()` public static method (DRY consolidation) |
 | `Engine/MemoryJudge.cs` | Abstention scoring mode in `BuildJudgmentPrompt()` |
 | `Evaluators/MemoryBenchmarkRunner.cs` | +3 switch cases, +3 handlers, `TryRunFromJsonAsync()` for JSON-first execution, corpus-based context pressure |
 | `Reporting/PentagonConsolidator.cs` | Temporal→3-way avg, Persistence→2-way avg, Organization→2-way avg |
-| `Reporting/BaselineExtensions.cs` | +3 recommendation keywords |
+| `Reporting/BaselineExtensions.cs` | +3 recommendation keywords, removed duplicate `ComputeGrade()` (uses `MemoryBenchmarkResult.ComputeGrade` via `using static`) |
+| `DataLoading/ScenarioLoader.cs` | `ExternalScenarioPath` changed to `volatile` for thread safety |
+| `Reporting/JsonFileBaselineStore.cs` | `TryDeserializeBaseline` now logs skipped files via `Debug.WriteLine` |
+| `Models/CrossSessionResult.cs` | Added SPDX license header |
 | `AgentEval.Memory.csproj` | +3 EmbeddedResource glob patterns |
 
 ### Offsets and Changes from Plan
@@ -116,10 +119,28 @@ All 7 phases (Tier 1 + Tier 2) implemented, tested, and reviewed.
 
 ### Post-Implementation Review Findings
 
-One documentation bug found and fixed:
+**Review 1 (initial):** One documentation bug found and fixed:
 - `PentagonConsolidator.cs` comment said "8 benchmark categories" — updated to "11 benchmark categories" with correct mapping documentation.
 
-No code bugs, no logic errors, no compilation issues. All 335 tests pass across 3 TFMs.
+**Review 2 (comprehensive, March 22 2026):** Three independent reviews performed (source code, tests, plan alignment). Issues found and fixed:
+
+| Issue | Severity | Fix Applied |
+|-------|----------|-------------|
+| `MemoryBenchmark.cs` line 60: comment says "10 categories" but Full has 11 | Medium | Updated to "all 11 categories" |
+| `BaselineExtensions.cs` + `MemoryBenchmarkResult.cs`: DRY violation — duplicated `ComputeGrade` logic | Medium | Moved to `MemoryBenchmarkResult.ComputeGrade()` (public static), removed duplicate from `BaselineExtensions` |
+| `ScenarioLoader.ExternalScenarioPath`: mutable static global, not thread-safe | Medium | Changed to `volatile` field |
+| `JsonFileBaselineStore.TryDeserializeBaseline`: silently swallows JsonException | Low | Added `Debug.WriteLine` for diagnostics |
+| `CrossSessionResult.cs`: missing SPDX license header | Low | Added header |
+| `AbstentionTests.cs`: weight sum precision `precision: 2` too loose | Medium | Changed to `precision: 10` and consolidated into single `[Theory]` covering all 4 presets |
+| `BaselineExtensionsTests.cs`: references to removed `BaselineExtensions.ComputeGrade` | Build break | Updated to `MemoryBenchmarkResult.ComputeGrade` |
+| Missing tests for new categories in runner | Low | Added 4 tests: Abstention in Standard, ConflictResolution in Full, MultiSessionReasoning skip for non-resettable, Diagnostic preset structure |
+
+**Test count progression:** 283 → 335 → 342 → 346 → **348 tests/TFM**. All pass across net8.0, net9.0, net10.0.
+
+**Remaining known issues (not fixed — low priority):**
+- `SyntheticHistoryGenerator.GetConversationTopics()` is 128 lines of hardcoded tuples — partially mitigated by JSON corpus system, kept as fallback
+- `CanRememberExtensions` has repeated scenario setup code across 3 overloads — functional, not blocking
+- Some tests check structure rather than behavior (vacuous) — adequate for unit testing, would need integration tests for deeper validation
 
 ---
 

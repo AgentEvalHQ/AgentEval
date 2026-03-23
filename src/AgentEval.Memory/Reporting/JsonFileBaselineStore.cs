@@ -170,8 +170,9 @@ public partial class JsonFileBaselineStore : IBaselineStore
         {
             return JsonSerializer.Deserialize<MemoryBaseline>(json, JsonOptions);
         }
-        catch (JsonException)
+        catch (JsonException ex)
         {
+            System.Diagnostics.Debug.WriteLine($"[AgentEval.Memory] Skipping corrupt baseline file: {ex.Message}");
             return null;
         }
     }

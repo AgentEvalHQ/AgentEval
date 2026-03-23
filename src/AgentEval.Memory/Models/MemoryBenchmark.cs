@@ -57,7 +57,7 @@ public class MemoryBenchmark
     };
 
     /// <summary>
-    /// Full benchmark: all 10 categories including cross-session, reducer, abstention, and conflict resolution.
+    /// Full benchmark: all 11 categories including cross-session, reducer, abstention, conflict resolution, and multi-session reasoning.
     /// Requires agent to implement ISessionResettableAgent for full results.
     /// </summary>
     public static MemoryBenchmark Full => new()

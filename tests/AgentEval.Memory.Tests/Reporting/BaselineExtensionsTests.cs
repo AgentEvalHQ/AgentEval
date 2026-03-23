@@ -106,17 +106,17 @@ public class BaselineExtensionsTests
     public void ToBaseline_CategoryGrade_MatchesBenchmarkResultGrading()
     {
         // MemoryBenchmarkResult.Grade uses: >=90 → A, >=80 → B, >=70 → C, >=60 → D, else F
-        // BaselineExtensions.ComputeGrade must match exactly
-        Assert.Equal("A", BaselineExtensions.ComputeGrade(95));
-        Assert.Equal("A", BaselineExtensions.ComputeGrade(90));
-        Assert.Equal("B", BaselineExtensions.ComputeGrade(85));  // NOT "A-"
-        Assert.Equal("B", BaselineExtensions.ComputeGrade(80));
-        Assert.Equal("C", BaselineExtensions.ComputeGrade(75));  // NOT "B-"
-        Assert.Equal("C", BaselineExtensions.ComputeGrade(70));
-        Assert.Equal("D", BaselineExtensions.ComputeGrade(65));
-        Assert.Equal("D", BaselineExtensions.ComputeGrade(60));
-        Assert.Equal("F", BaselineExtensions.ComputeGrade(55));
-        Assert.Equal("F", BaselineExtensions.ComputeGrade(0));
+        // MemoryBenchmarkResult.ComputeGrade must match exactly
+        Assert.Equal("A", MemoryBenchmarkResult.ComputeGrade(95));
+        Assert.Equal("A", MemoryBenchmarkResult.ComputeGrade(90));
+        Assert.Equal("B", MemoryBenchmarkResult.ComputeGrade(85));  // NOT "A-"
+        Assert.Equal("B", MemoryBenchmarkResult.ComputeGrade(80));
+        Assert.Equal("C", MemoryBenchmarkResult.ComputeGrade(75));  // NOT "B-"
+        Assert.Equal("C", MemoryBenchmarkResult.ComputeGrade(70));
+        Assert.Equal("D", MemoryBenchmarkResult.ComputeGrade(65));
+        Assert.Equal("D", MemoryBenchmarkResult.ComputeGrade(60));
+        Assert.Equal("F", MemoryBenchmarkResult.ComputeGrade(55));
+        Assert.Equal("F", MemoryBenchmarkResult.ComputeGrade(0));
     }
 
     [Fact]
@@ -162,7 +162,7 @@ public class BaselineExtensionsTests
     [InlineData(150, "A")]      // Out-of-range high
     public void ComputeGrade_BoundaryValues(double score, string expectedGrade)
     {
-        Assert.Equal(expectedGrade, BaselineExtensions.ComputeGrade(score));
+        Assert.Equal(expectedGrade, MemoryBenchmarkResult.ComputeGrade(score));
     }
 
     [Fact]
