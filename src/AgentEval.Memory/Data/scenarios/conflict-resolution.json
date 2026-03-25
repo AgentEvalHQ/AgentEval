@@ -110,7 +110,88 @@
         "corpus": "context-stress",
         "max_turns": 200,
         "sessions_count": 15
-      }
+      },
+      "facts": [
+        {
+          "content": "I'm learning Spanish in evening classes",
+          "category": "education",
+          "importance": 60,
+          "planted_as": "I signed up for Spanish evening classes at the community center. Always wanted to be fluent.",
+          "position": 0.15,
+          "session_id": 9,
+          "timestamp": "2025-06-01"
+        },
+        {
+          "content": "I switched from Spanish to Japanese classes",
+          "category": "education",
+          "importance": 65,
+          "planted_as": "I dropped the Spanish classes — wasn't clicking for me. Switched to Japanese instead, much more motivated now.",
+          "position": 0.45,
+          "session_id": 11,
+          "timestamp": "2025-09-15"
+        },
+        {
+          "content": "I actually went back to Spanish classes, dropped Japanese",
+          "category": "education",
+          "importance": 65,
+          "planted_as": "Funny story — I went back to Spanish classes after all. Japanese was way too hard with my schedule. Spanish just makes more sense for me long-term.",
+          "position": 0.75,
+          "session_id": 13,
+          "timestamp": "2026-01-10"
+        },
+        {
+          "content": "My salary is 85,000 per year",
+          "category": "financial",
+          "importance": 75,
+          "planted_as": "My salary just got bumped to 85,000 per year with the new role. Pretty happy about that.",
+          "position": 0.2,
+          "session_id": 9,
+          "timestamp": "2025-07-01"
+        },
+        {
+          "content": "My salary increased to 105,000 after the promotion",
+          "category": "financial",
+          "importance": 80,
+          "planted_as": "The promotion came with a nice raise — I'm at 105,000 now. Huge jump from the 85k I was making before.",
+          "position": 0.55,
+          "session_id": 12,
+          "timestamp": "2026-02-01"
+        }
+      ],
+      "queries": [
+        {
+          "question": "What language am I currently studying in evening classes?",
+          "expected_facts": [
+            "Spanish"
+          ],
+          "forbidden_facts": [
+            "Japanese"
+          ],
+          "difficulty": "correction_chain",
+          "query_type": "update"
+        },
+        {
+          "question": "What is my current salary?",
+          "expected_facts": [
+            "105,000"
+          ],
+          "forbidden_facts": [
+            "85,000"
+          ],
+          "difficulty": "correction_chain",
+          "query_type": "update"
+        },
+        {
+          "question": "Walk me through my language learning journey — what classes did I take and in what order?",
+          "expected_facts": [
+            "Spanish",
+            "Japanese",
+            "back to Spanish"
+          ],
+          "difficulty": "synthesis",
+          "query_type": "update"
+        }
+      ]
     }
   }
 }

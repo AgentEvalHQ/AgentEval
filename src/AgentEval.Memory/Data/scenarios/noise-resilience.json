@@ -109,7 +109,13 @@
         "I think I mentioned my car is a blue sedan, parked somewhere in this general area.",
         "The password might have been changed recently — someone mentioned needing to update it.",
         "I've been meaning to move my car but haven't gotten around to it yet.",
-        "Actually, now that I think about it, I have multiple appointments scheduled for next week."
+        "Actually, now that I think about it, I have multiple appointments scheduled for next week.",
+        "The team project deadline got pushed to March 15th — everyone's scrambling to finish on time.",
+        "Oh right, the fiscal year also ends on March 15th. Accounting is going nuts.",
+        "My colleague's daughter's birthday is also in June — we were comparing dates the other day.",
+        "The office Wi-Fi password got changed to something with Anderson or Andersen in it, funny coincidence.",
+        "June 22nd is also the summer solstice — longest day of the year.",
+        "Someone at work named Anderson keeps getting my emails by mistake."
       ],
       "facts": [
         {
@@ -191,6 +197,30 @@
           "planted_as": "Oh, and my bike lock combination is 7-23-41 — I always forget it.",
           "position": 0.5,
           "session_id": 5
+        },
+        {
+          "content": "My wedding anniversary is March 15",
+          "category": "personal",
+          "importance": 85,
+          "planted_as": "Our wedding anniversary is March 15th — can't believe it's been 8 years already.",
+          "position": 0.42,
+          "session_id": 5
+        },
+        {
+          "content": "My daughter Emma's birthday is June 22",
+          "category": "family",
+          "importance": 80,
+          "planted_as": "Emma's birthday is June 22nd — she's turning 7 this year and already asking for a puppy.",
+          "position": 0.37,
+          "session_id": 4
+        },
+        {
+          "content": "My mother's maiden name is Andersen",
+          "category": "personal",
+          "importance": 75,
+          "planted_as": "My mother's maiden name is Andersen — I use it as a security question for my bank account.",
+          "position": 0.57,
+          "session_id": 6
         }
       ],
       "queries": [
@@ -286,6 +316,45 @@
             "DL-X1C-88942"
           ],
           "difficulty": "synthesis",
+          "query_type": "standard"
+        },
+        {
+          "question": "When is my wedding anniversary?",
+          "expected_facts": [
+            "March 15"
+          ],
+          "forbidden_facts": [
+            "deadline",
+            "fiscal year",
+            "project"
+          ],
+          "difficulty": "discrimination",
+          "query_type": "standard"
+        },
+        {
+          "question": "When is my daughter Emma's birthday and how old is she turning?",
+          "expected_facts": [
+            "June 22",
+            "7"
+          ],
+          "forbidden_facts": [
+            "solstice",
+            "colleague's daughter"
+          ],
+          "difficulty": "discrimination",
+          "query_type": "standard"
+        },
+        {
+          "question": "What is my mother's maiden name?",
+          "expected_facts": [
+            "Andersen"
+          ],
+          "forbidden_facts": [
+            "Anderson",
+            "Wi-Fi",
+            "password"
+          ],
+          "difficulty": "discrimination",
           "query_type": "standard"
         }
       ]

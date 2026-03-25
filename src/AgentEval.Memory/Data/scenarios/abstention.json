@@ -226,6 +226,56 @@
           ],
           "difficulty": "synthesis",
           "query_type": "standard"
+        },
+        {
+          "question": "You mentioned you have 3 kids — what are their ages?",
+          "expected_facts": [
+            "2",
+            "8",
+            "12"
+          ],
+          "forbidden_facts": [
+            "3 kids",
+            "third child",
+            "three children"
+          ],
+          "difficulty": "counterfactual",
+          "query_type": "counterfactual"
+        },
+        {
+          "question": "Since you moved to Copenhagen from Madrid 5 years ago, how has the adjustment been?",
+          "expected_facts": [
+            "Barcelona",
+            "3 years"
+          ],
+          "forbidden_facts": [
+            "Madrid",
+            "5 years"
+          ],
+          "difficulty": "counterfactual",
+          "query_type": "counterfactual"
+        },
+        {
+          "question": "How's your labrador Max doing? Is he still as energetic as ever?",
+          "expected_facts": [
+            "golden retriever"
+          ],
+          "forbidden_facts": [
+            "labrador"
+          ],
+          "difficulty": "counterfactual",
+          "query_type": "counterfactual"
+        },
+        {
+          "question": "You told me you've been at the startup for about 5 years — that's quite a long time! What keeps you there?",
+          "expected_facts": [
+            "2 years"
+          ],
+          "forbidden_facts": [
+            "5 years"
+          ],
+          "difficulty": "counterfactual",
+          "query_type": "counterfactual"
         }
       ],
       "facts": [
@@ -243,6 +293,30 @@
           "importance": 60,
           "planted_as": "Hard to believe it has been 2 years already at the startup. Time flies when you are building something.",
           "position": 0.3,
+          "session_id": 4
+        },
+        {
+          "content": "I have 2 kids, ages 8 and 12",
+          "category": "family",
+          "importance": 75,
+          "planted_as": "My two kids are growing up so fast — the youngest is 8 and the oldest just turned 12. They keep me busy on weekends.",
+          "position": 0.5,
+          "session_id": 5
+        },
+        {
+          "content": "I moved to Copenhagen from Barcelona 3 years ago",
+          "category": "personal",
+          "importance": 65,
+          "planted_as": "It's been exactly 3 years since I moved to Copenhagen from Barcelona. Best decision I ever made, career-wise.",
+          "position": 0.6,
+          "session_id": 6
+        },
+        {
+          "content": "Max is a golden retriever, not a labrador",
+          "category": "personal",
+          "importance": 60,
+          "planted_as": "People always think Max is a labrador because of his size, but he's actually a golden retriever. The coat gives it away once you know what to look for.",
+          "position": 0.4,
           "session_id": 4
         }
       ]

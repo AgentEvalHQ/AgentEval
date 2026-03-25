@@ -118,6 +118,25 @@ PREFERENCE TOLERANCE: The agent may paraphrase the preference differently. If th
             "update" => @"
 
 UPDATE TOLERANCE: If a fact was updated/corrected, the agent mentioning BOTH the old and new version is acceptable (score 80+). The agent mentioning ONLY the new/correct version is ideal (score 100). The agent mentioning ONLY the old/outdated version without the correction should score low (0-30).",
+            "synthesis" => @"
+
+SYNTHESIS SCORING: This question requires combining information from MULTIPLE separate turns/sessions. ALL expected facts must be present for a high score — partial answers score proportionally lower. If the agent only finds 1 of 3 required fragments, score 30-40. If 2 of 3, score 60-70. All 3, score 90-100. Forbidden facts indicate the agent confused similar entities — penalize heavily (-20 per forbidden fact).",
+            "counterfactual" => @"
+
+COUNTERFACTUAL SCORING: The question contains a FALSE PREMISE that the agent should CORRECT. The agent MUST:
+1. Identify and correct the false premise (e.g., 'Actually I have 2 kids, not 3')
+2. Provide the correct information from memory
+If the agent accepts the false premise without correction, score 0-20.
+If the agent corrects the premise AND provides correct info, score 90-100.
+If the agent says 'I don't know' without correcting, score 40-50.",
+            "correction_chain" => @"
+
+CORRECTION CHAIN SCORING: The fact was updated MULTIPLE TIMES in sequence. Only the LATEST version is correct.
+- Agent states ONLY the latest value: score 90-100
+- Agent states the latest AND mentions it was updated: score 100
+- Agent states an intermediate (outdated) value: score 0-20
+- Agent states the original (oldest) value: score 0-10
+Forbidden facts list contains ALL outdated values — penalize -30 per forbidden fact found.",
             _ => "" // "standard" or unrecognized — no extra clause
         };
 

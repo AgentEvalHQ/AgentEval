@@ -292,6 +292,50 @@
           ],
           "difficulty": "synthesis",
           "query_type": "temporal"
+        },
+        {
+          "question": "Did you get your AWS certification before or after your Google rejection?",
+          "expected_facts": [
+            "after"
+          ],
+          "forbidden_facts": [
+            "before"
+          ],
+          "difficulty": "temporal_ordering",
+          "query_type": "temporal"
+        },
+        {
+          "question": "Did you start mentoring junior devs before or after winning the hackathon?",
+          "expected_facts": [
+            "after"
+          ],
+          "forbidden_facts": [
+            "before"
+          ],
+          "difficulty": "temporal_ordering",
+          "query_type": "temporal"
+        },
+        {
+          "question": "Which came first — completing your side project mobile app or getting the Docker certification?",
+          "expected_facts": [
+            "Docker"
+          ],
+          "forbidden_facts": [
+            "mobile app came first"
+          ],
+          "difficulty": "temporal_ordering",
+          "query_type": "temporal"
+        },
+        {
+          "question": "Did you start attending tech meetups before or after your QA engineer role?",
+          "expected_facts": [
+            "after"
+          ],
+          "forbidden_facts": [
+            "before"
+          ],
+          "difficulty": "temporal_ordering",
+          "query_type": "temporal"
         }
       ]
     },

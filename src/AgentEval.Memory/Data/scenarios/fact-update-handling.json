@@ -84,6 +84,87 @@
           "position": 0.5,
           "session_id": 5,
           "timestamp": "2026-02-01"
+        },
+        {
+          "content": "I work at Google",
+          "category": "work",
+          "importance": 75,
+          "planted_as": "Just started at Google last quarter — the onboarding was intense but I'm loving the team so far.",
+          "position": 0.1,
+          "session_id": 1,
+          "timestamp": "2025-09-15"
+        },
+        {
+          "content": "I left Google, now at Microsoft",
+          "category": "work",
+          "importance": 75,
+          "planted_as": "So I left Google — it just wasn't the right fit. I'm at Microsoft now, joined the Azure team. Much better culture for me.",
+          "position": 0.35,
+          "session_id": 4,
+          "timestamp": "2025-12-10"
+        },
+        {
+          "content": "I just accepted an offer at Apple, starting next month",
+          "category": "work",
+          "importance": 80,
+          "planted_as": "Big update — I just accepted an offer at Apple! Starting next month on the ML platform team. Third company this year, but this one feels right.",
+          "position": 0.65,
+          "session_id": 7,
+          "timestamp": "2026-03-01"
+        },
+        {
+          "content": "I adopted a cat named Whiskers",
+          "category": "personal",
+          "importance": 55,
+          "planted_as": "Guess what — I just adopted a cat! Named her Whiskers. She's a little grey tabby and already rules the apartment.",
+          "position": 0.12,
+          "session_id": 1,
+          "timestamp": "2025-06-01"
+        },
+        {
+          "content": "Renamed the cat to Luna",
+          "category": "personal",
+          "importance": 55,
+          "planted_as": "Remember Whiskers? We renamed her to Luna. Whiskers just didn't suit her personality — she's way too elegant for that name.",
+          "position": 0.38,
+          "session_id": 4,
+          "timestamp": "2025-08-15"
+        },
+        {
+          "content": "Cat renamed again to Mittens by my daughter",
+          "category": "personal",
+          "importance": 55,
+          "planted_as": "Update on the cat situation — my daughter renamed her AGAIN. She's Mittens now. I've given up fighting it. Mittens it is.",
+          "position": 0.68,
+          "session_id": 7,
+          "timestamp": "2025-10-20"
+        },
+        {
+          "content": "I'm vegetarian",
+          "category": "diet",
+          "importance": 65,
+          "planted_as": "I went fully vegetarian about six months ago. Feeling great, more energy, and I don't miss meat at all honestly.",
+          "position": 0.15,
+          "session_id": 2,
+          "timestamp": "2025-07-01"
+        },
+        {
+          "content": "Started eating fish again, now pescatarian",
+          "category": "diet",
+          "importance": 65,
+          "planted_as": "OK so I caved a little — I started eating fish again. Sushi is just too good. So I guess I'm pescatarian now? Still no red meat or chicken though.",
+          "position": 0.42,
+          "session_id": 5,
+          "timestamp": "2025-11-15"
+        },
+        {
+          "content": "Went fully vegan last week",
+          "category": "diet",
+          "importance": 70,
+          "planted_as": "Plot twist — I went fully vegan last week. Watched a documentary that really got to me. No fish, no dairy, no eggs. Going all in this time.",
+          "position": 0.72,
+          "session_id": 8,
+          "timestamp": "2026-03-15"
         }
       ],
       "queries": [
@@ -109,6 +190,43 @@
             "Android"
           ],
           "difficulty": "synthesis",
+          "query_type": "update"
+        },
+        {
+          "question": "Where do I work now?",
+          "expected_facts": [
+            "Apple"
+          ],
+          "forbidden_facts": [
+            "Google",
+            "Microsoft"
+          ],
+          "difficulty": "correction_chain",
+          "query_type": "update"
+        },
+        {
+          "question": "What's my cat's name?",
+          "expected_facts": [
+            "Mittens"
+          ],
+          "forbidden_facts": [
+            "Whiskers",
+            "Luna"
+          ],
+          "difficulty": "correction_chain",
+          "query_type": "update"
+        },
+        {
+          "question": "What's my current diet? Am I vegetarian, pescatarian, or something else?",
+          "expected_facts": [
+            "vegan"
+          ],
+          "forbidden_facts": [
+            "vegetarian",
+            "pescatarian",
+            "fish"
+          ],
+          "difficulty": "correction_chain",
           "query_type": "update"
         }
       ]

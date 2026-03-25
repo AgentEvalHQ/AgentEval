@@ -231,6 +231,94 @@
           "planted_as": "I primarily use my Revolut card — the one ending in 4738 — for everything.",
           "position": 0.25,
           "session_id": 7
+        },
+        {
+          "content": "I'm training for a race next month",
+          "category": "fitness",
+          "importance": 60,
+          "planted_as": "I've been waking up at 5am every day to train — got a big race next month and I want to be ready.",
+          "position": 0.12,
+          "session_id": 1
+        },
+        {
+          "content": "The marathon is in Portland",
+          "category": "fitness",
+          "importance": 60,
+          "planted_as": "By the way, the race is actually a marathon in Portland. I've never been there so it'll be a fun trip too.",
+          "position": 0.32,
+          "session_id": 3
+        },
+        {
+          "content": "My goal is sub-4-hours for the marathon",
+          "category": "fitness",
+          "importance": 60,
+          "planted_as": "My coach says sub-4-hours is ambitious for a first marathon but I'm going for it. I've been hitting the pace in training.",
+          "position": 0.52,
+          "session_id": 5
+        },
+        {
+          "content": "I'm building a home office in the spare bedroom",
+          "category": "home",
+          "importance": 50,
+          "planted_as": "I've decided to convert the spare bedroom into a proper home office. Tired of working from the kitchen table.",
+          "position": 0.18,
+          "session_id": 2
+        },
+        {
+          "content": "I ordered a standing desk for the home office",
+          "category": "home",
+          "importance": 50,
+          "planted_as": "Just ordered a standing desk — the Uplift V2. Should arrive next week for the new office setup.",
+          "position": 0.42,
+          "session_id": 4
+        },
+        {
+          "content": "The home office will also be a music recording space with soundproofing",
+          "category": "home",
+          "importance": 50,
+          "planted_as": "I'm adding soundproofing panels too — planning to use the home office as a music recording space in the evenings. Guitar mostly.",
+          "position": 0.62,
+          "session_id": 6
+        },
+        {
+          "content": "My colleague Sarah lives in Seattle and works in marketing",
+          "category": "social",
+          "importance": 55,
+          "planted_as": "My colleague Sarah just moved to Seattle — she's heading up the marketing team there. We still collaborate on projects remotely.",
+          "position": 0.22,
+          "session_id": 3
+        },
+        {
+          "content": "My sister Sandra lives in Sacramento and works as a teacher",
+          "category": "family",
+          "importance": 55,
+          "planted_as": "My sister Sandra has been in Sacramento for about five years now. She teaches third grade and absolutely loves it.",
+          "position": 0.38,
+          "session_id": 4
+        },
+        {
+          "content": "My friend Sam lives in San Francisco and works at a startup",
+          "category": "social",
+          "importance": 55,
+          "planted_as": "My buddy Sam is out in San Francisco — he's working at some AI startup. We try to catch up every few months.",
+          "position": 0.48,
+          "session_id": 5
+        },
+        {
+          "content": "My cousin Sofia lives in San Diego and works as a nurse",
+          "category": "family",
+          "importance": 55,
+          "planted_as": "My cousin Sofia is down in San Diego. She's been a nurse at the children's hospital there for about three years.",
+          "position": 0.58,
+          "session_id": 6
+        },
+        {
+          "content": "My neighbor Steve lives in the same building and works as a lawyer",
+          "category": "social",
+          "importance": 50,
+          "planted_as": "My neighbor Steve — he's a lawyer, lives two floors up from me — invited me over for dinner last weekend. Nice guy.",
+          "position": 0.68,
+          "session_id": 7
         }
       ],
       "queries": [
@@ -304,6 +392,106 @@
             "Q2 roadmap"
           ],
           "difficulty": "synthesis",
+          "query_type": "standard"
+        },
+        {
+          "question": "Tell me about my upcoming athletic event — where is it, what kind of race, and what's my target time?",
+          "expected_facts": [
+            "Portland",
+            "marathon",
+            "sub-4-hours"
+          ],
+          "difficulty": "synthesis",
+          "query_type": "synthesis"
+        },
+        {
+          "question": "Describe the home office project I've been working on — what furniture did I order, what room is it in, and what else will I use the space for?",
+          "expected_facts": [
+            "spare bedroom",
+            "standing desk",
+            "Uplift V2",
+            "music recording",
+            "soundproofing",
+            "guitar"
+          ],
+          "difficulty": "synthesis",
+          "query_type": "synthesis"
+        },
+        {
+          "question": "I'm planning a trip to the US West Coast and want to visit people I know. Who lives where?",
+          "expected_facts": [
+            "Sarah",
+            "Seattle",
+            "Sandra",
+            "Sacramento",
+            "Sam",
+            "San Francisco",
+            "Sofia",
+            "San Diego"
+          ],
+          "difficulty": "synthesis",
+          "query_type": "synthesis"
+        },
+        {
+          "question": "Between the marathon training and the home office project, what am I spending my mornings and evenings on?",
+          "expected_facts": [
+            "5am",
+            "training",
+            "marathon",
+            "music recording",
+            "guitar"
+          ],
+          "difficulty": "synthesis",
+          "query_type": "synthesis"
+        },
+        {
+          "question": "Where does my sister live?",
+          "expected_facts": [
+            "Sacramento"
+          ],
+          "forbidden_facts": [
+            "Seattle",
+            "San Francisco",
+            "San Diego"
+          ],
+          "difficulty": "discrimination",
+          "query_type": "standard"
+        },
+        {
+          "question": "What does my friend Sam do for work and where is he based?",
+          "expected_facts": [
+            "startup",
+            "San Francisco"
+          ],
+          "forbidden_facts": [
+            "marketing",
+            "teacher",
+            "nurse",
+            "lawyer",
+            "Seattle",
+            "Sacramento",
+            "San Diego"
+          ],
+          "difficulty": "discrimination",
+          "query_type": "standard"
+        },
+        {
+          "question": "Which of my contacts works in healthcare and where do they live?",
+          "expected_facts": [
+            "Sofia",
+            "San Diego",
+            "nurse"
+          ],
+          "forbidden_facts": [
+            "Seattle",
+            "Sacramento",
+            "San Francisco",
+            "marketing",
+            "teacher",
+            "startup",
+            "lawyer"
+          ],
+          "difficulty": "discrimination",
           "query_type": "standard"
         }
       ]
