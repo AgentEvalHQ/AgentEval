@@ -407,86 +407,567 @@ These projections align with LongMemEval's published results (GPT-4o: 57.7%, GPT
 
 ---
 
-## Part 7: Additional Hardening Plan (Tier 2)
+## Part 7: Data Gap Fixes (Detailed Implementation)
 
-### 7.1 Semantic Distractor Corpus
+These are gaps in the EXISTING Tier 1 implementation — infrastructure is built but some scenario files are missing data.
 
-**Problem:** Our context pressure uses generic ChatGPT filler that's topically unrelated to planted facts. A query about cooking is easy to find when surrounded by conversation about weather and movies.
+### 7.1 Fix: Add Timestamps to 4 Scenario Files
 
-**Solution:** For each category, generate corpus turns that are topically RELATED to the planted facts but contain different specific details. If the fact is "I run marathons", the corpus should mention "my friend runs ultramarathons", "I watched the Boston marathon on TV", "running shoes are so expensive". The agent must distinguish MY facts from topically similar filler.
+**Why:** Without timestamps, the temporal judge tolerance clause never activates. Facts planted with timestamps get `[2026-01-15] fact text` prepended by the runner (MemoryBenchmarkRunner.cs line 482). Without timestamps, temporal ordering queries can't work.
 
-**Implementation:**
-- Add `themed_corpus` field to ContextPressureConfig (corpus name or inline turns)
-- Create 3-4 themed corpus files (health, career, personal, hobbies)
-- CorpusLoader selects themed corpus when available
+#### basic-retention.json — Add timestamps to standard preset facts
 
-**Expected impact:** -10-15% across all categories
+Add `"timestamp"` to all 24 standard preset facts. Use dates spread over the last 6 months to create a realistic timeline:
 
-### 7.2 Paraphrase Variation Queries
+```json
+// Marathon training facts (synthesis group)
+{ "content": "Training for a race next month", "timestamp": "2026-01-05", "session_id": 1, ... },
+{ "content": "The marathon is in Portland", "timestamp": "2026-02-10", "session_id": 3, ... },
+{ "content": "Aiming for sub-4-hours", "timestamp": "2026-03-01", "session_id": 5, ... },
 
-**Problem:** We plant "I'm allergic to shellfish" and query "What am I allergic to?" This is keyword matching, not comprehension.
+// Home office project (synthesis group)
+{ "content": "Converting spare bedroom to home office", "timestamp": "2025-12-15", "session_id": 2, ... },
+{ "content": "Ordered a standing desk", "timestamp": "2026-01-20", "session_id": 4, ... },
+{ "content": "Soundproofing for music recording", "timestamp": "2026-02-25", "session_id": 6, ... },
 
-**Solution:** Query with very different wording that requires semantic understanding:
-- Planted: "I'm allergic to shellfish"
-- Query: "My team wants to order lobster bisque for the holiday dinner. Should I be concerned?"
-- Expected: "Yes, shellfish allergy"
+// Competing facts (S-names) — all in same time window to increase confusion
+{ "content": "Colleague Sarah lives in Seattle", "timestamp": "2026-01-10", ... },
+{ "content": "Sister Sandra lives in Sacramento", "timestamp": "2026-01-12", ... },
+{ "content": "Friend Sam lives in San Francisco", "timestamp": "2026-01-14", ... },
+{ "content": "Cousin Sofia is a nurse in San Diego", "timestamp": "2026-01-16", ... },
+{ "content": "Neighbor Steve is a lawyer", "timestamp": "2026-01-18", ... }
+```
 
-**Implementation:** Add `paraphrased_query` field to QueryDefinition, or simply write better queries in the JSON. No code changes needed — just better test data.
+#### noise-resilience.json — Add timestamps to standard preset facts
 
-**Expected impact:** -5-10% on basic retention and multi-topic
+```json
+// Distractor target facts
+{ "content": "Wedding anniversary is March 15", "timestamp": "2025-10-20", ... },
+{ "content": "Daughter Emma's birthday is June 22", "timestamp": "2025-11-15", ... },
+{ "content": "Mother's maiden name is Andersen", "timestamp": "2025-12-05", ... }
+```
 
-### 7.3 Negation Traps
+#### abstention.json — Add timestamps to standard preset facts
 
-**Problem:** We test what the agent KNOWS but not whether it understands NEGATION. "I don't eat red meat" should make the agent refuse steak recommendations.
+```json
+{ "content": "I have 2 kids, ages 8 and 12", "timestamp": "2026-01-20", ... },
+{ "content": "Moved from Barcelona 3 years ago", "timestamp": "2026-02-05", ... },
+{ "content": "Max is a golden retriever", "timestamp": "2026-02-15", ... }
+```
 
-**Solution:** Plant negated facts and query with positive assumptions:
-- Fact: "I stopped drinking coffee 6 months ago"
-- Query: "What's my usual coffee order?"
-- Expected: abstention or correction ("You stopped drinking coffee")
+#### preference-extraction.json — Add timestamps to standard preset facts
 
-**Implementation:** Add negation queries to abstention.json and preference-extraction.json. Use counterfactual judge variant.
+```json
+{ "content": "Always takes the stairs, avoids elevators", "timestamp": "2026-01-08", ... },
+{ "content": "Podcast backlog getting out of control", "timestamp": "2026-01-22", ... },
+{ "content": "Prefers GUI tools over terminal", "timestamp": "2026-02-12", ... }
+```
 
-**Expected impact:** -5-10% on abstention and preference categories
+### 7.2 Fix: Add Forbidden Facts to 2 Scenario Files
 
-### 7.4 Quantity/Specificity Attacks
+#### multi-topic.json — Add forbidden_facts to standard queries
 
-**Problem:** We never test whether the agent INVENTS details not in memory. "I have 2 cats" → agent might fabricate names.
+For each query, add facts from OTHER topics that could confuse the agent:
 
-**Solution:** Query for details never provided:
-- Fact: "I have 2 cats"
-- Query: "What are your cats' names and ages?"
-- Expected: "2 cats" + abstention on names/ages
-- Forbidden: any specific name or age (hallucination)
+```json
+{
+  "question": "What programming languages do I use at work?",
+  "expected_facts": ["C#", "Python"],
+  "forbidden_facts": ["hiking", "Copenhagen", "guitar"],
+  "query_type": "standard"
+}
+```
 
-**Implementation:** Add to basic-retention.json and abstention.json. Combine counterfactual + abstention judge logic.
+Add `forbidden_facts` to at least 5 of the 10 standard queries, each with 2-3 cross-topic distractors. Target the queries where topics overlap (e.g., "schedule" could pull from both work and personal hobbies).
 
-**Expected impact:** -5-10% on basic retention (catches hallucination)
+#### preference-extraction.json — Add forbidden_facts to standard queries
 
-### 7.5 Early-Position Fact Burial
+```json
+{
+  "question": "How do I prefer to commute to work?",
+  "expected_facts": ["bike", "avoids public transport"],
+  "forbidden_facts": ["car", "subway", "bus"],
+  "query_type": "preference"
+}
+```
 
-**Problem:** Most facts are planted at position 0.3-0.7 (middle of context). Models attend well to the middle. Facts at the very beginning (position 0.01-0.05) are harder to recall — the "lost in the beginning" problem.
+Add `forbidden_facts` with plausible-but-wrong preferences to each query. The agent must not invent preferences that were never demonstrated.
 
-**Solution:** Plant critical facts at extreme early positions (first 5% of context). These are the hardest to attend to in long contexts.
+### 7.3 Fix: Use correction_chain query_type in fact-update-handling.json
 
-**Implementation:** Set `position: 0.02` on 2-3 facts per category in Standard preset.
+The judge already has a `correction_chain` variant (MemoryJudge.cs) that penalizes -30 per outdated value. But the JSON uses `"query_type": "update"` instead. Change the 3 correction chain queries:
 
-**Expected impact:** -5-10% on categories with early-buried facts
+```json
+// BEFORE:
+{ "question": "Where do I work now?", "query_type": "update", ... }
 
-### 7.6 Red Herring Sessions
+// AFTER:
+{ "question": "Where do I work now?", "query_type": "correction_chain", ... }
+```
 
-**Problem:** Session boundaries help the agent organize memory. But what if some sessions are deliberately misleading?
+Change these 3 queries in standard preset (lines ~192, ~210, ~228):
+- "Where do I work now?" (Google → Microsoft → Apple chain)
+- "What's the name of my cat?" (Whiskers → Luna → Mittens chain)
+- "What diet do I follow?" (vegetarian → pescatarian → vegan chain)
 
-**Solution:** Add sessions that discuss the SAME topic as a planted fact but with WRONG details:
-- Session 3 (real): "My anniversary is March 15"
-- Session 7 (red herring): Discussion about planning a party "on March 15" for a coworker
+The `correction_chain` variant scores:
+- Only latest value → 90-100
+- Latest + mentions update → 100
+- Intermediate value → 0-20
+- Original value → 0-10
+- Each forbidden (outdated) value found → -30
 
-The agent must distinguish whose March 15 event is being asked about.
+This is much stricter than `update` which accepts "both old and new = 80+".
 
-**Implementation:** Add red herring turns to noise_between_facts with matching session_id placement. Already partially done in noise-resilience.json.
+---
 
-**Expected impact:** -5-10% on noise resilience
+## Part 8: Additional Hardening Plan (Tier 2) — Full Implementation Details
 
-### 7.7 Cumulative Impact Projection
+### 8.1 Semantic Distractor Corpus
+
+**Problem:** Our corpus files (`context-small.json`, `context-medium.json`, etc.) contain generic ChatGPT conversations about weather, movies, recipes. These are topically UNRELATED to planted facts, making needle-in-haystack trivially easy — the agent just looks for the one turn about "marathon" in a sea of movie reviews.
+
+**Solution:** Create themed corpus files where the filler is topically SIMILAR to the planted facts.
+
+#### Code Changes
+
+**File: `src/AgentEval.Memory/DataLoading/ContextPressureConfig` (in ScenarioDefinition.cs)**
+
+Add a new optional field:
+
+```csharp
+public class ContextPressureConfig
+{
+    [JsonPropertyName("corpus")]
+    public string Corpus { get; set; } = "context-small";
+
+    [JsonPropertyName("max_turns")]
+    public int? MaxTurns { get; set; }
+
+    [JsonPropertyName("sessions_count")]
+    public int? SessionsCount { get; set; }
+
+    // NEW: themed distractor turns injected ALONGSIDE the corpus
+    [JsonPropertyName("distractor_turns")]
+    public List<DistractorTurn>? DistractorTurns { get; set; }
+}
+
+public class DistractorTurn
+{
+    [JsonPropertyName("user")]
+    public string User { get; set; } = "";
+
+    [JsonPropertyName("assistant")]
+    public string Assistant { get; set; } = "";
+
+    [JsonPropertyName("topic")]
+    public string? Topic { get; set; }  // matches fact category for targeted interference
+}
+```
+
+**File: `src/AgentEval.Memory/Evaluators/MemoryBenchmarkRunner.cs`**
+
+In `TryRunFromJsonAsync`, after loading corpus turns, interleave distractor turns:
+
+```csharp
+var corpusTurns = /* existing corpus loading */;
+
+// Inject themed distractor turns at random positions in the corpus
+if (preset.ContextPressure?.DistractorTurns is { Count: > 0 } distractors)
+{
+    var rng = new Random(42); // deterministic for reproducibility
+    foreach (var d in distractors)
+    {
+        var insertAt = rng.Next(0, corpusTurns.Count);
+        corpusTurns.Insert(insertAt, (d.User, d.Assistant));
+    }
+}
+```
+
+#### JSON Example for basic-retention.json
+
+```json
+"context_pressure": {
+  "corpus": "context-stress",
+  "max_turns": 100,
+  "sessions_count": 8,
+  "distractor_turns": [
+    {
+      "user": "My friend just ran the Berlin marathon in 3:45, incredible!",
+      "assistant": "That's an impressive time! Berlin is known for being a fast course.",
+      "topic": "marathon"
+    },
+    {
+      "user": "I watched the Portland Trail Blazers game last night",
+      "assistant": "How did they do? Portland has had an interesting season.",
+      "topic": "portland"
+    },
+    {
+      "user": "My coworker Sarah just got promoted to VP",
+      "assistant": "That's great news! She must have worked hard for that.",
+      "topic": "sarah"
+    },
+    {
+      "user": "I'm thinking of converting my garage into a workshop",
+      "assistant": "That's a popular home improvement project. What would you use it for?",
+      "topic": "home_office"
+    },
+    {
+      "user": "Sam from accounting told me about a great restaurant in San Jose",
+      "assistant": "Oh nice, what kind of cuisine? San Jose has some great spots.",
+      "topic": "sam_city"
+    }
+  ]
+}
+```
+
+These distractors create confusion:
+- "friend ran Berlin marathon" vs planted "I'm training for Portland marathon"
+- "coworker Sarah got promoted" vs planted "colleague Sarah lives in Seattle"
+- "Sam from accounting in San Jose" vs planted "friend Sam in San Francisco"
+
+The agent must distinguish **my** facts from **other people's** similar facts.
+
+#### Recommended distractor counts per category
+
+| Category | Distractor Turns | Topics to Match |
+|---|:---:|---|
+| basic-retention | 8-10 | Match each synthesis/competing fact group |
+| temporal-reasoning | 5-6 | Career events at similar companies |
+| noise-resilience | 6-8 | Similar dates, similar names |
+| multi-topic | 8-10 | Cross-domain confusion (work↔hobby) |
+| abstention | 4-5 | Similar but different personal details |
+| preference-extraction | 5-6 | Opposite preferences from "friends" |
+
+### 8.2 Paraphrase Variation Queries — Full Implementation
+
+**Problem:** Queries use the same keywords as planted facts. "I'm allergic to shellfish" → "What am I allergic to?" is keyword matching.
+
+**No code changes needed.** This is purely a JSON data improvement. Replace direct-match queries with semantic-comprehension queries.
+
+#### Exact replacements in basic-retention.json (standard preset)
+
+```json
+// BEFORE (keyword match):
+{
+  "question": "Where does my sister live?",
+  "expected_facts": ["Sacramento"],
+  "forbidden_facts": ["Seattle", "San Francisco"]
+}
+
+// AFTER (paraphrase — requires inference):
+{
+  "question": "I need to ship a birthday gift to my sister. What city should I send it to?",
+  "expected_facts": ["Sacramento"],
+  "forbidden_facts": ["Seattle", "San Francisco"],
+  "difficulty": "discrimination",
+  "query_type": "standard"
+}
+```
+
+```json
+// BEFORE:
+{
+  "question": "What am I training for?",
+  "expected_facts": ["marathon", "Portland", "sub-4-hours"]
+}
+
+// AFTER:
+{
+  "question": "My physical therapist wants to know about my upcoming athletic commitments. What should I tell them?",
+  "expected_facts": ["marathon", "Portland", "sub-4-hours"],
+  "difficulty": "synthesis",
+  "query_type": "synthesis"
+}
+```
+
+#### Exact replacements in noise-resilience.json (standard preset)
+
+```json
+// BEFORE:
+{
+  "question": "When is my wedding anniversary?",
+  "expected_facts": ["March 15"]
+}
+
+// AFTER:
+{
+  "question": "I'm trying to book a surprise dinner reservation for a very special date with my spouse. When should I book it for?",
+  "expected_facts": ["March 15"],
+  "forbidden_facts": ["deadline", "fiscal year"],
+  "difficulty": "discrimination",
+  "query_type": "standard"
+}
+```
+
+#### Exact replacements in preference-extraction.json (standard preset)
+
+```json
+// BEFORE:
+{
+  "question": "How do I prefer to commute?",
+  "expected_facts": ["bike"]
+}
+
+// AFTER:
+{
+  "question": "It's raining heavily tomorrow. Should I adjust my morning routine or will my commute method handle it?",
+  "expected_facts": ["bike", "might get wet"],
+  "query_type": "preference"
+}
+```
+
+### 8.3 Negation Traps — Full Implementation
+
+**Add negation facts and trap queries to 2 scenario files.**
+
+#### abstention.json — Add to standard preset facts
+
+```json
+{
+  "content": "I stopped drinking coffee 6 months ago",
+  "category": "preference",
+  "importance": 60,
+  "planted_as": "I actually stopped drinking coffee about 6 months ago — sleeping way better now.",
+  "session_id": 3,
+  "timestamp": "2025-09-20"
+},
+{
+  "content": "I sold my car and bike everywhere now",
+  "category": "lifestyle",
+  "importance": 55,
+  "planted_as": "Best decision ever — I sold my car last year and just bike everywhere. No more parking stress.",
+  "session_id": 5,
+  "timestamp": "2025-06-15"
+},
+{
+  "content": "I quit social media completely",
+  "category": "lifestyle",
+  "importance": 50,
+  "planted_as": "I deleted all my social media accounts — Instagram, Twitter, everything. Don't miss it at all.",
+  "session_id": 4,
+  "timestamp": "2025-11-01"
+}
+```
+
+#### abstention.json — Add negation trap queries to standard preset
+
+```json
+{
+  "question": "What's my usual coffee order? I need to tell the new barista.",
+  "expected_facts": ["stopped drinking coffee", "quit", "6 months"],
+  "forbidden_facts": ["latte", "espresso", "americano", "cappuccino"],
+  "difficulty": "negation",
+  "query_type": "counterfactual"
+},
+{
+  "question": "Where do I usually park when I drive to work?",
+  "expected_facts": ["sold car", "bike"],
+  "forbidden_facts": ["garage", "parking lot", "street parking"],
+  "difficulty": "negation",
+  "query_type": "counterfactual"
+},
+{
+  "question": "Can you check my Instagram for that restaurant recommendation?",
+  "expected_facts": ["deleted", "quit social media"],
+  "forbidden_facts": ["instagram.com", "DM", "story", "post"],
+  "difficulty": "negation",
+  "query_type": "counterfactual"
+}
+```
+
+#### preference-extraction.json — Add to standard preset
+
+```json
+// Facts:
+{
+  "content": "I can't stand spicy food, even mild salsa is too much",
+  "category": "preference",
+  "importance": 60,
+  "planted_as": "Ugh, even mild salsa is too much for me. I just can't handle any spice at all.",
+  "session_id": 4,
+  "timestamp": "2026-01-25"
+}
+
+// Query:
+{
+  "question": "We're ordering Thai food for lunch — what spice level should I get for you?",
+  "expected_facts": ["can't stand spicy", "no spice", "mild is too much"],
+  "forbidden_facts": ["medium", "hot", "extra spicy"],
+  "difficulty": "negation",
+  "query_type": "preference"
+}
+```
+
+### 8.4 Quantity/Specificity Attacks — Full Implementation
+
+**Test whether the agent invents details it was never told.**
+
+#### basic-retention.json — Add to standard preset
+
+```json
+// Facts (add):
+{
+  "content": "I have 2 cats at home",
+  "category": "personal",
+  "importance": 50,
+  "planted_as": "Yeah, I have 2 cats at home. They're a handful but I love them.",
+  "session_id": 4,
+  "timestamp": "2026-01-28"
+},
+{
+  "content": "I went to college in the Midwest",
+  "category": "education",
+  "importance": 45,
+  "planted_as": "I went to college somewhere in the Midwest — feels like a lifetime ago.",
+  "session_id": 2,
+  "timestamp": "2025-11-10"
+}
+
+// Queries (add):
+{
+  "question": "What are my cats' names and how old are they?",
+  "expected_facts": ["2 cats"],
+  "forbidden_facts": ["Whiskers", "Luna", "Mittens", "Max", "Bella", "Oliver", "1 year", "2 years", "3 years", "kitten"],
+  "difficulty": "specificity_attack",
+  "query_type": "counterfactual"
+},
+{
+  "question": "Which university did I attend and what was my major?",
+  "expected_facts": ["college", "Midwest"],
+  "forbidden_facts": ["University of", "Ohio State", "Michigan", "Illinois", "engineering", "business", "computer science", "biology"],
+  "difficulty": "specificity_attack",
+  "query_type": "counterfactual"
+}
+```
+
+The `counterfactual` judge variant handles this well: the agent should confirm what it knows ("2 cats", "Midwest college") but say "I don't know" for the details never mentioned. Hallucinating names/ages/universities triggers forbidden fact penalties.
+
+#### abstention.json — Add to standard preset
+
+```json
+{
+  "question": "What's the name of the startup where I work and how many employees does it have?",
+  "expected_facts": ["startup", "2 years"],
+  "forbidden_facts": ["TechCorp", "InnovateCo", "50 employees", "100 employees", "Series A"],
+  "difficulty": "specificity_attack",
+  "query_type": "counterfactual"
+}
+```
+
+### 8.5 Early-Position Fact Burial — Full Implementation
+
+**Trivial change — just modify `position` values in JSON.**
+
+The runner interprets `position: 0.02` as "place this fact at 2% through the corpus" (BuildInterleavedHistory line 430). With 100 turns, position 0.02 = turn 2. The model must attend to the very start of a long context.
+
+#### basic-retention.json — Change 2 existing standard facts
+
+```json
+// BEFORE:
+{ "content": "Colleague Sarah lives in Seattle", "position": 0.3, ... }
+
+// AFTER:
+{ "content": "Colleague Sarah lives in Seattle", "position": 0.02, ... }
+```
+
+```json
+// BEFORE:
+{ "content": "Converting spare bedroom to home office", "position": 0.4, ... }
+
+// AFTER:
+{ "content": "Converting spare bedroom to home office", "position": 0.03, ... }
+```
+
+#### temporal-reasoning.json — Move 1 critical fact to early position
+
+```json
+// BEFORE:
+{ "content": "Started in customer support at a telecom company", "position": "early", ... }
+
+// AFTER (more specific):
+{ "content": "Started in customer support at a telecom company", "position": 0.01, ... }
+```
+
+#### noise-resilience.json — Bury 1 fact extremely early
+
+```json
+// BEFORE:
+{ "content": "Wedding anniversary is March 15", "position": 0.3, ... }
+
+// AFTER:
+{ "content": "Wedding anniversary is March 15", "position": 0.02, ... }
+```
+
+### 8.6 Red Herring Sessions — Full Implementation
+
+**Add noise turns that match the TOPIC of planted facts but with WRONG details.**
+
+#### noise-resilience.json — Add to noise_between_facts in standard preset
+
+```json
+"noise_between_facts": [
+  // EXISTING noise...
+
+  // NEW: Red herrings that match topics of planted facts
+  "My coworker mentioned her anniversary is coming up on March 12th — she's planning a big party.",
+  "The building manager said the March 15th maintenance window will affect the elevators.",
+  "My friend's daughter is named Emma too! Hers just turned 6 in June.",
+  "I was reading about the Andersen fairy tale museum in Denmark — our team is planning a visit.",
+  "There's a new restaurant opening at Vesterbrogade 130, just a few doors down from us.",
+  "My neighbor in apartment 4A was asking if we'd heard the construction noise lately."
+]
+```
+
+Each red herring matches a planted fact's key detail but in a different context:
+- "March 12th" / "March 15th maintenance" vs real "anniversary March 15"
+- "daughter Emma turned 6 in June" vs real "daughter Emma's birthday June 22"
+- "Andersen fairy tale museum" vs real "mother's maiden name Andersen"
+- "Vesterbrogade 130" vs real "Vesterbrogade 127"
+- "apartment 4A" vs real "apartment 4B"
+
+#### basic-retention.json — Add to noise_between_facts in standard preset
+
+```json
+"noise_between_facts": [
+  // EXISTING noise...
+
+  // NEW: Red herrings for competing facts
+  "My manager just got back from a trip to Sacramento — said the weather was perfect.",
+  "The Seattle office is hiring 3 new marketing people, Sarah from HR told me.",
+  "I saw on LinkedIn that someone named Sandra just moved to San Francisco.",
+  "There's a nursing conference in San Diego next month, my aunt Sofia is presenting.",
+  "Our building lawyer Steve is handling the HOA dispute with the adjacent property.",
+  "My running club friend is doing the Portland half-marathon — she's aiming for 1:45."
+]
+```
+
+These create maximum confusion:
+- "trip to Sacramento" vs real "sister Sandra in Sacramento"
+- "Sarah from HR" vs real "colleague Sarah in Seattle marketing"
+- "Sandra moved to San Francisco" vs real "Sandra in Sacramento" + "Sam in San Francisco"
+- "Portland half-marathon 1:45" vs real "Portland full marathon sub-4-hours"
+
+### 8.7 New Judge Variant: `specificity_attack`
+
+The `counterfactual` variant works for quantity/specificity attacks, but a dedicated variant would be cleaner.
+
+**File: `src/AgentEval.Memory/Engine/MemoryJudge.cs`**
+
+Add to the switch statement in `BuildJudgmentPrompt`:
+
+```csharp
+"specificity_attack" => @"
+
+SPECIFICITY ATTACK SCORING: The question asks for DETAILS that were never provided (names, ages, specific institutions, etc.). The agent was only told a general fact.
+- Agent confirms the general fact AND says 'I don't have those specific details': score 90-100
+- Agent confirms the general fact but stays silent on unasked details: score 70-80
+- Agent INVENTS specific details (names, ages, schools) not in memory: score 0-20
+- Each fabricated specific detail in forbidden_facts: -30 points
+The goal is to catch HALLUCINATION of plausible but fictional details.",
+```
+
+### 8.8 Cumulative Impact Projection
 
 | Technique | GPT-4.1 Impact | GPT-4o-mini Impact |
 |-----------|:-:|:-:|
@@ -501,13 +982,31 @@ The agent must distinguish whose March 15 event is being asked about.
 
 This would align our native benchmark with LongMemEval difficulty levels (GPT-4o: 57.7%) while testing fundamentally different cognitive abilities.
 
-### 7.8 Implementation Priority
+### 8.9 Implementation Priority & Effort Matrix
 
-| Priority | Technique | Effort | Impact | Dependencies |
-|:---:|---|:---:|:---:|---|
-| 1 | Semantic distractor corpus | Medium | High | New corpus files |
-| 2 | Paraphrase variation | Low | Medium | JSON data only |
-| 3 | Negation traps | Low | Medium | JSON data + counterfactual judge |
-| 4 | Quantity/specificity attacks | Low | Medium | JSON data + abstention judge |
-| 5 | Early-position burial | Trivial | Medium | Change position values in JSON |
-| 6 | Red herring sessions | Medium | Medium | Themed noise_between_facts |
+| Priority | Technique | Effort | Impact | Code Changes | Data Changes |
+|:---:|---|:---:|:---:|---|---|
+| 0 | Data gap fixes (§7.1-7.3) | Trivial | Medium | None | Add timestamps, forbidden_facts, fix query_type |
+| 1 | Early-position burial (§8.5) | Trivial | Medium | None | Change position values |
+| 2 | Red herring sessions (§8.6) | Low | High | None | Add noise_between_facts entries |
+| 3 | Paraphrase variation (§8.2) | Low | Medium | None | Rewrite query strings |
+| 4 | Negation traps (§8.3) | Low | Medium | None | Add facts + queries to 2 files |
+| 5 | Quantity/specificity attacks (§8.4) | Low | Medium | 1 judge variant (optional) | Add facts + queries to 2 files |
+| 6 | Semantic distractor corpus (§8.1) | Medium | High | Add DistractorTurn model + runner interleaving | Add distractor_turns to 6 JSON files |
+
+**Total effort for Tier 2:** ~2-3 hours of JSON editing + 30 min of C# code changes.
+
+### 8.10 Verification Checklist
+
+After implementing Tier 2:
+
+1. `dotnet test` — all tests pass (update fact count assertions as needed)
+2. Run Quick — scores unchanged (Tier 2 only targets Standard+)
+3. Run Standard GPT-4.1 — expect **55-70%** (vs 93% before hardening)
+4. Run Standard GPT-4o-mini — expect **35-50%** (vs 89% before)
+5. Run Standard GPT-4o — expect **45-60%** (between 4.1 and mini)
+6. Verify model ordering: GPT-4.1 > GPT-4o > GPT-4o-mini
+7. Run Full GPT-4.1 — expect **50-65%** (harder due to CrossSession + Conflict)
+8. Compare to LongMemEval: our Standard ≈ LongMemEval-S difficulty
+9. No category scores 100% on any model (if it does, that category needs more hardening)
+10. No category scores <20% on GPT-4.1 (if it does, the test is broken, not hard)
