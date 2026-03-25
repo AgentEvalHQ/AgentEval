@@ -21,6 +21,20 @@
           "category": "personal",
           "importance": 60,
           "planted_as": "I drive a Honda Civic."
+        },
+        {
+          "content": "My favorite color changed from blue to green",
+          "category": "preference",
+          "importance": 55,
+          "planted_as": "Actually, I've changed my mind — green is my favorite color now, not blue.",
+          "position": "late"
+        },
+        {
+          "content": "I traded the Honda Civic for a Tesla Model 3",
+          "category": "personal",
+          "importance": 65,
+          "planted_as": "Big news — I traded in the Honda Civic for a Tesla Model 3!",
+          "position": "late"
         }
       ],
       "noise_between_facts": [

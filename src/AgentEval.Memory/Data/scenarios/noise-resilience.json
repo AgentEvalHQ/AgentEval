@@ -270,9 +270,7 @@
             "Maria",
             "555-0147",
             "metformin",
-            "500mg",
-            "EpiPen",
-            "peanuts"
+            "500mg"
           ],
           "difficulty": "synthesis",
           "query_type": "standard"
