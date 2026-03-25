@@ -88,20 +88,103 @@ public class MemoryJudge : IMemoryJudge
 
     /// <summary>
     /// Builds a structured prompt for LLM-based fact verification.
+    /// Selects prompt variant based on query_type metadata when available.
     /// </summary>
-    private static string BuildJudgmentPrompt(string response, MemoryQuery query)
+    internal static string BuildJudgmentPrompt(string response, MemoryQuery query)
     {
-        // Abstention mode: expectedFacts is empty, agent should say "I don't know"
-        var isAbstention = query.ExpectedFacts.Count == 0
-            && query.Metadata?.ContainsKey("abstention") == true;
+        // Determine query type from metadata
+        var queryType = GetQueryType(query);
 
-        if (isAbstention)
+        // Abstention mode: triggered by metadata flag OR query_type = "abstention"
+        if (queryType == "abstention")
         {
-            var forbiddenList = query.ForbiddenFacts.Count > 0
-                ? string.Join("\n", query.ForbiddenFacts.Select((f, i) => $"{i + 1}. {f.Content}"))
-                : "Any specific fabricated personal detail";
+            return BuildAbstentionPrompt(response, query);
+        }
 
-            return $@"You are evaluating whether an AI agent correctly ABSTAINED from answering a question about information it was NEVER given.
+        var expectedFactsList = string.Join("\n", query.ExpectedFacts.Select((f, i) => $"{i + 1}. {f.Content}"));
+        var forbiddenFactsList = query.ForbiddenFacts.Count > 0
+            ? string.Join("\n", query.ForbiddenFacts.Select((f, i) => $"{i + 1}. {f.Content}"))
+            : "None";
+
+        // Build the type-specific tolerance clause
+        var toleranceClause = queryType switch
+        {
+            "temporal" => @"
+
+TEMPORAL TOLERANCE: Accept approximate time answers. If the expected answer is '3 months ago' and the agent says '12 weeks ago' or 'about 3 months', that is CORRECT. Allow ±1 unit tolerance on days/weeks/months. Focus on whether the agent correctly identified the temporal relationship, not exact precision.",
+            "preference" => @"
+
+PREFERENCE TOLERANCE: The agent may paraphrase the preference differently. If the expected fact is 'prefers window seats' and the agent says 'likes sitting by the window on flights', that is CORRECT. Accept flexible paraphrasing as long as the core preference is captured.",
+            "update" => @"
+
+UPDATE TOLERANCE: If a fact was updated/corrected, the agent mentioning BOTH the old and new version is acceptable (score 80+). The agent mentioning ONLY the new/correct version is ideal (score 100). The agent mentioning ONLY the old/outdated version without the correction should score low (0-30).",
+            _ => "" // "standard" or unrecognized — no extra clause
+        };
+
+        return $@"You are evaluating whether an AI agent's response demonstrates memory of specific facts.
+
+QUERY: {query.Question}
+
+AGENT'S RESPONSE:
+{response}
+
+EXPECTED FACTS (should be reflected in the response):
+{expectedFactsList}
+
+FORBIDDEN FACTS (should NOT be in the response):
+{forbiddenFactsList}{toleranceClause}
+
+Analyze the response and return a JSON object with this exact structure:
+{{
+  ""found_facts"": [""list of expected fact contents that are clearly reflected in the response""],
+  ""missing_facts"": [""list of expected fact contents that are missing or unclear in the response""],
+  ""forbidden_found"": [""list of forbidden fact contents that were incorrectly mentioned in the response""],
+  ""score"": 85,
+  ""explanation"": ""Brief explanation of the scoring decision""
+}}
+
+Scoring guidelines:
+- 100: All expected facts clearly present, no forbidden facts
+- 80-99: Most expected facts present, minor gaps
+- 60-79: Some expected facts present, significant gaps
+- 40-59: Few expected facts present, major gaps
+- 20-39: Minimal expected facts present
+- 0-19: No or very few expected facts present
+- Subtract 10-20 points per forbidden fact found
+
+Be precise - only mark facts as ""found"" if they are clearly and specifically mentioned or implied in the response.";
+    }
+
+    /// <summary>
+    /// Determines the effective query type from metadata, with backwards-compatible defaults.
+    /// </summary>
+    private static string GetQueryType(MemoryQuery query)
+    {
+        // Explicit query_type in metadata takes priority
+        if (query.Metadata?.TryGetValue("query_type", out var qt) == true && qt is string queryType)
+        {
+            return queryType;
+        }
+
+        // Legacy abstention flag
+        if (query.ExpectedFacts.Count == 0 && query.Metadata?.ContainsKey("abstention") == true)
+        {
+            return "abstention";
+        }
+
+        return "standard";
+    }
+
+    /// <summary>
+    /// Builds the abstention-specific prompt.
+    /// </summary>
+    private static string BuildAbstentionPrompt(string response, MemoryQuery query)
+    {
+        var forbiddenList = query.ForbiddenFacts.Count > 0
+            ? string.Join("\n", query.ForbiddenFacts.Select((f, i) => $"{i + 1}. {f.Content}"))
+            : "Any specific fabricated personal detail";
+
+        return $@"You are evaluating whether an AI agent correctly ABSTAINED from answering a question about information it was NEVER given.
 
 QUERY: {query.Question}
 
@@ -132,45 +215,6 @@ Scoring guidelines:
 - 0-24: Agent confidently provides specific fabricated details (hallucination)
 
 Be strict — any specific fabricated detail (a name, address, number, food item) is a hallucination and should score 0-25.";
-        }
-
-        var expectedFactsList = string.Join("\n", query.ExpectedFacts.Select((f, i) => $"{i + 1}. {f.Content}"));
-        var forbiddenFactsList = query.ForbiddenFacts.Count > 0
-            ? string.Join("\n", query.ForbiddenFacts.Select((f, i) => $"{i + 1}. {f.Content}"))
-            : "None";
-
-        return $@"You are evaluating whether an AI agent's response demonstrates memory of specific facts.
-
-QUERY: {query.Question}
-
-AGENT'S RESPONSE:
-{response}
-
-EXPECTED FACTS (should be reflected in the response):
-{expectedFactsList}
-
-FORBIDDEN FACTS (should NOT be in the response):
-{forbiddenFactsList}
-
-Analyze the response and return a JSON object with this exact structure:
-{{
-  ""found_facts"": [""list of expected fact contents that are clearly reflected in the response""],
-  ""missing_facts"": [""list of expected fact contents that are missing or unclear in the response""],
-  ""forbidden_found"": [""list of forbidden fact contents that were incorrectly mentioned in the response""],
-  ""score"": 85,
-  ""explanation"": ""Brief explanation of the scoring decision""
-}}
-
-Scoring guidelines:
-- 100: All expected facts clearly present, no forbidden facts
-- 80-99: Most expected facts present, minor gaps
-- 60-79: Some expected facts present, significant gaps
-- 40-59: Few expected facts present, major gaps
-- 20-39: Minimal expected facts present
-- 0-19: No or very few expected facts present
-- Subtract 10-20 points per forbidden fact found
-
-Be precise - only mark facts as ""found"" if they are clearly and specifically mentioned or implied in the response.";
     }
 
     /// <summary>

@@ -45,21 +45,21 @@ public class MemoryBenchmarkRunnerTests
     }
 
     [Fact]
-    public async Task RunBenchmarkAsync_StandardPreset_Returns7Categories()
+    public async Task RunBenchmarkAsync_StandardPreset_Returns8Categories()
     {
         var result = await _runner.RunBenchmarkAsync(_agent, MemoryBenchmark.Standard);
 
         Assert.Equal("Standard", result.BenchmarkName);
-        Assert.Equal(7, result.CategoryResults.Count);
+        Assert.Equal(8, result.CategoryResults.Count);
     }
 
     [Fact]
-    public async Task RunBenchmarkAsync_FullPreset_Returns11Categories()
+    public async Task RunBenchmarkAsync_FullPreset_Returns12Categories()
     {
         var result = await _runner.RunBenchmarkAsync(_agent, MemoryBenchmark.Full);
 
         Assert.Equal("Full", result.BenchmarkName);
-        Assert.Equal(11, result.CategoryResults.Count);
+        Assert.Equal(12, result.CategoryResults.Count);
     }
 
     [Fact]
@@ -215,7 +215,7 @@ public class MemoryBenchmarkRunnerTests
     {
         var result = await _runner.RunBenchmarkAsync(_agent, MemoryBenchmark.Standard);
 
-        Assert.Equal(7, result.CategoryResults.Count);
+        Assert.Equal(8, result.CategoryResults.Count);
         // Standard runs deeper scenarios — all should still produce valid scores
         Assert.All(result.CategoryResults.Where(c => !c.Skipped), c =>
         {
@@ -228,7 +228,7 @@ public class MemoryBenchmarkRunnerTests
     {
         var result = await _runner.RunBenchmarkAsync(_agent, MemoryBenchmark.Full);
 
-        Assert.Equal(11, result.CategoryResults.Count);
+        Assert.Equal(12, result.CategoryResults.Count);
         // Non-skipped categories should have valid scores
         Assert.All(result.CategoryResults.Where(c => !c.Skipped), c =>
         {

@@ -12,7 +12,21 @@
         { "question": "What food allergies should you know about?", "expected_facts": ["peanuts"], "difficulty": "direct" }
       ]
     },
-    "standard": { "extends": "quick" },
-    "full": { "extends": "standard" }
+    "standard": {
+      "extends": "quick",
+      "context_pressure": {
+        "corpus": "context-stress",
+        "max_turns": 100,
+        "sessions_count": 8
+      }
+    },
+    "full": {
+      "extends": "standard",
+      "context_pressure": {
+        "corpus": "context-stress",
+        "max_turns": 200,
+        "sessions_count": 15
+      }
+    }
   }
 }

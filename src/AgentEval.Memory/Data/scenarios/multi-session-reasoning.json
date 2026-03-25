@@ -13,7 +13,21 @@
         { "question": "After my flight lands, roughly how long do I have before hotel check-in? And where is the hotel?", "expected_facts": ["8am", "3pm", "Marriott", "Tower Bridge"], "difficulty": "synthesis" }
       ]
     },
-    "standard": { "extends": "quick" },
-    "full": { "extends": "standard" }
+    "standard": {
+      "extends": "quick",
+      "context_pressure": {
+        "corpus": "context-stress",
+        "max_turns": 100,
+        "sessions_count": 8
+      }
+    },
+    "full": {
+      "extends": "standard",
+      "context_pressure": {
+        "corpus": "context-stress",
+        "max_turns": 200,
+        "sessions_count": 15
+      }
+    }
   }
 }

@@ -1,0 +1,225 @@
+{
+  "schema_version": "1.0",
+  "category": "PreferenceExtraction",
+  "name": "Preference Extraction (SSP-style)",
+  "description": "Tests inference of user preferences from indirect behavioral signals, not direct statements. Modeled on LongMemEval's hardest category (SSP: 16-43% across all models).",
+  "context_pressure": {
+    "corpus": "context-small",
+    "max_turns": 15
+  },
+  "presets": {
+    "quick": {
+      "facts": [
+        {
+          "content": "User prefers window seats on flights",
+          "category": "preference",
+          "importance": 60,
+          "planted_as": "I always ask for window seats when I fly — I love watching the clouds and it helps me relax."
+        },
+        {
+          "content": "User prefers Italian food over Asian food",
+          "category": "preference",
+          "importance": 60,
+          "planted_as": "Last three times we went out for team dinner, I chose Italian. There's something about fresh pasta that just hits different. The team wanted Thai once but I suggested the new trattoria instead."
+        },
+        {
+          "content": "User is a morning person and prefers early meetings",
+          "category": "preference",
+          "importance": 70,
+          "planted_as": "I scheduled all my important meetings before 10am this quarter. By afternoon I'm basically useless — my brain shuts off around 3pm. I wake up at 5:30am naturally, no alarm needed."
+        },
+        {
+          "content": "User prefers physical books over e-readers",
+          "category": "preference",
+          "importance": 50,
+          "planted_as": "I just bought three new books from the bookstore on the corner. I know Kindle is more convenient but I can't stand reading on a screen for pleasure. There's something about the feel of paper."
+        },
+        {
+          "content": "User prefers office work over remote work",
+          "category": "preference",
+          "importance": 65,
+          "planted_as": "Working from home was driving me crazy during the pandemic. I was one of the first back in the office when they reopened. I need the separation of spaces — home is home, work is work."
+        }
+      ],
+      "noise_between_facts": [
+        "Do you think AI will replace most software engineering jobs?",
+        "I saw a documentary about deep sea creatures yesterday. Bioluminescence is wild.",
+        "My neighbor's cat keeps wandering into my apartment when I leave the balcony open.",
+        "The new iPhone looks interesting but I'm not sure it's worth upgrading from last year's."
+      ],
+      "queries": [
+        {
+          "question": "I'm booking a flight for this person. Should I try for an aisle seat or window seat?",
+          "expected_facts": ["window"],
+          "difficulty": "indirect"
+        },
+        {
+          "question": "The team is choosing a restaurant for a Friday celebration. What cuisine would this person most enjoy?",
+          "expected_facts": ["Italian", "pasta"],
+          "difficulty": "indirect"
+        },
+        {
+          "question": "When should I schedule a critical strategy meeting with this person for best results?",
+          "expected_facts": ["morning", "before 10", "early"],
+          "difficulty": "indirect"
+        },
+        {
+          "question": "I want to buy this person a thoughtful gift related to their reading hobby. Should I get a Kindle gift card or a bookstore gift card?",
+          "expected_facts": ["bookstore", "physical", "paper"],
+          "difficulty": "indirect"
+        },
+        {
+          "question": "We're restructuring the team. Should I set this person up with a permanent remote arrangement or keep them office-based?",
+          "expected_facts": ["office"],
+          "difficulty": "indirect"
+        }
+      ]
+    },
+    "standard": {
+      "extends": "quick",
+      "context_pressure": {
+        "corpus": "context-stress",
+        "max_turns": 100,
+        "sessions_count": 8
+      },
+      "noise_between_facts": [
+        "Do you think AI will replace most software engineering jobs?",
+        "I saw a documentary about deep sea creatures yesterday.",
+        "My neighbor's cat keeps wandering into my apartment.",
+        "The new iPhone looks interesting but not worth upgrading.",
+        "I've been meaning to try that new coffee place on the corner.",
+        "The weather has been so unpredictable this month.",
+        "I heard the company is expanding to a new office in Berlin.",
+        "My gym membership is up for renewal, might switch places."
+      ],
+      "facts": [
+        {
+          "content": "User prefers command line tools over GUIs",
+          "category": "preference",
+          "importance": 55,
+          "planted_as": "I spent 20 minutes setting up my terminal with custom aliases this morning. My colleagues use VS Code's GUI for everything but I find the command line so much faster. I even do git operations from the terminal — muscle memory at this point.",
+          "position": "early",
+          "session_id": 2
+        },
+        {
+          "content": "User prefers small focused meetings over large all-hands",
+          "category": "preference",
+          "importance": 60,
+          "planted_as": "We had that company all-hands yesterday — 200 people staring at slides for an hour. I barely said a word. Nothing gets decided in those things. Give me a 3-person huddle any day, that's where real decisions happen.",
+          "position": 0.25,
+          "session_id": 3
+        },
+        {
+          "content": "User prefers podcasts over music while working",
+          "category": "preference",
+          "importance": 50,
+          "planted_as": "My commute podcast backlog is getting out of control — I've got like 30 episodes queued up across 5 different shows. I used to listen to music but switched to podcasts about a year ago. Can't go back now, I feel like I'm wasting time if I'm not learning something.",
+          "position": "middle",
+          "session_id": 4
+        },
+        {
+          "content": "User prefers train travel over flying for short distances",
+          "category": "preference",
+          "importance": 55,
+          "planted_as": "I took the train to Hamburg last weekend instead of flying. Four hours, but you can actually open your laptop and get real work done. Plus no security theater, no boarding queues, no cramped middle seats. Anything under 5 hours, I'm taking the train every time.",
+          "position": 0.6,
+          "session_id": 6
+        },
+        {
+          "content": "User prefers async communication over synchronous calls",
+          "category": "preference",
+          "importance": 65,
+          "planted_as": "I declined three meeting invites today and sent detailed written summaries instead. Most things people want to 'hop on a quick call' about can be resolved in a well-crafted message. I block my calendar 2 hours every afternoon for uninterrupted deep work.",
+          "position": 0.35,
+          "session_id": 4
+        }
+      ],
+      "queries": [
+        {
+          "question": "We're choosing development tools for a new team member who will pair with this person. Should we set them up with a graphical IDE or help them configure a terminal-based workflow?",
+          "expected_facts": ["command line", "terminal"],
+          "difficulty": "indirect",
+          "query_type": "preference"
+        },
+        {
+          "question": "I need to get this person's input on a cross-team decision. Should I add them to the all-hands agenda or set up a small breakout session?",
+          "expected_facts": ["small", "focused", "huddle"],
+          "difficulty": "indirect",
+          "query_type": "preference"
+        },
+        {
+          "question": "Planning a team trip to a city 3 hours away. Should I book flights or train tickets for this person?",
+          "expected_facts": ["train"],
+          "difficulty": "indirect",
+          "query_type": "preference"
+        },
+        {
+          "question": "I need a quick status update from this person. Should I schedule a 15-minute call or send them a Slack message asking them to write it up?",
+          "expected_facts": ["written", "message", "async"],
+          "difficulty": "indirect",
+          "query_type": "preference"
+        },
+        {
+          "question": "Putting together a care package for this person's long commute. Should I include a Spotify Premium card or a podcast app subscription?",
+          "expected_facts": ["podcast"],
+          "difficulty": "indirect",
+          "query_type": "preference"
+        }
+      ]
+    },
+    "full": {
+      "extends": "standard",
+      "context_pressure": {
+        "corpus": "context-stress",
+        "max_turns": 200,
+        "sessions_count": 15
+      },
+      "facts": [
+        {
+          "content": "User prefers sparkling water over still water",
+          "category": "preference",
+          "importance": 40,
+          "planted_as": "Can you grab me a sparkling water? I always get sparkling — still water just tastes flat to me. I go through like 4 bottles a day.",
+          "position": 0.12,
+          "session_id": 8
+        },
+        {
+          "content": "User prefers dark mode in all applications",
+          "category": "preference",
+          "importance": 45,
+          "planted_as": "First thing I do on any new device is switch everything to dark mode. My eyes are really sensitive to bright screens, especially at night.",
+          "position": 0.4,
+          "session_id": 10
+        },
+        {
+          "content": "User prefers standing desk over sitting",
+          "category": "preference",
+          "importance": 50,
+          "planted_as": "I've been using a standing desk for the past two years. My back problems completely went away. I can't go back to sitting for 8 hours now — it feels wrong.",
+          "position": 0.65,
+          "session_id": 12
+        }
+      ],
+      "queries": [
+        {
+          "question": "We're setting up a new workstation for this person. What ergonomic setup should we order?",
+          "expected_facts": ["standing desk", "standing"],
+          "difficulty": "indirect",
+          "query_type": "preference"
+        },
+        {
+          "question": "Stocking the office kitchen for a team meeting this person is attending. Should we order still or sparkling water?",
+          "expected_facts": ["sparkling"],
+          "difficulty": "indirect",
+          "query_type": "preference"
+        },
+        {
+          "question": "Configuring a new laptop for this person. What display setting should we default to?",
+          "expected_facts": ["dark mode", "dark"],
+          "difficulty": "indirect",
+          "query_type": "preference"
+        }
+      ]
+    }
+  }
+}

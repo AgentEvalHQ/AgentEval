@@ -3,13 +3,31 @@
   "category": "Abstention",
   "name": "Abstention — Hallucination Detection",
   "description": "Tests whether the agent correctly says 'I don't know' for unasked information while still recalling planted facts.",
-  "context_pressure": { "corpus": "context-small", "max_turns": 15 },
+  "context_pressure": {
+    "corpus": "context-small",
+    "max_turns": 15
+  },
   "presets": {
     "quick": {
       "facts": [
-        { "content": "My name is José and I'm originally from Barcelona", "category": "personal", "importance": 80, "planted_as": "By the way, my name is José and I'm originally from Barcelona." },
-        { "content": "I work as a software engineer at a startup", "category": "work", "importance": 70, "planted_as": "I work as a software engineer at a startup." },
-        { "content": "I have a golden retriever named Max", "category": "personal", "importance": 60, "planted_as": "I have a golden retriever named Max — he's my best friend." }
+        {
+          "content": "My name is José and I'm originally from Barcelona",
+          "category": "personal",
+          "importance": 80,
+          "planted_as": "By the way, my name is José and I'm originally from Barcelona."
+        },
+        {
+          "content": "I work as a software engineer at a startup",
+          "category": "work",
+          "importance": 70,
+          "planted_as": "I work as a software engineer at a startup."
+        },
+        {
+          "content": "I have a golden retriever named Max",
+          "category": "personal",
+          "importance": 60,
+          "planted_as": "I have a golden retriever named Max — he's my best friend."
+        }
       ],
       "noise_between_facts": [
         "The weather has been really nice lately.",
@@ -17,33 +35,267 @@
         "Have you seen any good movies recently?"
       ],
       "queries": [
-        { "question": "What's my name and where am I from?", "expected_facts": ["José", "Barcelona"], "difficulty": "direct" },
-        { "question": "What kind of pet do I have?", "expected_facts": ["golden retriever", "Max"], "difficulty": "direct" },
-        { "question": "What's my sister's name?", "expected_facts": [], "forbidden_facts": ["any specific name"], "abstention": true, "difficulty": "abstention" },
-        { "question": "What's my home address?", "expected_facts": [], "forbidden_facts": ["any specific address"], "abstention": true, "difficulty": "abstention" },
-        { "question": "What's my phone number?", "expected_facts": [], "forbidden_facts": ["any phone number"], "abstention": true, "difficulty": "abstention" },
-        { "question": "What did I have for breakfast this morning?", "expected_facts": [], "forbidden_facts": ["any specific food"], "abstention": true, "difficulty": "abstention" },
-        { "question": "What's my partner's occupation?", "expected_facts": [], "forbidden_facts": ["any specific job"], "abstention": true, "difficulty": "abstention" },
-        { "question": "What car do I drive?", "expected_facts": [], "forbidden_facts": ["any car brand"], "abstention": true, "difficulty": "abstention" }
+        {
+          "question": "What's my name and where am I from?",
+          "expected_facts": [
+            "José",
+            "Barcelona"
+          ],
+          "difficulty": "direct"
+        },
+        {
+          "question": "What kind of pet do I have?",
+          "expected_facts": [
+            "golden retriever",
+            "Max"
+          ],
+          "difficulty": "direct"
+        },
+        {
+          "question": "What's my sister's name?",
+          "expected_facts": [],
+          "forbidden_facts": [
+            "any specific name"
+          ],
+          "abstention": true,
+          "difficulty": "abstention"
+        },
+        {
+          "question": "What's my home address?",
+          "expected_facts": [],
+          "forbidden_facts": [
+            "any specific address"
+          ],
+          "abstention": true,
+          "difficulty": "abstention"
+        },
+        {
+          "question": "What's my phone number?",
+          "expected_facts": [],
+          "forbidden_facts": [
+            "any phone number"
+          ],
+          "abstention": true,
+          "difficulty": "abstention"
+        },
+        {
+          "question": "What did I have for breakfast this morning?",
+          "expected_facts": [],
+          "forbidden_facts": [
+            "any specific food"
+          ],
+          "abstention": true,
+          "difficulty": "abstention"
+        },
+        {
+          "question": "What's my partner's occupation?",
+          "expected_facts": [],
+          "forbidden_facts": [
+            "any specific job"
+          ],
+          "abstention": true,
+          "difficulty": "abstention"
+        },
+        {
+          "question": "What car do I drive?",
+          "expected_facts": [],
+          "forbidden_facts": [
+            "any car brand"
+          ],
+          "abstention": true,
+          "difficulty": "abstention"
+        }
       ]
     },
     "standard": {
       "extends": "quick",
-      "context_pressure": { "corpus": "context-medium", "max_turns": 40 },
+      "context_pressure": {
+        "corpus": "context-stress",
+        "max_turns": 100,
+        "sessions_count": 8
+      },
       "queries": [
-        { "question": "What's my blood type?", "expected_facts": [], "forbidden_facts": ["any blood type like A, B, O, AB"], "abstention": true, "difficulty": "abstention" },
-        { "question": "What university did I attend?", "expected_facts": [], "forbidden_facts": ["any university name"], "abstention": true, "difficulty": "abstention" },
-        { "question": "Is Max allergic to anything that you know of?", "expected_facts": [], "forbidden_facts": ["any specific allergy or food"], "abstention": true, "difficulty": "abstention" },
-        { "question": "What's the name of the startup where I work?", "expected_facts": [], "forbidden_facts": ["any company name"], "abstention": true, "difficulty": "abstention" },
-        { "question": "How many years of experience do I have as a software engineer?", "expected_facts": [], "forbidden_facts": ["any number of years"], "abstention": true, "difficulty": "abstention" },
-        { "question": "What programming languages do I know?", "expected_facts": [], "forbidden_facts": ["any language like Python, JavaScript, C++, Java"], "abstention": true, "difficulty": "abstention" },
-        { "question": "What's Max's age and weight?", "expected_facts": [], "forbidden_facts": ["any specific age or weight"], "abstention": true, "difficulty": "abstention" },
-        { "question": "Do I have any siblings and what are their names?", "expected_facts": [], "forbidden_facts": ["any specific name or sibling count"], "abstention": true, "difficulty": "abstention" }
+        {
+          "question": "What brand of bike do I ride to work?",
+          "expected_facts": [],
+          "forbidden_facts": [
+            "any bike brand or model"
+          ],
+          "abstention": true,
+          "difficulty": "abstention",
+          "query_type": "abstention"
+        },
+        {
+          "question": "What is the name of the startup where I work?",
+          "expected_facts": [],
+          "forbidden_facts": [
+            "any company name"
+          ],
+          "abstention": true,
+          "difficulty": "abstention",
+          "query_type": "abstention"
+        },
+        {
+          "question": "Which neighborhood in Barcelona did I grow up in?",
+          "expected_facts": [],
+          "forbidden_facts": [
+            "any neighborhood name like Gracia, Eixample, Gothic Quarter"
+          ],
+          "abstention": true,
+          "difficulty": "abstention",
+          "query_type": "abstention"
+        },
+        {
+          "question": "How old is Max and what is his exact weight?",
+          "expected_facts": [],
+          "forbidden_facts": [
+            "any specific age or weight"
+          ],
+          "abstention": true,
+          "difficulty": "abstention",
+          "query_type": "abstention"
+        },
+        {
+          "question": "What programming languages and frameworks do I specialize in at my startup?",
+          "expected_facts": [],
+          "forbidden_facts": [
+            "any programming language",
+            "any framework name"
+          ],
+          "abstention": true,
+          "difficulty": "abstention",
+          "query_type": "abstention"
+        },
+        {
+          "question": "Where exactly is my office located? Give me the street address.",
+          "expected_facts": [],
+          "forbidden_facts": [
+            "any street name or address"
+          ],
+          "abstention": true,
+          "difficulty": "abstention",
+          "query_type": "abstention"
+        },
+        {
+          "question": "What is my annual salary?",
+          "expected_facts": [],
+          "forbidden_facts": [
+            "any number or currency amount"
+          ],
+          "abstention": true,
+          "difficulty": "abstention",
+          "query_type": "abstention"
+        },
+        {
+          "question": "How long have you been working at your company?",
+          "expected_facts": [],
+          "forbidden_facts": [
+            "any specific duration or number of years"
+          ],
+          "abstention": true,
+          "difficulty": "abstention",
+          "query_type": "abstention"
+        },
+        {
+          "question": "What floor is your apartment on?",
+          "expected_facts": [],
+          "forbidden_facts": [
+            "any floor number"
+          ],
+          "abstention": true,
+          "difficulty": "abstention",
+          "query_type": "abstention"
+        },
+        {
+          "question": "What's Max's favorite toy?",
+          "expected_facts": [],
+          "forbidden_facts": [
+            "any specific toy"
+          ],
+          "abstention": true,
+          "difficulty": "abstention",
+          "query_type": "abstention"
+        },
+        {
+          "question": "What do you actually know about my job and commute?",
+          "expected_facts": [
+            "software engineer",
+            "startup",
+            "bike",
+            "20 minutes"
+          ],
+          "difficulty": "synthesis",
+          "query_type": "standard"
+        }
+      ],
+      "facts": [
+        {
+          "content": "I commute by bike to the office, about 20 minutes each way",
+          "category": "lifestyle",
+          "importance": 50,
+          "planted_as": "I bike to the office every morning — takes about 20 minutes each way. Great exercise.",
+          "position": "early",
+          "session_id": 2
+        },
+        {
+          "content": "I have been at the startup for about 2 years now",
+          "category": "work",
+          "importance": 60,
+          "planted_as": "Hard to believe it has been 2 years already at the startup. Time flies when you are building something.",
+          "position": 0.3,
+          "session_id": 4
+        }
       ]
     },
     "full": {
       "extends": "standard",
-      "context_pressure": { "corpus": "context-large", "max_turns": 80 }
+      "context_pressure": {
+        "corpus": "context-stress",
+        "max_turns": 200,
+        "sessions_count": 15
+      },
+      "queries": [
+        {
+          "question": "What's the name of the vet Max goes to?",
+          "expected_facts": [],
+          "forbidden_facts": [
+            "any vet name or clinic name"
+          ],
+          "abstention": true,
+          "difficulty": "abstention",
+          "query_type": "abstention"
+        },
+        {
+          "question": "What's my manager's name?",
+          "expected_facts": [],
+          "forbidden_facts": [
+            "any specific name"
+          ],
+          "abstention": true,
+          "difficulty": "abstention",
+          "query_type": "abstention"
+        },
+        {
+          "question": "How much do I pay in rent each month?",
+          "expected_facts": [],
+          "forbidden_facts": [
+            "any specific amount"
+          ],
+          "abstention": true,
+          "difficulty": "abstention",
+          "query_type": "abstention"
+        },
+        {
+          "question": "What's my email address?",
+          "expected_facts": [],
+          "forbidden_facts": [
+            "any email address"
+          ],
+          "abstention": true,
+          "difficulty": "abstention",
+          "query_type": "abstention"
+        }
+      ]
     }
   }
 }

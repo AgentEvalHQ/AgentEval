@@ -3,15 +3,43 @@
   "category": "MultiTopic",
   "name": "Multi-Topic Memory",
   "description": "Tests memory across multiple conversation domains to check cross-contamination.",
-  "context_pressure": { "corpus": "context-small", "max_turns": 15 },
+  "context_pressure": {
+    "corpus": "context-small",
+    "max_turns": 15
+  },
   "presets": {
     "quick": {
       "facts": [
-        { "content": "My dog's name is Max", "category": "pets", "importance": 60, "planted_as": "My dog's name is Max." },
-        { "content": "I work at Contoso", "category": "work", "importance": 70, "planted_as": "I work at Contoso." },
-        { "content": "My birthday is March 15th", "category": "personal", "importance": 60, "planted_as": "My birthday is March 15th." },
-        { "content": "I speak Danish and English", "category": "languages", "importance": 50, "planted_as": "I speak Danish and English." },
-        { "content": "I take vitamin D supplements", "category": "health", "importance": 50, "planted_as": "I take vitamin D supplements daily." }
+        {
+          "content": "My dog's name is Max",
+          "category": "pets",
+          "importance": 60,
+          "planted_as": "My dog's name is Max."
+        },
+        {
+          "content": "I work at Contoso",
+          "category": "work",
+          "importance": 70,
+          "planted_as": "I work at Contoso."
+        },
+        {
+          "content": "My birthday is March 15th",
+          "category": "personal",
+          "importance": 60,
+          "planted_as": "My birthday is March 15th."
+        },
+        {
+          "content": "I speak Danish and English",
+          "category": "languages",
+          "importance": 50,
+          "planted_as": "I speak Danish and English."
+        },
+        {
+          "content": "I take vitamin D supplements",
+          "category": "health",
+          "importance": 50,
+          "planted_as": "I take vitamin D supplements daily."
+        }
       ],
       "noise_between_facts": [
         "The sunset was beautiful yesterday.",
@@ -19,15 +47,45 @@
         "My favorite season is autumn."
       ],
       "queries": [
-        { "question": "What do you know about my pet?", "expected_facts": ["Max", "dog"], "difficulty": "indirect" },
-        { "question": "Where do I work?", "expected_facts": ["Contoso"], "difficulty": "direct" },
-        { "question": "When is my birthday?", "expected_facts": ["March 15"], "difficulty": "direct" },
-        { "question": "What languages do I speak?", "expected_facts": ["Danish", "English"], "difficulty": "direct" }
+        {
+          "question": "What do you know about my pet?",
+          "expected_facts": [
+            "Max",
+            "dog"
+          ],
+          "difficulty": "indirect"
+        },
+        {
+          "question": "Where do I work?",
+          "expected_facts": [
+            "Contoso"
+          ],
+          "difficulty": "direct"
+        },
+        {
+          "question": "When is my birthday?",
+          "expected_facts": [
+            "March 15"
+          ],
+          "difficulty": "direct"
+        },
+        {
+          "question": "What languages do I speak?",
+          "expected_facts": [
+            "Danish",
+            "English"
+          ],
+          "difficulty": "direct"
+        }
       ]
     },
     "standard": {
       "extends": "quick",
-      "context_pressure": { "corpus": "context-medium", "max_turns": 40 },
+      "context_pressure": {
+        "corpus": "context-stress",
+        "max_turns": 100,
+        "sessions_count": 8
+      },
       "noise_between_facts": [
         "The sunset was beautiful yesterday.",
         "I tried a new restaurant last week.",
@@ -40,32 +98,206 @@
         "I've been listening to a lot of Nordic folk music."
       ],
       "facts": [
-        { "content": "Max is a 7-year-old golden retriever who needs medication for arthritis", "category": "pets", "importance": 70, "planted_as": "Actually, Max is a 7-year-old golden retriever now, and he needs some arthritis medication these days." },
-        { "content": "I work in the Copenhagen office of Contoso as a senior engineer", "category": "work", "importance": 75, "planted_as": "I work at Contoso's Copenhagen office — I'm a senior engineer there." },
-        { "content": "I also speak some Swedish and a bit of German from language courses", "category": "languages", "importance": 50, "planted_as": "I also picked up some Swedish in a language course, and I'm learning a bit of German too." },
-        { "content": "I have seasonal depression tendencies and the vitamin D helps with that", "category": "health", "importance": 80, "planted_as": "I have to be careful about seasonal depression, which is why the vitamin D supplements are really important for me." },
-        { "content": "I drive a blue Honda Civic and commute 25 minutes to work", "category": "transportation", "importance": 55, "planted_as": "I drive a blue Honda Civic — my commute is about 25 minutes to the office." },
-        { "content": "My favorite restaurant is Noma and I go there on special occasions", "category": "food", "importance": 45, "planted_as": "My favorite restaurant is Noma — I only go for really special occasions though, it's pricey." },
-        { "content": "I'm reading Sapiens by Yuval Harari and just started the third chapter", "category": "hobbies", "importance": 40, "planted_as": "I'm currently reading Sapiens by Yuval Harari — I'm on the third chapter. Fascinating book." },
-        { "content": "My annual salary review is in June and I'm hoping for a promotion to staff engineer", "category": "work", "importance": 70, "planted_as": "My salary review is coming up in June — I'm really hoping for a promotion to staff engineer." },
-        { "content": "Max goes to a dog daycare called Happy Paws on days I'm in the office", "category": "pets", "importance": 55, "planted_as": "When I'm at the office, Max goes to a dog daycare called Happy Paws. They're great with him." },
-        { "content": "I have a savings goal of 50000 DKK by end of year for a down payment", "category": "financial", "importance": 65, "planted_as": "I'm trying to save 50,000 DKK by end of year — working toward a down payment on an apartment." },
-        { "content": "My team at Contoso has 8 people and we use Scrum with 2-week sprints", "category": "work", "importance": 55, "planted_as": "My team has 8 people and we do Scrum — 2-week sprints, the usual." },
-        { "content": "I have a recurring migraine issue and take sumatriptan when it hits", "category": "health", "importance": 75, "planted_as": "I also get migraines occasionally — I take sumatriptan when it hits. It helps a lot." }
+        {
+          "content": "Max is a 7-year-old golden retriever who needs medication for arthritis",
+          "category": "pets",
+          "importance": 70,
+          "planted_as": "Actually, Max is a 7-year-old golden retriever now, and he needs some arthritis medication these days.",
+          "position": 0.1,
+          "session_id": 2
+        },
+        {
+          "content": "I work in the Copenhagen office of Contoso as a senior engineer",
+          "category": "work",
+          "importance": 75,
+          "planted_as": "I work at Contoso's Copenhagen office — I'm a senior engineer there.",
+          "position": 0.2,
+          "session_id": 2
+        },
+        {
+          "content": "I also speak some Swedish and a bit of German from language courses",
+          "category": "languages",
+          "importance": 50,
+          "planted_as": "I also picked up some Swedish in a language course, and I'm learning a bit of German too.",
+          "position": 0.3,
+          "session_id": 3
+        },
+        {
+          "content": "I have seasonal depression tendencies and the vitamin D helps with that",
+          "category": "health",
+          "importance": 80,
+          "planted_as": "I have to be careful about seasonal depression, which is why the vitamin D supplements are really important for me.",
+          "position": 0.4,
+          "session_id": 4
+        },
+        {
+          "content": "I drive a blue Honda Civic and commute 25 minutes to work",
+          "category": "transportation",
+          "importance": 55,
+          "planted_as": "I drive a blue Honda Civic — my commute is about 25 minutes to the office.",
+          "position": 0.5,
+          "session_id": 5
+        },
+        {
+          "content": "My favorite restaurant is Noma and I go there on special occasions",
+          "category": "food",
+          "importance": 45,
+          "planted_as": "My favorite restaurant is Noma — I only go for really special occasions though, it's pricey.",
+          "position": 0.55,
+          "session_id": 5
+        },
+        {
+          "content": "I'm reading Sapiens by Yuval Harari and just started the third chapter",
+          "category": "hobbies",
+          "importance": 40,
+          "planted_as": "I'm currently reading Sapiens by Yuval Harari — I'm on the third chapter. Fascinating book.",
+          "position": 0.6,
+          "session_id": 6
+        },
+        {
+          "content": "My annual salary review is in June and I'm hoping for a promotion to staff engineer",
+          "category": "work",
+          "importance": 70,
+          "planted_as": "My salary review is coming up in June — I'm really hoping for a promotion to staff engineer.",
+          "position": 0.15,
+          "session_id": 3
+        },
+        {
+          "content": "Max goes to a dog daycare called Happy Paws on days I'm in the office",
+          "category": "pets",
+          "importance": 55,
+          "planted_as": "When I'm at the office, Max goes to a dog daycare called Happy Paws. They're great with him.",
+          "position": 0.25,
+          "session_id": 3
+        },
+        {
+          "content": "I have a savings goal of 50000 DKK by end of year for a down payment",
+          "category": "financial",
+          "importance": 65,
+          "planted_as": "I'm trying to save 50,000 DKK by end of year — working toward a down payment on an apartment.",
+          "position": 0.35,
+          "session_id": 4
+        },
+        {
+          "content": "My team at Contoso has 8 people and we use Scrum with 2-week sprints",
+          "category": "work",
+          "importance": 55,
+          "planted_as": "My team has 8 people and we do Scrum — 2-week sprints, the usual.",
+          "position": 0.45,
+          "session_id": 5
+        },
+        {
+          "content": "I have a recurring migraine issue and take sumatriptan when it hits",
+          "category": "health",
+          "importance": 75,
+          "planted_as": "I also get migraines occasionally — I take sumatriptan when it hits. It helps a lot.",
+          "position": 0.65,
+          "session_id": 7
+        }
       ],
       "queries": [
-        { "question": "Tell me everything about your dog — what breed, how old, health concerns, and what happens when you're at work?", "expected_facts": ["Max", "golden retriever", "7-year-old", "arthritis", "medication", "Happy Paws", "daycare"], "difficulty": "synthesis" },
-        { "question": "What's your complete work picture — company, role, team size, methodology, location, and career ambitions?", "expected_facts": ["Contoso", "Copenhagen", "senior engineer", "8 people", "Scrum", "2-week sprints", "staff engineer", "June"], "difficulty": "synthesis" },
-        { "question": "What are ALL of your health issues and what medications or supplements do you take for each?", "expected_facts": ["seasonal depression", "vitamin D", "migraine", "sumatriptan"], "difficulty": "synthesis" },
-        { "question": "If I were planning a birthday celebration for you on March 15th, what restaurant would you want, what languages could the guests speak, and what health accommodations would be needed?", "expected_facts": ["March 15", "Noma", "Danish", "English", "Swedish", "German", "seasonal depression", "migraine"], "difficulty": "synthesis" },
-        { "question": "What are your financial goals and how do your work prospects factor in?", "expected_facts": ["50000 DKK", "down payment", "salary review", "June", "staff engineer"], "difficulty": "synthesis" },
-        { "question": "Walk me through a typical weekday — commute, work, dog care, evening activities.", "expected_facts": ["Honda Civic", "25 minutes", "Contoso", "Happy Paws", "Sapiens", "Scrum"], "difficulty": "synthesis" },
-        { "question": "What languages can you communicate in, and what book are you reading?", "expected_facts": ["Danish", "English", "Swedish", "German", "Sapiens", "Yuval Harari"], "difficulty": "indirect" }
+        {
+          "question": "Tell me everything about your dog — what breed, how old, health concerns, and what happens when you're at work?",
+          "expected_facts": [
+            "Max",
+            "golden retriever",
+            "7-year-old",
+            "arthritis",
+            "medication",
+            "Happy Paws",
+            "daycare"
+          ],
+          "difficulty": "synthesis",
+          "query_type": "standard"
+        },
+        {
+          "question": "What's your complete work picture — company, role, team size, methodology, location, and career ambitions?",
+          "expected_facts": [
+            "Contoso",
+            "Copenhagen",
+            "senior engineer",
+            "8 people",
+            "Scrum",
+            "2-week sprints",
+            "staff engineer",
+            "June"
+          ],
+          "difficulty": "synthesis",
+          "query_type": "standard"
+        },
+        {
+          "question": "What are ALL of your health issues and what medications or supplements do you take for each?",
+          "expected_facts": [
+            "seasonal depression",
+            "vitamin D",
+            "migraine",
+            "sumatriptan"
+          ],
+          "difficulty": "synthesis",
+          "query_type": "standard"
+        },
+        {
+          "question": "If I were planning a birthday celebration for you on March 15th, what restaurant would you want, what languages could the guests speak, and what health accommodations would be needed?",
+          "expected_facts": [
+            "March 15",
+            "Noma",
+            "Danish",
+            "English",
+            "Swedish",
+            "German",
+            "seasonal depression",
+            "migraine"
+          ],
+          "difficulty": "synthesis",
+          "query_type": "standard"
+        },
+        {
+          "question": "What are your financial goals and how do your work prospects factor in?",
+          "expected_facts": [
+            "50000 DKK",
+            "down payment",
+            "salary review",
+            "June",
+            "staff engineer"
+          ],
+          "difficulty": "synthesis",
+          "query_type": "standard"
+        },
+        {
+          "question": "Walk me through a typical weekday — commute, work, dog care, evening activities.",
+          "expected_facts": [
+            "Honda Civic",
+            "25 minutes",
+            "Contoso",
+            "Happy Paws",
+            "Sapiens",
+            "Scrum"
+          ],
+          "difficulty": "synthesis",
+          "query_type": "standard"
+        },
+        {
+          "question": "What languages can you communicate in, and what book are you reading?",
+          "expected_facts": [
+            "Danish",
+            "English",
+            "Swedish",
+            "German",
+            "Sapiens",
+            "Yuval Harari"
+          ],
+          "difficulty": "indirect",
+          "query_type": "standard"
+        }
       ]
     },
     "full": {
       "extends": "standard",
-      "context_pressure": { "corpus": "context-large", "max_turns": 80 }
+      "context_pressure": {
+        "corpus": "context-stress",
+        "max_turns": 200,
+        "sessions_count": 15
+      }
     }
   }
 }

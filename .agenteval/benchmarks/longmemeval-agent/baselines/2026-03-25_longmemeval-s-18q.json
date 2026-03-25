@@ -1,0 +1,84 @@
+{
+  "id": "bl-1f6e93da",
+  "name": "LongMemEval-S 18q",
+  "timestamp": "2026-03-25T04:31:38.0688172+00:00",
+  "configuration_id": "E0549E44F8F1",
+  "agent_config": {
+    "agent_name": "LongMemEval-Agent",
+    "model_id": "gpt-4.1",
+    "reducer_strategy": "None",
+    "context_providers": [],
+    "memory_provider": "InMemoryChatHistory (history injection)",
+    "custom_config": {},
+    "configuration_id": "E0549E44F8F1"
+  },
+  "benchmark": {
+    "preset": "longmemeval-S",
+    "duration": "00:01:43.5449761",
+    "total_llm_calls": 36,
+    "benchmark_source": "longmemeval"
+  },
+  "overall_score": 61.111111111111114,
+  "grade": "D",
+  "stars": 3,
+  "category_results": {
+    "single-session-user": {
+      "score": 100,
+      "grade": "A",
+      "skipped": false,
+      "scenario_count": 3
+    },
+    "multi-session": {
+      "score": 50,
+      "grade": "F",
+      "skipped": false,
+      "scenario_count": 4
+    },
+    "single-session-preference": {
+      "score": 0,
+      "grade": "F",
+      "skipped": false,
+      "scenario_count": 1
+    },
+    "temporal-reasoning": {
+      "score": 20,
+      "grade": "F",
+      "skipped": false,
+      "scenario_count": 5
+    },
+    "knowledge-update": {
+      "score": 100,
+      "grade": "A",
+      "skipped": false,
+      "scenario_count": 3
+    },
+    "single-session-assistant": {
+      "score": 100,
+      "grade": "A",
+      "skipped": false,
+      "scenario_count": 2
+    },
+    "abstention": {
+      "score": 100,
+      "grade": "A",
+      "skipped": false,
+      "scenario_count": 1
+    }
+  },
+  "dimension_scores": {
+    "Recall": 66.66666666666667,
+    "Temporal": 60,
+    "Synthesis": 50,
+    "Abstention": 100
+  },
+  "recommendations": [
+    "multi-session: accuracy 50% is moderate \u2014 consider improving recall for this category.",
+    "single-session-preference: accuracy 0% is below 50% \u2014 review agent\u0027s handling of this question type.",
+    "temporal-reasoning: accuracy 20% is below 50% \u2014 review agent\u0027s handling of this question type."
+  ],
+  "tags": [
+    "longmemeval",
+    "cross-platform",
+    "binary-scoring"
+  ]
+}

@@ -38,11 +38,11 @@ public class AbstentionTests
     {
         var standard = MemoryBenchmark.Standard;
 
-        Assert.Equal(7, standard.Categories.Count);
+        Assert.Equal(8, standard.Categories.Count);
         Assert.Contains(standard.Categories, c => c.ScenarioType == BenchmarkScenarioType.Abstention);
 
         var abstention = standard.Categories.First(c => c.ScenarioType == BenchmarkScenarioType.Abstention);
-        Assert.Equal(0.12, abstention.Weight);
+        Assert.Equal(0.10, abstention.Weight);
         Assert.Equal("Abstention", abstention.Name);
     }
 
@@ -51,7 +51,7 @@ public class AbstentionTests
     {
         var full = MemoryBenchmark.Full;
 
-        Assert.Equal(11, full.Categories.Count);
+        Assert.Equal(12, full.Categories.Count);
         Assert.Contains(full.Categories, c => c.ScenarioType == BenchmarkScenarioType.Abstention);
     }
 

@@ -20,7 +20,8 @@ public class ScenarioLoaderTests
     [InlineData("abstention")]
     [InlineData("conflict-resolution")]
     [InlineData("multi-session-reasoning")]
-    public void Load_All11Scenarios_DeserializeCorrectly(string scenarioName)
+    [InlineData("preference-extraction")]
+    public void Load_All12Scenarios_DeserializeCorrectly(string scenarioName)
     {
         var scenario = ScenarioLoader.Load(scenarioName);
 
@@ -33,7 +34,7 @@ public class ScenarioLoaderTests
     [Theory]
     [InlineData("basic-retention", "quick", 7)]    // 7 facts in quick
     [InlineData("basic-retention", "standard", 20)] // 7 + 13 inherited
-    [InlineData("basic-retention", "full", 22)]     // 7 + 13 + 2 inherited
+    [InlineData("basic-retention", "full", 24)]     // 7 + 13 + 4 inherited
     [InlineData("abstention", "quick", 3)]          // 3 planted facts
     [InlineData("noise-resilience", "quick", 4)]    // 4 buried facts
     public void ResolvePreset_InheritanceMergesFacts(string scenarioName, string preset, int expectedFactCount)
@@ -63,9 +64,9 @@ public class ScenarioLoaderTests
         var quickResolved = ScenarioLoader.ResolvePreset(scenario, "quick");
         var standardResolved = ScenarioLoader.ResolvePreset(scenario, "standard");
 
-        // Quick uses context-small, Standard overrides to context-medium
+        // Quick uses context-small, Standard overrides to context-stress
         Assert.Equal("context-small", quickResolved.ContextPressure?.Corpus);
-        Assert.Equal("context-medium", standardResolved.ContextPressure?.Corpus);
+        Assert.Equal("context-stress", standardResolved.ContextPressure?.Corpus);
     }
 
     [Fact]
@@ -119,10 +120,10 @@ public class ScenarioLoaderTests
     }
 
     [Fact]
-    public void ListAvailable_Returns11Scenarios()
+    public void ListAvailable_Returns12Scenarios()
     {
         var available = ScenarioLoader.ListAvailable();
-        Assert.True(available.Count >= 11, $"Expected at least 11 scenarios, got {available.Count}");
+        Assert.True(available.Count >= 12, $"Expected at least 12 scenarios, got {available.Count}");
     }
 
     [Theory]

@@ -68,9 +68,20 @@ public static class RunSingleBenchmark
         //  Step 3: Run the benchmark
         // ──────────────────────────────────────────────────────────
 
+        var progressReporter = new Progress<BenchmarkProgress>(p =>
+        {
+            var status = p.Skipped ? "SKIP" : $"{p.Score:F1}%";
+            var elapsed = $"{(int)p.Elapsed.TotalMinutes}m {p.Elapsed.Seconds:D2}s";
+            var remaining = $"~{(int)p.EstimatedRemaining.TotalMinutes}m {p.EstimatedRemaining.Seconds:D2}s";
+            Console.Write($"\r   [{p.CompletedCategories}/{p.TotalCategories}] {p.CategoryName}: {status} | {elapsed} elapsed | {remaining} remaining   ");
+        });
+
         var sw = System.Diagnostics.Stopwatch.StartNew();
-        var result = await benchmarkRunner.RunBenchmarkAsync(agent, benchmark);
+        var result = await benchmarkRunner.RunBenchmarkAsync(agent, benchmark, progressReporter);
         sw.Stop();
+
+        // Move past the progress line
+        Console.WriteLine();
 
         PrintResult(result, sw.Elapsed);
 
@@ -117,8 +128,8 @@ public static class RunSingleBenchmark
     {
         Console.WriteLine("Select a benchmark preset:\n");
         Console.WriteLine("   [1] Quick      3 categories   ~3 min    Basic Retention, Temporal, Noise");
-        Console.WriteLine("   [2] Standard   7 categories   ~10 min   + Reach-Back, Fact Update, Multi-Topic, Abstention");
-        Console.WriteLine("   [3] Full      11 categories   ~20 min   + Cross-Session, Reducer, Conflict, Multi-Session");
+        Console.WriteLine("   [2] Standard   8 categories   ~10 min   + Reach-Back, FactUpdate, MultiTopic, Abstention, Preference");
+        Console.WriteLine("   [3] Full      12 categories   ~25 min   + CrossSession, Reducer, Conflict, MultiSession, Preference");
         Console.WriteLine("   [Q] Cancel\n");
         Console.Write("   Choice: ");
 

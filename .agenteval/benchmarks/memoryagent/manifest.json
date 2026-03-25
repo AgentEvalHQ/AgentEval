@@ -1,6 +1,6 @@
 {
   "schema_version": "1.0",
-  "generated_at": "2026-03-23T07:32:20.264601+00:00",
+  "generated_at": "2026-03-25T15:45:54.8210865+00:00",
   "generated_by": "AgentEval.Memory v1.0.0.0",
   "agent": {
     "name": "MemoryAgent"
@@ -45,6 +45,94 @@
           "grade": "A",
           "tags": [
             "config-b"
+          ]
+        },
+        {
+          "id": "bl-4cdbadf6",
+          "file": "baselines/2026-03-25_full-mar-25-08-44.json",
+          "name": "Full \u2014 Mar 25 08:44",
+          "configuration_id": "D87F43FCAB0E",
+          "timestamp": "2026-03-25T08:44:01.6430509+00:00",
+          "overall_score": 90.73395937395938,
+          "grade": "A",
+          "tags": [
+            "full"
+          ]
+        }
+      ]
+    },
+    {
+      "benchmark_id": "memory-standard",
+      "preset": "Standard",
+      "categories": [
+        "Basic Retention",
+        "Temporal Reasoning",
+        "Noise Resilience",
+        "Reach-Back Depth",
+        "Fact Update Handling",
+        "Multi-Topic",
+        "Abstention",
+        "Preference Extraction"
+      ],
+      "baselines": [
+        {
+          "id": "bl-ec5c313a",
+          "file": "baselines/2026-03-25_minimal-prompt.json",
+          "name": "Minimal Prompt",
+          "configuration_id": "2D90A94C79DF",
+          "timestamp": "2026-03-25T07:42:05.7519639+00:00",
+          "overall_score": 93.48450174825174,
+          "grade": "A",
+          "tags": [
+            "config-a"
+          ]
+        },
+        {
+          "id": "bl-24af773e",
+          "file": "baselines/2026-03-25_memory-optimized-prompt.json",
+          "name": "Memory-Optimized Prompt",
+          "configuration_id": "D87F43FCAB0E",
+          "timestamp": "2026-03-25T07:47:55.6307854+00:00",
+          "overall_score": 96.70836538461538,
+          "grade": "A",
+          "tags": [
+            "config-b"
+          ]
+        },
+        {
+          "id": "bl-b03f4d1a",
+          "file": "baselines/2026-03-25_standard-mar-25-14-45.json",
+          "name": "Standard \u2014 Mar 25 14:45",
+          "configuration_id": "D87F43FCAB0E",
+          "timestamp": "2026-03-25T14:45:17.0689377+00:00",
+          "overall_score": 92.81086538461538,
+          "grade": "A",
+          "tags": [
+            "standard"
+          ]
+        },
+        {
+          "id": "bl-54a15c2e",
+          "file": "baselines/2026-03-25_standard-mar-25-14-51.json",
+          "name": "Standard \u2014 Mar 25 14:51",
+          "configuration_id": "EB3C8198D61E",
+          "timestamp": "2026-03-25T14:51:03.1556496+00:00",
+          "overall_score": 90.64585664335665,
+          "grade": "A",
+          "tags": [
+            "standard"
+          ]
+        },
+        {
+          "id": "bl-1087380f",
+          "file": "baselines/2026-03-25_standard-mar-25-15-45.json",
+          "name": "Standard \u2014 Mar 25 15:45",
+          "configuration_id": "D87F43FCAB0E",
+          "timestamp": "2026-03-25T15:45:54.7816325+00:00",
+          "overall_score": 93.91097165991903,
+          "grade": "A",
+          "tags": [
+            "standard"
           ]
         }
       ]

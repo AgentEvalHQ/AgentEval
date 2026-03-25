@@ -149,4 +149,17 @@ public static class AgentEvalMemoryServiceCollectionExtensions
 
         return services;
     }
+
+    /// <summary>
+    /// Registers LongMemEval external benchmark services.
+    /// Requires <see cref="Microsoft.Extensions.AI.IChatClient"/> to be already registered.
+    /// For non-DI usage, prefer <see cref="External.LongMemEval.LongMemEvalBenchmarkRunner.Create"/>.
+    /// </summary>
+    /// <param name="services">The service collection. Must already contain an IChatClient registration.</param>
+    /// <returns>The service collection for method chaining.</returns>
+    public static IServiceCollection AddLongMemEval(this IServiceCollection services)
+    {
+        services.AddScoped<External.IExternalBenchmarkRunner, External.LongMemEval.LongMemEvalBenchmarkRunner>();
+        return services;
+    }
 }

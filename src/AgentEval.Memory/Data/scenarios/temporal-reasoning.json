@@ -3,16 +3,49 @@
   "category": "TemporalReasoning",
   "name": "Temporal Reasoning",
   "description": "Tests temporal sequencing with events planted out of chronological order.",
-  "context_pressure": { "corpus": "context-small", "max_turns": 15 },
+  "context_pressure": {
+    "corpus": "context-small",
+    "max_turns": 15
+  },
   "presets": {
     "quick": {
       "facts": [
-        { "content": "Got promoted to mid-level developer", "category": "career", "importance": 70, "planted_as": "Two months ago I got promoted to mid-level developer." },
-        { "content": "Started learning Python on my own", "category": "career", "importance": 60, "planted_as": "About a year and a half ago, I started learning Python on my own." },
-        { "content": "Completed an advanced React course", "category": "career", "importance": 60, "planted_as": "Four months ago I completed an advanced React course." },
-        { "content": "Got my first junior developer job at a startup", "category": "career", "importance": 70, "planted_as": "A year ago I got my first junior developer job at a startup." },
-        { "content": "Switched to a larger company and learned C#", "category": "career", "importance": 70, "planted_as": "Eight months ago I switched to a larger company and learned C# there." },
-        { "content": "Led my first project as tech lead", "category": "career", "importance": 80, "planted_as": "Last month I led my first project as tech lead!" }
+        {
+          "content": "Got promoted to mid-level developer",
+          "category": "career",
+          "importance": 70,
+          "planted_as": "Two months ago I got promoted to mid-level developer."
+        },
+        {
+          "content": "Started learning Python on my own",
+          "category": "career",
+          "importance": 60,
+          "planted_as": "About a year and a half ago, I started learning Python on my own."
+        },
+        {
+          "content": "Completed an advanced React course",
+          "category": "career",
+          "importance": 60,
+          "planted_as": "Four months ago I completed an advanced React course."
+        },
+        {
+          "content": "Got my first junior developer job at a startup",
+          "category": "career",
+          "importance": 70,
+          "planted_as": "A year ago I got my first junior developer job at a startup."
+        },
+        {
+          "content": "Switched to a larger company and learned C#",
+          "category": "career",
+          "importance": 70,
+          "planted_as": "Eight months ago I switched to a larger company and learned C# there."
+        },
+        {
+          "content": "Led my first project as tech lead",
+          "category": "career",
+          "importance": 80,
+          "planted_as": "Last month I led my first project as tech lead!"
+        }
       ],
       "noise_between_facts": [
         "The coffee machine at work broke again today.",
@@ -20,14 +53,41 @@
         "My teammate recommended a great coding podcast."
       ],
       "queries": [
-        { "question": "Can you put my career milestones in chronological order, from earliest to most recent?", "expected_facts": ["Python", "junior developer", "C#", "React", "promoted", "tech lead"], "difficulty": "synthesis" },
-        { "question": "What was the first thing I learned in my tech career?", "expected_facts": ["Python"], "difficulty": "indirect" },
-        { "question": "What's the most recent career milestone I mentioned?", "expected_facts": ["tech lead"], "difficulty": "indirect" }
+        {
+          "question": "Can you put my career milestones in chronological order, from earliest to most recent?",
+          "expected_facts": [
+            "Python",
+            "junior developer",
+            "C#",
+            "React",
+            "promoted",
+            "tech lead"
+          ],
+          "difficulty": "synthesis"
+        },
+        {
+          "question": "What was the first thing I learned in my tech career?",
+          "expected_facts": [
+            "Python"
+          ],
+          "difficulty": "indirect"
+        },
+        {
+          "question": "What's the most recent career milestone I mentioned?",
+          "expected_facts": [
+            "tech lead"
+          ],
+          "difficulty": "indirect"
+        }
       ]
     },
     "standard": {
       "extends": "quick",
-      "context_pressure": { "corpus": "context-medium", "max_turns": 40 },
+      "context_pressure": {
+        "corpus": "context-stress",
+        "max_turns": 100,
+        "sessions_count": 8
+      },
       "noise_between_facts": [
         "The coffee machine at work broke again today.",
         "I need to update my LinkedIn profile.",
@@ -40,31 +100,277 @@
         "Someone mentioned a new framework that's trending."
       ],
       "facts": [
-        { "content": "Worked as a QA engineer for six months before transitioning to dev", "category": "career", "importance": 65, "planted_as": "Before all this, I spent about six months working as a QA engineer, which was eye-opening." },
-        { "content": "Attended a coding bootcamp 18 months ago to switch careers", "category": "education", "importance": 70, "planted_as": "Actually, let me backtrack — I attended an intensive bootcamp about 18 months ago when I decided to switch into tech." },
-        { "content": "Got AWS certified about 5 months ago just before switching companies", "category": "credentials", "importance": 60, "planted_as": "I also got my AWS certification about 5 months ago, just before I switched companies." },
-        { "content": "Before QA, worked 2 years in customer support at a telecom", "category": "career", "importance": 55, "planted_as": "Way before all the tech stuff, I worked in customer support at a telecom company for about 2 years." },
-        { "content": "Completed a side project mobile app about 9 months ago", "category": "career", "importance": 50, "planted_as": "Around 9 months ago, I finished a side project — a mobile app for tracking workouts." },
-        { "content": "Started mentoring junior devs about 6 weeks ago", "category": "career", "importance": 55, "planted_as": "About 6 weeks ago I started mentoring junior developers on the team — really enjoy it." },
-        { "content": "Got rejected from Google interviews about 7 months ago", "category": "career", "importance": 60, "planted_as": "I actually applied to Google about 7 months ago but didn't make it past the technical round." },
-        { "content": "Won an internal hackathon about 3 months ago with a CI/CD automation tool", "category": "career", "importance": 65, "planted_as": "About 3 months ago I won our company's internal hackathon — built a CI/CD automation tool." },
-        { "content": "Started attending tech meetups 14 months ago to network", "category": "career", "importance": 45, "planted_as": "I started going to tech meetups around 14 months ago — great for networking." },
-        { "content": "Got an offer from a fintech startup 3 weeks ago but turned it down", "category": "career", "importance": 70, "planted_as": "Actually, just 3 weeks ago I got an offer from a fintech startup, but I turned it down — too early to leave." },
-        { "content": "Completed a Docker certification about 11 months ago right after joining the startup", "category": "credentials", "importance": 55, "planted_as": "I also did a Docker certification about 11 months ago, right after I started at the startup." }
+        {
+          "content": "Worked as a QA engineer for six months before transitioning to dev",
+          "category": "career",
+          "importance": 65,
+          "planted_as": "So before I got into actual development, I spent about six months in QA. Honestly, it was eye-opening — breaking other people's code taught me more about edge cases than any tutorial ever did.",
+          "position": 0.1,
+          "session_id": 2,
+          "timestamp": "2024-03-15"
+        },
+        {
+          "content": "Attended a coding bootcamp 18 months ago to switch careers",
+          "category": "education",
+          "importance": 70,
+          "planted_as": "Actually, let me backtrack — the whole tech thing started when I enrolled in this intensive coding bootcamp about 18 months ago. I was working a completely different job and just decided to make the leap.",
+          "position": 0.3,
+          "session_id": 3,
+          "timestamp": "2024-09-01"
+        },
+        {
+          "content": "Got AWS certified about 5 months ago just before switching companies",
+          "category": "credentials",
+          "importance": 60,
+          "planted_as": "I also got my AWS certification about 5 months ago, just before I switched companies.",
+          "position": 0.5,
+          "session_id": 4,
+          "timestamp": "2025-10-15"
+        },
+        {
+          "content": "Before QA, worked 2 years in customer support at a telecom",
+          "category": "career",
+          "importance": 55,
+          "planted_as": "Way before all the tech stuff, I worked in customer support at a telecom company for about 2 years. That's where I first realized I wanted to build things, not just troubleshoot them.",
+          "position": 0.7,
+          "session_id": 6,
+          "timestamp": "2022-01-10"
+        },
+        {
+          "content": "Completed a side project mobile app about 9 months ago",
+          "category": "career",
+          "importance": 50,
+          "planted_as": "Around 9 months ago, I finished a side project — a mobile app for tracking workouts. Took me like three months of evenings and weekends but it felt amazing to ship something on my own.",
+          "position": 0.15,
+          "session_id": 2,
+          "timestamp": "2025-06-20"
+        },
+        {
+          "content": "Started mentoring junior devs about 6 weeks ago",
+          "category": "career",
+          "importance": 55,
+          "planted_as": "About 6 weeks ago I started mentoring junior developers on the team — really enjoy it.",
+          "position": 0.4,
+          "session_id": 4,
+          "timestamp": "2026-02-10"
+        },
+        {
+          "content": "Got rejected from Google interviews about 7 months ago",
+          "category": "career",
+          "importance": 60,
+          "planted_as": "I actually applied to Google about 7 months ago but didn't make it past the technical round. It stung at the time but honestly it motivated me to study harder.",
+          "position": 0.6,
+          "session_id": 5,
+          "timestamp": "2025-08-20"
+        },
+        {
+          "content": "Won an internal hackathon about 3 months ago with a CI/CD automation tool",
+          "category": "career",
+          "importance": 65,
+          "planted_as": "About 3 months ago I won our company's internal hackathon — built a CI/CD automation tool that saved the team like 4 hours a week.",
+          "position": 0.8,
+          "session_id": 7,
+          "timestamp": "2025-12-20"
+        },
+        {
+          "content": "Started attending tech meetups 14 months ago to network",
+          "category": "career",
+          "importance": 45,
+          "planted_as": "I started going to tech meetups around 14 months ago — great for networking.",
+          "position": 0.2,
+          "session_id": 3,
+          "timestamp": "2025-01-15"
+        },
+        {
+          "content": "Got an offer from a fintech startup 3 weeks ago but turned it down",
+          "category": "career",
+          "importance": 70,
+          "planted_as": "Actually, just 3 weeks ago I got an offer from a fintech startup, but I turned it down — too early to leave.",
+          "position": 0.35,
+          "session_id": 3,
+          "timestamp": "2026-03-04"
+        },
+        {
+          "content": "Completed a Docker certification about 11 months ago right after joining the startup",
+          "category": "credentials",
+          "importance": 55,
+          "planted_as": "I also did a Docker certification about 11 months ago, right after I started at the startup.",
+          "position": 0.55,
+          "session_id": 5,
+          "timestamp": "2025-04-25"
+        }
       ],
       "queries": [
-        { "question": "Walk me through your entire career progression from the very beginning — customer support, QA, bootcamp, first dev job, and everything after. Put it in chronological order.", "expected_facts": ["customer support", "telecom", "bootcamp", "QA engineer", "Python", "junior developer", "Docker", "startup", "C#", "mobile app", "AWS", "React", "promoted", "hackathon", "tech lead", "mentoring"], "difficulty": "synthesis" },
-        { "question": "What was your first formal training that led to your tech career?", "expected_facts": ["bootcamp"], "difficulty": "indirect" },
-        { "question": "What certifications have you earned, and in what order did you get them?", "expected_facts": ["Docker", "AWS", "11 months", "5 months"], "difficulty": "synthesis" },
-        { "question": "Between the Google rejection and your recent fintech offer, what milestones happened in between?", "expected_facts": ["Google", "7 months", "AWS", "React", "hackathon", "promoted", "tech lead", "fintech", "3 weeks"], "difficulty": "synthesis" },
-        { "question": "How long were you at your first dev job before you switched companies?", "expected_facts": ["year", "junior developer", "startup", "C#"], "difficulty": "synthesis" },
-        { "question": "What's the most recent thing that happened in your career and what's the oldest event you mentioned?", "expected_facts": ["fintech", "3 weeks", "customer support", "telecom", "2 years"], "difficulty": "synthesis" },
-        { "question": "What were you doing around 9-11 months ago? List everything from that period.", "expected_facts": ["mobile app", "9 months", "Docker", "11 months"], "difficulty": "synthesis" }
+        {
+          "question": "Walk me through your entire career progression from the very beginning — customer support, QA, bootcamp, first dev job, and everything after. Put it in chronological order.",
+          "expected_facts": [
+            "customer support",
+            "telecom",
+            "bootcamp",
+            "QA engineer",
+            "Python",
+            "junior developer",
+            "Docker",
+            "startup",
+            "C#",
+            "mobile app",
+            "AWS",
+            "React",
+            "promoted",
+            "hackathon",
+            "tech lead",
+            "mentoring"
+          ],
+          "difficulty": "synthesis",
+          "query_type": "temporal"
+        },
+        {
+          "question": "What was your first formal training that led to your tech career?",
+          "expected_facts": [
+            "bootcamp"
+          ],
+          "difficulty": "indirect",
+          "query_type": "temporal"
+        },
+        {
+          "question": "What certifications have you earned, and in what order did you get them?",
+          "expected_facts": [
+            "Docker",
+            "AWS",
+            "11 months",
+            "5 months"
+          ],
+          "difficulty": "synthesis",
+          "query_type": "temporal"
+        },
+        {
+          "question": "Between the Google rejection and your recent fintech offer, what milestones happened in between?",
+          "expected_facts": [
+            "Google",
+            "7 months",
+            "AWS",
+            "React",
+            "hackathon",
+            "promoted",
+            "tech lead",
+            "fintech",
+            "3 weeks"
+          ],
+          "difficulty": "synthesis",
+          "query_type": "temporal"
+        },
+        {
+          "question": "How long were you at your first dev job before you switched companies?",
+          "expected_facts": [
+            "year",
+            "junior developer",
+            "startup",
+            "C#"
+          ],
+          "difficulty": "synthesis",
+          "query_type": "temporal"
+        },
+        {
+          "question": "What's the most recent thing that happened in your career and what's the oldest event you mentioned?",
+          "expected_facts": [
+            "fintech",
+            "3 weeks",
+            "customer support",
+            "telecom",
+            "2 years"
+          ],
+          "difficulty": "synthesis",
+          "query_type": "temporal"
+        },
+        {
+          "question": "What were you doing around 9-11 months ago? List everything from that period.",
+          "expected_facts": [
+            "mobile app",
+            "9 months",
+            "Docker",
+            "11 months"
+          ],
+          "difficulty": "synthesis",
+          "query_type": "temporal"
+        }
       ]
     },
     "full": {
       "extends": "standard",
-      "context_pressure": { "corpus": "context-large", "max_turns": 80 }
+      "context_pressure": {
+        "corpus": "context-stress",
+        "max_turns": 200,
+        "sessions_count": 15
+      },
+      "facts": [
+        {
+          "content": "Gave a lightning talk at a local JS meetup about 4 months ago",
+          "category": "career",
+          "importance": 50,
+          "planted_as": "I actually gave my first lightning talk at a local JavaScript meetup about 4 months ago. I was terrified but the feedback was surprisingly positive.",
+          "position": 0.45,
+          "session_id": 9,
+          "timestamp": "2025-11-25"
+        },
+        {
+          "content": "Started contributing to an open source project 2 months ago",
+          "category": "career",
+          "importance": 55,
+          "planted_as": "About 2 months ago I started contributing to an open source Kubernetes tool — my first real OSS contribution. Already got two PRs merged.",
+          "position": 0.65,
+          "session_id": 11,
+          "timestamp": "2026-01-25"
+        },
+        {
+          "content": "Passed the system design interview at Amazon but declined the offer last month",
+          "category": "career",
+          "importance": 65,
+          "planted_as": "Remember when I failed the Google interview? Well, last month I actually passed the system design round at Amazon. They made an offer but I declined — decided I want to stay and grow where I am.",
+          "assistant_response": "That's a big deal — passing Amazon's system design round shows real growth since the Google experience. And it sounds like you made a thoughtful decision to stay. I'll remember that.",
+          "position": 0.75,
+          "session_id": 12,
+          "timestamp": "2026-02-20"
+        },
+        {
+          "content": "Enrolled in a part-time master's program in distributed systems starting this fall",
+          "category": "education",
+          "importance": 60,
+          "planted_as": "Big news — I just got accepted into a part-time master's program in distributed systems. Starts this fall. It'll be intense juggling work and school but I'm excited.",
+          "assistant_response": "Congratulations on getting accepted! A master's in distributed systems will complement your hands-on experience perfectly. I'll keep that in mind as we discuss your schedule going forward.",
+          "position": 0.85,
+          "session_id": 13,
+          "timestamp": "2026-03-15"
+        }
+      ],
+      "queries": [
+        {
+          "question": "What happened between your Google rejection and your Amazon interview? Walk me through each milestone with approximate dates.",
+          "expected_facts": [
+            "Google",
+            "mobile app",
+            "AWS",
+            "React",
+            "hackathon",
+            "promoted",
+            "tech lead",
+            "Amazon"
+          ],
+          "difficulty": "synthesis",
+          "query_type": "temporal"
+        },
+        {
+          "question": "What are your plans for professional development in the coming year?",
+          "expected_facts": [
+            "master's",
+            "distributed systems",
+            "open source",
+            "Kubernetes",
+            "mentoring"
+          ],
+          "difficulty": "synthesis",
+          "query_type": "temporal"
+        }
+      ]
     }
   }
 }

@@ -1,0 +1,85 @@
+{
+  "id": "bl-1087380f",
+  "name": "Standard \u2014 Mar 25 15:45",
+  "timestamp": "2026-03-25T15:45:54.7816325+00:00",
+  "configuration_id": "D87F43FCAB0E",
+  "agent_config": {
+    "agent_name": "MemoryAgent",
+    "model_id": "gpt-4.1",
+    "reducer_strategy": "None (memory-optimized prompt)",
+    "context_providers": [],
+    "memory_provider": "InMemoryChatHistory",
+    "custom_config": {},
+    "configuration_id": "D87F43FCAB0E"
+  },
+  "benchmark": {
+    "preset": "Standard",
+    "duration": "00:07:20.4190990",
+    "benchmark_source": "native"
+  },
+  "overall_score": 93.91097165991903,
+  "grade": "A",
+  "stars": 5,
+  "category_results": {
+    "Basic Retention": {
+      "score": 93.75,
+      "grade": "A",
+      "skipped": false,
+      "scenario_count": 1
+    },
+    "Temporal Reasoning": {
+      "score": 91,
+      "grade": "A",
+      "skipped": false,
+      "scenario_count": 1
+    },
+    "Noise Resilience": {
+      "score": 97.6923076923077,
+      "grade": "A",
+      "skipped": false,
+      "scenario_count": 1
+    },
+    "Reach-Back Depth": {
+      "score": 100,
+      "grade": "A",
+      "skipped": false,
+      "scenario_count": 1
+    },
+    "Fact Update Handling": {
+      "score": 88.75,
+      "grade": "B",
+      "skipped": false,
+      "scenario_count": 1
+    },
+    "Multi-Topic": {
+      "score": 100,
+      "grade": "A",
+      "skipped": false,
+      "scenario_count": 1
+    },
+    "Abstention": {
+      "score": 81.57894736842105,
+      "grade": "B",
+      "skipped": false,
+      "scenario_count": 1
+    },
+    "Preference Extraction": {
+      "score": 95.5,
+      "grade": "A",
+      "skipped": false,
+      "scenario_count": 1
+    }
+  },
+  "dimension_scores": {
+    "Recall": 96.875,
+    "Resilience": 97.6923076923077,
+    "Temporal": 89.875,
+    "Organization": 92.35964912280701
+  },
+  "recommendations": [
+    "All categories performing well! Consider running the Full benchmark for deeper analysis."
+  ],
+  "tags": [
+    "standard"
+  ]
+}

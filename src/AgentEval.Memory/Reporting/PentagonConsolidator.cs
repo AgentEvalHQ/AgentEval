@@ -15,7 +15,7 @@ namespace AgentEval.Memory.Reporting;
 ///   <item>Resilience = avg(NoiseResilience, ReducerFidelity)</item>
 ///   <item>Temporal = avg(TemporalReasoning, FactUpdateHandling, ConflictResolution)</item>
 ///   <item>Persistence = avg(CrossSession, MultiSessionReasoning)</item>
-///   <item>Organization = avg(MultiTopic, Abstention)</item>
+///   <item>Organization = avg(MultiTopic, Abstention, PreferenceExtraction)</item>
 /// </list>
 /// </para>
 /// Handles gracefully when categories are skipped (uses available data only).
@@ -64,9 +64,10 @@ public static class PentagonConsolidator
         AddAveraged(scores, "Persistence", lookup,
             BenchmarkScenarioType.CrossSession, BenchmarkScenarioType.MultiSessionReasoning);
 
-        // Organization = avg(MultiTopic, Abstention)
+        // Organization = avg(MultiTopic, Abstention, PreferenceExtraction)
         AddAveraged(scores, "Organization", lookup,
-            BenchmarkScenarioType.MultiTopic, BenchmarkScenarioType.Abstention);
+            BenchmarkScenarioType.MultiTopic, BenchmarkScenarioType.Abstention,
+            BenchmarkScenarioType.PreferenceExtraction);
 
         return scores;
     }
@@ -75,18 +76,15 @@ public static class PentagonConsolidator
         Dictionary<string, double> scores,
         string axisName,
         Dictionary<BenchmarkScenarioType, double> lookup,
-        BenchmarkScenarioType type1,
-        BenchmarkScenarioType type2)
+        params BenchmarkScenarioType[] types)
     {
-        var has1 = lookup.TryGetValue(type1, out var score1);
-        var has2 = lookup.TryGetValue(type2, out var score2);
+        var available = types
+            .Where(t => lookup.ContainsKey(t))
+            .Select(t => lookup[t])
+            .ToList();
 
-        if (has1 && has2)
-            scores[axisName] = (score1 + score2) / 2;
-        else if (has1)
-            scores[axisName] = score1;
-        else if (has2)
-            scores[axisName] = score2;
-        // If neither is available, omit the axis
+        if (available.Count > 0)
+            scores[axisName] = available.Average();
+        // If none available, omit the axis
     }
 }

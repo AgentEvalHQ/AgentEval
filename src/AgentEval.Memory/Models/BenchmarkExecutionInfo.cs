@@ -22,4 +22,10 @@ public class BenchmarkExecutionInfo
 
     /// <summary>Scenario depth level used ("Quick", "Standard", "Full").</summary>
     public string? ScenarioDepth { get; init; }
+
+    /// <summary>
+    /// Benchmark source: "native" for AgentEval benchmarks, "longmemeval" for LongMemEval, etc.
+    /// Report uses this to select rendering logic. Default: "native".
+    /// </summary>
+    public string BenchmarkSource { get; init; } = "native";
 }

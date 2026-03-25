@@ -86,13 +86,13 @@ public static class MemoryBenchmarkDemo
 
         // Step 3: Explain the benchmark tiers
         Console.WriteLine("📝 Step 3: Available benchmark tiers\n");
-        Console.WriteLine("   ┌───────────┬────────────────────────────────────────────────────────────────┐");
-        Console.WriteLine("   │ Tier      │ Categories                                                   │");
-        Console.WriteLine("   ├───────────┼────────────────────────────────────────────────────────────────┤");
-        Console.WriteLine("   │ Quick (3) │ BasicRetention, TemporalReasoning, NoiseResilience            │");
-        Console.WriteLine("   │ Std   (6) │ + ReachBackDepth, FactUpdateHandling, MultiTopic              │");
-        Console.WriteLine("   │ Full  (8) │ + CrossSession, ReducerFidelity                               │");
-        Console.WriteLine("   └───────────┴────────────────────────────────────────────────────────────────┘");
+        Console.WriteLine("   ┌────────────┬─────────────────────────────────────────────────────────────────────────┐");
+        Console.WriteLine("   │ Tier       │ Categories                                                              │");
+        Console.WriteLine("   ├────────────┼─────────────────────────────────────────────────────────────────────────┤");
+        Console.WriteLine("   │ Quick  (3) │ BasicRetention, TemporalReasoning, NoiseResilience                      │");
+        Console.WriteLine("   │ Std    (8) │ + ReachBackDepth, FactUpdate, MultiTopic, Abstention, PreferenceExtract │");
+        Console.WriteLine("   │ Full  (12) │ + CrossSession, Reducer, Conflict, MultiSession, PreferenceExtraction   │");
+        Console.WriteLine("   └────────────┴─────────────────────────────────────────────────────────────────────────┘");
         Console.WriteLine();
         Console.WriteLine("   Use Quick for CI, Standard for staging, Full for pre-release.\n");
 
@@ -173,7 +173,7 @@ public static class MemoryBenchmarkDemo
         Console.WriteLine();
         Console.WriteLine(new string('═', 70));
         Console.WriteLine("🎯 KEY TAKEAWAYS:");
-        Console.WriteLine("   • Quick (3 cats) for CI, Standard (6) for staging, Full (8) for releases");
+        Console.WriteLine("   • Quick (3 cats) for CI, Standard (8) for staging, Full (12) for releases");
         Console.WriteLine("   • All evaluations use a real LLM judge for accurate scoring");
         Console.WriteLine("   • Grades (A-F), stars (1-5), and recommendations are automatic");
         Console.WriteLine("   • Weak categories tell you exactly where to focus improvement");

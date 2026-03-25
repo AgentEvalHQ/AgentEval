@@ -219,6 +219,118 @@ public class MemoryJudgeTests
         Assert.Single(result.ForbiddenFound);
         Assert.Same(forbiddenFact, result.ForbiddenFound[0]);
     }
+
+    [Fact]
+    public void BuildJudgmentPrompt_NoQueryType_UsesStandardPrompt()
+    {
+        var query = MemoryQuery.Create("What is my name?", MemoryFact.Create("My name is John"));
+        var prompt = MemoryJudge.BuildJudgmentPrompt("Your name is John.", query);
+
+        Assert.Contains("EXPECTED FACTS", prompt);
+        Assert.DoesNotContain("TEMPORAL TOLERANCE", prompt);
+        Assert.DoesNotContain("PREFERENCE TOLERANCE", prompt);
+        Assert.DoesNotContain("UPDATE TOLERANCE", prompt);
+        Assert.DoesNotContain("ABSTENTION", prompt);
+    }
+
+    [Fact]
+    public void BuildJudgmentPrompt_TemporalQueryType_IncludesTemporalTolerance()
+    {
+        var query = new MemoryQuery
+        {
+            Question = "When did I start learning Python?",
+            ExpectedFacts = [MemoryFact.Create("Started learning Python 3 months ago")],
+            Metadata = new Dictionary<string, object> { ["query_type"] = "temporal" }
+        };
+        var prompt = MemoryJudge.BuildJudgmentPrompt("About 12 weeks ago.", query);
+
+        Assert.Contains("TEMPORAL TOLERANCE", prompt);
+        Assert.Contains("±1 unit tolerance", prompt);
+        Assert.DoesNotContain("PREFERENCE TOLERANCE", prompt);
+        Assert.DoesNotContain("UPDATE TOLERANCE", prompt);
+    }
+
+    [Fact]
+    public void BuildJudgmentPrompt_PreferenceQueryType_IncludesPreferenceTolerance()
+    {
+        var query = new MemoryQuery
+        {
+            Question = "What are my seating preferences?",
+            ExpectedFacts = [MemoryFact.Create("prefers window seats")],
+            Metadata = new Dictionary<string, object> { ["query_type"] = "preference" }
+        };
+        var prompt = MemoryJudge.BuildJudgmentPrompt("You like sitting by the window.", query);
+
+        Assert.Contains("PREFERENCE TOLERANCE", prompt);
+        Assert.Contains("flexible paraphrasing", prompt);
+        Assert.DoesNotContain("TEMPORAL TOLERANCE", prompt);
+        Assert.DoesNotContain("UPDATE TOLERANCE", prompt);
+    }
+
+    [Fact]
+    public void BuildJudgmentPrompt_UpdateQueryType_IncludesUpdateTolerance()
+    {
+        var query = new MemoryQuery
+        {
+            Question = "What is my email?",
+            ExpectedFacts = [MemoryFact.Create("email is new@example.com")],
+            Metadata = new Dictionary<string, object> { ["query_type"] = "update" }
+        };
+        var prompt = MemoryJudge.BuildJudgmentPrompt("Your email is new@example.com.", query);
+
+        Assert.Contains("UPDATE TOLERANCE", prompt);
+        Assert.Contains("old and new version is acceptable", prompt);
+        Assert.DoesNotContain("TEMPORAL TOLERANCE", prompt);
+        Assert.DoesNotContain("PREFERENCE TOLERANCE", prompt);
+    }
+
+    [Fact]
+    public void BuildJudgmentPrompt_AbstentionQueryType_UsesAbstentionPrompt()
+    {
+        var query = new MemoryQuery
+        {
+            Question = "What is my favorite color?",
+            ExpectedFacts = Array.Empty<MemoryFact>(),
+            ForbiddenFacts = [MemoryFact.Create("blue")],
+            Metadata = new Dictionary<string, object> { ["query_type"] = "abstention" }
+        };
+        var prompt = MemoryJudge.BuildJudgmentPrompt("I don't know.", query);
+
+        Assert.Contains("ABSTENTION", prompt);
+        Assert.Contains("HALLUCINATION INDICATORS", prompt);
+        Assert.DoesNotContain("EXPECTED FACTS", prompt);
+    }
+
+    [Fact]
+    public void BuildJudgmentPrompt_LegacyAbstentionFlag_StillWorks()
+    {
+        // Legacy: abstention via metadata flag with empty expected facts (no query_type)
+        var query = MemoryQuery.CreateAbstention("What is my favorite color?",
+            MemoryFact.Create("blue"));
+        var prompt = MemoryJudge.BuildJudgmentPrompt("I don't know.", query);
+
+        Assert.Contains("ABSTENTION", prompt);
+        Assert.Contains("HALLUCINATION INDICATORS", prompt);
+    }
+
+    [Fact]
+    public void BuildJudgmentPrompt_StandardQueryType_ExplicitSameAsDefault()
+    {
+        var fact = MemoryFact.Create("My name is John");
+        var queryDefault = MemoryQuery.Create("What is my name?", fact);
+        var queryExplicit = new MemoryQuery
+        {
+            Question = "What is my name?",
+            ExpectedFacts = [fact],
+            Metadata = new Dictionary<string, object> { ["query_type"] = "standard" }
+        };
+
+        var promptDefault = MemoryJudge.BuildJudgmentPrompt("John.", queryDefault);
+        var promptExplicit = MemoryJudge.BuildJudgmentPrompt("John.", queryExplicit);
+
+        // Both should produce the same prompt (no tolerance clause)
+        Assert.Equal(promptDefault, promptExplicit);
+    }
 }
 
 /// <summary>

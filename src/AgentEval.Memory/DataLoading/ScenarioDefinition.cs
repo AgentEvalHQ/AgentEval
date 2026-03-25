@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 AgentEval Contributors
 
+using System.Text.Json;
 using System.Text.Json.Serialization;
 
 namespace AgentEval.Memory.DataLoading;
@@ -40,6 +41,13 @@ public class ContextPressureConfig
 
     [JsonPropertyName("max_turns")]
     public int? MaxTurns { get; set; }
+
+    /// <summary>
+    /// Number of session boundaries to insert into the corpus.
+    /// When > 0, corpus turns are divided into this many segments with session markers between them.
+    /// </summary>
+    [JsonPropertyName("sessions_count")]
+    public int? SessionsCount { get; set; }
 }
 
 /// <summary>
@@ -87,6 +95,56 @@ public class FactDefinition
     /// </summary>
     [JsonPropertyName("planted_as")]
     public string? PlantedAs { get; set; }
+
+    /// <summary>
+    /// Where to bury this fact within the corpus context.
+    /// String values: "early" (10%), "middle" (50%), "late" (85%).
+    /// Numeric values: 0.0-1.0 = fractional position through the corpus.
+    /// Null = appended after corpus (current behavior, backwards compatible).
+    /// </summary>
+    [JsonPropertyName("position")]
+    public JsonElement? Position { get; set; }
+
+    /// <summary>
+    /// Optional timestamp for temporal context (e.g., "2025-10-03").
+    /// When set, the date is prefixed to the planted message: "[2025-10-03] Oh I just got promoted..."
+    /// Null means no date prefix (backwards compatible).
+    /// </summary>
+    [JsonPropertyName("timestamp")]
+    public string? Timestamp { get; set; }
+
+    /// <summary>
+    /// Optional session number (1-based) this fact belongs to.
+    /// When sessions are enabled, the fact is placed within the specified session segment
+    /// instead of using fractional position across the entire corpus.
+    /// </summary>
+    [JsonPropertyName("session_id")]
+    public int? SessionId { get; set; }
+
+    /// <summary>
+    /// Optional custom assistant response when this fact is planted.
+    /// Used for assistant-memory facts where the assistant acknowledges with a richer reply.
+    /// If null, defaults to "Got it, I'll remember that."
+    /// </summary>
+    [JsonPropertyName("assistant_response")]
+    public string? AssistantResponse { get; set; }
+
+    /// <summary>
+    /// Resolves the position to a fraction (0.0-1.0). Returns null if no position set.
+    /// </summary>
+    [JsonIgnore]
+    public double? FractionalPosition => Position?.ValueKind switch
+    {
+        JsonValueKind.String => Position.Value.GetString() switch
+        {
+            "early" => 0.1,
+            "middle" => 0.5,
+            "late" => 0.85,
+            _ => null
+        },
+        JsonValueKind.Number => Position.Value.GetDouble(),
+        _ => null
+    };
 }
 
 /// <summary>
@@ -110,6 +168,13 @@ public class QueryDefinition
     /// <summary>Whether this is an abstention query (agent should say "I don't know").</summary>
     [JsonPropertyName("abstention")]
     public bool Abstention { get; set; }
+
+    /// <summary>
+    /// Type-specific judge prompt selector: "standard", "temporal", "preference", "update", "abstention".
+    /// When null, defaults to "standard" (current behavior). When set to "abstention", also triggers abstention mode.
+    /// </summary>
+    [JsonPropertyName("query_type")]
+    public string? QueryType { get; set; }
 }
 
 /// <summary>

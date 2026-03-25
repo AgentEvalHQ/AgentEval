@@ -1,0 +1,79 @@
+{
+  "id": "bl-1df8efd1",
+  "name": "LongMemEval-S 50q (stratified)",
+  "timestamp": "2026-03-25T06:06:05.4147007+00:00",
+  "configuration_id": "E0549E44F8F1",
+  "agent_config": {
+    "agent_name": "LongMemEval-Agent",
+    "model_id": "gpt-4.1",
+    "reducer_strategy": "None",
+    "context_providers": [],
+    "memory_provider": "InMemoryChatHistory (history injection)",
+    "custom_config": {},
+    "configuration_id": "E0549E44F8F1"
+  },
+  "benchmark": {
+    "preset": "longmemeval-S",
+    "duration": "00:05:12.1018951",
+    "total_llm_calls": 100,
+    "benchmark_source": "longmemeval"
+  },
+  "overall_score": 60,
+  "grade": "D",
+  "stars": 3,
+  "category_results": {
+    "single-session-user": {
+      "score": 85.71428571428571,
+      "grade": "B",
+      "skipped": false,
+      "scenario_count": 7
+    },
+    "multi-session": {
+      "score": 38.46153846153847,
+      "grade": "F",
+      "skipped": false,
+      "scenario_count": 13
+    },
+    "single-session-preference": {
+      "score": 33.33333333333333,
+      "grade": "F",
+      "skipped": false,
+      "scenario_count": 3
+    },
+    "temporal-reasoning": {
+      "score": 46.15384615384615,
+      "grade": "F",
+      "skipped": false,
+      "scenario_count": 13
+    },
+    "knowledge-update": {
+      "score": 87.5,
+      "grade": "B",
+      "skipped": false,
+      "scenario_count": 8
+    },
+    "single-session-assistant": {
+      "score": 83.33333333333334,
+      "grade": "B",
+      "skipped": false,
+      "scenario_count": 6
+    }
+  },
+  "dimension_scores": {
+    "Information Extraction": 67.46031746031746,
+    "Multi-Session": 38.46153846153847,
+    "Temporal": 46.15384615384615,
+    "Knowledge Update": 87.5,
+    "Abstention": 100
+  },
+  "recommendations": [
+    "multi-session: accuracy 38% is below 50% \u2014 review agent\u0027s handling of this question type.",
+    "single-session-preference: accuracy 33% is below 50% \u2014 review agent\u0027s handling of this question type.",
+    "temporal-reasoning: accuracy 46% is below 50% \u2014 review agent\u0027s handling of this question type."
+  ],
+  "tags": [
+    "longmemeval",
+    "cross-platform",
+    "binary-scoring"
+  ]
+}

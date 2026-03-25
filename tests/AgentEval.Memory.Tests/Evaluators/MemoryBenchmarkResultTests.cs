@@ -126,20 +126,20 @@ public class MemoryBenchmarkResultTests
     }
 
     [Fact]
-    public void MemoryBenchmark_StandardPreset_Has7Categories()
+    public void MemoryBenchmark_StandardPreset_Has8Categories()
     {
         var bench = MemoryBenchmark.Standard;
         Assert.Equal("Standard", bench.Name);
-        Assert.Equal(7, bench.Categories.Count);
+        Assert.Equal(8, bench.Categories.Count);
         Assert.Equal(1.0, bench.Categories.Sum(c => c.Weight), 2);
     }
 
     [Fact]
-    public void MemoryBenchmark_FullPreset_Has11Categories()
+    public void MemoryBenchmark_FullPreset_Has12Categories()
     {
         var bench = MemoryBenchmark.Full;
         Assert.Equal("Full", bench.Name);
-        Assert.Equal(11, bench.Categories.Count);
+        Assert.Equal(12, bench.Categories.Count);
         Assert.Equal(1.0, bench.Categories.Sum(c => c.Weight), 2);
     }
 

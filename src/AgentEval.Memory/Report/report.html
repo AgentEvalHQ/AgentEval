@@ -101,8 +101,9 @@ canvas{max-width:100%}
 <div class="sec on" id="sec-overview">
   <div class="gh" id="gradeHero"></div>
   <div class="sh">Dimensions</div>
-  <div class="sd">5 consolidated dimensions — hover for details and contributing categories.</div>
+  <div class="sd" id="dimSubtitle">Consolidated dimensions — hover for details and contributing categories.</div>
   <div class="kpi-g" id="overviewDimGrid"></div>
+  <div id="refScores" style="display:none"></div>
   <div class="sh" style="margin-top:28px">Categories</div>
   <div class="sd">Each category scored 0-100 by the benchmark runner.</div>
   <div class="kpi-g" id="kpiGrid"></div>
@@ -114,7 +115,7 @@ canvas{max-width:100%}
   <div class="cfg" id="cfgCards"></div>
   <div class="kpi-g" id="dimKpiGrid" style="margin-top:8px"></div>
   <div class="row r2">
-    <div class="card"><h4>Capability Pentagon</h4><div class="sub">Each shape is a config. Larger = stronger memory.</div><canvas id="pentChart" height="340"></canvas></div>
+    <div class="card"><h4>Capability Radar</h4><div class="sub">Each shape is a config. Larger = stronger memory.</div><canvas id="pentChart" height="340"></canvas><div id="dimCallout" style="margin-top:12px;text-align:center;font-size:13px"></div></div>
     <div class="card"><h4>Category Breakdown</h4><div class="sub">All raw categories side-by-side.</div><canvas id="catBars" height="340"></canvas></div>
   </div>
 </div>
@@ -174,6 +175,11 @@ let pentChart=null,catBarChart=null,waterfallChart=null;
 
 function gc(s){return s>=85?'#34d399':s>=65?'#fb923c':'#f87171'}
 function gbc(s){return s>=85?'bg':s>=65?'bw':'bb'}
+function isExternal(){return baselines.length>0&&baselines[0].benchmark?.benchmark_source&&baselines[0].benchmark.benchmark_source!=='native'}
+function getBenchmarkSource(){return baselines[0]?.benchmark?.benchmark_source||'native'}
+function getCatInfo(name){return (isExternal()?EXT_CAT_INFO:CAT_INFO)[name]||{s:name,d:name,v:'—'}}
+function getDimInfo(){return isExternal()?EXT_DIM_INFO:DIM_INFO}
+function getActiveDims(){const di=getDimInfo();const latest=baselines[baselines.length-1];const ds=latest.dimension_scores;if(!ds||Object.keys(ds).length===0)return Object.keys(di);return Object.keys(di).filter(d=>ds[d]!=null)}
 
 // NAV
 const TABS=[{id:'overview',l:'Overview'},{id:'pentagon',l:'Pentagon'},{id:'timeline',l:'Timeline'},{id:'compare',l:'Comparer'}];
@@ -204,21 +210,27 @@ async function init(){
       '<span style="color:#f87171">Could not load manifest.json: '+e.message+'. Serve this folder with a local HTTP server (python -m http.server 8080).</span>';
     return;
   }
-  const group=manifest.benchmarks[0];
-  for(const entry of group.baselines){
-    try{
-      const data=await fetch(entry.file).then(r=>r.json());
-      data._entry=entry;
-      data._color=COLORS[baselines.length%COLORS.length];
-      baselines.push(data);
-    }catch(e){console.warn('Skip',entry.file,e);}
+  // Load baselines from ALL benchmark groups in the manifest
+  for(const group of manifest.benchmarks){
+    for(const entry of group.baselines){
+      try{
+        const data=await fetch(entry.file).then(r=>r.json());
+        data._entry=entry;
+        data._color=COLORS[baselines.length%COLORS.length];
+        baselines.push(data);
+      }catch(e){console.warn('Skip',entry.file,e);}
+    }
   }
   if(!baselines.length){document.getElementById('mastSub').innerHTML='<span style="color:#f87171">No baselines loaded. Check browser console for errors.</span>';return;}
   if(typeof Chart==='undefined'){document.getElementById('mastSub').innerHTML='<span style="color:#f87171">Chart.js failed to load from CDN. Check your internet connection.</span>';return;}
   baselines.forEach((b,i)=>{if(i>=baselines.length-2)selectedConfigs.add(i);});
+  const src=getBenchmarkSource();
+  const srcBadge=src!=='native'?`<span class="pill" style="background:#1e3a5f;color:#60a5fa">${src==='longmemeval'?'LongMemEval (ICLR 2025)':src}</span>`:'';
+  const scoringBadge=isExternal()?'<span class="pill" style="background:#3b1f1f;color:#fb923c">Binary Scoring (0/1)</span>':'';
   document.getElementById('mastSub').innerHTML=
     `<span>${manifest.agent.name}</span>`+
-    `<span class="pill">${group.preset} · ${group.categories.length} categories</span>`+
+    srcBadge+scoringBadge+
+    `<span class="pill">${manifest.benchmarks.map(g=>g.preset).join(', ')} · ${new Set(manifest.benchmarks.flatMap(g=>g.categories)).size} categories</span>`+
     `<span class="pill">${baselines.length} baselines</span>`;
   renderOverview();renderCfgCards();renderDimKpis();renderPentChart();renderCatBars();renderTimeline();setupComparer();
 }
@@ -237,7 +249,7 @@ function renderOverview(){
   const cats=Object.entries(c.category_results);
   document.getElementById('kpiGrid').innerHTML=cats.map(([name,cat])=>{
     const s=cat.score;
-    const info=CAT_INFO[name]||{s:name,d:name,v:'—'};
+    const info=getCatInfo(name);
     return `<div class="kpi" onmouseenter="showTT(this,'${name.replace(/'/g,"\\'")}','${info.d.replace(/'/g,"\\'")}','${info.v.replace(/'/g,"\\'")}')" onmouseleave="hideTT(this)">
       <div class="kl">${name}</div>
       <div class="kv" style="color:${cat.skipped?'var(--td)':gc(s)}">${cat.skipped?'SKIP':s.toFixed(0)+'%'}</div>
@@ -246,6 +258,13 @@ function renderOverview(){
       ${cat.recommendation?`<div style="font-size:10px;color:var(--tm);margin-top:8px">${cat.recommendation}</div>`:''}
     </div>`;
   }).join('');
+  // Reference scores for external benchmarks
+  const refEl=document.getElementById('refScores');
+  if(isExternal()&&getBenchmarkSource()==='longmemeval'){
+    const refHtml=Object.entries(LME_REF).map(([m,s])=>`<span style="margin-right:16px"><span style="color:var(--td)">${m}:</span> <span style="color:${gc(s)}">${s}%</span></span>`).join('');
+    refEl.innerHTML=`<div style="font-size:11px;padding:8px 12px;background:var(--cardBg);border:1px solid var(--border);border-radius:6px;margin-top:4px">Published reference (ICLR 2025, S mode): ${refHtml}</div>`;
+    refEl.style.display='block';
+  }else{refEl.style.display='none';}
 }
 
 function renderCfgCards(){
@@ -263,17 +282,21 @@ function renderDimKpis(){
   const html=buildDimKpiHtml();
   document.getElementById('dimKpiGrid').innerHTML=html;
   document.getElementById('overviewDimGrid').innerHTML=html;
+  const n=getActiveDims().length;
+  document.getElementById('dimSubtitle').textContent=`${n} consolidated dimensions — hover for details and contributing categories.`;
 }
 function buildDimKpiHtml(){
   const latest=baselines[baselines.length-1];
   const prev=baselines.length>1?baselines[baselines.length-2]:null;
-  return PENT.map(dim=>{
-    const info=DIM_INFO[dim]||{s:dim,color:'#64748b',cats:[]};
+  const dims=getActiveDims();
+  const di=getDimInfo();
+  return dims.map(dim=>{
+    const info=di[dim]||{s:dim,color:'#64748b',cats:[]};
     const s=latest.dimension_scores?.[dim]??0;
     const ps=prev?.dimension_scores?.[dim]??null;
     const delta=ps!==null?s-ps:null;
     const catRows=info.cats.map(catName=>{
-      const catInfo=CAT_INFO[catName]||{s:catName};
+      const catInfo=getCatInfo(catName);
       const catScore=latest.category_results?.[catName]?.score??null;
       const scoreColor=catScore!==null?gc(catScore):'var(--td)';
       return `<div class="de-cat">
@@ -297,15 +320,36 @@ function buildDimKpiHtml(){
 function renderPentChart(){
   const ctx=document.getElementById('pentChart').getContext('2d');
   if(pentChart)pentChart.destroy();
+  const axes=getActiveDims();
+  const shapeNames={3:'Triangle',4:'Diamond',5:'Pentagon',6:'Hexagon'};
+  const shapeLabel=shapeNames[axes.length]||`${axes.length}-gon`;
+  document.querySelector('#sec-pentagon .sh').textContent=`${shapeLabel} — ${axes.length} Consolidated Dimensions`;
   const datasets=[...selectedConfigs].map(i=>{
     const b=baselines[i];
-    const vals=PENT.map(a=>b.dimension_scores?.[a]??0);
+    const vals=axes.map(a=>b.dimension_scores?.[a]??0);
     return{label:b.name,data:vals,borderColor:b._color,backgroundColor:b._color+'18',borderWidth:2.5,pointBackgroundColor:b._color,pointRadius:4};
   });
-  pentChart=new Chart(ctx,{type:'radar',data:{labels:PENT,datasets},options:{responsive:true,
+  pentChart=new Chart(ctx,{type:'radar',data:{labels:axes,datasets},options:{responsive:true,
     scales:{r:{beginAtZero:true,max:100,grid:{color:'#1a2538'},angleLines:{color:'#1a2538'},
       pointLabels:{font:{size:12,family:'Anybody',weight:'600'},color:'#94a3b8'},ticks:{display:false}}},
     plugins:{legend:{position:'bottom'},tooltip:{callbacks:{label:c=>`${c.dataset.label}: ${c.raw.toFixed(1)}%`}}}}});
+  renderDimCallout();
+}
+
+function renderDimCallout(){
+  const latest=baselines[baselines.length-1];
+  const dims=latest.dimension_scores;
+  if(!dims||Object.keys(dims).length<2){document.getElementById('dimCallout').innerHTML='';return;}
+  const entries=Object.entries(dims).sort((a,b)=>b[1]-a[1]);
+  const best=entries[0], worst=entries[entries.length-1];
+  const di=isExternal()?EXT_DIM_INFO:DIM_INFO;
+  const bc=di[best[0]]?.color||'var(--good)', wc=di[worst[0]]?.color||'var(--bad)';
+  const recs=latest.category_results?Object.entries(latest.category_results).filter(([,v])=>v.recommendation).map(([k,v])=>`<div style="font-size:11px;color:var(--tm);margin-top:4px"><b>${k}</b>: ${v.recommendation}</div>`).join(''):'';
+  document.getElementById('dimCallout').innerHTML=`
+    <div style="display:flex;gap:24px;justify-content:center;flex-wrap:wrap;margin-bottom:8px">
+      <div><span style="color:${bc};font-weight:700">Strongest:</span> ${best[0]} <span style="color:${bc};font-weight:600">${best[1].toFixed(0)}%</span></div>
+      <div><span style="color:${wc};font-weight:700">Weakest:</span> ${worst[0]} <span style="color:${wc};font-weight:600">${worst[1].toFixed(0)}%</span></div>
+    </div>${recs}`;
 }
 
 function renderCatBars(){
@@ -327,8 +371,26 @@ const DIM_INFO={
   'Resilience':{s:'Can the agent filter signal from noise?',color:'#f472b6',cats:['Noise Resilience','Reducer Fidelity']},
   'Temporal':{s:'Can the agent reason about time and sequences?',color:'#a78bfa',cats:['Temporal Reasoning','Fact Update Handling','Conflict Resolution']},
   'Persistence':{s:'Do facts survive session boundaries?',color:'#60a5fa',cats:['Cross-Session','Multi-Session Reasoning']},
-  'Organization':{s:'Does the agent know what it does and doesn\'t know?',color:'#fb923c',cats:['Abstention','Multi-Topic']}
+  'Organization':{s:'Does the agent know what it does and doesn\'t know?',color:'#fb923c',cats:['Abstention','Multi-Topic','Preference Extraction']}
 };
+
+// --- External benchmark metadata ---
+const EXT_CAT_INFO={
+  'single-session-user':{s:'Recall facts the user mentioned in one session',d:'Tests if the agent can find and return a specific fact that the user stated in a single conversation session, buried in ~115K tokens of chat history.',v:'Type: Information Extraction. Haystack: ~48 sessions, 1 answer session. Judge: strict — must contain correct answer, subset = fail.'},
+  'single-session-assistant':{s:'Recall the assistant\'s own prior responses',d:'Tests if the agent remembers what IT previously said in a past session. The answer was generated by the assistant, not stated by the user.',v:'Type: Assistant Memory. Haystack: ~48 sessions, 1 answer session. Judge: strict — must contain correct answer.'},
+  'single-session-preference':{s:'Infer user preferences from conversation context',d:'Tests if the agent can infer and utilize the user\'s personal preferences from contextual clues in past conversations, not direct statements.',v:'Type: Preference Inference. Haystack: ~48 sessions. Judge: flexible — correct as long as it recalls personal info correctly.'},
+  'multi-session':{s:'Synthesize information scattered across sessions',d:'Tests if the agent can combine partial facts from 2+ separate sessions to answer a question that no single session fully answers.',v:'Type: Cross-Session Synthesis. Haystack: ~48 sessions, 2-6 answer sessions. Judge: strict — must contain complete synthesized answer.'},
+  'temporal-reasoning':{s:'Reason about time, order events, compute durations',d:'Tests if the agent can use timestamps and temporal cues to order events, calculate durations, or identify the most recent occurrence.',v:'Type: Temporal Analysis. Haystack: chronologically sorted. Judge: tolerant — allows off-by-one errors on day/week/month counts.'},
+  'knowledge-update':{s:'Return the latest version of updated facts',d:'Tests if the agent returns the UPDATED version of a fact that was corrected later in the conversation, not the original outdated version.',v:'Type: Fact Updates. Old session placed early, new session placed late. Judge: tolerant — old info alongside updated answer is still correct.'}
+};
+const EXT_DIM_INFO={
+  'Information Extraction':{s:'Can the agent find and return facts from ~115K tokens of chat history?',color:'#34d399',cats:['single-session-user','single-session-assistant','single-session-preference']},
+  'Multi-Session':{s:'Can the agent synthesize partial facts scattered across 2-6 sessions?',color:'#60a5fa',cats:['multi-session']},
+  'Temporal':{s:'Can the agent reason about time ordering, durations, and event sequences?',color:'#a78bfa',cats:['temporal-reasoning']},
+  'Knowledge Update':{s:'Can the agent return the latest version of corrected/updated facts?',color:'#f472b6',cats:['knowledge-update']},
+  'Abstention':{s:'Does the agent refuse to fabricate answers about non-existent info?',color:'#fb923c',cats:[]}
+};
+const LME_REF={'GPT-4o':57.7,'GPT-4o-mini':42.8,'Claude 3.5 Sonnet':53.0,'Llama-3.1-70B':39.8};
 
 function renderTimeline(){
   const labels=baselines.map(b=>b.name);
@@ -342,8 +404,10 @@ function renderTimeline(){
   // Dimension trend charts
   const container=document.getElementById('dimCharts');
   container.innerHTML='';
-  PENT.forEach(dim=>{
-    const info=DIM_INFO[dim]||{s:dim,color:'#64748b',cats:[]};
+  const dims=getActiveDims();
+  const di=getDimInfo();
+  dims.forEach(dim=>{
+    const info=di[dim]||{s:dim,color:'#64748b',cats:[]};
     const card=document.createElement('div');
     card.className='card';
     card.innerHTML=`<h4>${dim}</h4><div class="sub">${info.s}<br><span style="font-size:9px;color:var(--td)">Categories: ${info.cats.join(', ')||'—'}</span></div><canvas id="dim-${dim}" height="200"></canvas>`;

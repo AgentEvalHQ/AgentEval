@@ -43,16 +43,17 @@ public class MemoryBenchmark
     public static MemoryBenchmark Standard => new()
     {
         Name = "Standard",
-        Description = "Comprehensive memory benchmark (7 categories, includes Abstention)",
+        Description = "Comprehensive memory benchmark (8 categories, includes Abstention + Preference Extraction)",
         Categories =
         [
-            new() { Name = "Basic Retention", Weight = 0.18, ScenarioType = BenchmarkScenarioType.BasicRetention },
-            new() { Name = "Temporal Reasoning", Weight = 0.13, ScenarioType = BenchmarkScenarioType.TemporalReasoning },
-            new() { Name = "Noise Resilience", Weight = 0.13, ScenarioType = BenchmarkScenarioType.NoiseResilience },
-            new() { Name = "Reach-Back Depth", Weight = 0.18, ScenarioType = BenchmarkScenarioType.ReachBackDepth },
-            new() { Name = "Fact Update Handling", Weight = 0.13, ScenarioType = BenchmarkScenarioType.FactUpdateHandling },
-            new() { Name = "Multi-Topic", Weight = 0.13, ScenarioType = BenchmarkScenarioType.MultiTopic },
-            new() { Name = "Abstention", Weight = 0.12, ScenarioType = BenchmarkScenarioType.Abstention }
+            new() { Name = "Basic Retention", Weight = 0.16, ScenarioType = BenchmarkScenarioType.BasicRetention },
+            new() { Name = "Temporal Reasoning", Weight = 0.12, ScenarioType = BenchmarkScenarioType.TemporalReasoning },
+            new() { Name = "Noise Resilience", Weight = 0.12, ScenarioType = BenchmarkScenarioType.NoiseResilience },
+            new() { Name = "Reach-Back Depth", Weight = 0.16, ScenarioType = BenchmarkScenarioType.ReachBackDepth },
+            new() { Name = "Fact Update Handling", Weight = 0.12, ScenarioType = BenchmarkScenarioType.FactUpdateHandling },
+            new() { Name = "Multi-Topic", Weight = 0.10, ScenarioType = BenchmarkScenarioType.MultiTopic },
+            new() { Name = "Abstention", Weight = 0.10, ScenarioType = BenchmarkScenarioType.Abstention },
+            new() { Name = "Preference Extraction", Weight = 0.12, ScenarioType = BenchmarkScenarioType.PreferenceExtraction }
         ]
     };
 
@@ -63,20 +64,21 @@ public class MemoryBenchmark
     public static MemoryBenchmark Full => new()
     {
         Name = "Full",
-        Description = "Complete memory benchmark suite (11 categories)",
+        Description = "Complete memory benchmark suite (12 categories)",
         Categories =
         [
-            new() { Name = "Basic Retention", Weight = 0.11, ScenarioType = BenchmarkScenarioType.BasicRetention },
+            new() { Name = "Basic Retention", Weight = 0.10, ScenarioType = BenchmarkScenarioType.BasicRetention },
             new() { Name = "Temporal Reasoning", Weight = 0.08, ScenarioType = BenchmarkScenarioType.TemporalReasoning },
             new() { Name = "Noise Resilience", Weight = 0.08, ScenarioType = BenchmarkScenarioType.NoiseResilience },
-            new() { Name = "Reach-Back Depth", Weight = 0.11, ScenarioType = BenchmarkScenarioType.ReachBackDepth },
+            new() { Name = "Reach-Back Depth", Weight = 0.10, ScenarioType = BenchmarkScenarioType.ReachBackDepth },
             new() { Name = "Fact Update Handling", Weight = 0.07, ScenarioType = BenchmarkScenarioType.FactUpdateHandling },
             new() { Name = "Multi-Topic", Weight = 0.07, ScenarioType = BenchmarkScenarioType.MultiTopic },
-            new() { Name = "Cross-Session", Weight = 0.11, ScenarioType = BenchmarkScenarioType.CrossSession },
-            new() { Name = "Reducer Fidelity", Weight = 0.11, ScenarioType = BenchmarkScenarioType.ReducerFidelity },
-            new() { Name = "Abstention", Weight = 0.09, ScenarioType = BenchmarkScenarioType.Abstention },
-            new() { Name = "Conflict Resolution", Weight = 0.09, ScenarioType = BenchmarkScenarioType.ConflictResolution },
-            new() { Name = "Multi-Session Reasoning", Weight = 0.08, ScenarioType = BenchmarkScenarioType.MultiSessionReasoning }
+            new() { Name = "Cross-Session", Weight = 0.10, ScenarioType = BenchmarkScenarioType.CrossSession },
+            new() { Name = "Reducer Fidelity", Weight = 0.10, ScenarioType = BenchmarkScenarioType.ReducerFidelity },
+            new() { Name = "Abstention", Weight = 0.08, ScenarioType = BenchmarkScenarioType.Abstention },
+            new() { Name = "Conflict Resolution", Weight = 0.07, ScenarioType = BenchmarkScenarioType.ConflictResolution },
+            new() { Name = "Multi-Session Reasoning", Weight = 0.07, ScenarioType = BenchmarkScenarioType.MultiSessionReasoning },
+            new() { Name = "Preference Extraction", Weight = 0.08, ScenarioType = BenchmarkScenarioType.PreferenceExtraction }
         ]
     };
 
@@ -139,5 +141,7 @@ public enum BenchmarkScenarioType
     /// <summary>Tests agent detects and resolves implicit contradictions (not explicit corrections).</summary>
     ConflictResolution,
     /// <summary>Tests synthesis of information across multiple sessions (requires ISessionResettableAgent).</summary>
-    MultiSessionReasoning
+    MultiSessionReasoning,
+    /// <summary>Tests inference of user preferences from indirect behavioral signals (SSP-style).</summary>
+    PreferenceExtraction
 }

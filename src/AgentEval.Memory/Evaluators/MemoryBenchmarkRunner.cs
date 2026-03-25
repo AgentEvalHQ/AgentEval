@@ -104,9 +104,17 @@ public class MemoryBenchmarkRunner : IMemoryBenchmarkRunner
     }
 
     /// <inheritdoc />
+    public Task<MemoryBenchmarkResult> RunBenchmarkAsync(
+        IEvaluableAgent agent,
+        MemoryBenchmark benchmark,
+        CancellationToken cancellationToken = default)
+        => RunBenchmarkAsync(agent, benchmark, progress: null, cancellationToken);
+
+    /// <inheritdoc />
     public async Task<MemoryBenchmarkResult> RunBenchmarkAsync(
         IEvaluableAgent agent,
         MemoryBenchmark benchmark,
+        IProgress<BenchmarkProgress>? progress,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(agent);
@@ -114,9 +122,10 @@ public class MemoryBenchmarkRunner : IMemoryBenchmarkRunner
 
         var totalStopwatch = Stopwatch.StartNew();
         var categoryResults = new List<BenchmarkCategoryResult>();
+        var totalCategories = benchmark.Categories.Count;
 
         _logger.LogInformation("Starting memory benchmark: {BenchmarkName} ({CategoryCount} categories)",
-            benchmark.Name, benchmark.Categories.Count);
+            benchmark.Name, totalCategories);
 
         foreach (var category in benchmark.Categories)
         {
@@ -135,6 +144,27 @@ public class MemoryBenchmarkRunner : IMemoryBenchmarkRunner
 
             _logger.LogDebug("Category '{CategoryName}': Score={Score:F1}%, Skipped={Skipped}",
                 category.Name, catResult.Score, catResult.Skipped);
+
+            if (progress is not null)
+            {
+                var elapsed = totalStopwatch.Elapsed;
+                var completed = categoryResults.Count;
+                var remaining = totalCategories - completed;
+                var estimatedRemaining = completed > 0
+                    ? TimeSpan.FromTicks((long)(elapsed.Ticks / (double)completed * remaining))
+                    : TimeSpan.Zero;
+
+                progress.Report(new BenchmarkProgress
+                {
+                    CategoryName = catResult.CategoryName,
+                    Score = catResult.Score,
+                    Skipped = catResult.Skipped,
+                    CompletedCategories = completed,
+                    TotalCategories = totalCategories,
+                    Elapsed = elapsed,
+                    EstimatedRemaining = estimatedRemaining
+                });
+            }
         }
 
         totalStopwatch.Stop();
@@ -180,6 +210,7 @@ public class MemoryBenchmarkRunner : IMemoryBenchmarkRunner
                 BenchmarkScenarioType.Abstention => await RunAbstentionAsync(agent, presetName, cancellationToken),
                 BenchmarkScenarioType.ConflictResolution => await RunConflictResolutionAsync(agent, presetName, cancellationToken),
                 BenchmarkScenarioType.MultiSessionReasoning => await RunMultiSessionReasoningAsync(agent, presetName, cancellationToken),
+                BenchmarkScenarioType.PreferenceExtraction => await RunPreferenceExtractionAsync(agent, presetName, cancellationToken),
                 _ => (Score: 0.0, Skipped: true, SkipReason: $"Unknown scenario type: {category.ScenarioType}")
             };
 
@@ -235,30 +266,47 @@ public class MemoryBenchmarkRunner : IMemoryBenchmarkRunner
             var scenarioDef = DataLoading.ScenarioLoader.Load(scenarioName);
             var preset = DataLoading.ScenarioLoader.ResolvePreset(scenarioDef, presetName);
 
-            // Inject context pressure from corpus
-            if (preset.ContextPressure != null && agent is IHistoryInjectableAgent injectable)
+            // Load corpus turns (if configured)
+            List<(string User, string Assistant)>? corpusTurns = null;
+            if (preset.ContextPressure != null)
             {
                 try
                 {
-                    var corpus = DataLoading.CorpusLoader.Load(
+                    corpusTurns = DataLoading.CorpusLoader.Load(
                         preset.ContextPressure.Corpus,
-                        preset.ContextPressure.MaxTurns ?? 15);
-                    injectable.InjectConversationHistory(corpus);
+                        preset.ContextPressure.MaxTurns ?? 15).ToList();
                 }
                 catch { /* corpus not available — continue without pressure */ }
             }
 
-            // Build MemoryTestScenario from resolved preset
-            var steps = new List<MemoryStep>();
-            var queries = new List<MemoryQuery>();
-            var noiseIndex = 0;
+            // Separate facts into positioned (buried in corpus) and unpositioned (appended after)
+            var positionedFacts = preset.Facts.Where(f => f.FractionalPosition.HasValue).ToList();
+            var unpositionedFacts = preset.Facts.Where(f => !f.FractionalPosition.HasValue).ToList();
 
-            foreach (var fact in preset.Facts)
+            // If we have positioned facts AND a corpus, interleave them
+            if (positionedFacts.Count > 0 && corpusTurns != null && corpusTurns.Count > 0
+                && agent is IHistoryInjectableAgent injectable)
+            {
+                var interleaved = BuildInterleavedHistory(corpusTurns, positionedFacts, preset.NoiseBetweenFacts, preset.ContextPressure?.SessionsCount ?? 0);
+                injectable.InjectConversationHistory(interleaved);
+            }
+            else if (corpusTurns != null && agent is IHistoryInjectableAgent injectableNoPos)
+            {
+                // No positioned facts — inject corpus as before
+                injectableNoPos.InjectConversationHistory(corpusTurns);
+            }
+
+            // Build steps from unpositioned facts (appended after corpus, current behavior)
+            var steps = new List<MemoryStep>();
+            var noiseIndex = positionedFacts.Count; // continue noise rotation
+
+            foreach (var fact in unpositionedFacts)
             {
                 var plantedText = fact.PlantedAs ?? fact.Content;
+                if (fact.Timestamp != null)
+                    plantedText = $"[{fact.Timestamp}] {plantedText}";
                 steps.Add(MemoryStep.Fact(plantedText));
 
-                // Add noise between facts (if available)
                 if (preset.NoiseBetweenFacts.Count > 0)
                 {
                     var noiseMsg = preset.NoiseBetweenFacts[noiseIndex % preset.NoiseBetweenFacts.Count];
@@ -267,13 +315,27 @@ public class MemoryBenchmarkRunner : IMemoryBenchmarkRunner
                 }
             }
 
+            // Build queries
+            var queries = new List<MemoryQuery>();
             foreach (var q in preset.Queries)
             {
-                if (q.Abstention)
+                // For temporal queries, prepend today's date so the agent can reason about recency
+                var queryQuestion = q.Question;
+                if (string.Equals(q.QueryType, "temporal", StringComparison.OrdinalIgnoreCase))
+                    queryQuestion = $"Today's date is {DateTimeOffset.UtcNow:yyyy-MM-dd}.\n\n{queryQuestion}";
+
+                // Determine if this is an abstention query (explicit flag or query_type)
+                var isAbstention = q.Abstention || string.Equals(q.QueryType, "abstention", StringComparison.OrdinalIgnoreCase);
+
+                if (isAbstention)
                 {
                     var forbidden = (q.ForbiddenFacts ?? [])
                         .Select(f => MemoryFact.Create(f)).ToArray();
-                    queries.Add(MemoryQuery.CreateAbstention(q.Question, forbidden));
+                    var absQuery = MemoryQuery.CreateAbstention(queryQuestion, forbidden);
+                    // Ensure query_type metadata is set for abstention too
+                    if (q.QueryType != null)
+                        absQuery.Metadata!["query_type"] = q.QueryType;
+                    queries.Add(absQuery);
                 }
                 else
                 {
@@ -282,10 +344,20 @@ public class MemoryBenchmarkRunner : IMemoryBenchmarkRunner
                     var forbidden = (q.ForbiddenFacts ?? [])
                         .Select(f => MemoryFact.Create(f)).ToArray();
 
-                    if (forbidden.Length > 0)
-                        queries.Add(MemoryQuery.Create(q.Question, expected, forbidden));
-                    else
-                        queries.Add(MemoryQuery.Create(q.Question, expected));
+                    // Build metadata with query_type when specified
+                    Dictionary<string, object>? metadata = null;
+                    if (q.QueryType != null)
+                    {
+                        metadata = new Dictionary<string, object> { ["query_type"] = q.QueryType };
+                    }
+
+                    queries.Add(new MemoryQuery
+                    {
+                        Question = queryQuestion,
+                        ExpectedFacts = expected,
+                        ForbiddenFacts = forbidden,
+                        Metadata = metadata
+                    });
                 }
             }
 
@@ -307,11 +379,179 @@ public class MemoryBenchmarkRunner : IMemoryBenchmarkRunner
     }
 
     /// <summary>
+    /// Merges corpus turns with positioned facts, interleaving facts at their specified
+    /// fractional positions within the corpus. This buries facts deep in context instead
+    /// of appending them at the end (which exploits LLM recency bias).
+    /// When <paramref name="sessionsCount"/> is greater than 0, the corpus is divided into
+    /// that many segments with session boundary markers inserted between them.
+    /// Facts with a <see cref="DataLoading.FactDefinition.SessionId"/> are placed within
+    /// the corresponding session segment instead of using fractional positioning.
+    /// </summary>
+    internal static IEnumerable<(string User, string Assistant)> BuildInterleavedHistory(
+        List<(string User, string Assistant)> corpusTurns,
+        List<DataLoading.FactDefinition> positionedFacts,
+        List<string> noiseBetweenFacts,
+        int sessionsCount = 0)
+    {
+        if (sessionsCount <= 0)
+        {
+            // Original behavior — no session boundaries
+            return BuildInterleavedHistoryNoSessions(corpusTurns, positionedFacts, noiseBetweenFacts);
+        }
+
+        // --- Session-aware interleaving ---
+        // Divide corpus turns into sessionsCount equal segments
+        var turnsPerSession = corpusTurns.Count / sessionsCount;
+        var remainder = corpusTurns.Count % sessionsCount;
+
+        // Build session segments (distribute remainder turns across first segments)
+        var segments = new List<List<(string, string)>>();
+        var offset = 0;
+        for (int s = 0; s < sessionsCount; s++)
+        {
+            var count = turnsPerSession + (s < remainder ? 1 : 0);
+            segments.Add(corpusTurns.GetRange(offset, count));
+            offset += count;
+        }
+
+        // Separate facts by session assignment
+        var sessionFacts = positionedFacts.Where(f => f.SessionId.HasValue).ToList();
+        var fractionalFacts = positionedFacts.Where(f => !f.SessionId.HasValue).ToList();
+
+        // Insert fractional-position facts into their computed segment
+        // (same logic as before but scoped to the whole corpus)
+        foreach (var (fact, i) in fractionalFacts.Select((f, i) => (f, i)))
+        {
+            var globalIndex = Math.Clamp((int)(fact.FractionalPosition!.Value * corpusTurns.Count), 0, corpusTurns.Count);
+            // Determine which segment this index falls into
+            var cumulative = 0;
+            for (int s = 0; s < segments.Count; s++)
+            {
+                if (globalIndex <= cumulative + segments[s].Count || s == segments.Count - 1)
+                {
+                    var localIndex = Math.Clamp(globalIndex - cumulative, 0, segments[s].Count);
+                    InsertFactIntoSegment(segments[s], localIndex, fact, i, noiseBetweenFacts);
+                    break;
+                }
+                cumulative += segments[s].Count;
+            }
+        }
+
+        // Insert session-assigned facts into the middle of their segment
+        var noiseIdx = fractionalFacts.Count;
+        foreach (var fact in sessionFacts)
+        {
+            var sessionIndex = Math.Clamp(fact.SessionId!.Value - 1, 0, segments.Count - 1);
+            var segment = segments[sessionIndex];
+            var midpoint = segment.Count / 2;
+            InsertFactIntoSegment(segment, midpoint, fact, noiseIdx, noiseBetweenFacts);
+            noiseIdx++;
+        }
+
+        // Generate session boundary dates spread across the last 6 months
+        var today = DateTime.Today;
+        var totalDays = 180; // ~6 months
+        var dayStep = sessionsCount > 1 ? totalDays / (sessionsCount - 1) : 0;
+
+        // Assemble final result with session markers between segments
+        var result = new List<(string, string)>();
+        for (int s = 0; s < segments.Count; s++)
+        {
+            // Insert session boundary marker before each segment
+            var daysAgo = sessionsCount > 1
+                ? totalDays - (s * dayStep)
+                : 0;
+            var sessionDate = today.AddDays(-daysAgo);
+            var dateStr = sessionDate.ToString("yyyy-MM-dd");
+            result.Add(($"--- Session {s + 1} ({dateStr}) ---", "Starting a new conversation session."));
+
+            result.AddRange(segments[s]);
+        }
+
+        return result;
+    }
+
+    /// <summary>
+    /// Inserts a fact (and optional noise) into a segment at the given local index.
+    /// </summary>
+    private static void InsertFactIntoSegment(
+        List<(string, string)> segment, int localIndex, DataLoading.FactDefinition fact,
+        int noiseIndex, List<string> noiseBetweenFacts)
+    {
+        var plantedText = fact.PlantedAs ?? fact.Content;
+        if (fact.Timestamp != null)
+            plantedText = $"[{fact.Timestamp}] {plantedText}";
+        var assistantReply = fact.AssistantResponse ?? "Got it, I'll remember that.";
+        var factTurn = (plantedText, assistantReply);
+
+        if (noiseBetweenFacts.Count > 0)
+        {
+            var noiseMsg = noiseBetweenFacts[noiseIndex % noiseBetweenFacts.Count];
+            var noiseTurn = (noiseMsg, "That's an interesting point.");
+            segment.Insert(Math.Min(localIndex, segment.Count), noiseTurn);
+        }
+
+        segment.Insert(Math.Min(localIndex, segment.Count), factTurn);
+    }
+
+    /// <summary>
+    /// Original interleaving logic without session boundaries.
+    /// </summary>
+    private static IEnumerable<(string User, string Assistant)> BuildInterleavedHistoryNoSessions(
+        List<(string User, string Assistant)> corpusTurns,
+        List<DataLoading.FactDefinition> positionedFacts,
+        List<string> noiseBetweenFacts)
+    {
+        // Calculate insertion indices, sort descending so we insert from back to front
+        // (prevents earlier insertions from shifting later indices)
+        var insertions = positionedFacts
+            .Select((fact, i) => (
+                Index: Math.Clamp((int)(fact.FractionalPosition!.Value * corpusTurns.Count), 0, corpusTurns.Count),
+                Fact: fact,
+                NoiseIndex: i))
+            .OrderByDescending(x => x.Index)
+            .ToList();
+
+        var result = new List<(string, string)>(corpusTurns);
+
+        foreach (var ins in insertions)
+        {
+            var plantedText = ins.Fact.PlantedAs ?? ins.Fact.Content;
+            if (ins.Fact.Timestamp != null)
+                plantedText = $"[{ins.Fact.Timestamp}] {plantedText}";
+            var assistantReply = ins.Fact.AssistantResponse ?? "Got it, I'll remember that.";
+            var factTurn = (plantedText, assistantReply);
+
+            // Optionally insert a noise turn after the fact (so fact doesn't sit right next to a query)
+            if (noiseBetweenFacts.Count > 0)
+            {
+                var noiseMsg = noiseBetweenFacts[ins.NoiseIndex % noiseBetweenFacts.Count];
+                var noiseTurn = (noiseMsg, "That's an interesting point.");
+                result.Insert(ins.Index, noiseTurn);
+            }
+
+            result.Insert(ins.Index, factTurn);
+        }
+
+        return result;
+    }
+
+    /// <summary>
     /// Pre-fills the agent's conversation history with corpus-loaded turns to simulate
     /// a long conversation. This tests whether the agent can recall facts planted
     /// AFTER a large context has already been established — without expensive LLM calls.
     /// Falls back to SyntheticHistoryGenerator if corpus files are not available.
     /// </summary>
+    private async Task<(double Score, bool Skipped, string? SkipReason)> RunPreferenceExtractionAsync(
+        IEvaluableAgent agent, string presetName, CancellationToken ct)
+    {
+        var jsonResult = await TryRunFromJsonAsync(agent, "preference-extraction", presetName, ct);
+        if (jsonResult.HasValue) return jsonResult.Value;
+
+        // No hardcoded fallback — preference extraction is JSON-only
+        return (0, true, "Preference extraction scenario JSON not found");
+    }
+
     private static void InjectContextPressure(IEvaluableAgent agent, string presetName)
     {
         if (agent is not IHistoryInjectableAgent injectable) return;
@@ -319,8 +559,8 @@ public class MemoryBenchmarkRunner : IMemoryBenchmarkRunner
         var (corpusName, turnCount) = presetName switch
         {
             "Diagnostic" => ("context-stress", 250), // Diagnostic uses stress corpus (~120K tokens)
-            "Full" => ("context-large", 100),        // Full uses large corpus (~50K tokens)
-            "Standard" => ("context-medium", 30),    // Standard uses 30 medium turns (~15K tokens)
+            "Full" => ("context-stress", 200),       // Full uses stress corpus (~130K tokens)
+            "Standard" => ("context-stress", 100),   // Standard uses stress corpus (~65K tokens)
             _ => ("context-small", 15)               // Quick uses all 15 small turns (~8K tokens)
         };
 

@@ -1,29 +1,50 @@
 {
   "schema_version": "1.0",
-  "generated_at": "2026-03-23T14:43:31.5256016+00:00",
+  "generated_at": "2026-03-25T06:06:05.4796841+00:00",
   "generated_by": "AgentEval.Memory v1.0.0.0",
   "agent": {
     "name": "LongMemEval-Agent"
   },
   "benchmarks": [
     {
-      "benchmark_id": "memory-longmemeval",
-      "preset": "LongMemEval",
+      "benchmark_id": "memory-longmemeval-s",
+      "preset": "longmemeval-S",
       "categories": [
-        "single-session-user"
+        "single-session-user",
+        "multi-session",
+        "single-session-preference",
+        "temporal-reasoning",
+        "knowledge-update",
+        "single-session-assistant",
+        "abstention"
       ],
       "baselines": [
         {
-          "id": "bl-9842f0b6",
-          "file": "baselines/2026-03-23_longmemeval-10q.json",
-          "name": "LongMemEval 10q",
+          "id": "bl-1f6e93da",
+          "file": "baselines/2026-03-25_longmemeval-s-18q.json",
+          "name": "LongMemEval-S 18q",
           "configuration_id": "E0549E44F8F1",
-          "timestamp": "2026-03-23T14:43:31.4613306+00:00",
-          "overall_score": 95.5,
-          "grade": "A",
+          "timestamp": "2026-03-25T04:31:38.0688172+00:00",
+          "overall_score": 61.111111111111114,
+          "grade": "D",
           "tags": [
             "longmemeval",
-            "cross-platform"
+            "cross-platform",
+            "binary-scoring"
+          ]
+        },
+        {
+          "id": "bl-1df8efd1",
+          "file": "baselines/2026-03-25_longmemeval-s-50q-stratified.json",
+          "name": "LongMemEval-S 50q (stratified)",
+          "configuration_id": "E0549E44F8F1",
+          "timestamp": "2026-03-25T06:06:05.4147007+00:00",
+          "overall_score": 60,
+          "grade": "D",
+          "tags": [
+            "longmemeval",
+            "cross-platform",
+            "binary-scoring"
           ]
         }
       ]

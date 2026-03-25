@@ -3,14 +3,37 @@
   "category": "NoiseResilience",
   "name": "Noise Resilience",
   "description": "Tests recall of facts buried in heavy conversational noise.",
-  "context_pressure": { "corpus": "context-small", "max_turns": 15 },
+  "context_pressure": {
+    "corpus": "context-small",
+    "max_turns": 15
+  },
   "presets": {
     "quick": {
       "facts": [
-        { "content": "I'm severely allergic to peanuts and tree nuts", "category": "allergy", "importance": 100, "planted_as": "Oh, I should mention — I'm severely allergic to peanuts and tree nuts." },
-        { "content": "My dentist appointment is next Tuesday at 2:30pm", "category": "schedule", "importance": 80, "planted_as": "By the way, my dentist appointment is next Tuesday at 2:30pm." },
-        { "content": "My WiFi password at home is BlueOcean42", "category": "credentials", "importance": 90, "planted_as": "My WiFi password at home is BlueOcean42, just in case." },
-        { "content": "My car is parked in lot B spot 247", "category": "location", "importance": 70, "planted_as": "My car is parked in lot B, spot 247." }
+        {
+          "content": "I'm severely allergic to peanuts and tree nuts",
+          "category": "allergy",
+          "importance": 100,
+          "planted_as": "Oh, I should mention — I'm severely allergic to peanuts and tree nuts."
+        },
+        {
+          "content": "My dentist appointment is next Tuesday at 2:30pm",
+          "category": "schedule",
+          "importance": 80,
+          "planted_as": "By the way, my dentist appointment is next Tuesday at 2:30pm."
+        },
+        {
+          "content": "My WiFi password at home is BlueOcean42",
+          "category": "credentials",
+          "importance": 90,
+          "planted_as": "My WiFi password at home is BlueOcean42, just in case."
+        },
+        {
+          "content": "My car is parked in lot B spot 247",
+          "category": "location",
+          "importance": 70,
+          "planted_as": "My car is parked in lot B, spot 247."
+        }
       ],
       "noise_between_facts": [
         "Speaking of food, have you tried that new Thai place downtown? The pad thai is incredible.",
@@ -25,15 +48,47 @@
         "My phone battery dies so fast. I think I need a new one."
       ],
       "queries": [
-        { "question": "What food allergies do I have that you should know about?", "expected_facts": ["peanuts", "tree nuts"], "difficulty": "indirect" },
-        { "question": "I forgot where I parked. Can you help?", "expected_facts": ["lot B", "spot 247"], "difficulty": "direct" },
-        { "question": "What's my WiFi password?", "expected_facts": ["BlueOcean42"], "difficulty": "direct" },
-        { "question": "Do I have any appointments coming up?", "expected_facts": ["dentist", "Tuesday", "2:30"], "difficulty": "indirect" }
+        {
+          "question": "What food allergies do I have that you should know about?",
+          "expected_facts": [
+            "peanuts",
+            "tree nuts"
+          ],
+          "difficulty": "indirect"
+        },
+        {
+          "question": "I forgot where I parked. Can you help?",
+          "expected_facts": [
+            "lot B",
+            "spot 247"
+          ],
+          "difficulty": "direct"
+        },
+        {
+          "question": "What's my WiFi password?",
+          "expected_facts": [
+            "BlueOcean42"
+          ],
+          "difficulty": "direct"
+        },
+        {
+          "question": "Do I have any appointments coming up?",
+          "expected_facts": [
+            "dentist",
+            "Tuesday",
+            "2:30"
+          ],
+          "difficulty": "indirect"
+        }
       ]
     },
     "standard": {
       "extends": "quick",
-      "context_pressure": { "corpus": "context-medium", "max_turns": 40 },
+      "context_pressure": {
+        "corpus": "context-stress",
+        "max_turns": 100,
+        "sessions_count": 8
+      },
       "noise_between_facts": [
         "Speaking of food, have you tried that new Thai place downtown? The pad thai is incredible.",
         "I was reading about climate change impacts on agriculture yesterday. Fascinating and terrifying.",
@@ -57,32 +112,191 @@
         "Actually, now that I think about it, I have multiple appointments scheduled for next week."
       ],
       "facts": [
-        { "content": "I also have a severe shellfish allergy on top of peanuts and tree nuts", "category": "allergy", "importance": 95, "planted_as": "Actually, I should also mention I have a severe shellfish allergy too — so basically all the major allergens for me." },
-        { "content": "My car is a blue Honda Civic sedan", "category": "personal", "importance": 65, "planted_as": "Oh, and my car is a blue Honda Civic — I drive a sedan." },
-        { "content": "My emergency contact is my sister Maria at 555-0147", "category": "emergency", "importance": 100, "planted_as": "If there's ever an emergency, contact my sister Maria — her number is 555-0147." },
-        { "content": "I take metformin 500mg twice daily for pre-diabetes", "category": "health", "importance": 95, "planted_as": "I should mention I take metformin, 500mg twice a day — I was diagnosed with pre-diabetes last year." },
-        { "content": "My home insurance policy number is HI-2847-CPH", "category": "financial", "importance": 80, "planted_as": "My home insurance policy number is HI-2847-CPH, just for the records." },
-        { "content": "I'm in apartment 4B at Vesterbrogade 127", "category": "location", "importance": 75, "planted_as": "My address is Vesterbrogade 127, apartment 4B." },
-        { "content": "My work laptop serial number is DL-X1C-88942", "category": "work", "importance": 70, "planted_as": "The IT team asked me to note my laptop serial: DL-X1C-88942." },
-        { "content": "My gym membership ID is CPH-GYM-3391", "category": "personal", "importance": 50, "planted_as": "My gym membership card number is CPH-GYM-3391 in case I lose it." },
-        { "content": "I have a follow-up blood test on March 28th at Rigshospitalet", "category": "health", "importance": 85, "planted_as": "I have a follow-up blood test on March 28th at Rigshospitalet for the pre-diabetes monitoring." },
-        { "content": "My bike lock combination is 7-23-41", "category": "credentials", "importance": 65, "planted_as": "Oh, and my bike lock combination is 7-23-41 — I always forget it." }
+        {
+          "content": "I also have a severe shellfish allergy on top of peanuts and tree nuts",
+          "category": "allergy",
+          "importance": 95,
+          "planted_as": "Oh man, we went to that seafood buffet for my cousin's birthday and I had to sit there eating bread rolls the whole time. I have a severe shellfish allergy on top of the peanut and tree nut thing — basically all the major allergens are out to get me.",
+          "position": 0.15,
+          "session_id": 2
+        },
+        {
+          "content": "My car is a blue Honda Civic sedan",
+          "category": "personal",
+          "importance": 65,
+          "planted_as": "I was at the car wash this morning getting my blue Honda Civic cleaned up. The sedan looks brand new now — should have done it weeks ago.",
+          "position": 0.25,
+          "session_id": 3
+        },
+        {
+          "content": "My emergency contact is my sister Maria at 555-0147",
+          "category": "emergency",
+          "importance": 100,
+          "planted_as": "If there's ever an emergency, contact my sister Maria — her number is 555-0147.",
+          "position": 0.35,
+          "session_id": 4
+        },
+        {
+          "content": "I take metformin 500mg twice daily for pre-diabetes",
+          "category": "health",
+          "importance": 95,
+          "planted_as": "I should mention I take metformin, 500mg twice a day — I was diagnosed with pre-diabetes last year.",
+          "position": 0.45,
+          "session_id": 5
+        },
+        {
+          "content": "My home insurance policy number is HI-2847-CPH",
+          "category": "financial",
+          "importance": 80,
+          "planted_as": "My home insurance policy number is HI-2847-CPH, just for the records.",
+          "position": 0.55,
+          "session_id": 5
+        },
+        {
+          "content": "I'm in apartment 4B at Vesterbrogade 127",
+          "category": "location",
+          "importance": 75,
+          "planted_as": "My address is Vesterbrogade 127, apartment 4B.",
+          "position": 0.65,
+          "session_id": 6
+        },
+        {
+          "content": "My work laptop serial number is DL-X1C-88942",
+          "category": "work",
+          "importance": 70,
+          "planted_as": "The IT team asked me to note my laptop serial: DL-X1C-88942.",
+          "position": 0.2,
+          "session_id": 3
+        },
+        {
+          "content": "My gym membership ID is CPH-GYM-3391",
+          "category": "personal",
+          "importance": 50,
+          "planted_as": "My gym membership card number is CPH-GYM-3391 in case I lose it.",
+          "position": 0.3,
+          "session_id": 4
+        },
+        {
+          "content": "I have a follow-up blood test on March 28th at Rigshospitalet",
+          "category": "health",
+          "importance": 85,
+          "planted_as": "I have a follow-up blood test on March 28th at Rigshospitalet for the pre-diabetes monitoring.",
+          "position": 0.4,
+          "session_id": 4
+        },
+        {
+          "content": "My bike lock combination is 7-23-41",
+          "category": "credentials",
+          "importance": 65,
+          "planted_as": "Oh, and my bike lock combination is 7-23-41 — I always forget it.",
+          "position": 0.5,
+          "session_id": 5
+        }
       ],
       "queries": [
-        { "question": "If you were ordering seafood for me, what specific allergies would be your biggest concern?", "expected_facts": ["peanuts", "tree nuts", "shellfish"], "difficulty": "synthesis" },
-        { "question": "My dentist appointment — what day and time is it exactly? And if someone needs to pick me up from the appointment, how do they identify my car?", "expected_facts": ["Tuesday", "2:30pm", "blue Honda Civic", "lot B", "247"], "difficulty": "synthesis" },
-        { "question": "What is the EXACT WiFi password — not a variation, the one I specifically told you?", "expected_facts": ["BlueOcean42"], "difficulty": "direct" },
-        { "question": "List ALL my food allergies you know about, in full.", "expected_facts": ["peanuts", "tree nuts", "shellfish"], "difficulty": "synthesis" },
-        { "question": "If I had a medical emergency, who should be contacted and what medications am I on?", "expected_facts": ["Maria", "555-0147", "metformin", "500mg", "EpiPen", "peanuts"], "difficulty": "synthesis" },
-        { "question": "What's my exact home address including apartment number?", "expected_facts": ["Vesterbrogade 127", "4B"], "difficulty": "direct" },
-        { "question": "I need to file an insurance claim — what's my policy number?", "expected_facts": ["HI-2847-CPH"], "difficulty": "direct" },
-        { "question": "I have two upcoming medical appointments — what are they and when?", "expected_facts": ["dentist", "Tuesday", "2:30", "blood test", "March 28", "Rigshospitalet"], "difficulty": "synthesis" },
-        { "question": "What credential numbers do I need to remember — WiFi, gym, bike lock, and laptop serial?", "expected_facts": ["BlueOcean42", "CPH-GYM-3391", "7-23-41", "DL-X1C-88942"], "difficulty": "synthesis" }
+        {
+          "question": "If you were ordering seafood for me, what specific allergies would be your biggest concern?",
+          "expected_facts": [
+            "peanuts",
+            "tree nuts",
+            "shellfish"
+          ],
+          "difficulty": "synthesis",
+          "query_type": "standard"
+        },
+        {
+          "question": "My dentist appointment — what day and time is it exactly? And if someone needs to pick me up from the appointment, how do they identify my car?",
+          "expected_facts": [
+            "Tuesday",
+            "2:30pm",
+            "blue Honda Civic",
+            "lot B",
+            "247"
+          ],
+          "difficulty": "synthesis",
+          "query_type": "standard"
+        },
+        {
+          "question": "What is the EXACT WiFi password — not a variation, the one I specifically told you?",
+          "expected_facts": [
+            "BlueOcean42"
+          ],
+          "difficulty": "direct",
+          "query_type": "standard"
+        },
+        {
+          "question": "List ALL my food allergies you know about, in full.",
+          "expected_facts": [
+            "peanuts",
+            "tree nuts",
+            "shellfish"
+          ],
+          "difficulty": "synthesis",
+          "query_type": "standard"
+        },
+        {
+          "question": "If I had a medical emergency, who should be contacted and what medications am I on?",
+          "expected_facts": [
+            "Maria",
+            "555-0147",
+            "metformin",
+            "500mg",
+            "EpiPen",
+            "peanuts"
+          ],
+          "difficulty": "synthesis",
+          "query_type": "standard"
+        },
+        {
+          "question": "What's my exact home address including apartment number?",
+          "expected_facts": [
+            "Vesterbrogade 127",
+            "4B"
+          ],
+          "difficulty": "direct",
+          "query_type": "standard"
+        },
+        {
+          "question": "I need to file an insurance claim — what's my policy number?",
+          "expected_facts": [
+            "HI-2847-CPH"
+          ],
+          "difficulty": "direct",
+          "query_type": "standard"
+        },
+        {
+          "question": "I have two upcoming medical appointments — what are they and when?",
+          "expected_facts": [
+            "dentist",
+            "Tuesday",
+            "2:30",
+            "blood test",
+            "March 28",
+            "Rigshospitalet"
+          ],
+          "difficulty": "synthesis",
+          "query_type": "standard"
+        },
+        {
+          "question": "What credential numbers do I need to remember — WiFi, gym, bike lock, and laptop serial?",
+          "expected_facts": [
+            "BlueOcean42",
+            "CPH-GYM-3391",
+            "7-23-41",
+            "DL-X1C-88942"
+          ],
+          "difficulty": "synthesis",
+          "query_type": "standard"
+        }
       ]
     },
     "full": {
       "extends": "standard",
-      "context_pressure": { "corpus": "context-large", "max_turns": 80 }
+      "context_pressure": {
+        "corpus": "context-stress",
+        "max_turns": 200,
+        "sessions_count": 15
+      }
     }
   }
 }
