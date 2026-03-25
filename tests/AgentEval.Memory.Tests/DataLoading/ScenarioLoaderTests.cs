@@ -92,6 +92,69 @@ public class ScenarioLoaderTests
         Assert.True(recallQueries.Count >= 2, "Should have at least 2 recall queries");
     }
 
+    [Theory]
+    [InlineData("basic-retention")]
+    [InlineData("temporal-reasoning")]
+    [InlineData("noise-resilience")]
+    [InlineData("multi-topic")]
+    [InlineData("abstention")]
+    [InlineData("fact-update-handling")]
+    [InlineData("preference-extraction")]
+    [InlineData("conflict-resolution")]
+    public void ResolvePreset_StandardHasMoreFactsThanQuick(string scenarioName)
+    {
+        var scenario = ScenarioLoader.Load(scenarioName);
+        var quick = ScenarioLoader.ResolvePreset(scenario, "quick");
+        var standard = ScenarioLoader.ResolvePreset(scenario, "standard");
+
+        Assert.True(standard.Facts.Count >= quick.Facts.Count,
+            $"{scenarioName}: Standard ({standard.Facts.Count}) should have >= facts than Quick ({quick.Facts.Count})");
+    }
+
+    [Fact]
+    public void FactUpdateHandling_QuickPreset_HasUpdateFacts()
+    {
+        var scenario = ScenarioLoader.Load("fact-update-handling");
+        var resolved = ScenarioLoader.ResolvePreset(scenario, "quick");
+
+        // Quick must have both original AND update facts so queries expecting updated values pass
+        Assert.True(resolved.Facts.Count >= 4,
+            $"fact-update-handling quick needs original + update facts, got {resolved.Facts.Count}");
+
+        var hasColorUpdate = resolved.Facts.Any(f => f.Content.Contains("green", StringComparison.OrdinalIgnoreCase));
+        Assert.True(hasColorUpdate, "Quick should contain the color update fact (blue → green)");
+    }
+
+    [Theory]
+    [InlineData("basic-retention", "standard")]
+    [InlineData("noise-resilience", "standard")]
+    [InlineData("abstention", "standard")]
+    [InlineData("fact-update-handling", "standard")]
+    public void ResolvePreset_HardenedScenarios_HaveForbiddenFacts(string scenarioName, string preset)
+    {
+        var scenario = ScenarioLoader.Load(scenarioName);
+        var resolved = ScenarioLoader.ResolvePreset(scenario, preset);
+
+        var queriesWithForbidden = resolved.Queries.Where(q => q.ForbiddenFacts?.Count > 0).ToList();
+        Assert.True(queriesWithForbidden.Count >= 1,
+            $"{scenarioName}/{preset}: Hardened scenario should have at least 1 query with forbidden_facts, got {queriesWithForbidden.Count}");
+    }
+
+    [Theory]
+    [InlineData("basic-retention", "standard", "synthesis")]
+    [InlineData("abstention", "standard", "counterfactual")]
+    [InlineData("temporal-reasoning", "standard", "temporal")]
+    [InlineData("fact-update-handling", "standard", "update")]
+    public void ResolvePreset_HardenedQueries_HaveQueryType(string scenarioName, string preset, string expectedQueryType)
+    {
+        var scenario = ScenarioLoader.Load(scenarioName);
+        var resolved = ScenarioLoader.ResolvePreset(scenario, preset);
+
+        var matchingQueries = resolved.Queries.Where(q => q.QueryType == expectedQueryType).ToList();
+        Assert.True(matchingQueries.Count >= 1,
+            $"{scenarioName}/{preset}: Should have at least 1 query with query_type='{expectedQueryType}', got {matchingQueries.Count}");
+    }
+
     [Fact]
     public void Load_NonExistent_ThrowsFileNotFoundException()
     {

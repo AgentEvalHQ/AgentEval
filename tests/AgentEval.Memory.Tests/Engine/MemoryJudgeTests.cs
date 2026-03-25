@@ -440,3 +440,101 @@ public class FakeChatClient : IChatClient
     public object? GetService(Type serviceType, object? key = null) => null;
     public void Dispose() { }
 }
+public class MemoryJudgePromptTests
+{
+    private static MemoryQuery CreateWithType(string question, string queryType, params MemoryFact[] facts) => new()
+    {
+        Question = question,
+        ExpectedFacts = facts.ToArray(),
+        Metadata = new Dictionary<string, object> { ["query_type"] = queryType }
+    };
+
+    [Theory]
+    [InlineData("synthesis", "SYNTHESIS SCORING")]
+    [InlineData("counterfactual", "COUNTERFACTUAL SCORING")]
+    [InlineData("correction_chain", "CORRECTION CHAIN SCORING")]
+    [InlineData("temporal", "TEMPORAL TOLERANCE")]
+    [InlineData("preference", "PREFERENCE TOLERANCE")]
+    [InlineData("update", "UPDATE TOLERANCE")]
+    public void BuildJudgmentPrompt_IncludesCorrectToleranceClause(string queryType, string expectedClause)
+    {
+        var query = CreateWithType("Test question?", queryType, MemoryFact.Create("test fact"));
+
+        var prompt = MemoryJudge.BuildJudgmentPrompt("Agent says test fact.", query);
+
+        Assert.Contains(expectedClause, prompt);
+    }
+
+    [Fact]
+    public void BuildJudgmentPrompt_StandardType_NoToleranceClause()
+    {
+        var query = CreateWithType("Test question?", "standard", MemoryFact.Create("test fact"));
+
+        var prompt = MemoryJudge.BuildJudgmentPrompt("Agent says test fact.", query);
+
+        Assert.DoesNotContain("TOLERANCE", prompt);
+        Assert.DoesNotContain("SCORING:", prompt);
+    }
+
+    [Fact]
+    public void BuildJudgmentPrompt_Synthesis_RequiresAllFacts()
+    {
+        var query = CreateWithType("Tell me about my event", "synthesis",
+            MemoryFact.Create("marathon"),
+            MemoryFact.Create("Portland"),
+            MemoryFact.Create("sub-4-hours"));
+
+        var prompt = MemoryJudge.BuildJudgmentPrompt("The marathon in Portland, aiming for sub-4.", query);
+
+        Assert.Contains("SYNTHESIS SCORING", prompt);
+        Assert.Contains("ALL expected facts", prompt);
+        Assert.Contains("marathon", prompt);
+        Assert.Contains("Portland", prompt);
+        Assert.Contains("sub-4-hours", prompt);
+    }
+
+    [Fact]
+    public void BuildJudgmentPrompt_Counterfactual_MentionsFalsePremise()
+    {
+        var query = CreateWithType("You have 3 kids?", "counterfactual",
+            MemoryFact.Create("2 children"),
+            MemoryFact.Create("ages 8 and 12"));
+
+        var prompt = MemoryJudge.BuildJudgmentPrompt("Actually you have 2 kids.", query);
+
+        Assert.Contains("COUNTERFACTUAL SCORING", prompt);
+        Assert.Contains("FALSE PREMISE", prompt);
+    }
+
+    [Fact]
+    public void BuildJudgmentPrompt_CorrectionChain_ShowsForbiddenAndPenalty()
+    {
+        var query = new MemoryQuery
+        {
+            Question = "Where do I work?",
+            ExpectedFacts = new[] { MemoryFact.Create("Apple") },
+            ForbiddenFacts = new[] { MemoryFact.Create("Google"), MemoryFact.Create("Microsoft") },
+            Metadata = new Dictionary<string, object> { ["query_type"] = "correction_chain" }
+        };
+
+        var prompt = MemoryJudge.BuildJudgmentPrompt("You work at Apple.", query);
+
+        Assert.Contains("CORRECTION CHAIN SCORING", prompt);
+        Assert.Contains("-30", prompt);
+        Assert.Contains("Google", prompt);
+        Assert.Contains("Microsoft", prompt);
+    }
+
+    [Fact]
+    public void BuildJudgmentPrompt_NoMetadata_DefaultsToStandard()
+    {
+        var query = MemoryQuery.Create("Simple question?", MemoryFact.Create("simple fact"));
+
+        var prompt = MemoryJudge.BuildJudgmentPrompt("The answer is simple fact.", query);
+
+        Assert.DoesNotContain("TOLERANCE", prompt);
+        Assert.DoesNotContain("SYNTHESIS", prompt);
+        Assert.DoesNotContain("COUNTERFACTUAL", prompt);
+        Assert.Contains("simple fact", prompt);
+    }
+}
