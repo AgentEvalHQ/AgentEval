@@ -1,0 +1,85 @@
+{
+  "id": "bl-d6c6dc6e",
+  "name": "Standard \u2014 Mar 25 15:55",
+  "timestamp": "2026-03-25T15:55:56.3878818+00:00",
+  "configuration_id": "EB3C8198D61E",
+  "agent_config": {
+    "agent_name": "MemoryAgent",
+    "model_id": "gpt-4o-mini",
+    "reducer_strategy": "None (memory-optimized prompt)",
+    "context_providers": [],
+    "memory_provider": "InMemoryChatHistory",
+    "custom_config": {},
+    "configuration_id": "EB3C8198D61E"
+  },
+  "benchmark": {
+    "preset": "Standard",
+    "duration": "00:08:22.2076645",
+    "benchmark_source": "native"
+  },
+  "overall_score": 89.14734388418599,
+  "grade": "B",
+  "stars": 4,
+  "category_results": {
+    "Basic Retention": {
+      "score": 72.91666666666667,
+      "grade": "C",
+      "skipped": false,
+      "scenario_count": 1
+    },
+    "Temporal Reasoning": {
+      "score": 92,
+      "grade": "A",
+      "skipped": false,
+      "scenario_count": 1
+    },
+    "Noise Resilience": {
+      "score": 93.84615384615384,
+      "grade": "A",
+      "skipped": false,
+      "scenario_count": 1
+    },
+    "Reach-Back Depth": {
+      "score": 100,
+      "grade": "A",
+      "skipped": false,
+      "scenario_count": 1
+    },
+    "Fact Update Handling": {
+      "score": 78.33333333333333,
+      "grade": "C",
+      "skipped": false,
+      "scenario_count": 1
+    },
+    "Multi-Topic": {
+      "score": 95.45454545454545,
+      "grade": "A",
+      "skipped": false,
+      "scenario_count": 1
+    },
+    "Abstention": {
+      "score": 84.73684210526316,
+      "grade": "B",
+      "skipped": false,
+      "scenario_count": 1
+    },
+    "Preference Extraction": {
+      "score": 98,
+      "grade": "A",
+      "skipped": false,
+      "scenario_count": 1
+    }
+  },
+  "dimension_scores": {
+    "Recall": 86.45833333333334,
+    "Resilience": 93.84615384615384,
+    "Temporal": 85.16666666666666,
+    "Organization": 92.73046251993621
+  },
+  "recommendations": [
+    "All categories performing well! Consider running the Full benchmark for deeper analysis."
+  ],
+  "tags": [
+    "standard"
+  ]
+}

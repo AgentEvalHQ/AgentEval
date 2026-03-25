@@ -1,6 +1,6 @@
 {
   "schema_version": "1.0",
-  "generated_at": "2026-03-25T15:45:54.8210865+00:00",
+  "generated_at": "2026-03-25T15:55:56.4319158+00:00",
   "generated_by": "AgentEval.Memory v1.0.0.0",
   "agent": {
     "name": "MemoryAgent"
@@ -131,6 +131,18 @@
           "timestamp": "2026-03-25T15:45:54.7816325+00:00",
           "overall_score": 93.91097165991903,
           "grade": "A",
+          "tags": [
+            "standard"
+          ]
+        },
+        {
+          "id": "bl-d6c6dc6e",
+          "file": "baselines/2026-03-25_standard-mar-25-15-55.json",
+          "name": "Standard \u2014 Mar 25 15:55",
+          "configuration_id": "EB3C8198D61E",
+          "timestamp": "2026-03-25T15:55:56.3878818+00:00",
+          "overall_score": 89.14734388418599,
+          "grade": "B",
           "tags": [
             "standard"
           ]
