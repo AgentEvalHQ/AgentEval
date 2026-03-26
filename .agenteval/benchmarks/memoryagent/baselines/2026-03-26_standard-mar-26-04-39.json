@@ -1,0 +1,85 @@
+{
+  "id": "bl-45082169",
+  "name": "Standard \u2014 Mar 26 04:39",
+  "timestamp": "2026-03-26T04:39:24.6429701+00:00",
+  "configuration_id": "EB3C8198D61E",
+  "agent_config": {
+    "agent_name": "MemoryAgent",
+    "model_id": "gpt-4o-mini",
+    "reducer_strategy": "None (memory-optimized prompt)",
+    "context_providers": [],
+    "memory_provider": "InMemoryChatHistory",
+    "custom_config": {},
+    "configuration_id": "EB3C8198D61E"
+  },
+  "benchmark": {
+    "preset": "Standard",
+    "duration": "00:07:39.8756215",
+    "benchmark_source": "native"
+  },
+  "overall_score": 88.92258898508898,
+  "grade": "B",
+  "stars": 4,
+  "category_results": {
+    "Basic Retention": {
+      "score": 84.52380952380952,
+      "grade": "B",
+      "skipped": false,
+      "scenario_count": 1
+    },
+    "Temporal Reasoning": {
+      "score": 87.5,
+      "grade": "B",
+      "skipped": false,
+      "scenario_count": 1
+    },
+    "Noise Resilience": {
+      "score": 97.8125,
+      "grade": "A",
+      "skipped": false,
+      "scenario_count": 1
+    },
+    "Reach-Back Depth": {
+      "score": 100,
+      "grade": "A",
+      "skipped": false,
+      "scenario_count": 1
+    },
+    "Fact Update Handling": {
+      "score": 83.33333333333334,
+      "grade": "B",
+      "skipped": false,
+      "scenario_count": 1
+    },
+    "Multi-Topic": {
+      "score": 87.27272727272727,
+      "grade": "B",
+      "skipped": false,
+      "scenario_count": 1
+    },
+    "Abstention": {
+      "score": 68.70370370370371,
+      "grade": "D",
+      "skipped": false,
+      "scenario_count": 1
+    },
+    "Preference Extraction": {
+      "score": 96.36363636363636,
+      "grade": "A",
+      "skipped": false,
+      "scenario_count": 1
+    }
+  },
+  "dimension_scores": {
+    "Recall": 92.26190476190476,
+    "Resilience": 97.8125,
+    "Temporal": 85.41666666666667,
+    "Organization": 84.11335578002245
+  },
+  "recommendations": [
+    "Agent is hallucinating personal details (69%). Add \u0027I don\u0027t know\u0027 examples to system prompt and avoid fabricating information."
+  ],
+  "tags": [
+    "standard"
+  ]
+}

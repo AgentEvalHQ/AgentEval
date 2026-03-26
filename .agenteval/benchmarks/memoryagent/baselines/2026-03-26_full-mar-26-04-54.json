@@ -1,0 +1,111 @@
+{
+  "id": "bl-8d0a414f",
+  "name": "Full \u2014 Mar 26 04:54",
+  "timestamp": "2026-03-26T04:54:53.760648+00:00",
+  "configuration_id": "EB3C8198D61E",
+  "agent_config": {
+    "agent_name": "MemoryAgent",
+    "model_id": "gpt-4o-mini",
+    "reducer_strategy": "None (memory-optimized prompt)",
+    "context_providers": [],
+    "memory_provider": "InMemoryChatHistory",
+    "custom_config": {},
+    "configuration_id": "EB3C8198D61E"
+  },
+  "benchmark": {
+    "preset": "Full",
+    "duration": "00:10:52.1789852",
+    "benchmark_source": "native"
+  },
+  "overall_score": 84.41231950844856,
+  "grade": "B",
+  "stars": 4,
+  "category_results": {
+    "Basic Retention": {
+      "score": 80.2,
+      "grade": "B",
+      "skipped": false,
+      "scenario_count": 1
+    },
+    "Temporal Reasoning": {
+      "score": 87.8125,
+      "grade": "B",
+      "skipped": false,
+      "scenario_count": 1
+    },
+    "Noise Resilience": {
+      "score": 96.5625,
+      "grade": "A",
+      "skipped": false,
+      "scenario_count": 1
+    },
+    "Reach-Back Depth": {
+      "score": 94,
+      "grade": "A",
+      "skipped": false,
+      "scenario_count": 1
+    },
+    "Fact Update Handling": {
+      "score": 86.66666666666666,
+      "grade": "B",
+      "skipped": false,
+      "scenario_count": 1
+    },
+    "Multi-Topic": {
+      "score": 95,
+      "grade": "A",
+      "skipped": false,
+      "scenario_count": 1
+    },
+    "Cross-Session": {
+      "score": 56.666666666666664,
+      "grade": "F",
+      "skipped": false,
+      "scenario_count": 1,
+      "recommendation": "Cross-session memory is weak (57%). Implement persistent memory (vector store, Foundry, etc.)."
+    },
+    "Reducer Fidelity": {
+      "score": 100,
+      "grade": "A",
+      "skipped": false,
+      "scenario_count": 1
+    },
+    "Abstention": {
+      "score": 71.45161290322581,
+      "grade": "C",
+      "skipped": false,
+      "scenario_count": 1
+    },
+    "Conflict Resolution": {
+      "score": 75.71428571428571,
+      "grade": "C",
+      "skipped": false,
+      "scenario_count": 1
+    },
+    "Multi-Session Reasoning": {
+      "score": 70,
+      "grade": "C",
+      "skipped": false,
+      "scenario_count": 1
+    },
+    "Preference Extraction": {
+      "score": 99.28571428571429,
+      "grade": "A",
+      "skipped": false,
+      "scenario_count": 1
+    }
+  },
+  "dimension_scores": {
+    "Recall": 87.1,
+    "Resilience": 98.28125,
+    "Temporal": 83.39781746031746,
+    "Persistence": 63.33333333333333,
+    "Organization": 88.57910906298002
+  },
+  "recommendations": [
+    "Cross-session memory is weak (57%). Implement persistent memory (vector store, Foundry, etc.)."
+  ],
+  "tags": [
+    "full"
+  ]
+}
