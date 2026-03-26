@@ -19,6 +19,8 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.Agents.AI" />
     <PackageReference Include="Microsoft.Agents.AI.Workflows" />
+    <!-- Light path: AgentEval metrics as MEAI IEvaluator -->
+    <PackageReference Include="Microsoft.Extensions.AI.Evaluation.Quality" />
   </ItemGroup>
 
 </Project>
