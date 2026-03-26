@@ -207,6 +207,7 @@
             "Happy Paws",
             "daycare"
           ],
+          "forbidden_facts": ["promoted", "salary", "meeting"],
           "difficulty": "synthesis",
           "query_type": "standard"
         },
@@ -222,6 +223,7 @@
             "staff engineer",
             "June"
           ],
+          "forbidden_facts": ["arthritis", "guitar", "hiking"],
           "difficulty": "synthesis",
           "query_type": "standard"
         },
@@ -233,6 +235,7 @@
             "migraine",
             "sumatriptan"
           ],
+          "forbidden_facts": ["Noma", "Sapiens", "guitar"],
           "difficulty": "synthesis",
           "query_type": "standard"
         },
@@ -260,6 +263,7 @@
             "June",
             "staff engineer"
           ],
+          "forbidden_facts": ["Happy Paws", "arthritis", "Sapiens"],
           "difficulty": "synthesis",
           "query_type": "standard"
         },
@@ -286,6 +290,7 @@
             "Sapiens",
             "Yuval Harari"
           ],
+          "forbidden_facts": ["Noma", "sumatriptan", "Honda Civic"],
           "difficulty": "indirect",
           "query_type": "standard"
         }

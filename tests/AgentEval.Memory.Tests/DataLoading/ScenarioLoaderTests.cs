@@ -33,8 +33,8 @@ public class ScenarioLoaderTests
 
     [Theory]
     [InlineData("basic-retention", "quick", 7)]    // 7 facts in quick
-    [InlineData("basic-retention", "standard", 31)] // 7 + 24 inherited (includes synthesis + competing facts)
-    [InlineData("basic-retention", "full", 35)]     // 7 + 24 + 4 inherited
+    [InlineData("basic-retention", "standard", 33)] // 7 + 26 inherited (synthesis + competing + specificity facts)
+    [InlineData("basic-retention", "full", 37)]     // 7 + 26 + 4 inherited
     [InlineData("abstention", "quick", 3)]          // 3 planted facts
     [InlineData("noise-resilience", "quick", 4)]    // 4 buried facts
     public void ResolvePreset_InheritanceMergesFacts(string scenarioName, string preset, int expectedFactCount)

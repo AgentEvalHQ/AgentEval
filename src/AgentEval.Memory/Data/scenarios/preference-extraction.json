@@ -99,7 +99,8 @@
           "importance": 55,
           "planted_as": "I spent 20 minutes setting up my terminal with custom aliases this morning. My colleagues use VS Code's GUI for everything but I find the command line so much faster. I even do git operations from the terminal — muscle memory at this point.",
           "position": "early",
-          "session_id": 2
+          "session_id": 2,
+          "timestamp": "2025-11-01"
         },
         {
           "content": "User prefers small focused meetings over large all-hands",
@@ -107,7 +108,8 @@
           "importance": 60,
           "planted_as": "We had that company all-hands yesterday — 200 people staring at slides for an hour. I barely said a word. Nothing gets decided in those things. Give me a 3-person huddle any day, that's where real decisions happen.",
           "position": 0.25,
-          "session_id": 3
+          "session_id": 3,
+          "timestamp": "2025-12-01"
         },
         {
           "content": "User prefers podcasts over music while working",
@@ -115,7 +117,8 @@
           "importance": 50,
           "planted_as": "My commute podcast backlog is getting out of control — I've got like 30 episodes queued up across 5 different shows. I used to listen to music but switched to podcasts about a year ago. Can't go back now, I feel like I'm wasting time if I'm not learning something.",
           "position": "middle",
-          "session_id": 4
+          "session_id": 4,
+          "timestamp": "2026-01-01"
         },
         {
           "content": "User prefers train travel over flying for short distances",
@@ -123,7 +126,8 @@
           "importance": 55,
           "planted_as": "I took the train to Hamburg last weekend instead of flying. Four hours, but you can actually open your laptop and get real work done. Plus no security theater, no boarding queues, no cramped middle seats. Anything under 5 hours, I'm taking the train every time.",
           "position": 0.6,
-          "session_id": 6
+          "session_id": 6,
+          "timestamp": "2026-02-01"
         },
         {
           "content": "User prefers async communication over synchronous calls",
@@ -131,38 +135,59 @@
           "importance": 65,
           "planted_as": "I declined three meeting invites today and sent detailed written summaries instead. Most things people want to 'hop on a quick call' about can be resolved in a well-crafted message. I block my calendar 2 hours every afternoon for uninterrupted deep work.",
           "position": 0.35,
-          "session_id": 4
+          "session_id": 4,
+          "timestamp": "2026-03-01"
+        },
+        {
+          "content": "I can't stand spicy food, even mild salsa is too much",
+          "category": "preference",
+          "importance": 60,
+          "planted_as": "Ugh, even mild salsa is too much for me. I just can't handle any spice at all.",
+          "session_id": 4,
+          "timestamp": "2026-01-25"
         }
       ],
       "queries": [
         {
           "question": "We're choosing development tools for a new team member who will pair with this person. Should we set them up with a graphical IDE or help them configure a terminal-based workflow?",
           "expected_facts": ["command line", "terminal"],
+          "forbidden_facts": ["loves terminal", "uses vim", "command line enthusiast"],
           "difficulty": "indirect",
           "query_type": "preference"
         },
         {
           "question": "I need to get this person's input on a cross-team decision. Should I add them to the all-hands agenda or set up a small breakout session?",
           "expected_facts": ["small", "focused", "huddle"],
+          "forbidden_facts": ["loves all-hands", "enjoys large groups"],
           "difficulty": "indirect",
           "query_type": "preference"
         },
         {
           "question": "Planning a team trip to a city 3 hours away. Should I book flights or train tickets for this person?",
           "expected_facts": ["train"],
+          "forbidden_facts": ["always flies", "prefers driving"],
           "difficulty": "indirect",
           "query_type": "preference"
         },
         {
           "question": "I need a quick status update from this person. Should I schedule a 15-minute call or send them a Slack message asking them to write it up?",
           "expected_facts": ["written", "message", "async"],
+          "forbidden_facts": ["prefers video calls", "loves Zoom"],
           "difficulty": "indirect",
           "query_type": "preference"
         },
         {
           "question": "Putting together a care package for this person's long commute. Should I include a Spotify Premium card or a podcast app subscription?",
           "expected_facts": ["podcast"],
+          "forbidden_facts": ["drives to work", "takes the subway"],
           "difficulty": "indirect",
+          "query_type": "preference"
+        },
+        {
+          "question": "We're ordering Thai food for lunch — what spice level should I get for you?",
+          "expected_facts": ["can't stand spicy", "no spice", "mild is too much"],
+          "forbidden_facts": ["medium", "hot", "extra spicy"],
+          "difficulty": "negation",
           "query_type": "preference"
         }
       ]

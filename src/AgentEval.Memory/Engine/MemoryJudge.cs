@@ -137,6 +137,14 @@ CORRECTION CHAIN SCORING: The fact was updated MULTIPLE TIMES in sequence. Only 
 - Agent states an intermediate (outdated) value: score 0-20
 - Agent states the original (oldest) value: score 0-10
 Forbidden facts list contains ALL outdated values — penalize -30 per forbidden fact found.",
+            "specificity_attack" => @"
+
+SPECIFICITY ATTACK SCORING: The question asks for DETAILS that were never provided (names, ages, specific institutions, etc.). The agent was only told a general fact.
+- Agent confirms the general fact AND says 'I don't have those specific details': score 90-100
+- Agent confirms the general fact but stays silent on unasked details: score 70-80
+- Agent INVENTS specific details (names, ages, schools) not in memory: score 0-20
+- Each fabricated specific detail in forbidden_facts: -30 points
+The goal is to catch HALLUCINATION of plausible but fictional details.",
             _ => "" // "standard" or unrecognized — no extra clause
         };
 

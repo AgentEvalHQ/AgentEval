@@ -276,6 +276,34 @@
           ],
           "difficulty": "counterfactual",
           "query_type": "counterfactual"
+        },
+        {
+          "question": "What's my usual coffee order? I need to tell the new barista.",
+          "expected_facts": ["stopped drinking coffee", "quit", "6 months"],
+          "forbidden_facts": ["latte", "espresso", "americano", "cappuccino"],
+          "difficulty": "negation",
+          "query_type": "counterfactual"
+        },
+        {
+          "question": "Where do I usually park when I drive to work?",
+          "expected_facts": ["sold car", "bike"],
+          "forbidden_facts": ["garage", "parking lot", "street parking"],
+          "difficulty": "negation",
+          "query_type": "counterfactual"
+        },
+        {
+          "question": "Can you check my Instagram for that restaurant recommendation?",
+          "expected_facts": ["deleted", "quit social media"],
+          "forbidden_facts": ["instagram.com", "DM", "story", "post"],
+          "difficulty": "negation",
+          "query_type": "counterfactual"
+        },
+        {
+          "question": "What's the name of the startup where I work and how many employees does it have?",
+          "expected_facts": ["startup", "2 years"],
+          "forbidden_facts": ["TechCorp", "InnovateCo", "50 employees", "100 employees", "Series A"],
+          "difficulty": "specificity_attack",
+          "query_type": "specificity_attack"
         }
       ],
       "facts": [
@@ -285,7 +313,8 @@
           "importance": 50,
           "planted_as": "I bike to the office every morning — takes about 20 minutes each way. Great exercise.",
           "position": "early",
-          "session_id": 2
+          "session_id": 2,
+          "timestamp": "2025-12-01"
         },
         {
           "content": "I have been at the startup for about 2 years now",
@@ -293,7 +322,8 @@
           "importance": 60,
           "planted_as": "Hard to believe it has been 2 years already at the startup. Time flies when you are building something.",
           "position": 0.3,
-          "session_id": 4
+          "session_id": 4,
+          "timestamp": "2026-01-10"
         },
         {
           "content": "I have 2 kids, ages 8 and 12",
@@ -301,7 +331,8 @@
           "importance": 75,
           "planted_as": "My two kids are growing up so fast — the youngest is 8 and the oldest just turned 12. They keep me busy on weekends.",
           "position": 0.5,
-          "session_id": 5
+          "session_id": 5,
+          "timestamp": "2026-01-20"
         },
         {
           "content": "I moved to Copenhagen from Barcelona 3 years ago",
@@ -309,7 +340,8 @@
           "importance": 65,
           "planted_as": "It's been exactly 3 years since I moved to Copenhagen from Barcelona. Best decision I ever made, career-wise.",
           "position": 0.6,
-          "session_id": 6
+          "session_id": 6,
+          "timestamp": "2026-02-05"
         },
         {
           "content": "Max is a golden retriever, not a labrador",
@@ -317,7 +349,32 @@
           "importance": 60,
           "planted_as": "People always think Max is a labrador because of his size, but he's actually a golden retriever. The coat gives it away once you know what to look for.",
           "position": 0.4,
-          "session_id": 4
+          "session_id": 4,
+          "timestamp": "2026-02-15"
+        },
+        {
+          "content": "I stopped drinking coffee 6 months ago",
+          "category": "preference",
+          "importance": 60,
+          "planted_as": "I actually stopped drinking coffee about 6 months ago — sleeping way better now.",
+          "session_id": 3,
+          "timestamp": "2025-09-20"
+        },
+        {
+          "content": "I sold my car and bike everywhere now",
+          "category": "lifestyle",
+          "importance": 55,
+          "planted_as": "Best decision ever — I sold my car last year and just bike everywhere. No more parking stress.",
+          "session_id": 5,
+          "timestamp": "2025-06-15"
+        },
+        {
+          "content": "I quit social media completely",
+          "category": "lifestyle",
+          "importance": 50,
+          "planted_as": "I deleted all my social media accounts — Instagram, Twitter, everything. Don't miss it at all.",
+          "session_id": 4,
+          "timestamp": "2025-11-01"
         }
       ]
     },

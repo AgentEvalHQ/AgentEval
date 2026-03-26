@@ -125,7 +125,13 @@
         "My gym is offering a discount on annual memberships this month.",
         "The weather forecast says rain tomorrow, might need an umbrella.",
         "I tried a new coffee shop last Tuesday, their espresso was perfect.",
-        "My phone has been acting weird lately, maybe a software update issue."
+        "My phone has been acting weird lately, maybe a software update issue.",
+        "My manager just got back from a trip to Sacramento — said the weather was perfect.",
+        "The Seattle office is hiring 3 new marketing people, Sarah from HR told me.",
+        "I saw on LinkedIn that someone named Sandra just moved to San Francisco.",
+        "There's a nursing conference in San Diego next month, my aunt Sofia is presenting.",
+        "Our building lawyer Steve is handling the HOA dispute with the adjacent property.",
+        "My running club friend is doing the Portland half-marathon — she's aiming for 1:45."
       ],
       "facts": [
         {
@@ -134,7 +140,8 @@
           "importance": 60,
           "planted_as": "I was on a video call with my sister Ana last night — she's been absolutely swamped at the hospital in Madrid. Being a doctor there during flu season sounds brutal.",
           "position": "early",
-          "session_id": 2
+          "session_id": 2,
+          "timestamp": "2025-10-01"
         },
         {
           "content": "I'm lactose intolerant but can handle small amounts of cheese",
@@ -142,7 +149,8 @@
           "importance": 70,
           "planted_as": "Funny story — I ordered a big bowl of cream pasta at that work lunch yesterday and spent the entire afternoon regretting it. I'm lactose intolerant, though weirdly I can handle small amounts of cheese without issues. Just not a whole bowl of cream sauce.",
           "position": 0.2,
-          "session_id": 3
+          "session_id": 3,
+          "timestamp": "2025-10-15"
         },
         {
           "content": "My WiFi password at home is BlueOcean42",
@@ -150,7 +158,8 @@
           "importance": 90,
           "planted_as": "Hey, my neighbor just moved in and needed internet access. I shared our WiFi with them — the password is BlueOcean42. Reminded me I should probably change it soon.",
           "position": 0.3,
-          "session_id": 3
+          "session_id": 3,
+          "timestamp": "2025-11-01"
         },
         {
           "content": "I spend weekends rock climbing at the gym near Nørrebro",
@@ -158,7 +167,8 @@
           "importance": 60,
           "planted_as": "I had the most amazing weekend — dragged myself to the climbing gym near Nørrebro even though it was pouring rain outside. Three hours on the wall and my forearms are still screaming. Totally worth it though.",
           "position": "middle",
-          "session_id": 4
+          "session_id": 4,
+          "timestamp": "2025-11-15"
         },
         {
           "content": "I graduated from Technical University of Denmark with a degree in Software Engineering",
@@ -166,7 +176,8 @@
           "importance": 65,
           "planted_as": "I studied at the Technical University of Denmark — got my degree in Software Engineering.",
           "position": 0.35,
-          "session_id": 4
+          "session_id": 4,
+          "timestamp": "2025-12-01"
         },
         {
           "content": "My best friend from Barcelona is named Pau and he works in marketing in London",
@@ -174,7 +185,8 @@
           "importance": 55,
           "planted_as": "My best friend from Barcelona is named Pau. He moved to London for a marketing job.",
           "position": 0.45,
-          "session_id": 5
+          "session_id": 5,
+          "timestamp": "2025-12-15"
         },
         {
           "content": "My apartment is on the 4th floor of a building on Vesterbrogade street",
@@ -182,7 +194,8 @@
           "importance": 50,
           "planted_as": "I live on the 4th floor of a building on Vesterbrogade — nice area but the stairs are brutal.",
           "position": 0.55,
-          "session_id": 5
+          "session_id": 5,
+          "timestamp": "2026-01-01"
         },
         {
           "content": "I'm training for the Copenhagen Half Marathon in September",
@@ -190,7 +203,8 @@
           "importance": 55,
           "planted_as": "I'm training for the Copenhagen Half Marathon in September. It'll be my first one.",
           "position": 0.6,
-          "session_id": 6
+          "session_id": 6,
+          "timestamp": "2026-01-15"
         },
         {
           "content": "My blood type is O negative and I donate regularly",
@@ -198,7 +212,8 @@
           "importance": 75,
           "planted_as": "By the way, my blood type is O negative. I try to donate blood regularly since it's universal.",
           "position": "early",
-          "session_id": 2
+          "session_id": 2,
+          "timestamp": "2025-10-20"
         },
         {
           "content": "My manager Sarah previously worked at Google before joining our startup",
@@ -206,7 +221,8 @@
           "importance": 60,
           "planted_as": "Fun fact — my manager Sarah actually worked at Google before joining our startup.",
           "position": 0.4,
-          "session_id": 5
+          "session_id": 5,
+          "timestamp": "2026-01-20"
         },
         {
           "content": "I'm allergic to penicillin but can take amoxicillin as an alternative",
@@ -214,7 +230,8 @@
           "importance": 85,
           "planted_as": "Oh, I should also mention — I'm allergic to penicillin, but my doctor says amoxicillin is fine as an alternative.",
           "position": 0.15,
-          "session_id": 3
+          "session_id": 3,
+          "timestamp": "2025-11-20"
         },
         {
           "content": "My passport expires in November 2026 and I need to renew it before a trip to Japan",
@@ -222,7 +239,8 @@
           "importance": 65,
           "planted_as": "My passport expires in November 2026 and I need to renew it before my trip to Japan planned for December.",
           "position": 0.65,
-          "session_id": 6
+          "session_id": 6,
+          "timestamp": "2026-02-01"
         },
         {
           "content": "I use the Revolut bank card ending in 4738 as my primary payment method",
@@ -230,7 +248,8 @@
           "importance": 80,
           "planted_as": "I primarily use my Revolut card — the one ending in 4738 — for everything.",
           "position": 0.25,
-          "session_id": 7
+          "session_id": 7,
+          "timestamp": "2026-02-15"
         },
         {
           "content": "I'm training for a race next month",
@@ -238,7 +257,8 @@
           "importance": 60,
           "planted_as": "I've been waking up at 5am every day to train — got a big race next month and I want to be ready.",
           "position": 0.12,
-          "session_id": 1
+          "session_id": 1,
+          "timestamp": "2026-01-05"
         },
         {
           "content": "The marathon is in Portland",
@@ -246,7 +266,8 @@
           "importance": 60,
           "planted_as": "By the way, the race is actually a marathon in Portland. I've never been there so it'll be a fun trip too.",
           "position": 0.32,
-          "session_id": 3
+          "session_id": 3,
+          "timestamp": "2026-02-10"
         },
         {
           "content": "My goal is sub-4-hours for the marathon",
@@ -254,15 +275,17 @@
           "importance": 60,
           "planted_as": "My coach says sub-4-hours is ambitious for a first marathon but I'm going for it. I've been hitting the pace in training.",
           "position": 0.52,
-          "session_id": 5
+          "session_id": 5,
+          "timestamp": "2026-03-01"
         },
         {
           "content": "I'm building a home office in the spare bedroom",
           "category": "home",
           "importance": 50,
           "planted_as": "I've decided to convert the spare bedroom into a proper home office. Tired of working from the kitchen table.",
-          "position": 0.18,
-          "session_id": 2
+          "position": 0.03,
+          "session_id": 2,
+          "timestamp": "2025-12-15"
         },
         {
           "content": "I ordered a standing desk for the home office",
@@ -270,7 +293,8 @@
           "importance": 50,
           "planted_as": "Just ordered a standing desk — the Uplift V2. Should arrive next week for the new office setup.",
           "position": 0.42,
-          "session_id": 4
+          "session_id": 4,
+          "timestamp": "2026-01-20"
         },
         {
           "content": "The home office will also be a music recording space with soundproofing",
@@ -278,15 +302,17 @@
           "importance": 50,
           "planted_as": "I'm adding soundproofing panels too — planning to use the home office as a music recording space in the evenings. Guitar mostly.",
           "position": 0.62,
-          "session_id": 6
+          "session_id": 6,
+          "timestamp": "2026-02-25"
         },
         {
           "content": "My colleague Sarah lives in Seattle and works in marketing",
           "category": "social",
           "importance": 55,
           "planted_as": "My colleague Sarah just moved to Seattle — she's heading up the marketing team there. We still collaborate on projects remotely.",
-          "position": 0.22,
-          "session_id": 3
+          "position": 0.02,
+          "session_id": 3,
+          "timestamp": "2026-01-10"
         },
         {
           "content": "My sister Sandra lives in Sacramento and works as a teacher",
@@ -294,7 +320,8 @@
           "importance": 55,
           "planted_as": "My sister Sandra has been in Sacramento for about five years now. She teaches third grade and absolutely loves it.",
           "position": 0.38,
-          "session_id": 4
+          "session_id": 4,
+          "timestamp": "2026-01-12"
         },
         {
           "content": "My friend Sam lives in San Francisco and works at a startup",
@@ -302,7 +329,8 @@
           "importance": 55,
           "planted_as": "My buddy Sam is out in San Francisco — he's working at some AI startup. We try to catch up every few months.",
           "position": 0.48,
-          "session_id": 5
+          "session_id": 5,
+          "timestamp": "2026-01-14"
         },
         {
           "content": "My cousin Sofia lives in San Diego and works as a nurse",
@@ -310,7 +338,8 @@
           "importance": 55,
           "planted_as": "My cousin Sofia is down in San Diego. She's been a nurse at the children's hospital there for about three years.",
           "position": 0.58,
-          "session_id": 6
+          "session_id": 6,
+          "timestamp": "2026-01-16"
         },
         {
           "content": "My neighbor Steve lives in the same building and works as a lawyer",
@@ -318,7 +347,24 @@
           "importance": 50,
           "planted_as": "My neighbor Steve — he's a lawyer, lives two floors up from me — invited me over for dinner last weekend. Nice guy.",
           "position": 0.68,
-          "session_id": 7
+          "session_id": 7,
+          "timestamp": "2026-01-18"
+        },
+        {
+          "content": "I have 2 cats at home",
+          "category": "personal",
+          "importance": 50,
+          "planted_as": "Yeah, I have 2 cats at home. They're a handful but I love them.",
+          "session_id": 4,
+          "timestamp": "2026-01-28"
+        },
+        {
+          "content": "I went to college in the Midwest",
+          "category": "education",
+          "importance": 45,
+          "planted_as": "I went to college somewhere in the Midwest — feels like a lifetime ago.",
+          "session_id": 2,
+          "timestamp": "2025-11-10"
         }
       ],
       "queries": [
@@ -395,7 +441,7 @@
           "query_type": "standard"
         },
         {
-          "question": "Tell me about my upcoming athletic event — where is it, what kind of race, and what's my target time?",
+          "question": "My physical therapist wants to know about my upcoming athletic commitments — what event, where, and what time am I targeting?",
           "expected_facts": [
             "Portland",
             "marathon",
@@ -445,7 +491,7 @@
           "query_type": "synthesis"
         },
         {
-          "question": "Where does my sister live?",
+          "question": "I need to ship a birthday gift to my sister. What city should I send it to?",
           "expected_facts": [
             "Sacramento"
           ],
@@ -458,7 +504,7 @@
           "query_type": "standard"
         },
         {
-          "question": "What does my friend Sam do for work and where is he based?",
+          "question": "I'm looking for someone who understands the startup world to give me career advice. Which of my friends fits that profile and where are they?",
           "expected_facts": [
             "startup",
             "San Francisco"
@@ -493,6 +539,20 @@
           ],
           "difficulty": "discrimination",
           "query_type": "standard"
+        },
+        {
+          "question": "What are my cats' names and how old are they?",
+          "expected_facts": ["2 cats"],
+          "forbidden_facts": ["Whiskers", "Luna", "Mittens", "Max", "Bella", "Oliver", "1 year", "2 years", "3 years", "kitten"],
+          "difficulty": "specificity_attack",
+          "query_type": "specificity_attack"
+        },
+        {
+          "question": "Which university did I attend and what was my major?",
+          "expected_facts": ["college", "Midwest"],
+          "forbidden_facts": ["University of", "Ohio State", "Michigan", "Illinois", "engineering", "business", "computer science", "biology"],
+          "difficulty": "specificity_attack",
+          "query_type": "specificity_attack"
         }
       ]
     },

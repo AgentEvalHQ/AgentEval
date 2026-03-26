@@ -216,7 +216,7 @@
             "Microsoft"
           ],
           "difficulty": "correction_chain",
-          "query_type": "update"
+          "query_type": "correction_chain"
         },
         {
           "question": "What's my cat's name?",
@@ -228,7 +228,7 @@
             "Luna"
           ],
           "difficulty": "correction_chain",
-          "query_type": "update"
+          "query_type": "correction_chain"
         },
         {
           "question": "What's my current diet? Am I vegetarian, pescatarian, or something else?",
@@ -241,7 +241,7 @@
             "fish"
           ],
           "difficulty": "correction_chain",
-          "query_type": "update"
+          "query_type": "correction_chain"
         }
       ]
     },

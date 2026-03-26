@@ -115,7 +115,13 @@
         "My colleague's daughter's birthday is also in June — we were comparing dates the other day.",
         "The office Wi-Fi password got changed to something with Anderson or Andersen in it, funny coincidence.",
         "June 22nd is also the summer solstice — longest day of the year.",
-        "Someone at work named Anderson keeps getting my emails by mistake."
+        "Someone at work named Anderson keeps getting my emails by mistake.",
+        "My coworker mentioned her anniversary is coming up on March 12th — she's planning a big party.",
+        "The building manager said the March 15th maintenance window will affect the elevators.",
+        "My friend's daughter is named Emma too! Hers just turned 6 in June.",
+        "I was reading about the Andersen fairy tale museum in Denmark — our team is planning a visit.",
+        "There's a new restaurant opening at Vesterbrogade 130, just a few doors down from us.",
+        "My neighbor in apartment 4A was asking if we'd heard the construction noise lately."
       ],
       "facts": [
         {
@@ -124,7 +130,8 @@
           "importance": 95,
           "planted_as": "Oh man, we went to that seafood buffet for my cousin's birthday and I had to sit there eating bread rolls the whole time. I have a severe shellfish allergy on top of the peanut and tree nut thing — basically all the major allergens are out to get me.",
           "position": 0.15,
-          "session_id": 2
+          "session_id": 2,
+          "timestamp": "2025-10-25"
         },
         {
           "content": "My car is a blue Honda Civic sedan",
@@ -132,7 +139,8 @@
           "importance": 65,
           "planted_as": "I was at the car wash this morning getting my blue Honda Civic cleaned up. The sedan looks brand new now — should have done it weeks ago.",
           "position": 0.25,
-          "session_id": 3
+          "session_id": 3,
+          "timestamp": "2025-11-01"
         },
         {
           "content": "My emergency contact is my sister Maria at 555-0147",
@@ -140,7 +148,8 @@
           "importance": 100,
           "planted_as": "If there's ever an emergency, contact my sister Maria — her number is 555-0147.",
           "position": 0.35,
-          "session_id": 4
+          "session_id": 4,
+          "timestamp": "2026-01-10"
         },
         {
           "content": "I take metformin 500mg twice daily for pre-diabetes",
@@ -148,7 +157,8 @@
           "importance": 95,
           "planted_as": "I should mention I take metformin, 500mg twice a day — I was diagnosed with pre-diabetes last year.",
           "position": 0.45,
-          "session_id": 5
+          "session_id": 5,
+          "timestamp": "2025-11-20"
         },
         {
           "content": "My home insurance policy number is HI-2847-CPH",
@@ -156,7 +166,8 @@
           "importance": 80,
           "planted_as": "My home insurance policy number is HI-2847-CPH, just for the records.",
           "position": 0.55,
-          "session_id": 5
+          "session_id": 5,
+          "timestamp": "2025-12-10"
         },
         {
           "content": "I'm in apartment 4B at Vesterbrogade 127",
@@ -164,7 +175,8 @@
           "importance": 75,
           "planted_as": "My address is Vesterbrogade 127, apartment 4B.",
           "position": 0.65,
-          "session_id": 6
+          "session_id": 6,
+          "timestamp": "2026-01-25"
         },
         {
           "content": "My work laptop serial number is DL-X1C-88942",
@@ -172,7 +184,8 @@
           "importance": 70,
           "planted_as": "The IT team asked me to note my laptop serial: DL-X1C-88942.",
           "position": 0.2,
-          "session_id": 3
+          "session_id": 3,
+          "timestamp": "2025-11-10"
         },
         {
           "content": "My gym membership ID is CPH-GYM-3391",
@@ -180,7 +193,8 @@
           "importance": 50,
           "planted_as": "My gym membership card number is CPH-GYM-3391 in case I lose it.",
           "position": 0.3,
-          "session_id": 4
+          "session_id": 4,
+          "timestamp": "2025-12-15"
         },
         {
           "content": "I have a follow-up blood test on March 28th at Rigshospitalet",
@@ -188,7 +202,8 @@
           "importance": 85,
           "planted_as": "I have a follow-up blood test on March 28th at Rigshospitalet for the pre-diabetes monitoring.",
           "position": 0.4,
-          "session_id": 4
+          "session_id": 4,
+          "timestamp": "2025-12-20"
         },
         {
           "content": "My bike lock combination is 7-23-41",
@@ -196,15 +211,17 @@
           "importance": 65,
           "planted_as": "Oh, and my bike lock combination is 7-23-41 — I always forget it.",
           "position": 0.5,
-          "session_id": 5
+          "session_id": 5,
+          "timestamp": "2026-01-05"
         },
         {
           "content": "My wedding anniversary is March 15",
           "category": "personal",
           "importance": 85,
           "planted_as": "Our wedding anniversary is March 15th — can't believe it's been 8 years already.",
-          "position": 0.42,
-          "session_id": 5
+          "position": 0.02,
+          "session_id": 5,
+          "timestamp": "2025-10-20"
         },
         {
           "content": "My daughter Emma's birthday is June 22",
@@ -212,7 +229,8 @@
           "importance": 80,
           "planted_as": "Emma's birthday is June 22nd — she's turning 7 this year and already asking for a puppy.",
           "position": 0.37,
-          "session_id": 4
+          "session_id": 4,
+          "timestamp": "2025-11-15"
         },
         {
           "content": "My mother's maiden name is Andersen",
@@ -220,7 +238,8 @@
           "importance": 75,
           "planted_as": "My mother's maiden name is Andersen — I use it as a security question for my bank account.",
           "position": 0.57,
-          "session_id": 6
+          "session_id": 6,
+          "timestamp": "2025-12-05"
         }
       ],
       "queries": [
@@ -317,7 +336,7 @@
           "query_type": "standard"
         },
         {
-          "question": "When is my wedding anniversary?",
+          "question": "I'm trying to book a surprise dinner reservation for a very special date with my spouse. When should I book it for?",
           "expected_facts": [
             "March 15"
           ],
@@ -330,7 +349,7 @@
           "query_type": "standard"
         },
         {
-          "question": "When is my daughter Emma's birthday and how old is she turning?",
+          "question": "I need to request time off work for my kid's birthday party. What date should I put on the form and how old will she be?",
           "expected_facts": [
             "June 22",
             "7"
