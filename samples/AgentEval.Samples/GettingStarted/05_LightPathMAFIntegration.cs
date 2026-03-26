@@ -5,9 +5,7 @@ using Azure.AI.OpenAI;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.AI.Evaluation;
-using Microsoft.Extensions.AI.Evaluation.Quality;
 using AgentEval.MAF.Evaluators;
-using AgentEval.Metrics.Agentic;
 using System.ComponentModel;
 
 using MEAIIEvaluator = Microsoft.Extensions.AI.Evaluation.IEvaluator;
@@ -82,23 +80,23 @@ public static class LightPathMAFIntegration
         // DEMO 2: Multiple evaluators — AgentEval + MEAI side by side
         // ════════════════════════════════════════════════════════════
 
-        Console.WriteLine("━━━ DEMO 2: Mix AgentEval + MEAI evaluators ━━━━━━━━━━━━━━━━━\n");
+        Console.WriteLine("━━━ DEMO 2: Multiple evaluators in one call ━━━━━━━━━━━━━━━━━\n");
         Console.WriteLine("   CODE:");
         Console.ForegroundColor = ConsoleColor.Green;
         Console.WriteLine("   var results = await agent.EvaluateAsync(queries, [");
-        Console.WriteLine("       AgentEvalEvaluators.ToolSuccess(),   // AgentEval");
-        Console.WriteLine("       new RelevanceEvaluator(),            // MEAI built-in");
+        Console.WriteLine("       AgentEvalEvaluators.ToolSuccess(),              // individual metric");
+        Console.WriteLine("       AgentEvalEvaluators.Agentic([\"SearchFlights\"]),  // bundle");
         Console.WriteLine("   ]);");
         Console.ResetColor();
         Console.WriteLine();
 
-        // Two evaluators from different providers — same IEvaluator interface
+        // Two evaluators — one result set per evaluator
         var multiResults = await agent.EvaluateAsync(
             queries,
             evaluators: new MEAIIEvaluator[]
             {
-                AgentEvalEvaluators.ToolSuccess(),     // AgentEval
-                AgentEvalEvaluators.Agentic(["SearchFlights"]),  // AgentEval bundle
+                AgentEvalEvaluators.ToolSuccess(),                 // individual metric
+                AgentEvalEvaluators.Agentic(["SearchFlights"]),    // bundle (2 metrics)
             });
 
         for (int i = 0; i < multiResults.Count; i++)
