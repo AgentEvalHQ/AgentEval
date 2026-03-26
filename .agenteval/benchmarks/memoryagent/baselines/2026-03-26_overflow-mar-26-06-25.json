@@ -1,0 +1,85 @@
+{
+  "id": "bl-709b534b",
+  "name": "Overflow \u2014 Mar 26 06:25",
+  "timestamp": "2026-03-26T06:25:14.1079332+00:00",
+  "configuration_id": "EB3C8198D61E",
+  "agent_config": {
+    "agent_name": "MemoryAgent",
+    "model_id": "gpt-4o-mini",
+    "reducer_strategy": "None (memory-optimized prompt)",
+    "context_providers": [],
+    "memory_provider": "InMemoryChatHistory",
+    "custom_config": {},
+    "configuration_id": "EB3C8198D61E"
+  },
+  "benchmark": {
+    "preset": "Overflow",
+    "duration": "00:10:56.7033297",
+    "benchmark_source": "native"
+  },
+  "overall_score": 97.05250000000001,
+  "grade": "A",
+  "stars": 5,
+  "category_results": {
+    "Basic Retention": {
+      "score": 93,
+      "grade": "A",
+      "skipped": false,
+      "scenario_count": 1
+    },
+    "Temporal Reasoning": {
+      "score": 96.66666666666667,
+      "grade": "A",
+      "skipped": false,
+      "scenario_count": 1
+    },
+    "Noise Resilience": {
+      "score": 100,
+      "grade": "A",
+      "skipped": false,
+      "scenario_count": 1
+    },
+    "Reach-Back Depth": {
+      "score": 100,
+      "grade": "A",
+      "skipped": false,
+      "scenario_count": 1
+    },
+    "Fact Update Handling": {
+      "score": 100,
+      "grade": "A",
+      "skipped": false,
+      "scenario_count": 1
+    },
+    "Multi-Topic": {
+      "score": 100,
+      "grade": "A",
+      "skipped": false,
+      "scenario_count": 1
+    },
+    "Abstention": {
+      "score": 88.125,
+      "grade": "B",
+      "skipped": false,
+      "scenario_count": 1
+    },
+    "Preference Extraction": {
+      "score": 98,
+      "grade": "A",
+      "skipped": false,
+      "scenario_count": 1
+    }
+  },
+  "dimension_scores": {
+    "Recall": 96.5,
+    "Resilience": 100,
+    "Temporal": 98.33333333333334,
+    "Organization": 95.375
+  },
+  "recommendations": [
+    "All categories performing well! Consider running the Full benchmark for deeper analysis."
+  ],
+  "tags": [
+    "overflow"
+  ]
+}

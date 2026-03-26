@@ -130,7 +130,8 @@ public static class RunSingleBenchmark
         Console.WriteLine("   [1] Quick      3 categories   ~3 min    Basic Retention, Temporal, Noise");
         Console.WriteLine("   [2] Standard   8 categories   ~10 min   + Reach-Back, FactUpdate, MultiTopic, Abstention, Preference");
         Console.WriteLine("   [3] Full      12 categories   ~25 min   + CrossSession, Reducer, Conflict, MultiSession, Preference");
-        Console.WriteLine("   [4] Overflow   8 categories   ~15 min   Standard @ 192K tokens — tests memory architecture");
+        // [4] Overflow disabled — requires agent with reducer/memory system to be meaningful.
+        // See hardening plan Part 14 for details. Re-enable when ISessionResettableAgent reducers are available.
         Console.WriteLine("   [Q] Cancel\n");
         Console.Write("   Choice: ");
 
@@ -140,7 +141,6 @@ public static class RunSingleBenchmark
             "1" => MemoryBenchmark.Quick,
             "2" => MemoryBenchmark.Standard,
             "3" => MemoryBenchmark.Full,
-            "4" => MemoryBenchmark.Overflow,
             _ => null
         };
     }
