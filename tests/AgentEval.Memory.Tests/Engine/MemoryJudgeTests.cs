@@ -456,6 +456,7 @@ public class MemoryJudgePromptTests
     [InlineData("temporal", "TEMPORAL TOLERANCE")]
     [InlineData("preference", "PREFERENCE TOLERANCE")]
     [InlineData("update", "UPDATE TOLERANCE")]
+    [InlineData("specificity_attack", "SPECIFICITY ATTACK SCORING")]
     public void BuildJudgmentPrompt_IncludesCorrectToleranceClause(string queryType, string expectedClause)
     {
         var query = CreateWithType("Test question?", queryType, MemoryFact.Create("test fact"));
