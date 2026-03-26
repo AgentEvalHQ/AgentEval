@@ -27,6 +27,7 @@ public static class Program
             new("Agent + One Tool",          "Tool tracking and fluent assertions (HaveCalledTool, WithoutError)",      AgentWithOneTool.RunAsync),
             new("Agent + Multiple Tools",    "Tool ordering, BeforeTool / AfterTool, visual timeline",                 AgentWithMultipleTools.RunAsync),
             new("Performance Metrics",       "Latency, cost, TTFT, token budget assertions",                           PerformanceMetrics.RunAsync),
+            new("Light Path (MEAI)",        "AgentEval as MEAI IEvaluator — plug into MAF's evaluation pipeline",     LightPathMAFIntegration.RunAsync),
         ]),
 
         new('B', "Metrics & Quality", "",
