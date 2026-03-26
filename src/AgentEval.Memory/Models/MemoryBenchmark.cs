@@ -101,10 +101,10 @@ public class MemoryBenchmark
     public static MemoryBenchmark Overflow => new()
     {
         Name = "Overflow",
-        Description = "Gradual context overflow — fills 85% via injection, then 15% via real calls. Tests memory architecture.",
+        Description = "Gradual context overflow — fills 75% of 128K via injection, then filler calls push past the limit.",
         Categories = Standard.Categories,
-        TargetTokensOverride = 192_000,
-        OverflowCallsOverride = 15
+        TargetTokensOverride = 128_000,
+        OverflowCallsOverride = 20
     };
 
     /// <summary>

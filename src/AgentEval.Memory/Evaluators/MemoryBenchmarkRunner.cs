@@ -287,9 +287,9 @@ public class MemoryBenchmarkRunner : IMemoryBenchmarkRunner
                 {
                     if (preset.ContextPressure.TargetTokens.HasValue && preset.ContextPressure.TargetTokens.Value > 0)
                     {
-                        // When overflow_calls is set, inject only 85% as history — the rest comes via real InvokeAsync calls
+                        // When overflow_calls is set, inject only 75% as history — the rest comes via real InvokeAsync calls
                         var effectiveTokens = preset.ContextPressure.OverflowCalls > 0
-                            ? (int)(preset.ContextPressure.TargetTokens.Value * 0.85)
+                            ? (int)(preset.ContextPressure.TargetTokens.Value * 0.75)
                             : preset.ContextPressure.TargetTokens.Value;
                         corpusTurns = DataLoading.CorpusLoader.LoadToTargetTokens(
                             preset.ContextPressure.Corpus, effectiveTokens).ToList();
