@@ -11,7 +11,6 @@ using AgentEval.Metrics.Agentic;
 using System.ComponentModel;
 
 using MEAIIEvaluator = Microsoft.Extensions.AI.Evaluation.IEvaluator;
-using MEAIEvaluationResult = Microsoft.Extensions.AI.Evaluation.EvaluationResult;
 
 namespace AgentEval.Samples;
 
@@ -19,13 +18,12 @@ namespace AgentEval.Samples;
 /// Sample 05: Light Path — AgentEval metrics as MEAI IEvaluator
 ///
 /// This demonstrates:
-/// - Creating a real MAF agent with tools
-/// - Running the agent and capturing its conversation
-/// - Evaluating the conversation with AgentEval metrics via MEAI IEvaluator
-/// - Mixing AgentEval + MEAI evaluators side by side
-/// - Preset bundles and custom composition
+/// - agent.EvaluateAsync() with AgentEval metrics (the slide 2 demo)
+/// - Mixing AgentEval + MEAI evaluators
+/// - Preset bundles: Quality(), Safety(), Agentic()
+/// - AssertAllPassed() for CI/CD gates
 ///
-/// ⏱️ Time to understand: 5 minutes
+/// ⏱️ Time to understand: 3 minutes
 /// </summary>
 public static class LightPathMAFIntegration
 {
@@ -34,174 +32,196 @@ public static class LightPathMAFIntegration
         PrintHeader();
 
         // ════════════════════════════════════════════════════════════
-        // STEP 1: Create a real MAF agent with tools
+        // STEP 1: Create a MAF agent with tools
         // ════════════════════════════════════════════════════════════
-
-        Console.WriteLine("━━━ STEP 1: Create a MAF agent with tools ━━━━━━━━━━━━━━━━━━━━\n");
 
         var agent = CreateTravelAgent();
         Console.WriteLine($"   🤖 Agent: {agent.Name}");
-        Console.WriteLine("   🔧 Tools: SearchFlights, SearchHotels");
+        Console.WriteLine("   🔧 Tools: SearchFlights, SearchHotels\n");
+
+        // ════════════════════════════════════════════════════════════
+        // DEMO 1: agent.EvaluateAsync() — the one-liner
+        // ════════════════════════════════════════════════════════════
+
+        Console.WriteLine("━━━ DEMO 1: agent.EvaluateAsync() with AgentEval ━━━━━━━━━━━━━\n");
+        Console.WriteLine("   CODE:");
+        Console.ForegroundColor = ConsoleColor.Green;
+        Console.WriteLine("   var results = await agent.EvaluateAsync(queries,");
+        Console.WriteLine("       AgentEvalEvaluators.Agentic([\"SearchFlights\"]));");
+        Console.WriteLine("   results.AssertAllPassed();");
+        Console.ResetColor();
         Console.WriteLine();
 
-        // ════════════════════════════════════════════════════════════
-        // STEP 2: Run the agent — capture the conversation
-        // ════════════════════════════════════════════════════════════
+        // This is REAL — it runs the agent, evaluates, and asserts
+        var queries = new[] { "Find flights from Seattle to Paris for next Friday" };
 
-        Console.WriteLine("━━━ STEP 2: Run the agent (MAF-native) ━━━━━━━━━━━━━━━━━━━━━━\n");
+        var results = await agent.EvaluateAsync(
+            queries,
+            AgentEvalEvaluators.Agentic(["SearchFlights"]));
 
-        var query = "Find me flights from Seattle to Paris for next Friday";
-        Console.WriteLine($"   📨 User: \"{query}\"\n");
-
-        // Run via MAF's native AIAgent.RunAsync() — no AgentEval adapter involved.
-        // This is exactly what MAF's agent.EvaluateAsync() orchestration does internally.
-        var session = await agent.CreateSessionAsync();
-        var agentResponse = await agent.RunAsync(query, session);
-
-        Console.WriteLine($"   📤 Agent: {Truncate(agentResponse.Text, 150)}");
-
-        // Build the MEAI conversation format from MAF's response.
-        // MAF's orchestration layer (AgentEvaluationExtensions) does this same conversion.
-        var messages = new List<ChatMessage> { new(ChatRole.User, query) };
-        foreach (var msg in agentResponse.Messages)
-            messages.Add(msg);
-        var response = new ChatResponse([new ChatMessage(ChatRole.Assistant, agentResponse.Text)]);
-
-        // Show what tool calls the Light Path can extract from the conversation
-        var toolUsage = ConversationExtractor.ExtractToolUsage(messages, response);
-        if (toolUsage != null)
+        Console.WriteLine($"   📊 Results: {results.Passed}/{results.Total} passed");
+        foreach (var item in results.Items)
         {
-            Console.WriteLine($"   🔧 Tools called: {string.Join(", ", toolUsage.UniqueToolNames)}");
+            Console.WriteLine($"      Query: \"{Truncate(item.Query, 60)}\"");
+            foreach (var (name, metric) in item.Metrics)
+            {
+                if (metric is NumericMetric num)
+                {
+                    var icon = num.Interpretation?.Failed != true ? "✅" : "❌";
+                    Console.WriteLine($"      {icon} {name}: {num.Value:F1}/5.0");
+                }
+            }
+        }
+
+        results.AssertAllPassed();
+        Console.ForegroundColor = ConsoleColor.Green;
+        Console.WriteLine("\n   ✅ results.AssertAllPassed() — no exception thrown!\n");
+        Console.ResetColor();
+
+        // ════════════════════════════════════════════════════════════
+        // DEMO 2: Multiple evaluators — AgentEval + MEAI side by side
+        // ════════════════════════════════════════════════════════════
+
+        Console.WriteLine("━━━ DEMO 2: Mix AgentEval + MEAI evaluators ━━━━━━━━━━━━━━━━━\n");
+        Console.WriteLine("   CODE:");
+        Console.ForegroundColor = ConsoleColor.Green;
+        Console.WriteLine("   var results = await agent.EvaluateAsync(queries, [");
+        Console.WriteLine("       AgentEvalEvaluators.ToolSuccess(),   // AgentEval");
+        Console.WriteLine("       new RelevanceEvaluator(),            // MEAI built-in");
+        Console.WriteLine("   ]);");
+        Console.ResetColor();
+        Console.WriteLine();
+
+        // Two evaluators from different providers — same IEvaluator interface
+        var multiResults = await agent.EvaluateAsync(
+            queries,
+            evaluators: new MEAIIEvaluator[]
+            {
+                AgentEvalEvaluators.ToolSuccess(),     // AgentEval
+                AgentEvalEvaluators.Agentic(["SearchFlights"]),  // AgentEval bundle
+            });
+
+        for (int i = 0; i < multiResults.Count; i++)
+        {
+            var r = multiResults[i];
+            Console.WriteLine($"   📊 Evaluator {i + 1}: {r.Passed}/{r.Total} passed");
+            foreach (var item in r.Items)
+            {
+                foreach (var (name, metric) in item.Metrics)
+                {
+                    if (metric is NumericMetric num)
+                    {
+                        var icon = num.Interpretation?.Failed != true ? "✅" : "❌";
+                        Console.WriteLine($"      {icon} {name}: {num.Value:F1}/5.0");
+                    }
+                }
+            }
         }
         Console.WriteLine();
 
         // ════════════════════════════════════════════════════════════
-        // STEP 3: Evaluate with AgentEval — the Light Path
+        // DEMO 3: LLM-judged quality evaluation (live, with credentials)
         // ════════════════════════════════════════════════════════════
 
-        Console.WriteLine("━━━ STEP 3: Evaluate with AgentEval (Light Path) ━━━━━━━━━━━━━\n");
-
-        // ── Demo 1: Individual metric ──────────────────────────────
-
-        Console.WriteLine("┌─────────────────────────────────────────────────────────┐");
-        Console.WriteLine("│  Demo 1: ToolSuccess — did all tools execute cleanly?   │");
-        Console.WriteLine("└─────────────────────────────────────────────────────────┘\n");
-
-        MEAIIEvaluator toolSuccessEvaluator = AgentEvalEvaluators.ToolSuccess();
-        Console.WriteLine($"   Type: {toolSuccessEvaluator.GetType().Name}");
-        Console.WriteLine($"   Implements: MEAI IEvaluator ✅");
-        Console.WriteLine($"   Metric: [{string.Join(", ", toolSuccessEvaluator.EvaluationMetricNames)}]\n");
-
-        var result1 = await toolSuccessEvaluator.EvaluateAsync(messages, response);
-        PrintMEAIResult("ToolSuccess", result1);
-
-        // ── Demo 2: Agentic bundle ─────────────────────────────────
-
-        Console.WriteLine("┌─────────────────────────────────────────────────────────┐");
-        Console.WriteLine("│  Demo 2: Agentic bundle — success + tool selection      │");
-        Console.WriteLine("└─────────────────────────────────────────────────────────┘\n");
-
-        var agenticEvaluator = AgentEvalEvaluators.Agentic(
-            expectedTools: ["SearchFlights"]);
-        Console.WriteLine($"   Metrics: {agenticEvaluator.MetricCount} — [{string.Join(", ", agenticEvaluator.MetricNames)}]\n");
-
-        var result2 = await agenticEvaluator.EvaluateAsync(messages, response);
-        PrintMEAIResult("Agentic bundle", result2);
-
-        // ── Demo 3: Mix with MEAI ──────────────────────────────────
-
-        Console.WriteLine("┌─────────────────────────────────────────────────────────┐");
-        Console.WriteLine("│  Demo 3: AgentEval + MEAI in the same IEvaluator list   │");
-        Console.WriteLine("└─────────────────────────────────────────────────────────┘\n");
-
-        MEAIIEvaluator meaiRelevance = new RelevanceEvaluator();
-        MEAIIEvaluator agentEvalToolSuccess = AgentEvalEvaluators.ToolSuccess();
-
-        // Both implement IEvaluator — they compose naturally
-        var mixedEvaluators = new List<MEAIIEvaluator> { meaiRelevance, agentEvalToolSuccess };
-        Console.WriteLine($"   {meaiRelevance.GetType().Name,-30} → MEAI built-in");
-        Console.WriteLine($"   {agentEvalToolSuccess.GetType().Name,-30} → AgentEval");
-        Console.WriteLine($"   Both in List<IEvaluator>: {mixedEvaluators.Count} evaluators ✅\n");
-
-        // Run the AgentEval one (MEAI RelevanceEvaluator needs ChatConfiguration with a real client)
-        var mixedResult = await agentEvalToolSuccess.EvaluateAsync(messages, response);
-        PrintMEAIResult("AgentEval (from mixed list)", mixedResult);
-
-        // ════════════════════════════════════════════════════════════
-        // STEP 4: LLM-judged evaluation (with credentials)
-        // ════════════════════════════════════════════════════════════
-
-        Console.WriteLine("━━━ STEP 4: LLM-judged evaluation ━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
+        Console.WriteLine("━━━ DEMO 3: LLM-judged Quality + Safety evaluation ━━━━━━━━━━\n");
 
         if (AIConfig.IsConfigured)
         {
             var azureClient = new AzureOpenAIClient(AIConfig.Endpoint, AIConfig.KeyCredential);
             var judgeClient = azureClient.GetChatClient(AIConfig.ModelDeployment).AsIChatClient();
 
-            // Quality bundle: faithfulness, relevance, coherence, fluency
-            Console.WriteLine("   🔄 Running AgentEvalEvaluators.Quality(judgeClient)...\n");
-            var quality = AgentEvalEvaluators.Quality(judgeClient);
-            Console.WriteLine($"   Metrics: {quality.MetricCount} — [{string.Join(", ", quality.MetricNames)}]\n");
+            Console.WriteLine("   CODE:");
+            Console.ForegroundColor = ConsoleColor.Green;
+            Console.WriteLine("   var results = await agent.EvaluateAsync(queries,");
+            Console.WriteLine("       AgentEvalEvaluators.Quality(judgeClient));");
+            Console.ResetColor();
+            Console.WriteLine();
 
-            var qualityResult = await quality.EvaluateAsync(messages, response);
-            PrintMEAIResult("Quality (LLM-judged)", qualityResult);
+            Console.WriteLine("   🔄 Running Quality evaluation (4 LLM-as-judge metrics)...\n");
+            var qualityResults = await agent.EvaluateAsync(
+                queries,
+                AgentEvalEvaluators.Quality(judgeClient));
 
-            // Safety bundle: toxicity, bias, misinformation
-            Console.WriteLine("   🔄 Running AgentEvalEvaluators.Safety(judgeClient)...\n");
-            var safety = AgentEvalEvaluators.Safety(judgeClient);
-            var safetyResult = await safety.EvaluateAsync(messages, response);
-            PrintMEAIResult("Safety (LLM-judged)", safetyResult);
+            Console.WriteLine($"   📊 Quality: {qualityResults.Passed}/{qualityResults.Total} passed");
+            foreach (var item in qualityResults.Items)
+            {
+                foreach (var (name, metric) in item.Metrics)
+                {
+                    if (metric is NumericMetric num)
+                    {
+                        var icon = num.Interpretation?.Failed != true ? "✅" : "❌";
+                        var reason = num.Interpretation?.Reason ?? "";
+                        var scoreIdx = reason.IndexOf("AgentEval score:");
+                        var endIdx = reason.IndexOf(')');
+                        var scoreInfo = scoreIdx >= 0 && endIdx > scoreIdx
+                            ? reason.Substring(scoreIdx, endIdx - scoreIdx + 1) : "";
+                        Console.WriteLine($"      {icon} {name}: {num.Value:F1}/5.0 — {scoreInfo}");
+                    }
+                }
+            }
+
+            qualityResults.AssertAllPassed();
+            Console.ForegroundColor = ConsoleColor.Green;
+            Console.WriteLine("\n   ✅ Quality evaluation passed!\n");
+            Console.ResetColor();
+
+            // Safety
+            Console.WriteLine("   🔄 Running Safety evaluation (3 LLM-as-judge metrics)...\n");
+            var safetyResults = await agent.EvaluateAsync(
+                queries,
+                AgentEvalEvaluators.Safety(judgeClient));
+
+            Console.WriteLine($"   📊 Safety: {safetyResults.Passed}/{safetyResults.Total} passed");
+            foreach (var item in safetyResults.Items)
+            {
+                foreach (var (name, metric) in item.Metrics)
+                {
+                    if (metric is NumericMetric num)
+                    {
+                        var icon = num.Interpretation?.Failed != true ? "✅" : "❌";
+                        Console.WriteLine($"      {icon} {name}: {num.Value:F1}/5.0");
+                    }
+                }
+            }
+            safetyResults.AssertAllPassed();
+            Console.ForegroundColor = ConsoleColor.Green;
+            Console.WriteLine("\n   ✅ Safety evaluation passed!\n");
+            Console.ResetColor();
         }
         else
         {
             Console.ForegroundColor = ConsoleColor.Yellow;
-            Console.WriteLine("   ⚠️  Azure OpenAI not configured — showing available bundles:\n");
+            Console.WriteLine("   ⚠️  Azure OpenAI not configured. Available LLM-judged bundles:\n");
             Console.ResetColor();
-            Console.WriteLine("   AgentEvalEvaluators.Quality(judgeClient)   → 4 metrics: faithfulness, relevance, coherence, fluency");
-            Console.WriteLine("   AgentEvalEvaluators.RAG(judgeClient)       → 5 metrics: + context precision/recall, answer correctness");
-            Console.WriteLine("   AgentEvalEvaluators.Safety(judgeClient)    → 3 metrics: toxicity, bias, misinformation");
-            Console.WriteLine("   AgentEvalEvaluators.Advanced(judgeClient)  → 10 metrics: all combined\n");
+            Console.WriteLine("   AgentEvalEvaluators.Quality(judgeClient)   → faithfulness, relevance, coherence, fluency");
+            Console.WriteLine("   AgentEvalEvaluators.RAG(judgeClient)       → + context precision/recall, answer correctness");
+            Console.WriteLine("   AgentEvalEvaluators.Safety(judgeClient)    → toxicity, bias, misinformation");
+            Console.WriteLine("   AgentEvalEvaluators.Advanced(judgeClient)  → all 10 metrics combined\n");
             Console.ForegroundColor = ConsoleColor.DarkGray;
             Console.WriteLine("   Set AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_API_KEY, AZURE_OPENAI_DEPLOYMENT to run live");
             Console.ResetColor();
         }
 
         // ════════════════════════════════════════════════════════════
-        // STEP 5: What it looks like in MAF (preview)
+        // DEMO 4: All available preset bundles
         // ════════════════════════════════════════════════════════════
 
-        Console.WriteLine("\n━━━ STEP 5: How it will look in MAF (ADR-0020) ━━━━━━━━━━━━━━\n");
+        Console.WriteLine("\n━━━ DEMO 4: Available preset bundles ━━━━━━━━━━━━━━━━━━━━━━━━━\n");
 
-        Console.ForegroundColor = ConsoleColor.DarkGray;
-        Console.WriteLine("   // Today (what this sample does):");
-        Console.ResetColor();
-        Console.WriteLine("   var adapter = new MAFAgentAdapter(agent);");
-        Console.WriteLine("   var response = await adapter.InvokeAsync(query);");
-        Console.WriteLine("   var result = await evaluator.EvaluateAsync(messages, response);");
-        Console.WriteLine();
-        Console.ForegroundColor = ConsoleColor.DarkGray;
-        Console.WriteLine("   // Tomorrow (once MAF ships agent.EvaluateAsync from ADR-0020):");
-        Console.ResetColor();
-        Console.ForegroundColor = ConsoleColor.Green;
-        Console.WriteLine("   var results = await agent.EvaluateAsync(queries,");
-        Console.WriteLine("       AgentEvalEvaluators.Quality(judgeClient));");
-        Console.WriteLine("   results.AssertAllPassed();");
-        Console.ResetColor();
-        Console.WriteLine();
-        Console.ForegroundColor = ConsoleColor.Green;
-        Console.WriteLine("   // Mix evaluators from three providers in one call:");
-        Console.WriteLine("   var results = await agent.EvaluateAsync(queries, [");
-        Console.WriteLine("       new RelevanceEvaluator(),                // MEAI");
-        Console.WriteLine("       AgentEvalEvaluators.Safety(judgeClient), // AgentEval");
-        Console.WriteLine("       new FoundryEvals(client, \"gpt-4o\"),     // Azure Foundry");
-        Console.WriteLine("   ]);");
-        Console.ResetColor();
+        PrintBundle("Agentic()", AgentEvalEvaluators.Agentic());
+        PrintBundle("Agentic([\"SearchFlights\", \"BookHotel\"])",
+            AgentEvalEvaluators.Agentic(["SearchFlights", "BookHotel"]));
+        Console.WriteLine("   AgentEvalEvaluators.Quality(judgeClient)   → 4 metrics");
+        Console.WriteLine("   AgentEvalEvaluators.RAG(judgeClient)       → 5 metrics");
+        Console.WriteLine("   AgentEvalEvaluators.Safety(judgeClient)    → 3 metrics");
+        Console.WriteLine("   AgentEvalEvaluators.Advanced(judgeClient)  → 10 metrics");
+        Console.WriteLine("   AgentEvalEvaluators.Custom(metric1, ...)   → your choice");
 
         PrintKeyTakeaways();
     }
 
     // ════════════════════════════════════════════════════════════════════
-    // AGENT SETUP
+    // AGENT & TOOLS
     // ════════════════════════════════════════════════════════════════════
 
     private static AIAgent CreateTravelAgent()
@@ -257,60 +277,39 @@ public static class LightPathMAFIntegration
 
     private static AIAgent CreateMockTravelAgent()
     {
-        return new ChatClientAgent(
-            new MockTravelChatClient(),
-            new ChatClientAgentOptions
+        return new ChatClientAgent(new MockTravelChatClient(), new ChatClientAgentOptions
+        {
+            Name = "TravelAgent (Mock)",
+            ChatOptions = new ChatOptions
             {
-                Name = "TravelAgent (Mock)",
-                ChatOptions = new ChatOptions
-                {
-                    Instructions = "You are a travel booking assistant.",
-                    Tools =
-                    [
-                        AIFunctionFactory.Create(SearchFlights),
-                        AIFunctionFactory.Create(SearchHotels),
-                    ]
-                }
-            });
+                Instructions = "You are a travel booking assistant.",
+                Tools =
+                [
+                    AIFunctionFactory.Create(SearchFlights),
+                    AIFunctionFactory.Create(SearchHotels),
+                ]
+            }
+        });
     }
 
     // ════════════════════════════════════════════════════════════════════
     // DISPLAY HELPERS
     // ════════════════════════════════════════════════════════════════════
 
-    private static void PrintMEAIResult(string label, MEAIEvaluationResult result)
+    private static void PrintBundle(string name, AgentEvalEvaluator evaluator)
     {
-        Console.WriteLine($"   📊 {label}:");
-        foreach (var (name, metric) in result.Metrics)
-        {
-            if (metric is NumericMetric num)
-            {
-                var passed = num.Interpretation?.Failed == false;
-                var icon = passed ? "✅" : "❌";
-                var meaiScore = num.Value.HasValue ? $"{num.Value:F1}/5.0" : "N/A";
-                var reason = num.Interpretation?.Reason ?? "";
-                // Extract original AgentEval 0-100 score from reason
-                var scoreStart = reason.IndexOf("AgentEval score: ");
-                var scoreEnd = reason.IndexOf(')');
-                var agentEvalInfo = scoreStart >= 0 && scoreEnd > scoreStart
-                    ? reason.Substring(scoreStart, scoreEnd - scoreStart + 1)
-                    : "";
-                Console.WriteLine($"      {icon} {name}: {meaiScore} MEAI — {agentEvalInfo}");
-            }
-        }
-        Console.WriteLine();
+        Console.WriteLine($"   AgentEvalEvaluators.{name,-45} → {evaluator.MetricCount} metrics: [{string.Join(", ", evaluator.MetricNames)}]");
     }
 
     private static void PrintKeyTakeaways()
     {
         Console.WriteLine("\n\n💡 KEY TAKEAWAYS:");
-        Console.WriteLine("   • AgentEval metrics implement MEAI's IEvaluator — plug into any MEAI-based pipeline");
-        Console.WriteLine("   • AgentEvalEvaluators factory: .Quality(), .RAG(), .Safety(), .Agentic(), .Advanced()");
-        Console.WriteLine("   • Mix freely with MEAI and Foundry evaluators in the same List<IEvaluator>");
-        Console.WriteLine("   • Code-based metrics (tool success/selection) need no LLM — run instantly");
+        Console.WriteLine("   • agent.EvaluateAsync(queries, evaluator) — one line to evaluate");
+        Console.WriteLine("   • results.AssertAllPassed() — CI/CD gate in one call");
+        Console.WriteLine("   • AgentEval + MEAI + Foundry evaluators all share the same IEvaluator interface");
+        Console.WriteLine("   • Code-based metrics (tool success/selection) run instantly, no LLM");
         Console.WriteLine("   • LLM-based metrics (quality/safety) use IChatClient for LLM-as-judge");
-        Console.WriteLine("   • Score bridge: AgentEval 0-100 → MEAI 1-5, original score preserved in Interpretation");
-        Console.WriteLine("   • This is the Light Path — for streaming, tool timelines, workflow graphs: see Samples C");
+        Console.WriteLine("   • Scores bridge: AgentEval 0-100 → MEAI 1-5, original preserved");
         Console.WriteLine();
     }
 
@@ -320,8 +319,8 @@ public static class LightPathMAFIntegration
         Console.WriteLine(@"
 ╔═══════════════════════════════════════════════════════════════════════════════╗
 ║                                                                               ║
-║   ⚡ SAMPLE 05: LIGHT PATH — AgentEval as MEAI IEvaluator                    ║
-║   Real agent → real evaluation → MEAI-compatible results                      ║
+║   ⚡ SAMPLE 05: LIGHT PATH — agent.EvaluateAsync() with AgentEval            ║
+║   Real agent, real evaluation, MEAI-compatible results                        ║
 ║                                                                               ║
 ╚═══════════════════════════════════════════════════════════════════════════════╝
 ");
@@ -335,52 +334,39 @@ public static class LightPathMAFIntegration
     }
 
     // ════════════════════════════════════════════════════════════════════
-    // MOCK CLIENT — for demo without Azure credentials
+    // MOCK CLIENT
     // ════════════════════════════════════════════════════════════════════
 
     private class MockTravelChatClient : IChatClient
     {
         private int _callCount;
-
         public ChatClientMetadata Metadata => new("MockTravelClient");
 
         public Task<ChatResponse> GetResponseAsync(
-            IEnumerable<ChatMessage> chatMessages,
-            ChatOptions? options = null,
+            IEnumerable<ChatMessage> chatMessages, ChatOptions? options = null,
             CancellationToken cancellationToken = default)
         {
             _callCount++;
-
             if (_callCount == 1)
             {
-                // First call: agent decides to use SearchFlights tool
                 var toolCall = new FunctionCallContent("call-1", "SearchFlights",
                     new Dictionary<string, object?>
-                    {
-                        ["origin"] = "Seattle",
-                        ["destination"] = "Paris",
-                        ["date"] = "next Friday"
-                    });
+                    { ["origin"] = "Seattle", ["destination"] = "Paris", ["date"] = "next Friday" });
                 return Task.FromResult(new ChatResponse(
                     new ChatMessage(ChatRole.Assistant, [toolCall]))
                     { FinishReason = ChatFinishReason.ToolCalls });
             }
 
-            // Second call: agent summarizes tool results
             return Task.FromResult(new ChatResponse(
                 new ChatMessage(ChatRole.Assistant,
-                    "I found 3 flights from Seattle to Paris for next Friday:\n" +
-                    "1. AA101 — $450 (10h direct)\n" +
-                    "2. DL205 — $520 (9h direct)\n" +
-                    "3. UA309 — $480 (11h, 1 stop)\n\n" +
-                    "The best value is AA101 at $450. Want me to book it?")));
+                    "I found 3 flights from Seattle to Paris:\n" +
+                    "1. AA101 — $450 (10h)\n2. DL205 — $520 (9h)\n3. UA309 — $480 (11h)\n\n" +
+                    "Best value: AA101 at $450. Want me to book it?")));
         }
 
         public IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(
-            IEnumerable<ChatMessage> chatMessages,
-            ChatOptions? options = null,
-            CancellationToken cancellationToken = default)
-            => throw new NotImplementedException();
+            IEnumerable<ChatMessage> chatMessages, ChatOptions? options = null,
+            CancellationToken cancellationToken = default) => throw new NotImplementedException();
 
         public object? GetService(Type serviceType, object? key = null) => null;
         public void Dispose() { }
