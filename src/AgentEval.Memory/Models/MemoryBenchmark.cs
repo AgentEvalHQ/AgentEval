@@ -92,6 +92,25 @@ public class MemoryBenchmark
         Description = "Maximum context pressure diagnostic (11 categories, ~50K+ token context)",
         Categories = Full.Categories
     };
+
+    /// <summary>
+    /// Overflow benchmark: same 8 categories as Standard but with target_tokens set to 192K,
+    /// forcing context overflow on models with 128K windows (e.g., GPT-4o-mini).
+    /// Tests the agent's memory architecture (reducer, vector store) rather than LLM attention.
+    /// </summary>
+    public static MemoryBenchmark Overflow => new()
+    {
+        Name = "Overflow",
+        Description = "Context overflow test — 192K tokens on Standard categories. Tests memory architecture, not LLM attention.",
+        Categories = Standard.Categories,
+        TargetTokensOverride = 192_000
+    };
+
+    /// <summary>
+    /// When set, overrides context_pressure.target_tokens for all categories in this benchmark.
+    /// Used by the Overflow preset to force context beyond model limits.
+    /// </summary>
+    public int? TargetTokensOverride { get; init; }
 }
 
 /// <summary>

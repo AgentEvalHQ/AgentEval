@@ -62,6 +62,7 @@ public class MemoryBenchmarkRunner : IMemoryBenchmarkRunner
     private readonly ITemporalMemoryScenarios _temporalScenarios;
     private readonly ICrossSessionScenarios _crossSessionScenarios;
     private readonly ILogger<MemoryBenchmarkRunner> _logger;
+    private int? _targetTokensOverride;
 
     public MemoryBenchmarkRunner(
         IMemoryTestRunner runner,
@@ -120,6 +121,7 @@ public class MemoryBenchmarkRunner : IMemoryBenchmarkRunner
         ArgumentNullException.ThrowIfNull(agent);
         ArgumentNullException.ThrowIfNull(benchmark);
 
+        _targetTokensOverride = benchmark.TargetTokensOverride;
         var totalStopwatch = Stopwatch.StartNew();
         var categoryResults = new List<BenchmarkCategoryResult>();
         var totalCategories = benchmark.Categories.Count;
@@ -265,6 +267,12 @@ public class MemoryBenchmarkRunner : IMemoryBenchmarkRunner
         {
             var scenarioDef = DataLoading.ScenarioLoader.Load(scenarioName);
             var preset = DataLoading.ScenarioLoader.ResolvePreset(scenarioDef, presetName);
+
+            // Apply target_tokens override from benchmark (e.g., Overflow preset)
+            if (_targetTokensOverride.HasValue && preset.ContextPressure != null)
+            {
+                preset.ContextPressure.TargetTokens = _targetTokensOverride.Value;
+            }
 
             // Load corpus turns (if configured)
             List<(string User, string Assistant)>? corpusTurns = null;
