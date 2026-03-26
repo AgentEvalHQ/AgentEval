@@ -111,7 +111,17 @@
       "context_pressure": {
         "corpus": "context-stress",
         "max_turns": 100,
-        "sessions_count": 8
+        "sessions_count": 8,
+        "distractor_turns": [
+          {"user": "My friend just ran the Berlin marathon in 3:45, incredible!", "assistant": "That's an impressive time! Berlin is known for being a fast course.", "topic": "marathon"},
+          {"user": "I watched the Portland Trail Blazers game last night", "assistant": "How did they do? Portland has had an interesting season.", "topic": "portland"},
+          {"user": "My coworker Sarah just got promoted to VP", "assistant": "That's great news! She must have worked hard for that.", "topic": "sarah"},
+          {"user": "I'm thinking of converting my garage into a workshop", "assistant": "That's a popular home improvement project. What would you use it for?", "topic": "home_office"},
+          {"user": "Sam from accounting told me about a great restaurant in San Jose", "assistant": "Oh nice, what kind of cuisine? San Jose has some great spots.", "topic": "sam_city"},
+          {"user": "My cousin's daughter is also training for a 5K, she's only 14!", "assistant": "That's wonderful! Starting young with running is great for discipline.", "topic": "running"},
+          {"user": "The Sacramento Kings had an amazing game yesterday", "assistant": "They've been on a streak lately. Great to see them competitive again.", "topic": "sacramento"},
+          {"user": "My neighbor just adopted two kittens from the shelter", "assistant": "How exciting! Did they pick out names yet?", "topic": "cats"}
+        ]
       },
       "noise_between_facts": [
         "Speaking of food, have you tried that new Thai place downtown?",

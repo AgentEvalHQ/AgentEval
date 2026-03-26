@@ -86,7 +86,15 @@
       "context_pressure": {
         "corpus": "context-stress",
         "max_turns": 100,
-        "sessions_count": 8
+        "sessions_count": 8,
+        "distractor_turns": [
+          {"user": "My friend just got their AWS cert too — said the exam was brutal, took her 3 attempts", "assistant": "Three attempts shows real persistence! AWS certs are notoriously difficult.", "topic": "aws_cert"},
+          {"user": "The company announced a hackathon for Q2, same format as last year", "assistant": "Exciting! Are you planning to participate again this year?", "topic": "hackathon"},
+          {"user": "A recruiter from Google reached out to me — third time this month", "assistant": "They're persistent! Are you considering it?", "topic": "google"},
+          {"user": "My colleague just finished a coding bootcamp — she's switching from marketing to dev", "assistant": "That's a big career change! How's she finding the transition?", "topic": "bootcamp"},
+          {"user": "My team lead started mentoring interns last month, she's great at it", "assistant": "Mentoring is so rewarding. I'm sure the interns appreciate her guidance.", "topic": "mentoring"},
+          {"user": "I heard the QA team is hiring — they need someone with telecom experience", "assistant": "Telecom QA can be complex. Sounds like a specialized role.", "topic": "qa_telecom"}
+        ]
       },
       "noise_between_facts": [
         "The coffee machine at work broke again today.",

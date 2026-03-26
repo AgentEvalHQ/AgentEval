@@ -279,6 +279,17 @@ public class MemoryBenchmarkRunner : IMemoryBenchmarkRunner
                 catch { /* corpus not available — continue without pressure */ }
             }
 
+            // Inject themed distractor turns at deterministic positions in the corpus
+            if (corpusTurns != null && preset.ContextPressure?.DistractorTurns is { Count: > 0 } distractorTurns)
+            {
+                var rng = new Random(42); // deterministic seed for reproducibility
+                foreach (var d in distractorTurns)
+                {
+                    var insertAt = rng.Next(0, corpusTurns.Count);
+                    corpusTurns.Insert(insertAt, (d.User, d.Assistant));
+                }
+            }
+
             // Separate facts into positioned (buried in corpus) and unpositioned (appended after)
             var positionedFacts = preset.Facts.Where(f => f.FractionalPosition.HasValue).ToList();
             var unpositionedFacts = preset.Facts.Where(f => !f.FractionalPosition.HasValue).ToList();

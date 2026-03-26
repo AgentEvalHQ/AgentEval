@@ -87,7 +87,17 @@
       "context_pressure": {
         "corpus": "context-stress",
         "max_turns": 100,
-        "sessions_count": 8
+        "sessions_count": 8,
+        "distractor_turns": [
+          {"user": "The pharmacy is having a sale on metformin — my dad takes that for his diabetes", "assistant": "Good to know about the sale. Medication costs really add up.", "topic": "metformin"},
+          {"user": "My coworker Maria called in sick today, hope she's OK", "assistant": "Hope she feels better soon. Is it going around the office?", "topic": "maria"},
+          {"user": "Apartment 4A is having a leak problem again, the building manager told me", "assistant": "That's frustrating. Old buildings always have plumbing issues.", "topic": "apartment"},
+          {"user": "I saw a blue Honda Accord parked in the visitor spot — is that allowed?", "assistant": "I think visitor spots are usually fair game. Nice car though.", "topic": "blue_honda"},
+          {"user": "My friend's gym membership is only 200 DKK a month — CPH Fitness I think", "assistant": "That's a great deal! Copenhagen gyms can be expensive.", "topic": "gym"},
+          {"user": "I need to update my insurance — the policy expired last week", "assistant": "Don't wait too long on that. What kind of coverage do you need?", "topic": "insurance"},
+          {"user": "My sister's laptop serial number starts with DL too — same Dell model", "assistant": "Dell is popular for work laptops. The XPS line is solid.", "topic": "laptop_serial"},
+          {"user": "Someone left their bike lock combination on a sticky note in the break room — 4-4-7-2", "assistant": "That's not great security! Someone should take that down.", "topic": "lock_code"}
+        ]
       },
       "noise_between_facts": [
         "Speaking of food, have you tried that new Thai place downtown? The pad thai is incredible.",

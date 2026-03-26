@@ -112,7 +112,14 @@
       "context_pressure": {
         "corpus": "context-stress",
         "max_turns": 100,
-        "sessions_count": 8
+        "sessions_count": 8,
+        "distractor_turns": [
+          {"user": "My coworker bikes to work too — she does 30 minutes each way though", "assistant": "That's a solid commute by bike. Great exercise too.", "topic": "bike_commute"},
+          {"user": "My friend's startup just hit their 3-year anniversary — they're celebrating this week", "assistant": "Three years is a big milestone for a startup! Congrats to them.", "topic": "startup_years"},
+          {"user": "My neighbor has 3 kids — ages 6, 10, and 14. Her house is always chaos", "assistant": "Three kids is a handful! I bet the age range makes it interesting.", "topic": "kids"},
+          {"user": "Another colleague relocated from Madrid last year — she says Copenhagen is colder but safer", "assistant": "The weather shock from Spain must be real. But Copenhagen is lovely once you adjust.", "topic": "relocated_from_spain"},
+          {"user": "My friend just got a labrador puppy — named him Rex. He's adorable but destructive", "assistant": "Lab puppies are famous for chewing everything! He'll calm down eventually.", "topic": "labrador"}
+        ]
       },
       "queries": [
         {

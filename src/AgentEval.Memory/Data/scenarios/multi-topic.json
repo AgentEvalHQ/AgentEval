@@ -84,7 +84,19 @@
       "context_pressure": {
         "corpus": "context-stress",
         "max_turns": 100,
-        "sessions_count": 8
+        "sessions_count": 8,
+        "distractor_turns": [
+          {"user": "My neighbor has a golden retriever too — his name is Buddy, about 5 years old", "assistant": "Golden retrievers are such great dogs. Does Buddy get along with other dogs?", "topic": "dog"},
+          {"user": "A friend at Contoso's London office just got promoted to principal engineer", "assistant": "Congrats to them! That's a big milestone at Contoso.", "topic": "contoso_promotion"},
+          {"user": "I'm trying to learn Danish but Swedish keeps interfering — the pronunciation is so different", "assistant": "Scandinavian languages are tricky that way. Danish pronunciation is notoriously hard.", "topic": "languages"},
+          {"user": "My wife's vitamin D levels were low too — the doctor said it's super common in Copenhagen", "assistant": "Very common at northern latitudes. Supplementation helps a lot.", "topic": "vitamin_d"},
+          {"user": "Someone at work drives a red Honda Civic — I keep confusing it with mine in the parking lot", "assistant": "Ha! That must be annoying. Maybe a bumper sticker would help.", "topic": "honda_civic"},
+          {"user": "Have you been to Noma? My colleague went last week and said it was overrated", "assistant": "Opinions on Noma are really polarized. Some love it, others find it pretentious.", "topic": "noma"},
+          {"user": "I just finished Sapiens — started Homo Deus next, it's even better", "assistant": "Homo Deus is a great follow-up. Harari really expands on the themes.", "topic": "book"},
+          {"user": "My review cycle is in May this year — they moved it up from June", "assistant": "Good to know in advance. Are you preparing already?", "topic": "salary_review"},
+          {"user": "The vet said my friend's retriever needs joint supplements too — must be a breed thing", "assistant": "Golden retrievers are prone to joint issues. Glucosamine helps a lot.", "topic": "dog_medication"},
+          {"user": "My commute is 30 minutes by train — I'm jealous of people who can drive in 25", "assistant": "At least you can read on the train! But yeah, driving can be faster.", "topic": "commute"}
+        ]
       },
       "noise_between_facts": [
         "The sunset was beautiful yesterday.",

@@ -48,6 +48,30 @@ public class ContextPressureConfig
     /// </summary>
     [JsonPropertyName("sessions_count")]
     public int? SessionsCount { get; set; }
+
+    /// <summary>
+    /// Themed distractor turns injected into the corpus at deterministic positions.
+    /// These are topically SIMILAR to planted facts but contain WRONG details,
+    /// forcing the agent to discriminate between its own facts and similar filler.
+    /// </summary>
+    [JsonPropertyName("distractor_turns")]
+    public List<DistractorTurn>? DistractorTurns { get; set; }
+}
+
+/// <summary>
+/// A distractor turn that is topically related to a planted fact but attributed
+/// to someone else or containing different details. Used for semantic interference.
+/// </summary>
+public class DistractorTurn
+{
+    [JsonPropertyName("user")]
+    public string User { get; set; } = "";
+
+    [JsonPropertyName("assistant")]
+    public string Assistant { get; set; } = "";
+
+    [JsonPropertyName("topic")]
+    public string? Topic { get; set; }
 }
 
 /// <summary>
