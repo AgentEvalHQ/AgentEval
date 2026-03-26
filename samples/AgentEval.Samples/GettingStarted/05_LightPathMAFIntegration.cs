@@ -6,7 +6,6 @@ using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.AI.Evaluation;
 using Microsoft.Extensions.AI.Evaluation.Quality;
-using AgentEval.MAF;
 using AgentEval.MAF.Evaluators;
 using AgentEval.Metrics.Agentic;
 using System.ComponentModel;
@@ -49,30 +48,26 @@ public static class LightPathMAFIntegration
         // STEP 2: Run the agent — capture the conversation
         // ════════════════════════════════════════════════════════════
 
-        Console.WriteLine("━━━ STEP 2: Run the agent ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
+        Console.WriteLine("━━━ STEP 2: Run the agent (MAF-native) ━━━━━━━━━━━━━━━━━━━━━━\n");
 
         var query = "Find me flights from Seattle to Paris for next Friday";
         Console.WriteLine($"   📨 User: \"{query}\"\n");
 
-        // Run via MAFAgentAdapter to get the conversation in MEAI format
-        var adapter = new MAFAgentAdapter(agent);
-        var agentResponse = await adapter.InvokeAsync(query);
+        // Run via MAF's native AIAgent.RunAsync() — no AgentEval adapter involved.
+        // This is exactly what MAF's agent.EvaluateAsync() orchestration does internally.
+        var session = await agent.CreateSessionAsync();
+        var agentResponse = await agent.RunAsync(query, session);
 
         Console.WriteLine($"   📤 Agent: {Truncate(agentResponse.Text, 150)}");
 
-        // Build the MEAI conversation format (what MAF's orchestration produces)
+        // Build the MEAI conversation format from MAF's response.
+        // MAF's orchestration layer (AgentEvaluationExtensions) does this same conversion.
         var messages = new List<ChatMessage> { new(ChatRole.User, query) };
-        if (agentResponse.RawMessages != null)
-        {
-            foreach (var raw in agentResponse.RawMessages)
-            {
-                if (raw is ChatMessage chatMsg)
-                    messages.Add(chatMsg);
-            }
-        }
+        foreach (var msg in agentResponse.Messages)
+            messages.Add(msg);
         var response = new ChatResponse([new ChatMessage(ChatRole.Assistant, agentResponse.Text)]);
 
-        // Show what tool calls were captured
+        // Show what tool calls the Light Path can extract from the conversation
         var toolUsage = ConversationExtractor.ExtractToolUsage(messages, response);
         if (toolUsage != null)
         {
