@@ -281,6 +281,37 @@ public class ScenarioLoaderTests
     }
 
     [Fact]
+    public void LoadToTargetTokens_RepeatsCorpusToReachTarget()
+    {
+        // context-small is ~8K tokens. Requesting 20K should repeat it ~3x
+        var turns = CorpusLoader.LoadToTargetTokens("context-small", 20000);
+
+        // Should have more than the base 15 turns
+        Assert.True(turns.Count > 15,
+            $"LoadToTargetTokens(20000) should repeat context-small beyond 15 turns, got {turns.Count}");
+    }
+
+    [Fact]
+    public void LoadToTargetTokens_SmallTarget_ReturnsAtLeastOneCopy()
+    {
+        var turns = CorpusLoader.LoadToTargetTokens("context-small", 100);
+
+        // Even with tiny target, should return at least 1 copy
+        Assert.True(turns.Count >= 15,
+            $"Should return at least 1 full copy (15 turns), got {turns.Count}");
+    }
+
+    [Fact]
+    public void LoadToTargetTokens_LargeTarget_ProducesLargeCorpus()
+    {
+        // 192K tokens target with context-stress (~120K) should produce ~2x
+        var turns = CorpusLoader.LoadToTargetTokens("context-stress", 192000);
+
+        Assert.True(turns.Count >= 400,
+            $"192K target with context-stress should produce 400+ turns, got {turns.Count}");
+    }
+
+    [Fact]
     public void Load_NonExistent_ThrowsFileNotFoundException()
     {
         Assert.Throws<FileNotFoundException>(() => ScenarioLoader.Load("does-not-exist"));

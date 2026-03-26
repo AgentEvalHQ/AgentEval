@@ -272,9 +272,17 @@ public class MemoryBenchmarkRunner : IMemoryBenchmarkRunner
             {
                 try
                 {
-                    corpusTurns = DataLoading.CorpusLoader.Load(
-                        preset.ContextPressure.Corpus,
-                        preset.ContextPressure.MaxTurns ?? 15).ToList();
+                    if (preset.ContextPressure.TargetTokens.HasValue && preset.ContextPressure.TargetTokens.Value > 0)
+                    {
+                        corpusTurns = DataLoading.CorpusLoader.LoadToTargetTokens(
+                            preset.ContextPressure.Corpus, preset.ContextPressure.TargetTokens.Value).ToList();
+                    }
+                    else
+                    {
+                        corpusTurns = DataLoading.CorpusLoader.Load(
+                            preset.ContextPressure.Corpus,
+                            preset.ContextPressure.MaxTurns ?? 15).ToList();
+                    }
                 }
                 catch { /* corpus not available — continue without pressure */ }
             }

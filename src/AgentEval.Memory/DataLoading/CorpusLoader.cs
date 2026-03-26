@@ -55,6 +55,29 @@ public static class CorpusLoader
     }
 
     /// <summary>
+    /// Loads a corpus and repeats it until reaching the target token count.
+    /// Tokens are estimated at 4 characters per token.
+    /// Used for overflow testing where we need to exceed the model's context window.
+    /// </summary>
+    public static IReadOnlyList<(string UserMessage, string AssistantResponse)> LoadToTargetTokens(
+        string corpusName, int targetTokens)
+    {
+        var baseTurns = Load(corpusName);
+        var baseChars = baseTurns.Sum(t => t.UserMessage.Length + t.AssistantResponse.Length);
+        var baseTokensEst = baseChars / 4;
+
+        if (baseTokensEst <= 0) return baseTurns;
+
+        var repeats = Math.Max(1, (int)Math.Ceiling((double)targetTokens / baseTokensEst));
+
+        var result = new List<(string, string)>(baseTurns.Count * repeats);
+        for (int i = 0; i < repeats; i++)
+            result.AddRange(baseTurns);
+
+        return result;
+    }
+
+    /// <summary>
     /// Lists available corpus names from embedded resources.
     /// </summary>
     public static IReadOnlyList<string> ListAvailable()

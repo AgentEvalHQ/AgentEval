@@ -50,6 +50,15 @@ public class ContextPressureConfig
     public int? SessionsCount { get; set; }
 
     /// <summary>
+    /// Target total tokens for context pressure. When set, the corpus is repeated
+    /// enough times to reach this token count, overriding max_turns.
+    /// Used for overflow testing — set to 1.5x the model's context window
+    /// to force the agent's memory/reducer system to activate.
+    /// </summary>
+    [JsonPropertyName("target_tokens")]
+    public int? TargetTokens { get; set; }
+
+    /// <summary>
     /// Themed distractor turns injected into the corpus at deterministic positions.
     /// These are topically SIMILAR to planted facts but contain WRONG details,
     /// forcing the agent to discriminate between its own facts and similar filler.
