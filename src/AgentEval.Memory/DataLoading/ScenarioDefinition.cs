@@ -50,6 +50,14 @@ public class ContextPressureConfig
     public int? SessionsCount { get; set; }
 
     /// <summary>
+    /// Number of additional filler turns to send via InvokeAsync after injecting history.
+    /// Each call adds to the accumulated context, eventually pushing past the model's
+    /// context window. Used for gradual overflow testing.
+    /// </summary>
+    [JsonPropertyName("overflow_calls")]
+    public int? OverflowCalls { get; set; }
+
+    /// <summary>
     /// Target total tokens for context pressure. When set, the corpus is repeated
     /// enough times to reach this token count, overriding max_turns.
     /// Used for overflow testing — set to 1.5x the model's context window

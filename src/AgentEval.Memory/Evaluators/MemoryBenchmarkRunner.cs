@@ -63,6 +63,7 @@ public class MemoryBenchmarkRunner : IMemoryBenchmarkRunner
     private readonly ICrossSessionScenarios _crossSessionScenarios;
     private readonly ILogger<MemoryBenchmarkRunner> _logger;
     private int? _targetTokensOverride;
+    private int? _overflowCallsOverride;
 
     public MemoryBenchmarkRunner(
         IMemoryTestRunner runner,
@@ -122,6 +123,7 @@ public class MemoryBenchmarkRunner : IMemoryBenchmarkRunner
         ArgumentNullException.ThrowIfNull(benchmark);
 
         _targetTokensOverride = benchmark.TargetTokensOverride;
+        _overflowCallsOverride = benchmark.OverflowCallsOverride;
         var totalStopwatch = Stopwatch.StartNew();
         var categoryResults = new List<BenchmarkCategoryResult>();
         var totalCategories = benchmark.Categories.Count;
@@ -268,10 +270,13 @@ public class MemoryBenchmarkRunner : IMemoryBenchmarkRunner
             var scenarioDef = DataLoading.ScenarioLoader.Load(scenarioName);
             var preset = DataLoading.ScenarioLoader.ResolvePreset(scenarioDef, presetName);
 
-            // Apply target_tokens override from benchmark (e.g., Overflow preset)
-            if (_targetTokensOverride.HasValue && preset.ContextPressure != null)
+            // Apply overrides from benchmark (e.g., Overflow preset)
+            if (preset.ContextPressure != null)
             {
-                preset.ContextPressure.TargetTokens = _targetTokensOverride.Value;
+                if (_targetTokensOverride.HasValue)
+                    preset.ContextPressure.TargetTokens = _targetTokensOverride.Value;
+                if (_overflowCallsOverride.HasValue)
+                    preset.ContextPressure.OverflowCalls = _overflowCallsOverride.Value;
             }
 
             // Load corpus turns (if configured)
@@ -282,8 +287,12 @@ public class MemoryBenchmarkRunner : IMemoryBenchmarkRunner
                 {
                     if (preset.ContextPressure.TargetTokens.HasValue && preset.ContextPressure.TargetTokens.Value > 0)
                     {
+                        // When overflow_calls is set, inject only 85% as history — the rest comes via real InvokeAsync calls
+                        var effectiveTokens = preset.ContextPressure.OverflowCalls > 0
+                            ? (int)(preset.ContextPressure.TargetTokens.Value * 0.85)
+                            : preset.ContextPressure.TargetTokens.Value;
                         corpusTurns = DataLoading.CorpusLoader.LoadToTargetTokens(
-                            preset.ContextPressure.Corpus, preset.ContextPressure.TargetTokens.Value).ToList();
+                            preset.ContextPressure.Corpus, effectiveTokens).ToList();
                     }
                     else
                     {
@@ -321,6 +330,31 @@ public class MemoryBenchmarkRunner : IMemoryBenchmarkRunner
             {
                 // No positioned facts — inject corpus as before
                 injectableNoPos.InjectConversationHistory(corpusTurns);
+            }
+
+            // Gradual overflow: send filler turns via InvokeAsync to fill remaining context
+            var overflowCalls = preset.ContextPressure?.OverflowCalls ?? 0;
+            if (overflowCalls > 0 && preset.ContextPressure?.TargetTokens > 0)
+            {
+                var fillerTurns = DataLoading.CorpusLoader.Load(
+                    preset.ContextPressure.Corpus, overflowCalls);
+
+                for (int i = 0; i < fillerTurns.Count; i++)
+                {
+                    try
+                    {
+                        await agent.InvokeAsync(fillerTurns[i].UserMessage, ct);
+                    }
+                    catch (Exception ex) when (ex.Message.Contains("context_length_exceeded") ||
+                                                ex.Message.Contains("maximum context length"))
+                    {
+                        // Context overflow — expected. The agent's reducer should have fired.
+                        _logger.LogInformation(
+                            "Context overflow triggered after {Calls} filler calls — proceeding to queries",
+                            i + 1);
+                        break;
+                    }
+                }
             }
 
             // Build steps from unpositioned facts (appended after corpus, current behavior)

@@ -101,9 +101,10 @@ public class MemoryBenchmark
     public static MemoryBenchmark Overflow => new()
     {
         Name = "Overflow",
-        Description = "Context overflow test — 192K tokens on Standard categories. Tests memory architecture, not LLM attention.",
+        Description = "Gradual context overflow — fills 85% via injection, then 15% via real calls. Tests memory architecture.",
         Categories = Standard.Categories,
-        TargetTokensOverride = 192_000
+        TargetTokensOverride = 192_000,
+        OverflowCallsOverride = 15
     };
 
     /// <summary>
@@ -111,6 +112,13 @@ public class MemoryBenchmark
     /// Used by the Overflow preset to force context beyond model limits.
     /// </summary>
     public int? TargetTokensOverride { get; init; }
+
+    /// <summary>
+    /// When set, overrides context_pressure.overflow_calls for all categories.
+    /// Sends this many filler turns via InvokeAsync after history injection to gradually
+    /// fill the remaining context and trigger the agent's reducer.
+    /// </summary>
+    public int? OverflowCallsOverride { get; init; }
 }
 
 /// <summary>
