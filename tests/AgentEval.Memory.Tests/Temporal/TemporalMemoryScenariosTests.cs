@@ -1,4 +1,5 @@
 using AgentEval.Memory.Models;
+using AgentEval.Memory.Scenarios;
 using AgentEval.Memory.Temporal;
 using Xunit;
 

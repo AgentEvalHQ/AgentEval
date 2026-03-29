@@ -1,4 +1,5 @@
 using AgentEval.Memory.Models;
+using AgentEval.Memory.Scenarios;
 
 namespace AgentEval.Memory.Temporal;
 

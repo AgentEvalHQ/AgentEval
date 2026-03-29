@@ -129,6 +129,16 @@ public class ConversationExtractorTests
     }
 
     [Fact]
+    public void ExtractToolUsage_WithNullMessages_ReturnsNull()
+    {
+        var response = new ChatResponse([new ChatMessage(ChatRole.Assistant, "Hi!")]);
+
+        var report = ConversationExtractor.ExtractToolUsage(null!, response);
+
+        Assert.Null(report);
+    }
+
+    [Fact]
     public void ExtractToolUsage_WithNoToolCalls_ReturnsNull()
     {
         var messages = new List<ChatMessage>

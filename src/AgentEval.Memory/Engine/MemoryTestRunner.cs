@@ -1,6 +1,8 @@
 using AgentEval.Core;
 using AgentEval.Memory.Models;
+using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using System.Diagnostics;
 
 namespace AgentEval.Memory.Engine;
@@ -18,6 +20,18 @@ public class MemoryTestRunner : IMemoryTestRunner
     {
         _memoryJudge = memoryJudge;
         _logger = logger;
+    }
+
+    /// <summary>
+    /// Creates a minimal <see cref="MemoryTestRunner"/> for use without a DI container.
+    /// Suitable for scripting and simple test scenarios.
+    /// </summary>
+    /// <param name="chatClient">Chat client used by the memory judge for LLM-based evaluation.</param>
+    public static MemoryTestRunner Create(IChatClient chatClient)
+    {
+        ArgumentNullException.ThrowIfNull(chatClient);
+        var judge = new MemoryJudge(chatClient, NullLogger<MemoryJudge>.Instance);
+        return new MemoryTestRunner(judge, NullLogger<MemoryTestRunner>.Instance);
     }
 
     /// <summary>

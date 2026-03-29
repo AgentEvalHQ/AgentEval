@@ -92,8 +92,10 @@ public class GroundednessMetric : IRAGMetric, ISafetyMetric
             """ + input + """
             
             AI RESPONSE:
+            <agent_response>
             """ + output + """
-            
+            </agent_response>
+
             Analyze the response for groundedness. For each claim:
             1. Is it supported by the context?
             2. Is it common knowledge that doesn't need citation?
@@ -218,8 +220,10 @@ public class CoherenceMetric : IRAGMetric, IQualityMetric
             """ + input + """
             
             RESPONSE:
+            <agent_response>
             """ + output + """
-            
+            </agent_response>
+
             Evaluate the coherence of this response.
             
             Respond with a JSON object:
@@ -326,8 +330,10 @@ public class FluencyMetric : IRAGMetric, IQualityMetric
             - Sentence structure variety
             
             TEXT TO EVALUATE:
+            <agent_response>
             """ + output + """
-            
+            </agent_response>
+
             Evaluate the fluency of this text.
             
             Respond with a JSON object:

@@ -625,7 +625,7 @@ Metrics can declare multiple categories via `MetricCategory` flags:
 public override MetricCategory Categories => 
     MetricCategory.RAG | 
     MetricCategory.RequiresContext | 
-    MetricCategory.LLMBased;
+    MetricCategory.LLMEvaluated;
 ```
 
 For complete metric documentation, see:

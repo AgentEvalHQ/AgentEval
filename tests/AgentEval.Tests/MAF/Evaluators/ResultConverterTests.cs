@@ -79,11 +79,23 @@ public class ResultConverterTests
     }
 
     [Theory]
+    // Mid-range representative values
     [InlineData(95, EvaluationRating.Exceptional)]
     [InlineData(80, EvaluationRating.Good)]
     [InlineData(55, EvaluationRating.Average)]
     [InlineData(30, EvaluationRating.Poor)]
-    [InlineData(10, EvaluationRating.Inconclusive)]
+    [InlineData(10, EvaluationRating.Poor)]   // was Inconclusive — fixed by B6
+    // Boundary values (T4 coverage)
+    [InlineData(100, EvaluationRating.Exceptional)]
+    [InlineData(90,  EvaluationRating.Exceptional)]
+    [InlineData(89,  EvaluationRating.Good)]
+    [InlineData(75,  EvaluationRating.Good)]
+    [InlineData(74,  EvaluationRating.Average)]
+    [InlineData(50,  EvaluationRating.Average)]
+    [InlineData(49,  EvaluationRating.Poor)]
+    [InlineData(25,  EvaluationRating.Poor)]
+    [InlineData(24,  EvaluationRating.Poor)]
+    [InlineData(0,   EvaluationRating.Poor)]
     public void ToMEAI_RatingMapping_IsCorrect(double score, EvaluationRating expectedRating)
     {
         var metricResult = score >= 70

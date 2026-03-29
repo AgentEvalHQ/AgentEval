@@ -1,4 +1,5 @@
 using AgentEval.Core;
+using AgentEval.Memory.Extensions;
 using AgentEval.Memory.Models;
 using Microsoft.Extensions.Logging;
 
@@ -8,7 +9,7 @@ namespace AgentEval.Memory.Metrics;
 /// Code-computed metric that evaluates the fidelity of memory compression/reduction processes.
 /// Measures how well important information is preserved when conversation history is condensed.
 /// </summary>
-public class MemoryReducerFidelityMetric : IMetric
+public class MemoryReducerFidelityMetric : IMemoryMetric
 {
     private readonly ILogger<MemoryReducerFidelityMetric> _logger;
 
@@ -25,50 +26,50 @@ public class MemoryReducerFidelityMetric : IMetric
     
     public decimal? EstimatedCostPerEvaluation => 0m; // Code-based computation
 
-    public async Task<MetricResult> EvaluateAsync(EvaluationContext context, CancellationToken cancellationToken = default)
+    public Task<MetricResult> EvaluateAsync(EvaluationContext context, CancellationToken cancellationToken = default)
     {
         try
         {
-            var memoryResult = context.GetProperty<MemoryEvaluationResult>("MemoryEvaluationResult");
+            var memoryResult = context.GetProperty<MemoryEvaluationResult>(MemoryEvaluationContextExtensions.MemoryResultKey);
             if (memoryResult == null)
             {
-                return MetricResult.Fail(Name, "MemoryEvaluationResult not found in evaluation context.");
+                return Task.FromResult(MetricResult.Fail(Name, "MemoryEvaluationResult not found in evaluation context."));
             }
 
             // Check if this was a reducer fidelity test
             var isReducerTest = memoryResult.Metadata?.ContainsKey("ReducerFidelityTest") == true;
             if (!isReducerTest)
             {
-                return await EvaluateGeneralFidelity(memoryResult);
+                return EvaluateGeneralFidelity(memoryResult);
             }
-            
-            return await EvaluateSpecificReducerFidelity(memoryResult);
+
+            return EvaluateSpecificReducerFidelity(memoryResult);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error evaluating reducer fidelity metric");
-            return MetricResult.Fail(Name, $"Error during reducer fidelity evaluation: {ex.Message}");
+            return Task.FromResult(MetricResult.Fail(Name, $"Error during reducer fidelity evaluation: {ex.Message}"));
         }
     }
 
-    private async Task<MetricResult> EvaluateGeneralFidelity(MemoryEvaluationResult memoryResult)
+    private Task<MetricResult> EvaluateGeneralFidelity(MemoryEvaluationResult memoryResult)
     {
         // For general scenarios, evaluate fidelity based on preservation of important facts
         var totalExpectedFacts = memoryResult.FoundFacts.Count + memoryResult.MissingFacts.Count;
-        
+
         if (totalExpectedFacts == 0)
         {
-            return MetricResult.Pass(Name, 100, "No facts to evaluate for reduction fidelity");
+            return Task.FromResult(MetricResult.Pass(Name, 100, "No facts to evaluate for reduction fidelity"));
         }
-        
+
         var preservationRate = (double)memoryResult.FoundFacts.Count / totalExpectedFacts * 100;
-        
+
         // Analyze fact criticality (if metadata available)
         var criticalFactsPreserved = AnalyzeCriticalFactPreservation(memoryResult);
-        
+
         var fidelityScore = CalculateGeneralFidelityScore(preservationRate, criticalFactsPreserved);
         var passed = fidelityScore >= 75;
-        
+
         var details = new Dictionary<string, object>
         {
             ["preservation_rate"] = preservationRate,
@@ -78,17 +79,17 @@ public class MemoryReducerFidelityMetric : IMetric
             ["critical_facts_preserved"] = criticalFactsPreserved,
             ["evaluation_type"] = "general"
         };
-        
+
         var explanation = $"General memory fidelity: {fidelityScore:F1}% " +
                          $"({memoryResult.FoundFacts.Count}/{totalExpectedFacts} facts preserved, " +
                          $"{criticalFactsPreserved}% critical facts retained)";
-        
-        return passed
+
+        return Task.FromResult(passed
             ? MetricResult.Pass(Name, fidelityScore, explanation, details)
-            : MetricResult.Fail(Name, explanation, fidelityScore, details);
+            : MetricResult.Fail(Name, explanation, fidelityScore, details));
     }
 
-    private async Task<MetricResult> EvaluateSpecificReducerFidelity(MemoryEvaluationResult memoryResult)
+    private Task<MetricResult> EvaluateSpecificReducerFidelity(MemoryEvaluationResult memoryResult)
     {
         // Extract reducer-specific metrics from metadata
         var compressionRatio = memoryResult.Metadata?.GetValueOrDefault("CompressionRatio") as double? ?? 0;
@@ -130,9 +131,9 @@ public class MemoryReducerFidelityMetric : IMetric
         _logger.LogDebug("Reducer fidelity evaluation: {Score}% (compression: {Ratio:F1}x, loss: {Loss:F1}%)",
             fidelityScore, compressionRatio, informationLoss);
         
-        return passed
+        return Task.FromResult(passed
             ? MetricResult.Pass(Name, fidelityScore, explanation, details)
-            : MetricResult.Fail(Name, explanation, fidelityScore, details);
+            : MetricResult.Fail(Name, explanation, fidelityScore, details));
     }
 
     private static double AnalyzeCriticalFactPreservation(MemoryEvaluationResult memoryResult)

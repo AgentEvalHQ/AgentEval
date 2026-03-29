@@ -20,6 +20,9 @@ indent_size = 4
 dotnet_sort_system_directives_first = true
 dotnet_separate_import_directive_groups = false
 
+# CA2254: logging message templates — not applicable for AgentEval's dynamic evaluation reasons
+dotnet_diagnostic.CA2254.severity = none
+
 # Use 'var' when type is apparent
 csharp_style_var_for_built_in_types = false:suggestion
 csharp_style_var_when_type_is_apparent = true:suggestion

@@ -1,6 +1,6 @@
 using AgentEval.Memory.Models;
 
-namespace AgentEval.Memory.Temporal;
+namespace AgentEval.Memory.Scenarios;
 
 /// <summary>
 /// Interface for creating temporal memory test scenarios.
@@ -17,7 +17,7 @@ public interface ITemporalMemoryScenarios
     MemoryTestScenario CreateTimePointMemoryTest(
         IEnumerable<DateTimeOffset> timePoints,
         int eventsPerTimepoint = 3);
-    
+
     /// <summary>
     /// Creates a scenario testing memory of temporal sequences and ordering.
     /// </summary>
@@ -27,14 +27,14 @@ public interface ITemporalMemoryScenarios
     MemoryTestScenario CreateSequenceMemoryTest(
         IEnumerable<MemoryFact> events,
         bool shuffleQueries = true);
-    
+
     /// <summary>
     /// Creates a scenario testing causal reasoning about temporal relationships.
     /// </summary>
     /// <param name="causalChains">Sequences of causally related events</param>
     /// <returns>Causal reasoning memory test scenario</returns>
     MemoryTestScenario CreateCausalReasoningTest(IEnumerable<IEnumerable<MemoryFact>> causalChains);
-    
+
     /// <summary>
     /// Creates a scenario with overlapping time windows and competing facts.
     /// </summary>
@@ -44,7 +44,7 @@ public interface ITemporalMemoryScenarios
     MemoryTestScenario CreateOverlappingTimeWindowTest(
         IEnumerable<MemoryFact> overlappingFacts,
         (DateTimeOffset start, DateTimeOffset end) timeWindow);
-    
+
     /// <summary>
     /// Creates a scenario testing memory degradation over time with different fact ages.
     /// </summary>

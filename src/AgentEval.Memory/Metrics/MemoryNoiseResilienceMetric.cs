@@ -1,4 +1,5 @@
 using AgentEval.Core;
+using AgentEval.Memory.Extensions;
 using AgentEval.Memory.Models;
 using Microsoft.Extensions.Logging;
 
@@ -8,7 +9,7 @@ namespace AgentEval.Memory.Metrics;
 /// LLM-evaluated metric that measures agent's ability to maintain memory accuracy
 /// despite noisy, distracting conversations.
 /// </summary>
-public class MemoryNoiseResilienceMetric : IMetric
+public class MemoryNoiseResilienceMetric : IMemoryMetric
 {
     private readonly ILogger<MemoryNoiseResilienceMetric> _logger;
 
@@ -17,36 +18,36 @@ public class MemoryNoiseResilienceMetric : IMetric
         _logger = logger;
     }
 
-    public string Name => "llm_memory_noise_resilience";
+    public string Name => "code_memory_noise_resilience";
     
     public string Description => "Evaluates memory retention quality in presence of distracting conversation";
     
-    public MetricCategory Categories => MetricCategory.LLMEvaluated | MetricCategory.Memory | MetricCategory.Conversation;
+    public MetricCategory Categories => MetricCategory.CodeBased | MetricCategory.Memory | MetricCategory.Conversation;
     
     public decimal? EstimatedCostPerEvaluation => 0.002m;
 
-    public async Task<MetricResult> EvaluateAsync(EvaluationContext context, CancellationToken cancellationToken = default)
+    public Task<MetricResult> EvaluateAsync(EvaluationContext context, CancellationToken cancellationToken = default)
     {
         try
         {
-            var memoryResult = context.GetProperty<MemoryEvaluationResult>("MemoryEvaluationResult");
+            var memoryResult = context.GetProperty<MemoryEvaluationResult>(MemoryEvaluationContextExtensions.MemoryResultKey);
             if (memoryResult == null)
             {
-                return MetricResult.Fail(Name, "MemoryEvaluationResult not found in evaluation context.");
+                return Task.FromResult(MetricResult.Fail(Name, "MemoryEvaluationResult not found in evaluation context."));
             }
 
             // Check if this was a noise resilience test (chatty/buried facts scenario)
             var isNoiseTest = IsNoiseResilienceScenario(memoryResult.ScenarioName, memoryResult.Metadata);
             if (!isNoiseTest)
             {
-                return MetricResult.Pass(Name, memoryResult.OverallScore, 
-                    "Non-noise scenario - using general memory score");
+                return Task.FromResult(MetricResult.Pass(Name, memoryResult.OverallScore,
+                    "Non-noise scenario - using general memory score"));
             }
-            
+
             // Calculate noise resilience score
             var resilienceScore = CalculateNoiseResilience(memoryResult);
             var passed = resilienceScore >= 70; // Higher threshold for noise resilience
-            
+
             var details = new Dictionary<string, object>
             {
                 ["resilience_score"] = resilienceScore,
@@ -55,23 +56,23 @@ public class MemoryNoiseResilienceMetric : IMetric
                 ["queries_passed"] = memoryResult.PassedQueries,
                 ["total_queries"] = memoryResult.TotalQueries
             };
-            
+
             // Add noise-specific analysis
             AnalyzeNoisePattern(memoryResult, details);
-            
+
             var explanation = BuildNoiseResilienceExplanation(memoryResult, resilienceScore, details);
-            
+
             _logger.LogDebug("Noise resilience evaluation: {Score}% (scenario: {Scenario})",
                 resilienceScore, memoryResult.ScenarioName);
-            
-            return passed
+
+            return Task.FromResult(passed
                 ? MetricResult.Pass(Name, resilienceScore, explanation, details)
-                : MetricResult.Fail(Name, explanation, resilienceScore, details);
+                : MetricResult.Fail(Name, explanation, resilienceScore, details));
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error evaluating noise resilience metric");
-            return MetricResult.Fail(Name, $"Error during noise resilience evaluation: {ex.Message}");
+            return Task.FromResult(MetricResult.Fail(Name, $"Error during noise resilience evaluation: {ex.Message}"));
         }
     }
 

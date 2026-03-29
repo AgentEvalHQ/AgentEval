@@ -62,7 +62,15 @@ public class AgentEvalMetricAdapter : MEAIIEvaluator
             ExpectedTools = AdditionalContextHelper.ExtractExpectedTools(additionalContext),
         };
 
-        var metricResult = await _metric.EvaluateAsync(context, cancellationToken);
+        MetricResult metricResult;
+        try
+        {
+            metricResult = await _metric.EvaluateAsync(context, cancellationToken);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            metricResult = MetricResult.Fail(_metric.Name, $"Metric execution failed: {ex.Message}");
+        }
 
         return ResultConverter.ToMEAI(metricResult);
     }

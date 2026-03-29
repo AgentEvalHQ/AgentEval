@@ -69,6 +69,8 @@ public static class ConversationExtractor
         IEnumerable<ChatMessage> messages,
         ChatResponse response)
     {
+        if (messages is null) return null;
+
         var report = new ToolUsageReport();
         var pendingCalls = new Dictionary<string, ToolCallRecord>();
         int order = 0;

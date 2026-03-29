@@ -4,7 +4,7 @@ namespace AgentEval.Memory.Models;
 /// Represents a single unit of information that an agent should remember.
 /// Facts can have temporal context and relationships to other facts.
 /// </summary>
-public class MemoryFact
+public record MemoryFact
 {
     /// <summary>
     /// The actual content/information that should be remembered.

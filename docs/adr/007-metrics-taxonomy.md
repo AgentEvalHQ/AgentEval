@@ -85,11 +85,14 @@ public enum MetricCategory
     Relevance = 1 << 9,
     Coherence = 1 << 10,
     Fluency = 1 << 11,
-    
+
     // Computation method
-    LLMBased = 1 << 12,
+    LLMEvaluated = 1 << 12,  // renamed from LLMBased
     EmbeddingBased = 1 << 13,
-    CodeBased = 1 << 14
+    CodeBased = 1 << 14,
+
+    // Domain extensions
+    Memory = 1 << 15
 }
 ```
 
@@ -114,7 +117,7 @@ Retain existing prefixes with formal definition:
 
 | Prefix | Meaning | Categories Flag | Example |
 |--------|---------|-----------------|---------|
-| `llm_` | Requires LLM API call | `MetricCategory.LLMBased` | `llm_faithfulness` |
+| `llm_` | Requires LLM API call | `MetricCategory.LLMEvaluated` | `llm_faithfulness` |
 | `code_` | Computed by code only | `MetricCategory.CodeBased` | `code_tool_success` |
 | `embed_` | Requires embedding API | `MetricCategory.EmbeddingBased` | `embed_answer_similarity` |
 
@@ -136,7 +139,7 @@ public interface IMetricRegistry
 
 A flags enum allows combining multiple categories:
 ```csharp
-Categories = MetricCategory.RAG | MetricCategory.RequiresContext | MetricCategory.LLMBased
+Categories = MetricCategory.RAG | MetricCategory.RequiresContext | MetricCategory.LLMEvaluated
 ```
 
 This is more flexible than a single category assignment.
@@ -179,7 +182,7 @@ The new categories and metadata are additive with default values. Existing metri
 ### 1. Attribute-Based Categorization
 
 ```csharp
-[MetricCategory(Category.RAG, Category.LLMBased)]
+[MetricCategory(Category.RAG, Category.LLMEvaluated)]
 public class FaithfulnessMetric : IRAGMetric { }
 ```
 

@@ -53,7 +53,7 @@ public static class ResultConverter
             >= 75 => EvaluationRating.Good,
             >= 50 => EvaluationRating.Average,
             >= 25 => EvaluationRating.Poor,
-            _ => EvaluationRating.Inconclusive
+            _ => EvaluationRating.Poor
         };
 
         numericMetric.Interpretation = new EvaluationMetricInterpretation(

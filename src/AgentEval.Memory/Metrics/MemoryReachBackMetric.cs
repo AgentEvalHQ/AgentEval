@@ -1,4 +1,5 @@
 using AgentEval.Core;
+using AgentEval.Memory.Extensions;
 using AgentEval.Memory.Models;
 using Microsoft.Extensions.Logging;
 
@@ -8,7 +9,7 @@ namespace AgentEval.Memory.Metrics;
 /// Code-computed metric that measures agent's ability to reach back into conversation history
 /// to recall information from earlier interactions.
 /// </summary>
-public class MemoryReachBackMetric : IMetric
+public class MemoryReachBackMetric : IMemoryMetric
 {
     private readonly ILogger<MemoryReachBackMetric> _logger;
 
@@ -25,47 +26,47 @@ public class MemoryReachBackMetric : IMetric
     
     public decimal? EstimatedCostPerEvaluation => 0m; // Code-based, no API costs
 
-    public async Task<MetricResult> EvaluateAsync(EvaluationContext context, CancellationToken cancellationToken = default)
+    public Task<MetricResult> EvaluateAsync(EvaluationContext context, CancellationToken cancellationToken = default)
     {
         try
         {
-            var memoryResult = context.GetProperty<MemoryEvaluationResult>("MemoryEvaluationResult");
+            var memoryResult = context.GetProperty<MemoryEvaluationResult>(MemoryEvaluationContextExtensions.MemoryResultKey);
             if (memoryResult == null)
             {
-                return MetricResult.Fail(Name, "MemoryEvaluationResult not found in evaluation context.");
+                return Task.FromResult(MetricResult.Fail(Name, "MemoryEvaluationResult not found in evaluation context."));
             }
 
             // Check if this was a reach-back evaluation
             var isReachBackTest = memoryResult.Metadata?.ContainsKey("ReachBackTest") == true;
             if (!isReachBackTest)
             {
-                return await EvaluateGeneralReachBack(memoryResult);
+                return EvaluateGeneralReachBack(memoryResult);
             }
-            
-            return await EvaluateSpecificReachBack(memoryResult);
+
+            return EvaluateSpecificReachBack(memoryResult);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error evaluating memory reach-back metric");
-            return MetricResult.Fail(Name, $"Error during reach-back evaluation: {ex.Message}");
+            return Task.FromResult(MetricResult.Fail(Name, $"Error during reach-back evaluation: {ex.Message}"));
         }
     }
 
-    private async Task<MetricResult> EvaluateGeneralReachBack(MemoryEvaluationResult memoryResult)
+    private Task<MetricResult> EvaluateGeneralReachBack(MemoryEvaluationResult memoryResult)
     {
         // For general scenarios, analyze conversation depth based on query success patterns
         var queryResults = memoryResult.QueryResults.ToArray();
-        
+
         if (queryResults.Length == 0)
         {
-            return MetricResult.Pass(Name, 0, "No queries to analyze for reach-back capability");
+            return Task.FromResult(MetricResult.Pass(Name, 0, "No queries to analyze for reach-back capability"));
         }
-        
+
         // Simple heuristic: if agent can answer multiple queries about established facts,
         // it demonstrates reach-back capability
         var successfulReachBack = queryResults.Count(r => r.Passed);
         var reachBackScore = (double)successfulReachBack / queryResults.Length * 100;
-        
+
         var details = new Dictionary<string, object>
         {
             ["queries_analyzed"] = queryResults.Length,
@@ -73,16 +74,16 @@ public class MemoryReachBackMetric : IMetric
             ["reachback_score"] = reachBackScore,
             ["analysis_type"] = "general"
         };
-        
+
         var explanation = $"General reach-back analysis: {successfulReachBack}/{queryResults.Length} " +
                          $"queries successfully retrieved information from memory ({reachBackScore:F1}%)";
-        
-        return reachBackScore >= 70
+
+        return Task.FromResult(reachBackScore >= 70
             ? MetricResult.Pass(Name, reachBackScore, explanation, details)
-            : MetricResult.Fail(Name, explanation, reachBackScore, details);
+            : MetricResult.Fail(Name, explanation, reachBackScore, details));
     }
 
-    private async Task<MetricResult> EvaluateSpecificReachBack(MemoryEvaluationResult memoryResult)
+    private Task<MetricResult> EvaluateSpecificReachBack(MemoryEvaluationResult memoryResult)
     {
         // For specific reach-back tests, use metadata to determine depth and degradation
         var maxDepth = memoryResult.Metadata?.GetValueOrDefault("MaxDepth") as int? ?? 0;
@@ -116,9 +117,9 @@ public class MemoryReachBackMetric : IMetric
         _logger.LogDebug("Reach-back evaluation: {Score}% (max depth: {Depth})", 
             reachBackScore, maxDepth);
         
-        return passed
+        return Task.FromResult(passed
             ? MetricResult.Pass(Name, reachBackScore, explanation, details)
-            : MetricResult.Fail(Name, explanation, reachBackScore, details);
+            : MetricResult.Fail(Name, explanation, reachBackScore, details));
     }
 
     private static double CalculateReachBackScore(

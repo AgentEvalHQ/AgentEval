@@ -2,10 +2,8 @@ using AgentEval.Core;
 using AgentEval.Memory.Engine;
 using AgentEval.Memory.Models;
 using AgentEval.Memory.Scenarios;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.AI;
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace AgentEval.Memory.Extensions;
 
@@ -185,6 +183,7 @@ public static class CanRememberExtensions
             var response = await agent.InvokeAsync(question, cancellationToken);
             return response.Text.Contains(fact, StringComparison.OrdinalIgnoreCase);
         }
+        catch (OperationCanceledException) { throw; }
         catch
         {
             return false;
@@ -247,7 +246,7 @@ public static class CanRememberExtensions
     }
 
     /// <summary>
-    /// Gets a memory test runner from DI or creates a minimal working default.
+    /// Gets a memory test runner from DI or creates a minimal working default via the factory.
     /// </summary>
     private static IMemoryTestRunner GetMemoryTestRunner(IServiceProvider? serviceProvider)
     {
@@ -256,17 +255,12 @@ public static class CanRememberExtensions
             var runner = serviceProvider.GetService<IMemoryTestRunner>();
             if (runner != null) return runner;
         }
-        
-        // Create minimal working default for scenarios without DI
-        var logger = serviceProvider?.GetService<ILogger<MemoryTestRunner>>() ?? NullLogger<MemoryTestRunner>.Instance;
-        var chatClient = serviceProvider?.GetService<IChatClient>() ?? 
-            throw new InvalidOperationException(
-                "No IChatClient available. Please provide IServiceProvider with registered IChatClient or " +
-                "use services.AddAgentEvalMemory() for proper dependency injection setup.");
-                
-        var judgeLogger = serviceProvider?.GetService<ILogger<MemoryJudge>>() ?? NullLogger<MemoryJudge>.Instance;
-        var judge = new MemoryJudge(chatClient, judgeLogger);
-        
-        return new MemoryTestRunner(judge, logger);
+
+        var chatClient = serviceProvider?.GetService<IChatClient>()
+            ?? throw new InvalidOperationException(
+                "No IChatClient available. Provide an IServiceProvider with IChatClient registered, " +
+                "or call services.AddAgentEvalMemory() for full dependency injection setup.");
+
+        return MemoryTestRunner.Create(chatClient);
     }
 }

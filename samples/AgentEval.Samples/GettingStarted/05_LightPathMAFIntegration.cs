@@ -33,10 +33,6 @@ public static class LightPathMAFIntegration
         // STEP 1: Create a MAF agent with tools
         // ════════════════════════════════════════════════════════════
 
-        var agent = CreateTravelAgent();
-        Console.WriteLine($"   🤖 Agent: {agent.Name}");
-        Console.WriteLine("   🔧 Tools: SearchFlights, SearchHotels\n");
-
         // ════════════════════════════════════════════════════════════
         // DEMO 1: agent.EvaluateAsync() — the one-liner
         // ════════════════════════════════════════════════════════════
@@ -51,9 +47,14 @@ public static class LightPathMAFIntegration
         Console.WriteLine();
 
         // This is REAL — it runs the agent, evaluates, and asserts
+        // Fresh agent per demo so MockTravelChatClient._callCount starts at 0
+        var agent1 = CreateTravelAgent();
+        Console.WriteLine($"   🤖 Agent: {agent1.Name}");
+        Console.WriteLine("   🔧 Tools: SearchFlights, SearchHotels\n");
+
         var queries = new[] { "Find flights from Seattle to Paris for next Friday" };
 
-        var results = await agent.EvaluateAsync(
+        var results = await agent1.EvaluateAsync(
             queries,
             AgentEvalEvaluators.Agentic(["SearchFlights"]));
 
@@ -91,7 +92,9 @@ public static class LightPathMAFIntegration
         Console.WriteLine();
 
         // Two evaluators — one result set per evaluator
-        var multiResults = await agent.EvaluateAsync(
+        // Fresh agent so _callCount starts at 0 (independent from Demo 1)
+        var agent2 = CreateTravelAgent();
+        var multiResults = await agent2.EvaluateAsync(
             queries,
             evaluators: new MEAIIEvaluator[]
             {
@@ -136,7 +139,8 @@ public static class LightPathMAFIntegration
             Console.WriteLine();
 
             Console.WriteLine("   🔄 Running Quality evaluation (4 LLM-as-judge metrics)...\n");
-            var qualityResults = await agent.EvaluateAsync(
+            var agent3 = CreateTravelAgent();
+            var qualityResults = await agent3.EvaluateAsync(
                 queries,
                 AgentEvalEvaluators.Quality(judgeClient));
 
@@ -165,7 +169,8 @@ public static class LightPathMAFIntegration
 
             // Safety
             Console.WriteLine("   🔄 Running Safety evaluation (3 LLM-as-judge metrics)...\n");
-            var safetyResults = await agent.EvaluateAsync(
+            var agent4 = CreateTravelAgent();
+            var safetyResults = await agent4.EvaluateAsync(
                 queries,
                 AgentEvalEvaluators.Safety(judgeClient));
 
@@ -342,7 +347,7 @@ public static class LightPathMAFIntegration
 
         public Task<ChatResponse> GetResponseAsync(
             IEnumerable<ChatMessage> chatMessages, ChatOptions? options = null,
-            CancellationToken cancellationToken = default)
+            CancellationToken _ = default)
         {
             _callCount++;
             if (_callCount == 1)
@@ -364,7 +369,7 @@ public static class LightPathMAFIntegration
 
         public IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(
             IEnumerable<ChatMessage> chatMessages, ChatOptions? options = null,
-            CancellationToken cancellationToken = default) => throw new NotImplementedException();
+            CancellationToken _ = default) => throw new NotImplementedException();
 
         public object? GetService(Type serviceType, object? key = null) => null;
         public void Dispose() { }

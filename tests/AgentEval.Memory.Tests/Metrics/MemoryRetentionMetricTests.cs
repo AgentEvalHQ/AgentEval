@@ -2,7 +2,6 @@ using AgentEval.Core;
 using AgentEval.Memory.Extensions;
 using AgentEval.Memory.Metrics;
 using AgentEval.Memory.Models;
-using AgentEval.Memory.Tests.Engine;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 
@@ -14,8 +13,7 @@ public class MemoryRetentionMetricTests
 
     public MemoryRetentionMetricTests()
     {
-        var chatClient = new FakeChatClient();
-        _metric = new MemoryRetentionMetric(chatClient, NullLogger<MemoryRetentionMetric>.Instance);
+        _metric = new MemoryRetentionMetric(NullLogger<MemoryRetentionMetric>.Instance);
     }
 
     [Fact]
@@ -74,7 +72,7 @@ public class MemoryRetentionMetricTests
     [Fact]
     public void Name_ReturnsExpectedValue()
     {
-        Assert.Equal("llm_memory_retention", _metric.Name);
+        Assert.Equal("code_memory_retention", _metric.Name);
     }
 
     private static MemoryEvaluationResult CreateResult(double score, string scenarioName = "Test")

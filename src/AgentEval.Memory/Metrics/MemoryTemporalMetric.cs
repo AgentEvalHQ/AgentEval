@@ -1,4 +1,5 @@
 using AgentEval.Core;
+using AgentEval.Memory.Extensions;
 using AgentEval.Memory.Models;
 using Microsoft.Extensions.Logging;
 
@@ -8,7 +9,7 @@ namespace AgentEval.Memory.Metrics;
 /// LLM-evaluated metric that measures agent's temporal memory capabilities - 
 /// understanding what was known when and temporal reasoning.
 /// </summary>
-public class MemoryTemporalMetric : IMetric
+public class MemoryTemporalMetric : IMemoryMetric
 {
     private readonly ILogger<MemoryTemporalMetric> _logger;
 
@@ -17,38 +18,38 @@ public class MemoryTemporalMetric : IMetric
         _logger = logger;
     }
 
-    public string Name => "llm_memory_temporal";
+    public string Name => "code_memory_temporal";
     
     public string Description => "Evaluates agent's temporal memory abilities - time-travel queries and temporal reasoning";
     
-    public MetricCategory Categories => MetricCategory.LLMEvaluated | MetricCategory.Memory;
+    public MetricCategory Categories => MetricCategory.CodeBased | MetricCategory.Memory;
     
     public decimal? EstimatedCostPerEvaluation => 0.003m; // Temporal evaluation may be more complex
 
-    public async Task<MetricResult> EvaluateAsync(EvaluationContext context, CancellationToken cancellationToken = default)
+    public Task<MetricResult> EvaluateAsync(EvaluationContext context, CancellationToken cancellationToken = default)
     {
         try
         {
-            var memoryResult = context.GetProperty<MemoryEvaluationResult>("MemoryEvaluationResult");
+            var memoryResult = context.GetProperty<MemoryEvaluationResult>(MemoryEvaluationContextExtensions.MemoryResultKey);
             if (memoryResult == null)
             {
-                return MetricResult.Fail(Name, "MemoryEvaluationResult not found in evaluation context.");
+                return Task.FromResult(MetricResult.Fail(Name, "MemoryEvaluationResult not found in evaluation context."));
             }
 
             // Check if this was a temporal evaluation
             var isTemporalEvaluation = memoryResult.Metadata?.ContainsKey("TemporalEvaluation") == true;
             if (!isTemporalEvaluation)
             {
-                return MetricResult.Pass(Name, 0, "Non-temporal scenario - metric not applicable");
+                return Task.FromResult(MetricResult.Pass(Name, 0, "Non-temporal scenario - metric not applicable"));
             }
-            
+
             // Extract temporal-specific metrics
             var temporalScore = memoryResult.Metadata?.GetValueOrDefault("TemporalScore") as double? ?? memoryResult.OverallScore;
             var temporalAccuracy = memoryResult.Metadata?.GetValueOrDefault("TemporalAccuracy") as double? ?? 0;
             var temporalQueryCount = memoryResult.Metadata?.GetValueOrDefault("TemporalQueryCount") as int? ?? 0;
-            
+
             var passed = temporalScore >= 75; // Slightly lower threshold for complex temporal reasoning
-            
+
             var details = new Dictionary<string, object>
             {
                 ["temporal_score"] = temporalScore,
@@ -57,31 +58,31 @@ public class MemoryTemporalMetric : IMetric
                 ["overall_score"] = memoryResult.OverallScore,
                 ["scenario_name"] = memoryResult.ScenarioName
             };
-            
+
             // Add time range information if available
             if (memoryResult.Metadata?.TryGetValue("TimeRange", out var timeRangeObj) == true)
             {
                 details["time_range"] = timeRangeObj;
             }
-            
+
             if (memoryResult.Metadata?.TryGetValue("QueryTimes", out var queryTimesObj) == true)
             {
                 details["query_times"] = queryTimesObj;
             }
-            
+
             var explanation = BuildTemporalExplanation(memoryResult, temporalScore, temporalAccuracy, temporalQueryCount);
-            
+
             _logger.LogDebug("Temporal memory evaluation: {Score}% (accuracy: {Accuracy}%, queries: {Count})",
                 temporalScore, temporalAccuracy, temporalQueryCount);
-            
-            return passed
+
+            return Task.FromResult(passed
                 ? MetricResult.Pass(Name, temporalScore, explanation, details)
-                : MetricResult.Fail(Name, explanation, temporalScore, details);
+                : MetricResult.Fail(Name, explanation, temporalScore, details));
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error evaluating temporal memory metric");
-            return MetricResult.Fail(Name, $"Error during temporal memory evaluation: {ex.Message}");
+            return Task.FromResult(MetricResult.Fail(Name, $"Error during temporal memory evaluation: {ex.Message}"));
         }
     }
 

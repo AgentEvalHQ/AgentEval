@@ -1,50 +1,47 @@
 using AgentEval.Core;
-using AgentEval.Memory.Engine;
+using AgentEval.Memory.Extensions;
 using AgentEval.Memory.Models;
-using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
 
 namespace AgentEval.Memory.Metrics;
 
 /// <summary>
-/// LLM-evaluated metric that measures how well an agent retains and recalls established facts.
-/// Uses structured evaluation to determine memory retention quality.
+/// Code-computed metric that measures how well an agent retains and recalls established facts.
+/// Reads scores from <see cref="MemoryEvaluationResult"/> populated by the memory engine.
 /// </summary>
-public class MemoryRetentionMetric : IMetric
+public class MemoryRetentionMetric : IMemoryMetric
 {
-    private readonly IChatClient _chatClient;
     private readonly ILogger<MemoryRetentionMetric> _logger;
 
-    public MemoryRetentionMetric(IChatClient chatClient, ILogger<MemoryRetentionMetric> logger)
+    public MemoryRetentionMetric(ILogger<MemoryRetentionMetric> logger)
     {
-        _chatClient = chatClient;
         _logger = logger;
     }
 
-    public string Name => "llm_memory_retention";
-    
-    public string Description => "Evaluates agent's ability to retain and recall established facts using LLM-based analysis";
-    
-    public MetricCategory Categories => MetricCategory.LLMEvaluated | MetricCategory.Memory;
+    public string Name => "code_memory_retention";
+
+    public string Description => "Evaluates agent's ability to retain and recall established facts";
+
+    public MetricCategory Categories => MetricCategory.CodeBased | MetricCategory.Memory;
     
     public decimal? EstimatedCostPerEvaluation => 0.002m; // ~$0.002 per evaluation
 
-    public async Task<MetricResult> EvaluateAsync(EvaluationContext context, CancellationToken cancellationToken = default)
+    public Task<MetricResult> EvaluateAsync(EvaluationContext context, CancellationToken cancellationToken = default)
     {
         try
         {
             // Extract memory evaluation result from context
-            var memoryResult = context.GetProperty<MemoryEvaluationResult>("MemoryEvaluationResult");
+            var memoryResult = context.GetProperty<MemoryEvaluationResult>(MemoryEvaluationContextExtensions.MemoryResultKey);
             if (memoryResult == null)
             {
-                return MetricResult.Fail(Name, "MemoryEvaluationResult not found in evaluation context. " +
-                    "This metric requires memory evaluation results.");
+                return Task.FromResult(MetricResult.Fail(Name, "MemoryEvaluationResult not found in evaluation context. " +
+                    "This metric requires memory evaluation results."));
             }
-            
+
             // Use memory evaluation scores as basis
             var score = memoryResult.OverallScore;
             var passed = score >= 80; // Default threshold for memory retention
-            
+
             var details = new Dictionary<string, object>
             {
                 ["overall_score"] = score,
@@ -59,20 +56,20 @@ public class MemoryRetentionMetric : IMetric
                 ["tokens_used"] = memoryResult.TokensUsed,
                 ["estimated_cost"] = memoryResult.EstimatedCost
             };
-            
+
             var explanation = BuildExplanation(memoryResult);
-            
+
             _logger.LogDebug("Memory retention evaluation: {Score}% ({Passed}/{Total} queries passed)",
                 score, memoryResult.PassedQueries, memoryResult.TotalQueries);
-            
-            return passed
+
+            return Task.FromResult(passed
                 ? MetricResult.Pass(Name, score, explanation, details)
-                : MetricResult.Fail(Name, explanation, score, details);
+                : MetricResult.Fail(Name, explanation, score, details));
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error evaluating memory retention metric");
-            return MetricResult.Fail(Name, $"Error during memory retention evaluation: {ex.Message}");
+            return Task.FromResult(MetricResult.Fail(Name, $"Error during memory retention evaluation: {ex.Message}"));
         }
     }
 

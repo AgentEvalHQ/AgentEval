@@ -301,6 +301,7 @@ public class MemoryBenchmarkRunner : IMemoryBenchmarkRunner
                             preset.ContextPressure.MaxTurns ?? 15).ToList();
                     }
                 }
+                catch (OperationCanceledException) { throw; }
                 catch { /* corpus not available — continue without pressure */ }
             }
 
@@ -630,6 +631,7 @@ public class MemoryBenchmarkRunner : IMemoryBenchmarkRunner
             var history = DataLoading.CorpusLoader.Load(corpusName, turnCount);
             injectable.InjectConversationHistory(history);
         }
+        catch (OperationCanceledException) { throw; }
         catch
         {
             // Fallback to SyntheticHistoryGenerator if corpus not available
