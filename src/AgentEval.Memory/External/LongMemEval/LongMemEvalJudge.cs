@@ -43,20 +43,45 @@ public class LongMemEvalJudge : IExternalBenchmarkJudge
                 new ChatOptions { Temperature = 0, MaxOutputTokens = 30 },
                 ct);
 
-            var responseText = response.Text?.Trim().ToLowerInvariant() ?? "";
-            var correct = responseText.Contains("yes");
+            var rawResponseText = response.Text ?? string.Empty;
+            var normalizedResponseText = rawResponseText.Trim();
+
+            // Determine correctness based on the first token of the first non-empty line.
+            string? firstLine = null;
+            if (!string.IsNullOrEmpty(normalizedResponseText))
+            {
+                var lineSeparators = new[] { '\r', '\n' };
+                var lines = normalizedResponseText.Split(lineSeparators, StringSplitOptions.RemoveEmptyEntries);
+                if (lines.Length > 0)
+                {
+                    firstLine = lines[0];
+                }
+            }
+
+            string? firstToken = null;
+            if (!string.IsNullOrEmpty(firstLine))
+            {
+                // Split on any whitespace to get the first token ("yes"/"no"/etc.).
+                var tokens = firstLine.Split((char[])null, StringSplitOptions.RemoveEmptyEntries);
+                if (tokens.Length > 0)
+                {
+                    firstToken = tokens[0];
+                }
+            }
+
+            var correct = string.Equals(firstToken, "yes", StringComparison.OrdinalIgnoreCase);
 
             var tokensUsed = (int)(response.Usage?.TotalTokenCount ?? 0);
 
             _logger.LogDebug(
                 "LongMemEval judge [{QuestionId}] type={Type} correct={Correct} raw=\"{Raw}\"",
-                question.QuestionId, question.QuestionType, correct, responseText);
+                question.QuestionId, question.QuestionType, correct, normalizedResponseText);
 
             return new ExternalJudgmentResult
             {
                 Correct = correct,
                 RawScore = correct ? 100 : 0,
-                Explanation = $"Judge said: {responseText}",
+                Explanation = $"Judge said: {normalizedResponseText}",
                 TokensUsed = tokensUsed
             };
         }
