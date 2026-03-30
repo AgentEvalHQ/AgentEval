@@ -15,10 +15,10 @@ public static class ExternalBaselineExtensions
     /// <summary>
     /// Converts an external benchmark result to a <see cref="MemoryBaseline"/> for storage and reporting.
     /// </summary>
-    /// <summary>
+    /// <remarks>
     /// Pentagon mapper that receives both per-type results and question-level detail
     /// (needed for cross-cutting dimensions like Abstention).
-    /// </summary>
+    /// </remarks>
     public delegate Dictionary<string, double> PentagonMapperWithQuestions(
         Dictionary<string, TypeResult> perTypeResults,
         IReadOnlyList<QuestionResult>? questionResults);
