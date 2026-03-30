@@ -23,13 +23,14 @@ public class BaselineComparer : IBaselineComparer
             .Distinct()
             .ToList();
 
-        // Build per-dimension comparisons
+        // Build per-dimension comparisons — include every baseline for every dimension,
+        // using 0 as the default for baselines that do not define a score for that dimension.
+        // This keeps per-dimension tables and radar charts consistent (no silent omissions).
         var dimensions = allDimensions.Select(dim => new DimensionComparison
         {
             DimensionName = dim,
             Scores = baselines
-                .Where(b => b.DimensionScores.ContainsKey(dim))
-                .ToDictionary(b => b.Id, b => b.DimensionScores[dim])
+                .ToDictionary(b => b.Id, b => b.DimensionScores.GetValueOrDefault(dim, 0))
         }).ToList();
 
         // Determine best baseline (highest overall score)

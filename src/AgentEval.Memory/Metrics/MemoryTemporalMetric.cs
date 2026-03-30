@@ -6,8 +6,9 @@ using Microsoft.Extensions.Logging;
 namespace AgentEval.Memory.Metrics;
 
 /// <summary>
-/// LLM-evaluated metric that measures agent's temporal memory capabilities - 
+/// Code-computed metric that measures agent's temporal memory capabilities - 
 /// understanding what was known when and temporal reasoning.
+/// Scores are derived from <see cref="MemoryEvaluationResult.Metadata"/> without any LLM calls.
 /// </summary>
 public class MemoryTemporalMetric : IMemoryMetric
 {
@@ -24,7 +25,7 @@ public class MemoryTemporalMetric : IMemoryMetric
     
     public MetricCategory Categories => MetricCategory.CodeBased | MetricCategory.Memory;
     
-    public decimal? EstimatedCostPerEvaluation => 0.003m; // Temporal evaluation may be more complex
+    public decimal? EstimatedCostPerEvaluation => null; // Code-computed — no LLM calls, no API cost
 
     public Task<MetricResult> EvaluateAsync(EvaluationContext context, CancellationToken cancellationToken = default)
     {
@@ -44,9 +45,14 @@ public class MemoryTemporalMetric : IMemoryMetric
             }
 
             // Extract temporal-specific metrics
-            var temporalScore = memoryResult.Metadata?.GetValueOrDefault("TemporalScore") as double? ?? memoryResult.OverallScore;
-            var temporalAccuracy = memoryResult.Metadata?.GetValueOrDefault("TemporalAccuracy") as double? ?? 0;
-            var temporalQueryCount = memoryResult.Metadata?.GetValueOrDefault("TemporalQueryCount") as int? ?? 0;
+            // Use pattern-matching unboxing because values stored in Dictionary<string,object>
+            // are boxed primitives; `as double?` returns null for boxed doubles.
+            var temporalScore = memoryResult.Metadata?.GetValueOrDefault("TemporalScore") is double ts
+                ? ts : memoryResult.OverallScore;
+            var temporalAccuracy = memoryResult.Metadata?.GetValueOrDefault("TemporalAccuracy") is double ta
+                ? ta : 0;
+            var temporalQueryCount = memoryResult.Metadata?.GetValueOrDefault("TemporalQueryCount") is int tq
+                ? tq : 0;
 
             var passed = temporalScore >= 75; // Slightly lower threshold for complex temporal reasoning
 

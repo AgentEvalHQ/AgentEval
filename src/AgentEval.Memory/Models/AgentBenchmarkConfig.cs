@@ -57,12 +57,16 @@ public class AgentBenchmarkConfig
 
     private string ComputeConfigurationId()
     {
+        var customConfigSegment = string.Join(";",
+            CustomConfig.OrderBy(kv => kv.Key).Select(kv => $"{kv.Key}={kv.Value}"));
         var key = string.Join("|",
             AgentName ?? "",
             ModelId ?? "",
+            ModelVersion ?? "",
             ReducerStrategy ?? "",
             MemoryProvider ?? "",
-            string.Join(",", ContextProviders.OrderBy(p => p)));
+            string.Join(",", ContextProviders.OrderBy(p => p)),
+            customConfigSegment);
         return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(key)))[..12];
     }
 }

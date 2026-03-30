@@ -135,6 +135,13 @@ public enum MetricCategory
     /// <summary>Computed via LLM-as-judge (API cost).</summary>
     LLMEvaluated = 1 << 12,
 
+    /// <summary>
+    /// Obsolete alias for <see cref="LLMEvaluated"/> kept for backward compatibility.
+    /// Use <see cref="LLMEvaluated"/> instead.
+    /// </summary>
+    [System.Obsolete("MetricCategory.LLMBased is obsolete. Use MetricCategory.LLMEvaluated instead.")]
+    LLMBased = LLMEvaluated,
+
     /// <summary>Computed via embeddings (low API cost).</summary>
     EmbeddingBased = 1 << 13,
 

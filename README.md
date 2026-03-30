@@ -459,7 +459,7 @@ See the **[Getting Started Guide](docs/getting-started.md)** for a complete walk
 
 ## Samples
 
-Run all 32 included samples — organised into 7 groups:
+Run the included samples, organised into groups:
 
 ```bash
 dotnet run --project samples/AgentEval.Samples
