@@ -85,7 +85,12 @@ public static class CorpusLoader
         var assembly = typeof(CorpusLoader).Assembly;
         return assembly.GetManifestResourceNames()
             .Where(n => n.Contains("corpus") && n.EndsWith(".json"))
-            .Select(n => Path.GetFileNameWithoutExtension(n))
+            .Select(n =>
+            {
+                var nameWithoutExtension = Path.GetFileNameWithoutExtension(n);
+                var parts = nameWithoutExtension.Split('.');
+                return parts[^1];
+            })
             .ToList();
     }
 
