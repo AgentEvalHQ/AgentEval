@@ -44,7 +44,7 @@ public class JsonFileBaselineStoreTests : IDisposable
         var baseline = CreateBaseline("Test");
         await _store.SaveAsync(baseline);
 
-        var files = Directory.GetFiles(Path.Combine(_tempDir, "TestAgent", "baselines"), "*.json");
+        var files = Directory.GetFiles(Path.Combine(_store.GetReportDirectory("TestAgent"), "baselines"), "*.json");
         Assert.Single(files);
 
         var content = await File.ReadAllTextAsync(files[0]);
@@ -59,7 +59,7 @@ public class JsonFileBaselineStoreTests : IDisposable
         var baseline = CreateBaseline("Test");
         await _store.SaveAsync(baseline);
 
-        var manifestPath = Path.Combine(_tempDir, "TestAgent", "manifest.json");
+        var manifestPath = Path.Combine(_store.GetReportDirectory("TestAgent"), "manifest.json");
         Assert.True(File.Exists(manifestPath));
 
         var content = await File.ReadAllTextAsync(manifestPath);
@@ -77,7 +77,7 @@ public class JsonFileBaselineStoreTests : IDisposable
         var baseline = CreateBaseline("Test");
         await _store.SaveAsync(baseline);
 
-        Assert.True(File.Exists(Path.Combine(_tempDir, "TestAgent", "report.html")));
+        Assert.True(File.Exists(Path.Combine(_store.GetReportDirectory("TestAgent"), "report.html")));
     }
 
     [Fact]
@@ -186,7 +186,7 @@ public class JsonFileBaselineStoreTests : IDisposable
         await _store.SaveAsync(CreateBaseline("V2", timestamp: DateTimeOffset.UtcNow.AddDays(-1)));
         await _store.SaveAsync(CreateBaseline("V3", timestamp: DateTimeOffset.UtcNow));
 
-        var manifestPath = Path.Combine(_tempDir, "TestAgent", "manifest.json");
+        var manifestPath = Path.Combine(_store.GetReportDirectory("TestAgent"), "manifest.json");
         var content = await File.ReadAllTextAsync(manifestPath);
         var manifest = JsonSerializer.Deserialize<BenchmarkManifest>(content, JsonFileBaselineStore.JsonOptions);
 
@@ -200,7 +200,7 @@ public class JsonFileBaselineStoreTests : IDisposable
         await _store.SaveAsync(CreateBaseline("Quick1", preset: "Quick"));
         await _store.SaveAsync(CreateBaseline("Full1", preset: "Full"));
 
-        var manifestPath = Path.Combine(_tempDir, "TestAgent", "manifest.json");
+        var manifestPath = Path.Combine(_store.GetReportDirectory("TestAgent"), "manifest.json");
         var content = await File.ReadAllTextAsync(manifestPath);
         var manifest = JsonSerializer.Deserialize<BenchmarkManifest>(content, JsonFileBaselineStore.JsonOptions);
 
@@ -272,7 +272,7 @@ public class JsonFileBaselineStoreTests : IDisposable
         var baseline = CreateBaseline("Test");
         await _store.SaveAsync(baseline);
 
-        var files = Directory.GetFiles(Path.Combine(_tempDir, "TestAgent", "baselines"), "*.json");
+        var files = Directory.GetFiles(Path.Combine(_store.GetReportDirectory("TestAgent"), "baselines"), "*.json");
         var content = await File.ReadAllTextAsync(files[0]);
 
         Assert.Contains("\"overall_score\"", content);

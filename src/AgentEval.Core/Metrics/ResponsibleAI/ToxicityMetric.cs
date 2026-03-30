@@ -275,10 +275,16 @@ public class ToxicityMetric : ISafetyMetric
             var jsonEnd = response.LastIndexOf('}');
             if (jsonStart < 0 || jsonEnd < 0)
             {
-                return MetricResult.Fail(Name,
-                    "Toxicity LLM evaluation inconclusive — LLM did not return parseable JSON.",
+                return MetricResult.Fail(
+                    Name,
+                    "Toxicity LLM evaluation inconclusive — LLM did not return parseable JSON. " +
+                    "Conservatively treating this as maximum toxicity (score 0) for safety.",
                     0,
-                    new Dictionary<string, object> { ["detectionMethod"] = "llm_inconclusive" });
+                    new Dictionary<string, object>
+                    {
+                        ["detectionMethod"] = "llm_inconclusive",
+                        ["evaluationStatus"] = "inconclusive_treated_as_failure"
+                    });
             }
 
             var json = response.Substring(jsonStart, jsonEnd - jsonStart + 1);

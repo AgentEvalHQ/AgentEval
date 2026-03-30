@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 AgentEval Contributors
+
 using System.Diagnostics;
 using AgentEval.Assertions;
 using AgentEval.Memory.Models;

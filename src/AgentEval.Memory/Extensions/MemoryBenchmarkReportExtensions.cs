@@ -32,6 +32,7 @@ public static class MemoryBenchmarkReportExtensions
     {
         ArgumentNullException.ThrowIfNull(result);
 
+        var now = DateTimeOffset.UtcNow;
         return new EvaluationReport
         {
             Name = result.BenchmarkName,
@@ -40,8 +41,8 @@ public static class MemoryBenchmarkReportExtensions
             FailedTests = result.CategoryResults.Count(c => !c.Skipped && c.Score < 70),
             SkippedTests = result.CategoryResults.Count(c => c.Skipped),
             OverallScore = result.OverallScore,
-            StartTime = DateTimeOffset.UtcNow - result.Duration,
-            EndTime = DateTimeOffset.UtcNow,
+            StartTime = now - result.Duration,
+            EndTime = now,
             Agent = (agentName != null || modelName != null)
                 ? new AgentInfo { Name = agentName, Model = modelName }
                 : null,

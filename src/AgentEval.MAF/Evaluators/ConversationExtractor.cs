@@ -100,7 +100,7 @@ public static class ConversationExtractor
                 }
                 else if (content is FunctionResultContent result)
                 {
-                    var callId = result.CallId ?? "";
+                    var callId = result.CallId ?? $"result-{Guid.NewGuid():N}";
                     if (pendingCalls.TryGetValue(callId, out var pending))
                     {
                         pending.Result = result.Result;
