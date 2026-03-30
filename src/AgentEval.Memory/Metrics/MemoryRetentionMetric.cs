@@ -24,7 +24,7 @@ public class MemoryRetentionMetric : IMemoryMetric
 
     public MetricCategory Categories => MetricCategory.CodeBased | MetricCategory.Memory;
     
-    public decimal? EstimatedCostPerEvaluation => 0.002m; // ~$0.002 per evaluation
+    public decimal? EstimatedCostPerEvaluation => null; // Code-computed — reads precomputed values, no API cost
 
     public Task<MetricResult> EvaluateAsync(EvaluationContext context, CancellationToken cancellationToken = default)
     {

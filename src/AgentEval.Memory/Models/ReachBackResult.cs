@@ -34,7 +34,7 @@ public class ReachBackResult
         .FirstOrDefault();
 
     /// <summary>
-    /// Overall score (0-100) based on the proportion of depths that passed.
+    /// Overall score (0-100) as the average of per-depth raw scores.
     /// </summary>
     public double OverallScore => DepthResults.Count > 0
         ? DepthResults.Average(d => d.Score)

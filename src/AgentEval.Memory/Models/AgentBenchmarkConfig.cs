@@ -3,6 +3,7 @@
 
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 
 namespace AgentEval.Memory.Models;
 
@@ -52,21 +53,27 @@ public class AgentBenchmarkConfig
     /// Deterministic 12-char hex hash of memory-affecting properties.
     /// Same config produces the same ID every time.
     /// Reports use this to route: same ID = timeline (progression), different ID = radar (comparison).
+    /// The value is computed once and cached because all inputs are init-only.
     /// </summary>
-    public string ConfigurationId => ComputeConfigurationId();
+    public string ConfigurationId => _configurationId ??= ComputeConfigurationId();
+
+    private string? _configurationId;
 
     private string ComputeConfigurationId()
     {
-        var customConfigSegment = string.Join(";",
-            CustomConfig.OrderBy(kv => kv.Key).Select(kv => $"{kv.Key}={kv.Value}"));
-        var key = string.Join("|",
-            AgentName ?? "",
-            ModelId ?? "",
-            ModelVersion ?? "",
-            ReducerStrategy ?? "",
-            MemoryProvider ?? "",
-            string.Join(",", ContextProviders.OrderBy(p => p)),
-            customConfigSegment);
-        return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(key)))[..12];
+        // Use a JSON-array payload so separator characters inside values cannot cause collisions.
+        var payload = JsonSerializer.Serialize(new object?[]
+        {
+            AgentName,
+            ModelId,
+            ModelVersion,
+            ReducerStrategy,
+            MemoryProvider,
+            ContextProviders.OrderBy(p => p).ToArray(),
+            CustomConfig.OrderBy(kv => kv.Key)
+                        .Select(kv => new[] { kv.Key, kv.Value })
+                        .ToArray()
+        });
+        return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(payload)))[..12];
     }
 }

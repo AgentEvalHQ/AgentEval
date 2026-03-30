@@ -120,14 +120,15 @@ public static class LongMemEvalDataLoader
             }
         }
 
-        // Sample from each remaining group
+        // Sample from each remaining group using Fisher–Yates partial shuffle (O(take), not O(n log n))
         var result = new List<LongMemEvalEntry>();
         foreach (var group in groups)
         {
             if (!perType.TryGetValue(group.Key, out var take) || take <= 0)
                 continue;
-            var shuffled = group.OrderBy(_ => rng.Next()).Take(take);
-            result.AddRange(shuffled);
+            var pool = group.ToList();
+            FisherYatesShuffle(pool, take, rng);
+            result.AddRange(pool.Take(take));
         }
 
         return result;
@@ -137,6 +138,24 @@ public static class LongMemEvalDataLoader
         List<LongMemEvalEntry> entries, int maxQuestions, int? seed)
     {
         var rng = seed.HasValue ? new Random(seed.Value) : Random.Shared;
-        return entries.OrderBy(_ => rng.Next()).Take(maxQuestions).ToList();
+        var pool = entries.ToList();
+        FisherYatesShuffle(pool, maxQuestions, rng);
+        return pool.Take(maxQuestions).ToList();
+    }
+
+    /// <summary>
+    /// Performs a partial Fisher–Yates shuffle in-place, placing <paramref name="count"/>
+    /// randomly-selected elements at the front of <paramref name="list"/>.
+    /// O(count) time, O(1) extra space — avoids the O(n log n) sort-based shuffle anti-pattern.
+    /// </summary>
+    private static void FisherYatesShuffle(List<LongMemEvalEntry> list, int count, Random rng)
+    {
+        var n = list.Count;
+        var limit = Math.Min(count, n);
+        for (var i = 0; i < limit; i++)
+        {
+            var j = rng.Next(i, n);
+            (list[i], list[j]) = (list[j], list[i]);
+        }
     }
 }

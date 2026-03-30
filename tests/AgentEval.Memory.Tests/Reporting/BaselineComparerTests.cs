@@ -151,10 +151,13 @@ public class BaselineComparerTests
         // Should still have all 5 dimensions (bl-1 has them all)
         Assert.Equal(5, comparison.Dimensions.Count);
 
-        // Persistence dimension should only have bl-1's score
+        // Every dimension should include ALL baselines — baselines missing a dimension get score 0.
+        // This keeps per-dimension tables and radar charts consistent (no silent omissions).
         var persistence = comparison.Dimensions.First(d => d.DimensionName == "Persistence");
-        Assert.Single(persistence.Scores);
+        Assert.Equal(2, persistence.Scores.Count);
         Assert.True(persistence.Scores.ContainsKey("bl-1"));
+        Assert.True(persistence.Scores.ContainsKey("bl-2"));
+        Assert.Equal(0, persistence.Scores["bl-2"]); // bl-2 removed this dimension → defaults to 0
     }
 
     // --- Helpers ---

@@ -12,14 +12,14 @@ namespace AgentEval.NuGetConsumer.Tests;
 internal static class TestSetup
 {
     /// <summary>
-    /// Throws if Azure OpenAI credentials are not configured.
-    /// Call at the start of every test to fail fast with a clear message
-    /// instead of getting cryptic NullReferenceExceptions mid-test.
+    /// Skips the current test when Azure OpenAI credentials are not configured,
+    /// keeping <c>dotnet test</c> green in environments without secrets (local dev, default CI).
+    /// Tests are only executed when all three required environment variables are present.
     /// </summary>
     internal static void EnsureConfigured()
     {
         if (!Config.IsConfigured)
-            throw new InvalidOperationException(
+            throw Xunit.Sdk.SkipException.ForSkip(
                 "Azure OpenAI not configured. " +
                 "Set AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_API_KEY, and AZURE_OPENAI_DEPLOYMENT environment variables.");
     }
