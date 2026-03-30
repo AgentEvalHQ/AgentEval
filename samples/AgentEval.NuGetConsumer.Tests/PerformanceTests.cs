@@ -16,11 +16,10 @@ namespace AgentEval.NuGetConsumer.Tests;
 /// </summary>
 public class PerformanceTests
 {
-    [Fact]
+    [SkipIfNotConfiguredFact]
     [Trait("Category", "Integration")]
     public async Task SearchRequest_ShouldMeetLatencyAndTokenSLA()
     {
-        TestSetup.EnsureConfigured();
 
         var agent = new MAFAgentAdapter(AgentFactory.CreateTravelAIAgent(useMock: false));
         var harness = new MAFEvaluationHarness(verbose: false);
@@ -60,11 +59,10 @@ public class PerformanceTests
             .HaveNoErrors();
     }
 
-    [Fact]
+    [SkipIfNotConfiguredFact]
     [Trait("Category", "Integration")]
     public async Task FullBookingFlow_ShouldMeetCostBudget()
     {
-        TestSetup.EnsureConfigured();
 
         var agent = new MAFAgentAdapter(AgentFactory.CreateTravelAIAgent(useMock: false));
         var harness = new MAFEvaluationHarness(verbose: false);

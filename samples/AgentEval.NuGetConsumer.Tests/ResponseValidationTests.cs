@@ -16,11 +16,10 @@ namespace AgentEval.NuGetConsumer.Tests;
 /// </summary>
 public class ResponseValidationTests
 {
-    [Fact]
+    [SkipIfNotConfiguredFact]
     [Trait("Category", "Integration")]
     public async Task SearchResponse_ShouldMeetQualityCriteria()
     {
-        TestSetup.EnsureConfigured();
 
         var agent = new MAFAgentAdapter(AgentFactory.CreateTravelAIAgent(useMock: false));
         var evaluatorClient = AgentFactory.CreateEvaluatorChatClient();
@@ -67,11 +66,10 @@ public class ResponseValidationTests
             .HaveCalledTool("SearchFlights", because: "search was requested");
     }
 
-    [Fact]
+    [SkipIfNotConfiguredFact]
     [Trait("Category", "Integration")]
     public async Task VagueRequest_ShouldHandleGracefully_WithoutHallucination()
     {
-        TestSetup.EnsureConfigured();
 
         var agent = new MAFAgentAdapter(AgentFactory.CreateTravelAIAgent(useMock: false));
         var evaluatorClient = AgentFactory.CreateEvaluatorChatClient();

@@ -17,11 +17,10 @@ namespace AgentEval.NuGetConsumer.Tests;
 /// </summary>
 public class EndToEndBookingTests
 {
-    [Fact]
+    [SkipIfNotConfiguredFact]
     [Trait("Category", "Integration")]
     public async Task CompleteBookingFlow_ShouldPassAllEvaluations()
     {
-        TestSetup.EnsureConfigured();
 
         var agent = new MAFAgentAdapter(AgentFactory.CreateTravelAIAgent(useMock: false));
         var evaluatorClient = AgentFactory.CreateEvaluatorChatClient();

@@ -16,11 +16,10 @@ namespace AgentEval.NuGetConsumer.Tests;
 /// </summary>
 public class ToolSelectionTests
 {
-    [Fact]
+    [SkipIfNotConfiguredFact]
     [Trait("Category", "Integration")]
     public async Task SearchRequest_ShouldCallSearchFlights_AndNotBook()
     {
-        TestSetup.EnsureConfigured();
 
         var agent = new MAFAgentAdapter(AgentFactory.CreateTravelAIAgent(useMock: false));
         var harness = new MAFEvaluationHarness(verbose: false);
@@ -51,11 +50,10 @@ public class ToolSelectionTests
             .NeverCallTool("SendConfirmation", because: "no booking was made");
     }
 
-    [Fact]
+    [SkipIfNotConfiguredFact]
     [Trait("Category", "Integration")]
     public async Task BookingRequest_ShouldFollowSearchBookConfirmOrder()
     {
-        TestSetup.EnsureConfigured();
 
         var agent = new MAFAgentAdapter(AgentFactory.CreateTravelAIAgent(useMock: false));
         var harness = new MAFEvaluationHarness(verbose: false);

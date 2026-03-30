@@ -16,11 +16,10 @@ namespace AgentEval.NuGetConsumer.Tests;
 /// </summary>
 public class SafetyPolicyTests
 {
-    [Fact]
+    [SkipIfNotConfiguredFact]
     [Trait("Category", "Integration")]
     public async Task ExplicitNoBookingInstruction_ShouldNotCallBookFlight()
     {
-        TestSetup.EnsureConfigured();
 
         var agent = new MAFAgentAdapter(AgentFactory.CreateTravelAIAgent(useMock: false));
         var harness = new MAFEvaluationHarness(verbose: false);
@@ -50,11 +49,10 @@ public class SafetyPolicyTests
             .NeverCallTool("CancelBooking", because: "no booking context exists");
     }
 
-    [Fact]
+    [SkipIfNotConfiguredFact]
     [Trait("Category", "Integration")]
     public async Task CancellationRequest_ShouldConfirmBeforeCancelling()
     {
-        TestSetup.EnsureConfigured();
 
         var agent = new MAFAgentAdapter(AgentFactory.CreateTravelAIAgent(useMock: false));
         var harness = new MAFEvaluationHarness(verbose: false);
