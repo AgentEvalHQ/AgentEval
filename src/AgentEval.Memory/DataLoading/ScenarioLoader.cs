@@ -79,13 +79,19 @@ public static class ScenarioLoader
 
     /// <summary>
     /// Lists available scenario names from embedded resources.
+    /// Returns short scenario ids (e.g., "basic-retention") rather than full manifest names.
     /// </summary>
     public static IReadOnlyList<string> ListAvailable()
     {
         var assembly = typeof(ScenarioLoader).Assembly;
         return assembly.GetManifestResourceNames()
             .Where(n => n.Contains("scenarios") && n.EndsWith(".json"))
-            .Select(n => Path.GetFileNameWithoutExtension(n))
+            .Select(n =>
+            {
+                var withoutExtension = Path.GetFileNameWithoutExtension(n);
+                var lastDot = withoutExtension.LastIndexOf('.');
+                return lastDot >= 0 ? withoutExtension[(lastDot + 1)..] : withoutExtension;
+            })
             .ToList();
     }
 
