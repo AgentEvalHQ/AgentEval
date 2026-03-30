@@ -26,7 +26,7 @@
 | 13 | LOW-2: External Benchmark Interfaces | Could move to Abstractions for cross-module use | — | — | Backlog — extract when concrete use case exists |
 | 14 | LOW-3: Parallel Export Interfaces | `IResultExporter` vs `IReportExporter` parallel | — | — | Backlog — intentional design for incompatible data types |
 | 15 | NEW-1: Empty Folder Cleanup | `samples/.../TestHelpers/` empty directory | 🟢 100% | ✅ | Deleted |
-| 16 | NEW-2: CanRememberExtensions Tests | 6 public methods with zero test coverage | — | — | Follow-up issue — test gap for convenience API |
+| 16 | NEW-2: CanRememberExtensions Tests | 6 public methods with zero test coverage | 🟢 100% | ✅ | 17 tests added, all passing |
 
 ---
 
@@ -44,7 +44,7 @@
 
 **Backlog (items 12–14):** Potential future improvements that follow YAGNI — extract when a concrete need arises.
 
-**New findings (items 15–16):** Empty folder cleanup (trivial, done) and a test coverage gap for `CanRememberExtensions` (6 public untested methods — follow-up).
+**New findings (items 15–16):** Empty folder cleanup (done) and `CanRememberExtensions` test coverage gap (17 tests added, all passing).
 
 ---
 
@@ -341,21 +341,18 @@ Empty directory with no files. Deleted.
 
 ---
 
-### 🆕 NEW-2: `CanRememberExtensions` Test Coverage Gap
+### 🆕 NEW-2: `CanRememberExtensions` Test Coverage Gap ✅ FIXED
 
 **File:** [Extensions/CanRememberExtensions.cs](src/AgentEval.Memory/Extensions/CanRememberExtensions.cs)
 
-**Problem:** 6 public extension methods with zero dedicated test coverage:
-- `CanRememberAsync(agent, fact, ...)` — single fact test
-- `CanRememberAsync(agent, facts, ...)` — multi-fact test
-- `CanRememberAsync(agent, factsAndQueries, ...)` — custom queries test
-- `CanRememberThroughNoiseAsync(...)` — noise resilience test
-- `CanRememberAcrossSessionsAsync(...)` — cross-session test
-- `QuickMemoryCheckAsync(...)` — two overloads for string-matching check
+**Problem:** 6 public extension methods with zero dedicated test coverage.
 
-All other Memory extensions (`ServiceCollection`, `Context`, `Reporting`) have dedicated test files.
-
-**Recommendation:** File as follow-up issue. These are convenience APIs that delegate to tested components (`MemoryTestRunner`, `MemoryScenarios`), so the risk is limited, but the public API contract should have explicit tests.
+**Fix applied:** Created [CanRememberExtensionsTests.cs](tests/AgentEval.Memory.Tests/Extensions/CanRememberExtensionsTests.cs) with 17 tests covering:
+- `CanRememberAsync` — single fact, auto-generated question, multiple facts, custom queries
+- `CanRememberThroughNoiseAsync` — noise resilience path
+- `CanRememberAcrossSessionsAsync` — resettable agent happy path + non-resettable guard + error message content
+- `QuickMemoryCheckAsync` — fact present/absent, case insensitivity, agent throws, cancellation, multiple facts, custom question
+- `GetMemoryTestRunner` — null service provider error, DI-registered runner preference
 
 ---
 
