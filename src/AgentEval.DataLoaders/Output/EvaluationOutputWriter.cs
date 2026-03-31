@@ -2,6 +2,7 @@
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 
+using System.Globalization;
 using System.Text;
 using System.Text.Json;
 using AgentEval.Core;
@@ -191,11 +192,11 @@ public class EvaluationOutputWriter
     {
         _output.WriteLine();
         _output.WriteLine("⏱️  Performance:");
-        _output.WriteLine($"   Total Duration: {performance.TotalDuration.TotalMilliseconds:F0}ms");
+        _output.WriteLine(string.Create(CultureInfo.InvariantCulture, $"   Total Duration: {performance.TotalDuration.TotalMilliseconds:F0}ms"));
 
         if (performance.TimeToFirstToken.HasValue)
         {
-            _output.WriteLine($"   Time to First Token: {performance.TimeToFirstToken.Value.TotalMilliseconds:F0}ms");
+            _output.WriteLine(string.Create(CultureInfo.InvariantCulture, $"   Time to First Token: {performance.TimeToFirstToken.Value.TotalMilliseconds:F0}ms"));
         }
 
         if (performance.TotalTokens > 0)
@@ -205,7 +206,7 @@ public class EvaluationOutputWriter
 
         if (performance.EstimatedCost > 0)
         {
-            _output.WriteLine($"   Est. Cost: ${performance.EstimatedCost:F4}");
+            _output.WriteLine(string.Create(CultureInfo.InvariantCulture, $"   Est. Cost: ${performance.EstimatedCost:F4}"));
         }
     }
 
@@ -231,7 +232,7 @@ public class EvaluationOutputWriter
         foreach (var call in sortedCalls)
         {
             var statusIcon = !call.HasError ? "✓" : "✗";
-            var duration = call.Duration?.TotalMilliseconds.ToString("F0") + "ms" ?? "?ms";
+            var duration = call.Duration?.TotalMilliseconds.ToString("F0", CultureInfo.InvariantCulture) + "ms" ?? "?ms";
             
             var line = new StringBuilder();
             line.Append($"   {statusIcon} [{call.Order}] {call.Name} ({duration})");

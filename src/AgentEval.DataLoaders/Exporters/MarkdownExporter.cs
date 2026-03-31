@@ -2,6 +2,7 @@
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 
+using System.Globalization;
 using System.Text;
 using AgentEval.Core;
 using AgentEval.Models;
@@ -50,8 +51,8 @@ public class MarkdownExporter : IResultExporter
         sb.AppendLine("## 🤖 AgentEval Results");
         sb.AppendLine();
         sb.AppendLine($"**Status:** {statusEmoji} {statusText}");
-        sb.AppendLine($"**Score:** {report.OverallScore:F1}/100");
-        sb.AppendLine($"**Tests:** {report.PassedTests}/{report.TotalTests} passed ({report.PassRate:F0}%)");
+        sb.AppendLine(string.Create(CultureInfo.InvariantCulture, $"**Score:** {report.OverallScore:F1}/100"));
+        sb.AppendLine(string.Create(CultureInfo.InvariantCulture, $"**Tests:** {report.PassedTests}/{report.TotalTests} passed ({report.PassRate:F0}%)"));
         sb.AppendLine($"**Duration:** {FormatDuration(report.Duration)}");
         
         if (report.Agent?.Model != null)
@@ -76,7 +77,7 @@ public class MarkdownExporter : IResultExporter
             var status = test.Skipped ? "⏭️" : (test.Passed ? "✅" : "❌");
             var time = FormatDuration(TimeSpan.FromMilliseconds(test.DurationMs));
             
-            sb.AppendLine($"| {EscapeMarkdown(test.Name)} | {test.Score:F1} | {status} | {time} |");
+            sb.AppendLine(string.Create(CultureInfo.InvariantCulture, $"| {EscapeMarkdown(test.Name)} | {test.Score:F1} | {status} | {time} |"));
         }
         
         // Failures section
@@ -89,7 +90,7 @@ public class MarkdownExporter : IResultExporter
             
             foreach (var failure in failures)
             {
-                sb.AppendLine($"**{EscapeMarkdown(failure.Name)}** (Score: {failure.Score:F1}/100)");
+                sb.AppendLine(string.Create(CultureInfo.InvariantCulture, $"**{EscapeMarkdown(failure.Name)}** (Score: {failure.Score:F1}/100)"));
                 if (!string.IsNullOrEmpty(failure.Error))
                 {
                     sb.AppendLine($"- {EscapeMarkdown(failure.Error)}");
@@ -131,7 +132,7 @@ public class MarkdownExporter : IResultExporter
                 sb.Append($"| {EscapeMarkdown(test.Name)} |");
                 foreach (var metric in metricNames)
                 {
-                    var score = test.MetricScores.TryGetValue(metric, out var s) ? $"{s:F1}" : "-";
+                    var score = test.MetricScores.TryGetValue(metric, out var s) ? s.ToString("F1", CultureInfo.InvariantCulture) : "-";
                     sb.Append($" {score} |");
                 }
                 sb.AppendLine();
@@ -152,10 +153,10 @@ public class MarkdownExporter : IResultExporter
     private static string FormatDuration(TimeSpan duration)
     {
         if (duration.TotalMilliseconds < 1000)
-            return $"{duration.TotalMilliseconds:F0}ms";
+            return string.Create(CultureInfo.InvariantCulture, $"{duration.TotalMilliseconds:F0}ms");
         if (duration.TotalSeconds < 60)
-            return $"{duration.TotalSeconds:F1}s";
-        return $"{duration.TotalMinutes:F1}m";
+            return string.Create(CultureInfo.InvariantCulture, $"{duration.TotalSeconds:F1}s");
+        return string.Create(CultureInfo.InvariantCulture, $"{duration.TotalMinutes:F1}m");
     }
 
     private static string EscapeMarkdown(string text)

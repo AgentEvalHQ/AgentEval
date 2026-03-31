@@ -430,7 +430,7 @@ public class TaskCompletionResult
     
     public override string ToString() =>
         $"Task Completion: {AgentName}\n" +
-        $"  Passed: {PassedTests}/{TotalTests} | Avg Score: {AverageScore:F1}/100";
+        $"  Passed: {PassedTests}/{TotalTests} | Avg Score: {AverageScore.ToString("F1", CultureInfo.InvariantCulture)}/100";
 }
 
 public class TaskCompletionTestResult

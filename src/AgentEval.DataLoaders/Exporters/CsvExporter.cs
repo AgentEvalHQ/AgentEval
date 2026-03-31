@@ -2,6 +2,7 @@
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 
+using System.Globalization;
 using System.Text;
 using AgentEval.Core;
 using AgentEval.Models;
@@ -47,7 +48,7 @@ public class CsvExporter : IResultExporter
             var row = $"{EscapeCsvField(report.RunId)}," +
                      $"{EscapeCsvField(result.Name)}," +
                      $"{EscapeCsvField(result.Category ?? "")}," +
-                     $"{result.Score:F2}," +
+                     $"{result.Score.ToString("F2", CultureInfo.InvariantCulture)}," +
                      $"{result.Passed}," +
                      $"{result.Skipped}," +
                      $"{result.DurationMs}," +
@@ -58,7 +59,7 @@ public class CsvExporter : IResultExporter
             // Append metric score values
             foreach (var metric in metricNames)
             {
-                var value = result.MetricScores.TryGetValue(metric, out var s) ? s.ToString("F2") : "";
+                var value = result.MetricScores.TryGetValue(metric, out var s) ? s.ToString("F2", CultureInfo.InvariantCulture) : "";
                 row += $",{value}";
             }
             

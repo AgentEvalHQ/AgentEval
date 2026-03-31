@@ -2,6 +2,7 @@
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 
+using System.Globalization;
 using AgentEval.Core;
 using AgentEval.Models;
 
@@ -403,9 +404,9 @@ public class LatencyBenchmarkResult
     public override string ToString() =>
         $"Latency Benchmark: {AgentName}\n" +
         $"  Iterations: {SuccessfulIterations}/{Iterations}\n" +
-        $"  Mean: {MeanLatency.TotalMilliseconds:F0}ms | Min: {MinLatency.TotalMilliseconds:F0}ms | Max: {MaxLatency.TotalMilliseconds:F0}ms\n" +
-        $"  P50: {P50Latency.TotalMilliseconds:F0}ms | P90: {P90Latency.TotalMilliseconds:F0}ms | P99: {P99Latency.TotalMilliseconds:F0}ms" +
-        (MeanTimeToFirstToken.HasValue ? $"\n  Mean TTFT: {MeanTimeToFirstToken.Value.TotalMilliseconds:F0}ms" : "");
+        string.Create(CultureInfo.InvariantCulture, $"  Mean: {MeanLatency.TotalMilliseconds:F0}ms | Min: {MinLatency.TotalMilliseconds:F0}ms | Max: {MaxLatency.TotalMilliseconds:F0}ms\n") +
+        string.Create(CultureInfo.InvariantCulture, $"  P50: {P50Latency.TotalMilliseconds:F0}ms | P90: {P90Latency.TotalMilliseconds:F0}ms | P99: {P99Latency.TotalMilliseconds:F0}ms") +
+        (MeanTimeToFirstToken.HasValue ? string.Create(CultureInfo.InvariantCulture, $"\n  Mean TTFT: {MeanTimeToFirstToken.Value.TotalMilliseconds:F0}ms") : "");
 }
 
 /// <summary>
@@ -425,9 +426,9 @@ public class ThroughputBenchmarkResult
     
     public override string ToString() =>
         $"Throughput Benchmark: {AgentName}\n" +
-        $"  Duration: {Duration.TotalSeconds:F1}s | Concurrent: {ConcurrentRequests}\n" +
+        string.Create(CultureInfo.InvariantCulture, $"  Duration: {Duration.TotalSeconds:F1}s | Concurrent: {ConcurrentRequests}\n") +
         $"  Completed: {CompletedRequests} | Errors: {ErrorCount}\n" +
-        $"  RPS: {RequestsPerSecond:F2} | Mean Latency: {MeanLatency.TotalMilliseconds:F0}ms";
+        string.Create(CultureInfo.InvariantCulture, $"  RPS: {RequestsPerSecond:F2} | Mean Latency: {MeanLatency.TotalMilliseconds:F0}ms");
 }
 
 /// <summary>
@@ -453,6 +454,6 @@ public class CostBenchmarkResult
         $"Cost Benchmark: {AgentName} ({ModelName})\n" +
         $"  Prompts: {SuccessfulPrompts}/{TotalPrompts}\n" +
         $"  Tokens: {TotalInputTokens} input + {TotalOutputTokens} output = {TotalTokens} total\n" +
-        $"  Avg per prompt: {AverageInputTokensPerPrompt:F0} in / {AverageOutputTokensPerPrompt:F0} out\n" +
-        (EstimatedCostUSD.HasValue ? $"  Estimated Cost: ${EstimatedCostUSD:F6}" : "  Estimated Cost: Unknown pricing");
+        string.Create(CultureInfo.InvariantCulture, $"  Avg per prompt: {AverageInputTokensPerPrompt:F0} in / {AverageOutputTokensPerPrompt:F0} out\n") +
+        (EstimatedCostUSD.HasValue ? string.Create(CultureInfo.InvariantCulture, $"  Estimated Cost: ${EstimatedCostUSD:F6}") : "  Estimated Cost: Unknown pricing");
 }

@@ -2,6 +2,8 @@
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 
+using System.Globalization;
+
 namespace AgentEval.Models;
 
 /// <summary>
@@ -121,7 +123,7 @@ public static class TestSummaryExtensions
             metadata["TotalDuration"] = summary.TotalDuration.ToString();
 
         if (summary.TotalCost > 0)
-            metadata["TotalCost"] = summary.TotalCost.ToString("F6");
+            metadata["TotalCost"] = summary.TotalCost.ToString("F6", CultureInfo.InvariantCulture);
 
         return metadata;
     }

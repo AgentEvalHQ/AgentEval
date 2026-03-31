@@ -2,6 +2,7 @@
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 
+using System.Globalization;
 using AgentEval.Models;
 
 namespace AgentEval.Core;
@@ -115,7 +116,7 @@ public static class AgentEvalLoggerExtensions
     {
         if (logger.IsEnabled(LogLevel.Information))
         {
-            logger.Log(LogLevel.Information, $"Metric '{metricName}' completed: Score={score:F2}, Duration={duration.TotalMilliseconds:F0}ms");
+            logger.Log(LogLevel.Information, string.Create(CultureInfo.InvariantCulture, $"Metric '{metricName}' completed: Score={score:F2}, Duration={duration.TotalMilliseconds:F0}ms"));
         }
     }
 
