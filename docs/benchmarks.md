@@ -492,8 +492,8 @@ jobs:
 
 ## See Also
 
-- [Sample 06](../samples/AgentEval.Samples/Sample06_PerformanceProfiling.cs) - Performance profiling with MAFEvaluationHarness
-- [Sample 23](../samples/AgentEval.Samples/Sample23_BenchmarkSystem.cs) - Benchmark system with JSONL data loading
+- [Sample 06](samples/AgentEval.Samples/Sample06_PerformanceProfiling.cs) - Performance profiling with MAFEvaluationHarness
+- [Sample 23](samples/AgentEval.Samples/Sample23_BenchmarkSystem.cs) - Benchmark system with JSONL data loading
 - [Stochastic Evaluation](stochastic-evaluation.md) - Statistical evaluation for benchmarks
 - [Model Comparison](model-comparison.md) - Compare models on benchmarks
 - [Extensibility Guide](extensibility.md) - Creating custom metrics
