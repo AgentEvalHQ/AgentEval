@@ -309,8 +309,10 @@ public class TaskCompletionMetric : IAgenticMetric
             """ + input + """
             
             AGENT RESPONSE:
+            <agent_response>
             """ + output + toolsPart + """
-            
+            </agent_response>
+
             COMPLETION CRITERIA:
             """ + criteriaList + """
             

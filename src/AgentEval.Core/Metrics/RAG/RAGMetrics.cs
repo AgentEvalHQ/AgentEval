@@ -25,7 +25,7 @@ public class FaithfulnessMetric : IRAGMetric, IQualityMetric
         MetricCategory.RAG | 
         MetricCategory.RequiresContext | 
         MetricCategory.Faithfulness | 
-        MetricCategory.LLMBased;
+        MetricCategory.LLMEvaluated;
     
     public FaithfulnessMetric(IChatClient chatClient)
     {
@@ -62,8 +62,10 @@ public class FaithfulnessMetric : IRAGMetric, IQualityMetric
             """ + input + """
             
             RESPONSE:
+            <agent_response>
             """ + output + """
-            
+            </agent_response>
+
             Analyze the response for faithfulness. For each claim in the response:
             1. Is it directly supported by the context? 
             2. Is it a reasonable inference from the context?
@@ -124,7 +126,7 @@ public class RelevanceMetric : IRAGMetric, IQualityMetric
     public MetricCategory Categories => 
         MetricCategory.RAG | 
         MetricCategory.Relevance | 
-        MetricCategory.LLMBased;
+        MetricCategory.LLMEvaluated;
     
     public RelevanceMetric(IChatClient chatClient)
     {
@@ -154,8 +156,10 @@ public class RelevanceMetric : IRAGMetric, IQualityMetric
             """ + input + """
             
             RESPONSE:
+            <agent_response>
             """ + output + """
-            
+            </agent_response>
+
             Evaluate the relevance of this response.
             
             Respond with a JSON object:
@@ -207,7 +211,13 @@ public class ContextPrecisionMetric : IRAGMetric
     public string Description => "Measures how much of the retrieved context is relevant and useful for answering the question.";
     public bool RequiresContext => true;
     public bool RequiresGroundTruth => false;
-    
+
+    /// <inheritdoc />
+    public MetricCategory Categories =>
+        MetricCategory.RAG |
+        MetricCategory.RequiresContext |
+        MetricCategory.LLMEvaluated;
+
     public ContextPrecisionMetric(IChatClient chatClient)
     {
         _chatClient = chatClient ?? throw new ArgumentNullException(nameof(chatClient));
@@ -293,7 +303,14 @@ public class ContextRecallMetric : IRAGMetric
     public string Description => "Measures whether the retrieved context contains all information needed to answer the question correctly.";
     public bool RequiresContext => true;
     public bool RequiresGroundTruth => true;
-    
+
+    /// <inheritdoc />
+    public MetricCategory Categories =>
+        MetricCategory.RAG |
+        MetricCategory.RequiresContext |
+        MetricCategory.RequiresGroundTruth |
+        MetricCategory.LLMEvaluated;
+
     public ContextRecallMetric(IChatClient chatClient)
     {
         _chatClient = chatClient ?? throw new ArgumentNullException(nameof(chatClient));
@@ -390,7 +407,13 @@ public class AnswerCorrectnessMetric : IRAGMetric
     public string Description => "Measures how correct the answer is compared to the expected ground truth.";
     public bool RequiresContext => false;
     public bool RequiresGroundTruth => true;
-    
+
+    /// <inheritdoc />
+    public MetricCategory Categories =>
+        MetricCategory.RAG |
+        MetricCategory.RequiresGroundTruth |
+        MetricCategory.LLMEvaluated;
+
     public AnswerCorrectnessMetric(IChatClient chatClient)
     {
         _chatClient = chatClient ?? throw new ArgumentNullException(nameof(chatClient));
@@ -424,8 +447,10 @@ public class AnswerCorrectnessMetric : IRAGMetric
             """ + groundTruth + """
             
             GENERATED ANSWER:
+            <agent_response>
             """ + output + """
-            
+            </agent_response>
+
             Evaluate the correctness:
             1. Are the facts accurate?
             2. Is anything incorrect?

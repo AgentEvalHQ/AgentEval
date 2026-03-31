@@ -1,0 +1,690 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AgentEval — Memory Benchmark Report</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Anybody:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #060a10;
+  --surface: #0c1118;
+  --s2: #111a24;
+  --s3: #162030;
+  --border: #1a2538;
+  --bbright: #243348;
+  --t: #94a3b8;
+  --tm: #64748b;
+  --tb: #e2e8f0;
+  --td: #334155;
+  --good: #34d399;
+  --goodD: rgba(52,211,153,0.12);
+  --warn: #fb923c;
+  --warnD: rgba(251,146,60,0.12);
+  --bad: #f87171;
+  --badD: rgba(248,113,113,0.12);
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{font-family:'IBM Plex Mono',monospace;background:var(--bg);color:var(--t);min-height:100vh;line-height:1.5}
+body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:9999;opacity:.02;background:url("data:image/svg+xml,%3Csvg viewBox='0 0 512 512' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
+.wrap{max-width:1360px;margin:0 auto;padding:0 28px 80px}
+
+/* MASTHEAD */
+.mast{padding:48px 0 32px;border-bottom:1px solid var(--border);position:relative}
+.mast::after{content:'';position:absolute;bottom:-1px;left:0;width:140px;height:2px;background:linear-gradient(90deg,var(--good),transparent)}
+.mast-row{display:flex;justify-content:space-between;align-items:flex-start;gap:20px;flex-wrap:wrap}
+.mast h1{font-family:Anybody,sans-serif;font-size:26px;font-weight:700;color:var(--tb);letter-spacing:-.3px}
+.mast h1 em{font-style:normal;color:var(--good)}
+.mast-sub{font-size:12px;color:var(--tm);margin-top:8px;display:flex;gap:14px;flex-wrap:wrap;align-items:center}
+.pill{background:var(--s2);border:1px solid var(--border);padding:3px 10px;border-radius:3px;font-size:10px;text-transform:uppercase;letter-spacing:.7px;color:var(--tm)}
+.sel{background:var(--s2);border:1px solid var(--border);color:var(--t);padding:7px 12px;border-radius:5px;font-family:'IBM Plex Mono',monospace;font-size:11px;cursor:pointer}
+.sel:focus{outline:none;border-color:var(--good)}
+.sel-label{font-size:10px;text-transform:uppercase;letter-spacing:.6px;color:var(--tm);margin-bottom:3px}
+
+/* NAV */
+.nav{display:flex;gap:2px;padding:10px 0;border-bottom:1px solid var(--border);position:sticky;top:0;z-index:100;background:var(--bg);overflow-x:auto}
+.nb{background:0;border:0;color:var(--tm);font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:500;padding:8px 14px;border-radius:4px;cursor:pointer;white-space:nowrap;transition:all .15s;letter-spacing:.3px}
+.nb:hover{color:var(--t);background:var(--surface)}
+.nb.on{color:var(--good);background:rgba(52,211,153,.08);border-bottom:2px solid var(--good);border-radius:4px 4px 0 0}
+
+/* SECTIONS */
+.sec{display:none;padding-top:28px}
+.sec.on{display:block;animation:up .25s ease}
+@keyframes up{from{opacity:0;transform:translateY(6px)}to{opacity:1}}
+.sh{font-family:Anybody,sans-serif;font-size:17px;font-weight:700;color:var(--tb);margin-bottom:6px}
+.sd{font-size:12px;color:var(--tm);margin-bottom:22px;max-width:700px;line-height:1.7}
+
+/* CARD */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:20px 24px;margin-bottom:14px}
+.card h4{font-family:Anybody,sans-serif;font-size:13px;font-weight:600;color:var(--tb);margin-bottom:3px}
+.card .sub{font-size:11px;color:var(--tm);margin-bottom:14px}
+.row{display:grid;gap:14px}.r2{grid-template-columns:1fr 1fr}.r3{grid-template-columns:1fr 1fr 1fr}.r1{grid-template-columns:1fr}
+@media(max-width:900px){.r2,.r3{grid-template-columns:1fr}}
+canvas{max-width:100%}
+
+/* KPI CARDS */
+.kpi-g{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;margin-bottom:24px}
+.kpi{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:18px 20px;position:relative;overflow:hidden;transition:border-color .2s,transform .15s;cursor:default}
+.kpi:hover{border-color:var(--bbright);transform:translateY(-1px)}
+.kpi .ki{width:32px;height:32px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:16px;margin-bottom:10px}
+.kpi .kl{font-size:10px;text-transform:uppercase;letter-spacing:.8px;color:var(--tm);margin-bottom:4px;font-weight:500}
+.kpi .kv{font-family:Anybody,sans-serif;font-size:30px;font-weight:800;color:var(--tb);line-height:1.1}
+.kpi .kb{position:absolute;bottom:0;left:0;height:3px}
+.kpi .kd{display:inline-block;font-size:11px;font-weight:600;padding:2px 7px;border-radius:3px;margin-top:6px}
+.kpi .ke{font-size:11px;color:var(--tm);margin-top:10px;line-height:1.6;border-top:1px solid var(--border);padding-top:10px}
+.kpi .ke strong{color:var(--t);font-weight:600}
+.du{color:var(--good);background:var(--goodD)}.dd{color:var(--bad);background:var(--badD)}.df{color:var(--tm);background:rgba(100,116,139,.1)}
+.bg{background:var(--good)}.bw{background:var(--warn)}.bb{background:var(--bad)}
+
+/* DIM LEGEND */
+.dl{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:18px}
+.dc{display:flex;align-items:center;gap:6px;padding:5px 12px;border-radius:4px;font-size:11px;font-weight:500;background:var(--s2);border:1px solid var(--border);color:var(--t)}
+.dc .dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.dc .fm{color:var(--tm);font-size:10px;margin-left:4px}
+
+/* GRADE HERO */
+.gh{display:flex;align-items:center;gap:28px;padding:24px 28px;background:var(--surface);border:1px solid var(--border);border-radius:10px;margin-bottom:24px;flex-wrap:wrap}
+.gr{width:100px;height:100px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;position:relative}
+.gr::before{content:'';position:absolute;inset:0;border-radius:50%;border:3px solid var(--border)}
+.gr .gn{font-family:Anybody,sans-serif;font-size:32px;font-weight:800;color:var(--tb);z-index:1}
+.gr .gp{font-size:14px;font-weight:600;z-index:1}
+.gi h3{font-family:Anybody,sans-serif;font-size:18px;font-weight:700;color:var(--tb);margin-bottom:4px}
+.gi .gl{font-size:13px;margin-bottom:8px}
+.gi .gs{color:var(--warn);font-size:14px;letter-spacing:2px}
+.gi .gc{font-size:11px;color:var(--tm);margin-top:10px;line-height:1.6;border-top:1px solid var(--border);padding-top:10px}
+
+/* CONFIG CARDS */
+.cfg{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px;margin-bottom:20px}
+.cfg-card{background:var(--s2);border:1px solid var(--border);border-radius:8px;padding:14px 18px;cursor:pointer;transition:all .15s;position:relative}
+.cfg-card:hover{border-color:var(--bbright)}
+.cfg-card.active{border-color:var(--good);box-shadow:0 0 12px rgba(52,211,153,.08)}
+.cfg-card .cn{font-family:Anybody,sans-serif;font-size:13px;font-weight:600;color:var(--tb);margin-bottom:4px}
+.cfg-card .cm{font-size:10px;color:var(--tm);line-height:1.6}
+.cfg-card .cs{position:absolute;top:14px;right:18px;font-family:Anybody,sans-serif;font-size:22px;font-weight:800}
+.cfg-card .dot-i{width:10px;height:10px;border-radius:50%;display:inline-block;margin-right:6px;vertical-align:middle}
+
+/* FOLDER */
+.fb{background:var(--s2);border:1px solid var(--border);border-radius:6px;padding:16px 20px;font-size:12px;color:var(--tm);margin-bottom:20px;line-height:1.8;white-space:pre;overflow-x:auto}
+.fb .f{color:var(--good)}.fb .d{color:#38bdf8}.fb .c{color:var(--td)}
+
+/* SPARKLINE GRID */
+.spk-g{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:6px}
+.spk{background:var(--s2);border:1px solid var(--border);border-radius:6px;padding:10px 14px;display:flex;align-items:center;gap:10px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<!-- MASTHEAD -->
+<div class="mast">
+  <div class="mast-row">
+    <div>
+      <h1>AgentEval <em>Memory Benchmark</em></h1>
+      <div class="mast-sub">
+        <span>WeatherAssistant</span>
+        <span class="pill">Full · 8 categories</span>
+        <span class="pill">2026-03-20</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- NAV -->
+<div class="nav" id="nav"></div>
+
+<!-- OVERVIEW -->
+<div class="sec on" id="sec-overview">
+  <div class="gh" id="gradeHero"></div>
+  <div class="sh">Score Card — The 8 Memory KPIs</div>
+  <div class="sd">Each category is scored 0–100 by the benchmark runner. Cards show what the evaluator tests and why it matters for your agent.</div>
+  <div class="kpi-g" id="kpiGrid"></div>
+</div>
+
+<!-- HEXAGON -->
+<div class="sec" id="sec-hexagon">
+  <div class="sh">Hexagon — 6 Consolidated Dimensions</div>
+  <div class="sd">The 8 categories mapped to 6 macro-dimensions for shape comparison. Select configurations below to overlay on the hexagon — the shape tells the story.</div>
+  <div class="dl" id="dimLegend"></div>
+  <div class="sh" style="font-size:13px;margin-bottom:10px">Select configurations to compare</div>
+  <div class="cfg" id="cfgCards"></div>
+  <div class="row r2">
+    <div class="card">
+      <h4>Capability Hexagon — Overlay</h4>
+      <div class="sub">Each shape is an agent config. Larger = stronger memory. Click configs above to toggle.</div>
+      <canvas id="hexChart" height="340"></canvas>
+    </div>
+    <div class="card">
+      <h4>Category Breakdown — Grouped Bars</h4>
+      <div class="sub">All 8 raw categories side-by-side for selected configurations.</div>
+      <canvas id="catBars" height="340"></canvas>
+    </div>
+  </div>
+</div>
+
+<!-- BASELINES -->
+<div class="sec" id="sec-baselines">
+  <div class="sh">Baseline Timeline</div>
+  <div class="sd">Each memory feature tracked over time. Flat dashed lines = v1.0 baseline per category. Vertical markers = configuration changes.</div>
+  <div class="row r1">
+    <div class="card">
+      <h4>Overall Score Progression</h4>
+      <div class="sub">Weighted aggregate across all 8 categories. Shaded band = ±3% scenario variance.</div>
+      <canvas id="overallLine" height="200"></canvas>
+    </div>
+  </div>
+  <div class="row r1">
+    <div class="card">
+      <h4>Per-Category Timelines</h4>
+      <div class="sub">Click legend to toggle. Dashed reference = v1.0 score per category.</div>
+      <canvas id="catTimeline" height="280"></canvas>
+    </div>
+  </div>
+  <div class="row r1">
+    <div class="card">
+      <h4>Sparklines — Last 6 Runs</h4>
+      <div class="sub">At-a-glance trend per dimension. Arrow = direction since previous run.</div>
+      <div class="spk-g" id="sparkGrid"></div>
+    </div>
+  </div>
+</div>
+
+<!-- COMPARER -->
+<div class="sec" id="sec-compare">
+  <div class="sh">Baseline Comparer</div>
+  <div class="sd">Pick two configurations to diff. Green = current wins, red = baseline wins.</div>
+  <div style="display:flex;gap:16px;margin-bottom:20px;flex-wrap:wrap">
+    <div><div class="sel-label">Baseline (A)</div><select class="sel" id="cmpA"></select></div>
+    <div><div class="sel-label">Current (B)</div><select class="sel" id="cmpB"></select></div>
+  </div>
+  <div class="row r2">
+    <div class="card">
+      <h4>Delta Waterfall</h4>
+      <div class="sub">Bars above zero = B outperforms A.</div>
+      <canvas id="waterfall" height="280"></canvas>
+    </div>
+    <div class="card">
+      <h4>Head-to-Head Table</h4>
+      <div class="sub">Per-category winner with magnitude.</div>
+      <div id="cmpTable"></div>
+    </div>
+  </div>
+</div>
+
+<!-- FOLDER STRUCTURE -->
+<div class="sec" id="sec-structure">
+  <div class="sh">Dynamic Loading — Folder Structure</div>
+  <div class="sd">The report loads baselines from a manifest file. Drop new JSON baselines, regenerate manifest, report picks them up. Serve with <code>dotnet serve</code> or <code>python -m http.server</code>.</div>
+  <div class="fb"><span class="d">.agenteval/</span>
+<span class="d">└── benchmarks/</span>
+    <span class="f">├── manifest.json</span>           <span class="c">← auto-generated index</span>
+    <span class="f">├── report.html</span>             <span class="c">← this template</span>
+    <span class="d">└── baselines/</span>
+        <span class="f">├── 2026-03-01_gpt35_msgcount_v1.0.json</span>
+        <span class="f">├── 2026-03-08_gpt4o_sliding_v2.0.json</span>
+        <span class="f">├── 2026-03-15_gpt4o_sliding_v2.1.json</span>
+        <span class="f">└── 2026-03-20_gpt4omini_summary_v2.2.json</span></div>
+  <div class="card">
+    <h4>manifest.json</h4>
+    <div class="sub">Auto-generated by the benchmark runner. Each entry stores agent name, model, reducer strategy, and tags.</div>
+    <pre style="font-size:11px;color:var(--t);line-height:1.7;overflow-x:auto"><code>{
+  "version": "1.0",
+  "agent": "WeatherAssistant",
+  "baselines": [
+    {
+      "id": "bl-001",
+      "file": "baselines/2026-03-01_gpt35_msgcount_v1.0.json",
+      "name": "v1.0 gpt-3.5 MessageCount(10)",
+      "timestamp": "2026-03-01T10:00:00Z",
+      "agent_config": {
+        "agent_name": "WeatherAssistant",
+        "model_id": "gpt-3.5-turbo",
+        "reducer_strategy": "MessageCountingChatReducer(keep:10)",
+        "memory_provider": "InMemoryChatHistoryProvider"
+      },
+      "overall_score": 37.8,
+      "tags": ["v1.0", "initial"]
+    }
+  ]
+}</code></pre>
+  </div>
+  <div class="card" style="margin-top:14px">
+    <h4>Individual Baseline JSON</h4>
+    <div class="sub">Maps 1:1 to <code>MemoryBaseline</code> C# model. <code>dimension_scores</code> feeds the hexagon.</div>
+    <pre style="font-size:11px;color:var(--t);line-height:1.7;overflow-x:auto"><code>{
+  "id": "bl-005",
+  "name": "v2.1 gpt-4o SlidingWindow(50)",
+  "agent_config": {
+    "agent_name": "WeatherAssistant",
+    "model_id": "gpt-4o",
+    "model_version": "2025-01-01",
+    "reducer_strategy": "SlidingWindowChatReducer(window:50)",
+    "memory_provider": "InMemoryChatHistoryProvider"
+  },
+  "category_results": {
+    "BasicRetention":     { "score": 95, "grade": "A+" },
+    "TemporalReasoning":  { "score": 82, "grade": "B"  },
+    "NoiseResilience":    { "score": 71, "grade": "C+" },
+    "ReachBackDepth":     { "score": 88, "grade": "B+" },
+    "FactUpdateHandling": { "score": 73, "grade": "C+" },
+    "MultiTopic":         { "score": 80, "grade": "B"  },
+    "CrossSession":       { "score": 85, "grade": "B+" },
+    "ReducerFidelity":    { "score": 68, "grade": "C"  }
+  },
+  "dimension_scores": {
+    "Recall": 91.5, "Resilience": 71.0, "Temporal": 77.5,
+    "Persistence": 85.0, "Organization": 80.0, "Compression": 68.0
+  },
+  "recommendations": [
+    "Reducer fidelity is weak — try semantic chunking.",
+    "Noise resilience below 75% — increase chatty scenario depth."
+  ]
+}</code></pre>
+  </div>
+</div>
+
+</div>
+
+<script>
+// ══════════════════════════════════════════════════════
+// DATA — simulates what manifest.json + baselines provide
+// ══════════════════════════════════════════════════════
+const CATS = ['BasicRetention','TemporalReasoning','NoiseResilience','ReachBackDepth','FactUpdateHandling','MultiTopic','CrossSession','ReducerFidelity'];
+const CAT_L = ['Retention','Temporal','Noise','Depth','Updates','Topics','Session','Reducer'];
+const CAT_C = ['#34d399','#a78bfa','#38bdf8','#60a5fa','#fb923c','#f472b6','#e879f9','#facc15'];
+
+const HEX = ['Recall','Resilience','Temporal','Persistence','Organization','Compression'];
+const HEX_C = ['#34d399','#38bdf8','#a78bfa','#fb923c','#f472b6','#facc15'];
+const HEX_SRC = ['avg(Retention, Depth)','Noise Resilience','avg(Temporal, Updates)','Cross-Session','Multi-Topic','Reducer Fidelity'];
+
+const BL = [
+  { id:0, name:'v1.0 gpt-3.5 MsgCount(10)', ts:'Mar 1', model:'gpt-3.5-turbo', reducer:'MessageCount(10)', provider:'InMemory',
+    cats:[62,45,38,30,50,42,0,35], overall:37.8, grade:'F', stars:1,
+    hex:[46,38,47.5,0,42,35], tags:['initial'], color:'#64748b' },
+  { id:1, name:'v1.5 gpt-3.5 Sliding(20)', ts:'Mar 5', model:'gpt-3.5-turbo', reducer:'SlidingWindow(20)', provider:'InMemory',
+    cats:[70,52,45,42,55,50,48,42], overall:50.5, grade:'D', stars:2,
+    hex:[56,45,53.5,48,50,42], tags:['sliding'], color:'#475569' },
+  { id:2, name:'v2.0 gpt-4o MsgCount(10)', ts:'Mar 8', model:'gpt-4o', reducer:'MessageCount(10)', provider:'InMemory',
+    cats:[88,70,58,65,62,68,72,50], overall:66.6, grade:'C+', stars:3,
+    hex:[76.5,58,66,72,68,50], tags:['model-upgrade'], color:'#a78bfa' },
+  { id:3, name:'v2.0.1 gpt-4o Sliding(30)', ts:'Mar 12', model:'gpt-4o', reducer:'SlidingWindow(30)', provider:'InMemory',
+    cats:[90,75,64,78,68,72,78,58], overall:72.9, grade:'B-', stars:3,
+    hex:[84,64,71.5,78,72,58], tags:[], color:'#60a5fa' },
+  { id:4, name:'v2.1 gpt-4o Sliding(50)', ts:'Mar 15', model:'gpt-4o', reducer:'SlidingWindow(50)', provider:'InMemory',
+    cats:[95,82,71,88,73,80,85,68], overall:80.3, grade:'B', stars:4,
+    hex:[91.5,71,77.5,85,80,68], tags:['production'], color:'#34d399' },
+  { id:5, name:'v2.2 gpt-4o-mini Summarizer', ts:'Mar 20', model:'gpt-4o-mini', reducer:'SummarizingReducer', provider:'InMemory',
+    cats:[78,91,75,65,80,82,45,92], overall:76.0, grade:'B-', stars:4,
+    hex:[71.5,75,85.5,45,82,92], tags:['latest'], color:'#f472b6' },
+];
+
+const CURRENT = BL[BL.length-1];
+
+const KPI_INFO = {
+  BasicRetention:    {icon:'🧠',explain:'<strong>What:</strong> Plant 5 facts (name, city, allergy, pet, job), then query each. LLM judge scores recall accuracy. <strong>Why:</strong> The foundation — if basic retention fails, nothing else matters.'},
+  TemporalReasoning: {icon:'⏰',explain:'<strong>What:</strong> Plant timestamped facts ("moved to Paris in March"), ask time-relative questions ("where before April?"). <strong>Why:</strong> Users expect "before/after/last week" reasoning. Failure causes stale-data bugs.'},
+  NoiseResilience:   {icon:'📢',explain:'<strong>What:</strong> Bury 2–3 facts in 20+ noise messages (small talk, emoji, digressions). Query the buried facts. <strong>Why:</strong> Real conversations are 80%+ noise. #1 production failure mode.'},
+  ReachBackDepth:    {icon:'🔬',explain:'<strong>What:</strong> Plant fact at turn T, inject N noise turns, query. Test depths [5,10,25,50,100]. <strong>Why:</strong> Produces the single most actionable number: "memory fails at N turns."'},
+  FactUpdateHandling:{icon:'✏️',explain:'<strong>What:</strong> "I live in NYC" → later "Actually I moved to London" → query current city. <strong>Why:</strong> Users correct themselves constantly. Stale facts after corrections = dangerous.'},
+  MultiTopic:        {icon:'🗂️',explain:'<strong>What:</strong> Plant facts across 5 domains (medical, work, family, travel, food). Check cross-contamination. <strong>Why:</strong> A pet allergy bleeding into medical answers is a liability.'},
+  CrossSession:      {icon:'🔄',explain:'<strong>What:</strong> Plant facts → <code>ResetSessionAsync()</code> → query. Tests persistent memory. <strong>Why:</strong> 15% of Full benchmark weight. Requires ISessionResettableAgent — silently skips without it.'},
+  ReducerFidelity:   {icon:'🗜️',explain:'<strong>What:</strong> 20+ messages with 3 facts → apply IChatReducer → verify facts survive. <strong>Why:</strong> Every reducer loses info. Score of 33% = 2 of 3 facts gone after compression.'},
+};
+
+// Chart.js global config
+Chart.defaults.color = '#64748b';
+Chart.defaults.font.family = "'IBM Plex Mono', monospace";
+Chart.defaults.font.size = 11;
+Chart.defaults.plugins.legend.labels.boxWidth = 12;
+Chart.defaults.plugins.legend.labels.padding = 14;
+
+// ══════════════════════════════════════════════════════
+// NAV
+// ══════════════════════════════════════════════════════
+const TABS=[{id:'overview',l:'Overview'},{id:'hexagon',l:'Hexagon'},{id:'baselines',l:'Baselines'},{id:'compare',l:'Comparer'},{id:'structure',l:'Folder Structure'}];
+const navEl=document.getElementById('nav');
+TABS.forEach((t,i)=>{
+  const b=document.createElement('button');
+  b.className='nb'+(i===0?' on':'');
+  b.textContent=t.l;
+  b.onclick=()=>{
+    document.querySelectorAll('.nb').forEach(x=>x.classList.remove('on'));
+    document.querySelectorAll('.sec').forEach(x=>x.classList.remove('on'));
+    b.classList.add('on');
+    document.getElementById('sec-'+t.id).classList.add('on');
+  };
+  navEl.appendChild(b);
+});
+
+// ══════════════════════════════════════════════════════
+// HELPERS
+// ══════════════════════════════════════════════════════
+function gc(s){return s>=85?'var(--good)':s>=65?'var(--warn)':'var(--bad)'}
+function gcRaw(s){return s>=85?'#34d399':s>=65?'#fb923c':'#f87171'}
+function gbc(s){return s>=85?'bg':s>=65?'bw':'bb'}
+function dc(d){return d>0?'du':d<0?'dd':'df'}
+
+// ══════════════════════════════════════════════════════
+// OVERVIEW
+// ══════════════════════════════════════════════════════
+function renderOverview(){
+  const c=CURRENT, b=BL[BL.length-2];
+  const dO=+(c.overall-b.overall).toFixed(1);
+  document.getElementById('gradeHero').innerHTML=`
+    <div class="gr"><div class="gn" style="color:${gcRaw(c.overall)}">${c.overall}<span class="gp">%</span></div></div>
+    <div class="gi">
+      <h3>${c.name}</h3>
+      <div class="gl" style="color:${gcRaw(c.overall)}">Grade ${c.grade} · ${'★'.repeat(c.stars)}${'☆'.repeat(5-c.stars)}</div>
+      <div style="font-size:12px;color:var(--t)">${c.model} · ${c.reducer} · ${c.provider}</div>
+      <div style="font-size:11px;margin-top:4px"><span class="${dc(dO)}" style="padding:2px 8px;border-radius:3px;font-weight:600">${dO>0?'+':''}${dO}% vs ${b.name}</span></div>
+      <div class="gc">
+        <strong>Recommendations:</strong><br>
+        • Cross-session dropped to 45% (model downgrade) — biggest regression.<br>
+        • Compression jumped to 92% — SummarizingReducer far outperforms SlidingWindow.<br>
+        • Temporal +9% — the summarizer preserves time context better.
+      </div>
+    </div>`;
+
+  const grid=document.getElementById('kpiGrid');
+  grid.innerHTML=CATS.map((cat,i)=>{
+    const s=c.cats[i],bs=b.cats[i],d=s-bs,info=KPI_INFO[cat],skip=s===0;
+    return `<div class="kpi">
+      <div class="ki" style="background:${CAT_C[i]}22;color:${CAT_C[i]}">${info.icon}</div>
+      <div class="kl">${CAT_L[i]}</div>
+      <div class="kv" style="color:${skip?'var(--td)':gcRaw(s)}">${skip?'SKIP':s+'%'}</div>
+      ${skip?'<div style="font-size:10px;color:var(--bad);margin-top:4px">⚠ Missing ISessionResettableAgent</div>':''}
+      ${!skip?`<div class="kd ${dc(d)}">${d>0?'+':''}${d}%</div>`:''}
+      <div class="kb ${gbc(s)}" style="width:${s}%"></div>
+      <div class="ke">${info.explain}</div>
+    </div>`;
+  }).join('');
+}
+renderOverview();
+
+// ══════════════════════════════════════════════════════
+// HEXAGON — with config selector
+// ══════════════════════════════════════════════════════
+let selectedConfigs = new Set([4,5]); // default: last two
+let hexChart=null, catBarChart=null;
+
+function renderCfgCards(){
+  document.getElementById('cfgCards').innerHTML=BL.map(b=>`
+    <div class="cfg-card${selectedConfigs.has(b.id)?' active':''}" onclick="toggleCfg(${b.id})">
+      <div class="dot-i" style="background:${b.color}"></div>
+      <span class="cn">${b.name}</span>
+      <div class="cs" style="color:${gcRaw(b.overall)}">${b.overall}%</div>
+      <div class="cm">${b.model}<br>${b.reducer}<br>${b.provider}</div>
+    </div>
+  `).join('');
+}
+
+function toggleCfg(id){
+  if(selectedConfigs.has(id)) selectedConfigs.delete(id); else selectedConfigs.add(id);
+  renderCfgCards();
+  renderHexChart();
+  renderCatBars();
+}
+
+function renderHexChart(){
+  const ctx=document.getElementById('hexChart').getContext('2d');
+  if(hexChart) hexChart.destroy();
+  const datasets=[...selectedConfigs].map(id=>{
+    const b=BL[id];
+    return {
+      label:b.name,
+      data:b.hex,
+      borderColor:b.color,
+      backgroundColor:b.color+'18',
+      borderWidth:2.5,
+      pointBackgroundColor:b.color,
+      pointRadius:4,
+      pointHoverRadius:6,
+    };
+  });
+  hexChart=new Chart(ctx,{
+    type:'radar',
+    data:{labels:HEX, datasets},
+    options:{
+      responsive:true,
+      scales:{
+        r:{
+          beginAtZero:true, max:100,
+          grid:{color:'#1a2538'},
+          angleLines:{color:'#1a2538'},
+          pointLabels:{font:{size:12,family:'Anybody',weight:'600'},color:'#94a3b8'},
+          ticks:{display:false}
+        }
+      },
+      plugins:{
+        legend:{position:'bottom',labels:{color:'#94a3b8',font:{size:11}}},
+        tooltip:{
+          backgroundColor:'#111a24',borderColor:'#1a2538',borderWidth:1,
+          titleFont:{family:'Anybody',weight:'600'},
+          bodyFont:{family:'IBM Plex Mono'},
+          callbacks:{label:ctx=>`${ctx.dataset.label}: ${ctx.raw}%`}
+        }
+      }
+    }
+  });
+}
+
+function renderCatBars(){
+  const ctx=document.getElementById('catBars').getContext('2d');
+  if(catBarChart) catBarChart.destroy();
+  const datasets=[...selectedConfigs].map(id=>{
+    const b=BL[id];
+    return {label:b.name, data:b.cats, backgroundColor:b.color+'99', borderColor:b.color, borderWidth:1, borderRadius:3};
+  });
+  catBarChart=new Chart(ctx,{
+    type:'bar',
+    data:{labels:CAT_L,datasets},
+    options:{
+      responsive:true,
+      scales:{
+        x:{grid:{color:'#1a253800'},ticks:{font:{size:10}}},
+        y:{beginAtZero:true,max:105,grid:{color:'#1a2538'},ticks:{callback:v=>v+'%'}}
+      },
+      plugins:{
+        legend:{position:'bottom',labels:{color:'#94a3b8',font:{size:10}}},
+        tooltip:{backgroundColor:'#111a24',borderColor:'#1a2538',borderWidth:1,callbacks:{label:ctx=>`${ctx.dataset.label}: ${ctx.raw}%`}}
+      }
+    }
+  });
+}
+
+// Dim legend
+document.getElementById('dimLegend').innerHTML=HEX.map((d,i)=>`<div class="dc"><div class="dot" style="background:${HEX_C[i]}"></div>${d}<span class="fm">= ${HEX_SRC[i]}</span></div>`).join('');
+
+renderCfgCards();
+renderHexChart();
+renderCatBars();
+
+// ══════════════════════════════════════════════════════
+// BASELINES TIMELINE
+// ══════════════════════════════════════════════════════
+(function(){
+  const ts=BL.map(b=>b.ts);
+
+  // Overall line
+  new Chart(document.getElementById('overallLine').getContext('2d'),{
+    type:'line',
+    data:{
+      labels:ts,
+      datasets:[
+        {label:'Overall Score',data:BL.map(b=>b.overall),borderColor:'#34d399',backgroundColor:'rgba(52,211,153,0.08)',fill:true,borderWidth:3,pointRadius:5,pointBackgroundColor:'#34d399',tension:0.3},
+      ]
+    },
+    options:{
+      responsive:true,
+      scales:{
+        x:{grid:{color:'#1a253800'}},
+        y:{min:20,max:100,grid:{color:'#1a2538'},ticks:{callback:v=>v+'%'}}
+      },
+      plugins:{
+        legend:{display:false},
+        tooltip:{
+          backgroundColor:'#111a24',borderColor:'#1a2538',borderWidth:1,
+          callbacks:{
+            title:items=>{const i=items[0].dataIndex;return BL[i].name},
+            label:ctx=>`Score: ${ctx.raw}% · Grade: ${BL[ctx.dataIndex].grade}`,
+            afterLabel:ctx=>`Model: ${BL[ctx.dataIndex].model}\nReducer: ${BL[ctx.dataIndex].reducer}`
+          }
+        },
+        annotation: undefined
+      }
+    },
+    plugins:[{
+      id:'milestones',
+      afterDraw(chart){
+        const ctx2=chart.ctx;
+        const marks=[{idx:2,label:'↑ gpt-4o',c:'#a78bfa'},{idx:5,label:'↑ gpt-4o-mini',c:'#f472b6'}];
+        marks.forEach(m=>{
+          const meta=chart.getDatasetMeta(0);
+          if(!meta.data[m.idx]) return;
+          const x=meta.data[m.idx].x;
+          ctx2.save();
+          ctx2.strokeStyle=m.c+'44';
+          ctx2.lineWidth=1;
+          ctx2.setLineDash([4,4]);
+          ctx2.beginPath();ctx2.moveTo(x,chart.chartArea.top);ctx2.lineTo(x,chart.chartArea.bottom);ctx2.stroke();
+          ctx2.setLineDash([]);
+          ctx2.fillStyle=m.c;
+          ctx2.font="500 10px 'IBM Plex Mono'";
+          ctx2.textAlign='center';
+          ctx2.fillText(m.label,x,chart.chartArea.top-6);
+          ctx2.restore();
+        });
+      }
+    }]
+  });
+
+  // Per-category timeline
+  const catDS=CATS.map((cat,i)=>({
+    label:CAT_L[i],
+    data:BL.map(b=>b.cats[i]||null),
+    borderColor:CAT_C[i],
+    backgroundColor:CAT_C[i]+'00',
+    borderWidth:2,
+    pointRadius:3,
+    pointBackgroundColor:CAT_C[i],
+    tension:0.3,
+    spanGaps:true,
+  }));
+  new Chart(document.getElementById('catTimeline').getContext('2d'),{
+    type:'line',
+    data:{labels:ts, datasets:catDS},
+    options:{
+      responsive:true,
+      interaction:{mode:'index',intersect:false},
+      scales:{
+        x:{grid:{color:'#1a253800'}},
+        y:{min:0,max:105,grid:{color:'#1a2538'},ticks:{callback:v=>v+'%'}}
+      },
+      plugins:{
+        legend:{position:'bottom',labels:{color:'#94a3b8',font:{size:10},usePointStyle:true,pointStyle:'circle'}},
+        tooltip:{backgroundColor:'#111a24',borderColor:'#1a2538',borderWidth:1,callbacks:{label:ctx=>ctx.raw===null?`${ctx.dataset.label}: SKIPPED`:`${ctx.dataset.label}: ${ctx.raw}%`}}
+      }
+    }
+  });
+
+  // Sparklines
+  const sg=document.getElementById('sparkGrid');
+  CATS.forEach((cat,i)=>{
+    const vals=BL.map(b=>b.cats[i]);
+    const last=vals[vals.length-1],prev=vals[vals.length-2];
+    const trend=last-prev;
+    const arrow=trend>0?'↑':trend<0?'↓':'→';
+    const ac=trend>0?'var(--good)':trend<0?'var(--bad)':'var(--tm)';
+    const div=document.createElement('div');
+    div.className='spk';
+    const cid='spk'+i;
+    div.innerHTML=`
+      <div style="flex:1;min-width:0">
+        <div style="font-size:9px;color:var(--tm);text-transform:uppercase;letter-spacing:.5px">${CAT_L[i]}</div>
+        <div style="font-family:Anybody,sans-serif;font-size:18px;font-weight:700;color:${gcRaw(last)}">${last===0?'—':last+'%'}</div>
+      </div>
+      <canvas id="${cid}" width="80" height="32" style="flex-shrink:0"></canvas>
+      <div style="font-size:16px;font-weight:700;color:${ac}">${arrow}</div>`;
+    sg.appendChild(div);
+    requestAnimationFrame(()=>{
+      new Chart(document.getElementById(cid).getContext('2d'),{
+        type:'line',
+        data:{labels:vals.map((_,j)=>j),datasets:[{data:vals,borderColor:CAT_C[i],borderWidth:2,pointRadius:0,tension:0.4,fill:false}]},
+        options:{responsive:false,scales:{x:{display:false},y:{display:false,min:0,max:100}},plugins:{legend:{display:false},tooltip:{enabled:false}},animation:false}
+      });
+    });
+  });
+})();
+
+// ══════════════════════════════════════════════════════
+// COMPARER
+// ══════════════════════════════════════════════════════
+let waterfallChart=null;
+
+function populateCmpSelects(){
+  const html=BL.map((b,i)=>`<option value="${i}">${b.name}</option>`).join('');
+  document.getElementById('cmpA').innerHTML=html;
+  document.getElementById('cmpB').innerHTML=html;
+  document.getElementById('cmpA').value=4;
+  document.getElementById('cmpB').value=5;
+}
+populateCmpSelects();
+
+function renderComparer(){
+  const ai=parseInt(document.getElementById('cmpA').value);
+  const bi=parseInt(document.getElementById('cmpB').value);
+  const a=BL[ai], b=BL[bi];
+  const deltas=b.cats.map((v,i)=>v-a.cats[i]);
+  const colors=deltas.map(d=>d>=0?'#34d399':'#f87171');
+
+  const ctx=document.getElementById('waterfall').getContext('2d');
+  if(waterfallChart) waterfallChart.destroy();
+  waterfallChart=new Chart(ctx,{
+    type:'bar',
+    data:{labels:CAT_L,datasets:[{data:deltas,backgroundColor:colors,borderColor:colors,borderWidth:1,borderRadius:3}]},
+    options:{
+      responsive:true,
+      indexAxis:'y',
+      scales:{
+        x:{grid:{color:'#1a2538'},ticks:{callback:v=>(v>0?'+':'')+v+'%'}},
+        y:{grid:{color:'#1a253800'},ticks:{font:{size:11}}}
+      },
+      plugins:{legend:{display:false},tooltip:{backgroundColor:'#111a24',borderColor:'#1a2538',borderWidth:1,callbacks:{label:ctx=>(ctx.raw>=0?'+':'')+ctx.raw+'%'}}}
+    }
+  });
+
+  // Table
+  const tbl=document.getElementById('cmpTable');
+  tbl.innerHTML=`<table style="width:100%;border-collapse:collapse;font-size:12px">
+    <thead><tr style="border-bottom:1px solid var(--border)">
+      <th style="text-align:left;padding:8px 10px;font-size:10px;text-transform:uppercase;color:var(--tm);font-weight:500">Category</th>
+      <th style="text-align:right;padding:8px 10px;font-size:10px;color:var(--tm)">A</th>
+      <th style="text-align:right;padding:8px 10px;font-size:10px;color:var(--tm)">B</th>
+      <th style="text-align:right;padding:8px 10px;font-size:10px;color:var(--tm)">Winner</th>
+    </tr></thead>
+    <tbody>${CATS.map((cat,i)=>{
+      const av=a.cats[i],bv=b.cats[i],d=bv-av;
+      const w=d>0?'B wins':d<0?'A wins':'Tie';
+      const wc=d>0?'var(--good)':d<0?'var(--bad)':'var(--tm)';
+      return `<tr style="border-bottom:1px solid rgba(26,37,56,.5)">
+        <td style="padding:9px 10px;color:var(--t)">${CAT_L[i]}</td>
+        <td style="padding:9px 10px;text-align:right;color:${av===0?'var(--td)':'var(--t)'}">${av===0?'SKIP':av+'%'}</td>
+        <td style="padding:9px 10px;text-align:right;color:${bv===0?'var(--td)':'var(--t)'}">${bv===0?'SKIP':bv+'%'}</td>
+        <td style="padding:9px 10px;text-align:right;color:${wc};font-weight:600">${w} ${d!==0?'('+(d>0?'+':'')+d+'%)':''}</td>
+      </tr>`;
+    }).join('')}
+    <tr style="border-top:2px solid var(--border)">
+      <td style="padding:9px 10px;color:var(--tb);font-weight:600">Overall</td>
+      <td style="padding:9px 10px;text-align:right;color:var(--tb);font-weight:600">${a.overall}%</td>
+      <td style="padding:9px 10px;text-align:right;color:var(--tb);font-weight:600">${b.overall}%</td>
+      <td style="padding:9px 10px;text-align:right;font-weight:700;color:${b.overall>a.overall?'var(--good)':'var(--bad)'}">${b.overall>a.overall?'B':'A'} wins (${b.overall>a.overall?'+':''}${(b.overall-a.overall).toFixed(1)}%)</td>
+    </tr>
+    </tbody></table>`;
+}
+renderComparer();
+document.getElementById('cmpA').onchange=renderComparer;
+document.getElementById('cmpB').onchange=renderComparer;
+</script>
+</body>
+</html>

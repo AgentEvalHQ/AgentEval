@@ -1,0 +1,257 @@
+{
+  "schema_version": "1.0",
+  "category": "FactUpdateHandling",
+  "name": "Fact Update Handling",
+  "description": "Tests agent's ability to handle corrections — updating old facts with new ones.",
+  "context_pressure": {
+    "corpus": "context-small",
+    "max_turns": 15
+  },
+  "presets": {
+    "quick": {
+      "facts": [
+        {
+          "content": "My favorite color is blue",
+          "category": "preference",
+          "importance": 50,
+          "planted_as": "My favorite color is blue."
+        },
+        {
+          "content": "I drive a Honda Civic",
+          "category": "personal",
+          "importance": 60,
+          "planted_as": "I drive a Honda Civic."
+        },
+        {
+          "content": "My favorite color changed from blue to green",
+          "category": "preference",
+          "importance": 55,
+          "planted_as": "Actually, I've changed my mind — green is my favorite color now, not blue.",
+          "position": "late"
+        },
+        {
+          "content": "I traded the Honda Civic for a Tesla Model 3",
+          "category": "personal",
+          "importance": 65,
+          "planted_as": "Big news — I traded in the Honda Civic for a Tesla Model 3!",
+          "position": "late"
+        }
+      ],
+      "noise_between_facts": [
+        "I've been meaning to redecorate my apartment.",
+        "The weather has been unpredictable lately."
+      ],
+      "queries": [
+        {
+          "question": "What's my current favorite color?",
+          "expected_facts": [
+            "green"
+          ],
+          "forbidden_facts": [
+            "blue"
+          ],
+          "difficulty": "direct"
+        },
+        {
+          "question": "What car do I drive now?",
+          "expected_facts": [
+            "Tesla"
+          ],
+          "forbidden_facts": [
+            "Honda"
+          ],
+          "difficulty": "direct"
+        }
+      ]
+    },
+    "standard": {
+      "extends": "quick",
+      "context_pressure": {
+        "corpus": "context-stress",
+        "max_turns": 100,
+        "sessions_count": 8
+      },
+      "facts": [
+        {
+          "content": "My favorite color changed from blue to green after redecorating",
+          "category": "preference",
+          "importance": 55,
+          "planted_as": "You know, I've actually changed my mind about my favorite color. After redecorating the apartment with all these plants, I've really fallen in love with green. Blue feels so last year.",
+          "position": 0.4,
+          "session_id": 4,
+          "timestamp": "2026-01-15"
+        },
+        {
+          "content": "I traded the Honda Civic for a Tesla Model 3",
+          "category": "personal",
+          "importance": 65,
+          "planted_as": "Big news — I finally traded in the Honda Civic for a Tesla Model 3 last week. The acceleration is insane and I'm saving a fortune on gas.",
+          "position": 0.6,
+          "session_id": 6,
+          "timestamp": "2026-02-20"
+        },
+        {
+          "content": "I switched from Android to iPhone last month",
+          "category": "tech",
+          "importance": 55,
+          "planted_as": "Oh, I also switched from my Android to an iPhone last month. The ecosystem integration is way better for my workflow.",
+          "position": 0.5,
+          "session_id": 5,
+          "timestamp": "2026-02-01"
+        },
+        {
+          "content": "I work at Google",
+          "category": "work",
+          "importance": 75,
+          "planted_as": "Just started at Google last quarter — the onboarding was intense but I'm loving the team so far.",
+          "position": 0.1,
+          "session_id": 1,
+          "timestamp": "2025-09-15"
+        },
+        {
+          "content": "I left Google, now at Microsoft",
+          "category": "work",
+          "importance": 75,
+          "planted_as": "So I left Google — it just wasn't the right fit. I'm at Microsoft now, joined the Azure team. Much better culture for me.",
+          "position": 0.35,
+          "session_id": 4,
+          "timestamp": "2025-12-10"
+        },
+        {
+          "content": "I just accepted an offer at Apple, starting next month",
+          "category": "work",
+          "importance": 80,
+          "planted_as": "Big update — I just accepted an offer at Apple! Starting next month on the ML platform team. Third company this year, but this one feels right.",
+          "position": 0.65,
+          "session_id": 7,
+          "timestamp": "2026-03-01"
+        },
+        {
+          "content": "I adopted a cat named Whiskers",
+          "category": "personal",
+          "importance": 55,
+          "planted_as": "Guess what — I just adopted a cat! Named her Whiskers. She's a little grey tabby and already rules the apartment.",
+          "position": 0.12,
+          "session_id": 1,
+          "timestamp": "2025-06-01"
+        },
+        {
+          "content": "Renamed the cat to Luna",
+          "category": "personal",
+          "importance": 55,
+          "planted_as": "Remember Whiskers? We renamed her to Luna. Whiskers just didn't suit her personality — she's way too elegant for that name.",
+          "position": 0.38,
+          "session_id": 4,
+          "timestamp": "2025-08-15"
+        },
+        {
+          "content": "Cat renamed again to Mittens by my daughter",
+          "category": "personal",
+          "importance": 55,
+          "planted_as": "Update on the cat situation — my daughter renamed her AGAIN. She's Mittens now. I've given up fighting it. Mittens it is.",
+          "position": 0.68,
+          "session_id": 7,
+          "timestamp": "2025-10-20"
+        },
+        {
+          "content": "I'm vegetarian",
+          "category": "diet",
+          "importance": 65,
+          "planted_as": "I went fully vegetarian about six months ago. Feeling great, more energy, and I don't miss meat at all honestly.",
+          "position": 0.15,
+          "session_id": 2,
+          "timestamp": "2025-07-01"
+        },
+        {
+          "content": "Started eating fish again, now pescatarian",
+          "category": "diet",
+          "importance": 65,
+          "planted_as": "OK so I caved a little — I started eating fish again. Sushi is just too good. So I guess I'm pescatarian now? Still no red meat or chicken though.",
+          "position": 0.42,
+          "session_id": 5,
+          "timestamp": "2025-11-15"
+        },
+        {
+          "content": "Went fully vegan last week",
+          "category": "diet",
+          "importance": 70,
+          "planted_as": "Plot twist — I went fully vegan last week. Watched a documentary that really got to me. No fish, no dairy, no eggs. Going all in this time.",
+          "position": 0.72,
+          "session_id": 8,
+          "timestamp": "2026-03-15"
+        }
+      ],
+      "queries": [
+        {
+          "question": "What phone do I use now?",
+          "expected_facts": [
+            "iPhone"
+          ],
+          "forbidden_facts": [
+            "Android"
+          ],
+          "difficulty": "direct",
+          "query_type": "update"
+        },
+        {
+          "question": "What's changed about my preferences and belongings recently? Walk me through the updates.",
+          "expected_facts": [
+            "green",
+            "blue",
+            "Tesla",
+            "Honda",
+            "iPhone",
+            "Android"
+          ],
+          "difficulty": "synthesis",
+          "query_type": "update"
+        },
+        {
+          "question": "Where do I work now?",
+          "expected_facts": [
+            "Apple"
+          ],
+          "forbidden_facts": [
+            "Google",
+            "Microsoft"
+          ],
+          "difficulty": "correction_chain",
+          "query_type": "correction_chain"
+        },
+        {
+          "question": "What's my cat's name?",
+          "expected_facts": [
+            "Mittens"
+          ],
+          "forbidden_facts": [
+            "Whiskers",
+            "Luna"
+          ],
+          "difficulty": "correction_chain",
+          "query_type": "correction_chain"
+        },
+        {
+          "question": "What's my current diet? Am I vegetarian, pescatarian, or something else?",
+          "expected_facts": [
+            "vegan"
+          ],
+          "forbidden_facts": [
+            "vegetarian",
+            "pescatarian",
+            "fish"
+          ],
+          "difficulty": "correction_chain",
+          "query_type": "correction_chain"
+        }
+      ]
+    },
+    "full": {
+      "extends": "standard",
+      "context_pressure": {
+        "corpus": "context-stress",
+        "max_turns": 200,
+        "sessions_count": 15
+      }
+    }
+  }
+}

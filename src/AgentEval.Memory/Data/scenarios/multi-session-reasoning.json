@@ -1,0 +1,33 @@
+{
+  "schema_version": "1.0",
+  "category": "MultiSessionReasoning",
+  "name": "Multi-Session Reasoning",
+  "description": "Tests synthesis of partial information across sessions. Requires ISessionResettableAgent.",
+  "presets": {
+    "quick": {
+      "facts": [
+        { "content": "My flight to London leaves at 8am from gate B12", "category": "travel", "importance": 80, "planted_as": "My flight to London leaves at 8am from gate B12." },
+        { "content": "My hotel in London is the Marriott near Tower Bridge, check-in at 3pm", "category": "travel", "importance": 80, "planted_as": "My hotel in London is the Marriott near Tower Bridge, check-in at 3pm." }
+      ],
+      "queries": [
+        { "question": "After my flight lands, roughly how long do I have before hotel check-in? And where is the hotel?", "expected_facts": ["8am", "3pm", "Marriott", "Tower Bridge"], "difficulty": "synthesis" }
+      ]
+    },
+    "standard": {
+      "extends": "quick",
+      "context_pressure": {
+        "corpus": "context-stress",
+        "max_turns": 100,
+        "sessions_count": 8
+      }
+    },
+    "full": {
+      "extends": "standard",
+      "context_pressure": {
+        "corpus": "context-stress",
+        "max_turns": 200,
+        "sessions_count": 15
+      }
+    }
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "schema_version": "1.0",
+  "category": "ReducerFidelity",
+  "name": "Reducer Fidelity",
+  "description": "Tests information retention after context reduction. Uses IReducerEvaluator.",
+  "presets": {
+    "quick": {
+      "facts": [
+        { "content": "I'm allergic to peanuts", "category": "allergy", "importance": 100 },
+        { "content": "My meeting is at 3pm", "category": "schedule", "importance": 80 },
+        { "content": "I prefer email over Slack", "category": "preference", "importance": 50 }
+      ]
+    },
+    "standard": {
+      "extends": "quick",
+      "facts": [
+        { "content": "My dog's name is Max", "category": "personal", "importance": 60 },
+        { "content": "I work at Contoso", "category": "work", "importance": 70 }
+      ]
+    },
+    "full": { "extends": "standard" }
+  }
+}

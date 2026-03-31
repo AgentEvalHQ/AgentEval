@@ -1,0 +1,197 @@
+{
+  "schema_version": "1.0",
+  "category": "ConflictResolution",
+  "name": "Conflict Resolution",
+  "description": "Tests agent's ability to detect and resolve implicit contradictions — tracking which information is current vs outdated.",
+  "context_pressure": {
+    "corpus": "context-small",
+    "max_turns": 15
+  },
+  "presets": {
+    "quick": {
+      "facts": [
+        {
+          "content": "I work as a software engineer at Microsoft",
+          "category": "work",
+          "importance": 80,
+          "planted_as": "I work as a software engineer at Microsoft."
+        },
+        {
+          "content": "I live in a small apartment in downtown Seattle",
+          "category": "personal",
+          "importance": 70,
+          "planted_as": "I live in a small apartment in downtown Seattle."
+        },
+        {
+          "content": "I just accepted a new position at Google — starting next month as a senior engineer",
+          "category": "work",
+          "importance": 90,
+          "planted_as": "Big news — I just accepted a new position at Google! I'm starting next month as a senior engineer."
+        },
+        {
+          "content": "We're moving to a house in Mountain View next week",
+          "category": "personal",
+          "importance": 80,
+          "planted_as": "We're moving to a house in Mountain View next week, closer to the new office."
+        }
+      ],
+      "noise_between_facts": [
+        "The weather has been really unpredictable this month.",
+        "I need to cancel my gym membership before we move.",
+        "My team threw me a going-away party yesterday."
+      ],
+      "queries": [
+        {
+          "question": "Where do I currently work?",
+          "expected_facts": [
+            "Google"
+          ],
+          "forbidden_facts": [
+            "Microsoft"
+          ],
+          "difficulty": "direct"
+        },
+        {
+          "question": "Where am I living now?",
+          "expected_facts": [
+            "Mountain View"
+          ],
+          "forbidden_facts": [
+            "Seattle apartment"
+          ],
+          "difficulty": "direct"
+        },
+        {
+          "question": "Can you tell me about my career history and current role?",
+          "expected_facts": [
+            "Microsoft",
+            "Google",
+            "senior engineer"
+          ],
+          "difficulty": "synthesis"
+        }
+      ]
+    },
+    "standard": {
+      "extends": "quick",
+      "context_pressure": {
+        "corpus": "context-stress",
+        "max_turns": 100,
+        "sessions_count": 8
+      },
+      "facts": [
+        {
+          "content": "I switched from an iPhone to a Samsung Galaxy last month",
+          "category": "tech",
+          "importance": 60,
+          "planted_as": "I finally switched from my iPhone to a Samsung Galaxy last month. The camera is amazing.",
+          "position": "late",
+          "session_id": 7
+        }
+      ],
+      "queries": [
+        {
+          "question": "What phone do I use?",
+          "expected_facts": [
+            "Samsung",
+            "Galaxy"
+          ],
+          "forbidden_facts": [
+            "iPhone"
+          ],
+          "difficulty": "direct",
+          "query_type": "update"
+        }
+      ]
+    },
+    "full": {
+      "extends": "standard",
+      "context_pressure": {
+        "corpus": "context-stress",
+        "max_turns": 200,
+        "sessions_count": 15
+      },
+      "facts": [
+        {
+          "content": "I'm learning Spanish in evening classes",
+          "category": "education",
+          "importance": 60,
+          "planted_as": "I signed up for Spanish evening classes at the community center. Always wanted to be fluent.",
+          "position": 0.15,
+          "session_id": 9,
+          "timestamp": "2025-06-01"
+        },
+        {
+          "content": "I switched from Spanish to Japanese classes",
+          "category": "education",
+          "importance": 65,
+          "planted_as": "I dropped the Spanish classes — wasn't clicking for me. Switched to Japanese instead, much more motivated now.",
+          "position": 0.45,
+          "session_id": 11,
+          "timestamp": "2025-09-15"
+        },
+        {
+          "content": "I actually went back to Spanish classes, dropped Japanese",
+          "category": "education",
+          "importance": 65,
+          "planted_as": "Funny story — I went back to Spanish classes after all. Japanese was way too hard with my schedule. Spanish just makes more sense for me long-term.",
+          "position": 0.75,
+          "session_id": 13,
+          "timestamp": "2026-01-10"
+        },
+        {
+          "content": "My salary is 85,000 per year",
+          "category": "financial",
+          "importance": 75,
+          "planted_as": "My salary just got bumped to 85,000 per year with the new role. Pretty happy about that.",
+          "position": 0.2,
+          "session_id": 9,
+          "timestamp": "2025-07-01"
+        },
+        {
+          "content": "My salary increased to 105,000 after the promotion",
+          "category": "financial",
+          "importance": 80,
+          "planted_as": "The promotion came with a nice raise — I'm at 105,000 now. Huge jump from the 85k I was making before.",
+          "position": 0.55,
+          "session_id": 12,
+          "timestamp": "2026-02-01"
+        }
+      ],
+      "queries": [
+        {
+          "question": "What language am I currently studying in evening classes?",
+          "expected_facts": [
+            "Spanish"
+          ],
+          "forbidden_facts": [
+            "Japanese"
+          ],
+          "difficulty": "correction_chain",
+          "query_type": "update"
+        },
+        {
+          "question": "What is my current salary?",
+          "expected_facts": [
+            "105,000"
+          ],
+          "forbidden_facts": [
+            "85,000"
+          ],
+          "difficulty": "correction_chain",
+          "query_type": "update"
+        },
+        {
+          "question": "Walk me through my language learning journey — what classes did I take and in what order?",
+          "expected_facts": [
+            "Spanish",
+            "Japanese",
+            "back to Spanish"
+          ],
+          "difficulty": "synthesis",
+          "query_type": "update"
+        }
+      ]
+    }
+  }
+}

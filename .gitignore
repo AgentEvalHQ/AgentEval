@@ -430,3 +430,14 @@ strategy/
 # MAF source reference (local only - not for distribution)
 /MAF/
 /MAFvnext/
+
+# LongMemEval large dataset files (download separately from HuggingFace)
+src/AgentEval.Memory/Data/longmemeval/longmemeval_s_cleaned.json
+src/AgentEval.Memory/Data/longmemeval/longmemeval_m_cleaned.json
+src/AgentEval.Memory/Data/longmemeval/longmemeval_oracle.json
+
+# Claude Code local settings (personal tool permissions)
+.claude/settings.local.json
+
+# AgentEval local benchmark run outputs (machine-specific, not for distribution)
+.agenteval/

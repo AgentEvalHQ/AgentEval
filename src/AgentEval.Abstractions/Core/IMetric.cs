@@ -115,31 +115,41 @@ public enum MetricCategory
     
     /// <summary>Safety and harm evaluation.</summary>
     Safety = 1 << 7,
-    
+
     // === Quality Aspects ===
-    
+
     /// <summary>Evaluates faithfulness to source content.</summary>
     Faithfulness = 1 << 8,
-    
+
     /// <summary>Evaluates relevance to query.</summary>
     Relevance = 1 << 9,
-    
+
     /// <summary>Evaluates logical coherence.</summary>
     Coherence = 1 << 10,
-    
+
     /// <summary>Evaluates language fluency.</summary>
     Fluency = 1 << 11,
-    
+
     // === Computation Method ===
-    
+
     /// <summary>Computed via LLM-as-judge (API cost).</summary>
-    LLMBased = 1 << 12,
-    
+    LLMEvaluated = 1 << 12,
+
+    /// <summary>
+    /// Obsolete alias for <see cref="LLMEvaluated"/> kept for backward compatibility.
+    /// Use <see cref="LLMEvaluated"/> instead.
+    /// </summary>
+    [System.Obsolete("MetricCategory.LLMBased is obsolete. Use MetricCategory.LLMEvaluated instead.")]
+    LLMBased = LLMEvaluated,
+
     /// <summary>Computed via embeddings (low API cost).</summary>
     EmbeddingBased = 1 << 13,
-    
+
     /// <summary>Computed by code logic (free).</summary>
-    CodeBased = 1 << 14
+    CodeBased = 1 << 14,
+
+    /// <summary>Memory evaluation and retention testing.</summary>
+    Memory = 1 << 15
 }
 
 /// <summary>

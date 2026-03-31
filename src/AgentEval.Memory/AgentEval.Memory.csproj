@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
+    <IsPackable>false</IsPackable>
+    <RootNamespace>AgentEval</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="AgentEval" />
+    <InternalsVisibleTo Include="AgentEval.Tests" />
+    <InternalsVisibleTo Include="AgentEval.Memory.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="Report\report.html" />
+    <EmbeddedResource Include="Report\archetypes.json" />
+    <EmbeddedResource Include="Data\corpus\*.json" />
+    <EmbeddedResource Include="Data\scenarios\*.json" />
+    <EmbeddedResource Include="Data\longmemeval\longmemeval-subset.json" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../AgentEval.Abstractions/AgentEval.Abstractions.csproj" />
+    <ProjectReference Include="../AgentEval.Core/AgentEval.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.AI" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
+  </ItemGroup>
+
+</Project>

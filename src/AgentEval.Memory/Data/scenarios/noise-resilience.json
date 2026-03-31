@@ -1,0 +1,398 @@
+{
+  "schema_version": "1.0",
+  "category": "NoiseResilience",
+  "name": "Noise Resilience",
+  "description": "Tests recall of facts buried in heavy conversational noise.",
+  "context_pressure": {
+    "corpus": "context-small",
+    "max_turns": 15
+  },
+  "presets": {
+    "quick": {
+      "facts": [
+        {
+          "content": "I'm severely allergic to peanuts and tree nuts",
+          "category": "allergy",
+          "importance": 100,
+          "planted_as": "Oh, I should mention — I'm severely allergic to peanuts and tree nuts."
+        },
+        {
+          "content": "My dentist appointment is next Tuesday at 2:30pm",
+          "category": "schedule",
+          "importance": 80,
+          "planted_as": "By the way, my dentist appointment is next Tuesday at 2:30pm."
+        },
+        {
+          "content": "My WiFi password at home is BlueOcean42",
+          "category": "credentials",
+          "importance": 90,
+          "planted_as": "My WiFi password at home is BlueOcean42, just in case."
+        },
+        {
+          "content": "My car is parked in lot B spot 247",
+          "category": "location",
+          "importance": 70,
+          "planted_as": "My car is parked in lot B, spot 247."
+        }
+      ],
+      "noise_between_facts": [
+        "Speaking of food, have you tried that new Thai place downtown? The pad thai is incredible.",
+        "I was reading about climate change impacts on agriculture yesterday. Fascinating and terrifying.",
+        "Do you think remote work will remain popular? I've been working from home for two years now.",
+        "The traffic this morning was absolutely terrible. Took me an hour to get here.",
+        "I need to remember to pick up groceries later. Running low on everything.",
+        "My neighbor just got a new puppy. It's so cute but barks all night.",
+        "Have you watched that new documentary on Netflix? Everyone's talking about it.",
+        "The gym near my office is having a sale on memberships. Might sign up.",
+        "I tried a new coffee shop yesterday. Their espresso was amazing.",
+        "My phone battery dies so fast. I think I need a new one."
+      ],
+      "queries": [
+        {
+          "question": "What food allergies do I have that you should know about?",
+          "expected_facts": [
+            "peanuts",
+            "tree nuts"
+          ],
+          "difficulty": "indirect"
+        },
+        {
+          "question": "I forgot where I parked. Can you help?",
+          "expected_facts": [
+            "lot B",
+            "spot 247"
+          ],
+          "difficulty": "direct"
+        },
+        {
+          "question": "What's my WiFi password?",
+          "expected_facts": [
+            "BlueOcean42"
+          ],
+          "difficulty": "direct"
+        },
+        {
+          "question": "Do I have any appointments coming up?",
+          "expected_facts": [
+            "dentist",
+            "Tuesday",
+            "2:30"
+          ],
+          "difficulty": "indirect"
+        }
+      ]
+    },
+    "standard": {
+      "extends": "quick",
+      "context_pressure": {
+        "corpus": "context-stress",
+        "max_turns": 100,
+        "sessions_count": 8,
+        "distractor_turns": [
+          {"user": "The pharmacy is having a sale on metformin — my dad takes that for his diabetes", "assistant": "Good to know about the sale. Medication costs really add up.", "topic": "metformin"},
+          {"user": "My coworker Maria called in sick today, hope she's OK", "assistant": "Hope she feels better soon. Is it going around the office?", "topic": "maria"},
+          {"user": "Apartment 4A is having a leak problem again, the building manager told me", "assistant": "That's frustrating. Old buildings always have plumbing issues.", "topic": "apartment"},
+          {"user": "I saw a blue Honda Accord parked in the visitor spot — is that allowed?", "assistant": "I think visitor spots are usually fair game. Nice car though.", "topic": "blue_honda"},
+          {"user": "My friend's gym membership is only 200 DKK a month — CPH Fitness I think", "assistant": "That's a great deal! Copenhagen gyms can be expensive.", "topic": "gym"},
+          {"user": "I need to update my insurance — the policy expired last week", "assistant": "Don't wait too long on that. What kind of coverage do you need?", "topic": "insurance"},
+          {"user": "My sister's laptop serial number starts with DL too — same Dell model", "assistant": "Dell is popular for work laptops. The XPS line is solid.", "topic": "laptop_serial"},
+          {"user": "Someone left their bike lock combination on a sticky note in the break room — 4-4-7-2", "assistant": "That's not great security! Someone should take that down.", "topic": "lock_code"}
+        ]
+      },
+      "noise_between_facts": [
+        "Speaking of food, have you tried that new Thai place downtown? The pad thai is incredible.",
+        "I was reading about climate change impacts on agriculture yesterday. Fascinating and terrifying.",
+        "Do you think remote work will remain popular? I've been working from home for two years now.",
+        "The traffic this morning was absolutely terrible. Took me an hour to get here.",
+        "I need to remember to pick up groceries later. Running low on everything.",
+        "My neighbor just got a new puppy. It's so cute but barks all night.",
+        "Have you watched that new documentary on Netflix? Everyone's talking about it.",
+        "The gym near my office is having a sale on memberships. Might sign up.",
+        "I tried a new coffee shop yesterday. Their espresso was amazing.",
+        "My phone battery dies so fast. I think I need a new one.",
+        "Oh, my brother has a severe shellfish allergy, keep that in mind when planning family meals.",
+        "My appointment is actually next Thursday, not Tuesday. No wait, it was definitely Tuesday.",
+        "I sometimes use the password variations like BlueOcean41 or BlueOcean43 depending on which network.",
+        "I'm usually parked in lot C near the entrance, or sometimes lot A if it's crowded.",
+        "You know, my roommate's WiFi password is similar — something with Ocean in it too.",
+        "There was this other dentist I was considering, but I'm still going to Dr. Chen on Tuesday.",
+        "I think I mentioned my car is a blue sedan, parked somewhere in this general area.",
+        "The password might have been changed recently — someone mentioned needing to update it.",
+        "I've been meaning to move my car but haven't gotten around to it yet.",
+        "Actually, now that I think about it, I have multiple appointments scheduled for next week.",
+        "The team project deadline got pushed to March 15th — everyone's scrambling to finish on time.",
+        "Oh right, the fiscal year also ends on March 15th. Accounting is going nuts.",
+        "My colleague's daughter's birthday is also in June — we were comparing dates the other day.",
+        "The office Wi-Fi password got changed to something with Anderson or Andersen in it, funny coincidence.",
+        "June 22nd is also the summer solstice — longest day of the year.",
+        "Someone at work named Anderson keeps getting my emails by mistake.",
+        "My coworker mentioned her anniversary is coming up on March 12th — she's planning a big party.",
+        "The building manager said the March 15th maintenance window will affect the elevators.",
+        "My friend's daughter is named Emma too! Hers just turned 6 in June.",
+        "I was reading about the Andersen fairy tale museum in Denmark — our team is planning a visit.",
+        "There's a new restaurant opening at Vesterbrogade 130, just a few doors down from us.",
+        "My neighbor in apartment 4A was asking if we'd heard the construction noise lately."
+      ],
+      "facts": [
+        {
+          "content": "I also have a severe shellfish allergy on top of peanuts and tree nuts",
+          "category": "allergy",
+          "importance": 95,
+          "planted_as": "Oh man, we went to that seafood buffet for my cousin's birthday and I had to sit there eating bread rolls the whole time. I have a severe shellfish allergy on top of the peanut and tree nut thing — basically all the major allergens are out to get me.",
+          "position": 0.15,
+          "session_id": 2,
+          "timestamp": "2025-10-25"
+        },
+        {
+          "content": "My car is a blue Honda Civic sedan",
+          "category": "personal",
+          "importance": 65,
+          "planted_as": "I was at the car wash this morning getting my blue Honda Civic cleaned up. The sedan looks brand new now — should have done it weeks ago.",
+          "position": 0.25,
+          "session_id": 3,
+          "timestamp": "2025-11-01"
+        },
+        {
+          "content": "My emergency contact is my sister Maria at 555-0147",
+          "category": "emergency",
+          "importance": 100,
+          "planted_as": "If there's ever an emergency, contact my sister Maria — her number is 555-0147.",
+          "position": 0.35,
+          "session_id": 4,
+          "timestamp": "2026-01-10"
+        },
+        {
+          "content": "I take metformin 500mg twice daily for pre-diabetes",
+          "category": "health",
+          "importance": 95,
+          "planted_as": "I should mention I take metformin, 500mg twice a day — I was diagnosed with pre-diabetes last year.",
+          "position": 0.45,
+          "session_id": 5,
+          "timestamp": "2025-11-20"
+        },
+        {
+          "content": "My home insurance policy number is HI-2847-CPH",
+          "category": "financial",
+          "importance": 80,
+          "planted_as": "My home insurance policy number is HI-2847-CPH, just for the records.",
+          "position": 0.55,
+          "session_id": 5,
+          "timestamp": "2025-12-10"
+        },
+        {
+          "content": "I'm in apartment 4B at Vesterbrogade 127",
+          "category": "location",
+          "importance": 75,
+          "planted_as": "My address is Vesterbrogade 127, apartment 4B.",
+          "position": 0.65,
+          "session_id": 6,
+          "timestamp": "2026-01-25"
+        },
+        {
+          "content": "My work laptop serial number is DL-X1C-88942",
+          "category": "work",
+          "importance": 70,
+          "planted_as": "The IT team asked me to note my laptop serial: DL-X1C-88942.",
+          "position": 0.2,
+          "session_id": 3,
+          "timestamp": "2025-11-10"
+        },
+        {
+          "content": "My gym membership ID is CPH-GYM-3391",
+          "category": "personal",
+          "importance": 50,
+          "planted_as": "My gym membership card number is CPH-GYM-3391 in case I lose it.",
+          "position": 0.3,
+          "session_id": 4,
+          "timestamp": "2025-12-15"
+        },
+        {
+          "content": "I have a follow-up blood test on March 28th at Rigshospitalet",
+          "category": "health",
+          "importance": 85,
+          "planted_as": "I have a follow-up blood test on March 28th at Rigshospitalet for the pre-diabetes monitoring.",
+          "position": 0.4,
+          "session_id": 4,
+          "timestamp": "2025-12-20"
+        },
+        {
+          "content": "My bike lock combination is 7-23-41",
+          "category": "credentials",
+          "importance": 65,
+          "planted_as": "Oh, and my bike lock combination is 7-23-41 — I always forget it.",
+          "position": 0.5,
+          "session_id": 5,
+          "timestamp": "2026-01-05"
+        },
+        {
+          "content": "My wedding anniversary is March 15",
+          "category": "personal",
+          "importance": 85,
+          "planted_as": "Our wedding anniversary is March 15th — can't believe it's been 8 years already.",
+          "position": 0.02,
+          "session_id": 5,
+          "timestamp": "2025-10-20"
+        },
+        {
+          "content": "My daughter Emma's birthday is June 22",
+          "category": "family",
+          "importance": 80,
+          "planted_as": "Emma's birthday is June 22nd — she's turning 7 this year and already asking for a puppy.",
+          "position": 0.37,
+          "session_id": 4,
+          "timestamp": "2025-11-15"
+        },
+        {
+          "content": "My mother's maiden name is Andersen",
+          "category": "personal",
+          "importance": 75,
+          "planted_as": "My mother's maiden name is Andersen — I use it as a security question for my bank account.",
+          "position": 0.57,
+          "session_id": 6,
+          "timestamp": "2025-12-05"
+        }
+      ],
+      "queries": [
+        {
+          "question": "If you were ordering seafood for me, what specific allergies would be your biggest concern?",
+          "expected_facts": [
+            "peanuts",
+            "tree nuts",
+            "shellfish"
+          ],
+          "difficulty": "synthesis",
+          "query_type": "standard"
+        },
+        {
+          "question": "My dentist appointment — what day and time is it exactly? And if someone needs to pick me up from the appointment, how do they identify my car?",
+          "expected_facts": [
+            "Tuesday",
+            "2:30pm",
+            "blue Honda Civic",
+            "lot B",
+            "247"
+          ],
+          "difficulty": "synthesis",
+          "query_type": "standard"
+        },
+        {
+          "question": "What is the EXACT WiFi password — not a variation, the one I specifically told you?",
+          "expected_facts": [
+            "BlueOcean42"
+          ],
+          "difficulty": "direct",
+          "query_type": "standard"
+        },
+        {
+          "question": "List ALL my food allergies you know about, in full.",
+          "expected_facts": [
+            "peanuts",
+            "tree nuts",
+            "shellfish"
+          ],
+          "difficulty": "synthesis",
+          "query_type": "standard"
+        },
+        {
+          "question": "If I had a medical emergency, who should be contacted and what medications am I on?",
+          "expected_facts": [
+            "Maria",
+            "555-0147",
+            "metformin",
+            "500mg"
+          ],
+          "difficulty": "synthesis",
+          "query_type": "standard"
+        },
+        {
+          "question": "What's my exact home address including apartment number?",
+          "expected_facts": [
+            "Vesterbrogade 127",
+            "4B"
+          ],
+          "difficulty": "direct",
+          "query_type": "standard"
+        },
+        {
+          "question": "I need to file an insurance claim — what's my policy number?",
+          "expected_facts": [
+            "HI-2847-CPH"
+          ],
+          "difficulty": "direct",
+          "query_type": "standard"
+        },
+        {
+          "question": "I have two upcoming medical appointments — what are they and when?",
+          "expected_facts": [
+            "dentist",
+            "Tuesday",
+            "2:30",
+            "blood test",
+            "March 28",
+            "Rigshospitalet"
+          ],
+          "difficulty": "synthesis",
+          "query_type": "standard"
+        },
+        {
+          "question": "What credential numbers do I need to remember — WiFi, gym, bike lock, and laptop serial?",
+          "expected_facts": [
+            "BlueOcean42",
+            "CPH-GYM-3391",
+            "7-23-41",
+            "DL-X1C-88942"
+          ],
+          "difficulty": "synthesis",
+          "query_type": "standard"
+        },
+        {
+          "question": "I'm trying to book a surprise dinner reservation for a very special date with my spouse. When should I book it for?",
+          "expected_facts": [
+            "March 15"
+          ],
+          "forbidden_facts": [
+            "deadline",
+            "fiscal year",
+            "project"
+          ],
+          "difficulty": "discrimination",
+          "query_type": "standard"
+        },
+        {
+          "question": "I need to request time off work for my kid's birthday party. What date should I put on the form and how old will she be?",
+          "expected_facts": [
+            "June 22",
+            "7"
+          ],
+          "forbidden_facts": [
+            "solstice",
+            "colleague's daughter"
+          ],
+          "difficulty": "discrimination",
+          "query_type": "standard"
+        },
+        {
+          "question": "What is my mother's maiden name?",
+          "expected_facts": [
+            "Andersen"
+          ],
+          "forbidden_facts": [
+            "Anderson",
+            "Wi-Fi",
+            "password"
+          ],
+          "difficulty": "discrimination",
+          "query_type": "standard"
+        }
+      ]
+    },
+    "full": {
+      "extends": "standard",
+      "context_pressure": {
+        "corpus": "context-stress",
+        "max_turns": 200,
+        "sessions_count": 15
+      }
+    }
+  }
+}

@@ -12,7 +12,7 @@ namespace AgentEval.MAF;
 /// <summary>
 /// Adapts a Microsoft Agent Framework (MAF) AIAgent for testing with AgentEval.
 /// </summary>
-public class MAFAgentAdapter : IStreamableAgent
+public class MAFAgentAdapter : IStreamableAgent, ISessionResettableAgent
 {
     private readonly AIAgent _agent;
     private AgentSession? _session;

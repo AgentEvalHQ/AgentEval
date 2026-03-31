@@ -12,7 +12,7 @@ namespace AgentEval.Core;
 /// Adapter that wraps an IChatClient as an IStreamableAgent for testing.
 /// This enables using Microsoft.Extensions.AI chat clients directly with AgentEval.
 /// </summary>
-public class ChatClientAgentAdapter : IStreamableAgent
+public class ChatClientAgentAdapter : IStreamableAgent, ISessionResettableAgent, IHistoryInjectableAgent
 {
     private readonly IChatClient _chatClient;
     private readonly ChatOptions? _chatOptions;
@@ -158,10 +158,27 @@ public class ChatClientAgentAdapter : IStreamableAgent
         _conversationHistory.Clear();
     }
 
+    /// <inheritdoc />
+    public Task ResetSessionAsync(CancellationToken cancellationToken = default)
+    {
+        ClearHistory();
+        return Task.CompletedTask;
+    }
+
     /// <summary>
     /// Gets the current conversation history.
     /// </summary>
     public IReadOnlyList<ChatMessage> History => _conversationHistory.AsReadOnly();
+
+    /// <inheritdoc />
+    public void InjectConversationHistory(IEnumerable<(string UserMessage, string AssistantResponse)> conversationTurns)
+    {
+        foreach (var (userMessage, assistantResponse) in conversationTurns)
+        {
+            _conversationHistory.Add(new ChatMessage(ChatRole.User, userMessage));
+            _conversationHistory.Add(new ChatMessage(ChatRole.Assistant, assistantResponse));
+        }
+    }
 
     /// <summary>
     /// Creates a ChatClientAgentAdapter with a specific model configuration.

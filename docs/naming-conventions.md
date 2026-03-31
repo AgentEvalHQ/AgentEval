@@ -17,7 +17,7 @@ Metrics use prefixes to indicate their computation method and cost:
 
 | Prefix | Computation | Cost | MetricCategory Flag |
 |--------|-------------|------|---------------------|
-| `llm_` | LLM-evaluated via prompt | $$$ (API calls) | `MetricCategory.LLMBased` |
+| `llm_` | LLM-evaluated via prompt | $$$ (API calls) | `MetricCategory.LLMEvaluated` |
 | `code_` | Computed by code logic | Free | `MetricCategory.CodeBased` |
 | `embed_` | Computed via embeddings | $ (embedding API) | `MetricCategory.EmbeddingBased` |
 
