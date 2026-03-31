@@ -3,7 +3,7 @@
 **Status:** Accepted  
 **Date:** 2026-02-25  
 **Decision Makers:** AgentEval Contributors  
-**Related:** [ADR-006](006-service-based-architecture-di.md), [Extensibility Strategy](../../strategy/AgentEval-Extensibility-Implementation-Review-and-Refinement.md), [Extensibility Guide](../extensibility.md)
+**Related:** [ADR-006](006-service-based-architecture-di.md), [Extensibility Guide](../extensibility.md)
 
 ---
 
