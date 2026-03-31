@@ -54,7 +54,13 @@ public class MemoryBenchmarkResult
     /// <summary>
     /// Star rating (1-5) based on overall score.
     /// </summary>
-    public int Stars => OverallScore switch
+    public int Stars => ComputeStars(OverallScore);
+
+    /// <summary>
+    /// Star rating (1-5) for the given score.
+    /// Shared by all star computations (overall, per-category, baselines).
+    /// </summary>
+    public static int ComputeStars(double score) => score switch
     {
         >= 90 => 5,
         >= 75 => 4,

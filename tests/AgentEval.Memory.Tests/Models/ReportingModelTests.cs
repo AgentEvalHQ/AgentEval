@@ -124,7 +124,7 @@ public class ReportingModelTests
         };
 
         Assert.Equal(0, dim.BestScore);
-        Assert.Equal("", dim.BestBaselineId);
+        Assert.Null(dim.BestBaselineId);
     }
 
     // --- StochasticData tests ---

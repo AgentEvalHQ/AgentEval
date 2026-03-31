@@ -3,6 +3,7 @@
 
 using AgentEval.Memory.External.Models;
 using AgentEval.Memory.Models;
+using static AgentEval.Memory.Models.MemoryBenchmarkResult; // ComputeGrade, ComputeStars
 
 namespace AgentEval.Memory.External;
 
@@ -79,24 +80,6 @@ public static class ExternalBaselineExtensions
             Tags = tags?.ToList() ?? [result.BenchmarkId, "external-benchmark"]
         };
     }
-
-    private static string ComputeGrade(double score) => score switch
-    {
-        >= 90 => "A",
-        >= 80 => "B",
-        >= 70 => "C",
-        >= 60 => "D",
-        _ => "F"
-    };
-
-    private static int ComputeStars(double score) => score switch
-    {
-        >= 90 => 5,
-        >= 75 => 4,
-        >= 60 => 3,
-        >= 40 => 2,
-        _ => 1
-    };
 
     private static List<string> BuildRecommendations(ExternalBenchmarkResult result)
     {

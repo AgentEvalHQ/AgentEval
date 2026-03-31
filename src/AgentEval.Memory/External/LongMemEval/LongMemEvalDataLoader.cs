@@ -122,13 +122,30 @@ public static class LongMemEvalDataLoader
 
         // Sample from each remaining group using Fisher–Yates partial shuffle (O(take), not O(n log n))
         var result = new List<LongMemEvalEntry>();
+        var usedIds = new HashSet<string>();
         foreach (var group in groups)
         {
             if (!perType.TryGetValue(group.Key, out var take) || take <= 0)
                 continue;
             var pool = group.ToList();
             FisherYatesShuffle(pool, take, rng);
-            result.AddRange(pool.Take(take));
+            foreach (var e in pool.Take(take))
+            {
+                result.Add(e);
+                usedIds.Add(e.QuestionId);
+            }
+        }
+
+        // Top-up: if result is still under budget (due to capped groups),
+        // fill with random entries from the remaining pool (no duplicates).
+        if (result.Count < maxQuestions)
+        {
+            var remaining = entries
+                .Where(e => !usedIds.Contains(e.QuestionId))
+                .ToList();
+            var needed = maxQuestions - result.Count;
+            FisherYatesShuffle(remaining, needed, rng);
+            result.AddRange(remaining.Take(needed));
         }
 
         return result;

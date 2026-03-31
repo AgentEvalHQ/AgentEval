@@ -44,7 +44,12 @@ public class MemoryTemporalMetric : IMemoryMetric
             var isTemporalEvaluation = memoryResult.Metadata?.ContainsKey("TemporalEvaluation") == true;
             if (!isTemporalEvaluation)
             {
-                return Task.FromResult(MetricResult.Pass(Name, 0, "Non-temporal scenario - metric not applicable"));
+                var notApplicableDetails = new Dictionary<string, object>
+                {
+                    ["not_applicable"] = true,
+                    ["reason"] = "Non-temporal scenario"
+                };
+                return Task.FromResult(MetricResult.Pass(Name, 0, "Non-temporal scenario - metric not applicable", notApplicableDetails));
             }
 
             // Extract temporal-specific metrics

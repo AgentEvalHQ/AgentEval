@@ -26,6 +26,7 @@ namespace AgentEval.MAF.Evaluators;
 public class AgentEvalEvaluator : MEAIIEvaluator
 {
     private readonly IReadOnlyList<IMetric> _metrics;
+    private readonly IReadOnlyCollection<string> _evaluationMetricNames;
 
     /// <summary>
     /// Creates a composite evaluator from a collection of AgentEval metrics.
@@ -35,6 +36,7 @@ public class AgentEvalEvaluator : MEAIIEvaluator
         _metrics = (metrics ?? throw new ArgumentNullException(nameof(metrics))).ToList();
         if (_metrics.Count == 0)
             throw new ArgumentException("At least one metric must be provided.", nameof(metrics));
+        _evaluationMetricNames = _metrics.Select(m => m.Name).ToList().AsReadOnly();
     }
 
     /// <summary>Gets the number of metrics in this evaluator.</summary>
@@ -44,8 +46,7 @@ public class AgentEvalEvaluator : MEAIIEvaluator
     public IEnumerable<string> MetricNames => _metrics.Select(m => m.Name);
 
     /// <inheritdoc/>
-    public IReadOnlyCollection<string> EvaluationMetricNames =>
-        _metrics.Select(m => m.Name).ToList().AsReadOnly();
+    public IReadOnlyCollection<string> EvaluationMetricNames => _evaluationMetricNames;
 
     /// <inheritdoc/>
     public async ValueTask<MEAIEvaluationResult> EvaluateAsync(

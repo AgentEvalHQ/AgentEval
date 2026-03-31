@@ -37,5 +37,6 @@ public class DimensionComparison
     public double BestScore => Scores.Count > 0 ? Scores.Values.Max() : 0;
 
     /// <summary>ID of the baseline with the best score for this dimension.</summary>
-    public string BestBaselineId => Scores.Count > 0 ? Scores.MaxBy(kvp => kvp.Value).Key : "";
+    /// <remarks>Returns <c>null</c> when there are no scores.</remarks>
+    public string? BestBaselineId => Scores.Count > 0 ? Scores.MaxBy(kvp => kvp.Value).Key : null;
 }

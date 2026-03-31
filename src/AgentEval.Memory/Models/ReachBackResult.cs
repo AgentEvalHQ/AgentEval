@@ -32,6 +32,7 @@ public class ReachBackResult
     /// Returns null if the agent succeeded at all tested depths.
     /// </summary>
     public int? FailurePoint => DepthResults
+        .OrderBy(d => d.Depth)
         .Where(d => d.Score < 80)
         .Select(d => (int?)d.Depth)
         .FirstOrDefault();
