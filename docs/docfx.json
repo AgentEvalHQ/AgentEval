@@ -27,6 +27,7 @@
       {
         "src": "../samples",
         "files": ["**/*.cs"],
+        "exclude": ["**/bin/**", "**/obj/**"],
         "dest": "samples"
       }
     ],
