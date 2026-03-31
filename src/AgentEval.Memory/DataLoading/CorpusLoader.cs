@@ -32,8 +32,13 @@ public static class CorpusLoader
         var resourceName = names.FirstOrDefault(n => n.EndsWith($"{corpusName}.json"));
 
         if (resourceName == null)
-            throw new FileNotFoundException($"Corpus '{corpusName}' not found in embedded resources. Available: {string.Join(", ", names.Where(n => n.Contains("corpus")))}");
-
+        {
+            var availableCorpora = ListAvailable();
+            throw new FileNotFoundException(
+                $"Corpus '{corpusName}' not found in embedded resources. " +
+                $"Available corpora: {string.Join(", ", availableCorpora)}. " +
+                "Call CorpusLoader.ListAvailable() for the full list.");
+        }
         using var stream = assembly.GetManifestResourceStream(resourceName)!;
         using var reader = new StreamReader(stream);
         var json = reader.ReadToEnd();

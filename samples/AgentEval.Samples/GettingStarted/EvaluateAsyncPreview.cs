@@ -45,13 +45,7 @@ public static class EvaluateAsyncPreview
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            var session = await agent.CreateSessionAsync(cancellationToken);
-            var agentResponse = await agent.RunAsync(query, session, cancellationToken: cancellationToken);
-
-            var messages = new List<ChatMessage> { new(ChatRole.User, query) };
-            foreach (var msg in agentResponse.Messages)
-                messages.Add(msg);
-            var response = new ChatResponse([new ChatMessage(ChatRole.Assistant, agentResponse.Text)]);
+            var (agentResponse, messages, response) = await RunQueryAsync(agent, query, cancellationToken);
 
             var evalResult = await evaluator.EvaluateAsync(
                 messages, response, cancellationToken: cancellationToken);
@@ -77,14 +71,7 @@ public static class EvaluateAsyncPreview
         foreach (var query in queries)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var session = await agent.CreateSessionAsync(cancellationToken);
-            var agentResponse = await agent.RunAsync(query, session, cancellationToken: cancellationToken);
-
-            var messages = new List<ChatMessage> { new(ChatRole.User, query) };
-            foreach (var msg in agentResponse.Messages)
-                messages.Add(msg);
-            var response = new ChatResponse([new ChatMessage(ChatRole.Assistant, agentResponse.Text)]);
-
+            var (agentResponse, messages, response) = await RunQueryAsync(agent, query, cancellationToken);
             conversations.Add((query, agentResponse.Text, messages, response));
         }
 
@@ -103,6 +90,29 @@ public static class EvaluateAsyncPreview
         }
 
         return results;
+    }
+
+    /// <summary>
+    /// Runs the agent for a single query and returns the response plus the formatted conversation.
+    /// Disposes the session when done if it implements <see cref="IAsyncDisposable"/>.
+    /// </summary>
+    private static async Task<(AgentResponse Response, List<ChatMessage> Messages, ChatResponse Chat)>
+        RunQueryAsync(AIAgent agent, string query, CancellationToken cancellationToken)
+    {
+        var session = await agent.CreateSessionAsync(cancellationToken);
+        // Dispose the session when done if it supports async disposal.
+        // This is a no-op for session types that are not IAsyncDisposable.
+        await using (session as IAsyncDisposable)
+        {
+            var agentResponse = await agent.RunAsync(query, session, cancellationToken: cancellationToken);
+
+            var messages = new List<ChatMessage> { new(ChatRole.User, query) };
+            foreach (var msg in agentResponse.Messages)
+                messages.Add(msg);
+            var chat = new ChatResponse([new ChatMessage(ChatRole.Assistant, agentResponse.Text)]);
+
+            return (agentResponse, messages, chat);
+        }
     }
 }
 

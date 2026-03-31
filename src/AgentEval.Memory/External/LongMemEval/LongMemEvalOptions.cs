@@ -10,5 +10,7 @@ namespace AgentEval.Memory.External.LongMemEval;
 /// Currently inherits all configuration from <see cref="ExternalBenchmarkOptions"/>.
 /// Exists as a typed extension point for future LongMemEval-specific settings.
 /// </summary>
-public class LongMemEvalOptions : ExternalBenchmarkOptions;
+public class LongMemEvalOptions : ExternalBenchmarkOptions
+{
+}
 

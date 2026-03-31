@@ -62,7 +62,7 @@ public class LongMemEvalJudge : IExternalBenchmarkJudge
             if (!string.IsNullOrEmpty(firstLine))
             {
                 // Split on any whitespace to get the first token ("yes"/"no"/etc.).
-                var tokens = firstLine.Split((char[])null, StringSplitOptions.RemoveEmptyEntries);
+                var tokens = firstLine.Split(Array.Empty<char>(), StringSplitOptions.RemoveEmptyEntries);
                 if (tokens.Length > 0)
                 {
                     firstToken = tokens[0];

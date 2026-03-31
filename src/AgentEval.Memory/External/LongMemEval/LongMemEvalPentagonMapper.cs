@@ -55,7 +55,7 @@ public static class LongMemEvalPentagonMapper
         //    Does the agent refuse to fabricate answers about non-existent information?
         if (questionResults != null)
         {
-            var absQuestions = questionResults.Where(q => q.QuestionId.Contains("_abs")).ToList();
+            var absQuestions = questionResults.Where(q => q.QuestionId.EndsWith("_abs", StringComparison.Ordinal)).ToList();
             if (absQuestions.Count > 0)
             {
                 var absCorrect = absQuestions.Count(q => q.Correct);

@@ -35,7 +35,7 @@ public class LongMemEvalEntry
 
     /// <summary>Whether this is an abstention question (identified by _abs suffix).</summary>
     [JsonIgnore]
-    public bool IsAbstention => QuestionId.Contains("_abs");
+    public bool IsAbstention => QuestionId.EndsWith("_abs", StringComparison.Ordinal);
 
     [JsonPropertyName("question_date")]
     public string? QuestionDate { get; set; }

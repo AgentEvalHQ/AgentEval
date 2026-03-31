@@ -100,7 +100,26 @@ public static class ConversationExtractor
                 }
                 else if (content is FunctionResultContent result)
                 {
-                    var callId = result.CallId ?? $"result-{Guid.NewGuid():N}";
+                    // If the result has a CallId, use it directly.
+                    // If null, correlate to the most-recently-registered pending call (by highest Order).
+                    // This heuristic works for the typical sequential MAF tool-call pattern where
+                    // function calls and results appear in order. In concurrent or out-of-order scenarios
+                    // (where multiple calls are pending at once), this may mis-correlate results.
+                    // In those cases the result is still recorded — just possibly under the wrong call name.
+                    // A new unique ID is used as a last resort when there are no pending calls at all.
+                    string callId;
+                    if (result.CallId != null)
+                    {
+                        callId = result.CallId;
+                    }
+                    else
+                    {
+                        var latestPending = pendingCalls.Values
+                            .OrderByDescending(c => c.Order)
+                            .FirstOrDefault();
+                        callId = latestPending?.CallId ?? $"result-{Guid.NewGuid():N}";
+                    }
+
                     if (pendingCalls.TryGetValue(callId, out var pending))
                     {
                         pending.Result = result.Result;
