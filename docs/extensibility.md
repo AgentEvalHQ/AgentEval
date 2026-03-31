@@ -758,4 +758,4 @@ public MyMetric(double threshold = 70)
 - [Embedding Metrics](embedding-metrics.md) - Fast similarity evaluation
 - [Benchmarks Guide](benchmarks.md) - Performance benchmarking
 - [Snapshots](snapshots.md) - Snapshot comparison with `ISnapshotComparer` interface
-- [Sample 26: Extensibility](../samples/AgentEval.Samples/Sample26_Extensibility.cs) - End-to-end extensibility demo with custom metrics, exporters, loaders, and attack types
+- [Sample 26: Extensibility](samples/AgentEval.Samples/Sample26_Extensibility.cs) - End-to-end extensibility demo with custom metrics, exporters, loaders, and attack types
