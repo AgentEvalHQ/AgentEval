@@ -296,8 +296,8 @@ Console.WriteLine($"  Estimated Cost: ${result.EstimatedCostUSD:F6}");
 > **🚧 Planned Feature** — `WorkflowPerformanceBenchmark` is planned for a future release.
 > Currently, use `PerformanceBenchmark` with individual agent adapters within your workflow,
 > or use `MAFEvaluationHarness` with `TrackPerformance = true` for end-to-end workflow timing.
-> See [Sample 09](../samples/AgentEval.Samples/Sample09_WorkflowEvaluationReal.cs) (Sequential Workflows) and
-> [Sample 10](../samples/AgentEval.Samples/Sample10_WorkflowWithTools.cs) (Tool-Enabled Workflows) for workflow
+> See [Sample 09](samples/AgentEval.Samples/Sample09_WorkflowEvaluationReal.cs) (Sequential Workflows) and
+> [Sample 10](samples/AgentEval.Samples/Sample10_WorkflowWithTools.cs) (Tool-Enabled Workflows) for workflow
 > performance monitoring patterns.
 
 ---
