@@ -85,11 +85,3 @@ On `ResetSessionAsync()`:
 | Sample 06 (Session Lifecycle) | Shows `CreateSessionAsync` → multi-turn → `ResetSessionAsync` → isolation |
 | Sample 32 (Cross-Session Memory) | Manual memory: `LLMPersistentMemoryAgent` with `_longTermMemory` dict |
 | Sample 33 (AIContextProvider Memory) | MAF-native: `PersistentMemoryProvider : AIContextProvider` in pipeline |
-
-## Future Considerations
-
-### Session Observability (Deferred)
-Currently, `AgentSession.StateBag` is opaque to evaluators. For advanced scenarios, it might be useful to inspect what an `AIContextProvider` stored. Recommendation: defer unless users request it — evaluators should test behavior, not implementation details.
-
-### CompactionStrategy Integration (Deferred)
-`ReducerEvaluator` could be enhanced to configure a MAF agent with a specific `CompactionStrategy` and report pre/post-compaction message counts. Recommendation: defer — keep `AgentEval.Memory` framework-agnostic. Users configure their agents; the evaluator measures results.
