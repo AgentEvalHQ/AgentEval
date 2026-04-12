@@ -65,6 +65,8 @@
     href: rich-evaluation-output-guide.md
   - name: Security Scanning
     href: security-scanning.md
+  - name: MAF Memory Integration
+    href: maf-memory-integration.md
 
 - name: API Reference
   items:

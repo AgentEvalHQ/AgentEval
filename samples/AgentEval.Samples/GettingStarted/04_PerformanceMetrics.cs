@@ -185,25 +185,18 @@ public static class PerformanceMetrics
             .GetChatClient(AIConfig.ModelDeployment)
             .AsIChatClient();
 
-        return new ChatClientAgent(
-            chatClient,
-            new ChatClientAgentOptions
-            {
-                Name = "WriterAgent",
-                ChatOptions = new() { Instructions = "You are a helpful writing assistant. Keep responses concise but informative." }
-            });
+        // .AsAIAgent() is the idiomatic MAF 1.1.0 convenience extension on IChatClient
+        return chatClient.AsAIAgent(
+            name: "WriterAgent",
+            instructions: "You are a helpful writing assistant. Keep responses concise but informative.");
     }
 
     private static AIAgent CreateMockAgent()
     {
         var mockClient = new MockWriterChatClient();
-        return new ChatClientAgent(
-            mockClient,
-            new ChatClientAgentOptions
-            {
-                Name = "WriterAgent (Mock)",
-                ChatOptions = new() { Instructions = "You are a helpful writing assistant." }
-            });
+        return mockClient.AsAIAgent(
+            name: "WriterAgent (Mock)",
+            instructions: "You are a helpful writing assistant.");
     }
 
     private static void PrintHeader()

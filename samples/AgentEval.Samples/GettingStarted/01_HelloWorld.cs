@@ -117,30 +117,23 @@ public static class HelloWorld
             .GetChatClient(AIConfig.ModelDeployment)
             .AsIChatClient();
 
-        return new ChatClientAgent(
-            chatClient,
-            new ChatClientAgentOptions
-            {
-                Name = "GreetingAgent",
-                ChatOptions = new() { Instructions = """
-                    You are a friendly greeting assistant.
-                    When someone introduces themselves, greet them warmly by name.
-                    Keep responses brief and friendly.
-                    """ }
-            });
+        // .AsAIAgent() is the idiomatic MAF 1.1.0 convenience extension on IChatClient
+        return chatClient.AsAIAgent(
+            name: "GreetingAgent",
+            instructions: """
+                You are a friendly greeting assistant.
+                When someone introduces themselves, greet them warmly by name.
+                Keep responses brief and friendly.
+                """);
     }
 
     private static AIAgent CreateMockAgent()
     {
         // For demo without Azure credentials - uses a fake response
         var mockClient = new MockChatClient("Hello Alice! 👋 Nice to meet you!");
-        return new ChatClientAgent(
-            mockClient,
-            new ChatClientAgentOptions
-            {
-                Name = "GreetingAgent (Mock)",
-                ChatOptions = new() { Instructions = "You are a friendly greeting assistant." }
-            });
+        return mockClient.AsAIAgent(
+            name: "GreetingAgent (Mock)",
+            instructions: "You are a friendly greeting assistant.");
     }
 
     private static void PrintHeader()

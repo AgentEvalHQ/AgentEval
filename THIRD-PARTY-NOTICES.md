@@ -6,17 +6,17 @@ AgentEval uses the following third-party libraries. Each is used under its respe
 
 | Package | Version | License | URL |
 |---------|---------|---------|-----|
-| Microsoft.Agents.AI | 1.0.0-rc3 | MIT | https://github.com/microsoft/agents |
-| Microsoft.Agents.AI.OpenAI | 1.0.0-rc3 | MIT | https://github.com/microsoft/agents |
-| Microsoft.Agents.AI.Workflows | 1.0.0-rc3 | MIT | https://github.com/microsoft/agents |
-| Microsoft.Extensions.AI | 10.3.0 | MIT | https://github.com/dotnet/extensions |
-| Microsoft.Extensions.AI.OpenAI | 10.3.0 | MIT | https://github.com/dotnet/extensions |
-| Microsoft.Extensions.AI.Evaluation.Quality | 10.3.0 | MIT | https://github.com/dotnet/extensions |
+| Microsoft.Agents.AI | 1.1.0 | MIT | https://github.com/microsoft/agents |
+| Microsoft.Agents.AI.OpenAI | 1.1.0 | MIT | https://github.com/microsoft/agents |
+| Microsoft.Agents.AI.Workflows | 1.1.0 | MIT | https://github.com/microsoft/agents |
+| Microsoft.Extensions.AI | 10.4.0 | MIT | https://github.com/dotnet/extensions |
+| Microsoft.Extensions.AI.OpenAI | 10.4.0 | MIT | https://github.com/dotnet/extensions |
+| Microsoft.Extensions.AI.Evaluation.Quality | 10.4.0 | MIT | https://github.com/dotnet/extensions |
 | Microsoft.Extensions.DependencyInjection | 9.0.0 | MIT | https://github.com/dotnet/runtime |
 | Microsoft.Extensions.Hosting.Abstractions | 9.0.0 | MIT | https://github.com/dotnet/runtime |
 | Azure.AI.OpenAI | 2.8.0-beta.1 | MIT | https://github.com/Azure/azure-sdk-for-net |
 | Azure.Identity | 1.18.0 | MIT | https://github.com/Azure/azure-sdk-for-net |
-| System.Numerics.Tensors | 10.0.3 | MIT | https://github.com/dotnet/runtime |
+| System.Numerics.Tensors | 10.0.4 | MIT | https://github.com/dotnet/runtime |
 | System.CommandLine | 2.0.3 | MIT | https://github.com/dotnet/command-line-api |
 | YamlDotNet | 16.3.0 | MIT | https://github.com/aaubry/YamlDotNet |
 | PdfSharp-MigraDoc | 6.2.4 | MIT | https://github.com/empira/PDFsharp |

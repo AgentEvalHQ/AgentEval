@@ -268,6 +268,17 @@ var testCase = ConversationalTestCase.Create("Error Recovery")
     .AddUserTurn("Book flight to invalid destination")
     .AddAssistantTurn("I'm sorry, I couldn't find that destination.")
     .Build();
+```
+
+## MAF Session Lifecycle
+
+When using `MAFAgentAdapter`, session management is handled automatically:
+
+- **Within a test case:** All turns share one `AgentSession` — context is retained
+- **On `ResetSessionAsync()`:** A new `AgentSession` is created via `agent.CreateSessionAsync()` — conversation history is cleared
+- **AIContextProvider state persists** across session resets — long-term memory survives
+
+This is how `CrossSessionEvaluator` tests persistent memory: it plants facts, resets the session, then verifies recall. See [MAF Memory Integration](maf-memory-integration.md) for the full concept mapping between AgentEval.Memory and MAF's pipeline architecture.
 
 var result = await runner.RunAsync(testCase);
 

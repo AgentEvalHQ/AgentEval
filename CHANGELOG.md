@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **MAF upgraded from 1.0.0-rc3 to 1.1.0** — All three MAF package references (`Microsoft.Agents.AI`, `Microsoft.Agents.AI.OpenAI`, `Microsoft.Agents.AI.Workflows`) updated to 1.1.0 (first post-GA minor release). Zero AgentEval source code changes required — all changes in 1.1.0 are additive (new `FinishReason` property on `AgentResponse`, internal `ChatClientAgent` refactoring for per-service-call persistence, new Skills/Compaction APIs). Cascading dependency bumps: `Microsoft.Extensions.AI` 10.3.0 → 10.4.0, `Microsoft.Extensions.AI.OpenAI` 10.3.0 → 10.4.0, `Microsoft.Extensions.AI.Evaluation.Quality` 10.3.0 → 10.4.0, `System.Numerics.Tensors` 10.0.3 → 10.0.4. Full test suite (9,129 tests × 3 TFMs) passes with zero failures. See [MAF-Upgrade-Plan.md](MAF/MAF-Upgrade-Plan.md) for full diff analysis.
+- **NuGetConsumer sample** — Updated explicit version pins to MAF 1.1.0 and MEAI 10.4.0 (CPM disabled project).
+- **NuGet metadata** — Updated `PackageReleaseNotes` to reference MAF 1.1.0 + MEAI 10.4.0.
+- **README.md** — Updated MAF compatibility badge and compatibility table to 1.1.0.
+- **docs/installation.md** — Updated compatibility and dependency tables to MAF 1.1.0 + MEAI 10.4.0.
+- **THIRD-PARTY-NOTICES.md** — Synced all MAF/MEAI/Tensors package versions to match `Directory.Packages.props`.
+
+### Fixed
+- **AgentResponseEvent handling in MAFWorkflowEventBridge** — `AgentResponseEvent` (which inherits `WorkflowOutputEvent`) was falling through to the generic `WorkflowOutputEvent` handler, triggering false `WorkflowCompleteEvent` emissions and losing `Usage`/`FinishReason`/`ExecutorId` data. Added an explicit `case AgentResponseEvent` handler before the `WorkflowOutputEvent` case. Emits new `ExecutorAgentResponseEvent` record with per-executor text, token usage, and finish reason.
+
+### Added
+- **`ExecutorAgentResponseEvent` record** — New workflow event type that extends `ExecutorOutputEvent` with `Usage` (TokenUsage?) and `FinishReason` (string?) properties. Backward-compatible via Liskov substitution.
+- **`IHistoryInjectableAgent` on MAFAgentAdapter** — `MAFAgentAdapter` now implements `IHistoryInjectableAgent`, enabling synthetic conversation history injection for evaluation. Injected history is prepended to messages on next `InvokeAsync`/`InvokeStreamingAsync`, then cleared after first use.
+- **Getting Started samples updated to `.AsAIAgent()` pattern** — Samples 01-05 now use `chatClient.AsAIAgent(name:, instructions:, tools:)` instead of `new ChatClientAgent(client, new ChatClientAgentOptions { ... })`. Follows MAF 1.1.0 recommended idiomatic pattern.
+- **Sample: [MessageHandler] Source-Generated Executors** — New sample (C4) showing MAF's `[MessageHandler]` partial class executor pattern: deterministic text pipeline (Sanitizer → Classifier → Formatter) evaluated with standard AgentEval assertions. No LLM needed, runs offline. Added `Microsoft.Agents.AI.Workflows.Generators` 1.1.0 dependency for source generation.
+- **Sample: AIContextProvider-Based Persistent Memory** — New sample (G6) demonstrating MAF's native `AIContextProvider` for persistent memory. `PersistentMemoryProvider` subclass injects stored facts via `ProvideAIContextAsync()` and extracts facts via `StoreAIContextAsync()`. Evaluated with `CrossSessionEvaluator` — zero evaluator changes required.
+- **Sample: AgentSession Lifecycle** — New sample (A6) showing MAF session management: `CreateSessionAsync` → multi-turn conversation → `ResetSessionAsync` → session isolation verification. Demonstrates how `MAFAgentAdapter.ResetSessionAsync()` maps to `agent.CreateSessionAsync()`.
+- **docs/maf-memory-integration.md** — New documentation mapping AgentEval.Memory concepts to MAF 1.1.0 equivalents (session lifecycle, AIContextProvider, CompactionStrategy). Includes architecture diagrams and adapter selection guide.
+- **4 new MAFWorkflowEventBridge tests** — Agent-based workflow tests: `YieldsExecutorAgentResponseEvent`, `PreservesExecutorId`, `IsNotMistakenForWorkflowOutput`, `IsSubtypeOfExecutorOutputEvent`.
+- **5 new MAFAgentAdapter tests** — History injection tests: `ImplementsIHistoryInjectableAgent`, `MessagesIncludedInNextInvocation`, `ClearedAfterFirstInvocation`, `WithNoHistory_OnlyPromptSent`, `ResetSessionAsync_ClearsInjectedHistory`.
+
 ---
 
 ## [0.6.0-beta] - 2026-03-05

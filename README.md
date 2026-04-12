@@ -15,7 +15,7 @@
   <a href="https://joslat.github.io/AgentEval/"><img src="https://img.shields.io/badge/docs-GitHub%20Pages-blue" alt="Documentation" /></a>
   <a href="https://www.nuget.org/packages/AgentEval"><img src="https://img.shields.io/nuget/v/AgentEval.svg" alt="NuGet" /></a>
   <a href="https://github.com/AgentEvalHQ/AgentEval/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="License" /></a>
-  <img src="https://img.shields.io/badge/MAF-1.0.0--rc3-blueviolet" alt="MAF 1.0.0-rc3" />
+  <img src="https://img.shields.io/badge/MAF-1.1.0-blueviolet" alt="MAF 1.1.0" />
   <img src="https://img.shields.io/badge/.NET-8.0%20|%209.0%20|%2010.0-512BD4" alt=".NET 8.0 | 9.0 | 10.0" />
 </p>
 
@@ -411,8 +411,8 @@ dotnet add package AgentEval --prerelease
 
 | Dependency | Version |
 |------------|----------|
-| Microsoft Agent Framework (MAF) | `1.0.0-rc3` |
-| Microsoft.Extensions.AI | `10.3.0` |
+| Microsoft Agent Framework (MAF) | `1.1.0` |
+| Microsoft.Extensions.AI | `10.4.0` |
 | .NET | 8.0, 9.0, 10.0 |
 
 **Single package, modular internals:**
