@@ -22,7 +22,7 @@ public class MAFAgentAdapter : IStreamableAgent, ISessionResettableAgent, IHisto
     /// Create an adapter for an AIAgent.
     /// </summary>
     /// <param name="agent">The MAF agent to adapt.</param>
-    /// <param name="session">Optional session for conversation context. If null, a new session is lazily created on first invocation and reused for subsequent calls.</param>
+    /// <param name="session">Optional session for conversation context. If null, a new session is lazily created on first invocation and reused for all subsequent calls on this adapter instance.</param>
     public MAFAgentAdapter(AIAgent agent, AgentSession? session = null)
     {
         _agent = agent ?? throw new ArgumentNullException(nameof(agent));
