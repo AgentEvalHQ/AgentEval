@@ -7,8 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+---
+
+## [0.7.0-beta] - 2026-04-12
+
+**MAF 1.1.0 GA + Memory Integration + Workflow Enhancements** 🚀
+
 ### Changed
-- **MAF upgraded from 1.0.0-rc3 to 1.1.0** — All three MAF package references (`Microsoft.Agents.AI`, `Microsoft.Agents.AI.OpenAI`, `Microsoft.Agents.AI.Workflows`) updated to 1.1.0 (first post-GA minor release). Zero AgentEval source code changes required — all changes in 1.1.0 are additive (new `FinishReason` property on `AgentResponse`, internal `ChatClientAgent` refactoring for per-service-call persistence, new Skills/Compaction APIs). Cascading dependency bumps: `Microsoft.Extensions.AI` 10.3.0 → 10.4.0, `Microsoft.Extensions.AI.OpenAI` 10.3.0 → 10.4.0, `Microsoft.Extensions.AI.Evaluation.Quality` 10.3.0 → 10.4.0, `System.Numerics.Tensors` 10.0.3 → 10.0.4. Full test suite (9,129 tests × 3 TFMs) passes with zero failures. See [MAF-Upgrade-Plan.md](MAF/MAF-Upgrade-Plan.md) for full diff analysis.
+- **MAF upgraded from 1.0.0-rc3 to 1.1.0** — All three MAF package references (`Microsoft.Agents.AI`, `Microsoft.Agents.AI.OpenAI`, `Microsoft.Agents.AI.Workflows`) updated to 1.1.0 (first post-GA minor release). Zero source code changes required for the version bump alone — all changes in 1.1.0 are additive (new `FinishReason` property on `AgentResponse`, internal `ChatClientAgent` refactoring for per-service-call persistence, new Skills/Compaction APIs). Cascading dependency bumps: `Microsoft.Extensions.AI` 10.3.0 → 10.4.0, `Microsoft.Extensions.AI.OpenAI` 10.3.0 → 10.4.0, `Microsoft.Extensions.AI.Evaluation.Quality` 10.3.0 → 10.4.0, `System.Numerics.Tensors` 10.0.3 → 10.0.4. Full test suite (9,129 tests × 3 TFMs) passes with zero failures. See [MAF-Upgrade-Plan.md](MAF/MAF-Upgrade-Plan.md) for full diff analysis.
 - **NuGetConsumer sample** — Updated explicit version pins to MAF 1.1.0 and MEAI 10.4.0 (CPM disabled project).
 - **NuGet metadata** — Updated `PackageReleaseNotes` to reference MAF 1.1.0 + MEAI 10.4.0.
 - **README.md** — Updated MAF compatibility badge and compatibility table to 1.1.0.
@@ -642,7 +648,8 @@ This release marks the transition from alpha to beta. The framework is now featu
 - `AgentEval.Tracing` (OTel + run artifacts) - planned
 - `AgentEval.Studio` (workflow visualizer / time-travel UI) - future
 
-[Unreleased]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.6.0-beta...HEAD
+[Unreleased]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.7.0-beta...HEAD
+[0.7.0-beta]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.6.0-beta...v0.7.0-beta
 [0.6.0-beta]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.5.4-beta...v0.6.0-beta
 [0.5.2-beta]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.5.1-beta...v0.5.2-beta
 [0.5.1-beta]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.4.0-beta...v0.5.1-beta

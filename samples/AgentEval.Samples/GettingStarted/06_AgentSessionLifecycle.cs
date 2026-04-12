@@ -11,9 +11,9 @@ using AgentEval.Testing;
 namespace AgentEval.Samples;
 
 /// <summary>
-/// Sample 06: AgentSession Lifecycle — MAF session management with evaluation
+/// AgentSession Lifecycle — MAF session management with evaluation
 /// 
-/// This demonstrates:
+/// This sample demonstrates:
 /// - MAF's session lifecycle: CreateSessionAsync → multi-turn → ResetSessionAsync
 /// - How MAFAgentAdapter maps ResetSessionAsync to new session creation
 /// - Multi-turn conversations with session state (context retention)

@@ -14,9 +14,9 @@ using AgentEval.Memory.Models;
 namespace AgentEval.Samples;
 
 /// <summary>
-/// Sample 33: AIContextProvider-Based Persistent Memory
+/// AIContextProvider-Based Persistent Memory
 /// 
-/// This demonstrates:
+/// This sample demonstrates:
 /// - MAF's native AIContextProvider pattern for persistent memory
 /// - ProvideAIContextAsync injects stored facts before each LLM call
 /// - StoreAIContextAsync extracts and persists facts after each response
@@ -264,8 +264,8 @@ internal sealed class PersistentMemoryProvider : AIContextProvider
 
             // Extract content after common prefixes
             var content = text;
-            string[] prefixes = ["please remember this:", "please remember:", "remember:",
-                "please remember this important information:", "please note:"];
+            string[] prefixes = ["please remember this important information:", "please remember this:",
+                "please remember:", "remember:", "please note:"];
 
             foreach (var prefix in prefixes)
             {

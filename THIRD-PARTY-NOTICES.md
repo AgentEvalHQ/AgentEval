@@ -25,6 +25,7 @@ AgentEval uses the following third-party libraries. Each is used under its respe
 
 | Package | Version | License | URL |
 |---------|---------|---------|-----|
+| Microsoft.Agents.AI.Workflows.Generators | 1.1.0 | MIT | https://github.com/microsoft/agents |
 | Microsoft.SourceLink.GitHub | 8.0.0 | MIT | https://github.com/dotnet/sourcelink |
 
 ## Test Dependencies (not shipped)

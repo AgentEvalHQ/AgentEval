@@ -10,9 +10,9 @@ using AgentEval.Models.Serialization;
 namespace AgentEval.Samples;
 
 /// <summary>
-/// Sample 11: Workflow with [MessageHandler] Source-Generated Executors
+/// Workflow with [MessageHandler] Source-Generated Executors
 /// 
-/// This demonstrates:
+/// This sample demonstrates:
 /// - MAF's recommended [MessageHandler] partial class executor pattern
 /// - Source-generated routing (zero reflection, AOT-compatible)
 /// - Evaluating [MessageHandler] workflows with AgentEval's standard assertions
