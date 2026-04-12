@@ -5,6 +5,7 @@
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Text;
+using AgentEval.Core;
 using AgentEval.Models;
 using Microsoft.Extensions.AI;
 using MAFWorkflows = Microsoft.Agents.AI.Workflows;
@@ -232,6 +233,52 @@ public static class MAFWorkflowEventBridge
                         exception?.Message ?? "Executor failed",
                         exception?.StackTrace,
                         exception?.GetType().Name);
+                    break;
+
+                // ── Agent complete (non-streaming) response ──────────────
+                // AgentResponseEvent inherits WorkflowOutputEvent, so this case
+                // MUST come before the generic WorkflowOutputEvent handler.
+
+                case MAFWorkflows.AgentResponseEvent agentResponse:
+                    // Non-streaming complete response from an executor.
+                    // Extract per-executor text, token usage, and finish reason.
+                    var responseExecutorId = NormalizeId(agentResponse.ExecutorId);
+
+                    // Flush any previously accumulated streaming output for a different executor
+                    if (currentExecutorId != null && currentExecutorId != responseExecutorId && outputAccumulator.Length > 0)
+                    {
+                        yield return new ExecutorOutputEvent(
+                            currentExecutorId,
+                            outputAccumulator.ToString());
+                        outputAccumulator.Clear();
+                    }
+                    currentExecutorId = responseExecutorId;
+
+                    // Build response text: prefer accumulated streaming text, fall back to Response.Text
+                    var agentResponseText = outputAccumulator.Length > 0
+                        ? outputAccumulator.ToString()
+                        : agentResponse.Response.Text;
+                    outputAccumulator.Clear();
+
+                    // Extract token usage from AgentResponse.Usage
+                    TokenUsage? responseUsage = null;
+                    if (agentResponse.Response.Usage is { } usage)
+                    {
+                        responseUsage = new TokenUsage
+                        {
+                            PromptTokens = (int)(usage.InputTokenCount ?? 0),
+                            CompletionTokens = (int)(usage.OutputTokenCount ?? 0)
+                        };
+                    }
+
+                    // Extract finish reason (ChatFinishReason.ToString())
+                    var finishReason = agentResponse.Response.FinishReason?.ToString();
+
+                    yield return new ExecutorAgentResponseEvent(
+                        ExecutorId: responseExecutorId,
+                        Output: agentResponseText,
+                        Usage: responseUsage,
+                        FinishReason: finishReason);
                     break;
 
                 // ── Workflow-level events ────────────────────────────────

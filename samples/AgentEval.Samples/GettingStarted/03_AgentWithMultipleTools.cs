@@ -235,51 +235,38 @@ public static class AgentWithMultipleTools
             .GetChatClient(AIConfig.ModelDeployment)
             .AsIChatClient();
 
-        return new ChatClientAgent(
-            chatClient,
-            new ChatClientAgentOptions
-            {
-                Name = "ResearchAgent",
-                ChatOptions = new ChatOptions
-                {
-                    Instructions = """
-                        You are a research assistant.
-                        When researching a topic:
-                        1. FIRST use SearchTool to find information
-                        2. THEN use SummarizeTool to create a summary
-                        3. Optionally use FactCheckTool to verify claims
-                        
-                        Always follow this order for best results.
-                        """,
-                    Tools = 
-                    [
-                        AIFunctionFactory.Create(SearchTool),
-                        AIFunctionFactory.Create(SummarizeTool),
-                        AIFunctionFactory.Create(FactCheckTool)
-                    ]
-                }
-            });
+        // .AsAIAgent() is the idiomatic MAF 1.1.0 convenience extension on IChatClient
+        return chatClient.AsAIAgent(
+            name: "ResearchAgent",
+            instructions: """
+                You are a research assistant.
+                When researching a topic:
+                1. FIRST use SearchTool to find information
+                2. THEN use SummarizeTool to create a summary
+                3. Optionally use FactCheckTool to verify claims
+                
+                Always follow this order for best results.
+                """,
+            tools:
+            [
+                AIFunctionFactory.Create(SearchTool),
+                AIFunctionFactory.Create(SummarizeTool),
+                AIFunctionFactory.Create(FactCheckTool)
+            ]);
     }
 
     private static AIAgent CreateMockResearchAgent()
     {
         var mockClient = new MockResearchChatClient();
-        return new ChatClientAgent(
-            mockClient,
-            new ChatClientAgentOptions
-            {
-                Name = "ResearchAgent (Mock)",
-                ChatOptions = new ChatOptions
-                {
-                    Instructions = "You are a research assistant.",
-                    Tools = 
-                    [
-                        AIFunctionFactory.Create(SearchTool),
-                        AIFunctionFactory.Create(SummarizeTool),
-                        AIFunctionFactory.Create(FactCheckTool)
-                    ]
-                }
-            });
+        return mockClient.AsAIAgent(
+            name: "ResearchAgent (Mock)",
+            instructions: "You are a research assistant.",
+            tools:
+            [
+                AIFunctionFactory.Create(SearchTool),
+                AIFunctionFactory.Create(SummarizeTool),
+                AIFunctionFactory.Create(FactCheckTool)
+            ]);
     }
 
     [Description("Searches for information on a topic. Returns relevant content.")]

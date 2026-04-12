@@ -168,37 +168,24 @@ public static class AgentWithOneTool
             .GetChatClient(AIConfig.ModelDeployment)
             .AsIChatClient();
 
-        return new ChatClientAgent(
-            chatClient,
-            new ChatClientAgentOptions
-            {
-                Name = "MathAgent",
-                ChatOptions = new ChatOptions
-                {
-                    Instructions = """
-                        You are a helpful math assistant.
-                        When asked to perform calculations, ALWAYS use the CalculatorTool.
-                        Provide the result in a clear, conversational way.
-                        """,
-                    Tools = [AIFunctionFactory.Create(CalculatorTool)]
-                }
-            });
+        // .AsAIAgent() is the idiomatic MAF 1.1.0 convenience extension on IChatClient
+        return chatClient.AsAIAgent(
+            name: "MathAgent",
+            instructions: """
+                You are a helpful math assistant.
+                When asked to perform calculations, ALWAYS use the CalculatorTool.
+                Provide the result in a clear, conversational way.
+                """,
+            tools: [AIFunctionFactory.Create(CalculatorTool)]);
     }
 
     private static AIAgent CreateMockCalculatorAgent()
     {
         var mockClient = new MockCalculatorChatClient();
-        return new ChatClientAgent(
-            mockClient,
-            new ChatClientAgentOptions
-            {
-                Name = "MathAgent (Mock)",
-                ChatOptions = new ChatOptions
-                {
-                    Instructions = "You are a math assistant.",
-                    Tools = [AIFunctionFactory.Create(CalculatorTool)]
-                }
-            });
+        return mockClient.AsAIAgent(
+            name: "MathAgent (Mock)",
+            instructions: "You are a math assistant.",
+            tools: [AIFunctionFactory.Create(CalculatorTool)]);
     }
 
     [Description("Performs basic arithmetic operations. Supports add, subtract, multiply, divide.")]
