@@ -22,7 +22,7 @@ public class MAFAgentAdapter : IStreamableAgent, ISessionResettableAgent, IHisto
     /// Create an adapter for an AIAgent.
     /// </summary>
     /// <param name="agent">The MAF agent to adapt.</param>
-    /// <param name="session">Optional session for conversation context. If null, a new session is created per invocation.</param>
+    /// <param name="session">Optional session for conversation context. If null, a new session is lazily created on first invocation and reused for all subsequent calls on this adapter instance.</param>
     public MAFAgentAdapter(AIAgent agent, AgentSession? session = null)
     {
         _agent = agent ?? throw new ArgumentNullException(nameof(agent));
@@ -35,11 +35,11 @@ public class MAFAgentAdapter : IStreamableAgent, ISessionResettableAgent, IHisto
     /// <inheritdoc/>
     public async Task<AgentResponse> InvokeAsync(string prompt, CancellationToken cancellationToken = default)
     {
-        var session = _session ?? await _agent.CreateSessionAsync(cancellationToken).ConfigureAwait(false);
+        _session ??= await _agent.CreateSessionAsync(cancellationToken).ConfigureAwait(false);
         
         // Build message list: injected history + current prompt
         var messages = BuildMessages(prompt);
-        var response = await _agent.RunAsync(messages, session, cancellationToken: cancellationToken).ConfigureAwait(false);
+        var response = await _agent.RunAsync(messages, _session, cancellationToken: cancellationToken).ConfigureAwait(false);
         
         // Clear injected history after first use — the agent's session tracks it going forward
         _injectedHistory.Clear();
@@ -68,13 +68,13 @@ public class MAFAgentAdapter : IStreamableAgent, ISessionResettableAgent, IHisto
         string prompt, 
         [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
-        var session = _session ?? await _agent.CreateSessionAsync(cancellationToken).ConfigureAwait(false);
+        _session ??= await _agent.CreateSessionAsync(cancellationToken).ConfigureAwait(false);
         TokenUsage? capturedUsage = null;
         
         // Build message list: injected history + current prompt
         var messages = BuildMessages(prompt);
         
-        await foreach (var update in _agent.RunStreamingAsync(messages, session, cancellationToken: cancellationToken).ConfigureAwait(false))
+        await foreach (var update in _agent.RunStreamingAsync(messages, _session, cancellationToken: cancellationToken).ConfigureAwait(false))
         {
             // Clear injected history after streaming has started successfully
             if (_injectedHistory.Count > 0)
