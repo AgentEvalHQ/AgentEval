@@ -4,7 +4,6 @@
 
 using System.Runtime.CompilerServices;
 using System.Text.Json;
-using AgentEval.Core;
 using AgentEval.MAF;
 using AgentEval.Models;
 using Microsoft.Agents.AI;

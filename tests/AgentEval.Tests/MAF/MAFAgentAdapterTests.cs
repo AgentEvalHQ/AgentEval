@@ -7,7 +7,6 @@ using AgentEval.Core;
 using AgentEval.MAF;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
-using AgentResponse = AgentEval.Core.AgentResponse;
 using MAFAgentResponse = Microsoft.Agents.AI.AgentResponse;
 
 namespace AgentEval.Tests.MAF;

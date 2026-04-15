@@ -74,11 +74,12 @@ public class MAFAgentAdapter : IStreamableAgent, ISessionResettableAgent, IHisto
         // Build message list: injected history + current prompt
         var messages = BuildMessages(prompt);
         
-        // Clear injected history after first use — the agent's session tracks it going forward
-        _injectedHistory.Clear();
-        
         await foreach (var update in _agent.RunStreamingAsync(messages, session, cancellationToken: cancellationToken).ConfigureAwait(false))
         {
+            // Clear injected history after streaming has started successfully
+            if (_injectedHistory.Count > 0)
+                _injectedHistory.Clear();
+            
             foreach (var content in update.Contents)
             {
                 switch (content)
