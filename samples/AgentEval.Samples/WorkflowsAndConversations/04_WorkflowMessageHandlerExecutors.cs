@@ -63,7 +63,7 @@ public static partial class WorkflowMessageHandlerExecutors
         var testCase = new WorkflowTestCase
         {
             Name = "Text Pipeline — Sanitize, Classify, Format",
-            Input = "  Hello, WORLD!  This is a <b>TEST</b> message from sample #11.  ",
+            Input = "  Hello, WORLD!  This is a <b>TEST</b> message from sample C4.  ",
             Description = "Tests deterministic [MessageHandler] executor pipeline (no LLM)",
             ExpectedExecutors = ["Sanitizer", "Classifier", "Formatter"],
             StrictExecutorOrder = true,
@@ -237,7 +237,7 @@ public static partial class WorkflowMessageHandlerExecutors
         Console.WriteLine(@"
 ╔═══════════════════════════════════════════════════════════════════════════════╗
 ║                                                                               ║
-║   🔧 SAMPLE 11: [MessageHandler] SOURCE-GENERATED EXECUTORS                  ║
+║   🔧 SAMPLE C4: [MessageHandler] SOURCE-GENERATED EXECUTORS                  ║
 ║   Deterministic Pipeline — No LLM Required                                    ║
 ║                                                                               ║
 ╚═══════════════════════════════════════════════════════════════════════════════╝

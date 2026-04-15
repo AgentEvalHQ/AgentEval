@@ -13,7 +13,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 namespace AgentEval.Samples;
 
 /// <summary>
-/// Sample 30: Memory Scenarios - Targeted memory tests with evaluators
+/// Sample G3: Memory Scenarios - Targeted memory tests with evaluators
 ///
 /// This demonstrates:
 /// - Using ReachBackEvaluator to test recall depth through noise
@@ -239,7 +239,7 @@ public static class MemoryScenariosDemo
     {
         Console.WriteLine();
         Console.WriteLine("═══════════════════════════════════════════════════════════════════");
-        Console.WriteLine("🔬 AgentEval Memory - Sample 30: Memory Scenarios & Evaluators");
+        Console.WriteLine("🔬 AgentEval Memory - Sample G3: Memory Scenarios & Evaluators");
         Console.WriteLine("═══════════════════════════════════════════════════════════════════");
         Console.WriteLine("Targeted memory testing with reach-back depth and reducer fidelity...");
         Console.WriteLine();

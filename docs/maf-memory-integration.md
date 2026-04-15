@@ -18,7 +18,7 @@ The two systems are complementary, not competing.
 | `ISessionResettableAgent.ResetSessionAsync()` | `agent.CreateSessionAsync()` (new session) | **Same effect.** `MAFAgentAdapter.ResetSessionAsync()` calls `CreateSessionAsync()` internally. New session = fresh conversation history. |
 | `IHistoryInjectableAgent.InjectConversationHistory()` | `ChatHistoryProvider.ProvideChatHistoryAsync()` | **Different purpose.** AgentEval injects *synthetic test data* to skip LLM setup calls. MAF providers manage *real* conversation history. `MAFAgentAdapter` implements both. |
 | `ChatClientAgentAdapter._conversationHistory` | `InMemoryChatHistoryProvider` | **Reimplementation.** Both maintain `List<ChatMessage>`. `ChatClientAgentAdapter` does this outside MAF's pipeline (for raw `IChatClient` wrapping). |
-| `LLMPersistentMemoryAgent` (Sample 32) | `AIContextProvider` subclass | **Same pattern, different implementation.** Manual memory management vs. pipeline-integrated. See Sample 33 for the MAF-native approach. |
+| `LLMPersistentMemoryAgent` (Sample G5) | `AIContextProvider` subclass | **Same pattern, different implementation.** Manual memory management vs. pipeline-integrated. See Sample G6 for the MAF-native approach. |
 | `ReducerEvaluator` | `CompactionStrategy` (experimental) | **Complementary.** `ReducerEvaluator` *measures* compression quality. `CompactionStrategy` *performs* compression. Different layers — one evaluates, the other executes. |
 | `CrossSessionEvaluator` | `AgentSession` lifecycle | **Compatible.** Evaluator calls `ResetSessionAsync()` → adapter creates new session → `ChatHistoryProvider` loses history → `AIContextProvider` retains long-term memory. Correctly tests persistent memory. |
 | `ReachBackEvaluator` | `InMemoryChatHistoryProvider` + reducers | **Compatible.** Noise turns fill context window → reducers may drop early turns → evaluator measures what the agent still recalls. |
@@ -82,9 +82,9 @@ On `ResetSessionAsync()`:
 
 | Sample | Description |
 |---|---|
-| Sample 06 (Session Lifecycle) | Shows `CreateSessionAsync` → multi-turn → `ResetSessionAsync` → isolation |
-| Sample 32 (Cross-Session Memory) | Manual memory: `LLMPersistentMemoryAgent` with `_longTermMemory` dict |
-| Sample 33 (AIContextProvider Memory) | MAF-native: `PersistentMemoryProvider : AIContextProvider` in pipeline |
+| Sample A6 (Session Lifecycle) | Shows `CreateSessionAsync` → multi-turn → `ResetSessionAsync` → isolation |
+| Sample G5 (Cross-Session Memory) | Manual memory: `LLMPersistentMemoryAgent` with `_longTermMemory` dict |
+| Sample G6 (AIContextProvider Memory) | MAF-native: `PersistentMemoryProvider : AIContextProvider` in pipeline |
 
 ## Future Considerations
 

@@ -13,7 +13,7 @@ using System.ComponentModel;
 namespace AgentEval.Samples;
 
 /// <summary>
-/// Sample 02: Agent with One Tool - Tool tracking and assertions
+/// Sample A2: Agent with One Tool - Tool tracking and assertions
 /// 
 /// This demonstrates:
 /// - Creating an agent with a tool
@@ -153,7 +153,7 @@ public static class AgentWithOneTool
         Console.WriteLine("   • .HaveNoErrors() verifies ALL tools completed successfully");
         Console.WriteLine("   • 💡 Use 'because:' to document WHY assertions matter!");
         
-        Console.WriteLine("\n🔗 NEXT: Run Sample 03 to see multi-tool ordering!\n");
+        Console.WriteLine("\n🔗 NEXT: Run Sample A3 to see multi-tool ordering!\n");
     }
 
     private static AIAgent CreateCalculatorAgent()
@@ -212,7 +212,7 @@ public static class AgentWithOneTool
         Console.WriteLine(@"
 ╔═══════════════════════════════════════════════════════════════════════════════╗
 ║                                                                               ║
-║   🔧 SAMPLE 02: AGENT WITH ONE TOOL                                          ║
+║   🔧 SAMPLE A2: AGENT WITH ONE TOOL                                          ║
 ║   Tool tracking and fluent assertions                                         ║
 ║                                                                               ║
 ╚═══════════════════════════════════════════════════════════════════════════════╝

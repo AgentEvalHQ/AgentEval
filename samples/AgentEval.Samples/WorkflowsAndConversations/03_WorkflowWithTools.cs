@@ -14,7 +14,7 @@ using AgentEval.Models.Serialization;
 namespace AgentEval.Samples;
 
 /// <summary>
-/// Sample 10: Workflow With Tools — TripPlanner Pipeline
+/// Sample C3: Workflow With Tools — TripPlanner Pipeline
 /// 
 /// This demonstrates:
 /// - MAF Workflow where multiple agents use tools (function calling)
@@ -559,7 +559,7 @@ public static class WorkflowWithTools
         Console.WriteLine(@"
 ╔═══════════════════════════════════════════════════════════════════════════════╗
 ║                                                                               ║
-║   🧳 SAMPLE 10: WORKFLOW WITH TOOLS — TripPlanner Pipeline                   ║
+║   🧳 SAMPLE C3: WORKFLOW WITH TOOLS — TripPlanner Pipeline                   ║
 ║   TripPlanner → FlightReservation → HotelReservation → Presenter             ║
 ║                                                                               ║
 ╚═══════════════════════════════════════════════════════════════════════════════╝
@@ -572,7 +572,7 @@ public static class WorkflowWithTools
         Console.ForegroundColor = ConsoleColor.Yellow;
         Console.WriteLine(@"
    ┌─────────────────────────────────────────────────────────────────────────────┐
-   │  ⚠️  SKIPPING SAMPLE 10 - Azure OpenAI Credentials Required               │
+   │  ⚠️  SKIPPING SAMPLE C3 - Azure OpenAI Credentials Required               │
    ├─────────────────────────────────────────────────────────────────────────────┤
    │  This sample runs a real TripPlanner MAF workflow with tool-calling agents. │
    │                                                                             │

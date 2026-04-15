@@ -13,7 +13,7 @@ using System.ComponentModel;
 namespace AgentEval.Samples;
 
 /// <summary>
-/// Sample 03: Agent with Multiple Tools - Ordering, timing, and timeline
+/// Sample A3: Agent with Multiple Tools - Ordering, timing, and timeline
 /// 
 /// This demonstrates:
 /// - Agent with multiple tools
@@ -220,7 +220,7 @@ public static class AgentWithMultipleTools
         Console.WriteLine("   • Timeline shows visual tool execution flow");
         Console.WriteLine("   • Streaming provides real-time tool status");
         
-        Console.WriteLine("\n🔗 NEXT: Run Sample 04 to see performance metrics!\n");
+        Console.WriteLine("\n🔗 NEXT: Run Sample A4 to see performance metrics!\n");
     }
 
     private static AIAgent CreateResearchAgent()
@@ -309,7 +309,7 @@ public static class AgentWithMultipleTools
         Console.WriteLine(@"
 ╔═══════════════════════════════════════════════════════════════════════════════╗
 ║                                                                               ║
-║   🔧 SAMPLE 03: AGENT WITH MULTIPLE TOOLS                                    ║
+║   🔧 SAMPLE A3: AGENT WITH MULTIPLE TOOLS                                    ║
 ║   Tool ordering, timing, and timeline visualization                          ║
 ║                                                                               ║
 ╚═══════════════════════════════════════════════════════════════════════════════╝

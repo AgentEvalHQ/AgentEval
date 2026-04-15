@@ -148,7 +148,7 @@ public static class AgentSessionLifecycle
         Console.WriteLine(@"
 ╔═══════════════════════════════════════════════════════════════════════════════╗
 ║                                                                               ║
-║   🔄 SAMPLE 06: AgentSession Lifecycle                                        ║
+║   🔄 SAMPLE A6: AgentSession Lifecycle                                        ║
 ║   MAF Session Management with Evaluation                                      ║
 ║                                                                               ║
 ╚═══════════════════════════════════════════════════════════════════════════════╝
@@ -161,7 +161,7 @@ public static class AgentSessionLifecycle
         Console.ForegroundColor = ConsoleColor.Yellow;
         Console.WriteLine(@"
    ┌─────────────────────────────────────────────────────────────────────────────┐
-   │  ⚠️  SKIPPING SAMPLE 06 - Azure OpenAI Credentials Required               │
+   │  ⚠️  SKIPPING SAMPLE A6 - Azure OpenAI Credentials Required               │
    ├─────────────────────────────────────────────────────────────────────────────┤
    │  This sample demonstrates AgentSession lifecycle with real LLM calls.       │
    │                                                                             │
@@ -205,7 +205,7 @@ public static class AgentSessionLifecycle
 │     The evaluator calls the same ResetSessionAsync() you see here              │
 │                                                                                 │
 │  6. For persistent memory across resets, use AIContextProvider:                 │
-│     See Sample 33 (AIContextProvider Memory) for the native MAF pattern        │
+│     See Sample G6 (AIContextProvider Memory) for the native MAF pattern        │
 │                                                                                 │
 └─────────────────────────────────────────────────────────────────────────────────┘
 ");

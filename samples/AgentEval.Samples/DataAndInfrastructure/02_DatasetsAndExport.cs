@@ -13,7 +13,7 @@ using AgentEval.Models;
 namespace AgentEval.Samples;
 
 /// <summary>
-/// Sample 11: Datasets and Export - Rich Output Formats &amp; Visual Reports
+/// Sample F2: Datasets and Export - Rich Output Formats &amp; Visual Reports
 /// 
 /// This demonstrates AgentEval's comprehensive output format ecosystem:
 /// - Loading test datasets from YAML using DatasetLoaderFactory
@@ -442,7 +442,7 @@ public static class DatasetsAndExport
         Console.WriteLine(@"
 ╔═══════════════════════════════════════════════════════════════════════════════╗
 ║                                                                               ║
-║   📦 SAMPLE 11: RICH OUTPUT FORMATS & VISUAL REPORTS                         ║
+║   📦 SAMPLE F2: RICH OUTPUT FORMATS & VISUAL REPORTS                         ║
 ║   Interactive HTML, charts, CI/CD integration + 6 export formats             ║
 ║                                                                               ║
 ╚═══════════════════════════════════════════════════════════════════════════════╝
@@ -455,7 +455,7 @@ public static class DatasetsAndExport
         Console.ForegroundColor = ConsoleColor.Yellow;
         Console.WriteLine(@"
    ┌─────────────────────────────────────────────────────────────────────────────┐
-   │  ⚠️  SKIPPING SAMPLE 11 - Azure OpenAI Credentials Required               │
+   │  ⚠️  SKIPPING SAMPLE F2 - Azure OpenAI Credentials Required               │
    ├─────────────────────────────────────────────────────────────────────────────┤
    │  This sample loads a real dataset and runs batch evaluations.               │
    │                                                                             │
@@ -477,7 +477,7 @@ public static class DatasetsAndExport
         Console.WriteLine("   • CI/CD Ready: GitHub Actions, Azure DevOps, Jenkins integration");
         Console.WriteLine("   • Visual Console Output: ASCII charts, performance tables, rich formatting");
         Console.WriteLine("   • Business Intelligence: CSV export for Excel/BI tool analysis");
-        Console.WriteLine("\n🔗 NEXT: Run Sample 12 for policy and safety evaluation!");
+        Console.WriteLine("\n🔗 NEXT: Run Sample E1 for policy and safety evaluation!");
         Console.WriteLine("📊 TIP: Open the HTML report (results.html) for interactive experience!\n");
     }
 }

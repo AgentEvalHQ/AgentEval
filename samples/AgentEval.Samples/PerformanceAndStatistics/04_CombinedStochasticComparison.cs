@@ -15,7 +15,7 @@ using ChatOptions = Microsoft.Extensions.AI.ChatOptions;
 namespace AgentEval.Samples;
 
 /// <summary>
-/// Sample 16: Combined Stochastic + Model Comparison
+/// Sample D4: Combined Stochastic + Model Comparison
 /// 
 /// This demonstrates:
 /// - Running stochastic tests across multiple models
@@ -261,7 +261,7 @@ public static class CombinedStochasticComparison
         Console.WriteLine("""
 
         ╔═══════════════════════════════════════════════════════════════╗
-        ║  Sample 16: Combined Stochastic + Model Comparison            ║
+        ║  Sample D4: Combined Stochastic + Model Comparison            ║
         ║  Compare models with statistical rigor (3 runs each)          ║
         ╚═══════════════════════════════════════════════════════════════╝
 

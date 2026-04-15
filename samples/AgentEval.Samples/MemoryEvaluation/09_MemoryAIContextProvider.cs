@@ -24,7 +24,7 @@ namespace AgentEval.Samples;
 /// - CrossSessionEvaluator works unchanged — it sees IEvaluableAgent
 /// 
 /// Architecture comparison:
-///   Manual (Sample 32): Agent manually manages _longTermMemory + _conversationHistory
+///   Manual (Sample G5): Agent manually manages _longTermMemory + _conversationHistory
 ///   Native (this sample): AIContextProvider in MAF pipeline handles memory lifecycle
 /// 
 /// Requires: AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_API_KEY, AZURE_OPENAI_DEPLOYMENT
@@ -103,7 +103,7 @@ public static class MemoryAIContextProvider
         Console.WriteLine("   Memory managed by: PersistentMemoryProvider (ProvideAIContextAsync / StoreAIContextAsync)");
         Console.WriteLine("   Session resets: Clear conversation history, AIContextProvider facts persist\n");
 
-        // Step 4: Evaluate — same API as Sample 32
+        // Step 4: Evaluate — same API as Sample G5
         Console.WriteLine("📝 Step 4: Running cross-session evaluation...\n");
         Console.WriteLine("   ⏳ Planting facts → resetting sessions → testing recall...\n");
 
@@ -150,7 +150,7 @@ public static class MemoryAIContextProvider
         Console.WriteLine(@"
 ╔═══════════════════════════════════════════════════════════════════════════════╗
 ║                                                                               ║
-║   🧠 SAMPLE 33: AIContextProvider-Based Persistent Memory                     ║
+║   🧠 SAMPLE G6: AIContextProvider-Based Persistent Memory                     ║
 ║   MAF-Native Memory Pipeline Evaluation                                       ║
 ║                                                                               ║
 ╚═══════════════════════════════════════════════════════════════════════════════╝
@@ -188,7 +188,7 @@ public static class MemoryAIContextProvider
 │     - On next call: ProvideAIContextAsync injects stored facts automatically   │
 │     - AgentEval.Memory evaluators don't need to know about the pipeline        │
 │                                                                                 │
-│  5. Compare with Sample 32 (manual memory):                                    │
+│  5. Compare with Sample G5 (manual memory):                                    │
 │     Manual: Agent manages _longTermMemory dict + system prompt injection       │
 │     Native: AIContextProvider handles injection/extraction in the pipeline      │
 │     Both achieve the same result — but native follows MAF best practices       │

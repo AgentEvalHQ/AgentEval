@@ -15,7 +15,7 @@ using ChatOptions = Microsoft.Extensions.AI.ChatOptions;
 namespace AgentEval.Samples;
 
 /// <summary>
-/// Sample 15: Model Comparison - Compare multiple models on the same task
+/// Sample D3: Model Comparison - Compare multiple models on the same task
 /// 
 /// This demonstrates:
 /// - Using agent factories to swap models
@@ -273,7 +273,7 @@ public static class ModelComparison
         Console.WriteLine("""
 
         ╔═══════════════════════════════════════════════════════════════╗
-        ║  Sample 15: Model Comparison                                  ║
+        ║  Sample D3: Model Comparison                                  ║
         ║  Compare models on quality, speed, cost & tool usage          ║
         ╚═══════════════════════════════════════════════════════════════╝
 

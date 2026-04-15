@@ -14,7 +14,7 @@ using ChatOptions = Microsoft.Extensions.AI.ChatOptions;
 namespace AgentEval.Samples;
 
 /// <summary>
-/// Sample 23: Benchmark System — Real Performance &amp; Agentic Benchmarking
+/// Sample F4: Benchmark System — Real Performance &amp; Agentic Benchmarking
 /// 
 /// This sample shows how to use AgentEval's benchmark classes against a
 /// real Azure OpenAI-backed agent, loading test data from JSONL files
@@ -207,7 +207,7 @@ public static class BenchmarkSystem
     {
         Console.WriteLine();
         Console.WriteLine("+============================================================================+");
-        Console.WriteLine("|                    Sample 23: Benchmark System                              |");
+        Console.WriteLine("|                    Sample F4: Benchmark System                              |");
         Console.WriteLine("|          Real Performance & Agentic Benchmarks with AgentEval               |");
         Console.WriteLine("+============================================================================+");
         Console.WriteLine();
@@ -216,7 +216,7 @@ public static class BenchmarkSystem
     private static void PrintMissingCredentialsBox()
     {
         Console.WriteLine("+-----------------------------------------------------------------------------+");
-        Console.WriteLine("|  SKIPPING SAMPLE 23 - Azure OpenAI Credentials Required                     |");
+        Console.WriteLine("|  SKIPPING SAMPLE F4 - Azure OpenAI Credentials Required                     |");
         Console.WriteLine("|                                                                             |");
         Console.WriteLine("|  This sample runs REAL benchmarks against a live agent.                     |");
         Console.WriteLine("|  Set AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_API_KEY, AZURE_OPENAI_DEPLOYMENT  |");
@@ -231,6 +231,6 @@ public static class BenchmarkSystem
         Console.WriteLine("   - PerformanceBenchmark provides latency percentiles and cost estimation");
         Console.WriteLine("   - AgenticBenchmark verifies tool selection against declared expectations");
         Console.WriteLine("   - All data shown above comes from REAL LLM calls — no faked numbers");
-        Console.WriteLine("\n   NEXT: Explore Sample 24 for calibrated evaluation!\n");
+        Console.WriteLine("\n   NEXT: Explore Sample B5 for calibrated evaluation!\n");
     }
 }

@@ -13,7 +13,7 @@ using MEAIIEvaluator = Microsoft.Extensions.AI.Evaluation.IEvaluator;
 namespace AgentEval.Samples;
 
 /// <summary>
-/// Sample 05: Light Path — AgentEval metrics as MEAI IEvaluator
+/// Sample A5: Light Path — AgentEval metrics as MEAI IEvaluator
 ///
 /// This demonstrates:
 /// - agent.EvaluateAsync() with AgentEval metrics (the slide 2 demo)
@@ -313,7 +313,7 @@ public static class LightPathMAFIntegration
         Console.WriteLine(@"
 ╔═══════════════════════════════════════════════════════════════════════════════╗
 ║                                                                               ║
-║   ⚡ SAMPLE 05: LIGHT PATH — agent.EvaluateAsync() with AgentEval            ║
+║   ⚡ SAMPLE A5: LIGHT PATH — agent.EvaluateAsync() with AgentEval            ║
 ║   Real agent, real evaluation, MEAI-compatible results                        ║
 ║                                                                               ║
 ╚═══════════════════════════════════════════════════════════════════════════════╝

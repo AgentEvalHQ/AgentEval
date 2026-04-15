@@ -16,7 +16,7 @@ using ChatOptions = Microsoft.Extensions.AI.ChatOptions;
 namespace AgentEval.Samples;
 
 /// <summary>
-/// Sample 14: Stochastic Evaluation - Run tests multiple times for reliability
+/// Sample D2: Stochastic Evaluation - Run tests multiple times for reliability
 /// 
 /// This demonstrates:
 /// - Running the same test N times to measure consistency
@@ -162,7 +162,7 @@ public static class StochasticEvaluation
         Console.WriteLine("""
 
         ╔═══════════════════════════════════════════════════════════════╗
-        ║  Sample 14: Stochastic Evaluation                             ║
+        ║  Sample D2: Stochastic Evaluation                             ║
         ║  Run tests multiple times for reliability measurement         ║
         ╚═══════════════════════════════════════════════════════════════╝
 

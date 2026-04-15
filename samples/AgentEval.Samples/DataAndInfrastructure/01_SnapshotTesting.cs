@@ -15,7 +15,7 @@ using ChatOptions = Microsoft.Extensions.AI.ChatOptions;
 namespace AgentEval.Samples;
 
 /// <summary>
-/// Sample 07: Snapshot Testing - Detecting regressions in agent behavior
+/// Sample F1: Snapshot Testing - Detecting regressions in agent behavior
 /// 
 /// This demonstrates:
 /// - Capturing a real agent response as a baseline snapshot
@@ -307,7 +307,7 @@ public static class SnapshotTesting
         Console.WriteLine(@"
 ╔═══════════════════════════════════════════════════════════════════════════════╗
 ║                                                                               ║
-║   📸 SAMPLE 07: SNAPSHOT TESTING                                              ║
+║   📸 SAMPLE F1: SNAPSHOT TESTING                                              ║
 ║   Detect regressions with real agent responses, tool calls, and semantics     ║
 ║                                                                               ║
 ╚═══════════════════════════════════════════════════════════════════════════════╝
@@ -320,7 +320,7 @@ public static class SnapshotTesting
         Console.ForegroundColor = ConsoleColor.Yellow;
         Console.WriteLine(@"
    ┌─────────────────────────────────────────────────────────────────────────────┐
-   │  ⚠️  SKIPPING SAMPLE 07 - Azure OpenAI Credentials Required               │
+   │  ⚠️  SKIPPING SAMPLE F1 - Azure OpenAI Credentials Required               │
    ├─────────────────────────────────────────────────────────────────────────────┤
    │  This sample captures real agent responses and compares them as snapshots.  │
    │                                                                             │
@@ -341,7 +341,7 @@ public static class SnapshotTesting
         Console.WriteLine("   • Semantic comparison tolerates LLM rephrasing via Jaccard similarity");
         Console.WriteLine("   • Snapshot tool-call data to catch agentic regressions (wrong tools, missing calls)");
         Console.WriteLine("   • Store management: list, count, delete snapshots for CI/CD workflows");
-        Console.WriteLine("\n🔗 NEXT: Run Sample 08 to see conversation evaluation!\n");
+        Console.WriteLine("\n🔗 NEXT: Run Sample C1 to see conversation evaluation!\n");
     }
 }
 

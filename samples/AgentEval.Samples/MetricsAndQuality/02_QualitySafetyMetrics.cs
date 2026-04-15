@@ -10,7 +10,7 @@ using AgentEval.Testing;
 namespace AgentEval.Samples;
 
 /// <summary>
-/// Sample 17: Quality &amp; Safety Metrics - Evaluating groundedness, coherence, and fluency
+/// Sample B2: Quality &amp; Safety Metrics - Evaluating groundedness, coherence, and fluency
 /// 
 /// This demonstrates:
 /// - GroundednessMetric (ISafetyMetric) - Detecting fabricated claims and sources
@@ -285,7 +285,7 @@ public static class QualitySafetyMetrics
         Console.WriteLine("   • Use Categories property to understand metric classification");
         Console.WriteLine("   • Combine with RAG metrics for comprehensive evaluation");
         
-        Console.WriteLine("\n🎉 Sample complete! See Sample 05 for RAG metrics.\n");
+        Console.WriteLine("\n🎉 Sample complete! See Sample B1 for RAG metrics.\n");
     }
 
     private static IChatClient? CreateEvaluatorClient()
@@ -351,7 +351,7 @@ public static class QualitySafetyMetrics
         Console.WriteLine(@"
 ╔═══════════════════════════════════════════════════════════════════════════════╗
 ║                                                                               ║
-║   🛡️ SAMPLE 17: QUALITY & SAFETY METRICS                                     ║
+║   🛡️ SAMPLE B2: QUALITY & SAFETY METRICS                                     ║
 ║   Groundedness, Coherence, and Fluency evaluation                             ║
 ║                                                                               ║
 ╚═══════════════════════════════════════════════════════════════════════════════╝

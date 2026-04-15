@@ -11,7 +11,7 @@ using Microsoft.Extensions.AI;
 namespace AgentEval.Samples;
 
 /// <summary>
-/// Sample 18: Judge Calibration - Multi-model consensus for reliable LLM-as-judge evaluations.
+/// Sample B3: Judge Calibration - Multi-model consensus for reliable LLM-as-judge evaluations.
 /// 
 /// This demonstrates:
 /// - Using CalibratedJudge for multi-model evaluation
@@ -257,7 +257,7 @@ public static class JudgeCalibration
         Console.WriteLine(@"
 ╔═══════════════════════════════════════════════════════════════════════════════╗
 ║                                                                               ║
-║            Sample 18: Judge Calibration (Multi-Model Consensus)               ║
+║            Sample B3: Judge Calibration (Multi-Model Consensus)               ║
 ║                                                                               ║
 ║   Learn how to:                                                               ║
 ║   • Use multiple LLM judges for reliable evaluations                          ║

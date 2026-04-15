@@ -14,7 +14,7 @@ using ChatOptions = Microsoft.Extensions.AI.ChatOptions;
 namespace AgentEval.Samples;
 
 /// <summary>
-/// Sample 06: Performance Profiling — Latency, tokens, and tool accuracy via MAFEvaluationHarness
+/// Sample D1: Performance Profiling — Latency, tokens, and tool accuracy via MAFEvaluationHarness
 /// 
 /// This demonstrates:
 /// - Running real prompts through an agent and collecting latency data
@@ -200,7 +200,7 @@ public static class PerformanceProfiling
         Console.WriteLine(@"
 ╔═══════════════════════════════════════════════════════════════════════════════╗
 ║                                                                               ║
-║   📊 SAMPLE 06: PERFORMANCE PROFILING                                        ║
+║   📊 SAMPLE D1: PERFORMANCE PROFILING                                        ║
 ║   Real latency measurement, percentiles, and tool accuracy                    ║
 ║                                                                               ║
 ╚═══════════════════════════════════════════════════════════════════════════════╝
@@ -213,7 +213,7 @@ public static class PerformanceProfiling
         Console.ForegroundColor = ConsoleColor.Yellow;
         Console.WriteLine(@"
    ┌─────────────────────────────────────────────────────────────────────────────┐
-   │  ⚠️  SKIPPING SAMPLE 06 - Azure OpenAI Credentials Required               │
+   │  ⚠️  SKIPPING SAMPLE D1 - Azure OpenAI Credentials Required               │
    ├─────────────────────────────────────────────────────────────────────────────┤
    │  This sample runs real prompts to measure actual latency and tool accuracy. │
    │                                                                             │
@@ -233,7 +233,7 @@ public static class PerformanceProfiling
         Console.WriteLine("   • Use p50/p90/p99 percentiles for SLA enforcement");
         Console.WriteLine("   • Compare expected vs actual tool calls for agentic accuracy");
         Console.WriteLine("   • Track token usage to estimate and control costs");
-        Console.WriteLine("\n🔗 NEXT: Run Sample 07 to see snapshot testing!\n");
+        Console.WriteLine("\n🔗 NEXT: Run Sample F1 to see snapshot testing!\n");
     }
 }
 

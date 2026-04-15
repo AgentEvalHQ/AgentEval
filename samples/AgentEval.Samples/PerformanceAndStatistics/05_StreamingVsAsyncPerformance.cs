@@ -11,7 +11,7 @@ using AgentEval.Models;
 namespace AgentEval.Samples;
 
 /// <summary>
-/// Sample 19: Streaming vs Non-Streaming Performance Comparison
+/// Sample D5: Streaming vs Non-Streaming Performance Comparison
 /// 
 /// This demonstrates:
 /// - Running the SAME test with streaming and non-streaming (async)
@@ -105,7 +105,7 @@ public static class StreamingVsAsyncPerformance
         Console.WriteLine(@"
 ╔═══════════════════════════════════════════════════════════════════════════════╗
 ║                                                                               ║
-║   🌊 SAMPLE 19: STREAMING VS NON-STREAMING PERFORMANCE                       ║
+║   🌊 SAMPLE D5: STREAMING VS NON-STREAMING PERFORMANCE                       ║
 ║   Compare token/cost capture between streaming and async modes                ║
 ║                                                                               ║
 ╚═══════════════════════════════════════════════════════════════════════════════╝
@@ -118,7 +118,7 @@ public static class StreamingVsAsyncPerformance
         Console.ForegroundColor = ConsoleColor.Yellow;
         Console.WriteLine(@"
    ┌─────────────────────────────────────────────────────────────────────────────┐
-   │  ⚠️  SKIPPING SAMPLE 19 - Azure OpenAI Credentials Required               │
+   │  ⚠️  SKIPPING SAMPLE D5 - Azure OpenAI Credentials Required               │
    ├─────────────────────────────────────────────────────────────────────────────┤
    │  This sample compares streaming vs non-streaming performance metrics.       │
    │                                                                             │
