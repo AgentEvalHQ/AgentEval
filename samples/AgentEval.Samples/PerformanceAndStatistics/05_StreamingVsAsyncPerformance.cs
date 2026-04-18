@@ -92,11 +92,9 @@ public static class StreamingVsAsyncPerformance
         var azureClient = new AzureOpenAIClient(AIConfig.Endpoint, AIConfig.KeyCredential);
         var chatClient = azureClient.GetChatClient(AIConfig.ModelDeployment).AsIChatClient();
 
-        return new ChatClientAgent(chatClient, new ChatClientAgentOptions
-        {
-            Name = "PerformanceTestAgent",
-            ChatOptions = new() { Instructions = "You are a helpful assistant. Answer concisely." }
-        });
+        return chatClient.AsAIAgent(
+            name: "PerformanceTestAgent",
+            instructions: "You are a helpful assistant. Answer concisely.");
     }
 
     private static void PrintHeader()

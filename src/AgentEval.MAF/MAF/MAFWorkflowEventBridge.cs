@@ -167,7 +167,24 @@ public static class MAFWorkflowEventBridge
                     foreach (var result in agentUpdate.Update.Contents.OfType<FunctionResultContent>())
                     {
                         var resultCallId = result.CallId ?? string.Empty;
-                        if (pendingToolCalls.TryGetValue(resultCallId, out var pending))
+                        
+                        // Try exact CallId match first
+                        if (!pendingToolCalls.TryGetValue(resultCallId, out var pending))
+                        {
+                            // Fallback: when CallId is null/empty, match the most recent pending call.
+                            // This handles the case where FunctionCallContent.CallId was null (stored
+                            // under a generated GUID) and FunctionResultContent.CallId is also null.
+                            if (string.IsNullOrEmpty(resultCallId) && pendingToolCalls.Count > 0)
+                            {
+                                var fallbackEntry = pendingToolCalls
+                                    .OrderByDescending(kvp => kvp.Value.StartTime)
+                                    .First();
+                                resultCallId = fallbackEntry.Key;
+                                pending = fallbackEntry.Value;
+                            }
+                        }
+                        
+                        if (pending != default)
                         {
                             var duration = sw.Elapsed - pending.StartTime;
                             yield return new ExecutorToolCallEvent(

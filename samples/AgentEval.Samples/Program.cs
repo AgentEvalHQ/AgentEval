@@ -29,6 +29,7 @@ public static class Program
             new("Performance Metrics",       "Latency, cost, TTFT, token budget assertions",                           PerformanceMetrics.RunAsync),
             new("Light Path (MEAI)",        "AgentEval as MEAI IEvaluator — plug into MAF's evaluation pipeline",     LightPathMAFIntegration.RunAsync),
             new("Session Lifecycle",         "MAF AgentSession: create → multi-turn → reset → isolation",             AgentSessionLifecycle.RunAsync),
+            new("Advanced MAF Features",     "ChatHistory, middleware, structured output, approval, agent-as-tool",   AdvancedMAFFeatures.RunAsync),
         ]),
 
         new('B', "Metrics & Quality", "",
@@ -86,6 +87,7 @@ public static class Program
             new("Benchmark Reporting",       "Run benchmarks, save baselines, compare configs, HTML report",        MemoryBenchmarkReporting.RunAsync),
             new("LongMemEval Benchmark",     "Cross-platform memory eval — 120K token haystacks (ICLR 2025, MIT)",  LongMemEvalBenchmark.RunAsync),
             new("Run Single Benchmark",     "Pick Quick/Standard/Full, run it, save baseline, view report",       RunSingleBenchmark.RunAsync),
+            new("LongMemEval Baseline Repro","GPT-4o baseline reproduction — TextBlob mode, paper-matching config", LongMemEvalBaselineRepro.RunAsync),
         ]),
     ];
 

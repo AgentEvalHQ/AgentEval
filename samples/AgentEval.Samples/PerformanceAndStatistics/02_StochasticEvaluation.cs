@@ -125,21 +125,15 @@ public static class StochasticEvaluation
             .GetChatClient(AIConfig.ModelDeployment)
             .AsIChatClient();
         
-        var agent = new ChatClientAgent(
-            chatClient,
-            new ChatClientAgentOptions
-            {
-                Name = "Calculator Agent",
-                ChatOptions = new ChatOptions
-                {
-                    Instructions = "You are a math assistant. Always use the CalculatorTool for calculations.",
-                    Tools = [AIFunctionFactory.Create(CalculatorTool)]
-                }
-            });
-        
+        var agent = chatClient.AsAIAgent(
+            name: "Calculator Agent",
+            instructions: "You are a math assistant. Always use the CalculatorTool for calculations.",
+            tools: [AIFunctionFactory.Create(CalculatorTool)]);
+
+        // Wrap with MAFAgentAdapter for evaluation
         return new MAFAgentAdapter(agent);
     }
-    
+
     [Description("Performs basic arithmetic operations")]
     private static string CalculatorTool(
         [Description("First operand")] double a,
@@ -156,7 +150,7 @@ public static class StochasticEvaluation
         };
         return $"{a} {operation} {b} = {result}";
     }
-    
+
     private static void PrintHeader()
     {
         Console.WriteLine("""

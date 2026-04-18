@@ -9,6 +9,11 @@ namespace AgentEval.Samples;
 /// Configuration for Azure OpenAI.
 /// Set environment variables AZURE_OPENAI_ENDPOINT and AZURE_OPENAI_API_KEY.
 /// </summary>
+/// <remarks>
+/// These samples use AzureKeyCredential (API key) for simplicity.
+/// For production, use ManagedIdentityCredential or another specific TokenCredential
+/// instead of DefaultAzureCredential. See MAF best practice #2.
+/// </remarks>
 public static class AIConfig
 {
     private static readonly Lazy<(Uri Endpoint, AzureKeyCredential KeyCredential)?> s_values =

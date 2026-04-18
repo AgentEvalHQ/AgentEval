@@ -2,6 +2,7 @@
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 
+using System.Text.Json;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
 using AgentEval.Core;
@@ -14,8 +15,8 @@ namespace AgentEval.MAF;
 /// </summary>
 public class MAFAgentAdapter : IStreamableAgent, ISessionResettableAgent, IHistoryInjectableAgent
 {
-    private readonly AIAgent _agent;
-    private AgentSession? _session;
+    private protected readonly AIAgent _agent;
+    private protected AgentSession? _session;
     private readonly List<ChatMessage> _injectedHistory = new();
     
     /// <summary>
@@ -32,8 +33,13 @@ public class MAFAgentAdapter : IStreamableAgent, ISessionResettableAgent, IHisto
     /// <inheritdoc/>
     public string Name => _agent.Name ?? string.Empty;
     
+    /// <summary>
+    /// Model identifier to embed in responses. Override in subclasses to tag responses with a model ID.
+    /// </summary>
+    protected virtual string? ResponseModelId => null;
+    
     /// <inheritdoc/>
-    public async Task<AgentResponse> InvokeAsync(string prompt, CancellationToken cancellationToken = default)
+    public virtual async Task<AgentResponse> InvokeAsync(string prompt, CancellationToken cancellationToken = default)
     {
         _session ??= await _agent.CreateSessionAsync(cancellationToken).ConfigureAwait(false);
         
@@ -59,12 +65,15 @@ public class MAFAgentAdapter : IStreamableAgent, ISessionResettableAgent, IHisto
         {
             Text = response.Text,
             RawMessages = response.Messages.ToList(),
-            TokenUsage = tokenUsage
+            TokenUsage = tokenUsage,
+            ModelId = ResponseModelId,
+            FinishReason = response.FinishReason?.ToString(),
+            AdditionalProperties = BuildAdditionalProperties(response)
         };
     }
     
     /// <inheritdoc/>
-    public async IAsyncEnumerable<AgentResponseChunk> InvokeStreamingAsync(
+    public virtual async IAsyncEnumerable<AgentResponseChunk> InvokeStreamingAsync(
         string prompt, 
         [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
@@ -124,13 +133,13 @@ public class MAFAgentAdapter : IStreamableAgent, ISessionResettableAgent, IHisto
             }
         }
         
-        yield return new AgentResponseChunk { IsComplete = true, Usage = capturedUsage };
+        yield return new AgentResponseChunk { IsComplete = true, Usage = capturedUsage, ModelId = ResponseModelId };
     }
     
     /// <summary>
     /// Reset the conversation session.
     /// </summary>
-    public async Task ResetSessionAsync(CancellationToken cancellationToken = default)
+    public virtual async Task ResetSessionAsync(CancellationToken cancellationToken = default)
     {
         _session = await _agent.CreateSessionAsync(cancellationToken).ConfigureAwait(false);
         _injectedHistory.Clear();
@@ -155,11 +164,45 @@ public class MAFAgentAdapter : IStreamableAgent, ISessionResettableAgent, IHisto
     /// <summary>
     /// Builds the message list from injected history and current prompt.
     /// </summary>
-    private List<ChatMessage> BuildMessages(string prompt)
+    protected List<ChatMessage> BuildMessages(string prompt)
     {
         var messages = new List<ChatMessage>(_injectedHistory.Count + 1);
         messages.AddRange(_injectedHistory);
         messages.Add(new ChatMessage(ChatRole.User, prompt));
         return messages;
     }
+    
+    /// <summary>
+    /// Serializes the current agent session for persistence or replay.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">Thrown when no active session exists.</exception>
+    public async Task<JsonElement> SerializeSessionAsync(CancellationToken cancellationToken = default)
+    {
+        if (_session is null)
+            throw new InvalidOperationException("No active session to serialize. Invoke the agent at least once to create a session.");
+        return await _agent.SerializeSessionAsync(_session, cancellationToken: cancellationToken).ConfigureAwait(false);
+    }
+    
+    /// <summary>
+    /// Restores a previously serialized session, replacing the current session.
+    /// </summary>
+    public async Task RestoreSessionAsync(JsonElement serializedState, CancellationToken cancellationToken = default)
+    {
+        _session = await _agent.DeserializeSessionAsync(serializedState, cancellationToken: cancellationToken).ConfigureAwait(false);
+    }
+
+#pragma warning disable MEAI001 // ContinuationToken is experimental
+    private static IReadOnlyDictionary<string, object?>? BuildAdditionalProperties(Microsoft.Agents.AI.AgentResponse response)
+    {
+        if (response.ContinuationToken is null && response.CreatedAt is null)
+            return null;
+
+        var props = new Dictionary<string, object?>();
+        if (response.ContinuationToken is not null)
+            props["ContinuationToken"] = response.ContinuationToken;
+        if (response.CreatedAt is not null)
+            props["CreatedAt"] = response.CreatedAt;
+        return props;
+    }
+#pragma warning restore MEAI001
 }

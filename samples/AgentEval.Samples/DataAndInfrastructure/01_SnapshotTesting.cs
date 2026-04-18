@@ -272,18 +272,13 @@ public static class SnapshotTesting
         var azureClient = new AzureOpenAIClient(AIConfig.Endpoint, AIConfig.KeyCredential);
         var chatClient = azureClient.GetChatClient(AIConfig.ModelDeployment).AsIChatClient();
 
-        return new ChatClientAgent(chatClient, new ChatClientAgentOptions
-        {
-            Name = "SnapshotAgent",
-            ChatOptions = new ChatOptions
-            {
-                Instructions = """
-                    You are a helpful assistant. Give concise, factual answers.
-                    Use the available tools when appropriate.
-                    """,
-                Tools = [AIFunctionFactory.Create(GetWeather), AIFunctionFactory.Create(Calculate)]
-            }
-        });
+        return chatClient.AsAIAgent(
+            name: "SnapshotAgent",
+            instructions: """
+                You are a helpful assistant. Give concise, factual answers.
+                Use the available tools when appropriate.
+                """,
+            tools: [AIFunctionFactory.Create(GetWeather), AIFunctionFactory.Create(Calculate)]);
     }
 
     [Description("Get the current weather for a city")]

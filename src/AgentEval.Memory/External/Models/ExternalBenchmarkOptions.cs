@@ -44,4 +44,16 @@ public class ExternalBenchmarkOptions
     /// Optional path to the dataset file. Null = use embedded subset.
     /// </summary>
     public string? DatasetPath { get; init; }
+
+    /// <summary>
+    /// Controls how conversation history is injected into the agent.
+    /// Default: <see cref="HistoryInjectionMode.Auto"/> (structured if agent supports it, else text blob).
+    /// </summary>
+    /// <remarks>
+    /// Set to <see cref="HistoryInjectionMode.TextBlob"/> to match the original LongMemEval paper's
+    /// prompt format, or to ensure history is visible to MAF AIContextProviders. Set to
+    /// <see cref="HistoryInjectionMode.StructuredChatHistory"/> to force fast structured injection
+    /// (requires IHistoryInjectableAgent).
+    /// </remarks>
+    public HistoryInjectionMode HistoryInjectionMode { get; init; } = HistoryInjectionMode.Auto;
 }

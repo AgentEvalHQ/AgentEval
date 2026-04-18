@@ -155,17 +155,13 @@ public static class ConversationEvaluation
             .GetChatClient(AIConfig.ModelDeployment)
             .AsIChatClient();
 
-        return new ChatClientAgent(
-            chatClient,
-            new ChatClientAgentOptions
-            {
-                Name = "ConversationAgent",
-                ChatOptions = new() { Instructions = """
-                    You are a helpful, knowledgeable conversational assistant.
-                    Answer questions thoroughly but concisely.
-                    Remember context from earlier in the conversation.
-                    """ }
-            });
+        return chatClient.AsAIAgent(
+            name: "ConversationAgent",
+            instructions: """
+                You are a helpful, knowledgeable conversational assistant.
+                Answer questions thoroughly but concisely.
+                Remember context from earlier in the conversation.
+                """);
     }
 
     private static void PrintHeader()

@@ -118,6 +118,9 @@ public static class ConversationExtractor
                             .OrderByDescending(c => c.Order)
                             .FirstOrDefault();
                         callId = latestPending?.CallId ?? $"result-{Guid.NewGuid():N}";
+                        System.Diagnostics.Trace.TraceWarning(
+                            $"[AgentEval] Tool result correlated by heuristic (CallId was null). " +
+                            $"Matched to '{latestPending?.Name ?? "(none)"}'. May mis-correlate for concurrent calls.");
                     }
 
                     if (pendingCalls.TryGetValue(callId, out var pending))

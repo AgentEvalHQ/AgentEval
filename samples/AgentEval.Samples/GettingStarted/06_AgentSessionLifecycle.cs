@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 AgentEval Contributors
 
+using System.Text.Json;
 using Azure.AI.OpenAI;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
@@ -79,6 +80,30 @@ public static class AgentSessionLifecycle
         var containsAlice = response2.Text?.Contains("Alice", StringComparison.OrdinalIgnoreCase) == true;
         Console.ForegroundColor = containsAlice ? ConsoleColor.Green : ConsoleColor.Red;
         Console.WriteLine($"   ✅ Recalled 'Alice': {containsAlice}\n");
+        Console.ResetColor();
+
+        // Step 2b: Serialize session state for persistence/replay
+        Console.WriteLine("📝 Step 2b: Session serialization — save and restore session state...\n");
+        Console.WriteLine("   SerializeSessionAsync() captures the current session for persistence,");
+        Console.WriteLine("   RestoreSessionAsync() rehydrates it later — useful for CI replay.\n");
+
+        var serialized = await adapter.SerializeSessionAsync();
+        Console.WriteLine($"   📦 Serialized session: {serialized.GetRawText().Length} chars");
+
+        // Reset and verify the agent forgot
+        await adapter.ResetSessionAsync();
+        var afterReset = await adapter.InvokeAsync("What is my name?");
+        var forgotAfterReset = afterReset.Text?.Contains("Alice", StringComparison.OrdinalIgnoreCase) != true;
+        Console.ForegroundColor = forgotAfterReset ? ConsoleColor.Green : ConsoleColor.Red;
+        Console.WriteLine($"   🔄 After reset, forgot Alice: {forgotAfterReset}");
+        Console.ResetColor();
+
+        // Restore the saved session
+        await adapter.RestoreSessionAsync(serialized);
+        var afterRestore = await adapter.InvokeAsync("What is my name?");
+        var remembersAfterRestore = afterRestore.Text?.Contains("Alice", StringComparison.OrdinalIgnoreCase) == true;
+        Console.ForegroundColor = remembersAfterRestore ? ConsoleColor.Green : ConsoleColor.Red;
+        Console.WriteLine($"   ♻️ After restore, recalls Alice: {remembersAfterRestore}\n");
         Console.ResetColor();
 
         // Step 3: Reset session — creates a new AgentSession
