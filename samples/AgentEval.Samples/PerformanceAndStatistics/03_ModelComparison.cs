@@ -15,7 +15,7 @@ using ChatOptions = Microsoft.Extensions.AI.ChatOptions;
 namespace AgentEval.Samples;
 
 /// <summary>
-/// Sample 15: Model Comparison - Compare multiple models on the same task
+/// Sample D3: Model Comparison - Compare multiple models on the same task
 /// 
 /// This demonstrates:
 /// - Using agent factories to swap models
@@ -236,21 +236,15 @@ public static class ModelComparison
             .GetChatClient(deployment)
             .AsIChatClient();
         
-        var agent = new ChatClientAgent(
-            chatClient,
-            new ChatClientAgentOptions
-            {
-                Name = $"Calculator Agent ({deployment})",
-                ChatOptions = new ChatOptions
-                {
-                    Instructions = "You are a math assistant. Always use the CalculatorTool for calculations.",
-                    Tools = [AIFunctionFactory.Create(CalculatorTool)]
-                }
-            });
-        
+        var agent = chatClient.AsAIAgent(
+            name: $"Calculator Agent ({deployment})",
+            instructions: "You are a math assistant. Always use the CalculatorTool for calculations.",
+            tools: [AIFunctionFactory.Create(CalculatorTool)]);
+
+        // Wrap with MAFAgentAdapter for evaluation
         return new MAFAgentAdapter(agent);
     }
-    
+
     [Description("Performs basic arithmetic operations")]
     private static string CalculatorTool(
         [Description("First operand")] double a,
@@ -273,7 +267,7 @@ public static class ModelComparison
         Console.WriteLine("""
 
         ╔═══════════════════════════════════════════════════════════════╗
-        ║  Sample 15: Model Comparison                                  ║
+        ║  Sample D3: Model Comparison                                  ║
         ║  Compare models on quality, speed, cost & tool usage          ║
         ╚═══════════════════════════════════════════════════════════════╝
 

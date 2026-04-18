@@ -12,7 +12,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 namespace AgentEval.Samples;
 
 /// <summary>
-/// Sample 28: Memory Evaluation Basics - Testing if agents remember facts
+/// Sample G1: Memory Evaluation Basics - Testing if agents remember facts
 ///
 /// This demonstrates:
 /// - Setting up memory evaluation with a real LLM judge
@@ -230,7 +230,7 @@ public static class MemoryBasics
     {
         Console.WriteLine();
         Console.WriteLine("═══════════════════════════════════════════════════════════════════");
-        Console.WriteLine("🧠 AgentEval Memory - Sample 28: Memory Evaluation Basics");
+        Console.WriteLine("🧠 AgentEval Memory - Sample G1: Memory Evaluation Basics");
         Console.WriteLine("═══════════════════════════════════════════════════════════════════");
         Console.WriteLine("Testing whether AI agents remember what you tell them...");
         Console.WriteLine();

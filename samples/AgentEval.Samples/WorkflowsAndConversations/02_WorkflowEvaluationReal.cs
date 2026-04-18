@@ -14,7 +14,7 @@ using AgentEval.Models.Serialization;
 namespace AgentEval.Samples;
 
 /// <summary>
-/// Sample 09: Real MAF Workflow Evaluation — WorkflowBuilder + InProcessExecution
+/// Sample C2: Real MAF Workflow Evaluation — WorkflowBuilder + InProcessExecution
 /// 
 /// This demonstrates:
 /// - Building a real MAF Workflow using <see cref="WorkflowBuilder"/>
@@ -353,7 +353,7 @@ public static class WorkflowEvaluationReal
         Console.WriteLine(@"
 ╔═══════════════════════════════════════════════════════════════════════════════╗
 ║                                                                               ║
-║   🔄 SAMPLE 09: REAL MAF WORKFLOW EVALUATION                                 ║
+║   🔄 SAMPLE C2: REAL MAF WORKFLOW EVALUATION                                 ║
 ║   WorkflowBuilder + InProcessExecution                                        ║
 ║                                                                               ║
 ╚═══════════════════════════════════════════════════════════════════════════════╝
@@ -366,7 +366,7 @@ public static class WorkflowEvaluationReal
         Console.ForegroundColor = ConsoleColor.Yellow;
         Console.WriteLine(@"
    ┌─────────────────────────────────────────────────────────────────────────────┐
-   │  ⚠️  SKIPPING SAMPLE 09 - Azure OpenAI Credentials Required               │
+   │  ⚠️  SKIPPING SAMPLE C2 - Azure OpenAI Credentials Required               │
    ├─────────────────────────────────────────────────────────────────────────────┤
    │  This sample runs a real 4-agent MAF workflow pipeline.                     │
    │                                                                             │

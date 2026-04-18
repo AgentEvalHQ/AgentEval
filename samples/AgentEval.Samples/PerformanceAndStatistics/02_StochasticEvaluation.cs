@@ -16,7 +16,7 @@ using ChatOptions = Microsoft.Extensions.AI.ChatOptions;
 namespace AgentEval.Samples;
 
 /// <summary>
-/// Sample 14: Stochastic Evaluation - Run tests multiple times for reliability
+/// Sample D2: Stochastic Evaluation - Run tests multiple times for reliability
 /// 
 /// This demonstrates:
 /// - Running the same test N times to measure consistency
@@ -125,21 +125,15 @@ public static class StochasticEvaluation
             .GetChatClient(AIConfig.ModelDeployment)
             .AsIChatClient();
         
-        var agent = new ChatClientAgent(
-            chatClient,
-            new ChatClientAgentOptions
-            {
-                Name = "Calculator Agent",
-                ChatOptions = new ChatOptions
-                {
-                    Instructions = "You are a math assistant. Always use the CalculatorTool for calculations.",
-                    Tools = [AIFunctionFactory.Create(CalculatorTool)]
-                }
-            });
-        
+        var agent = chatClient.AsAIAgent(
+            name: "Calculator Agent",
+            instructions: "You are a math assistant. Always use the CalculatorTool for calculations.",
+            tools: [AIFunctionFactory.Create(CalculatorTool)]);
+
+        // Wrap with MAFAgentAdapter for evaluation
         return new MAFAgentAdapter(agent);
     }
-    
+
     [Description("Performs basic arithmetic operations")]
     private static string CalculatorTool(
         [Description("First operand")] double a,
@@ -156,13 +150,13 @@ public static class StochasticEvaluation
         };
         return $"{a} {operation} {b} = {result}";
     }
-    
+
     private static void PrintHeader()
     {
         Console.WriteLine("""
 
         ╔═══════════════════════════════════════════════════════════════╗
-        ║  Sample 14: Stochastic Evaluation                             ║
+        ║  Sample D2: Stochastic Evaluation                             ║
         ║  Run tests multiple times for reliability measurement         ║
         ╚═══════════════════════════════════════════════════════════════╝
 

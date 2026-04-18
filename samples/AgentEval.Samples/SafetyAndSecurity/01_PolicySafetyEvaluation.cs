@@ -13,7 +13,7 @@ using AgentEval.Assertions;
 namespace AgentEval.Samples;
 
 /// <summary>
-/// Sample 12: Policy &amp; Safety Evaluation — Enterprise safety guardrails
+/// Sample E1: Policy &amp; Safety Evaluation — Enterprise safety guardrails
 /// 
 /// This demonstrates:
 /// - Running a real agent with "dangerous" tools available
@@ -394,7 +394,7 @@ public static class PolicySafetyEvaluation
         Console.WriteLine(@"
 ╔═══════════════════════════════════════════════════════════════════════════════╗
 ║                                                                               ║
-║   🛡️ SAMPLE 12: POLICY & SAFETY EVALUATION                                    ║
+║   🛡️ SAMPLE E1: POLICY & SAFETY EVALUATION                                    ║
 ║   Enterprise guardrails: NeverCallTool, PII, MustConfirmBefore              ║
 ║                                                                               ║
 ╚═══════════════════════════════════════════════════════════════════════════════╝
@@ -407,7 +407,7 @@ public static class PolicySafetyEvaluation
         Console.ForegroundColor = ConsoleColor.Yellow;
         Console.WriteLine(@"
    ┌─────────────────────────────────────────────────────────────────────────────┐
-   │  ⚠️  SKIPPING SAMPLE 12 - Azure OpenAI Credentials Required               │
+   │  ⚠️  SKIPPING SAMPLE E1 - Azure OpenAI Credentials Required               │
    ├─────────────────────────────────────────────────────────────────────────────┤
    │  This sample runs a real agent with dangerous tools + policy assertions.   │
    │                                                                             │

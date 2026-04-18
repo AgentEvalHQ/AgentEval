@@ -9,7 +9,7 @@ using Microsoft.Extensions.AI;
 namespace AgentEval.Samples;
 
 /// <summary>
-/// Sample 24: CalibratedEvaluator - Multi-model harness evaluation with criteria-based consensus.
+/// Sample B5: CalibratedEvaluator - Multi-model harness evaluation with criteria-based consensus.
 ///
 /// This demonstrates:
 /// - Using CalibratedEvaluator as a drop-in replacement for ChatClientEvaluator
@@ -136,7 +136,7 @@ public static class CalibratedEvaluatorDemo
         Console.WriteLine(@"
 ╔═══════════════════════════════════════════════════════════════════════════════╗
 ║                                                                               ║
-║         Sample 24: CalibratedEvaluator (Multi-Model Harness Evaluation)       ║
+║         Sample B5: CalibratedEvaluator (Multi-Model Harness Evaluation)       ║
 ║                                                                               ║
 ║   Learn how to:                                                               ║
 ║   • Replace single-model evaluation with multi-model consensus                ║

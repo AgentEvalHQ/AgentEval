@@ -8,7 +8,7 @@ using AgentEval.Models;
 namespace AgentEval.Samples;
 
 /// <summary>
-/// Sample 25: Dataset Loaders — Comprehensive Multi-Format Pipeline
+/// Sample F5: Dataset Loaders — Comprehensive Multi-Format Pipeline
 ///
 /// Demonstrates the full AgentEval dataset loading pipeline:
 /// - Multi-format loading: YAML, JSONL, CSV (auto-detected from extension)
@@ -345,7 +345,7 @@ public static class DatasetLoaders
         Console.WriteLine(@"
 ╔═══════════════════════════════════════════════════════════════════════════════╗
 ║                                                                               ║
-║   📂 SAMPLE 25: DATASET LOADERS — MULTI-FORMAT PIPELINE                      ║
+║   📂 SAMPLE F5: DATASET LOADERS — MULTI-FORMAT PIPELINE                      ║
 ║   Multi-format, streaming, ToTestCase, ToEvaluationContext, factory patterns  ║
 ║   ⚡ No credentials required — runs fully offline                             ║
 ║                                                                               ║
@@ -365,6 +365,6 @@ public static class DatasetLoaders
         Console.WriteLine("   • IDatasetLoaderFactory for DI; DatasetLoaderFactory static facade for quick scripts");
         Console.WriteLine("   • Field aliases auto-recognized: question/prompt/query → Input, answer/response → ExpectedOutput");
         Console.WriteLine("   • New properties: evaluation_criteria, tags, passing_score — parsed by all loaders");
-        Console.WriteLine("\n🔗 See also: Sample 11 (Datasets & Export), docs/naming-conventions.md, ADR-014\n");
+        Console.WriteLine("\n🔗 See also: Sample F2 (Datasets & Export), docs/naming-conventions.md, ADR-014\n");
     }
 }

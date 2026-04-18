@@ -60,6 +60,12 @@ public class AgentResponse
     
     /// <summary>Model used for the response.</summary>
     public string? ModelId { get; init; }
+
+    /// <summary>Finish reason from the underlying framework (e.g., "Stop", "MaxTokens").</summary>
+    public string? FinishReason { get; init; }
+
+    /// <summary>Additional properties from the underlying framework response.</summary>
+    public IReadOnlyDictionary<string, object?>? AdditionalProperties { get; init; }
 }
 
 /// <summary>

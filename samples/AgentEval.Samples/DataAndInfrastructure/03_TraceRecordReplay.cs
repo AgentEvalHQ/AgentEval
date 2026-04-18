@@ -13,7 +13,7 @@ using AgentEval.Tracing;
 namespace AgentEval.Samples;
 
 /// <summary>
-/// Sample 13: Trace Record &amp; Replay
+/// Sample F3: Trace Record &amp; Replay
 /// 
 /// Demonstrates how to record agent executions to trace files and replay them
 /// for deterministic evaluation without calling external AI services.
@@ -324,7 +324,7 @@ public static class TraceRecordReplay
         Console.WriteLine(@"
 ╔═══════════════════════════════════════════════════════════════════════════════╗
 ║                                                                               ║
-║   📼 SAMPLE 13: TRACE RECORD & REPLAY                                        ║
+║   📼 SAMPLE F3: TRACE RECORD & REPLAY                                        ║
 ║   Record real agent calls, save traces, replay without AI costs               ║
 ║                                                                               ║
 ╚═══════════════════════════════════════════════════════════════════════════════╝
@@ -337,7 +337,7 @@ public static class TraceRecordReplay
         Console.ForegroundColor = ConsoleColor.Yellow;
         Console.WriteLine(@"
    ┌─────────────────────────────────────────────────────────────────────────────┐
-   │  ⚠️  SKIPPING SAMPLE 13 - Azure OpenAI Credentials Required               │
+   │  ⚠️  SKIPPING SAMPLE F3 - Azure OpenAI Credentials Required               │
    ├─────────────────────────────────────────────────────────────────────────────┤
    │  This sample records real agent traces for deterministic replay.            │
    │                                                                             │
@@ -359,6 +359,6 @@ public static class TraceRecordReplay
         Console.WriteLine("   • ChatTraceRecorder handles multi-turn conversations");
         Console.WriteLine("   • WorkflowTraceReplayingAgent replays multi-step workflows");
         Console.WriteLine("   • Use traces for deterministic CI testing!");
-        Console.WriteLine("\n✅ Sample 13 complete!\n");
+        Console.WriteLine("\n✅ Sample F3 complete!\n");
     }
 }

@@ -12,7 +12,7 @@ using Microsoft.Extensions.AI;
 namespace AgentEval.Samples;
 
 /// <summary>
-/// Memory Benchmark Reporting &amp; Multi-Model Comparison
+/// Sample G7: Memory Benchmark Reporting &amp; Multi-Model Comparison
 ///
 /// This demonstrates:
 /// - Running the Standard benchmark across 3 models (GPT-4o-mini, GPT-4o, GPT-4.1)
@@ -245,7 +245,7 @@ public static class MemoryBenchmarkReporting
     {
         Console.WriteLine();
         Console.WriteLine("===================================================================");
-        Console.WriteLine("AgentEval Memory — Multi-Model Benchmark Comparison");
+        Console.WriteLine("AgentEval Memory — Sample G7: Multi-Model Benchmark Comparison");
         Console.WriteLine("===================================================================");
         Console.WriteLine("Run Standard benchmark across 3 models, compare & report.");
         Console.WriteLine();

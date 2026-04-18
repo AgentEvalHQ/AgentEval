@@ -15,7 +15,7 @@ using Microsoft.Extensions.DependencyInjection;
 namespace AgentEval.Samples;
 
 /// <summary>
-/// Sample 26: Extensibility — DI Registries &amp; Custom Extensions
+/// Sample F6: Extensibility — DI Registries &amp; Custom Extensions
 ///
 /// Demonstrates how to extend AgentEval through Dependency Injection:
 /// - Custom metrics registered via DI (auto-discovered by IMetricRegistry)
@@ -676,7 +676,7 @@ public static class Extensibility
         Console.WriteLine(@"
 ╔═══════════════════════════════════════════════════════════════════════════════╗
 ║                                                                               ║
-║   🔌 SAMPLE 26: EXTENSIBILITY — DI REGISTRIES & CUSTOM EXTENSIONS            ║
+║   🔌 SAMPLE F6: EXTENSIBILITY — DI REGISTRIES & CUSTOM EXTENSIONS            ║
 ║   Custom metrics, exporters, loaders, attack types via Dependency Injection   ║
 ║   Steps 1-6: Offline | Step 7: Live LLM (or mock fallback)                   ║
 ║                                                                               ║

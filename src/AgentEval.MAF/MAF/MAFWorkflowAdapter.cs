@@ -602,6 +602,21 @@ public record ExecutorErrorEvent(
     string? ExceptionType = null) : WorkflowEvent;
 
 /// <summary>
+/// Event indicating a complete (non-streaming) agent response from an executor.
+/// Captures token usage and finish reason that streaming events cannot provide.
+/// </summary>
+/// <remarks>
+/// This event is emitted when MAF fires an <c>AgentResponseEvent</c> (non-streaming
+/// complete response). It extends <see cref="ExecutorOutputEvent"/> with additional
+/// per-executor token usage and finish reason data.
+/// </remarks>
+public record ExecutorAgentResponseEvent(
+    string ExecutorId,
+    string? Output,
+    TokenUsage? Usage = null,
+    string? FinishReason = null) : ExecutorOutputEvent(ExecutorId, Output);
+
+/// <summary>
 /// Event indicating workflow completion.
 /// </summary>
 public record WorkflowCompleteEvent : WorkflowEvent;

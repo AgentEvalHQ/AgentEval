@@ -13,7 +13,7 @@ using MEAIIEvaluator = Microsoft.Extensions.AI.Evaluation.IEvaluator;
 namespace AgentEval.Samples;
 
 /// <summary>
-/// Sample 05: Light Path — AgentEval metrics as MEAI IEvaluator
+/// Sample A5: Light Path — AgentEval metrics as MEAI IEvaluator
 ///
 /// This demonstrates:
 /// - agent.EvaluateAsync() with AgentEval metrics (the slide 2 demo)
@@ -237,23 +237,19 @@ public static class LightPathMAFIntegration
             .GetChatClient(AIConfig.ModelDeployment)
             .AsIChatClient();
 
-        return new ChatClientAgent(chatClient, new ChatClientAgentOptions
-        {
-            Name = "TravelAgent",
-            ChatOptions = new ChatOptions
-            {
-                Instructions = """
-                    You are a travel booking assistant. When asked to find flights or hotels,
-                    ALWAYS use the available tools. Present results clearly and recommend
-                    the best option. Be concise.
-                    """,
-                Tools =
-                [
-                    AIFunctionFactory.Create(SearchFlights),
-                    AIFunctionFactory.Create(SearchHotels),
-                ]
-            }
-        });
+        // .AsAIAgent() is the idiomatic MAF 1.1.0 convenience extension on IChatClient
+        return chatClient.AsAIAgent(
+            name: "TravelAgent",
+            instructions: """
+                You are a travel booking assistant. When asked to find flights or hotels,
+                ALWAYS use the available tools. Present results clearly and recommend
+                the best option. Be concise.
+                """,
+            tools:
+            [
+                AIFunctionFactory.Create(SearchFlights),
+                AIFunctionFactory.Create(SearchHotels),
+            ]);
     }
 
     [Description("Search for available flights between two cities on a given date.")]
@@ -280,19 +276,14 @@ public static class LightPathMAFIntegration
 
     private static AIAgent CreateMockTravelAgent()
     {
-        return new ChatClientAgent(new MockTravelChatClient(), new ChatClientAgentOptions
-        {
-            Name = "TravelAgent (Mock)",
-            ChatOptions = new ChatOptions
-            {
-                Instructions = "You are a travel booking assistant.",
-                Tools =
-                [
-                    AIFunctionFactory.Create(SearchFlights),
-                    AIFunctionFactory.Create(SearchHotels),
-                ]
-            }
-        });
+        return new MockTravelChatClient().AsAIAgent(
+            name: "TravelAgent (Mock)",
+            instructions: "You are a travel booking assistant.",
+            tools:
+            [
+                AIFunctionFactory.Create(SearchFlights),
+                AIFunctionFactory.Create(SearchHotels),
+            ]);
     }
 
     // ════════════════════════════════════════════════════════════════════
@@ -322,7 +313,7 @@ public static class LightPathMAFIntegration
         Console.WriteLine(@"
 ╔═══════════════════════════════════════════════════════════════════════════════╗
 ║                                                                               ║
-║   ⚡ SAMPLE 05: LIGHT PATH — agent.EvaluateAsync() with AgentEval            ║
+║   ⚡ SAMPLE A5: LIGHT PATH — agent.EvaluateAsync() with AgentEval            ║
 ║   Real agent, real evaluation, MEAI-compatible results                        ║
 ║                                                                               ║
 ╚═══════════════════════════════════════════════════════════════════════════════╝

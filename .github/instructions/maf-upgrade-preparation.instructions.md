@@ -27,43 +27,54 @@ The output of Phase 1 is a markdown document (`MAF/MAF-Upgrade-Plan.md`) that se
 
 ## Prerequisites
 
-- `/MAF/` contains the **current** MAF source (matching the version pinned in `Directory.Packages.props`)
+- `/MAF/` contains the **current** (or recent prior) MAF source for reference
 - `/MAFVnext/` contains the **newer** MAF source to upgrade to
 - Both directories are gitignored and local-only
+- The version pinned in `Directory.Packages.props` is the authoritative current version
 - Do NOT update `Directory.Packages.props` yet — that happens in Phase 2
 
 ## Solution Structure (Post-Modularization)
 
-AgentEval is modularized into 6 sub-projects (see ADR-016). MAF dependencies are **compile-time isolated** in a separate project:
+AgentEval is modularized into 7 sub-projects (see ADR-016). MAF dependencies are **compile-time isolated** in a separate project:
 
 ```
 src/
 ├── AgentEval.Abstractions/   ← Interfaces, models — zero external deps
 ├── AgentEval.Core/           ← Metrics, assertions, comparison — no MAF deps
 ├── AgentEval.DataLoaders/    ← Dataset loading, exporters — no MAF deps
-├── AgentEval.MAF/            ← MAF adapters (7 files) — ONLY project with MAF deps
-│   └── MAF/
-│       ├── MAFAgentAdapter.cs              ← Microsoft.Agents.AI
-│       ├── MAFIdentifiableAgentAdapter.cs  ← Microsoft.Agents.AI
-│       ├── MAFWorkflowEventBridge.cs       ← Microsoft.Agents.AI.Workflows (heaviest)
-│       ├── MAFGraphExtractor.cs            ← Microsoft.Agents.AI.Workflows + Checkpointing
-│       ├── MAFWorkflowAdapter.cs           ← Microsoft.Agents.AI.Workflows (factory only)
-│       ├── MAFEvaluationHarness.cs         ← NO MAF deps (works through interfaces)
-│       └── WorkflowEvaluationHarness.cs    ← NO MAF deps (works through interfaces)
+├── AgentEval.MAF/            ← MAF adapters + evaluators — ONLY project with MAF deps
+│   ├── MAF/                  ← 7 adapter files (MAF type dependencies)
+│   │   ├── MAFAgentAdapter.cs              ← Microsoft.Agents.AI
+│   │   ├── MAFIdentifiableAgentAdapter.cs  ← Microsoft.Agents.AI
+│   │   ├── MAFWorkflowEventBridge.cs       ← Microsoft.Agents.AI.Workflows (heaviest)
+│   │   ├── MAFGraphExtractor.cs            ← Microsoft.Agents.AI.Workflows + Checkpointing
+│   │   ├── MAFWorkflowAdapter.cs           ← Microsoft.Agents.AI.Workflows (factory only)
+│   │   ├── MAFEvaluationHarness.cs         ← NO MAF deps (works through interfaces)
+│   │   └── WorkflowEvaluationHarness.cs    ← NO MAF deps (works through interfaces)
+│   └── Evaluators/           ← 6 files: MEAI IEvaluator "light path" bridge (no MAF deps, uses Microsoft.Extensions.AI.Evaluation)
+│       ├── AdditionalContextHelper.cs
+│       ├── AgentEvalEvaluator.cs
+│       ├── AgentEvalEvaluators.cs
+│       ├── AgentEvalMetricAdapter.cs
+│       ├── ConversationExtractor.cs
+│       └── ResultConverter.cs
+├── AgentEval.Memory/         ← Memory evaluation — no direct MAF deps (gets MAF transitively)
 ├── AgentEval.RedTeam/        ← Security scanning — no MAF deps
-├── AgentEval/                ← Umbrella NuGet package (embeds all 5 DLLs)
-└── AgentEval.Cli/            ← CLI tool (separate NuGet)
+└── AgentEval/                ← Umbrella NuGet package (embeds all sub-project DLLs)
 ```
+
+**Note:** The CLI has been moved to its own repository at `AgentEvalHQ/AgentEval.Cli`.
 
 **Which `.csproj` files reference MAF NuGet packages:**
 
 | Project | MAF Packages | Why |
 |---------|-------------|-----|
-| `src/AgentEval.MAF/AgentEval.MAF.csproj` | `Microsoft.Agents.AI`, `Microsoft.Agents.AI.Workflows` | Compile-time dependency (adapter code) |
-| `src/AgentEval/AgentEval.csproj` (umbrella) | Same two packages re-declared | `PrivateAssets="all"` suppresses transitive propagation from sub-projects, so umbrella must re-declare for NuGet consumers |
+| `src/AgentEval.MAF/AgentEval.MAF.csproj` | `Microsoft.Agents.AI`, `Microsoft.Agents.AI.Workflows` | Compile-time dependency (adapter code). Also refs `Microsoft.Extensions.AI.Evaluation.Quality` for light-path evaluator bridge |
+| `src/AgentEval/AgentEval.csproj` (umbrella) | `Microsoft.Agents.AI`, `Microsoft.Agents.AI.Workflows` | `PrivateAssets="all"` suppresses transitive propagation from sub-projects, so umbrella must re-declare for NuGet consumers |
 | `samples/AgentEval.Samples/AgentEval.Samples.csproj` | `Microsoft.Agents.AI.OpenAI`, `Microsoft.Agents.AI.Workflows` | Samples create real MAF agents |
+| `samples/AgentEval.NuGetConsumer/AgentEval.NuGetConsumer.csproj` | `Microsoft.Agents.AI` (explicit version, CPM disabled) | Standalone consumer sample — tests the published NuGet package as an external consumer would. Has its own version pins, NOT managed by `Directory.Packages.props` |
 
-All versions are centrally managed in `Directory.Packages.props`.
+All versions (except NuGetConsumer) are centrally managed in `Directory.Packages.props`.
 
 ## Step 1: Read the Current MAF Version
 
@@ -145,13 +156,27 @@ Also check test files for test-only MAF APIs:
 | `tests/AgentEval.Tests/MAF/MAFWorkflowEventBridgeTests.cs` | `WorkflowBuilder`, `ExecutorBindingExtensions` |
 | `tests/AgentEval.Tests/MAF/MAFGraphExtractorTests.cs` | `WorkflowBuilder`, `ExecutorBindingExtensions` |
 | `tests/AgentEval.Tests/MAF/MAFWorkflowAdapterFromMAFWorkflowTests.cs` | `WorkflowBuilder`, `ExecutorBindingExtensions` |
+| `tests/AgentEval.Tests/MAF/MAFIdentifiableAgentAdapterTests.cs` | `Microsoft.Agents.AI` types |
+| `tests/AgentEval.Tests/MAF/MAFEvaluationHarnessTests.cs` | Through interfaces (no direct MAF deps) |
+| `tests/AgentEval.Tests/MAF/MAFWorkflowAdapterTests.cs` | Workflow adapter surface |
+| `tests/AgentEval.Tests/MAF/MAFWorkflowAdapterEdgeTests.cs` | Workflow adapter edge cases |
+| `tests/AgentEval.Tests/MAF/WorkflowEvaluationHarnessTests.cs` | Through interfaces (no direct MAF deps) |
+| `tests/AgentEval.Tests/MAF/WorkflowToolTrackingTests.cs` | Workflow tool tracking |
+| `tests/AgentEval.Tests/MAF/ChatClientAdapterStreamingIntegrationTests.cs` | Streaming integration |
+| `tests/AgentEval.Tests/MAF/MicrosoftEvaluatorAdapterTests.cs` | MEAI evaluator bridge |
+| `tests/AgentEval.Tests/MAF/Evaluators/*.cs` (7 files) | Light-path evaluator tests (MEAI IEvaluator, not MAF directly) |
 
 Also check sample files and the umbrella project for MAF API usage:
 | File | MAF APIs It Uses |
 |------|-----------------|
-| `samples/AgentEval.Samples/*.cs` (8 samples) | `ChatClientAgent`, `ChatClientAgentOptions`, `ChatOptions`, `MAFAgentAdapter`, `MAFEvaluationHarness`, `WorkflowBuilder` |
+| `samples/AgentEval.Samples/GettingStarted/*.cs` (6 files) | `ChatClientAgent`, `ChatClientAgentOptions`, `ChatOptions`, `AIFunctionFactory`, `AIAgent` |
+| `samples/AgentEval.Samples/PerformanceAndStatistics/*.cs` (5 files) | Same core MAF types |
+| `samples/AgentEval.Samples/SafetyAndSecurity/*.cs` (3 files) | Same core MAF types |
+| `samples/AgentEval.Samples/DataAndInfrastructure/*.cs` (4 files) | Same core MAF types + `WorkflowBuilder`, `Workflow` (trace sample) |
+| `samples/AgentEval.Samples/WorkflowsAndConversations/*.cs` (3 files) | `WorkflowBuilder`, `Workflow` + core MAF types |
+| `samples/AgentEval.Samples/MemoryEvaluation/*.cs` | Memory evaluation samples |
+| `samples/AgentEval.NuGetConsumer/AgentFactory.cs` | `ChatClientAgent`, `ChatClientAgentOptions`, `ChatOptions`, `AIFunctionFactory`, `AIAgent` — uses explicit version pins (CPM disabled) |
 | `src/AgentEval/AgentEval.csproj` (umbrella) | Re-declares MAF package refs — must match versions in `Directory.Packages.props` |
-| `src/AgentEval.Cli/Commands/EvalCommand.cs` | `MAFEvaluationHarness` (via `using AgentEval.MAF`) |
 
 ## Step 5: Produce the Plan Document
 
@@ -223,7 +248,8 @@ Changes in MAF areas AgentEval doesn't use (listed for completeness).
 3. Run `dotnet build` to verify compilation
 4. Run `dotnet test --filter "Category=MAFIntegration"`
 5. Run `dotnet test` for full suite
-6. Update compatibility note in release
+6. Update `samples/AgentEval.NuGetConsumer/AgentEval.NuGetConsumer.csproj` separately (CPM disabled, has its own version pins)
+7. Update compatibility note in release
 
 ## 7. Estimated Effort
 

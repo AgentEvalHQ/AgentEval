@@ -15,7 +15,7 @@ using ChatOptions = Microsoft.Extensions.AI.ChatOptions;
 namespace AgentEval.Samples;
 
 /// <summary>
-/// Sample 16: Combined Stochastic + Model Comparison
+/// Sample D4: Combined Stochastic + Model Comparison
 /// 
 /// This demonstrates:
 /// - Running stochastic tests across multiple models
@@ -195,21 +195,14 @@ public static class CombinedStochasticComparison
             .GetChatClient(deployment)
             .AsIChatClient();
         
-        var agent = new ChatClientAgent(
-            chatClient,
-            new ChatClientAgentOptions
-            {
-                Name = $"Calculator Agent ({deployment})",
-                ChatOptions = new ChatOptions
-                {
-                    Instructions = "You are a math assistant. Always use the CalculatorTool for calculations.",
-                    Tools = [AIFunctionFactory.Create(CalculatorTool)]
-                }
-            });
-        
+        var agent = chatClient.AsAIAgent(
+            name: $"Calculator Agent ({deployment})",
+            instructions: "You are a math assistant. Always use the CalculatorTool for calculations.",
+            tools: [AIFunctionFactory.Create(CalculatorTool)]);
+
         return new MAFAgentAdapter(agent);
     }
-    
+
     [Description("Performs basic arithmetic operations")]
     private static string CalculatorTool(
         [Description("First operand")] double a,
@@ -261,7 +254,7 @@ public static class CombinedStochasticComparison
         Console.WriteLine("""
 
         ╔═══════════════════════════════════════════════════════════════╗
-        ║  Sample 16: Combined Stochastic + Model Comparison            ║
+        ║  Sample D4: Combined Stochastic + Model Comparison            ║
         ║  Compare models with statistical rigor (3 runs each)          ║
         ╚═══════════════════════════════════════════════════════════════╝
 
