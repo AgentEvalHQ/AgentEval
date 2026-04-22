@@ -234,6 +234,45 @@ public class ChatClientAgentAdapterStreamingToolTests
     }
 
     // ═══════════════════════════════════════════════════════════════════
+    // INJECT CONVERSATION HISTORY — works even when includeHistory=false
+    // ═══════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public async Task InjectConversationHistory_WhenIncludeHistoryFalse_InjectedMessagesStillSentToClient()
+    {
+        // Arrange — adapter constructed with default includeHistory=false (via Create())
+        var mock = new MockStreamingChatClient(
+            streamingChunks: [[new TextContent("response")]],
+            nonStreamingResponse: "response");
+        var adapter = ChatClientAgentAdapter.Create(mock, name: "TestAgent");
+
+        adapter.InjectConversationHistory(new[]
+        {
+            ("What is 2+2?", "4"),
+            ("What is 3+3?", "6"),
+        });
+
+        // Act
+        _ = await adapter.InvokeAsync("And 4+4?");
+
+        // Assert — the mock should have received the injected turns + the current prompt
+        var received = mock.ReceivedMessages.Single().ToList();
+        // No system prompt, so we expect: user(What is 2+2?), assistant(4),
+        //                                 user(What is 3+3?), assistant(6), user(And 4+4?)
+        Assert.Equal(5, received.Count);
+        Assert.Equal(ChatRole.User, received[0].Role);
+        Assert.Equal("What is 2+2?", received[0].Text);
+        Assert.Equal(ChatRole.Assistant, received[1].Role);
+        Assert.Equal("4", received[1].Text);
+        Assert.Equal(ChatRole.User, received[2].Role);
+        Assert.Equal("What is 3+3?", received[2].Text);
+        Assert.Equal(ChatRole.Assistant, received[3].Role);
+        Assert.Equal("6", received[3].Text);
+        Assert.Equal(ChatRole.User, received[4].Role);
+        Assert.Equal("And 4+4?", received[4].Text);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
     // HELPERS
     // ═══════════════════════════════════════════════════════════════════
 

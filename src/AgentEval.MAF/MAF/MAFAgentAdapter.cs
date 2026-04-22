@@ -13,6 +13,24 @@ namespace AgentEval.MAF;
 /// <summary>
 /// Adapts a Microsoft Agent Framework (MAF) AIAgent for testing with AgentEval.
 /// </summary>
+/// <remarks>
+/// <para>
+/// This adapter implements <see cref="IHistoryInjectableAgent"/> to support one-time snapshot
+/// injection of prior conversation turns before evaluation. Injected messages are prepended to
+/// the next invocation only and cleared automatically afterwards (single-use snapshot pattern).
+/// </para>
+/// <para>
+/// <strong>Limitation — AIContextProvider pipeline is bypassed:</strong><br/>
+/// Messages injected via <see cref="InjectConversationHistory"/> are prepended directly to the
+/// messages list passed to <c>RunAsync</c>/<c>RunStreamingAsync</c>, bypassing any
+/// <c>AIContextProvider</c> configured on the agent (e.g. <c>InMemoryChatHistoryProvider</c>).
+/// If the agent uses an <c>InMemoryChatHistoryProvider</c> with a compaction strategy, injected
+/// messages are not visible to that reducer — they will not be compacted and may exceed the
+/// configured context window. Use <see cref="InjectConversationHistory"/> only when the agent
+/// has no managed history provider, or when a one-time seed is acceptable for evaluation
+/// purposes.
+/// </para>
+/// </remarks>
 public class MAFAgentAdapter : IStreamableAgent, ISessionResettableAgent, IHistoryInjectableAgent
 {
     private protected readonly AIAgent _agent;
@@ -85,10 +103,6 @@ public class MAFAgentAdapter : IStreamableAgent, ISessionResettableAgent, IHisto
         
         await foreach (var update in _agent.RunStreamingAsync(messages, _session, cancellationToken: cancellationToken).ConfigureAwait(false))
         {
-            // Clear injected history after streaming has started successfully
-            if (_injectedHistory.Count > 0)
-                _injectedHistory.Clear();
-            
             foreach (var content in update.Contents)
             {
                 switch (content)
@@ -132,7 +146,10 @@ public class MAFAgentAdapter : IStreamableAgent, ISessionResettableAgent, IHisto
                 }
             }
         }
-        
+
+        // Clear injected history after streaming completes — ensures it's used for exactly one invocation
+        _injectedHistory.Clear();
+
         yield return new AgentResponseChunk { IsComplete = true, Usage = capturedUsage, ModelId = ResponseModelId };
     }
     
@@ -152,6 +169,12 @@ public class MAFAgentAdapter : IStreamableAgent, ISessionResettableAgent, IHisto
         => await _agent.CreateSessionAsync(cancellationToken).ConfigureAwait(false);
     
     /// <inheritdoc/>
+    /// <remarks>
+    /// Injected messages are prepended as user/assistant turn pairs on the very next invocation
+    /// only. They bypass any <c>AIContextProvider</c> (e.g. <c>InMemoryChatHistoryProvider</c>)
+    /// configured on the underlying agent, so compaction strategies will not see them.
+    /// After the first invocation completes, the injected messages are cleared automatically.
+    /// </remarks>
     public void InjectConversationHistory(IEnumerable<(string UserMessage, string AssistantResponse)> conversationTurns)
     {
         foreach (var (userMessage, assistantResponse) in conversationTurns)

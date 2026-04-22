@@ -42,6 +42,13 @@ public class MemoryTestScenario
     /// </summary>
     public Dictionary<string, object>? Metadata { get; init; }
 
+    /// <summary>
+    /// Pre-built text blob containing conversation history (corpus + facts + noise) to prepend 
+    /// to each verification query. When set, setup steps are skipped and this blob is used
+    /// instead — matching the LongMemEval text-blob injection approach.
+    /// </summary>
+    public string? ContextTextBlob { get; set; }
+
     public override string ToString() => Name;
 
     /// <summary>

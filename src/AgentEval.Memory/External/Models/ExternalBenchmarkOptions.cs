@@ -8,8 +8,8 @@ namespace AgentEval.Memory.External.Models;
 /// </summary>
 public class ExternalBenchmarkOptions
 {
-    /// <summary>Maximum number of questions to run (null = all).</summary>
-    public int? MaxQuestions { get; init; }
+    /// <summary>Maximum number of questions to run (null = all). Default: 50.</summary>
+    public int? MaxQuestions { get; init; } = 50;
 
     /// <summary>
     /// Use stratified sampling to ensure proportional representation of each question type.
@@ -47,13 +47,15 @@ public class ExternalBenchmarkOptions
 
     /// <summary>
     /// Controls how conversation history is injected into the agent.
-    /// Default: <see cref="HistoryInjectionMode.Auto"/> (structured if agent supports it, else text blob).
+    /// Default: <see cref="HistoryInjectionMode.TextBlob"/> — matches the original LongMemEval paper's
+    /// prompt format and works with any agent.
     /// </summary>
     /// <remarks>
-    /// Set to <see cref="HistoryInjectionMode.TextBlob"/> to match the original LongMemEval paper's
-    /// prompt format, or to ensure history is visible to MAF AIContextProviders. Set to
-    /// <see cref="HistoryInjectionMode.StructuredChatHistory"/> to force fast structured injection
-    /// (requires IHistoryInjectableAgent).
+    /// TextBlob is the default because it matches the LongMemEval paper methodology and ensures
+    /// history is visible to all middleware, context providers, and memory pipelines.
+    /// Set to <see cref="HistoryInjectionMode.StructuredChatHistory"/> to force fast structured injection
+    /// (requires IHistoryInjectableAgent). Set to <see cref="HistoryInjectionMode.Auto"/> to let the
+    /// runner choose based on agent capabilities.
     /// </remarks>
-    public HistoryInjectionMode HistoryInjectionMode { get; init; } = HistoryInjectionMode.Auto;
+    public HistoryInjectionMode HistoryInjectionMode { get; init; } = HistoryInjectionMode.TextBlob;
 }

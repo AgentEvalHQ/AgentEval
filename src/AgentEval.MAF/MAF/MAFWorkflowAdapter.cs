@@ -101,6 +101,7 @@ public class MAFWorkflowAdapter : IWorkflowEvaluableAgent
 
         try
         {
+            var workflowComplete = false;
             await foreach (var evt in _workflowExecutor(prompt, cancellationToken))
             {
                 switch (evt)
@@ -236,8 +237,12 @@ public class MAFWorkflowAdapter : IWorkflowEvaluableAgent
                                 currentOutgoingEdges,
                                 stepBranchId));
                         }
-                        goto done; // Exit the foreach
+                        workflowComplete = true;
+                        break;
                 }
+
+                if (workflowComplete)
+                    break;
             }
 
             // If no WorkflowCompleteEvent was received, save final step
@@ -255,7 +260,6 @@ public class MAFWorkflowAdapter : IWorkflowEvaluableAgent
                     stepBranchId));
             }
 
-            done:
             overallStopwatch.Stop();
         }
         catch (Exception ex)

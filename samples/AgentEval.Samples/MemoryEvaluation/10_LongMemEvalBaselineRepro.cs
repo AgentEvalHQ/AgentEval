@@ -113,18 +113,18 @@ public static class LongMemEvalBaselineRepro
         Console.WriteLine();
 
         // ──────────────────────────────────────────────────────────
-        //  Step 2: Configure — TextBlob mode, 100q, stratified
+        //  Step 2: Configure — TextBlob mode, 50q, stratified
         // ──────────────────────────────────────────────────────────
 
         var options = new ExternalBenchmarkOptions
         {
-            MaxQuestions = null,                // null = ALL 500 questions — full paper reproduction
+            MaxQuestions = 50,                 // 50q stratified; set null for full 500q reproduction
             StratifiedSampling = true,         // proportional across all 6 types
             PreserveSessionBoundaries = true,  // session markers in text blob
             IncludeTimestamps = true,          // temporal metadata preserved
             DatasetMode = "S",                 // ~115K tokens per question  
             RandomSeed = 42,                   // reproducible
-            HistoryInjectionMode = HistoryInjectionMode.TextBlob  // KEY: match paper format
+            // HistoryInjectionMode defaults to TextBlob — matches paper format
         };
 
         Console.WriteLine("Step 2: Running LongMemEval (paper-matching config)...\n");

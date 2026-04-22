@@ -2,6 +2,7 @@
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 
+using System.Runtime.CompilerServices;
 using System.Text.Json;
 using AgentEval.Core;
 using AgentEval.MAF;
@@ -116,6 +117,32 @@ public class MAFAgentAdapterTests
         Assert.Single(agent.LastReceivedMessages);
         Assert.Equal("Fresh prompt", agent.LastReceivedMessages[0].Text);
     }
+
+    [Fact]
+    public async Task InjectConversationHistory_StreamingPath_ClearedAfterInvocation()
+    {
+        // Arrange: use streaming-capable fake agent
+        var agent = new StreamingHistoryCapturingAgent("Test", "response");
+        var adapter = new MAFAgentAdapter(agent);
+
+        adapter.InjectConversationHistory(new[]
+        {
+            ("Past message", "Past response")
+        });
+
+        // Act: first streaming call includes injected history — must consume all chunks
+        await foreach (var _ in adapter.InvokeStreamingAsync("First")) { }
+
+        // Assert: injected history was passed in the first call (1 user + 1 assistant injected + 1 prompt = 3)
+        Assert.Equal(3, agent.LastReceivedMessages!.Count);
+
+        // Act: second streaming call should NOT include injected history (cleared after first)
+        await foreach (var _ in adapter.InvokeStreamingAsync("Second")) { }
+
+        // Assert: only the prompt was sent
+        Assert.Single(agent.LastReceivedMessages!);
+        Assert.Equal("Second", agent.LastReceivedMessages[0].Text);
+    }
 }
 
 #region Test Helpers
@@ -176,6 +203,63 @@ internal class HistoryCapturingAgent : AIAgent
 
 internal class SimpleAgentSession : AgentSession
 {
+}
+
+/// <summary>
+/// A fake AIAgent that captures messages in both the non-streaming and streaming paths.
+/// Used to verify that <see cref="MAFAgentAdapter"/> clears injected history after
+/// the streaming path completes.
+/// </summary>
+internal class StreamingHistoryCapturingAgent : AIAgent
+{
+    private readonly string _responseText;
+
+    public override string? Name { get; }
+    public List<ChatMessage>? LastReceivedMessages { get; private set; }
+
+    public StreamingHistoryCapturingAgent(string name, string responseText)
+    {
+        Name = name;
+        _responseText = responseText;
+    }
+
+    protected override ValueTask<AgentSession> CreateSessionCoreAsync(
+        CancellationToken cancellationToken = default)
+        => new(new SimpleAgentSession());
+
+    protected override Task<MAFAgentResponse> RunCoreAsync(
+        IEnumerable<ChatMessage> messages,
+        AgentSession? session = null,
+        AgentRunOptions? options = null,
+        CancellationToken cancellationToken = default)
+    {
+        LastReceivedMessages = messages.ToList();
+        var responseMessage = new ChatMessage(ChatRole.Assistant, _responseText);
+        return Task.FromResult(new MAFAgentResponse(responseMessage));
+    }
+
+    protected override async IAsyncEnumerable<AgentResponseUpdate> RunCoreStreamingAsync(
+        IEnumerable<ChatMessage> messages,
+        AgentSession? session = null,
+        AgentRunOptions? options = null,
+        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        LastReceivedMessages = messages.ToList();
+        await Task.Yield();
+        yield return new AgentResponseUpdate(ChatRole.Assistant, _responseText);
+    }
+
+    protected override ValueTask<JsonElement> SerializeSessionCoreAsync(
+        AgentSession session,
+        JsonSerializerOptions? jsonSerializerOptions = null,
+        CancellationToken cancellationToken = default)
+        => new(JsonSerializer.SerializeToElement(new { }));
+
+    protected override ValueTask<AgentSession> DeserializeSessionCoreAsync(
+        JsonElement serializedState,
+        JsonSerializerOptions? jsonSerializerOptions = null,
+        CancellationToken cancellationToken = default)
+        => new(new SimpleAgentSession());
 }
 
 #endregion

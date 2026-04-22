@@ -213,11 +213,9 @@ public class ChatClientAgentAdapter : IStreamableAgent, ISessionResettableAgent,
             messages.Add(new ChatMessage(ChatRole.System, _systemPrompt));
         }
 
-        // Add conversation history if maintaining state
-        if (_includeHistory)
-        {
-            messages.AddRange(_conversationHistory);
-        }
+        // Always include history — populated by conversation tracking (_includeHistory=true)
+        // or by InjectConversationHistory(), which must work regardless of _includeHistory.
+        messages.AddRange(_conversationHistory);
 
         // Add the current user prompt
         messages.Add(new ChatMessage(ChatRole.User, prompt));

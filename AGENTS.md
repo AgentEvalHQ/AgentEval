@@ -26,8 +26,10 @@ dotnet run --project samples/AgentEval.Samples
 - `src/AgentEval.Core/` - Implementations: metrics, assertions, comparison, tracing
 - `src/AgentEval.DataLoaders/` - Data loaders, exporters, output formatting
 - `src/AgentEval.MAF/` - Microsoft Agent Framework integration
+- `src/AgentEval.Memory/` - Memory evaluation (retention, temporal, cross-session, benchmarks)
 - `src/AgentEval.RedTeam/` - Security scanning, attack types, compliance
 - `tests/AgentEval.Tests/` - Unit tests (mirrors src structure)
+- `tests/AgentEval.Memory.Tests/` - Memory module unit tests
 - `samples/AgentEval.Samples/` - 27 runnable samples
 - `docs/` - Documentation
 
@@ -81,6 +83,7 @@ services.AddAgentEvalAll();
 // Or register selectively:
 services.AddAgentEval();              // Core services
 services.AddAgentEvalDataLoaders();   // DataLoaders + Exporters
+services.AddAgentEvalMemory();        // Memory evaluation
 services.AddAgentEvalRedTeam();       // Red Team security testing
 
 // Inject interfaces
