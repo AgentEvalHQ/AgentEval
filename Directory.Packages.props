@@ -19,6 +19,7 @@
     <!-- Azure -->
     <PackageVersion Include="Azure.AI.OpenAI" Version="2.8.0-beta.1" />
     <PackageVersion Include="Azure.Identity" Version="1.18.0" />
+    <PackageVersion Include="OpenTelemetry.Api" Version="1.15.3" />
     
     <!-- Core -->
     <PackageVersion Include="System.Numerics.Tensors" Version="10.0.3" />
