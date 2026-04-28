@@ -10,7 +10,7 @@ using AgentEval.Models;
 namespace AgentEval.Samples;
 
 /// <summary>
-/// Sample 01: Hello World - The simplest possible AgentEval evaluation
+/// Sample A1: Hello World - The simplest possible AgentEval evaluation
 /// 
 /// This demonstrates:
 /// - Creating a simple agent
@@ -99,9 +99,9 @@ public static class HelloWorld
         Console.WriteLine("   • TestCase defines what to evaluate and what to expect");
         Console.WriteLine("   • MAFAgentAdapter wraps MAF agents for evaluation");
         Console.WriteLine("   • TestResult contains pass/fail status, score, and output");
-        Console.WriteLine("   • For AI-judged evaluation, see Sample 05 (RAG) and Sample 17 (Quality Metrics)");
+        Console.WriteLine("   • For AI-judged evaluation, see Sample B1 (RAG) and Sample B2 (Quality Metrics)");
         
-        Console.WriteLine("\n🔗 NEXT: Run Sample 02 to see tool tracking in action!\n");
+        Console.WriteLine("\n🔗 NEXT: Run Sample A2 to see tool tracking in action!\n");
     }
 
     private static AIAgent CreateGreetingAgent()
@@ -117,30 +117,23 @@ public static class HelloWorld
             .GetChatClient(AIConfig.ModelDeployment)
             .AsIChatClient();
 
-        return new ChatClientAgent(
-            chatClient,
-            new ChatClientAgentOptions
-            {
-                Name = "GreetingAgent",
-                ChatOptions = new() { Instructions = """
-                    You are a friendly greeting assistant.
-                    When someone introduces themselves, greet them warmly by name.
-                    Keep responses brief and friendly.
-                    """ }
-            });
+        // .AsAIAgent() is the idiomatic MAF 1.3.0 convenience extension on IChatClient
+        return chatClient.AsAIAgent(
+            name: "GreetingAgent",
+            instructions: """
+                You are a friendly greeting assistant.
+                When someone introduces themselves, greet them warmly by name.
+                Keep responses brief and friendly.
+                """);
     }
 
     private static AIAgent CreateMockAgent()
     {
         // For demo without Azure credentials - uses a fake response
         var mockClient = new MockChatClient("Hello Alice! 👋 Nice to meet you!");
-        return new ChatClientAgent(
-            mockClient,
-            new ChatClientAgentOptions
-            {
-                Name = "GreetingAgent (Mock)",
-                ChatOptions = new() { Instructions = "You are a friendly greeting assistant." }
-            });
+        return mockClient.AsAIAgent(
+            name: "GreetingAgent (Mock)",
+            instructions: "You are a friendly greeting assistant.");
     }
 
     private static void PrintHeader()
@@ -149,7 +142,7 @@ public static class HelloWorld
         Console.WriteLine(@"
 ╔═══════════════════════════════════════════════════════════════════════════════╗
 ║                                                                               ║
-║   🌍 SAMPLE 01: HELLO WORLD                                                   ║
+║   🌍 SAMPLE A1: HELLO WORLD                                                   ║
 ║   The simplest possible AgentEval evaluation                                  ║
 ║                                                                               ║
 ╚═══════════════════════════════════════════════════════════════════════════════╝

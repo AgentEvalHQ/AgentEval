@@ -82,16 +82,41 @@ public class LongMemEvalBenchmarkRunner : IExternalBenchmarkRunner
 
             // Inject history (0 LLM calls) or fall back to text blob prepended to query
             string? textBlobPrefix = null;
-            if (agent is IHistoryInjectableAgent injectable)
+            var injectionMode = options.HistoryInjectionMode;
+
+            var useStructured = injectionMode switch
+            {
+                HistoryInjectionMode.StructuredChatHistory => true,
+                HistoryInjectionMode.TextBlob => false,
+                _ => agent is IHistoryInjectableAgent // Auto: use structured if available
+            };
+
+            if (useStructured && agent is IHistoryInjectableAgent injectable)
             {
                 var history = LongMemEvalHistoryFormatter.Format(entry, options);
                 injectable.InjectConversationHistory(history);
             }
             else
             {
-                _logger.LogWarning(
-                    "Agent does not implement IHistoryInjectableAgent — using text blob fallback for {QuestionId}",
-                    entry.QuestionId);
+                if (injectionMode == HistoryInjectionMode.StructuredChatHistory && agent is not IHistoryInjectableAgent)
+                {
+                    _logger.LogWarning(
+                        "HistoryInjectionMode is StructuredChatHistory but agent does not implement IHistoryInjectableAgent — falling back to text blob for {QuestionId}",
+                        entry.QuestionId);
+                }
+                else if (injectionMode == HistoryInjectionMode.TextBlob)
+                {
+                    _logger.LogDebug(
+                        "Using text blob injection mode (configured) for {QuestionId}",
+                        entry.QuestionId);
+                }
+                else
+                {
+                    _logger.LogWarning(
+                        "Agent does not implement IHistoryInjectableAgent — using text blob fallback for {QuestionId}",
+                        entry.QuestionId);
+                }
+
                 textBlobPrefix = LongMemEvalHistoryFormatter.FormatAsTextBlob(entry, options);
             }
 
@@ -102,42 +127,70 @@ public class LongMemEvalBenchmarkRunner : IExternalBenchmarkRunner
             if (textBlobPrefix == null && !string.IsNullOrEmpty(entry.QuestionDate))
                 queryPrompt = $"Current Date: {entry.QuestionDate}\n\n{queryPrompt}";
 
-            var response = await agent.InvokeAsync(queryPrompt, ct);
-            totalLlmCalls++;
-
-            // Judge (1 LLM call)
-            var question = new ExternalBenchmarkQuestion
+            try
             {
-                QuestionId = entry.QuestionId,
-                QuestionType = entry.QuestionType,
-                Question = entry.Question,
-                GoldAnswer = entry.Answer,
-                QuestionDate = entry.QuestionDate,
-                IsAbstention = entry.IsAbstention
-            };
+                var response = await agent.InvokeAsync(queryPrompt, ct);
+                totalLlmCalls++;
 
-            var judgment = await judge.JudgeAsync(response.Text, question, ct);
-            totalLlmCalls++;
+                // Judge (1 LLM call)
+                var question = new ExternalBenchmarkQuestion
+                {
+                    QuestionId = entry.QuestionId,
+                    QuestionType = entry.QuestionType,
+                    Question = entry.Question,
+                    GoldAnswer = entry.Answer,
+                    QuestionDate = entry.QuestionDate,
+                    IsAbstention = entry.IsAbstention
+                };
 
-            qStopwatch.Stop();
+                var judgment = await judge.JudgeAsync(response.Text, question, ct);
+                totalLlmCalls++;
 
-            questionResults.Add(new QuestionResult
+                qStopwatch.Stop();
+
+                questionResults.Add(new QuestionResult
+                {
+                    QuestionId = entry.QuestionId,
+                    QuestionType = entry.QuestionType,
+                    Question = entry.Question,
+                    GoldAnswer = entry.Answer,
+                    AgentResponse = response.Text,
+                    Correct = judgment.Correct,
+                    RawScore = judgment.RawScore,
+                    JudgeExplanation = judgment.Explanation,
+                    Duration = qStopwatch.Elapsed
+                });
+
+                var correctLabel = judgment.Correct ? "CORRECT" : "WRONG";
+                _logger.LogInformation(
+                    "[{Index}/{Total}] {Type,-30} {Correct}  ({Elapsed:F1}s)",
+                    i + 1, entries.Count, entry.QuestionType,
+                    correctLabel, qStopwatch.Elapsed.TotalSeconds);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
             {
-                QuestionId = entry.QuestionId,
-                QuestionType = entry.QuestionType,
-                Question = entry.Question,
-                GoldAnswer = entry.Answer,
-                AgentResponse = response.Text,
-                Correct = judgment.Correct,
-                RawScore = judgment.RawScore,
-                JudgeExplanation = judgment.Explanation,
-                Duration = qStopwatch.Elapsed
-            });
+                qStopwatch.Stop();
+                var errorMsg = ex.Message.Contains("content_filter", StringComparison.OrdinalIgnoreCase)
+                    ? "CONTENT_FILTER"
+                    : $"ERROR: {ex.Message}";
 
-            _logger.LogInformation(
-                "[{Index}/{Total}] {Type,-30} {Correct}",
-                i + 1, entries.Count, entry.QuestionType,
-                judgment.Correct ? "CORRECT" : "WRONG");
+                questionResults.Add(new QuestionResult
+                {
+                    QuestionId = entry.QuestionId,
+                    QuestionType = entry.QuestionType,
+                    Question = entry.Question,
+                    GoldAnswer = entry.Answer,
+                    AgentResponse = $"[{errorMsg}]",
+                    Correct = false,
+                    RawScore = 0,
+                    JudgeExplanation = $"Skipped due to error: {ex.Message}",
+                    Duration = qStopwatch.Elapsed
+                });
+
+                _logger.LogWarning(
+                    "[{Index}/{Total}] {Type,-30} {Error} — {QuestionId}  ({Elapsed:F1}s)",
+                    i + 1, entries.Count, entry.QuestionType, errorMsg, entry.QuestionId, qStopwatch.Elapsed.TotalSeconds);
+            }
         }
 
         totalStopwatch.Stop();

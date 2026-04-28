@@ -7,6 +7,7 @@ using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using System.Diagnostics;
+using System.Text;
 
 namespace AgentEval.Memory.Engine;
 
@@ -59,15 +60,32 @@ public class MemoryTestRunner : IMemoryTestRunner
 
         try
         {
-            // Phase 1: Execute setup steps to establish facts
-            await ExecuteSetupStepsAsync(agent, scenario.Steps, cancellationToken);
+            // Phase 1: Build or use pre-built text blob from setup steps
+            var contextBlob = scenario.ContextTextBlob;
+            if (contextBlob == null && scenario.Steps.Count > 0)
+            {
+                // Check for cross-session scenarios that need individual InvokeAsync calls
+                var hasSessionResets = scenario.Steps.Any(s => s.Content.Contains("[SESSION_RESET_POINT]"));
+                if (hasSessionResets)
+                {
+                    // Cross-session: must use individual calls for session reset support
+                    await ExecuteSetupStepsWithCallsAsync(agent, scenario.Steps, cancellationToken);
+                }
+                else
+                {
+                    // Standard path: build text blob from steps (no LLM calls)
+                    contextBlob = BuildTextBlobFromSteps(scenario.Steps);
+                    _logger.LogDebug("Built text blob from {StepCount} setup steps ({CharCount} chars)", 
+                        scenario.Steps.Count, contextBlob.Length);
+                }
+            }
             
-            // Phase 2: Run verification queries
+            // Phase 2: Run verification queries (prepending text blob if available)
             var queryResults = new List<MemoryQueryResult>();
             
             foreach (var query in scenario.Queries)
             {
-                var queryResult = await EvaluateQueryAsync(agent, query, cancellationToken);
+                var queryResult = await EvaluateQueryAsync(agent, query, contextBlob, cancellationToken);
                 queryResults.Add(queryResult);
                 totalTokens += queryResult.TokensUsed;
                 
@@ -131,38 +149,46 @@ public class MemoryTestRunner : IMemoryTestRunner
     }
 
     /// <summary>
-    /// Executes the setup steps to establish facts in the agent's memory.
-    /// When the agent supports history injection (IHistoryInjectableAgent), injects
-    /// facts and noise as synthetic conversation history — ZERO LLM calls.
-    /// Falls back to individual LLM calls only when history injection is not supported
-    /// or when session reset markers are present (cross-session scenarios).
+    /// Builds a text blob from scenario steps (facts + noise) formatted as conversation history.
+    /// This matches the LongMemEval text-blob approach — all context is prepended to each query
+    /// as a single block of text. No LLM calls needed for setup.
     /// </summary>
-    private async Task ExecuteSetupStepsAsync(
+    internal static string BuildTextBlobFromSteps(IReadOnlyList<MemoryStep> steps)
+    {
+        var sb = new StringBuilder();
+        sb.AppendLine("Below is a conversation history between you and a user. Use it to answer the question that follows.");
+        sb.AppendLine();
+        sb.AppendLine("Conversation History:");
+
+        foreach (var step in steps)
+        {
+            var response = step.Type switch
+            {
+                MemoryStepType.Fact => "Got it, I'll remember that.",
+                MemoryStepType.Noise => "Interesting, thanks for sharing.",
+                _ => "I understand."
+            };
+
+            sb.AppendLine($"user: {step.Content}");
+            sb.AppendLine($"assistant: {response}");
+        }
+
+        return sb.ToString();
+    }
+
+    /// <summary>
+    /// Fallback: executes setup steps via individual InvokeAsync calls.
+    /// Only used for cross-session scenarios that contain [SESSION_RESET_POINT] markers,
+    /// which require actual session resets between steps.
+    /// </summary>
+    private async Task ExecuteSetupStepsWithCallsAsync(
         IEvaluableAgent agent,
         IReadOnlyList<MemoryStep> steps,
         CancellationToken cancellationToken)
     {
         if (steps.Count == 0) return;
 
-        _logger.LogDebug("Executing {StepCount} setup steps", steps.Count);
-
-        // Check if any steps require session resets — if so, fall back to individual calls
-        var hasSessionResets = steps.Any(s => s.Content.Contains("[SESSION_RESET_POINT]"));
-
-        // Use efficient history injection when possible
-        if (!hasSessionResets && agent is IHistoryInjectableAgent injectable)
-        {
-            var history = BuildSyntheticHistory(steps);
-            if (history.Count > 0)
-            {
-                injectable.InjectConversationHistory(history);
-                _logger.LogDebug("Injected {TurnCount} turns as conversation history (0 LLM calls)", history.Count);
-                return;
-            }
-        }
-
-        // Fallback: individual LLM calls (needed for cross-session scenarios with resets)
-        _logger.LogDebug("Using individual LLM calls for setup steps (session resets detected or no history injection)");
+        _logger.LogDebug("Executing {StepCount} setup steps via individual calls (cross-session mode)", steps.Count);
 
         foreach (var step in steps)
         {
@@ -206,43 +232,26 @@ public class MemoryTestRunner : IMemoryTestRunner
     }
 
     /// <summary>
-    /// Converts scenario steps into synthetic conversation history pairs (user, assistant).
-    /// Facts become user messages, noise becomes user messages, and all get synthetic assistant responses.
-    /// </summary>
-    private static IReadOnlyList<(string UserMessage, string AssistantResponse)> BuildSyntheticHistory(
-        IReadOnlyList<MemoryStep> steps)
-    {
-        var history = new List<(string UserMessage, string AssistantResponse)>();
-
-        foreach (var step in steps)
-        {
-            var response = step.Type switch
-            {
-                MemoryStepType.Fact => "Got it, I'll remember that.",
-                MemoryStepType.Noise => "Interesting, thanks for sharing.",
-                _ => "I understand."
-            };
-
-            history.Add((step.Content, response));
-        }
-
-        return history;
-    }
-
-    /// <summary>
     /// Evaluates a single memory query against the agent.
+    /// When contextBlob is provided, it is prepended to the query (text-blob injection).
     /// </summary>
     private async Task<MemoryQueryResult> EvaluateQueryAsync(
         IEvaluableAgent agent, 
-        MemoryQuery query, 
+        MemoryQuery query,
+        string? contextBlob,
         CancellationToken cancellationToken)
     {
         var queryStopwatch = Stopwatch.StartNew();
         
         try
         {
+            // Prepend text blob to query if available (text-blob injection, same as LongMemEval)
+            var prompt = contextBlob != null
+                ? $"{contextBlob}\nQuestion: {query.Question}\nAnswer:"
+                : query.Question;
+
             // Get agent's response to the memory query
-            var response = await agent.InvokeAsync(query.Question, cancellationToken);
+            var response = await agent.InvokeAsync(prompt, cancellationToken);
             
             // Use MemoryJudge to evaluate the response
             var judgmentResult = await _memoryJudge.JudgeAsync(response.Text, query, cancellationToken);

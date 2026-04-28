@@ -3,6 +3,7 @@
 // Licensed under the MIT License.
 
 using Microsoft.Extensions.AI;
+using Microsoft.Extensions.Logging;
 using AgentEval.Models;
 
 namespace AgentEval.MAF.Evaluators;
@@ -65,9 +66,13 @@ public static class ConversationExtractor
     /// Extracts tool usage from conversation messages and response.
     /// Captures tool names, arguments, and results — but NOT timing (light path limitation).
     /// </summary>
+    /// <param name="messages">The conversation messages to inspect.</param>
+    /// <param name="response">The agent response containing any additional messages.</param>
+    /// <param name="logger">Optional logger for correlation diagnostics (e.g. heuristic CallId matching). When null, diagnostics are silently dropped.</param>
     public static ToolUsageReport? ExtractToolUsage(
         IEnumerable<ChatMessage> messages,
-        ChatResponse response)
+        ChatResponse response,
+        ILogger? logger = null)
     {
         if (messages is null) return null;
 
@@ -118,6 +123,10 @@ public static class ConversationExtractor
                             .OrderByDescending(c => c.Order)
                             .FirstOrDefault();
                         callId = latestPending?.CallId ?? $"result-{Guid.NewGuid():N}";
+                        logger?.LogWarning(
+                            "[AgentEval] Tool result correlated by heuristic (CallId was null). " +
+                            "Matched to '{MatchedToolName}'. May mis-correlate for concurrent calls.",
+                            latestPending?.Name ?? "(none)");
                     }
 
                     if (pendingCalls.TryGetValue(callId, out var pending))

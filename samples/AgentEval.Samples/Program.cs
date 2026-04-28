@@ -21,13 +21,15 @@ public static class Program
 
     private static readonly IReadOnlyList<SampleGroup> Groups =
     [
-        new('A', "Getting Started", "★ no credentials needed",
+        new('A', "Getting Started", "★ no credentials needed (except Session Lifecycle)",
         [
             new("Hello World",               "Minimal AgentEval test — TestCase, TestResult, pass/fail",               HelloWorld.RunAsync),
             new("Agent + One Tool",          "Tool tracking and fluent assertions (HaveCalledTool, WithoutError)",      AgentWithOneTool.RunAsync),
             new("Agent + Multiple Tools",    "Tool ordering, BeforeTool / AfterTool, visual timeline",                 AgentWithMultipleTools.RunAsync),
             new("Performance Metrics",       "Latency, cost, TTFT, token budget assertions",                           PerformanceMetrics.RunAsync),
             new("Light Path (MEAI)",        "AgentEval as MEAI IEvaluator — plug into MAF's evaluation pipeline",     LightPathMAFIntegration.RunAsync),
+            new("Session Lifecycle",         "MAF AgentSession: create → multi-turn → reset → isolation",             AgentSessionLifecycle.RunAsync),
+            new("Advanced MAF Features",     "ChatHistory, middleware, structured output, approval, agent-as-tool",   AdvancedMAFFeatures.RunAsync),
         ]),
 
         new('B', "Metrics & Quality", "",
@@ -44,6 +46,7 @@ public static class Program
             new("Conversation Evaluation",   "Multi-turn testing with ConversationRunner and fluent builder API",     ConversationEvaluation.RunAsync),
             new("Real MAF Workflow",         "WorkflowBuilder + InProcessExecution: 4-agent pipeline",               WorkflowEvaluationReal.RunAsync),
             new("Workflow + Tools",          "TripPlanner pipeline: 4 agents with tool call tracking",               WorkflowWithTools.RunAsync),
+            new("[MessageHandler] Executors", "Source-gen executor pipeline — deterministic, no LLM, AOT-ready",     WorkflowMessageHandlerExecutors.RunAsync),
         ]),
 
         new('D', "Performance & Statistics", "",
@@ -80,9 +83,11 @@ public static class Program
             new("Memory Scenarios",          "ReachBackEvaluator (recall depth), ReducerEvaluator (compression)",    MemoryScenariosDemo.RunAsync),
             new("Memory DI",                 "Production DI wiring — AddAgentEvalMemory(), CanRememberAsync()",      MemoryDI.RunAsync),
             new("Cross-Session Memory",      "Fact persistence across session resets — compare with / without",      MemoryCrossSession.RunAsync),
+            new("AIContextProvider Memory",  "MAF-native memory pipeline — AIContextProvider + CrossSessionEval",    MemoryAIContextProvider.RunAsync),
             new("Benchmark Reporting",       "Run benchmarks, save baselines, compare configs, HTML report",        MemoryBenchmarkReporting.RunAsync),
             new("LongMemEval Benchmark",     "Cross-platform memory eval — 120K token haystacks (ICLR 2025, MIT)",  LongMemEvalBenchmark.RunAsync),
             new("Run Single Benchmark",     "Pick Quick/Standard/Full, run it, save baseline, view report",       RunSingleBenchmark.RunAsync),
+            new("LongMemEval Baseline Repro","GPT-4o baseline reproduction — TextBlob mode, paper-matching config", LongMemEvalBaselineRepro.RunAsync),
         ]),
     ];
 
@@ -99,7 +104,7 @@ public static class Program
         if (!AIConfig.IsConfigured)
             AIConfig.PrintMissingCredentialsWarning();
 
-        // Legacy CLI: dotnet run -- <1-32>  (direct sample number, flattened in group order)
+        // Legacy CLI: dotnet run -- <1-41>  (direct sample number, flattened in group order)
         if (args.Length > 0 && int.TryParse(args[0], out var legacyNumber))
         {
             _interactive = false;

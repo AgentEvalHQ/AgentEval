@@ -12,7 +12,7 @@ using Microsoft.Extensions.AI;
 namespace AgentEval.Samples;
 
 /// <summary>
-/// Run a Single Memory Benchmark
+/// Sample G9: Run a Single Memory Benchmark
 ///
 /// Interactive sample that lets you pick a benchmark preset (Quick/Standard/Full),
 /// runs it once with the memory-optimized prompt, saves the baseline, and opens the report.
@@ -184,7 +184,7 @@ public static class RunSingleBenchmark
     {
         Console.WriteLine();
         Console.WriteLine("===================================================================");
-        Console.WriteLine("AgentEval Memory — Run Single Benchmark");
+        Console.WriteLine("AgentEval Memory — Sample G9: Run Single Benchmark");
         Console.WriteLine("===================================================================");
         Console.WriteLine("Pick a preset, run it, save the baseline, view the report.");
         Console.WriteLine();

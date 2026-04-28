@@ -13,7 +13,7 @@ using System.ComponentModel;
 namespace AgentEval.Samples;
 
 /// <summary>
-/// Sample 02: Agent with One Tool - Tool tracking and assertions
+/// Sample A2: Agent with One Tool - Tool tracking and assertions
 /// 
 /// This demonstrates:
 /// - Creating an agent with a tool
@@ -153,7 +153,7 @@ public static class AgentWithOneTool
         Console.WriteLine("   • .HaveNoErrors() verifies ALL tools completed successfully");
         Console.WriteLine("   • 💡 Use 'because:' to document WHY assertions matter!");
         
-        Console.WriteLine("\n🔗 NEXT: Run Sample 03 to see multi-tool ordering!\n");
+        Console.WriteLine("\n🔗 NEXT: Run Sample A3 to see multi-tool ordering!\n");
     }
 
     private static AIAgent CreateCalculatorAgent()
@@ -168,37 +168,24 @@ public static class AgentWithOneTool
             .GetChatClient(AIConfig.ModelDeployment)
             .AsIChatClient();
 
-        return new ChatClientAgent(
-            chatClient,
-            new ChatClientAgentOptions
-            {
-                Name = "MathAgent",
-                ChatOptions = new ChatOptions
-                {
-                    Instructions = """
-                        You are a helpful math assistant.
-                        When asked to perform calculations, ALWAYS use the CalculatorTool.
-                        Provide the result in a clear, conversational way.
-                        """,
-                    Tools = [AIFunctionFactory.Create(CalculatorTool)]
-                }
-            });
+        // .AsAIAgent() is the idiomatic MAF 1.3.0 convenience extension on IChatClient
+        return chatClient.AsAIAgent(
+            name: "MathAgent",
+            instructions: """
+                You are a helpful math assistant.
+                When asked to perform calculations, ALWAYS use the CalculatorTool.
+                Provide the result in a clear, conversational way.
+                """,
+            tools: [AIFunctionFactory.Create(CalculatorTool)]);
     }
 
     private static AIAgent CreateMockCalculatorAgent()
     {
         var mockClient = new MockCalculatorChatClient();
-        return new ChatClientAgent(
-            mockClient,
-            new ChatClientAgentOptions
-            {
-                Name = "MathAgent (Mock)",
-                ChatOptions = new ChatOptions
-                {
-                    Instructions = "You are a math assistant.",
-                    Tools = [AIFunctionFactory.Create(CalculatorTool)]
-                }
-            });
+        return mockClient.AsAIAgent(
+            name: "MathAgent (Mock)",
+            instructions: "You are a math assistant.",
+            tools: [AIFunctionFactory.Create(CalculatorTool)]);
     }
 
     [Description("Performs basic arithmetic operations. Supports add, subtract, multiply, divide.")]
@@ -225,7 +212,7 @@ public static class AgentWithOneTool
         Console.WriteLine(@"
 ╔═══════════════════════════════════════════════════════════════════════════════╗
 ║                                                                               ║
-║   🔧 SAMPLE 02: AGENT WITH ONE TOOL                                          ║
+║   🔧 SAMPLE A2: AGENT WITH ONE TOOL                                          ║
 ║   Tool tracking and fluent assertions                                         ║
 ║                                                                               ║
 ╚═══════════════════════════════════════════════════════════════════════════════╝

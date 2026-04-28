@@ -34,9 +34,11 @@
     <!-- Supporting packages with explicit versions (CPM disabled) -->
     <PackageReference Include="Azure.AI.OpenAI" Version="2.8.0-beta.1" />
     <PackageReference Include="System.Memory.Data" Version="10.0.3" />
-    <PackageReference Include="Microsoft.Agents.AI" Version="1.0.0-rc3" />
-    <PackageReference Include="Microsoft.Extensions.AI" Version="10.3.0" />
-    <PackageReference Include="Microsoft.Extensions.AI.OpenAI" Version="10.3.0" />
+    <PackageReference Include="Microsoft.Agents.AI" Version="1.3.0" />
+    <PackageReference Include="Microsoft.Extensions.AI" Version="10.5.0" />
+    <PackageReference Include="Microsoft.Extensions.AI.OpenAI" Version="10.5.0" />
+    <!-- Security: override transitive OT dep to patch resolving GHSA-g94r-2vxg-569j -->
+    <PackageReference Include="OpenTelemetry.Api" Version="1.15.3" />
     
     <!-- Semantic Kernel — for SK-native agent demo -->
     <PackageReference Include="Microsoft.SemanticKernel" Version="1.72.0" />

@@ -14,7 +14,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 namespace AgentEval.Samples;
 
 /// <summary>
-/// Sample 29: Memory Benchmark Suite - Comprehensive agent memory scoring
+/// Sample G2: Memory Benchmark Suite - Comprehensive agent memory scoring
 ///
 /// This demonstrates:
 /// - Running the Quick/Standard/Full memory benchmark presets
@@ -184,7 +184,7 @@ public static class MemoryBenchmarkDemo
     {
         Console.WriteLine();
         Console.WriteLine("═══════════════════════════════════════════════════════════════════");
-        Console.WriteLine("🏆 AgentEval Memory - Sample 29: Memory Benchmark Suite");
+        Console.WriteLine("🏆 AgentEval Memory - Sample G2: Memory Benchmark Suite");
         Console.WriteLine("═══════════════════════════════════════════════════════════════════");
         Console.WriteLine("Comprehensive agent memory scoring with grades and recommendations...");
         Console.WriteLine();

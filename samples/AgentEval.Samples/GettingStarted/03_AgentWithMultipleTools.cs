@@ -13,7 +13,7 @@ using System.ComponentModel;
 namespace AgentEval.Samples;
 
 /// <summary>
-/// Sample 03: Agent with Multiple Tools - Ordering, timing, and timeline
+/// Sample A3: Agent with Multiple Tools - Ordering, timing, and timeline
 /// 
 /// This demonstrates:
 /// - Agent with multiple tools
@@ -220,7 +220,7 @@ public static class AgentWithMultipleTools
         Console.WriteLine("   • Timeline shows visual tool execution flow");
         Console.WriteLine("   • Streaming provides real-time tool status");
         
-        Console.WriteLine("\n🔗 NEXT: Run Sample 04 to see performance metrics!\n");
+        Console.WriteLine("\n🔗 NEXT: Run Sample A4 to see performance metrics!\n");
     }
 
     private static AIAgent CreateResearchAgent()
@@ -235,51 +235,38 @@ public static class AgentWithMultipleTools
             .GetChatClient(AIConfig.ModelDeployment)
             .AsIChatClient();
 
-        return new ChatClientAgent(
-            chatClient,
-            new ChatClientAgentOptions
-            {
-                Name = "ResearchAgent",
-                ChatOptions = new ChatOptions
-                {
-                    Instructions = """
-                        You are a research assistant.
-                        When researching a topic:
-                        1. FIRST use SearchTool to find information
-                        2. THEN use SummarizeTool to create a summary
-                        3. Optionally use FactCheckTool to verify claims
-                        
-                        Always follow this order for best results.
-                        """,
-                    Tools = 
-                    [
-                        AIFunctionFactory.Create(SearchTool),
-                        AIFunctionFactory.Create(SummarizeTool),
-                        AIFunctionFactory.Create(FactCheckTool)
-                    ]
-                }
-            });
+        // .AsAIAgent() is the idiomatic MAF 1.3.0 convenience extension on IChatClient
+        return chatClient.AsAIAgent(
+            name: "ResearchAgent",
+            instructions: """
+                You are a research assistant.
+                When researching a topic:
+                1. FIRST use SearchTool to find information
+                2. THEN use SummarizeTool to create a summary
+                3. Optionally use FactCheckTool to verify claims
+                
+                Always follow this order for best results.
+                """,
+            tools:
+            [
+                AIFunctionFactory.Create(SearchTool),
+                AIFunctionFactory.Create(SummarizeTool),
+                AIFunctionFactory.Create(FactCheckTool)
+            ]);
     }
 
     private static AIAgent CreateMockResearchAgent()
     {
         var mockClient = new MockResearchChatClient();
-        return new ChatClientAgent(
-            mockClient,
-            new ChatClientAgentOptions
-            {
-                Name = "ResearchAgent (Mock)",
-                ChatOptions = new ChatOptions
-                {
-                    Instructions = "You are a research assistant.",
-                    Tools = 
-                    [
-                        AIFunctionFactory.Create(SearchTool),
-                        AIFunctionFactory.Create(SummarizeTool),
-                        AIFunctionFactory.Create(FactCheckTool)
-                    ]
-                }
-            });
+        return mockClient.AsAIAgent(
+            name: "ResearchAgent (Mock)",
+            instructions: "You are a research assistant.",
+            tools:
+            [
+                AIFunctionFactory.Create(SearchTool),
+                AIFunctionFactory.Create(SummarizeTool),
+                AIFunctionFactory.Create(FactCheckTool)
+            ]);
     }
 
     [Description("Searches for information on a topic. Returns relevant content.")]
@@ -322,7 +309,7 @@ public static class AgentWithMultipleTools
         Console.WriteLine(@"
 ╔═══════════════════════════════════════════════════════════════════════════════╗
 ║                                                                               ║
-║   🔧 SAMPLE 03: AGENT WITH MULTIPLE TOOLS                                    ║
+║   🔧 SAMPLE A3: AGENT WITH MULTIPLE TOOLS                                    ║
 ║   Tool ordering, timing, and timeline visualization                          ║
 ║                                                                               ║
 ╚═══════════════════════════════════════════════════════════════════════════════╝

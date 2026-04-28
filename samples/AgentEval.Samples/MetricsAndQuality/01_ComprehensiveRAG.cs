@@ -11,7 +11,7 @@ using AgentEval.Embeddings;
 namespace AgentEval.Samples;
 
 /// <summary>
-/// Sample 05: Comprehensive RAG - Build and Evaluate a Complete RAG System
+/// Sample B1: Comprehensive RAG - Build and Evaluate a Complete RAG System
 /// 
 /// This demonstrates:
 /// - PART 1: Building a RAG system (document loading, chunking, embedding, vector storage)
@@ -422,7 +422,7 @@ public static class ComprehensiveRAG
         Console.ForegroundColor = ConsoleColor.Yellow;
         Console.WriteLine(@"
    ┌─────────────────────────────────────────────────────────────────────────────┐
-   │  ⚠️  SKIPPING SAMPLE 05 - Credentials Required                            │
+   │  ⚠️  SKIPPING SAMPLE B1 - Credentials Required                            │
    ├─────────────────────────────────────────────────────────────────────────────┤
    │  This sample requires both chat and embedding Azure OpenAI deployments.    │
    │                                                                             │
@@ -446,7 +446,7 @@ public static class ComprehensiveRAG
         Console.WriteLine(@"
 ╔═══════════════════════════════════════════════════════════════════════════════╗
 ║                                                                               ║
-║   🏗️ SAMPLE 05: COMPREHENSIVE RAG - Build & Evaluate a Complete RAG System   ║
+║   🏗️ SAMPLE B1: COMPREHENSIVE RAG - Build & Evaluate a Complete RAG System   ║
 ║   All 8 metrics: 5 LLM-based + 3 Embedding-based                             ║
 ║                                                                               ║
 ╚═══════════════════════════════════════════════════════════════════════════════╝

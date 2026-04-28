@@ -13,7 +13,7 @@ using AgentEval.RedTeam.Reporting;
 namespace AgentEval.Samples;
 
 /// <summary>
-/// Sample 20: Basic Red Team Evaluation
+/// Sample E2: Basic Red Team Evaluation
 /// 
 /// Demonstrates the simplest red team workflow:
 /// 1. One-liner scan (QuickRedTeamScanAsync)
@@ -104,7 +104,7 @@ public static class RedTeamBasic
         Console.WriteLine($"  📝 Markdown report: {mdPath}");
 
         Console.WriteLine();
-        Console.WriteLine("=== Sample 20 Complete ===");
+        Console.WriteLine("=== Sample E2 Complete ===");
     }
 
     private static AIAgent CreateAgent()
@@ -131,7 +131,7 @@ public static class RedTeamBasic
         Console.WriteLine(@"
 ╔═══════════════════════════════════════════════════════════════════════════════╗
 ║                                                                               ║
-║   🛡️ SAMPLE 20: BASIC RED TEAM EVALUATION                                    ║
+║   🛡️ SAMPLE E2: BASIC RED TEAM EVALUATION                                    ║
 ║   Quick security scan with assertions and detailed reporting                  ║
 ║                                                                               ║
 ╚═══════════════════════════════════════════════════════════════════════════════╝
@@ -144,7 +144,7 @@ public static class RedTeamBasic
         Console.ForegroundColor = ConsoleColor.Yellow;
         Console.WriteLine(@"
    ┌─────────────────────────────────────────────────────────────────────────────┐
-   │  ⚠️  SKIPPING SAMPLE 20 - Azure OpenAI Credentials Required               │
+   │  ⚠️  SKIPPING SAMPLE E2 - Azure OpenAI Credentials Required               │
    ├─────────────────────────────────────────────────────────────────────────────┤
    │  This sample runs a red team security scan on a real agent.                 │
    │                                                                             │

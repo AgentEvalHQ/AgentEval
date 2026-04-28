@@ -11,7 +11,7 @@ using AgentEval.Testing;
 namespace AgentEval.Samples;
 
 /// <summary>
-/// Sample 08: Conversation Evaluation - Multi-turn agent interactions
+/// Sample C1: Conversation Evaluation - Multi-turn agent interactions
 /// 
 /// This demonstrates:
 /// - Creating a MAF AIAgent (ChatClientAgent) and wrapping it with MAFAgentAdapter
@@ -155,17 +155,13 @@ public static class ConversationEvaluation
             .GetChatClient(AIConfig.ModelDeployment)
             .AsIChatClient();
 
-        return new ChatClientAgent(
-            chatClient,
-            new ChatClientAgentOptions
-            {
-                Name = "ConversationAgent",
-                ChatOptions = new() { Instructions = """
-                    You are a helpful, knowledgeable conversational assistant.
-                    Answer questions thoroughly but concisely.
-                    Remember context from earlier in the conversation.
-                    """ }
-            });
+        return chatClient.AsAIAgent(
+            name: "ConversationAgent",
+            instructions: """
+                You are a helpful, knowledgeable conversational assistant.
+                Answer questions thoroughly but concisely.
+                Remember context from earlier in the conversation.
+                """);
     }
 
     private static void PrintHeader()
@@ -174,7 +170,7 @@ public static class ConversationEvaluation
         Console.WriteLine(@"
 ╔═══════════════════════════════════════════════════════════════════════════════╗
 ║                                                                               ║
-║   💬 SAMPLE 08: CONVERSATION EVALUATION                                      ║
+║   💬 SAMPLE C1: CONVERSATION EVALUATION                                      ║
 ║   Multi-turn testing with ConversationRunner + ConversationalTestCase         ║
 ║                                                                               ║
 ╚═══════════════════════════════════════════════════════════════════════════════╝
@@ -187,7 +183,7 @@ public static class ConversationEvaluation
         Console.ForegroundColor = ConsoleColor.Yellow;
         Console.WriteLine(@"
    ┌─────────────────────────────────────────────────────────────────────────────┐
-   │  ⚠️  SKIPPING SAMPLE 08 - Azure OpenAI Credentials Required               │
+   │  ⚠️  SKIPPING SAMPLE C1 - Azure OpenAI Credentials Required               │
    ├─────────────────────────────────────────────────────────────────────────────┤
    │  This sample runs real multi-turn conversations against an AI agent.       │
    │                                                                             │
@@ -209,6 +205,6 @@ public static class ConversationEvaluation
         Console.WriteLine("   • ConversationalTestCase.Create() provides a fluent builder API");
         Console.WriteLine("   • Built-in assertions check tool usage, completeness, and duration");
         Console.WriteLine("   • Multi-turn tests catch context drift and memory issues");
-        Console.WriteLine("\n🔗 NEXT: Run Sample 09 to see workflow evaluation!\n");
+        Console.WriteLine("\n🔗 NEXT: Run Sample C2 to see workflow evaluation!\n");
     }
 }

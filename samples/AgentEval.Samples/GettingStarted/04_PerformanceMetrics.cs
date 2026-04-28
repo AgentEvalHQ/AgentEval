@@ -13,7 +13,7 @@ using System.ComponentModel;
 namespace AgentEval.Samples;
 
 /// <summary>
-/// Sample 04: Performance Metrics - Latency, cost, TTFT, and tokens
+/// Sample A4: Performance Metrics - Latency, cost, TTFT, and tokens
 /// 
 /// This demonstrates:
 /// - Capturing performance metrics during evaluations
@@ -170,7 +170,7 @@ public static class PerformanceMetrics
         Console.WriteLine("   • Cost estimation works with token counts + model pricing");
         Console.WriteLine("   • Use assertions to enforce SLAs and budgets");
         
-        Console.WriteLine("\n🔗 NEXT: Run Sample 05 to see RAG evaluation!\n");
+        Console.WriteLine("\n🔗 NEXT: Run Sample B1 to see RAG evaluation!\n");
     }
 
     private static AIAgent CreateAgent()
@@ -185,25 +185,18 @@ public static class PerformanceMetrics
             .GetChatClient(AIConfig.ModelDeployment)
             .AsIChatClient();
 
-        return new ChatClientAgent(
-            chatClient,
-            new ChatClientAgentOptions
-            {
-                Name = "WriterAgent",
-                ChatOptions = new() { Instructions = "You are a helpful writing assistant. Keep responses concise but informative." }
-            });
+        // .AsAIAgent() is the idiomatic MAF 1.3.0 convenience extension on IChatClient
+        return chatClient.AsAIAgent(
+            name: "WriterAgent",
+            instructions: "You are a helpful writing assistant. Keep responses concise but informative.");
     }
 
     private static AIAgent CreateMockAgent()
     {
         var mockClient = new MockWriterChatClient();
-        return new ChatClientAgent(
-            mockClient,
-            new ChatClientAgentOptions
-            {
-                Name = "WriterAgent (Mock)",
-                ChatOptions = new() { Instructions = "You are a helpful writing assistant." }
-            });
+        return mockClient.AsAIAgent(
+            name: "WriterAgent (Mock)",
+            instructions: "You are a helpful writing assistant.");
     }
 
     private static void PrintHeader()
@@ -212,7 +205,7 @@ public static class PerformanceMetrics
         Console.WriteLine(@"
 ╔═══════════════════════════════════════════════════════════════════════════════╗
 ║                                                                               ║
-║   ⚡ SAMPLE 04: PERFORMANCE METRICS                                          ║
+║   ⚡ SAMPLE A4: PERFORMANCE METRICS                                          ║
 ║   Latency, cost, tokens, and TTFT tracking                                    ║
 ║                                                                               ║
 ╚═══════════════════════════════════════════════════════════════════════════════╝

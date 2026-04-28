@@ -11,7 +11,7 @@ using Microsoft.Extensions.AI;
 namespace AgentEval.Samples;
 
 /// <summary>
-/// Sample 27: Cross-Framework Evaluation — Universal IChatClient Adapter
+/// Sample F7: Cross-Framework Evaluation — Universal IChatClient Adapter
 ///
 /// Demonstrates the <c>IChatClient.AsEvaluableAgent()</c> one-liner that makes
 /// **any LLM provider** evaluable by AgentEval — zero boilerplate:
@@ -133,7 +133,7 @@ public static class CrossFrameworkEvaluation
         Console.WriteLine(@"
 ╔═══════════════════════════════════════════════════════════════════════════════╗
 ║                                                                               ║
-║   🌐 SAMPLE 27: CROSS-FRAMEWORK EVALUATION                                    ║
+║   🌐 SAMPLE F7: CROSS-FRAMEWORK EVALUATION                                    ║
 ║   Universal IChatClient Adapter · Any Provider · Export                        ║
 ║                                                                               ║
 ╚═══════════════════════════════════════════════════════════════════════════════╝

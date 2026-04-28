@@ -101,6 +101,7 @@ public class MAFWorkflowAdapter : IWorkflowEvaluableAgent
 
         try
         {
+            var workflowComplete = false;
             await foreach (var evt in _workflowExecutor(prompt, cancellationToken))
             {
                 switch (evt)
@@ -236,8 +237,12 @@ public class MAFWorkflowAdapter : IWorkflowEvaluableAgent
                                 currentOutgoingEdges,
                                 stepBranchId));
                         }
-                        goto done; // Exit the foreach
+                        workflowComplete = true;
+                        break;
                 }
+
+                if (workflowComplete)
+                    break;
             }
 
             // If no WorkflowCompleteEvent was received, save final step
@@ -255,7 +260,6 @@ public class MAFWorkflowAdapter : IWorkflowEvaluableAgent
                     stepBranchId));
             }
 
-            done:
             overallStopwatch.Stop();
         }
         catch (Exception ex)
@@ -600,6 +604,21 @@ public record ExecutorErrorEvent(
     string? Message, 
     string? StackTrace = null,
     string? ExceptionType = null) : WorkflowEvent;
+
+/// <summary>
+/// Event indicating a complete (non-streaming) agent response from an executor.
+/// Captures token usage and finish reason that streaming events cannot provide.
+/// </summary>
+/// <remarks>
+/// This event is emitted when MAF fires an <c>AgentResponseEvent</c> (non-streaming
+/// complete response). It extends <see cref="ExecutorOutputEvent"/> with additional
+/// per-executor token usage and finish reason data.
+/// </remarks>
+public record ExecutorAgentResponseEvent(
+    string ExecutorId,
+    string? Output,
+    TokenUsage? Usage = null,
+    string? FinishReason = null) : ExecutorOutputEvent(ExecutorId, Output);
 
 /// <summary>
 /// Event indicating workflow completion.

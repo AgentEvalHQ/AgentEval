@@ -259,8 +259,10 @@ public class MemoryBenchmarkRunner : IMemoryBenchmarkRunner
     }
 
     /// <summary>
-    /// Loads a scenario from JSON, injects context pressure, builds a MemoryTestScenario,
+    /// Loads a scenario from JSON, builds context as a text blob, creates a MemoryTestScenario,
     /// and runs it. Returns null if the JSON file doesn't exist (caller falls back to hardcoded).
+    /// All context (corpus + facts + noise) is formatted as a text blob prepended to each query,
+    /// matching the LongMemEval approach. No IHistoryInjectableAgent dependency.
     /// </summary>
     private async Task<(double Score, bool Skipped, string? SkipReason)?> TryRunFromJsonAsync(
         IEvaluableAgent agent, string scenarioName, string presetName, CancellationToken ct)
@@ -287,7 +289,7 @@ public class MemoryBenchmarkRunner : IMemoryBenchmarkRunner
                 {
                     if (preset.ContextPressure.TargetTokens.HasValue && preset.ContextPressure.TargetTokens.Value > 0)
                     {
-                        // When overflow_calls is set, inject only 75% as history — the rest comes via real InvokeAsync calls
+                        // When overflow_calls is set, load only 75% as text blob — the rest comes via real InvokeAsync calls
                         var effectiveTokens = preset.ContextPressure.OverflowCalls > 0
                             ? (int)(preset.ContextPressure.TargetTokens.Value * 0.75)
                             : preset.ContextPressure.TargetTokens.Value;
@@ -320,20 +322,43 @@ public class MemoryBenchmarkRunner : IMemoryBenchmarkRunner
             var positionedFacts = preset.Facts.Where(f => f.FractionalPosition.HasValue).ToList();
             var unpositionedFacts = preset.Facts.Where(f => !f.FractionalPosition.HasValue).ToList();
 
-            // If we have positioned facts AND a corpus, interleave them
-            if (positionedFacts.Count > 0 && corpusTurns != null && corpusTurns.Count > 0
-                && agent is IHistoryInjectableAgent injectable)
+            // Build the combined turn list: corpus + interleaved positioned facts
+            List<(string User, string Assistant)> allTurns;
+            if (positionedFacts.Count > 0 && corpusTurns != null && corpusTurns.Count > 0)
             {
-                var interleaved = BuildInterleavedHistory(corpusTurns, positionedFacts, preset.NoiseBetweenFacts, preset.ContextPressure?.SessionsCount ?? 0);
-                injectable.InjectConversationHistory(interleaved);
+                allTurns = BuildInterleavedHistory(corpusTurns, positionedFacts, preset.NoiseBetweenFacts, preset.ContextPressure?.SessionsCount ?? 0).ToList();
             }
-            else if (corpusTurns != null && agent is IHistoryInjectableAgent injectableNoPos)
+            else if (corpusTurns != null)
             {
-                // No positioned facts — inject corpus as before
-                injectableNoPos.InjectConversationHistory(corpusTurns);
+                allTurns = new List<(string, string)>(corpusTurns);
+            }
+            else
+            {
+                allTurns = new List<(string, string)>();
             }
 
-            // Gradual overflow: send filler turns via InvokeAsync to fill remaining context
+            // Append unpositioned facts as conversation turns in the text blob
+            var noiseIndex = positionedFacts.Count;
+            foreach (var fact in unpositionedFacts)
+            {
+                var plantedText = fact.PlantedAs ?? fact.Content;
+                if (fact.Timestamp != null)
+                    plantedText = $"[{fact.Timestamp}] {plantedText}";
+                allTurns.Add((plantedText, "Got it, I'll remember that."));
+
+                if (preset.NoiseBetweenFacts.Count > 0)
+                {
+                    var noiseMsg = preset.NoiseBetweenFacts[noiseIndex % preset.NoiseBetweenFacts.Count];
+                    allTurns.Add((noiseMsg, "Interesting, thanks for sharing."));
+                    noiseIndex++;
+                }
+            }
+
+            // Format all turns as text blob (matching LongMemEval approach)
+            string? contextBlob = allTurns.Count > 0 ? FormatTurnsAsTextBlob(allTurns) : null;
+
+            // Gradual overflow: send filler turns via InvokeAsync to fill remaining context.
+            // This intentionally uses real calls to test the agent's reducer/memory architecture.
             var overflowCalls = preset.ContextPressure?.OverflowCalls ?? 0;
             if (overflowCalls > 0 && preset.ContextPressure?.TargetTokens > 0)
             {
@@ -349,7 +374,6 @@ public class MemoryBenchmarkRunner : IMemoryBenchmarkRunner
                     catch (Exception ex) when (ex.Message.Contains("context_length_exceeded") ||
                                                 ex.Message.Contains("maximum context length"))
                     {
-                        // Context overflow — expected. The agent's reducer should have fired.
                         _logger.LogInformation(
                             "Context overflow triggered after {Calls} filler calls — proceeding to queries",
                             i + 1);
@@ -358,35 +382,14 @@ public class MemoryBenchmarkRunner : IMemoryBenchmarkRunner
                 }
             }
 
-            // Build steps from unpositioned facts (appended after corpus, current behavior)
-            var steps = new List<MemoryStep>();
-            var noiseIndex = positionedFacts.Count; // continue noise rotation
-
-            foreach (var fact in unpositionedFacts)
-            {
-                var plantedText = fact.PlantedAs ?? fact.Content;
-                if (fact.Timestamp != null)
-                    plantedText = $"[{fact.Timestamp}] {plantedText}";
-                steps.Add(MemoryStep.Fact(plantedText));
-
-                if (preset.NoiseBetweenFacts.Count > 0)
-                {
-                    var noiseMsg = preset.NoiseBetweenFacts[noiseIndex % preset.NoiseBetweenFacts.Count];
-                    steps.Add(MemoryStep.Noise(noiseMsg));
-                    noiseIndex++;
-                }
-            }
-
-            // Build queries
+            // Build queries (no setup steps needed — everything is in the text blob)
             var queries = new List<MemoryQuery>();
             foreach (var q in preset.Queries)
             {
-                // For temporal queries, prepend today's date so the agent can reason about recency
                 var queryQuestion = q.Question;
                 if (string.Equals(q.QueryType, "temporal", StringComparison.OrdinalIgnoreCase))
                     queryQuestion = $"Today's date is {DateTimeOffset.UtcNow:yyyy-MM-dd}.\n\n{queryQuestion}";
 
-                // Determine if this is an abstention query (explicit flag or query_type)
                 var isAbstention = q.Abstention || string.Equals(q.QueryType, "abstention", StringComparison.OrdinalIgnoreCase);
 
                 if (isAbstention)
@@ -394,7 +397,6 @@ public class MemoryBenchmarkRunner : IMemoryBenchmarkRunner
                     var forbidden = (q.ForbiddenFacts ?? [])
                         .Select(f => MemoryFact.Create(f)).ToArray();
                     var absQuery = MemoryQuery.CreateAbstention(queryQuestion, forbidden);
-                    // Ensure query_type metadata is set for abstention too
                     if (q.QueryType != null)
                         absQuery.Metadata!["query_type"] = q.QueryType;
                     queries.Add(absQuery);
@@ -406,7 +408,6 @@ public class MemoryBenchmarkRunner : IMemoryBenchmarkRunner
                     var forbidden = (q.ForbiddenFacts ?? [])
                         .Select(f => MemoryFact.Create(f)).ToArray();
 
-                    // Build metadata with query_type when specified
                     Dictionary<string, object>? metadata = null;
                     if (q.QueryType != null)
                     {
@@ -427,8 +428,9 @@ public class MemoryBenchmarkRunner : IMemoryBenchmarkRunner
             {
                 Name = scenarioDef.Name,
                 Description = scenarioDef.Description ?? "",
-                Steps = steps,
-                Queries = queries
+                Steps = [], // No setup steps — all context is in the text blob
+                Queries = queries,
+                ContextTextBlob = contextBlob
             };
 
             var result = await _runner.RunAsync(agent, scenario, ct);
@@ -614,10 +616,13 @@ public class MemoryBenchmarkRunner : IMemoryBenchmarkRunner
         return (0, true, "Preference extraction scenario JSON not found");
     }
 
-    private static void InjectContextPressure(IEvaluableAgent agent, string presetName)
+    /// <summary>
+    /// Builds a text blob from corpus-loaded conversation turns to simulate context pressure.
+    /// The blob is prepended to each verification query (text-blob injection, matching LongMemEval).
+    /// Falls back to SyntheticHistoryGenerator if corpus files are not available.
+    /// </summary>
+    private static string? BuildContextPressureBlob(string presetName)
     {
-        if (agent is not IHistoryInjectableAgent injectable) return;
-
         var (corpusName, turnCount) = presetName switch
         {
             "Diagnostic" => ("context-stress", 250), // Diagnostic uses stress corpus (~120K tokens)
@@ -626,18 +631,39 @@ public class MemoryBenchmarkRunner : IMemoryBenchmarkRunner
             _ => ("context-small", 15)               // Quick uses all 15 small turns (~8K tokens)
         };
 
+        IReadOnlyList<(string UserMessage, string AssistantResponse)> turns;
         try
         {
-            var history = DataLoading.CorpusLoader.Load(corpusName, turnCount);
-            injectable.InjectConversationHistory(history);
+            turns = DataLoading.CorpusLoader.Load(corpusName, turnCount);
         }
         catch (OperationCanceledException) { throw; }
         catch
         {
             // Fallback to SyntheticHistoryGenerator if corpus not available
-            var fallback = SyntheticHistoryGenerator.Generate(turnCount);
-            injectable.InjectConversationHistory(fallback);
+            turns = SyntheticHistoryGenerator.Generate(turnCount);
         }
+
+        return FormatTurnsAsTextBlob(turns);
+    }
+
+    /// <summary>
+    /// Formats conversation turns as a text blob suitable for prepending to queries.
+    /// </summary>
+    internal static string FormatTurnsAsTextBlob(
+        IEnumerable<(string UserMessage, string AssistantResponse)> turns)
+    {
+        var sb = new System.Text.StringBuilder();
+        sb.AppendLine("Below is a conversation history between you and a user. Use it to answer the question that follows.");
+        sb.AppendLine();
+        sb.AppendLine("Conversation History:");
+
+        foreach (var (user, assistant) in turns)
+        {
+            sb.AppendLine($"user: {user}");
+            sb.AppendLine($"assistant: {assistant}");
+        }
+
+        return sb.ToString();
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -653,7 +679,7 @@ public class MemoryBenchmarkRunner : IMemoryBenchmarkRunner
 
         // Fallback: hardcoded scenario (legacy — will be removed once JSON migration is verified)
         var scores = new List<double>();
-        InjectContextPressure(agent, presetName);
+        var contextBlob = BuildContextPressureBlob(presetName);
 
         // Quick+: Facts planted conversationally
         // with distractor conversation between facts and queries.
@@ -680,6 +706,7 @@ public class MemoryBenchmarkRunner : IMemoryBenchmarkRunner
         ];
 
         var scenario = _memoryScenarios.CreateBasicMemoryTest(facts, queries);
+        scenario.ContextTextBlob = contextBlob;
         var result = await _runner.RunAsync(agent, scenario, ct);
         scores.Add(result.OverallScore);
 
@@ -688,6 +715,7 @@ public class MemoryBenchmarkRunner : IMemoryBenchmarkRunner
         {
             await ResetBetweenScenarios(agent, ct);
             var longTermScenario = _memoryScenarios.CreateLongTermMemoryTest(facts, conversationTurns: 10);
+            longTermScenario.ContextTextBlob = contextBlob;
             var longTermResult = await _runner.RunAsync(agent, longTermScenario, ct);
             scores.Add(longTermResult.OverallScore);
         }
@@ -699,6 +727,7 @@ public class MemoryBenchmarkRunner : IMemoryBenchmarkRunner
             MemoryFact[] highPriority = [MemoryFact.Create("I'm allergic to peanuts", "allergy", 100)];
             MemoryFact[] lowPriority = [MemoryFact.Create("I like the color blue", "preference", 20)];
             var priorityScenario = _memoryScenarios.CreatePriorityMemoryTest(highPriority, lowPriority);
+            priorityScenario.ContextTextBlob = contextBlob;
             var priorityResult = await _runner.RunAsync(agent, priorityScenario, ct);
             scores.Add(priorityResult.OverallScore);
         }
@@ -713,7 +742,7 @@ public class MemoryBenchmarkRunner : IMemoryBenchmarkRunner
         if (jsonResult.HasValue) return jsonResult.Value;
 
         var scores = new List<double>();
-        InjectContextPressure(agent, presetName);
+        var contextBlob = BuildContextPressureBlob(presetName);
 
         // Fallback: Quick+: Sequence ordering with 6 events (more events = harder to order correctly)
         // Events are NOT in chronological order when planted — agent must sort them
@@ -726,6 +755,7 @@ public class MemoryBenchmarkRunner : IMemoryBenchmarkRunner
             MemoryFact.Create("Switched to a larger company and learned C# there", DateTimeOffset.UtcNow.AddMonths(-8)),
             MemoryFact.Create("Led my first project as tech lead", DateTimeOffset.UtcNow.AddMonths(-1))
         ]);
+        sequenceScenario.ContextTextBlob = contextBlob;
         var seqResult = await _runner.RunAsync(agent, sequenceScenario, ct);
         scores.Add(seqResult.OverallScore);
 
@@ -739,6 +769,7 @@ public class MemoryBenchmarkRunner : IMemoryBenchmarkRunner
                 DateTimeOffset.UtcNow.AddDays(-7),
                 DateTimeOffset.UtcNow.AddDays(-1)
             ], eventsPerTimepoint: 2);
+            timePointScenario.ContextTextBlob = contextBlob;
             var tpResult = await _runner.RunAsync(agent, timePointScenario, ct);
             scores.Add(tpResult.OverallScore);
         }
@@ -756,6 +787,7 @@ public class MemoryBenchmarkRunner : IMemoryBenchmarkRunner
                     MemoryFact.Create("Called a plumber to fix the damage", DateTimeOffset.UtcNow.AddHours(-1))
                 }
             ]);
+            causalScenario.ContextTextBlob = contextBlob;
             var causalResult = await _runner.RunAsync(agent, causalScenario, ct);
             scores.Add(causalResult.OverallScore);
         }
@@ -770,7 +802,7 @@ public class MemoryBenchmarkRunner : IMemoryBenchmarkRunner
         if (jsonResult.HasValue) return jsonResult.Value;
 
         var scores = new List<double>();
-        InjectContextPressure(agent, presetName);
+        var contextBlob = BuildContextPressureBlob(presetName);
 
         // Fallback: Quick+: 4 facts buried in heavy noise (ratio 5:1 instead of default 3:1)
         // More facts = harder to recall all of them. Higher noise = more distraction.
@@ -782,6 +814,7 @@ public class MemoryBenchmarkRunner : IMemoryBenchmarkRunner
             MemoryFact.Create("My car is parked in lot B, spot 247", "location", 70)
         ];
         var buriedScenario = _chattyScenarios.CreateBuriedFactsScenario(facts, noiseRatio: 5);
+        buriedScenario.ContextTextBlob = contextBlob;
         var buriedResult = await _runner.RunAsync(agent, buriedScenario, ct);
         scores.Add(buriedResult.OverallScore);
 
@@ -790,6 +823,7 @@ public class MemoryBenchmarkRunner : IMemoryBenchmarkRunner
         {
             await ResetBetweenScenarios(agent, ct);
             var topicScenario = _chattyScenarios.CreateTopicSwitchingScenario(facts, topicChanges: 8);
+            topicScenario.ContextTextBlob = contextBlob;
             var topicResult = await _runner.RunAsync(agent, topicScenario, ct);
             scores.Add(topicResult.OverallScore);
         }
@@ -799,6 +833,7 @@ public class MemoryBenchmarkRunner : IMemoryBenchmarkRunner
         {
             await ResetBetweenScenarios(agent, ct);
             var emotionalScenario = _chattyScenarios.CreateEmotionalDistractorScenario(facts);
+            emotionalScenario.ContextTextBlob = contextBlob;
             var emotionalResult = await _runner.RunAsync(agent, emotionalScenario, ct);
             scores.Add(emotionalResult.OverallScore);
 
@@ -810,6 +845,7 @@ public class MemoryBenchmarkRunner : IMemoryBenchmarkRunner
                 MemoryFact.Create("Your car is in lot C, spot 112")
             ];
             var falseInfoScenario = _chattyScenarios.CreateFalseInformationScenario(facts, falseFacts);
+            falseInfoScenario.ContextTextBlob = contextBlob;
             var falseResult = await _runner.RunAsync(agent, falseInfoScenario, ct);
             scores.Add(falseResult.OverallScore);
         }
@@ -1073,7 +1109,7 @@ public class MemoryBenchmarkRunner : IMemoryBenchmarkRunner
         if (jsonResult.HasValue) return jsonResult.Value;
 
         // Fallback: hardcoded abstention
-        InjectContextPressure(agent, presetName);
+        var contextBlob = BuildContextPressureBlob(presetName);
 
         // Plant a FEW real facts — so the agent has SOME info but not about every topic
         MemoryFact[] plantedFacts =
@@ -1118,7 +1154,8 @@ public class MemoryBenchmarkRunner : IMemoryBenchmarkRunner
             Name = "Abstention — Hallucination Detection",
             Description = "Tests whether the agent correctly says 'I don't know' for information it was never given, while still recalling facts it WAS given.",
             Steps = steps,
-            Queries = allQueries
+            Queries = allQueries,
+            ContextTextBlob = contextBlob
         };
 
         var result = await _runner.RunAsync(agent, scenario, ct);

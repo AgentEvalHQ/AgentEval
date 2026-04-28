@@ -15,7 +15,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 namespace AgentEval.Samples;
 
 /// <summary>
-/// Sample 31: DI-Based Memory Evaluation - Using dependency injection for memory services
+/// Sample G4: DI-Based Memory Evaluation - Using dependency injection for memory services
 ///
 /// This demonstrates:
 /// - Registering a real Azure OpenAI client as IChatClient in DI
@@ -180,7 +180,7 @@ public static class MemoryDI
     {
         Console.WriteLine();
         Console.WriteLine("═══════════════════════════════════════════════════════════════════");
-        Console.WriteLine("💉 AgentEval Memory - Sample 31: DI-Based Memory Evaluation");
+        Console.WriteLine("💉 AgentEval Memory - Sample G4: DI-Based Memory Evaluation");
         Console.WriteLine("═══════════════════════════════════════════════════════════════════");
         Console.WriteLine("Using dependency injection for memory evaluation services...");
         Console.WriteLine();

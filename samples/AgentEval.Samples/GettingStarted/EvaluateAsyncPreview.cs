@@ -143,7 +143,7 @@ public class AgentEvalResults
                 return $"  \"{Truncate(i.Query, 60)}\": failed [{string.Join(", ", failedMetrics)}]";
             });
 
-        throw new Exception(
+        throw new InvalidOperationException(
             message ?? $"Evaluation failed: {Failed}/{Total} queries did not pass.\n{string.Join("\n", failures)}");
     }
 

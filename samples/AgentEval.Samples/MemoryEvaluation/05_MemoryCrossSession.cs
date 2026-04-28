@@ -12,7 +12,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 namespace AgentEval.Samples;
 
 /// <summary>
-/// Sample 32: Cross-Session Memory - Testing fact persistence across session resets
+/// Sample G5: Cross-Session Memory - Testing fact persistence across session resets
 ///
 /// This demonstrates:
 /// - Using a real LLM agent that implements ISessionResettableAgent
@@ -169,7 +169,7 @@ public static class MemoryCrossSession
     {
         Console.WriteLine();
         Console.WriteLine("═══════════════════════════════════════════════════════════════════");
-        Console.WriteLine("🔄 AgentEval Memory - Sample 32: Cross-Session Memory Persistence");
+        Console.WriteLine("🔄 AgentEval Memory - Sample G5: Cross-Session Memory Persistence");
         Console.WriteLine("═══════════════════════════════════════════════════════════════════");
         Console.WriteLine("Testing whether agents remember facts after session resets...");
         Console.WriteLine();

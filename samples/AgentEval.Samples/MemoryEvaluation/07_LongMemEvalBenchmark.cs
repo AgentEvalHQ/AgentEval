@@ -13,7 +13,7 @@ using Microsoft.Extensions.AI;
 namespace AgentEval.Samples;
 
 /// <summary>
-/// LongMemEval Cross-Platform Benchmark (ICLR 2025, MIT License)
+/// Sample G8: LongMemEval Cross-Platform Benchmark (ICLR 2025, MIT License)
 ///
 /// Runs research-grade memory evaluation using the official LongMemEval methodology:
 /// - Stratified sampling across all 6 question types
@@ -178,7 +178,7 @@ public static class LongMemEvalBenchmark
     {
         Console.WriteLine();
         Console.WriteLine("===================================================================");
-        Console.WriteLine("AgentEval Memory — LongMemEval Cross-Platform Benchmark");
+        Console.WriteLine("AgentEval Memory — Sample G8: LongMemEval Cross-Platform Benchmark");
         Console.WriteLine("===================================================================");
         Console.WriteLine("Research-grade memory evaluation using LongMemEval (ICLR 2025, MIT).");
         Console.WriteLine("Uses the new External Benchmark framework with:");
