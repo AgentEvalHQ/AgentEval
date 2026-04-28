@@ -1,10 +1,10 @@
 # MAF ↔ AgentEval.Memory Concept Mapping
 
-This document explains how AgentEval.Memory evaluators work with Microsoft Agent Framework (MAF) 1.1.0's pipeline architecture, and why no code changes are needed.
+This document explains how AgentEval.Memory evaluators work with Microsoft Agent Framework (MAF) 1.3.0's pipeline architecture, and why no code changes are needed.
 
 ## Architecture Overlap
 
-MAF 1.1.0 and AgentEval.Memory both deal with conversation history and memory, but at different abstraction levels:
+MAF 1.3.0 and AgentEval.Memory both deal with conversation history and memory, but at different abstraction levels:
 
 - **MAF** manages memory *inside the agent pipeline*: `ChatHistoryProvider`, `AIContextProvider`, `CompactionStrategy`
 - **AgentEval.Memory** *evaluates* memory quality from *outside*: it sends prompts, resets sessions, and measures retention
@@ -13,7 +13,7 @@ The two systems are complementary, not competing.
 
 ## Concept Mapping Table
 
-| AgentEval.Memory Concept | MAF 1.1.0 Equivalent | Relationship |
+| AgentEval.Memory Concept | MAF 1.3.0 Equivalent | Relationship |
 |---|---|---|
 | `ISessionResettableAgent.ResetSessionAsync()` | `agent.CreateSessionAsync()` (new session) | **Same effect.** `MAFAgentAdapter.ResetSessionAsync()` calls `CreateSessionAsync()` internally. New session = fresh conversation history. |
 | `IHistoryInjectableAgent.InjectConversationHistory()` | `ChatHistoryProvider.ProvideChatHistoryAsync()` | **Different purpose.** AgentEval injects *synthetic test data* to skip LLM setup calls. MAF providers manage *real* conversation history. `MAFAgentAdapter` implements both. |

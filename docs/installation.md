@@ -36,8 +36,8 @@ AgentEval is tested and compatible with:
 
 | Dependency | Version | Notes |
 |------------|---------|-------|
-| **Microsoft Agent Framework (MAF)** | `1.1.0` | Native integration — adapters, tool tracking, workflows |
-| **Microsoft.Extensions.AI** | `10.4.0` | Universal `IChatClient` support |
+| **Microsoft Agent Framework (MAF)** | `1.3.0` | Native integration — adapters, tool tracking, workflows |
+| **Microsoft.Extensions.AI** | `10.5.0` | Universal `IChatClient` support |
 | **.NET 8.0** | ✅ Supported | LTS |
 | **.NET 9.0** | ✅ Supported | STS |
 | **.NET 10.0** | ✅ Supported | Preview |
@@ -50,10 +50,10 @@ AgentEval ships as a single NuGet package with these key dependencies:
 
 | Package | Version | Purpose |
 |---------|---------|--------|
-| Microsoft.Agents.AI | 1.1.0 | Microsoft Agent Framework integration |
-| Microsoft.Agents.AI.Workflows | 1.1.0 | Workflow orchestration support |
-| Microsoft.Extensions.AI | 10.4.0 | AI abstractions (IChatClient) |
-| Microsoft.Extensions.AI.Evaluation.Quality | 10.4.0 | Quality evaluation metrics |
+| Microsoft.Agents.AI | 1.3.0 | Microsoft Agent Framework integration |
+| Microsoft.Agents.AI.Workflows | 1.3.0 | Workflow orchestration support |
+| Microsoft.Extensions.AI | 10.5.0 | AI abstractions (IChatClient) |
+| Microsoft.Extensions.AI.Evaluation.Quality | 10.5.0 | Quality evaluation metrics |
 
 See [THIRD-PARTY-NOTICES.md](https://github.com/AgentEvalHQ/AgentEval/blob/main/THIRD-PARTY-NOTICES.md) for the complete dependency list with licenses.
 
