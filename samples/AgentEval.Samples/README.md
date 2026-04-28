@@ -1,6 +1,6 @@
 # AgentEval Samples
 
-> **41 focused, educational samples — browse by group, get started in 5 minutes.**
+> **Focused, educational samples — browse by group, get started in 5 minutes.**
 
 ## Core Principle
 

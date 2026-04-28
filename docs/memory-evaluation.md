@@ -4,7 +4,7 @@
 
 What [LongMemEval](https://github.com/xiaowu0162/LongMemEval) (ICLR 2025) does for Python research, AgentEval.Memory does for production .NET — plus a curated benchmark suite, an HTML reporting engine, baseline tracking, and a fluent assertion API.
 
-> **Status:** ✅ Available since AgentEval `0.7.0-beta`. Ships in the `AgentEval` umbrella package as the `AgentEval.Memory` module.
+> **Status:** ✅ Available in the current release. Ships in the `AgentEval` umbrella package as the `AgentEval.Memory` module.
 
 ---
 
