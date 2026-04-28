@@ -671,7 +671,8 @@ This release marks the transition from alpha to beta. The framework is now featu
 - `AgentEval.Tracing` (OTel + run artifacts) - planned
 - `AgentEval.Studio` (workflow visualizer / time-travel UI) - future
 
-[Unreleased]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.7.0-beta...HEAD
+[Unreleased]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.8.0-beta...HEAD
+[0.8.0-beta]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.7.0-beta...v0.8.0-beta
 [0.7.0-beta]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.6.0-beta...v0.7.0-beta
 [0.6.0-beta]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.5.4-beta...v0.6.0-beta
 [0.5.2-beta]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.5.1-beta...v0.5.2-beta
