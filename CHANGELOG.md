@@ -9,6 +9,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.8.0-beta] - 2026-04-28
+
+**MAF 1.3.0 + MEAI 10.5.0 Compatibility** ✅
+
+### Changed
+- **MAF upgraded from 1.1.0 to 1.3.0** — All four MAF package references (`Microsoft.Agents.AI`, `Microsoft.Agents.AI.OpenAI`, `Microsoft.Agents.AI.Workflows`, `Microsoft.Agents.AI.Workflows.Generators`) bumped to `1.3.0`. Verified via `dotnet-inspect` API diff: zero breaking changes in `Microsoft.Agents.AI`, `Microsoft.Agents.AI.Abstractions`, and `Microsoft.Agents.AI.OpenAI`. Two attribute types (`StreamsMessageAttribute`, `YieldsMessageAttribute`) were removed from `Microsoft.Agents.AI.Workflows` — AgentEval does not reference either, confirmed via repo-wide grep. New additive APIs (not consumed by AgentEval): `AgentEvaluationExtensions`, `WorkflowEvaluationExtensions`, `IAgentEvaluator`, `AgentSkill*`, A2A SDK v1 surfaces, server-side Foundry Toolbox.
+- **MEAI upgraded from 10.4.0 to 10.5.0** — Cascading bump for `Microsoft.Extensions.AI`, `Microsoft.Extensions.AI.OpenAI`, `Microsoft.Extensions.AI.Evaluation.Quality`. Transitive dependency `System.Numerics.Tensors` bumped from `10.0.4` to `10.0.6` to satisfy the new MEAI minimum.
+- **NuGetConsumer sample** — Explicit version pins updated (CPM-disabled project).
+- **NuGet metadata** — `<PackageReleaseNotes>` reflects MAF 1.3.0 + MEAI 10.5.0.
+- **README.md** — MAF compatibility badge updated to 1.3.0.
+- **docs/installation.md, docs/maf-memory-integration.md** — Version references refreshed.
+- **THIRD-PARTY-NOTICES.md** — Package version table updated (7 MAF/MEAI rows + Tensors).
+
+### Verified
+- Full test suite passes across all three target frameworks (`net8.0`, `net9.0`, `net10.0`).
+- All 27 samples build.
+- Zero source-code changes required for the version bump itself.
+
+### Verification Tool
+This migration was verified end-to-end via the `dotnet-inspect` skill (installed at `.github/skills/dotnet-inspect/SKILL.md`, CLI `dnx dotnet-inspect@0.7.6`) rather than by reading source from `MAF/` or `MAFVnext/` folders. See [migration-to-MAF-1.3-plan.md](migration-to-MAF-1.3-plan.md).
+
+---
+
 ## [0.7.0-beta] - 2026-04-12
 
 **MAF 1.1.0 GA + Memory Integration + Workflow Enhancements** 🚀
