@@ -168,7 +168,7 @@ public static class AgentWithOneTool
             .GetChatClient(AIConfig.ModelDeployment)
             .AsIChatClient();
 
-        // .AsAIAgent() is the idiomatic MAF 1.1.0 convenience extension on IChatClient
+        // .AsAIAgent() is the idiomatic MAF 1.3.0 convenience extension on IChatClient
         return chatClient.AsAIAgent(
             name: "MathAgent",
             instructions: """

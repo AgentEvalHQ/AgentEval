@@ -19,10 +19,10 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.Agents.AI" />
     <PackageReference Include="Microsoft.Agents.AI.Workflows" />
-    <!-- NOTE: AgentEval.MAF does NOT reference Microsoft.Agents.AI.Workflows.Generators (1.1.0).
+    <!-- NOTE: AgentEval.MAF does NOT reference Microsoft.Agents.AI.Workflows.Generators (1.3.0).
          That package provides source-generator support for [MessageHandler] attributed executor classes.
          If your consumer project uses [MessageHandler] executors, add the following to your own project:
-           <PackageReference Include="Microsoft.Agents.AI.Workflows.Generators" Version="1.1.0" />
+           <PackageReference Include="Microsoft.Agents.AI.Workflows.Generators" Version="1.3.0" />
          This keeps the generator as a dev-time tooling dependency rather than a runtime transitive ref. -->
     <!-- Note: Microsoft.Agents.AI.OpenAI is intentionally omitted to keep this layer
          provider-agnostic. Consumers add it themselves for Azure/OpenAI scenarios.

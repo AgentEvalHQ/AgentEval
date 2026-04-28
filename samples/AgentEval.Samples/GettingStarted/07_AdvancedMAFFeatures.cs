@@ -12,9 +12,9 @@ using System.Runtime.CompilerServices;
 namespace AgentEval.Samples;
 
 /// <summary>
-/// Advanced MAF 1.1.0 Features — demonstrates seven MAF capabilities
+/// Advanced MAF 1.3.0 Features — demonstrates seven MAF capabilities
 ///
-/// This sample showcases MAF 1.1.0 features that complement AgentEval's evaluation:
+/// This sample showcases MAF 1.3.0 features that complement AgentEval's evaluation:
 /// 1. InMemoryChatHistoryProvider — managed conversation history with compaction
 /// 2. Middleware pipeline — .AsBuilder().Use(runFunc, runStreamingFunc) for guardrails
 /// 3. Structured output — RunAsync&lt;T&gt;() for type-safe responses
@@ -212,7 +212,7 @@ public static class AdvancedMAFFeatures
 
         // ─── Feature 7: OpenTelemetry ─────────────────────────────────────────
         Console.WriteLine("📝 Feature 7: OpenTelemetry Observability\n");
-        Console.WriteLine("   MAF 1.1.0 pattern: agent.AsBuilder().UseOpenTelemetry(sourceName, cfg).Build()\n");
+        Console.WriteLine("   MAF 1.3.0 pattern: agent.AsBuilder().UseOpenTelemetry(sourceName, cfg).Build()\n");
 
         // MAF pattern: wrap the agent via AsBuilder().UseOpenTelemetry().Build()
         // This injects OpenTelemetryAgent, which itself wraps an OpenTelemetryChatClient
@@ -260,7 +260,7 @@ public static class AdvancedMAFFeatures
         Console.WriteLine(@"
 ╔═══════════════════════════════════════════════════════════════════════════════╗
 ║                                                                               ║
-║   🚀 SAMPLE A7: Advanced MAF 1.1.0 Features                                  ║
+║   🚀 SAMPLE A7: Advanced MAF 1.3.0 Features                                  ║
 ║   ChatHistoryProvider, Middleware, Structured Output, Approval,                ║
 ║   Compaction, Agent-as-Tool, OpenTelemetry                                    ║
 ║                                                                               ║
@@ -276,7 +276,7 @@ public static class AdvancedMAFFeatures
    ┌─────────────────────────────────────────────────────────────────────────────┐
    │  ⚠️  SKIPPING SAMPLE A7 - Azure OpenAI Credentials Required               │
    ├─────────────────────────────────────────────────────────────────────────────┤
-   │  This sample demonstrates advanced MAF 1.1.0 features with real LLM calls. │
+   │  This sample demonstrates advanced MAF 1.3.0 features with real LLM calls. │
    │                                                                             │
    │  Set these environment variables:                                           │
    │    AZURE_OPENAI_ENDPOINT     - Your Azure OpenAI endpoint                   │

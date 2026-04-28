@@ -185,7 +185,7 @@ public static class PerformanceMetrics
             .GetChatClient(AIConfig.ModelDeployment)
             .AsIChatClient();
 
-        // .AsAIAgent() is the idiomatic MAF 1.1.0 convenience extension on IChatClient
+        // .AsAIAgent() is the idiomatic MAF 1.3.0 convenience extension on IChatClient
         return chatClient.AsAIAgent(
             name: "WriterAgent",
             instructions: "You are a helpful writing assistant. Keep responses concise but informative.");

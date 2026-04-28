@@ -5,11 +5,11 @@
     
     <!-- NuGet Package Info -->
     <PackageId>AgentEval</PackageId>
-    <Version>0.7.0-beta</Version>
+    <Version>0.8.0-beta</Version>
     <Description>The comprehensive .NET evaluation toolkit for AI agents—tool usage validation, RAG quality metrics, stochastic evaluation, model comparison, and red team security testing. Built for Microsoft Agent Framework (MAF) with fluent assertion APIs.</Description>
     <PackageTags>ai;agent;evaluation;testing;benchmarking;maf;llm;openai;azure;rag;agentic;redteam;security</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>v0.7.0-beta: MAF 1.1.0 + MEAI 10.4.0 compatibility. Zero breaking changes to AgentEval APIs. See CHANGELOG.md for details.</PackageReleaseNotes>
+    <PackageReleaseNotes>v0.8.0-beta: MAF 1.3.0 + MEAI 10.5.0 compatibility. Zero breaking changes to AgentEval APIs. Two MAF Workflows attributes (StreamsMessageAttribute, YieldsMessageAttribute) were removed in 1.3.0; AgentEval did not reference them. See CHANGELOG.md for details.</PackageReleaseNotes>
     
     <!-- SourceLink: enables stepping into source code during debugging -->
     <PublishRepositoryUrl>true</PublishRepositoryUrl>
