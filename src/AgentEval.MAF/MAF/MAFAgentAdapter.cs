@@ -63,10 +63,12 @@ public class MAFAgentAdapter : IStreamableAgent, ISessionResettableAgent, IHisto
         
         // Build message list: injected history + current prompt
         var messages = BuildMessages(prompt);
-        var response = await _agent.RunAsync(messages, _session, cancellationToken: cancellationToken).ConfigureAwait(false);
         
-        // Clear injected history after first use — the agent's session tracks it going forward
+        // Clear injected history before the call — ensures it is used for exactly one invocation
+        // even if RunAsync throws (single-use snapshot pattern).
         _injectedHistory.Clear();
+        
+        var response = await _agent.RunAsync(messages, _session, cancellationToken: cancellationToken).ConfigureAwait(false);
         
         // Extract token usage from AgentResponse.Usage property
         TokenUsage? tokenUsage = null;
@@ -98,8 +100,10 @@ public class MAFAgentAdapter : IStreamableAgent, ISessionResettableAgent, IHisto
         _session ??= await _agent.CreateSessionAsync(cancellationToken).ConfigureAwait(false);
         TokenUsage? capturedUsage = null;
         
-        // Build message list: injected history + current prompt
+        // Build message list: injected history + current prompt, then clear immediately —
+        // ensures it is used for exactly one invocation even if streaming throws or is cancelled.
         var messages = BuildMessages(prompt);
+        _injectedHistory.Clear();
         
         await foreach (var update in _agent.RunStreamingAsync(messages, _session, cancellationToken: cancellationToken).ConfigureAwait(false))
         {
@@ -146,9 +150,6 @@ public class MAFAgentAdapter : IStreamableAgent, ISessionResettableAgent, IHisto
                 }
             }
         }
-
-        // Clear injected history after streaming completes — ensures it's used for exactly one invocation
-        _injectedHistory.Clear();
 
         yield return new AgentResponseChunk { IsComplete = true, Usage = capturedUsage, ModelId = ResponseModelId };
     }
@@ -209,9 +210,14 @@ public class MAFAgentAdapter : IStreamableAgent, ISessionResettableAgent, IHisto
     /// <summary>
     /// Restores a previously serialized session, replacing the current session.
     /// </summary>
+    /// <remarks>
+    /// Clears any pending injected history so that history injected before the restore
+    /// is not prepended to the first invocation on the restored session.
+    /// </remarks>
     public async Task RestoreSessionAsync(JsonElement serializedState, CancellationToken cancellationToken = default)
     {
         _session = await _agent.DeserializeSessionAsync(serializedState, cancellationToken: cancellationToken).ConfigureAwait(false);
+        _injectedHistory.Clear();
     }
 
 #pragma warning disable MEAI001 // ContinuationToken is experimental

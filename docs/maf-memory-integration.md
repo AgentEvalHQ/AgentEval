@@ -86,10 +86,10 @@ On `ResetSessionAsync()`:
 | Sample G5 (Cross-Session Memory) | Manual memory: `LLMPersistentMemoryAgent` with `_longTermMemory` dict |
 | Sample G6 (AIContextProvider Memory) | MAF-native: `PersistentMemoryProvider : AIContextProvider` in pipeline |
 
-## Future Considerations
+## Current Limitations
 
-### Session Observability (Deferred)
-Currently, `AgentSession.StateBag` is opaque to evaluators. For advanced scenarios, it might be useful to inspect what an `AIContextProvider` stored. Recommendation: defer unless users request it — evaluators should test behavior, not implementation details.
+### Session Observability
+`AgentSession.StateBag` is not exposed to evaluators. AgentEval.Memory evaluates observable behavior — whether the agent recalls facts across turns or sessions — rather than inspecting what an `AIContextProvider` stored internally.
 
-### CompactionStrategy Integration (Deferred)
-`ReducerEvaluator` could be enhanced to configure a MAF agent with a specific `CompactionStrategy` and report pre/post-compaction message counts. Recommendation: defer — keep `AgentEval.Memory` framework-agnostic. Users configure their agents; the evaluator measures results.
+### CompactionStrategy Configuration
+`ReducerEvaluator` measures the effects of history reduction through agent responses, but it does not configure a MAF `CompactionStrategy` or report internal pre/post-compaction message counts. Agent configuration remains the responsibility of the host application; the evaluator measures the resulting behavior.
