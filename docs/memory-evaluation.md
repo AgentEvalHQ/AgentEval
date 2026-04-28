@@ -150,7 +150,7 @@ Our curated `Standard` benchmark scores roughly **88–93% on GPT-4.1** in our r
 - Use **LongMemEval** (Sample G8 / G10) for **cross-platform comparable** numbers — it's calibrated to the published GPT-4o = 57.7% baseline.
 - Use the **Diagnostic** and **Overflow** presets to apply real context pressure.
 
-**What we're working on:** harder synthesis / counterfactual / correction-chain scenarios with stronger distractors and timestamp-burial. Tracked in our internal hardening plan; targeted scores ~60–80% for strong models, 40–60% for weaker ones.
+**Current limitation:** the native benchmark is better suited to regression tracking than fine-grained model differentiation, especially when stronger models can solve many scenarios through retrieval alone.
 
 ### ⚠️ Memory Evaluation Always Calls a Real LLM
 
