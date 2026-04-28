@@ -24,7 +24,7 @@ public enum HistoryInjectionMode
     /// <summary>
     /// Automatically choose the best mode based on agent capabilities.
     /// Uses StructuredChatHistory if the agent implements IHistoryInjectableAgent,
-    /// otherwise falls back to TextBlob. This is the default behavior.
+    /// otherwise falls back to TextBlob.
     /// </summary>
     Auto = 0,
 

@@ -195,7 +195,7 @@ await result.ExportHtmlReportAsync("memory-report.html");
 - **LongMemEval (ICLR 2025)** — fully re-implemented in .NET, paper-comparable scoring
 - **MAF-native** — works with `AIContextProvider`, `ChatHistoryProvider`, `CompactionStrategy`
 
-> **Honest note:** the native `Standard` benchmark currently scores ~88–93% on GPT-4.1 — use it as a regression gate for your own delta and use **LongMemEval** for cross-platform comparable numbers.
+> **Honest note:** use the native `Standard` benchmark primarily as a regression gate for changes in your own agent, and use **LongMemEval** when you need broader cross-platform comparability.
 
 [Memory Evaluation →](memory-evaluation.md)
 
@@ -298,7 +298,7 @@ Rigorous evaluation capabilities: RAG metrics (Faithfulness, Relevance, Context 
 
 ## Samples
 
-**41 detailed examples** included—from Hello World to advanced Multi-Agent Workflows, Red Team Security, Memory Evaluation, and Cross-Framework evaluation.
+**Detailed examples** included—from Hello World to advanced Multi-Agent Workflows, Red Team Security, Memory Evaluation, and Cross-Framework evaluation.
 
 ```bash
 dotnet run --project samples/AgentEval.Samples

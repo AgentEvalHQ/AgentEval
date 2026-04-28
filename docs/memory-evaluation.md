@@ -86,15 +86,16 @@ The biggest research-grade memory benchmark, **fully re-implemented in .NET** wi
 
 ```csharp
 var runner = LongMemEvalBenchmarkRunner.Create(chatClient, datasetPath);
+var config = new AgentBenchmarkConfig { ConfigurationId = "my-agent", ModelId = "gpt-4o" };
 
-var result = await runner.RunAsync(agent, new ExternalBenchmarkOptions
+var result = await runner.RunAsync(agent, config, new ExternalBenchmarkOptions
 {
     MaxQuestions = 50,
     StratifiedSampling = true,         // proportional across all 6 question types
     PreserveSessionBoundaries = true,  // session markers in history
 });
 
-Console.WriteLine($"Score: {result.AccuracyPercent:F1}% (paper: GPT-4o = 57.7%)");
+Console.WriteLine($"Score: {result.OverallAccuracy:F1}% (paper: GPT-4o = 57.7%)");
 ```
 
 What's preserved from the official benchmark:
