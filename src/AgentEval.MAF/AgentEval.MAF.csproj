@@ -19,6 +19,9 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.Agents.AI" />
     <PackageReference Include="Microsoft.Agents.AI.Workflows" />
+    <!-- Security: explicit pin to patch that resolves GHSA-g94r-2vxg-569j;
+         overrides the 1.15.0 transitive dep pulled in by Microsoft.Agents.AI 1.3.0 -->
+    <PackageReference Include="OpenTelemetry.Api" />
     <!-- NOTE: AgentEval.MAF does NOT reference Microsoft.Agents.AI.Workflows.Generators (1.3.0).
          That package provides source-generator support for [MessageHandler] attributed executor classes.
          If your consumer project uses [MessageHandler] executors, add the following to your own project:
