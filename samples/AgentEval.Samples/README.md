@@ -1,6 +1,6 @@
 # AgentEval Samples
 
-> **32 focused, educational samples — browse by group, get started in 5 minutes.**
+> **41 focused, educational samples — browse by group, get started in 5 minutes.**
 
 ## Core Principle
 
@@ -9,7 +9,7 @@
 - **Evaluation** (LLM-as-judge scores, metrics) → always real or gracefully skipped
 - **Structure** (tool ordering, workflows, conversations) → can be demonstrated with mock data
 
-Group A (samples 1–4) and Dataset Loaders / Extensibility in Group F run fully without credentials.
+Group A (samples A1–A5, except A6 Session Lifecycle) and Dataset Loaders / Extensibility in Group F run fully without credentials.
 All other samples require Azure OpenAI for meaningful results.
 
 ---
@@ -22,25 +22,28 @@ dotnet run
 ```
 
 The interactive menu organises samples into **7 groups**. Select a group letter, then a sample number.
-You can also run a specific sample directly from the command line (legacy numbering 1–32):
+You can also run a specific sample directly from the command line (legacy numbering 1–41):
 
 ```bash
 dotnet run -- 1    # Hello World
-dotnet run -- 20   # Red Team Basic
+dotnet run -- 23   # Red Team Basic
 ```
 
 ---
 
 ## Sample Groups
 
-### A — Getting Started  ★ no credentials needed
+### A — Getting Started  ★ mostly no credentials needed
 
-| # | Sample | What You'll Learn | Time |
-|---|--------|-------------------|------|
-| 1 | **Hello World** | Basic test setup, TestCase, TestResult, pass/fail | 2 min |
-| 2 | **Agent + One Tool** | Tool tracking, fluent assertions (`HaveCalledTool`, `WithoutError`) | 5 min |
-| 3 | **Agent + Multiple Tools** | Tool ordering (`BeforeTool`/`AfterTool`), visual timeline | 7 min |
-| 4 | **Performance Metrics** | Latency, cost, TTFT, token budget — basic assertions | 5 min |
+| # | Sample | What You'll Learn | Azure? | Time |
+|---|--------|-------------------|--------|------|
+| 1 | **Hello World** | Basic test setup, TestCase, TestResult, pass/fail | No | 2 min |
+| 2 | **Agent + One Tool** | Tool tracking, fluent assertions (`HaveCalledTool`, `WithoutError`) | No | 5 min |
+| 3 | **Agent + Multiple Tools** | Tool ordering (`BeforeTool`/`AfterTool`), visual timeline | No | 7 min |
+| 4 | **Performance Metrics** | Latency, cost, TTFT, token budget — basic assertions | No | 5 min |
+| 5 | **Light Path (MEAI)** | AgentEval as MEAI `IEvaluator` — plug into MAF's evaluation pipeline | Yes | 5 min |
+| 6 | **Session Lifecycle** | MAF `AgentSession`: create → multi-turn → reset → isolation | Yes | 8 min |
+| 7 | **Advanced MAF Features** | ChatHistory, middleware, structured output, approval, agent-as-tool | Yes | 10 min |
 
 ### B — Metrics & Quality
 
@@ -59,6 +62,7 @@ dotnet run -- 20   # Red Team Basic
 | 1 | **Conversation Evaluation** | Multi-turn testing, `ConversationRunner`, fluent builder API | Yes | 5 min |
 | 2 | **Real MAF Workflow** | `WorkflowBuilder` + `InProcessExecution`: 4-agent pipeline ⭐ | Yes | 15 min |
 | 3 | **Workflow + Tools** | TripPlanner pipeline: 4 agents with tool call tracking ⭐ | Yes | 15 min |
+| 4 | **[MessageHandler] Executors** | Source-gen executor pipeline — deterministic, no LLM, AOT-ready | No | 8 min |
 
 ### D — Performance & Statistics
 
@@ -101,6 +105,11 @@ dotnet run -- 20   # Red Team Basic
 | 3 | **Memory Scenarios** | `ReachBackEvaluator` (recall depth), `ReducerEvaluator` (compression) | Yes | 8 min |
 | 4 | **Memory DI** | Production DI wiring — `AddAgentEvalMemory()`, `CanRememberAsync()` | Yes | 5 min |
 | 5 | **Cross-Session Memory** | Fact persistence across session resets — compare with / without memory | Yes | 8 min |
+| 6 | **AIContextProvider Memory** | MAF-native memory pipeline — `AIContextProvider` + cross-session evaluation | Yes | 8 min |
+| 7 | **Benchmark Reporting** | Multi-model comparison + interactive HTML pentagon report | Yes ×3 | 15 min |
+| 8 | **LongMemEval Benchmark** | Cross-platform research-grade eval — ICLR 2025, MIT-licensed dataset | Yes | 15 min |
+| 9 | **Run Single Benchmark** | Pick Quick/Standard/Full, run, save baseline, view report | Yes | 8 min |
+| 10 | **LongMemEval Baseline Repro** | Reproduce the GPT-4o paper baseline (TextBlob mode) | Yes | 20 min |
 
 ---
 

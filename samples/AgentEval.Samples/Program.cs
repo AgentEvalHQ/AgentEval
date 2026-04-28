@@ -104,7 +104,7 @@ public static class Program
         if (!AIConfig.IsConfigured)
             AIConfig.PrintMissingCredentialsWarning();
 
-        // Legacy CLI: dotnet run -- <1-32>  (direct sample number, flattened in group order)
+        // Legacy CLI: dotnet run -- <1-41>  (direct sample number, flattened in group order)
         if (args.Length > 0 && int.TryParse(args[0], out var legacyNumber))
         {
             _interactive = false;

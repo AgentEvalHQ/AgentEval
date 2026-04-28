@@ -14,7 +14,7 @@ AgentEval/
 │   ├── AgentEval.RedTeam/       # Security scanning, attack types, compliance
 │   └── AgentEval/               # Umbrella packaging project (NuGet: AgentEval)
 ├── tests/AgentEval.Tests/       # xUnit tests, mirrors src/ structure
-└── samples/AgentEval.Samples/   # 27 runnable samples (Sample01_HelloWorld, etc.)
+└── samples/AgentEval.Samples/   # 41 runnable samples (organised in groups A–G)
 ```
 
 All 5 library sub-projects use `RootNamespace=AgentEval` to preserve original namespaces. Only the umbrella is `IsPackable=true`; the single NuGet package contains all 5 DLLs per TFM. The CLI has been moved to its own repository at `AgentEvalHQ/AgentEval.Cli`.

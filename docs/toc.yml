@@ -35,6 +35,8 @@
     href: redteam.md
   - name: Responsible AI
     href: ResponsibleAI.md
+  - name: Memory Evaluation
+    href: memory-evaluation.md
   - name: Conversations
     href: conversations.md
   - name: Workflow Evaluation
@@ -83,7 +85,9 @@
     href: extensibility.md
   - name: Naming Conventions
     href: naming-conventions.md
-  - name: Migration Guide
+  - name: Upgrading MAF (1.3.0)
+    href: maf-1.3.0-migration-guide.md
+  - name: Migration Guide (from Python)
     href: comparison.md
   - name: Code Gallery
     href: showcase/code-gallery.md
