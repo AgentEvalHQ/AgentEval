@@ -119,11 +119,11 @@ public class JUnitXmlExporter : IResultExporter
                 {
                     await writer.WriteStartElementAsync(null, "failure", null);
                     await writer.WriteAttributeStringAsync(null, "message", null, 
-                        test.Error ?? $"Score {test.Score:F1} below threshold");
+                        test.Error ?? string.Create(CultureInfo.InvariantCulture, $"Score {test.Score:F1} below threshold"));
                     await writer.WriteAttributeStringAsync(null, "type", null, "AssertionError");
                     
                     var failureContent = new StringBuilder();
-                    failureContent.AppendLine($"Score: {test.Score:F1}/100");
+                    failureContent.AppendLine(string.Create(CultureInfo.InvariantCulture, $"Score: {test.Score:F1}/100"));
                     if (!string.IsNullOrEmpty(test.Error))
                     {
                         failureContent.AppendLine(test.Error);
@@ -141,10 +141,10 @@ public class JUnitXmlExporter : IResultExporter
                 {
                     await writer.WriteStartElementAsync(null, "system-out", null);
                     var outputContent = new StringBuilder();
-                    outputContent.AppendLine($"Score: {test.Score:F1}/100");
+                    outputContent.AppendLine(string.Create(CultureInfo.InvariantCulture, $"Score: {test.Score:F1}/100"));
                     foreach (var (metric, score) in test.MetricScores)
                     {
-                        outputContent.AppendLine($"{metric}: {score:F1}");
+                        outputContent.AppendLine(string.Create(CultureInfo.InvariantCulture, $"{metric}: {score:F1}"));
                     }
                     if (!string.IsNullOrEmpty(test.Output))
                     {

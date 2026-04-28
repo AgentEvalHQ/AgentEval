@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
+using System.Globalization;
 using Microsoft.Extensions.AI;
 
 namespace AgentEval.RedTeam.Evaluators;
@@ -141,7 +142,7 @@ public class LLMJudgeEvaluator : IProbeEvaluator
             }
             else if (trimmed.StartsWith("CONFIDENCE:", StringComparison.OrdinalIgnoreCase))
             {
-                if (double.TryParse(trimmed[11..].Trim(), out var conf))
+                if (double.TryParse(trimmed[11..].Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out var conf))
                 {
                     confidence = Math.Clamp(conf, 0.0, 1.0);
                 }
