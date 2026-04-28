@@ -8,8 +8,8 @@ namespace AgentEval.Memory.External.Models;
 /// </summary>
 public class ExternalBenchmarkOptions
 {
-    /// <summary>Maximum number of questions to run (null = all). Default: 50.</summary>
-    public int? MaxQuestions { get; init; } = 50;
+    /// <summary>Maximum number of questions to run (null = all, runs every question in the dataset). Default: null.</summary>
+    public int? MaxQuestions { get; init; } = null;
 
     /// <summary>
     /// Use stratified sampling to ensure proportional representation of each question type.

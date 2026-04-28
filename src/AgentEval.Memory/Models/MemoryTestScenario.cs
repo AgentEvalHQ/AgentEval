@@ -47,6 +47,11 @@ public class MemoryTestScenario
     /// to each verification query. When set, setup steps are skipped and this blob is used
     /// instead — matching the LongMemEval text-blob injection approach.
     /// </summary>
+    /// <remarks>
+    /// Intentionally mutable (not <c>init</c>): benchmark runners set this after calling
+    /// preset-agnostic factory methods, because the context blob is determined by the active
+    /// preset at run time, not at scenario construction time.
+    /// </remarks>
     public string? ContextTextBlob { get; set; }
 
     public override string ToString() => Name;

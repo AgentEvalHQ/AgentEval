@@ -161,12 +161,11 @@ public class LongMemEvalBenchmarkRunner : IExternalBenchmarkRunner
                     Duration = qStopwatch.Elapsed
                 });
 
-                var correctLabel = judgment.Correct ? "✓ CORRECT" : "✗ WRONG";
+                var correctLabel = judgment.Correct ? "CORRECT" : "WRONG";
                 _logger.LogInformation(
-                    "[{Index}/{Total}] {Type,-30} {Correct}",
+                    "[{Index}/{Total}] {Type,-30} {Correct}  ({Elapsed:F1}s)",
                     i + 1, entries.Count, entry.QuestionType,
-                    judgment.Correct ? "CORRECT" : "WRONG");
-                Console.WriteLine($"   [{i + 1,3}/{entries.Count}] {entry.QuestionType,-30} {correctLabel}  ({qStopwatch.Elapsed.TotalSeconds:F1}s)");
+                    correctLabel, qStopwatch.Elapsed.TotalSeconds);
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
@@ -189,9 +188,8 @@ public class LongMemEvalBenchmarkRunner : IExternalBenchmarkRunner
                 });
 
                 _logger.LogWarning(
-                    "[{Index}/{Total}] {Type,-30} {Error} — {QuestionId}",
-                    i + 1, entries.Count, entry.QuestionType, errorMsg, entry.QuestionId);
-                Console.WriteLine($"   [{i + 1,3}/{entries.Count}] {entry.QuestionType,-30} ⚠ {errorMsg}  ({qStopwatch.Elapsed.TotalSeconds:F1}s)");
+                    "[{Index}/{Total}] {Type,-30} {Error} — {QuestionId}  ({Elapsed:F1}s)",
+                    i + 1, entries.Count, entry.QuestionType, errorMsg, entry.QuestionId, qStopwatch.Elapsed.TotalSeconds);
             }
         }
 
