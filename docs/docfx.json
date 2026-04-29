@@ -23,6 +23,12 @@
     "resource": [
       {
         "files": ["images/**"]
+      },
+      {
+        "src": "../samples",
+        "files": ["**/*.cs"],
+        "exclude": ["**/bin/**", "**/obj/**"],
+        "dest": "../samples"
       }
     ],
     "output": "_site",
