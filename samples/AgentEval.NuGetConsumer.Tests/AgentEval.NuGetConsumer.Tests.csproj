@@ -19,12 +19,12 @@
 
   <ItemGroup>
     <!-- AgentEval — used directly for TestCase, EvaluationOptions, assertions, harness -->
-    <PackageReference Include="AgentEval" Version="0.6.0-beta" />
+    <PackageReference Include="AgentEval" Version="0.8.1-beta" />
     <!-- Security: explicit transitive pin (GHSA-g94r-2vxg-569j); CPM disabled in this project -->
     <PackageReference Include="OpenTelemetry.Api" Version="1.15.3" />
 
     <!-- Test framework -->
-    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.0" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.3.0" />
     <PackageReference Include="xunit" Version="2.9.3" />
     <PackageReference Include="xunit.runner.visualstudio" Version="3.1.0" />
     <PackageReference Include="coverlet.collector" Version="6.0.4" />
