@@ -1,6 +1,10 @@
 <Project>
   <PropertyGroup>
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+    <!-- Pin transitive package versions to the values declared below.
+         Required so that security pins (e.g. OpenTelemetry.Api 1.15.3 for GHSA-g94r-2vxg-569j)
+         take effect for packages we don't reference directly. -->
+    <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
   </PropertyGroup>
   
   <ItemGroup>
@@ -27,10 +31,10 @@
     <PackageVersion Include="OpenTelemetry.Api" Version="1.15.3" />
     <PackageVersion Include="System.CommandLine" Version="2.0.3" />
     <PackageVersion Include="YamlDotNet" Version="16.3.0" />
-    <!-- Intentionally 9.0.0 — supports net8.0/9.0/10.0 without forcing .NET 10 runtime deps.
-         MAF's transitive requirement is DependencyInjection.Abstractions (a different package). -->
-    <PackageVersion Include="Microsoft.Extensions.DependencyInjection" Version="9.0.0" />
-    <PackageVersion Include="Microsoft.Extensions.Hosting.Abstractions" Version="9.0.0" />
+    <!-- Abstractions packages target netstandard2.0/net8.0 — safe for net8/9/10 TFMs.
+         10.0.3 required transitively by Azure.Identity 1.18.0. -->
+    <PackageVersion Include="Microsoft.Extensions.DependencyInjection" Version="10.0.3" />
+    <PackageVersion Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.3" />
     
     <!-- PDF Generation (MIT License) -->
     <PackageVersion Include="PdfSharp-MigraDoc" Version="6.2.4" />

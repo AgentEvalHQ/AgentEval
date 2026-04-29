@@ -37,7 +37,7 @@
     <PackageReference Include="Microsoft.Agents.AI" Version="1.3.0" />
     <PackageReference Include="Microsoft.Extensions.AI" Version="10.5.0" />
     <PackageReference Include="Microsoft.Extensions.AI.OpenAI" Version="10.5.0" />
-    <!-- Security: override transitive OT dep to patch resolving GHSA-g94r-2vxg-569j -->
+    <!-- Security: explicit transitive pin (GHSA-g94r-2vxg-569j); CPM disabled in this project -->
     <PackageReference Include="OpenTelemetry.Api" Version="1.15.3" />
     
     <!-- Semantic Kernel — for SK-native agent demo -->

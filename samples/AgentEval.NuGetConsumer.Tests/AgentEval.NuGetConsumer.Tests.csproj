@@ -20,6 +20,8 @@
   <ItemGroup>
     <!-- AgentEval — used directly for TestCase, EvaluationOptions, assertions, harness -->
     <PackageReference Include="AgentEval" Version="0.6.0-beta" />
+    <!-- Security: explicit transitive pin (GHSA-g94r-2vxg-569j); CPM disabled in this project -->
+    <PackageReference Include="OpenTelemetry.Api" Version="1.15.3" />
 
     <!-- Test framework -->
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.0" />
