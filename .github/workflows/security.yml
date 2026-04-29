@@ -7,6 +7,7 @@ on:
     branches: [ main ]
   schedule:
     - cron: '0 0 * * 1' # Weekly scan on Mondays
+  workflow_dispatch: {} # Allow manual runs against any branch / HEAD
 
 # Skip if commit message contains [skip ci] or [ci skip]
 # This is useful for documentation-only changes or formatting fixes
