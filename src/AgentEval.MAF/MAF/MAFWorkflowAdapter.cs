@@ -163,9 +163,41 @@ public class MAFWorkflowAdapter : IWorkflowEvaluableAgent
                         };
                         traversedEdges.Add(edgeExecution);
                         currentOutgoingEdges.Add(edgeExecution);
-                        
-                        // Set as pending incoming edge for next step
-                        pendingIncomingEdge = edgeExecution;
+
+                        // Flush the source executor's step immediately.
+                        // Tool calls from the TARGET executor arrive AFTER this event but
+                        // BEFORE the target's first ExecutorOutputEvent, so we must advance
+                        // currentExecutorId NOW — otherwise those calls end up attributed to
+                        // the source executor's step (the original off-by-one attribution bug).
+                        if (currentExecutorId != null)
+                        {
+                            steps.Add(CreateStep(
+                                currentExecutorId,
+                                currentOutput.ToString(),
+                                stepStartOffset,
+                                executorStopwatch.Elapsed,
+                                stepIndex++,
+                                currentToolCalls,
+                                stepIncomingEdge,
+                                currentOutgoingEdges,
+                                stepBranchId));
+
+                            currentToolCalls = [];
+                            currentOutgoingEdges = [];
+                            currentOutput.Clear();
+                        }
+
+                        // Transition to the target executor so subsequent tool calls are
+                        // correctly attributed before its first ExecutorOutputEvent arrives.
+                        currentExecutorId = edgeEvent.TargetExecutorId;
+                        stepStartOffset = overallStopwatch.Elapsed;
+                        executorStopwatch.Restart();
+                        stepBranchId = currentBranchId;
+                        stepIncomingEdge = edgeExecution;
+                        pendingIncomingEdge = null;
+
+                        if (!_executorIds.Contains(currentExecutorId))
+                            _executorIds.Add(currentExecutorId);
                         break;
 
                     case RoutingDecisionEvent routingEvent:
@@ -207,7 +239,10 @@ public class MAFWorkflowAdapter : IWorkflowEvaluableAgent
                             StartTime = DateTimeOffset.UtcNow - toolEvent.Duration,
                             EndTime = DateTimeOffset.UtcNow,
                             Order = currentToolCalls.Count + 1,
-                            ExecutorId = currentExecutorId
+                            // Use the executor ID embedded in the event (set by the bridge from the
+                            // MAF streaming update that contained the tool call), falling back to
+                            // currentExecutorId only when the event carries no ID itself.
+                            ExecutorId = toolEvent.ExecutorId ?? currentExecutorId
                         });
                         break;
 

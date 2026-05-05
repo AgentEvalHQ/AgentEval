@@ -49,7 +49,6 @@ public static class Demo02_TripPlannerWorkflow
         Console.ResetColor();
 
         // ── 3. Run workflow via MAF InProcessExecution ────────────────────────
-        string? finalOutput = null;
         try
         {
             // MAF ChatProtocol requires a ChatMessage input + explicit TurnToken
@@ -58,11 +57,65 @@ public static class Demo02_TripPlannerWorkflow
 
             await run.TrySendMessageAsync(new TurnToken(emitEvents: true));
 
-            // Collect the final output from the workflow output event
-            await foreach (var mafEvent in run.WatchStreamAsync())
+            // Stream all workflow events in real-time as they arrive
+            bool textStreamed = false;
+
+            await foreach (WorkflowEvent evt in run.WatchStreamAsync())
             {
-                if (mafEvent is WorkflowOutputEvent outputEvent)
-                    finalOutput = outputEvent.Data?.ToString();
+                switch (evt)
+                {
+                    case WorkflowStartedEvent:
+                        Console.ForegroundColor = ConsoleColor.DarkCyan;
+                        Console.WriteLine("  ▶ Workflow started\n");
+                        Console.ResetColor();
+                        break;
+
+                    case ExecutorInvokedEvent invoke:
+                        if (textStreamed) { Console.WriteLine("\n"); textStreamed = false; }
+                        Console.ForegroundColor = ConsoleColor.Cyan;
+                        Console.WriteLine($"  🤖 [{invoke.ExecutorId}] starting...");
+                        Console.ResetColor();
+                        break;
+
+                    case AgentResponseUpdateEvent agentUpdate:
+                        if (!string.IsNullOrEmpty(agentUpdate.Update.Text))
+                        {
+                            Console.Write(agentUpdate.Update.Text);
+                            textStreamed = true;
+                        }
+                        break;
+
+                    case ExecutorCompletedEvent complete:
+                        if (textStreamed) { Console.WriteLine("\n"); textStreamed = false; }
+                        Console.ForegroundColor = ConsoleColor.Green;
+                        Console.WriteLine($"  ✓ [{complete.ExecutorId}] completed");
+                        Console.ResetColor();
+                        Console.WriteLine();
+                        break;
+
+                    case WorkflowOutputEvent output:
+                        if (textStreamed) { Console.WriteLine(); textStreamed = false; }
+                        Console.ForegroundColor = ConsoleColor.DarkGray;
+                        Console.WriteLine("\n  ─────────────────────────────────────────────────────────────────────────");
+                        Console.ResetColor();
+                        Console.ForegroundColor = ConsoleColor.White;
+                        Console.WriteLine("  ✈  Final itinerary:\n");
+                        Console.WriteLine(output.Data?.ToString() ?? "(no output)");
+                        Console.ResetColor();
+                        return;
+
+                    case WorkflowErrorEvent error:
+                        Console.ForegroundColor = ConsoleColor.Red;
+                        Console.WriteLine($"\n  ❌ Workflow error: {error.Exception?.Message}");
+                        Console.ResetColor();
+                        return;
+
+                    case WorkflowWarningEvent warning:
+                        Console.ForegroundColor = ConsoleColor.Yellow;
+                        Console.WriteLine($"\n  ⚠ Warning: {warning.Data}");
+                        Console.ResetColor();
+                        break;
+                }
             }
         }
         catch (Exception ex)
@@ -73,16 +126,6 @@ public static class Demo02_TripPlannerWorkflow
             Console.WriteLine("\n  💡 Ensure your Azure OpenAI deployment supports tool calling (function calling).");
             return;
         }
-
-        // ── 4. Print final itinerary ──────────────────────────────────────────
-        Console.ForegroundColor = ConsoleColor.DarkGray;
-        Console.WriteLine("  ─────────────────────────────────────────────────────────────────────────");
-        Console.ResetColor();
-        Console.WriteLine();
-        Console.ForegroundColor = ConsoleColor.White;
-        Console.WriteLine("  Final itinerary (from Presenter agent):\n");
-        Console.WriteLine(finalOutput ?? "(no output)");
-        Console.ResetColor();
     }
 
     // ── UI helpers ────────────────────────────────────────────────────────────
