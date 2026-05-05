@@ -14,16 +14,6 @@ namespace ECS2026MAF.Demos;
 /// Starting point for the live coding session at ECS 2026.
 /// The four coding phases below map 1-to-1 to the completed reference in
 /// <see cref="Demo03_LiveDemoComplete"/> — build them here, in order.
-///
-/// ─── CODING PHASES ───────────────────────────────────────────────────────────
-///
-///   SNIPPET 1  —  Connect to Azure OpenAI               (~3 lines)
-///   SNIPPET 2  —  Register travel tools                 (~8 lines)
-///   SNIPPET 3  —  Create the ChatClientAgent            (~14 lines)
-///   SNIPPET 4  —  Interactive chat loop                 (~20 lines)
-///
-/// ─────────────────────────────────────────────────────────────────────────────
-///
 /// Tools: reuse from ECS2026MAF.Tools.TravelTools — no new code needed.
 /// Reference: see Demo03_LiveDemoComplete for the fully-built version.
 /// </summary>
