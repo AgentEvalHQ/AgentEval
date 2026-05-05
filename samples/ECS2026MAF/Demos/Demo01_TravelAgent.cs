@@ -8,12 +8,16 @@ using ECS2026MAF.Agents;
 namespace ECS2026MAF.Demos;
 
 /// <summary>
-/// Demo 01 — TravelAgent
+/// Demo 01 — TravelAgent (single all-in-one agent)
 ///
-/// Shows a single MAF agent with tools that searches for flights, books them,
-/// and sends a confirmation email — all via function calling.
+/// Shows a single MAF <see cref="ChatClientAgent"/> handling an entire trip:
+///   GetInfoAbout → SearchFlights → BookFlight
+///                → SearchHotel  → BookHotel → SendConfirmation
 ///
-/// ⏱️ Runtime: ~10–20 seconds (2–3 LLM calls with tool round-trips)
+/// Same task as Demo 02 — but handled by ONE agent instead of a pipeline.
+/// Compare results to see how a workflow adds determinism.
+///
+/// ⏱️ Runtime: ~20–40 seconds (multiple LLM + tool round-trips)
 /// </summary>
 public static class Demo01_TravelAgent
 {
@@ -27,17 +31,18 @@ public static class Demo01_TravelAgent
             return;
         }
 
-        Console.WriteLine("  Creating TravelBookingAgent...\n");
+        Console.WriteLine("  Creating TravelAgent...\n");
         var agent = TravelAgentFactory.Create();
 
-        Console.WriteLine("  Sending request to agent...\n");
+        Console.WriteLine("  ⏳ Running full-service agent — this may take ~30 seconds...\n");
         Console.ForegroundColor = ConsoleColor.DarkGray;
         Console.WriteLine("  ─────────────────────────────────────────────────────────────────────────");
         Console.ResetColor();
 
-        var request = "Search for flights from Madrid to Tokyo for 2026-09-15, " +
-                      "book the cheapest one for 1 passenger, " +
-                      "and send a confirmation to traveller@example.com.";
+        var request = "Plan a 7-day trip visiting both Tokyo and Cologne. " +
+                      "I need city information, flights between them, " +
+                      "and hotel bookings for each city. " +
+                      "Please send a trip summary to traveller@example.com.";
 
         Console.WriteLine($"  Request: \"{request}\"\n");
 
@@ -62,8 +67,8 @@ public static class Demo01_TravelAgent
         Console.ForegroundColor = ConsoleColor.Cyan;
         Console.WriteLine(@"
 ╔══════════════════════════════════════════════════════════════════════════════╗
-║   Demo 01 — TravelAgent                                                      ║
-║   Single agent · SearchFlights → BookFlight → SendConfirmation              ║
+║   Demo 01 — TravelAgent (single agent)                                       ║
+║   Research → Flights → Hotels → Confirmation  (same task as Demo 02)        ║
 ╚══════════════════════════════════════════════════════════════════════════════╝
 ");
         Console.ResetColor();

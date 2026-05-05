@@ -10,7 +10,6 @@
 //   dotnet run --project samples/ECS2026MAF.Evals
 
 using System.Text;
-using ECS2026MAF.Evals;
 
 Console.OutputEncoding = Encoding.UTF8;
 
@@ -29,6 +28,9 @@ static async Task ShowMenuAsync()
 ║                                                                              ║
 ║   1  TravelAgent Evals       Behavioral policies + tool assertions           ║
 ║   2  TripPlanner Evals       Workflow structure + tool-level assertions      ║
+║   3  Hypothesis Comparison   Load snapshots — side-by-side (no LLM calls)   ║
+║   4  Stochastic Agent        5-run reliability test · single agent           ║
+║   5  Stochastic Workflow     5-run reliability test · 4-agent pipeline       ║
 ║                                                                              ║
 ║   Q  Quit                                                                    ║
 ║                                                                              ║
@@ -36,7 +38,7 @@ static async Task ShowMenuAsync()
 ");
         Console.ResetColor();
 
-        if (!ECS2026MAF.Config.IsConfigured)
+        if (!Config.IsConfigured)
         {
             Console.ForegroundColor = ConsoleColor.Yellow;
             Console.WriteLine("  ⚠️  Azure OpenAI credentials not found.");
@@ -50,8 +52,11 @@ static async Task ShowMenuAsync()
 
         switch (key)
         {
-            case '1': await Eval01_TravelAgentEvals.RunAsync();    break;
-            case '2': await Eval02_TripPlannerEvals.RunAsync();    break;
+            case '1': await Eval01_TravelAgentEvals.RunAsync();        break;
+            case '2': await Eval02_TripPlannerEvals.RunAsync();        break;
+            case '3': await Eval03_HypothesisComparison.RunAsync();    break;
+            case '4': await Eval04_StochasticAgent.RunAsync();         break;
+            case '5': await Eval05_StochasticWorkflow.RunAsync();      break;
             case 'q' or 'Q': return;
         }
 

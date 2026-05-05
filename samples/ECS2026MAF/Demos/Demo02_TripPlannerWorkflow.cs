@@ -38,7 +38,7 @@ public static class Demo02_TripPlannerWorkflow
         Console.WriteLine($"  Model     : {Config.Model}\n");
 
         // ── 2. Define the request ─────────────────────────────────────────────
-        var request = "Plan a 7-day trip visiting both Tokyo and Beijing. " +
+        var request = "Plan a 7-day trip visiting both Tokyo and Cologne. " +
                       "I need city information, flights between them, " +
                       "and hotel bookings for each city.";
 

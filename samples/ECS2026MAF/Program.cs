@@ -30,6 +30,7 @@ static async Task ShowMenuAsync()
 ║   1  TravelAgent             Single agent with tools                         ║
 ║   2  TripPlanner Workflow    Multi-agent pipeline (4 agents + tools)         ║
 ║   3  Live Demo               Placeholder — built live during the talk        ║
+║   4  Live Demo (Complete)    Completed reference — chat loop from scratch    ║
 ║                                                                              ║
 ║   Q  Quit                                                                    ║
 ║                                                                              ║
@@ -51,9 +52,10 @@ static async Task ShowMenuAsync()
 
         switch (key)
         {
-            case '1': await Demo01_TravelAgent.RunAsync();        break;
-            case '2': await Demo02_TripPlannerWorkflow.RunAsync(); break;
-            case '3': await Demo03_LiveDemo.RunAsync();            break;
+            case '1': await Demo01_TravelAgent.RunAsync();             break;
+            case '2': await Demo02_TripPlannerWorkflow.RunAsync();     break;
+            case '3': await Demo03_LiveDemo.RunAsync();                break;
+            case '4': await Demo03_LiveDemoComplete.RunAsync();        break;
             case 'q' or 'Q': return;
         }
 

@@ -72,18 +72,89 @@ public static class TravelTools
         return $"User confirmed: {action}";
     }
 
-    [Description("Cancel an existing booking by reference number.")]
-    public static async Task<string> CancelBooking(
-        [Description("Booking reference number to cancel")] string bookingRef)
+    [Description("Cancel a flight reservation. Non-refundable fares receive a travel voucher; refundable fares are fully refunded. Always inform the user of the policy before cancelling.")]
+    public static async Task<string> CancelFlightReservation(
+        [Description("Flight booking confirmation number to cancel (e.g. CONF-AE-205-12345)")] string bookingRef)
     {
-        Console.WriteLine($"   ❌ CancelBooking(\"{bookingRef}\")");
+        Console.WriteLine($"   ✈️❌ CancelFlightReservation(\"{bookingRef}\")");
         await Task.Delay(50);
-        return $"Booking {bookingRef} cancelled. Refund processed within 5–7 business days.";
+        return $"""
+            Flight reservation {bookingRef} cancelled.
+            Policy applied  : Non-refundable fare — $150 change fee deducted.
+            Refund method   : Travel voucher valid 12 months (remaining balance).
+            Voucher code    : VCH-{Random.Shared.Next(10000, 99999)}
+            Processing time : 5–7 business days.
+            """;
+    }
+
+    [Description("Cancel a hotel booking. Free cancellation if 7+ days before check-in; otherwise a 1-night penalty applies. Always confirm the policy with the user before cancelling.")]
+    public static async Task<string> CancelHotelBooking(
+        [Description("Hotel booking confirmation number to cancel (e.g. HTL-TOK-12345)")] string bookingRef,
+        [Description("City of the hotel (used to look up the booking)")] string city)
+    {
+        Console.WriteLine($"   🏨❌ CancelHotelBooking(\"{bookingRef}\", city=\"{city}\")");
+        await Task.Delay(50);
+
+        // Simulate whether we are within the free-cancellation window
+        var isFree = Random.Shared.Next(0, 2) == 0;   // 50/50 for demo purposes
+
+        if (isFree)
+        {
+            return $"""
+                Hotel booking {bookingRef} in {city} cancelled.
+                Policy applied  : Free cancellation (7+ days before check-in).
+                Refund          : Full amount refunded to original payment method.
+                Processing time : 3–5 business days.
+                """;
+        }
+        else
+        {
+            return $"""
+                Hotel booking {bookingRef} in {city} cancelled.
+                Policy applied  : Late cancellation — 1-night penalty charged.
+                Penalty charge  : 1 night at the booked rate.
+                Remaining refund: Processed to original payment method.
+                Processing time : 5–7 business days.
+                """;
+        }
     }
 
     // ── Hotel tools ──────────────────────────────────────────────────────────
 
-    [Description("Book a hotel in a city for the given dates. Returns confirmation details.")]
+    [Description("Search for available hotels in a city for the given dates.")]
+    public static async Task<string> SearchHotel(
+        [Description("City to search hotels in")] string city,
+        [Description("Check-in date (YYYY-MM-DD)")] string checkIn,
+        [Description("Check-out date (YYYY-MM-DD)")] string checkOut,
+        [Description("Number of guests")] int guests = 1)
+    {
+        Console.WriteLine($"   🔍 SearchHotel(\"{city}\", {checkIn} → {checkOut}, guests={guests})");
+        await Task.Delay(100);
+
+        var (h1, h2, h3, price1, price2, price3) = city.ToLowerInvariant() switch
+        {
+            "tokyo"   => ("Shinjuku Grand Hotel",           "Park Hyatt Tokyo",              "APA Hotel Shinjuku",          180, 420, 90),
+            "beijing" => ("Beijing Imperial Garden Hotel",  "The Peninsula Beijing",         "Beijing City Youth Hostel",   120, 380, 45),
+            "paris"   => ("Hôtel de la Lumière",            "Le Meurice",                    "Hotel Ibis Paris Centre",     200, 650, 80),
+            "london"  => ("The Westminster Arms Hotel",     "The Savoy",                     "Hub by Premier Inn",          220, 800,  95),
+            "zurich"  => ("Hotel Zürichberg",                "Baur au Lac",                   "MEININGER Hotel Zürich",      280, 620, 110),
+            "cologne" or "köln"
+                      => ("Dorint Hotel am Dom Köln",        "Excelsior Hotel Ernst",         "A&O Köln City",               150, 380,  65),
+            _         => ($"{city} Central Hotel",          $"{city} Grand Suites",          $"{city} Budget Inn",          100, 250,  55)
+        };
+
+        return $"""
+            Available hotels in {city} ({checkIn} → {checkOut}, {guests} guest(s)):
+
+            1. ⭐⭐⭐   {h1,-35} | ${price1}/night | Free WiFi, Breakfast included
+            2. ⭐⭐⭐⭐⭐ {h2,-35} | ${price2}/night | Spa, Concierge, City views
+            3. ⭐⭐     {h3,-35} | ${price3}/night | Budget-friendly, Central location
+
+            Recommended: {h1} (best value)
+            """;
+    }
+
+    [Description("Book a specific hotel in a city for the given dates. Returns a booking confirmation.")]
     public static async Task<string> BookHotel(
         [Description("City to book the hotel in")] string city,
         [Description("Check-in date (YYYY-MM-DD)")] string checkIn,
@@ -99,6 +170,9 @@ public static class TravelTools
             "beijing" => ("Beijing Imperial Garden Hotel",   120),
             "paris"   => ("Hôtel de la Lumière",             200),
             "london"  => ("The Westminster Arms Hotel",      220),
+            "zurich"  => ("Hotel Zürichberg",                 280),
+            "cologne" or "köln"
+                      => ("Dorint Hotel am Dom Köln",         150),
             _         => ($"{city} Central Hotel",           100)
         };
 
@@ -144,6 +218,42 @@ public static class TravelTools
                 🚇 Transport   : Extensive subway. DiDi app for taxis.
                 🌤️ Best time   : Sep–Oct (clear skies) or Apr–May (spring).
                 💰 Budget      : ~$80–150/day mid-range. Hotels from $50–150/night.
+                """,
+
+            "paris" => """
+                Paris, France — the City of Light, art, fashion, and romance.
+                🗼 Attractions : Eiffel Tower, Louvre, Musée d'Orsay, Notre-Dame, Montmartre
+                🥐 Food        : Croissants, baguettes, bistro classics, Café de Flore — eat everything.
+                🚇 Transport   : 16-line Métro covers the whole city. Vélib bikes for short hops.
+                🌸 Best time   : Apr–Jun or Sep–Oct (mild weather, fewer crowds).
+                💰 Budget      : ~$150–300/day mid-range. Hotels from $100–250/night.
+                """,
+
+            "london" => """
+                London, UK — a global metropolis of history, culture, and world-class food.
+                🏰 Attractions : Tower of London, British Museum, Hyde Park, The Tate, Borough Market
+                🍟 Food        : Sunday roast, fish & chips, and one of the world's best multicultural food scenes.
+                🚇 Transport   : The Tube (Underground) + black cabs. Get an Oyster or contactless card.
+                ☀️ Best time   : May–Sep for warmth. Dec for Christmas atmosphere.
+                💰 Budget      : ~$150–300/day mid-range. Hotels from $100–250/night.
+                """,
+
+            "zurich" => """
+                Zurich, Switzerland — Alpine elegance meets cutting-edge design and finance.
+                🏔️ Attractions : Old Town (Altstadt), Lake Zurich, Kunsthaus, Rhine Falls day trip, Uetliberg hill
+                🧀 Food        : Raclette, fondue, Zürcher Geschnetzeltes, Swiss chocolate — indulge freely.
+                🚋 Transport   : Impeccable trams, buses, and S-Bahn (ZVV network). Swiss Travel Pass recommended.
+                🌞 Best time   : Jun–Sep (hiking season) or Dec (magical Christmas markets).
+                💰 Budget      : ~$250–400/day (one of Europe's priciest cities). Hotels from $150–350/night.
+                """,
+
+            "cologne" or "köln" => """
+                Cologne (Köln), Germany — Rhine city famous for its cathedral, Kölsch beer, and carnival spirit.
+                ⛪ Attractions : Cologne Cathedral (Dom, UNESCO), Old Town, Museum Ludwig, Rhine promenade
+                🍺 Food        : Kölsch beer (only served here!), Himmel un Ääd, Halver Hahn, hearty Rhineland cuisine.
+                🚇 Transport   : S-Bahn, U-Bahn, and trams (KVB). Excellent rail hub — Berlin/Paris/Amsterdam in 4 h.
+                🎄 Best time   : May–Sep or December (some of Germany's finest Christmas markets).
+                💰 Budget      : ~$100–180/day mid-range. Hotels from $80–180/night.
                 """,
 
             _ => $"""
