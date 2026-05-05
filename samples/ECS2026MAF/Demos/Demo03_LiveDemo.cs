@@ -1,5 +1,10 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 ECS2026 Demo
+using Azure.AI.OpenAI;
+using ECS2026MAF.Tools;
+using Microsoft.Agents.AI;
+using Microsoft.Extensions.AI;
+using ChatOptions = Microsoft.Extensions.AI.ChatOptions;
 
 namespace ECS2026MAF.Demos;
 
@@ -37,7 +42,6 @@ public static class Demo03_LiveDemo
         // ════════════════════════════════════════════════════════════════════
         // 1  —  Connect to Azure OpenAI
         // ════════════════════════════════════════════════════════════════════
-
 
 
         // ════════════════════════════════════════════════════════════════════
