@@ -13,19 +13,7 @@ namespace ECS2026MAF.Demos;
 /// Demo 03 — Live Demo  (COMPLETED REFERENCE)
 ///
 /// This is the fully finished version of what gets built live during Demo 03.
-/// Use it to rehearse the typing sequence and to generate the slide code snippets.
-///
-/// ─── CODING PHASES ───────────────────────────────────────────────────────────
-///
-///   SNIPPET 1  —  Connect to Azure OpenAI               (~3 lines)
-///   SNIPPET 2  —  Register travel tools                 (~8 lines)
-///   SNIPPET 3  —  Create the ChatClientAgent            (~14 lines)
-///   SNIPPET 4  —  Interactive chat loop                 (~20 lines)
-///
-/// ─────────────────────────────────────────────────────────────────────────────
-///
 /// Tools are reused from TravelTools — no new code needed there.
-/// ⏱️ Runtime: interactive (stays open until user types 'exit')
 /// </summary>
 public static class Demo03_LiveDemoComplete
 {
@@ -40,14 +28,14 @@ public static class Demo03_LiveDemoComplete
         }
 
         // ════════════════════════════════════════════════════════════════════
-        // SNIPPET 1  —  Connect to Azure OpenAI
+        //  1  —  Connect to Azure OpenAI
         // ════════════════════════════════════════════════════════════════════
 
         var azure      = new AzureOpenAIClient(Config.Endpoint, Config.KeyCredential);
         var chatClient = azure.GetChatClient(Config.Model).AsIChatClient();
 
         // ════════════════════════════════════════════════════════════════════
-        // SNIPPET 2  —  Register travel tools  (static methods from TravelTools)
+        //  2  —  Register travel tools  (static methods from TravelTools)
         // ════════════════════════════════════════════════════════════════════
 
         AITool[] tools =
@@ -81,7 +69,7 @@ public static class Demo03_LiveDemoComplete
         });
 
         // ════════════════════════════════════════════════════════════════════
-        // SNIPPET 4  —  Interactive chat loop
+        //  4  —  Interactive chat loop
         // ════════════════════════════════════════════════════════════════════
 
         var session = await agent.CreateSessionAsync();
