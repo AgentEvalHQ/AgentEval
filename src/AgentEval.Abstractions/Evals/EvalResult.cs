@@ -18,6 +18,6 @@ public sealed record EvalResult(
             Metric: new(eval.Key, eval.Name, eval.Category, eval.Version),
             Score: new(0, null, "skipped", false, null, "none", null),
             Details: new(null, null, new[] { reason }, null, null),
-            Provenance: new("composite", null, null, null, null, 0, false),
+            Provenance: new("skipped", null, null, null, null, 0, false),
             EvaluatedAt: DateTimeOffset.UtcNow);
 }
