@@ -21,15 +21,24 @@ internal static class LegacyPathScanner
     public static IEnumerable<Finding> Scan(string workspaceRoot)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(workspaceRoot);
+        if (!Directory.Exists(workspaceRoot)) yield break;
 
-        if (Directory.Exists(Path.Combine(workspaceRoot, ".AgentEval")))
+        var topLevel = new DirectoryInfo(workspaceRoot).GetDirectories();
+
+        // Case-sensitive match against the on-disk name. On Windows the FS is
+        // case-insensitive at lookup but case-preserving at create time, so a
+        // directory created as ".AgentEval" reports its name as ".AgentEval"
+        // even though Path.Combine(root, ".AgentEval") would also resolve to
+        // an existing ".agenteval/" — that aliasing is what we must avoid here
+        // to prevent a false positive on modern lowercase workspaces.
+        if (topLevel.Any(d => string.Equals(d.Name, ".AgentEval", StringComparison.Ordinal)))
             yield return new Finding(".AgentEval/", "Legacy uppercase folder; rename to .agenteval/");
 
         if (Directory.Exists(Path.Combine(workspaceRoot, "TestResults", "traces")))
             yield return new Finding("TestResults/traces/", "Legacy trace artifact location; move to .agenteval/subjects/.../runs/.../traces/");
 
-        var legacyBench = Path.Combine(workspaceRoot, ".agenteval", "benchmarks");
-        if (Directory.Exists(legacyBench))
+        var lowerAgentEval = topLevel.FirstOrDefault(d => string.Equals(d.Name, ".agenteval", StringComparison.Ordinal));
+        if (lowerAgentEval is not null && Directory.Exists(Path.Combine(lowerAgentEval.FullName, "benchmarks")))
             yield return new Finding(".agenteval/benchmarks/", "Legacy memory-benchmark location; should be migrated to .agenteval/subjects/agents/{Name}/");
     }
 }

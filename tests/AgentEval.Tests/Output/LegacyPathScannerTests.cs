@@ -84,6 +84,25 @@ public class LegacyPathScannerTests : IDisposable
     }
 
     [Fact]
+    public void Scan_LowercaseAgentevalOnly_DoesNotReportUppercaseLegacy()
+    {
+        var ws = Path.Combine(_workspaceRoot, "modern_only");
+        Directory.CreateDirectory(Path.Combine(ws, ".agenteval", "subjects", "agents", "Demo"));
+
+        var findings = LegacyPathScanner.Scan(ws).ToList();
+
+        Assert.DoesNotContain(findings, f => f.Path == ".AgentEval/");
+    }
+
+    [Fact]
+    public void Scan_NonexistentRoot_ReturnsEmpty()
+    {
+        var ghost = Path.Combine(_workspaceRoot, "does-not-exist");
+        var findings = LegacyPathScanner.Scan(ghost).ToList();
+        Assert.Empty(findings);
+    }
+
+    [Fact]
     public void Scan_NullRoot_Throws()
     {
         // ArgumentNullException is a subclass of ArgumentException; use ThrowsAny to allow either
