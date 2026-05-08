@@ -1,0 +1,9 @@
+[
+  runs-index/recent.jsonl,
+  solution.json,
+  subjects/agents/TravelAgent/history.jsonl,
+  subjects/agents/TravelAgent/runs/{runId}/manifest.json,
+  subjects/agents/TravelAgent/runs/{runId}/scenarios/scenario1.json,
+  subjects/agents/TravelAgent/runs/{runId}/summary.json,
+  subjects/agents/TravelAgent/subject.json
+]
