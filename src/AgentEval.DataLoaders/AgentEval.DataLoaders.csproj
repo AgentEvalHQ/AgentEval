@@ -20,4 +20,8 @@
     <PackageReference Include="YamlDotNet" />
   </ItemGroup>
 
+  <ItemGroup>
+    <EmbeddedResource Include="Output/Schema/v1/*.json" />
+  </ItemGroup>
+
 </Project>

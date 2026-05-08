@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agenteval.dev/schemas/v1/summary.schema.json",
+  "title": "AgentEval Run Summary",
+  "type": "object",
+  "required": ["schemaVersion", "runId", "verdict", "stats", "metrics"],
+  "properties": {
+    "schemaVersion": { "type": "string", "const": "1.0" },
+    "runId": { "type": "string" },
+    "verdict": { "enum": ["PASS", "FAIL", "WARN"] },
+    "stats": {
+      "type": "object",
+      "required": ["total", "passed", "failed", "warnings"],
+      "properties": {
+        "total": { "type": "integer", "minimum": 0 },
+        "passed": { "type": "integer", "minimum": 0 },
+        "failed": { "type": "integer", "minimum": 0 },
+        "warnings": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "metrics": {
+      "type": "object",
+      "additionalProperties": { "type": "number" }
+    },
+    "cost": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["estimatedCost", "promptTokens", "completionTokens"],
+          "properties": {
+            "estimatedCost": { "type": "number" },
+            "promptTokens": { "type": "integer", "minimum": 0 },
+            "completionTokens": { "type": "integer", "minimum": 0 }
+          }
+        },
+        { "type": "null" }
+      ]
+    }
+  }
+}

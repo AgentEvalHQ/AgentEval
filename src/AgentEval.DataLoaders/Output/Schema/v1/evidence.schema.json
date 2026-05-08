@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agenteval.dev/schemas/v1/evidence.schema.json",
+  "title": "AgentEval Compliance Evidence",
+  "type": "object",
+  "required": ["schemaVersion", "regulation", "subject", "generatedAt", "sourceRun", "controls", "summary", "attestation"],
+  "properties": {
+    "schemaVersion": { "type": "string", "const": "1.0" },
+    "regulation": { "type": "string" },
+    "subject": {
+      "type": "object",
+      "required": ["kind", "name"],
+      "properties": {
+        "kind": { "enum": ["agent", "workflow"] },
+        "name": { "type": "string" }
+      }
+    },
+    "generatedAt": { "type": "string", "format": "date-time" },
+    "sourceRun": {
+      "type": "object",
+      "required": ["runId", "manifestHash"],
+      "properties": {
+        "runId": { "type": "string" },
+        "manifestHash": { "type": "string" }
+      }
+    },
+    "controls": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "title", "status", "passRate", "scenarioRefs"],
+        "properties": {
+          "id": { "type": "string" },
+          "title": { "type": "string" },
+          "status": { "type": "string" },
+          "passRate": { "type": "number", "minimum": 0, "maximum": 1 },
+          "scenarioRefs": { "type": "array", "items": { "type": "string" } },
+          "notes": { "type": ["string", "null"] },
+          "regressedFromBaseline": { "type": ["boolean", "null"] }
+        }
+      }
+    },
+    "summary": {
+      "type": "object",
+      "required": ["controlsTotal", "passed", "warnings", "failed", "overallStatus"],
+      "properties": {
+        "controlsTotal": { "type": "integer", "minimum": 0 },
+        "passed": { "type": "integer", "minimum": 0 },
+        "warnings": { "type": "integer", "minimum": 0 },
+        "failed": { "type": "integer", "minimum": 0 },
+        "overallStatus": { "type": "string" }
+      }
+    },
+    "attestation": {
+      "type": "object",
+      "required": ["agentEvalVersion", "evaluator", "evaluatorModel"],
+      "properties": {
+        "agentEvalVersion": { "type": "string" },
+        "configurationId": { "type": ["string", "null"] },
+        "evaluator": { "type": "string" },
+        "evaluatorModel": { "type": "string" }
+      }
+    }
+  }
+}

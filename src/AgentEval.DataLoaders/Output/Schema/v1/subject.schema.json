@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agenteval.dev/schemas/v1/subject.schema.json",
+  "title": "AgentEval Subject",
+  "type": "object",
+  "required": ["kind", "name"],
+  "properties": {
+    "kind": { "enum": ["agent", "workflow"] },
+    "name": { "type": "string" },
+    "version": { "type": ["string", "null"] },
+    "framework": { "type": ["string", "null"] },
+    "modelId": { "type": ["string", "null"] },
+    "sourceProject": { "type": ["string", "null"] },
+    "sourcePath": { "type": ["string", "null"] },
+    "tags": {
+      "type": "array",
+      "items": { "type": "string" }
+    }
+  }
+}

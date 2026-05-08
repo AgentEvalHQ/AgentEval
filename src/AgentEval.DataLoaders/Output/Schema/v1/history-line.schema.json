@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agenteval.dev/schemas/v1/history-line.schema.json",
+  "title": "AgentEval History Line",
+  "type": "object",
+  "required": ["runId", "timestamp", "verdict", "score"],
+  "properties": {
+    "runId": { "type": "string" },
+    "timestamp": { "type": "string", "format": "date-time" },
+    "verdict": { "enum": ["PASS", "FAIL", "WARN"] },
+    "score": { "type": "number", "minimum": 0, "maximum": 1 },
+    "notes": { "type": ["string", "null"] }
+  }
+}
