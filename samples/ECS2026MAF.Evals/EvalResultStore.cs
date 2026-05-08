@@ -8,17 +8,17 @@ using AgentEval.Core;
 namespace ECS2026MAF.Evals;
 
 /// <summary>
-/// Persists lightweight eval snapshots to <c>.AgentEval/ECS2026MAF_Evals/</c> under
-/// the solution root so Eval03 can compare results without re-running any eval.
+/// Persists lightweight eval snapshots under the canonical AgentEval workspace
+/// so Eval03 can compare results without re-running any eval.
 ///
 /// Storage format: indented JSON (one file per key).
 /// This is NOT the standard AgentEval exporter format (IResultExporter / JUnit XML /
 /// Markdown). Those exporters are for CI pipelines; this store is a fast in-process
-/// cache for cross-eval hypothesis comparisons.
+/// snapshot of demo-specific data for cross-eval hypothesis comparisons.
 ///
-/// Location: &lt;solution-root&gt;/.AgentEval/ECS2026MAF_Evals/{key}.json
-/// The .AgentEval/ folder is created automatically if it does not exist.
-/// Add it to .gitignore to avoid committing evaluation artefacts.
+/// Location: &lt;workspace-root&gt;/.agenteval/samples/ECS2026MAF.Evals/snapshots/{key}.json
+/// The folder is created automatically if it does not exist and is gitignored
+/// via the repo-wide .agenteval/ rule.
 /// </summary>
 public static class EvalResultStore
 {
@@ -29,7 +29,7 @@ public static class EvalResultStore
 
     /// <summary>
     /// Walks up from the running assembly's directory until it finds a directory
-    /// containing <c>AgentEval.sln</c> or <c>AGENTS.md</c> (solution root).
+    /// containing <c>AgentEval.sln</c> or <c>AGENTS.md</c> (workspace root).
     /// Falls back to <c>Directory.GetCurrentDirectory()</c> if not found.
     /// </summary>
     private static string FindStorePath()
@@ -39,10 +39,10 @@ public static class EvalResultStore
         {
             if (dir.GetFiles("AgentEval.sln").Length > 0
              || dir.GetFiles("AGENTS.md").Length > 0)
-                return Path.Combine(dir.FullName, ".AgentEval", "ECS2026MAF_Evals");
+                return Path.Combine(dir.FullName, ".agenteval", "samples", "ECS2026MAF.Evals", "snapshots");
             dir = dir.Parent;
         }
-        return Path.Combine(Directory.GetCurrentDirectory(), ".AgentEval", "ECS2026MAF_Evals");
+        return Path.Combine(Directory.GetCurrentDirectory(), ".agenteval", "samples", "ECS2026MAF.Evals", "snapshots");
     }
 
     // ── EvalSnapshot (single-run) ─────────────────────────────────────────────
