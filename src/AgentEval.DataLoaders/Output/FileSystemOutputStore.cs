@@ -41,6 +41,21 @@ public sealed class FileSystemOutputStore : IOutputStore
     public string? WorkspaceRoot => _layout.Root;
     public bool IsAvailable => File.Exists(_layout.SolutionFile);
 
+    /// <summary>
+    /// Returns the canonical traces directory for a given subject and run, creating it if absent.
+    /// </summary>
+    /// <param name="subject">The subject identity.</param>
+    /// <param name="runId">The run identifier.</param>
+    /// <returns>The absolute path to the traces directory.</returns>
+    public string GetTracesDirectory(SubjectIdentity subject, string runId)
+    {
+        ArgumentNullException.ThrowIfNull(subject);
+        ArgumentException.ThrowIfNullOrWhiteSpace(runId);
+        var path = _layout.TracesDir(subject, runId);
+        Directory.CreateDirectory(path);
+        return path;
+    }
+
     // ─── Solution lifecycle ──────────────────────────────────────────────────
 
     public async Task<SolutionInfo> EnsureSolutionAsync(CancellationToken ct = default)

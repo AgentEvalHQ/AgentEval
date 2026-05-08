@@ -9,6 +9,7 @@ using System.Text.Json.Serialization;
 using AgentEval.Core;
 using AgentEval.Exporters.Models;
 using AgentEval.Models;
+using AgentEval.Output;
 
 namespace AgentEval.Exporters;
 
@@ -156,6 +157,65 @@ public sealed class DirectoryExporter : IResultExporter
         var timestamp = report.StartTime.ToString("yyyy-MM-dd_HH-mm-ss");
         var model = report.Agent?.Model?.Replace('/', '-').Replace('\\', '-').Replace(':', '-') ?? "unknown";
         return $"{timestamp}_{model}";
+    }
+
+    // ─── Store-based export ─────────────────────────────────────────────
+
+    internal async Task ExportThroughStoreAsync(
+        IOutputStore store,
+        SubjectIdentity subject,
+        RunManifest manifest,
+        EvaluationReport report,
+        CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(store);
+        ArgumentNullException.ThrowIfNull(subject);
+        ArgumentNullException.ThrowIfNull(manifest);
+        ArgumentNullException.ThrowIfNull(report);
+
+        foreach (var result in report.TestResults)
+        {
+            var sr = new ScenarioResult(
+                Id: result.Name,
+                Name: result.Name,
+                Input: "",
+                Output: result.Output ?? "",
+                Passed: result.Passed,
+                Score: result.Score,
+                Metrics: result.MetricScores,
+                Assertions: Array.Empty<AssertionResult>(),
+                Duration: TimeSpan.FromMilliseconds(result.DurationMs),
+                EstimatedCost: 0);
+            await store.WriteScenarioResultAsync(manifest.Run.RunId, sr, ct);
+        }
+
+        var stats = new RunStats(report.TotalTests, report.PassedTests, report.FailedTests, report.SkippedTests);
+        var metrics = ComputeMetricMeans(report);
+        var verdict = report.FailedTests > 0 ? "FAIL" : (report.PassedTests > 0 ? "PASS" : "WARN");
+        var summary = new RunSummary("1.0", manifest.Run.RunId, verdict, stats, metrics);
+        await store.CompleteRunAsync(manifest, summary, ct);
+    }
+
+    private static IReadOnlyDictionary<string, double> ComputeMetricMeans(EvaluationReport report)
+    {
+        var metricValues = new Dictionary<string, List<double>>(StringComparer.OrdinalIgnoreCase);
+        foreach (var result in report.TestResults)
+        {
+            foreach (var (metricName, score) in result.MetricScores)
+            {
+                if (!metricValues.TryGetValue(metricName, out var values))
+                {
+                    values = new List<double>();
+                    metricValues[metricName] = values;
+                }
+                values.Add(score);
+            }
+        }
+
+        return metricValues.ToDictionary(
+            kv => kv.Key,
+            kv => kv.Value.Count > 0 ? kv.Value.Average() : 0.0,
+            StringComparer.OrdinalIgnoreCase);
     }
 
     // ─── Private helpers ────────────────────────────────────────────────
