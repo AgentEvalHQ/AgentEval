@@ -248,6 +248,9 @@ public enum NonConformitySeverity
 /// </summary>
 public class ISO27001ComplianceReporter : IComplianceReporter<ISO27001ComplianceReport>
 {
+    /// <summary>Canonical regulation key used in the output store.</summary>
+    public const string Regulation = "ISO27001";
+
     /// <inheritdoc />
     public ISO27001ComplianceReport GenerateReport(RedTeamResult result, ComplianceReportOptions? options = null)
     {
@@ -338,6 +341,63 @@ public class ISO27001ComplianceReporter : IComplianceReporter<ISO27001Compliance
             Recommendations = recommendations,
             NonConformities = nonConformities
         };
+    }
+
+    /// <summary>
+    /// Generates an ISO 27001 compliance report and persists it as structured evidence via <paramref name="store"/>.
+    /// </summary>
+    /// <param name="store">The output store to write evidence into.</param>
+    /// <param name="subject">The subject being evaluated.</param>
+    /// <param name="sourceRunId">Run ID of the evaluation run that produced <paramref name="result"/>.</param>
+    /// <param name="result">The red team scan result.</param>
+    /// <param name="options">Optional report generation options.</param>
+    /// <param name="ct">Cancellation token.</param>
+    public async Task SaveReportAsync(
+        AgentEval.Output.IOutputStore store,
+        AgentEval.Output.SubjectIdentity subject,
+        string sourceRunId,
+        RedTeamResult result,
+        ComplianceReportOptions? options = null,
+        CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(store);
+        ArgumentNullException.ThrowIfNull(subject);
+        ArgumentException.ThrowIfNullOrWhiteSpace(sourceRunId);
+        ArgumentNullException.ThrowIfNull(result);
+
+        var report = GenerateReport(result, options);
+
+        var sourceManifest = await store.GetRunManifestAsync(sourceRunId, ct)
+            ?? throw new InvalidOperationException($"Source run {sourceRunId} not found in store.");
+
+        var controls = report.Controls
+            .Select(c => new AgentEval.Output.EvidenceControl(
+                Id: c.Control.ControlId,
+                Title: c.Control.ControlName,
+                Status: c.Status.ToString(),
+                PassRate: c.TotalTests > 0 ? c.PassedTests / (double)c.TotalTests : 0.0,
+                ScenarioRefs: c.Control.RelevantAttacks,
+                Notes: c.EvidenceSummary.Length > 0 ? c.EvidenceSummary : null))
+            .ToList();
+
+        var passed = controls.Count(x => x.Status == ControlEvaluationStatus.Effective.ToString());
+        var warnings = controls.Count(x => x.Status == ControlEvaluationStatus.PartiallyEffective.ToString());
+        var failed = controls.Count(x => x.Status == ControlEvaluationStatus.NeedsImprovement.ToString());
+        var overallStatus = failed > 0 ? "FAIL" : warnings > 0 ? "WARN" : "PASS";
+
+        var evidence = new AgentEval.Output.ComplianceEvidence(
+            SchemaVersion: "1.0",
+            Regulation: Regulation,
+            Subject: subject,
+            GeneratedAt: report.GeneratedAt,
+            SourceRun: new AgentEval.Output.SourceRunRef(sourceRunId, sourceManifest.ContentHash),
+            Controls: controls,
+            Summary: new AgentEval.Output.EvidenceSummary(controls.Count, passed, warnings, failed, overallStatus),
+            Attestation: new AgentEval.Output.Attestation(
+                typeof(ISO27001ComplianceReporter).Assembly.GetName().Version!.ToString(),
+                null, "AgentEval", "internal"));
+
+        await store.SaveComplianceEvidenceAsync(Regulation, subject, evidence, ct);
     }
 
     private static List<NonConformity> GenerateNonConformities(List<ControlStatus> controls)

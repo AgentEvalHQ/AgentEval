@@ -48,4 +48,16 @@ internal static class ContentHasher
         var finalHash = hash.GetHashAndReset();
         return Convert.ToHexString(finalHash).ToLowerInvariant();
     }
+
+    /// <summary>Returns true when the hash of the canonical run files matches <paramref name="expectedHash"/>.</summary>
+    public static async Task<bool> VerifyAsync(
+        FileSystemLayout layout,
+        SubjectIdentity subject,
+        string runId,
+        string expectedHash,
+        CancellationToken ct)
+    {
+        var actual = await HashRunAsync(layout, subject, runId, ct);
+        return $"sha256:{actual}" == expectedHash;
+    }
 }

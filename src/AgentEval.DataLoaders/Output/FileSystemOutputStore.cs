@@ -298,6 +298,20 @@ public sealed class FileSystemOutputStore : IOutputStore
 
     public async Task SaveComplianceEvidenceAsync(string regulation, SubjectIdentity subject, ComplianceEvidence evidence, CancellationToken ct = default)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(regulation);
+        ArgumentNullException.ThrowIfNull(subject);
+        ArgumentNullException.ThrowIfNull(evidence);
+
+        SchemaValidator.ValidateOrThrow(evidence, "evidence.schema.json");
+
+        var sourceManifest = await GetRunManifestAsync(evidence.SourceRun.RunId, ct);
+        if (sourceManifest is null)
+            throw new InvalidOperationException(
+                $"Cannot save evidence: source run {evidence.SourceRun.RunId} not found.");
+        if (sourceManifest.ContentHash != evidence.SourceRun.ManifestHash)
+            throw new InvalidOperationException(
+                $"Manifest hash mismatch — source run has {sourceManifest.ContentHash}, evidence references {evidence.SourceRun.ManifestHash}.");
+
         var ts = evidence.GeneratedAt.ToString("yyyy-MM-dd_HH-mm-ss");
         var path = _layout.ComplianceEvidenceFile(regulation, subject, ts);
         await WriteJsonAsync(path, evidence, ct);

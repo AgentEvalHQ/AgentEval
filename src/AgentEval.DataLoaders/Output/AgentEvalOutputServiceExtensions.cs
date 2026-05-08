@@ -14,9 +14,9 @@ public static class AgentEvalOutputServiceExtensions
     /// </summary>
     public static IServiceCollection AddAgentEvalOutputStore(
         this IServiceCollection services,
-        Action<EvaluationOptions>? configure = null)
+        Action<OutputStoreOptions>? configure = null)
     {
-        var opts = new EvaluationOptions();
+        var opts = new OutputStoreOptions();
         configure?.Invoke(opts);
 
         services.AddSingleton(opts);

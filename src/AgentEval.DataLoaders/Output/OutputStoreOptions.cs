@@ -5,7 +5,7 @@
 namespace AgentEval.Output;
 
 /// <summary>Options controlling how the output store is resolved at startup.</summary>
-public sealed class EvaluationOptions
+public sealed class OutputStoreOptions
 {
     /// <summary>Determines which <see cref="IOutputStore"/> implementation is activated.</summary>
     public OutputStoreMode OutputStore { get; set; } = OutputStoreMode.Auto;
