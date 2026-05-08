@@ -250,8 +250,22 @@ public sealed class InMemoryOutputStore : IOutputStore
 
     public Task SaveComplianceEvidenceAsync(string regulation, SubjectIdentity subject, ComplianceEvidence evidence, CancellationToken ct = default)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(regulation);
+        ArgumentNullException.ThrowIfNull(subject);
+        ArgumentNullException.ThrowIfNull(evidence);
+
+        SchemaValidator.ValidateOrThrow(evidence, "evidence.schema.json");
+
         lock (_lock)
         {
+            // Audit chain: source run must exist and its manifest hash must match.
+            if (!_runs.TryGetValue(evidence.SourceRun.RunId, out var entry))
+                throw new InvalidOperationException(
+                    $"Cannot save evidence: source run {evidence.SourceRun.RunId} not found.");
+            if (entry.Manifest.ContentHash != evidence.SourceRun.ManifestHash)
+                throw new InvalidOperationException(
+                    $"Manifest hash mismatch — source run has {entry.Manifest.ContentHash}, evidence references {evidence.SourceRun.ManifestHash}.");
+
             var ts = evidence.GeneratedAt.ToString("yyyy-MM-dd_HH-mm-ss");
             _complianceEvidence[(regulation, subject.Kind, subject.Name, ts)] = evidence;
         }

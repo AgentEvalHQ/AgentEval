@@ -80,6 +80,52 @@ public class InMemoryOutputStoreTests
     }
 
     [Fact]
+    public async Task SaveComplianceEvidence_NoSourceRun_Throws()
+    {
+        var store = new InMemoryOutputStore();
+        var subject = new SubjectIdentity(SubjectKind.Agent, "ComplianceAgent");
+        var evidence = new ComplianceEvidence(
+            SchemaVersion: "1.0",
+            Regulation: "SOC2",
+            Subject: subject,
+            GeneratedAt: DateTimeOffset.UtcNow,
+            SourceRun: new SourceRunRef("nonexistent", "sha256:" + new string('0', 64)),
+            Controls: new[] { new EvidenceControl("CC6.1", "Logical Access", "PASS", 1.0, new[] { "s1" }, null) },
+            Summary: new EvidenceSummary(1, 1, 0, 0, "PASS"),
+            Attestation: new Attestation("0.0.0", null, "AgentEval", "internal"));
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => store.SaveComplianceEvidenceAsync("SOC2", subject, evidence));
+    }
+
+    [Fact]
+    public async Task SaveComplianceEvidence_HashMismatch_Throws()
+    {
+        var store = new InMemoryOutputStore();
+        var subject = new SubjectIdentity(SubjectKind.Agent, "ComplianceAgent");
+        var manifest = await store.StartRunAsync(subject, DefaultContext());
+        var summary = new RunSummary("1.0", manifest.Run.RunId, "PASS",
+            new RunStats(1, 1, 0, 0), new Dictionary<string, double> { ["score"] = 1.0 });
+        await store.CompleteRunAsync(manifest, summary);
+
+        // Use a wrong hash — must mismatch the run's actual ContentHash
+        var wrongHash = "sha256:" + new string('a', 64);
+        var evidence = new ComplianceEvidence(
+            SchemaVersion: "1.0",
+            Regulation: "SOC2",
+            Subject: subject,
+            GeneratedAt: DateTimeOffset.UtcNow,
+            SourceRun: new SourceRunRef(manifest.Run.RunId, wrongHash),
+            Controls: new[] { new EvidenceControl("CC6.1", "Logical Access", "PASS", 1.0, new[] { "s1" }, null) },
+            Summary: new EvidenceSummary(1, 1, 0, 0, "PASS"),
+            Attestation: new Attestation("0.0.0", null, "AgentEval", "internal"));
+
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => store.SaveComplianceEvidenceAsync("SOC2", subject, evidence));
+        Assert.Contains("Manifest hash mismatch", ex.Message);
+    }
+
+    [Fact]
     public async Task History_AppendAndReadBack()
     {
         var store = new InMemoryOutputStore();

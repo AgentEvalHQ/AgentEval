@@ -94,6 +94,41 @@ public class DoctorCommandTests : IDisposable
     }
 
     [Fact]
+    public async Task Doctor_OrphanRunWithoutManifest_ReportsWarning()
+    {
+        var agentEvalDir = Path.Combine(_root, ".agenteval");
+        WriteSolutionJson(agentEvalDir);
+
+        // Create a subject + a run dir WITHOUT manifest.json (orphan)
+        var subjectDir = Path.Combine(agentEvalDir, "subjects", "agents", "TestAgent");
+        Directory.CreateDirectory(subjectDir);
+        var subjectFile = Path.Combine(subjectDir, "subject.json");
+        var subjectDoc = new { schemaVersion = "1.0", kind = "agent", name = "TestAgent" };
+        await File.WriteAllTextAsync(subjectFile, JsonSerializer.Serialize(subjectDoc, s_json));
+
+        var orphanRunDir = Path.Combine(subjectDir, "runs", "2026-01-01_12-00-00_orphan01");
+        Directory.CreateDirectory(orphanRunDir);
+
+        // Capture stdout to confirm the warning surfaces; also confirm exit code is 0
+        // (orphan is a warning, not an error).
+        var originalOut = Console.Out;
+        using var captured = new StringWriter();
+        Console.SetOut(captured);
+        int result;
+        try
+        {
+            result = await DoctorCommand.RunAsync(rootOverride: _root);
+        }
+        finally
+        {
+            Console.SetOut(originalOut);
+        }
+
+        Assert.Equal(0, result);
+        Assert.Contains("Orphan run", captured.ToString(), StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task Doctor_SubjectNameDoesNotMatchFolder_ReportsError()
     {
         var agentEvalDir = Path.Combine(_root, ".agenteval");
