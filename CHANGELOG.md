@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Composite evaluations primitive** (`AgentEval.Evals` namespace) — a composite eval aggregates N sub-evals into one scored result with a recursive tree of sub-results. `IEval` unifies atomic and composite evals; `CompositeEval` runs sub-evals in parallel via `Task.WhenAll` and aggregates via a pluggable `IAggregationStrategy`. Phase 1 ships `WeightedSumAggregation` (the only strategy needed for GDPR per-article rollups, Foundry's tool-call-accuracy formula, and 80% of other use cases).
+- **`AtomicLlmEval` / `AtomicCodeEval`** — atomic evals wrap either an existing `AgentEval.Core.IEvaluator` (LLM-judge case) or a deterministic computation (code case). Both produce the same `EvalResult` shape so callers don't branch on type.
+- **`SeverityRollup` / `CostRollup` helpers** — composite severity = max of sub-severities (`none < low < medium < high < critical`); composite cost = sum of sub-costs; cache-hit only when all subs hit cache.
+- **`eval-result.schema.json` v1** — JSON Schema (draft 2020-12) for the recursive `EvalResult` tree, embedded as a resource in `AgentEval.DataLoaders`. Used for runtime validation.
+- **`EvalResultPersistence`** — bridges composite results to the existing `IOutputStore`. `ToScenarioResult(result, id, name)` serialises the recursive tree as JSON inside `ScenarioResult.Output` while lifting score / pass-state / dimensions / cost to top-level fields. `FromScenarioResult(sr)` restores the tree. The existing `ContentHasher.HashRunAsync` covers the embedded JSON, so the audit chain extends to composite results with no schema or store changes.
+- **`AddCompositeEvals` DI extension** — registers `WeightedSumAggregation` as the default `IAggregationStrategy`. `TryAdd` semantics preserve consumer overrides.
+
+Verdict matrix: when no threshold is set on a composite, its label is severity-driven — `critical|high → fail`, `medium → warn`, `none|low → pass`. With a threshold, label is purely score-driven (`score >= threshold ? pass : fail`).
+
+Tests added on this branch — Article 17 golden tree (executable spec), 24+ unit tests across atomics and composite, schema validation, persistence round-trips, DI wiring. Total suite delta: +60 tests; 2738 passing on net10.0.
+
 - **Canonical `.agenteval/` workspace layout** — `subjects/{kind}/{name}/runs/{runId}/...` is now the single source of truth for all evaluation output. Seven v1 JSON Schemas (manifest, summary, subject, solution, history-line, evidence, red-team-manifest) are embedded as resources in `AgentEval.DataLoaders` and validated at runtime.
 - **`IOutputStore` interface and three implementations** — `FileSystemOutputStore` persists to the canonical folder tree; `NullOutputStore` silently discards all writes (no-op, no filesystem side effects); `InMemoryOutputStore` accumulates data in memory for testing. All three live in the `AgentEval.Output` namespace.
 - **`AgentEval.Cli` executable with `init`, `doctor`, and `migrate` subcommands** — `doctor` validates `solution.json` structure, subject-name-vs-folder consistency, per-run manifest content hashes, the compliance-evidence audit chain, and legacy paths via `LegacyPathScanner`. Exit code `2` means validation errors were found; `0` means clean.
