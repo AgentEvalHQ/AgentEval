@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Canonical `.agenteval/` workspace layout** — `subjects/{kind}/{name}/runs/{runId}/...` is now the single source of truth for all evaluation output. Seven v1 JSON Schemas (manifest, summary, subject, solution, history-line, evidence, red-team-manifest) are embedded as resources in `AgentEval.DataLoaders` and validated at runtime.
+- **`IOutputStore` interface and three implementations** — `FileSystemOutputStore` persists to the canonical folder tree; `NullOutputStore` silently discards all writes (no-op, no filesystem side effects); `InMemoryOutputStore` accumulates data in memory for testing. All three live in the `AgentEval.Output` namespace.
+- **`AgentEval.Cli` executable with `init`, `doctor`, and `migrate` subcommands** — `doctor` validates `solution.json` structure, subject-name-vs-folder consistency, per-run manifest content hashes, the compliance-evidence audit chain, and legacy paths via `LegacyPathScanner`. Exit code `2` means validation errors were found; `0` means clean.
+- **`agenteval init`** — Writes three files into `.agenteval/`: `solution.json` (schema v1, random UUID, solution display name), `README.md`, and `.gitignore`. All three are sourced from embedded templates. Safe to re-run; exits cleanly if already initialized.
+- **`agenteval migrate`** — Dry-run by default; pass `--apply` to commit changes. Handles three migration paths: (1) renames uppercase `.AgentEval/` → `.agenteval/` using a temp-name intermediate on Windows; (2) moves `TestResults/traces/{name}_{ts}_{*}.json` into per-subject run folders under `.agenteval/subjects/agents/{name}/runs/{ts}/traces/`; (3) moves `.agenteval/benchmarks/{Agent}/baselines/{*}.json` into `.agenteval/subjects/agents/{Agent}/baselines/v{n}.json`. Accepts `--root` to override the auto-detected workspace root.
+- **Compliance evidence audit chain** — `SaveComplianceEvidenceAsync` validates each evidence document against `evidence.schema.json` and refuses to persist it when `sourceRun.manifestHash` does not match the source run's stored `ContentHash`. `agenteval doctor` re-validates the full chain on demand.
+- **`ContentHasher.HashRunAsync` / `ContentHasher.VerifyAsync`** (internal) — Compute a deterministic SHA-256 hash over a run's summary, sorted scenario results, and optional trace. Used by both `CompleteRunAsync` and `agenteval doctor`.
+- **`AddAgentEvalOutputStore` DI extension method** — Registered on `IServiceCollection` in `AgentEval.Output`; accepts `Action<OutputStoreOptions>` for configuring `OutputStoreMode` (`Auto`, `FileSystem`, `Null`) and an optional explicit workspace path. `InMemoryOutputStore` is available for tests but is not selectable via `OutputStoreMode` — wire it directly in DI when needed.
+
+### Changed
+
+- **`JsonFileBaselineStore`** gains a constructor overload `(MemoryReportingOptions, IOutputStore, SubjectIdentity?)` that dual-writes baselines to both the legacy path (source-of-truth) and the canonical store path. Existing callers using the original constructor are unaffected.
+- **Four red-team compliance reporters** (`OWASPComplianceReporter`, `ISO27001ComplianceReporter`, `SOC2ComplianceReporter`, `MITREATLASReporter`) gain a `SaveReportAsync(IOutputStore, SubjectIdentity, runId, ...)` overload that maps their report types into `ComplianceEvidence` and routes through the audit chain.
+- **`EvalResultStore` in `samples/ECS2026MAF.Evals/`** now writes snapshots to `.agenteval/samples/ECS2026MAF.Evals/snapshots/` instead of `.AgentEval/ECS2026MAF_Evals/`.
+- **`Program.cs` in `samples/ECS2026MAF.Evals/`** now accepts an optional positional `1`..`5` argument to invoke a single eval directly; the interactive menu remains the default when no argument is supplied.
+
+### Fixed
+
+- **`LegacyPathScanner`** no longer reports a false-positive `.AgentEval/` finding on Windows when the workspace already uses the lowercase `.agenteval/` folder. The previous case-insensitive lookup matched the same on-disk directory under both names.
+
 ---
 
 ## [0.8.0-beta] - 2026-04-28

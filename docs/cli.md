@@ -1,344 +1,184 @@
 # CLI Reference
 
-AgentEval ships a standalone CLI tool for running evaluations from the terminal, CI/CD pipelines, and shell scripts — without writing C# code.
+AgentEval ships a CLI for managing the `.agenteval/` workspace from the terminal and CI/CD pipelines.
 
 ## Installation
 
 ```bash
+# During development
+dotnet run --project src/AgentEval.Cli -- <command>
+
+# Packaged tool (planned)
 dotnet tool install --global AgentEval.Cli --prerelease
 ```
 
-After installation the `agenteval` command is available system-wide.
+After installation as a global tool, the `agenteval` command is available system-wide. Until the package is published, use `dotnet run --project src/AgentEval.Cli --` as the prefix in place of `agenteval`.
 
-## Quick Start
-
-```bash
-# Evaluate with Azure OpenAI
-agenteval eval \
-  --azure --model gpt-4o \
-  --dataset tests.yaml \
-  --format json -o results.json
-
-# Evaluate with any OpenAI-compatible endpoint (Ollama, vLLM, Groq, etc.)
-agenteval eval \
-  --endpoint http://localhost:11434/v1 \
-  --model llama3 \
-  --dataset tests.yaml
-
-# Pipe JSON to jq for quick inspection
-agenteval eval --azure --model gpt-4o --dataset tests.yaml | jq '.passRate'
-```
+---
 
 ## Commands
 
-### `agenteval eval`
+### `agenteval init`
 
-Evaluate an AI agent against a dataset of test cases.
+Initialize the `.agenteval/` workspace for the current solution.
+
+**Synopsis**
 
 ```
-agenteval eval [options]
+agenteval init [--name <display-name>]
 ```
 
-#### Required Options
+**What it does**
+
+Walks up from the current directory until it finds a `.sln`, `.slnx`, or `.git` marker and treats that directory as the workspace root. Creates `.agenteval/` if it does not exist, then writes three files:
+
+- `solution.json` — solution-level identity: a random UUID, the display name, and `schemaVersion: "1.0"`.
+- `README.md` — overview of the workspace layout.
+- `.gitignore` — excludes per-run artifacts and red-team outputs from source control.
+
+If `solution.json` already exists, the command reports that the workspace is already initialized and exits cleanly.
+
+**Options**
 
 | Option | Description |
 |--------|-------------|
-| `--dataset <file>` | Dataset file (YAML, JSON, JSONL, or CSV) |
-| `--model <name>` | Model or deployment name |
+| `--name <display-name>` | Display name to record in `solution.json`. Defaults to the directory name of the solution root. |
 
-#### Endpoint Options (choose one)
+**Example**
 
-| Option | Description |
-|--------|-------------|
-| `--endpoint <url>` | OpenAI-compatible API endpoint URL |
-| `--azure` | Use Azure OpenAI (reads `AZURE_OPENAI_ENDPOINT` and `AZURE_OPENAI_API_KEY` env vars) |
+```
+$ dotnet run --project src/AgentEval.Cli -- init --name "MyProject"
+✔ Initialized .agenteval/ at /home/user/myproject/.agenteval
+```
 
-#### Authentication
-
-| Option | Description |
-|--------|-------------|
-| `--api-key <key>` | API key (or set `OPENAI_API_KEY` / `AZURE_OPENAI_API_KEY` env var) |
-
-> **Tip:** For local providers like Ollama that don't require authentication, omit `--api-key`.
-
-#### Agent Configuration
-
-| Option | Default | Description |
-|--------|---------|-------------|
-| `--system-prompt <text>` | *(none)* | System prompt text |
-| `--system-prompt-file <file>` | *(none)* | Read system prompt from a file |
-| `--temperature <float>` | `0` | Sampling temperature (0 = deterministic) |
-| `--max-tokens <int>` | *(none)* | Maximum output tokens |
-
-#### LLM-as-Judge
-
-| Option | Description |
-|--------|-------------|
-| `--judge <url>` | Separate endpoint for LLM-as-judge scoring |
-| `--judge-model <name>` | Model for the judge (defaults to `--model`) |
-
-When `--judge` is provided, the evaluation harness uses a separate LLM to score agent responses using the `TaskCompletionMetric` and other LLM-backed metrics.
-
-#### Output
-
-| Option | Default | Description |
-|--------|---------|-------------|
-| `--format <fmt>` | `json` | Export format (see table below) |
-| `-o, --output <file>` | stdout | Output file path |
-
-**Supported formats:**
-
-| Format | Aliases | Description |
-|--------|---------|-------------|
-| `json` | | JSON report with full details |
-| `junit` | `xml` | JUnit XML for CI/CD integration |
-| `markdown` | `md` | Human-readable Markdown table |
-| `trx` | | Visual Studio TRX format |
-| `csv` | | Comma-separated values |
-
-#### Verbosity
-
-| Option | Description |
-|--------|-------------|
-| `--verbose` | Show detailed progress during evaluation |
-| `--quiet` | Suppress all output except the export data |
-
-### Exit Codes
+**Exit codes**
 
 | Code | Meaning |
 |------|---------|
-| `0` | All tests passed |
-| `1` | One or more tests failed |
-| `2` | Usage error (invalid arguments) |
-| `3` | Runtime error (network, auth, file not found) |
-
-Exit codes are designed for **CI/CD integration** — a non-zero exit code fails the pipeline step.
+| `0` | Initialized successfully (or already initialized). |
+| `1` | Could not locate a solution root. |
 
 ---
 
-## Dataset Format
+### `agenteval doctor`
 
-The CLI uses `DatasetLoaderFactory` which auto-detects format by file extension.
+Validate the `.agenteval/` workspace structure and content hashes.
 
-### YAML (recommended)
+**Synopsis**
 
-```yaml
-data:
-  - id: capital_city
-    input: What is the capital of France?
-    expected: Paris
-    expected_tools:
-      - lookup_city
-
-  - id: simple_math
-    input: What is 7 * 8?
-    expected: "56"
+```
+agenteval doctor
 ```
 
-### JSON
+**What it does**
 
-```json
-[
-  { "input": "What is the capital of France?", "expected": "Paris" },
-  { "input": "What is 7 * 8?", "expected": "56" }
-]
+Performs five checks in sequence:
+
+1. **`solution.json`** — Verifies that `schemaVersion`, `id` (non-empty GUID), and `name` are all present and well-formed.
+2. **Subject-name consistency** — For each subject folder under `subjects/agents/` and `subjects/workflows/`, verifies that the sanitized `name` field inside `subject.json` matches the folder name on disk.
+3. **Per-run content hashes** — For each run with a `manifest.json`, recomputes the SHA-256 hash over the run's summary, sorted scenario results, and optional trace, and compares it against the stored `contentHash`.
+4. **Compliance evidence audit chain** — For each `evidence.json` under `compliance/`, verifies that `sourceRun.manifestHash` matches the `contentHash` recorded in the source run's `manifest.json`.
+5. **Legacy paths** — Runs `LegacyPathScanner` to detect `.AgentEval/` (uppercase), `TestResults/traces/`, and `.agenteval/benchmarks/` and reports them as errors.
+
+After all checks, prints a summary line:
+
+```
+Errors: N | Warnings: N | OK: N
 ```
 
-### JSONL
+**Example output (clean workspace)**
 
-```jsonl
-{"input": "What is the capital of France?", "expected": "Paris"}
-{"input": "What is 7 * 8?", "expected": "56"}
+```
+✔ solution.json OK
+✔ Run 3f8a1b2c (subject: TravelAgent)
+✔ compliance/OWASP/TravelAgent/2026-04-10T14:32:00Z/evidence.json
+
+Errors: 0 | Warnings: 0 | OK: 3
 ```
 
-### CSV
+**Example output (issues found)**
 
-```csv
-input,expected
-"What is the capital of France?","Paris"
-"What is 7 * 8?","56"
 ```
+✔ solution.json OK
+✖ Hash mismatch in run 3f8a1b2c (subject: TravelAgent).
+✖ Legacy path: TestResults/traces/ - legacy trace artifacts; run `agenteval migrate`
+
+Errors: 2 | Warnings: 0 | OK: 1
+```
+
+**Exit codes**
+
+| Code | Meaning |
+|------|---------|
+| `0` | No errors found. |
+| `1` | Could not locate a solution root or `.agenteval/` is missing. |
+| `2` | One or more validation errors found. |
+
+Warnings (e.g. a subject folder with a missing `subject.json`) do not affect the exit code.
 
 ---
 
-## CI/CD Examples
+### `agenteval migrate`
 
-### GitHub Actions
+Migrate legacy AgentEval output paths to the canonical `.agenteval/` layout.
 
-```yaml
-- name: Evaluate AI Agent
-  run: |
-    agenteval eval \
-      --azure --model gpt-4o \
-      --dataset tests/eval-dataset.yaml \
-      --format junit -o results.xml
-  env:
-    AZURE_OPENAI_ENDPOINT: ${{ secrets.AZURE_OPENAI_ENDPOINT }}
-    AZURE_OPENAI_API_KEY: ${{ secrets.AZURE_OPENAI_API_KEY }}
+**Synopsis**
 
-- name: Publish Test Results
-  uses: dorny/test-reporter@v1
-  with:
-    name: Agent Evaluation
-    path: results.xml
-    reporter: java-junit
+```
+agenteval migrate [--apply] [--root <path>]
 ```
 
-### Azure DevOps
+**What it does**
 
-```yaml
-- task: DotNetCoreCLI@2
-  displayName: Install AgentEval CLI
-  inputs:
-    command: custom
-    custom: tool
-    arguments: install --global AgentEval.Cli --prerelease
+Dry-run by default: scans the workspace for legacy paths and prints what would happen. Pass `--apply` to execute the moves.
 
-- script: |
-    agenteval eval \
-      --azure --model gpt-4o \
-      --dataset $(Build.SourcesDirectory)/tests/eval-dataset.yaml \
-      --format trx -o $(Build.ArtifactStagingDirectory)/eval-results.trx
-  displayName: Run Agent Evaluation
-  env:
-    AZURE_OPENAI_ENDPOINT: $(AZURE_OPENAI_ENDPOINT)
-    AZURE_OPENAI_API_KEY: $(AZURE_OPENAI_API_KEY)
+Three migration paths are handled automatically:
 
-- task: PublishTestResults@2
-  inputs:
-    testResultsFormat: VSTest
-    testResultsFiles: '**/*.trx'
+1. **`.AgentEval/` → `.agenteval/`** — Renames the uppercase folder. On Windows (case-insensitive filesystem), uses a two-step move through a temporary name to avoid collisions.
+2. **`TestResults/traces/`** — Parses each `{name}_{yyyy-MM-dd}_{suffix}.json` filename, resolves the subject folder, and moves the file to `.agenteval/subjects/agents/{name}/runs/{ts}/traces/`. Files that cannot be parsed or whose subject does not exist are skipped with a warning.
+3. **`.agenteval/benchmarks/{Agent}/baselines/`** — Moves each baseline file to `.agenteval/subjects/agents/{Agent}/baselines/v{n}.json` (sequential version numbers per agent). An adjacent `manifest.json` is renamed to `memory-index.json`.
+
+Sample-specific sub-paths (e.g. `.AgentEval/ECS2026MAF_Evals/`) are flagged as requiring manual migration.
+
+**Options**
+
+| Option | Description |
+|--------|-------------|
+| `--apply` | Execute moves; default is dry-run only. |
+| `--root <path>` | Override the auto-detected workspace root path. |
+
+**Example: dry-run**
+
 ```
+$ dotnet run --project src/AgentEval.Cli -- migrate
+[DRY-RUN] Rename .AgentEval → .agenteval (via temp intermediate on Windows).
+[DRY-RUN] Move trace: TestResults/traces/TravelAgent_2026-04-10_run1.json
+         → .agenteval/subjects/agents/TravelAgent/runs/2026-04-10_run1/traces/TravelAgent_2026-04-10_run1.json
+[DRY-RUN] Move baseline: .agenteval/benchmarks/TravelAgent/baselines/baseline.json
+         → .agenteval/subjects/agents/TravelAgent/baselines/v1.json
+```
+
+**Example: apply**
+
+```
+$ dotnet run --project src/AgentEval.Cli -- migrate --apply
+[APPLIED] Rename .AgentEval → .agenteval (via temp intermediate on Windows).
+  ✔ Renamed /repo/.AgentEval → /repo/.agenteval
+[APPLIED] Move trace: TestResults/traces/TravelAgent_2026-04-10_run1.json
+         → .agenteval/subjects/agents/TravelAgent/runs/2026-04-10_run1/traces/TravelAgent_2026-04-10_run1.json
+  ✔ Moved
+```
+
+**Exit codes**
+
+| Code | Meaning |
+|------|---------|
+| `0` | Command completed (nothing to do, or moves applied). |
+| `1` | Could not locate a solution root. |
 
 ---
-
-## Provider Examples
-
-### Azure OpenAI
-
-```bash
-agenteval eval --azure --model gpt-4o --dataset tests.yaml
-```
-
-### OpenAI
-
-```bash
-agenteval eval \
-  --endpoint https://api.openai.com/v1 \
-  --model gpt-4o \
-  --api-key $OPENAI_API_KEY \
-  --dataset tests.yaml
-```
-
-### Ollama (local)
-
-```bash
-agenteval eval \
-  --endpoint http://localhost:11434/v1 \
-  --model llama3.1 \
-  --dataset tests.yaml
-```
-
-### LM Studio
-
-```bash
-agenteval eval \
-  --endpoint http://localhost:1234/v1 \
-  --model local-model \
-  --dataset tests.yaml
-```
-
-### Groq
-
-```bash
-agenteval eval \
-  --endpoint https://api.groq.com/openai/v1 \
-  --model llama-3.1-70b-versatile \
-  --api-key $GROQ_API_KEY \
-  --dataset tests.yaml
-```
-
-### Together.ai
-
-```bash
-agenteval eval \
-  --endpoint https://api.together.xyz/v1 \
-  --model meta-llama/Llama-3-70b-chat-hf \
-  --api-key $TOGETHER_API_KEY \
-  --dataset tests.yaml
-```
-
----
-
-## Piping & Composition
-
-The CLI follows Unix conventions: **data goes to stdout, messages to stderr**.
-
-```bash
-# Pipe JSON to jq
-agenteval eval --azure --model gpt-4o --dataset tests.yaml | jq '.passRate'
-
-# Save JSON and view Markdown
-agenteval eval --azure --model gpt-4o --dataset tests.yaml -o results.json
-agenteval eval --azure --model gpt-4o --dataset tests.yaml --format md
-
-# Compare two models (run both, diff)
-agenteval eval --azure --model gpt-4o --dataset tests.yaml -o gpt4o.json
-agenteval eval --azure --model gpt-4o-mini --dataset tests.yaml -o gpt4omini.json
-```
-
----
-
-## Troubleshooting
-
-| Error | Cause | Fix |
-|-------|-------|-----|
-| `Specify --endpoint <url> or --azure` | No endpoint provided | Add `--endpoint` or `--azure` |
-| `Dataset not found` | File doesn't exist | Check `--dataset` path |
-| `Dataset is empty` | File has no test cases | Ensure YAML/JSON has `data:` entries |
-| `Unknown format 'xxx'` | Unsupported export format | Use: json, junit, xml, markdown, md, trx, csv |
-| `Azure endpoint required` | Missing Azure config | Set `AZURE_OPENAI_ENDPOINT` env var |
-| `Azure API key required` | Missing Azure key | Set `AZURE_OPENAI_API_KEY` env var |
-
----
-
-## Architecture
-
-The CLI is a thin shell over the same libraries you use in C# code:
-
-```
-agenteval eval --azure --model gpt-4o --dataset tests.yaml --format junit
-       │
-       ▼
-  ┌─────────────────┐
-  │  EvalCommand     │  Parse options, validate
-  └────────┬────────┘
-           ▼
-  ┌─────────────────┐
-  │ EndpointFactory  │  Create IChatClient (Azure or OpenAI-compatible)
-  └────────┬────────┘
-           ▼
-  ┌─────────────────┐
-  │ AsEvaluableAgent │  IChatClient → IStreamableAgent (zero boilerplate)
-  └────────┬────────┘
-           ▼
-  ┌─────────────────┐
-  │ DatasetLoader    │  YAML/JSON/JSONL/CSV → List<TestCase>
-  └────────┬────────┘
-           ▼
-  ┌─────────────────────────┐
-  │ MAFEvaluationHarness    │  Run tests, track tools & performance
-  └────────┬────────────────┘
-           ▼
-  ┌─────────────────┐
-  │ ExportHandler    │  Format routing → stdout or file
-  └─────────────────┘
-```
-
-All evaluation logic lives in the shared libraries — the CLI adds no custom evaluation code.
 
 ## See Also
 
-- [Getting Started](getting-started.md) - C# library quickstart
-- [Export Formats](export.md) - Detailed format documentation
-- [Cross-Framework Evaluation](cross-framework.md) - Using with any LLM provider
+- [Migration Guide](migration/output-folder.md) — Step-by-step migration from legacy paths.
+- [Getting Started](getting-started.md) — C# library quickstart.
