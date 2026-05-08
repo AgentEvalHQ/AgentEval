@@ -76,7 +76,7 @@ internal sealed class FileSystemLayout
     public string SyncedFile => Path.Combine(PortalDir, "synced.jsonl");
 
     // Helpers
-    private static string Sanitize(string name)
+    internal static string Sanitize(string name)
     {
         var invalid = Path.GetInvalidFileNameChars().Concat(new[] { '/', '\\' }).ToArray();
         var s = string.Concat(name.Select(c => invalid.Contains(c) ? '-' : c));

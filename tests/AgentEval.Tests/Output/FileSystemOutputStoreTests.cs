@@ -108,6 +108,96 @@ public class FileSystemOutputStoreTests : IDisposable
     }
 
     [Fact]
+    public async Task SubjectName_WithPathTraversalChars_StaysContainedUnderRoot()
+    {
+        WriteSolutionJson();
+        var store = new FileSystemOutputStore(_root);
+        var evil = new SubjectIdentity(SubjectKind.Agent, "../../etc/passwd");
+
+        await store.EnsureSubjectAsync(evil);
+
+        var written = Directory.EnumerateFiles(_root, "subject.json", SearchOption.AllDirectories).ToList();
+        Assert.Single(written);
+
+        var rootFull = Path.GetFullPath(_root);
+        var writtenFull = Path.GetFullPath(written[0]);
+        Assert.StartsWith(rootFull, writtenFull, StringComparison.OrdinalIgnoreCase);
+
+        var rel = Path.GetRelativePath(_root, writtenFull);
+        var sep = Path.DirectorySeparatorChar;
+        Assert.Equal($"subjects{sep}agents", Path.GetDirectoryName(Path.GetDirectoryName(rel)));
+    }
+
+    [Fact]
+    public async Task ListSubjects_FiltersByKind()
+    {
+        WriteSolutionJson();
+        var store = new FileSystemOutputStore(_root);
+        await store.EnsureSubjectAsync(new SubjectIdentity(SubjectKind.Agent, "Alpha"));
+        await store.EnsureSubjectAsync(new SubjectIdentity(SubjectKind.Agent, "Beta"));
+        await store.EnsureSubjectAsync(new SubjectIdentity(SubjectKind.Workflow, "Gamma"));
+
+        var agents = new List<SubjectInfo>();
+        await foreach (var s in store.ListSubjectsAsync(SubjectKind.Agent))
+            agents.Add(s);
+
+        var workflows = new List<SubjectInfo>();
+        await foreach (var s in store.ListSubjectsAsync(SubjectKind.Workflow))
+            workflows.Add(s);
+
+        Assert.Equal(2, agents.Count);
+        Assert.Single(workflows);
+        Assert.Contains(agents, a => a.Identity.Name == "Alpha");
+        Assert.Contains(agents, a => a.Identity.Name == "Beta");
+        Assert.Contains(workflows, w => w.Identity.Name == "Gamma");
+    }
+
+    [Fact]
+    public async Task RedTeamCampaign_StartAndComplete_PersistsManifestAndFindings()
+    {
+        WriteSolutionJson();
+        var store = new FileSystemOutputStore(_root);
+        var ctx = new RedTeamCampaignContext("My Campaign",
+            new[] { new SubjectIdentity(SubjectKind.Agent, "TargetAgent") }, "lite");
+
+        var manifest = await store.StartRedTeamCampaignAsync(ctx);
+        Assert.Equal("My Campaign", manifest.Name);
+        Assert.Matches(@"^My Campaign_\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}$", manifest.CampaignId);
+
+        await store.CompleteRedTeamCampaignAsync(manifest.CampaignId,
+            new RedTeamFindings(new List<object> { new { id = "f1", severity = "low" } }));
+
+        var redTeamRoot = Path.Combine(_root, "red-team");
+        var findingsFiles = Directory.EnumerateFiles(redTeamRoot, "findings.json", SearchOption.AllDirectories).ToList();
+        Assert.Single(findingsFiles);
+    }
+
+    [Fact]
+    public async Task StartRun_InitialManifest_ValidatesAgainstSchema()
+    {
+        WriteSolutionJson();
+        var store = new FileSystemOutputStore(_root);
+        var subject = DefaultSubject();
+        var manifest = await store.StartRunAsync(subject, DefaultContext());
+
+        var manifestPath = Path.Combine(_root, "subjects", "agents", "TestAgent", "runs", manifest.Run.RunId, "manifest.json");
+        var json = await File.ReadAllTextAsync(manifestPath);
+
+        var asm = typeof(FileSystemOutputStore).Assembly;
+        var resourceName = asm.GetManifestResourceNames()
+            .Single(n => n.EndsWith(".manifest.schema.json", StringComparison.OrdinalIgnoreCase));
+        using var stream = asm.GetManifestResourceStream(resourceName)!;
+        using var reader = new StreamReader(stream);
+        var schema = Json.Schema.JsonSchema.FromText(reader.ReadToEnd());
+
+        var result = schema.Evaluate(System.Text.Json.Nodes.JsonNode.Parse(json),
+            new Json.Schema.EvaluationOptions { OutputFormat = Json.Schema.OutputFormat.List });
+        Assert.True(result.IsValid,
+            string.Join("\n", result.Details.Where(d => !d.IsValid)
+                .Select(d => $"{d.EvaluationPath}: {string.Join(", ", d.Errors?.Select(e => $"{e.Key}={e.Value}") ?? Array.Empty<string>())}")));
+    }
+
+    [Fact]
     public async Task RoundTrip_StartWriteScenarioComplete_PersistsAll()
     {
         WriteSolutionJson();

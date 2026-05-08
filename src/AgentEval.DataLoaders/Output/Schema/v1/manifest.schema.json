@@ -36,7 +36,7 @@
         "timestamp": { "type": "string", "format": "date-time" },
         "duration": { "type": "string" },
         "scenarioCount": { "type": "integer", "minimum": 0 },
-        "verdict": { "enum": ["PASS", "FAIL", "WARN"] },
+        "verdict": { "enum": ["PASS", "FAIL", "WARN", "PENDING"] },
         "kind": { "enum": ["eval", "memory-benchmark", "stochastic-eval", "compliance"] },
         "evalProject": { "type": ["string", "null"] },
         "evalProjectPath": { "type": ["string", "null"] },

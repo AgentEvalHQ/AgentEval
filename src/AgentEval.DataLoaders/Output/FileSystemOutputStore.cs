@@ -309,7 +309,7 @@ public sealed class FileSystemOutputStore : IOutputStore
             {
                 var subjectName = Path.GetFileName(subjectDir);
                 if (subject is not null && !string.Equals(subjectName,
-                    subject.Name.Replace('/', '-').Replace('\\', '-'), StringComparison.OrdinalIgnoreCase))
+                    FileSystemLayout.Sanitize(subject.Name), StringComparison.OrdinalIgnoreCase))
                     continue;
 
                 foreach (var tsDir in Directory.GetDirectories(subjectDir))
@@ -336,7 +336,7 @@ public sealed class FileSystemOutputStore : IOutputStore
     public async Task<RedTeamCampaignManifest> StartRedTeamCampaignAsync(RedTeamCampaignContext context, CancellationToken ct = default)
     {
         var ts = DateTimeOffset.UtcNow.ToString("yyyy-MM-dd_HH-mm-ss");
-        var sanitizedName = SanitizeName(context.Name);
+        var sanitizedName = FileSystemLayout.Sanitize(context.Name);
         var campaignId = $"{sanitizedName}_{ts}";
 
         var manifest = new RedTeamCampaignManifest(
@@ -530,13 +530,6 @@ public sealed class FileSystemOutputStore : IOutputStore
         System.Security.Cryptography.RandomNumberGenerator.Fill(bytes);
         var hex = Convert.ToHexString(bytes).ToLowerInvariant();
         return $"{ts}_{hex}";
-    }
-
-    private static string SanitizeName(string name)
-    {
-        var invalid = Path.GetInvalidFileNameChars().Concat(new[] { '/', '\\' }).ToArray();
-        var s = string.Concat(name.Select(c => invalid.Contains(c) ? '-' : c));
-        return s.Trim('.', ' ');
     }
 
     // Private write-only helper (not yet exposed but included for completeness)
