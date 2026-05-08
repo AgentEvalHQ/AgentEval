@@ -9,6 +9,7 @@
   <ItemGroup>
     <InternalsVisibleTo Include="AgentEval" />
     <InternalsVisibleTo Include="AgentEval.Tests" />
+    <InternalsVisibleTo Include="AgentEval.Cli" />
   </ItemGroup>
 
   <ItemGroup>
