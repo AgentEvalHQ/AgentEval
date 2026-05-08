@@ -3,7 +3,7 @@
 
 using Azure;
 
-namespace ECS2026MAF;
+namespace AgentEval.TravelDemo;
 
 /// <summary>
 /// Azure OpenAI configuration sourced from environment variables.

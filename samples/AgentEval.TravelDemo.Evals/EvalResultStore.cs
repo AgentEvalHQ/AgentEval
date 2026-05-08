@@ -5,7 +5,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using AgentEval.Core;
 
-namespace ECS2026MAF.Evals;
+namespace AgentEval.TravelDemo.Evals;
 
 /// <summary>
 /// Persists lightweight eval snapshots under the canonical AgentEval workspace
@@ -16,7 +16,7 @@ namespace ECS2026MAF.Evals;
 /// Markdown). Those exporters are for CI pipelines; this store is a fast in-process
 /// snapshot of demo-specific data for cross-eval hypothesis comparisons.
 ///
-/// Location: &lt;workspace-root&gt;/.agenteval/samples/ECS2026MAF.Evals/snapshots/{key}.json
+/// Location: &lt;workspace-root&gt;/.agenteval/samples/AgentEval.TravelDemo.Evals/snapshots/{key}.json
 /// The folder is created automatically if it does not exist and is gitignored
 /// via the repo-wide .agenteval/ rule.
 /// </summary>
@@ -39,10 +39,10 @@ public static class EvalResultStore
         {
             if (dir.GetFiles("AgentEval.sln").Length > 0
              || dir.GetFiles("AGENTS.md").Length > 0)
-                return Path.Combine(dir.FullName, ".agenteval", "samples", "ECS2026MAF.Evals", "snapshots");
+                return Path.Combine(dir.FullName, ".agenteval", "samples", "AgentEval.TravelDemo.Evals", "snapshots");
             dir = dir.Parent;
         }
-        return Path.Combine(Directory.GetCurrentDirectory(), ".agenteval", "samples", "ECS2026MAF.Evals", "snapshots");
+        return Path.Combine(Directory.GetCurrentDirectory(), ".agenteval", "samples", "AgentEval.TravelDemo.Evals", "snapshots");
     }
 
     // ── EvalSnapshot (single-run) ─────────────────────────────────────────────

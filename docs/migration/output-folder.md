@@ -39,10 +39,10 @@ Run `agenteval migrate --apply`. The command parses the filename pattern `{name}
 
 ### Sample snapshots (`.AgentEval/ECS2026MAF_Evals/`)
 
-The ECS2026MAF.Evals sample now writes to `.agenteval/samples/ECS2026MAF.Evals/snapshots/` automatically when you update to this release. For existing data you want to preserve, move it manually:
+The travel demo (renamed in this release from `ECS2026MAF*` to `AgentEval.TravelDemo*`) now writes to `.agenteval/samples/AgentEval.TravelDemo.Evals/snapshots/` automatically when you update. For existing data you want to preserve, move it manually:
 
 ```
-mv .AgentEval/ECS2026MAF_Evals .agenteval/samples/ECS2026MAF.Evals/snapshots
+mv .AgentEval/ECS2026MAF_Evals .agenteval/samples/AgentEval.TravelDemo.Evals/snapshots
 ```
 
 `agenteval migrate` will flag the `.AgentEval/` directory and suggest a manual move, but it does not move sample-specific sub-paths automatically because they do not map directly to subjects in the canonical layout.

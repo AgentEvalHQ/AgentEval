@@ -15,14 +15,14 @@
 
   <ItemGroup>
     <!-- Reference the demo project — agents and workflow factories live there -->
-    <ProjectReference Include="../ECS2026MAF/ECS2026MAF.csproj" />
+    <ProjectReference Include="../AgentEval.TravelDemo/AgentEval.TravelDemo.csproj" />
   </ItemGroup>
 
   <ItemGroup>
     <!-- AgentEval NuGet package for assertions and metrics -->
     <PackageReference Include="AgentEval" Version="0.8.1-beta" />
 
-    <!-- MAF + Azure packages (must match ECS2026MAF to avoid version conflicts) -->
+    <!-- MAF + Azure packages (must match AgentEval.TravelDemo to avoid version conflicts) -->
     <PackageReference Include="Microsoft.Agents.AI" Version="1.3.0" />
     <PackageReference Include="Microsoft.Agents.AI.Workflows" Version="1.3.0" />
     <PackageReference Include="Azure.AI.OpenAI" Version="2.8.0-beta.1" />

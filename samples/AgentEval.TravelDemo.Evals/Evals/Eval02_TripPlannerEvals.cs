@@ -6,10 +6,10 @@ using AgentEval.Core;
 using AgentEval.MAF;
 using AgentEval.Models;
 using Azure.AI.OpenAI;
-using ECS2026MAF.Workflows;
+using AgentEval.TravelDemo.Workflows;
 using Microsoft.Extensions.AI;
 
-namespace ECS2026MAF.Evals;
+namespace AgentEval.TravelDemo.Evals;
 
 /// <summary>
 /// Eval 02 — TripPlanner Workflow Assertions
@@ -20,7 +20,7 @@ namespace ECS2026MAF.Evals;
 /// - Completes within a reasonable time budget
 /// - Produces non-empty output at every stage
 ///
-/// The workflow factory is imported from ECS2026MAF — no duplication.
+/// The workflow factory is imported from AgentEval.TravelDemo — no duplication.
 /// </summary>
 public static class Eval02_TripPlannerEvals
 {
@@ -41,7 +41,7 @@ public static class Eval02_TripPlannerEvals
         var evaluatorClient = azureClient.GetChatClient(Config.Model).AsIChatClient();
         var evaluator       = new ChatClientEvaluator(evaluatorClient);
 
-        // ── Workflow from ECS2026MAF (no duplication) ─────────────────────────
+        // ── Workflow from AgentEval.TravelDemo (no duplication) ─────────────────────────
         var (workflow, executorIds) = TripPlannerWorkflow.Create();
 
         var workflowAdapter = MAFWorkflowAdapter.FromMAFWorkflow(

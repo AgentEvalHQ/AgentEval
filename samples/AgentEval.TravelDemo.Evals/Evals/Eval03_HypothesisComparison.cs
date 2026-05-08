@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 ECS2026 Demo
 
-namespace ECS2026MAF.Evals;
+namespace AgentEval.TravelDemo.Evals;
 
 /// <summary>
 /// Eval 03 — Hypothesis Comparison (zero LLM calls, instant)

@@ -3,9 +3,9 @@
 
 using Microsoft.Agents.AI.Workflows;
 using Microsoft.Extensions.AI;
-using ECS2026MAF.Workflows;
+using AgentEval.TravelDemo.Workflows;
 
-namespace ECS2026MAF.Demos;
+namespace AgentEval.TravelDemo.Demos;
 
 /// <summary>
 /// Demo 02 — TripPlanner Workflow

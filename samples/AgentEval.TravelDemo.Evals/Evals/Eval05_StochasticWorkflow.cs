@@ -3,11 +3,11 @@
 
 using AgentEval.MAF;
 using Azure.AI.OpenAI;
-using ECS2026MAF.Workflows;
+using AgentEval.TravelDemo.Workflows;
 using Microsoft.Agents.AI.Workflows;
 using Microsoft.Extensions.AI;
 
-namespace ECS2026MAF.Evals;
+namespace AgentEval.TravelDemo.Evals;
 
 /// <summary>
 /// Eval 05 — Stochastic TripPlanner Workflow (5 runs)

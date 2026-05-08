@@ -4,10 +4,10 @@
 using AgentEval.Assertions;
 using AgentEval.MAF;
 using Azure.AI.OpenAI;
-using ECS2026MAF.Agents;
+using AgentEval.TravelDemo.Agents;
 using Microsoft.Extensions.AI;
 
-namespace ECS2026MAF.Evals;
+namespace AgentEval.TravelDemo.Evals;
 
 /// <summary>
 /// Eval 04 — Stochastic TravelAgent (single agent, 5 runs)

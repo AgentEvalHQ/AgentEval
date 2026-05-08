@@ -3,7 +3,7 @@
 
 using System.ComponentModel;
 
-namespace ECS2026MAF.Tools;
+namespace AgentEval.TravelDemo.Tools;
 
 /// <summary>
 /// Shared travel tools used by both the TravelAgent (Demo 01) and the

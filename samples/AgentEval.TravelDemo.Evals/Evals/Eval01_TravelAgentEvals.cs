@@ -5,11 +5,11 @@ using AgentEval.Assertions;
 using AgentEval.Core;
 using AgentEval.MAF;
 using AgentEval.Models;
-using ECS2026MAF.Agents;
+using AgentEval.TravelDemo.Agents;
 using Azure.AI.OpenAI;
 using Microsoft.Extensions.AI;
 
-namespace ECS2026MAF.Evals;
+namespace AgentEval.TravelDemo.Evals;
 
 /// <summary>
 /// Eval 01 — TravelAgent Full-Trip Assertions (Hypothesis Test)
@@ -22,7 +22,7 @@ namespace ECS2026MAF.Evals;
 /// Hypothesis: a single agent is LESS deterministic than a structured workflow.
 /// If these assertions ever fail on a given run, the hypothesis is confirmed.
 ///
-/// Agents and tools are imported from ECS2026MAF — no duplication.
+/// Agents and tools are imported from AgentEval.TravelDemo — no duplication.
 /// </summary>
 public static class Eval01_TravelAgentEvals
 {
@@ -38,7 +38,7 @@ public static class Eval01_TravelAgentEvals
 
         Console.WriteLine("  Creating TravelAgent + AgentEval harness...\n");
 
-        // ── Agent from ECS2026MAF (no duplication) ────────────────────────────
+        // ── Agent from AgentEval.TravelDemo (no duplication) ────────────────────────────
         var rawAgent = TravelAgentFactory.Create();
         var agent    = new MAFAgentAdapter(rawAgent);
 

@@ -4,7 +4,7 @@
 using AgentEval.Core;
 using AgentEval.Models;
 
-namespace ECS2026MAF.Evals;
+namespace AgentEval.TravelDemo.Evals;
 
 /// <summary>
 /// ASCII-art console output for evaluation results.

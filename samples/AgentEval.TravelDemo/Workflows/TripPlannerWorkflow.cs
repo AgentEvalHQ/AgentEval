@@ -5,9 +5,9 @@ using Azure.AI.OpenAI;
 using Microsoft.Agents.AI;
 using Microsoft.Agents.AI.Workflows;
 using Microsoft.Extensions.AI;
-using ECS2026MAF.Agents;
+using AgentEval.TravelDemo.Agents;
 
-namespace ECS2026MAF.Workflows;
+namespace AgentEval.TravelDemo.Workflows;
 
 /// <summary>
 /// Assembles the TripPlanner sequential workflow:

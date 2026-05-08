@@ -22,8 +22,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **`JsonFileBaselineStore`** gains a constructor overload `(MemoryReportingOptions, IOutputStore, SubjectIdentity?)` that dual-writes baselines to both the legacy path (source-of-truth) and the canonical store path. Existing callers using the original constructor are unaffected.
 - **Four red-team compliance reporters** (`OWASPComplianceReporter`, `ISO27001ComplianceReporter`, `SOC2ComplianceReporter`, `MITREATLASReporter`) gain a `SaveReportAsync(IOutputStore, SubjectIdentity, runId, ...)` overload that maps their report types into `ComplianceEvidence` and routes through the audit chain.
-- **`EvalResultStore` in `samples/ECS2026MAF.Evals/`** now writes snapshots to `.agenteval/samples/ECS2026MAF.Evals/snapshots/` instead of `.AgentEval/ECS2026MAF_Evals/`.
-- **`Program.cs` in `samples/ECS2026MAF.Evals/`** now accepts an optional positional `1`..`5` argument to invoke a single eval directly; the interactive menu remains the default when no argument is supplied.
+- **`EvalResultStore` in the travel demo** now writes snapshots to `.agenteval/samples/AgentEval.TravelDemo.Evals/snapshots/` instead of `.AgentEval/ECS2026MAF_Evals/`.
+- **`Program.cs` in the travel demo** now accepts an optional positional `1`..`5` argument to invoke a single eval directly; the interactive menu remains the default when no argument is supplied.
+- **Renamed `samples/ECS2026MAF*` → `samples/AgentEval.TravelDemo*`** — Drops the conference-specific name in favour of an evergreen one. Folder, csproj, root namespace (`AgentEval.TravelDemo` / `AgentEval.TravelDemo.Evals`), `using` statements, and the sample's `EvalResultStore` snapshot path were all updated. Existing snapshots at `.agenteval/samples/ECS2026MAF.Evals/snapshots/` were moved to the new path during the rename so Eval03's hypothesis comparison continues to work without re-running.
 
 ### Fixed
 

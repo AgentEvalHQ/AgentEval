@@ -4,10 +4,10 @@
 using Azure.AI.OpenAI;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
-using ECS2026MAF.Tools;
+using AgentEval.TravelDemo.Tools;
 using ChatOptions = Microsoft.Extensions.AI.ChatOptions;
 
-namespace ECS2026MAF.Agents;
+namespace AgentEval.TravelDemo.Agents;
 
 /// <summary>
 /// Creates the all-in-one <c>TravelAgent</c> used in Demo 01.

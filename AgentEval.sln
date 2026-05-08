@@ -33,9 +33,9 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AgentEval.Memory.Tests", "t
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AgentEval.NuGetConsumer.Tests", "samples\AgentEval.NuGetConsumer.Tests\AgentEval.NuGetConsumer.Tests.csproj", "{FDD321C8-4190-4D72-BFE9-E7F17D660D79}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ECS2026MAF", "samples\ECS2026MAF\ECS2026MAF.csproj", "{C2EA49E2-92F7-4B3B-8F06-B45E612A5F76}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AgentEval.TravelDemo", "samples\AgentEval.TravelDemo\AgentEval.TravelDemo.csproj", "{C2EA49E2-92F7-4B3B-8F06-B45E612A5F76}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ECS2026MAF.Evals", "samples\ECS2026MAF.Evals\ECS2026MAF.Evals.csproj", "{D01363F2-4B8F-4B8C-AA0B-D95E58F12D70}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AgentEval.TravelDemo.Evals", "samples\AgentEval.TravelDemo.Evals\AgentEval.TravelDemo.Evals.csproj", "{D01363F2-4B8F-4B8C-AA0B-D95E58F12D70}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AgentEval.Cli", "src\AgentEval.Cli\AgentEval.Cli.csproj", "{3E8C3413-F04E-4095-8843-FD0B9E439311}"
 EndProject

@@ -3,9 +3,9 @@
 
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
-using ECS2026MAF.Agents;
+using AgentEval.TravelDemo.Agents;
 
-namespace ECS2026MAF.Demos;
+namespace AgentEval.TravelDemo.Demos;
 
 /// <summary>
 /// Demo 01 — TravelAgent (single all-in-one agent)

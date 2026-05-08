@@ -5,7 +5,7 @@ using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
 using ChatOptions = Microsoft.Extensions.AI.ChatOptions;
 
-namespace ECS2026MAF.Agents;
+namespace AgentEval.TravelDemo.Agents;
 
 /// <summary>
 /// Creates the <c>Presenter</c> agent for the TripPlanner Workflow (Demo 02).

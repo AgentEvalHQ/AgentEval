@@ -2,17 +2,31 @@
 // Copyright (c) 2026 ECS2026 Demo
 //
 // ╔══════════════════════════════════════════════════════════════════════════════╗
-// ║               ECS2026MAF — Microsoft Agent Framework Demos                  ║
-// ║   Pure MAF code — no AgentEval dependencies in this project                 ║
+// ║           AgentEval.TravelDemo.Evals — AgentEval Assertions & Metrics                 ║
+// ║   Pure AgentEval evaluation code — agents live in AgentEval.TravelDemo               ║
 // ╚══════════════════════════════════════════════════════════════════════════════╝
 //
 // Run:
-//   dotnet run --project samples/ECS2026MAF
+//   dotnet run --project samples/AgentEval.TravelDemo.Evals
 
 using System.Text;
-using ECS2026MAF.Demos;
 
 Console.OutputEncoding = Encoding.UTF8;
+
+if (args.Length > 0)
+{
+    switch (args[0])
+    {
+        case "1": await Eval01_TravelAgentEvals.RunAsync(); return;
+        case "2": await Eval02_TripPlannerEvals.RunAsync(); return;
+        case "3": await Eval03_HypothesisComparison.RunAsync(); return;
+        case "4": await Eval04_StochasticAgent.RunAsync(); return;
+        case "5": await Eval05_StochasticWorkflow.RunAsync(); return;
+        default:
+            Console.Error.WriteLine($"Unknown eval id: {args[0]}. Valid: 1..5.");
+            return;
+    }
+}
 
 await ShowMenuAsync();
 
@@ -21,16 +35,17 @@ static async Task ShowMenuAsync()
     while (true)
     {
         Console.Clear();
-        Console.ForegroundColor = ConsoleColor.Cyan;
+        Console.ForegroundColor = ConsoleColor.Green;
         Console.WriteLine(@"
 ╔══════════════════════════════════════════════════════════════════════════════╗
-║                 ECS 2026 — Microsoft Agent Framework Demos                  ║
+║                ECS 2026 — AgentEval Evaluation Demos                        ║
 ╠══════════════════════════════════════════════════════════════════════════════╣
 ║                                                                              ║
-║   1  TravelAgent             Single agent with tools                         ║
-║   2  TripPlanner Workflow    Multi-agent pipeline (4 agents + tools)         ║
-║   3  Live Demo               Placeholder — built live during the talk        ║
-║   4  Live Demo (Complete)    Completed reference — chat loop from scratch    ║
+║   1  TravelAgent Evals       Behavioral policies + tool assertions           ║
+║   2  TripPlanner Evals       Workflow structure + tool-level assertions      ║
+║   3  Hypothesis Comparison   Load snapshots — side-by-side (no LLM calls)   ║
+║   4  Stochastic Agent        5-run reliability test · single agent           ║
+║   5  Stochastic Workflow     5-run reliability test · 4-agent pipeline       ║
 ║                                                                              ║
 ║   Q  Quit                                                                    ║
 ║                                                                              ║
@@ -38,7 +53,7 @@ static async Task ShowMenuAsync()
 ");
         Console.ResetColor();
 
-        if (!ECS2026MAF.Config.IsConfigured)
+        if (!Config.IsConfigured)
         {
             Console.ForegroundColor = ConsoleColor.Yellow;
             Console.WriteLine("  ⚠️  Azure OpenAI credentials not found.");
@@ -52,10 +67,11 @@ static async Task ShowMenuAsync()
 
         switch (key)
         {
-            case '1': await Demo01_TravelAgent.RunAsync();             break;
-            case '2': await Demo02_TripPlannerWorkflow.RunAsync();     break;
-            case '3': await Demo03_LiveDemo.RunAsync();                break;
-            case '4': await Demo03_LiveDemoComplete.RunAsync();        break;
+            case '1': await Eval01_TravelAgentEvals.RunAsync();        break;
+            case '2': await Eval02_TripPlannerEvals.RunAsync();        break;
+            case '3': await Eval03_HypothesisComparison.RunAsync();    break;
+            case '4': await Eval04_StochasticAgent.RunAsync();         break;
+            case '5': await Eval05_StochasticWorkflow.RunAsync();      break;
             case 'q' or 'Q': return;
         }
 
