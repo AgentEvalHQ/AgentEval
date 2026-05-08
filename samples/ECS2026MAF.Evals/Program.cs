@@ -13,6 +13,21 @@ using System.Text;
 
 Console.OutputEncoding = Encoding.UTF8;
 
+if (args.Length > 0)
+{
+    switch (args[0])
+    {
+        case "1": await Eval01_TravelAgentEvals.RunAsync(); return;
+        case "2": await Eval02_TripPlannerEvals.RunAsync(); return;
+        case "3": await Eval03_HypothesisComparison.RunAsync(); return;
+        case "4": await Eval04_StochasticAgent.RunAsync(); return;
+        case "5": await Eval05_StochasticWorkflow.RunAsync(); return;
+        default:
+            Console.Error.WriteLine($"Unknown eval id: {args[0]}. Valid: 1..5.");
+            return;
+    }
+}
+
 await ShowMenuAsync();
 
 static async Task ShowMenuAsync()
