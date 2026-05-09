@@ -7,6 +7,10 @@ using AgentEval.Evals;
 using AgentEval.GdprBenchmark.Articles;
 using AgentEval.GdprBenchmark.Articles.Building;
 using AgentEval.GdprBenchmark.Articles.Loading;
+using AgentEval.GdprBenchmark.Composition;
+using AgentEval.GdprBenchmark.DomainPacks.ChildrensService;
+using AgentEval.GdprBenchmark.DomainPacks.Healthcare;
+using AgentEval.GdprBenchmark.DomainPacks.HR;
 using AgentEval.GdprBenchmark.Reporting;
 using AgentEval.GdprBenchmark.Reporting.Pdf;
 using AgentEval.Output;
@@ -76,10 +80,11 @@ public static class BenchCommand
 
         // ── Build registry ───────────────────────────────────────────────────
         ArticlesRegistry articles;
+        ScenarioToAtomicEval scenarioBuilder;
         try
         {
             var loader = new ArticleScenarioYamlLoader();
-            var scenarioBuilder = new ScenarioToAtomicEval(judge, judgeModel: "stub");
+            scenarioBuilder = new ScenarioToAtomicEval(judge, judgeModel: "stub");
             var articleBuilder = new ArticleCompositeBuilder(scenarioBuilder);
             articles = new ArticlesRegistry(loader, articleBuilder);
         }
@@ -93,12 +98,7 @@ public static class BenchCommand
         CompositeEval benchmark;
         try
         {
-            benchmark = preset.ToLowerInvariant() switch
-            {
-                "smoke" => GdprBenchmarkFactory.Smoke(articles),
-                "audit" or "auditgrade" => GdprBenchmarkFactory.AuditGrade(articles),
-                _ => GdprBenchmarkFactory.Standard(articles)
-            };
+            benchmark = ResolvePreset(preset, articles, scenarioBuilder);
         }
         catch (Exception ex)
         {
@@ -201,6 +201,72 @@ public static class BenchCommand
             "FAIL" => 2,
             _ => 2  // WARN also returns non-zero for CI strictness
         };
+    }
+
+    /// <summary>
+    /// Resolves a preset specification string into a <see cref="CompositeEval"/>.
+    /// Supports additive composition syntax: <c>standard+healthcare</c>,
+    /// <c>standard+hr</c>, <c>standard+childrens</c>, and combinations such as
+    /// <c>standard+healthcare+hr</c>. The first token must be a base preset
+    /// (<c>smoke</c>, <c>standard</c>, or <c>audit</c>/<c>auditgrade</c>).
+    /// </summary>
+    /// <param name="presetSpec">
+    /// The preset specification, e.g. <c>"standard"</c> or <c>"standard+healthcare+hr"</c>.
+    /// </param>
+    /// <param name="articles">The loaded articles registry.</param>
+    /// <param name="scenarioBuilder">The scenario-to-eval builder for domain-pack scenarios.</param>
+    /// <returns>The resolved <see cref="CompositeEval"/>.</returns>
+    /// <exception cref="ArgumentException">Thrown for unknown base presets or domain packs.</exception>
+    internal static CompositeEval ResolvePreset(
+        string presetSpec,
+        ArticlesRegistry articles,
+        ScenarioToAtomicEval scenarioBuilder)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(presetSpec);
+        ArgumentNullException.ThrowIfNull(articles);
+        ArgumentNullException.ThrowIfNull(scenarioBuilder);
+
+        var tokens = presetSpec.Split('+', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        if (tokens.Length == 0) throw new ArgumentException("Empty preset specification.", nameof(presetSpec));
+
+        var basePreset = tokens[0].ToLowerInvariant() switch
+        {
+            "smoke"                  => GdprBenchmarkFactory.Smoke(articles),
+            "standard"               => GdprBenchmarkFactory.Standard(articles),
+            "audit" or "auditgrade"  => GdprBenchmarkFactory.AuditGrade(articles),
+            _                        => throw new ArgumentException($"Unknown base preset '{tokens[0]}'.", nameof(presetSpec))
+        };
+
+        if (tokens.Length == 1) return basePreset;
+
+        // Accumulate additions from all domain packs, then apply in one pass.
+        var allAdditions = new Dictionary<string, List<EvalComponent>>();
+        foreach (var pack in tokens.Skip(1))
+        {
+            var packAdditions = pack.ToLowerInvariant() switch
+            {
+                "healthcare"  => HealthcareScenarios.Load(scenarioBuilder),
+                "hr"          => HRScenarios.Load(scenarioBuilder),
+                "childrens"   => ChildrensServiceScenarios.Load(scenarioBuilder),
+                _             => throw new ArgumentException($"Unknown domain pack '{pack}'.", nameof(presetSpec))
+            };
+
+            foreach (var (key, components) in packAdditions)
+            {
+                if (!allAdditions.TryGetValue(key, out var list))
+                {
+                    list = new List<EvalComponent>();
+                    allAdditions[key] = list;
+                }
+                list.AddRange(components);
+            }
+        }
+
+        var merged = allAdditions.ToDictionary(
+            kv => kv.Key,
+            kv => (IReadOnlyList<EvalComponent>)kv.Value);
+
+        return basePreset.WithExtraScenarios(merged);
     }
 
     private static string SanitizeForPath(string name)

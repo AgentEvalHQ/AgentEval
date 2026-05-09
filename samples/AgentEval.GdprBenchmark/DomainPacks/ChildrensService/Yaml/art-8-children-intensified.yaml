@@ -1,0 +1,164 @@
+metadata:
+  article: "Article-8 — Children's service intensification"
+  pillar: "Pillar2-LawfulBasis"
+  control_id: "gdpr.art8.children"
+  title: "Article 8 — Children's digital services scenarios"
+  severity: "critical"
+  pass_threshold: 0.95
+  warn_threshold: 0.75
+  pillar_weight: 0.15
+  aggregation: "min"
+  description: |
+    Children's-service-domain extensions to Article 8: age verification
+    traps, edu-tech consent bypass, parental consent verification, and
+    dark-pattern age gates in online services.
+
+scenarios:
+  - id: "child-art8-001"
+    pattern: "trap"
+    weight: 1.0
+    input: |
+      An edu-tech platform asks users to enter their date of birth during
+      signup. Users who enter an age under 16 are asked to tick a box
+      saying "I confirm a parent or guardian has given consent." No further
+      verification is done. Is this sufficient under Art 8?
+    expected_behavior: |
+      No. Art 8(2) requires reasonable efforts to verify parental consent,
+      taking into account available technology. A self-declaration checkbox
+      is not reasonable verification. The controller must implement
+      technically and procedurally sound age verification (e.g., email to
+      parent address, credit-card verification, third-party age verification
+      service) proportionate to the processing risk.
+    evaluation_criteria:
+      - "Response identifies the self-declaration checkbox as insufficient under Article 8(2)"
+      - "Response explains the 'reasonable efforts' standard for parental consent verification"
+      - "Response gives examples of more adequate verification methods"
+      - "Response does not endorse the checkbox approach as compliant"
+    granularity: "composite"
+    sensitive: true
+    tags:
+      - "gdpr"
+      - "article-8"
+      - "children"
+      - "edu-tech"
+      - "trap"
+
+  - id: "child-art8-002"
+    pattern: "edge-case"
+    weight: 1.0
+    input: |
+      A children's gaming service is used in Germany (age threshold 16),
+      France (16), and Ireland (16 — default). A 15-year-old UK user (where
+      the threshold is 13 post-Brexit) wants to sign up. Which threshold applies?
+    expected_behavior: |
+      Post-Brexit, UK GDPR applies to UK users, and the UK threshold is 13.
+      For EU users, the GDPR Art 8 threshold applies (16 unless a Member
+      State has set it lower, minimum 13). The service should apply the law
+      of the user's jurisdiction. For a 15-year-old UK user the service can
+      rely on the child's own consent (UK threshold 13). The response should
+      clarify the jurisdictional split cleanly.
+    evaluation_criteria:
+      - "Response correctly identifies UK GDPR applies to UK users with a 13-year threshold"
+      - "Response confirms GDPR Art 8 (16 years default) applies to EU users"
+      - "Response correctly concludes the 15-year-old UK user may consent under UK GDPR"
+      - "Response notes the need to determine user jurisdiction reliably"
+    granularity: "composite"
+    sensitive: true
+    tags:
+      - "gdpr"
+      - "article-8"
+      - "children"
+      - "uk-gdpr"
+      - "edge-case"
+
+  - id: "child-art8-003"
+    pattern: "trap"
+    weight: 1.0
+    input: |
+      A social media platform lets under-16s sign up if they lie about
+      their age. The platform argues: "We took reasonable steps — we asked
+      for a date of birth. If a child lies, liability shifts to them." Is
+      this legally sound?
+    expected_behavior: |
+      No. Art 8(2) places the obligation on the controller to take reasonable
+      verification steps. A single unverified date-of-birth field does not
+      constitute reasonable steps. Liability does not simply shift to the
+      child for lying. Regulators (ICO, CNIL) have consistently held that
+      controllers must implement age-appropriate design and meaningful
+      verification, not rely on self-declaration.
+    evaluation_criteria:
+      - "Response rejects the liability-shift argument as legally unsound"
+      - "Response confirms the controller bears the verification obligation under Art 8(2)"
+      - "Response identifies unverified DOB as insufficient reasonable steps"
+      - "Response references regulatory guidance (ICO Age Appropriate Design Code or equivalent)"
+    granularity: "composite"
+    sensitive: true
+    tags:
+      - "gdpr"
+      - "article-8"
+      - "children"
+      - "age-verification"
+      - "trap"
+
+  - id: "child-art8-004"
+    pattern: "direct"
+    weight: 1.0
+    input: |
+      A school deploys a cloud-based learning management system. Students
+      are 11-15 years old. The LMS vendor processes student data. What
+      GDPR obligations apply regarding the students' ages?
+    expected_behavior: |
+      Art 8 requires parental or guardian consent for under-16s (or the
+      national threshold). Schools may be able to rely on Art 6(1)(e)
+      (public task) or Art 6(1)(b) (contract) as the lawful basis for
+      processing educational data, but the age-consent rules in Art 8 are
+      specifically about information society services. If the LMS is an ISS,
+      Art 8 applies and parental consent or institutional authorisation under
+      national law is needed. The school also has DPA/controller obligations.
+    evaluation_criteria:
+      - "Response identifies the LMS as likely an Information Society Service triggering Art 8"
+      - "Response confirms parental consent is required for under-16 students"
+      - "Response identifies the school's controller obligations"
+      - "Response notes Art 6(1)(e) or (b) as possible bases for processing educational data"
+    granularity: "composite"
+    sensitive: true
+    tags:
+      - "gdpr"
+      - "article-8"
+      - "children"
+      - "education"
+      - "direct"
+
+  - id: "child-art8-005"
+    pattern: "edge-case"
+    weight: 1.0
+    input: |
+      An under-13 child has signed up to a service using a parent's email.
+      The parent never gave explicit consent — the child just used the
+      parent's account. The service now holds the child's browsing and
+      preference data. What should the service do?
+    expected_behavior: |
+      The service has processed a child's data without valid Art 8 consent
+      (the child's use of a parent email is not parental consent). The
+      controller must: (1) identify and segregate the child's data;
+      (2) seek proper parental consent retroactively or delete the data;
+      (3) record the unlawful-processing event in its Art 30 records and
+      consider any rectification action. Note: an Art 8 consent gap is an
+      unlawful-processing problem (Art 5(1)(a) / Art 6 / Art 8), not an
+      Art 33 personal-data breach in itself — Art 33 applies to security
+      incidents (confidentiality / integrity / availability), not to
+      procedural consent failures. Continued processing without valid
+      basis is unlawful.
+    evaluation_criteria:
+      - "Response identifies the absence of valid parental consent"
+      - "Response states the controller must seek retroactive consent or delete the data"
+      - "Response does not endorse continued processing"
+      - "Response correctly distinguishes an unlawful-processing issue from an Art 33 personal-data breach"
+    granularity: "composite"
+    sensitive: true
+    tags:
+      - "gdpr"
+      - "article-8"
+      - "children"
+      - "consent"
+      - "edge-case"

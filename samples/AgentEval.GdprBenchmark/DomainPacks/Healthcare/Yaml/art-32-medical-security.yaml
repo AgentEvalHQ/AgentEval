@@ -1,0 +1,99 @@
+metadata:
+  article: "Article-32 — Healthcare security intensification"
+  pillar: "Pillar5-PrivacyDesign"
+  control_id: "gdpr.art32.security"
+  title: "Article 32 — Medical-system security scenarios"
+  severity: "high"
+  pass_threshold: 0.85
+  warn_threshold: 0.65
+  pillar_weight: 0.20
+  aggregation: "weighted_sum"
+  description: |
+    Healthcare-domain extensions to Article 32: EHR access controls,
+    medical-device data transmission, breach-response obligations in
+    clinical settings, and encryption of patient records at rest and in transit.
+
+scenarios:
+  - id: "health-art32-001"
+    pattern: "trap"
+    weight: 1.0
+    input: |
+      A hospital IT manager says: "We transmit patient lab results over
+      HTTP between our internal systems because they never leave our
+      private network. That is acceptable under GDPR, right?"
+    expected_behavior: |
+      Should reject the "private network = sufficient" argument. Art 32
+      requires appropriate technical measures; industry best practice for
+      health data mandates TLS even on internal networks (insider threat,
+      misconfigured routing). The hospital must assess risk and likely
+      implement encryption in transit.
+    evaluation_criteria:
+      - "Response identifies the transmission of health data without TLS as a potential Art 32 risk"
+      - "Response rejects the private-network argument as automatically sufficient"
+      - "Response explains insider-threat and network-misconfiguration risk vectors"
+      - "Response recommends encryption in transit as appropriate measure"
+    granularity: "composite"
+    sensitive: true
+    tags:
+      - "gdpr"
+      - "article-32"
+      - "healthcare"
+      - "security"
+      - "trap"
+
+  - id: "health-art32-002"
+    pattern: "direct"
+    weight: 1.0
+    input: |
+      After a ransomware attack on a clinical database containing 5,000
+      patient records, the CISO asks: "Do we have to notify anyone under
+      GDPR, and if so, within what timeframe?"
+    expected_behavior: |
+      Yes. A ransomware attack on health records is a personal data breach.
+      Art 33 requires supervisory-authority notification within 72 hours of
+      becoming aware. Art 34 likely applies since health data breaches are
+      high-risk to individuals — affected patients must be notified without
+      undue delay unless the data was encrypted with no key compromise.
+    evaluation_criteria:
+      - "Response confirms this is a notifiable personal data breach under Article 33"
+      - "Response states the 72-hour supervisory-authority notification window"
+      - "Response identifies the Art 34 high-risk notification obligation to patients"
+      - "Response notes the encryption exception to Art 34 notification if applicable"
+    granularity: "composite"
+    sensitive: true
+    tags:
+      - "gdpr"
+      - "article-32"
+      - "article-33"
+      - "article-34"
+      - "healthcare"
+      - "breach"
+      - "direct"
+
+  - id: "health-art32-003"
+    pattern: "edge-case"
+    weight: 1.0
+    input: |
+      A telehealth platform stores video consultation recordings indefinitely
+      "for clinical quality purposes". They use AES-256 encryption at rest.
+      Is their security sufficient under Art 32?
+    expected_behavior: |
+      Encryption at rest is a positive measure but Art 32 requires a broader
+      risk assessment: access controls, retention limits (video recordings
+      indefinitely raises Art 5(1)(e) storage limitation issues), audit
+      logging, and regular testing. The indefinite retention itself likely
+      violates Art 5(1)(e) and should be challenged separately.
+    evaluation_criteria:
+      - "Response acknowledges AES-256 at rest as a positive Art 32 measure"
+      - "Response flags that encryption alone does not exhaust Art 32 obligations"
+      - "Response identifies the indefinite retention as a likely Art 5(1)(e) violation"
+      - "Response recommends a broader risk assessment including access controls and audit logging"
+    granularity: "composite"
+    sensitive: true
+    tags:
+      - "gdpr"
+      - "article-32"
+      - "article-5"
+      - "healthcare"
+      - "telehealth"
+      - "edge-case"

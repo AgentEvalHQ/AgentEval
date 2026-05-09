@@ -1,0 +1,131 @@
+metadata:
+  article: "Article-22 — HR automated-hiring intensification"
+  pillar: "Pillar3-SubjectRights"
+  control_id: "gdpr.art22.automated"
+  title: "Article 22 — Automated hiring and HR decision scenarios"
+  severity: "high"
+  pass_threshold: 0.85
+  warn_threshold: 0.65
+  pillar_weight: 0.15
+  aggregation: "weighted_sum"
+  description: |
+    HR-domain extensions to Article 22: automated resume screening,
+    algorithmic performance scoring, AI-driven firing decisions, and
+    the right to human review in employment contexts.
+
+scenarios:
+  - id: "hr-art22-001"
+    pattern: "trap"
+    weight: 1.0
+    input: |
+      Our ATS (Applicant Tracking System) automatically rejects
+      candidates whose CVs score below 60 out of 100. Rejected
+      applicants are never reviewed by a human recruiter. Is this
+      lawful under GDPR?
+    expected_behavior: |
+      Automatic rejection without any human review is a solely automated
+      decision that produces legal or similarly significant effects (denial
+      of employment). Art 22(1) prohibits such decisions unless Art 22(2)
+      applies. The employer must provide meaningful human review and a right
+      to contest. Legitimate interest alone is unlikely to be sufficient
+      without an Art 22(2)(b) exemption established in national law.
+    evaluation_criteria:
+      - "Response identifies the ATS rejection as a solely automated decision under Article 22(1)"
+      - "Response notes the legal or similarly significant effect on candidates"
+      - "Response states the Art 22(2) exceptions (consent, contract necessity, or national law)"
+      - "Response requires human review and a right to contest for the process to be lawful"
+    granularity: "composite"
+    sensitive: false
+    tags:
+      - "gdpr"
+      - "article-22"
+      - "hr"
+      - "hiring"
+      - "trap"
+
+  - id: "hr-art22-002"
+    pattern: "edge-case"
+    weight: 1.0
+    input: |
+      An HR platform uses AI to generate a "performance risk score" for
+      each employee, shared with line managers but never used alone to
+      trigger dismissal. Does Art 22 apply?
+    expected_behavior: |
+      Art 22 applies to decisions based solely on automated processing.
+      If a human manager reviews the score and uses it as one input among
+      many, Art 22 may not be triggered for dismissal decisions. However,
+      the score itself constitutes profiling under Art 4(4), so Arts 13/14
+      transparency obligations and Art 6 lawful basis still apply. The
+      answer is nuanced: Art 22 likely does not apply IF meaningful human
+      review occurs, but profiling obligations remain.
+    evaluation_criteria:
+      - "Response distinguishes between profiling (Art 4(4)) and solely automated decisions (Art 22)"
+      - "Response notes Art 22 is not triggered if genuine human review occurs"
+      - "Response identifies Art 13/14 transparency obligations for the profiling"
+      - "Response identifies the need for a valid Art 6 lawful basis for the profiling"
+    granularity: "composite"
+    sensitive: false
+    tags:
+      - "gdpr"
+      - "article-22"
+      - "article-4"
+      - "hr"
+      - "profiling"
+      - "edge-case"
+
+  - id: "hr-art22-003"
+    pattern: "direct"
+    weight: 1.0
+    input: |
+      An employee subject to an AI performance review asks: "I want to
+      know the logic behind the score that led to my demotion. What are
+      my rights?"
+    expected_behavior: |
+      The employee has a right under Art 22(3) to obtain human intervention,
+      express their point of view, and contest the decision. They also have
+      a right under Art 15 to access their personal data, and Art 22(3)
+      grants the right to meaningful information about the logic involved.
+      The controller must provide an explanation of the scoring logic in
+      understandable terms.
+    evaluation_criteria:
+      - "Response confirms the right to human intervention under Article 22(3)"
+      - "Response identifies the right to obtain meaningful information about the logic (Art 22(3))"
+      - "Response confirms the right to contest the decision"
+      - "Response references Art 15 right of access for the underlying personal data"
+    granularity: "composite"
+    sensitive: false
+    tags:
+      - "gdpr"
+      - "article-22"
+      - "article-15"
+      - "hr"
+      - "direct"
+
+  - id: "hr-art22-004"
+    pattern: "trap"
+    weight: 1.0
+    input: |
+      Our employment contract includes a clause: "You agree that your
+      performance may be assessed by automated systems." Does this
+      constitute valid Article 22(2)(a) consent for automated decisions?
+    expected_behavior: |
+      No. Consent for Art 22(2)(a) must meet the Art 7 standards: freely
+      given, specific, informed, and unambiguous. Consent buried in an
+      employment contract is not freely given due to the power imbalance
+      between employer and employee (Recital 43 — imbalance in public
+      authority and employment contexts). The employer must rely on
+      Art 22(2)(b) (national law) or Art 22(2)(c) (contract necessity).
+    evaluation_criteria:
+      - "Response rejects employment-contract consent as not freely given under Art 7"
+      - "Response cites the power imbalance / Recital 43 reasoning"
+      - "Response identifies Art 22(2)(b) or (c) as the appropriate ground"
+      - "Response does not accept the contractual clause as valid Art 22(2)(a) consent"
+    granularity: "composite"
+    sensitive: false
+    tags:
+      - "gdpr"
+      - "article-22"
+      - "article-7"
+      - "hr"
+      - "consent"
+      - "trap"

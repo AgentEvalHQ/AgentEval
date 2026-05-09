@@ -21,8 +21,22 @@ public sealed class ArticleScenarioYamlLoader
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
         var text = await File.ReadAllTextAsync(path, ct);
-        var dto = _yaml.Deserialize<ArticleDto>(text)
-            ?? throw new InvalidOperationException($"YAML at {path} deserialised to null.");
+        return LoadFromYamlText(text, sourceName: path);
+    }
+
+    /// <summary>
+    /// Parses an <see cref="ArticleSpec"/> directly from a YAML string.
+    /// Useful when the YAML content is already in memory (e.g. from an embedded resource).
+    /// </summary>
+    /// <param name="yaml">The YAML text to parse.</param>
+    /// <param name="sourceName">Optional label used in error messages (e.g. a resource name).</param>
+    /// <returns>The parsed <see cref="ArticleSpec"/>.</returns>
+    public ArticleSpec LoadFromYamlText(string yaml, string? sourceName = null)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(yaml);
+        var dto = _yaml.Deserialize<ArticleDto>(yaml)
+            ?? throw new InvalidOperationException(
+                $"YAML{(sourceName is null ? "" : $" '{sourceName}'")} deserialised to null.");
         return dto.ToSpec();
     }
 
@@ -44,14 +58,16 @@ public sealed class ArticleScenarioYamlLoader
     /// <summary>
     /// Loads all article YAMLs embedded as resources in <paramref name="assembly"/>.
     /// Resource names are matched with <c>EndsWith(".yaml")</c>; resources whose name contains
-    /// <c>"test-fixture"</c> are excluded by default so the validator/registry only see real articles.
+    /// <c>"test-fixture"</c> or <c>".DomainPacks."</c> are excluded by default so the
+    /// validator/registry only see the 21 canonical article YAMLs.
     /// </summary>
     public async Task<IReadOnlyList<ArticleSpec>> LoadAllFromAssemblyAsync(System.Reflection.Assembly assembly, bool includeTestFixtures = false, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(assembly);
 
         var names = assembly.GetManifestResourceNames()
-            .Where(n => n.EndsWith(".yaml", StringComparison.OrdinalIgnoreCase));
+            .Where(n => n.EndsWith(".yaml", StringComparison.OrdinalIgnoreCase))
+            .Where(n => !n.Contains(".DomainPacks.", StringComparison.Ordinal));
         if (!includeTestFixtures)
             names = names.Where(n => !n.Contains("test-fixture", StringComparison.OrdinalIgnoreCase));
 

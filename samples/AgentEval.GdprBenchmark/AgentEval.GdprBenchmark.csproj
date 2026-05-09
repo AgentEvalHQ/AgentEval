@@ -24,5 +24,6 @@
     <EmbeddedResource Include="Resources\Prompts\*.md" />
     <EmbeddedResource Include="Reporting\Schema\*.json" />
     <EmbeddedResource Include="Articles/Yaml/*.yaml" />
+    <EmbeddedResource Include="DomainPacks\**\*.yaml" />
   </ItemGroup>
 </Project>

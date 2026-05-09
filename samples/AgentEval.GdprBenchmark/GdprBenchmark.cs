@@ -5,6 +5,11 @@
 using AgentEval.Core;
 using AgentEval.Evals;
 using AgentEval.GdprBenchmark.Articles;
+using AgentEval.GdprBenchmark.Articles.Building;
+using AgentEval.GdprBenchmark.Composition;
+using AgentEval.GdprBenchmark.DomainPacks.ChildrensService;
+using AgentEval.GdprBenchmark.DomainPacks.Healthcare;
+using AgentEval.GdprBenchmark.DomainPacks.HR;
 using AgentEval.GdprBenchmark.Pillars;
 
 namespace AgentEval.GdprBenchmark;
@@ -138,4 +143,55 @@ public static class GdprBenchmark
             ],
             aggregation: CapByWorstAggregation.Instance,
             threshold: 0.90);
+
+    /// <summary>
+    /// Builds the Standard preset augmented with healthcare-domain scenario extensions.
+    /// Scenarios for targeted articles (e.g. Art 9, Art 32) are appended and weights
+    /// are renormalised. All other articles are unchanged.
+    /// </summary>
+    /// <param name="articles">Registry containing all 21 GDPR article composites.</param>
+    /// <param name="scenarioBuilder">Builder used to construct eval components from scenario specs.</param>
+    /// <returns>A <see cref="CompositeEval"/> combining the Standard preset with healthcare additions.</returns>
+    public static CompositeEval Healthcare(ArticlesRegistry articles, ScenarioToAtomicEval scenarioBuilder)
+    {
+        ArgumentNullException.ThrowIfNull(articles);
+        ArgumentNullException.ThrowIfNull(scenarioBuilder);
+        var standard = Standard(articles);
+        var additions = HealthcareScenarios.Load(scenarioBuilder);
+        return standard.WithExtraScenarios(additions);
+    }
+
+    /// <summary>
+    /// Builds the Standard preset augmented with HR-domain scenario extensions.
+    /// Scenarios for targeted articles (e.g. Art 22, Art 6) are appended and weights
+    /// are renormalised. All other articles are unchanged.
+    /// </summary>
+    /// <param name="articles">Registry containing all 21 GDPR article composites.</param>
+    /// <param name="scenarioBuilder">Builder used to construct eval components from scenario specs.</param>
+    /// <returns>A <see cref="CompositeEval"/> combining the Standard preset with HR additions.</returns>
+    public static CompositeEval HR(ArticlesRegistry articles, ScenarioToAtomicEval scenarioBuilder)
+    {
+        ArgumentNullException.ThrowIfNull(articles);
+        ArgumentNullException.ThrowIfNull(scenarioBuilder);
+        var standard = Standard(articles);
+        var additions = HRScenarios.Load(scenarioBuilder);
+        return standard.WithExtraScenarios(additions);
+    }
+
+    /// <summary>
+    /// Builds the Standard preset augmented with children's-service-domain scenario extensions.
+    /// Scenarios for targeted articles (e.g. Art 8, Art 13) are appended and weights
+    /// are renormalised. All other articles are unchanged.
+    /// </summary>
+    /// <param name="articles">Registry containing all 21 GDPR article composites.</param>
+    /// <param name="scenarioBuilder">Builder used to construct eval components from scenario specs.</param>
+    /// <returns>A <see cref="CompositeEval"/> combining the Standard preset with children's-service additions.</returns>
+    public static CompositeEval ChildrensService(ArticlesRegistry articles, ScenarioToAtomicEval scenarioBuilder)
+    {
+        ArgumentNullException.ThrowIfNull(articles);
+        ArgumentNullException.ThrowIfNull(scenarioBuilder);
+        var standard = Standard(articles);
+        var additions = ChildrensServiceScenarios.Load(scenarioBuilder);
+        return standard.WithExtraScenarios(additions);
+    }
 }
