@@ -176,6 +176,104 @@ public class GraphQLReadResolversTests : IClassFixture<SeededMissionControlFacto
         var run = doc.RootElement.GetProperty("data").GetProperty("run");
         Assert.Equal(JsonValueKind.Null, run.ValueKind);
     }
+
+    [Fact]
+    public async Task RunSummary_ReturnsVerdictAndStats()
+    {
+        using var client = _factory.CreateClient();
+        // Locate the seeded run id first.
+        var listResp = await client.PostAsJsonAsync("/graphql",
+            new { query = "{ recentRuns(count: 1) { runId } }" });
+        listResp.EnsureSuccessStatusCode();
+        using var listDoc = JsonDocument.Parse(await listResp.Content.ReadAsStringAsync());
+        var runId = listDoc.RootElement.GetProperty("data")
+            .GetProperty("recentRuns")[0].GetProperty("runId").GetString();
+        Assert.False(string.IsNullOrEmpty(runId));
+
+        var summaryResp = await client.PostAsJsonAsync("/graphql",
+            new { query = $"{{ runSummary(runId: \"{runId}\") {{ verdict stats {{ total passed failed warnings }} }} }}" });
+        summaryResp.EnsureSuccessStatusCode();
+
+        var body = await summaryResp.Content.ReadAsStringAsync();
+        using var doc = JsonDocument.Parse(body);
+        var summary = doc.RootElement.GetProperty("data").GetProperty("runSummary");
+
+        Assert.Equal("PASS", summary.GetProperty("verdict").GetString());
+        var stats = summary.GetProperty("stats");
+        Assert.Equal(2, stats.GetProperty("total").GetInt32());
+        Assert.Equal(2, stats.GetProperty("passed").GetInt32());
+        Assert.Equal(0, stats.GetProperty("failed").GetInt32());
+    }
+
+    [Fact]
+    public async Task Scenarios_ReturnsSeededScenarioRecords()
+    {
+        using var client = _factory.CreateClient();
+        var listResp = await client.PostAsJsonAsync("/graphql",
+            new { query = "{ recentRuns(count: 1) { runId } }" });
+        listResp.EnsureSuccessStatusCode();
+        using var listDoc = JsonDocument.Parse(await listResp.Content.ReadAsStringAsync());
+        var runId = listDoc.RootElement.GetProperty("data")
+            .GetProperty("recentRuns")[0].GetProperty("runId").GetString();
+
+        var resp = await client.PostAsJsonAsync("/graphql",
+            new { query = $"{{ scenarios(runId: \"{runId}\") {{ id name passed score }} }}" });
+        resp.EnsureSuccessStatusCode();
+
+        var body = await resp.Content.ReadAsStringAsync();
+        using var doc = JsonDocument.Parse(body);
+        var scenarios = doc.RootElement.GetProperty("data").GetProperty("scenarios");
+
+        Assert.Equal(2, scenarios.GetArrayLength());
+        var ids = scenarios.EnumerateArray().Select(s => s.GetProperty("id").GetString()).ToList();
+        Assert.Contains("scenario-1", ids);
+        Assert.Contains("scenario-2", ids);
+    }
+
+    [Fact]
+    public async Task Scenario_ByRunIdAndScenarioId_ReturnsMatchingRecord()
+    {
+        using var client = _factory.CreateClient();
+        var listResp = await client.PostAsJsonAsync("/graphql",
+            new { query = "{ recentRuns(count: 1) { runId } }" });
+        listResp.EnsureSuccessStatusCode();
+        using var listDoc = JsonDocument.Parse(await listResp.Content.ReadAsStringAsync());
+        var runId = listDoc.RootElement.GetProperty("data")
+            .GetProperty("recentRuns")[0].GetProperty("runId").GetString();
+
+        var resp = await client.PostAsJsonAsync("/graphql",
+            new { query = $"{{ scenario(runId: \"{runId}\", scenarioId: \"scenario-1\") {{ id name passed }} }}" });
+        resp.EnsureSuccessStatusCode();
+
+        var body = await resp.Content.ReadAsStringAsync();
+        using var doc = JsonDocument.Parse(body);
+        var scenario = doc.RootElement.GetProperty("data").GetProperty("scenario");
+
+        Assert.Equal(JsonValueKind.Object, scenario.ValueKind);
+        Assert.Equal("scenario-1", scenario.GetProperty("id").GetString());
+        Assert.True(scenario.GetProperty("passed").GetBoolean());
+    }
+
+    [Fact]
+    public async Task Scenario_UnknownScenarioId_ReturnsNull()
+    {
+        using var client = _factory.CreateClient();
+        var listResp = await client.PostAsJsonAsync("/graphql",
+            new { query = "{ recentRuns(count: 1) { runId } }" });
+        listResp.EnsureSuccessStatusCode();
+        using var listDoc = JsonDocument.Parse(await listResp.Content.ReadAsStringAsync());
+        var runId = listDoc.RootElement.GetProperty("data")
+            .GetProperty("recentRuns")[0].GetProperty("runId").GetString();
+
+        var resp = await client.PostAsJsonAsync("/graphql",
+            new { query = $"{{ scenario(runId: \"{runId}\", scenarioId: \"nope\") {{ id }} }}" });
+        resp.EnsureSuccessStatusCode();
+
+        var body = await resp.Content.ReadAsStringAsync();
+        using var doc = JsonDocument.Parse(body);
+        var scenario = doc.RootElement.GetProperty("data").GetProperty("scenario");
+        Assert.Equal(JsonValueKind.Null, scenario.ValueKind);
+    }
 }
 
 /// <summary>
@@ -218,11 +316,25 @@ public sealed class SeededMissionControlFactory : WebApplicationFactory<Query>
             ParentInvocationId: null,
             Kind: "eval"));
 
+        // Seed two scenarios so the scenarios / scenario resolvers have data.
+        var emptyMetrics = new Dictionary<string, double>();
+        var emptyAssertions = new List<AssertionResult>();
+        await store.WriteScenarioResultAsync(manifest.Run.RunId, new ScenarioResult(
+            Id: "scenario-1", Name: "Book a flight", Input: "Book ATL→LAX",
+            Output: "OK", Passed: true, Score: 0.95,
+            Metrics: emptyMetrics, Assertions: emptyAssertions,
+            Duration: TimeSpan.FromMilliseconds(1200), EstimatedCost: 0.004));
+        await store.WriteScenarioResultAsync(manifest.Run.RunId, new ScenarioResult(
+            Id: "scenario-2", Name: "Recommend a hotel", Input: "Hotel near LAX",
+            Output: "Hotel X", Passed: true, Score: 0.88,
+            Metrics: emptyMetrics, Assertions: emptyAssertions,
+            Duration: TimeSpan.FromMilliseconds(900), EstimatedCost: 0.003));
+
         var summary = new RunSummary(
             SchemaVersion: "1.0",
             RunId: manifest.Run.RunId,
             Verdict: "PASS",
-            Stats: new RunStats(Total: 5, Passed: 5, Failed: 0, Warnings: 0),
+            Stats: new RunStats(Total: 2, Passed: 2, Failed: 0, Warnings: 0),
             Metrics: new Dictionary<string, double> { ["score"] = 0.92 });
 
         await store.CompleteRunAsync(manifest, summary);

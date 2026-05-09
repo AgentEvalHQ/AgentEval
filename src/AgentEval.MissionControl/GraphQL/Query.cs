@@ -153,4 +153,53 @@ public sealed class Query
         if (!store.IsAvailable) return Task.FromResult<RunManifest?>(null);
         return store.GetRunManifestAsync(runId, ct);
     }
+
+    /// <summary>
+    /// Returns the summary (verdict, stats, metrics, cost) for a specific run, or
+    /// <c>null</c> if the run ID is unknown or the run is still in progress.
+    /// </summary>
+    public Task<RunSummary?> RunSummary(
+        [Service] IOutputStoreReader store,
+        string runId,
+        CancellationToken ct = default)
+    {
+        if (!store.IsAvailable) return Task.FromResult<RunSummary?>(null);
+        return store.GetRunSummaryAsync(runId, ct);
+    }
+
+    /// <summary>
+    /// Streams all scenario results for a given run. Returns empty when the run is
+    /// unknown or has no scenarios. The recursive <c>EvalResult</c> tree per scenario
+    /// is reconstituted from <see cref="ScenarioResult.Output"/> JSON in MC1.4.6 —
+    /// this resolver returns the flat scenario shape only.
+    /// </summary>
+    public async IAsyncEnumerable<ScenarioResult> Scenarios(
+        [Service] IOutputStoreReader store,
+        string runId,
+        [EnumeratorCancellation] CancellationToken ct = default)
+    {
+        if (!store.IsAvailable) yield break;
+        await foreach (var s in store.GetScenarioResultsAsync(runId, ct))
+        {
+            yield return s;
+        }
+    }
+
+    /// <summary>
+    /// Returns a single scenario result by run + scenario id, or <c>null</c> if absent.
+    /// </summary>
+    public async Task<ScenarioResult?> Scenario(
+        [Service] IOutputStoreReader store,
+        string runId,
+        string scenarioId,
+        CancellationToken ct = default)
+    {
+        if (!store.IsAvailable) return null;
+        await foreach (var s in store.GetScenarioResultsAsync(runId, ct))
+        {
+            if (string.Equals(s.Id, scenarioId, StringComparison.Ordinal))
+                return s;
+        }
+        return null;
+    }
 }
