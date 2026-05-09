@@ -55,6 +55,7 @@ public sealed class ScenarioToAtomicEval
             criteria: scenario.EvaluationCriteria,
             passThreshold: article.PassThreshold,
             judgeModel: _judgeModel,
-            promptId: _promptId);
+            promptId: _promptId,
+            failureSeverity: article.Severity);
     }
 }

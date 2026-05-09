@@ -340,6 +340,35 @@ public class ReportingUnitTests
         Assert.Equal(1.0, weightSum, precision: 10);
     }
 
+    // ── GdprBenchmark.AuditGrade ─────────────────────────────────────────────
+
+    [Fact]
+    public void GdprBenchmark_AuditGrade_NullRegistry_Throws()
+    {
+        Assert.Throws<ArgumentNullException>(() =>
+            AgentEval.GdprBenchmark.GdprBenchmark.AuditGrade(null!));
+    }
+
+    [Fact]
+    public void GdprBenchmark_AuditGrade_Key_IsCorrect()
+    {
+        var registry = BuildRegistry();
+        var auditGrade = AgentEval.GdprBenchmark.GdprBenchmark.AuditGrade(registry);
+        Assert.Equal("gdpr.compliance.auditgrade", auditGrade.Key);
+        Assert.Equal(5, auditGrade.Components.Count);
+        Assert.Equal(0.90, auditGrade.Threshold);
+        Assert.Equal("CapByWorst", auditGrade.Aggregation.Name);
+    }
+
+    [Fact]
+    public void GdprBenchmark_AuditGrade_WeightsSumToOne()
+    {
+        var registry = BuildRegistry();
+        var auditGrade = AgentEval.GdprBenchmark.GdprBenchmark.AuditGrade(registry);
+        var weightSum = auditGrade.Components.Sum(c => c.Weight);
+        Assert.Equal(1.0, weightSum, precision: 10);
+    }
+
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     private static GdprComplianceEvidence MakeSampleEvidence(

@@ -14,6 +14,7 @@ public sealed class AtomicLlmEval : AtomicEval
     private readonly string? _judgeModel;
     private readonly string? _promptId;
     private readonly double _passThreshold;
+    private readonly string? _failureSeverity;
 
     /// <summary>
     /// Initialises a new <see cref="AtomicLlmEval"/>.
@@ -27,6 +28,13 @@ public sealed class AtomicLlmEval : AtomicEval
     /// <param name="passThreshold">Score fraction (0..1) at or above which the eval passes. Defaults to 0.70.</param>
     /// <param name="judgeModel">Optional judge model identifier recorded in provenance.</param>
     /// <param name="promptId">Optional prompt identifier recorded in provenance.</param>
+    /// <param name="failureSeverity">
+    /// When set, overrides the severity used in the result when the eval fails.
+    /// This propagates the article-level severity (e.g. "critical") from YAML metadata
+    /// into the eval result, enabling severity-aware aggregation strategies such as
+    /// <see cref="CapByWorstAggregation"/> to identify critical-article failures.
+    /// When <c>null</c> (default), severity is computed from score: &lt;0.40 → "high", else "medium".
+    /// </param>
     public AtomicLlmEval(
         AgentEval.Core.IEvaluator evaluator,
         string key,
@@ -36,7 +44,8 @@ public sealed class AtomicLlmEval : AtomicEval
         IReadOnlyList<string> criteria,
         double passThreshold = 0.70,
         string? judgeModel = null,
-        string? promptId = null)
+        string? promptId = null,
+        string? failureSeverity = null)
         : base(key, name, category, version)
     {
         _evaluator = evaluator ?? throw new ArgumentNullException(nameof(evaluator));
@@ -44,6 +53,7 @@ public sealed class AtomicLlmEval : AtomicEval
         _passThreshold = passThreshold;
         _judgeModel = judgeModel;
         _promptId = promptId;
+        _failureSeverity = failureSeverity;
     }
 
     /// <inheritdoc/>
@@ -57,7 +67,15 @@ public sealed class AtomicLlmEval : AtomicEval
 
         var value = Math.Clamp(er.OverallScore / 100.0, 0.0, 1.0);
         var passed = value >= _passThreshold;
-        var severity = passed ? "none" : (value < 0.40 ? "high" : "medium");
+        // Compute severity from score; then take the maximum with failureSeverity (if set)
+        // so that critical/high article metadata severity is surfaced without downgrading
+        // score-derived severity for lower-severity articles.
+        var scoreSeverity = value < 0.40 ? "high" : "medium";
+        var severity = passed
+            ? "none"
+            : (_failureSeverity is null
+                ? scoreSeverity
+                : SeverityRollup.Max([scoreSeverity, _failureSeverity]));
         var label = passed ? "pass" : "fail";
 
         var dimensions = er.CriteriaResults?

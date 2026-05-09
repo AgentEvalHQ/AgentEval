@@ -89,4 +89,52 @@ public class ArticleCompositeBuilderTests
         Assert.Equal(art17.Metadata.ControlId, composite.Key);
         Assert.Equal(art17.Metadata.Title, composite.Name);
     }
+
+    [Fact]
+    public async Task Build_Art9SpecAggregationMin_UsesMinAggregation()
+    {
+        // Arrange — Art 9 YAML specifies aggregation: "min"
+        var loader = new ArticleScenarioYamlLoader();
+        var assembly = typeof(AgentEval.GdprBenchmark.Articles.ArticlesRegistry).Assembly;
+        var all = await loader.LoadAllFromAssemblyAsync(assembly, includeTestFixtures: false);
+        var art9 = all.Single(a => a.Metadata.ControlId == "gdpr.art9.special_categories");
+        var sut = MakeSut();
+
+        // Act
+        var composite = sut.Build(art9);
+
+        // Assert
+        Assert.Equal("Min", composite.Aggregation.Name);
+    }
+
+    [Fact]
+    public void Build_UnknownAggregation_Throws()
+    {
+        // Arrange — synthetic spec with an unsupported aggregation value
+        var sut = MakeSut();
+        var metadata = new AgentEval.GdprBenchmark.Articles.Models.ArticleMetadata(
+            Article: "Article-99",
+            Pillar: "Pillar1-Foundations",
+            ControlId: "gdpr.test.unknown",
+            Title: "Unknown aggregation test",
+            Severity: "low",
+            PassThreshold: 0.70,
+            WarnThreshold: 0.50,
+            PillarWeight: 0.10,
+            Aggregation: "exotic");
+        var scenario = new AgentEval.GdprBenchmark.Articles.Models.ScenarioSpec(
+            Id: "test-unknown-001",
+            Pattern: "direct",
+            Weight: 1.0,
+            Input: "test input",
+            EvaluationCriteria: ["some criterion"],
+            Granularity: "atomic",
+            Sensitive: false,
+            ExpectedBehavior: null,
+            Tags: []);
+        var spec = new AgentEval.GdprBenchmark.Articles.Models.ArticleSpec(metadata, [scenario]);
+
+        // Act & Assert
+        Assert.Throws<InvalidOperationException>(() => sut.Build(spec));
+    }
 }

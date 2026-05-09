@@ -10,8 +10,8 @@ namespace AgentEval.GdprBenchmark.Articles.Building;
 /// <summary>
 /// Turns an <see cref="ArticleSpec"/> into a <see cref="CompositeEval"/>.
 /// Aggregation strategy is selected from <see cref="ArticleMetadata.Aggregation"/>.
-/// Phase 2 supports <c>weighted_sum</c>; unknown values fall back to
-/// <see cref="WeightedSumAggregation"/> — Phase 5 (G5.*) wires additional strategies.
+/// Supported values: <c>weighted_sum</c>, <c>min</c>, <c>cap_by_worst</c>.
+/// An unknown value is a misconfiguration and throws <see cref="InvalidOperationException"/>.
 /// </summary>
 public sealed class ArticleCompositeBuilder
 {
@@ -40,14 +40,13 @@ public sealed class ArticleCompositeBuilder
                 Required: true))
             .ToList();
 
-        // Phase 2 knows weighted_sum. "min" and "cap_by_worst" are wired in Phase 5.
-        // For now, unknown aggregation values fall back to weighted_sum so all 21
-        // articles build without errors. Art9 uses "min" which becomes a real strategy
-        // in Phase 5.
         var aggregation = article.Metadata.Aggregation switch
         {
-            "weighted_sum" => WeightedSumAggregation.Instance,
-            _ => WeightedSumAggregation.Instance
+            "weighted_sum"  => WeightedSumAggregation.Instance,
+            "min"           => MinAggregation.Instance,
+            "cap_by_worst"  => CapByWorstAggregation.Instance,
+            _ => throw new InvalidOperationException(
+                $"Unknown aggregation '{article.Metadata.Aggregation}' for {article.Metadata.ControlId}.")
         };
 
         return new CompositeEval(
