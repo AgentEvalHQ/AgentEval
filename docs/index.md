@@ -319,6 +319,7 @@ dotnet run --project samples/AgentEval.Samples
 |  | [Metrics Reference](metrics-reference.md) | [Upgrading MAF](maf-1.3.0-migration-guide.md) |
 |  | [Benchmarks](benchmarks.md) |  |
 |  | [Workflows](workflows.md) |  |
+|  | [GDPR Benchmark](gdpr-benchmark/getting-started.md) |  |
 
 ---
 

@@ -43,6 +43,36 @@ Tests added on this branch — Article 17 golden tree (executable spec), 24+ uni
 
 ---
 
+### GDPR Benchmark (Plan 03)
+
+#### Added
+
+- **`samples/AgentEval.GdprBenchmark/`** — sample project with 21 article scenario YAMLs covering 5 GDPR pillars (Art 5, 6, 7, 8, 9, 13, 14, 15, 16, 17, 18, 20, 21, 22, 25, 32). Scenario YAMLs live under `Articles/Yaml/`; domain packs live under `DomainPacks/`.
+- **Three benchmark presets** — `Smoke` (5 articles, ~$0.05/run), `Standard` (16 articles, ~$0.50/run), and `AuditGrade` (Standard + `CapByWorstAggregation` severity-aware cap, optional multi-judge consensus, Mode-B per-criterion evaluation for Critical articles Art 9 and Art 22).
+- **Three domain packs** — `Healthcare` (8 scenarios targeting Art 9(2)(h) and special-category data), `HR` (7 scenarios targeting Art 6(1)(b)/(c), Art 15, and Art 17 in employment context), and `ChildrensService` (8 scenarios targeting Art 8 age-of-consent and parental consent). Composable via `--preset standard+healthcare` etc.; weights are renormalized automatically.
+- **`GDPRComplianceReporter`** integrated with `IOutputStore`: writes `evidence.json` (audit-chain-validated) plus a sibling `gdpr-evidence.json` containing the recursive composite tree, per-pillar and per-article rollups, critical findings, recommendations, the verbatim disclaimer, and a GDPR attestation block. Validated against `gdpr-evidence.schema.json` before writing.
+- **Markdown and PDF reporters** with PII redaction for scenarios marked `sensitive: true`. PDF reporter uses QuestPDF and includes a cover page, executive summary, per-pillar section, per-article section, audit-chain appendix, methodology note, and disclaimer.
+- **Calibration suite** — 120 hand-labeled golden entries distributed across 5 GDPR pillars (30/20/40/15/15). `agenteval bench gdpr calibrate` runs the golden dataset against the configured judge and computes per-pillar accuracy and Cohen's kappa. GitHub Actions release gate requires accuracy >= 0.85 and Cohen's kappa >= 0.70 per pillar, with zero evaluation failures.
+- **Five new aggregation strategies** in `AgentEval.Core/Evals/Aggregations/`: `MinAggregation`, `CapByWorstAggregation`, `MajorityVoteAggregation`, `WeightedMedianAggregation` (reusable by Foundry plan 04 and any other consumer).
+- **`MultiJudgeWrapper`** primitive in `AgentEval.Core/Evals/` for N-judge parallel evaluation with majority-vote aggregation.
+- **`WithExtraScenarios` extension method** on `CompositeEval` for layered domain packs. Returns a new composite with the additional `EvalComponent` entries appended; weights are renormalized across all components.
+- **New CLI subcommands**: `agenteval bench gdpr [--preset] [--subject] [--root] [--runs]`, `agenteval bench gdpr calibrate`, and `agenteval compliance render --regulation gdpr [--subject] [--ts]`.
+
+#### Changed
+
+- **`AtomicLlmEval`** gained an optional `failureSeverity` parameter so atomic results can inherit metadata-driven severity (escalated only, via `SeverityRollup.Max`). Backward-compatible; existing callers see no behavior change.
+- **`ScenarioToAtomicEval`** gained an optional `useModeB` flag and an optional list of judges; when both Critical-article flag and judge count > 1 are set, scenarios become per-criterion composites wrapped in `MultiJudgeWrapper`.
+
+#### Fixed
+
+- An earlier draft of `gdpr-evidence.json` could be persisted without schema validation; the reporter now validates against `gdpr-evidence.schema.json` before writing and refuses to proceed if validation fails.
+- `CalibrationRunner` previously used the parent article's first-scenario criteria for every golden entry, making calibration meaningless for entries targeting other scenarios; it now looks up the matching scenario by id.
+- `CalibrationRunner` previously swallowed all evaluation exceptions silently; failures are now logged to stderr and counted in the `Eval failures` column of the calibration report.
+
+Total LoC delta: approximately +4200 production / +1124 test. Test count delta: +124 tests; suite is ~3462 passing on net10.0 across both test projects (was ~3338 before plan 03).
+
+---
+
 ## [0.8.0-beta] - 2026-04-28
 
 **MAF 1.3.0 + MEAI 10.5.0 Compatibility** ✅
