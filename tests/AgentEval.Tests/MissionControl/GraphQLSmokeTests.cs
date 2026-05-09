@@ -84,6 +84,88 @@ public class GraphQLSmokeTests : IClassFixture<WebApplicationFactory<Query>>
     // The proper depth-limit test (depth=100 → rejected) lands with MC1.4.6.
 
     [Fact]
+    public async Task GraphQL_Evaluators_ReturnsRegisteredCards()
+    {
+        // MC1.5.3 contract: Query.evaluators returns the cards that ship as embedded
+        // resources in AgentEval.Evals.Agentic/EvaluatorCards/*.json. Phase 1 baseline
+        // ships 5 representative cards; full 46 follow in a later session.
+        using var client = _factory.CreateClient();
+        var request = new { query = "{ evaluators { key name category costTier higherIsBetter } }" };
+
+        var response = await client.PostAsJsonAsync("/graphql", request);
+        response.EnsureSuccessStatusCode();
+
+        var body = await response.Content.ReadAsStringAsync();
+        using var doc = JsonDocument.Parse(body);
+        var evaluators = doc.RootElement.GetProperty("data").GetProperty("evaluators");
+
+        Assert.True(evaluators.GetArrayLength() >= 5,
+            $"Expected at least 5 EvaluatorCards from sample set; full response was: {body}");
+
+        // task_completion is one of the sample cards; verify it's queryable.
+        var hasTaskCompletion = evaluators.EnumerateArray()
+            .Any(e => e.GetProperty("key").GetString() == "task_completion");
+        Assert.True(hasTaskCompletion, "Expected task_completion in the registry response.");
+    }
+
+    [Fact]
+    public async Task GraphQL_EvaluatorByKey_ReturnsSpecificCard()
+    {
+        using var client = _factory.CreateClient();
+        var request = new { query = "{ evaluator(key: \"task_completion\") { key name category costTier description } }" };
+
+        var response = await client.PostAsJsonAsync("/graphql", request);
+        response.EnsureSuccessStatusCode();
+
+        var body = await response.Content.ReadAsStringAsync();
+        using var doc = JsonDocument.Parse(body);
+        var card = doc.RootElement.GetProperty("data").GetProperty("evaluator");
+
+        Assert.Equal("task_completion", card.GetProperty("key").GetString());
+        Assert.Equal("Task Completion", card.GetProperty("name").GetString());
+        Assert.Equal("system", card.GetProperty("category").GetString());
+    }
+
+    [Fact]
+    public async Task GraphQL_EvaluatorByKey_UnknownKey_ReturnsNull()
+    {
+        using var client = _factory.CreateClient();
+        var request = new { query = "{ evaluator(key: \"definitely_not_a_real_key\") { key } }" };
+
+        var response = await client.PostAsJsonAsync("/graphql", request);
+        response.EnsureSuccessStatusCode();
+
+        var body = await response.Content.ReadAsStringAsync();
+        using var doc = JsonDocument.Parse(body);
+        var evaluator = doc.RootElement.GetProperty("data").GetProperty("evaluator");
+        Assert.Equal(JsonValueKind.Null, evaluator.ValueKind);
+    }
+
+    [Fact]
+    public async Task GraphQL_EvaluatorsByCostTier_FiltersResults()
+    {
+        // Filter to TRIVIAL: only cost_quality_efficiency from the sample set.
+        using var client = _factory.CreateClient();
+        var request = new { query = "{ evaluators(costTier: TRIVIAL) { key costTier } }" };
+
+        var response = await client.PostAsJsonAsync("/graphql", request);
+        response.EnsureSuccessStatusCode();
+
+        var body = await response.Content.ReadAsStringAsync();
+        using var doc = JsonDocument.Parse(body);
+        var evaluators = doc.RootElement.GetProperty("data").GetProperty("evaluators");
+
+        // Every returned card must have costTier == TRIVIAL.
+        foreach (var e in evaluators.EnumerateArray())
+        {
+            Assert.Equal("TRIVIAL", e.GetProperty("costTier").GetString());
+        }
+        // At least cost_quality_efficiency should match.
+        var keys = evaluators.EnumerateArray().Select(e => e.GetProperty("key").GetString()).ToList();
+        Assert.Contains("cost_quality_efficiency", keys);
+    }
+
+    [Fact]
     public async Task RestVersion_ReturnsExpectedShape()
     {
         using var client = _factory.CreateClient();

@@ -2,6 +2,9 @@
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 
+using AgentEval.Evals;
+using AgentEval.MissionControl.Services;
+
 namespace AgentEval.MissionControl.GraphQL;
 
 /// <summary>
@@ -40,4 +43,26 @@ public sealed class Query
     /// and returns well-formed responses.
     /// </summary>
     public string Ping() => "pong";
+
+    // ─── Evaluator registry (MC1.5.3) ────────────────────────────────────────
+
+    /// <summary>
+    /// Returns all registered evaluator cards, optionally filtered by category
+    /// (e.g. <c>"system"</c>, <c>"adversarial"</c>) and / or cost tier.
+    /// Drives Mission Control's <c>&lt;EvaluatorRegistry/&gt;</c> page.
+    /// </summary>
+    public IEnumerable<EvaluatorCard> Evaluators(
+        [Service] EvaluatorCardRegistry registry,
+        string? category = null,
+        EvaluatorCostTier? costTier = null) =>
+        registry.List(category, costTier);
+
+    /// <summary>
+    /// Returns a single evaluator card by its key (e.g. <c>"task_completion"</c>),
+    /// or <c>null</c> if no card is registered for that key.
+    /// </summary>
+    public EvaluatorCard? Evaluator(
+        [Service] EvaluatorCardRegistry registry,
+        string key) =>
+        registry.Get(key);
 }

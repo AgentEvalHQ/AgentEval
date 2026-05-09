@@ -3,21 +3,29 @@
 // Licensed under the MIT License.
 
 using AgentEval.MissionControl.GraphQL;
+using AgentEval.MissionControl.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// ─── GraphQL (Hot Chocolate 14, ChilliCream — primary read surface) ─────────
+// ─── In-memory services ─────────────────────────────────────────────────────
+
+// Evaluator-card registry: loads all EvaluatorCard JSON files at startup from
+// AgentEval.Evals.Agentic's embedded resources. Drives Query.evaluators(...).
+// Plan-08 MC1.5.3.
+builder.Services.AddSingleton<EvaluatorCardRegistry>();
+
+// ─── GraphQL (Hot Chocolate 16, ChilliCream — primary read surface) ─────────
 //
 // Plan-07 §3 Challenge 1: hybrid REST + GraphQL split.
 //   Reads (dashboard, compliance matrix, recursive EvalResult tree, evaluator
 //   registry) → GraphQL. Writes / binary streams / version → REST below.
-// Plan-08 MC1.4.0: this is the baseline scaffolding. Resolvers (MC1.4.1-7)
-// land in subsequent commits.
+// Plan-08 MC1.4.0: this is the baseline scaffolding. MC1.5.3 adds the first
+// real resolvers (Query.evaluators / Query.evaluator). MC1.4.2-7 follow.
 builder.Services
     .AddGraphQLServer()
     .AddQueryType<Query>()
-    // Hot Chocolate's default execution-depth limit is 8 in our config — guards
-    // against unbounded recursion attacks on the EvalResult tree. Plan-07 §8.1.
+    // Hot Chocolate's default execution-depth limit guards against unbounded
+    // recursion attacks on the EvalResult tree. Plan-07 §8.1.
     .ModifyRequestOptions(opts => opts.ExecutionTimeout = TimeSpan.FromSeconds(30));
 
 var app = builder.Build();
