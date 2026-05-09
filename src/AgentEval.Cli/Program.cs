@@ -41,18 +41,21 @@ var benchPresetOpt = new Option<string?>("--preset") { Description = "Benchmark 
 var benchSubjectOpt = new Option<string?>("--subject") { Description = "Subject name (agent or workflow under evaluation, default: default-agent)" };
 var benchRootOpt = new Option<string?>("--root") { Description = "Workspace root path (default: auto-detected)" };
 var benchInputOpt = new Option<string?>("--input") { Description = "Agent input text for the evaluation (default: built-in fixture)" };
+var benchRunsOpt = new Option<int?>("--runs") { Description = "Number of stochastic runs (default: 1). When > 1, runs the benchmark N times and aggregates via MajorityVote." };
 var benchGdprCmd = new Command("gdpr", "Run the GDPR compliance benchmark");
 benchGdprCmd.Add(benchPresetOpt);
 benchGdprCmd.Add(benchSubjectOpt);
 benchGdprCmd.Add(benchRootOpt);
 benchGdprCmd.Add(benchInputOpt);
+benchGdprCmd.Add(benchRunsOpt);
 benchGdprCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =>
 {
     var preset = parseResult.GetValue(benchPresetOpt) ?? "standard";
     var subject = parseResult.GetValue(benchSubjectOpt) ?? "default-agent";
     var root = parseResult.GetValue(benchRootOpt);
     var input = parseResult.GetValue(benchInputOpt);
-    return await BenchCommand.RunGdprAsync(preset, subject, root, input);
+    var runs = parseResult.GetValue(benchRunsOpt) ?? 1;
+    return await BenchCommand.RunGdprAsync(preset, subject, root, input, runs: runs);
 });
 benchCmd.Add(benchGdprCmd);
 

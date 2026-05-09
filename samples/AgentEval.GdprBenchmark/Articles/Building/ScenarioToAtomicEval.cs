@@ -9,34 +9,64 @@ namespace AgentEval.GdprBenchmark.Articles.Building;
 
 /// <summary>
 /// Converts a <see cref="ScenarioSpec"/> (with its parent <see cref="ArticleMetadata"/>)
-/// into an <see cref="AtomicLlmEval"/>. Phase 1 / Mode A only — one eval per scenario
-/// using the full criteria list. Mode B (per-criterion) is Phase 7 (G7.3).
+/// into an <see cref="IEval"/>.
+/// <para>
+/// Mode A (default): one <see cref="AtomicLlmEval"/> per scenario using the full criteria list.
+/// </para>
+/// <para>
+/// Mode B (<c>useModeB=true</c>): when <see cref="ScenarioSpec.Granularity"/> is
+/// <c>"composite"</c>, each criterion becomes its own <see cref="AtomicLlmEval"/>
+/// wrapped in a <see cref="CompositeEval"/>. Atomic-granularity scenarios still produce
+/// a single <see cref="AtomicLlmEval"/> even in Mode B.
+/// </para>
+/// <para>
+/// Multi-judge path: when the optional <c>judges</c> list has more than one entry AND the
+/// article severity is <c>"critical"</c>, each judge produces its own <see cref="AtomicLlmEval"/>
+/// and the scenario is wrapped with a <see cref="MultiJudgeWrapper"/> using
+/// <see cref="WeightedMedianAggregation"/>.
+/// </para>
 /// </summary>
 public sealed class ScenarioToAtomicEval
 {
     private readonly AgentEval.Core.IEvaluator _judge;
     private readonly string? _judgeModel;
-    private readonly string _promptId;
+    private readonly string _systemPromptId;
+    private readonly string _perCriterionPromptId;
+    private readonly bool _modeB;
+    private readonly IReadOnlyList<(AgentEval.Core.IEvaluator Judge, double Weight)>? _judges;
 
     /// <summary>
-    /// Initialises a new <see cref="ScenarioToAtomicEval"/>.
+    /// Initialises a new <see cref="ScenarioToAtomicEval"/> with a single judge (Mode A or B).
     /// </summary>
     /// <param name="judge">The LLM evaluator used to score each scenario.</param>
     /// <param name="judgeModel">Optional judge model identifier recorded in provenance.</param>
-    /// <param name="promptId">Prompt identifier recorded in provenance.</param>
+    /// <param name="promptId">Prompt identifier for single-eval (Mode A) scenarios.</param>
+    /// <param name="perCriterionPromptId">Prompt identifier for per-criterion (Mode B) sub-evals.</param>
+    /// <param name="useModeB">When <c>true</c>, composite-granularity scenarios are split into per-criterion sub-evals.</param>
+    /// <param name="judges">
+    /// Optional list of judges with weights. When provided and the article is critical-severity,
+    /// the scenario is wrapped with a <see cref="MultiJudgeWrapper"/> for multi-judge consensus.
+    /// When <c>null</c> or empty, the primary <paramref name="judge"/> is used.
+    /// </param>
     public ScenarioToAtomicEval(
         AgentEval.Core.IEvaluator judge,
         string? judgeModel = null,
-        string promptId = "gdpr-judge-system.v1")
+        string promptId = "gdpr-judge-system.v1",
+        string perCriterionPromptId = "per-criterion.v1",
+        bool useModeB = false,
+        IReadOnlyList<(AgentEval.Core.IEvaluator Judge, double Weight)>? judges = null)
     {
         _judge = judge ?? throw new ArgumentNullException(nameof(judge));
         _judgeModel = judgeModel;
-        _promptId = promptId;
+        _systemPromptId = promptId;
+        _perCriterionPromptId = perCriterionPromptId;
+        _modeB = useModeB;
+        _judges = judges;
     }
 
     /// <summary>
-    /// Builds an <see cref="AtomicLlmEval"/> for <paramref name="scenario"/> scoped to
-    /// <paramref name="article"/>'s pass threshold and pillar category.
+    /// Builds an <see cref="IEval"/> for <paramref name="scenario"/> scoped to
+    /// <paramref name="article"/>'s pass threshold, pillar category, and severity.
     /// </summary>
     /// <param name="article">The parent article metadata.</param>
     /// <param name="scenario">The scenario to convert.</param>
@@ -46,16 +76,91 @@ public sealed class ScenarioToAtomicEval
         ArgumentNullException.ThrowIfNull(article);
         ArgumentNullException.ThrowIfNull(scenario);
 
-        return new AtomicLlmEval(
-            evaluator: _judge,
+        // Multi-judge path: when multiple judges are supplied AND the article is critical-severity,
+        // build per-judge atomics and wrap with MultiJudgeWrapper(WeightedMedianAggregation).
+        if (_judges is { Count: > 1 } && article.Severity == "critical")
+        {
+            return BuildMultiJudge(article, scenario);
+        }
+
+        // Mode B: composite-granularity scenario → split into per-criterion CompositeEval.
+        if (_modeB && scenario.Granularity == "composite")
+        {
+            return BuildModeB(article, scenario);
+        }
+
+        // Mode A — single AtomicLlmEval using the full criteria list.
+        return BuildAtomic(article, scenario, _judge, _judgeModel, _systemPromptId, scenario.Id);
+    }
+
+    private IEval BuildMultiJudge(ArticleMetadata article, ScenarioSpec scenario)
+    {
+        var judgeComponents = _judges!.Select((entry, idx) =>
+            new EvalComponent(
+                Eval: BuildAtomic(
+                    article, scenario,
+                    entry.Judge,
+                    judgeModel: $"judge-{idx + 1}",
+                    promptId: _systemPromptId,
+                    key: $"{scenario.Id}-j{idx + 1}"),
+                Weight: entry.Weight,
+                Required: true))
+            .ToList();
+
+        return new MultiJudgeWrapper(
             key: scenario.Id,
-            name: $"{article.Article} — {scenario.Id}",
+            name: $"{article.Article} — {scenario.Id} (multi-judge)",
+            category: $"compliance.{article.Pillar}",
+            version: "1.0.0",
+            judges: judgeComponents,
+            aggregation: WeightedMedianAggregation.Instance);
+    }
+
+    private IEval BuildModeB(ArticleMetadata article, ScenarioSpec scenario)
+    {
+        var perCritComponents = scenario.EvaluationCriteria.Select((criterion, idx) =>
+            new EvalComponent(
+                Eval: new AtomicLlmEval(
+                    evaluator: _judge,
+                    key: $"{scenario.Id}-c{idx + 1}",
+                    name: $"{article.Article} — {scenario.Id} — criterion {idx + 1}",
+                    category: $"compliance.{article.Pillar}",
+                    version: "1.0.0",
+                    criteria: new[] { criterion },
+                    passThreshold: article.PassThreshold,
+                    judgeModel: _judgeModel,
+                    promptId: _perCriterionPromptId,
+                    failureSeverity: article.Severity),
+                Weight: 1.0 / scenario.EvaluationCriteria.Count,
+                Required: true))
+            .ToList();
+
+        return new CompositeEval(
+            key: scenario.Id,
+            name: $"{article.Article} — {scenario.Id} (Mode-B)",
+            category: $"compliance.{article.Pillar}",
+            version: "1.0.0",
+            components: perCritComponents,
+            aggregation: WeightedSumAggregation.Instance,
+            threshold: article.PassThreshold);
+    }
+
+    private static AtomicLlmEval BuildAtomic(
+        ArticleMetadata article,
+        ScenarioSpec scenario,
+        AgentEval.Core.IEvaluator evaluator,
+        string? judgeModel,
+        string promptId,
+        string key) =>
+        new AtomicLlmEval(
+            evaluator: evaluator,
+            key: key,
+            name: $"{article.Article} — {key}",
             category: $"compliance.{article.Pillar}",
             version: "1.0.0",
             criteria: scenario.EvaluationCriteria,
             passThreshold: article.PassThreshold,
-            judgeModel: _judgeModel,
-            promptId: _promptId,
+            judgeModel: judgeModel,
+            promptId: promptId,
             failureSeverity: article.Severity);
-    }
 }

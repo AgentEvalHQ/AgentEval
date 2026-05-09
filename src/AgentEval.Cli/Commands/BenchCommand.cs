@@ -26,8 +26,9 @@ public static class BenchCommand
         string preset,
         string subject,
         string? rootOverride,
-        string? inputText) =>
-        RunGdprAsync(preset, subject, rootOverride, inputText, evaluatorOverride: null);
+        string? inputText,
+        int runs = 1) =>
+        RunGdprAsync(preset, subject, rootOverride, inputText, evaluatorOverride: null, runs: runs);
 
     /// <summary>Runs the bench gdpr command with optional overrides (used in tests).</summary>
     internal static async Task<int> RunGdprAsync(
@@ -35,7 +36,8 @@ public static class BenchCommand
         string subject,
         string? rootOverride,
         string? inputText,
-        IEvaluator? evaluatorOverride)
+        IEvaluator? evaluatorOverride,
+        int runs = 1)
     {
         // ── Workspace setup ──────────────────────────────────────────────────
         var workspaceRoot = rootOverride ?? WorkspaceRootDiscovery.Find(Directory.GetCurrentDirectory());
@@ -115,15 +117,26 @@ public static class BenchCommand
         // ── Run benchmark ────────────────────────────────────────────────────
         var store = new FileSystemOutputStore(agentEvalDir);
         var subjectIdentity = new SubjectIdentity(SubjectKind.Agent, subject);
-        var runner = new GdprBenchmarkRunner();
 
-        Console.WriteLine($"Running GDPR benchmark ({preset}) for subject '{subject}'...");
+        Console.WriteLine($"Running GDPR benchmark ({preset}) for subject '{subject}'" +
+            (runs > 1 ? $" [{runs} stochastic runs]" : "") + "...");
 
         string runId;
         EvalResult compositeResult;
         try
         {
-            (runId, compositeResult) = await runner.RunAsync(store, subjectIdentity, benchmark, evalInput);
+            if (runs > 1)
+            {
+                // Stochastic mode: run N times, aggregate via MajorityVote.
+                compositeResult = await StochasticBenchRunner.RunNAsync(store, subjectIdentity, benchmark, evalInput, runs);
+                // Use the benchmark key as the run ID for reporting purposes.
+                runId = $"{benchmark.Key}.runs{runs}.{DateTimeOffset.UtcNow:yyyyMMddHHmmss}";
+            }
+            else
+            {
+                var runner = new GdprBenchmarkRunner();
+                (runId, compositeResult) = await runner.RunAsync(store, subjectIdentity, benchmark, evalInput);
+            }
         }
         catch (Exception ex)
         {
