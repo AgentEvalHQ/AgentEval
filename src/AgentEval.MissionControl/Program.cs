@@ -27,6 +27,10 @@ builder.Services.AddSingleton<IOutputStoreReader>(sp =>
     return new FileSystemOutputStore(System.IO.Path.Combine(root, ".agenteval"));
 });
 
+// ComplianceMatrixService: builds Query.complianceMatrix from evidence + subjects.
+// Scoped because it depends on IOutputStoreReader. Plan-08 MC1.4.4.
+builder.Services.AddScoped<ComplianceMatrixService>();
+
 // ─── GraphQL (Hot Chocolate 16, ChilliCream — primary read surface) ─────────
 //
 // Plan-07 §3 Challenge 1: hybrid REST + GraphQL split.

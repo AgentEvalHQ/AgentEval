@@ -4,6 +4,7 @@
 
 using System.Runtime.CompilerServices;
 using AgentEval.Evals;
+using AgentEval.MissionControl.GraphQL;
 using AgentEval.MissionControl.Services;
 using AgentEval.Output;
 
@@ -201,5 +202,46 @@ public sealed class Query
                 return s;
         }
         return null;
+    }
+
+    // ─── Compliance (MC1.4.4) ────────────────────────────────────────────────
+
+    /// <summary>
+    /// Lists all regulations that have at least one evidence record stored, with
+    /// per-regulation aggregate stats (subject count, total evidence count, latest
+    /// evidence timestamp + overall status).
+    /// </summary>
+    public Task<IReadOnlyList<ComplianceRegulationSummary>> Compliance(
+        [Service] ComplianceMatrixService service,
+        CancellationToken ct = default) =>
+        service.ListRegulationsAsync(ct);
+
+    /// <summary>
+    /// Returns the subjects × controls matrix for a regulation. The portal's
+    /// <c>&lt;ComplianceMatrix/&gt;</c> Visx heatmap (plan-07 §10) renders
+    /// directly from this shape.
+    /// </summary>
+    public Task<ComplianceMatrix> ComplianceMatrix(
+        [Service] ComplianceMatrixService service,
+        string regulation,
+        CancellationToken ct = default) =>
+        service.BuildMatrixAsync(regulation, ct);
+
+    /// <summary>
+    /// Returns a single compliance evidence document (base shape only — regulation-
+    /// specific wrappers like <c>GdprComplianceEvidence</c> arrive in a follow-up
+    /// once the GraphQL interface + inline-fragment support per plan-07 §8.3 lands).
+    /// </summary>
+    public async Task<ComplianceEvidence?> ComplianceEvidence(
+        [Service] IOutputStoreReader store,
+        string regulation,
+        SubjectKind subjectKind,
+        string subjectName,
+        string timestamp,
+        CancellationToken ct = default)
+    {
+        if (!store.IsAvailable) return null;
+        var identity = new SubjectIdentity(subjectKind, subjectName);
+        return await store.GetComplianceEvidenceAsync(regulation, identity, timestamp, ct);
     }
 }
