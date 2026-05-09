@@ -17,6 +17,7 @@
   <ItemGroup>
     <PackageReference Include="YamlDotNet" />
     <PackageReference Include="JsonSchema.Net" />
+    <PackageReference Include="QuestPDF" />
   </ItemGroup>
 
   <ItemGroup>

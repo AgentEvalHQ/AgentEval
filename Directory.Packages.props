@@ -34,8 +34,9 @@
     <PackageVersion Include="Microsoft.Extensions.DependencyInjection" Version="10.0.3" />
     <PackageVersion Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.3" />
     
-    <!-- PDF Generation (MIT License) -->
+    <!-- PDF Generation -->
     <PackageVersion Include="PdfSharp-MigraDoc" Version="6.2.4" />
+    <PackageVersion Include="QuestPDF" Version="2026.2.4" />
     
     <!-- JSON Schema -->
     <PackageVersion Include="JsonSchema.Net" Version="7.3.4" />
