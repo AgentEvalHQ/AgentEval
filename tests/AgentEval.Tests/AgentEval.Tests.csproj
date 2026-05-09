@@ -34,5 +34,8 @@
     <ProjectReference Include="..\..\samples\AgentEval.GdprBenchmark\AgentEval.GdprBenchmark.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <EmbeddedResource Include="GdprBenchmark/Calibration/Golden/*.jsonl" />
+  </ItemGroup>
 
 </Project>

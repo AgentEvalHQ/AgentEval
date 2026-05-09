@@ -57,6 +57,21 @@ benchGdprCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =>
     var runs = parseResult.GetValue(benchRunsOpt) ?? 1;
     return await BenchCommand.RunGdprAsync(preset, subject, root, input, runs: runs);
 });
+
+// bench gdpr calibrate
+var calibrateRootOpt = new Option<string?>("--root") { Description = "Workspace root path (default: current directory)" };
+var calibrateOutOpt = new Option<string?>("--out") { Description = "Output Markdown report path (default: docs/gdpr-benchmark/calibration-{date}.md)" };
+var calibrateCmd = new Command("calibrate", "Run GDPR judge calibration against hand-labeled golden datasets");
+calibrateCmd.Add(calibrateRootOpt);
+calibrateCmd.Add(calibrateOutOpt);
+calibrateCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =>
+{
+    var root = parseResult.GetValue(calibrateRootOpt);
+    var outPath = parseResult.GetValue(calibrateOutOpt);
+    return await BenchCalibrateCommand.RunAsync(root, outPath);
+});
+benchGdprCmd.Add(calibrateCmd);
+
 benchCmd.Add(benchGdprCmd);
 
 // ─── compliance ───────────────────────────────────────────────────────────────
