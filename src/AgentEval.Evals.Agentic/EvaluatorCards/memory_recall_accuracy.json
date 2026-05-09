@@ -1,0 +1,22 @@
+{
+  "schemaVersion": "1.0",
+  "key": "memory_recall_accuracy",
+  "name": "Memory Recall Accuracy",
+  "category": "memory",
+  "version": "1.0.0",
+  "description": "Evaluates whether an AI agent correctly recalls facts established in earlier conversation turns, without confabulating information that was never stated. The full conversation history is embedded in the judge prompt — high token cost.",
+  "costTier": "High",
+  "higherIsBetter": true,
+  "defaultThreshold": 0.8,
+  "expectedInputs": [
+    { "kind": "query", "key": "", "required": true, "description": "The current turn's user query." },
+    { "kind": "response", "key": "", "required": true, "description": "The agent's response in the current turn." },
+    { "kind": "metadata", "key": "conversation_history", "required": true, "description": "IReadOnlyList<ConversationTurn> of prior turns. Read via ConversationHistoryHelper.TryGetHistory." }
+  ],
+  "recommendedVisualization": "timeline",
+  "compatibleWith": [],
+  "links": {
+    "documentation": "/docs/benchmarks/agentic/getting-started.md#memory-recall-accuracy",
+    "source": "src/AgentEval.Evals.Agentic/Memory/MemoryRecallAccuracyEval.cs"
+  }
+}

@@ -29,6 +29,7 @@
     <EmbeddedResource Include="Resources\Prompts\**\*.md" />
     <EmbeddedResource Include="Reporting\Schema\*.json" />
     <EmbeddedResource Include="Adversarial\Resources\*.json" />
+    <EmbeddedResource Include="EvaluatorCards\*.json" />
   </ItemGroup>
 
 </Project>
