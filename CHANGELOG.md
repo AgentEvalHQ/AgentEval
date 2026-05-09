@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — AgentEval Mission Control Phase 1 — local viewer + GraphQL backend (plan-08)
+
+Mission Control is the visualisation, aggregation, and governance layer on top of `.agenteval/`. Phase 1 ships the dotnet backend with the full read surface; the React + Vite SPA, CLI subcommand wiring, and Mode C self-hosted server land in subsequent phases (per plan-08).
+
+- **`AgentEval.MissionControl`** — new .NET 10 project (`src/AgentEval.MissionControl/`) hosting the GraphQL server + REST binary endpoints. Boot via `dotnet run --project src/AgentEval.MissionControl`.
+- **`IOutputStoreReader` interface** extracted from `IOutputStore` — pure additive refactor; existing implementations satisfy it for free. Mission Control consumes only the reader, verified by `ReaderOnlyArchitectureTests`. Mode A's local viewer cannot accidentally write to `.agenteval/`.
+- **`RunPointer` extended** with optional `Kind`, `Score`, `DurationMs`, `EstimatedCost` fields — backwards-compatible (4-arg positional ctor still works; legacy JSON deserialises with new fields as null).
+- **15 GraphQL resolvers** at `POST /graphql`:
+  - `Query.solution`, `Query.subjects(kind?)`, `Query.subject(kind, name)`.
+  - `Query.recentRuns(count)`, `Query.run(runId)`, `Query.runSummary(runId)`.
+  - `Query.scenarios(runId)`, `Query.scenario(runId, scenarioId)`.
+  - `Query.scenarioTree(runId, scenarioId)` — **recursive `EvalResult` walked in one round-trip** (the central architectural justification for choosing GraphQL over REST on the read path).
+  - `Query.compliance`, `Query.complianceMatrix(regulation)` — the killer-feature compliance dashboard backend, with audit-chain validation per cell. `Query.complianceEvidence(...)`.
+  - `Query.evaluators(category?, costTier?)`, `Query.evaluator(key)` — driven by 59 hand-authored + generated `EvaluatorCard` JSON files (full coverage of every shipped evaluator).
+- **`EvaluatorCard` primitive** — schema-driven UI metadata per evaluator. Drop a JSON file at `src/AgentEval.Evals.Agentic/EvaluatorCards/<key>.json` and it appears in `Query.evaluators` immediately, no code change. `evaluator-card.schema.json` v1.0 in `AgentEval.DataLoaders`. Lock-down tests verify schema validation, tier-match against `EvaluatorCostMap`, source-path resolution, no duplicate keys.
+- **5 REST binary endpoints**: `GET /api/v1/runs/{runId}/trace`, `/reports/{format}`, `GET /api/v1/compliance/{reg}/{subject}/{ts}/report.pdf`, `GET /api/v1/compliance/{regulation}/schema`, `GET /api/v1/subjects/{kind}/{name}/history` (NDJSON stream).
+- **`GET /api/v1/version`** — server metadata for diagnostics.
+- **Hot Chocolate 16 (ChilliCream OSS — *not* Microsoft)** — GraphQL server with `MaxAllowedExecutionDepth = 8` guarding the recursive `EvalResult` tree, embedded Nitro UI at `/graphql` for ad-hoc query exploration in dev.
+- **`FileSystemLayout` promoted to public** in `AgentEval.DataLoaders` so Mission Control's binary endpoints can resolve canonical paths without re-implementing the layout.
+- **Hybrid REST + GraphQL design** — see `docs/missioncontrol/api-design.md` for rationale. GitHub / Stripe / Shopify all do this; we're following established practice.
+- **Documentation**: `docs/missioncontrol/{getting-started,portal-ready-evaluators,charting,api-design}.md`.
+- **Tooling**: `tools/gen_evaluator_cards.py` — idempotent generator for boilerplate cards. Hand-authored cards take precedence; the generator only writes keys not already present.
+- **Test coverage**: 35 MC integration tests (8 GraphQL smoke + 16 read-resolver/compliance + 7 binary endpoint + 1 reader-only architecture + 3 recursive-tree) on net10.0; 14 EvaluatorCard schema tests. Multi-TFM build clean (net8.0 / net9.0 / net10.0); MC tests are net10.0-gated since `Microsoft.AspNetCore.Mvc.Testing 10.0.0` is net10-only.
+
+
+
 ### Added
 
 - **Composite evaluations primitive** (`AgentEval.Evals` namespace) — a composite eval aggregates N sub-evals into one scored result with a recursive tree of sub-results. `IEval` unifies atomic and composite evals; `CompositeEval` runs sub-evals in parallel via `Task.WhenAll` and aggregates via a pluggable `IAggregationStrategy`. Phase 1 ships `WeightedSumAggregation` (the only strategy needed for GDPR per-article rollups, Foundry's tool-call-accuracy formula, and 80% of other use cases).
