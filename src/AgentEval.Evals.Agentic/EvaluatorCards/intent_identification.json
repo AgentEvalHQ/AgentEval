@@ -1,0 +1,21 @@
+{
+  "schemaVersion": "1.0",
+  "key": "intent_identification",
+  "name": "Intent Identification",
+  "category": "system",
+  "version": "1.0.0",
+  "description": "Single-turn LLM judge assessing whether the agent correctly identified what the user actually wanted (the *intent*), independent of whether the agent then succeeded at fulfilling that intent. The 'did they understand the question?' check.",
+  "costTier": "Low",
+  "higherIsBetter": true,
+  "defaultThreshold": 0.8,
+  "expectedInputs": [
+    { "kind": "query", "key": "", "required": true, "description": "The user's request — possibly ambiguous or implicit." },
+    { "kind": "response", "key": "", "required": true, "description": "The agent's response — judged against whether the intent was correctly inferred." }
+  ],
+  "recommendedVisualization": "histogram",
+  "compatibleWith": [],
+  "links": {
+    "documentation": "/docs/benchmarks/agentic/getting-started.md#intent-identification",
+    "source": "src/AgentEval.Evals.Agentic/System/IntentIdentificationEval.cs"
+  }
+}
