@@ -244,4 +244,35 @@ public sealed class Query
         var identity = new SubjectIdentity(subjectKind, subjectName);
         return await store.GetComplianceEvidenceAsync(regulation, identity, timestamp, ct);
     }
+
+    // ─── Recursive EvalResult tree (MC1.4.6) ─────────────────────────────────
+
+    /// <summary>
+    /// Returns the recursive <see cref="EvalResult"/> tree for a given scenario,
+    /// reconstituted from the JSON stored in <see cref="ScenarioResult.Output"/> via
+    /// <see cref="EvalResultPersistence.FromScenarioResult"/>. Returns <c>null</c>
+    /// when the scenario doesn't exist or its <c>Output</c> field is not a serialised
+    /// EvalResult tree (e.g., legacy flat scenarios where Output is just the agent's
+    /// response text).
+    /// </summary>
+    /// <remarks>
+    /// This is the demonstration of plan-07 §3 Challenge 1's central justification:
+    /// a single GraphQL fragment walks the whole composite tree in one round-trip.
+    /// Compare with REST: returning the full tree requires either a fat endpoint
+    /// (large response) or a depth/cursor parameter (chatty client).
+    /// </remarks>
+    public async Task<EvalResult?> ScenarioTree(
+        [Service] IOutputStoreReader store,
+        string runId,
+        string scenarioId,
+        CancellationToken ct = default)
+    {
+        if (!store.IsAvailable) return null;
+        await foreach (var s in store.GetScenarioResultsAsync(runId, ct))
+        {
+            if (string.Equals(s.Id, scenarioId, StringComparison.Ordinal))
+                return EvalResultPersistence.FromScenarioResult(s);
+        }
+        return null;
+    }
 }

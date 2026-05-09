@@ -6,6 +6,7 @@
 
 using System.Net.Http.Json;
 using System.Text.Json;
+using AgentEval.Evals;
 using AgentEval.MissionControl.GraphQL;
 using AgentEval.Output;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -224,7 +225,8 @@ public class GraphQLReadResolversTests : IClassFixture<SeededMissionControlFacto
         using var doc = JsonDocument.Parse(body);
         var scenarios = doc.RootElement.GetProperty("data").GetProperty("scenarios");
 
-        Assert.Equal(2, scenarios.GetArrayLength());
+        Assert.True(scenarios.GetArrayLength() >= 2,
+            $"Expected at least 2 seeded scenarios; got {scenarios.GetArrayLength()}");
         var ids = scenarios.EnumerateArray().Select(s => s.GetProperty("id").GetString()).ToList();
         Assert.Contains("scenario-1", ids);
         Assert.Contains("scenario-2", ids);
@@ -344,6 +346,143 @@ public class GraphQLReadResolversTests : IClassFixture<SeededMissionControlFacto
         Assert.True(matrix.GetProperty("allChainsValid").GetBoolean());
     }
 
+    // ─── Recursive EvalResult tree (MC1.4.6) ──────────────────────────────────
+
+    [Fact]
+    public async Task ScenarioTree_ReturnsRecursiveEvalResult_InOneRoundTrip()
+    {
+        // The seed writes a recursive tree as a third scenario via EvalResultPersistence.
+        // This is the demonstration of plan-07 §3 Challenge 1: a single fragment walks
+        // the whole tree.
+        using var client = _factory.CreateClient();
+        var listResp = await client.PostAsJsonAsync("/graphql",
+            new { query = "{ recentRuns(count: 1) { runId } }" });
+        listResp.EnsureSuccessStatusCode();
+        using var listDoc = JsonDocument.Parse(await listResp.Content.ReadAsStringAsync());
+        var runId = listDoc.RootElement.GetProperty("data")
+            .GetProperty("recentRuns")[0].GetProperty("runId").GetString();
+
+        var query = $$"""
+            {
+              scenarioTree(runId: "{{runId}}", scenarioId: "tree-scenario") {
+                metric { key name }
+                score { value passed }
+                details {
+                  aggregationStrategy
+                  subResults {
+                    metric { key }
+                    score { value passed }
+                    details {
+                      subResults {
+                        metric { key }
+                        score { value }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+            """;
+
+        var resp = await client.PostAsJsonAsync("/graphql", new { query });
+        resp.EnsureSuccessStatusCode();
+
+        var body = await resp.Content.ReadAsStringAsync();
+        using var doc = JsonDocument.Parse(body);
+        var tree = doc.RootElement.GetProperty("data").GetProperty("scenarioTree");
+
+        Assert.Equal(JsonValueKind.Object, tree.ValueKind);
+        Assert.Equal("composite-root", tree.GetProperty("metric").GetProperty("key").GetString());
+        Assert.True(tree.GetProperty("score").GetProperty("passed").GetBoolean());
+
+        // Walk down: composite-root → 2 mid-level composites → leaves.
+        var midLevel = tree.GetProperty("details").GetProperty("subResults");
+        Assert.Equal(2, midLevel.GetArrayLength());
+
+        var firstMidKey = midLevel[0].GetProperty("metric").GetProperty("key").GetString();
+        Assert.True(firstMidKey == "mid-1" || firstMidKey == "mid-2");
+
+        // Each mid has one leaf — verify recursion went two levels deep.
+        var leaves = midLevel[0].GetProperty("details").GetProperty("subResults");
+        Assert.Equal(1, leaves.GetArrayLength());
+    }
+
+    [Fact]
+    public async Task ScenarioTree_UnknownScenario_ReturnsNull()
+    {
+        using var client = _factory.CreateClient();
+        var listResp = await client.PostAsJsonAsync("/graphql",
+            new { query = "{ recentRuns(count: 1) { runId } }" });
+        listResp.EnsureSuccessStatusCode();
+        using var listDoc = JsonDocument.Parse(await listResp.Content.ReadAsStringAsync());
+        var runId = listDoc.RootElement.GetProperty("data")
+            .GetProperty("recentRuns")[0].GetProperty("runId").GetString();
+
+        var resp = await client.PostAsJsonAsync("/graphql",
+            new { query = $"{{ scenarioTree(runId: \"{runId}\", scenarioId: \"nope\") {{ metric {{ key }} }} }}" });
+        resp.EnsureSuccessStatusCode();
+
+        var body = await resp.Content.ReadAsStringAsync();
+        using var doc = JsonDocument.Parse(body);
+        var tree = doc.RootElement.GetProperty("data").GetProperty("scenarioTree");
+        Assert.Equal(JsonValueKind.Null, tree.ValueKind);
+    }
+
+    [Fact]
+    public async Task GraphQL_DepthLimit_RejectsExcessivelyDeepRecursiveQuery()
+    {
+        // Now that we have the recursive EvalResult schema, we can write a meaningful
+        // depth-limit test. MaxAllowedExecutionDepth=8; this query goes 12 levels deep
+        // through subResults. Should be rejected with `errors`.
+        using var client = _factory.CreateClient();
+        var listResp = await client.PostAsJsonAsync("/graphql",
+            new { query = "{ recentRuns(count: 1) { runId } }" });
+        listResp.EnsureSuccessStatusCode();
+        using var listDoc = JsonDocument.Parse(await listResp.Content.ReadAsStringAsync());
+        var runId = listDoc.RootElement.GetProperty("data")
+            .GetProperty("recentRuns")[0].GetProperty("runId").GetString();
+
+        // 12 nested `details { subResults { ... } }` levels — exceeds the depth=8 cap.
+        var deepQuery = $$"""
+            {
+              scenarioTree(runId: "{{runId}}", scenarioId: "tree-scenario") {
+                details { subResults {
+                  details { subResults {
+                    details { subResults {
+                      details { subResults {
+                        details { subResults {
+                          details { subResults {
+                            details { subResults {
+                              details { subResults {
+                                details { subResults {
+                                  details { subResults {
+                                    details { subResults {
+                                      details { subResults {
+                                        metric { key }
+                                      } }
+                                    } }
+                                  } }
+                                } }
+                              } }
+                            } }
+                          } }
+                        } }
+                      } }
+                    } }
+                  } }
+                } }
+              }
+            }
+            """;
+
+        var resp = await client.PostAsJsonAsync("/graphql", new { query = deepQuery });
+        var body = await resp.Content.ReadAsStringAsync();
+
+        // Hot Chocolate returns 200 + GraphQL `errors` on validation failures (the spec norm).
+        Assert.Contains("errors", body, StringComparison.Ordinal);
+        Assert.Contains("depth", body, StringComparison.OrdinalIgnoreCase);
+    }
+
     [Fact]
     public async Task ComplianceEvidence_FetchesSpecificEvidence()
     {
@@ -450,6 +589,14 @@ public sealed class SeededMissionControlFactory : WebApplicationFactory<Query>
             Metrics: emptyMetrics, Assertions: emptyAssertions,
             Duration: TimeSpan.FromMilliseconds(900), EstimatedCost: 0.003));
 
+        // Seed a recursive EvalResult tree as a third scenario so MC1.4.6
+        // (Query.scenarioTree) has data. Tree shape: root composite → 2 mid composites
+        // → 1 leaf each. Round-tripped through EvalResultPersistence so Output is
+        // the serialised tree JSON.
+        var tree = BuildSampleEvalResultTree();
+        await store.WriteScenarioResultAsync(manifest.Run.RunId,
+            EvalResultPersistence.ToScenarioResult(tree, "tree-scenario", "Composite tree demo"));
+
         var summary = new RunSummary(
             SchemaVersion: "1.0",
             RunId: manifest.Run.RunId,
@@ -492,6 +639,56 @@ public sealed class SeededMissionControlFactory : WebApplicationFactory<Query>
             },
             overallStatus: "pass"));
     }
+
+    private static EvalResult BuildSampleEvalResultTree()
+    {
+        var leafA = MakeAtomicResult("leaf-A", 0.92);
+        var leafB = MakeAtomicResult("leaf-B", 0.85);
+
+        var mid1 = new EvalResult(
+            Metric: new EvalMetadata("mid-1", "Mid 1", "test", "1.0"),
+            Score: new EvalScore(0.92, null, "pass", true, 0.7, "none", null),
+            Details: new EvalDetails(
+                Dimensions: null,
+                Evidence: null,
+                Recommendations: null,
+                SubResults: new[] { leafA },
+                AggregationStrategy: "weighted-sum"),
+            Provenance: new EvalProvenance("composite", null, null, null, null, 0, false),
+            EvaluatedAt: DateTimeOffset.UtcNow);
+
+        var mid2 = new EvalResult(
+            Metric: new EvalMetadata("mid-2", "Mid 2", "test", "1.0"),
+            Score: new EvalScore(0.85, null, "pass", true, 0.7, "none", null),
+            Details: new EvalDetails(
+                Dimensions: null,
+                Evidence: null,
+                Recommendations: null,
+                SubResults: new[] { leafB },
+                AggregationStrategy: "weighted-sum"),
+            Provenance: new EvalProvenance("composite", null, null, null, null, 0, false),
+            EvaluatedAt: DateTimeOffset.UtcNow);
+
+        return new EvalResult(
+            Metric: new EvalMetadata("composite-root", "Composite Root", "test", "1.0"),
+            Score: new EvalScore(0.885, null, "pass", true, 0.7, "none", null),
+            Details: new EvalDetails(
+                Dimensions: null,
+                Evidence: null,
+                Recommendations: null,
+                SubResults: new[] { mid1, mid2 },
+                AggregationStrategy: "weighted-sum"),
+            Provenance: new EvalProvenance("composite", null, null, null, null, 0, false),
+            EvaluatedAt: DateTimeOffset.UtcNow);
+    }
+
+    private static EvalResult MakeAtomicResult(string key, double score) =>
+        new(
+            Metric: new EvalMetadata(key, key, "test", "1.0"),
+            Score: new EvalScore(score, null, "pass", true, 0.7, "none", null),
+            Details: new EvalDetails(null, null, null, null, null),
+            Provenance: new EvalProvenance("atomic-llm", "stub", null, null, null, 0.001, false),
+            EvaluatedAt: DateTimeOffset.UtcNow);
 
     private static ComplianceEvidence BuildEvidence(
         string regulation,

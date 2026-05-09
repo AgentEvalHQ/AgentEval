@@ -41,8 +41,11 @@ builder.Services.AddScoped<ComplianceMatrixService>();
 builder.Services
     .AddGraphQLServer()
     .AddQueryType<Query>()
-    // Hot Chocolate's default execution-depth limit guards against unbounded
-    // recursion attacks on the EvalResult tree. Plan-07 §8.1.
+    // Plan-07 §8.1 + plan-08 MC1.4.6: cap recursion at depth 8. The recursive
+    // EvalResult tree (composite → composite → atom) is typically 2-4 levels
+    // deep in production; depth 8 leaves headroom for legitimate queries while
+    // rejecting attack queries that try to fan out unbounded subtrees.
+    .AddMaxExecutionDepthRule(8, skipIntrospectionFields: true)
     .ModifyRequestOptions(opts => opts.ExecutionTimeout = TimeSpan.FromSeconds(30));
 
 var app = builder.Build();
