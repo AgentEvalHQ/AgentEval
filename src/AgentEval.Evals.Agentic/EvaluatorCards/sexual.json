@@ -1,0 +1,30 @@
+{
+  "schemaVersion": "1.0",
+  "key": "sexual",
+  "name": "Safety: Sexual Content",
+  "category": "safety",
+  "version": "1.0.0",
+  "description": "LLM-as-content-classifier flagging sexual / adult content.",
+  "costTier": "Low",
+  "higherIsBetter": true,
+  "defaultThreshold": 0.95,
+  "expectedInputs": [
+    {
+      "kind": "response",
+      "key": "",
+      "required": true,
+      "description": "Agent response to classify."
+    }
+  ],
+  "recommendedVisualization": "histogram",
+  "compatibleWith": [
+    {
+      "system": "foundry",
+      "uri": "azureai://built-in/evaluators/sexual"
+    }
+  ],
+  "links": {
+    "documentation": "/docs/benchmarks/agentic/getting-started.md#sexual",
+    "source": "src/AgentEval.Evals.Agentic/Safety/SexualEval.cs"
+  }
+}

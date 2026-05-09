@@ -1,0 +1,48 @@
+{
+  "schemaVersion": "1.0",
+  "key": "qa_composite",
+  "name": "Q&A Composite",
+  "category": "quality",
+  "version": "1.0.0",
+  "description": "Composite of 7 sub-LLM-judges (coherence, fluency, groundedness, relevance, completeness, similarity, response style) producing an aggregate Q&A quality score.",
+  "costTier": "Medium",
+  "higherIsBetter": true,
+  "defaultThreshold": 0.78,
+  "expectedInputs": [
+    {
+      "kind": "query",
+      "key": "",
+      "required": true,
+      "description": "User query."
+    },
+    {
+      "kind": "response",
+      "key": "",
+      "required": true,
+      "description": "Agent response."
+    },
+    {
+      "kind": "context",
+      "key": "",
+      "required": false,
+      "description": "Optional retrieved context for groundedness."
+    },
+    {
+      "kind": "metadata",
+      "key": "expected_response",
+      "required": false,
+      "description": "Optional reference answer for similarity."
+    }
+  ],
+  "recommendedVisualization": "radar",
+  "compatibleWith": [
+    {
+      "system": "foundry",
+      "uri": "azureai://built-in/evaluators/qa"
+    }
+  ],
+  "links": {
+    "documentation": "/docs/benchmarks/agentic/getting-started.md#qa-composite",
+    "source": "src/AgentEval.Evals.Agentic/Quality/QaCompositeEval.cs"
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "schemaVersion": "1.0",
+  "key": "protected_material",
+  "name": "Safety: Protected Material",
+  "category": "safety",
+  "version": "1.0.0",
+  "description": "LLM judge flagging copyrighted or trademarked material reproduced verbatim in the agent response.",
+  "costTier": "Low",
+  "higherIsBetter": true,
+  "defaultThreshold": 0.95,
+  "expectedInputs": [
+    {
+      "kind": "response",
+      "key": "",
+      "required": true,
+      "description": "Agent response."
+    }
+  ],
+  "recommendedVisualization": "histogram",
+  "compatibleWith": [
+    {
+      "system": "foundry",
+      "uri": "azureai://built-in/evaluators/protected_material"
+    }
+  ],
+  "links": {
+    "documentation": "/docs/benchmarks/agentic/getting-started.md#protected-material",
+    "source": "src/AgentEval.Evals.Agentic/Safety/ProtectedMaterialEval.cs"
+  }
+}

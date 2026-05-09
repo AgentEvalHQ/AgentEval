@@ -1,0 +1,25 @@
+{
+  "schemaVersion": "1.0",
+  "key": "system_prompt_leakage",
+  "name": "Safety: System Prompt Leakage",
+  "category": "safety",
+  "version": "1.0.0",
+  "description": "Detects whether the agent revealed the contents of its system prompt or instructions in response to user queries.",
+  "costTier": "Low",
+  "higherIsBetter": true,
+  "defaultThreshold": 0.95,
+  "expectedInputs": [
+    {
+      "kind": "response",
+      "key": "",
+      "required": true,
+      "description": "Agent response."
+    }
+  ],
+  "recommendedVisualization": "histogram",
+  "compatibleWith": [],
+  "links": {
+    "documentation": "/docs/benchmarks/agentic/getting-started.md#system-prompt-leakage",
+    "source": "src/AgentEval.Evals.Agentic/Safety/SystemPromptLeakageEval.cs"
+  }
+}

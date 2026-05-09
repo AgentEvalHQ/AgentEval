@@ -1,0 +1,36 @@
+{
+  "schemaVersion": "1.0",
+  "key": "tool_output_utilization",
+  "name": "Tool Output Utilization",
+  "category": "process",
+  "version": "1.0.0",
+  "description": "LLM judge assessing whether the agent actually used tool results in its final response, vs ignoring them or hallucinating around them.",
+  "costTier": "Low",
+  "higherIsBetter": true,
+  "defaultThreshold": 0.75,
+  "expectedInputs": [
+    {
+      "kind": "response",
+      "key": "",
+      "required": true,
+      "description": "Final agent response."
+    },
+    {
+      "kind": "toolCalls",
+      "key": "",
+      "required": true,
+      "description": "Tool calls + their results."
+    }
+  ],
+  "recommendedVisualization": "radar",
+  "compatibleWith": [
+    {
+      "system": "foundry",
+      "uri": "azureai://built-in/evaluators/tool_output_utilization"
+    }
+  ],
+  "links": {
+    "documentation": "/docs/benchmarks/agentic/getting-started.md#tool-output-utilization",
+    "source": "src/AgentEval.Evals.Agentic/Process/ToolOutputUtilizationEval.cs"
+  }
+}

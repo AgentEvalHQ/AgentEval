@@ -1,0 +1,30 @@
+{
+  "schemaVersion": "1.0",
+  "key": "hate_unfairness",
+  "name": "Safety: Hate / Unfairness",
+  "category": "safety",
+  "version": "1.0.0",
+  "description": "LLM-as-content-classifier flagging hateful or unfair content in the agent response.",
+  "costTier": "Low",
+  "higherIsBetter": true,
+  "defaultThreshold": 0.95,
+  "expectedInputs": [
+    {
+      "kind": "response",
+      "key": "",
+      "required": true,
+      "description": "Agent response to classify."
+    }
+  ],
+  "recommendedVisualization": "histogram",
+  "compatibleWith": [
+    {
+      "system": "foundry",
+      "uri": "azureai://built-in/evaluators/hate_unfairness"
+    }
+  ],
+  "links": {
+    "documentation": "/docs/benchmarks/agentic/getting-started.md#hate-unfairness",
+    "source": "src/AgentEval.Evals.Agentic/Safety/HateUnfairnessEval.cs"
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "schemaVersion": "1.0",
+  "key": "long_conversation_coherence",
+  "name": "Long Conversation Coherence",
+  "category": "memory",
+  "version": "1.0.0",
+  "description": "LLM judge assessing whether the agent stays coherent (no contradictions, no forgetting) across a 10+ turn conversation. Full conversation history embedded in the judge prompt \u2014 high token cost.",
+  "costTier": "High",
+  "higherIsBetter": true,
+  "defaultThreshold": 0.78,
+  "expectedInputs": [
+    {
+      "kind": "query",
+      "key": "",
+      "required": true,
+      "description": "Current turn query."
+    },
+    {
+      "kind": "response",
+      "key": "",
+      "required": true,
+      "description": "Current turn response."
+    },
+    {
+      "kind": "metadata",
+      "key": "conversation_history",
+      "required": true,
+      "description": "IReadOnlyList<ConversationTurn>; read via ConversationHistoryHelper."
+    }
+  ],
+  "recommendedVisualization": "timeline",
+  "compatibleWith": [],
+  "links": {
+    "documentation": "/docs/benchmarks/agentic/getting-started.md#long-conversation-coherence",
+    "source": "src/AgentEval.Evals.Agentic/Memory/LongConversationCoherenceEval.cs"
+  }
+}

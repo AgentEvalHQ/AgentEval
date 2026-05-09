@@ -1,0 +1,25 @@
+{
+  "schemaVersion": "1.0",
+  "key": "judge_drift",
+  "name": "Judge Drift",
+  "category": "judge-quality",
+  "version": "1.0.0",
+  "description": "Pure-code meta-evaluator: detects when a judge verdicts have shifted distribution over time vs a reference window. Lower is better (low drift).",
+  "costTier": "Trivial",
+  "higherIsBetter": false,
+  "defaultThreshold": 0.1,
+  "expectedInputs": [
+    {
+      "kind": "metadata",
+      "key": "judge_history",
+      "required": true,
+      "description": "Time-windowed judge verdicts for drift comparison."
+    }
+  ],
+  "recommendedVisualization": "timeline",
+  "compatibleWith": [],
+  "links": {
+    "documentation": "/docs/benchmarks/agentic/getting-started.md#judge-drift",
+    "source": "src/AgentEval.Evals.Agentic/JudgeQuality/JudgeDriftEval.cs"
+  }
+}

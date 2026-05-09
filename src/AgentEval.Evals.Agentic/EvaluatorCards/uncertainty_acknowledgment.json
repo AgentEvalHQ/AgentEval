@@ -1,0 +1,31 @@
+{
+  "schemaVersion": "1.0",
+  "key": "uncertainty_acknowledgment",
+  "name": "Uncertainty Acknowledgment",
+  "category": "calibration",
+  "version": "1.0.0",
+  "description": "LLM judge assessing whether the agent appropriately acknowledged uncertainty when its knowledge or confidence was actually low.",
+  "costTier": "Low",
+  "higherIsBetter": true,
+  "defaultThreshold": 0.8,
+  "expectedInputs": [
+    {
+      "kind": "query",
+      "key": "",
+      "required": true,
+      "description": "User query."
+    },
+    {
+      "kind": "response",
+      "key": "",
+      "required": true,
+      "description": "Agent response."
+    }
+  ],
+  "recommendedVisualization": "histogram",
+  "compatibleWith": [],
+  "links": {
+    "documentation": "/docs/benchmarks/agentic/getting-started.md#uncertainty-acknowledgment",
+    "source": "src/AgentEval.Evals.Agentic/Calibration/UncertaintyAcknowledgmentEval.cs"
+  }
+}

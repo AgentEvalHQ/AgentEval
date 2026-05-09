@@ -1,0 +1,37 @@
+{
+  "schemaVersion": "1.0",
+  "key": "reasoning_correctness",
+  "name": "Reasoning Correctness",
+  "category": "reasoning",
+  "version": "1.0.0",
+  "description": "LLM judge assessing soundness of the reasoning chain \u2014 independent of whether the final answer happens to be correct (catches lucky-coincidence answers via broken reasoning).",
+  "costTier": "Medium",
+  "higherIsBetter": true,
+  "defaultThreshold": 0.8,
+  "expectedInputs": [
+    {
+      "kind": "query",
+      "key": "",
+      "required": true,
+      "description": "User query."
+    },
+    {
+      "kind": "response",
+      "key": "",
+      "required": true,
+      "description": "Agent response."
+    },
+    {
+      "kind": "metadata",
+      "key": "reasoning_trace",
+      "required": false,
+      "description": "Explicit reasoning trace; eval scans Response when absent."
+    }
+  ],
+  "recommendedVisualization": "radar",
+  "compatibleWith": [],
+  "links": {
+    "documentation": "/docs/benchmarks/agentic/getting-started.md#reasoning-correctness",
+    "source": "src/AgentEval.Evals.Agentic/Reasoning/ReasoningCorrectnessEval.cs"
+  }
+}

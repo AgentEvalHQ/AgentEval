@@ -1,0 +1,31 @@
+{
+  "schemaVersion": "1.0",
+  "key": "tone_appropriateness",
+  "name": "Tone Appropriateness",
+  "category": "ux",
+  "version": "1.0.0",
+  "description": "LLM judge assessing whether the response tone matched the situation (formal/casual, empathetic/factual, etc.).",
+  "costTier": "Low",
+  "higherIsBetter": true,
+  "defaultThreshold": 0.8,
+  "expectedInputs": [
+    {
+      "kind": "query",
+      "key": "",
+      "required": true,
+      "description": "User query."
+    },
+    {
+      "kind": "response",
+      "key": "",
+      "required": true,
+      "description": "Agent response."
+    }
+  ],
+  "recommendedVisualization": "histogram",
+  "compatibleWith": [],
+  "links": {
+    "documentation": "/docs/benchmarks/agentic/getting-started.md#tone-appropriateness",
+    "source": "src/AgentEval.Evals.Agentic/UX/ToneAppropriatenessEval.cs"
+  }
+}

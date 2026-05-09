@@ -1,0 +1,31 @@
+{
+  "schemaVersion": "1.0",
+  "key": "intermediate_step_hallucination",
+  "name": "Intermediate Step Hallucination",
+  "category": "reasoning",
+  "version": "1.0.0",
+  "description": "LLM judge cross-checking each intermediate factual claim in the agent reasoning against the actual tool-call results \u2014 catches hallucinations between tool calls.",
+  "costTier": "Medium",
+  "higherIsBetter": true,
+  "defaultThreshold": 0.85,
+  "expectedInputs": [
+    {
+      "kind": "response",
+      "key": "",
+      "required": true,
+      "description": "Agent response."
+    },
+    {
+      "kind": "toolCalls",
+      "key": "",
+      "required": true,
+      "description": "Tool calls + their results."
+    }
+  ],
+  "recommendedVisualization": "radar",
+  "compatibleWith": [],
+  "links": {
+    "documentation": "/docs/benchmarks/agentic/getting-started.md#intermediate-step-hallucination",
+    "source": "src/AgentEval.Evals.Agentic/Reasoning/IntermediateStepHallucinationEval.cs"
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "schemaVersion": "1.0",
+  "key": "tool_latency",
+  "name": "Telemetry: Tool Latency",
+  "category": "telemetry",
+  "version": "1.0.0",
+  "description": "Pure-code telemetry evaluator surfacing per-tool latency percentiles from AgenticTelemetry.ToolLatencyMs. Lower is better.",
+  "costTier": "Trivial",
+  "higherIsBetter": false,
+  "defaultThreshold": 1.0,
+  "expectedInputs": [
+    {
+      "kind": "metadata",
+      "key": "agentic_telemetry",
+      "required": true,
+      "description": "AgenticTelemetry record with ToolLatencyMs."
+    }
+  ],
+  "recommendedVisualization": "histogram",
+  "compatibleWith": [],
+  "links": {
+    "documentation": "/docs/benchmarks/agentic/getting-started.md#tool-latency",
+    "source": "src/AgentEval.Evals.Agentic/Telemetry/ToolLatencyEval.cs"
+  }
+}

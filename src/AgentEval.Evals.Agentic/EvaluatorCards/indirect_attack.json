@@ -1,0 +1,36 @@
+{
+  "schemaVersion": "1.0",
+  "key": "indirect_attack",
+  "name": "Safety: Indirect Prompt Injection (XPIA)",
+  "category": "safety",
+  "version": "1.0.0",
+  "description": "Detects cross-prompt-injection attacks where adversarial instructions arrive via tool outputs (search results, fetched documents, etc.) and the agent acts on them.",
+  "costTier": "Low",
+  "higherIsBetter": true,
+  "defaultThreshold": 0.95,
+  "expectedInputs": [
+    {
+      "kind": "response",
+      "key": "",
+      "required": true,
+      "description": "Agent response."
+    },
+    {
+      "kind": "toolCalls",
+      "key": "",
+      "required": true,
+      "description": "Tool calls \u2014 judged for whether their results contained adversarial instructions and whether the agent followed them."
+    }
+  ],
+  "recommendedVisualization": "radar",
+  "compatibleWith": [
+    {
+      "system": "foundry",
+      "uri": "azureai://built-in/evaluators/indirect_attack"
+    }
+  ],
+  "links": {
+    "documentation": "/docs/benchmarks/agentic/getting-started.md#indirect-attack",
+    "source": "src/AgentEval.Evals.Agentic/Safety/IndirectAttackEval.cs"
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "schemaVersion": "1.0",
+  "key": "retry_rate",
+  "name": "Telemetry: Retry Rate",
+  "category": "telemetry",
+  "version": "1.0.0",
+  "description": "Pure-code telemetry evaluator computing the fraction of agent calls that required at least one retry. Lower is better.",
+  "costTier": "Trivial",
+  "higherIsBetter": false,
+  "defaultThreshold": 0.1,
+  "expectedInputs": [
+    {
+      "kind": "metadata",
+      "key": "agentic_telemetry",
+      "required": true,
+      "description": "AgenticTelemetry record with RetryCount + TotalCalls."
+    }
+  ],
+  "recommendedVisualization": "histogram",
+  "compatibleWith": [],
+  "links": {
+    "documentation": "/docs/benchmarks/agentic/getting-started.md#retry-rate",
+    "source": "src/AgentEval.Evals.Agentic/Telemetry/RetryRateEval.cs"
+  }
+}
