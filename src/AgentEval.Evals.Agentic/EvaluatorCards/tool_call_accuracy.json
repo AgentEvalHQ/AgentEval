@@ -20,6 +20,6 @@
   ],
   "links": {
     "documentation": "/docs/benchmarks/agentic/getting-started.md#tool-call-accuracy",
-    "source": "src/AgentEval.Evals.Agentic/Process/ToolCallAccuracyAggregator.cs"
+    "source": "src/AgentEval.Evals.Agentic/Process/ToolCallAccuracyAggregateEval.cs"
   }
 }

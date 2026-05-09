@@ -120,6 +120,43 @@ public class EvaluatorCardSchemaTests
     }
 
     [Fact]
+    public void EveryCardLinkSource_PointsAtAnExistingFile()
+    {
+        // Catch authoring typos like "ToolCallAccuracyAggregator.cs" when the actual
+        // file is "ToolCallAccuracyAggregateEval.cs". links.source is repo-relative.
+        var repoRoot = FindRepoRoot();
+        Assert.NotNull(repoRoot);
+
+        var cards = LoadAllShippedCards();
+        foreach (var (resourceName, json) in cards)
+        {
+            var card = JsonSerializer.Deserialize<EvaluatorCard>(json, JsonOpts)!;
+            var sourcePath = card.Links?.Source;
+            if (string.IsNullOrWhiteSpace(sourcePath)) continue;
+            // Skip URLs — only verify repo-relative file paths.
+            if (sourcePath.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
+                sourcePath.StartsWith("https://", StringComparison.OrdinalIgnoreCase)) continue;
+
+            var absolute = Path.Combine(repoRoot!, sourcePath.Replace('/', Path.DirectorySeparatorChar));
+            Assert.True(File.Exists(absolute),
+                $"EvaluatorCard '{card.Key}' links.source='{sourcePath}' does not resolve to an existing file (looked for '{absolute}').");
+        }
+    }
+
+    private static string? FindRepoRoot()
+    {
+        var dir = AppContext.BaseDirectory;
+        while (!string.IsNullOrEmpty(dir))
+        {
+            if (File.Exists(Path.Combine(dir, "AgentEval.sln"))) return dir;
+            var parent = Directory.GetParent(dir);
+            if (parent is null) return null;
+            dir = parent.FullName;
+        }
+        return null;
+    }
+
+    [Fact]
     public void NoDuplicateCardKeys()
     {
         var cards = LoadAllShippedCards();
