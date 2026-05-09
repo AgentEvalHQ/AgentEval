@@ -61,7 +61,7 @@ public class CalibrationDatasetLoaderTests
         Assert.Contains("line 2", ex.Message);
     }
 
-    // ── LoadAllFromAssemblyAsync loads all 5 pillar JSONL files ──────────────
+    // ── LoadAllFromAssemblyAsync loads all pillar JSONL files ──────────────
 
     [Fact]
     public async Task LoadAllFromAssemblyAsync_LoadsAllFivePillarFiles()
@@ -72,8 +72,10 @@ public class CalibrationDatasetLoaderTests
         // Act
         var datasets = await _loader.LoadAllFromAssemblyAsync(testAssembly);
 
-        // Assert
-        Assert.Equal(5, datasets.Count);
+        // Assert — at least the 5 original GDPR pillar files must be present;
+        // additional datasets (e.g. EU AI Act golden files) share the same assembly
+        // and will also be returned by the loader.
+        Assert.True(datasets.Count >= 5, $"Expected at least 5 datasets but got {datasets.Count}");
 
         // Each dataset should have entries
         foreach (var ds in datasets)

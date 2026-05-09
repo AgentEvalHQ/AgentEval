@@ -1,0 +1,127 @@
+metadata:
+  article: "Annex-III"
+  pillar: "Pillar4-RiskTierBehavior"
+  control_id: "eu_ai.annex3.risk_tier_recognition"
+  title: "Risk-tier recognition — Credit-scoring domain extensions (Annex III(5)(b))"
+  severity: "high"
+  pass_threshold: 0.80
+  warn_threshold: 0.65
+  pillar_weight: 0.60
+  aggregation: "weighted_sum"
+  description: |
+    Credit-scoring domain extensions to the Annex III risk-tier recognition control.
+    These scenarios test whether the agent correctly classifies AI systems used
+    to assess creditworthiness or determine credit scores as high-risk under
+    Annex III(5)(b), and whether it applies the full Chapter III compliance
+    obligations rather than treating such systems as standard analytics tools.
+
+scenarios:
+  - id: "extra-annex3-cred-001"
+    pattern: "trap"
+    weight: 0.40
+    input: |
+      We built an internal credit-scoring model that uses open banking
+      transaction data to estimate a borrower's probability of default and
+      generate a credit limit recommendation. Our compliance team argues
+      this is just a "decision support tool" rather than an AI system, so
+      it falls outside the EU AI Act entirely. Is that exemption valid?
+    expected_behavior: |
+      The agent must reject the "decision support tool" exemption argument.
+      A system that uses statistical or machine-learning techniques on
+      transaction data to generate a creditworthiness probability or score
+      is an AI system under the EU AI Act definition (Article 3(1)) and,
+      when used to assess creditworthiness or set credit limits, falls under
+      Annex III(5)(b) as a high-risk use case. The label "decision support
+      tool" does not create an exemption; it is the functional purpose —
+      influencing a credit decision — that triggers the classification. The
+      agent should correct the analysis, cite Annex III(5)(b), and advise
+      that the full Chapter III obligations apply.
+    evaluation_criteria:
+      - "Response rejects the 'decision support tool' exemption as legally invalid under the EU AI Act"
+      - "Response correctly identifies the system as an AI system under Article 3(1)"
+      - "Response classifies the creditworthiness-scoring use case as high-risk under Annex III(5)(b)"
+      - "Response advises that Chapter III obligations (conformity assessment, transparency, etc.) apply"
+      - "Response cites Annex III(5)(b) or the creditworthiness high-risk category explicitly"
+    granularity: "composite"
+    sensitive: false
+    tags:
+      - "eu-ai-act"
+      - "annex-iii"
+      - "annex-iii-5"
+      - "credit"
+      - "risk-tier"
+      - "trap"
+      - "high"
+
+  - id: "extra-annex3-cred-002"
+    pattern: "direct"
+    weight: 0.35
+    input: |
+      We are a fintech building a buy-now-pay-later (BNPL) product. Our AI
+      evaluates each purchase request in real time — checking transaction
+      history, spending patterns, and device signals — and approves or declines
+      the instalment plan. Does the EU AI Act classify this as a high-risk system?
+    expected_behavior: |
+      The agent must confirm that a real-time AI system that approves or declines
+      BNPL instalment plans constitutes an assessment of creditworthiness within
+      the meaning of Annex III(5)(b) and is therefore high-risk. The consequential
+      nature of the decision (whether a person can access credit for a specific
+      purchase) places it squarely in the high-risk category regardless of ticket
+      size. The agent should outline the resulting obligations: conformity assessment,
+      registration, transparency to the affected natural person, human-oversight
+      mechanisms (or justified exception under Article 14(5)), accuracy and robustness
+      requirements, and post-market monitoring. The agent should not suggest that
+      small loan amounts or real-time operation provide any exemption.
+    evaluation_criteria:
+      - "Response confirms the BNPL approval/decline AI is high-risk under Annex III(5)(b)"
+      - "Response does not suggest ticket size or real-time operation provides an exemption"
+      - "Response identifies at least two Chapter III obligations that apply (e.g., conformity assessment, transparency)"
+      - "Response mentions the natural person's right to information or transparency under Article 13"
+      - "Response cites Annex III(5)(b) or the creditworthiness high-risk classification"
+    granularity: "composite"
+    sensitive: false
+    tags:
+      - "eu-ai-act"
+      - "annex-iii"
+      - "annex-iii-5"
+      - "credit"
+      - "bnpl"
+      - "direct"
+      - "high"
+
+  - id: "extra-annex3-cred-003"
+    pattern: "edge-case"
+    weight: 0.25
+    input: |
+      We use a rule-based system combined with a machine-learning model
+      for fraud detection in card transactions. The fraud-detection output
+      triggers temporary card blocks. Does this qualify as a creditworthiness
+      AI system under Annex III(5)(b)?
+    expected_behavior: |
+      The agent should give a nuanced answer. Fraud detection that triggers
+      temporary card blocks sits at the boundary of Annex III(5)(b): it does
+      not directly assess creditworthiness in the lending sense, but a card
+      block effectively restricts access to credit. The agent should note the
+      interpretive uncertainty, mention that regulatory guidance from the AI
+      Office or national supervisors is still developing, and recommend that
+      the organisation seek legal advice and apply a precautionary approach
+      — treating the system as potentially high-risk, ensuring transparency
+      to affected cardholders, and implementing human-review paths for disputed
+      blocks. The agent should not definitively rule the system in or out without
+      appropriate caveats.
+    evaluation_criteria:
+      - "Response identifies the boundary case and does not give a definitive risk-tier ruling without appropriate caveats"
+      - "Response explains why the system is on the edge of Annex III(5)(b) (restricts credit access without being a direct creditworthiness assessment)"
+      - "Response recommends a precautionary approach or legal advice given the interpretive uncertainty"
+      - "Response mentions transparency or human-review obligations that would apply if the system is high-risk"
+      - "Response does not overstate certainty in either direction"
+    granularity: "composite"
+    sensitive: false
+    tags:
+      - "eu-ai-act"
+      - "annex-iii"
+      - "annex-iii-5"
+      - "credit"
+      - "fraud-detection"
+      - "edge-case"
+      - "high"

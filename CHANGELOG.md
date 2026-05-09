@@ -43,6 +43,125 @@ Tests added on this branch — Article 17 golden tree (executable spec), 24+ uni
 
 ---
 
+### Added — Agentic Evaluator Suite Phase 6: Memory, Multi-turn, Reasoning, Calibration, Adversarial, UX (plan 06)
+
+- **19 new evaluators** across 7 new categories — all AgentEval-original (no upstream prompty equivalents):
+  - _Memory (2)_: `MemoryRecallAccuracyEval` (HIGH), `LongConversationCoherenceEval` (HIGH) — in `Memory/`.
+  - _Multi-turn (3)_: `TurnCoherenceEval` (MEDIUM), `GoalTrackingEval` (HIGH), `ClarificationAppropriatenessEval` (LOW) — in `MultiTurn/`.
+  - _Reasoning (4)_: `ReasoningCorrectnessEval` (MEDIUM), `GoalDecompositionQualityEval` (MEDIUM), `PlanFormulationQualityEval` (MEDIUM), `IntermediateStepHallucinationEval` (MEDIUM) — in `Reasoning/`.
+  - _Calibration (3)_: `ConfidenceCalibrationEval` (LOW), `UncertaintyAcknowledgmentEval` (LOW), `SelfCorrectionQualityEval` (MEDIUM) — in `Calibration/`.
+  - _Adversarial (3)_: `DirectInjectionEval` (LOW — hybrid deterministic-first), `PersonaAttackEval` (LOW — hybrid deterministic-first), `JailbreakResistanceEval` (MEDIUM — combined pattern library) — in `Adversarial/`.
+  - _UX (3)_: `VerbosityAppropriatenessEval` (LOW), `ToneAppropriatenessEval` (LOW), `RefusalQualityEval` (LOW) — in `UX/`.
+  - _Efficiency (1)_: `CostQualityEfficiencyEval` (TRIVIAL — pure code) — in `Efficiency/`.
+- **`EvaluatorCostTier` enum + `EvaluatorCostMap` static dictionary** in `AgentEval.Abstractions/Evals/` — 46 entries spanning all plan-05 + plan-06 evaluators. Unknown keys default to `Medium` (conservative).
+- **`--budget-tier {trivial|low|medium|high|all}` CLI flag** for `agenteval bench agentic` — filters out above-budget evaluators and renormalizes weights. Use `low` for dev iteration, `medium` for PR builds, omit for release gates.
+- **4 new preset factories** in `AgenticBenchmark`:
+  - `Conversational()` — 5 evaluators (MemoryRecall 0.25, LongConvCoherence 0.25, TurnCoherence 0.20, GoalTracking 0.20, ClarificationAppropriateness 0.10); threshold 0.80.
+  - `Reasoning()` — 4 evaluators (ReasoningCorrectness 0.30, IntermediateStepHallucination 0.25, PlanFormulationQuality 0.25, GoalDecompositionQuality 0.20); threshold 0.80.
+  - `UserExperience()` — 5 evaluators (ToneAppropriateness 0.30, VerbosityAppropriateness 0.25, RefusalQuality 0.20, ConfidenceCalibration 0.15, UncertaintyAcknowledgment 0.10); threshold 0.80.
+  - `AdversarialDirect()` — 3 evaluators (DirectInjection 0.40, PersonaAttack 0.30, JailbreakResistance 0.30); threshold 0.95.
+  - **Total agentic preset count: 11** (up from 7).
+- **4 new CLI presets** — `conversational`, `reasoning`, `user-experience`, `adversarial-direct` added to `BenchAgenticCommand.ResolvePreset`.
+- **`ConversationTurn` record** — `sealed record ConversationTurn(Role, Content, Timestamp?)` in `Conversation/`; carries the `EvalInput.Metadata["conversation_history"]` contract for all memory, multi-turn, and calibration evaluators.
+- **`ConversationHistoryHelper`** in `Conversation/` — public helper that centralises `TryGetHistory`, `TryGetCorrectionTurn`, `FormatTranscript`, and `FormatPreviousTurn`. New conversation-history-consuming evaluators must use this helper rather than re-implementing private copies.
+- **`AdversarialPatternLibrary`** in `Adversarial/` — internal helper that loads + compiles regex patterns from embedded JSON resources. Used by `DirectInjectionEval`, `PersonaAttackEval`, and `JailbreakResistanceEval`.
+- **`CostFilteredCompositeBuilder.FilterByBudget`** — filters composite components by cost tier and renormalizes weights.
+- **19 new per-evaluator test files** across `tests/AgentEval.Tests/Agentic/{Memory,MultiTurn,Reasoning,Calibration,Adversarial,UX,Efficiency}/`.
+- **4 new E2E preset tests** — `AgenticConversationalE2ETest`, `AgenticReasoningE2ETest`, `AgenticUserExperienceE2ETest`, `AgenticAdversarialDirectE2ETest`.
+- **3 new `CostFilteredCompositeBuilder` tests** — filter low, no-op all, and throw-on-empty. Plus a zero-weight-component edge-case test added in the R1-R7 polish pass.
+- **R6 boundary tests** for `JailbreakResistanceEval.patternsToRun` — `Theory` covering 0/-1/-100 throw paths, plus single-pattern cap and `int.MaxValue` overflow guard.
+- **5 new golden datasets** under `tests/AgentEval.Tests/Agentic/Calibration/Golden/` — ~77 hand-labeled scenarios:
+  - `golden-memory-multiturn.jsonl` — 25 entries across 5 memory/multi-turn evaluators.
+  - `golden-reasoning.jsonl` — 16 entries across 4 reasoning evaluators.
+  - `golden-confidence-calibration.jsonl` — 12 entries across 3 calibration evaluators.
+  - `golden-adversarial-direct.jsonl` — 12 entries across 3 adversarial evaluators.
+  - `golden-ux.jsonl` — 12 entries across 3 UX evaluators.
+- **Documentation updates** — `docs/benchmarks/agentic/getting-started.md` extended with 4 new preset rows, 7 new category sections, and a "Cost-Aware Execution" section. New `docs/benchmarks/agentic/cost-guidance.md` with per-evaluator cost-tier table, recommended budget tiers per use case, and estimated costs per preset.
+
+---
+
+### Added — Agentic Evaluator Suite (plan 05 Phase 1)
+
+- New `src/AgentEval.Evals.Agentic/` project: 11 named `IEval` implementations for agent-level evaluation (Task Completion, Task Adherence with 5 sub-dimensions, Intent Identification, Intent Resolution, Task Navigation Efficiency, Tool Selection, Tool Input Accuracy, Tool Output Utilization, Tool Call Success — deterministic-first, Tool Efficiency, Tool Call Accuracy aggregate).
+- Evaluator prompts under `Resources/Prompts/{system,process}/` are forked from public MIT-licensed sources (`azure-sdk-for-python` `_evaluators/*.prompty` files) and improved per the AgentEval envelope: `temperature: 0`, structured `evidence[]` output, severity rubric, sub-dimensions where applicable. Each prompt file's header carries the source URL, pinned commit SHA at fork time, and the list of modifications.
+- `AgenticBenchmark.AgenticExecution()` and `.ToolCallAccuracy()` factory methods.
+- New CLI verbs: `agenteval bench agentic [--preset agentic-execution|tool-call-accuracy]`, `agenteval bench agentic calibrate`, `agenteval render --benchmark agentic`.
+- New CI workflow `.github/workflows/agentic-calibration.yml`.
+- `AgenticBenchmarkResult` wrapper + `agentic-result.schema.json` (separate from compliance evidence).
+
+### Notes
+
+- Multi-judge × Mode-B mutual exclusivity continues to apply (inherited from plan-03 G7.6).
+- PDF rendering is deferred to a follow-up batch; Markdown report ships in Phase 1.
+- The previous Foundry-equivalent compatibility layer (`FoundryUriRegistry`, `ExternalReference`, `FoundryEquivalent()` preset) was removed; the project's relationship to upstream is **prompt provenance only** — each forked prompt cites its public MIT-licensed source in the file header, and the `findings-and-suggestions.md` document captures the upstream feedback story.
+
+---
+
+### Added — Agentic Evaluator Suite Phases 4 + 5: Safety + Telemetry + Stochastic Stability (plan 05 Phase 4 + 5)
+
+- **13 safety evaluators** in `src/AgentEval.Evals.Agentic/Safety/`:
+  - _Hybrid deterministic-first (3)_: `ProhibitedActionsEval` (policy-as-code, forbidden tools + patterns + approval checks → LLM fallback), `SensitiveDataLeakageEval` (regex scan for PII/secrets → LLM fallback), `SystemPromptLeakageEval` (high-signal phrase patterns → LLM fallback).
+  - _Content-safety hybrid (4)_: `HateUnfairnessEval`, `SexualEval`, `ViolenceEval`, `SelfHarmEval` — each delegates to `IContentSafetyClient` when available, falls back to LLM judge. All four carry `severity: critical` and threshold 0.95.
+  - _LLM judge (4)_: `IndirectAttackEval` (XPIA / cross-prompt injection), `ProtectedMaterialEval` (copyright), `CodeVulnerabilityEval` (insecure generated code), `UngroundedAttributesEval` (hallucinated facts).
+  - _LLM judge with skip short-circuit (1)_: `UnsafeToolUseEval` — returns `Skipped` when no tool calls are present.
+- **Policy-as-code framework** — `ProhibitedActionPolicy` (immutable record), `IPolicyResolver` interface, `StaticPolicyResolver` (single global policy), `ToolPattern` (regex-based call prohibition). Located in `Safety/Policy/`.
+- **`IContentSafetyClient` / `NullContentSafetyClient`** — pluggable interface for Azure AI Content Safety integration. `NullContentSafetyClient.Instance` is the default (all zero severity → LLM fallback).
+- **6 telemetry evaluators** in `src/AgentEval.Evals.Agentic/Telemetry/` — pure-code, zero LLM calls: `LatencyEval` (P99 vs. threshold), `TokenUsageEval` (token budget), `CostEval` (USD budget), `ErrorRateEval` (call error rate), `RetryRateEval` (retry rate), `ToolLatencyEval` (worst per-tool mean latency). All read telemetry from `EvalInput.Metadata["agentic_telemetry"]` (`AgenticTelemetry` record) or constructor fallback. Return `Skipped` when no telemetry data is present.
+- **`StochasticStabilityEval`** in `src/AgentEval.Evals.Agentic/StochasticStability/` — pure-code meta-evaluator measuring run-to-run score consistency across N prior runs. Composite of success-rate (0.50), score-variance-inverse (0.30), and failure-mode-consistency (0.20). Reads `EvalInput.Metadata["run_results"]`. Requires ≥2 runs; returns `Skipped` for fewer.
+- **`AgenticBenchmark.Safety()` factory** — 12-evaluator composite (threshold 0.90); weights 0.20/0.10/0.08/0.08/0.08/0.08/0.10/0.06/0.06/0.04/0.06/0.06 for critical-to-high dimension priority.
+- **3 new CLI presets** — `agenteval bench agentic --preset safety | telemetry | stochastic-stability` added to `BenchAgenticCommand.ResolvePreset`. Safety preset uses an empty `StaticPolicyResolver`; custom policies must be supplied programmatically.
+- 9 of the 13 safety-evaluator prompts (hate-unfairness, sexual, violence, self-harm, protected-material, code-vulnerability, indirect-attack, ungrounded-attributes, sensitive-data-leakage) carry MIT-attribution headers citing their public-source `.prompty` upstreams; the remaining 4 (prohibited-actions, system-prompt-leakage, unsafe-tool-use, content within the policy framework) are AgentEval-original. Telemetry and stochastic-stability are pure-code AgentEval-original operational metrics with no upstream prompts.
+- **78 new tests** across `Safety/` (13 files × ~4 tests), `Telemetry/` (6 files × 3 tests), `StochasticStability/` (4 tests), `EndToEnd/AgenticSafetyE2ETest.cs` (2 tests). Total suite: 3242 passing.
+
+### Fixed — Agentic Evaluator Suite Phases 4 + 5 (Opus review fixes)
+
+- **Credit-card regex false-positive** (`SensitiveDataLeakageEval`): old pattern `\b(?:\d[ \-]?){13,16}\b` matched 14-digit timestamps (e.g., `20250509120000`) as credit card numbers. Replaced with an issuer-prefix–anchored pattern requiring a known Visa / MasterCard / Amex / Discover / Diners prefix. Regression test: `"order id 20250509120000"` no longer triggers; `"4532 1234 5678 9012"` (Visa) does.
+- **Severity label `"none"` on failure** (`HateUnfairnessEval`, `SexualEval`, `ViolenceEval`, `SelfHarmEval`): when a strict threshold (e.g., 0.95) caused a fail on a small absolute severity (e.g., severity=0.06 → score=0.94), the severity label was erroneously `"none"` rather than `"low"`. Fixed via a `(passed, severity)` switch expression that guarantees at least `"low"` on all failure paths. Test coverage added for all four evaluators.
+
+---
+
+### Added — Agentic Evaluator Suite Phase 3: Multi-Judge Adjudication + Meta-Evaluators (plan 05 Phase 3)
+
+- **`AdjudicatedMultiJudgeWrapper`** in `src/AgentEval.Evals.Agentic/Adjudication/` — wraps a panel of judges, computes inter-rater agreement (Cohen's kappa for ≥3 judges, pairwise agreement rate for 2), and conditionally invokes an adjudicator judge when agreement falls below a configurable threshold (default 0.70). Adjudication state surfaced in `Details.Dimensions` (`agreement`, `disputed`, `adjudicated`). SubResults include panel + adjudicator result when triggered.
+- **`JudgeAgreementEval`** in `src/AgentEval.Evals.Agentic/JudgeQuality/` — pure-code meta-evaluator computing Cohen's kappa across a judge panel. Reads results from `EvalInput.Metadata["judge_results"]` (accepts `IEnumerable<EvalResult>`, `IEnumerable<string>` of labels, or a JSON array string). Pass threshold: 0.60.
+- **`CalibrationAccuracyEval`** in `src/AgentEval.Evals.Agentic/JudgeQuality/` — pure-code meta-evaluator computing fraction of judge verdicts matching expected verdicts. Reads from `EvalInput.Metadata["calibration_pairs"]`. Pass threshold: 0.85.
+- **`JudgeDriftEval`** in `src/AgentEval.Evals.Agentic/JudgeQuality/` — pure-code meta-evaluator comparing two run snapshots (`snapshot_a` / `snapshot_b` in metadata) and computing `score = 1.0 - max_delta`. Passes when max_delta < 0.05 (5%). Severity: low (meta-metric).
+- **`AgenticBenchmark.JudgeQuality()`** factory — 3-evaluator meta-benchmark: `JudgeAgreementEval` (0.40), `CalibrationAccuracyEval` (0.40), `JudgeDriftEval` (0.20); aggregation `WeightedSumAggregation`; threshold 0.75. No LLM judge required.
+- **New CLI preset** `agenteval bench agentic --preset judge-quality` — resolves to `AgenticBenchmark.JudgeQuality()` in `BenchAgenticCommand.ResolvePreset`.
+- 3 new meta-evaluators (`judge_agreement`, `calibration_accuracy`, `judge_drift`) — all AgentEval-original; pure code, no LLM dependency.
+- **13 new tests** across `Adjudication/AdjudicatedMultiJudgeWrapperTests.cs` (3), `JudgeQuality/JudgeAgreementEvalTests.cs` (3), `JudgeQuality/CalibrationAccuracyEvalTests.cs` (3), `JudgeQuality/JudgeDriftEvalTests.cs` (3), and `EndToEnd/AgenticJudgeQualityE2ETest.cs` (2).
+
+---
+
+### Added — Agentic Evaluator Suite Phase 2: RAG/Quality (plan 05 Phase 2)
+
+- **8 RAG/quality evaluators** in `src/AgentEval.Evals.Agentic/Quality/`: `GroundednessEval` (4-sub-dimension composite: claim support, claim contradicted, citation accuracy, evidence coverage), `RelevanceEval`, `CoherenceEval`, `FluencyEval`, `SimilarityEval`, `ResponseCompletenessEval`, `QaCompositeEval` (weighted roll-up of all 7 quality dimensions).
+- **`F1ScoreEval`** ships in `src/AgentEval.Core/Evals/` — pure-code deterministic evaluator, zero LLM dependency; useful standalone without pulling the agentic package.
+- **`AgenticBenchmark.RagQuality()`** factory — 7-evaluator flat composite (groundedness 0.30, response_completeness 0.20, relevance 0.15, similarity 0.15, f1_score 0.10, coherence 0.05, fluency 0.05); threshold 0.70. Tree is intentionally flat for diagnosis; `QaCompositeEval` is the single-number roll-up for users who don't need per-dimension breakdown.
+- **New CLI preset** `agenteval bench agentic --preset rag-quality`.
+- **Golden dataset** `tests/AgentEval.Tests/Agentic/Calibration/Golden/golden-20-quality.jsonl` — 20 hand-labeled scenarios across 7 quality evaluators (~70% pass / 30% fail).
+- 7 of the 8 RAG-evaluator prompts (groundedness, relevance, coherence, fluency, similarity, response-completeness — plus the 4 groundedness sub-dimensions sharing the parent prompt) carry MIT-attribution headers citing their public-source `.prompty` upstreams. `f1_score` is pure code (no prompt). `qa_composite` is AgentEval-original (composite of the other 7).
+- **24 new tests** across `Golden/` (Groundedness, Relevance, Coherence, Fluency, Similarity, ResponseCompleteness, F1Score, QaComposite — 3 tests each) and `EndToEnd/AgenticRagQualityE2ETest.cs` (2 tests).
+
+---
+
+### Added — EU AI Act Compliance Benchmark (plan 04)
+
+- New `samples/AgentEval.EuAiActBenchmark/` sample implementing an EU AI Act behavioral compliance benchmark covering 13 controls across 6 pillars (Art 5 prohibitions, Art 13/14, Art 15, Art 50, Annex III, Art 51-55 GPAI probe).
+- New CLI verb `agenteval bench eu-ai-act` with presets `smoke` / `standard` / `audit` (+ `standard+high-risk-{employment,credit,education}` domain packs if E8.1-3 shipped).
+- New CLI verb `agenteval bench eu-ai-act calibrate` for hand-labeled judge calibration.
+- Extended `agenteval compliance render --regulation eu-ai-act` to re-render PDFs without LLM cost.
+- New CI workflow `.github/workflows/eu-ai-act-calibration.yml` gating release branches on judge calibration accuracy.
+- New cross-regulation linking: `CrossRegulationLinker` surfaces overlap between GDPR and EU AI Act findings.
+- All Composite-Eval Phase-2 strategies reused from GDPR (CapByWorst, Min, MajorityVote, WeightedMedian, MultiJudgeWrapper) — zero new strategies added in Core, validating the expand-on-demand-then-reuse pattern.
+
+### Notes
+
+- This benchmark is a first-line **dialog-behavior screening tool**. It does not establish EU AI Act compliance — full compliance requires risk classification, conformity assessment, technical documentation, post-market monitoring, and (where applicable) EU database registration, none of which are in scope.
+- Multi-judge x Mode-B mutual exclusivity is a known v1 limitation inherited from the GDPR plan-03 implementation.
+
+---
+
 ### GDPR Benchmark (Plan 03)
 
 #### Added

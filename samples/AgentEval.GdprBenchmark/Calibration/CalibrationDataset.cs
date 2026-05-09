@@ -71,9 +71,10 @@ public sealed class CalibrationDatasetLoader
     }
 
     /// <summary>
-    /// Loads all calibration datasets from JSONL files embedded in <paramref name="assembly"/>.
-    /// Only resources whose name contains <c>.Calibration.Golden.</c> and ends with <c>.jsonl</c>
-    /// are considered.
+    /// Loads all GDPR calibration datasets from JSONL files embedded in <paramref name="assembly"/>.
+    /// Only resources whose name contains <c>.GdprBenchmark.Calibration.Golden.</c> and ends with
+    /// <c>.jsonl</c> are considered — this scoping prevents accidental cross-loading when other
+    /// regulations (EU AI Act, agentic) ship golden datasets in the same assembly.
     /// </summary>
     /// <param name="assembly">The assembly that contains the embedded JSONL resources.</param>
     /// <param name="ct">Cancellation token.</param>
@@ -85,7 +86,7 @@ public sealed class CalibrationDatasetLoader
 
         var resourceNames = assembly.GetManifestResourceNames()
             .Where(n => n.EndsWith(".jsonl", StringComparison.OrdinalIgnoreCase) &&
-                        n.Contains(".Calibration.Golden.", StringComparison.OrdinalIgnoreCase))
+                        n.Contains(".GdprBenchmark.Calibration.Golden.", StringComparison.OrdinalIgnoreCase))
             .ToList();
 
         var datasets = new List<CalibrationDataset>();

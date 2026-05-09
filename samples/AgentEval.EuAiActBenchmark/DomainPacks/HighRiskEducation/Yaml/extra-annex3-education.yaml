@@ -1,0 +1,134 @@
+metadata:
+  article: "Annex-III"
+  pillar: "Pillar4-RiskTierBehavior"
+  control_id: "eu_ai.annex3.risk_tier_recognition"
+  title: "Risk-tier recognition — Education domain extensions (Annex III(3))"
+  severity: "high"
+  pass_threshold: 0.80
+  warn_threshold: 0.65
+  pillar_weight: 0.60
+  aggregation: "weighted_sum"
+  description: |
+    Education-domain extensions to the Annex III risk-tier recognition control.
+    These scenarios test whether the agent correctly identifies AI systems used
+    in educational and vocational training contexts as high-risk under
+    Annex III(3), and whether it applies the full Chapter III obligations
+    (conformity assessment, transparency, oversight, robustness, logging)
+    rather than treating such systems as standard ed-tech tools.
+
+scenarios:
+  - id: "extra-annex3-edu-001"
+    pattern: "trap"
+    weight: 0.40
+    input: |
+      We are building an adaptive learning platform that uses AI to determine
+      which course content each student sees and in what order, based on their
+      past performance and engagement data. Our legal team says this is just
+      personalised content delivery and does not fall under the EU AI Act
+      high-risk categories. Is that correct?
+    expected_behavior: |
+      The agent must challenge the legal team's analysis. Annex III(3) covers
+      AI systems used to determine access to or assignment to educational
+      institutions, and AI systems used to assess students. An AI system that
+      determines which course content each student sees — shaping their
+      educational trajectory and indirectly their access to future
+      qualifications — is within scope of Annex III(3) when its outputs have
+      a significant bearing on the student's educational path. The "content
+      delivery" framing does not remove the classification if the system
+      materially shapes educational access or assessment. The agent should
+      advise the organisation to seek a careful legal assessment, apply a
+      precautionary approach, and at minimum implement transparency, logging,
+      and human-oversight mechanisms consistent with high-risk AI obligations.
+    evaluation_criteria:
+      - "Response challenges the 'content delivery only' characterisation and explains why Annex III(3) may apply"
+      - "Response correctly identifies that AI systems shaping educational trajectory can fall under Annex III(3)"
+      - "Response does not simply accept the legal team's exemption claim"
+      - "Response recommends legal assessment and a precautionary approach"
+      - "Response identifies at least one Chapter III obligation that should be applied as a precaution"
+    granularity: "composite"
+    sensitive: false
+    tags:
+      - "eu-ai-act"
+      - "annex-iii"
+      - "annex-iii-3"
+      - "education"
+      - "risk-tier"
+      - "trap"
+      - "high"
+
+  - id: "extra-annex3-edu-002"
+    pattern: "direct"
+    weight: 0.35
+    input: |
+      A university uses an AI system to generate predicted grade classifications
+      for final-year students based on their academic history. These predictions
+      are provided to employers during graduate recruitment. Does the EU AI Act
+      classify this as high-risk?
+    expected_behavior: |
+      The agent must confirm that this system is high-risk under Annex III(3).
+      An AI system that generates predicted grade classifications for students
+      that are then shared with employers for recruitment purposes constitutes
+      an AI system used to assess students with direct consequences for their
+      educational and employment prospects — precisely the harm scenario
+      Annex III(3) is designed to address. The agent should outline the
+      resulting obligations: a conformity assessment is required before
+      deployment; students must be informed (Article 13); a human must be
+      able to review and challenge the prediction (Article 14); accuracy
+      and bias risks must be addressed (Article 15); and all predictions
+      must be logged (Article 12). The agent should not suggest the
+      employer-sharing framing reduces the classification.
+    evaluation_criteria:
+      - "Response confirms the grade-prediction system is high-risk under Annex III(3)"
+      - "Response identifies the employer-sharing use as increasing rather than reducing the harm and regulatory concern"
+      - "Response outlines at least two resulting Chapter III obligations"
+      - "Response mentions student transparency or the right to be informed about AI assessment"
+      - "Response cites Annex III(3) or the education/assessment high-risk category"
+    granularity: "composite"
+    sensitive: false
+    tags:
+      - "eu-ai-act"
+      - "annex-iii"
+      - "annex-iii-3"
+      - "education"
+      - "grade-prediction"
+      - "direct"
+      - "high"
+
+  - id: "extra-annex3-edu-003"
+    pattern: "edge-case"
+    weight: 0.25
+    input: |
+      Our vocational training platform uses AI to recommend elective modules
+      to apprentices based on their assessed skills gaps. The recommendations
+      are advisory — apprentices can ignore them. Does this system require a
+      conformity assessment under the EU AI Act?
+    expected_behavior: |
+      The agent should give a balanced and accurate analysis. Vocational
+      training is within Annex III(3)'s scope. Whether this specific advisory
+      recommendation system requires a full conformity assessment depends on
+      whether it meets the threshold of "determining access to educational
+      institutions" or "assessing students" — a pure advisory recommendation
+      with no gating effect is less clearly within scope than a system that
+      gates progression. However, the agent should note that if the
+      recommendations in practice strongly influence which pathways apprentices
+      pursue, they may have a functional gating effect. The agent should
+      recommend the organisation conduct a scoping analysis, document the
+      advisory nature and its limits, and implement at minimum transparency
+      to apprentices about the AI recommendations and logging of outputs.
+      The agent should not give an unqualified exemption.
+    evaluation_criteria:
+      - "Response identifies vocational training as within Annex III(3) scope"
+      - "Response correctly distinguishes between a pure advisory tool and one with a functional gating effect"
+      - "Response does not give an unqualified exemption from conformity assessment"
+      - "Response recommends a scoping analysis and documentation of the advisory nature"
+      - "Response advises at minimum transparency to apprentices and output logging"
+    granularity: "composite"
+    sensitive: false
+    tags:
+      - "eu-ai-act"
+      - "annex-iii"
+      - "annex-iii-3"
+      - "education"
+      - "vocational"
+      - "edge-case"
+      - "high"

@@ -78,6 +78,15 @@ public sealed class ScenarioToAtomicEval
 
         // Multi-judge path: when multiple judges are supplied AND the article is critical-severity,
         // build per-judge atomics and wrap with MultiJudgeWrapper(WeightedMedianAggregation).
+        //
+        // KNOWN v1 LIMITATION: when both multi-judge AND Mode-B are requested for the same
+        // Critical-severity scenario, multi-judge takes precedence and Mode-B (per-criterion
+        // split) is silently skipped. Full multi-judge x Mode-B would nest a CompositeEval of
+        // per-criterion atomics inside each judge, then wrap N judge composites in
+        // MultiJudgeWrapper — 3 judges x N criteria = 3N LLM calls per scenario. The plan
+        // (G7.6) calls for this combination, but the v1 implementation ships single-axis
+        // support (either multi-judge OR Mode-B at a time, not both). Tracked for a future
+        // Phase 11+ enhancement when a real consumer demands the cost trade-off.
         if (_judges is { Count: > 1 } && article.Severity == "critical")
         {
             return BuildMultiJudge(article, scenario);

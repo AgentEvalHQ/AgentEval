@@ -11,7 +11,9 @@
   <ItemGroup>
     <ProjectReference Include="../AgentEval.Abstractions/AgentEval.Abstractions.csproj" />
     <ProjectReference Include="../AgentEval.DataLoaders/AgentEval.DataLoaders.csproj" />
+    <ProjectReference Include="../AgentEval.Evals.Agentic/AgentEval.Evals.Agentic.csproj" />
     <ProjectReference Include="..\..\samples\AgentEval.GdprBenchmark\AgentEval.GdprBenchmark.csproj" />
+    <ProjectReference Include="..\..\samples\AgentEval.EuAiActBenchmark\AgentEval.EuAiActBenchmark.csproj" />
   </ItemGroup>
 
   <ItemGroup>

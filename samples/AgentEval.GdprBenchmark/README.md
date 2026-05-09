@@ -32,7 +32,7 @@ project (`tests/AgentEval.Tests/GdprBenchmark/`), not in this sample.
 
 ## Further Reading
 
-- [Full getting-started guide](../../docs/gdpr-benchmark/getting-started.md) —
+- [Full getting-started guide](../../docs/benchmarks/gdpr/getting-started.md) —
   presets, output structure, result interpretation, custom scenarios, calibration,
   and audit chain.
 - [Composite Evaluations](../../docs/composite-evals.md) — the underlying

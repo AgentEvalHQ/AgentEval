@@ -10,6 +10,12 @@ using AgentEval.GdprBenchmark.Articles.Loading;
 using AgentEval.GdprBenchmark.Reporting;
 using AgentEval.GdprBenchmark.Reporting.Pdf;
 using AgentEval.Output;
+using EuAiActLoader = AgentEval.EuAiActBenchmark.Articles.Loading.ArticleScenarioYamlLoader;
+using EuAiActScenarioToAtomicEval = AgentEval.EuAiActBenchmark.Articles.Building.ScenarioToAtomicEval;
+using EuAiActArticleCompositeBuilder = AgentEval.EuAiActBenchmark.Articles.Building.ArticleCompositeBuilder;
+using AgentEval.EuAiActBenchmark.Articles;
+using AgentEval.EuAiActBenchmark.Reporting;
+using AgentEval.EuAiActBenchmark.Reporting.Pdf;
 
 namespace AgentEval.Cli.Commands;
 
@@ -42,9 +48,11 @@ public static class ComplianceRenderCommand
         string? rootOverride,
         ArticlesRegistry? registryOverride)
     {
-        if (!string.Equals(regulation, "gdpr", StringComparison.OrdinalIgnoreCase))
+        var isGdpr = string.Equals(regulation, "gdpr", StringComparison.OrdinalIgnoreCase);
+        var isEuAiAct = string.Equals(regulation, "eu-ai-act", StringComparison.OrdinalIgnoreCase);
+        if (!isGdpr && !isEuAiAct)
         {
-            Console.Error.WriteLine($"Unsupported regulation '{regulation}'. Only 'gdpr' is supported in v1.");
+            Console.Error.WriteLine($"Unsupported regulation '{regulation}'. Supported in v1: gdpr, eu-ai-act.");
             return 1;
         }
 
@@ -58,12 +66,18 @@ public static class ComplianceRenderCommand
 
         var agentEvalDir = Path.Combine(workspaceRoot, ".agenteval");
         var sanitizedSubject = SanitizeForPath(subject);
-        var complianceDir = Path.Combine(agentEvalDir, "compliance", "GDPR", sanitizedSubject);
+        var regulationFolder = isGdpr ? "GDPR" : "EU-AI-Act";
+        var complianceDir = Path.Combine(agentEvalDir, "compliance", regulationFolder, sanitizedSubject);
 
         if (!Directory.Exists(complianceDir))
         {
             Console.Error.WriteLine($"No compliance evidence found at {complianceDir}.");
             return 1;
+        }
+
+        if (isEuAiAct)
+        {
+            return await RenderEuAiActAsync(complianceDir, ts);
         }
 
         // ── Resolve timestamp directory ──────────────────────────────────────
@@ -137,6 +151,90 @@ public static class ComplianceRenderCommand
         try
         {
             var renderer = new GDPRPdfRenderer(articles);
+            await renderer.RenderAsync(evidence, pdfPath);
+            Console.WriteLine($"PDF report written to: {pdfPath}");
+            return 0;
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Failed to render PDF: {ex.Message}");
+            return 1;
+        }
+    }
+
+    private static async Task<int> RenderEuAiActAsync(string complianceDir, string? ts)
+    {
+        // ── Resolve timestamp directory ──────────────────────────────────────
+        string evidenceDir;
+        if (!string.IsNullOrWhiteSpace(ts))
+        {
+            evidenceDir = Path.Combine(complianceDir, ts);
+        }
+        else
+        {
+            var dirs = Directory.GetDirectories(complianceDir).OrderByDescending(d => d).ToList();
+            if (dirs.Count == 0)
+            {
+                Console.Error.WriteLine($"No evidence directories found under {complianceDir}.");
+                return 1;
+            }
+            evidenceDir = dirs[0];
+        }
+
+        if (!Directory.Exists(evidenceDir))
+        {
+            Console.Error.WriteLine($"Evidence directory not found: {evidenceDir}.");
+            return 1;
+        }
+
+        // ── Load eu-ai-act-evidence.json ─────────────────────────────────────
+        var evidenceFile = Path.Combine(evidenceDir, "eu-ai-act-evidence.json");
+        if (!File.Exists(evidenceFile))
+        {
+            Console.Error.WriteLine($"eu-ai-act-evidence.json not found at {evidenceFile}.");
+            return 1;
+        }
+
+        EuAiActComplianceEvidence evidence;
+        try
+        {
+            await using var stream = File.OpenRead(evidenceFile);
+            evidence = await JsonSerializer.DeserializeAsync<EuAiActComplianceEvidence>(stream, s_jsonOpts)
+                ?? throw new InvalidOperationException("Deserialized evidence was null.");
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Failed to read evidence file: {ex.Message}");
+            return 1;
+        }
+
+        // ── Build optional registry for PII redaction ────────────────────────
+        EuAiActArticlesRegistry? articles = null;
+        try
+        {
+            var loader = new EuAiActLoader();
+            var stubEval = new StubEvaluatorForRegistry();
+            var scenarioBuilder = new EuAiActScenarioToAtomicEval(stubEval, judgeModel: "none");
+            var articleBuilder = new EuAiActArticleCompositeBuilder(scenarioBuilder);
+            articles = new EuAiActArticlesRegistry(loader, articleBuilder);
+        }
+        catch
+        {
+            // Registry is optional — proceed without redaction on failure
+            articles = null;
+        }
+
+        if (articles is null)
+        {
+            Console.Error.WriteLine("EU AI Act registry could not be loaded; PDF rendering requires the registry for PII redaction lookup.");
+            return 1;
+        }
+
+        // ── Render PDF ───────────────────────────────────────────────────────
+        var pdfPath = Path.Combine(evidenceDir, "report.pdf");
+        try
+        {
+            var renderer = new EuAiActPdfRenderer(articles);
             await renderer.RenderAsync(evidence, pdfPath);
             Console.WriteLine($"PDF report written to: {pdfPath}");
             return 0;

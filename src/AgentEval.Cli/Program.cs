@@ -60,7 +60,7 @@ benchGdprCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =>
 
 // bench gdpr calibrate
 var calibrateRootOpt = new Option<string?>("--root") { Description = "Workspace root path (default: current directory)" };
-var calibrateOutOpt = new Option<string?>("--out") { Description = "Output Markdown report path (default: docs/gdpr-benchmark/calibration-{date}.md)" };
+var calibrateOutOpt = new Option<string?>("--out") { Description = "Output Markdown report path (default: docs/benchmarks/gdpr/calibration-{date}.md)" };
 var calibrateCmd = new Command("calibrate", "Run GDPR judge calibration against hand-labeled golden datasets");
 calibrateCmd.Add(calibrateRootOpt);
 calibrateCmd.Add(calibrateOutOpt);
@@ -73,6 +73,77 @@ calibrateCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =>
 benchGdprCmd.Add(calibrateCmd);
 
 benchCmd.Add(benchGdprCmd);
+
+// bench eu-ai-act — same shape as bench gdpr, EU AI Act presets
+var benchEuAiActPresetOpt = new Option<string?>("--preset") { Description = "Preset: smoke | standard | audit (default: standard). Domain-pack composition: standard+high-risk-employment | standard+high-risk-credit | standard+high-risk-education (multi-pack composition like standard+high-risk-employment+high-risk-credit also supported)." };
+var benchEuAiActSubjectOpt = new Option<string?>("--subject") { Description = "Subject name (default: default-agent)" };
+var benchEuAiActRootOpt = new Option<string?>("--root") { Description = "Workspace root path (default: auto-detected)" };
+var benchEuAiActInputOpt = new Option<string?>("--input") { Description = "Agent input text for the evaluation (default: built-in fixture)" };
+var benchEuAiActCmd = new Command("eu-ai-act", "Run the EU AI Act compliance benchmark");
+benchEuAiActCmd.Add(benchEuAiActPresetOpt);
+benchEuAiActCmd.Add(benchEuAiActSubjectOpt);
+benchEuAiActCmd.Add(benchEuAiActRootOpt);
+benchEuAiActCmd.Add(benchEuAiActInputOpt);
+benchEuAiActCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =>
+{
+    var preset = parseResult.GetValue(benchEuAiActPresetOpt) ?? "standard";
+    var subject = parseResult.GetValue(benchEuAiActSubjectOpt) ?? "default-agent";
+    var root = parseResult.GetValue(benchEuAiActRootOpt);
+    var input = parseResult.GetValue(benchEuAiActInputOpt);
+    return await BenchEuAiActCommand.RunAsync(preset, subject, root, input);
+});
+// bench eu-ai-act calibrate
+var euCalibrateRootOpt = new Option<string?>("--root") { Description = "Workspace root path (default: current directory)" };
+var euCalibrateOutOpt = new Option<string?>("--out") { Description = "Output Markdown report path (default: docs/benchmarks/eu-ai-act/calibration-{date}.md)" };
+var euCalibrateCmd = new Command("calibrate", "Run EU AI Act judge calibration against hand-labeled golden datasets");
+euCalibrateCmd.Add(euCalibrateRootOpt);
+euCalibrateCmd.Add(euCalibrateOutOpt);
+euCalibrateCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =>
+{
+    var root = parseResult.GetValue(euCalibrateRootOpt);
+    var outPath = parseResult.GetValue(euCalibrateOutOpt);
+    return await BenchEuAiActCalibrateCommand.RunAsync(root, outPath);
+});
+benchEuAiActCmd.Add(euCalibrateCmd);
+
+benchCmd.Add(benchEuAiActCmd);
+
+// bench agentic — same shape as bench eu-ai-act, agentic presets
+var benchAgenticPresetOpt = new Option<string?>("--preset") { Description = "Preset: agentic-execution | tool-call-accuracy | rag-quality | judge-quality | safety | telemetry | stochastic-stability | conversational | reasoning | user-experience | adversarial-direct (default: agentic-execution). The judge-quality, telemetry, and stochastic-stability presets are pure-code (no LLM cost). The safety preset uses a default empty policy; supply custom policies programmatically." };
+var benchAgenticSubjectOpt = new Option<string?>("--subject") { Description = "Subject name (default: default-agent)" };
+var benchAgenticRootOpt = new Option<string?>("--root") { Description = "Workspace root path (default: auto-detected)" };
+var benchAgenticInputOpt = new Option<string?>("--input") { Description = "Agent input text for the evaluation (default: built-in fixture)" };
+var benchAgenticBudgetTierOpt = new Option<string?>("--budget-tier") { Description = "Budget tier filter: trivial | low | medium | high | all (default: all). Components with a cost tier above the budget are filtered out and remaining weights are renormalized. Use 'low' or 'medium' for fast feedback loops; 'all' for full audit runs." };
+var benchAgenticCmd = new Command("agentic", "Run the agentic behavior benchmark");
+benchAgenticCmd.Add(benchAgenticPresetOpt);
+benchAgenticCmd.Add(benchAgenticSubjectOpt);
+benchAgenticCmd.Add(benchAgenticRootOpt);
+benchAgenticCmd.Add(benchAgenticInputOpt);
+benchAgenticCmd.Add(benchAgenticBudgetTierOpt);
+benchAgenticCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =>
+{
+    var preset = parseResult.GetValue(benchAgenticPresetOpt) ?? "agentic-execution";
+    var subject = parseResult.GetValue(benchAgenticSubjectOpt) ?? "default-agent";
+    var root = parseResult.GetValue(benchAgenticRootOpt);
+    var input = parseResult.GetValue(benchAgenticInputOpt);
+    var budgetTier = parseResult.GetValue(benchAgenticBudgetTierOpt);
+    return await BenchAgenticCommand.RunAsync(preset, subject, root, input, budgetTier);
+});
+// bench agentic calibrate
+var agenticCalibrateRootOpt = new Option<string?>("--root") { Description = "Workspace root path (default: current directory)" };
+var agenticCalibrateOutOpt = new Option<string?>("--out") { Description = "Output Markdown report path (default: docs/benchmarks/agentic/calibration-{date}.md)" };
+var agenticCalibrateCmd = new Command("calibrate", "Run agentic judge calibration against hand-labeled golden datasets");
+agenticCalibrateCmd.Add(agenticCalibrateRootOpt);
+agenticCalibrateCmd.Add(agenticCalibrateOutOpt);
+agenticCalibrateCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =>
+{
+    var root = parseResult.GetValue(agenticCalibrateRootOpt);
+    var outPath = parseResult.GetValue(agenticCalibrateOutOpt);
+    return await BenchAgenticCalibrateCommand.RunAsync(root, outPath);
+});
+benchAgenticCmd.Add(agenticCalibrateCmd);
+
+benchCmd.Add(benchAgenticCmd);
 
 // ─── compliance ───────────────────────────────────────────────────────────────
 var complianceCmd = new Command("compliance", "Compliance reporting commands");
@@ -102,6 +173,30 @@ renderCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =>
 });
 complianceCmd.Add(renderCmd);
 
+// ─── render ───────────────────────────────────────────────────────────────────
+var renderBenchmarkOpt = new Option<string?>("--benchmark") { Description = "Benchmark type to render (currently: agentic)" };
+var renderBenchSubjectOpt = new Option<string?>("--subject") { Description = "Subject name to render results for (required)" };
+var renderBenchTsOpt = new Option<string?>("--ts") { Description = "Timestamp directory (yyyy-MM-dd_HH-mm-ss); defaults to most recent" };
+var renderBenchRootOpt = new Option<string?>("--root") { Description = "Workspace root path (default: auto-detected)" };
+var renderBenchCmd = new Command("render", "Render a Markdown report from existing agentic benchmark results (no LLM cost)");
+renderBenchCmd.Add(renderBenchmarkOpt);
+renderBenchCmd.Add(renderBenchSubjectOpt);
+renderBenchCmd.Add(renderBenchTsOpt);
+renderBenchCmd.Add(renderBenchRootOpt);
+renderBenchCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =>
+{
+    var benchmark = parseResult.GetValue(renderBenchmarkOpt);
+    var subject = parseResult.GetValue(renderBenchSubjectOpt);
+    if (string.IsNullOrWhiteSpace(benchmark) || string.IsNullOrWhiteSpace(subject))
+    {
+        Console.Error.WriteLine("Error: --benchmark and --subject are required.");
+        return 1;
+    }
+    var ts = parseResult.GetValue(renderBenchTsOpt);
+    var root = parseResult.GetValue(renderBenchRootOpt);
+    return await RenderCommand.RunAsync(benchmark, subject, ts, root);
+});
+
 // ─── root ─────────────────────────────────────────────────────────────────────
 var rootCmd = new RootCommand("AgentEval CLI — output-store lifecycle management");
 rootCmd.Add(initCmd);
@@ -109,5 +204,6 @@ rootCmd.Add(doctorCmd);
 rootCmd.Add(migrateCmd);
 rootCmd.Add(benchCmd);
 rootCmd.Add(complianceCmd);
+rootCmd.Add(renderBenchCmd);
 
 return await rootCmd.Parse(args).InvokeAsync();

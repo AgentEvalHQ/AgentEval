@@ -54,6 +54,38 @@ dotnet run --project src/AgentEval.Cli --framework net10.0 -- bench gdpr --prese
 
 ---
 
+## Cost
+
+The per-run cost figures in the preset table are estimates assuming a GPT-4o-class judge (~$0.0025/1K input, ~$0.010/1K output). Actual costs depend on your judge model + provider pricing + scenario complexity.
+
+### Cost factors
+
+The benchmark cost is dominated by:
+
+- **Number of scenarios per preset.** Smoke runs ~5 scenarios; Standard runs ~30; Audit runs all 30+ with multi-judge consensus and Mode-B per-criterion split for Critical articles.
+- **LLM judge calls per scenario.** Most articles use a single-judge `AtomicLlmEval` (1 call). Articles configured with `granularity: composite` and Mode-B split into N calls (one per criterion). The `audit` preset adds 3-judge consensus on Critical articles, multiplying calls by 3.
+- **Domain packs.** `healthcare`, `hr`, `childrens` add ~7-10 scenarios each. Composing two domain packs (`standard+healthcare+hr`) approximately adds the per-pack costs.
+
+### Calibration cost
+
+`agenteval bench gdpr calibrate` runs hand-labeled golden datasets through the judge and computes accuracy + Cohen's kappa per pillar:
+
+- 120 golden entries × 1 LLM call each = ~$0.30-0.60 per full calibration run with a GPT-4o-class judge.
+- The release-gate CI workflow (`.github/workflows/gdpr-calibration.yml`) runs full calibration on each release-branch PR.
+
+### Cost reduction strategies
+
+GDPR is a compliance benchmark — it does **not** support a `--budget-tier` filter (compliance evidence requires full coverage of the configured preset). Cost reduction strategies:
+
+1. **Use `smoke` for dev-loop iteration.** ~$0.05/run is cheap enough to run on every commit.
+2. **Use a smaller / cheaper judge model** in dev, swap to GPT-4o-class in CI/release.
+3. **Filter scenarios** via custom `IBenchmarkRunner` if you only care about specific pillars.
+4. **Enable judge caching** (`OutputStoreOptions.EnableJudgeCache`) to avoid re-invoking the LLM for identical (eval, prompt-version, input-hash) tuples on re-runs.
+
+For granular per-evaluator cost classification of the *agentic* benchmark suite (which `bench agentic` exposes alongside this compliance benchmark), see [`docs/benchmarks/agentic/cost-guidance.md`](../agentic/cost-guidance.md).
+
+---
+
 ## Output Structure
 
 Each run writes to `.agenteval/compliance/GDPR/{subject}/{timestamp}/`. The timestamp uses ISO-8601 format (`yyyy-MM-ddTHH-mm-ssZ`).
@@ -197,7 +229,7 @@ The calibration report records per-pillar accuracy (fraction of entries within a
 - Cohen's kappa >= 0.70 per pillar
 - Zero evaluation failures (judge errors) per pillar
 
-A pillar that fails any threshold blocks the release PR. The report is committed to `docs/gdpr-benchmark/calibration-report.md` as part of the release workflow.
+A pillar that fails any threshold blocks the release PR. The report is committed to `docs/benchmarks/gdpr/calibration-report.md` as part of the release workflow.
 
 **Caveat**: calibration results are only meaningful when a real LLM judge is wired (Azure OpenAI with `AZURE_OPENAI_*` env vars set). Running calibration against the stub judge produces meaningless metrics because the stub always returns placeholder scores.
 
