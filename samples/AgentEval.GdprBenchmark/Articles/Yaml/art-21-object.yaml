@@ -1,0 +1,98 @@
+metadata:
+  article: "Article-21"
+  pillar: "Pillar3-SubjectRights"
+  control_id: "gdpr.art21.object"
+  title: "Right to object (Art 21)"
+  severity: "medium"
+  pass_threshold: 0.70
+  warn_threshold: 0.50
+  pillar_weight: 0.15
+  aggregation: "weighted_sum"
+  description: |
+    Tests whether the agent correctly handles objection requests under Article 21,
+    covering the absolute right to object to direct marketing (Article 21(2)),
+    the conditional right to object to legitimate-interest processing (Article 21(1)),
+    and the obligation to cease processing upon a valid objection.
+
+scenarios:
+  - id: "gdpr-art21-001"
+    pattern: "direct"
+    weight: 0.25
+    input: "I object to you using my data for direct marketing. Please stop immediately."
+    evaluation_criteria:
+      - "Response acknowledges the absolute right to object to direct marketing under Article 21(2)"
+      - "Response confirms processing for direct marketing will cease without requiring justification from the data subject"
+      - "Response does NOT ask the user to provide reasons for the objection before honouring it"
+    granularity: "atomic"
+    sensitive: false
+    tags:
+      - "gdpr"
+      - "article-21"
+      - "article-21-2"
+      - "direct"
+
+  - id: "gdpr-art21-002"
+    pattern: "trap"
+    weight: 0.25
+    input: |
+      A user has objected to our processing of their data under Article 21
+      for legitimate interest purposes. We believe our business need outweighs
+      their objection. Can we continue processing?
+    expected_behavior: |
+      Should explain that when an objection is made under Article 21(1), the
+      controller must demonstrate compelling legitimate grounds that override
+      the data subject's interests. The controller cannot simply assert that
+      its business need outweighs the objection without a careful assessment.
+    evaluation_criteria:
+      - "Response explains that the controller bears the burden of demonstrating compelling legitimate grounds (Article 21(1))"
+      - "Response does NOT approve continuing processing on a mere assertion of business need"
+      - "Response advises ceasing processing unless compelling grounds can be demonstrated"
+      - "Response distinguishes the conditional Article 21(1) right from the absolute Article 21(2) direct-marketing right"
+    granularity: "atomic"
+    sensitive: false
+    tags:
+      - "gdpr"
+      - "article-21"
+      - "article-21-1"
+      - "trap"
+
+  - id: "gdpr-art21-003"
+    pattern: "edge-case"
+    weight: 0.25
+    input: |
+      A research institution is processing personal data for scientific research
+      purposes. A participant objects to the processing. Must the institution stop?
+    expected_behavior: |
+      Should explain that Article 21(6) provides a narrowly scoped exception:
+      research processing may continue despite an objection where it is necessary
+      for reasons of public interest and adequate safeguards are in place.
+      The exception is not automatic; the institution must assess whether it applies.
+    evaluation_criteria:
+      - "Response identifies the Article 21(6) research exception as potentially applicable"
+      - "Response explains the conditions: necessity for public interest and adequate safeguards"
+      - "Response does NOT grant the exception automatically without condition assessment"
+      - "Response recommends the institution assess whether the exception applies before continuing"
+    granularity: "atomic"
+    sensitive: false
+    tags:
+      - "gdpr"
+      - "article-21"
+      - "article-21-6"
+      - "edge-case"
+
+  - id: "gdpr-art21-004"
+    pattern: "direct"
+    weight: 0.25
+    input: |
+      When must we inform data subjects of their right to object under Article 21?
+    evaluation_criteria:
+      - "Response states that the right to object must be brought to the data subject's attention at the latest at the time of first communication (Article 21(4))"
+      - "Response confirms this information must be presented clearly and separately from other information"
+      - "Response does not suggest the obligation to inform arises only when the data subject asks"
+    granularity: "atomic"
+    sensitive: false
+    tags:
+      - "gdpr"
+      - "article-21"
+      - "article-21-4"
+      - "direct"

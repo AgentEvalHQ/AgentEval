@@ -21,6 +21,6 @@
   <ItemGroup>
     <EmbeddedResource Include="Resources\Prompts\*.md" />
     <EmbeddedResource Include="Reporting\Schema\*.json" />
-    <None Include="Articles\Yaml\*.yaml" CopyToOutputDirectory="PreserveNewer" />
+    <EmbeddedResource Include="Articles/Yaml/*.yaml" />
   </ItemGroup>
 </Project>

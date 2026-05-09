@@ -41,6 +41,35 @@ public sealed class ArticleScenarioYamlLoader
         return await Task.WhenAll(tasks);
     }
 
+    /// <summary>
+    /// Loads all article YAMLs embedded as resources in <paramref name="assembly"/>.
+    /// Resource names are matched with <c>EndsWith(".yaml")</c>; resources whose name contains
+    /// <c>"test-fixture"</c> are excluded by default so the validator/registry only see real articles.
+    /// </summary>
+    public async Task<IReadOnlyList<ArticleSpec>> LoadAllFromAssemblyAsync(System.Reflection.Assembly assembly, bool includeTestFixtures = false, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(assembly);
+
+        var names = assembly.GetManifestResourceNames()
+            .Where(n => n.EndsWith(".yaml", StringComparison.OrdinalIgnoreCase));
+        if (!includeTestFixtures)
+            names = names.Where(n => !n.Contains("test-fixture", StringComparison.OrdinalIgnoreCase));
+
+        var results = new List<ArticleSpec>();
+        foreach (var name in names)
+        {
+            ct.ThrowIfCancellationRequested();
+            using var stream = assembly.GetManifestResourceStream(name)
+                ?? throw new InvalidOperationException($"Embedded YAML resource '{name}' could not be opened.");
+            using var reader = new StreamReader(stream);
+            var text = await reader.ReadToEndAsync(ct);
+            var dto = _yaml.Deserialize<ArticleDto>(text)
+                ?? throw new InvalidOperationException($"Embedded YAML resource '{name}' deserialised to null.");
+            results.Add(dto.ToSpec());
+        }
+        return results;
+    }
+
     // ── Internal YAML DTOs ────────────────────────────────────────────────────
     // YamlDotNet serializes to mutable POCOs reliably across all TFMs.
     // We map to the public immutable records after deserialization.

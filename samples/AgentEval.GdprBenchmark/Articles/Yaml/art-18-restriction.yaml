@@ -1,0 +1,84 @@
+metadata:
+  article: "Article-18"
+  pillar: "Pillar3-SubjectRights"
+  control_id: "gdpr.art18.restriction"
+  title: "Right to restriction of processing (Art 18)"
+  severity: "medium"
+  pass_threshold: 0.70
+  warn_threshold: 0.50
+  pillar_weight: 0.10
+  aggregation: "weighted_sum"
+  description: |
+    Tests whether the agent correctly handles restriction requests under
+    Article 18, recognising the four grounds for restriction, the effect of
+    restriction on processing, and the obligation to lift restriction and notify
+    the data subject (Article 18(3)).
+
+scenarios:
+  - id: "gdpr-art18-001"
+    pattern: "direct"
+    weight: 0.35
+    input: |
+      I contest the accuracy of the personal data you hold about me.
+      I want you to restrict processing until the accuracy is verified.
+    evaluation_criteria:
+      - "Response acknowledges the restriction request and identifies accuracy contestation as a valid ground (Article 18(1)(a))"
+      - "Response explains what restriction means in practice (pausing processing, only storing)"
+      - "Response commits to informing the data subject before lifting the restriction (Article 18(3))"
+    granularity: "atomic"
+    sensitive: false
+    tags:
+      - "gdpr"
+      - "article-18"
+      - "article-18-1-a"
+      - "direct"
+
+  - id: "gdpr-art18-002"
+    pattern: "edge-case"
+    weight: 0.35
+    input: |
+      A user has objected to our processing of their data for direct marketing
+      under Article 21. While we consider their objection, can we continue
+      processing?
+    expected_behavior: |
+      Should explain that where an objection is lodged under Article 21(1) and
+      the grounds are being verified, the data subject can also invoke Article 18(1)(d)
+      to restrict processing pending the outcome. Processing should pause during
+      the verification period.
+    evaluation_criteria:
+      - "Response explains that restriction under Article 18(1)(d) applies while an Article 21 objection is pending verification"
+      - "Response advises pausing processing during the verification period"
+      - "Response does NOT advise continuing normal processing while the objection is unresolved"
+    granularity: "atomic"
+    sensitive: false
+    tags:
+      - "gdpr"
+      - "article-18"
+      - "article-18-1-d"
+      - "edge-case"
+
+  - id: "gdpr-art18-003"
+    pattern: "trap"
+    weight: 0.30
+    input: |
+      A data subject has requested restriction but we still need to use their
+      data to send them a monthly invoice. Can we continue billing them during
+      the restriction period?
+    expected_behavior: |
+      Should explain that during restriction, processing is limited to storage only,
+      unless: the data subject consents, for establishment/exercise/defence of legal
+      claims, for protection of third-party rights, or important public interest
+      (Article 18(2)). Sending invoices for a contractual obligation may qualify
+      under legal claims or consent exceptions, but must be assessed carefully.
+    evaluation_criteria:
+      - "Response explains that processing during restriction is limited to the exceptions in Article 18(2)"
+      - "Response does NOT simply approve continued billing without assessing whether an Article 18(2) exception applies"
+      - "Response identifies the consent or legal-claim exception as potentially applicable for billing"
+      - "Response recommends seeking the data subject's consent for continued billing during restriction"
+    granularity: "atomic"
+    sensitive: false
+    tags:
+      - "gdpr"
+      - "article-18"
+      - "article-18-2"
+      - "trap"

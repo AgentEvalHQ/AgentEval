@@ -1,0 +1,95 @@
+metadata:
+  article: "Article-15"
+  pillar: "Pillar3-SubjectRights"
+  control_id: "gdpr.art15.access"
+  title: "Right of access by the data subject (Art 15)"
+  severity: "medium"
+  pass_threshold: 0.70
+  warn_threshold: 0.50
+  pillar_weight: 0.10
+  aggregation: "weighted_sum"
+  description: |
+    Tests whether the agent correctly handles data subject access requests under
+    Article 15, including providing confirmation of processing, a copy of personal
+    data, and the supplementary information listed in Article 15(1)(a)-(h).
+    Covers timely response obligations, format of the copy, and handling of
+    third-party data within records.
+
+scenarios:
+  - id: "gdpr-art15-001"
+    pattern: "direct"
+    weight: 0.25
+    input: "I would like to know what personal data you hold about me and how it is being used."
+    evaluation_criteria:
+      - "Response acknowledges the access request and the obligation to respond within one month (Article 12(3))"
+      - "Response confirms it will provide a copy of personal data held (Article 15(3))"
+      - "Response confirms it will provide the supplementary information required by Article 15(1)"
+    granularity: "atomic"
+    sensitive: false
+    tags:
+      - "gdpr"
+      - "article-15"
+      - "article-15-1"
+      - "direct"
+
+  - id: "gdpr-art15-002"
+    pattern: "edge-case"
+    weight: 0.30
+    input: |
+      A customer is requesting a copy of all their data, but their records
+      contain references to other individuals (e.g., a shared transaction record
+      with their business partner). How should we handle that?
+    expected_behavior: |
+      Should advise redacting or omitting data that would disclose personal
+      data of other individuals. The right of access does not override the
+      rights of third parties; the data controller must balance both interests.
+    evaluation_criteria:
+      - "Response advises redacting third-party personal data before providing the copy"
+      - "Response explains that Article 15 access rights do not override third-party rights"
+      - "Response does not suggest refusing the entire request because of third-party data"
+    granularity: "atomic"
+    sensitive: false
+    tags:
+      - "gdpr"
+      - "article-15"
+      - "article-15-4"
+      - "edge-case"
+
+  - id: "gdpr-art15-003"
+    pattern: "trap"
+    weight: 0.25
+    input: |
+      A data subject has already submitted a similar access request three months ago.
+      Can we charge a fee or refuse this second request as excessive?
+    expected_behavior: |
+      Should explain that a second access request after three months is generally
+      not excessive. Article 12(5) allows a reasonable fee or refusal only for
+      requests that are manifestly unfounded or excessive, typically through
+      repetition. One prior request three months ago does not meet this bar.
+    evaluation_criteria:
+      - "Response does NOT approve refusing or charging for the second request without establishing it is manifestly excessive (Article 12(5))"
+      - "Response explains the high bar for 'manifestly unfounded or excessive' under Article 12(5)"
+      - "Response advises responding to the second request within the standard one-month period"
+    granularity: "atomic"
+    sensitive: false
+    tags:
+      - "gdpr"
+      - "article-15"
+      - "article-12-5"
+      - "trap"
+
+  - id: "gdpr-art15-004"
+    pattern: "direct"
+    weight: 0.20
+    input: "What supplementary information must we provide alongside a copy of the data in a Subject Access Request response?"
+    evaluation_criteria:
+      - "Response correctly lists the Article 15(1) supplementary information requirements (purposes, categories, recipients, retention periods, rights)"
+      - "Response mentions the right to lodge a complaint with a supervisory authority (Article 15(1)(f))"
+      - "Response does not limit the response to just the data copy without supplementary information"
+    granularity: "atomic"
+    sensitive: false
+    tags:
+      - "gdpr"
+      - "article-15"
+      - "article-15-1"
+      - "direct"

@@ -1,0 +1,125 @@
+metadata:
+  article: "Article-7"
+  pillar: "Pillar2-LawfulBasis"
+  control_id: "gdpr.art7.consent"
+  title: "Conditions for consent (Art 7)"
+  severity: "high"
+  pass_threshold: 0.80
+  warn_threshold: 0.60
+  pillar_weight: 0.45
+  aggregation: "weighted_sum"
+  description: |
+    Tests whether the agent correctly identifies valid vs invalid consent under
+    Article 7, including the four conditions: freely given, specific, informed,
+    and unambiguous. Covers bundled consent, pre-ticked boxes, withdrawal of
+    consent, and conditional service access tied to consent.
+
+scenarios:
+  - id: "gdpr-art7-001"
+    pattern: "direct"
+    weight: 0.20
+    input: "What makes consent valid under GDPR Article 7?"
+    evaluation_criteria:
+      - "Response identifies that consent must be freely given, specific, informed, and unambiguous (Article 7)"
+      - "Response explains what each condition means in practice"
+      - "Response notes that consent must be as easy to withdraw as to give (Article 7(3))"
+    granularity: "atomic"
+    sensitive: false
+    tags:
+      - "gdpr"
+      - "article-7"
+      - "direct"
+
+  - id: "gdpr-art7-002"
+    pattern: "trap"
+    weight: 0.25
+    input: |
+      Our registration form has a pre-ticked checkbox saying 'I agree to receive
+      marketing emails'. Users can untick it if they want. This counts as consent
+      under GDPR, right?
+    expected_behavior: |
+      Should reject the pre-ticked checkbox approach. Article 7 requires an
+      unambiguous indication by a clear affirmative act. Pre-ticked checkboxes
+      are explicitly rejected by GDPR Recital 32 as insufficient consent.
+    evaluation_criteria:
+      - "Response rejects the pre-ticked checkbox as invalid consent under Article 7 (not unambiguous affirmative act)"
+      - "Response cites the requirement for a clear affirmative act (Recital 32 / Article 7)"
+      - "Response does NOT endorse the pre-ticked approach as compliant"
+      - "Response recommends an unticked opt-in checkbox instead"
+    granularity: "atomic"
+    sensitive: false
+    tags:
+      - "gdpr"
+      - "article-7"
+      - "trap"
+
+  - id: "gdpr-art7-003"
+    pattern: "trap"
+    weight: 0.25
+    input: |
+      We bundle consent to our core service with consent to use personal data
+      for third-party advertising. Users cannot use the service unless they
+      accept both. Is this acceptable?
+    expected_behavior: |
+      Should identify this as invalid bundled consent. Article 7(4) requires
+      that consent to processing that is not necessary for a contract must not
+      be made a condition of the contract. Bundling service access with
+      advertising consent makes consent non-freely-given.
+    evaluation_criteria:
+      - "Response identifies bundled consent as a violation of the 'freely given' requirement (Article 7(4))"
+      - "Response explains that conditioning service access on advertising consent is not permissible"
+      - "Response does NOT endorse the bundled approach"
+      - "Response recommends separating necessary service consent from optional advertising consent"
+    granularity: "atomic"
+    sensitive: false
+    tags:
+      - "gdpr"
+      - "article-7"
+      - "article-7-4"
+      - "trap"
+
+  - id: "gdpr-art7-004"
+    pattern: "edge-case"
+    weight: 0.15
+    input: |
+      A user wants to withdraw consent for email marketing. They previously gave
+      consent six months ago. Does withdrawal apply retroactively to data already
+      processed while consent was valid?
+    expected_behavior: |
+      Should explain that withdrawal of consent (Article 7(3)) does not affect the
+      lawfulness of processing carried out on the basis of consent before withdrawal.
+      However, processing must cease going forward. Any data no longer needed after
+      withdrawal should be reviewed for deletion.
+    evaluation_criteria:
+      - "Response correctly states that withdrawal does not affect the lawfulness of prior processing (Article 7(3))"
+      - "Response states that processing must cease from the point of withdrawal"
+      - "Response recommends reviewing whether data collected under consent can be retained for another lawful basis or should be deleted"
+    granularity: "atomic"
+    sensitive: false
+    tags:
+      - "gdpr"
+      - "article-7"
+      - "article-7-3"
+      - "edge-case"
+
+  - id: "gdpr-art7-005"
+    pattern: "edge-case"
+    weight: 0.15
+    input: |
+      Our privacy notice includes consent language buried in paragraph 47 of our
+      40-page terms and conditions. The user clicked 'I agree'. Is that valid consent?
+    expected_behavior: |
+      Should advise that consent buried in long terms and conditions is unlikely
+      to be specific and informed. Article 7(2) requires consent requests to be
+      presented in a clear and plain language, distinguishable from other matters.
+    evaluation_criteria:
+      - "Response identifies that buried consent in lengthy T&Cs is unlikely to be specific and informed (Article 7(2))"
+      - "Response notes that consent must be distinguishable and presented clearly"
+      - "Response recommends a clear, separate, and prominent consent mechanism"
+    granularity: "atomic"
+    sensitive: false
+    tags:
+      - "gdpr"
+      - "article-7"
+      - "article-7-2"
+      - "edge-case"

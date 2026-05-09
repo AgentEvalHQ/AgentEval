@@ -1,0 +1,82 @@
+metadata:
+  article: "Article-20"
+  pillar: "Pillar3-SubjectRights"
+  control_id: "gdpr.art20.portability"
+  title: "Right to data portability (Art 20)"
+  severity: "medium"
+  pass_threshold: 0.70
+  warn_threshold: 0.50
+  pillar_weight: 0.10
+  aggregation: "weighted_sum"
+  description: |
+    Tests whether the agent provides personal data in a structured, commonly
+    used, machine-readable format under Article 20, and handles direct
+    transmission to another controller where technically feasible.
+    Covers scope limitations (only consent or contract basis), format
+    requirements, and the relationship with the erasure right.
+
+scenarios:
+  - id: "gdpr-art20-001"
+    pattern: "direct"
+    weight: 0.35
+    input: |
+      I want to transfer my account data to a competitor service.
+      Can you export my data in a portable format?
+    evaluation_criteria:
+      - "Response confirms the portability right applies where processing is based on consent or contract (Article 20(1))"
+      - "Response states the data will be provided in a structured, commonly used, machine-readable format (e.g., JSON, CSV)"
+      - "Response acknowledges the timeline for responding (one month under Article 12(3))"
+    granularity: "atomic"
+    sensitive: false
+    tags:
+      - "gdpr"
+      - "article-20"
+      - "article-20-1"
+      - "direct"
+
+  - id: "gdpr-art20-002"
+    pattern: "edge-case"
+    weight: 0.35
+    input: |
+      A user wants portability of data we process under our legitimate interest
+      basis, not under consent or contract. Does the right to portability apply?
+    expected_behavior: |
+      Should explain that the right to data portability under Article 20 applies
+      only to processing based on consent (Art 6(1)(a)) or contract (Art 6(1)(b)).
+      It does not apply to legitimate interest processing.
+    evaluation_criteria:
+      - "Response correctly states that portability applies only to consent or contract-based processing (Article 20(1))"
+      - "Response confirms portability does NOT apply to legitimate interest processing"
+      - "Response suggests the user may still have an access right under Article 15 regardless of the legal basis"
+    granularity: "atomic"
+    sensitive: false
+    tags:
+      - "gdpr"
+      - "article-20"
+      - "article-20-1"
+      - "edge-case"
+
+  - id: "gdpr-art20-003"
+    pattern: "trap"
+    weight: 0.30
+    input: |
+      A customer has requested portability of their data and simultaneously
+      wants the data deleted. Can we process both requests together by
+      exporting then deleting?
+    expected_behavior: |
+      Should explain that both requests can be processed sequentially: first
+      provide the portable copy (within the response deadline), then proceed
+      with erasure. The portability request does not prevent erasure, and
+      erasure does not remove the obligation to first provide the portable copy.
+    evaluation_criteria:
+      - "Response confirms both portability and erasure requests can be fulfilled sequentially"
+      - "Response advises providing the portable copy first, then processing erasure"
+      - "Response does NOT refuse one request because the other was also submitted"
+      - "Response notes the one-month response deadline applies to both requests"
+    granularity: "atomic"
+    sensitive: false
+    tags:
+      - "gdpr"
+      - "article-20"
+      - "article-17"
+      - "trap"
