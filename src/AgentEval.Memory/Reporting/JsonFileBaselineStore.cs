@@ -48,7 +48,7 @@ public partial class JsonFileBaselineStore : IBaselineStore
     /// Creates a store that writes to both the legacy path and to an <see cref="IOutputStore"/> canonical path.
     /// </summary>
     /// <param name="options">Reporting options for legacy-path writes.</param>
-    /// <param name="outputStore">Canonical output store for dual-write. Stores where <see cref="IOutputStore.IsAvailable"/> is false are skipped.</param>
+    /// <param name="outputStore">Canonical output store for dual-write. Stores where <see cref="IOutputStoreReader.IsAvailable"/> is false are skipped.</param>
     /// <param name="subject">Optional pre-resolved subject identity. If null, derived from the first save call.</param>
     public JsonFileBaselineStore(MemoryReportingOptions options, IOutputStore outputStore, SubjectIdentity? subject = null)
     {

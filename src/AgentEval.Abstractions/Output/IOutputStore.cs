@@ -4,23 +4,23 @@
 
 namespace AgentEval.Output;
 
-/// <summary>Abstracts all read/write operations against an AgentEval output folder.</summary>
-public interface IOutputStore
+/// <summary>
+/// Abstracts all read/write operations against an AgentEval output folder.
+/// </summary>
+/// <remarks>
+/// Inherits read methods from <see cref="IOutputStoreReader"/>. Mission Control's
+/// local viewer (Mode A) and workspace aggregator (Mode B) consume only
+/// <see cref="IOutputStoreReader"/> so they cannot accidentally write — the constraint is
+/// verified in plan-08 Phase 1 by a reflection-based test.
+/// </remarks>
+public interface IOutputStore : IOutputStoreReader
 {
-    // ─── Solution lifecycle ──────────────────────────────────────────────────
-
-    /// <summary>Ensures the solution root exists and returns its info.</summary>
-    Task<SolutionInfo> EnsureSolutionAsync(CancellationToken ct = default);
-
-    // ─── Subject lifecycle ───────────────────────────────────────────────────
+    // ─── Subject lifecycle (write) ───────────────────────────────────────────
 
     /// <summary>Ensures the subject folder exists and returns its current info.</summary>
     Task<SubjectInfo> EnsureSubjectAsync(SubjectIdentity identity, CancellationToken ct = default);
 
-    /// <summary>Enumerates known subjects, optionally filtered by kind.</summary>
-    IAsyncEnumerable<SubjectInfo> ListSubjectsAsync(SubjectKind? kind = null, CancellationToken ct = default);
-
-    // ─── Run lifecycle ───────────────────────────────────────────────────────
+    // ─── Run lifecycle (write) ───────────────────────────────────────────────
 
     /// <summary>Starts a new run for the given subject and persists its manifest.</summary>
     Task<RunManifest> StartRunAsync(SubjectIdentity subject, RunContext context, CancellationToken ct = default);
@@ -34,73 +34,28 @@ public interface IOutputStore
     /// <summary>Appends an agent trace to the run's trace artifact.</summary>
     Task AppendTraceAsync(string runId, AgentTrace trace, CancellationToken ct = default);
 
-    // ─── Baselines ───────────────────────────────────────────────────────────
+    // ─── Baselines (write) ───────────────────────────────────────────────────
 
     /// <summary>Saves the given summary as the baseline for the specified subject.</summary>
     Task SaveBaselineAsync(SubjectIdentity subject, RunSummary summary, string? versionTag = null, CancellationToken ct = default);
 
-    /// <summary>Loads the current baseline summary for the given subject, or null if none exists.</summary>
-    Task<RunSummary?> LoadBaselineAsync(SubjectIdentity subject, CancellationToken ct = default);
-
-    /// <summary>Compares the run identified by <paramref name="runId"/> against its subject's baseline.</summary>
-    Task<BaselineComparison> CompareToBaselineAsync(string runId, CancellationToken ct = default);
-
-    // ─── History ─────────────────────────────────────────────────────────────
+    // ─── History (write) ─────────────────────────────────────────────────────
 
     /// <summary>Appends a history entry to the subject's <c>history.jsonl</c> file.</summary>
     Task AppendHistoryEntryAsync(SubjectIdentity subject, HistoryEntry entry, CancellationToken ct = default);
 
-    /// <summary>Streams history entries for the given subject, optionally filtered by date range.</summary>
-    IAsyncEnumerable<HistoryEntry> GetHistoryAsync(SubjectIdentity subject, DateRange? range = null, CancellationToken ct = default);
-
-    // ─── Compliance (v1) ─────────────────────────────────────────────────────
+    // ─── Compliance (write) ──────────────────────────────────────────────────
 
     /// <summary>Persists a compliance evidence document for a regulation and subject.</summary>
     Task SaveComplianceEvidenceAsync(string regulation, SubjectIdentity subject, ComplianceEvidence evidence, CancellationToken ct = default);
 
-    /// <summary>Enumerates compliance evidence pointers, optionally filtered by regulation or subject.</summary>
-    IAsyncEnumerable<ComplianceEvidencePointer> ListComplianceEvidenceAsync(string? regulation = null, SubjectIdentity? subject = null, CancellationToken ct = default);
-
-    /// <summary>Retrieves a specific compliance evidence document by regulation, subject, and timestamp.</summary>
-    Task<ComplianceEvidence?> GetComplianceEvidenceAsync(string regulation, SubjectIdentity subject, string timestamp, CancellationToken ct = default);
-
-    // ─── Red-team (v1) ───────────────────────────────────────────────────────
+    // ─── Red-team (write) ────────────────────────────────────────────────────
 
     /// <summary>Starts a red-team campaign and persists its manifest.</summary>
     Task<RedTeamCampaignManifest> StartRedTeamCampaignAsync(RedTeamCampaignContext context, CancellationToken ct = default);
 
     /// <summary>Completes a red-team campaign by recording findings in its manifest.</summary>
     Task CompleteRedTeamCampaignAsync(string campaignId, RedTeamFindings findings, CancellationToken ct = default);
-
-    // ─── Cross-cutting ────────────────────────────────────────────────────────
-
-    /// <summary>Returns the most recent run pointers across all subjects, up to <paramref name="count"/>.</summary>
-    IAsyncEnumerable<RunPointer> GetRecentRunsAsync(int count = 50, CancellationToken ct = default);
-
-    // ─── Run retrieval ────────────────────────────────────────────────────────
-
-    /// <summary>Retrieves the manifest for the given run ID, or null if not found.</summary>
-    Task<RunManifest?> GetRunManifestAsync(string runId, CancellationToken ct = default);
-
-    /// <summary>Retrieves the summary for the given run ID, or null if not found.</summary>
-    Task<RunSummary?> GetRunSummaryAsync(string runId, CancellationToken ct = default);
-
-    /// <summary>Streams all scenario results for the given run.</summary>
-    IAsyncEnumerable<ScenarioResult> GetScenarioResultsAsync(string runId, CancellationToken ct = default);
-
-    /// <summary>Retrieves the agent trace for the given run, or null if not found.</summary>
-    Task<AgentTrace?> GetTraceAsync(string runId, CancellationToken ct = default);
-
-    /// <summary>Enumerates all run manifests for the given subject.</summary>
-    IAsyncEnumerable<RunManifest> ListRunsAsync(SubjectIdentity subject, CancellationToken ct = default);
-
-    // ─── Workspace ────────────────────────────────────────────────────────────
-
-    /// <summary>The resolved workspace root path, or null when the store is unavailable.</summary>
-    string? WorkspaceRoot { get; }
-
-    /// <summary>Indicates whether the store is ready to accept operations.</summary>
-    bool IsAvailable { get; }
 }
 
 /// <summary>Context provided when starting a new evaluation run.</summary>
@@ -115,7 +70,7 @@ public sealed record RunContext(
 /// <summary>Inclusive date range used when filtering history entries.</summary>
 public sealed record DateRange(DateTimeOffset From, DateTimeOffset To);
 
-/// <summary>Persistent solution-level information returned by <see cref="IOutputStore.EnsureSolutionAsync"/>.</summary>
+/// <summary>Persistent solution-level information returned by <see cref="IOutputStoreReader.EnsureSolutionAsync"/>.</summary>
 public sealed record SolutionInfo(Guid Id, string Name, string Path);
 
 /// <summary>Context for starting a red-team campaign.</summary>
