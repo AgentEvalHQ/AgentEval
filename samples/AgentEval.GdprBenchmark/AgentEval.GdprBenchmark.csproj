@@ -16,6 +16,7 @@
 
   <ItemGroup>
     <PackageReference Include="YamlDotNet" />
+    <PackageReference Include="JsonSchema.Net" />
   </ItemGroup>
 
   <ItemGroup>

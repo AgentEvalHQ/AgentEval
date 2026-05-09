@@ -3,10 +3,12 @@
 // Licensed under the MIT License.
 
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 using AgentEval.Evals;
 using AgentEval.GdprBenchmark.Articles;
 using AgentEval.Output;
+using Json.Schema;
 
 namespace AgentEval.GdprBenchmark.Reporting;
 
@@ -136,6 +138,12 @@ public sealed class GDPRComplianceReporter
         GdprComplianceEvidence evidence,
         CancellationToken ct)
     {
+        // Validate against the embedded gdpr-evidence.schema.json BEFORE persisting.
+        // (Plan 03 G4.3 acceptance: "A fixture gdpr-evidence.json validates against this schema.")
+        // This catches shape regressions even on non-filesystem stores; throws if the schema check fails
+        // so a malformed wrapper never reaches disk.
+        ValidateAgainstGdprEvidenceSchema(evidence);
+
         // Re-derive the compliance/{regulation}/{subject}/{ts}/ folder used by SaveComplianceEvidenceAsync.
         // Uses the same sanitization rule as FileSystemLayout.Sanitize.
         if (store is FileSystemOutputStore fsStore)
@@ -153,6 +161,35 @@ public sealed class GDPRComplianceReporter
         }
         // For non-filesystem stores (InMemory, Null), the wrapper is held in memory by the caller's
         // returned GdprComplianceEvidence value. Tests that want to inspect the JSON serialise it themselves.
+    }
+
+    private static JsonSchema? s_cachedGdprSchema;
+
+    private static void ValidateAgainstGdprEvidenceSchema(GdprComplianceEvidence evidence)
+    {
+        var schema = LoadGdprEvidenceSchema();
+        var json = JsonSerializer.Serialize(evidence, s_jsonOpts);
+        var node = JsonNode.Parse(json);
+        var result = schema.Evaluate(node, new Json.Schema.EvaluationOptions { OutputFormat = Json.Schema.OutputFormat.List });
+        if (!result.IsValid)
+        {
+            var errors = string.Join("; ", result.Details
+                .Where(d => !d.IsValid)
+                .SelectMany(d => d.Errors?.Select(e => $"{d.EvaluationPath} {e.Key}={e.Value}") ?? Array.Empty<string>()));
+            throw new InvalidOperationException($"gdpr-evidence.json failed schema validation: {errors}");
+        }
+    }
+
+    private static JsonSchema LoadGdprEvidenceSchema()
+    {
+        if (s_cachedGdprSchema is not null) return s_cachedGdprSchema;
+        var asm = typeof(GDPRComplianceReporter).Assembly;
+        var resourceName = asm.GetManifestResourceNames()
+            .Single(n => n.EndsWith(".gdpr-evidence.schema.json", StringComparison.OrdinalIgnoreCase));
+        using var stream = asm.GetManifestResourceStream(resourceName)!;
+        using var reader = new StreamReader(stream);
+        s_cachedGdprSchema = JsonSchema.FromText(reader.ReadToEnd());
+        return s_cachedGdprSchema;
     }
 
     private static string SanitizeForPath(string name)
