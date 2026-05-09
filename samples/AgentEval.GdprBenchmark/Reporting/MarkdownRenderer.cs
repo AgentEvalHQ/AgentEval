@@ -38,13 +38,18 @@ public sealed class MarkdownRenderer
         sb.AppendLine($"**Overall**: **{evidence.Summary.OverallStatus}** (score {evidence.Summary.OverallScore:P0})");
         sb.AppendLine();
 
-        sb.AppendLine("## Per-pillar");
-        sb.AppendLine();
-        sb.AppendLine("| Pillar | Score | Status | Critical fails |");
-        sb.AppendLine("|---|---:|---|---|");
-        foreach (var (key, p) in evidence.Summary.PerPillar)
-            sb.AppendLine($"| {key} | {p.Score:P0} | **{p.Status}** | {(p.CriticalFails.Count == 0 ? "—" : string.Join(", ", p.CriticalFails))} |");
-        sb.AppendLine();
+        // Smoke and other flat presets produce an empty PerPillar dict; suppress the section entirely
+        // to avoid a misleading empty table.
+        if (evidence.Summary.PerPillar.Count > 0)
+        {
+            sb.AppendLine("## Per-pillar");
+            sb.AppendLine();
+            sb.AppendLine("| Pillar | Score | Status | Critical fails |");
+            sb.AppendLine("|---|---:|---|---|");
+            foreach (var (key, p) in evidence.Summary.PerPillar)
+                sb.AppendLine($"| {key} | {p.Score:P0} | **{p.Status}** | {(p.CriticalFails.Count == 0 ? "—" : string.Join(", ", p.CriticalFails))} |");
+            sb.AppendLine();
+        }
 
         sb.AppendLine("## Per-article");
         sb.AppendLine();
