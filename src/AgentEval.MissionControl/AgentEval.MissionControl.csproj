@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>AgentEval.MissionControl</RootNamespace>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Make Program accessible to WebApplicationFactory<Program> in tests. -->
+    <InternalsVisibleTo Include="AgentEval.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\AgentEval.Abstractions\AgentEval.Abstractions.csproj" />
+    <ProjectReference Include="..\AgentEval.DataLoaders\AgentEval.DataLoaders.csproj" />
+    <ProjectReference Include="..\AgentEval.Evals.Agentic\AgentEval.Evals.Agentic.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="HotChocolate.AspNetCore" />
+  </ItemGroup>
+
+</Project>
