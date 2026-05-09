@@ -3,6 +3,7 @@
 // Licensed under the MIT License.
 
 using AgentEval.MissionControl.GraphQL;
+using AgentEval.MissionControl.Rest;
 using AgentEval.MissionControl.Services;
 using AgentEval.Output;
 
@@ -67,6 +68,10 @@ app.MapGet("/api/v1/version", () =>
         // Future plan-08 work: schemaVersions, available features.
     });
 });
+
+// REST binary + streaming endpoints (plan-07 §8.2; plan-08 MC1.3.2-6).
+// Reports, traces, PDFs are byte streams — REST not GraphQL.
+app.MapBinaryEndpoints();
 
 app.Run();
 

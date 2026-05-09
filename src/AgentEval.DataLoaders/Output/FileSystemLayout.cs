@@ -4,7 +4,13 @@
 
 namespace AgentEval.Output;
 
-internal sealed class FileSystemLayout
+/// <summary>
+/// Pure path-resolution helper for the canonical <c>.agenteval/</c> folder layout.
+/// Stateless beyond the root path. Public so Mission Control's read-only binary
+/// REST endpoints (trace / report / PDF) can resolve paths without re-implementing
+/// the layout convention.
+/// </summary>
+public sealed class FileSystemLayout
 {
     public string Root { get; }
 
