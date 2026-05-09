@@ -2,8 +2,10 @@
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 
+using System.Runtime.CompilerServices;
 using AgentEval.Evals;
 using AgentEval.MissionControl.Services;
+using AgentEval.Output;
 
 namespace AgentEval.MissionControl.GraphQL;
 
@@ -65,4 +67,90 @@ public sealed class Query
         [Service] EvaluatorCardRegistry registry,
         string key) =>
         registry.Get(key);
+
+    // ─── Solution / subjects / runs (MC1.4.2) ────────────────────────────────
+
+    /// <summary>
+    /// Returns the local solution info, or <c>null</c> when no <c>solution.json</c>
+    /// exists (i.e. the cwd's <c>.agenteval/</c> hasn't been initialised).
+    /// </summary>
+    public async Task<SolutionInfo?> Solution(
+        [Service] IOutputStoreReader store,
+        CancellationToken ct = default)
+    {
+        if (!store.IsAvailable) return null;
+        try
+        {
+            return await store.EnsureSolutionAsync(ct);
+        }
+        catch (InvalidOperationException)
+        {
+            // FileSystemOutputStore throws "no solution.json" for an uninitialised folder;
+            // surface that to the SPA as `solution: null` instead of a GraphQL error.
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Lists all known subjects in the local solution, optionally filtered by kind.
+    /// </summary>
+    public async IAsyncEnumerable<SubjectInfo> Subjects(
+        [Service] IOutputStoreReader store,
+        SubjectKind? kind = null,
+        [EnumeratorCancellation] CancellationToken ct = default)
+    {
+        if (!store.IsAvailable) yield break;
+        await foreach (var s in store.ListSubjectsAsync(kind, ct))
+        {
+            yield return s;
+        }
+    }
+
+    /// <summary>
+    /// Returns a single subject by kind + name, or <c>null</c> if no subject with
+    /// that pair exists.
+    /// </summary>
+    public async Task<SubjectInfo?> Subject(
+        [Service] IOutputStoreReader store,
+        SubjectKind kind,
+        string name,
+        CancellationToken ct = default)
+    {
+        if (!store.IsAvailable) return null;
+        await foreach (var s in store.ListSubjectsAsync(kind, ct))
+        {
+            if (string.Equals(s.Identity.Name, name, StringComparison.Ordinal))
+                return s;
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// Returns the most recent run pointers across all subjects in the local solution,
+    /// up to <paramref name="count"/>. Default 50, max 500.
+    /// </summary>
+    public async IAsyncEnumerable<RunPointer> RecentRuns(
+        [Service] IOutputStoreReader store,
+        int count = 50,
+        [EnumeratorCancellation] CancellationToken ct = default)
+    {
+        if (!store.IsAvailable) yield break;
+        var clamped = Math.Clamp(count, 1, 500);
+        await foreach (var p in store.GetRecentRunsAsync(clamped, ct))
+        {
+            yield return p;
+        }
+    }
+
+    /// <summary>
+    /// Returns the manifest for a specific run, or <c>null</c> if the run ID is unknown.
+    /// </summary>
+    public Task<RunManifest?> Run(
+        [Service] IOutputStoreReader store,
+        string runId,
+        CancellationToken ct = default)
+    {
+        if (!store.IsAvailable) return Task.FromResult<RunManifest?>(null);
+        return store.GetRunManifestAsync(runId, ct);
+    }
 }

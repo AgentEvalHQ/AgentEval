@@ -4,6 +4,7 @@
 
 using AgentEval.MissionControl.GraphQL;
 using AgentEval.MissionControl.Services;
+using AgentEval.Output;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -13,6 +14,18 @@ var builder = WebApplication.CreateBuilder(args);
 // AgentEval.Evals.Agentic's embedded resources. Drives Query.evaluators(...).
 // Plan-08 MC1.5.3.
 builder.Services.AddSingleton<EvaluatorCardRegistry>();
+
+// IOutputStoreReader: read-only access to the local .agenteval/ folder. Mode A.
+// Configured root is `<AgentEval:Root>/.agenteval` if set, else `<cwd>/.agenteval`.
+// Plan-08 MC1.2.2. Tests inject their own IOutputStoreReader via WithWebHostBuilder.
+builder.Services.AddSingleton<IOutputStoreReader>(sp =>
+{
+    var configuredRoot = builder.Configuration["AgentEval:Root"];
+    var root = !string.IsNullOrWhiteSpace(configuredRoot)
+        ? configuredRoot
+        : Directory.GetCurrentDirectory();
+    return new FileSystemOutputStore(System.IO.Path.Combine(root, ".agenteval"));
+});
 
 // ─── GraphQL (Hot Chocolate 16, ChilliCream — primary read surface) ─────────
 //
