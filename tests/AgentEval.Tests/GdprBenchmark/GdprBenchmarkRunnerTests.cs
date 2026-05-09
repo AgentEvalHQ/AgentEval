@@ -67,7 +67,7 @@ public class GdprBenchmarkRunnerTests
         var subject = MakeSubject();
         var input = new EvalInput(Query: "test query", Response: "test response");
 
-        var result = await runner.RunAsync(store, subject, composite, input);
+        var (runId, result) = await runner.RunAsync(store, subject, composite, input);
 
         // Composite result shape
         Assert.Equal("test.composite", result.Metric.Key);
@@ -75,7 +75,6 @@ public class GdprBenchmarkRunnerTests
         Assert.True(result.Score.Passed);
 
         // Verify 2 scenario results were persisted
-        var runId = result.EvaluatedAt; // we need the runId from the manifest
         // We need to find the run by getting recent runs
         var runs = new List<RunPointer>();
         await foreach (var r in store.GetRecentRunsAsync(10))
@@ -134,6 +133,7 @@ public class GdprBenchmarkRunnerTests
         var summary = await store.GetRunSummaryAsync(runs[0].RunId);
         Assert.NotNull(summary);
         Assert.Equal("FAIL", summary!.Verdict);
+
     }
 
     [Fact]

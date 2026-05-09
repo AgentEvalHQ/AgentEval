@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agenteval.dev/schemas/v1/gdpr-evidence.schema.json",
+  "title": "AgentEval GDPR Compliance Evidence (wrapper)",
+  "type": "object",
+  "required": ["base", "preset", "compositeTree", "summary", "criticalFindings", "recommendations", "disclaimer", "gdprAttestation"],
+  "properties": {
+    "base": {
+      "type": "object",
+      "description": "The plan-01 ComplianceEvidence record. Schema lives separately at evidence.schema.json; we don't $ref across embedded-resource boundaries here, just require the object shape."
+    },
+    "preset": { "enum": ["smoke", "standard", "audit", "healthcare", "hr", "childrens"] },
+    "compositeTree": {
+      "type": "object",
+      "description": "Recursive EvalResult tree. Validated separately by eval-result.schema.json."
+    },
+    "summary": {
+      "type": "object",
+      "required": ["overallScore", "overallStatus", "perPillar", "perArticle"],
+      "properties": {
+        "overallScore":   { "type": "number", "minimum": 0, "maximum": 1 },
+        "overallStatus":  { "enum": ["PASS", "FAIL", "WARN"] },
+        "perPillar":      { "type": "object", "additionalProperties": { "$ref": "#/$defs/pillarSummary" } },
+        "perArticle":     { "type": "object", "additionalProperties": { "$ref": "#/$defs/articleSummary" } }
+      }
+    },
+    "criticalFindings": {
+      "type": "array",
+      "items": { "type": "object", "description": "EvalResult for a critical-severity scenario that failed." }
+    },
+    "recommendations": { "type": "array", "items": { "type": "string" } },
+    "disclaimer": { "type": "string", "minLength": 1 },
+    "gdprAttestation": {
+      "type": "object",
+      "required": ["judgeMode"],
+      "properties": {
+        "judgeMode":      { "enum": ["mode-a", "mode-b", "multi-judge"] },
+        "promptVersions": { "type": "object", "additionalProperties": { "type": "string" } }
+      }
+    }
+  },
+  "$defs": {
+    "pillarSummary": {
+      "type": "object",
+      "required": ["score", "status"],
+      "properties": {
+        "score":            { "type": "number", "minimum": 0, "maximum": 1 },
+        "status":           { "enum": ["PASS", "FAIL", "WARN"] },
+        "criticalFails":    { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "articleSummary": {
+      "type": "object",
+      "required": ["score", "status", "scenarioCount", "scenariosFailed", "severity"],
+      "properties": {
+        "score":           { "type": "number", "minimum": 0, "maximum": 1 },
+        "status":          { "enum": ["PASS", "FAIL", "WARN"] },
+        "scenarioCount":   { "type": "integer", "minimum": 0 },
+        "scenariosFailed": { "type": "integer", "minimum": 0 },
+        "severity":        { "enum": ["none", "low", "medium", "high", "critical"] }
+      }
+    }
+  }
+}

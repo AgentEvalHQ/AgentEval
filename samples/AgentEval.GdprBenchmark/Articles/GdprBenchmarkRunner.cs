@@ -17,8 +17,8 @@ public sealed class GdprBenchmarkRunner
 {
     /// <summary>
     /// Executes <paramref name="benchmark"/> against <paramref name="input"/>, persists
-    /// all leaf scenario results to <paramref name="store"/>, and returns the composite
-    /// <see cref="EvalResult"/>.
+    /// all leaf scenario results to <paramref name="store"/>, and returns the run ID together
+    /// with the composite <see cref="EvalResult"/>.
     /// </summary>
     /// <param name="store">Output store that receives the run manifest, scenario results, and summary.</param>
     /// <param name="subject">Identity of the agent or workflow under evaluation.</param>
@@ -26,8 +26,11 @@ public sealed class GdprBenchmarkRunner
     /// <param name="input">Eval input forwarded to every sub-eval.</param>
     /// <param name="context">Optional run context; a default GDPR benchmark context is used when null.</param>
     /// <param name="ct">Cancellation token.</param>
-    /// <returns>The composite <see cref="EvalResult"/> after all sub-evals have completed.</returns>
-    public async Task<EvalResult> RunAsync(
+    /// <returns>
+    /// A tuple of the run ID (for passing to reporters) and the composite <see cref="EvalResult"/>
+    /// after all sub-evals have completed.
+    /// </returns>
+    public async Task<(string RunId, EvalResult Result)> RunAsync(
         IOutputStore store,
         SubjectIdentity subject,
         CompositeEval benchmark,
@@ -64,7 +67,7 @@ public sealed class GdprBenchmarkRunner
         var summary = BuildSummary(result, manifest.Run.RunId);
         await store.CompleteRunAsync(manifest, summary, ct);
 
-        return result;
+        return (manifest.Run.RunId, result);
     }
 
     private static IEnumerable<(string Id, EvalResult Result)> EnumerateAtomicLeaves(EvalResult node)
