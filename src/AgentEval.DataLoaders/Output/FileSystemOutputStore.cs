@@ -216,8 +216,23 @@ public sealed class FileSystemOutputStore : IOutputStore
         var entry = HistoryEntry.From(updated, summary);
         await AppendHistoryEntryAsync(subject, entry, ct);
 
+        // Populate the additive v1.7 fields so callers (Mission Control's
+        // recentRuns resolver) don't need an N+1 lookup against summary.json
+        // for the score / duration / cost columns.
+        var score = summary.Stats.Total > 0
+            ? (double)summary.Stats.Passed / summary.Stats.Total
+            : 0.0;
+        var estimatedCost = summary.Cost?.EstimatedCost;
         await AppendJsonlLineAsync(_layout.RecentRunsFile,
-            new RunPointer(runId, subject.Name, summary.Verdict, manifest.Run.Timestamp), ct);
+            new RunPointer(
+                RunId: runId,
+                SubjectName: subject.Name,
+                Verdict: summary.Verdict,
+                Timestamp: manifest.Run.Timestamp,
+                Kind: subject.Kind,
+                Score: score,
+                DurationMs: (long)updated.Run.Duration.TotalMilliseconds,
+                EstimatedCost: estimatedCost), ct);
     }
 
     public async Task AppendTraceAsync(string runId, AgentTrace trace, CancellationToken ct = default)
@@ -304,6 +319,15 @@ public sealed class FileSystemOutputStore : IOutputStore
         ArgumentException.ThrowIfNullOrWhiteSpace(regulation);
         ArgumentNullException.ThrowIfNull(subject);
         ArgumentNullException.ThrowIfNull(evidence);
+
+        // The `regulation` segment flows directly into Path.Combine via
+        // FileSystemLayout.ComplianceDir. Reject anything that could escape
+        // the workspace — defence-in-depth in case a caller forgot to
+        // validate the value (Mission Control already does, but callers
+        // outside the portal may not).
+        if (!FileSystemLayout.IsSafePathSegment(regulation))
+            throw new ArgumentException(
+                $"Regulation '{regulation}' contains characters that would compromise the on-disk path layout.", nameof(regulation));
 
         SchemaValidator.ValidateOrThrow(evidence, "evidence.schema.json");
 

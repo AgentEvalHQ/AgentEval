@@ -8,6 +8,12 @@ using AgentEval.Output;
 
 namespace AgentEval.Tests.Cli;
 
+// Joins the `ConsoleTests` collection because several tests in this class
+// mutate the global `Console.Out` to capture diagnostic output (see lines
+// ~114). Without the collection annotation xUnit may parallelise this
+// class with other Console-mutating fixtures (e.g.
+// Core/AgentEvalLoggerTests), corrupting captured streams.
+[Collection("ConsoleTests")]
 public class DoctorCommandTests : IDisposable
 {
     private readonly string _root;

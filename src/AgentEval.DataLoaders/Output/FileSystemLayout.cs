@@ -89,12 +89,22 @@ public sealed class FileSystemLayout
         if (string.IsNullOrWhiteSpace(name))
             throw new ArgumentException("Name cannot be null/empty/whitespace.", nameof(name));
         var invalid = Path.GetInvalidFileNameChars().Concat(new[] { '/', '\\' }).ToArray();
-        var s = string.Concat(name.Select(c => invalid.Contains(c) ? '-' : c));
-        s = s.Trim('.', ' ');
-        if (string.IsNullOrEmpty(s))
+        var rewrote = string.Concat(name.Select(c => invalid.Contains(c) ? '-' : c));
+        var trimmed = rewrote.Trim('.', ' ');
+        if (string.IsNullOrEmpty(trimmed))
             throw new ArgumentException(
                 $"Name '{name}' sanitises to empty — it must contain at least one non-dot/space character that survives sanitisation.", nameof(name));
-        return s;
+
+        // Round-trip protection: if sanitisation was lossy (any invalid
+        // character was replaced or any leading/trailing dot/space was
+        // stripped), append a short hash of the ORIGINAL name so names that
+        // collide under sanitisation (e.g. "Foo/Bar" + "Foo-Bar" both produce
+        // "Foo-Bar") map to distinct on-disk folders. The hash is a 4-byte
+        // SHA-256 prefix in hex, deterministic across processes.
+        if (trimmed == name)
+            return trimmed;
+        var hashBytes = System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(name));
+        return $"{trimmed}__{Convert.ToHexString(hashBytes, 0, 4).ToLowerInvariant()}";
     }
 
     /// <summary>

@@ -155,12 +155,12 @@ function AuditChainBadge({ valid }: { valid: boolean }) {
       }`}
       title={
         valid
-          ? "Every loaded evidence's manifest hash matches its source run's content hash."
+          ? "Every loaded evidence's recorded manifestHash equals its source run's stored contentHash. Note: this verifies the stored hash field — it does not recompute the manifest's content hash against its body or hash the evidence document itself."
           : "At least one piece of evidence does not match its source run — possible tampering."
       }
     >
       {valid ? <ShieldCheck size={14} /> : <ShieldAlert size={14} />}
-      Audit chain {valid ? "verified" : "issues"}
+      Source-run hash {valid ? "verified" : "mismatch"}
     </span>
   );
 }

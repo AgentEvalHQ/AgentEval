@@ -6,9 +6,12 @@ namespace AgentEval.Evals;
 
 /// <summary>
 /// Aggregation strategy for multi-run stochastic-agent verdicts.
-/// Counts pass/warn/fail labels among non-skipped sub-results; the majority wins.
-/// Ties are broken by most severe (fail beats warn beats pass).
-/// The numeric score is the mean of voting (non-skipped) results; severity is the max.
+/// Counts pass/warn/fail labels among non-skipped sub-results; the
+/// winning label drives the returned <c>severity</c> (which is what the
+/// composite verdict matrix in <see cref="CompositeEval"/> reads); the
+/// numeric score is the mean of voting results. Ties between labels
+/// resolve by most severe (<c>fail</c> &gt; <c>warn</c> &gt; <c>pass</c>),
+/// matching the rollup convention used elsewhere.
 /// </summary>
 public sealed class MajorityVoteAggregation : IAggregationStrategy
 {
@@ -35,15 +38,28 @@ public sealed class MajorityVoteAggregation : IAggregationStrategy
         var warnCount = voting.Count(r => r.Score.Label == "warn");
         var failCount = voting.Count(r => r.Score.Label == "fail");
 
-        // Score = mean of voting results (so majority verdict still has a numeric anchor).
         var meanScore = voting.Average(r => r.Score.Value);
-        var severity = SeverityRollup.Max(voting.Select(r => r.Score.Severity));
 
-        // Determine majority. Tie-breaking by most severe (fail > warn > pass).
-        if (failCount >= passCount && failCount >= warnCount) return (meanScore, severity);
-        if (warnCount >= passCount) return (meanScore, severity);
+        // Determine the WINNING label by majority, with most-severe tie-break.
+        // Then derive the severity from the winning label so the composite
+        // verdict matrix actually reflects the majority vote (previously
+        // every branch returned the rolled-up max severity, which collapsed
+        // the vote into "worst result wins" regardless of the count).
+        string winningLabel;
+        if (failCount > passCount && failCount > warnCount)            winningLabel = "fail";
+        else if (warnCount > passCount && warnCount > failCount)       winningLabel = "warn";
+        else if (passCount > failCount && passCount > warnCount)       winningLabel = "pass";
+        else if (failCount > 0 && failCount >= warnCount && failCount >= passCount) winningLabel = "fail";  // tie → fail wins
+        else if (warnCount > 0 && warnCount >= passCount)              winningLabel = "warn";              // tie → warn beats pass
+        else                                                            winningLabel = "pass";
+
+        var severity = winningLabel switch
+        {
+            "fail" => SeverityRollup.Max(voting.Where(r => r.Score.Label == "fail").Select(r => r.Score.Severity)),
+            "warn" => "medium",
+            _      => "none",
+        };
+
         return (meanScore, severity);
-        // Note: severity rollup already incorporates the worst — strategy returns mean score
-        // and rolled-up severity. Caller's verdict matrix interprets via severity.
     }
 }

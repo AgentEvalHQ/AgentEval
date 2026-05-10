@@ -360,14 +360,23 @@ public sealed class Query
             FilteredOut: Array.Empty<string>());
     }
 
+    /// <summary>Max recursion depth for tree walks — protects against
+    /// pathological / attacker-shaped trees that would overflow the stack.
+    /// Set to 32 to comfortably exceed the GraphQL depth cap (10) and any
+    /// realistic composite (root → pillar → article → multi-judge ≤ 5).</summary>
+    private const int MaxTreeWalkDepth = 32;
+
     private static void WalkAndAccumulate(
         EvalResult node,
         ref double trivial,
         ref double low,
         ref double medium,
         ref double high,
-        ref double unknown)
+        ref double unknown,
+        int depth = 0)
     {
+        if (depth > MaxTreeWalkDepth) return;
+
         var cost = node.Provenance.EstimatedCost;
         if (cost > 0)
         {
@@ -395,7 +404,7 @@ public sealed class Query
         {
             foreach (var child in children)
             {
-                WalkAndAccumulate(child, ref trivial, ref low, ref medium, ref high, ref unknown);
+                WalkAndAccumulate(child, ref trivial, ref low, ref medium, ref high, ref unknown, depth + 1);
             }
         }
     }
@@ -513,15 +522,16 @@ public sealed class Query
     /// the first node whose metric key matches. Pre-order (parent before
     /// children) so a composite-of-the-same-key wins over its leaves.
     /// </summary>
-    private static EvalResult? FindEvaluatorNode(EvalResult node, string key)
+    private static EvalResult? FindEvaluatorNode(EvalResult node, string key, int depth = 0)
     {
+        if (depth > MaxTreeWalkDepth) return null;
         if (string.Equals(node.Metric.Key, key, StringComparison.Ordinal))
             return node;
         var subs = node.Details.SubResults;
         if (subs is null) return null;
         foreach (var s in subs)
         {
-            var found = FindEvaluatorNode(s, key);
+            var found = FindEvaluatorNode(s, key, depth + 1);
             if (found is not null) return found;
         }
         return null;

@@ -44,7 +44,7 @@ public static class EvaluatorCostMap
         ["similarity"]                      = EvaluatorCostTier.Low,
         ["response_completeness"]           = EvaluatorCostTier.Low,
         ["f1_score"]                        = EvaluatorCostTier.Trivial,   // pure code
-        ["qa_composite"]                    = EvaluatorCostTier.Medium,    // composite of 7
+        ["qa_composite"]                    = EvaluatorCostTier.High,      // composite of 7 — GroundednessEval alone fans out to 4 LLM judges; total is 10+ LLM calls per scenario
 
         // ── Plan 05 — Adjudication / meta (3 + 1 wrapper) ──────────────────
         // AdjudicatedMultiJudgeWrapper itself isn't a leaf — it inherits cost from wrapped panel.
@@ -64,7 +64,7 @@ public static class EvaluatorCostMap
         ["code_vulnerability"]              = EvaluatorCostTier.Low,
         ["ungrounded_attributes"]           = EvaluatorCostTier.Low,
         ["system_prompt_leakage"]           = EvaluatorCostTier.Low,       // hybrid: regex-first
-        ["unsafe_tool_use"]                 = EvaluatorCostTier.Low,
+        ["unsafe_tool_use"]                 = EvaluatorCostTier.Medium,    // LLM-judge in v1; planned v2 deterministic policy lookup will revisit
 
         // ── Plan 05 — Telemetry (6) ────────────────────────────────────────
         ["latency"]                         = EvaluatorCostTier.Trivial,   // all telemetry is pure code

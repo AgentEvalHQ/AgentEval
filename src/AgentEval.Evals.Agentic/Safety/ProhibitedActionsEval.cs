@@ -182,6 +182,20 @@ public sealed class ProhibitedActionsEval : IEval
         return true;
     }
 
+    // Per-policy compiled regex cache. Policies are typically reused across
+    // many EvaluateAsync invocations, but each pattern is otherwise compiled
+    // fresh on every call — for a high-tool-call scenario × M patterns the
+    // CPU spent in `Regex.IsMatch` adds up. Keyed by the exact `(pattern,
+    // options)` tuple via the underlying `Regex` cache, which is bounded.
+    private static readonly global::System.Collections.Concurrent.ConcurrentDictionary<string, Regex> s_compiledPatterns = new(StringComparer.Ordinal);
+
+    private static Regex GetOrCompile(string pattern)
+        => s_compiledPatterns.GetOrAdd(
+            pattern,
+            p => new Regex(p,
+                RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.Compiled,
+                TimeSpan.FromMilliseconds(200)));
+
     private static bool TryFindForbiddenPattern(
         EvalInput input,
         ProhibitedActionPolicy policy,
@@ -209,9 +223,8 @@ public sealed class ProhibitedActionsEval : IEval
                 bool matched;
                 try
                 {
-                    matched = Regex.IsMatch(argsJson, pattern.ArgumentRegex,
-                        RegexOptions.IgnoreCase | RegexOptions.CultureInvariant,
-                        TimeSpan.FromMilliseconds(200));
+                    var compiled = GetOrCompile(pattern.ArgumentRegex);
+                    matched = compiled.IsMatch(argsJson);
                 }
                 catch (RegexMatchTimeoutException)
                 {

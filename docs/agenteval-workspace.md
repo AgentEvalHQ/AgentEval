@@ -164,6 +164,40 @@ modified after completion. `ContentHasher.HashRunAsync` covers the run's
 summary, sorted scenario results, embedded `EvalResult` trees, and optional
 trace.
 
+### What the chain guarantees — and what it doesn't (v1)
+
+The v1 audit chain enforces a single equality: an evidence document's
+`sourceRun.manifestHash` field must equal the manifest's stored
+`contentHash` field. Both are read from disk; neither is recomputed at
+verification time. This catches the common tampering vector — editing a
+run's `contentHash` field after sealing — and is what Mission Control's
+"Source-run hash verified" badge reports.
+
+Three weaker guarantees the v1 chain does NOT enforce:
+
+1. **The manifest's `contentHash` is not recomputed against its body.** An
+   attacker who edits the manifest's `subject.name`, `git.commit`, `seed`,
+   or `evalProject` fields without touching `contentHash` will pass the
+   chain check. Re-running `agenteval doctor` re-hashes the run's summary
+   + scenarios + trace via `ContentHasher.HashRunAsync` and catches
+   tampering of THOSE files, but the manifest itself is currently trusted
+   as a label.
+2. **The evidence document body is not hashed.** Edits to
+   `controls[i].status`, `controls[i].passRate`, or the `attestation`
+   block change the evidence semantics but do not change any hash
+   compared by the chain. Evidence integrity in v1 depends on filesystem
+   ACLs and the integrity of the writing process.
+3. **No cross-evidence chain.** Each evidence document points back to one
+   run; there is no "previous evidence hash" pointer that would let you
+   reconstruct a tamper-evident timeline of attestations for a single
+   subject.
+
+These are tracked as v2 hardening (canonical-JSON hashing across manifest
++ evidence; chained evidence hashes). For v1 the chain is the right
+defence against the most common tampering vector — direct edits to a
+run's stored hash — and Mission Control's badge wording reflects what is
+actually enforced.
+
 ### `agenteval doctor`
 
 Re-validates the entire chain on demand:

@@ -34,6 +34,8 @@ The following obligations are **highly or partially testable from agent dialog b
 The following are not in scope for any automated dialog benchmark:
 
 - **Risk classification** of your AI system (Art 6, Art 7, Annex III) — a legal and architectural exercise requiring human judgment.
+- **Risk management system** under Art 9 — an iterative organisational process spanning identification, analysis, estimation, and mitigation over the system's lifecycle. Cannot be substantiated from dialog behaviour alone; the benchmark could probe whether the agent ACKNOWLEDGES the Art-9 requirement, but v1 does not include such a probe.
+- **Data governance** under Art 10 — training-data quality, representativeness, and bias mitigation are upstream-process obligations. Like Art 9, dialog-level acknowledgement probes are possible but not shipped in v1.
 - **Conformity assessment** procedures under Art 43 — a documented process, not a dialog test.
 - **Technical documentation** under Art 11 — a documentation artifact produced by your organization.
 - **Quality management system** under Art 17 — an organizational process.

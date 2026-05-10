@@ -33,7 +33,7 @@ export function ManifestHashBadge({ contentHash, expectedHash }: ManifestHashBad
           ? "bg-green-50 text-green-700"
           : "bg-red-50 text-red-700"
       }`}
-      title={verified ? "Audit chain verified" : "Hash mismatch — tampered"}
+      title={verified ? "Stored contentHash matches the expected source-run hash. (Does not recompute the manifest's body — see compliance docs for the exact guarantee.)" : "Hash mismatch — tampered"}
     >
       {verified ? <ShieldCheck size={12} /> : <ShieldAlert size={12} />}
       <code className="font-mono">{contentHash.slice(0, 8)}…</code>

@@ -35,9 +35,14 @@ public class MajorityVoteAggregationTests
     private readonly MajorityVoteAggregation _sut = new();
 
     [Fact]
-    public void Aggregate_ThreePassingVotes_ScoreIsMeanSeverityIsMax()
+    public void Aggregate_ThreePassingVotes_ScoreIsMeanAndSeverityReflectsWinningLabel()
     {
-        // Arrange — all three pass; mean = (0.9+0.8+0.85)/3 ≈ 0.85, severity = max = low
+        // Arrange — all three pass; mean = (0.9+0.8+0.85)/3 ≈ 0.85.
+        // Pass wins the vote 3-0; severity should reflect the WINNING label
+        // (= "none" for pass), not the max severity across all voters. The
+        // old behavior collapsed everything to max severity regardless of
+        // vote count, which contradicted the documented majority semantics
+        // (Opus review I4).
         var results = new[]
         {
             MakeResult(0.90, "none", "pass"),
@@ -52,7 +57,7 @@ public class MajorityVoteAggregationTests
         // Assert
         var expectedMean = (0.90 + 0.80 + 0.85) / 3.0;
         Assert.Equal(expectedMean, score, precision: 10);
-        Assert.Equal("low", severity); // max of none, low, none
+        Assert.Equal("none", severity); // pass won → severity is "none"
     }
 
     [Fact]
