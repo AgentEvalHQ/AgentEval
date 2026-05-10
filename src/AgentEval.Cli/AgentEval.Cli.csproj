@@ -26,6 +26,9 @@
 
   <ItemGroup>
     <PackageReference Include="System.CommandLine" />
+    <!-- Real Azure OpenAI judge for `agenteval bench ...` when env vars are set. -->
+    <PackageReference Include="Azure.AI.OpenAI" />
+    <PackageReference Include="Microsoft.Extensions.AI.OpenAI" />
   </ItemGroup>
 
   <ItemGroup>

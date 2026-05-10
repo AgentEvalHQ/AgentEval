@@ -239,4 +239,89 @@ public class CompositeEvalTests
 
         Assert.Equal("WeightedSum", result.Details.AggregationStrategy);
     }
+
+    // ── EvalComponent.Required = false suppression (batch-1 surface) ─────────
+
+    [Fact]
+    public async Task EvaluateAsync_OptionalFailingComponent_VerdictIsPass()
+    {
+        // Required pass + optional high-severity fail → verdict label must be
+        // "pass" (the optional fail's severity drives Score.Severity for
+        // transparency, but does NOT propagate into the verdict-label decision).
+        // Per the batch-1 fix in CompositeEval:78-94.
+        var components = new EvalComponent[]
+        {
+            new(new StubAtomic("required-pass", 0.95, severity: "none", passed: true), Weight: 1.0, Required: true),
+            new(new StubAtomic("optional-fail", 0.10, severity: "high", passed: false), Weight: 1.0, Required: false),
+        };
+        var sut = MakeComposite(components);
+
+        var result = await sut.EvaluateAsync(Input);
+
+        // Verdict label reflects required-only severity rollup → pass.
+        Assert.Equal("pass", result.Score.Label);
+        Assert.True(result.Score.Passed);
+    }
+
+    [Fact]
+    public async Task EvaluateAsync_RequiredFailDominates_RegardlessOfOptionalPasses()
+    {
+        // Required fail + optional pass → required fail's severity propagates
+        // to the verdict label.
+        var components = new EvalComponent[]
+        {
+            new(new StubAtomic("required-fail", 0.10, severity: "high", passed: false), Weight: 1.0, Required: true),
+            new(new StubAtomic("optional-pass", 0.95, severity: "none", passed: true),  Weight: 1.0, Required: false),
+        };
+        var sut = MakeComposite(components);
+
+        var result = await sut.EvaluateAsync(Input);
+
+        Assert.Equal("high", result.Score.Severity);
+        Assert.Equal("fail", result.Score.Label);
+    }
+
+    [Fact]
+    public async Task EvaluateAsync_AllOptionalAllFail_VerdictLabelIsPass()
+    {
+        // No required components, all optional, all failing → verdict label
+        // must be "pass" (no required component dragged it down). Score.Severity
+        // still reflects the aggregation-level worst-case (for diagnostics),
+        // but the consumer-facing verdict is governed by required-component
+        // severities only.
+        var components = new EvalComponent[]
+        {
+            new(new StubAtomic("opt-1", 0.10, severity: "critical", passed: false), Weight: 1.0, Required: false),
+            new(new StubAtomic("opt-2", 0.10, severity: "high",     passed: false), Weight: 1.0, Required: false),
+        };
+        var sut = MakeComposite(components);
+
+        var result = await sut.EvaluateAsync(Input);
+
+        // Verdict label = pass because there are no required components that
+        // failed; the optional fails' severity does not propagate into the
+        // label decision.
+        Assert.Equal("pass", result.Score.Label);
+        Assert.True(result.Score.Passed);
+    }
+
+    // ── Threshold validation (batch-5 surface) ───────────────────────────────
+
+    [Fact]
+    public void Constructor_ThresholdOutOfRange_ThrowsArgumentOutOfRange()
+    {
+        var components = new EvalComponent[] { new(new StubAtomic("a", 1.0)) };
+
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            new CompositeEval("k", "n", "c", "1.0.0", components,
+                WeightedSumAggregation.Instance, threshold: 1.5));
+
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            new CompositeEval("k", "n", "c", "1.0.0", components,
+                WeightedSumAggregation.Instance, threshold: -0.1));
+
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            new CompositeEval("k", "n", "c", "1.0.0", components,
+                WeightedSumAggregation.Instance, threshold: double.NaN));
+    }
 }

@@ -81,4 +81,90 @@ public class FileSystemLayoutTests
         Assert.EndsWith(runId, runDir);
         Assert.StartsWith(layout.Root, runDir);
     }
+
+    // ── Sanitize hash-suffix (batch-2 surface) ───────────────────────────────
+
+    [Fact]
+    public void Sanitize_LossyNamesGetDistinctHashSuffix_NoCollision()
+    {
+        // "Foo/Bar" and "Foo-Bar" both trim to "Foo-Bar"; without the hash-suffix
+        // they'd map to the same on-disk folder. Verify the hash differentiates
+        // them.
+        var layout = Layout();
+        var slashSubject = new SubjectIdentity(SubjectKind.Agent, "Foo/Bar");
+        var dashSubject  = new SubjectIdentity(SubjectKind.Agent, "Foo-Bar");
+
+        var slashDir = Path.GetFileName(layout.SubjectDir(slashSubject));
+        var dashDir  = Path.GetFileName(layout.SubjectDir(dashSubject));
+
+        Assert.NotEqual(slashDir, dashDir);
+        // The lossy one (slash → dash) carries the suffix; the clean one stays
+        // unmodified.
+        Assert.StartsWith("Foo-Bar__", slashDir);
+        Assert.Equal("Foo-Bar", dashDir);
+    }
+
+    [Fact]
+    public void Sanitize_LossyInput_HashSuffixIsDeterministic()
+    {
+        // Same lossy input must produce the same hash suffix across calls,
+        // otherwise sequential writes to the same subject would land in
+        // different directories.
+        var layout = Layout();
+        var subject1 = new SubjectIdentity(SubjectKind.Agent, "Foo/Bar/Baz");
+        var subject2 = new SubjectIdentity(SubjectKind.Agent, "Foo/Bar/Baz");
+
+        var dir1 = layout.SubjectDir(subject1);
+        var dir2 = layout.SubjectDir(subject2);
+
+        Assert.Equal(dir1, dir2);
+    }
+
+    [Fact]
+    public void Sanitize_NonLossyName_NoHashSuffixAppended()
+    {
+        // Clean names should NOT get the suffix — the suffix is for collision
+        // disambiguation only, not a blanket mangling.
+        var layout = Layout();
+        var subject = new SubjectIdentity(SubjectKind.Agent, "TravelAgent");
+
+        var dirName = Path.GetFileName(layout.SubjectDir(subject));
+
+        Assert.Equal("TravelAgent", dirName);
+        Assert.DoesNotContain("__", dirName);
+    }
+
+    // ── IsSafePathSegment defensive cases ────────────────────────────────────
+
+    [Theory]
+    [InlineData("..")]
+    [InlineData(".")]
+    [InlineData("foo/bar")]
+    [InlineData("foo\\bar")]
+    [InlineData("foo..bar")]
+    [InlineData("CON")]
+    [InlineData("PRN")]
+    [InlineData("NUL")]
+    [InlineData("CON.txt")]
+    [InlineData("LPT1")]
+    [InlineData("trailing.")]
+    [InlineData("trailing ")]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void IsSafePathSegment_RejectsUnsafeInputs(string segment)
+    {
+        Assert.False(FileSystemLayout.IsSafePathSegment(segment),
+            $"'{segment}' must be rejected as an unsafe path segment");
+    }
+
+    [Theory]
+    [InlineData("MyAgent")]
+    [InlineData("foo-bar-baz")]
+    [InlineData("subject_v2")]
+    [InlineData("2026-05-10_14-30-00_abcd1234")]
+    public void IsSafePathSegment_AcceptsSafeInputs(string segment)
+    {
+        Assert.True(FileSystemLayout.IsSafePathSegment(segment),
+            $"'{segment}' must be accepted as a safe path segment");
+    }
 }

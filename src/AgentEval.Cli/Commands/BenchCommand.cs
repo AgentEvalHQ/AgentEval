@@ -60,34 +60,9 @@ public static class BenchCommand
         }
 
         // ── Judge / evaluator ────────────────────────────────────────────────
-        IEvaluator judge;
-        if (evaluatorOverride is not null)
-        {
-            judge = evaluatorOverride;
-        }
-        else
-        {
-            // Check for real LLM configuration
-            var azureEndpoint = Environment.GetEnvironmentVariable("AZURE_OPENAI_ENDPOINT");
-            if (string.IsNullOrWhiteSpace(azureEndpoint))
-            {
-                var allowStub = Environment.GetEnvironmentVariable("AGENTEVAL_ALLOW_STUB_JUDGE");
-                if (!string.Equals(allowStub, "1", StringComparison.Ordinal)
-                 && !string.Equals(allowStub, "true", StringComparison.OrdinalIgnoreCase))
-                {
-                    Console.Error.WriteLine(
-                        "✖ No LLM evaluator configured (AZURE_OPENAI_ENDPOINT is unset).\n" +
-                        "  Set AZURE_OPENAI_ENDPOINT + AZURE_OPENAI_API_KEY + AZURE_OPENAI_DEPLOYMENT\n" +
-                        "  to enable real judging, or set AGENTEVAL_ALLOW_STUB_JUDGE=1 to run with\n" +
-                        "  a deterministic stub (results are not meaningful — CI must NOT do this).");
-                    return 2;
-                }
-                Console.Error.WriteLine(
-                    "⚠ AGENTEVAL_ALLOW_STUB_JUDGE=1 — using stub evaluator. " +
-                    "Results are not a real judgement; do not rely on the verdict in CI.");
-            }
-            judge = new StubEvaluator();
-        }
+        var (resolvedJudge, judgeModelName, exitCode) = JudgeFactory.Resolve(evaluatorOverride, "GDPR benchmark");
+        if (resolvedJudge is null) return exitCode;
+        IEvaluator judge = resolvedJudge;
 
         // ── Build registry ───────────────────────────────────────────────────
         ArticlesRegistry articles;
@@ -95,7 +70,7 @@ public static class BenchCommand
         try
         {
             var loader = new ArticleScenarioYamlLoader();
-            scenarioBuilder = new ScenarioToAtomicEval(judge, judgeModel: "stub");
+            scenarioBuilder = new ScenarioToAtomicEval(judge, judgeModel: judgeModelName);
             var articleBuilder = new ArticleCompositeBuilder(scenarioBuilder);
             articles = new ArticlesRegistry(loader, articleBuilder);
         }
@@ -156,8 +131,14 @@ public static class BenchCommand
         }
 
         // ── Generate reports ─────────────────────────────────────────────────
+        // judgeMode reflects what actually ran:
+        //   stochastic N>1 → "multi-judge" (majority-vote aggregation across runs)
+        //   single judge   → "mode-a"
+        // (Mode-B per-criterion fan-out is wired via ScenarioToAtomicEval ctor flags
+        //  in the article-builder; bench gdpr does not enable that in v1.)
+        var judgeMode = runs > 1 ? "multi-judge" : "mode-a";
         var reporter = new GDPRComplianceReporter(articles);
-        var options = new GdprReportOptions(Preset: preset);
+        var options = new GdprReportOptions(Preset: preset, JudgeMode: judgeMode);
         GdprComplianceEvidence evidence;
         try
         {
@@ -287,32 +268,4 @@ public static class BenchCommand
         return s.Trim('.', ' ');
     }
 
-    /// <summary>
-    /// Stub evaluator used when no real LLM wiring is available.
-    /// Returns a fixed passing score (75/100) for every scenario.
-    /// </summary>
-    private sealed class StubEvaluator : IEvaluator
-    {
-        public Task<EvaluationResult> EvaluateAsync(
-            string input,
-            string output,
-            IEnumerable<string> criteria,
-            CancellationToken cancellationToken = default)
-        {
-            var criteriaList = criteria.ToList();
-            return Task.FromResult(new EvaluationResult
-            {
-                OverallScore = 75,
-                Summary = "Stub evaluation — no real LLM judge configured.",
-                CriteriaResults = criteriaList
-                    .Select(c => new CriterionResult
-                    {
-                        Criterion = c,
-                        Met = true,
-                        Explanation = "Stub: assumed met."
-                    })
-                    .ToList()
-            });
-        }
-    }
 }

@@ -224,4 +224,88 @@ public class EvalResultPersistenceTests
         Assert.Throws<ArgumentException>(() =>
             EvalResultPersistence.ToScenarioResult(validResult, "id", "   "));
     }
+
+    // ── Metrics-lift (batch-4 surface) ───────────────────────────────────────
+
+    [Theory]
+    [InlineData("none",     0)]
+    [InlineData("low",      1)]
+    [InlineData("medium",   2)]
+    [InlineData("high",     3)]
+    [InlineData("critical", 4)]
+    public void ToScenarioResult_SeverityOrdinalLiftedIntoMetrics(string severity, double expectedOrdinal)
+    {
+        // Arrange — atomic result with the given severity
+        var result = new EvalResult(
+            Metric: new("test_metric", "Test", "test", "1.0.0"),
+            Score: new(0.5, null, severity == "none" ? "pass" : "fail", severity == "none", null, severity, null),
+            Details: new(null, null, null, null, null),
+            Provenance: new("atomic-llm", null, null, null, null, 0.0, false),
+            EvaluatedAt: DateTimeOffset.UtcNow);
+
+        // Act
+        var sr = EvalResultPersistence.ToScenarioResult(result, "scenario-1", "Scenario 1");
+
+        // Assert — severity_ordinal lifted so callers can query Metrics
+        // without re-deserialising the recursive Output JSON.
+        Assert.True(sr.Metrics.ContainsKey("severity_ordinal"),
+            "severity_ordinal must be lifted into Metrics for query-side use");
+        Assert.Equal(expectedOrdinal, sr.Metrics["severity_ordinal"]);
+    }
+
+    [Fact]
+    public void ToScenarioResult_ConfidenceLiftedIntoMetrics_WhenPresent()
+    {
+        var result = new EvalResult(
+            Metric: new("test_metric", "Test", "test", "1.0.0"),
+            Score: new(0.9, null, "pass", true, null, "none", Confidence: 0.92),
+            Details: new(null, null, null, null, null),
+            Provenance: new("atomic-llm", null, null, null, null, 0.0, false),
+            EvaluatedAt: DateTimeOffset.UtcNow);
+
+        var sr = EvalResultPersistence.ToScenarioResult(result, "scenario-1", "Scenario 1");
+
+        Assert.True(sr.Metrics.ContainsKey("confidence"));
+        Assert.Equal(0.92, sr.Metrics["confidence"]);
+    }
+
+    [Fact]
+    public void ToScenarioResult_ConfidenceAbsentFromMetrics_WhenNull()
+    {
+        var result = new EvalResult(
+            Metric: new("test_metric", "Test", "test", "1.0.0"),
+            Score: new(0.9, null, "pass", true, null, "none", Confidence: null),
+            Details: new(null, null, null, null, null),
+            Provenance: new("atomic-llm", null, null, null, null, 0.0, false),
+            EvaluatedAt: DateTimeOffset.UtcNow);
+
+        var sr = EvalResultPersistence.ToScenarioResult(result, "scenario-1", "Scenario 1");
+
+        Assert.False(sr.Metrics.ContainsKey("confidence"));
+    }
+
+    [Fact]
+    public void ToScenarioResult_DimensionsArePreservedAlongsideLiftedMetrics()
+    {
+        var dimensions = new Dictionary<string, double>
+        {
+            ["clarity"] = 0.95,
+            ["accuracy"] = 0.80,
+        };
+        var result = new EvalResult(
+            Metric: new("test_metric", "Test", "test", "1.0.0"),
+            Score: new(0.9, null, "pass", true, null, "low", 0.85),
+            Details: new(dimensions, null, null, null, null),
+            Provenance: new("atomic-llm", null, null, null, null, 0.0, false),
+            EvaluatedAt: DateTimeOffset.UtcNow);
+
+        var sr = EvalResultPersistence.ToScenarioResult(result, "scenario-1", "Scenario 1");
+
+        // Dimensions survive
+        Assert.Equal(0.95, sr.Metrics["clarity"]);
+        Assert.Equal(0.80, sr.Metrics["accuracy"]);
+        // Lifted alongside
+        Assert.Equal(1.0,  sr.Metrics["severity_ordinal"]); // low=1
+        Assert.Equal(0.85, sr.Metrics["confidence"]);
+    }
 }

@@ -258,4 +258,98 @@ public class EvalResultSchemaTests
         var result = Evaluate(MalformedResultJson);
         Assert.False(result.IsValid);
     }
+
+    // ── batch-2 surface: multi-judge-adjudicated provenance enum ─────────────
+
+    private const string MultiJudgeAdjudicatedJson = """
+        {
+          "metric": {
+            "key": "adjudicated_panel",
+            "name": "Adjudicated Panel",
+            "category": "compliance.gdpr",
+            "version": "1.0.0"
+          },
+          "score": {
+            "value": 0.85,
+            "label": "pass",
+            "passed": true,
+            "severity": "none"
+          },
+          "details": {
+            "dimensions": {
+              "agreement": 0.66,
+              "disputed": 1.0,
+              "adjudicated": 1.0
+            }
+          },
+          "provenance": {
+            "type": "multi-judge-adjudicated",
+            "estimatedCost": 0.012,
+            "cacheHit": false
+          },
+          "evaluatedAt": "2026-05-08T14:35:00Z"
+        }
+        """;
+
+    [Fact]
+    public void MultiJudgeAdjudicatedResult_ValidatesAgainstSchema()
+    {
+        // Regression test for the batch-2 schema fix: AdjudicatedMultiJudgeWrapper
+        // emits provenance.type = "multi-judge-adjudicated"; the schema enum was
+        // missing it, causing an invalid-but-uncaught state. Lock the new value in.
+        var result = Evaluate(MultiJudgeAdjudicatedJson);
+        Assert.True(result.IsValid, FormatErrors(result));
+    }
+
+    [Fact]
+    public void Result_WithExtraUnknownProperty_FailsValidation()
+    {
+        // batch-1 strictness: additionalProperties=false on every object means
+        // unknown fields (typos, unintended persistence of internal state) get
+        // caught by the validator at write time.
+        const string withExtra = """
+            {
+              "metric": {
+                "key": "x", "name": "X", "category": "test", "version": "1.0.0",
+                "extraField": "should fail"
+              },
+              "score": {
+                "value": 0.9, "label": "pass", "passed": true, "severity": "none"
+              },
+              "details": {},
+              "provenance": {
+                "type": "atomic-code",
+                "estimatedCost": 0.0,
+                "cacheHit": false
+              },
+              "evaluatedAt": "2026-05-08T14:30:00Z"
+            }
+            """;
+        var result = Evaluate(withExtra);
+        Assert.False(result.IsValid, "Schema must reject unknown 'extraField' on metric (additionalProperties=false).");
+    }
+
+    [Fact]
+    public void Result_WithThresholdAboveOne_FailsValidation()
+    {
+        // batch-1 strictness: score.threshold clamped to [0,1].
+        const string outOfRange = """
+            {
+              "metric": { "key": "x", "name": "X", "category": "test", "version": "1.0.0" },
+              "score": {
+                "value": 0.9, "label": "pass", "passed": true, "severity": "none",
+                "threshold": 1.5
+              },
+              "details": {},
+              "provenance": {
+                "type": "atomic-code",
+                "estimatedCost": 0.0,
+                "cacheHit": false
+              },
+              "evaluatedAt": "2026-05-08T14:30:00Z"
+            }
+            """;
+        var result = Evaluate(outOfRange);
+        Assert.False(result.IsValid, "Schema must reject score.threshold > 1.");
+    }
 }

@@ -200,4 +200,118 @@ public class MultiJudgeWrapperTests
         // Act & Assert
         await Assert.ThrowsAsync<ArgumentNullException>(() => sut.EvaluateAsync(null!));
     }
+
+    // ── Threshold parameter (batch-4 surface) ────────────────────────────────
+
+    [Fact]
+    public async Task EvaluateAsync_ThresholdSet_ScoreAboveThreshold_LabelIsPass()
+    {
+        // Arrange — single high-severity judge but score crosses the threshold.
+        // With Threshold set, the label is score-vs-threshold, not severity-driven.
+        var judges = new[]
+        {
+            JudgeComp("j1", 0.85, "high", "fail"),
+        };
+        var sut = new MultiJudgeWrapper(
+            "thr", "Threshold", "test", "1.0.0",
+            judges,
+            WeightedMedianAggregation.Instance,
+            threshold: 0.80);
+
+        // Act
+        var result = await sut.EvaluateAsync(Input);
+
+        // Assert
+        Assert.Equal("pass", result.Score.Label);
+        Assert.True(result.Score.Passed);
+    }
+
+    [Fact]
+    public async Task EvaluateAsync_ThresholdSet_ScoreBelowThreshold_LabelIsFail()
+    {
+        // Arrange — low-severity judges but score below threshold → fail.
+        var judges = new[]
+        {
+            JudgeComp("j1", 0.40, "none", "pass"),
+            JudgeComp("j2", 0.40, "none", "pass"),
+        };
+        var sut = new MultiJudgeWrapper(
+            "thr", "Threshold", "test", "1.0.0",
+            judges,
+            WeightedMedianAggregation.Instance,
+            threshold: 0.80);
+
+        // Act
+        var result = await sut.EvaluateAsync(Input);
+
+        // Assert — threshold-fail short-circuits the severity-driven matrix
+        Assert.Equal("fail", result.Score.Label);
+        Assert.False(result.Score.Passed);
+    }
+
+    [Fact]
+    public void Constructor_ThresholdOutOfRange_ThrowsArgumentOutOfRange()
+    {
+        var judges = new[] { JudgeComp("j1", 0.9) };
+
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            new MultiJudgeWrapper("k", "n", "c", "1.0.0", judges, WeightedMedianAggregation.Instance, threshold: 1.5));
+
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            new MultiJudgeWrapper("k", "n", "c", "1.0.0", judges, WeightedMedianAggregation.Instance, threshold: -0.1));
+    }
+
+    [Fact]
+    public async Task EvaluateAsync_AllJudgesCacheHit_ProvenanceCacheHitIsTrue()
+    {
+        // Arrange — three judges, all cache hits. Need a custom helper that
+        // produces sub-results with CacheHit=true; the existing JudgeComp uses
+        // false. Build a result directly.
+        EvalComponent CacheHitJudge(string key, double value)
+        {
+            var result = new EvalResult(
+                Metric: new(key, key, "test", "1.0.0"),
+                Score: new(value, null, "pass", true, null, "none", null),
+                Details: new(null, null, null, null, null),
+                Provenance: new("atomic-llm", null, null, null, null, 0.0, true /* cache hit */),
+                EvaluatedAt: DateTimeOffset.UtcNow);
+            return new EvalComponent(new FixedResultEval(key, result), 1.0);
+        }
+
+        var judges = new[]
+        {
+            CacheHitJudge("j1", 0.9),
+            CacheHitJudge("j2", 0.9),
+        };
+        var sut = MakeWrapper(judges);
+
+        // Act
+        var result = await sut.EvaluateAsync(Input);
+
+        // Assert — CostRollup propagates AllCacheHits when every sub is a hit
+        Assert.True(result.Provenance.CacheHit);
+    }
+
+    [Fact]
+    public async Task EvaluateAsync_OneCacheMiss_ProvenanceCacheHitIsFalse()
+    {
+        // Arrange — one cache hit + one cache miss → CacheHit must be false
+        EvalComponent Judge(string key, double value, bool cacheHit)
+        {
+            var result = new EvalResult(
+                Metric: new(key, key, "test", "1.0.0"),
+                Score: new(value, null, "pass", true, null, "none", null),
+                Details: new(null, null, null, null, null),
+                Provenance: new("atomic-llm", null, null, null, null, 0.0, cacheHit),
+                EvaluatedAt: DateTimeOffset.UtcNow);
+            return new EvalComponent(new FixedResultEval(key, result), 1.0);
+        }
+
+        var judges = new[] { Judge("j1", 0.9, true), Judge("j2", 0.9, false) };
+        var sut = MakeWrapper(judges);
+
+        var result = await sut.EvaluateAsync(Input);
+
+        Assert.False(result.Provenance.CacheHit);
+    }
 }

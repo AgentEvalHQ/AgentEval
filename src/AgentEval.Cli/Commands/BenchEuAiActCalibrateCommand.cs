@@ -39,22 +39,11 @@ public static class BenchEuAiActCalibrateCommand
         IEvaluator? evaluatorOverride)
     {
         // ── Judge / evaluator ────────────────────────────────────────────────
-        IEvaluator judge;
-        if (evaluatorOverride is not null)
-        {
-            judge = evaluatorOverride;
-        }
-        else
-        {
-            var azureEndpoint = Environment.GetEnvironmentVariable("AZURE_OPENAI_ENDPOINT");
-            if (string.IsNullOrWhiteSpace(azureEndpoint))
-            {
-                Console.Error.WriteLine(
-                    "Warning: No real LLM evaluator configured; using stub. " +
-                    "Set AZURE_OPENAI_* env vars to enable real judging.");
-            }
-            judge = new StubEvaluator();
-        }
+        // Calibration requires AGENTEVAL_ALLOW_STUB_JUDGE=1 to use stub mode —
+        // stub-graded calibration gates the wrong thing.
+        var (resolvedJudge, _, exitCode) = JudgeFactory.Resolve(evaluatorOverride, "EU AI Act calibration");
+        if (resolvedJudge is null) return exitCode;
+        IEvaluator judge = resolvedJudge;
 
         // ── Load EU AI Act article registry ──────────────────────────────────
         EuAiActArticlesRegistry articles;
@@ -213,32 +202,4 @@ public static class BenchEuAiActCalibrateCommand
         return sb.ToString();
     }
 
-    /// <summary>
-    /// Stub evaluator used when no real LLM judge is configured.
-    /// Returns a fixed passing score (75/100) for every scenario.
-    /// </summary>
-    private sealed class StubEvaluator : IEvaluator
-    {
-        public Task<EvaluationResult> EvaluateAsync(
-            string input,
-            string output,
-            IEnumerable<string> criteria,
-            CancellationToken cancellationToken = default)
-        {
-            var criteriaList = criteria.ToList();
-            return Task.FromResult(new EvaluationResult
-            {
-                OverallScore = 75,
-                Summary = "Stub evaluation — no real LLM judge configured.",
-                CriteriaResults = criteriaList
-                    .Select(c => new CriterionResult
-                    {
-                        Criterion = c,
-                        Met = true,
-                        Explanation = "Stub: assumed met."
-                    })
-                    .ToList()
-            });
-        }
-    }
 }

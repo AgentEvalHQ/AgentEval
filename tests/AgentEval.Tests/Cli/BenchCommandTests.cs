@@ -169,4 +169,82 @@ public class BenchCommandTests : IDisposable
         Assert.True(new FileInfo(Path.Combine(tsDir, "report.pdf")).Length > 0,
             "report.pdf should be non-empty");
     }
+
+    // ── AGENTEVAL_ALLOW_STUB_JUDGE gate (batch-5 surface) ────────────────────
+    //
+    // These tests scrub the AZURE_OPENAI_* env vars to simulate a CI run that
+    // forgot to wire the secrets. With evaluatorOverride=null the resolver
+    // falls into the gate path. Marked [Collection("EnvVarTests")] so they
+    // don't race with parallel tests that also touch env vars.
+
+    [Fact]
+    public async Task RunGdprAsync_NoEnvVars_NoStubOptIn_ReturnsExitCode2()
+    {
+        InitWorkspace();
+
+        // Snapshot + scrub env vars so the resolver hits the no-config branch.
+        var envAzureEndpoint   = Environment.GetEnvironmentVariable("AZURE_OPENAI_ENDPOINT");
+        var envAzureKey        = Environment.GetEnvironmentVariable("AZURE_OPENAI_API_KEY");
+        var envAzureDeployment = Environment.GetEnvironmentVariable("AZURE_OPENAI_DEPLOYMENT");
+        var envAllowStub       = Environment.GetEnvironmentVariable("AGENTEVAL_ALLOW_STUB_JUDGE");
+        try
+        {
+            Environment.SetEnvironmentVariable("AZURE_OPENAI_ENDPOINT", null);
+            Environment.SetEnvironmentVariable("AZURE_OPENAI_API_KEY", null);
+            Environment.SetEnvironmentVariable("AZURE_OPENAI_DEPLOYMENT", null);
+            Environment.SetEnvironmentVariable("AGENTEVAL_ALLOW_STUB_JUDGE", null);
+
+            var exit = await BenchCommand.RunGdprAsync(
+                preset: "smoke",
+                subject: "EnvGateTest",
+                rootOverride: _root,
+                inputText: null,
+                evaluatorOverride: null);
+
+            Assert.Equal(2, exit);
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("AZURE_OPENAI_ENDPOINT",     envAzureEndpoint);
+            Environment.SetEnvironmentVariable("AZURE_OPENAI_API_KEY",      envAzureKey);
+            Environment.SetEnvironmentVariable("AZURE_OPENAI_DEPLOYMENT",   envAzureDeployment);
+            Environment.SetEnvironmentVariable("AGENTEVAL_ALLOW_STUB_JUDGE", envAllowStub);
+        }
+    }
+
+    [Fact]
+    public async Task RunGdprAsync_PartialAzureConfig_ReturnsExitCode2()
+    {
+        // Endpoint set but API key + deployment missing — must NOT fall through
+        // to the stub silently. The resolver flags partial config explicitly.
+        InitWorkspace();
+        var snap = (
+            Environment.GetEnvironmentVariable("AZURE_OPENAI_ENDPOINT"),
+            Environment.GetEnvironmentVariable("AZURE_OPENAI_API_KEY"),
+            Environment.GetEnvironmentVariable("AZURE_OPENAI_DEPLOYMENT"),
+            Environment.GetEnvironmentVariable("AGENTEVAL_ALLOW_STUB_JUDGE"));
+        try
+        {
+            Environment.SetEnvironmentVariable("AZURE_OPENAI_ENDPOINT", "https://example.openai.azure.com");
+            Environment.SetEnvironmentVariable("AZURE_OPENAI_API_KEY",  null);
+            Environment.SetEnvironmentVariable("AZURE_OPENAI_DEPLOYMENT", null);
+            Environment.SetEnvironmentVariable("AGENTEVAL_ALLOW_STUB_JUDGE", null);
+
+            var exit = await BenchCommand.RunGdprAsync(
+                preset: "smoke",
+                subject: "PartialConfigTest",
+                rootOverride: _root,
+                inputText: null,
+                evaluatorOverride: null);
+
+            Assert.Equal(2, exit);
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("AZURE_OPENAI_ENDPOINT",     snap.Item1);
+            Environment.SetEnvironmentVariable("AZURE_OPENAI_API_KEY",      snap.Item2);
+            Environment.SetEnvironmentVariable("AZURE_OPENAI_DEPLOYMENT",   snap.Item3);
+            Environment.SetEnvironmentVariable("AGENTEVAL_ALLOW_STUB_JUDGE", snap.Item4);
+        }
+    }
 }

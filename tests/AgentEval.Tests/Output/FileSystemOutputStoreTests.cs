@@ -236,4 +236,49 @@ public class FileSystemOutputStoreTests : IDisposable
         Assert.Single(scenarios);
         Assert.Equal("scenario-01", scenarios[0].Id);
     }
+
+    // ── Case-insensitive collision (batch-5 surface) ─────────────────────────
+
+    [Fact]
+    public async Task EnsureSubject_DifferentCaseSameName_ThrowsCollisionError()
+    {
+        // Windows / default macOS filesystems are case-insensitive, so
+        // "TravelAgent" and "travelagent" resolve to the same directory.
+        // The store must surface this explicitly instead of silently
+        // overwriting the first subject's `subject.json` with the second
+        // identity.
+        WriteSolutionJson();
+        var store = new FileSystemOutputStore(_root);
+
+        await store.EnsureSubjectAsync(new SubjectIdentity(SubjectKind.Agent, "TravelAgent"));
+
+        // On case-insensitive FS (Windows/macOS default) this re-resolves to
+        // the same directory but finds a subject.json whose stored name has
+        // a different case → throws. On case-sensitive FS (typical Linux)
+        // this resolves to a separate directory and succeeds — both behaviours
+        // are correct; we only assert when running on the case-insensitive
+        // platforms where the collision would otherwise be silent.
+        var isCaseInsensitiveFs =
+            OperatingSystem.IsWindows() ||
+            OperatingSystem.IsMacOS();
+        if (!isCaseInsensitiveFs) return;
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => store.EnsureSubjectAsync(new SubjectIdentity(SubjectKind.Agent, "travelagent")));
+    }
+
+    [Fact]
+    public async Task EnsureSubject_SameNameExactCase_DoesNotThrow()
+    {
+        // The collision guard must not false-positive when the same identity
+        // is ensured twice (the common idempotency case).
+        WriteSolutionJson();
+        var store = new FileSystemOutputStore(_root);
+
+        await store.EnsureSubjectAsync(new SubjectIdentity(SubjectKind.Agent, "TravelAgent"));
+        // Second call with the SAME case is idempotent.
+        var info = await store.EnsureSubjectAsync(new SubjectIdentity(SubjectKind.Agent, "TravelAgent"));
+
+        Assert.Equal("TravelAgent", info.Identity.Name);
+    }
 }

@@ -55,37 +55,9 @@ public static class BenchAgenticCommand
         }
 
         // ── Judge / evaluator ────────────────────────────────────────────────
-        IEvaluator judge;
-        if (evaluatorOverride is not null)
-        {
-            judge = evaluatorOverride;
-        }
-        else
-        {
-            var azureEndpoint = Environment.GetEnvironmentVariable("AZURE_OPENAI_ENDPOINT");
-            if (string.IsNullOrWhiteSpace(azureEndpoint))
-            {
-                // No real LLM creds. Refuse to run silently — a stub-evaluated
-                // bench run produces a misleading PASS verdict in CI. Users
-                // who actually want to exercise the harness without LLM cost
-                // must opt in explicitly via AGENTEVAL_ALLOW_STUB_JUDGE=1.
-                var allowStub = Environment.GetEnvironmentVariable("AGENTEVAL_ALLOW_STUB_JUDGE");
-                if (!string.Equals(allowStub, "1", StringComparison.Ordinal)
-                 && !string.Equals(allowStub, "true", StringComparison.OrdinalIgnoreCase))
-                {
-                    Console.Error.WriteLine(
-                        "✖ No LLM evaluator configured (AZURE_OPENAI_ENDPOINT is unset).\n" +
-                        "  Set AZURE_OPENAI_ENDPOINT + AZURE_OPENAI_API_KEY + AZURE_OPENAI_DEPLOYMENT\n" +
-                        "  to enable real judging, or set AGENTEVAL_ALLOW_STUB_JUDGE=1 to run with\n" +
-                        "  a deterministic stub (results are not meaningful — CI must NOT do this).");
-                    return 2;
-                }
-                Console.Error.WriteLine(
-                    "⚠ AGENTEVAL_ALLOW_STUB_JUDGE=1 — using stub evaluator. " +
-                    "Results are not a real judgement; do not rely on the verdict in CI.");
-            }
-            judge = new StubEvaluator();
-        }
+        var (resolvedJudge, _, exitCode) = JudgeFactory.Resolve(evaluatorOverride, "agentic benchmark");
+        if (resolvedJudge is null) return exitCode;
+        IEvaluator judge = resolvedJudge;
 
         // ── Select preset ────────────────────────────────────────────────────
         CompositeEval benchmark;
@@ -282,32 +254,4 @@ public static class BenchAgenticCommand
         }
     }
 
-    /// <summary>
-    /// Stub evaluator used when no real LLM wiring is available.
-    /// Returns a fixed score (75/100) for every scenario.
-    /// </summary>
-    private sealed class StubEvaluator : IEvaluator
-    {
-        public Task<EvaluationResult> EvaluateAsync(
-            string input,
-            string output,
-            IEnumerable<string> criteria,
-            CancellationToken cancellationToken = default)
-        {
-            var criteriaList = criteria.ToList();
-            return Task.FromResult(new EvaluationResult
-            {
-                OverallScore = 75,
-                Summary = "Stub evaluation — no real LLM judge configured.",
-                CriteriaResults = criteriaList
-                    .Select(c => new CriterionResult
-                    {
-                        Criterion = c,
-                        Met = true,
-                        Explanation = "Stub: assumed met."
-                    })
-                    .ToList()
-            });
-        }
-    }
 }

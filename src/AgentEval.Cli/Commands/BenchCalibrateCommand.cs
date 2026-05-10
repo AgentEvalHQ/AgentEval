@@ -39,22 +39,13 @@ public static class BenchCalibrateCommand
         IEvaluator? evaluatorOverride)
     {
         // ── Judge / evaluator ────────────────────────────────────────────────
-        IEvaluator judge;
-        if (evaluatorOverride is not null)
-        {
-            judge = evaluatorOverride;
-        }
-        else
-        {
-            var azureEndpoint = Environment.GetEnvironmentVariable("AZURE_OPENAI_ENDPOINT");
-            if (string.IsNullOrWhiteSpace(azureEndpoint))
-            {
-                Console.Error.WriteLine(
-                    "Warning: No real LLM evaluator configured; using stub. " +
-                    "Set AZURE_OPENAI_* env vars to enable real judging.");
-            }
-            judge = new StubEvaluator();
-        }
+        // Calibration uses the SAME gate as `bench` — running calibration against
+        // the stub produces a meaningless accuracy/kappa number and dead-weights
+        // the CI gate. AGENTEVAL_ALLOW_STUB_JUDGE=1 is required to fall through
+        // to the stub.
+        var (resolvedJudge, _, exitCode) = JudgeFactory.Resolve(evaluatorOverride, "GDPR calibration");
+        if (resolvedJudge is null) return exitCode;
+        IEvaluator judge = resolvedJudge;
 
         // ── Load GDPR article registry ───────────────────────────────────────
         ArticlesRegistry articles;
@@ -204,32 +195,4 @@ public static class BenchCalibrateCommand
         return sb.ToString();
     }
 
-    /// <summary>
-    /// Stub evaluator used when no real LLM judge is configured.
-    /// Returns a fixed passing score (75/100) for every scenario.
-    /// </summary>
-    private sealed class StubEvaluator : IEvaluator
-    {
-        public Task<EvaluationResult> EvaluateAsync(
-            string input,
-            string output,
-            IEnumerable<string> criteria,
-            CancellationToken cancellationToken = default)
-        {
-            var criteriaList = criteria.ToList();
-            return Task.FromResult(new EvaluationResult
-            {
-                OverallScore = 75,
-                Summary = "Stub evaluation — no real LLM judge configured.",
-                CriteriaResults = criteriaList
-                    .Select(c => new CriterionResult
-                    {
-                        Criterion = c,
-                        Met = true,
-                        Explanation = "Stub: assumed met."
-                    })
-                    .ToList()
-            });
-        }
-    }
 }
