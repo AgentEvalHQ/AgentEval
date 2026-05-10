@@ -113,6 +113,8 @@
     href: architecture.md
   - name: The .agenteval Workspace
     href: agenteval-workspace.md
+  - name: Deferred & Pending Items
+    href: deferred-pending.md
   - name: Building Documentation
     href: building-docs.md
   - name: Extensibility
