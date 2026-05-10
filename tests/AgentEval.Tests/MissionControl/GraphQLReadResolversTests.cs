@@ -30,6 +30,37 @@ public class GraphQLReadResolversTests : IClassFixture<SeededMissionControlFacto
         _factory = factory;
     }
 
+    // ─── Workspace state (MC1.10.1) ──────────────────────────────────────────
+
+    [Fact]
+    public async Task Workspace_SeededFixture_ReportsInitializedTrueWithRootAndSolution()
+    {
+        // The seeded fixture has solution.json + IsAvailable=true → landing
+        // logic in the SPA must NOT trip; full dashboard renders.
+        using var client = _factory.CreateClient();
+        var resp = await client.PostAsJsonAsync("/graphql", new
+        {
+            query = """
+                {
+                  workspace {
+                    initialized
+                    root
+                    agentEvalVersion
+                    solution { name }
+                  }
+                }
+                """
+        });
+        resp.EnsureSuccessStatusCode();
+
+        using var doc = JsonDocument.Parse(await resp.Content.ReadAsStringAsync());
+        var ws = doc.RootElement.GetProperty("data").GetProperty("workspace");
+
+        Assert.True(ws.GetProperty("initialized").GetBoolean());
+        Assert.False(string.IsNullOrEmpty(ws.GetProperty("agentEvalVersion").GetString()));
+        Assert.Equal("test-solution", ws.GetProperty("solution").GetProperty("name").GetString());
+    }
+
     [Fact]
     public async Task Solution_ReturnsSeededSolutionInfo()
     {

@@ -92,6 +92,57 @@ public sealed class Query
         }
     }
 
+    // ─── Workspace state (MC1.10.1 first-run landing) ────────────────────────
+
+    /// <summary>
+    /// Returns workspace bootstrap state — whether the resolved workspace has
+    /// an initialised <c>.agenteval/</c> folder, the root path, and the
+    /// AgentEval version. Drives the SPA's first-run landing page: when
+    /// <see cref="WorkspaceState.Initialized"/> is <c>false</c> the SPA renders
+    /// "run agenteval init" instead of an empty dashboard.
+    /// </summary>
+    public async Task<WorkspaceState> Workspace(
+        [Service] IOutputStoreReader store,
+        CancellationToken ct = default)
+    {
+        var version = typeof(IOutputStoreReader).Assembly.GetName().Version?.ToString() ?? "0.0.0";
+        var root = store.WorkspaceRoot;
+
+        // The store reports `IsAvailable=false` until solution.json + at
+        // least the .agenteval/ folder are present. Treat anything else as
+        // uninitialised — even if the folder physically exists. This matches
+        // what the user expects from `agenteval init`'s post-condition.
+        if (!store.IsAvailable)
+        {
+            return new WorkspaceState(
+                Initialized: false,
+                Root: root,
+                Solution: null,
+                AgentEvalVersion: version);
+        }
+
+        SolutionInfo? solution = null;
+        try
+        {
+            solution = await store.EnsureSolutionAsync(ct);
+        }
+        catch (InvalidOperationException)
+        {
+            // Solution missing → treat as not yet initialised.
+            return new WorkspaceState(
+                Initialized: false,
+                Root: root,
+                Solution: null,
+                AgentEvalVersion: version);
+        }
+
+        return new WorkspaceState(
+            Initialized: true,
+            Root: root,
+            Solution: solution,
+            AgentEvalVersion: version);
+    }
+
     /// <summary>
     /// Lists all known subjects in the local solution, optionally filtered by kind.
     /// </summary>

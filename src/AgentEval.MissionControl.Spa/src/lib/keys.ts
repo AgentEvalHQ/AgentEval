@@ -8,6 +8,10 @@
 export const queryKeys = {
   version: () => ["version"] as const,
 
+  workspace: {
+    state: () => ["workspace", "state"] as const,
+  },
+
   subjects: {
     all: () => ["subjects"] as const,
     list: (kind?: "AGENT" | "WORKFLOW") => ["subjects", "list", { kind }] as const,
