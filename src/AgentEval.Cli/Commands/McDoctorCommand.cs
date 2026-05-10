@@ -26,18 +26,35 @@ namespace AgentEval.Cli.Commands;
 /// </remarks>
 public static class McDoctorCommand
 {
-    public static Task<int> RunAsync()
+    public static Task<int> RunAsync() => RunAsync(probeDirOverride: null);
+
+    /// <summary>
+    /// Test-friendly entry point that lets callers supply an explicit probe
+    /// directory instead of inferring it from <c>Assembly.Location</c>.
+    /// </summary>
+    internal static Task<int> RunAsync(string? probeDirOverride)
     {
 #if NET10_0_OR_GREATER
         var errors = 0;
         var warnings = 0;
         var ok = 0;
 
-        // The CLI assembly's directory is where MC.dll + wwwroot/ are
-        // expected to live (because CLI references MissionControl on net10
-        // and we copy wwwroot via <None Include="wwwroot\**\*" /> in MC's
-        // csproj).
-        var cliDir = Path.GetDirectoryName(typeof(McDoctorCommand).Assembly.Location)!;
+        // Resolve the probe directory. Prefer the override (tests) → assembly
+        // location (normal `dotnet run` / `dotnet tool install`) → AppContext
+        // .BaseDirectory (handles `PublishSingleFile=true` where Assembly
+        // .Location returns empty string).
+        string cliDir;
+        if (!string.IsNullOrWhiteSpace(probeDirOverride))
+        {
+            cliDir = probeDirOverride;
+        }
+        else
+        {
+            var loc = typeof(McDoctorCommand).Assembly.Location;
+            cliDir = !string.IsNullOrEmpty(loc)
+                ? Path.GetDirectoryName(loc)!
+                : AppContext.BaseDirectory;
+        }
         Console.WriteLine($"  Probe directory: {cliDir}");
 
         // ─── 1. Mission Control assembly co-located ─────────────────────────
@@ -110,19 +127,58 @@ public static class McDoctorCommand
         }
 
         // ─── 3. Static-asset manifests (Microsoft.NET.Sdk.Web) ──────────────
+        // The Web SDK emits one or both of these depending on the build flavour:
+        //   - `…endpoints.json`     — Release / dotnet publish (used by MapStaticAssets)
+        //   - `…runtime.json`        — Debug / dotnet build (used at runtime fallback)
+        // Either is sufficient for the SPA to serve.
         var endpointsManifest = Path.Combine(cliDir, "AgentEval.MissionControl.staticwebassets.endpoints.json");
-        if (File.Exists(endpointsManifest))
+        var runtimeManifest   = Path.Combine(cliDir, "AgentEval.MissionControl.staticwebassets.runtime.json");
+        if (File.Exists(endpointsManifest) || File.Exists(runtimeManifest))
         {
-            Console.WriteLine("✔ Static-asset endpoints manifest present");
+            Console.WriteLine("✔ Static-asset manifest present");
             ok++;
         }
         else
         {
-            Console.WriteLine("  ⚠ Static-asset endpoints manifest missing — `MapStaticAssets` may fail at runtime.");
+            Console.WriteLine("  ⚠ Static-asset manifests missing — `MapStaticAssets` may fail at runtime.");
             warnings++;
         }
 
-        // ─── 4. Summary ──────────────────────────────────────────────────────
+        // ─── 4. dotnet runtime on PATH (non-Windows subprocess path) ────────
+        if (!OperatingSystem.IsWindows())
+        {
+            // McServeCommand spawns `dotnet AgentEval.MissionControl.dll` on
+            // Linux/macOS (no native apphost). Probe `dotnet --version` so a
+            // stripped image / minimal container surfaces a clear error.
+            try
+            {
+                using var proc = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = "dotnet",
+                    ArgumentList = { "--version" },
+                    RedirectStandardOutput = true,
+                    UseShellExecute = false,
+                });
+                proc?.WaitForExit(2000);
+                if (proc?.ExitCode == 0)
+                {
+                    Console.WriteLine("✔ dotnet runtime on PATH");
+                    ok++;
+                }
+                else
+                {
+                    Console.Error.WriteLine("✖ dotnet runtime not on PATH — `mc serve` will fail to spawn the MC subprocess.");
+                    errors++;
+                }
+            }
+            catch
+            {
+                Console.Error.WriteLine("✖ dotnet runtime not on PATH — `mc serve` will fail to spawn the MC subprocess.");
+                errors++;
+            }
+        }
+
+        // ─── 5. Summary ──────────────────────────────────────────────────────
         Console.WriteLine();
         Console.WriteLine($"Errors: {errors} | Warnings: {warnings} | OK: {ok}");
 
