@@ -94,7 +94,11 @@ public static class McServeCommand
             return 1;
         }
 
-        psi.Environment["ASPNETCORE_URLS"] = $"http://localhost:{port}";
+        // Use 127.0.0.1 explicitly (not "localhost") so both probe and
+        // subprocess bind the same IPv4 endpoint. On dual-stack hosts
+        // "localhost" can resolve to IPv6 (`::1`), which would let the
+        // probe report "free" while the IPv6 port is busy.
+        psi.Environment["ASPNETCORE_URLS"] = $"http://127.0.0.1:{port}";
         psi.Environment["AgentEval__Root"] = resolvedRoot;
 
         Console.WriteLine($"▶ Mission Control on http://localhost:{port}");
@@ -106,14 +110,15 @@ public static class McServeCommand
         // Wire Ctrl+C so it cleanly stops the child instead of orphaning it.
         // On Windows the console-control event reaches both processes (Kestrel
         // handles its own SIGINT), so we just need to wait for the child to
-        // exit gracefully. If it doesn't exit within a short grace period we
+        // exit gracefully. If it doesn't exit within the grace period we
         // kill the whole tree to avoid zombies.
         using var cts = new CancellationTokenSource();
-        Console.CancelKeyPress += (_, e) =>
+        ConsoleCancelEventHandler cancelHandler = (_, e) =>
         {
             e.Cancel = true; // suppress immediate process termination
             cts.Cancel();
         };
+        Console.CancelKeyPress += cancelHandler;
 
         try
         {
@@ -128,7 +133,9 @@ public static class McServeCommand
                 Console.WriteLine("⏹ Stopping Mission Control…");
                 if (!proc.HasExited)
                 {
-                    using var graceCts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+                    // 10 s grace — Kestrel typically releases in <2 s but
+                    // cold container hosts / slow CI can take longer.
+                    using var graceCts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
                     try
                     {
                         await proc.WaitForExitAsync(graceCts.Token);
@@ -148,6 +155,12 @@ public static class McServeCommand
             Console.Error.WriteLine($"✖ Failed to start Mission Control: {ex.Message}");
             return 1;
         }
+        finally
+        {
+            // Unregister so repeated invocations (test harnesses) don't leak
+            // handlers + their captured `cts` instances.
+            Console.CancelKeyPress -= cancelHandler;
+        }
 #else
         // The MissionControl assembly isn't referenced on net8/net9 builds
         // (see AgentEval.Cli.csproj's conditional ProjectReference).
@@ -164,7 +177,11 @@ public static class McServeCommand
     /// Probes the requested port with a short-lived bind. Returns true when
     /// the port is free; on failure populates <paramref name="error"/> with
     /// the reason ("address already in use", permission denied, etc.). Bound
-    /// to localhost since that's all we serve on.
+    /// to <c>127.0.0.1</c> (matching the subprocess's <c>ASPNETCORE_URLS</c>)
+    /// so the probe and the actual bind share an IP family — otherwise on
+    /// dual-stack hosts a busy IPv6 port would slip past an IPv4-only probe.
+    /// There is a TOCTOU window between probe-release and subprocess-bind;
+    /// acceptable for v1's single-user local Mode A.
     /// </summary>
     private static bool TryProbePort(int port, out string error)
     {

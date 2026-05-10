@@ -203,6 +203,21 @@ public class FileSystemLayoutPathSafetyTests
     // Unicode slash lookalikes.
     [InlineData("foo／bar")]   // U+FF0F fullwidth solidus
     [InlineData("foo∕bar")]   // U+2215 division slash
+    // Lesser-known reserved device names (post-Opus-deep-review).
+    [InlineData("CONIN$")]
+    [InlineData("CONOUT$")]
+    [InlineData("CLOCK$")]
+    [InlineData("CONIN$.json")]
+    // Reserved name with trailing space inside the stem ("CON .json"
+    // strips on NTFS to "CON.json" → CON device).
+    [InlineData("CON .json")]
+    [InlineData("CON.")]
+    // Bidirectional / formatting controls — homograph attack vectors.
+    [InlineData("foo‎bar")]    // U+200E LTR mark
+    [InlineData("foo‮bar")]    // U+202E RTL override
+    [InlineData("foo​bar")]    // U+200B zero-width space
+    // Length cap (256 chars).
+    [InlineData("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")]
     public void IsSafePathSegment_RejectsHostileInput(string input)
     {
         Assert.False(FileSystemLayout.IsSafePathSegment(input));

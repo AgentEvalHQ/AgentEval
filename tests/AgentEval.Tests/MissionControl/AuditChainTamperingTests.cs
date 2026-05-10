@@ -150,7 +150,14 @@ public class AuditChainTamperingTests
             // evidence's recorded sourceRun.manifestHash — they now differ.
             var manifestPath = Directory.GetFiles(workspace, "manifest.json", SearchOption.AllDirectories).Single();
             var raw = await File.ReadAllTextAsync(manifestPath);
-            var tampered = raw.Replace(validHash, "TAMPERED_AFTER_WRITE");
+            // Pin the mutation to the exact contentHash field via regex so
+            // a future change introducing the same hex string in another
+            // field doesn't double-replace. Tolerates either compact or
+            // pretty-printed JSON (System.Text.Json defaults to pretty here).
+            var tampered = System.Text.RegularExpressions.Regex.Replace(
+                raw,
+                "\"contentHash\"\\s*:\\s*\"" + System.Text.RegularExpressions.Regex.Escape(validHash) + "\"",
+                "\"contentHash\":\"TAMPERED_AFTER_WRITE\"");
             Assert.NotEqual(raw, tampered);
             await File.WriteAllTextAsync(manifestPath, tampered);
 

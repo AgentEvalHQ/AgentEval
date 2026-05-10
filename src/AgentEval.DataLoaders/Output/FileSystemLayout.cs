@@ -2,6 +2,8 @@
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 
+using System.Text;
+
 namespace AgentEval.Output;
 
 /// <summary>
@@ -116,17 +118,31 @@ public sealed class FileSystemLayout
     public static bool IsSafePathSegment(string? segment)
     {
         if (string.IsNullOrWhiteSpace(segment)) return false;
-        if (segment is "." or "..") return false;
-        if (segment.Contains("..", StringComparison.Ordinal)) return false;
-        if (segment.Contains('/') || segment.Contains('\\')) return false;
-        // Unicode lookalikes that some tools later normalize to '/' (U+FF0F
-        // fullwidth solidus, U+2215 division slash). Reject them upfront so
-        // a path that "looks safe" today doesn't escape after a normalization
-        // pass tomorrow.
-        if (segment.Contains('／') || segment.Contains('∕')) return false;
-        // Trailing '.' / ' ' silently strip on NTFS ("foo." opens "foo"),
-        // creating a write-vs-read alias hazard.
-        if (segment.EndsWith('.') || segment.EndsWith(' ')) return false;
+        // Length cap — NTFS path-component limit is 255. Defence-in-depth
+        // against DoS-style fat segments.
+        if (segment.Length > 255) return false;
+        // Compatibility decomposition: catches NFKC-equivalents that would
+        // collapse later (zero-width chars, fullwidth lookalikes, etc.). We
+        // re-run the prohibited-substring checks against BOTH the raw and
+        // normalised forms so an attacker can't smuggle traversal markers
+        // through a non-canonical encoding.
+        var normalised = segment.IsNormalized(NormalizationForm.FormKC)
+            ? segment
+            : segment.Normalize(NormalizationForm.FormKC);
+
+        foreach (var s in new[] { segment, normalised })
+        {
+            if (s is "." or "..") return false;
+            if (s.Contains("..", StringComparison.Ordinal)) return false;
+            if (s.Contains('/') || s.Contains('\\')) return false;
+            // Unicode slash lookalikes — even after NFKC, exotic codepoints
+            // can leak through. Reject upfront.
+            if (s.Contains('／') || s.Contains('∕')) return false;
+            // Trailing '.' / ' ' silently strip on NTFS ("foo." opens "foo"),
+            // creating a write-vs-read alias hazard.
+            if (s.EndsWith('.') || s.EndsWith(' ')) return false;
+        }
+
         // Windows superset of invalid filename chars (Linux's
         // GetInvalidFileNameChars returns only {'\0','/'}; harden for shared
         // workspaces accessed cross-platform).
@@ -137,13 +153,21 @@ public sealed class FileSystemLayout
             if (Array.IndexOf(invalid, c) >= 0) return false;
             if (winInvalid.IndexOf(c) >= 0) return false;
             if (char.IsControl(c)) return false;
+            // Bidirectional / formatting controls (RTL/LTR overrides, ZWSP,
+            // variation selectors). They're not `IsControl` but are still
+            // homograph-attack vectors.
+            if (c is '​' or '‎' or '‮' or '️') return false;
         }
+
         // Reject Windows reserved device names — CON, PRN, NUL, AUX, COM1-9,
-        // LPT1-9. Windows treats `CON.json` as the device too, so we match
-        // the stem before the first '.'.
+        // LPT1-9, plus the lesser-known CONIN$ / CONOUT$ / CLOCK$. Windows
+        // treats `CON.json` as the device too, so we match the stem before
+        // the first '.'. Trailing dot/space inside the stem ("CON .json")
+        // is also stripped by NTFS — TrimEnd ensures lookup catches that.
         var stem = segment;
         var dot = stem.IndexOf('.');
         if (dot >= 0) stem = stem[..dot];
+        stem = stem.TrimEnd('.', ' ');
         if (s_reservedDeviceNames.Contains(stem)) return false;
         return true;
     }
@@ -153,5 +177,6 @@ public sealed class FileSystemLayout
         "CON", "PRN", "NUL", "AUX",
         "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8", "COM9",
         "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9",
+        "CONIN$", "CONOUT$", "CLOCK$",
     };
 }

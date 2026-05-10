@@ -56,7 +56,7 @@ public sealed record EvaluatorCard(
 /// <summary>
 /// One required-or-optional input that the evaluator reads from <see cref="EvalInput"/>.
 /// </summary>
-/// <param name="Kind">Where the input comes from: <c>"metadata"</c> (the typical case — keyed lookup in <c>EvalInput.Metadata</c>), <c>"query"</c>, <c>"response"</c>, <c>"context"</c>, <c>"toolCalls"</c>, or <c>"systemMessage"</c>.</param>
+/// <param name="Kind">Where the input comes from: <c>"metadata"</c> (the typical case — keyed lookup in <c>EvalInput.Metadata</c>), <c>"query"</c>, <c>"response"</c>, <c>"context"</c>, <c>"toolCalls"</c>, <c>"systemMessage"</c>, or <c>"groundTruth"</c> (top-level <c>EvalInput.GroundTruth</c> field — used by F1Score and similar reference-comparison evaluators).</param>
 /// <param name="Key">When <paramref name="Kind"/> is <c>"metadata"</c>, the metadata-dictionary key. Empty string when not applicable.</param>
 /// <param name="Required">Whether the eval skips (returns <see cref="EvalResult.Skipped(IEval, string)"/>) when this input is missing.</param>
 /// <param name="Description">Human-readable description of what this input represents.</param>
