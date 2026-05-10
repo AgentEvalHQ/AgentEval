@@ -30,6 +30,11 @@ public sealed class MultiJudgeWrapper : IEval
     /// <summary>The aggregation strategy used to combine judge results.</summary>
     public IAggregationStrategy Aggregation { get; }
 
+    /// <summary>Optional pass threshold (0..1). When set, the composite
+    /// passes iff <c>aggregated score &gt;= Threshold</c>; otherwise the
+    /// verdict is severity-driven. Mirrors <see cref="CompositeEval"/>.</summary>
+    public double? Threshold { get; }
+
     /// <summary>Initialises a new <see cref="MultiJudgeWrapper"/>.</summary>
     public MultiJudgeWrapper(
         string key,
@@ -37,7 +42,8 @@ public sealed class MultiJudgeWrapper : IEval
         string category,
         string version,
         IReadOnlyList<EvalComponent> judges,
-        IAggregationStrategy aggregation)
+        IAggregationStrategy aggregation,
+        double? threshold = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(key);
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
@@ -47,11 +53,14 @@ public sealed class MultiJudgeWrapper : IEval
         ArgumentNullException.ThrowIfNull(aggregation);
         if (judges.Count == 0)
             throw new ArgumentException("MultiJudgeWrapper must have at least one judge.", nameof(judges));
+        if (threshold is not null && (threshold < 0 || threshold > 1))
+            throw new ArgumentOutOfRangeException(nameof(threshold), threshold, "Threshold must be in [0, 1].");
 
         Key = key;
         Name = name;
         Category = category;
         Version = version;
+        Threshold = threshold;
         Judges = judges;
         Aggregation = aggregation;
     }
@@ -65,26 +74,36 @@ public sealed class MultiJudgeWrapper : IEval
         var subs = await Task.WhenAll(subTasks);
 
         var (score, severity) = Aggregation.Aggregate(subs, Judges);
-        var cost = subs.Sum(s => s.Provenance.EstimatedCost);
 
-        var label = severity switch
-        {
-            "critical" or "high" => "fail",
-            "medium" => "warn",
-            _ => "pass"
-        };
+        // Use CostRollup so cost + cache-hit semantics match CompositeEval —
+        // previously every panel run reported `CacheHit: false` even when
+        // every judge was a cache hit.
+        var (cost, allCacheHits) = CostRollup.Aggregate(subs);
+
+        // Honour the optional Threshold parameter (when supplied) — falls
+        // back to the severity-driven verdict matrix otherwise. Mirrors
+        // CompositeEval's behaviour so consumers can pick whichever shape
+        // is right for their use case.
+        var label = Threshold is { } t
+            ? (score >= t ? "pass" : "fail")
+            : severity switch
+            {
+                "critical" or "high" => "fail",
+                "medium" => "warn",
+                _ => "pass"
+            };
         var passed = label == "pass";
 
         return new EvalResult(
             Metric: new(Key, Name, Category, Version),
-            Score: new(score, null, label, passed, null, severity, null),
+            Score: new(score, null, label, passed, Threshold, severity, null),
             Details: new(
                 Dimensions: null,
                 Evidence: null,
                 Recommendations: null,
                 SubResults: subs,
                 AggregationStrategy: Aggregation.Name),
-            Provenance: new("composite", null, null, null, null, cost, false),
+            Provenance: new("composite", null, null, null, null, cost, allCacheHits),
             EvaluatedAt: DateTimeOffset.UtcNow);
     }
 }

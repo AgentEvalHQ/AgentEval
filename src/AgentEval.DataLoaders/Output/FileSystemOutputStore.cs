@@ -417,8 +417,12 @@ public sealed class FileSystemOutputStore : IOutputStore
         var ts = campaignId[^tsSuffixLen..];
         var nameWithUnderscore = campaignId[..^(tsSuffixLen + 1)];
 
-        // Validate ts looks like a timestamp
-        if (ts.Length != tsSuffixLen || !char.IsDigit(ts[0]))
+        // Validate ts looks like a timestamp — strict yyyy-MM-dd_HH-mm-ss
+        // pattern. Previous code only checked first-char-is-digit, which let
+        // malformed suffixes through that could re-trigger path semantics
+        // (e.g. an embedded separator).
+        if (ts.Length != tsSuffixLen ||
+            !System.Text.RegularExpressions.Regex.IsMatch(ts, @"^\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}$"))
             throw new ArgumentException($"Invalid campaignId format: '{campaignId}'.", nameof(campaignId));
 
         await WriteJsonAsync(_layout.RedTeamFindingsFile(nameWithUnderscore, ts), findings, ct);
@@ -444,7 +448,15 @@ public sealed class FileSystemOutputStore : IOutputStore
                 var pointer = JsonSerializer.Deserialize<RunPointer>(line, _jsonl);
                 if (pointer is not null) pointers.Add(pointer);
             }
-            catch { }
+            catch (JsonException ex)
+            {
+                // Don't fail the whole stream on a single bad line, but
+                // surface the corruption so it isn't invisible. Writes to
+                // stderr because this is a recoverable-by-design path
+                // (recent.jsonl is regenerated on every run).
+                Console.Error.WriteLine(
+                    $"⚠ recent.jsonl: skipping malformed line in {recentFile}: {ex.Message}");
+            }
         }
 
         foreach (var pointer in pointers.AsEnumerable().Reverse().Take(count))
@@ -519,8 +531,15 @@ public sealed class FileSystemOutputStore : IOutputStore
     private async Task WriteJsonAsync<T>(string path, T value, CancellationToken ct)
     {
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-        await using var stream = File.Create(path);
-        await JsonSerializer.SerializeAsync(stream, value, _json, ct);
+        // Atomic-replace: write to a sibling .tmp file then File.Move with
+        // overwrite. Prevents readers from seeing a truncated/partial JSON
+        // if the process is killed mid-write.
+        var tmp = path + ".tmp";
+        await using (var stream = File.Create(tmp))
+        {
+            await JsonSerializer.SerializeAsync(stream, value, _json, ct);
+        }
+        File.Move(tmp, path, overwrite: true);
     }
 
     private async Task AppendJsonlLineAsync<T>(string path, T value, CancellationToken ct)

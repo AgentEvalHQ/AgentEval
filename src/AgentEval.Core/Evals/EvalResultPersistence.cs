@@ -30,7 +30,26 @@ public static class EvalResultPersistence
         ArgumentException.ThrowIfNullOrWhiteSpace(scenarioName);
 
         var json = JsonSerializer.Serialize(result, s_jsonOpts);
-        var dimensions = result.Details.Dimensions ?? new Dictionary<string, double>();
+
+        // Build a Metrics dictionary that lifts queryable-from-the-flat-shape
+        // fields out of the recursive tree: dimensions (already there);
+        // confidence + severity-as-ordinal so callers querying the store
+        // by `ScenarioResult.Metrics["severity"]` don't have to deserialise
+        // the JSON tree. Severity is encoded as a small ordinal {none=0,
+        // low=1, medium=2, high=3, critical=4} for numeric comparison.
+        var metrics = result.Details.Dimensions is { } dims
+            ? new Dictionary<string, double>(dims)
+            : new Dictionary<string, double>();
+        if (result.Score.Confidence is { } conf)
+            metrics["confidence"] = conf;
+        metrics["severity_ordinal"] = result.Score.Severity switch
+        {
+            "critical" => 4,
+            "high"     => 3,
+            "medium"   => 2,
+            "low"      => 1,
+            _          => 0,
+        };
 
         return new ScenarioResult(
             Id: scenarioId,
@@ -39,7 +58,7 @@ public static class EvalResultPersistence
             Output: json,
             Passed: result.Score.Passed,
             Score: result.Score.Value,
-            Metrics: dimensions,
+            Metrics: metrics,
             Assertions: Array.Empty<AssertionResult>(),
             Duration: TimeSpan.Zero,
             EstimatedCost: result.Provenance.EstimatedCost);
