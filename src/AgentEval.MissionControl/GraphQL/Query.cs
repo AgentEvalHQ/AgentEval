@@ -369,4 +369,98 @@ public sealed class Query
         }
         return null;
     }
+
+    // ─── Per-evaluator timeline (Wave 8b / MC1.6.9) ──────────────────────────
+
+    /// <summary>
+    /// Returns recent occurrences of a specific evaluator across runs, newest
+    /// first. Drives the <c>&lt;EvaluatorTimelineChart/&gt;</c> on the
+    /// evaluator-detail page; for the <c>judge_drift</c>,
+    /// <c>judge_agreement</c>, <c>calibration_accuracy</c>, and
+    /// <c>confidence_calibration</c> cards specifically, this is the drift /
+    /// calibration surface called out in plan-07 §6.1.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Walks <see cref="IOutputStoreReader.GetRecentRunsAsync"/>; for each run
+    /// loads the manifest + scenario results; for each scenario reconstitutes
+    /// the recursive <see cref="EvalResult"/> tree via
+    /// <see cref="EvalResultPersistence.FromScenarioResult"/> and recursively
+    /// searches for a node whose <c>metric.key</c> matches the requested
+    /// <paramref name="evaluatorKey"/>. The first match per run is yielded.
+    /// </para>
+    /// <para>
+    /// Cost: O(runs × scenarios × tree-depth). For the v1 scale (≤ 100 recent
+    /// runs, &lt;100 scenarios per run, ≤ 5-deep trees) this is acceptable
+    /// without the GreenDonut DataLoader scaffolding from MC1.4.7. When that
+    /// lands, this resolver becomes a natural batching candidate.
+    /// </para>
+    /// </remarks>
+    public async IAsyncEnumerable<EvaluatorTimelinePoint> EvaluatorTimeline(
+        [Service] IOutputStoreReader store,
+        string evaluatorKey,
+        int count = 30,
+        [EnumeratorCancellation] CancellationToken ct = default)
+    {
+        if (!store.IsAvailable) yield break;
+        if (string.IsNullOrWhiteSpace(evaluatorKey)) yield break;
+        if (count <= 0) yield break;
+
+        // Scan up to 4× the requested count of recent runs so we can keep
+        // returning data even when the evaluator is missing from many runs.
+        // Capped to 200 to bound worst-case scanning.
+        var maxScan = Math.Min(Math.Max(count * 4, 50), 200);
+        var returned = 0;
+
+        await foreach (var ptr in store.GetRecentRunsAsync(maxScan, ct))
+        {
+            if (returned >= count) yield break;
+
+            var manifest = await store.GetRunManifestAsync(ptr.RunId, ct);
+            if (manifest is null) continue;
+
+            EvalResult? matched = null;
+            await foreach (var scenario in store.GetScenarioResultsAsync(ptr.RunId, ct))
+            {
+                var tree = EvalResultPersistence.FromScenarioResult(scenario);
+                if (tree is null) continue;
+
+                matched = FindEvaluatorNode(tree, evaluatorKey);
+                if (matched is not null) break;
+            }
+
+            if (matched is null) continue;
+
+            yield return new EvaluatorTimelinePoint(
+                RunId: ptr.RunId,
+                Timestamp: manifest.Run.Timestamp,
+                SubjectKind: manifest.Subject.Kind,
+                SubjectName: manifest.Subject.Name,
+                Score: matched.Score.Value,
+                Passed: matched.Score.Passed,
+                Severity: matched.Score.Severity,
+                Confidence: matched.Score.Confidence,
+                ManifestHash: manifest.ContentHash);
+            returned++;
+        }
+    }
+
+    /// <summary>
+    /// Recursively walks a recursive <see cref="EvalResult"/> tree looking for
+    /// the first node whose metric key matches. Pre-order (parent before
+    /// children) so a composite-of-the-same-key wins over its leaves.
+    /// </summary>
+    private static EvalResult? FindEvaluatorNode(EvalResult node, string key)
+    {
+        if (string.Equals(node.Metric.Key, key, StringComparison.Ordinal))
+            return node;
+        var subs = node.Details.SubResults;
+        if (subs is null) return null;
+        foreach (var s in subs)
+        {
+            var found = FindEvaluatorNode(s, key);
+            if (found is not null) return found;
+        }
+        return null;
+    }
 }

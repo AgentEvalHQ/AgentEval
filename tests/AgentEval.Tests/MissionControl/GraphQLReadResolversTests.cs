@@ -579,6 +579,123 @@ public class GraphQLReadResolversTests : IClassFixture<SeededMissionControlFacto
         Assert.True(evidence.ValueKind == JsonValueKind.Object || evidence.ValueKind == JsonValueKind.Null);
     }
 
+    // ─── Per-evaluator timeline (Wave 8b / MC1.6.9) ──────────────────────────
+
+    [Fact]
+    public async Task EvaluatorTimeline_ReturnsMatchedEvaluatorAcrossRuns()
+    {
+        // The seed plants a recursive tree-scenario with composite-root → mid-1/mid-2
+        // → leaf-A/leaf-B. Querying for "leaf-A" should return at least one timeline
+        // point even though the matching node is two levels deep in the tree.
+        using var client = _factory.CreateClient();
+        var resp = await client.PostAsJsonAsync("/graphql", new
+        {
+            query = """
+                {
+                  evaluatorTimeline(evaluatorKey: "leaf-A", count: 10) {
+                    runId
+                    timestamp
+                    subjectKind
+                    subjectName
+                    score
+                    passed
+                    severity
+                    manifestHash
+                  }
+                }
+                """
+        });
+        resp.EnsureSuccessStatusCode();
+
+        var body = await resp.Content.ReadAsStringAsync();
+        using var doc = JsonDocument.Parse(body);
+        var points = doc.RootElement.GetProperty("data").GetProperty("evaluatorTimeline");
+
+        Assert.Equal(JsonValueKind.Array, points.ValueKind);
+        Assert.True(points.GetArrayLength() >= 1, "Expected at least one timeline point for leaf-A");
+
+        var first = points[0];
+        Assert.Equal(0.92, first.GetProperty("score").GetDouble(), 3);
+        Assert.True(first.GetProperty("passed").GetBoolean());
+        Assert.False(string.IsNullOrEmpty(first.GetProperty("manifestHash").GetString()));
+    }
+
+    [Fact]
+    public async Task EvaluatorTimeline_FindsCompositeRootNode()
+    {
+        // The recursive search is pre-order: a composite at the top of the tree
+        // wins over deeper matches. composite-root is the actual root.
+        using var client = _factory.CreateClient();
+        var resp = await client.PostAsJsonAsync("/graphql", new
+        {
+            query = """
+                {
+                  evaluatorTimeline(evaluatorKey: "composite-root", count: 5) {
+                    score
+                    passed
+                  }
+                }
+                """
+        });
+        resp.EnsureSuccessStatusCode();
+
+        var body = await resp.Content.ReadAsStringAsync();
+        using var doc = JsonDocument.Parse(body);
+        var points = doc.RootElement.GetProperty("data").GetProperty("evaluatorTimeline");
+
+        Assert.Equal(JsonValueKind.Array, points.ValueKind);
+        Assert.True(points.GetArrayLength() >= 1);
+        Assert.Equal(0.885, points[0].GetProperty("score").GetDouble(), 3);
+    }
+
+    [Fact]
+    public async Task EvaluatorTimeline_UnknownEvaluator_ReturnsEmpty()
+    {
+        using var client = _factory.CreateClient();
+        var resp = await client.PostAsJsonAsync("/graphql", new
+        {
+            query = """
+                {
+                  evaluatorTimeline(evaluatorKey: "no-such-evaluator-key", count: 10) {
+                    runId
+                  }
+                }
+                """
+        });
+        resp.EnsureSuccessStatusCode();
+
+        var body = await resp.Content.ReadAsStringAsync();
+        using var doc = JsonDocument.Parse(body);
+        var points = doc.RootElement.GetProperty("data").GetProperty("evaluatorTimeline");
+
+        Assert.Equal(JsonValueKind.Array, points.ValueKind);
+        Assert.Equal(0, points.GetArrayLength());
+    }
+
+    [Fact]
+    public async Task EvaluatorTimeline_EmptyKey_ReturnsEmpty()
+    {
+        using var client = _factory.CreateClient();
+        var resp = await client.PostAsJsonAsync("/graphql", new
+        {
+            query = """
+                {
+                  evaluatorTimeline(evaluatorKey: "", count: 10) {
+                    runId
+                  }
+                }
+                """
+        });
+        resp.EnsureSuccessStatusCode();
+
+        var body = await resp.Content.ReadAsStringAsync();
+        using var doc = JsonDocument.Parse(body);
+        var points = doc.RootElement.GetProperty("data").GetProperty("evaluatorTimeline");
+
+        Assert.Equal(JsonValueKind.Array, points.ValueKind);
+        Assert.Equal(0, points.GetArrayLength());
+    }
+
     [Fact]
     public async Task Scenario_UnknownScenarioId_ReturnsNull()
     {

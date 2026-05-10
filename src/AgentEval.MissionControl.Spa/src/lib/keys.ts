@@ -40,5 +40,7 @@ export const queryKeys = {
     list: (filters?: { category?: string; costTier?: string }) =>
       ["evaluators", "list", filters ?? {}] as const,
     detail: (key: string) => ["evaluators", "detail", key] as const,
+    timeline: (key: string, count: number) =>
+      ["evaluators", "timeline", key, { count }] as const,
   },
 };

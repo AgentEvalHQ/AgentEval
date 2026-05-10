@@ -4,9 +4,44 @@ import { ArrowLeft, ExternalLink, FileCode } from "lucide-react";
 import { gqlRequest } from "@/lib/graphql-client";
 import { queryKeys } from "@/lib/keys";
 import { DataState } from "@/components/DataState";
+import { TimelineChart, type TimelinePoint } from "@/components/charts/TimelineChart";
 import { CostTierPill } from "./EvaluatorsPage";
 
 // Plan-08 Wave 5 (MC1.6.10): per-evaluator card detail.
+// Plan-08 Wave 8b (MC1.6.9): adds the per-evaluator timeline chart fed by
+// Query.evaluatorTimeline. For judge-quality evaluators (judge_drift,
+// judge_agreement, calibration_accuracy, confidence_calibration) this is the
+// drift / calibration surface called out in plan-07 §6.1.
+
+interface EvaluatorTimelineResponse {
+  evaluatorTimeline: {
+    runId: string;
+    timestamp: string;
+    subjectKind: "AGENT" | "WORKFLOW";
+    subjectName: string;
+    score: number;
+    passed: boolean;
+    severity: string;
+    confidence: number | null;
+    manifestHash: string;
+  }[];
+}
+
+const EVALUATOR_TIMELINE_QUERY = /* GraphQL */ `
+  query EvaluatorTimeline($key: String!, $count: Int!) {
+    evaluatorTimeline(evaluatorKey: $key, count: $count) {
+      runId
+      timestamp
+      subjectKind
+      subjectName
+      score
+      passed
+      severity
+      confidence
+      manifestHash
+    }
+  }
+`;
 
 interface EvaluatorDetailResponse {
   evaluator: {
@@ -62,6 +97,17 @@ export function EvaluatorDetailPage() {
     queryKey: queryKeys.evaluators.detail(key),
     queryFn: () =>
       gqlRequest<EvaluatorDetailResponse>(EVALUATOR_DETAIL_QUERY, { key }),
+    enabled: key.length > 0,
+  });
+
+  const timelineCount = 30;
+  const timelineQ = useQuery({
+    queryKey: queryKeys.evaluators.timeline(key, timelineCount),
+    queryFn: () =>
+      gqlRequest<EvaluatorTimelineResponse>(EVALUATOR_TIMELINE_QUERY, {
+        key,
+        count: timelineCount,
+      }),
     enabled: key.length > 0,
   });
 
@@ -129,6 +175,14 @@ export function EvaluatorDetailPage() {
                 {ev.description}
               </p>
             </section>
+
+            <TimelineSection
+              evaluatorKey={ev.key}
+              threshold={ev.defaultThreshold ?? undefined}
+              points={timelineQ.data?.evaluatorTimeline ?? null}
+              isPending={timelineQ.isPending}
+              isError={timelineQ.isError}
+            />
 
             <section className="rounded-lg border border-slate-200 bg-white p-4">
               <h3 className="text-sm font-semibold text-slate-700 mb-3">
@@ -217,5 +271,59 @@ function BackLink() {
     >
       <ArrowLeft size={14} /> Back to evaluator registry
     </Link>
+  );
+}
+
+function TimelineSection({
+  evaluatorKey,
+  threshold,
+  points,
+  isPending,
+  isError,
+}: {
+  evaluatorKey: string;
+  threshold?: number;
+  points: EvaluatorTimelineResponse["evaluatorTimeline"] | null;
+  isPending: boolean;
+  isError: boolean;
+}) {
+  const chartPoints: TimelinePoint[] = (points ?? []).map((p) => ({
+    timestamp: p.timestamp,
+    score: p.score,
+    runId: p.runId,
+    verdict: p.passed
+      ? "PASS"
+      : p.severity === "medium"
+        ? "WARN"
+        : "FAIL",
+  }));
+
+  return (
+    <section className="rounded-lg border border-slate-200 bg-white p-4">
+      <header className="flex items-baseline justify-between mb-2">
+        <h3 className="text-sm font-semibold text-slate-700">
+          Score over recent runs
+        </h3>
+        <span className="text-xs text-slate-500">
+          {chartPoints.length > 0 && `${chartPoints.length} runs`}
+        </span>
+      </header>
+      {isPending ? (
+        <div className="text-sm text-slate-500 italic py-12 text-center">
+          Loading timeline…
+        </div>
+      ) : isError ? (
+        <div className="text-sm text-red-600 italic py-12 text-center">
+          Failed to load timeline.
+        </div>
+      ) : chartPoints.length === 0 ? (
+        <div className="text-sm text-slate-500 italic py-12 text-center">
+          <code className="font-mono text-xs">{evaluatorKey}</code> hasn't been
+          recorded in any recent runs yet.
+        </div>
+      ) : (
+        <TimelineChart data={chartPoints} threshold={threshold} />
+      )}
+    </section>
   );
 }
