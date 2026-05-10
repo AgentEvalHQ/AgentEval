@@ -1,10 +1,16 @@
 # SPDX-License-Identifier: MIT
 # Plan-08 MC1.12.1 — Mission Control quick-start via Docker Compose.
 #
+# PREREQUISITE: run `agenteval init` in the host directory FIRST. If
+# `.agenteval/` doesn't exist, Docker will create an empty (root-owned)
+# directory for the bind mount and Mission Control will render the
+# "uninitialised workspace" landing page (MC1.10.1).
+#
 # Mounts the host's .agenteval/ folder (read-only) into the container at
 # /workspace/.agenteval, then serves Mission Control on http://localhost:5000.
 #
 # Usage:
+#   agenteval init                                 # one-time
 #   docker compose up
 #   open http://localhost:5000
 #
@@ -24,4 +30,6 @@ services:
       - ${AGENTEVAL_WORKSPACE:-./.agenteval}:/workspace/.agenteval:ro
     environment:
       AgentEval__Root: /workspace
-    restart: unless-stopped
+    # Dev-viewer default — don't auto-restart on host reboot. Override to
+    # `unless-stopped` when running on a server.
+    restart: "no"

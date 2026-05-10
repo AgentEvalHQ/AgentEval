@@ -31,7 +31,9 @@ Same endpoints, same port, same behaviour.
 
 ### Docker (single-binary container)
 
-A multi-stage `Dockerfile` ships at the repo root. To build + run with your `.agenteval/` mounted read-only:
+A multi-stage `Dockerfile` ships at the repo root. **Prerequisite**: run `agenteval init` in the host directory first — without an existing `.agenteval/` the container will render the empty-workspace landing page.
+
+To build + run with your `.agenteval/` mounted read-only:
 
 ```bash
 docker build -t agenteval/mc:latest .
@@ -47,6 +49,12 @@ docker compose up
 ```
 
 The image runs as a non-root user (UID 1654), exposes port 5000, and reads from `/workspace/.agenteval` (override the host path with `AGENTEVAL_WORKSPACE=…`).
+
+**Cross-architecture builds.** Both base images (`node:22-alpine` and `mcr.microsoft.com/dotnet/{sdk,aspnet}:10.0`) are multi-arch, so a single `docker build` produces an image native to your host (Apple Silicon → arm64, Intel/AMD → amd64). To publish a multi-arch image for both:
+
+```bash
+docker buildx build --platform linux/amd64,linux/arm64 -t agenteval/mc:latest --push .
+```
 
 ### First run — empty workspace?
 

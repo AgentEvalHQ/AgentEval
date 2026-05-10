@@ -26,8 +26,11 @@ RUN npm ci --no-audit --no-fund
 # so the relative path resolves identically inside the container.
 WORKDIR /work
 COPY src/AgentEval.MissionControl.Spa/ ./AgentEval.MissionControl.Spa/
-RUN cp -r /spa/node_modules ./AgentEval.MissionControl.Spa/node_modules
-RUN mkdir -p ./AgentEval.MissionControl/wwwroot
+# Move (not copy) the cached node_modules so we don't pay double disk usage.
+# `.dockerignore` excludes **/node_modules/** so the COPY above leaves
+# AgentEval.MissionControl.Spa/node_modules unset.
+RUN mv /spa/node_modules ./AgentEval.MissionControl.Spa/node_modules \
+ && mkdir -p ./AgentEval.MissionControl/wwwroot
 
 WORKDIR /work/AgentEval.MissionControl.Spa
 RUN npm run build
@@ -37,10 +40,17 @@ RUN npm run build
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS sdk
 WORKDIR /src
 
-# Copy package-version pins + project descriptors first for restore-layer caching.
-COPY *.props *.targets ./
+# Copy package-version pins + SDK pin + project descriptors first for
+# restore-layer caching. (Earlier draft used `COPY *.props *.targets ./` —
+# but no `.targets` exists at the repo root, and modern BuildKit errors
+# on zero-match patterns. Enumerate explicitly.)
+COPY Directory.Build.props Directory.Packages.props global.json ./
+
+# Mission Control's transitive dependency closure is Abstractions → Core →
+# DataLoaders → Evals.Agentic — all under src/. Samples are NOT needed for
+# `dotnet restore` or `publish`, so don't ship ~hundreds of MB of unrelated
+# benchmark sources into the build context.
 COPY src/ ./src/
-COPY samples/ ./samples/
 
 # Pull the SPA build artefacts in BEFORE publish so the SDK's static-asset
 # pipeline picks them up via the wwwroot/ glob already declared in the csproj.
@@ -55,11 +65,12 @@ RUN dotnet publish -c Release -o /app/publish --no-restore /p:UseAppHost=false
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 WORKDIR /app
 
-# Run as a non-root user. The official aspnet image already ships a `app`
-# user (UID 1654) — use it.
-USER app
+# Run as a non-root user. The official aspnet image ships an `app` user at
+# UID 1654 — refer to it numerically so the image still works under
+# `--read-only` policies that block name resolution.
+USER 1654:1654
 
-COPY --from=sdk --chown=app:app /app/publish ./
+COPY --from=sdk --chown=1654:1654 /app/publish ./
 
 # Default the workspace to /workspace; users mount their .agenteval/ here.
 # AgentEval__Root → AgentEval:Root (env-var → IConfiguration mapping).
