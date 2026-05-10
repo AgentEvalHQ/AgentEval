@@ -4,6 +4,7 @@ import { DashboardPage } from "@/pages/DashboardPage";
 import { SubjectDetailPage } from "@/pages/SubjectDetailPage";
 import { RunsListPage } from "@/pages/RunsListPage";
 import { RunDetailPage } from "@/pages/RunDetailPage";
+import { ScenarioTreePage } from "@/pages/ScenarioTreePage";
 import { ComplianceListPage } from "@/pages/ComplianceListPage";
 import { ComplianceMatrixPage } from "@/pages/ComplianceMatrixPage";
 import { EvidenceDetailPage } from "@/pages/EvidenceDetailPage";
@@ -23,6 +24,10 @@ export function App() {
         <Route path="subjects/:kind/:name" element={<SubjectDetailPage />} />
         <Route path="runs" element={<RunsListPage />} />
         <Route path="runs/:runId" element={<RunDetailPage />} />
+        <Route
+          path="runs/:runId/scenarios/:scenarioId"
+          element={<ScenarioTreePage />}
+        />
         <Route path="compliance" element={<ComplianceListPage />} />
         <Route path="compliance/:regulation" element={<ComplianceMatrixPage />} />
         <Route

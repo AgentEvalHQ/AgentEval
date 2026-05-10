@@ -255,7 +255,14 @@ export function RunDetailPage() {
                   <tbody className="divide-y divide-slate-100">
                     {d.scenarios.map((s) => (
                       <tr key={s.id} className="hover:bg-slate-50">
-                        <td className="px-4 py-2 text-slate-900">{s.name}</td>
+                        <td className="px-4 py-2 text-slate-900">
+                          <Link
+                            to={`/runs/${encodeURIComponent(runId)}/scenarios/${encodeURIComponent(s.id)}`}
+                            className="text-accent-700 hover:text-accent-500"
+                          >
+                            {s.name}
+                          </Link>
+                        </td>
                         <td className="px-4 py-2 font-mono text-xs text-slate-600">{s.id}</td>
                         <td className="px-4 py-2 text-right font-mono">{formatScore(s.score)}</td>
                         <td className="px-4 py-2 text-right font-mono text-slate-700">
