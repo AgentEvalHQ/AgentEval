@@ -39,6 +39,44 @@ public class MissionControlEndToEndTests : IClassFixture<EndToEndFixture>
     // ─── doctor ──────────────────────────────────────────────────────────────
 
     [Fact]
+    public void RedTeamCampaign_FilesPersisted()
+    {
+        // MC1.4.5 (red-team resolvers) is ⬜, so we don't query via GraphQL.
+        // But the fixture's StartRedTeamCampaignAsync + Complete... pair
+        // produces real on-disk artefacts; verify they exist + parse as JSON
+        // so a future MC1.4.5 regressing the on-disk shape would surface here.
+        var redTeamRoot = Path.Combine(_fixture.Manifest.AgentEvalDir, "red-team");
+        Assert.True(Directory.Exists(redTeamRoot), $"red-team dir missing at {redTeamRoot}.");
+
+        var manifests = Directory.GetFiles(redTeamRoot, "manifest.json", SearchOption.AllDirectories);
+        var findings = Directory.GetFiles(redTeamRoot, "findings.json", SearchOption.AllDirectories);
+        Assert.Single(manifests);
+        Assert.Single(findings);
+
+        // Parses + has expected fields.
+        using var mDoc = JsonDocument.Parse(File.ReadAllText(manifests[0]));
+        Assert.True(mDoc.RootElement.TryGetProperty("campaignId", out _),
+            "Red-team manifest must include campaignId.");
+
+        using var fDoc = JsonDocument.Parse(File.ReadAllText(findings[0]));
+        Assert.True(fDoc.RootElement.TryGetProperty("items", out var items));
+        Assert.Equal(3, items.GetArrayLength());
+    }
+
+    [Fact]
+    public void LegacyLongmemevalBaseline_FileExists()
+    {
+        // MC1.10.2 (`--legacy-import`) is ⬜. The fixture seeds the file so
+        // a future implementation has a known anchor; verify the path exists
+        // + parses, so the seed shape doesn't drift before MC1.10.2 lands.
+        Assert.True(File.Exists(_fixture.Manifest.LegacyBaselinePath));
+        using var doc = JsonDocument.Parse(File.ReadAllText(_fixture.Manifest.LegacyBaselinePath));
+        Assert.Equal("longmemeval-fixture",
+            doc.RootElement.GetProperty("name").GetString());
+        Assert.True(doc.RootElement.GetProperty("scenarios").GetArrayLength() >= 1);
+    }
+
+    [Fact]
     public async Task AgentEvalDoctor_AgainstFixture_ExitsZero()
     {
         // The fixture's audit chains must validate via the existing
@@ -64,6 +102,8 @@ public class MissionControlEndToEndTests : IClassFixture<EndToEndFixture>
         using var doc = JsonDocument.Parse(await resp.Content.ReadAsStringAsync());
         var ws = doc.RootElement.GetProperty("data").GetProperty("workspace");
         Assert.True(ws.GetProperty("initialized").GetBoolean());
+        Assert.False(string.IsNullOrEmpty(ws.GetProperty("agentEvalVersion").GetString()),
+            "agentEvalVersion must be a non-empty string.");
     }
 
     // ─── subjects ────────────────────────────────────────────────────────────
@@ -105,7 +145,7 @@ public class MissionControlEndToEndTests : IClassFixture<EndToEndFixture>
     // ─── recent runs (newest-first across 3 dates) ──────────────────────────
 
     [Fact]
-    public async Task RecentRuns_TraversesAllThreeDates()
+    public async Task RecentRuns_ReturnsAllFixtureRuns()
     {
         using var client = _fixture.CreateClient();
         var resp = await client.PostAsJsonAsync("/graphql", new
@@ -116,15 +156,21 @@ public class MissionControlEndToEndTests : IClassFixture<EndToEndFixture>
         using var doc = JsonDocument.Parse(await resp.Content.ReadAsStringAsync());
         var runs = doc.RootElement.GetProperty("data").GetProperty("recentRuns");
 
-        // Fixture seeds: 6 normal-eval + 1 Foundry + 2 memory = 9.
-        Assert.True(runs.GetArrayLength() >= 9,
-            $"Expected at least 9 fixture runs (6 normal + 1 Foundry + 2 memory); got {runs.GetArrayLength()}.");
+        // Fixture seeds exactly 9 runs (6 normal + 1 Foundry + 2 memory).
+        // (Ordering is not asserted here because fixture manifests cluster
+        // at build-time within milliseconds — see builder remarks. A
+        // dedicated InMemoryOutputStore-based ordering test elsewhere
+        // is a better signal.)
+        Assert.Equal(9, runs.GetArrayLength());
 
-        // Spot-check that newest-first ordering crosses the date boundary
-        // (T2 dates should appear before T0 dates).
-        var firstTs = DateTimeOffset.Parse(runs[0].GetProperty("timestamp").GetString()!);
-        var lastTs  = DateTimeOffset.Parse(runs[runs.GetArrayLength() - 1].GetProperty("timestamp").GetString()!);
-        Assert.True(firstTs >= lastTs, "recentRuns must be newest-first.");
+        // Every run-id surfaced must be among the fixture's tracked ids.
+        var fixtureRunIds = _fixture.Manifest.RunIds.Values.ToHashSet(StringComparer.Ordinal);
+        foreach (var run in runs.EnumerateArray())
+        {
+            var id = run.GetProperty("runId").GetString();
+            Assert.NotNull(id);
+            Assert.Contains(id, fixtureRunIds);
+        }
     }
 
     // ─── compliance matrix ──────────────────────────────────────────────────
@@ -151,9 +197,12 @@ public class MissionControlEndToEndTests : IClassFixture<EndToEndFixture>
 
         Assert.True(m.GetProperty("allChainsValid").GetBoolean(),
             "Audit chain must validate clean against the fixture's sealed manifests.");
-        Assert.True(m.GetProperty("subjects").GetArrayLength() >= 2);
-        Assert.True(m.GetProperty("cells").GetArrayLength() >= 4,
-            "GDPR fixture has 4 controls × ≥1 subject; expected ≥4 cells.");
+        // Fixture seeds GDPR evidence for 2 subjects × 2 dates (T1, T2).
+        // ComplianceMatrixService picks LATEST-evidence-per-subject → uses
+        // T2 for both subjects. T2 evidence has 4 controls each.
+        // Therefore exactly 2 subjects × 4 controls = 8 cells.
+        Assert.Equal(2, m.GetProperty("subjects").GetArrayLength());
+        Assert.Equal(8, m.GetProperty("cells").GetArrayLength());
     }
 
     [Fact]
@@ -175,8 +224,9 @@ public class MissionControlEndToEndTests : IClassFixture<EndToEndFixture>
         using var doc = JsonDocument.Parse(await resp.Content.ReadAsStringAsync());
         var m = doc.RootElement.GetProperty("data").GetProperty("complianceMatrix");
         Assert.True(m.GetProperty("allChainsValid").GetBoolean());
-        Assert.True(m.GetProperty("cells").GetArrayLength() >= 3,
-            "EU AI Act fixture has 3 controls; expected ≥3 cells.");
+        // Fixture seeds EU AI Act evidence for TripPlanner only at T2, with
+        // 3 controls. So exactly 1 subject × 3 controls = 3 cells.
+        Assert.Equal(3, m.GetProperty("cells").GetArrayLength());
     }
 
     [Fact]
@@ -200,10 +250,27 @@ public class MissionControlEndToEndTests : IClassFixture<EndToEndFixture>
     // ─── recursive scenario tree ────────────────────────────────────────────
 
     [Fact]
+    public async Task EvaluatorTimeline_MemRecallAccuracy_ReturnsTwoPoints()
+    {
+        // The fixture seeds exactly 2 memory-eval runs (TravelAgent at T1
+        // and T2), each with one `mem_recall_accuracy` scenario.
+        using var client = _fixture.CreateClient();
+        var resp = await client.PostAsJsonAsync("/graphql", new
+        {
+            query = "{ evaluatorTimeline(evaluatorKey: \"mem_recall_accuracy\", count: 50) { runId score } }"
+        });
+        resp.EnsureSuccessStatusCode();
+        using var doc = JsonDocument.Parse(await resp.Content.ReadAsStringAsync());
+        var pts = doc.RootElement.GetProperty("data").GetProperty("evaluatorTimeline");
+
+        Assert.Equal(2, pts.GetArrayLength());
+    }
+
+    [Fact]
     public async Task ScenarioTree_OfFoundryRun_ReturnsRecursiveTree()
     {
         var foundryRunId = _fixture.GetRunId(MissionControlFixtureBuilder.TripPlanner,
-            MissionControlFixtureBuilder.T2, "foundry");
+            MissionControlFixtureBuilder.T2, FixtureRunKind.Foundry);
 
         using var client = _fixture.CreateClient();
         var resp = await client.PostAsJsonAsync("/graphql", new
@@ -241,14 +308,8 @@ public class MissionControlEndToEndTests : IClassFixture<EndToEndFixture>
         // Every normal-eval run has a `composite-root` recursive tree, so
         // the timeline should cover all 6 normal runs (2 subjects × 3 dates)
         // plus the Foundry run (which also uses key=composite-root) = 7.
-        //
-        // Note: `IOutputStore.StartRunAsync` stamps each manifest with
-        // `DateTimeOffset.UtcNow` at write-time — there's no public API
-        // for back-dating runs to T0/T1/T2. So the fixture's "different
-        // points in time" is encoded in the EVIDENCE timestamps + trace
-        // events; the run manifests themselves cluster at fixture-build
-        // time. This assertion therefore verifies COVERAGE (every run
-        // contributes a timeline point) rather than calendar spread.
+        // (Ordering is not asserted here — see builder remarks about
+        // build-time-clustered manifest timestamps.)
         using var client = _fixture.CreateClient();
         var resp = await client.PostAsJsonAsync("/graphql", new
         {
@@ -258,13 +319,7 @@ public class MissionControlEndToEndTests : IClassFixture<EndToEndFixture>
         using var doc = JsonDocument.Parse(await resp.Content.ReadAsStringAsync());
         var pts = doc.RootElement.GetProperty("data").GetProperty("evaluatorTimeline");
 
-        Assert.True(pts.GetArrayLength() >= 7,
-            $"Expected ≥7 timeline points (6 normal + 1 Foundry); got {pts.GetArrayLength()}.");
-
-        // Newest-first ordering verified: first.timestamp >= last.timestamp.
-        var first = DateTimeOffset.Parse(pts[0].GetProperty("timestamp").GetString()!);
-        var last  = DateTimeOffset.Parse(pts[pts.GetArrayLength() - 1].GetProperty("timestamp").GetString()!);
-        Assert.True(first >= last, "evaluatorTimeline must be newest-first.");
+        Assert.Equal(7, pts.GetArrayLength());
     }
 
     // ─── cost-tier breakdown ────────────────────────────────────────────────
@@ -273,7 +328,7 @@ public class MissionControlEndToEndTests : IClassFixture<EndToEndFixture>
     public async Task RunCostBreakdown_NormalRun_ReturnsTotalAndTiers()
     {
         var runId = _fixture.GetRunId(MissionControlFixtureBuilder.TravelAgent,
-            MissionControlFixtureBuilder.T2, "eval");
+            MissionControlFixtureBuilder.T2, FixtureRunKind.Eval);
 
         using var client = _fixture.CreateClient();
         var resp = await client.PostAsJsonAsync("/graphql", new
@@ -339,6 +394,40 @@ public class MissionControlEndToEndTests : IClassFixture<EndToEndFixture>
     // ─── tampering negative test ────────────────────────────────────────────
 
     [Fact]
+    public async Task AgentEvalDoctor_AgainstTamperedFixture_ExitsNonZero()
+    {
+        // Companion to the matrix-flip negative test below. Validates that
+        // the workspace-side `agenteval doctor` command also catches a
+        // contentHash tamper — that's the headline guarantee for users who
+        // run doctor as a CI check rather than going through MC.
+        var tempRoot = Path.Combine(Path.GetTempPath(), "agenteval-e2e-doctor-tamper-" + Guid.NewGuid().ToString("N")[..8]);
+        Directory.CreateDirectory(tempRoot);
+        try
+        {
+            var manifest = await MissionControlFixtureBuilder.BuildAsync(tempRoot);
+            var runId = manifest.RunIds[(MissionControlFixtureBuilder.TravelAgent,
+                MissionControlFixtureBuilder.T2, FixtureRunKind.Eval)];
+            var manifestFile = Directory.GetFiles(manifest.AgentEvalDir, "manifest.json", SearchOption.AllDirectories)
+                .Single(p => Path.GetDirectoryName(p)!.EndsWith(runId, StringComparison.Ordinal));
+
+            var raw = await File.ReadAllTextAsync(manifestFile);
+            var tampered = System.Text.RegularExpressions.Regex.Replace(
+                raw,
+                "\"contentHash\"\\s*:\\s*\"[^\"]*\"",
+                "\"contentHash\":\"TAMPERED\"");
+            Assert.NotEqual(raw, tampered);
+            await File.WriteAllTextAsync(manifestFile, tampered);
+
+            var exit = await DoctorCommand.RunAsync(tempRoot);
+            Assert.Equal(2, exit); // doctor returns 2 when errors found.
+        }
+        finally
+        {
+            try { Directory.Delete(tempRoot, recursive: true); } catch { /* best-effort */ }
+        }
+    }
+
+    [Fact]
     public async Task ComplianceMatrix_AfterFilesystemTampering_FlipsRed()
     {
         // Use a separate per-test fixture so the tampering doesn't leak
@@ -354,7 +443,7 @@ public class MissionControlEndToEndTests : IClassFixture<EndToEndFixture>
             // uses latest-per-subject, so tampering an older run wouldn't
             // be observable in the matrix's allChainsValid flag).
             var runId = manifest.RunIds[(MissionControlFixtureBuilder.TravelAgent,
-                MissionControlFixtureBuilder.T2, "eval")];
+                MissionControlFixtureBuilder.T2, FixtureRunKind.Eval)];
             var manifestCandidates = Directory.GetFiles(manifest.AgentEvalDir, "manifest.json", SearchOption.AllDirectories)
                 .Where(p => Path.GetDirectoryName(p)!.EndsWith(runId, StringComparison.Ordinal))
                 .ToList();
@@ -422,14 +511,36 @@ public sealed class EndToEndFixture : IDisposable
 
     public HttpClient CreateClient() => _factory.CreateClient();
 
-    public string GetRunId(SubjectIdentity subject, DateTimeOffset date, string kind) =>
+    public string GetRunId(SubjectIdentity subject, DateTimeOffset date, FixtureRunKind kind) =>
         Manifest.RunIds[(subject, date, kind)];
 
     public void Dispose()
     {
         _factory.Dispose();
+        // On Windows, Kestrel + FileSystemOutputStore handles can linger past
+        // the factory dispose. Retry the temp-dir delete a few times with
+        // backoff so we don't leak %TEMP%\agenteval-e2e-fixture-* dirs on
+        // dev boxes / CI runners.
+        for (var attempt = 0; attempt < 3; attempt++)
+        {
+            try
+            {
+                if (Directory.Exists(OuterWorkspaceRoot))
+                    Directory.Delete(OuterWorkspaceRoot, recursive: true);
+                return;
+            }
+            catch (IOException)
+            {
+                Thread.Sleep(50 * (attempt + 1));
+            }
+            catch (UnauthorizedAccessException)
+            {
+                Thread.Sleep(50 * (attempt + 1));
+            }
+        }
+        // Final swallow — best-effort.
         try { Directory.Delete(OuterWorkspaceRoot, recursive: true); }
-        catch { /* best-effort */ }
+        catch { /* leak rather than throw from disposer */ }
     }
 }
 

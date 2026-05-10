@@ -17,9 +17,23 @@ namespace AgentEval.Tests.MissionControl.Fixtures;
 /// </summary>
 /// <remarks>
 /// <para>
-/// The fixture spans <b>three dates</b> separated by ~7 days each — T0, T1,
-/// T2 — which lets E2E tests assert ordering / time-series behaviour
-/// (recent-runs newest-first, evaluator-timeline-across-dates, etc.).
+/// The fixture is shaped around <b>three logical dates</b> T0/T1/T2
+/// (~7 days apart) for content-domain coverage — runs at each "date"
+/// for each subject, GDPR evidence at T1+T2, EU AI Act at T2, etc. — but
+/// be aware: <see cref="IOutputStore.StartRunAsync"/> stamps each manifest
+/// with <c>DateTimeOffset.UtcNow</c> at write-time. There is no public API
+/// for back-dating runs to T0/T1/T2, so the fixture's "different points
+/// in time" is reflected in:
+/// <list type="bullet">
+///   <item>Compliance evidence's <c>GeneratedAt</c> field (passed
+///   explicitly via the API).</item>
+///   <item>Trace-event timestamps (passed explicitly).</item>
+///   <item>The memory-eval scenario's <c>EvaluatedAt</c> (set on the
+///   recursive <see cref="EvalResult"/>).</item>
+/// </list>
+/// Manifest timestamps cluster at fixture-build wall-clock time. Tests
+/// that need calendar-spread behaviour should assert on the explicitly-
+/// dated fields above, not on the manifest timestamp.
 /// </para>
 /// <para>
 /// <b>Content matrix</b>:
@@ -40,11 +54,19 @@ namespace AgentEval.Tests.MissionControl.Fixtures;
 /// </list>
 /// </para>
 /// </remarks>
+/// <summary>Loose enum for the per-(subject, date) fixture run-id index. Not the
+/// run's metadata `Kind` field (that's a separate string on RunContext).</summary>
+public enum FixtureRunKind { Eval, Foundry, Memory }
+
 public static class MissionControlFixtureBuilder
 {
-    /// <summary>The three timestamps the fixture spans (all UTC).</summary>
+    /// <summary>Logical date T0 (the oldest of the three) — used as the
+    /// timestamp for compliance evidence + trace events on T0-bucketed runs.
+    /// Manifest timestamps cluster at build-time, see class remarks.</summary>
     public static readonly DateTimeOffset T0 = new(2026, 4, 19, 14, 30, 0, TimeSpan.Zero);
+    /// <summary>Logical date T1 (~7 days after T0). See <see cref="T0"/>.</summary>
     public static readonly DateTimeOffset T1 = new(2026, 4, 26, 14, 30, 0, TimeSpan.Zero);
+    /// <summary>Logical date T2 (~7 days after T1, the most recent). See <see cref="T0"/>.</summary>
     public static readonly DateTimeOffset T2 = new(2026, 5,  3, 14, 30, 0, TimeSpan.Zero);
 
     /// <summary>Subject identity constants.</summary>
@@ -79,7 +101,7 @@ public static class MissionControlFixtureBuilder
         await store.EnsureSubjectAsync(TravelAgent, ct);
         await store.EnsureSubjectAsync(TripPlanner, ct);
 
-        var runIds = new Dictionary<(SubjectIdentity, DateTimeOffset, string), string>();
+        var runIds = new Dictionary<(SubjectIdentity, DateTimeOffset, FixtureRunKind), string>();
         var evidenceRefs = new List<EvidenceRef>();
 
         // ─── Normal-eval runs at (subject, date) ─────────────────────────────
@@ -88,19 +110,19 @@ public static class MissionControlFixtureBuilder
             foreach (var date in new[] { T0, T1, T2 })
             {
                 var runId = await SeedNormalRunAsync(store, subject, date, "eval", ct);
-                runIds[(subject, date, "eval")] = runId;
+                runIds[(subject, date, FixtureRunKind.Eval)] = runId;
             }
         }
 
         // ─── Foundry-style agentic-benchmark run (TripPlanner @ T2) ─────────
         var foundryRunId = await SeedFoundryAgenticRunAsync(store, TripPlanner, T2, ct);
-        runIds[(TripPlanner, T2, "foundry")] = foundryRunId;
+        runIds[(TripPlanner, T2, FixtureRunKind.Foundry)] = foundryRunId;
 
         // ─── Memory-eval runs (TravelAgent @ T1, T2) ────────────────────────
         foreach (var date in new[] { T1, T2 })
         {
             var runId = await SeedMemoryEvalRunAsync(store, TravelAgent, date, ct);
-            runIds[(TravelAgent, date, "memory")] = runId;
+            runIds[(TravelAgent, date, FixtureRunKind.Memory)] = runId;
         }
 
         // ─── Compliance evidence ─────────────────────────────────────────────
@@ -109,7 +131,7 @@ public static class MissionControlFixtureBuilder
         {
             foreach (var subject in new[] { TravelAgent, TripPlanner })
             {
-                var sourceRunId = runIds[(subject, date, "eval")];
+                var sourceRunId = runIds[(subject, date, FixtureRunKind.Eval)];
                 var sealedManifest = await store.GetRunManifestAsync(sourceRunId, ct);
                 if (sealedManifest is null) continue;
                 var ts = await SaveGdprEvidenceAsync(store, subject, sealedManifest, date.AddHours(2), ct);
@@ -119,7 +141,7 @@ public static class MissionControlFixtureBuilder
 
         // EU AI Act: TripPlanner @ T2.
         {
-            var sourceRunId = runIds[(TripPlanner, T2, "eval")];
+            var sourceRunId = runIds[(TripPlanner, T2, FixtureRunKind.Eval)];
             var sealedManifest = await store.GetRunManifestAsync(sourceRunId, ct);
             if (sealedManifest is not null)
             {
@@ -470,7 +492,7 @@ public static class MissionControlFixtureBuilder
 public sealed record FixtureManifest(
     string WorkspaceRoot,
     string AgentEvalDir,
-    IReadOnlyDictionary<(SubjectIdentity Subject, DateTimeOffset Date, string Kind), string> RunIds,
+    IReadOnlyDictionary<(SubjectIdentity Subject, DateTimeOffset Date, FixtureRunKind Kind), string> RunIds,
     IReadOnlyList<EvidenceRef> EvidenceRefs,
     string CampaignId,
     string LegacyBaselinePath);
