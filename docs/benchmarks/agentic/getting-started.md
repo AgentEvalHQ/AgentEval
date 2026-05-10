@@ -138,6 +138,12 @@ Pure-code evaluator for cost-quality trade-off:
 
 ---
 
+## v1 access path
+
+> The agentic 60-evaluator suite currently runs through the `agenteval` CLI binaries. Programmatic access to the individual evaluators via NuGet (`using AgentEval.Evals.Agentic;`) is planned for v1.1 — see [`docs/deferred-pending.md`](../../deferred-pending.md). Today the CLI co-locates the evaluator DLLs so `agenteval bench agentic --preset ...` runs without further setup.
+
+---
+
 ## Prerequisites
 
 - .NET 10.0.x SDK (or 8.x / 9.x).

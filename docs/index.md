@@ -258,7 +258,7 @@ await result.ExportHtmlReportAsync("memory-report.html");
 
 -   **🖥️ CLI Tool**
     
-    `agenteval eval` - evaluate any AI agent from the command line
+    `agenteval init / doctor / bench / mc serve` — workspace, benchmarks, Mission Control
 
 -   **🔌 Cross-Framework**
     

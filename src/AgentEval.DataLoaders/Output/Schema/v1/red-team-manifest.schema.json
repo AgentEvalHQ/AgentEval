@@ -3,6 +3,7 @@
   "$id": "https://agenteval.dev/schemas/v1/red-team-manifest.schema.json",
   "title": "AgentEval Red-Team Campaign Manifest",
   "type": "object",
+  "additionalProperties": false,
   "required": ["schemaVersion", "campaignId", "name", "startedAt", "targets", "mode"],
   "properties": {
     "schemaVersion": { "type": "string", "const": "1.0" },
@@ -13,6 +14,7 @@
       "type": "array",
       "items": {
         "type": "object",
+        "additionalProperties": false,
         "required": ["kind", "name"],
         "properties": {
           "kind": { "enum": ["agent", "workflow"] },

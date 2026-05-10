@@ -714,7 +714,7 @@ public class MissionControlEndToEndTests : IClassFixture<EndToEndFixture>
 /// </summary>
 public sealed class EndToEndFixture : IDisposable
 {
-    /// <summary>The outer root passed to <see cref="DoctorCommand.RunAsync"/> + <see cref="EndToEndFactory"/>.</summary>
+    /// <summary>The outer root passed to <see cref="DoctorCommand.RunAsync(string?)"/> + <see cref="EndToEndFactory"/>.</summary>
     public string OuterWorkspaceRoot { get; }
     public FixtureManifest Manifest { get; }
     private readonly EndToEndFactory _factory;

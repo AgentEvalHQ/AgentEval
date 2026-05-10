@@ -60,6 +60,42 @@ $ dotnet run --project src/AgentEval.Cli -- init --name "MyProject"
 
 ---
 
+### `agenteval migrate`
+
+Migrate legacy AgentEval output paths to the canonical `.agenteval/` layout. Dry-run by default; pass `--apply` to commit changes.
+
+**Synopsis**
+
+```
+agenteval migrate [--apply] [--root <path>]
+```
+
+**What it does**
+
+Walks the workspace looking for three legacy patterns and reports (or moves, with `--apply`) each to its canonical location:
+
+1. **Uppercase `.AgentEval/`** (Windows-collapsed casing) → lowercase `.agenteval/` (preserves audit-chain integrity by moving in-place on the same volume).
+2. **`TestResults/traces/*.json`** legacy trace dumps → `subjects/<kind>/<name>/runs/<runId>/traces/agent-trace.json` per discovered subject (file is renamed to the canonical name).
+3. **Flat `.agenteval/benchmarks/`** outside the per-subject hierarchy → `subjects/<kind>/<name>/benchmarks/...`.
+
+The dry-run output lists each move as `MOVE <src> → <dest>` so you can preview before committing. `--apply` performs the moves; `--root <path>` lets you target a specific workspace explicitly instead of the auto-detected one.
+
+**Options**
+
+| Option | Description |
+|--------|-------------|
+| `--apply` | Commit the moves. Without it, the command only prints what it would do. |
+| `--root <path>` | Workspace root path. Default: auto-detected. |
+
+**Exit codes**
+
+| Code | Meaning |
+|------|---------|
+| `0` | Migration plan printed (dry-run) or applied (`--apply`). |
+| `1` | Could not locate a workspace root, or an I/O error occurred during a move. |
+
+---
+
 ### `agenteval doctor`
 
 Validate the `.agenteval/` workspace structure and content hashes.
@@ -163,7 +199,7 @@ agenteval compliance render --regulation <reg> --subject <name> [--ts <timestamp
 
 | Option | Description |
 |--------|-------------|
-| `--regulation <reg>` | Required. Regulation identifier (currently: `gdpr`). |
+| `--regulation <reg>` | Required. Regulation identifier: `gdpr` or `eu-ai-act`. |
 | `--subject <name>` | Required. Subject name to render evidence for. |
 | `--ts <timestamp>` | Timestamp directory (`yyyy-MM-dd_HH-mm-ss`). Defaults to most recent. |
 | `--root <path>` | Workspace root. Default: auto-detected. |

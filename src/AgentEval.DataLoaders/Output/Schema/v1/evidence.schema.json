@@ -3,21 +3,30 @@
   "$id": "https://agenteval.dev/schemas/v1/evidence.schema.json",
   "title": "AgentEval Compliance Evidence",
   "type": "object",
+  "additionalProperties": false,
   "required": ["schemaVersion", "regulation", "subject", "generatedAt", "sourceRun", "controls", "summary", "attestation"],
   "properties": {
     "schemaVersion": { "type": "string", "const": "1.0" },
     "regulation": { "type": "string" },
     "subject": {
       "type": "object",
+      "additionalProperties": false,
       "required": ["kind", "name"],
       "properties": {
         "kind": { "enum": ["agent", "workflow"] },
-        "name": { "type": "string" }
+        "name": { "type": "string" },
+        "version": { "type": ["string", "null"] },
+        "framework": { "type": ["string", "null"] },
+        "modelId": { "type": ["string", "null"] },
+        "sourceProject": { "type": ["string", "null"] },
+        "sourcePath": { "type": ["string", "null"] },
+        "tags": { "oneOf": [{ "type": "array", "items": { "type": "string" } }, { "type": "null" }] }
       }
     },
     "generatedAt": { "type": "string", "format": "date-time" },
     "sourceRun": {
       "type": "object",
+      "additionalProperties": false,
       "required": ["runId", "manifestHash"],
       "properties": {
         "runId": { "type": "string" },
@@ -28,6 +37,7 @@
       "type": "array",
       "items": {
         "type": "object",
+        "additionalProperties": false,
         "required": ["id", "title", "status", "passRate", "scenarioRefs"],
         "properties": {
           "id": { "type": "string" },
@@ -42,6 +52,7 @@
     },
     "summary": {
       "type": "object",
+      "additionalProperties": false,
       "required": ["controlsTotal", "passed", "warnings", "failed", "overallStatus"],
       "properties": {
         "controlsTotal": { "type": "integer", "minimum": 0 },
@@ -53,6 +64,7 @@
     },
     "attestation": {
       "type": "object",
+      "additionalProperties": false,
       "required": ["agentEvalVersion", "evaluator", "evaluatorModel"],
       "properties": {
         "agentEvalVersion": { "type": "string" },

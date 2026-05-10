@@ -54,6 +54,8 @@ public sealed class F1ScoreEval : AtomicCodeEval
     public F1ScoreEval(double passThreshold = 0.50, string? groundTruth = null)
         : base("f1_score", "F1 Score", "rag", "1.0.0")
     {
+        if (!double.IsFinite(passThreshold) || passThreshold < 0.0 || passThreshold > 1.0)
+            throw new ArgumentOutOfRangeException(nameof(passThreshold), passThreshold, "passThreshold must be a finite value in [0, 1].");
         _passThreshold = passThreshold;
         _groundTruth = groundTruth;
     }

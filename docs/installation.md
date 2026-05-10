@@ -107,7 +107,9 @@ AgentEval also ships a standalone CLI for terminal and CI/CD usage:
 
 ```bash
 dotnet tool install --global AgentEval.Cli --prerelease
-agenteval eval --azure --model gpt-4o --dataset tests.yaml
+agenteval init                                       # bootstrap .agenteval/ workspace
+agenteval bench gdpr --preset smoke --subject MyAgent # run a benchmark
+agenteval mc serve                                    # open Mission Control on http://localhost:5000
 ```
 
 See [CLI Reference](cli.md) for full documentation.

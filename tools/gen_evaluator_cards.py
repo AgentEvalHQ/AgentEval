@@ -208,7 +208,7 @@ CARDS = {
         "histogram", "azureai://built-in/evaluators/violence"),
     "stochastic_stability": ("Stochastic Stability", "stochastic-stability", "Trivial", True, 0.8,
         "Pure-code evaluator: across N stochastic re-runs of the same scenario, what fraction of verdicts agree? Surfaces sampling-noise issues in the agent or the judge.",
-        [("metadata", "stochastic_run_results", True, "Per-run results from N stochastic invocations.")],
+        [("metadata", "run_results", True, "Per-run results from N stochastic invocations.")],
         "histogram", None),
     "long_conversation_coherence": ("Long Conversation Coherence", "memory", "High", True, 0.78,
         "LLM judge assessing whether the agent stays coherent (no contradictions, no forgetting) across a 10+ turn conversation. Full conversation history embedded in the judge prompt — high token cost.",

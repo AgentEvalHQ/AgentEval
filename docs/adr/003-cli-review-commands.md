@@ -14,9 +14,12 @@ AgentEval CLI provides:
 
 | Command | Purpose | Status |
 |---------|---------|--------|
-| `agenteval eval` | Run evaluations | ✅ Implemented |
-| `agenteval init` | Initialize config | ✅ Implemented |
-| `agenteval list` | List metrics/assertions/formats | ✅ Implemented |
+| `agenteval init / doctor / migrate` | Workspace lifecycle | ✅ Implemented |
+| `agenteval bench {gdpr,eu-ai-act,agentic}` | Run compliance + agentic benchmarks | ✅ Implemented |
+| `agenteval bench {gdpr,eu-ai-act,agentic} calibrate` | Judge calibration suites | ✅ Implemented |
+| `agenteval compliance render` / `agenteval render --benchmark agentic` | Re-render reports (no LLM cost) | ✅ Implemented |
+| `agenteval mc serve / mc doctor` | Mission Control portal | ✅ Implemented |
+| `agenteval eval` (cross-framework dataset runner) | Originally proposed in this ADR | ⬜ Deferred — superseded by `agenteval bench` and the in-tree `samples/AgentEval.Samples` runner |
 
 ### Problem
 

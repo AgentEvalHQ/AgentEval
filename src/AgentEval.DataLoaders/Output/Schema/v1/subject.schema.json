@@ -3,8 +3,10 @@
   "$id": "https://agenteval.dev/schemas/v1/subject.schema.json",
   "title": "AgentEval Subject",
   "type": "object",
-  "required": ["kind", "name"],
+  "additionalProperties": false,
+  "required": ["schemaVersion", "kind", "name"],
   "properties": {
+    "schemaVersion": { "type": "string", "const": "1.0" },
     "kind": { "enum": ["agent", "workflow"] },
     "name": { "type": "string" },
     "version": { "type": ["string", "null"] },
@@ -13,8 +15,11 @@
     "sourceProject": { "type": ["string", "null"] },
     "sourcePath": { "type": ["string", "null"] },
     "tags": {
-      "type": "array",
-      "items": { "type": "string" }
+      "oneOf": [
+        { "type": "array", "items": { "type": "string" } },
+        { "type": "null" }
+      ]
     }
   }
 }
+

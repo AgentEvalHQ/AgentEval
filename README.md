@@ -457,11 +457,11 @@ await result.ExportHtmlReportAsync("memory-report.html");
 - Behavioral policies - NeverCallTool, MustConfirmBefore, NeverPassArgumentMatching
 
 ### CLI Tool
-- `agenteval eval` - Evaluate any OpenAI-compatible agent from the command line
-- `agenteval init / doctor` - Bootstrap and validate the `.agenteval/` workspace (canonical output store with audit-chain integrity)
+- `agenteval init / doctor / migrate` - Bootstrap, validate, and migrate the `.agenteval/` workspace (canonical output store with audit-chain integrity)
 - `agenteval bench {gdpr,eu-ai-act,agentic}` - Run compliance and agentic benchmark suites
-- `agenteval mc serve / mc doctor` - Launch the Mission Control web portal (read-only viewer over `.agenteval/`)
-- Flexible CLI with multiple options, several export formats, LLM-as-judge, CI/CD-friendly exit codes
+- `agenteval compliance render` / `agenteval render --benchmark agentic` - Re-render reports from existing evidence (no LLM cost)
+- `agenteval mc serve / mc doctor` - Launch and verify the Mission Control web portal (read-only viewer over `.agenteval/`)
+- CI/CD-friendly exit codes; multiple export formats via `agenteval render`
 
 ### Mission Control Portal
 - Single-binary web portal (Hot Chocolate 16 GraphQL + minimal REST + React SPA) served on `http://localhost:5000`
@@ -519,15 +519,21 @@ dotnet add package AgentEval --prerelease
 The CLI ships in-tree but is not yet published as a `dotnet tool`. Run via:
 
 ```bash
-dotnet run --project src/AgentEval.Cli -- eval --endpoint https://your-resource.openai.azure.com --model gpt-4o --dataset tests.yaml
+dotnet run --project src/AgentEval.Cli -- init
+dotnet run --project src/AgentEval.Cli -- bench gdpr --preset smoke --subject MyAgent
+dotnet run --project src/AgentEval.Cli -- mc serve
 ```
 
 Once published, the equivalent will be:
 
 ```bash
 dotnet tool install -g AgentEval.Cli --prerelease   # planned
-agenteval eval --endpoint https://your-resource.openai.azure.com --model gpt-4o --dataset tests.yaml
+agenteval init
+agenteval bench gdpr --preset smoke --subject MyAgent
+agenteval mc serve
 ```
+
+> **v1 NuGet scope.** The `AgentEval` package currently ships `AgentEval.{Abstractions,Core,DataLoaders,MAF,RedTeam}`. The agentic 60-evaluator suite, GDPR/EU AI Act benchmark code, and memory evaluation pack live alongside the `agenteval` CLI but are not yet exposed as programmatic NuGet APIs — they are runnable today via the CLI binaries. See [`docs/deferred-pending.md`](docs/deferred-pending.md) for the v1.1 plan to surface them as separate packages.
 
 **Supported Frameworks:** .NET 8.0, 9.0, 10.0
 

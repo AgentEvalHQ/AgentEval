@@ -19,6 +19,8 @@
 
 ## Quick Start
 
+> **v1 access path.** The GDPR benchmark currently runs through the `agenteval` CLI binaries. Programmatic access via NuGet (`using AgentEval.GdprBenchmark;`) is planned for v1.1 — see [`docs/deferred-pending.md`](../../deferred-pending.md).
+
 The benchmark requires no special configuration to run. Without `AZURE_OPENAI_*` environment variables, the CLI falls back to a stub judge that returns deterministic placeholder scores with a warning printed to stderr. Results from the stub judge are not meaningful for compliance purposes.
 
 ```
@@ -41,7 +43,7 @@ AZURE_OPENAI_DEPLOYMENT=<your-gpt-4o-deployment>
 
 | Preset | Articles covered | Approx. cost / run | Target audience |
 |--------|------------------|--------------------|-----------------|
-| `smoke` | Art 5, 13, 17, 22, 25 (5 articles) | ~$0.05 | Developer inner loop, PR checks |
+| `smoke` | Art 5, 6, 9, 17, 22 (5 articles) | ~$0.05 | Developer inner loop, PR checks |
 | `standard` | 16 articles (Art 5–9, 13–18, 20–22, 25, 32) | ~$0.50 | Team QA gate, sprint reviews |
 | `audit` | Standard + CapByWorst severity-aware cap; optional multi-judge consensus; Mode-B per-criterion for Critical articles (Art 9, Art 22) | ~$1.20 | DPO review, release sign-off |
 | `healthcare` | 8 domain-specific scenarios targeting Art 9(2)(h), special-category processing | ~$0.20 | Healthcare / MedTech teams |

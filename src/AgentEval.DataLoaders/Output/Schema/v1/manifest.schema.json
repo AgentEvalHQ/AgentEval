@@ -3,11 +3,13 @@
   "$id": "https://agenteval.dev/schemas/v1/manifest.schema.json",
   "title": "AgentEval Run Manifest",
   "type": "object",
+  "additionalProperties": false,
   "required": ["schemaVersion", "solution", "subject", "run", "git", "agentEval", "environment", "contentHash"],
   "properties": {
     "schemaVersion": { "type": "string", "const": "1.0" },
     "solution": {
       "type": "object",
+      "additionalProperties": false,
       "required": ["id", "name"],
       "properties": {
         "id": { "type": "string", "format": "uuid" },
@@ -17,6 +19,7 @@
     },
     "subject": {
       "type": "object",
+      "additionalProperties": false,
       "required": ["kind", "name"],
       "properties": {
         "kind": { "enum": ["agent", "workflow"] },
@@ -30,6 +33,7 @@
     },
     "run": {
       "type": "object",
+      "additionalProperties": false,
       "required": ["runId", "timestamp", "duration", "scenarioCount", "verdict", "kind", "harness"],
       "properties": {
         "runId": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}_\\d{2}-\\d{2}-\\d{2}_[a-z0-9]{8}$" },
@@ -47,6 +51,7 @@
     },
     "git": {
       "type": "object",
+      "additionalProperties": false,
       "properties": {
         "commit": { "type": ["string", "null"] },
         "branch": { "type": ["string", "null"] },
@@ -56,6 +61,7 @@
     },
     "agentEval": {
       "type": "object",
+      "additionalProperties": false,
       "required": ["version"],
       "properties": {
         "version": { "type": "string" },
@@ -64,6 +70,7 @@
     },
     "environment": {
       "type": "object",
+      "additionalProperties": false,
       "required": ["machine", "os", "dotnetVersion"],
       "properties": {
         "machine": { "type": "string" },

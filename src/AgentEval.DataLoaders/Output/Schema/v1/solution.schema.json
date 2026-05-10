@@ -3,6 +3,7 @@
   "$id": "https://agenteval.dev/schemas/v1/solution.schema.json",
   "title": "AgentEval Solution",
   "type": "object",
+  "additionalProperties": false,
   "required": ["schemaVersion", "id", "name"],
   "properties": {
     "schemaVersion": { "type": "string", "const": "1.0" },

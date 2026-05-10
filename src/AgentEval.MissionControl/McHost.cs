@@ -81,6 +81,35 @@ public static class McHost
     /// </summary>
     public static void ConfigurePipeline(WebApplication app)
     {
+        // Defense-in-depth response headers. Phase 1 has no auth and the bench
+        // pipeline lets users write arbitrary text into report.html / report.xml,
+        // so cap script execution and MIME-sniffing at the response level.
+        // The frame-ancestors directive prevents click-jacking against operators
+        // who run the portal next to other local web tools.
+        app.Use(async (ctx, next) =>
+        {
+            var headers = ctx.Response.Headers;
+            if (!headers.ContainsKey("X-Content-Type-Options"))
+                headers["X-Content-Type-Options"] = "nosniff";
+            if (!headers.ContainsKey("X-Frame-Options"))
+                headers["X-Frame-Options"] = "DENY";
+            if (!headers.ContainsKey("Referrer-Policy"))
+                headers["Referrer-Policy"] = "no-referrer";
+            if (!headers.ContainsKey("Content-Security-Policy"))
+                // SPA bundle is self-hosted; Nitro UI loads its own assets — allow
+                // 'unsafe-inline' for Nitro's inline styles + scripts (Hot Chocolate
+                // 16 ships those without a nonce). Tighten when Nitro grows nonce
+                // support or when introspection / Nitro is gated by environment.
+                headers["Content-Security-Policy"] =
+                    "default-src 'self'; " +
+                    "script-src 'self' 'unsafe-inline'; " +
+                    "style-src 'self' 'unsafe-inline'; " +
+                    "img-src 'self' data:; " +
+                    "connect-src 'self'; " +
+                    "frame-ancestors 'none'";
+            await next();
+        });
+
         // GraphQL endpoint at /graphql. The embedded "Nitro" UI (Hot Chocolate's
         // successor to BananaCakePop) is reachable at /graphql in dev mode.
         app.MapGraphQL("/graphql");

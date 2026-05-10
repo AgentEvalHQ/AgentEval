@@ -51,6 +51,8 @@ public sealed class CompositeEval : IEval
         ArgumentNullException.ThrowIfNull(aggregation);
         if (components.Count == 0)
             throw new ArgumentException("Composite must have at least one component.", nameof(components));
+        if (threshold is { } t && (!double.IsFinite(t) || t < 0.0 || t > 1.0))
+            throw new ArgumentOutOfRangeException(nameof(threshold), threshold, "threshold must be a finite value in [0, 1].");
 
         Key = key;
         Name = name;

@@ -149,7 +149,7 @@ benchCmd.Add(benchAgenticCmd);
 var complianceCmd = new Command("compliance", "Compliance reporting commands");
 
 // compliance render — required values validated inside RunAsync
-var renderRegulationOpt = new Option<string?>("--regulation") { Description = "Regulation identifier (currently: gdpr)" };
+var renderRegulationOpt = new Option<string?>("--regulation") { Description = "Regulation identifier: gdpr | eu-ai-act" };
 var renderSubjectOpt = new Option<string?>("--subject") { Description = "Subject name to render evidence for" };
 var renderTsOpt = new Option<string?>("--ts") { Description = "Timestamp directory (yyyy-MM-dd_HH-mm-ss); defaults to most recent" };
 var renderRootOpt = new Option<string?>("--root") { Description = "Workspace root path (default: auto-detected)" };

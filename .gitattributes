@@ -1,0 +1,8 @@
+# Force LF line endings for AgentEval workspace artefacts so SHA-256 content
+# hashes are deterministic across Windows/macOS/Linux runners.
+# .NET 9+ also pins JsonSerializerOptions.NewLine = "\n" on the writer side;
+# this attribute is belt-and-braces for files that are committed (e.g.
+# compliance/, baseline.json, history.jsonl, subject.json).
+.agenteval/**/*.json   text eol=lf
+.agenteval/**/*.jsonl  text eol=lf
+src/AgentEval.DataLoaders/Output/Schema/v1/*.json text eol=lf

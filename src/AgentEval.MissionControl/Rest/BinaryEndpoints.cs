@@ -75,7 +75,13 @@ internal static class BinaryEndpoints
             if (!File.Exists(path)) return Results.NotFound();
 
             var contentType = ContentTypeFor(format);
-            return Results.File(File.OpenRead(path), contentType);
+            // Force download for browser-rendered formats (html / xml / sarif) so a
+            // report containing user-controlled content can't run as same-origin
+            // script against the GraphQL + REST surface. Markdown is safe to inline.
+            var inline = format is "markdown" or "md";
+            var fileDownloadName = inline ? null : $"report.{format}";
+            var result = Results.File(File.OpenRead(path), contentType, fileDownloadName: fileDownloadName);
+            return result;
         });
 
         // ─── MC1.3.4 — compliance PDF stream ─────────────────────────────────

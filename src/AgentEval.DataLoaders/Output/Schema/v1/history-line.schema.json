@@ -3,6 +3,7 @@
   "$id": "https://agenteval.dev/schemas/v1/history-line.schema.json",
   "title": "AgentEval History Line",
   "type": "object",
+  "additionalProperties": false,
   "required": ["runId", "timestamp", "verdict", "score"],
   "properties": {
     "runId": { "type": "string" },

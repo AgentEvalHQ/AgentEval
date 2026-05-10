@@ -16,5 +16,12 @@ public sealed record SubjectIdentity(
     IReadOnlyList<string>? Tags = null)
 {
     /// <summary>The qualified identifier for this subject (v1: same as Name).</summary>
+    /// <remarks>
+    /// Computed alias for callers that want a "stable id" handle independent of how
+    /// v2 may split <see cref="Name"/> from a fully-qualified scope. Not persisted —
+    /// the on-disk JSON shape is governed by <c>subject.schema.json</c> /
+    /// <c>evidence.schema.json</c>, which require <c>kind</c>+<c>name</c> only.
+    /// </remarks>
+    [System.Text.Json.Serialization.JsonIgnore]
     public string QualifiedId => Name;
 }

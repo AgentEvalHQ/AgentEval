@@ -160,7 +160,9 @@ REST stays for binary streams because GraphQL doesn't do streams cleanly. See [`
 | Setting | CLI flag | Env var | Default | What it does |
 |---|---|---|---|---|
 | Workspace root | `--workspace <path>` | `AgentEval__Root` | `Directory.GetCurrentDirectory()` | Where to find `.agenteval/`. Useful when running the portal binary from a different folder than the solution. |
-| Port | `--port N` | `ASPNETCORE_URLS` (e.g. `http://0.0.0.0:5050`) | `5000` | Bind a different HTTP port. |
+| Port | `--port N` | n/a (see note) | `5000` | Bind a different HTTP port. |
+
+> **Bind address.** `agenteval mc serve` always binds Mission Control to `http://127.0.0.1:<port>` (loopback only) — it overrides any pre-set `ASPNETCORE_URLS`. To expose Mission Control on a different interface (e.g. LAN), launch the portal binary directly instead: `dotnet run --project src/AgentEval.MissionControl` honours your `ASPNETCORE_URLS`. Phase 1 has no built-in auth — only bind broader interfaces on trusted networks.
 
 > Note: ASP.NET Core uses double-underscore (`__`) as the env-var separator for hierarchical config keys. So `AgentEval:Root` in `appsettings.json` becomes `AgentEval__Root` as an env var.
 
@@ -178,8 +180,8 @@ REST stays for binary streams because GraphQL doesn't do streams cleanly. See [`
 
 | Mode | When to use | Setup |
 |---|---|---|
-| **A — Local viewer** | Solo dev / single-team, single repo | `agenteval mc serve` (or `dotnet run --project src/AgentEval.MissionControl`) |
-| **B — Workspace aggregator** | Platform engineer / AI lead reviewing multiple repos on one machine | `agenteval mc serve --workspace <path>` |
+| **A — Local viewer** | Solo dev / single-team, single repo | `agenteval mc serve` (or `dotnet run --project src/AgentEval.MissionControl`). The default `--workspace` is the current directory; pass `--workspace <path>` to point at a different repo's `.agenteval/`. |
+| **B — Multi-workspace aggregator** | Platform engineer / AI lead reviewing multiple repos on one host | Phase 2 (target v1.5). Phase 1 reads exactly one `.agenteval/` per process; aggregation across multiple workspaces is deferred. See [`docs/deferred-pending.md`](../deferred-pending.md). |
 | **C — Self-hosted server** | Org-wide collaboration with auth + multi-tenant + sync | Phase 2 (target v1.5) |
 
 ---

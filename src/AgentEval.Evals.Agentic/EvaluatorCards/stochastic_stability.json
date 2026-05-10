@@ -11,7 +11,7 @@
   "expectedInputs": [
     {
       "kind": "metadata",
-      "key": "stochastic_run_results",
+      "key": "run_results",
       "required": true,
       "description": "Per-run results from N stochastic invocations."
     }

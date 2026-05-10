@@ -39,6 +39,15 @@ public sealed class FileSystemOutputStore : IOutputStore
             DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
             Converters = { new JsonStringEnumConverter(JsonNamingPolicy.CamelCase) }
         };
+#if NET9_0_OR_GREATER
+        // Pin newline to LF so ContentHasher produces the same bytes regardless of
+        // the host OS — otherwise Windows producers emit CRLF and Linux producers
+        // emit LF, and the audit-chain hash differs across CI matrices. .NET 8
+        // doesn't expose this option; on net8 we rely on `.gitattributes` to keep
+        // committed JSON LF-only for any cross-platform consumer.
+        _json.NewLine = "\n";
+        _jsonl.NewLine = "\n";
+#endif
     }
 
     public string? WorkspaceRoot => _layout.Root;
@@ -85,6 +94,19 @@ public sealed class FileSystemOutputStore : IOutputStore
         SubjectFileV1? existing = null;
         if (File.Exists(subjectFile))
             existing = await ReadJsonAsync<SubjectFileV1>(subjectFile, ct);
+
+        // Defend against case-insensitive filesystem collisions: on NTFS / default
+        // APFS, "TravelAgent" and "travelagent" resolve to the same directory. The
+        // path-resolved Sanitize output may match a sibling whose subject.json says
+        // a differently-cased name. Surface the collision before we overwrite their
+        // subject.json with a wrongly-cased identity.
+        if (existing is not null && !string.Equals(existing.Name, identity.Name, StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException(
+                $"Subject directory '{Path.GetFileName(_layout.SubjectDir(identity))}' is already in use by subject " +
+                $"'{existing.Name}' (case-insensitive filesystem collision with requested name '{identity.Name}'). " +
+                "Pick a unique name that does not collide on case.");
+        }
 
         var dto = new SubjectFileV1(
             SchemaVersion: "1.0",

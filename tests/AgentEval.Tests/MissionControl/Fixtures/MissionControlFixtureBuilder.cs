@@ -489,6 +489,10 @@ public static class MissionControlFixtureBuilder
 /// </summary>
 /// <param name="WorkspaceRoot">Outer directory passed to <see cref="MissionControlFixtureBuilder.BuildAsync"/>; this is the directory whose <c>.agenteval/</c> + <c>benchmarks/</c> children were populated.</param>
 /// <param name="AgentEvalDir">Convenience pointer to <c>{WorkspaceRoot}/.agenteval</c> — the directory most filesystem-traversing tests want.</param>
+/// <param name="RunIds">Map from (subject, date, kind) to the canonical runId of each seeded run; tests use this to navigate to a specific run without recomputing the id from the timestamp seed.</param>
+/// <param name="EvidenceRefs">Pointers to every seeded compliance evidence record so tests can drive the audit-chain matrix without re-globbing the disk.</param>
+/// <param name="CampaignId">Identifier of the seeded red-team campaign (if any); empty string when the fixture did not request a campaign.</param>
+/// <param name="LegacyBaselinePath">Absolute path to the seeded legacy <c>baseline.json</c> file (if any), used by migrate-command and Mode-B negative tests.</param>
 public sealed record FixtureManifest(
     string WorkspaceRoot,
     string AgentEvalDir,

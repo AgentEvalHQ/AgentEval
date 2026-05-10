@@ -50,6 +50,8 @@ public sealed class AtomicLlmEval : AtomicEval
     {
         _evaluator = evaluator ?? throw new ArgumentNullException(nameof(evaluator));
         _criteria = criteria ?? throw new ArgumentNullException(nameof(criteria));
+        if (!double.IsFinite(passThreshold) || passThreshold < 0.0 || passThreshold > 1.0)
+            throw new ArgumentOutOfRangeException(nameof(passThreshold), passThreshold, "passThreshold must be a finite value in [0, 1].");
         _passThreshold = passThreshold;
         _judgeModel = judgeModel;
         _promptId = promptId;

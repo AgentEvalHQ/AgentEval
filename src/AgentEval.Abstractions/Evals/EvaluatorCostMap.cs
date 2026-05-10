@@ -19,7 +19,7 @@ namespace AgentEval.Evals;
 /// </remarks>
 public static class EvaluatorCostMap
 {
-    private static readonly Dictionary<string, EvaluatorCostTier> s_tiers = new(StringComparer.OrdinalIgnoreCase)
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, EvaluatorCostTier> s_tiers = new(StringComparer.OrdinalIgnoreCase)
     {
         // ── Plan 05 — System (5) ───────────────────────────────────────────
         ["task_completion"]                 = EvaluatorCostTier.Low,
@@ -133,7 +133,7 @@ public static class EvaluatorCostMap
     public static void Register(string evaluatorKey, EvaluatorCostTier tier)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(evaluatorKey);
-        s_tiers[evaluatorKey] = tier;
+        s_tiers.AddOrUpdate(evaluatorKey, tier, (_, _) => tier);
     }
 
     /// <summary>True if <paramref name="evaluatorTier"/> is at or below <paramref name="budgetTier"/>.</summary>
