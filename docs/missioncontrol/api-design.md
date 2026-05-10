@@ -9,9 +9,13 @@ This is the operational companion to [plan-07 §3 Challenge 1](../../strategy/Fu
 | Concern | Endpoint | Why |
 |---|---|---|
 | **Reads** (dashboard, compliance matrix, recursive `EvalResult` tree, evaluator registry) | `POST /graphql` (single endpoint) | Recursive trees, sparse selection, schema-driven UI |
-| **Ingest / writes** | `POST /api/v1/runs` (REST; idempotent) | Flat records, content-hash audit chain, retry semantics |
+| **Ingest / writes** | `POST /api/v1/runs` (REST; idempotent) — Mode C (deferred) | Flat records, content-hash audit chain, retry semantics |
 | **Binary downloads** | `GET /api/v1/.../report.pdf`, `GET /api/v1/runs/{id}/trace` | Streams |
-| **Live updates** | SSE (Mode A/B) / SignalR (Mode C) | Read-only push (Mode A/B) vs bidirectional (Mode C) |
+| **Live updates** | SSE (Mode A/B) / SignalR (Mode C) — **deferred** | Read-only push (Mode A/B) vs bidirectional (Mode C) |
+
+> Phase 1 ships the read surface only: GraphQL at `/graphql`, the REST binary
+> + version surface listed below, and the SPA. Ingest (`POST /api/v1/runs`),
+> live updates (SSE + SignalR), and auth land with Mode C in a later phase.
 
 This isn't exotic — GitHub does it (REST v3 + GraphQL v4), Stripe does it (REST primary + GraphQL for dashboard), Shopify does it.
 
@@ -72,8 +76,8 @@ CDN / browser / proxy caching of `GET` requests is automatic and free. GraphQL q
 ## Operational costs of GraphQL (honest read)
 
 - **Self-hoster debugging** is harder than `curl /api/v1/recent`. They need GraphiQL or to know the schema. Mitigation: ship Hot Chocolate's embedded Nitro UI at `/graphql` (off in production).
-- **Query-depth and -complexity limits** are required to prevent "give me 1000-deep recursion" attacks. Hot Chocolate ships these (`MaxAllowedExecutionDepth`, complexity analyzer); Mission Control configures `MaxAllowedExecutionDepth = 8`.
-- **N+1 resolver risk** is real. Mitigation: GreenDonut (DataLoader port for .NET, ships with Hot Chocolate) handles batched per-request loading. (Wired in MC1.4.7 — coming soon.)
+- **Query-depth and -complexity limits** are required to prevent "give me 1000-deep recursion" attacks. Hot Chocolate ships these (`MaxAllowedExecutionDepth`, complexity analyzer); Mission Control configures `MaxAllowedExecutionDepth = 10` (raised from 8 in Wave 8a to accommodate the SPA's 3-level scenario-tree drill-down at depth 9; deeper attack queries are still rejected).
+- **N+1 resolver risk** is real. Mitigation: GreenDonut (DataLoader port for .NET, ships with Hot Chocolate) handles batched per-request loading. Deferred to MC1.4.7 — `Query.evaluatorTimeline` is the documented N+1 candidate, currently bounded by its own `maxScan: 200` cap.
 - **Persisted queries** become real work if we want HTTP caching of GraphQL responses. Deferred to v1.6+.
 
 ---
@@ -81,37 +85,37 @@ CDN / browser / proxy caching of `GET` requests is automatic and free. GraphQL q
 ## REST surface (`/api/v1/*`)
 
 ```
-# Server metadata
+# Shipped today — server metadata + binary streams (Mode A)
 GET    /api/v1/version
-
-# Binary streams (Mode A/B/C)
 GET    /api/v1/runs/{runId}/trace
 GET    /api/v1/runs/{runId}/reports/{format}            # markdown / html / junit / sarif
 GET    /api/v1/compliance/{regulation}/{subject}/{ts}/report.pdf
 GET    /api/v1/compliance/{regulation}/schema
 GET    /api/v1/subjects/{kind}/{name}/history           # application/x-ndjson stream
 
-# Ingest (Mode C only — Phase 2)
+# Deferred — Mode C ingest (Phase 2)
 POST   /api/v1/runs                                      # idempotent on (solutionId, runId)
 POST   /api/v1/runs/bulk
 POST   /api/v1/runs/{runId}/trace                        # multipart, large
 POST   /api/v1/compliance/evidence
 POST   /api/v1/red-team/campaigns
 
-# Auth (Mode C only — Phase 2)
+# Deferred — Mode C auth (Phase 2)
 POST   /api/v1/auth/tokens
 GET    /api/v1/auth/tokens
 DELETE /api/v1/auth/tokens/{id}
 GET    /api/v1/auth/me
 
-# Admin (Mode C only — Phase 2)
+# Deferred — Mode C admin (Phase 2)
 GET    /api/v1/admin/audit-log
 DELETE /api/v1/solutions/{id}/data?subject={name}        # right-to-be-forgotten
 
-# Live updates
-GET    /api/v1/events?topics=                            # SSE; Mode A/B
+# Deferred — live updates (Mode A/B SSE + Mode C SignalR)
+GET    /api/v1/events?topics=                            # SSE; not implemented in Phase 1
 WS     /hub/notifications                                # SignalR; Mode C only
 ```
+
+The shipped block above matches `src/AgentEval.MissionControl/Rest/BinaryEndpoints.cs` and `McHost.cs` exactly.
 
 ---
 

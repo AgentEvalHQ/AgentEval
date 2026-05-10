@@ -1,4 +1,4 @@
-﻿# AgentEval Documentation - Navigation
+# AgentEval Documentation - Navigation
 
 - name: Home
   href: index.md
@@ -28,6 +28,8 @@
     href: model-comparison.md
   - name: Trace Recording
     href: tracing.md
+  - name: Composite Evaluations
+    href: composite-evals.md
 
 - name: Evaluation Coverage
   items:
@@ -56,8 +58,38 @@
     href: embedding-metrics.md
   - name: Evaluation Guide
     href: evaluation-guide.md
-  - name: Benchmarks
+
+- name: Benchmarks
+  items:
+  - name: Benchmarks Guide
     href: benchmarks.md
+  - name: Agentic Benchmark
+    items:
+    - name: Getting Started
+      href: benchmarks/agentic/getting-started.md
+    - name: Cost Guidance
+      href: benchmarks/agentic/cost-guidance.md
+    - name: Evaluator Cards
+      href: benchmarks/agentic/evaluator-cards.md
+  - name: EU AI Act Benchmark
+    href: benchmarks/eu-ai-act/getting-started.md
+  - name: GDPR Benchmark
+    items:
+    - name: Getting Started
+      href: benchmarks/gdpr/getting-started.md
+    - name: Calibration Report
+      href: benchmarks/gdpr/calibration-report.md
+
+- name: Mission Control
+  items:
+  - name: Getting Started
+    href: missioncontrol/getting-started.md
+  - name: API Design (REST + GraphQL)
+    href: missioncontrol/api-design.md
+  - name: Charting
+    href: missioncontrol/charting.md
+  - name: Portal-Ready Evaluators
+    href: missioncontrol/portal-ready-evaluators.md
 
 - name: Integration
   items:
@@ -79,6 +111,10 @@
   items:
   - name: Architecture Overview
     href: architecture.md
+  - name: The .agenteval Workspace
+    href: agenteval-workspace.md
+  - name: Workspace Migration Guide
+    href: migration/output-folder.md
   - name: Building Documentation
     href: building-docs.md
   - name: Extensibility

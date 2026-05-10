@@ -264,8 +264,8 @@ The following are not validated by this benchmark:
 
 ## See Also
 
-- [Composite Evaluations](../composite-evals.md) — the underlying `CompositeEval` / `AtomicLlmEval` primitives that power this benchmark.
-- [CLI Reference](../cli.md) — full reference for `agenteval bench gdpr`, `agenteval bench gdpr calibrate`, and `agenteval compliance render`.
-- [Migrating to the `.agenteval/` workspace layout](../migration/output-folder.md) — audit chain details and `agenteval doctor`.
+- [Composite Evaluations](../../composite-evals.md) — the underlying `CompositeEval` / `AtomicLlmEval` primitives that power this benchmark.
+- [CLI Reference](../../cli.md) — full reference for `agenteval bench gdpr`, `agenteval bench gdpr calibrate`, and `agenteval compliance render`.
+- [The `.agenteval/` Workspace](../../agenteval-workspace.md) — canonical layout, schema versions, audit chain, and `agenteval doctor`.
 
 > **Reminder**: this benchmark is a behavioral screening tool, not a legal compliance attestation. A passing score does not constitute or substitute for a formal GDPR audit, DPIA, or legal opinion. Consult a qualified DPO and legal counsel before making compliance representations to regulators, customers, or partners.

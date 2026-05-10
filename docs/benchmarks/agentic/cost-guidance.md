@@ -211,7 +211,7 @@ Estimates assume a GPT-4o-class judge, 10 scenarios per evaluator, and average p
 ## Implementation Reference
 
 - **Enum**: `AgentEval.Evals.EvaluatorCostTier` in `src/AgentEval.Abstractions/Evals/`
-- **Cost map**: `AgentEval.Evals.EvaluatorCostMap` (static dictionary, 46+ entries)
+- **Cost map**: `AgentEval.Evals.EvaluatorCostMap` (static dictionary, 60 entries — one per shipped evaluator)
 - **Filter logic**: `AgentEval.Evals.Agentic.Composition.CostFilteredCompositeBuilder.FilterByBudget`
 - **CLI integration**: `--budget-tier` flag on `agenteval bench agentic`
 

@@ -171,4 +171,5 @@ The following are deferred until a concrete consumer asks for them:
 ## See also
 
 - [Evaluation Guide](evaluation-guide.md) — choosing the right metrics for your use case
-- [Migrating to the `.agenteval/` workspace layout](migration/output-folder.md) — canonical output store, audit chain, and `agenteval doctor`
+- [The `.agenteval/` Workspace](agenteval-workspace.md) — canonical output store, schema versions, audit chain, and `agenteval doctor`
+- [Migrating to the `.agenteval/` workspace layout](migration/output-folder.md) — moving legacy paths into the canonical layout

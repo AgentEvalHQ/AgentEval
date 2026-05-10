@@ -6,9 +6,12 @@
 > (Per-Evaluator Implementation Cards) and the master analysis document
 > `strategy/FutureFeatures/todo/microsoft-foundry-evals-agent-eval-design.md` §3–§10.
 
-The 27 evaluators shipped across Phases 1–5 are organized below by category. Each card will
+The 60 evaluators shipped across Phases 1–6 are organized below by category. Each card will
 document: key, category, version, score formula, severity, pass threshold, Foundry URI (where
-applicable), input contract, and known limitations.
+applicable), input contract, and known limitations. Phase 1–5 cards are summarised inline below;
+Phase 6 evaluators (memory, multi-turn, reasoning, calibration, UX, adversarial, efficiency)
+are listed in [Cost Guidance](cost-guidance.md) and shipped as `EvaluatorCard` JSON files
+under `src/AgentEval.Evals.Agentic/EvaluatorCards/`.
 
 ---
 

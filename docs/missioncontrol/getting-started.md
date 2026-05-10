@@ -1,6 +1,6 @@
 # AgentEval Mission Control — Getting Started
 
-> **Status**: v1.7+ Phase 1 (local viewer + workspace aggregator). Mode C self-hosted server lands in v1.5+.
+> **Status**: Phase 1 — local viewer + workspace aggregator (target v1.2–v1.4). Mode C self-hosted server lands in Phase 2 (target v1.5).
 
 Mission Control is the visualisation, aggregation, and governance layer on top of `.agenteval/`. This guide gets you a working portal in under 30 seconds against a populated solution.
 
@@ -157,10 +157,10 @@ REST stays for binary streams because GraphQL doesn't do streams cleanly (per [p
 
 ## Configuration
 
-| Setting | Env var | Default | What it does |
-|---|---|---|---|
-| Workspace root | `AgentEval__Root` | `Directory.GetCurrentDirectory()` | Where to find `.agenteval/`. Useful when running the portal binary from a different folder than the solution. |
-| Port | (ASP.NET default) | `5000` (HTTP) / `5001` (HTTPS) | Override via `--urls http://0.0.0.0:5050` |
+| Setting | CLI flag | Env var | Default | What it does |
+|---|---|---|---|---|
+| Workspace root | `--workspace <path>` | `AgentEval__Root` | `Directory.GetCurrentDirectory()` | Where to find `.agenteval/`. Useful when running the portal binary from a different folder than the solution. |
+| Port | `--port N` | `ASPNETCORE_URLS` (e.g. `http://0.0.0.0:5050`) | `5000` | Bind a different HTTP port. |
 
 > Note: ASP.NET Core uses double-underscore (`__`) as the env-var separator for hierarchical config keys. So `AgentEval:Root` in `appsettings.json` becomes `AgentEval__Root` as an env var.
 
@@ -180,7 +180,7 @@ REST stays for binary streams because GraphQL doesn't do streams cleanly (per [p
 |---|---|---|
 | **A — Local viewer** | Solo dev / single-team, single repo | `dotnet run --project src/AgentEval.MissionControl` |
 | **B — Workspace aggregator** | Platform engineer / AI lead reviewing multiple repos on one machine | `--workspace ./repos` (lands with MC1.7.3) |
-| **C — Self-hosted server** | Org-wide collaboration with auth + multi-tenant + sync | Plan-08 Phase 2 (v1.5+) |
+| **C — Self-hosted server** | Org-wide collaboration with auth + multi-tenant + sync | Plan-08 Phase 2 (target v1.5) |
 
 ---
 
@@ -196,7 +196,7 @@ Mission Control consumes only `IOutputStoreReader` (the read-only abstraction ex
 
 **Empty subjects / runs** — verify `.agenteval/subjects/` exists and contains `agents/` or `workflows/` subfolders.
 
-**`GraphQL ... allowed depth: 8`** — you're issuing a query that recurses deeper than 8 levels. The depth limit guards against unbounded-tree attacks (plan-07 §8.1). Restructure the query.
+**`GraphQL ... allowed depth: 10`** — you're issuing a query that recurses deeper than 10 levels. The depth limit guards against unbounded-tree attacks (plan-07 §8.1). Restructure the query — most production trees fit within 3 nested `details { subResults { ... } }` pairs.
 
 **Tampered evidence detected** — `complianceMatrix.allChainsValid: false` means at least one piece of evidence's `manifest_hash` no longer matches its source run's `content_hash`. Run `agenteval doctor` to identify the affected runs.
 

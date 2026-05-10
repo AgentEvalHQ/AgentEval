@@ -178,7 +178,129 @@ $ dotnet run --project src/AgentEval.Cli -- migrate --apply
 
 ---
 
+### `agenteval bench`
+
+Run a benchmark against a subject (agent or workflow). Three benchmark families ship: `gdpr`, `eu-ai-act`, and `agentic`. Each writes results under `.agenteval/compliance/{regulation}/...` (or `.agenteval/benchmarks/agentic/...` for the agentic family) and an audit-chained evidence file the portal and `agenteval doctor` can read.
+
+**Synopsis**
+
+```
+agenteval bench gdpr      [--preset <name>] [--subject <name>] [--root <path>] [--input <text>] [--runs <N>]
+agenteval bench gdpr      calibrate [--root <path>] [--out <path>]
+agenteval bench eu-ai-act [--preset <name>] [--subject <name>] [--root <path>] [--input <text>]
+agenteval bench eu-ai-act calibrate [--root <path>] [--out <path>]
+agenteval bench agentic   [--preset <name>] [--subject <name>] [--root <path>] [--input <text>] [--budget-tier <tier>]
+agenteval bench agentic   calibrate [--root <path>] [--out <path>]
+```
+
+**Common options**
+
+| Option | Description |
+|--------|-------------|
+| `--preset <name>` | Preset selector. GDPR: `smoke` / `standard` / `audit`, plus `+healthcare` / `+hr` / `+childrens` domain packs. EU AI Act: `smoke` / `standard` / `audit`, plus `+high-risk-employment` / `+high-risk-credit` / `+high-risk-education` domain packs. Agentic: `agentic-execution` / `tool-call-accuracy` / `rag-quality` / `judge-quality` / `safety` / `telemetry` / `stochastic-stability` / `conversational` / `reasoning` / `user-experience` / `adversarial-direct`. |
+| `--subject <name>` | Subject name (agent or workflow) under evaluation. Default: `default-agent`. |
+| `--root <path>` | Workspace root path. Default: auto-detected (walks up to `.sln` / `.slnx` / `.git`). |
+| `--input <text>` | Agent input text. Default: built-in fixture. |
+| `--budget-tier <tier>` | _Agentic only._ Filter by cost tier: `trivial` / `low` / `medium` / `high` / `all`. Components above the tier are removed and remaining weights renormalised. See [Cost Guidance](benchmarks/agentic/cost-guidance.md). |
+| `--runs <N>` | _GDPR only._ Run the benchmark N times and aggregate via `MajorityVote`. Default: 1. |
+
+**Reference docs**
+
+- GDPR: [Getting Started](benchmarks/gdpr/getting-started.md)
+- EU AI Act: [Getting Started](benchmarks/eu-ai-act/getting-started.md)
+- Agentic: [Getting Started](benchmarks/agentic/getting-started.md) · [Cost Guidance](benchmarks/agentic/cost-guidance.md) · [Evaluator Cards](benchmarks/agentic/evaluator-cards.md)
+
+---
+
+### `agenteval compliance render`
+
+Re-render a PDF report from existing compliance evidence — no LLM cost (the evidence is already on disk).
+
+**Synopsis**
+
+```
+agenteval compliance render --regulation <reg> --subject <name> [--ts <timestamp>] [--root <path>]
+```
+
+| Option | Description |
+|--------|-------------|
+| `--regulation <reg>` | Required. Regulation identifier (currently: `gdpr`). |
+| `--subject <name>` | Required. Subject name to render evidence for. |
+| `--ts <timestamp>` | Timestamp directory (`yyyy-MM-dd_HH-mm-ss`). Defaults to most recent. |
+| `--root <path>` | Workspace root. Default: auto-detected. |
+
+---
+
+### `agenteval render`
+
+Re-render a Markdown report from existing benchmark results — no LLM cost.
+
+**Synopsis**
+
+```
+agenteval render --benchmark <kind> --subject <name> [--ts <timestamp>] [--root <path>]
+```
+
+| Option | Description |
+|--------|-------------|
+| `--benchmark <kind>` | Required. Benchmark type (currently: `agentic`). |
+| `--subject <name>` | Required. Subject name to render results for. |
+| `--ts <timestamp>` | Timestamp directory. Defaults to most recent. |
+| `--root <path>` | Workspace root. Default: auto-detected. |
+
+---
+
+### `agenteval mc serve`
+
+Start the Mission Control web portal — GraphQL, REST, and SPA on one port — from any working directory. Requires .NET 10. See [Mission Control Getting Started](missioncontrol/getting-started.md).
+
+**Synopsis**
+
+```
+agenteval mc serve [--port <N>] [--workspace <path>]
+```
+
+| Option | Env var | Default | Description |
+|--------|---------|---------|-------------|
+| `--port <N>` | `ASPNETCORE_URLS` | `5000` | Bind a different HTTP port. |
+| `--workspace <path>` | `AgentEval__Root` | current directory | Workspace root. Mission Control reads `{workspace}/.agenteval/`. |
+
+The CLI spawns `AgentEval.MissionControl(.exe|.dll)` co-located in the same publish directory. The subprocess inherits its working directory from the CLI's bin folder so the SPA's static-asset pipeline resolves correctly; the workspace is plumbed through the `AgentEval__Root` env var.
+
+**Exit codes**
+
+| Code | Meaning |
+|------|---------|
+| `0` | Stopped cleanly (Ctrl+C). |
+| `1` | Port unavailable, MC assembly missing, or subprocess failed to start. |
+| `2` | Running on net8/net9 — Mission Control requires .NET 10. |
+
+---
+
+### `agenteval mc doctor`
+
+Verify Mission Control's runtime artefacts are co-located with the CLI and the SPA bundle is intact. Useful diagnostic before `mc serve` fails with a less-informative error. Sibling to `agenteval doctor` (which validates workspace data, not portal binaries). Requires .NET 10.
+
+**Synopsis**
+
+```
+agenteval mc doctor
+```
+
+**What it checks**
+
+1. `AgentEval.MissionControl.dll` (and `.exe` on Windows) is present alongside the CLI.
+2. `wwwroot/` exists with `index.html` and a populated `assets/` folder (JS + CSS bundles).
+3. The Web SDK's static-asset manifest (`*.staticwebassets.endpoints.json` or `*.runtime.json`) is present.
+4. On non-Windows, `dotnet` is on PATH (the CLI spawns the MC `.dll` via `dotnet`).
+
+Prints `Errors: N | Warnings: N | OK: N` and exits `2` on any error.
+
+---
+
 ## See Also
 
 - [Migration Guide](migration/output-folder.md) — Step-by-step migration from legacy paths.
 - [Getting Started](getting-started.md) — C# library quickstart.
+- [The `.agenteval/` Workspace](agenteval-workspace.md) — canonical layout, schema versions, audit chain.
+- [Mission Control Getting Started](missioncontrol/getting-started.md) — the read-only web portal.

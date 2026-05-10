@@ -1,5 +1,10 @@
 # Migrating to the `.agenteval/` Workspace Layout
 
+> **Looking for the canonical layout reference?** See
+> [The `.agenteval/` Workspace](../agenteval-workspace.md). This document is
+> the historical migration guide for moving legacy AgentEval output paths
+> into the canonical layout.
+
 ## Why we changed the layout
 
 Before this release, AgentEval wrote output to three separate, uncoordinated locations: sample snapshots went to `.AgentEval/{Project}_Evals/{key}.json` (uppercase, project-specific); memory baselines went to `.agenteval/benchmarks/{Agent}/baselines/...`; and trace artifacts landed in `TestResults/traces/{name}_{ts}_{*}.json`. None of these locations shared a common identity layer, so there was no reliable way to correlate a trace with the run that produced it, no content hashes to detect corruption or tampering, and no audit trail linking a compliance attestation back to a specific evaluation run. The mixed casing (`.AgentEval/` vs `.agenteval/`) also caused false positives in tooling on case-insensitive filesystems.

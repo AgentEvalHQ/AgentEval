@@ -337,7 +337,7 @@ Each prompt file's header carries the source URL, pinned commit SHA at fork time
 - **Master analysis**: `strategy/FutureFeatures/todo/microsoft-foundry-evals-agent-eval-design.md`
 - [GDPR Compliance Benchmark](../gdpr/getting-started.md) — the original reference benchmark whose pattern the agentic benchmark mirrors.
 - [EU AI Act Compliance Benchmark](../eu-ai-act/getting-started.md) — the second reference benchmark.
-- [Composite Evaluations](../composite-evals.md) — the underlying `CompositeEval` / `AtomicLlmEval` / `AtomicCodeEval` primitives.
-- [CLI Reference](../cli.md) — full reference for `agenteval bench agentic` and `agenteval bench agentic calibrate`.
+- [Composite Evaluations](../../composite-evals.md) — the underlying `CompositeEval` / `AtomicLlmEval` / `AtomicCodeEval` primitives.
+- [CLI Reference](../../cli.md) — full reference for `agenteval bench agentic` and `agenteval bench agentic calibrate`.
 
 > **Reminder**: this benchmark is a behavioral evaluation tool, not a compliance attestation, certification, or production-readiness guarantee. A passing score does not substitute for human review, monitoring, penetration testing, or domain-specific validation. Consult qualified domain and legal personnel before making any quality or compliance representations.

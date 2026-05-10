@@ -308,6 +308,30 @@ dotnet run --project samples/AgentEval.Samples
 
 ---
 
+## Mission Control + Compliance Benchmarks
+
+Mission Control is the read-only web portal over your `.agenteval/` workspace —
+GraphQL, REST, and SPA on one port. Three Phase-1 benchmarks ship alongside:
+the **Agentic Benchmark** (60 evaluators, 11 presets), the **EU AI Act
+Benchmark** (6 pillars, 13 controls), and the **GDPR Benchmark** (5 pillars, 16
+articles + 3 domain packs). All three produce audit-chained evidence under
+`.agenteval/compliance/`.
+
+```bash
+agenteval init                       # one-time workspace bootstrap
+agenteval bench agentic   --preset agentic-execution --subject MyAgent
+agenteval bench eu-ai-act --preset standard          --subject MyAgent
+agenteval bench gdpr      --preset standard          --subject MyAgent
+agenteval mc serve                   # browse runs + evidence at http://localhost:5000
+```
+
+[Mission Control →](missioncontrol/getting-started.md) ·
+[Agentic →](benchmarks/agentic/getting-started.md) ·
+[EU AI Act →](benchmarks/eu-ai-act/getting-started.md) ·
+[GDPR →](benchmarks/gdpr/getting-started.md)
+
+---
+
 ## Documentation
 
 | Getting Started | Features | Advanced |
@@ -317,10 +341,11 @@ dotnet run --project samples/AgentEval.Samples
 |  | [Responsible AI](ResponsibleAI.md) | [Trace Record/Replay](tracing.md) |
 | [Walkthrough](walkthrough.md) | [Memory Evaluation](memory-evaluation.md) | [Architecture](architecture.md) |
 |  | [Metrics Reference](metrics-reference.md) | [Upgrading MAF](maf-1.3.0-migration-guide.md) |
-|  | [Benchmarks](benchmarks.md) |  |
-|  | [Workflows](workflows.md) |  |
-|  | [GDPR Benchmark](benchmarks/gdpr/getting-started.md) |  |
+|  | [Benchmarks](benchmarks.md) | [Composite Evaluations](composite-evals.md) |
+|  | [Workflows](workflows.md) | [The .agenteval Workspace](agenteval-workspace.md) |
+|  | [GDPR Benchmark](benchmarks/gdpr/getting-started.md) | [Mission Control](missioncontrol/getting-started.md) |
 |  | [EU AI Act Benchmark](benchmarks/eu-ai-act/getting-started.md) |  |
+|  | [Agentic Benchmark](benchmarks/agentic/getting-started.md) |  |
 
 ---
 
