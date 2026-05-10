@@ -42,11 +42,13 @@ builder.Services.AddScoped<ComplianceMatrixService>();
 builder.Services
     .AddGraphQLServer()
     .AddQueryType<Query>()
-    // Plan-07 §8.1 + plan-08 MC1.4.6: cap recursion at depth 8. The recursive
-    // EvalResult tree (composite → composite → atom) is typically 2-4 levels
-    // deep in production; depth 8 leaves headroom for legitimate queries while
-    // rejecting attack queries that try to fan out unbounded subtrees.
-    .AddMaxExecutionDepthRule(8, skipIntrospectionFields: true)
+    // Plan-07 §8.1 + plan-08 MC1.4.6: cap recursion at depth 10. Each
+    // composite-tree level costs 2 query depth (one each for `subResults` and
+    // its inner `details`), so the SPA's 3-level drill-down (root → pillar →
+    // article → judges) needs depth 9. Depth 10 leaves a unit of headroom
+    // while still rejecting attack queries that try to fan out unbounded
+    // subtrees (the 12-level deep-query test asserts ~24 depth is rejected).
+    .AddMaxExecutionDepthRule(10, skipIntrospectionFields: true)
     .ModifyRequestOptions(opts => opts.ExecutionTimeout = TimeSpan.FromSeconds(30));
 
 var app = builder.Build();

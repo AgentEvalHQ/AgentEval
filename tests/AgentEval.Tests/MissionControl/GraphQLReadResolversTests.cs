@@ -497,8 +497,9 @@ public class GraphQLReadResolversTests : IClassFixture<SeededMissionControlFacto
     public async Task GraphQL_DepthLimit_RejectsExcessivelyDeepRecursiveQuery()
     {
         // Now that we have the recursive EvalResult schema, we can write a meaningful
-        // depth-limit test. MaxAllowedExecutionDepth=8; this query goes 12 levels deep
-        // through subResults. Should be rejected with `errors`.
+        // depth-limit test. MaxAllowedExecutionDepth=10 (raised from 8 in Wave 8 to
+        // accommodate the SPA's 3-level subResults drill-down at depth 9); this query
+        // goes 12 levels deep through subResults. Should be rejected with `errors`.
         using var client = _factory.CreateClient();
         var listResp = await client.PostAsJsonAsync("/graphql",
             new { query = "{ recentRuns(count: 1) { runId } }" });

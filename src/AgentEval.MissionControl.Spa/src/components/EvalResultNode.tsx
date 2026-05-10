@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { ChevronDown, ChevronRight, Sigma } from "lucide-react";
 import {
   type EvalResultNodeShape,
@@ -20,9 +20,9 @@ import { formatScore, formatCost } from "@/lib/format";
 //   - <AdjudicationFlow/> when the node is multi-judge or adjudicated
 //   - recursive sub-nodes (collapsible) for the rest of the tree
 //
-// Truncation: the GraphQL query in <ScenarioTreePage/> nests 4 levels deep
-// (Hot Chocolate's depth=8 cap). When a node has subResults but the query
-// didn't fetch them, we surface "subtree truncated — see JSON trace".
+// Atomic-leaf nodes (no sub-results, no dimensions, no recommendations, no
+// extended meta) skip the collapse mechanism entirely so the header isn't
+// a misleading no-op control.
 
 interface Props {
   node: EvalResultNodeShape;
@@ -58,6 +58,19 @@ export function EvalResultNode({
 
   const dims = dimensionsToRecord(node.details.dimensions);
   const dimEntries = Object.entries(dims);
+  const hasRecommendations =
+    (node.details.recommendations?.length ?? 0) > 0;
+  const hasExtendedMeta =
+    node.score.threshold !== null ||
+    node.score.confidence !== null ||
+    !!node.details.aggregationStrategy ||
+    !!node.provenance.judgeModel ||
+    node.provenance.estimatedCost > 0;
+  // Headers act as a disclosure widget only when there is a body to disclose.
+  // Pure leaves (atomic-code evals with no dimensions, no recommendations, no
+  // sub-results, and no extended meta) render a static row instead.
+  const collapsible =
+    hasSubResults || dimEntries.length > 0 || hasRecommendations || hasExtendedMeta;
 
   return (
     <div
@@ -65,11 +78,13 @@ export function EvalResultNode({
         depth > 0 ? "ml-3" : ""
       }`}
     >
-      <header className="flex items-center justify-between gap-3 px-3 py-2 cursor-pointer hover:bg-white/30"
-        onClick={() => setOpen((o) => !o)}
+      <Header
+        collapsible={collapsible}
+        open={open}
+        onToggle={() => setOpen((o) => !o)}
       >
         <div className="flex items-center gap-2 min-w-0 flex-1">
-          {hasSubResults || dimEntries.length > 0 ? (
+          {collapsible ? (
             open ? (
               <ChevronDown size={14} className="shrink-0 text-slate-600" />
             ) : (
@@ -91,9 +106,9 @@ export function EvalResultNode({
           </span>
           <VerdictBadge verdict={labelToVerdict(node.score.label)} size="sm" />
         </div>
-      </header>
+      </Header>
 
-      {open && (
+      {collapsible && open && (
         <div className="px-3 pb-3 pt-0 space-y-3 bg-white/40 rounded-b-lg">
           <div className="flex items-center gap-2 text-xs text-slate-600 flex-wrap">
             {node.score.threshold !== null && (
@@ -159,6 +174,40 @@ export function EvalResultNode({
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+function Header({
+  collapsible,
+  open,
+  onToggle,
+  children,
+}: {
+  collapsible: boolean;
+  open: boolean;
+  onToggle: () => void;
+  children: ReactNode;
+}) {
+  // When collapsible we render a `<button>` so the disclosure widget is
+  // focusable + keyboard-activatable (Enter / Space) and announces "expanded
+  // / collapsed" to assistive tech via aria-expanded. Static leaves get a
+  // plain div so they don't appear in the keyboard tab order as no-ops.
+  if (collapsible) {
+    return (
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={open}
+        className="w-full flex items-center justify-between gap-3 px-3 py-2 hover:bg-white/30 text-left rounded-t-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-500"
+      >
+        {children}
+      </button>
+    );
+  }
+  return (
+    <div className="flex items-center justify-between gap-3 px-3 py-2">
+      {children}
     </div>
   );
 }

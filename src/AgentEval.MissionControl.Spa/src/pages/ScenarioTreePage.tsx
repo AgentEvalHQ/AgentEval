@@ -12,9 +12,12 @@ import { formatDateTime, formatScore, formatCost } from "@/lib/format";
 // Plan-08 Wave 8 (MC1.6.9): drill-down view of a single scenario's recursive
 // EvalResult tree, fetched via Query.scenarioTree (MC1.4.6).
 //
-// Hot Chocolate's MaxAllowedExecutionDepth = 8 caps the query at four
-// `details { subResults { ... } }` nestings — sufficient for typical
-// composite trees (composite root → pillar → article → judges, ~4 levels).
+// Hot Chocolate's MaxAllowedExecutionDepth = 10 (Program.cs) accommodates
+// three nested `details { subResults { ... } }` levels — depth 9 — which
+// covers the typical composite tree shape (root → pillar → article →
+// judges, where the L3 article composite uses an `AdjudicatedMultiJudgeWrapper`
+// whose panel judges are part of L3's own `subResults` and are rendered
+// inline by `<AdjudicationFlow/>` without requiring a deeper query).
 
 interface ScenarioTreeResponse {
   scenarioTree: EvalResultNodeShape | null;
@@ -69,6 +72,9 @@ const SCENARIO_TREE_QUERY = /* GraphQL */ `
     }
   }
 `;
+// Three nested `subResults` produce execution depth 9 (within the depth=10
+// cap). For unusually deep trees (>4 levels), the trace JSON link remains
+// authoritative.
 
 export function ScenarioTreePage() {
   const { runId: runIdParam, scenarioId: scenarioIdParam } = useParams<{
@@ -149,10 +155,10 @@ export function ScenarioTreePage() {
                 </section>
 
                 <p className="text-xs text-slate-500">
-                  Tip: nodes with severity ≥ medium and the root are expanded
-                  by default; click any header to collapse / expand.
-                  Multi-judge and adjudicated nodes render an inline panel
-                  showing each judge's verdict.
+                  Tip: the root and any non-passing node are expanded by
+                  default; click any header to collapse / expand. Multi-judge
+                  and adjudicated nodes render an inline panel showing each
+                  judge's verdict.
                 </p>
               </>
             )}

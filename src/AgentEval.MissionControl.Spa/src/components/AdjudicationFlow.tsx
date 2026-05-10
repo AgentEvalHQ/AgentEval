@@ -42,6 +42,10 @@ export function AdjudicationFlow({ node }: Props) {
   const agreement = dims["agreement"];
   const disputed = dims["disputed"] === 1;
 
+  // Contract: when AdjudicatedMultiJudgeWrapper triggers adjudication, it
+  // appends the adjudicator's result as the FINAL element of subResults
+  // (see AdjudicatedMultiJudgeWrapper.cs:147 — `[...panelResults,
+  // adjudicatorResult]`). Slicing -1 isolates panel judges from adjudicator.
   const panelJudges = adjudicated && disputed ? subs.slice(0, -1) : subs;
   const adjudicator = adjudicated && disputed ? subs[subs.length - 1] : null;
 
