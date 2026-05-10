@@ -47,9 +47,11 @@ export function AppShell() {
   const wsQ = useQuery({
     queryKey: queryKeys.workspace.state(),
     queryFn: () => gqlRequest<WorkspaceStateResponse>(WORKSPACE_STATE_QUERY),
-    // Cache for the session — workspace state only changes on a fresh
-    // `agenteval init`, after which the user manually refreshes.
-    staleTime: Infinity,
+    // 30 s staleTime + refetch on window focus: cheap mitigation for the
+    // common "ran agenteval init in another terminal, came back to MC tab"
+    // flow. Pure refresh-only would force users to hard-reload the page.
+    staleTime: 30_000,
+    refetchOnWindowFocus: true,
   });
 
   // While the probe is in flight, render the shell with the normal outlet
@@ -106,13 +108,21 @@ function Sidebar({ disabled = false }: { disabled?: boolean }) {
         {navItems.map((item) => (
           <li key={item.to}>
             {disabled ? (
-              <span
-                className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-slate-400 cursor-not-allowed"
+              // Render the same anchor shape but mark it disabled to assistive
+              // tech. `aria-disabled` + `tabIndex={-1}` keeps screen-reader
+              // semantics ("link, dimmed, disabled") instead of a decorative
+              // span; `pointer-events-none` blocks the click without removing
+              // the focusable role.
+              <a
+                role="link"
+                aria-disabled="true"
+                tabIndex={-1}
                 title="Initialise the workspace first"
+                className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-slate-400 cursor-not-allowed pointer-events-none"
               >
                 <item.icon size={16} />
                 {item.label}
-              </span>
+              </a>
             ) : (
               <NavLink
                 to={item.to}

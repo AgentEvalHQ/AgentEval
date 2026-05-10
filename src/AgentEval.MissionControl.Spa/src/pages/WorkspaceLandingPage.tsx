@@ -19,9 +19,9 @@ export function WorkspaceLandingPage({ root, agentEvalVersion }: Props) {
         <div className="inline-flex items-center justify-center size-14 rounded-full bg-accent-50 text-accent-700">
           <Sparkles size={28} />
         </div>
-        <h1 className="text-3xl font-bold text-slate-900">
+        <h2 className="text-3xl font-bold text-slate-900">
           Welcome to Mission Control
-        </h1>
+        </h2>
         <p className="text-base text-slate-600">
           This workspace hasn't been initialised yet. Run{" "}
           <code className="font-mono bg-slate-100 px-1.5 py-0.5 rounded text-slate-800">
@@ -32,10 +32,10 @@ export function WorkspaceLandingPage({ root, agentEvalVersion }: Props) {
       </header>
 
       <section className="rounded-lg border border-slate-200 bg-white p-5 space-y-4">
-        <h2 className="text-sm font-semibold text-slate-700 flex items-center gap-2">
+        <h3 className="text-sm font-semibold text-slate-700 flex items-center gap-2">
           <Terminal size={14} />
           Get started in three commands
-        </h2>
+        </h3>
         <ol className="space-y-3 text-sm">
           <Step
             n={1}
@@ -78,7 +78,7 @@ export function WorkspaceLandingPage({ root, agentEvalVersion }: Props) {
       )}
 
       <section className="rounded-lg border border-slate-200 bg-white p-5 space-y-2">
-        <h2 className="text-sm font-semibold text-slate-700">Learn more</h2>
+        <h3 className="text-sm font-semibold text-slate-700">Learn more</h3>
         <ul className="space-y-1.5 text-sm">
           <li>
             <a
@@ -137,7 +137,7 @@ function Step({
         {n}
       </span>
       <div className="flex-1">
-        <h3 className="text-sm font-medium text-slate-900">{title}</h3>
+        <h4 className="text-sm font-medium text-slate-900">{title}</h4>
         {command && (
           <pre className="mt-1.5 px-3 py-2 rounded bg-slate-900 text-slate-100 text-xs font-mono overflow-x-auto">
             {command}

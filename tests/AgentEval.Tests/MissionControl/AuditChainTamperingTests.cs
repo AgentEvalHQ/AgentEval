@@ -333,4 +333,95 @@ public class AuditChainTamperingTests
     }
 }
 
+/// <summary>
+/// Locks down the MC1.10.1 first-run landing contract: <c>Query.workspace</c>
+/// reports <c>initialized: false</c> when the store is unavailable AND when
+/// the store is available but no <c>solution.json</c> exists. The seeded
+/// fixture covers <c>initialized: true</c> in <c>GraphQLReadResolversTests</c>;
+/// this class covers the negative branches the resolver's try/catch was
+/// added for.
+/// </summary>
+public class WorkspaceStateUninitialisedTests
+{
+    [Fact]
+    public async Task Workspace_StoreUnavailable_ReportsInitializedFalse()
+    {
+        var reader = new UnavailableReader();
+        var ws = await new AgentEval.MissionControl.GraphQL.Query().Workspace(reader, CancellationToken.None);
+
+        Assert.False(ws.Initialized);
+        Assert.Null(ws.Solution);
+        Assert.False(string.IsNullOrEmpty(ws.AgentEvalVersion));
+    }
+
+    [Fact]
+    public async Task Workspace_AvailableButNoSolution_ReportsInitializedFalse()
+    {
+        // Folder-exists-but-uninitialised path: IsAvailable=true,
+        // EnsureSolutionAsync throws InvalidOperationException ("no solution.json").
+        var reader = new ThrowingSolutionReader();
+        var ws = await new AgentEval.MissionControl.GraphQL.Query().Workspace(reader, CancellationToken.None);
+
+        Assert.False(ws.Initialized);
+        Assert.Null(ws.Solution);
+        Assert.Equal("/some-root", ws.Root);
+    }
+
+    private sealed class UnavailableReader : IOutputStoreReader
+    {
+        public bool IsAvailable => false;
+        public string? WorkspaceRoot => null;
+        public Task<SolutionInfo> EnsureSolutionAsync(CancellationToken ct = default) =>
+            throw new InvalidOperationException("not initialised");
+        public IAsyncEnumerable<SubjectInfo> ListSubjectsAsync(SubjectKind? kind = null, CancellationToken ct = default) => EmptyAsync<SubjectInfo>();
+        public Task<RunManifest?> GetRunManifestAsync(string runId, CancellationToken ct = default) => Task.FromResult<RunManifest?>(null);
+        public Task<RunSummary?> GetRunSummaryAsync(string runId, CancellationToken ct = default) => Task.FromResult<RunSummary?>(null);
+        public IAsyncEnumerable<ScenarioResult> GetScenarioResultsAsync(string runId, CancellationToken ct = default) => EmptyAsync<ScenarioResult>();
+        public Task<AgentTrace?> GetTraceAsync(string runId, CancellationToken ct = default) => Task.FromResult<AgentTrace?>(null);
+        public IAsyncEnumerable<RunManifest> ListRunsAsync(SubjectIdentity subject, CancellationToken ct = default) => EmptyAsync<RunManifest>();
+        public IAsyncEnumerable<RunPointer> GetRecentRunsAsync(int count = 50, CancellationToken ct = default) => EmptyAsync<RunPointer>();
+        public Task<RunSummary?> LoadBaselineAsync(SubjectIdentity subject, CancellationToken ct = default) => Task.FromResult<RunSummary?>(null);
+        public Task<BaselineComparison> CompareToBaselineAsync(string runId, CancellationToken ct = default) =>
+            throw new NotImplementedException();
+        public IAsyncEnumerable<HistoryEntry> GetHistoryAsync(SubjectIdentity subject, DateRange? range = null, CancellationToken ct = default) => EmptyAsync<HistoryEntry>();
+        public IAsyncEnumerable<ComplianceEvidencePointer> ListComplianceEvidenceAsync(string? regulation = null, SubjectIdentity? subject = null, CancellationToken ct = default) => EmptyAsync<ComplianceEvidencePointer>();
+        public Task<ComplianceEvidence?> GetComplianceEvidenceAsync(string regulation, SubjectIdentity subject, string timestamp, CancellationToken ct = default) => Task.FromResult<ComplianceEvidence?>(null);
+
+        private static async IAsyncEnumerable<T> EmptyAsync<T>(
+            [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
+        {
+            await Task.CompletedTask;
+            yield break;
+        }
+    }
+
+    private sealed class ThrowingSolutionReader : IOutputStoreReader
+    {
+        public bool IsAvailable => true;
+        public string? WorkspaceRoot => "/some-root";
+        public Task<SolutionInfo> EnsureSolutionAsync(CancellationToken ct = default) =>
+            throw new InvalidOperationException("solution.json not found at /some-root");
+        public IAsyncEnumerable<SubjectInfo> ListSubjectsAsync(SubjectKind? kind = null, CancellationToken ct = default) => EmptyAsync<SubjectInfo>();
+        public Task<RunManifest?> GetRunManifestAsync(string runId, CancellationToken ct = default) => Task.FromResult<RunManifest?>(null);
+        public Task<RunSummary?> GetRunSummaryAsync(string runId, CancellationToken ct = default) => Task.FromResult<RunSummary?>(null);
+        public IAsyncEnumerable<ScenarioResult> GetScenarioResultsAsync(string runId, CancellationToken ct = default) => EmptyAsync<ScenarioResult>();
+        public Task<AgentTrace?> GetTraceAsync(string runId, CancellationToken ct = default) => Task.FromResult<AgentTrace?>(null);
+        public IAsyncEnumerable<RunManifest> ListRunsAsync(SubjectIdentity subject, CancellationToken ct = default) => EmptyAsync<RunManifest>();
+        public IAsyncEnumerable<RunPointer> GetRecentRunsAsync(int count = 50, CancellationToken ct = default) => EmptyAsync<RunPointer>();
+        public Task<RunSummary?> LoadBaselineAsync(SubjectIdentity subject, CancellationToken ct = default) => Task.FromResult<RunSummary?>(null);
+        public Task<BaselineComparison> CompareToBaselineAsync(string runId, CancellationToken ct = default) =>
+            throw new NotImplementedException();
+        public IAsyncEnumerable<HistoryEntry> GetHistoryAsync(SubjectIdentity subject, DateRange? range = null, CancellationToken ct = default) => EmptyAsync<HistoryEntry>();
+        public IAsyncEnumerable<ComplianceEvidencePointer> ListComplianceEvidenceAsync(string? regulation = null, SubjectIdentity? subject = null, CancellationToken ct = default) => EmptyAsync<ComplianceEvidencePointer>();
+        public Task<ComplianceEvidence?> GetComplianceEvidenceAsync(string regulation, SubjectIdentity subject, string timestamp, CancellationToken ct = default) => Task.FromResult<ComplianceEvidence?>(null);
+
+        private static async IAsyncEnumerable<T> EmptyAsync<T>(
+            [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
+        {
+            await Task.CompletedTask;
+            yield break;
+        }
+    }
+}
+
 #endif
