@@ -1,4 +1,4 @@
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft, ShieldAlert, ShieldCheck } from "lucide-react";
 import { gqlRequest } from "@/lib/graphql-client";
@@ -47,6 +47,7 @@ const MATRIX_QUERY = /* GraphQL */ `
 `;
 
 export function ComplianceMatrixPage() {
+  const navigate = useNavigate();
   const { regulation: regulationParam } = useParams<{ regulation: string }>();
   const regulation = regulationParam ? decodeURIComponent(regulationParam) : "";
 
@@ -112,11 +113,26 @@ export function ComplianceMatrixPage() {
                 subjects={m.subjects}
                 controls={m.controls}
                 cells={m.cells}
-                onCellClick={(subjectName, controlId) => {
-                  // eslint-disable-next-line no-console
-                  console.log("Cell clicked:", { subjectName, controlId });
-                  // TODO Wave 4 follow-up: drill-through to a per-cell detail
-                  // showing the EvidenceControl + its source-run audit-chain.
+                onCellClick={(subjectName, _controlId) => {
+                  // Drill into the most recent evidence for this subject under
+                  // this regulation. Plan-08 Wave 7 (MC1.6.8): the cell click
+                  // maps to the latest evidence's timestamp, which we look up
+                  // from the matrix's own cell metadata.
+                  const cell = m.cells.find((c) => c.subjectName === subjectName);
+                  if (!cell) return;
+                  const subject = m.subjects.find((s) => s.name === subjectName);
+                  if (!subject) return;
+                  // The on-disk timestamp format mirrors what FileSystemOutputStore
+                  // writes ("yyyy-MM-dd_HH-mm-ss"). The matrix's lastEvidenceAt is
+                  // an ISO string; we re-format for the route param.
+                  const tsForUrl = new Date(cell.lastEvidenceAt)
+                    .toISOString()
+                    .replace(/\.\d+Z$/, "Z")
+                    .replace(/T/, "_")
+                    .replace(/:/g, "-")
+                    .replace(/Z$/, "");
+                  const path = `/compliance/${encodeURIComponent(regulation)}/${subject.kind.toLowerCase()}/${encodeURIComponent(subjectName)}/${encodeURIComponent(tsForUrl)}`;
+                  navigate(path);
                 }}
               />
             </section>

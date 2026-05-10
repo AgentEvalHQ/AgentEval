@@ -6,6 +6,7 @@ import { RunsListPage } from "@/pages/RunsListPage";
 import { RunDetailPage } from "@/pages/RunDetailPage";
 import { ComplianceListPage } from "@/pages/ComplianceListPage";
 import { ComplianceMatrixPage } from "@/pages/ComplianceMatrixPage";
+import { EvidenceDetailPage } from "@/pages/EvidenceDetailPage";
 import { EvaluatorsPage } from "@/pages/EvaluatorsPage";
 import { EvaluatorDetailPage } from "@/pages/EvaluatorDetailPage";
 import { NotFoundPage } from "@/pages/NotFoundPage";
@@ -24,6 +25,10 @@ export function App() {
         <Route path="runs/:runId" element={<RunDetailPage />} />
         <Route path="compliance" element={<ComplianceListPage />} />
         <Route path="compliance/:regulation" element={<ComplianceMatrixPage />} />
+        <Route
+          path="compliance/:regulation/:kind/:name/:ts"
+          element={<EvidenceDetailPage />}
+        />
         <Route path="evaluators" element={<EvaluatorsPage />} />
         <Route path="evaluators/:key" element={<EvaluatorDetailPage />} />
         <Route path="*" element={<NotFoundPage />} />
