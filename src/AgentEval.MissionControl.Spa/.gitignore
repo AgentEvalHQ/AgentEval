@@ -1,0 +1,15 @@
+# Build artefacts
+node_modules/
+dist/
+*.tsbuildinfo
+
+# Generated GraphQL types — re-generated via `npm run codegen`
+src/__generated__/
+
+# Editor
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db

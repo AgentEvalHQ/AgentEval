@@ -1,0 +1,40 @@
+// Plan-08 MC1.6.3: small REST client for binary endpoints.
+//
+// REST surface (per plan-07 §8.2): trace JSON, reports (markdown/html/junit/sarif),
+// compliance PDFs, history NDJSON, /api/v1/version. GraphQL handles the rest.
+//
+// We use the native `fetch` with an auto-prefixed base URL — no 3rd-party
+// dependency. Vite proxies /api/v1 to the dotnet backend in dev; same-origin
+// in production.
+
+const REST_BASE = "/api/v1";
+
+export interface VersionInfo {
+  mode: string;
+  agentEvalVersion: string;
+  graphqlEndpoint: string;
+}
+
+export async function fetchVersion(): Promise<VersionInfo> {
+  const response = await fetch(`${REST_BASE}/version`);
+  if (!response.ok) {
+    throw new Error(`/api/v1/version returned ${response.status}`);
+  }
+  return (await response.json()) as VersionInfo;
+}
+
+/**
+ * URL builder for REST routes. Components that render binary content (PDF
+ * viewer, image embeds) take a URL string and let the browser fetch directly.
+ */
+export const restUrls = {
+  trace: (runId: string) => `${REST_BASE}/runs/${encodeURIComponent(runId)}/trace`,
+  report: (runId: string, format: string) =>
+    `${REST_BASE}/runs/${encodeURIComponent(runId)}/reports/${format}`,
+  compliancePdf: (regulation: string, subjectName: string, ts: string) =>
+    `${REST_BASE}/compliance/${encodeURIComponent(regulation)}/${encodeURIComponent(subjectName)}/${encodeURIComponent(ts)}/report.pdf`,
+  complianceSchema: (regulation: string) =>
+    `${REST_BASE}/compliance/${encodeURIComponent(regulation)}/schema`,
+  history: (kind: string, name: string) =>
+    `${REST_BASE}/subjects/${encodeURIComponent(kind)}/${encodeURIComponent(name)}/history`,
+};

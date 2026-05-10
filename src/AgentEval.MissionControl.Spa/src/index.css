@@ -1,0 +1,14 @@
+/* Plan-08 MC1.6.2: Tailwind 4 entry point.
+ * The new directive replaces the v3 @tailwind base/components/utilities triplet. */
+@import "tailwindcss";
+
+@layer base {
+  body {
+    font-family: "Inter", system-ui, sans-serif;
+  }
+
+  code,
+  pre {
+    font-family: "JetBrains Mono", monospace;
+  }
+}
