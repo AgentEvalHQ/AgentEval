@@ -33,6 +33,7 @@ internal static class BinaryEndpoints
             IOutputStoreReader store,
             CancellationToken ct) =>
         {
+            if (!FileSystemLayout.IsSafePathSegment(runId)) return Results.BadRequest("Invalid runId.");
             if (!store.IsAvailable) return Results.NotFound();
             var trace = await store.GetTraceAsync(runId, ct);
             if (trace is null) return Results.NotFound();
@@ -51,6 +52,11 @@ internal static class BinaryEndpoints
             IOutputStoreReader store,
             CancellationToken ct) =>
         {
+            if (!FileSystemLayout.IsSafePathSegment(runId)) return Results.BadRequest("Invalid runId.");
+            // `format` is also a path segment (`report.{format}`) — a `..`-laced
+            // value would escape the reports dir even though IsAllowedReportFormat
+            // already rejects it. Defence-in-depth.
+            if (!FileSystemLayout.IsSafePathSegment(format)) return Results.BadRequest("Invalid format.");
             if (!IsAllowedReportFormat(format))
                 return Results.BadRequest($"Unsupported report format '{format}'. Allowed: markdown, html, junit, sarif.");
 
@@ -80,6 +86,9 @@ internal static class BinaryEndpoints
             IOutputStoreReader store,
             CancellationToken ct) =>
         {
+            if (!FileSystemLayout.IsSafePathSegment(regulation)) return Results.BadRequest("Invalid regulation.");
+            if (!FileSystemLayout.IsSafePathSegment(subjectName)) return Results.BadRequest("Invalid subjectName.");
+            if (!FileSystemLayout.IsSafePathSegment(ts)) return Results.BadRequest("Invalid timestamp.");
             if (string.IsNullOrEmpty(store.WorkspaceRoot)) return Results.NotFound();
 
             // Compliance evidence on disk is keyed by subject NAME only — the kind
@@ -103,6 +112,7 @@ internal static class BinaryEndpoints
         // discovery path is wired up.
         app.MapGet("/api/v1/compliance/{regulation}/schema", (string regulation, CancellationToken ct) =>
         {
+            if (!FileSystemLayout.IsSafePathSegment(regulation)) return Results.BadRequest("Invalid regulation.");
             // Discover the embedded schema in DataLoaders.
             var asm = typeof(FileSystemLayout).Assembly;
             var resourceName = asm.GetManifestResourceNames()
@@ -128,6 +138,12 @@ internal static class BinaryEndpoints
             {
                 httpContext.Response.StatusCode = StatusCodes.Status400BadRequest;
                 await httpContext.Response.WriteAsync($"Unknown subject kind '{kind}'.", ct);
+                return;
+            }
+            if (!FileSystemLayout.IsSafePathSegment(name))
+            {
+                httpContext.Response.StatusCode = StatusCodes.Status400BadRequest;
+                await httpContext.Response.WriteAsync("Invalid subject name.", ct);
                 return;
             }
             if (!store.IsAvailable)

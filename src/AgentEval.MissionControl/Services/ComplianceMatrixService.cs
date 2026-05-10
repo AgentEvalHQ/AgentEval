@@ -75,6 +75,11 @@ public sealed class ComplianceMatrixService
     {
         if (!_store.IsAvailable)
             return EmptyMatrix(regulation);
+        // Untrusted segment — flows into FileSystemLayout.ComplianceDir.
+        // Reject anything that could escape the workspace; return an empty
+        // matrix instead so the SPA renders a graceful "no evidence" state.
+        if (!FileSystemLayout.IsSafePathSegment(regulation))
+            return EmptyMatrix(regulation);
 
         // Step 1 — collect all evidence pointers for the regulation.
         var pointers = new List<ComplianceEvidencePointer>();

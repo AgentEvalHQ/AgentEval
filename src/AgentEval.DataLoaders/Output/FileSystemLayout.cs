@@ -88,4 +88,43 @@ public sealed class FileSystemLayout
         var s = string.Concat(name.Select(c => invalid.Contains(c) ? '-' : c));
         return s.Trim('.', ' ');
     }
+
+    /// <summary>
+    /// Strictly validates a user-supplied URL route or GraphQL argument that is
+    /// about to be concatenated into a filesystem path (e.g. <c>runId</c>,
+    /// <c>regulation</c>, <c>timestamp</c>, <c>format</c>). Returns <c>true</c>
+    /// only when the segment is safe — non-empty, no directory separators, no
+    /// <c>..</c> traversal markers, no control characters, no platform-invalid
+    /// filename characters.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Unlike <see cref="Sanitize"/> which silently <em>rewrites</em> a
+    /// user-friendly subject name into a safe filename (lossy), this helper is
+    /// strict: it returns <c>false</c> rather than scrub the input. Callers
+    /// (Mission Control's REST + GraphQL endpoints) MUST validate untrusted
+    /// route segments with this helper before they reach <c>Path.Combine</c>.
+    /// Failing to do so opens a directory-traversal attack surface — e.g.
+    /// <c>GET /api/v1/runs/..%2F..%2Fetc%2Fpasswd/trace</c>.
+    /// </para>
+    /// <para>
+    /// Trust boundary at v1 is "single user, local Mode A" so impact is bounded,
+    /// but this becomes a CVE-class hazard the moment Mission Control runs in
+    /// Mode B (multi-tenant workspace aggregator) — fix it once, here.
+    /// </para>
+    /// </remarks>
+    public static bool IsSafePathSegment(string? segment)
+    {
+        if (string.IsNullOrWhiteSpace(segment)) return false;
+        if (segment is "." or "..") return false;
+        if (segment.Contains("..", StringComparison.Ordinal)) return false;
+        if (segment.Contains('/') || segment.Contains('\\')) return false;
+        var invalid = Path.GetInvalidFileNameChars();
+        foreach (var c in segment)
+        {
+            if (Array.IndexOf(invalid, c) >= 0) return false;
+            if (char.IsControl(c)) return false;
+        }
+        return true;
+    }
 }

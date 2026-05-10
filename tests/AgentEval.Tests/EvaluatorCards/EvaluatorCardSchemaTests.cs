@@ -157,6 +157,49 @@ public class EvaluatorCardSchemaTests
     }
 
     [Fact]
+    public void EveryRegisteredCostMapKey_HasAShippedCard()
+    {
+        // Inverse-direction lockdown: catches the case where someone registers
+        // an evaluator in EvaluatorCostMap but forgets to author a card. The
+        // SPA's evaluator-registry page would then silently omit a budget-
+        // tier-eligible evaluator.
+        //
+        // Reflective lookup of the cost map's `_tiers` private field via a
+        // snapshot through GetTier won't tell us the registered key set —
+        // we need IsRegistered + a known evaluator-key list. The cleanest
+        // path is to enumerate the cost-map source via reflection over
+        // EvaluatorCostMap's internal dictionary, but that requires access
+        // we don't expose. Instead we hardcode the known cost-map keys
+        // here; if EvaluatorCostMap grows, this test surfaces the gap.
+        var cards = LoadAllShippedCards();
+        var cardKeys = cards
+            .Select(c => JsonSerializer.Deserialize<EvaluatorCard>(c.Json, JsonOpts)!.Key)
+            .ToHashSet(StringComparer.Ordinal);
+
+        // Pull every key registered in the cost map by reflecting over the
+        // (internal) dictionary backing EvaluatorCostMap.IsRegistered. This
+        // makes the test self-updating as new evaluators land.
+        var costMapType = typeof(EvaluatorCostMap);
+        var tiersField = costMapType.GetField("s_tiers",
+            BindingFlags.NonPublic | BindingFlags.Static);
+        Assert.NotNull(tiersField);
+        var tiers = (System.Collections.IDictionary)tiersField!.GetValue(null)!;
+
+        var missingCards = new List<string>();
+        foreach (var key in tiers.Keys)
+        {
+            var k = (string)key!;
+            if (!cardKeys.Contains(k))
+                missingCards.Add(k);
+        }
+
+        Assert.True(
+            missingCards.Count == 0,
+            $"EvaluatorCostMap registers keys without an EvaluatorCard JSON file: {string.Join(", ", missingCards)}. " +
+            "Either author <key>.json under src/AgentEval.Evals.Agentic/EvaluatorCards/ or remove the key from EvaluatorCostMap.");
+    }
+
+    [Fact]
     public void NoDuplicateCardKeys()
     {
         var cards = LoadAllShippedCards();

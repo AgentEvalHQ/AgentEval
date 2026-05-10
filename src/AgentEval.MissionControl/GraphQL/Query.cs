@@ -118,6 +118,7 @@ public sealed class Query
         CancellationToken ct = default)
     {
         if (!store.IsAvailable) return null;
+        if (!FileSystemLayout.IsSafePathSegment(name)) return null;
         await foreach (var s in store.ListSubjectsAsync(kind, ct))
         {
             if (string.Equals(s.Identity.Name, name, StringComparison.Ordinal))
@@ -152,6 +153,7 @@ public sealed class Query
         CancellationToken ct = default)
     {
         if (!store.IsAvailable) return Task.FromResult<RunManifest?>(null);
+        if (!FileSystemLayout.IsSafePathSegment(runId)) return Task.FromResult<RunManifest?>(null);
         return store.GetRunManifestAsync(runId, ct);
     }
 
@@ -165,6 +167,7 @@ public sealed class Query
         CancellationToken ct = default)
     {
         if (!store.IsAvailable) return Task.FromResult<RunSummary?>(null);
+        if (!FileSystemLayout.IsSafePathSegment(runId)) return Task.FromResult<RunSummary?>(null);
         return store.GetRunSummaryAsync(runId, ct);
     }
 
@@ -180,6 +183,7 @@ public sealed class Query
         [EnumeratorCancellation] CancellationToken ct = default)
     {
         if (!store.IsAvailable) yield break;
+        if (!FileSystemLayout.IsSafePathSegment(runId)) yield break;
         await foreach (var s in store.GetScenarioResultsAsync(runId, ct))
         {
             yield return s;
@@ -196,6 +200,8 @@ public sealed class Query
         CancellationToken ct = default)
     {
         if (!store.IsAvailable) return null;
+        if (!FileSystemLayout.IsSafePathSegment(runId)) return null;
+        if (!FileSystemLayout.IsSafePathSegment(scenarioId)) return null;
         await foreach (var s in store.GetScenarioResultsAsync(runId, ct))
         {
             if (string.Equals(s.Id, scenarioId, StringComparison.Ordinal))
@@ -241,6 +247,9 @@ public sealed class Query
         CancellationToken ct = default)
     {
         if (!store.IsAvailable) return null;
+        if (!FileSystemLayout.IsSafePathSegment(regulation)) return null;
+        if (!FileSystemLayout.IsSafePathSegment(subjectName)) return null;
+        if (!FileSystemLayout.IsSafePathSegment(timestamp)) return null;
         var identity = new SubjectIdentity(subjectKind, subjectName);
         return await store.GetComplianceEvidenceAsync(regulation, identity, timestamp, ct);
     }
@@ -263,6 +272,7 @@ public sealed class Query
         CancellationToken ct = default)
     {
         if (!store.IsAvailable) return null;
+        if (!FileSystemLayout.IsSafePathSegment(runId)) return null;
 
         var manifest = await store.GetRunManifestAsync(runId, ct);
         if (manifest is null) return null;
@@ -362,6 +372,8 @@ public sealed class Query
         CancellationToken ct = default)
     {
         if (!store.IsAvailable) return null;
+        if (!FileSystemLayout.IsSafePathSegment(runId)) return null;
+        if (!FileSystemLayout.IsSafePathSegment(scenarioId)) return null;
         await foreach (var s in store.GetScenarioResultsAsync(runId, ct))
         {
             if (string.Equals(s.Id, scenarioId, StringComparison.Ordinal))

@@ -104,6 +104,104 @@ public class BinaryEndpointTests : IClassFixture<FilesystemSeededFactory>, IDisp
         var response = await client.GetAsync("/api/v1/compliance/gdpr/TravelAgent/2026-01-01_00-00-00/report.pdf");
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
+
+    // ─── Path-traversal hardening (post-Wave-8 Opus review) ──────────────────
+
+    [Theory]
+    [InlineData("/api/v1/runs/..%2F..%2Fetc%2Fpasswd/trace")]
+    [InlineData("/api/v1/runs/run.._dotdot/trace")]
+    [InlineData("/api/v1/runs/has%5Cbackslash/trace")]
+    [InlineData("/api/v1/runs/has%2Fslash/trace")]
+    public async Task Trace_PathTraversal_Returns400(string url)
+    {
+        using var client = _factory.CreateClient();
+        var response = await client.GetAsync(url);
+        // Some traversal patterns get normalized by Kestrel before reaching us
+        // (e.g. ..%2F.. → 404 because the route doesn't match) — the contract
+        // is "must NOT 200 with content from outside the workspace".
+        Assert.NotEqual(HttpStatusCode.OK, response.StatusCode);
+        Assert.True(
+            response.StatusCode == HttpStatusCode.BadRequest ||
+            response.StatusCode == HttpStatusCode.NotFound,
+            $"Expected 400 or 404 for {url}, got {(int)response.StatusCode}.");
+    }
+
+    [Theory]
+    [InlineData("/api/v1/runs/dummy/reports/..%2F..%2Fetc")]
+    [InlineData("/api/v1/runs/dummy/reports/has%2Fslash")]
+    public async Task Reports_PathTraversalInFormat_Returns400(string url)
+    {
+        using var client = _factory.CreateClient();
+        var response = await client.GetAsync(url);
+        Assert.NotEqual(HttpStatusCode.OK, response.StatusCode);
+        Assert.True(
+            response.StatusCode == HttpStatusCode.BadRequest ||
+            response.StatusCode == HttpStatusCode.NotFound,
+            $"Expected 400 or 404 for {url}, got {(int)response.StatusCode}.");
+    }
+
+    [Theory]
+    [InlineData("/api/v1/compliance/..%2F..%2Fetc/TravelAgent/2026-01-01_00-00-00/report.pdf")]
+    [InlineData("/api/v1/compliance/gdpr/TravelAgent/..%2F..%2Fetc/report.pdf")]
+    [InlineData("/api/v1/compliance/has%5Cbackslash/schema")]
+    public async Task Compliance_PathTraversal_Returns400(string url)
+    {
+        using var client = _factory.CreateClient();
+        var response = await client.GetAsync(url);
+        Assert.NotEqual(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task History_PathTraversalInName_Returns400()
+    {
+        using var client = _factory.CreateClient();
+        var response = await client.GetAsync("/api/v1/subjects/agent/..%2F..%2Fetc/history");
+        // Route binding may normalize before our handler sees it; either way
+        // we must not 200 with content.
+        Assert.NotEqual(HttpStatusCode.OK, response.StatusCode);
+    }
+}
+
+public class FileSystemLayoutPathSafetyTests
+{
+    // Direct unit tests of the strict validator. Kestrel may normalize URLs
+    // before they reach handlers — this nails down the validator independently.
+
+    [Theory]
+    [InlineData("..")]
+    [InlineData(".")]
+    [InlineData("../etc")]
+    [InlineData("foo/bar")]
+    [InlineData("foo\\bar")]
+    [InlineData("has..parent")]
+    [InlineData("")]
+    [InlineData("   ")]
+    [InlineData("has\0null")]
+    [InlineData("has\nnewline")]
+    public void IsSafePathSegment_RejectsHostileInput(string input)
+    {
+        Assert.False(FileSystemLayout.IsSafePathSegment(input));
+    }
+
+    [Theory]
+    [InlineData("2026-05-09_14-30-22")]
+    [InlineData("a8c3f72e_run-id")]
+    [InlineData("gdpr")]
+    [InlineData("eu-ai-act")]
+    [InlineData("markdown")]
+    [InlineData("html")]
+    [InlineData("v1.0")]
+    [InlineData("TravelAgent")]
+    public void IsSafePathSegment_AcceptsLegitimateInput(string input)
+    {
+        Assert.True(FileSystemLayout.IsSafePathSegment(input));
+    }
+
+    [Fact]
+    public void IsSafePathSegment_NullIsRejected()
+    {
+        Assert.False(FileSystemLayout.IsSafePathSegment(null));
+    }
 }
 
 /// <summary>
