@@ -113,12 +113,16 @@ export function ComplianceMatrixPage() {
                 subjects={m.subjects}
                 controls={m.controls}
                 cells={m.cells}
-                onCellClick={(subjectName, _controlId) => {
-                  // Drill into the most recent evidence for this subject under
-                  // this regulation. Plan-08 Wave 7 (MC1.6.8): the cell click
-                  // maps to the latest evidence's timestamp, which we look up
-                  // from the matrix's own cell metadata.
-                  const cell = m.cells.find((c) => c.subjectName === subjectName);
+                onCellClick={(subjectName, controlId) => {
+                  // Drill into the evidence record that backs THIS specific
+                  // cell — finding by both subjectName + controlId ensures we
+                  // navigate to the evidence the user actually clicked, not
+                  // an arbitrary cell from the same row. Different controls
+                  // for the same subject may live in distinct evidence files
+                  // with distinct timestamps.
+                  const cell = m.cells.find(
+                    (c) => c.subjectName === subjectName && c.controlId === controlId,
+                  );
                   if (!cell) return;
                   const subject = m.subjects.find((s) => s.name === subjectName);
                   if (!subject) return;

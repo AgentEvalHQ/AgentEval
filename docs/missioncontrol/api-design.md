@@ -1,6 +1,9 @@
 # Mission Control API Design — REST + GraphQL Hybrid
 
-This is the operational companion to [plan-07 §3 Challenge 1](../../strategy/FutureFeatures/todo/07-AgentEval-MissionControl-Design.md#3-where-we-depart-from-the-master-analysis-seven-challenges) where the hybrid REST + GraphQL split was decided.
+This page explains the hybrid REST + GraphQL split chosen for Mission Control:
+reads (dashboard, compliance matrix, recursive `EvalResult` tree, evaluator
+registry) flow through GraphQL; binary streams (PDF reports, agent traces,
+history JSONL) and the version endpoint stay on REST.
 
 ---
 
@@ -159,6 +162,6 @@ Both surfaces share the data model; you cannot get *different* data shapes from 
 
 ## See also
 
-- [Plan-07 §3 Challenge 1](../../strategy/FutureFeatures/todo/07-AgentEval-MissionControl-Design.md#3-where-we-depart-from-the-master-analysis-seven-challenges) — original REST + GraphQL hybrid decision.
-- [Plan-07 §8](../../strategy/FutureFeatures/todo/07-AgentEval-MissionControl-Design.md#8-api-surface-rest--graphql-hybrid) — full route inventory + sample queries.
 - [`getting-started.md`](getting-started.md) — sample queries to get going.
+- [`charting.md`](charting.md) — chart library choice + render hints.
+- [`portal-ready-evaluators.md`](portal-ready-evaluators.md) — how to make an evaluator render as a first-class card in the portal.

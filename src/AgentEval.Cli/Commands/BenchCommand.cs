@@ -71,9 +71,20 @@ public static class BenchCommand
             var azureEndpoint = Environment.GetEnvironmentVariable("AZURE_OPENAI_ENDPOINT");
             if (string.IsNullOrWhiteSpace(azureEndpoint))
             {
+                var allowStub = Environment.GetEnvironmentVariable("AGENTEVAL_ALLOW_STUB_JUDGE");
+                if (!string.Equals(allowStub, "1", StringComparison.Ordinal)
+                 && !string.Equals(allowStub, "true", StringComparison.OrdinalIgnoreCase))
+                {
+                    Console.Error.WriteLine(
+                        "✖ No LLM evaluator configured (AZURE_OPENAI_ENDPOINT is unset).\n" +
+                        "  Set AZURE_OPENAI_ENDPOINT + AZURE_OPENAI_API_KEY + AZURE_OPENAI_DEPLOYMENT\n" +
+                        "  to enable real judging, or set AGENTEVAL_ALLOW_STUB_JUDGE=1 to run with\n" +
+                        "  a deterministic stub (results are not meaningful — CI must NOT do this).");
+                    return 2;
+                }
                 Console.Error.WriteLine(
-                    "Warning: No real LLM evaluator wired; using stub. " +
-                    "Set AZURE_OPENAI_* env vars to enable real judging.");
+                    "⚠ AGENTEVAL_ALLOW_STUB_JUDGE=1 — using stub evaluator. " +
+                    "Results are not a real judgement; do not rely on the verdict in CI.");
             }
             judge = new StubEvaluator();
         }

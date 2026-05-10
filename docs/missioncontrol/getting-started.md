@@ -134,7 +134,7 @@ A single fragment walks the whole composite tree in **one round-trip**. Compare 
 }
 ```
 
-Filterable by `category` and `costTier`. Drives the portal's `<EvaluatorRegistry/>` page (plan-07 §10).
+Filterable by `category` and `costTier`. Drives the portal's evaluator-registry page.
 
 ---
 
@@ -151,7 +151,7 @@ For binary / streaming data:
 | `GET /api/v1/compliance/{regulation}/schema` | The evidence JSON schema |
 | `GET /api/v1/subjects/{kind}/{name}/history` | `application/x-ndjson` (history stream) |
 
-REST stays for binary streams because GraphQL doesn't do streams cleanly (per [plan-07 §3 Challenge 1](../../strategy/FutureFeatures/todo/07-AgentEval-MissionControl-Design.md#3-where-we-depart-from-the-master-analysis-seven-challenges)).
+REST stays for binary streams because GraphQL doesn't do streams cleanly. See [`api-design.md`](api-design.md) for the full split rationale.
 
 ---
 
@@ -170,7 +170,7 @@ REST stays for binary streams because GraphQL doesn't do streams cleanly (per [p
 
 - **Frontend** (when SPA ships): React 19 + Vite 6 + TypeScript 5.5 + Tailwind 4 + Recharts + Visx + TanStack Query + `graphql-request` (GraphQL transport) + GraphQL Code Generator (typed React hooks).
 - **Backend**: .NET 10 + ASP.NET Minimal API + Hot Chocolate 16 (ChilliCream — *not* Microsoft) for GraphQL.
-- **Storage**: filesystem-only in Mode A/B (the `.agenteval/` folder is the source of truth). Mode C adds SQLite (default) or PostgreSQL (config) as a hot-path index — see plan-07 §6.3.
+- **Storage**: filesystem-only in Mode A/B (the `.agenteval/` folder is the source of truth). Mode C adds SQLite (default) or PostgreSQL (config) as a hot-path index.
 
 ---
 
@@ -204,7 +204,7 @@ Mission Control consumes only `IOutputStoreReader` (the read-only abstraction). 
 
 ## Further reading
 
-- [Mission Control Design (plan-07)](../../strategy/FutureFeatures/todo/07-AgentEval-MissionControl-Design.md) — architecture + 7 challenges to the master analysis.
-- [Mission Control Implementation Plan (plan-08)](../../strategy/FutureFeatures/todo/08-AgentEval-MissionControl-ImplementationPlan.md) — per-task tracking.
+- [`api-design.md`](api-design.md) — REST + GraphQL hybrid split.
 - [`portal-ready-evaluators.md`](portal-ready-evaluators.md) — how to write an evaluator that renders well in the portal.
 - [`charting.md`](charting.md) — Recharts vs Visx component mapping.
+- [`agenteval-workspace.md`](../agenteval-workspace.md) — the on-disk standard Mission Control reads from.

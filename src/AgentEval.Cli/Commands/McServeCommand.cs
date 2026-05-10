@@ -110,13 +110,29 @@ public static class McServeCommand
         // Wire Ctrl+C so it cleanly stops the child instead of orphaning it.
         // On Windows the console-control event reaches both processes (Kestrel
         // handles its own SIGINT), so we just need to wait for the child to
-        // exit gracefully. If it doesn't exit within the grace period we
-        // kill the whole tree to avoid zombies.
+        // exit gracefully. If the user hits Ctrl+C a SECOND time the child
+        // hasn't responded — escalate to Kill immediately on the next press.
         using var cts = new CancellationTokenSource();
+        Process? procHandle = null;
+        var pressCount = 0;
         ConsoleCancelEventHandler cancelHandler = (_, e) =>
         {
             e.Cancel = true; // suppress immediate process termination
-            cts.Cancel();
+            pressCount++;
+            if (pressCount == 1)
+            {
+                cts.Cancel();
+            }
+            else
+            {
+                // Second (or later) press — operator wants out NOW.
+                try
+                {
+                    if (procHandle is { HasExited: false })
+                        procHandle.Kill(entireProcessTree: true);
+                }
+                catch { /* best-effort */ }
+            }
         };
         Console.CancelKeyPress += cancelHandler;
 
@@ -124,13 +140,14 @@ public static class McServeCommand
         {
             using var proc = Process.Start(psi)
                 ?? throw new InvalidOperationException("Process.Start returned null.");
+            procHandle = proc;
             try
             {
                 await proc.WaitForExitAsync(cts.Token);
             }
             catch (OperationCanceledException)
             {
-                Console.WriteLine("⏹ Stopping Mission Control…");
+                Console.WriteLine("⏹ Stopping Mission Control… (Ctrl+C again to force-kill)");
                 if (!proc.HasExited)
                 {
                     // 10 s grace — Kestrel typically releases in <2 s but

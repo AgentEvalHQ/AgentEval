@@ -1,6 +1,8 @@
 # Mission Control Charting — Recharts vs Visx Decision Matrix
 
-This is the operational companion to [plan-07 §3 Challenge 2](../../strategy/FutureFeatures/todo/07-AgentEval-MissionControl-Design.md#3-where-we-depart-from-the-master-analysis-seven-challenges) where we challenged the master analysis's Apache ECharts choice.
+This page explains why Mission Control uses **Recharts** for most charts
+plus **Visx** for two specific ones (compliance heatmaps + sankey/node-link
+flows), and the bundle-size budget those choices target.
 
 ---
 
@@ -77,6 +79,6 @@ The `EvaluatorCard.recommendedVisualization` field gives the portal a hint for w
 
 ## See also
 
-- [Plan-07 §3 Challenge 2](../../strategy/FutureFeatures/todo/07-AgentEval-MissionControl-Design.md#3-where-we-depart-from-the-master-analysis-seven-challenges) — original Recharts-vs-ECharts decision.
-- [Plan-07 §10](../../strategy/FutureFeatures/todo/07-AgentEval-MissionControl-Design.md#10-ui-design) — full component inventory.
 - [`portal-ready-evaluators.md`](portal-ready-evaluators.md) — `recommendedVisualization` values and how to author them.
+- [`getting-started.md`](getting-started.md) — running Mission Control locally.
+- [`api-design.md`](api-design.md) — REST + GraphQL hybrid.

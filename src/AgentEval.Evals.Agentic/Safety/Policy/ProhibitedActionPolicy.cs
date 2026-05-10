@@ -40,11 +40,20 @@ namespace AgentEval.Evals.Agentic.Safety.Policy;
 /// checks (e.g., paraphrased prohibited information); simple keyword matches are
 /// handled deterministically.
 /// </param>
+/// <param name="ApprovalToolNames">
+/// Exact tool names (case-insensitive) that count as an "approval" call when they
+/// appear before a <see cref="RequiredApprovalTools"/> tool in the call sequence.
+/// When null/empty, defaults to <c>["approve", "confirm"]</c> matched as exact
+/// names (NOT as substrings — a tool named <c>disapprove_log</c> does NOT count
+/// as approval). Set explicitly to enumerate the approval primitives your policy
+/// recognises (e.g. <c>["request_user_approval", "manager_sign_off"]</c>).
+/// </param>
 public sealed record ProhibitedActionPolicy(
     IReadOnlyList<string> ForbiddenTools,
     IReadOnlyList<ToolPattern> ForbiddenToolCallPatterns,
     IReadOnlyList<string> RequiredApprovalTools,
-    IReadOnlyList<string> ForbiddenContent);
+    IReadOnlyList<string> ForbiddenContent,
+    IReadOnlyList<string>? ApprovalToolNames = null);
 
 /// <summary>
 /// A pattern-based prohibition that matches a specific combination of tool name

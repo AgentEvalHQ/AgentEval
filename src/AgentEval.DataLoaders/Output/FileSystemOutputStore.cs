@@ -16,8 +16,11 @@ public sealed class FileSystemOutputStore : IOutputStore
     private readonly JsonSerializerOptions _jsonl;
     private SolutionInfo? _cachedSolution;
 
-    // Cache for LocateRunAsync — stores (subject, runId) of the most recently located run
-    private (SubjectIdentity Subject, string RunId)? _lastLocated;
+    // Per-runId resolution cache. Keyed by runId so concurrent GraphQL queries
+    // for different runs do not tear a single shared field. ConcurrentDictionary
+    // also gives us a memory ceiling-free read path; entries are added on first
+    // resolve and never invalidated (run identity is immutable post-completion).
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, SubjectIdentity> _runSubjectCache = new(StringComparer.Ordinal);
 
     public FileSystemOutputStore(string root)
     {
@@ -520,8 +523,8 @@ public sealed class FileSystemOutputStore : IOutputStore
 
     private async Task<SubjectIdentity?> TryLocateRunAsync(string runId, CancellationToken ct)
     {
-        if (_lastLocated.HasValue && _lastLocated.Value.RunId == runId)
-            return _lastLocated.Value.Subject;
+        if (_runSubjectCache.TryGetValue(runId, out var cached))
+            return cached;
 
         foreach (var kind in new[] { SubjectKind.Agent, SubjectKind.Workflow })
         {
@@ -544,7 +547,7 @@ public sealed class FileSystemOutputStore : IOutputStore
                     parsedKind = kind;
 
                 var identity = new SubjectIdentity(parsedKind, dto.Name, dto.SourceProject, dto.SourcePath, dto.Version, dto.ModelId, dto.Framework, dto.Tags);
-                _lastLocated = (identity, runId);
+                _runSubjectCache.TryAdd(runId, identity);
                 return identity;
             }
         }

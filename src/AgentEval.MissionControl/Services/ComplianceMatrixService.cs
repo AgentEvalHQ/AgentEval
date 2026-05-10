@@ -50,7 +50,14 @@ public sealed class ComplianceMatrixService
             .Select(g =>
             {
                 var subjects = g.Select(p => p.SubjectName).Distinct(StringComparer.Ordinal).Count();
-                var sorted = g.OrderByDescending(p => p.Timestamp, StringComparer.Ordinal).ToList();
+                // Sort by parsed timestamp where possible; fall back to lexical
+                // ordinal compare only when parse fails. The fixed
+                // `yyyy-MM-dd_HH-mm-ss` format IS lexicographically sortable,
+                // but parsing first guards against any future format drift.
+                var sorted = g
+                    .OrderByDescending(p => TryParseTimestamp(p.Timestamp) ?? DateTimeOffset.MinValue)
+                    .ThenByDescending(p => p.Timestamp, StringComparer.Ordinal)
+                    .ToList();
                 var latest = sorted.First();
                 var lastTs = TryParseTimestamp(latest.Timestamp);
                 return new ComplianceRegulationSummary(
@@ -90,9 +97,15 @@ public sealed class ComplianceMatrixService
             return EmptyMatrix(regulation);
 
         // Step 2 — for each subject, find the most recent evidence.
+        // Order by parsed timestamp where possible; fall back to lexical
+        // ordinal sort when parsing fails so the rule degrades gracefully
+        // if any evidence ever lands in an unexpected format.
         var latestPerSubject = pointers
             .GroupBy(p => p.SubjectName, StringComparer.Ordinal)
-            .Select(g => g.OrderByDescending(p => p.Timestamp, StringComparer.Ordinal).First())
+            .Select(g => g
+                .OrderByDescending(p => TryParseTimestamp(p.Timestamp) ?? DateTimeOffset.MinValue)
+                .ThenByDescending(p => p.Timestamp, StringComparer.Ordinal)
+                .First())
             .ToList();
 
         // Step 3 — load each latest evidence to read its full Controls list.

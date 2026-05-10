@@ -66,7 +66,9 @@ Create a simple test to verify AgentEval is installed and working correctly:
 ```csharp
 using AgentEval.MAF;
 using AgentEval.Models;
+using AgentEval.Testing;        // FakeChatClient
 using Microsoft.Extensions.AI;
+using Microsoft.Agents.AI;       // ChatClientAgent
 
 // 1. Create a evaluation harness
 var harness = new MAFEvaluationHarness(verbose: true);

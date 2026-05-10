@@ -86,9 +86,15 @@ public sealed class FileSystemLayout
     // Helpers
     internal static string Sanitize(string name)
     {
+        if (string.IsNullOrWhiteSpace(name))
+            throw new ArgumentException("Name cannot be null/empty/whitespace.", nameof(name));
         var invalid = Path.GetInvalidFileNameChars().Concat(new[] { '/', '\\' }).ToArray();
         var s = string.Concat(name.Select(c => invalid.Contains(c) ? '-' : c));
-        return s.Trim('.', ' ');
+        s = s.Trim('.', ' ');
+        if (string.IsNullOrEmpty(s))
+            throw new ArgumentException(
+                $"Name '{name}' sanitises to empty — it must contain at least one non-dot/space character that survives sanitisation.", nameof(name));
+        return s;
     }
 
     /// <summary>

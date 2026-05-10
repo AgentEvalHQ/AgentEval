@@ -4,10 +4,12 @@
   "title": "AgentEval Eval Result (atomic or composite)",
   "type": "object",
   "required": ["metric", "score", "details", "provenance", "evaluatedAt"],
+  "additionalProperties": false,
   "properties": {
     "metric": {
       "type": "object",
       "required": ["key", "name", "category", "version"],
+      "additionalProperties": false,
       "properties": {
         "key":      { "type": "string" },
         "name":     { "type": "string" },
@@ -18,18 +20,20 @@
     "score": {
       "type": "object",
       "required": ["value", "label", "passed", "severity"],
+      "additionalProperties": false,
       "properties": {
         "value":      { "type": "number", "minimum": 0, "maximum": 1 },
         "label":      { "enum": ["pass", "fail", "warn", "skipped"] },
         "passed":     { "type": "boolean" },
         "severity":   { "enum": ["none", "low", "medium", "high", "critical"] },
         "ordinal":    { "type": ["integer", "null"], "minimum": 1, "maximum": 5 },
-        "threshold":  { "type": ["number", "null"] },
+        "threshold":  { "type": ["number", "null"], "minimum": 0, "maximum": 1 },
         "confidence": { "type": ["number", "null"], "minimum": 0, "maximum": 1 }
       }
     },
     "details": {
       "type": "object",
+      "additionalProperties": false,
       "properties": {
         "dimensions": {
           "type": ["object", "null"],
@@ -53,8 +57,9 @@
     "provenance": {
       "type": "object",
       "required": ["type", "estimatedCost", "cacheHit"],
+      "additionalProperties": false,
       "properties": {
-        "type":          { "enum": ["atomic-llm", "atomic-code", "composite", "skipped"] },
+        "type":          { "enum": ["atomic-llm", "atomic-code", "composite", "skipped", "multi-judge-adjudicated"] },
         "judgeModel":    { "type": ["string", "null"] },
         "promptId":      { "type": ["string", "null"] },
         "promptHash":    { "type": ["string", "null"] },
@@ -69,6 +74,7 @@
     "evidence": {
       "type": "object",
       "required": ["source", "reference", "message"],
+      "additionalProperties": false,
       "properties": {
         "source":    { "type": "string" },
         "reference": { "type": "string" },

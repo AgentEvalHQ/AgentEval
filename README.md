@@ -458,8 +458,27 @@ await result.ExportHtmlReportAsync("memory-report.html");
 
 ### CLI Tool
 - `agenteval eval` - Evaluate any OpenAI-compatible agent from the command line
+- `agenteval init / doctor` - Bootstrap and validate the `.agenteval/` workspace (canonical output store with audit-chain integrity)
+- `agenteval bench {gdpr,eu-ai-act,agentic}` - Run compliance and agentic benchmark suites
+- `agenteval mc serve / mc doctor` - Launch the Mission Control web portal (read-only viewer over `.agenteval/`)
 - Flexible CLI with multiple options, several export formats, LLM-as-judge, CI/CD-friendly exit codes
-- Packaged as `dotnet tool install AgentEval.Cli`
+
+### Mission Control Portal
+- Single-binary web portal (Hot Chocolate 16 GraphQL + minimal REST + React SPA) served on `http://localhost:5000`
+- Read-only view over `.agenteval/`: dashboard, runs list, recursive `EvalResult` tree drill-down, compliance matrix with audit-chain badges, evaluator registry, per-evaluator timeline
+- Single-port deployment via `agenteval mc serve`, `dotnet run --project src/AgentEval.MissionControl`, or `docker compose up`
+- See [`docs/missioncontrol/getting-started.md`](docs/missioncontrol/getting-started.md)
+
+### Compliance Benchmarks
+- **GDPR** — composite-eval audit suite covering 16 articles across 5 pillars; smoke / standard / audit presets + healthcare / HR / children's domain packs
+- **EU AI Act** — Regulation (EU) 2024/1689 high-risk obligations; smoke / standard / audit presets + high-risk-employment / -credit / -education domain packs
+- **Agentic** — Foundry-equivalent 60-evaluator suite (11 presets covering tool calls, RAG quality, judge quality, safety, telemetry, stochastic stability, conversational, reasoning)
+- Every evidence document cryptographically chained to its source run; `agenteval doctor` re-validates on demand
+
+### `.agenteval/` Workspace Standard
+- Canonical on-disk format: one folder per agent / workflow, deterministic run IDs, SHA-256 content hashes on every manifest
+- Read-only consumed by Mission Control; written by the CLI, test harnesses, and benchmark runners
+- See [`docs/agenteval-workspace.md`](docs/agenteval-workspace.md)
 
 ### Cross-Framework & DI
 - Universal `IChatClient.AsEvaluableAgent()` one-liner for any AI provider
@@ -496,8 +515,17 @@ dotnet add package AgentEval --prerelease
 - `AgentEval.RedTeam` — Security testing
 
 **CLI Tool:**
+
+The CLI ships in-tree but is not yet published as a `dotnet tool`. Run via:
+
 ```bash
-dotnet tool install -g AgentEval.Cli --prerelease
+dotnet run --project src/AgentEval.Cli -- eval --endpoint https://your-resource.openai.azure.com --model gpt-4o --dataset tests.yaml
+```
+
+Once published, the equivalent will be:
+
+```bash
+dotnet tool install -g AgentEval.Cli --prerelease   # planned
 agenteval eval --endpoint https://your-resource.openai.azure.com --model gpt-4o --dataset tests.yaml
 ```
 

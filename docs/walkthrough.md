@@ -197,7 +197,7 @@ Verify the response contains expected information:
 ```csharp
 using AgentEval.Assertions;
 
-result.Response
+result.ActualOutput
     .Should()
     .Contain("Paris")
     .ContainAny("flight", "airline")

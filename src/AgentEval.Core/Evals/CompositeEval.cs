@@ -73,13 +73,31 @@ public sealed class CompositeEval : IEval
         var (score, severity) = Aggregation.Aggregate(subs, Components);
         var (cost, allCacheHits) = CostRollup.Aggregate(subs);
 
+        // Severity rollup honours EvalComponent.Required: an optional component
+        // that fails should not propagate its severity to the composite verdict.
+        // The aggregation strategy still sees the optional component's score
+        // (it shapes the weighted-sum / median / etc.), but the verdict-level
+        // severity considers only required-component severities.
+        var verdictSeverity = severity;
+        if (Components.Any(c => !c.Required))
+        {
+            var requiredSeverities = subs
+                .Zip(Components, (s, c) => (Sub: s, Component: c))
+                .Where(pair => pair.Component.Required)
+                .Select(pair => pair.Sub.Score.Severity)
+                .ToArray();
+            verdictSeverity = requiredSeverities.Length > 0
+                ? SeverityRollup.Max(requiredSeverities)
+                : "none";
+        }
+
         // Verdict matrix:
         //   Threshold set       -> score >= threshold ? pass : fail
         //   Threshold null      -> severity is { high|critical -> fail, medium -> warn, _ -> pass }
         // "warn" is a soft fail: passed = false but label distinguishes from a hard fail.
         var label = Threshold is { } t
             ? (score >= t ? "pass" : "fail")
-            : severity switch
+            : verdictSeverity switch
             {
                 "critical" or "high" => "fail",
                 "medium" => "warn",
