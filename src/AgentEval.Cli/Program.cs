@@ -197,6 +197,22 @@ renderBenchCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =
     return await RenderCommand.RunAsync(benchmark, subject, ts, root);
 });
 
+// ─── mc — Mission Control (plan-08 MC1.7.1) ──────────────────────────────────
+var mcCmd = new Command("mc", "Mission Control web portal commands");
+
+var mcServePortOpt = new Option<int?>("--port") { Description = "Port to bind (default: 5000)" };
+var mcServeWorkspaceOpt = new Option<string?>("--workspace") { Description = "Workspace root (default: current directory). Mission Control reads {workspace}/.agenteval/" };
+var mcServeCmd = new Command("serve", "Start the Mission Control web portal (GraphQL + REST + SPA on one port). Requires .NET 10.");
+mcServeCmd.Add(mcServePortOpt);
+mcServeCmd.Add(mcServeWorkspaceOpt);
+mcServeCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =>
+{
+    var port = parseResult.GetValue(mcServePortOpt) ?? 5000;
+    var workspace = parseResult.GetValue(mcServeWorkspaceOpt);
+    return await McServeCommand.RunAsync(port, workspace);
+});
+mcCmd.Add(mcServeCmd);
+
 // ─── root ─────────────────────────────────────────────────────────────────────
 var rootCmd = new RootCommand("AgentEval CLI — output-store lifecycle management");
 rootCmd.Add(initCmd);
@@ -205,5 +221,6 @@ rootCmd.Add(migrateCmd);
 rootCmd.Add(benchCmd);
 rootCmd.Add(complianceCmd);
 rootCmd.Add(renderBenchCmd);
+rootCmd.Add(mcCmd);
 
 return await rootCmd.Parse(args).InvokeAsync();

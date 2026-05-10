@@ -16,6 +16,14 @@
     <ProjectReference Include="..\..\samples\AgentEval.EuAiActBenchmark\AgentEval.EuAiActBenchmark.csproj" />
   </ItemGroup>
 
+  <!-- Plan-08 MC1.7.1: AgentEval.MissionControl is net10-only (Hot Chocolate 16
+       + MapStaticAssets). The CLI is multi-targeted; only the net10 build
+       references it. On net8 / net9 the `agenteval mc serve` subcommand prints
+       a graceful "requires .NET 10" message and exits 2. -->
+  <ItemGroup Condition="'$(TargetFramework)' == 'net10.0'">
+    <ProjectReference Include="..\AgentEval.MissionControl\AgentEval.MissionControl.csproj" />
+  </ItemGroup>
+
   <ItemGroup>
     <PackageReference Include="System.CommandLine" />
   </ItemGroup>

@@ -26,7 +26,20 @@
   <!-- Plan-08 MC1.8.1: SPA build artefacts live at wwwroot/ (Vite writes here
        via outDir in src/AgentEval.MissionControl.Spa/vite.config.ts). They're
        gitignored — `npm run build` reproduces them locally. The Microsoft.NET.Sdk.Web
-       SDK auto-includes wwwroot/**/* as Content with `CopyToOutputDirectory=PreserveNewest`,
-       so no explicit ItemGroup is needed. -->
+       SDK auto-publishes wwwroot/**/* via static web assets (a manifest is
+       generated and served at runtime), so the standalone `dotnet run` path
+       works without any explicit copy.
+
+       Plan-08 MC1.7.1 (`agenteval mc serve`): the CLI spawns this project as a
+       subprocess. `MapFallbackToFile("index.html")` resolves through the
+       process's `WebRootPath = {ContentRootPath}/wwwroot/`, which means the
+       subprocess's CWD must contain a wwwroot/ — not just the static-asset
+       manifest. Copy the SPA build into bin/wwwroot/ for that path. -->
+  <ItemGroup>
+    <None Include="wwwroot\**\*"
+          CopyToOutputDirectory="PreserveNewest"
+          CopyToPublishDirectory="PreserveNewest"
+          Visible="false" />
+  </ItemGroup>
 
 </Project>
