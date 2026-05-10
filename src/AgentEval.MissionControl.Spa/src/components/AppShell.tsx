@@ -1,5 +1,5 @@
 import { NavLink, Outlet } from "react-router-dom";
-import { LayoutDashboard, ShieldCheck, ListChecks, Activity } from "lucide-react";
+import { LayoutDashboard, ShieldCheck, ListChecks, Activity, History } from "lucide-react";
 import { ErrorBoundary } from "./ErrorBoundary";
 
 // Plan-08 MC1.6.2: shell layout — top nav + left sidebar.
@@ -11,6 +11,7 @@ import { ErrorBoundary } from "./ErrorBoundary";
 const navItems = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard, end: true },
   { to: "/subjects", label: "Subjects", icon: ListChecks, end: false },
+  { to: "/runs", label: "Runs", icon: History, end: false },
   { to: "/compliance", label: "Compliance", icon: ShieldCheck, end: false },
   { to: "/evaluators", label: "Evaluators", icon: Activity, end: false },
 ];
