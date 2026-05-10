@@ -36,6 +36,26 @@ public class MissionControlEndToEndTests : IClassFixture<EndToEndFixture>
 
     public MissionControlEndToEndTests(EndToEndFixture fixture) => _fixture = fixture;
 
+    // Manual-only: materialises the fixture to a stable path for human
+    // inspection. Skipped by default so it doesn't pollute the test runner,
+    // leave artefacts in %TEMP%, or run unnecessarily as part of the suite.
+    // To execute: temporarily delete the Skip argument and run via
+    //   dotnet test --filter "FullyQualifiedName~Materialize"
+    [Fact(Skip = "Manual-only — materialises a fixture to %TEMP% for human inspection.")]
+    public async Task Materialize_FixtureToTempForReview()
+    {
+        var target = Path.Combine(Path.GetTempPath(), "agenteval-review-fixture");
+        if (Directory.Exists(target)) Directory.Delete(target, true);
+        Directory.CreateDirectory(target);
+        var m = await MissionControlFixtureBuilder.BuildAsync(target);
+        Console.WriteLine($"WorkspaceRoot:  {m.WorkspaceRoot}");
+        Console.WriteLine($"AgentEvalDir:   {m.AgentEvalDir}");
+        Console.WriteLine($"RunIds:         {m.RunIds.Count}");
+        Console.WriteLine($"EvidenceRefs:   {m.EvidenceRefs.Count}");
+        Console.WriteLine($"CampaignId:     {m.CampaignId}");
+        Console.WriteLine($"LegacyBaseline: {m.LegacyBaselinePath}");
+    }
+
     // ─── doctor ──────────────────────────────────────────────────────────────
 
     [Fact]
@@ -354,8 +374,207 @@ public class MissionControlEndToEndTests : IClassFixture<EndToEndFixture>
             b.GetProperty("byTier").GetProperty("medium").GetDouble() +
             b.GetProperty("byTier").GetProperty("high").GetDouble() +
             b.GetProperty("unknownKeyCost").GetDouble();
+
+        // Invariant: total == sum(byTier) + unknown. The resolver computes
+        // total this way, so this is a guard against future refactors that
+        // might compute total separately.
         Assert.Equal(total, sum, 6);
-        Assert.True(total >= 0.0);
+
+        // The fixture's normal-eval run has 4 flat scenarios (each
+        // estimatedCost=0.003 → 0.012 in `unknown` since flat scenarios are
+        // not tree-attributed) plus the composite tree's 2 LLM leaves
+        // (cost 0.0009 + 0.0011 = 0.002). composite-root, policy_compliance,
+        // response_quality are not in EvaluatorCostMap, so they go to
+        // `unknown` as well. Total should be ≥ 0.012 + 0.002 = 0.014.
+        Assert.True(total >= 0.013, $"total cost ({total}) is suspiciously low — expected ≥ 0.013.");
+    }
+
+    // ─── run / runSummary / scenarios / scenario resolver coverage ─────────
+
+    [Fact]
+    public async Task Run_ByRunId_ReturnsManifestWithMatchingSubject()
+    {
+        var runId = _fixture.GetRunId(MissionControlFixtureBuilder.TravelAgent,
+            MissionControlFixtureBuilder.T2, FixtureRunKind.Eval);
+
+        using var client = _fixture.CreateClient();
+        var resp = await client.PostAsJsonAsync("/graphql", new
+        {
+            query = $$"""
+                {
+                  run(runId: "{{runId}}") {
+                    run { runId verdict kind }
+                    subject { kind name }
+                    contentHash
+                  }
+                }
+                """
+        });
+        resp.EnsureSuccessStatusCode();
+        using var doc = JsonDocument.Parse(await resp.Content.ReadAsStringAsync());
+        var r = doc.RootElement.GetProperty("data").GetProperty("run");
+        Assert.Equal(runId, r.GetProperty("run").GetProperty("runId").GetString());
+        Assert.Equal("PASS", r.GetProperty("run").GetProperty("verdict").GetString());
+        Assert.Equal("TravelAgent", r.GetProperty("subject").GetProperty("name").GetString());
+        Assert.StartsWith("sha256:", r.GetProperty("contentHash").GetString());
+    }
+
+    [Fact]
+    public async Task RunSummary_ByRunId_ReturnsStatsAndMetrics()
+    {
+        var runId = _fixture.GetRunId(MissionControlFixtureBuilder.TravelAgent,
+            MissionControlFixtureBuilder.T2, FixtureRunKind.Eval);
+
+        using var client = _fixture.CreateClient();
+        var resp = await client.PostAsJsonAsync("/graphql", new
+        {
+            query = $$"""
+                {
+                  runSummary(runId: "{{runId}}") {
+                    verdict
+                    stats { total passed failed warnings }
+                  }
+                }
+                """
+        });
+        resp.EnsureSuccessStatusCode();
+        using var doc = JsonDocument.Parse(await resp.Content.ReadAsStringAsync());
+        var s = doc.RootElement.GetProperty("data").GetProperty("runSummary");
+        Assert.Equal("PASS", s.GetProperty("verdict").GetString());
+        Assert.Equal(5, s.GetProperty("stats").GetProperty("total").GetInt32());
+        Assert.Equal(5, s.GetProperty("stats").GetProperty("passed").GetInt32());
+    }
+
+    [Fact]
+    public async Task Scenarios_OfNormalRun_YieldsFourFlatPlusComposite()
+    {
+        var runId = _fixture.GetRunId(MissionControlFixtureBuilder.TravelAgent,
+            MissionControlFixtureBuilder.T2, FixtureRunKind.Eval);
+
+        using var client = _fixture.CreateClient();
+        var resp = await client.PostAsJsonAsync("/graphql", new
+        {
+            query = $$"""{ scenarios(runId: "{{runId}}") { id passed score } }"""
+        });
+        resp.EnsureSuccessStatusCode();
+        using var doc = JsonDocument.Parse(await resp.Content.ReadAsStringAsync());
+        var arr = doc.RootElement.GetProperty("data").GetProperty("scenarios");
+        Assert.Equal(5, arr.GetArrayLength());
+        var ids = new HashSet<string>();
+        foreach (var s in arr.EnumerateArray())
+            ids.Add(s.GetProperty("id").GetString()!);
+        Assert.Contains("s-1", ids);
+        Assert.Contains("s-4", ids);
+        Assert.Contains("composite-tree", ids);
+    }
+
+    [Fact]
+    public async Task Scenario_BySingleId_ReturnsThatScenario()
+    {
+        var runId = _fixture.GetRunId(MissionControlFixtureBuilder.TravelAgent,
+            MissionControlFixtureBuilder.T2, FixtureRunKind.Eval);
+
+        using var client = _fixture.CreateClient();
+        var resp = await client.PostAsJsonAsync("/graphql", new
+        {
+            query = $$"""
+                {
+                  scenario(runId: "{{runId}}", scenarioId: "s-2") {
+                    id name passed score
+                  }
+                }
+                """
+        });
+        resp.EnsureSuccessStatusCode();
+        using var doc = JsonDocument.Parse(await resp.Content.ReadAsStringAsync());
+        var s = doc.RootElement.GetProperty("data").GetProperty("scenario");
+        Assert.NotEqual(JsonValueKind.Null, s.ValueKind);
+        Assert.Equal("s-2", s.GetProperty("id").GetString());
+        Assert.Equal("Plan trip 2", s.GetProperty("name").GetString());
+        Assert.True(s.GetProperty("passed").GetBoolean());
+    }
+
+    // ─── negative paths ──────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task Run_UnknownRunId_ReturnsNull()
+    {
+        using var client = _fixture.CreateClient();
+        var resp = await client.PostAsJsonAsync("/graphql", new
+        {
+            query = """{ run(runId: "2099-12-31_23-59-59_deadbeef") { run { runId } } }"""
+        });
+        resp.EnsureSuccessStatusCode();
+        using var doc = JsonDocument.Parse(await resp.Content.ReadAsStringAsync());
+        Assert.Equal(JsonValueKind.Null,
+            doc.RootElement.GetProperty("data").GetProperty("run").ValueKind);
+    }
+
+    [Fact]
+    public async Task RunCostBreakdown_UnknownRunId_ReturnsNull()
+    {
+        using var client = _fixture.CreateClient();
+        var resp = await client.PostAsJsonAsync("/graphql", new
+        {
+            query = """{ runCostBreakdown(runId: "2099-12-31_23-59-59_deadbeef") { totalCost } }"""
+        });
+        resp.EnsureSuccessStatusCode();
+        using var doc = JsonDocument.Parse(await resp.Content.ReadAsStringAsync());
+        Assert.Equal(JsonValueKind.Null,
+            doc.RootElement.GetProperty("data").GetProperty("runCostBreakdown").ValueKind);
+    }
+
+    [Fact]
+    public async Task ScenarioTree_FlatScenarioId_ReturnsNull()
+    {
+        // Flat scenarios (s-1..s-4) have a plain string Output, not a JSON
+        // EvalResult tree. ScenarioTree must return null for them so the SPA
+        // can fall back to the flat shape. Guards against EvalResultPersistence
+        // ever silently parsing arbitrary strings as a tree.
+        var runId = _fixture.GetRunId(MissionControlFixtureBuilder.TravelAgent,
+            MissionControlFixtureBuilder.T2, FixtureRunKind.Eval);
+
+        using var client = _fixture.CreateClient();
+        var resp = await client.PostAsJsonAsync("/graphql", new
+        {
+            query = $$"""
+                {
+                  scenarioTree(runId: "{{runId}}", scenarioId: "s-1") { metric { key } }
+                }
+                """
+        });
+        resp.EnsureSuccessStatusCode();
+        using var doc = JsonDocument.Parse(await resp.Content.ReadAsStringAsync());
+        Assert.Equal(JsonValueKind.Null,
+            doc.RootElement.GetProperty("data").GetProperty("scenarioTree").ValueKind);
+    }
+
+    [Fact]
+    public async Task RecentRuns_ReturnsNewestFirst()
+    {
+        // Production guarantee: recentRuns is newest-first. The fixture's
+        // 9 runs are completed sequentially, so the build-order matches
+        // chronological order. This is the only E2E assertion of the
+        // resolver's ordering contract — earlier tests deliberately
+        // skipped it because ordering is mostly verified at the
+        // InMemoryOutputStore unit level, but reverse-of-file-order can
+        // and has silently broken on past refactors.
+        using var client = _fixture.CreateClient();
+        var resp = await client.PostAsJsonAsync("/graphql", new
+        {
+            query = "{ recentRuns(count: 50) { runId timestamp } }"
+        });
+        resp.EnsureSuccessStatusCode();
+        using var doc = JsonDocument.Parse(await resp.Content.ReadAsStringAsync());
+        var runs = doc.RootElement.GetProperty("data").GetProperty("recentRuns");
+        var timestamps = runs.EnumerateArray()
+            .Select(r => DateTimeOffset.Parse(r.GetProperty("timestamp").GetString()!))
+            .ToList();
+        for (var i = 1; i < timestamps.Count; i++)
+        {
+            Assert.True(timestamps[i - 1] >= timestamps[i],
+                $"recentRuns[{i - 1}].timestamp ({timestamps[i - 1]:O}) must be ≥ recentRuns[{i}].timestamp ({timestamps[i]:O}).");
+        }
     }
 
     // ─── compliance evidence drill-through ──────────────────────────────────
