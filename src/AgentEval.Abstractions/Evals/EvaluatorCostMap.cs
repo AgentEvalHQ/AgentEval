@@ -144,4 +144,20 @@ public static class EvaluatorCostMap
     /// </remarks>
     public static bool IsWithinBudget(EvaluatorCostTier evaluatorTier, EvaluatorCostTier budgetTier) =>
         (int)evaluatorTier <= (int)budgetTier;
+
+    /// <summary>
+    /// True if <paramref name="evaluatorKey"/> has an explicit registration (vs. falling
+    /// back to <see cref="EvaluatorCostTier.Medium"/> via <see cref="GetTier"/>'s default).
+    /// </summary>
+    /// <remarks>
+    /// Used by Mission Control's <c>Query.runCostBreakdown</c> resolver to distinguish
+    /// "this evaluator's cost rolls into Medium because we know it's medium" from
+    /// "we don't know what tier this evaluator is, surface its cost separately as
+    /// `unknownKeyCost`". Plan-08 MC1.4.3.
+    /// </remarks>
+    public static bool IsRegistered(string evaluatorKey)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(evaluatorKey);
+        return s_tiers.ContainsKey(evaluatorKey);
+    }
 }

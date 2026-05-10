@@ -8,6 +8,7 @@ import { DataState } from "@/components/DataState";
 import { VerdictBadge, type Verdict } from "@/components/VerdictBadge";
 import { ManifestHashBadge } from "@/components/ManifestHashBadge";
 import { ModelBadge } from "@/components/ModelBadge";
+import { CostTierBreakdownChart } from "@/components/charts/CostTierBreakdownChart";
 import { formatDateTime, formatScore, formatCost } from "@/lib/format";
 
 // Plan-08 Wave 3: full run detail with manifest + summary + scenarios.
@@ -59,6 +60,12 @@ interface RunDetailResponse {
     duration: string;
     estimatedCost: number;
   }[];
+  runCostBreakdown: {
+    totalCost: number;
+    byTier: { trivial: number; low: number; medium: number; high: number };
+    unknownKeyCost: number;
+    filteredOut: string[];
+  } | null;
 }
 
 const RUN_DETAIL_QUERY = /* GraphQL */ `
@@ -94,6 +101,12 @@ const RUN_DETAIL_QUERY = /* GraphQL */ `
       score
       duration
       estimatedCost
+    }
+    runCostBreakdown(runId: $runId) {
+      totalCost
+      byTier { trivial low medium high }
+      unknownKeyCost
+      filteredOut
     }
   }
 `;
@@ -194,6 +207,29 @@ export function RunDetailPage() {
                 value={formatCost(d.runSummary?.cost?.estimatedCost ?? null)}
               />
             </section>
+
+            {d.runCostBreakdown && d.runCostBreakdown.totalCost > 0 && (
+              <section className="rounded-lg border border-slate-200 bg-white p-4">
+                <h3 className="text-sm font-semibold text-slate-700 mb-2">
+                  Cost by tier
+                </h3>
+                <CostTierBreakdownChart
+                  byTier={d.runCostBreakdown.byTier}
+                  unknown={d.runCostBreakdown.unknownKeyCost}
+                />
+                <p className="text-xs text-slate-500 mt-2">
+                  Total: {formatCost(d.runCostBreakdown.totalCost)} —
+                  derived from each leaf evaluator's <code>provenance.estimatedCost</code>
+                  in the recursive <code>EvalResult</code> tree.
+                  {d.runCostBreakdown.unknownKeyCost > 0 && (
+                    <span className="ml-1 text-amber-700">
+                      ({formatCost(d.runCostBreakdown.unknownKeyCost)} from
+                      keys not registered in <code>EvaluatorCostMap</code>.)
+                    </span>
+                  )}
+                </p>
+              </section>
+            )}
 
             <section className="rounded-lg border border-slate-200 bg-white">
               <header className="px-4 py-2 border-b border-slate-200 flex items-baseline justify-between">

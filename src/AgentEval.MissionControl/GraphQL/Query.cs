@@ -245,6 +245,100 @@ public sealed class Query
         return await store.GetComplianceEvidenceAsync(regulation, identity, timestamp, ct);
     }
 
+    // ─── Cost-tier breakdown (MC1.4.3) ───────────────────────────────────────
+
+    /// <summary>
+    /// Returns a per-cost-tier breakdown of a run's estimated cost. Walks every
+    /// scenario's recursive <see cref="EvalResult"/> tree (reconstituted from
+    /// <see cref="ScenarioResult.Output"/> JSON via
+    /// <see cref="EvalResultPersistence.FromScenarioResult"/>); for each leaf
+    /// with an LLM or code provenance, looks up the cost tier via
+    /// <see cref="EvaluatorCostMap.GetTier"/> and adds
+    /// <see cref="EvalProvenance.EstimatedCost"/> to that tier's bucket.
+    /// Drives the SPA's <c>&lt;CostTierBreakdownChart/&gt;</c> stacked bar.
+    /// </summary>
+    public async Task<RunCostBreakdown?> RunCostBreakdown(
+        [Service] IOutputStoreReader store,
+        string runId,
+        CancellationToken ct = default)
+    {
+        if (!store.IsAvailable) return null;
+
+        var manifest = await store.GetRunManifestAsync(runId, ct);
+        if (manifest is null) return null;
+
+        double trivial = 0, low = 0, medium = 0, high = 0, unknown = 0;
+
+        await foreach (var scenario in store.GetScenarioResultsAsync(runId, ct))
+        {
+            // Some scenarios are flat (Output is the agent response text); for those
+            // we attribute the scenario's estimatedCost to the unknown bucket — the
+            // tier-aware path requires a recursive EvalResult tree in Output JSON.
+            var tree = EvalResultPersistence.FromScenarioResult(scenario);
+            if (tree is null)
+            {
+                unknown += scenario.EstimatedCost;
+                continue;
+            }
+
+            // Walk the tree, accumulating per-tier cost from every leaf's provenance.
+            // Composites have EstimatedCost == 0; only LLM/code leaves carry real cost.
+            // The tree is authoritative — supersedes scenario.EstimatedCost (which is
+            // the root composite's provenance, often 0 for trees).
+            WalkAndAccumulate(tree, ref trivial, ref low, ref medium, ref high, ref unknown);
+        }
+
+        // Invariant: total = sum(byTier) + unknown. Computed last so callers can
+        // trust the relationship for visualisation (stacked-bar height = total).
+        var total = trivial + low + medium + high + unknown;
+
+        return new RunCostBreakdown(
+            TotalCost: total,
+            ByTier: new CostByTier(trivial, low, medium, high),
+            UnknownKeyCost: unknown,
+            FilteredOut: Array.Empty<string>());
+    }
+
+    private static void WalkAndAccumulate(
+        EvalResult node,
+        ref double trivial,
+        ref double low,
+        ref double medium,
+        ref double high,
+        ref double unknown)
+    {
+        var cost = node.Provenance.EstimatedCost;
+        if (cost > 0)
+        {
+            // Lookup by metric key. Unknown keys default to Medium per
+            // EvaluatorCostMap.GetTier — but we want to flag them as
+            // "unknown" instead of silently lumping them into Medium.
+            // Use the explicit registration check.
+            if (EvaluatorCostMap.IsRegistered(node.Metric.Key))
+            {
+                switch (EvaluatorCostMap.GetTier(node.Metric.Key))
+                {
+                    case EvaluatorCostTier.Trivial: trivial += cost; break;
+                    case EvaluatorCostTier.Low:     low     += cost; break;
+                    case EvaluatorCostTier.Medium:  medium  += cost; break;
+                    case EvaluatorCostTier.High:    high    += cost; break;
+                }
+            }
+            else
+            {
+                unknown += cost;
+            }
+        }
+
+        if (node.Details.SubResults is { } children)
+        {
+            foreach (var child in children)
+            {
+                WalkAndAccumulate(child, ref trivial, ref low, ref medium, ref high, ref unknown);
+            }
+        }
+    }
+
     // ─── Recursive EvalResult tree (MC1.4.6) ─────────────────────────────────
 
     /// <summary>

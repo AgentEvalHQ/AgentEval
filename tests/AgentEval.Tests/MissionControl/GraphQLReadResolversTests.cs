@@ -346,6 +346,71 @@ public class GraphQLReadResolversTests : IClassFixture<SeededMissionControlFacto
         Assert.True(matrix.GetProperty("allChainsValid").GetBoolean());
     }
 
+    // ─── Cost-tier breakdown (MC1.4.3) ────────────────────────────────────────
+
+    [Fact]
+    public async Task RunCostBreakdown_ReturnsTierAndUnknown_InvariantHolds()
+    {
+        using var client = _factory.CreateClient();
+        var listResp = await client.PostAsJsonAsync("/graphql",
+            new { query = "{ recentRuns(count: 1) { runId } }" });
+        listResp.EnsureSuccessStatusCode();
+        using var listDoc = JsonDocument.Parse(await listResp.Content.ReadAsStringAsync());
+        var runId = listDoc.RootElement.GetProperty("data")
+            .GetProperty("recentRuns")[0].GetProperty("runId").GetString();
+
+        var resp = await client.PostAsJsonAsync("/graphql", new
+        {
+            query = $@"{{
+                runCostBreakdown(runId: ""{runId}"") {{
+                    totalCost
+                    byTier {{ trivial low medium high }}
+                    unknownKeyCost
+                    filteredOut
+                }}
+            }}"
+        });
+        resp.EnsureSuccessStatusCode();
+
+        var body = await resp.Content.ReadAsStringAsync();
+        using var doc = JsonDocument.Parse(body);
+        var br = doc.RootElement.GetProperty("data").GetProperty("runCostBreakdown");
+
+        var totalCost = br.GetProperty("totalCost").GetDouble();
+        var trivial = br.GetProperty("byTier").GetProperty("trivial").GetDouble();
+        var low = br.GetProperty("byTier").GetProperty("low").GetDouble();
+        var medium = br.GetProperty("byTier").GetProperty("medium").GetDouble();
+        var high = br.GetProperty("byTier").GetProperty("high").GetDouble();
+        var unknown = br.GetProperty("unknownKeyCost").GetDouble();
+
+        // Core invariant: total = sum(byTier) + unknown.
+        Assert.Equal(totalCost, trivial + low + medium + high + unknown, 6);
+
+        // The seed has 2 flat scenarios (cost 0.004 + 0.003) attributed to unknown
+        // because their Output is plain text not a serialised EvalResult tree.
+        // Plus the recursive tree-scenario contributes 0.002 (2 leaves at 0.001 each
+        // with unregistered keys "leaf-A" / "leaf-B"). Expected total ≈ 0.009.
+        Assert.True(totalCost >= 0.0085 && totalCost <= 0.0095,
+            $"Expected total cost ~0.009; got {totalCost}");
+
+        // filteredOut is always empty until RunRef.BudgetTier ships (plan-08 backlog).
+        Assert.Equal(0, br.GetProperty("filteredOut").GetArrayLength());
+    }
+
+    [Fact]
+    public async Task RunCostBreakdown_UnknownRunId_ReturnsNull()
+    {
+        using var client = _factory.CreateClient();
+        var resp = await client.PostAsJsonAsync("/graphql",
+            new { query = "{ runCostBreakdown(runId: \"definitely-not-a-real-run\") { totalCost } }" });
+        resp.EnsureSuccessStatusCode();
+
+        var body = await resp.Content.ReadAsStringAsync();
+        using var doc = JsonDocument.Parse(body);
+        Assert.Equal(JsonValueKind.Null,
+            doc.RootElement.GetProperty("data").GetProperty("runCostBreakdown").ValueKind);
+    }
+
     // ─── Recursive EvalResult tree (MC1.4.6) ──────────────────────────────────
 
     [Fact]
