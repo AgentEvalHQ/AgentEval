@@ -213,6 +213,14 @@ mcServeCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =>
 });
 mcCmd.Add(mcServeCmd);
 
+// mc doctor — verifies the Mission Control bundle (DLL + SPA wwwroot/) is
+// present and well-formed. Sibling to `agenteval doctor` (which validates
+// the workspace data, not the portal binaries).
+var mcDoctorCmd = new Command("doctor", "Verify Mission Control's runtime artefacts are co-located with the CLI and the SPA bundle is intact. Requires .NET 10.");
+mcDoctorCmd.SetAction(async (ParseResult _, CancellationToken ct) =>
+    await McDoctorCommand.RunAsync());
+mcCmd.Add(mcDoctorCmd);
+
 // ─── root ─────────────────────────────────────────────────────────────────────
 var rootCmd = new RootCommand("AgentEval CLI — output-store lifecycle management");
 rootCmd.Add(initCmd);
