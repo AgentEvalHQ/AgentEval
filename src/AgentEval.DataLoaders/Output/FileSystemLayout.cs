@@ -119,12 +119,39 @@ public sealed class FileSystemLayout
         if (segment is "." or "..") return false;
         if (segment.Contains("..", StringComparison.Ordinal)) return false;
         if (segment.Contains('/') || segment.Contains('\\')) return false;
+        // Unicode lookalikes that some tools later normalize to '/' (U+FF0F
+        // fullwidth solidus, U+2215 division slash). Reject them upfront so
+        // a path that "looks safe" today doesn't escape after a normalization
+        // pass tomorrow.
+        if (segment.Contains('／') || segment.Contains('∕')) return false;
+        // Trailing '.' / ' ' silently strip on NTFS ("foo." opens "foo"),
+        // creating a write-vs-read alias hazard.
+        if (segment.EndsWith('.') || segment.EndsWith(' ')) return false;
+        // Windows superset of invalid filename chars (Linux's
+        // GetInvalidFileNameChars returns only {'\0','/'}; harden for shared
+        // workspaces accessed cross-platform).
+        const string winInvalid = "<>:\"|?*";
         var invalid = Path.GetInvalidFileNameChars();
         foreach (var c in segment)
         {
             if (Array.IndexOf(invalid, c) >= 0) return false;
+            if (winInvalid.IndexOf(c) >= 0) return false;
             if (char.IsControl(c)) return false;
         }
+        // Reject Windows reserved device names — CON, PRN, NUL, AUX, COM1-9,
+        // LPT1-9. Windows treats `CON.json` as the device too, so we match
+        // the stem before the first '.'.
+        var stem = segment;
+        var dot = stem.IndexOf('.');
+        if (dot >= 0) stem = stem[..dot];
+        if (s_reservedDeviceNames.Contains(stem)) return false;
         return true;
     }
+
+    private static readonly HashSet<string> s_reservedDeviceNames = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "CON", "PRN", "NUL", "AUX",
+        "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8", "COM9",
+        "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9",
+    };
 }

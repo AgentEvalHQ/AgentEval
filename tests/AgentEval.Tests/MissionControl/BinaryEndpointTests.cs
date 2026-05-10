@@ -178,6 +178,31 @@ public class FileSystemLayoutPathSafetyTests
     [InlineData("   ")]
     [InlineData("has\0null")]
     [InlineData("has\nnewline")]
+    // Windows reserved device names — opening these on Windows targets a
+    // hardware device, not a file. Match case-insensitively + with extensions.
+    [InlineData("CON")]
+    [InlineData("con")]
+    [InlineData("CON.json")]
+    [InlineData("PRN")]
+    [InlineData("NUL.txt")]
+    [InlineData("AUX")]
+    [InlineData("COM1")]
+    [InlineData("LPT9.log")]
+    // Trailing dot / space silently strip on NTFS — "foo." opens "foo"
+    // creating a write-vs-read alias.
+    [InlineData("foo.")]
+    [InlineData("foo ")]
+    [InlineData("foo.txt.")]
+    // Windows-only invalid chars — harden for cross-platform shared workspaces.
+    [InlineData("a:b")]
+    [InlineData("a|b")]
+    [InlineData("a*b")]
+    [InlineData("a?b")]
+    [InlineData("a<b>c")]
+    [InlineData("a\"b")]
+    // Unicode slash lookalikes.
+    [InlineData("foo／bar")]   // U+FF0F fullwidth solidus
+    [InlineData("foo∕bar")]   // U+2215 division slash
     public void IsSafePathSegment_RejectsHostileInput(string input)
     {
         Assert.False(FileSystemLayout.IsSafePathSegment(input));

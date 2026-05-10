@@ -1,4 +1,6 @@
 using System.Diagnostics;
+using System.Net;
+using System.Net.Sockets;
 
 namespace AgentEval.Cli.Commands;
 
@@ -40,6 +42,15 @@ public static class McServeCommand
             Console.Error.WriteLine("    Run `agenteval init` first, or pass --workspace <path> to point at an initialized workspace.");
             // We still serve — the SPA renders a graceful empty / landing
             // state — but warn the user so they're not surprised.
+        }
+
+        // Pre-flight port check. Without it, a busy port surfaces as an
+        // opaque Kestrel crash inside the subprocess + a misleading exit code.
+        if (!TryProbePort(port, out var probeError))
+        {
+            Console.Error.WriteLine($"✖ Port {port} is not available: {probeError}");
+            Console.Error.WriteLine($"    Try a different port: `agenteval mc serve --port {port + 1}`.");
+            return 1;
         }
 
         // Locate the MC assembly + executable. Both ship next to the CLI's
@@ -92,16 +103,45 @@ public static class McServeCommand
         Console.WriteLine($"  rest:      http://localhost:{port}/api/v1/version");
         Console.WriteLine("  Ctrl+C to stop");
 
+        // Wire Ctrl+C so it cleanly stops the child instead of orphaning it.
+        // On Windows the console-control event reaches both processes (Kestrel
+        // handles its own SIGINT), so we just need to wait for the child to
+        // exit gracefully. If it doesn't exit within a short grace period we
+        // kill the whole tree to avoid zombies.
+        using var cts = new CancellationTokenSource();
+        Console.CancelKeyPress += (_, e) =>
+        {
+            e.Cancel = true; // suppress immediate process termination
+            cts.Cancel();
+        };
+
         try
         {
             using var proc = Process.Start(psi)
                 ?? throw new InvalidOperationException("Process.Start returned null.");
-            await proc.WaitForExitAsync();
+            try
+            {
+                await proc.WaitForExitAsync(cts.Token);
+            }
+            catch (OperationCanceledException)
+            {
+                Console.WriteLine("⏹ Stopping Mission Control…");
+                if (!proc.HasExited)
+                {
+                    using var graceCts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+                    try
+                    {
+                        await proc.WaitForExitAsync(graceCts.Token);
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        try { proc.Kill(entireProcessTree: true); }
+                        catch { /* best-effort */ }
+                    }
+                }
+                return 0;
+            }
             return proc.ExitCode;
-        }
-        catch (OperationCanceledException)
-        {
-            return 0;
         }
         catch (Exception ex)
         {
@@ -118,4 +158,34 @@ public static class McServeCommand
         return 2;
 #endif
     }
+
+#if NET10_0_OR_GREATER
+    /// <summary>
+    /// Probes the requested port with a short-lived bind. Returns true when
+    /// the port is free; on failure populates <paramref name="error"/> with
+    /// the reason ("address already in use", permission denied, etc.). Bound
+    /// to localhost since that's all we serve on.
+    /// </summary>
+    private static bool TryProbePort(int port, out string error)
+    {
+        error = "";
+        try
+        {
+            using var listener = new TcpListener(IPAddress.Loopback, port);
+            listener.Start();
+            listener.Stop();
+            return true;
+        }
+        catch (SocketException ex)
+        {
+            error = ex.Message;
+            return false;
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+            return false;
+        }
+    }
+#endif
 }

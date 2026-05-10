@@ -15,9 +15,11 @@ namespace AgentEval.MissionControl;
 /// <list type="bullet">
 ///   <item><c>Program.cs</c> top-level statements (the
 ///         <c>dotnet run --project src/AgentEval.MissionControl</c> path).</item>
-///   <item><c>agenteval mc serve</c> (plan-08 MC1.7.1) — the user-friendly CLI
-///         entry point. Lives in <c>AgentEval.Cli</c> and invokes
-///         <see cref="RunAsync"/> directly without shelling out to <c>dotnet</c>.</item>
+///   <item><c>agenteval mc serve</c> (plan-08 MC1.7.1) — spawns this assembly's
+///         executable as a subprocess, so its top-level <c>Program</c> remains
+///         the entry point and <c>Microsoft.NET.Sdk.Web</c>'s static-asset pipeline
+///         resolves correctly. Both paths call <see cref="ConfigureServices"/>
+///         and <see cref="ConfigurePipeline"/>.</item>
 /// </list>
 /// </summary>
 public static class McHost

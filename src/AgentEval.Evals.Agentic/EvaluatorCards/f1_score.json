@@ -16,10 +16,10 @@
       "description": "The agent's response text (whitespace-tokenized + lowercased before comparison)."
     },
     {
-      "kind": "metadata",
-      "key": "groundTruth",
+      "kind": "groundTruth",
+      "key": "",
       "required": true,
-      "description": "Reference / expected answer (string). EvalInput.GroundTruth takes precedence over the constructor fallback; if neither is supplied the eval returns 0 with a 'medium' severity evidence note."
+      "description": "Reference / expected answer. Wired via EvalInput.GroundTruth (top-level field, NOT a metadata bag entry); takes precedence over the constructor fallback. If neither is supplied the eval returns 0 with a 'medium' severity evidence note."
     }
   ],
   "recommendedVisualization": "histogram",
