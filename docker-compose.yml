@@ -1,0 +1,27 @@
+# SPDX-License-Identifier: MIT
+# Plan-08 MC1.12.1 — Mission Control quick-start via Docker Compose.
+#
+# Mounts the host's .agenteval/ folder (read-only) into the container at
+# /workspace/.agenteval, then serves Mission Control on http://localhost:5000.
+#
+# Usage:
+#   docker compose up
+#   open http://localhost:5000
+#
+# Custom workspace path:
+#   AGENTEVAL_WORKSPACE=/path/to/your/workspace docker compose up
+
+services:
+  mission-control:
+    build: .
+    image: agenteval/mc:latest
+    container_name: agenteval-mc
+    ports:
+      - "5000:5000"
+    volumes:
+      # Mount the host's .agenteval/ read-only — Mission Control is a
+      # read-only viewer and never writes to the workspace.
+      - ${AGENTEVAL_WORKSPACE:-./.agenteval}:/workspace/.agenteval:ro
+    environment:
+      AgentEval__Root: /workspace
+    restart: unless-stopped

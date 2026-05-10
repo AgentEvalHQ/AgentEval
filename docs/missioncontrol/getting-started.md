@@ -11,12 +11,46 @@ Mission Control is the visualisation, aggregation, and governance layer on top o
 From inside any solution that has run `agenteval init`:
 
 ```bash
+agenteval mc serve
+```
+
+Open `http://localhost:5000` in your browser — SPA, GraphQL (`/graphql`),
+and REST (`/api/v1/*`) all serve from the same port. Use `--port N` to bind
+elsewhere, or `--workspace <path>` to read a different `.agenteval/` folder.
+
+ChilliCream's Nitro GraphQL playground is embedded at `/graphql` — explore the schema, run queries, click through into the recursive `EvalResult` tree.
+
+### Equivalent without the CLI
+If you've cloned the repo and want to run the project directly:
+
+```bash
 dotnet run --project src/AgentEval.MissionControl
 ```
 
-Open `http://localhost:5000/graphql` in your browser. ChilliCream's Nitro UI ships embedded — explore the schema, run queries, click through into the recursive `EvalResult` tree.
+Same endpoints, same port, same behaviour.
 
-> The CLI subcommand `agenteval mc serve` is wired in [plan-08 MC1.7.1](../../strategy/FutureFeatures/todo/08-AgentEval-MissionControl-ImplementationPlan.md#mc171). Until that lands, use `dotnet run` as above.
+### Docker (single-binary container)
+
+A multi-stage `Dockerfile` ships at the repo root. To build + run with your `.agenteval/` mounted read-only:
+
+```bash
+docker build -t agenteval/mc:latest .
+docker run --rm -p 5000:5000 \
+  -v "$(pwd)/.agenteval:/workspace/.agenteval:ro" \
+  agenteval/mc:latest
+```
+
+Or, using the `docker-compose.yml` shipped at the repo root:
+
+```bash
+docker compose up
+```
+
+The image runs as a non-root user (UID 1654), exposes port 5000, and reads from `/workspace/.agenteval` (override the host path with `AGENTEVAL_WORKSPACE=…`).
+
+### First run — empty workspace?
+
+If `.agenteval/` doesn't exist yet (or exists but isn't initialised), the SPA renders a guided welcome page with the three-step `init → bench → refresh` workflow instead of an empty dashboard. Run `agenteval init` then refresh.
 
 ---
 
