@@ -1,14 +1,29 @@
 /* Plan-08 MC1.6.2: Tailwind 4 entry point.
- * The new directive replaces the v3 @tailwind base/components/utilities triplet. */
+ *
+ * Tailwind 4 is CSS-first: theme tokens live in @theme blocks (NOT in a JS
+ * tailwind.config.ts — that file is ignored unless you opt in via @config).
+ * Custom colours under @theme automatically generate utilities like
+ * `bg-accent-700` / `text-accent-50` / `hover:bg-accent-500`. */
 @import "tailwindcss";
+
+@theme {
+  /* Mission Control palette: slate base + accent blue. */
+  --color-accent-50:  #eff6ff;
+  --color-accent-500: #3b82f6;
+  --color-accent-700: #1d4ed8;
+
+  /* Typography stack — fonts loaded via index.html's Google-Fonts link. */
+  --font-sans: "Inter", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", monospace;
+}
 
 @layer base {
   body {
-    font-family: "Inter", system-ui, sans-serif;
+    font-family: var(--font-sans);
   }
 
   code,
   pre {
-    font-family: "JetBrains Mono", monospace;
+    font-family: var(--font-mono);
   }
 }

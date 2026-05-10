@@ -11,9 +11,14 @@ import type { CodegenConfig } from "@graphql-codegen/cli";
 //   2. `npm run codegen`  → produces src/__generated__/graphql.ts
 //   3. Import typed hooks: `import { useSubjectsQuery } from "@/__generated__/graphql";`
 //
-// Until codegen has run, the smoke pages use the untyped graphql-request client
+// Until codegen has run, smoke pages use the untyped graphql-request client
 // directly with hand-written response interfaces. Codegen is recommended but
 // optional — the SPA builds either way.
+//
+// Fetcher: we reuse the shared `gqlRequest` from `@/lib/graphql-client` so the
+// generated hooks share retry/header config with hand-written queries (per the
+// Opus review F6 — HardcodedFetch as a separate transport would have created
+// two divergent fetch paths).
 const config: CodegenConfig = {
   overwrite: true,
   schema: "http://localhost:5000/graphql",
@@ -26,17 +31,18 @@ const config: CodegenConfig = {
         "typescript-react-query",
       ],
       config: {
+        // Reuse the shared graphql-request client so emitted hooks pick up
+        // the same headers / retry config as the hand-written queries.
         fetcher: {
-          endpoint: "/graphql",
-          fetchParams: {
-            headers: {
-              "Content-Type": "application/json",
-            },
-          },
+          func: "@/lib/graphql-client#gqlRequest",
+          isReactHook: false,
         },
+        // Match the runtime react-query major version. The plugin emits v4
+        // imports by default; v5 has slightly different hook signatures.
+        reactQueryVersion: 5,
+        reactQueryImportFrom: "@tanstack/react-query",
         exposeQueryKeys: true,
         exposeFetcher: true,
-        legacyMode: false,
       },
     },
   },

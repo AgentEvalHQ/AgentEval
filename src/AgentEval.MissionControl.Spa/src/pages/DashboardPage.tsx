@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { gqlRequest } from "@/lib/graphql-client";
 import { fetchVersion } from "@/lib/rest-client";
+import { queryKeys } from "@/lib/keys";
 
 // Plan-08 MC1.6.3 smoke deliverable: the dashboard page proves end-to-end
 // wiring by querying Query.subjects via graphql-request + TanStack Query and
@@ -38,12 +39,12 @@ const SUBJECTS_QUERY = /* GraphQL */ `
 
 export function DashboardPage() {
   const versionQ = useQuery({
-    queryKey: ["version"],
+    queryKey: queryKeys.version(),
     queryFn: fetchVersion,
   });
 
   const subjectsQ = useQuery({
-    queryKey: ["subjects"],
+    queryKey: queryKeys.subjects.list(),
     queryFn: () => gqlRequest<SubjectsQueryResponse>(SUBJECTS_QUERY),
   });
 
