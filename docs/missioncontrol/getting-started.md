@@ -1,6 +1,6 @@
 # AgentEval Mission Control — Getting Started
 
-> **Status**: Phase 1 — local viewer + workspace aggregator (target v1.2–v1.4). Mode C self-hosted server lands in Phase 2 (target v1.5).
+> **Status**: Phase 1 — local viewer + workspace aggregator (target v1.2–v1.4). Mode C self-hosted server is Phase 2 (target v1.5).
 
 Mission Control is the visualisation, aggregation, and governance layer on top of `.agenteval/`. This guide gets you a working portal in under 30 seconds against a populated solution.
 
@@ -178,15 +178,15 @@ REST stays for binary streams because GraphQL doesn't do streams cleanly (per [p
 
 | Mode | When to use | Setup |
 |---|---|---|
-| **A — Local viewer** | Solo dev / single-team, single repo | `dotnet run --project src/AgentEval.MissionControl` |
-| **B — Workspace aggregator** | Platform engineer / AI lead reviewing multiple repos on one machine | `--workspace ./repos` (lands with MC1.7.3) |
-| **C — Self-hosted server** | Org-wide collaboration with auth + multi-tenant + sync | Plan-08 Phase 2 (target v1.5) |
+| **A — Local viewer** | Solo dev / single-team, single repo | `agenteval mc serve` (or `dotnet run --project src/AgentEval.MissionControl`) |
+| **B — Workspace aggregator** | Platform engineer / AI lead reviewing multiple repos on one machine | `agenteval mc serve --workspace <path>` |
+| **C — Self-hosted server** | Org-wide collaboration with auth + multi-tenant + sync | Phase 2 (target v1.5) |
 
 ---
 
 ## Read-only guarantee
 
-Mission Control consumes only `IOutputStoreReader` (the read-only abstraction extracted in MC1.1.1). A reflection-based test (`ReaderOnlyArchitectureTests`) verifies at every build that no MissionControl type references `IOutputStore` (the write surface). The portal **cannot** corrupt your `.agenteval/` folder.
+Mission Control consumes only `IOutputStoreReader` (the read-only abstraction). A reflection-based test (`ReaderOnlyArchitectureTests`) verifies at every build that no MissionControl type references `IOutputStore` (the write surface). The portal **cannot** corrupt your `.agenteval/` folder.
 
 ---
 
@@ -196,7 +196,7 @@ Mission Control consumes only `IOutputStoreReader` (the read-only abstraction ex
 
 **Empty subjects / runs** — verify `.agenteval/subjects/` exists and contains `agents/` or `workflows/` subfolders.
 
-**`GraphQL ... allowed depth: 10`** — you're issuing a query that recurses deeper than 10 levels. The depth limit guards against unbounded-tree attacks (plan-07 §8.1). Restructure the query — most production trees fit within 3 nested `details { subResults { ... } }` pairs.
+**`GraphQL ... allowed depth: 10`** — you're issuing a query that recurses deeper than 10 levels. The depth limit guards against unbounded-tree attacks. Restructure the query — most production trees fit within 3 nested `details { subResults { ... } }` pairs.
 
 **Tampered evidence detected** — `complianceMatrix.allChainsValid: false` means at least one piece of evidence's `manifest_hash` no longer matches its source run's `content_hash`. Run `agenteval doctor` to identify the affected runs.
 

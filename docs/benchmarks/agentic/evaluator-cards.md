@@ -1,17 +1,16 @@
 # Agentic Benchmark — Evaluator Cards
 
-> **Placeholder**: per-evaluator detail cards will be expanded in a follow-up documentation pass.
-> For the full domain analysis, scoring formulas, criteria rubrics, and Foundry provenance for
-> each evaluator, see **`strategy/FutureFeatures/todo/05-AgentEval-Foundry-Evals-Local.md` §8**
-> (Per-Evaluator Implementation Cards) and the master analysis document
-> `strategy/FutureFeatures/todo/microsoft-foundry-evals-agent-eval-design.md` §3–§10.
+The 60 evaluators shipped across Phases 1–6 are organized below by category, with their key,
+implementing class, and (where applicable) the Foundry evaluator they fork from.
 
-The 60 evaluators shipped across Phases 1–6 are organized below by category. Each card will
-document: key, category, version, score formula, severity, pass threshold, Foundry URI (where
-applicable), input contract, and known limitations. Phase 1–5 cards are summarised inline below;
-Phase 6 evaluators (memory, multi-turn, reasoning, calibration, UX, adversarial, efficiency)
-are listed in [Cost Guidance](cost-guidance.md) and shipped as `EvaluatorCard` JSON files
-under `src/AgentEval.Evals.Agentic/EvaluatorCards/`.
+The authoritative source for each evaluator's full metadata — score formula, severity, pass
+threshold, expected inputs, recommended visualisation, and external compatibility — is the
+matching `EvaluatorCard` JSON under `src/AgentEval.Evals.Agentic/EvaluatorCards/<key>.json`.
+At runtime, Mission Control loads these into the GraphQL `evaluators` query (see
+[Mission Control Getting Started](../../missioncontrol/getting-started.md)), and the
+[Portal-Ready Evaluators](../../missioncontrol/portal-ready-evaluators.md) guide documents
+the schema for new evaluator authors. Phase 6 evaluators (memory, multi-turn, reasoning,
+calibration, UX, adversarial, efficiency) are listed in [Cost Guidance](cost-guidance.md).
 
 ---
 
@@ -85,6 +84,6 @@ under `src/AgentEval.Evals.Agentic/EvaluatorCards/`.
 
 ---
 
-> Per-evaluator detail cards — including scoring rubrics, input contracts, calibration guidance,
-> and design rationale — will be added as part of the Phase 5 documentation wrap-up.
-> Track progress in `strategy/FutureFeatures/todo/05-AgentEval-Foundry-Evals-Local.md` task A5.7.
+> Detailed per-evaluator scoring rubrics, input contracts, and calibration guidance live in
+> the `EvaluatorCard` JSON files. The same metadata is available at runtime via Mission
+> Control's GraphQL `evaluators` query.

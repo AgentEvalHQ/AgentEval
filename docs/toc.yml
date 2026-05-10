@@ -113,8 +113,6 @@
     href: architecture.md
   - name: The .agenteval Workspace
     href: agenteval-workspace.md
-  - name: Workspace Migration Guide
-    href: migration/output-folder.md
   - name: Building Documentation
     href: building-docs.md
   - name: Extensibility

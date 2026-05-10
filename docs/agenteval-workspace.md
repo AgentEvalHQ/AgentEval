@@ -1,8 +1,8 @@
 # The `.agenteval/` Workspace
 
-> **Reference** for the canonical AgentEval output layout. For the historical
-> "why we changed the layout" story and how to migrate legacy folders, see
-> [Migrating to the `.agenteval/` workspace layout](migration/output-folder.md).
+> **Reference** for the canonical AgentEval output layout — the standard for
+> how runs, baselines, compliance evidence, and red-team artefacts are
+> persisted on disk.
 
 `.agenteval/` is AgentEval's single source of truth for evaluation runs,
 baselines, compliance evidence, and red-team campaigns. Every run is identified
@@ -120,23 +120,24 @@ zero-width characters.
 
 ## Schema versions
 
-All v1 schemas are embedded as resources in the `AgentEval.DataLoaders`
-assembly and loaded at runtime with no filesystem dependency.
+Core v1 schemas are embedded as resources in the `AgentEval.DataLoaders`
+assembly and loaded at runtime with no filesystem dependency. Benchmark and
+regulation-specific schemas live alongside their owning project.
 
-| Schema | Document |
-|---|---|
-| `solution.schema.json` | `solution.json` |
-| `subject.schema.json` | `subjects/*/<name>/subject.json` |
-| `manifest.schema.json` | `runs/<runId>/manifest.json` |
-| `summary.schema.json` | `runs/<runId>/summary.json` |
-| `history-line.schema.json` | `subjects/*/<name>/history.jsonl` (per line) |
-| `evidence.schema.json` | `compliance/<reg>/<subject>/<ts>/evidence.json` |
-| `gdpr-evidence.schema.json` | `compliance/GDPR/.../gdpr-evidence.json` |
-| `eu-ai-act-evidence.schema.json` | `compliance/EU-AI-Act/.../eu-ai-act-evidence.json` |
-| `agentic-result.schema.json` | `benchmarks/agentic/.../agentic-result.json` |
-| `eval-result.schema.json` | Embedded recursive `EvalResult` trees |
-| `red-team-manifest.schema.json` | `red-team/<campaign>_<ts>/manifest.json` |
-| `evaluator-card.schema.json` | EvaluatorCard JSON files (embedded resources) |
+| Schema | Document | Resource location |
+|---|---|---|
+| `solution.schema.json` | `solution.json` | `AgentEval.DataLoaders` |
+| `subject.schema.json` | `subjects/*/<name>/subject.json` | `AgentEval.DataLoaders` |
+| `manifest.schema.json` | `runs/<runId>/manifest.json` | `AgentEval.DataLoaders` |
+| `summary.schema.json` | `runs/<runId>/summary.json` | `AgentEval.DataLoaders` |
+| `history-line.schema.json` | `subjects/*/<name>/history.jsonl` (per line) | `AgentEval.DataLoaders` |
+| `evidence.schema.json` | `compliance/<reg>/<subject>/<ts>/evidence.json` | `AgentEval.DataLoaders` |
+| `eval-result.schema.json` | Embedded recursive `EvalResult` trees | `AgentEval.DataLoaders` |
+| `red-team-manifest.schema.json` | `red-team/<campaign>_<ts>/manifest.json` | `AgentEval.DataLoaders` |
+| `evaluator-card.schema.json` | EvaluatorCard JSON files | `AgentEval.DataLoaders` |
+| `agentic-result.schema.json` | `benchmarks/agentic/.../agentic-result.json` | `AgentEval.Evals.Agentic` |
+| `gdpr-evidence.schema.json` | `compliance/GDPR/.../gdpr-evidence.json` | `samples/AgentEval.GdprBenchmark` |
+| `eu-ai-act-evidence.schema.json` | `compliance/EU-AI-Act/.../eu-ai-act-evidence.json` | `samples/AgentEval.EuAiActBenchmark` |
 
 Future schema bumps are additive (new optional fields only) until a v2 is
 declared. The `schemaVersion` field selects the correct validator when
@@ -175,7 +176,7 @@ For every evidence file, doctor:
 
 1. Reads `sourceRun.runId` and `sourceRun.manifestHash`.
 2. Locates the corresponding `manifest.json` under
-   `subjects/*/runs/{runId}/`.
+   `subjects/{agents|workflows}/{name}/runs/{runId}/`.
 3. Compares the stored `contentHash` with the value in the evidence file.
 4. Reports a `Hash mismatch` error if the values differ.
 
@@ -183,7 +184,7 @@ For every evidence file, doctor:
 solution.json OK
 Run 3f8a1b2c (subject: TravelAgent)
 Run 7d9e4f01 (subject: TravelAgent)
-compliance/OWASP/TravelAgent/2026-04-10T14:32:00Z/evidence.json
+compliance/GDPR/TravelAgent/2026-04-10_14-32-00/evidence.json
 
 Errors: 0 | Warnings: 0 | OK: 3
 ```
@@ -218,28 +219,34 @@ docker run --rm -p 5000:5000 \
 
 ---
 
-## Disabling the canonical store
+## Output store modes
 
-If you are not ready to adopt the canonical layout, do not call
-`AddAgentEvalOutputStore` — the framework falls back to legacy behaviour
-automatically when no `IOutputStore` is registered.
+`AddAgentEvalOutputStore` is the entry point. Three modes are available via
+`OutputStoreOptions.OutputStore`:
 
-To explicitly opt in to the no-op mode:
+| Mode | Behaviour |
+|---|---|
+| `Auto` (default) | Uses the file-system store when a workspace root with `solution.json` is discoverable; otherwise returns `NullOutputStore`. The standard registration for production code. |
+| `FileSystem` | Always uses the file-system store. Throws if no workspace root is found — useful when you want a hard failure rather than silently dropping data. |
+| `Null` | Always uses `NullOutputStore`. Accepts every write call and discards the data silently; no `.agenteval/` folder is touched. Pick this in unit tests and contexts where filesystem side effects are not acceptable. |
 
 ```csharp
+// Tests / no-op
 services.AddAgentEvalOutputStore(opts =>
     opts.OutputStore = OutputStoreMode.Null);
+
+// Force file-system, fail loudly if the workspace is missing
+services.AddAgentEvalOutputStore(opts =>
+    opts.OutputStore = OutputStoreMode.FileSystem);
 ```
 
-`NullOutputStore` accepts all calls and discards all data silently. It is
-safe in unit tests or contexts where filesystem side effects are not
-acceptable.
+If `AddAgentEvalOutputStore` is never called, `IOutputStore` is not
+registered and DI resolution fails for any code that depends on it.
 
 ---
 
 ## See also
 
-- [Migrating to the `.agenteval/` workspace layout](migration/output-folder.md) — historical migration guide.
 - [Mission Control Getting Started](missioncontrol/getting-started.md) — read-only portal that consumes `.agenteval/`.
 - [Composite Evaluations](composite-evals.md) — recursive `EvalResult` persistence inside `subjects/*/runs/{runId}/scenarios/`.
-- [CLI Reference](cli.md) — `agenteval init`, `agenteval doctor`, `agenteval migrate`.
+- [CLI Reference](cli.md) — `agenteval init`, `agenteval doctor`.

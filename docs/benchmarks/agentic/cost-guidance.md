@@ -164,8 +164,8 @@ agenteval bench agentic --preset user-experience --subject MyAgent --budget-tier
 Use in CI for pull request validation — balances speed and coverage.
 
 - Keeps: all TRIVIAL + LOW + MEDIUM tier evaluators
-- Removes: HIGH tier evaluators (full-history memory evaluators)
-- **Conversational preset result after `medium` filter**: 4 components retained (all except MemoryRecallAccuracy and LongConversationCoherence).
+- Removes: HIGH tier evaluators (full-history conversation evaluators)
+- **Conversational preset result after `medium` filter**: 2 components retained (`turn_coherence`, `clarification_appropriateness`); the three HIGH-tier evaluators (`memory_recall_accuracy`, `long_conversation_coherence`, `goal_tracking`) are removed and remaining weights renormalised.
 
 ```bash
 agenteval bench agentic --preset conversational --subject MyAgent --budget-tier medium
@@ -204,14 +204,14 @@ Estimates assume a GPT-4o-class judge, 10 scenarios per evaluator, and average p
 | `user-experience` | 5 | LOW×5 | ~$0.25–$0.50 |
 | `adversarial-direct` | 3 | MEDIUM×1, LOW×2 | ~$0.15–$0.60 |
 
-> The `conversational` preset is the most expensive due to its two HIGH-tier evaluators (MemoryRecallAccuracy, LongConversationCoherence, GoalTracking) which embed full conversation histories in every judge prompt. For dev-loop use, apply `--budget-tier medium` or `--budget-tier low`.
+> The `conversational` preset is the most expensive due to its three HIGH-tier evaluators (MemoryRecallAccuracy, LongConversationCoherence, GoalTracking) which embed full conversation histories in every judge prompt. For dev-loop use, apply `--budget-tier medium` or `--budget-tier low`.
 
 ---
 
 ## Implementation Reference
 
 - **Enum**: `AgentEval.Evals.EvaluatorCostTier` in `src/AgentEval.Abstractions/Evals/`
-- **Cost map**: `AgentEval.Evals.EvaluatorCostMap` (static dictionary, 60 entries — one per shipped evaluator)
+- **Cost map**: `AgentEval.Evals.EvaluatorCostMap` (static dictionary keyed by evaluator key — covers all shipped atomic evaluators plus the composites and aggregates that consumers reference directly)
 - **Filter logic**: `AgentEval.Evals.Agentic.Composition.CostFilteredCompositeBuilder.FilterByBudget`
 - **CLI integration**: `--budget-tier` flag on `agenteval bench agentic`
 

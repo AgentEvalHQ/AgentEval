@@ -296,7 +296,7 @@ The `agenteval bench agentic calibrate` command runs the hand-labeled golden dat
 agenteval bench agentic calibrate
 ```
 
-The golden dataset contains 60 hand-labeled scenario/response pairs distributed across three categories (20 system/process + 20 quality + 20 mixed). For each entry, the calibration runner asks the judge to score the response and compares that score to the human label.
+The golden dataset contains hand-labeled scenario/response pairs distributed across category-specific files under `tests/AgentEval.Tests/Agentic/Calibration/Golden/` — three Phase 1–2 files of 20 entries each (system / process / quality), plus Phase 6 files for adversarial, confidence calibration, memory + multi-turn, reasoning, and UX. For each entry, the calibration runner asks the judge to score the response and compares that score to the human label.
 
 The calibration report records per-category accuracy (fraction of entries within an acceptable score band) and Cohen's kappa (inter-rater agreement). The CI workflow `.github/workflows/agentic-calibration.yml` gates release branches on:
 
@@ -316,7 +316,7 @@ The calibration report is written to `docs/benchmarks/agentic/calibration-{date}
 
 Evaluator prompts are forked from public MIT-licensed sources (the `azure-sdk-for-python` evaluator `.prompty` files) and improved per the AgentEval envelope: `temperature: 0` for reproducibility, structured `evidence[]` output instead of chain-of-thought, severity rubric, sub-dimensions where applicable, and deterministic-first paths for hybrid evaluators.
 
-Each prompt file's header carries the source URL, pinned commit SHA at fork time, and the list of modifications applied — that's the credit-where-credit-is-due story per the MIT license. The upstream-feedback summary documenting the improvements lives at [`strategy/FutureFeatures/todo/findings-and-suggestions.md`](../../../strategy/FutureFeatures/todo/findings-and-suggestions.md).
+Each prompt file's header carries the source URL, pinned commit SHA at fork time, and the list of modifications applied — that's the credit-where-credit-is-due story per the MIT license.
 
 ---
 
@@ -333,11 +333,11 @@ Each prompt file's header carries the source URL, pinned commit SHA at fork time
 
 ## References
 
-- **Implementation plan**: `strategy/FutureFeatures/todo/05-AgentEval-Foundry-Evals-Local.md`
-- **Master analysis**: `strategy/FutureFeatures/todo/microsoft-foundry-evals-agent-eval-design.md`
 - [GDPR Compliance Benchmark](../gdpr/getting-started.md) — the original reference benchmark whose pattern the agentic benchmark mirrors.
 - [EU AI Act Compliance Benchmark](../eu-ai-act/getting-started.md) — the second reference benchmark.
 - [Composite Evaluations](../../composite-evals.md) — the underlying `CompositeEval` / `AtomicLlmEval` / `AtomicCodeEval` primitives.
+- [Cost Guidance](cost-guidance.md) — per-evaluator cost-tier classification and `--budget-tier` filtering.
+- [Evaluator Cards](evaluator-cards.md) — index of the 60 shipped evaluators by category.
 - [CLI Reference](../../cli.md) — full reference for `agenteval bench agentic` and `agenteval bench agentic calibrate`.
 
 > **Reminder**: this benchmark is a behavioral evaluation tool, not a compliance attestation, certification, or production-readiness guarantee. A passing score does not substitute for human review, monitoring, penetration testing, or domain-specific validation. Consult qualified domain and legal personnel before making any quality or compliance representations.

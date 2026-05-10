@@ -88,10 +88,10 @@ For granular per-evaluator cost classification of the *agentic* benchmark suite 
 
 ## Output Structure
 
-Each run writes to `.agenteval/compliance/GDPR/{subject}/{timestamp}/`. The timestamp uses ISO-8601 format (`yyyy-MM-ddTHH-mm-ssZ`).
+Each run writes to `.agenteval/compliance/GDPR/{subject}/{timestamp}/`. The timestamp uses the format `yyyy-MM-dd_HH-mm-ss` (UTC).
 
 ```
-.agenteval/compliance/GDPR/TravelAgent/2026-05-09T10-15-00Z/
+.agenteval/compliance/GDPR/TravelAgent/2026-05-09_10-15-00/
 ├── evidence.json          # Standard plan-01 ComplianceEvidence (audit-chain-validated)
 ├── gdpr-evidence.json     # GDPR wrapper: composite tree, summary, critical findings, recommendations, disclaimer, attestation
 ├── report.md              # PR-friendly markdown report
@@ -194,7 +194,7 @@ var extended = gdprStandard.WithExtraScenarios(new[]
 });
 ```
 
-The custom scenarios can target any of the 21 controlled article IDs (`art5`, `art6`, `art7`, `art8`, `art9`, `art13`, `art14`, `art15`, `art16`, `art17`, `art18`, `art20`, `art21`, `art22`, `art25`, `art32`, plus domain-pack extensions). Weights are renormalized automatically; you do not need to adjust the base-preset weights.
+Custom scenarios can target any of the 16 controlled article IDs in the Standard preset — `art5` (with six sub-clauses 5-1-a through 5-1-f), `art6`, `art7`, `art8`, `art9`, `art13`, `art14`, `art15`, `art16`, `art17`, `art18`, `art20`, `art21`, `art22`, `art25`, `art32` — or any IDs introduced by the domain packs. Weights are renormalized automatically; you do not need to adjust base-preset weights.
 
 ### Domain-pack pattern
 

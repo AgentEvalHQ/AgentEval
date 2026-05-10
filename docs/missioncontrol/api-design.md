@@ -25,7 +25,7 @@ This isn't exotic — GitHub does it (REST v3 + GraphQL v4), Stripe does it (RES
 
 ### 1. The recursive `EvalResult` tree is graph-shaped
 
-Plan-02 ships `EvalResult.SubResults` as `IReadOnlyList<EvalResult>?` — composites contain composites contain atoms. REST has three bad answers:
+`EvalResult.SubResults` is `IReadOnlyList<EvalResult>?` — composites contain composites contain atoms. REST has three bad answers:
 
 - **Send the whole tree always** — expensive on large composites (a GDPR full-calibration tree is ~50 KB JSON × dozens of scenarios).
 - **Add `?depth=N`** — congratulations, you reinvented GraphQL's field selection, badly.
@@ -121,24 +121,27 @@ The shipped block above matches `src/AgentEval.MissionControl/Rest/BinaryEndpoin
 
 ## GraphQL surface (`POST /graphql`)
 
-Schema is auto-discovered from C# records. Top-level resolvers (Phase 1):
+Schema is auto-discovered from C# records (`src/AgentEval.MissionControl/GraphQL/Query.cs`). Top-level resolvers (Phase 1):
 
 ```
-Query.solution                            Solution
-Query.subjects(kind?, search?)            [Subject!]!
-Query.subject(kind, name)                 Subject?
-Query.recentRuns(count = 50)              [RunPointer!]!
-Query.run(runId)                          RunManifest?
-Query.runSummary(runId)                   RunSummary?
-Query.scenarios(runId)                    [ScenarioResult!]!
-Query.scenario(runId, scenarioId)         ScenarioResult?
-Query.scenarioTree(runId, scenarioId)     EvalResult?       ← recursive!
-Query.compliance                          [ComplianceRegulationSummary!]!
-Query.complianceMatrix(regulation)        ComplianceMatrix!  ← killer feature
+Query.solution                                 SolutionInfo?
+Query.workspace                                WorkspaceState!     ← drives first-run landing
+Query.subjects(kind?)                          [SubjectInfo!]!
+Query.subject(kind, name)                      SubjectInfo?
+Query.recentRuns(count = 50)                   [RunPointer!]!     ← max 500
+Query.run(runId)                               RunManifest?
+Query.runSummary(runId)                        RunSummary?
+Query.runCostBreakdown(runId)                  RunCostBreakdown?  ← per-tier cost
+Query.scenarios(runId)                         [ScenarioResult!]!
+Query.scenario(runId, scenarioId)              ScenarioResult?
+Query.scenarioTree(runId, scenarioId)          EvalResult?        ← recursive!
+Query.compliance                               [ComplianceRegulationSummary!]!
+Query.complianceMatrix(regulation)             ComplianceMatrix!  ← killer feature
 Query.complianceEvidence(reg, kind, name, ts)  ComplianceEvidence?
-Query.evaluators(category?, costTier?)    [EvaluatorCard!]!
-Query.evaluator(key)                      EvaluatorCard?
-Query.ping / Query.agentEvalVersion        smoke
+Query.evaluators(category?, costTier?)         [EvaluatorCard!]!
+Query.evaluator(key)                           EvaluatorCard?
+Query.evaluatorTimeline(key, count = 30)       [EvaluatorTimelinePoint!]!  ← drift / calibration surface
+Query.ping / Query.agentEvalVersion             smoke
 ```
 
 In Phase 2 the schema extends with `Query.workspaces`, `Query.search`, `Query.crossRegulationOverlap`, `Query.redTeamCampaigns`, etc. — see plan-07 §8.1 for the full forward-looking shape.

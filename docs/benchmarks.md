@@ -2,6 +2,12 @@
 
 > **Running industry-standard AI benchmarks and creating custom benchmark suites with AgentEval**
 
+This guide covers the in-process, library-API benchmarks: `AgenticBenchmark` (BFCL/GAIA-style test cases) and `PerformanceBenchmark` (latency, throughput, cost). For the CLI-driven, audit-chained presets that write to `.agenteval/`, see:
+
+- [Agentic Benchmark](benchmarks/agentic/getting-started.md) — 60 evaluators, 11 presets, `agenteval bench agentic`
+- [GDPR Benchmark](benchmarks/gdpr/getting-started.md) — 16 GDPR articles, `agenteval bench gdpr`
+- [EU AI Act Benchmark](benchmarks/eu-ai-act/getting-started.md) — 13 controls, `agenteval bench eu-ai-act`
+
 ---
 
 ## What You Can Do

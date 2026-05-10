@@ -2,13 +2,23 @@
 
 ## Overview
 
-A composite evaluation aggregates multiple sub-evals into one scored result with a recursive tree of sub-results. This is the right primitive when a single pass/fail verdict must draw on several independent checks — for example, a GDPR Article 17 rollup across acknowledgment, backup propagation, legal obligation, and over-erasure checks; Foundry's tool-call-accuracy formula (`0.25 × selection + 0.25 × input + ...`); or a multi-judge consensus where each judge is one component. Phase 1 ships `WeightedSumAggregation` as the only aggregation strategy. Additional strategies (`Min`, `WeightedMedian`, `Strict`) are deferred until a concrete consumer asks for them.
+A composite evaluation aggregates multiple sub-evals into one scored result with a recursive tree of sub-results. This is the right primitive when a single pass/fail verdict must draw on several independent checks — for example, a GDPR Article 17 rollup across acknowledgment, backup propagation, legal obligation, and over-erasure checks; Foundry's tool-call-accuracy formula (`0.25 × selection + 0.25 × input + ...`); or a multi-judge consensus where each judge is one component.
+
+Five aggregation strategies ship under `AgentEval.Evals.Aggregations`:
+
+| Strategy | When to use |
+|---|---|
+| `WeightedSumAggregation` | Default — score is `Σ(weight_i × score_i)` over components. Used by most agentic and GDPR Standard presets. |
+| `MinAggregation` | Score is the minimum across components — any weak component caps the verdict. Used inside EU AI Act Pillar 1 (Prohibited Practices). |
+| `CapByWorstAggregation` | Score is capped at the worst severity-weighted sub-score; surfaces critical failures even when other components score well. Used by GDPR / EU AI Act `audit` presets. |
+| `WeightedMedianAggregation` | Outlier-resistant alternative to weighted sum — useful when one judge in a multi-judge panel is known to skew scores. |
+| `MajorityVoteAggregation` | Pass/fail verdict by majority vote across components — used for stochastic-runs aggregation in `agenteval bench gdpr --runs N`. |
 
 ---
 
-## Two kinds of evals
+## Three kinds of evals
 
-Both types implement `IEval` and produce the same `EvalResult` shape. Callers never need to branch on type.
+All three implement `IEval` and produce the same `EvalResult` shape. Callers never need to branch on type.
 
 | Kind | Class | How it scores |
 |------|-------|---------------|
@@ -151,15 +161,12 @@ The `eval-result.schema.json` v1 schema is embedded as a resource in the `AgentE
 
 ---
 
-## What is not in Phase 1
+## Deferred features
 
 The following are deferred until a concrete consumer asks for them:
 
-- `MinAggregation` — useful for audit-grade compliance where every component must pass.
-- `WeightedMedianAggregation` — outlier-resistant alternative to weighted sum.
-- `StrictAggregation` — any failure fails the composite.
-- `CapByWorstAggregation` — caps the composite score at the lowest sub-score.
-- `MedianAggregation` — unweighted median for multi-judge consensus.
+- `StrictAggregation` — any failure fails the composite (`MinAggregation` covers most use cases today).
+- `MedianAggregation` — unweighted median for multi-judge consensus (`WeightedMedianAggregation` covers the weighted case).
 - `Predicate` field on `EvalComponent` — conditional component skipping with automatic weight renormalization.
 - YAML composite authoring — declare composites in config rather than code.
 - Sub-eval result caching — reuse a sub-eval result across multiple composites.
@@ -172,4 +179,3 @@ The following are deferred until a concrete consumer asks for them:
 
 - [Evaluation Guide](evaluation-guide.md) — choosing the right metrics for your use case
 - [The `.agenteval/` Workspace](agenteval-workspace.md) — canonical output store, schema versions, audit chain, and `agenteval doctor`
-- [Migrating to the `.agenteval/` workspace layout](migration/output-folder.md) — moving legacy paths into the canonical layout

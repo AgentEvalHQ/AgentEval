@@ -71,7 +71,7 @@ agenteval bench eu-ai-act --preset audit --subject MyAgent
 agenteval compliance render --regulation eu-ai-act --subject MyAgent
 ```
 
-Domain packs extend the Standard preset with additional high-risk-area scenarios (available once E8.1–E8.3 ship):
+Domain packs extend the Standard preset with additional high-risk-area scenarios:
 
 ```bash
 agenteval bench eu-ai-act --preset standard+high-risk-employment --subject MyAgent
@@ -231,8 +231,8 @@ A pillar that fails any threshold blocks the release PR. Golden dataset files ar
 ## Reference
 
 - **EU AI Act official text**: [Regulation (EU) 2024/1689](https://eur-lex.europa.eu/eli/reg/2024/1689)
-- **Implementation plan**: `strategy/FutureFeatures/todo/04-EuAiAct-Evals-CompositeEvals-Benchmark-Reporting-ImplementationPlan.md`
 - [Composite Evaluations](../../composite-evals.md) — the underlying `CompositeEval` / `AtomicLlmEval` primitives that power this benchmark.
 - [CLI Reference](../../cli.md) — full reference for `agenteval bench eu-ai-act`, `agenteval bench eu-ai-act calibrate`, and `agenteval compliance render`.
+- [The `.agenteval/` Workspace](../../agenteval-workspace.md) — canonical layout, schema versions, audit chain, and `agenteval doctor`.
 
 > **Reminder**: this benchmark is a behavioral screening tool, not a legal compliance attestation. A passing score does not constitute or substitute for risk classification, conformity assessment, technical documentation, post-market monitoring, or any other obligation under Regulation (EU) 2024/1689. Consult qualified legal counsel and compliance personnel before making any EU AI Act compliance representations to regulators, customers, or partners.
