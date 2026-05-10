@@ -287,16 +287,25 @@ function TimelineSection({
   isPending: boolean;
   isError: boolean;
 }) {
-  const chartPoints: TimelinePoint[] = (points ?? []).map((p) => ({
-    timestamp: p.timestamp,
-    score: p.score,
-    runId: p.runId,
-    verdict: p.passed
-      ? "PASS"
-      : p.severity === "medium"
-        ? "WARN"
-        : "FAIL",
-  }));
+  // Verdict mapping (keep aligned with VerdictBadge):
+  //   passed=true                                                  → PASS
+  //   passed=true  + severity in {medium}                          → WARN (drift detected, still under threshold)
+  //   passed=false + severity in {low, medium}                     → WARN
+  //   passed=false + severity in {high, critical}  (or unknown)    → FAIL
+  // `severity = "none"` defers entirely to `passed`.
+  const chartPoints: TimelinePoint[] = (points ?? []).map((p) => {
+    const sev = (p.severity ?? "").toLowerCase();
+    const isWarnSeverity = sev === "low" || sev === "medium";
+    const verdict: TimelinePoint["verdict"] = p.passed
+      ? sev === "medium" ? "WARN" : "PASS"
+      : isWarnSeverity ? "WARN" : "FAIL";
+    return {
+      timestamp: p.timestamp,
+      score: p.score,
+      runId: p.runId,
+      verdict,
+    };
+  });
 
   return (
     <section className="rounded-lg border border-slate-200 bg-white p-4">

@@ -673,6 +673,66 @@ public class GraphQLReadResolversTests : IClassFixture<SeededMissionControlFacto
     }
 
     [Fact]
+    public async Task EvaluatorTimeline_NonPositiveCount_ReturnsEmpty()
+    {
+        // Lock down the count <= 0 short-circuit; if someone "fixes" it to clamp
+        // to 1 instead of yielding an empty list this test will catch the change
+        // and force a deliberate decision.
+        using var client = _factory.CreateClient();
+        foreach (var bogusCount in new[] { 0, -1, -5 })
+        {
+            var resp = await client.PostAsJsonAsync("/graphql", new
+            {
+                query = $$"""
+                    {
+                      evaluatorTimeline(evaluatorKey: "leaf-A", count: {{bogusCount}}) {
+                        runId
+                      }
+                    }
+                    """
+            });
+            resp.EnsureSuccessStatusCode();
+
+            var body = await resp.Content.ReadAsStringAsync();
+            using var doc = JsonDocument.Parse(body);
+            var points = doc.RootElement.GetProperty("data").GetProperty("evaluatorTimeline");
+
+            Assert.Equal(JsonValueKind.Array, points.ValueKind);
+            Assert.Equal(0, points.GetArrayLength());
+        }
+    }
+
+    [Fact]
+    public async Task EvaluatorTimeline_TolerantToFlatScenarios()
+    {
+        // The seed plants both flat scenarios (Output is plain text → FromScenarioResult
+        // returns null) and the recursive tree-scenario. Querying for any composite-tree
+        // key still returns matches without throwing on the flat scenarios. Locks down
+        // the `tree is null → continue` branch in the resolver.
+        using var client = _factory.CreateClient();
+        var resp = await client.PostAsJsonAsync("/graphql", new
+        {
+            query = """
+                {
+                  evaluatorTimeline(evaluatorKey: "mid-1", count: 5) {
+                    runId
+                    score
+                  }
+                }
+                """
+        });
+        resp.EnsureSuccessStatusCode();
+
+        var body = await resp.Content.ReadAsStringAsync();
+        using var doc = JsonDocument.Parse(body);
+        var points = doc.RootElement.GetProperty("data").GetProperty("evaluatorTimeline");
+
+        Assert.Equal(JsonValueKind.Array, points.ValueKind);
+        Assert.True(points.GetArrayLength() >= 1);
+        Assert.Equal(0.92, points[0].GetProperty("score").GetDouble(), 3);
+    }
+
+    [Fact]
     public async Task EvaluatorTimeline_EmptyKey_ReturnsEmpty()
     {
         using var client = _factory.CreateClient();
