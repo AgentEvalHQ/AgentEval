@@ -23,4 +23,10 @@
     <PackageReference Include="HotChocolate.AspNetCore" />
   </ItemGroup>
 
+  <!-- Plan-08 MC1.8.1: SPA build artefacts live at wwwroot/ (Vite writes here
+       via outDir in src/AgentEval.MissionControl.Spa/vite.config.ts). They're
+       gitignored — `npm run build` reproduces them locally. The Microsoft.NET.Sdk.Web
+       SDK auto-includes wwwroot/**/* as Content with `CopyToOutputDirectory=PreserveNewest`,
+       so no explicit ItemGroup is needed. -->
+
 </Project>

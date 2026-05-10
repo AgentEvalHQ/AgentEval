@@ -73,6 +73,20 @@ app.MapGet("/api/v1/version", () =>
 // Reports, traces, PDFs are byte streams — REST not GraphQL.
 app.MapBinaryEndpoints();
 
+// Plan-08 MC1.8.1: serve the React SPA from wwwroot/ so a single
+// `dotnet run --project src/AgentEval.MissionControl` boots the whole portal
+// (GraphQL + REST + UI) on one port. The SPA is built via
+// `npm run build` in src/AgentEval.MissionControl.Spa/ which writes its
+// `dist/` output directly into this project's wwwroot/ (see vite.config.ts).
+//
+// Order matters: UseDefaultFiles must come BEFORE MapStaticAssets, else
+// requests for "/" are 404'd. MapFallbackToFile handles SPA routes
+// (e.g. /subjects/agent/Foo) by serving index.html so client-side
+// react-router takes over.
+app.UseDefaultFiles();
+app.MapStaticAssets();
+app.MapFallbackToFile("index.html");
+
 app.Run();
 
 // Expose Program to WebApplicationFactory<Program> in AgentEval.Tests.

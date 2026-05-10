@@ -16,6 +16,15 @@ export default defineConfig({
       "@": path.resolve(__dirname, "src"),
     },
   },
+  // Plan-08 MC1.8.1: build into the dotnet project's wwwroot/ so a single
+  // `dotnet run --project ../AgentEval.MissionControl` serves both the SPA
+  // and the GraphQL/REST endpoints from the same port. emptyOutDir=true
+  // means stale assets get cleared on each build.
+  build: {
+    outDir: path.resolve(__dirname, "../AgentEval.MissionControl/wwwroot"),
+    emptyOutDir: true,
+    chunkSizeWarningLimit: 800,
+  },
   server: {
     port: 5173,
     proxy: {
