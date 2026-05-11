@@ -42,6 +42,13 @@ internal static class JudgeFactory
     /// </summary>
     /// <param name="evaluatorOverride">Optional override used by tests; bypasses env-var resolution.</param>
     /// <param name="judgeKind">Diagnostic label written into provenance (e.g. <c>"calibration"</c>, <c>"benchmark"</c>); only used for the error messages.</param>
+    /// <param name="systemPrompt">
+    /// Optional system prompt to wire into <see cref="ChatClientEvaluator"/>. Phase-6 Task 6.8:
+    /// the GDPR / EU AI Act bench paths load their embedded judge prompts and pass them here
+    /// so the LLM is actually steered by the "Cite articles / Be conservative / Flag evasive
+    /// responses" rules. <c>null</c> (the default) preserves the prior behaviour of using
+    /// <see cref="ChatClientEvaluator"/>'s built-in default system prompt.
+    /// </param>
     /// <returns>
     /// <c>(judge, judgeModel, exitCode)</c>. When <c>judge</c> is <c>null</c>, the caller
     /// MUST return <c>exitCode</c> immediately (the helper already wrote the user-facing
@@ -50,7 +57,8 @@ internal static class JudgeFactory
     /// </returns>
     internal static (IEvaluator? Judge, string JudgeModel, int ExitCode) Resolve(
         IEvaluator? evaluatorOverride,
-        string judgeKind = "benchmark")
+        string judgeKind = "benchmark",
+        string? systemPrompt = null)
     {
         if (evaluatorOverride is not null)
             return (evaluatorOverride, "override", 0);
@@ -71,9 +79,10 @@ internal static class JudgeFactory
             {
                 var azureClient = new AzureOpenAIClient(new Uri(endpoint!), new AzureKeyCredential(apiKey!));
                 IChatClient chatClient = azureClient.GetChatClient(deployment!).AsIChatClient();
-                IEvaluator real = new ChatClientEvaluator(chatClient);
+                IEvaluator real = new ChatClientEvaluator(chatClient, systemPrompt);
                 Console.Error.WriteLine(
-                    $"✔ Azure OpenAI judge configured — endpoint={endpoint}, deployment={deployment} ({judgeKind}).");
+                    $"✔ Azure OpenAI judge configured — endpoint={endpoint}, deployment={deployment} ({judgeKind})" +
+                    (systemPrompt is null ? "." : $" [system prompt: {systemPrompt.Length} chars]."));
                 return (real, deployment!, 0);
             }
             catch (Exception ex)

@@ -77,6 +77,7 @@ public class EuAiActEvidenceSchemaTests
         var malformed = new EuAiActComplianceEvidence(
             Base: baseEvidence,
             Preset: "banana",   // <-- invalid; schema enum rejects
+            DomainPacks: Array.Empty<string>(),
             CompositeTree: atomic,
             Summary: new EuAiActSummary(
                 OverallScore: 1.0,

@@ -41,8 +41,18 @@ internal static class BinaryEndpoints
             // Serialize on the fly; trace files are typically <1 MB JSON. For
             // large traces (>5 MB compressed), Phase 2's blob-store-backed
             // S3 streaming will replace this in-memory path.
+            //
+            // Phase-7 Task 7.13: force attachment Content-Disposition. A trace
+            // contains agent + tool I/O, which is user-controlled. Forcing
+            // attachment (over `application/json` inline) prevents a browser
+            // from treating any reflected XSS-shaped JSON as an HTML render
+            // path. Defence-in-depth — the JSON content type already protects.
             var json = JsonSerializer.Serialize(trace, s_traceJson);
-            return Results.Content(json, "application/json");
+            var result = Results.File(
+                System.Text.Encoding.UTF8.GetBytes(json),
+                contentType: "application/json",
+                fileDownloadName: $"agent-trace.{runId}.json");
+            return result;
         });
 
         // ─── MC1.3.3 — report stream (markdown / html / junit / sarif) ───────

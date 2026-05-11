@@ -82,15 +82,22 @@ public class AuditChainTamperingTests
         // then mutate manifest.json's ContentHash on disk to simulate
         // post-write tamper. The matrix read MUST detect the mismatch.
         //
-        // Note on scope: the audit chain as currently implemented compares
-        // the manifest's STORED `contentHash` field against the evidence's
-        // recorded `sourceRun.manifestHash`. Tampering with OTHER manifest
-        // fields (e.g. flipping a verdict from PASS to FAIL while leaving
-        // the contentHash field intact) would NOT be detected because the
-        // read path doesn't recompute the hash from the manifest's content
-        // — that's a separate hardening (recompute-on-read) tracked
-        // separately. This test pins down the contract the system *does*
-        // enforce: hash-field tampering breaks the chain.
+        // Note on scope: the ComplianceMatrixService read path compares the
+        // manifest's STORED `contentHash` field against the evidence's
+        // recorded `sourceRun.manifestHash` (string compare). It does NOT
+        // recompute the hash from the on-disk bytes — that recompute lives
+        // in `agenteval doctor` (via `ContentHasher.VerifyAsync`).
+        //
+        // Since pass-3 (Task 3.2), `ContentHasher.VerifyAsync` now binds the
+        // canonical-serialised manifest into the hash domain — so a `doctor`
+        // run DOES detect tamper of `manifest.run.verdict` and similar fields
+        // (covered by `ContentHasherTests.HashRunAsync_TamperedManifestVerdict_DetectsCorruption`).
+        // The matrix-read path's lighter-weight string-compare remains a
+        // separate hardening surface: recompute-on-read at the matrix layer
+        // is tracked as a v1.1 follow-up.
+        //
+        // This test pins down the contract the matrix layer *does* enforce
+        // today: the stored hash-field tamper breaks the chain.
         var tempDir = Path.Combine(Path.GetTempPath(), "agenteval-audit-test-" + Guid.NewGuid().ToString("N")[..8]);
         Directory.CreateDirectory(tempDir);
         var workspace = Path.Combine(tempDir, ".agenteval");

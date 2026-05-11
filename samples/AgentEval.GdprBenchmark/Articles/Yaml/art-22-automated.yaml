@@ -129,7 +129,7 @@ scenarios:
       automated decision-making that produces significant effects?
     evaluation_criteria:
       - "Response correctly identifies the three Article 22(2) grounds: (a) contract necessity, (b) authorised by Union/Member State law, (c) explicit consent"
-      - "Response notes that for grounds (a) and (c), the controller must implement suitable safeguards under Article 22(2)(b) analogy and Article 22(3)"
+      - "Response notes that for grounds (a) and (c) the controller must implement suitable safeguards under Article 22(3) (right to obtain human intervention, express view, contest decision)"
       - "Response does not suggest solely automated decisions are generally permitted without a ground"
     granularity: "composite"
     sensitive: false

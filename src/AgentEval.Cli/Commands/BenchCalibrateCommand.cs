@@ -38,12 +38,20 @@ public static class BenchCalibrateCommand
         string? outPathOverride,
         IEvaluator? evaluatorOverride)
     {
+        // ── Workspace root canonicalisation ──────────────────────────────────
+        if (rootOverride is not null)
+        {
+            var canonical = WorkspaceRootValidator.CanonicaliseOrNull(rootOverride);
+            if (canonical is null) return 1;
+            rootOverride = canonical;
+        }
+
         // ── Judge / evaluator ────────────────────────────────────────────────
         // Calibration uses the SAME gate as `bench` — running calibration against
         // the stub produces a meaningless accuracy/kappa number and dead-weights
         // the CI gate. AGENTEVAL_ALLOW_STUB_JUDGE=1 is required to fall through
         // to the stub.
-        var (resolvedJudge, _, exitCode) = JudgeFactory.Resolve(evaluatorOverride, "GDPR calibration");
+        var (resolvedJudge, judgeModelName, exitCode) = JudgeFactory.Resolve(evaluatorOverride, "GDPR calibration");
         if (resolvedJudge is null) return exitCode;
         IEvaluator judge = resolvedJudge;
 
@@ -52,7 +60,7 @@ public static class BenchCalibrateCommand
         try
         {
             var loader = new ArticleScenarioYamlLoader();
-            var scenarioBuilder = new ScenarioToAtomicEval(judge, judgeModel: "calibration");
+            var scenarioBuilder = new ScenarioToAtomicEval(judge, judgeModel: judgeModelName);
             var articleBuilder = new ArticleCompositeBuilder(scenarioBuilder);
             articles = new ArticlesRegistry(loader, articleBuilder);
         }
@@ -127,21 +135,31 @@ public static class BenchCalibrateCommand
         }
 
         // ── Evaluate thresholds ──────────────────────────────────────────────
+        // Phase-6 Task 6.6: gate on EvaluationFailures > 0 in addition to accuracy /
+        // kappa. When every entry throws (Azure unreachable, transient infra error,
+        // etc.) accuracy = 0 and kappa = 0 by definition, indistinguishable from a
+        // real bad calibration result. Surface the failure count and emit a separate
+        // INFRA-FAIL status so operators can distinguish infrastructure breakage
+        // from genuine model regression.
         bool allPass = true;
         foreach (var (pillar, pillarReport) in report.PerPillar)
         {
             var accOk = pillarReport.Accuracy >= AccuracyThreshold;
             var kappaOk = pillarReport.CohensKappa >= KappaThreshold;
-            var status = accOk && kappaOk ? "PASS" : "FAIL";
+            var noInfraFail = pillarReport.EvaluationFailures == 0;
+            var status = !noInfraFail
+                ? "INFRA-FAIL"
+                : (accOk && kappaOk ? "PASS" : "FAIL");
             Console.WriteLine(
                 $"  [{status}] {pillar}: accuracy={pillarReport.Accuracy:P1}, " +
-                $"kappa={pillarReport.CohensKappa:F3}, entries={pillarReport.EntryCount}");
-            if (!accOk || !kappaOk) allPass = false;
+                $"kappa={pillarReport.CohensKappa:F3}, entries={pillarReport.EntryCount}, " +
+                $"failures={pillarReport.EvaluationFailures}");
+            if (!accOk || !kappaOk || !noInfraFail) allPass = false;
         }
 
         Console.WriteLine(allPass
-            ? "Calibration gate PASSED — all pillars meet thresholds."
-            : $"Calibration gate FAILED — one or more pillars below accuracy>={AccuracyThreshold:P0} or kappa>={KappaThreshold:F2}.");
+            ? "Calibration gate PASSED — all pillars meet thresholds with zero evaluation failures."
+            : $"Calibration gate FAILED — one or more pillars below accuracy>={AccuracyThreshold:P0} or kappa>={KappaThreshold:F2}, or had non-zero evaluation_failures.");
 
         return allPass ? 0 : 2;
     }
@@ -178,13 +196,17 @@ public static class BenchCalibrateCommand
         {
             var accOk = pr.Accuracy >= AccuracyThreshold;
             var kappaOk = pr.CohensKappa >= KappaThreshold;
-            var badge = accOk && kappaOk ? "PASS" : "FAIL";
+            var noInfraFail = pr.EvaluationFailures == 0;
+            var badge = !noInfraFail
+                ? "INFRA-FAIL"
+                : (accOk && kappaOk ? "PASS" : "FAIL");
 
             sb.AppendLine($"## {pillar} [{badge}]");
             sb.AppendLine();
             sb.AppendLine($"| Metric | Value | Threshold | Status |");
             sb.AppendLine($"|--------|-------|-----------|--------|");
             sb.AppendLine($"| Entries evaluated | {pr.EntryCount} | — | — |");
+            sb.AppendLine($"| Evaluation failures | {pr.EvaluationFailures} | == 0 | {(noInfraFail ? "OK" : "INFRA-FAIL")} |");
             sb.AppendLine($"| Accuracy | {pr.Accuracy:P1} | >= {AccuracyThreshold:P0} | {(accOk ? "OK" : "BELOW")} |");
             sb.AppendLine($"| Cohen's kappa | {pr.CohensKappa:F3} | >= {KappaThreshold:F2} | {(kappaOk ? "OK" : "BELOW")} |");
             sb.AppendLine($"| Within score range | {pr.WithinScoreRange} / {pr.EntryCount} | — | — |");

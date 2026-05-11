@@ -78,7 +78,7 @@ var adapter = new MAFAgentAdapter(myAgent);
 For any `IChatClient`:
 
 ```csharp
-using AgentEval.Adapters;
+using AgentEval.Core;
 
 // Wrap an IChatClient
 var adapter = new ChatClientAgentAdapter(chatClient, "MyAgent");

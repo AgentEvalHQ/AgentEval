@@ -126,16 +126,12 @@ export function ComplianceMatrixPage() {
                   if (!cell) return;
                   const subject = m.subjects.find((s) => s.name === subjectName);
                   if (!subject) return;
-                  // The on-disk timestamp format mirrors what FileSystemOutputStore
-                  // writes ("yyyy-MM-dd_HH-mm-ss"). The matrix's lastEvidenceAt is
-                  // an ISO string; we re-format for the route param.
-                  const tsForUrl = new Date(cell.lastEvidenceAt)
-                    .toISOString()
-                    .replace(/\.\d+Z$/, "Z")
-                    .replace(/T/, "_")
-                    .replace(/:/g, "-")
-                    .replace(/Z$/, "");
-                  const path = `/compliance/${encodeURIComponent(regulation)}/${subject.kind.toLowerCase()}/${encodeURIComponent(subjectName)}/${encodeURIComponent(tsForUrl)}`;
+                  // The cell carries the raw on-disk timestamp directory name
+                  // ("yyyy-MM-dd_HH-mm-ss") from the resolver — no conversion.
+                  // Round-tripping `lastEvidenceAt` through `Date.toISOString()`
+                  // silently shifts to UTC and 404s in any non-UTC workspace.
+                  if (!cell.timestamp) return;
+                  const path = `/compliance/${encodeURIComponent(regulation)}/${subject.kind.toLowerCase()}/${encodeURIComponent(subjectName)}/${encodeURIComponent(cell.timestamp)}`;
                   navigate(path);
                 }}
               />

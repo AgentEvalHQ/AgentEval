@@ -21,6 +21,15 @@ namespace AgentEval.GdprBenchmark;
 /// Ordered list of judges (evaluator + weight) used for consensus aggregation
 /// over Critical-severity articles. Typically 3 judges with equal weights.
 /// </param>
+/// <remarks>
+/// Phase-8 Task 8.5: this record is <see cref="ObsoleteAttribute"/>-marked
+/// because Mode-B per-criterion multi-judge fan-out has moved into
+/// <c>ScenarioToAtomicEval</c> ctor flags. The <c>AuditGrade</c> factory's
+/// MultiJudgeOptions parameter is retained for v1 source compatibility but
+/// a removal is scheduled for v1.1. See <c>deferred-pending.md</c>.
+/// </remarks>
+[Obsolete("MultiJudgeOptions is deprecated; configure multi-judge via ScenarioToAtomicEval Mode-B flags instead. " +
+          "Pass `null` to AuditGrade to retain single-judge behaviour. Removal scheduled for v1.1.")]
 public sealed record MultiJudgeOptions(
     IReadOnlyList<(IEvaluator Judge, double Weight)> Judges);
 
@@ -115,11 +124,15 @@ public static class GdprBenchmark
     /// is used only to set the composite name for traceability.
     /// </param>
     /// <returns>A fully configured <see cref="CompositeEval"/> for the Audit-Grade preset.</returns>
+#pragma warning disable CS0618 // Phase-8 8.5: signature retained for v1 compatibility.
     public static CompositeEval AuditGrade(ArticlesRegistry articles, MultiJudgeOptions? multiJudge)
+#pragma warning restore CS0618
     {
         ArgumentNullException.ThrowIfNull(articles);
 
+#pragma warning disable CS0618 // Reading the Obsolete record's properties here is intentional.
         var useMultiJudge = multiJudge is { Judges.Count: > 1 };
+#pragma warning restore CS0618
         var name = useMultiJudge
             ? "GDPR Compliance — Audit-Grade (multi-judge)"
             : "GDPR Compliance — Audit-Grade Preset (single judge)";

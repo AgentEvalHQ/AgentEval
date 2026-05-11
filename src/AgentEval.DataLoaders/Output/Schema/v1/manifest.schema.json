@@ -41,7 +41,7 @@
         "duration": { "type": "string" },
         "scenarioCount": { "type": "integer", "minimum": 0 },
         "verdict": { "enum": ["PASS", "FAIL", "WARN", "PENDING"] },
-        "kind": { "enum": ["eval", "memory-benchmark", "stochastic-eval", "compliance"] },
+        "kind": { "enum": ["eval", "benchmark", "memory-benchmark", "stochastic-eval", "compliance"] },
         "evalProject": { "type": ["string", "null"] },
         "evalProjectPath": { "type": ["string", "null"] },
         "harness": { "type": "string" },

@@ -1,8 +1,11 @@
 # ADR-003: CLI Review Commands
 
-**Status:** Proposed  
-**Date:** 2026-01-07  
+**Status:** Proposed — **Deferred** (not implemented as of v0.8.1-beta)
+**Date:** 2026-01-07
+**Last reviewed:** 2026-05-11
 **Decision Makers:** AgentEval Contributors
+
+> **Implementation status (2026-05-11)** — The `agenteval summary` and `agenteval diff` commands proposed below were never implemented. Their goals (cross-run comparison, regression detection) are now better served by **Mission Control** (`agenteval mc serve` — see `docs/missioncontrol/getting-started.md`), which renders the same comparisons as a richer interactive UI. The CLI-side proposal is retained here as a historical decision record; it may be revisited in a future minor if a headless terminal flow is requested.
 
 ---
 
@@ -29,15 +32,17 @@ After running multiple evaluations, users need to:
 2. **Diff runs** — See which specific tests changed between versions
 3. **Identify regressions** — Quickly spot degraded metrics
 
-**Current workflow (manual):**
+**Current workflow** (as of v0.8.1-beta — Mission Control covers comparison; the CLI handles execution only):
 ```bash
-# Run evaluations
-agenteval eval --output run1.json
-agenteval eval --output run2.json
+# Run evaluations against your subject
+agenteval bench agentic --subject MyAgent --input "..."   # writes under .agenteval/
 
-# Compare manually (no tooling!)
-# User must write custom scripts or eyeball JSON files
+# Compare runs interactively in Mission Control
+agenteval mc serve
+# Navigate to http://localhost:5000 → Compliance Matrix / Run Detail pages
 ```
+
+The original proposal below describes a CLI-side comparison flow (`agenteval summary` / `agenteval diff`) that was superseded by Mission Control.
 
 **Example workflow (ai-rag-chat-evaluator):**
 ```bash

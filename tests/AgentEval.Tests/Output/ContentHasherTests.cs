@@ -139,6 +139,90 @@ public class ContentHasherTests : IDisposable
         Assert.False(result);
     }
 
+    // ── Phase 3 / Task 3.1 — trace-files-in-hash-domain regression ───────
+
+    /// <summary>
+    /// Pre-pass-3, ContentHasher only hashed agent-trace.json. Per-test trace
+    /// files written by TraceArtifactManager (and any other consumer) sat
+    /// outside the audit chain. Verify that ANY *.json file under traces/
+    /// affects the hash now.
+    /// </summary>
+    [Fact]
+    public async Task HashRunAsync_TimestampedTraceFile_IsCovered()
+    {
+        WriteSolutionJson();
+        var store = new FileSystemOutputStore(_root);
+        var subject = new SubjectIdentity(SubjectKind.Agent, "TestAgent");
+        await store.EnsureSubjectAsync(subject);
+        var manifest = await store.StartRunAsync(subject, DefaultContext());
+        var runId = manifest.Run.RunId;
+        var summary = new RunSummary("1.0", runId, "PASS",
+            new RunStats(1, 1, 0, 0),
+            new Dictionary<string, double>());
+        await store.CompleteRunAsync(manifest, summary);
+
+        var tracesDir = Path.Combine(_root, "subjects", "agents", "TestAgent", "runs", runId, "traces");
+        Directory.CreateDirectory(tracesDir);
+
+        // Hash with no extra trace files
+        var accessor = new FileSystemLayoutAccessor(_root);
+        var hashBefore = await accessor.ComputeHashAsync(subject, runId);
+
+        // Add a per-test timestamped trace file
+        var extraTracePath = Path.Combine(tracesDir, "test01_20260101_120000_trace.json");
+        await File.WriteAllTextAsync(extraTracePath, "{\"events\":[]}");
+        var hashAfter = await accessor.ComputeHashAsync(subject, runId);
+
+        Assert.NotEqual(hashBefore, hashAfter);
+    }
+
+    // ── Phase 3 / Task 3.2 — manifest tamper-detection regression ────────
+
+    /// <summary>
+    /// Pre-pass-3, mutating manifest.run.verdict post-write while leaving
+    /// contentHash intact silently passed audit. With Task 3.2 (canonical
+    /// manifest in hash domain), VerifyAsync should now flag the tamper.
+    /// </summary>
+    [Fact]
+    public async Task HashRunAsync_TamperedManifestVerdict_DetectsCorruption()
+    {
+        WriteSolutionJson();
+        var store = new FileSystemOutputStore(_root);
+        var subject = new SubjectIdentity(SubjectKind.Agent, "TestAgent");
+        await store.EnsureSubjectAsync(subject);
+        var manifest = await store.StartRunAsync(subject, DefaultContext());
+        var runId = manifest.Run.RunId;
+        var summary = new RunSummary("1.0", runId, "PASS",
+            new RunStats(1, 1, 0, 0),
+            new Dictionary<string, double>());
+        await store.CompleteRunAsync(manifest, summary);
+
+        // The stored manifest now has the real contentHash. Verify it once
+        // to baseline.
+        var manifestPath = Path.Combine(_root, "subjects", "agents", "TestAgent", "runs", runId, "manifest.json");
+        var manifestJson = await File.ReadAllTextAsync(manifestPath);
+        var storedManifest = System.Text.Json.JsonSerializer.Deserialize<RunManifest>(
+            manifestJson,
+            new System.Text.Json.JsonSerializerOptions
+            {
+                PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase,
+                Converters = { new System.Text.Json.Serialization.JsonStringEnumConverter(System.Text.Json.JsonNamingPolicy.CamelCase) }
+            })!;
+        var accessor = new FileSystemLayoutAccessor(_root);
+        Assert.True(await accessor.VerifyAsync(subject, runId, storedManifest.ContentHash),
+            "Baseline: the run should verify cleanly before tampering.");
+
+        // Tamper: rewrite manifest.json with run.verdict = "PASS" → "FAIL",
+        // keeping the original contentHash field intact (the attack surface).
+        var tampered = manifestJson.Replace("\"verdict\": \"PASS\"", "\"verdict\": \"FAIL\"");
+        Assert.NotEqual(manifestJson, tampered);  // sanity — replacement actually changed something
+        await File.WriteAllTextAsync(manifestPath, tampered);
+
+        // VerifyAsync must now report the tamper.
+        Assert.False(await accessor.VerifyAsync(subject, runId, storedManifest.ContentHash),
+            "Manifest verdict tamper must be detected by the canonical-manifest hash domain.");
+    }
+
     /// <summary>
     /// Thin accessor to call internal ContentHasher methods via the InternalsVisibleTo grant.
     /// </summary>

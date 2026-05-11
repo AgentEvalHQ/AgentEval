@@ -12,20 +12,40 @@ namespace AgentEval.Tests.Cli;
 /// Tests for the <c>agenteval bench gdpr calibrate</c> subcommand
 /// (<see cref="BenchCalibrateCommand"/>).
 /// </summary>
+[Collection("EnvVarTests")]
 public class BenchCalibrateCommandTests : IDisposable
 {
     private readonly string _root;
+    private readonly (string? Endpoint, string? Key, string? Deployment, string? Stub) _envSnapshot;
 
     public BenchCalibrateCommandTests()
     {
         _root = Path.Combine(Path.GetTempPath(), "agenteval-calibrate-test-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(_root);
+        _envSnapshot = (
+            Environment.GetEnvironmentVariable("AZURE_OPENAI_ENDPOINT"),
+            Environment.GetEnvironmentVariable("AZURE_OPENAI_API_KEY"),
+            Environment.GetEnvironmentVariable("AZURE_OPENAI_DEPLOYMENT"),
+            Environment.GetEnvironmentVariable("AGENTEVAL_ALLOW_STUB_JUDGE"));
+        ScrubEnv();
     }
 
     public void Dispose()
     {
+        Environment.SetEnvironmentVariable("AZURE_OPENAI_ENDPOINT",      _envSnapshot.Endpoint);
+        Environment.SetEnvironmentVariable("AZURE_OPENAI_API_KEY",       _envSnapshot.Key);
+        Environment.SetEnvironmentVariable("AZURE_OPENAI_DEPLOYMENT",    _envSnapshot.Deployment);
+        Environment.SetEnvironmentVariable("AGENTEVAL_ALLOW_STUB_JUDGE", _envSnapshot.Stub);
         if (Directory.Exists(_root))
             try { Directory.Delete(_root, recursive: true); } catch { }
+    }
+
+    private static void ScrubEnv()
+    {
+        Environment.SetEnvironmentVariable("AZURE_OPENAI_ENDPOINT", null);
+        Environment.SetEnvironmentVariable("AZURE_OPENAI_API_KEY", null);
+        Environment.SetEnvironmentVariable("AZURE_OPENAI_DEPLOYMENT", null);
+        Environment.SetEnvironmentVariable("AGENTEVAL_ALLOW_STUB_JUDGE", null);
     }
 
     // ── Stub evaluators ───────────────────────────────────────────────────────
@@ -71,6 +91,26 @@ public class BenchCalibrateCommandTests : IDisposable
                     .ToList()
             });
         }
+    }
+
+    // ── Env-gate trio (Phase-4 gate-review follow-up) ─────────────────────────
+
+    [Fact]
+    public async Task Calibrate_NoEnvVars_NoStubOptIn_ReturnsExitCode2()
+    {
+        // env already scrubbed by ctor.
+        var exit = await BenchCalibrateCommand.RunAsync(_root, outPathOverride: null);
+        Assert.Equal(2, exit);
+    }
+
+    [Fact]
+    public async Task Calibrate_PartialAzureConfig_ReturnsExitCode2()
+    {
+        Environment.SetEnvironmentVariable("AZURE_OPENAI_ENDPOINT", "https://example.openai.azure.com/");
+        // Missing key + deployment — JudgeFactory should refuse to construct an Azure client.
+
+        var exit = await BenchCalibrateCommand.RunAsync(_root, outPathOverride: null);
+        Assert.Equal(2, exit);
     }
 
     // ── Tests ─────────────────────────────────────────────────────────────────

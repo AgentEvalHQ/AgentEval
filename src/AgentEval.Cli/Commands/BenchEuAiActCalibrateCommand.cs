@@ -41,7 +41,15 @@ public static class BenchEuAiActCalibrateCommand
         // ── Judge / evaluator ────────────────────────────────────────────────
         // Calibration requires AGENTEVAL_ALLOW_STUB_JUDGE=1 to use stub mode —
         // stub-graded calibration gates the wrong thing.
-        var (resolvedJudge, _, exitCode) = JudgeFactory.Resolve(evaluatorOverride, "EU AI Act calibration");
+        // Workspace root canonicalisation (defense-in-depth against --root traversal).
+        if (rootOverride is not null)
+        {
+            var canonical = WorkspaceRootValidator.CanonicaliseOrNull(rootOverride);
+            if (canonical is null) return 1;
+            rootOverride = canonical;
+        }
+
+        var (resolvedJudge, judgeModelName, exitCode) = JudgeFactory.Resolve(evaluatorOverride, "EU AI Act calibration");
         if (resolvedJudge is null) return exitCode;
         IEvaluator judge = resolvedJudge;
 
@@ -50,7 +58,7 @@ public static class BenchEuAiActCalibrateCommand
         try
         {
             var loader = new ArticleScenarioYamlLoader();
-            var scenarioBuilder = new ScenarioToAtomicEval(judge, judgeModel: "calibration");
+            var scenarioBuilder = new ScenarioToAtomicEval(judge, judgeModel: judgeModelName);
             var articleBuilder = new ArticleCompositeBuilder(scenarioBuilder);
             articles = new EuAiActArticlesRegistry(loader, articleBuilder);
         }
@@ -134,21 +142,27 @@ public static class BenchEuAiActCalibrateCommand
         }
 
         // ── Evaluate thresholds ──────────────────────────────────────────────
+        // Phase-6 Task 6.6: see BenchCalibrateCommand for rationale — gate on
+        // EvaluationFailures > 0 with a distinct INFRA-FAIL status.
         bool allPass = true;
         foreach (var (pillar, pillarReport) in report.PerPillar)
         {
             var accOk = pillarReport.Accuracy >= AccuracyThreshold;
             var kappaOk = pillarReport.CohensKappa >= KappaThreshold;
-            var status = accOk && kappaOk ? "PASS" : "FAIL";
+            var noInfraFail = pillarReport.EvaluationFailures == 0;
+            var status = !noInfraFail
+                ? "INFRA-FAIL"
+                : (accOk && kappaOk ? "PASS" : "FAIL");
             Console.WriteLine(
                 $"  [{status}] {pillar}: accuracy={pillarReport.Accuracy:P1}, " +
-                $"kappa={pillarReport.CohensKappa:F3}, entries={pillarReport.EntryCount}");
-            if (!accOk || !kappaOk) allPass = false;
+                $"kappa={pillarReport.CohensKappa:F3}, entries={pillarReport.EntryCount}, " +
+                $"failures={pillarReport.EvaluationFailures}");
+            if (!accOk || !kappaOk || !noInfraFail) allPass = false;
         }
 
         Console.WriteLine(allPass
-            ? "EU AI Act calibration gate PASSED — all pillars meet thresholds."
-            : $"EU AI Act calibration gate FAILED — one or more pillars below accuracy>={AccuracyThreshold:P0} or kappa>={KappaThreshold:F2}.");
+            ? "EU AI Act calibration gate PASSED — all pillars meet thresholds with zero evaluation failures."
+            : $"EU AI Act calibration gate FAILED — one or more pillars below accuracy>={AccuracyThreshold:P0} or kappa>={KappaThreshold:F2}, or had non-zero evaluation_failures.");
 
         return allPass ? 0 : 2;
     }
@@ -185,13 +199,17 @@ public static class BenchEuAiActCalibrateCommand
         {
             var accOk = pr.Accuracy >= AccuracyThreshold;
             var kappaOk = pr.CohensKappa >= KappaThreshold;
-            var badge = accOk && kappaOk ? "PASS" : "FAIL";
+            var noInfraFail = pr.EvaluationFailures == 0;
+            var badge = !noInfraFail
+                ? "INFRA-FAIL"
+                : (accOk && kappaOk ? "PASS" : "FAIL");
 
             sb.AppendLine($"## {pillar} [{badge}]");
             sb.AppendLine();
             sb.AppendLine($"| Metric | Value | Threshold | Status |");
             sb.AppendLine($"|--------|-------|-----------|--------|");
             sb.AppendLine($"| Entries evaluated | {pr.EntryCount} | — | — |");
+            sb.AppendLine($"| Evaluation failures | {pr.EvaluationFailures} | == 0 | {(noInfraFail ? "OK" : "INFRA-FAIL")} |");
             sb.AppendLine($"| Accuracy | {pr.Accuracy:P1} | >= {AccuracyThreshold:P0} | {(accOk ? "OK" : "BELOW")} |");
             sb.AppendLine($"| Cohen's kappa | {pr.CohensKappa:F3} | >= {KappaThreshold:F2} | {(kappaOk ? "OK" : "BELOW")} |");
             sb.AppendLine($"| Within score range | {pr.WithinScoreRange} / {pr.EntryCount} | — | — |");

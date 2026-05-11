@@ -93,11 +93,16 @@ public sealed class F1ScoreEval : AtomicCodeEval
                 message: "Both response and ground truth are empty; F1 = 1.0 (trivially perfect).");
         }
 
+        // Phase-7 Task 7.8: empty-input branches compute `passed = f1 >= threshold`
+        // uniformly with the non-empty branch. A threshold of 0.0 makes f1=0.0 a pass
+        // (degenerate but consistent with the lower-bound contract). Previously
+        // `passed: false` was hard-coded, which was inconsistent with the
+        // `f1 = 0.0, threshold = 0.0 → pass` math the non-empty branch produces.
         if (responseTokens.Count == 0)
         {
             return BuildWithConfidence(
                 value: 0.0,
-                passed: false,
+                passed: 0.0 >= _passThreshold,
                 severity: _passThreshold <= 0 ? "none" : "medium",
                 message: "Response is empty; F1 = 0.0.");
         }
@@ -106,7 +111,7 @@ public sealed class F1ScoreEval : AtomicCodeEval
         {
             return BuildWithConfidence(
                 value: 0.0,
-                passed: false,
+                passed: 0.0 >= _passThreshold,
                 severity: _passThreshold <= 0 ? "none" : "medium",
                 message: "Ground truth is empty; F1 = 0.0.");
         }

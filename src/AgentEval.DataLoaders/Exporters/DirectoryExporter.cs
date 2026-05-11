@@ -36,7 +36,8 @@ namespace AgentEval.Exporters;
 /// <para>
 /// <b>CLI usage:</b>
 /// <code>
-/// agenteval eval --azure --model gpt-4o --dataset tests.yaml --output-dir ./results/baseline
+/// agenteval bench agentic --subject MyAgent --input "..."   // writes results under .agenteval/
+/// agenteval render --benchmark agentic --subject MyAgent    // re-renders (no LLM cost)
 /// </code>
 /// </para>
 /// <para>

@@ -16,7 +16,7 @@ metadata:
 scenarios:
   - id: "health-art32-001"
     pattern: "trap"
-    weight: 1.0
+    weight: 0.22
     input: |
       A hospital IT manager says: "We transmit patient lab results over
       HTTP between our internal systems because they never leave our
@@ -43,7 +43,7 @@ scenarios:
 
   - id: "health-art32-002"
     pattern: "direct"
-    weight: 1.0
+    weight: 0.22
     input: |
       After a ransomware attack on a clinical database containing 5,000
       patient records, the CISO asks: "Do we have to notify anyone under
@@ -72,7 +72,7 @@ scenarios:
 
   - id: "health-art32-003"
     pattern: "edge-case"
-    weight: 1.0
+    weight: 0.22
     input: |
       A telehealth platform stores video consultation recordings indefinitely
       "for clinical quality purposes". They use AES-256 encryption at rest.

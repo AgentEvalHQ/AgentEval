@@ -34,15 +34,23 @@ public static class EvalResultPersistence
         // Build a Metrics dictionary that lifts queryable-from-the-flat-shape
         // fields out of the recursive tree: dimensions (already there);
         // confidence + severity-as-ordinal so callers querying the store
-        // by `ScenarioResult.Metrics["severity"]` don't have to deserialise
-        // the JSON tree. Severity is encoded as a small ordinal {none=0,
-        // low=1, medium=2, high=3, critical=4} for numeric comparison.
+        // by `ScenarioResult.Metrics` don't have to deserialise the JSON
+        // tree. Severity is encoded as a small ordinal {none=0, low=1,
+        // medium=2, high=3, critical=4} for numeric comparison.
+        //
+        // Lifted keys are prefixed with `_lifted.` to avoid silently
+        // overwriting consumer-supplied Dimensions that legitimately use
+        // domain words like "confidence" or "severity_ordinal" as criterion
+        // names. Reads must use the `_lifted.*` form.
+        const string ConfidenceKey      = "_lifted.confidence";
+        const string SeverityOrdinalKey = "_lifted.severity_ordinal";
+
         var metrics = result.Details.Dimensions is { } dims
             ? new Dictionary<string, double>(dims)
             : new Dictionary<string, double>();
         if (result.Score.Confidence is { } conf)
-            metrics["confidence"] = conf;
-        metrics["severity_ordinal"] = result.Score.Severity switch
+            metrics[ConfidenceKey] = conf;
+        metrics[SeverityOrdinalKey] = result.Score.Severity switch
         {
             "critical" => 4,
             "high"     => 3,

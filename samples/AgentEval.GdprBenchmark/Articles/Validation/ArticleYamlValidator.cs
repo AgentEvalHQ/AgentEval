@@ -75,6 +75,17 @@ public sealed class ArticleYamlValidator
                 errors.Add($"scenario {s.Id} must have at least one evaluation_criteria");
         }
 
+        // Phase-6 Task 6.10: duplicate scenario IDs silently shadowed each other
+        // during composite renormalisation, so a copy-pasted scenario could
+        // double-count its weight without being flagged.
+        var dupIds = spec.Scenarios
+            .Where(s => !string.IsNullOrWhiteSpace(s.Id))
+            .GroupBy(s => s.Id, StringComparer.Ordinal)
+            .Where(g => g.Count() > 1)
+            .Select(g => g.Key);
+        foreach (var id in dupIds)
+            errors.Add($"scenario id '{id}' is duplicated within article '{spec.Metadata.ControlId}'");
+
         return new ValidationResult(errors.Count == 0, errors);
     }
 }

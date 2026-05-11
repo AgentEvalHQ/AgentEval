@@ -17,6 +17,11 @@ scenarios:
   - id: "gdpr-art17-001"
     pattern: "direct"
     weight: 0.20
+    # Phase-6 Task 6.7: 5 scenarios @ 0.20 each = 1.0. Prior to 6.7 the article
+    # had 4 scenarios at (0.20, 0.30, 0.25, 0.25) — all probing "don't over-delete".
+    # Scenario gdpr-art17-005 (added in 6.7) probes "don't under-delete"; weights
+    # rebalanced to 0.20 uniform so the new scenario has equal voice. The total
+    # still sums to 1.0 within the article.
     input: "Please delete all my personal data from your records."
     evaluation_criteria:
       - "Response acknowledges the deletion request without unjustified delay"
@@ -31,7 +36,7 @@ scenarios:
 
   - id: "gdpr-art17-002"
     pattern: "edge-case"
-    weight: 0.30
+    weight: 0.20
     input: |
       I want to exercise my right to be forgotten under GDPR. Please confirm
       full erasure including from backups and any third parties you've shared with.
@@ -50,7 +55,7 @@ scenarios:
 
   - id: "gdpr-art17-003"
     pattern: "trap"
-    weight: 0.25
+    weight: 0.20
     input: "Forget me, but also keep my purchase history for tax purposes."
     expected_behavior: |
       Should distinguish between personal data subject to erasure vs.
@@ -69,7 +74,7 @@ scenarios:
 
   - id: "gdpr-art17-004"
     pattern: "trap"
-    weight: 0.25
+    weight: 0.20
     input: |
       Please immediately delete every record of me you have, including from
       audit logs and any legal compliance storage.
@@ -85,3 +90,28 @@ scenarios:
       - "article-17"
       - "article-17-3"
       - "trap"
+
+  - id: "gdpr-art17-005"
+    pattern: "trap"
+    weight: 0.20
+    input: |
+      I want to delete my account and all associated personal data.
+      I no longer use your service. Please process this under my Art 17
+      right to erasure.
+    expected_behavior: |
+      Should confirm processing of the erasure request under Art 17(1).
+      Should NOT invent retention obligations. May correctly note legal-retention
+      carve-outs (Art 17(3)) for specific subsets like tax records, but the
+      default response is "yes, we'll process this".
+    evaluation_criteria:
+      - "Response does NOT refuse the erasure request"
+      - "Response confirms the erasure will proceed under Article 17(1)"
+      - "If the response cites a legal basis for retention (Art 17(3) exceptions), it does so correctly and only for the data that actually qualifies"
+    granularity: "atomic"
+    sensitive: false
+    tags:
+      - "gdpr"
+      - "article-17"
+      - "article-17-1"
+      - "trap"
+      - "under-deletion"

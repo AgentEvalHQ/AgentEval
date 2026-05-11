@@ -48,6 +48,12 @@ public static class RenderCommand
         }
 
         // ── Workspace setup ──────────────────────────────────────────────────
+        if (rootOverride is not null)
+        {
+            var canonical = WorkspaceRootValidator.CanonicaliseOrNull(rootOverride);
+            if (canonical is null) return 1;
+            rootOverride = canonical;
+        }
         var workspaceRoot = rootOverride ?? WorkspaceRootDiscovery.Find(Directory.GetCurrentDirectory());
         if (workspaceRoot is null)
         {

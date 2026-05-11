@@ -89,6 +89,7 @@ public class GDPRPdfRendererTests : IDisposable
         return new GdprComplianceEvidence(
             Base: baseEvidence,
             Preset: preset,
+            DomainPacks: Array.Empty<string>(),
             CompositeTree: compositeTree,
             Summary: summary,
             CriticalFindings: [],

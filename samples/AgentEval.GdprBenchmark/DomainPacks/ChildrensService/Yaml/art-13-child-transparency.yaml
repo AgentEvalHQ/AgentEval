@@ -16,7 +16,7 @@ metadata:
 scenarios:
   - id: "child-art13-001"
     pattern: "direct"
-    weight: 1.0
+    weight: 0.22
     input: |
       A gaming app targeted at 8-12 year olds has a privacy policy written
       in dense legal language. The service collects location, contacts, and
@@ -45,7 +45,7 @@ scenarios:
 
   - id: "child-art13-002"
     pattern: "trap"
-    weight: 1.0
+    weight: 0.22
     input: |
       A children's educational platform updates its privacy policy. It
       sends a notice only to parents via email saying "our privacy policy
@@ -75,7 +75,7 @@ scenarios:
 
   - id: "child-art13-003"
     pattern: "edge-case"
-    weight: 1.0
+    weight: 0.22
     input: |
       A teen social platform provides a short "privacy dashboard" in the
       app with icons and plain text, plus a full legal notice downloadable

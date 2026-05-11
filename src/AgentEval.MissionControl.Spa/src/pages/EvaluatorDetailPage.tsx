@@ -91,7 +91,10 @@ const EVALUATOR_DETAIL_QUERY = /* GraphQL */ `
 
 export function EvaluatorDetailPage() {
   const { key: keyParam } = useParams<{ key: string }>();
-  const key = keyParam ?? "";
+  // Phase-7 Task 7.10: URL params arrive percent-encoded (react-router does
+  // NOT decode automatically). An evaluator key like `tool_call_accuracy:v1`
+  // would arrive as `tool_call_accuracy%3Av1` and miss the GraphQL lookup.
+  const key = keyParam ? decodeURIComponent(keyParam) : "";
 
   const detailQ = useQuery({
     queryKey: queryKeys.evaluators.detail(key),

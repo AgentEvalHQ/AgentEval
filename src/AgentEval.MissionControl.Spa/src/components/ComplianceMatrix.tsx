@@ -24,6 +24,10 @@ export interface MatrixCell {
   passRate: number;
   lastEvidenceAt: string;
   lastEvidenceRunId: string;
+  // Raw on-disk timestamp directory name ("yyyy-MM-dd_HH-mm-ss"). Use this
+  // for drill-through URLs instead of round-tripping `lastEvidenceAt` through
+  // `Date.toISOString()`, which UTC-shifts in non-UTC workspaces and 404s.
+  timestamp: string;
   regressedFromBaseline: boolean | null;
 }
 
@@ -137,6 +141,14 @@ function Row({
             key={`${subject.name}-${c.id}`}
             onClick={() => onCellClick?.(subject.name, c.id)}
             className={`${CELL_TONE[status]} border border-slate-50 grid place-items-center text-xs font-medium text-slate-700 transition`}
+            // Phase-7 Task 7.12: aria-label so screen readers announce
+            // "{subject} · {control}: {status} (Pass rate: …)" instead of
+            // just the glyph (✓ / ! / ✗ / ·) which is meaningless out loud.
+            aria-label={
+              cell
+                ? `${subject.name}, ${c.id}, status ${cell.status}, pass rate ${(cell.passRate * 100).toFixed(0)}%`
+                : `${subject.name}, ${c.id}, no evidence`
+            }
             title={
               cell
                 ? `${subject.name} · ${c.id}\nStatus: ${cell.status}\nPass rate: ${(cell.passRate * 100).toFixed(0)}%\nLast evidence: ${cell.lastEvidenceAt}`

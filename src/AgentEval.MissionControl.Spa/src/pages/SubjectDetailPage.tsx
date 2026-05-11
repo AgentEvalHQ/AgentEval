@@ -100,8 +100,14 @@ export function SubjectDetailPage() {
           );
         }
 
+        // Phase-7 Task 7.9: filter by BOTH kind AND name. An agent and a
+        // workflow can legitimately share a name; the prior name-only filter
+        // mixed their runs on the detail page. Run pointers with kind=null
+        // (legacy / not yet backfilled) are accepted as a soft match — they
+        // would otherwise disappear from history entirely.
         const subjectRuns = d.recentRuns
           .filter((r) => r.subjectName === name)
+          .filter((r) => r.kind == null || r.kind === kindParam)
           .filter((r) => r.score !== null);
 
         const timelinePoints: TimelinePoint[] = subjectRuns.map((r) => ({

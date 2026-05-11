@@ -14,6 +14,7 @@ namespace AgentEval.EuAiActBenchmark.Reporting;
 public sealed record EuAiActComplianceEvidence(
     ComplianceEvidence Base,
     string Preset,
+    IReadOnlyList<string> DomainPacks,
     EvalResult CompositeTree,
     EuAiActSummary Summary,
     IReadOnlyList<EvalResult> CriticalFindings,
@@ -42,5 +43,7 @@ public sealed record EuAiActAttestation(string JudgeMode, IReadOnlyDictionary<st
 /// <summary>Options controlling how the EU AI Act compliance report is generated.</summary>
 public sealed record EuAiActReportOptions(
     string Preset = "standard",
+    IReadOnlyList<string>? DomainPacks = null,
     string JudgeMode = "mode-a",
-    IReadOnlyDictionary<string, string>? PromptVersions = null);
+    IReadOnlyDictionary<string, string>? PromptVersions = null,
+    string? JudgeModel = null);

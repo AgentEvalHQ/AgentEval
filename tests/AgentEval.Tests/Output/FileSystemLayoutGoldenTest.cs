@@ -21,6 +21,12 @@ public class FileSystemLayoutGoldenTest
         await store.CompleteRunAsync(manifest, MakeSummaryFixture("PASS", manifest.Run.RunId));
 
         var files = Directory.EnumerateFiles(temp.Path, "*", SearchOption.AllDirectories)
+            // Exclude advisory sentinels — `.lock` files from EnsureSubjectAsync's
+            // concurrency gate (Task 3.5) and `.invalid.json` sidecars from
+            // schema-validate failures (Task 3.7). They are not part of the
+            // canonical layout users / Mission Control / doctor care about.
+            .Where(f => !f.EndsWith(".lock", StringComparison.Ordinal)
+                     && !f.EndsWith(".invalid.json", StringComparison.Ordinal))
             .Select(f => System.IO.Path.GetRelativePath(temp.Path, f).Replace('\\', '/'))
             .Select(p => ReplaceRunId(p, manifest.Run.RunId, "{runId}"))
             .OrderBy(p => p, StringComparer.Ordinal)

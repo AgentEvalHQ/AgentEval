@@ -390,6 +390,13 @@ current branch merges.
 - **Trigger to revisit**: When Phase 1 merges to main.
 - **Effort estimate**: 2–3 hours.
 
+### Thread `judgeModel` through `AgenticBenchmark.<Preset>(judge)` factories
+- **Source**: Phase-4 review-03 remediation (Task 4.4 — judgeModelName threading).
+- **Scope**: `src/AgentEval.Evals.Agentic/Composition/AgenticBenchmark.cs` — every static factory (`AgenticExecution`, `ToolCallAccuracy`, `RagQuality`, `Safety`, `Conversational`, `Reasoning`, `UserExperience`, `AdversarialDirect`, etc.) accepts an `IEvaluator judge` but no `string? judgeModel` parameter. The two CLI sites that consume these factories (`BenchAgenticCommand.cs`, `BenchAgenticCalibrateCommand.cs`) currently discard the resolved `judgeModelName` because there is nowhere to thread it. The GDPR / EU AI Act bench paths thread it correctly because their builders (`ScenarioToAtomicEval`) expose `judgeModel`.
+- **Why deferred**: Each factory builds 4–12 evaluators internally and passes a single `judge` into them. Threading `judgeModel` end-to-end means a parameter on every factory + every internal eval ctor that exposes `judgeModel`. Net: ~15 factory signatures + ~50 internal ctor sites. Mechanical but high diff churn and best handled when the agentic Attestation block lands (which itself is a v1.1 item — agentic bench writes `agentic-result.json`, not a compliance Attestation today).
+- **Trigger to revisit**: When agentic bench grows a compliance Attestation block (when the user requests it, or when ECS2026MAF or downstream consumers need to record which judge deployment graded the agentic run).
+- **Effort estimate**: 4–6 hours including tests.
+
 ---
 
 ## Cross-cutting from the 10-agent Opus review
@@ -465,6 +472,41 @@ These items are deferred for one of three reasons:
 
 ---
 
+## Review-03 remediation deferrals (Phase 8, 2026-05-11)
+
+The eight-phase review-03 plan closed every P0 / P1 finding. The items below
+were deliberately deferred for v1.1 (Phase 8 tasks 8.1 – 8.10).
+
+### Composite-preset bench output — historical note (closed in 2.1 / 2.2)
+- **Source**: Phase-8 Task 8.1; closed by Phase-2 Tasks 2.1 (GDPR) + 2.2 (EU AI Act).
+- **Scope**: Bench composite presets like `standard+healthcare` previously crashed at `SaveReportAsync` because the on-disk schema enum only listed the 6 base presets. The fix split the preset into a `preset` enum + `domainPacks: string[]` array.
+- **Why deferred (historical only)**: This entry is preserved so a future reader of `deferred-pending.md` understands why the schema carries the seemingly-redundant pair.
+- **Trigger to revisit**: N/A — already closed. Remove this entry when the next deferred-pending refresh runs.
+- **Effort estimate**: 0 hours (closed).
+
+### Memory + Evals.Agentic NuGet packaging
+- **Source**: Phase-8 Task 8.2; Phase-2 Task 2.4 chose Path A (bundle into the umbrella `AgentEval` nupkg).
+- **Scope**: A future v1.1 may split `AgentEval.Memory` and/or `AgentEval.Evals.Agentic` into standalone NuGet packages so consumers can pull only the subsystem they need (smaller dep graph, faster restore, independent versioning).
+- **Why deferred**: Path A unblocks v1 consumers without paying the packaging overhead. The standalone-package route adds 2 csproj migrations + nuspec authoring + cross-package compatibility tests; not worth the v1 churn when umbrella works.
+- **Trigger to revisit**: When a downstream consumer reports `AgentEval` (the umbrella) is too large to depend on (typical signal: a Function App / AOT-compiled console that wants only the agentic pieces).
+- **Effort estimate**: 4–6 hours (carve out csproj + nuspec; rewire AddAgentEvalAll DI extension to be additive).
+
+### Evaluator card-vs-code category drift (scope correction)
+- **Source**: Phase-8 Task 8.3; 10-agent Opus review.
+- **Scope**: 38 of the 60 plan-05 / plan-06 evaluator cards have category metadata that disagrees with the runtime registration. The earlier `deferred-pending.md` entry said "some cards drift"; the actual scope is 38/60 — a much wider surface that warrants a dedicated card-vs-code reconciliation pass.
+- **Why deferred**: Mechanical scrub touching every card file + matching `EvaluatorCostMap` registration. Out of scope for v1 because the GraphQL `evaluators.category` field can already be served from either source (the runtime registration is authoritative; cards are documentation).
+- **Trigger to revisit**: When the Mission Control evaluator-registry UI ships richer per-card metadata that auditors will read end-to-end.
+- **Effort estimate**: 6–8 hours (38 card edits + reconciliation tests).
+
+### BenchAgenticCalibrate dispatch coverage breakdown
+- **Source**: Phase-8 Task 8.4.
+- **Scope**: `BenchAgenticCalibrateCommand` dispatches against 11 of the 60 agentic evaluators today (Plan-05 phases 1-3 evaluators + a slice of Plan-06). The remaining 49 evaluators (Plan-05 phase 4-5 safety/telemetry/stochastic-stability composites and Plan-06 reasoning/UX/adversarial composites) are not yet wired into the calibrate dispatch table.
+- **Why deferred**: Adding them requires authoring 49 new calibration goldens (one per evaluator) — a content lift, not a code lift. Premature without consumer demand for per-evaluator calibration.
+- **Trigger to revisit**: When a consumer asks "how well-calibrated is the X evaluator?" for an X that isn't in the 11.
+- **Effort estimate**: ~30 minutes per new evaluator × 49 = ~24 hours of golden-authoring + dispatch-table wiring.
+
+---
+
 ## How to use this document
 
 - **For PR authors**: when reviewing this branch's merge PR, scan this doc to confirm none of the deferrals affect your area. If they do, flag in the PR comments.
@@ -477,6 +519,7 @@ same shape.
 
 ---
 
-*Last updated: 2026-05-10 after the 10-agent Opus cross-cutting review.
+*Last updated: 2026-05-11 after the review-03 8-phase remediation pass.
 Captures items deferred from plans 00–08 + the post-review remediation
-batches (commits `129a98b` / `8b4d691` / `a157f7a`).*
+batches (commits `129a98b` / `8b4d691` / `a157f7a`) + the review-03
+Phase-8 entries above.*

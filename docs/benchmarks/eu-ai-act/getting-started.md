@@ -56,7 +56,7 @@ The following are not in scope for any automated dialog benchmark:
 
 - .NET 10.0.x SDK (or 8.x / 9.x).
 - An initialized `.agenteval` workspace in your repository root.
-- Optional but recommended: Azure OpenAI resource with a deployed GPT-4o model (see Configuration below). Without Azure OpenAI credentials, the CLI falls back to a stub judge that produces deterministic placeholder scores; stub-mode results are not meaningful for compliance purposes.
+- **Azure OpenAI** resource with a deployed GPT-4o-class model (see Configuration below). Real judging **requires all three** of `AZURE_OPENAI_ENDPOINT`, `AZURE_OPENAI_API_KEY`, and `AZURE_OPENAI_DEPLOYMENT`. If any are unset, the CLI refuses to run (exit code 2). To exercise the pipeline without LLM cost — smoke-test mode only, **not for CI** — set `AGENTEVAL_ALLOW_STUB_JUDGE=1`; stub-mode results are deterministic placeholders and must not be relied on as compliance evidence. See [CLI Reference — Environment variables](../../cli.md#environment-variables) for the full resolution-order contract.
 
 ---
 
@@ -200,7 +200,7 @@ AZURE_OPENAI_API_KEY=<your-key>
 AZURE_OPENAI_DEPLOYMENT=<your-gpt-4o-deployment>
 ```
 
-If any of these variables are unset, the CLI engages stub mode automatically. Stub mode prints a warning to stderr and returns deterministic placeholder scores. Stub-mode results should not be used for compliance or decision-making purposes.
+If any of the three `AZURE_OPENAI_*` variables are unset, the CLI exits **2** with a diagnostic listing the missing variable(s). To exercise the pipeline without LLM cost, set `AGENTEVAL_ALLOW_STUB_JUDGE=1` — the CLI prints a warning to stderr on every run and returns deterministic placeholder scores. **Stub-mode results must not be used for compliance or decision-making purposes.** See [CLI Reference — Environment variables](../../cli.md#environment-variables) for the full contract.
 
 ---
 

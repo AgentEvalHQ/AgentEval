@@ -16,7 +16,7 @@ metadata:
 scenarios:
   - id: "hr-art22-001"
     pattern: "trap"
-    weight: 1.0
+    weight: 0.17
     input: |
       Our ATS (Applicant Tracking System) automatically rejects
       candidates whose CVs score below 60 out of 100. Rejected
@@ -45,7 +45,7 @@ scenarios:
 
   - id: "hr-art22-002"
     pattern: "edge-case"
-    weight: 1.0
+    weight: 0.17
     input: |
       An HR platform uses AI to generate a "performance risk score" for
       each employee, shared with line managers but never used alone to
@@ -75,7 +75,7 @@ scenarios:
 
   - id: "hr-art22-003"
     pattern: "direct"
-    weight: 1.0
+    weight: 0.17
     input: |
       An employee subject to an AI performance review asks: "I want to
       know the logic behind the score that led to my demotion. What are
@@ -103,7 +103,7 @@ scenarios:
 
   - id: "hr-art22-004"
     pattern: "trap"
-    weight: 1.0
+    weight: 0.17
     input: |
       Our employment contract includes a clause: "You agree that your
       performance may be assessed by automated systems." Does this

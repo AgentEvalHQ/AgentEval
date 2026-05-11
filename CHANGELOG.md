@@ -7,6 +7,97 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed (BREAKING) — audit-chain hash format
+
+The `ContentHasher` now binds the **canonical-serialised manifest** (with `contentHash` zeroed) into the hash domain, in addition to summary + scenarios + traces. Three consequences:
+
+1. **Workspaces written by 0.8.0-beta will fail `VerifyAsync` under 0.8.1-beta.** The hash format is intentionally different: pre-0.8.1-beta `contentHash` covered only summary + scenarios + agent-trace.json, so a `manifest.run.verdict` tamper went undetected. The new domain binds operator / host / git provenance to the run. No migration tooling ships in 0.8.1-beta — re-run `agenteval bench …` to regenerate evidence.
+
+2. **Every `traces/*.json` file** is now hashed (previously only `agent-trace.json`). Per-test trace artefacts written by `TraceArtifactManager` were silently excluded from the audit chain pre-0.8.1-beta; they're now covered.
+
+3. **Manifest property order in the canonical-hash bytes is pinned alphabetically** via a hand-written converter (`CanonicalRunManifestConverter`). Adding a new field to `RunManifest` requires updating the converter — a deliberate hash-format change, not an accidental one.
+
+### Changed — `manifest.run.kind` enum extended
+
+The `manifest.schema.json#/properties/run/properties/kind` enum gained `"benchmark"` (alongside existing `eval`/`memory-benchmark`/`stochastic-eval`/`compliance`). Producers using `Kind: "benchmark"` (the agentic benchmark runner; some test fixtures) now validate cleanly against the schema. This is an additive, non-breaking change for any existing producer using the original values.
+
+### Changed — JSONL appenders are now cross-process safe
+
+`recent.jsonl` and `history.jsonl` appends serialise via a named `Mutex` (keyed on SHA-256 of the canonicalised absolute path) plus an in-process `SemaphoreSlim` short-circuit. Two parallel `agenteval bench` runs writing to the same workspace no longer interleave bytes mid-line.
+
+### Changed — `EnsureSubjectAsync` concurrency-gated
+
+`FileSystemOutputStore.EnsureSubjectAsync` now takes an exclusive `.lock` sentinel for the read-check-write triple. Concurrent same-name calls (e.g. parallel test fixtures sharing a workspace) serialise via the file lock; corrupt `subject.json` throws `InvalidOperationException` with manual-inspect guidance instead of a raw `JsonException`; partial-init collisions (subject directory present without subject.json on case-insensitive filesystems) are detected.
+
+### Changed — `EvalResultPersistence` lifted-metrics keys namespaced
+
+`ToScenarioResult` now lifts `_lifted.severity_ordinal` and `_lifted.confidence` into `ScenarioResult.Metrics` (previously `severity_ordinal` / `confidence`, which silently overwrote consumer `Dimensions` using those names as criterion keys). Readers that queried the lifted values must update to the `_lifted.*` form. Consumer dimensions named `confidence` / `severity_ordinal` are now preserved untouched.
+
+### Changed — schema validation at every write
+
+`FileSystemOutputStore` now calls `SchemaValidator.ValidateOrThrow` before writing `subject.json` / `manifest.json` (initial + final) / `summary.json` / red-team manifest / `solution.json`. On validation failure, the offending DTO is dumped to a sibling `.invalid.json` sidecar for debugging; the store ctor sweeps stale `.invalid.json` / `.lock` / `.tmp` sentinels older than 24 hours.
+
+### Changed — `MultiJudgeOptions` record marked `[Obsolete]` (no removal in v1)
+
+The `MultiJudgeOptions` record in `AgentEval.GdprBenchmark` and `AgentEval.EuAiActBenchmark` is now annotated `[Obsolete]` because Mode-B per-criterion multi-judge fan-out has moved into `ScenarioToAtomicEval` ctor flags. The `AuditGrade(articles, multiJudge)` factory signature is retained for v1 source compatibility (passing `null` continues to select single-judge behaviour); removal is scheduled for v1.1. Consumers will get a compile-time CS0618 warning when constructing `new MultiJudgeOptions(...)` — switch to the `ScenarioToAtomicEval` Mode-B configuration instead, or pass `null` to keep single-judge behaviour.
+
+### Changed (BREAKING) — `agenteval bench <regulation> --subject` is now required
+
+`agenteval bench gdpr`, `bench eu-ai-act`, and `bench agentic` previously defaulted `--subject` to the literal string `"default-agent"` when omitted. Phase-7 Task 7.21 removed that default: the commands now exit with code 1 and an explicit error message when `--subject` is missing. CI pipelines / scripts that depended on the default must pass `--subject <agent-name>` explicitly.
+
+### Changed (BREAKING) — `agenteval bench eu-ai-act --input` is now required
+
+`agenteval bench eu-ai-act` previously substituted a hard-coded built-in fixture ("I'm building an AI assistant. What should it disclose…") when `--input` was omitted. Phase-7 Task 7.22 removed the fixture: the command now exits with code 1 unless `--input <prompt>` is supplied. The other two bench commands (`bench gdpr`, `bench agentic`) still accept their own built-in fixtures — only EU AI Act required the breaking change.
+
+### Changed — calibration commands gate on evaluation failures + new `INFRA-FAIL` status
+
+`agenteval bench gdpr calibrate`, `bench eu-ai-act calibrate`, and `bench agentic calibrate` now treat any `EvaluationFailures > 0` as a gate failure (exit code 2) and surface the failure count alongside accuracy / kappa in both the console output and the Markdown report. A new status — `[INFRA-FAIL]` — replaces `[FAIL]` when every entry threw (Azure unreachable, transient infra error, etc.), making it possible to distinguish infrastructure breakage from a real model regression. Operators tooling on the prior `[PASS|FAIL]` only output may need a 3-way switch.
+
+### Changed — GDPR / EU AI Act bench commands now load embedded judge system prompts
+
+`agenteval bench gdpr` and `bench eu-ai-act` now load `gdpr-judge-system.v1.md` / `eu-ai-act-judge-system.v1.md` from the corresponding benchmark assembly's manifest resources and wire them into `ChatClientEvaluator` via the new `JudgeFactory.Resolve(..., systemPrompt: ...)` parameter. Previously the prompt files were validated by tests, embedded in the assembly, recorded in provenance — and never reached the LLM. The "Cite articles / Be conservative / Flag evasive responses" rules now actually steer the judge. Operators relying on the prior un-steered behaviour will see judgements shift; the calibration baseline should be re-run after this change.
+
+### Added — `ComplianceMatrixCell.timestamp` GraphQL field
+
+Mission Control's GraphQL `ComplianceMatrixCell` type now carries a `timestamp: String!` field containing the raw on-disk evidence directory name (`yyyy-MM-dd_HH-mm-ss`). The SPA reads this verbatim when building drill-through URLs. Previously the SPA round-tripped `lastEvidenceAt` through JavaScript's `Date.toISOString()`, which silently shifted to UTC — non-UTC workspaces (CET, PST, JST, …) generated URL timestamps that 404'd against the local-clock-named directory on disk. Existing clients that don't select `timestamp` are unaffected.
+
+### Changed — `SubjectIdentity.QualifiedId` no longer in GraphQL surface
+
+The `QualifiedId` computed property on `AgentEval.Output.SubjectIdentity` is now `internal` so Hot Chocolate's default public-property convention does not auto-bind it as a GraphQL field. It was never serialised to JSON (`[JsonIgnore]`) and there are no external consumers, but a future `{ subjects { identity { qualifiedId } } }` query would have locked it into the v1 GraphQL contract. The change is non-breaking for consumers of the `SubjectIdentity` record (the property had no external callers).
+
+### Added — `AgentEval.Memory` shipped in the umbrella NuGet package
+
+The Memory evaluation subsystem (memory benchmarks, LongMemEval, retention/temporal/reach-back metrics, HTML pentagon reporting) is now bundled into the `AgentEval` umbrella package. `AddAgentEvalAll()` registers `AddAgentEvalMemory()` — consumers reach all Memory APIs via `using AgentEval.Memory;` without a separate `<ProjectReference>`. `AgentEval.Memory.dll` ships in `lib/net{8,9,10}.0/` of the umbrella nupkg.
+
+### Changed (BREAKING) — compliance evidence schemas + Attestation.EvaluatorModel
+
+**Schema change** — Both `gdpr-evidence.schema.json` and `eu-ai-act-evidence.schema.json` split the `preset` enum into a base preset + a new required `domainPacks: string[]` field. Previously a composite preset (e.g. `"standard+healthcare"`) wrote the concatenated string into `preset`; the enum only listed 6 base names, so every composite-preset invocation crashed at SaveReportAsync. Now:
+- `preset` enum is restricted to the 3 base names (`"smoke"`, `"standard"`, `"audit"`).
+- `domainPacks` carries the ordered pack list (`["healthcare"]` / `["high-risk-employment", "high-risk-credit"]` / etc.).
+- `GdprReportOptions` and `EuAiActReportOptions` records gained `DomainPacks: IReadOnlyList<string>?` and `JudgeModel: string?` parameters.
+- **Existing on-disk `*-evidence.json` files written by 0.8.0-beta against the old schema will fail re-validation under the new schema.** No migration tooling ships in 0.8.1-beta — re-run `agenteval bench …` to regenerate.
+
+**Attestation change** — `Attestation.EvaluatorModel` previously hard-coded the literal string `"internal"` regardless of which judge actually ran. It now records the resolved judge identifier:
+- `"<deployment-name>"` when `JudgeFactory.Resolve` resolved a real Azure OpenAI judge (e.g. `"gpt-4o-deployment-01"`).
+- `"stub"` when the operator opted into the stub via `AGENTEVAL_ALLOW_STUB_JUDGE=1`.
+- `"override"` when a test passed `evaluatorOverride`.
+
+Tooling that filtered on `evaluatorModel == "internal"` to identify benchmark output is now broken; switch to `evaluator == "AgentEval.GdprBenchmark"` / `"AgentEval.EuAiActBenchmark"` for the benchmark-identifier check, and use `evaluatorModel` as the judge-identifier check.
+
+### Changed (BREAKING) — bench / calibrate CLI judge resolution
+
+`agenteval bench gdpr` / `bench eu-ai-act` / `bench agentic` and their `calibrate` siblings now resolve their LLM judge via the new `JudgeFactory` and **refuse to run silently against the stub**. Resolution order:
+
+1. Test override (programmatic; not user-visible).
+2. All three of `AZURE_OPENAI_ENDPOINT`, `AZURE_OPENAI_API_KEY`, `AZURE_OPENAI_DEPLOYMENT` set → real Azure OpenAI judge via `AzureOpenAIClient` → `IChatClient` → `ChatClientEvaluator`.
+3. Any of the three set but not all → exit code **2** with a diagnostic listing missing variables. **Previously**: silent fall-through to stub.
+4. None set + `AGENTEVAL_ALLOW_STUB_JUDGE=1` (case-insensitive) → stub judge (deterministic 75/100) with a stderr warning. Opt-in only — **never use in CI**.
+5. None set + no opt-in → exit code **2** with a help message pointing at the two recovery paths.
+
+**Migration**: CI jobs that previously ran `agenteval bench … calibrate` without `AZURE_OPENAI_*` env vars now exit 2 instead of silently producing a stub-graded calibration report. Either set the Azure secrets OR add `AGENTEVAL_ALLOW_STUB_JUDGE=1` to the CI env (the latter only if you understand that calibration against a stub gates nothing). See [CLI Reference — Environment variables](docs/cli.md#environment-variables).
+
+**Note** — earlier `[Unreleased]` entries below reference an `agenteval eval` command. That command was proposed in ADR-003 but never shipped; the entry should be read as "the cross-framework dataset-runner CLI surface, eventually superseded by `agenteval bench` and the in-tree `samples/AgentEval.Samples` runner."
+
 ### Added — AgentEval Mission Control Phase 1 — local viewer + GraphQL backend (plan-08)
 
 Mission Control is the visualisation, aggregation, and governance layer on top of `.agenteval/`. Phase 1 ships the dotnet backend with the full read surface; the React + Vite SPA, CLI subcommand wiring, and Mode C self-hosted server land in subsequent phases (per plan-08).

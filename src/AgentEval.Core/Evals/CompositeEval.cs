@@ -9,6 +9,24 @@ namespace AgentEval.Evals;
 /// </summary>
 public sealed class CompositeEval : IEval
 {
+    /// <summary>
+    /// Producer-side recursion-depth cap matching Mission Control's
+    /// <c>MaxTreeWalkDepth=32</c>. Phase-7 Task 7.5: a deeply-nested composite
+    /// configuration (root → pillar → article → sub-article → … past 32 levels)
+    /// would stack-overflow the resolver thread on the consumer side. Fail at
+    /// the producer instead so the bug surfaces during the bench run with a
+    /// clear diagnostic, not as a hard crash during PDF rendering.
+    /// </summary>
+    internal const int MaxNestingDepth = 32;
+
+    /// <summary>
+    /// AsyncLocal depth counter — increments on each <see cref="EvaluateAsync"/>
+    /// entry, decrements on exit. AsyncLocal flows naturally through awaits so
+    /// the depth tracks the true composite-tree nesting even with parallel
+    /// fan-out (each child task sees the same logical-call depth).
+    /// </summary>
+    private static readonly AsyncLocal<int> s_nestingDepth = new();
+
     /// <inheritdoc/>
     public string Key { get; }
 
@@ -68,6 +86,28 @@ public sealed class CompositeEval : IEval
     {
         ArgumentNullException.ThrowIfNull(input);
 
+        // Phase-7 Task 7.5: producer-side recursion-depth check. Mirrors the
+        // consumer-side MissionControl.GraphQL.Query.MaxTreeWalkDepth so a tree
+        // that would crash the resolver also fails fast at construction time.
+        var depth = s_nestingDepth.Value + 1;
+        if (depth > MaxNestingDepth)
+            throw new InvalidOperationException(
+                $"CompositeEval recursion depth exceeded {MaxNestingDepth} (current: {depth}). " +
+                "A composite tree this deep would stack-overflow Mission Control's resolver — " +
+                "flatten the composite or split it into multiple top-level evals.");
+        s_nestingDepth.Value = depth;
+        try
+        {
+            return await EvaluateCoreAsync(input, ct);
+        }
+        finally
+        {
+            s_nestingDepth.Value = depth - 1;
+        }
+    }
+
+    private async Task<EvalResult> EvaluateCoreAsync(EvalInput input, CancellationToken ct)
+    {
         // Run all sub-evals in parallel (no throttle in Phase 1).
         var subTasks = Components.Select(c => c.Eval.EvaluateAsync(input, ct)).ToArray();
         var subs = await Task.WhenAll(subTasks);

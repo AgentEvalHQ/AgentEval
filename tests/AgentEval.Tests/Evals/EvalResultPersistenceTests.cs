@@ -246,11 +246,13 @@ public class EvalResultPersistenceTests
         // Act
         var sr = EvalResultPersistence.ToScenarioResult(result, "scenario-1", "Scenario 1");
 
-        // Assert — severity_ordinal lifted so callers can query Metrics
-        // without re-deserialising the recursive Output JSON.
-        Assert.True(sr.Metrics.ContainsKey("severity_ordinal"),
-            "severity_ordinal must be lifted into Metrics for query-side use");
-        Assert.Equal(expectedOrdinal, sr.Metrics["severity_ordinal"]);
+        // Assert — _lifted.severity_ordinal lifted so callers can query Metrics
+        // without re-deserialising the recursive Output JSON. Note the
+        // `_lifted.` prefix added in pass-3 to avoid collisions with consumer
+        // dimensions that legitimately use "severity_ordinal" as a key.
+        Assert.True(sr.Metrics.ContainsKey("_lifted.severity_ordinal"),
+            "_lifted.severity_ordinal must be lifted into Metrics for query-side use");
+        Assert.Equal(expectedOrdinal, sr.Metrics["_lifted.severity_ordinal"]);
     }
 
     [Fact]
@@ -265,8 +267,8 @@ public class EvalResultPersistenceTests
 
         var sr = EvalResultPersistence.ToScenarioResult(result, "scenario-1", "Scenario 1");
 
-        Assert.True(sr.Metrics.ContainsKey("confidence"));
-        Assert.Equal(0.92, sr.Metrics["confidence"]);
+        Assert.True(sr.Metrics.ContainsKey("_lifted.confidence"));
+        Assert.Equal(0.92, sr.Metrics["_lifted.confidence"]);
     }
 
     [Fact]
@@ -281,7 +283,7 @@ public class EvalResultPersistenceTests
 
         var sr = EvalResultPersistence.ToScenarioResult(result, "scenario-1", "Scenario 1");
 
-        Assert.False(sr.Metrics.ContainsKey("confidence"));
+        Assert.False(sr.Metrics.ContainsKey("_lifted.confidence"));
     }
 
     [Fact]
@@ -304,8 +306,40 @@ public class EvalResultPersistenceTests
         // Dimensions survive
         Assert.Equal(0.95, sr.Metrics["clarity"]);
         Assert.Equal(0.80, sr.Metrics["accuracy"]);
-        // Lifted alongside
-        Assert.Equal(1.0,  sr.Metrics["severity_ordinal"]); // low=1
-        Assert.Equal(0.85, sr.Metrics["confidence"]);
+        // Lifted alongside under `_lifted.*` keys
+        Assert.Equal(1.0,  sr.Metrics["_lifted.severity_ordinal"]); // low=1
+        Assert.Equal(0.85, sr.Metrics["_lifted.confidence"]);
+    }
+
+    /// <summary>
+    /// Phase 3 / Task 3.6 regression — namespacing prevents lifted metrics
+    /// from clobbering consumer-supplied Dimensions whose key happens to
+    /// coincide with one of the lifted names. Without the `_lifted.` prefix
+    /// added in pass-3, the dimension was silently overwritten.
+    /// </summary>
+    [Fact]
+    public void ToScenarioResult_DimensionsNamed_Confidence_OrSeverityOrdinal_AreNOTOverwritten()
+    {
+        var dimensions = new Dictionary<string, double>
+        {
+            // Plausible domain words a consumer might use as criterion names.
+            ["confidence"]       = 0.42,
+            ["severity_ordinal"] = 99.9,
+        };
+        var result = new EvalResult(
+            Metric: new("test_metric", "Test", "test", "1.0.0"),
+            Score: new(0.9, null, "fail", false, null, "high", Confidence: 0.92),
+            Details: new(dimensions, null, null, null, null),
+            Provenance: new("atomic-llm", null, null, null, null, 0.0, false),
+            EvaluatedAt: DateTimeOffset.UtcNow);
+
+        var sr = EvalResultPersistence.ToScenarioResult(result, "scenario-1", "Scenario 1");
+
+        // Consumer dimensions preserved
+        Assert.Equal(0.42, sr.Metrics["confidence"]);
+        Assert.Equal(99.9, sr.Metrics["severity_ordinal"]);
+        // Lifted values under namespaced keys
+        Assert.Equal(0.92, sr.Metrics["_lifted.confidence"]);
+        Assert.Equal(3.0,  sr.Metrics["_lifted.severity_ordinal"]);  // high = 3
     }
 }

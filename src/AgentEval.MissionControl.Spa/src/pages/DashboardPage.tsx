@@ -77,13 +77,15 @@ export function DashboardPage() {
   });
 
   // Build the trend (sparkline data) per subject by filtering recentRuns.
+  // Phase-7 Task 7.9: key by `${kind}::${name}` so an agent and a workflow
+  // with the same name don't share a sparkline.
   const trendBySubject = buildTrendIndex(recentRunsQ.data?.recentRuns ?? []);
   const cards: SubjectCardData[] = (subjectsQ.data?.subjects ?? []).map((s) => ({
     kind: s.identity.kind,
     name: s.identity.name,
     lastVerdict: s.lastRun?.verdict ?? null,
     lastRunId: s.lastRun?.runId ?? null,
-    trend: trendBySubject.get(s.identity.name) ?? [],
+    trend: trendBySubject.get(`${s.identity.kind}::${s.identity.name}`) ?? [],
   }));
 
   return (
@@ -164,17 +166,24 @@ export function DashboardPage() {
 function buildTrendIndex(
   runs: RecentRunsResponse["recentRuns"],
 ): Map<string, { value: number }[]> {
-  const byName = new Map<string, { ts: string; value: number }[]>();
+  // Phase-7 Task 7.9: key the trend map by `${kind}::${name}` so an agent and
+  // a workflow sharing a name don't have their sparklines merged. Runs with
+  // a null kind (legacy / not-yet-backfilled run pointers) bucket under an
+  // explicit `UNKNOWN::{name}` so they still appear if any subject lookup
+  // happens to match — but they will not show up on the agent OR workflow
+  // detail page, which is the right answer for ambiguous legacy data.
+  const byKey = new Map<string, { ts: string; value: number }[]>();
   for (const r of runs) {
     if (r.score === null) continue;
-    const list = byName.get(r.subjectName) ?? [];
+    const key = `${r.kind ?? "UNKNOWN"}::${r.subjectName}`;
+    const list = byKey.get(key) ?? [];
     list.push({ ts: r.timestamp, value: r.score });
-    byName.set(r.subjectName, list);
+    byKey.set(key, list);
   }
   // Sort each list by timestamp ascending; drop the ts after sort.
   return new Map(
-    Array.from(byName.entries()).map(([name, points]) => [
-      name,
+    Array.from(byKey.entries()).map(([key, points]) => [
+      key,
       points
         .sort((a, b) => a.ts.localeCompare(b.ts))
         .map((p) => ({ value: p.value })),

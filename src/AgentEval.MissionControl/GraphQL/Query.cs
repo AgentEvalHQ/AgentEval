@@ -364,9 +364,9 @@ public sealed class Query
     /// pathological / attacker-shaped trees that would overflow the stack.
     /// Set to 32 to comfortably exceed the GraphQL depth cap (10) and any
     /// realistic composite (root → pillar → article → multi-judge ≤ 5).</summary>
-    private const int MaxTreeWalkDepth = 32;
+    internal const int MaxTreeWalkDepth = 32;
 
-    private static void WalkAndAccumulate(
+    internal static void WalkAndAccumulate(
         EvalResult node,
         ref double trivial,
         ref double low,
@@ -522,7 +522,7 @@ public sealed class Query
     /// the first node whose metric key matches. Pre-order (parent before
     /// children) so a composite-of-the-same-key wins over its leaves.
     /// </summary>
-    private static EvalResult? FindEvaluatorNode(EvalResult node, string key, int depth = 0)
+    internal static EvalResult? FindEvaluatorNode(EvalResult node, string key, int depth = 0)
     {
         if (depth > MaxTreeWalkDepth) return null;
         if (string.Equals(node.Metric.Key, key, StringComparison.Ordinal))

@@ -48,6 +48,32 @@ public sealed class FileSystemOutputStore : IOutputStore
         _json.NewLine = "\n";
         _jsonl.NewLine = "\n";
 #endif
+
+        // Best-effort sweep of stale sentinels left behind by killed processes:
+        // `.invalid.json` siblings written when a schema-validate-before-write
+        // failed (task 3.7), and `.lock` sentinels orphaned by EnsureSubjectAsync
+        // (task 3.5). Anything older than 24h is fair game. Swallow IO errors —
+        // a clean store ctor must never block on cleanup of advisory artefacts.
+        try { TrySweepStaleSentinels(_layout.Root); }
+        catch { /* intentional swallow */ }
+    }
+
+    private static void TrySweepStaleSentinels(string root)
+    {
+        if (!Directory.Exists(root)) return;
+        var cutoff = DateTimeOffset.UtcNow.AddHours(-24);
+        foreach (var pattern in new[] { "*.invalid.json", "*.lock", "*.tmp" })
+        {
+            foreach (var file in Directory.EnumerateFiles(root, pattern, SearchOption.AllDirectories))
+            {
+                try
+                {
+                    var info = new FileInfo(file);
+                    if (info.LastWriteTimeUtc < cutoff) info.Delete();
+                }
+                catch { /* skip files we can't access — another process may hold them */ }
+            }
+        }
     }
 
     public string? WorkspaceRoot => _layout.Root;
@@ -91,35 +117,109 @@ public sealed class FileSystemOutputStore : IOutputStore
     public async Task<SubjectInfo> EnsureSubjectAsync(SubjectIdentity identity, CancellationToken ct = default)
     {
         var subjectFile = _layout.SubjectFile(identity);
-        SubjectFileV1? existing = null;
-        if (File.Exists(subjectFile))
-            existing = await ReadJsonAsync<SubjectFileV1>(subjectFile, ct);
 
-        // Defend against case-insensitive filesystem collisions: on NTFS / default
-        // APFS, "TravelAgent" and "travelagent" resolve to the same directory. The
-        // path-resolved Sanitize output may match a sibling whose subject.json says
-        // a differently-cased name. Surface the collision before we overwrite their
-        // subject.json with a wrongly-cased identity.
-        if (existing is not null && !string.Equals(existing.Name, identity.Name, StringComparison.Ordinal))
+        // Concurrency gate — two parallel EnsureSubjectAsync calls (e.g. one
+        // per-test fixture initialising a workspace, or two `agenteval bench`
+        // runs racing) must not both pass the case-collision check below and
+        // each write a subject.json. Take an exclusive file lock for the
+        // read-check-write triple. The .lock sentinel is gitignored (see
+        // .gitattributes + the gitignore entry added in task 3.7b).
+        var lockPath = subjectFile + ".lock";
+        Directory.CreateDirectory(Path.GetDirectoryName(lockPath)!);
+        SubjectFileV1? existing;
+        // Acquire an exclusive file lock with retry-on-contention. `FileShare.None`
+        // makes the first opener exclusive; subsequent openers throw IOException.
+        // Spin-wait with brief backoff until the holder releases (typical contention
+        // window is < 1 ms — subject.json writes are microseconds). 30s overall
+        // deadline; cancellation honoured during sleep.
+        var lockDeadline = DateTimeOffset.UtcNow.AddSeconds(30);
+        FileStream? lockHandle = null;
+        while (lockHandle is null)
         {
-            throw new InvalidOperationException(
-                $"Subject directory '{Path.GetFileName(_layout.SubjectDir(identity))}' is already in use by subject " +
-                $"'{existing.Name}' (case-insensitive filesystem collision with requested name '{identity.Name}'). " +
-                "Pick a unique name that does not collide on case.");
+            ct.ThrowIfCancellationRequested();
+            try
+            {
+                lockHandle = new FileStream(lockPath, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
+            }
+            catch (IOException) when (DateTimeOffset.UtcNow < lockDeadline)
+            {
+                await Task.Delay(TimeSpan.FromMilliseconds(10), ct);
+            }
         }
+        await using (lockHandle)
+        {
+            existing = null;
+            if (File.Exists(subjectFile))
+            {
+                try
+                {
+                    existing = await ReadJsonAsync<SubjectFileV1>(subjectFile, ct);
+                }
+                catch (JsonException jx)
+                {
+                    throw new InvalidOperationException(
+                        $"subject.json at '{subjectFile}' is corrupt and cannot be deserialised " +
+                        $"({jx.Message}). Manually inspect or delete the file to proceed; the " +
+                        "case-collision and idempotency checks cannot run safely against unreadable JSON.",
+                        jx);
+                }
+            }
 
-        var dto = new SubjectFileV1(
-            SchemaVersion: "1.0",
-            Kind: identity.Kind.ToString().ToLowerInvariant(),
-            Name: identity.Name,
-            Version: identity.Version ?? existing?.Version,
-            Framework: identity.Framework ?? existing?.Framework,
-            ModelId: identity.ModelId ?? existing?.ModelId,
-            SourceProject: identity.SourceProject ?? existing?.SourceProject,
-            SourcePath: identity.SourcePath ?? existing?.SourcePath,
-            Tags: identity.Tags ?? existing?.Tags);
+            // Defend against case-insensitive filesystem collisions when subject.json
+            // is intact and disagrees with the requested identity. On NTFS / default
+            // APFS, "TravelAgent" and "travelagent" resolve to the same directory.
+            if (existing is not null && !string.Equals(existing.Name, identity.Name, StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException(
+                    $"Subject directory '{Path.GetFileName(_layout.SubjectDir(identity))}' is already in use by subject " +
+                    $"'{existing.Name}' (case-insensitive filesystem collision with requested name '{identity.Name}'). " +
+                    "Pick a unique name that does not collide on case.");
+            }
 
-        await WriteJsonAsync(subjectFile, dto, ct);
+            // Defend against partial-init: directory exists but subject.json is
+            // missing (e.g. prior process killed mid-write). Detect a sibling
+            // directory in the same parent whose name matches OUR sanitised path
+            // case-insensitively but with a different case — that's a collision
+            // where the colliding subject hasn't even been able to write its file.
+            if (existing is null)
+            {
+                var kindDir = _layout.SubjectKindDir(identity.Kind);
+                if (Directory.Exists(kindDir))
+                {
+                    var requestedDirName = Path.GetFileName(_layout.SubjectDir(identity));
+                    foreach (var siblingPath in Directory.GetDirectories(kindDir))
+                    {
+                        var siblingName = Path.GetFileName(siblingPath);
+                        if (siblingName is null) continue;
+                        if (string.Equals(siblingName, requestedDirName, StringComparison.OrdinalIgnoreCase)
+                         && !string.Equals(siblingName, requestedDirName, StringComparison.Ordinal))
+                        {
+                            throw new InvalidOperationException(
+                                $"Partial subject directory '{siblingName}' already exists alongside the " +
+                                $"requested '{requestedDirName}' (case-only difference on a case-insensitive " +
+                                "filesystem). Pick a unique name that does not collide on case, or remove " +
+                                "the stale directory before retrying.");
+                        }
+                    }
+                }
+            }
+
+            var dto = new SubjectFileV1(
+                SchemaVersion: "1.0",
+                Kind: identity.Kind.ToString().ToLowerInvariant(),
+                Name: identity.Name,
+                Version: identity.Version ?? existing?.Version,
+                Framework: identity.Framework ?? existing?.Framework,
+                ModelId: identity.ModelId ?? existing?.ModelId,
+                SourceProject: identity.SourceProject ?? existing?.SourceProject,
+                SourcePath: identity.SourcePath ?? existing?.SourcePath,
+                Tags: identity.Tags ?? existing?.Tags);
+
+            await ValidateAndWriteJsonAsync(subjectFile, dto, "subject.schema.json", ct);
+        }
+        // The .lock sentinel stays on disk as a zero-byte file — cheaper than
+        // racing a Delete against another holder. Sweep periodically via the
+        // store-ctor cleanup (see task 3.7b).
 
         // Load latest run summary if any
         RunSummary? lastRun = null;
@@ -204,7 +304,7 @@ public sealed class FileSystemOutputStore : IOutputStore
             Environment: EnvProbe.Probe(),
             ContentHash: "sha256:0000000000000000000000000000000000000000000000000000000000000000");
 
-        await WriteJsonAsync(_layout.ManifestFile(subject, runId), manifest, ct);
+        await ValidateAndWriteJsonAsync(_layout.ManifestFile(subject, runId), manifest, "manifest.schema.json", ct);
         return manifest;
     }
 
@@ -212,6 +312,12 @@ public sealed class FileSystemOutputStore : IOutputStore
     {
         var subject = await LocateRunAsync(runId, ct);
         var path = _layout.ScenarioFile(subject, runId, result.Id);
+        // Schema for the per-scenario file is eval-result.schema.json, but it
+        // validates the EMBEDDED JSON tree inside ScenarioResult.Output rather
+        // than the ScenarioResult wrapper itself. Validating the embedded tree
+        // would require parsing Output back to a node — defer to v1.1 when
+        // the bridge gets a dedicated schema. The wrapper's shape is enforced
+        // by C# typing.
         await WriteJsonAsync(path, result, ct);
     }
 
@@ -220,12 +326,17 @@ public sealed class FileSystemOutputStore : IOutputStore
         var subject = manifest.Subject.ToIdentity();
         var runId = manifest.Run.RunId;
 
-        await WriteJsonAsync(_layout.SummaryFile(subject, runId), summary, ct);
+        await ValidateAndWriteJsonAsync(_layout.SummaryFile(subject, runId), summary, "summary.schema.json", ct);
 
-        var hash = await ContentHasher.HashRunAsync(_layout, subject, runId, ct);
-        var updated = manifest with
+        // Hash domain now includes the manifest (with contentHash zeroed). We
+        // MUST hash against the final manifest (Verdict/Duration/ScenarioCount
+        // populated), NOT the PENDING placeholder still on disk — otherwise
+        // Verify would read the final manifest later and compute a different
+        // hash. Build the final manifest in-memory FIRST, then hash with that
+        // as the override, then write it.
+        var pendingForHash = manifest with
         {
-            ContentHash = $"sha256:{hash}",
+            ContentHash = "",   // will be overwritten with the real hash post-compute
             Run = manifest.Run with
             {
                 Verdict = summary.Verdict,
@@ -233,7 +344,9 @@ public sealed class FileSystemOutputStore : IOutputStore
                 ScenarioCount = summary.Stats.Total
             }
         };
-        await WriteJsonAsync(_layout.ManifestFile(subject, runId), updated, ct);
+        var hash = await ContentHasher.HashRunAsync(_layout, subject, runId, pendingForHash, ct);
+        var updated = pendingForHash with { ContentHash = $"sha256:{hash}" };
+        await ValidateAndWriteJsonAsync(_layout.ManifestFile(subject, runId), updated, "manifest.schema.json", ct);
 
         var entry = HistoryEntry.From(updated, summary);
         await AppendHistoryEntryAsync(subject, entry, ct);
@@ -425,7 +538,7 @@ public sealed class FileSystemOutputStore : IOutputStore
             Targets: context.Targets,
             Mode: context.Mode);
 
-        await WriteJsonAsync(_layout.RedTeamManifestFile(sanitizedName, ts), manifest, ct);
+        await ValidateAndWriteJsonAsync(_layout.RedTeamManifestFile(sanitizedName, ts), manifest, "red-team-manifest.schema.json", ct);
         return manifest;
     }
 
@@ -550,26 +663,129 @@ public sealed class FileSystemOutputStore : IOutputStore
 
     // ─── Private helpers ────────────────────────────────────────────────────
 
+    /// <summary>
+    /// Validate <paramref name="value"/> against the named v1 schema and write
+    /// it via <see cref="WriteJsonAsync{T}"/>. On schema-validation failure,
+    /// dump the offending DTO JSON to a sibling <c>{path}.invalid.json</c>
+    /// sidecar so the failure can be debugged without re-running the workload.
+    /// The 24h sweep in the store ctor cleans up stale sidecars.
+    /// </summary>
+    private async Task ValidateAndWriteJsonAsync<T>(string path, T value, string schemaResource, CancellationToken ct)
+    {
+        try
+        {
+            SchemaValidator.ValidateOrThrow(value, schemaResource);
+        }
+        catch (InvalidOperationException ex) when (ex.Message.StartsWith("Schema validation failed", StringComparison.Ordinal))
+        {
+            try
+            {
+                var invalidPath = path + ".invalid.json";
+                Directory.CreateDirectory(Path.GetDirectoryName(invalidPath)!);
+                var json = JsonSerializer.Serialize(value, _json);
+                await File.WriteAllTextAsync(invalidPath, json, ct);
+                throw new InvalidOperationException(
+                    $"{ex.Message}\nOffending JSON written to {invalidPath} for inspection.", ex);
+            }
+            catch (Exception sidecarEx) when (sidecarEx is not InvalidOperationException || !ReferenceEquals(sidecarEx.InnerException, ex))
+            {
+                // Could not write the sidecar (disk full, permissions). Rethrow
+                // the original validation error so the caller still gets the
+                // primary signal; the secondary failure is suppressed.
+                throw ex;
+            }
+        }
+        await WriteJsonAsync(path, value, ct);
+    }
+
     private async Task WriteJsonAsync<T>(string path, T value, CancellationToken ct)
     {
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
         // Atomic-replace: write to a sibling .tmp file then File.Move with
         // overwrite. Prevents readers from seeing a truncated/partial JSON
         // if the process is killed mid-write.
-        var tmp = path + ".tmp";
-        await using (var stream = File.Create(tmp))
+        //
+        // The .tmp filename includes a per-call GUID suffix so two concurrent
+        // writers targeting the same path (e.g. two `agenteval bench` runs
+        // racing on the same workspace) do not stomp on each other's .tmp.
+        // The reader at File.Move ignores per-call .tmp variants.
+        var tmp = path + "." + Guid.NewGuid().ToString("N").Substring(0, 8) + ".tmp";
+        try
         {
-            await JsonSerializer.SerializeAsync(stream, value, _json, ct);
+            await using (var stream = File.Create(tmp))
+            {
+                await JsonSerializer.SerializeAsync(stream, value, _json, ct);
+            }
+            File.Move(tmp, path, overwrite: true);
         }
-        File.Move(tmp, path, overwrite: true);
+        catch
+        {
+            // Best-effort cleanup: if anything between Create and Move blew up,
+            // don't leave a stray .tmp behind. Suppress secondary errors so the
+            // original exception bubbles up.
+            try { if (File.Exists(tmp)) File.Delete(tmp); } catch { }
+            throw;
+        }
     }
 
+    /// <summary>
+    /// Append a line to a JSONL file with cross-process safety. Two parallel
+    /// <c>agenteval bench</c> runs (separate OS processes) that both target the
+    /// same workspace will not interleave bytes mid-line: each takes a named
+    /// kernel <see cref="System.Threading.Mutex"/> keyed by the canonical
+    /// absolute path's SHA-256, plus an in-process <see cref="SemaphoreSlim"/>
+    /// to short-circuit when the contention is within one process.
+    /// </summary>
     private async Task AppendJsonlLineAsync<T>(string path, T value, CancellationToken ct)
     {
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-        var line = JsonSerializer.Serialize(value, _jsonl);
-        await File.AppendAllTextAsync(path, line + "\n", ct);
+        var canonicalPath = Path.GetFullPath(path);
+
+        // In-process gate first — cheaper than acquiring the kernel mutex.
+        var sem = s_appendLocks.GetOrAdd(canonicalPath, _ => new SemaphoreSlim(1, 1));
+        await sem.WaitAsync(ct);
+        try
+        {
+            // Cross-process gate keyed on a SHA-256 of the canonical path. Mutex
+            // names on Windows are limited to 260 chars and case-sensitive;
+            // hash-truncated names stay portable. `Global\` ensures the lock
+            // crosses session boundaries (terminal services).
+            //
+            // CRITICAL: `Mutex.WaitOne` and `Mutex.ReleaseMutex` must run on
+            // the SAME thread (thread-affinity). The entire acquire→write→
+            // release sequence therefore runs inside one Task.Run so the
+            // continuation doesn't drift to another thread between WaitOne
+            // and ReleaseMutex.
+            var line = JsonSerializer.Serialize(value, _jsonl) + "\n";
+            var hashBytes = System.Security.Cryptography.SHA256.HashData(
+                System.Text.Encoding.UTF8.GetBytes(canonicalPath));
+            var mutexName = "Global\\AgentEval-jsonl-" + Convert.ToHexString(hashBytes, 0, 8);
+
+            await Task.Run(() =>
+            {
+                using var crossProc = new System.Threading.Mutex(initiallyOwned: false, name: mutexName);
+                bool owned = false;
+                try
+                {
+                    try { owned = crossProc.WaitOne(); }
+                    catch (System.Threading.AbandonedMutexException)
+                    {
+                        // A prior holder exited without releasing — we still
+                        // own the mutex now. Carry on with the append.
+                        owned = true;
+                    }
+                    File.AppendAllText(path, line);
+                }
+                finally
+                {
+                    if (owned) crossProc.ReleaseMutex();
+                }
+            }, ct);
+        }
+        finally { sem.Release(); }
     }
+
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, SemaphoreSlim> s_appendLocks = new(StringComparer.Ordinal);
 
     private async Task<T?> ReadJsonAsync<T>(string path, CancellationToken ct)
     {
@@ -631,7 +847,10 @@ public sealed class FileSystemOutputStore : IOutputStore
 
     // Private write-only helper (not yet exposed but included for completeness)
     private async Task WriteSolutionAsync(Guid id, string name, CancellationToken ct)
-        => await WriteJsonAsync(_layout.SolutionFile, new SolutionFileV1("1.0", id, name), ct);
+    {
+        var dto = new SolutionFileV1("1.0", id, name);
+        await ValidateAndWriteJsonAsync(_layout.SolutionFile, dto, "solution.schema.json", ct);
+    }
 
     // ─── Private DTOs ────────────────────────────────────────────────────────
 

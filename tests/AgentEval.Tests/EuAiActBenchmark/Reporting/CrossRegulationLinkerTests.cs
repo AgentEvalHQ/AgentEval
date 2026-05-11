@@ -50,6 +50,7 @@ public class CrossRegulationLinkerTests
         return new GdprComplianceEvidence(
             Base: base_,
             Preset: "smoke",
+            DomainPacks: Array.Empty<string>(),
             CompositeTree: compositeTree,
             Summary: summary,
             CriticalFindings: Array.Empty<EvalResult>(),
@@ -91,6 +92,7 @@ public class CrossRegulationLinkerTests
         return new EuAiActComplianceEvidence(
             Base: base_,
             Preset: "smoke",
+            DomainPacks: Array.Empty<string>(),
             CompositeTree: compositeTree,
             Summary: summary,
             CriticalFindings: Array.Empty<EvalResult>(),

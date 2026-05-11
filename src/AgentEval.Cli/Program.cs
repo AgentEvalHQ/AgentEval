@@ -37,8 +37,9 @@ migrateCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =>
 var benchCmd = new Command("bench", "Run a benchmark against an agent");
 
 // bench gdpr — options with defaults handled in the action handler via ??
-var benchPresetOpt = new Option<string?>("--preset") { Description = "Benchmark preset: smoke | standard | audit (default: standard)" };
-var benchSubjectOpt = new Option<string?>("--subject") { Description = "Subject name (agent or workflow under evaluation, default: default-agent)" };
+// Phase-7 Task 7.21: --subject required (breaking).
+var benchPresetOpt = new Option<string?>("--preset") { Description = "Preset: smoke | standard | audit (default: standard). Domain-pack composition: standard+healthcare | standard+hr | standard+childrens (multi-pack composition like standard+healthcare+hr also supported)." };
+var benchSubjectOpt = new Option<string?>("--subject") { Description = "Subject name (agent or workflow under evaluation). REQUIRED — no default; previously defaulted to 'default-agent'." };
 var benchRootOpt = new Option<string?>("--root") { Description = "Workspace root path (default: auto-detected)" };
 var benchInputOpt = new Option<string?>("--input") { Description = "Agent input text for the evaluation (default: built-in fixture)" };
 var benchRunsOpt = new Option<int?>("--runs") { Description = "Number of stochastic runs (default: 1). When > 1, runs the benchmark N times and aggregates via MajorityVote." };
@@ -51,7 +52,12 @@ benchGdprCmd.Add(benchRunsOpt);
 benchGdprCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =>
 {
     var preset = parseResult.GetValue(benchPresetOpt) ?? "standard";
-    var subject = parseResult.GetValue(benchSubjectOpt) ?? "default-agent";
+    var subject = parseResult.GetValue(benchSubjectOpt);
+    if (string.IsNullOrWhiteSpace(subject))
+    {
+        Console.Error.WriteLine("Error: --subject is required. (Phase-7 7.21: the previous 'default-agent' default has been removed.)");
+        return 1;
+    }
     var root = parseResult.GetValue(benchRootOpt);
     var input = parseResult.GetValue(benchInputOpt);
     var runs = parseResult.GetValue(benchRunsOpt) ?? 1;
@@ -75,10 +81,11 @@ benchGdprCmd.Add(calibrateCmd);
 benchCmd.Add(benchGdprCmd);
 
 // bench eu-ai-act — same shape as bench gdpr, EU AI Act presets
+// Phase-7 Tasks 7.21 + 7.22: --subject AND --input required (breaking).
 var benchEuAiActPresetOpt = new Option<string?>("--preset") { Description = "Preset: smoke | standard | audit (default: standard). Domain-pack composition: standard+high-risk-employment | standard+high-risk-credit | standard+high-risk-education (multi-pack composition like standard+high-risk-employment+high-risk-credit also supported)." };
-var benchEuAiActSubjectOpt = new Option<string?>("--subject") { Description = "Subject name (default: default-agent)" };
+var benchEuAiActSubjectOpt = new Option<string?>("--subject") { Description = "Subject name. REQUIRED — no default; previously defaulted to 'default-agent'." };
 var benchEuAiActRootOpt = new Option<string?>("--root") { Description = "Workspace root path (default: auto-detected)" };
-var benchEuAiActInputOpt = new Option<string?>("--input") { Description = "Agent input text for the evaluation (default: built-in fixture)" };
+var benchEuAiActInputOpt = new Option<string?>("--input") { Description = "Agent input text for the evaluation. REQUIRED — no default; previously a hard-coded fixture was used." };
 var benchEuAiActCmd = new Command("eu-ai-act", "Run the EU AI Act compliance benchmark");
 benchEuAiActCmd.Add(benchEuAiActPresetOpt);
 benchEuAiActCmd.Add(benchEuAiActSubjectOpt);
@@ -87,9 +94,19 @@ benchEuAiActCmd.Add(benchEuAiActInputOpt);
 benchEuAiActCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =>
 {
     var preset = parseResult.GetValue(benchEuAiActPresetOpt) ?? "standard";
-    var subject = parseResult.GetValue(benchEuAiActSubjectOpt) ?? "default-agent";
-    var root = parseResult.GetValue(benchEuAiActRootOpt);
+    var subject = parseResult.GetValue(benchEuAiActSubjectOpt);
     var input = parseResult.GetValue(benchEuAiActInputOpt);
+    if (string.IsNullOrWhiteSpace(subject))
+    {
+        Console.Error.WriteLine("Error: --subject is required. (Phase-7 7.21: 'default-agent' default removed.)");
+        return 1;
+    }
+    if (string.IsNullOrWhiteSpace(input))
+    {
+        Console.Error.WriteLine("Error: --input is required. (Phase-7 7.22: built-in fixture removed.)");
+        return 1;
+    }
+    var root = parseResult.GetValue(benchEuAiActRootOpt);
     return await BenchEuAiActCommand.RunAsync(preset, subject, root, input);
 });
 // bench eu-ai-act calibrate
@@ -110,7 +127,7 @@ benchCmd.Add(benchEuAiActCmd);
 
 // bench agentic — same shape as bench eu-ai-act, agentic presets
 var benchAgenticPresetOpt = new Option<string?>("--preset") { Description = "Preset: agentic-execution | tool-call-accuracy | rag-quality | judge-quality | safety | telemetry | stochastic-stability | conversational | reasoning | user-experience | adversarial-direct (default: agentic-execution). The judge-quality, telemetry, and stochastic-stability presets are pure-code (no LLM cost). The safety preset uses a default empty policy; supply custom policies programmatically." };
-var benchAgenticSubjectOpt = new Option<string?>("--subject") { Description = "Subject name (default: default-agent)" };
+var benchAgenticSubjectOpt = new Option<string?>("--subject") { Description = "Subject name. REQUIRED — no default; previously defaulted to 'default-agent'." };
 var benchAgenticRootOpt = new Option<string?>("--root") { Description = "Workspace root path (default: auto-detected)" };
 var benchAgenticInputOpt = new Option<string?>("--input") { Description = "Agent input text for the evaluation (default: built-in fixture)" };
 var benchAgenticBudgetTierOpt = new Option<string?>("--budget-tier") { Description = "Budget tier filter: trivial | low | medium | high | all (default: all). Components with a cost tier above the budget are filtered out and remaining weights are renormalized. Use 'low' or 'medium' for fast feedback loops; 'all' for full audit runs." };
@@ -123,7 +140,12 @@ benchAgenticCmd.Add(benchAgenticBudgetTierOpt);
 benchAgenticCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =>
 {
     var preset = parseResult.GetValue(benchAgenticPresetOpt) ?? "agentic-execution";
-    var subject = parseResult.GetValue(benchAgenticSubjectOpt) ?? "default-agent";
+    var subject = parseResult.GetValue(benchAgenticSubjectOpt);
+    if (string.IsNullOrWhiteSpace(subject))
+    {
+        Console.Error.WriteLine("Error: --subject is required. (Phase-7 7.21: 'default-agent' default removed.)");
+        return 1;
+    }
     var root = parseResult.GetValue(benchAgenticRootOpt);
     var input = parseResult.GetValue(benchAgenticInputOpt);
     var budgetTier = parseResult.GetValue(benchAgenticBudgetTierOpt);

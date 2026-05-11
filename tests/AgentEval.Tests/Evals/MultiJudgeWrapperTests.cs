@@ -261,6 +261,21 @@ public class MultiJudgeWrapperTests
             new MultiJudgeWrapper("k", "n", "c", "1.0.0", judges, WeightedMedianAggregation.Instance, threshold: -0.1));
     }
 
+    [Theory]
+    [InlineData(double.NaN)]
+    [InlineData(double.PositiveInfinity)]
+    [InlineData(double.NegativeInfinity)]
+    public void Constructor_ThresholdNonFinite_ThrowsArgumentOutOfRange(double badThreshold)
+    {
+        // Phase-4 (Task 4.1) — IsFinite guard parity with sibling evals.
+        // NaN comparisons silently fail (any < or > returns false) which would
+        // otherwise let NaN bypass the [0,1] range check.
+        var judges = new[] { JudgeComp("j1", 0.9) };
+
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            new MultiJudgeWrapper("k", "n", "c", "1.0.0", judges, WeightedMedianAggregation.Instance, threshold: badThreshold));
+    }
+
     [Fact]
     public async Task EvaluateAsync_AllJudgesCacheHit_ProvenanceCacheHitIsTrue()
     {

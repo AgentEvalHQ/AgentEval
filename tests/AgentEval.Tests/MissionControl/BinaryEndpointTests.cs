@@ -64,10 +64,47 @@ public class BinaryEndpointTests : IClassFixture<FilesystemSeededFactory>, IDisp
     [Fact]
     public async Task Reports_NoFileGenerated_Returns404()
     {
+        // The seed writes `report.md` + `report.html`; everything else is 404.
         using var client = _factory.CreateClient();
         var runId = await _factory.GetSeededRunIdAsync();
-        var response = await client.GetAsync($"/api/v1/runs/{runId}/reports/markdown");
+        var response = await client.GetAsync($"/api/v1/runs/{runId}/reports/junit");
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    // ─── Phase-5 Task 5.3 — Content-Disposition contract ─────────────────────
+
+    [Fact]
+    public async Task Reports_HtmlFormat_DownloadsAsAttachment()
+    {
+        // Browser-rendered formats (html / xml / sarif) carry user-controlled
+        // content. The endpoint forces attachment disposition so the browser
+        // never renders them as same-origin script against /graphql.
+        using var client = _factory.CreateClient();
+        var runId = await _factory.GetSeededRunIdAsync();
+        var response = await client.GetAsync($"/api/v1/runs/{runId}/reports/html");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var cd = response.Content.Headers.ContentDisposition;
+        Assert.NotNull(cd);
+        Assert.Equal("attachment", cd!.DispositionType);
+        Assert.Equal("report.html", cd.FileName?.Trim('"'));
+    }
+
+    [Fact]
+    public async Task Reports_MarkdownFormat_RendersInline()
+    {
+        // Markdown is plain text — safe to render inline. The benchmark pipeline
+        // writes `report.md`, so the URL format token is `md`.
+        using var client = _factory.CreateClient();
+        var runId = await _factory.GetSeededRunIdAsync();
+        var response = await client.GetAsync($"/api/v1/runs/{runId}/reports/md");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var cd = response.Content.Headers.ContentDisposition;
+        // Inline branch: the endpoint passes `fileDownloadName: null`, so no
+        // Content-Disposition header is emitted by Results.File.
+        Assert.True(cd is null || cd.DispositionType != "attachment",
+            $"Markdown should NOT be forced to attachment; got '{cd?.DispositionType}'.");
     }
 
     [Fact]
@@ -308,6 +345,16 @@ public sealed class FilesystemSeededFactory : WebApplicationFactory<Query>, IDis
             Verdict: "PASS",
             Stats: new RunStats(Total: 1, Passed: 1, Failed: 0, Warnings: 0),
             Metrics: new Dictionary<string, double>()));
+
+        // Phase-5 Task 5.3 — seed report.md + report.html so the Content-Disposition
+        // contract (markdown inline / html attachment) can be regression-tested.
+        var layout = new FileSystemLayout(store.WorkspaceRoot!);
+        var reportsDir = layout.ReportsDir(agent, manifest.Run.RunId);
+        Directory.CreateDirectory(reportsDir);
+        await File.WriteAllTextAsync(Path.Combine(reportsDir, "report.md"),
+            "# Test report\n\nSeeded for Content-Disposition regression.");
+        await File.WriteAllTextAsync(Path.Combine(reportsDir, "report.html"),
+            "<!doctype html><title>seed</title><h1>seeded for attachment test</h1>");
 
         return manifest.Run.RunId;
     }

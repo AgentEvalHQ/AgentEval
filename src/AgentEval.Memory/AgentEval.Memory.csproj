@@ -2,6 +2,8 @@
 
   <PropertyGroup>
     <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
+    <!-- Bundled into the AgentEval umbrella NuGet via <ProjectReference PrivateAssets="all"/> in AgentEval/AgentEval.csproj.
+         Not packed as a standalone package — consumers reach Memory types via the umbrella. -->
     <IsPackable>false</IsPackable>
     <RootNamespace>AgentEval</RootNamespace>
   </PropertyGroup>

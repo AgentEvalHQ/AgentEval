@@ -48,7 +48,7 @@ The `EvaluatorCostTier` enum (in `AgentEval.Abstractions/Evals/EvaluatorCostTier
 | `similarity` | LOW | Single-turn LLM judge |
 | `response_completeness` | LOW | Single-turn LLM judge |
 | `f1_score` | TRIVIAL | Pure-code token overlap |
-| `qa_composite` | MEDIUM | Composite of all 7 above — total LLM calls compound |
+| `qa_composite` | HIGH | Composite of all 7 above — GroundednessEval alone fans out to 4 LLM judges; 10+ LLM calls per scenario |
 
 ### Phase 3 — Judge Quality (Meta)
 
@@ -73,7 +73,7 @@ The `EvaluatorCostTier` enum (in `AgentEval.Abstractions/Evals/EvaluatorCostTier
 | `code_vulnerability` | LOW | Single-turn LLM judge |
 | `ungrounded_attributes` | LOW | Single-turn LLM judge |
 | `system_prompt_leakage` | LOW | Hybrid pattern scan + LLM fallback |
-| `unsafe_tool_use` | LOW | Deterministic short-circuit when no tool calls; LLM otherwise |
+| `unsafe_tool_use` | MEDIUM | LLM-judge in v1 (deterministic short-circuit when no tool calls); v2 will add policy-driven short-circuit |
 
 ### Phase 5 — Telemetry + Stochastic Stability
 
@@ -194,9 +194,9 @@ Estimates assume a GPT-4o-class judge, 10 scenarios per evaluator, and average p
 |--------|------------|-------|----------------------------------|
 | `agentic-execution` | 6 | LOW×6 | ~$0.30–$0.60 |
 | `tool-call-accuracy` | 5 (via aggregate) | LOW×5 | ~$0.25–$0.50 |
-| `rag-quality` | 7 | TRIVIAL×1, LOW×6 | ~$0.30–$0.60 |
+| `rag-quality` | 7 | TRIVIAL×1, LOW×5, HIGH×1 | ~$0.80–$2.00 |
 | `judge-quality` | 3 | TRIVIAL×3 | ~$0.00 |
-| `safety` | 12 | TRIVIAL×2, LOW×10 | ~$0.50–$1.00 |
+| `safety` | 12 | LOW×11, MEDIUM×1 | ~$0.60–$1.20 |
 | `telemetry` | 6 | TRIVIAL×6 | ~$0.00 |
 | `stochastic-stability` | 1 | TRIVIAL×1 | ~$0.00 |
 | `conversational` | 5 | HIGH×3, MEDIUM×1, LOW×1 | ~$1.50–$3.00 |

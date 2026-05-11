@@ -13,6 +13,7 @@ namespace AgentEval.Tests.Cli;
 /// <summary>
 /// Tests for the <c>agenteval bench gdpr</c> subcommand (<see cref="BenchCommand"/>).
 /// </summary>
+[Collection("EnvVarTests")]
 public class BenchCommandTests : IDisposable
 {
     private readonly string _root;
@@ -152,14 +153,15 @@ public class BenchCommandTests : IDisposable
         InitWorkspace();
 
         // Act
-        await BenchCommand.RunGdprAsync(
+        var exitCode = await BenchCommand.RunGdprAsync(
             preset: "standard",
             subject: "StandardTestAgent",
             rootOverride: _root,
             inputText: null,
             evaluatorOverride: new PassingStubEvaluator());
 
-        // Assert — evidence directory contains report.md and report.pdf
+        // Assert — exit cleanly + evidence directory contains report.md and report.pdf
+        Assert.Equal(0, exitCode);
         var agentEvalDir = Path.Combine(_root, ".agenteval");
         var complianceRoot = Path.Combine(agentEvalDir, "compliance", "GDPR", "StandardTestAgent");
         var tsDir = Directory.GetDirectories(complianceRoot).OrderByDescending(d => d).First();
@@ -168,6 +170,76 @@ public class BenchCommandTests : IDisposable
         Assert.True(File.Exists(Path.Combine(tsDir, "report.pdf")), "report.pdf should be generated");
         Assert.True(new FileInfo(Path.Combine(tsDir, "report.pdf")).Length > 0,
             "report.pdf should be non-empty");
+    }
+
+    /// <summary>
+    /// Phase 2 / Task 2.1 regression — composite preset (`standard+healthcare`) previously
+    /// crashed at SaveReportAsync because the schema enum only listed the six base names.
+    /// The fix splits the preset into a base + `domainPacks[]` array; verify the full
+    /// pipeline writes schema-valid evidence end-to-end and records the pack.
+    /// </summary>
+    [Fact]
+    public async Task BenchGdpr_StandardPlusHealthcare_E2E_WritesValidEvidence()
+    {
+        // Arrange
+        InitWorkspace();
+
+        // Act
+        var exitCode = await BenchCommand.RunGdprAsync(
+            preset: "standard+healthcare",
+            subject: "ComposedPresetAgent",
+            rootOverride: _root,
+            inputText: null,
+            evaluatorOverride: new PassingStubEvaluator());
+
+        // Assert — exit cleanly + evidence files present
+        Assert.Equal(0, exitCode);
+        var complianceRoot = Path.Combine(_root, ".agenteval", "compliance", "GDPR", "ComposedPresetAgent");
+        var tsDir = Directory.GetDirectories(complianceRoot).OrderByDescending(d => d).First();
+
+        // gdpr-evidence.json was the file that crashed pre-fix; its mere presence proves the schema accepted the composite preset.
+        var gdprEvidencePath = Path.Combine(tsDir, "gdpr-evidence.json");
+        Assert.True(File.Exists(gdprEvidencePath),
+            $"gdpr-evidence.json should be present at {gdprEvidencePath} — if missing, SaveReportAsync's schema validation rejected the composite preset.");
+
+        // The wrapper should record the base preset cleanly + the pack in domainPacks.
+        var gdprJson = JsonDocument.Parse(File.ReadAllText(gdprEvidencePath));
+        Assert.Equal("standard", gdprJson.RootElement.GetProperty("preset").GetString());
+        var packs = gdprJson.RootElement.GetProperty("domainPacks").EnumerateArray()
+            .Select(p => p.GetString()).ToArray();
+        Assert.Contains("healthcare", packs);
+    }
+
+    /// <summary>
+    /// Phase 2 / Task 2.3 regression — Attestation.EvaluatorModel previously hard-coded
+    /// "internal" regardless of which judge actually ran. With pass-3's JudgeFactory wiring,
+    /// the test-override path records "override"; an Azure path would record the deployment.
+    /// </summary>
+    [Fact]
+    public async Task BenchGdpr_RecordsJudgeModelInAttestation()
+    {
+        // Arrange
+        InitWorkspace();
+
+        // Act
+        await BenchCommand.RunGdprAsync(
+            preset: "smoke",
+            subject: "AttestationTestAgent",
+            rootOverride: _root,
+            inputText: null,
+            evaluatorOverride: new PassingStubEvaluator());
+
+        // Assert — base evidence.json's attestation.evaluatorModel reflects the resolved judge.
+        var complianceRoot = Path.Combine(_root, ".agenteval", "compliance", "GDPR", "AttestationTestAgent");
+        var tsDir = Directory.GetDirectories(complianceRoot).OrderByDescending(d => d).First();
+        var baseEvidencePath = Path.Combine(tsDir, "evidence.json");
+        Assert.True(File.Exists(baseEvidencePath));
+
+        var baseJson = JsonDocument.Parse(File.ReadAllText(baseEvidencePath));
+        var attestation = baseJson.RootElement.GetProperty("attestation");
+        // JudgeFactory.Resolve returns "override" as the judge model when evaluatorOverride is supplied.
+        Assert.Equal("override", attestation.GetProperty("evaluatorModel").GetString());
+        Assert.Equal("AgentEval.GdprBenchmark", attestation.GetProperty("evaluator").GetString());
     }
 
     // ── AGENTEVAL_ALLOW_STUB_JUDGE gate (batch-5 surface) ────────────────────

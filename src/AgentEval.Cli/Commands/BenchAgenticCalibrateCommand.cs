@@ -57,10 +57,18 @@ public static class BenchAgenticCalibrateCommand
         string? outPathOverride,
         IEvaluator? evaluatorOverride)
     {
+        // ── Workspace root canonicalisation ──────────────────────────────────
+        if (rootOverride is not null)
+        {
+            var canonical = WorkspaceRootValidator.CanonicaliseOrNull(rootOverride);
+            if (canonical is null) return 1;
+            rootOverride = canonical;
+        }
+
         // ── Judge / evaluator ────────────────────────────────────────────────
         // Calibration requires AGENTEVAL_ALLOW_STUB_JUDGE=1 to use stub mode —
         // stub-graded calibration gates the wrong thing.
-        var (resolvedJudge, _, exitCode) = JudgeFactory.Resolve(evaluatorOverride, "agentic calibration");
+        var (resolvedJudge, judgeModelName, exitCode) = JudgeFactory.Resolve(evaluatorOverride, "agentic calibration");
         if (resolvedJudge is null) return exitCode;
         IEvaluator judge = resolvedJudge;
 
@@ -70,18 +78,18 @@ public static class BenchAgenticCalibrateCommand
         var evalRegistry = new Dictionary<string, IEval>(StringComparer.OrdinalIgnoreCase)
         {
             // System evaluators
-            ["task_completion"]           = new TaskCompletionEval(judge, judgeModel: "calibration"),
-            ["task_adherence"]            = new TaskAdherenceEval(judge, judgeModel: "calibration"),
-            ["intent_identification"]     = new IntentIdentificationEval(judge, judgeModel: "calibration"),
-            ["intent_resolution"]         = new IntentResolutionEval(judge, judgeModel: "calibration"),
-            ["task_navigation_efficiency"] = new TaskNavigationEfficiencyEval(judge, judgeModel: "calibration"),
+            ["task_completion"]           = new TaskCompletionEval(judge, judgeModel: judgeModelName),
+            ["task_adherence"]            = new TaskAdherenceEval(judge, judgeModel: judgeModelName),
+            ["intent_identification"]     = new IntentIdentificationEval(judge, judgeModel: judgeModelName),
+            ["intent_resolution"]         = new IntentResolutionEval(judge, judgeModel: judgeModelName),
+            ["task_navigation_efficiency"] = new TaskNavigationEfficiencyEval(judge, judgeModel: judgeModelName),
             // Process evaluators
-            ["tool_selection"]            = new ToolSelectionEval(judge, judgeModel: "calibration"),
-            ["tool_input_accuracy"]       = new ToolInputAccuracyEval(judge, judgeModel: "calibration"),
-            ["tool_output_utilization"]   = new ToolOutputUtilizationEval(judge, judgeModel: "calibration"),
-            ["tool_call_success"]         = new ToolCallSuccessEval(judge, judgeModel: "calibration"),
-            ["tool_efficiency"]           = new ToolEfficiencyEval(judge, judgeModel: "calibration"),
-            ["tool_call_accuracy"]        = new ToolCallAccuracyAggregateEval(judge, judgeModel: "calibration"),
+            ["tool_selection"]            = new ToolSelectionEval(judge, judgeModel: judgeModelName),
+            ["tool_input_accuracy"]       = new ToolInputAccuracyEval(judge, judgeModel: judgeModelName),
+            ["tool_output_utilization"]   = new ToolOutputUtilizationEval(judge, judgeModel: judgeModelName),
+            ["tool_call_success"]         = new ToolCallSuccessEval(judge, judgeModel: judgeModelName),
+            ["tool_efficiency"]           = new ToolEfficiencyEval(judge, judgeModel: judgeModelName),
+            ["tool_call_accuracy"]        = new ToolCallAccuracyAggregateEval(judge, judgeModel: judgeModelName),
         };
 
         IEval? Resolver(string key) =>
@@ -151,22 +159,28 @@ public static class BenchAgenticCalibrateCommand
         }
 
         // ── Evaluate thresholds ──────────────────────────────────────────────
+        // Phase-6 Task 6.6: see BenchCalibrateCommand for rationale — gate on
+        // EvaluationFailures > 0 with a distinct INFRA-FAIL status.
         bool allPass = true;
         foreach (var (category, categoryReport) in report.PerCategory.OrderBy(kv => kv.Key))
         {
             var accOk = categoryReport.Accuracy >= AccuracyThreshold;
             var kappaOk = categoryReport.CohensKappa >= KappaThreshold;
-            var status = accOk && kappaOk ? "PASS" : "FAIL";
+            var noInfraFail = categoryReport.EvaluationFailures == 0;
+            var status = !noInfraFail
+                ? "INFRA-FAIL"
+                : (accOk && kappaOk ? "PASS" : "FAIL");
             Console.WriteLine(
                 $"  [{status}] {category}: accuracy={categoryReport.Accuracy:P1}, " +
-                $"kappa={categoryReport.CohensKappa:F3}, entries={categoryReport.EntryCount}");
-            if (!accOk || !kappaOk) allPass = false;
+                $"kappa={categoryReport.CohensKappa:F3}, entries={categoryReport.EntryCount}, " +
+                $"failures={categoryReport.EvaluationFailures}");
+            if (!accOk || !kappaOk || !noInfraFail) allPass = false;
         }
 
         Console.WriteLine(allPass
-            ? "Agentic calibration gate PASSED — all categories meet thresholds."
+            ? "Agentic calibration gate PASSED — all categories meet thresholds with zero evaluation failures."
             : $"Agentic calibration gate FAILED — one or more categories below " +
-              $"accuracy>={AccuracyThreshold:P0} or kappa>={KappaThreshold:F2}.");
+              $"accuracy>={AccuracyThreshold:P0} or kappa>={KappaThreshold:F2}, or had non-zero evaluation_failures.");
 
         return allPass ? 0 : 2;
     }
@@ -204,19 +218,22 @@ public static class BenchAgenticCalibrateCommand
         {
             var accOk = cr.Accuracy >= AccuracyThreshold;
             var kappaOk = cr.CohensKappa >= KappaThreshold;
-            var badge = accOk && kappaOk ? "PASS" : "FAIL";
+            var noInfraFail = cr.EvaluationFailures == 0;
+            var badge = !noInfraFail
+                ? "INFRA-FAIL"
+                : (accOk && kappaOk ? "PASS" : "FAIL");
 
             sb.AppendLine($"## {category} [{badge}]");
             sb.AppendLine();
             sb.AppendLine($"| Metric | Value | Threshold | Status |");
             sb.AppendLine($"|--------|-------|-----------|--------|");
             sb.AppendLine($"| Entries evaluated | {cr.EntryCount} | — | — |");
+            sb.AppendLine($"| Evaluation failures | {cr.EvaluationFailures} | == 0 | {(noInfraFail ? "OK" : "INFRA-FAIL")} |");
             sb.AppendLine($"| Accuracy | {cr.Accuracy:P1} | >= {AccuracyThreshold:P0} | {(accOk ? "OK" : "BELOW")} |");
             sb.AppendLine($"| Cohen's kappa | {cr.CohensKappa:F3} | >= {KappaThreshold:F2} | {(kappaOk ? "OK" : "BELOW")} |");
             sb.AppendLine($"| Within score range | {cr.WithinScoreRange} / {cr.EntryCount} | — | — |");
             sb.AppendLine($"| Mean score delta | {cr.MeanScoreDelta:+0.000;-0.000;0.000} | — | — |");
-            if (cr.EvaluationFailures > 0)
-                sb.AppendLine($"| Evaluation failures | {cr.EvaluationFailures} | — | — |");
+            // (EvaluationFailures already surfaced as a gated row above.)
             if (cr.SkippedUnknownKey > 0)
                 sb.AppendLine($"| Skipped (unknown key) | {cr.SkippedUnknownKey} | — | — |");
             sb.AppendLine();

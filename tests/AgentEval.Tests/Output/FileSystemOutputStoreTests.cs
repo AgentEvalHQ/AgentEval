@@ -281,4 +281,157 @@ public class FileSystemOutputStoreTests : IDisposable
 
         Assert.Equal("TravelAgent", info.Identity.Name);
     }
+
+    // ── Phase 3 / Task 3.5 — EnsureSubjectAsync hardening regressions ────
+
+    /// <summary>
+    /// Corrupt subject.json should produce a context-rich exception instead
+    /// of an opaque JsonException bubbling up. Pass-3 hardening: catch
+    /// JsonException in EnsureSubjectAsync, rethrow as InvalidOperationException
+    /// with manual-inspect guidance.
+    /// </summary>
+    [Fact]
+    public async Task EnsureSubject_CorruptJson_ThrowsWithContext()
+    {
+        WriteSolutionJson();
+        var store = new FileSystemOutputStore(_root);
+        await store.EnsureSubjectAsync(new SubjectIdentity(SubjectKind.Agent, "BrokenSubject"));
+
+        // Corrupt the subject.json
+        var subjectPath = Path.Combine(_root, "subjects", "agents", "BrokenSubject", "subject.json");
+        await File.WriteAllTextAsync(subjectPath, "{ this is not valid JSON !!!");
+
+        // Re-ensure should throw with manual-inspect guidance, not a raw JsonException.
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => store.EnsureSubjectAsync(new SubjectIdentity(SubjectKind.Agent, "BrokenSubject")));
+        Assert.Contains("corrupt", ex.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Manually inspect or delete", ex.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// Partial-init: subject directory exists (from a killed mid-write process)
+    /// but no subject.json. A second EnsureSubjectAsync with a case-only-
+    /// different name should detect the collision against the bare directory.
+    /// </summary>
+    [Fact]
+    public async Task EnsureSubject_PartialDirCollision_OnCaseInsensitiveFs_ThrowsCollisionError()
+    {
+        // Same OS skip as the sibling collision test — only meaningful on
+        // case-insensitive filesystems.
+        var isCaseInsensitiveFs = OperatingSystem.IsWindows() || OperatingSystem.IsMacOS();
+        if (!isCaseInsensitiveFs) return;
+
+        WriteSolutionJson();
+        // Pre-create a stale subject directory without subject.json
+        var staleDir = Path.Combine(_root, "subjects", "agents", "PartialAgent");
+        Directory.CreateDirectory(staleDir);
+        // Subject.json deliberately missing
+
+        var store = new FileSystemOutputStore(_root);
+        // Different-case name maps to the same directory on case-insensitive FS.
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => store.EnsureSubjectAsync(new SubjectIdentity(SubjectKind.Agent, "partialagent")));
+        Assert.Contains("Partial subject directory", ex.Message);
+    }
+
+    /// <summary>
+    /// Concurrent same-name EnsureSubjectAsync should serialise via the lock
+    /// sentinel — both calls complete with the same identity, neither stomps
+    /// the other's subject.json.
+    /// </summary>
+    [Fact]
+    public async Task EnsureSubject_ConcurrentSameNameRace_AllSucceedWithSameIdentity()
+    {
+        WriteSolutionJson();
+        var store = new FileSystemOutputStore(_root);
+
+        // 10 parallel calls with the same identity.
+        var tasks = Enumerable.Range(0, 10)
+            .Select(_ => store.EnsureSubjectAsync(new SubjectIdentity(SubjectKind.Agent, "ConcurrentAgent")))
+            .ToArray();
+        var results = await Task.WhenAll(tasks);
+
+        Assert.All(results, r => Assert.Equal("ConcurrentAgent", r.Identity.Name));
+        // subject.json should be valid JSON (no torn-write corruption).
+        var subjectPath = Path.Combine(_root, "subjects", "agents", "ConcurrentAgent", "subject.json");
+        Assert.True(File.Exists(subjectPath));
+        var json = await File.ReadAllTextAsync(subjectPath);
+        var doc = System.Text.Json.JsonDocument.Parse(json);  // throws on corruption
+        Assert.Equal("ConcurrentAgent", doc.RootElement.GetProperty("name").GetString());
+    }
+
+    // ── Phase 3 / Task 3.3 — cross-process JSONL appender regression ─────
+
+    /// <summary>
+    /// 50 parallel in-process appends to the same recent-runs JSONL file must
+    /// produce exactly 50 well-formed lines (no interleaving). Cross-process
+    /// safety adds a named Mutex on top — that path is harder to test
+    /// hermetically; the in-process case is the most common contention.
+    /// </summary>
+    [Fact]
+    public async Task AppendJsonl_50ParallelAppenders_SameProcess_AllLinesIntact()
+    {
+        WriteSolutionJson();
+        var store = new FileSystemOutputStore(_root);
+        var subject = new SubjectIdentity(SubjectKind.Agent, "AppendTestAgent");
+        await store.EnsureSubjectAsync(subject);
+
+        // Drive 50 history-append calls in parallel (history.jsonl flows through
+        // the same AppendJsonlLineAsync gate as recent.jsonl).
+        var tasks = Enumerable.Range(0, 50)
+            .Select(i => store.AppendHistoryEntryAsync(subject, new HistoryEntry(
+                RunId: $"run-{i:D3}",
+                Timestamp: DateTimeOffset.UtcNow,
+                Verdict: "PASS",
+                Score: 1.0,
+                Notes: null)))
+            .ToArray();
+        await Task.WhenAll(tasks);
+
+        // Read the file and count well-formed JSON lines.
+        var historyPath = Path.Combine(_root, "subjects", "agents", "AppendTestAgent", "history.jsonl");
+        Assert.True(File.Exists(historyPath));
+        var lines = await File.ReadAllLinesAsync(historyPath);
+        Assert.Equal(50, lines.Length);
+        // Each line is parseable JSON
+        foreach (var line in lines)
+        {
+            var doc = System.Text.Json.JsonDocument.Parse(line);  // throws on interleaved bytes
+            Assert.True(doc.RootElement.TryGetProperty("runId", out _));
+        }
+    }
+
+    // ── Phase 3 / Task 3.7 — schema-validate writes a .invalid.json sidecar ─
+
+    /// <summary>
+    /// On schema-validation failure the producer must dump the offending JSON
+    /// to a sibling `.invalid.json` so the failure can be debugged without
+    /// re-running the workload. The 24h ctor sweep cleans up stale sidecars.
+    /// </summary>
+    [Fact]
+    public async Task WriteJson_SchemaValidationFails_InvalidJsonSidecarIsWritten()
+    {
+        WriteSolutionJson();
+        var store = new FileSystemOutputStore(_root);
+        await store.EnsureSubjectAsync(new SubjectIdentity(SubjectKind.Agent, "ValidationTestAgent"));
+
+        // Force a schema-validate failure by passing an invalid RunContext kind.
+        // The schema's run.kind enum is {eval,benchmark,memory-benchmark,stochastic-eval,compliance};
+        // a value like "invalid-kind-name" will be rejected by manifest.schema.json.
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            store.StartRunAsync(
+                new SubjectIdentity(SubjectKind.Agent, "ValidationTestAgent"),
+                new RunContext("TestProject", "/path", "xunit", null, null, "INVALID_KIND_VALUE")));
+        Assert.Contains("Schema validation failed", ex.Message);
+        Assert.Contains(".invalid.json", ex.Message);
+
+        // The sidecar must exist on disk.
+        var runsDir = Path.Combine(_root, "subjects", "agents", "ValidationTestAgent", "runs");
+        Assert.True(Directory.Exists(runsDir));
+        var sidecars = Directory.GetFiles(runsDir, "manifest.json.invalid.json", SearchOption.AllDirectories);
+        Assert.NotEmpty(sidecars);
+        var sidecarJson = await File.ReadAllTextAsync(sidecars[0]);
+        var doc = System.Text.Json.JsonDocument.Parse(sidecarJson);
+        Assert.Equal("INVALID_KIND_VALUE", doc.RootElement.GetProperty("run").GetProperty("kind").GetString());
+    }
 }

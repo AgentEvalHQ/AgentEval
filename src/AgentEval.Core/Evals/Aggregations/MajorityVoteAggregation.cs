@@ -53,11 +53,22 @@ public sealed class MajorityVoteAggregation : IAggregationStrategy
         else if (warnCount > 0 && warnCount >= passCount)              winningLabel = "warn";              // tie → warn beats pass
         else                                                            winningLabel = "pass";
 
+        // Phase-7 Task 7.6: roll up severity from voters that actually carried
+        // the winning label, instead of hard-coding "medium" / "none". A "warn"
+        // vote can carry severity "high" (e.g. a borderline result that the
+        // judge flagged as a serious risk); the prior "medium" hard-code lost
+        // that signal. Falls back to {medium, none} only when no voter exists
+        // for the winning label (defensive — should not happen given the
+        // counting above).
+        var winningVoterSeverities = voting
+            .Where(r => r.Score.Label == winningLabel)
+            .Select(r => r.Score.Severity)
+            .ToList();
         var severity = winningLabel switch
         {
-            "fail" => SeverityRollup.Max(voting.Where(r => r.Score.Label == "fail").Select(r => r.Score.Severity)),
-            "warn" => "medium",
-            _      => "none",
+            "fail" => winningVoterSeverities.Count > 0 ? SeverityRollup.Max(winningVoterSeverities) : "high",
+            "warn" => winningVoterSeverities.Count > 0 ? SeverityRollup.Max(winningVoterSeverities) : "medium",
+            _      => winningVoterSeverities.Count > 0 ? SeverityRollup.Max(winningVoterSeverities) : "none",
         };
 
         return (meanScore, severity);

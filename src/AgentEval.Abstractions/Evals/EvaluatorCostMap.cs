@@ -130,10 +130,33 @@ public static class EvaluatorCostMap
     /// </summary>
     /// <param name="evaluatorKey">Evaluator key, e.g. <c>"my_custom_eval"</c>.</param>
     /// <param name="tier">The cost tier to register.</param>
+    /// <remarks>
+    /// Phase-7 Task 7.4: when an existing registration is overwritten with a
+    /// DIFFERENT tier, a warning is written to <see cref="Console.Error"/>.
+    /// Re-registering the SAME tier is a no-op (idempotent). The previous
+    /// silent-overwrite hid one of the more painful misconfigurations: a
+    /// consumer registering the same key twice with conflicting tiers got
+    /// last-write-wins with no diagnostic. The warning is non-fatal — Register
+    /// remains idempotent and side-effect-free so existing call sites continue
+    /// to work.
+    /// </remarks>
     public static void Register(string evaluatorKey, EvaluatorCostTier tier)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(evaluatorKey);
-        s_tiers.AddOrUpdate(evaluatorKey, tier, (_, _) => tier);
+        s_tiers.AddOrUpdate(
+            evaluatorKey,
+            addValueFactory: _ => tier,
+            updateValueFactory: (key, existing) =>
+            {
+                if (existing != tier)
+                {
+                    Console.Error.WriteLine(
+                        $"⚠ EvaluatorCostMap.Register: '{key}' was previously registered as " +
+                        $"{existing} but is now being overwritten to {tier}. Last-write-wins; " +
+                        "this may indicate a misconfiguration in two competing plug-ins.");
+                }
+                return tier;
+            });
     }
 
     /// <summary>True if <paramref name="evaluatorTier"/> is at or below <paramref name="budgetTier"/>.</summary>

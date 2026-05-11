@@ -99,12 +99,17 @@ public sealed class FileSystemLayout
         // character was replaced or any leading/trailing dot/space was
         // stripped), append a short hash of the ORIGINAL name so names that
         // collide under sanitisation (e.g. "Foo/Bar" + "Foo-Bar" both produce
-        // "Foo-Bar") map to distinct on-disk folders. The hash is a 4-byte
-        // SHA-256 prefix in hex, deterministic across processes.
+        // "Foo-Bar") map to distinct on-disk folders. The hash is an 8-byte
+        // SHA-256 prefix in hex, deterministic across processes. Phase-7 Task
+        // 7.3: bumped from 4→8 bytes (8 hex chars → 16 hex chars). 4-byte
+        // prefix had ~65k possible values, so two distinct names sharing a
+        // sanitised stem hit ~50% birthday collision at ~300 entries; 8-byte
+        // prefix lifts that to ~5 billion — far beyond any realistic .agenteval/
+        // subject count.
         if (trimmed == name)
             return trimmed;
         var hashBytes = System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(name));
-        return $"{trimmed}__{Convert.ToHexString(hashBytes, 0, 4).ToLowerInvariant()}";
+        return $"{trimmed}__{Convert.ToHexString(hashBytes, 0, 8).ToLowerInvariant()}";
     }
 
     /// <summary>

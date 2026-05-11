@@ -4,7 +4,7 @@ import {
   dimensionsToRecord,
   isAdjudicatedNode,
 } from "@/lib/eval-tree";
-import { VerdictBadge, type Verdict } from "@/components/VerdictBadge";
+import { VerdictBadge } from "@/components/VerdictBadge";
 import { ModelBadge } from "@/components/ModelBadge";
 import { formatScore, formatCost } from "@/lib/format";
 
@@ -25,13 +25,8 @@ interface Props {
   node: EvalResultNodeShape;
 }
 
-function labelToVerdict(label: string): Verdict {
-  const lower = (label ?? "").toLowerCase();
-  if (lower === "pass" || lower === "passed") return "PASS";
-  if (lower === "warn" || lower === "warning") return "WARN";
-  if (lower === "fail" || lower === "failed") return "FAIL";
-  return "PENDING";
-}
+// Phase-7 Task 7.11: labelToVerdict lifted to @/lib/verdict.
+import { labelToVerdict } from "@/lib/verdict";
 
 export function AdjudicationFlow({ node }: Props) {
   const adjudicated = isAdjudicatedNode(node);

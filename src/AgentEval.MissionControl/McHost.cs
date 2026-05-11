@@ -69,6 +69,21 @@ public static class McHost
             // article → judges) needs depth 9. Depth 10 leaves a unit of headroom
             // while still rejecting attack queries that try to fan out unbounded
             // subtrees (the 12-level deep-query test asserts ~24 depth is rejected).
+            //
+            // Phase-8 Task 8.8 — Introspection-in-production decision:
+            // The default Hot Chocolate configuration leaves GraphQL introspection
+            // enabled. In a Phase-1 local-only deployment (loopback bind, no auth)
+            // that's intentional: introspection enables the embedded Nitro UI,
+            // schema-tooling for SPA development, and `__type` queries that the
+            // Phase-5 5.2 regression tests rely on. There is no risk surface
+            // because the entire endpoint is loopback-only.
+            // Phase 2 of Mission Control (multi-user / auth gates) should:
+            //   1. Gate introspection behind an environment flag
+            //      (e.g. AGENTEVAL_MC_DISABLE_INTROSPECTION=1).
+            //   2. Default to disabled in cloud / multi-tenant deployments.
+            //   3. Keep enabled in the local Mode-A path.
+            // The 5.2 introspection-based regression tests will need an
+            // alternative pin (e.g. schema dump snapshot) in that world.
             .AddMaxExecutionDepthRule(10, skipIntrospectionFields: true)
             .ModifyRequestOptions(opts => opts.ExecutionTimeout = TimeSpan.FromSeconds(30));
     }
@@ -100,6 +115,22 @@ public static class McHost
                 // 'unsafe-inline' for Nitro's inline styles + scripts (Hot Chocolate
                 // 16 ships those without a nonce). Tighten when Nitro grows nonce
                 // support or when introspection / Nitro is gated by environment.
+                //
+                // Phase-8 Task 8.7 — `'unsafe-inline'` carve-out trade-off:
+                // The CSP includes `'unsafe-inline'` for script-src + style-src
+                // SOLELY to support Hot Chocolate 16's bundled Nitro UI, which
+                // ships inline `<script>` / `<style>` blocks WITHOUT nonces or
+                // hashes. Tightening to `'strict-dynamic'` or nonce-only would
+                // break the embedded /graphql Nitro UI.
+                // Risk surface in Phase 1 is low because:
+                //   1. The portal is loopback-only (127.0.0.1, no LAN expose).
+                //   2. There is no auth or multi-tenancy; no third-party content
+                //      reaches the response body.
+                //   3. Browser-rendered REPORT outputs (report.html / xml / sarif)
+                //      are forced to attachment Content-Disposition (Task 7.13)
+                //      so they cannot execute as same-origin script.
+                // Phase 2 should tighten when Nitro grows nonce support, OR
+                // gate `unsafe-inline` behind a development-only env flag.
                 headers["Content-Security-Policy"] =
                     "default-src 'self'; " +
                     "script-src 'self' 'unsafe-inline'; " +

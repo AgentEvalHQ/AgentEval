@@ -123,21 +123,25 @@ var agent = client.AsEvaluableAgent(
 var result = await harness.RunEvaluationAsync(agent, testCase);
 ```
 
-### CLI (Any Provider, No Code)
+### CLI (Workspace + Benchmark Suites)
 
-The CLI wraps this pattern for terminal usage:
+The CLI focuses on workspace lifecycle and shipped benchmark suites — the cross-framework evaluation pattern shown above lives in code, not in a CLI flag. To evaluate non-MAF agents from the terminal, point a benchmark at your subject:
 
 ```bash
-# Azure OpenAI
-agenteval eval --azure --model gpt-4o --dataset tests.yaml
-
-# Ollama (local)
-agenteval eval --endpoint http://localhost:11434/v1 --model llama3 --dataset tests.yaml
-
-# Groq
-agenteval eval --endpoint https://api.groq.com/openai/v1 --model llama-3.1-70b \
-  --api-key $GROQ_API_KEY --dataset tests.yaml
+# Run the agentic benchmark against a subject — judge wired via AZURE_OPENAI_* env vars
+export AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.com
+export AZURE_OPENAI_API_KEY=...
+export AZURE_OPENAI_DEPLOYMENT=gpt-4o
+agenteval bench agentic --subject MyAgent --input "user prompt to evaluate"
 ```
+
+For arbitrary dataset-driven runs against any `IChatClient`-compatible provider (Azure OpenAI, Ollama, Groq, etc.), use the in-tree samples as a starting point:
+
+```bash
+dotnet run --project samples/AgentEval.Samples
+```
+
+See [Mock-vs-Real-Mode samples](showcase/code-gallery.md) for working programs.
 
 ## Multi-Framework Model Comparison
 

@@ -145,7 +145,7 @@ If user provides a config file, copy it for reproducibility.
 
 ### Positive
 
-- **Cross-Run Comparison** — Enables `agenteval summary` and `agenteval diff` commands
+- **Cross-Run Comparison** — Enables cross-run UI comparison via Mission Control (`agenteval mc serve`). The `agenteval summary` and `agenteval diff` CLI commands originally proposed in ADR-003 were deferred; Mission Control covers the same use cases interactively.
 - **Reproducibility** — Run parameters stored with results
 - **Streaming** — JSONL enables processing large result sets
 - **History** — Directory-per-run enables time-series analysis
@@ -188,10 +188,12 @@ If user provides a config file, copy it for reproducibility.
 
 ## Implementation
 
-1. Create `DirectoryExporter : IResultExporter`
-2. Add `--output-dir` option to CLI `eval` command
-3. Implement `summary` and `diff` commands that read this format
-4. Document format specification in docs
+**Status as of v0.8.1-beta**:
+
+1. ✅ `DirectoryExporter : IResultExporter` shipped in `src/AgentEval.DataLoaders/Exporters/`. Writes under `.agenteval/<subject>/runs/<runId>/reports/` from the bench + render CLI paths.
+2. ⏭️ The proposed `--output-dir` option on a standalone `agenteval eval` command was **deferred** along with the rest of the `agenteval eval` surface (see ADR-003). Reports now land in the canonical `.agenteval/` layout automatically.
+3. ⏭️ `summary` and `diff` CLI commands were **deferred** to Mission Control (`agenteval mc serve`) — the interactive Compliance Matrix + Run Detail pages cover the same comparison use cases. See ADR-003 for the rationale.
+4. ✅ Format specification documented at `docs/agenteval-workspace.md`.
 
 ---
 

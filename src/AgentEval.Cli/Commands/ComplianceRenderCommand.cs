@@ -56,7 +56,25 @@ public static class ComplianceRenderCommand
             return 1;
         }
 
+        // Phase-7 Task 7.1: validate the --ts path segment if supplied. The CLI
+        // already canonicalises --root; --ts goes straight into a filesystem
+        // join via Path.Combine, so a `..`-laced value would escape the
+        // workspace. The MC REST endpoint already rejects this; the CLI should
+        // too for symmetry.
+        if (!string.IsNullOrWhiteSpace(ts)
+            && !AgentEval.Output.FileSystemLayout.IsSafePathSegment(ts))
+        {
+            Console.Error.WriteLine($"Error: --ts '{ts}' is not a safe path segment.");
+            return 1;
+        }
+
         // ── Workspace setup ──────────────────────────────────────────────────
+        if (rootOverride is not null)
+        {
+            var canonical = WorkspaceRootValidator.CanonicaliseOrNull(rootOverride);
+            if (canonical is null) return 1;
+            rootOverride = canonical;
+        }
         var workspaceRoot = rootOverride ?? WorkspaceRootDiscovery.Find(Directory.GetCurrentDirectory());
         if (workspaceRoot is null)
         {
@@ -253,16 +271,30 @@ public static class ComplianceRenderCommand
         return s.Trim('.', ' ');
     }
 
-    /// <summary>Minimal stub evaluator required only to construct the ArticlesRegistry.</summary>
+    /// <summary>
+    /// Minimal stub evaluator used ONLY to satisfy the <see cref="ArticlesRegistry"/>
+    /// constructor's <c>IEvaluator</c> dependency. The PDF render path reads a
+    /// pre-existing <c>gdpr-evidence.json</c> (or EU-AI-Act equivalent) end-to-end
+    /// and never invokes <see cref="EvaluateAsync"/> — no judgment occurs.
+    /// <para>
+    /// This stub therefore does NOT need to be gated by
+    /// <c>AGENTEVAL_ALLOW_STUB_JUDGE</c>: that gate exists to prevent stub-graded
+    /// CI gates, and there is no grading on the render path. The registry is
+    /// needed only for PII-redaction metadata lookup during PDF rendering. If
+    /// <see cref="EvaluateAsync"/> is ever called on this type, it throws — that
+    /// would indicate the render path regressed into a grading flow and should
+    /// fail loudly.
+    /// </para>
+    /// </summary>
     private sealed class StubEvaluatorForRegistry : AgentEval.Core.IEvaluator
     {
         public Task<AgentEval.Core.EvaluationResult> EvaluateAsync(
             string input, string output, IEnumerable<string> criteria,
             CancellationToken cancellationToken = default) =>
-            Task.FromResult(new AgentEval.Core.EvaluationResult
-            {
-                OverallScore = 100,
-                Summary = "registry-only stub"
-            });
+            throw new InvalidOperationException(
+                "StubEvaluatorForRegistry.EvaluateAsync was invoked. This stub is " +
+                "registry-construction-only — no grading should occur on the render " +
+                "path. If you see this, the render path has regressed into a " +
+                "judgment flow without the AGENTEVAL_ALLOW_STUB_JUDGE gate.");
     }
 }

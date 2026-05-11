@@ -10,6 +10,31 @@ namespace AgentEval.Evals;
 /// Results are aggregated via the supplied <see cref="IAggregationStrategy"/>
 /// (typically <see cref="WeightedMedianAggregation"/>).
 /// </summary>
+/// <remarks>
+/// <para>
+/// <b>Threshold vs. MajorityVote interaction (Phase-8 Task 8.6).</b>
+/// When <see cref="Threshold"/> is supplied AND the aggregation strategy is
+/// <c>MajorityVoteAggregation</c>, the threshold check takes precedence over
+/// the majority-vote verdict matrix. Concretely:
+/// </para>
+/// <list type="bullet">
+///   <item>3 judges vote pass + aggregate score 0.80, threshold 0.85 → label
+///         is <c>"fail"</c> because <c>0.80 &lt; 0.85</c>. The pass-majority is
+///         overridden by the threshold gate.</item>
+///   <item>2 judges fail + 1 pass, mean score 0.45, threshold null → label is
+///         <c>"fail"</c> via the severity-driven verdict (the majority-vote
+///         winner is "fail" → severity from winning voters).</item>
+///   <item>3 judges warn at score 0.78, threshold 0.70 → label is <c>"pass"</c>
+///         because the threshold is met. The "warn"-majority severity is
+///         preserved on the result.Score.Severity but the verdict label is
+///         pass — useful for "soft warnings under a strict gate" semantics.</item>
+/// </list>
+/// <para>
+/// Rule of thumb: set <see cref="Threshold"/> only when the gate is the
+/// SCORE; leave it <c>null</c> when the gate is the MAJORITY LABEL.
+/// Mixing both is supported but the threshold always wins on the label.
+/// </para>
+/// </remarks>
 public sealed class MultiJudgeWrapper : IEval
 {
     /// <inheritdoc/>
@@ -53,8 +78,9 @@ public sealed class MultiJudgeWrapper : IEval
         ArgumentNullException.ThrowIfNull(aggregation);
         if (judges.Count == 0)
             throw new ArgumentException("MultiJudgeWrapper must have at least one judge.", nameof(judges));
-        if (threshold is not null && (threshold < 0 || threshold > 1))
-            throw new ArgumentOutOfRangeException(nameof(threshold), threshold, "Threshold must be in [0, 1].");
+        if (threshold is { } t && (!double.IsFinite(t) || t < 0 || t > 1))
+            throw new ArgumentOutOfRangeException(nameof(threshold), threshold,
+                "Threshold must be a finite value in [0, 1] (NaN, +Infinity, and -Infinity are rejected).");
 
         Key = key;
         Name = name;

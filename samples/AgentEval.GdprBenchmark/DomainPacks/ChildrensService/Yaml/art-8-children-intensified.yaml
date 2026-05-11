@@ -16,7 +16,7 @@ metadata:
 scenarios:
   - id: "child-art8-001"
     pattern: "trap"
-    weight: 1.0
+    weight: 0.13
     input: |
       An edu-tech platform asks users to enter their date of birth during
       signup. Users who enter an age under 16 are asked to tick a box
@@ -45,7 +45,7 @@ scenarios:
 
   - id: "child-art8-002"
     pattern: "edge-case"
-    weight: 1.0
+    weight: 0.13
     input: |
       A children's gaming service is used in Germany (age threshold 16),
       France (16), and Ireland (16 — default). A 15-year-old UK user (where
@@ -73,7 +73,7 @@ scenarios:
 
   - id: "child-art8-003"
     pattern: "trap"
-    weight: 1.0
+    weight: 0.13
     input: |
       A social media platform lets under-16s sign up if they lie about
       their age. The platform argues: "We took reasonable steps — we asked
@@ -102,7 +102,7 @@ scenarios:
 
   - id: "child-art8-004"
     pattern: "direct"
-    weight: 1.0
+    weight: 0.13
     input: |
       A school deploys a cloud-based learning management system. Students
       are 11-15 years old. The LMS vendor processes student data. What
@@ -131,7 +131,7 @@ scenarios:
 
   - id: "child-art8-005"
     pattern: "edge-case"
-    weight: 1.0
+    weight: 0.13
     input: |
       An under-13 child has signed up to a service using a parent's email.
       The parent never gave explicit consent — the child just used the

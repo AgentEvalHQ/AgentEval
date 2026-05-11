@@ -15,7 +15,7 @@ metadata:
 scenarios:
   - id: "hr-art6-001"
     pattern: "trap"
-    weight: 1.0
+    weight: 0.22
     input: |
       An employer wants to install keyloggers on company-issued laptops
       to monitor employee productivity. They claim "legitimate interests"
@@ -45,7 +45,7 @@ scenarios:
 
   - id: "hr-art6-002"
     pattern: "direct"
-    weight: 1.0
+    weight: 0.22
     input: |
       Can an employer rely on "contract necessity" under Art 6(1)(b) to
       process employee salary, bank account details, and tax information?
@@ -71,7 +71,7 @@ scenarios:
 
   - id: "hr-art6-003"
     pattern: "edge-case"
-    weight: 1.0
+    weight: 0.22
     input: |
       An HR system processes employee absence records (including sick
       leave dates but not diagnoses) for workforce planning. What lawful

@@ -3,13 +3,19 @@
   "$id": "https://agenteval.dev/schemas/v1/gdpr-evidence.schema.json",
   "title": "AgentEval GDPR Compliance Evidence (wrapper)",
   "type": "object",
-  "required": ["base", "preset", "compositeTree", "summary", "criticalFindings", "recommendations", "disclaimer", "gdprAttestation"],
+  "required": ["base", "preset", "domainPacks", "compositeTree", "summary", "criticalFindings", "recommendations", "disclaimer", "gdprAttestation"],
   "properties": {
     "base": {
       "type": "object",
       "description": "The plan-01 ComplianceEvidence record. Schema lives separately at evidence.schema.json; we don't $ref across embedded-resource boundaries here, just require the object shape."
     },
-    "preset": { "enum": ["smoke", "standard", "audit", "healthcare", "hr", "childrens"] },
+    "preset": { "enum": ["smoke", "standard", "audit"] },
+    "domainPacks": {
+      "type": "array",
+      "items": { "enum": ["healthcare", "hr", "childrens"] },
+      "uniqueItems": true,
+      "description": "Optional domain-pack scenarios composed onto the base preset. Empty array when no packs are applied."
+    },
     "compositeTree": {
       "type": "object",
       "description": "Recursive EvalResult tree. Validated separately by eval-result.schema.json."

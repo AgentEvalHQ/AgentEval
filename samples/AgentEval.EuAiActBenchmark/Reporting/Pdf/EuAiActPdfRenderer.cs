@@ -241,17 +241,24 @@ public sealed class EuAiActPdfRenderer
                         c.RelativeColumn();
                     });
 
+                    // Try to get article spec for sensitive-flag + Phase-6 Task 6.9 lookup.
+                    ArticleSpec? spec = null;
+                    try { spec = _articles.GetSpec(articleKey); } catch { /* registry miss — skip redaction */ }
+
+                    // Phase-6 Task 6.9: prefer actual scenario input over judge reasoning.
+                    bool anyScenarioHasSpecInput = scenarios.Any(s =>
+                        (spec?.Scenarios.FirstOrDefault(ss => ss.Id == s.Metric.Key)?.Input?.Length ?? 0) > 0);
+                    string previewHeader = anyScenarioHasSpecInput
+                        ? "Input preview"
+                        : "Judge reasoning preview";
+
                     table.Header(h =>
                     {
                         h.Cell().Background(Colors.Grey.Lighten2).Padding(5).Text("Scenario").Bold();
                         h.Cell().Background(Colors.Grey.Lighten2).Padding(5).Text("Score").Bold();
                         h.Cell().Background(Colors.Grey.Lighten2).Padding(5).Text("Status").Bold();
-                        h.Cell().Background(Colors.Grey.Lighten2).Padding(5).Text("Input preview").Bold();
+                        h.Cell().Background(Colors.Grey.Lighten2).Padding(5).Text(previewHeader).Bold();
                     });
-
-                    // Try to get article spec for sensitive-flag lookup
-                    ArticleSpec? spec = null;
-                    try { spec = _articles.GetSpec(articleKey); } catch { /* registry miss — skip redaction */ }
 
                     foreach (var scenario in scenarios)
                     {
@@ -259,15 +266,21 @@ public sealed class EuAiActPdfRenderer
                             .FirstOrDefault(s => s.Id == scenario.Metric.Key);
                         bool sensitive = scenarioSpec?.Sensitive ?? false;
 
-                        // PII redaction: replace input text for sensitive scenarios
-                        string inputPreview = sensitive
-                            ? RedactedSentinel
-                            : TruncateForPreview(scenario.Details.Evidence?.FirstOrDefault()?.Message);
+                        // PII redaction: replace input text for sensitive scenarios.
+                        // Phase-6 Task 6.9: when the YAML scenario input is available,
+                        // show THAT — not the judge's per-criterion explanation.
+                        string preview;
+                        if (sensitive)
+                            preview = RedactedSentinel;
+                        else if (scenarioSpec?.Input is { Length: > 0 } input)
+                            preview = TruncateForPreview(input, 200);
+                        else
+                            preview = TruncateForPreview(scenario.Details.Evidence?.FirstOrDefault()?.Message);
 
                         table.Cell().Padding(5).Text(scenario.Metric.Key);
                         table.Cell().Padding(5).Text($"{scenario.Score.Value:P0}");
                         table.Cell().Padding(5).Text(scenario.Score.Label.ToUpperInvariant());
-                        table.Cell().Padding(5).Text(inputPreview);
+                        table.Cell().Padding(5).Text(preview);
                     }
                 });
 
@@ -453,13 +466,17 @@ public sealed class EuAiActPdfRenderer
             "testing against Regulation (EU) 2024/1689. Pass threshold is 0.85."
     };
 
-    private static EvalResult? FindResultByKey(EvalResult root, string key)
+    // Phase-7 Task 7.2: shared depth cap mirrors MissionControl.GraphQL.Query.MaxTreeWalkDepth.
+    private const int MaxRenderWalkDepth = 32;
+
+    private static EvalResult? FindResultByKey(EvalResult root, string key, int depth = 0)
     {
+        if (depth > MaxRenderWalkDepth) return null;
         if (root.Metric.Key == key) return root;
         if (root.Details.SubResults is null) return null;
         foreach (var child in root.Details.SubResults)
         {
-            var found = FindResultByKey(child, key);
+            var found = FindResultByKey(child, key, depth + 1);
             if (found is not null) return found;
         }
         return null;

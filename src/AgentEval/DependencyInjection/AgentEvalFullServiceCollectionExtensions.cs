@@ -2,22 +2,24 @@
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 
+using AgentEval.Memory.Extensions;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace AgentEval.DependencyInjection;
 
 /// <summary>
-/// Extension methods for registering all AgentEval services including RedTeam.
+/// Extension methods for registering all AgentEval services including RedTeam and Memory.
 /// This extension is provided by the umbrella package. Use
 /// <see cref="AgentEvalServiceCollectionExtensions.AddAgentEval"/> (Core),
-/// <see cref="DataLoaderServiceCollectionExtensions.AddAgentEvalDataLoaders"/> (DataLoaders), and
-/// <see cref="RedTeamServiceCollectionExtensions.AddAgentEvalRedTeam"/> (RedTeam)
+/// <see cref="DataLoaderServiceCollectionExtensions.AddAgentEvalDataLoaders"/> (DataLoaders),
+/// <see cref="RedTeamServiceCollectionExtensions.AddAgentEvalRedTeam"/> (RedTeam), and
+/// <see cref="AgentEvalMemoryServiceCollectionExtensions.AddAgentEvalMemory"/> (Memory)
 /// individually if you only need a subset.
 /// </summary>
 public static class AgentEvalFullServiceCollectionExtensions
 {
     /// <summary>
-    /// Adds all AgentEval services (Core + DataLoaders + RedTeam) to the service collection.
+    /// Adds all AgentEval services (Core + DataLoaders + RedTeam + Memory) to the service collection.
     /// This is the recommended entry point for consumers of the full AgentEval NuGet package.
     /// </summary>
     /// <param name="services">The service collection to add services to.</param>
@@ -38,6 +40,9 @@ public static class AgentEvalFullServiceCollectionExtensions
 
         // Register RedTeam services
         services.AddAgentEvalRedTeam();
+
+        // Register Memory evaluation services (memory benchmark runner, judge, scenarios, metrics, reporting).
+        services.AddAgentEvalMemory();
 
         return services;
     }

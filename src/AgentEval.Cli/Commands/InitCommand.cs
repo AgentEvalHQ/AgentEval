@@ -24,6 +24,12 @@ public static class InitCommand
     /// <summary>Runs the init command with an optional explicit root override (used in tests).</summary>
     internal static async Task<int> RunAsync(string? name, string? rootOverride)
     {
+        if (rootOverride is not null)
+        {
+            var canonical = WorkspaceRootValidator.CanonicaliseOrNull(rootOverride);
+            if (canonical is null) return 1;
+            rootOverride = canonical;
+        }
         var root = rootOverride ?? WorkspaceRootDiscovery.Find(Directory.GetCurrentDirectory());
         if (root is null)
         {

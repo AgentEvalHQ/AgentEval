@@ -44,6 +44,12 @@ public static class BenchCommand
         int runs = 1)
     {
         // ── Workspace setup ──────────────────────────────────────────────────
+        if (rootOverride is not null)
+        {
+            var canonical = WorkspaceRootValidator.CanonicaliseOrNull(rootOverride);
+            if (canonical is null) return 1;
+            rootOverride = canonical;
+        }
         var workspaceRoot = rootOverride ?? WorkspaceRootDiscovery.Find(Directory.GetCurrentDirectory());
         if (workspaceRoot is null)
         {
@@ -60,7 +66,17 @@ public static class BenchCommand
         }
 
         // ── Judge / evaluator ────────────────────────────────────────────────
-        var (resolvedJudge, judgeModelName, exitCode) = JudgeFactory.Resolve(evaluatorOverride, "GDPR benchmark");
+        // Phase-6 Task 6.8: load the embedded GDPR judge system prompt and pass it
+        // through. Previously the prompt was validated by tests + recorded in
+        // provenance but never reached the LLM — the "Cite articles / Be conservative /
+        // Flag evasive responses" rules had no actual effect on judgements.
+        var gdprPrompt = EmbeddedPromptLoader.Load(
+            typeof(GdprBenchmark.GdprBenchmark).Assembly,
+            "gdpr-judge-system.v1.md");
+        var (resolvedJudge, judgeModelName, exitCode) = JudgeFactory.Resolve(
+            evaluatorOverride,
+            judgeKind: "GDPR benchmark",
+            systemPrompt: gdprPrompt);
         if (resolvedJudge is null) return exitCode;
         IEvaluator judge = resolvedJudge;
 
@@ -137,8 +153,21 @@ public static class BenchCommand
         // (Mode-B per-criterion fan-out is wired via ScenarioToAtomicEval ctor flags
         //  in the article-builder; bench gdpr does not enable that in v1.)
         var judgeMode = runs > 1 ? "multi-judge" : "mode-a";
+
+        // Split the composite preset string (e.g. "standard+healthcare+hr") into a base
+        // preset + ordered domain-pack list so gdpr-evidence.json records each pack
+        // separately. The base name is what the schema's `preset` enum accepts; the
+        // packs land in a structured `domainPacks` array.
+        var presetTokens = preset.Split('+', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        var basePreset = presetTokens.Length > 0 ? presetTokens[0].ToLowerInvariant() : "standard";
+        var domainPacks = presetTokens.Skip(1).Select(t => t.ToLowerInvariant()).ToArray();
+
         var reporter = new GDPRComplianceReporter(articles);
-        var options = new GdprReportOptions(Preset: preset, JudgeMode: judgeMode);
+        var options = new GdprReportOptions(
+            Preset: basePreset,
+            DomainPacks: domainPacks,
+            JudgeMode: judgeMode,
+            JudgeModel: judgeModelName);
         GdprComplianceEvidence evidence;
         try
         {

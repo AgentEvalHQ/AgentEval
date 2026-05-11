@@ -106,7 +106,10 @@ If this runs without errors and shows "Passed: True", AgentEval is correctly ins
 AgentEval also ships a standalone CLI for terminal and CI/CD usage:
 
 ```bash
-dotnet tool install --global AgentEval.Cli --prerelease
+# Planned (v1.1): a `dotnet tool` install path. Tracked in deferred-pending.md.
+# For now in v0.8.1-beta, run the CLI from a cloned repo build:
+#   dotnet run --project src/AgentEval.Cli -- init
+dotnet tool install --global AgentEval.Cli --prerelease  # (planned — not published yet)
 agenteval init                                       # bootstrap .agenteval/ workspace
 agenteval bench gdpr --preset smoke --subject MyAgent # run a benchmark
 agenteval mc serve                                    # open Mission Control on http://localhost:5000

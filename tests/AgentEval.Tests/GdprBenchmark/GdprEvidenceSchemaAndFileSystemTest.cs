@@ -150,6 +150,7 @@ public class GdprEvidenceSchemaAndFileSystemTest : IDisposable
         var malformed = new GdprComplianceEvidence(
             Base: baseEvidence,
             Preset: "INVALID_PRESET_NOT_IN_ENUM",   // <-- invalid; schema enum rejects
+            DomainPacks: Array.Empty<string>(),
             CompositeTree: atomic,
             Summary: new GdprSummary(1.0, "PASS",
                 new Dictionary<string, GdprPillarSummary>(),

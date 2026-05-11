@@ -390,7 +390,7 @@ var registry = new MetricRegistry(new IMetric[]
 AgentEval includes `MicrosoftEvaluatorAdapter` to use official Microsoft evaluators:
 
 ```csharp
-using AgentEval.Adapters;
+using AgentEval.Core;
 using Microsoft.Extensions.AI.Evaluation.Quality;
 
 // Create Microsoft evaluator

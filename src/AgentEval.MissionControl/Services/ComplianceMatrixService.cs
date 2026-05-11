@@ -168,6 +168,7 @@ public sealed class ComplianceMatrixService
                     PassRate: control.PassRate,
                     LastEvidenceAt: ts,
                     LastEvidenceRunId: ev.SourceRun.RunId,
+                    Timestamp: pointer.Timestamp,
                     RegressedFromBaseline: control.RegressedFromBaseline));
             }
         }

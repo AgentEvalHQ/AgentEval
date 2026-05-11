@@ -21,13 +21,7 @@
 
 > **v1 access path.** The GDPR benchmark currently runs through the `agenteval` CLI binaries. Programmatic access via NuGet (`using AgentEval.GdprBenchmark;`) is planned for v1.1 — see [`docs/deferred-pending.md`](../../deferred-pending.md).
 
-The benchmark requires no special configuration to run. Without `AZURE_OPENAI_*` environment variables, the CLI falls back to a stub judge that returns deterministic placeholder scores with a warning printed to stderr. Results from the stub judge are not meaningful for compliance purposes.
-
-```
-dotnet run --project src/AgentEval.Cli --framework net10.0 -- bench gdpr --preset smoke --subject TravelAgent
-dotnet run --project src/AgentEval.Cli --framework net10.0 -- bench gdpr --preset standard --subject TravelAgent
-dotnet run --project src/AgentEval.Cli --framework net10.0 -- bench gdpr --preset audit --subject TravelAgent
-```
+> **Real judging requires all three** of `AZURE_OPENAI_ENDPOINT`, `AZURE_OPENAI_API_KEY`, and `AZURE_OPENAI_DEPLOYMENT`. If any are unset, the CLI refuses to run (exit code **2**). To exercise the pipeline without LLM cost — smoke-test mode only, **not for CI** — set `AGENTEVAL_ALLOW_STUB_JUDGE=1`. Stub-mode results are deterministic placeholders and **must not** be relied on as compliance evidence. See [CLI Reference — Environment variables](../../cli.md#environment-variables) for the full contract.
 
 Set up the real judge by exporting the following environment variables before running:
 
@@ -35,6 +29,14 @@ Set up the real judge by exporting the following environment variables before ru
 AZURE_OPENAI_ENDPOINT=https://<your-resource>.openai.azure.com/
 AZURE_OPENAI_API_KEY=<your-key>
 AZURE_OPENAI_DEPLOYMENT=<your-gpt-4o-deployment>
+```
+
+Then run any of the three presets:
+
+```
+dotnet run --project src/AgentEval.Cli --framework net10.0 -- bench gdpr --preset smoke --subject TravelAgent
+dotnet run --project src/AgentEval.Cli --framework net10.0 -- bench gdpr --preset standard --subject TravelAgent
+dotnet run --project src/AgentEval.Cli --framework net10.0 -- bench gdpr --preset audit --subject TravelAgent
 ```
 
 ---
@@ -164,7 +166,9 @@ A pillar verdict of `FAIL` means at least one article in that pillar failed at `
 
 ### Extracting recommendations
 
-The `criticalFindings` array in `gdpr-evidence.json` lists every article that failed at `high` or `critical` severity. Each entry has an `articleId`, a `score`, a `severity`, and a `recommendation` string. The `report.md` renders these as a numbered list at the top of the Recommendations section.
+The `criticalFindings` array in `gdpr-evidence.json` lists every article that failed at `high` or `critical` severity. Each entry is a full `EvalResult` node — you can read `metric.key` for the article id, `score.value` / `score.severity` / `score.label` for the verdict, and walk `details.subResults` for per-scenario diagnostics. Recommendations are kept on a **separate sibling field** `recommendations: string[]` (one entry per finding, same order as `criticalFindings`) so renderers can apply different formatting to the two — the `report.md` renders them as a paired numbered list at the top of the Recommendations section.
+
+> A structured `recommendations[]` shape (`{articleId, severity, text}` per entry) is planned for v1.1 once we have a clear consumer for the per-entry metadata. v0.8.1-beta ships the strings-only shape.
 
 ---
 

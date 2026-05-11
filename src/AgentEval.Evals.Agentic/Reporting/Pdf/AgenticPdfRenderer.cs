@@ -445,13 +445,17 @@ public sealed class AgenticPdfRenderer
             "and aggregation rules."
     };
 
-    private static EvalResult? FindResultByKey(EvalResult root, string key)
+    // Phase-7 Task 7.2: shared depth cap mirrors MissionControl.GraphQL.Query.MaxTreeWalkDepth.
+    private const int MaxRenderWalkDepth = 32;
+
+    private static EvalResult? FindResultByKey(EvalResult root, string key, int depth = 0)
     {
+        if (depth > MaxRenderWalkDepth) return null;
         if (root.Metric.Key == key) return root;
         if (root.Details.SubResults is null) return null;
         foreach (var child in root.Details.SubResults)
         {
-            var found = FindResultByKey(child, key);
+            var found = FindResultByKey(child, key, depth + 1);
             if (found is not null) return found;
         }
         return null;

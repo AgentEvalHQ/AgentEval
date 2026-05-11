@@ -280,7 +280,7 @@ public static class MissionControlFixtureBuilder
             Harness: "agentic-execution",
             Seed: 7,
             ParentInvocationId: null,
-            Kind: "bench"), ct);
+            Kind: "benchmark"), ct);
 
         // Realistic Foundry-style agentic-execution composite: root → 3 mid
         // pillars (intent, tool-use, telemetry) → 2 leaf evals each.
@@ -311,7 +311,7 @@ public static class MissionControlFixtureBuilder
             Harness: "memory",
             Seed: 11,
             ParentInvocationId: null,
-            Kind: "memory"), ct);
+            Kind: "memory-benchmark"), ct);
 
         var emptyMetrics = new Dictionary<string, double>();
         var emptyAssertions = Array.Empty<AssertionResult>();

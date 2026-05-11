@@ -21,6 +21,13 @@ namespace AgentEval.EuAiActBenchmark;
 /// Ordered list of judges (evaluator + weight) used for consensus aggregation
 /// over Critical-severity articles. Typically 3 judges with equal weights.
 /// </param>
+/// <remarks>
+/// Phase-8 Task 8.5: this record is <see cref="ObsoleteAttribute"/>-marked
+/// because Mode-B per-criterion multi-judge fan-out has moved into
+/// <c>ScenarioToAtomicEval</c> ctor flags. See <c>deferred-pending.md</c>.
+/// </remarks>
+[Obsolete("MultiJudgeOptions is deprecated; configure multi-judge via ScenarioToAtomicEval Mode-B flags instead. " +
+          "Pass `null` to AuditGrade to retain single-judge behaviour. Removal scheduled for v1.1.")]
 public sealed record MultiJudgeOptions(
     IReadOnlyList<(IEvaluator Judge, double Weight)> Judges);
 
@@ -104,11 +111,15 @@ public static class EuAiActBenchmark
     /// (multi-judge wins). See <c>ScenarioToAtomicEval.Build</c> for details.
     /// </para>
     /// </remarks>
+#pragma warning disable CS0618 // Phase-8 8.5: signature retained for v1 compatibility.
     public static CompositeEval AuditGrade(EuAiActArticlesRegistry articles, MultiJudgeOptions? multiJudge)
+#pragma warning restore CS0618
     {
         ArgumentNullException.ThrowIfNull(articles);
 
+#pragma warning disable CS0618 // Reading the Obsolete record's properties here is intentional.
         var useMultiJudge = multiJudge is { Judges.Count: > 1 };
+#pragma warning restore CS0618
         var name = useMultiJudge
             ? "EU AI Act Compliance — Audit-Grade (multi-judge)"
             : "EU AI Act Compliance — Audit-Grade Preset (single judge)";

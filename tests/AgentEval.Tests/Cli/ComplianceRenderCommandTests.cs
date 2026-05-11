@@ -96,6 +96,7 @@ public class ComplianceRenderCommandTests : IDisposable
         return new GdprComplianceEvidence(
             Base: baseEvidence,
             Preset: "smoke",
+            DomainPacks: Array.Empty<string>(),
             CompositeTree: compositeTree,
             Summary: new GdprSummary(
                 OverallScore: 0.90,

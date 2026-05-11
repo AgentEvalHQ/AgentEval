@@ -2,6 +2,12 @@
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 
+// Phase-8 Task 8.5: MultiJudgeOptions is now [Obsolete] but this E2E test
+// is the regression net for the existing AuditGrade(multiJudge) path — we
+// intentionally keep exercising the deprecated surface to prove backward
+// compatibility while it remains available in v1.
+#pragma warning disable CS0618 // MultiJudgeOptions is obsolete
+
 using AgentEval.Evals;
 using GdprBenchmarkFactory = AgentEval.GdprBenchmark.GdprBenchmark;
 using AgentEval.GdprBenchmark;
@@ -213,3 +219,5 @@ public class E2E_AuditGradeMultiJudgeTest
         return found;
     }
 }
+
+#pragma warning restore CS0618

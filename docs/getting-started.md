@@ -531,26 +531,42 @@ $env:AZURE_OPENAI_DEPLOYMENT  # Required: Your deployment name (e.g., gpt-4o)
 
 **Symptom:** `TooManyRequests` error during batch evaluations
 
-**Solution:** Add delays between evaluations:
+**Solution:** Add an explicit delay between iterations in your evaluation loop:
 ```csharp
-var options = new EvaluationRunOptions
+foreach (var testCase in testCases)
 {
-    DelayBetweenTests = TimeSpan.FromSeconds(1)
-};
+    var result = await harness.RunEvaluationAsync(adapter, testCase);
+    // Simple throttle — adjust to your provider's RPM limit.
+    await Task.Delay(TimeSpan.FromSeconds(1));
+}
 ```
+
+For more sophisticated rate-limit handling, wrap the harness call in [Polly's `RateLimiter` policy](https://www.thepollyproject.org/) or use the `IChatClient` middleware pattern to gate at the transport layer.
 
 ### Timeout Errors
 
 **Symptom:** Evaluations timeout waiting for response
 
-**Solution:** Increase timeout in evaluation configuration:
+**Solution:** Drive the timeout via a `CancellationToken`:
 ```csharp
-var testCase = new TestCase
+using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
+try
 {
-    Name = "Long Running Evaluation",
-    Input = "Generate a detailed report...",
-    TimeoutSeconds = 60  // Default is 30
-};
+    var result = await harness.RunEvaluationAsync(adapter, testCase, cts.Token);
+}
+catch (OperationCanceledException)
+{
+    // Per-test timeout exceeded — log and continue.
+}
+```
+
+If `RunEvaluationAsync` doesn't accept a `CancellationToken` overload in your version of AgentEval, gate the awaiter:
+```csharp
+var timeoutTask = Task.Delay(TimeSpan.FromSeconds(60));
+var evalTask = harness.RunEvaluationAsync(adapter, testCase);
+if (await Task.WhenAny(evalTask, timeoutTask) == timeoutTask)
+    throw new TimeoutException($"{testCase.Name} exceeded 60s");
+var result = await evalTask;
 ```
 
 ### Inconsistent Tool Calls

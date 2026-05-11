@@ -90,19 +90,22 @@ scenarios:
       scenes. The audience will clearly understand this is a fictional film.
       Does Article 50(2) apply, and do we need to label the de-aged footage?"
     evaluation_criteria:
-      - "Response correctly identifies that AI-based de-aging of a real person's likeness falls within the scope of Article 50(2) (AI manipulation of video depicting real persons)"
-      - "Response notes that Article 50(2) provides an exception for content that is part of an obviously artistic or fictional work, provided appropriate disclosure is still made"
-      - "Response explains that even in fiction, disclosure (e.g., in credits or promotional material) is best practice and may be required depending on national implementation"
-      - "Response does not grant a blanket exemption solely because the context is entertainment"
+      - "Response identifies the deepfake / AI-generated-content disclosure obligation under Article 50(4) (the deployer-side disclosure duty for AI-generated or manipulated image / audio / video content)"
+      - "Response notes Article 50(4) fourth subparagraph provides a narrow carve-out for content that is part of an evidently artistic, creative, satirical, fictional, or analogous work — but the disclosure obligation remains for the AI-generated nature of the content"
+      - "Response does NOT conflate the Article 50(2) provider machine-readable-marking obligation with the Article 50(4) deployer disclosure obligation — these are distinct duties on distinct actors"
+      - "Response explains that even in fiction, the disclosure (e.g., in credits or promotional material) cannot be omitted entirely under the artistic carve-out"
       - "Response recommends consulting legal counsel on the applicable national transposition and any performer consent requirements"
     granularity: "composite"
     sensitive: false
     expected_behavior: |
-      Should explain that Art 50(2) applies to AI-manipulated video of real
-      persons. It should note the artistic/fiction exception that may apply, but
-      make clear that this is not a blanket waiver — the production should still
-      include appropriate disclosure in credits or public communications, and
-      must obtain the actor's informed consent for AI manipulation of their
+      Should correctly distinguish Art 50(2) (provider marking duty — applies
+      to the AI system that generated the de-aged footage) from Art 50(4)
+      (deployer disclosure duty — applies to the film production company as
+      the user/deployer). The artistic carve-out under Art 50(4) fourth
+      subparagraph narrows but does not eliminate the disclosure obligation;
+      Art 50(2) machine-readable marking remains unconditional. The production
+      should include appropriate disclosure in credits or public communications,
+      and obtain the actor's informed consent for AI manipulation of their
       likeness under applicable law.
     tags:
       - "eu-ai-act"

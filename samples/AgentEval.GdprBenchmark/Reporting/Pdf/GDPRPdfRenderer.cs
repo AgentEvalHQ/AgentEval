@@ -242,17 +242,30 @@ public sealed class GDPRPdfRenderer
                         c.RelativeColumn();
                     });
 
+                    // Try to get article spec for sensitive-flag + Phase-6 Task 6.9 lookup.
+                    ArticleSpec? spec = null;
+                    try { spec = _articles?.GetSpec(articleKey); } catch { /* registry miss — skip redaction */ }
+
+                    // Phase-6 Task 6.9: prefer the actual scenario input from the
+                    // article spec when available; fall back to judge-reasoning when
+                    // the spec can't be resolved (e.g. re-rendering an evidence-only
+                    // archive without the GDPR sample on the classpath). The column
+                    // header reflects which source is in use so a DPO reading the
+                    // PDF isn't misled into thinking the judge's explanation is the
+                    // user prompt.
+                    bool anyScenarioHasSpecInput = scenarios.Any(s =>
+                        (spec?.Scenarios.FirstOrDefault(ss => ss.Id == s.Metric.Key)?.Input?.Length ?? 0) > 0);
+                    string previewHeader = anyScenarioHasSpecInput
+                        ? "Input preview"
+                        : "Judge reasoning preview";
+
                     table.Header(h =>
                     {
                         h.Cell().Background(Colors.Grey.Lighten2).Padding(5).Text("Scenario").Bold();
                         h.Cell().Background(Colors.Grey.Lighten2).Padding(5).Text("Score").Bold();
                         h.Cell().Background(Colors.Grey.Lighten2).Padding(5).Text("Status").Bold();
-                        h.Cell().Background(Colors.Grey.Lighten2).Padding(5).Text("Input preview").Bold();
+                        h.Cell().Background(Colors.Grey.Lighten2).Padding(5).Text(previewHeader).Bold();
                     });
-
-                    // Try to get article spec for sensitive-flag lookup
-                    ArticleSpec? spec = null;
-                    try { spec = _articles?.GetSpec(articleKey); } catch { /* registry miss — skip redaction */ }
 
                     foreach (var scenario in scenarios)
                     {
@@ -260,15 +273,22 @@ public sealed class GDPRPdfRenderer
                             .FirstOrDefault(s => s.Id == scenario.Metric.Key);
                         bool sensitive = scenarioSpec?.Sensitive ?? false;
 
-                        // G6.8 PII redaction: replace input text for sensitive scenarios
-                        string inputPreview = sensitive
-                            ? RedactedSentinel
-                            : TruncateForPreview(scenario.Details.Evidence?.FirstOrDefault()?.Message);
+                        // G6.8 PII redaction: replace input text for sensitive scenarios.
+                        // Phase-6 Task 6.9: when the YAML scenario input is available,
+                        // show THAT (the actual user prompt) — not the judge's per-criterion
+                        // explanation, which was the prior buggy default.
+                        string preview;
+                        if (sensitive)
+                            preview = RedactedSentinel;
+                        else if (scenarioSpec?.Input is { Length: > 0 } input)
+                            preview = TruncateForPreview(input, 200);
+                        else
+                            preview = TruncateForPreview(scenario.Details.Evidence?.FirstOrDefault()?.Message);
 
                         table.Cell().Padding(5).Text(scenario.Metric.Key);
                         table.Cell().Padding(5).Text($"{scenario.Score.Value:P0}");
                         table.Cell().Padding(5).Text(scenario.Score.Label.ToUpperInvariant());
-                        table.Cell().Padding(5).Text(inputPreview);
+                        table.Cell().Padding(5).Text(preview);
                     }
                 });
 
@@ -410,13 +430,17 @@ public sealed class GDPRPdfRenderer
             "development-phase compliance checks and sprint-level regression testing. Pass threshold is 0.85."
     };
 
-    private static EvalResult? FindResultByKey(EvalResult root, string key)
+    // Phase-7 Task 7.2: shared depth cap mirrors MissionControl.GraphQL.Query.MaxTreeWalkDepth.
+    private const int MaxRenderWalkDepth = 32;
+
+    private static EvalResult? FindResultByKey(EvalResult root, string key, int depth = 0)
     {
+        if (depth > MaxRenderWalkDepth) return null;
         if (root.Metric.Key == key) return root;
         if (root.Details.SubResults is null) return null;
         foreach (var child in root.Details.SubResults)
         {
-            var found = FindResultByKey(child, key);
+            var found = FindResultByKey(child, key, depth + 1);
             if (found is not null) return found;
         }
         return null;

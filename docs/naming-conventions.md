@@ -81,7 +81,8 @@ var exporter = new DirectoryExporter();
 await exporter.ExportToDirectoryAsync(report, "./results/baseline");
 
 // Or via CLI:
-// agenteval eval --azure --model gpt-4o --dataset tests.yaml --output-dir ./results
+// agenteval bench agentic --subject MyAgent --input "..." (writes results under .agenteval/)
+// agenteval render --benchmark agentic --subject MyAgent (re-renders existing results)
 ```
 
 ---

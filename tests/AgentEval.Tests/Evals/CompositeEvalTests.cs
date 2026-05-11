@@ -324,4 +324,54 @@ public class CompositeEvalTests
             new CompositeEval("k", "n", "c", "1.0.0", components,
                 WeightedSumAggregation.Instance, threshold: double.NaN));
     }
+
+    // ── Phase-7 Tasks 7.5 + 7.20 — recursion-depth guard ─────────────────────
+
+    [Fact]
+    public async Task EvaluateAsync_RecursionDepthExceedsCap_ThrowsInvalidOperation()
+    {
+        // Build a linear chain of nested composites exceeding the depth cap.
+        // The Phase-7 7.5 producer-side guard must fail fast rather than
+        // letting the consumer-side Mission Control resolver stack-overflow
+        // on the resulting tree.
+        const int chainLength = 40;
+        IEval current = new StubAtomic("leaf", 0.9, severity: "none", passed: true);
+        for (var i = 0; i < chainLength; i++)
+        {
+            current = new CompositeEval(
+                key: $"level-{i}",
+                name: $"Level{i}",
+                category: "test",
+                version: "1.0.0",
+                components: new EvalComponent[] { new(current) },
+                aggregation: WeightedSumAggregation.Instance);
+        }
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => current.EvaluateAsync(Input));
+    }
+
+    [Fact]
+    public async Task EvaluateAsync_RecursionDepthAtCap_Succeeds()
+    {
+        // Cap is MaxNestingDepth=32 (internal const). A chain exactly at the
+        // boundary should NOT throw — the guard fires only past the cap.
+        // We use 30 levels to leave headroom for the test runner / xunit frames.
+        const int chainLength = 30;
+        IEval current = new StubAtomic("leaf", 0.9, severity: "none", passed: true);
+        for (var i = 0; i < chainLength; i++)
+        {
+            current = new CompositeEval(
+                key: $"level-{i}",
+                name: $"Level{i}",
+                category: "test",
+                version: "1.0.0",
+                components: new EvalComponent[] { new(current) },
+                aggregation: WeightedSumAggregation.Instance);
+        }
+
+        var result = await current.EvaluateAsync(Input);
+        Assert.NotNull(result);
+        Assert.Equal($"level-{chainLength - 1}", result.Metric.Key);
+    }
 }

@@ -14,6 +14,7 @@ namespace AgentEval.GdprBenchmark.Reporting;
 public sealed record GdprComplianceEvidence(
     ComplianceEvidence Base,
     string Preset,
+    IReadOnlyList<string> DomainPacks,
     EvalResult CompositeTree,
     GdprSummary Summary,
     IReadOnlyList<EvalResult> CriticalFindings,
@@ -42,5 +43,7 @@ public sealed record GdprAttestation(string JudgeMode, IReadOnlyDictionary<strin
 /// <summary>Options controlling how the GDPR compliance report is generated.</summary>
 public sealed record GdprReportOptions(
     string Preset = "standard",
+    IReadOnlyList<string>? DomainPacks = null,
     string JudgeMode = "mode-a",
-    IReadOnlyDictionary<string, string>? PromptVersions = null);
+    IReadOnlyDictionary<string, string>? PromptVersions = null,
+    string? JudgeModel = null);

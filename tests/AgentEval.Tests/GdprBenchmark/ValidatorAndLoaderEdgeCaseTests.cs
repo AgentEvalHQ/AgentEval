@@ -396,6 +396,7 @@ public class ValidatorAndLoaderEdgeCaseTests
         return new GdprComplianceEvidence(
             Base: baseEvidence,
             Preset: "smoke",
+            DomainPacks: Array.Empty<string>(),
             CompositeTree: atomic,
             Summary: new GdprSummary(
                 OverallScore: 1.0,

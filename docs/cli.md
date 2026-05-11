@@ -16,6 +16,49 @@ After installation as a global tool, the `agenteval` command is available system
 
 ---
 
+## Environment variables
+
+The CLI honours the following process-level environment variables.
+
+### `AZURE_OPENAI_ENDPOINT`, `AZURE_OPENAI_API_KEY`, `AZURE_OPENAI_DEPLOYMENT`
+
+Real LLM judging requires **all three**. Consumed by:
+
+- `agenteval bench gdpr` · `bench eu-ai-act` · `bench agentic`
+- `agenteval bench <regulation> calibrate`
+
+If any of the three are set but others are missing, the command exits **2** with a diagnostic listing the missing variable(s). Partial config is **never** silently downgraded to a stub — the resolver refuses to run rather than produce stub-graded evidence under partial-config conditions.
+
+### `AGENTEVAL_ALLOW_STUB_JUDGE`
+
+Opt-in escape valve for running benchmarks **without** an Azure OpenAI endpoint. Set to `1` or `true` (case-insensitive) to fall back to a deterministic placeholder evaluator that returns score **75/100** and "criterion met" for every criterion.
+
+**Do NOT use in CI.** Stub-mode results are not real judgements; the CLI prints a warning to stderr on every run, and the produced evidence is unsuitable for any compliance claim. Use this only for smoke-testing the pipeline end-to-end without LLM cost.
+
+| Platform | Set the variable |
+|---|---|
+| Linux / macOS (bash, zsh) | `export AGENTEVAL_ALLOW_STUB_JUDGE=1` |
+| Windows (PowerShell) | `$env:AGENTEVAL_ALLOW_STUB_JUDGE = "1"` |
+| Windows (cmd) | `set AGENTEVAL_ALLOW_STUB_JUDGE=1` |
+| GitHub Actions | `env: AGENTEVAL_ALLOW_STUB_JUDGE: "1"` *(don't — set the AZURE_OPENAI_* secrets instead)* |
+
+**Resolution order** (as of v0.8.1-beta):
+1. Test override (programmatic; not user-visible).
+2. All three `AZURE_OPENAI_*` set → real Azure OpenAI judge.
+3. Any of the three set but not all three → exit 2 with diagnostic.
+4. None set + `AGENTEVAL_ALLOW_STUB_JUDGE=1` → stub judge (with stderr warning).
+5. None set + no opt-in → exit 2 ("Set AZURE_OPENAI_… or AGENTEVAL_ALLOW_STUB_JUDGE=1").
+
+### `AgentEval__Root`
+
+Workspace-root override for processes that aren't launched from inside the workspace. Read by `agenteval mc serve` (the Mission Control host) and any program using `AgentEvalServiceCollectionExtensions.AddAgentEvalAll()`. Double-underscore is ASP.NET Core's hierarchical-key separator (`AgentEval:Root` in `appsettings.json` → `AgentEval__Root` as an env var).
+
+### `ASPNETCORE_URLS`
+
+Honoured **only** when launching Mission Control directly (`dotnet run --project src/AgentEval.MissionControl`). `agenteval mc serve` forcibly binds to `http://127.0.0.1:<port>` and overrides this variable — there is no built-in auth in Phase 1, so the CLI hard-pins to loopback. To bind a broader interface (e.g. LAN), run the portal binary directly with your own `ASPNETCORE_URLS` and accept the trust trade-off.
+
+---
+
 ## Commands
 
 ### `agenteval init`
@@ -237,7 +280,7 @@ agenteval mc serve [--port <N>] [--workspace <path>]
 
 | Option | Env var | Default | Description |
 |--------|---------|---------|-------------|
-| `--port <N>` | `ASPNETCORE_URLS` | `5000` | Bind a different HTTP port. |
+| `--port <N>` | _(none — see note)_ | `5000` | Bind a different HTTP port. `mc serve` forcibly binds to `http://127.0.0.1:<port>` and **ignores** any pre-set `ASPNETCORE_URLS` (see [Environment variables](#environment-variables)). |
 | `--workspace <path>` | `AgentEval__Root` | current directory | Workspace root. Mission Control reads `{workspace}/.agenteval/`. |
 
 The CLI spawns `AgentEval.MissionControl(.exe|.dll)` co-located in the same publish directory. The subprocess inherits its working directory from the CLI's bin folder so the SPA's static-asset pipeline resolves correctly; the workspace is plumbed through the `AgentEval__Root` env var.

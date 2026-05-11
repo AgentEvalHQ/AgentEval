@@ -39,6 +39,12 @@ public static class BenchAgenticCommand
         string? budgetTier = null)
     {
         // ── Workspace setup ──────────────────────────────────────────────────
+        if (rootOverride is not null)
+        {
+            var canonical = WorkspaceRootValidator.CanonicaliseOrNull(rootOverride);
+            if (canonical is null) return 1;
+            rootOverride = canonical;
+        }
         var workspaceRoot = rootOverride ?? WorkspaceRootDiscovery.Find(Directory.GetCurrentDirectory());
         if (workspaceRoot is null)
         {
@@ -55,6 +61,12 @@ public static class BenchAgenticCommand
         }
 
         // ── Judge / evaluator ────────────────────────────────────────────────
+        // `judgeModelName` discarded here because `AgenticBenchmark.<Preset>(judge)`
+        // factories internally wire the judge into individual evals without exposing
+        // a `judgeModel` parameter, and BenchAgenticCommand does not write a
+        // compliance Attestation block (those land for GDPR / EU AI Act bench).
+        // Threading the deployment name through every preset factory is a v1.1
+        // refactor (see deferred-pending.md).
         var (resolvedJudge, _, exitCode) = JudgeFactory.Resolve(evaluatorOverride, "agentic benchmark");
         if (resolvedJudge is null) return exitCode;
         IEvaluator judge = resolvedJudge;
@@ -216,7 +228,17 @@ public static class BenchAgenticCommand
             "safety" => AgenticBenchmark.Safety(
                 judge,
                 policyResolver: new StaticPolicyResolver(new ProhibitedActionPolicy([], [], [], [])),
-                subjectId: subjectId ?? "default-agent",
+                // Phase-7 Task 7.21 made --subject required at the CLI; the
+                // null-fallback path is now unreachable from the CLI surface.
+                // In-process callers MUST supply subjectId; the null-coalesce
+                // is preserved only as a defensive guard for those callers
+                // (e.g. tests instantiating ResolvePreset directly without a
+                // policy-resolver subject).
+                subjectId: subjectId ?? throw new ArgumentNullException(
+                    nameof(subjectId),
+                    "Safety preset requires an explicit subjectId for policy resolution. " +
+                    "Pass subjectId: <agent-name> to ResolvePreset, or use the CLI which " +
+                    "now requires --subject."),
                 contentSafetyClient: null),
             "telemetry" => AgenticBenchmark.Telemetry(),
             "stochastic-stability" => AgenticBenchmark.StochasticStability(),

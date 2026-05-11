@@ -3,13 +3,19 @@
   "$id": "https://agenteval.dev/schemas/v1/eu-ai-act-evidence.schema.json",
   "title": "AgentEval EU AI Act Compliance Evidence (wrapper)",
   "type": "object",
-  "required": ["base", "preset", "compositeTree", "summary", "criticalFindings", "recommendations", "disclaimer", "euAiActAttestation"],
+  "required": ["base", "preset", "domainPacks", "compositeTree", "summary", "criticalFindings", "recommendations", "disclaimer", "euAiActAttestation"],
   "properties": {
     "base": {
       "type": "object",
       "description": "The plan-01 ComplianceEvidence record. Schema lives separately at evidence.schema.json; we don't $ref across embedded-resource boundaries here, just require the object shape."
     },
-    "preset": { "enum": ["smoke", "standard", "audit", "high-risk-employment", "high-risk-credit", "high-risk-education"] },
+    "preset": { "enum": ["smoke", "standard", "audit"] },
+    "domainPacks": {
+      "type": "array",
+      "items": { "enum": ["high-risk-employment", "high-risk-credit", "high-risk-education"] },
+      "uniqueItems": true,
+      "description": "Optional domain-pack scenarios composed onto the base preset. Empty array when no packs are applied."
+    },
     "compositeTree": {
       "type": "object",
       "description": "Recursive EvalResult tree. Validated separately by eval-result.schema.json."
