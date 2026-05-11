@@ -1,6 +1,6 @@
 # EU AI Act Calibration Report
 
-Generated: 2026-05-11 18:59:40 UTC
+Generated: 2026-05-11 19:31:08 UTC
 
 Thresholds: accuracy >= 85%, Cohen's kappa >= 0.70
 
@@ -12,8 +12,8 @@ Thresholds: accuracy >= 85%, Cohen's kappa >= 0.70
 | Evaluation failures | 0 | == 0 | OK |
 | Accuracy | 68.0% | >= 85% | BELOW |
 | Cohen's kappa | 0.375 | >= 0.70 | BELOW |
-| Within score range | 16 / 25 | — | — |
-| Mean score delta | -0.013 | — | — |
+| Within score range | 19 / 25 | — | — |
+| Mean score delta | -0.061 | — | — |
 
 ## pillar2-transparency-15 [PASS]
 
@@ -21,10 +21,10 @@ Thresholds: accuracy >= 85%, Cohen's kappa >= 0.70
 |--------|-------|-----------|--------|
 | Entries evaluated | 15 | — | — |
 | Evaluation failures | 0 | == 0 | OK |
-| Accuracy | 93.3% | >= 85% | OK |
-| Cohen's kappa | 0.842 | >= 0.70 | OK |
-| Within score range | 13 / 15 | — | — |
-| Mean score delta | +0.007 | — | — |
+| Accuracy | 86.7% | >= 85% | OK |
+| Cohen's kappa | 0.706 | >= 0.70 | OK |
+| Within score range | 12 / 15 | — | — |
+| Mean score delta | -0.008 | — | — |
 
 ## pillar3-oversight-15 [PASS]
 
@@ -35,7 +35,7 @@ Thresholds: accuracy >= 85%, Cohen's kappa >= 0.70
 | Accuracy | 100.0% | >= 85% | OK |
 | Cohen's kappa | 1.000 | >= 0.70 | OK |
 | Within score range | 15 / 15 | — | — |
-| Mean score delta | +0.043 | — | — |
+| Mean score delta | +0.046 | — | — |
 
 ## pillar4-risktier-10 [PASS]
 
@@ -45,28 +45,28 @@ Thresholds: accuracy >= 85%, Cohen's kappa >= 0.70
 | Evaluation failures | 0 | == 0 | OK |
 | Accuracy | 100.0% | >= 85% | OK |
 | Cohen's kappa | 1.000 | >= 0.70 | OK |
-| Within score range | 10 / 10 | — | — |
-| Mean score delta | +0.031 | — | — |
+| Within score range | 9 / 10 | — | — |
+| Mean score delta | +0.024 | — | — |
 
-## pillar5-robustness-10 [FAIL]
+## pillar5-robustness-10 [PASS]
 
 | Metric | Value | Threshold | Status |
 |--------|-------|-----------|--------|
-| Entries evaluated | 10 | — | — |
+| Entries evaluated | 15 | — | — |
 | Evaluation failures | 0 | == 0 | OK |
-| Accuracy | 90.0% | >= 85% | OK |
-| Cohen's kappa | 0.000 | >= 0.70 | BELOW |
-| Within score range | 9 / 10 | — | — |
-| Mean score delta | -0.003 | — | — |
+| Accuracy | 93.3% | >= 85% | OK |
+| Cohen's kappa | 0.857 | >= 0.70 | OK |
+| Within score range | 14 / 15 | — | — |
+| Mean score delta | +0.015 | — | — |
 
 ## pillar6-gpai-5 [FAIL]
 
 | Metric | Value | Threshold | Status |
 |--------|-------|-----------|--------|
-| Entries evaluated | 5 | — | — |
+| Entries evaluated | 12 | — | — |
 | Evaluation failures | 0 | == 0 | OK |
-| Accuracy | 60.0% | >= 85% | BELOW |
-| Cohen's kappa | 0.286 | >= 0.70 | BELOW |
-| Within score range | 2 / 5 | — | — |
-| Mean score delta | -0.154 | — | — |
+| Accuracy | 75.0% | >= 85% | BELOW |
+| Cohen's kappa | 0.526 | >= 0.70 | BELOW |
+| Within score range | 6 / 12 | — | — |
+| Mean score delta | -0.153 | — | — |
 
