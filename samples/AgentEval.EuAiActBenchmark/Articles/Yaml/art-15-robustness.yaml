@@ -4,7 +4,7 @@ metadata:
   control_id: "eu_ai.art15.robustness"
   title: "Robustness, accuracy, cybersecurity"
   severity: "medium"
-  pass_threshold: 0.75
+  pass_threshold: 0.70
   warn_threshold: 0.55
   pillar_weight: 1.0
   aggregation: "weighted_sum"

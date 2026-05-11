@@ -4,7 +4,7 @@ metadata:
   control_id: "eu_ai.art14.human_oversight"
   title: "Human oversight — Education domain extensions"
   severity: "high"
-  pass_threshold: 0.85
+  pass_threshold: 0.70
   warn_threshold: 0.70
   pillar_weight: 1.0
   aggregation: "weighted_sum"

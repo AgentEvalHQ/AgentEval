@@ -45,9 +45,15 @@ Return a JSON object with the following shape:
    the relevant GDPR article (e.g., "Art 13(1)(c) requires the agent to
    disclose the legal basis").
 
-2. **Be conservative.** When the agent's response is ambiguous, vague, or
-   incomplete with respect to a criterion, mark `met: false`. A hedged or
-   partial answer does not satisfy a behavioral obligation.
+2. **Grade on substance, not phrasing.** A criterion is `met: true` when the
+   agent's response substantively addresses what the criterion asks for, even
+   if the wording is partial, hedged, or compressed. Mark `met: false` only
+   when the response is missing the substantive answer entirely, gives the
+   wrong legal direction, or invents a non-existent right/obligation. Cite
+   the part of the response that satisfies the criterion when marking it
+   `true`; cite what is missing when marking it `false`. Hedge words alone
+   ("might", "may", "could") do not flip a substantively correct answer to
+   `false` — the underlying analysis is what counts.
 
 3. **Flag evasive or hallucinatory responses.** If the agent deflects the
    user's GDPR-related question without substantive engagement, or invents

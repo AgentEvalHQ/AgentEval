@@ -1,6 +1,6 @@
 # EU AI Act Calibration Report
 
-Generated: 2026-05-11 17:45:25 UTC
+Generated: 2026-05-11 18:08:39 UTC
 
 Thresholds: accuracy >= 85%, Cohen's kappa >= 0.70
 
@@ -10,10 +10,10 @@ Thresholds: accuracy >= 85%, Cohen's kappa >= 0.70
 |--------|-------|-----------|--------|
 | Entries evaluated | 25 | — | — |
 | Evaluation failures | 0 | == 0 | OK |
-| Accuracy | 20.0% | >= 85% | BELOW |
-| Cohen's kappa | 0.000 | >= 0.70 | BELOW |
+| Accuracy | 36.0% | >= 85% | BELOW |
+| Cohen's kappa | 0.091 | >= 0.70 | BELOW |
 | Within score range | 10 / 25 | — | — |
-| Mean score delta | -0.223 | — | — |
+| Mean score delta | -0.213 | — | — |
 
 ## pillar2-transparency-15 [FAIL]
 
@@ -21,10 +21,10 @@ Thresholds: accuracy >= 85%, Cohen's kappa >= 0.70
 |--------|-------|-----------|--------|
 | Entries evaluated | 15 | — | — |
 | Evaluation failures | 0 | == 0 | OK |
-| Accuracy | 33.3% | >= 85% | BELOW |
-| Cohen's kappa | 0.051 | >= 0.70 | BELOW |
+| Accuracy | 53.3% | >= 85% | BELOW |
+| Cohen's kappa | 0.234 | >= 0.70 | BELOW |
 | Within score range | 4 / 15 | — | — |
-| Mean score delta | -0.213 | — | — |
+| Mean score delta | -0.218 | — | — |
 
 ## pillar3-oversight-15 [FAIL]
 
@@ -35,7 +35,7 @@ Thresholds: accuracy >= 85%, Cohen's kappa >= 0.70
 | Accuracy | 0.0% | >= 85% | BELOW |
 | Cohen's kappa | 0.000 | >= 0.70 | BELOW |
 | Within score range | 0 / 15 | — | — |
-| Mean score delta | -0.516 | — | — |
+| Mean score delta | -0.536 | — | — |
 
 ## pillar4-risktier-10 [FAIL]
 
@@ -43,10 +43,10 @@ Thresholds: accuracy >= 85%, Cohen's kappa >= 0.70
 |--------|-------|-----------|--------|
 | Entries evaluated | 10 | — | — |
 | Evaluation failures | 0 | == 0 | OK |
-| Accuracy | 20.0% | >= 85% | BELOW |
+| Accuracy | 40.0% | >= 85% | BELOW |
 | Cohen's kappa | 0.000 | >= 0.70 | BELOW |
-| Within score range | 2 / 10 | — | — |
-| Mean score delta | -0.334 | — | — |
+| Within score range | 3 / 10 | — | — |
+| Mean score delta | -0.331 | — | — |
 
 ## pillar5-robustness-10 [FAIL]
 
@@ -65,8 +65,8 @@ Thresholds: accuracy >= 85%, Cohen's kappa >= 0.70
 |--------|-------|-----------|--------|
 | Entries evaluated | 5 | — | — |
 | Evaluation failures | 0 | == 0 | OK |
-| Accuracy | 80.0% | >= 85% | BELOW |
-| Cohen's kappa | 0.545 | >= 0.70 | BELOW |
+| Accuracy | 60.0% | >= 85% | BELOW |
+| Cohen's kappa | 0.286 | >= 0.70 | BELOW |
 | Within score range | 1 / 5 | — | — |
 | Mean score delta | -0.200 | — | — |
 

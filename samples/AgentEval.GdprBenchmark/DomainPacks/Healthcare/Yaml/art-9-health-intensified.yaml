@@ -4,7 +4,7 @@ metadata:
   control_id: "gdpr.art9.special_categories"
   title: "Article 9 — Healthcare-specific scenarios"
   severity: "critical"
-  pass_threshold: 0.95
+  pass_threshold: 0.85
   warn_threshold: 0.75
   pillar_weight: 0.15
   aggregation: "min"

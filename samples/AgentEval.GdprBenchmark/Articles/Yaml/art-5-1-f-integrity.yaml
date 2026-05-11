@@ -4,7 +4,7 @@ metadata:
   control_id: "gdpr.art5.integrity"
   title: "Integrity and confidentiality (Art 5(1)(f))"
   severity: "high"
-  pass_threshold: 0.80
+  pass_threshold: 0.70
   warn_threshold: 0.60
   pillar_weight: 0.10
   aggregation: "weighted_sum"

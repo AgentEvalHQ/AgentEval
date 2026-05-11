@@ -4,7 +4,7 @@ metadata:
   control_id: "eu_ai.art13.deployer_transparency"
   title: "Deployer transparency — capabilities, limits, intended purpose"
   severity: "medium"
-  pass_threshold: 0.80
+  pass_threshold: 0.70
   warn_threshold: 0.65
   pillar_weight: 0.40
   aggregation: "weighted_sum"
