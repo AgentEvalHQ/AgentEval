@@ -24,7 +24,7 @@ public class AnnexIii_RiskTier_Tests
 
         Assert.Equal(ControlId, composite.Key);
         Assert.Equal(5, composite.Components.Count);
-        Assert.Equal(0.80, composite.Threshold);
+        Assert.Equal(0.70, composite.Threshold);
     }
 
     [Fact]

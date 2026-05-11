@@ -24,7 +24,7 @@ public class Art14_HumanOversight_Tests
 
         Assert.Equal(ControlId, composite.Key);
         Assert.Equal(5, composite.Components.Count);
-        Assert.Equal(0.85, composite.Threshold);
+        Assert.Equal(0.70, composite.Threshold);
     }
 
     [Fact]

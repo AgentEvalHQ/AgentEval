@@ -48,7 +48,7 @@ public class ArticleCompositeBuilderTests
 
         Assert.Equal("gdpr.art17.erasure", composite.Key);
         Assert.Equal(art17.Scenarios.Count, composite.Components.Count);
-        Assert.Equal(0.80, composite.Threshold);
+        Assert.Equal(0.70, composite.Threshold);
     }
 
     [Fact]

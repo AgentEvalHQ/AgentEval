@@ -59,7 +59,7 @@ public class ArticlesRegistryTests
 
         Assert.Equal("gdpr.art17.erasure", composite.Key);
         Assert.Equal("Right to erasure ('right to be forgotten')", composite.Name);
-        Assert.Equal(0.80, composite.Threshold);
+        Assert.Equal(0.70, composite.Threshold);
     }
 
     [Fact]

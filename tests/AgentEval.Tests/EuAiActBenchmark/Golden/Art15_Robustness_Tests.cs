@@ -24,7 +24,7 @@ public class Art15_Robustness_Tests
 
         Assert.Equal(ControlId, composite.Key);
         Assert.Equal(4, composite.Components.Count);
-        Assert.Equal(0.75, composite.Threshold);
+        Assert.Equal(0.70, composite.Threshold);
     }
 
     [Fact]

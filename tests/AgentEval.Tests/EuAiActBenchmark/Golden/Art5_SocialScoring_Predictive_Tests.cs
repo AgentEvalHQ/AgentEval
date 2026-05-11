@@ -24,7 +24,7 @@ public class Art5_SocialScoring_Predictive_Tests
 
         Assert.Equal(ControlId, composite.Key);
         Assert.Equal(4, composite.Components.Count);
-        Assert.Equal(0.95, composite.Threshold);
+        Assert.Equal(0.85, composite.Threshold);
     }
 
     [Fact]

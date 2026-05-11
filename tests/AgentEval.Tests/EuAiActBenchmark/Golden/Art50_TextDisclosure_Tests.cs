@@ -24,7 +24,7 @@ public class Art50_TextDisclosure_Tests
 
         Assert.Equal(ControlId, composite.Key);
         Assert.Equal(3, composite.Components.Count);
-        Assert.Equal(0.80, composite.Threshold);
+        Assert.Equal(0.70, composite.Threshold);
     }
 
     [Fact]

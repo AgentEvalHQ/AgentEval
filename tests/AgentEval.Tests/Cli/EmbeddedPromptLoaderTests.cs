@@ -27,7 +27,10 @@ public class EmbeddedPromptLoaderTests
         Assert.False(string.IsNullOrWhiteSpace(prompt),
             "EmbeddedPromptLoader returned empty string for the GDPR judge prompt.");
         Assert.Contains("Cite articles", prompt);
-        Assert.Contains("Be conservative", prompt);
+        // Calibration-tuning replaced the "Be conservative" rule with a
+        // "Grade on substance, not phrasing" rule to fix systematic
+        // mark-correct-as-fail behaviour on multi-criterion rubrics.
+        Assert.Contains("Grade on substance", prompt);
         Assert.Contains("Flag evasive", prompt);
     }
 
@@ -41,7 +44,11 @@ public class EmbeddedPromptLoaderTests
         Assert.False(string.IsNullOrWhiteSpace(prompt),
             "EmbeddedPromptLoader returned empty string for the EU AI Act judge prompt.");
         Assert.Contains("Cite articles", prompt);
-        Assert.Contains("Be conservative", prompt);
+        // For the EU AI Act prompt, "Be conservative on Art 5" remains strict
+        // for prohibited-practices articles, but the general-purpose rule
+        // ("Be conservative in general") was replaced with "Grade on substance".
+        Assert.Contains("Be conservative on Art 5", prompt);
+        Assert.Contains("Grade on substance", prompt);
         Assert.Contains("Flag evasive", prompt);
     }
 
