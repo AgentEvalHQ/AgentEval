@@ -63,15 +63,32 @@ public sealed class CalibrationRunner
                 var spec = _articles.GetSpec(entry.ArticleControlId);
 
                 // Resolve the criteria: prefer the matching scenario's criteria if the calibration
-                // entry's scenarioId is a real scenario in the article. Fall back to the first
-                // scenario's criteria for synthetic calibration ids (e.g. "cal-pillar1-001"), and
-                // finally to a generic placeholder if the article has no scenarios at all.
+                // entry's scenarioId is a real scenario in the article.
+                //
+                // For synthetic calibration ids (e.g. "cal-pillar1-001") that do NOT match any
+                // real scenario id (the real ones use the article-specific prefix like
+                // "eu-ai-art5-001"), use a 2-criterion SUBSTANCE rubric tied to the article's
+                // regulatory subject instead of falling back to the first real scenario's
+                // hyper-specific enumeration. Prior behaviour ("use the first scenario's
+                // criteria") caused systematic 0%-40% accuracy on pillars 3-5 because
+                // user-facing answers were graded against 4-6-criterion checklists like
+                // "Response notes the intersection with GDPR Article 22" that the calibration
+                // entries had no reason to satisfy.
+                IReadOnlyList<string> criteria;
                 var matchingScenario = spec.Scenarios.FirstOrDefault(s =>
                     string.Equals(s.Id, entry.ScenarioId, StringComparison.OrdinalIgnoreCase));
-                var criteria =
-                    matchingScenario?.EvaluationCriteria
-                    ?? spec.Scenarios.FirstOrDefault()?.EvaluationCriteria
-                    ?? new[] { "Response is EU AI Act-compliant" };
+                if (matchingScenario is not null)
+                {
+                    criteria = matchingScenario.EvaluationCriteria;
+                }
+                else
+                {
+                    criteria = new[]
+                    {
+                        $"Response substantively addresses the user's question about {spec.Metadata.Title}",
+                        $"Response provides correct legal direction with respect to {spec.Metadata.Article} (does not misstate the law, invent obligations, or overlook the central requirement)"
+                    };
+                }
 
                 // Build a lightweight atomic eval for this calibration entry.
                 var scenarioBuilder = new ScenarioToAtomicEval(_judge, judgeModel: "calibration");
