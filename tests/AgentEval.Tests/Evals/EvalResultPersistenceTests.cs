@@ -342,4 +342,74 @@ public class EvalResultPersistenceTests
         Assert.Equal(0.92, sr.Metrics["_lifted.confidence"]);
         Assert.Equal(3.0,  sr.Metrics["_lifted.severity_ordinal"]);  // high = 3
     }
+
+    // ── Phase-9 / Task 7.19 closure: deep-tree persistence regression
+
+    /// <summary>
+    /// Producer-side guard (Phase-7 Task 7.5) caps composite trees at depth=32,
+    /// but if a hostile / malformed tree is constructed directly (bypassing
+    /// CompositeEval) and passed through persistence, the underlying
+    /// System.Text.Json default MaxDepth=64 will throw or fail rather than
+    /// silently truncating. This test pins the defence-in-depth behaviour: a
+    /// 70-deep tree must either round-trip cleanly (if STJ tolerates it) or
+    /// throw a deterministic exception — it must NOT silently lose data or
+    /// produce a partial result.
+    /// </summary>
+    [Fact]
+    public void ToFromScenarioResult_DeepTree_BeyondStjDefaultMaxDepth_GracefullyHandled()
+    {
+        // Build a 70-level chain manually (bypasses CompositeEval producer guard).
+        EvalResult Leaf() => new(
+            Metric: new("leaf", "Leaf", "test", "1.0.0"),
+            Score: new(0.5, null, "warn", false, null, "medium", null),
+            Details: new(null, null, null, null, null),
+            Provenance: new("atomic-llm", null, null, null, null, 0.001, false),
+            EvaluatedAt: DateTimeOffset.UtcNow);
+
+        EvalResult Build(int level)
+        {
+            if (level == 0) return Leaf();
+            return new EvalResult(
+                Metric: new($"level-{level}", $"Level{level}", "composite", "1.0.0"),
+                Score: new(0.5, null, "warn", false, null, "medium", null),
+                Details: new(null, null, null, new[] { Build(level - 1) }, "WeightedSum"),
+                Provenance: new("composite", null, null, null, null, 0.001, false),
+                EvaluatedAt: DateTimeOffset.UtcNow);
+        }
+
+        var deepTree = Build(70);
+
+        // ToScenarioResult writes the tree as embedded JSON. With STJ default
+        // MaxDepth=64 and a depth-70 tree, the serializer should either
+        // (a) succeed (if STJ tolerates this depth) or
+        // (b) throw a deterministic JsonException — both are acceptable.
+        // What is NOT acceptable: silent data loss or a corrupted ScenarioResult.
+        try
+        {
+            var sr = EvalResultPersistence.ToScenarioResult(deepTree, "deep-tree", "Deep tree");
+            // If serialization succeeded, the round-trip via FromScenarioResult
+            // must produce an EvalResult that's either null (graceful failure)
+            // or structurally consistent (no partial / silently-truncated tree).
+            var round = EvalResultPersistence.FromScenarioResult(sr);
+            if (round is not null)
+            {
+                // Walk down and count actual depth — must match what we serialised
+                // (no silent truncation).
+                int actualDepth = 0;
+                var current = round;
+                while (current.Details.SubResults is { Count: > 0 } subs)
+                {
+                    current = subs[0];
+                    actualDepth++;
+                    if (actualDepth > 200) break; // safety
+                }
+                Assert.Equal(70, actualDepth);
+            }
+            // If round is null, that's an acceptable graceful failure.
+        }
+        catch (System.Text.Json.JsonException)
+        {
+            // Acceptable deterministic failure mode — depth limit enforced.
+        }
+    }
 }

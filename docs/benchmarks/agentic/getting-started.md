@@ -334,6 +334,9 @@ Each prompt file's header carries the source URL, pinned commit SHA at fork time
 - **Stochastic Stability requires multiple prior runs** — at least 2 `EvalResult` objects must be supplied via `EvalInput.Metadata["run_results"]`. The evaluator returns a skipped result when fewer than 2 results are available.
 - **English-only scenarios** — all built-in benchmark scenarios are authored in English. Multi-language scenario packs are deferred.
 - **Cost estimation is caller responsibility** — `AgenticTelemetry.EstimatedCostUsd` must be computed and supplied by the caller. If cost tracking is not implemented, `CostEval` scores 1.0 unconditionally (zero cost = within budget).
+- **Workflow-specific evaluators not in v1 (A5.3 deferred)** — evaluators that probe multi-agent workflow behavior (handoffs, parent-child task graphs, agent-to-agent message integrity) are deferred to a follow-up batch. They will live in `AgentEval.MAF` or a future `AgentEval.Evals.Workflow` package, not in `AgentEval.Evals.Agentic`.
+- **Foundry cross-calibration Pearson-correlation report not in v1 (A5.4 deferred)** — the `FoundryEquivalent` preset exposes the data path for cross-validating AgentEval evaluators against Microsoft Foundry's evaluator SDK on a shared dataset, but the Pearson-correlation report generator is deferred. The raw scoring path works today; the comparison / visualisation layer ships in a follow-up.
+- **Calibration coverage is 11 of 60 evaluators (v1.1 work)** — `agenteval bench agentic calibrate` currently dispatches against 11 evaluators (Plan-05 phases 1-3 + a slice of Plan-06). The remaining 49 evaluators have calibration goldens but no dispatch wiring yet; their entries are skipped into an `unknown` bucket in the calibration report (visible as `[SKIP]` rows). Wiring is tracked in `deferred-pending.md` entry 8.4 for v1.1.
 
 ---
 

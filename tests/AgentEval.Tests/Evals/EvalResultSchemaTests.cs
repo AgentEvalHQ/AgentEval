@@ -352,4 +352,105 @@ public class EvalResultSchemaTests
         var result = Evaluate(outOfRange);
         Assert.False(result.IsValid, "Schema must reject score.threshold > 1.");
     }
+
+    // ── Phase-9 / Task 7.18 closure: missing-required + wrong-type negative cases
+
+    [Fact]
+    public void Result_MissingRequiredMetric_FailsValidation()
+    {
+        // metric is a required top-level field; absence must be flagged at write time.
+        const string noMetric = """
+            {
+              "score": {
+                "value": 0.9, "label": "pass", "passed": true, "severity": "none"
+              },
+              "details": {},
+              "provenance": {
+                "type": "atomic-code", "estimatedCost": 0.0, "cacheHit": false
+              },
+              "evaluatedAt": "2026-05-12T10:00:00Z"
+            }
+            """;
+        var result = Evaluate(noMetric);
+        Assert.False(result.IsValid, "Schema must reject EvalResult missing the required 'metric' field.");
+    }
+
+    [Fact]
+    public void Result_MissingRequiredScore_FailsValidation()
+    {
+        const string noScore = """
+            {
+              "metric": { "key": "x", "name": "X", "category": "test", "version": "1.0.0" },
+              "details": {},
+              "provenance": {
+                "type": "atomic-code", "estimatedCost": 0.0, "cacheHit": false
+              },
+              "evaluatedAt": "2026-05-12T10:00:00Z"
+            }
+            """;
+        var result = Evaluate(noScore);
+        Assert.False(result.IsValid, "Schema must reject EvalResult missing the required 'score' field.");
+    }
+
+    [Fact]
+    public void Result_MissingRequiredEvaluatedAt_FailsValidation()
+    {
+        const string noTimestamp = """
+            {
+              "metric": { "key": "x", "name": "X", "category": "test", "version": "1.0.0" },
+              "score": { "value": 0.9, "label": "pass", "passed": true, "severity": "none" },
+              "details": {},
+              "provenance": {
+                "type": "atomic-code", "estimatedCost": 0.0, "cacheHit": false
+              }
+            }
+            """;
+        var result = Evaluate(noTimestamp);
+        Assert.False(result.IsValid, "Schema must reject EvalResult missing the required 'evaluatedAt' field.");
+    }
+
+    [Fact]
+    public void Result_ScoreValueWrongType_String_FailsValidation()
+    {
+        // score.value must be a number; a stringly-typed value should be rejected.
+        const string wrongType = """
+            {
+              "metric": { "key": "x", "name": "X", "category": "test", "version": "1.0.0" },
+              "score": {
+                "value": "0.9",
+                "label": "pass",
+                "passed": true,
+                "severity": "none"
+              },
+              "details": {},
+              "provenance": {
+                "type": "atomic-code", "estimatedCost": 0.0, "cacheHit": false
+              },
+              "evaluatedAt": "2026-05-12T10:00:00Z"
+            }
+            """;
+        var result = Evaluate(wrongType);
+        Assert.False(result.IsValid, "Schema must reject score.value as a string (must be number).");
+    }
+
+    [Fact]
+    public void Result_ProvenanceTypeWrongType_Number_FailsValidation()
+    {
+        // provenance.type must be a string from the enum; a number value should be rejected.
+        const string wrongType = """
+            {
+              "metric": { "key": "x", "name": "X", "category": "test", "version": "1.0.0" },
+              "score": { "value": 0.9, "label": "pass", "passed": true, "severity": "none" },
+              "details": {},
+              "provenance": {
+                "type": 42,
+                "estimatedCost": 0.0,
+                "cacheHit": false
+              },
+              "evaluatedAt": "2026-05-12T10:00:00Z"
+            }
+            """;
+        var result = Evaluate(wrongType);
+        Assert.False(result.IsValid, "Schema must reject provenance.type as a number (must be string from enum).");
+    }
 }
