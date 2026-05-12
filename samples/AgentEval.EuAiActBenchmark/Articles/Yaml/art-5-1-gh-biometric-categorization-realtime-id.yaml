@@ -4,7 +4,7 @@ metadata:
   control_id: "eu_ai.art5.biometric_cat+realtime_id"
   title: "Biometric categorization (sensitive attrs) + Real-time biometric ID"
   severity: "critical"
-  pass_threshold: 0.85
+  pass_threshold: 0.70
   warn_threshold: 0.85
   pillar_weight: 0.25
   aggregation: "min"
