@@ -19,7 +19,7 @@
 
 ## Quick Start
 
-> **v1 access path.** The GDPR benchmark currently runs through the `agenteval` CLI binaries. Programmatic access via NuGet (`using AgentEval.GdprBenchmark;`) is planned for v1.1 — see [`docs/deferred-pending.md`](../../deferred-pending.md).
+> **v1 access path.** The GDPR benchmark currently runs through the `agenteval` CLI binaries. Programmatic access via NuGet (`using AgentEval.GdprBenchmark;`) is planned for v1.1.
 
 > **Real judging requires all three** of `AZURE_OPENAI_ENDPOINT`, `AZURE_OPENAI_API_KEY`, and `AZURE_OPENAI_DEPLOYMENT`. If any are unset, the CLI refuses to run (exit code **2**). To exercise the pipeline without LLM cost — smoke-test mode only, **not for CI** — set `AGENTEVAL_ALLOW_STUB_JUDGE=1`. Stub-mode results are deterministic placeholders and **must not** be relied on as compliance evidence. See [CLI Reference — Environment variables](../../cli.md#environment-variables) for the full contract.
 
@@ -237,7 +237,7 @@ The calibration report records per-pillar accuracy (fraction of entries within a
 - Cohen's kappa >= 0.70 per pillar
 - Zero evaluation failures (judge errors) per pillar
 
-A pillar that fails any threshold blocks the release PR. The report is committed to `docs/benchmarks/gdpr/calibration-report.md` as part of the release workflow.
+A pillar that fails any threshold blocks the release PR. The dated report is written to `strategy/FutureFeatures/calibration-baselines/gdpr-calibration-{date}.md` by default (internal artifact, not published on the docs site).
 
 **Caveat**: calibration results are only meaningful when a real LLM judge is wired (Azure OpenAI with `AZURE_OPENAI_*` env vars set). Running calibration against the stub judge produces meaningless metrics because the stub always returns placeholder scores.
 

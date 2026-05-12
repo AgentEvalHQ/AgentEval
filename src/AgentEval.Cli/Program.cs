@@ -66,7 +66,7 @@ benchGdprCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =>
 
 // bench gdpr calibrate
 var calibrateRootOpt = new Option<string?>("--root") { Description = "Workspace root path (default: current directory)" };
-var calibrateOutOpt = new Option<string?>("--out") { Description = "Output Markdown report path (default: docs/benchmarks/gdpr/calibration-{date}.md)" };
+var calibrateOutOpt = new Option<string?>("--out") { Description = "Output Markdown report path (default: strategy/FutureFeatures/calibration-baselines/gdpr-calibration-{date}.md)" };
 var calibrateCmd = new Command("calibrate", "Run GDPR judge calibration against hand-labeled golden datasets");
 calibrateCmd.Add(calibrateRootOpt);
 calibrateCmd.Add(calibrateOutOpt);
@@ -111,7 +111,7 @@ benchEuAiActCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) 
 });
 // bench eu-ai-act calibrate
 var euCalibrateRootOpt = new Option<string?>("--root") { Description = "Workspace root path (default: current directory)" };
-var euCalibrateOutOpt = new Option<string?>("--out") { Description = "Output Markdown report path (default: docs/benchmarks/eu-ai-act/calibration-{date}.md)" };
+var euCalibrateOutOpt = new Option<string?>("--out") { Description = "Output Markdown report path (default: strategy/FutureFeatures/calibration-baselines/eu-ai-act-calibration-{date}.md)" };
 var euCalibrateCmd = new Command("calibrate", "Run EU AI Act judge calibration against hand-labeled golden datasets");
 euCalibrateCmd.Add(euCalibrateRootOpt);
 euCalibrateCmd.Add(euCalibrateOutOpt);
@@ -153,7 +153,7 @@ benchAgenticCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) 
 });
 // bench agentic calibrate
 var agenticCalibrateRootOpt = new Option<string?>("--root") { Description = "Workspace root path (default: current directory)" };
-var agenticCalibrateOutOpt = new Option<string?>("--out") { Description = "Output Markdown report path (default: docs/benchmarks/agentic/calibration-{date}.md)" };
+var agenticCalibrateOutOpt = new Option<string?>("--out") { Description = "Output Markdown report path (default: strategy/FutureFeatures/calibration-baselines/agentic-calibration-{date}.md)" };
 var agenticCalibrateCmd = new Command("calibrate", "Run agentic judge calibration against hand-labeled golden datasets");
 agenticCalibrateCmd.Add(agenticCalibrateRootOpt);
 agenticCalibrateCmd.Add(agenticCalibrateOutOpt);

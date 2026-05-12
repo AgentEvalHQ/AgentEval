@@ -140,7 +140,7 @@ Pure-code evaluator for cost-quality trade-off:
 
 ## v1 access path
 
-> The agentic 60-evaluator suite currently runs through the `agenteval` CLI binaries. Programmatic access to the individual evaluators via NuGet (`using AgentEval.Evals.Agentic;`) is planned for v1.1 — see [`docs/deferred-pending.md`](../../deferred-pending.md). Today the CLI co-locates the evaluator DLLs so `agenteval bench agentic --preset ...` runs without further setup.
+> The agentic 60-evaluator suite currently runs through the `agenteval` CLI binaries. Programmatic access to the individual evaluators via NuGet (`using AgentEval.Evals.Agentic;`) is planned for v1.1. Today the CLI co-locates the evaluator DLLs so `agenteval bench agentic --preset ...` runs without further setup.
 
 ---
 
@@ -312,7 +312,7 @@ The calibration report records per-category accuracy (fraction of entries within
 
 A category that fails any threshold blocks the release PR. Golden dataset files are located under `tests/AgentEval.Tests/Agentic/Calibration/Golden/` as JSONL files.
 
-The calibration report is written to `docs/benchmarks/agentic/calibration-{date}.md`.
+The calibration report is written to `strategy/FutureFeatures/calibration-baselines/agentic-calibration-{date}.md` by default (internal artifact, not published on the docs site).
 
 **Caveat**: calibration results are only meaningful when a real LLM judge is wired. Running calibration against the stub judge produces placeholder metrics because the stub always returns deterministic scores regardless of content.
 
@@ -336,7 +336,7 @@ Each prompt file's header carries the source URL, pinned commit SHA at fork time
 - **Cost estimation is caller responsibility** — `AgenticTelemetry.EstimatedCostUsd` must be computed and supplied by the caller. If cost tracking is not implemented, `CostEval` scores 1.0 unconditionally (zero cost = within budget).
 - **Workflow-specific evaluators not in v1 (A5.3 deferred)** — evaluators that probe multi-agent workflow behavior (handoffs, parent-child task graphs, agent-to-agent message integrity) are deferred to a follow-up batch. They will live in `AgentEval.MAF` or a future `AgentEval.Evals.Workflow` package, not in `AgentEval.Evals.Agentic`.
 - **Foundry cross-calibration Pearson-correlation report not in v1 (A5.4 deferred)** — the `FoundryEquivalent` preset exposes the data path for cross-validating AgentEval evaluators against Microsoft Foundry's evaluator SDK on a shared dataset, but the Pearson-correlation report generator is deferred. The raw scoring path works today; the comparison / visualisation layer ships in a follow-up.
-- **Calibration coverage is 11 of 60 evaluators (v1.1 work)** — `agenteval bench agentic calibrate` currently dispatches against 11 evaluators (Plan-05 phases 1-3 + a slice of Plan-06). The remaining 49 evaluators have calibration goldens but no dispatch wiring yet; their entries are skipped into an `unknown` bucket in the calibration report (visible as `[SKIP]` rows). Wiring is tracked in `deferred-pending.md` entry 8.4 for v1.1.
+- **Calibration coverage is 11 of 60 evaluators (v1.1 work)** — `agenteval bench agentic calibrate` currently dispatches against 11 evaluators (Plan-05 phases 1-3 + a slice of Plan-06). The remaining 49 evaluators run fine under `agenteval bench agentic` itself; they simply lack calibration-baseline measurement because the `calibrate` subcommand's dispatch table only wires the 11. Their goldens land in an `unknown` bucket (visible as `[SKIP]` rows). Wiring the remaining 49 is tracked as a v1.1 task.
 
 ---
 

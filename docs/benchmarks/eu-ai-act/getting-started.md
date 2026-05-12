@@ -48,7 +48,7 @@ The following are not in scope for any automated dialog benchmark:
 
 ## v1 access path
 
-> The EU AI Act benchmark currently runs through the `agenteval` CLI binaries. Programmatic access via NuGet (`using AgentEval.EuAiActBenchmark;`) is planned for v1.1 — see [`docs/deferred-pending.md`](../../deferred-pending.md).
+> The EU AI Act benchmark currently runs through the `agenteval` CLI binaries. Programmatic access via NuGet (`using AgentEval.EuAiActBenchmark;`) is planned for v1.1.
 
 ---
 

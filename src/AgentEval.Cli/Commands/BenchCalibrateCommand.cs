@@ -119,7 +119,7 @@ public static class BenchCalibrateCommand
         var dateStr = report.GeneratedAt.ToString("yyyy-MM-dd");
         var defaultOut = Path.Combine(
             rootOverride ?? Directory.GetCurrentDirectory(),
-            "docs", "benchmarks", "gdpr", $"calibration-{dateStr}.md");
+            "strategy", "FutureFeatures", "calibration-baselines", $"gdpr-calibration-{dateStr}.md");
         var outPath = outPathOverride ?? defaultOut;
 
         try

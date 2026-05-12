@@ -161,7 +161,7 @@ public static class BenchEuAiActCalibrateCommand
         var dateStr = report.GeneratedAt.ToString("yyyy-MM-dd");
         var defaultOut = Path.Combine(
             rootOverride ?? Directory.GetCurrentDirectory(),
-            "docs", "benchmarks", "eu-ai-act", $"calibration-{dateStr}.md");
+            "strategy", "FutureFeatures", "calibration-baselines", $"eu-ai-act-calibration-{dateStr}.md");
         var outPath = outPathOverride ?? defaultOut;
 
         try

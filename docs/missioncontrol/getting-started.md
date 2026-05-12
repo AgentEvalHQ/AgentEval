@@ -181,7 +181,7 @@ REST stays for binary streams because GraphQL doesn't do streams cleanly. See [`
 | Mode | When to use | Setup |
 |---|---|---|
 | **A — Local viewer** | Solo dev / single-team, single repo | `agenteval mc serve` (or `dotnet run --project src/AgentEval.MissionControl`). The default `--workspace` is the current directory; pass `--workspace <path>` to point at a different repo's `.agenteval/`. |
-| **B — Multi-workspace aggregator** | Platform engineer / AI lead reviewing multiple repos on one host | Phase 2 (target v1.5). Phase 1 reads exactly one `.agenteval/` per process; aggregation across multiple workspaces is deferred. See [`docs/deferred-pending.md`](../deferred-pending.md). |
+| **B — Multi-workspace aggregator** | Platform engineer / AI lead reviewing multiple repos on one host | Phase 2 (target v1.5). Phase 1 reads exactly one `.agenteval/` per process; aggregation across multiple workspaces is deferred. |
 | **C — Self-hosted server** | Org-wide collaboration with auth + multi-tenant + sync | Phase 2 (target v1.5) |
 
 ---

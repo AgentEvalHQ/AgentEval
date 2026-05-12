@@ -77,8 +77,6 @@
     items:
     - name: Getting Started
       href: benchmarks/gdpr/getting-started.md
-    - name: Calibration Report
-      href: benchmarks/gdpr/calibration-report.md
 
 - name: Mission Control
   items:
@@ -113,8 +111,6 @@
     href: architecture.md
   - name: The .agenteval Workspace
     href: agenteval-workspace.md
-  - name: Deferred & Pending Items
-    href: deferred-pending.md
   - name: Building Documentation
     href: building-docs.md
   - name: Extensibility

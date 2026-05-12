@@ -533,7 +533,7 @@ agenteval bench gdpr --preset smoke --subject MyAgent
 agenteval mc serve
 ```
 
-> **v1 NuGet scope.** The `AgentEval` package currently ships `AgentEval.{Abstractions,Core,DataLoaders,MAF,RedTeam}`. The agentic 60-evaluator suite, GDPR/EU AI Act benchmark code, and memory evaluation pack live alongside the `agenteval` CLI but are not yet exposed as programmatic NuGet APIs — they are runnable today via the CLI binaries. See [`docs/deferred-pending.md`](docs/deferred-pending.md) for the v1.1 plan to surface them as separate packages.
+> **v1 NuGet scope.** The `AgentEval` package currently ships `AgentEval.{Abstractions,Core,DataLoaders,MAF,RedTeam}`. The agentic 60-evaluator suite, GDPR/EU AI Act benchmark code, and memory evaluation pack live alongside the `agenteval` CLI but are not yet exposed as programmatic NuGet APIs — they are runnable today via the CLI binaries. Surfacing them as separate packages is on the v1.1 roadmap.
 
 **Supported Frameworks:** .NET 8.0, 9.0, 10.0
 
