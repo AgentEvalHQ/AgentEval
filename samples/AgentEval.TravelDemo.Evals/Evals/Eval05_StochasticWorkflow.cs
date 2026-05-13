@@ -51,7 +51,8 @@ public static class Eval05_StochasticWorkflow
 
         var input = "Plan a 7-day trip visiting both Tokyo and Cologne. " +
                     "I need city information, flights between them, " +
-                    "and hotel bookings for each city.";
+                    "and hotel bookings for each city. " +
+                    "I live in Zurich, leaving from this city and returning to it.";
 
         Console.WriteLine($"  Criteria ({TravelEvalCriteria.Stochastic.Length} top-3 discriminating):");
         for (int i = 0; i < TravelEvalCriteria.Stochastic.Length; i++)

@@ -40,7 +40,8 @@ public static class Demo02_TripPlannerWorkflow
         // ── 2. Define the request ─────────────────────────────────────────────
         var request = "Plan a 7-day trip visiting both Tokyo and Cologne. " +
                       "I need city information, flights between them, " +
-                      "and hotel bookings for each city.";
+                      "and hotel bookings for each city. " +
+                      "I live in Zurich, leaving from this city and returning to it.";
 
         Console.WriteLine($"  Request: \"{request}\"\n");
         Console.WriteLine("  ⏳ Executing workflow — this may take a minute...\n");
