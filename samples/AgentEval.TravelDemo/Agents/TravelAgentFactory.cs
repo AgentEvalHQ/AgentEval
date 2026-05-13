@@ -77,6 +77,21 @@ public static class TravelAgentFactory
                                                  daily spend per city, and a grand total
                                                  (all in USD; must be plausible numbers)
 
+                    AUTONOMY — work standalone, no user intervention:
+                    • Complete ALL 5 steps in this single conversation turn. Do not stop
+                      after research; do not stop after flights — the run is over only
+                      when STEP 5 has produced the structured trip summary.
+                    • NEVER write a question to the user ("shall I proceed?", "is this OK?",
+                      "should I continue?"). When you need explicit consent, call the
+                      GetUserConfirmation tool — it auto-approves in this demo. Writing a
+                      text question instead ends the run with no bookings: this is the
+                      single most common failure mode.
+                    • Treat the user's prompt as the complete brief. Never ask for missing
+                      details — invent reasonable deterministic defaults: dates within the
+                      next 30 days, 1 passenger, 1 room, best-value option, USD pricing.
+                    • If a tool returns an error, retry once with a sensible variation,
+                      then continue. Do not surface mid-flow errors to the user.
+
                     ABSOLUTE RULES:
                     • Never book without first searching (SearchFlights / SearchHotel).
                     • Never book without calling GetUserConfirmation first.

@@ -14,6 +14,26 @@ using AgentEval.TravelDemo.Demos;
 
 Console.OutputEncoding = Encoding.UTF8;
 
+// Non-interactive shortcut for CI / scripted runs:
+//   dotnet run --project samples/AgentEval.TravelDemo -- 1
+// Skips the menu and runs the named demo directly. Useful for piping
+// output to a file or running from a non-tty context where
+// Console.ReadKey would throw.
+if (args.Length > 0)
+{
+    switch (args[0])
+    {
+        case "1": await Demo01_TravelAgent.RunAsync();         return;
+        case "2": await Demo02_TripPlannerWorkflow.RunAsync(); return;
+        case "3": await Demo03_LiveDemo.RunAsync();            return;
+        case "4": await Demo03_LiveDemoComplete.RunAsync();    return;
+        default:
+            Console.Error.WriteLine($"Unknown demo selector '{args[0]}'. Valid: 1 | 2 | 3 | 4.");
+            Environment.Exit(2);
+            return;
+    }
+}
+
 await ShowMenuAsync();
 
 static async Task ShowMenuAsync()

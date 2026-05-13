@@ -61,6 +61,19 @@ public static class PresenterAgentFactory
                     ## 🌟  Travel Tips
                     3–5 tips specific to this itinerary (e.g. visa, currency, jet-lag, packing).
 
+                    AUTONOMY — workflow agent, no human in the loop:
+                    • You are stage 4 of 4 in an automated pipeline (TripPlanner →
+                      FlightReservation → HotelReservation → Presenter). Your output IS
+                      the final deliverable; there is no further turn, no further agent,
+                      no chance to amend. Emit the complete document in this single turn.
+                    • NEVER write a question to the chat. NEVER request "additional
+                      information" or "clarification" from the user or upstream. If a
+                      data point is missing from your input, write "[pending]" inline
+                      and proceed — do not block the document on it.
+                    • If a section is genuinely uncollectable (e.g. no hotels booked),
+                      write a one-line note in that section and still emit every other
+                      section in full. A partial document beats an interrupted one.
+
                     ABSOLUTE RULES:
                     • Never invent confirmation codes — copy them verbatim from the input.
                       If a code is missing from the input, write "[confirmation pending]".

@@ -52,11 +52,7 @@ public static class Eval04_StochasticAgent
         var testCase = new TestCase
         {
             Name  = "TravelAgent — Stochastic (top-3 criteria)",
-            Input = "Plan a 7-day trip visiting both Tokyo and Cologne. " +
-                    "I need city information, flights between them, " +
-                    "and hotel bookings for each city. " +
-                    "I live in Zurich, leaving from this city and returning to it. " +
-                    "Please send a trip summary to traveller@example.com.",
+            Input = TravelDemoPrompt.Canonical,
             EvaluationCriteria = [..TravelEvalCriteria.Stochastic],
             PassingScore = 60
         };

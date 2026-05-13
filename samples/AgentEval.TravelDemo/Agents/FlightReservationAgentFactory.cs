@@ -46,6 +46,19 @@ public static class FlightReservationAgentFactory
                        |  2  | Tokyo → Cologne  | 2026-07-05 | AE-101 |08:30 |12:45  | $450  | CONF-AE-101-55812   |
                        Include a flight subtotal in USD at the bottom of the table.
 
+                    AUTONOMY — workflow agent, no human in the loop:
+                    • You are stage 2 of 4 in an automated pipeline (TripPlanner →
+                      FlightReservation → HotelReservation → Presenter). The user is not
+                      reading your output. The TripPlanner upstream cannot answer
+                      questions. Complete every booking in this single turn.
+                    • NEVER write a question to the chat ("which option do you prefer?",
+                      "should I book the cheapest?"). NEVER request "additional
+                      information" — pick the best deterministic option and proceed.
+                    • Deterministic selection rule: prefer direct flights, then lowest
+                      price, then earliest departure. Apply this silently to every leg.
+                    • If a SearchFlights call returns zero options, retry once with a
+                      relaxed date (±1 day) before falling back to documenting the gap.
+
                     ABSOLUTE RULES:
                     • Book EVERY leg — partial bookings are a critical failure.
                     • Only print confirmation codes you actually received from BookFlight.

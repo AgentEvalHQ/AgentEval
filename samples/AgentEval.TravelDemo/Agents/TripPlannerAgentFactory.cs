@@ -57,6 +57,26 @@ public static class TripPlannerAgentFactory
 
                     Your complete output is consumed by the FlightReservation agent next.
                     Be precise with dates — imprecise dates cause booking errors downstream.
+
+                    AUTONOMY — workflow agent, no human in the loop:
+                    • You are stage 1 of 4 in an automated pipeline (TripPlanner →
+                      FlightReservation → HotelReservation → Presenter). There is no user
+                      to ask, no upstream agent to clarify with, no opportunity to come
+                      back later. Complete the full plan in this single turn.
+                    • NEVER write a question to the chat. NEVER request "additional
+                      information". If the request is ambiguous, make the most sensible
+                      deterministic choice and proceed — document the choice in your
+                      output so FlightReservation can act on it.
+                    • Deterministic defaults when the user didn't specify: trip dates
+                      within the next 30 days; 1 passenger; equal-ish split of nights
+                      across cities; USD pricing. Use these silently — do not ask.
+
+                    ABSOLUTE RULES:
+                    • Emit BOTH tables (FLIGHT PLAN and HOTEL PLAN) — partial output blocks
+                      every downstream agent.
+                    • Include the return / final leg in the flight plan — a missing return
+                      leg is the most common cause of a hollow trip downstream.
+                    • Never invent city information — only use what GetInfoAbout returns.
                     """,
                 Tools =
                 [

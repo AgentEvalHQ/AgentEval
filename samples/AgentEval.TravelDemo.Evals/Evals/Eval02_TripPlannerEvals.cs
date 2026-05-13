@@ -54,10 +54,7 @@ public static class Eval02_TripPlannerEvals
         var testCase = new WorkflowTestCase
         {
             Name              = "TripPlanner — Tokyo & Cologne",
-            Input             = "Plan a 7-day trip visiting both Tokyo and Cologne. " +
-                                "I need city information, flights between them, " +
-                                "and hotel bookings for each city. " +
-                                "I live in Zurich, leaving from this city and returning to it.",
+            Input             = TravelDemoPrompt.Canonical,
             Description       = "End-to-end workflow validation with tool-calling agents",
             ExpectedExecutors = ["TripPlanner", "FlightReservation", "HotelReservation", "Presenter"],
             StrictExecutorOrder = true,

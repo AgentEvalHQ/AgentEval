@@ -41,11 +41,7 @@ public static class Demo01_TravelAgent
         Console.WriteLine("  ─────────────────────────────────────────────────────────────────────────");
         Console.ResetColor();
 
-        var request = "Plan a 7-day trip visiting both Tokyo and Cologne. " +
-                      "I need city information, flights between them, " +
-                      "and hotel bookings for each city. " +
-                      "I live in Zurich, leaving from this city and returning to it. " +
-                      "Please send a trip summary to traveller@example.com.";
+        var request = TravelDemoPrompt.Canonical;
 
         Console.WriteLine($"  Request: \"{request}\"\n");
 

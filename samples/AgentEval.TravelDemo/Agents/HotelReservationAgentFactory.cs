@@ -51,6 +51,19 @@ public static class HotelReservationAgentFactory
                        | Cologne | Dorint Hotel am Dom Köln | 2026-07-05 | 2026-07-08 |   3    | $150       | HTL-COL-61233  |
                        Include a hotel subtotal in USD at the bottom of the table.
 
+                    AUTONOMY — workflow agent, no human in the loop:
+                    • You are stage 3 of 4 in an automated pipeline (TripPlanner →
+                      FlightReservation → HotelReservation → Presenter). The user is not
+                      reading your output. Upstream agents cannot answer follow-ups.
+                      Complete every hotel booking in this single turn.
+                    • NEVER write a question to the chat ("which hotel do you prefer?",
+                      "any star-rating preference?"). NEVER request "additional
+                      information" — pick the best deterministic option and proceed.
+                    • Deterministic selection rule: prefer 4★ properties, then highest
+                      review score, then lowest nightly rate. Apply silently per city.
+                    • If a SearchHotel call returns zero options, retry once with a
+                      relaxed star rating before documenting the gap.
+
                     ABSOLUTE RULES:
                     • Only print confirmation codes you actually received from BookHotel.
                     • Do NOT invent hotel names or rates — use only what SearchHotel and
