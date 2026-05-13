@@ -88,7 +88,13 @@ public sealed class FileSystemLayout
     {
         if (string.IsNullOrWhiteSpace(name))
             throw new ArgumentException("Name cannot be null/empty/whitespace.", nameof(name));
-        var invalid = Path.GetInvalidFileNameChars().Concat(new[] { '/', '\\' }).ToArray();
+        // Windows superset of invalid filename chars — Linux's
+        // Path.GetInvalidFileNameChars() returns only {'\0','/'}, so a colon
+        // (or '<>"|?*') sails through on Linux despite being illegal on
+        // Windows/macOS resource forks. Harden cross-platform.
+        var invalid = Path.GetInvalidFileNameChars()
+            .Concat(new[] { '/', '\\', '<', '>', ':', '"', '|', '?', '*' })
+            .ToArray();
         var rewrote = string.Concat(name.Select(c => invalid.Contains(c) ? '-' : c));
         var trimmed = rewrote.Trim('.', ' ');
         if (string.IsNullOrEmpty(trimmed))

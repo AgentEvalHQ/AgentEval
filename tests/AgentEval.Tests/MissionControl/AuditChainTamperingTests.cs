@@ -34,7 +34,8 @@ public class AuditChainTamperingTests
     [Fact]
     public async Task ComplianceMatrix_TamperedManifestHash_FlipsAllChainsValidToFalse()
     {
-        const string evidenceClaimedHash = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+        // Fixture hash strings; not credentials.
+        const string evidenceClaimedHash = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"; // DevSkim: ignore DS173237
         const string actualManifestHash  = "TAMPERED_HASH_DOES_NOT_MATCH_THE_EVIDENCE_RECORDED_HASH";
 
         var (subject, manifest, evidence) =

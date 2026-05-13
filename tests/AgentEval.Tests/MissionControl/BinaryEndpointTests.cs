@@ -253,7 +253,7 @@ public class FileSystemLayoutPathSafetyTests
     [InlineData("foo‎bar")]    // U+200E LTR mark
     [InlineData("foo‮bar")]    // U+202E RTL override
     [InlineData("foo​bar")]    // U+200B zero-width space
-    // Length cap (256 chars).
+    // Length cap (256 chars). DevSkim: ignore DS173237 (long test string, not a credential)
     [InlineData("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")]
     public void IsSafePathSegment_RejectsHostileInput(string input)
     {

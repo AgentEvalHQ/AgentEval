@@ -49,6 +49,14 @@ jobs:
       with:
         directory-to-scan: .
         output-filename: devskim-results.sarif
+        # Exclude generated / scenario / strategy content from DevSkim:
+        # - samples/.../Articles/Yaml: scenario content intentionally names
+        #   weak hash algorithms (MD5/SHA-1) as the prohibited input the agent
+        #   must refuse — not code that uses them.
+        # - node_modules + docs/_site: generated content.
+        # - strategy/: internal-only planning + calibration-baseline reports.
+        # Real source code under src/ and tests/ remains scanned.
+        ignore-globs: "**/samples/**/Articles/Yaml/**,**/node_modules/**,**/_site/**,**/strategy/**"
 
     - name: Upload DevSkim scan results to GitHub Security tab
       if: always()
