@@ -3,6 +3,9 @@
 - name: Home
   href: index.md
 
+- name: Roadmap
+  href: roadmap.md
+
 - name: Getting Started
   items:
   - name: Installation

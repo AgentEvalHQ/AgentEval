@@ -86,8 +86,7 @@ public class GdprBenchmarkRunnerTests
 
         // ContentHash should be non-trivial (not all zeros — CompleteRunAsync computes a real hash)
         Assert.NotNull(runManifestFromStore!.ContentHash);
-        // DevSkim: ignore DS173237 (fixture sentinel string, not a credential)
-        Assert.DoesNotContain("0000000000000000000000000000000000000000000000000000000000000000",
+        Assert.DoesNotContain("0000000000000000000000000000000000000000000000000000000000000000",  // DevSkim: ignore DS173237
             runManifestFromStore.ContentHash);
 
         // Verify 2 scenarios were written
