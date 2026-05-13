@@ -120,6 +120,9 @@ public static class BenchAgenticCommand
 
         // ── Run benchmark ────────────────────────────────────────────────────
         var store = new FileSystemOutputStore(agentEvalDir);
+        // Workspace hygiene: sweep stale 24h+ sentinels. Phase-0 0.9: only
+        // CLI writer paths sweep; MC (read-only viewer) does not.
+        await store.SweepStaleSentinelsAsync(TimeSpan.FromHours(24));
         var subjectIdentity = new SubjectIdentity(SubjectKind.Agent, subject);
 
         Console.WriteLine($"Running agentic benchmark ({preset}) for subject '{subject}'...");

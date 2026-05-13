@@ -49,19 +49,40 @@ public sealed class FileSystemOutputStore : IOutputStore
         _jsonl.NewLine = "\n";
 #endif
 
-        // Best-effort sweep of stale sentinels left behind by killed processes:
-        // `.invalid.json` siblings written when a schema-validate-before-write
-        // failed (task 3.7), and `.lock` sentinels orphaned by EnsureSubjectAsync
-        // (task 3.5). Anything older than 24h is fair game. Swallow IO errors —
-        // a clean store ctor must never block on cleanup of advisory artefacts.
-        try { TrySweepStaleSentinels(_layout.Root); }
-        catch { /* intentional swallow */ }
+        // Phase-0 security 0.9 (2026-05-13): stale-sentinel sweep was previously
+        // invoked from this constructor unconditionally. That violated the
+        // "read-only viewer" contract of Mission Control (plan-07 §1 +
+        // docs/missioncontrol/getting-started.md), which constructs this store
+        // at startup but must never mutate the workspace. Sweep is now an
+        // explicit public method (`SweepStaleSentinelsAsync`) that ONLY the
+        // CLI writer entry points (bench / init / migrate) call.
     }
 
-    private static void TrySweepStaleSentinels(string root)
+    /// <summary>
+    /// Best-effort sweep of stale sentinels left behind by killed processes:
+    /// <c>*.invalid.json</c> siblings written when a schema-validate-before-write
+    /// failed, and <c>*.lock</c> / <c>*.tmp</c> sentinels orphaned mid-write.
+    /// Files older than <paramref name="olderThan"/> are deleted; IO errors
+    /// (held files, permission denials) are swallowed by design — workspace
+    /// hygiene must never block a benchmark run.
+    /// </summary>
+    /// <remarks>
+    /// Callers: <b>only</b> CLI writer commands (`agenteval init` / `bench …`
+    /// / `migrate`). Read-only consumers (Mission Control) MUST NOT call this
+    /// — the method exists outside the ctor specifically to keep the
+    /// read-only-viewer contract intact (Phase-0 security 0.9).
+    /// </remarks>
+    public Task SweepStaleSentinelsAsync(TimeSpan olderThan, CancellationToken ct = default)
+    {
+        try { TrySweepStaleSentinels(_layout.Root, olderThan); }
+        catch { /* intentional swallow — see remarks */ }
+        return Task.CompletedTask;
+    }
+
+    private static void TrySweepStaleSentinels(string root, TimeSpan olderThan)
     {
         if (!Directory.Exists(root)) return;
-        var cutoff = DateTimeOffset.UtcNow.AddHours(-24);
+        var cutoff = DateTimeOffset.UtcNow - olderThan;
         foreach (var pattern in new[] { "*.invalid.json", "*.lock", "*.tmp" })
         {
             foreach (var file in Directory.EnumerateFiles(root, pattern, SearchOption.AllDirectories))

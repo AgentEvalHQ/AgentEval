@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security — Mission Control portal audit findings (Phase-0 close, 2026-05-13)
+
+Three findings from the in-depth Mission Control portal security audit (2026-05-13). 0 P0 blockers were found; the three items below are P1 hardening that the audit recommended landing before merge to `main`.
+
+- **`Query.complianceEvidence` now enforces the per-doc audit chain (plan-07 §7).** The resolver previously returned the evidence document blind to whether `evidence.SourceRun.ManifestHash` still matched the actual `RunManifest.ContentHash`. The aggregated `ComplianceMatrix` already enforced the check; this resolver now mirrors it. New return shape `ComplianceEvidenceWithChain { evidence, chainValid, chainBreakReason }` — `chainBreakReason` is `null` (valid), `"source-run-not-found"` (orphaned evidence), or `"hash-mismatch"` (tamper signal). The SPA's evidence-detail page now renders a red "Audit chain broken" banner + a `valid` / `broken` shield badge in the Audit-chain section. (Breaking schema change to the `complianceEvidence` GraphQL field; SPA query updated in this PR.)
+- **`FileSystemOutputStore` constructor no longer sweeps stale sentinels.** The 24h+ sweep of `*.invalid.json` / `*.lock` / `*.tmp` files moved out of the constructor into a new explicit `SweepStaleSentinelsAsync(TimeSpan olderThan)` method. CLI writer entry points (`bench gdpr` / `bench eu-ai-act` / `bench agentic`) call sweep after constructing the store; Mission Control (read-only viewer per plan-07 §1) does not. Closes the previous contract violation where MC startup silently deleted files outside Docker.
+- **`Dockerfile` `docker run` example bound to `127.0.0.1`.** The comment example at `Dockerfile:13` previously showed `-p 5000:5000`, which publishes the unauthenticated portal on all host interfaces. Now shows `-p 127.0.0.1:5000:5000` (matching `docker-compose.yml`) with an explicit `# SECURITY:` note explaining when LAN exposure is acceptable.
+
 ### Changed (BREAKING) — audit-chain hash format
 
 The `ContentHasher` now binds the **canonical-serialised manifest** (with `contentHash` zeroed) into the hash domain, in addition to summary + scenarios + traces. Three consequences:

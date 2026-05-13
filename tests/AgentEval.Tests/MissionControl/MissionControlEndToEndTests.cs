@@ -585,6 +585,8 @@ public class MissionControlEndToEndTests : IClassFixture<EndToEndFixture>
         var ev = _fixture.Manifest.EvidenceRefs.First(e => e.Regulation == "gdpr");
 
         using var client = _fixture.CreateClient();
+        // Phase-0 0.8: the resolver now returns a `ComplianceEvidenceWithChain`
+        // wrapper carrying `chainValid` + `chainBreakReason` + nested `evidence`.
         var resp = await client.PostAsJsonAsync("/graphql", new
         {
             query = $$"""
@@ -595,17 +597,28 @@ public class MissionControlEndToEndTests : IClassFixture<EndToEndFixture>
                     subjectName: "{{ev.Subject.Name}}",
                     timestamp: "{{ev.Timestamp}}"
                   ) {
-                    regulation
-                    sourceRun { runId manifestHash }
-                    summary { controlsTotal overallStatus }
+                    chainValid
+                    chainBreakReason
+                    evidence {
+                      regulation
+                      sourceRun { runId manifestHash }
+                      summary { controlsTotal overallStatus }
+                    }
                   }
                 }
                 """
         });
         resp.EnsureSuccessStatusCode();
         using var doc = JsonDocument.Parse(await resp.Content.ReadAsStringAsync());
-        var e = doc.RootElement.GetProperty("data").GetProperty("complianceEvidence");
-        Assert.NotEqual(JsonValueKind.Null, e.ValueKind);
+        var wrapper = doc.RootElement.GetProperty("data").GetProperty("complianceEvidence");
+        Assert.NotEqual(JsonValueKind.Null, wrapper.ValueKind);
+        // The seeded fixture should produce a valid audit chain (no tamper applied).
+        Assert.True(wrapper.GetProperty("chainValid").GetBoolean(),
+            "Seeded fixture must produce a valid audit chain — chainBreakReason: "
+            + (wrapper.GetProperty("chainBreakReason").ValueKind == JsonValueKind.Null
+                ? "null"
+                : wrapper.GetProperty("chainBreakReason").GetString()));
+        var e = wrapper.GetProperty("evidence");
         Assert.Equal(ev.Regulation, e.GetProperty("regulation").GetString());
         Assert.Equal(ev.SourceRunId, e.GetProperty("sourceRun").GetProperty("runId").GetString());
     }

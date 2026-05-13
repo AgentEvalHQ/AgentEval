@@ -1,6 +1,6 @@
 import { Link, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, ExternalLink } from "lucide-react";
+import { ArrowLeft, ExternalLink, ShieldAlert, ShieldCheck } from "lucide-react";
 import { gqlRequest } from "@/lib/graphql-client";
 import { restUrls } from "@/lib/rest-client";
 import { queryKeys } from "@/lib/keys";
@@ -10,42 +10,52 @@ import { formatDate, formatDateTime } from "@/lib/format";
 // Plan-08 Wave 7 (MC1.6.8): per-evidence detail page reachable from the
 // compliance matrix. Renders the full evidence (controls + summary +
 // attestation + audit-chain badge) and links to the source PDF / source run.
+//
+// Phase-0 security 0.8 (2026-05-13): the resolver now wraps the evidence in
+// a `complianceEvidenceWithChain` shape that exposes `chainValid` +
+// `chainBreakReason`. The detail page renders a visible warning badge when
+// the per-doc audit chain is broken (source-run-not-found or hash-mismatch).
 
 type CellStatus = "pass" | "warn" | "fail";
+type ChainBreakReason = "source-run-not-found" | "hash-mismatch";
 
 interface EvidenceDetailResponse {
   complianceEvidence: {
-    schemaVersion: string;
-    regulation: string;
-    subject: {
-      kind: "AGENT" | "WORKFLOW";
-      name: string;
-    };
-    generatedAt: string;
-    sourceRun: {
-      runId: string;
-      manifestHash: string;
-    };
-    summary: {
-      controlsTotal: number;
-      passed: number;
-      warnings: number;
-      failed: number;
-      overallStatus: CellStatus;
-    };
-    controls: {
-      id: string;
-      title: string;
-      status: CellStatus;
-      passRate: number;
-      notes: string | null;
-      regressedFromBaseline: boolean | null;
-    }[];
-    attestation: {
-      agentEvalVersion: string;
-      configurationId: string | null;
-      evaluator: string;
-      evaluatorModel: string;
+    chainValid: boolean;
+    chainBreakReason: ChainBreakReason | null;
+    evidence: {
+      schemaVersion: string;
+      regulation: string;
+      subject: {
+        kind: "AGENT" | "WORKFLOW";
+        name: string;
+      };
+      generatedAt: string;
+      sourceRun: {
+        runId: string;
+        manifestHash: string;
+      };
+      summary: {
+        controlsTotal: number;
+        passed: number;
+        warnings: number;
+        failed: number;
+        overallStatus: CellStatus;
+      };
+      controls: {
+        id: string;
+        title: string;
+        status: CellStatus;
+        passRate: number;
+        notes: string | null;
+        regressedFromBaseline: boolean | null;
+      }[];
+      attestation: {
+        agentEvalVersion: string;
+        configurationId: string | null;
+        evaluator: string;
+        evaluatorModel: string;
+      };
     };
   } | null;
 }
@@ -53,24 +63,35 @@ interface EvidenceDetailResponse {
 const EVIDENCE_QUERY = /* GraphQL */ `
   query EvidenceDetail($regulation: String!, $kind: SubjectKind!, $name: String!, $ts: String!) {
     complianceEvidence(regulation: $regulation, subjectKind: $kind, subjectName: $name, timestamp: $ts) {
-      schemaVersion
-      regulation
-      subject { kind name }
-      generatedAt
-      sourceRun { runId manifestHash }
-      summary { controlsTotal passed warnings failed overallStatus }
-      controls {
-        id
-        title
-        status
-        passRate
-        notes
-        regressedFromBaseline
+      chainValid
+      chainBreakReason
+      evidence {
+        schemaVersion
+        regulation
+        subject { kind name }
+        generatedAt
+        sourceRun { runId manifestHash }
+        summary { controlsTotal passed warnings failed overallStatus }
+        controls {
+          id
+          title
+          status
+          passRate
+          notes
+          regressedFromBaseline
+        }
+        attestation { agentEvalVersion configurationId evaluator evaluatorModel }
       }
-      attestation { agentEvalVersion configurationId evaluator evaluatorModel }
     }
   }
 `;
+
+const CHAIN_BREAK_MESSAGE: Record<ChainBreakReason, string> = {
+  "source-run-not-found":
+    "The source run referenced by this evidence is missing from the workspace. The evidence may be orphaned or the run was deleted after attestation.",
+  "hash-mismatch":
+    "The source run's content hash does not match the value recorded in this evidence. The run body has been modified after attestation — treat the evidence as untrusted until verified.",
+};
 
 const STATUS_TONE: Record<CellStatus, string> = {
   pass: "bg-green-100 text-green-800",
@@ -109,8 +130,8 @@ export function EvidenceDetailPage() {
       errorPrefix="Failed to load evidence"
     >
       {(d) => {
-        const ev = d.complianceEvidence;
-        if (!ev) {
+        const wrapper = d.complianceEvidence;
+        if (!wrapper) {
           return (
             <div>
               <BackLink regulation={regulation} subjectName={name} />
@@ -124,9 +145,28 @@ export function EvidenceDetailPage() {
             </div>
           );
         }
+        const ev = wrapper.evidence;
+        const chainBroken = !wrapper.chainValid;
         return (
           <div className="space-y-6">
             <BackLink regulation={regulation} subjectName={name} />
+
+            {chainBroken && wrapper.chainBreakReason && (
+              <div
+                role="alert"
+                className="rounded-lg border border-red-300 bg-red-50 p-4 flex items-start gap-3"
+              >
+                <ShieldAlert className="text-red-600 shrink-0 mt-0.5" size={20} aria-hidden="true" />
+                <div>
+                  <h3 className="text-sm font-semibold text-red-900">
+                    Audit chain broken ({wrapper.chainBreakReason})
+                  </h3>
+                  <p className="text-sm text-red-800 mt-1">
+                    {CHAIN_BREAK_MESSAGE[wrapper.chainBreakReason]}
+                  </p>
+                </div>
+              </div>
+            )}
 
             <header className="flex items-start justify-between gap-4">
               <div>
@@ -212,9 +252,22 @@ export function EvidenceDetailPage() {
             </section>
 
             <section className="rounded-lg border border-slate-200 bg-white p-4">
-              <h3 className="text-sm font-semibold text-slate-700 mb-2">
-                Audit chain
-              </h3>
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-sm font-semibold text-slate-700">
+                  Audit chain
+                </h3>
+                {chainBroken ? (
+                  <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded bg-red-100 text-red-800">
+                    <ShieldAlert size={12} aria-hidden="true" />
+                    broken
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded bg-green-100 text-green-800">
+                    <ShieldCheck size={12} aria-hidden="true" />
+                    valid
+                  </span>
+                )}
+              </div>
               <dl className="grid grid-cols-2 gap-x-6 gap-y-1 text-sm">
                 <DT label="Source run" value={ev.sourceRun.runId} mono />
                 <DT label="Manifest hash" value={ev.sourceRun.manifestHash.slice(0, 16) + "…"} mono />

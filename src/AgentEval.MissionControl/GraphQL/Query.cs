@@ -285,11 +285,27 @@ public sealed class Query
         service.BuildMatrixAsync(regulation, ct);
 
     /// <summary>
-    /// Returns a single compliance evidence document (base shape only — regulation-
-    /// specific wrappers like <c>GdprComplianceEvidence</c> arrive in a follow-up
-    /// once the GraphQL interface + inline-fragment support per plan-07 §8.3 lands).
+    /// Returns a single compliance evidence document together with its per-doc
+    /// audit-chain verdict. Plan-07 §7 requires every evidence read to enforce
+    /// that <c>evidence.SourceRun.ManifestHash</c> matches the actual source
+    /// <c>RunManifest.ContentHash</c>; this resolver makes the verdict explicit
+    /// so the SPA can surface a tampering warning on the evidence-detail page.
+    /// (Regulation-specific wrappers like <c>GdprComplianceEvidence</c> arrive
+    /// in a follow-up once the GraphQL interface + inline-fragment support per
+    /// plan-07 §8.3 lands.)
     /// </summary>
-    public async Task<ComplianceEvidence?> ComplianceEvidence(
+    /// <remarks>
+    /// <c>ChainBreakReason</c> values:
+    /// <list type="bullet">
+    ///   <item><c>null</c> — chain valid; the stored manifest hash matches the recomputed source-run content hash.</item>
+    ///   <item><c>"source-run-not-found"</c> — evidence references a run that no longer exists under <c>runs/&lt;run-id&gt;/manifest.json</c>.</item>
+    ///   <item><c>"hash-mismatch"</c> — the source run exists, but its <c>ContentHash</c> differs from <c>evidence.SourceRun.ManifestHash</c> (tamper signal).</item>
+    /// </list>
+    /// The resolver returns the evidence WITH the broken-chain bit set rather
+    /// than throwing or returning <c>null</c>, so the SPA can render a visible
+    /// warning instead of silently failing.
+    /// </remarks>
+    public async Task<ComplianceEvidenceWithChain?> ComplianceEvidence(
         [Service] IOutputStoreReader store,
         string regulation,
         SubjectKind subjectKind,
@@ -302,7 +318,22 @@ public sealed class Query
         if (!FileSystemLayout.IsSafePathSegment(subjectName)) return null;
         if (!FileSystemLayout.IsSafePathSegment(timestamp)) return null;
         var identity = new SubjectIdentity(subjectKind, subjectName);
-        return await store.GetComplianceEvidenceAsync(regulation, identity, timestamp, ct);
+        var evidence = await store.GetComplianceEvidenceAsync(regulation, identity, timestamp, ct);
+        if (evidence is null) return null;
+
+        // Per-doc audit-chain check (plan-07 §7). Mirrors the verdict
+        // ComplianceMatrixService.BuildMatrixAsync already computes for the
+        // aggregated matrix, surfaced here per-document so the evidence-detail
+        // page can render a visible tampering warning.
+        var manifest = await store.GetRunManifestAsync(evidence.SourceRun.RunId, ct);
+        string? breakReason = manifest switch
+        {
+            null => "source-run-not-found",
+            _ when !string.Equals(manifest.ContentHash, evidence.SourceRun.ManifestHash, StringComparison.Ordinal)
+                => "hash-mismatch",
+            _ => null,
+        };
+        return new ComplianceEvidenceWithChain(evidence, breakReason is null, breakReason);
     }
 
     // ─── Cost-tier breakdown (MC1.4.3) ───────────────────────────────────────

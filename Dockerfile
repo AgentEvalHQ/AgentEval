@@ -10,8 +10,14 @@
 #   3. runtime — minimal ASP.NET runtime, single-port (5000) bind, non-root user.
 #
 # Build:  docker build -t agenteval/mc:latest .
-# Run:    docker run --rm -p 5000:5000 -v $(pwd)/.agenteval:/workspace/.agenteval:ro agenteval/mc:latest
+# Run:    docker run --rm -p 127.0.0.1:5000:5000 -v $(pwd)/.agenteval:/workspace/.agenteval:ro agenteval/mc:latest
 # Browse: http://localhost:5000
+#
+# SECURITY: the `-p 127.0.0.1:5000:5000` prefix is intentional — Mission
+# Control is unauthenticated (Phase 1 / Mode A trusts the operator). Binding
+# to the loopback interface keeps the portal off the LAN. Use `-p
+# 0.0.0.0:5000:5000` only when you intentionally want LAN exposure AND have
+# put an authenticating reverse proxy in front.
 
 # ─── Stage 1: SPA build ───────────────────────────────────────────────────────
 FROM node:22-alpine AS spa

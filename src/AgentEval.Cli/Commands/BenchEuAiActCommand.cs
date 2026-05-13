@@ -126,6 +126,9 @@ public static class BenchEuAiActCommand
 
         // ── Run benchmark ────────────────────────────────────────────────────
         var store = new FileSystemOutputStore(agentEvalDir);
+        // Workspace hygiene: sweep stale 24h+ sentinels (.invalid.json / .lock
+        // / .tmp). Phase-0 0.9: only CLI writer paths sweep; MC does not.
+        await store.SweepStaleSentinelsAsync(TimeSpan.FromHours(24));
         var subjectIdentity = new SubjectIdentity(SubjectKind.Agent, subject);
 
         Console.WriteLine($"Running EU AI Act benchmark ({preset}) for subject '{subject}'...");

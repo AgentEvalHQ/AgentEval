@@ -594,20 +594,23 @@ public class GraphQLReadResolversTests : IClassFixture<SeededMissionControlFacto
         Assert.False(string.IsNullOrEmpty(lastAt));
 
         // Re-format to the on-disk timestamp shape (the InMemoryOutputStore mirrors that).
+        // Phase-0 0.8: the resolver now returns a `ComplianceEvidenceWithChain`
+        // wrapper carrying `chainValid` + `chainBreakReason` + nested `evidence`.
         var ts = DateTimeOffset.Parse(lastAt!).ToString("yyyy-MM-dd_HH-mm-ss");
         var evResp = await client.PostAsJsonAsync("/graphql", new
         {
-            query = $"{{ complianceEvidence(regulation: \"gdpr\", subjectKind: AGENT, subjectName: \"TravelAgent\", timestamp: \"{ts}\") {{ regulation summary {{ overallStatus controlsTotal }} }} }}"
+            query = $"{{ complianceEvidence(regulation: \"gdpr\", subjectKind: AGENT, subjectName: \"TravelAgent\", timestamp: \"{ts}\") {{ chainValid chainBreakReason evidence {{ regulation summary {{ overallStatus controlsTotal }} }} }} }}"
         });
         evResp.EnsureSuccessStatusCode();
 
         var body = await evResp.Content.ReadAsStringAsync();
         using var doc = JsonDocument.Parse(body);
-        var evidence = doc.RootElement.GetProperty("data").GetProperty("complianceEvidence");
+        var wrapper = doc.RootElement.GetProperty("data").GetProperty("complianceEvidence");
 
-        // The evidence may or may not match exactly because of timestamp-format rounding; just
-        // check the resolver shape works (returns Object or Null) and doesn't throw.
-        Assert.True(evidence.ValueKind == JsonValueKind.Object || evidence.ValueKind == JsonValueKind.Null);
+        // Wrapper may be null (no evidence at the exact timestamp due to format
+        // rounding) or an object. Shape-check only — the per-doc audit-chain
+        // contract is exercised in ComplianceEvidenceAuditChainResolverTests.
+        Assert.True(wrapper.ValueKind == JsonValueKind.Object || wrapper.ValueKind == JsonValueKind.Null);
     }
 
     // ─── Per-evaluator timeline (Wave 8b / MC1.6.9) ──────────────────────────
