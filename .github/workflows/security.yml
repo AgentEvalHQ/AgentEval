@@ -70,7 +70,7 @@ jobs:
         #   intentional (PDF rendering, code-vuln eval scanner).
         # - DS176209 suspicious comment: TODO/HACK markers are normal dev
         #   markers, tracked separately in the planning docs.
-        ignore-rules-list: "DS137138,DS162092,DS172412,DS176209"
+        exclude-rules: "DS137138,DS162092,DS172412,DS176209"
 
     - name: Upload DevSkim scan results to GitHub Security tab
       if: always()
