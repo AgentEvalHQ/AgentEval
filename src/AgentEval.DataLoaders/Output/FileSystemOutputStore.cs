@@ -67,10 +67,15 @@ public sealed class FileSystemOutputStore : IOutputStore
     /// hygiene must never block a benchmark run.
     /// </summary>
     /// <remarks>
-    /// Callers: <b>only</b> CLI writer commands (`agenteval init` / `bench …`
-    /// / `migrate`). Read-only consumers (Mission Control) MUST NOT call this
-    /// — the method exists outside the ctor specifically to keep the
-    /// read-only-viewer contract intact (Phase-0 security 0.9).
+    /// Callers: the three CLI bench writer commands (`bench gdpr` /
+    /// `bench eu-ai-act` / `bench agentic`) call sweep after constructing the
+    /// store, since they are the entry points that legitimately create the
+    /// `*.lock` / `*.tmp` sentinels in the first place. `agenteval init` and
+    /// `agenteval migrate` do not call this — they don't currently construct
+    /// <see cref="FileSystemOutputStore"/> directly. Read-only consumers
+    /// (Mission Control) MUST NOT call this — the method exists outside the
+    /// ctor specifically to keep the read-only-viewer contract intact
+    /// (Phase-0 security 0.9).
     /// </remarks>
     public Task SweepStaleSentinelsAsync(TimeSpan olderThan, CancellationToken ct = default)
     {

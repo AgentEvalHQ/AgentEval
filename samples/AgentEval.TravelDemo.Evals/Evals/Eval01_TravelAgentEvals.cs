@@ -55,6 +55,7 @@ public static class Eval01_TravelAgentEvals
             Input = "Plan a 7-day trip visiting both Tokyo and Cologne. " +
                     "I need city information, flights between them, " +
                     "and hotel bookings for each city. " +
+                    "I live in Zurich, leaving from this city and returning to it. " +            
                     "Please send a trip summary to traveller@example.com.",
             ExpectedTools          = ["GetInfoAbout", "SearchFlights", "SearchHotel",
                                       "BookFlight", "BookHotel", "SendConfirmation"],

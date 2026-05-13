@@ -325,6 +325,19 @@ public sealed class Query
         // ComplianceMatrixService.BuildMatrixAsync already computes for the
         // aggregated matrix, surfaced here per-document so the evidence-detail
         // page can render a visible tampering warning.
+        //
+        // Defense-in-depth: `evidence.SourceRun.RunId` is read from the
+        // workspace's own evidence.json. A hostile workspace could ship a
+        // path-traversal payload (e.g. `../../../etc/passwd`) hoping
+        // `GetRunManifestAsync` reads outside the workspace. The store layer
+        // does its own scoping, but a path-segment guard here closes the
+        // theoretical hole at the resolver boundary too (Phase-0 gap-review
+        // concern #2 / 2026-05-13). If the segment is unsafe, treat it as
+        // source-run-not-found rather than throwing — same UX as the
+        // legitimately-orphaned-evidence case.
+        if (!FileSystemLayout.IsSafePathSegment(evidence.SourceRun.RunId))
+            return new ComplianceEvidenceWithChain(evidence, ChainValid: false, ChainBreakReason: "source-run-not-found");
+
         var manifest = await store.GetRunManifestAsync(evidence.SourceRun.RunId, ct);
         string? breakReason = manifest switch
         {
