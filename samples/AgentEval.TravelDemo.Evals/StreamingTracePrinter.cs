@@ -19,11 +19,17 @@ namespace AgentEval.TravelDemo.Evals;
 /// </list>
 /// <remarks>
 /// <para>
-/// Centralised here so every TravelDemo.Evals eval that uses the streaming
-/// surface (today: Eval01) shares an identical, copy-paste-free trace shape.
-/// Eval02 (workflow path) uses <c>WorkflowEvaluationHarness</c> which has no
-/// streaming surface today — those evals get verbose-mode harness output
-/// instead of the callbacks below.
+/// Lives in <c>AgentEval.TravelDemo.Evals</c> (not <c>AgentEval.TravelDemo</c>)
+/// because it depends on <c>AgentEval.Core</c> + <c>AgentEval.Models</c>, and
+/// the sibling <c>AgentEval.TravelDemo</c> project is intentionally a
+/// pure-MAF demo with no AgentEval dependencies (per its
+/// <c>Program.cs</c> banner).
+/// </para>
+/// <para>
+/// Today this is consumed by <c>Eval01_TravelAgentEvals</c> via
+/// <c>MAFEvaluationHarness.RunEvaluationStreamingAsync</c>. Eval02 uses
+/// <c>WorkflowEvaluationHarness</c> which has no streaming surface — those
+/// evals get verbose-mode harness output instead.
 /// </para>
 /// <para>
 /// The text-chunk callback uses <c>Console.Write</c> (no newline) so the
@@ -41,7 +47,6 @@ public static class StreamingTracePrinter
     /// </summary>
     public static StreamingOptions Create()
     {
-        var firstTokenStopwatch = System.Diagnostics.Stopwatch.StartNew();
         var lastMetricsUpdateAt = DateTimeOffset.UtcNow;
 
         return new StreamingOptions
@@ -104,11 +109,6 @@ public static class StreamingTracePrinter
                 Console.ResetColor();
             }
         };
-
-        // Keep the firstTokenStopwatch reference alive across closures even
-        // though we don't read it after init — the harness invokes the
-        // OnFirstToken callback with the TTFT it measured internally.
-        _ = firstTokenStopwatch;
     }
 
     private static string FormatArguments(IDictionary<string, object?>? args)

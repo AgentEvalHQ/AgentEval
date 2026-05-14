@@ -104,14 +104,62 @@ public class ComplianceEvidenceAuditChainResolverTests
         Assert.Equal(ValidHash, result.Evidence.SourceRun.ManifestHash);
     }
 
-    private static AuditChainResolverReader BuildReader(
-        string manifestHash,
-        string evidenceClaimedHash,
-        bool withholdManifest = false)
+    [Theory]
+    [InlineData("../../../etc/passwd")]
+    [InlineData("..\\..\\..\\Windows\\System32\\config\\sam")]
+    [InlineData("a/b/c")]
+    [InlineData(".")]
+    [InlineData("..")]
+    public async Task ComplianceEvidence_UnsafeRunId_ReturnsSourceRunNotFound(string hostileRunId)
     {
+        // Defense-in-depth: a hostile or tampered workspace can ship an
+        // evidence.json whose `sourceRun.runId` is a path-traversal payload.
+        // The resolver MUST short-circuit via `IsSafePathSegment` before the
+        // value reaches `store.GetRunManifestAsync` (which calls TryLocate...
+        // / Path.Combine internally). Without this guard, a malicious
+        // workspace could exfiltrate manifests from outside the workspace
+        // root. Pins the security guard at Query.cs lines 338-339
+        // (Phase-0 gap-review concern #2, commit 6dbc5b4).
+        //
+        // The resolver returns the evidence WITH ChainBreakReason set rather
+        // than throwing — same UX shape as the legitimately-orphaned case so
+        // the SPA renders the broken-chain banner uniformly.
         var subject = new SubjectIdentity(SubjectKind.Agent, "TestAgent");
+        var manifest = BuildManifest(ValidHash);
+        var evidence = new ComplianceEvidence(
+            SchemaVersion: "1.0",
+            Regulation: Regulation,
+            Subject: subject,
+            GeneratedAt: DateTimeOffset.UtcNow,
+            // Hostile RunId — this MUST be rejected by IsSafePathSegment before
+            // it reaches store.GetRunManifestAsync.
+            SourceRun: new SourceRunRef(hostileRunId, ValidHash),
+            Controls: new[]
+            {
+                new EvidenceControl("ctrl-1", "Test", "pass", 1.0, Array.Empty<string>(), Notes: null),
+            },
+            Summary: new EvidenceSummary(1, 1, 0, 0, "pass"),
+            Attestation: new Attestation("1.0", null, "stub", "stub"));
 
-        var manifest = new RunManifest(
+        var reader = new AuditChainResolverReader(subject, manifest, evidence, withholdManifest: false);
+        var query = new Query();
+
+        var result = await query.ComplianceEvidence(
+            reader, Regulation, SubjectKind.Agent, "TestAgent", Timestamp);
+
+        // Guard must trip — evidence still returned, but flagged broken.
+        Assert.NotNull(result);
+        Assert.False(result!.ChainValid,
+            $"Guard regression: RunId '{hostileRunId}' was accepted by IsSafePathSegment.");
+        Assert.Equal("source-run-not-found", result.ChainBreakReason);
+        // The hostile RunId must NOT appear in the returned shape's SourceRun;
+        // the evidence payload is passed through as-is for inspection, but the
+        // chain-break reason makes the broken state explicit.
+        Assert.NotNull(result.Evidence);
+    }
+
+    private static RunManifest BuildManifest(string manifestHash) =>
+        new(
             SchemaVersion: "1.0",
             Solution: new SolutionRef(Guid.Empty, "test", null),
             Subject: new SubjectRef(SubjectKind.Agent, "TestAgent", "1.0", null, null, null, null),
@@ -132,6 +180,13 @@ public class ComplianceEvidenceAuditChainResolverTests
             Environment: new EnvRef("machine", "os", "10.0", false, null, null),
             ContentHash: manifestHash);
 
+    private static AuditChainResolverReader BuildReader(
+        string manifestHash,
+        string evidenceClaimedHash,
+        bool withholdManifest = false)
+    {
+        var subject  = new SubjectIdentity(SubjectKind.Agent, "TestAgent");
+        var manifest = BuildManifest(manifestHash);
         var evidence = new ComplianceEvidence(
             SchemaVersion: "1.0",
             Regulation: Regulation,

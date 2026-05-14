@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 ECS2026 Demo
 
-using System.ComponentModel.Design;
 using AgentEval.Assertions;
 using AgentEval.Core;
 using AgentEval.MAF;
