@@ -15,7 +15,7 @@
 | **02** | Composite Evaluations | ✅ shipped | Recursive `IEval` model, atomic + composite primitives, 7 aggregations, depth cap, DI |
 | **03** | GDPR Compliance Benchmark | ✅ shipped (5/5 pillars PASS calibration) — Pillar 6 governance probes deferred to v1.1 | 21 article YAMLs, 5 pillars, evidence + PDF reporter, calibration suite |
 | **04** | EU AI Act Compliance Benchmark | ✅ shipped (6/6 pillars PASS calibration with 2 documented threshold overrides) — Art 9/10 awareness probes deferred to v1.1 | EU AI Act articles + pillars; honest scope for GPAI / admin obligations |
-| **05** | Foundry-equivalent Agentic Suite | ✅ shipped (60 evaluators) — calibration coverage is 11 of 60; remaining 49 deferred to v1.1 | 60 agentic evaluators across 8 categories, FoundryEquivalent preset for cross-validation |
+| **05** | Foundry-equivalent Agentic Suite | ✅ shipped (60 evaluators) — calibration coverage is 11 of 60 dispatched; 26 more have goldens but await dispatch wiring (v1.1) | 60 agentic evaluators across 8 categories; relationship to upstream Foundry is prompt-provenance-only (cited per-file) |
 | **06** | Memory / Multi-turn / Reasoning / UX | ✅ shipped | Memory recall, multi-turn coherence, reasoning, UX evaluators wired into the 60-suite |
 | **07** | Mission Control — Design | ✅ design-doc | Phase-1 viewer + Phase-2 server architecture; identity, audit, ingestion contracts |
 | **08** | Mission Control — Phase 1 implementation | ✅ shipped | ASP.NET host, Hot Chocolate GraphQL, binary REST endpoints, React 19 + Vite 6 SPA, single-binary deployment, Docker image, `agenteval mc serve / doctor`, first-run landing |
@@ -80,7 +80,7 @@
 **Highlights**:
 - **8 categories**: Process (tool-call accuracy, tool selection, intent resolution), System (task completion, task adherence), RAG quality (groundedness, relevance, coherence, fluency, similarity, response-completeness, F1), Safety (12 evaluators incl. violence, sexual, protected material, hate speech, ungrounded attributes, indirect attack, code vulnerability, unsafe tool use), Reasoning, UX, Adversarial, Memory.
 - **EvaluatorCard registry**: 59 cards (one per evaluator) carry display metadata, cost tier, calibration status — drives the Mission Control SPA's Evaluators page.
-- **`FoundryEquivalent` preset**: cross-validation entry point against Microsoft Foundry's evaluator SDK on a shared dataset.
+- **Prompt provenance**: each forked judge prompt cites its public MIT-licensed Foundry source in the file header (commit SHA pinned, modifications enumerated). A Pearson-correlation cross-validation report generator (A5.4) is deferred to v1.1.
 - **Deferred to v1.1**: calibration coverage for the **other 49 evaluators** (each needs ~30 min of golden authoring + a dispatch-table entry; 24 h total).
 - **Deferred indefinitely**: A5.3 workflow-specific evaluators (stays in `AgentEval.MAF`), A5.4 Foundry Pearson-correlation report generator (data path ships; report is value-additive without ask), `AdjudicatedMultiJudgeWrapper` kappa-of-1 real fix (data-dependent), 60-card category drift audit (38/60 — cosmetic).
 

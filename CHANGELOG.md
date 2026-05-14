@@ -119,7 +119,7 @@ Mission Control is the visualisation, aggregation, and governance layer on top o
   - `Query.scenarios(runId)`, `Query.scenario(runId, scenarioId)`.
   - `Query.scenarioTree(runId, scenarioId)` — **recursive `EvalResult` walked in one round-trip** (the central architectural justification for choosing GraphQL over REST on the read path).
   - `Query.compliance`, `Query.complianceMatrix(regulation)` — the killer-feature compliance dashboard backend, with audit-chain validation per cell. `Query.complianceEvidence(...)`.
-  - `Query.evaluators(category?, costTier?)`, `Query.evaluator(key)` — driven by 59 hand-authored + generated `EvaluatorCard` JSON files (full coverage of every shipped evaluator).
+  - `Query.evaluators(category?, costTier?)`, `Query.evaluator(key)` — driven by 60 hand-authored + generated `EvaluatorCard` JSON files (full coverage of every shipped evaluator).
 - **`EvaluatorCard` primitive** — schema-driven UI metadata per evaluator. Drop a JSON file at `src/AgentEval.Evals.Agentic/EvaluatorCards/<key>.json` and it appears in `Query.evaluators` immediately, no code change. `evaluator-card.schema.json` v1.0 in `AgentEval.DataLoaders`. Lock-down tests verify schema validation, tier-match against `EvaluatorCostMap`, source-path resolution, no duplicate keys.
 - **5 REST binary endpoints**: `GET /api/v1/runs/{runId}/trace`, `/reports/{format}`, `GET /api/v1/compliance/{reg}/{subject}/{ts}/report.pdf`, `GET /api/v1/compliance/{regulation}/schema`, `GET /api/v1/subjects/{kind}/{name}/history` (NDJSON stream).
 - **`GET /api/v1/version`** — server metadata for diagnostics.
