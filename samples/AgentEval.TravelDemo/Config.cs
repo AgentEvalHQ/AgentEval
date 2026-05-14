@@ -37,6 +37,34 @@ public static class Config
     /// </remarks>
     public const string PreferredDeployment = "gpt-5-mini";
 
+    /// <summary>
+    /// Programmatic model override. When non-null, takes precedence over BOTH
+    /// the <c>AZURE_OPENAI_DEPLOYMENT</c> env var AND <see cref="PreferredDeployment"/>.
+    /// Set at the top of <c>Program.cs</c> (or before a demo's <c>RunAsync</c>)
+    /// to pin a specific deployment for an entire process without juggling
+    /// shell env vars across runs.
+    /// </summary>
+    /// <example>
+    /// <code>
+    /// // Force gpt-4o-mini for the whole demo session:
+    /// Config.ModelOverride = "gpt-4o-mini";
+    /// await Demo01_TravelAgent.RunAsync();
+    /// </code>
+    /// </example>
+    public static string? ModelOverride { get; set; }
+
+    /// <summary>
+    /// Convenience setter for <see cref="ModelOverride"/>. Returns the previous
+    /// override value so callers can restore it (useful inside a <c>try/finally</c>
+    /// when only one demo should use a different model).
+    /// </summary>
+    public static string? UseModel(string? deployment)
+    {
+        var prev = ModelOverride;
+        ModelOverride = deployment;
+        return prev;
+    }
+
     private static readonly Lazy<(Uri Endpoint, AzureKeyCredential Key)?> _credentials = new(() =>
     {
         var endpoint = Environment.GetEnvironmentVariable("AZURE_OPENAI_ENDPOINT");
@@ -64,15 +92,19 @@ public static class Config
         ?? throw new InvalidOperationException("AZURE_OPENAI_API_KEY is not set.");
 
     /// <summary>
-    /// Resolved model deployment name. Uses <c>AZURE_OPENAI_DEPLOYMENT</c>
-    /// when set; otherwise falls back to <see cref="PreferredDeployment"/>
-    /// (<c>gpt-5-mini</c>). The env-var still wins so existing setups don't
-    /// silently change behaviour.
+    /// Resolved model deployment name. Resolution order (first non-empty wins):
+    /// <list type="number">
+    ///   <item><see cref="ModelOverride"/> — programmatic override.</item>
+    ///   <item><c>AZURE_OPENAI_DEPLOYMENT</c> env var.</item>
+    ///   <item><see cref="PreferredDeployment"/> — built-in default (<c>gpt-5-mini</c>).</item>
+    /// </list>
     /// </summary>
     public static string Model =>
-        Environment.GetEnvironmentVariable("AZURE_OPENAI_DEPLOYMENT") is { Length: > 0 } env
-            ? env
-            : PreferredDeployment;
+        !string.IsNullOrEmpty(ModelOverride)
+            ? ModelOverride
+            : Environment.GetEnvironmentVariable("AZURE_OPENAI_DEPLOYMENT") is { Length: > 0 } env
+                ? env
+                : PreferredDeployment;
 
     /// <summary>
     /// Prints a "Azure target" header block to the console showing the
@@ -92,9 +124,11 @@ public static class Config
         var key      = Environment.GetEnvironmentVariable("AZURE_OPENAI_API_KEY");
         var envDep   = Environment.GetEnvironmentVariable("AZURE_OPENAI_DEPLOYMENT");
         var resolved = Model;
-        var source   = string.IsNullOrEmpty(envDep)
-            ? $"default ({PreferredDeployment})"
-            : "AZURE_OPENAI_DEPLOYMENT";
+
+        string source;
+        if (!string.IsNullOrEmpty(ModelOverride))         source = "Config.ModelOverride (code)";
+        else if (!string.IsNullOrEmpty(envDep))           source = "AZURE_OPENAI_DEPLOYMENT (env)";
+        else                                              source = $"default ({PreferredDeployment})";
 
         Console.ForegroundColor = ConsoleColor.DarkCyan;
         Console.WriteLine("  ─── Azure target ────────────────────────────────────────────────────");
