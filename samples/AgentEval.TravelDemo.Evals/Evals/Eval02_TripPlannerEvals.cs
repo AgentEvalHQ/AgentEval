@@ -66,11 +66,23 @@ public static class Eval02_TripPlannerEvals
         Console.WriteLine($"  Running: \"{testCase.Name}\"\n");
         Console.WriteLine("  ⏳ This may take up to 2 minutes (4 LLM calls with tools)...\n");
 
-        var harness     = new WorkflowEvaluationHarness(verbose: false);
+        // Workflow path — WorkflowEvaluationHarness has no StreamingOptions
+        // surface today (unlike MAFEvaluationHarness used in Eval01), so the
+        // closest equivalent is verbose mode on both the ctor and the test
+        // options, plus CaptureTelemetry so per-executor timing + tool calls
+        // show up in the result. Per-stage progress will print to the
+        // console as the workflow advances.
+        Console.WriteLine();
+        Console.ForegroundColor = ConsoleColor.DarkCyan;
+        Console.WriteLine("  ─── Live trace (verbose workflow harness) ──────────────────────────");
+        Console.ResetColor();
+
+        var harness     = new WorkflowEvaluationHarness(verbose: true);
         var testOptions = new WorkflowTestOptions
         {
-            Timeout = TimeSpan.FromMinutes(5),
-            Verbose = false
+            Timeout          = TimeSpan.FromMinutes(5),
+            Verbose          = true,
+            CaptureTelemetry = true
         };
 
         WorkflowTestResult testResult;
@@ -85,6 +97,10 @@ public static class Eval02_TripPlannerEvals
             Console.ResetColor();
             return;
         }
+
+        Console.ForegroundColor = ConsoleColor.DarkCyan;
+        Console.WriteLine("  ─── End of live trace ───────────────────────────────────────────────");
+        Console.ResetColor();
 
         // ── Print rich ASCII summary ───────────────────────────────────────────
         EvalPrinter.PrintWorkflowResult(

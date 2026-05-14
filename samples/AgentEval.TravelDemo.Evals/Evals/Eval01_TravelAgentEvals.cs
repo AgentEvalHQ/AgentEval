@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 ECS2026 Demo
 
+using System.ComponentModel.Design;
 using AgentEval.Assertions;
 using AgentEval.Core;
 using AgentEval.MAF;
@@ -63,15 +64,31 @@ public static class Eval01_TravelAgentEvals
         Console.WriteLine($"  Running: \"{testCase.Name}\"\n");
         Console.WriteLine("  ⏳ This may take ~30 seconds (single agent, multiple tool calls)...\n");
 
+        // Live trace — wire the harness's five streaming callbacks to a
+        // colour-coded console printer so the operator can watch the agent
+        // think + call tools in real time. Catches the same failure modes
+        // the Demo01 tool-trace dump catches, but live instead of post-hoc.
+        Console.WriteLine();
+        Console.ForegroundColor = ConsoleColor.DarkCyan;
+        Console.WriteLine("  ─── Live trace ──────────────────────────────────────────────────────");
+        Console.ResetColor();
+
         var result = await harness.RunEvaluationStreamingAsync(
             agent,
             testCase,
+            streamingOptions: StreamingTracePrinter.Create(),
             options: new EvaluationOptions
             {
                 TrackTools       = true,
                 EvaluateResponse = true,
-                ModelName        = Config.Model
+                ModelName        = Config.Model,
+                Verbose          = true,
+                TrackPerformance = true,
             });
+
+        Console.ForegroundColor = ConsoleColor.DarkCyan;
+        Console.WriteLine("\n  ─── End of live trace ───────────────────────────────────────────────");
+        Console.ResetColor();
 
         // ── Print rich ASCII summary ─────────────────────────────────────────────
         EvalPrinter.PrintAgentResult(
