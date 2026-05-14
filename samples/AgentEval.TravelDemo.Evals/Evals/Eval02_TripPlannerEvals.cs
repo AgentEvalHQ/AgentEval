@@ -34,6 +34,12 @@ public static class Eval02_TripPlannerEvals
             return;
         }
 
+        // Show which Azure target this eval is about to charge — endpoint,
+        // deployment, model, and a redacted key fingerprint. Identical block
+        // to Eval01 so the operator can compare runs side-by-side.
+        Config.PrintAzureTarget();
+        Console.WriteLine();
+
         Console.WriteLine("  Building TripPlanner workflow + AgentEval harness...\n");
 
         // ── Evaluator client (for LLM-as-judge after the workflow run) ────────

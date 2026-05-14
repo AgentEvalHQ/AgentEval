@@ -37,6 +37,13 @@ public static class Eval01_TravelAgentEvals
             return;
         }
 
+        // Show which Azure target this eval is about to charge — endpoint,
+        // deployment, model, and a redacted key fingerprint. Helps the
+        // operator confirm at a glance that the right deployment is wired
+        // before a 30-second LLM run.
+        Config.PrintAzureTarget();
+        Console.WriteLine();
+
         Console.WriteLine("  Creating TravelAgent + AgentEval harness...\n");
 
         // ── Agent from AgentEval.TravelDemo (no duplication) ────────────────────────────
