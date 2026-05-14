@@ -9,30 +9,50 @@ namespace AgentEval.TravelDemo;
 /// Azure OpenAI configuration sourced from environment variables.
 /// </summary>
 /// <remarks>
-/// Required environment variables:
+/// <para>Required environment variables:</para>
 /// <list type="bullet">
 ///   <item>AZURE_OPENAI_ENDPOINT</item>
 ///   <item>AZURE_OPENAI_API_KEY</item>
-///   <item>AZURE_OPENAI_DEPLOYMENT</item>
+/// </list>
+/// <para>Optional environment variables:</para>
+/// <list type="bullet">
+///   <item>AZURE_OPENAI_DEPLOYMENT — overrides <see cref="PreferredDeployment"/> (default: <c>gpt-5-mini</c>).</item>
 /// </list>
 /// </remarks>
 public static class Config
 {
+    /// <summary>
+    /// Recommended deployment for TravelDemo + TravelDemo.Evals — picked for
+    /// a balance of fast per-turn latency and reliable function-calling on
+    /// Azure AI Foundry. Used when <c>AZURE_OPENAI_DEPLOYMENT</c> is unset.
+    /// </summary>
+    /// <remarks>
+    /// Empirical baseline on the <c>msfoundryjose</c> Foundry resource:
+    /// <list type="bullet">
+    ///   <item><c>gpt-5-chat</c>: ~3 min for the full 18-tool TravelAgent flow (reasoning-heavy, slow per turn).</item>
+    ///   <item><c>gpt-5-mini</c>: ~30–60 s for the same flow — same reasoning family, faster turns. RECOMMENDED.</item>
+    ///   <item><c>gpt-4o</c> / <c>gpt-4o-mini</c>: ~15–30 s — battle-tested function-calling, fastest overall.</item>
+    /// </list>
+    /// Override with <c>AZURE_OPENAI_DEPLOYMENT</c> to pin a specific deployment.
+    /// </remarks>
+    public const string PreferredDeployment = "gpt-5-mini";
+
     private static readonly Lazy<(Uri Endpoint, AzureKeyCredential Key)?> _credentials = new(() =>
     {
-        var endpoint   = Environment.GetEnvironmentVariable("AZURE_OPENAI_ENDPOINT");
-        var key        = Environment.GetEnvironmentVariable("AZURE_OPENAI_API_KEY");
-        var deployment = Environment.GetEnvironmentVariable("AZURE_OPENAI_DEPLOYMENT");
+        var endpoint = Environment.GetEnvironmentVariable("AZURE_OPENAI_ENDPOINT");
+        var key      = Environment.GetEnvironmentVariable("AZURE_OPENAI_API_KEY");
 
-        if (string.IsNullOrWhiteSpace(endpoint)   ||
-            string.IsNullOrWhiteSpace(key)         ||
-            string.IsNullOrWhiteSpace(deployment))
+        // AZURE_OPENAI_DEPLOYMENT is optional now — `Model` falls back to
+        // `PreferredDeployment` if it's unset. Endpoint + key remain required.
+
+        if (string.IsNullOrWhiteSpace(endpoint) ||
+            string.IsNullOrWhiteSpace(key))
             return null;
 
         return (new Uri(endpoint), new AzureKeyCredential(key));
     });
 
-    /// <summary>True when all three environment variables are present.</summary>
+    /// <summary>True when endpoint and key are both set. Deployment is optional and falls back to <see cref="PreferredDeployment"/>.</summary>
     public static bool IsConfigured => _credentials.Value.HasValue;
 
     /// <summary>Azure OpenAI endpoint URI.</summary>
@@ -43,9 +63,16 @@ public static class Config
     public static AzureKeyCredential KeyCredential => _credentials.Value?.Key
         ?? throw new InvalidOperationException("AZURE_OPENAI_API_KEY is not set.");
 
-    /// <summary>Primary model deployment name (default: gpt-4o).</summary>
+    /// <summary>
+    /// Resolved model deployment name. Uses <c>AZURE_OPENAI_DEPLOYMENT</c>
+    /// when set; otherwise falls back to <see cref="PreferredDeployment"/>
+    /// (<c>gpt-5-mini</c>). The env-var still wins so existing setups don't
+    /// silently change behaviour.
+    /// </summary>
     public static string Model =>
-        Environment.GetEnvironmentVariable("AZURE_OPENAI_DEPLOYMENT") ?? "gpt-4o";
+        Environment.GetEnvironmentVariable("AZURE_OPENAI_DEPLOYMENT") is { Length: > 0 } env
+            ? env
+            : PreferredDeployment;
 
     /// <summary>
     /// Prints a "Azure target" header block to the console showing the
@@ -61,16 +88,19 @@ public static class Config
     /// </remarks>
     public static void PrintAzureTarget()
     {
-        var endpoint   = Environment.GetEnvironmentVariable("AZURE_OPENAI_ENDPOINT");
-        var key        = Environment.GetEnvironmentVariable("AZURE_OPENAI_API_KEY");
-        var deployment = Environment.GetEnvironmentVariable("AZURE_OPENAI_DEPLOYMENT");
+        var endpoint = Environment.GetEnvironmentVariable("AZURE_OPENAI_ENDPOINT");
+        var key      = Environment.GetEnvironmentVariable("AZURE_OPENAI_API_KEY");
+        var envDep   = Environment.GetEnvironmentVariable("AZURE_OPENAI_DEPLOYMENT");
+        var resolved = Model;
+        var source   = string.IsNullOrEmpty(envDep)
+            ? $"default ({PreferredDeployment})"
+            : "AZURE_OPENAI_DEPLOYMENT";
 
         Console.ForegroundColor = ConsoleColor.DarkCyan;
         Console.WriteLine("  ─── Azure target ────────────────────────────────────────────────────");
         Console.ResetColor();
         Console.WriteLine($"  Endpoint   : {endpoint ?? "(unset)"}");
-        Console.WriteLine($"  Deployment : {deployment ?? "(unset — falls back to 'gpt-4o')"}");
-        Console.WriteLine($"  Model      : {Model}");
+        Console.WriteLine($"  Model      : {resolved}  [source: {source}]");
         Console.WriteLine($"  API key    : {FingerprintKey(key)}");
         Console.ForegroundColor = ConsoleColor.DarkCyan;
         Console.WriteLine("  ─────────────────────────────────────────────────────────────────────");
