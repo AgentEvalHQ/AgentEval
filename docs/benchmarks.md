@@ -4,9 +4,9 @@
 
 This guide covers the in-process, library-API benchmarks: `AgenticBenchmark` (BFCL/GAIA-style test cases) and `PerformanceBenchmark` (latency, throughput, cost). For the CLI-driven, audit-chained presets that write to `.agenteval/`, see:
 
-- [Agentic Benchmark](benchmarks/agentic/getting-started.md) — 60 evaluators, 11 presets, `agenteval bench agentic`
-- [GDPR Benchmark](benchmarks/gdpr/getting-started.md) — 16 GDPR articles, `agenteval bench gdpr`
-- [EU AI Act Benchmark](benchmarks/eu-ai-act/getting-started.md) — 13 controls, `agenteval bench eu-ai-act`
+- [Agentic Benchmark](benchmarks/agentic/getting-started.md) — broad agent-quality coverage across ~60 evaluators organised into 10 categories and several presets. CLI: `agenteval bench agentic`. Plain-English explainer: [how-it-works.md](benchmarks/agentic/how-it-works.md).
+- [GDPR Benchmark](benchmarks/gdpr/getting-started.md) — dialog-level behavioural conformance across the GDPR articles relevant to agent interaction, organised in 5 pillars. CLI: `agenteval bench gdpr`. Plain-English explainer: [how-it-works.md](benchmarks/gdpr/how-it-works.md).
+- [EU AI Act Benchmark](benchmarks/eu-ai-act/getting-started.md) — dialog-level conformance against Regulation (EU) 2024/1689 controls, organised in 6 pillars. CLI: `agenteval bench eu-ai-act`. Plain-English explainer: [how-it-works.md](benchmarks/eu-ai-act/how-it-works.md).
 
 ---
 

@@ -296,23 +296,23 @@ Pure-code evaluators (Telemetry, StochasticStability, JudgeQuality, TaskNavigati
 
 ## Calibration
 
-The `agenteval bench agentic calibrate` command runs the hand-labeled golden dataset against the configured judge and produces a calibration report:
+The `agenteval bench agentic calibrate` command runs the hand-labeled golden datasets against the configured judge and produces a calibration report:
 
 ```bash
 agenteval bench agentic calibrate
 ```
 
-The golden dataset contains hand-labeled scenario/response pairs distributed across category-specific files under `tests/AgentEval.Tests/Agentic/Calibration/Golden/` — three Phase 1–2 files of 20 entries each (system / process / quality), plus Phase 6 files for adversarial, confidence calibration, memory + multi-turn, reasoning, and UX. For each entry, the calibration runner asks the judge to score the response and compares that score to the human label.
+The golden datasets live as JSONL files under `tests/AgentEval.Tests/Agentic/Calibration/Golden/`, organised by evaluator category. Each dataset is mixed-class by design (both pass-labeled and fail-labeled entries with rationales) — single-class datasets would let the kappa math collapse trivially. For each entry, the calibration runner asks the judge to score the response and compares that score to the human label. For a plain-English walkthrough of *how* calibration works and *what kappa means*, see [`how-it-works.md`](how-it-works.md).
 
-The calibration report records per-category accuracy (fraction of entries within an acceptable score band) and Cohen's kappa (inter-rater agreement). The CI workflow `.github/workflows/agentic-calibration.yml` gates release branches on:
+The calibration report records per-category accuracy (fraction of entries within an acceptable score band) and Cohen's kappa (inter-rater agreement). The default CI workflow `.github/workflows/agentic-calibration.yml` gates release branches on:
 
-- Accuracy >= 0.85 per category.
-- Cohen's kappa >= 0.70 per category.
+- Accuracy ≥ 85% per category.
+- Cohen's kappa ≥ 0.70 per category.
 - Zero evaluation failures (judge errors) per category.
 
-A category that fails any threshold blocks the release PR. Golden dataset files are located under `tests/AgentEval.Tests/Agentic/Calibration/Golden/` as JSONL files.
+A category that fails any threshold blocks the release PR. The calibration report is written to `strategy/FutureFeatures/calibration-baselines/agentic-calibration-{date}.md` by default (internal artifact, not published on the docs site).
 
-The calibration report is written to `strategy/FutureFeatures/calibration-baselines/agentic-calibration-{date}.md` by default (internal artifact, not published on the docs site).
+**Calibration coverage is a known v1.1 expansion item**: the headline system-and-process and RAG-quality categories meet the strict gate; several other categories run at runtime but await fuller calibration evidence. See the Known Limitations section below and [`how-it-works.md`](how-it-works.md) for the per-category quality picture.
 
 **Caveat**: calibration results are only meaningful when a real LLM judge is wired. Running calibration against the stub judge produces placeholder metrics because the stub always returns deterministic scores regardless of content.
 
@@ -336,17 +336,18 @@ Each prompt file's header carries the source URL, pinned commit SHA at fork time
 - **Cost estimation is caller responsibility** — `AgenticTelemetry.EstimatedCostUsd` must be computed and supplied by the caller. If cost tracking is not implemented, `CostEval` scores 1.0 unconditionally (zero cost = within budget).
 - **Workflow-specific evaluators not in v1 (A5.3 deferred)** — evaluators that probe multi-agent workflow behavior (handoffs, parent-child task graphs, agent-to-agent message integrity) are deferred to a follow-up batch. They will live in `AgentEval.MAF` or a future `AgentEval.Evals.Workflow` package, not in `AgentEval.Evals.Agentic`.
 - **Foundry cross-calibration not in v1 (A5.3/A5.4 deferred)** — the project's relationship to upstream Foundry is **prompt provenance only**: each forked judge prompt cites its public MIT-licensed Foundry source in the file header. A Pearson-correlation cross-validation report against Foundry's evaluator SDK on a shared dataset is deferred to v1.1; the previous `FoundryEquivalent` preset was removed because it added no operational value beyond `AgenticExecution` (see CHANGELOG entry under "Removed — FoundryEquivalent compatibility layer").
-- **Calibration coverage is 11 of 60 evaluators (v1.1 work)** — `agenteval bench agentic calibrate` currently dispatches against 11 evaluators (Plan-05 phases 1-3 + a slice of Plan-06). The remaining 49 evaluators run fine under `agenteval bench agentic` itself; they simply lack calibration-baseline measurement because the `calibrate` subcommand's dispatch table only wires the 11. Their goldens land in an `unknown` bucket (visible as `[SKIP]` rows). Wiring the remaining 49 is tracked as a v1.1 task.
+- **Calibration coverage is incomplete (v1.1 work)** — `agenteval bench agentic calibrate` currently dispatches a subset of the shipped evaluators (the headline system-and-process and RAG-quality groups). The remaining evaluators run fine under `agenteval bench agentic` itself and produce verdicts; they simply lack calibration-baseline measurement because the `calibrate` subcommand's dispatch table does not yet wire them. Goldens for those evaluators land in an `unknown` bucket (visible as `[SKIP]` rows). Closing the gap is tracked as task **1.3** in [`strategy/FutureFeatures/todo/11-v1.1-implementation-plan.md`](../../../strategy/FutureFeatures/todo/11-v1.1-implementation-plan.md). See [`how-it-works.md`](how-it-works.md#calibration-quality-today) for the per-category qualitative picture.
 
 ---
 
 ## References
 
-- [GDPR Compliance Benchmark](../gdpr/getting-started.md) — the original reference benchmark whose pattern the agentic benchmark mirrors.
-- [EU AI Act Compliance Benchmark](../eu-ai-act/getting-started.md) — the second reference benchmark.
+- [How It Works (plain-English)](how-it-works.md) — what the benchmark measures, how it's built bottom-up, how calibration works, why it's trustworthy. Read this first if you're new.
+- [GDPR Compliance Benchmark](../gdpr/getting-started.md) — the compliance benchmark pattern that this benchmark mirrors.
+- [EU AI Act Compliance Benchmark](../eu-ai-act/getting-started.md) — the second compliance benchmark.
 - [Composite Evaluations](../../composite-evals.md) — the underlying `CompositeEval` / `AtomicLlmEval` / `AtomicCodeEval` primitives.
 - [Cost Guidance](cost-guidance.md) — per-evaluator cost-tier classification and `--budget-tier` filtering.
-- [Evaluator Cards](evaluator-cards.md) — index of the 60 shipped evaluators by category.
+- [Evaluator Cards](evaluator-cards.md) — index of the shipped evaluators by category.
 - [CLI Reference](../../cli.md) — full reference for `agenteval bench agentic` and `agenteval bench agentic calibrate`.
 
 > **Reminder**: this benchmark is a behavioral evaluation tool, not a compliance attestation, certification, or production-readiness guarantee. A passing score does not substitute for human review, monitoring, penetration testing, or domain-specific validation. Consult qualified domain and legal personnel before making any quality or compliance representations.

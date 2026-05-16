@@ -68,6 +68,8 @@
     href: benchmarks.md
   - name: Agentic Benchmark
     items:
+    - name: How It Works (Plain-English)
+      href: benchmarks/agentic/how-it-works.md
     - name: Getting Started
       href: benchmarks/agentic/getting-started.md
     - name: Cost Guidance
@@ -75,9 +77,15 @@
     - name: Evaluator Cards
       href: benchmarks/agentic/evaluator-cards.md
   - name: EU AI Act Benchmark
-    href: benchmarks/eu-ai-act/getting-started.md
+    items:
+    - name: How It Works (Plain-English)
+      href: benchmarks/eu-ai-act/how-it-works.md
+    - name: Getting Started
+      href: benchmarks/eu-ai-act/getting-started.md
   - name: GDPR Benchmark
     items:
+    - name: How It Works (Plain-English)
+      href: benchmarks/gdpr/how-it-works.md
     - name: Getting Started
       href: benchmarks/gdpr/getting-started.md
 

@@ -76,7 +76,7 @@ The benchmark cost is dominated by:
 
 `agenteval bench gdpr calibrate` runs hand-labeled golden datasets through the judge and computes accuracy + Cohen's kappa per pillar:
 
-- 120 golden entries × 1 LLM call each = ~$0.30-0.60 per full calibration run with a GPT-4o-class judge.
+- One LLM call per golden entry; total cost is in the LOW band (cents to a few dollars per full run with a GPT-4o-class judge, depending on dataset size).
 - The release-gate CI workflow (`.github/workflows/gdpr-calibration.yml`) runs full calibration on each release-branch PR.
 
 ### Cost reduction strategies
@@ -224,17 +224,17 @@ var eval = GdprBenchmark
 
 ## Calibration
 
-The `agenteval bench gdpr calibrate` command runs the 120-entry golden dataset against the configured judge and produces a calibration report:
+The `agenteval bench gdpr calibrate` command runs the hand-labeled golden dataset against the configured judge and produces a calibration report:
 
 ```
 dotnet run --project src/AgentEval.Cli --framework net10.0 -- bench gdpr calibrate
 ```
 
-The golden dataset contains 120 hand-labeled scenario/response pairs distributed across the 5 GDPR pillars (30 / 20 / 40 / 15 / 15). For each entry, the calibration runner asks the judge to score the response, then compares the judge's score to the human label.
+The golden dataset contains hand-labeled scenario/response pairs distributed across the 5 GDPR pillars. For each entry, the calibration runner asks the judge to score the response, then compares the judge's score to the human label. For an end-to-end plain-English walkthrough of *how* calibration works and *what kappa means*, see [`how-it-works.md`](how-it-works.md).
 
-The calibration report records per-pillar accuracy (fraction of entries within an acceptable score band) and Cohen's kappa (inter-rater agreement). The CI gate requires:
-- accuracy >= 0.85 per pillar
-- Cohen's kappa >= 0.70 per pillar
+The calibration report records per-pillar accuracy (fraction of entries within an acceptable score band) and Cohen's kappa (inter-rater agreement). The default CI gate requires:
+- accuracy ≥ 85% per pillar
+- Cohen's kappa ≥ 0.70 per pillar
 - Zero evaluation failures (judge errors) per pillar
 
 A pillar that fails any threshold blocks the release PR. The dated report is written to `strategy/FutureFeatures/calibration-baselines/gdpr-calibration-{date}.md` by default (internal artifact, not published on the docs site).
@@ -272,6 +272,7 @@ The following are not validated by this benchmark:
 
 ## See Also
 
+- [How It Works (plain-English)](how-it-works.md) — what the benchmark measures, how it's built bottom-up, how calibration works, why it's trustworthy. Read this first if you're new.
 - [Composite Evaluations](../../composite-evals.md) — the underlying `CompositeEval` / `AtomicLlmEval` primitives that power this benchmark.
 - [CLI Reference](../../cli.md) — full reference for `agenteval bench gdpr`, `agenteval bench gdpr calibrate`, and `agenteval compliance render`.
 - [The `.agenteval/` Workspace](../../agenteval-workspace.md) — canonical layout, schema versions, audit chain, and `agenteval doctor`.

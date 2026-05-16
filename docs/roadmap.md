@@ -15,11 +15,11 @@
 | **02** | Composite Evaluations | ✅ shipped | Recursive `IEval` model, atomic + composite primitives, 7 aggregations, depth cap, DI |
 | **03** | GDPR Compliance Benchmark | ✅ shipped (5/5 pillars PASS calibration) — Pillar 6 governance probes deferred to v1.1 | 21 article YAMLs, 5 pillars, evidence + PDF reporter, calibration suite |
 | **04** | EU AI Act Compliance Benchmark | ✅ shipped (6/6 pillars PASS calibration with 2 documented threshold overrides) — Art 9/10 awareness probes deferred to v1.1 | EU AI Act articles + pillars; honest scope for GPAI / admin obligations |
-| **05** | Foundry-equivalent Agentic Suite | ✅ shipped (60 evaluators) — calibration coverage is 11 of 60 dispatched; 26 more have goldens but await dispatch wiring (v1.1) | 60 agentic evaluators across 8 categories; relationship to upstream Foundry is prompt-provenance-only (cited per-file) |
+| **05** | Foundry-equivalent Agentic Suite | ✅ shipped — calibration coverage is partial today (headline system-and-process + RAG-quality categories meet the strict gate; remaining categories await calibration evidence in v1.1) | Broad agentic evaluator suite across 10 categories; relationship to upstream Foundry is prompt-provenance-only (cited per-file) |
 | **06** | Memory / Multi-turn / Reasoning / UX | ✅ shipped | Memory recall, multi-turn coherence, reasoning, UX evaluators wired into the 60-suite |
 | **07** | Mission Control — Design | ✅ design-doc | Phase-1 viewer + Phase-2 server architecture; identity, audit, ingestion contracts |
 | **08** | Mission Control — Phase 1 implementation | ✅ shipped | ASP.NET host, Hot Chocolate GraphQL, binary REST endpoints, React 19 + Vite 6 SPA, single-binary deployment, Docker image, `agenteval mc serve / doctor`, first-run landing |
-| **v1.1 plan** | Honest-scope completion + adoption-leverage + audit hardening | ⬜ draft (`11-v1.1-implementation-plan.md`) | Closes the v0.8.1-beta disclaimers (Pillar 6, Art 9/10, calibration 49-of-60), publishes `dotnet tool`, hardens audit chain |
+| **v1.1 plan** | Honest-scope completion + adoption-leverage + audit hardening | ⬜ draft (`11-v1.1-implementation-plan.md`) | Closes the v0.8.1-beta disclaimers (Pillar 6, Art 9/10, agentic calibration coverage), publishes `dotnet tool`, hardens audit chain |
 
 ---
 
@@ -75,14 +75,14 @@
 - **Deferred indefinitely**: Art 11 TD probe (lower value), Art 71/72/73 (process attestation, needs v2 evidence pipeline), GPAI Art 51–55 (different audience — provider, not deployer), Annex III law-enforcement / migration / justice / critical-infra packs (community-contribution scope).
 
 ### Plan 05 — Foundry-equivalent Agentic Suite
-**Status**: Shipped in v0.8.1-beta. **60 evaluators** run today via `agenteval bench agentic`. **Calibration coverage is 11 of 60**; the other 49 ship and run fine but lack calibration-baseline measurement — `bench agentic calibrate`'s dispatch table only wires 11 of them.
+**Status**: Shipped in v0.8.1-beta. The full evaluator suite runs today via `agenteval bench agentic`. Calibration coverage is partial — the headline system-and-process and RAG-quality categories meet the strict gate; the remaining categories run and produce verdicts but await fuller calibration evidence. The dispatch wiring for `bench agentic calibrate` is being extended to those categories in v1.1.
 **Scope**: Production-grade agentic evaluators forked from Microsoft Foundry's public MIT-licensed `.prompty` files. Each evaluator emits `evidence[]` instead of chain-of-thought, runs at `temperature: 0`, and carries pinned-commit provenance.
 **Highlights**:
-- **8 categories**: Process (tool-call accuracy, tool selection, intent resolution), System (task completion, task adherence), RAG quality (groundedness, relevance, coherence, fluency, similarity, response-completeness, F1), Safety (12 evaluators incl. violence, sexual, protected material, hate speech, ungrounded attributes, indirect attack, code vulnerability, unsafe tool use), Reasoning, UX, Adversarial, Memory.
-- **EvaluatorCard registry**: 59 cards (one per evaluator) carry display metadata, cost tier, calibration status — drives the Mission Control SPA's Evaluators page.
+- **10 categories**: Process (tool-call accuracy, tool selection, intent resolution), System (task completion, task adherence), RAG quality (groundedness, relevance, coherence, fluency, similarity, response-completeness, F1), Safety (violence, sexual content, protected material, hate, ungrounded attributes, indirect attack, code vulnerability, unsafe tool use), Reasoning, UX, Adversarial, Memory, Multi-turn, Calibration (epistemic).
+- **EvaluatorCard registry**: one card per evaluator carries display metadata, cost tier, calibration status — drives the Mission Control SPA's Evaluators page.
 - **Prompt provenance**: each forked judge prompt cites its public MIT-licensed Foundry source in the file header (commit SHA pinned, modifications enumerated). A Pearson-correlation cross-validation report generator (A5.4) is deferred to v1.1.
-- **Deferred to v1.1**: calibration coverage for the **other 49 evaluators** (each needs ~30 min of golden authoring + a dispatch-table entry; 24 h total).
-- **Deferred indefinitely**: A5.3 workflow-specific evaluators (stays in `AgentEval.MAF`), A5.4 Foundry Pearson-correlation report generator (data path ships; report is value-additive without ask), `AdjudicatedMultiJudgeWrapper` kappa-of-1 real fix (data-dependent), 60-card category drift audit (38/60 — cosmetic).
+- **Deferred to v1.1**: calibration-coverage extension to the remaining categories (task **1.3** in `11-v1.1-implementation-plan.md`).
+- **Deferred indefinitely**: A5.3 workflow-specific evaluators (stays in `AgentEval.MAF`), A5.4 Foundry Pearson-correlation report generator (data path ships; report is value-additive without ask), `AdjudicatedMultiJudgeWrapper` kappa-of-1 real fix (data-dependent), card-category drift audit (cosmetic).
 
 ### Plan 06 — Memory / Multi-turn / Reasoning / UX
 **Status**: Shipped in v0.8.1-beta.
@@ -126,7 +126,7 @@
 **Filter**: From the ~52-item v1.1 backlog spanning two source docs, the plan KEEPs 14 + 3 stretch items; DROPs 27; DEFERs-further 11. The KEEP criteria are strict: (a) closes a v0.8.1-beta honest-scope disclaimer, (b) the user explicitly named the item, (c) it removes measurable adoption friction, or (d) it's a mechanical refactor whose blast radius grows with delay.
 
 **Phases**:
-- **Phase 1 — Honest-scope completion (~8 working days)**: GDPR Pillar 6 governance probes, EU AI Act Art 9 + 10 awareness probes, agentic calibration coverage extension to 49 of 60, recalibrate all three benchmarks after content additions, structured `Recommendations[]` shape, 60-card category drift audit.
+- **Phase 1 — Honest-scope completion (~8 working days)**: GDPR Pillar 6 governance probes, EU AI Act Art 9 + 10 awareness probes, agentic calibration coverage extension to the remaining categories, recalibrate all three benchmarks after content additions, structured `Recommendations[]` shape, evaluator-card category-drift audit.
 - **Phase 2 — Adoption leverage (~2 working days)**: `dotnet tool install --global AgentEval.Cli --prerelease`, ECS 2026 showcase smoke.
 - **Phase 3 — Architecture cleanup + audit hardening (~7 working days)**: Promote `samples/AgentEval.GdprBenchmark` + `samples/AgentEval.EuAiActBenchmark` → `src/AgentEval.Compliance.*` (CLI-references-samples antipattern fix), disambiguate the two `AgenticBenchmark` types, relocate `EvaluatorCostMap` out of Abstractions, thread `judgeModel` through agentic factories, `agenteval doctor` schema validation, manifest+evidence body re-hashing with canonical-JSON projection (RFC 8785).
 - **Phase 4 — Stretch (~3 working days)**: `AdjudicatedMultiJudgeWrapper` kappa-rename cosmetic fix, `runCostBreakdown` unknown-bucket semantics split, MC1.4.5 red-team campaign SPA page.

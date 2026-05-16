@@ -125,8 +125,8 @@ The per-run cost figures in the quick-start CLI examples assume a GPT-4o-class j
 
 ### Calibration cost
 
-`agenteval bench eu-ai-act calibrate` runs ~80 golden entries across 6 pillar datasets:
-- ~80 LLM calls × $0.005–0.01 each = **~$0.40–0.80 per full calibration run**.
+`agenteval bench eu-ai-act calibrate` runs the per-pillar golden datasets through the configured judge:
+- One LLM call per golden entry; total cost is in the LOW band (cents to a few dollars per full run with a GPT-4o-class judge, depending on dataset size).
 - The CI workflow (`.github/workflows/eu-ai-act-calibration.yml`) runs calibration on each release-branch PR.
 
 ### Cost reduction strategies
@@ -212,15 +212,17 @@ The `agenteval bench eu-ai-act calibrate` command runs the hand-labeled golden d
 agenteval bench eu-ai-act calibrate
 ```
 
-The golden dataset contains approximately 80 hand-labeled scenario/response pairs distributed across the 6 EU AI Act pillars. For each entry, the calibration runner asks the judge to score the response and compares that score to the human label.
+The golden dataset contains hand-labeled scenario/response pairs distributed across the 6 EU AI Act pillars. Each pillar's dataset is mixed-class by design (both pass-labeled and fail-labeled examples with regulator-grade citations) — single-class datasets would make the kappa math collapse trivially. For each entry, the calibration runner asks the judge to score the response and compares that score to the human label. For a plain-English walkthrough of *how* calibration works and *what kappa means*, see [`how-it-works.md`](how-it-works.md).
 
-The calibration report records per-pillar accuracy (fraction of entries within an acceptable score band) and Cohen's kappa (inter-rater agreement). The CI workflow `.github/workflows/eu-ai-act-calibration.yml` gates release branches on:
+The calibration report records per-pillar accuracy (fraction of entries within an acceptable score band) and Cohen's kappa (inter-rater agreement). The default CI workflow `.github/workflows/eu-ai-act-calibration.yml` gates release branches on:
 
-- Accuracy >= 0.85 per pillar.
-- Cohen's kappa >= 0.70 per pillar.
+- Accuracy ≥ 85% per pillar.
+- Cohen's kappa ≥ 0.70 per pillar.
 - Zero evaluation failures (judge errors) per pillar.
 
-A pillar that fails any threshold blocks the release PR. Golden dataset files are located under `samples/AgentEval.EuAiActBenchmark/Calibration/` as JSONL files, one per pillar.
+Two pillars run against documented relaxed thresholds with a written investigation path to retire them: **pillar 1 (Prohibited Practices)** because the rubric is strictly graded with borderline cases, and **pillar 6 (GPAI self-awareness)** because the small dataset is prone to small-N stochasticity. The relaxations are encoded in `src/AgentEval.Cli/Commands/BenchEuAiActCalibrateCommand.cs`.
+
+A pillar that fails any threshold blocks the release PR. Golden dataset files are embedded by the test assembly from `tests/AgentEval.Tests/EuAiActBenchmark/Calibration/Golden/`.
 
 **Caveat**: calibration results are only meaningful when a real LLM judge is wired. Running calibration against the stub judge produces placeholder metrics because the stub always returns deterministic scores regardless of content.
 
@@ -238,6 +240,7 @@ A pillar that fails any threshold blocks the release PR. Golden dataset files ar
 
 ## Reference
 
+- [How It Works (plain-English)](how-it-works.md) — what the benchmark measures, how it's built bottom-up, how calibration works, why it's trustworthy. Read this first if you're new.
 - **EU AI Act official text**: [Regulation (EU) 2024/1689](https://eur-lex.europa.eu/eli/reg/2024/1689)
 - [Composite Evaluations](../../composite-evals.md) — the underlying `CompositeEval` / `AtomicLlmEval` primitives that power this benchmark.
 - [CLI Reference](../../cli.md) — full reference for `agenteval bench eu-ai-act`, `agenteval bench eu-ai-act calibrate`, and `agenteval compliance render`.
