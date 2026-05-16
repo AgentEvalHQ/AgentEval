@@ -115,7 +115,7 @@ The GDPR-specific wrapper. Contains:
 - `pillarSummary` — per-pillar score, pass/fail, and article count.
 - `overallVerdict` — `PASS`, `WARN`, or `FAIL`.
 - `criticalFindings` — list of articles that scored below threshold at `high` or `critical` severity.
-- `recommendations` — one recommendation string per critical finding.
+- `recommendations` — array of structured `{ controlId, severity, text, metadata? }` objects, one per failing article, sorted alphabetically by `controlId`. The schema accepts both this v1.1+ shape and the legacy v0.8.1-beta `string[]` shape via `anyOf` at the `items` level for backward compatibility. The optional `metadata: { string: string }` is reserved for v1.2+ extensions.
 - `disclaimer` — the verbatim disclaimer text from this document's Scope section.
 - `attestation` — `{ "type": "behavioral-benchmark", "regulation": "GDPR", "preset": "...", "subject": "...", "timestamp": "...", "runId": "..." }`.
 

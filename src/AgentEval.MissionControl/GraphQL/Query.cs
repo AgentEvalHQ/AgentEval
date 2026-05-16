@@ -51,8 +51,9 @@ public sealed class Query
 
     /// <summary>
     /// Returns all registered evaluator cards, optionally filtered by category
-    /// (e.g. <c>"system"</c>, <c>"adversarial"</c>) and / or cost tier.
+    /// (e.g. <c>"system-outcome"</c>, <c>"adversarial"</c>) and / or cost tier.
     /// Drives Mission Control's <c>&lt;EvaluatorRegistry/&gt;</c> page.
+    /// See <c>evaluator-card.schema.json</c> for the canonical category enum.
     /// </summary>
     public IEnumerable<EvaluatorCard> Evaluators(
         [Service] EvaluatorCardRegistry registry,

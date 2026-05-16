@@ -47,6 +47,15 @@ public class SecurityHeadersTests : IClassFixture<WebApplicationFactory<Query>>
         var csp = string.Join(",", response.Headers.GetValues("Content-Security-Policy"));
         Assert.Contains("default-src 'self'", csp);
         Assert.Contains("frame-ancestors 'none'", csp);
+
+        // LR7-S3 (2026-05-16) — Permissions-Policy locks down geolocation, mic,
+        // camera, payment, USB, MIDI, magnetometer, gyroscope, accelerometer.
+        // None of these APIs are used by the portal; the header is defense in
+        // depth against a future XSS bug or a permissive front-end proxy.
+        var pp = string.Join(",", response.Headers.GetValues("Permissions-Policy"));
+        Assert.Contains("geolocation=()", pp);
+        Assert.Contains("microphone=()", pp);
+        Assert.Contains("camera=()", pp);
     }
 
     [Fact]
