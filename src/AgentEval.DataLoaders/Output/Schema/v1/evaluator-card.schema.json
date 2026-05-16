@@ -34,8 +34,23 @@
     },
     "category": {
       "type": "string",
-      "minLength": 1,
-      "description": "Category folder name (system / process / quality / judge-quality / adjudication / safety / telemetry / stochastic-stability / memory / multi-turn / reasoning / calibration / adversarial / ux / efficiency)."
+      "enum": [
+        "system-outcome",
+        "agentic-process",
+        "rag",
+        "judge-quality",
+        "adjudication",
+        "safety-security",
+        "operational",
+        "memory",
+        "multi-turn",
+        "reasoning",
+        "calibration",
+        "adversarial",
+        "ux",
+        "efficiency"
+      ],
+      "description": "Canonical category. Locked to an enum so card↔runtime drift (the M1.6 / LR3-008 class of bugs) is caught at schema-validation time, not just by CardRuntimeMetadataParityTest. Add new values here only when a new runtime category is introduced."
     },
     "version": {
       "type": "string",

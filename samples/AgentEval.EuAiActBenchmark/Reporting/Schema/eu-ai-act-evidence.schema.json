@@ -3,6 +3,7 @@
   "$id": "https://agenteval.dev/schemas/v1/eu-ai-act-evidence.schema.json",
   "title": "AgentEval EU AI Act Compliance Evidence (wrapper)",
   "type": "object",
+  "additionalProperties": false,
   "required": ["base", "preset", "domainPacks", "compositeTree", "summary", "criticalFindings", "recommendations", "disclaimer", "euAiActAttestation"],
   "properties": {
     "base": {

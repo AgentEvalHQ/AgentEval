@@ -110,6 +110,15 @@ public static class McHost
                 headers["X-Frame-Options"] = "DENY";
             if (!headers.ContainsKey("Referrer-Policy"))
                 headers["Referrer-Policy"] = "no-referrer";
+            if (!headers.ContainsKey("Permissions-Policy"))
+                // Defense-in-depth: the portal never uses geolocation, mic, camera,
+                // payment, or USB device access. Lock these down at the header level
+                // so an operator who follows the Dockerfile LAN-expose example or
+                // accidentally proxies the portal through a permissive front-end
+                // doesn't get a free attack surface from a future XSS bug.
+                headers["Permissions-Policy"] =
+                    "geolocation=(), microphone=(), camera=(), payment=(), usb=(), " +
+                    "midi=(), magnetometer=(), gyroscope=(), accelerometer=()";
             if (!headers.ContainsKey("Content-Security-Policy"))
                 // SPA bundle is self-hosted; Nitro UI loads its own assets — allow
                 // 'unsafe-inline' for Nitro's inline styles + scripts (Hot Chocolate

@@ -20,6 +20,16 @@ namespace AgentEval.EuAiActBenchmark.Reporting.Pdf;
 /// QuestPDF community license is accepted in the static constructor so that
 /// unit tests that instantiate this type do not need to configure the license
 /// themselves.
+/// <para>
+/// <b>Recommendations omission (intentional).</b> The PDF report does NOT
+/// surface the <see cref="EuAiActComplianceEvidence.Recommendations"/> array.
+/// Recommendations are deliberately scoped to the operator-facing Markdown
+/// report (<c>report.md</c>) and to the machine-readable evidence JSON.
+/// The PDF is designed as the compliance-officer's signed boardroom artefact;
+/// mixing actionable engineering remediation copy into that document would
+/// dilute the audit signal. Rendering recommendations in the PDF is tracked
+/// as a v1.1 markdown-reporter-parity item.
+/// </para>
 /// </remarks>
 public sealed class EuAiActPdfRenderer
 {

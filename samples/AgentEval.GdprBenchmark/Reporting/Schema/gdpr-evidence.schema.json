@@ -3,6 +3,7 @@
   "$id": "https://agenteval.dev/schemas/v1/gdpr-evidence.schema.json",
   "title": "AgentEval GDPR Compliance Evidence (wrapper)",
   "type": "object",
+  "additionalProperties": false,
   "required": ["base", "preset", "domainPacks", "compositeTree", "summary", "criticalFindings", "recommendations", "disclaimer", "gdprAttestation"],
   "properties": {
     "base": {

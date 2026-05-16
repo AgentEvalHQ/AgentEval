@@ -37,7 +37,7 @@ The shipped `eval-result.schema.json` carries the *result* shape (metric, score,
   "schemaVersion": "1.0",                          // always "1.0" today
   "key": "tool_call_accuracy",                     // matches IEval.Key (snake_case)
   "name": "Tool Call Accuracy",                    // UI label
-  "category": "process",                           // folder name (system/process/quality/...)
+  "category": "agentic-process",                   // canonical category (see evaluator-card.schema.json enum)
   "version": "1.0.0",                              // SemVer
   "description": "Composite of tool selection ...", // human-readable explanation
   "costTier": "Medium",                            // Trivial / Low / Medium / High
