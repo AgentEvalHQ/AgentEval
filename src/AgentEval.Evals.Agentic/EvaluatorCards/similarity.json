@@ -2,7 +2,7 @@
   "schemaVersion": "1.0",
   "key": "similarity",
   "name": "Similarity",
-  "category": "quality",
+  "category": "rag",
   "version": "1.0.0",
   "description": "LLM judge or embedding-based similarity between the agent response and a reference / ground-truth answer.",
   "costTier": "Low",

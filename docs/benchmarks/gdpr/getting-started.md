@@ -166,9 +166,7 @@ A pillar verdict of `FAIL` means at least one article in that pillar failed at `
 
 ### Extracting recommendations
 
-The `criticalFindings` array in `gdpr-evidence.json` lists every article that failed at `high` or `critical` severity. Each entry is a full `EvalResult` node — you can read `metric.key` for the article id, `score.value` / `score.severity` / `score.label` for the verdict, and walk `details.subResults` for per-scenario diagnostics. Recommendations are kept on a **separate sibling field** `recommendations: string[]` (one entry per finding, same order as `criticalFindings`) so renderers can apply different formatting to the two — the `report.md` renders them as a paired numbered list at the top of the Recommendations section.
-
-> A structured `recommendations[]` shape (`{articleId, severity, text}` per entry) is planned for v1.1 once we have a clear consumer for the per-entry metadata. v0.8.1-beta ships the strings-only shape.
+The `criticalFindings` array in `gdpr-evidence.json` lists every article that failed at `high` or `critical` severity. Each entry is a full `EvalResult` node — you can read `metric.key` for the article id, `score.value` / `score.severity` / `score.label` for the verdict, and walk `details.subResults` for per-scenario diagnostics. Recommendations are kept on a **separate sibling field** `recommendations` — an array of structured `{ controlId, severity, text }` objects (one per failing article, sorted alphabetically by `controlId`) so renderers can apply `controlId [severity]: text` formatting without re-parsing. The schema accepts both the structured shape (v1.1+) and the legacy `string[]` shape (v0.8.1-beta) via `oneOf` for backward compatibility.
 
 ---
 

@@ -34,7 +34,26 @@
       "type": "array",
       "items": { "type": "object", "description": "EvalResult for a critical-severity scenario that failed." }
     },
-    "recommendations": { "type": "array", "items": { "type": "string" } },
+    "recommendations": {
+      "type": "array",
+      "description": "Recommendations in control-ID order. v1.1+ uses the structured shape; v0.8.1-beta used string[].",
+      "items": {
+        "anyOf": [
+          { "type": "string",
+            "description": "Legacy v0.8.1-beta strings-only entry. Still valid for backward compatibility." },
+          { "type": "object",
+            "required": ["controlId", "severity", "text"],
+            "additionalProperties": false,
+            "properties": {
+              "controlId": { "type": "string" },
+              "severity":  { "type": "string", "enum": ["low", "medium", "high", "critical"] },
+              "text":      { "type": "string" }
+            },
+            "description": "Structured shape introduced in v1.1 (task 1.5)."
+          }
+        ]
+      }
+    },
     "disclaimer": { "type": "string", "minLength": 1 },
     "euAiActAttestation": {
       "type": "object",

@@ -2,7 +2,7 @@
   "schemaVersion": "1.0",
   "key": "response_completeness",
   "name": "Response Completeness",
-  "category": "quality",
+  "category": "rag",
   "version": "1.0.0",
   "description": "LLM judge assessing whether the response covers all aspects of the user query (no missing parts).",
   "costTier": "Low",

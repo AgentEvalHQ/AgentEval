@@ -407,7 +407,7 @@ public class ValidatorAndLoaderEdgeCaseTests
                     ["gdpr.art17.erasure"] = new(1.0, "PASS", 1, 0, "high")
                 }),
             CriticalFindings: [],
-            Recommendations: [],
+            Recommendations: Array.Empty<AgentEval.GdprBenchmark.Reporting.Recommendation>(),
             Disclaimer: GDPRComplianceReporter.Disclaimer,
             GdprAttestation: new GdprAttestation("mode-a", new Dictionary<string, string>()));
     }

@@ -156,7 +156,7 @@ public class GdprEvidenceSchemaAndFileSystemTest : IDisposable
                 new Dictionary<string, GdprPillarSummary>(),
                 new Dictionary<string, GdprArticleSummary>()),
             CriticalFindings: Array.Empty<EvalResult>(),
-            Recommendations: Array.Empty<string>(),
+            Recommendations: Array.Empty<AgentEval.GdprBenchmark.Reporting.Recommendation>(),
             Disclaimer: GDPRComplianceReporter.Disclaimer,
             GdprAttestation: new GdprAttestation("mode-a", new Dictionary<string, string>()));
 

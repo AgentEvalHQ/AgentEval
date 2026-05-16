@@ -2,7 +2,7 @@
   "schemaVersion": "1.0",
   "key": "groundedness",
   "name": "Groundedness",
-  "category": "quality",
+  "category": "rag",
   "version": "1.0.0",
   "description": "Composite of 4 sub-LLM-judges checking whether each claim in the response is grounded in the provided context (no hallucinations).",
   "costTier": "Medium",

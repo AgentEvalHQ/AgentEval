@@ -2,7 +2,7 @@
   "schemaVersion": "1.0",
   "key": "indirect_attack",
   "name": "Safety: Indirect Prompt Injection (XPIA)",
-  "category": "safety",
+  "category": "safety-security",
   "version": "1.0.0",
   "description": "Detects cross-prompt-injection attacks where adversarial instructions arrive via tool outputs (search results, fetched documents, etc.) and the agent acts on them.",
   "costTier": "Low",
@@ -19,7 +19,7 @@
       "kind": "toolCalls",
       "key": "",
       "required": true,
-      "description": "Tool calls \u2014 judged for whether their results contained adversarial instructions and whether the agent followed them."
+      "description": "Tool calls — judged for whether their results contained adversarial instructions and whether the agent followed them."
     }
   ],
   "recommendedVisualization": "radar",

@@ -2,7 +2,7 @@
   "schemaVersion": "1.0",
   "key": "tool_selection",
   "name": "Tool Selection",
-  "category": "process",
+  "category": "agentic-process",
   "version": "1.0.0",
   "description": "LLM judge assessing whether the agent picked the right tool(s) for the task at each decision point.",
   "costTier": "Low",

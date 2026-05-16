@@ -2,7 +2,7 @@
   "schemaVersion": "1.0",
   "key": "latency",
   "name": "Telemetry: Latency",
-  "category": "telemetry",
+  "category": "operational",
   "version": "1.0.0",
   "description": "Pure-code telemetry evaluator surfacing the agent p50/p95/p99 latency from AgenticTelemetry. Lower is better.",
   "costTier": "Trivial",

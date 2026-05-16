@@ -67,6 +67,26 @@ public sealed class AtomicLlmEval : AtomicEval
 
         var er = await _evaluator.EvaluateAsync(input.Query, input.Response, _criteria, ct);
 
+        // v1.1 task 1.7 / 6-plan F-002: populate EstimatedCost from real judge token usage
+        // so composite cost rollups stop summing to $0. When the underlying IEvaluator does
+        // not report token counts (e.g. test fakes, non-chat evaluators), tokensUsed stays
+        // null and estimatedCost stays 0 — matching the pre-1.7 behaviour for those paths.
+        long? inputTokens = er.InputTokenCount;
+        long? outputTokens = er.OutputTokenCount;
+        int? tokensUsed = null;
+        double estimatedCost = 0;
+        if (inputTokens is not null || outputTokens is not null)
+        {
+            var inT = inputTokens ?? 0;
+            var outT = outputTokens ?? 0;
+            estimatedCost = JudgeCostMap.EstimateCost(_judgeModel, inT, outT);
+            // EvalProvenance.TokensUsed is the legacy single-int totals field; sum the two
+            // for backwards-compatible reporting. We clamp to int.MaxValue defensively even
+            // though realistic judge transcripts are nowhere near that volume.
+            var total = inT + outT;
+            tokensUsed = total > int.MaxValue ? int.MaxValue : (int)total;
+        }
+
         var value = Math.Clamp(er.OverallScore / 100.0, 0.0, 1.0);
         var passed = value >= _passThreshold;
         // Compute severity from score; then take the maximum with failureSeverity (if set)
@@ -105,8 +125,8 @@ public sealed class AtomicLlmEval : AtomicEval
                 JudgeModel: _judgeModel,
                 PromptId: _promptId,
                 PromptHash: null,
-                TokensUsed: null,
-                EstimatedCost: 0,
+                TokensUsed: tokensUsed,
+                EstimatedCost: estimatedCost,
                 CacheHit: false),
             EvaluatedAt: DateTimeOffset.UtcNow);
     }

@@ -2,21 +2,44 @@
   "schemaVersion": "1.0",
   "key": "task_navigation_efficiency",
   "name": "Task Navigation Efficiency",
-  "category": "system",
+  "category": "system-outcome",
   "version": "1.0.0",
   "description": "Hybrid algorithmic + LLM evaluator. The deterministic part (AtomicCodeEval, free) measures the agent's tool-call path length vs. the optimal path. The LLM judge then assesses whether deviations were justified (e.g., good error recovery) or wasteful (redundant calls). Gives credit for navigating efficiently while not penalising legitimate exploration.",
   "costTier": "Low",
   "higherIsBetter": true,
   "defaultThreshold": 0.7,
   "expectedInputs": [
-    { "kind": "query", "key": "", "required": true, "description": "The user's request." },
-    { "kind": "response", "key": "", "required": true, "description": "The agent's final response." },
-    { "kind": "toolCalls", "key": "", "required": true, "description": "The full sequence of tool invocations; the algorithmic component computes path length from this." },
-    { "kind": "metadata", "key": "expected_actions", "required": false, "description": "Optional ground-truth optimal path; when absent, the LLM judge estimates." }
+    {
+      "kind": "query",
+      "key": "",
+      "required": true,
+      "description": "The user's request."
+    },
+    {
+      "kind": "response",
+      "key": "",
+      "required": true,
+      "description": "The agent's final response."
+    },
+    {
+      "kind": "toolCalls",
+      "key": "",
+      "required": true,
+      "description": "The full sequence of tool invocations; the algorithmic component computes path length from this."
+    },
+    {
+      "kind": "metadata",
+      "key": "expected_actions",
+      "required": false,
+      "description": "Optional ground-truth optimal path; when absent, the LLM judge estimates."
+    }
   ],
   "recommendedVisualization": "histogram",
   "compatibleWith": [
-    { "system": "foundry", "uri": "azureai://built-in/evaluators/task_navigation_efficiency" }
+    {
+      "system": "foundry",
+      "uri": "azureai://built-in/evaluators/task_navigation_efficiency"
+    }
   ],
   "links": {
     "documentation": "/docs/benchmarks/agentic/getting-started.md#task-navigation-efficiency",

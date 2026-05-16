@@ -123,7 +123,7 @@ public class GraphQLSmokeTests : IClassFixture<WebApplicationFactory<Query>>
 
         Assert.Equal("task_completion", card.GetProperty("key").GetString());
         Assert.Equal("Task Completion", card.GetProperty("name").GetString());
-        Assert.Equal("system", card.GetProperty("category").GetString());
+        Assert.Equal("system-outcome", card.GetProperty("category").GetString());
     }
 
     [Fact]

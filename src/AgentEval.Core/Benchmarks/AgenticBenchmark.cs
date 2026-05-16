@@ -11,6 +11,12 @@ namespace AgentEval.Benchmarks;
 /// <summary>
 /// Benchmark for evaluating agent capabilities: tool usage accuracy, task completion, and multi-step reasoning.
 /// </summary>
+/// <remarks>
+/// This is the legacy library-API benchmark for tool-calling test cases (BFCL/GAIA style).
+/// Use <c>AgentEval.Evals.Agentic.Composition.AgenticBenchmark</c> for the canonical
+/// 60-evaluator preset factory. v1.2 removal target.
+/// </remarks>
+[Obsolete("AgentEval.Core.Benchmarks.AgenticBenchmark is the legacy library-API benchmark for tool-calling test cases. Use AgentEval.Evals.Agentic.Composition.AgenticBenchmark for the canonical 60-evaluator preset factory. v1.2 removal target.")]
 public class AgenticBenchmark
 {
     private readonly IEvaluableAgent _agent;

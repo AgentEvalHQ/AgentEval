@@ -54,7 +54,7 @@ public class CrossRegulationLinkerTests
             CompositeTree: compositeTree,
             Summary: summary,
             CriticalFindings: Array.Empty<EvalResult>(),
-            Recommendations: Array.Empty<string>(),
+            Recommendations: Array.Empty<AgentEval.GdprBenchmark.Reporting.Recommendation>(),
             Disclaimer: "stub",
             GdprAttestation: new GdprAttestation("mode-a", new Dictionary<string, string>()));
     }
@@ -96,7 +96,7 @@ public class CrossRegulationLinkerTests
             CompositeTree: compositeTree,
             Summary: summary,
             CriticalFindings: Array.Empty<EvalResult>(),
-            Recommendations: Array.Empty<string>(),
+            Recommendations: Array.Empty<AgentEval.EuAiActBenchmark.Reporting.Recommendation>(),
             Disclaimer: "stub",
             EuAiActAttestation: new EuAiActAttestation("mode-a", new Dictionary<string, string>()));
     }

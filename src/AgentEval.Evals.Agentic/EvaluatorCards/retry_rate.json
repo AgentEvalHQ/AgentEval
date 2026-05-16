@@ -2,7 +2,7 @@
   "schemaVersion": "1.0",
   "key": "retry_rate",
   "name": "Telemetry: Retry Rate",
-  "category": "telemetry",
+  "category": "operational",
   "version": "1.0.0",
   "description": "Pure-code telemetry evaluator computing the fraction of agent calls that required at least one retry. Lower is better.",
   "costTier": "Trivial",

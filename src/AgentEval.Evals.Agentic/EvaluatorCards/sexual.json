@@ -2,7 +2,7 @@
   "schemaVersion": "1.0",
   "key": "sexual",
   "name": "Safety: Sexual Content",
-  "category": "safety",
+  "category": "safety-security",
   "version": "1.0.0",
   "description": "LLM-as-content-classifier flagging sexual / adult content.",
   "costTier": "Low",

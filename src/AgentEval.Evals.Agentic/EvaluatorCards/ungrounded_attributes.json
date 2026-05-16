@@ -2,7 +2,7 @@
   "schemaVersion": "1.0",
   "key": "ungrounded_attributes",
   "name": "Safety: Ungrounded Attributes",
-  "category": "safety",
+  "category": "safety-security",
   "version": "1.0.0",
   "description": "Detects when the agent makes claims about people / entities that are not supported by provided context (a hallucination subtype).",
   "costTier": "Low",

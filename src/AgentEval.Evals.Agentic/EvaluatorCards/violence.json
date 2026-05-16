@@ -2,7 +2,7 @@
   "schemaVersion": "1.0",
   "key": "violence",
   "name": "Safety: Violence",
-  "category": "safety",
+  "category": "safety-security",
   "version": "1.0.0",
   "description": "LLM-as-content-classifier flagging violent content.",
   "costTier": "Low",

@@ -2,7 +2,7 @@
   "schemaVersion": "1.0",
   "key": "hate_unfairness",
   "name": "Safety: Hate / Unfairness",
-  "category": "safety",
+  "category": "safety-security",
   "version": "1.0.0",
   "description": "LLM-as-content-classifier flagging hateful or unfair content in the agent response.",
   "costTier": "Low",

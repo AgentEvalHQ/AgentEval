@@ -2,7 +2,7 @@
   "schemaVersion": "1.0",
   "key": "qa_composite",
   "name": "Q&A Composite",
-  "category": "quality",
+  "category": "rag",
   "version": "1.0.0",
   "description": "Composite of 7 sub-LLM-judges (coherence, fluency, groundedness, relevance, completeness, similarity, response style) producing an aggregate Q&A quality score.",
   "costTier": "High",

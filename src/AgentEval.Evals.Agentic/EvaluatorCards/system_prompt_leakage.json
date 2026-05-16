@@ -2,7 +2,7 @@
   "schemaVersion": "1.0",
   "key": "system_prompt_leakage",
   "name": "Safety: System Prompt Leakage",
-  "category": "safety",
+  "category": "safety-security",
   "version": "1.0.0",
   "description": "Detects whether the agent revealed the contents of its system prompt or instructions in response to user queries.",
   "costTier": "Low",

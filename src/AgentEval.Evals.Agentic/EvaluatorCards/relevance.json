@@ -2,7 +2,7 @@
   "schemaVersion": "1.0",
   "key": "relevance",
   "name": "Relevance",
-  "category": "quality",
+  "category": "rag",
   "version": "1.0.0",
   "description": "LLM judge assessing whether the response addresses the user actual query rather than tangents.",
   "costTier": "Low",

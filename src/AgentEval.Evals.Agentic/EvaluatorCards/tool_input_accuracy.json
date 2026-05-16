@@ -2,7 +2,7 @@
   "schemaVersion": "1.0",
   "key": "tool_input_accuracy",
   "name": "Tool Input Accuracy",
-  "category": "process",
+  "category": "agentic-process",
   "version": "1.0.0",
   "description": "Hybrid deterministic + LLM judge: schema-checks tool arguments against the tool declared input schema, then LLM judges semantic correctness for fields the schema cannot validate.",
   "costTier": "Low",

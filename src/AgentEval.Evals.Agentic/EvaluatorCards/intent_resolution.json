@@ -2,20 +2,38 @@
   "schemaVersion": "1.0",
   "key": "intent_resolution",
   "name": "Intent Resolution",
-  "category": "system",
+  "category": "system-outcome",
   "version": "1.0.0",
   "description": "Composite of 2 sub-LLM-judges assessing whether the agent both correctly identified the user's intent AND took appropriate action to resolve it. The end-to-end 'did they understand and act' check, distinct from intent_identification (which only judges understanding).",
   "costTier": "Medium",
   "higherIsBetter": true,
   "defaultThreshold": 0.75,
   "expectedInputs": [
-    { "kind": "query", "key": "", "required": true, "description": "The user's request." },
-    { "kind": "response", "key": "", "required": true, "description": "The agent's final response." },
-    { "kind": "toolCalls", "key": "", "required": false, "description": "Optional tool calls — strengthens the resolution judgment when the agent acted via tools." }
+    {
+      "kind": "query",
+      "key": "",
+      "required": true,
+      "description": "The user's request."
+    },
+    {
+      "kind": "response",
+      "key": "",
+      "required": true,
+      "description": "The agent's final response."
+    },
+    {
+      "kind": "toolCalls",
+      "key": "",
+      "required": false,
+      "description": "Optional tool calls — strengthens the resolution judgment when the agent acted via tools."
+    }
   ],
   "recommendedVisualization": "radar",
   "compatibleWith": [
-    { "system": "foundry", "uri": "azureai://built-in/evaluators/intent_resolution" }
+    {
+      "system": "foundry",
+      "uri": "azureai://built-in/evaluators/intent_resolution"
+    }
   ],
   "links": {
     "documentation": "/docs/benchmarks/agentic/getting-started.md#intent-resolution",

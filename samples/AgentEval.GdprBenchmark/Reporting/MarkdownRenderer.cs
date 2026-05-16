@@ -73,7 +73,7 @@ public sealed class MarkdownRenderer
             sb.AppendLine("## Recommendations");
             sb.AppendLine();
             foreach (var r in evidence.Recommendations)
-                sb.AppendLine($"- {r}");
+                sb.AppendLine($"- `{r.ControlId}` [{r.Severity}]: {r.Text}");
             sb.AppendLine();
         }
 

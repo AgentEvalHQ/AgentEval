@@ -2,7 +2,7 @@
   "schemaVersion": "1.0",
   "key": "tool_output_utilization",
   "name": "Tool Output Utilization",
-  "category": "process",
+  "category": "agentic-process",
   "version": "1.0.0",
   "description": "LLM judge assessing whether the agent actually used tool results in its final response, vs ignoring them or hallucinating around them.",
   "costTier": "Low",

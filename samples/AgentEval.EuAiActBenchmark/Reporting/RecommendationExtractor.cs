@@ -8,9 +8,13 @@ namespace AgentEval.EuAiActBenchmark.Reporting;
 
 /// <summary>
 /// Walks the composite result tree, collects failed article control IDs, and maps
-/// each to a static recommendation string. Dynamic LLM-generated recommendations
+/// each to a structured <see cref="Recommendation"/>. Dynamic LLM-generated recommendations
 /// are deferred to a future phase.
 /// </summary>
+/// <remarks>
+/// v1.1 task 1.5: returns <see cref="Recommendation"/> records instead of raw strings so that
+/// consumers can render <c>controlId [severity]: text</c> without re-parsing.
+/// </remarks>
 public sealed class RecommendationExtractor
 {
     private static readonly IReadOnlyDictionary<string, string> s_recommendations =
@@ -32,28 +36,34 @@ public sealed class RecommendationExtractor
         };
 
     /// <summary>
-    /// Builds a list of recommendation strings for every failed article in the result tree.
+    /// Builds a list of structured <see cref="Recommendation"/> objects for every failed article
+    /// in the result tree.
     /// </summary>
     /// <param name="root">The top-level composite <see cref="EvalResult"/>.</param>
     /// <returns>
-    /// Recommendations in control-ID alphabetical order. Each item is the static
-    /// recommendation for that control, or a generic fallback when no mapping is registered.
+    /// Recommendations in control-ID alphabetical order. Each entry carries the control ID,
+    /// the severity from the failing node, and the static remediation text (or a generic
+    /// fallback when no mapping is registered).
     /// </returns>
-    public IReadOnlyList<string> Build(EvalResult root)
+    public IReadOnlyList<Recommendation> Build(EvalResult root)
     {
         ArgumentNullException.ThrowIfNull(root);
-        var failed = new HashSet<string>();
+        var failed = new Dictionary<string, string>(StringComparer.Ordinal);
         WalkArticles(root, failed);
         return failed
-            .OrderBy(k => k, StringComparer.Ordinal)
-            .Select(k => s_recommendations.TryGetValue(k, out var rec) ? rec : $"Review failures in {k}.")
+            .OrderBy(kv => kv.Key, StringComparer.Ordinal)
+            .Select(kv =>
+            {
+                var text = s_recommendations.TryGetValue(kv.Key, out var rec) ? rec : $"Review failures in {kv.Key}.";
+                return new Recommendation(ControlId: kv.Key, Severity: kv.Value, Text: text);
+            })
             .ToList();
     }
 
-    private static void WalkArticles(EvalResult node, HashSet<string> sink)
+    private static void WalkArticles(EvalResult node, Dictionary<string, string> sink)
     {
         if (node.Metric.Key.StartsWith("eu_ai.", StringComparison.Ordinal) && !node.Score.Passed)
-            sink.Add(node.Metric.Key);
+            sink.TryAdd(node.Metric.Key, node.Score.Severity);
 
         var subs = node.Details.SubResults;
         if (subs is null) return;

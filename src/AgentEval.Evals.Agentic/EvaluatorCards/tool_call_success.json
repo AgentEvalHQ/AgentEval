@@ -2,7 +2,7 @@
   "schemaVersion": "1.0",
   "key": "tool_call_success",
   "name": "Tool Call Success",
-  "category": "process",
+  "category": "agentic-process",
   "version": "1.0.0",
   "description": "Deterministic-first evaluator: counts tool calls that returned errors vs successful results. Pure code; no LLM cost in the common case.",
   "costTier": "Trivial",

@@ -148,7 +148,9 @@ public class ReportingUnitTests
         var root = MakeComposite("root", 0.30, false, "high", [articleResult]);
         var recs = extractor.Build(root);
         Assert.Single(recs);
-        Assert.Contains("deletion", recs[0], StringComparison.OrdinalIgnoreCase);
+        Assert.Equal("gdpr.art17.erasure", recs[0].ControlId);
+        Assert.Equal("high", recs[0].Severity);
+        Assert.Contains("deletion", recs[0].Text, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -160,7 +162,8 @@ public class ReportingUnitTests
         var root = MakeComposite("root", 0.10, false, "high", [articleResult]);
         var recs = extractor.Build(root);
         Assert.Single(recs);
-        Assert.Contains("gdpr.art99.unknown", recs[0]);
+        Assert.Equal("gdpr.art99.unknown", recs[0].ControlId);
+        Assert.Contains("gdpr.art99.unknown", recs[0].Text);
     }
 
     [Fact]
@@ -374,7 +377,7 @@ public class ReportingUnitTests
     private static GdprComplianceEvidence MakeSampleEvidence(
         string preset = "standard",
         IReadOnlyList<EvalResult>? criticalFindings = null,
-        IReadOnlyList<string>? recommendations = null)
+        IReadOnlyList<AgentEval.GdprBenchmark.Reporting.Recommendation>? recommendations = null)
     {
         criticalFindings ??= [];
         recommendations ??= [];

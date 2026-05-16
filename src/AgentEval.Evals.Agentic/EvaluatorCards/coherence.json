@@ -2,7 +2,7 @@
   "schemaVersion": "1.0",
   "key": "coherence",
   "name": "Coherence",
-  "category": "quality",
+  "category": "rag",
   "version": "1.0.0",
   "description": "LLM judge assessing whether the agent response is internally consistent and logically coherent (no self-contradictions, smooth flow).",
   "costTier": "Low",

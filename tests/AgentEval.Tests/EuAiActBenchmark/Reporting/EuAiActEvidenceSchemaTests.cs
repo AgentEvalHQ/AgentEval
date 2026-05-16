@@ -85,7 +85,7 @@ public class EuAiActEvidenceSchemaTests
                 PerPillar: new Dictionary<string, EuAiActPillarSummary>(),
                 PerArticle: new Dictionary<string, EuAiActArticleSummary>()),
             CriticalFindings: Array.Empty<EvalResult>(),
-            Recommendations: Array.Empty<string>(),
+            Recommendations: Array.Empty<AgentEval.EuAiActBenchmark.Reporting.Recommendation>(),
             Disclaimer: EuAiActComplianceReporter.Disclaimer,
             EuAiActAttestation: new EuAiActAttestation(
                 JudgeMode: "mode-a",

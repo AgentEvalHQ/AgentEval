@@ -2,7 +2,7 @@
   "schemaVersion": "1.0",
   "key": "tool_efficiency",
   "name": "Tool Efficiency",
-  "category": "process",
+  "category": "agentic-process",
   "version": "1.0.0",
   "description": "LLM judge assessing whether the agent used the minimum tool calls needed (no redundant lookups, no obvious omissions).",
   "costTier": "Low",

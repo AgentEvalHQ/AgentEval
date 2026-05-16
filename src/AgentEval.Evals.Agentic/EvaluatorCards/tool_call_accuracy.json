@@ -2,21 +2,44 @@
   "schemaVersion": "1.0",
   "key": "tool_call_accuracy",
   "name": "Tool Call Accuracy",
-  "category": "process",
+  "category": "agentic-process",
   "version": "1.0.0",
   "description": "Composite of tool selection, input accuracy, output utilisation, call success, and tool efficiency. Aggregates 5 sub-LLM judges into a single score representing the agent's tool-use quality.",
   "costTier": "Medium",
   "higherIsBetter": true,
   "defaultThreshold": 0.8,
   "expectedInputs": [
-    { "kind": "query", "key": "", "required": true, "description": "The user's request that triggered the tool calls." },
-    { "kind": "response", "key": "", "required": true, "description": "The agent's final response." },
-    { "kind": "toolCalls", "key": "", "required": true, "description": "The sequence of tool invocations the agent made, including arguments and results." },
-    { "kind": "metadata", "key": "expected_actions", "required": false, "description": "Optional ground-truth actions for stricter scoring." }
+    {
+      "kind": "query",
+      "key": "",
+      "required": true,
+      "description": "The user's request that triggered the tool calls."
+    },
+    {
+      "kind": "response",
+      "key": "",
+      "required": true,
+      "description": "The agent's final response."
+    },
+    {
+      "kind": "toolCalls",
+      "key": "",
+      "required": true,
+      "description": "The sequence of tool invocations the agent made, including arguments and results."
+    },
+    {
+      "kind": "metadata",
+      "key": "expected_actions",
+      "required": false,
+      "description": "Optional ground-truth actions for stricter scoring."
+    }
   ],
   "recommendedVisualization": "radar",
   "compatibleWith": [
-    { "system": "foundry", "uri": "azureai://built-in/evaluators/tool_call_accuracy" }
+    {
+      "system": "foundry",
+      "uri": "azureai://built-in/evaluators/tool_call_accuracy"
+    }
   ],
   "links": {
     "documentation": "/docs/benchmarks/agentic/getting-started.md#tool-call-accuracy",

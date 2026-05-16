@@ -18,7 +18,7 @@ public sealed record EuAiActComplianceEvidence(
     EvalResult CompositeTree,
     EuAiActSummary Summary,
     IReadOnlyList<EvalResult> CriticalFindings,
-    IReadOnlyList<string> Recommendations,
+    IReadOnlyList<Recommendation> Recommendations,
     string Disclaimer,
     EuAiActAttestation EuAiActAttestation);
 

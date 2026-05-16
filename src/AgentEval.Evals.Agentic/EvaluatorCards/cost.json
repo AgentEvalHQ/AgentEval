@@ -2,7 +2,7 @@
   "schemaVersion": "1.0",
   "key": "cost",
   "name": "Telemetry: Cost",
-  "category": "telemetry",
+  "category": "operational",
   "version": "1.0.0",
   "description": "Pure-code telemetry evaluator returning the agent estimated dollar cost from AgenticTelemetry. Lower is better; pass when within budget.",
   "costTier": "Trivial",

@@ -18,7 +18,7 @@ public sealed record GdprComplianceEvidence(
     EvalResult CompositeTree,
     GdprSummary Summary,
     IReadOnlyList<EvalResult> CriticalFindings,
-    IReadOnlyList<string> Recommendations,
+    IReadOnlyList<Recommendation> Recommendations,
     string Disclaimer,
     GdprAttestation GdprAttestation);
 

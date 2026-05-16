@@ -2,7 +2,7 @@
   "schemaVersion": "1.0",
   "key": "token_usage",
   "name": "Telemetry: Token Usage",
-  "category": "telemetry",
+  "category": "operational",
   "version": "1.0.0",
   "description": "Pure-code telemetry evaluator returning prompt + completion token counts from AgenticTelemetry. Lower is better when constrained by budget.",
   "costTier": "Trivial",

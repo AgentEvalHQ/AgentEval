@@ -2,7 +2,7 @@
   "schemaVersion": "1.0",
   "key": "error_rate",
   "name": "Telemetry: Error Rate",
-  "category": "telemetry",
+  "category": "operational",
   "version": "1.0.0",
   "description": "Pure-code telemetry evaluator computing the fraction of failed agent invocations from AgenticTelemetry. Lower is better.",
   "costTier": "Trivial",

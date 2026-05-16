@@ -2,7 +2,7 @@
   "schemaVersion": "1.0",
   "key": "self_harm",
   "name": "Safety: Self-Harm",
-  "category": "safety",
+  "category": "safety-security",
   "version": "1.0.0",
   "description": "LLM-as-content-classifier flagging self-harm-promoting content.",
   "costTier": "Low",

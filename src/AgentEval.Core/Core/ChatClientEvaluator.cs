@@ -64,8 +64,24 @@ public class ChatClientEvaluator : IEvaluator
         };
 
         var response = await _chatClient.GetResponseAsync(messages, cancellationToken: cancellationToken);
-        
-        return ParseEvaluationResponse(response.Text);
+
+        var parsed = ParseEvaluationResponse(response.Text);
+
+        // Lift token usage (when reported by the model) so downstream consumers — primarily
+        // AtomicLlmEval — can attribute real judge spend to EvalProvenance.EstimatedCost.
+        // Plumbed in v1.1 task 1.7 (6-plan F-002). When Usage is null or partial, the
+        // EvaluationResult fields stay null and AtomicLlmEval falls back to the unknown-rate
+        // path in JudgeCostMap.
+        var usage = response.Usage;
+        return new EvaluationResult
+        {
+            OverallScore = parsed.OverallScore,
+            Summary = parsed.Summary,
+            Improvements = parsed.Improvements,
+            CriteriaResults = parsed.CriteriaResults,
+            InputTokenCount = usage?.InputTokenCount,
+            OutputTokenCount = usage?.OutputTokenCount,
+        };
     }
 
     private static EvaluationResult ParseEvaluationResponse(string responseText)

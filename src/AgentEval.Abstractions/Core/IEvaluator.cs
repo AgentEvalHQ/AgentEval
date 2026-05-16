@@ -31,15 +31,29 @@ public class EvaluationResult
 {
     /// <summary>Overall score from 0 to 100.</summary>
     public int OverallScore { get; init; }
-    
+
     /// <summary>Summary of the evaluation.</summary>
     public string Summary { get; init; } = "";
-    
+
     /// <summary>Suggested improvements.</summary>
     public IReadOnlyList<string> Improvements { get; init; } = [];
-    
+
     /// <summary>Individual criteria results.</summary>
     public IReadOnlyList<CriterionResult> CriteriaResults { get; init; } = [];
+
+    /// <summary>
+    /// Optional input (prompt) token count reported by the underlying chat model.
+    /// <c>null</c> when the evaluator did not invoke a chat model or the model did not report usage.
+    /// Surfaced via v1.1 task 1.7 so AgentEval.Evals.AtomicLlmEval can populate
+    /// <see cref="AgentEval.Evals.EvalProvenance.EstimatedCost"/> from real token usage.
+    /// </summary>
+    public long? InputTokenCount { get; init; }
+
+    /// <summary>
+    /// Optional output (completion) token count reported by the underlying chat model.
+    /// <c>null</c> when the evaluator did not invoke a chat model or the model did not report usage.
+    /// </summary>
+    public long? OutputTokenCount { get; init; }
 }
 
 /// <summary>
