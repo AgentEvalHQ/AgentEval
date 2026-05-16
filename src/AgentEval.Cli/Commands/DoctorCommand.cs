@@ -23,6 +23,14 @@ public static class DoctorCommand
     /// <summary>Runs the doctor command with an optional explicit root override (used in tests).</summary>
     internal static async Task<int> RunAsync(string? rootOverride)
     {
+        // Defense-in-depth canonicalisation for operator-supplied paths.
+        if (rootOverride is not null)
+        {
+            var canonical = WorkspaceRootValidator.CanonicaliseOrNull(rootOverride);
+            if (canonical is null) return 1;
+            rootOverride = canonical;
+        }
+
         var workspaceRoot = rootOverride ?? WorkspaceRootDiscovery.Find(Directory.GetCurrentDirectory());
         if (workspaceRoot is null)
         {

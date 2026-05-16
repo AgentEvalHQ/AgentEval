@@ -34,6 +34,14 @@ public static class McServeCommand
     public static async Task<int> RunAsync(int port, string? workspaceRoot)
     {
 #if NET10_0_OR_GREATER
+        // Defense-in-depth canonicalisation for operator-supplied --workspace.
+        if (workspaceRoot is not null)
+        {
+            var canonical = WorkspaceRootValidator.CanonicaliseOrNull(workspaceRoot);
+            if (canonical is null) return 1;
+            workspaceRoot = canonical;
+        }
+
         var resolvedRoot = workspaceRoot ?? Directory.GetCurrentDirectory();
         var agenteval = Path.Combine(resolvedRoot, ".agenteval");
         if (!Directory.Exists(agenteval))

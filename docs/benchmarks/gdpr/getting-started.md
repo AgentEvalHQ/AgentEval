@@ -4,7 +4,7 @@
 
 > **Disclaimer**: This benchmark evaluates an AI agent's dialog behavior against GDPR articles. It is a first-line screening tool for behavioral conformance, not a legal compliance attestation. A passing score does not mean the system is legally GDPR-compliant; it means the agent's observed responses, across the tested scenarios, satisfy the behavioral criteria encoded in the benchmark. Legal compliance depends on many factors outside the scope of any automated dialog benchmark, including encryption at rest, breach notification processes, DPIA documentation, international transfer mechanisms, and privacy-by-design at the infrastructure level. Consult a qualified Data Protection Officer and legal counsel before making any compliance claims to regulators, customers, or partners.
 
-> **v1 article coverage is non-exhaustive.** The current 16 articles span Pillars 1–5 (lawful basis, data subject rights, transparency, security, privacy by design). **Out of scope in v1 and not exercised by any preset:** Art 28 (processor contracts), Art 30 (records of processing), Art 33/34 (personal-data-breach notification — 72-hour clock + data-subject communication), Art 35 (DPIA), Art 37–39 (DPO obligations), Art 44–49 (international transfers — Schrems II / SCCs), Art 5(2) (accountability principle as a discrete control). These obligations are the ones DPAs prosecute most often; they require process + documentation evidence outside a dialog benchmark's reach. Plan to cover them in v2 via a separate "governance pillar" once a credible evidence pipeline (document-review + process-attestation) is wired up.
+> **v1 article coverage is non-exhaustive.** The current articles span Pillars 1–5 (foundations, lawful basis, subject rights, transparency, privacy by design). **Out of scope in v1 and not exercised by any preset:** Art 28 (processor contracts), Art 30 (records of processing), Art 33/34 (personal-data-breach notification — 72-hour clock + data-subject communication), Art 35 (DPIA), Art 37–39 (DPO obligations), Art 44–49 (international transfers — Schrems II / SCCs), Art 5(2) (accountability principle as a discrete control). These obligations are the ones DPAs prosecute most often; they require process + documentation evidence outside a dialog benchmark's reach. Plan to cover them in v2 via a separate "governance pillar" once a credible evidence pipeline (document-review + process-attestation) is wired up.
 
 ### Audiences and defensible claims
 
@@ -212,12 +212,26 @@ Domain packs are pre-built `WithExtraScenarios` extensions for specific vertical
 - `HR` — 7 scenarios targeting Art 6(1)(b)/(c) lawful basis for employment processing, Art 15 access in HR context, and Art 17 in the offboarding scenario.
 - `ChildrensService` — 8 scenarios targeting Art 8 age-of-consent checks, parental consent verification, and age-appropriate design.
 
-To compose a domain pack with a base preset in code:
+To compose a domain pack with the standard preset in code:
 
 ```csharp
-var eval = GdprBenchmark
-    .Standard()
-    .WithExtraScenarios(HealthcareDomainPack.Scenarios);
+// Build the article registry and the Standard preset
+var loader = new ArticleScenarioYamlLoader();
+var scenarioBuilder = new ScenarioToAtomicEval(judge, judgeModel: "gpt-4o");
+var articleBuilder = new ArticleCompositeBuilder(scenarioBuilder);
+var articles = new ArticlesRegistry(loader, articleBuilder);
+
+var standard = GdprBenchmark.Standard(articles);
+
+// Load the Healthcare domain pack and compose
+var healthcarePack = HealthcareScenarios.Load(scenarioBuilder);
+var eval = standard.WithExtraScenarios(healthcarePack);
+```
+
+For the CLI-equivalent invocation (no programmatic wiring), use the preset-composition syntax:
+
+```bash
+agenteval bench gdpr --preset standard+healthcare --subject MyAgent
 ```
 
 ---

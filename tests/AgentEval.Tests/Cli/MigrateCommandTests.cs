@@ -72,4 +72,23 @@ public class MigrateCommandTests : IDisposable
         var movedFiles = Directory.GetFiles(runsDir, "bar_2026-01-01_trace.json", SearchOption.AllDirectories);
         Assert.Single(movedFiles);
     }
+
+    [Fact]
+    public async Task Migrate_RootOverride_NonExistent_ReturnsExitOne()
+    {
+        // Defense-in-depth: --root pointing at a non-existent directory must
+        // surface as exit 1 (validator rejects), not crash deep in the pipeline.
+        var bogus = Path.Combine(Path.GetTempPath(), "definitely-not-a-real-dir-" + Guid.NewGuid().ToString("N"));
+        var result = await MigrateCommand.RunAsync(apply: false, root: null, rootOverride: bogus);
+        Assert.Equal(1, result);
+    }
+
+    [Fact]
+    public async Task Migrate_Root_NonExistent_ReturnsExitOne()
+    {
+        // Same path-traversal defense applied to the --root positional too.
+        var bogus = Path.Combine(Path.GetTempPath(), "definitely-not-a-real-dir-" + Guid.NewGuid().ToString("N"));
+        var result = await MigrateCommand.RunAsync(apply: false, root: bogus, rootOverride: null);
+        Assert.Equal(1, result);
+    }
 }

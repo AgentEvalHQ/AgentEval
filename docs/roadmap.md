@@ -76,11 +76,11 @@
 
 ### Plan 05 — Foundry-equivalent Agentic Suite
 **Status**: Shipped in v0.8.1-beta. The full evaluator suite runs today via `agenteval bench agentic`. Calibration coverage is partial — the headline system-and-process and RAG-quality categories meet the strict gate; the remaining categories run and produce verdicts but await fuller calibration evidence. The dispatch wiring for `bench agentic calibrate` is being extended to those categories in v1.1.
-**Scope**: Production-grade agentic evaluators forked from Microsoft Foundry's public MIT-licensed `.prompty` files. Each evaluator emits `evidence[]` instead of chain-of-thought, runs at `temperature: 0`, and carries pinned-commit provenance.
+**Scope**: Production-grade agentic evaluators forked from Microsoft Foundry's public MIT-licensed `.prompty` files. Each evaluator emits `evidence[]` instead of chain-of-thought, runs at `temperature: 0`, and carries date-stamped fork provenance (SHA-pinning tracked for v1.1).
 **Highlights**:
 - **10 categories**: Process (tool-call accuracy, tool selection, intent resolution), System (task completion, task adherence), RAG quality (groundedness, relevance, coherence, fluency, similarity, response-completeness, F1), Safety (violence, sexual content, protected material, hate, ungrounded attributes, indirect attack, code vulnerability, unsafe tool use), Reasoning, UX, Adversarial, Memory, Multi-turn, Calibration (epistemic).
 - **EvaluatorCard registry**: one card per evaluator carries display metadata, cost tier, calibration status — drives the Mission Control SPA's Evaluators page.
-- **Prompt provenance**: each forked judge prompt cites its public MIT-licensed Foundry source in the file header (commit SHA pinned, modifications enumerated). A Pearson-correlation cross-validation report generator (A5.4) is deferred to v1.1.
+- **Prompt provenance**: each forked judge prompt cites its public MIT-licensed Foundry source in the file header with a date-stamped fork reference (e.g., `main/2026-05`) and the modifications enumerated. Tightening the date stamps to real pinned commit SHAs per file is tracked as a v1.1 polish item. A Pearson-correlation cross-validation report generator (A5.4) is deferred to v1.1.
 - **Deferred to v1.1**: calibration-coverage extension to the remaining categories (task **1.3** in `11-v1.1-implementation-plan.md`).
 - **Deferred indefinitely**: A5.3 workflow-specific evaluators (stays in `AgentEval.MAF`), A5.4 Foundry Pearson-correlation report generator (data path ships; report is value-additive without ask), `AdjudicatedMultiJudgeWrapper` kappa-of-1 real fix (data-dependent), card-category drift audit (cosmetic).
 

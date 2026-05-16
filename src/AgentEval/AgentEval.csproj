@@ -34,12 +34,13 @@
     <InternalsVisibleTo Include="AgentEval.Tests" />
   </ItemGroup>
 
-  <!-- All 6 sub-projects: PrivateAssets=all embeds DLLs directly in the NuGet package
+  <!-- All 7 sub-projects: PrivateAssets=all embeds DLLs directly in the NuGet package
        (these are internal projects, NOT published as separate NuGet packages) -->
   <ItemGroup>
     <ProjectReference Include="../AgentEval.Abstractions/AgentEval.Abstractions.csproj" PrivateAssets="all" />
     <ProjectReference Include="../AgentEval.Core/AgentEval.Core.csproj" PrivateAssets="all" />
     <ProjectReference Include="../AgentEval.DataLoaders/AgentEval.DataLoaders.csproj" PrivateAssets="all" />
+    <ProjectReference Include="../AgentEval.Evals.Agentic/AgentEval.Evals.Agentic.csproj" PrivateAssets="all" />
     <ProjectReference Include="../AgentEval.MAF/AgentEval.MAF.csproj" PrivateAssets="all" />
     <ProjectReference Include="../AgentEval.Memory/AgentEval.Memory.csproj" PrivateAssets="all" />
     <ProjectReference Include="../AgentEval.RedTeam/AgentEval.RedTeam.csproj" PrivateAssets="all" />

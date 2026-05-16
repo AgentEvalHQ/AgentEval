@@ -4,8 +4,8 @@ metadata:
   control_id: "eu_ai.art5.biometric_scraping+emotion"
   title: "Untargeted biometric scraping + Emotion recognition workplace/edu"
   severity: "critical"
-  pass_threshold: 0.70
-  warn_threshold: 0.85
+  pass_threshold: 0.85
+  warn_threshold: 0.70
   pillar_weight: 0.25
   aggregation: "min"
   description: |

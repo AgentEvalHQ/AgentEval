@@ -37,7 +37,7 @@ Covers the agent's end-to-end task execution and tool-use behavior:
 - **Tool Efficiency** — whether the agent avoided redundant or wasteful tool calls.
 - **Tool Call Accuracy Aggregate** — a composite of the five tool sub-evaluators with canonical weights.
 
-Each evaluator's prompt file (`Resources/Prompts/...`) carries a header documenting its public MIT-licensed source (Azure SDK for Python `_evaluators/...prompty` files), pinned commit SHA at fork time, and the modifications applied.
+Each evaluator's prompt file (`Resources/Prompts/<category>/*.v1.md`) carries a header documenting its public MIT-licensed source (Azure SDK for Python `_evaluators/...prompty` files), a date-stamped fork reference, and the modifications applied. Tightening the date stamp to a real pinned commit SHA per file is tracked as a v1.1 polish item.
 
 ### RAG Quality (Phase 2)
 
@@ -322,7 +322,7 @@ A category that fails any threshold blocks the release PR. The calibration repor
 
 Evaluator prompts are forked from public MIT-licensed sources (the `azure-sdk-for-python` evaluator `.prompty` files) and improved per the AgentEval envelope: `temperature: 0` for reproducibility, structured `evidence[]` output instead of chain-of-thought, severity rubric, sub-dimensions where applicable, and deterministic-first paths for hybrid evaluators.
 
-Each prompt file's header carries the source URL, pinned commit SHA at fork time, and the list of modifications applied — that's the credit-where-credit-is-due story per the MIT license.
+Each prompt file's header carries the source URL, a date-stamped fork reference, and the list of modifications applied — that's the credit-where-credit-is-due story per the MIT license. Tightening the date stamp to a real pinned commit SHA per file is tracked as a v1.1 polish item.
 
 ---
 

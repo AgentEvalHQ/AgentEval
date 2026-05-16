@@ -61,7 +61,7 @@ Articles group into **six pillars**. Each pillar carries a *weight* (its relativ
 | 1 — Prohibited practices | Art 5 — manipulation, social scoring, predictive policing, biometric scraping, emotion recognition, real-time biometric ID, biometric categorisation | **highest** | **critical** for all sub-points |
 | 2 — Transparency to natural persons | Art 50 — AI-nature disclosure, deepfake labelling, emotion-system disclosure, AI-generated text labelling | high | high |
 | 3 — Human oversight | Art 14 — the agent must acknowledge limits and offer override paths | medium | high |
-| 4 — Risk-tier behaviour | Art 13 deployer transparency + Annex III high-risk-area recognition (employment, credit, education, healthcare) | medium | high |
+| 4 — Risk-tier behaviour | Art 13 deployer transparency + Annex III high-risk-area recognition (employment per III(4); credit per III(5)(b); education per III(3)). Healthcare and the remaining Annex III categories — law enforcement, justice, critical infrastructure — are out of scope for v1 | medium | high |
 | 5 — Robustness and accuracy | Art 15 — consistent behaviour, refusal of confidently-wrong answers in high-stakes contexts | medium | medium |
 | 6 — GPAI self-awareness | Art 51–55 — agent's epistemic honesty about its own model provenance | low | low (probe-only) |
 

@@ -2,24 +2,26 @@
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 
+using AgentEval.Evals.Agentic;
 using AgentEval.Memory.Extensions;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace AgentEval.DependencyInjection;
 
 /// <summary>
-/// Extension methods for registering all AgentEval services including RedTeam and Memory.
+/// Extension methods for registering all AgentEval services including RedTeam, Memory, and the Agentic suite.
 /// This extension is provided by the umbrella package. Use
 /// <see cref="AgentEvalServiceCollectionExtensions.AddAgentEval"/> (Core),
 /// <see cref="DataLoaderServiceCollectionExtensions.AddAgentEvalDataLoaders"/> (DataLoaders),
-/// <see cref="RedTeamServiceCollectionExtensions.AddAgentEvalRedTeam"/> (RedTeam), and
-/// <see cref="AgentEvalMemoryServiceCollectionExtensions.AddAgentEvalMemory"/> (Memory)
+/// <see cref="RedTeamServiceCollectionExtensions.AddAgentEvalRedTeam"/> (RedTeam),
+/// <see cref="AgentEvalMemoryServiceCollectionExtensions.AddAgentEvalMemory"/> (Memory), and
+/// <see cref="AgenticServiceCollectionExtensions.AddAgentEvalAgentic"/> (Agentic)
 /// individually if you only need a subset.
 /// </summary>
 public static class AgentEvalFullServiceCollectionExtensions
 {
     /// <summary>
-    /// Adds all AgentEval services (Core + DataLoaders + RedTeam + Memory) to the service collection.
+    /// Adds all AgentEval services (Core + DataLoaders + RedTeam + Memory + Agentic) to the service collection.
     /// This is the recommended entry point for consumers of the full AgentEval NuGet package.
     /// </summary>
     /// <param name="services">The service collection to add services to.</param>
@@ -43,6 +45,10 @@ public static class AgentEvalFullServiceCollectionExtensions
 
         // Register Memory evaluation services (memory benchmark runner, judge, scenarios, metrics, reporting).
         services.AddAgentEvalMemory();
+
+        // Register the agentic evaluator suite options (AgenticEvaluatorOptions).
+        // The evaluators themselves are constructed directly; this gives consumers a Options-pattern hook.
+        services.AddAgentEvalAgentic();
 
         return services;
     }

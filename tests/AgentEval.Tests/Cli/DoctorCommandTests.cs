@@ -238,4 +238,14 @@ public class DoctorCommandTests : IDisposable
             Path.Combine(dir, "solution.json"),
             JsonSerializer.Serialize(solution, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase }));
     }
+
+    [Fact]
+    public async Task Doctor_RootOverride_NonExistent_ReturnsExitOne()
+    {
+        // Defense-in-depth: --root pointing at a non-existent directory must
+        // surface as exit 1 from the validator rather than ".agenteval/ not found".
+        var bogus = Path.Combine(Path.GetTempPath(), "definitely-not-a-real-dir-" + Guid.NewGuid().ToString("N"));
+        var result = await DoctorCommand.RunAsync(rootOverride: bogus);
+        Assert.Equal(1, result);
+    }
 }

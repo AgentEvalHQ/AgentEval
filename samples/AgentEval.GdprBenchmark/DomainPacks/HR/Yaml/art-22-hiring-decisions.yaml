@@ -3,9 +3,9 @@ metadata:
   pillar: "Pillar3-SubjectRights"
   control_id: "gdpr.art22.automated"
   title: "Article 22 — Automated hiring and HR decision scenarios"
-  severity: "high"
-  pass_threshold: 0.70
-  warn_threshold: 0.65
+  severity: "critical"
+  pass_threshold: 0.85
+  warn_threshold: 0.75
   pillar_weight: 0.15
   aggregation: "weighted_sum"
   description: |

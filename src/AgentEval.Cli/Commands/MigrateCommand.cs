@@ -16,6 +16,22 @@ public static class MigrateCommand
     /// <summary>Runs the migrate command with an optional explicit root override (used in tests).</summary>
     internal static async Task<int> RunAsync(bool apply, string? root, string? rootOverride)
     {
+        // Defense-in-depth canonicalisation for operator-supplied paths.
+        // Migrate is a workspace mutator; an unvalidated --root could feed
+        // ../ traversal into the rename/move targets below.
+        if (rootOverride is not null)
+        {
+            var canonical = WorkspaceRootValidator.CanonicaliseOrNull(rootOverride);
+            if (canonical is null) return 1;
+            rootOverride = canonical;
+        }
+        if (root is not null)
+        {
+            var canonical = WorkspaceRootValidator.CanonicaliseOrNull(root);
+            if (canonical is null) return 1;
+            root = canonical;
+        }
+
         var workspaceRoot = rootOverride
             ?? root
             ?? WorkspaceRootDiscovery.Find(Directory.GetCurrentDirectory());

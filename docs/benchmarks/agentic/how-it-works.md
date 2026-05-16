@@ -16,7 +16,7 @@ This page explains, in everyday language, **what the agentic benchmark does**, h
 
 ## The structure, bottom-up
 
-The agentic benchmark is organised by *evaluator* rather than by article. There are around 60 named evaluators grouped into ten categories. Each evaluator answers one specific question about agent behaviour.
+The agentic benchmark is organised by *evaluator* rather than by article. There are around 60 named evaluators grouped into roughly a dozen categories. Each evaluator answers one specific question about agent behaviour.
 
 ```
                 ┌─────────────────────────────────────┐
@@ -45,7 +45,7 @@ The trace is what the evaluators look at. Some evaluators read the response only
 
 Each atomic evaluator answers one focused question. There are three kinds:
 
-- **LLM-judge evaluators** — a second AI grades the agent's output against a rubric (e.g., *Task Completion*, *Groundedness*, *Coherence*). The rubric is loaded from a prompt file (`src/AgentEval.Evals.Agentic/.../Prompts/*.prompty` or equivalent). Most rubrics are forked from the public MIT-licensed Azure SDK evaluators with documented modifications.
+- **LLM-judge evaluators** — a second AI grades the agent's output against a rubric (e.g., *Task Completion*, *Groundedness*, *Coherence*). The rubric is loaded from a prompt file under `src/AgentEval.Evals.Agentic/Resources/Prompts/<category>/*.v1.md`. Most rubrics are forked from the public MIT-licensed Azure SDK evaluators with documented modifications.
 - **Code-only evaluators** — pure C# code reads the trace and computes a score (e.g., *Latency*, *Cost*, *Token Usage*, *Error Rate*, *F1 Score*). No LLM call, no LLM cost.
 - **Hybrid evaluators** — deterministic check first, LLM fallback only when needed (e.g., *Tool Call Success* reads structured status fields if present, falls back to LLM only on free-text result strings).
 
@@ -65,9 +65,9 @@ ToolCallAccuracy = 0.25 × ToolSelection
 
 The composite score is useful as a single number, but the individual sub-scores tell you *which* dimension dragged the verdict down — "your tool selection is fine but your tool inputs are wrong" is far more actionable than just "tool calls scored 0.4".
 
-### Layer 4 — Categories (ten broad areas)
+### Layer 4 — Categories (the broad areas)
 
-Atomic + composite evaluators group into **ten categories** by concern. You don't have to run every evaluator every time; you pick a preset that activates a coherent subset.
+Atomic + composite evaluators group into **categories** by concern. You don't have to run every evaluator every time; you pick a preset that activates a coherent subset.
 
 | Category | What it covers |
 |---|---|
@@ -75,6 +75,7 @@ Atomic + composite evaluators group into **ten categories** by concern. You don'
 | **RAG Quality** | Groundedness, relevance, coherence, fluency, similarity, response completeness, F1 score |
 | **Judge Quality** | Meta-evaluators (no LLM): judge agreement, calibration accuracy, judge drift — for evaluator-health monitoring |
 | **Operational / Telemetry** | Pure-code: latency, token usage, cost, error rate, retry rate, tool latency, stochastic stability |
+| **Safety** | Prohibited actions, indirect prompt injection, hate / sexual / violence / self-harm, sensitive-data leakage, protected material, code vulnerability, system-prompt leakage, unsafe tool use, ungrounded attributes |
 | **Memory** | Memory recall accuracy, long-conversation coherence |
 | **Multi-turn** | Turn coherence, goal tracking, clarification appropriateness |
 | **Reasoning** | Reasoning correctness, goal decomposition, plan formulation, intermediate-step hallucination |
@@ -101,12 +102,12 @@ Each preset has its own pass threshold (e.g., agentic-execution requires 0.85; R
 
 Not every evaluator costs the same. The benchmark tags each evaluator with a **cost tier**:
 
-- **NONE** — pure-code evaluators that read trace metadata only (no LLM calls). Examples: Latency, Token Usage, F1 Score, Cost, Error Rate.
+- **TRIVIAL** — pure-code evaluators that read trace metadata only (no LLM calls). Examples: Latency, Token Usage, F1 Score, Cost, Error Rate.
 - **LOW** — single LLM call per scenario, shorter prompts.
 - **MEDIUM** — single LLM call per scenario, longer prompts (multi-criterion grading).
 - **HIGH** — multiple LLM calls per scenario (multi-judge consensus, Mode-B per-criterion split).
 
-The `--budget-tier low` flag filters the preset to keep only LOW and NONE tier evaluators. Useful for fast dev-loop iteration when you don't want to pay for the full sweep.
+The `--budget-tier low` flag filters the preset to keep only LOW and TRIVIAL tier evaluators. Useful for fast dev-loop iteration when you don't want to pay for the full sweep.
 
 ---
 
@@ -116,7 +117,7 @@ The agentic benchmark uses many judges (one per LLM-graded dimension), each with
 
 ### The golden datasets — reference truth per evaluator
 
-For each LLM-judge evaluator, we hand-labeled a set of scenario+response pairs with the expected verdict and rationale. The datasets live as JSONL files under `tests/AgentEval.Tests/Agentic/Golden/`.
+For each LLM-judge evaluator, we hand-labeled a set of scenario+response pairs with the expected verdict and rationale. The datasets live as JSONL files under `tests/AgentEval.Tests/Agentic/Calibration/Golden/`.
 
 Each dataset is *mixed-class by design* — it contains examples that should pass and examples that should fail. A single-class dataset would let the math collapse into a trivially-perfect-but-meaningless agreement number; mixed datasets force the judge to make real distinctions.
 
@@ -161,6 +162,7 @@ Specific kappa and accuracy values live in the dated baseline report under `stra
 | RAG Quality | **HIGH** (calibrated subset) | Groundedness, relevance, completeness meet the gate |
 | Judge Quality | **N/A — meta** | Meta-evaluators have no separate judge to calibrate |
 | Operational / Telemetry | **N/A — code-only** | No LLM judge to calibrate; deterministic from trace metadata |
+| Safety | **MEDIUM** (coverage gap) | Calibration coverage being expanded in v1.1; the Safety preset still runs and produces verdicts today |
 | Memory | **MEDIUM** (coverage gap) | Calibration coverage being expanded in v1.1 |
 | Multi-turn | **MEDIUM** (coverage gap) | Calibration coverage being expanded in v1.1 |
 | Reasoning | **MEDIUM** (coverage gap) | Calibration coverage being expanded in v1.1 |
@@ -175,7 +177,7 @@ Categories shown as MEDIUM run at runtime and produce verdicts — they just awa
 
 ## Why this is worth running
 
-1. **Coverage.** No single number tells you whether an agent is good. The benchmark gives you ten orthogonal angles — task completion, tool accuracy, RAG quality, reasoning, memory, safety — and shows where the agent succeeds and where it breaks.
+1. **Coverage.** No single number tells you whether an agent is good. The benchmark gives you many orthogonal angles — task completion, tool accuracy, RAG quality, reasoning, memory, safety — and shows where the agent succeeds and where it breaks.
 2. **Diagnosability.** Composite evaluators surface sub-scores. A 0.4 on Tool Call Accuracy tells you something failed; the sub-scores tell you *which dimension* — selection, inputs, outputs, execution, or efficiency.
 3. **Cost-tiered.** The `--budget-tier low` flag keeps inner-loop runs cheap. Operational evaluators run free (pure-code). Safety and RAG runs reserved for releases.
 4. **Forked-from-Foundry.** The LLM-judge prompts trace back to the public Azure SDK Foundry evaluator prompts — same lineage as the Microsoft tooling, with documented improvements (deterministic-first tool-call success, structured failure-type taxonomy, multi-judge consensus, sub-dimension splits).
