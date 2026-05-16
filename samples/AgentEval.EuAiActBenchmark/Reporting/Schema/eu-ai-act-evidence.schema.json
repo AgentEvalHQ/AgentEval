@@ -47,9 +47,14 @@
             "properties": {
               "controlId": { "type": "string" },
               "severity":  { "type": "string", "enum": ["low", "medium", "high", "critical"] },
-              "text":      { "type": "string" }
+              "text":      { "type": "string" },
+              "metadata":  {
+                "type": "object",
+                "additionalProperties": { "type": "string" },
+                "description": "Optional v1.2+ extension hook: arbitrary string-to-string metadata (evidence refs, correlation ids, …). Unknown keys here do not break older readers."
+              }
             },
-            "description": "Structured shape introduced in v1.1 (task 1.5)."
+            "description": "Structured shape introduced in v1.1 (task 1.5). Optional metadata hook added for v1.2 forward-compat (task LR7-F2)."
           }
         ]
       }

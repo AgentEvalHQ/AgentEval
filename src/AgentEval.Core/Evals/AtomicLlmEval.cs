@@ -15,6 +15,7 @@ public sealed class AtomicLlmEval : AtomicEval
     private readonly string? _promptId;
     private readonly double _passThreshold;
     private readonly string? _failureSeverity;
+    private readonly Func<string?, JudgeCostMap.ModelRate>? _rateResolver;
 
     /// <summary>
     /// Initialises a new <see cref="AtomicLlmEval"/>.
@@ -35,6 +36,15 @@ public sealed class AtomicLlmEval : AtomicEval
     /// <see cref="CapByWorstAggregation"/> to identify critical-article failures.
     /// When <c>null</c> (default), severity is computed from score: &lt;0.40 → "high", else "medium".
     /// </param>
+    /// <param name="rateResolver">
+    /// Optional per-instance cost-rate resolver. When supplied, takes precedence over the
+    /// static <see cref="JudgeCostMap"/> for this eval's cost computation — useful when a
+    /// tenant has a negotiated rate that differs from the public list price, when running
+    /// against a regional Azure deployment with regional pricing, or when overriding cost
+    /// in a test fixture. The delegate receives the judge model identifier
+    /// (<paramref name="judgeModel"/>) and returns a <see cref="JudgeCostMap.ModelRate"/>.
+    /// When <c>null</c> (default), falls back to <see cref="JudgeCostMap.GetRate(string?)"/>.
+    /// </param>
     public AtomicLlmEval(
         AgentEval.Core.IEvaluator evaluator,
         string key,
@@ -45,7 +55,8 @@ public sealed class AtomicLlmEval : AtomicEval
         double passThreshold = 0.70,
         string? judgeModel = null,
         string? promptId = null,
-        string? failureSeverity = null)
+        string? failureSeverity = null,
+        Func<string?, JudgeCostMap.ModelRate>? rateResolver = null)
         : base(key, name, category, version)
     {
         _evaluator = evaluator ?? throw new ArgumentNullException(nameof(evaluator));
@@ -56,6 +67,7 @@ public sealed class AtomicLlmEval : AtomicEval
         _judgeModel = judgeModel;
         _promptId = promptId;
         _failureSeverity = failureSeverity;
+        _rateResolver = rateResolver;
     }
 
     /// <inheritdoc/>
@@ -79,7 +91,20 @@ public sealed class AtomicLlmEval : AtomicEval
         {
             var inT = inputTokens ?? 0;
             var outT = outputTokens ?? 0;
-            estimatedCost = JudgeCostMap.EstimateCost(_judgeModel, inT, outT);
+            if (_rateResolver is not null)
+            {
+                // LR7-F1: per-instance resolver wins over the static JudgeCostMap.
+                // Lets a tenant override list price with a negotiated rate without
+                // forking or mutating the process-global rate table.
+                var rate = _rateResolver(_judgeModel);
+                if (inT > 0 || outT > 0)
+                    estimatedCost = (Math.Max(0, inT) / 1000.0) * rate.InputRatePer1K
+                                  + (Math.Max(0, outT) / 1000.0) * rate.OutputRatePer1K;
+            }
+            else
+            {
+                estimatedCost = JudgeCostMap.EstimateCost(_judgeModel, inT, outT);
+            }
             // EvalProvenance.TokensUsed is the legacy single-int totals field; sum the two
             // for backwards-compatible reporting. We clamp to int.MaxValue defensively even
             // though realistic judge transcripts are nowhere near that volume.

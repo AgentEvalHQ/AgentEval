@@ -125,6 +125,43 @@ public class AtomicLlmEvalCostTests
     }
 
     [Fact]
+    public async Task EvaluateAsync_WithRateResolver_OverridesStaticMap()
+    {
+        // LR7-F1: a per-instance rate resolver wins over JudgeCostMap.GetRate.
+        // Useful for tenants with negotiated rates that differ from list price.
+        var evaluator = new TokenReportingEvaluator(85, inputTokens: 1000, outputTokens: 1000);
+        Func<string?, JudgeCostMap.ModelRate> tenantResolver =
+            _ => new JudgeCostMap.ModelRate(InputRatePer1K: 0.00100, OutputRatePer1K: 0.00200);
+        var sut = new AtomicLlmEval(
+            evaluator: evaluator,
+            key: "test.cost",
+            name: "Test",
+            category: "test",
+            version: "1.0.0",
+            criteria: new[] { "scored well" },
+            passThreshold: 0.70,
+            judgeModel: "gpt-4o-mini",
+            rateResolver: tenantResolver);
+
+        var result = await sut.EvaluateAsync(MakeInput());
+
+        // Tenant rate: 0.00100 + 0.00200 = 0.00300 (NOT the static map's 0.00075)
+        Assert.Equal(0.00300, result.Provenance.EstimatedCost, precision: 8);
+    }
+
+    [Fact]
+    public async Task EvaluateAsync_NoRateResolver_UsesStaticMap()
+    {
+        // Confirms backward-compat: when no resolver is supplied the static map governs.
+        var evaluator = new TokenReportingEvaluator(85, inputTokens: 1000, outputTokens: 1000);
+        var sut = MakeSut(evaluator, judgeModel: "gpt-4o-mini");
+
+        var result = await sut.EvaluateAsync(MakeInput());
+
+        Assert.Equal(0.00075, result.Provenance.EstimatedCost, precision: 8);
+    }
+
+    [Fact]
     public async Task EvaluateAsync_Gpt41_UsesItsOwnRateNotLegacyGpt4()
     {
         // Regression guard for the LR7 finding: substring lookup would otherwise misprice
