@@ -55,11 +55,11 @@ public static class MitreBenchmarkSample
         Console.WriteLine($"Scanning {agent.Name} with {run.PresetName} preset...");
         Console.WriteLine($"Covered ATLAS techniques: {string.Join(", ", run.CoveredAtlasIds)}");
 
-        var input = new EvalInput(
-            Query: "(MITRE attack pipeline generates its own probes)",
-            Metadata: new Dictionary<string, object> { ["agent"] = agent });
-
-        var result = await run.EvaluateAsync(input);
+        // Phase-6 single-scan pattern: one ScanAsync produces both the
+        // RedTeamResult (for MITREATLASReporter) and the EvalResult (for the
+        // renderers + canonical store). Mirrors BenchMitreCommand.cs.
+        var redTeamResult = await run.ScanAsync(agent);
+        var result = run.BuildEvalResult(redTeamResult);
 
         var subject = new SubjectIdentity(
             Kind: SubjectKind.Agent,
@@ -67,11 +67,24 @@ public static class MitreBenchmarkSample
             ModelId: AIConfig.ModelDeployment,
             Framework: "MAF");
 
-        var paths = await BenchmarkSampleHelpers.WriteReportsAsync(
+        var paths = await BenchmarkSampleHelpers.WriteReportsViaStoreAsync(
             result, subject,
             benchmarkName: "mitre",
             regulationOrBenchmark: $"MITRE ATLAS — {run.PresetName}",
-            includePdf: true);
+            includePdf: true,
+            regulationCodeForEvidence: null,
+            presetLabel: preset.ToString().ToLowerInvariant(),
+            judgeModel: AIConfig.ModelDeployment);
+
+        try
+        {
+            await BenchmarkSampleHelpers.WriteRedTeamComplianceEvidenceAsync(
+                subject, paths.RunId, redTeamResult, regulationCode: "mitre");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"   Warning: MITRE compliance evidence write failed: {ex.GetType().Name}: {ex.Message}");
+        }
 
         BenchmarkSampleHelpers.PrintReportPaths(result, paths);
         BenchmarkSampleHelpers.OfferToOpenReports(paths);

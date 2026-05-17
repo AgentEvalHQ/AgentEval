@@ -97,11 +97,20 @@ public static class GdprBenchmarkSample
             ModelId: AIConfig.ModelDeployment,
             Framework: "MAF");
 
-        var paths = await BenchmarkSampleHelpers.WriteReportsAsync(
+        var paths = await BenchmarkSampleHelpers.WriteReportsViaStoreAsync(
             result, subject,
             benchmarkName: "gdpr",
             regulationOrBenchmark: $"GDPR — {presetLabel}",
-            includePdf: true);
+            includePdf: true,
+            regulationCodeForEvidence: "gdpr",
+            presetLabel: preset switch
+            {
+                SamplePreset.Standard => "standard",
+                SamplePreset.AuditGrade => "audit",
+                _ => "smoke",
+            },
+            gdprArticlesRegistry: registry,
+            judgeModel: AIConfig.ModelDeployment);
 
         BenchmarkSampleHelpers.PrintReportPaths(result, paths);
         BenchmarkSampleHelpers.OfferToOpenReports(paths);

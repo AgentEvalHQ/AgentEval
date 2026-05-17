@@ -57,11 +57,11 @@ public static class OwaspBenchmarkSample
         Console.WriteLine($"Scanning {agent.Name} with {run.PresetName} preset...");
         Console.WriteLine($"Covered OWASP IDs: {string.Join(", ", run.CoveredOwaspIds)}");
 
-        var input = new EvalInput(
-            Query: "(OWASP attack pipeline generates its own probes)",
-            Metadata: new Dictionary<string, object> { ["agent"] = agent });
-
-        var result = await run.EvaluateAsync(input);
+        // Phase-6 single-scan pattern: one ScanAsync produces both the
+        // RedTeamResult (for OWASPComplianceReporter) and the EvalResult (for
+        // the renderers + canonical store). Mirrors BenchOwaspCommand.cs.
+        var redTeamResult = await run.ScanAsync(agent);
+        var result = run.BuildEvalResult(redTeamResult);
 
         var subject = new SubjectIdentity(
             Kind: SubjectKind.Agent,
@@ -69,11 +69,27 @@ public static class OwaspBenchmarkSample
             ModelId: AIConfig.ModelDeployment,
             Framework: "MAF");
 
-        var paths = await BenchmarkSampleHelpers.WriteReportsAsync(
+        var paths = await BenchmarkSampleHelpers.WriteReportsViaStoreAsync(
             result, subject,
             benchmarkName: "owasp",
             regulationOrBenchmark: $"OWASP LLM Top 10 — {run.PresetName} preset",
-            includePdf: true);
+            includePdf: true,
+            // OWASP / MITRE reporters take a RedTeamResult — wired separately
+            // below via WriteRedTeamComplianceEvidenceAsync so this helper
+            // doesn't have to know about the red-team shape.
+            regulationCodeForEvidence: null,
+            presetLabel: preset.ToString().ToLowerInvariant(),
+            judgeModel: AIConfig.ModelDeployment);
+
+        try
+        {
+            await BenchmarkSampleHelpers.WriteRedTeamComplianceEvidenceAsync(
+                subject, paths.RunId, redTeamResult, regulationCode: "owasp");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"   Warning: OWASP compliance evidence write failed: {ex.GetType().Name}: {ex.Message}");
+        }
 
         BenchmarkSampleHelpers.PrintReportPaths(result, paths);
         BenchmarkSampleHelpers.OfferToOpenReports(paths);
