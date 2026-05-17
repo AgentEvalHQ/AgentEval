@@ -239,7 +239,7 @@ public class BenchCommandTests : IDisposable
         var attestation = baseJson.RootElement.GetProperty("attestation");
         // JudgeFactory.Resolve returns "override" as the judge model when evaluatorOverride is supplied.
         Assert.Equal("override", attestation.GetProperty("evaluatorModel").GetString());
-        Assert.Equal("AgentEval.GdprBenchmark", attestation.GetProperty("evaluator").GetString());
+        Assert.Equal("AgentEval.Compliance.Gdpr", attestation.GetProperty("evaluator").GetString());
     }
 
     // ── AGENTEVAL_ALLOW_STUB_JUDGE gate (batch-5 surface) ────────────────────

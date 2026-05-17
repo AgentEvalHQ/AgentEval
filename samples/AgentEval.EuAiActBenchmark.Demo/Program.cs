@@ -4,11 +4,11 @@
 
 using AgentEval.Core;
 using AgentEval.Evals;
-using AgentEval.EuAiActBenchmark.Articles;
-using AgentEval.EuAiActBenchmark.Articles.Building;
-using AgentEval.EuAiActBenchmark.Articles.Loading;
-using AgentEval.EuAiActBenchmark.Articles.Validation;
-using AgentEval.EuAiActBenchmark.Reporting;
+using AgentEval.Compliance.EuAiAct.Articles;
+using AgentEval.Compliance.EuAiAct.Articles.Building;
+using AgentEval.Compliance.EuAiAct.Articles.Loading;
+using AgentEval.Compliance.EuAiAct.Articles.Validation;
+using AgentEval.Compliance.EuAiAct.Reporting;
 using AgentEval.Output;
 
 QuestPDF.Settings.License = QuestPDF.Infrastructure.LicenseType.Community;
@@ -87,7 +87,7 @@ if (args.Length > 0 && args[0] == "smoke-run")
     return 0;
 }
 
-Console.WriteLine("AgentEval.EuAiActBenchmark — run via `agenteval bench eu-ai-act`.");
+Console.WriteLine("AgentEval.Compliance.EuAiAct — run via `agenteval bench eu-ai-act`.");
 Console.WriteLine("Smoke tests:");
 Console.WriteLine("  dotnet run -- smoke-load   (validate YAMLs)");
 Console.WriteLine("  dotnet run -- smoke-run    (end-to-end with stub judge)");

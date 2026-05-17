@@ -43,11 +43,11 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AgentEval.Evals.Agentic", "
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AgentEval.MissionControl", "src\AgentEval.MissionControl\AgentEval.MissionControl.csproj", "{14C5F2CF-AB0D-4BFC-84C5-69909FBCAF1F}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AgentEval.Evals.Compliance.Gdpr", "src\AgentEval.Evals.Compliance.Gdpr\AgentEval.Evals.Compliance.Gdpr.csproj", "{07DD6255-7298-444B-B90A-776B5331C82D}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AgentEval.Compliance.Gdpr", "src\AgentEval.Compliance.Gdpr\AgentEval.Compliance.Gdpr.csproj", "{07DD6255-7298-444B-B90A-776B5331C82D}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AgentEval.GdprBenchmark.Demo", "samples\AgentEval.GdprBenchmark.Demo\AgentEval.GdprBenchmark.Demo.csproj", "{436EAE2C-F823-4CCC-930A-ECF72DA45016}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AgentEval.Evals.Compliance.EuAiAct", "src\AgentEval.Evals.Compliance.EuAiAct\AgentEval.Evals.Compliance.EuAiAct.csproj", "{F566DC41-432B-4929-9EED-2FB3F4E77C98}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AgentEval.Compliance.EuAiAct", "src\AgentEval.Compliance.EuAiAct\AgentEval.Compliance.EuAiAct.csproj", "{F566DC41-432B-4929-9EED-2FB3F4E77C98}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AgentEval.EuAiActBenchmark.Demo", "samples\AgentEval.EuAiActBenchmark.Demo\AgentEval.EuAiActBenchmark.Demo.csproj", "{1F04C02E-05AE-46F2-8307-32F362E50137}"
 EndProject

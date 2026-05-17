@@ -4,18 +4,18 @@
 
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using AgentEval.GdprBenchmark.Articles;
-using AgentEval.GdprBenchmark.Articles.Building;
-using AgentEval.GdprBenchmark.Articles.Loading;
-using AgentEval.GdprBenchmark.Reporting;
-using AgentEval.GdprBenchmark.Reporting.Pdf;
+using AgentEval.Compliance.Gdpr.Articles;
+using AgentEval.Compliance.Gdpr.Articles.Building;
+using AgentEval.Compliance.Gdpr.Articles.Loading;
+using AgentEval.Compliance.Gdpr.Reporting;
+using AgentEval.Compliance.Gdpr.Reporting.Pdf;
 using AgentEval.Output;
-using EuAiActLoader = AgentEval.EuAiActBenchmark.Articles.Loading.ArticleScenarioYamlLoader;
-using EuAiActScenarioToAtomicEval = AgentEval.EuAiActBenchmark.Articles.Building.ScenarioToAtomicEval;
-using EuAiActArticleCompositeBuilder = AgentEval.EuAiActBenchmark.Articles.Building.ArticleCompositeBuilder;
-using AgentEval.EuAiActBenchmark.Articles;
-using AgentEval.EuAiActBenchmark.Reporting;
-using AgentEval.EuAiActBenchmark.Reporting.Pdf;
+using EuAiActLoader = AgentEval.Compliance.EuAiAct.Articles.Loading.ArticleScenarioYamlLoader;
+using EuAiActScenarioToAtomicEval = AgentEval.Compliance.EuAiAct.Articles.Building.ScenarioToAtomicEval;
+using EuAiActArticleCompositeBuilder = AgentEval.Compliance.EuAiAct.Articles.Building.ArticleCompositeBuilder;
+using AgentEval.Compliance.EuAiAct.Articles;
+using AgentEval.Compliance.EuAiAct.Reporting;
+using AgentEval.Compliance.EuAiAct.Reporting.Pdf;
 
 namespace AgentEval.Cli.Commands;
 

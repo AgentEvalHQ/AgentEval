@@ -2,24 +2,19 @@
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 
+using AgentEval.Benchmarks;
 using AgentEval.Core;
 using AgentEval.Evals;
-using AgentEval.EuAiActBenchmark.Articles;
-using AgentEval.EuAiActBenchmark.Articles.Building;
-using AgentEval.EuAiActBenchmark.Articles.Loading;
-using AgentEval.EuAiActBenchmark.Composition;
-using AgentEval.EuAiActBenchmark.DomainPacks.HighRiskCredit;
-using AgentEval.EuAiActBenchmark.DomainPacks.HighRiskEducation;
-using AgentEval.EuAiActBenchmark.DomainPacks.HighRiskEmployment;
-using AgentEval.EuAiActBenchmark.Reporting;
-using AgentEval.EuAiActBenchmark.Reporting.Pdf;
+using AgentEval.Compliance.EuAiAct.Articles;
+using AgentEval.Compliance.EuAiAct.Articles.Building;
+using AgentEval.Compliance.EuAiAct.Articles.Loading;
+using AgentEval.Compliance.EuAiAct.Composition;
+using AgentEval.Compliance.EuAiAct.DomainPacks.HighRiskCredit;
+using AgentEval.Compliance.EuAiAct.DomainPacks.HighRiskEducation;
+using AgentEval.Compliance.EuAiAct.DomainPacks.HighRiskEmployment;
+using AgentEval.Compliance.EuAiAct.Reporting;
+using AgentEval.Compliance.EuAiAct.Reporting.Pdf;
 using AgentEval.Output;
-// Alias is required: the `using AgentEval.EuAiActBenchmark.*;` directives above import the
-// parent namespace `AgentEval.EuAiActBenchmark`, which makes the bare identifier
-// `EuAiActBenchmark` resolve to that namespace, not the factory type in `AgentEval.Benchmarks`
-// (CS0234). See lastreview/11-phase4-gate-review.md §4 (Concern A). Do not remove without
-// first fully-qualifying every call site.
-using EuAiActBenchmarkFactory = AgentEval.Benchmarks.EuAiActBenchmark;
 
 namespace AgentEval.Cli.Commands;
 
@@ -72,7 +67,7 @@ public static class BenchEuAiActCommand
         // Phase-6 Task 6.8: load the embedded EU AI Act judge system prompt and pass
         // it through. See BenchCommand for rationale.
         var euAiActPrompt = EmbeddedPromptLoader.Load(
-            typeof(EuAiActBenchmarkFactory).Assembly,
+            typeof(EuAiActBenchmark).Assembly,
             "eu-ai-act-judge-system.v1.md");
         var (resolvedJudge, judgeModelName, exitCode) = JudgeFactory.Resolve(
             evaluatorOverride,
@@ -251,9 +246,9 @@ public static class BenchEuAiActCommand
 
         var basePreset = tokens[0].ToLowerInvariant() switch
         {
-            "smoke"                  => EuAiActBenchmarkFactory.Smoke(articles),
-            "standard"               => EuAiActBenchmarkFactory.Standard(articles),
-            "audit" or "auditgrade"  => EuAiActBenchmarkFactory.AuditGrade(articles),
+            "smoke"                  => EuAiActBenchmark.Smoke(articles),
+            "standard"               => EuAiActBenchmark.Standard(articles),
+            "audit" or "auditgrade"  => EuAiActBenchmark.AuditGrade(articles),
             _                        => throw new ArgumentException($"Unknown EU AI Act preset '{tokens[0]}'.", nameof(presetSpec))
         };
 

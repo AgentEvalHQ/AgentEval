@@ -41,8 +41,8 @@
     <ProjectReference Include="../AgentEval.Core/AgentEval.Core.csproj" PrivateAssets="all" />
     <ProjectReference Include="../AgentEval.DataLoaders/AgentEval.DataLoaders.csproj" PrivateAssets="all" />
     <ProjectReference Include="../AgentEval.Evals.Agentic/AgentEval.Evals.Agentic.csproj" PrivateAssets="all" />
-    <ProjectReference Include="../AgentEval.Evals.Compliance.Gdpr/AgentEval.Evals.Compliance.Gdpr.csproj" PrivateAssets="all" />
-    <ProjectReference Include="../AgentEval.Evals.Compliance.EuAiAct/AgentEval.Evals.Compliance.EuAiAct.csproj" PrivateAssets="all" />
+    <ProjectReference Include="../AgentEval.Compliance.Gdpr/AgentEval.Compliance.Gdpr.csproj" PrivateAssets="all" />
+    <ProjectReference Include="../AgentEval.Compliance.EuAiAct/AgentEval.Compliance.EuAiAct.csproj" PrivateAssets="all" />
     <ProjectReference Include="../AgentEval.Evals.Performance/AgentEval.Evals.Performance.csproj" PrivateAssets="all" />
     <ProjectReference Include="../AgentEval.MAF/AgentEval.MAF.csproj" PrivateAssets="all" />
     <ProjectReference Include="../AgentEval.Memory/AgentEval.Memory.csproj" PrivateAssets="all" />

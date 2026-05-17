@@ -7,5 +7,5 @@
 // but setting it here ensures it is configured for any direct invocations too.
 QuestPDF.Settings.License = QuestPDF.Infrastructure.LicenseType.Community;
 
-Console.WriteLine("AgentEval.GdprBenchmark — run via `agenteval bench gdpr`.");
+Console.WriteLine("AgentEval.Compliance.Gdpr — run via `agenteval bench gdpr`.");
 return 0;

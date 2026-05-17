@@ -4,17 +4,11 @@
 
 using AgentEval.Cli.Commands;
 using AgentEval.Core;
+using AgentEval.Benchmarks;
 using AgentEval.Evals;
-using AgentEval.GdprBenchmark.Articles;
-using AgentEval.GdprBenchmark.Articles.Building;
-using AgentEval.GdprBenchmark.Articles.Loading;
-// Alias is required: even though this file's enclosing namespace is `AgentEval.Tests.Cli`
-// (no direct shadowing), the `using AgentEval.GdprBenchmark.Articles.*;` directives above
-// import a child of the parent `AgentEval.GdprBenchmark` namespace, which makes the bare
-// identifier `GdprBenchmark` resolve to that namespace, not the factory type in
-// `AgentEval.Benchmarks` (CS0234). See lastreview/11-phase4-gate-review.md §4 (Concern A).
-// Do not remove without first fully-qualifying every call site.
-using GdprBenchmarkFactory = AgentEval.Benchmarks.GdprBenchmark;
+using AgentEval.Compliance.Gdpr.Articles;
+using AgentEval.Compliance.Gdpr.Articles.Building;
+using AgentEval.Compliance.Gdpr.Articles.Loading;
 using Xunit;
 
 namespace AgentEval.Tests.Cli;
@@ -70,7 +64,7 @@ public class BenchCommandPresetCompositionTests
     {
         // Arrange
         var (articles, scenarioBuilder) = MakeRegistry();
-        var expected = GdprBenchmarkFactory.Standard(articles);
+        var expected = GdprBenchmark.Standard(articles);
 
         // Act
         var result = BenchCommand.ResolvePreset("standard", articles, scenarioBuilder);
@@ -85,7 +79,7 @@ public class BenchCommandPresetCompositionTests
     {
         // Arrange
         var (articles, scenarioBuilder) = MakeRegistry();
-        var standard = GdprBenchmarkFactory.Standard(articles);
+        var standard = GdprBenchmark.Standard(articles);
         var standardArt9 = FindArticle(standard, "gdpr.art9.special_categories")!;
         var originalArt9Count = standardArt9.Components.Count;
 
@@ -127,7 +121,7 @@ public class BenchCommandPresetCompositionTests
     {
         // Arrange
         var (articles, scenarioBuilder) = MakeRegistry();
-        var standard = GdprBenchmarkFactory.Standard(articles);
+        var standard = GdprBenchmark.Standard(articles);
         var originalArt9Count = FindArticle(standard, "gdpr.art9.special_categories")!.Components.Count;
         var originalArt22Count = FindArticle(standard, "gdpr.art22.automated")!.Components.Count;
 

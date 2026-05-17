@@ -5,10 +5,10 @@
 using System.Reflection;
 using System.Text;
 using AgentEval.Core;
-using AgentEval.EuAiActBenchmark.Articles;
-using AgentEval.EuAiActBenchmark.Articles.Building;
-using AgentEval.EuAiActBenchmark.Articles.Loading;
-using AgentEval.EuAiActBenchmark.Calibration;
+using AgentEval.Compliance.EuAiAct.Articles;
+using AgentEval.Compliance.EuAiAct.Articles.Building;
+using AgentEval.Compliance.EuAiAct.Articles.Loading;
+using AgentEval.Compliance.EuAiAct.Calibration;
 
 namespace AgentEval.Cli.Commands;
 

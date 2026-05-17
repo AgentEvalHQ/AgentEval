@@ -3,7 +3,7 @@
 // Licensed under the MIT License.
 
 using AgentEval.Evals;
-using AgentEval.GdprBenchmark.Articles;
+using AgentEval.Compliance.Gdpr.Articles;
 using AgentEval.Output;
 
 namespace AgentEval.Cli.Commands;

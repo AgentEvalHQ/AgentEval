@@ -9,6 +9,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\AgentEval.Evals.Compliance.EuAiAct\AgentEval.Evals.Compliance.EuAiAct.csproj" />
+    <ProjectReference Include="..\..\src\AgentEval.Compliance.EuAiAct\AgentEval.Compliance.EuAiAct.csproj" />
   </ItemGroup>
 </Project>
