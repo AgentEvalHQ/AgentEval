@@ -5,6 +5,7 @@ using Azure.AI.OpenAI;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
 using AgentEval.Core;
+using AgentEval.Core.Benchmarks;       // BenchmarkFamilyRegistry (Phase 9 supplementary section)
 using AgentEval.DataLoaders;
 using AgentEval.Evals;
 using AgentEval.Benchmarks;
@@ -99,7 +100,87 @@ public static class BenchmarkSystem
         Console.WriteLine($"   |  Overall Accuracy:       {(double)passed / Math.Max(1, prompts.Count),27:P1}   |");
         Console.WriteLine("   +----------------------------------------------------------+");
 
+        // ── Supplementary: enumerate registered benchmark families (Phase 9 / ADR-017 Convention 3)
+        EnumerateRegisteredFamilies(judge);
+
         PrintKeyTakeaways();
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // Benchmark Family Registry — discovery surface added in v0.10.0-beta
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// Demonstrates <see cref="BenchmarkFamilyRegistry"/> — the canonical discovery
+    /// mechanism for benchmark families (ADR-017 Convention 3). Every shipped family
+    /// auto-registers via <c>[ModuleInitializer]</c> on assembly load; third-party plugins
+    /// that publish a NuGet package can drop into the same surface via the same mechanism.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>Assembly-anchor pattern</b>: <see cref="BenchmarkFamilyRegistry"/> is populated
+    /// lazily by <c>[ModuleInitializer]</c>-attributed methods that run the first time
+    /// any code in the owning assembly is touched. In a real CLI / Mission Control we'd
+    /// touch one type from each expected assembly to force-load. In this sample, we
+    /// reach the agentic family by virtue of <c>AgenticBenchmark.ToolCallAccuracy(...)</c>
+    /// being called above. Other families that haven't been touched yet (GDPR, EU AI
+    /// Act, OWASP, MITRE, LongMemEval, Memory, Performance) live in assemblies the
+    /// umbrella NuGet embeds via <c>PrivateAssets="all"</c> — their <c>[ModuleInitializer]</c>
+    /// hooks will fire once we reference any type from them; we don't here, so we get
+    /// at least one family in this minimal sample.
+    /// </para>
+    /// </remarks>
+    private static void EnumerateRegisteredFamilies(IEvaluator judge)
+    {
+        Console.WriteLine();
+        Console.WriteLine("   +============================================================+");
+        Console.WriteLine("   |   BenchmarkFamilyRegistry — Registered Families (v0.10.0)   |");
+        Console.WriteLine("   +============================================================+");
+
+        // ── 1. Enumerate all registered families ────────────────────────────────
+        var families = BenchmarkFamilyRegistry.All;
+        Console.WriteLine($"\n   {families.Count} families currently registered:");
+        foreach (var family in families)
+        {
+            Console.WriteLine($"     • {family.Name,-14} ({family.DefaultCostTier,-6}) — {family.Description}");
+            foreach (var preset in family.Presets)
+            {
+                var tier = preset.CostTier?.ToString() ?? family.DefaultCostTier.ToString();
+                Console.WriteLine($"         └─ {preset.Name,-22} [{tier,-6}] {preset.Description}");
+            }
+        }
+        Console.WriteLine();
+        Console.WriteLine("   NOTE: In this minimal sample, only assemblies referenced from this");
+        Console.WriteLine("         file are loaded; other families (GDPR / EU AI Act / OWASP /");
+        Console.WriteLine("         MITRE / LongMemEval / Memory / Performance) auto-register");
+        Console.WriteLine("         when their assembly is touched. The CLI's `bench --list`");
+        Console.WriteLine("         force-loads every umbrella sub-assembly before enumeration.");
+
+        // ── 2. Look up a specific family by name ────────────────────────────────
+        var agentic = BenchmarkFamilyRegistry.TryGet("agentic");
+        if (agentic is not null)
+        {
+            Console.WriteLine($"\n   Lookup `TryGet(\"agentic\")` returned:");
+            Console.WriteLine($"     Name:        {agentic.Name}");
+            Console.WriteLine($"     CostTier:    {agentic.DefaultCostTier}");
+            Console.WriteLine($"     Presets:     {agentic.Presets.Count} ({string.Join(", ", agentic.Presets.Select(p => p.Name))})");
+            Console.WriteLine($"     DocLink:     {agentic.DocLinkUrl ?? "(none)"}");
+            Console.WriteLine($"     OwningAsm:   {agentic.OwningAssemblyName ?? "(unknown)"}");
+
+            // ── 3. Construct a CompositeEval from registry metadata (Shape A) ──
+            // The CompositeFactory delegate produces a CompositeEval given a preset
+            // name + optional judge — the same shape the static factories return,
+            // but driven purely by registry metadata (useful for plugins / dynamic CLIs).
+            try
+            {
+                var compositeFromRegistry = agentic.CompositeFactory?.Invoke("agentic-execution", judge);
+                Console.WriteLine($"     Composite:   {compositeFromRegistry?.GetType().Name ?? "(no composite factory)"}");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"     Composite:   (factory threw — {ex.GetType().Name}: {ex.Message})");
+            }
+        }
     }
 
     // ═══════════════════════════════════════════════════════════════════════════

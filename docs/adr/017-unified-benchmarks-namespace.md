@@ -2,11 +2,11 @@
 
 ## Status
 
-**Accepted** (2026-05-17). Implementation in flight for v0.10.0-beta — phases 0–5 closed on branch `feature/v0.10.0-unified-benchmarks` as of 2026-05-17. Updated 2026-05-17 to add three durable conventions (Phase 4b compliance internal rename, `BenchmarkFamilyRegistry` as canonical registry, `EvaluateAsync` as canonical result-type homogenisation primitive) plus the Opus gate-review-after-every-phase rule.
+**Implemented in v0.10.0-beta** (2026-05-17). Registry canonical at commit `2f6fbc5` (Phase 8); Phase-5b yellow closeout (OWASP `Top10ForRag` honesty gap) at commit `ac0cece`. All nine phases (0-8 + 5b) complete on branch `feature/v0.10.0-unified-benchmarks`; Phase 9 closes the docs gap (`CHANGELOG.md` v0.10.0-beta entries, this ADR status update, `docs/architecture.md` "Benchmark family registration" section, sample registry-enumeration snippet). Phase 10 = final pre-merge review + tag.
 
 ## Date
 
-2026-05-17 (revision 2 — extended scope; see "Conventions established by this ADR" below)
+2026-05-17 (revision 3 — implementation complete; status moved from "Accepted" to "Implemented in v0.10.0-beta" with commit references and the Verification subsection enumerating the contract tests that pin each convention)
 
 ## Context
 
@@ -238,6 +238,22 @@ Gate-review verdicts:
 No phase is considered closed until its gate-review is ✅ or 🟡-with-documented-follow-ups. The reviewing agent flips the relevant rows in the master tracking table to ✅; the executing agent flips rows to 🟦 / ✅ as each task completes. The status column is the single source of truth for "where are we right now" — never leave it stale across a session boundary.
 
 This convention emerged from observing Sonnet's tendency to over-report success on complex phases (Phase 4 in particular surfaced two material follow-ups Sonnet missed — Concerns A and B in `lastreview/11-phase4-gate-review.md` — that only Opus #12 caught on independent review).
+
+## Verification
+
+Each of the four conventions is pinned by a dedicated contract test that fails the build if a future change drifts away from the convention:
+
+| Convention | Contract test | Assembly | What it asserts |
+|---|---|---|---|
+| **1** — Top-level factory namespace = `AgentEval.Benchmarks` | `BenchmarkNamespaceContractTests` (P4.6, extended P4b.5) | `tests/AgentEval.Tests/Benchmarks/` | Reflection enumerates every `*Benchmark`-suffixed factory type across the umbrella's sub-assemblies and asserts each lives in `AgentEval.Benchmarks` (with a documented exception list for domain types like `*BenchmarkRunner` / `*BenchmarkResult`). `MemoryBenchmarkNamespaceContractTest` covers `MemoryBenchmark` + `LongMemEvalBenchmark` in `AgentEval.Memory.Tests` (the umbrella's `PrivateAssets="all"` referencing pattern means main contract test can't reach Memory types directly). |
+| **2** — `EvaluateAsync(EvalInput) → EvalResult` adapter | `PerformanceBenchmarkAdapterTests`, `OwaspBenchmarkTests` round-trip, `MitreBenchmarkTests` round-trip | `tests/AgentEval.Tests/Benchmarks/` and `tests/AgentEval.Tests/RedTeam/Reporting/Compliance/` | Calls `EvaluateAsync` against a synthetic `EvalInput`, asserts the returned `EvalResult` has the expected `SubResults` shape (one leaf per category / metric), and round-trips through `IRunOutputStore` so audit-chain hashing succeeds. The Performance variant additionally asserts the `CapByWorst` aggregation caps the composite on a single critical-fail leaf. |
+| **3** — `BenchmarkFamilyRegistry` canonical | `BenchmarkFamilyRegistryTests` (12 tests) + `BenchListCommandTests.OutputComesFromRegistry` (extensibility) + `BenchmarkFamilyRegistryIntegrationTests` (Memory.Tests, 5 tests) | `tests/AgentEval.Tests/Benchmarks/` and `tests/AgentEval.Memory.Tests/Benchmarks/` | Asserts that registration / lookup / enumerate-all / unique-name / preset-overlap / extensibility / thread-safety invariants hold; `AllEightDefaultFamilies_AppearInRegistry` confirms the eight default families register on assembly load; `OutputComesFromRegistry` proves `bench --list` is genuinely registry-sourced (not a hardcoded constant) by registering a synthetic UUID-named family at runtime and asserting it appears in CLI output. |
+| **4** — Opus gate-review after every phase | Sign-off docs under `strategy/FutureFeatures/todo/lastreview/{N}-phase{M}-gate-review.md` | (process, not code) | Documents 1-9 in the `lastreview/` directory cover Phases 1 through 8 plus 5b. Each gate-review documents the gates that passed, anything Opus would push back on, and items to fold into the next phase's brief. Phase 9 is reviewed by `18-phase9-gate-review.md`. Phase 10 (final pre-merge) is reviewed by a follow-up document at tag time. |
+
+The Verification subsection means a future contributor adding (say) a `HipaaBenchmark` family
+needs to satisfy all four contract tests — name in `AgentEval.Benchmarks` (1), `EvaluateAsync`
+adapter if not `CompositeEval`-native (2), `[ModuleInitializer]` registration (3) — or the
+build fails. Process convention (4) is enforced by the review workflow, not the test suite.
 
 ## Implementation note
 
