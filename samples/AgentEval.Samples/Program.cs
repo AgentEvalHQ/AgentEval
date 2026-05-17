@@ -115,6 +115,19 @@ public static class Program
 
         PrintBanner();
 
+        // Forward `--preset <value>` from argv into AGENTEVAL_SAMPLES_PRESET so
+        // BenchmarkSampleHelpers.ResolvePreset (which is called from inside each
+        // RunAsync) picks it up without having to thread args through every sample.
+        // Documented in samples/AgentEval.Samples/Benchmarks/README.md.
+        for (var i = 0; i < args.Length - 1; i++)
+        {
+            if (string.Equals(args[i], "--preset", StringComparison.OrdinalIgnoreCase))
+            {
+                Environment.SetEnvironmentVariable("AGENTEVAL_SAMPLES_PRESET", args[i + 1]);
+                break;
+            }
+        }
+
         if (!AIConfig.IsConfigured)
             AIConfig.PrintMissingCredentialsWarning();
 
