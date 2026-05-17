@@ -73,6 +73,7 @@ public static class GdprBenchmarkSample
             includePdf: true);
 
         BenchmarkSampleHelpers.PrintReportPaths(result, paths);
+        BenchmarkSampleHelpers.OfferToOpenReports(paths);
 
         Console.WriteLine();
         Console.WriteLine("   KEY TAKEAWAYS:");

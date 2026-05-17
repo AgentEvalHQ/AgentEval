@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 AgentEval Contributors
 
+using System.Diagnostics;
 using System.Text.Json;
 using AgentEval.Core.Evals.Rendering;
 using AgentEval.Evals;
@@ -118,4 +119,95 @@ internal static class BenchmarkSampleHelpers
         if (paths.pdf is not null)
             Console.WriteLine($"   PDF:  {paths.pdf}");
     }
+
+    /// <summary>
+    /// Prompts the user to open one of the just-saved report files with the OS default
+    /// application (HTML / JSON / PDF). Skipped automatically in non-interactive contexts
+    /// (input redirected, or <c>AGENTEVAL_SAMPLES_NONINTERACTIVE=1</c> set in the
+    /// environment) so CI / scripted runs do not hang waiting on a keypress.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Cross-platform: uses <see cref="Process.Start(ProcessStartInfo)"/> with
+    /// <c>UseShellExecute = true</c>, which on Windows hands the path to the shell
+    /// (default app for the extension) and on macOS/Linux routes through the platform's
+    /// xdg-open / open handler. Any failure falls back to printing the path for manual open.
+    /// </para>
+    /// <para>
+    /// Accepted keys (case-insensitive): <c>h</c> = HTML, <c>j</c> = JSON,
+    /// <c>p</c> = PDF (only offered when a PDF was produced), <c>n</c> / Enter / anything
+    /// else = skip.
+    /// </para>
+    /// </remarks>
+    public static void OfferToOpenReports((string json, string html, string? pdf) paths)
+    {
+        if (IsNonInteractive()) return;
+
+        Console.WriteLine();
+        var prompt = paths.pdf is not null
+            ? "   Open the report? [h] HTML  [j] JSON  [p] PDF  [n] no: "
+            : "   Open the report? [h] HTML  [j] JSON  [n] no: ";
+        Console.Write(prompt);
+
+        ConsoleKeyInfo key;
+        try
+        {
+            key = Console.ReadKey(intercept: false);
+        }
+        catch (InvalidOperationException)
+        {
+            // No console available (e.g. dotnet run launched without a TTY) — skip gracefully.
+            Console.WriteLine();
+            return;
+        }
+        Console.WriteLine();
+
+        var ch = char.ToLowerInvariant(key.KeyChar);
+        switch (ch)
+        {
+            case 'h':
+                TryOpen(paths.html);
+                break;
+            case 'j':
+                TryOpen(paths.json);
+                break;
+            case 'p':
+                if (paths.pdf is not null) TryOpen(paths.pdf);
+                else Console.WriteLine("   (no PDF was produced for this sample)");
+                break;
+            default:
+                // 'n', Enter, or any other key → skip silently.
+                break;
+        }
+    }
+
+    /// <summary>
+    /// Attempts to open the file at <paramref name="path"/> with the OS default app
+    /// using <see cref="Process.Start(ProcessStartInfo)"/> + <c>UseShellExecute=true</c>.
+    /// Falls back to printing the path for manual open if the shell-execute call fails.
+    /// </summary>
+    public static void TryOpen(string path)
+    {
+        try
+        {
+            Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"   Could not open — open manually at: {path}");
+            Console.WriteLine($"   ({ex.GetType().Name}: {ex.Message})");
+        }
+    }
+
+    /// <summary>
+    /// Returns true when the host is non-interactive (no stdin TTY, or
+    /// <c>AGENTEVAL_SAMPLES_NONINTERACTIVE=1</c> set). Used by the open-after-save and
+    /// report-browser prompts so CI / scripted runs never hang.
+    /// </summary>
+    public static bool IsNonInteractive() =>
+        Console.IsInputRedirected ||
+        string.Equals(
+            Environment.GetEnvironmentVariable("AGENTEVAL_SAMPLES_NONINTERACTIVE"),
+            "1",
+            StringComparison.Ordinal);
 }

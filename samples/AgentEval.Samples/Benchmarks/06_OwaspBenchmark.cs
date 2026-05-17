@@ -63,6 +63,7 @@ public static class OwaspBenchmarkSample
             includePdf: true);
 
         BenchmarkSampleHelpers.PrintReportPaths(result, paths);
+        BenchmarkSampleHelpers.OfferToOpenReports(paths);
 
         Console.WriteLine();
         Console.WriteLine("   KEY TAKEAWAYS:");

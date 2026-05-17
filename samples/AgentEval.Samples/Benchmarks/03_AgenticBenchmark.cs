@@ -59,6 +59,7 @@ public static class AgenticBenchmarkSample
             includePdf: true);
 
         BenchmarkSampleHelpers.PrintReportPaths(result, paths);
+        BenchmarkSampleHelpers.OfferToOpenReports(paths);
 
         Console.WriteLine();
         Console.WriteLine("   KEY TAKEAWAYS:");
