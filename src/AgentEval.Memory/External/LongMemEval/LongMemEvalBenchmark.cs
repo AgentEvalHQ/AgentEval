@@ -51,14 +51,17 @@ namespace AgentEval.Benchmarks;
 /// </list>
 /// </para>
 /// <para>
-/// <b>EvaluateAsync deviation</b>: Unlike <c>MitreBenchmark</c> and
-/// <c>OwaspBenchmark</c>, this façade does <em>not</em> expose an
-/// <c>EvaluateAsync(EvalInput) → EvalResult</c> Convention-2 adapter. LongMemEval
-/// has its own well-defined "run all N questions, compute accuracy" semantics and
-/// the runner already produces an <c>ExternalBenchmarkResult</c> that the CLI
-/// and Mission Control can persist as-is. An <c>EvaluateAsync</c> adapter will
-/// be wired in Phase 8 via <c>BenchmarkFamilyRegistry</c> when the canonical
-/// adapter shape for external-dataset benchmarks is established.
+/// <b>EvaluateAsync deviation</b>: This façade does <em>not</em> expose an
+/// <c>EvaluateAsync(EvalInput) → EvalResult</c> Convention-2 adapter because
+/// LongMemEval's semantics ("run all N questions, compute accuracy across question
+/// types") do not map cleanly onto the single-shot <c>(EvalInput) → EvalResult</c>
+/// shape that Convention 2 was designed for. Instead, LongMemEval registers via
+/// the registry's <b>Shape B</b> path (per ADR-017 Convention 3, established in
+/// Phase 8): callers obtain the runner via <c>BenchmarkFamilyRegistry.TryGet("longmemeval")
+/// .RunnerFactory("subset")</c> or directly via <see cref="Subset"/> / <see cref="Full"/>,
+/// then invoke <c>runner.RunAsync(agent, config)</c> to get the native
+/// <c>ExternalBenchmarkResult</c>. The CLI and Mission Control persist this native
+/// result as-is.
 /// </para>
 /// <para>
 /// <b>Convention 1 (ADR-017)</b>: this class lives in <c>AgentEval.Benchmarks</c>
@@ -104,9 +107,14 @@ public static partial class LongMemEvalBenchmark
     {
         ArgumentNullException.ThrowIfNull(chatClient);
 
+        // Phase 8 (v0.10.0-beta): bake SubsetOptions into the runner so the preset's
+        // intended sampling cap + random seed are actually applied. The 2-arg
+        // RunAsync(agent, config) overload uses these defaults. Closes the Phase-7
+        // gate-review concern about dead RandomSeed/MaxQuestions.
         return AgentEval.Memory.External.LongMemEval.LongMemEvalBenchmarkRunner.Create(
             chatClient,
-            datasetPath: null);   // null → use embedded subset
+            datasetPath: null,        // null → use embedded subset
+            defaultOptions: SubsetOptions);
     }
 
     /// <summary>
@@ -162,12 +170,27 @@ public static partial class LongMemEvalBenchmark
     {
         ArgumentNullException.ThrowIfNull(chatClient);
 
-        // Resolve dataset path from env var; null falls back to embedded subset in the runner.
+        // Phase 8 (v0.10.0-beta): Full() now throws when LONGMEMEVAL_DATASET_PATH is
+        // unset, rather than silently degrading to the 30-question embedded subset.
+        // The previous behaviour was a real footgun — operators would believe they had
+        // reproduced LongMemEval paper scores when in fact they had run a tiny
+        // stratified sample. Closes the Phase-7 gate-review concern.
         var envPath = Environment.GetEnvironmentVariable("LONGMEMEVAL_DATASET_PATH");
+        if (string.IsNullOrWhiteSpace(envPath))
+        {
+            throw new InvalidOperationException(
+                "LongMemEvalBenchmark.Full() requires the LONGMEMEVAL_DATASET_PATH environment " +
+                "variable to point at the full LongMemEval dataset JSON file. The dataset is NOT " +
+                "bundled with AgentEval — download longmemeval_s.json (~500 questions) from " +
+                "https://github.com/xiaowu0162/LongMemEval and set the env var to its absolute path. " +
+                "For development / CI use LongMemEvalBenchmark.Subset(chatClient) instead, which " +
+                "uses the embedded 30-question stratified sample.");
+        }
 
         return AgentEval.Memory.External.LongMemEval.LongMemEvalBenchmarkRunner.Create(
             chatClient,
-            datasetPath: envPath);
+            datasetPath: envPath,
+            defaultOptions: FullOptions);
     }
 
     /// <summary>

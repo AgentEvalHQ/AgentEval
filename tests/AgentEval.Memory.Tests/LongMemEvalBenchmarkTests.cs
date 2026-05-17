@@ -2,6 +2,7 @@
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 
+using System.Text.Json;
 using AgentEval.Benchmarks;
 using AgentEval.Memory.External.LongMemEval;
 using AgentEval.Memory.External.Models;
@@ -37,6 +38,10 @@ public class LongMemEvalBenchmarkTests
     [Fact]
     public void Full_ReturnsNonNull_LongMemEvalBenchmarkRunner()
     {
+        // Phase 8 (v0.10.0-beta): Full() now requires LONGMEMEVAL_DATASET_PATH.
+        // Set a fake path for construction-only tests (the runner won't actually
+        // read the file in this test).
+        using var _ = SetEnvVar("LONGMEMEVAL_DATASET_PATH", "/fake/path/to/longmemeval-s.json");
         var client = new StubChatClient();
         var runner = LongMemEvalBenchmark.Full(client);
 
@@ -47,6 +52,7 @@ public class LongMemEvalBenchmarkTests
     [Fact]
     public void Subset_And_Full_ReturnDistinctRunnerInstances()
     {
+        using var _ = SetEnvVar("LONGMEMEVAL_DATASET_PATH", "/fake/path/to/longmemeval-s.json");
         var client = new StubChatClient();
         var subset = LongMemEvalBenchmark.Subset(client);
         var full = LongMemEvalBenchmark.Full(client);
@@ -130,6 +136,131 @@ public class LongMemEvalBenchmarkTests
         Assert.Throws<ArgumentNullException>(() => LongMemEvalBenchmark.Full(null!));
     }
 
+    // ─── Phase 8 (v0.10.0-beta) follow-ups from Phase 7 gate review ────────────
+
+    /// <summary>
+    /// Phase 8 follow-up #2: Full() must throw a clear InvalidOperationException
+    /// when LONGMEMEVAL_DATASET_PATH is unset, rather than silently degrading to the
+    /// 30-question embedded subset.
+    /// </summary>
+    [Fact]
+    public void Full_WhenEnvVarUnset_Throws_InvalidOperationException()
+    {
+        var client = new StubChatClient();
+        var oldValue = Environment.GetEnvironmentVariable("LONGMEMEVAL_DATASET_PATH");
+        Environment.SetEnvironmentVariable("LONGMEMEVAL_DATASET_PATH", null);
+        try
+        {
+            var ex = Assert.Throws<InvalidOperationException>(() => LongMemEvalBenchmark.Full(client));
+            Assert.Contains("LONGMEMEVAL_DATASET_PATH", ex.Message);
+            Assert.Contains("Subset", ex.Message);
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("LONGMEMEVAL_DATASET_PATH", oldValue);
+        }
+    }
+
+    /// <summary>
+    /// Phase 8 follow-up #1: Subset() now bakes SubsetOptions into the returned runner's
+    /// DefaultOptions so the preset's intended sampling cap and random seed are actually
+    /// applied (closes the Phase 7 dead-RandomSeed footgun).
+    /// </summary>
+    [Fact]
+    public void Subset_RunnerHasDefaultOptionsBakedIn()
+    {
+        var client = new StubChatClient();
+        var runner = LongMemEvalBenchmark.Subset(client);
+
+        Assert.NotNull(runner.DefaultOptions);
+        Assert.Equal(30, runner.DefaultOptions!.MaxQuestions);
+        Assert.Equal(42, runner.DefaultOptions.RandomSeed);
+        Assert.Equal("Subset", runner.DefaultOptions.DatasetMode);
+        Assert.True(runner.DefaultOptions.StratifiedSampling);
+    }
+
+    /// <summary>
+    /// Phase 8 follow-up #4: round-trip serialization of ExternalBenchmarkResult through
+    /// System.Text.Json must preserve all top-level metric fields. This catches accidental
+    /// `[JsonIgnore]` regressions on the result record.
+    /// </summary>
+    [Fact]
+    public void ExternalBenchmarkResult_RoundTripSerialization_PreservesMetrics()
+    {
+        var original = new ExternalBenchmarkResult
+        {
+            BenchmarkId = "longmemeval",
+            BenchmarkName = "LongMemEval (ICLR 2025)",
+            OverallAccuracy = 73.5,
+            TaskAveragedAccuracy = 71.2,
+            PerTypeResults = new Dictionary<string, TypeResult>
+            {
+                ["temporal-reasoning"] = new TypeResult
+                {
+                    TypeName = "temporal-reasoning",
+                    TotalQuestions = 5,
+                    CorrectQuestions = 4,
+                    Duration = TimeSpan.FromSeconds(15),
+                },
+            },
+            QuestionResults = new List<QuestionResult>
+            {
+                new QuestionResult
+                {
+                    QuestionId = "q-1",
+                    QuestionType = "temporal-reasoning",
+                    Question = "What date did the user mention?",
+                    GoldAnswer = "2024-01-15",
+                    AgentResponse = "January 15, 2024",
+                    Correct = true,
+                    RawScore = 1.0,
+                    JudgeExplanation = "Date matches",
+                    Duration = TimeSpan.FromSeconds(3),
+                },
+            },
+            Duration = TimeSpan.FromMinutes(2),
+            TotalLlmCalls = 60,
+            EstimatedCostUsd = 0.024,
+            Options = new ExternalBenchmarkOptions
+            {
+                MaxQuestions = 30,
+                StratifiedSampling = true,
+                RandomSeed = 42,
+                PreserveSessionBoundaries = true,
+                IncludeTimestamps = true,
+                DatasetMode = "Subset"
+            }
+        };
+
+        var json = JsonSerializer.Serialize(original);
+        var rehydrated = JsonSerializer.Deserialize<ExternalBenchmarkResult>(json);
+
+        Assert.NotNull(rehydrated);
+        Assert.Equal(original.BenchmarkId, rehydrated!.BenchmarkId);
+        Assert.Equal(original.BenchmarkName, rehydrated.BenchmarkName);
+        Assert.Equal(original.OverallAccuracy, rehydrated.OverallAccuracy);
+        Assert.Equal(original.TaskAveragedAccuracy, rehydrated.TaskAveragedAccuracy);
+        Assert.Equal(original.TotalLlmCalls, rehydrated.TotalLlmCalls);
+        Assert.Equal(original.EstimatedCostUsd, rehydrated.EstimatedCostUsd);
+        Assert.Equal(original.Duration, rehydrated.Duration);
+        Assert.Single(rehydrated.PerTypeResults);
+        Assert.Single(rehydrated.QuestionResults);
+        Assert.Equal("Subset", rehydrated.Options.DatasetMode);
+    }
+
+    /// <summary>
+    /// Phase 8 follow-up #4: the embedded LongMemEval subset resource must load and
+    /// return at least 1 entry (i.e. the resource is actually embedded and parseable).
+    /// </summary>
+    [Fact]
+    public void LongMemEvalDataLoader_LoadEmbedded_ReturnsAtLeastOneEntry()
+    {
+        var opts = LongMemEvalBenchmark.SubsetOptions;
+        var entries = LongMemEvalDataLoader.LoadEmbedded(opts);
+
+        Assert.NotEmpty(entries);
+    }
+
     // ─── Runner identity ───────────────────────────────────────────────────────
 
     [Fact]
@@ -146,6 +277,7 @@ public class LongMemEvalBenchmarkTests
     [Fact]
     public void Runner_DisplayName_ContainsLongMemEval()
     {
+        using var _ = SetEnvVar("LONGMEMEVAL_DATASET_PATH", "/fake/path/to/longmemeval-s.json");
         var client = new StubChatClient();
         var runner = LongMemEvalBenchmark.Full(client);
 
@@ -153,6 +285,21 @@ public class LongMemEvalBenchmarkTests
     }
 
     // ─── Helper ───────────────────────────────────────────────────────────────
+
+    /// <summary>Scoped environment variable setter that restores the prior value on Dispose().</summary>
+    private static IDisposable SetEnvVar(string name, string? value)
+    {
+        var prev = Environment.GetEnvironmentVariable(name);
+        Environment.SetEnvironmentVariable(name, value);
+        return new ScopedDisposable(() => Environment.SetEnvironmentVariable(name, prev));
+    }
+
+    private sealed class ScopedDisposable : IDisposable
+    {
+        private readonly Action _onDispose;
+        public ScopedDisposable(Action onDispose) { _onDispose = onDispose; }
+        public void Dispose() => _onDispose();
+    }
 
     /// <summary>
     /// Minimal <see cref="IChatClient"/> stub for façade construction tests.

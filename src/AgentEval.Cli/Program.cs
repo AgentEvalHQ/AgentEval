@@ -36,9 +36,28 @@ migrateCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =>
 // ─── bench ───────────────────────────────────────────────────────────────────
 var benchCmd = new Command("bench", "Run a benchmark against an agent");
 
+// Phase 8 (v0.10.0-beta): anchor every benchmark-bearing assembly so module initializers
+// have fired before any --help / --list surface inspects BenchmarkFamilyRegistry. The
+// anchor is idempotent — same-content registrations are no-ops.
+AgentEval.Cli.Commands.BenchListCommand.AnchorAssemblies();
+
+// bench --list (Phase 8 / v0.10.0-beta): enumerates BenchmarkFamilyRegistry. NOT a hardcoded list.
+var benchListOpt = new Option<bool>("--list") { Description = "List every registered benchmark family with its presets and cost tiers (sourced from BenchmarkFamilyRegistry, not a hardcoded list)." };
+benchCmd.Add(benchListOpt);
+
+// Helper for per-family --help: pull the family's preset list from BenchmarkFamilyRegistry
+// so the help text is sourced from the registry rather than a hardcoded string.
+static string PresetsHelpFromRegistry(string familyName)
+{
+    var family = AgentEval.Core.Benchmarks.BenchmarkFamilyRegistry.TryGet(familyName);
+    if (family is null) return $"Preset (family '{familyName}' is not registered).";
+    var lines = family.Presets.Select(p => $"  {p.Name} — {p.Description}");
+    return $"Preset (sourced from BenchmarkFamilyRegistry):" + Environment.NewLine + string.Join(Environment.NewLine, lines);
+}
+
 // bench gdpr — options with defaults handled in the action handler via ??
 // Phase-7 Task 7.21: --subject required (breaking).
-var benchPresetOpt = new Option<string?>("--preset") { Description = "Preset: smoke | standard | audit (default: standard). Domain-pack composition: standard+healthcare | standard+hr | standard+childrens (multi-pack composition like standard+healthcare+hr also supported)." };
+var benchPresetOpt = new Option<string?>("--preset") { Description = PresetsHelpFromRegistry("gdpr") + Environment.NewLine + "Default: standard. Domain-pack composition: standard+healthcare | standard+hr | standard+childrens (multi-pack composition like standard+healthcare+hr also supported)." };
 var benchSubjectOpt = new Option<string?>("--subject") { Description = "Subject name (agent or workflow under evaluation). REQUIRED — no default; previously defaulted to 'default-agent'." };
 var benchRootOpt = new Option<string?>("--root") { Description = "Workspace root path (default: auto-detected)" };
 var benchInputOpt = new Option<string?>("--input") { Description = "Agent input text for the evaluation (default: built-in fixture)" };
@@ -82,7 +101,7 @@ benchCmd.Add(benchGdprCmd);
 
 // bench eu-ai-act — same shape as bench gdpr, EU AI Act presets
 // Phase-7 Tasks 7.21 + 7.22: --subject AND --input required (breaking).
-var benchEuAiActPresetOpt = new Option<string?>("--preset") { Description = "Preset: smoke | standard | audit (default: standard). Domain-pack composition: standard+high-risk-employment | standard+high-risk-credit | standard+high-risk-education (multi-pack composition like standard+high-risk-employment+high-risk-credit also supported)." };
+var benchEuAiActPresetOpt = new Option<string?>("--preset") { Description = PresetsHelpFromRegistry("eu-ai-act") + Environment.NewLine + "Default: standard. Domain-pack composition: standard+high-risk-employment | standard+high-risk-credit | standard+high-risk-education (multi-pack composition like standard+high-risk-employment+high-risk-credit also supported)." };
 var benchEuAiActSubjectOpt = new Option<string?>("--subject") { Description = "Subject name. REQUIRED — no default; previously defaulted to 'default-agent'." };
 var benchEuAiActRootOpt = new Option<string?>("--root") { Description = "Workspace root path (default: auto-detected)" };
 var benchEuAiActInputOpt = new Option<string?>("--input") { Description = "Agent input text for the evaluation. REQUIRED — no default; previously a hard-coded fixture was used." };
@@ -126,7 +145,7 @@ benchEuAiActCmd.Add(euCalibrateCmd);
 benchCmd.Add(benchEuAiActCmd);
 
 // bench agentic — same shape as bench eu-ai-act, agentic presets
-var benchAgenticPresetOpt = new Option<string?>("--preset") { Description = "Preset: agentic-execution | tool-call-accuracy | rag-quality | judge-quality | safety | telemetry | stochastic-stability | conversational | reasoning | user-experience | adversarial-direct (default: agentic-execution). The judge-quality, telemetry, and stochastic-stability presets are pure-code (no LLM cost). The safety preset uses a default empty policy; supply custom policies programmatically." };
+var benchAgenticPresetOpt = new Option<string?>("--preset") { Description = PresetsHelpFromRegistry("agentic") + Environment.NewLine + "Default: agentic-execution. judge-quality / telemetry / stochastic-stability are pure-code (no LLM cost); safety needs a programmatic policy resolver." };
 var benchAgenticSubjectOpt = new Option<string?>("--subject") { Description = "Subject name. REQUIRED — no default; previously defaulted to 'default-agent'." };
 var benchAgenticRootOpt = new Option<string?>("--root") { Description = "Workspace root path (default: auto-detected)" };
 var benchAgenticInputOpt = new Option<string?>("--input") { Description = "Agent input text for the evaluation (default: built-in fixture)" };
@@ -169,7 +188,7 @@ benchCmd.Add(benchAgenticCmd);
 
 // bench owasp — Phase 5 (v0.10.0-beta): OWASP LLM Top 10 red-team scan.
 // Presets: top10 | smoke | audit | top10-rag.
-var benchOwaspPresetOpt = new Option<string?>("--preset") { Description = "Preset: top10 | smoke | audit (=auditgrade) | top10-rag (=top10forrag). Default: top10. The smoke preset uses 3 attacks (PromptInjection + Jailbreak + PIILeakage); top10 / top10-rag / audit use all 9 attacks. audit runs at Comprehensive intensity for higher-confidence verdicts." };
+var benchOwaspPresetOpt = new Option<string?>("--preset") { Description = PresetsHelpFromRegistry("owasp") + Environment.NewLine + "Default: top10. The smoke preset uses 3 attacks (PromptInjection + Jailbreak + PIILeakage); audit runs at Comprehensive intensity for higher-confidence verdicts." };
 var benchOwaspSubjectOpt = new Option<string?>("--subject") { Description = "Subject name (agent or workflow under evaluation). REQUIRED." };
 var benchOwaspRootOpt = new Option<string?>("--root") { Description = "Workspace root path (default: auto-detected)" };
 var benchOwaspInputOpt = new Option<string?>("--input") { Description = "Provenance text for the run (the OWASP attack pipeline generates its own probes; --input is recorded for traceability, not consumed by attacks)." };
@@ -195,7 +214,7 @@ benchCmd.Add(benchOwaspCmd);
 
 // bench mitre — Phase 6 (v0.10.0-beta): MITRE ATLAS red-team scan.
 // Presets: atlas-baseline | atlas-smoke | atlas-audit-grade.
-var benchMitrePresetOpt = new Option<string?>("--preset") { Description = "Preset: atlas-baseline | atlas-smoke | atlas-audit-grade (=atlas-audit, audit). Default: atlas-baseline. The atlas-smoke preset uses 3 attacks (PromptInjection + Jailbreak + PIILeakage); atlas-baseline / atlas-audit-grade use all 9 attacks. atlas-audit-grade runs at Comprehensive intensity for higher-confidence verdicts." };
+var benchMitrePresetOpt = new Option<string?>("--preset") { Description = PresetsHelpFromRegistry("mitre") + Environment.NewLine + "Default: atlas-baseline. The atlas-smoke preset uses 3 attacks (PromptInjection + Jailbreak + PIILeakage); atlas-audit-grade runs at Comprehensive intensity for higher-confidence verdicts." };
 var benchMitreSubjectOpt = new Option<string?>("--subject") { Description = "Subject name (agent or workflow under evaluation). REQUIRED." };
 var benchMitreRootOpt = new Option<string?>("--root") { Description = "Workspace root path (default: auto-detected)" };
 var benchMitreInputOpt = new Option<string?>("--input") { Description = "Provenance text for the run (the MITRE ATLAS attack pipeline generates its own probes; --input is recorded for traceability, not consumed by attacks)." };
@@ -218,6 +237,52 @@ benchMitreCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =>
     return await BenchMitreCommand.RunAsync(preset, subject, root, input);
 });
 benchCmd.Add(benchMitreCmd);
+
+// bench perf — Phase 8 (v0.10.0-beta): Performance benchmark CLI surface (previously CLI-less).
+// Sub-commands resolve the "perf" family from BenchmarkFamilyRegistry and dispatch to its
+// Convention-2 EvaluateAsync adapter.
+{
+    var benchPerfSubjectOpt = new Option<string?>("--subject") { Description = "Subject name (agent or workflow under evaluation). REQUIRED." };
+    var benchPerfPromptOpt = new Option<string?>("--prompt") { Description = "Prompt to measure against (default: 'Hello!')." };
+    var benchPerfRootOpt = new Option<string?>("--root") { Description = "Workspace root path (default: auto-detected)" };
+
+    var benchPerfCmd = new Command("perf", "Run a performance benchmark (latency, throughput, cost)");
+
+    foreach (var presetName in new[] { "latency", "throughput", "cost" })
+    {
+        var presetCmd = new Command(presetName, $"Run the perf {presetName} preset");
+        presetCmd.Add(benchPerfSubjectOpt);
+        presetCmd.Add(benchPerfPromptOpt);
+        presetCmd.Add(benchPerfRootOpt);
+        var capturedPreset = presetName;
+        presetCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =>
+        {
+            var subject = parseResult.GetValue(benchPerfSubjectOpt);
+            if (string.IsNullOrWhiteSpace(subject))
+            {
+                Console.Error.WriteLine("Error: --subject is required.");
+                return 1;
+            }
+            var prompt = parseResult.GetValue(benchPerfPromptOpt);
+            var root = parseResult.GetValue(benchPerfRootOpt);
+            return await BenchPerfCommand.RunAsync(capturedPreset, subject, prompt, root);
+        });
+        benchPerfCmd.Add(presetCmd);
+    }
+    benchCmd.Add(benchPerfCmd);
+}
+
+// bench --list handler attaches to the bench root via SetAction so that
+// `agenteval bench --list` (without a sub-command) prints the registry listing.
+benchCmd.SetAction((ParseResult parseResult, CancellationToken ct) =>
+{
+    if (parseResult.GetValue(benchListOpt))
+    {
+        return Task.FromResult(BenchListCommand.Run());
+    }
+    Console.Error.WriteLine("Usage: agenteval bench {family} [--preset NAME] ... | agenteval bench --list");
+    return Task.FromResult(1);
+});
 
 // ─── compliance ───────────────────────────────────────────────────────────────
 var complianceCmd = new Command("compliance", "Compliance reporting commands");
