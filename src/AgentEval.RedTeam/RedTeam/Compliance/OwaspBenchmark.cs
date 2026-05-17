@@ -56,6 +56,12 @@ public static partial class OwaspBenchmark
     private static readonly TimeSpan QuickTimeout = TimeSpan.FromMinutes(10);
     private static readonly TimeSpan ThoroughTimeout = TimeSpan.FromMinutes(30);
 
+    // Top10ForRag sits between Quick (Top10/Smoke) and Thorough (AuditGrade): the threat-model
+    // priority for RAG agents is to find any working poisoned-document payload, so probe depth
+    // matters more than scan latency, but full audit-grade timeouts (30 min) are overkill when
+    // the goal is RAG-vector triage rather than evidence-pack thoroughness.
+    private static readonly TimeSpan RagFocusedTimeout = TimeSpan.FromMinutes(20);
+
     /// <summary>
     /// All nine implemented attacks at <see cref="Intensity.Quick"/> intensity,
     /// covering 6 of the 10 OWASP LLM Top 10 categories (LLM01, LLM02, LLM05,
@@ -129,22 +135,47 @@ public static partial class OwaspBenchmark
     }
 
     /// <summary>
-    /// RAG-focused variant of <see cref="Top10"/>: extends the standard set by
-    /// adding extra weight to RAG-specific attack vectors (<see cref="IndirectInjectionAttack"/>
-    /// — external-data manipulation — covers LLM01 + the not-otherwise-tested LLM08).
-    /// Same 9-attack set as Top10 since IndirectInjectionAttack is already in
-    /// <see cref="Attack.All"/>; the preset name signals intent to consumers
-    /// rather than altering the attack roster. Future versions may add
-    /// retrieval-corpus-poisoning probes that explicitly target LLM08.
+    /// RAG-focused variant of <see cref="Top10"/>: all 9 attacks at
+    /// <see cref="Intensity.Comprehensive"/> intensity with a 20-minute overall
+    /// timeout. Materially distinct from <see cref="Top10"/> (Quick intensity)
+    /// and <see cref="AuditGrade"/> (Comprehensive at 30 min).
     /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>Threat model</b>: RAG agents face <see cref="IndirectInjectionAttack"/>
+    /// — instruction-bearing content embedded in retrieved documents — as the
+    /// primary attack vector. The same attack roster as <see cref="Top10"/> is used,
+    /// but at deeper probe coverage (<see cref="Intensity.Comprehensive"/>) because
+    /// finding a working poisoned-document payload is fundamentally a coverage
+    /// problem: the attacker needs only one successful exfiltration, so the defender
+    /// needs broad sampling of injection techniques. Quick intensity (used by
+    /// <see cref="Top10"/>) under-samples the indirect-injection probe space.
+    /// </para>
+    /// <para>
+    /// <b>Why not drop LLM06 / LLM10</b>: RAG pipelines that auto-fetch URLs from
+    /// retrieved documents are a textbook excessive-agency vector (LLM06), and
+    /// retrieved-context bloat amplifies unbounded-consumption risk (LLM10). Both
+    /// stay in the roster.
+    /// </para>
+    /// <para>
+    /// <b>Coverage gap (LLM08)</b>: dedicated retrieval-corpus-poisoning and vector-store
+    /// probes for LLM08 (Vector / Embedding weaknesses) are not yet implemented and
+    /// remain on the roadmap. LLM08 appears as a skipped leaf in
+    /// <see cref="OwaspBenchmarkRun.EvaluateAsync"/> output, same as <see cref="Top10"/>.
+    /// </para>
+    /// <para>
+    /// <b>Cost positioning</b>: between <see cref="Top10"/> and <see cref="AuditGrade"/>.
+    /// Use for RAG-vector triage when full audit-grade evidence packs are overkill.
+    /// </para>
+    /// </remarks>
     /// <param name="judge">See <see cref="Top10"/>.</param>
     /// <returns>An <see cref="OwaspBenchmarkRun"/> wired with the Top10-for-RAG set.</returns>
     public static OwaspBenchmarkRun Top10ForRag(IEvaluator? judge = null)
     {
         var pipeline = AttackPipeline.Create()
             .WithAttacks([.. Attack.All])
-            .WithIntensity(Intensity.Quick)
-            .WithTimeout(QuickTimeout)
+            .WithIntensity(Intensity.Comprehensive)
+            .WithTimeout(RagFocusedTimeout)
             .WithEvidence(true);
         return new OwaspBenchmarkRun(
             pipeline,

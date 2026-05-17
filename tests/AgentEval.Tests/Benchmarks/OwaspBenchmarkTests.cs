@@ -78,6 +78,66 @@ public class OwaspBenchmarkTests
         Assert.NotNull(run);
         Assert.Equal("Top10ForRag", run.PresetName);
         Assert.Equal(Attack.All.Count, run.Pipeline.GetProbePreview().Select(p => p.AttackName).Distinct().Count());
+
+        // Coverage parity with Top10: same 6 OWASP categories tested at the agent-API layer
+        // (LLM08 retrieval-corpus-poisoning probes are roadmap, not yet shipped).
+        var covered = run.CoveredOwaspIds;
+        Assert.Equal(6, covered.Count);
+        Assert.Contains("LLM01", covered);
+    }
+
+    /// <summary>
+    /// Phase-5 yellow closeout (lastreview/17-phase5b-gate-review.md): <see cref="OwaspBenchmark.Top10ForRag"/>
+    /// must be materially distinct from <see cref="OwaspBenchmark.Top10"/>, not just a relabel.
+    /// We verify divergence via probe count: Comprehensive intensity strictly increases the
+    /// probe count vs Quick across the 9-attack roster, so a label-only duplicate would fail this.
+    /// </summary>
+    [Fact]
+    public void Top10ForRag_IsMateriallyDistinctFromTop10_DeepProbeCoverage()
+    {
+        var top10 = OwaspBenchmark.Top10();
+        var ragFocused = OwaspBenchmark.Top10ForRag();
+
+        var top10ProbeCount = top10.Pipeline.GetProbePreview().Count;
+        var ragProbeCount = ragFocused.Pipeline.GetProbePreview().Count;
+
+        // Comprehensive intensity must produce strictly more probes than Quick.
+        // If a future refactor accidentally re-aligns the intensities, this test fails loudly.
+        Assert.True(
+            ragProbeCount > top10ProbeCount,
+            $"Top10ForRag must run more probes than Top10 (Comprehensive vs Quick intensity). " +
+            $"Got Top10={top10ProbeCount}, Top10ForRag={ragProbeCount}.");
+
+        // Both presets cover the same 9 attack types; the divergence is depth, not breadth.
+        var top10Attacks = top10.Pipeline.GetProbePreview().Select(p => p.AttackName).Distinct().OrderBy(n => n).ToList();
+        var ragAttacks   = ragFocused.Pipeline.GetProbePreview().Select(p => p.AttackName).Distinct().OrderBy(n => n).ToList();
+        Assert.Equal(top10Attacks, ragAttacks);
+
+        // Same OWASP coverage too.
+        Assert.Equal(top10.CoveredOwaspIds.OrderBy(x => x), ragFocused.CoveredOwaspIds.OrderBy(x => x));
+    }
+
+    /// <summary>
+    /// <see cref="OwaspBenchmark.Top10ForRag"/> sits between <see cref="OwaspBenchmark.Top10"/>
+    /// (Quick) and <see cref="OwaspBenchmark.AuditGrade"/> (Comprehensive). Probe-count
+    /// should be at parity with AuditGrade (same intensity); the differentiator vs
+    /// AuditGrade is the tighter 20-min timeout and the RAG threat-model framing.
+    /// </summary>
+    [Fact]
+    public void Top10ForRag_ProbeDepth_MatchesAuditGrade_NotTop10()
+    {
+        var top10 = OwaspBenchmark.Top10();
+        var auditGrade = OwaspBenchmark.AuditGrade();
+        var ragFocused = OwaspBenchmark.Top10ForRag();
+
+        var top10Count   = top10.Pipeline.GetProbePreview().Count;
+        var auditCount   = auditGrade.Pipeline.GetProbePreview().Count;
+        var ragCount     = ragFocused.Pipeline.GetProbePreview().Count;
+
+        // AuditGrade and Top10ForRag share Intensity.Comprehensive; both must equal each other
+        // and both must exceed Top10 (Quick).
+        Assert.Equal(auditCount, ragCount);
+        Assert.True(ragCount > top10Count, "Top10ForRag must run strictly more probes than Top10.");
     }
 
     [Fact]
