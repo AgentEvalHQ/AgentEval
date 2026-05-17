@@ -68,14 +68,14 @@ public class BenchMitreCommandTests : IDisposable
     public async Task BenchMitre_NoEnvVars_NoStubOptIn_ReturnsExitCode2()
     {
         InitWorkspace();
-        var exit = await BenchMitreCommand.RunAsync(
+        var result = await BenchMitreCommand.RunAsync(
             preset: "atlas-smoke",
             subject: "MitreGateTestAgent",
             rootOverride: _root,
             inputText: null,
             evaluatorOverride: null,
             agentOverride: null);
-        Assert.Equal(2, exit);
+        Assert.Equal(2, result.ExitCode);
     }
 
     [Fact]
@@ -85,14 +85,14 @@ public class BenchMitreCommandTests : IDisposable
         Environment.SetEnvironmentVariable("AZURE_OPENAI_ENDPOINT", "https://example.openai.azure.com/");
         // Missing key + deployment → partial config → exit 2.
 
-        var exit = await BenchMitreCommand.RunAsync(
+        var result = await BenchMitreCommand.RunAsync(
             preset: "atlas-smoke",
             subject: "MitrePartialAgent",
             rootOverride: _root,
             inputText: null,
             evaluatorOverride: null,
             agentOverride: null);
-        Assert.Equal(2, exit);
+        Assert.Equal(2, result.ExitCode);
     }
 
     [Fact]
@@ -101,7 +101,7 @@ public class BenchMitreCommandTests : IDisposable
         var noWorkspaceRoot = Path.Combine(_root, "no-workspace");
         Directory.CreateDirectory(noWorkspaceRoot);
 
-        var exit = await BenchMitreCommand.RunAsync(
+        var result = await BenchMitreCommand.RunAsync(
             preset: "atlas-smoke",
             subject: "MitreMissingAgent",
             rootOverride: noWorkspaceRoot,
@@ -109,7 +109,7 @@ public class BenchMitreCommandTests : IDisposable
             evaluatorOverride: new PassingStubEvaluator(),
             agentOverride: null);
 
-        Assert.Equal(1, exit);
+        Assert.Equal(1, result.ExitCode);
     }
 
     // ── Preset arg parsing ────────────────────────────────────────────────────
@@ -146,7 +146,7 @@ public class BenchMitreCommandTests : IDisposable
     {
         InitWorkspace();
 
-        var exit = await BenchMitreCommand.RunAsync(
+        var (exit, reportDir) = await BenchMitreCommand.RunAsync(
             preset: "atlas-smoke",
             subject: "MitreSmokeAgent",
             rootOverride: _root,
@@ -159,17 +159,22 @@ public class BenchMitreCommandTests : IDisposable
         Assert.True(exit == 0 || exit == 2,
             $"Expected exit 0 (PASS) or 2 (WARN/FAIL verdict); got {exit}.");
 
-        // The MITRE report directory should exist with at least one timestamped folder.
-        var reportsRoot = Path.Combine(_root, ".agenteval", "compliance", "MITRE-ATLAS", "MitreSmokeAgent");
-        Assert.True(Directory.Exists(reportsRoot),
-            $"Reports root {reportsRoot} should exist after a completed bench run.");
-        var tsDirs = Directory.GetDirectories(reportsRoot);
-        Assert.NotEmpty(tsDirs);
-        var latestTs = tsDirs.OrderByDescending(d => d).First();
-        Assert.True(File.Exists(Path.Combine(latestTs, "report.md")),
+        // The command returns the absolute path of the timestamped report
+        // directory; using it directly avoids the second-precision-timestamp
+        // race that "OrderByDescending(d => d).First()" would otherwise have on
+        // directory-name strings of shape `yyyy-MM-dd_HH-mm-ss`.
+        Assert.NotNull(reportDir);
+        Assert.True(Directory.Exists(reportDir),
+            $"Report directory {reportDir} should exist after a completed bench run.");
+        Assert.True(File.Exists(Path.Combine(reportDir!, "report.md")),
             "report.md should be generated alongside the run.");
-        Assert.True(File.Exists(Path.Combine(latestTs, "report.json")),
+        Assert.True(File.Exists(Path.Combine(reportDir!, "report.json")),
             "report.json should be generated alongside the run.");
+
+        // Sanity-check that the directory lives under the expected compliance
+        // tree (the path-shape part of the original assertion).
+        var reportsRoot = Path.Combine(_root, ".agenteval", "compliance", "MITRE-ATLAS", "MitreSmokeAgent");
+        Assert.StartsWith(reportsRoot, reportDir);
 
         // The unified output-store should have a run manifest written by the
         // command's StartRunAsync/CompleteRunAsync flow.

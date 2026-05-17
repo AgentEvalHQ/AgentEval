@@ -22,15 +22,26 @@ namespace AgentEval.Cli.Commands;
 public static class BenchOwaspCommand
 {
     /// <summary>Runs the bench owasp command using auto-discovered workspace root.</summary>
-    public static Task<int> RunAsync(
+    public static async Task<int> RunAsync(
         string preset,
         string subject,
         string? rootOverride,
-        string? inputText) =>
-        RunAsync(preset, subject, rootOverride, inputText, evaluatorOverride: null, agentOverride: null);
+        string? inputText)
+    {
+        var (exitCode, _) = await RunAsync(preset, subject, rootOverride, inputText, evaluatorOverride: null, agentOverride: null).ConfigureAwait(false);
+        return exitCode;
+    }
 
-    /// <summary>Runs the bench owasp command with optional overrides (used in tests).</summary>
-    internal static async Task<int> RunAsync(
+    /// <summary>
+    /// Runs the bench owasp command with optional overrides (used in tests).
+    /// Returns the exit code plus the absolute path of the timestamped report
+    /// directory (where <c>report.md</c> / <c>report.json</c> are written), or
+    /// <c>null</c> if the command exited before reaching the report-write step.
+    /// Tests use the returned path directly instead of enumerating timestamped
+    /// directories by name — that name-based lookup races on second-precision
+    /// timestamps when two operations land in the same second.
+    /// </summary>
+    internal static async Task<(int ExitCode, string? ReportDir)> RunAsync(
         string preset,
         string subject,
         string? rootOverride,
@@ -42,7 +53,7 @@ public static class BenchOwaspCommand
         if (rootOverride is not null)
         {
             var canonical = WorkspaceRootValidator.CanonicaliseOrNull(rootOverride);
-            if (canonical is null) return 1;
+            if (canonical is null) return (1, null);
             rootOverride = canonical;
         }
         var workspaceRoot = rootOverride ?? WorkspaceRootDiscovery.Find(Directory.GetCurrentDirectory());
@@ -50,14 +61,14 @@ public static class BenchOwaspCommand
         {
             Console.Error.WriteLine("Could not find a solution root (.sln, .slnx, or .git). " +
                 "Provide --root or run from within a solution directory.");
-            return 1;
+            return (1, null);
         }
 
         var agentEvalDir = Path.Combine(workspaceRoot, ".agenteval");
         if (!Directory.Exists(agentEvalDir))
         {
             Console.Error.WriteLine($".agenteval/ not found at {agentEvalDir}. Run `agenteval init` first.");
-            return 1;
+            return (1, null);
         }
 
         // ── Judge / evaluator ────────────────────────────────────────────────
@@ -68,7 +79,7 @@ public static class BenchOwaspCommand
         var (resolvedJudge, judgeModelName, exitCode) = JudgeFactory.Resolve(
             evaluatorOverride,
             judgeKind: "OWASP benchmark");
-        if (resolvedJudge is null) return exitCode;
+        if (resolvedJudge is null) return (exitCode, null);
 
         // ── Select preset ────────────────────────────────────────────────────
         OwaspBenchmarkRun benchmark;
@@ -79,7 +90,7 @@ public static class BenchOwaspCommand
         catch (Exception ex)
         {
             Console.Error.WriteLine($"Failed to build OWASP preset '{preset}': {ex.Message}");
-            return 1;
+            return (1, null);
         }
 
         // ── Resolve target agent ─────────────────────────────────────────────
@@ -115,7 +126,7 @@ public static class BenchOwaspCommand
         catch (Exception ex)
         {
             Console.Error.WriteLine($"OWASP scan failed: {ex.Message}");
-            return 1;
+            return (1, null);
         }
 
         var report = benchmark.GenerateReport(redTeamResult);
@@ -171,7 +182,7 @@ public static class BenchOwaspCommand
         catch (Exception ex)
         {
             Console.Error.WriteLine($"Failed to persist OWASP run to output store: {ex.Message}");
-            return 1;
+            return (1, null);
         }
 
         // ── Persist the rich OWASP compliance evidence (sibling to GDPR/EU AI Act) ─
@@ -218,12 +229,13 @@ public static class BenchOwaspCommand
             $"({report.Summary.CriticalFindings} critical / {report.Summary.HighFindings} high findings); " +
             $"composite verdict {compositeEval.Score.Label.ToUpperInvariant()}");
 
-        return compositeEval.Score.Label.ToLowerInvariant() switch
+        var finalExit = compositeEval.Score.Label.ToLowerInvariant() switch
         {
             "pass" => 0,
             "fail" => 2,
             _      => 2  // WARN/skipped also returns non-zero for CI strictness
         };
+        return (finalExit, outputDir);
     }
 
     /// <summary>
