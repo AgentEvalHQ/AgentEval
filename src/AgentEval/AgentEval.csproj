@@ -41,6 +41,7 @@
     <ProjectReference Include="../AgentEval.Core/AgentEval.Core.csproj" PrivateAssets="all" />
     <ProjectReference Include="../AgentEval.DataLoaders/AgentEval.DataLoaders.csproj" PrivateAssets="all" />
     <ProjectReference Include="../AgentEval.Evals.Agentic/AgentEval.Evals.Agentic.csproj" PrivateAssets="all" />
+    <ProjectReference Include="../AgentEval.Evals.Compliance.Gdpr/AgentEval.Evals.Compliance.Gdpr.csproj" PrivateAssets="all" />
     <ProjectReference Include="../AgentEval.MAF/AgentEval.MAF.csproj" PrivateAssets="all" />
     <ProjectReference Include="../AgentEval.Memory/AgentEval.Memory.csproj" PrivateAssets="all" />
     <ProjectReference Include="../AgentEval.RedTeam/AgentEval.RedTeam.csproj" PrivateAssets="all" />
@@ -55,6 +56,9 @@
     <PackageReference Include="System.Numerics.Tensors" />
     <!-- DataLoaders -->
     <PackageReference Include="YamlDotNet" />
+    <!-- Evals.Compliance.Gdpr -->
+    <PackageReference Include="JsonSchema.Net" />
+    <PackageReference Include="QuestPDF" />
     <!-- MAF -->
     <PackageReference Include="Microsoft.Agents.AI" />
     <PackageReference Include="Microsoft.Agents.AI.Workflows" />

@@ -12,7 +12,7 @@
     <ProjectReference Include="..\..\src\AgentEval.Abstractions\AgentEval.Abstractions.csproj" />
     <ProjectReference Include="..\..\src\AgentEval.Core\AgentEval.Core.csproj" />
     <ProjectReference Include="..\..\src\AgentEval.DataLoaders\AgentEval.DataLoaders.csproj" />
-    <ProjectReference Include="..\AgentEval.GdprBenchmark\AgentEval.GdprBenchmark.csproj" />
+    <ProjectReference Include="..\..\src\AgentEval.Evals.Compliance.Gdpr\AgentEval.Evals.Compliance.Gdpr.csproj" />
   </ItemGroup>
 
   <ItemGroup>

@@ -34,7 +34,7 @@
     <ProjectReference Include="..\..\src\AgentEval.RedTeam\AgentEval.RedTeam.csproj" />
     <ProjectReference Include="..\..\src\AgentEval\AgentEval.csproj" />
     <ProjectReference Include="..\..\src\AgentEval.Cli\AgentEval.Cli.csproj" />
-    <ProjectReference Include="..\..\samples\AgentEval.GdprBenchmark\AgentEval.GdprBenchmark.csproj" />
+    <ProjectReference Include="..\..\src\AgentEval.Evals.Compliance.Gdpr\AgentEval.Evals.Compliance.Gdpr.csproj" />
     <ProjectReference Include="..\..\samples\AgentEval.EuAiActBenchmark\AgentEval.EuAiActBenchmark.csproj" />
     <ProjectReference Include="..\..\src\AgentEval.Evals.Agentic\AgentEval.Evals.Agentic.csproj" />
     <!-- MissionControl is net10.0-only (server project); guard the reference so older
