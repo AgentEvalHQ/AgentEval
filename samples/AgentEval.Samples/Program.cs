@@ -2,6 +2,7 @@
 // Copyright (c) 2026 AgentEval Contributors
 
 using System.Text;
+using AgentEval.Samples.Benchmarks;
 
 namespace AgentEval.Samples;
 
@@ -89,6 +90,18 @@ public static class Program
             new("Run Single Benchmark",     "Pick Quick/Standard/Full, run it, save baseline, view report",       RunSingleBenchmark.RunAsync),
             new("LongMemEval Baseline Repro","GPT-4o baseline reproduction — TextBlob mode, paper-matching config", LongMemEvalBaselineRepro.RunAsync),
         ]),
+
+        new('H', "Benchmarks (v0.10.1)", "★ JSON + HTML (+ PDF) outputs for every registered family",
+        [
+            new("Registry Discovery",        "Walk BenchmarkFamilyRegistry — no Azure required",                     RegistryDiscoveryBenchmark.RunAsync),
+            new("Performance",               "Latency / throughput / cost via EchoAgent stub — no Azure required",   PerformanceBenchmarkSample.RunAsync),
+            new("Agentic",                   "Tool-Call-Accuracy preset with JSON + HTML + PDF outputs",            AgenticBenchmarkSample.RunAsync),
+            new("GDPR",                      "GDPR Smoke preset with JSON + HTML + PDF outputs",                    GdprBenchmarkSample.RunAsync),
+            new("EU AI Act",                 "EU AI Act Smoke preset with JSON + HTML + PDF outputs",               EuAiActBenchmarkSample.RunAsync),
+            new("OWASP LLM Top 10",          "OWASP Smoke preset (PromptInjection + Jailbreak + PIILeakage)",       OwaspBenchmarkSample.RunAsync),
+            new("MITRE ATLAS",               "MITRE ATLAS Baseline preset with HTML + PDF",                         MitreBenchmarkSample.RunAsync),
+            new("LongMemEval",               "Memory benchmark metadata + usage walkthrough (ICLR 2025)",           LongMemEvalBenchmarkSample.RunAsync),
+        ]),
     ];
 
     // ──────────────────────────────────────────────────────────
@@ -151,7 +164,7 @@ public static class Program
             var group = Groups.FirstOrDefault(g => g.Key.ToString() == raw);
             if (group is not null) return group;
 
-            Console.WriteLine("  Enter a letter A–G or Q to quit.\n");
+            Console.WriteLine("  Enter a letter A–H or Q to quit.\n");
         }
     }
 
