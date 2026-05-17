@@ -33,13 +33,14 @@ public class BenchmarkNamespaceContractTests
 {
     private const string ExpectedNamespace = "AgentEval.Benchmarks";
 
-    // Static factory types (currently 5 — Memory is covered in AgentEval.Memory.Tests).
+    // Static factory types (currently 6 — Memory is covered in AgentEval.Memory.Tests).
     [Theory]
     [InlineData(typeof(AgentEval.Benchmarks.AgenticBenchmark))]
     [InlineData(typeof(AgentEval.Benchmarks.GdprBenchmark))]
     [InlineData(typeof(AgentEval.Benchmarks.EuAiActBenchmark))]
     [InlineData(typeof(AgentEval.Benchmarks.PerformanceBenchmark))]
     [InlineData(typeof(AgentEval.Benchmarks.OwaspBenchmark))]
+    [InlineData(typeof(AgentEval.Benchmarks.MitreBenchmark))]
     public void BenchmarkType_LivesIn_AgentEvalBenchmarksNamespace(Type benchmarkType)
     {
         Assert.Equal(ExpectedNamespace, benchmarkType.Namespace);
@@ -51,6 +52,7 @@ public class BenchmarkNamespaceContractTests
     [InlineData(typeof(AgentEval.Benchmarks.EuAiActBenchmark))]
     [InlineData(typeof(AgentEval.Benchmarks.PerformanceBenchmark))]
     [InlineData(typeof(AgentEval.Benchmarks.OwaspBenchmark))]
+    [InlineData(typeof(AgentEval.Benchmarks.MitreBenchmark))]
     public void BenchmarkType_IsPublic(Type benchmarkType)
     {
         Assert.True(benchmarkType.IsPublic, $"{benchmarkType.FullName} must be public");
@@ -66,6 +68,7 @@ public class BenchmarkNamespaceContractTests
     [InlineData(typeof(AgentEval.Benchmarks.GdprBenchmark))]
     [InlineData(typeof(AgentEval.Benchmarks.EuAiActBenchmark))]
     [InlineData(typeof(AgentEval.Benchmarks.OwaspBenchmark))]
+    [InlineData(typeof(AgentEval.Benchmarks.MitreBenchmark))]
     public void StaticBenchmarkFactory_IsAbstractSealed(Type factoryType)
     {
         // C# static classes compile to abstract+sealed in IL.
@@ -96,6 +99,7 @@ public class BenchmarkNamespaceContractTests
         _ = typeof(AgentEval.Benchmarks.EuAiActBenchmark).Assembly;
         _ = typeof(AgentEval.Benchmarks.PerformanceBenchmark).Assembly;
         _ = typeof(AgentEval.Benchmarks.OwaspBenchmark).Assembly;
+        _ = typeof(AgentEval.Benchmarks.MitreBenchmark).Assembly;
 
         var assemblies = AppDomain.CurrentDomain.GetAssemblies()
             .Where(a => !a.IsDynamic
@@ -171,6 +175,9 @@ public class BenchmarkNamespaceContractTests
 
         // OWASP companions (Phase 5):
         "OwaspBenchmarkRun",              // the thin wrapper around AttackPipeline + reporter
+
+        // MITRE ATLAS companions (Phase 6):
+        "MitreBenchmarkRun",              // the thin wrapper around AttackPipeline + MITREATLASReporter
 
         // External academic benchmarks may add *BenchmarkRunner companions here later
         // (e.g. LongMemEvalBenchmarkRunner in Phase 7).

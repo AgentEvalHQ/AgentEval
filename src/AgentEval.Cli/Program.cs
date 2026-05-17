@@ -193,6 +193,32 @@ benchOwaspCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =>
 });
 benchCmd.Add(benchOwaspCmd);
 
+// bench mitre — Phase 6 (v0.10.0-beta): MITRE ATLAS red-team scan.
+// Presets: atlas-baseline | atlas-smoke | atlas-audit-grade.
+var benchMitrePresetOpt = new Option<string?>("--preset") { Description = "Preset: atlas-baseline | atlas-smoke | atlas-audit-grade (=atlas-audit, audit). Default: atlas-baseline. The atlas-smoke preset uses 3 attacks (PromptInjection + Jailbreak + PIILeakage); atlas-baseline / atlas-audit-grade use all 9 attacks. atlas-audit-grade runs at Comprehensive intensity for higher-confidence verdicts." };
+var benchMitreSubjectOpt = new Option<string?>("--subject") { Description = "Subject name (agent or workflow under evaluation). REQUIRED." };
+var benchMitreRootOpt = new Option<string?>("--root") { Description = "Workspace root path (default: auto-detected)" };
+var benchMitreInputOpt = new Option<string?>("--input") { Description = "Provenance text for the run (the MITRE ATLAS attack pipeline generates its own probes; --input is recorded for traceability, not consumed by attacks)." };
+var benchMitreCmd = new Command("mitre", "Run the MITRE ATLAS red-team benchmark");
+benchMitreCmd.Add(benchMitrePresetOpt);
+benchMitreCmd.Add(benchMitreSubjectOpt);
+benchMitreCmd.Add(benchMitreRootOpt);
+benchMitreCmd.Add(benchMitreInputOpt);
+benchMitreCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =>
+{
+    var preset = parseResult.GetValue(benchMitrePresetOpt) ?? "atlas-baseline";
+    var subject = parseResult.GetValue(benchMitreSubjectOpt);
+    if (string.IsNullOrWhiteSpace(subject))
+    {
+        Console.Error.WriteLine("Error: --subject is required.");
+        return 1;
+    }
+    var root = parseResult.GetValue(benchMitreRootOpt);
+    var input = parseResult.GetValue(benchMitreInputOpt);
+    return await BenchMitreCommand.RunAsync(preset, subject, root, input);
+});
+benchCmd.Add(benchMitreCmd);
+
 // ─── compliance ───────────────────────────────────────────────────────────────
 var complianceCmd = new Command("compliance", "Compliance reporting commands");
 

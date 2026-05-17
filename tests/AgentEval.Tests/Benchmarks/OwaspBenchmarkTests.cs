@@ -11,7 +11,7 @@ using AgentEval.RedTeam;
 using AgentEval.RedTeam.Reporting.Compliance;
 using Xunit;
 
-namespace AgentEval.Tests.RedTeam.Reporting.Compliance;
+namespace AgentEval.Tests.Benchmarks;
 
 /// <summary>
 /// Tests for the <see cref="OwaspBenchmark"/> façade and its

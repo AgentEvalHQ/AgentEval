@@ -12,16 +12,23 @@ using AgentEval.RedTeam.Reporting.Compliance;
 namespace AgentEval.Cli.Commands;
 
 /// <summary>
-/// Implements the <c>agenteval bench owasp</c> subcommand. Runs the OWASP LLM Top 10
+/// Implements the <c>agenteval bench mitre</c> subcommand. Runs the MITRE ATLAS
 /// red-team scan against an agent (a stub safe-refusal agent is used by default —
 /// supply an agent override on the internal overload for real targets in tests),
 /// persists the resulting <see cref="EvalResult"/> through the unified output-store,
-/// and additionally emits the rich <see cref="OWASPComplianceReport"/> as JSON +
+/// and additionally emits the rich <see cref="MITREATLASReport"/> as JSON +
 /// Markdown alongside.
 /// </summary>
-public static class BenchOwaspCommand
+/// <remarks>
+/// Symmetric to <see cref="BenchOwaspCommand"/>. Uses the Phase-6 single-scan
+/// pattern: one <see cref="MitreBenchmarkRun.ScanAsync"/> per CLI invocation;
+/// the resulting <see cref="RedTeamResult"/> is fed into both
+/// <see cref="MitreBenchmarkRun.BuildEvalResult"/> and
+/// <see cref="MitreBenchmarkRun.GenerateReport"/>.
+/// </remarks>
+public static class BenchMitreCommand
 {
-    /// <summary>Runs the bench owasp command using auto-discovered workspace root.</summary>
+    /// <summary>Runs the bench mitre command using auto-discovered workspace root.</summary>
     public static Task<int> RunAsync(
         string preset,
         string subject,
@@ -29,7 +36,7 @@ public static class BenchOwaspCommand
         string? inputText) =>
         RunAsync(preset, subject, rootOverride, inputText, evaluatorOverride: null, agentOverride: null);
 
-    /// <summary>Runs the bench owasp command with optional overrides (used in tests).</summary>
+    /// <summary>Runs the bench mitre command with optional overrides (used in tests).</summary>
     internal static async Task<int> RunAsync(
         string preset,
         string subject,
@@ -61,32 +68,31 @@ public static class BenchOwaspCommand
         }
 
         // ── Judge / evaluator ────────────────────────────────────────────────
-        // The OWASP attack pipeline uses heuristic per-attack evaluators today;
+        // The MITRE ATLAS attack pipeline uses heuristic per-attack evaluators today;
         // the judge is accepted for API symmetry with other bench commands and
         // reserved for future LLM-graded probes. JudgeFactory.Resolve still runs
         // to honour the AZURE_OPENAI_* env gate (CI parity).
         var (resolvedJudge, judgeModelName, exitCode) = JudgeFactory.Resolve(
             evaluatorOverride,
-            judgeKind: "OWASP benchmark");
+            judgeKind: "MITRE ATLAS benchmark");
         if (resolvedJudge is null) return exitCode;
 
         // ── Select preset ────────────────────────────────────────────────────
-        OwaspBenchmarkRun benchmark;
+        MitreBenchmarkRun benchmark;
         try
         {
             benchmark = ResolvePreset(preset, resolvedJudge);
         }
         catch (Exception ex)
         {
-            Console.Error.WriteLine($"Failed to build OWASP preset '{preset}': {ex.Message}");
+            Console.Error.WriteLine($"Failed to build MITRE ATLAS preset '{preset}': {ex.Message}");
             return 1;
         }
 
         // ── Resolve target agent ─────────────────────────────────────────────
-        // The OWASP pipeline drives the agent itself (it generates and sends its
-        // own probes); --input is accepted for symmetry with the other bench
-        // commands and is recorded for provenance only — it is not consumed by
-        // the scan flow. We reference it to keep the parameter meaningful.
+        // The MITRE pipeline drives the agent itself (it generates and sends its
+        // own probes); --input is recorded for provenance only — not consumed by
+        // the scan flow. Reference it so the parameter stays meaningful.
         _ = inputText;
         var agent = agentOverride ?? new SafeRefusalAgent(subject);
 
@@ -97,24 +103,20 @@ public static class BenchOwaspCommand
         await store.EnsureSolutionAsync();
         await store.EnsureSubjectAsync(subjectIdentity);
 
-        Console.WriteLine($"Running OWASP benchmark ({preset}) for subject '{subject}'...");
+        Console.WriteLine($"Running MITRE ATLAS benchmark ({preset}) for subject '{subject}'...");
 
         EvalResult compositeEval;
         RedTeamResult redTeamResult;
         try
         {
-            // Run the scan exactly once. The Phase-6 BuildEvalResult(RedTeamResult)
-            // overload lets us shape the EvalResult composite from the existing
-            // RedTeamResult and lets GenerateReport project the rich compliance
-            // report from the same result — both derived from a single pipeline
-            // execution. Closes the Phase-5 double-scan smell flagged in
-            // lastreview/13-phase5-gate-review.md §6 (Anti-patterns).
+            // Single-scan pattern (Phase 6): one pipeline execution; the
+            // RedTeamResult feeds both BuildEvalResult and GenerateReport.
             redTeamResult = await benchmark.ScanAsync(agent);
             compositeEval = benchmark.BuildEvalResult(redTeamResult);
         }
         catch (Exception ex)
         {
-            Console.Error.WriteLine($"OWASP scan failed: {ex.Message}");
+            Console.Error.WriteLine($"MITRE ATLAS scan failed: {ex.Message}");
             return 1;
         }
 
@@ -129,20 +131,20 @@ public static class BenchOwaspCommand
                 new RunContext(
                     EvalProject: "AgentEval.RedTeam",
                     EvalProjectPath: "src/AgentEval.RedTeam/",
-                    Harness: "BenchOwaspCommand",
+                    Harness: "BenchMitreCommand",
                     Seed: null,
                     ParentInvocationId: null,
                     Kind: "benchmark"));
             runId = manifest.Run.RunId;
 
-            // Write the 10-leaf composite as the run's "scenario result" — the
-            // recursive tree is preserved as JSON inside ScenarioResult.Output, so
-            // a downstream reader can rehydrate the full EvalResult via
+            // Write the composite as the run's "scenario result" — the recursive
+            // tree is preserved as JSON inside ScenarioResult.Output, so a
+            // downstream reader can rehydrate the full EvalResult via
             // EvalResultPersistence.FromScenarioResult.
             var scenarioResult = EvalResultPersistence.ToScenarioResult(
                 compositeEval,
-                scenarioId: $"owasp-{preset.ToLowerInvariant()}",
-                scenarioName: $"OWASP LLM Top 10 — {preset}");
+                scenarioId: $"mitre-{preset.ToLowerInvariant()}",
+                scenarioName: $"MITRE ATLAS — {preset}");
             await store.WriteScenarioResultAsync(runId, scenarioResult);
 
             var verdict = compositeEval.Score.Label.ToUpperInvariant() switch
@@ -170,25 +172,25 @@ public static class BenchOwaspCommand
         }
         catch (Exception ex)
         {
-            Console.Error.WriteLine($"Failed to persist OWASP run to output store: {ex.Message}");
+            Console.Error.WriteLine($"Failed to persist MITRE ATLAS run to output store: {ex.Message}");
             return 1;
         }
 
-        // ── Persist the rich OWASP compliance evidence (sibling to GDPR/EU AI Act) ─
+        // ── Persist the rich MITRE compliance evidence (sibling to GDPR/EU AI Act/OWASP) ─
         try
         {
-            var reporter = new OWASPComplianceReporter();
+            var reporter = new MITREATLASReporter();
             await reporter.SaveReportAsync(store, subjectIdentity, runId, redTeamResult);
         }
         catch (Exception ex)
         {
-            Console.Error.WriteLine($"Warning: failed to persist OWASP compliance evidence: {ex.Message}");
+            Console.Error.WriteLine($"Warning: failed to persist MITRE ATLAS compliance evidence: {ex.Message}");
         }
 
         // ── Emit JSON + Markdown reports alongside ───────────────────────────
         var sanitizedSubject = SanitizeForPath(subject);
         var ts = report.GeneratedAt.ToString("yyyy-MM-dd_HH-mm-ss");
-        var outputDir = Path.Combine(agentEvalDir, "compliance", "OWASP-LLM-Top10", sanitizedSubject, ts);
+        var outputDir = Path.Combine(agentEvalDir, "compliance", "MITRE-ATLAS", sanitizedSubject, ts);
         Directory.CreateDirectory(outputDir);
 
         try
@@ -199,7 +201,7 @@ public static class BenchOwaspCommand
         }
         catch (Exception ex)
         {
-            Console.Error.WriteLine($"Warning: failed to write OWASP JSON report: {ex.Message}");
+            Console.Error.WriteLine($"Warning: failed to write MITRE ATLAS JSON report: {ex.Message}");
         }
 
         try
@@ -210,7 +212,7 @@ public static class BenchOwaspCommand
         }
         catch (Exception ex)
         {
-            Console.Error.WriteLine($"Warning: failed to write OWASP Markdown report: {ex.Message}");
+            Console.Error.WriteLine($"Warning: failed to write MITRE ATLAS Markdown report: {ex.Message}");
         }
 
         // ── Exit code ─────────────────────────────────────────────────────────
@@ -227,27 +229,29 @@ public static class BenchOwaspCommand
     }
 
     /// <summary>
-    /// Resolves an OWASP preset specification into an <see cref="OwaspBenchmarkRun"/>.
+    /// Resolves a MITRE ATLAS preset specification into a <see cref="MitreBenchmarkRun"/>.
     /// </summary>
     /// <param name="presetSpec">
-    /// Preset identifier: <c>top10</c>, <c>smoke</c>, <c>audit</c>/<c>auditgrade</c>, or
-    /// <c>top10-rag</c>/<c>top10forrag</c>.
+    /// Preset identifier (case-insensitive): <c>atlas-baseline</c>/<c>atlasbaseline</c>/<c>baseline</c>,
+    /// <c>atlas-smoke</c>/<c>atlassmoke</c>/<c>smoke</c>, or
+    /// <c>atlas-audit-grade</c>/<c>atlas-audit</c>/<c>atlasauditgrade</c>/<c>audit</c>/<c>auditgrade</c>.
     /// </param>
     /// <param name="judge">LLM evaluator passed through to the preset factory.</param>
-    internal static OwaspBenchmarkRun ResolvePreset(string presetSpec, IEvaluator judge)
+    internal static MitreBenchmarkRun ResolvePreset(string presetSpec, IEvaluator judge)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(presetSpec);
         ArgumentNullException.ThrowIfNull(judge);
 
         return presetSpec.Trim().ToLowerInvariant() switch
         {
-            "top10"                          => OwaspBenchmark.Top10(judge),
-            "smoke"                          => OwaspBenchmark.Smoke(judge),
-            "audit" or "auditgrade"          => OwaspBenchmark.AuditGrade(judge),
-            "top10-rag" or "top10forrag"     => OwaspBenchmark.Top10ForRag(judge),
+            "atlas-baseline" or "atlasbaseline" or "baseline"                     => MitreBenchmark.AtlasBaseline(judge),
+            "atlas-smoke" or "atlassmoke" or "smoke"                              => MitreBenchmark.AtlasSmoke(judge),
+            "atlas-audit-grade" or "atlas-audit" or "atlasauditgrade"
+                or "audit" or "auditgrade"                                        => MitreBenchmark.AtlasAuditGrade(judge),
             _ => throw new ArgumentException(
-                $"Unknown OWASP preset '{presetSpec}'. " +
-                "Known presets: top10, smoke, audit (=auditgrade), top10-rag (=top10forrag).",
+                $"Unknown MITRE ATLAS preset '{presetSpec}'. " +
+                "Known presets: atlas-baseline (=baseline), atlas-smoke (=smoke), " +
+                "atlas-audit-grade (=atlas-audit / audit / auditgrade).",
                 nameof(presetSpec))
         };
     }
@@ -261,7 +265,7 @@ public static class BenchOwaspCommand
 
     /// <summary>
     /// Deterministic stub agent used by the CLI when no real target is supplied.
-    /// Always returns a safe refusal — under the OWASP pipeline the heuristic
+    /// Always returns a safe refusal — under the MITRE pipeline the heuristic
     /// evaluators classify these as "resisted" for prompt-injection/jailbreak/PII
     /// probes, so a default CLI run produces a clean PASS report. Real targets
     /// override this via the <c>agentOverride</c> parameter on the internal
