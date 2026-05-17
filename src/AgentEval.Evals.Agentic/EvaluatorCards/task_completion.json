@@ -1,0 +1,36 @@
+{
+  "schemaVersion": "1.0",
+  "key": "task_completion",
+  "name": "Task Completion",
+  "category": "system-outcome",
+  "version": "1.0.0",
+  "description": "Holistic LLM-as-a-judge assessment of whether the agent completed the user's task. Measures end-to-end success: did the agent deliver the result the user actually asked for?",
+  "costTier": "Low",
+  "higherIsBetter": true,
+  "defaultThreshold": 0.7,
+  "expectedInputs": [
+    {
+      "kind": "query",
+      "key": "",
+      "required": true,
+      "description": "The user's original task or request."
+    },
+    {
+      "kind": "response",
+      "key": "",
+      "required": true,
+      "description": "The agent's final response or deliverable."
+    }
+  ],
+  "recommendedVisualization": "timeline",
+  "compatibleWith": [
+    {
+      "system": "foundry",
+      "uri": "azureai://built-in/evaluators/task_completion"
+    }
+  ],
+  "links": {
+    "documentation": "/docs/benchmarks/agentic/getting-started.md#task-completion",
+    "source": "src/AgentEval.Evals.Agentic/System/TaskCompletionEval.cs"
+  }
+}

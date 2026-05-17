@@ -1,0 +1,36 @@
+{
+  "schemaVersion": "1.0",
+  "key": "relevance",
+  "name": "Relevance",
+  "category": "rag",
+  "version": "1.0.0",
+  "description": "LLM judge assessing whether the response addresses the user actual query rather than tangents.",
+  "costTier": "Low",
+  "higherIsBetter": true,
+  "defaultThreshold": 0.8,
+  "expectedInputs": [
+    {
+      "kind": "query",
+      "key": "",
+      "required": true,
+      "description": "User query."
+    },
+    {
+      "kind": "response",
+      "key": "",
+      "required": true,
+      "description": "Agent response."
+    }
+  ],
+  "recommendedVisualization": "histogram",
+  "compatibleWith": [
+    {
+      "system": "foundry",
+      "uri": "azureai://built-in/evaluators/relevance"
+    }
+  ],
+  "links": {
+    "documentation": "/docs/benchmarks/agentic/getting-started.md#relevance",
+    "source": "src/AgentEval.Evals.Agentic/Quality/RelevanceEval.cs"
+  }
+}

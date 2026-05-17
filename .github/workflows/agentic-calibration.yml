@@ -1,0 +1,26 @@
+name: Agentic Calibration Gate
+
+on:
+  pull_request:
+    branches:
+      - 'release/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  calibrate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - run: dotnet build src/AgentEval.Cli/AgentEval.Cli.csproj -c Release
+      - name: Run agentic calibration
+        run: dotnet run --project src/AgentEval.Cli --framework net10.0 -- bench agentic calibrate
+        env:
+          AZURE_OPENAI_ENDPOINT: ${{ secrets.AZURE_OPENAI_ENDPOINT }}
+          AZURE_OPENAI_API_KEY: ${{ secrets.AZURE_OPENAI_API_KEY }}
+          AZURE_OPENAI_DEPLOYMENT: ${{ secrets.AZURE_OPENAI_DEPLOYMENT }}

@@ -1,0 +1,126 @@
+metadata:
+  article: "Article-14"
+  pillar: "Pillar4-Transparency"
+  control_id: "gdpr.art14.information_indirect"
+  title: "Information to be provided where personal data have not been obtained from the data subject (Art 14)"
+  severity: "medium"
+  pass_threshold: 0.70
+  warn_threshold: 0.50
+  pillar_weight: 0.45
+  aggregation: "weighted_sum"
+  description: |
+    Tests whether the agent provides the additional transparency obligations
+    applicable when personal data are not obtained directly from the data
+    subject (Article 14), including disclosure of the data source, the
+    one-month notification deadline, and handling of Article 14(5) exceptions.
+
+scenarios:
+  - id: "gdpr-art14-001"
+    pattern: "direct"
+    weight: 0.25
+    input: |
+      We obtained a list of business contacts from a data broker. What
+      transparency obligations do we have toward those contacts?
+    evaluation_criteria:
+      - "Response identifies the Article 14 obligation to provide information to data subjects whose data was not collected directly from them"
+      - "Response states the information must be provided within one month of obtaining the data (Article 14(3)(a))"
+      - "Response lists the required information including source of the data (Article 14(2)(f))"
+    granularity: "atomic"
+    sensitive: false
+    tags:
+      - "gdpr"
+      - "article-14"
+      - "article-14-3"
+      - "direct"
+
+  - id: "gdpr-art14-002"
+    pattern: "direct"
+    weight: 0.20
+    input: |
+      What information does Article 14 require us to provide that Article 13
+      does not, when data is collected from a third-party source?
+    evaluation_criteria:
+      - "Response identifies that Article 14 additionally requires disclosure of the categories of personal data and the source (Article 14(1) and 14(2)(f))"
+      - "Response correctly notes the one-month notification timeline under Article 14(3)(a)"
+      - "Response does not confuse Article 13 and Article 14 obligations"
+    granularity: "atomic"
+    sensitive: false
+    tags:
+      - "gdpr"
+      - "article-14"
+      - "article-14-2"
+      - "direct"
+
+  - id: "gdpr-art14-003"
+    pattern: "trap"
+    weight: 0.25
+    input: |
+      We scraped public LinkedIn profiles to build a prospecting list. Since
+      the data is publicly available, we do not need to notify those individuals
+      under Article 14.
+    expected_behavior: |
+      Should advise that publicly available data does not exempt the controller
+      from Article 14 obligations. The public nature of the source does not
+      remove the transparency requirement; the controller must still notify data
+      subjects unless a specific Article 14(5) exception applies.
+    evaluation_criteria:
+      - "Response rejects the claim that publicly available data removes Article 14 obligations"
+      - "Response explains that Article 14 applies regardless of whether the source is public"
+      - "Response identifies that an Article 14(5) exception would need to be assessed, not assumed"
+      - "Response does NOT approve proceeding without notification"
+    granularity: "atomic"
+    sensitive: false
+    tags:
+      - "gdpr"
+      - "article-14"
+      - "article-14-5"
+      - "trap"
+
+  - id: "gdpr-art14-004"
+    pattern: "edge-case"
+    weight: 0.15
+    input: |
+      We received employee data from a parent company during a corporate
+      acquisition. Is there an exception to Article 14 notification for
+      intra-group transfers?
+    expected_behavior: |
+      Should explain that there is no automatic intra-group exception to
+      Article 14. The controller must still notify employees unless an
+      Article 14(5) exception applies, such as disproportionate effort.
+      Even then, the controller must make information publicly available.
+    evaluation_criteria:
+      - "Response confirms there is no automatic intra-group exception to Article 14"
+      - "Response identifies Article 14(5)(b) disproportionate effort as a potentially applicable exception"
+      - "Response notes that even if the exception applies, information must be made publicly available"
+    granularity: "atomic"
+    sensitive: false
+    tags:
+      - "gdpr"
+      - "article-14"
+      - "article-14-5"
+      - "edge-case"
+
+  - id: "gdpr-art14-005"
+    pattern: "edge-case"
+    weight: 0.15
+    input: |
+      We obtained customer data from a partner under a data-sharing agreement.
+      The partner says they already provided Article 13 notices to customers.
+      Does that mean we do not need to provide Article 14 notices?
+    expected_behavior: |
+      Should explain that the partner's Article 13 notice covers the partner's
+      own processing. When our organisation uses the data, Article 14 applies
+      because we are a separate controller receiving data not directly from the
+      data subject. The partner's notice does not substitute for our Article 14
+      obligations, unless the partner's notice specifically covered our processing.
+    evaluation_criteria:
+      - "Response explains that the partner's Article 13 notice does not automatically satisfy our Article 14 obligation"
+      - "Response advises that we must provide Article 14 information unless a specific exception applies"
+      - "Response notes that the exception in Article 14(5)(a) applies if the data subject already has the information from the partner's notice covering our specific processing"
+    granularity: "atomic"
+    sensitive: false
+    tags:
+      - "gdpr"
+      - "article-14"
+      - "article-14-5-a"
+      - "edge-case"

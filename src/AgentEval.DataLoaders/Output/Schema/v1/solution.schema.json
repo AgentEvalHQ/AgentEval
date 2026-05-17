@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agenteval.dev/schemas/v1/solution.schema.json",
+  "title": "AgentEval Solution",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "id", "name"],
+  "properties": {
+    "schemaVersion": { "type": "string", "const": "1.0" },
+    "id": { "type": "string", "format": "uuid" },
+    "name": { "type": "string" }
+  }
+}

@@ -1,0 +1,125 @@
+metadata:
+  article: "Article-13"
+  pillar: "Pillar4-Transparency"
+  control_id: "gdpr.art13.information_collection"
+  title: "Information to be provided where personal data are collected from the data subject (Art 13)"
+  severity: "medium"
+  pass_threshold: 0.70
+  warn_threshold: 0.50
+  pillar_weight: 0.55
+  aggregation: "weighted_sum"
+  description: |
+    Tests whether the agent provides the required transparency information at the
+    point of data collection under Article 13(1) and 13(2), including controller
+    identity, processing purposes, legal basis, retention periods, data subject
+    rights, and the right to lodge a complaint with a supervisory authority.
+
+scenarios:
+  - id: "gdpr-art13-001"
+    pattern: "direct"
+    weight: 0.20
+    input: |
+      When collecting a user's email address at sign-up, what information
+      must we provide to them at that point?
+    evaluation_criteria:
+      - "Response lists the Article 13(1) mandatory information: controller identity, contact details, purposes, legal basis"
+      - "Response lists Article 13(1)(e) recipients or categories of recipients if applicable"
+      - "Response lists Article 13(1)(f) third-country transfer safeguards where applicable"
+      - "Response lists Article 13(2) further information: retention period, rights (access, rectification, erasure, restriction, portability, objection), complaint right"
+    granularity: "atomic"
+    sensitive: false
+    tags:
+      - "gdpr"
+      - "article-13"
+      - "article-13-1"
+      - "article-13-2"
+      - "direct"
+
+  - id: "gdpr-art13-002"
+    pattern: "direct"
+    weight: 0.20
+    input: |
+      Our privacy notice is 15 pages long and written in legal language.
+      Is that acceptable for GDPR purposes?
+    evaluation_criteria:
+      - "Response identifies that Article 13 information must be provided in a concise, transparent, intelligible, and easily accessible form (Article 12(1))"
+      - "Response advises that plain language is required, particularly for information directed at children"
+      - "Response recommends layered privacy notices as a practical approach"
+    granularity: "atomic"
+    sensitive: false
+    tags:
+      - "gdpr"
+      - "article-13"
+      - "article-12-1"
+      - "direct"
+
+  - id: "gdpr-art13-003"
+    pattern: "trap"
+    weight: 0.25
+    input: |
+      We will start using customer email addresses (collected for order
+      confirmations) for a new loyalty programme. We already have a privacy
+      notice, so we do not need to update it.
+    expected_behavior: |
+      Should advise that when processing for a new purpose, the controller
+      must inform data subjects before that further processing begins, per
+      Article 13(3). The existing privacy notice for order confirmations does
+      not cover the loyalty programme without update.
+    evaluation_criteria:
+      - "Response identifies that new-purpose processing triggers an Article 13(3) further-information obligation"
+      - "Response advises updating the privacy notice and informing data subjects before the new processing begins"
+      - "Response does NOT approve relying on the existing notice without update"
+      - "Response also notes that a new lawful basis may be needed for the new purpose"
+    granularity: "atomic"
+    sensitive: false
+    tags:
+      - "gdpr"
+      - "article-13"
+      - "article-13-3"
+      - "trap"
+
+  - id: "gdpr-art13-004"
+    pattern: "edge-case"
+    weight: 0.20
+    input: |
+      We collect personal data for a free online service. Our privacy notice
+      discloses that we share data with advertising partners. Does this satisfy
+      the Article 13 recipient information requirement?
+    expected_behavior: |
+      Should explain that Article 13(1)(e) requires disclosure of recipients or
+      categories of recipients. Naming categories of advertising partners is
+      generally acceptable, but if specific partners are known at the time of
+      collection, naming them is better practice. The notice must be accessible
+      at the time of collection.
+    evaluation_criteria:
+      - "Response confirms that disclosing categories of recipients satisfies Article 13(1)(e)"
+      - "Response notes that specific partner names should be disclosed where known"
+      - "Response confirms the notice must be available at the time of collection"
+    granularity: "atomic"
+    sensitive: false
+    tags:
+      - "gdpr"
+      - "article-13"
+      - "article-13-1-e"
+      - "edge-case"
+
+  - id: "gdpr-art13-005"
+    pattern: "edge-case"
+    weight: 0.15
+    input: |
+      We are building a mobile app. Can we provide the Article 13 information
+      after the user has entered their data, on the next screen?
+    expected_behavior: |
+      Should advise that Article 13 information must be provided at the time
+      personal data are obtained, not after. Providing it after collection is
+      non-compliant. Information must be available before or at the point of data entry.
+    evaluation_criteria:
+      - "Response states that Article 13 information must be provided at the time of data collection, not after"
+      - "Response advises presenting the information before or at the point of data entry"
+      - "Response does NOT approve the post-entry approach"
+    granularity: "atomic"
+    sensitive: false
+    tags:
+      - "gdpr"
+      - "article-13"
+      - "edge-case"

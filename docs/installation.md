@@ -66,7 +66,9 @@ Create a simple test to verify AgentEval is installed and working correctly:
 ```csharp
 using AgentEval.MAF;
 using AgentEval.Models;
+using AgentEval.Testing;        // FakeChatClient
 using Microsoft.Extensions.AI;
+using Microsoft.Agents.AI;       // ChatClientAgent
 
 // 1. Create a evaluation harness
 var harness = new MAFEvaluationHarness(verbose: true);
@@ -104,8 +106,13 @@ If this runs without errors and shows "Passed: True", AgentEval is correctly ins
 AgentEval also ships a standalone CLI for terminal and CI/CD usage:
 
 ```bash
-dotnet tool install --global AgentEval.Cli --prerelease
-agenteval eval --azure --model gpt-4o --dataset tests.yaml
+# Planned (v1.1): a `dotnet tool` install path.
+# For now in v0.8.1-beta, run the CLI from a cloned repo build:
+#   dotnet run --project src/AgentEval.Cli -- init
+dotnet tool install --global AgentEval.Cli --prerelease  # (planned — not published yet)
+agenteval init                                       # bootstrap .agenteval/ workspace
+agenteval bench gdpr --preset smoke --subject MyAgent # run a benchmark
+agenteval mc serve                                    # open Mission Control on http://localhost:5000
 ```
 
 See [CLI Reference](cli.md) for full documentation.

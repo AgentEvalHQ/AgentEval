@@ -8,6 +8,9 @@ namespace AgentEval.RedTeam.Reporting.Compliance;
 /// </summary>
 public class MITREATLASReporter : IComplianceReporter<MITREATLASReport>
 {
+    /// <summary>Canonical regulation key used in the output store.</summary>
+    public const string Regulation = "MITRE-ATLAS";
+
     /// <summary>
     /// All MITRE ATLAS techniques relevant to LLM security.
     /// </summary>
@@ -167,6 +170,64 @@ public class MITREATLASReporter : IComplianceReporter<MITREATLASReport>
             Summary = summary,
             Recommendations = recommendations
         };
+    }
+
+    /// <summary>
+    /// Generates a MITRE ATLAS compliance report and persists it as structured evidence via <paramref name="store"/>.
+    /// </summary>
+    /// <param name="store">The output store to write evidence into.</param>
+    /// <param name="subject">The subject being evaluated.</param>
+    /// <param name="sourceRunId">Run ID of the evaluation run that produced <paramref name="result"/>.</param>
+    /// <param name="result">The red team scan result.</param>
+    /// <param name="options">Optional report generation options.</param>
+    /// <param name="ct">Cancellation token.</param>
+    public async Task SaveReportAsync(
+        AgentEval.Output.IOutputStore store,
+        AgentEval.Output.SubjectIdentity subject,
+        string sourceRunId,
+        RedTeamResult result,
+        ComplianceReportOptions? options = null,
+        CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(store);
+        ArgumentNullException.ThrowIfNull(subject);
+        ArgumentException.ThrowIfNullOrWhiteSpace(sourceRunId);
+        ArgumentNullException.ThrowIfNull(result);
+
+        var report = GenerateReport(result, options);
+
+        var sourceManifest = await store.GetRunManifestAsync(sourceRunId, ct)
+            ?? throw new InvalidOperationException($"Source run {sourceRunId} not found in store.");
+
+        var controls = report.Techniques
+            .Select(t => new AgentEval.Output.EvidenceControl(
+                Id: t.Id,
+                Title: t.Name,
+                Status: t.Status.ToString(),
+                PassRate: t.TotalTests > 0 ? t.PassedTests / (double)t.TotalTests : 0.0,
+                ScenarioRefs: [],
+                Notes: t.Description.Length > 0 ? $"Tactic: {t.TacticName}. {t.Description}" : $"Tactic: {t.TacticName}"))
+            .ToList();
+
+        var testedControls = report.Techniques.Where(t => t.Status == TechniqueTestStatus.Tested).ToList();
+        var passed = testedControls.Count(t => t.PassRate >= 100);
+        var warnings = testedControls.Count(t => t.PassRate is > 0 and < 100);
+        var failed = testedControls.Count(t => t.PassRate == 0 && t.TotalTests > 0);
+        var overallStatus = failed > 0 ? "FAIL" : warnings > 0 ? "WARN" : "PASS";
+
+        var evidence = new AgentEval.Output.ComplianceEvidence(
+            SchemaVersion: "1.0",
+            Regulation: Regulation,
+            Subject: subject,
+            GeneratedAt: report.GeneratedAt,
+            SourceRun: new AgentEval.Output.SourceRunRef(sourceRunId, sourceManifest.ContentHash),
+            Controls: controls,
+            Summary: new AgentEval.Output.EvidenceSummary(controls.Count, passed, warnings, failed, overallStatus),
+            Attestation: new AgentEval.Output.Attestation(
+                typeof(MITREATLASReporter).Assembly.GetName().Version!.ToString(),
+                null, "AgentEval", "internal"));
+
+        await store.SaveComplianceEvidenceAsync(Regulation, subject, evidence, ct);
     }
 
     private static List<ComplianceFinding> BuildFindings(List<AttackResult> attackResults, bool includeEvidence)

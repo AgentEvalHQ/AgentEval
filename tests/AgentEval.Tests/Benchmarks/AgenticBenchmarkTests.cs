@@ -8,6 +8,7 @@ using AgentEval.Models;
 using AgentEval.Testing;
 using AgentEval.Tests.TestHelpers;
 using Xunit;
+using AgenticBenchmark = AgentEval.Benchmarks.AgenticBenchmark;
 
 namespace AgentEval.Tests.Benchmarks;
 

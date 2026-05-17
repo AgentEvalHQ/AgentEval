@@ -1,0 +1,30 @@
+{
+  "schemaVersion": "1.0",
+  "key": "coherence",
+  "name": "Coherence",
+  "category": "rag",
+  "version": "1.0.0",
+  "description": "LLM judge assessing whether the agent response is internally consistent and logically coherent (no self-contradictions, smooth flow).",
+  "costTier": "Low",
+  "higherIsBetter": true,
+  "defaultThreshold": 0.75,
+  "expectedInputs": [
+    {
+      "kind": "response",
+      "key": "",
+      "required": true,
+      "description": "Agent response."
+    }
+  ],
+  "recommendedVisualization": "histogram",
+  "compatibleWith": [
+    {
+      "system": "foundry",
+      "uri": "azureai://built-in/evaluators/coherence"
+    }
+  ],
+  "links": {
+    "documentation": "/docs/benchmarks/agentic/getting-started.md#coherence",
+    "source": "src/AgentEval.Evals.Agentic/Quality/CoherenceEval.cs"
+  }
+}

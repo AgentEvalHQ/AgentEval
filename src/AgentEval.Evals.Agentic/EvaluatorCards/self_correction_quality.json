@@ -1,0 +1,37 @@
+{
+  "schemaVersion": "1.0",
+  "key": "self_correction_quality",
+  "name": "Self-Correction Quality",
+  "category": "calibration",
+  "version": "1.0.0",
+  "description": "LLM judge assessing whether, after a user correction or pushback, the agent integrated the feedback correctly (not just capitulated, not stubbornly re-asserted).",
+  "costTier": "Medium",
+  "higherIsBetter": true,
+  "defaultThreshold": 0.75,
+  "expectedInputs": [
+    {
+      "kind": "query",
+      "key": "",
+      "required": true,
+      "description": "User correction message."
+    },
+    {
+      "kind": "response",
+      "key": "",
+      "required": true,
+      "description": "Agent response to the correction."
+    },
+    {
+      "kind": "metadata",
+      "key": "correction_turn",
+      "required": true,
+      "description": "The original turn being corrected \u2014 read via ConversationHistoryHelper.TryGetCorrectionTurn."
+    }
+  ],
+  "recommendedVisualization": "histogram",
+  "compatibleWith": [],
+  "links": {
+    "documentation": "/docs/benchmarks/agentic/getting-started.md#self-correction-quality",
+    "source": "src/AgentEval.Evals.Agentic/Calibration/SelfCorrectionQualityEval.cs"
+  }
+}

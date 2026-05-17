@@ -1,0 +1,42 @@
+{
+  "schemaVersion": "1.0",
+  "key": "tool_selection",
+  "name": "Tool Selection",
+  "category": "agentic-process",
+  "version": "1.0.0",
+  "description": "LLM judge assessing whether the agent picked the right tool(s) for the task at each decision point.",
+  "costTier": "Low",
+  "higherIsBetter": true,
+  "defaultThreshold": 0.8,
+  "expectedInputs": [
+    {
+      "kind": "query",
+      "key": "",
+      "required": true,
+      "description": "User request."
+    },
+    {
+      "kind": "response",
+      "key": "",
+      "required": true,
+      "description": "Final agent response."
+    },
+    {
+      "kind": "toolCalls",
+      "key": "",
+      "required": true,
+      "description": "Tool calls made by the agent."
+    }
+  ],
+  "recommendedVisualization": "radar",
+  "compatibleWith": [
+    {
+      "system": "foundry",
+      "uri": "azureai://built-in/evaluators/tool_selection"
+    }
+  ],
+  "links": {
+    "documentation": "/docs/benchmarks/agentic/getting-started.md#tool-selection",
+    "source": "src/AgentEval.Evals.Agentic/Process/ToolSelectionEval.cs"
+  }
+}

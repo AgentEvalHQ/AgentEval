@@ -1,0 +1,130 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agenteval.ai/schemas/v1/evaluator-card.schema.json",
+  "title": "AgentEval Evaluator Card v1.0",
+  "description": "Schema-driven metadata for an IEval implementation. Plan-07 §11; plan-08 MC1.5.0.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "key",
+    "name",
+    "category",
+    "version",
+    "description",
+    "costTier",
+    "higherIsBetter",
+    "expectedInputs",
+    "compatibleWith"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "type": "string",
+      "const": "1.0"
+    },
+    "key": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[a-z][a-z0-9_]*$",
+      "description": "Stable evaluator key, snake_case."
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "category": {
+      "type": "string",
+      "enum": [
+        "system-outcome",
+        "agentic-process",
+        "rag",
+        "judge-quality",
+        "adjudication",
+        "safety-security",
+        "operational",
+        "memory",
+        "multi-turn",
+        "reasoning",
+        "calibration",
+        "adversarial",
+        "ux",
+        "efficiency"
+      ],
+      "description": "Canonical category. Locked to an enum so card↔runtime drift (the M1.6 / LR3-008 class of bugs) is caught at schema-validation time, not just by CardRuntimeMetadataParityTest. Add new values here only when a new runtime category is introduced."
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+(\\.[0-9]+)?$"
+    },
+    "description": {
+      "type": "string",
+      "minLength": 1
+    },
+    "costTier": {
+      "type": "string",
+      "enum": ["Trivial", "Low", "Medium", "High"]
+    },
+    "higherIsBetter": {
+      "type": "boolean"
+    },
+    "defaultThreshold": {
+      "type": ["number", "null"],
+      "minimum": 0,
+      "maximum": 1
+    },
+    "expectedInputs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["kind", "key", "required", "description"],
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": ["metadata", "query", "response", "context", "toolCalls", "systemMessage", "groundTruth"]
+          },
+          "key": {
+            "type": "string"
+          },
+          "required": {
+            "type": "boolean"
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "recommendedVisualization": {
+      "type": ["string", "null"],
+      "enum": ["timeline", "radar", "histogram", "heatmap", "sparkline", "sankey", "stackedBar", "none", null]
+    },
+    "compatibleWith": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["system", "uri"],
+        "properties": {
+          "system": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uri": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "links": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "properties": {
+        "documentation": { "type": ["string", "null"] },
+        "source": { "type": ["string", "null"] }
+      }
+    }
+  }
+}

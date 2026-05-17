@@ -1,0 +1,9 @@
+# Per-run artifacts (regenerated on every eval run; not source-of-truth)
+subjects/*/*/runs/
+runs-index/
+
+# Red-team campaign outputs (large, may contain sensitive prompt data)
+red-team/
+
+# Local user files
+*.local.json

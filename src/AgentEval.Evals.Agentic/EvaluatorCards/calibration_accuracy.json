@@ -1,0 +1,25 @@
+{
+  "schemaVersion": "1.0",
+  "key": "calibration_accuracy",
+  "name": "Judge Calibration Accuracy",
+  "category": "judge-quality",
+  "version": "1.0.0",
+  "description": "Pure-code meta-evaluator: fraction of judge verdicts that match expected verdicts. Reads from EvalInput.Metadata[calibration_pairs].",
+  "costTier": "Trivial",
+  "higherIsBetter": true,
+  "defaultThreshold": 0.85,
+  "expectedInputs": [
+    {
+      "kind": "metadata",
+      "key": "calibration_pairs",
+      "required": true,
+      "description": "List of (judge_verdict, expected_verdict) pairs."
+    }
+  ],
+  "recommendedVisualization": "histogram",
+  "compatibleWith": [],
+  "links": {
+    "documentation": "/docs/benchmarks/agentic/getting-started.md#calibration-accuracy",
+    "source": "src/AgentEval.Evals.Agentic/JudgeQuality/CalibrationAccuracyEval.cs"
+  }
+}

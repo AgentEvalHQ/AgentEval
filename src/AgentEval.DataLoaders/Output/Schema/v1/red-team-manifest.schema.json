@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agenteval.dev/schemas/v1/red-team-manifest.schema.json",
+  "title": "AgentEval Red-Team Campaign Manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "campaignId", "name", "startedAt", "targets", "mode"],
+  "properties": {
+    "schemaVersion": { "type": "string", "const": "1.0" },
+    "campaignId": { "type": "string" },
+    "name": { "type": "string" },
+    "startedAt": { "type": "string", "format": "date-time" },
+    "targets": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["kind", "name"],
+        "properties": {
+          "kind": { "enum": ["agent", "workflow"] },
+          "name": { "type": "string" }
+        }
+      }
+    },
+    "mode": { "type": "string" },
+    "completedAt": { "type": ["string", "null"], "format": "date-time" }
+  }
+}

@@ -5,6 +5,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 using AgentEval.Memory.Models;
+using AgentEval.Output;
 
 namespace AgentEval.Memory.Reporting;
 
@@ -14,7 +15,11 @@ namespace AgentEval.Memory.Reporting;
 /// </summary>
 public partial class JsonFileBaselineStore : IBaselineStore
 {
+    private const string DefaultOutputPathTemplate = ".agenteval/benchmarks/{AgentName}";
+
     private readonly MemoryReportingOptions _options;
+    private readonly IOutputStore? _outputStore;
+    private readonly SubjectIdentity? _subject;
 
     internal static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -39,6 +44,19 @@ public partial class JsonFileBaselineStore : IBaselineStore
         _options = options ?? throw new ArgumentNullException(nameof(options));
     }
 
+    /// <summary>
+    /// Creates a store that writes to both the legacy path and to an <see cref="IOutputStore"/> canonical path.
+    /// </summary>
+    /// <param name="options">Reporting options for legacy-path writes.</param>
+    /// <param name="outputStore">Canonical output store for dual-write. Stores where <see cref="IOutputStoreReader.IsAvailable"/> is false are skipped.</param>
+    /// <param name="subject">Optional pre-resolved subject identity. If null, derived from the first save call.</param>
+    public JsonFileBaselineStore(MemoryReportingOptions options, IOutputStore outputStore, SubjectIdentity? subject = null)
+    {
+        _options = options ?? throw new ArgumentNullException(nameof(options));
+        _outputStore = outputStore ?? throw new ArgumentNullException(nameof(outputStore));
+        _subject = subject;
+    }
+
     public async Task SaveAsync(MemoryBaseline baseline, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(baseline);
@@ -58,6 +76,28 @@ public partial class JsonFileBaselineStore : IBaselineStore
             await EnsureEmbeddedResourceAsync(rootPath, "report.html", ct);
         if (_options.IncludeArchetypes)
             await EnsureEmbeddedResourceAsync(rootPath, "archetypes.json", ct);
+
+        if (_outputStore is { IsAvailable: true })
+        {
+            try
+            {
+                var subject = _subject ?? new SubjectIdentity(SubjectKind.Agent, baseline.AgentConfig.AgentName);
+                var summary = new RunSummary(
+                    SchemaVersion: "1.0",
+                    RunId: baseline.Id,
+                    Verdict: DeriveVerdict(baseline),
+                    Stats: BuildStats(baseline),
+                    Metrics: BuildMetrics(baseline));
+                var versionTag = $"v{baseline.Timestamp:yyyy-MM-ddTHHmmss}";
+                await _outputStore.SaveBaselineAsync(subject, summary, versionTag: versionTag, ct: ct);
+                // Also persist as the "current" (non-pinned) baseline so LoadBaselineAsync works.
+                await _outputStore.SaveBaselineAsync(subject, summary, versionTag: null, ct: ct);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[AgentEval.Memory] Canonical baseline write failed: {ex.Message}");
+            }
+        }
     }
 
     public async Task<MemoryBaseline?> LoadAsync(string id, CancellationToken ct = default)
@@ -395,4 +435,37 @@ public partial class JsonFileBaselineStore : IBaselineStore
 
     [GeneratedRegex(@"[^a-z0-9]+", RegexOptions.Compiled)]
     private static partial Regex SlugifyRegex();
+
+    private static string DeriveVerdict(MemoryBaseline b)
+    {
+        if (!string.IsNullOrEmpty(b.Grade))
+        {
+            return b.Grade switch
+            {
+                "A" or "B" or "C" => "PASS",
+                _ => "FAIL"
+            };
+        }
+        return b.OverallScore >= 70.0 ? "PASS" : "FAIL";
+    }
+
+    private static RunStats BuildStats(MemoryBaseline b)
+    {
+        var total = b.CategoryResults.Count;
+        var passed = b.CategoryResults.Values.Count(c => !c.Skipped && c.Score >= 70.0);
+        var skipped = b.CategoryResults.Values.Count(c => c.Skipped);
+        var failed = total - passed - skipped;
+        return new RunStats(total, passed, failed < 0 ? 0 : failed, 0);
+    }
+
+    private static IReadOnlyDictionary<string, double> BuildMetrics(MemoryBaseline b)
+    {
+        var dict = new Dictionary<string, double>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["OverallScore"] = b.OverallScore
+        };
+        foreach (var (category, entry) in b.CategoryResults)
+            dict[category] = entry.Score;
+        return dict;
+    }
 }

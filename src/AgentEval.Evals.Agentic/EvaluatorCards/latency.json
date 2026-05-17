@@ -1,0 +1,25 @@
+{
+  "schemaVersion": "1.0",
+  "key": "latency",
+  "name": "Telemetry: Latency",
+  "category": "operational",
+  "version": "1.0.0",
+  "description": "Pure-code telemetry evaluator surfacing the agent p50/p95/p99 latency from AgenticTelemetry. Lower is better.",
+  "costTier": "Trivial",
+  "higherIsBetter": false,
+  "defaultThreshold": 1.0,
+  "expectedInputs": [
+    {
+      "kind": "metadata",
+      "key": "agentic_telemetry",
+      "required": true,
+      "description": "AgenticTelemetry record with LatencyMsP50/P95/P99."
+    }
+  ],
+  "recommendedVisualization": "histogram",
+  "compatibleWith": [],
+  "links": {
+    "documentation": "/docs/benchmarks/agentic/getting-started.md#latency",
+    "source": "src/AgentEval.Evals.Agentic/Telemetry/LatencyEval.cs"
+  }
+}

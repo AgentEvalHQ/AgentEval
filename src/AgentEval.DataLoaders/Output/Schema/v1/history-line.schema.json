@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agenteval.dev/schemas/v1/history-line.schema.json",
+  "title": "AgentEval History Line",
+  "description": "One terminal-state line appended to a subject's history.jsonl after a run completes. Phase-7 Task 7.7 documented the terminal-only semantics: only completed runs land here, so the `verdict` enum is intentionally limited to the three terminal states (PASS / FAIL / WARN). A `PENDING` state would imply mid-run records, which is not the contract — pending state lives in the run manifest, not history.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["runId", "timestamp", "verdict", "score"],
+  "properties": {
+    "runId": { "type": "string" },
+    "timestamp": { "type": "string", "format": "date-time" },
+    "verdict": {
+      "enum": ["PASS", "FAIL", "WARN"],
+      "description": "Terminal verdict of the run. PENDING is intentionally NOT a valid value — history.jsonl is the post-run audit log, not the live run-state tracker. Mid-run state belongs in run/manifest.json."
+    },
+    "score": { "type": "number", "minimum": 0, "maximum": 1 },
+    "notes": { "type": ["string", "null"] }
+  }
+}

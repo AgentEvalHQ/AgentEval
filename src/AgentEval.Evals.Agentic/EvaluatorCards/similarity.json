@@ -1,0 +1,36 @@
+{
+  "schemaVersion": "1.0",
+  "key": "similarity",
+  "name": "Similarity",
+  "category": "rag",
+  "version": "1.0.0",
+  "description": "LLM judge or embedding-based similarity between the agent response and a reference / ground-truth answer.",
+  "costTier": "Low",
+  "higherIsBetter": true,
+  "defaultThreshold": 0.8,
+  "expectedInputs": [
+    {
+      "kind": "response",
+      "key": "",
+      "required": true,
+      "description": "Agent response."
+    },
+    {
+      "kind": "metadata",
+      "key": "expected_response",
+      "required": true,
+      "description": "Ground-truth reference answer."
+    }
+  ],
+  "recommendedVisualization": "histogram",
+  "compatibleWith": [
+    {
+      "system": "foundry",
+      "uri": "azureai://built-in/evaluators/similarity"
+    }
+  ],
+  "links": {
+    "documentation": "/docs/benchmarks/agentic/getting-started.md#similarity",
+    "source": "src/AgentEval.Evals.Agentic/Quality/SimilarityEval.cs"
+  }
+}

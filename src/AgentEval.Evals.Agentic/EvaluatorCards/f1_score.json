@@ -1,0 +1,31 @@
+{
+  "schemaVersion": "1.0",
+  "key": "f1_score",
+  "name": "F1 Score",
+  "category": "rag",
+  "version": "1.0.0",
+  "description": "Pure-code (zero-LLM) token-level F1 score between an AI response and a ground-truth reference. Whitespace-tokenized + lowercased; F1 = 2·(precision·recall)/(precision+recall). Deterministic — confidence = 1.0.",
+  "costTier": "Trivial",
+  "higherIsBetter": true,
+  "defaultThreshold": 0.50,
+  "expectedInputs": [
+    {
+      "kind": "response",
+      "key": "",
+      "required": true,
+      "description": "The agent's response text (whitespace-tokenized + lowercased before comparison)."
+    },
+    {
+      "kind": "groundTruth",
+      "key": "",
+      "required": true,
+      "description": "Reference / expected answer. Wired via EvalInput.GroundTruth (top-level field, NOT a metadata bag entry); takes precedence over the constructor fallback. If neither is supplied the eval returns 0 with a 'medium' severity evidence note."
+    }
+  ],
+  "recommendedVisualization": "histogram",
+  "compatibleWith": [],
+  "links": {
+    "documentation": "/docs/benchmarks/agentic/getting-started.md#f1-score",
+    "source": "src/AgentEval.Core/Evals/F1ScoreEval.cs"
+  }
+}

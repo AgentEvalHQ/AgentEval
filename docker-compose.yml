@@ -1,0 +1,41 @@
+# SPDX-License-Identifier: MIT
+# Plan-08 MC1.12.1 — Mission Control quick-start via Docker Compose.
+#
+# PREREQUISITE: run `agenteval init` in the host directory FIRST. If
+# `.agenteval/` doesn't exist, Docker will create an empty (root-owned)
+# directory for the bind mount and Mission Control will render the
+# "uninitialised workspace" landing page (MC1.10.1).
+#
+# Mounts the host's .agenteval/ folder (read-only) into the container at
+# /workspace/.agenteval, then serves Mission Control on http://localhost:5000.
+#
+# Usage:
+#   agenteval init                                 # one-time
+#   docker compose up
+#   open http://localhost:5000
+#
+# Custom workspace path:
+#   AGENTEVAL_WORKSPACE=/path/to/your/workspace docker compose up
+
+services:
+  mission-control:
+    build: .
+    image: agenteval/mc:latest
+    container_name: agenteval-mc
+    # SECURITY: Phase 1 ships no authentication — the default port mapping
+    # binds to loopback only. To expose Mission Control on a LAN/VPN/WAN
+    # interface, change to `"5000:5000"` AND understand the trust model:
+    # anyone reaching the port can read every subject, run, scenario, and
+    # compliance evidence in the workspace. See
+    # docs/missioncontrol/getting-started.md "Bind address" callout.
+    ports:
+      - "127.0.0.1:5000:5000"
+    volumes:
+      # Mount the host's .agenteval/ read-only — Mission Control is a
+      # read-only viewer and never writes to the workspace.
+      - ${AGENTEVAL_WORKSPACE:-./.agenteval}:/workspace/.agenteval:ro
+    environment:
+      AgentEval__Root: /workspace
+    # Dev-viewer default — don't auto-restart on host reboot. Override to
+    # `unless-stopped` when running on a server.
+    restart: "no"

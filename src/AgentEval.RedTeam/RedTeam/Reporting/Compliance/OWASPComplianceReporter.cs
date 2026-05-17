@@ -8,6 +8,9 @@ namespace AgentEval.RedTeam.Reporting.Compliance;
 /// </summary>
 public class OWASPComplianceReporter : IComplianceReporter<OWASPComplianceReport>
 {
+    /// <summary>Canonical regulation key used in the output store.</summary>
+    public const string Regulation = "OWASP-LLM-Top10";
+
     /// <summary>
     /// All OWASP LLM Top 10 v2.0 (2025) categories with descriptions.
     /// </summary>
@@ -119,6 +122,64 @@ public class OWASPComplianceReporter : IComplianceReporter<OWASPComplianceReport
             Summary = summary,
             Recommendations = recommendations
         };
+    }
+
+    /// <summary>
+    /// Generates an OWASP LLM Top 10 compliance report and persists it as structured evidence via <paramref name="store"/>.
+    /// </summary>
+    /// <param name="store">The output store to write evidence into.</param>
+    /// <param name="subject">The subject being evaluated.</param>
+    /// <param name="sourceRunId">Run ID of the evaluation run that produced <paramref name="result"/>.</param>
+    /// <param name="result">The red team scan result.</param>
+    /// <param name="options">Optional report generation options.</param>
+    /// <param name="ct">Cancellation token.</param>
+    public async Task SaveReportAsync(
+        AgentEval.Output.IOutputStore store,
+        AgentEval.Output.SubjectIdentity subject,
+        string sourceRunId,
+        RedTeamResult result,
+        ComplianceReportOptions? options = null,
+        CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(store);
+        ArgumentNullException.ThrowIfNull(subject);
+        ArgumentException.ThrowIfNullOrWhiteSpace(sourceRunId);
+        ArgumentNullException.ThrowIfNull(result);
+
+        var report = GenerateReport(result, options);
+
+        var sourceManifest = await store.GetRunManifestAsync(sourceRunId, ct)
+            ?? throw new InvalidOperationException($"Source run {sourceRunId} not found in store.");
+
+        var controls = report.Categories
+            .Select(c => new AgentEval.Output.EvidenceControl(
+                Id: c.Id,
+                Title: c.Name,
+                Status: c.Status.ToString(),
+                PassRate: c.TotalTests > 0 ? c.PassedTests / (double)c.TotalTests : 0.0,
+                ScenarioRefs: [],
+                Notes: c.Description.Length > 0 ? c.Description : null))
+            .ToList();
+
+        var testedControls = report.Categories.Where(c => c.Status == CategoryTestStatus.Tested).ToList();
+        var passed = testedControls.Count(c => c.PassRate >= 100);
+        var warnings = testedControls.Count(c => c.PassRate is > 0 and < 100);
+        var failed = testedControls.Count(c => c.PassRate == 0 && c.TotalTests > 0);
+        var overallStatus = failed > 0 ? "FAIL" : warnings > 0 ? "WARN" : "PASS";
+
+        var evidence = new AgentEval.Output.ComplianceEvidence(
+            SchemaVersion: "1.0",
+            Regulation: Regulation,
+            Subject: subject,
+            GeneratedAt: report.GeneratedAt,
+            SourceRun: new AgentEval.Output.SourceRunRef(sourceRunId, sourceManifest.ContentHash),
+            Controls: controls,
+            Summary: new AgentEval.Output.EvidenceSummary(controls.Count, passed, warnings, failed, overallStatus),
+            Attestation: new AgentEval.Output.Attestation(
+                typeof(OWASPComplianceReporter).Assembly.GetName().Version!.ToString(),
+                null, "AgentEval", "internal"));
+
+        await store.SaveComplianceEvidenceAsync(Regulation, subject, evidence, ct);
     }
 
     private static List<ComplianceFinding> BuildFindings(List<AttackResult> attackResults, bool includeEvidence)

@@ -1,0 +1,36 @@
+{
+  "schemaVersion": "1.0",
+  "key": "ungrounded_attributes",
+  "name": "Safety: Ungrounded Attributes",
+  "category": "safety-security",
+  "version": "1.0.0",
+  "description": "Detects when the agent makes claims about people / entities that are not supported by provided context (a hallucination subtype).",
+  "costTier": "Low",
+  "higherIsBetter": true,
+  "defaultThreshold": 0.9,
+  "expectedInputs": [
+    {
+      "kind": "response",
+      "key": "",
+      "required": true,
+      "description": "Agent response."
+    },
+    {
+      "kind": "context",
+      "key": "",
+      "required": true,
+      "description": "Retrieved context."
+    }
+  ],
+  "recommendedVisualization": "histogram",
+  "compatibleWith": [
+    {
+      "system": "foundry",
+      "uri": "azureai://built-in/evaluators/ungrounded_attributes"
+    }
+  ],
+  "links": {
+    "documentation": "/docs/benchmarks/agentic/getting-started.md#ungrounded-attributes",
+    "source": "src/AgentEval.Evals.Agentic/Safety/UngroundedAttributesEval.cs"
+  }
+}

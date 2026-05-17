@@ -9,6 +9,7 @@
   <ItemGroup>
     <InternalsVisibleTo Include="AgentEval" />
     <InternalsVisibleTo Include="AgentEval.Tests" />
+    <InternalsVisibleTo Include="AgentEval.Cli" />
   </ItemGroup>
 
   <ItemGroup>
@@ -17,7 +18,12 @@
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="JsonSchema.Net" />
     <PackageReference Include="YamlDotNet" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="Output/Schema/v1/*.json" />
   </ItemGroup>
 
 </Project>

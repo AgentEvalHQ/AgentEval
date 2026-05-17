@@ -1,0 +1,37 @@
+{
+  "schemaVersion": "1.0",
+  "key": "plan_formulation_quality",
+  "name": "Plan Formulation Quality",
+  "category": "reasoning",
+  "version": "1.0.0",
+  "description": "LLM judge assessing whether the agent produced a sound, well-structured plan before executing.",
+  "costTier": "Medium",
+  "higherIsBetter": true,
+  "defaultThreshold": 0.75,
+  "expectedInputs": [
+    {
+      "kind": "query",
+      "key": "",
+      "required": true,
+      "description": "User request."
+    },
+    {
+      "kind": "response",
+      "key": "",
+      "required": true,
+      "description": "Agent response."
+    },
+    {
+      "kind": "metadata",
+      "key": "plan",
+      "required": false,
+      "description": "Explicit plan text \u2014 when absent, the eval scans Response for plan-like structure."
+    }
+  ],
+  "recommendedVisualization": "radar",
+  "compatibleWith": [],
+  "links": {
+    "documentation": "/docs/benchmarks/agentic/getting-started.md#plan-formulation-quality",
+    "source": "src/AgentEval.Evals.Agentic/Reasoning/PlanFormulationQualityEval.cs"
+  }
+}

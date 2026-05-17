@@ -37,6 +37,23 @@ public class TraceArtifactManager
     }
 
     /// <summary>
+    /// Creates a TraceArtifactManager whose output directory is resolved from the canonical store layout.
+    /// For <see cref="FileSystemOutputStore"/> the directory is derived via <see cref="FileSystemOutputStore.GetTracesDirectory"/>.
+    /// For all other store types the default verbosity trace directory is used as fallback.
+    /// </summary>
+    /// <param name="store">The output store to resolve the traces directory from.</param>
+    /// <param name="subject">The subject identity for the canonical path.</param>
+    /// <param name="runId">The run identifier for the canonical path.</param>
+    public TraceArtifactManager(IOutputStore store, SubjectIdentity subject, string runId)
+    {
+        ArgumentNullException.ThrowIfNull(store);
+        ArgumentNullException.ThrowIfNull(subject);
+        ArgumentException.ThrowIfNullOrWhiteSpace(runId);
+        _outputDirectory = (store as FileSystemOutputStore)?.GetTracesDirectory(subject, runId)
+            ?? VerbosityConfiguration.TraceDirectory;
+    }
+
+    /// <summary>
     /// Gets the output directory for trace files.
     /// </summary>
     public string OutputDirectory => _outputDirectory;

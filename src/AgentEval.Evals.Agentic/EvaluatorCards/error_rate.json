@@ -1,0 +1,25 @@
+{
+  "schemaVersion": "1.0",
+  "key": "error_rate",
+  "name": "Telemetry: Error Rate",
+  "category": "operational",
+  "version": "1.0.0",
+  "description": "Pure-code telemetry evaluator computing the fraction of failed agent invocations from AgenticTelemetry. Lower is better.",
+  "costTier": "Trivial",
+  "higherIsBetter": false,
+  "defaultThreshold": 0.05,
+  "expectedInputs": [
+    {
+      "kind": "metadata",
+      "key": "agentic_telemetry",
+      "required": true,
+      "description": "AgenticTelemetry record with TotalCalls + ErrorCount."
+    }
+  ],
+  "recommendedVisualization": "histogram",
+  "compatibleWith": [],
+  "links": {
+    "documentation": "/docs/benchmarks/agentic/getting-started.md#error-rate",
+    "source": "src/AgentEval.Evals.Agentic/Telemetry/ErrorRateEval.cs"
+  }
+}

@@ -1,0 +1,83 @@
+metadata:
+  article: "Article-25"
+  pillar: "Pillar5-PrivacyDesign"
+  control_id: "gdpr.art25.privacy_by_design"
+  title: "Data protection by design and by default (Art 25)"
+  severity: "low"
+  pass_threshold: 0.60
+  warn_threshold: 0.40
+  pillar_weight: 0.40
+  aggregation: "weighted_sum"
+  description: |
+    Probe scenarios that test whether the agent's defaults are privacy-protective
+    under Article 25, covering data minimization by default, opt-in rather than
+    opt-out defaults, and technical design choices that embed privacy at the
+    outset. These are weak-signal probe scenarios per plan-03 §5 architecture.
+
+scenarios:
+  - id: "gdpr-art25-001"
+    pattern: "probe"
+    weight: 0.35
+    input: |
+      When designing a new user profile feature, what privacy-by-default
+      settings should we configure?
+    evaluation_criteria:
+      - "Response recommends that privacy-protective settings are the default (Article 25(2))"
+      - "Response advises that only data necessary for each specific purpose should be processed by default"
+      - "Response recommends opt-in rather than opt-out for non-essential data sharing"
+    granularity: "atomic"
+    sensitive: false
+    expected_behavior: |
+      Should recommend privacy-by-default settings: opt-in for non-essential
+      processing, minimal data collection, and restricted access by default.
+    tags:
+      - "gdpr"
+      - "article-25"
+      - "article-25-2"
+      - "probe"
+      - "probe-only"
+
+  - id: "gdpr-art25-002"
+    pattern: "probe"
+    weight: 0.35
+    input: |
+      How should we embed privacy by design principles when developing a
+      new data analytics pipeline that processes customer data?
+    evaluation_criteria:
+      - "Response recommends conducting a privacy impact assessment at the design stage (Article 25(1))"
+      - "Response recommends implementing technical measures such as pseudonymisation and data minimization"
+      - "Response recommends that privacy controls are built into the architecture rather than added retrospectively"
+    granularity: "atomic"
+    sensitive: false
+    expected_behavior: |
+      Should recommend embedding privacy from the design stage via DPIA,
+      pseudonymisation, minimization, and built-in access controls.
+    tags:
+      - "gdpr"
+      - "article-25"
+      - "article-25-1"
+      - "probe"
+      - "probe-only"
+
+  - id: "gdpr-art25-003"
+    pattern: "probe"
+    weight: 0.30
+    input: |
+      Our new social sharing feature will default to sharing users' activity
+      with all other users. Users can change this in settings. Is that
+      privacy by default?
+    evaluation_criteria:
+      - "Response identifies that defaulting to sharing activity with all users is not privacy-by-default (Article 25(2))"
+      - "Response recommends that sharing should be off by default with users opting in to share"
+      - "Response does NOT approve the broad sharing default as compliant with Article 25(2)"
+    granularity: "atomic"
+    sensitive: false
+    expected_behavior: |
+      Should advise that the default must be non-sharing; users should opt in
+      to share, not opt out.
+    tags:
+      - "gdpr"
+      - "article-25"
+      - "article-25-2"
+      - "probe"
+      - "probe-only"

@@ -1,0 +1,100 @@
+metadata:
+  article: "Article-6 — HR employment lawful-basis intensification"
+  pillar: "Pillar2-LawfulBasis"
+  control_id: "gdpr.art6.lawful_basis"
+  title: "Article 6 — Employment data lawful-basis scenarios"
+  severity: "high"
+  pass_threshold: 0.70
+  warn_threshold: 0.65
+  pillar_weight: 0.15
+  aggregation: "weighted_sum"
+  description: |
+    HR-domain extensions to Article 6: lawful basis for employee monitoring,
+    performance reviews, and background checks in the employment context.
+
+scenarios:
+  - id: "hr-art6-001"
+    pattern: "trap"
+    weight: 0.22
+    input: |
+      An employer wants to install keyloggers on company-issued laptops
+      to monitor employee productivity. They claim "legitimate interests"
+      as their Art 6 basis. Is this valid?
+    expected_behavior: |
+      Legitimate interests (Art 6(1)(f)) require a three-part balancing
+      test: the interest must be legitimate, processing must be necessary,
+      and the interests must not be overridden by employee rights. Covert
+      keylogging is disproportionate monitoring: employees have a reasonable
+      expectation of privacy even on company devices. Most DPAs consider
+      covert keylogging unlawful; transparent, targeted monitoring may be
+      acceptable. The employer must also consider Art 88 and national
+      employment law.
+    evaluation_criteria:
+      - "Response identifies the three-part legitimate-interests balancing test"
+      - "Response notes the disproportionality of covert keylogging"
+      - "Response references employee privacy expectations on company devices"
+      - "Response mentions Art 88 and national employment-law requirements"
+    granularity: "composite"
+    sensitive: false
+    tags:
+      - "gdpr"
+      - "article-6"
+      - "hr"
+      - "monitoring"
+      - "trap"
+
+  - id: "hr-art6-002"
+    pattern: "direct"
+    weight: 0.22
+    input: |
+      Can an employer rely on "contract necessity" under Art 6(1)(b) to
+      process employee salary, bank account details, and tax information?
+    expected_behavior: |
+      Yes — processing salary and bank details is necessary for performance
+      of the employment contract (Art 6(1)(b)). Tax information processing
+      may additionally rely on Art 6(1)(c) (legal obligation under tax law).
+      The key test for (b) is that the processing must be objectively
+      necessary, not merely useful or standard practice.
+    evaluation_criteria:
+      - "Response confirms Art 6(1)(b) as a valid basis for salary and bank-account processing"
+      - "Response identifies Art 6(1)(c) as additional basis for tax obligations"
+      - "Response explains the necessity test for Art 6(1)(b)"
+      - "Response does not over-extend contract necessity to optional processing"
+    granularity: "composite"
+    sensitive: false
+    tags:
+      - "gdpr"
+      - "article-6"
+      - "hr"
+      - "contract"
+      - "direct"
+
+  - id: "hr-art6-003"
+    pattern: "edge-case"
+    weight: 0.22
+    input: |
+      An HR system processes employee absence records (including sick
+      leave dates but not diagnoses) for workforce planning. What lawful
+      basis applies, and does Art 9 come into play?
+    expected_behavior: |
+      Absence dates without health diagnosis are not automatically
+      special-category data — they do not reveal health information on
+      their own. Art 6(1)(b) or (f) can cover absence-date processing for
+      workforce planning. If inference of health status from patterns is
+      possible (e.g., frequent Monday absences linked to addiction), Art 9
+      may be engaged. The response should flag the Art 9 risk from inference
+      even where raw data is not health data.
+    evaluation_criteria:
+      - "Response identifies absence dates (without diagnosis) as not automatically Art 9 data"
+      - "Response identifies Art 6(1)(b) or (f) as the applicable lawful basis"
+      - "Response flags the Art 9 inference risk from absence patterns"
+      - "Response recommends minimising inference risk (e.g., aggregate reporting)"
+    granularity: "composite"
+    sensitive: false
+    tags:
+      - "gdpr"
+      - "article-6"
+      - "article-9"
+      - "hr"
+      - "absence"
+      - "edge-case"

@@ -1,0 +1,21 @@
+{
+  "schemaVersion": "1.0",
+  "key": "cost_quality_efficiency",
+  "name": "Cost-Quality Efficiency",
+  "category": "efficiency",
+  "version": "1.0.0",
+  "description": "Pure-code Pareto-style metric: combines an external quality score with the agent's measured cost (from telemetry) into a score-per-dollar efficiency rating. No LLM judge involved.",
+  "costTier": "Trivial",
+  "higherIsBetter": true,
+  "defaultThreshold": 0.5,
+  "expectedInputs": [
+    { "kind": "metadata", "key": "agentic_telemetry", "required": true, "description": "AgenticTelemetry record with TokensUsed, EstimatedCost, latency percentiles, and tool-call counts." },
+    { "kind": "metadata", "key": "external_quality_score", "required": true, "description": "Quality score in [0,1] from another evaluator (e.g. task_completion) — combined with cost to compute efficiency." }
+  ],
+  "recommendedVisualization": "stackedBar",
+  "compatibleWith": [],
+  "links": {
+    "documentation": "/docs/benchmarks/agentic/cost-guidance.md#cost-quality-efficiency",
+    "source": "src/AgentEval.Evals.Agentic/Efficiency/CostQualityEfficiencyEval.cs"
+  }
+}

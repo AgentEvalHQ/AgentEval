@@ -1,0 +1,36 @@
+{
+  "schemaVersion": "1.0",
+  "key": "response_completeness",
+  "name": "Response Completeness",
+  "category": "rag",
+  "version": "1.0.0",
+  "description": "LLM judge assessing whether the response covers all aspects of the user query (no missing parts).",
+  "costTier": "Low",
+  "higherIsBetter": true,
+  "defaultThreshold": 0.75,
+  "expectedInputs": [
+    {
+      "kind": "query",
+      "key": "",
+      "required": true,
+      "description": "User query."
+    },
+    {
+      "kind": "response",
+      "key": "",
+      "required": true,
+      "description": "Agent response."
+    }
+  ],
+  "recommendedVisualization": "histogram",
+  "compatibleWith": [
+    {
+      "system": "foundry",
+      "uri": "azureai://built-in/evaluators/response_completeness"
+    }
+  ],
+  "links": {
+    "documentation": "/docs/benchmarks/agentic/getting-started.md#response-completeness",
+    "source": "src/AgentEval.Evals.Agentic/Quality/ResponseCompletenessEval.cs"
+  }
+}

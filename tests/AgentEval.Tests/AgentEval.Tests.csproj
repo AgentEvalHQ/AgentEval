@@ -14,6 +14,10 @@
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
     <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" />
+    <!-- Mvc.Testing 10.0 only available for net10.0; conditional so the test project
+         can keep multi-targeting net8.0/net9.0/net10.0 for the rest of the suite. -->
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" Condition="'$(TargetFramework)' == 'net10.0'" />
+    <PackageReference Include="JsonSchema.Net" />
     <PackageReference Include="Verify.Xunit" />
     <PackageReference Include="xunit" />
     <PackageReference Include="xunit.runner.visualstudio">
@@ -29,6 +33,20 @@
     <ProjectReference Include="..\..\src\AgentEval.MAF\AgentEval.MAF.csproj" />
     <ProjectReference Include="..\..\src\AgentEval.RedTeam\AgentEval.RedTeam.csproj" />
     <ProjectReference Include="..\..\src\AgentEval\AgentEval.csproj" />
+    <ProjectReference Include="..\..\src\AgentEval.Cli\AgentEval.Cli.csproj" />
+    <ProjectReference Include="..\..\samples\AgentEval.GdprBenchmark\AgentEval.GdprBenchmark.csproj" />
+    <ProjectReference Include="..\..\samples\AgentEval.EuAiActBenchmark\AgentEval.EuAiActBenchmark.csproj" />
+    <ProjectReference Include="..\..\src\AgentEval.Evals.Agentic\AgentEval.Evals.Agentic.csproj" />
+    <!-- MissionControl is net10.0-only (server project); guard the reference so older
+         test target frameworks can still build the rest of the suite. -->
+    <ProjectReference Include="..\..\src\AgentEval.MissionControl\AgentEval.MissionControl.csproj"
+                      Condition="'$(TargetFramework)' == 'net10.0'" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="GdprBenchmark/Calibration/Golden/*.jsonl" />
+    <EmbeddedResource Include="EuAiActBenchmark/Calibration/Golden/*.jsonl" />
+    <EmbeddedResource Include="Agentic/Calibration/Golden/*.jsonl" />
   </ItemGroup>
 
 </Project>

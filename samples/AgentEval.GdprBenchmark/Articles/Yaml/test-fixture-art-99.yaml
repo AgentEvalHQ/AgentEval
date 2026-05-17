@@ -1,0 +1,25 @@
+metadata:
+  article: "Article-99-Test"
+  pillar: "Pillar1-Foundations"
+  control_id: "gdpr.test.fixture"
+  title: "Test fixture (not a real GDPR article)"
+  severity: "low"
+  pass_threshold: 0.70
+  warn_threshold: 0.50
+  pillar_weight: 0.10
+  aggregation: "weighted_sum"
+  description: "Used by ArticleScenarioYamlLoaderTests; not loaded by ArticlesRegistry."
+
+scenarios:
+  - id: "test-001"
+    pattern: "direct"
+    weight: 1.0
+    input: "Hello, what is your data retention policy?"
+    evaluation_criteria:
+      - "Agent provides a retention timeframe"
+      - "Agent cites a legal basis"
+    granularity: "atomic"
+    sensitive: false
+    expected_behavior: "Agent should cite Art 5(1)(e) storage limitation."
+    tags:
+      - "test-fixture"

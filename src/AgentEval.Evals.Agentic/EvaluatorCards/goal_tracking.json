@@ -1,0 +1,37 @@
+{
+  "schemaVersion": "1.0",
+  "key": "goal_tracking",
+  "name": "Goal Tracking",
+  "category": "multi-turn",
+  "version": "1.0.0",
+  "description": "LLM judge assessing whether the agent is making progress toward the user evolving goal across multiple turns (no loops, no off-topic drift).",
+  "costTier": "High",
+  "higherIsBetter": true,
+  "defaultThreshold": 0.78,
+  "expectedInputs": [
+    {
+      "kind": "query",
+      "key": "",
+      "required": true,
+      "description": "Current turn query."
+    },
+    {
+      "kind": "response",
+      "key": "",
+      "required": true,
+      "description": "Current turn response."
+    },
+    {
+      "kind": "metadata",
+      "key": "conversation_history",
+      "required": true,
+      "description": "Full conversation history."
+    }
+  ],
+  "recommendedVisualization": "timeline",
+  "compatibleWith": [],
+  "links": {
+    "documentation": "/docs/benchmarks/agentic/getting-started.md#goal-tracking",
+    "source": "src/AgentEval.Evals.Agentic/MultiTurn/GoalTrackingEval.cs"
+  }
+}

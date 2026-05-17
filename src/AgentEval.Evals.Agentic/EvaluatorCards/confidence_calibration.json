@@ -1,0 +1,31 @@
+{
+  "schemaVersion": "1.0",
+  "key": "confidence_calibration",
+  "name": "Confidence Calibration",
+  "category": "calibration",
+  "version": "1.0.0",
+  "description": "LLM judge assessing whether the agent stated confidence level matches the actual correctness of its response (overconfidence and underconfidence both hurt).",
+  "costTier": "Low",
+  "higherIsBetter": true,
+  "defaultThreshold": 0.7,
+  "expectedInputs": [
+    {
+      "kind": "query",
+      "key": "",
+      "required": true,
+      "description": "User query."
+    },
+    {
+      "kind": "response",
+      "key": "",
+      "required": true,
+      "description": "Agent response with stated confidence."
+    }
+  ],
+  "recommendedVisualization": "histogram",
+  "compatibleWith": [],
+  "links": {
+    "documentation": "/docs/benchmarks/agentic/getting-started.md#confidence-calibration",
+    "source": "src/AgentEval.Evals.Agentic/Calibration/ConfidenceCalibrationEval.cs"
+  }
+}

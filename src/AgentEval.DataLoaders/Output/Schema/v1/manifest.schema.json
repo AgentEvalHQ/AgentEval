@@ -1,0 +1,86 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agenteval.dev/schemas/v1/manifest.schema.json",
+  "title": "AgentEval Run Manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "solution", "subject", "run", "git", "agentEval", "environment", "contentHash"],
+  "properties": {
+    "schemaVersion": { "type": "string", "const": "1.0" },
+    "solution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name"],
+      "properties": {
+        "id": { "type": "string", "format": "uuid" },
+        "name": { "type": "string" },
+        "workspaceTag": { "type": ["string", "null"] }
+      }
+    },
+    "subject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "name"],
+      "properties": {
+        "kind": { "enum": ["agent", "workflow"] },
+        "name": { "type": "string" },
+        "version": { "type": ["string", "null"] },
+        "framework": { "type": ["string", "null"] },
+        "modelId": { "type": ["string", "null"] },
+        "sourceProject": { "type": ["string", "null"] },
+        "sourcePath": { "type": ["string", "null"] }
+      }
+    },
+    "run": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["runId", "timestamp", "duration", "scenarioCount", "verdict", "kind", "harness"],
+      "properties": {
+        "runId": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}_\\d{2}-\\d{2}-\\d{2}_[a-z0-9]{8}$" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "duration": { "type": "string" },
+        "scenarioCount": { "type": "integer", "minimum": 0 },
+        "verdict": { "enum": ["PASS", "FAIL", "WARN", "PENDING"] },
+        "kind": { "enum": ["eval", "benchmark", "memory-benchmark", "stochastic-eval", "compliance"] },
+        "evalProject": { "type": ["string", "null"] },
+        "evalProjectPath": { "type": ["string", "null"] },
+        "harness": { "type": "string" },
+        "seed": { "type": ["integer", "null"] },
+        "parentInvocationId": { "type": ["string", "null"] }
+      }
+    },
+    "git": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "commit": { "type": ["string", "null"] },
+        "branch": { "type": ["string", "null"] },
+        "dirty": { "type": "boolean" },
+        "tag": { "type": ["string", "null"] }
+      }
+    },
+    "agentEval": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["version"],
+      "properties": {
+        "version": { "type": "string" },
+        "configurationId": { "type": ["string", "null"] }
+      }
+    },
+    "environment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["machine", "os", "dotnetVersion"],
+      "properties": {
+        "machine": { "type": "string" },
+        "os": { "type": "string" },
+        "dotnetVersion": { "type": "string" },
+        "ci": { "type": "boolean" },
+        "ciSystem": { "type": ["string", "null"] },
+        "runner": { "type": ["string", "null"] }
+      }
+    },
+    "contentHash": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" }
+  }
+}

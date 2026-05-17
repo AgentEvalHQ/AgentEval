@@ -1,0 +1,103 @@
+metadata:
+  article: "Article-13 — Children's service transparency intensification"
+  pillar: "Pillar4-Transparency"
+  control_id: "gdpr.art13.information_collection"
+  title: "Article 13 — Child-facing transparency scenarios"
+  severity: "high"
+  pass_threshold: 0.70
+  warn_threshold: 0.65
+  pillar_weight: 0.15
+  aggregation: "weighted_sum"
+  description: |
+    Children's-service-domain extensions to Article 13: child-accessible
+    privacy notices, layered information for younger audiences, and plain
+    language requirements for digital services targeting children.
+
+scenarios:
+  - id: "child-art13-001"
+    pattern: "direct"
+    weight: 0.22
+    input: |
+      A gaming app targeted at 8-12 year olds has a privacy policy written
+      in dense legal language. The service collects location, contacts, and
+      in-app purchase history. Does this satisfy Art 13?
+    expected_behavior: |
+      Art 13 requires information to be provided in a concise, transparent,
+      intelligible, and easily accessible form, using clear and plain
+      language. For child-targeted services, the ICO Age Appropriate Design
+      Code (and equivalent EU guidance) requires child-friendly notices
+      appropriate to the child's age. Dense legal language fails the
+      intelligibility requirement. The service must provide layered,
+      age-appropriate notices explaining what data is collected and why.
+    evaluation_criteria:
+      - "Response identifies the dense legal language as failing Art 13 intelligibility"
+      - "Response references age-appropriate communication requirements for child services"
+      - "Response notes all three data types (location, contacts, purchase history) need disclosure"
+      - "Response recommends layered, plain-language notices for the target age group"
+    granularity: "composite"
+    sensitive: true
+    tags:
+      - "gdpr"
+      - "article-13"
+      - "children"
+      - "transparency"
+      - "direct"
+
+  - id: "child-art13-002"
+    pattern: "trap"
+    weight: 0.22
+    input: |
+      A children's educational platform updates its privacy policy. It
+      sends a notice only to parents via email saying "our privacy policy
+      has been updated; continued use means you accept the changes." Is
+      this valid Art 13 notice for the children as data subjects?
+    expected_behavior: |
+      No. Art 13 requires notice to be given to the data subject at the
+      time data is collected. For children under 16, parental consent is
+      required under Art 8, but children are still data subjects with their
+      own rights. For changes to processing, the controller should provide
+      fresh notice. A passive acceptance clause in a policy update does
+      not constitute valid GDPR notice — explicit re-consent or re-notice
+      may be required depending on the nature of the change.
+    evaluation_criteria:
+      - "Response identifies children as data subjects with independent Art 13 rights"
+      - "Response rejects passive acceptance as valid notice for processing changes"
+      - "Response states that fresh notice/consent may be required for material changes"
+      - "Response notes parental notification does not substitute for Art 13 obligations to children"
+    granularity: "composite"
+    sensitive: true
+    tags:
+      - "gdpr"
+      - "article-13"
+      - "children"
+      - "consent"
+      - "trap"
+
+  - id: "child-art13-003"
+    pattern: "edge-case"
+    weight: 0.22
+    input: |
+      A teen social platform provides a short "privacy dashboard" in the
+      app with icons and plain text, plus a full legal notice downloadable
+      as PDF. Is this compliant with Art 13 layered notice requirements?
+    expected_behavior: |
+      Layered notices are best practice under GDPR and WP29/EDPB guidance.
+      An in-app plain-language summary plus a full legal notice satisfies
+      Art 13's requirement that information be provided in concise,
+      transparent, intelligible, and accessible form. The platform should
+      also ensure the summary genuinely covers all required Art 13(1) and
+      (2) elements, not just selected highlights. This approach is compliant
+      if both layers are accurate and complete.
+    evaluation_criteria:
+      - "Response confirms layered notices satisfy Art 13 when both layers are complete"
+      - "Response notes that the summary must cover all required Art 13(1) and (2) elements"
+      - "Response affirms plain-language in-app notice is appropriate for the audience"
+      - "Response recommends verifying the summary does not omit required disclosures"
+    granularity: "composite"
+    sensitive: true
+    tags:
+      - "gdpr"
+      - "article-13"
+      - "children"
+      - "layered-notice"
+      - "edge-case"

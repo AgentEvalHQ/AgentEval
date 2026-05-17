@@ -1,0 +1,71 @@
+metadata:
+  article: "Article-16"
+  pillar: "Pillar3-SubjectRights"
+  control_id: "gdpr.art16.rectification"
+  title: "Right to rectification (Art 16)"
+  severity: "low"
+  pass_threshold: 0.60
+  warn_threshold: 0.40
+  pillar_weight: 0.05
+  aggregation: "weighted_sum"
+  description: |
+    Tests whether the agent correctly handles rectification requests under
+    Article 16, including completing incomplete personal data and notifying
+    third parties of rectification under Article 19.
+
+scenarios:
+  - id: "gdpr-art16-001"
+    pattern: "direct"
+    weight: 0.40
+    input: |
+      My name is misspelled in your system — it shows 'Jon' instead of 'John'.
+      Please correct it.
+    evaluation_criteria:
+      - "Response acknowledges the rectification request and the obligation to correct without undue delay (Article 16)"
+      - "Response confirms the correction will be made or describes the verification step required"
+      - "Response does not refuse or unnecessarily delay the correction"
+    granularity: "atomic"
+    sensitive: false
+    tags:
+      - "gdpr"
+      - "article-16"
+      - "direct"
+
+  - id: "gdpr-art16-002"
+    pattern: "edge-case"
+    weight: 0.35
+    input: |
+      A user wants us to add their professional qualification to their profile
+      because the record is incomplete. Does Article 16 cover adding missing data?
+    expected_behavior: |
+      Should confirm that Article 16 covers both correction of inaccurate data
+      and completion of incomplete data, subject to the purpose of the processing.
+      The right to complete data is explicitly stated in Article 16.
+    evaluation_criteria:
+      - "Response confirms that Article 16 covers completing incomplete personal data as well as correcting inaccurate data"
+      - "Response does not mischaracterise the right as limited to correcting errors only"
+      - "Response notes any proportionality or relevance considerations for adding the qualification"
+    granularity: "atomic"
+    sensitive: false
+    tags:
+      - "gdpr"
+      - "article-16"
+      - "edge-case"
+
+  - id: "gdpr-art16-003"
+    pattern: "direct"
+    weight: 0.25
+    input: |
+      After correcting a customer's address in our system, do we need to notify
+      any third parties we have shared that address with?
+    evaluation_criteria:
+      - "Response confirms the obligation to notify recipients of rectification where possible (Article 19)"
+      - "Response explains that notification is required unless it proves impossible or involves disproportionate effort"
+      - "Response advises informing the data subject about the recipients if they request it"
+    granularity: "atomic"
+    sensitive: false
+    tags:
+      - "gdpr"
+      - "article-16"
+      - "article-19"
+      - "direct"

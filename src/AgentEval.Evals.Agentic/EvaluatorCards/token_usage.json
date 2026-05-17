@@ -1,0 +1,25 @@
+{
+  "schemaVersion": "1.0",
+  "key": "token_usage",
+  "name": "Telemetry: Token Usage",
+  "category": "operational",
+  "version": "1.0.0",
+  "description": "Pure-code telemetry evaluator returning prompt + completion token counts from AgenticTelemetry. Lower is better when constrained by budget.",
+  "costTier": "Trivial",
+  "higherIsBetter": false,
+  "defaultThreshold": 1.0,
+  "expectedInputs": [
+    {
+      "kind": "metadata",
+      "key": "agentic_telemetry",
+      "required": true,
+      "description": "AgenticTelemetry record with TokensUsed."
+    }
+  ],
+  "recommendedVisualization": "stackedBar",
+  "compatibleWith": [],
+  "links": {
+    "documentation": "/docs/benchmarks/agentic/getting-started.md#token-usage",
+    "source": "src/AgentEval.Evals.Agentic/Telemetry/TokenUsageEval.cs"
+  }
+}

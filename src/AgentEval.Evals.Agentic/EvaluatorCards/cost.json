@@ -1,0 +1,25 @@
+{
+  "schemaVersion": "1.0",
+  "key": "cost",
+  "name": "Telemetry: Cost",
+  "category": "operational",
+  "version": "1.0.0",
+  "description": "Pure-code telemetry evaluator returning the agent estimated dollar cost from AgenticTelemetry. Lower is better; pass when within budget.",
+  "costTier": "Trivial",
+  "higherIsBetter": false,
+  "defaultThreshold": 1.0,
+  "expectedInputs": [
+    {
+      "kind": "metadata",
+      "key": "agentic_telemetry",
+      "required": true,
+      "description": "AgenticTelemetry record with EstimatedCost."
+    }
+  ],
+  "recommendedVisualization": "stackedBar",
+  "compatibleWith": [],
+  "links": {
+    "documentation": "/docs/benchmarks/agentic/getting-started.md#cost",
+    "source": "src/AgentEval.Evals.Agentic/Telemetry/CostEval.cs"
+  }
+}

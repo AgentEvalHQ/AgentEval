@@ -1,0 +1,85 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agenteval.dev/schemas/v1/eval-result.schema.json",
+  "title": "AgentEval Eval Result (atomic or composite)",
+  "type": "object",
+  "required": ["metric", "score", "details", "provenance", "evaluatedAt"],
+  "additionalProperties": false,
+  "properties": {
+    "metric": {
+      "type": "object",
+      "required": ["key", "name", "category", "version"],
+      "additionalProperties": false,
+      "properties": {
+        "key":      { "type": "string" },
+        "name":     { "type": "string" },
+        "category": { "type": "string" },
+        "version":  { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$" }
+      }
+    },
+    "score": {
+      "type": "object",
+      "required": ["value", "label", "passed", "severity"],
+      "additionalProperties": false,
+      "properties": {
+        "value":      { "type": "number", "minimum": 0, "maximum": 1 },
+        "label":      { "enum": ["pass", "fail", "warn", "skipped"] },
+        "passed":     { "type": "boolean" },
+        "severity":   { "enum": ["none", "low", "medium", "high", "critical"] },
+        "ordinal":    { "type": ["integer", "null"], "minimum": 1, "maximum": 5 },
+        "threshold":  { "type": ["number", "null"], "minimum": 0, "maximum": 1 },
+        "confidence": { "type": ["number", "null"], "minimum": 0, "maximum": 1 }
+      }
+    },
+    "details": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "dimensions": {
+          "type": ["object", "null"],
+          "additionalProperties": { "type": "number" }
+        },
+        "evidence": {
+          "type": ["array", "null"],
+          "items": { "$ref": "#/$defs/evidence" }
+        },
+        "recommendations": {
+          "type": ["array", "null"],
+          "items": { "type": "string" }
+        },
+        "subResults": {
+          "type": ["array", "null"],
+          "items": { "$ref": "#" }
+        },
+        "aggregationStrategy": { "type": ["string", "null"] }
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "required": ["type", "estimatedCost", "cacheHit"],
+      "additionalProperties": false,
+      "properties": {
+        "type":          { "enum": ["atomic-llm", "atomic-code", "composite", "skipped", "multi-judge-adjudicated"] },
+        "judgeModel":    { "type": ["string", "null"] },
+        "promptId":      { "type": ["string", "null"] },
+        "promptHash":    { "type": ["string", "null"] },
+        "tokensUsed":    { "type": ["integer", "null"] },
+        "estimatedCost": { "type": "number", "minimum": 0 },
+        "cacheHit":      { "type": "boolean" }
+      }
+    },
+    "evaluatedAt": { "type": "string", "format": "date-time" }
+  },
+  "$defs": {
+    "evidence": {
+      "type": "object",
+      "required": ["source", "reference", "message"],
+      "additionalProperties": false,
+      "properties": {
+        "source":    { "type": "string" },
+        "reference": { "type": "string" },
+        "message":   { "type": "string" }
+      }
+    }
+  }
+}

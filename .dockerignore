@@ -1,0 +1,33 @@
+# SPDX-License-Identifier: MIT
+# Plan-08 MC1.12.1 — keep the Docker build context lean.
+# Anything not on this list ships into the daemon for the COPY commands.
+
+# Build outputs
+**/bin/
+**/obj/
+**/dist/
+**/out/
+**/wwwroot/
+**/node_modules/
+
+# IDE / editor
+.vs/
+.vscode/
+.idea/
+**/*.user
+**/*.suo
+
+# Local-only artefacts
+.agenteval/
+.git/
+.github/
+strategy/
+docs/
+benchmarks/
+**/coverage*/
+**/TestResults/
+
+# Misc
+*.md
+!README.md
+*.log

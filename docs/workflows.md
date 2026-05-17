@@ -1040,7 +1040,7 @@ See [Tracing](tracing.md) for complete Record & Replay documentation.
 **Advanced Topics:**
 - [Red Team](redteam.md) - Security evaluation for workflow endpoints
 - [Performance & Cost](benchmarks.md) - Workflow performance optimization
-- [CI/CD Integration](ci-cd-integration.md) - Automated workflow evaluation pipelines
+- [Export Formats](export.md) - JUnit XML / SARIF / JSON export for CI/CD pipelines
 
 **Live Examples:**
 - [Sample 09: Real MAF Workflow Evaluation](https://github.com/AgentEvalHQ/AgentEval/blob/main/samples/AgentEval.Samples/Sample09_WorkflowEvaluationReal.cs) - Sequential content pipeline (Planner → Researcher → Writer → Editor)

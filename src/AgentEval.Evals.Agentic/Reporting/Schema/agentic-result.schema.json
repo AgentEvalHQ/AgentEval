@@ -1,0 +1,153 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agenteval.dev/schemas/v1/agentic-result.schema.json",
+  "title": "AgentEval Agentic Benchmark Result",
+  "type": "object",
+  "required": [
+    "preset",
+    "subject",
+    "sourceRunId",
+    "sourceManifestHash",
+    "generatedAt",
+    "compositeTree",
+    "summary",
+    "criticalFindings",
+    "recommendations",
+    "disclaimer",
+    "attestation"
+  ],
+  "properties": {
+    "preset": {
+      "type": "string",
+      "description": "The benchmark preset used for this evaluation run.",
+      "examples": [
+        "agentic-execution",
+        "tool-call-accuracy",
+        "rag-quality",
+        "judge-quality",
+        "safety",
+        "telemetry",
+        "stochastic-stability"
+      ]
+    },
+    "subject": {
+      "type": "object",
+      "description": "Identity of the agent or workflow that was evaluated.",
+      "required": ["kind", "name"],
+      "properties": {
+        "kind":           { "type": "string" },
+        "name":           { "type": "string", "minLength": 1 },
+        "version":        { "type": "string" },
+        "framework":      { "type": "string" },
+        "modelId":        { "type": "string" },
+        "sourceProject":  { "type": "string" },
+        "sourcePath":     { "type": "string" },
+        "tags":           { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "sourceRunId": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Run ID of the benchmark run that produced the composite tree."
+    },
+    "sourceManifestHash": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Content hash of the source run manifest, for audit trail integrity."
+    },
+    "generatedAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "UTC timestamp when this result document was generated."
+    },
+    "compositeTree": {
+      "type": "object",
+      "description": "Recursive EvalResult tree produced by the benchmark runner. Validated separately by eval-result.schema.json."
+    },
+    "summary": {
+      "type": "object",
+      "required": ["overallScore", "overallStatus", "perCategory", "perEvaluator"],
+      "properties": {
+        "overallScore": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Composite score across all evaluators."
+        },
+        "overallStatus": {
+          "enum": ["PASS", "FAIL", "WARN"],
+          "description": "Overall verdict."
+        },
+        "perCategory": {
+          "type": "object",
+          "description": "Category-level roll-ups keyed by category string.",
+          "additionalProperties": { "$ref": "#/$defs/categorySummary" }
+        },
+        "perEvaluator": {
+          "type": "object",
+          "description": "Evaluator-level roll-ups keyed by metric key.",
+          "additionalProperties": { "$ref": "#/$defs/evaluatorSummary" }
+        }
+      }
+    },
+    "criticalFindings": {
+      "type": "array",
+      "description": "Leaf EvalResult nodes with severity=critical that did not pass, ordered worst-first.",
+      "items": {
+        "type": "object",
+        "description": "EvalResult for a critical-severity evaluator that failed."
+      }
+    },
+    "recommendations": {
+      "type": "array",
+      "description": "Short remediation strings for failed evaluators, ordered by evaluator key.",
+      "items": { "type": "string" }
+    },
+    "disclaimer": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Required disclaimer that this result is not a compliance attestation."
+    },
+    "attestation": {
+      "type": "object",
+      "required": ["agentEvalVersion", "judgeMode"],
+      "description": "Tooling and judge configuration metadata for reproducibility.",
+      "properties": {
+        "agentEvalVersion": {
+          "type": "string",
+          "description": "AgentEval assembly version that generated this result."
+        },
+        "judgeMode": {
+          "enum": ["single", "panel", "adjudicated"],
+          "description": "Judge mode used during evaluation."
+        },
+        "promptVersions": {
+          "type": "object",
+          "description": "Map of prompt template key to version string.",
+          "additionalProperties": { "type": "string" }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "categorySummary": {
+      "type": "object",
+      "required": ["score", "status"],
+      "properties": {
+        "score":          { "type": "number", "minimum": 0, "maximum": 1 },
+        "status":         { "enum": ["PASS", "FAIL", "WARN"] },
+        "criticalFails":  { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "evaluatorSummary": {
+      "type": "object",
+      "required": ["score", "status", "severity"],
+      "properties": {
+        "score":       { "type": "number", "minimum": 0, "maximum": 1 },
+        "status":      { "enum": ["PASS", "FAIL", "WARN"] },
+        "severity":    { "enum": ["none", "low", "medium", "high", "critical"] },
+        "confidence":  { "type": ["number", "null"], "minimum": 0, "maximum": 1 }
+      }
+    }
+  }
+}

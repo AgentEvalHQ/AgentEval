@@ -1,0 +1,25 @@
+{
+  "schemaVersion": "1.0",
+  "key": "judge_agreement",
+  "name": "Judge Panel Agreement",
+  "category": "judge-quality",
+  "version": "1.0.0",
+  "description": "Pure-code meta-evaluator: Cohen kappa or simple agreement rate across N judges verdicts. Surfaces panel disagreement as a quality signal.",
+  "costTier": "Trivial",
+  "higherIsBetter": true,
+  "defaultThreshold": 0.7,
+  "expectedInputs": [
+    {
+      "kind": "metadata",
+      "key": "judge_panel_results",
+      "required": true,
+      "description": "Per-judge results; the meta-evaluator computes pairwise agreement."
+    }
+  ],
+  "recommendedVisualization": "histogram",
+  "compatibleWith": [],
+  "links": {
+    "documentation": "/docs/benchmarks/agentic/getting-started.md#judge-agreement",
+    "source": "src/AgentEval.Evals.Agentic/JudgeQuality/JudgeAgreementEval.cs"
+  }
+}

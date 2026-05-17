@@ -1,0 +1,25 @@
+{
+  "schemaVersion": "1.0",
+  "key": "stochastic_stability",
+  "name": "Stochastic Stability",
+  "category": "operational",
+  "version": "1.0.0",
+  "description": "Pure-code evaluator: across N stochastic re-runs of the same scenario, what fraction of verdicts agree? Surfaces sampling-noise issues in the agent or the judge.",
+  "costTier": "Trivial",
+  "higherIsBetter": true,
+  "defaultThreshold": 0.8,
+  "expectedInputs": [
+    {
+      "kind": "metadata",
+      "key": "run_results",
+      "required": true,
+      "description": "Per-run results from N stochastic invocations."
+    }
+  ],
+  "recommendedVisualization": "histogram",
+  "compatibleWith": [],
+  "links": {
+    "documentation": "/docs/benchmarks/agentic/getting-started.md#stochastic-stability",
+    "source": "src/AgentEval.Evals.Agentic/StochasticStability/StochasticStabilityEval.cs"
+  }
+}

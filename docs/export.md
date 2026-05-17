@@ -165,7 +165,14 @@ await exporter.ExportToDirectoryAsync(report, $"./results/{dirName}");
 
 **CLI usage:**
 ```bash
-agenteval eval --azure --model gpt-4o --dataset tests.yaml --output-dir ./results
+# Run a benchmark — exporters write to .agenteval/<subject>/runs/<runId>/reports/ automatically
+export AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.com
+export AZURE_OPENAI_API_KEY=...
+export AZURE_OPENAI_DEPLOYMENT=gpt-4o
+agenteval bench agentic --subject MyAgent --input "..."
+
+# Re-render reports later (no LLM cost) into any export format the renderer supports:
+agenteval render --benchmark agentic --subject MyAgent
 ```
 
 Each run produces a directory with:

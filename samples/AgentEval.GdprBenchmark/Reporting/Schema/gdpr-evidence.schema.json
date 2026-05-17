@@ -1,0 +1,95 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agenteval.dev/schemas/v1/gdpr-evidence.schema.json",
+  "title": "AgentEval GDPR Compliance Evidence (wrapper)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["base", "preset", "domainPacks", "compositeTree", "summary", "criticalFindings", "recommendations", "disclaimer", "gdprAttestation"],
+  "properties": {
+    "base": {
+      "type": "object",
+      "description": "The plan-01 ComplianceEvidence record. Schema lives separately at evidence.schema.json; we don't $ref across embedded-resource boundaries here, just require the object shape."
+    },
+    "preset": { "enum": ["smoke", "standard", "audit"] },
+    "domainPacks": {
+      "type": "array",
+      "items": { "enum": ["healthcare", "hr", "childrens"] },
+      "uniqueItems": true,
+      "description": "Optional domain-pack scenarios composed onto the base preset. Empty array when no packs are applied."
+    },
+    "compositeTree": {
+      "type": "object",
+      "description": "Recursive EvalResult tree. Validated separately by eval-result.schema.json."
+    },
+    "summary": {
+      "type": "object",
+      "required": ["overallScore", "overallStatus", "perPillar", "perArticle"],
+      "properties": {
+        "overallScore":   { "type": "number", "minimum": 0, "maximum": 1 },
+        "overallStatus":  { "enum": ["PASS", "FAIL", "WARN"] },
+        "perPillar":      { "type": "object", "additionalProperties": { "$ref": "#/$defs/pillarSummary" } },
+        "perArticle":     { "type": "object", "additionalProperties": { "$ref": "#/$defs/articleSummary" } }
+      }
+    },
+    "criticalFindings": {
+      "type": "array",
+      "items": { "type": "object", "description": "EvalResult for a critical-severity scenario that failed." }
+    },
+    "recommendations": {
+      "type": "array",
+      "description": "Recommendations in control-ID order. v1.1+ uses the structured shape; v0.8.1-beta used string[].",
+      "items": {
+        "anyOf": [
+          { "type": "string",
+            "description": "Legacy v0.8.1-beta strings-only entry. Still valid for backward compatibility." },
+          { "type": "object",
+            "required": ["controlId", "severity", "text"],
+            "additionalProperties": false,
+            "properties": {
+              "controlId": { "type": "string" },
+              "severity":  { "type": "string", "enum": ["low", "medium", "high", "critical"] },
+              "text":      { "type": "string" },
+              "metadata":  {
+                "type": "object",
+                "additionalProperties": { "type": "string" },
+                "description": "Optional v1.2+ extension hook: arbitrary string-to-string metadata (evidence refs, correlation ids, …). Unknown keys here do not break older readers."
+              }
+            },
+            "description": "Structured shape introduced in v1.1 (task 1.5). Optional metadata hook added for v1.2 forward-compat (task LR7-F2)."
+          }
+        ]
+      }
+    },
+    "disclaimer": { "type": "string", "minLength": 1 },
+    "gdprAttestation": {
+      "type": "object",
+      "required": ["judgeMode"],
+      "properties": {
+        "judgeMode":      { "enum": ["mode-a", "mode-b", "multi-judge"] },
+        "promptVersions": { "type": "object", "additionalProperties": { "type": "string" } }
+      }
+    }
+  },
+  "$defs": {
+    "pillarSummary": {
+      "type": "object",
+      "required": ["score", "status"],
+      "properties": {
+        "score":            { "type": "number", "minimum": 0, "maximum": 1 },
+        "status":           { "enum": ["PASS", "FAIL", "WARN"] },
+        "criticalFails":    { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "articleSummary": {
+      "type": "object",
+      "required": ["score", "status", "scenarioCount", "scenariosFailed", "severity"],
+      "properties": {
+        "score":           { "type": "number", "minimum": 0, "maximum": 1 },
+        "status":          { "enum": ["PASS", "FAIL", "WARN"] },
+        "scenarioCount":   { "type": "integer", "minimum": 0 },
+        "scenariosFailed": { "type": "integer", "minimum": 0 },
+        "severity":        { "enum": ["none", "low", "medium", "high", "critical"] }
+      }
+    }
+  }
+}

@@ -78,7 +78,7 @@ var adapter = new MAFAgentAdapter(myAgent);
 For any `IChatClient`:
 
 ```csharp
-using AgentEval.Adapters;
+using AgentEval.Core;
 
 // Wrap an IChatClient
 var adapter = new ChatClientAgentAdapter(chatClient, "MyAgent");
@@ -197,7 +197,7 @@ Verify the response contains expected information:
 ```csharp
 using AgentEval.Assertions;
 
-result.Response
+result.ActualOutput
     .Should()
     .Contain("Paris")
     .ContainAny("flight", "airline")
