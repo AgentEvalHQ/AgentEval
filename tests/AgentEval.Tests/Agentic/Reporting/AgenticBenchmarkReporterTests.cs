@@ -9,7 +9,6 @@ using AgentEval.Evals.Agentic.Composition;
 using AgentEval.Evals.Agentic.Reporting;
 using AgentEval.Output;
 using Xunit;
-using AgenticBenchmarkFactory = AgentEval.Evals.Agentic.AgenticBenchmark;
 
 namespace AgentEval.Tests.Agentic.Reporting;
 
@@ -48,7 +47,7 @@ public class AgenticBenchmarkReporterTests
         var judge = new StubEvaluator(stubScore);
 
         // Use a small 1-evaluator composite to keep the test deterministic and fast.
-        var benchmark = AgenticBenchmarkFactory.ToolCallAccuracy(judge);
+        var benchmark = AgenticBenchmark.ToolCallAccuracy(judge);
         var runner = new AgenticBenchmarkRunner();
         var input = new EvalInput(
             Query: "reporter test",

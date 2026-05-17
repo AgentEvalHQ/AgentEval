@@ -8,7 +8,6 @@ using AgentEval.Evals.Agentic;
 using AgentEval.Evals.Agentic.Composition;
 using AgentEval.Output;
 using Xunit;
-using AgenticBenchmarkFactory = AgentEval.Evals.Agentic.AgenticBenchmark;
 
 namespace AgentEval.Tests.Agentic.EndToEnd;
 
@@ -38,7 +37,7 @@ public class AgenticUserExperienceE2ETest
     public void UserExperience_HasExpected5Components()
     {
         var judge = new StubEvaluator(100);
-        var benchmark = AgenticBenchmarkFactory.UserExperience(judge);
+        var benchmark = AgenticBenchmark.UserExperience(judge);
 
         Assert.Equal(5, benchmark.Components.Count);
     }
@@ -49,7 +48,7 @@ public class AgenticUserExperienceE2ETest
         var store = new InMemoryOutputStore();
         var subject = new SubjectIdentity(SubjectKind.Agent, "E2E-UserExperienceAgent");
         var judge = new StubEvaluator(100);
-        var benchmark = AgenticBenchmarkFactory.UserExperience(judge);
+        var benchmark = AgenticBenchmark.UserExperience(judge);
         var runner = new AgenticBenchmarkRunner();
 
         var input = new EvalInput(

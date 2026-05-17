@@ -8,10 +8,7 @@ using AgentEval.Core;
 using AgentEval.DataLoaders;
 using AgentEval.Evals;
 using AgentEval.Evals.Agentic;
-using AgentEval.MAF;
-using AgentEval.Models;
 using System.ComponentModel;
-using ChatOptions = Microsoft.Extensions.AI.ChatOptions;
 
 namespace AgentEval.Samples;
 

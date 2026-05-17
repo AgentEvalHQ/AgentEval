@@ -25,7 +25,6 @@ This project contains the automated tests for AgentEval. It lives at `tests/Agen
 | File | Focus |
 | --- | --- |
 | `AgentEvalBuilderTests.cs` | Builder API, plugin lifecycle, transformers, and evaluation flow |
-| `AgenticBenchmarkTests.cs` | Agentic benchmark execution and metrics |
 | `ConcurrencyTests.cs` | Concurrent evaluation safety |
 | `ConversationalTestCaseTests.cs` | Multi-turn conversation builder and metric |
 | `ConversationRunnerTests.cs` | Conversation execution against IChatClient |

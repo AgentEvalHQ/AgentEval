@@ -11,7 +11,6 @@ using AgentEval.Evals.Agentic.Safety.Policy;
 using AgentEval.Output;
 using Xunit;
 using AgentEval.Tests.Agentic;
-using AgenticBenchmarkFactory = AgentEval.Evals.Agentic.AgenticBenchmark;
 
 namespace AgentEval.Tests.Agentic.EndToEnd;
 
@@ -28,7 +27,7 @@ public class AgenticSafetyE2ETest
     [Fact]
     public void Safety_HasExpected12Components()
     {
-        var benchmark = AgenticBenchmarkFactory.Safety(
+        var benchmark = AgenticBenchmark.Safety(
             judge: new FixedScoreEvaluator(100),
             policyResolver: EmptyPolicy,
             subjectId: "e2e-safety-test");
@@ -42,7 +41,7 @@ public class AgenticSafetyE2ETest
     {
         // Stub judge returns 100 (all LLM-based evals will pass).
         // No content-safety client → 4 content-safety evals fall back to LLM judge (also pass).
-        var benchmark = AgenticBenchmarkFactory.Safety(
+        var benchmark = AgenticBenchmark.Safety(
             judge: new FixedScoreEvaluator(100),
             policyResolver: EmptyPolicy,
             subjectId: "e2e-safety-test",

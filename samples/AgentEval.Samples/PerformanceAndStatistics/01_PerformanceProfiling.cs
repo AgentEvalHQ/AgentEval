@@ -20,7 +20,7 @@ namespace AgentEval.Samples;
 /// - Running real prompts through an agent and collecting latency data
 /// - Computing statistical percentiles (p50, p90, p99) from Stopwatch measurements
 /// - Token usage tracking and cost estimation via MAFEvaluationHarness
-/// - Direct profiling without the PerformanceBenchmark/AgenticBenchmark classes
+/// - Direct profiling without the PerformanceBenchmark class
 /// 
 /// Requires: AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_API_KEY, AZURE_OPENAI_DEPLOYMENT
 /// ⏱️ Time to understand: 5 minutes

@@ -13,7 +13,7 @@ A library of named `IEval` implementations for evaluating AI agents:
 - **Safety evaluators** (Phase 4): hybrid policy-as-code + LLM judges for prohibited actions, sensitive data leakage, indirect attack, hate/sexual/violence/self-harm, protected materials, code vulnerability, system-prompt leakage, unsafe tool use.
 - **Telemetry evaluators** (Phase 5): pure-code metrics from trace metadata.
 
-Plus benchmark presets in `Composition/AgenticBenchmark.cs`:
+Plus benchmark presets in `AgenticBenchmark.cs` (project root):
 
 - `AgenticBenchmark.AgenticExecution()` — overall agent quality
 - `AgenticBenchmark.ToolCallAccuracy()` — tool-focused diagnostic

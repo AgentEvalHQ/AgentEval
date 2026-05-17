@@ -8,7 +8,6 @@ using AgentEval.Evals.Agentic;
 using AgentEval.Evals.Agentic.Composition;
 using AgentEval.Output;
 using Xunit;
-using AgenticBenchmarkFactory = AgentEval.Evals.Agentic.AgenticBenchmark;
 
 namespace AgentEval.Tests.Agentic.EndToEnd;
 
@@ -39,7 +38,7 @@ public class AgenticRagQualityE2ETest
     public void RagQuality_HasExpectedComponents()
     {
         var judge = new StubEvaluator(100);
-        var benchmark = AgenticBenchmarkFactory.RagQuality(judge);
+        var benchmark = AgenticBenchmark.RagQuality(judge);
 
         // RagQuality preset defines 7 top-level component evaluators (flat tree, no nested QaComposite).
         Assert.Equal(7, benchmark.Components.Count);
@@ -51,7 +50,7 @@ public class AgenticRagQualityE2ETest
         var store = new InMemoryOutputStore();
         var subject = new SubjectIdentity(SubjectKind.Agent, "E2E-RagQualityAgent");
         var judge = new StubEvaluator(100);
-        var benchmark = AgenticBenchmarkFactory.RagQuality(judge);
+        var benchmark = AgenticBenchmark.RagQuality(judge);
         var runner = new AgenticBenchmarkRunner();
 
         var input = new EvalInput(
