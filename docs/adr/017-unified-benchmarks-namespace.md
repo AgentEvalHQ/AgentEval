@@ -2,11 +2,11 @@
 
 ## Status
 
-**Accepted** (2026-05-17). Implementation scheduled for v0.10.0-beta.
+**Accepted** (2026-05-17). Implementation in flight for v0.10.0-beta — phases 0–5 closed on branch `feature/v0.10.0-unified-benchmarks` as of 2026-05-17. Updated 2026-05-17 to add three durable conventions (Phase 4b compliance internal rename, `BenchmarkFamilyRegistry` as canonical registry, `EvaluateAsync` as canonical result-type homogenisation primitive) plus the Opus gate-review-after-every-phase rule.
 
 ## Date
 
-2026-05-17
+2026-05-17 (revision 2 — extended scope; see "Conventions established by this ADR" below)
 
 ## Context
 
@@ -69,11 +69,11 @@ OWASP / MITRE / Performance runners get a new `EvaluateAsync(EvalInput) → Eval
 ```
 src/AgentEval                              (umbrella; only IsPackable=true)
 src/AgentEval.Abstractions
-src/AgentEval.Core
+src/AgentEval.Core                         (hosts BenchmarkFamilyRegistry — see below)
 src/AgentEval.DataLoaders
 src/AgentEval.Evals.Agentic                (existing — AgenticBenchmark NS rehosted)
-src/AgentEval.Evals.Compliance.Gdpr        (NEW — promoted from samples/AgentEval.GdprBenchmark)
-src/AgentEval.Evals.Compliance.EuAiAct     (NEW — promoted from samples/AgentEval.EuAiActBenchmark)
+src/AgentEval.Compliance.Gdpr              (NEW — promoted from samples/AgentEval.GdprBenchmark; Phase 4b renamed out of Evals.* prefix)
+src/AgentEval.Compliance.EuAiAct           (NEW — promoted from samples/AgentEval.EuAiActBenchmark; Phase 4b renamed out of Evals.* prefix)
 src/AgentEval.Evals.Performance            (NEW — promoted from src/AgentEval.Core/Benchmarks/)
 src/AgentEval.MAF
 src/AgentEval.Memory                       (existing — MemoryBenchmark NS rehosted)
@@ -86,7 +86,9 @@ samples/AgentEval.GdprBenchmark.Demo       (NEW — ~50 LOC consumer of promoted
 samples/AgentEval.EuAiActBenchmark.Demo    (NEW — ~50 LOC consumer of promoted assembly)
 ```
 
-The compliance benchmarks live in **separate assemblies per regulation** (not one fat `AgentEval.Evals.Compliance`). Rationale: regulations have wildly different runtime cost profiles (embedded YAML, judge prompts, calibration baselines). One assembly per regulation scales out to HIPAA / PCI-DSS / ISO 42001 / SOC 2 / NIS2 over the v1.1+ roadmap without forcing consumers to download all of them.
+The compliance benchmarks live in **separate assemblies per regulation** (not one fat `AgentEval.Compliance`). Rationale: regulations have wildly different runtime cost profiles (embedded YAML, judge prompts, calibration baselines). One assembly per regulation scales out to HIPAA / PCI-DSS / ISO 42001 / SOC 2 / NIS2 over the v1.1+ roadmap without forcing consumers to download all of them.
+
+**Why compliance lives outside `Evals.*`** (Phase 4b decision, revision 2 of this ADR): the `Evals.*` namespace tree is the established convention for *evaluator collections* (Agentic, Performance — packages of evaluator primitives that compose to score one dimension at a time). Compliance benchmarks are conceptually different: they are *regulatory packages* that compose evaluator primitives into domain-specific scenarios, with audit-chain evidence, regulator-grade pillar weights, and human-labelled calibration baselines. They deserve their own top-level namespace `AgentEval.Compliance.*` rather than the `Evals.*` umbrella. Phase 4b also resolves the parent-namespace-vs-type-name collision that birthed 13 `using XxxBenchmarkFactory = AgentEval.Benchmarks.XxxBenchmark;` workaround aliases after Phase 4 (because `AgentEval.GdprBenchmark` was simultaneously a namespace AND the factory type name). Renaming the parent namespace eliminates the collision at root.
 
 ## Rationale
 
@@ -172,6 +174,70 @@ Create a new top-level `AgentEval.Benchmarks` library that contains every preset
 
 - "Split-declared static partial classes" — some teams dislike this pattern because "grep for all members of `OwaspBenchmark`" requires more than one search. Mitigated by IDE features that aggregate partials.
 - The umbrella NuGet remains monolithic — the user can still get every benchmark from one package install. If a future need for fine-grained packaging emerges, it's straightforward to flip individual sub-assemblies to `IsPackable=true`.
+
+## Conventions established by this ADR
+
+This ADR establishes four durable conventions that apply beyond the v0.10.0-beta migration itself. Future contributors and AI agents working in the benchmark area should follow these without re-deriving them.
+
+### Convention 1 — Top-level factory namespace
+
+Every benchmark family's top-level preset-factory class is declared as `public static partial class {Family}Benchmark` and lives in namespace `AgentEval.Benchmarks`. Implementation lives in the family's domain assembly. Examples:
+- `AgentEval.Benchmarks.AgenticBenchmark` — `AgentEval.Evals.Agentic.dll`
+- `AgentEval.Benchmarks.GdprBenchmark` — `AgentEval.Compliance.Gdpr.dll`
+- `AgentEval.Benchmarks.OwaspBenchmark` — `AgentEval.RedTeam.dll`
+- `AgentEval.Benchmarks.PerformanceBenchmark` — `AgentEval.Evals.Performance.dll`
+
+Internal types (registries, pillars, runners, evaluators) stay in the family's domain namespace. The `partial` keyword allows split-declaration across multiple assemblies if a single family ever grows multi-assembly extensions.
+
+### Convention 2 — `EvaluateAsync` is the canonical result-type homogenisation primitive
+
+Every benchmark family that ships a non-`CompositeEval`-native result type MUST provide an `EvaluateAsync(EvalInput, CancellationToken) → EvalResult` adapter. The adapter:
+
+- Returns an `EvalResult` whose `SubResults` enumerate per-leaf metrics
+- Preserves the natural result type (`LatencyBenchmarkResult`, `OWASPComplianceReport`, `MITREATLASReport`, `MemoryBenchmarkResult`, …) in `Provenance` for downstream consumers that want richer data
+- Computes a top-level `Score` that lets the family flow through the unified output-store / audit-chain / Mission Control rendering pipeline
+
+This convention is what allows the same `IRunOutputStore` to host evidence from every benchmark family. PerformanceBenchmark (Phase 3) and OwaspBenchmark / MitreBenchmark (Phases 5–6) are the reference implementations. Future families that ship custom result types (HIPAA, PCI-DSS, NIS2, etc.) MUST implement the adapter or the unified pipeline degrades to family-specific special-casing — a regression the architecture explicitly forbids.
+
+Documented in detail in `docs/architecture.md` (Phase 9 deliverable: section titled "Benchmark result-type homogenisation via `EvaluateAsync`").
+
+### Convention 3 — `BenchmarkFamilyRegistry` is the canonical "where is every benchmark family registered" mechanism
+
+Every benchmark family — current (Agentic, GDPR, EU AI Act, OWASP, MITRE, LongMemEval, Performance, Memory) AND future (HIPAA, PCI-DSS, ISO 42001, NIS2, SOC 2, UK AI Bill, …) — registers itself with `AgentEval.Core.Benchmarks.BenchmarkFamilyRegistry` (Phase 8 deliverable). Registration entries carry:
+
+- Family name (CLI-friendly, lowercase, hyphen-separated)
+- One-line description (operator-facing)
+- Cost tier (low / medium / high)
+- Preset list with per-preset descriptions
+- Factory delegate `(IEvaluator? judge) → CompositeEval` (or equivalent runner for non-CompositeEval families)
+- `EvaluateAsync` adapter delegate (per Convention 2)
+- Metadata for Mission Control rendering, doc-link URLs
+
+The registry is the single source of truth for:
+- `agenteval bench --list`
+- `agenteval bench {family} --help` preset enumeration
+- Mission Control's family-discovery surface
+- The future external-registrar plugin mechanism (e.g., a third-party `AgentEval.Compliance.Hipaa` NuGet package auto-registers on assembly load)
+
+Adding a new benchmark family without registering here is a contract violation caught by `BenchmarkNamespaceContractTests` (Phase 4 deliverable, extended in Phase 4b).
+
+### Convention 4 — Opus gate-review after every phase
+
+Every architectural phase (Phase 1 onward in v0.10.0-beta; future similar arcs) ends with an explicit Opus gate-review task. The gate-review:
+
+1. Reads what the executing agent landed
+2. Verifies the phase's stated acceptance criteria
+3. Actively tries to find what the executing agent missed (it does NOT default to "looks fine to me")
+4. Writes a sign-off doc in `strategy/FutureFeatures/todo/lastreview/{N}-phase{M}-gate-review.md`
+
+Gate-review verdicts:
+- ✅ **GO** — advance to next phase, all criteria met
+- 🟡 **GO with follow-up** — advance is fine, but list specific items to fold into the next phase's brief
+- ❌ **NO-GO** — list blockers; do NOT advance until they're resolved
+
+No phase is considered closed until its gate-review is ✅ or 🟡-with-documented-follow-ups. The reviewing agent flips the relevant rows in the master tracking table to ✅; the executing agent flips rows to 🟦 / ✅ as each task completes. The status column is the single source of truth for "where are we right now" — never leave it stale across a session boundary.
+
+This convention emerged from observing Sonnet's tendency to over-report success on complex phases (Phase 4 in particular surfaced two material follow-ups Sonnet missed — Concerns A and B in `lastreview/11-phase4-gate-review.md` — that only Opus #12 caught on independent review).
 
 ## Implementation note
 
