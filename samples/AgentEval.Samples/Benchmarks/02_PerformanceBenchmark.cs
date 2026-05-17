@@ -17,9 +17,9 @@ namespace AgentEval.Samples.Benchmarks;
 /// Demonstrates:
 ///   1. The Convention-2 <c>EvaluateAsync(EvalInput) → EvalResult</c> adapter
 ///      on <see cref="PerformanceBenchmark"/> (added in v0.10.0).
-///   2. Generic HTML rendering of the resulting 3-leaf composite tree
+///   2. Generic HTML + PDF rendering of the resulting 3-leaf composite tree
 ///      (latency / throughput / cost).
-///   3. The unified output layout: <c>JSON</c> + <c>HTML</c> side-by-side.
+///   3. The unified output layout: <c>JSON</c> + <c>HTML</c> + <c>PDF</c> side-by-side.
 /// </summary>
 /// <remarks>
 /// No Azure OpenAI credentials required — uses an in-process EchoAgent stub.
@@ -54,15 +54,16 @@ public static class PerformanceBenchmarkSample
             result, subject,
             benchmarkName: "performance",
             regulationOrBenchmark: "AgentEval Performance Benchmark",
-            includePdf: false);
+            includePdf: true);
 
         BenchmarkSampleHelpers.PrintReportPaths(result, paths);
+        BenchmarkSampleHelpers.OfferToOpenReports(paths);
 
         Console.WriteLine();
         Console.WriteLine("   KEY TAKEAWAYS:");
         Console.WriteLine("   - PerformanceBenchmark.EvaluateAsync produces a CompositeEval-shaped EvalResult");
         Console.WriteLine("     with three leaves: perf_latency, perf_throughput, perf_cost.");
-        Console.WriteLine("   - The same shape flows through the HTML renderer that any other benchmark uses.");
+        Console.WriteLine("   - The same shape flows through the HTML + PDF renderers any other benchmark uses.");
         Console.WriteLine("   - For richer scenarios pass a real Azure-backed agent + EvalInput.Metadata[\"prompts\"].");
     }
 
