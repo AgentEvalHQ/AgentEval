@@ -8,7 +8,10 @@ production code path end-to-end:
 - Grades the response with a real LLM judge.
 - Renders the unified `EvalResult` tree to JSON + HTML + PDF using the v0.10.1
   generic renderers (`HtmlEvalResultRenderer`, `PdfEvalResultRenderer`).
-- Drops the artefacts in `samples/AgentEval.Samples/output/{family}/run-{utc}/`.
+- Writes a canonical audit-chained run under `samples/AgentEval.Samples/.agenteval/`
+  via `FileSystemOutputStore` (Mission Control + `agenteval doctor` read here).
+- Mirrors the HTML / PDF / bare-JSON sidecar to
+  `samples/AgentEval.Samples/output/{family}/run-{utc}/` for direct human consumption.
 
 If `AZURE_OPENAI_ENDPOINT` / `_API_KEY` / `_DEPLOYMENT` are missing, samples skip
 with a clear box and no exceptions — safe to run in CI.
@@ -151,3 +154,44 @@ without re-running the benchmark.
 - `PdfEvalResultRenderer` → `src/AgentEval.Rendering.Pdf/`
 - The unified output writer + cost rollup helpers used by every sample live in
   `Benchmarks/_BenchmarkSampleHelpers.cs`.
+
+---
+
+## Where the runs are saved
+
+Samples B2 – B7 write to **two** locations per run (v0.10.1, plan-25):
+
+| Artefact                                      | Location                                                           | Why                                                                                                                              |
+|-----------------------------------------------|--------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------|
+| Manifest, scenarios, summary, compliance evidence | `samples/AgentEval.Samples/.agenteval/`                              | **Canonical.** Audit-chained; Mission Control + `agenteval doctor` read here.                                                    |
+| HTML report                                   | `samples/AgentEval.Samples/output/{family}/run-{utc}/report.html`    | Direct browser open. Carries the canonical manifest's `ContentHash` in the audit-hash footer.                                    |
+| PDF report                                    | `samples/AgentEval.Samples/output/{family}/run-{utc}/report.pdf`     | Direct PDF open. Same audit-hash footer.                                                                                          |
+| Bare `report.json` (composite EvalResult)     | `samples/AgentEval.Samples/output/{family}/run-{utc}/report.json`    | Legacy compat — what `09_ReportBrowser` reads to surface the score / label per run.                                              |
+
+### Mission Control on a sample run
+
+```bash
+cd samples/AgentEval.Samples
+dotnet agenteval mc        # MC auto-discovers .agenteval/ and lists every run
+```
+
+MC reads the canonical tree only — sidecar HTML / PDF are out of scope for the
+portal. Audit-chain validation (`agenteval doctor`) works against the canonical
+tree as well.
+
+### Compliance evidence
+
+For B4 (GDPR) and B5 (EU AI Act) the sample additionally writes a regulator-grade
+evidence document via `GDPRComplianceReporter` / `EuAiActComplianceReporter`:
+
+- `.agenteval/compliance/GDPR/{subject}/{ts}/evidence.json`
+- `.agenteval/compliance/EU-AI-Act/{subject}/{ts}/evidence.json`
+
+For B6 (OWASP) and B7 (MITRE) the same shape lands via
+`OWASPComplianceReporter` / `MITREATLASReporter`:
+
+- `.agenteval/compliance/OWASP-LLM-Top10/{subject}/{ts}/evidence.json`
+- `.agenteval/compliance/MITRE-ATLAS/{subject}/{ts}/evidence.json`
+
+Each evidence file references the source run's `ContentHash`, so an auditor can
+re-verify the chain end-to-end.
