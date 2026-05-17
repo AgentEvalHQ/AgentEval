@@ -7,7 +7,69 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Known issues / tracked for v0.10.1+
+## [0.10.1-beta] - 2026-05-18
+
+The **Samples Consolidation + Generic Renderers** release. v0.10.1-beta introduces a
+uniform `IEvalResultRenderer` contract in `AgentEval.Abstractions`, ships two
+implementations — `HtmlEvalResultRenderer` (in `AgentEval.Core`) and the new
+`PdfEvalResultRenderer` (in a new `AgentEval.Rendering.Pdf` project) — and
+consolidates the per-family `*.Demo` projects into a focused `samples/AgentEval.Samples/Benchmarks/`
+sample suite with one example per registered benchmark family.
+
+### Added
+
+- **`IEvalResultRenderer` interface** (`AgentEval.Abstractions/Evals/IEvalResultRenderer.cs`):
+  uniform rendering contract any benchmark family can target. `FormatId`, `FileExtension`,
+  and `RenderAsync(EvalResult, EvalResultRenderOptions, CancellationToken) -> byte[]`.
+  Framing metadata (subject, run id, audit hash, AgentEval version) flows through
+  `EvalResultRenderOptions`.
+- **`HtmlEvalResultRenderer`** (`AgentEval.Core/Evals/Rendering/`): self-contained HTML
+  output — inline CSS, `<details>` collapsible sections, severity-coded badges, XSS-safe
+  encoding via `WebUtility.HtmlEncode`. Skipped leaves render honestly as `NOT TESTED`.
+- **`AgentEval.Rendering.Pdf` project** with **`PdfEvalResultRenderer`**: QuestPDF-backed
+  generic renderer with cover page, optional component summary, per-leaf detail pages
+  (score / severity / provenance / evidence / metrics), and an audit-chain appendix.
+  Embedded into the umbrella `AgentEval` NuGet via `PrivateAssets="all"`.
+- **`samples/AgentEval.Samples/Benchmarks/` sample suite** — 8 new focused examples:
+  Registry Discovery (no Azure), Performance (no Azure), Agentic, GDPR, EU AI Act, OWASP,
+  MITRE, LongMemEval. Each example writes JSON + HTML (+ PDF for audit-grade families)
+  via the new renderers. Wired into `Program.cs` as menu group H.
+
+### Changed
+
+- **`samples/AgentEval.Samples/AgentEval.Samples.csproj`** now references
+  `AgentEval.Compliance.Gdpr`, `AgentEval.Compliance.EuAiAct`, `AgentEval.Evals.Performance`,
+  and `AgentEval.Rendering.Pdf` directly so the new Benchmarks samples have compile-time
+  targets.
+- **Umbrella `src/AgentEval/AgentEval.csproj`** bumped to `0.10.1-beta` and now embeds
+  `AgentEval.Rendering.Pdf.dll` via `PrivateAssets="all"`.
+
+### Removed
+
+- **`samples/AgentEval.GdprBenchmark.Demo/` project** — the original 11-line stub was a
+  CLI-hint Program.cs and added no real demonstration value. Equivalent test coverage
+  already lives in `tests/AgentEval.Tests/Compliance/Gdpr/` (E2E_Standard, E2E_Smoke,
+  E2E_AuditGrade, AllArticleYamlsValidate, etc.). The `Benchmarks/04_GdprBenchmark.cs`
+  sample replaces it with a proper end-to-end walkthrough.
+- **`samples/AgentEval.EuAiActBenchmark.Demo/` project** — `smoke-load` and `smoke-run`
+  sub-commands were already covered by `tests/AgentEval.Tests/Compliance/EuAiAct/EndToEnd/`
+  (`EuAiActSmokeE2ETest.cs`, `EuAiActStandardE2ETest.cs`). The `Benchmarks/05_EuAiActBenchmark.cs`
+  sample replaces the demo with a single focused end-to-end run.
+- **Stale orphan directories** `samples/AgentEval.GdprBenchmark/` and
+  `samples/AgentEval.EuAiActBenchmark/` (no tracked source, only `bin/obj` artefacts)
+  were already absent from git tracking but were sitting in the working tree from
+  pre-v0.10.0 reorganisation.
+
+### Notes on existing family-specific PDF renderers
+
+`GDPRPdfRenderer`, `EuAiActPdfRenderer`, and `AgenticPdfRenderer` remain untouched. They
+consume bespoke evidence envelopes (`GdprComplianceEvidence`, `EuAiActComplianceEvidence`,
+`AgenticBenchmarkEvidence`) that carry pillar tables, attestation blocks, and methodology
+appendices the universal `EvalResult` shape does not represent. They are the right choice
+for boardroom/DPO/regulator-grade audit PDFs. The new `PdfEvalResultRenderer` targets the
+universal cross-family path (samples, third-party plugins, discovery walkthroughs).
+
+### Known issues / tracked for v0.10.2+
 
 - **NuGetConsumer LLM non-determinism**: `samples/AgentEval.NuGetConsumer.Tests/SafetyPolicyTests.CancellationRequest_ShouldConfirmBeforeCancelling` is flaky at roughly 90% pass rate on 10-iteration stress (real LLM call; when the model responds with text instead of a tool call, the strict tool-call assertion fails). Pre-existing — predates the v0.10.0-beta arc. Not introduced by any phase of v0.10.0-beta. Tracked here for v0.10.1 stabilisation (likely fix: relax the test's strictness to accept either-tool-or-confirmation-text, or seed the model into a deterministic mode).
 - **`docs/redteam/owasp.md` not authored**: `OwaspBenchmarkRegistration.docLinkUrl` points at this future doc; deferred to v0.11+ docs-pack.
