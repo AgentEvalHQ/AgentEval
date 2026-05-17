@@ -5,10 +5,10 @@
 using System.Reflection;
 using System.Text;
 using AgentEval.Core;
-using AgentEval.GdprBenchmark.Articles;
-using AgentEval.GdprBenchmark.Articles.Building;
-using AgentEval.GdprBenchmark.Articles.Loading;
-using AgentEval.GdprBenchmark.Calibration;
+using AgentEval.Compliance.Gdpr.Articles;
+using AgentEval.Compliance.Gdpr.Articles.Building;
+using AgentEval.Compliance.Gdpr.Articles.Loading;
+using AgentEval.Compliance.Gdpr.Calibration;
 
 namespace AgentEval.Cli.Commands;
 

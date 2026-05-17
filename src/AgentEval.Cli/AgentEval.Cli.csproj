@@ -12,8 +12,14 @@
     <ProjectReference Include="../AgentEval.Abstractions/AgentEval.Abstractions.csproj" />
     <ProjectReference Include="../AgentEval.DataLoaders/AgentEval.DataLoaders.csproj" />
     <ProjectReference Include="../AgentEval.Evals.Agentic/AgentEval.Evals.Agentic.csproj" />
-    <ProjectReference Include="..\..\samples\AgentEval.GdprBenchmark\AgentEval.GdprBenchmark.csproj" />
-    <ProjectReference Include="..\..\samples\AgentEval.EuAiActBenchmark\AgentEval.EuAiActBenchmark.csproj" />
+    <ProjectReference Include="..\AgentEval.Compliance.Gdpr\AgentEval.Compliance.Gdpr.csproj" />
+    <ProjectReference Include="..\AgentEval.Compliance.EuAiAct\AgentEval.Compliance.EuAiAct.csproj" />
+    <ProjectReference Include="..\AgentEval.RedTeam\AgentEval.RedTeam.csproj" />
+    <!-- Phase 8 (v0.10.0-beta): CLI needs direct refs to Performance and Memory for
+         BenchPerfCommand and to anchor their module initializers so registry entries
+         appear in bench list / per-family help. -->
+    <ProjectReference Include="..\AgentEval.Evals.Performance\AgentEval.Evals.Performance.csproj" />
+    <ProjectReference Include="..\AgentEval.Memory\AgentEval.Memory.csproj" />
   </ItemGroup>
 
   <!-- Plan-08 MC1.7.1: AgentEval.MissionControl is net10-only (Hot Chocolate 16

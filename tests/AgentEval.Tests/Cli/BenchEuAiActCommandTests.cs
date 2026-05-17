@@ -235,6 +235,6 @@ public class BenchEuAiActCommandTests : IDisposable
         var attestation = baseJson.RootElement.GetProperty("attestation");
         // JudgeFactory.Resolve returns "override" as the judge model when evaluatorOverride is supplied.
         Assert.Equal("override", attestation.GetProperty("evaluatorModel").GetString());
-        Assert.Equal("AgentEval.EuAiActBenchmark", attestation.GetProperty("evaluator").GetString());
+        Assert.Equal("AgentEval.Compliance.EuAiAct", attestation.GetProperty("evaluator").GetString());
     }
 }

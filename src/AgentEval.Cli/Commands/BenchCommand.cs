@@ -2,19 +2,19 @@
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 
+using AgentEval.Benchmarks;
 using AgentEval.Core;
 using AgentEval.Evals;
-using AgentEval.GdprBenchmark.Articles;
-using AgentEval.GdprBenchmark.Articles.Building;
-using AgentEval.GdprBenchmark.Articles.Loading;
-using AgentEval.GdprBenchmark.Composition;
-using AgentEval.GdprBenchmark.DomainPacks.ChildrensService;
-using AgentEval.GdprBenchmark.DomainPacks.Healthcare;
-using AgentEval.GdprBenchmark.DomainPacks.HR;
-using AgentEval.GdprBenchmark.Reporting;
-using AgentEval.GdprBenchmark.Reporting.Pdf;
+using AgentEval.Compliance.Gdpr.Articles;
+using AgentEval.Compliance.Gdpr.Articles.Building;
+using AgentEval.Compliance.Gdpr.Articles.Loading;
+using AgentEval.Compliance.Gdpr.Composition;
+using AgentEval.Compliance.Gdpr.DomainPacks.ChildrensService;
+using AgentEval.Compliance.Gdpr.DomainPacks.Healthcare;
+using AgentEval.Compliance.Gdpr.DomainPacks.HR;
+using AgentEval.Compliance.Gdpr.Reporting;
+using AgentEval.Compliance.Gdpr.Reporting.Pdf;
 using AgentEval.Output;
-using GdprBenchmarkFactory = AgentEval.GdprBenchmark.GdprBenchmark;
 
 namespace AgentEval.Cli.Commands;
 
@@ -71,7 +71,7 @@ public static class BenchCommand
         // provenance but never reached the LLM — the "Cite articles / Be conservative /
         // Flag evasive responses" rules had no actual effect on judgements.
         var gdprPrompt = EmbeddedPromptLoader.Load(
-            typeof(GdprBenchmark.GdprBenchmark).Assembly,
+            typeof(GdprBenchmark).Assembly,
             "gdpr-judge-system.v1.md");
         var (resolvedJudge, judgeModelName, exitCode) = JudgeFactory.Resolve(
             evaluatorOverride,
@@ -256,9 +256,9 @@ public static class BenchCommand
 
         var basePreset = tokens[0].ToLowerInvariant() switch
         {
-            "smoke"                  => GdprBenchmarkFactory.Smoke(articles),
-            "standard"               => GdprBenchmarkFactory.Standard(articles),
-            "audit" or "auditgrade"  => GdprBenchmarkFactory.AuditGrade(articles),
+            "smoke"                  => GdprBenchmark.Smoke(articles),
+            "standard"               => GdprBenchmark.Standard(articles),
+            "audit" or "auditgrade"  => GdprBenchmark.AuditGrade(articles),
             _                        => throw new ArgumentException($"Unknown base preset '{tokens[0]}'.", nameof(presetSpec))
         };
 

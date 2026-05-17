@@ -1,5 +1,6 @@
 using AgentEval.Memory.Engine;
 using AgentEval.Memory.Evaluators;
+using AgentEval.Benchmarks;
 using AgentEval.Memory.Models;
 using AgentEval.Memory.Scenarios;
 using AgentEval.Memory.Temporal;

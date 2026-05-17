@@ -5,6 +5,7 @@ using Azure.AI.OpenAI;
 using AgentEval.Core;
 using AgentEval.Memory.Evaluators;
 using AgentEval.Memory.Extensions;
+using AgentEval.Benchmarks;
 using AgentEval.Memory.Models;
 using AgentEval.Memory.Reporting;
 using Microsoft.Extensions.AI;

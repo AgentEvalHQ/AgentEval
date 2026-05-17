@@ -1,0 +1,296 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 AgentEval Contributors
+// Licensed under the MIT License.
+
+using AgentEval.Benchmarks;
+using AgentEval.Core;
+using AgentEval.Evals;
+using AgentEval.Output;
+using AgentEval.RedTeam;
+using AgentEval.RedTeam.Reporting.Compliance;
+
+namespace AgentEval.Cli.Commands;
+
+/// <summary>
+/// Implements the <c>agenteval bench mitre</c> subcommand. Runs the MITRE ATLAS
+/// red-team scan against an agent (a stub safe-refusal agent is used by default —
+/// supply an agent override on the internal overload for real targets in tests),
+/// persists the resulting <see cref="EvalResult"/> through the unified output-store,
+/// and additionally emits the rich <see cref="MITREATLASReport"/> as JSON +
+/// Markdown alongside.
+/// </summary>
+/// <remarks>
+/// Symmetric to <see cref="BenchOwaspCommand"/>. Uses the Phase-6 single-scan
+/// pattern: one <see cref="MitreBenchmarkRun.ScanAsync"/> per CLI invocation;
+/// the resulting <see cref="RedTeamResult"/> is fed into both
+/// <see cref="MitreBenchmarkRun.BuildEvalResult"/> and
+/// <see cref="MitreBenchmarkRun.GenerateReport"/>.
+/// </remarks>
+public static class BenchMitreCommand
+{
+    /// <summary>Runs the bench mitre command using auto-discovered workspace root.</summary>
+    public static async Task<int> RunAsync(
+        string preset,
+        string subject,
+        string? rootOverride,
+        string? inputText)
+    {
+        var (exitCode, _) = await RunAsync(preset, subject, rootOverride, inputText, evaluatorOverride: null, agentOverride: null).ConfigureAwait(false);
+        return exitCode;
+    }
+
+    /// <summary>
+    /// Runs the bench mitre command with optional overrides (used in tests).
+    /// Returns the exit code plus the absolute path of the timestamped report
+    /// directory (where <c>report.md</c> / <c>report.json</c> are written), or
+    /// <c>null</c> if the command exited before reaching the report-write step.
+    /// Tests use the returned path directly instead of enumerating timestamped
+    /// directories by name — that name-based lookup races on second-precision
+    /// timestamps when two operations land in the same second.
+    /// </summary>
+    internal static async Task<(int ExitCode, string? ReportDir)> RunAsync(
+        string preset,
+        string subject,
+        string? rootOverride,
+        string? inputText,
+        IEvaluator? evaluatorOverride,
+        IEvaluableAgent? agentOverride)
+    {
+        // ── Workspace setup ──────────────────────────────────────────────────
+        if (rootOverride is not null)
+        {
+            var canonical = WorkspaceRootValidator.CanonicaliseOrNull(rootOverride);
+            if (canonical is null) return (1, null);
+            rootOverride = canonical;
+        }
+        var workspaceRoot = rootOverride ?? WorkspaceRootDiscovery.Find(Directory.GetCurrentDirectory());
+        if (workspaceRoot is null)
+        {
+            Console.Error.WriteLine("Could not find a solution root (.sln, .slnx, or .git). " +
+                "Provide --root or run from within a solution directory.");
+            return (1, null);
+        }
+
+        var agentEvalDir = Path.Combine(workspaceRoot, ".agenteval");
+        if (!Directory.Exists(agentEvalDir))
+        {
+            Console.Error.WriteLine($".agenteval/ not found at {agentEvalDir}. Run `agenteval init` first.");
+            return (1, null);
+        }
+
+        // ── Judge / evaluator ────────────────────────────────────────────────
+        // The MITRE ATLAS attack pipeline uses heuristic per-attack evaluators today;
+        // the judge is accepted for API symmetry with other bench commands and
+        // reserved for future LLM-graded probes. JudgeFactory.Resolve still runs
+        // to honour the AZURE_OPENAI_* env gate (CI parity).
+        var (resolvedJudge, judgeModelName, exitCode) = JudgeFactory.Resolve(
+            evaluatorOverride,
+            judgeKind: "MITRE ATLAS benchmark");
+        if (resolvedJudge is null) return (exitCode, null);
+
+        // ── Select preset ────────────────────────────────────────────────────
+        MitreBenchmarkRun benchmark;
+        try
+        {
+            benchmark = ResolvePreset(preset, resolvedJudge);
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Failed to build MITRE ATLAS preset '{preset}': {ex.Message}");
+            return (1, null);
+        }
+
+        // ── Resolve target agent ─────────────────────────────────────────────
+        // The MITRE pipeline drives the agent itself (it generates and sends its
+        // own probes); --input is recorded for provenance only — not consumed by
+        // the scan flow. Reference it so the parameter stays meaningful.
+        _ = inputText;
+        var agent = agentOverride ?? new SafeRefusalAgent(subject);
+
+        // ── Run benchmark ────────────────────────────────────────────────────
+        var store = new FileSystemOutputStore(agentEvalDir);
+        await store.SweepStaleSentinelsAsync(TimeSpan.FromHours(24));
+        var subjectIdentity = new SubjectIdentity(SubjectKind.Agent, subject);
+        await store.EnsureSolutionAsync();
+        await store.EnsureSubjectAsync(subjectIdentity);
+
+        Console.WriteLine($"Running MITRE ATLAS benchmark ({preset}) for subject '{subject}'...");
+
+        EvalResult compositeEval;
+        RedTeamResult redTeamResult;
+        try
+        {
+            // Single-scan pattern (Phase 6): one pipeline execution; the
+            // RedTeamResult feeds both BuildEvalResult and GenerateReport.
+            redTeamResult = await benchmark.ScanAsync(agent);
+            compositeEval = benchmark.BuildEvalResult(redTeamResult);
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"MITRE ATLAS scan failed: {ex.Message}");
+            return (1, null);
+        }
+
+        var report = benchmark.GenerateReport(redTeamResult);
+
+        // ── Persist through the unified output-store ─────────────────────────
+        string runId;
+        try
+        {
+            var manifest = await store.StartRunAsync(
+                subjectIdentity,
+                new RunContext(
+                    EvalProject: "AgentEval.RedTeam",
+                    EvalProjectPath: "src/AgentEval.RedTeam/",
+                    Harness: "BenchMitreCommand",
+                    Seed: null,
+                    ParentInvocationId: null,
+                    Kind: "benchmark"));
+            runId = manifest.Run.RunId;
+
+            // Write the composite as the run's "scenario result" — the recursive
+            // tree is preserved as JSON inside ScenarioResult.Output, so a
+            // downstream reader can rehydrate the full EvalResult via
+            // EvalResultPersistence.FromScenarioResult.
+            var scenarioResult = EvalResultPersistence.ToScenarioResult(
+                compositeEval,
+                scenarioId: $"mitre-{preset.ToLowerInvariant()}",
+                scenarioName: $"MITRE ATLAS — {preset}");
+            await store.WriteScenarioResultAsync(runId, scenarioResult);
+
+            var verdict = compositeEval.Score.Label.ToUpperInvariant() switch
+            {
+                "PASS" => "PASS",
+                "WARN" => "WARN",
+                _      => "FAIL"
+            };
+            var summary = new RunSummary(
+                SchemaVersion: "1.0",
+                RunId: runId,
+                Verdict: verdict,
+                Stats: new RunStats(
+                    Total: 1,
+                    Passed: compositeEval.Score.Passed ? 1 : 0,
+                    Failed: !compositeEval.Score.Passed && compositeEval.Score.Label != "warn" ? 1 : 0,
+                    Warnings: compositeEval.Score.Label == "warn" ? 1 : 0),
+                Metrics: new Dictionary<string, double>
+                {
+                    ["overallScore"] = compositeEval.Score.Value,
+                    ["overallPassRate"] = report.Summary.OverallPassRate / 100.0,
+                });
+            await store.CompleteRunAsync(manifest, summary);
+            Console.WriteLine($"Persisted run {runId} to {agentEvalDir}");
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Failed to persist MITRE ATLAS run to output store: {ex.Message}");
+            return (1, null);
+        }
+
+        // ── Persist the rich MITRE compliance evidence (sibling to GDPR/EU AI Act/OWASP) ─
+        try
+        {
+            var reporter = new MITREATLASReporter();
+            await reporter.SaveReportAsync(store, subjectIdentity, runId, redTeamResult);
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Warning: failed to persist MITRE ATLAS compliance evidence: {ex.Message}");
+        }
+
+        // ── Emit JSON + Markdown reports alongside ───────────────────────────
+        var sanitizedSubject = SanitizeForPath(subject);
+        var ts = report.GeneratedAt.ToString("yyyy-MM-dd_HH-mm-ss");
+        var outputDir = Path.Combine(agentEvalDir, "compliance", "MITRE-ATLAS", sanitizedSubject, ts);
+        Directory.CreateDirectory(outputDir);
+
+        try
+        {
+            var jsonPath = Path.Combine(outputDir, "report.json");
+            await File.WriteAllTextAsync(jsonPath, report.ToJson());
+            Console.WriteLine($"JSON report:     {jsonPath}");
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Warning: failed to write MITRE ATLAS JSON report: {ex.Message}");
+        }
+
+        try
+        {
+            var mdPath = Path.Combine(outputDir, "report.md");
+            await File.WriteAllTextAsync(mdPath, report.ToMarkdown());
+            Console.WriteLine($"Markdown report: {mdPath}");
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Warning: failed to write MITRE ATLAS Markdown report: {ex.Message}");
+        }
+
+        // ── Exit code ─────────────────────────────────────────────────────────
+        Console.WriteLine($"Overall result: pass rate {report.Summary.OverallPassRate:F1}% " +
+            $"({report.Summary.CriticalFindings} critical / {report.Summary.HighFindings} high findings); " +
+            $"composite verdict {compositeEval.Score.Label.ToUpperInvariant()}");
+
+        var finalExit = compositeEval.Score.Label.ToLowerInvariant() switch
+        {
+            "pass" => 0,
+            "fail" => 2,
+            _      => 2  // WARN/skipped also returns non-zero for CI strictness
+        };
+        return (finalExit, outputDir);
+    }
+
+    /// <summary>
+    /// Resolves a MITRE ATLAS preset specification into a <see cref="MitreBenchmarkRun"/>.
+    /// </summary>
+    /// <param name="presetSpec">
+    /// Preset identifier (case-insensitive): <c>atlas-baseline</c>/<c>atlasbaseline</c>/<c>baseline</c>,
+    /// <c>atlas-smoke</c>/<c>atlassmoke</c>/<c>smoke</c>, or
+    /// <c>atlas-audit-grade</c>/<c>atlas-audit</c>/<c>atlasauditgrade</c>/<c>audit</c>/<c>auditgrade</c>.
+    /// </param>
+    /// <param name="judge">LLM evaluator passed through to the preset factory.</param>
+    internal static MitreBenchmarkRun ResolvePreset(string presetSpec, IEvaluator judge)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(presetSpec);
+        ArgumentNullException.ThrowIfNull(judge);
+
+        return presetSpec.Trim().ToLowerInvariant() switch
+        {
+            "atlas-baseline" or "atlasbaseline" or "baseline"                     => MitreBenchmark.AtlasBaseline(judge),
+            "atlas-smoke" or "atlassmoke" or "smoke"                              => MitreBenchmark.AtlasSmoke(judge),
+            "atlas-audit-grade" or "atlas-audit" or "atlasauditgrade"
+                or "audit" or "auditgrade"                                        => MitreBenchmark.AtlasAuditGrade(judge),
+            _ => throw new ArgumentException(
+                $"Unknown MITRE ATLAS preset '{presetSpec}'. " +
+                "Known presets: atlas-baseline (=baseline), atlas-smoke (=smoke), " +
+                "atlas-audit-grade (=atlas-audit / audit / auditgrade).",
+                nameof(presetSpec))
+        };
+    }
+
+    private static string SanitizeForPath(string name)
+    {
+        var invalid = Path.GetInvalidFileNameChars().Concat(new[] { '/', '\\' }).ToArray();
+        var s = string.Concat(name.Select(c => invalid.Contains(c) ? '-' : c));
+        return s.Trim('.', ' ');
+    }
+
+    /// <summary>
+    /// Deterministic stub agent used by the CLI when no real target is supplied.
+    /// Always returns a safe refusal — under the MITRE pipeline the heuristic
+    /// evaluators classify these as "resisted" for prompt-injection/jailbreak/PII
+    /// probes, so a default CLI run produces a clean PASS report. Real targets
+    /// override this via the <c>agentOverride</c> parameter on the internal
+    /// <see cref="RunAsync(string,string,string?,string?,IEvaluator?,IEvaluableAgent?)"/> overload.
+    /// </summary>
+    internal sealed class SafeRefusalAgent : IEvaluableAgent
+    {
+        public string Name { get; }
+        public SafeRefusalAgent(string name) { Name = name; }
+        public Task<AgentResponse> InvokeAsync(string prompt, CancellationToken cancellationToken = default)
+            => Task.FromResult(new AgentResponse
+            {
+                Text = "I cannot help with that request. Please rephrase or ask something else."
+            });
+    }
+}

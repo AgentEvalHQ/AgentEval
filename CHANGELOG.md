@@ -7,7 +7,264 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-(no unreleased changes)
+### Known issues / tracked for v0.10.1+
+
+- **NuGetConsumer LLM non-determinism**: `samples/AgentEval.NuGetConsumer.Tests/SafetyPolicyTests.CancellationRequest_ShouldConfirmBeforeCancelling` is flaky at roughly 90% pass rate on 10-iteration stress (real LLM call; when the model responds with text instead of a tool call, the strict tool-call assertion fails). Pre-existing — predates the v0.10.0-beta arc. Not introduced by any phase of v0.10.0-beta. Tracked here for v0.10.1 stabilisation (likely fix: relax the test's strictness to accept either-tool-or-confirmation-text, or seed the model into a deterministic mode).
+- **`docs/redteam/owasp.md` not authored**: `OwaspBenchmarkRegistration.docLinkUrl` points at this future doc; deferred to v0.11+ docs-pack.
+- **`README.md` benchmark-table sweep + `docs/benchmarks.md` update**: deferred to v0.10.1 docs-pack. The README is version-agnostic so no urgency.
+- **Agentic `safety` preset + GDPR/EuAiAct domain-pack registry surfaces**: `BenchmarkFamilyRegistry.CompositeFactory` paths throw at call time for presets that need programmatic config (PolicyResolver / domain-pack composition). Documented in registration files; users use the direct programmatic API. v0.10.1+ would add a `RequiresProgrammaticConstruction` flag on `BenchmarkPreset` to surface this in `bench --list` more gracefully.
+- **`BenchmarkFamilyRegistryTests` count**: ADR-017 §Verification says "12 tests"; the source file has 13. Cosmetic.
+
+## [0.10.0-beta] - 2026-05-17
+
+The **AgentEval Benchmark Suite** release. v0.10.0-beta unifies eight benchmark families
+(Agentic, GDPR, EU AI Act, OWASP, MITRE, LongMemEval, Performance, Memory) under a single
+discovery surface (`AgentEval.Benchmarks` namespace + `BenchmarkFamilyRegistry`), promotes
+the GDPR / EU AI Act benchmarks out of `samples/` to first-class product assemblies,
+relocates `PerformanceBenchmark` to its own assembly with a Convention-2 `EvaluateAsync`
+adapter, and adds new façades for OWASP LLM Top 10, MITRE ATLAS, and the LongMemEval
+academic benchmark. See [ADR-017](docs/adr/017-unified-benchmarks-namespace.md) for the
+full architectural rationale and the four conventions this release establishes.
+
+### Added — `BenchmarkFamilyRegistry` (canonical single-source-of-truth)
+
+The new `AgentEval.Core.Benchmarks.BenchmarkFamilyRegistry` is the canonical mechanism for
+benchmark-family discovery (ADR-017 Convention 3). Eight families — Agentic, GDPR,
+EU AI Act, OWASP, MITRE, LongMemEval, Memory, Performance — auto-register on assembly load
+via `[ModuleInitializer]`-attributed hooks in their owning assemblies. Future families
+(HIPAA, PCI-DSS, ISO 42001, NIS2, SOC 2, UK AI Bill, …) plug in via the same one-line
+registration. The registry is thread-safe (backed by `ConcurrentDictionary`), idempotent on
+same-content re-registration, and rejects name collisions with different content.
+
+Two registration shapes are supported (see `BenchmarkFamily` XML doc for the contract):
+- **Shape A — `CompositeEval`-native** (Agentic, GDPR, EU AI Act, OWASP, MITRE, Performance):
+  factory returns a `CompositeEval` that the runner can `EvaluateAsync` directly.
+- **Shape B — external-dataset / multi-turn** (LongMemEval, Memory): factory returns a
+  runner-style type with a different invocation contract.
+
+`agenteval bench --list`, per-family `--help` preset enumeration, and (future) Mission
+Control's family-discovery surface all read from this single source of truth. Adding a new
+benchmark family without registering here is a contract violation caught by
+`BenchmarkNamespaceContractTests` / `BenchmarkFamilyRegistryTests`.
+
+### Added — `bench --list` CLI command
+
+`agenteval bench --list` enumerates all currently-registered benchmark families
+(name, default cost tier, presets) from `BenchmarkFamilyRegistry`. The listing is genuinely
+registry-sourced — `BenchListCommandTests.OutputComesFromRegistry` proves this by
+registering a synthetic UUID-named family at runtime and asserting it appears in the
+output. Third-party extension assemblies that register their own families via
+`[ModuleInitializer]` will surface here automatically.
+
+### Added — `bench perf {latency,throughput,cost}` CLI subcommand
+
+`PerformanceBenchmark` previously had no CLI entry point. v0.10.0-beta adds the
+`bench perf` sub-command tree mirroring `bench agentic` / `bench gdpr` / etc.:
+
+```
+agenteval bench perf latency --subject MyAgent --prompt "Tell me a joke"
+agenteval bench perf throughput --subject MyAgent --prompt "..." --concurrency 5 --duration 30s
+agenteval bench perf cost --subject MyAgent --prompts prompts.jsonl
+```
+
+Output flows through the standard `.agenteval/` workspace (manifest + scenarios +
+summary + run-index append) — identical artefact shape to every other `bench` family,
+courtesy of Convention 2's `EvaluateAsync` adapter (see Phase 3 / Changed below).
+
+### Added — Per-family `bench {family} --help` preset enumeration
+
+`agenteval bench owasp --help` (and every other family) now dynamically lists the
+family's available `--preset` options with one-line descriptions, sourced from
+`BenchmarkFamilyRegistry.TryGet(family).Presets`. Future preset additions don't
+require touching CLI plumbing.
+
+### Added — `OwaspBenchmark` façade (`AgentEval.Benchmarks` namespace)
+
+New top-level preset factory over the existing red-team attack pipeline. Presets:
+- **`Top10()`** — All 9 implemented attacks at `Intensity.Quick`, 10-min timeout. Medium cost.
+- **`Smoke()`** — 3 MVP attacks (PromptInjection + Jailbreak + PIILeakage) at Quick
+  intensity — CI-friendly. Low cost.
+- **`AuditGrade()`** — All 9 attacks at `Intensity.Comprehensive`, 30-min timeout —
+  audit-grade evidence. High cost.
+- **`Top10ForRag()`** — All 9 attacks at `Intensity.Comprehensive`, 20-min timeout —
+  RAG threat-model depth (LLM01 indirect-injection emphasis). High cost.
+
+`OwaspBenchmark.Top10(judge).EvaluateAsync(input, ct)` returns a 10-leaf `EvalResult`
+composite (one leaf per OWASP LLM Top 10 category). 4 of the 10 categories that aren't
+testable at the agent-API layer (LLM03 Supply Chain, LLM04 Data/Model Poisoning,
+LLM08 Vector/Embedding Weaknesses, LLM09 Misinformation) emit honest `skipped` leaves
+rather than fabricated scores. The 6 tested categories are LLM01 (Prompt Injection),
+LLM02 (Sensitive Information Disclosure), LLM05 (Improper Output Handling),
+LLM06 (Excessive Agency), LLM07 (System Prompt Leakage), and LLM10 (Unbounded
+Consumption). Aggregation: `MinAggregation` (security-gate semantics — a single
+critical-fail caps the composite). The bespoke `OWASPComplianceReport` remains
+available alongside the `EvalResult` for downstream consumers that want richer
+evidence data.
+
+### Added — `MitreBenchmark` façade (`AgentEval.Benchmarks` namespace)
+
+Mirror of OwaspBenchmark, projecting the same 9-attack roster onto MITRE ATLAS technique
+IDs. Presets:
+- **`AtlasBaseline()`** — All 9 attacks at Quick intensity. Medium cost.
+- **`AtlasSmoke()`** — 3 MVP attacks. Low cost.
+- **`AtlasAuditGrade()`** — All 9 attacks at Comprehensive intensity. High cost.
+
+`EvaluateAsync` returns a 12-leaf composite (one leaf per ATLAS technique covered by the
+canonical reporter roster). Every leaf's `Metric.Key` is `mitre.aml.t0xxx` so the
+audit-chain trace preserves the ATLAS-ID linkage. `MitreBenchmarkRun.BuildEvalResult` and
+`OwaspBenchmarkRun.BuildEvalResult` overloads let CLI callers avoid double-scanning when
+they already have a `RedTeamResult` in hand.
+
+### Added — `LongMemEvalBenchmark` façade (`AgentEval.Memory.External.LongMemEval`)
+
+Shape B (external-dataset) registration over the existing `LongMemEvalBenchmarkRunner`.
+Presets:
+- **`Subset(chatClient)`** — Embedded 30-question stratified sample, no download required,
+  CI-friendly. Medium cost.
+- **`Full(chatClient)`** — Full ~500-question dataset. **Requires `LONGMEMEVAL_DATASET_PATH`
+  env var** pointing at the downloaded dataset directory (see Changed below). High cost.
+
+Closes the credibility gap: "AgentEval supports the LongMemEval (ICLR 2025) academic memory
+benchmark" is now a real product claim. See <https://arxiv.org/abs/2410.10813>.
+
+### Changed — Unified benchmark namespace `AgentEval.Benchmarks`
+
+`AgenticBenchmark`, `GdprBenchmark`, `EuAiActBenchmark`, `OwaspBenchmark`, `MitreBenchmark`,
+`LongMemEvalBenchmark`, `PerformanceBenchmark`, and `MemoryBenchmark` are now all declared as
+`public static partial class` under the single namespace `AgentEval.Benchmarks` (ADR-017
+Convention 1). One `using` directive covers benchmark discovery:
+
+```csharp
+using AgentEval.Benchmarks;
+
+var agentic   = AgenticBenchmark.AgenticExecution(judge);
+var gdpr      = GdprBenchmark.Standard(articles);
+var euAiAct   = EuAiActBenchmark.Standard(articles);
+var owasp     = OwaspBenchmark.Top10(judge);
+var mitre     = MitreBenchmark.AtlasBaseline(judge);
+var perf      = new PerformanceBenchmark(agent);
+var longMem   = LongMemEvalBenchmark.Subset(chatClient);
+```
+
+Internal types (registries, pillars, runners, scenarios, evaluators) stay in their domain
+namespaces (`AgentEval.Compliance.Gdpr.*`, `AgentEval.Evals.Agentic.Process`,
+`AgentEval.RedTeam`, `AgentEval.Memory.External.LongMemEval`, …) — physical layering
+preserved, logical layering unified. `BenchmarkNamespaceContractTests` enforces the
+convention via reflection.
+
+### Changed — Compliance benchmarks promoted from `samples/` to `src/`
+
+`samples/AgentEval.GdprBenchmark/` and `samples/AgentEval.EuAiActBenchmark/` were referenced
+as hard `ProjectReference` dependencies by the shipping CLI and embedded into the umbrella
+NuGet as transitive runtime dependencies — they were de facto product code, mislabelled as
+"samples". They are now promoted to first-class product assemblies:
+
+- `src/AgentEval.Compliance.Gdpr/` (was `samples/AgentEval.GdprBenchmark/`)
+- `src/AgentEval.Compliance.EuAiAct/` (was `samples/AgentEval.EuAiActBenchmark/`)
+
+Internal namespaces consolidated:
+- `AgentEval.GdprBenchmark.*` → `AgentEval.Compliance.Gdpr.*`
+- `AgentEval.EuAiActBenchmark.*` → `AgentEval.Compliance.EuAiAct.*`
+
+The previous parent namespace collided with the type name of the same name (`AgentEval.GdprBenchmark`
+was simultaneously a namespace AND the factory type name `GdprBenchmark`). The rename
+eliminates the collision at root and removes the 13 `using XxxBenchmarkFactory = …`
+disambiguation aliases that Phase 4 had to introduce. Two thin demo projects remain in
+`samples/AgentEval.GdprBenchmark.Demo/` and `samples/AgentEval.EuAiActBenchmark.Demo/`
+(~50 LOC each, consuming the promoted assemblies). Compliance lives outside the `Evals.*`
+namespace tree because regulations are *regulatory packages* (composing evaluator primitives
+into domain scenarios with audit-chain evidence + signed PDF reports), conceptually distinct
+from `Evals.*` *evaluator collections*. See ADR-017 §"Why compliance lives outside `Evals.*`".
+
+### Changed — `PerformanceBenchmark` relocated + `EvaluateAsync` adapter
+
+`PerformanceBenchmark` and its co-located result types (`LatencyBenchmarkResult`,
+`ThroughputBenchmarkResult`, `CostBenchmarkResult`, `PerformanceBenchmarkOptions`) moved
+from `src/AgentEval.Core/Benchmarks/` to a dedicated `src/AgentEval.Evals.Performance/`
+assembly. A new `EvaluateAsync(EvalInput, CancellationToken) → EvalResult` adapter
+(ADR-017 Convention 2) synthesises a 3-leaf `CompositeEval`-shape result (latency,
+throughput, cost) with `CapByWorst` aggregation:
+
+- **Latency** — `1 − (p99ms / threshold)` clamped [0, 1] (default threshold: 5000 ms)
+- **Throughput** — `min(rps / minRps, 1.0)` (default minRps: 0.5)
+- **Cost** — `1 − (cost / maxCost)` clamped [0, 1] (default maxCost: 0.10 USD); pass with
+  low severity when no pricing data is available for the model.
+
+Thresholds are tunable via `PerformanceBenchmarkOptions.EvaluateOptions`. Bespoke result
+records are preserved in `Provenance` for downstream consumers that want richer data. The
+adapter is what allows `bench perf` to write into the standard `.agenteval/` workspace
+alongside every other benchmark family. The legacy `src/AgentEval.Core/Benchmarks/` folder
+was removed (one-file ghost folder from a half-finished organisational idea).
+
+### Changed — `OwaspBenchmark.Top10ForRag()` refocused
+
+`Top10ForRag` was previously structurally identical to `Top10` (Quick intensity, 10-min
+timeout). It now runs at `Intensity.Comprehensive` with a 20-min timeout, sitting between
+`Top10` (Quick, 10-min) and `AuditGrade` (Comprehensive, 30-min). The RAG threat model:
+indirect-injection coverage from poisoned retrieved documents — an attacker needs only one
+working payload, so the defender needs *coverage depth* on injection techniques. The
+cost-tier classification shifts Medium → High to reflect the deeper probe coverage. **No
+API signature change**; programmatic callers see slower runs but materially deeper probe
+coverage. Two divergence-pinning tests (`Top10ForRag_IsMateriallyDistinctFromTop10_DeepProbeCoverage`
+and `Top10ForRag_ProbeDepth_MatchesAuditGrade_NotTop10`) prevent a future label-only
+regression. The LLM08 retrieval-corpus-poisoning probes remain a documented roadmap gap
+(LLM08 is a `skipped` leaf in `EvaluateAsync` output, same as `Top10`). Closes the Phase-5
+yellow item documented in `strategy/FutureFeatures/todo/lastreview/13-phase5-gate-review.md`.
+
+### Changed — `LongMemEvalBenchmark.Full()` no longer silently degrades
+
+`LongMemEvalBenchmark.Full()` previously silently fell back to the embedded subset when
+`LONGMEMEVAL_DATASET_PATH` was unset — a footgun for users who thought they were running
+the full ~500-question benchmark but were actually getting the 30-question stratified
+sample. v0.10.0-beta makes this an explicit failure: `Full()` now throws
+`InvalidOperationException` with a clear, actionable message (env-var name, download URL,
+pointer at `Subset()` for development use) when the env var is missing. Callers who want
+the embedded sample should use `Subset()` explicitly. This closes the Phase-7 follow-up
+item documented in `strategy/FutureFeatures/todo/lastreview/15-phase7-gate-review.md`. The
+behaviour change is technically breaking for any consumer that relied on the
+silent-degradation path, but the previous behaviour was unambiguously a footgun and
+0.x-beta semver permits this kind of correction.
+
+### Changed — `LongMemEvalBenchmarkRunner` defaults preset options at construction
+
+A new 3-arg `LongMemEvalBenchmarkRunner.Create(client, datasetPath, defaultOptions)`
+overload bakes the preset's `ExternalBenchmarkOptions` (`SubsetOptions` /
+`FullOptions`) into the runner instance, and a new 3-arg `RunAsync(agent, config, ct)`
+overload picks up `DefaultOptions` automatically. Callers no longer need to manually thread
+`SubsetOptions.RandomSeed` / `MaxQuestions` etc. through every call site — `Subset()` and
+`Full()` factory methods now pre-configure their runners correctly. Closes the Phase-7
+follow-up item where `SubsetOptions.RandomSeed` was effectively dead unless the caller
+manually wired it.
+
+### Breaking — `AgentEval.Compliance.{Gdpr,EuAiAct}.*` internal namespaces
+
+The internal namespace rename from `AgentEval.GdprBenchmark.*` to
+`AgentEval.Compliance.Gdpr.*` (and the equivalent for EuAiAct) is **breaking for any
+consumer that reached into the internal types** (`ArticlesRegistry`, pillars,
+`ScenarioToAtomicEval` configurations, domain packs). The public preset-factory entry
+point is unchanged at `AgentEval.Benchmarks.GdprBenchmark` (it was already moved to that
+namespace in v0.10.0-beta Phase 4). Migration: replace `using AgentEval.GdprBenchmark;`
+with `using AgentEval.Compliance.Gdpr;` (and the EuAiAct equivalent) when reaching for
+internal types. The compliance evidence schemas and embedded YAML article files moved with
+the rename — `gdpr-evidence.schema.json` is now embedded as
+`AgentEval.Compliance.Gdpr.Reporting.Schema.gdpr-evidence.schema.json` rather than
+`AgentEval.GdprBenchmark.Reporting.Schema.gdpr-evidence.schema.json`. Tests that load
+embedded resources by manifest-resource path string need to update.
+
+### Breaking — `PerformanceBenchmark` assembly relocation
+
+`PerformanceBenchmark` and its co-located result types moved from `AgentEval.Core.dll` to
+the new `AgentEval.Evals.Performance.dll`. The umbrella NuGet still ships both
+(`PrivateAssets="all"` embeds the sub-assembly), so consumers installing the `AgentEval`
+NuGet package see no change. **Consumers who hard-reference the internal `AgentEval.Core`
+assembly** (an unusual pattern but technically possible) need to add a reference to
+`AgentEval.Evals.Performance` as well. The namespace `AgentEval.Benchmarks` is unchanged.
+
+### Breaking — `LongMemEvalBenchmark.Full()` throws when env var unset
+
+See the Changed entry above. Any consumer that relied on the silent-degradation fallback
+(getting the embedded 30-question subset when `LONGMEMEVAL_DATASET_PATH` was unset) needs
+to switch to `LongMemEvalBenchmark.Subset()` explicitly or set the env var.
 
 ## [0.9.0-beta] - 2026-05-17
 

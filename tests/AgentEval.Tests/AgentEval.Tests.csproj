@@ -34,8 +34,9 @@
     <ProjectReference Include="..\..\src\AgentEval.RedTeam\AgentEval.RedTeam.csproj" />
     <ProjectReference Include="..\..\src\AgentEval\AgentEval.csproj" />
     <ProjectReference Include="..\..\src\AgentEval.Cli\AgentEval.Cli.csproj" />
-    <ProjectReference Include="..\..\samples\AgentEval.GdprBenchmark\AgentEval.GdprBenchmark.csproj" />
-    <ProjectReference Include="..\..\samples\AgentEval.EuAiActBenchmark\AgentEval.EuAiActBenchmark.csproj" />
+    <ProjectReference Include="..\..\src\AgentEval.Compliance.Gdpr\AgentEval.Compliance.Gdpr.csproj" />
+    <ProjectReference Include="..\..\src\AgentEval.Compliance.EuAiAct\AgentEval.Compliance.EuAiAct.csproj" />
+    <ProjectReference Include="..\..\src\AgentEval.Evals.Performance\AgentEval.Evals.Performance.csproj" />
     <ProjectReference Include="..\..\src\AgentEval.Evals.Agentic\AgentEval.Evals.Agentic.csproj" />
     <!-- MissionControl is net10.0-only (server project); guard the reference so older
          test target frameworks can still build the rest of the suite. -->
@@ -44,8 +45,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <EmbeddedResource Include="GdprBenchmark/Calibration/Golden/*.jsonl" />
-    <EmbeddedResource Include="EuAiActBenchmark/Calibration/Golden/*.jsonl" />
+    <EmbeddedResource Include="Compliance/Gdpr/Calibration/Golden/*.jsonl" />
+    <EmbeddedResource Include="Compliance/EuAiAct/Calibration/Golden/*.jsonl" />
     <EmbeddedResource Include="Agentic/Calibration/Golden/*.jsonl" />
   </ItemGroup>
 

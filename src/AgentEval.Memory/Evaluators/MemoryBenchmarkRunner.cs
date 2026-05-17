@@ -3,6 +3,7 @@
 
 using AgentEval.Core;
 using AgentEval.Memory.Engine;
+using AgentEval.Benchmarks;
 using AgentEval.Memory.Models;
 using AgentEval.Memory.Scenarios;
 using AgentEval.Memory.Temporal;

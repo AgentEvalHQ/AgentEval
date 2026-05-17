@@ -25,6 +25,15 @@ public class LongMemEvalBenchmarkRunner : IExternalBenchmarkRunner
     public string BenchmarkId => "longmemeval";
     public string DisplayName => "LongMemEval (ICLR 2025)";
 
+    /// <summary>
+    /// Preset-baked options that the runner uses when <c>RunAsync</c> is called via the
+    /// parameterless preset entry point (or when the caller passes <c>null</c> options).
+    /// Phase 8 (v0.10.0-beta): replaces the dead-<c>RandomSeed</c>/dead-<c>MaxQuestions</c>
+    /// footgun where Subset()/Full() returned a runner that ignored its preset configuration
+    /// unless the caller manually passed <c>LongMemEvalBenchmark.SubsetOptions</c>.
+    /// </summary>
+    public ExternalBenchmarkOptions? DefaultOptions { get; private set; }
+
     public LongMemEvalBenchmarkRunner(
         IChatClient chatClient,
         ILogger<LongMemEvalBenchmarkRunner>? logger = null)
@@ -39,6 +48,47 @@ public class LongMemEvalBenchmarkRunner : IExternalBenchmarkRunner
     /// </summary>
     public static LongMemEvalBenchmarkRunner Create(IChatClient chatClient, string? datasetPath = null)
         => new(chatClient) { _datasetPath = datasetPath };
+
+    /// <summary>
+    /// Factory method that bakes a preset's <see cref="ExternalBenchmarkOptions"/> into the
+    /// returned runner. Phase 8 (v0.10.0-beta) — fixes the dead-options footgun where
+    /// callers had to manually pass <c>LongMemEvalBenchmark.SubsetOptions</c> to get the
+    /// preset's intended sampling / seed behaviour.
+    /// </summary>
+    /// <param name="chatClient">Required <see cref="IChatClient"/> for the LLM judge.</param>
+    /// <param name="datasetPath">Optional path to the full LongMemEval dataset.</param>
+    /// <param name="defaultOptions">
+    /// Preset-baked options. When the caller invokes <c>RunAsync(agent, config)</c> (or
+    /// passes <c>null</c> for options on the full overload), these defaults are applied.
+    /// </param>
+    public static LongMemEvalBenchmarkRunner Create(
+        IChatClient chatClient,
+        string? datasetPath,
+        ExternalBenchmarkOptions? defaultOptions)
+        => new(chatClient) { _datasetPath = datasetPath, DefaultOptions = defaultOptions };
+
+    /// <summary>
+    /// Convenience overload that runs the benchmark using the runner's
+    /// <see cref="DefaultOptions"/>. Phase 8 (v0.10.0-beta): closes the dead-options
+    /// footgun where callers had to manually pass <c>LongMemEvalBenchmark.SubsetOptions</c>
+    /// to get the preset's intended sampling / seed behaviour.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">When <see cref="DefaultOptions"/> is null (runner was not constructed via the options-baking factory).</exception>
+    public Task<ExternalBenchmarkResult> RunAsync(
+        IEvaluableAgent agent,
+        AgentBenchmarkConfig config,
+        CancellationToken ct = default)
+    {
+        if (DefaultOptions is null)
+        {
+            throw new InvalidOperationException(
+                "LongMemEvalBenchmarkRunner.RunAsync(agent, config, ct) requires the runner to have been " +
+                "constructed via Create(client, datasetPath, defaultOptions) so DefaultOptions is populated. " +
+                "Either pass options explicitly via the 4-arg RunAsync overload, or use the preset factories " +
+                "in LongMemEvalBenchmark which bake the options for you.");
+        }
+        return RunAsync(agent, config, DefaultOptions, ct);
+    }
 
     /// <summary>
     /// Runs the LongMemEval benchmark.

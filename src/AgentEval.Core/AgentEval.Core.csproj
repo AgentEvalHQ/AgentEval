@@ -9,6 +9,9 @@
   <ItemGroup>
     <InternalsVisibleTo Include="AgentEval" />
     <InternalsVisibleTo Include="AgentEval.Tests" />
+    <!-- Phase 8 (v0.10.0-beta): Memory.Tests touches BenchmarkFamilyRegistry.Reset()
+         to isolate registry state between integration tests. Reset() is internal. -->
+    <InternalsVisibleTo Include="AgentEval.Memory.Tests" />
   </ItemGroup>
 
   <ItemGroup>

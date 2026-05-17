@@ -3,6 +3,7 @@
 
 using System.Text.Json;
 using AgentEval.Memory.Extensions;
+using AgentEval.Benchmarks;
 using AgentEval.Memory.Models;
 using AgentEval.Memory.Reporting;
 using static AgentEval.Memory.Models.MemoryBenchmarkResult;

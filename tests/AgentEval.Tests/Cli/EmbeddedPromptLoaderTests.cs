@@ -2,6 +2,7 @@
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 
+using AgentEval.Benchmarks;
 using AgentEval.Cli.Commands;
 using Xunit;
 
@@ -21,7 +22,7 @@ public class EmbeddedPromptLoaderTests
     public void Load_GdprJudgeSystemPrompt_ContainsCiteArticlesMarker()
     {
         var prompt = EmbeddedPromptLoader.Load(
-            typeof(AgentEval.GdprBenchmark.GdprBenchmark).Assembly,
+            typeof(AgentEval.Benchmarks.GdprBenchmark).Assembly,
             "gdpr-judge-system.v1.md");
 
         Assert.False(string.IsNullOrWhiteSpace(prompt),
@@ -38,7 +39,7 @@ public class EmbeddedPromptLoaderTests
     public void Load_EuAiActJudgeSystemPrompt_ContainsCiteArticlesMarker()
     {
         var prompt = EmbeddedPromptLoader.Load(
-            typeof(AgentEval.EuAiActBenchmark.EuAiActBenchmark).Assembly,
+            typeof(AgentEval.Benchmarks.EuAiActBenchmark).Assembly,
             "eu-ai-act-judge-system.v1.md");
 
         Assert.False(string.IsNullOrWhiteSpace(prompt),
@@ -57,7 +58,7 @@ public class EmbeddedPromptLoaderTests
     {
         Assert.Throws<InvalidOperationException>(() =>
             EmbeddedPromptLoader.Load(
-                typeof(AgentEval.GdprBenchmark.GdprBenchmark).Assembly,
+                typeof(AgentEval.Benchmarks.GdprBenchmark).Assembly,
                 "definitely-not-a-real-file.v9.md"));
     }
 
@@ -65,10 +66,10 @@ public class EmbeddedPromptLoaderTests
     public void Load_SameSuffixTwice_ReturnsCachedResult()
     {
         var first = EmbeddedPromptLoader.Load(
-            typeof(AgentEval.GdprBenchmark.GdprBenchmark).Assembly,
+            typeof(AgentEval.Benchmarks.GdprBenchmark).Assembly,
             "gdpr-judge-system.v1.md");
         var second = EmbeddedPromptLoader.Load(
-            typeof(AgentEval.GdprBenchmark.GdprBenchmark).Assembly,
+            typeof(AgentEval.Benchmarks.GdprBenchmark).Assembly,
             "gdpr-judge-system.v1.md");
 
         // Reference-equal proves the cache served the second call.

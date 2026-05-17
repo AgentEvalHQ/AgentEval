@@ -5,10 +5,10 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using AgentEval.Cli.Commands;
-using AgentEval.GdprBenchmark.Articles;
-using AgentEval.GdprBenchmark.Articles.Building;
-using AgentEval.GdprBenchmark.Articles.Loading;
-using AgentEval.GdprBenchmark.Reporting;
+using AgentEval.Compliance.Gdpr.Articles;
+using AgentEval.Compliance.Gdpr.Articles.Building;
+using AgentEval.Compliance.Gdpr.Articles.Loading;
+using AgentEval.Compliance.Gdpr.Reporting;
 using AgentEval.Output;
 using Xunit;
 
@@ -70,7 +70,7 @@ public class ComplianceRenderCommandTests : IDisposable
             SourceRun: new SourceRunRef("run-render-001", "sha256:" + new string('b', 64)),
             Controls: [],
             Summary: new EvidenceSummary(1, 1, 0, 0, "PASS"),
-            Attestation: new Attestation("0.0.0", null, "AgentEval.GdprBenchmark", "stub"));
+            Attestation: new Attestation("0.0.0", null, "AgentEval.Compliance.Gdpr", "stub"));
 
         var articleLeaf = new AgentEval.Evals.EvalResult(
             Metric: new("gdpr.art17.erasure-001", "scenario", "compliance", "1.0"),
@@ -107,7 +107,7 @@ public class ComplianceRenderCommandTests : IDisposable
                     ["gdpr.art17.erasure"] = new(0.90, "PASS", 1, 0, "high")
                 }),
             CriticalFindings: [],
-            Recommendations: Array.Empty<AgentEval.GdprBenchmark.Reporting.Recommendation>(),
+            Recommendations: Array.Empty<AgentEval.Compliance.Gdpr.Reporting.Recommendation>(),
             Disclaimer: GDPRComplianceReporter.Disclaimer,
             GdprAttestation: new GdprAttestation(
                 "mode-a",

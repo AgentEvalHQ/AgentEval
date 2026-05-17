@@ -820,6 +820,151 @@ All projects use `RootNamespace=AgentEval` so consumers see no namespace changes
 
 ---
 
+## Benchmark family registration
+
+> **Architecture established by [ADR-017](adr/017-unified-benchmarks-namespace.md), implemented in v0.10.0-beta.**
+
+AgentEval ships eight benchmark families — **Agentic, GDPR, EU AI Act, OWASP, MITRE, LongMemEval, Memory, Performance** — and is built to absorb future families (HIPAA, PCI-DSS, ISO 42001, NIS2, SOC 2, UK AI Bill, …) without touching the CLI or Mission Control. Every family plugs into a single source of truth: `AgentEval.Core.Benchmarks.BenchmarkFamilyRegistry`.
+
+This section documents how to add a benchmark family. Most consumers don't need this — they just `using AgentEval.Benchmarks;` and call the static factories. This section is for AgentEval contributors and third-party plugin authors.
+
+### Two registration shapes
+
+Benchmark families register in one of two shapes, depending on whether their natural result type fits the `EvalInput → EvalResult` envelope:
+
+#### Shape A — `CompositeEval`-native
+
+Most benchmark families (Agentic, GDPR, EU AI Act, OWASP, MITRE, Performance) ship a static factory class in the `AgentEval.Benchmarks` namespace whose preset methods return `CompositeEval`. The composite flows through the unified `EvaluateAsync(EvalInput) → EvalResult` pipeline (Convention 2).
+
+```csharp
+// Factory — partial class declared per-assembly, all under AgentEval.Benchmarks
+namespace AgentEval.Benchmarks;
+
+public static partial class OwaspBenchmark
+{
+    public static OwaspBenchmarkRun Top10(IEvaluator? judge = null) => /* ... */;
+    public static OwaspBenchmarkRun Smoke(IEvaluator? judge = null) => /* ... */;
+    public static OwaspBenchmarkRun AuditGrade(IEvaluator? judge = null) => /* ... */;
+    public static OwaspBenchmarkRun Top10ForRag(IEvaluator? judge = null) => /* ... */;
+}
+
+// Registration — internal, in the same assembly, runs on assembly load
+namespace AgentEval.RedTeam.Compliance;
+
+internal static class OwaspBenchmarkRegistration
+{
+    [ModuleInitializer]
+    public static void Register()
+    {
+        BenchmarkFamilyRegistry.Register(new BenchmarkFamily(
+            name: "owasp",
+            description: "OWASP LLM Top 10 v2.0 red-team benchmark",
+            defaultCostTier: CostTier.Medium,
+            presets:
+            [
+                new("top10",     "All 9 attacks at Quick intensity (default)", CostTier.Medium),
+                new("smoke",     "3 MVP attacks — CI-friendly",                 CostTier.Low),
+                new("audit",     "All 9 attacks at Comprehensive intensity",    CostTier.High),
+                new("top10-rag", "Comprehensive intensity, RAG-vector depth",  CostTier.High),
+            ],
+            runnerType: typeof(OwaspBenchmarkRun),
+            runnerFactory: preset => ResolvePresetRun(preset, judge: null),
+            evaluateAsync: async (input, judge, ct) =>
+            {
+                var presetName = input.Metadata?.TryGetValue("preset", out var p) == true
+                    ? p?.ToString() ?? "top10"
+                    : "top10";
+                var run = ResolvePresetRun(presetName, judge);
+                return await run.EvaluateAsync(input, ct);
+            },
+            docLinkUrl: "https://github.com/joslat/AgentEval/blob/main/docs/redteam/owasp.md",
+            owningAssemblyName: typeof(OwaspBenchmark).Assembly.GetName().Name));
+    }
+}
+```
+
+#### Shape B — external-dataset / multi-turn
+
+Some benchmarks don't fit the single-shot `EvalInput → EvalResult` shape because their natural semantics are "N questions → accuracy" (LongMemEval) or "stateful runner with required dependencies" (Memory). They register a runner type plus a runner factory; `EvaluateAsync` is null and the registry surfaces them in `bench --list` as Shape B.
+
+```csharp
+namespace AgentEval.Memory.External.LongMemEval;
+
+internal static class LongMemEvalBenchmarkRegistration
+{
+    [ModuleInitializer]
+    public static void Register()
+    {
+        BenchmarkFamilyRegistry.Register(new BenchmarkFamily(
+            name: "longmemeval",
+            description: "LongMemEval (ICLR 2025) — academic memory benchmark",
+            defaultCostTier: CostTier.Medium,
+            presets:
+            [
+                new("subset", "Embedded 30-question stratified sample", CostTier.Medium),
+                new("full",   "Full ~500-question dataset (requires download)", CostTier.High),
+            ],
+            runnerType: typeof(LongMemEvalBenchmarkRunner),
+            runnerFactory: preset =>
+            {
+                var client = LongMemEvalRunnerHostingContext.Current?.ChatClient
+                    ?? throw new InvalidOperationException("Populate LongMemEvalRunnerHostingContext first.");
+                return preset switch
+                {
+                    "subset" => LongMemEvalBenchmark.Subset(client),
+                    "full"   => LongMemEvalBenchmark.Full(client),
+                    _ => throw new ArgumentException($"Unknown preset '{preset}'.")
+                };
+            },
+            evaluateAsync: null,  // Shape B — semantics don't map onto (EvalInput) → EvalResult
+            docLinkUrl: "https://arxiv.org/abs/2410.10813",
+            owningAssemblyName: typeof(LongMemEvalBenchmark).Assembly.GetName().Name));
+    }
+}
+```
+
+Both shapes are equally first-class in `bench --list` — Shape B families just expose their custom runner type via `RunnerType` so CLI / Mission Control can produce typed-output hints.
+
+### The four conventions at a glance
+
+ADR-017 establishes four durable conventions that apply to every benchmark family, current and future:
+
+1. **Top-level factory namespace** = `AgentEval.Benchmarks`. The factory class is `public static partial class {Family}Benchmark`. Pinned by `BenchmarkNamespaceContractTests`.
+2. **`EvaluateAsync(EvalInput, CT) → EvalResult` adapter** is the canonical result-type homogenisation primitive. Every benchmark family that ships a non-`CompositeEval`-native result type (e.g. `LatencyBenchmarkResult`, `OWASPComplianceReport`, `MITREATLASReport`) provides this adapter so its results flow through the same `IRunOutputStore` / audit-chain / Mission Control rendering pipeline. The natural result type is preserved in `Provenance` for downstream consumers that want richer data. Pinned by `PerformanceBenchmarkAdapterTests` + `OwaspBenchmarkTests` round-trip + `MitreBenchmarkTests` round-trip.
+3. **`BenchmarkFamilyRegistry` is canonical**. Every family auto-registers via `[ModuleInitializer]`. The CLI / Mission Control read from the registry — there are no hardcoded family lists anywhere. Pinned by `BenchmarkFamilyRegistryTests` (12 tests) + `BenchListCommandTests.OutputComesFromRegistry` (extensibility test that registers a synthetic UUID-named family at runtime and asserts it appears in `bench --list`).
+4. **Opus gate-review after every phase** of an architectural arc. Process convention, not code. Sign-off docs live in `strategy/FutureFeatures/todo/lastreview/`.
+
+See [ADR-017 §"Conventions established by this ADR"](adr/017-unified-benchmarks-namespace.md#conventions-established-by-this-adr) for the full normative text and [§"Verification"](adr/017-unified-benchmarks-namespace.md#verification) for the contract-test mapping.
+
+### Adding a new benchmark family — 5-step walkthrough
+
+To add a new benchmark family (say, HIPAA compliance):
+
+1. **csproj** — Create `src/AgentEval.Compliance.Hipaa/` with `<RootNamespace>AgentEval.Compliance.Hipaa</RootNamespace>` and `<IsPackable>false</IsPackable>`. Reference `AgentEval.Abstractions` + `AgentEval.Core` (+ `AgentEval.DataLoaders` if loading embedded YAML/JSON). Add `PrivateAssets="all"` ProjectReference to it from `src/AgentEval/AgentEval.csproj` (the umbrella).
+2. **Factory** — Add `HipaaBenchmark.cs` with `namespace AgentEval.Benchmarks; public static partial class HipaaBenchmark { ... }`. Expose preset factory methods (`Standard()`, `Strict()`, etc.) returning `CompositeEval` for Shape A, or a runner type for Shape B.
+3. **`EvaluateAsync` adapter** (Shape A with bespoke result type only) — If your preset returns a custom result record alongside `EvalResult`, add an `EvaluateAsync(EvalInput, CancellationToken) → EvalResult` method that synthesises an `EvalResult` whose `SubResults` enumerate per-leaf metrics and preserves the custom record in `Provenance`.
+4. **Registration** — Add `HipaaBenchmarkRegistration.cs` with `internal static class HipaaBenchmarkRegistration { [ModuleInitializer] public static void Register() { BenchmarkFamilyRegistry.Register(new BenchmarkFamily(...)); } }`. Suppress CA2255 inline with a one-line justification comment.
+5. **Contract test inclusion** — Add `HipaaBenchmark` to the reflection enumerator in `BenchmarkNamespaceContractTests` (or just let the enumerator pick it up automatically — it scans `*Benchmark`-suffixed types across umbrella sub-assemblies). Add an integration test in `BenchmarkFamilyRegistryIntegrationTests` asserting the family registers on assembly load.
+
+Done. The CLI's `bench --list` will pick up the new family on next run; `bench hipaa --help` will enumerate its presets from the registry. No changes to `src/AgentEval.Cli/` are required.
+
+### OWASP preset cost gradient (concrete example)
+
+The four `OwaspBenchmark` presets demonstrate a clean depth/cost gradient on the same 9-attack roster:
+
+| Preset | Attacks | Intensity | Timeout | Cost tier | Use case |
+|---|---|---|---|---|---|
+| `Smoke` | 3 | Quick | 10 min | Low | CI-friendly quick check (PromptInjection + Jailbreak + PIILeakage) |
+| `Top10` | 9 | Quick | 10 min | Medium | Standard OWASP LLM Top 10 sweep |
+| `Top10ForRag` | 9 | **Comprehensive** | **20 min** | **High** | RAG threat model — indirect-injection coverage depth |
+| `AuditGrade` | 9 | Comprehensive | 30 min | High | Full audit-grade evidence pack |
+
+`Top10ForRag` sits between `Top10` and `AuditGrade` — same Comprehensive intensity as `AuditGrade` (an attacker needs only one working poisoned-document payload, so the defender needs *coverage depth* on injection techniques), but a tighter 20-minute timeout to differentiate it as RAG-triage rather than audit-grade evidence. Two divergence-pinning tests (`Top10ForRag_IsMateriallyDistinctFromTop10_DeepProbeCoverage` + `Top10ForRag_ProbeDepth_MatchesAuditGrade_NotTop10`) prevent future regressions from collapsing it back to a label-only duplicate of `Top10`.
+
+The cost-tier gradient (Low → Medium → High → High) is surfaced by `bench --list` so operators can pick the right preset for their CI / pre-merge / audit-pipeline budgets without having to read the source.
+
+---
+
 ## See Also
 
 - [Extensibility Guide](extensibility.md) - Creating custom metrics and plugins
@@ -827,3 +972,4 @@ All projects use `RootNamespace=AgentEval` so consumers see no namespace changes
 - [Benchmarks Guide](benchmarks.md) - Running standard benchmarks
 - [Metrics Reference](metrics-reference.md) - Complete metric catalog
 - [Evaluation Guide](evaluation-guide.md) - Metric selection guidance
+- [ADR-017: Unified Benchmarks Namespace](adr/017-unified-benchmarks-namespace.md) - Architectural rationale for the registry + namespace + conventions

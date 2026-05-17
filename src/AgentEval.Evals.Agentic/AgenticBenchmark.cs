@@ -22,7 +22,7 @@ using AgentEval.Evals.Agentic.Telemetry;
 using AgentEval.Evals.Agentic.Composition;
 using AgentEval.Evals.Agentic.UX;
 
-namespace AgentEval.Evals.Agentic;
+namespace AgentEval.Benchmarks;
 
 /// <summary>
 /// Top-level factory methods for agentic benchmark presets.
@@ -43,7 +43,7 @@ namespace AgentEval.Evals.Agentic;
 /// </list>
 /// </para>
 /// </summary>
-public static class AgenticBenchmark
+public static partial class AgenticBenchmark
 {
     /// <summary>
     /// Builds the Agentic Execution preset: 6 evaluators with canonical weights covering
