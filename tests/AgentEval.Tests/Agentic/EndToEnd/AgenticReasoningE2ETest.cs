@@ -4,10 +4,10 @@
 
 using AgentEval.Core;
 using AgentEval.Evals;
+using AgentEval.Evals.Agentic;
 using AgentEval.Evals.Agentic.Composition;
 using AgentEval.Output;
 using Xunit;
-using AgenticBenchmarkFactory = AgentEval.Evals.Agentic.Composition.AgenticBenchmark;
 
 namespace AgentEval.Tests.Agentic.EndToEnd;
 
@@ -37,7 +37,7 @@ public class AgenticReasoningE2ETest
     public void Reasoning_HasExpected4Components()
     {
         var judge = new StubEvaluator(100);
-        var benchmark = AgenticBenchmarkFactory.Reasoning(judge);
+        var benchmark = AgenticBenchmark.Reasoning(judge);
 
         Assert.Equal(4, benchmark.Components.Count);
     }
@@ -48,7 +48,7 @@ public class AgenticReasoningE2ETest
         var store = new InMemoryOutputStore();
         var subject = new SubjectIdentity(SubjectKind.Agent, "E2E-ReasoningAgent");
         var judge = new StubEvaluator(100);
-        var benchmark = AgenticBenchmarkFactory.Reasoning(judge);
+        var benchmark = AgenticBenchmark.Reasoning(judge);
         var runner = new AgenticBenchmarkRunner();
 
         var input = new EvalInput(

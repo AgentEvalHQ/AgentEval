@@ -276,7 +276,7 @@ public static class MissionControlFixtureBuilder
     {
         var manifest = await store.StartRunAsync(subject, new RunContext(
             EvalProject: "Foundry.Agentic",
-            EvalProjectPath: "samples/AgentEval.AgenticBenchmark",
+            EvalProjectPath: "src/AgentEval.Evals.Agentic",
             Harness: "agentic-execution",
             Seed: 7,
             ParentInvocationId: null,
@@ -307,7 +307,7 @@ public static class MissionControlFixtureBuilder
     {
         var manifest = await store.StartRunAsync(subject, new RunContext(
             EvalProject: "Memory.Recall",
-            EvalProjectPath: "samples/AgentEval.AgenticBenchmark/Memory",
+            EvalProjectPath: "src/AgentEval.Evals.Agentic/Memory",
             Harness: "memory",
             Seed: 11,
             ParentInvocationId: null,

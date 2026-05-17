@@ -4,11 +4,11 @@
 
 using AgentEval.Core;
 using AgentEval.Evals;
+using AgentEval.Evals.Agentic;
 using AgentEval.Evals.Agentic.Composition;
 using AgentEval.Evals.Agentic.Reporting;
 using AgentEval.Output;
 using Xunit;
-using AgenticBenchmarkFactory = AgentEval.Evals.Agentic.Composition.AgenticBenchmark;
 
 namespace AgentEval.Tests.Agentic.EndToEnd;
 
@@ -44,7 +44,7 @@ public class AgenticExecutionE2ETest
     public void AgenticExecution_CompositeHas6Components()
     {
         var judge = new StubEvaluator(100);
-        var benchmark = AgenticBenchmarkFactory.AgenticExecution(judge);
+        var benchmark = AgenticBenchmark.AgenticExecution(judge);
 
         // The AgenticExecution preset defines 6 top-level component evaluators.
         Assert.Equal(6, benchmark.Components.Count);
@@ -56,7 +56,7 @@ public class AgenticExecutionE2ETest
         var store = new InMemoryOutputStore();
         var subject = new SubjectIdentity(SubjectKind.Agent, "E2E-AgenticAgent");
         var judge = new StubEvaluator(100);
-        var benchmark = AgenticBenchmarkFactory.AgenticExecution(judge);
+        var benchmark = AgenticBenchmark.AgenticExecution(judge);
         var runner = new AgenticBenchmarkRunner();
 
         var input = new EvalInput(
@@ -82,7 +82,7 @@ public class AgenticExecutionE2ETest
         var store = new InMemoryOutputStore();
         var subject = new SubjectIdentity(SubjectKind.Agent, "E2E-AgenticAgent2");
         var judge = new StubEvaluator(100);
-        var benchmark = AgenticBenchmarkFactory.AgenticExecution(judge);
+        var benchmark = AgenticBenchmark.AgenticExecution(judge);
         var runner = new AgenticBenchmarkRunner();
 
         var input = new EvalInput(Query: "Test", Response: "Response");
@@ -104,7 +104,7 @@ public class AgenticExecutionE2ETest
         var store = new InMemoryOutputStore();
         var subject = new SubjectIdentity(SubjectKind.Agent, "E2E-AgenticAgent3");
         var judge = new StubEvaluator(100);
-        var benchmark = AgenticBenchmarkFactory.AgenticExecution(judge);
+        var benchmark = AgenticBenchmark.AgenticExecution(judge);
         var runner = new AgenticBenchmarkRunner();
 
         var input = new EvalInput(Query: "Test", Response: "Response");

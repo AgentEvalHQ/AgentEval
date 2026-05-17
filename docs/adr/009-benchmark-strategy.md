@@ -1,7 +1,9 @@
 # ADR-009: Benchmark Strategy
 
 ## Status
-**Accepted**
+**Superseded** (2026-05-17) — the v0.9.0-beta release removed the library-API `AgenticBenchmark` class described below (with `RunToolAccuracyBenchmarkAsync` / `RunTaskCompletionBenchmarkAsync` / `RunMultiStepReasoningBenchmarkAsync`) and replaced it with the preset-factory `AgentEval.Evals.Agentic.AgenticBenchmark` covering ~60 evaluators across 11 presets. The strategy described here was correct for v0.3-v0.8 betas; today the canonical agentic benchmark surface lives in `AgentEval.Evals.Agentic` and is driven via `agenteval bench agentic --preset X`. `PerformanceBenchmark` (the in-process latency/throughput/cost measurement) remains as documented.
+
+Originally accepted: 2026-01-13.
 
 ## Date
 2026-01-13

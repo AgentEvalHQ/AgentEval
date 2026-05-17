@@ -190,7 +190,7 @@ agenteval render --benchmark agentic --subject MyTravelAgent
 
 ## Preset Reference
 
-Each preset is a `static CompositeEval` factory in `AgenticBenchmark` (`src/AgentEval.Evals.Agentic/Composition/AgenticBenchmark.cs`).
+Each preset is a `static CompositeEval` factory in `AgenticBenchmark` (`src/AgentEval.Evals.Agentic/AgenticBenchmark.cs`).
 
 | Preset | CLI name | Components | Pass threshold | Intended use |
 |--------|----------|------------|----------------|--------------|

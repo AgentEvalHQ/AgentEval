@@ -5,6 +5,8 @@
 using AgentEval.Core;
 using AgentEval.Evals;
 using AgentEval.Evals.Agentic.Adversarial;
+// Imported for the <see cref="AgenticBenchmarkRunner"/> XML-doc references below — the
+// runner lives in Composition/ while this factory now sits at the project root.
 using AgentEval.Evals.Agentic.Calibration;
 using AgentEval.Evals.Agentic.JudgeQuality;
 using AgentEval.Evals.Agentic.Memory;
@@ -17,9 +19,10 @@ using AgentEval.Evals.Agentic.Safety.Policy;
 using AgentEval.Evals.Agentic.StochasticStability;
 using AgentEval.Evals.Agentic.System;
 using AgentEval.Evals.Agentic.Telemetry;
+using AgentEval.Evals.Agentic.Composition;
 using AgentEval.Evals.Agentic.UX;
 
-namespace AgentEval.Evals.Agentic.Composition;
+namespace AgentEval.Evals.Agentic;
 
 /// <summary>
 /// Top-level factory methods for agentic benchmark presets.

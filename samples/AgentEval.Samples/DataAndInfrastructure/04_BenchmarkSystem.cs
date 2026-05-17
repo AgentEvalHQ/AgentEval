@@ -4,35 +4,35 @@
 using Azure.AI.OpenAI;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
-using AgentEval.Benchmarks;
+using AgentEval.Core;
 using AgentEval.DataLoaders;
-using AgentEval.MAF;
-using AgentEval.Models;
+using AgentEval.Evals;
+using AgentEval.Evals.Agentic;
 using System.ComponentModel;
-using ChatOptions = Microsoft.Extensions.AI.ChatOptions;
 
 namespace AgentEval.Samples;
 
 /// <summary>
-/// Sample F4: Benchmark System — Real Performance &amp; Agentic Benchmarking
-/// 
-/// This sample shows how to use AgentEval's benchmark classes against a
-/// real Azure OpenAI-backed agent, loading test data from JSONL files
-/// via <see cref="DatasetLoaderFactory"/> (the industry-standard format
-/// for AI benchmark datasets — used by BFCL, GAIA, MMLU, GSM8K, etc.).
-/// 
+/// Sample F4: Benchmark System — Real Agentic Benchmarking with Preset Factories
+///
+/// This sample shows how to use AgentEval's agentic preset factory against a real
+/// Azure OpenAI-backed agent, loading test prompts from a JSONL file via
+/// <see cref="DatasetLoaderFactory"/> (the industry-standard format for AI benchmark
+/// datasets — used by BFCL, GAIA, MMLU, GSM8K, etc.).
+///
 /// It demonstrates:
-///   1. Loading all 3 JSONL dataset types (latency, cost, tool-accuracy)
-///   2. Converting <see cref="AgentEval.Models.DatasetTestCase"/> to benchmark types via bridge extensions
-///   3. Running a tool accuracy benchmark as the showcase (full JSONL → bridge → benchmark pipeline)
-/// 
-/// Only one benchmark type is executed to keep API costs low while still
-/// proving the complete data loading and conversion pipeline.
-/// 
-/// Everything here is REAL: actual LLM calls, actual measurements, actual results.
-/// Test data is loaded from <c>samples/datasets/benchmark-*.jsonl</c> files.
-/// No hardcoded fallbacks — JSONL datasets must be present.
-/// 
+///   1. Loading test prompts from JSONL via <see cref="DatasetLoaderFactory"/>
+///   2. Building a <see cref="CompositeEval"/> via the agentic preset factory
+///      (<see cref="AgenticBenchmark.ToolCallAccuracy"/>)
+///   3. Running the agent against each prompt and evaluating its response with the preset
+///   4. Printing per-scenario + aggregate verdicts from the composite tree
+///
+/// The agentic suite supersedes AgentEval's prior library-API benchmark surface
+/// (removed in v0.9.0-beta). For a full pipeline with audit-chain evidence, PDF reports,
+/// and Mission Control integration, prefer the CLI:
+///
+///     agenteval bench agentic --preset tool-call-accuracy --subject MyAgent
+///
 /// Requires: AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_API_KEY, AZURE_OPENAI_DEPLOYMENT
 /// ⏱️ Time to understand: 5 minutes
 /// ⏱️ Time to run: ~15–30 seconds (depends on model latency)
@@ -52,39 +52,53 @@ public static class BenchmarkSystem
         Console.WriteLine($"   Endpoint: {AIConfig.Endpoint}");
         Console.WriteLine($"   Model:    {AIConfig.ModelDeployment}\n");
 
-        // ── Create a real agent with tools ──────────────────────────────────
+        // ── Build the agent + a judge (the second model that grades responses) ────
         var agent = CreateAgentWithTools();
-        var adapter = new MAFAgentAdapter(agent);
+        var judge = CreateJudgeEvaluator();
 
-        // ── Load benchmark datasets from JSONL ─────────────────────────────
-        // Demonstrates loading from all 3 JSONL dataset types via DatasetLoaderFactory.
-        // This proves the JSONL → DatasetTestCase pipeline works for all benchmark types.
-        Console.WriteLine("Loading benchmark datasets from JSONL...\n");
+        // ── Load test prompts from JSONL ─────────────────────────────────────────
+        // DatasetLoaderFactory understands the industry-standard JSONL shape used
+        // by BFCL, GAIA, MMLU, GSM8K, ToolBench, etc.
+        Console.WriteLine("Loading benchmark prompts from JSONL...\n");
+        var prompts = await LoadPromptsFromJsonl("benchmark-tool-accuracy.jsonl");
+        Console.WriteLine($"   Loaded {prompts.Count} prompts\n");
 
-        var latencyPrompts = await LoadPromptsFromJsonl("benchmark-latency.jsonl");
-        var costPrompts = await LoadPromptsFromJsonl("benchmark-cost.jsonl");
-        var toolCases = await LoadToolAccuracyCases("benchmark-tool-accuracy.jsonl");
+        // ── Build the agentic Tool-Call-Accuracy preset ──────────────────────────
+        // The preset factory composes 5 sub-evaluators (selection, input accuracy,
+        // output utilization, success, efficiency) into one CompositeEval with
+        // canonical weights — same as the CLI's `--preset tool-call-accuracy`.
+        var preset = AgenticBenchmark.ToolCallAccuracy(judge, judgeModel: AIConfig.ModelDeployment);
 
-        Console.WriteLine($"   Loaded {latencyPrompts.Count} latency prompts");
-        Console.WriteLine($"   Loaded {costPrompts.Count} cost prompts");
-        Console.WriteLine($"   Loaded {toolCases.Count} tool accuracy test cases\n");
+        Console.WriteLine($"Running Tool-Call-Accuracy preset against {prompts.Count} prompts\n");
 
-        // ── Run Tool Accuracy Benchmark (showcase) ──────────────────────────
-        // We run only the tool accuracy benchmark here to keep API costs low.
-        // It demonstrates the full pipeline: JSONL → DatasetTestCase → bridge → benchmark.
-        // See PerformanceBenchmark for latency/throughput/cost benchmarks.
-        Console.WriteLine("Running Tool Accuracy Benchmark (JSONL → bridge → benchmark)\n");
+        // ── Run the agent against each prompt, then evaluate the response ────────
+        int passed = 0;
+        for (int i = 0; i < prompts.Count; i++)
+        {
+            var prompt = prompts[i];
+            var response = await agent.RunAsync(prompt);
+            var responseText = response.Text ?? string.Empty;
 
-        var agenticBenchmark = new AgenticBenchmark(adapter, evaluator: null,
-            new AgenticBenchmarkOptions { Verbose = true });
+            // EvalInput carries the user query + agent response into every sub-evaluator.
+            // For richer scenarios (multi-turn, tool traces) you would also populate
+            // EvalInput.Metadata with the structured trace data — see the CLI for examples.
+            var input = new EvalInput(Query: prompt, Response: responseText);
+            var result = await preset.EvaluateAsync(input);
 
-        var toolResult = await agenticBenchmark.RunToolAccuracyBenchmarkAsync(toolCases);
+            var icon = result.Score.Passed ? "PASS" : "FAIL";
+            Console.WriteLine($"   [{icon}] [{i + 1,2}/{prompts.Count}] {Truncate(prompt, 60)}  score={result.Score.Value:F2}");
+            if (result.Score.Passed) passed++;
+        }
 
-        PrintToolAccuracyResults(toolResult);
+        // ── Summary ─────────────────────────────────────────────────────────────
+        Console.WriteLine();
+        Console.WriteLine("   +----------------------------------------------------------+");
+        Console.WriteLine("   |             TOOL-CALL-ACCURACY PRESET RESULTS            |");
+        Console.WriteLine("   +----------------------------------------------------------+");
+        Console.WriteLine($"   |  Passed / Total:         {passed,4} / {prompts.Count,-24}|");
+        Console.WriteLine($"   |  Overall Accuracy:       {(double)passed / Math.Max(1, prompts.Count),27:P1}   |");
+        Console.WriteLine("   +----------------------------------------------------------+");
 
-        // ── Summary ─────────────────────────────────────────────────────────
-        Console.WriteLine($"\n   SUMMARY: {toolResult.PassedTests}/{toolResult.TotalTests} tool accuracy tests passed ({toolResult.OverallAccuracy:P0})");
-        Console.WriteLine($"   Loaded {latencyPrompts.Count + costPrompts.Count + toolCases.Count} total items from 3 JSONL files");
         PrintKeyTakeaways();
     }
 
@@ -109,23 +123,6 @@ public static class BenchmarkSystem
     }
 
     /// <summary>
-    /// Loads tool accuracy test cases from a JSONL file via <see cref="DatasetLoaderFactory"/>,
-    /// converting each <see cref="DatasetTestCase"/> to a <see cref="ToolAccuracyTestCase"/>
-    /// using the <see cref="DatasetTestCaseBenchmarkExtensions.ToToolAccuracyTestCase"/> bridge.
-    /// </summary>
-    private static async Task<List<ToolAccuracyTestCase>> LoadToolAccuracyCases(string fileName)
-    {
-        var path = ResolveDatasetPath(fileName)
-            ?? throw new FileNotFoundException(
-                $"Benchmark dataset not found: {fileName}. " +
-                $"Ensure the file exists in samples/datasets/. " +
-                $"See docs/benchmarks.md for JSONL format details.");
-
-        var dataset = await DatasetLoaderFactory.LoadAsync(path);
-        return dataset.Select(dc => dc.ToToolAccuracyTestCase()).ToList();
-    }
-
-    /// <summary>
     /// Resolves a dataset file path relative to the samples/datasets directory.
     /// </summary>
     private static string? ResolveDatasetPath(string fileName)
@@ -142,7 +139,7 @@ public static class BenchmarkSystem
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
-    // Agent Setup
+    // Agent + Judge Setup
     // ═══════════════════════════════════════════════════════════════════════════
 
     private static AIAgent CreateAgentWithTools()
@@ -160,6 +157,16 @@ public static class BenchmarkSystem
             ]);
     }
 
+    private static IEvaluator CreateJudgeEvaluator()
+    {
+        // The judge is a second LLM call that grades the agent's response against the
+        // preset's rubric. Same Azure deployment is used here for simplicity; in production
+        // you would typically use a stronger judge model than the system under test.
+        var azureClient = new AzureOpenAIClient(AIConfig.Endpoint, AIConfig.KeyCredential);
+        var judgeChatClient = azureClient.GetChatClient(AIConfig.ModelDeployment).AsIChatClient();
+        return new ChatClientEvaluator(judgeChatClient);
+    }
+
     [Description("Get current weather for a city")]
     private static string GetWeather([Description("City name")] string city) =>
         $"The weather in {city} is 18°C and partly cloudy.";
@@ -169,41 +176,18 @@ public static class BenchmarkSystem
         $"Result of {expression} = (calculated)";
 
     // ═══════════════════════════════════════════════════════════════════════════
-    // Result Printers
+    // Helpers
     // ═══════════════════════════════════════════════════════════════════════════
 
-    private static void PrintToolAccuracyResults(ToolAccuracyResult r)
-    {
-        Console.WriteLine();
-        foreach (var t in r.Results)
-        {
-            var icon = t.Passed ? "PASS" : "FAIL";
-            Console.Write($"      [{icon}] {t.TestCaseName}");
-            if (t.ToolsMissed.Count > 0)
-                Console.Write($"  (missed: {string.Join(", ", t.ToolsMissed)})");
-            if (t.ParameterErrors.Count > 0)
-                Console.Write($"  (params: {string.Join("; ", t.ParameterErrors)})");
-            if (!string.IsNullOrEmpty(t.Error))
-                Console.Write($"  (error: {t.Error})");
-            Console.WriteLine();
-        }
-
-        Console.WriteLine();
-        Console.WriteLine("   +----------------------------------------------------------+");
-        Console.WriteLine("   |             TOOL ACCURACY BENCHMARK RESULTS              |");
-        Console.WriteLine("   +----------------------------------------------------------+");
-        Console.WriteLine($"   |  Passed / Total:         {r.PassedTests,4} / {r.TotalTests,-24}|");
-        Console.WriteLine($"   |  Overall Accuracy:       {r.OverallAccuracy,27:P1}   |");
-        Console.WriteLine("   +----------------------------------------------------------+");
-    }
-
+    private static string Truncate(string s, int max) =>
+        s.Length <= max ? s : s[..(max - 1)] + "…";
 
     private static void PrintHeader()
     {
         Console.WriteLine();
         Console.WriteLine("+============================================================================+");
         Console.WriteLine("|                    Sample F4: Benchmark System                              |");
-        Console.WriteLine("|          Real Performance & Agentic Benchmarks with AgentEval               |");
+        Console.WriteLine("|       Real Agentic Benchmarking with Preset Factories (v0.9.0-beta+)        |");
         Console.WriteLine("+============================================================================+");
         Console.WriteLine();
     }
@@ -221,11 +205,13 @@ public static class BenchmarkSystem
     private static void PrintKeyTakeaways()
     {
         Console.WriteLine("\n   KEY TAKEAWAYS:");
-        Console.WriteLine("   - Test data loaded from JSONL files via DatasetLoaderFactory (industry standard!)");
-        Console.WriteLine("   - DatasetTestCase → ToolAccuracyTestCase bridge enables JSONL → Benchmark pipeline");
-        Console.WriteLine("   - PerformanceBenchmark provides latency percentiles and cost estimation");
-        Console.WriteLine("   - AgenticBenchmark verifies tool selection against declared expectations");
-        Console.WriteLine("   - All data shown above comes from REAL LLM calls — no faked numbers");
-        Console.WriteLine("\n   NEXT: Explore Sample B5 for calibrated evaluation!\n");
+        Console.WriteLine("   - Test data loaded from JSONL files via DatasetLoaderFactory (industry standard)");
+        Console.WriteLine("   - AgenticBenchmark.ToolCallAccuracy(judge) returns a CompositeEval composed of");
+        Console.WriteLine("     5 sub-evaluators with canonical weights; same as the CLI preset");
+        Console.WriteLine("   - For full pipeline with audit-chain evidence + PDF reports, use the CLI:");
+        Console.WriteLine("       agenteval bench agentic --preset tool-call-accuracy --subject MyAgent");
+        Console.WriteLine("   - Other presets: agentic-execution, rag-quality, safety, conversational,");
+        Console.WriteLine("     reasoning, user-experience, adversarial-direct, telemetry, judge-quality");
+        Console.WriteLine("\n   NEXT: Explore Sample B5 for calibrated evaluation, or run `agenteval bench`!\n");
     }
 }

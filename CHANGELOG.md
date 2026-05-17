@@ -7,6 +7,57 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+(no unreleased changes)
+
+## [0.9.0-beta] - 2026-05-17
+
+### Removed (BREAKING) — Legacy `AgenticBenchmark` library API
+
+Removed the entire pre-v0.9.0 library-API benchmark surface. The new agentic preset-factory API (`AgentEval.Evals.Agentic.AgenticBenchmark` + the ~60-evaluator suite, driven via `agenteval bench agentic --preset X`) is the canonical replacement and is strictly more capable.
+
+**Types removed** (all were in `AgentEval.Benchmarks` namespace, shipped in v0.3.0-beta through v0.8.1-beta):
+- `AgenticBenchmark` (the library runner class with `RunToolAccuracyBenchmarkAsync`, `RunTaskCompletionBenchmarkAsync`, `RunMultiStepReasoningBenchmarkAsync` methods)
+- `AgenticBenchmarkOptions`
+- `ToolAccuracyTestCase`, `ExpectedTool`, `ToolAccuracyResult`, `ToolAccuracyTestResult`
+- `TaskCompletionTestCase`, `TaskCompletionResult`, `TaskCompletionTestResult`
+- `MultiStepTestCase`, `ExpectedStep`, `MultiStepReasoningResult`, `MultiStepTestResult`, `StepResult`
+
+**Extension methods removed** (in `AgentEval.DataLoaders`):
+- `DatasetTestCase.ToToolAccuracyTestCase()`
+- `DatasetTestCase.ToTaskCompletionTestCase()`
+
+**Migration**
+
+| Legacy v0.3-v0.8 | v0.9.0-beta+ |
+|---|---|
+| `new AgenticBenchmark(adapter).RunToolAccuracyBenchmarkAsync(cases)` | `AgenticBenchmark.ToolCallAccuracy(judge)` returning a `CompositeEval` you evaluate against `EvalInput` |
+| `new AgenticBenchmark(adapter, evaluator).RunTaskCompletionBenchmarkAsync(cases)` | `AgenticBenchmark.AgenticExecution(judge)` (covers task completion + adherence + intent + tool accuracy + navigation) |
+| `new AgenticBenchmark(adapter).RunMultiStepReasoningBenchmarkAsync(cases)` | `AgenticBenchmark.Reasoning(judge)` (4 evaluators: correctness, intermediate-step hallucination, plan formulation, goal decomposition) |
+| `dc.ToToolAccuracyTestCase()` | Load prompts via `DatasetLoaderFactory`, build `EvalInput(query, response)` directly |
+| `dc.ToTaskCompletionTestCase()` | Same — `EvalInput` is the unified shape across all agentic evaluators |
+
+For a full migration example see [`samples/AgentEval.Samples/DataAndInfrastructure/04_BenchmarkSystem.cs`](samples/AgentEval.Samples/DataAndInfrastructure/04_BenchmarkSystem.cs) — rewritten against the new API in this release.
+
+**Why now**: the legacy class shipped 3 hard-coded benchmark kinds with bespoke result records and no audit-chain integration. The new preset-factory API covers 11 presets + 60 evaluators, integrates with the CLI / `.agenteval/` workspace / Mission Control portal / calibration tooling, and shares the unified `EvalResult` envelope with every other AgentEval evaluator. Keeping the legacy surface alongside the new one would have permanently fragmented the public API and added maintenance burden on a feature with no remaining advocates. Semver `0.x` permits breaking minor bumps; v0.9.0-beta is the natural cut point.
+
+**`PerformanceBenchmark` (the in-process latency/throughput/cost measurement) is unchanged** and remains in `AgentEval.Benchmarks` namespace.
+
+### Changed — `AgenticBenchmark` namespace moved
+
+The preset-factory `AgenticBenchmark` (introduced in v0.8.x) moved from `AgentEval.Evals.Agentic.Composition` to `AgentEval.Evals.Agentic`. Consumers using fully-qualified references or `using AgentEval.Evals.Agentic.Composition;` to reach the preset factory must update:
+
+```csharp
+// Before
+using AgentEval.Evals.Agentic.Composition;
+var preset = AgenticBenchmark.ToolCallAccuracy(judge);
+
+// After
+using AgentEval.Evals.Agentic;
+var preset = AgenticBenchmark.ToolCallAccuracy(judge);
+```
+
+The companion infrastructure types (`AgenticBenchmarkRunner`, `CostFilteredCompositeBuilder`) remain in `AgentEval.Evals.Agentic.Composition`. The rename better reflects that `AgenticBenchmark` is a top-level entry point (matching `GdprBenchmark` and `EuAiActBenchmark` which both sit at their respective project roots).
+
 ### Added — Pre-merge polish from last-review parallel Opus sweep (2026-05-16)
 
 Eight merge-critical items (M1-M8) plus four pulled-forward v1.1 items (1.5 / 1.6 / 1.7 / 3.2) landed in the pre-merge bundle. See `strategy/FutureFeatures/todo/lastreview/00-summary.md` for the full audit trail.

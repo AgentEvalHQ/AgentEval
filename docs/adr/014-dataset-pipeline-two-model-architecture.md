@@ -160,7 +160,7 @@ Introduce `TestCaseSource { FromFile(DatasetTestCase), Inline(TestCase) }` and h
 - Property names intentionally diverge: `Name` (required) vs `Id` (optional), `ExpectedOutputContains` vs `ExpectedOutput`. These are different semantics, not aliases.
 - `Metadata` nullability differs: `IDictionary<string, object>?` vs `Dictionary<string, object?>`. Neither contract can be weakened without downstream impact.
 - Only 2 properties (`Input`, `ExpectedTools`) actually share both name and type â€” too thin for a useful abstraction.
-- Existing benchmark test case types (`ToolAccuracyTestCase`, `TaskCompletionTestCase`, `MultiStepTestCase`) already don't share a base. Introducing inheritance only here would be architecturally inconsistent.
+- Historical context: when this ADR was authored (pre-v0.9.0-beta), the legacy `AgenticBenchmark` library API exposed three test-case types (`ToolAccuracyTestCase`, `TaskCompletionTestCase`, `MultiStepTestCase`) that already didn't share a base. The decision-context against inheritance has only become stronger since: in v0.9.0-beta those three types were removed and replaced with a single unified `EvalInput` flowing through every agentic preset.
 - Extensibility for custom dataset formats is already covered by `IDatasetLoader` (the interface) and `Metadata` (the bag). Subclassing `DatasetTestCase` adds no value `IDatasetLoader` doesn't already provide.
 ---
 

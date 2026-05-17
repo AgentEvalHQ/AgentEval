@@ -4,10 +4,10 @@
 
 using AgentEval.Core;
 using AgentEval.Evals;
+using AgentEval.Evals.Agentic;
 using AgentEval.Evals.Agentic.Composition;
 using AgentEval.Output;
 using Xunit;
-using AgenticBenchmarkFactory = AgentEval.Evals.Agentic.Composition.AgenticBenchmark;
 
 namespace AgentEval.Tests.Agentic.EndToEnd;
 
@@ -29,7 +29,7 @@ public class AgenticJudgeQualityE2ETest
     [Fact]
     public void JudgeQuality_HasExpectedComponents()
     {
-        var benchmark = AgenticBenchmarkFactory.JudgeQuality();
+        var benchmark = AgenticBenchmark.JudgeQuality();
 
         // JudgeQuality preset defines exactly 3 top-level component evaluators.
         Assert.Equal(3, benchmark.Components.Count);
@@ -40,7 +40,7 @@ public class AgenticJudgeQualityE2ETest
     {
         var store = new InMemoryOutputStore();
         var subject = new SubjectIdentity(SubjectKind.Agent, "E2E-JudgeQualityAgent");
-        var benchmark = AgenticBenchmarkFactory.JudgeQuality();
+        var benchmark = AgenticBenchmark.JudgeQuality();
         var runner = new AgenticBenchmarkRunner();
 
         // Supply all three metadata keys required by the meta-evaluators

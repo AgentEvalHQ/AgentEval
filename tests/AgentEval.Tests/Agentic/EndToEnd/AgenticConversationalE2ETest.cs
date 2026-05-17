@@ -4,11 +4,11 @@
 
 using AgentEval.Core;
 using AgentEval.Evals;
+using AgentEval.Evals.Agentic;
 using AgentEval.Evals.Agentic.Composition;
 using AgentEval.Evals.Agentic.Conversation;
 using AgentEval.Output;
 using Xunit;
-using AgenticBenchmarkFactory = AgentEval.Evals.Agentic.Composition.AgenticBenchmark;
 
 namespace AgentEval.Tests.Agentic.EndToEnd;
 
@@ -47,7 +47,7 @@ public class AgenticConversationalE2ETest
     public void Conversational_HasExpected5Components()
     {
         var judge = new StubEvaluator(100);
-        var benchmark = AgenticBenchmarkFactory.Conversational(judge);
+        var benchmark = AgenticBenchmark.Conversational(judge);
 
         Assert.Equal(5, benchmark.Components.Count);
     }
@@ -58,7 +58,7 @@ public class AgenticConversationalE2ETest
         var store = new InMemoryOutputStore();
         var subject = new SubjectIdentity(SubjectKind.Agent, "E2E-ConversationalAgent");
         var judge = new StubEvaluator(100);
-        var benchmark = AgenticBenchmarkFactory.Conversational(judge);
+        var benchmark = AgenticBenchmark.Conversational(judge);
         var runner = new AgenticBenchmarkRunner();
 
         var input = new EvalInput(

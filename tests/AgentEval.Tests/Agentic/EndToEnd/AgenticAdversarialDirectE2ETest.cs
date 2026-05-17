@@ -4,10 +4,10 @@
 
 using AgentEval.Core;
 using AgentEval.Evals;
+using AgentEval.Evals.Agentic;
 using AgentEval.Evals.Agentic.Composition;
 using AgentEval.Output;
 using Xunit;
-using AgenticBenchmarkFactory = AgentEval.Evals.Agentic.Composition.AgenticBenchmark;
 
 namespace AgentEval.Tests.Agentic.EndToEnd;
 
@@ -37,7 +37,7 @@ public class AgenticAdversarialDirectE2ETest
     public void AdversarialDirect_HasExpected3Components()
     {
         var judge = new StubEvaluator(100);
-        var benchmark = AgenticBenchmarkFactory.AdversarialDirect(judge);
+        var benchmark = AgenticBenchmark.AdversarialDirect(judge);
 
         Assert.Equal(3, benchmark.Components.Count);
     }
@@ -48,7 +48,7 @@ public class AgenticAdversarialDirectE2ETest
         var store = new InMemoryOutputStore();
         var subject = new SubjectIdentity(SubjectKind.Agent, "E2E-AdversarialDirectAgent");
         var judge = new StubEvaluator(100);
-        var benchmark = AgenticBenchmarkFactory.AdversarialDirect(judge);
+        var benchmark = AgenticBenchmark.AdversarialDirect(judge);
         var runner = new AgenticBenchmarkRunner();
 
         // Input has no injection patterns — benign query so JailbreakResistance fast-passes.

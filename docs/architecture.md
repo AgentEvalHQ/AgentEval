@@ -94,10 +94,11 @@ AgentEval is designed with a layered architecture that separates concerns and en
 │  ├────────────────────────────────────────────────────────────────────────┤ │
 │  │                                                                         │ │
 │  │  ┌─────────────────────────┐  ┌─────────────────────────────────────┐   │ │
-│  │  │   PerformanceBenchmark  │  │        AgenticBenchmark             │   │ │
-│  │  │   • Latency             │  │   • ToolAccuracy                    │   │ │
-│  │  │   • Throughput          │  │   • TaskCompletion                  │   │ │
-│  │  │   • Cost                │  │   • MultiStepReasoning              │   │ │
+│  │  │   PerformanceBenchmark  │  │   AgenticBenchmark (preset factory) │   │ │
+│  │  │   • Latency             │  │   • AgenticExecution                │   │ │
+│  │  │   • Throughput          │  │   • ToolCallAccuracy / RagQuality   │   │ │
+│  │  │   • Cost                │  │   • Safety / Conversational / …     │   │ │
+│  │  │  (AgentEval.Core)       │  │  (AgentEval.Evals.Agentic)          │   │ │
 │  │  └─────────────────────────┘  └─────────────────────────────────────┘   │ │
 │  │                                                                         │ │
 │  └────────────────────────────────────────────────────────────────────────┘ │
@@ -565,7 +566,7 @@ src/
 │   ├── Comparison/               # StochasticRunner, ModelComparer, StatisticsCalculator
 │   ├── Tracing/                  # TraceRecordingAgent, TraceReplayingAgent, ChatTraceRecorder
 │   ├── Calibration/              # CalibratedJudge, VotingStrategy
-│   ├── Benchmarks/               # PerformanceBenchmark, AgenticBenchmark
+│   ├── Benchmarks/               # PerformanceBenchmark (the agentic preset factory lives in AgentEval.Evals.Agentic)
 │   ├── Adapters/                 # MicrosoftEvaluatorAdapter, ChatClientAgentAdapter
 │   ├── Testing/                  # FakeChatClient
 │   └── DependencyInjection/      # AddAgentEval()

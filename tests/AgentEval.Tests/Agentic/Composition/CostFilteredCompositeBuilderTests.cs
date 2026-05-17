@@ -4,11 +4,11 @@
 
 using AgentEval.Core;
 using AgentEval.Evals;
+using AgentEval.Evals.Agentic;
 using AgentEval.Evals.Agentic.Composition;
 using AgentEval.Evals.Agentic.Memory;
 using AgentEval.Evals.Agentic.MultiTurn;
 using Xunit;
-using AgenticBenchmarkFactory = AgentEval.Evals.Agentic.Composition.AgenticBenchmark;
 
 namespace AgentEval.Tests.Agentic.Composition;
 
@@ -49,7 +49,7 @@ public class CostFilteredCompositeBuilderTests
     public void FilterByBudget_LowTier_RemovesHighAndMediumEvaluators()
     {
         var judge = new StubEvaluator();
-        var original = AgenticBenchmarkFactory.Conversational(judge);
+        var original = AgenticBenchmark.Conversational(judge);
 
         var filtered = CostFilteredCompositeBuilder.FilterByBudget(original, EvaluatorCostTier.Low);
 
@@ -70,7 +70,7 @@ public class CostFilteredCompositeBuilderTests
     public void FilterByBudget_AllTier_NoOp()
     {
         var judge = new StubEvaluator();
-        var original = AgenticBenchmarkFactory.Conversational(judge);
+        var original = AgenticBenchmark.Conversational(judge);
 
         var filtered = CostFilteredCompositeBuilder.FilterByBudget(original, EvaluatorCostTier.High);
 
@@ -88,7 +88,7 @@ public class CostFilteredCompositeBuilderTests
         var judge = new StubEvaluator();
         // AdversarialDirect has DirectInjection (LOW) + PersonaAttack (LOW) + JailbreakResistance (MEDIUM).
         // Filtering to Trivial should remove all three → InvalidOperationException.
-        var original = AgenticBenchmarkFactory.AdversarialDirect(judge);
+        var original = AgenticBenchmark.AdversarialDirect(judge);
 
         var ex = Assert.Throws<InvalidOperationException>(() =>
             CostFilteredCompositeBuilder.FilterByBudget(original, EvaluatorCostTier.Trivial));

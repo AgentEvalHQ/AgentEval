@@ -10,6 +10,7 @@
     <ProjectReference Include="..\..\src\AgentEval.Abstractions\AgentEval.Abstractions.csproj" />
     <ProjectReference Include="..\..\src\AgentEval.Core\AgentEval.Core.csproj" />
     <ProjectReference Include="..\..\src\AgentEval.DataLoaders\AgentEval.DataLoaders.csproj" />
+    <ProjectReference Include="..\..\src\AgentEval.Evals.Agentic\AgentEval.Evals.Agentic.csproj" />
     <ProjectReference Include="..\..\src\AgentEval.MAF\AgentEval.MAF.csproj" />
     <ProjectReference Include="..\..\src\AgentEval.Memory\AgentEval.Memory.csproj" />
     <ProjectReference Include="..\..\src\AgentEval.RedTeam\AgentEval.RedTeam.csproj" />
