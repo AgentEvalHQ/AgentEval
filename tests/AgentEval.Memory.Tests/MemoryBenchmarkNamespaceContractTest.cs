@@ -8,11 +8,13 @@ namespace AgentEval.Memory.Tests;
 
 /// <summary>
 /// Companion contract test to <c>BenchmarkNamespaceContractTests</c> in AgentEval.Tests.
-/// Pins that <c>MemoryBenchmark</c> lives in <c>AgentEval.Benchmarks</c> after
-/// the Phase-4 namespace consolidation.
+/// Pins that Memory-assembly benchmark factory types live in <c>AgentEval.Benchmarks</c>.
+/// Covers <c>MemoryBenchmark</c> (Phase 4) and <c>LongMemEvalBenchmark</c> (Phase 7).
 /// </summary>
 public class MemoryBenchmarkNamespaceContractTest
 {
+    // ─── MemoryBenchmark (Phase 4) ────────────────────────────────────────────
+
     [Fact]
     public void MemoryBenchmark_LivesIn_AgentEvalBenchmarksNamespace()
     {
@@ -41,5 +43,29 @@ public class MemoryBenchmarkNamespaceContractTest
 
         Assert.False(found,
             "AgentEval.Memory.Models.MemoryBenchmark must no longer exist after Phase-4 migration.");
+    }
+
+    // ─── LongMemEvalBenchmark (Phase 7) ───────────────────────────────────────
+
+    [Fact]
+    public void LongMemEvalBenchmark_LivesIn_AgentEvalBenchmarksNamespace()
+    {
+        // Convention 1 (ADR-017): benchmark factory types must live in AgentEval.Benchmarks.
+        Assert.Equal("AgentEval.Benchmarks", typeof(AgentEval.Benchmarks.LongMemEvalBenchmark).Namespace);
+    }
+
+    [Fact]
+    public void LongMemEvalBenchmark_IsPublic()
+    {
+        Assert.True(typeof(AgentEval.Benchmarks.LongMemEvalBenchmark).IsPublic,
+            "LongMemEvalBenchmark must be public for API consumers.");
+    }
+
+    [Fact]
+    public void LongMemEvalBenchmark_IsStaticClass_AbstractAndSealed()
+    {
+        var t = typeof(AgentEval.Benchmarks.LongMemEvalBenchmark);
+        Assert.True(t.IsAbstract && t.IsSealed,
+            $"{t.Name} must be a static class (abstract+sealed in IL); Convention 1 requires static partial.");
     }
 }
