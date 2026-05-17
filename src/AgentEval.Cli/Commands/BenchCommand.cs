@@ -14,6 +14,11 @@ using AgentEval.GdprBenchmark.DomainPacks.HR;
 using AgentEval.GdprBenchmark.Reporting;
 using AgentEval.GdprBenchmark.Reporting.Pdf;
 using AgentEval.Output;
+// Alias is required: the `using AgentEval.GdprBenchmark.*;` directives above import the
+// parent namespace `AgentEval.GdprBenchmark`, which makes the bare identifier
+// `GdprBenchmark` resolve to that namespace, not the factory type in `AgentEval.Benchmarks`
+// (CS0234). See lastreview/11-phase4-gate-review.md §4 (Concern A). Do not remove without
+// first fully-qualifying every call site.
 using GdprBenchmarkFactory = AgentEval.Benchmarks.GdprBenchmark;
 
 namespace AgentEval.Cli.Commands;

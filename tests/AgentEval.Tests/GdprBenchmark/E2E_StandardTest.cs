@@ -2,6 +2,12 @@
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 
+// Alias is required: this file's enclosing namespace `AgentEval.Tests.GdprBenchmark` shadows
+// the same-named factory type in `AgentEval.Benchmarks`, and the `using AgentEval.GdprBenchmark.*;`
+// directives below also import the parent namespace — both effects make the bare identifier
+// `GdprBenchmark` resolve to a namespace, not the factory type (CS0234).
+// See lastreview/11-phase4-gate-review.md §4 (Concern A). Do not remove without first
+// restructuring this file's namespace or fully-qualifying every call site.
 using GdprBenchmarkFactory = AgentEval.Benchmarks.GdprBenchmark;
 using AgentEval.Evals;
 using AgentEval.GdprBenchmark;

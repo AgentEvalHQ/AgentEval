@@ -167,6 +167,32 @@ benchAgenticCmd.Add(agenticCalibrateCmd);
 
 benchCmd.Add(benchAgenticCmd);
 
+// bench owasp — Phase 5 (v0.10.0-beta): OWASP LLM Top 10 red-team scan.
+// Presets: top10 | smoke | audit | top10-rag.
+var benchOwaspPresetOpt = new Option<string?>("--preset") { Description = "Preset: top10 | smoke | audit (=auditgrade) | top10-rag (=top10forrag). Default: top10. The smoke preset uses 3 attacks (PromptInjection + Jailbreak + PIILeakage); top10 / top10-rag / audit use all 9 attacks. audit runs at Comprehensive intensity for higher-confidence verdicts." };
+var benchOwaspSubjectOpt = new Option<string?>("--subject") { Description = "Subject name (agent or workflow under evaluation). REQUIRED." };
+var benchOwaspRootOpt = new Option<string?>("--root") { Description = "Workspace root path (default: auto-detected)" };
+var benchOwaspInputOpt = new Option<string?>("--input") { Description = "Provenance text for the run (the OWASP attack pipeline generates its own probes; --input is recorded for traceability, not consumed by attacks)." };
+var benchOwaspCmd = new Command("owasp", "Run the OWASP LLM Top 10 red-team benchmark");
+benchOwaspCmd.Add(benchOwaspPresetOpt);
+benchOwaspCmd.Add(benchOwaspSubjectOpt);
+benchOwaspCmd.Add(benchOwaspRootOpt);
+benchOwaspCmd.Add(benchOwaspInputOpt);
+benchOwaspCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =>
+{
+    var preset = parseResult.GetValue(benchOwaspPresetOpt) ?? "top10";
+    var subject = parseResult.GetValue(benchOwaspSubjectOpt);
+    if (string.IsNullOrWhiteSpace(subject))
+    {
+        Console.Error.WriteLine("Error: --subject is required.");
+        return 1;
+    }
+    var root = parseResult.GetValue(benchOwaspRootOpt);
+    var input = parseResult.GetValue(benchOwaspInputOpt);
+    return await BenchOwaspCommand.RunAsync(preset, subject, root, input);
+});
+benchCmd.Add(benchOwaspCmd);
+
 // ─── compliance ───────────────────────────────────────────────────────────────
 var complianceCmd = new Command("compliance", "Compliance reporting commands");
 

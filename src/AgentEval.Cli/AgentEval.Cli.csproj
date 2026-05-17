@@ -14,6 +14,7 @@
     <ProjectReference Include="../AgentEval.Evals.Agentic/AgentEval.Evals.Agentic.csproj" />
     <ProjectReference Include="..\AgentEval.Evals.Compliance.Gdpr\AgentEval.Evals.Compliance.Gdpr.csproj" />
     <ProjectReference Include="..\AgentEval.Evals.Compliance.EuAiAct\AgentEval.Evals.Compliance.EuAiAct.csproj" />
+    <ProjectReference Include="..\AgentEval.RedTeam\AgentEval.RedTeam.csproj" />
   </ItemGroup>
 
   <!-- Plan-08 MC1.7.1: AgentEval.MissionControl is net10-only (Hot Chocolate 16

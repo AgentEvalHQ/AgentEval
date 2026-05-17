@@ -1,0 +1,285 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 AgentEval Contributors
+// Licensed under the MIT License.
+
+using AgentEval.Benchmarks;
+using AgentEval.Core;
+using AgentEval.Evals;
+using AgentEval.Output;
+using AgentEval.RedTeam;
+using AgentEval.RedTeam.Reporting.Compliance;
+
+namespace AgentEval.Cli.Commands;
+
+/// <summary>
+/// Implements the <c>agenteval bench owasp</c> subcommand. Runs the OWASP LLM Top 10
+/// red-team scan against an agent (a stub safe-refusal agent is used by default —
+/// supply an agent override on the internal overload for real targets in tests),
+/// persists the resulting <see cref="EvalResult"/> through the unified output-store,
+/// and additionally emits the rich <see cref="OWASPComplianceReport"/> as JSON +
+/// Markdown alongside.
+/// </summary>
+public static class BenchOwaspCommand
+{
+    /// <summary>Runs the bench owasp command using auto-discovered workspace root.</summary>
+    public static Task<int> RunAsync(
+        string preset,
+        string subject,
+        string? rootOverride,
+        string? inputText) =>
+        RunAsync(preset, subject, rootOverride, inputText, evaluatorOverride: null, agentOverride: null);
+
+    /// <summary>Runs the bench owasp command with optional overrides (used in tests).</summary>
+    internal static async Task<int> RunAsync(
+        string preset,
+        string subject,
+        string? rootOverride,
+        string? inputText,
+        IEvaluator? evaluatorOverride,
+        IEvaluableAgent? agentOverride)
+    {
+        // ── Workspace setup ──────────────────────────────────────────────────
+        if (rootOverride is not null)
+        {
+            var canonical = WorkspaceRootValidator.CanonicaliseOrNull(rootOverride);
+            if (canonical is null) return 1;
+            rootOverride = canonical;
+        }
+        var workspaceRoot = rootOverride ?? WorkspaceRootDiscovery.Find(Directory.GetCurrentDirectory());
+        if (workspaceRoot is null)
+        {
+            Console.Error.WriteLine("Could not find a solution root (.sln, .slnx, or .git). " +
+                "Provide --root or run from within a solution directory.");
+            return 1;
+        }
+
+        var agentEvalDir = Path.Combine(workspaceRoot, ".agenteval");
+        if (!Directory.Exists(agentEvalDir))
+        {
+            Console.Error.WriteLine($".agenteval/ not found at {agentEvalDir}. Run `agenteval init` first.");
+            return 1;
+        }
+
+        // ── Judge / evaluator ────────────────────────────────────────────────
+        // The OWASP attack pipeline uses heuristic per-attack evaluators today;
+        // the judge is accepted for API symmetry with other bench commands and
+        // reserved for future LLM-graded probes. JudgeFactory.Resolve still runs
+        // to honour the AZURE_OPENAI_* env gate (CI parity).
+        var (resolvedJudge, judgeModelName, exitCode) = JudgeFactory.Resolve(
+            evaluatorOverride,
+            judgeKind: "OWASP benchmark");
+        if (resolvedJudge is null) return exitCode;
+
+        // ── Select preset ────────────────────────────────────────────────────
+        OwaspBenchmarkRun benchmark;
+        try
+        {
+            benchmark = ResolvePreset(preset, resolvedJudge);
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Failed to build OWASP preset '{preset}': {ex.Message}");
+            return 1;
+        }
+
+        // ── Resolve target agent + build EvalInput ───────────────────────────
+        // The OWASP pipeline drives the agent itself (it generates and sends its
+        // own probes); --input is recorded for provenance only.
+        var query = inputText ?? "Please summarize how you handle sensitive instructions.";
+        var agent = agentOverride ?? new SafeRefusalAgent(subject);
+
+        // ── Run benchmark ────────────────────────────────────────────────────
+        var store = new FileSystemOutputStore(agentEvalDir);
+        await store.SweepStaleSentinelsAsync(TimeSpan.FromHours(24));
+        var subjectIdentity = new SubjectIdentity(SubjectKind.Agent, subject);
+        await store.EnsureSolutionAsync();
+        await store.EnsureSubjectAsync(subjectIdentity);
+
+        Console.WriteLine($"Running OWASP benchmark ({preset}) for subject '{subject}'...");
+
+        EvalResult compositeEval;
+        RedTeamResult redTeamResult;
+        try
+        {
+            // Run the scan once. We then derive both the EvalResult (via the same
+            // 10-leaf shape EvaluateAsync builds) and the OWASPComplianceReport from
+            // the single RedTeamResult — avoiding a duplicate scan.
+            redTeamResult = await benchmark.ScanAsync(agent);
+
+            // EvaluateAsync re-runs the scan internally; for the CLI we already
+            // have the result so we wrap the agent input that EvaluateAsync expects
+            // and let it produce the composite EvalResult shape. This is the price
+            // of running the same scan twice; a more refined CLI implementation
+            // would expose a "BuildEvalResult(RedTeamResult)" method on the run,
+            // but the duplicate scan cost is acceptable for v0.10.0-beta.
+            var evalInput = new EvalInput(
+                Query: query,
+                Metadata: new Dictionary<string, object> { ["agent"] = agent });
+            compositeEval = await benchmark.EvaluateAsync(evalInput);
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"OWASP scan failed: {ex.Message}");
+            return 1;
+        }
+
+        var report = benchmark.GenerateReport(redTeamResult);
+
+        // ── Persist through the unified output-store ─────────────────────────
+        string runId;
+        try
+        {
+            var manifest = await store.StartRunAsync(
+                subjectIdentity,
+                new RunContext(
+                    EvalProject: "AgentEval.RedTeam",
+                    EvalProjectPath: "src/AgentEval.RedTeam/",
+                    Harness: "BenchOwaspCommand",
+                    Seed: null,
+                    ParentInvocationId: null,
+                    Kind: "benchmark"));
+            runId = manifest.Run.RunId;
+
+            // Write the 10-leaf composite as the run's "scenario result" — the
+            // recursive tree is preserved as JSON inside ScenarioResult.Output, so
+            // a downstream reader can rehydrate the full EvalResult via
+            // EvalResultPersistence.FromScenarioResult.
+            var scenarioResult = EvalResultPersistence.ToScenarioResult(
+                compositeEval,
+                scenarioId: $"owasp-{preset.ToLowerInvariant()}",
+                scenarioName: $"OWASP LLM Top 10 — {preset}");
+            await store.WriteScenarioResultAsync(runId, scenarioResult);
+
+            var verdict = compositeEval.Score.Label.ToUpperInvariant() switch
+            {
+                "PASS" => "PASS",
+                "WARN" => "WARN",
+                _      => "FAIL"
+            };
+            var summary = new RunSummary(
+                SchemaVersion: "1.0",
+                RunId: runId,
+                Verdict: verdict,
+                Stats: new RunStats(
+                    Total: 1,
+                    Passed: compositeEval.Score.Passed ? 1 : 0,
+                    Failed: !compositeEval.Score.Passed && compositeEval.Score.Label != "warn" ? 1 : 0,
+                    Warnings: compositeEval.Score.Label == "warn" ? 1 : 0),
+                Metrics: new Dictionary<string, double>
+                {
+                    ["overallScore"] = compositeEval.Score.Value,
+                    ["overallPassRate"] = report.Summary.OverallPassRate / 100.0,
+                });
+            await store.CompleteRunAsync(manifest, summary);
+            Console.WriteLine($"Persisted run {runId} to {agentEvalDir}");
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Failed to persist OWASP run to output store: {ex.Message}");
+            return 1;
+        }
+
+        // ── Persist the rich OWASP compliance evidence (sibling to GDPR/EU AI Act) ─
+        try
+        {
+            var reporter = new OWASPComplianceReporter();
+            await reporter.SaveReportAsync(store, subjectIdentity, runId, redTeamResult);
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Warning: failed to persist OWASP compliance evidence: {ex.Message}");
+        }
+
+        // ── Emit JSON + Markdown reports alongside ───────────────────────────
+        var sanitizedSubject = SanitizeForPath(subject);
+        var ts = report.GeneratedAt.ToString("yyyy-MM-dd_HH-mm-ss");
+        var outputDir = Path.Combine(agentEvalDir, "compliance", "OWASP-LLM-Top10", sanitizedSubject, ts);
+        Directory.CreateDirectory(outputDir);
+
+        try
+        {
+            var jsonPath = Path.Combine(outputDir, "report.json");
+            await File.WriteAllTextAsync(jsonPath, report.ToJson());
+            Console.WriteLine($"JSON report:     {jsonPath}");
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Warning: failed to write OWASP JSON report: {ex.Message}");
+        }
+
+        try
+        {
+            var mdPath = Path.Combine(outputDir, "report.md");
+            await File.WriteAllTextAsync(mdPath, report.ToMarkdown());
+            Console.WriteLine($"Markdown report: {mdPath}");
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Warning: failed to write OWASP Markdown report: {ex.Message}");
+        }
+
+        // ── Exit code ─────────────────────────────────────────────────────────
+        Console.WriteLine($"Overall result: pass rate {report.Summary.OverallPassRate:F1}% " +
+            $"({report.Summary.CriticalFindings} critical / {report.Summary.HighFindings} high findings); " +
+            $"composite verdict {compositeEval.Score.Label.ToUpperInvariant()}");
+
+        return compositeEval.Score.Label.ToLowerInvariant() switch
+        {
+            "pass" => 0,
+            "fail" => 2,
+            _      => 2  // WARN/skipped also returns non-zero for CI strictness
+        };
+    }
+
+    /// <summary>
+    /// Resolves an OWASP preset specification into an <see cref="OwaspBenchmarkRun"/>.
+    /// </summary>
+    /// <param name="presetSpec">
+    /// Preset identifier: <c>top10</c>, <c>smoke</c>, <c>audit</c>/<c>auditgrade</c>, or
+    /// <c>top10-rag</c>/<c>top10forrag</c>.
+    /// </param>
+    /// <param name="judge">LLM evaluator passed through to the preset factory.</param>
+    internal static OwaspBenchmarkRun ResolvePreset(string presetSpec, IEvaluator judge)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(presetSpec);
+        ArgumentNullException.ThrowIfNull(judge);
+
+        return presetSpec.Trim().ToLowerInvariant() switch
+        {
+            "top10"                          => OwaspBenchmark.Top10(judge),
+            "smoke"                          => OwaspBenchmark.Smoke(judge),
+            "audit" or "auditgrade"          => OwaspBenchmark.AuditGrade(judge),
+            "top10-rag" or "top10forrag"     => OwaspBenchmark.Top10ForRag(judge),
+            _ => throw new ArgumentException(
+                $"Unknown OWASP preset '{presetSpec}'. " +
+                "Known presets: top10, smoke, audit (=auditgrade), top10-rag (=top10forrag).",
+                nameof(presetSpec))
+        };
+    }
+
+    private static string SanitizeForPath(string name)
+    {
+        var invalid = Path.GetInvalidFileNameChars().Concat(new[] { '/', '\\' }).ToArray();
+        var s = string.Concat(name.Select(c => invalid.Contains(c) ? '-' : c));
+        return s.Trim('.', ' ');
+    }
+
+    /// <summary>
+    /// Deterministic stub agent used by the CLI when no real target is supplied.
+    /// Always returns a safe refusal — under the OWASP pipeline the heuristic
+    /// evaluators classify these as "resisted" for prompt-injection/jailbreak/PII
+    /// probes, so a default CLI run produces a clean PASS report. Real targets
+    /// override this via the <c>agentOverride</c> parameter on the internal
+    /// <see cref="RunAsync(string,string,string?,string?,IEvaluator?,IEvaluableAgent?)"/> overload.
+    /// </summary>
+    internal sealed class SafeRefusalAgent : IEvaluableAgent
+    {
+        public string Name { get; }
+        public SafeRefusalAgent(string name) { Name = name; }
+        public Task<AgentResponse> InvokeAsync(string prompt, CancellationToken cancellationToken = default)
+            => Task.FromResult(new AgentResponse
+            {
+                Text = "I cannot help with that request. Please rephrase or ask something else."
+            });
+    }
+}

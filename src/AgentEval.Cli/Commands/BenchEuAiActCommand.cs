@@ -14,6 +14,11 @@ using AgentEval.EuAiActBenchmark.DomainPacks.HighRiskEmployment;
 using AgentEval.EuAiActBenchmark.Reporting;
 using AgentEval.EuAiActBenchmark.Reporting.Pdf;
 using AgentEval.Output;
+// Alias is required: the `using AgentEval.EuAiActBenchmark.*;` directives above import the
+// parent namespace `AgentEval.EuAiActBenchmark`, which makes the bare identifier
+// `EuAiActBenchmark` resolve to that namespace, not the factory type in `AgentEval.Benchmarks`
+// (CS0234). See lastreview/11-phase4-gate-review.md §4 (Concern A). Do not remove without
+// first fully-qualifying every call site.
 using EuAiActBenchmarkFactory = AgentEval.Benchmarks.EuAiActBenchmark;
 
 namespace AgentEval.Cli.Commands;
