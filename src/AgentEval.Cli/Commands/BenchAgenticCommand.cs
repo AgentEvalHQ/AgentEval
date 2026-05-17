@@ -4,6 +4,7 @@
 
 using AgentEval.Core;
 using AgentEval.Evals;
+using AgentEval.Evals.Agentic;
 using AgentEval.Evals.Agentic.Composition;
 using AgentEval.Evals.Agentic.Reporting;
 using AgentEval.Evals.Agentic.Reporting.Pdf;

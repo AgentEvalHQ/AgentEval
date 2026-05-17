@@ -8,7 +8,7 @@ using AgentEval.Evals.Agentic.Composition;
 using AgentEval.Evals.Agentic.Memory;
 using AgentEval.Evals.Agentic.MultiTurn;
 using Xunit;
-using AgenticBenchmarkFactory = AgentEval.Evals.Agentic.Composition.AgenticBenchmark;
+using AgenticBenchmarkFactory = AgentEval.Evals.Agentic.AgenticBenchmark;
 
 namespace AgentEval.Tests.Agentic.Composition;
 

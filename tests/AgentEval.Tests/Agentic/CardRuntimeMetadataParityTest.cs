@@ -58,7 +58,7 @@ public class CardRuntimeMetadataParityTest(ITestOutputHelper output)
 
     private static IReadOnlyList<(string ResourceName, string Json)> LoadAllShippedCards()
     {
-        var asm = typeof(AgentEval.Evals.Agentic.Composition.AgenticBenchmark).Assembly;
+        var asm = typeof(AgentEval.Evals.Agentic.AgenticBenchmark).Assembly;
         var cardResources = asm.GetManifestResourceNames()
             .Where(n => n.Contains("EvaluatorCards.") && n.EndsWith(".json", StringComparison.OrdinalIgnoreCase))
             .ToList();
@@ -89,7 +89,7 @@ public class CardRuntimeMetadataParityTest(ITestOutputHelper output)
         if (string.IsNullOrWhiteSpace(className)) return null;
 
         // Search in the two assemblies that contain evaluators.
-        var agenticAsm = typeof(AgentEval.Evals.Agentic.Composition.AgenticBenchmark).Assembly;
+        var agenticAsm = typeof(AgentEval.Evals.Agentic.AgenticBenchmark).Assembly;
         var coreAsm    = typeof(AgentEval.Evals.CompositeEval).Assembly;
 
         return agenticAsm.GetTypes().FirstOrDefault(t => t.Name == className)

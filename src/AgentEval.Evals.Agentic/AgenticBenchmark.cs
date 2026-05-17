@@ -19,7 +19,7 @@ using AgentEval.Evals.Agentic.System;
 using AgentEval.Evals.Agentic.Telemetry;
 using AgentEval.Evals.Agentic.UX;
 
-namespace AgentEval.Evals.Agentic.Composition;
+namespace AgentEval.Evals.Agentic;
 
 /// <summary>
 /// Top-level factory methods for agentic benchmark presets.

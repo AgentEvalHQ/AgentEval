@@ -2,504 +2,139 @@
 
 > **Running industry-standard AI benchmarks and creating custom benchmark suites with AgentEval**
 
-This guide covers the in-process, library-API benchmarks: `AgenticBenchmark` (BFCL/GAIA-style test cases) and `PerformanceBenchmark` (latency, throughput, cost). For the CLI-driven, audit-chained presets that write to `.agenteval/`, see:
+AgentEval ships **four benchmark families**, each with its own getting-started + plain-English explainer:
 
-- [Agentic Benchmark](benchmarks/agentic/getting-started.md) — broad agent-quality coverage across ~60 evaluators organised into 10 categories and several presets. CLI: `agenteval bench agentic`. Plain-English explainer: [how-it-works.md](benchmarks/agentic/how-it-works.md).
-- [GDPR Benchmark](benchmarks/gdpr/getting-started.md) — dialog-level behavioural conformance across the GDPR articles relevant to agent interaction, organised in 5 pillars. CLI: `agenteval bench gdpr`. Plain-English explainer: [how-it-works.md](benchmarks/gdpr/how-it-works.md).
-- [EU AI Act Benchmark](benchmarks/eu-ai-act/getting-started.md) — dialog-level conformance against Regulation (EU) 2024/1689 controls, organised in 6 pillars. CLI: `agenteval bench eu-ai-act`. Plain-English explainer: [how-it-works.md](benchmarks/eu-ai-act/how-it-works.md).
+| Family | What it measures | CLI | Docs |
+|---|---|---|---|
+| **Agentic** | Broad agent quality across ~60 evaluators organised into ~12 categories (task completion, tool-call accuracy, RAG, safety, memory, reasoning, …) — 11 named presets | `agenteval bench agentic --preset X` | [getting-started](benchmarks/agentic/getting-started.md) · [how-it-works](benchmarks/agentic/how-it-works.md) · [cost guidance](benchmarks/agentic/cost-guidance.md) · [evaluator cards](benchmarks/agentic/evaluator-cards.md) |
+| **GDPR** | Dialog-level conformance across the GDPR articles relevant to agent interaction, in 5 pillars; healthcare/HR/childrens domain packs | `agenteval bench gdpr --preset X` | [getting-started](benchmarks/gdpr/getting-started.md) · [how-it-works](benchmarks/gdpr/how-it-works.md) |
+| **EU AI Act** | Dialog-level conformance against Regulation (EU) 2024/1689 controls, in 6 pillars; high-risk employment/credit/education domain packs | `agenteval bench eu-ai-act --preset X` | [getting-started](benchmarks/eu-ai-act/getting-started.md) · [how-it-works](benchmarks/eu-ai-act/how-it-works.md) |
+| **Performance** | Latency percentiles, throughput, estimated cost — in-process library API in `AgentEval.Benchmarks.PerformanceBenchmark` | n/a (library API) | This page, below |
 
----
+The three benchmark suites in the top three rows are **preset-factory based**: a factory method returns a `CompositeEval` configured with canonical evaluator weights, which the CLI executes against a subject + scenario set, persisting audit-chain-validated evidence to `.agenteval/`. The same factory methods are publicly callable from any consumer that links the corresponding assembly.
 
-## What You Can Do
-
-AgentEval provides comprehensive benchmarking capabilities for AI agents:
-
-| Feature | Description |
-|---------|-------------|
-| **Performance benchmarks** | Measure latency, throughput, and cost |
-| **BFCL-style evaluations** | Tool calling accuracy with industry-standard patterns |
-| **GAIA-style evaluations** | Task completion with multi-step reasoning |
-| **Multi-step reasoning** | Ordered tool chain validation with dependency tracking |
-| **Custom benchmark suites** | Create your own domain-specific benchmarks |
-| **JSONL datasets** | Load benchmark data from industry-standard JSONL files |
+> **v0.9.0-beta breaking change.** The earlier in-process library-API benchmark surface — `AgentEval.Benchmarks.AgenticBenchmark` with `ToolAccuracyTestCase` / `TaskCompletionTestCase` / `MultiStepTestCase` plus `RunToolAccuracyBenchmarkAsync` / `RunTaskCompletionBenchmarkAsync` / `RunMultiStepReasoningBenchmarkAsync` — has been **removed**. Migrate to the agentic preset-factory API or the CLI; both ship strictly more capable replacements (60 evaluators vs the legacy 3 fixed methods, calibration, audit chain). See [the migration note in `CHANGELOG.md`](../CHANGELOG.md) for details.
 
 ---
 
-## Quick Start
+## Quick Start — agentic via CLI
 
-### ✅ Run Performance Benchmarks
-Measure latency, throughput, and cost across your agents.
+The fastest path to a working benchmark:
 
-### ✅ Run Agentic Benchmarks
-Evaluate tool accuracy, task completion, and multi-step reasoning.
-
-### ✅ Load from JSONL
-Use `DatasetLoaderFactory` to load benchmark data from JSONL files — the industry-standard format used by BFCL, GAIA, MMLU, GSM8K, and ToolBench.
-
-### ✅ Industry-Standard Patterns
-Create evaluations following BFCL/GAIA patterns and compare against published leaderboards.
-
----
-
-## Prerequisites
-
-All benchmark examples assume you have created a MAF agent:
-
-```csharp
-using Azure.AI.OpenAI;
-using Microsoft.Agents.AI;
-using Microsoft.Extensions.AI;
-
-var azureClient = new AzureOpenAIClient(
-    new Uri(Environment.GetEnvironmentVariable("AZURE_OPENAI_ENDPOINT")!),
-    new Azure.AzureKeyCredential(Environment.GetEnvironmentVariable("AZURE_OPENAI_API_KEY")!));
-
-var chatClient = azureClient
-    .GetChatClient("gpt-4o")
-    .AsIChatClient();
-
-var agent = new ChatClientAgent(
-    chatClient,
-    new ChatClientAgentOptions
-    {
-        Name = "BenchmarkAgent",
-        ChatOptions = new ChatOptions
-        {
-            Instructions = "You are a helpful assistant with access to various tools.",
-            Tools = [/* Your tools here */]
-        }
-    });
-
-var adapter = new MAFAgentAdapter(agent);
-
-// For AI-powered evaluation (task completion), create an evaluator
-var evaluator = new ChatClientEvaluator(
-    azureClient.GetChatClient("gpt-4o").AsIChatClient());
+```bash
+agenteval init --name MySolution
+agenteval bench agentic --preset agentic-execution --subject MyAgent
 ```
 
----
+This writes evidence to `.agenteval/compliance/agentic/MyAgent/<timestamp>/` (markdown, PDF, JSON, audit-chain-validated). The [agentic getting-started](benchmarks/agentic/getting-started.md) covers every preset.
 
-## Berkeley Function Calling Leaderboard (BFCL)
+## Quick Start — agentic programmatically
 
-BFCL is the industry standard for evaluating function/tool calling accuracy. AgentEval supports creating BFCL-style evaluation cases:
+Each preset factory returns a `CompositeEval` that you can evaluate directly:
 
 ```csharp
-var bfclTests = new List<ToolAccuracyTestCase>
-{
-    // Simple function call (BFCL simple_python category)
-    new ToolAccuracyTestCase
-    {
-        Name = "simple_math",
-        Prompt = "Calculate 15 factorial",
-        ExpectedTools = new[]
-        {
-            new ExpectedTool { Name = "factorial", RequiredParameters = new[] { "n" } }
-        }
-    },
-    
-    // Parallel calls (BFCL parallel category)
-    new ToolAccuracyTestCase
-    {
-        Name = "parallel_weather",
-        Prompt = "What's the weather in NYC and LA?",
-        ExpectedTools = new[]
-        {
-            new ExpectedTool { Name = "get_weather", RequiredParameters = new[] { "location" } },
-            new ExpectedTool { Name = "get_weather", RequiredParameters = new[] { "location" } }
-        }
-    },
-    
-    // Sequential calls (BFCL multiple category)
-    new ToolAccuracyTestCase
-    {
-        Name = "sequential_booking",
-        Prompt = "Find flights to Paris and book the cheapest one",
-        ExpectedTools = new[]
-        {
-            new ExpectedTool { Name = "search_flights", RequiredParameters = new[] { "destination" } },
-            new ExpectedTool { Name = "book_flight", RequiredParameters = new[] { "flight_id" } }
-        }
-    }
-};
+using AgentEval.Core;
+using AgentEval.Evals;
+using AgentEval.Evals.Agentic;       // AgenticBenchmark preset factory
 
-// Run and measure
-var benchmark = new AgenticBenchmark(adapter);
-var results = await benchmark.RunToolAccuracyBenchmarkAsync(bfclTests);
+IEvaluator judge = /* your IEvaluator — e.g. ChatClientEvaluator wrapping IChatClient */;
 
-Console.WriteLine($"BFCL-Style Results");
-Console.WriteLine($"  Accuracy: {results.OverallAccuracy:P1}");
-Console.WriteLine($"  Passed: {results.PassedTests}/{results.TotalTests}");
+CompositeEval preset = AgenticBenchmark.ToolCallAccuracy(judge, judgeModel: "gpt-4o");
+
+var input = new EvalInput(
+    Query: "What's the weather in Paris?",
+    Response: agentResponseText);   // optionally also pass tool-trace metadata
+
+EvalResult result = await preset.EvaluateAsync(input);
+
+Console.WriteLine($"Score: {result.Score.Value:F2}  Verdict: {result.Score.Label}");
 ```
 
-### Loading from JSONL
+For the full pipeline (run against many scenarios, persist evidence, walk the composite tree), see `AgenticBenchmarkRunner` in `AgentEval.Evals.Agentic.Composition` — or use the CLI which does all of that for you.
 
-Instead of hardcoding test cases, load them from JSONL files using `DatasetLoaderFactory`:
+## Available agentic presets
+
+| Preset | CLI name | Use case |
+|---|---|---|
+| `AgenticBenchmark.AgenticExecution(judge)` | `agentic-execution` | Standard 6-evaluator agent quality gate |
+| `AgenticBenchmark.ToolCallAccuracy(judge)` | `tool-call-accuracy` | Focused 5-sub-dimension tool-call diagnostic |
+| `AgenticBenchmark.RagQuality(judge)` | `rag-quality` | 7-evaluator RAG pipeline quality |
+| `AgenticBenchmark.JudgeQuality()` | `judge-quality` | Meta-evaluation of judge health (no LLM needed) |
+| `AgenticBenchmark.Safety(judge, policyResolver, …)` | `safety` | 12-evaluator safety/security gate |
+| `AgenticBenchmark.Telemetry()` | `telemetry` | 6 pure-code operational evaluators |
+| `AgenticBenchmark.StochasticStability()` | `stochastic-stability` | Run-to-run consistency |
+| `AgenticBenchmark.Conversational(judge)` | `conversational` | Memory + multi-turn quality |
+| `AgenticBenchmark.Reasoning(judge)` | `reasoning` | Reasoning chain quality |
+| `AgenticBenchmark.UserExperience(judge)` | `user-experience` | UX/communication quality |
+| `AgenticBenchmark.AdversarialDirect(judge)` | `adversarial-direct` | Direct adversarial resistance gate |
+
+Full preset reference + cost tiers: [agentic getting-started.md](benchmarks/agentic/getting-started.md#preset-reference).
+
+---
+
+## Performance Benchmark (in-process)
+
+`AgentEval.Benchmarks.PerformanceBenchmark` (in `AgentEval.Core`) measures latency percentiles, throughput, and estimated cost without LLM judging. Useful for capacity planning and regression detection on hot paths.
+
+```csharp
+using AgentEval.Benchmarks;
+
+var bench = new PerformanceBenchmark(adapter);
+var result = await bench.MeasureLatencyAsync(prompts, runsPerPrompt: 5);
+
+Console.WriteLine($"P50: {result.P50Ms} ms");
+Console.WriteLine($"P99: {result.P99Ms} ms");
+Console.WriteLine($"Throughput: {result.RequestsPerSecond:F1} req/s");
+```
+
+PerformanceBenchmark is a pure-code measurement layer — no LLM judge involved. It pairs naturally with the agentic suite's `telemetry` preset, which provides the equivalent measurements wrapped in the standard `EvalResult` envelope with budget thresholds.
+
+---
+
+## JSONL dataset loading
+
+Both the agentic suite and PerformanceBenchmark accept prompts loaded from JSONL files via `DatasetLoaderFactory`. JSONL is the industry-standard format for AI benchmark datasets (used by BFCL, GAIA, MMLU, GSM8K, ToolBench, etc.).
 
 ```csharp
 using AgentEval.DataLoaders;
 
-// Load tool accuracy test cases from JSONL (industry standard!)
-var dataset = await DatasetLoaderFactory.LoadAsync("benchmark-tool-accuracy.jsonl");
-var toolCases = dataset.Select(dc => dc.ToToolAccuracyTestCase()).ToList();
-
-var results = await benchmark.RunToolAccuracyBenchmarkAsync(toolCases);
+var dataset = await DatasetLoaderFactory.LoadAsync("samples/datasets/benchmark-tool-accuracy.jsonl");
+var prompts = dataset.Select(dc => dc.Input).ToList();
 ```
 
-Example JSONL file (`benchmark-tool-accuracy.jsonl`):
-```json
-{"id": "weather_simple", "input": "What is the weather in Seattle?", "expected_tools": ["GetWeather"], "metadata": {"required_params": {"GetWeather": ["city"]}}}
-{"id": "calc_simple", "input": "Calculate 15 * 7 + 3", "expected_tools": ["Calculate"], "metadata": {"required_params": {"Calculate": ["expression"]}}}
-```
-
-### Compare Against Published Leaderboard
-
-BFCL publishes scores for major models. Run your evaluations and compare:
-
-| Model | Simple | Parallel | Multiple | Multi-turn | Overall |
-|-------|--------|----------|----------|------------|---------|
-| GPT-4o | 94.5% | 91.2% | 88.5% | 82.1% | 89.1% |
-| Claude-3.5 | 92.1% | 88.7% | 85.2% | 79.8% | 86.5% |
-| Gemini-1.5 | 91.8% | 87.5% | 84.1% | 78.2% | 85.4% |
-| **Your Agent** | ?% | ?% | ?% | ?% | ?% |
+A working end-to-end sample lives at [`samples/AgentEval.Samples/DataAndInfrastructure/04_BenchmarkSystem.cs`](../samples/AgentEval.Samples/DataAndInfrastructure/04_BenchmarkSystem.cs) — it loads prompts from JSONL, runs an agent against each, and evaluates the responses with `AgenticBenchmark.ToolCallAccuracy(judge)`.
 
 ---
 
-## GAIA (General AI Assistants)
+## Custom presets
 
-GAIA tests multi-step reasoning and real-world task completion:
-
-```csharp
-var gaiaCases = new List<TaskCompletionTestCase>
-{
-    // Level 1: Simple
-    new TaskCompletionTestCase
-    {
-        Name = "gaia_level1_001",
-        Prompt = "What is the population of Tokyo?",
-        CompletionCriteria = new[]
-        {
-            "Provides a specific number",
-            "Number is approximately correct (within 5%)",
-            "Cites a source or explains where the data comes from"
-        },
-        PassingScore = 70
-    },
-    
-    // Level 2: Moderate
-    new TaskCompletionTestCase
-    {
-        Name = "gaia_level2_015",
-        Prompt = "Find the contact email for customer support at Microsoft",
-        CompletionCriteria = new[]
-        {
-            "Provides an email address",
-            "Email appears to be a valid Microsoft domain",
-            "Explains how to reach support"
-        },
-        PassingScore = 70
-    },
-    
-    // Level 3: Complex
-    new TaskCompletionTestCase
-    {
-        Name = "gaia_level3_042",
-        Prompt = "Research the top 3 electric vehicle manufacturers by market cap and compare their 2024 revenue",
-        CompletionCriteria = new[]
-        {
-            "Identifies 3 companies correctly",
-            "Provides market cap figures",
-            "Provides revenue figures",
-            "Makes a coherent comparison"
-        },
-        PassingScore = 80
-    }
-};
-
-var benchmark = new AgenticBenchmark(adapter, evaluator);
-var results = await benchmark.RunTaskCompletionBenchmarkAsync(gaiaCases);
-
-Console.WriteLine($"GAIA-Style Results");
-Console.WriteLine($"  Average Score: {results.AverageScore:F1}/100");
-Console.WriteLine($"  Pass Rate: {(double)results.PassedTests / results.TotalTests:P1}");
-```
-
-> **Note:** By default, `AgenticBenchmark` adds two standard criteria ("fully addresses the user's request", "complete and actionable") to every task completion evaluation. Set `AddDefaultCompletionCriteria = false` in `AgenticBenchmarkOptions` for strict criteria-only evaluation.
-
----
-
-## Performance Benchmarks
-
-Measure latency, throughput, and cost across your agents using `PerformanceBenchmark`.
-
-### Latency Benchmark
+To build your own preset composite:
 
 ```csharp
-var benchmark = new PerformanceBenchmark(adapter);
+using AgentEval.Core;
+using AgentEval.Evals;
 
-// Single prompt — run multiple iterations
-var result = await benchmark.RunLatencyBenchmarkAsync(
-    "What is the capital of France?",
-    iterations: 10,
-    warmupIterations: 2);
-
-Console.WriteLine($"Latency Benchmark");
-Console.WriteLine($"  P50: {result.P50Latency.TotalMilliseconds:F0}ms");
-Console.WriteLine($"  P90: {result.P90Latency.TotalMilliseconds:F0}ms");
-Console.WriteLine($"  P99: {result.P99Latency.TotalMilliseconds:F0}ms");
-Console.WriteLine($"  Mean: {result.MeanLatency.TotalMilliseconds:F0}ms");
-Console.WriteLine($"  Min: {result.MinLatency.TotalMilliseconds:F0}ms");
-Console.WriteLine($"  Max: {result.MaxLatency.TotalMilliseconds:F0}ms");
+var custom = new CompositeEval(
+    key: "my.custom.preset",
+    name: "My Custom Preset",
+    category: "custom",
+    version: "1.0.0",
+    components:
+    [
+        new(AgenticBenchmark.ToolCallAccuracy(judge), 0.6),
+        new(AgenticBenchmark.RagQuality(judge), 0.4),
+    ],
+    aggregation: WeightedSumAggregation.Instance,
+    threshold: 0.75);
 ```
 
-### Multi-Prompt Latency Benchmark
-
-Use varied prompts to avoid server-side caching effects:
-
-```csharp
-// Multiple prompts — avoids LLM server-side caching
-var result = await benchmark.RunLatencyBenchmarkAsync(
-    new[] { "What is 2+2?", "Name three colors.", "Capital of France?" },
-    iterationsPerPrompt: 3,
-    warmupIterations: 1);
-
-Console.WriteLine($"  Iterations: {result.Iterations}");   // 9 (3 prompts × 3)
-Console.WriteLine($"  Mean: {result.MeanLatency.TotalMilliseconds:F0}ms");
-```
-
-### Throughput Benchmark
-
-```csharp
-var result = await benchmark.RunThroughputBenchmarkAsync(
-    "What is 2+2?",
-    concurrentRequests: 10,
-    duration: TimeSpan.FromSeconds(60));
-
-Console.WriteLine($"Throughput Benchmark");
-Console.WriteLine($"  Requests/sec: {result.RequestsPerSecond:F1}");
-Console.WriteLine($"  Completed: {result.CompletedRequests}");
-Console.WriteLine($"  Errors: {result.ErrorCount}");
-Console.WriteLine($"  Mean Latency: {result.MeanLatency.TotalMilliseconds:F0}ms");
-```
-
-### Cost Benchmark
-
-```csharp
-var result = await benchmark.RunCostBenchmarkAsync(
-    new[] { "prompt1", "prompt2", "prompt3" },
-    "gpt-4o");
-
-Console.WriteLine($"Cost Benchmark");
-Console.WriteLine($"  Total Tokens: {result.TotalTokens}");
-Console.WriteLine($"  Avg Input/Prompt: {result.AverageInputTokensPerPrompt:F0}");
-Console.WriteLine($"  Avg Output/Prompt: {result.AverageOutputTokensPerPrompt:F0}");
-Console.WriteLine($"  Estimated Cost: ${result.EstimatedCostUSD:F6}");
-```
-
----
-
-## Workflow Performance Benchmarks
-
-> **🚧 Planned Feature** — `WorkflowPerformanceBenchmark` is planned for a future release.
-> Currently, use `PerformanceBenchmark` with individual agent adapters within your workflow,
-> or use `MAFEvaluationHarness` with `TrackPerformance = true` for end-to-end workflow timing.
-> See [Sample 09](../samples/AgentEval.Samples) (Sequential Workflows) and
-> [Sample 10](../samples/AgentEval.Samples) (Tool-Enabled Workflows) for workflow
-> performance monitoring patterns.
-
----
-
-## Creating Custom Benchmark Suites
-
-Create domain-specific benchmarks tailored to your use case by composing
-`AgenticBenchmark` and `PerformanceBenchmark`:
-
-```csharp
-public class CustomerSupportBenchmark
-{
-    private readonly IEvaluableAgent _agent;
-    private readonly IEvaluator _evaluator;
-    
-    public CustomerSupportBenchmark(IEvaluableAgent agent, IEvaluator evaluator)
-    {
-        _agent = agent;
-        _evaluator = evaluator;
-    }
-    
-    public async Task<Dictionary<string, double>> RunFullSuiteAsync()
-    {
-        var scores = new Dictionary<string, double>();
-        
-        var benchmark = new AgenticBenchmark(_agent, _evaluator);
-        var perfBenchmark = new PerformanceBenchmark(_agent);
-        
-        // Category 1: Tool accuracy
-        var toolResults = await benchmark.RunToolAccuracyBenchmarkAsync(GetToolTestCases());
-        scores["ToolAccuracy"] = toolResults.OverallAccuracy * 100;
-        
-        // Category 2: Task completion
-        var taskResults = await benchmark.RunTaskCompletionBenchmarkAsync(GetTaskTestCases());
-        scores["TaskCompletion"] = taskResults.AverageScore;
-        
-        // Category 3: Latency
-        var latencyResult = await perfBenchmark.RunLatencyBenchmarkAsync(
-            "What is my order status?", iterations: 5);
-        scores["P90LatencyMs"] = latencyResult.P90Latency.TotalMilliseconds;
-        
-        // Overall score (weighted)
-        scores["Overall"] = scores["ToolAccuracy"] * 0.4 + scores["TaskCompletion"] * 0.6;
-        
-        return scores;
-    }
-    
-    private List<ToolAccuracyTestCase> GetToolTestCases() => new()
-    {
-        new ToolAccuracyTestCase
-        {
-            Name = "password_reset",
-            Prompt = "I forgot my password, help me reset it",
-            ExpectedTools = new[] { new ExpectedTool { Name = "reset_password" } }
-        },
-        new ToolAccuracyTestCase
-        {
-            Name = "order_lookup",
-            Prompt = "Where is my order #12345?",
-            ExpectedTools = new[] { new ExpectedTool { Name = "track_order" } }
-        }
-    };
-    
-    private List<TaskCompletionTestCase> GetTaskTestCases() => new()
-    {
-        new TaskCompletionTestCase
-        {
-            Name = "refund_request",
-            Prompt = "I want a refund for my last order",
-            CompletionCriteria = new[]
-            {
-                "Acknowledges the refund request",
-                "Retrieves order details",
-                "Explains refund policy or timeline"
-            }
-        }
-    };
-}
-```
-
-### Run and Report
-
-```csharp
-var benchmark = new CustomerSupportBenchmark(agent, evaluator);
-var scores = await benchmark.RunFullSuiteAsync();
-
-Console.WriteLine("BENCHMARK RESULTS");
-foreach (var (category, score) in scores)
-{
-    Console.WriteLine($"  {category,-20} {score,8:F1}");
-}
-```
-
----
-
-## Regression Detection Pattern
-
-> **Note:** This is a recommended pattern — AgentEval does not yet provide built-in
-> baseline storage or comparison infrastructure. You implement the baseline I/O yourself.
-
-```csharp
-// Save results as your baseline
-var results = await benchmark.RunToolAccuracyBenchmarkAsync(testCases);
-File.WriteAllText("baseline.json", JsonSerializer.Serialize(new
-{
-    Date = DateTimeOffset.UtcNow,
-    ToolAccuracy = results.OverallAccuracy,
-    PassRate = (double)results.PassedTests / results.TotalTests
-}));
-
-// Later, compare against baseline
-var baseline = JsonDocument.Parse(File.ReadAllText("baseline.json"));
-var baselineAccuracy = baseline.RootElement.GetProperty("ToolAccuracy").GetDouble();
-
-var current = await benchmark.RunToolAccuracyBenchmarkAsync(testCases);
-
-if (current.OverallAccuracy < baselineAccuracy - 0.05)
-{
-    Console.WriteLine("⚠️ REGRESSION: Tool accuracy dropped!");
-    Environment.ExitCode = 1;  // Fail CI/CD
-}
-```
-
----
-
-## CI/CD Integration
-
-### GitHub Actions
-
-```yaml
-name: Benchmark
-
-on:
-  push:
-    branches: [main]
-  pull_request:
-
-jobs:
-  benchmark:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: '9.0.x'
-      
-      - name: Run Benchmarks
-        env:
-          AZURE_OPENAI_ENDPOINT: ${{ secrets.AZURE_OPENAI_ENDPOINT }}
-          AZURE_OPENAI_API_KEY: ${{ secrets.AZURE_OPENAI_API_KEY }}
-        run: |
-          dotnet run --project benchmarks/AgentBenchmarks.csproj
-```
-
-> **Tip:** Combine with the regression detection pattern above to fail CI on score drops.
-
----
-
-## API Reference Summary
-
-### PerformanceBenchmark
-
-| Method | Parameters | Returns |
-|--------|-----------|---------|
-| `RunLatencyBenchmarkAsync` | `string prompt, int iterations, int warmupIterations` | `LatencyBenchmarkResult` |
-| `RunLatencyBenchmarkAsync` | `IEnumerable<string> prompts, int iterationsPerPrompt, int warmupIterations` | `LatencyBenchmarkResult` |
-| `RunThroughputBenchmarkAsync` | `string prompt, int concurrentRequests, TimeSpan duration` | `ThroughputBenchmarkResult` |
-| `RunCostBenchmarkAsync` | `IEnumerable<string> prompts, string modelName` | `CostBenchmarkResult` |
-
-### AgenticBenchmark
-
-| Method | Parameters | Returns |
-|--------|-----------|---------|
-| `RunToolAccuracyBenchmarkAsync` | `IEnumerable<ToolAccuracyTestCase>` | `ToolAccuracyResult` |
-| `RunTaskCompletionBenchmarkAsync` | `IEnumerable<TaskCompletionTestCase>` | `TaskCompletionResult` |
-| `RunMultiStepReasoningBenchmarkAsync` | `IEnumerable<MultiStepTestCase>` | `MultiStepReasoningResult` |
-
-### Key Result Properties
-
-| Result Type | Key Properties |
-|-------------|---------------|
-| `LatencyBenchmarkResult` | `MeanLatency`, `MinLatency`, `MaxLatency`, `P50Latency`, `P90Latency`, `P99Latency`, `MeanTimeToFirstToken`, `AllLatencies` |
-| `ThroughputBenchmarkResult` | `RequestsPerSecond`, `CompletedRequests`, `ErrorCount`, `MeanLatency`, `Duration` |
-| `CostBenchmarkResult` | `EstimatedCostUSD`, `TotalTokens`, `TotalInputTokens`, `TotalOutputTokens`, `AverageInputTokensPerPrompt` |
-| `ToolAccuracyResult` | `OverallAccuracy`, `PassedTests`, `TotalTests`, `Results` |
-| `TaskCompletionResult` | `AverageScore`, `PassedTests`, `TotalTests`, `Results` |
-| `MultiStepReasoningResult` | `AverageStepCompletion`, `PassedTests`, `TotalTests`, `Results` |
+This combines two presets with custom weights. The result is a standard `CompositeEval` that runs through the same runner / reporter / audit-chain pipeline as the built-in presets.
 
 ---
 
 ## See Also
 
-- [Sample 06](../samples/AgentEval.Samples) - Performance profiling with MAFEvaluationHarness
-- [Sample 23](../samples/AgentEval.Samples) - Benchmark system with JSONL data loading
-- [Stochastic Evaluation](stochastic-evaluation.md) - Statistical evaluation for benchmarks
-- [Model Comparison](model-comparison.md) - Compare models on benchmarks
-- [Extensibility Guide](extensibility.md) - Creating custom metrics
+- [Composite Evaluations](composite-evals.md) — the underlying `CompositeEval` / `AtomicLlmEval` / `AtomicCodeEval` primitives.
+- [CLI Reference](cli.md) — `agenteval bench {agentic,gdpr,eu-ai-act}` and their `calibrate` subcommands.
+- [The `.agenteval/` Workspace](agenteval-workspace.md) — canonical layout, schema versions, audit chain.
+- [Evaluation Guide](evaluation-guide.md) — overall framework concepts.

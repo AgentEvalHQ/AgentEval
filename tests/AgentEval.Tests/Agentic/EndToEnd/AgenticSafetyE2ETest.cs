@@ -4,13 +4,14 @@
 
 using AgentEval.Core;
 using AgentEval.Evals;
+using AgentEval.Evals.Agentic;
 using AgentEval.Evals.Agentic.Composition;
 using AgentEval.Evals.Agentic.Safety;
 using AgentEval.Evals.Agentic.Safety.Policy;
 using AgentEval.Output;
 using Xunit;
 using AgentEval.Tests.Agentic;
-using AgenticBenchmarkFactory = AgentEval.Evals.Agentic.Composition.AgenticBenchmark;
+using AgenticBenchmarkFactory = AgentEval.Evals.Agentic.AgenticBenchmark;
 
 namespace AgentEval.Tests.Agentic.EndToEnd;
 

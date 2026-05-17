@@ -57,7 +57,7 @@ public sealed class EvaluatorCardRegistry
     private static Dictionary<string, EvaluatorCard> LoadAll()
     {
         // Cards live in AgentEval.Evals.Agentic; locate that assembly via a known type.
-        var asm = typeof(AgentEval.Evals.Agentic.Composition.AgenticBenchmark).Assembly;
+        var asm = typeof(AgentEval.Evals.Agentic.AgenticBenchmark).Assembly;
         var cardResources = asm.GetManifestResourceNames()
             .Where(n => n.Contains("EvaluatorCards.") && n.EndsWith(".json", StringComparison.OrdinalIgnoreCase))
             .ToArray();
