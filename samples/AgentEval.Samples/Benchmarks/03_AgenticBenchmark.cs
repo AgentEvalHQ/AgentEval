@@ -77,11 +77,14 @@ public static class AgenticBenchmarkSample
             ModelId: AIConfig.ModelDeployment,
             Framework: "MAF");
 
-        var paths = await BenchmarkSampleHelpers.WriteReportsAsync(
+        var paths = await BenchmarkSampleHelpers.WriteReportsViaStoreAsync(
             result, subject,
             benchmarkName: "agentic",
             regulationOrBenchmark: $"AgentEval Agentic — {presetLabel}",
-            includePdf: true);
+            includePdf: true,
+            regulationCodeForEvidence: null,
+            presetLabel: preset.ToString().ToLowerInvariant(),
+            judgeModel: AIConfig.ModelDeployment);
 
         BenchmarkSampleHelpers.PrintReportPaths(result, paths);
         BenchmarkSampleHelpers.OfferToOpenReports(paths);

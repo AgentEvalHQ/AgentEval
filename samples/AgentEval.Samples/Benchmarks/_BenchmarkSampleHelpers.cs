@@ -10,8 +10,30 @@ using AgentEval.Core.Evals.Rendering;
 using AgentEval.Evals;
 using AgentEval.Output;
 using AgentEval.Rendering.Pdf;
+using AgentEval.RedTeam;
+using AgentEval.RedTeam.Reporting.Compliance;
+using AgentEval.Compliance.Gdpr.Articles;
+using AgentEval.Compliance.Gdpr.Reporting;
+using AgentEval.Compliance.EuAiAct.Articles;
+using AgentEval.Compliance.EuAiAct.Reporting;
 
 namespace AgentEval.Samples.Benchmarks;
+
+/// <summary>
+/// Bundle of paths returned by <see cref="BenchmarkSampleHelpers.WriteReportsViaStoreAsync"/>.
+/// Both locations are populated for every successful run: the canonical
+/// <c>.agenteval/</c> tree (which Mission Control + <c>agenteval doctor</c> read)
+/// and the sidecar <c>output/{family}/run-{ts}/</c> tree (which the report
+/// browser walks + users open directly).
+/// </summary>
+internal sealed record SampleRunPaths(
+    string CanonicalRunDir,
+    string SidecarDir,
+    string SidecarJson,
+    string SidecarHtml,
+    string? SidecarPdf,
+    string RunId,
+    string? AuditHash);
 
 /// <summary>
 /// Selects the breadth / fidelity tier each benchmark sample runs at. Resolution
@@ -51,6 +73,91 @@ internal static class BenchmarkSampleHelpers
         var full = Path.GetFullPath(root);
         Directory.CreateDirectory(full);
         return full;
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    //  Canonical .agenteval/ workspace bootstrapping (v0.10.1 — Mission Control)
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// The sample suite's canonical AgentEval solution name. All samples write into
+    /// one solution so Mission Control / <c>agenteval doctor</c> see them grouped.
+    /// </summary>
+    public const string SamplesSolutionName = "AgentEval Samples";
+
+    private static readonly Lazy<FileSystemOutputStore> s_sharedStore =
+        new(InitializeStore, isThreadSafe: true);
+
+    /// <summary>
+    /// Returns the sample workspace root — the directory whose <c>.agenteval/</c>
+    /// subfolder receives the canonical run artefacts. This is
+    /// <c>samples/AgentEval.Samples/</c>, regardless of the host process's CWD.
+    /// </summary>
+    public static string SampleWorkspaceRoot
+    {
+        get
+        {
+            // AppContext.BaseDirectory points at the bin/{config}/{tfm}/ output
+            // dir during `dotnet run`, so three "..\" hops back to the project
+            // root mirror EnsureRunDirectory's convention exactly.
+            var root = Path.Combine(AppContext.BaseDirectory, "..", "..", "..");
+            return Path.GetFullPath(root);
+        }
+    }
+
+    /// <summary>
+    /// Returns the canonical <c>.agenteval/</c> directory under the sample workspace.
+    /// Mission Control reads from here; <see cref="WriteReportsViaStoreAsync"/> writes
+    /// the manifest, scenarios, summary, and compliance evidence here.
+    /// </summary>
+    public static string SampleAgentEvalDir =>
+        Path.Combine(SampleWorkspaceRoot, ".agenteval");
+
+    /// <summary>
+    /// Returns the lazily-initialised <see cref="FileSystemOutputStore"/> bound to
+    /// the sample workspace. The store is a process-wide singleton so multiple
+    /// samples in one run share the solution cache + run-locator cache.
+    /// </summary>
+    public static FileSystemOutputStore SharedStore => s_sharedStore.Value;
+
+    /// <summary>
+    /// Initialises the canonical <c>.agenteval/</c> workspace lazily: creates the
+    /// directory if missing and seeds a <c>solution.json</c> when one isn't
+    /// already on disk. Mirrors what <c>agenteval init</c> would write so the
+    /// store's <see cref="FileSystemOutputStore.EnsureSolutionAsync"/> contract holds.
+    /// </summary>
+    private static FileSystemOutputStore InitializeStore()
+    {
+        var dir = SampleAgentEvalDir;
+        Directory.CreateDirectory(dir);
+
+        var solutionFile = Path.Combine(dir, "solution.json");
+        if (!File.Exists(solutionFile))
+        {
+            var solutionDoc = new
+            {
+                schemaVersion = "1.0",
+                id = Guid.NewGuid(),
+                name = SamplesSolutionName,
+            };
+            var json = JsonSerializer.Serialize(solutionDoc, new JsonSerializerOptions
+            {
+                WriteIndented = true,
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+            });
+            File.WriteAllText(solutionFile, json);
+        }
+
+        var gitignoreFile = Path.Combine(dir, ".gitignore");
+        if (!File.Exists(gitignoreFile))
+        {
+            // The default init template lives in the CLI's embedded resources; we
+            // can't reach it from a sample, but a minimal ".lock + .tmp" gitignore
+            // keeps sentinel files out of source control which is the practical goal.
+            File.WriteAllText(gitignoreFile, "# AgentEval workspace gitignore (samples)\n*.lock\n*.tmp\n*.invalid.json\n");
+        }
+
+        return new FileSystemOutputStore(dir);
     }
 
     /// <summary>
@@ -102,6 +209,317 @@ internal static class BenchmarkSampleHelpers
         return (jsonPath, htmlPath, pdfPath);
     }
 
+    /// <summary>
+    /// Persists <paramref name="result"/> through <em>both</em> the canonical
+    /// <c>.agenteval/</c> output store (so Mission Control + <c>agenteval doctor</c>
+    /// see the run with a valid audit chain) AND the legacy
+    /// <c>output/{family}/run-{ts}/</c> sidecar (HTML / PDF / bare JSON for
+    /// direct browser open + the <c>09_ReportBrowser</c> sample).
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Architecture (v0.10.1, plan-25):
+    /// <list type="bullet">
+    ///   <item><description>Manifest, scenarios, summary, compliance evidence → canonical <c>.agenteval/</c> via <see cref="FileSystemOutputStore"/>.</description></item>
+    ///   <item><description>HTML / PDF / bare JSON → sidecar <c>output/{family}/run-{ts}/</c>.</description></item>
+    /// </list>
+    /// </para>
+    /// <para>
+    /// The HTML + PDF renderers receive the canonical manifest's
+    /// <c>ContentHash</c> as their <c>auditHash</c> option so the rendered
+    /// footer carries the real chain anchor — viewers can re-verify against
+    /// the canonical run.
+    /// </para>
+    /// <para>
+    /// For compliance benchmarks pass a non-null <paramref name="regulationCodeForEvidence"/>
+    /// ("gdpr" / "eu-ai-act") to also persist the regulator-grade evidence
+    /// document via the appropriate reporter. For agentic / performance runs
+    /// pass <c>null</c> — only the manifest + scenarios + summary land.
+    /// </para>
+    /// </remarks>
+    public static async Task<SampleRunPaths> WriteReportsViaStoreAsync(
+        EvalResult result,
+        SubjectIdentity subject,
+        string benchmarkName,
+        string regulationOrBenchmark,
+        bool includePdf,
+        string? regulationCodeForEvidence = null,
+        string? presetLabel = null,
+        ArticlesRegistry? gdprArticlesRegistry = null,
+        EuAiActArticlesRegistry? euAiActArticlesRegistry = null,
+        string? judgeModel = null,
+        CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(result);
+        ArgumentNullException.ThrowIfNull(subject);
+        ArgumentException.ThrowIfNullOrWhiteSpace(benchmarkName);
+        ArgumentException.ThrowIfNullOrWhiteSpace(regulationOrBenchmark);
+
+        // ── 1. Bootstrap the shared store + register the subject ───────────────
+        var store = SharedStore;
+        await store.EnsureSolutionAsync(ct);
+        await store.EnsureSubjectAsync(subject, ct);
+
+        // ── 2. Start the run ────────────────────────────────────────────────────
+        var runContext = new RunContext(
+            EvalProject: "AgentEval.Samples",
+            EvalProjectPath: "samples/AgentEval.Samples/",
+            Harness: $"Samples.Benchmarks.{benchmarkName}",
+            Seed: null,
+            ParentInvocationId: null,
+            Kind: regulationCodeForEvidence is null ? "benchmark" : "compliance");
+
+        var manifest = await store.StartRunAsync(subject, runContext, ct);
+        var runId = manifest.Run.RunId;
+
+        // ── 3. Persist every leaf as a ScenarioResult ──────────────────────────
+        // The composite result was built either by CompositeEval.EvaluateAsync
+        // (B2 / B3 / B6 / B7) or by RunCompliancePresetWithAgentProbesAsync
+        // (B4 / B5). Either way, walking SubResults yields the atomic leaves.
+        var leafIndex = 0;
+        foreach (var (scenarioId, leaf) in EnumerateAtomicLeaves(result))
+        {
+            // ScenarioResult.Id must be unique within a run — append the ordinal
+            // index to disambiguate the case where two leaves share a Metric.Key
+            // (multi-judge wrapping, scenario fan-out, etc.).
+            var uniqueId = $"{leafIndex:D4}-{scenarioId}";
+            var sr = EvalResultPersistence.ToScenarioResult(leaf, uniqueId, leaf.Metric.Name);
+            await store.WriteScenarioResultAsync(runId, sr, ct);
+            leafIndex++;
+        }
+
+        // ── 4. Complete the run (this fills in ContentHash) ────────────────────
+        var summary = BuildRunSummary(result, runId);
+        await store.CompleteRunAsync(manifest, summary, ct);
+
+        // ── 5. Fetch the post-completion manifest to retrieve the audit hash ───
+        var completedManifest = await store.GetRunManifestAsync(runId, ct);
+        var auditHash = completedManifest?.ContentHash;
+
+        // ── 6. Compliance evidence (regulator-grade reporters) ─────────────────
+        if (!string.IsNullOrWhiteSpace(regulationCodeForEvidence))
+        {
+            try
+            {
+                await WriteComplianceEvidenceAsync(
+                    store, subject, runId, result,
+                    regulationCodeForEvidence,
+                    presetLabel,
+                    gdprArticlesRegistry,
+                    euAiActArticlesRegistry,
+                    judgeModel,
+                    ct);
+            }
+            catch (Exception ex)
+            {
+                // Compliance-evidence write is best-effort: a malformed
+                // composite shape (e.g. a domain pack the reporter wasn't
+                // built for) must not lose the canonical run. Surface the
+                // failure but keep the run intact.
+                Console.WriteLine($"   Warning: compliance evidence write failed: {ex.GetType().Name}: {ex.Message}");
+            }
+        }
+
+        // ── 7. Sidecar artefacts (HTML / PDF / bare JSON) ──────────────────────
+        var sidecarDir = EnsureRunDirectory(benchmarkName);
+        var sidecarJsonPath = Path.Combine(sidecarDir, "report.json");
+        var sidecarJsonOpts = new JsonSerializerOptions { WriteIndented = true };
+        await File.WriteAllTextAsync(sidecarJsonPath, JsonSerializer.Serialize(result, sidecarJsonOpts), ct);
+
+        var renderOpts = new EvalResultRenderOptions(
+            Subject: subject,
+            Title: result.Metric.Name,
+            RegulationOrBenchmark: regulationOrBenchmark,
+            RunId: runId,
+            GeneratedAt: DateTimeOffset.UtcNow,
+            IncludeProvenance: true,
+            AuditHash: auditHash,
+            AgentEvalVersion: "0.10.1-beta");
+
+        var htmlBytes = await new HtmlEvalResultRenderer().RenderAsync(result, renderOpts, ct);
+        var sidecarHtmlPath = Path.Combine(sidecarDir, "report.html");
+        await File.WriteAllBytesAsync(sidecarHtmlPath, htmlBytes, ct);
+
+        string? sidecarPdfPath = null;
+        if (includePdf)
+        {
+            var pdfBytes = await new PdfEvalResultRenderer().RenderAsync(result, renderOpts, ct);
+            sidecarPdfPath = Path.Combine(sidecarDir, "report.pdf");
+            await File.WriteAllBytesAsync(sidecarPdfPath, pdfBytes, ct);
+        }
+
+        // ── 8. Resolve the canonical run dir for the print-paths helper ────────
+        // The store doesn't expose RunDir publicly, but we can reconstruct it
+        // from FileSystemLayout's known convention: subjects/{kind.Folder()}/{name}/runs/{runId}/.
+        var sanitizedKind = subject.Kind.Folder();
+        var sanitizedName = SanitizeForPath(subject.Name);
+        var canonicalRunDir = Path.Combine(
+            SampleAgentEvalDir, "subjects", sanitizedKind, sanitizedName, "runs", runId);
+
+        return new SampleRunPaths(
+            CanonicalRunDir: canonicalRunDir,
+            SidecarDir: sidecarDir,
+            SidecarJson: sidecarJsonPath,
+            SidecarHtml: sidecarHtmlPath,
+            SidecarPdf: sidecarPdfPath,
+            RunId: runId,
+            AuditHash: auditHash);
+    }
+
+    /// <summary>
+    /// Dispatches compliance-evidence persistence to the right reporter based on
+    /// the <paramref name="regulationCode"/>. GDPR + EU AI Act use their composite-
+    /// tree reporters; the OWASP / MITRE reporters take a <c>RedTeamResult</c>
+    /// directly and are wired by the OWASP / MITRE samples themselves
+    /// (which split the scan into <c>ScanAsync</c> + <c>BuildEvalResult</c>
+    /// so the native shape stays available).
+    /// </summary>
+    private static async Task WriteComplianceEvidenceAsync(
+        FileSystemOutputStore store,
+        SubjectIdentity subject,
+        string runId,
+        EvalResult compositeResult,
+        string regulationCode,
+        string? presetLabel,
+        ArticlesRegistry? gdprRegistry,
+        EuAiActArticlesRegistry? euAiActRegistry,
+        string? judgeModel,
+        CancellationToken ct)
+    {
+        switch (regulationCode.ToLowerInvariant())
+        {
+            case "gdpr":
+                if (gdprRegistry is null)
+                    throw new InvalidOperationException("GDPR evidence requires ArticlesRegistry.");
+                var gdprReporter = new GDPRComplianceReporter(gdprRegistry);
+                await gdprReporter.SaveReportAsync(
+                    store, subject, runId, compositeResult,
+                    new GdprReportOptions(
+                        Preset: presetLabel ?? "standard",
+                        DomainPacks: Array.Empty<string>(),
+                        JudgeMode: "mode-a",
+                        JudgeModel: judgeModel),
+                    ct);
+                break;
+
+            case "eu-ai-act":
+                if (euAiActRegistry is null)
+                    throw new InvalidOperationException("EU AI Act evidence requires EuAiActArticlesRegistry.");
+                var euReporter = new EuAiActComplianceReporter(euAiActRegistry);
+                await euReporter.SaveReportAsync(
+                    store, subject, runId, compositeResult,
+                    new EuAiActReportOptions(
+                        Preset: presetLabel ?? "standard",
+                        DomainPacks: Array.Empty<string>(),
+                        JudgeMode: "mode-a",
+                        JudgeModel: judgeModel),
+                    ct);
+                break;
+
+            default:
+                throw new ArgumentException(
+                    $"Unknown regulationCodeForEvidence '{regulationCode}'. " +
+                    "Known: gdpr, eu-ai-act. OWASP / MITRE samples must pass their " +
+                    "RedTeamResult to WriteRedTeamComplianceEvidenceAsync instead.",
+                    nameof(regulationCode));
+        }
+    }
+
+    /// <summary>
+    /// OWASP / MITRE samples call this after <c>WriteReportsViaStoreAsync</c> with
+    /// the <see cref="RedTeamResult"/> they captured via <c>ScanAsync</c>. The
+    /// reporter writes its native compliance evidence shape under
+    /// <c>.agenteval/compliance/{REG}/{subject}/{ts}/evidence.json</c> with the
+    /// audit chain validated against the canonical run.
+    /// </summary>
+    public static async Task WriteRedTeamComplianceEvidenceAsync(
+        SubjectIdentity subject,
+        string runId,
+        RedTeamResult redTeamResult,
+        string regulationCode,
+        CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(subject);
+        ArgumentException.ThrowIfNullOrWhiteSpace(runId);
+        ArgumentNullException.ThrowIfNull(redTeamResult);
+        ArgumentException.ThrowIfNullOrWhiteSpace(regulationCode);
+
+        var store = SharedStore;
+        switch (regulationCode.ToLowerInvariant())
+        {
+            case "owasp":
+                await new OWASPComplianceReporter().SaveReportAsync(store, subject, runId, redTeamResult, options: null, ct);
+                break;
+            case "mitre":
+                await new MITREATLASReporter().SaveReportAsync(store, subject, runId, redTeamResult, options: null, ct);
+                break;
+            default:
+                throw new ArgumentException(
+                    $"Unknown red-team regulationCode '{regulationCode}'. Known: owasp, mitre.",
+                    nameof(regulationCode));
+        }
+    }
+
+    /// <summary>
+    /// Walks the <paramref name="node"/> EvalResult tree leaf-first, yielding
+    /// each atomic leaf paired with its metric key. Mirrors
+    /// <c>GdprBenchmarkRunner.EnumerateAtomicLeaves</c>.
+    /// </summary>
+    private static IEnumerable<(string Id, EvalResult Result)> EnumerateAtomicLeaves(EvalResult node)
+    {
+        var subs = node.Details.SubResults;
+        if (subs is null || subs.Count == 0)
+        {
+            yield return (node.Metric.Key, node);
+            yield break;
+        }
+        foreach (var child in subs)
+            foreach (var leaf in EnumerateAtomicLeaves(child))
+                yield return leaf;
+    }
+
+    /// <summary>
+    /// Builds a <see cref="RunSummary"/> from a composite result's verdict and
+    /// the rolled-up leaf statistics. Mirrors the shape the GDPR / OWASP CLI
+    /// commands produce so Mission Control's view is identical.
+    /// </summary>
+    private static RunSummary BuildRunSummary(EvalResult root, string runId)
+    {
+        var leaves = EnumerateAtomicLeaves(root).Select(l => l.Result).ToList();
+        var passed = leaves.Count(l => l.Score.Passed);
+        var failed = leaves.Count(l => !l.Score.Passed && l.Score.Label != "warn");
+        var warnings = leaves.Count(l => l.Score.Label == "warn");
+
+        var verdict = root.Score.Label.ToUpperInvariant() switch
+        {
+            "PASS" => "PASS",
+            "WARN" => "WARN",
+            _      => "FAIL",
+        };
+
+        return new RunSummary(
+            SchemaVersion: "1.0",
+            RunId: runId,
+            Verdict: verdict,
+            Stats: new RunStats(leaves.Count, passed, failed, warnings),
+            Metrics: new Dictionary<string, double>
+            {
+                ["overallScore"] = root.Score.Value,
+            });
+    }
+
+    /// <summary>
+    /// Sanitises a name for use as a path segment — mirrors the rule the CLI
+    /// commands use so the canonical-run path the helper reconstructs matches
+    /// the path the store actually wrote to.
+    /// </summary>
+    private static string SanitizeForPath(string name)
+    {
+        var invalid = Path.GetInvalidFileNameChars().Concat(new[] { '/', '\\' }).ToArray();
+        var s = string.Concat(name.Select(c => invalid.Contains(c) ? '-' : c));
+        return s.Trim('.', ' ');
+    }
+
     /// <summary>Prints a per-sample header banner.</summary>
     public static void PrintHeader(string title, string subtitle)
     {
@@ -140,6 +558,46 @@ internal static class BenchmarkSampleHelpers
         if (paths.pdf is not null)
             Console.WriteLine($"   PDF:  {paths.pdf}");
     }
+
+    /// <summary>
+    /// Prints the v0.10.1 dual-location summary: canonical <c>.agenteval/</c> run dir
+    /// (Mission Control reads here) plus sidecar <c>output/{family}/run-{ts}/</c>
+    /// (HTML / PDF / JSON for direct human consumption).
+    /// </summary>
+    public static void PrintReportPaths(EvalResult result, SampleRunPaths paths)
+    {
+        Console.WriteLine();
+        Console.WriteLine("   +------------------------------------------------------------+");
+        Console.WriteLine("   |                       SUMMARY                              |");
+        Console.WriteLine("   +------------------------------------------------------------+");
+        var label = string.Equals(result.Score.Label, "skipped", StringComparison.OrdinalIgnoreCase)
+            ? "NOT TESTED"
+            : result.Score.Label.ToUpperInvariant();
+        Console.WriteLine($"   Verdict:  {label}   Score: {result.Score.Value:P1}   Severity: {result.Score.Severity}");
+        Console.WriteLine();
+        Console.WriteLine($"   Run ID:   {paths.RunId}");
+        if (paths.AuditHash is not null)
+            Console.WriteLine($"   Audit:    {paths.AuditHash}");
+        Console.WriteLine();
+        Console.WriteLine($"   Canonical run:    {paths.CanonicalRunDir}");
+        Console.WriteLine($"   Sidecar reports:  {paths.SidecarDir}");
+        Console.WriteLine($"     - JSON: {Path.GetFileName(paths.SidecarJson)}");
+        Console.WriteLine($"     - HTML: {Path.GetFileName(paths.SidecarHtml)}");
+        if (paths.SidecarPdf is not null)
+            Console.WriteLine($"     - PDF:  {Path.GetFileName(paths.SidecarPdf)}");
+        Console.WriteLine();
+        Console.WriteLine("   Mission Control:");
+        Console.WriteLine("     cd samples/AgentEval.Samples && dotnet agenteval mc");
+        Console.WriteLine("     (MC discovers .agenteval/ automatically and lists this run)");
+    }
+
+    /// <summary>
+    /// Companion to the tuple-based <c>OfferToOpenReports</c> overload for the
+    /// dual-location <see cref="SampleRunPaths"/>. Opens the sidecar files —
+    /// the canonical run dir is for tooling consumption.
+    /// </summary>
+    public static void OfferToOpenReports(SampleRunPaths paths)
+        => OfferToOpenReports((paths.SidecarJson, paths.SidecarHtml, paths.SidecarPdf));
 
     /// <summary>
     /// Prompts the user to open one of the just-saved report files with the OS default
