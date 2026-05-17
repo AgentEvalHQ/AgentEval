@@ -1,7 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
-    <OutputType>Exe</OutputType>
     <RootNamespace>AgentEval.EuAiActBenchmark</RootNamespace>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
@@ -9,10 +8,10 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\AgentEval.Abstractions\AgentEval.Abstractions.csproj" />
-    <ProjectReference Include="..\..\src\AgentEval.Core\AgentEval.Core.csproj" />
-    <ProjectReference Include="..\..\src\AgentEval.DataLoaders\AgentEval.DataLoaders.csproj" />
-    <ProjectReference Include="..\..\src\AgentEval.Evals.Compliance.Gdpr\AgentEval.Evals.Compliance.Gdpr.csproj" />
+    <ProjectReference Include="..\AgentEval.Abstractions\AgentEval.Abstractions.csproj" />
+    <ProjectReference Include="..\AgentEval.Core\AgentEval.Core.csproj" />
+    <ProjectReference Include="..\AgentEval.DataLoaders\AgentEval.DataLoaders.csproj" />
+    <ProjectReference Include="..\AgentEval.Evals.Compliance.Gdpr\AgentEval.Evals.Compliance.Gdpr.csproj" />
   </ItemGroup>
 
   <ItemGroup>

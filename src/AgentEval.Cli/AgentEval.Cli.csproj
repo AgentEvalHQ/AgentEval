@@ -13,7 +13,7 @@
     <ProjectReference Include="../AgentEval.DataLoaders/AgentEval.DataLoaders.csproj" />
     <ProjectReference Include="../AgentEval.Evals.Agentic/AgentEval.Evals.Agentic.csproj" />
     <ProjectReference Include="..\AgentEval.Evals.Compliance.Gdpr\AgentEval.Evals.Compliance.Gdpr.csproj" />
-    <ProjectReference Include="..\..\samples\AgentEval.EuAiActBenchmark\AgentEval.EuAiActBenchmark.csproj" />
+    <ProjectReference Include="..\AgentEval.Evals.Compliance.EuAiAct\AgentEval.Evals.Compliance.EuAiAct.csproj" />
   </ItemGroup>
 
   <!-- Plan-08 MC1.7.1: AgentEval.MissionControl is net10-only (Hot Chocolate 16
