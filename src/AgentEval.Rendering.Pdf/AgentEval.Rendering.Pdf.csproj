@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
+    <RootNamespace>AgentEval.Rendering.Pdf</RootNamespace>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <IsPackable>false</IsPackable>
+    <Description>Generic IEvalResultRenderer PDF implementation. Backed by QuestPDF (Community license). Renders any EvalResult composite tree into an audit-grade PDF with cover page, per-leaf detail sections, and an audit-chain footer. Family-specific renderers (GDPR, EU AI Act, Agentic) keep their bespoke shape; this one targets cross-family scenarios.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\AgentEval.Abstractions\AgentEval.Abstractions.csproj" />
+    <ProjectReference Include="..\AgentEval.Core\AgentEval.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="QuestPDF" />
+  </ItemGroup>
+
+</Project>

@@ -38,6 +38,7 @@
     <ProjectReference Include="..\..\src\AgentEval.Compliance.EuAiAct\AgentEval.Compliance.EuAiAct.csproj" />
     <ProjectReference Include="..\..\src\AgentEval.Evals.Performance\AgentEval.Evals.Performance.csproj" />
     <ProjectReference Include="..\..\src\AgentEval.Evals.Agentic\AgentEval.Evals.Agentic.csproj" />
+    <ProjectReference Include="..\..\src\AgentEval.Rendering.Pdf\AgentEval.Rendering.Pdf.csproj" />
     <!-- MissionControl is net10.0-only (server project); guard the reference so older
          test target frameworks can still build the rest of the suite. -->
     <ProjectReference Include="..\..\src\AgentEval.MissionControl\AgentEval.MissionControl.csproj"

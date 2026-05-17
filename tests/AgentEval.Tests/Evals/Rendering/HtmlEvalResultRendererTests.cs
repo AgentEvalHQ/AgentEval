@@ -225,7 +225,7 @@ public class HtmlEvalResultRendererTests
     // ── UTF-8 round-trip ──────────────────────────────────────────────────────
 
     [Fact]
-    public void Output_is_utf8_encoded()
+    public async Task Output_is_utf8_encoded()
     {
         var result = new EvalResult(
             Metric: new("k", "Naïve résumé café 漢字", "test", "1.0.0"),
@@ -234,7 +234,7 @@ public class HtmlEvalResultRendererTests
             Provenance: new("atomic-code", null, null, null, null, 0, false),
             EvaluatedAt: DateTimeOffset.UtcNow);
 
-        var bytes = new HtmlEvalResultRenderer().RenderAsync(result, DefaultOpts()).GetAwaiter().GetResult();
+        var bytes = await new HtmlEvalResultRenderer().RenderAsync(result, DefaultOpts());
         var s = Encoding.UTF8.GetString(bytes);
         // WebUtility.HtmlEncode escapes Latin-extended chars to numeric entities but leaves
         // higher-BMP characters (CJK) untouched. Either way the content survives the encode +
