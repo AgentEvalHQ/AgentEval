@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+(no unreleased changes)
+
+## [0.9.0-beta] - 2026-05-17
+
 ### Removed (BREAKING) — Legacy `AgenticBenchmark` library API
 
 Removed the entire pre-v0.9.0 library-API benchmark surface. The new agentic preset-factory API (`AgentEval.Evals.Agentic.AgenticBenchmark` + the ~60-evaluator suite, driven via `agenteval bench agentic --preset X`) is the canonical replacement and is strictly more capable.
