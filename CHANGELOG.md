@@ -7,7 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-(no unreleased changes)
+### Known issues / tracked for v0.10.1+
+
+- **NuGetConsumer LLM non-determinism**: `samples/AgentEval.NuGetConsumer.Tests/SafetyPolicyTests.CancellationRequest_ShouldConfirmBeforeCancelling` is flaky at roughly 90% pass rate on 10-iteration stress (real LLM call; when the model responds with text instead of a tool call, the strict tool-call assertion fails). Pre-existing — predates the v0.10.0-beta arc. Not introduced by any phase of v0.10.0-beta. Tracked here for v0.10.1 stabilisation (likely fix: relax the test's strictness to accept either-tool-or-confirmation-text, or seed the model into a deterministic mode).
+- **`docs/redteam/owasp.md` not authored**: `OwaspBenchmarkRegistration.docLinkUrl` points at this future doc; deferred to v0.11+ docs-pack.
+- **`README.md` benchmark-table sweep + `docs/benchmarks.md` update**: deferred to v0.10.1 docs-pack. The README is version-agnostic so no urgency.
+- **Agentic `safety` preset + GDPR/EuAiAct domain-pack registry surfaces**: `BenchmarkFamilyRegistry.CompositeFactory` paths throw at call time for presets that need programmatic config (PolicyResolver / domain-pack composition). Documented in registration files; users use the direct programmatic API. v0.10.1+ would add a `RequiresProgrammaticConstruction` flag on `BenchmarkPreset` to surface this in `bench --list` more gracefully.
+- **`BenchmarkFamilyRegistryTests` count**: ADR-017 §Verification says "12 tests"; the source file has 13. Cosmetic.
 
 ## [0.10.0-beta] - 2026-05-17
 
@@ -85,11 +91,15 @@ New top-level preset factory over the existing red-team attack pipeline. Presets
 
 `OwaspBenchmark.Top10(judge).EvaluateAsync(input, ct)` returns a 10-leaf `EvalResult`
 composite (one leaf per OWASP LLM Top 10 category). 4 of the 10 categories that aren't
-testable at the agent-API layer (LLM03 / LLM04 / LLM05 / LLM07) emit honest `skipped`
-leaves rather than fabricated scores. Aggregation: `MinAggregation` (security-gate
-semantics — a single critical-fail caps the composite). The bespoke
-`OWASPComplianceReport` remains available alongside the `EvalResult` for downstream
-consumers that want richer evidence data.
+testable at the agent-API layer (LLM03 Supply Chain, LLM04 Data/Model Poisoning,
+LLM08 Vector/Embedding Weaknesses, LLM09 Misinformation) emit honest `skipped` leaves
+rather than fabricated scores. The 6 tested categories are LLM01 (Prompt Injection),
+LLM02 (Sensitive Information Disclosure), LLM05 (Improper Output Handling),
+LLM06 (Excessive Agency), LLM07 (System Prompt Leakage), and LLM10 (Unbounded
+Consumption). Aggregation: `MinAggregation` (security-gate semantics — a single
+critical-fail caps the composite). The bespoke `OWASPComplianceReport` remains
+available alongside the `EvalResult` for downstream consumers that want richer
+evidence data.
 
 ### Added — `MitreBenchmark` façade (`AgentEval.Benchmarks` namespace)
 

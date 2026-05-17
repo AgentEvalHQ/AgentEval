@@ -309,6 +309,52 @@ public class MitreBenchmarkTests
             restoredSkipped);
     }
 
+    // ─── Convention-2 adapter equivalence ─────────────────────────────────────
+
+    /// <summary>
+    /// Phase-10 completeness audit (LR#21): pins the Convention-2 invariant that
+    /// <see cref="MitreBenchmarkRun.EvaluateAsync"/> is functionally equivalent to
+    /// <c>BuildEvalResult(await ScanAsync(agent))</c> — the two code paths must produce
+    /// the same 12-leaf composite shape and scoring. Catches a regression where one
+    /// path drifts from the other.
+    /// </summary>
+    [Fact]
+    public async Task EvaluateAsync_EquivalentTo_ScanThenBuildEvalResult()
+    {
+        var agent = new PassingAgent("MitreEquivAgent");
+
+        var runForEval  = MitreBenchmark.AtlasBaseline();
+        var runForBuild = MitreBenchmark.AtlasBaseline();
+
+        var evalInput = new EvalInput(
+            Query: "drive both paths",
+            Metadata: new Dictionary<string, object> { ["agent"] = agent });
+        var viaAdapter = await runForEval.EvaluateAsync(evalInput);
+
+        var rawResult = await runForBuild.ScanAsync(agent);
+        var viaBuilder = runForBuild.BuildEvalResult(rawResult);
+
+        // Composite shape parity
+        Assert.Equal(viaAdapter.Metric.Key, viaBuilder.Metric.Key);
+        Assert.Equal(viaAdapter.Metric.Category, viaBuilder.Metric.Category);
+        Assert.Equal(viaAdapter.Details.AggregationStrategy, viaBuilder.Details.AggregationStrategy);
+
+        // Sub-results parity (both 12-leaf composites)
+        Assert.NotNull(viaAdapter.Details.SubResults);
+        Assert.NotNull(viaBuilder.Details.SubResults);
+        Assert.Equal(viaAdapter.Details.SubResults!.Count, viaBuilder.Details.SubResults!.Count);
+        Assert.Equal(12, viaAdapter.Details.SubResults.Count);
+
+        // ATLAS technique-ID parity preserved
+        var adapterKeys = viaAdapter.Details.SubResults.Select(l => l.Metric.Key).ToList();
+        var builderKeys = viaBuilder.Details.SubResults.Select(l => l.Metric.Key).ToList();
+        Assert.Equal(adapterKeys, builderKeys);
+        Assert.All(adapterKeys, k => Assert.StartsWith("mitre.aml.t", k));
+
+        // Score label parity for a deterministic passing agent
+        Assert.Equal(viaAdapter.Score.Label, viaBuilder.Score.Label);
+    }
+
     // ─── Helpers ──────────────────────────────────────────────────────────────
 
     /// <summary>

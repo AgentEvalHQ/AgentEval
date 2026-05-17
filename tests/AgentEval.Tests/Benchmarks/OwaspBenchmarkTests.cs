@@ -335,6 +335,56 @@ public class OwaspBenchmarkTests
             restoredSkipped);
     }
 
+    // ─── Convention-2 adapter equivalence ─────────────────────────────────────
+
+    /// <summary>
+    /// Phase-10 completeness audit (LR#21): pins the Convention-2 invariant that
+    /// <see cref="OwaspBenchmarkRun.EvaluateAsync"/> is functionally equivalent to
+    /// <c>BuildEvalResult(await ScanAsync(agent))</c> — the two code paths must produce
+    /// the same composite shape and scoring. Catches a future regression where
+    /// <c>EvaluateAsync</c> drifts from <c>ScanAsync + BuildEvalResult</c> (e.g., somebody
+    /// adding a side-path on the adapter that doesn't also land on the build path).
+    /// </summary>
+    [Fact]
+    public async Task EvaluateAsync_EquivalentTo_ScanThenBuildEvalResult()
+    {
+        var agent = new PassingAgent("OwaspEquivAgent");
+
+        // Two distinct runs to drive both adapter paths. We can't share a single
+        // RedTeamResult because EvaluateAsync internally drives its own ScanAsync;
+        // running ScanAsync externally produces a structurally equivalent but
+        // not-byte-identical RedTeamResult (different timestamps / run IDs).
+        var runForEval  = OwaspBenchmark.Top10();
+        var runForBuild = OwaspBenchmark.Top10();
+
+        var evalInput = new EvalInput(
+            Query: "drive both paths",
+            Metadata: new Dictionary<string, object> { ["agent"] = agent });
+        var viaAdapter = await runForEval.EvaluateAsync(evalInput);
+
+        var rawResult = await runForBuild.ScanAsync(agent);
+        var viaBuilder = runForBuild.BuildEvalResult(rawResult);
+
+        // Composite shape parity
+        Assert.Equal(viaAdapter.Metric.Key, viaBuilder.Metric.Key);
+        Assert.Equal(viaAdapter.Metric.Category, viaBuilder.Metric.Category);
+        Assert.Equal(viaAdapter.Details.AggregationStrategy, viaBuilder.Details.AggregationStrategy);
+
+        // Sub-results parity (both 10-leaf composites)
+        Assert.NotNull(viaAdapter.Details.SubResults);
+        Assert.NotNull(viaBuilder.Details.SubResults);
+        Assert.Equal(viaAdapter.Details.SubResults!.Count, viaBuilder.Details.SubResults!.Count);
+        Assert.Equal(10, viaAdapter.Details.SubResults.Count);
+
+        // Per-leaf key parity in canonical order
+        var adapterKeys = viaAdapter.Details.SubResults.Select(l => l.Metric.Key).ToList();
+        var builderKeys = viaBuilder.Details.SubResults.Select(l => l.Metric.Key).ToList();
+        Assert.Equal(adapterKeys, builderKeys);
+
+        // For a deterministic passing agent the score label is the same on both paths
+        Assert.Equal(viaAdapter.Score.Label, viaBuilder.Score.Label);
+    }
+
     // ─── Helpers ──────────────────────────────────────────────────────────────
 
     /// <summary>
