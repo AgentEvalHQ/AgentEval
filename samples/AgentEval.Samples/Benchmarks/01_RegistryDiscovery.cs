@@ -41,14 +41,19 @@ public static class RegistryDiscoveryBenchmark
             "Benchmarks B1: BenchmarkFamilyRegistry Discovery",
             "Walk every registered benchmark family + preset (no Azure required)");
 
-        // Force-load: reference one type per family (compile-time references force
-        // assembly load → triggers each ModuleInitializer).
-        _ = nameof(AgenticBenchmark);
-        _ = nameof(ArticlesRegistry);
-        _ = nameof(EuAiActArticlesRegistry);
-        _ = nameof(AgentEval.Benchmarks.OwaspBenchmark);
-        _ = nameof(AgentEval.Benchmarks.MitreBenchmark);
-        _ = nameof(AgentEval.Benchmarks.PerformanceBenchmark);
+        // Force-load: read `.Assembly` off one type per family. This is the canonical
+        // anchor pattern (same idiom as `BenchListCommand.AnchorAssemblies`): JITting the
+        // property access forces the CLR to resolve the type token, load the assembly,
+        // and run its [ModuleInitializer] which registers the family with the registry.
+        // `nameof(...)` would NOT achieve this — it is a compile-time constant.
+        _ = typeof(AgenticBenchmark).Assembly;
+        _ = typeof(ArticlesRegistry).Assembly;
+        _ = typeof(EuAiActArticlesRegistry).Assembly;
+        _ = typeof(AgentEval.Benchmarks.OwaspBenchmark).Assembly;
+        _ = typeof(AgentEval.Benchmarks.MitreBenchmark).Assembly;
+        _ = typeof(AgentEval.Benchmarks.PerformanceBenchmark).Assembly;
+        _ = typeof(AgentEval.Benchmarks.MemoryBenchmark).Assembly;
+        _ = typeof(AgentEval.Benchmarks.LongMemEvalBenchmark).Assembly;
 
         var families = BenchmarkFamilyRegistry.All;
         Console.WriteLine($"   {families.Count} benchmark families registered:\n");
