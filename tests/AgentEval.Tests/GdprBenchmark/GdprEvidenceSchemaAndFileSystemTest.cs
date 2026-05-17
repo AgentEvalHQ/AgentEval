@@ -5,6 +5,7 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using AgentEval.Evals;
+using GdprBenchmarkFactory = AgentEval.Benchmarks.GdprBenchmark;
 using AgentEval.GdprBenchmark;
 using AgentEval.GdprBenchmark.Articles;
 using AgentEval.GdprBenchmark.Articles.Building;
@@ -13,7 +14,6 @@ using AgentEval.GdprBenchmark.Reporting;
 using AgentEval.Output;
 using Json.Schema;
 using Xunit;
-using GdprBenchmarkFactory = AgentEval.GdprBenchmark.GdprBenchmark;
 
 namespace AgentEval.Tests.GdprBenchmark;
 

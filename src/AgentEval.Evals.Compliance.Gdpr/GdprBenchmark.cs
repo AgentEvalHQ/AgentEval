@@ -4,6 +4,7 @@
 
 using AgentEval.Core;
 using AgentEval.Evals;
+using AgentEval.GdprBenchmark;
 using AgentEval.GdprBenchmark.Articles;
 using AgentEval.GdprBenchmark.Articles.Building;
 using AgentEval.GdprBenchmark.Composition;
@@ -12,31 +13,12 @@ using AgentEval.GdprBenchmark.DomainPacks.Healthcare;
 using AgentEval.GdprBenchmark.DomainPacks.HR;
 using AgentEval.GdprBenchmark.Pillars;
 
-namespace AgentEval.GdprBenchmark;
-
-/// <summary>
-/// Options for multi-judge evaluation of Critical articles in the Audit-Grade preset.
-/// </summary>
-/// <param name="Judges">
-/// Ordered list of judges (evaluator + weight) used for consensus aggregation
-/// over Critical-severity articles. Typically 3 judges with equal weights.
-/// </param>
-/// <remarks>
-/// Phase-8 Task 8.5: this record is <see cref="ObsoleteAttribute"/>-marked
-/// because Mode-B per-criterion multi-judge fan-out has moved into
-/// <c>ScenarioToAtomicEval</c> ctor flags. The <c>AuditGrade</c> factory's
-/// MultiJudgeOptions parameter is retained for v1 source compatibility but
-/// a removal is scheduled for v1.1. See <c>deferred-pending.md</c>.
-/// </remarks>
-[Obsolete("MultiJudgeOptions is deprecated; configure multi-judge via ScenarioToAtomicEval Mode-B flags instead. " +
-          "Pass `null` to AuditGrade to retain single-judge behaviour. Removal scheduled for v1.1.")]
-public sealed record MultiJudgeOptions(
-    IReadOnlyList<(IEvaluator Judge, double Weight)> Judges);
+namespace AgentEval.Benchmarks;
 
 /// <summary>
 /// Top-level factory methods for GDPR benchmark presets.
 /// </summary>
-public static class GdprBenchmark
+public static partial class GdprBenchmark
 {
     /// <summary>
     /// Builds the Standard preset: all five pillars with their canonical weights,
@@ -109,13 +91,13 @@ public static class GdprBenchmark
     /// Builds the Audit-Grade preset with optional multi-judge consensus for Critical articles.
     /// When <paramref name="multiJudge"/> is provided with more than one judge, the
     /// <paramref name="articles"/> registry must have been built with a
-    /// <see cref="Articles.Building.ScenarioToAtomicEval"/> that was constructed with the same
+    /// <see cref="AgentEval.GdprBenchmark.Articles.Building.ScenarioToAtomicEval"/> that was constructed with the same
     /// judge list — the multi-judge wiring happens inside
-    /// <see cref="Articles.Building.ScenarioToAtomicEval.Build"/> at the scenario level.
+    /// <see cref="AgentEval.GdprBenchmark.Articles.Building.ScenarioToAtomicEval.Build"/> at the scenario level.
     /// For single-judge mode, pass <c>null</c> (or omit) to get the Phase-5 default behavior.
     /// </summary>
     /// <param name="articles">
-    /// Registry built with the appropriate <see cref="Articles.Building.ScenarioToAtomicEval"/>
+    /// Registry built with the appropriate <see cref="AgentEval.GdprBenchmark.Articles.Building.ScenarioToAtomicEval"/>
     /// (single-judge or multi-judge depending on <paramref name="multiJudge"/>).
     /// </param>
     /// <param name="multiJudge">

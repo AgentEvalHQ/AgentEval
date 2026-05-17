@@ -4,7 +4,7 @@
 
 using AgentEval.Core;
 using AgentEval.Evals;
-using AgentEval.Evals.Agentic;
+using AgentEval.Benchmarks;
 using AgentEval.Evals.Agentic.Composition;
 using AgentEval.Output;
 using Xunit;

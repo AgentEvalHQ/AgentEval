@@ -2,6 +2,7 @@
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 
+using EuAiActBenchmarkFactory = AgentEval.Benchmarks.EuAiActBenchmark;
 using AgentEval.Evals;
 using AgentEval.EuAiActBenchmark;
 using AgentEval.EuAiActBenchmark.Articles;
@@ -10,7 +11,6 @@ using AgentEval.EuAiActBenchmark.Articles.Loading;
 using AgentEval.EuAiActBenchmark.Reporting;
 using AgentEval.Output;
 using Xunit;
-using EuAiActBenchmarkFactory = AgentEval.EuAiActBenchmark.EuAiActBenchmark;
 
 namespace AgentEval.Tests.EuAiActBenchmark.EndToEnd;
 

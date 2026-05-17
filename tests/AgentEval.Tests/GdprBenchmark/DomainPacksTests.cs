@@ -11,8 +11,8 @@ using AgentEval.GdprBenchmark.Composition;
 using AgentEval.GdprBenchmark.DomainPacks.ChildrensService;
 using AgentEval.GdprBenchmark.DomainPacks.Healthcare;
 using AgentEval.GdprBenchmark.DomainPacks.HR;
+using GdprBenchmarkFactory = AgentEval.Benchmarks.GdprBenchmark;
 using Xunit;
-using GdprBenchmarkFactory = AgentEval.GdprBenchmark.GdprBenchmark;
 
 namespace AgentEval.Tests.GdprBenchmark;
 

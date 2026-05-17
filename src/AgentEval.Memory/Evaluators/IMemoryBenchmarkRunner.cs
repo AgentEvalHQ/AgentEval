@@ -2,6 +2,7 @@
 // Copyright (c) 2026 AgentEval Contributors
 
 using AgentEval.Core;
+using AgentEval.Benchmarks;
 using AgentEval.Memory.Models;
 
 namespace AgentEval.Memory.Evaluators;

@@ -14,7 +14,7 @@ using AgentEval.EuAiActBenchmark.DomainPacks.HighRiskEmployment;
 using AgentEval.EuAiActBenchmark.Reporting;
 using AgentEval.EuAiActBenchmark.Reporting.Pdf;
 using AgentEval.Output;
-using EuAiActBenchmarkFactory = AgentEval.EuAiActBenchmark.EuAiActBenchmark;
+using EuAiActBenchmarkFactory = AgentEval.Benchmarks.EuAiActBenchmark;
 
 namespace AgentEval.Cli.Commands;
 

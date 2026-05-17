@@ -2,6 +2,7 @@
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 
+using AgentEval.Benchmarks;
 using AgentEval.Evals;
 using AgentEval.Output;
 

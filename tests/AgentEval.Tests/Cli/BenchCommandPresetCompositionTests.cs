@@ -8,8 +8,8 @@ using AgentEval.Evals;
 using AgentEval.GdprBenchmark.Articles;
 using AgentEval.GdprBenchmark.Articles.Building;
 using AgentEval.GdprBenchmark.Articles.Loading;
+using GdprBenchmarkFactory = AgentEval.Benchmarks.GdprBenchmark;
 using Xunit;
-using GdprBenchmarkFactory = AgentEval.GdprBenchmark.GdprBenchmark;
 
 namespace AgentEval.Tests.Cli;
 

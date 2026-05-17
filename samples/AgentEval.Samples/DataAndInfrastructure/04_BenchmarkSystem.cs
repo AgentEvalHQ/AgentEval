@@ -7,7 +7,7 @@ using Microsoft.Extensions.AI;
 using AgentEval.Core;
 using AgentEval.DataLoaders;
 using AgentEval.Evals;
-using AgentEval.Evals.Agentic;
+using AgentEval.Benchmarks;
 using System.ComponentModel;
 
 namespace AgentEval.Samples;

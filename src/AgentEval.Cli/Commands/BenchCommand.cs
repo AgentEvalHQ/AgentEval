@@ -14,7 +14,7 @@ using AgentEval.GdprBenchmark.DomainPacks.HR;
 using AgentEval.GdprBenchmark.Reporting;
 using AgentEval.GdprBenchmark.Reporting.Pdf;
 using AgentEval.Output;
-using GdprBenchmarkFactory = AgentEval.GdprBenchmark.GdprBenchmark;
+using GdprBenchmarkFactory = AgentEval.Benchmarks.GdprBenchmark;
 
 namespace AgentEval.Cli.Commands;
 
@@ -71,7 +71,7 @@ public static class BenchCommand
         // provenance but never reached the LLM — the "Cite articles / Be conservative /
         // Flag evasive responses" rules had no actual effect on judgements.
         var gdprPrompt = EmbeddedPromptLoader.Load(
-            typeof(GdprBenchmark.GdprBenchmark).Assembly,
+            typeof(GdprBenchmarkFactory).Assembly,
             "gdpr-judge-system.v1.md");
         var (resolvedJudge, judgeModelName, exitCode) = JudgeFactory.Resolve(
             evaluatorOverride,

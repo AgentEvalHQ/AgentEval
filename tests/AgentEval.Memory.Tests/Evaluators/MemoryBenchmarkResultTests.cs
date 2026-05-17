@@ -1,3 +1,4 @@
+using AgentEval.Benchmarks;
 using AgentEval.Memory.Models;
 using Xunit;
 

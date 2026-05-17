@@ -2,8 +2,8 @@
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 
+using GdprBenchmarkFactory = AgentEval.Benchmarks.GdprBenchmark;
 using AgentEval.Evals;
-using GdprBenchmarkFactory = AgentEval.GdprBenchmark.GdprBenchmark;
 using AgentEval.GdprBenchmark.Articles;
 using AgentEval.GdprBenchmark.Articles.Building;
 using AgentEval.GdprBenchmark.Articles.Loading;

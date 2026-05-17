@@ -2,6 +2,7 @@
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 
+using GdprBenchmarkFactory = AgentEval.Benchmarks.GdprBenchmark;
 using AgentEval.Evals;
 using AgentEval.GdprBenchmark.Articles;
 using AgentEval.GdprBenchmark.Articles.Building;
@@ -295,21 +296,21 @@ public class ReportingUnitTests
     public void GdprBenchmark_Smoke_NullRegistry_Throws()
     {
         Assert.Throws<ArgumentNullException>(() =>
-            AgentEval.GdprBenchmark.GdprBenchmark.Smoke(null!));
+            GdprBenchmarkFactory.Smoke(null!));
     }
 
     [Fact]
     public void GdprBenchmark_Standard_NullRegistry_Throws()
     {
         Assert.Throws<ArgumentNullException>(() =>
-            AgentEval.GdprBenchmark.GdprBenchmark.Standard(null!));
+            GdprBenchmarkFactory.Standard(null!));
     }
 
     [Fact]
     public void GdprBenchmark_Smoke_Key_IsCorrect()
     {
         var registry = BuildRegistry();
-        var smoke = AgentEval.GdprBenchmark.GdprBenchmark.Smoke(registry);
+        var smoke = GdprBenchmarkFactory.Smoke(registry);
         Assert.Equal("gdpr.compliance.smoke", smoke.Key);
         Assert.Equal(5, smoke.Components.Count);
         Assert.Equal(0.80, smoke.Threshold);
@@ -319,7 +320,7 @@ public class ReportingUnitTests
     public void GdprBenchmark_Standard_Key_IsCorrect()
     {
         var registry = BuildRegistry();
-        var standard = AgentEval.GdprBenchmark.GdprBenchmark.Standard(registry);
+        var standard = GdprBenchmarkFactory.Standard(registry);
         Assert.Equal("gdpr.compliance.standard", standard.Key);
         Assert.Equal(5, standard.Components.Count);
         Assert.Equal(0.85, standard.Threshold);
@@ -329,7 +330,7 @@ public class ReportingUnitTests
     public void GdprBenchmark_Standard_WeightsSumToOne()
     {
         var registry = BuildRegistry();
-        var standard = AgentEval.GdprBenchmark.GdprBenchmark.Standard(registry);
+        var standard = GdprBenchmarkFactory.Standard(registry);
         var weightSum = standard.Components.Sum(c => c.Weight);
         Assert.Equal(1.0, weightSum, precision: 10);
     }
@@ -338,25 +339,25 @@ public class ReportingUnitTests
     public void GdprBenchmark_Smoke_WeightsSumToOne()
     {
         var registry = BuildRegistry();
-        var smoke = AgentEval.GdprBenchmark.GdprBenchmark.Smoke(registry);
+        var smoke = GdprBenchmarkFactory.Smoke(registry);
         var weightSum = smoke.Components.Sum(c => c.Weight);
         Assert.Equal(1.0, weightSum, precision: 10);
     }
 
-    // ── GdprBenchmark.AuditGrade ─────────────────────────────────────────────
+    // ── GdprBenchmarkFactory.AuditGrade ─────────────────────────────────────────────
 
     [Fact]
     public void GdprBenchmark_AuditGrade_NullRegistry_Throws()
     {
         Assert.Throws<ArgumentNullException>(() =>
-            AgentEval.GdprBenchmark.GdprBenchmark.AuditGrade(null!));
+            GdprBenchmarkFactory.AuditGrade(null!));
     }
 
     [Fact]
     public void GdprBenchmark_AuditGrade_Key_IsCorrect()
     {
         var registry = BuildRegistry();
-        var auditGrade = AgentEval.GdprBenchmark.GdprBenchmark.AuditGrade(registry);
+        var auditGrade = GdprBenchmarkFactory.AuditGrade(registry);
         Assert.Equal("gdpr.compliance.auditgrade", auditGrade.Key);
         Assert.Equal(5, auditGrade.Components.Count);
         Assert.Equal(0.90, auditGrade.Threshold);
@@ -367,7 +368,7 @@ public class ReportingUnitTests
     public void GdprBenchmark_AuditGrade_WeightsSumToOne()
     {
         var registry = BuildRegistry();
-        var auditGrade = AgentEval.GdprBenchmark.GdprBenchmark.AuditGrade(registry);
+        var auditGrade = GdprBenchmarkFactory.AuditGrade(registry);
         var weightSum = auditGrade.Components.Sum(c => c.Weight);
         Assert.Equal(1.0, weightSum, precision: 10);
     }

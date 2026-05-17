@@ -2,6 +2,7 @@
 // Copyright (c) 2026 AgentEval Contributors
 
 using AgentEval.Memory.Extensions;
+using AgentEval.Benchmarks;
 using AgentEval.Memory.Models;
 using static AgentEval.Memory.Models.MemoryBenchmarkResult;
 using Xunit;

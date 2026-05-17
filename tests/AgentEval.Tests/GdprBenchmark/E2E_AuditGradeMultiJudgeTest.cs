@@ -8,8 +8,8 @@
 // compatibility while it remains available in v1.
 #pragma warning disable CS0618 // MultiJudgeOptions is obsolete
 
+using GdprBenchmarkFactory = AgentEval.Benchmarks.GdprBenchmark;
 using AgentEval.Evals;
-using GdprBenchmarkFactory = AgentEval.GdprBenchmark.GdprBenchmark;
 using AgentEval.GdprBenchmark;
 using AgentEval.GdprBenchmark.Articles;
 using AgentEval.GdprBenchmark.Articles.Building;

@@ -44,9 +44,9 @@ if (args.Length > 0 && args[0] == "smoke-load")
     Console.WriteLine($"Registry built with {registry.All.Count} composite(s).");
 
     // Verify the top-level presets construct without throwing (catches missing IDs early).
-    var standard = AgentEval.EuAiActBenchmark.EuAiActBenchmark.Standard(registry);
-    var smoke    = AgentEval.EuAiActBenchmark.EuAiActBenchmark.Smoke(registry);
-    var audit    = AgentEval.EuAiActBenchmark.EuAiActBenchmark.AuditGrade(registry);
+    var standard = AgentEval.Benchmarks.EuAiActBenchmark.Standard(registry);
+    var smoke    = AgentEval.Benchmarks.EuAiActBenchmark.Smoke(registry);
+    var audit    = AgentEval.Benchmarks.EuAiActBenchmark.AuditGrade(registry);
     Console.WriteLine($"Standard preset: {standard.Components.Count} components.");
     Console.WriteLine($"Smoke preset:    {smoke.Components.Count} components.");
     Console.WriteLine($"AuditGrade:      {audit.Components.Count} components.");
@@ -63,7 +63,7 @@ if (args.Length > 0 && args[0] == "smoke-run")
     var articleBuilder = new ArticleCompositeBuilder(scenarioBuilder);
     var registry = new EuAiActArticlesRegistry(loader, articleBuilder);
 
-    var benchmark = AgentEval.EuAiActBenchmark.EuAiActBenchmark.Smoke(registry);
+    var benchmark = AgentEval.Benchmarks.EuAiActBenchmark.Smoke(registry);
 
     var store = new InMemoryOutputStore();
     store.Initialize("smoke-sln");

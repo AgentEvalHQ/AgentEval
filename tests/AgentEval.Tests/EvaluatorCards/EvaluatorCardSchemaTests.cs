@@ -38,7 +38,7 @@ public class EvaluatorCardSchemaTests
 
     private static IReadOnlyList<(string ResourceName, string Json)> LoadAllShippedCards()
     {
-        var asm = typeof(AgentEval.Evals.Agentic.AgenticBenchmark).Assembly;
+        var asm = typeof(AgentEval.Benchmarks.AgenticBenchmark).Assembly;
         var cardResources = asm.GetManifestResourceNames()
             .Where(n => n.Contains("EvaluatorCards.") && n.EndsWith(".json", StringComparison.OrdinalIgnoreCase))
             .ToList();

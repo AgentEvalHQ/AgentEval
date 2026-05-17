@@ -4,6 +4,7 @@
 
 using AgentEval.Core;
 using AgentEval.Evals;
+using AgentEval.EuAiActBenchmark;
 using AgentEval.EuAiActBenchmark.Articles;
 using AgentEval.EuAiActBenchmark.Articles.Building;
 using AgentEval.EuAiActBenchmark.Composition;
@@ -12,29 +13,12 @@ using AgentEval.EuAiActBenchmark.DomainPacks.HighRiskEducation;
 using AgentEval.EuAiActBenchmark.DomainPacks.HighRiskEmployment;
 using AgentEval.EuAiActBenchmark.Pillars;
 
-namespace AgentEval.EuAiActBenchmark;
-
-/// <summary>
-/// Options for multi-judge evaluation of Critical articles in the Audit-Grade preset.
-/// </summary>
-/// <param name="Judges">
-/// Ordered list of judges (evaluator + weight) used for consensus aggregation
-/// over Critical-severity articles. Typically 3 judges with equal weights.
-/// </param>
-/// <remarks>
-/// Phase-8 Task 8.5: this record is <see cref="ObsoleteAttribute"/>-marked
-/// because Mode-B per-criterion multi-judge fan-out has moved into
-/// <c>ScenarioToAtomicEval</c> ctor flags. See <c>deferred-pending.md</c>.
-/// </remarks>
-[Obsolete("MultiJudgeOptions is deprecated; configure multi-judge via ScenarioToAtomicEval Mode-B flags instead. " +
-          "Pass `null` to AuditGrade to retain single-judge behaviour. Removal scheduled for v1.1.")]
-public sealed record MultiJudgeOptions(
-    IReadOnlyList<(IEvaluator Judge, double Weight)> Judges);
+namespace AgentEval.Benchmarks;
 
 /// <summary>
 /// Top-level factory methods for EU AI Act benchmark presets.
 /// </summary>
-public static class EuAiActBenchmark
+public static partial class EuAiActBenchmark
 {
     /// <summary>
     /// Builds the Standard preset: all six pillars with their canonical weights,
@@ -103,16 +87,16 @@ public static class EuAiActBenchmark
     /// </summary>
     /// <remarks>
     /// When <paramref name="multiJudge"/> is provided with more than one judge, the registry must
-    /// have been built with a <see cref="Articles.Building.ScenarioToAtomicEval"/> constructed
+    /// have been built with a <see cref="AgentEval.EuAiActBenchmark.Articles.Building.ScenarioToAtomicEval"/> constructed
     /// with the same judge list — the multi-judge wiring happens at the scenario level inside
-    /// <see cref="Articles.Building.ScenarioToAtomicEval.Build"/>.
+    /// <see cref="AgentEval.EuAiActBenchmark.Articles.Building.ScenarioToAtomicEval.Build"/>.
     /// <para>
     /// KNOWN v1 LIMITATION: multi-judge and Mode-B are mutually exclusive at the scenario level
     /// (multi-judge wins). See <c>ScenarioToAtomicEval.Build</c> for details.
     /// </para>
     /// </remarks>
 #pragma warning disable CS0618 // Phase-8 8.5: signature retained for v1 compatibility.
-    public static CompositeEval AuditGrade(EuAiActArticlesRegistry articles, MultiJudgeOptions? multiJudge)
+    public static CompositeEval AuditGrade(EuAiActArticlesRegistry articles, AgentEval.EuAiActBenchmark.MultiJudgeOptions? multiJudge)
 #pragma warning restore CS0618
     {
         ArgumentNullException.ThrowIfNull(articles);
