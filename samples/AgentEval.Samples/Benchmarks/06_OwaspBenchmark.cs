@@ -11,26 +11,31 @@ using AgentEval.Output;
 namespace AgentEval.Samples.Benchmarks;
 
 /// <summary>
-/// Benchmarks B6: OWASP LLM Top 10 — runs <see cref="OwaspBenchmark.Smoke"/>
-/// against a real Azure OpenAI-backed agent and renders the resulting 10-leaf
-/// composite tree to JSON + HTML + PDF.
+/// Benchmarks B6: OWASP LLM Top 10 — runs an OWASP attack pipeline against a
+/// real Azure OpenAI-backed agent and renders the resulting composite tree to
+/// JSON + HTML + PDF. The OWASP family is a Shape B / runner-style benchmark —
+/// the pipeline generates its own attack probes via
+/// <see cref="OwaspBenchmarkRun.EvaluateAsync"/> using the agent supplied at
+/// <c>EvalInput.Metadata["agent"]</c>.
 ///
-/// The OWASP family is a Shape B / runner-style benchmark — it generates its
-/// own attack probes via <see cref="OwaspBenchmarkRun.EvaluateAsync"/> using
-/// the agent supplied at <c>EvalInput.Metadata["agent"]</c>.
+/// Preset mapping:
+/// <list type="bullet">
+///   <item><see cref="SamplePreset.Smoke"/> → <see cref="OwaspBenchmark.Smoke"/> (3 attacks @ Quick)</item>
+///   <item><see cref="SamplePreset.Standard"/> → <see cref="OwaspBenchmark.Top10"/> (9 attacks @ Quick)</item>
+///   <item><see cref="SamplePreset.AuditGrade"/> → <see cref="OwaspBenchmark.AuditGrade"/> (9 attacks @ Comprehensive)</item>
+/// </list>
 /// </summary>
 /// <remarks>
 /// Requires Azure OpenAI credentials. Skips gracefully when missing.
-/// Uses the Smoke preset (3 attacks at Quick intensity) so the run finishes
-/// in well under a minute.
+/// Default preset is Smoke (finishes in well under a minute).
 /// </remarks>
 public static class OwaspBenchmarkSample
 {
     public static async Task RunAsync()
     {
         BenchmarkSampleHelpers.PrintHeader(
-            "Benchmarks B6: OWASP LLM Top 10 — Smoke preset",
-            "PromptInjection + Jailbreak + PIILeakage at Quick intensity");
+            "Benchmarks B6: OWASP LLM Top 10",
+            "Real agent + adversarial probe pipeline. Skips without Azure credentials.");
 
         if (!AIConfig.IsConfigured)
         {
@@ -38,8 +43,16 @@ public static class OwaspBenchmarkSample
             return;
         }
 
+        var preset = BenchmarkSampleHelpers.ResolvePreset();
+        BenchmarkSampleHelpers.PrintPreset(preset);
+
         var agent = CreateAgent();
-        var run = OwaspBenchmark.Smoke();
+        var run = preset switch
+        {
+            SamplePreset.Standard => OwaspBenchmark.Top10(),
+            SamplePreset.AuditGrade => OwaspBenchmark.AuditGrade(),
+            _ => OwaspBenchmark.Smoke(),
+        };
 
         Console.WriteLine($"Scanning {agent.Name} with {run.PresetName} preset...");
         Console.WriteLine($"Covered OWASP IDs: {string.Join(", ", run.CoveredOwaspIds)}");
@@ -59,7 +72,7 @@ public static class OwaspBenchmarkSample
         var paths = await BenchmarkSampleHelpers.WriteReportsAsync(
             result, subject,
             benchmarkName: "owasp",
-            regulationOrBenchmark: "OWASP LLM Top 10 — Smoke preset",
+            regulationOrBenchmark: $"OWASP LLM Top 10 — {run.PresetName} preset",
             includePdf: true);
 
         BenchmarkSampleHelpers.PrintReportPaths(result, paths);
@@ -69,7 +82,7 @@ public static class OwaspBenchmarkSample
         Console.WriteLine("   KEY TAKEAWAYS:");
         Console.WriteLine("   - OWASP is a Shape B / runner-style benchmark — the pipeline drives the agent itself.");
         Console.WriteLine("   - Skipped LLM categories (LLM05 weaknesses, LLM09 misinformation) render honestly.");
-        Console.WriteLine("   - For deeper coverage use the AuditGrade preset (all 9 attacks at Comprehensive intensity).");
+        Console.WriteLine("   - Smoke = 3 attacks @ Quick; Standard = Top10 (9 @ Quick); AuditGrade = Top10 @ Comprehensive.");
     }
 
     private static IEvaluableAgent CreateAgent()

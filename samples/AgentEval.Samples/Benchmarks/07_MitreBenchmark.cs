@@ -11,12 +11,18 @@ using AgentEval.Output;
 namespace AgentEval.Samples.Benchmarks;
 
 /// <summary>
-/// Benchmarks B7: MITRE ATLAS — runs <see cref="MitreBenchmark.AtlasBaseline"/>
-/// against a real Azure OpenAI-backed agent and renders the resulting
-/// composite (one leaf per ATLAS technique) to JSON + HTML + PDF.
+/// Benchmarks B7: MITRE ATLAS — runs an ATLAS attack pipeline against a real
+/// Azure OpenAI-backed agent and renders the resulting composite (one leaf per
+/// ATLAS technique) to JSON + HTML + PDF. Like OWASP, this is a Shape B /
+/// runner-style benchmark — the attack pipeline drives the agent itself via
+/// <see cref="MitreBenchmarkRun.EvaluateAsync"/>.
 ///
-/// Like OWASP, this is a Shape B / runner-style benchmark — the attack
-/// pipeline drives the agent itself via <see cref="MitreBenchmarkRun.EvaluateAsync"/>.
+/// Preset mapping:
+/// <list type="bullet">
+///   <item><see cref="SamplePreset.Smoke"/> → <see cref="MitreBenchmark.AtlasSmoke"/></item>
+///   <item><see cref="SamplePreset.Standard"/> → <see cref="MitreBenchmark.AtlasBaseline"/></item>
+///   <item><see cref="SamplePreset.AuditGrade"/> → <see cref="MitreBenchmark.AtlasAuditGrade"/></item>
+/// </list>
 /// </summary>
 /// <remarks>
 /// Requires Azure OpenAI credentials. Skips gracefully when missing.
@@ -26,8 +32,8 @@ public static class MitreBenchmarkSample
     public static async Task RunAsync()
     {
         BenchmarkSampleHelpers.PrintHeader(
-            "Benchmarks B7: MITRE ATLAS — AtlasBaseline preset",
-            "Adversarial Threat Landscape for AI Systems — technique-level coverage");
+            "Benchmarks B7: MITRE ATLAS",
+            "Real agent + ATLAS adversarial pipeline. Skips without Azure credentials.");
 
         if (!AIConfig.IsConfigured)
         {
@@ -35,8 +41,16 @@ public static class MitreBenchmarkSample
             return;
         }
 
+        var preset = BenchmarkSampleHelpers.ResolvePreset();
+        BenchmarkSampleHelpers.PrintPreset(preset);
+
         var agent = CreateAgent();
-        var run = MitreBenchmark.AtlasBaseline();
+        var run = preset switch
+        {
+            SamplePreset.Standard => MitreBenchmark.AtlasBaseline(),
+            SamplePreset.AuditGrade => MitreBenchmark.AtlasAuditGrade(),
+            _ => MitreBenchmark.AtlasSmoke(),
+        };
 
         Console.WriteLine($"Scanning {agent.Name} with {run.PresetName} preset...");
         Console.WriteLine($"Covered ATLAS techniques: {string.Join(", ", run.CoveredAtlasIds)}");
@@ -56,7 +70,7 @@ public static class MitreBenchmarkSample
         var paths = await BenchmarkSampleHelpers.WriteReportsAsync(
             result, subject,
             benchmarkName: "mitre",
-            regulationOrBenchmark: "MITRE ATLAS Baseline",
+            regulationOrBenchmark: $"MITRE ATLAS — {run.PresetName}",
             includePdf: true);
 
         BenchmarkSampleHelpers.PrintReportPaths(result, paths);
@@ -67,6 +81,7 @@ public static class MitreBenchmarkSample
         Console.WriteLine("   - MITRE ATLAS catalogues adversarial techniques against AI systems.");
         Console.WriteLine("   - Non-applicable techniques (e.g. AML.T0044 Full Model Replication) render");
         Console.WriteLine("     honestly as 'NOT TESTED' rather than passing by default.");
+        Console.WriteLine("   - Smoke → AtlasSmoke; Standard → AtlasBaseline; AuditGrade → AtlasAuditGrade.");
         Console.WriteLine("   - Composite aggregation uses MinAggregation: a single failure fails the run.");
     }
 
