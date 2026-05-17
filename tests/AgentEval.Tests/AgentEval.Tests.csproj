@@ -36,6 +36,7 @@
     <ProjectReference Include="..\..\src\AgentEval.Cli\AgentEval.Cli.csproj" />
     <ProjectReference Include="..\..\src\AgentEval.Evals.Compliance.Gdpr\AgentEval.Evals.Compliance.Gdpr.csproj" />
     <ProjectReference Include="..\..\src\AgentEval.Evals.Compliance.EuAiAct\AgentEval.Evals.Compliance.EuAiAct.csproj" />
+    <ProjectReference Include="..\..\src\AgentEval.Evals.Performance\AgentEval.Evals.Performance.csproj" />
     <ProjectReference Include="..\..\src\AgentEval.Evals.Agentic\AgentEval.Evals.Agentic.csproj" />
     <!-- MissionControl is net10.0-only (server project); guard the reference so older
          test target frameworks can still build the rest of the suite. -->
