@@ -31,9 +31,16 @@ public static class LongMemEvalBenchmarkSample
             "Benchmarks B8: LongMemEval — Memory benchmark (ICLR 2025)",
             "Subset (30Q embedded) vs Full (~500Q, requires LONGMEMEVAL_DATASET_PATH)");
 
-        // Touch the AgentEval.Memory assembly so its [ModuleInitializer] fires before
-        // we enumerate the registry. The discard suppresses an unused-variable warning.
-        _ = typeof(MemoryBenchmark);
+        // Force-load: read `.Assembly` off a type from AgentEval.Memory so the CLR
+        // resolves the type token, loads the assembly, and fires its [ModuleInitializer]
+        // which registers `longmemeval` + `memory`. The reference is FULLY QUALIFIED
+        // because the bare identifier `LongMemEvalBenchmark` is shadowed by the Group-G
+        // sample class `AgentEval.Samples.LongMemEvalBenchmark` (declared in
+        // MemoryEvaluation/07_LongMemEvalBenchmark.cs) — C# name resolution picks the
+        // sample (parent-namespace) type, returns the Samples assembly, and the real
+        // factory in AgentEval.Memory.dll is never loaded. Same anchor idiom as
+        // `BenchListCommand.AnchorAssemblies` + `01_RegistryDiscovery`.
+        _ = typeof(AgentEval.Benchmarks.LongMemEvalBenchmark).Assembly;
 
         var family = BenchmarkFamilyRegistry.TryGet("longmemeval");
         if (family is null)
