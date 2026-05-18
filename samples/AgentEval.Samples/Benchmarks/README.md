@@ -9,11 +9,14 @@ exercise the **real** production code path end-to-end:
 - Grade the response with a real LLM judge.
 - Render the unified `EvalResult` tree to JSON + HTML + PDF using the v0.10.1
   generic renderers (`HtmlEvalResultRenderer`, `PdfEvalResultRenderer`).
-- Write a canonical audit-chained run under `samples/AgentEval.Samples/.agenteval/`
-  via `FileSystemOutputStore` (Mission Control + `agenteval doctor` read here).
+- Write a canonical audit-chained run under the **repo-root `.agenteval/`**
+  workspace via `FileSystemOutputStore` (the same one `agenteval init` creates —
+  resolved by walking up to the nearest `*.sln`/`*.slnx`/`.git/` ancestor, so
+  every AgentEval surface — CLI, samples, Mission Control, `agenteval doctor` —
+  shares one workspace).
 - Mirror the HTML / PDF / bare-JSON sidecar to
   `samples/AgentEval.Samples/output/{family}/run-{utc}-{suffix}/` for direct
-  human consumption.
+  human consumption (this stays project-local).
 
 Three samples have a different shape and do **not** invoke an agent or write
 reports:
@@ -175,16 +178,18 @@ Samples B2 – B7 write to **two** locations per run (v0.10.1, plan-25):
 
 | Artefact                                      | Location                                                           | Why                                                                                                                              |
 |-----------------------------------------------|--------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------|
-| Manifest, scenarios, summary, compliance evidence | `samples/AgentEval.Samples/.agenteval/`                              | **Canonical.** Audit-chained; Mission Control + `agenteval doctor` read here.                                                    |
-| HTML report                                   | `samples/AgentEval.Samples/output/{family}/run-{utc}/report.html`    | Direct browser open. Carries the canonical manifest's `ContentHash` in the audit-hash footer.                                    |
-| PDF report                                    | `samples/AgentEval.Samples/output/{family}/run-{utc}/report.pdf`     | Direct PDF open. Same audit-hash footer.                                                                                          |
-| Bare `report.json` (composite EvalResult)     | `samples/AgentEval.Samples/output/{family}/run-{utc}/report.json`    | Legacy compat — what `09_ReportBrowser` reads to surface the score / label per run.                                              |
+| Manifest, scenarios, summary, compliance evidence | `<repo>/.agenteval/`                                              | **Canonical.** Same workspace `agenteval init` creates — resolved via the `*.sln`/`*.slnx`/`.git/` walk-up. Audit-chained; Mission Control + `agenteval doctor` read here.            |
+| HTML report                                   | `samples/AgentEval.Samples/output/{family}/run-{utc}-{suffix}/report.html` | Direct browser open. Carries the canonical manifest's `ContentHash` in the audit-hash footer.                                    |
+| PDF report                                    | `samples/AgentEval.Samples/output/{family}/run-{utc}-{suffix}/report.pdf`  | Direct PDF open. Same audit-hash footer.                                                                                          |
+| Bare `report.json` (composite EvalResult)     | `samples/AgentEval.Samples/output/{family}/run-{utc}-{suffix}/report.json` | Legacy compat — what `09_ReportBrowser` reads to surface the score / label per run.                                              |
 
 ### Mission Control on a sample run
 
 ```bash
-cd samples/AgentEval.Samples
-dotnet agenteval mc        # MC auto-discovers .agenteval/ and lists every run
+# From the repo root — MC auto-discovers .agenteval/ at the cwd.
+dotnet run --project src/AgentEval.MissionControl
+# Or via the CLI (when installed):
+agenteval mc serve
 ```
 
 MC reads the canonical tree only — sidecar HTML / PDF are out of scope for the

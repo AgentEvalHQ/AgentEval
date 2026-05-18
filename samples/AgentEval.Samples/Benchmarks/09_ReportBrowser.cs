@@ -17,9 +17,12 @@ namespace AgentEval.Samples.Benchmarks;
 /// </summary>
 /// <remarks>
 /// <para>
-/// The samples write both a canonical run to <c>samples/AgentEval.Samples/.agenteval/</c>
-/// (for Mission Control + <c>agenteval doctor</c>) and a sidecar
-/// <c>output/{family}/run-{ts}/</c> (for direct human consumption). This browser
+/// The samples write both a canonical run to the repo-root <c>.agenteval/</c>
+/// workspace (the same one <c>agenteval init</c> creates — discovered via the
+/// nearest ancestor with a <c>*.sln</c>, <c>*.slnx</c>, or <c>.git/</c>) and a
+/// sidecar <c>samples/AgentEval.Samples/output/{family}/run-{ts}/</c> tree for
+/// direct human consumption. Mission Control + <c>agenteval doctor</c> see the
+/// canonical workspace; this browser
 /// walks the sidecar because its bare <c>report.json</c> exposes the composite
 /// <c>Score</c> tree directly. The canonical scenarios files store the result
 /// tree as a JSON string embedded inside <c>ScenarioResult.Output</c> which

@@ -54,18 +54,25 @@ sample suite with one example per registered benchmark family.
   probe prompt, captures the live response, and lets the judge grade it against the
   scenario's rubric. Used by `04_GdprBenchmark` and `05_EuAiActBenchmark` (replaces the
   earlier pattern that fanned one hardcoded response across all scenarios).
-- **Canonical `IOutputStore` integration** (commits `39638b7`, `9437be4`): every running
-  sample now writes the canonical run through `FileSystemOutputStore` to
-  `samples/AgentEval.Samples/.agenteval/` (manifest, scenarios, summary, compliance evidence)
-  in addition to the sidecar `samples/AgentEval.Samples/output/{family}/run-{ts}/` (JSON
-  + HTML + PDF). Mission Control discovers the workspace automatically; `agenteval doctor`
-  validates the audit chain. Compliance reporters (`GDPRComplianceReporter`,
-  `EuAiActComplianceReporter`, `OWASPComplianceReporter`, `MITREATLASReporter`) are
-  invoked for the four regulator-shaped families so evidence packs land alongside the
-  run manifest with full audit-chain anchoring.
+- **Canonical `IOutputStore` integration** (commits `39638b7`, `9437be4`, repo-root fix
+  commit below): every running sample writes the canonical run through
+  `FileSystemOutputStore` to the **repo-root `.agenteval/`** workspace — the same
+  one `agenteval init` creates, resolved by walking up from the running assembly's
+  directory to the nearest `*.sln`/`*.slnx`/`.git/` ancestor (matches the documented
+  convention in `WorkspaceRootDiscovery.cs`). Manifest, scenarios, summary, and
+  compliance evidence land there; Mission Control launched from the repo root auto-
+  discovers them; `agenteval doctor` validates the audit chain. Compliance reporters
+  (`GDPRComplianceReporter`, `EuAiActComplianceReporter`, `OWASPComplianceReporter`,
+  `MITREATLASReporter`) are invoked for the four regulator-shaped families so
+  evidence packs land alongside the run manifest with full audit-chain anchoring.
+  Sidecar HTML/PDF/JSON remain project-local at
+  `samples/AgentEval.Samples/output/{family}/run-{ts}-{suffix}/` for direct human
+  consumption + `09_ReportBrowser`.
 - **`BenchmarkSampleHelpers.SharedStore`**: process-wide `Lazy<FileSystemOutputStore>` so
-  multiple samples in one process share the workspace + auto-seed `solution.json` (no
-  separate `agenteval init` step needed for the sample workspace).
+  multiple samples in one process share the workspace + auto-seed `solution.json` (name
+  derived from the repo's `*.sln` filename) if it doesn't already exist (no separate
+  `agenteval init` step needed for first-time users — but any prior `agenteval init` is
+  respected).
 
 ### Changed
 

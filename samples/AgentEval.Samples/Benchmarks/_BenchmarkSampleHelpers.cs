@@ -83,28 +83,45 @@ internal static class BenchmarkSampleHelpers
     // ═══════════════════════════════════════════════════════════════════════════
 
     /// <summary>
-    /// The sample suite's canonical AgentEval solution name. All samples write into
-    /// one solution so Mission Control / <c>agenteval doctor</c> see them grouped.
+    /// Fallback solution name used to auto-seed <c>solution.json</c> only when
+    /// the workspace root has neither a pre-existing <c>solution.json</c> nor a
+    /// derivable <c>*.sln</c> filename to borrow.
     /// </summary>
-    public const string SamplesSolutionName = "AgentEval Samples";
+    public const string FallbackSolutionName = "AgentEval Workspace";
 
     private static readonly Lazy<FileSystemOutputStore> s_sharedStore =
         new(InitializeStore, isThreadSafe: true);
 
     /// <summary>
-    /// Returns the sample workspace root — the directory whose <c>.agenteval/</c>
-    /// subfolder receives the canonical run artefacts. This is
-    /// <c>samples/AgentEval.Samples/</c>, regardless of the host process's CWD.
+    /// Returns the canonical workspace root — the same path
+    /// <see cref="AgentEval.Output.WorkspaceRootDiscovery"/> and the CLI's
+    /// <c>agenteval init</c> resolve to: the nearest ancestor directory
+    /// containing a <c>*.sln</c>, <c>*.slnx</c>, or <c>.git/</c>. For this
+    /// repo that is the repo root (the AgentEval solution lives there).
     /// </summary>
+    /// <remarks>
+    /// Re-implemented inline (rather than calling <c>WorkspaceRootDiscovery.Find</c>)
+    /// because that type is <c>internal</c> in <c>AgentEval.DataLoaders</c>. The
+    /// behaviour is intentionally identical so the samples obey exactly the same
+    /// convention every other AgentEval surface (CLI, doctor, MC) obeys. If no
+    /// solution / repo anchor is found (e.g., a consumer running the samples
+    /// outside any repo), falls back to the project directory.
+    /// </remarks>
     public static string SampleWorkspaceRoot
     {
         get
         {
-            // AppContext.BaseDirectory points at the bin/{config}/{tfm}/ output
-            // dir during `dotnet run`, so three "..\" hops back to the project
-            // root mirror EnsureRunDirectory's convention exactly.
-            var root = Path.Combine(AppContext.BaseDirectory, "..", "..", "..");
-            return Path.GetFullPath(root);
+            var dir = new DirectoryInfo(AppContext.BaseDirectory);
+            while (dir is not null)
+            {
+                if (dir.GetFiles("*.sln").Length > 0 ||
+                    dir.GetFiles("*.slnx").Length > 0 ||
+                    dir.GetDirectories(".git").Length > 0)
+                    return dir.FullName;
+                dir = dir.Parent;
+            }
+            // Fallback: the project directory (three `..` hops from bin/{cfg}/{tfm}).
+            return Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", ".."));
         }
     }
 
@@ -137,11 +154,19 @@ internal static class BenchmarkSampleHelpers
         var solutionFile = Path.Combine(dir, "solution.json");
         if (!File.Exists(solutionFile))
         {
+            // Derive a sensible solution name from the workspace root's .sln
+            // filename ("AgentEval.sln" → "AgentEval"). Falls back to the
+            // generic label when no .sln is visible (e.g., consumer in a
+            // git-only repo without a solution file).
+            var slnFile = new DirectoryInfo(SampleWorkspaceRoot).GetFiles("*.sln").FirstOrDefault();
+            var solutionName = slnFile is null
+                ? FallbackSolutionName
+                : Path.GetFileNameWithoutExtension(slnFile.Name);
             var solutionDoc = new
             {
                 schemaVersion = "1.0",
                 id = Guid.NewGuid(),
-                name = SamplesSolutionName,
+                name = solutionName,
             };
             var json = JsonSerializer.Serialize(solutionDoc, new JsonSerializerOptions
             {

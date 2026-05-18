@@ -39,15 +39,22 @@ public static class McHost
         builder.Services.AddSingleton<EvaluatorCardRegistry>();
 
         // IOutputStoreReader: read-only access to the local .agenteval/ folder.
-        // Configured root is `<AgentEval:Root>/.agenteval` if set, else
-        // `<cwd>/.agenteval`. Plan-08 MC1.2.2. Tests inject their own reader
-        // via WithWebHostBuilder.
+        // Workspace-root resolution order:
+        //   1. `<AgentEval:Root>` configuration (the `AgentEval__Root` env var the
+        //      CLI's `agenteval mc serve --workspace …` sets);
+        //   2. The nearest ancestor of CWD containing *.sln / *.slnx / .git/ —
+        //      the same documented convention WorkspaceRootDiscovery uses in
+        //      AgentEval.DataLoaders so the CLI, the samples, and MC all
+        //      converge on one workspace per repo;
+        //   3. Plain CWD as the last-resort fallback (consumer running outside
+        //      any solution / git repo).
+        // Plan-08 MC1.2.2. Tests inject their own reader via WithWebHostBuilder.
         builder.Services.AddSingleton<IOutputStoreReader>(sp =>
         {
             var configuredRoot = builder.Configuration["AgentEval:Root"];
             var root = !string.IsNullOrWhiteSpace(configuredRoot)
                 ? configuredRoot
-                : Directory.GetCurrentDirectory();
+                : DiscoverWorkspaceRoot(Directory.GetCurrentDirectory());
             return new FileSystemOutputStore(System.IO.Path.Combine(root, ".agenteval"));
         });
 
@@ -188,4 +195,27 @@ public static class McHost
     // (MapStaticAssets, MapFallbackToFile) expects the entry assembly to BE
     // the web project. The CLI's `mc serve` therefore spawns the MC executable
     // as a subprocess instead — see McServeCommand.cs in AgentEval.Cli.
+
+    /// <summary>
+    /// Walks up from <paramref name="startDir"/> looking for the nearest
+    /// ancestor containing a <c>*.sln</c>, <c>*.slnx</c>, or <c>.git/</c> —
+    /// the documented canonical-workspace convention (see
+    /// <c>WorkspaceRootDiscovery</c> in <c>AgentEval.DataLoaders</c>; that type
+    /// is internal so MC re-implements the 6-line walk locally rather than
+    /// bumping the public surface area). Falls back to <paramref name="startDir"/>
+    /// when no anchor is found.
+    /// </summary>
+    private static string DiscoverWorkspaceRoot(string startDir)
+    {
+        var dir = new DirectoryInfo(startDir);
+        while (dir is not null)
+        {
+            if (dir.GetFiles("*.sln").Length > 0 ||
+                dir.GetFiles("*.slnx").Length > 0 ||
+                dir.GetDirectories(".git").Length > 0)
+                return dir.FullName;
+            dir = dir.Parent;
+        }
+        return startDir;
+    }
 }
