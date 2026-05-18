@@ -876,18 +876,25 @@ internal static class BenchmarkSampleHelpers
                 var componentsCount = scenarioComponents.Count;
                 var perScenarioCount = Math.Min(inputsCount, componentsCount);
 
-                // Coverage-loss visibility: when the YAML-supplied probes count and the
-                // composite-component count diverge, the truncated side is silently lost
-                // unless we surface it. Emit a console warning + carry honest "skipped"
-                // leaves for any extra components (we have a rubric but no probe to grade
-                // against) so the verdict reflects the real coverage gap.
+                // Coverage-loss visibility: when the YAML-supplied probes count and
+                // the composite-component count diverge, the truncated side is silently
+                // lost unless we surface it. Console-warn and (below) carry honest
+                // skipped leaves in both directions so the gap is visible in the
+                // persisted tree, the HTML report, and the PDF appendix.
+                //
+                // Note: WeightedSum and friends ignore skipped leaves, so a coverage
+                // gap does NOT in itself escalate the score — it is surfaced as visible
+                // NOT TESTED leaves and a summary Recommendation on the article-level
+                // result. Reviewers see exactly which probes lacked a rubric (or which
+                // rubrics lacked a probe) and can re-run after reconciling YAML+composite.
                 if (inputsCount != componentsCount)
                 {
                     Console.Error.WriteLine(
                         $"   ⚠  Article '{node.Key}' has {inputsCount} YAML probe input(s) but "
-                        + $"{componentsCount} composite component(s). Honest 'skipped' leaves will "
-                        + $"be emitted for the {Math.Abs(inputsCount - componentsCount)} missing "
-                        + $"pair(s); compliance verdict will reflect this coverage gap.");
+                        + $"{componentsCount} composite component(s). The "
+                        + $"{Math.Abs(inputsCount - componentsCount)} unmatched item(s) will be "
+                        + $"emitted as NOT TESTED leaves in the report; reconcile the YAML "
+                        + $"scenario list with the composite roster to close the gap.");
                 }
 
                 var scenarioResults = new List<EvalResult>(Math.Max(inputsCount, componentsCount));
@@ -959,13 +966,61 @@ internal static class BenchmarkSampleHelpers
 
                 // Coverage-loss visibility (extra probes): when the YAML probe list
                 // outpaces the composite-component list, those extra probes have no
-                // rubric to grade against. We can't add them as sub-results without
-                // tripping the aggregator's 1:1 invariant (IAggregationStrategy
-                // implementations throw on results.Count != components.Count), so we
-                // surface the gap as a Recommendation on the article-level result —
-                // the persisted tree, HTML report, and PDF appendix all carry it.
+                // rubric to grade against. We cannot extend the `subs` passed to the
+                // aggregator (IAggregationStrategy implementations enforce
+                // results.Count == components.Count and throw otherwise), but we can
+                // append explicit NOT TESTED leaves to the article-level result's
+                // SubResults *after* aggregation. The aggregated score is unchanged
+                // (WeightedSum / siblings already ignore skipped leaves), and:
+                //   - the synthetic leaves render as NOT TESTED in HTML + PDF,
+                //   - they persist as ScenarioResults in the canonical .agenteval/ tree
+                //     (EnumerateAtomicLeaves walks them via Details.SubResults),
+                //   - a summary Recommendation on the article makes the gap explicit.
+                // This addresses PR #30 review comment #22 ("add explicit skipped/error
+                // results for those unmatched probes so the coverage gap is visible").
                 if (inputsCount > componentsCount)
                 {
+                    var extraLeaves = new List<EvalResult>(
+                        aggregated.Details.SubResults ?? Array.Empty<EvalResult>());
+                    for (var pi = perScenarioCount; pi < inputsCount; pi++)
+                    {
+                        var probeText = scenarioInputs[pi];
+                        var preview = probeText.Length > 120
+                            ? probeText[..120] + "…"
+                            : probeText;
+                        extraLeaves.Add(new EvalResult(
+                            Metric: new EvalMetadata(
+                                Key: $"{node.Key}::unmatched-probe[{pi}]",
+                                Name: $"Unmatched probe input #{pi + 1}",
+                                Category: "coverage",
+                                Version: "1.0.0"),
+                            Score: new EvalScore(0, null, "skipped", false, null, "none", null),
+                            Details: new EvalDetails(
+                                Dimensions: null,
+                                Evidence: new[]
+                                {
+                                    new EvalEvidence(
+                                        Source: "coverage",
+                                        Reference: $"probe-index-{pi}",
+                                        Message: $"Probe input not graded — no matching composite component. Probe (truncated): \"{preview}\"")
+                                },
+                                Recommendations: new[]
+                                {
+                                    $"Add a composite component (rubric) for this probe, or remove probe #{pi + 1} from the YAML scenario list for article '{node.Key}'."
+                                },
+                                SubResults: null,
+                                AggregationStrategy: null),
+                            Provenance: new EvalProvenance(
+                                Type: "skipped-unmatched-probe",
+                                JudgeModel: null,
+                                PromptId: null,
+                                PromptHash: null,
+                                TokensUsed: null,
+                                EstimatedCost: 0,
+                                CacheHit: false),
+                            EvaluatedAt: DateTimeOffset.UtcNow));
+                    }
+
                     var extraRecs = new List<string>(
                         aggregated.Details.Recommendations ?? Array.Empty<string>())
                     {
@@ -973,12 +1028,15 @@ internal static class BenchmarkSampleHelpers
                         + $"article '{node.Key}' but the composite has only "
                         + $"{componentsCount} component(s). The {inputsCount - componentsCount} "
                         + "trailing probe(s) had no matching rubric and were NOT graded — "
-                        + "reconcile the YAML scenario list with the composite roster "
-                        + "(add a rubric for each extra probe, or remove the unused probes)."
+                        + "see the appended unmatched-probe[…] leaves for the verbatim probe text."
                     };
                     aggregated = aggregated with
                     {
-                        Details = aggregated.Details with { Recommendations = extraRecs }
+                        Details = aggregated.Details with
+                        {
+                            SubResults = extraLeaves,
+                            Recommendations = extraRecs,
+                        },
                     };
                 }
 

@@ -66,18 +66,47 @@ public static class LongMemEvalDataLoader
     /// <summary>
     /// Resolves the LongMemEval dataset path using the documented order:
     /// explicit <paramref name="explicitPath"/> → <c>LONGMEMEVAL_DATASET_PATH</c> env var →
-    /// canonical local default under the workspace root. Returns the first path that
-    /// points at an existing file, or <c>null</c> if none of them do (caller decides
-    /// whether to throw and how to phrase the message).
+    /// canonical local default under the workspace root.
     /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Caller-supplied paths are <b>authoritative</b>. A non-whitespace
+    /// <paramref name="explicitPath"/> or <c>LONGMEMEVAL_DATASET_PATH</c> env var
+    /// is treated as "the caller asked for this specific dataset" — if the file
+    /// does not exist at the supplied location, the method throws
+    /// <see cref="LongMemEvalDatasetNotFoundException"/> instead of silently
+    /// falling back to a different dataset. This prevents typos (in <c>DatasetPath</c>
+    /// or in the <c>Full()</c> env-var path) from producing misleading benchmark
+    /// results against the canonical local default. Falling back to the canonical
+    /// local path only happens when neither explicit path nor env var is supplied.
+    /// </para>
+    /// <para>
+    /// Returns the resolved existing path, or <c>null</c> if no path was supplied
+    /// (explicit and env var both empty) and the canonical local path is missing —
+    /// the caller decides how to phrase the "nothing reachable" message.
+    /// </para>
+    /// </remarks>
+    /// <exception cref="LongMemEvalDatasetNotFoundException">
+    /// When a non-whitespace <paramref name="explicitPath"/> or the
+    /// <c>LONGMEMEVAL_DATASET_PATH</c> env var is set but the corresponding file
+    /// does not exist on disk.
+    /// </exception>
     public static string? ResolveDatasetPath(string? explicitPath = null)
     {
-        if (!string.IsNullOrWhiteSpace(explicitPath) && File.Exists(explicitPath))
-            return explicitPath;
+        if (!string.IsNullOrWhiteSpace(explicitPath))
+        {
+            if (File.Exists(explicitPath))
+                return explicitPath;
+            throw LongMemEvalDatasetNotFoundException.ForPath(explicitPath);
+        }
 
         var envPath = Environment.GetEnvironmentVariable(DatasetPathEnvVar);
-        if (!string.IsNullOrWhiteSpace(envPath) && File.Exists(envPath))
-            return envPath;
+        if (!string.IsNullOrWhiteSpace(envPath))
+        {
+            if (File.Exists(envPath))
+                return envPath;
+            throw LongMemEvalDatasetNotFoundException.ForPath(envPath);
+        }
 
         var canonical = TryFindCanonicalLocalPath();
         if (canonical != null && File.Exists(canonical))

@@ -83,15 +83,16 @@ public sealed class HtmlEvalResultRenderer : IEvalResultRenderer
 
         // Overall verdict banner — translate "skipped" to "NOT TESTED" so an atomic
         // skipped root presents consistently with the leaf badges (which already do
-        // this remapping inside WriteNode). Without this, the cover label would read
-        // "SKIPPED" while the per-leaf badges read "NOT TESTED" for the same state.
+        // this remapping inside WriteNode) and with the PDF cover ("OVERALL: NOT
+        // TESTED"). Without this, the HTML cover label read "SKIPPED" while per-leaf
+        // badges read "NOT TESTED" for the same state. Score is kept visible (mirrors
+        // PDF cover behaviour); for an atomic skipped result this is 0%.
         var sev = SeverityClass(root.Score.Severity, root.Score.Label);
         var rootIsSkipped = string.Equals(root.Score.Label, "skipped", StringComparison.OrdinalIgnoreCase);
         var rootBannerLabel = rootIsSkipped ? "NOT TESTED" : WebUtility.HtmlEncode(root.Score.Label.ToUpperInvariant());
         sb.Append("<div class=\"verdict ").Append(sev).Append("\">\n");
         sb.Append("<span class=\"label\">").Append(rootBannerLabel).Append("</span>\n");
-        if (!rootIsSkipped)
-            sb.Append("<span class=\"score\">").Append(FormatPct(root.Score.Value)).Append("</span>\n");
+        sb.Append("<span class=\"score\">").Append(FormatPct(root.Score.Value)).Append("</span>\n");
         sb.Append("</div>\n");
 
         sb.Append("</header>\n");

@@ -285,6 +285,47 @@ public class LongMemEvalBenchmarkTests
             "LongMemEvalDatasetNotFoundException must subclass FileNotFoundException for back-compat.");
     }
 
+    /// <summary>
+    /// PR #30 review follow-up: a caller-supplied <c>explicitPath</c> that points
+    /// at a non-existent file MUST throw, not silently fall through to the env
+    /// var or canonical local default. Otherwise a typo in <c>DatasetPath</c>
+    /// produces a benchmark run against a different dataset than the caller
+    /// asked for, which is a misleading-results bug.
+    /// </summary>
+    [Fact]
+    public void ResolveDatasetPath_ExplicitMissingPath_ThrowsDatasetNotFound_DoesNotFallThrough()
+    {
+        // Clear the env var so a fall-through, if it happened, would land on the
+        // canonical local path. We're asserting the throw fires BEFORE that.
+        using var _ = SetEnvVar("LONGMEMEVAL_DATASET_PATH", null);
+        var bogus = Path.Combine(Path.GetTempPath(), $"agenteval-longmemeval-explicit-missing-{Guid.NewGuid():N}.json");
+
+        var ex = Assert.Throws<LongMemEvalDatasetNotFoundException>(
+            () => LongMemEvalDataLoader.ResolveDatasetPath(bogus));
+
+        // Exception message must mention the path the caller actually asked for —
+        // not the canonical path — so the user can fix their typo.
+        Assert.Contains(bogus, ex.Message);
+    }
+
+    /// <summary>
+    /// PR #30 review follow-up: the <c>LONGMEMEVAL_DATASET_PATH</c> env var is
+    /// the other "explicit declaration of intent" (it is required by
+    /// <c>LongMemEvalBenchmark.Full()</c>). A typo in that env var must surface
+    /// the same way — throw rather than silently load the canonical dataset.
+    /// </summary>
+    [Fact]
+    public void ResolveDatasetPath_EnvVarMissingPath_ThrowsDatasetNotFound_DoesNotFallThrough()
+    {
+        var bogus = Path.Combine(Path.GetTempPath(), $"agenteval-longmemeval-envvar-missing-{Guid.NewGuid():N}.json");
+        using var _ = SetEnvVar("LONGMEMEVAL_DATASET_PATH", bogus);
+
+        var ex = Assert.Throws<LongMemEvalDatasetNotFoundException>(
+            () => LongMemEvalDataLoader.ResolveDatasetPath(explicitPath: null));
+
+        Assert.Contains(bogus, ex.Message);
+    }
+
     // ─── Runner identity ───────────────────────────────────────────────────────
 
     [Fact]

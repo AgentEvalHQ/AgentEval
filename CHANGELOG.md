@@ -216,6 +216,40 @@ sample suite with one example per registered benchmark family.
   were already absent from git tracking but were sitting in the working tree from
   pre-v0.10.0 reorganisation.
 
+### Breaking
+
+The bulk of v0.10.1 is purely additive on top of v0.10.0-beta (new renderers,
+new sample suite, new canonical-store wiring). The "real-data-only" LongMemEval
+shift, however, removes one previously-public API and tightens dataset-path
+resolution. NuGet consumers depending on these surfaces will need to migrate:
+
+- **`LongMemEvalDataLoader.LoadEmbedded(...)` removed.** The static method that
+  loaded the bundled "inspired by LongMemEval" subset (10 entries, partial
+  schema) from `Assembly.GetManifestResourceStream` is gone — the underlying
+  embedded resource is also gone (see "Removed" above). The data was a
+  hand-authored approximation that produced misleading scores. **Migration**:
+  replace `LongMemEvalDataLoader.LoadEmbedded(options)` with
+  `LongMemEvalDataLoader.LoadResolved(options)` and ensure the real
+  `longmemeval_s_cleaned.json` is reachable via canonical local path
+  (`<workspace-root>/src/AgentEval.Memory/Data/longmemeval/`) or the
+  `LONGMEMEVAL_DATASET_PATH` env var. Catch
+  `LongMemEvalDatasetNotFoundException` for friendly "download instructions"
+  UX (see `samples/AgentEval.Samples/Benchmarks/08_LongMemEvalBenchmark.cs`
+  for the pattern).
+- **`LongMemEvalDataLoader.ResolveDatasetPath(...)` tightened semantics.**
+  When a non-whitespace `explicitPath` argument or the
+  `LONGMEMEVAL_DATASET_PATH` env var is supplied but the file does NOT exist
+  on disk, the method now **throws** `LongMemEvalDatasetNotFoundException`
+  instead of silently falling through to the env var / canonical local path
+  (PR #30 review follow-up). The previous behaviour could silently run a
+  benchmark against a different dataset than the caller asked for — a
+  misleading-results bug for users who typo-ed `DatasetPath` or the
+  `Full()` env-var path. Fall-through to the canonical local path only
+  applies when **neither** explicit nor env-var is supplied. **Migration**:
+  if you previously relied on the fall-through to suppress typos, either
+  validate `File.Exists` at the call site before invoking, or catch
+  `LongMemEvalDatasetNotFoundException` and surface the typo to the user.
+
 ### Notes on existing family-specific PDF renderers
 
 `GDPRPdfRenderer`, `EuAiActPdfRenderer`, and `AgenticPdfRenderer` remain untouched. They
