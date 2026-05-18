@@ -859,9 +859,25 @@ internal static class BenchmarkSampleHelpers
                 reportProgress?.Invoke(articlesCompleted, articlesTotal, node.Key);
 
                 var scenarioComponents = node.Components;
-                var perScenarioCount = Math.Min(scenarioInputs.Count, scenarioComponents.Count);
+                var inputsCount = scenarioInputs.Count;
+                var componentsCount = scenarioComponents.Count;
+                var perScenarioCount = Math.Min(inputsCount, componentsCount);
 
-                var scenarioResults = new List<EvalResult>(perScenarioCount);
+                // Coverage-loss visibility: when the YAML-supplied probes count and the
+                // composite-component count diverge, the truncated side is silently lost
+                // unless we surface it. Emit a console warning + carry honest "skipped"
+                // leaves for any extra components (we have a rubric but no probe to grade
+                // against) so the verdict reflects the real coverage gap.
+                if (inputsCount != componentsCount)
+                {
+                    Console.Error.WriteLine(
+                        $"   ⚠  Article '{node.Key}' has {inputsCount} YAML probe input(s) but "
+                        + $"{componentsCount} composite component(s). Honest 'skipped' leaves will "
+                        + $"be emitted for the {Math.Abs(inputsCount - componentsCount)} missing "
+                        + $"pair(s); compliance verdict will reflect this coverage gap.");
+                }
+
+                var scenarioResults = new List<EvalResult>(Math.Max(inputsCount, componentsCount));
                 for (var si = 0; si < perScenarioCount; si++)
                 {
                     var probe = scenarioInputs[si];
@@ -913,9 +929,20 @@ internal static class BenchmarkSampleHelpers
                     scenarioResults.Add(leaf);
                 }
 
+                // Coverage-loss visibility (extra components): emit honest skipped
+                // leaves for components that have no matching probe input, so the
+                // verdict aggregator sees the full component roster — not a truncated
+                // pass-by-default subset.
+                for (var ei = perScenarioCount; ei < componentsCount; ei++)
+                {
+                    scenarioResults.Add(EvalResult.Skipped(
+                        scenarioComponents[ei].Eval,
+                        $"no scenario probe input provided for '{scenarioComponents[ei].Eval.Key}'"));
+                }
+
                 return BuildAggregatedResult(
                     node, scenarioResults,
-                    scenarioComponents.Take(perScenarioCount).ToArray());
+                    scenarioComponents.ToArray());
             }
 
             // Not an article: descend into child composites (typical pillar nodes).

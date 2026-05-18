@@ -1,7 +1,7 @@
 # `samples/AgentEval.Samples/Benchmarks/` — focused benchmark walkthroughs
 
 One sample per registered benchmark family. The **running** benchmark samples
-(B2 Performance, B3 Agentic, B4 GDPR, B5 EU AI Act, B6 OWASP, B7 MITRE) each
+(H2 Performance, H3 Agentic, H4 GDPR, H5 EU AI Act, H6 OWASP, H7 MITRE) each
 exercise the **real** production code path end-to-end:
 
 - Build a real Azure OpenAI–backed agent (when credentials are configured).
@@ -18,11 +18,11 @@ exercise the **real** production code path end-to-end:
 Three samples have a different shape and do **not** invoke an agent or write
 reports:
 
-- **B1 Registry Discovery** — read-only walk of `BenchmarkFamilyRegistry.All`,
+- **H1 Registry Discovery** — read-only walk of `BenchmarkFamilyRegistry.All`,
   no Azure needed.
-- **B8 LongMemEval** — metadata-only walkthrough; a real LongMemEval run needs
+- **H8 LongMemEval** — metadata-only walkthrough; a real LongMemEval run needs
   a memory-enabled agent + `LONGMEMEVAL_DATASET_PATH` and is left to consumers.
-- **B9 Report Browser** — interactive browser over past runs written by the
+- **H9 Report Browser** — interactive browser over past runs written by the
   running samples above; opens JSON / HTML / PDF in the OS default app.
 
 If `AZURE_OPENAI_ENDPOINT` / `_API_KEY` / `_DEPLOYMENT` are missing, the running
@@ -114,7 +114,7 @@ export AZURE_OPENAI_DEPLOYMENT="<deployment-name>"   # e.g. gpt-4o
 ```
 
 Without these set, every executing sample prints a skip box and exits with a
-zero verdict. **B1 Registry Discovery** runs without credentials.
+zero verdict. **H1 Registry Discovery** runs without credentials.
 
 ---
 
@@ -154,7 +154,7 @@ zero verdict. **B1 Registry Discovery** runs without credentials.
 
 ## Viewing past runs
 
-Sample **B9 Report Browser** (`09_ReportBrowser.cs`) lists every report under
+Sample **H9 Report Browser** (`09_ReportBrowser.cs`) lists every report under
 `samples/AgentEval.Samples/output/` and lets you re-open the HTML / PDF / JSON
 without re-running the benchmark.
 

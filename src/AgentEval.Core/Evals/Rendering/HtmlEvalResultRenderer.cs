@@ -243,6 +243,15 @@ public sealed class HtmlEvalResultRenderer : IEvalResultRenderer
         if (string.Equals(label, "skipped", StringComparison.OrdinalIgnoreCase))
             return "sev-skipped";
 
+        // Verdict label outranks severity for the badge color: a composite that misses
+        // its threshold ("fail") with all-low-severity leaves would otherwise render
+        // green. Treat any explicit fail/warn label as the colour anchor; fall back to
+        // severity for unlabelled / pass cases.
+        if (string.Equals(label, "fail", StringComparison.OrdinalIgnoreCase))
+            return "sev-high";
+        if (string.Equals(label, "warn", StringComparison.OrdinalIgnoreCase))
+            return "sev-medium";
+
         return severity?.ToLowerInvariant() switch
         {
             "critical" or "high" => "sev-high",

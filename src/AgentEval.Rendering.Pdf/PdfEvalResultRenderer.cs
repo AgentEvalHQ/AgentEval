@@ -311,6 +311,15 @@ public sealed class PdfEvalResultRenderer : IEvalResultRenderer
         if (string.Equals(label, "skipped", StringComparison.OrdinalIgnoreCase))
             return Colors.Grey.Medium;
 
+        // Verdict label outranks severity for badge / cover colour: a composite that
+        // misses its threshold ("fail") with all-low-severity leaves would otherwise
+        // render green on the cover. Treat fail/warn labels as the colour anchor; fall
+        // back to severity for pass / unlabelled cases.
+        if (string.Equals(label, "fail", StringComparison.OrdinalIgnoreCase))
+            return Colors.Red.Medium;
+        if (string.Equals(label, "warn", StringComparison.OrdinalIgnoreCase))
+            return Colors.Orange.Medium;
+
         return severity?.ToLowerInvariant() switch
         {
             "critical" or "high" => Colors.Red.Medium,
