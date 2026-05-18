@@ -9,44 +9,53 @@ using AgentEval.Core;
 using AgentEval.Core.Benchmarks;
 using AgentEval.Evals;
 using AgentEval.Output;
+using AgentEval.Memory.External.LongMemEval;
 using AgentEval.Memory.External.Models;
 using AgentEval.Memory.Models;
 
 namespace AgentEval.Samples.Benchmarks;
 
 /// <summary>
-/// Benchmarks B8: LongMemEval — cross-platform memory evaluation
+/// Benchmarks H8: LongMemEval — cross-platform memory evaluation
 /// (ICLR 2025 paper, MIT-licensed dataset).
 ///
 /// LongMemEval is a Shape B / runner-style benchmark (ADR-017 Convention 3).
 /// This sample wires the preset-driven (Smoke / Standard / AuditGrade) running-
-/// sample shape used by B2–B7 over the LongMemEval runner: real Azure OpenAI
+/// sample shape used by H2–H7 over the LongMemEval runner: real Azure OpenAI
 /// agent (history-injectable) + LLM judge + canonical <c>.agenteval/</c> store
 /// + sidecar JSON / HTML / PDF. The native <c>ExternalBenchmarkResult</c> is
 /// also written to <c>report-native.json</c> for power users who need the
 /// unaltered per-question / per-type shape.
 ///
-/// Preset mapping:
+/// v0.10.1-beta: all presets read the REAL <c>longmemeval_s_cleaned.json</c>
+/// dataset on disk — the previously-bundled "embedded subset" was a hand-
+/// authored approximation and produced misleading scores. No fake fallback
+/// data exists in this version. When the dataset cannot be located the sample
+/// catches <see cref="LongMemEvalDatasetNotFoundException"/> and prints a
+/// friendly download-instructions box, then returns cleanly to the menu.
+///
+/// Preset mapping (all against the real ~500-question dataset):
 /// <list type="bullet">
-///   <item><see cref="SamplePreset.Smoke"/> → <c>Subset(chatClient)</c> with MaxQuestions=10 (embedded, ~3–5 min)</item>
-///   <item><see cref="SamplePreset.Standard"/> → <c>Subset(chatClient)</c> full 30Q embedded (~10–15 min)</item>
-///   <item><see cref="SamplePreset.AuditGrade"/> → <c>Full(chatClient)</c> ~500Q (requires <c>LONGMEMEVAL_DATASET_PATH</c>, ~30–60 min)</item>
+///   <item><see cref="SamplePreset.Smoke"/> → <c>Subset(chatClient)</c> with override MaxQuestions=10 (~5–10 min)</item>
+///   <item><see cref="SamplePreset.Standard"/> → <c>Subset(chatClient)</c> with baked SubsetOptions (default 50 questions)</item>
+///   <item><see cref="SamplePreset.AuditGrade"/> → <c>Full(chatClient)</c> all ~500 questions (requires <c>LONGMEMEVAL_DATASET_PATH</c>, ~30–60 min)</item>
 /// </list>
 /// </summary>
 /// <remarks>
 /// Requires Azure OpenAI credentials. Skips gracefully when missing.
+/// Smoke + Standard work without any env var when the canonical dataset file
+/// is present at <c>&lt;workspace-root&gt;/src/AgentEval.Memory/Data/longmemeval/longmemeval_s_cleaned.json</c>.
 /// AuditGrade additionally requires the <c>LONGMEMEVAL_DATASET_PATH</c>
-/// environment variable to point at <c>longmemeval_s.json</c> (or equivalent);
-/// when unset, the sample exits cleanly with a clear error rather than
-/// throwing an unhandled exception.
+/// environment variable (deliberate audit-grade gate); when unset, the sample
+/// exits cleanly with a clear message rather than throwing.
 /// </remarks>
 public static class LongMemEvalBenchmarkSample
 {
     public static async Task RunAsync()
     {
         BenchmarkSampleHelpers.PrintHeader(
-            "Benchmarks B8: LongMemEval — Memory benchmark (ICLR 2025)",
-            "Subset (30Q embedded) vs Full (~500Q, requires LONGMEMEVAL_DATASET_PATH)");
+            "Benchmarks H8: LongMemEval — Memory benchmark (ICLR 2025)",
+            "Smoke=10Q / Standard=50Q / AuditGrade=~500Q — all real dataset");
 
         // ── Force-load AgentEval.Memory so [ModuleInitializer] registers "longmemeval".
         // The FQN is used consistently across all force-load anchors here (and in
@@ -74,7 +83,7 @@ public static class LongMemEvalBenchmarkSample
 
         if (!AIConfig.IsConfigured)
         {
-            BenchmarkSampleHelpers.PrintMissingCredentialsBox("BENCHMARKS B8 — LongMemEval");
+            BenchmarkSampleHelpers.PrintMissingCredentialsBox("BENCHMARKS H8 — LongMemEval");
             return;
         }
 
@@ -85,15 +94,17 @@ public static class LongMemEvalBenchmarkSample
         // dataset env var is unset, rather than letting Full() throw a raw
         // InvalidOperationException up the menu.
         if (preset == SamplePreset.AuditGrade &&
-            string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("LONGMEMEVAL_DATASET_PATH")))
+            string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable(LongMemEvalDataLoader.DatasetPathEnvVar)))
         {
             Console.WriteLine();
             Console.ForegroundColor = ConsoleColor.Yellow;
-            Console.WriteLine("   AuditGrade preset requires LONGMEMEVAL_DATASET_PATH (the full ~500Q dataset");
-            Console.WriteLine("   is NOT bundled). Download longmemeval_s.json from the official repo and set:");
-            Console.WriteLine("     setx LONGMEMEVAL_DATASET_PATH \"C:\\path\\to\\longmemeval_s.json\"   (Windows)");
-            Console.WriteLine("     export LONGMEMEVAL_DATASET_PATH=/path/to/longmemeval_s.json         (Unix)");
-            Console.WriteLine("   For development / CI use --preset smoke (10Q embedded) or --preset standard (30Q embedded).");
+            Console.WriteLine($"   AuditGrade preset requires {LongMemEvalDataLoader.DatasetPathEnvVar} (the full ~500Q dataset is");
+            Console.WriteLine("   gated to opt-in env-var to keep audit runs deliberate). Set it to the absolute");
+            Console.WriteLine($"   path of {LongMemEvalDataLoader.CanonicalDatasetFileName} and re-run:");
+            Console.WriteLine($"     setx {LongMemEvalDataLoader.DatasetPathEnvVar} \"C:\\path\\to\\{LongMemEvalDataLoader.CanonicalDatasetFileName}\"   (Windows)");
+            Console.WriteLine($"     export {LongMemEvalDataLoader.DatasetPathEnvVar}=/path/to/{LongMemEvalDataLoader.CanonicalDatasetFileName}        (Unix)");
+            Console.WriteLine("   For development / CI use --preset smoke (10Q) or --preset standard (50Q) —");
+            Console.WriteLine("   both pick up the canonical local dataset automatically.");
             Console.ResetColor();
             return;
         }
@@ -116,37 +127,50 @@ public static class LongMemEvalBenchmarkSample
         };
 
         // ── Resolve runner + options for the chosen preset.
-        // Embedded subset is 30 questions. Smoke truncates further (10) for fast CI.
-        // Standard runs the full embedded 30 (uses the baked-in SubsetOptions).
-        // AuditGrade switches to Full() which reads LONGMEMEVAL_DATASET_PATH.
+        // v0.10.1-beta: all presets use the real ~500Q dataset on disk.
+        // Smoke caps to 10 questions. Standard uses the baked SubsetOptions (default 50).
+        // AuditGrade switches to Full() which mandates LONGMEMEVAL_DATASET_PATH.
         AgentEval.Memory.External.LongMemEval.LongMemEvalBenchmarkRunner runner;
         ExternalBenchmarkOptions options;
         string presetName;
-        switch (preset)
+        try
         {
-            case SamplePreset.AuditGrade:
-                runner = LongMemEvalBenchmark.Full(chatClient);
-                options = LongMemEvalBenchmark.FullOptions;
-                presetName = "audit-grade";
-                break;
-            case SamplePreset.Standard:
-                runner = LongMemEvalBenchmark.Subset(chatClient);
-                options = LongMemEvalBenchmark.SubsetOptions;
-                presetName = "standard";
-                break;
-            default: // Smoke
-                runner = LongMemEvalBenchmark.Subset(chatClient);
-                options = new ExternalBenchmarkOptions
-                {
-                    MaxQuestions = 10,
-                    StratifiedSampling = true,
-                    RandomSeed = 42,
-                    PreserveSessionBoundaries = true,
-                    IncludeTimestamps = true,
-                    DatasetMode = "Subset"
-                };
-                presetName = "smoke";
-                break;
+            switch (preset)
+            {
+                case SamplePreset.AuditGrade:
+                    runner = LongMemEvalBenchmark.Full(chatClient);
+                    options = LongMemEvalBenchmark.FullOptions;
+                    presetName = "audit-grade";
+                    break;
+                case SamplePreset.Standard:
+                    runner = LongMemEvalBenchmark.Subset(chatClient);
+                    options = LongMemEvalBenchmark.SubsetOptions;
+                    presetName = "standard";
+                    break;
+                default: // Smoke
+                    runner = LongMemEvalBenchmark.Subset(chatClient);
+                    options = new ExternalBenchmarkOptions
+                    {
+                        MaxQuestions = 10,
+                        StratifiedSampling = true,
+                        RandomSeed = 42,
+                        PreserveSessionBoundaries = true,
+                        IncludeTimestamps = true,
+                        DatasetMode = "Subset"
+                    };
+                    presetName = "smoke";
+                    break;
+            }
+        }
+        catch (InvalidOperationException ex)
+        {
+            // AuditGrade's Full() factory throws when LONGMEMEVAL_DATASET_PATH is unset.
+            // The pre-flight above already handles this, but catch defensively so a future
+            // semantics change can't crash the menu.
+            Console.ForegroundColor = ConsoleColor.Yellow;
+            Console.WriteLine($"   LongMemEval preset selection failed: {ex.Message}");
+            Console.ResetColor();
+            return;
         }
 
         Console.WriteLine();
@@ -164,6 +188,19 @@ public static class LongMemEvalBenchmarkSample
         try
         {
             result = await runner.RunAsync(agent, benchmarkConfig, options);
+        }
+        catch (LongMemEvalDatasetNotFoundException ex)
+        {
+            PrintDatasetMissingBox(ex);
+            return;
+        }
+        catch (FileNotFoundException ex) when (ex.Message.Contains("LongMemEval", StringComparison.OrdinalIgnoreCase))
+        {
+            // Defensive: any other LongMemEval-flavoured file-not-found that isn't the
+            // typed exception (e.g. from a custom DatasetPath override pointing at a
+            // missing file) — still render the friendly box rather than the menu crash.
+            PrintDatasetMissingBox(ex);
+            return;
         }
         catch (Exception ex)
         {
@@ -238,7 +275,37 @@ public static class LongMemEvalBenchmarkSample
         Console.WriteLine("   - report.json / report.html / report.pdf reflect the synthesised tree;");
         Console.WriteLine("     report-native.json carries the unaltered ExternalBenchmarkResult shape.");
         Console.WriteLine("   - Reference (paper, S mode): GPT-4o = 57.7%; small samples are high variance.");
-        Console.WriteLine("   - Smoke = 10Q (embedded); Standard = 30Q (embedded); AuditGrade = full dataset (env var required).");
+        Console.WriteLine("   - v0.10.1+: Smoke=10Q, Standard=50Q, AuditGrade=~500Q — all real dataset.");
+    }
+
+    // ──────────────────────────────────────────────────────────────────────
+    //  Friendly download-instructions box for missing dataset
+    // ──────────────────────────────────────────────────────────────────────
+
+    private static void PrintDatasetMissingBox(Exception ex)
+    {
+        var canonical = (ex as LongMemEvalDatasetNotFoundException)?.CanonicalLocalPath
+            ?? Path.Combine("src", "AgentEval.Memory", "Data", "longmemeval", LongMemEvalDataLoader.CanonicalDatasetFileName);
+
+        Console.WriteLine();
+        Console.ForegroundColor = ConsoleColor.Yellow;
+        Console.WriteLine("   +----------------------------------------------------------------------------+");
+        Console.WriteLine("   |  LongMemEval dataset not found.                                            |");
+        Console.WriteLine("   |                                                                            |");
+        Console.WriteLine("   |  H8 LongMemEval requires the real LongMemEval dataset — no fake data is    |");
+        Console.WriteLine("   |  bundled (so scores stay paper-comparable).                                |");
+        Console.WriteLine("   |                                                                            |");
+        Console.WriteLine("   |  To run this sample:                                                       |");
+        Console.WriteLine("   |    1. Download from:                                                       |");
+        Console.WriteLine($"   |       {LongMemEvalDataLoader.DatasetDownloadUrl,-69}|");
+        Console.WriteLine("   |    2. Place the file at:                                                   |");
+        Console.WriteLine($"   |       {canonical,-69}|");
+        Console.WriteLine($"   |       (or set {LongMemEvalDataLoader.DatasetPathEnvVar} to point at the file)              |");
+        Console.WriteLine("   |    3. Re-run sample H8.                                                    |");
+        Console.WriteLine("   |                                                                            |");
+        Console.WriteLine("   |  Returning to the menu — no run executed.                                  |");
+        Console.WriteLine("   +----------------------------------------------------------------------------+");
+        Console.ResetColor();
     }
 
     // ──────────────────────────────────────────────────────────────────────

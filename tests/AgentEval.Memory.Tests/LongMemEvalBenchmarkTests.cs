@@ -165,6 +165,8 @@ public class LongMemEvalBenchmarkTests
     /// Phase 8 follow-up #1: Subset() now bakes SubsetOptions into the returned runner's
     /// DefaultOptions so the preset's intended sampling cap and random seed are actually
     /// applied (closes the Phase 7 dead-RandomSeed footgun).
+    /// v0.10.1-beta: SubsetMaxQuestions raised from 30 → 50 to reflect "representative sample
+    /// of the real 500" intent (the embedded 30Q fake subset was deleted).
     /// </summary>
     [Fact]
     public void Subset_RunnerHasDefaultOptionsBakedIn()
@@ -173,7 +175,8 @@ public class LongMemEvalBenchmarkTests
         var runner = LongMemEvalBenchmark.Subset(client);
 
         Assert.NotNull(runner.DefaultOptions);
-        Assert.Equal(30, runner.DefaultOptions!.MaxQuestions);
+        Assert.Equal(LongMemEvalBenchmark.SubsetMaxQuestions, runner.DefaultOptions!.MaxQuestions);
+        Assert.Equal(50, runner.DefaultOptions.MaxQuestions);
         Assert.Equal(42, runner.DefaultOptions.RandomSeed);
         Assert.Equal("Subset", runner.DefaultOptions.DatasetMode);
         Assert.True(runner.DefaultOptions.StratifiedSampling);
@@ -249,16 +252,37 @@ public class LongMemEvalBenchmarkTests
     }
 
     /// <summary>
-    /// Phase 8 follow-up #4: the embedded LongMemEval subset resource must load and
-    /// return at least 1 entry (i.e. the resource is actually embedded and parseable).
+    /// v0.10.1-beta: the fake "embedded subset" was removed. When the loader cannot
+    /// locate the real dataset (explicit path -> env var -> canonical local path),
+    /// it must throw <see cref="LongMemEvalDatasetNotFoundException"/> with the
+    /// download URL + env-var name baked into the message so users see exactly how
+    /// to recover. This test simulates the "nothing on disk" path by pointing the
+    /// env var at a path we know doesn't exist (and using a non-existent canonical
+    /// dataset would require deleting the file on disk — which we don't want to do
+    /// in a test).
     /// </summary>
     [Fact]
-    public void LongMemEvalDataLoader_LoadEmbedded_ReturnsAtLeastOneEntry()
+    public void LongMemEvalDataLoader_LoadFromFile_MissingPath_Throws_DatasetNotFound()
     {
         var opts = LongMemEvalBenchmark.SubsetOptions;
-        var entries = LongMemEvalDataLoader.LoadEmbedded(opts);
+        var bogus = Path.Combine(Path.GetTempPath(), $"agenteval-longmemeval-missing-{Guid.NewGuid():N}.json");
 
-        Assert.NotEmpty(entries);
+        var ex = Assert.Throws<LongMemEvalDatasetNotFoundException>(
+            () => LongMemEvalDataLoader.LoadFromFile(bogus, opts));
+        Assert.Contains(LongMemEvalDataLoader.DatasetPathEnvVar, ex.Message);
+        Assert.Contains(LongMemEvalDataLoader.DatasetDownloadUrl, ex.Message);
+    }
+
+    /// <summary>
+    /// v0.10.1-beta: the dataset-not-found exception subclasses
+    /// <see cref="FileNotFoundException"/> so existing <c>catch (FileNotFoundException)</c>
+    /// blocks still trigger, while the concrete type enables the sample's friendly box.
+    /// </summary>
+    [Fact]
+    public void LongMemEvalDatasetNotFoundException_Subclasses_FileNotFoundException()
+    {
+        Assert.True(typeof(FileNotFoundException).IsAssignableFrom(typeof(LongMemEvalDatasetNotFoundException)),
+            "LongMemEvalDatasetNotFoundException must subclass FileNotFoundException for back-compat.");
     }
 
     // ─── Runner identity ───────────────────────────────────────────────────────

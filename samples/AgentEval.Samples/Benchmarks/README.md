@@ -1,8 +1,9 @@
 # `samples/AgentEval.Samples/Benchmarks/` — focused benchmark walkthroughs
 
 One sample per registered benchmark family. The **running** benchmark samples
-(H2 Performance, H3 Agentic, H4 GDPR, H5 EU AI Act, H6 OWASP, H7 MITRE) each
-exercise the **real** production code path end-to-end:
+(H2 Performance, H3 Agentic, H4 GDPR, H5 EU AI Act, H6 OWASP, H7 MITRE,
+H8 LongMemEval, H9 Memory) each exercise the **real** production code path
+end-to-end:
 
 - Build a real Azure OpenAI–backed agent (when credentials are configured).
 - Invoke the agent for live responses — **no stubs, no hardcoded responses**.
@@ -23,17 +24,25 @@ reports:
 
 - **H1 Registry Discovery** — read-only walk of `BenchmarkFamilyRegistry.All`,
   no Azure needed.
-- **H9 Report Browser** — interactive browser over past runs written by the
+- **H10 Report Browser** — interactive browser over past runs written by the
   running samples above; opens JSON / HTML / PDF in the OS default app.
 
-**H8 LongMemEval** (ICLR 2025) is a Shape B benchmark — its runner returns an
-`ExternalBenchmarkResult` (per-question / per-type) rather than the
-`EvalResult` composite the renderers expect. The sample bridges by
-synthesising an `EvalResult` tree (root = overall accuracy; children =
-per-type composites; grandchildren = per-question atomic leaves with 0/1
-score) so it produces the same canonical store + JSON + HTML + PDF artefacts
-as every other running sample. The unaltered native shape is **also** written
-to `report-native.json` alongside `report.json`.
+**H8 LongMemEval** (ICLR 2025) and **H9 Memory** are Shape B benchmarks —
+their runners return native result records (`ExternalBenchmarkResult` /
+`MemoryBenchmarkResult`) rather than the `EvalResult` composite the renderers
+expect. Each sample bridges by synthesising an `EvalResult` tree (H8: root =
+overall accuracy + per-type composites + per-question leaves; H9: root =
+weighted overall score + per-category leaves) so they produce the same
+canonical store + JSON + HTML + PDF artefacts as every other running sample.
+The unaltered native shape is **also** written to `report-native.json`
+alongside `report.json`.
+
+v0.10.1+: **H8 LongMemEval** no longer ships an "embedded subset" (the prior
+hand-authored 10-entry approximation produced misleading scores). All H8
+presets read the real `longmemeval_s_cleaned.json` from
+`<workspace-root>/src/AgentEval.Memory/Data/longmemeval/` (or
+`LONGMEMEVAL_DATASET_PATH`). If the file is missing the sample prints a
+friendly download-instructions box and returns cleanly to the menu.
 
 If `AZURE_OPENAI_ENDPOINT` / `_API_KEY` / `_DEPLOYMENT` are missing, the running
 samples skip with a clear box and no exceptions — safe to run in CI.
@@ -56,14 +65,17 @@ Or by legacy index (1-based across the flat sample list):
 dotnet run --project samples/AgentEval.Samples -- 43   # Performance
 dotnet run --project samples/AgentEval.Samples -- 44   # Agentic
 dotnet run --project samples/AgentEval.Samples -- 45   # GDPR
-# … etc.
+# …
+dotnet run --project samples/AgentEval.Samples -- 49   # LongMemEval (H8)
+dotnet run --project samples/AgentEval.Samples -- 50   # Memory (H9)
+dotnet run --project samples/AgentEval.Samples -- 51   # Report Browser (H10)
 ```
 
 ---
 
 ## Preset selection
 
-Every executing sample (H2 – H8) respects a **preset tier** so the same code
+Every executing sample (H2 – H9) respects a **preset tier** so the same code
 scales from a CI smoke check to a full audit:
 
 | Sample              | Smoke (default)              | Standard                    | Audit-Grade                          |
@@ -74,6 +86,8 @@ scales from a CI smoke check to a full audit:
 | **H5 EU AI Act**    | `Smoke` (5 controls)         | `Standard` (6 pillars)      | `AuditGrade` (6 pillars, cap-by-worst)   |
 | **H6 OWASP**        | `Smoke` (3 attacks @ Quick)  | `Top10` (9 attacks @ Quick) | `AuditGrade` (9 @ Comprehensive)      |
 | **H7 MITRE ATLAS**  | `AtlasSmoke`                 | `AtlasBaseline`             | `AtlasAuditGrade`                    |
+| **H8 LongMemEval**  | `Subset` w/ MaxQuestions=10  | `Subset` w/ MaxQuestions=50 | `Full` (~500Q, requires env var)     |
+| **H9 Memory**       | `Quick` (3 categories)       | `Standard` (8 categories)   | `Full` (12 categories)               |
 
 ### Selecting a preset
 
@@ -130,17 +144,18 @@ zero verdict. **H1 Registry Discovery** runs without credentials.
 
 ## Per-sample fidelity notes
 
-| #  | Sample                  | What it exercises                                                                                       |
-|----|-------------------------|----------------------------------------------------------------------------------------------------------|
-| H1 | Registry Discovery      | No agent, no judge. Walks `BenchmarkFamilyRegistry` + force-loads sub-assemblies.                       |
-| H2 | Performance             | Real agent, no judge. Latency + throughput + cost metrics against your live deployment.                  |
-| H3 | Agentic                 | Real agent **invoked once** with a representative prompt; real judge grades the live response.           |
-| H4 | GDPR                    | Real agent **invoked per scenario** with each YAML `input`; real judge grades each live response.        |
-| H5 | EU AI Act               | Same per-scenario probing as GDPR; pillar-nested presets descend recursively.                            |
-| H6 | OWASP LLM Top 10        | Real agent driven by the OWASP adversarial pipeline (Shape B runner — pipeline owns the probe loop).    |
-| H7 | MITRE ATLAS             | Real agent driven by the ATLAS adversarial pipeline (Shape B runner).                                    |
-| H8 | LongMemEval             | Real history-injectable agent + LLM judge. Subset (10Q/30Q embedded) or Full (~500Q via `LONGMEMEVAL_DATASET_PATH`). Shape-B result is synthesised into an `EvalResult` tree; native shape preserved in `report-native.json`. |
-| H9 | Report Browser          | No agent. Opens previously-generated JSON / HTML / PDF artefacts.                                       |
+| #   | Sample                  | What it exercises                                                                                       |
+|-----|-------------------------|----------------------------------------------------------------------------------------------------------|
+| H1  | Registry Discovery      | No agent, no judge. Walks `BenchmarkFamilyRegistry` + force-loads sub-assemblies.                       |
+| H2  | Performance             | Real agent, no judge. Latency + throughput + cost metrics against your live deployment.                  |
+| H3  | Agentic                 | Real agent **invoked once** with a representative prompt; real judge grades the live response.           |
+| H4  | GDPR                    | Real agent **invoked per scenario** with each YAML `input`; real judge grades each live response.        |
+| H5  | EU AI Act               | Same per-scenario probing as GDPR; pillar-nested presets descend recursively.                            |
+| H6  | OWASP LLM Top 10        | Real agent driven by the OWASP adversarial pipeline (Shape B runner — pipeline owns the probe loop).    |
+| H7  | MITRE ATLAS             | Real agent driven by the ATLAS adversarial pipeline (Shape B runner).                                    |
+| H8  | LongMemEval             | Real history-injectable agent + LLM judge against the REAL `longmemeval_s_cleaned.json` dataset (no fake fallback). Smoke=10Q, Standard=50Q, AuditGrade=~500Q (requires `LONGMEMEVAL_DATASET_PATH`). Shape-B result synthesised into an `EvalResult` tree; native shape preserved in `report-native.json`. Friendly download-instructions box when dataset missing. |
+| H9  | Memory                  | Real history-injectable agent + LLM judge running the canonical Memory benchmark suite. Quick/Standard/Full presets map to 3/8/12 categories. Shape-B `MemoryBenchmarkResult` synthesised into an `EvalResult` tree; native shape preserved in `report-native.json` (grade, stars, weak categories, recommendations). |
+| H10 | Report Browser          | No agent. Opens previously-generated JSON / HTML / PDF artefacts.                                       |
 
 ---
 
@@ -164,7 +179,7 @@ zero verdict. **H1 Registry Discovery** runs without credentials.
 
 ## Viewing past runs
 
-Sample **H9 Report Browser** (`09_ReportBrowser.cs`) lists every report under
+Sample **H10 Report Browser** (`10_ReportBrowser.cs`) lists every report under
 `samples/AgentEval.Samples/output/` and lets you re-open the HTML / PDF / JSON
 without re-running the benchmark.
 
@@ -181,14 +196,14 @@ without re-running the benchmark.
 
 ## Where the runs are saved
 
-Samples H2 – H8 write to **two** locations per run (v0.10.1, plan-25):
+Samples H2 – H9 write to **two** locations per run (v0.10.1, plan-25):
 
 | Artefact                                      | Location                                                           | Why                                                                                                                              |
 |-----------------------------------------------|--------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------|
 | Manifest, scenarios, summary, compliance evidence | `<repo>/.agenteval/`                                              | **Canonical.** Same workspace `agenteval init` creates — resolved via the `*.sln`/`*.slnx`/`.git/` walk-up. Audit-chained; Mission Control + `agenteval doctor` read here.            |
 | HTML report                                   | `samples/AgentEval.Samples/output/{family}/run-{utc}-{suffix}/report.html` | Direct browser open. Carries the canonical manifest's `ContentHash` in the audit-hash footer.                                    |
 | PDF report                                    | `samples/AgentEval.Samples/output/{family}/run-{utc}-{suffix}/report.pdf`  | Direct PDF open. Same audit-hash footer.                                                                                          |
-| Bare `report.json` (composite EvalResult)     | `samples/AgentEval.Samples/output/{family}/run-{utc}-{suffix}/report.json` | Legacy compat — what `09_ReportBrowser` reads to surface the score / label per run.                                              |
+| Bare `report.json` (composite EvalResult)     | `samples/AgentEval.Samples/output/{family}/run-{utc}-{suffix}/report.json` | Legacy compat — what `10_ReportBrowser` reads to surface the score / label per run.                                              |
 
 ### Mission Control on a sample run
 

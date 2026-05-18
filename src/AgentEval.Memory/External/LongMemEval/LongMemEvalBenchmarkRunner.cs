@@ -251,11 +251,15 @@ public class LongMemEvalBenchmarkRunner : IExternalBenchmarkRunner
 
     private IReadOnlyList<LongMemEvalEntry> LoadEntries(ExternalBenchmarkOptions options)
     {
-        var path = options.DatasetPath ?? _datasetPath;
+        // v0.10.1-beta: no embedded fallback any more. Resolution order:
+        // explicit options.DatasetPath -> runner-baked _datasetPath -> LONGMEMEVAL_DATASET_PATH env var
+        // -> canonical local path under workspace root -> throw LongMemEvalDatasetNotFoundException.
+        var explicitPath = options.DatasetPath ?? _datasetPath;
+        var resolved = LongMemEvalDataLoader.ResolveDatasetPath(explicitPath);
+        if (resolved == null)
+            throw LongMemEvalDatasetNotFoundException.ForResolutionFailure();
 
-        return path != null
-            ? LongMemEvalDataLoader.LoadFromFile(path, options)
-            : LongMemEvalDataLoader.LoadEmbedded(options);
+        return LongMemEvalDataLoader.LoadFromFile(resolved, options);
     }
 
     private ExternalBenchmarkResult AggregateResults(

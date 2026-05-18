@@ -101,6 +101,7 @@ public static class Program
             new("OWASP LLM Top 10",          "Real attack pipeline; preset-driven (smoke / audit-grade)",           OwaspBenchmarkSample.RunAsync),
             new("MITRE ATLAS",               "ATLAS technique-level probes; preset-driven (smoke / audit-grade)",   MitreBenchmarkSample.RunAsync),
             new("LongMemEval",               "Real history-injectable agent + judge; Subset / Full presets (ICLR 2025)", LongMemEvalBenchmarkSample.RunAsync),
+            new("Memory",                    "Comprehensive memory benchmark — Quick/Standard/Full presets",        MemoryBenchmarkSample.RunAsync),
             new("Report Browser",            "Open previously-generated JSON / HTML / PDF runs",                    ReportBrowserBenchmark.RunAsync),
         ]),
     ];

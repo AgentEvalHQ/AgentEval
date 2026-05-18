@@ -6,7 +6,7 @@ using System.Text.Json;
 namespace AgentEval.Samples.Benchmarks;
 
 /// <summary>
-/// Benchmarks B9: Report Browser — scans the local <c>samples/AgentEval.Samples/output/</c>
+/// Benchmarks H10: Report Browser — scans the local <c>samples/AgentEval.Samples/output/</c>
 /// directory, lists the most-recent benchmark runs (newest first), and lets the user open
 /// any one of them with the OS default app.
 ///
@@ -48,7 +48,7 @@ public static class ReportBrowserBenchmark
     public static Task RunAsync()
     {
         BenchmarkSampleHelpers.PrintHeader(
-            "Benchmarks B9: Report Browser",
+            "Benchmarks H10: Report Browser",
             "Browse previously generated JSON / HTML / PDF reports under samples/.../output/");
 
         var outputRoot = ResolveOutputRoot();

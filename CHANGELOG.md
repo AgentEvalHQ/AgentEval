@@ -35,16 +35,39 @@ sample suite with one example per registered benchmark family.
   EU AI Act, OWASP, MITRE, LongMemEval, and **Report Browser**. Every
   running sample writes JSON + HTML + PDF via the new renderers (the audit-grade-only
   PDF carve-out was closed mid-cycle — all running samples now produce all three formats).
-- **B8 LongMemEval real-run wiring** — promoted from metadata-only walkthrough to a
-  preset-driven (Smoke / Standard / AuditGrade) running sample. Smoke runs the embedded
-  10Q stratified sample (~3–5 min), Standard runs the full 30Q embedded subset, and
-  AuditGrade runs `LongMemEvalBenchmark.Full(chatClient)` against the ~500Q dataset
-  (requires `LONGMEMEVAL_DATASET_PATH`; clean error exit when unset). Shape-B bridging:
-  the runner's `ExternalBenchmarkResult` is synthesised into an `EvalResult` composite
-  tree (root = overall accuracy; per-type composites; per-question atomic leaves) so the
-  canonical `.agenteval/` store + sidecar JSON / HTML / PDF artefacts come out identical
-  to every other Group-H sample. The unaltered native shape is **also** written to
-  `report-native.json` alongside `report.json` (no info loss).
+- **H8 LongMemEval real-run wiring** — promoted from metadata-only walkthrough to a
+  preset-driven (Smoke / Standard / AuditGrade) running sample. v0.10.1+: all presets
+  run against the **real** `longmemeval_s_cleaned.json` dataset (the hand-authored
+  "embedded subset" was removed — see "Changed" below). Smoke caps to 10 questions
+  (~5–10 min), Standard runs `SubsetOptions` (default 50 questions), and AuditGrade
+  runs `LongMemEvalBenchmark.Full(chatClient)` against the full ~500-question dataset
+  (requires `LONGMEMEVAL_DATASET_PATH`). When the dataset can't be located the sample
+  catches `LongMemEvalDatasetNotFoundException` and prints a friendly download-instructions
+  box (URL + canonical path + env var) and returns cleanly to the menu — no unhandled
+  exceptions. Shape-B bridging: the runner's `ExternalBenchmarkResult` is synthesised
+  into an `EvalResult` composite tree (root = overall accuracy; per-type composites;
+  per-question atomic leaves) so the canonical `.agenteval/` store + sidecar
+  JSON / HTML / PDF artefacts come out identical to every other Group-H sample.
+  The unaltered native shape is **also** written to `report-native.json` alongside
+  `report.json` (no info loss).
+- **H9 Memory benchmark sample** (`samples/.../Benchmarks/09_MemoryBenchmark.cs`) —
+  mirror of the H8 Shape-B pattern over the canonical `MemoryBenchmarkRunner`.
+  Smoke / Standard / AuditGrade presets map to `MemoryBenchmark.Quick` (3 categories) /
+  `Standard` (8 categories) / `Full` (12 categories). Per-category progress is streamed
+  to the console so long Full runs don't look hung; the result is synthesised into a
+  weighted-mean `EvalResult` tree (root + per-category atomic leaves, with weights /
+  stars / durations carried in `Details.Dimensions`); the unaltered
+  `MemoryBenchmarkResult` (including grade, weak categories, recommendations) is
+  written to `report-native.json`. Group-H now spans H1–H10:
+  Registry / Performance / Agentic / GDPR / EU AI Act / OWASP / MITRE / LongMemEval /
+  **Memory** / Report Browser.
+- **`LongMemEvalDatasetNotFoundException`** in
+  `src/AgentEval.Memory/External/LongMemEval/LongMemEvalDataLoader.cs` — subclasses
+  `FileNotFoundException` (existing `catch` blocks still trigger) and carries the
+  canonical local path, env-var name, and Hugging Face download URL so consumers see
+  exactly how to recover. Thrown from the new
+  `LongMemEvalDataLoader.LoadResolved`/`ResolveDatasetPath` resolution flow (explicit
+  arg → `LONGMEMEVAL_DATASET_PATH` → canonical local path under workspace root).
 - **`09_ReportBrowser` sample** (commit `077374d`): interactive browser that walks
   `samples/AgentEval.Samples/output/{family}/run-*/`, sorts newest-first (caps at 20
   with "older runs omitted"), reads `Score.Value` + `Label` from the sidecar JSON, and
@@ -132,9 +155,50 @@ sample suite with one example per registered benchmark family.
   targets.
 - **Umbrella `src/AgentEval/AgentEval.csproj`** bumped to `0.10.1-beta` and now embeds
   `AgentEval.Rendering.Pdf.dll` via `PrivateAssets="all"`.
+- **H8 LongMemEval — eliminate fake embedded subset** (this commit). The previously-bundled
+  `src/AgentEval.Memory/Data/longmemeval/longmemeval-subset.json` was a hand-authored
+  "inspired by LongMemEval" approximation (10 entries, partial schema — missing
+  `question_date`, `haystack_dates`, `haystack_session_ids`, `answer_session_ids`) whose
+  `_attribution` field admitted it wasn't the real paper dataset. Running against it
+  produced scores that looked paper-comparable but were not. All presets now load the
+  real `longmemeval_s_cleaned.json` from disk:
+  - **Resolution order** (highest precedence first): explicit
+    `ExternalBenchmarkOptions.DatasetPath` → `LONGMEMEVAL_DATASET_PATH` env var →
+    canonical local default `<workspace-root>/src/AgentEval.Memory/Data/longmemeval/longmemeval_s_cleaned.json`.
+    When none resolves to an existing file the loader throws
+    `LongMemEvalDatasetNotFoundException` (a `FileNotFoundException` subclass) whose
+    message names the canonical path, the env var, and the Hugging Face download URL.
+  - **Preset mapping**: Smoke = 10Q sample of the real 500; Standard = 50Q sample
+    (was: 30Q "embedded"); AuditGrade = ~500Q via `LONGMEMEVAL_DATASET_PATH` (unchanged).
+    `LongMemEvalBenchmark.SubsetMaxQuestions` raised 30 → 50 so the constant matches
+    the Subset preset's "representative sample of the real 500" intent.
+  - **H8 sample defensive catch**: `08_LongMemEvalBenchmark.cs` wraps the run in a
+    `try/catch (LongMemEvalDatasetNotFoundException)` that renders a friendly download-
+    instructions box (URL + canonical path + env var) and returns cleanly to the menu —
+    no unhandled exceptions, the rest of the sample suite stays usable.
+  - **Registration descriptions** updated to drop "embedded 30-question stratified sample"
+    in favour of "Real LongMemEval dataset capped to MaxQuestions (default 50)".
+  - **Tests**: the embedded-subset round-trip test in
+    `tests/AgentEval.Memory.Tests/LongMemEvalBenchmarkTests.cs` is replaced with two
+    new tests — one asserting `LoadFromFile` throws `LongMemEvalDatasetNotFoundException`
+    with the download URL + env var name baked into the message, the other asserting
+    the exception subclasses `FileNotFoundException` for back-compat.
 
 ### Removed
 
+- **`src/AgentEval.Memory/Data/longmemeval/longmemeval-subset.json`** (and its
+  `<EmbeddedResource>` line in `AgentEval.Memory.csproj`) — the hand-authored
+  "inspired by LongMemEval" content was misleading enough to fail the "honest
+  benchmarks" bar (see the "Changed" section above for full details). Consumers
+  must now have the real `longmemeval_s_cleaned.json` on disk (canonical local
+  path under workspace root, or `LONGMEMEVAL_DATASET_PATH`) — the loader's new
+  resolution flow throws `LongMemEvalDatasetNotFoundException` with download
+  instructions when it can't locate the file.
+- **`LongMemEvalDataLoader.LoadEmbedded(...)`** — the static method that loaded
+  the fake subset from `Assembly.GetManifestResourceStream`. Replaced by
+  `LongMemEvalDataLoader.LoadResolved(...)` (which throws when no real dataset
+  is reachable) and `LongMemEvalDataLoader.ResolveDatasetPath(...)` (the
+  pure-resolution helper that returns the first existing file from the chain).
 - **`samples/AgentEval.GdprBenchmark.Demo/` project** — the original 11-line stub was a
   CLI-hint Program.cs and added no real demonstration value. Equivalent test coverage
   already lives in `tests/AgentEval.Tests/Compliance/Gdpr/` (E2E_Standard, E2E_Smoke,
