@@ -105,7 +105,7 @@ What's preserved from the official benchmark:
 - **Binary scoring** (0/1) comparable to published results
 - **2 LLM calls per question** (query + judge) via history injection
 
-Sample [G8: LongMemEvalBenchmark](../samples/AgentEval.Samples/MemoryEvaluation/07_LongMemEvalBenchmark.cs) and [G10: LongMemEvalBaselineRepro](../samples/AgentEval.Samples/MemoryEvaluation/10_LongMemEvalBaselineRepro.cs) reproduce the GPT-4o paper baseline.
+Sample [G8: LongMemEvalBenchmarkDemo](../samples/AgentEval.Samples/MemoryEvaluation/07_LongMemEvalBenchmarkDemo.cs) and [G10: LongMemEvalBaselineRepro](../samples/AgentEval.Samples/MemoryEvaluation/10_LongMemEvalBaselineRepro.cs) reproduce the GPT-4o paper baseline.
 
 ### ✍️ Fluent Memory Assertions
 
@@ -186,7 +186,7 @@ See [Sample G3 — Memory Scenarios](../samples/AgentEval.Samples/MemoryEvaluati
 | G4 | [Memory DI](../samples/AgentEval.Samples/MemoryEvaluation/04_MemoryDI.cs) | `AddAgentEvalMemory()`, `CanRememberAsync()` |
 | G5 | [Cross-Session Memory](../samples/AgentEval.Samples/MemoryEvaluation/05_MemoryCrossSession.cs) | Fact persistence across session resets |
 | G6 | [Benchmark Reporting](../samples/AgentEval.Samples/MemoryEvaluation/06_MemoryBenchmarkReporting.cs) | Multi-model HTML pentagon report |
-| G7 | [LongMemEval Benchmark](../samples/AgentEval.Samples/MemoryEvaluation/07_LongMemEvalBenchmark.cs) | Cross-platform research-grade evaluation |
+| G7 | [LongMemEval Benchmark](../samples/AgentEval.Samples/MemoryEvaluation/07_LongMemEvalBenchmarkDemo.cs) | Cross-platform research-grade evaluation |
 | G8 | [Run Single Benchmark](../samples/AgentEval.Samples/MemoryEvaluation/08_RunSingleBenchmark.cs) | Pick a preset, save a baseline, view report |
 | G9 | [AIContextProvider Memory](../samples/AgentEval.Samples/MemoryEvaluation/09_MemoryAIContextProvider.cs) | MAF-native pipeline memory |
 | G10 | [LongMemEval Baseline Repro](../samples/AgentEval.Samples/MemoryEvaluation/10_LongMemEvalBaselineRepro.cs) | Reproduce the GPT-4o paper baseline |

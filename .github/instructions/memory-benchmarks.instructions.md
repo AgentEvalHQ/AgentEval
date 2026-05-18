@@ -327,7 +327,7 @@ The `LongMemEvalBenchmarkRunner` has built-in error handling:
 | G4 | `04_MemoryDI.cs` | Dependency injection setup |
 | G5 | `05_MemoryCrossSession.cs` | Session reset & persistence |
 | G6 | `06_MemoryBenchmarkReporting.cs` | Baseline save & retrieval |
-| G7 | `07_LongMemEvalBenchmark.cs` | LongMemEval benchmark run |
+| G7 | `07_LongMemEvalBenchmarkDemo.cs` | LongMemEval benchmark run |
 | G8 | `08_RunSingleBenchmark.cs` | Running one category in isolation |
 | G9 | `09_MemoryAIContextProvider.cs` | MAF AIContextProvider integration |
 | G10 | `10_LongMemEvalBaselineRepro.cs` | Paper baseline reproduction (gpt-4o, TextBlob) |

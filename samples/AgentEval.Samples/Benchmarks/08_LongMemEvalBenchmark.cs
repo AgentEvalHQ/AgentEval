@@ -4,6 +4,7 @@
 using System.Text.Json;
 using Azure.AI.OpenAI;
 using Microsoft.Extensions.AI;
+using AgentEval.Benchmarks;                       // → production factory LongMemEvalBenchmark (the shadow against the Group-G demo was removed in v0.10.1)
 using AgentEval.Core;
 using AgentEval.Core.Benchmarks;
 using AgentEval.Evals;
@@ -48,10 +49,11 @@ public static class LongMemEvalBenchmarkSample
             "Subset (30Q embedded) vs Full (~500Q, requires LONGMEMEVAL_DATASET_PATH)");
 
         // ── Force-load AgentEval.Memory so [ModuleInitializer] registers "longmemeval".
-        // The reference is FULLY QUALIFIED because the bare identifier
-        // `LongMemEvalBenchmark` is shadowed by the Group-G sample class
-        // `AgentEval.Samples.LongMemEvalBenchmark` — C# name resolution picks the
-        // sample (parent-namespace) type and the real factory is never loaded.
+        // The FQN is used consistently across all force-load anchors here (and in
+        // 01_RegistryDiscovery) so a future name shadow elsewhere in the Samples
+        // assembly can't silently break the load. (The original Group-G class shadow
+        // that motivated this was removed in v0.10.1 — the demo class is now
+        // `LongMemEvalBenchmarkDemo`.)
         _ = typeof(AgentEval.Benchmarks.LongMemEvalBenchmark).Assembly;
 
         // ── Registry metadata header (pedagogical — keep it short).
@@ -123,17 +125,17 @@ public static class LongMemEvalBenchmarkSample
         switch (preset)
         {
             case SamplePreset.AuditGrade:
-                runner = AgentEval.Benchmarks.LongMemEvalBenchmark.Full(chatClient);
-                options = AgentEval.Benchmarks.LongMemEvalBenchmark.FullOptions;
+                runner = LongMemEvalBenchmark.Full(chatClient);
+                options = LongMemEvalBenchmark.FullOptions;
                 presetName = "audit-grade";
                 break;
             case SamplePreset.Standard:
-                runner = AgentEval.Benchmarks.LongMemEvalBenchmark.Subset(chatClient);
-                options = AgentEval.Benchmarks.LongMemEvalBenchmark.SubsetOptions;
+                runner = LongMemEvalBenchmark.Subset(chatClient);
+                options = LongMemEvalBenchmark.SubsetOptions;
                 presetName = "standard";
                 break;
             default: // Smoke
-                runner = AgentEval.Benchmarks.LongMemEvalBenchmark.Subset(chatClient);
+                runner = LongMemEvalBenchmark.Subset(chatClient);
                 options = new ExternalBenchmarkOptions
                 {
                     MaxQuestions = 10,

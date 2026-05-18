@@ -46,6 +46,11 @@ public static class RegistryDiscoveryBenchmark
         // property access forces the CLR to resolve the type token, load the assembly,
         // and run its [ModuleInitializer] which registers the family with the registry.
         // `nameof(...)` would NOT achieve this — it is a compile-time constant.
+        //
+        // The fully-qualified form (`AgentEval.Benchmarks.X`) is used for the entries
+        // below as defensive consistency: a future name shadow elsewhere in the Samples
+        // assembly (parent-namespace types beat using-imported types in C# name
+        // resolution) can't silently break the load.
         _ = typeof(AgenticBenchmark).Assembly;
         _ = typeof(ArticlesRegistry).Assembly;
         _ = typeof(EuAiActArticlesRegistry).Assembly;

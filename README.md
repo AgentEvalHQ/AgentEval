@@ -383,7 +383,7 @@ await result.ExportHtmlReportAsync("memory-report.html");
 - Memory evaluation **always calls a real LLM** (the judge can't be mocked).
 - LongMemEval dataset isn't redistributed — [download it from HuggingFace](https://huggingface.co/datasets/xiaowu0162/longmemeval-cleaned).
 
-**✅ See:** [docs/memory-evaluation.md](docs/memory-evaluation.md) • [docs/maf-memory-integration.md](docs/maf-memory-integration.md) • [Sample G2: Memory Benchmark](samples/AgentEval.Samples/MemoryEvaluation/02_MemoryBenchmarkDemo.cs) • [Sample G7: LongMemEval](samples/AgentEval.Samples/MemoryEvaluation/07_LongMemEvalBenchmark.cs)
+**✅ See:** [docs/memory-evaluation.md](docs/memory-evaluation.md) • [docs/maf-memory-integration.md](docs/maf-memory-integration.md) • [Sample G2: Memory Benchmark](samples/AgentEval.Samples/MemoryEvaluation/02_MemoryBenchmarkDemo.cs) • [Sample G7: LongMemEval](samples/AgentEval.Samples/MemoryEvaluation/07_LongMemEvalBenchmarkDemo.cs)
 
 ---
 

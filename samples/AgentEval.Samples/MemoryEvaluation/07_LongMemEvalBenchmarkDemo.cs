@@ -13,14 +13,24 @@ using Microsoft.Extensions.AI;
 namespace AgentEval.Samples;
 
 /// <summary>
-/// Sample G8: LongMemEval Cross-Platform Benchmark (ICLR 2025, MIT License)
+/// Sample G8: LongMemEval Cross-Platform Benchmark Demo (ICLR 2025, MIT License)
 ///
-/// Runs research-grade memory evaluation using the official LongMemEval methodology:
+/// Demonstrates research-grade memory evaluation using the official LongMemEval methodology:
 /// - Stratified sampling across all 6 question types
 /// - Type-specific judge prompts matching the official evaluation
 /// - Session boundary + timestamp preservation in history injection
 /// - Binary scoring (0/1) comparable to published results (GPT-4o = 57.7%)
 /// - 2 LLM calls per question (query + judge) via history injection
+///
+/// <para>
+/// Renamed from <c>LongMemEvalBenchmark</c> to <c>LongMemEvalBenchmarkDemo</c> in
+/// v0.10.1 to eliminate the name shadow against the production factory
+/// <c>AgentEval.Benchmarks.LongMemEvalBenchmark</c>. C# name resolution prefers
+/// types reached by walking out the enclosing namespace over types pulled in via
+/// <c>using</c>, so the bare identifier in Samples code silently resolved to this
+/// demo class instead of the real factory. The <c>Demo</c> suffix conveys
+/// "demonstration of how to use the benchmark", not the benchmark factory itself.
+/// </para>
 ///
 /// Prerequisites:
 /// - Download longmemeval_s_cleaned.json from:
@@ -31,7 +41,7 @@ namespace AgentEval.Samples;
 /// Attribution: LongMemEval by Di Wu et al. (ICLR 2025)
 /// https://github.com/xiaowu0162/LongMemEval
 /// </summary>
-public static class LongMemEvalBenchmark
+public static class LongMemEvalBenchmarkDemo
 {
     private static readonly string DatasetPath = Path.GetFullPath(Path.Combine(
         AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", "..",

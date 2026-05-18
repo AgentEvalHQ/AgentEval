@@ -86,6 +86,22 @@ sample suite with one example per registered benchmark family.
 
 ### Changed
 
+- **Group-G sample class rename: `LongMemEvalBenchmark` → `LongMemEvalBenchmarkDemo`**
+  (file `samples/AgentEval.Samples/MemoryEvaluation/07_LongMemEvalBenchmark.cs` →
+  `07_LongMemEvalBenchmarkDemo.cs`). Closes the name-shadow foot-gun flagged in
+  commit `de1e20b`'s "v0.10.2 follow-up" note: two static classes both named
+  `LongMemEvalBenchmark` (production factory in `AgentEval.Benchmarks`,
+  registered with `BenchmarkFamilyRegistry` via `[ModuleInitializer]`; and the
+  Group-G demo in `AgentEval.Samples.MemoryEvaluation`) caused C#'s
+  parent-namespace-beats-`using` name-resolution rule to silently pick the demo
+  class for bare identifiers in Samples code — exactly how `08_LongMemEval`
+  initially loaded the wrong assembly and the registry returned "family not
+  registered" despite `AgentEval.Memory` being referenced. The `de1e20b` fix
+  fully-qualified all references as a workaround; this commit removes the
+  shadow at its source so future Samples code can't silently misfire. The
+  fully-qualified force-load anchors in `01_RegistryDiscovery` and
+  `08_LongMemEvalBenchmark` are retained as defensive consistency against any
+  future shadow elsewhere in the Samples assembly.
 - **`02_PerformanceBenchmark`** uses a real Azure-backed agent (was: in-process
   `EchoAgent` stub). The format-gap closure (commit `d932746`) and the real-agent
   rewiring (commit `4e09db5`) close the headline "no stubs anywhere" promise of v0.10.1.

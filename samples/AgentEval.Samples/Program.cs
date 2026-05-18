@@ -86,7 +86,7 @@ public static class Program
             new("Cross-Session Memory",      "Fact persistence across session resets — compare with / without",      MemoryCrossSession.RunAsync),
             new("AIContextProvider Memory",  "MAF-native memory pipeline — AIContextProvider + CrossSessionEval",    MemoryAIContextProvider.RunAsync),
             new("Benchmark Reporting",       "Run benchmarks, save baselines, compare configs, HTML report",        MemoryBenchmarkReporting.RunAsync),
-            new("LongMemEval Benchmark",     "Cross-platform memory eval — 120K token haystacks (ICLR 2025, MIT)",  LongMemEvalBenchmark.RunAsync),
+            new("LongMemEval Benchmark",     "Cross-platform memory eval — 120K token haystacks (ICLR 2025, MIT)",  LongMemEvalBenchmarkDemo.RunAsync),
             new("Run Single Benchmark",     "Pick Quick/Standard/Full, run it, save baseline, view report",       RunSingleBenchmark.RunAsync),
             new("LongMemEval Baseline Repro","GPT-4o baseline reproduction — TextBlob mode, paper-matching config", LongMemEvalBaselineRepro.RunAsync),
         ]),
