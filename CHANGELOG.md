@@ -69,6 +69,11 @@ appendices the universal `EvalResult` shape does not represent. They are the rig
 for boardroom/DPO/regulator-grade audit PDFs. The new `PdfEvalResultRenderer` targets the
 universal cross-family path (samples, third-party plugins, discovery walkthroughs).
 
+### Mission Control workspace + score semantics
+
+- **`--workspace <path>` is now honoured by bare `dotnet run --project src/AgentEval.MissionControl`**: previously the bare run-path silently fell back to `Directory.GetCurrentDirectory()` (yielding `src/AgentEval.MissionControl/.agenteval`) regardless of the flag. The CLI form `agenteval mc serve --workspace ...` already routed through `AgentEval__Root` env var; the bare-run path now does the same. Mirrors `McServeCommand`'s behaviour.
+- **`Query.recentRuns(...).score` returns pass-rate** (passed leaves / total leaves), not the weighted-composite verdict score that the sample console prints. Both are valid; they diverge when composite aggregation strategies weight leaves non-uniformly (most clearly with `MinAggregation` security-gate semantics). Use `Query.run(runId:).overallScore` for the composite score; `recentRuns.score` is intentionally a fast scan-time summary suitable for list views.
+
 ### Known issues / tracked for v0.10.2+
 
 - **NuGetConsumer LLM non-determinism**: `samples/AgentEval.NuGetConsumer.Tests/SafetyPolicyTests.CancellationRequest_ShouldConfirmBeforeCancelling` is flaky at roughly 90% pass rate on 10-iteration stress (real LLM call; when the model responds with text instead of a tool call, the strict tool-call assertion fails). Pre-existing — predates the v0.10.0-beta arc. Not introduced by any phase of v0.10.0-beta. Tracked here for v0.10.1 stabilisation (likely fix: relax the test's strictness to accept either-tool-or-confirmation-text, or seed the model into a deterministic mode).
