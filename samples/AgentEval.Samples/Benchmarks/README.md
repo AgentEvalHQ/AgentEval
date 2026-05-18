@@ -63,17 +63,17 @@ dotnet run --project samples/AgentEval.Samples -- 45   # GDPR
 
 ## Preset selection
 
-Every executing sample (B2 – B8) respects a **preset tier** so the same code
+Every executing sample (H2 – H8) respects a **preset tier** so the same code
 scales from a CI smoke check to a full audit:
 
 | Sample              | Smoke (default)              | Standard                    | Audit-Grade                          |
 |---------------------|------------------------------|------------------------------|---------------------------------------|
-| **B2 Performance**  | 3 iters + 2s throughput      | 10 iters + 10s throughput   | 50 iters + 30s throughput            |
-| **B3 Agentic**      | `ToolCallAccuracy` (5 evals) | `AgenticExecution` (6 evals)| `AgenticExecution` + stronger judge   |
-| **B4 GDPR**         | `Smoke` (5 articles)         | `Standard` (21 articles)    | `AuditGrade` (21 articles, cap-by-worst) |
-| **B5 EU AI Act**    | `Smoke` (5 controls)         | `Standard` (6 pillars)      | `AuditGrade` (6 pillars, cap-by-worst)   |
-| **B6 OWASP**        | `Smoke` (3 attacks @ Quick)  | `Top10` (9 attacks @ Quick) | `AuditGrade` (9 @ Comprehensive)      |
-| **B7 MITRE ATLAS**  | `AtlasSmoke`                 | `AtlasBaseline`             | `AtlasAuditGrade`                    |
+| **H2 Performance**  | 3 iters + 2s throughput      | 10 iters + 10s throughput   | 50 iters + 30s throughput            |
+| **H3 Agentic**      | `ToolCallAccuracy` (5 evals) | `AgenticExecution` (6 evals)| `AgenticExecution` + stronger judge   |
+| **H4 GDPR**         | `Smoke` (5 articles)         | `Standard` (21 articles)    | `AuditGrade` (21 articles, cap-by-worst) |
+| **H5 EU AI Act**    | `Smoke` (5 controls)         | `Standard` (6 pillars)      | `AuditGrade` (6 pillars, cap-by-worst)   |
+| **H6 OWASP**        | `Smoke` (3 attacks @ Quick)  | `Top10` (9 attacks @ Quick) | `AuditGrade` (9 @ Comprehensive)      |
+| **H7 MITRE ATLAS**  | `AtlasSmoke`                 | `AtlasBaseline`             | `AtlasAuditGrade`                    |
 
 ### Selecting a preset
 
@@ -109,7 +109,7 @@ public list price. Faster or smaller models cost less; stronger judges cost more
 | Standard     | 5 – 15 min                  | ~$0.50 – $2               |
 | Audit-Grade  | 15 – 45 min                 | ~$2 – $10                 |
 
-Compliance samples (B4 GDPR, B5 EU AI Act) sit at the upper end because every
+Compliance samples (H4 GDPR, H5 EU AI Act) sit at the upper end because every
 article scenario invokes both the agent and the judge — Smoke = ~25 LLM round
 trips, Standard / Audit-Grade = ~100+ round trips.
 
@@ -132,31 +132,31 @@ zero verdict. **H1 Registry Discovery** runs without credentials.
 
 | #  | Sample                  | What it exercises                                                                                       |
 |----|-------------------------|----------------------------------------------------------------------------------------------------------|
-| B1 | Registry Discovery      | No agent, no judge. Walks `BenchmarkFamilyRegistry` + force-loads sub-assemblies.                       |
-| B2 | Performance             | Real agent, no judge. Latency + throughput + cost metrics against your live deployment.                  |
-| B3 | Agentic                 | Real agent **invoked once** with a representative prompt; real judge grades the live response.           |
-| B4 | GDPR                    | Real agent **invoked per scenario** with each YAML `input`; real judge grades each live response.        |
-| B5 | EU AI Act               | Same per-scenario probing as GDPR; pillar-nested presets descend recursively.                            |
-| B6 | OWASP LLM Top 10        | Real agent driven by the OWASP adversarial pipeline (Shape B runner — pipeline owns the probe loop).    |
-| B7 | MITRE ATLAS             | Real agent driven by the ATLAS adversarial pipeline (Shape B runner).                                    |
-| B8 | LongMemEval             | Real history-injectable agent + LLM judge. Subset (10Q/30Q embedded) or Full (~500Q via `LONGMEMEVAL_DATASET_PATH`). Shape-B result is synthesised into an `EvalResult` tree; native shape preserved in `report-native.json`. |
-| B9 | Report Browser          | No agent. Opens previously-generated JSON / HTML / PDF artefacts.                                       |
+| H1 | Registry Discovery      | No agent, no judge. Walks `BenchmarkFamilyRegistry` + force-loads sub-assemblies.                       |
+| H2 | Performance             | Real agent, no judge. Latency + throughput + cost metrics against your live deployment.                  |
+| H3 | Agentic                 | Real agent **invoked once** with a representative prompt; real judge grades the live response.           |
+| H4 | GDPR                    | Real agent **invoked per scenario** with each YAML `input`; real judge grades each live response.        |
+| H5 | EU AI Act               | Same per-scenario probing as GDPR; pillar-nested presets descend recursively.                            |
+| H6 | OWASP LLM Top 10        | Real agent driven by the OWASP adversarial pipeline (Shape B runner — pipeline owns the probe loop).    |
+| H7 | MITRE ATLAS             | Real agent driven by the ATLAS adversarial pipeline (Shape B runner).                                    |
+| H8 | LongMemEval             | Real history-injectable agent + LLM judge. Subset (10Q/30Q embedded) or Full (~500Q via `LONGMEMEVAL_DATASET_PATH`). Shape-B result is synthesised into an `EvalResult` tree; native shape preserved in `report-native.json`. |
+| H9 | Report Browser          | No agent. Opens previously-generated JSON / HTML / PDF artefacts.                                       |
 
 ---
 
 ## Honest limitations
 
-- **B3 Agentic** invokes the agent **once** with a representative query. Real
+- **H3 Agentic** invokes the agent **once** with a representative query. Real
   agentic evaluations probe across a dataset (see `samples/datasets/benchmark-tool-accuracy.jsonl`
   and `DataAndInfrastructure/04_BenchmarkSystem.cs` for the JSONL-driven flow).
-- **B4 GDPR / B5 EU AI Act**: per-scenario probing reuses the canonical
+- **H4 GDPR / H5 EU AI Act**: per-scenario probing reuses the canonical
   `ScenarioToAtomicEval` and the preset's aggregation strategy, but rebuilds
   the verdict tree from individual scenario results because the default
   `CompositeEval.EvaluateAsync` threads one input to every leaf. Provider
   safety filters that reject a probe surface as honest "skipped" leaves
   (rather than aborting the run) — a real audit would route around the filter
   or document the filter itself as a control.
-- **B2 Performance** at Smoke / Standard preset measures your deployment under
+- **H2 Performance** at Smoke / Standard preset measures your deployment under
   light load. Audit-grade (50 iters + 30s throughput) is closer to real
   bake-off conditions but is still single-machine and single-client.
 
@@ -181,7 +181,7 @@ without re-running the benchmark.
 
 ## Where the runs are saved
 
-Samples B2 – B8 write to **two** locations per run (v0.10.1, plan-25):
+Samples H2 – H8 write to **two** locations per run (v0.10.1, plan-25):
 
 | Artefact                                      | Location                                                           | Why                                                                                                                              |
 |-----------------------------------------------|--------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------|
@@ -205,13 +205,13 @@ tree as well.
 
 ### Compliance evidence
 
-For B4 (GDPR) and B5 (EU AI Act) the sample additionally writes a regulator-grade
+For H4 (GDPR) and H5 (EU AI Act) the sample additionally writes a regulator-grade
 evidence document via `GDPRComplianceReporter` / `EuAiActComplianceReporter`:
 
 - `.agenteval/compliance/GDPR/{subject}/{ts}/evidence.json`
 - `.agenteval/compliance/EU-AI-Act/{subject}/{ts}/evidence.json`
 
-For B6 (OWASP) and B7 (MITRE) the same shape lands via
+For H6 (OWASP) and H7 (MITRE) the same shape lands via
 `OWASPComplianceReporter` / `MITREATLASReporter`:
 
 - `.agenteval/compliance/OWASP-LLM-Top10/{subject}/{ts}/evidence.json`
