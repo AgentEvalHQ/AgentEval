@@ -18,15 +18,22 @@ exercise the **real** production code path end-to-end:
   `samples/AgentEval.Samples/output/{family}/run-{utc}-{suffix}/` for direct
   human consumption (this stays project-local).
 
-Three samples have a different shape and do **not** invoke an agent or write
+Two samples have a different shape and do **not** invoke an agent or write
 reports:
 
 - **H1 Registry Discovery** — read-only walk of `BenchmarkFamilyRegistry.All`,
   no Azure needed.
-- **H8 LongMemEval** — metadata-only walkthrough; a real LongMemEval run needs
-  a memory-enabled agent + `LONGMEMEVAL_DATASET_PATH` and is left to consumers.
 - **H9 Report Browser** — interactive browser over past runs written by the
   running samples above; opens JSON / HTML / PDF in the OS default app.
+
+**H8 LongMemEval** (ICLR 2025) is a Shape B benchmark — its runner returns an
+`ExternalBenchmarkResult` (per-question / per-type) rather than the
+`EvalResult` composite the renderers expect. The sample bridges by
+synthesising an `EvalResult` tree (root = overall accuracy; children =
+per-type composites; grandchildren = per-question atomic leaves with 0/1
+score) so it produces the same canonical store + JSON + HTML + PDF artefacts
+as every other running sample. The unaltered native shape is **also** written
+to `report-native.json` alongside `report.json`.
 
 If `AZURE_OPENAI_ENDPOINT` / `_API_KEY` / `_DEPLOYMENT` are missing, the running
 samples skip with a clear box and no exceptions — safe to run in CI.
@@ -56,7 +63,7 @@ dotnet run --project samples/AgentEval.Samples -- 45   # GDPR
 
 ## Preset selection
 
-Every executing sample (B2 – B7) respects a **preset tier** so the same code
+Every executing sample (B2 – B8) respects a **preset tier** so the same code
 scales from a CI smoke check to a full audit:
 
 | Sample              | Smoke (default)              | Standard                    | Audit-Grade                          |
@@ -132,7 +139,7 @@ zero verdict. **H1 Registry Discovery** runs without credentials.
 | B5 | EU AI Act               | Same per-scenario probing as GDPR; pillar-nested presets descend recursively.                            |
 | B6 | OWASP LLM Top 10        | Real agent driven by the OWASP adversarial pipeline (Shape B runner — pipeline owns the probe loop).    |
 | B7 | MITRE ATLAS             | Real agent driven by the ATLAS adversarial pipeline (Shape B runner).                                    |
-| B8 | LongMemEval             | Metadata-only walkthrough. Real memory runs live in group G's `MemoryEvaluation/` samples.              |
+| B8 | LongMemEval             | Real history-injectable agent + LLM judge. Subset (10Q/30Q embedded) or Full (~500Q via `LONGMEMEVAL_DATASET_PATH`). Shape-B result is synthesised into an `EvalResult` tree; native shape preserved in `report-native.json`. |
 | B9 | Report Browser          | No agent. Opens previously-generated JSON / HTML / PDF artefacts.                                       |
 
 ---
@@ -174,7 +181,7 @@ without re-running the benchmark.
 
 ## Where the runs are saved
 
-Samples B2 – B7 write to **two** locations per run (v0.10.1, plan-25):
+Samples B2 – B8 write to **two** locations per run (v0.10.1, plan-25):
 
 | Artefact                                      | Location                                                           | Why                                                                                                                              |
 |-----------------------------------------------|--------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------|

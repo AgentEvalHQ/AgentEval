@@ -100,7 +100,7 @@ public static class Program
             new("EU AI Act",                 "Per-scenario agent probing; preset-driven; full audit-chain evidence", EuAiActBenchmarkSample.RunAsync),
             new("OWASP LLM Top 10",          "Real attack pipeline; preset-driven (smoke / audit-grade)",           OwaspBenchmarkSample.RunAsync),
             new("MITRE ATLAS",               "ATLAS technique-level probes; preset-driven (smoke / audit-grade)",   MitreBenchmarkSample.RunAsync),
-            new("LongMemEval",               "Memory benchmark metadata + usage walkthrough (ICLR 2025)",           LongMemEvalBenchmarkSample.RunAsync),
+            new("LongMemEval",               "Real history-injectable agent + judge; Subset / Full presets (ICLR 2025)", LongMemEvalBenchmarkSample.RunAsync),
             new("Report Browser",            "Open previously-generated JSON / HTML / PDF runs",                    ReportBrowserBenchmark.RunAsync),
         ]),
     ];

@@ -32,9 +32,19 @@ sample suite with one example per registered benchmark family.
   Embedded into the umbrella `AgentEval` NuGet via `PrivateAssets="all"`.
 - **`samples/AgentEval.Samples/Benchmarks/` sample suite** — 9 focused examples wired
   into `Program.cs` as menu group H: Registry Discovery, Performance, Agentic, GDPR,
-  EU AI Act, OWASP, MITRE, LongMemEval (metadata-only), and **Report Browser**. Every
+  EU AI Act, OWASP, MITRE, LongMemEval, and **Report Browser**. Every
   running sample writes JSON + HTML + PDF via the new renderers (the audit-grade-only
   PDF carve-out was closed mid-cycle — all running samples now produce all three formats).
+- **B8 LongMemEval real-run wiring** — promoted from metadata-only walkthrough to a
+  preset-driven (Smoke / Standard / AuditGrade) running sample. Smoke runs the embedded
+  10Q stratified sample (~3–5 min), Standard runs the full 30Q embedded subset, and
+  AuditGrade runs `LongMemEvalBenchmark.Full(chatClient)` against the ~500Q dataset
+  (requires `LONGMEMEVAL_DATASET_PATH`; clean error exit when unset). Shape-B bridging:
+  the runner's `ExternalBenchmarkResult` is synthesised into an `EvalResult` composite
+  tree (root = overall accuracy; per-type composites; per-question atomic leaves) so the
+  canonical `.agenteval/` store + sidecar JSON / HTML / PDF artefacts come out identical
+  to every other Group-H sample. The unaltered native shape is **also** written to
+  `report-native.json` alongside `report.json` (no info loss).
 - **`09_ReportBrowser` sample** (commit `077374d`): interactive browser that walks
   `samples/AgentEval.Samples/output/{family}/run-*/`, sorts newest-first (caps at 20
   with "older runs omitted"), reads `Score.Value` + `Label` from the sidecar JSON, and
