@@ -7,7 +7,9 @@ end-to-end:
 
 - Build a real Azure OpenAI–backed agent (when credentials are configured).
 - Invoke the agent for live responses — **no stubs, no hardcoded responses**.
-- Grade the response with a real LLM judge.
+- Grade the response with a real LLM judge — **H3 onward**. H2 Performance is
+  metric-only (latency / throughput / cost against your live deployment) and
+  does not create a judge; see the per-sample fidelity table below.
 - Render the unified `EvalResult` tree to JSON + HTML + PDF using the v0.10.1
   generic renderers (`HtmlEvalResultRenderer`, `PdfEvalResultRenderer`).
 - Write a canonical audit-chained run under the **repo-root `.agenteval/`**

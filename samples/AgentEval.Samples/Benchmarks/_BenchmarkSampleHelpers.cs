@@ -328,12 +328,12 @@ internal static class BenchmarkSampleHelpers
         }
 
         // ── 8. Resolve the canonical run dir for the print-paths helper ────────
-        // The store doesn't expose RunDir publicly, but we can reconstruct it
-        // from FileSystemLayout's known convention: subjects/{kind.Folder()}/{name}/runs/{runId}/.
-        var sanitizedKind = subject.Kind.Folder();
-        var sanitizedName = SanitizeForPath(subject.Name);
-        var canonicalRunDir = Path.Combine(
-            SampleAgentEvalDir, "subjects", sanitizedKind, sanitizedName, "runs", runId);
+        // Use FileSystemLayout.RunDir directly so the path matches exactly what the
+        // FileSystemOutputStore writes — including the collision-resistant hash
+        // suffix Sanitize appends when a subject name contains Windows-invalid
+        // characters (':', '/', '\', '<', '>', '"', '|', '?', '*'). Re-implementing
+        // the layout locally is fragile and was a Copilot review finding on PR #30.
+        var canonicalRunDir = new FileSystemLayout(SampleAgentEvalDir).RunDir(subject, runId);
 
         return new SampleRunPaths(
             CanonicalRunDir: canonicalRunDir,
@@ -485,18 +485,6 @@ internal static class BenchmarkSampleHelpers
             {
                 ["overallScore"] = root.Score.Value,
             });
-    }
-
-    /// <summary>
-    /// Sanitises a name for use as a path segment — mirrors the rule the CLI
-    /// commands use so the canonical-run path the helper reconstructs matches
-    /// the path the store actually wrote to.
-    /// </summary>
-    private static string SanitizeForPath(string name)
-    {
-        var invalid = Path.GetInvalidFileNameChars().Concat(new[] { '/', '\\' }).ToArray();
-        var s = string.Concat(name.Select(c => invalid.Contains(c) ? '-' : c));
-        return s.Trim('.', ' ');
     }
 
     /// <summary>Prints a per-sample header banner.</summary>
@@ -965,9 +953,36 @@ internal static class BenchmarkSampleHelpers
                         $"no scenario probe input provided for '{scenarioComponents[ei].Eval.Key}'"));
                 }
 
-                return BuildAggregatedResult(
+                var aggregated = BuildAggregatedResult(
                     node, scenarioResults,
                     scenarioComponents.ToArray());
+
+                // Coverage-loss visibility (extra probes): when the YAML probe list
+                // outpaces the composite-component list, those extra probes have no
+                // rubric to grade against. We can't add them as sub-results without
+                // tripping the aggregator's 1:1 invariant (IAggregationStrategy
+                // implementations throw on results.Count != components.Count), so we
+                // surface the gap as a Recommendation on the article-level result —
+                // the persisted tree, HTML report, and PDF appendix all carry it.
+                if (inputsCount > componentsCount)
+                {
+                    var extraRecs = new List<string>(
+                        aggregated.Details.Recommendations ?? Array.Empty<string>())
+                    {
+                        $"Coverage gap: YAML declares {inputsCount} probe input(s) for "
+                        + $"article '{node.Key}' but the composite has only "
+                        + $"{componentsCount} component(s). The {inputsCount - componentsCount} "
+                        + "trailing probe(s) had no matching rubric and were NOT graded — "
+                        + "reconcile the YAML scenario list with the composite roster "
+                        + "(add a rubric for each extra probe, or remove the unused probes)."
+                    };
+                    aggregated = aggregated with
+                    {
+                        Details = aggregated.Details with { Recommendations = extraRecs }
+                    };
+                }
+
+                return aggregated;
             }
 
             // Not an article: descend into child composites (typical pillar nodes).

@@ -81,11 +81,17 @@ public sealed class HtmlEvalResultRenderer : IEvalResultRenderer
         WriteMetaPair(sb, "Scenarios", leafCount.ToString(System.Globalization.CultureInfo.InvariantCulture));
         sb.Append("</dl>\n");
 
-        // Overall verdict banner
+        // Overall verdict banner — translate "skipped" to "NOT TESTED" so an atomic
+        // skipped root presents consistently with the leaf badges (which already do
+        // this remapping inside WriteNode). Without this, the cover label would read
+        // "SKIPPED" while the per-leaf badges read "NOT TESTED" for the same state.
         var sev = SeverityClass(root.Score.Severity, root.Score.Label);
+        var rootIsSkipped = string.Equals(root.Score.Label, "skipped", StringComparison.OrdinalIgnoreCase);
+        var rootBannerLabel = rootIsSkipped ? "NOT TESTED" : WebUtility.HtmlEncode(root.Score.Label.ToUpperInvariant());
         sb.Append("<div class=\"verdict ").Append(sev).Append("\">\n");
-        sb.Append("<span class=\"label\">").Append(WebUtility.HtmlEncode(root.Score.Label.ToUpperInvariant())).Append("</span>\n");
-        sb.Append("<span class=\"score\">").Append(FormatPct(root.Score.Value)).Append("</span>\n");
+        sb.Append("<span class=\"label\">").Append(rootBannerLabel).Append("</span>\n");
+        if (!rootIsSkipped)
+            sb.Append("<span class=\"score\">").Append(FormatPct(root.Score.Value)).Append("</span>\n");
         sb.Append("</div>\n");
 
         sb.Append("</header>\n");

@@ -30,11 +30,14 @@ sample suite with one example per registered benchmark family.
   generic renderer with cover page, optional component summary, per-leaf detail pages
   (score / severity / provenance / evidence / metrics), and an audit-chain appendix.
   Embedded into the umbrella `AgentEval` NuGet via `PrivateAssets="all"`.
-- **`samples/AgentEval.Samples/Benchmarks/` sample suite** — 9 focused examples wired
+- **`samples/AgentEval.Samples/Benchmarks/` sample suite** — 10 focused examples wired
   into `Program.cs` as menu group H: Registry Discovery, Performance, Agentic, GDPR,
-  EU AI Act, OWASP, MITRE, LongMemEval, and **Report Browser**. Every
+  EU AI Act, OWASP, MITRE, LongMemEval, **Memory**, and **Report Browser**. Every
   running sample writes JSON + HTML + PDF via the new renderers (the audit-grade-only
-  PDF carve-out was closed mid-cycle — all running samples now produce all three formats).
+  PDF carve-out was closed mid-cycle — all running samples now produce all three
+  formats). Note that H2 Performance is metric-only (latency / throughput / cost)
+  and does not create an LLM judge; every other running sample (H3 onward) uses a
+  real Azure-backed agent **and** a real LLM judge for grading.
 - **H8 LongMemEval real-run wiring** — promoted from metadata-only walkthrough to a
   preset-driven (Smoke / Standard / AuditGrade) running sample. v0.10.1+: all presets
   run against the **real** `longmemeval_s_cleaned.json` dataset (the hand-authored
