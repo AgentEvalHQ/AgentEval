@@ -40,6 +40,7 @@ public sealed class HtmlEvalResultRenderer : IEvalResultRenderer
     {
         ArgumentNullException.ThrowIfNull(result);
         ArgumentNullException.ThrowIfNull(options);
+        ct.ThrowIfCancellationRequested();
 
         var sb = new StringBuilder(8192);
         WriteDocument(sb, result, options);

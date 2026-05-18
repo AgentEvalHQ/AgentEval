@@ -1,20 +1,32 @@
 # `samples/AgentEval.Samples/Benchmarks/` — focused benchmark walkthroughs
 
-One sample per registered benchmark family. Each sample exercises the **real**
-production code path end-to-end:
+One sample per registered benchmark family. The **running** benchmark samples
+(B2 Performance, B3 Agentic, B4 GDPR, B5 EU AI Act, B6 OWASP, B7 MITRE) each
+exercise the **real** production code path end-to-end:
 
-- Builds a real Azure OpenAI–backed agent (when credentials are configured).
-- Invokes the agent for live responses — **no stubs, no hardcoded responses**.
-- Grades the response with a real LLM judge.
-- Renders the unified `EvalResult` tree to JSON + HTML + PDF using the v0.10.1
+- Build a real Azure OpenAI–backed agent (when credentials are configured).
+- Invoke the agent for live responses — **no stubs, no hardcoded responses**.
+- Grade the response with a real LLM judge.
+- Render the unified `EvalResult` tree to JSON + HTML + PDF using the v0.10.1
   generic renderers (`HtmlEvalResultRenderer`, `PdfEvalResultRenderer`).
-- Writes a canonical audit-chained run under `samples/AgentEval.Samples/.agenteval/`
+- Write a canonical audit-chained run under `samples/AgentEval.Samples/.agenteval/`
   via `FileSystemOutputStore` (Mission Control + `agenteval doctor` read here).
-- Mirrors the HTML / PDF / bare-JSON sidecar to
-  `samples/AgentEval.Samples/output/{family}/run-{utc}/` for direct human consumption.
+- Mirror the HTML / PDF / bare-JSON sidecar to
+  `samples/AgentEval.Samples/output/{family}/run-{utc}-{suffix}/` for direct
+  human consumption.
 
-If `AZURE_OPENAI_ENDPOINT` / `_API_KEY` / `_DEPLOYMENT` are missing, samples skip
-with a clear box and no exceptions — safe to run in CI.
+Three samples have a different shape and do **not** invoke an agent or write
+reports:
+
+- **B1 Registry Discovery** — read-only walk of `BenchmarkFamilyRegistry.All`,
+  no Azure needed.
+- **B8 LongMemEval** — metadata-only walkthrough; a real LongMemEval run needs
+  a memory-enabled agent + `LONGMEMEVAL_DATASET_PATH` and is left to consumers.
+- **B9 Report Browser** — interactive browser over past runs written by the
+  running samples above; opens JSON / HTML / PDF in the OS default app.
+
+If `AZURE_OPENAI_ENDPOINT` / `_API_KEY` / `_DEPLOYMENT` are missing, the running
+samples skip with a clear box and no exceptions — safe to run in CI.
 
 ---
 

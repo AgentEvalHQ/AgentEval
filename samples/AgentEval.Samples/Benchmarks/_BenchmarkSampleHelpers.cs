@@ -62,14 +62,17 @@ internal enum SamplePreset
 internal static class BenchmarkSampleHelpers
 {
     /// <summary>
-    /// Returns a per-benchmark, per-timestamp output directory under
-    /// <c>samples/AgentEval.Samples/output/{benchmark}/run-{utc-timestamp}/</c>.
-    /// The directory is created if it does not exist.
+    /// Returns a per-benchmark, per-run output directory under
+    /// <c>samples/AgentEval.Samples/output/{benchmark}/run-{utc-timestamp}-{suffix}/</c>.
+    /// The 8-char random suffix prevents same-second collisions (e.g., scripted /
+    /// loop reruns that would otherwise overwrite an earlier run's reports). The
+    /// directory is created if it does not exist.
     /// </summary>
     public static string EnsureRunDirectory(string benchmarkName)
     {
         var stamp = DateTimeOffset.UtcNow.ToString("yyyyMMdd-HHmmss");
-        var root = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "output", benchmarkName, $"run-{stamp}");
+        var suffix = Guid.NewGuid().ToString("N")[..8];
+        var root = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "output", benchmarkName, $"run-{stamp}-{suffix}");
         var full = Path.GetFullPath(root);
         Directory.CreateDirectory(full);
         return full;

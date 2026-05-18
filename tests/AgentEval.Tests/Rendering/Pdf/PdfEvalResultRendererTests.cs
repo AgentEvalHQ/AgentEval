@@ -57,7 +57,7 @@ public class PdfEvalResultRendererTests
     // ── Format-id / extension contract ────────────────────────────────────────
 
     [Fact]
-    public void Format_id_and_extension_are_pdf()
+    public void FormatIdAndFileExtension_OnPdfRenderer_ArePdfValues()
     {
         var r = new PdfEvalResultRenderer();
         Assert.Equal("pdf", r.FormatId);
@@ -67,7 +67,7 @@ public class PdfEvalResultRendererTests
     // ── Smoke: simple atomic result ───────────────────────────────────────────
 
     [Fact]
-    public async Task Renders_simple_atomic_result_with_pdf_signature()
+    public async Task RenderAsync_SimpleAtomicResult_ProducesValidPdfWithSignature()
     {
         var result = MakeAtomic("smoke-1", 0.85, "pass", true, "none", evidence: "Looks good.");
         var bytes = await new PdfEvalResultRenderer().RenderAsync(result, DefaultOpts());
@@ -85,7 +85,7 @@ public class PdfEvalResultRendererTests
     // ── Deep composite tree ───────────────────────────────────────────────────
 
     [Fact]
-    public async Task Renders_deep_composite_tree_three_levels()
+    public async Task RenderAsync_DeepCompositeTreeThreeLevels_ProducesValidPdf()
     {
         var leaf1 = MakeAtomic("leaf-a", 0.9, "pass", true, "none");
         var leaf2 = MakeAtomic("leaf-b", 0.4, "fail", false, "high", evidence: "Detected violation.");
@@ -103,7 +103,7 @@ public class PdfEvalResultRendererTests
     // ── QuestPDF community license is auto-accepted via static ctor ───────────
 
     [Fact]
-    public async Task Static_constructor_accepts_questpdf_community_license()
+    public async Task StaticConstructor_OnFirstAccess_AcceptsQuestPdfCommunityLicense()
     {
         // If the license wasn't set we'd see a license-related exception. The
         // simplest assertion is that we can render without prior license setup.
@@ -115,7 +115,7 @@ public class PdfEvalResultRendererTests
     // ── Skipped leaves render honestly ────────────────────────────────────────
 
     [Fact]
-    public async Task Skipped_leaves_render_without_throwing()
+    public async Task RenderAsync_SkippedLeaves_RenderedWithoutThrowing()
     {
         var skipped = new EvalResult(
             Metric: new("skip", "Skipped Test", "test", "1.0.0"),
@@ -132,7 +132,7 @@ public class PdfEvalResultRendererTests
     // ── Provenance toggle ─────────────────────────────────────────────────────
 
     [Fact]
-    public async Task Without_provenance_still_produces_valid_pdf()
+    public async Task RenderAsync_IncludeProvenanceFalse_StillProducesValidPdf()
     {
         var result = MakeAtomic("k", 0.9, "pass", true, "none");
         var bytes = await new PdfEvalResultRenderer().RenderAsync(result, DefaultOpts(includeProvenance: false));
@@ -142,7 +142,7 @@ public class PdfEvalResultRendererTests
     // ── Honors cancellation ──────────────────────────────────────────────────
 
     [Fact]
-    public async Task Pre_cancelled_token_throws_OperationCanceledException()
+    public async Task RenderAsync_PreCancelledToken_ThrowsOperationCanceledException()
     {
         var result = MakeAtomic("k", 0.9, "pass", true, "none");
         using var cts = new CancellationTokenSource();

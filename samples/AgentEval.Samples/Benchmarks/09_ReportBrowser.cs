@@ -16,21 +16,16 @@ namespace AgentEval.Samples.Benchmarks;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>v0.10.1 decision — Option A (sidecar walk).</b> The samples now write a
-/// canonical run to <c>samples/AgentEval.Samples/.agenteval/</c> in addition to
-/// the sidecar <c>output/{family}/run-{ts}/</c>. This browser intentionally
-/// walks the sidecar because the bare <c>report.json</c> there exposes the
-/// composite <c>Score</c> tree directly — the canonical scenarios files store
-/// the result tree as a JSON string embedded inside <c>ScenarioResult.Output</c>,
-/// which would need a deeper parse to extract the same fields.
-/// </para>
-/// <para>
-/// <b>Future enhancement (Option B, deferred to v0.10.2):</b> walk
-/// <c>.agenteval/subjects/*/runs/*/</c> instead, read the manifest for run
-/// metadata + the summary for the verdict + cost. That would let the browser
-/// surface subject identity + the audit hash. For v0.10.1 the sidecar walk is
-/// sufficient because the writing samples drop both locations together —
-/// nothing is silently lost.
+/// The samples write both a canonical run to <c>samples/AgentEval.Samples/.agenteval/</c>
+/// (for Mission Control + <c>agenteval doctor</c>) and a sidecar
+/// <c>output/{family}/run-{ts}/</c> (for direct human consumption). This browser
+/// walks the sidecar because its bare <c>report.json</c> exposes the composite
+/// <c>Score</c> tree directly. The canonical scenarios files store the result
+/// tree as a JSON string embedded inside <c>ScenarioResult.Output</c> which
+/// requires a deeper parse to extract the same fields — surfacing subject
+/// identity + the audit hash from the canonical manifest would be a richer
+/// view, but the writing samples drop both locations together, so nothing is
+/// silently lost in the sidecar view.
 /// </para>
 /// <para>
 /// Path resolution mirrors <see cref="BenchmarkSampleHelpers.EnsureRunDirectory(string)"/>

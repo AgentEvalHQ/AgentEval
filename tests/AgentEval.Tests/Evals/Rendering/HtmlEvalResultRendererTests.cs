@@ -65,7 +65,7 @@ public class HtmlEvalResultRendererTests
     // ── Format-id / extension contract ────────────────────────────────────────
 
     [Fact]
-    public void Format_id_and_extension_are_html()
+    public void FormatIdAndFileExtension_OnHtmlRenderer_AreHtmlValues()
     {
         var r = new HtmlEvalResultRenderer();
         Assert.Equal("html", r.FormatId);
@@ -75,7 +75,7 @@ public class HtmlEvalResultRendererTests
     // ── Smoke: simple atomic result ───────────────────────────────────────────
 
     [Fact]
-    public void Renders_simple_atomic_result()
+    public void RenderAsync_SimpleAtomicResult_ProducesValidHtmlWithScoreAndIdentity()
     {
         var result = MakeAtomic("smoke-1", 0.85, "pass", passed: true, severity: "none");
         var html = Render(result, DefaultOpts(title: "Simple Smoke"));
@@ -92,7 +92,7 @@ public class HtmlEvalResultRendererTests
     // ── Deep composite tree ───────────────────────────────────────────────────
 
     [Fact]
-    public void Renders_deep_composite_tree_three_levels()
+    public void RenderAsync_DeepCompositeTreeThreeLevels_PreservesAllNodeKeysAndSeverityStyling()
     {
         var leaf1 = MakeAtomic("leaf-a", 0.9, "pass", true, "none");
         var leaf2 = MakeAtomic("leaf-b", 0.4, "fail", false, "high");
@@ -114,7 +114,7 @@ public class HtmlEvalResultRendererTests
     // ── XSS escaping ──────────────────────────────────────────────────────────
 
     [Fact]
-    public void Encodes_user_content_to_prevent_xss()
+    public void RenderAsync_HostileUserContent_HtmlEncodesToPreventXss()
     {
         var result = new EvalResult(
             Metric: new("<script>bad()</script>", "Inject<script>", "test", "1.0.0"),
@@ -140,7 +140,7 @@ public class HtmlEvalResultRendererTests
     // ── Skipped leaves rendered honestly ──────────────────────────────────────
 
     [Fact]
-    public void Skipped_leaves_render_as_not_tested()
+    public void RenderAsync_SkippedLeaf_RendersAsNotTestedWithoutFakePassStyling()
     {
         var skipped = EvalResult.Skipped(
             new TestEval(), reason: "Azure OpenAI credentials missing");
@@ -165,7 +165,7 @@ public class HtmlEvalResultRendererTests
     // ── Audit hash + version footer ───────────────────────────────────────────
 
     [Fact]
-    public void Audit_hash_appears_in_footer_when_provided()
+    public void RenderAsync_AuditHashProvided_AppearsInFooter()
     {
         var result = MakeAtomic("k", 0.9, "pass", true, "none");
         var html = Render(result, DefaultOpts(auditHash: "sha256:abcdef1234567890"));
@@ -176,7 +176,7 @@ public class HtmlEvalResultRendererTests
     }
 
     [Fact]
-    public void Audit_hash_omitted_when_null()
+    public void RenderAsync_AuditHashNull_OmittedFromFooter()
     {
         var result = MakeAtomic("k", 0.9, "pass", true, "none");
         var html = Render(result, DefaultOpts(auditHash: null));
@@ -187,7 +187,7 @@ public class HtmlEvalResultRendererTests
     // ── IncludeProvenance toggle ──────────────────────────────────────────────
 
     [Fact]
-    public void Provenance_section_appears_when_enabled()
+    public void RenderAsync_IncludeProvenanceTrue_ShowsProvenanceSection()
     {
         var result = MakeAtomic("k", 0.9, "pass", true, "none", judgeModel: "gpt-4o-judge");
         var html = Render(result, DefaultOpts(includeProvenance: true));
@@ -197,7 +197,7 @@ public class HtmlEvalResultRendererTests
     }
 
     [Fact]
-    public void Provenance_section_omitted_when_disabled()
+    public void RenderAsync_IncludeProvenanceFalse_OmitsProvenanceSection()
     {
         var result = MakeAtomic("k", 0.9, "pass", true, "none", judgeModel: "gpt-4o-judge");
         var html = Render(result, DefaultOpts(includeProvenance: false));
@@ -210,7 +210,7 @@ public class HtmlEvalResultRendererTests
     // ── Self-containment ──────────────────────────────────────────────────────
 
     [Fact]
-    public void Output_is_self_contained_no_external_references()
+    public void RenderAsync_AnyResult_OutputContainsNoExternalReferences()
     {
         var result = MakeAtomic("k", 0.9, "pass", true, "none");
         var html = Render(result, DefaultOpts());
@@ -222,10 +222,22 @@ public class HtmlEvalResultRendererTests
         Assert.Contains("<style>", html);
     }
 
+    // ── Honors cancellation (Copilot review follow-up) ───────────────────────
+
+    [Fact]
+    public async Task RenderAsync_PreCancelledToken_ThrowsOperationCanceledException()
+    {
+        var result = MakeAtomic("k", 0.9, "pass", true, "none");
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => new HtmlEvalResultRenderer().RenderAsync(result, DefaultOpts(), cts.Token));
+    }
+
     // ── UTF-8 round-trip ──────────────────────────────────────────────────────
 
     [Fact]
-    public async Task Output_is_utf8_encoded()
+    public async Task RenderAsync_NonAsciiContent_OutputIsUtf8Encoded()
     {
         var result = new EvalResult(
             Metric: new("k", "Naïve résumé café 漢字", "test", "1.0.0"),
