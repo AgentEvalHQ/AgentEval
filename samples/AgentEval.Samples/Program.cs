@@ -2,6 +2,7 @@
 // Copyright (c) 2026 AgentEval Contributors
 
 using System.Text;
+using AgentEval.Samples.Benchmarks;
 
 namespace AgentEval.Samples;
 
@@ -85,9 +86,23 @@ public static class Program
             new("Cross-Session Memory",      "Fact persistence across session resets — compare with / without",      MemoryCrossSession.RunAsync),
             new("AIContextProvider Memory",  "MAF-native memory pipeline — AIContextProvider + CrossSessionEval",    MemoryAIContextProvider.RunAsync),
             new("Benchmark Reporting",       "Run benchmarks, save baselines, compare configs, HTML report",        MemoryBenchmarkReporting.RunAsync),
-            new("LongMemEval Benchmark",     "Cross-platform memory eval — 120K token haystacks (ICLR 2025, MIT)",  LongMemEvalBenchmark.RunAsync),
+            new("LongMemEval Benchmark",     "Cross-platform memory eval — 120K token haystacks (ICLR 2025, MIT)",  LongMemEvalBenchmarkDemo.RunAsync),
             new("Run Single Benchmark",     "Pick Quick/Standard/Full, run it, save baseline, view report",       RunSingleBenchmark.RunAsync),
             new("LongMemEval Baseline Repro","GPT-4o baseline reproduction — TextBlob mode, paper-matching config", LongMemEvalBaselineRepro.RunAsync),
+        ]),
+
+        new('H', "Benchmarks (v0.10.1)", "★ JSON + HTML (+ PDF) outputs for every registered family",
+        [
+            new("Registry Discovery",        "Walk BenchmarkFamilyRegistry — no Azure required",                     RegistryDiscoveryBenchmark.RunAsync),
+            new("Performance",               "Latency / throughput / cost against a real Azure agent — JSON+HTML+PDF",PerformanceBenchmarkSample.RunAsync),
+            new("Agentic",                   "Real agent + judge; preset-driven (smoke / standard / audit-grade)",  AgenticBenchmarkSample.RunAsync),
+            new("GDPR",                      "Per-scenario agent probing; preset-driven; full audit-chain evidence", GdprBenchmarkSample.RunAsync),
+            new("EU AI Act",                 "Per-scenario agent probing; preset-driven; full audit-chain evidence", EuAiActBenchmarkSample.RunAsync),
+            new("OWASP LLM Top 10",          "Real attack pipeline; preset-driven (smoke / audit-grade)",           OwaspBenchmarkSample.RunAsync),
+            new("MITRE ATLAS",               "ATLAS technique-level probes; preset-driven (smoke / audit-grade)",   MitreBenchmarkSample.RunAsync),
+            new("LongMemEval",               "Real history-injectable agent + judge; Subset / Full presets (ICLR 2025)", LongMemEvalBenchmarkSample.RunAsync),
+            new("Memory",                    "Comprehensive memory benchmark — Quick/Standard/Full presets",        MemoryBenchmarkSample.RunAsync),
+            new("Report Browser",            "Open previously-generated JSON / HTML / PDF runs",                    ReportBrowserBenchmark.RunAsync),
         ]),
     ];
 
@@ -100,6 +115,19 @@ public static class Program
         Console.OutputEncoding = Encoding.UTF8;
 
         PrintBanner();
+
+        // Forward `--preset <value>` from argv into AGENTEVAL_SAMPLES_PRESET so
+        // BenchmarkSampleHelpers.ResolvePreset (which is called from inside each
+        // RunAsync) picks it up without having to thread args through every sample.
+        // Documented in samples/AgentEval.Samples/Benchmarks/README.md.
+        for (var i = 0; i < args.Length - 1; i++)
+        {
+            if (string.Equals(args[i], "--preset", StringComparison.OrdinalIgnoreCase))
+            {
+                Environment.SetEnvironmentVariable("AGENTEVAL_SAMPLES_PRESET", args[i + 1]);
+                break;
+            }
+        }
 
         if (!AIConfig.IsConfigured)
             AIConfig.PrintMissingCredentialsWarning();
@@ -151,7 +179,7 @@ public static class Program
             var group = Groups.FirstOrDefault(g => g.Key.ToString() == raw);
             if (group is not null) return group;
 
-            Console.WriteLine("  Enter a letter A–G or Q to quit.\n");
+            Console.WriteLine("  Enter a letter A–H or Q to quit.\n");
         }
     }
 

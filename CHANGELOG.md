@@ -7,7 +7,264 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Known issues / tracked for v0.10.1+
+## [0.10.1-beta] - 2026-05-18
+
+The **Samples Consolidation + Generic Renderers** release. v0.10.1-beta introduces a
+uniform `IEvalResultRenderer` contract in `AgentEval.Abstractions`, ships two
+implementations — `HtmlEvalResultRenderer` (in `AgentEval.Core`) and the new
+`PdfEvalResultRenderer` (in a new `AgentEval.Rendering.Pdf` project) — and
+consolidates the per-family `*.Demo` projects into a focused `samples/AgentEval.Samples/Benchmarks/`
+sample suite with one example per registered benchmark family.
+
+### Added
+
+- **`IEvalResultRenderer` interface** (`AgentEval.Abstractions/Evals/IEvalResultRenderer.cs`):
+  uniform rendering contract any benchmark family can target. `FormatId`, `FileExtension`,
+  and `RenderAsync(EvalResult, EvalResultRenderOptions, CancellationToken) -> byte[]`.
+  Framing metadata (subject, run id, audit hash, AgentEval version) flows through
+  `EvalResultRenderOptions`.
+- **`HtmlEvalResultRenderer`** (`AgentEval.Core/Evals/Rendering/`): self-contained HTML
+  output — inline CSS, `<details>` collapsible sections, severity-coded badges, XSS-safe
+  encoding via `WebUtility.HtmlEncode`. Skipped leaves render honestly as `NOT TESTED`.
+- **`AgentEval.Rendering.Pdf` project** with **`PdfEvalResultRenderer`**: QuestPDF-backed
+  generic renderer with cover page, optional component summary, per-leaf detail pages
+  (score / severity / provenance / evidence / metrics), and an audit-chain appendix.
+  Embedded into the umbrella `AgentEval` NuGet via `PrivateAssets="all"`.
+- **`samples/AgentEval.Samples/Benchmarks/` sample suite** — 10 focused examples wired
+  into `Program.cs` as menu group H: Registry Discovery, Performance, Agentic, GDPR,
+  EU AI Act, OWASP, MITRE, LongMemEval, **Memory**, and **Report Browser**. Every
+  running sample writes JSON + HTML + PDF via the new renderers (the audit-grade-only
+  PDF carve-out was closed mid-cycle — all running samples now produce all three
+  formats). Note that H2 Performance is metric-only (latency / throughput / cost)
+  and does not create an LLM judge; every other running sample (H3 onward) uses a
+  real Azure-backed agent **and** a real LLM judge for grading.
+- **H8 LongMemEval real-run wiring** — promoted from metadata-only walkthrough to a
+  preset-driven (Smoke / Standard / AuditGrade) running sample. v0.10.1+: all presets
+  run against the **real** `longmemeval_s_cleaned.json` dataset (the hand-authored
+  "embedded subset" was removed — see "Changed" below). Smoke caps to 10 questions
+  (~5–10 min), Standard runs `SubsetOptions` (default 50 questions), and AuditGrade
+  runs `LongMemEvalBenchmark.Full(chatClient)` against the full ~500-question dataset
+  (requires `LONGMEMEVAL_DATASET_PATH`). When the dataset can't be located the sample
+  catches `LongMemEvalDatasetNotFoundException` and prints a friendly download-instructions
+  box (URL + canonical path + env var) and returns cleanly to the menu — no unhandled
+  exceptions. Shape-B bridging: the runner's `ExternalBenchmarkResult` is synthesised
+  into an `EvalResult` composite tree (root = overall accuracy; per-type composites;
+  per-question atomic leaves) so the canonical `.agenteval/` store + sidecar
+  JSON / HTML / PDF artefacts come out identical to every other Group-H sample.
+  The unaltered native shape is **also** written to `report-native.json` alongside
+  `report.json` (no info loss).
+- **H9 Memory benchmark sample** (`samples/.../Benchmarks/09_MemoryBenchmark.cs`) —
+  mirror of the H8 Shape-B pattern over the canonical `MemoryBenchmarkRunner`.
+  Smoke / Standard / AuditGrade presets map to `MemoryBenchmark.Quick` (3 categories) /
+  `Standard` (8 categories) / `Full` (12 categories). Per-category progress is streamed
+  to the console so long Full runs don't look hung; the result is synthesised into a
+  weighted-mean `EvalResult` tree (root + per-category atomic leaves, with weights /
+  stars / durations carried in `Details.Dimensions`); the unaltered
+  `MemoryBenchmarkResult` (including grade, weak categories, recommendations) is
+  written to `report-native.json`. Group-H now spans H1–H10:
+  Registry / Performance / Agentic / GDPR / EU AI Act / OWASP / MITRE / LongMemEval /
+  **Memory** / Report Browser.
+- **`LongMemEvalDatasetNotFoundException`** in
+  `src/AgentEval.Memory/External/LongMemEval/LongMemEvalDataLoader.cs` — subclasses
+  `FileNotFoundException` (existing `catch` blocks still trigger) and carries the
+  canonical local path, env-var name, and Hugging Face download URL so consumers see
+  exactly how to recover. Thrown from the new
+  `LongMemEvalDataLoader.LoadResolved`/`ResolveDatasetPath` resolution flow (explicit
+  arg → `LONGMEMEVAL_DATASET_PATH` → canonical local path under workspace root).
+- **`09_ReportBrowser` sample** (commit `077374d`): interactive browser that walks
+  `samples/AgentEval.Samples/output/{family}/run-*/`, sorts newest-first (caps at 20
+  with "older runs omitted"), reads `Score.Value` + `Label` from the sidecar JSON, and
+  delegates to `OfferToOpenReports` for one-keystroke open of any past run's JSON / HTML / PDF.
+- **`OfferToOpenReports(...)` open-after-save prompt** (commit `077374d`): `[h]/[j]/[p]/[n]`
+  console prompt after each sample writes its reports. Uses
+  `Process.Start(ProcessStartInfo { UseShellExecute = true })` for cross-platform
+  default-app open. Honours `AGENTEVAL_SAMPLES_NONINTERACTIVE=1` and redirected stdin
+  (skips the prompt cleanly for CI / scripted runs).
+- **`SamplePreset` toggle** (commit `ddc1b05`) — every running sample accepts
+  `AGENTEVAL_SAMPLES_PRESET=smoke|standard|audit-grade` (env var) or `--preset <value>`
+  (CLI arg forwarded by `Program.cs`) so users can scale sample runtime from cents to
+  audit-grade. Default: `smoke`.
+- **Per-scenario compliance probing** (commit `ddc1b05`):
+  `RunCompliancePresetWithAgentProbesAsync` in `_BenchmarkSampleHelpers` walks each
+  article / control scenario in the preset, invokes the real agent with that scenario's
+  probe prompt, captures the live response, and lets the judge grade it against the
+  scenario's rubric. Used by `04_GdprBenchmark` and `05_EuAiActBenchmark` (replaces the
+  earlier pattern that fanned one hardcoded response across all scenarios).
+- **Canonical `IOutputStore` integration** (commits `39638b7`, `9437be4`, repo-root fix
+  commit below): every running sample writes the canonical run through
+  `FileSystemOutputStore` to the **repo-root `.agenteval/`** workspace — the same
+  one `agenteval init` creates, resolved by walking up from the running assembly's
+  directory to the nearest `*.sln`/`*.slnx`/`.git/` ancestor (matches the documented
+  convention in `WorkspaceRootDiscovery.cs`). Manifest, scenarios, summary, and
+  compliance evidence land there; Mission Control launched from the repo root auto-
+  discovers them; `agenteval doctor` validates the audit chain. Compliance reporters
+  (`GDPRComplianceReporter`, `EuAiActComplianceReporter`, `OWASPComplianceReporter`,
+  `MITREATLASReporter`) are invoked for the four regulator-shaped families so
+  evidence packs land alongside the run manifest with full audit-chain anchoring.
+  Sidecar HTML/PDF/JSON remain project-local at
+  `samples/AgentEval.Samples/output/{family}/run-{ts}-{suffix}/` for direct human
+  consumption + `09_ReportBrowser`.
+- **`BenchmarkSampleHelpers.SharedStore`**: process-wide `Lazy<FileSystemOutputStore>` so
+  multiple samples in one process share the workspace + auto-seed `solution.json` (name
+  derived from the repo's `*.sln` filename) if it doesn't already exist (no separate
+  `agenteval init` step needed for first-time users — but any prior `agenteval init` is
+  respected).
+
+### Changed
+
+- **Group-G sample class rename: `LongMemEvalBenchmark` → `LongMemEvalBenchmarkDemo`**
+  (file `samples/AgentEval.Samples/MemoryEvaluation/07_LongMemEvalBenchmark.cs` →
+  `07_LongMemEvalBenchmarkDemo.cs`). Closes the name-shadow foot-gun flagged in
+  commit `de1e20b`'s "v0.10.2 follow-up" note: two static classes both named
+  `LongMemEvalBenchmark` (production factory in `AgentEval.Benchmarks`,
+  registered with `BenchmarkFamilyRegistry` via `[ModuleInitializer]`; and the
+  Group-G demo in `AgentEval.Samples.MemoryEvaluation`) caused C#'s
+  parent-namespace-beats-`using` name-resolution rule to silently pick the demo
+  class for bare identifiers in Samples code — exactly how `08_LongMemEval`
+  initially loaded the wrong assembly and the registry returned "family not
+  registered" despite `AgentEval.Memory` being referenced. The `de1e20b` fix
+  fully-qualified all references as a workaround; this commit removes the
+  shadow at its source so future Samples code can't silently misfire. The
+  fully-qualified force-load anchors in `01_RegistryDiscovery` and
+  `08_LongMemEvalBenchmark` are retained as defensive consistency against any
+  future shadow elsewhere in the Samples assembly.
+- **`02_PerformanceBenchmark`** uses a real Azure-backed agent (was: in-process
+  `EchoAgent` stub). The format-gap closure (commit `d932746`) and the real-agent
+  rewiring (commit `4e09db5`) close the headline "no stubs anywhere" promise of v0.10.1.
+- **`03_AgenticBenchmark`** invokes the real agent for each query (commit `ffbb3dd`);
+  dropped the prior hardcoded `response` constant. The judge grades the live agent
+  response, not a string literal.
+- **`04_GdprBenchmark` + `05_EuAiActBenchmark`** probe the agent once per scenario
+  (commit `fadf35d`) using the per-scenario YAML `input`. Each agent response is then
+  judged against that scenario's evaluation criteria. Replaces the previous (incorrect)
+  pattern that fanned one hardcoded response across all article scenarios.
+- **`06_OwaspBenchmark` + `07_MitreBenchmark`** were already real-agent-driven (their
+  attack pipelines generate adversarial probes against the agent); the preset toggle
+  was wired in (commit `b6b6a96`) so users can scale from `Smoke` / `AtlasBaseline` up to
+  `AuditGrade` / `AtlasAuditGrade`.
+- **`01_RegistryDiscovery` actually loads sub-assemblies** (commit `31d2e27`): the prior
+  `_ = nameof(...)` anchor was a compile-time string constant and did NOT trigger runtime
+  assembly load, so the registry walk reported "0 benchmark families registered" instead
+  of 8. Switched to the canonical `typeof(T).Assembly` anchor pattern (matches
+  `BenchListCommand.AnchorAssemblies`).
+- **`samples/AgentEval.Samples/output/`** is gitignored (commit `6c3b523`) so running
+  samples doesn't dirty the working tree with generated PDF / HTML / JSON.
+- **`samples/AgentEval.Samples/README.md`** explains the canonical-vs-sidecar storage
+  split + Mission Control launch instructions + the preset toggle (commit `d19e28a`).
+
+- **`samples/AgentEval.Samples/AgentEval.Samples.csproj`** now references
+  `AgentEval.Compliance.Gdpr`, `AgentEval.Compliance.EuAiAct`, `AgentEval.Evals.Performance`,
+  and `AgentEval.Rendering.Pdf` directly so the new Benchmarks samples have compile-time
+  targets.
+- **Umbrella `src/AgentEval/AgentEval.csproj`** bumped to `0.10.1-beta` and now embeds
+  `AgentEval.Rendering.Pdf.dll` via `PrivateAssets="all"`.
+- **H8 LongMemEval — eliminate fake embedded subset** (this commit). The previously-bundled
+  `src/AgentEval.Memory/Data/longmemeval/longmemeval-subset.json` was a hand-authored
+  "inspired by LongMemEval" approximation (10 entries, partial schema — missing
+  `question_date`, `haystack_dates`, `haystack_session_ids`, `answer_session_ids`) whose
+  `_attribution` field admitted it wasn't the real paper dataset. Running against it
+  produced scores that looked paper-comparable but were not. All presets now load the
+  real `longmemeval_s_cleaned.json` from disk:
+  - **Resolution order** (highest precedence first): explicit
+    `ExternalBenchmarkOptions.DatasetPath` → `LONGMEMEVAL_DATASET_PATH` env var →
+    canonical local default `<workspace-root>/src/AgentEval.Memory/Data/longmemeval/longmemeval_s_cleaned.json`.
+    When none resolves to an existing file the loader throws
+    `LongMemEvalDatasetNotFoundException` (a `FileNotFoundException` subclass) whose
+    message names the canonical path, the env var, and the Hugging Face download URL.
+  - **Preset mapping**: Smoke = 10Q sample of the real 500; Standard = 50Q sample
+    (was: 30Q "embedded"); AuditGrade = ~500Q via `LONGMEMEVAL_DATASET_PATH` (unchanged).
+    `LongMemEvalBenchmark.SubsetMaxQuestions` raised 30 → 50 so the constant matches
+    the Subset preset's "representative sample of the real 500" intent.
+  - **H8 sample defensive catch**: `08_LongMemEvalBenchmark.cs` wraps the run in a
+    `try/catch (LongMemEvalDatasetNotFoundException)` that renders a friendly download-
+    instructions box (URL + canonical path + env var) and returns cleanly to the menu —
+    no unhandled exceptions, the rest of the sample suite stays usable.
+  - **Registration descriptions** updated to drop "embedded 30-question stratified sample"
+    in favour of "Real LongMemEval dataset capped to MaxQuestions (default 50)".
+  - **Tests**: the embedded-subset round-trip test in
+    `tests/AgentEval.Memory.Tests/LongMemEvalBenchmarkTests.cs` is replaced with two
+    new tests — one asserting `LoadFromFile` throws `LongMemEvalDatasetNotFoundException`
+    with the download URL + env var name baked into the message, the other asserting
+    the exception subclasses `FileNotFoundException` for back-compat.
+
+### Removed
+
+- **`src/AgentEval.Memory/Data/longmemeval/longmemeval-subset.json`** (and its
+  `<EmbeddedResource>` line in `AgentEval.Memory.csproj`) — the hand-authored
+  "inspired by LongMemEval" content was misleading enough to fail the "honest
+  benchmarks" bar (see the "Changed" section above for full details). Consumers
+  must now have the real `longmemeval_s_cleaned.json` on disk (canonical local
+  path under workspace root, or `LONGMEMEVAL_DATASET_PATH`) — the loader's new
+  resolution flow throws `LongMemEvalDatasetNotFoundException` with download
+  instructions when it can't locate the file.
+- **`LongMemEvalDataLoader.LoadEmbedded(...)`** — the static method that loaded
+  the fake subset from `Assembly.GetManifestResourceStream`. Replaced by
+  `LongMemEvalDataLoader.LoadResolved(...)` (which throws when no real dataset
+  is reachable) and `LongMemEvalDataLoader.ResolveDatasetPath(...)` (the
+  pure-resolution helper that returns the first existing file from the chain).
+- **`samples/AgentEval.GdprBenchmark.Demo/` project** — the original 11-line stub was a
+  CLI-hint Program.cs and added no real demonstration value. Equivalent test coverage
+  already lives in `tests/AgentEval.Tests/Compliance/Gdpr/` (E2E_Standard, E2E_Smoke,
+  E2E_AuditGrade, AllArticleYamlsValidate, etc.). The `Benchmarks/04_GdprBenchmark.cs`
+  sample replaces it with a proper end-to-end walkthrough.
+- **`samples/AgentEval.EuAiActBenchmark.Demo/` project** — `smoke-load` and `smoke-run`
+  sub-commands were already covered by `tests/AgentEval.Tests/Compliance/EuAiAct/EndToEnd/`
+  (`EuAiActSmokeE2ETest.cs`, `EuAiActStandardE2ETest.cs`). The `Benchmarks/05_EuAiActBenchmark.cs`
+  sample replaces the demo with a single focused end-to-end run.
+- **Stale orphan directories** `samples/AgentEval.GdprBenchmark/` and
+  `samples/AgentEval.EuAiActBenchmark/` (no tracked source, only `bin/obj` artefacts)
+  were already absent from git tracking but were sitting in the working tree from
+  pre-v0.10.0 reorganisation.
+
+### Breaking
+
+The bulk of v0.10.1 is purely additive on top of v0.10.0-beta (new renderers,
+new sample suite, new canonical-store wiring). The "real-data-only" LongMemEval
+shift, however, removes one previously-public API and tightens dataset-path
+resolution. NuGet consumers depending on these surfaces will need to migrate:
+
+- **`LongMemEvalDataLoader.LoadEmbedded(...)` removed.** The static method that
+  loaded the bundled "inspired by LongMemEval" subset (10 entries, partial
+  schema) from `Assembly.GetManifestResourceStream` is gone — the underlying
+  embedded resource is also gone (see "Removed" above). The data was a
+  hand-authored approximation that produced misleading scores. **Migration**:
+  replace `LongMemEvalDataLoader.LoadEmbedded(options)` with
+  `LongMemEvalDataLoader.LoadResolved(options)` and ensure the real
+  `longmemeval_s_cleaned.json` is reachable via canonical local path
+  (`<workspace-root>/src/AgentEval.Memory/Data/longmemeval/`) or the
+  `LONGMEMEVAL_DATASET_PATH` env var. Catch
+  `LongMemEvalDatasetNotFoundException` for friendly "download instructions"
+  UX (see `samples/AgentEval.Samples/Benchmarks/08_LongMemEvalBenchmark.cs`
+  for the pattern).
+- **`LongMemEvalDataLoader.ResolveDatasetPath(...)` tightened semantics.**
+  When a non-whitespace `explicitPath` argument or the
+  `LONGMEMEVAL_DATASET_PATH` env var is supplied but the file does NOT exist
+  on disk, the method now **throws** `LongMemEvalDatasetNotFoundException`
+  instead of silently falling through to the env var / canonical local path
+  (PR #30 review follow-up). The previous behaviour could silently run a
+  benchmark against a different dataset than the caller asked for — a
+  misleading-results bug for users who typo-ed `DatasetPath` or the
+  `Full()` env-var path. Fall-through to the canonical local path only
+  applies when **neither** explicit nor env-var is supplied. **Migration**:
+  if you previously relied on the fall-through to suppress typos, either
+  validate `File.Exists` at the call site before invoking, or catch
+  `LongMemEvalDatasetNotFoundException` and surface the typo to the user.
+
+### Notes on existing family-specific PDF renderers
+
+`GDPRPdfRenderer`, `EuAiActPdfRenderer`, and `AgenticPdfRenderer` remain untouched. They
+consume bespoke evidence envelopes (`GdprComplianceEvidence`, `EuAiActComplianceEvidence`,
+`AgenticBenchmarkEvidence`) that carry pillar tables, attestation blocks, and methodology
+appendices the universal `EvalResult` shape does not represent. They are the right choice
+for boardroom/DPO/regulator-grade audit PDFs. The new `PdfEvalResultRenderer` targets the
+universal cross-family path (samples, third-party plugins, discovery walkthroughs).
+
+### Mission Control workspace + score semantics
+
+- **`--workspace <path>` is now honoured by bare `dotnet run --project src/AgentEval.MissionControl`**: previously the bare run-path silently fell back to `Directory.GetCurrentDirectory()` (yielding `src/AgentEval.MissionControl/.agenteval`) regardless of the flag. The CLI form `agenteval mc serve --workspace ...` already routed through `AgentEval__Root` env var; the bare-run path now does the same. Mirrors `McServeCommand`'s behaviour.
+- **`Query.recentRuns(...).score` returns pass-rate** (passed leaves / total leaves), not the weighted-composite verdict score that the sample console prints. Both are valid; they diverge when composite aggregation strategies weight leaves non-uniformly (most clearly with `MinAggregation` security-gate semantics). Use `Query.run(runId:).overallScore` for the composite score; `recentRuns.score` is intentionally a fast scan-time summary suitable for list views.
+
+### Known issues / tracked for v0.10.2+
 
 - **NuGetConsumer LLM non-determinism**: `samples/AgentEval.NuGetConsumer.Tests/SafetyPolicyTests.CancellationRequest_ShouldConfirmBeforeCancelling` is flaky at roughly 90% pass rate on 10-iteration stress (real LLM call; when the model responds with text instead of a tool call, the strict tool-call assertion fails). Pre-existing — predates the v0.10.0-beta arc. Not introduced by any phase of v0.10.0-beta. Tracked here for v0.10.1 stabilisation (likely fix: relax the test's strictness to accept either-tool-or-confirmation-text, or seed the model into a deterministic mode).
 - **`docs/redteam/owasp.md` not authored**: `OwaspBenchmarkRegistration.docLinkUrl` points at this future doc; deferred to v0.11+ docs-pack.

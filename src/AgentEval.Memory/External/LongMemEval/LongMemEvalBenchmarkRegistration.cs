@@ -46,12 +46,12 @@ internal static class LongMemEvalBenchmarkRegistration
     {
         BenchmarkFamilyRegistry.Register(new BenchmarkFamily(
             name: "longmemeval",
-            description: "LongMemEval (ICLR 2025) — academic memory benchmark (Subset ships embedded; Full requires download)",
+            description: "LongMemEval (ICLR 2025) — academic memory benchmark; all presets read the real longmemeval_s_cleaned.json on disk",
             defaultCostTier: CostTier.Medium,
             presets:
             [
-                new("subset", "Embedded 30-question stratified sample — no download, CI-friendly", CostTier.Medium),
-                new("full", "Full ~500-question dataset (requires LONGMEMEVAL_DATASET_PATH env var)", CostTier.High),
+                new("subset", "Real LongMemEval dataset capped to MaxQuestions (default 50) — requires the dataset file on disk", CostTier.Medium),
+                new("full", "Full ~500-question dataset (requires LONGMEMEVAL_DATASET_PATH env var explicitly)", CostTier.High),
             ],
             // Shape B only — no CompositeFactory, no EvaluateAsync adapter.
             runnerType: typeof(LongMemEvalBenchmarkRunner),

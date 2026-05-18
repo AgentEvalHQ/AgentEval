@@ -441,3 +441,5 @@ src/AgentEval.Memory/Data/longmemeval/longmemeval_oracle.json
 
 # AgentEval local benchmark run outputs (machine-specific, not for distribution)
 .agenteval/
+# v0.10.1 Benchmarks/ sample suite emits JSON/HTML/PDF artefacts here (per-run timestamped dirs).
+samples/AgentEval.Samples/output/
