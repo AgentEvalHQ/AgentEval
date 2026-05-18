@@ -30,12 +30,68 @@ sample suite with one example per registered benchmark family.
   generic renderer with cover page, optional component summary, per-leaf detail pages
   (score / severity / provenance / evidence / metrics), and an audit-chain appendix.
   Embedded into the umbrella `AgentEval` NuGet via `PrivateAssets="all"`.
-- **`samples/AgentEval.Samples/Benchmarks/` sample suite** — 8 new focused examples:
-  Registry Discovery (no Azure), Performance (no Azure), Agentic, GDPR, EU AI Act, OWASP,
-  MITRE, LongMemEval. Each example writes JSON + HTML (+ PDF for audit-grade families)
-  via the new renderers. Wired into `Program.cs` as menu group H.
+- **`samples/AgentEval.Samples/Benchmarks/` sample suite** — 9 focused examples wired
+  into `Program.cs` as menu group H: Registry Discovery, Performance, Agentic, GDPR,
+  EU AI Act, OWASP, MITRE, LongMemEval (metadata-only), and **Report Browser**. Every
+  running sample writes JSON + HTML + PDF via the new renderers (the audit-grade-only
+  PDF carve-out was closed mid-cycle — all running samples now produce all three formats).
+- **`09_ReportBrowser` sample** (commit `077374d`): interactive browser that walks
+  `samples/AgentEval.Samples/output/{family}/run-*/`, sorts newest-first (caps at 20
+  with "older runs omitted"), reads `Score.Value` + `Label` from the sidecar JSON, and
+  delegates to `OfferToOpenReports` for one-keystroke open of any past run's JSON / HTML / PDF.
+- **`OfferToOpenReports(...)` open-after-save prompt** (commit `077374d`): `[h]/[j]/[p]/[n]`
+  console prompt after each sample writes its reports. Uses
+  `Process.Start(ProcessStartInfo { UseShellExecute = true })` for cross-platform
+  default-app open. Honours `AGENTEVAL_SAMPLES_NONINTERACTIVE=1` and redirected stdin
+  (skips the prompt cleanly for CI / scripted runs).
+- **`SamplePreset` toggle** (commit `ddc1b05`) — every running sample accepts
+  `AGENTEVAL_SAMPLES_PRESET=smoke|standard|audit-grade` (env var) or `--preset <value>`
+  (CLI arg forwarded by `Program.cs`) so users can scale sample runtime from cents to
+  audit-grade. Default: `smoke`.
+- **Per-scenario compliance probing** (commit `ddc1b05`):
+  `RunCompliancePresetWithAgentProbesAsync` in `_BenchmarkSampleHelpers` walks each
+  article / control scenario in the preset, invokes the real agent with that scenario's
+  probe prompt, captures the live response, and lets the judge grade it against the
+  scenario's rubric. Used by `04_GdprBenchmark` and `05_EuAiActBenchmark` (replaces the
+  earlier pattern that fanned one hardcoded response across all scenarios).
+- **Canonical `IOutputStore` integration** (commits `39638b7`, `9437be4`): every running
+  sample now writes the canonical run through `FileSystemOutputStore` to
+  `samples/AgentEval.Samples/.agenteval/` (manifest, scenarios, summary, compliance evidence)
+  in addition to the sidecar `samples/AgentEval.Samples/output/{family}/run-{ts}/` (JSON
+  + HTML + PDF). Mission Control discovers the workspace automatically; `agenteval doctor`
+  validates the audit chain. Compliance reporters (`GDPRComplianceReporter`,
+  `EuAiActComplianceReporter`, `OWASPComplianceReporter`, `MITREATLASReporter`) are
+  invoked for the four regulator-shaped families so evidence packs land alongside the
+  run manifest with full audit-chain anchoring.
+- **`BenchmarkSampleHelpers.SharedStore`**: process-wide `Lazy<FileSystemOutputStore>` so
+  multiple samples in one process share the workspace + auto-seed `solution.json` (no
+  separate `agenteval init` step needed for the sample workspace).
 
 ### Changed
+
+- **`02_PerformanceBenchmark`** uses a real Azure-backed agent (was: in-process
+  `EchoAgent` stub). The format-gap closure (commit `d932746`) and the real-agent
+  rewiring (commit `4e09db5`) close the headline "no stubs anywhere" promise of v0.10.1.
+- **`03_AgenticBenchmark`** invokes the real agent for each query (commit `ffbb3dd`);
+  dropped the prior hardcoded `response` constant. The judge grades the live agent
+  response, not a string literal.
+- **`04_GdprBenchmark` + `05_EuAiActBenchmark`** probe the agent once per scenario
+  (commit `fadf35d`) using the per-scenario YAML `input`. Each agent response is then
+  judged against that scenario's evaluation criteria. Replaces the previous (incorrect)
+  pattern that fanned one hardcoded response across all article scenarios.
+- **`06_OwaspBenchmark` + `07_MitreBenchmark`** were already real-agent-driven (their
+  attack pipelines generate adversarial probes against the agent); the preset toggle
+  was wired in (commit `b6b6a96`) so users can scale from `Smoke` / `AtlasBaseline` up to
+  `AuditGrade` / `AtlasAuditGrade`.
+- **`01_RegistryDiscovery` actually loads sub-assemblies** (commit `31d2e27`): the prior
+  `_ = nameof(...)` anchor was a compile-time string constant and did NOT trigger runtime
+  assembly load, so the registry walk reported "0 benchmark families registered" instead
+  of 8. Switched to the canonical `typeof(T).Assembly` anchor pattern (matches
+  `BenchListCommand.AnchorAssemblies`).
+- **`samples/AgentEval.Samples/output/`** is gitignored (commit `6c3b523`) so running
+  samples doesn't dirty the working tree with generated PDF / HTML / JSON.
+- **`samples/AgentEval.Samples/README.md`** explains the canonical-vs-sidecar storage
+  split + Mission Control launch instructions + the preset toggle (commit `d19e28a`).
 
 - **`samples/AgentEval.Samples/AgentEval.Samples.csproj`** now references
   `AgentEval.Compliance.Gdpr`, `AgentEval.Compliance.EuAiAct`, `AgentEval.Evals.Performance`,

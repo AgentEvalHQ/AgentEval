@@ -161,55 +161,6 @@ internal static class BenchmarkSampleHelpers
     }
 
     /// <summary>
-    /// Writes the result as canonical JSON next to an HTML report rendered by
-    /// <see cref="HtmlEvalResultRenderer"/>. PDF is optional — pass
-    /// <paramref name="includePdf"/>=true for audit-grade families.
-    /// </summary>
-    /// <returns>Tuple of (jsonPath, htmlPath, pdfPath?).</returns>
-    public static async Task<(string json, string html, string? pdf)> WriteReportsAsync(
-        EvalResult result,
-        SubjectIdentity subject,
-        string benchmarkName,
-        string regulationOrBenchmark,
-        bool includePdf,
-        string? auditHash = null,
-        CancellationToken ct = default)
-    {
-        var outDir = EnsureRunDirectory(benchmarkName);
-
-        // ── JSON (canonical) ─────────────────────────────────────────────────
-        var jsonPath = Path.Combine(outDir, "report.json");
-        var jsonOpts = new JsonSerializerOptions { WriteIndented = true };
-        await File.WriteAllTextAsync(jsonPath, JsonSerializer.Serialize(result, jsonOpts), ct);
-
-        // ── HTML (always) ────────────────────────────────────────────────────
-        var renderOpts = new EvalResultRenderOptions(
-            Subject: subject,
-            Title: result.Metric.Name,
-            RegulationOrBenchmark: regulationOrBenchmark,
-            RunId: Path.GetFileName(outDir),
-            GeneratedAt: DateTimeOffset.UtcNow,
-            IncludeProvenance: true,
-            AuditHash: auditHash,
-            AgentEvalVersion: "0.10.1-beta");
-
-        var htmlBytes = await new HtmlEvalResultRenderer().RenderAsync(result, renderOpts, ct);
-        var htmlPath = Path.Combine(outDir, "report.html");
-        await File.WriteAllBytesAsync(htmlPath, htmlBytes, ct);
-
-        // ── PDF (opt-in) ─────────────────────────────────────────────────────
-        string? pdfPath = null;
-        if (includePdf)
-        {
-            var pdfBytes = await new PdfEvalResultRenderer().RenderAsync(result, renderOpts, ct);
-            pdfPath = Path.Combine(outDir, "report.pdf");
-            await File.WriteAllBytesAsync(pdfPath, pdfBytes, ct);
-        }
-
-        return (jsonPath, htmlPath, pdfPath);
-    }
-
-    /// <summary>
     /// Persists <paramref name="result"/> through <em>both</em> the canonical
     /// <c>.agenteval/</c> output store (so Mission Control + <c>agenteval doctor</c>
     /// see the run with a valid audit chain) AND the legacy
