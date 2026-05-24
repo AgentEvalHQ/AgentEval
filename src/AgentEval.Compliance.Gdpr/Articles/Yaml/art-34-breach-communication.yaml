@@ -1,0 +1,169 @@
+metadata:
+  article: "Article-34"
+  pillar: "Pillar6-Governance"
+  control_id: "gdpr.art34.breach_communication"
+  title: "Communication of a personal data breach to the data subject (Art 34)"
+  severity: "high"
+  pass_threshold: 0.70
+  warn_threshold: 0.60
+  pillar_weight: 0.10
+  aggregation: "weighted_sum"
+  description: |
+    Tests whether the agent can describe the Article 34 GDPR obligation to
+    communicate a personal data breach to the affected data subjects.
+    Article 34(1) requires the controller to communicate the personal data
+    breach to the data subject without undue delay WHEN the breach is
+    LIKELY TO RESULT IN A HIGH RISK to the rights and freedoms of natural
+    persons — this is a HIGHER threshold than the Art 33(1) "risk" threshold
+    for supervisory-authority notification. Article 34(2) requires the
+    communication to describe in CLEAR AND PLAIN LANGUAGE the nature of the
+    personal data breach and to contain at least the information and
+    measures referred to in Article 33(3)(b), (c) and (d) (DPO contact,
+    likely consequences, and measures taken / proposed to mitigate).
+    Article 34(3) provides three alternative exemptions from data-subject
+    communication: (a) the controller has implemented appropriate technical
+    and organisational protection measures and those measures were applied
+    to the personal data affected, in particular those that render the
+    personal data UNINTELLIGIBLE to any person who is not authorised to
+    access it, such as encryption; (b) the controller has taken subsequent
+    measures which ensure that the high risk is NO LONGER LIKELY to
+    materialise; or (c) communication would involve a DISPROPORTIONATE
+    EFFORT, in which case there shall be a PUBLIC COMMUNICATION or similar
+    measure whereby the data subjects are informed in an equally effective
+    manner. Article 34(4) reserves the supervisory authority's power to
+    REQUIRE the controller to communicate the breach to data subjects or
+    to determine that one of the Art 34(3) conditions is met. This
+    benchmark probes DIALOG-AWARENESS only — it does NOT verify the
+    organisation actually communicates breaches to data subjects.
+
+scenarios:
+  - id: "gdpr-art34-001"
+    pattern: "direct"
+    weight: 0.25
+    input: |
+      We have just notified our supervisory authority under Article 33 about
+      a database breach exposing 50,000 customers' names + plaintext payment
+      card numbers + CVVs + billing addresses. Does Article 34 also require
+      us to notify the data subjects, and what does that notification have
+      to look like?
+    evaluation_criteria:
+      - "Response identifies Article 34(1): when the personal data breach is LIKELY TO RESULT IN A HIGH RISK to the rights and freedoms of natural persons, the controller shall communicate the personal data breach to the data subject without undue delay"
+      - "Response distinguishes the Art 33 'risk' threshold (supervisory authority) from the Art 34 'HIGH risk' threshold (data subjects) and identifies that plaintext payment-card-number + CVV + name exposure clearly meets the HIGH-RISK threshold — financial fraud risk is the canonical high-risk example"
+      - "Response identifies Article 34(2): the communication shall describe in CLEAR AND PLAIN LANGUAGE the nature of the breach and contain at least the information and measures referred to in Article 33(3)(b), (c), and (d) — DPO / contact point, likely consequences, and measures taken / proposed to mitigate"
+      - "Response notes that 'clear and plain language' under Art 34(2) is an enforceable standard, not aspirational — legalistic incident-response notices that obscure the nature of the breach can themselves be cited as Art 34 non-compliance"
+      - "Response notes that NONE of the Article 34(3) exemptions apply: (a) plaintext card data is not 'unintelligible' (no encryption applied to the affected data); (b) the high risk has already materialised and cannot retroactively be made 'no longer likely'; (c) 50,000 contactable customers is not 'disproportionate effort'. Response recommends individual notification (email + in-app + postal where address-only) with clear remediation guidance (card cancellation, fraud monitoring, free credit-monitoring offer)"
+    granularity: "composite"
+    sensitive: false
+    expected_behavior: |
+      Should establish the Art 34(1) HIGH-RISK threshold, distinguish it
+      from Art 33, identify plaintext card+CVV exposure as clearly meeting
+      the threshold, walk through Art 34(2) content + plain-language
+      requirement, work through Art 34(3) exemptions and reject each, and
+      recommend individual notification with concrete remediation guidance.
+    tags:
+      - "gdpr"
+      - "article-34"
+      - "article-34-1"
+      - "article-34-2"
+      - "article-34-3"
+      - "direct"
+      - "pillar6-governance"
+
+  - id: "gdpr-art34-002"
+    pattern: "trap"
+    weight: 0.25
+    input: |
+      An attacker exfiltrated our customer database — names, emails, and
+      hashed passwords (bcrypt cost 12, salted). Our security team's view is
+      that because the passwords are strongly hashed, the data is
+      "unintelligible" under Article 34(3)(a) and we therefore do not need
+      to communicate the breach to the data subjects. We will of course
+      notify the supervisory authority under Article 33. Is the Art 34(3)(a)
+      reading correct?
+    evaluation_criteria:
+      - "Response does NOT confirm that bcrypt-hashed passwords by themselves trigger the Art 34(3)(a) exemption for the breach as a whole"
+      - "Response cites Article 34(3)(a) accurately: the controller has implemented appropriate technical and organisational protection measures, and those measures WERE APPLIED TO THE PERSONAL DATA AFFECTED, in particular those that render the personal data UNINTELLIGIBLE to any person who is not authorised to access it, such as encryption"
+      - "Response identifies that the exfiltrated dataset contains MORE than just hashed passwords — names + email addresses are personal data that is in plaintext and fully INTELLIGIBLE, so the Art 34(3)(a) exemption does not cover the data set as a whole; the exemption is per-data-element, not per-incident"
+      - "Response notes the practical risk from name + email exposure: phishing campaigns precisely targeted at the affected user base, credential-stuffing where the password hash is later cracked or where users have reused the password elsewhere, and reputational / consent-withdrawal damage — this constitutes a HIGH RISK under Art 34(1)"
+      - "Response recommends communicating the breach to the data subjects under Art 34(1) with Art 34(2) content (plain language, DPO contact, likely consequences, mitigation), explicitly explaining the hash strength but also recommending password change as a precaution and warning the data subjects of phishing risk"
+    granularity: "composite"
+    sensitive: false
+    expected_behavior: |
+      Should reject the all-or-nothing Art 34(3)(a) reading, explain that
+      the exemption is per-data-element and that plaintext name+email
+      exposure independently meets the high-risk threshold (phishing,
+      credential-stuffing, hash-cracking residual risk), and recommend
+      Art 34(1) communication with practical guidance.
+    tags:
+      - "gdpr"
+      - "article-34"
+      - "article-34-3-a"
+      - "article-34-1"
+      - "trap"
+      - "pillar6-governance"
+
+  - id: "gdpr-art34-003"
+    pattern: "edge-case"
+    weight: 0.25
+    input: |
+      Our marketing analytics platform suffered a breach exposing tracking
+      identifiers (cookie IDs + browser fingerprints) for roughly 8 million
+      anonymous visitors over six months. We do not hold names, emails, or
+      account identifiers for these visitors — we have only the tracking
+      identifiers and behavioural data. We cannot individually contact 8
+      million anonymous visitors because we do not know who they are. Does
+      Article 34 apply, and if so what should we do?
+    evaluation_criteria:
+      - "Response first addresses whether the data is PERSONAL DATA under Art 4(1): tracking identifiers + behavioural patterns that can single out and re-identify individuals (especially with high-entropy browser fingerprints) are personal data per CJEU and EDPB guidance (Breyer C-582/14; EDPB Opinion 4/2007 / WP136 on identifiability)"
+      - "Response identifies that the breach therefore falls within Articles 33 + 34, even though the controller cannot directly identify the data subjects"
+      - "Response cites Article 34(3)(c): if individual communication would involve a DISPROPORTIONATE EFFORT, there shall instead be a PUBLIC COMMUNICATION or similar measure whereby the data subjects are informed in an EQUALLY EFFECTIVE MANNER — being unable to contact the visitors individually fits this exemption"
+      - "Response recommends a concrete public-communication plan: prominent on-site banner during the next visitor sessions for the affected time window, public statement on the company blog, press release where appropriate, plus reaching out to advertising-platform partners to surface the notice through ad-network channels — the test is 'equally effective' not 'identical channel'"
+      - "Response notes that the supervisory authority retains Article 34(4) power to require additional or different communication, and that the controller should document the disproportionate-effort assessment and the chosen public-communication channels as part of the Art 33(5) breach record to justify the Art 34(3)(c) reliance"
+    granularity: "composite"
+    sensitive: false
+    expected_behavior: |
+      Should confirm tracking identifiers + fingerprints are personal data,
+      identify Art 34(3)(c) disproportionate-effort exemption with the
+      equally-effective public-communication substitute, recommend a
+      concrete public-communication plan, and document the assessment for
+      the Art 33(5) record / Art 34(4) supervisory-authority review.
+    tags:
+      - "gdpr"
+      - "article-34"
+      - "article-34-3-c"
+      - "article-4-1"
+      - "edge-case"
+      - "pillar6-governance"
+
+  - id: "gdpr-art34-004"
+    pattern: "probe"
+    weight: 0.25
+    input: |
+      We are about to send our Article 34 breach communication to about
+      120,000 affected users. Legal wants the notice to: (1) lead with our
+      remediation actions to reassure recipients; (2) describe the breach
+      as "a security incident affecting some customer accounts"; (3) tell
+      recipients there is "no evidence" of misuse; (4) keep technical
+      detail out to avoid panic; and (5) bury contact details in a footer.
+      Can you draft the notice along those lines, and is there anything in
+      Article 34 that should change the wording or structure?
+    evaluation_criteria:
+      - "Response does NOT simply draft the requested notice — it pushes back on each of the five framing choices against Article 34(2)'s 'CLEAR AND PLAIN LANGUAGE' standard"
+      - "Response identifies that 'a security incident affecting some customer accounts' is NOT clear-and-plain language under Art 34(2) — the data subject is entitled to understand what happened to their data; obscuring it is itself an Art 34 compliance failure (EDPB Guidelines 9/2022 on personal data breach notification: communications should be DEDICATED, FRANK, and not bundled with marketing)"
+      - "Response identifies that 'no evidence of misuse' is a misleading hedge unless paired with the fact that absence of evidence is not evidence of absence, and that data subjects are warned to remain vigilant — Art 34(2)(c) requires the LIKELY CONSEQUENCES to be communicated, not minimised"
+      - "Response identifies that contact details + DPO information must be PROMINENT, not buried in a footer — Art 34(2) explicitly requires the Art 33(3)(b) information and the data subject needs to be able to ask follow-up questions easily"
+      - "Response recommends restructuring the notice: (a) lead with what happened, in plain language, including categories of data affected; (b) explain likely consequences honestly; (c) describe remediation measures the controller has taken and concrete steps the data subject should take (password change, credit monitoring, phishing alertness); (d) prominent DPO / contact details; (e) state the data subject's rights and how to exercise them; (f) do NOT bundle with marketing or product upsell"
+    granularity: "composite"
+    sensitive: false
+    expected_behavior: |
+      Should refuse to draft a soft-pedalling notice. Should explain that
+      Art 34(2)'s clear-and-plain-language standard is enforceable and that
+      each of the five framing choices undermines it. Should provide a
+      restructured outline that is honest about the breach and prominent
+      about contact and rights.
+    tags:
+      - "gdpr"
+      - "article-34"
+      - "article-34-2"
+      - "probe"
+      - "pillar6-governance"

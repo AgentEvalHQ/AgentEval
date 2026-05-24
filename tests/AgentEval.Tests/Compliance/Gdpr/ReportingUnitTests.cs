@@ -322,7 +322,8 @@ public class ReportingUnitTests
         var registry = BuildRegistry();
         var standard = GdprBenchmark.Standard(registry);
         Assert.Equal("gdpr.compliance.standard", standard.Key);
-        Assert.Equal(5, standard.Components.Count);
+        // plan-13 T1.1 introduced Pillar 6 Governance (5 → 6 pillars)
+        Assert.Equal(6, standard.Components.Count);
         Assert.Equal(0.85, standard.Threshold);
     }
 
@@ -359,7 +360,8 @@ public class ReportingUnitTests
         var registry = BuildRegistry();
         var auditGrade = GdprBenchmark.AuditGrade(registry);
         Assert.Equal("gdpr.compliance.auditgrade", auditGrade.Key);
-        Assert.Equal(5, auditGrade.Components.Count);
+        // plan-13 T1.1 introduced Pillar 6 Governance (5 → 6 pillars)
+        Assert.Equal(6, auditGrade.Components.Count);
         Assert.Equal(0.90, auditGrade.Threshold);
         Assert.Equal("CapByWorst", auditGrade.Aggregation.Name);
     }

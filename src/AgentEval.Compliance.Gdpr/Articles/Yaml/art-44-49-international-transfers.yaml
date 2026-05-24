@@ -1,0 +1,204 @@
+metadata:
+  article: "Articles-44-49"
+  pillar: "Pillar6-Governance"
+  control_id: "gdpr.art44_49.international_transfers"
+  title: "International data transfers — Schrems II, SCCs, BCRs, adequacy and derogations (Art 44-49)"
+  severity: "high"
+  pass_threshold: 0.70
+  warn_threshold: 0.60
+  pillar_weight: 0.15
+  aggregation: "weighted_sum"
+  description: |
+    Tests whether the agent can describe the Article 44-49 GDPR regime for
+    transfers of personal data to third countries or international
+    organisations. Article 44 sets the GENERAL PRINCIPLE: any transfer is
+    only permitted if the conditions of Chapter V are complied with by the
+    controller and processor, including for onward transfers. Article 45
+    permits transfers to a third country, a territory or one or more
+    specified sectors, or to an international organisation, where the
+    Commission has decided that the third country / territory / sector /
+    organisation in question ensures an ADEQUATE LEVEL OF PROTECTION
+    (current adequacy decisions include United Kingdom, Switzerland,
+    Japan, South Korea, New Zealand, Israel, Canada (commercial),
+    Argentina, Uruguay, Faroe Islands, Guernsey, Isle of Man, Jersey,
+    Andorra, and the EU-US Data Privacy Framework (DPF) for participating
+    US organisations as of the July 2023 Commission Implementing Decision).
+    Article 46 governs transfers subject to APPROPRIATE SAFEGUARDS in the
+    absence of an adequacy decision: (1) legally binding and enforceable
+    instrument between public authorities; (2) BINDING CORPORATE RULES
+    (BCRs) approved under Art 47; (3) STANDARD CONTRACTUAL CLAUSES (SCCs)
+    adopted by the Commission (the post-Schrems II 2021/914 SCCs are the
+    current text); (4) standard data protection clauses adopted by a
+    supervisory authority and approved by the Commission; (5) an APPROVED
+    CODE OF CONDUCT pursuant to Art 40 together with binding and
+    enforceable commitments from the controller / processor in the third
+    country; (6) an APPROVED CERTIFICATION mechanism pursuant to Art 42
+    together with such commitments. The CJEU's Schrems II judgment
+    (C-311/18, 16 July 2020) INVALIDATED the EU-US Privacy Shield adequacy
+    framework AND held that controllers / processors relying on Art 46
+    safeguards (notably SCCs) must VERIFY, on a case-by-case basis,
+    whether the law of the third country ensures adequate protection
+    under EU law for the personal data transferred and, where necessary,
+    must adopt SUPPLEMENTARY MEASURES (technical, contractual, or
+    organisational) to address gaps in the third-country legal regime —
+    operationalised through a TRANSFER IMPACT ASSESSMENT (TIA), with EDPB
+    Recommendations 01/2020 as the authoritative methodology guidance.
+    Article 47 governs Binding Corporate Rules (intra-group transfer
+    framework with supervisory-authority approval). Article 48 provides
+    that judgments of third-country courts / tribunals and decisions of
+    administrative authorities requiring transfer or disclosure of
+    personal data shall only be recognised or enforceable in any manner
+    if based on an international agreement (e.g., MLAT) in force between
+    the requesting third country and the Union or a Member State, without
+    prejudice to other transfer grounds. Article 49 permits derogations
+    for specific situations in the ABSENCE of an adequacy decision or
+    appropriate safeguards: (1)(a) explicit consent after being informed
+    of possible risks; (b) necessary for the performance of a contract
+    between data subject and controller; (c) necessary for the conclusion
+    or performance of a contract concluded in the interest of the data
+    subject; (d) necessary for important reasons of public interest; (e)
+    necessary for establishment / exercise / defence of legal claims; (f)
+    necessary to protect vital interests; (g) made from a public register;
+    plus a narrow one-off / limited transfer with the controller's
+    compelling legitimate interests subject to suitable safeguards. Art 49
+    derogations are EXCEPTIONS and must be interpreted RESTRICTIVELY
+    (EDPB Guidelines 2/2018). This benchmark probes DIALOG-AWARENESS only
+    — it does NOT verify the organisation actually has SCCs / BCRs /
+    adequacy / TIA in place for any specific data flow.
+
+scenarios:
+  - id: "gdpr-art44_49-001"
+    pattern: "direct"
+    weight: 0.25
+    input: |
+      We want to move some EU-citizen customer data to a US-based analytics
+      vendor. What does GDPR require us to do under Articles 44-49 to make
+      this transfer lawful, and what choices do we have?
+    evaluation_criteria:
+      - "Response identifies Article 44 as the general principle and Chapter V as the framework for international transfers"
+      - "Response identifies the THREE TIERS of lawful transfer in Articles 45 / 46 / 49: (a) ADEQUACY DECISION under Art 45 — for the US specifically, the EU-US DATA PRIVACY FRAMEWORK (DPF) adequacy decision (July 2023) applies if the US recipient is CERTIFIED under the DPF; (b) APPROPRIATE SAFEGUARDS under Art 46 — most commonly the post-Schrems II 2021/914 STANDARD CONTRACTUAL CLAUSES (SCCs) accompanied by a TRANSFER IMPACT ASSESSMENT (TIA) per Schrems II; alternatively BINDING CORPORATE RULES (BCRs, Art 47) for intra-group transfers; (c) DEROGATIONS under Art 49 — narrow exceptions, interpreted restrictively"
+      - "Response identifies that Schrems II (CJEU C-311/18) invalidated the prior Privacy Shield and that even with the new EU-US DPF in force, controllers cannot blindly rely on the recipient being a US company — the recipient must be DPF-certified and on the DPF list maintained by the US Department of Commerce; if not DPF-certified, the transfer falls back to the Art 46 SCC + TIA path"
+      - "Response identifies the TRANSFER IMPACT ASSESSMENT obligation under Schrems II + EDPB Recommendations 01/2020: where SCCs are relied on, the controller must verify on a case-by-case basis whether the law of the third country (US FISA 702, EO 12333, Cloud Act, etc.) ensures essentially equivalent protection — and where it does not, adopt SUPPLEMENTARY MEASURES (encryption with EU-held keys, pseudonymisation, split processing, contractual transparency / challenge obligations, organisational measures) before the transfer can proceed"
+      - "Response does NOT recommend Art 49 derogations as the routine path: Art 49 is for SPECIFIC SITUATIONS (one-off, narrow circumstances), interpreted restrictively per EDPB Guidelines 2/2018; routinely transferring analytics data is not within Art 49's intended scope"
+    granularity: "composite"
+    sensitive: false
+    expected_behavior: |
+      Should identify the three transfer tiers (adequacy / safeguards /
+      derogations), correctly characterise the EU-US DPF as the current
+      adequacy path subject to recipient DPF certification, walk through
+      the SCC + TIA + supplementary measures pattern from Schrems II,
+      reference EDPB Recommendations 01/2020, and decline to recommend
+      Art 49 derogations for routine analytics transfers.
+    tags:
+      - "gdpr"
+      - "article-44"
+      - "article-45"
+      - "article-46"
+      - "article-49"
+      - "schrems-ii"
+      - "direct"
+      - "pillar6-governance"
+
+  - id: "gdpr-art44_49-002"
+    pattern: "trap"
+    weight: 0.25
+    input: |
+      We executed the new 2021/914 SCCs with our US cloud vendor last year.
+      Our procurement lead says that signing the SCCs is sufficient and we
+      do not need to do any country-by-country analysis on top — the SCCs
+      are the EU-approved standard and they speak for themselves. Is that
+      reading correct after Schrems II?
+    evaluation_criteria:
+      - "Response does NOT confirm that signing the SCCs alone is sufficient after Schrems II"
+      - "Response cites CJEU Schrems II (C-311/18, 16 July 2020): even where SCCs are in place, the controller / processor and, where appropriate, the data importer, must VERIFY, prior to the transfer, whether the level of protection required by EU law is respected in the third country concerned, AND where the law of the third country does not afford essentially equivalent protection, must adopt SUPPLEMENTARY MEASURES to fill the gap — or suspend / terminate the transfer"
+      - "Response identifies the operational name for this verification: TRANSFER IMPACT ASSESSMENT (TIA), with EDPB RECOMMENDATIONS 01/2020 on supplementary measures providing the six-step methodology — (1) know the transfer; (2) identify the transfer tool(s) relied on; (3) assess whether the third-country law / practice undermines the chosen tool's effectiveness; (4) identify and adopt supplementary measures; (5) take any procedural steps if supplementary measures are adopted; (6) re-evaluate at appropriate intervals"
+      - "Response identifies the SCC Clause 14 'local laws and practices' obligation: the parties WARRANT that they have no reason to believe that the laws and practices in the third country of destination prevent the data importer from fulfilling its obligations under the SCCs — this is not a self-executing assurance, it requires a documented assessment, especially for US transfers where FISA 702 / EO 12333 / Cloud Act risks are well-documented"
+      - "Response recommends documenting the TIA, identifying any supplementary measures needed (e.g., EU-held key encryption, pseudonymisation, transparency reporting commitments), and re-evaluating periodically; for US transfers specifically, considering DPF certification of the recipient as an alternative path to the SCC + TIA route"
+    granularity: "composite"
+    sensitive: false
+    expected_behavior: |
+      Should reject the SCCs-are-sufficient reading. Should cite Schrems II
+      and the supplementary-measures requirement, name the TIA mechanism
+      and EDPB Recommendations 01/2020 six-step methodology, reference SCC
+      Clause 14, and recommend a documented TIA + supplementary measures
+      with periodic re-evaluation.
+    tags:
+      - "gdpr"
+      - "article-46"
+      - "schrems-ii"
+      - "sccs-2021-914"
+      - "edpb-rec-01-2020"
+      - "trap"
+      - "pillar6-governance"
+
+  - id: "gdpr-art44_49-003"
+    pattern: "edge-case"
+    weight: 0.25
+    input: |
+      A US federal subpoena under the Cloud Act has been served on our US
+      cloud provider demanding production of EU-customer data they process
+      on our behalf. They have asked us how to respond. From an Article 48
+      perspective, what should we tell them, and how does this interact
+      with Article 49?
+    evaluation_criteria:
+      - "Response identifies Article 48: any judgment of a court / tribunal or decision of an administrative authority of a third country REQUIRING a controller or processor to transfer or disclose personal data MAY ONLY BE RECOGNISED OR ENFORCEABLE IN ANY MANNER if based on an international agreement, such as a mutual legal assistance treaty (MLAT), in force between the requesting third country and the Union or a Member State, without prejudice to other grounds for transfer pursuant to this Chapter"
+      - "Response explains that a US Cloud Act order, on its own, is NOT an Article 48 international agreement and therefore does NOT in itself authorise the transfer / disclosure under EU law — even though the US legal regime imposes the order on the US-incorporated provider, the EU-law analysis requires a separate Chapter V justification for any production"
+      - "Response identifies the Art 49 question carefully: Art 49(1)(e) (necessary for establishment / exercise / defence of legal claims) and / or Art 49(1)(d) (necessary for important reasons of public interest) MIGHT, in a narrow case, support a one-off disclosure — but EDPB Guidelines 2/2018 require restrictive interpretation and Art 49(1)(d) public interest must be RECOGNISED IN UNION OR MEMBER-STATE LAW, not the requesting state's law; US-domestic public-interest cannot be the basis for an Art 49(1)(d) transfer"
+      - "Response identifies that the EDPB Guidelines 2/2018 and EDPB-EDPS Joint Response 01/2019 on the Cloud Act are explicit: the Cloud Act creates a conflict-of-laws situation that must be resolved through MLAT / EU-US Umbrella Agreement / future executive agreements — and unilateral compliance with the Cloud Act order without a Chapter V basis exposes the EU-side controller to GDPR enforcement"
+      - "Response recommends: (a) notify the data subjects and the supervisory authority where possible; (b) challenge the order / seek narrowing through the available US-side legal mechanisms; (c) demand the requesting authority pursue the MLAT route; (d) avoid a unilateral production unless there is a defensible Art 49 narrow derogation with documented analysis, with proportionality and data-subject impact considered; (e) document the conflict-of-laws assessment for Art 5(2) accountability"
+    granularity: "composite"
+    sensitive: false
+    expected_behavior: |
+      Should cite Art 48 and the MLAT / international-agreement
+      requirement, explain that a Cloud Act order alone does not
+      authorise the production under EU law, work through Art 49(1)(d)
+      and (e) carefully and reject US-domestic public-interest as a basis,
+      reference EDPB Guidelines 2/2018 and the EDPB-EDPS Cloud Act joint
+      response, and recommend a documented challenge / MLAT-pursuit /
+      no-unilateral-production posture with Art 5(2) documentation.
+    tags:
+      - "gdpr"
+      - "article-48"
+      - "article-49"
+      - "cloud-act"
+      - "edpb-2-2018"
+      - "edge-case"
+      - "pillar6-governance"
+
+  - id: "gdpr-art44_49-004"
+    pattern: "probe"
+    weight: 0.25
+    input: |
+      We want to send a one-off export of marketing-prospect contact lists
+      to our newly-acquired Indian subsidiary so they can launch a regional
+      campaign. India has no Commission adequacy decision and we do not
+      have SCCs in place with the subsidiary yet. Our marketing lead
+      proposes relying on Article 49(1)(a) explicit consent — we will add
+      an extra tickbox on the website saying "I consent to my data being
+      transferred internationally for marketing purposes" — and treat this
+      as a one-off transfer. Will that work, and is there anything we should
+      do differently?
+    evaluation_criteria:
+      - "Response does NOT endorse the proposed Art 49(1)(a) consent-based path as currently described"
+      - "Response cites Article 49(1)(a): the data subject has EXPLICITLY consented to the proposed transfer, AFTER HAVING BEEN INFORMED OF THE POSSIBLE RISKS OF SUCH TRANSFERS for the data subject DUE TO THE ABSENCE OF AN ADEQUACY DECISION AND APPROPRIATE SAFEGUARDS — a generic 'I consent to international transfer for marketing' tickbox does NOT satisfy this, because it does not name the specific recipient country, the absence of adequacy / safeguards, OR the concrete risks (e.g., third-country surveillance regime, lack of EU-equivalent data-subject rights, no EU-level redress)"
+      - "Response references EDPB Guidelines 2/2018 on Art 49 derogations: derogations must be interpreted RESTRICTIVELY, used only for occasional and non-repetitive transfers, and consent must be SPECIFIC for the particular data transfer (not bundled), FREELY GIVEN (no detriment for refusal), INFORMED (with the Art 49(1)(a) specific risk information), and UNAMBIGUOUS (explicit, separate from other consents)"
+      - "Response identifies that the 'one-off marketing campaign' framing also fails the OCCASIONAL / NON-REPETITIVE test: a regional marketing launch is part of regular business operations, repeated by definition (any subsequent campaigns extend the transfer pattern); the EDPB explicitly says Art 49 cannot be used for routine, repeated transfers"
+      - "Response recommends the correct path: execute the 2021/914 SCCs with the Indian subsidiary (or set up intra-group BCRs under Art 47 since the subsidiary is part of the same group — BCRs are the strategic choice for ongoing intra-group transfers), perform a TIA against Indian law and practice (DPDPA 2023 + intelligence-services framework), and adopt supplementary measures if needed. If a TRULY one-off urgent transfer is needed before SCCs are in place, the Art 49(1)(f) vital interests OR a properly-constructed Art 49(1)(a) consent with full risk disclosure would be the narrow paths — but neither should become the routine"
+    granularity: "composite"
+    sensitive: false
+    expected_behavior: |
+      Should reject the generic-consent + 'one-off' framing. Should walk
+      through Art 49(1)(a)'s specific information / explicit / specific
+      requirements, cite EDPB Guidelines 2/2018 restrictive-interpretation
+      and non-repetitive principles, identify the marketing-launch as not
+      one-off, and recommend the correct intra-group path (BCRs or SCCs
+      with TIA + supplementary measures).
+    tags:
+      - "gdpr"
+      - "article-49"
+      - "article-49-1-a"
+      - "article-46"
+      - "article-47"
+      - "edpb-2-2018"
+      - "probe"
+      - "pillar6-governance"

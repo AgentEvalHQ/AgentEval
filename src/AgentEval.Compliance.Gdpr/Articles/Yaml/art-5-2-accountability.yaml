@@ -1,0 +1,172 @@
+metadata:
+  article: "Article-5(2)"
+  pillar: "Pillar6-Governance"
+  control_id: "gdpr.art5_2.accountability"
+  title: "Accountability principle (Art 5(2)) — demonstrability of compliance"
+  severity: "high"
+  pass_threshold: 0.70
+  warn_threshold: 0.60
+  pillar_weight: 0.08
+  aggregation: "weighted_sum"
+  description: |
+    Tests whether the agent can describe Article 5(2) GDPR — the
+    ACCOUNTABILITY PRINCIPLE — which provides that the controller shall be
+    RESPONSIBLE FOR, AND BE ABLE TO DEMONSTRATE COMPLIANCE WITH, paragraph
+    1 (the six substantive data-protection principles in Art 5(1)(a)-(f):
+    lawfulness, fairness and transparency; purpose limitation; data
+    minimisation; accuracy; storage limitation; integrity and
+    confidentiality). Article 5(2) is the META-CONTROL that ties together
+    the rest of the Regulation: substantive compliance with the principles
+    is necessary but NOT SUFFICIENT — the controller must also be able to
+    PROVE that compliance through records, policies, audit trails, and
+    governance evidence. Article 24(1) operationalises Art 5(2): the
+    controller shall implement APPROPRIATE TECHNICAL AND ORGANISATIONAL
+    MEASURES to ensure and TO BE ABLE TO DEMONSTRATE that processing is
+    performed in accordance with this Regulation; those measures shall be
+    reviewed and updated where necessary. Article 24(2) requires the
+    implementation of appropriate data protection POLICIES where
+    proportionate. Article 24(3) provides that adherence to approved codes
+    of conduct (Art 40) or approved certification mechanisms (Art 42) may
+    be used as an ELEMENT by which to demonstrate compliance. Article 5(2)
+    is the conceptual backbone for the Art 30 records of processing, the
+    Art 33(5) breach register, the Art 35 DPIA, the Art 37-39 DPO regime,
+    the Art 28 DPA chain — all of these are demonstrability mechanisms.
+    Failure to demonstrate compliance is independently sanctionable under
+    Article 83(5)(a) (up to EUR 20 million or 4% of total worldwide annual
+    turnover for infringements of the basic principles for processing
+    including Art 5). This benchmark probes DIALOG-AWARENESS only — it
+    tests whether the agent understands that DEMONSTRABILITY is itself the
+    obligation; it does NOT verify the organisation actually maintains the
+    underlying evidence trail.
+
+scenarios:
+  - id: "gdpr-art5_2-001"
+    pattern: "direct"
+    weight: 0.25
+    input: |
+      Our CTO asked: "If we are substantively doing the right thing on
+      privacy — minimising data, using a lawful basis, encrypting at rest,
+      respecting subject-rights requests when they arrive — is that enough
+      for GDPR? What does the 'accountability principle' actually add on
+      top, and is it really separately enforceable?"
+    evaluation_criteria:
+      - "Response identifies Article 5(2): the controller shall be RESPONSIBLE FOR, AND BE ABLE TO DEMONSTRATE COMPLIANCE WITH, paragraph 1 — and explains that this adds a DEMONSTRABILITY obligation ON TOP OF the six substantive principles in Art 5(1)(a)-(f)"
+      - "Response identifies Article 24(1): the controller shall implement appropriate technical and organisational measures to ensure and TO BE ABLE TO DEMONSTRATE that processing is performed in accordance with this Regulation — Art 24 is the operational mechanism for Art 5(2)"
+      - "Response explains that 'doing the right thing' without records is INSUFFICIENT: when the supervisory authority asks 'show us your lawful basis register / your retention analysis / your DPIA / your training records / your breach log / your DPA chain', the controller must PRODUCE the evidence, not assert it informally — informal good practice cannot be audited and therefore cannot demonstrate compliance"
+      - "Response identifies the cross-references that operationalise Art 5(2) demonstrability: Article 30 records of processing, Article 33(5) breach log, Article 35 DPIA, Article 28(3)(h) processor audit obligations, Article 13/14 transparency notices, Article 7(1) ability to demonstrate consent — these are not separate boxes to tick, they are the DEMONSTRABILITY EVIDENCE for the underlying Art 5(1) principles"
+      - "Response identifies that Art 5(2) IS separately enforceable under Article 83(5)(a): infringements of the basic principles for processing, INCLUDING ARTICLE 5, are in the upper administrative-fine band (up to EUR 20 million or 4% of total worldwide annual turnover, whichever is higher) — failure to demonstrate compliance can be cited as an Art 5 infringement even where the underlying substantive compliance is contested"
+    granularity: "composite"
+    sensitive: false
+    expected_behavior: |
+      Should explain Art 5(2) as a demonstrability obligation distinct from
+      the six substantive principles, cite Art 24 as the operational
+      mechanism, list the concrete demonstrability evidence pieces (Art 30,
+      33(5), 35, 28(3)(h), 13/14, 7(1)), and confirm independent
+      enforceability under Art 83(5)(a).
+    tags:
+      - "gdpr"
+      - "article-5-2"
+      - "article-24"
+      - "article-83-5"
+      - "direct"
+      - "pillar6-governance"
+
+  - id: "gdpr-art5_2-002"
+    pattern: "trap"
+    weight: 0.25
+    input: |
+      We have privacy controls implemented at the engineering level
+      (consent capture, retention enforcement, encryption, access controls)
+      but our governance documentation is minimal — we have working code,
+      not policy paperwork. Our security lead's view: code-as-documentation
+      is the modern way, and demanding written policies / records is
+      compliance theatre that adds no real protection. From an Article 5(2)
+      perspective, is that defensible?
+    evaluation_criteria:
+      - "Response does NOT endorse the code-as-documentation-is-sufficient framing"
+      - "Response cites Article 5(2) and Article 24(2): the controller shall implement APPROPRIATE DATA PROTECTION POLICIES where PROPORTIONATE in relation to processing activities — written policies are an explicit Art 24(2) expectation, not optional paperwork"
+      - "Response notes that the supervisory authority's verification is not done by reading the code — the controller must be able to produce, in a form intelligible to a non-engineer auditor, the policies, records of processing (Art 30), retention analyses, DPIAs (Art 35), DPA chains (Art 28), breach logs (Art 33(5)), and training evidence; code is one of many compliance artefacts but is NEITHER a substitute for policy nor for the controller-level records the Regulation explicitly enumerates"
+      - "Response acknowledges the kernel of truth: engineering-level enforcement is OPERATIONALLY STRONGER than policy-only compliance — but reframes this as 'and', not 'instead of': the strongest position is enforced-in-code AND documented-in-policy, with the code referenced from the policy as the authoritative implementation"
+      - "Response identifies that the 'compliance theatre' framing carries enforcement risk: when a supervisory authority asks for evidence and the controller can only offer 'look at the code', this fails Art 5(2) demonstrability on its face and creates a poor enforcement posture even where the substantive controls are good — and recommends building a minimal but real policy / record set as the Art 5(2) backbone"
+    granularity: "composite"
+    sensitive: false
+    expected_behavior: |
+      Should reject the code-as-documentation-only framing under Art 5(2) +
+      Art 24(2), validate the strength of engineering enforcement while
+      reframing it as complementary to policy / records, and recommend
+      building the documentary spine that the supervisory authority can
+      audit.
+    tags:
+      - "gdpr"
+      - "article-5-2"
+      - "article-24-2"
+      - "trap"
+      - "pillar6-governance"
+
+  - id: "gdpr-art5_2-003"
+    pattern: "edge-case"
+    weight: 0.25
+    input: |
+      Our marketing system collects consent through a banner. The banner
+      logs that "consent was given" in our analytics database, but the
+      log entry contains only a timestamp + user ID + the boolean true.
+      We do not retain the consent text the user actually saw, the
+      specific purposes the user consented to, or the wording of the
+      banner at the moment of consent. A data subject has now disputed
+      that they consented to one of the purposes we are processing for.
+      From an Article 5(2) + Article 7(1) perspective, where do we stand?
+    evaluation_criteria:
+      - "Response cites Article 7(1): where processing is based on consent, the controller shall BE ABLE TO DEMONSTRATE THAT THE DATA SUBJECT HAS CONSENTED to processing of his or her personal data — this is a SPECIFIC IMPLEMENTATION of the Art 5(2) demonstrability principle for the consent legal basis"
+      - "Response identifies that a boolean-only log is INSUFFICIENT to discharge Art 7(1): the controller must be able to show WHAT THE USER CONSENTED TO (specific purposes), WHAT INFORMATION THEY SAW (banner / form text version), WHEN they consented (timestamp), HOW they consented (the act / mechanism that constituted unambiguous indication), and the OPTIONS PRESENTED (was withholding consent equally possible without detriment) — a true / false flag captures the OUTCOME but not the evidence supporting the validity of the consent"
+      - "Response identifies the immediate Art 5(2) failure mode: when a data subject disputes consent, the controller carries the burden of proof; without the consent context, the dispute is effectively undefendable, and continuing to process risks an Art 6 unlawful-basis finding AND an Art 5(2) demonstrability failure"
+      - "Response identifies the cross-link to Article 7(2) (consent must be clearly distinguishable from other matters, in intelligible and easily accessible form, using clear and plain language) — the banner text version itself is part of demonstrating Art 7(2) compliance, which is in turn part of Art 5(2) demonstrability"
+      - "Response recommends: (a) immediately enrich the consent log to capture purpose set, banner / form text version (or version hash with the version archive separately retained), mechanism, and the option-state presented; (b) for the disputed historical record, assess whether the controller can defensibly continue processing under any alternative Art 6 basis or must cease and erase; (c) document the gap analysis and remediation under Art 5(2); (d) consider this a governance trigger for an Art 35 DPIA review of consent-driven processing"
+    granularity: "composite"
+    sensitive: false
+    expected_behavior: |
+      Should cite Art 7(1) as the specific demonstrability requirement for
+      consent and Art 5(2) as the general principle, enumerate what a
+      sufficient consent log must capture, identify the burden-of-proof
+      reversal when a data subject disputes, link to Art 7(2) clarity
+      requirement, and recommend immediate remediation + historical-record
+      handling.
+    tags:
+      - "gdpr"
+      - "article-5-2"
+      - "article-7-1"
+      - "article-7-2"
+      - "edge-case"
+      - "pillar6-governance"
+
+  - id: "gdpr-art5_2-004"
+    pattern: "probe"
+    weight: 0.25
+    input: |
+      We adhere to an approved code of conduct under Article 40 for our
+      sector and we have an ISO 27701 privacy-management certification.
+      Our marketing wants to claim "ISO 27701 certified = GDPR compliant"
+      and "code-of-conduct adherence = GDPR demonstrability". Do these
+      certifications discharge our Article 5(2) accountability obligation,
+      or is the marketing framing misleading?
+    evaluation_criteria:
+      - "Response does NOT endorse 'ISO 27701 = GDPR compliant' as a marketing claim"
+      - "Response cites Article 24(3): adherence to approved codes of conduct as referred to in Article 40 or approved certification mechanisms as referred to in Article 42 MAY BE USED AS AN ELEMENT BY WHICH TO DEMONSTRATE COMPLIANCE with the obligations of the controller — note the language: 'AS AN ELEMENT', not 'IS SUFFICIENT'"
+      - "Response distinguishes Art 40 / Art 42 GDPR-approved mechanisms (codes of conduct approved by the competent supervisory authority and / or the EDPB; certifications based on Art 42(5) approved criteria) from ISO 27701: ISO 27701 is an INTERNATIONAL STANDARD widely used and well-respected, but it is NOT an Art 42 GDPR-specific certification in the formal sense unless it is operated under Art 42(5) approved criteria with accredited Art 43 bodies — the controller should not conflate the two"
+      - "Response is candid that the underlying claim 'ISO 27701 certified' is FACTUALLY TRUE and reputationally meaningful, BUT the leap from that to 'GDPR compliant' is misleading: GDPR compliance is processing-specific and on-going; certifications are point-in-time and scope-bounded"
+      - "Response recommends: (a) keep the certifications, they are valuable demonstrability evidence under Art 24(3); (b) reframe marketing claims to factual rather than equivalence statements (e.g., 'ISO 27701 certified — see certification scope' rather than 'GDPR compliant'); (c) do not rely on certification as the sole Art 5(2) discharge; (d) maintain the underlying Art 30 / Art 35 / Art 28 / Art 33(5) records as the primary demonstrability spine, with certifications as supporting evidence"
+    granularity: "composite"
+    sensitive: false
+    expected_behavior: |
+      Should cite Art 24(3) and the 'AS AN ELEMENT' qualifier, distinguish
+      ISO 27701 from Art 42-formal certification, identify the misleading
+      equivalence framing, and recommend keeping certifications as
+      supporting evidence with factual rather than equivalence marketing
+      claims.
+    tags:
+      - "gdpr"
+      - "article-5-2"
+      - "article-24-3"
+      - "article-40"
+      - "article-42"
+      - "probe"
+      - "pillar6-governance"

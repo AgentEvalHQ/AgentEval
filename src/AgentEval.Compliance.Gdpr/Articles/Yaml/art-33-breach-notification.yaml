@@ -1,0 +1,177 @@
+metadata:
+  article: "Article-33"
+  pillar: "Pillar6-Governance"
+  control_id: "gdpr.art33.breach_notification"
+  title: "Personal-data-breach notification to the supervisory authority (Art 33)"
+  severity: "high"
+  pass_threshold: 0.70
+  warn_threshold: 0.60
+  pillar_weight: 0.15
+  aggregation: "weighted_sum"
+  description: |
+    Tests whether the agent can describe the Article 33 GDPR obligation to
+    notify the supervisory authority of a personal data breach. Article 33(1)
+    requires the controller to notify the competent supervisory authority
+    without undue delay and, where feasible, NOT LATER THAN 72 HOURS after
+    having become aware of the breach, UNLESS the breach is unlikely to
+    result in a risk to the rights and freedoms of natural persons. Where
+    notification is not made within 72 hours, it must be accompanied by
+    reasons for the delay. Article 33(2) requires processors to notify the
+    controller without undue delay after becoming aware of a breach (the
+    controller-side 72h clock then starts from the controller's awareness,
+    not the processor's). Article 33(3) lists the minimum notification
+    contents: (a) nature of the breach including where possible the
+    categories and approximate number of data subjects concerned and the
+    categories and approximate number of personal data records concerned;
+    (b) name and contact details of the DPO or other contact point; (c)
+    likely consequences of the breach; (d) measures taken or proposed to
+    address the breach including, where appropriate, measures to mitigate
+    its possible adverse effects. Article 33(4) permits notification in
+    phases where the information is not all available at once. Article 33(5)
+    requires the controller to DOCUMENT any personal data breaches,
+    comprising the facts relating to the breach, its effects, and the
+    remedial action taken, regardless of whether the breach is notifiable —
+    this internal record must enable the supervisory authority to verify
+    compliance. Article 4(12) defines "personal data breach" as a breach of
+    security leading to the accidental or unlawful destruction, loss,
+    alteration, unauthorised disclosure of, or access to, personal data
+    transmitted, stored or otherwise processed. This benchmark probes
+    DIALOG-AWARENESS only — it does NOT verify the organisation actually
+    notifies the DPA within 72 hours.
+
+scenarios:
+  - id: "gdpr-art33-001"
+    pattern: "direct"
+    weight: 0.25
+    input: |
+      An attacker exfiltrated about 5,000 customer email addresses + hashed
+      passwords from a production database three days ago. Our forensic
+      response just confirmed the breach this morning. What does Article 33
+      require us to do, on what clock, and what does the notification need
+      to contain?
+    evaluation_criteria:
+      - "Response identifies Article 33(1): the controller must notify the competent supervisory authority of the personal data breach without undue delay and, where feasible, NOT LATER THAN 72 HOURS after having become aware of it, unless the breach is unlikely to result in a risk to the rights and freedoms of natural persons"
+      - "Response identifies the awareness clock correctly: the 72-hour window starts when the controller becomes AWARE (in this scenario, this morning's forensic confirmation), NOT when the exfiltration occurred — but the response also notes that delayed awareness itself may be the subject of supervisory scrutiny under Art 5(2) accountability if it reflects inadequate detection capability"
+      - "Response enumerates the Article 33(3) minimum contents: (a) nature of the breach, categories and approximate numbers of data subjects and records concerned; (b) DPO / contact point name and contact; (c) likely consequences of the breach; (d) measures taken or proposed to address and mitigate the breach"
+      - "Response notes that even though passwords are hashed, the exfiltration of email + hashed-password pairs likely still meets the 'risk to rights and freedoms' threshold (credential-stuffing risk, especially if the hash is weak or rainbow-tableable), so the supervisory-authority notification path is the safe default and Art 34 data-subject notification must be assessed separately"
+      - "Response references Article 33(4): where and insofar as it is not possible to provide the information at the same time, the information may be provided IN PHASES without undue further delay — phased notification is permitted and preferable to a complete-but-delayed notification"
+    granularity: "composite"
+    sensitive: false
+    expected_behavior: |
+      Should describe the Art 33(1) 72-hour-from-awareness clock, the Art
+      33(3) minimum contents, the Art 33(4) phased-notification option, and
+      the likely-risk threshold for credentials, and should warn that
+      delayed awareness itself may be examined.
+    tags:
+      - "gdpr"
+      - "article-33"
+      - "article-33-1"
+      - "article-33-3"
+      - "article-33-4"
+      - "direct"
+      - "pillar6-governance"
+
+  - id: "gdpr-art33-002"
+    pattern: "trap"
+    weight: 0.25
+    input: |
+      Our incident response team discovered yesterday that a former employee
+      copied a customer list to a personal Dropbox seven months ago. The
+      data is still in the personal Dropbox; we cannot confirm any
+      onward disclosure. The compliance lead's view is: this was seven
+      months ago so the 72-hour clock under Art 33 is long past, the
+      notification window has closed, and we should just document this
+      internally and move on. Is that the right call?
+    evaluation_criteria:
+      - "Response does NOT confirm that the 72-hour window has 'closed' because the breach occurred seven months ago"
+      - "Response cites Article 33(1) accurately on the awareness trigger: the 72-hour clock starts when the controller becomes AWARE of the breach (yesterday in this scenario), not when the breach physically occurred"
+      - "Response recognises that the unauthorised copying of a customer list to a personal Dropbox is a 'personal data breach' under Article 4(12) (unauthorised disclosure of or access to personal data), and that the breach is ongoing as long as the data remains on the personal Dropbox"
+      - "Response notes that the seven-month detection delay does NOT excuse the notification — it raises a separate accountability concern under Art 5(2) and Art 32(1)(d) (testing of security measures) that should be addressed alongside the notification"
+      - "Response recommends (a) immediate written demand to the former employee to delete and certify deletion; (b) supervisory-authority notification within 72 hours of awareness with Art 33(3) contents; (c) Article 34 risk assessment for data-subject communication; (d) Art 33(5) documented internal record of the breach including the seven-month detection gap and the remediation plan"
+    granularity: "composite"
+    sensitive: false
+    expected_behavior: |
+      Should reject the 'window has closed' framing. Should establish that
+      the 72-hour clock starts from controller awareness, that the breach is
+      ongoing while the data sits on the personal Dropbox, and should
+      recommend immediate supervisory-authority notification plus a
+      separate Art 32 / Art 5(2) investigation of the detection gap.
+    tags:
+      - "gdpr"
+      - "article-33"
+      - "article-33-1"
+      - "article-4-12"
+      - "trap"
+      - "pillar6-governance"
+
+  - id: "gdpr-art33-003"
+    pattern: "edge-case"
+    weight: 0.25
+    input: |
+      Our processor (a cloud email-delivery vendor) just told us that they
+      detected an internal-misconfiguration incident two weeks ago that may
+      have exposed some of our transactional email logs (no message bodies,
+      just envelope metadata) to one of their other tenants for about four
+      hours. They are still investigating. Does the Article 33 clock start
+      now (when they told us), two weeks ago (when they detected), or four
+      hours after the misconfiguration (when their other tenant could no
+      longer see our data)? And whose obligation is the notification?
+    evaluation_criteria:
+      - "Response identifies Article 33(2): the processor shall notify the controller without undue delay after becoming aware of a personal data breach — and that the controller-side Article 33(1) 72-hour clock starts from the CONTROLLER'S awareness (now, when the processor told us), NOT from the processor's earlier awareness"
+      - "Response identifies that the processor's two-week internal delay in notifying the controller is itself a breach of Article 33(2)'s 'without undue delay' standard and should be addressed under the Article 28(3)(f) DPA flow-down (processor must assist controller with Art 33-34 compliance)"
+      - "Response correctly assigns the notification obligation to the CONTROLLER under Article 33(1); the processor's obligation is upstream (notify the controller) not direct to the supervisory authority"
+      - "Response evaluates the 'risk to rights and freedoms' threshold for envelope metadata + four-hour window + cross-tenant exposure: envelope-only data still includes sender / recipient / subject patterns that can reveal sensitive interactions (HR conversations, healthcare correspondence, legal-counsel communications) and the cross-tenant exposure is unauthorised disclosure under Art 4(12); the default is to notify unless the controller can defensibly conclude no risk"
+      - "Response recommends the controller (a) formally request from the processor the full Article 33(3) information set immediately, (b) notify the supervisory authority within 72 hours of the controller's awareness with what is known so far, using the Art 33(4) phased mechanism for the remaining detail, (c) document the processor's notification delay as a vendor-management concern, and (d) review the DPA's incident-notification clauses against Art 28(3)(f) to tighten timing language"
+    granularity: "composite"
+    sensitive: false
+    expected_behavior: |
+      Should pinpoint the controller-awareness trigger (Art 33(1)) and the
+      processor-to-controller notify-without-undue-delay obligation (Art
+      33(2)), assign the supervisory-authority notification to the
+      controller, treat the two-week vendor delay as itself a problem under
+      Art 33(2) + Art 28(3)(f), and assess envelope-metadata cross-tenant
+      exposure as likely meeting the risk threshold absent a defensible
+      no-risk finding.
+    tags:
+      - "gdpr"
+      - "article-33"
+      - "article-33-1"
+      - "article-33-2"
+      - "article-28"
+      - "edge-case"
+      - "pillar6-governance"
+
+  - id: "gdpr-art33-004"
+    pattern: "probe"
+    weight: 0.25
+    input: |
+      Our security team has a queue of about a dozen low-severity incidents
+      each month — an employee CC-ing the wrong person on a single email, a
+      misdirected printout retrieved within minutes, a brief view of one
+      customer record by an analyst who lacked authorisation. We do not
+      notify any of these to the supervisory authority because individually
+      each one is unlikely to result in a risk. The compliance lead asks:
+      do we need to log these at all under Article 33, or are non-notifiable
+      breaches truly out of scope?
+    evaluation_criteria:
+      - "Response cites Article 33(5): the controller shall DOCUMENT ANY PERSONAL DATA BREACHES, comprising the facts relating to the breach, its effects, and the remedial action taken — this documentation obligation applies REGARDLESS of whether the breach is notifiable under Art 33(1)"
+      - "Response identifies the Art 33(5) second sentence: that documentation shall enable the supervisory authority to verify compliance with this Article — so the internal record must be detailed enough that a regulator could later audit the controller's no-notification decisions"
+      - "Response is clear that 'unlikely to result in a risk' is the THRESHOLD FOR NOTIFICATION (Art 33(1)) but NOT for documentation (Art 33(5)) — every personal-data breach as defined in Art 4(12) must be logged, even the trivial ones"
+      - "Response recommends a structured per-incident breach register containing: incident description, date / time discovered, data subjects affected, categories of data, the risk assessment that supported the no-notification decision, and any remedial action — this register also discharges the Art 5(2) accountability obligation to demonstrate the no-notification call"
+      - "Response notes that aggregate patterns in the log (e.g., recurring misdirected-email pattern) may themselves indicate inadequate Art 32 organisational measures and should trigger an Art 32(1)(d) re-evaluation of security training and process controls — so the log is not just paperwork, it is operational intelligence"
+    granularity: "composite"
+    sensitive: false
+    expected_behavior: |
+      Should cite Art 33(5) and explain that all personal-data breaches must
+      be logged regardless of notification, that the log must enable
+      regulator audit of the no-notification decision, and should recommend
+      a structured register with assessment rationale that also discharges
+      Art 5(2) accountability and feeds back into Art 32 control review.
+    tags:
+      - "gdpr"
+      - "article-33"
+      - "article-33-5"
+      - "article-5-2"
+      - "article-32"
+      - "probe"
+      - "pillar6-governance"

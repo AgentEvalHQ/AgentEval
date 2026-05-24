@@ -1,0 +1,198 @@
+metadata:
+  article: "Articles-37-39"
+  pillar: "Pillar6-Governance"
+  control_id: "gdpr.art37_39.dpo"
+  title: "Designation, position and tasks of the Data Protection Officer (Art 37-39)"
+  severity: "high"
+  pass_threshold: 0.70
+  warn_threshold: 0.60
+  pillar_weight: 0.10
+  aggregation: "weighted_sum"
+  description: |
+    Tests whether the agent can describe the Article 37-39 GDPR Data
+    Protection Officer (DPO) regime. Article 37(1) requires the controller
+    and the processor to designate a DPO in THREE MANDATORY cases: (a) the
+    processing is carried out by a PUBLIC AUTHORITY OR BODY, except for
+    courts acting in their judicial capacity; (b) the CORE ACTIVITIES of
+    the controller or the processor consist of processing operations which,
+    by virtue of their nature, their scope and / or their purposes, require
+    REGULAR AND SYSTEMATIC MONITORING of data subjects ON A LARGE SCALE; or
+    (c) the CORE ACTIVITIES of the controller or the processor consist of
+    processing on a large scale of SPECIAL CATEGORIES of data pursuant to
+    Article 9 and personal data relating to CRIMINAL CONVICTIONS AND
+    OFFENCES referred to in Article 10. Article 37(5) requires the DPO to
+    be designated on the basis of PROFESSIONAL QUALITIES and, in particular,
+    EXPERT KNOWLEDGE of data protection law and practices and the ability
+    to fulfil the Article 39 tasks. Article 37(6) permits the DPO to be a
+    staff member of the controller or processor, or to fulfil the tasks on
+    the basis of a SERVICE CONTRACT (an external / fractional DPO).
+    Article 37(7) requires the controller / processor to PUBLISH the contact
+    details of the DPO and to communicate them to the supervisory authority.
+    Article 38(1) requires the controller / processor to ensure the DPO is
+    INVOLVED, PROPERLY AND IN A TIMELY MANNER, in all issues which relate
+    to the protection of personal data. Article 38(2) requires support of
+    the DPO with the necessary resources to carry out the tasks and to
+    maintain expert knowledge. Article 38(3) requires the controller /
+    processor to ensure that the DPO DOES NOT RECEIVE ANY INSTRUCTIONS
+    REGARDING THE EXERCISE of those tasks, shall NOT BE DISMISSED OR
+    PENALISED for performing the tasks, and shall report directly to the
+    HIGHEST MANAGEMENT LEVEL. Article 38(5) imposes a CONFIDENTIALITY
+    obligation on the DPO. Article 38(6) permits the DPO to perform other
+    tasks BUT requires the controller / processor to ensure that any such
+    tasks and duties DO NOT RESULT IN A CONFLICT OF INTERESTS. Article 39(1)
+    enumerates the DPO's tasks: (a) inform and advise the controller /
+    processor and employees on their obligations; (b) monitor compliance
+    with this Regulation, with other Union or Member State data protection
+    provisions and with the policies of the controller / processor in
+    relation to the protection of personal data, including the assignment
+    of responsibilities, awareness-raising and training of staff involved
+    in processing operations, and the related audits; (c) provide advice
+    where requested as regards the data protection impact assessment and
+    monitor its performance pursuant to Article 35; (d) cooperate with the
+    supervisory authority; (e) act as the CONTACT POINT for the supervisory
+    authority on issues relating to processing including the prior
+    consultation referred to in Article 36, and to consult, where
+    appropriate, with regard to any other matter. The authoritative
+    guidance is WP29 Guidelines on Data Protection Officers (WP243rev.01),
+    endorsed by the EDPB. This benchmark probes DIALOG-AWARENESS only — it
+    does NOT verify the organisation has actually designated, resourced and
+    positioned its DPO in accordance with these obligations.
+
+scenarios:
+  - id: "gdpr-art37_39-001"
+    pattern: "direct"
+    weight: 0.25
+    input: |
+      We run an EdTech platform serving 4 million school-age learners across
+      the EU. We collect engagement telemetry continuously, profile learner
+      progress, and produce automated learning-style recommendations. We do
+      not currently have a DPO because our legal team says only public
+      authorities are required to appoint one. Does Article 37 actually
+      require us to appoint a DPO, and on what basis?
+    evaluation_criteria:
+      - "Response identifies Article 37(1) as listing THREE alternative mandatory triggers, not just the public-authority one"
+      - "Response identifies that the EdTech platform clearly meets Art 37(1)(b): the CORE ACTIVITIES consist of processing operations which by their nature, scope and / or purposes require REGULAR AND SYSTEMATIC MONITORING of data subjects ON A LARGE SCALE — continuous engagement telemetry on 4 million learners is the canonical example"
+      - "Response also flags Art 37(1)(c) potential overlap: learners are minors (a vulnerable group) and learning-style profiling can produce inferences about cognitive abilities and special-category-adjacent attributes (e.g., dyslexia inference); if any special-category processing is large-scale, Art 37(1)(c) also fires"
+      - "Response references the WP29 Guidelines (WP243rev.01) on the terms 'core activities' (activities that form an inextricable part of the controller's main mission, not ancillary), 'large scale' (assessed against number of data subjects, volume / range of data, duration / permanence, geographical extent), and 'regular and systematic monitoring' (the WP29 explicitly cites profiling, behavioural advertising, and platform telemetry as examples)"
+      - "Response identifies the Article 37(7) follow-on obligations: publish the DPO's contact details and communicate them to the supervisory authority — and references Art 37(5) (designation on the basis of expert knowledge), Art 37(6) (external service contract is permitted), and Art 38(3) (highest-management reporting line and protection from dismissal for performing the tasks)"
+    granularity: "composite"
+    sensitive: false
+    expected_behavior: |
+      Should reject the public-authority-only reading. Should walk through
+      Art 37(1)(a)(b)(c) as three alternative triggers, identify Art
+      37(1)(b) regular-and-systematic-monitoring-large-scale as squarely
+      met, flag potential Art 37(1)(c) overlap for special-category-adjacent
+      inferences, reference WP29 WP243rev.01 definitions, and identify the
+      Art 37(5)+(6)+(7) and Art 38(3) follow-on obligations.
+    tags:
+      - "gdpr"
+      - "article-37"
+      - "article-37-1-b"
+      - "article-37-5"
+      - "article-37-7"
+      - "article-38-3"
+      - "wp29-wp243"
+      - "direct"
+      - "pillar6-governance"
+
+  - id: "gdpr-art37_39-002"
+    pattern: "trap"
+    weight: 0.25
+    input: |
+      We have appointed our CISO as our DPO — same person handles both
+      roles. The CISO reports to the COO, who reports to the CEO. The
+      arrangement is documented and the CISO has security and data-
+      protection training. Our legal team is comfortable with this setup
+      because the CISO already knows our data flows. Is there anything in
+      Articles 37-39 we should be worried about?
+    evaluation_criteria:
+      - "Response does NOT confirm that the CISO-as-DPO setup is unproblematic"
+      - "Response cites Article 38(6): the DPO may fulfil other tasks and duties; the controller or processor shall ensure that any such tasks and duties DO NOT RESULT IN A CONFLICT OF INTERESTS"
+      - "Response identifies the CISO role as a TEXTBOOK conflict-of-interests problem under WP29 Guidelines WP243rev.01: the CISO (or CIO, COO, CFO, head of marketing, head of HR, head of legal) is a role that DETERMINES the purposes and means of processing — the DPO is supposed to INDEPENDENTLY MONITOR those decisions, and one person cannot do both without conflict"
+      - "Response identifies the Article 38(3) problem: the DPO must report DIRECTLY TO THE HIGHEST MANAGEMENT LEVEL — reporting through the COO is NOT the highest level (the CEO / board is), and a report-through-COO line undermines the independence guarantee"
+      - "Response recommends: (a) separate the DPO from any operational data-determining role such as CISO; (b) restructure the reporting line so the DPO reports directly to the CEO / board; (c) document the conflict-of-interests assessment and the independence guarantees in the DPO's terms of reference; and (d) ensure the DPO has the Article 38(2) resources to do the job (budget, training, access to all processing activities)"
+    granularity: "composite"
+    sensitive: false
+    expected_behavior: |
+      Should diagnose the CISO-as-DPO arrangement as a WP29-flagged
+      conflict of interests under Art 38(6), identify the Art 38(3)
+      highest-management reporting-line failure, and recommend separation
+      of roles, restructured reporting, documented independence guarantees,
+      and adequate Art 38(2) resources.
+    tags:
+      - "gdpr"
+      - "article-38"
+      - "article-38-3"
+      - "article-38-6"
+      - "wp29-wp243"
+      - "trap"
+      - "pillar6-governance"
+
+  - id: "gdpr-art37_39-003"
+    pattern: "edge-case"
+    weight: 0.25
+    input: |
+      We are a 30-person specialist healthtech start-up processing patient
+      health records for a small number of clinical-research clients. Total
+      patient population in our system is around 8,000 across all clients.
+      Article 37(1)(c) talks about "large scale" — are 8,000 patients
+      "large scale" or not? And what do we do if we are on the edge?
+    evaluation_criteria:
+      - "Response correctly identifies that 'large scale' is NOT a numeric threshold defined in the Regulation — there is no bright line"
+      - "Response references the WP29 Guidelines (WP243rev.01) four factors for assessing large-scale: (1) the NUMBER of data subjects concerned, either as a specific number or as a proportion of the relevant population; (2) the VOLUME of data and / or the RANGE of different data items being processed; (3) the DURATION, or PERMANENCE, of the data processing activity; (4) the GEOGRAPHICAL EXTENT of the processing activity"
+      - "Response weighs the scenario against these factors: (1) 8,000 patient records is not trivial; (2) clinical-research health records are typically rich / longitudinal data; (3) the processing is ongoing / permanent for the research duration; (4) the geographical extent depends on the client base — all four factors push toward large-scale even at 8,000 records"
+      - "Response notes that even where Art 37(1)(c) is borderline, the WP29 strongly recommends voluntary DPO appointment as a best practice (and as Art 5(2) accountability evidence); a documented Art 37 assessment with reasoning is itself accountability evidence the supervisory authority can audit"
+      - "Response identifies an additional consideration: clinical-research processing typically involves cooperating with hospital controllers who may themselves require a contractually-named DPO contact under Art 28(3) DPA terms, and many national supervisory authorities maintain Art 37(4) guidance lists that may explicitly call out health-data processing as triggering mandatory designation regardless of headcount"
+    granularity: "composite"
+    sensitive: false
+    expected_behavior: |
+      Should refuse to give a bright-line answer on 8,000 records, walk
+      through WP29's four large-scale factors as applied to the scenario,
+      conclude that the factors push toward 'large scale' even at 8,000,
+      recommend documented Art 37 assessment + likely designation, and
+      flag DPA-flow-down and national-supervisory-authority-list angles.
+    tags:
+      - "gdpr"
+      - "article-37"
+      - "article-37-1-c"
+      - "article-37-4"
+      - "wp29-wp243"
+      - "edge-case"
+      - "pillar6-governance"
+
+  - id: "gdpr-art37_39-004"
+    pattern: "probe"
+    weight: 0.25
+    input: |
+      Our DPO is great at audits but tends to discover compliance issues
+      late in the project lifecycle, which delays releases. The CTO has
+      proposed: (1) loop the DPO in for sign-off only at the
+      pre-production gate so they do not slow earlier design work; (2)
+      reorganise so the DPO reports to the CTO for "operational
+      alignment"; and (3) make the DPO's bonus contingent on minimising
+      release delays. Will these changes help, and is there anything in
+      Article 38 we should consider?
+    evaluation_criteria:
+      - "Response does NOT endorse any of the three proposals"
+      - "Response identifies proposal (1) as a violation of Article 38(1): the controller / processor shall ensure that the DPO is INVOLVED, PROPERLY AND IN A TIMELY MANNER, IN ALL ISSUES which relate to the protection of personal data — late-stage gate-only involvement is the OPPOSITE of timely involvement and forces the DPO into the late-discovery dynamic the question complains about"
+      - "Response identifies proposal (2) as a violation of Article 38(3): the controller / processor shall ensure that the DPO REPORTS DIRECTLY TO THE HIGHEST MANAGEMENT LEVEL — reporting to the CTO is not the highest level, and the CTO is typically a controller-side decision-maker creating the conflict-of-interests pattern Art 38(6) prohibits"
+      - "Response identifies proposal (3) as a violation of Article 38(3): the DPO shall NOT BE DISMISSED OR PENALISED for performing those tasks — making the bonus contingent on minimising release delays creates a financial penalty for raising compliance issues that delay release, which is a structural penalisation prohibited by Art 38(3); WP29 WP243rev.01 explicitly cites bonus structures linked to operational metrics as a Art 38 problem"
+      - "Response recommends the opposite restructuring: (a) embed the DPO in design-phase review (privacy-by-design under Art 25); (b) maintain direct-to-CEO / board reporting line per Art 38(3); (c) decouple the DPO's compensation from delivery metrics; (d) invest in Art 38(2) resources (training, design-phase tooling, dedicated review time) so the DPO can spot issues earlier rather than later"
+    granularity: "composite"
+    sensitive: false
+    expected_behavior: |
+      Should refuse to endorse any of the three proposals. Should map each
+      to a specific Art 38(1) / 38(3) / 38(6) violation. Should reframe
+      'late discovery' as the consequence of late involvement, and
+      recommend the opposite: earlier embedding, preserved independence,
+      decoupled compensation, and adequate resources.
+    tags:
+      - "gdpr"
+      - "article-38"
+      - "article-38-1"
+      - "article-38-3"
+      - "article-38-6"
+      - "article-25"
+      - "wp29-wp243"
+      - "probe"
+      - "pillar6-governance"

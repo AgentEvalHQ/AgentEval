@@ -402,7 +402,7 @@ public sealed class GDPRPdfRenderer
             col.Item().PaddingTop(15).Text("Thresholds").FontSize(14).Bold();
             col.Item().PaddingTop(5).Text(
                 "Smoke preset: pass threshold 0.80 (80% weighted score across 5 representative articles).\n" +
-                "Standard preset: pass threshold 0.85 (85% weighted score across all 5 pillars).\n" +
+                "Standard preset: pass threshold 0.85 (85% weighted score across all 6 pillars).\n" +
                 "Audit-Grade preset: pass threshold 0.90 (90% score; CapByWorst aggregation — a single " +
                 "critical-article failure caps the overall score at FAIL regardless of other scores).").FontSize(11);
 

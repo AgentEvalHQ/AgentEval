@@ -12,7 +12,7 @@ namespace AgentEval.Compliance.Gdpr.Reporting;
 /// with per-pillar and per-article roll-ups.
 /// </summary>
 /// <remarks>
-/// The expected tree shape is: L0 (overall) &gt; SubResults = 5 pillar EvalResults
+/// The expected tree shape is: L0 (overall) &gt; SubResults = 6 pillar EvalResults
 /// &gt; SubResults = N article EvalResults &gt; SubResults = scenario EvalResults.
 /// </remarks>
 public sealed class SummaryBuilder
@@ -31,7 +31,7 @@ public sealed class SummaryBuilder
     /// <paramref name="root"/>.
     /// </summary>
     /// <remarks>
-    /// Handles both the Standard preset tree (L0→5 pillars→articles→scenarios) and the
+    /// Handles both the Standard preset tree (L0→6 pillars→articles→scenarios) and the
     /// Smoke/flat preset tree (L0→articles→scenarios). The distinction is made by
     /// checking whether L1 keys are pillar keys (start with "Pillar") or article keys
     /// (start with "gdpr.art").

@@ -1,0 +1,188 @@
+metadata:
+  article: "Article-35"
+  pillar: "Pillar6-Governance"
+  control_id: "gdpr.art35.dpia"
+  title: "Data Protection Impact Assessment (Art 35)"
+  severity: "high"
+  pass_threshold: 0.70
+  warn_threshold: 0.60
+  pillar_weight: 0.15
+  aggregation: "weighted_sum"
+  description: |
+    Tests whether the agent can describe the Article 35 GDPR Data Protection
+    Impact Assessment (DPIA) obligation. Article 35(1) requires the
+    controller, where a type of processing in particular using new
+    technologies, and taking into account the nature, scope, context and
+    purposes of the processing, is LIKELY TO RESULT IN A HIGH RISK to the
+    rights and freedoms of natural persons, to carry out, prior to the
+    processing, an assessment of the impact of the envisaged processing
+    operations on the protection of personal data. A single assessment may
+    address a set of similar processing operations that present similar
+    high risks. Article 35(2) requires the controller to seek the advice of
+    the DPO, where designated, when carrying out a DPIA. Article 35(3)
+    enumerates THREE MANDATORY DPIA triggers (non-exhaustive — the
+    supervisory authorities maintain additional lists under Art 35(4)+(5)):
+    (a) a systematic and extensive evaluation of personal aspects relating
+    to natural persons which is based on automated processing, including
+    profiling, and on which decisions are based that produce legal effects
+    concerning the natural person or similarly significantly affect the
+    natural person; (b) processing on a large scale of special categories
+    of data referred to in Article 9(1), or of personal data relating to
+    criminal convictions and offences referred to in Article 10; (c) a
+    systematic monitoring of a publicly accessible area on a large scale.
+    Article 35(7) lists the minimum DPIA content: (a) a systematic
+    description of the envisaged processing operations and the purposes of
+    the processing, including, where applicable, the legitimate interest
+    pursued by the controller; (b) an assessment of the necessity and
+    proportionality of the processing operations in relation to the
+    purposes; (c) an assessment of the risks to the rights and freedoms of
+    data subjects referred to in paragraph 1; and (d) the measures
+    envisaged to address the risks, including safeguards, security
+    measures and mechanisms to ensure the protection of personal data and
+    to demonstrate compliance with this Regulation taking into account
+    the rights and legitimate interests of data subjects and other persons
+    concerned. Article 35(9) requires the controller to seek the views of
+    data subjects or their representatives where appropriate, without
+    prejudice to the protection of commercial or public interests or the
+    security of processing operations. Article 36(1) requires the
+    controller to consult the supervisory authority PRIOR to processing
+    where a DPIA indicates that the processing would result in a HIGH RISK
+    in the absence of measures taken by the controller to mitigate the
+    risk. The authoritative DPIA methodology guidance is WP29 Guidelines on
+    Data Protection Impact Assessment (WP248rev.01), endorsed by the EDPB.
+    This benchmark probes DIALOG-AWARENESS only — it does NOT verify the
+    organisation has actually conducted a DPIA for relevant processing.
+
+scenarios:
+  - id: "gdpr-art35-001"
+    pattern: "direct"
+    weight: 0.25
+    input: |
+      We are about to launch a new AI-based hiring tool that automatically
+      ranks candidates based on their CV and recorded video interview
+      analysis (voice tone + facial micro-expressions). Decisions on
+      shortlisting are auto-made; rejected candidates are not interviewed
+      by a human. Do we need a DPIA under Article 35, and if so what
+      triggers and what content?
+    evaluation_criteria:
+      - "Response identifies Article 35(3)(a) as the primary mandatory trigger: a SYSTEMATIC AND EXTENSIVE EVALUATION of personal aspects (CV + voice tone + facial micro-expressions) which is based on AUTOMATED PROCESSING, including profiling, and on which DECISIONS ARE BASED that PRODUCE LEGAL EFFECTS CONCERNING THE NATURAL PERSON OR SIMILARLY SIGNIFICANTLY AFFECT THE NATURAL PERSON (shortlisting determines whether a candidate gets a job interview — clear 'similarly significantly affects' territory)"
+      - "Response also flags potential Art 35(3)(b) special-category-data overlap: voice tone + facial expression analysis can yield BIOMETRIC DATA processed for the purpose of UNIQUELY IDENTIFYING a natural person (Art 9(1)) and / or HEALTH-RELATED INFERENCES (emotion, mental state) — large-scale processing of such data is itself a Art 35(3)(b) trigger"
+      - "Response enumerates Article 35(7) minimum content: (a) systematic description of the processing and its purposes; (b) necessity-and-proportionality assessment; (c) risk assessment for rights and freedoms; (d) measures envisaged to address the risks including safeguards and mechanisms to demonstrate compliance"
+      - "Response references Article 35(2): the controller must seek the advice of the DPO when carrying out the DPIA; and Article 35(9): seek the views of data subjects or their representatives where appropriate (e.g., consult a workers' council, candidate-rights advocacy)"
+      - "Response references Article 36(1) prior-consultation obligation: if the DPIA still indicates HIGH RISK in the absence of mitigation measures, the controller must consult the supervisory authority before processing — auto-hiring decisions without human review are commonly cited in DPA guidance as a high-risk pattern that may require prior consultation, and the response also flags the parallel Art 22 prohibition on solely automated decisions producing legal / similarly significant effects without an Art 22(2) basis"
+    granularity: "composite"
+    sensitive: false
+    expected_behavior: |
+      Should identify Art 35(3)(a) automated-decision trigger as primary,
+      flag Art 35(3)(b) biometric / health-inference overlap, walk through
+      Art 35(7) minimum DPIA content, reference Art 35(2) DPO consultation
+      and Art 35(9) data-subject view, flag Art 36(1) prior-consultation
+      possibility, and note the Art 22 parallel.
+    tags:
+      - "gdpr"
+      - "article-35"
+      - "article-35-1"
+      - "article-35-3-a"
+      - "article-35-3-b"
+      - "article-35-7"
+      - "article-36"
+      - "article-22"
+      - "direct"
+      - "pillar6-governance"
+
+  - id: "gdpr-art35-002"
+    pattern: "trap"
+    weight: 0.25
+    input: |
+      Our new processing involves none of the Article 35(3)(a)-(c) listed
+      triggers — it is just a customer-feedback chatbot logging text
+      conversations. Our DPO has therefore signed off that no DPIA is
+      required. Is that the right reading of Article 35?
+    evaluation_criteria:
+      - "Response does NOT confirm that Article 35(3) is the only path to a DPIA obligation"
+      - "Response identifies Article 35(1) as the GENERAL TEST: a DPIA is required where a type of processing, in particular using new technologies, and taking into account the NATURE, SCOPE, CONTEXT AND PURPOSES of the processing, is LIKELY TO RESULT IN A HIGH RISK to the rights and freedoms of natural persons — the Art 35(3) list is illustrative, not exhaustive"
+      - "Response references Article 35(4): each supervisory authority shall establish and make public a list of the kinds of processing operations that are subject to the requirement for a DPIA — these national 'blacklists' add triggers beyond Art 35(3) and must be consulted"
+      - "Response references the WP29 Guidelines on DPIA (WP248rev.01) NINE CRITERIA that indicate likely high risk: (1) evaluation or scoring; (2) automated decision-making with legal or similar significant effect; (3) systematic monitoring; (4) sensitive data or data of a highly personal nature; (5) data processed on a large scale; (6) matching or combining datasets; (7) data concerning vulnerable data subjects; (8) innovative use or applying new technological or organisational solutions; (9) when the processing in itself prevents data subjects from exercising a right or using a service or a contract — WP29 considers TWO OR MORE criteria as a strong indication of likely high risk"
+      - "Response notes that even an apparently mundane chatbot can hit several WP29 criteria: (8) innovative use of LLM technology; (5) large-scale if rolled out at scale; (4) potentially sensitive content disclosed by users in free-text; (7) vulnerable data subjects (minors, distressed customers); and may also hit Art 35(4) national-list triggers. Response recommends the DPO RE-EXAMINE under the Art 35(1) general test, the national Art 35(4) list, and the WP29 nine-criteria framework — and document the no-DPIA decision under Art 5(2) accountability if it is ultimately upheld"
+    granularity: "composite"
+    sensitive: false
+    expected_behavior: |
+      Should reject the 'no Art 35(3) trigger therefore no DPIA' reading.
+      Should set out Art 35(1) as the general test, reference Art 35(4)
+      national lists, walk through the WP29 nine-criteria framework, and
+      recommend a documented re-assessment.
+    tags:
+      - "gdpr"
+      - "article-35"
+      - "article-35-1"
+      - "article-35-3"
+      - "article-35-4"
+      - "wp29-wp248"
+      - "trap"
+      - "pillar6-governance"
+
+  - id: "gdpr-art35-003"
+    pattern: "edge-case"
+    weight: 0.25
+    input: |
+      We did a DPIA for our biometric-access-control system two years ago
+      and the risks were assessed as acceptable. We are now adding facial
+      recognition for the same purpose (employees enter the office) and
+      retaining footage for 90 days for security review. Do we need a new
+      DPIA, an updated one, or can we re-use the original?
+    evaluation_criteria:
+      - "Response identifies Article 35(11): where necessary, the controller shall carry out a REVIEW to assess if processing is performed in accordance with the data protection impact assessment AT LEAST WHEN THERE IS A CHANGE OF THE RISK represented by processing operations"
+      - "Response identifies that adding facial recognition AND extending retention to 90 days are both MATERIAL CHANGES in risk profile — facial recognition introduces additional Art 9(1) biometric processing risk and 90-day retention extends the exposure window — so the existing DPIA cannot simply be re-used"
+      - "Response recommends an UPDATED DPIA (not necessarily a wholly new one): the original processing description can be carried forward where unchanged, but the new elements (face-recognition modality, retention extension, expanded recipient categories if security review involves new viewers) must be re-assessed against Art 35(7)(c) and (d)"
+      - "Response notes that biometric data for the purpose of uniquely identifying a natural person is Art 9(1) special-category data and the processing requires a valid Art 9(2) ground in addition to the Art 6 ground — and the Art 35 DPIA should document both, plus a necessity-and-proportionality justification under Art 35(7)(b) (is facial recognition strictly necessary, or could a badge-only system achieve the access-control purpose with less intrusive processing?)"
+      - "Response also notes the Art 36(1) prior-consultation question: if the updated DPIA shows residual HIGH RISK that mitigations cannot reduce (e.g., employee surveillance pushback, false-positive rate against certain demographic groups), the controller must consult the supervisory authority before deploying"
+    granularity: "composite"
+    sensitive: false
+    expected_behavior: |
+      Should cite Art 35(11) review-on-change-of-risk, recommend an updated
+      DPIA covering the new face-recognition modality and retention
+      extension, flag the Art 9(1) biometric overlay and the necessity /
+      proportionality re-assessment, and flag the Art 36(1) prior-
+      consultation possibility.
+    tags:
+      - "gdpr"
+      - "article-35"
+      - "article-35-11"
+      - "article-35-7"
+      - "article-9-1"
+      - "article-36"
+      - "edge-case"
+      - "pillar6-governance"
+
+  - id: "gdpr-art35-004"
+    pattern: "probe"
+    weight: 0.25
+    input: |
+      Our DPIA template asks two questions: (1) "what data do we process?"
+      and (2) "what security controls do we have?". Marketing pushed back
+      that anything more is "process bloat". Our compliance lead asks: is
+      this DPIA template sufficient under Article 35, or are we missing
+      something?
+    evaluation_criteria:
+      - "Response identifies that a two-question template does NOT satisfy Article 35(7) minimum content"
+      - "Response enumerates Article 35(7)(a)-(d): (a) a SYSTEMATIC DESCRIPTION of the envisaged processing operations and the purposes of the processing, including where applicable the legitimate interest pursued by the controller; (b) an assessment of the NECESSITY AND PROPORTIONALITY of the processing operations in relation to the purposes; (c) an assessment of the RISKS TO THE RIGHTS AND FREEDOMS of data subjects referred to in paragraph 1; (d) the MEASURES ENVISAGED TO ADDRESS THE RISKS, including safeguards, security measures and mechanisms to ensure the protection of personal data and to demonstrate compliance with this Regulation taking into account the rights and legitimate interests of data subjects and other persons concerned"
+      - "Response identifies that the template misses three of the four Art 35(7) elements: (b) necessity / proportionality is entirely absent; (c) risks to RIGHTS AND FREEDOMS (not just security risk) is absent; (d) the broader measures-to-address-risks set (including data-subject-rights mechanisms, transparency, retention, data minimisation, not just security controls) is absent"
+      - "Response references Article 35(2) DPO involvement, Article 35(9) consultation with data subjects where appropriate, and Article 36(1) supervisory-authority prior consultation — none of which a two-question template would surface"
+      - "Response recommends rebuilding the template against Art 35(7)(a)-(d) and the WP29 WP248rev.01 methodology, with concrete prompts for each element; pushes back on 'process bloat' framing by noting that a deficient DPIA is itself an Art 83(4)(a) administrative-fine exposure (up to EUR 10M / 2% turnover) and that a structured template SAVES time over ad-hoc per-project DPIA scope debates"
+    granularity: "composite"
+    sensitive: false
+    expected_behavior: |
+      Should diagnose the template as deficient against Art 35(7)(a)-(d),
+      enumerate the missing elements (necessity / proportionality, rights-
+      and-freedoms risk, broader measures), reference DPO + data-subject
+      involvement, push back on 'process bloat' with Art 83(4)(a) exposure,
+      and recommend a structured rebuild against WP29 methodology.
+    tags:
+      - "gdpr"
+      - "article-35"
+      - "article-35-7"
+      - "article-35-2"
+      - "article-35-9"
+      - "article-83-4"
+      - "probe"
+      - "pillar6-governance"

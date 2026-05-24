@@ -15,8 +15,9 @@ using Xunit;
 namespace AgentEval.Tests.Compliance.Gdpr;
 
 /// <summary>
-/// End-to-end tests for the GDPR Standard preset: verifies the full five-pillar,
-/// 21-article tree shape, evidence persistence, and Markdown rendering with a mocked judge.
+/// End-to-end tests for the GDPR Standard preset: verifies the full six-pillar,
+/// 29-article tree shape (21 baseline + 8 Pillar 6 Governance from plan-13 T1.1),
+/// evidence persistence, and Markdown rendering with a mocked judge.
 /// </summary>
 public class E2E_StandardTest
 {
@@ -89,11 +90,11 @@ public class E2E_StandardTest
         // Overall verdict
         Assert.Equal("PASS", evidence.Summary.OverallStatus);
 
-        // Standard has 5 pillars
-        Assert.Equal(5, evidence.Summary.PerPillar.Count);
+        // Standard has 6 pillars (plan-13 T1.1 added Pillar 6 Governance)
+        Assert.Equal(6, evidence.Summary.PerPillar.Count);
 
-        // Standard has all 21 articles
-        Assert.Equal(21, evidence.Summary.PerArticle.Count);
+        // Standard has all 29 articles (21 baseline + 8 Pillar 6)
+        Assert.Equal(29, evidence.Summary.PerArticle.Count);
 
         // All pillars should pass
         Assert.All(evidence.Summary.PerPillar.Values, p => Assert.Equal("PASS", p.Status));
@@ -122,11 +123,11 @@ public class E2E_StandardTest
             pointers.Add(p);
         Assert.Single(pointers);
 
-        // Base evidence has 21 controls (one per article)
+        // Base evidence has 29 controls (one per article — 21 baseline + 8 Pillar 6)
         var baseEvidence = await store.GetComplianceEvidenceAsync(
             "GDPR", subject, evidence.Base.GeneratedAt.ToString("yyyy-MM-dd_HH-mm-ss"));
         Assert.NotNull(baseEvidence);
-        Assert.Equal(21, baseEvidence!.Controls.Count);
+        Assert.Equal(29, baseEvidence!.Controls.Count);
     }
 
     [Fact]
@@ -151,16 +152,16 @@ public class E2E_StandardTest
 
         Assert.Equal("FAIL", evidence.Summary.OverallStatus);
 
-        // All 5 pillars fail
-        Assert.Equal(5, evidence.Summary.PerPillar.Count);
+        // All 6 pillars fail (plan-13 T1.1 added Pillar 6 Governance)
+        Assert.Equal(6, evidence.Summary.PerPillar.Count);
         Assert.All(evidence.Summary.PerPillar.Values, p => Assert.Equal("FAIL", p.Status));
 
-        // All 21 articles fail
-        Assert.Equal(21, evidence.Summary.PerArticle.Count);
+        // All 29 articles fail (21 baseline + 8 Pillar 6)
+        Assert.Equal(29, evidence.Summary.PerArticle.Count);
         Assert.All(evidence.Summary.PerArticle.Values, a => Assert.Equal("FAIL", a.Status));
 
-        // Recommendations for all 21 articles
-        Assert.Equal(21, evidence.Recommendations.Count);
+        // Recommendations for all 29 articles
+        Assert.Equal(29, evidence.Recommendations.Count);
 
         // Markdown has recommendations section
         var md = new MarkdownRenderer().Render(evidence);
@@ -193,6 +194,7 @@ public class E2E_StandardTest
         Assert.Contains("Pillar3-SubjectRights", pillarKeys);
         Assert.Contains("Pillar4-Transparency", pillarKeys);
         Assert.Contains("Pillar5-PrivacyDesign", pillarKeys);
+        Assert.Contains("Pillar6-Governance", pillarKeys);
     }
 
     [Fact]

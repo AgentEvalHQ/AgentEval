@@ -36,18 +36,26 @@ public class ArticlesRegistryTests
     // ── Tests ─────────────────────────────────────────────────────────────────
 
     [Fact]
-    public void Registry_LoadsAll21Articles()
+    public void Registry_LoadsAll29Articles()
     {
         var registry = BuildRegistry();
 
-        Assert.True(registry.All.Count >= 21,
-            $"Expected at least 21 articles, got {registry.All.Count}");
+        // Plan-13 T1.1 added 8 Pillar 6 Governance articles on top of the 21
+        // Phase-2 baseline (21 + 8 = 29). Lower-bound assertion keeps the test
+        // robust against future Pillar 7+ additions.
+        Assert.True(registry.All.Count >= 29,
+            $"Expected at least 29 articles, got {registry.All.Count}");
 
-        // Assert specific control IDs are present
+        // Assert specific control IDs are present (mix of baseline + Pillar 6)
         Assert.Contains("gdpr.art17.erasure",         registry.All.Keys);
         Assert.Contains("gdpr.art9.special_categories", registry.All.Keys);
         Assert.Contains("gdpr.art22.automated",       registry.All.Keys);
         Assert.Contains("gdpr.art5.lawfulness",       registry.All.Keys);
+        // Plan-13 T1.1 Pillar 6 Governance spot checks:
+        Assert.Contains("gdpr.art28.processor_contracts", registry.All.Keys);
+        Assert.Contains("gdpr.art33.breach_notification", registry.All.Keys);
+        Assert.Contains("gdpr.art35.dpia",                registry.All.Keys);
+        Assert.Contains("gdpr.art44_49.international_transfers", registry.All.Keys);
     }
 
     [Fact]

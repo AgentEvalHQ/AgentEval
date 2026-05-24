@@ -12,8 +12,10 @@ using Xunit;
 namespace AgentEval.Tests.Compliance.Gdpr;
 
 /// <summary>
-/// Parameterized tests for Phase 3 G3.1-G3.6: verifies all five GDPR pillar composites
-/// build correctly and produce the expected evaluation structure when run against stub evaluators.
+/// Parameterized tests for Phase 3 G3.1-G3.6 + plan-13 T1.1: verifies all six GDPR
+/// pillar composites build correctly and produce the expected evaluation structure
+/// when run against stub evaluators. Pillar 6 (Governance and Accountability) added
+/// in v1.1 / plan-13 T1.1 with the 8 governance article YAMLs.
 /// </summary>
 public class PillarCompositesTests
 {
@@ -67,6 +69,7 @@ public class PillarCompositesTests
             3 => Pillar3SubjectRights.Build(registry),
             4 => Pillar4Transparency.Build(registry),
             5 => Pillar5PrivacyDesign.Build(registry),
+            6 => Pillar6Governance.Build(registry),
             _ => throw new ArgumentOutOfRangeException(nameof(pillarNumber))
         };
 
@@ -78,6 +81,7 @@ public class PillarCompositesTests
     [InlineData(3, "Pillar3-SubjectRights", 7)]
     [InlineData(4, "Pillar4-Transparency",  2)]
     [InlineData(5, "Pillar5-PrivacyDesign", 2)]
+    [InlineData(6, "Pillar6-Governance",    8)]
     public void Pillar_Build_HasCorrectKeyAndComponentCount(
         int pillarNumber,
         string expectedKey,
@@ -96,6 +100,7 @@ public class PillarCompositesTests
     [InlineData(3)]
     [InlineData(4)]
     [InlineData(5)]
+    [InlineData(6)]
     public void Pillar_ComponentWeights_SumToOne(int pillarNumber)
     {
         var registry = BuildRegistry();
@@ -112,6 +117,7 @@ public class PillarCompositesTests
     [InlineData(3, 7)]
     [InlineData(4, 2)]
     [InlineData(5, 2)]
+    [InlineData(6, 8)]
     public async Task Pillar_EvaluateAsync_PassingStub_ProducesSubResultsPerArticle(
         int pillarNumber,
         int expectedSubResultCount)
@@ -126,7 +132,7 @@ public class PillarCompositesTests
         Assert.Equal(expectedSubResultCount, result.Details.SubResults!.Count);
     }
 
-    // ── Smoke test: all 5 pillars build without exceptions ───────────────────
+    // ── Smoke test: all 6 pillars build without exceptions ───────────────────
 
     [Fact]
     public void AllPillars_Build_WithoutException()
@@ -138,12 +144,14 @@ public class PillarCompositesTests
         var pillar3 = Pillar3SubjectRights.Build(registry);
         var pillar4 = Pillar4Transparency.Build(registry);
         var pillar5 = Pillar5PrivacyDesign.Build(registry);
+        var pillar6 = Pillar6Governance.Build(registry);
 
         Assert.NotNull(pillar1);
         Assert.NotNull(pillar2);
         Assert.NotNull(pillar3);
         Assert.NotNull(pillar4);
         Assert.NotNull(pillar5);
+        Assert.NotNull(pillar6);
     }
 
     // ── Specific key checks ───────────────────────────────────────────────────
@@ -184,6 +192,10 @@ public class PillarCompositesTests
     public void Pillar5_NullRegistry_Throws() =>
         Assert.Throws<ArgumentNullException>(() => Pillar5PrivacyDesign.Build(null!));
 
+    [Fact]
+    public void Pillar6_NullRegistry_Throws() =>
+        Assert.Throws<ArgumentNullException>(() => Pillar6Governance.Build(null!));
+
     // ── PillarCompositeBuilder guard tests ────────────────────────────────────
 
     [Fact]
@@ -218,6 +230,7 @@ public class PillarCompositesTests
     [InlineData(3)]
     [InlineData(4)]
     [InlineData(5)]
+    [InlineData(6)]
     public void Pillar_Threshold_IsNull(int pillarNumber)
     {
         var registry = BuildRegistry();
