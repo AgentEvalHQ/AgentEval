@@ -16,22 +16,27 @@ internal static class ContentHasher
     /// <list type="number">
     ///   <item>The run's <c>manifest.json</c> serialised canonically with the
     ///         <c>contentHash</c> field zeroed (so the hash binds operator / host /
-    ///         git provenance to the run, not just the raw scenario bytes).</item>
-    ///   <item>The run's <c>summary.json</c> raw bytes.</item>
-    ///   <item>Every <c>scenarios/*.json</c> file, sorted by filename for determinism.</item>
-    ///   <item>Every <c>traces/*.json</c> file, sorted by filename for determinism
-    ///         (previously only <c>agent-trace.json</c>, which silently excluded
-    ///         per-test trace artefacts written by <c>TraceArtifactManager</c>).</item>
+    ///         git provenance to the run, not just the raw scenario bytes). Uses the
+    ///         hand-written <c>CanonicalRunManifestConverter</c>.</item>
+    ///   <item>The run's <c>summary.json</c> canonicalised via
+    ///         <see cref="CanonicalJsonProjector"/> (alphabetic property order, no
+    ///         insignificant whitespace, deterministic number encoding).</item>
+    ///   <item>Every <c>scenarios/*.json</c> file (canonical projection), sorted by
+    ///         filename for determinism.</item>
+    ///   <item>Every <c>traces/*.json</c> file (canonical projection), sorted by
+    ///         filename for determinism. Non-JSON trace artefacts fall back to raw
+    ///         bytes so they stay inside the audit envelope.</item>
     /// </list>
     /// </summary>
     /// <remarks>
     /// <para>
-    /// <b>Backwards compatibility</b> — workspaces written by pre-pass-3 code did not
-    /// include the manifest in their <c>contentHash</c>. After this change, those
-    /// workspaces will fail <see cref="VerifyAsync"/>. Per the v0.8.1-beta release
-    /// notes, no migration tooling ships in this version: re-run <c>agenteval bench …</c>
-    /// to regenerate. This is acceptable because the pre-pass-3 chain is a known
-    /// audit-coverage gap that v0.8.1-beta closes.
+    /// <b>Backwards compatibility</b> — pre-pass-3 (v0.7.x) workspaces did not include
+    /// the manifest in their hash. v1.1 / T1.7 additionally switches scenario/summary/trace
+    /// files from raw-byte hashing to canonical-JSON projection. Both transitions cause
+    /// pre-upgrade workspaces to fail <see cref="VerifyAsync"/>. Per the v0.8.1-beta
+    /// precedent, no migration tooling ships: re-run <c>agenteval bench …</c> to
+    /// regenerate. <c>agenteval doctor</c>'s hash-mismatch diagnostic surfaces the
+    /// upgrade path inline so operators don't mistake the change for tampering.
     /// </para>
     /// </remarks>
     public static async Task<string> HashRunAsync(
@@ -75,12 +80,23 @@ internal static class ContentHasher
             hash.AppendData(canonicalBytes);
         }
 
+        // T1.7 (v1.1): hash files via CanonicalJsonProjector instead of raw bytes. The
+        // projector applies RFC 8785-style canonicalization (alphabetic property order,
+        // no insignificant whitespace, deterministic number encoding) so:
+        //   - whitespace-only or property-reorder edits are TOLERATED (operator no longer
+        //     has to re-run benchmarks because a formatter touched the file);
+        //   - value edits / property adds / property removes are REJECTED (the canonical
+        //     bytes differ → the hash differs → VerifyAsync fails).
+        // BREAKING: pre-v1.1 workspaces' contentHash values were computed against raw bytes
+        // and will not match the canonical-projection hash. agenteval doctor surfaces the
+        // mismatch with a friendly "re-run bench" message.
+
         // 2. Summary
         var summaryFile = layout.SummaryFile(subject, runId);
         if (File.Exists(summaryFile))
         {
-            var bytes = await File.ReadAllBytesAsync(summaryFile, ct);
-            hash.AppendData(bytes);
+            var canonicalBytes = await CanonicalJsonProjector.ProjectFileAsync(summaryFile, ct);
+            hash.AppendData(canonicalBytes);
         }
 
         // 3. Scenarios (sorted by filename for determinism)
@@ -93,8 +109,8 @@ internal static class ContentHasher
 
             foreach (var file in scenarioFiles)
             {
-                var bytes = await File.ReadAllBytesAsync(file, ct);
-                hash.AppendData(bytes);
+                var canonicalBytes = await CanonicalJsonProjector.ProjectFileAsync(file, ct);
+                hash.AppendData(canonicalBytes);
             }
         }
 
@@ -110,8 +126,8 @@ internal static class ContentHasher
 
             foreach (var file in traceFiles)
             {
-                var bytes = await File.ReadAllBytesAsync(file, ct);
-                hash.AppendData(bytes);
+                var canonicalBytes = await CanonicalJsonProjector.ProjectFileAsync(file, ct);
+                hash.AppendData(canonicalBytes);
             }
         }
 

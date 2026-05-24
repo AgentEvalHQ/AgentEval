@@ -248,4 +248,53 @@ public class DoctorCommandTests : IDisposable
         var result = await DoctorCommand.RunAsync(rootOverride: bogus);
         Assert.Equal(1, result);
     }
+
+    // ── T1.6 (v1.1): schema-validation tests ──────────────────────────────────
+
+    [Fact]
+    public async Task Doctor_SolutionJsonWithBogusVerdictlikeField_StillFlagsSchemaShape()
+    {
+        // Init clean, then mutate solution.json to add an unknown top-level property.
+        // The hand-written spot-checks above pass (id/schemaVersion/name all present),
+        // so without schema validation this slips through. T1.6 wires SchemaValidator
+        // which has `additionalProperties: false` and catches the unknown field.
+        await InitCommand.RunAsync(name: "DoctorSchemaTest", rootOverride: _root);
+        var solutionFile = Path.Combine(_root, ".agenteval", "solution.json");
+        var json = await File.ReadAllTextAsync(solutionFile);
+        // Inject an unknown property — solution.schema.json has additionalProperties: false
+        var tampered = json.TrimEnd().TrimEnd('}') + ", \"unknownProperty\": 42 }";
+        await File.WriteAllTextAsync(solutionFile, tampered);
+
+        var result = await DoctorCommand.RunAsync(rootOverride: _root);
+
+        // Schema-validation failure ⇒ exit code 2.
+        Assert.Equal(2, result);
+    }
+
+    [Fact]
+    public async Task Doctor_ManifestWithMalformedRunIdPattern_FlaggedBySchemaValidation()
+    {
+        // The manifest schema constrains runId to "^\\d{4}-\\d{2}-\\d{2}_\\d{2}-\\d{2}-\\d{2}_[a-z0-9]{8}$".
+        // Hand-craft a manifest that violates the pattern; doctor should flag it.
+        var agentEvalDir = Path.Combine(_root, ".agenteval");
+        WriteSolutionJson(agentEvalDir);
+
+        var store = new FileSystemOutputStore(agentEvalDir);
+        var subject = new SubjectIdentity(SubjectKind.Agent, "DoctorSchemaAgent");
+        var manifest = await store.StartRunAsync(subject, new RunContext("TP", "/p", "xunit", null, null, "eval"));
+        await store.CompleteRunAsync(manifest, new RunSummary("1.0", manifest.Run.RunId, "PASS",
+            new RunStats(0, 0, 0, 0), new Dictionary<string, double>()));
+
+        // Tamper the manifest's runId to violate the schema pattern.
+        var manifestFile = Path.Combine(agentEvalDir, "subjects", "agents", "DoctorSchemaAgent", "runs", manifest.Run.RunId, "manifest.json");
+        var json = await File.ReadAllTextAsync(manifestFile);
+        // Replace the embedded run-id field value with a clearly-invalid one
+        // (the runId field appears at `run.runId`; a malformed pattern triggers the schema fail).
+        var tampered = json.Replace($"\"runId\": \"{manifest.Run.RunId}\"", "\"runId\": \"not-a-runid\"");
+        await File.WriteAllTextAsync(manifestFile, tampered);
+
+        var result = await DoctorCommand.RunAsync(rootOverride: _root);
+
+        Assert.Equal(2, result);
+    }
 }

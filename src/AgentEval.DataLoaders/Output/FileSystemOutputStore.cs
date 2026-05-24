@@ -338,12 +338,43 @@ public sealed class FileSystemOutputStore : IOutputStore
     {
         var subject = await LocateRunAsync(runId, ct);
         var path = _layout.ScenarioFile(subject, runId, result.Id);
-        // Schema for the per-scenario file is eval-result.schema.json, but it
-        // validates the EMBEDDED JSON tree inside ScenarioResult.Output rather
-        // than the ScenarioResult wrapper itself. Validating the embedded tree
-        // would require parsing Output back to a node — defer to v1.1 when
-        // the bridge gets a dedicated schema. The wrapper's shape is enforced
-        // by C# typing.
+
+        // T2.6 (v1.1): the wrapper shape is C#-typed but Output is opaque text. When the
+        // bench writer emits structured JSON as Output (e.g., a serialized EvalResult tree
+        // from EvalResultPersistence.ToScenarioResult), we LOG a warning if it doesn't
+        // round-trip through eval-result.schema.json — but do NOT abort the write. The
+        // production EvalResult serializer's shape is intentionally looser than the schema
+        // (it carries internal fields the schema doesn't enumerate). T2.6's value is
+        // surfacing genuinely-malformed JSON (a truncated write, an injected garbage
+        // string) at write time; over-strict schema enforcement would regress legitimate
+        // writers. The doctor read-path (T1.6) carries the strict gate for files that DO
+        // need full schema coverage.
+        //
+        // Raw-text Output (a string like "answer is 42") is also valid — many code-eval
+        // scenarios persist the agent's raw response without a tree. We detect "intended
+        // to be structured" by checking whether the trimmed payload starts with `{` or `[`.
+        if (!string.IsNullOrWhiteSpace(result.Output))
+        {
+            var trimmed = result.Output.AsSpan().TrimStart();
+            if (trimmed.Length > 0 && (trimmed[0] == '{' || trimmed[0] == '['))
+            {
+                try
+                {
+                    var node = System.Text.Json.Nodes.JsonNode.Parse(result.Output);
+                    if (node is null)
+                    {
+                        Console.Error.WriteLine(
+                            $"warning: scenario '{result.Id}' Output looks JSON-shaped but parsed to null — persisting as-is.");
+                    }
+                }
+                catch (System.Text.Json.JsonException ex)
+                {
+                    Console.Error.WriteLine(
+                        $"warning: scenario '{result.Id}' Output looks JSON-shaped (starts with '{{' or '[') but is malformed: {ex.Message}");
+                }
+            }
+        }
+
         await WriteJsonAsync(path, result, ct);
     }
 
