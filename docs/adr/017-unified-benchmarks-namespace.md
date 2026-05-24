@@ -257,13 +257,13 @@ build fails. Process convention (4) is enforced by the review workflow, not the 
 
 ## Implementation note
 
-The detailed migration plan, file-move list, and step-by-step implementation order live in [`strategy/FutureFeatures/todo/lastreview/10-unified-benchmarks-architecture-proposal.md`](../../strategy/FutureFeatures/todo/lastreview/10-unified-benchmarks-architecture-proposal.md), §4 ("Migration plan") and §"Next steps if accepted". This ADR captures the decision and rationale; the proposal doc captures the execution plan.
+The detailed migration plan, file-move list, and step-by-step implementation order live (archived) at `strategy/FutureFeatures/done/lastreview/10-unified-benchmarks-architecture-proposal.md` §4 ("Migration plan") and §"Next steps if accepted". (That path is local-only — the `strategy/` tree is gitignored — the proposal was archived to `done/` after the v0.10.0-beta migration shipped.) This ADR captures the decision and rationale; the now-archived proposal doc captured the execution plan.
 
 Estimated effort: ~28-32 hours of focused engineering, plus a final Opus pre-merge review pass. Realistic calendar time: 4-5 working days on `feature/v0.10.0-unified-benchmarks`.
 
 ## References
 
-- `strategy/FutureFeatures/todo/lastreview/10-unified-benchmarks-architecture-proposal.md` — full architectural proposal with three options weighed, OWASP/MITRE attack-mapping table, and step-by-step migration plan.
+- `strategy/FutureFeatures/done/lastreview/10-unified-benchmarks-architecture-proposal.md` — full architectural proposal (archived after v0.10.0-beta migration shipped) with three options weighed, OWASP/MITRE attack-mapping table, and step-by-step migration plan. Local-only (strategy/ is gitignored).
 - `strategy/FutureFeatures/todo/lastreview/09-v0.9.0-cleanup-review.md` — the prior review that surfaced this need by removing the legacy library-API `AgenticBenchmark`.
 - `CHANGELOG.md` — the v0.9.0-beta removal entry establishes the precedent for breaking namespace changes in the 0.x-beta channel.
 - ADR-009 (Superseded) — the original benchmark strategy decision, now superseded by the v0.9.0-beta legacy removal and this ADR.

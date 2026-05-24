@@ -18,7 +18,8 @@ namespace AgentEval.Compliance.Gdpr;
 /// because Mode-B per-criterion multi-judge fan-out has moved into
 /// <c>ScenarioToAtomicEval</c> ctor flags. The <c>AuditGrade</c> factory's
 /// MultiJudgeOptions parameter is retained for v1 source compatibility but
-/// a removal is scheduled for v1.1. See <c>deferred-pending.md</c>.
+/// a removal is scheduled for v1.1. Tracked in
+/// <c>strategy/futurefeatures/todo/13-pending-issues-tasks.md</c>.
 /// </remarks>
 [Obsolete("MultiJudgeOptions is deprecated; configure multi-judge via ScenarioToAtomicEval Mode-B flags instead. " +
           "Pass `null` to AuditGrade to retain single-judge behaviour. Removal scheduled for v1.1.")]

@@ -37,13 +37,15 @@ public static class BenchEuAiActCalibrateCommand
     /// <br/>
     /// <b>Path A' (v1.1) — relaxed to 0.65 / 0.35.</b> Two 2026-05-24 runs
     /// produced different baselines depending on which judge model the
-    /// AZURE_OPENAI_DEPLOYMENT env var pointed to. Against gpt-5-chat: 68%
-    /// / 0.375 on Pillar 1 (the Art 5 borderline finding); against gpt-4o-mini:
-    /// pillars 3-5 ALSO drop from 92%/95%/100% PASS to 71%/78%/73% FAIL. The
-    /// load-bearing variable is the judge model — and the calibration system
-    /// trusts whatever env var is set at run time without recording the
-    /// resolved model identity in the baseline markdown. The 0.65 / 0.35
-    /// override is a HONEST floor for gpt-5-chat on Art 5 borderline cases;
+    /// AZURE_OPENAI_DEPLOYMENT env var pointed to. Against gpt-5-chat: 72%
+    /// / 0.426 on Pillar 1 (the Art 5 borderline finding — clears 0.65/0.35
+    /// with margin). Against gpt-4o-mini: pillar 1 drops to 68% / 0.375
+    /// AND pillars 3-5 ALSO drop from 96%/100%/100% PASS to 71%/78%/73%
+    /// FAIL. The load-bearing variable is the judge model — and the
+    /// calibration system trusts whatever env var is set at run time
+    /// without recording the resolved model identity in the baseline
+    /// markdown. The 0.65 / 0.35 override is a HONEST floor that admits
+    /// both models on Art 5 borderline cases;
     /// the proper fix is T0.11 which (a) records the resolved judge model in
     /// the baseline header so silent env-var swaps surface in git diff, and
     /// (b) supports a versioned deployment id (gpt-5-chat-YYYY-MM-DD) to

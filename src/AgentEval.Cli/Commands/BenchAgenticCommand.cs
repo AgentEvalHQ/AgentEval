@@ -66,8 +66,8 @@ public static class BenchAgenticCommand
         // factories internally wire the judge into individual evals without exposing
         // a `judgeModel` parameter, and BenchAgenticCommand does not write a
         // compliance Attestation block (those land for GDPR / EU AI Act bench).
-        // Threading the deployment name through every preset factory is a v1.1
-        // refactor (see deferred-pending.md).
+        // Threading the deployment name through every preset factory is tracked
+        // as T3.2 in strategy/futurefeatures/todo/13-pending-issues-tasks.md.
         var (resolvedJudge, _, exitCode) = JudgeFactory.Resolve(evaluatorOverride, "agentic benchmark");
         if (resolvedJudge is null) return exitCode;
         IEvaluator judge = resolvedJudge;

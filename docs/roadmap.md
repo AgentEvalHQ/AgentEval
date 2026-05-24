@@ -157,7 +157,7 @@ These items live in the backlogs as inventory; they will NOT enter a v1.x plan w
 | Implementation plans 00–08 | `strategy/FutureFeatures/todo/0{0..8}-*.md` (local-only / gitignored) |
 | Closed master tracking (review-03 8-phase remediation) | `strategy/FutureFeatures/todo/10-review03-findings-fix-implementation-plan.md` |
 | v1.1 plan (filtered + sequenced) | `strategy/FutureFeatures/todo/11-v1.1-implementation-plan.md` |
-| Plan-first backlog (full inventory) | `strategy/FutureFeatures/todo/deferred-pending.md` |
+| Plan-first backlog (full inventory) | `strategy/FutureFeatures/todo/13-pending-issues-tasks.md` (v1.1 consolidation supersedes earlier `deferred-pending.md`, archived under `done/`) |
 | Feature-first backlog (same items, regrouped) | `strategy/FutureFeatures/todo/pending-tasks-by-feature.md` |
 | Calibration baselines (3 benchmarks) | `strategy/FutureFeatures/calibration-baselines/{gdpr,eu-ai-act,agentic}-calibration-report.md` |
 | Honest-scope disclaimers (public-facing) | `docs/benchmarks/{gdpr,eu-ai-act,agentic}/getting-started.md` |
