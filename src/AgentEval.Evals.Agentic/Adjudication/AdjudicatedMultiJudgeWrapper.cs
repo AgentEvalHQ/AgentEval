@@ -213,6 +213,13 @@ public sealed class AdjudicatedMultiJudgeWrapper : IEval
                     (panelResults[i].Score.Label, panelResults[j].Score.Label)
                 };
                 var k = CalibrationMetrics.CohensKappa(pair);
+                // F-004 split semantics (2026-05-24): NaN here means "the two raters returned
+                // the same single label" — pe=1.0 (degenerate marginals on a one-observation
+                // pair). For pair-agreement this IS perfect agreement, not "undefined". The
+                // honest-NaN signal exists for calibration-dataset use where single-class
+                // means the golden lacks balance; for in-panel scoring we want the historical
+                // 1.0 behaviour. Normalise here, keep NaN at the calibration boundary.
+                if (double.IsNaN(k)) k = 1.0;
                 kappas.Add(k);
             }
         }

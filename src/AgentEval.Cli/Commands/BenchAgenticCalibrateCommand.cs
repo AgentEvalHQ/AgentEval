@@ -220,7 +220,7 @@ public static class BenchAgenticCalibrateCommand
                 : string.Empty;
             Console.WriteLine(
                 $"  [{status}] {category}: accuracy={categoryReport.Accuracy:P1}, " +
-                $"kappa={categoryReport.CohensKappa:F3}, entries={categoryReport.EntryCount}, " +
+                $"kappa={FormatKappa(categoryReport.CohensKappa)}, entries={categoryReport.EntryCount}, " +
                 $"failures={categoryReport.EvaluationFailures}{thrSuffix}");
             if (!accOk || !kappaOk || !noInfraFail) allPass = false;
         }
@@ -232,6 +232,12 @@ public static class BenchAgenticCalibrateCommand
 
         return allPass ? 0 : 2;
     }
+
+    // F-004 honest surface: NaN comes from CalibrationMetrics.CohensKappa when the dataset
+    // is degenerate (single-class → pe ≈ 1 → kappa is mathematically undefined). Render as
+    // "UNDEFINED" so regulator-facing reports don't show a misleading numeric value.
+    private static string FormatKappa(double kappa)
+        => double.IsNaN(kappa) ? "UNDEFINED" : kappa.ToString("F3", System.Globalization.CultureInfo.InvariantCulture);
 
     private static Assembly? LoadTestAssembly()
     {
@@ -290,7 +296,7 @@ public static class BenchAgenticCalibrateCommand
             sb.AppendLine($"| Entries evaluated | {cr.EntryCount} | — | — |");
             sb.AppendLine($"| Evaluation failures | {cr.EvaluationFailures} | == 0 | {(noInfraFail ? "OK" : "INFRA-FAIL")} |");
             sb.AppendLine($"| Accuracy | {cr.Accuracy:P1} | >= {accThr:P0} | {(accOk ? "OK" : "BELOW")} |");
-            sb.AppendLine($"| Cohen's kappa | {cr.CohensKappa:F3} | >= {kapThr:F2} | {(kappaOk ? "OK" : "BELOW")} |");
+            sb.AppendLine($"| Cohen's kappa | {FormatKappa(cr.CohensKappa)} | >= {kapThr:F2} | {(kappaOk ? "OK" : "BELOW")} |");
             sb.AppendLine($"| Within score range | {cr.WithinScoreRange} / {cr.EntryCount} | — | — |");
             sb.AppendLine($"| Mean score delta | {cr.MeanScoreDelta:+0.000;-0.000;0.000} | — | — |");
             if (cr.SkippedUnknownKey > 0)

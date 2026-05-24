@@ -945,8 +945,48 @@ internal static class BenchmarkSampleHelpers
                         continue;
                     }
                     var perScenarioInput = new EvalInput(Query: probe, Response: responseText);
-                    var leaf = await scenarioComponents[si].Eval.EvaluateAsync(perScenarioInput, ct);
-                    scenarioResults.Add(leaf);
+                    try
+                    {
+                        var leaf = await scenarioComponents[si].Eval.EvaluateAsync(perScenarioInput, ct);
+                        scenarioResults.Add(leaf);
+                    }
+                    catch (OperationCanceledException) { throw; }
+                    catch (Exception ex)
+                    {
+                        // Mirror the agent-failure shape above: a judge call that trips a provider
+                        // safety filter (e.g., rubric criteria containing words like "deceive" or
+                        // "manipulate" — common in EU AI Act Art 50 disclosure scenarios) must not
+                        // abort the entire preset run. Surface as honest skipped leaf so the audit
+                        // continues and reviewers see exactly which scenario lacked a graded result.
+                        // Without this, a single judge content-filter rejection cancels the rest of
+                        // the run AND writes no canonical artefacts.
+                        scenarioResults.Add(new EvalResult(
+                            Metric: new EvalMetadata(
+                                Key: scenarioComponents[si].Eval.Key,
+                                Name: scenarioComponents[si].Eval.Name,
+                                Category: scenarioComponents[si].Eval.Category,
+                                Version: scenarioComponents[si].Eval.Version),
+                            Score: new EvalScore(0, null, "skipped", false, null, "none", null),
+                            Details: new EvalDetails(
+                                Dimensions: null,
+                                Evidence: null,
+                                Recommendations: new[]
+                                {
+                                    $"Judge rejected the grading prompt: {ex.GetType().Name}: {ex.Message}",
+                                    "The scenario was probed successfully but could not be graded — likely because the rubric criteria contained content the judge model's safety filter blocks. A real audit would route the judge through a less-restricted endpoint or rephrase the rubric."
+                                },
+                                SubResults: null,
+                                AggregationStrategy: null),
+                            Provenance: new EvalProvenance(
+                                Type: "skipped",
+                                JudgeModel: null,
+                                PromptId: null,
+                                PromptHash: null,
+                                TokensUsed: null,
+                                EstimatedCost: 0,
+                                CacheHit: false),
+                            EvaluatedAt: DateTimeOffset.UtcNow));
+                    }
                 }
 
                 // Coverage-loss visibility (extra components): emit honest skipped

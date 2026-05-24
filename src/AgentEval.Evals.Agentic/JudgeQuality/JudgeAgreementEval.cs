@@ -76,6 +76,13 @@ public sealed class JudgeAgreementEval : IEval
         // Build all pairwise (rater-i, rater-j) label pairs and compute kappa
         var pairs = BuildPairs(labels);
         var kappa = CalibrationMetrics.CohensKappa(pairs);
+        // F-004 split semantics (2026-05-24): at the calibration-dataset level (judge vs
+        // golden labels) NaN from CohensKappa means "single-class dataset → undefined,
+        // surface for operator review". At the panel-agreement level (judge-to-judge on
+        // a single observation) NaN means "all raters returned the same label" — which IS
+        // perfect agreement, not undefined. Normalise here to preserve the historical
+        // pair-agreement semantics; the honest-NaN signal still fires for calibration runs.
+        if (double.IsNaN(kappa)) kappa = 1.0;
         // Clamp negative kappa to 0
         var score = Math.Max(0.0, kappa);
 

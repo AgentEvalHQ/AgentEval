@@ -29,6 +29,10 @@ export interface MatrixCell {
   // `Date.toISOString()`, which UTC-shifts in non-UTC workspaces and 404s.
   timestamp: string;
   regressedFromBaseline: boolean | null;
+  // Plan-08 portal-review A1 (2026-05-24): per-cell audit-chain check.
+  // false → source-run not found OR manifest hash mismatch → render tamper overlay.
+  chainValid: boolean;
+  chainBreakReason: string | null;
 }
 
 interface ComplianceMatrixProps {
@@ -136,26 +140,41 @@ function Row({
       {controls.map((c) => {
         const cell = cellIndex.get(`${subject.name}::${c.id}`);
         const status: CellStatus = cell?.status ?? "no-data";
+        // Plan-08 portal-review A1 (2026-05-24): when the per-cell audit-chain check
+        // fails, overlay a diagonal yellow-stripe pattern + "⚠" badge over the cell's
+        // normal status colour. This keeps the underlying status visible (auditor still
+        // sees what the run claimed) while making the tamper risk impossible to miss.
+        const chainBroken = cell !== undefined && cell.chainValid === false;
         return (
           <button
             key={`${subject.name}-${c.id}`}
             onClick={() => onCellClick?.(subject.name, c.id)}
-            className={`${CELL_TONE[status]} border border-slate-50 grid place-items-center text-xs font-medium text-slate-700 transition`}
+            className={`${CELL_TONE[status]} ${chainBroken ? "ring-2 ring-amber-500 ring-inset relative" : ""} border border-slate-50 grid place-items-center text-xs font-medium text-slate-700 transition`}
+            style={
+              chainBroken
+                ? {
+                    // Diagonal stripe overlay using a CSS gradient on top of the
+                    // status background. Tailwind has no built-in striped utility.
+                    backgroundImage:
+                      "repeating-linear-gradient(45deg, rgba(245, 158, 11, 0.25) 0 4px, transparent 4px 8px)",
+                  }
+                : undefined
+            }
             // Phase-7 Task 7.12: aria-label so screen readers announce
             // "{subject} · {control}: {status} (Pass rate: …)" instead of
             // just the glyph (✓ / ! / ✗ / ·) which is meaningless out loud.
             aria-label={
               cell
-                ? `${subject.name}, ${c.id}, status ${cell.status}, pass rate ${(cell.passRate * 100).toFixed(0)}%`
+                ? `${subject.name}, ${c.id}, status ${cell.status}, pass rate ${(cell.passRate * 100).toFixed(0)}%${chainBroken ? `, audit chain broken: ${cell.chainBreakReason}` : ""}`
                 : `${subject.name}, ${c.id}, no evidence`
             }
             title={
               cell
-                ? `${subject.name} · ${c.id}\nStatus: ${cell.status}\nPass rate: ${(cell.passRate * 100).toFixed(0)}%\nLast evidence: ${cell.lastEvidenceAt}`
+                ? `${subject.name} · ${c.id}\nStatus: ${cell.status}\nPass rate: ${(cell.passRate * 100).toFixed(0)}%\nLast evidence: ${cell.lastEvidenceAt}${chainBroken ? `\n\n⚠ AUDIT CHAIN BROKEN: ${cell.chainBreakReason}\nThis cell's source-run hash does not match the stored evidence hash. The displayed status reflects what the evidence claims, NOT verified data.` : ""}`
                 : `${subject.name} · ${c.id}\nNo evidence`
             }
           >
-            {CELL_LABEL[status]}
+            {chainBroken ? "⚠" : CELL_LABEL[status]}
           </button>
         );
       })}
@@ -165,12 +184,22 @@ function Row({
 
 function Legend() {
   return (
-    <div className="flex items-center gap-4 mt-3 text-xs text-slate-600">
+    <div className="flex flex-wrap items-center gap-4 mt-3 text-xs text-slate-600">
       <span className="font-medium">Legend:</span>
       <LegendDot tone="bg-green-200" label="pass" />
       <LegendDot tone="bg-amber-200" label="warn" />
       <LegendDot tone="bg-red-200" label="fail" />
       <LegendDot tone="bg-slate-100" label="no data" />
+      <span className="inline-flex items-center gap-1.5">
+        <span
+          className="size-3 rounded-sm ring-2 ring-amber-500 ring-inset"
+          style={{
+            backgroundImage:
+              "repeating-linear-gradient(45deg, rgba(245, 158, 11, 0.4) 0 2px, transparent 2px 4px)",
+          }}
+        />
+        audit chain broken
+      </span>
     </div>
   );
 }

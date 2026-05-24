@@ -38,7 +38,10 @@ const MATRIX_QUERY = /* GraphQL */ `
         passRate
         lastEvidenceAt
         lastEvidenceRunId
+        timestamp
         regressedFromBaseline
+        chainValid
+        chainBreakReason
       }
       allChainsValid
       lastEvidenceAt

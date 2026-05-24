@@ -152,7 +152,7 @@ public static class BenchCalibrateCommand
                 : (accOk && kappaOk ? "PASS" : "FAIL");
             Console.WriteLine(
                 $"  [{status}] {pillar}: accuracy={pillarReport.Accuracy:P1}, " +
-                $"kappa={pillarReport.CohensKappa:F3}, entries={pillarReport.EntryCount}, " +
+                $"kappa={FormatKappa(pillarReport.CohensKappa)}, entries={pillarReport.EntryCount}, " +
                 $"failures={pillarReport.EvaluationFailures}");
             if (!accOk || !kappaOk || !noInfraFail) allPass = false;
         }
@@ -163,6 +163,12 @@ public static class BenchCalibrateCommand
 
         return allPass ? 0 : 2;
     }
+
+    // F-004 honest surface: NaN comes from CalibrationMetrics.CohensKappa when the dataset
+    // is degenerate (single-class → pe ≈ 1 → kappa is mathematically undefined). Render as
+    // "UNDEFINED" so regulator-facing reports don't show a misleading numeric value.
+    private static string FormatKappa(double kappa)
+        => double.IsNaN(kappa) ? "UNDEFINED" : kappa.ToString("F3", System.Globalization.CultureInfo.InvariantCulture);
 
     private static Assembly? LoadTestAssembly()
     {
@@ -208,7 +214,7 @@ public static class BenchCalibrateCommand
             sb.AppendLine($"| Entries evaluated | {pr.EntryCount} | — | — |");
             sb.AppendLine($"| Evaluation failures | {pr.EvaluationFailures} | == 0 | {(noInfraFail ? "OK" : "INFRA-FAIL")} |");
             sb.AppendLine($"| Accuracy | {pr.Accuracy:P1} | >= {AccuracyThreshold:P0} | {(accOk ? "OK" : "BELOW")} |");
-            sb.AppendLine($"| Cohen's kappa | {pr.CohensKappa:F3} | >= {KappaThreshold:F2} | {(kappaOk ? "OK" : "BELOW")} |");
+            sb.AppendLine($"| Cohen's kappa | {FormatKappa(pr.CohensKappa)} | >= {KappaThreshold:F2} | {(kappaOk ? "OK" : "BELOW")} |");
             sb.AppendLine($"| Within score range | {pr.WithinScoreRange} / {pr.EntryCount} | — | — |");
             sb.AppendLine($"| Mean score delta | {pr.MeanScoreDelta:+0.000;-0.000;0.000} | — | — |");
             sb.AppendLine();

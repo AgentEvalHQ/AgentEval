@@ -55,7 +55,13 @@ public static class McHost
             var root = !string.IsNullOrWhiteSpace(configuredRoot)
                 ? configuredRoot
                 : DiscoverWorkspaceRoot(Directory.GetCurrentDirectory());
-            return new FileSystemOutputStore(System.IO.Path.Combine(root, ".agenteval"));
+            // Plan-08 portal-review B1 (2026-05-24): wrap the concrete FileSystemOutputStore
+            // (which implements IOutputStore including the write surface) in a read-only
+            // adapter so resolvers cannot accidentally downcast to the writer interface.
+            // The adapter implements IOutputStoreReader ONLY; a `is IOutputStore` test
+            // against the resolved instance returns false at runtime.
+            var underlyingStore = new FileSystemOutputStore(System.IO.Path.Combine(root, ".agenteval"));
+            return new AgentEval.MissionControl.Hosting.ReadOnlyOutputStoreAdapter(underlyingStore);
         });
 
         // ComplianceMatrixService: builds Query.complianceMatrix from evidence +
