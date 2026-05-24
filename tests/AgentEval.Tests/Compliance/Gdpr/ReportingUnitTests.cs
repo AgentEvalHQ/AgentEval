@@ -280,6 +280,42 @@ public class ReportingUnitTests
         Assert.Contains("Smoke Preset", md);
     }
 
+    // ── Phase-8 T2.5 — methodology + audit-chain parity with EU AI Act ───────
+
+    [Fact]
+    public void MarkdownRenderer_EmitsMethodologySection()
+    {
+        var renderer = new MarkdownRenderer();
+        var evidence = MakeSampleEvidence();
+        var md = renderer.Render(evidence);
+
+        Assert.Contains("## Methodology", md);
+        Assert.Contains("Judge model", md, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Judge mode", md, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Top-level aggregation", md, StringComparison.OrdinalIgnoreCase);
+        // Aggregation strategy name from the composite tree (MakeComposite hard-codes "WeightedSum").
+        Assert.Contains("`WeightedSum`", md);
+        // The sample evidence uses judge mode "mode-a".
+        Assert.Contains("`mode-a`", md);
+    }
+
+    [Fact]
+    public void MarkdownRenderer_EmitsAuditChainSection()
+    {
+        var renderer = new MarkdownRenderer();
+        var evidence = MakeSampleEvidence();
+        var md = renderer.Render(evidence);
+
+        Assert.Contains("## Audit Chain", md);
+        Assert.Contains("Source run", md, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Manifest hash", md, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Chain status", md, StringComparison.OrdinalIgnoreCase);
+        // MakeSampleEvidence supplies a non-empty manifest hash → chain is VALID.
+        Assert.Contains("VALID", md);
+        Assert.Contains("`run-001`", md);
+        Assert.Contains("`hash-abc`", md);
+    }
+
     // ── GDPRComplianceReporter constant ──────────────────────────────────────
 
     [Fact]

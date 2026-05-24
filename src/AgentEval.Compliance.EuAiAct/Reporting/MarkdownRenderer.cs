@@ -3,6 +3,7 @@
 // Licensed under the MIT License.
 
 using System.Text;
+using AgentEval.Core.Reporting;
 
 namespace AgentEval.Compliance.EuAiAct.Reporting;
 
@@ -58,6 +59,18 @@ public sealed class MarkdownRenderer
         foreach (var (key, a) in evidence.Summary.PerArticle.OrderBy(kv => kv.Key, StringComparer.Ordinal))
             sb.AppendLine($"| `{key}` | {a.Score:P0} | **{a.Status}** | {a.Severity} | {a.ScenariosFailed}/{a.ScenarioCount} |");
         sb.AppendLine();
+
+        // Phase-8 T2.5 — shared helper drives parity with GDPR renderer.
+        MarkdownSectionBuilder.AppendMethodology(
+            sb,
+            evidence.CompositeTree,
+            evidence.Base.Attestation.EvaluatorModel,
+            evidence.EuAiActAttestation.JudgeMode);
+
+        MarkdownSectionBuilder.AppendAuditChain(
+            sb,
+            evidence.Base.SourceRun,
+            previousEvidenceRef: null);
 
         if (evidence.CriticalFindings.Count > 0)
         {

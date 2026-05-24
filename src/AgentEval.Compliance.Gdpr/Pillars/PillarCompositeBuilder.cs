@@ -17,11 +17,13 @@ public static class PillarCompositeBuilder
     /// <param name="pillarKey">Short key identifying the pillar (e.g. <c>Pillar1-Foundations</c>).</param>
     /// <param name="pillarName">Human-readable pillar name.</param>
     /// <param name="articles">Article composites and their weights within the pillar. Weights must sum to 1.0.</param>
+    /// <param name="aggregation">Aggregation strategy. Defaults to <see cref="WeightedSumAggregation.Instance"/>.</param>
     /// <returns>A configured pillar <see cref="CompositeEval"/>.</returns>
     public static CompositeEval Build(
         string pillarKey,
         string pillarName,
-        IReadOnlyList<(CompositeEval article, double weight)> articles)
+        IReadOnlyList<(CompositeEval article, double weight)> articles,
+        IAggregationStrategy? aggregation = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(pillarKey);
         ArgumentException.ThrowIfNullOrWhiteSpace(pillarName);
@@ -39,7 +41,7 @@ public static class PillarCompositeBuilder
             category: $"compliance.gdpr.{pillarKey}",
             version: "1.0.0",
             components: components,
-            aggregation: WeightedSumAggregation.Instance,
+            aggregation: aggregation ?? WeightedSumAggregation.Instance,
             threshold: null);    // pillar-level threshold inherited from overall composite
     }
 }

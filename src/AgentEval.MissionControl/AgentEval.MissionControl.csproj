@@ -23,6 +23,21 @@
     <PackageReference Include="HotChocolate.AspNetCore" />
   </ItemGroup>
 
+  <!-- Phase-8 T2.7 — per-regulation evidence schemas. The schemas live in the
+       compliance projects (which MC intentionally does NOT reference), so we
+       link them in as MC-local embedded resources for the
+       /api/v1/compliance/{regulation}/schema endpoint. The originals stay the
+       single source of truth; this is a copy-in-the-binary, not a duplicate
+       on disk. -->
+  <ItemGroup>
+    <EmbeddedResource Include="..\AgentEval.Compliance.Gdpr\Reporting\Schema\gdpr-evidence.schema.json"
+                      LogicalName="AgentEval.MissionControl.Schemas.gdpr-evidence.schema.json"
+                      Link="Schemas\gdpr-evidence.schema.json" />
+    <EmbeddedResource Include="..\AgentEval.Compliance.EuAiAct\Reporting\Schema\eu-ai-act-evidence.schema.json"
+                      LogicalName="AgentEval.MissionControl.Schemas.eu-ai-act-evidence.schema.json"
+                      Link="Schemas\eu-ai-act-evidence.schema.json" />
+  </ItemGroup>
+
   <!-- Plan-08 MC1.8.1: SPA build artefacts live at wwwroot/ (Vite writes here
        via outDir in src/AgentEval.MissionControl.Spa/vite.config.ts). They're
        gitignored — `npm run build` reproduces them locally. The Microsoft.NET.Sdk.Web

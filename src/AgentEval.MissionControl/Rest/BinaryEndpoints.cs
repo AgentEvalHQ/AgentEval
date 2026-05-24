@@ -122,20 +122,27 @@ internal static class BinaryEndpoints
 
         // ─── MC1.3.5 — compliance evidence JSON schema ───────────────────────
         // Returns the JSON schema for a regulation's evidence so a generic SPA can
-        // adaptively render unknown regulations. Currently serves only the BASE
-        // evidence.schema.json; regulation-specific wrapper schemas (gdpr-evidence,
-        // eu-ai-act-evidence) live in sample projects and are deferred until a
-        // discovery path is wired up.
+        // adaptively render unknown regulations. Phase-8 T2.7: per-regulation
+        // dispatch — gdpr → gdpr-evidence.schema.json; eu-ai-act → eu-ai-act-evidence.schema.json;
+        // unknown → 404. The wrapper schemas are embedded into MC via csproj <EmbeddedResource Link>
+        // so MC stays decoupled from the compliance projects.
         app.MapGet("/api/v1/compliance/{regulation}/schema", (string regulation, CancellationToken ct) =>
         {
             if (!FileSystemLayout.IsSafePathSegment(regulation)) return Results.BadRequest("Invalid regulation.");
-            // Discover the embedded schema in DataLoaders.
-            var asm = typeof(FileSystemLayout).Assembly;
-            var resourceName = asm.GetManifestResourceNames()
-                .FirstOrDefault(n => n.EndsWith("evidence.schema.json", StringComparison.OrdinalIgnoreCase));
-            if (resourceName is null) return Results.NotFound();
 
-            using var stream = asm.GetManifestResourceStream(resourceName)!;
+            var resourceName = regulation.ToLowerInvariant() switch
+            {
+                "gdpr"      => "AgentEval.MissionControl.Schemas.gdpr-evidence.schema.json",
+                "eu-ai-act" => "AgentEval.MissionControl.Schemas.eu-ai-act-evidence.schema.json",
+                _           => null,
+            };
+
+            if (resourceName is null)
+                return Results.NotFound($"Unknown regulation: {regulation}. Known regulations: gdpr, eu-ai-act.");
+
+            var asm = typeof(BinaryEndpoints).Assembly;
+            using var stream = asm.GetManifestResourceStream(resourceName);
+            if (stream is null) return Results.NotFound($"Schema resource missing for regulation '{regulation}'.");
             using var reader = new StreamReader(stream);
             var schema = reader.ReadToEnd();
             return Results.Content(schema, "application/schema+json");
