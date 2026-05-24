@@ -57,6 +57,11 @@
     <!-- T0.5 (v1.1): generic IEvalResultRenderer for OWASP / MITRE / Perf CLI report parity
          with GDPR / EuAiAct / Agentic. QuestPDF is bundled PrivateAssets in Rendering.Pdf. -->
     <ProjectReference Include="..\AgentEval.Rendering.Pdf\AgentEval.Rendering.Pdf.csproj" />
+    <!-- v1.1 CLI consolidation: MAFEvaluationHarness is the runtime hosting the eval pipeline
+         for the ported `agenteval eval` command (and only that command). Other commands talk
+         to the harness via DataLoaders / Compliance / RedTeam abstractions and do not need
+         this reference directly. -->
+    <ProjectReference Include="..\AgentEval.MAF\AgentEval.MAF.csproj" />
   </ItemGroup>
 
   <!-- Plan-08 MC1.7.1: AgentEval.MissionControl is net10-only (Hot Chocolate 16

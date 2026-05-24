@@ -5,11 +5,20 @@
 using System.CommandLine;
 using AgentEval.Cli.Commands;
 
-// ─── init ────────────────────────────────────────────────────────────────────
+// ─── init (dataset scaffolder) ───────────────────────────────────────────────
+// v1.1 consolidation: the canonical `init` is the dataset-scaffolding command
+// ported from AgentEvalHQ/AgentEval.Cli v0.2.0-alpha. The previous in-tree
+// behaviour (initialise a .agenteval/ workspace) is preserved verbatim and
+// exposed as `init-workspace` below — call sites that consumed
+// AgentEval.Cli.Commands.InitCommand.RunAsync(...) still compile because we
+// only renamed the command, not the .NET type.
+var datasetInitCmd = AgentEval.Cli.Commands.Classic.DatasetInitCommand.Create();
+
+// ─── init-workspace (formerly `init`) ────────────────────────────────────────
 var nameOpt = new Option<string?>("--name") { Description = "Solution display name" };
-var initCmd = new Command("init", "Initialize .agenteval/ in the current solution");
-initCmd.Add(nameOpt);
-initCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =>
+var initWorkspaceCmd = new Command("init-workspace", "Initialize .agenteval/ in the current solution (workspace bootstrap; the dataset scaffolder is `agenteval init`)");
+initWorkspaceCmd.Add(nameOpt);
+initWorkspaceCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =>
 {
     var name = parseResult.GetValue(nameOpt);
     return await InitCommand.RunAsync(name);
@@ -420,8 +429,17 @@ mcDoctorCmd.SetAction(async (ParseResult _, CancellationToken ct) =>
 mcCmd.Add(mcDoctorCmd);
 
 // ─── root ─────────────────────────────────────────────────────────────────────
-var rootCmd = new RootCommand("AgentEval CLI — output-store lifecycle management");
-rootCmd.Add(initCmd);
+var rootCmd = new RootCommand("AgentEval CLI — evaluate AI agents, run benchmark suites, manage the .agenteval/ output store, and serve Mission Control.");
+
+// Legacy command surface ported from AgentEvalHQ/AgentEval.Cli v0.2.0-alpha
+// (documentation and CI pipelines depend on these exact names and flags):
+rootCmd.Add(datasetInitCmd);                  // init — scaffold an evaluation dataset
+rootCmd.Add(EvalCommand.Create());            // eval — run an agent against a dataset
+rootCmd.Add(ListCommand.Create());            // list — catalogues of metrics/attacks/exporters/datasets
+rootCmd.Add(RedTeamCommand.Create());         // redteam — low-level red-team scanner
+
+// v0.10+ command surface (output store, benchmark families, Mission Control):
+rootCmd.Add(initWorkspaceCmd);
 rootCmd.Add(doctorCmd);
 rootCmd.Add(migrateCmd);
 rootCmd.Add(benchCmd);
