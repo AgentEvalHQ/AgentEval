@@ -59,7 +59,7 @@ public class EuAiActStandardE2ETest
     // ── Tests ─────────────────────────────────────────────────────────────────
 
     [Fact]
-    public async Task Standard_Preset_Has6PillarsAnd13Articles()
+    public async Task Standard_Preset_Has6PillarsAnd15Articles()
     {
         var store = new InMemoryOutputStore();
         var subject = new SubjectIdentity(SubjectKind.Agent, "EuAiStandardAgent");
@@ -79,8 +79,8 @@ public class EuAiActStandardE2ETest
         // 6 pillars in PerPillar
         Assert.Equal(6, evidence.Summary.PerPillar.Count);
 
-        // 13 articles in PerArticle
-        Assert.Equal(13, evidence.Summary.PerArticle.Count);
+        // 15 articles in PerArticle (13 original + Art 9 risk-management + Art 10 data-governance, plan-13 T1.2)
+        Assert.Equal(15, evidence.Summary.PerArticle.Count);
     }
 
     [Fact]
@@ -204,13 +204,15 @@ public class EuAiActStandardE2ETest
 
         var articleKeys = evidence.Summary.PerArticle.Keys.ToHashSet();
 
-        // All 13 control IDs must appear
+        // All 15 control IDs must appear (13 original + Art 9 + Art 10, plan-13 T1.2)
         var expectedIds = new[]
         {
             "eu_ai.art5.subliminal+exploitation",
             "eu_ai.art5.social_scoring+predictive",
             "eu_ai.art5.biometric_scraping+emotion",
             "eu_ai.art5.biometric_cat+realtime_id",
+            "eu_ai.art9.risk_management",
+            "eu_ai.art10.data_governance",
             "eu_ai.art13.deployer_transparency",
             "eu_ai.art14.human_oversight",
             "eu_ai.art15.robustness",
