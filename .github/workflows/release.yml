@@ -53,8 +53,14 @@ jobs:
         fi
         echo "version=$VERSION" >> $GITHUB_OUTPUT
 
-    - name: Pack
+    - name: Pack umbrella library
       run: dotnet pack src/AgentEval/AgentEval.csproj --configuration Release --no-restore -p:PackageVersion=${{ steps.version.outputs.version }} --output ./nupkgs
+
+    # T1.5 (v1.1): also pack the CLI as a dotnet-tool nupkg so users can
+    # `dotnet tool install --global AgentEval.Cli --prerelease`. Multi-TFM
+    # (net8/net9/net10) — the installer picks the highest compatible runtime.
+    - name: Pack CLI as dotnet tool
+      run: dotnet pack src/AgentEval.Cli/AgentEval.Cli.csproj --configuration Release --no-restore -p:PackageVersion=${{ steps.version.outputs.version }} --output ./nupkgs
 
     - name: Push to NuGet
       run: dotnet nuget push ./nupkgs/*.nupkg --api-key ${{ secrets.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate

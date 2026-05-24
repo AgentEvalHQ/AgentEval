@@ -34,9 +34,9 @@ AZURE_OPENAI_DEPLOYMENT=<your-gpt-4o-deployment>
 Then run any of the three presets:
 
 ```
-dotnet run --project src/AgentEval.Cli --framework net10.0 -- bench gdpr --preset smoke --subject TravelAgent
-dotnet run --project src/AgentEval.Cli --framework net10.0 -- bench gdpr --preset standard --subject TravelAgent
-dotnet run --project src/AgentEval.Cli --framework net10.0 -- bench gdpr --preset audit --subject TravelAgent
+agenteval bench gdpr --preset smoke --subject TravelAgent
+agenteval bench gdpr --preset standard --subject TravelAgent
+agenteval bench gdpr --preset audit --subject TravelAgent
 ```
 
 ---
@@ -55,7 +55,7 @@ dotnet run --project src/AgentEval.Cli --framework net10.0 -- bench gdpr --prese
 Presets can be composed using `+` syntax. The weights of all active scenarios are renormalized automatically:
 
 ```
-dotnet run --project src/AgentEval.Cli --framework net10.0 -- bench gdpr --preset standard+healthcare --subject TravelAgent
+agenteval bench gdpr --preset standard+healthcare --subject TravelAgent
 ```
 
 ---
@@ -239,7 +239,7 @@ agenteval bench gdpr --preset standard+healthcare --subject MyAgent
 The `agenteval bench gdpr calibrate` command runs the hand-labeled golden dataset against the configured judge and produces a calibration report:
 
 ```
-dotnet run --project src/AgentEval.Cli --framework net10.0 -- bench gdpr calibrate
+agenteval bench gdpr calibrate
 ```
 
 The golden dataset contains hand-labeled scenario/response pairs distributed across the 5 GDPR pillars. For each entry, the calibration runner asks the judge to score the response, then compares the judge's score to the human label. For an end-to-end plain-English walkthrough of *how* calibration works and *what kappa means*, see [`how-it-works.md`](how-it-works.md).

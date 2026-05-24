@@ -127,7 +127,7 @@
 
 **Phases**:
 - **Phase 1 — Honest-scope completion (~8 working days)**: GDPR Pillar 6 governance probes, EU AI Act Art 9 + 10 awareness probes, agentic calibration coverage extension to the remaining categories, recalibrate all three benchmarks after content additions, structured `Recommendations[]` shape, evaluator-card category-drift audit.
-- **Phase 2 — Adoption leverage (~2 working days)**: `dotnet tool install --global AgentEval.Cli --prerelease`, ECS 2026 showcase smoke.
+- **Phase 2 — Adoption leverage (~2 working days)**: ✅ `dotnet tool install --global AgentEval.Cli --prerelease` (landed 2026-05-24 — CLI is now packed as a `dotnet tool` with multi-TFM net8 LTS / net10 targets; install picks the highest compatible runtime); ECS 2026 showcase smoke.
 - **Phase 3 — Architecture cleanup + audit hardening (~7 working days)**: Promote `samples/AgentEval.GdprBenchmark` + `samples/AgentEval.EuAiActBenchmark` → `src/AgentEval.Compliance.*` (CLI-references-samples antipattern fix), relocate `EvaluatorCostMap` out of Abstractions, thread `judgeModel` through agentic factories, `agenteval doctor` schema validation, manifest+evidence body re-hashing with canonical-JSON projection (RFC 8785). (The "disambiguate two `AgenticBenchmark` types" task was resolved by the v0.9.0-beta removal of the legacy class.)
 - **Phase 4 — Stretch (~3 working days)**: `AdjudicatedMultiJudgeWrapper` kappa-rename cosmetic fix, `runCostBreakdown` unknown-bucket semantics split, MC1.4.5 red-team campaign SPA page.
 

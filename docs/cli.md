@@ -5,14 +5,24 @@ AgentEval ships a CLI for managing the `.agenteval/` workspace from the terminal
 ## Installation
 
 ```bash
-# During development
-dotnet run --project src/AgentEval.Cli -- <command>
-
-# Packaged tool (planned)
+# Recommended — install once, use anywhere
 dotnet tool install --global AgentEval.Cli --prerelease
+
+# Update later
+dotnet tool update --global AgentEval.Cli --prerelease
+
+# Or run from a cloned repo (contributor / development path)
+dotnet run --project src/AgentEval.Cli -- <command>
 ```
 
-After installation as a global tool, the `agenteval` command is available system-wide. Until the package is published, use `dotnet run --project src/AgentEval.Cli --` as the prefix in place of `agenteval`.
+After global install, the `agenteval` command is available system-wide. **Requires .NET 8
+SDK or later** for the core surface; **`agenteval mc serve` additionally requires .NET 10**
+because Mission Control depends on Hot Chocolate 16 + `MapStaticAssets` (net10-only). On
+.NET 8/9 installations, `mc serve` exits with a graceful "requires .NET 10" message rather
+than failing obscurely.
+
+Examples below use the global `agenteval` form. To run from a cloned repo, substitute
+`dotnet run --project src/AgentEval.Cli --` (note the trailing `--`).
 
 ---
 
@@ -90,7 +100,7 @@ If `solution.json` already exists, the command reports that the workspace is alr
 **Example**
 
 ```
-$ dotnet run --project src/AgentEval.Cli -- init --name "MyProject"
+$ agenteval init --name "MyProject"
 ✔ Initialized .agenteval/ at /home/user/myproject/.agenteval
 ```
 

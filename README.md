@@ -516,22 +516,24 @@ dotnet add package AgentEval --prerelease
 
 **CLI Tool:**
 
-The CLI ships in-tree but is not yet published as a `dotnet tool`. Run via:
+The CLI is published as a [`dotnet tool`](https://learn.microsoft.com/dotnet/core/tools/global-tools) on NuGet:
 
 ```bash
-dotnet run --project src/AgentEval.Cli -- init
-dotnet run --project src/AgentEval.Cli -- bench gdpr --preset smoke --subject MyAgent
-dotnet run --project src/AgentEval.Cli -- mc serve
+# Install (one-time, global)
+dotnet tool install --global AgentEval.Cli --prerelease
+
+# Use
+agenteval init                                                 # bootstrap .agenteval/ workspace
+agenteval bench --list                                         # discover the 8 benchmark families
+agenteval bench gdpr --preset smoke --subject MyAgent          # run a GDPR compliance benchmark
+agenteval bench owasp --preset smoke --subject MyAgent --azure-from-env   # OWASP red-team against your real agent
+agenteval mc serve                                             # open Mission Control (requires .NET 10)
+agenteval doctor                                               # verify workspace integrity
 ```
 
-Once published, the equivalent will be:
-
-```bash
-dotnet tool install -g AgentEval.Cli --prerelease   # planned
-agenteval init
-agenteval bench gdpr --preset smoke --subject MyAgent
-agenteval mc serve
-```
+**Requirements**: .NET 8 SDK for the core surface; .NET 10 SDK additionally for `mc serve`
+(graceful fallback message on .NET 8). See [`docs/installation.md`](docs/installation.md#cli-tool)
+for update / uninstall / contributor-path (`dotnet run --project src/AgentEval.Cli`) details.
 
 > **v1 NuGet scope.** The `AgentEval` package currently ships `AgentEval.{Abstractions,Core,DataLoaders,MAF,RedTeam}`. The agentic 60-evaluator suite, GDPR/EU AI Act benchmark code, and memory evaluation pack live alongside the `agenteval` CLI but are not yet exposed as programmatic NuGet APIs — they are runnable today via the CLI binaries. Surfacing them as separate packages is on the v1.1 roadmap.
 
