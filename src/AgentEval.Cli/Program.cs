@@ -192,11 +192,13 @@ var benchOwaspPresetOpt = new Option<string?>("--preset") { Description = Preset
 var benchOwaspSubjectOpt = new Option<string?>("--subject") { Description = "Subject name (agent or workflow under evaluation). REQUIRED." };
 var benchOwaspRootOpt = new Option<string?>("--root") { Description = "Workspace root path (default: auto-detected)" };
 var benchOwaspInputOpt = new Option<string?>("--input") { Description = "Provenance text for the run (the OWASP attack pipeline generates its own probes; --input is recorded for traceability, not consumed by attacks)." };
+var benchOwaspAzureFromEnvOpt = new Option<bool>("--azure-from-env") { Description = "Build an Azure OpenAI chat agent from AZURE_OPENAI_* env vars instead of scanning the built-in stub. Requires AZURE_OPENAI_ENDPOINT + AZURE_OPENAI_API_KEY + AZURE_OPENAI_DEPLOYMENT." };
 var benchOwaspCmd = new Command("owasp", "Run the OWASP LLM Top 10 red-team benchmark");
 benchOwaspCmd.Add(benchOwaspPresetOpt);
 benchOwaspCmd.Add(benchOwaspSubjectOpt);
 benchOwaspCmd.Add(benchOwaspRootOpt);
 benchOwaspCmd.Add(benchOwaspInputOpt);
+benchOwaspCmd.Add(benchOwaspAzureFromEnvOpt);
 benchOwaspCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =>
 {
     var preset = parseResult.GetValue(benchOwaspPresetOpt) ?? "top10";
@@ -208,7 +210,8 @@ benchOwaspCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =>
     }
     var root = parseResult.GetValue(benchOwaspRootOpt);
     var input = parseResult.GetValue(benchOwaspInputOpt);
-    return await BenchOwaspCommand.RunAsync(preset, subject, root, input);
+    var azureFromEnv = parseResult.GetValue(benchOwaspAzureFromEnvOpt);
+    return await BenchOwaspCommand.RunAsync(preset, subject, root, input, azureFromEnv);
 });
 benchCmd.Add(benchOwaspCmd);
 
@@ -218,11 +221,13 @@ var benchMitrePresetOpt = new Option<string?>("--preset") { Description = Preset
 var benchMitreSubjectOpt = new Option<string?>("--subject") { Description = "Subject name (agent or workflow under evaluation). REQUIRED." };
 var benchMitreRootOpt = new Option<string?>("--root") { Description = "Workspace root path (default: auto-detected)" };
 var benchMitreInputOpt = new Option<string?>("--input") { Description = "Provenance text for the run (the MITRE ATLAS attack pipeline generates its own probes; --input is recorded for traceability, not consumed by attacks)." };
+var benchMitreAzureFromEnvOpt = new Option<bool>("--azure-from-env") { Description = "Build an Azure OpenAI chat agent from AZURE_OPENAI_* env vars instead of scanning the built-in stub. Requires AZURE_OPENAI_ENDPOINT + AZURE_OPENAI_API_KEY + AZURE_OPENAI_DEPLOYMENT." };
 var benchMitreCmd = new Command("mitre", "Run the MITRE ATLAS red-team benchmark");
 benchMitreCmd.Add(benchMitrePresetOpt);
 benchMitreCmd.Add(benchMitreSubjectOpt);
 benchMitreCmd.Add(benchMitreRootOpt);
 benchMitreCmd.Add(benchMitreInputOpt);
+benchMitreCmd.Add(benchMitreAzureFromEnvOpt);
 benchMitreCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =>
 {
     var preset = parseResult.GetValue(benchMitrePresetOpt) ?? "atlas-baseline";
@@ -234,7 +239,8 @@ benchMitreCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =>
     }
     var root = parseResult.GetValue(benchMitreRootOpt);
     var input = parseResult.GetValue(benchMitreInputOpt);
-    return await BenchMitreCommand.RunAsync(preset, subject, root, input);
+    var azureFromEnv = parseResult.GetValue(benchMitreAzureFromEnvOpt);
+    return await BenchMitreCommand.RunAsync(preset, subject, root, input, azureFromEnv);
 });
 benchCmd.Add(benchMitreCmd);
 
@@ -245,6 +251,57 @@ benchCmd.Add(benchMitreCmd);
     var benchPerfSubjectOpt = new Option<string?>("--subject") { Description = "Subject name (agent or workflow under evaluation). REQUIRED." };
     var benchPerfPromptOpt = new Option<string?>("--prompt") { Description = "Prompt to measure against (default: 'Hello!')." };
     var benchPerfRootOpt = new Option<string?>("--root") { Description = "Workspace root path (default: auto-detected)" };
+    var benchPerfAzureFromEnvOpt = new Option<bool>("--azure-from-env") { Description = "Measure a real Azure OpenAI chat agent built from AZURE_OPENAI_* env vars instead of the built-in EchoAgent stub. Requires AZURE_OPENAI_ENDPOINT + AZURE_OPENAI_API_KEY + AZURE_OPENAI_DEPLOYMENT." };
+
+    // bench longmemeval — T0.6 (v1.1): closes CLI ↔ registry gap.
+    {
+        var benchLmePresetOpt = new Option<string?>("--preset") { Description = "subset | full. Default: subset. 'full' requires LONGMEMEVAL_DATASET_PATH." };
+        var benchLmeSubjectOpt = new Option<string?>("--subject") { Description = "Subject name (agent under evaluation). REQUIRED." };
+        var benchLmeRootOpt = new Option<string?>("--root") { Description = "Workspace root path (default: auto-detected)" };
+
+        var benchLmeCmd = new Command("longmemeval", "Run the LongMemEval ICLR 2025 memory benchmark. Reads AZURE_OPENAI_ENDPOINT / AZURE_OPENAI_API_KEY / AZURE_OPENAI_DEPLOYMENT — there is no stub fallback (the runner makes ~2 LLM calls per question; the LLM round-trip IS the correctness signal).");
+        benchLmeCmd.Add(benchLmePresetOpt);
+        benchLmeCmd.Add(benchLmeSubjectOpt);
+        benchLmeCmd.Add(benchLmeRootOpt);
+        benchLmeCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =>
+        {
+            var preset = parseResult.GetValue(benchLmePresetOpt) ?? "subset";
+            var subject = parseResult.GetValue(benchLmeSubjectOpt);
+            if (string.IsNullOrWhiteSpace(subject))
+            {
+                Console.Error.WriteLine("Error: --subject is required.");
+                return 1;
+            }
+            var root = parseResult.GetValue(benchLmeRootOpt);
+            return await BenchLongMemEvalCommand.RunAsync(preset, subject, root);
+        });
+        benchCmd.Add(benchLmeCmd);
+    }
+
+    // bench memory — T0.6 (v1.1): closes CLI ↔ registry gap.
+    {
+        var benchMemPresetOpt = new Option<string?>("--preset") { Description = "quick | standard | full | diagnostic | overflow. Default: quick." };
+        var benchMemSubjectOpt = new Option<string?>("--subject") { Description = "Subject name (agent under evaluation). REQUIRED." };
+        var benchMemRootOpt = new Option<string?>("--root") { Description = "Workspace root path (default: auto-detected)" };
+
+        var benchMemCmd = new Command("memory", "Run the AgentEval memory benchmark. Reads AZURE_OPENAI_ENDPOINT / AZURE_OPENAI_API_KEY / AZURE_OPENAI_DEPLOYMENT — there is no stub fallback (the benchmark needs a real LLM-backed agent under test).");
+        benchMemCmd.Add(benchMemPresetOpt);
+        benchMemCmd.Add(benchMemSubjectOpt);
+        benchMemCmd.Add(benchMemRootOpt);
+        benchMemCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =>
+        {
+            var preset = parseResult.GetValue(benchMemPresetOpt) ?? "quick";
+            var subject = parseResult.GetValue(benchMemSubjectOpt);
+            if (string.IsNullOrWhiteSpace(subject))
+            {
+                Console.Error.WriteLine("Error: --subject is required.");
+                return 1;
+            }
+            var root = parseResult.GetValue(benchMemRootOpt);
+            return await BenchMemoryCommand.RunAsync(preset, subject, root);
+        });
+        benchCmd.Add(benchMemCmd);
+    }
 
     var benchPerfCmd = new Command("perf", "Run a performance benchmark (latency, throughput, cost)");
 
@@ -254,6 +311,7 @@ benchCmd.Add(benchMitreCmd);
         presetCmd.Add(benchPerfSubjectOpt);
         presetCmd.Add(benchPerfPromptOpt);
         presetCmd.Add(benchPerfRootOpt);
+        presetCmd.Add(benchPerfAzureFromEnvOpt);
         var capturedPreset = presetName;
         presetCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =>
         {
@@ -265,7 +323,8 @@ benchCmd.Add(benchMitreCmd);
             }
             var prompt = parseResult.GetValue(benchPerfPromptOpt);
             var root = parseResult.GetValue(benchPerfRootOpt);
-            return await BenchPerfCommand.RunAsync(capturedPreset, subject, prompt, root);
+            var azureFromEnv = parseResult.GetValue(benchPerfAzureFromEnvOpt);
+            return await BenchPerfCommand.RunAsync(capturedPreset, subject, prompt, root, azureFromEnv);
         });
         benchPerfCmd.Add(presetCmd);
     }

@@ -20,6 +20,9 @@
          appear in bench list / per-family help. -->
     <ProjectReference Include="..\AgentEval.Evals.Performance\AgentEval.Evals.Performance.csproj" />
     <ProjectReference Include="..\AgentEval.Memory\AgentEval.Memory.csproj" />
+    <!-- T0.5 (v1.1): generic IEvalResultRenderer for OWASP / MITRE / Perf CLI report parity
+         with GDPR / EuAiAct / Agentic. QuestPDF is bundled PrivateAssets in Rendering.Pdf. -->
+    <ProjectReference Include="..\AgentEval.Rendering.Pdf\AgentEval.Rendering.Pdf.csproj" />
   </ItemGroup>
 
   <!-- Plan-08 MC1.7.1: AgentEval.MissionControl is net10-only (Hot Chocolate 16

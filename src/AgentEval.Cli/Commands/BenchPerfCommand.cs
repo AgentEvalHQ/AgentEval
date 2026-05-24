@@ -24,16 +24,23 @@ public static class BenchPerfCommand
         string preset,
         string subject,
         string? prompt,
-        string? rootOverride) =>
-        RunAsync(preset, subject, prompt, rootOverride, agentOverride: null);
+        string? rootOverride,
+        bool azureFromEnv = false) =>
+        RunAsync(preset, subject, prompt, rootOverride, agentOverride: null, azureFromEnv);
 
-    /// <summary>Internal overload exposed for tests; allows agent injection.</summary>
+    /// <summary>
+    /// Internal overload exposed for tests; allows agent injection. <paramref name="azureFromEnv"/>
+    /// builds an Azure OpenAI chat agent from <c>AZURE_OPENAI_*</c> env vars when
+    /// <paramref name="agentOverride"/> is null; otherwise falls back to the <c>EchoAgent</c> stub
+    /// with a prominent warning banner.
+    /// </summary>
     internal static async Task<int> RunAsync(
         string preset,
         string subject,
         string? prompt,
         string? rootOverride,
-        IEvaluableAgent? agentOverride)
+        IEvaluableAgent? agentOverride,
+        bool azureFromEnv = false)
     {
         // ── Workspace setup ──────────────────────────────────────────────────
         if (rootOverride is not null)
@@ -77,9 +84,27 @@ public static class BenchPerfCommand
         }
 
         // ── Resolve target agent ─────────────────────────────────────────────
-        // The CLI uses a deterministic stub agent by default. Real targets override via the
-        // internal overload (used by tests).
-        var agent = agentOverride ?? new EchoAgent(subject);
+        // Default is the deterministic EchoAgent stub (50ms-delay echo). --azure-from-env
+        // builds a real Azure OpenAI agent. Tests inject via agentOverride.
+        IEvaluableAgent agent;
+        if (agentOverride is not null)
+        {
+            agent = agentOverride;
+        }
+        else if (azureFromEnv)
+        {
+            var (azureAgent, azureExitCode) = AzureChatAgentFactory.TryBuildFromEnv(subject);
+            if (azureAgent is null) return azureExitCode;
+            agent = azureAgent;
+        }
+        else
+        {
+            AzureChatAgentFactory.PrintStubAgentWarning(
+                benchmarkName: "Performance",
+                stubAgentDescription: "EchoAgent stub",
+                sampleFileName: "02_PerformanceBenchmark.cs");
+            agent = new EchoAgent(subject);
+        }
 
         // ── Build EvalInput from prompt(s) ───────────────────────────────────
         var resolvedPrompt = string.IsNullOrWhiteSpace(prompt) ? "Hello!" : prompt;
@@ -152,6 +177,29 @@ public static class BenchPerfCommand
                 });
             await store.CompleteRunAsync(manifest, summary);
             Console.WriteLine($"Persisted run {runId} to {agentEvalDir}");
+
+            // T0.5 (v1.1): emit JSON + HTML + PDF reports alongside the canonical run.
+            // Perf previously emitted nothing beyond the store; this brings it to parity
+            // with the compliance commands. Reports land in the canonical run dir.
+            var runDir = Path.Combine(agentEvalDir, "subjects", "agents", subject, "runs", runId);
+            try
+            {
+                var jsonPath = Path.Combine(runDir, "report.json");
+                await File.WriteAllTextAsync(jsonPath, System.Text.Json.JsonSerializer.Serialize(result, new System.Text.Json.JsonSerializerOptions { WriteIndented = true }));
+                Console.WriteLine($"JSON report:     {jsonPath}");
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"Warning: failed to write perf JSON report: {ex.Message}");
+            }
+            var (htmlPath, pdfPath) = await GenericReportRenderer.WriteHtmlAndPdfAsync(
+                result,
+                runDir,
+                subjectIdentity,
+                benchmarkLabel: $"Performance — {preset}",
+                runId: runId);
+            if (htmlPath is not null) Console.WriteLine($"HTML report:     {htmlPath}");
+            if (pdfPath is not null)  Console.WriteLine($"PDF report:      {pdfPath}");
         }
         catch (Exception ex)
         {

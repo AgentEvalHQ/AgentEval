@@ -26,9 +26,10 @@ public static class BenchOwaspCommand
         string preset,
         string subject,
         string? rootOverride,
-        string? inputText)
+        string? inputText,
+        bool azureFromEnv = false)
     {
-        var (exitCode, _) = await RunAsync(preset, subject, rootOverride, inputText, evaluatorOverride: null, agentOverride: null).ConfigureAwait(false);
+        var (exitCode, _) = await RunAsync(preset, subject, rootOverride, inputText, evaluatorOverride: null, agentOverride: null, azureFromEnv).ConfigureAwait(false);
         return exitCode;
     }
 
@@ -40,6 +41,11 @@ public static class BenchOwaspCommand
     /// Tests use the returned path directly instead of enumerating timestamped
     /// directories by name — that name-based lookup races on second-precision
     /// timestamps when two operations land in the same second.
+    /// When <paramref name="azureFromEnv"/> is true AND <paramref name="agentOverride"/>
+    /// is null, builds an Azure OpenAI chat agent from <c>AZURE_OPENAI_*</c> env vars
+    /// via <see cref="AzureChatAgentFactory"/>. When neither is provided, falls back to
+    /// the built-in <c>SafeRefusalAgent</c> stub with a prominent warning banner
+    /// explaining that results do not reflect a real agent.
     /// </summary>
     internal static async Task<(int ExitCode, string? ReportDir)> RunAsync(
         string preset,
@@ -47,7 +53,8 @@ public static class BenchOwaspCommand
         string? rootOverride,
         string? inputText,
         IEvaluator? evaluatorOverride,
-        IEvaluableAgent? agentOverride)
+        IEvaluableAgent? agentOverride,
+        bool azureFromEnv = false)
     {
         // ── Workspace setup ──────────────────────────────────────────────────
         if (rootOverride is not null)
@@ -99,7 +106,25 @@ public static class BenchOwaspCommand
         // commands and is recorded for provenance only — it is not consumed by
         // the scan flow. We reference it to keep the parameter meaningful.
         _ = inputText;
-        var agent = agentOverride ?? new SafeRefusalAgent(subject);
+        IEvaluableAgent agent;
+        if (agentOverride is not null)
+        {
+            agent = agentOverride;
+        }
+        else if (azureFromEnv)
+        {
+            var (azureAgent, azureExitCode) = AzureChatAgentFactory.TryBuildFromEnv(subject);
+            if (azureAgent is null) return (azureExitCode, null);
+            agent = azureAgent;
+        }
+        else
+        {
+            AzureChatAgentFactory.PrintStubAgentWarning(
+                benchmarkName: "OWASP LLM Top 10",
+                stubAgentDescription: "SafeRefusalAgent stub",
+                sampleFileName: "06_OwaspBenchmark.cs");
+            agent = new SafeRefusalAgent(subject);
+        }
 
         // ── Run benchmark ────────────────────────────────────────────────────
         var store = new FileSystemOutputStore(agentEvalDir);
@@ -224,6 +249,17 @@ public static class BenchOwaspCommand
             Console.Error.WriteLine($"Warning: failed to write OWASP Markdown report: {ex.Message}");
         }
 
+        // T0.5 (v1.1): emit generic HTML + PDF alongside JSON/MD for parity with the
+        // compliance commands (GDPR / EU AI Act / Agentic). Both are best-effort.
+        var (htmlPath, pdfPath) = await GenericReportRenderer.WriteHtmlAndPdfAsync(
+            compositeEval,
+            outputDir,
+            subjectIdentity,
+            benchmarkLabel: "OWASP LLM Top 10",
+            runId: runId);
+        if (htmlPath is not null) Console.WriteLine($"HTML report:     {htmlPath}");
+        if (pdfPath is not null)  Console.WriteLine($"PDF report:      {pdfPath}");
+
         // ── Exit code ─────────────────────────────────────────────────────────
         Console.WriteLine($"Overall result: pass rate {report.Summary.OverallPassRate:F1}% " +
             $"({report.Summary.CriticalFindings} critical / {report.Summary.HighFindings} high findings); " +
@@ -277,7 +313,7 @@ public static class BenchOwaspCommand
     /// evaluators classify these as "resisted" for prompt-injection/jailbreak/PII
     /// probes, so a default CLI run produces a clean PASS report. Real targets
     /// override this via the <c>agentOverride</c> parameter on the internal
-    /// <see cref="RunAsync(string,string,string?,string?,IEvaluator?,IEvaluableAgent?)"/> overload.
+    /// <see cref="RunAsync(string,string,string?,string?,IEvaluator?,IEvaluableAgent?,bool)"/> overload.
     /// </summary>
     internal sealed class SafeRefusalAgent : IEvaluableAgent
     {
