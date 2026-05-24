@@ -48,14 +48,25 @@ public class SecurityHeadersTests : IClassFixture<WebApplicationFactory<Query>>
         Assert.Contains("default-src 'self'", csp);
         Assert.Contains("frame-ancestors 'none'", csp);
 
-        // LR7-S3 (2026-05-16) — Permissions-Policy locks down geolocation, mic,
-        // camera, payment, USB, MIDI, magnetometer, gyroscope, accelerometer.
-        // None of these APIs are used by the portal; the header is defense in
-        // depth against a future XSS bug or a permissive front-end proxy.
+        // Plan-08 T2.3 (2026-05-25) — explicit `font-src 'self'` so the
+        // contract reads honestly without chasing the default-src fallback,
+        // and pairs with the self-hosted Inter + JetBrains Mono webfonts
+        // under wwwroot/assets/fonts/ (Google Fonts CDN dependency removed).
+        Assert.Contains("font-src 'self'", csp);
+
+        // LR7-S3 (2026-05-16) — Permissions-Policy locks down all 9
+        // directives the portal never uses. Pinned individually so a
+        // future header edit that silently drops one fails this test.
         var pp = string.Join(",", response.Headers.GetValues("Permissions-Policy"));
         Assert.Contains("geolocation=()", pp);
         Assert.Contains("microphone=()", pp);
         Assert.Contains("camera=()", pp);
+        Assert.Contains("payment=()", pp);
+        Assert.Contains("usb=()", pp);
+        Assert.Contains("midi=()", pp);
+        Assert.Contains("magnetometer=()", pp);
+        Assert.Contains("gyroscope=()", pp);
+        Assert.Contains("accelerometer=()", pp);
     }
 
     [Fact]

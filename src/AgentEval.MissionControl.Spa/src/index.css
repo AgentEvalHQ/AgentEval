@@ -6,13 +6,37 @@
  * `bg-accent-700` / `text-accent-50` / `hover:bg-accent-500`. */
 @import "tailwindcss";
 
+/* Plan-08 T2.3 (2026-05-25): self-hosted webfonts.
+ *
+ * Inter ships as a variable woff2 (single file, weight axis 100..900) from
+ * https://rsms.me/inter/. JetBrains Mono's official v2.304 release does not
+ * provide a variable woff2, so we ship the variable .ttf (single file,
+ * weight axis 100..800) — universal browser support, only ~50 KB heavier
+ * than woff2 would have been. Both files are OFL-1.1 licensed; the
+ * attribution lives at /assets/fonts/LICENSE.txt. */
+@font-face {
+  font-family: 'Inter';
+  src: url('/assets/fonts/InterVariable.woff2') format('woff2-variations');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'JetBrains Mono';
+  src: url('/assets/fonts/JetBrainsMono.ttf') format('truetype-variations');
+  font-weight: 100 800;
+  font-style: normal;
+  font-display: swap;
+}
+
 @theme {
   /* Mission Control palette: slate base + accent blue. */
   --color-accent-50:  #eff6ff;
   --color-accent-500: #3b82f6;
   --color-accent-700: #1d4ed8;
 
-  /* Typography stack — fonts loaded via index.html's Google-Fonts link. */
+  /* Typography stack — fonts self-hosted via the @font-face blocks above. */
   --font-sans: "Inter", system-ui, sans-serif;
   --font-mono: "JetBrains Mono", monospace;
 }

@@ -6,6 +6,12 @@ import { restUrls } from "@/lib/rest-client";
 import { queryKeys } from "@/lib/keys";
 import { DataState } from "@/components/DataState";
 import { EvalResultNode } from "@/components/EvalResultNode";
+import { ModelBadge } from "@/components/ModelBadge";
+import {
+  PromptHashPill,
+  JudgeModePill,
+  deriveJudgeMode,
+} from "@/components/ProvenancePills";
 import type { EvalResultNodeShape } from "@/lib/eval-tree";
 import { formatDateTime, formatScore, formatCost } from "@/lib/format";
 
@@ -138,6 +144,21 @@ export function ScenarioTreePage() {
                       </>
                     )}
                   </p>
+                  {/* Plan-08 portal-review A4 (T2.2, 2026-05-25): root-level
+                      provenance — model id + promptHash pill (click-to-copy)
+                      + judge-mode pill. The promptHash pill exposes the SHA
+                      the run was pinned at so reviewers can correlate with the
+                      canonical prompts table; the judge-mode pill surfaces
+                      whether the root composite was scored single / panel /
+                      majority-vote. Both are sourced from the existing
+                      `provenance` shape — no schema change. */}
+                  <div className="mt-3 flex items-center gap-2 flex-wrap">
+                    {tree.provenance.judgeModel && (
+                      <ModelBadge model={tree.provenance.judgeModel} role="judge" />
+                    )}
+                    <PromptHashPill promptHash={tree.provenance.promptHash} />
+                    <JudgeModePill mode={deriveJudgeMode(tree.provenance, tree.details)} />
+                  </div>
                   <div className="mt-2 flex items-center gap-3 flex-wrap">
                     <a
                       href={restUrls.trace(runId)}

@@ -178,6 +178,28 @@ public class GraphQLSmokeTests : IClassFixture<WebApplicationFactory<Query>>
         Assert.Contains("\"graphqlEndpoint\":\"/graphql\"", body);
         Assert.Contains("\"agentEvalVersion\"", body);
     }
+
+    [Fact]
+    public async Task RestVersion_ModeRespectsConfigurationOverride()
+    {
+        // Plan-08 portal-review B4 (T2.2, 2026-05-25): `mode` MUST be sourced
+        // from the AgentEval:Mode configuration key (env `AgentEval__Mode`),
+        // not hard-coded. Override with `aggregator` and confirm it round-trips
+        // to the REST payload. Mode A operators see `local` by default; the
+        // override path covers the future Mode B / Mode C surfaces.
+        using var overrideFactory = _factory.WithWebHostBuilder(builder =>
+        {
+            builder.UseSetting("AgentEval:Mode", "aggregator");
+        });
+        using var client = overrideFactory.CreateClient();
+        var response = await client.GetAsync("/api/v1/version");
+
+        response.EnsureSuccessStatusCode();
+        var body = await response.Content.ReadAsStringAsync();
+
+        Assert.Contains("\"mode\":\"aggregator\"", body);
+        Assert.DoesNotContain("\"mode\":\"local\"", body);
+    }
 }
 
 #endif

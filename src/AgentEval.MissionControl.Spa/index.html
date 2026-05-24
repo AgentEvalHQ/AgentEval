@@ -5,9 +5,13 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#0f172a" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+    <!-- Plan-08 T2.3 (2026-05-25): self-host Inter + JetBrains Mono under
+         public/assets/fonts/ so the portal honours its own CSP (default-src
+         'self') and works on air-gapped / corporate networks. The Google
+         Fonts <link> tags were removed at the same time. Fonts are licensed
+         OFL-1.1 — see public/assets/fonts/LICENSE.txt for attribution. -->
+    <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/InterVariable.woff2" crossorigin />
+    <link rel="preload" as="font" type="font/ttf" href="/assets/fonts/JetBrainsMono.ttf" crossorigin />
     <title>AgentEval Mission Control</title>
   </head>
   <body class="bg-slate-50 text-slate-900 antialiased">

@@ -158,6 +158,15 @@ public static class McHost
                     "script-src 'self' 'unsafe-inline'; " +
                     "style-src 'self' 'unsafe-inline'; " +
                     "img-src 'self' data:; " +
+                    // Plan-08 T2.3 (2026-05-25): explicit `font-src 'self'`.
+                    // `default-src 'self'` already covers fonts per CSP3
+                    // §6.1, but the R7 review playbook requires the
+                    // directive be spelled out so the contract reads
+                    // honestly without needing to chase the fallback rule.
+                    // Pairs with the self-hosted Inter + JetBrains Mono
+                    // under wwwroot/assets/fonts/ (Google Fonts CDN
+                    // dependency removed by the same commit).
+                    "font-src 'self'; " +
                     "connect-src 'self'; " +
                     "frame-ancestors 'none'";
             await next();
@@ -168,11 +177,20 @@ public static class McHost
         app.MapGraphQL("/graphql");
 
         // REST: minimal binary + version surface (plan-07 §8.2).
+        // Plan-08 portal-review B4 (T2.2, 2026-05-25): the deployment mode is
+        // sourced from configuration (`AgentEval:Mode` / env `AgentEval__Mode`)
+        // instead of being hard-coded. Mode A on loopback reports `"local"`;
+        // Mode B/C (when they ship) report `"aggregator"` / `"server"`. The
+        // default remains `"local"` so existing local-only operators see no
+        // behaviour change. Subsumes the version-enrichment work tracked as
+        // T3.10 (workspaceRoot + workspaceInitialized — deferred).
+        var configuredMode = app.Configuration["AgentEval:Mode"];
+        var resolvedMode = string.IsNullOrWhiteSpace(configuredMode) ? "local" : configuredMode;
         app.MapGet("/api/v1/version", () =>
         {
             return Results.Json(new
             {
-                mode = "local",
+                mode = resolvedMode,
                 agentEvalVersion = typeof(AgentEval.Output.IOutputStoreReader).Assembly
                     .GetName().Version?.ToString() ?? "0.0.0",
                 graphqlEndpoint = "/graphql",

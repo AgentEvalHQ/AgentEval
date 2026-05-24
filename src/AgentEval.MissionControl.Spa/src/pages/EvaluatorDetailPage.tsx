@@ -5,6 +5,7 @@ import { gqlRequest } from "@/lib/graphql-client";
 import { queryKeys } from "@/lib/keys";
 import { DataState } from "@/components/DataState";
 import { TimelineChart, type TimelinePoint } from "@/components/charts/TimelineChart";
+import { GenericEvaluatorRenderer } from "@/components/GenericEvaluatorRenderer";
 import { CostTierPill } from "./EvaluatorsPage";
 
 // Plan-08 Wave 5 (MC1.6.10): per-evaluator card detail.
@@ -164,11 +165,33 @@ export function EvaluatorDetailPage() {
                 )}
                 {ev.recommendedVisualization && (
                   <span className="text-xs text-slate-600">
-                    chart hint: <code>{ev.recommendedVisualization}</code>
+                    chart hint:{" "}
+                    <code className="font-mono bg-slate-100 px-1 rounded">
+                      {ev.recommendedVisualization}
+                    </code>
                   </span>
                 )}
               </div>
             </header>
+
+            {/* Plan-08 portal-review A5 (T2.2, 2026-05-25): switch on the
+                evaluator's recommendedVisualization hint and render a live
+                preview using the evaluator timeline as payload. Previously
+                the hint string was the only surface — operators had no way
+                to see what shape the evaluator's signal takes. The renderer
+                tolerates a null payload and falls back to JSON for unknown
+                hints; see GenericEvaluatorRenderer.tsx for the switch logic. */}
+            {ev.recommendedVisualization && (
+              <section className="rounded-lg border border-slate-200 bg-white p-4">
+                <h3 className="text-sm font-semibold text-slate-700 mb-3">
+                  Visualisation preview ({ev.recommendedVisualization})
+                </h3>
+                <GenericEvaluatorRenderer
+                  recommendedVisualization={ev.recommendedVisualization}
+                  payload={timelineQ.data?.evaluatorTimeline ?? []}
+                />
+              </section>
+            )}
 
             <section className="rounded-lg border border-slate-200 bg-white p-4">
               <h3 className="text-sm font-semibold text-slate-700 mb-2">
