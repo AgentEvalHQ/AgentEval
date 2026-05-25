@@ -383,17 +383,17 @@ function EmptyTraceBanner() {
     <section className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 space-y-2">
       <p className="font-medium">No trace data captured for this run.</p>
       <p className="text-amber-800">
-        Trace export requires{" "}
-        <code className="font-mono text-xs bg-amber-100 px-1 rounded">
-          OTEL_EXPORTER_OTLP_ENDPOINT
-        </code>{" "}
-        to be set during the run, or the in-process{" "}
+        Trace recording requires the in-process{" "}
         <code className="font-mono text-xs bg-amber-100 px-1 rounded">
           TraceRecordingAgent
         </code>{" "}
-        wrapper to be used. If the run completed without either, this page
-        cannot render a waterfall — re-run with tracing enabled to populate
-        it.
+        wrapper around the subject agent, or{" "}
+        <code className="font-mono text-xs bg-amber-100 px-1 rounded">
+          SaveTraceFiles=true
+        </code>{" "}
+        in the AgentEval settings. If the run completed without either, this
+        page cannot render a waterfall — re-run with tracing enabled to
+        populate it.
       </p>
     </section>
   );
