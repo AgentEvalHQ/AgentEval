@@ -109,7 +109,11 @@ public sealed class ComplianceMatrixService
             .ToList();
 
         // Step 3 — load each latest evidence to read its full Controls list.
-        var loaded = new List<(ComplianceEvidencePointer Pointer, ComplianceEvidence Evidence)>();
+        // 2026-05-24 (plan-08 portal-review A1): capture the per-evidence chain-check
+        // outcome (valid / source-run-not-found / hash-mismatch) so we can propagate
+        // it down to per-cell granularity in step 6. The aggregate `allChainsValid`
+        // remains for the matrix-header badge.
+        var loaded = new List<(ComplianceEvidencePointer Pointer, ComplianceEvidence Evidence, bool ChainValid, string? ChainBreakReason)>();
         var allChainsValid = true;
         foreach (var pointer in latestPerSubject)
         {
@@ -123,10 +127,27 @@ public sealed class ComplianceMatrixService
 
             // Verify audit chain: SourceRun.ManifestHash must match the run's content hash.
             var manifest = await _store.GetRunManifestAsync(evidence.SourceRun.RunId, ct);
-            if (manifest is null || !string.Equals(manifest.ContentHash, evidence.SourceRun.ManifestHash, StringComparison.Ordinal))
+            bool chainValid;
+            string? chainBreakReason;
+            if (manifest is null)
+            {
+                chainValid = false;
+                chainBreakReason = "source-run-not-found";
                 allChainsValid = false;
+            }
+            else if (!string.Equals(manifest.ContentHash, evidence.SourceRun.ManifestHash, StringComparison.Ordinal))
+            {
+                chainValid = false;
+                chainBreakReason = "hash-mismatch";
+                allChainsValid = false;
+            }
+            else
+            {
+                chainValid = true;
+                chainBreakReason = null;
+            }
 
-            loaded.Add((pointer, evidence));
+            loaded.Add((pointer, evidence, chainValid, chainBreakReason));
         }
 
         if (loaded.Count == 0)
@@ -134,7 +155,7 @@ public sealed class ComplianceMatrixService
 
         // Step 4 — derive the column inventory from the union of controls.
         var controlMap = new Dictionary<string, string>(StringComparer.Ordinal); // id -> title
-        foreach (var (_, ev) in loaded)
+        foreach (var (_, ev, _, _) in loaded)
         {
             foreach (var c in ev.Controls)
             {
@@ -154,9 +175,9 @@ public sealed class ComplianceMatrixService
             .ThenBy(s => s.Name, StringComparer.Ordinal)
             .ToList();
 
-        // Step 6 — build cells.
+        // Step 6 — build cells. Per-cell ChainValid + ChainBreakReason propagated from step 3.
         var cells = new List<ComplianceMatrixCell>(loaded.Count * controls.Count);
-        foreach (var (pointer, ev) in loaded)
+        foreach (var (pointer, ev, chainValid, chainBreakReason) in loaded)
         {
             var ts = TryParseTimestamp(pointer.Timestamp) ?? ev.GeneratedAt;
             foreach (var control in ev.Controls)
@@ -169,7 +190,9 @@ public sealed class ComplianceMatrixService
                     LastEvidenceAt: ts,
                     LastEvidenceRunId: ev.SourceRun.RunId,
                     Timestamp: pointer.Timestamp,
-                    RegressedFromBaseline: control.RegressedFromBaseline));
+                    RegressedFromBaseline: control.RegressedFromBaseline,
+                    ChainValid: chainValid,
+                    ChainBreakReason: chainBreakReason));
             }
         }
 

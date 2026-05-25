@@ -35,6 +35,9 @@ Each ADR follows this structure:
 | [012](012-workflow-assertion-design.md) | Workflow Assertion Design | Accepted | 2026-02-14 |
 | [013](013-maf-rc1-upgrade.md) | Microsoft Agent Framework RC1 Upgrade | Accepted | 2026-02 |
 | [014](014-dataset-pipeline-two-model-architecture.md) | Dataset Pipeline — Two-Model Architecture | Accepted | 2026-02-24 |
+| [015](015-extension-registration-manual-vs-auto-discovery.md) | Extension Registration — Manual vs Auto-Discovery | Accepted | 2026-02-25 |
+| [016](016-monolith-modularization.md) | Monolith Modularization | Accepted | 2026-02-26 |
+| [017](017-unified-benchmarks-namespace.md) | Unified Benchmarks Namespace (Convention 1-4) | Implemented (v0.10.0-beta) | 2026-05-17 |
 
 ---
 

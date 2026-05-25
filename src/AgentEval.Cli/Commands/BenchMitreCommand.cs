@@ -33,9 +33,10 @@ public static class BenchMitreCommand
         string preset,
         string subject,
         string? rootOverride,
-        string? inputText)
+        string? inputText,
+        bool azureFromEnv = false)
     {
-        var (exitCode, _) = await RunAsync(preset, subject, rootOverride, inputText, evaluatorOverride: null, agentOverride: null).ConfigureAwait(false);
+        var (exitCode, _) = await RunAsync(preset, subject, rootOverride, inputText, evaluatorOverride: null, agentOverride: null, azureFromEnv).ConfigureAwait(false);
         return exitCode;
     }
 
@@ -47,6 +48,10 @@ public static class BenchMitreCommand
     /// Tests use the returned path directly instead of enumerating timestamped
     /// directories by name — that name-based lookup races on second-precision
     /// timestamps when two operations land in the same second.
+    /// When <paramref name="azureFromEnv"/> is true AND <paramref name="agentOverride"/>
+    /// is null, builds an Azure OpenAI chat agent from <c>AZURE_OPENAI_*</c> env vars
+    /// via <see cref="AzureChatAgentFactory"/>. When neither is provided, falls back to
+    /// the built-in <c>SafeRefusalAgent</c> stub with a prominent warning banner.
     /// </summary>
     internal static async Task<(int ExitCode, string? ReportDir)> RunAsync(
         string preset,
@@ -54,7 +59,8 @@ public static class BenchMitreCommand
         string? rootOverride,
         string? inputText,
         IEvaluator? evaluatorOverride,
-        IEvaluableAgent? agentOverride)
+        IEvaluableAgent? agentOverride,
+        bool azureFromEnv = false)
     {
         // ── Workspace setup ──────────────────────────────────────────────────
         if (rootOverride is not null)
@@ -105,7 +111,25 @@ public static class BenchMitreCommand
         // own probes); --input is recorded for provenance only — not consumed by
         // the scan flow. Reference it so the parameter stays meaningful.
         _ = inputText;
-        var agent = agentOverride ?? new SafeRefusalAgent(subject);
+        IEvaluableAgent agent;
+        if (agentOverride is not null)
+        {
+            agent = agentOverride;
+        }
+        else if (azureFromEnv)
+        {
+            var (azureAgent, azureExitCode) = AzureChatAgentFactory.TryBuildFromEnv(subject);
+            if (azureAgent is null) return (azureExitCode, null);
+            agent = azureAgent;
+        }
+        else
+        {
+            AzureChatAgentFactory.PrintStubAgentWarning(
+                benchmarkName: "MITRE ATLAS",
+                stubAgentDescription: "SafeRefusalAgent stub",
+                sampleFileName: "07_MitreBenchmark.cs");
+            agent = new SafeRefusalAgent(subject);
+        }
 
         // ── Run benchmark ────────────────────────────────────────────────────
         var store = new FileSystemOutputStore(agentEvalDir);
@@ -226,6 +250,16 @@ public static class BenchMitreCommand
             Console.Error.WriteLine($"Warning: failed to write MITRE ATLAS Markdown report: {ex.Message}");
         }
 
+        // T0.5 (v1.1): emit generic HTML + PDF alongside JSON/MD for parity.
+        var (htmlPath, pdfPath) = await GenericReportRenderer.WriteHtmlAndPdfAsync(
+            compositeEval,
+            outputDir,
+            subjectIdentity,
+            benchmarkLabel: "MITRE ATLAS",
+            runId: runId);
+        if (htmlPath is not null) Console.WriteLine($"HTML report:     {htmlPath}");
+        if (pdfPath is not null)  Console.WriteLine($"PDF report:      {pdfPath}");
+
         // ── Exit code ─────────────────────────────────────────────────────────
         Console.WriteLine($"Overall result: pass rate {report.Summary.OverallPassRate:F1}% " +
             $"({report.Summary.CriticalFindings} critical / {report.Summary.HighFindings} high findings); " +
@@ -281,7 +315,7 @@ public static class BenchMitreCommand
     /// evaluators classify these as "resisted" for prompt-injection/jailbreak/PII
     /// probes, so a default CLI run produces a clean PASS report. Real targets
     /// override this via the <c>agentOverride</c> parameter on the internal
-    /// <see cref="RunAsync(string,string,string?,string?,IEvaluator?,IEvaluableAgent?)"/> overload.
+    /// <see cref="RunAsync(string,string,string?,string?,IEvaluator?,IEvaluableAgent?,bool)"/> overload.
     /// </summary>
     internal sealed class SafeRefusalAgent : IEvaluableAgent
     {

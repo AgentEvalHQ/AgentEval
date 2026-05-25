@@ -45,8 +45,13 @@ public static class CalibrationMetrics
     /// </list>
     /// </para>
     /// <para>
-    /// Returns <c>1.0</c> when pe = 1.0 (all raters agree on every label with identical
-    /// marginal distributions — trivially perfect agreement, divide-by-zero guard).
+    /// Returns <see cref="double.NaN"/> when <c>pe ≈ 1.0</c> (degenerate expected-agreement —
+    /// typically single-class data where every entry has the same label). Mathematically the
+    /// kappa is undefined in this case (0/0); historically this guard returned <c>1.0</c>
+    /// trivially, which was misleading on regulator-facing reports. Callers should treat NaN as
+    /// "kappa undefined — review the golden dataset for class balance" rather than as a PASS.
+    /// Aggregator gates that compare <c>kappa &gt;= threshold</c> naturally evaluate to false on
+    /// NaN, which forces operator review.
     /// </para>
     /// </remarks>
     /// <param name="pairs">Pairs of (expected verdict, actual verdict).</param>
@@ -84,8 +89,10 @@ public static class CalibrationMetrics
 
         double pe = labels.Sum(l => expectedDist[l] * actualDist[l]);
 
-        // Guard: if pe == 1.0, all agreement is by chance (trivial case)
-        if (Math.Abs(1.0 - pe) < 1e-10) return 1.0;
+        // Degenerate guard (F-004): when pe ≈ 1.0 the kappa expression is 0/0. Return NaN so
+        // the consumer renders "undefined" and the aggregator gate fails the pillar (forces
+        // operator review). Pre-F-004 this returned 1.0 — misleading on regulator-facing reports.
+        if (Math.Abs(1.0 - pe) < 1e-10) return double.NaN;
 
         return (po - pe) / (1.0 - pe);
     }

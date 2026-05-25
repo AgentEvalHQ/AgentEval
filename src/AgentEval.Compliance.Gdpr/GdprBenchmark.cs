@@ -21,11 +21,34 @@ namespace AgentEval.Benchmarks;
 public static partial class GdprBenchmark
 {
     /// <summary>
-    /// Builds the Standard preset: all five pillars with their canonical weights,
+    /// Builds the Standard preset: all six pillars with their canonical weights,
     /// pass threshold 0.85.
     /// </summary>
-    /// <param name="articles">Registry containing all 21 GDPR article composites.</param>
+    /// <param name="articles">Registry containing all 29 GDPR article composites
+    /// (21 baseline + 8 Pillar 6 governance articles added in v1.1 / plan-13 T1.1).</param>
     /// <returns>A fully configured <see cref="CompositeEval"/> for the Standard preset.</returns>
+    /// <remarks>
+    /// Weight rebalancing rationale (v1.1, plan-13 T1.1 — Pillar 6 introduction):
+    /// <list type="bullet">
+    ///   <item>Pillar 1 Foundations: 0.25 → 0.20 (still a high-weight cluster, slight
+    ///         trim to make room for Pillar 6 without disturbing the rights / privacy
+    ///         emphasis below).</item>
+    ///   <item>Pillar 2 Lawful Basis: 0.15 → 0.12 (small trim; Art 6 / Art 7 remain
+    ///         well-covered).</item>
+    ///   <item>Pillar 3 Subject Rights: 0.30 → 0.25 (still the highest single pillar
+    ///         weight; subject-rights dialog behaviour is the most directly observable
+    ///         dynamic in a dialog benchmark).</item>
+    ///   <item>Pillar 4 Transparency: 0.15 → 0.13 (small trim).</item>
+    ///   <item>Pillar 5 Privacy by Design + Security: 0.15 (unchanged; Art 25 + Art 32
+    ///         remain core).</item>
+    ///   <item>Pillar 6 Governance and Accountability: NEW at 0.15 — dialog-awareness
+    ///         only; the eight articles (5(2), 28, 30, 33, 34, 35, 37-39, 44-49) close
+    ///         the previously-disclaimed "v1 out of scope" surface but cannot
+    ///         substantiate the upstream-process attestation, so weight is kept below
+    ///         the operational pillars 1 + 3 + 5.</item>
+    /// </list>
+    /// New sum: 0.20 + 0.12 + 0.25 + 0.13 + 0.15 + 0.15 = 1.00.
+    /// </remarks>
     public static CompositeEval Standard(ArticlesRegistry articles)
     {
         ArgumentNullException.ThrowIfNull(articles);
@@ -33,14 +56,15 @@ public static partial class GdprBenchmark
             key: "gdpr.compliance.standard",
             name: "GDPR Compliance — Standard Preset",
             category: "compliance.gdpr",
-            version: "1.0.0",
+            version: "1.1.0",
             components:
             [
-                new(Pillar1Foundations.Build(articles),     0.25),
-                new(Pillar2LawfulBasis.Build(articles),     0.15),
-                new(Pillar3SubjectRights.Build(articles),   0.30),
-                new(Pillar4Transparency.Build(articles),    0.15),
+                new(Pillar1Foundations.Build(articles),     0.20),
+                new(Pillar2LawfulBasis.Build(articles),     0.12),
+                new(Pillar3SubjectRights.Build(articles),   0.25),
+                new(Pillar4Transparency.Build(articles),    0.13),
                 new(Pillar5PrivacyDesign.Build(articles),   0.15),
+                new(Pillar6Governance.Build(articles),      0.15),
             ],
             aggregation: WeightedSumAggregation.Instance,
             threshold: 0.85);
@@ -74,12 +98,13 @@ public static partial class GdprBenchmark
 
     /// <summary>
     /// Builds the Audit-Grade preset (single judge).
-    /// Same five-pillar structure as <see cref="Standard"/>, but uses
+    /// Same six-pillar structure as <see cref="Standard"/>, but uses
     /// <see cref="CapByWorstAggregation"/> at the top level so that a single
     /// critical-article failure caps the overall composite score at fail (score &lt;= 0.40).
     /// Pass threshold is 0.90.
     /// </summary>
-    /// <param name="articles">Registry containing all 21 GDPR article composites.</param>
+    /// <param name="articles">Registry containing all 29 GDPR article composites
+    /// (21 baseline + 8 Pillar 6 governance articles added in v1.1 / plan-13 T1.1).</param>
     /// <returns>A fully configured <see cref="CompositeEval"/> for the Audit-Grade preset.</returns>
     public static CompositeEval AuditGrade(ArticlesRegistry articles)
     {
@@ -122,19 +147,24 @@ public static partial class GdprBenchmark
         return AuditGradeInternal(articles, name);
     }
 
+    // AuditGrade weights mirror Standard (see Standard() rationale block); the only
+    // delta is the top-level CapByWorstAggregation + 0.90 threshold. The plan-13 T1.1
+    // rebalancing introduces Pillar 6 at 0.15 in the cap-by-worst pool so a Pillar 6
+    // governance failure (e.g., DPIA-trigger trap miss) can drag the audit verdict.
     private static CompositeEval AuditGradeInternal(ArticlesRegistry articles, string name) =>
         new CompositeEval(
             key: "gdpr.compliance.auditgrade",
             name: name,
             category: "compliance.gdpr",
-            version: "1.0.0",
+            version: "1.1.0",
             components:
             [
-                new(Pillar1Foundations.Build(articles),     0.25),
-                new(Pillar2LawfulBasis.Build(articles),     0.15),
-                new(Pillar3SubjectRights.Build(articles),   0.30),
-                new(Pillar4Transparency.Build(articles),    0.15),
+                new(Pillar1Foundations.Build(articles),     0.20),
+                new(Pillar2LawfulBasis.Build(articles),     0.12),
+                new(Pillar3SubjectRights.Build(articles),   0.25),
+                new(Pillar4Transparency.Build(articles),    0.13),
                 new(Pillar5PrivacyDesign.Build(articles),   0.15),
+                new(Pillar6Governance.Build(articles),      0.15),
             ],
             aggregation: CapByWorstAggregation.Instance,
             threshold: 0.90);

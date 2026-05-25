@@ -2,7 +2,20 @@
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 
-namespace AgentEval.Evals;
+// Phase-10 T3.1 (2026-05-25, BREAKING): moved out of `AgentEval.Abstractions`.
+// EvaluatorCostMap is a concrete data dictionary that hard-codes the cost
+// tier of every agentic evaluator AgentEval ships — it is NOT an
+// abstraction. Hosting it in AgentEval.Abstractions forced every consumer
+// of the contract surface to load the full evaluator list. Moving it under
+// AgentEval.Evals.Agentic.Cost restores the layering invariant
+// (Abstractions = contracts only; Evals.Agentic = catalogue + impl).
+// External consumers binding to `using AgentEval.Abstractions.Evals;` for
+// EvaluatorCostMap must switch to `using AgentEval.Evals.Agentic.Cost;`.
+// The umbrella `AgentEval` NuGet flows the new namespace transparently.
+
+using AgentEval.Evals; // keep the EvaluatorCostTier enum binding (still in Abstractions)
+
+namespace AgentEval.Evals.Agentic.Cost;
 
 /// <summary>
 /// Static map from evaluator key (e.g. <c>"task_completion"</c>) to its
@@ -19,7 +32,7 @@ namespace AgentEval.Evals;
 /// </remarks>
 public static class EvaluatorCostMap
 {
-    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, EvaluatorCostTier> s_tiers = new(StringComparer.OrdinalIgnoreCase)
+    private static readonly global::System.Collections.Concurrent.ConcurrentDictionary<string, EvaluatorCostTier> s_tiers = new(StringComparer.OrdinalIgnoreCase)
     {
         // ── Plan 05 — System (5) ───────────────────────────────────────────
         ["task_completion"]                 = EvaluatorCostTier.Low,

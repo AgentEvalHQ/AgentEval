@@ -14,7 +14,7 @@
 | **01** | `.agenteval/` Output Store | ✅ shipped | Workspace contract, audit-chain hashing, three store impls, `agenteval init/doctor/migrate` CLI |
 | **02** | Composite Evaluations | ✅ shipped | Recursive `IEval` model, atomic + composite primitives, 7 aggregations, depth cap, DI |
 | **03** | GDPR Compliance Benchmark | ✅ shipped (5/5 pillars PASS calibration) — Pillar 6 governance probes deferred to v1.1 | 21 article YAMLs, 5 pillars, evidence + PDF reporter, calibration suite |
-| **04** | EU AI Act Compliance Benchmark | ✅ shipped (6/6 pillars PASS calibration with 2 documented threshold overrides) — Art 9/10 awareness probes deferred to v1.1 | EU AI Act articles + pillars; honest scope for GPAI / admin obligations |
+| **04** | EU AI Act Compliance Benchmark | ✅ shipped (6/6 pillars PASS calibration with 2 documented threshold overrides — Pillar 1 at 0.65/0.35 per Path A' R5 judge-model-drift, Pillar 6 GPAI at 0.60/0.25) — Art 9/10 awareness probes shipped in v1.1 T1.2 | EU AI Act articles + pillars; honest scope for GPAI / admin obligations |
 | **05** | Foundry-equivalent Agentic Suite | ✅ shipped — calibration coverage is partial today (headline system-and-process + RAG-quality categories meet the strict gate; remaining categories await calibration evidence in v1.1) | Broad agentic evaluator suite across 10 categories; relationship to upstream Foundry is prompt-provenance-only (cited per-file) |
 | **06** | Memory / Multi-turn / Reasoning / UX | ✅ shipped | Memory recall, multi-turn coherence, reasoning, UX evaluators wired into the 60-suite |
 | **07** | Mission Control — Design | ✅ design-doc | Phase-1 viewer + Phase-2 server architecture; identity, audit, ingestion contracts |
@@ -64,7 +64,7 @@
 - **Deferred indefinitely**: multi-language scenarios (English-only honest scope), Art 88 Member-State variants, external compliance-platform integrations.
 
 ### Plan 04 — EU AI Act Compliance Benchmark
-**Status**: Shipped in v0.8.1-beta. **6 of 6 calibration pillars PASS** — 4 at default thresholds + 2 with documented per-pillar overrides (`pillar1-prohibited-25` at 0.75/0.50 absorbs Art 5 prohibited-practice stochasticity; `pillar6-gpai-5` at 0.60/0.25 reflects Art 51–55 GPAI scope ambiguity).
+**Status**: Shipped in v0.8.1-beta. **6 of 6 calibration pillars PASS** — 4 at default thresholds + 2 with documented per-pillar overrides (`pillar1-prohibited-25` at 0.75/0.50 absorbs Art 5 prohibited-practice stochasticity; `pillar6-gpai-12` at 0.60/0.25 reflects Art 51–55 GPAI scope ambiguity).
 **Scope**: Same shape as GDPR, EU AI Act articles + pillars.
 **Highlights**:
 - Pillars cover prohibited practices (Art 5), high-risk-system obligations (Art 13/14/15/17/26/27), deployer-side awareness (Art 50), GPAI awareness (Art 51–55).
@@ -127,7 +127,7 @@
 
 **Phases**:
 - **Phase 1 — Honest-scope completion (~8 working days)**: GDPR Pillar 6 governance probes, EU AI Act Art 9 + 10 awareness probes, agentic calibration coverage extension to the remaining categories, recalibrate all three benchmarks after content additions, structured `Recommendations[]` shape, evaluator-card category-drift audit.
-- **Phase 2 — Adoption leverage (~2 working days)**: `dotnet tool install --global AgentEval.Cli --prerelease`, ECS 2026 showcase smoke.
+- **Phase 2 — Adoption leverage (~2 working days)**: ✅ `dotnet tool install --global AgentEval.Cli --prerelease` (landed 2026-05-24 — CLI is now packed as a `dotnet tool` with multi-TFM net8 LTS / net10 targets; install picks the highest compatible runtime); ECS 2026 showcase smoke.
 - **Phase 3 — Architecture cleanup + audit hardening (~7 working days)**: Promote `samples/AgentEval.GdprBenchmark` + `samples/AgentEval.EuAiActBenchmark` → `src/AgentEval.Compliance.*` (CLI-references-samples antipattern fix), relocate `EvaluatorCostMap` out of Abstractions, thread `judgeModel` through agentic factories, `agenteval doctor` schema validation, manifest+evidence body re-hashing with canonical-JSON projection (RFC 8785). (The "disambiguate two `AgenticBenchmark` types" task was resolved by the v0.9.0-beta removal of the legacy class.)
 - **Phase 4 — Stretch (~3 working days)**: `AdjudicatedMultiJudgeWrapper` kappa-rename cosmetic fix, `runCostBreakdown` unknown-bucket semantics split, MC1.4.5 red-team campaign SPA page.
 
@@ -157,7 +157,7 @@ These items live in the backlogs as inventory; they will NOT enter a v1.x plan w
 | Implementation plans 00–08 | `strategy/FutureFeatures/todo/0{0..8}-*.md` (local-only / gitignored) |
 | Closed master tracking (review-03 8-phase remediation) | `strategy/FutureFeatures/todo/10-review03-findings-fix-implementation-plan.md` |
 | v1.1 plan (filtered + sequenced) | `strategy/FutureFeatures/todo/11-v1.1-implementation-plan.md` |
-| Plan-first backlog (full inventory) | `strategy/FutureFeatures/todo/deferred-pending.md` |
+| Plan-first backlog (full inventory) | `strategy/FutureFeatures/todo/13-pending-issues-tasks.md` (v1.1 consolidation supersedes earlier `deferred-pending.md`, archived under `done/`) |
 | Feature-first backlog (same items, regrouped) | `strategy/FutureFeatures/todo/pending-tasks-by-feature.md` |
 | Calibration baselines (3 benchmarks) | `strategy/FutureFeatures/calibration-baselines/{gdpr,eu-ai-act,agentic}-calibration-report.md` |
 | Honest-scope disclaimers (public-facing) | `docs/benchmarks/{gdpr,eu-ai-act,agentic}/getting-started.md` |

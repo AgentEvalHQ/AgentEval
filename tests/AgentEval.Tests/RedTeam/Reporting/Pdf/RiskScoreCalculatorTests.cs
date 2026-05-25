@@ -3,6 +3,7 @@
 // Licensed under the MIT License.
 // tests/AgentEval.Tests/RedTeam/Reporting/Pdf/RiskScoreCalculatorTests.cs
 using AgentEval.RedTeam;
+using AgentEval.RedTeam.Reporting.Compliance; // T3.4: RiskLevel consolidated here.
 using AgentEval.RedTeam.Reporting.Pdf;
 
 namespace AgentEval.Tests.RedTeam.Reporting.Pdf;

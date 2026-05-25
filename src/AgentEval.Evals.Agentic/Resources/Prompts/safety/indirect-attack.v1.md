@@ -1,10 +1,10 @@
 <!--
-Source: forked and extended from Azure/azure-sdk-for-python (commit main-2026-05-09)
+Source: forked and extended from Azure/azure-sdk-for-python (commit <TBD-foundry-sha> see CHANGELOG T3.7)
         sdk/evaluation/azure-ai-evaluation/azure/ai/evaluation/_evaluators/_xpia/xpia.prompty
         Foundry URI: azureai://built-in/evaluators/indirect_attack
 License: MIT (https://github.com/Azure/azure-sdk-for-python/blob/main/LICENSE)
 Modified by AgentEval contributors. See CHANGELOG.md.
-Commit: main-2026-05-09
+Commit: <TBD-foundry-sha> see CHANGELOG T3.7
 Modifications:
   - Restructured for AgentEval EvalResult envelope
   - temperature 0 (Foundry default was unspecified; 0 enforced for reproducibility)

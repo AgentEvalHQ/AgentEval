@@ -77,6 +77,24 @@ public interface IOutputStoreReader
     /// <summary>Retrieves a specific compliance evidence document by regulation, subject, and timestamp.</summary>
     Task<ComplianceEvidence?> GetComplianceEvidenceAsync(string regulation, SubjectIdentity subject, string timestamp, CancellationToken ct = default);
 
+    // ─── Red-team campaigns (read) ───────────────────────────────────────────
+
+    /// <summary>
+    /// T3.6 (2026-05-25) — enumerates all red-team campaign manifests stored
+    /// under <c>.agenteval/red-team/{campaign-id}/manifest.json</c>. Empty
+    /// when the directory is missing or unreadable. Manifest IDs are
+    /// <c>{sanitizedName}_{timestamp}</c> and round-trip back through
+    /// <see cref="GetRedTeamCampaignAsync"/>.
+    /// </summary>
+    IAsyncEnumerable<RedTeamCampaignManifest> ListRedTeamCampaignsAsync(CancellationToken ct = default);
+
+    /// <summary>
+    /// T3.6 (2026-05-25) — fetches a single red-team campaign manifest by
+    /// campaign id, or <c>null</c> when the campaign does not exist or the
+    /// id violates path-safety rules.
+    /// </summary>
+    Task<RedTeamCampaignManifest?> GetRedTeamCampaignAsync(string campaignId, CancellationToken ct = default);
+
     // ─── Workspace ────────────────────────────────────────────────────────────
 
     /// <summary>The resolved workspace root path, or null when the store is unavailable.</summary>
@@ -84,4 +102,27 @@ public interface IOutputStoreReader
 
     /// <summary>Indicates whether the store is ready to accept operations.</summary>
     bool IsAvailable { get; }
+
+    // ─── Path resolution (read-only) ─────────────────────────────────────────
+
+    /// <summary>
+    /// Returns the canonical absolute on-disk path of the directory that holds
+    /// the given subject's run (the folder containing <c>manifest.json</c>,
+    /// <c>summary.json</c>, <c>scenarios/</c>, etc.). Pure projection — does not
+    /// touch the filesystem; callers should not assume the directory exists.
+    /// </summary>
+    /// <remarks>
+    /// Plan-13 T4.1b item 11. Before this accessor shipped, callers (notably
+    /// <c>WriteReportsViaStoreAsync</c> in the samples helper) re-implemented the
+    /// run-dir layout by hand (<c>new FileSystemLayout(root).RunDir(subject, runId)</c>),
+    /// which leaked the <c>FileSystemLayout</c> Sanitize() rules across
+    /// layers and was a v0.10.1 review finding. Implementations that have no
+    /// concept of an on-disk run folder (in-memory test doubles, virtual stores)
+    /// may throw <see cref="NotSupportedException"/>; callers depending on the
+    /// returned path should guard with <see cref="IsAvailable"/>.
+    /// </remarks>
+    /// <param name="subject">Required.</param>
+    /// <param name="runId">Required. Must match the run id returned by <see cref="IOutputStore.StartRunAsync"/>.</param>
+    /// <returns>The canonical run directory path; never null when <see cref="IsAvailable"/> is true.</returns>
+    string ResolveRunDirectory(SubjectIdentity subject, string runId);
 }

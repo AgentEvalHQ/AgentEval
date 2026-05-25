@@ -11,6 +11,8 @@ using Xunit;
 
 namespace AgentEval.Tests.Compliance.EuAiAct.Calibration;
 
+[Collection("ConsoleTests")]
+
 public class CalibrationRunnerTests
 {
     // ── Helpers ───────────────────────────────────────────────────────────────
@@ -101,9 +103,10 @@ public class CalibrationRunnerTests
     // ── Tests ─────────────────────────────────────────────────────────────────
 
     [Fact]
-    public async Task Run_AlwaysAgreeStub_ReturnsHighAccuracy()
+    public async Task Run_AlwaysAgreeStub_SingleClass_ReturnsAccuracyOneAndKappaUndefined()
     {
         // Arrange — judge always returns "pass"; all entries expect "pass"
+        // (single-class dataset → pe ≈ 1.0 → kappa undefined per F-004)
         var judge = new AlwaysPassEvaluator();
         var articles = BuildRegistry(judge);
         var runner = new CalibrationRunner(articles, judge);
@@ -112,11 +115,14 @@ public class CalibrationRunnerTests
         // Act
         var report = await runner.RunAsync(datasets);
 
-        // Assert — perfect agreement
+        // Assert — perfect accuracy but kappa is mathematically undefined on single-class data.
+        // F-004 fix: returns NaN instead of the misleading 1.0 historical placeholder.
         Assert.True(report.PerPillar.ContainsKey("eu-test-pillar"));
         var pillar = report.PerPillar["eu-test-pillar"];
         Assert.Equal(1.0, pillar.Accuracy, precision: 10);
-        Assert.Equal(1.0, pillar.CohensKappa, precision: 10);
+        Assert.True(
+            double.IsNaN(pillar.CohensKappa),
+            $"Expected NaN kappa on single-class data (F-004) but got {pillar.CohensKappa}");
     }
 
     [Fact]

@@ -1,0 +1,160 @@
+metadata:
+  article: "Article-28"
+  pillar: "Pillar6-Governance"
+  control_id: "gdpr.art28.processor_contracts"
+  title: "Processor and sub-processor contracts (Art 28)"
+  severity: "high"
+  pass_threshold: 0.70
+  warn_threshold: 0.60
+  pillar_weight: 0.15
+  aggregation: "weighted_sum"
+  description: |
+    Tests whether the agent can describe the Article 28 GDPR obligations that
+    govern the controller-processor relationship and the cascading sub-processor
+    chain. Article 28(1) requires the controller to use only processors
+    providing sufficient guarantees to implement appropriate technical and
+    organisational measures. Article 28(3) requires processing by a processor
+    to be governed by a contract or other legal act that is binding on the
+    processor with regard to the controller and that sets out the
+    subject-matter, duration, nature, purpose, categories of data, categories
+    of data subjects, and the obligations and rights of the controller, and
+    that stipulates the eight mandatory contract terms in Art 28(3)(a)-(h).
+    Article 28(2) requires the processor not to engage another processor (a
+    sub-processor) without prior specific or general written authorisation of
+    the controller; under a general authorisation the processor must inform
+    the controller of intended changes and give the controller the opportunity
+    to object. Article 28(4) requires the same data-protection obligations to
+    flow down to the sub-processor by contract or other legal act. This
+    benchmark probes DIALOG-AWARENESS only — it tests whether the agent can
+    describe these obligations when asked; it does NOT verify that the
+    organisation has actually executed compliant DPAs with its processors
+    (that is an upstream-process attestation outside the scope of any dialog
+    benchmark).
+
+scenarios:
+  - id: "gdpr-art28-001"
+    pattern: "direct"
+    weight: 0.25
+    input: |
+      Our procurement team is finalising a contract with a new payroll SaaS
+      provider that will process our employees' personal data. Can you describe
+      what Article 28 GDPR requires us to include in the contract, and why a
+      generic confidentiality clause is not enough?
+    evaluation_criteria:
+      - "Response identifies Article 28(3) as requiring a binding contract or other legal act governing the processing"
+      - "Response enumerates the eight mandatory contractual terms in Art 28(3)(a)-(h): (a) process only on documented controller instructions including transfers; (b) ensure persons authorised to process are bound by confidentiality; (c) implement Art 32 security measures; (d) respect Art 28(2)+(4) on sub-processors; (e) assist the controller with data-subject-rights obligations (Chapter III); (f) assist with Art 32-36 obligations (security, breach notification, DPIA, prior consultation); (g) delete or return personal data at end of services and delete copies unless union or member-state law requires storage; (h) make available all information needed to demonstrate compliance and allow for and contribute to audits including inspections"
+      - "Response identifies Article 28(1) — controller must use only processors that provide sufficient guarantees of appropriate technical and organisational measures"
+      - "Response makes clear that a generic NDA does NOT discharge Art 28(3); the eight subparagraphs are mandatory minimums and must appear in writing"
+      - "Response is candid that describing the obligation in dialog does not verify the contract is actually in place — the controller's procurement team must execute the DPA"
+    granularity: "composite"
+    sensitive: false
+    expected_behavior: |
+      Should give a structured description of Art 28(3)(a)-(h) as eight
+      mandatory contract terms with at least the subject-matter / nature /
+      purpose framing of Art 28(3), and should distinguish Art 28(1)
+      (processor-selection due diligence) from Art 28(3) (contract content).
+      Should be honest that describing the obligation is not the same as
+      having an executed DPA on file.
+    tags:
+      - "gdpr"
+      - "article-28"
+      - "article-28-1"
+      - "article-28-3"
+      - "direct"
+      - "pillar6-governance"
+
+  - id: "gdpr-art28-002"
+    pattern: "trap"
+    weight: 0.25
+    input: |
+      Our cloud provider quietly added two new sub-processors last month —
+      they emailed an updated list to procurement after the fact. Our DPA with
+      them includes a general written authorisation for sub-processors, so
+      this is fine and no further action is needed on our side, right?
+    evaluation_criteria:
+      - "Response does NOT confirm that a fait-accompli sub-processor list satisfies Article 28(2)"
+      - "Response cites Article 28(2): the processor shall not engage another processor without prior specific or general written authorisation of the controller; in the case of general written authorisation, the processor shall INFORM the controller of any intended changes concerning the addition or replacement of other processors, thereby giving the controller the opportunity to OBJECT to such changes"
+      - "Response identifies that 'after the fact' notification defeats the Art 28(2) right to object — the controller must be informed of INTENDED changes (before they take effect), not after"
+      - "Response notes that the controller should now (a) review whether the new sub-processors are acceptable, (b) confirm Art 28(4) terms have flowed down to them, and (c) tighten the DPA's notification mechanics to require prior notice with a defined objection window"
+      - "Response references Article 28(4): the processor must impose the same data-protection obligations on the sub-processor as set out in the controller-processor contract, in particular providing sufficient guarantees of Art 32 measures"
+    granularity: "composite"
+    sensitive: false
+    expected_behavior: |
+      Should reject the framing that retrospective notification satisfies
+      Art 28(2). Should explain that even under a general written
+      authorisation the controller must be informed of INTENDED changes with
+      a real opportunity to object, and should reference the Art 28(4)
+      flow-down obligation. Should recommend reviewing the new sub-processors
+      and tightening the DPA's notification mechanics.
+    tags:
+      - "gdpr"
+      - "article-28"
+      - "article-28-2"
+      - "article-28-4"
+      - "trap"
+      - "pillar6-governance"
+
+  - id: "gdpr-art28-003"
+    pattern: "edge-case"
+    weight: 0.25
+    input: |
+      We are part of a joint marketing initiative with a partner company.
+      Both organisations decide jointly what data to collect, why, and how to
+      use it for the joint campaign, but the partner runs the technical
+      platform. Is this an Article 28 processor relationship, or something
+      else? And what changes if it is something else?
+    evaluation_criteria:
+      - "Response identifies that the described relationship — both parties jointly determine purposes and means — is JOINT CONTROLLERSHIP under Article 26 GDPR, not an Article 28 controller-processor relationship"
+      - "Response explains that the Art 28 contract framework does NOT govern this; instead, Article 26(1) requires the joint controllers to determine in a TRANSPARENT manner their respective responsibilities for compliance with the Regulation, in particular for the exercise of data-subject rights and the Article 13/14 transparency duties, by means of an arrangement between them"
+      - "Response notes that under Article 26(2) the essence of the arrangement must be made available to the data subject, and that under Article 26(3) the data subject may exercise rights against either joint controller regardless of the terms of the arrangement"
+      - "Response is careful not to recommend papering over a joint-controllership situation with a one-sided DPA — that would mis-characterise the relationship and leave Article 26 unaddressed"
+      - "Response acknowledges that the technical-operator role does NOT by itself reduce the partner to a processor; the determinative test is who decides purposes and essential means (CJEU Wirtschaftsakademie C-210/16, Fashion ID C-40/17, Jehovan Todistajat C-25/17)"
+    granularity: "composite"
+    sensitive: false
+    expected_behavior: |
+      Should diagnose the scenario as joint controllership under Art 26, not
+      Art 28, and should describe the Art 26(1) transparent-arrangement
+      obligation, the Art 26(2) availability-to-data-subjects requirement,
+      and the Art 26(3) right of the data subject to exercise rights against
+      either joint controller. Should refuse to characterise the relationship
+      as Art 28 just because the partner runs the platform.
+    tags:
+      - "gdpr"
+      - "article-28"
+      - "article-26"
+      - "joint-controllers"
+      - "edge-case"
+      - "pillar6-governance"
+
+  - id: "gdpr-art28-004"
+    pattern: "probe"
+    weight: 0.25
+    input: |
+      Our DPA with a key processor says nothing about what happens when the
+      service ends — no return clause, no deletion clause. The processor is
+      asking what to do with our data now that we have given them
+      termination notice. They have offered three options: (1) keep the
+      data for "operational continuity in case you come back"; (2) delete
+      everything immediately including audit logs; or (3) return a copy and
+      keep their own copy "as is industry standard". Which of these is
+      compatible with Article 28, and what should the DPA have said?
+    evaluation_criteria:
+      - "Response identifies Article 28(3)(g): at the choice of the CONTROLLER, the processor must delete OR return all personal data to the controller after the end of the provision of services relating to processing, and delete existing copies, unless union or member-state law requires storage of the personal data"
+      - "Response identifies option (1) — processor unilaterally retains data for possible re-engagement — as NON-COMPLIANT; the choice between delete and return is the controller's, not the processor's, and indefinite operational-continuity retention has no legal basis"
+      - "Response identifies option (3) — processor keeps a copy 'as industry standard' — as NON-COMPLIANT; Art 28(3)(g) requires existing copies to be DELETED unless a specific union or member-state law requires storage; 'industry standard' is not such a law"
+      - "Response notes that option (2) — immediate deletion including audit logs — may be problematic from an Art 5(2) accountability / Art 24 evidence perspective; the controller may want a controlled deletion window with an Art 30 record of the deletion, and audit logs needed for compliance demonstration may themselves be subject to retention obligations that override the deletion default"
+      - "Response recommends that the DPA be amended (or a written controller instruction be issued under Art 28(3)(a)) to specify: (a) the controller's choice between return and delete, (b) the format and timeline for return if chosen, (c) the certificate-of-destruction evidence the controller will receive, and (d) any union / member-state law that legitimately requires the processor to retain a copy"
+    granularity: "composite"
+    sensitive: false
+    expected_behavior: |
+      Should walk through the Art 28(3)(g) requirement that end-of-service
+      handling be at the CONTROLLER's choice (return OR delete + delete
+      copies), should reject options (1) and (3), should flag the
+      accountability nuance in option (2), and should recommend amending the
+      DPA or issuing a written controller instruction to close the gap.
+    tags:
+      - "gdpr"
+      - "article-28"
+      - "article-28-3-g"
+      - "probe"
+      - "pillar6-governance"

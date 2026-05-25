@@ -317,6 +317,116 @@ public class PerformanceBenchmarkAdapterTests
         Assert.Equal(3, result.Details.SubResults.Count);
     }
 
+    // ─── Test 6 (P0-1): cost-leaf actually consults the pricing table ────────
+
+    /// <summary>
+    /// Regression guard for P0-1 (Sprint 0). Before the fix, the cost-leaf was
+    /// silently hard-coded to PASS because <c>EvaluateOptions.CostModelName</c>
+    /// defaulted to null and the fallback to <c>_agent.Name</c> never matched
+    /// the pricing table — so <c>EstimatedCostUSD</c> stayed null and
+    /// the cost-leaf builder defaulted to score=1.0 / "pass".
+    /// This test pins the new behaviour: when the operator
+    /// supplies a real pricing-table key via <c>CostModelName</c>, the cost
+    /// leaf MUST produce a real cost number (cost_usd > 0) and label it
+    /// against the budget — proving the pricing-table lookup actually happened.
+    /// </summary>
+    [Fact]
+    public async Task PerformanceBenchmark_CostLeaf_UsesCostModelName_FromOptions()
+    {
+        // Arrange — agent advertises token usage so the pricing lookup has
+        // something to multiply against. "MyAgent" is deliberately NOT a
+        // pricing-table key; without the fix, the cost leaf would fall back to
+        // the agent name, miss the pricing table, and return null cost.
+        var agent = new TokenReportingAgent(
+            name: "MyAgent",
+            response: "ok",
+            inputTokens: 1000,
+            outputTokens: 500);
+
+        // The fix: caller sets CostModelName to a known pricing-table entry
+        // (matches the pattern the CLI now uses with AZURE_OPENAI_DEPLOYMENT and
+        // the Sample now uses with AIConfig.ModelDeployment).
+        var optsWithCostModel = new PerformanceBenchmarkEvaluateOptions
+        {
+            P99LatencyThresholdMs = 60_000,
+            LatencyIterationsPerPrompt = 1,
+            WarmupIterations = 0,
+            MinThroughputRps = 0.01,
+            ThroughputConcurrentRequests = 1,
+            ThroughputDuration = TimeSpan.FromMilliseconds(50),
+            MaxCostUSD = 1.0,
+            CompositePassThreshold = 0.6,
+            CostModelName = "gpt-4o-mini",   // <-- the P0-1 fix
+        };
+        var benchmark = FastBenchmark(agent, optsWithCostModel);
+        var input = new EvalInput("hi");
+
+        // Act
+        var result = await benchmark.EvaluateAsync(input);
+
+        // Assert — cost leaf hit a real pricing entry, not the silent-PASS fallback
+        Assert.NotNull(result.Details.SubResults);
+        var costLeaf = result.Details.SubResults.Single(r => r.Metric.Key == "perf_cost");
+
+        Assert.NotNull(costLeaf.Details.Dimensions);
+        Assert.True(costLeaf.Details.Dimensions.ContainsKey("cost_usd"),
+            "Cost leaf must surface cost_usd dimension");
+        var costUsd = costLeaf.Details.Dimensions["cost_usd"];
+        Assert.True(costUsd > 0,
+            $"Expected cost_usd > 0 for gpt-4o-mini with 1000 in / 500 out tokens; got {costUsd}. " +
+            "If this is 0, CostModelName was ignored and the leaf fell back to the silent-PASS branch.");
+
+        // And — the cost leaf evidence (Reference field carries "agent (model)") must
+        // mention the resolved model name we asked for.
+        Assert.NotNull(costLeaf.Details.Evidence);
+        Assert.Contains(costLeaf.Details.Evidence,
+            e => e.Reference.Contains("gpt-4o-mini", StringComparison.OrdinalIgnoreCase));
+    }
+
+    /// <summary>
+    /// Companion to <see cref="PerformanceBenchmark_CostLeaf_UsesCostModelName_FromOptions"/>:
+    /// when the caller does NOT pass <c>CostModelName</c> but the agent populates
+    /// <see cref="AgentResponse.ModelId"/>, the new priority chain MUST still find
+    /// the pricing entry via the response's reported model id (priority #2). This
+    /// is the safety net that catches frameworks like MAF where deployment id is
+    /// not known to the harness up front.
+    /// </summary>
+    [Fact]
+    public async Task PerformanceBenchmark_CostLeaf_FallsBackTo_ResponseModelId_WhenOptionsMissing()
+    {
+        // Arrange — agent.Name is not a pricing key, but ModelId IS.
+        var agent = new TokenReportingAgent(
+            name: "MyAgent",
+            response: "ok",
+            inputTokens: 1000,
+            outputTokens: 500,
+            modelId: "gpt-4o-mini");
+
+        // No CostModelName set — must fall back to response.ModelId.
+        var opts = new PerformanceBenchmarkEvaluateOptions
+        {
+            P99LatencyThresholdMs = 60_000,
+            LatencyIterationsPerPrompt = 1,
+            WarmupIterations = 0,
+            MinThroughputRps = 0.01,
+            ThroughputConcurrentRequests = 1,
+            ThroughputDuration = TimeSpan.FromMilliseconds(50),
+            MaxCostUSD = 1.0,
+            CompositePassThreshold = 0.6,
+            CostModelName = null,
+        };
+        var benchmark = FastBenchmark(agent, opts);
+
+        // Act
+        var result = await benchmark.EvaluateAsync(new EvalInput("hi"));
+
+        // Assert — response.ModelId rescued the lookup
+        var costLeaf = result.Details.SubResults!.Single(r => r.Metric.Key == "perf_cost");
+        var costUsd = costLeaf.Details.Dimensions!["cost_usd"];
+        Assert.True(costUsd > 0,
+            $"Expected cost_usd > 0 via response.ModelId fallback; got {costUsd}.");
+    }
+
     // ─── Private test helpers ─────────────────────────────────────────────────
 
     /// <summary>
@@ -341,6 +451,49 @@ public class PerformanceBenchmarkAdapterTests
         {
             await Task.Delay(_delay, cancellationToken);
             return new AgentResponse { Text = _response };
+        }
+    }
+
+    /// <summary>
+    /// Agent that returns a fixed response with explicit token usage (and optionally
+    /// a reported <see cref="AgentResponse.ModelId"/>). Used to exercise the cost-leaf
+    /// pricing-table lookup in P0-1 regression tests.
+    /// </summary>
+    private sealed class TokenReportingAgent : IEvaluableAgent
+    {
+        private readonly string _response;
+        private readonly int _inputTokens;
+        private readonly int _outputTokens;
+        private readonly string? _modelId;
+
+        public string Name { get; }
+
+        public TokenReportingAgent(
+            string name,
+            string response,
+            int inputTokens,
+            int outputTokens,
+            string? modelId = null)
+        {
+            Name = name;
+            _response = response;
+            _inputTokens = inputTokens;
+            _outputTokens = outputTokens;
+            _modelId = modelId;
+        }
+
+        public Task<AgentResponse> InvokeAsync(string input, CancellationToken cancellationToken = default)
+        {
+            return Task.FromResult(new AgentResponse
+            {
+                Text = _response,
+                ModelId = _modelId,
+                TokenUsage = new TokenUsage
+                {
+                    PromptTokens = _inputTokens,
+                    CompletionTokens = _outputTokens,
+                },
+            });
         }
     }
 }

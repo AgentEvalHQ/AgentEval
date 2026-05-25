@@ -108,7 +108,7 @@ public class BinaryEndpointTests : IClassFixture<FilesystemSeededFactory>, IDisp
     }
 
     [Fact]
-    public async Task ComplianceSchema_ReturnsBaseSchema()
+    public async Task ComplianceSchema_Gdpr_ReturnsGdprWrapperSchema()
     {
         using var client = _factory.CreateClient();
         var response = await client.GetAsync("/api/v1/compliance/gdpr/schema");
@@ -116,8 +116,37 @@ public class BinaryEndpointTests : IClassFixture<FilesystemSeededFactory>, IDisp
         Assert.Equal("application/schema+json", response.Content.Headers.ContentType?.MediaType);
 
         var body = await response.Content.ReadAsStringAsync();
-        // The base evidence.schema.json declares a $schema URI.
+        // Phase-8 T2.7 — must return the GDPR wrapper schema specifically.
         Assert.Contains("$schema", body, StringComparison.Ordinal);
+        Assert.Contains("gdpr-evidence", body, StringComparison.Ordinal);
+        Assert.Contains("gdprAttestation", body, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task ComplianceSchema_EuAiAct_ReturnsEuAiActWrapperSchema()
+    {
+        using var client = _factory.CreateClient();
+        var response = await client.GetAsync("/api/v1/compliance/eu-ai-act/schema");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("application/schema+json", response.Content.Headers.ContentType?.MediaType);
+
+        var body = await response.Content.ReadAsStringAsync();
+        Assert.Contains("$schema", body, StringComparison.Ordinal);
+        Assert.Contains("eu-ai-act-evidence", body, StringComparison.Ordinal);
+        Assert.Contains("euAiActAttestation", body, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task ComplianceSchema_UnknownRegulation_Returns404()
+    {
+        using var client = _factory.CreateClient();
+        var response = await client.GetAsync("/api/v1/compliance/totally-unknown-regulation/schema");
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+
+        var body = await response.Content.ReadAsStringAsync();
+        // The 404 body explains the unknown regulation so an SPA can surface the error
+        // rather than treating the response as a generic "not found".
+        Assert.Contains("Unknown regulation", body, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

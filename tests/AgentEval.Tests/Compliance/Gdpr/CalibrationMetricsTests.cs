@@ -206,4 +206,52 @@ public class CalibrationMetricsTests
         // Assert
         Assert.Equal(0.0, result, precision: 10);
     }
+
+    // ── F-004: degenerate / single-class data ─────────────────────────────────
+
+    [Fact]
+    public void CohensKappa_SingleClass_AllAgree_ReturnsNaN()
+    {
+        // Arrange — 5 entries, both raters always say "pass" → single-class dataset.
+        // Mathematically: po = 1, pe = 1*1 = 1, kappa = 0/0 (undefined).
+        // Pre-F-004 this returned 1.0 (misleading). After F-004 it returns NaN so the
+        // consumer renders "UNDEFINED" and the aggregator gate fails the pillar (forcing
+        // operator review of the golden dataset's class balance).
+        var pairs = new List<(string Expected, string Actual)>
+        {
+            ("pass", "pass"),
+            ("pass", "pass"),
+            ("pass", "pass"),
+            ("pass", "pass"),
+            ("pass", "pass"),
+        };
+
+        // Act
+        var result = CalibrationMetrics.CohensKappa(pairs);
+
+        // Assert
+        Assert.True(
+            double.IsNaN(result),
+            $"Expected NaN on single-class data (F-004 audit-honesty fix) but got {result}");
+    }
+
+    [Fact]
+    public void CohensKappa_NaNDoesNotPassAggregatorGate()
+    {
+        // F-004 acceptance: aggregator gates that compare kappa >= threshold must treat
+        // NaN as not-PASS (forces operator review). NaN comparisons in C# evaluate to
+        // false for >=, <=, >, <, == — so the gate naturally fails. Pin this behaviour
+        // so a future refactor that switches to a NaN-tolerant comparison breaks the test.
+        var pairs = new List<(string Expected, string Actual)>
+        {
+            ("pass", "pass"),
+            ("pass", "pass"),
+            ("pass", "pass"),
+        };
+
+        var kappa = CalibrationMetrics.CohensKappa(pairs);
+        const double threshold = 0.70;
+
+        Assert.False(kappa >= threshold, "NaN kappa must NOT pass the aggregator gate");
+    }
 }

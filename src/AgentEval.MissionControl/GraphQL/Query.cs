@@ -4,6 +4,7 @@
 
 using System.Runtime.CompilerServices;
 using AgentEval.Evals;
+using AgentEval.Evals.Agentic.Cost; // T3.1: EvaluatorCostMap relocated here.
 using AgentEval.MissionControl.GraphQL;
 using AgentEval.MissionControl.Services;
 using AgentEval.Output;
@@ -160,6 +161,42 @@ public sealed class Query
     }
 
     /// <summary>
+    /// T3.8 (2026-05-25) — Relay-shaped paginated variant of <see cref="Subjects"/>.
+    /// Default page size 50, max 200. Cursors are opaque (base64 index); pass
+    /// the previous response's <c>pageInfo.endCursor</c> back as <paramref name="after"/>
+    /// to advance. Returns an empty page (no edges, hasNextPage=false) when the
+    /// store is unavailable. The Connection shape gives the SPA bounded payload
+    /// sizes for large workspaces without forcing a deprecation of the
+    /// existing <see cref="Subjects"/> resolver.
+    /// </summary>
+    public async Task<Connection<SubjectInfo>> SubjectsConnection(
+        [Service] IOutputStoreReader store,
+        SubjectKind? kind = null,
+        int? first = null,
+        string? after = null,
+        CancellationToken ct = default)
+    {
+        if (!store.IsAvailable)
+        {
+            return new Connection<SubjectInfo>(
+                Array.Empty<Edge<SubjectInfo>>(),
+                new PageInfo(false, false, null, null),
+                TotalCount: 0);
+        }
+
+        // Materialise + sort once. Subjects are bounded by ListSubjectsAsync;
+        // for the v1 scale (≤ thousands of subjects per workspace) the up-front
+        // materialisation is cheap and gives cursor stability across page calls.
+        var subjects = new List<SubjectInfo>();
+        await foreach (var s in store.ListSubjectsAsync(kind, ct))
+        {
+            subjects.Add(s);
+        }
+        subjects.Sort((a, b) => string.CompareOrdinal(a.Identity.Name, b.Identity.Name));
+        return Pagination.Paginate(subjects, first, after);
+    }
+
+    /// <summary>
     /// Returns a single subject by kind + name, or <c>null</c> if no subject with
     /// that pair exists.
     /// </summary>
@@ -243,6 +280,40 @@ public sealed class Query
     }
 
     /// <summary>
+    /// T3.8 (2026-05-25) — Relay-shaped paginated variant of <see cref="Scenarios"/>.
+    /// Default page size 50, max 200. The original (non-paginated) resolver is
+    /// retained so the SPA's existing run-detail page keeps working unchanged.
+    /// Returns an empty page when the run id is unknown or unsafe.
+    /// </summary>
+    public async Task<Connection<ScenarioResult>> ScenarioResultsConnection(
+        [Service] IOutputStoreReader store,
+        string runId,
+        int? first = null,
+        string? after = null,
+        CancellationToken ct = default)
+    {
+        if (!store.IsAvailable || !FileSystemLayout.IsSafePathSegment(runId))
+        {
+            return new Connection<ScenarioResult>(
+                Array.Empty<Edge<ScenarioResult>>(),
+                new PageInfo(false, false, null, null),
+                TotalCount: 0);
+        }
+
+        // Materialise scenarios for cursor stability. Runs are bounded by
+        // per-run scenario count (≤ 100s for v1); large compliance runs may
+        // approach 1000 — still cheap relative to the LLM-judge cost that
+        // produced them. Sort by Id for deterministic pagination.
+        var scenarios = new List<ScenarioResult>();
+        await foreach (var s in store.GetScenarioResultsAsync(runId, ct))
+        {
+            scenarios.Add(s);
+        }
+        scenarios.Sort((a, b) => string.CompareOrdinal(a.Id, b.Id));
+        return Pagination.Paginate(scenarios, first, after);
+    }
+
+    /// <summary>
     /// Returns a single scenario result by run + scenario id, or <c>null</c> if absent.
     /// </summary>
     public async Task<ScenarioResult?> Scenario(
@@ -260,6 +331,38 @@ public sealed class Query
                 return s;
         }
         return null;
+    }
+
+    // ─── Red-team campaigns (MC1.4.5 / T3.6, 2026-05-25) ─────────────────────
+
+    /// <summary>
+    /// T3.6 (2026-05-25) — lists all red-team campaign manifests stored under
+    /// <c>.agenteval/red-team/</c>. Returns an empty list when the store is
+    /// unavailable or no campaigns exist. Drives the SPA <c>/red-team</c> page.
+    /// </summary>
+    public async IAsyncEnumerable<RedTeamCampaignManifest> RedTeamCampaigns(
+        [Service] IOutputStoreReader store,
+        [EnumeratorCancellation] CancellationToken ct = default)
+    {
+        if (!store.IsAvailable) yield break;
+        await foreach (var campaign in store.ListRedTeamCampaignsAsync(ct))
+        {
+            yield return campaign;
+        }
+    }
+
+    /// <summary>
+    /// T3.6 (2026-05-25) — fetches a single red-team campaign by id, or
+    /// <c>null</c> when the id is unknown / unsafe.
+    /// </summary>
+    public Task<RedTeamCampaignManifest?> RedTeamCampaign(
+        [Service] IOutputStoreReader store,
+        string id,
+        CancellationToken ct = default)
+    {
+        if (!store.IsAvailable) return Task.FromResult<RedTeamCampaignManifest?>(null);
+        if (!FileSystemLayout.IsSafePathSegment(id)) return Task.FromResult<RedTeamCampaignManifest?>(null);
+        return store.GetRedTeamCampaignAsync(id, ct);
     }
 
     // ─── Compliance (MC1.4.4) ────────────────────────────────────────────────
@@ -373,17 +476,21 @@ public sealed class Query
         var manifest = await store.GetRunManifestAsync(runId, ct);
         if (manifest is null) return null;
 
-        double trivial = 0, low = 0, medium = 0, high = 0, unknown = 0;
+        double trivial = 0, low = 0, medium = 0, high = 0, unknown = 0, legacyFlat = 0;
 
         await foreach (var scenario in store.GetScenarioResultsAsync(runId, ct))
         {
             // Some scenarios are flat (Output is the agent response text); for those
-            // we attribute the scenario's estimatedCost to the unknown bucket — the
-            // tier-aware path requires a recursive EvalResult tree in Output JSON.
+            // we attribute the scenario's estimatedCost to the LEGACY FLAT bucket —
+            // the tier-aware path requires a recursive EvalResult tree in Output
+            // JSON which pre-v0.8.1-beta evidence does NOT carry. T3.5 (2026-05-25):
+            // surfaced as a separate field from UnknownKeyCost (which is the
+            // in-tree-but-unregistered case) so operators can tell the two
+            // pathologies apart.
             var tree = EvalResultPersistence.FromScenarioResult(scenario);
             if (tree is null)
             {
-                unknown += scenario.EstimatedCost;
+                legacyFlat += scenario.EstimatedCost;
                 continue;
             }
 
@@ -394,14 +501,15 @@ public sealed class Query
             WalkAndAccumulate(tree, ref trivial, ref low, ref medium, ref high, ref unknown);
         }
 
-        // Invariant: total = sum(byTier) + unknown. Computed last so callers can
-        // trust the relationship for visualisation (stacked-bar height = total).
-        var total = trivial + low + medium + high + unknown;
+        // Invariant: total = sum(byTier) + unknown + legacyFlat. Computed last so callers
+        // can trust the relationship for visualisation (stacked-bar height = total).
+        var total = trivial + low + medium + high + unknown + legacyFlat;
 
         return new RunCostBreakdown(
             TotalCost: total,
             ByTier: new CostByTier(trivial, low, medium, high),
             UnknownKeyCost: unknown,
+            LegacyFlatCost: legacyFlat,
             FilteredOut: Array.Empty<string>());
     }
 

@@ -150,4 +150,98 @@ public class PdfEvalResultRendererTests
         await Assert.ThrowsAnyAsync<OperationCanceledException>(
             () => new PdfEvalResultRenderer().RenderAsync(result, DefaultOpts(), cts.Token));
     }
+
+    // ── Plan-13 T4.1b item 9: PdfPig parser checks ───────────────────────────
+
+    /// <summary>
+    /// Pulls a real PDF parser (UglyToad.PdfPig) and verifies that the audit
+    /// hash provided via <c>EvalResultRenderOptions.AuditHash</c> actually
+    /// appears in the rendered PDF body. Pre-T4.1b only the HTML test exercised
+    /// this — the PDF surface relied on byte-signature + length checks, which
+    /// would have missed an audit-hash regression silently.
+    /// </summary>
+    [Fact]
+    public async Task RenderAsync_AuditHash_AppearsInRenderedPdfBody()
+    {
+        const string distinctiveHash = "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"; // DevSkim: ignore DS173237
+        var result = MakeAtomic("audit-test", 0.9, "pass", true, "none");
+        var opts = new EvalResultRenderOptions(
+            Subject: new SubjectIdentity(SubjectKind.Agent, "TestAgent"),
+            Title: "Audit-Hash Inclusion Test",
+            RegulationOrBenchmark: "Test Suite",
+            RunId: "run-pdf-audit-001",
+            GeneratedAt: new DateTimeOffset(2026, 5, 25, 12, 0, 0, TimeSpan.Zero),
+            IncludeProvenance: true,
+            AuditHash: distinctiveHash,
+            AgentEvalVersion: "0.10.1-beta");
+
+        var bytes = await new PdfEvalResultRenderer().RenderAsync(result, opts);
+
+        var extractedText = ExtractAllTextFromPdf(bytes);
+        Assert.Contains(distinctiveHash, extractedText);
+    }
+
+    /// <summary>
+    /// Plan-13 T4.1b item 8 — when an evidence message exceeds the configured
+    /// truncation length, the PDF body must carry the "(N more chars)" footer
+    /// so the reader knows content was dropped.
+    /// </summary>
+    [Fact]
+    public async Task RenderAsync_EvidenceLongerThanTruncationLength_AppendsOverflowFooter()
+    {
+        // Build a leaf with an oversized evidence message (well past the 800-default).
+        var oversized = string.Concat(Enumerable.Repeat("Lorem ipsum dolor sit amet. ", 100)); // ~2,800 chars
+        var leaf = new EvalResult(
+            Metric: new("trunc-test", "trunc-test", "test", "1.0.0"),
+            Score: new(0.5, null, "warn", false, null, "medium", null),
+            Details: new(
+                Dimensions: null,
+                Evidence: new[] { new EvalEvidence("test", "ref:1", oversized) },
+                Recommendations: null,
+                SubResults: null,
+                AggregationStrategy: null),
+            Provenance: new("atomic-code", null, null, null, null, 0, false),
+            EvaluatedAt: DateTimeOffset.UtcNow);
+
+        var bytes = await new PdfEvalResultRenderer().RenderAsync(leaf, DefaultOpts());
+        var extractedText = ExtractAllTextFromPdf(bytes);
+
+        // Footer mentions "truncated" + a "more chars" qualifier — verifies both
+        // halves of the overflow message the renderer composes.
+        Assert.Contains("truncated", extractedText, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("more chars", extractedText, StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// Verifies the EvidenceTruncationLength=0 escape hatch — no truncation,
+    /// no overflow footer.
+    /// </summary>
+    [Fact]
+    public async Task RenderAsync_EvidenceTruncationLengthZero_DoesNotTruncate()
+    {
+        var oversized = string.Concat(Enumerable.Repeat("Lorem ipsum dolor sit amet. ", 100));
+        var leaf = new EvalResult(
+            Metric: new("notrunc-test", "notrunc-test", "test", "1.0.0"),
+            Score: new(0.5, null, "warn", false, null, "medium", null),
+            Details: new(null, new[] { new EvalEvidence("test", "ref:1", oversized) }, null, null, null),
+            Provenance: new("atomic-code", null, null, null, null, 0, false),
+            EvaluatedAt: DateTimeOffset.UtcNow);
+
+        var opts = DefaultOpts() with { EvidenceTruncationLength = 0 };
+        var bytes = await new PdfEvalResultRenderer().RenderAsync(leaf, opts);
+        var extractedText = ExtractAllTextFromPdf(bytes);
+
+        Assert.DoesNotContain("more chars", extractedText, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string ExtractAllTextFromPdf(byte[] bytes)
+    {
+        var sb = new StringBuilder();
+        using var doc = UglyToad.PdfPig.PdfDocument.Open(bytes);
+        foreach (var page in doc.GetPages())
+        {
+            sb.AppendLine(page.Text);
+        }
+        return sb.ToString();
+    }
 }

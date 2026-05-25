@@ -297,6 +297,17 @@ public class PerformanceBenchmark
     /// <summary>
     /// Run a cost benchmark measuring token usage and estimated cost.
     /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <paramref name="modelName"/> is the operator-supplied pricing key. The method
+    /// will first try that exact value against <see cref="ModelPricing"/>. If no
+    /// pricing entry matches and any agent response carried a non-null
+    /// <see cref="AgentResponse.ModelId"/>, the lookup is retried using the
+    /// first successful response's reported <c>ModelId</c>. This protects the
+    /// cost-leaf from a silent $0 / PASS when the caller passes the agent's
+    /// display name rather than a real deployment id.
+    /// </para>
+    /// </remarks>
     public async Task<CostBenchmarkResult> RunCostBenchmarkAsync(
         IEnumerable<string> prompts,
         string modelName,
@@ -306,14 +317,14 @@ public class PerformanceBenchmark
         var totalInputTokens = 0;
         var totalOutputTokens = 0;
         var errors = new List<Exception>();
-        
+
         foreach (var prompt in prompts)
         {
             try
             {
                 var response = await _agent.InvokeAsync(prompt, cancellationToken);
                 results.Add((prompt, response));
-                
+
                 if (response.TokenUsage != null)
                 {
                     totalInputTokens += response.TokenUsage.InputTokens;
@@ -325,17 +336,49 @@ public class PerformanceBenchmark
                 errors.Add(ex);
             }
         }
-        
-        var pricing = ModelPricing.GetPricing(modelName);
+
+        // P0-1: priority chain for pricing resolution.
+        //   1. modelName (operator-supplied; usually opts.CostModelName)
+        //   2. first successful response.ModelId (when the framework surfaces it)
+        //   3. agent.Name — last resort, with a warning, because agent display
+        //      names rarely match a pricing-table key and lead to silent $0 / PASS.
+        var resolvedModelName = modelName;
+        var pricing = ModelPricing.GetPricing(resolvedModelName);
+
+        if (pricing == null)
+        {
+            var firstResponseModelId = results
+                .Select(r => r.Response.ModelId)
+                .FirstOrDefault(id => !string.IsNullOrWhiteSpace(id));
+            if (!string.IsNullOrWhiteSpace(firstResponseModelId))
+            {
+                var fallbackPricing = ModelPricing.GetPricing(firstResponseModelId);
+                if (fallbackPricing != null)
+                {
+                    resolvedModelName = firstResponseModelId!;
+                    pricing = fallbackPricing;
+                }
+            }
+        }
+
+        if (pricing == null && string.Equals(resolvedModelName, _agent.Name, StringComparison.Ordinal))
+        {
+            Console.Error.WriteLine(
+                $"[perf-cost] WARNING: no pricing entry found for '{resolvedModelName}'. " +
+                "Agent name is not a model id; cost lookup may be inaccurate. " +
+                "Pass PerformanceBenchmarkEvaluateOptions.CostModelName (e.g. 'gpt-4o-mini') " +
+                "or ensure your IEvaluableAgent populates AgentResponse.ModelId.");
+        }
+
         var estimatedCost = pricing != null
             ? (totalInputTokens / 1_000_000m * pricing.Value.InputPricePerMillion) +
               (totalOutputTokens / 1_000_000m * pricing.Value.OutputPricePerMillion)
             : (decimal?)null;
-        
+
         return new CostBenchmarkResult
         {
             AgentName = _agent.Name,
-            ModelName = modelName,
+            ModelName = resolvedModelName,
             TotalPrompts = results.Count + errors.Count,
             SuccessfulPrompts = results.Count,
             Errors = errors,
@@ -343,11 +386,11 @@ public class PerformanceBenchmark
             TotalOutputTokens = totalOutputTokens,
             TotalTokens = totalInputTokens + totalOutputTokens,
             EstimatedCostUSD = estimatedCost,
-            AverageInputTokensPerPrompt = results.Count > 0 
-                ? (double)totalInputTokens / results.Count 
+            AverageInputTokensPerPrompt = results.Count > 0
+                ? (double)totalInputTokens / results.Count
                 : 0,
-            AverageOutputTokensPerPrompt = results.Count > 0 
-                ? (double)totalOutputTokens / results.Count 
+            AverageOutputTokensPerPrompt = results.Count > 0
+                ? (double)totalOutputTokens / results.Count
                 : 0
         };
     }

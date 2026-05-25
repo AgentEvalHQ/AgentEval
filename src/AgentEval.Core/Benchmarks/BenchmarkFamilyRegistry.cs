@@ -53,6 +53,20 @@ public enum CostTier
 /// Control rendering. Phase 8 (ADR-017 Convention 3) — created together with the
 /// <see cref="BenchmarkFamilyRegistry"/>.
 /// </summary>
+/// <remarks>
+/// <para>
+/// <b>TODO (plan-13 T4.1b item 22 / lastreview/16 §8)</b>: add a
+/// <c>RequiresProgrammaticConstruction</c> bool that surfaces presets which
+/// throw from their registry-driven <see cref="BenchmarkFamily.CompositeFactory"/>
+/// because they need programmatic config the registry can't supply (policy
+/// resolvers, domain-pack composition, etc.). Today such presets register the
+/// flag-equivalent behaviour ad-hoc by throwing from the factory; surfacing it
+/// at metadata level lets <c>agenteval bench --list</c> show the constraint
+/// inline instead of failing at run time. Tracked under v0.11.0 hardening
+/// because adding the property is BREAKING for any external consumer that
+/// constructs <see cref="BenchmarkPreset"/> via positional arguments.
+/// </para>
+/// </remarks>
 /// <param name="Name">CLI-friendly preset name (lowercase, hyphen-separated). Example: <c>"agentic-execution"</c>.</param>
 /// <param name="Description">One-line operator-facing description.</param>
 /// <param name="CostTier">Optional override of the family's default cost tier — set when one preset is materially cheaper / more expensive than the others (e.g. OWASP <c>smoke</c> is much cheaper than OWASP <c>audit</c>).</param>

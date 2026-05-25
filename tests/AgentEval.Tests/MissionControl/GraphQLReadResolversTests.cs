@@ -397,6 +397,7 @@ public class GraphQLReadResolversTests : IClassFixture<SeededMissionControlFacto
                     totalCost
                     byTier {{ trivial low medium high }}
                     unknownKeyCost
+                    legacyFlatCost
                     filteredOut
                 }}
             }}"
@@ -413,16 +414,25 @@ public class GraphQLReadResolversTests : IClassFixture<SeededMissionControlFacto
         var medium = br.GetProperty("byTier").GetProperty("medium").GetDouble();
         var high = br.GetProperty("byTier").GetProperty("high").GetDouble();
         var unknown = br.GetProperty("unknownKeyCost").GetDouble();
+        var legacyFlat = br.GetProperty("legacyFlatCost").GetDouble();
 
-        // Core invariant: total = sum(byTier) + unknown.
-        Assert.Equal(totalCost, trivial + low + medium + high + unknown, 6);
+        // Core invariant (T3.5 split): total = sum(byTier) + unknown + legacyFlat.
+        // unknown captures in-tree leaves whose key is not registered in
+        // EvaluatorCostMap; legacyFlat captures pre-v0.8.1-beta scenarios whose
+        // Output payload lacks an EvalResult tree entirely.
+        Assert.Equal(totalCost, trivial + low + medium + high + unknown + legacyFlat, 6);
 
-        // The seed has 2 flat scenarios (cost 0.004 + 0.003) attributed to unknown
-        // because their Output is plain text not a serialised EvalResult tree.
-        // Plus the recursive tree-scenario contributes 0.002 (2 leaves at 0.001 each
-        // with unregistered keys "leaf-A" / "leaf-B"). Expected total ≈ 0.009.
+        // The seed has 2 flat scenarios (cost 0.004 + 0.003) attributed to LEGACY
+        // FLAT because their Output is plain text not a serialised EvalResult tree.
+        // Plus the recursive tree-scenario contributes 0.002 (2 leaves at 0.001
+        // each with unregistered keys "leaf-A" / "leaf-B") attributed to UNKNOWN.
+        // Expected: legacyFlat = 0.007, unknown = 0.002, total ≈ 0.009.
         Assert.True(totalCost >= 0.0085 && totalCost <= 0.0095,
             $"Expected total cost ~0.009; got {totalCost}");
+        Assert.True(legacyFlat >= 0.0065 && legacyFlat <= 0.0075,
+            $"Expected legacyFlatCost ~0.007 from the 2 flat-output scenarios; got {legacyFlat}");
+        Assert.True(unknown >= 0.0015 && unknown <= 0.0025,
+            $"Expected unknownKeyCost ~0.002 from the in-tree leaf-A/leaf-B keys; got {unknown}");
 
         // filteredOut is always empty until RunRef.BudgetTier ships (plan-08 backlog).
         Assert.Equal(0, br.GetProperty("filteredOut").GetArrayLength());
@@ -995,6 +1005,259 @@ public sealed class SeededMissionControlFactory : WebApplicationFactory<Query>
                 ConfigurationId: null,
                 Evaluator: "gpt-4o-mini",
                 EvaluatorModel: "gpt-4o-mini-2024-07-18"));
+    }
+}
+
+// ─── T3.6 Red-team campaign resolvers (2026-05-25) ──────────────────────────
+
+public class RedTeamCampaignResolverTests : IClassFixture<SeededMissionControlFactory>
+{
+    private readonly SeededMissionControlFactory _factory;
+
+    public RedTeamCampaignResolverTests(SeededMissionControlFactory factory)
+    {
+        _factory = factory;
+    }
+
+    [Fact]
+    public async Task RedTeamCampaignsQuery_ReturnsAllCampaigns()
+    {
+        // T3.6 contract: redTeamCampaigns lists every manifest under
+        // .agenteval/red-team/. The seeded fixture may or may not include
+        // a campaign — the resolver MUST return a non-error JSON array
+        // either way (empty array when the directory is absent).
+        using var client = _factory.CreateClient();
+        var resp = await client.PostAsJsonAsync("/graphql", new
+        {
+            query = """
+                {
+                  redTeamCampaigns {
+                    campaignId
+                    name
+                    startedAt
+                    mode
+                    targets { kind name }
+                  }
+                }
+                """
+        });
+        resp.EnsureSuccessStatusCode();
+
+        var body = await resp.Content.ReadAsStringAsync();
+        using var doc = JsonDocument.Parse(body);
+        Assert.False(doc.RootElement.TryGetProperty("errors", out _),
+            $"redTeamCampaigns must not surface GraphQL errors; body was:\n{body}");
+        var campaigns = doc.RootElement.GetProperty("data").GetProperty("redTeamCampaigns");
+        Assert.Equal(JsonValueKind.Array, campaigns.ValueKind);
+    }
+
+    [Fact]
+    public async Task RedTeamCampaignQuery_ReturnsByIdOrNull()
+    {
+        // T3.6 contract: redTeamCampaign(id) returns null for an unknown id
+        // (and never crashes the resolver). The id is validated via
+        // FileSystemLayout.IsSafePathSegment first, so a `../foo` traversal
+        // attempt also returns null silently.
+        using var client = _factory.CreateClient();
+        var resp = await client.PostAsJsonAsync("/graphql", new
+        {
+            query = """
+                {
+                  redTeamCampaign(id: "definitely-not-a-real-campaign-id_2026-01-01_00-00-00") {
+                    campaignId
+                  }
+                }
+                """
+        });
+        resp.EnsureSuccessStatusCode();
+
+        using var doc = JsonDocument.Parse(await resp.Content.ReadAsStringAsync());
+        Assert.Equal(JsonValueKind.Null,
+            doc.RootElement.GetProperty("data").GetProperty("redTeamCampaign").ValueKind);
+
+        // Path-traversal attempt: also returns null, no errors.
+        var resp2 = await client.PostAsJsonAsync("/graphql", new
+        {
+            query = """{ redTeamCampaign(id: "../../etc/passwd") { campaignId } }"""
+        });
+        resp2.EnsureSuccessStatusCode();
+        using var doc2 = JsonDocument.Parse(await resp2.Content.ReadAsStringAsync());
+        Assert.Equal(JsonValueKind.Null,
+            doc2.RootElement.GetProperty("data").GetProperty("redTeamCampaign").ValueKind);
+    }
+}
+
+// ─── T3.8 Paginated Connection resolvers (2026-05-25) ──────────────────────
+
+public class GraphQLPaginationTests : IClassFixture<SeededMissionControlFactory>
+{
+    private readonly SeededMissionControlFactory _factory;
+
+    public GraphQLPaginationTests(SeededMissionControlFactory factory)
+    {
+        _factory = factory;
+    }
+
+    [Fact]
+    public async Task SubjectsConnection_FirstPage_ReturnsEdgesAndCursor()
+    {
+        // T3.8 contract: subjectsConnection returns Relay-shaped
+        // edges + pageInfo. With first=2 we expect 2 edges and (depending on
+        // the seed) hasNextPage = true if more than 2 subjects exist.
+        using var client = _factory.CreateClient();
+        var resp = await client.PostAsJsonAsync("/graphql", new
+        {
+            query = """
+                {
+                  subjectsConnection(first: 2) {
+                    totalCount
+                    edges { cursor node { identity { kind name } } }
+                    pageInfo { hasNextPage hasPreviousPage startCursor endCursor }
+                  }
+                }
+                """
+        });
+        resp.EnsureSuccessStatusCode();
+
+        var body = await resp.Content.ReadAsStringAsync();
+        using var doc = JsonDocument.Parse(body);
+        var conn = doc.RootElement.GetProperty("data").GetProperty("subjectsConnection");
+
+        var total = conn.GetProperty("totalCount").GetInt32();
+        Assert.True(total >= 1, $"Seed should have at least one subject; got total={total}.");
+
+        var edges = conn.GetProperty("edges");
+        Assert.True(edges.GetArrayLength() <= 2, "first=2 must cap edges at 2.");
+
+        if (total >= 1)
+        {
+            var firstCursor = edges[0].GetProperty("cursor").GetString();
+            Assert.False(string.IsNullOrEmpty(firstCursor),
+                "Edges must carry an opaque cursor.");
+            Assert.Equal(firstCursor,
+                conn.GetProperty("pageInfo").GetProperty("startCursor").GetString());
+        }
+        Assert.False(conn.GetProperty("pageInfo").GetProperty("hasPreviousPage").GetBoolean());
+    }
+
+    [Fact]
+    public async Task SubjectsConnection_AfterCursor_AdvancesToNextPage()
+    {
+        // T3.8 contract: passing pageInfo.endCursor of page 1 as `after` for
+        // page 2 must return edges that do NOT overlap with page 1. With a
+        // small seed (≥ 2 subjects) we can verify by paging size 1 twice.
+        using var client = _factory.CreateClient();
+
+        var page1Resp = await client.PostAsJsonAsync("/graphql", new
+        {
+            query = """
+                {
+                  subjectsConnection(first: 1) {
+                    totalCount
+                    edges { cursor node { identity { name } } }
+                    pageInfo { endCursor hasNextPage }
+                  }
+                }
+                """
+        });
+        page1Resp.EnsureSuccessStatusCode();
+        using var page1Doc = JsonDocument.Parse(await page1Resp.Content.ReadAsStringAsync());
+        var page1 = page1Doc.RootElement.GetProperty("data").GetProperty("subjectsConnection");
+        var total = page1.GetProperty("totalCount").GetInt32();
+        if (total < 2)
+        {
+            // Seed only has one subject; can't exercise the page-advance path
+            // meaningfully. Bail without failing — the FirstPage_ReturnsEdges
+            // assertion already covers the single-page case.
+            return;
+        }
+
+        var endCursor = page1.GetProperty("pageInfo").GetProperty("endCursor").GetString();
+        var page1Name = page1.GetProperty("edges")[0]
+            .GetProperty("node").GetProperty("identity").GetProperty("name").GetString();
+
+        var page2Resp = await client.PostAsJsonAsync("/graphql", new
+        {
+            query = $$"""
+                {
+                  subjectsConnection(first: 1, after: "{{endCursor}}") {
+                    edges { node { identity { name } } }
+                    pageInfo { hasPreviousPage }
+                  }
+                }
+                """
+        });
+        page2Resp.EnsureSuccessStatusCode();
+        using var page2Doc = JsonDocument.Parse(await page2Resp.Content.ReadAsStringAsync());
+        var page2 = page2Doc.RootElement.GetProperty("data").GetProperty("subjectsConnection");
+
+        Assert.True(page2.GetProperty("edges").GetArrayLength() >= 1);
+        var page2Name = page2.GetProperty("edges")[0]
+            .GetProperty("node").GetProperty("identity").GetProperty("name").GetString();
+        Assert.NotEqual(page1Name, page2Name);
+        Assert.True(page2.GetProperty("pageInfo").GetProperty("hasPreviousPage").GetBoolean(),
+            "Page 2 must report hasPreviousPage=true.");
+    }
+
+    [Fact]
+    public async Task SubjectsConnection_FirstExceedsMax_IsClampedTo200()
+    {
+        // T3.8 contract: callers cannot demand unbounded payloads by passing
+        // first=10000; the resolver clamps to MaxFirst=200. Verified via the
+        // returned edge count which can never exceed 200 regardless of
+        // requested first.
+        using var client = _factory.CreateClient();
+        var resp = await client.PostAsJsonAsync("/graphql", new
+        {
+            query = """
+                {
+                  subjectsConnection(first: 10000) {
+                    totalCount
+                    edges { cursor }
+                  }
+                }
+                """
+        });
+        resp.EnsureSuccessStatusCode();
+        using var doc = JsonDocument.Parse(await resp.Content.ReadAsStringAsync());
+        var conn = doc.RootElement.GetProperty("data").GetProperty("subjectsConnection");
+        Assert.True(conn.GetProperty("edges").GetArrayLength() <= 200,
+            "first=10000 must clamp to MaxFirst=200.");
+    }
+
+    [Fact]
+    public async Task ScenarioResultsConnection_ReturnsConnectionShape_ForKnownRun()
+    {
+        // T3.8 contract for the scenario-results paginated variant. Uses the
+        // seeded run from the SeededMissionControlFactory.
+        using var client = _factory.CreateClient();
+        var listResp = await client.PostAsJsonAsync("/graphql",
+            new { query = "{ recentRuns(count: 1) { runId } }" });
+        listResp.EnsureSuccessStatusCode();
+        using var listDoc = JsonDocument.Parse(await listResp.Content.ReadAsStringAsync());
+        var runId = listDoc.RootElement.GetProperty("data")
+            .GetProperty("recentRuns")[0].GetProperty("runId").GetString();
+        Assert.False(string.IsNullOrEmpty(runId));
+
+        var resp = await client.PostAsJsonAsync("/graphql", new
+        {
+            query = $$"""
+                {
+                  scenarioResultsConnection(runId: "{{runId}}", first: 50) {
+                    totalCount
+                    edges { cursor node { id name } }
+                    pageInfo { hasNextPage hasPreviousPage }
+                  }
+                }
+                """
+        });
+        resp.EnsureSuccessStatusCode();
+        using var doc = JsonDocument.Parse(await resp.Content.ReadAsStringAsync());
+        var conn = doc.RootElement.GetProperty("data").GetProperty("scenarioResultsConnection");
+
+        Assert.True(conn.GetProperty("totalCount").GetInt32() >= 1,
+            "Seed should have at least one scenario.");
+        Assert.False(conn.GetProperty("pageInfo").GetProperty("hasPreviousPage").GetBoolean());
     }
 }
 

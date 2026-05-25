@@ -359,6 +359,7 @@ public class MissionControlEndToEndTests : IClassFixture<EndToEndFixture>
                     totalCost
                     byTier { trivial low medium high }
                     unknownKeyCost
+                    legacyFlatCost
                   }
                 }
                 """
@@ -373,20 +374,21 @@ public class MissionControlEndToEndTests : IClassFixture<EndToEndFixture>
             b.GetProperty("byTier").GetProperty("low").GetDouble() +
             b.GetProperty("byTier").GetProperty("medium").GetDouble() +
             b.GetProperty("byTier").GetProperty("high").GetDouble() +
-            b.GetProperty("unknownKeyCost").GetDouble();
+            b.GetProperty("unknownKeyCost").GetDouble() +
+            b.GetProperty("legacyFlatCost").GetDouble();
 
-        // Invariant: total == sum(byTier) + unknown. The resolver computes
-        // total this way, so this is a guard against future refactors that
-        // might compute total separately.
+        // Invariant (T3.5 split): total == sum(byTier) + unknown + legacyFlat.
+        // The resolver computes total this way, so this is a guard against
+        // future refactors that might compute total separately.
         Assert.Equal(total, sum, 6);
 
         // The fixture's normal-eval run has 4 flat scenarios (each
-        // estimatedCost=0.003 → 0.012 in `unknown` since flat scenarios are
-        // not tree-attributed) plus the composite tree's 2 LLM leaves
-        // (cost 0.0009 + 0.0011 = 0.002). composite-root, policy_compliance,
-        // response_quality are not in EvaluatorCostMap, so they go to
-        // `unknown` as well. Total should be ≥ 0.012 + 0.002 = 0.014.
-        Assert.True(total >= 0.013, $"total cost ({total}) is suspiciously low — expected ≥ 0.013.");
+        // estimatedCost=0.003 → 0.012 in `legacyFlatCost` since flat scenarios
+        // are not tree-attributed) plus the composite tree's 2 LLM leaves
+        // (cost 0.0009 + 0.0011 = 0.002) attributed to `unknownKeyCost` because
+        // composite-root, policy_compliance, response_quality are not in
+        // EvaluatorCostMap. Total should be ≥ 0.012 + 0.002 = 0.014.
+        Assert.True(total >= 0.014, $"total cost ({total}) is suspiciously low — expected ≥ 0.014 (0.012 legacyFlat + 0.002 unknownKey).");
     }
 
     // ─── run / runSummary / scenarios / scenario resolver coverage ─────────

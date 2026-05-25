@@ -10,7 +10,7 @@ namespace AgentEval.Compliance.Gdpr.Articles.Validation;
 public sealed class ArticleYamlValidator
 {
     private static readonly string[] s_validPillars =
-        ["Pillar1-Foundations", "Pillar2-LawfulBasis", "Pillar3-SubjectRights", "Pillar4-Transparency", "Pillar5-PrivacyDesign"];
+        ["Pillar1-Foundations", "Pillar2-LawfulBasis", "Pillar3-SubjectRights", "Pillar4-Transparency", "Pillar5-PrivacyDesign", "Pillar6-Governance"];
 
     private static readonly string[] s_validSeverities = ["low", "medium", "high", "critical"];
 

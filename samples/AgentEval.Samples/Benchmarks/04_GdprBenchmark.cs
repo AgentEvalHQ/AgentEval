@@ -20,8 +20,8 @@ namespace AgentEval.Samples.Benchmarks;
 /// Preset mapping:
 /// <list type="bullet">
 ///   <item><see cref="SamplePreset.Smoke"/> → <see cref="GdprBenchmark.Smoke"/> (5 representative articles)</item>
-///   <item><see cref="SamplePreset.Standard"/> → <see cref="GdprBenchmark.Standard"/> (all 21 articles, weighted_sum, threshold 0.85)</item>
-///   <item><see cref="SamplePreset.AuditGrade"/> → <see cref="GdprBenchmark.AuditGrade(ArticlesRegistry)"/> (all 21 articles, cap_by_worst, threshold 0.90)</item>
+///   <item><see cref="SamplePreset.Standard"/> → <see cref="GdprBenchmark.Standard"/> (all 29 articles across 6 pillars, weighted_sum, threshold 0.85)</item>
+///   <item><see cref="SamplePreset.AuditGrade"/> → <see cref="GdprBenchmark.AuditGrade(ArticlesRegistry)"/> (all 29 articles across 6 pillars, cap_by_worst, threshold 0.90)</item>
 /// </list>
 ///
 /// For Mode-A boardroom-grade PDFs with pillar tables, scenario verbatims, and
@@ -68,10 +68,10 @@ public static class GdprBenchmarkSample
         {
             SamplePreset.Standard => (
                 GdprBenchmark.Standard(registry),
-                "Standard (all 21 articles, weighted_sum, threshold 0.85)"),
+                "Standard (all 29 articles across 6 pillars, weighted_sum, threshold 0.85)"),
             SamplePreset.AuditGrade => (
                 GdprBenchmark.AuditGrade(registry),
-                "Audit-Grade (all 21 articles, cap_by_worst, threshold 0.90)"),
+                "Audit-Grade (all 29 articles across 6 pillars, cap_by_worst, threshold 0.90)"),
             _ => (
                 GdprBenchmark.Smoke(registry),
                 "Smoke (5 representative articles, weighted_sum, threshold 0.80)"),
@@ -119,7 +119,7 @@ public static class GdprBenchmarkSample
         Console.WriteLine("   KEY TAKEAWAYS:");
         Console.WriteLine("   - Every scenario probed the real agent with its YAML 'input' — no hardcoded responses.");
         Console.WriteLine("   - The judge graded each live response against that scenario's evaluation_criteria.");
-        Console.WriteLine("   - Standard / Audit-Grade scale up from 5 articles to 21 (weighted_sum vs cap_by_worst).");
+        Console.WriteLine("   - Standard / Audit-Grade scale up from 5 articles to all 29 articles across 6 pillars (weighted_sum vs cap_by_worst).");
         Console.WriteLine("   - For boardroom-grade DPO reports with pillar tables + redaction, use:");
         Console.WriteLine("       agenteval bench gdpr --preset standard --pdf");
     }

@@ -328,12 +328,11 @@ internal static class BenchmarkSampleHelpers
         }
 
         // ── 8. Resolve the canonical run dir for the print-paths helper ────────
-        // Use FileSystemLayout.RunDir directly so the path matches exactly what the
-        // FileSystemOutputStore writes — including the collision-resistant hash
-        // suffix Sanitize appends when a subject name contains Windows-invalid
-        // characters (':', '/', '\', '<', '>', '"', '|', '?', '*'). Re-implementing
-        // the layout locally is fragile and was a Copilot review finding on PR #30.
-        var canonicalRunDir = new FileSystemLayout(SampleAgentEvalDir).RunDir(subject, runId);
+        // Plan-13 T4.1b item 11: route through IOutputStoreReader.ResolveRunDirectory
+        // rather than reaching for FileSystemLayout directly. Same path output,
+        // but no layer-leak — and works against any IOutputStore implementation
+        // (in-memory test doubles, future cloud-backed stores).
+        var canonicalRunDir = store.ResolveRunDirectory(subject, runId);
 
         return new SampleRunPaths(
             CanonicalRunDir: canonicalRunDir,
@@ -945,8 +944,48 @@ internal static class BenchmarkSampleHelpers
                         continue;
                     }
                     var perScenarioInput = new EvalInput(Query: probe, Response: responseText);
-                    var leaf = await scenarioComponents[si].Eval.EvaluateAsync(perScenarioInput, ct);
-                    scenarioResults.Add(leaf);
+                    try
+                    {
+                        var leaf = await scenarioComponents[si].Eval.EvaluateAsync(perScenarioInput, ct);
+                        scenarioResults.Add(leaf);
+                    }
+                    catch (OperationCanceledException) { throw; }
+                    catch (Exception ex)
+                    {
+                        // Mirror the agent-failure shape above: a judge call that trips a provider
+                        // safety filter (e.g., rubric criteria containing words like "deceive" or
+                        // "manipulate" — common in EU AI Act Art 50 disclosure scenarios) must not
+                        // abort the entire preset run. Surface as honest skipped leaf so the audit
+                        // continues and reviewers see exactly which scenario lacked a graded result.
+                        // Without this, a single judge content-filter rejection cancels the rest of
+                        // the run AND writes no canonical artefacts.
+                        scenarioResults.Add(new EvalResult(
+                            Metric: new EvalMetadata(
+                                Key: scenarioComponents[si].Eval.Key,
+                                Name: scenarioComponents[si].Eval.Name,
+                                Category: scenarioComponents[si].Eval.Category,
+                                Version: scenarioComponents[si].Eval.Version),
+                            Score: new EvalScore(0, null, "skipped", false, null, "none", null),
+                            Details: new EvalDetails(
+                                Dimensions: null,
+                                Evidence: null,
+                                Recommendations: new[]
+                                {
+                                    $"Judge rejected the grading prompt: {ex.GetType().Name}: {ex.Message}",
+                                    "The scenario was probed successfully but could not be graded — likely because the rubric criteria contained content the judge model's safety filter blocks. A real audit would route the judge through a less-restricted endpoint or rephrase the rubric."
+                                },
+                                SubResults: null,
+                                AggregationStrategy: null),
+                            Provenance: new EvalProvenance(
+                                Type: "skipped",
+                                JudgeModel: null,
+                                PromptId: null,
+                                PromptHash: null,
+                                TokensUsed: null,
+                                EstimatedCost: 0,
+                                CacheHit: false),
+                            EvaluatedAt: DateTimeOffset.UtcNow));
+                    }
                 }
 
                 // Coverage-loss visibility (extra components): emit honest skipped

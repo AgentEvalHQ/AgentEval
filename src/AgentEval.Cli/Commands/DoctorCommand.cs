@@ -50,6 +50,10 @@ public static class DoctorCommand
         int ok = 0;
 
         // ─── Validate solution.json ─────────────────────────────────────────
+        // T1.6 (v1.1): in addition to the spot-checks below (which surface friendly
+        // operator messages), also run the canonical schema-validator against the
+        // embedded solution.schema.json. Catches malformed enums + missing required
+        // properties the spot-checks don't enumerate.
         var solutionFile = Path.Combine(dir, "solution.json");
         if (!File.Exists(solutionFile))
         {
@@ -84,6 +88,16 @@ public static class DoctorCommand
                     errors++;
                     valid = false;
                 }
+
+                // Schema validation (T1.6)
+                var (schemaOk, schemaErr) = SchemaValidator.ValidateFile(solutionFile, "solution.schema.json");
+                if (!schemaOk)
+                {
+                    Console.Error.WriteLine($"✖ solution.json: {schemaErr}");
+                    errors++;
+                    valid = false;
+                }
+
                 if (valid)
                 {
                     Console.WriteLine("✔ solution.json OK");
@@ -115,6 +129,14 @@ public static class DoctorCommand
                     Console.WriteLine($"  ⚠ subject.json missing for {subjectDirPath}");
                     warnings++;
                     continue;
+                }
+
+                // T1.6: schema validation for subject.json
+                var (subjectSchemaOk, subjectSchemaErr) = SchemaValidator.ValidateFile(subjectFile, "subject.schema.json");
+                if (!subjectSchemaOk)
+                {
+                    Console.Error.WriteLine($"✖ {subjectFile}: {subjectSchemaErr}");
+                    errors++;
                 }
 
                 // Parse identity for use with ContentHasher
@@ -159,6 +181,36 @@ public static class DoctorCommand
                         continue;
                     }
 
+                    // T1.6: schema validation for manifest.json
+                    var (manSchemaOk, manSchemaErr) = SchemaValidator.ValidateFile(manifestFile, "manifest.schema.json");
+                    if (!manSchemaOk)
+                    {
+                        Console.Error.WriteLine($"✖ {manifestFile}: {manSchemaErr}");
+                        errors++;
+                    }
+
+                    // T1.6: schema validation for summary.json (when present — runs that
+                    // didn't complete may not have one, which is a separate warning above).
+                    var summaryFile = Path.Combine(runDirPath, "summary.json");
+                    if (File.Exists(summaryFile))
+                    {
+                        var (sumSchemaOk, sumSchemaErr) = SchemaValidator.ValidateFile(summaryFile, "summary.schema.json");
+                        if (!sumSchemaOk)
+                        {
+                            Console.Error.WriteLine($"✖ {summaryFile}: {sumSchemaErr}");
+                            errors++;
+                        }
+                    }
+
+                    // T1.6 (v1.1): no schema validation for scenarios/*.json — the file shape
+                    // on disk is the `ScenarioResult` wrapper (id/name/input/output/passed/...),
+                    // not an EvalResult tree. `eval-result.schema.json` describes the EvalResult
+                    // tree that may LIVE INSIDE `ScenarioResult.Output`; per T2.6, the production
+                    // writer's EvalResult serialization is intentionally looser than the schema,
+                    // so this validation was rejecting legitimate fixture data. The wrapper shape
+                    // is enforced by C# typing at write time. A future v1.2 task may introduce a
+                    // dedicated `scenario-result.schema.json` and re-enable validation here.
+
                     if (identity is not null)
                     {
                         try
@@ -170,6 +222,18 @@ public static class DoctorCommand
                                 if (!matches)
                                 {
                                     Console.Error.WriteLine($"✖ Hash mismatch in run {runId} (subject: {subjectName}).");
+                                    // T1.7 (v1.1) BREAKING-change diagnostic: pre-v1.1 workspaces had
+                                    // their contentHash computed against raw scenario/summary/trace bytes.
+                                    // v1.1's CanonicalJsonProjector hashes the canonical JSON projection
+                                    // (alphabetic property order, no insignificant whitespace, deterministic
+                                    // number encoding). Operators upgrading from v0.8.1-beta will trip
+                                    // this on every legacy run — surface the upgrade path inline so they
+                                    // don't think this is a tamper alert.
+                                    Console.Error.WriteLine(
+                                        "  If this workspace was created before AgentEval v1.1, the hash " +
+                                        "algorithm changed (canonical-JSON projection). Re-run " +
+                                        "`agenteval bench …` to regenerate the run; the new hash will " +
+                                        "match thereafter. See CHANGELOG v1.1 for details.");
                                     errors++;
                                 }
                                 else
@@ -203,6 +267,18 @@ public static class DoctorCommand
                     {
                         var evidenceFile = Path.Combine(tsDir, "evidence.json");
                         if (!File.Exists(evidenceFile)) continue;
+
+                        // T1.6: schema validation for evidence.json. The base evidence.schema.json
+                        // is the universal contract; regulation-specific schemas (gdpr-evidence.schema.json,
+                        // eu-ai-act-evidence.schema.json) are additional and live in their owning
+                        // assemblies. The base schema catches the missing-sourceRun / wrong-enum / etc.
+                        // class of corruption that the spot-checks below don't enumerate.
+                        var (evSchemaOk, evSchemaErr) = SchemaValidator.ValidateFile(evidenceFile, "evidence.schema.json");
+                        if (!evSchemaOk)
+                        {
+                            Console.Error.WriteLine($"✖ {evidenceFile}: {evSchemaErr}");
+                            errors++;
+                        }
 
                         try
                         {

@@ -26,7 +26,7 @@ namespace AgentEval.Evals.Agentic.Quality;
 /// infers expected facts from the query alone, which may undercount expectations.
 /// </para>
 /// <para>
-/// Source: forked from Azure/azure-sdk-for-python (commit main-2026-05-09)
+/// Source: forked from Azure/azure-sdk-for-python (commit &lt;TBD-foundry-sha&gt; see CHANGELOG T3.7)
 /// sdk/evaluation/azure-ai-evaluation/azure/ai/evaluation/_evaluators/_response_completeness/response_completeness.prompty
 /// License: MIT. Modifications: temperature=0, critical/optional gap classification,
 /// missing_facts[] array, structured evidence[], label table, severity=medium.

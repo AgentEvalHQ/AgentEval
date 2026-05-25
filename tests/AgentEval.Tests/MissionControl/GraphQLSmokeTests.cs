@@ -178,6 +178,94 @@ public class GraphQLSmokeTests : IClassFixture<WebApplicationFactory<Query>>
         Assert.Contains("\"graphqlEndpoint\":\"/graphql\"", body);
         Assert.Contains("\"agentEvalVersion\"", body);
     }
+
+    [Fact]
+    public async Task VersionEndpoint_IncludesWorkspaceRoot()
+    {
+        // Plan-08 T3.10 (2026-05-25): payload exposes the resolved workspace
+        // root so the SPA's About panel can display it. Mode A only.
+        using var client = _factory.CreateClient();
+        var response = await client.GetAsync("/api/v1/version");
+
+        response.EnsureSuccessStatusCode();
+        var body = await response.Content.ReadAsStringAsync();
+        using var doc = JsonDocument.Parse(body);
+        var root = doc.RootElement;
+
+        Assert.True(root.TryGetProperty("workspaceRoot", out var workspaceRoot),
+            $"payload missing workspaceRoot; body was: {body}");
+        Assert.Equal(JsonValueKind.String, workspaceRoot.ValueKind);
+        Assert.False(string.IsNullOrWhiteSpace(workspaceRoot.GetString()),
+            "workspaceRoot must be a non-empty resolved absolute path.");
+
+        Assert.True(root.TryGetProperty("workspaceInitialized", out var initFlag),
+            $"payload missing workspaceInitialized; body was: {body}");
+        Assert.True(initFlag.ValueKind == JsonValueKind.True || initFlag.ValueKind == JsonValueKind.False,
+            "workspaceInitialized must be a boolean.");
+    }
+
+    [Fact]
+    public async Task VersionEndpoint_WorkspaceInitialized_True_AfterInit()
+    {
+        // Plan-08 T3.10 (2026-05-25): point the server at a tempdir we've
+        // already seeded with an `.agenteval/` folder; assert the flag flips
+        // to true. The complementary "false" assertion is implicit in the
+        // negative case — the test would otherwise be the SAME workspace
+        // for both, defeating the purpose.
+        var tempRoot = System.IO.Path.Combine(
+            System.IO.Path.GetTempPath(),
+            $"agenteval-version-test-{Guid.NewGuid():N}");
+        System.IO.Directory.CreateDirectory(System.IO.Path.Combine(tempRoot, ".agenteval"));
+
+        try
+        {
+            using var overrideFactory = _factory.WithWebHostBuilder(builder =>
+            {
+                builder.UseSetting("AgentEval:Root", tempRoot);
+            });
+            using var client = overrideFactory.CreateClient();
+            var response = await client.GetAsync("/api/v1/version");
+
+            response.EnsureSuccessStatusCode();
+            var body = await response.Content.ReadAsStringAsync();
+            using var doc = JsonDocument.Parse(body);
+            var root = doc.RootElement;
+
+            Assert.Equal(JsonValueKind.True, root.GetProperty("workspaceInitialized").ValueKind);
+            // The leaked path matches what we requested (case-insensitive on Windows).
+            var leakedRoot = root.GetProperty("workspaceRoot").GetString();
+            Assert.Equal(
+                System.IO.Path.GetFullPath(tempRoot).TrimEnd('\\', '/'),
+                leakedRoot?.TrimEnd('\\', '/'),
+                ignoreCase: OperatingSystem.IsWindows());
+        }
+        finally
+        {
+            try { System.IO.Directory.Delete(tempRoot, recursive: true); } catch { }
+        }
+    }
+
+    [Fact]
+    public async Task RestVersion_ModeRespectsConfigurationOverride()
+    {
+        // Plan-08 portal-review B4 (T2.2, 2026-05-25): `mode` MUST be sourced
+        // from the AgentEval:Mode configuration key (env `AgentEval__Mode`),
+        // not hard-coded. Override with `aggregator` and confirm it round-trips
+        // to the REST payload. Mode A operators see `local` by default; the
+        // override path covers the future Mode B / Mode C surfaces.
+        using var overrideFactory = _factory.WithWebHostBuilder(builder =>
+        {
+            builder.UseSetting("AgentEval:Mode", "aggregator");
+        });
+        using var client = overrideFactory.CreateClient();
+        var response = await client.GetAsync("/api/v1/version");
+
+        response.EnsureSuccessStatusCode();
+        var body = await response.Content.ReadAsStringAsync();
+
+        Assert.Contains("\"mode\":\"aggregator\"", body);
+        Assert.DoesNotContain("\"mode\":\"local\"", body);
+    }
 }
 
 #endif

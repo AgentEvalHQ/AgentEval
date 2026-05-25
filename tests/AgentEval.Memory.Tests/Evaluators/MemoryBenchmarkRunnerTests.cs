@@ -377,4 +377,81 @@ public class MemoryBenchmarkRunnerTests
         Assert.Equal(full.Categories.Count, diagnostic.Categories.Count);
         Assert.Equal("Diagnostic", diagnostic.Name);
     }
+
+    // ═══════════════════════════════════════════════════════════════
+    // P0-2 (Sprint 0) — Diagnostic / Overflow preset routing fixes
+    // ═══════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// Regression guard for P0-2 (Sprint 0). Before the fix,
+    /// <see cref="MemoryBenchmark.Diagnostic"/> had <c>Name = "Diagnostic"</c>
+    /// which flowed into <c>ScenarioLoader.ResolvePreset</c>.
+    /// No JSON file declared a "diagnostic" key, so the loader silently fell
+    /// back to "quick" and the marquee "~50K+ token context" claim was a lie —
+    /// the runner actually loaded the ~8K <c>context-small</c> corpus.
+    /// The fix introduced <see cref="MemoryBenchmark.PresetResolutionKey"/> which
+    /// routes Diagnostic to "Full" internally. This test pins the resulting
+    /// behaviour: Diagnostic must produce a context blob that is materially
+    /// larger than Quick's (the "Full" branch uses context-stress, ~120K+ chars).
+    /// </summary>
+    [Fact]
+    public void RunBenchmarkAsync_DiagnosticPreset_HasLargerContextThanQuick()
+    {
+        // Arrange — Diagnostic now reports "Full" as its effective resolution key
+        var diagnostic = MemoryBenchmark.Diagnostic;
+        Assert.Equal("Full", diagnostic.EffectivePresetResolutionKey);
+
+        // Act — build context blobs using both keys; this is what the runner does
+        // internally per category. (BuildContextPressureBlob is internal for tests.)
+        var quickBlob = MemoryBenchmarkRunner.BuildContextPressureBlob("Quick");
+        var diagnosticBlob = MemoryBenchmarkRunner.BuildContextPressureBlob(
+            diagnostic.EffectivePresetResolutionKey);
+
+        // Assert — both blobs exist
+        Assert.NotNull(quickBlob);
+        Assert.NotNull(diagnosticBlob);
+
+        // Assert — Diagnostic's blob is materially larger than Quick's. Quick uses
+        // 15 turns of context-small (~8K chars); the Full-routed Diagnostic uses
+        // 200 turns of context-stress (~80K+ chars). A 5x size delta is the
+        // smoking-gun proof that the resolution-key fix actually loads stress
+        // content rather than silently degrading to small.
+        Assert.True(diagnosticBlob!.Length > quickBlob!.Length * 5,
+            $"Expected Diagnostic blob to be > 5x Quick blob; got Quick={quickBlob.Length}, " +
+            $"Diagnostic={diagnosticBlob.Length}. If this fails close to 1x, the resolution-key " +
+            "fix regressed and Diagnostic is once again silently using context-small.");
+    }
+
+    /// <summary>
+    /// Companion to <see cref="RunBenchmarkAsync_DiagnosticPreset_HasLargerContextThanQuick"/>.
+    /// Asserts that <see cref="MemoryBenchmark.Overflow"/>:
+    /// (a) routes its preset resolution through "Full" so JSON scenarios actually
+    ///     load the stress corpus instead of falling back to "quick"; and
+    /// (b) carries the bumped <c>TargetTokensOverride = 192_000</c> needed to
+    ///     force overflow on a 128K-window model (was 128_000 before the fix).
+    /// </summary>
+    [Fact]
+    public void RunBenchmarkAsync_OverflowPreset_LoadsContextStressCorpus()
+    {
+        // Arrange / Act
+        var overflow = MemoryBenchmark.Overflow;
+
+        // Assert (a) — resolution key routes JSON resolution through "Full"
+        Assert.Equal("Full", overflow.EffectivePresetResolutionKey);
+
+        // Sanity check the JSON path actually loads context-stress via the
+        // "full" preset key (this is what TryRunFromJsonAsync does internally).
+        var scenarioDef = AgentEval.Memory.DataLoading.ScenarioLoader.Load("basic-retention");
+        var resolved = AgentEval.Memory.DataLoading.ScenarioLoader.ResolvePreset(
+            scenarioDef, overflow.EffectivePresetResolutionKey);
+
+        Assert.NotNull(resolved.ContextPressure);
+        Assert.Equal("context-stress", resolved.ContextPressure!.Corpus);
+
+        // Assert (b) — target tokens raised to 192K so the doc claim
+        // ("fills 75% of 192K via injection, then filler calls push past
+        // the 128K window") actually holds.
+        Assert.Equal(192_000, overflow.TargetTokensOverride);
+        Assert.Equal(20, overflow.OverflowCallsOverride);
+    }
 }

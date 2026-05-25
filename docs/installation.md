@@ -103,19 +103,41 @@ If this runs without errors and shows "Passed: True", AgentEval is correctly ins
 
 ## CLI Tool
 
-AgentEval also ships a standalone CLI for terminal and CI/CD usage:
+AgentEval ships a standalone CLI for terminal and CI/CD usage, published as a
+[`dotnet tool`](https://learn.microsoft.com/dotnet/core/tools/global-tools) on NuGet.
 
 ```bash
-# Planned (v1.1): a `dotnet tool` install path.
-# For now in v0.8.1-beta, run the CLI from a cloned repo build:
-#   dotnet run --project src/AgentEval.Cli -- init
-dotnet tool install --global AgentEval.Cli --prerelease  # (planned — not published yet)
-agenteval init                                       # bootstrap .agenteval/ workspace
-agenteval bench gdpr --preset smoke --subject MyAgent # run a benchmark
-agenteval mc serve                                    # open Mission Control on http://localhost:5000
+# Install (one-time, global)
+dotnet tool install --global AgentEval.Cli --prerelease
+
+# Use
+agenteval init                                                 # bootstrap .agenteval/ workspace
+agenteval bench --list                                         # discover available benchmark families
+agenteval bench gdpr --preset smoke --subject MyAgent          # run a GDPR compliance benchmark
+agenteval bench owasp --preset smoke --subject MyAgent --azure-from-env   # OWASP red-team against your real agent
+agenteval mc serve                                             # open Mission Control on http://localhost:5000 (requires .NET 10)
+agenteval doctor                                               # verify workspace integrity (audit-chain v2 hashing)
 ```
 
-See [CLI Reference](cli.md) for full documentation.
+**Requirements**:
+- **.NET 8 SDK or later** for the core surface (`bench`, `init`, `doctor`, `migrate`).
+- **.NET 10 SDK** if you want `agenteval mc serve` — the Mission Control portal uses
+  Hot Chocolate 16 + `MapStaticAssets`, which are net10-only. On .NET 8/9 installations
+  the `mc serve` subcommand prints a graceful "requires .NET 10" message.
+
+**Updating**:
+
+```bash
+dotnet tool update --global AgentEval.Cli --prerelease
+```
+
+**Uninstalling**:
+
+```bash
+dotnet tool uninstall --global AgentEval.Cli
+```
+
+See [CLI Reference](cli.md) for full documentation of every subcommand.
 
 ## Next Steps
 

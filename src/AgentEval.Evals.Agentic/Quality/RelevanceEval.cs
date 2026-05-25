@@ -25,7 +25,7 @@ namespace AgentEval.Evals.Agentic.Quality;
 /// scoped to the retrieved material.
 /// </para>
 /// <para>
-/// Source: forked from Azure/azure-sdk-for-python (commit main-2026-05-09)
+/// Source: forked from Azure/azure-sdk-for-python (commit &lt;TBD-foundry-sha&gt; see CHANGELOG T3.7)
 /// sdk/evaluation/azure-ai-evaluation/azure/ai/evaluation/_evaluators/_relevance/relevance.prompty
 /// License: MIT. Modifications: temperature=0, secondary-metric caveat, structured evidence[],
 /// label assignment table, severity rubric.

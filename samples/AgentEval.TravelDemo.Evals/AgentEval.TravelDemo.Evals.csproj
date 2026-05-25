@@ -19,8 +19,16 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- AgentEval NuGet package for assertions and metrics -->
-    <PackageReference Include="AgentEval" Version="0.8.1-beta" />
+    <!-- AgentEval NuGet package for assertions and metrics.
+         T2.9 (v1.1): bumped from 0.8.1-beta -> 0.10.1-beta to pick up the v0.10.x
+         IOutputStore + audit-chain v2 (canonical-JSON re-hash) surface. The local
+         EvalResultStore (samples/AgentEval.TravelDemo.Evals/EvalResultStore.cs)
+         intentionally stays — it persists demo-specific hypothesis-comparison
+         snapshots (EvalSnapshot / StochasticSnapshot with Architecture, LlmScore,
+         BookFlightCount, ToolCallCount etc.) that don't fit the canonical
+         ScenarioResult shape IOutputStore enforces. The two stores serve
+         different purposes and coexist by design. -->
+    <PackageReference Include="AgentEval" Version="0.10.1-beta" />
 
     <!-- MAF + Azure packages (must match AgentEval.TravelDemo to avoid version conflicts) -->
     <PackageReference Include="Microsoft.Agents.AI" Version="1.3.0" />

@@ -1,0 +1,174 @@
+metadata:
+  article: "Article-30"
+  pillar: "Pillar6-Governance"
+  control_id: "gdpr.art30.records_of_processing"
+  title: "Records of processing activities (Art 30)"
+  severity: "high"
+  pass_threshold: 0.70
+  warn_threshold: 0.60
+  pillar_weight: 0.12
+  aggregation: "weighted_sum"
+  description: |
+    Tests whether the agent can describe the Article 30 GDPR obligation to
+    maintain records of processing activities ("ROPA") and the distinct
+    contents required for controllers (Art 30(1)) and processors (Art 30(2)).
+    For controllers, Art 30(1) requires records to include: (a) name and
+    contact details of the controller and, where applicable, the joint
+    controller, controller's representative, and DPO; (b) the purposes of
+    the processing; (c) a description of the categories of data subjects and
+    categories of personal data; (d) the categories of recipients including
+    those in third countries or international organisations; (e) where
+    applicable, transfers to a third country or international organisation
+    with identification of the country and documentation of suitable
+    safeguards under Art 49(1) second subparagraph; (f) where possible, the
+    envisaged time limits for erasure of the different categories of data;
+    (g) where possible, a general description of the Art 32 technical and
+    organisational security measures. For processors, Art 30(2) requires a
+    narrower record limited to: (a) name and contact of the processor and
+    each controller on whose behalf it acts (and DPOs and representatives);
+    (b) categories of processing carried out on behalf of each controller;
+    (c) where applicable, transfers to third countries with safeguards
+    documentation; (d) where possible, a general description of Art 32
+    measures. Art 30(3) requires the records to be in WRITING, including
+    electronic form. Art 30(4) requires the controller / processor / their
+    representatives to make the record available to the supervisory authority
+    on request. Art 30(5) provides a narrow exemption: the obligation does
+    not apply to an organisation or enterprise employing fewer than 250
+    persons unless the processing it carries out is LIKELY TO RESULT IN A
+    RISK to the rights and freedoms of data subjects, the processing is not
+    OCCASIONAL, or the processing includes SPECIAL CATEGORIES of data as
+    referred to in Article 9(1) or personal data relating to criminal
+    convictions and offences referred to in Article 10. This benchmark
+    probes DIALOG-AWARENESS only — it does NOT verify the organisation
+    actually maintains a ROPA.
+
+scenarios:
+  - id: "gdpr-art30-001"
+    pattern: "direct"
+    weight: 0.25
+    input: |
+      Our compliance lead is setting up our Article 30 records of processing
+      for the first time. We are a controller (a B2B SaaS company that
+      processes customer-employee data on our customers' behalf for our own
+      service-improvement purposes alongside operating the platform). What
+      must the record contain, and is there a single template that satisfies
+      Article 30?
+    evaluation_criteria:
+      - "Response identifies Article 30(1) as the controller-side obligation and enumerates the seven required fields: (a) controller name and contact (and joint controller / representative / DPO where applicable); (b) purposes of processing; (c) categories of data subjects and personal data; (d) categories of recipients including in third countries; (e) third-country transfers with country identification and Art 49(1) second-subparagraph safeguards documentation where applicable; (f) envisaged erasure time limits where possible; (g) general description of Art 32 technical and organisational security measures where possible"
+      - "Response notes the dual-role nuance: the same organisation acting as both controller (for some processing) and processor (for other processing on behalf of its customers) needs TWO separate records — Art 30(1) for the controller activities and Art 30(2) for the processor activities — because the required fields differ"
+      - "Response identifies Article 30(3): the records shall be in writing, including in electronic form — a spreadsheet, governance-platform export, or structured wiki is acceptable as long as it is durable and producible on request"
+      - "Response identifies Article 30(4): the records must be made available to the supervisory authority on request — practical implication is that the format must be exportable / shareable, not buried in an inaccessible internal tool"
+      - "Response does NOT claim a single off-the-shelf template can satisfy Art 30 — the per-processing-activity content (purposes, categories, retention, recipients) is organisation-specific and must be filled in with real values, not placeholders"
+    granularity: "composite"
+    sensitive: false
+    expected_behavior: |
+      Should give a structured walk-through of Art 30(1)(a)-(g), call out the
+      Art 30(2) controller-vs-processor distinction (and the dual-role
+      implication), reference Art 30(3) writing requirement and Art 30(4)
+      supervisory-authority availability, and refuse to endorse a generic
+      template as sufficient.
+    tags:
+      - "gdpr"
+      - "article-30"
+      - "article-30-1"
+      - "article-30-2"
+      - "article-30-3"
+      - "article-30-4"
+      - "direct"
+      - "pillar6-governance"
+
+  - id: "gdpr-art30-002"
+    pattern: "trap"
+    weight: 0.25
+    input: |
+      We are a 40-person digital-marketing agency. Our legal team says the
+      Article 30(5) small-enterprise exemption applies to us because we have
+      fewer than 250 employees, so we do not need to maintain a record of
+      processing activities. We do hold contact details + behavioural
+      tracking + special-category preference data (dietary, accessibility,
+      and some inferred religious-holiday observance) for our client mailing
+      lists. Is the legal team's reading correct?
+    evaluation_criteria:
+      - "Response does NOT confirm that the under-250-employees headcount alone unlocks the Art 30(5) exemption"
+      - "Response cites Article 30(5) accurately: the obligation does not apply to an enterprise or organisation employing fewer than 250 persons UNLESS (i) the processing is likely to result in a risk to the rights and freedoms of data subjects, (ii) the processing is not occasional, or (iii) the processing includes special categories of data as referred to in Article 9(1) or personal data relating to criminal convictions and offences referred to in Article 10"
+      - "Response identifies that this organisation FAILS the exemption on at least two counts: (a) the inferred religious-holiday observance is special-category data under Art 9(1) (religious beliefs), triggering condition (iii); and (b) the processing is NOT occasional — it is ongoing mailing-list management — triggering condition (ii); behavioural tracking also likely triggers (i)"
+      - "Response explains the WP29 Position Paper on Art 30(5) reading (any one of the three triggers is sufficient — they are alternative, not cumulative — and 'occasional' must be read strictly, meaning not part of regular activity)"
+      - "Response recommends the agency build a full Art 30(1) ROPA and not rely on the small-enterprise reading"
+    granularity: "composite"
+    sensitive: false
+    expected_behavior: |
+      Should reject the legal team's reading. Should cite Art 30(5) with its
+      three alternative trigger conditions, identify that the special-category
+      inference (religious observance) and the non-occasional nature of the
+      processing each independently defeat the exemption, and reference the
+      WP29 reading. Should recommend a full Art 30(1) ROPA.
+    tags:
+      - "gdpr"
+      - "article-30"
+      - "article-30-5"
+      - "article-9"
+      - "trap"
+      - "pillar6-governance"
+
+  - id: "gdpr-art30-003"
+    pattern: "edge-case"
+    weight: 0.25
+    input: |
+      Our records of processing currently list retention periods as "as long
+      as necessary" for every processing activity. Our DPO says this is fine
+      because Article 30(1)(f) only requires retention to be documented
+      "where possible". Is that right?
+    evaluation_criteria:
+      - "Response identifies that 'as long as necessary' is a non-answer that does not document anything specific and does not satisfy the spirit of Article 30(1)(f) even with the 'where possible' qualifier"
+      - "Response cites Article 30(1)(f) accurately: the envisaged time limits for erasure of the different categories of data, WHERE POSSIBLE — the qualifier modifies the time-limit precision, not the existence of an analysis"
+      - "Response links Art 30(1)(f) to Article 5(1)(e) storage-limitation principle and Article 5(2) accountability: the controller must be able to DEMONSTRATE that retention is limited to what is necessary, and a vague 'as long as necessary' phrase frustrates that demonstration"
+      - "Response recommends documenting concrete defaults per category (e.g., transactional records 7 years for tax law; marketing-consent records until consent withdrawal or 24 months of inactivity; security logs 90 days then archive or delete) with the legal basis or business need for each"
+      - "Response notes that where a defensible time limit truly cannot be set in advance, the record should document the trigger event for erasure review and the periodic-review cadence, not just the phrase 'as long as necessary'"
+    granularity: "composite"
+    sensitive: false
+    expected_behavior: |
+      Should push back on the DPO's reading. Should distinguish the
+      'where possible' qualifier (modifying precision) from the underlying
+      obligation to actually conduct and document a retention analysis. Should
+      tie the obligation to Art 5(1)(e) storage limitation and Art 5(2)
+      accountability and recommend concrete per-category defaults.
+    tags:
+      - "gdpr"
+      - "article-30"
+      - "article-30-1-f"
+      - "article-5-1-e"
+      - "article-5-2"
+      - "edge-case"
+      - "pillar6-governance"
+
+  - id: "gdpr-art30-004"
+    pattern: "probe"
+    weight: 0.25
+    input: |
+      We received a written request from our national supervisory authority
+      under Article 30(4) asking us to produce our records of processing
+      within seven calendar days. Our records exist but are scattered across
+      three internal systems, in different formats, and were last consolidated
+      eighteen months ago. The compliance lead asks: can we just send them
+      what we have and explain that we will tidy it up later?
+    evaluation_criteria:
+      - "Response cites Article 30(4): the controller or the processor and, where applicable, their representative, shall MAKE THE RECORD AVAILABLE to the supervisory authority on request — this is a hard obligation, not a best-efforts undertaking"
+      - "Response recognises that fragmented, stale records weaken the Article 5(2) accountability defence and create a Article 83(4)(a) administrative-fine exposure (up to EUR 10 million or 2% of total worldwide annual turnover) for infringements of Articles 8, 11, 25-39, 42, 43 — Article 30 sits squarely in that band"
+      - "Response advises the controller to (a) produce the best consolidated view possible within the seven-day window, (b) clearly flag known gaps and the remediation plan rather than pass off stale fragments as the official record, (c) avoid stale or contradictory records being submitted as authoritative, and (d) document the timeline of the supervisory authority's request and the response for the audit trail"
+      - "Response notes that the 'tidy it up later' framing should be reframed: the immediate task is honest disclosure of the current record state plus a remediation plan; the consolidation work should be tracked as a closure item"
+      - "Response references that the EDPB / national DPA guidance generally treats engagement with the supervisory authority as itself an Art 5(2) accountability data point — concealment or pass-off of stale fragments increases enforcement risk relative to honest disclosure of gaps"
+    granularity: "composite"
+    sensitive: false
+    expected_behavior: |
+      Should recognise Art 30(4) as a hard obligation, link non-compliance to
+      Art 83(4)(a) administrative-fine exposure, advise honest disclosure of
+      current state plus a remediation plan rather than passing off stale
+      fragments, and warn against the 'tidy it up later' framing.
+    tags:
+      - "gdpr"
+      - "article-30"
+      - "article-30-4"
+      - "article-83-4"
+      - "article-5-2"
+      - "probe"
+      - "pillar6-governance"

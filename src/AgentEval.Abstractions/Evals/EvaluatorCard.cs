@@ -32,7 +32,7 @@ namespace AgentEval.Evals;
 /// <param name="Category">Category folder name (e.g. <c>"system"</c>, <c>"process"</c>, <c>"adversarial"</c>).</param>
 /// <param name="Version">SemVer-shaped evaluator version, matching <see cref="IEval.Version"/>.</param>
 /// <param name="Description">Human-readable explanation of what this evaluator measures.</param>
-/// <param name="CostTier">Cost tier per <see cref="EvaluatorCostMap"/>.</param>
+/// <param name="CostTier">Cost tier per <c>AgentEval.Evals.Agentic.Cost.EvaluatorCostMap</c> (T3.1: now lives in the Evals.Agentic project; cref written as plain text because Abstractions does not reference Evals.Agentic).</param>
 /// <param name="HigherIsBetter">True when a higher score is better (the typical case); false for "lower is better" metrics.</param>
 /// <param name="DefaultThreshold">Suggested pass threshold when constructing the evaluator without an explicit one.</param>
 /// <param name="ExpectedInputs">Required + optional inputs the evaluator consumes (typically <c>EvalInput.Metadata</c> keys).</param>

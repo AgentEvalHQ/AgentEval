@@ -4,10 +4,17 @@
 namespace AgentEval.Memory.Models;
 
 /// <summary>
-/// Result of comparing two or more baselines.
+/// Result of comparing two or more memory baselines.
 /// Contains per-dimension score comparisons and radar chart data for visualization.
 /// </summary>
-public class BaselineComparison
+/// <remarks>
+/// T3.4 (LR1-003, 2026-05-25): renamed from <c>BaselineComparison</c> to
+/// disambiguate from <see cref="AgentEval.Output.BaselineComparison"/> (the
+/// run-vs-saved-baseline shape on <c>IOutputStoreReader</c>). Memory's
+/// baselines are pentagon-dimension comparisons across multiple memory
+/// baselines; Output's are run-summary deltas. They are NOT interchangeable.
+/// </remarks>
+public class MemoryBaselineComparison
 {
     /// <summary>The baselines being compared.</summary>
     public required IReadOnlyList<MemoryBaseline> Baselines { get; init; }

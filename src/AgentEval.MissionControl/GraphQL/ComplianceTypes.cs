@@ -47,7 +47,16 @@ public sealed record ComplianceMatrixCell(
     DateTimeOffset LastEvidenceAt,
     string LastEvidenceRunId,
     string Timestamp,
-    bool? RegressedFromBaseline);
+    bool? RegressedFromBaseline,
+    bool ChainValid = true,
+    string? ChainBreakReason = null);
+// ChainValid + ChainBreakReason added 2026-05-24 per plan-08 portal-review finding A1.
+// The aggregate `ComplianceMatrix.AllChainsValid` boolean answered "is at least one
+// cell broken?" without telling the SPA WHICH cell. A tampered cell whose pre-tamper
+// status was `pass` would render as the green ✓ without any visual cue. The per-cell
+// bit lets `ComplianceMatrix.tsx` overlay a "tamper detected" stripe on the affected
+// cell while leaving honest cells alone. Defaults preserve backward-compat for any
+// test/fixture that constructs cells without the new fields.
 
 /// <summary>
 /// The killer-feature endpoint: full subject × control matrix for a regulation,

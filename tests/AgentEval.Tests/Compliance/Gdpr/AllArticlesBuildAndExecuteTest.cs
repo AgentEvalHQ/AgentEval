@@ -11,9 +11,10 @@ using Xunit;
 namespace AgentEval.Tests.Compliance.Gdpr;
 
 /// <summary>
-/// Parameterized golden test for Phase 2 — exercises all 21 GDPR article composites
-/// with stub evaluators returning fixed scores. Verifies build correctness and
-/// end-to-end evaluation pipeline for every control_id.
+/// Parameterized golden test for Phase 2 + plan-13 T1.1 — exercises all 29 GDPR
+/// article composites (21 baseline + 8 Pillar 6 governance articles added in
+/// v1.1) with stub evaluators returning fixed scores. Verifies build correctness
+/// and end-to-end evaluation pipeline for every control_id.
 /// </summary>
 public class AllArticlesBuildAndExecuteTest
 {
@@ -57,7 +58,7 @@ public class AllArticlesBuildAndExecuteTest
         return new ArticlesRegistry(loader, articleBuilder);
     }
 
-    // ── Passing theory — all 21 articles ─────────────────────────────────────
+    // ── Passing theory — all 29 articles ─────────────────────────────────────
 
     [Theory]
     [InlineData("gdpr.art5.lawfulness")]
@@ -81,6 +82,15 @@ public class AllArticlesBuildAndExecuteTest
     [InlineData("gdpr.art22.automated")]
     [InlineData("gdpr.art25.privacy_by_design")]
     [InlineData("gdpr.art32.security")]
+    // Plan-13 T1.1 — Pillar 6 Governance and Accountability:
+    [InlineData("gdpr.art28.processor_contracts")]
+    [InlineData("gdpr.art30.records_of_processing")]
+    [InlineData("gdpr.art33.breach_notification")]
+    [InlineData("gdpr.art34.breach_communication")]
+    [InlineData("gdpr.art35.dpia")]
+    [InlineData("gdpr.art37_39.dpo")]
+    [InlineData("gdpr.art44_49.international_transfers")]
+    [InlineData("gdpr.art5_2.accountability")]
     public async Task Article_Composite_PassingStub_AllScenariosPass(string controlId)
     {
         var registry = BuildRegistry(stubScore: 95);

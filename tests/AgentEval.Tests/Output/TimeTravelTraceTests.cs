@@ -100,12 +100,12 @@ public class TimeTravelTraceTests
     [Fact]
     public void AgentInfo_CanIncludeTools()
     {
-        var agent = new AgentInfo
+        var agent = new TraceAgentInfo
         {
             AgentId = "agent_1",
             AgentName = "TestAgent",
             ModelId = "gpt-4o",
-            AvailableTools = new List<ToolDefinition>
+            AvailableTools = new List<TraceToolDefinition>
             {
                 new()
                 {
@@ -310,7 +310,7 @@ public class TimeTravelTraceTests
                 EndTime = endTime,
                 Passed = true
             },
-            Agents = new List<AgentInfo>
+            Agents = new List<TraceAgentInfo>
             {
                 new()
                 {

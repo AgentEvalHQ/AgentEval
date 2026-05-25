@@ -12,6 +12,19 @@ public sealed class NullOutputStore : IOutputStore
     public string? WorkspaceRoot => null;
     public bool IsAvailable => false;
 
+    /// <inheritdoc/>
+    /// <remarks>
+    /// Null store has no concept of run folders — returns a sentinel
+    /// <c>"&lt;null&gt;"</c> string so callers that log the path still get
+    /// something printable. Plan-13 T4.1b item 11.
+    /// </remarks>
+    public string ResolveRunDirectory(SubjectIdentity subject, string runId)
+    {
+        ArgumentNullException.ThrowIfNull(subject);
+        ArgumentException.ThrowIfNullOrWhiteSpace(runId);
+        return "<null>";
+    }
+
     public Task<SolutionInfo> EnsureSolutionAsync(CancellationToken ct = default)
         => Task.FromResult(new SolutionInfo(Guid.Empty, "<null>", ""));
 
@@ -82,6 +95,17 @@ public sealed class NullOutputStore : IOutputStore
 
     public Task CompleteRedTeamCampaignAsync(string campaignId, RedTeamFindings findings, CancellationToken ct = default)
         => Task.CompletedTask;
+
+    // T3.6: no-op store yields no campaigns.
+    public async IAsyncEnumerable<RedTeamCampaignManifest> ListRedTeamCampaignsAsync(
+        [EnumeratorCancellation] CancellationToken ct = default)
+    {
+        await Task.CompletedTask;
+        yield break;
+    }
+
+    public Task<RedTeamCampaignManifest?> GetRedTeamCampaignAsync(string campaignId, CancellationToken ct = default)
+        => Task.FromResult<RedTeamCampaignManifest?>(null);
 
     public async IAsyncEnumerable<RunPointer> GetRecentRunsAsync(
         int count = 50,

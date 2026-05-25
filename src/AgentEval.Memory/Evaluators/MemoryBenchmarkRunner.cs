@@ -144,7 +144,13 @@ public class MemoryBenchmarkRunner : IMemoryBenchmarkRunner
 
             _logger.LogDebug("Running benchmark category: {CategoryName}", category.Name);
 
-            var catResult = await RunCategoryAsync(agent, category, benchmark.Name, cancellationToken);
+            // P0-2 (Sprint 0): use the benchmark's internal resolution key for downstream
+            // preset switches and JSON scenario lookups. Diagnostic/Overflow route to "Full"
+            // so the JSON preset chain + context-stress corpus are actually loaded rather
+            // than silently degrading to Quick (no JSON file declares "diagnostic" or
+            // "overflow" — both fell back to "quick" via the ScenarioLoader default).
+            var catResult = await RunCategoryAsync(
+                agent, category, benchmark.EffectivePresetResolutionKey, cancellationToken);
             categoryResults.Add(catResult);
 
             _logger.LogDebug("Category '{CategoryName}': Score={Score:F1}%, Skipped={Skipped}",
@@ -622,7 +628,9 @@ public class MemoryBenchmarkRunner : IMemoryBenchmarkRunner
     /// The blob is prepended to each verification query (text-blob injection, matching LongMemEval).
     /// Falls back to SyntheticHistoryGenerator if corpus files are not available.
     /// </summary>
-    private static string? BuildContextPressureBlob(string presetName)
+    // internal for P0-2 (Sprint 0) regression tests that assert Diagnostic / Overflow
+    // resolve to context-stress rather than context-small.
+    internal static string? BuildContextPressureBlob(string presetName)
     {
         var (corpusName, turnCount) = presetName switch
         {

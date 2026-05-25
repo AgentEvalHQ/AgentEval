@@ -37,13 +37,13 @@ internal static class GdprBenchmarkRegistration
     {
         BenchmarkFamilyRegistry.Register(new BenchmarkFamily(
             name: "gdpr",
-            description: "GDPR compliance benchmark — 21 articles across 5 pillars",
+            description: "GDPR compliance benchmark — 29 articles across 6 pillars",
             defaultCostTier: CostTier.High,
             presets:
             [
                 new("smoke", "5 representative articles (CI-friendly, threshold 0.80)", CostTier.Medium),
-                new("standard", "All 21 articles across 5 pillars (threshold 0.85)", CostTier.High),
-                new("audit", "Audit-grade with CapByWorst aggregation (threshold 0.90)", CostTier.High),
+                new("standard", "All 29 articles across 6 pillars (threshold 0.85)", CostTier.High),
+                new("audit", "Audit-grade with CapByWorst aggregation across 6 pillars (threshold 0.90)", CostTier.High),
             ],
             compositeFactory: (preset, judge) => BuildPreset(preset, RequireJudge(judge, preset)),
             evaluateAsync: null,  // CompositeEval-native; consumers call CompositeEval.EvaluateAsync.

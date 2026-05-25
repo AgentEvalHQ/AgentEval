@@ -3,6 +3,7 @@
 // Licensed under the MIT License.
 
 using System.Text;
+using AgentEval.Core.Reporting;
 
 namespace AgentEval.Compliance.Gdpr.Reporting;
 
@@ -58,6 +59,18 @@ public sealed class MarkdownRenderer
         foreach (var (key, a) in evidence.Summary.PerArticle.OrderBy(kv => kv.Key, StringComparer.Ordinal))
             sb.AppendLine($"| `{key}` | {a.Score:P0} | **{a.Status}** | {a.Severity} | {a.ScenariosFailed}/{a.ScenarioCount} |");
         sb.AppendLine();
+
+        // Phase-8 T2.5 — parity with EU AI Act renderer.
+        MarkdownSectionBuilder.AppendMethodology(
+            sb,
+            evidence.CompositeTree,
+            evidence.Base.Attestation.EvaluatorModel,
+            evidence.GdprAttestation.JudgeMode);
+
+        MarkdownSectionBuilder.AppendAuditChain(
+            sb,
+            evidence.Base.SourceRun,
+            previousEvidenceRef: null);
 
         if (evidence.CriticalFindings.Count > 0)
         {

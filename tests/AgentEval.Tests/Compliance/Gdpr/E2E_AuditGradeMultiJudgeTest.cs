@@ -194,9 +194,9 @@ public class E2E_AuditGradeMultiJudgeTest
         // Act
         var result = await auditGrade.EvaluateAsync(BenchmarkInput);
 
-        // Assert — well-formed 5-pillar composite
+        // Assert — well-formed 6-pillar composite (plan-13 T1.1 added Pillar 6 Governance)
         Assert.NotNull(result.Details.SubResults);
-        Assert.Equal(5, result.Details.SubResults!.Count); // 5 pillars
+        Assert.Equal(6, result.Details.SubResults!.Count); // 6 pillars
 
         // Verify that at least one leaf uses WeightedMedian (from MultiJudgeWrapper on Critical articles)
         var multiJudgeLeaves = FindMultiJudgeLeaves(result, minSubResults: 3);

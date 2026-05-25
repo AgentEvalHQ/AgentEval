@@ -84,7 +84,7 @@ scales from a CI smoke check to a full audit:
 |---------------------|------------------------------|------------------------------|---------------------------------------|
 | **H2 Performance**  | 3 iters + 2s throughput      | 10 iters + 10s throughput   | 50 iters + 30s throughput            |
 | **H3 Agentic**      | `ToolCallAccuracy` (5 evals) | `AgenticExecution` (6 evals)| `AgenticExecution` + stronger judge   |
-| **H4 GDPR**         | `Smoke` (5 articles)         | `Standard` (21 articles)    | `AuditGrade` (21 articles, cap-by-worst) |
+| **H4 GDPR**         | `Smoke` (5 articles)         | `Standard` (29 articles / 6 pillars) | `AuditGrade` (29 articles / 6 pillars, cap-by-worst) |
 | **H5 EU AI Act**    | `Smoke` (5 controls)         | `Standard` (6 pillars)      | `AuditGrade` (6 pillars, cap-by-worst)   |
 | **H6 OWASP**        | `Smoke` (3 attacks @ Quick)  | `Top10` (9 attacks @ Quick) | `AuditGrade` (9 @ Comprehensive)      |
 | **H7 MITRE ATLAS**  | `AtlasSmoke`                 | `AtlasBaseline`             | `AtlasAuditGrade`                    |

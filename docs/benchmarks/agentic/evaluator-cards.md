@@ -84,6 +84,106 @@ calibration, UX, adversarial, efficiency) are listed in [Cost Guidance](cost-gui
 
 ---
 
+## UX Evaluators (Phase 6 — 3 evaluators)
+
+Plan-13 T4.1e LR3-005..LR3-013 closeout: append the Phase 6 evaluator tables that were
+authored as `EvaluatorCard` JSONs but not surfaced here.
+
+| Key | Class | Foundry URI |
+|-----|-------|-------------|
+| `verbosity_appropriateness` | `VerbosityAppropriatenessEval` | AgentEval-original |
+| `tone_appropriateness` | `ToneAppropriatenessEval` | AgentEval-original |
+| `refusal_quality` | `RefusalQualityEval` | AgentEval-original |
+
+---
+
+## Adversarial-Resistance Evaluators (Phase 6 — 5 evaluators)
+
+| Key | Class | Foundry URI |
+|-----|-------|-------------|
+| `direct_injection` | `DirectInjectionEval` | AgentEval-original (mirrors OWASP LLM01) |
+| `persona_attack` | `PersonaAttackEval` | AgentEval-original |
+| `jailbreak_resistance` | `JailbreakResistanceEval` | AgentEval-original (mirrors OWASP LLM01) |
+| `prompt_leak` | `PromptLeakEval` | AgentEval-original |
+| `escalation_resistance` | `EscalationResistanceEval` | AgentEval-original |
+
+---
+
+## Reasoning Evaluators (Phase 6 — 5 evaluators)
+
+| Key | Class | Foundry URI |
+|-----|-------|-------------|
+| `reasoning_correctness` | `ReasoningCorrectnessEval` | AgentEval-original |
+| `intermediate_step_hallucination` | `IntermediateStepHallucinationEval` | AgentEval-original |
+| `plan_formulation_quality` | `PlanFormulationQualityEval` | AgentEval-original |
+| `goal_decomposition_quality` | `GoalDecompositionQualityEval` | AgentEval-original |
+| `self_correction_quality` | `SelfCorrectionQualityEval` | AgentEval-original |
+
+---
+
+## Calibration Meta Evaluators (Phase 6 — 2 evaluators)
+
+| Key | Class | Notes |
+|-----|-------|-------|
+| `confidence_calibration` | `ConfidenceCalibrationEval` | Flagged "noisy" — relaxed thresholds tracked in calibration overrides |
+| `uncertainty_acknowledgment` | `UncertaintyAcknowledgmentEval` | Flagged "noisy" — relaxed thresholds tracked in calibration overrides |
+
+---
+
+## Memory / Multi-Turn Evaluators (Phase 6 — 5 evaluators)
+
+Note: these evaluators require `conversationHistory[]` on `CalibrationEntry`; they remain carved
+out of the agentic calibration runner until T3.13 ships (see plan-13 Phase 6 lessons-learned).
+
+| Key | Class | Foundry URI |
+|-----|-------|-------------|
+| `memory_recall_accuracy` | `MemoryRecallAccuracyEval` | AgentEval-original |
+| `turn_coherence` | `TurnCoherenceEval` | AgentEval-original |
+| `goal_tracking` | `GoalTrackingEval` | AgentEval-original |
+| `clarification_appropriateness` | `ClarificationAppropriatenessEval` | AgentEval-original |
+| `long_conversation_coherence` | `LongConversationCoherenceEval` | AgentEval-original |
+
+---
+
+## Safety / Content-Classifier Evaluators (Phase 6 — 12 evaluators)
+
+All twelve evaluators route through the IContentSafety / safety pipeline rather than the
+adversarial-prompt-resistance library; see `CalibrationDataset.DeriveCategory` for the
+dispatch rules.
+
+| Key | Class | Foundry URI |
+|-----|-------|-------------|
+| `hate_unfairness` | `HateUnfairnessEval` | `azureai://built-in/evaluators/hate_unfairness` |
+| `self_harm` | `SelfHarmEval` | `azureai://built-in/evaluators/self_harm` |
+| `sexual` | `SexualEval` | `azureai://built-in/evaluators/sexual` |
+| `violence` | `ViolenceEval` | `azureai://built-in/evaluators/violence` |
+| `code_vulnerability` | `CodeVulnerabilityEval` | `azureai://built-in/evaluators/code_vulnerability` |
+| `ungrounded_attributes` | `UngroundedAttributesEval` | `azureai://built-in/evaluators/ungrounded_attributes` |
+| `sensitive_data_leakage` | `SensitiveDataLeakageEval` | AgentEval-original |
+| `protected_material` | `ProtectedMaterialEval` | `azureai://built-in/evaluators/protected_material` |
+| `unsafe_tool_use` | `UnsafeToolUseEval` | AgentEval-original |
+| `indirect_attack` | `IndirectAttackEval` | `azureai://built-in/evaluators/indirect_attack` |
+| `system_prompt_leakage` | `SystemPromptLeakageEval` | AgentEval-original |
+| `prohibited_actions` | `ProhibitedActionsEval` | AgentEval-original |
+
+---
+
+## Cost / Quality Efficiency (Phase 6 — 1 evaluator)
+
+| Key | Class | Score formula |
+|-----|-------|---------------|
+| `cost_quality_efficiency` | `CostQualityEfficiencyEval` | Quality ÷ cost ratio against per-tier budget |
+
+---
+
+## QA Composite (Phase 6 — 1 evaluator)
+
+| Key | Class | Notes |
+|-----|-------|-------|
+| `qa_composite` | `QaCompositeEval` | Aggregator over groundedness + relevance + correctness for a single bound score |
+
+---
+
 > Detailed per-evaluator scoring rubrics, input contracts, and calibration guidance live in
-> the `EvaluatorCard` JSON files. The same metadata is available at runtime via Mission
-> Control's GraphQL `evaluators` query.
+> the `EvaluatorCard` JSON files (60 total under `src/AgentEval.Evals.Agentic/EvaluatorCards/`).
+> The same metadata is available at runtime via Mission Control's GraphQL `evaluators` query.

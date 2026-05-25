@@ -66,6 +66,8 @@
   items:
   - name: Benchmarks Guide
     href: benchmarks.md
+  - name: Eval & Benchmark Architecture
+    href: eval-benchmark-architecture.md
   - name: Agentic Benchmark
     items:
     - name: How It Works (Plain-English)
@@ -88,6 +90,26 @@
       href: benchmarks/gdpr/how-it-works.md
     - name: Getting Started
       href: benchmarks/gdpr/getting-started.md
+  - name: OWASP Benchmark
+    items:
+    - name: Getting Started
+      href: benchmarks/owasp/getting-started.md
+  - name: MITRE ATLAS Benchmark
+    items:
+    - name: Getting Started
+      href: benchmarks/mitre/getting-started.md
+  - name: Performance Benchmark
+    items:
+    - name: Getting Started
+      href: benchmarks/perf/getting-started.md
+  - name: LongMemEval Benchmark
+    items:
+    - name: Getting Started
+      href: benchmarks/longmemeval/getting-started.md
+  - name: Memory Benchmark
+    items:
+    - name: Getting Started
+      href: benchmarks/memory/getting-started.md
 
 - name: Mission Control
   items:

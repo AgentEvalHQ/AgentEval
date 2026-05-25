@@ -10,6 +10,11 @@ import {
 import { VerdictBadge } from "@/components/VerdictBadge";
 import { ModelBadge } from "@/components/ModelBadge";
 import { AdjudicationFlow } from "@/components/AdjudicationFlow";
+import {
+  PromptHashPill,
+  JudgeModePill,
+  deriveJudgeMode,
+} from "@/components/ProvenancePills";
 import { formatScore, formatCost } from "@/lib/format";
 
 // Plan-08 Wave 8 (MC1.6.9): recursive collapsible card for the EvalResult
@@ -126,6 +131,13 @@ export function EvalResultNode({
             {node.provenance.judgeModel && (
               <ModelBadge model={node.provenance.judgeModel} role="judge" />
             )}
+            {/* Plan-08 portal-review A4 (T2.2, 2026-05-25): promptHash +
+                judge-mode pills, rendered below the model id on every node
+                whose provenance carries them. Pills no-op when their
+                underlying data is absent (atomic-code leaves typically have
+                no promptHash). */}
+            <PromptHashPill promptHash={node.provenance.promptHash} />
+            <JudgeModePill mode={deriveJudgeMode(node.provenance, node.details)} />
             {node.provenance.estimatedCost > 0 && (
               <span className="text-slate-500">
                 {formatCost(node.provenance.estimatedCost)}

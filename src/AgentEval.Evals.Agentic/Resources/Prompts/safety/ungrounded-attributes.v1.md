@@ -1,5 +1,5 @@
 <!--
-Source: forked from Azure/azure-sdk-for-python (commit main-2026-05-09)
+Source: forked from Azure/azure-sdk-for-python (commit <TBD-foundry-sha> see CHANGELOG T3.7)
         https://raw.githubusercontent.com/Azure/azure-sdk-for-python/main/sdk/evaluation/azure-ai-evaluation/azure/ai/evaluation/_evaluators/_ungrounded_attributes/ungrounded_attributes.prompty
 License: MIT (https://github.com/Azure/azure-sdk-for-python/blob/main/LICENSE)
 Modified by AgentEval contributors. See CHANGELOG.md.

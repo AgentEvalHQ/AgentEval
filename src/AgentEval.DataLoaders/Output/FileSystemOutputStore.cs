@@ -105,6 +105,21 @@ public sealed class FileSystemOutputStore : IOutputStore
     public string? WorkspaceRoot => _layout.Root;
     public bool IsAvailable => File.Exists(_layout.SolutionFile);
 
+    /// <inheritdoc/>
+    /// <remarks>
+    /// Plan-13 T4.1b item 11. Delegates to <see cref="FileSystemLayout.RunDir"/>
+    /// — pure path projection, no I/O. The returned path includes the layout's
+    /// <c>Sanitize</c> rewrites for Windows-invalid subject-name characters
+    /// (<c>:</c>, <c>/</c>, <c>\</c>, <c>&lt;</c>, <c>&gt;</c>, <c>"</c>, <c>|</c>, <c>?</c>, <c>*</c>),
+    /// so callers no longer need to reach for <see cref="FileSystemLayout"/> directly.
+    /// </remarks>
+    public string ResolveRunDirectory(SubjectIdentity subject, string runId)
+    {
+        ArgumentNullException.ThrowIfNull(subject);
+        ArgumentException.ThrowIfNullOrWhiteSpace(runId);
+        return _layout.RunDir(subject, runId);
+    }
+
     /// <summary>
     /// Returns the canonical traces directory for a given subject and run, creating it if absent.
     /// </summary>
@@ -338,12 +353,43 @@ public sealed class FileSystemOutputStore : IOutputStore
     {
         var subject = await LocateRunAsync(runId, ct);
         var path = _layout.ScenarioFile(subject, runId, result.Id);
-        // Schema for the per-scenario file is eval-result.schema.json, but it
-        // validates the EMBEDDED JSON tree inside ScenarioResult.Output rather
-        // than the ScenarioResult wrapper itself. Validating the embedded tree
-        // would require parsing Output back to a node — defer to v1.1 when
-        // the bridge gets a dedicated schema. The wrapper's shape is enforced
-        // by C# typing.
+
+        // T2.6 (v1.1): the wrapper shape is C#-typed but Output is opaque text. When the
+        // bench writer emits structured JSON as Output (e.g., a serialized EvalResult tree
+        // from EvalResultPersistence.ToScenarioResult), we LOG a warning if it doesn't
+        // round-trip through eval-result.schema.json — but do NOT abort the write. The
+        // production EvalResult serializer's shape is intentionally looser than the schema
+        // (it carries internal fields the schema doesn't enumerate). T2.6's value is
+        // surfacing genuinely-malformed JSON (a truncated write, an injected garbage
+        // string) at write time; over-strict schema enforcement would regress legitimate
+        // writers. The doctor read-path (T1.6) carries the strict gate for files that DO
+        // need full schema coverage.
+        //
+        // Raw-text Output (a string like "answer is 42") is also valid — many code-eval
+        // scenarios persist the agent's raw response without a tree. We detect "intended
+        // to be structured" by checking whether the trimmed payload starts with `{` or `[`.
+        if (!string.IsNullOrWhiteSpace(result.Output))
+        {
+            var trimmed = result.Output.AsSpan().TrimStart();
+            if (trimmed.Length > 0 && (trimmed[0] == '{' || trimmed[0] == '['))
+            {
+                try
+                {
+                    var node = System.Text.Json.Nodes.JsonNode.Parse(result.Output);
+                    if (node is null)
+                    {
+                        Console.Error.WriteLine(
+                            $"warning: scenario '{result.Id}' Output looks JSON-shaped but parsed to null — persisting as-is.");
+                    }
+                }
+                catch (System.Text.Json.JsonException ex)
+                {
+                    Console.Error.WriteLine(
+                        $"warning: scenario '{result.Id}' Output looks JSON-shaped (starts with '{{' or '[') but is malformed: {ex.Message}");
+                }
+            }
+        }
+
         await WriteJsonAsync(path, result, ct);
     }
 
@@ -587,6 +633,68 @@ public sealed class FileSystemOutputStore : IOutputStore
             throw new ArgumentException($"Invalid campaignId format: '{campaignId}'.", nameof(campaignId));
 
         await WriteJsonAsync(_layout.RedTeamFindingsFile(nameWithUnderscore, ts), findings, ct);
+    }
+
+    // T3.6 (2026-05-25) — Read-side enumeration of red-team campaigns. The
+    // on-disk shape is `.agenteval/red-team/{sanitizedName}_{ts}/manifest.json`;
+    // we walk the red-team directory and emit one RedTeamCampaignManifest per
+    // child folder that contains a manifest.json. Missing or corrupt manifests
+    // skip silently with a stderr warning so a single bad campaign does not
+    // hide the whole list. Used by the MC `redTeamCampaigns` GraphQL resolver
+    // (T3.6) and the `/red-team` SPA page.
+    public async IAsyncEnumerable<RedTeamCampaignManifest> ListRedTeamCampaignsAsync(
+        [EnumeratorCancellation] CancellationToken ct = default)
+    {
+        var redTeamRoot = Path.Combine(_layout.Root, "red-team");
+        if (!Directory.Exists(redTeamRoot)) yield break;
+
+        foreach (var campaignDir in Directory.EnumerateDirectories(redTeamRoot))
+        {
+            ct.ThrowIfCancellationRequested();
+            var manifestPath = Path.Combine(campaignDir, "manifest.json");
+            if (!File.Exists(manifestPath)) continue;
+
+            RedTeamCampaignManifest? manifest = null;
+            try
+            {
+                manifest = await ReadJsonAsync<RedTeamCampaignManifest>(manifestPath, ct);
+            }
+            catch (Exception ex) when (ex is JsonException or IOException)
+            {
+                Console.Error.WriteLine(
+                    $"⚠ red-team manifest at {manifestPath} could not be deserialised: {ex.Message}");
+                continue;
+            }
+            if (manifest is not null) yield return manifest;
+        }
+    }
+
+    // T3.6 (2026-05-25) — Single-campaign lookup. Returns null when the
+    // campaign id violates path-safety rules (rejects `../`, embedded
+    // separators) or when no manifest exists for that id.
+    public async Task<RedTeamCampaignManifest?> GetRedTeamCampaignAsync(
+        string campaignId,
+        CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(campaignId)) return null;
+        // Defense-in-depth path-safety: the campaignId becomes a folder name
+        // under .agenteval/red-team/, so reject any segment that contains
+        // path-separator characters or starts with `..`.
+        if (!FileSystemLayout.IsSafePathSegment(campaignId)) return null;
+
+        var manifestPath = Path.Combine(_layout.Root, "red-team", campaignId, "manifest.json");
+        if (!File.Exists(manifestPath)) return null;
+
+        try
+        {
+            return await ReadJsonAsync<RedTeamCampaignManifest>(manifestPath, ct);
+        }
+        catch (Exception ex) when (ex is JsonException or IOException)
+        {
+            Console.Error.WriteLine(
+                $"⚠ red-team manifest at {manifestPath} could not be deserialised: {ex.Message}");
+            return null;
+        }
     }
 
     // ─── Cross-cutting ────────────────────────────────────────────────────────

@@ -14,13 +14,13 @@ namespace AgentEval.Compliance.Gdpr;
 /// over Critical-severity articles. Typically 3 judges with equal weights.
 /// </param>
 /// <remarks>
-/// Phase-8 Task 8.5: this record is <see cref="ObsoleteAttribute"/>-marked
-/// because Mode-B per-criterion multi-judge fan-out has moved into
-/// <c>ScenarioToAtomicEval</c> ctor flags. The <c>AuditGrade</c> factory's
-/// MultiJudgeOptions parameter is retained for v1 source compatibility but
-/// a removal is scheduled for v1.1. See <c>deferred-pending.md</c>.
+/// This record is <see cref="ObsoleteAttribute"/>-marked because Mode-B
+/// per-criterion multi-judge fan-out has moved into <c>ScenarioToAtomicEval</c>
+/// ctor flags. The <c>AuditGrade</c> factory's MultiJudgeOptions parameter is
+/// retained for source compatibility within the v1.x line; removal is planned
+/// for a future release. See <c>CHANGELOG.md</c> for the migration guide.
 /// </remarks>
 [Obsolete("MultiJudgeOptions is deprecated; configure multi-judge via ScenarioToAtomicEval Mode-B flags instead. " +
-          "Pass `null` to AuditGrade to retain single-judge behaviour. Removal scheduled for v1.1.")]
+          "Pass `null` to AuditGrade to retain single-judge behaviour. Will be removed in a future release; see CHANGELOG.md.")]
 public sealed record MultiJudgeOptions(
     IReadOnlyList<(IEvaluator Judge, double Weight)> Judges);

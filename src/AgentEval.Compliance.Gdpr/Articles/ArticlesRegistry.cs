@@ -10,8 +10,9 @@ using AgentEval.Compliance.Gdpr.Articles.Models;
 namespace AgentEval.Compliance.Gdpr.Articles;
 
 /// <summary>
-/// Loads all 21 GDPR article YAMLs at construction (from embedded resources),
-/// builds their <see cref="CompositeEval"/> representations, and exposes lookup
+/// Loads all GDPR article YAMLs at construction (from embedded resources) —
+/// currently 29 articles (21 baseline + 8 Pillar 6 Governance from plan-13 T1.1)
+/// — builds their <see cref="CompositeEval"/> representations, and exposes lookup
 /// by <c>control_id</c>. Intended to be registered as a DI singleton.
 /// </summary>
 /// <remarks>

@@ -469,11 +469,24 @@ await result.ExportHtmlReportAsync("memory-report.html");
 - Single-port deployment via `agenteval mc serve`, `dotnet run --project src/AgentEval.MissionControl`, or `docker compose up`
 - See [`docs/missioncontrol/getting-started.md`](docs/missioncontrol/getting-started.md)
 
-### Compliance Benchmarks
-- **GDPR** — composite-eval audit suite covering 16 articles across 5 pillars; smoke / standard / audit presets + healthcare / HR / children's domain packs
-- **EU AI Act** — Regulation (EU) 2024/1689 high-risk obligations; smoke / standard / audit presets + high-risk-employment / -credit / -education domain packs
-- **Agentic** — Foundry-equivalent 60-evaluator suite (11 presets covering tool calls, RAG quality, judge quality, safety, telemetry, stochastic stability, conversational, reasoning)
-- Every evidence document cryptographically chained to its source run; `agenteval doctor` re-validates on demand
+### Benchmark Families (8 families, single-source-of-truth registry)
+
+Every family auto-registers via `[ModuleInitializer]` into `BenchmarkFamilyRegistry`.
+`agenteval bench --list` reads from the registry — no hardcoded family lists anywhere
+(ADR-017 Convention 3). Updated 2026-05-25 (plan-13 T4.1b item 21).
+
+| Family | Presets | CLI status | What it grades | Cost tier (default) |
+|---|---|---|---|---|
+| **GDPR** | `smoke` / `standard` / `audit` + 3 domain packs (healthcare / HR / children) | ✅ end-to-end | 22 article YAMLs across 5 pillars | Medium |
+| **EU AI Act** | `smoke` / `standard` / `audit` + 3 domain packs (high-risk-employment / -credit / -education) | ✅ end-to-end | 13 article YAMLs across 6 pillars (Reg (EU) 2024/1689) | Medium |
+| **Agentic** | 11 presets (`tool-call-accuracy` / `agentic-execution` / `audit-grade` / `--budget-tier {free,low,medium,high}` filter etc.) | ✅ end-to-end | Foundry-equivalent 60-evaluator universe — system / process / UX / quality / safety / adversarial / reasoning / calibration / memory | Medium |
+| **OWASP LLM Top 10** | `top10` / `smoke` / `audit` / `top10-rag` | ✅ end-to-end (`--azure-from-env` for real agents; stub fallback) | 9 attack types covering 6 of 10 OWASP LLM Top 10 v2.0 categories; LLM03/04/08/09 surface as honest `skipped` leaves | Medium |
+| **MITRE ATLAS** | `atlas-baseline` / `atlas-smoke` / `atlas-audit-grade` | ✅ end-to-end | Same 9 attacks mapped via `IAttackType.MitreAtlasIds` covering 6 of 8 applicable ATLAS techniques | Medium |
+| **LongMemEval** | `subset` / `full` (ICLR 2025) | ✅ end-to-end | Cross-platform memory benchmark — paper-published GPT-4o baseline ≈ 57.7% | Medium |
+| **Memory** | `quick` / `standard` / `full` / `diagnostic` / `overflow` | ✅ end-to-end | Native AgentEval memory benchmark — 3/8/12 categories, weighted grading | Medium |
+| **Performance** | `latency` / `throughput` / `cost` | ✅ end-to-end (`--azure-from-env`) | P99 latency / concurrent throughput / per-prompt cost against your deployment | Low |
+
+Every evidence document is cryptographically chained to its source run; `agenteval doctor` re-validates on demand. Per-family `getting-started.md` guides live under [`docs/benchmarks/`](docs/benchmarks/) (OWASP + GDPR + EU AI Act + Memory + LongMemEval + MITRE + Performance + Agentic).
 
 ### `.agenteval/` Workspace Standard
 - Canonical on-disk format: one folder per agent / workflow, deterministic run IDs, SHA-256 content hashes on every manifest
@@ -516,22 +529,24 @@ dotnet add package AgentEval --prerelease
 
 **CLI Tool:**
 
-The CLI ships in-tree but is not yet published as a `dotnet tool`. Run via:
+The CLI is published as a [`dotnet tool`](https://learn.microsoft.com/dotnet/core/tools/global-tools) on NuGet:
 
 ```bash
-dotnet run --project src/AgentEval.Cli -- init
-dotnet run --project src/AgentEval.Cli -- bench gdpr --preset smoke --subject MyAgent
-dotnet run --project src/AgentEval.Cli -- mc serve
+# Install (one-time, global)
+dotnet tool install --global AgentEval.Cli --prerelease
+
+# Use
+agenteval init                                                 # bootstrap .agenteval/ workspace
+agenteval bench --list                                         # discover the 8 benchmark families
+agenteval bench gdpr --preset smoke --subject MyAgent          # run a GDPR compliance benchmark
+agenteval bench owasp --preset smoke --subject MyAgent --azure-from-env   # OWASP red-team against your real agent
+agenteval mc serve                                             # open Mission Control (requires .NET 10)
+agenteval doctor                                               # verify workspace integrity
 ```
 
-Once published, the equivalent will be:
-
-```bash
-dotnet tool install -g AgentEval.Cli --prerelease   # planned
-agenteval init
-agenteval bench gdpr --preset smoke --subject MyAgent
-agenteval mc serve
-```
+**Requirements**: .NET 8 SDK for the core surface; .NET 10 SDK additionally for `mc serve`
+(graceful fallback message on .NET 8). See [`docs/installation.md`](docs/installation.md#cli-tool)
+for update / uninstall / contributor-path (`dotnet run --project src/AgentEval.Cli`) details.
 
 > **v1 NuGet scope.** The `AgentEval` package currently ships `AgentEval.{Abstractions,Core,DataLoaders,MAF,RedTeam}`. The agentic 60-evaluator suite, GDPR/EU AI Act benchmark code, and memory evaluation pack live alongside the `agenteval` CLI but are not yet exposed as programmatic NuGet APIs — they are runnable today via the CLI binaries. Surfacing them as separate packages is on the v1.1 roadmap.
 

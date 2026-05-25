@@ -62,8 +62,13 @@ public class ContentHasherTests : IDisposable
     }
 
     [Fact]
-    public async Task Hash_ModifiedFile_ProducesDifferentHash()
+    public async Task Hash_ValueEdit_ProducesDifferentHash()
     {
+        // T1.7 (v1.1): canonical-JSON projection tolerates whitespace-only edits but
+        // catches VALUE edits. Pre-T1.7 this test appended a single space to the scenario
+        // file and expected the hash to change. Under canonical projection that's
+        // correctly tolerated; we now edit the `passed` boolean (a real value change)
+        // and expect the hash to change.
         WriteSolutionJson();
         var store = new FileSystemOutputStore(_root);
         var subject = DefaultSubject();
@@ -89,13 +94,54 @@ public class ContentHasherTests : IDisposable
 
         var scenariosDir = Path.Combine(_root, "subjects", "agents", "HashTestAgent", "runs", runId, "scenarios");
         var scenarioFile = Directory.GetFiles(scenariosDir, "*.json").First();
-        await File.AppendAllTextAsync(scenarioFile, " ");
+        var json = await File.ReadAllTextAsync(scenarioFile);
+        var tampered = json.Replace("\"passed\":true", "\"passed\":false")
+                           .Replace("\"passed\": true", "\"passed\": false");
+        Assert.NotEqual(json, tampered); // sanity — the replace actually landed
+        await File.WriteAllTextAsync(scenarioFile, tampered);
 
-        var storeInternal = store;
         var layout = new FileSystemLayoutAccessor(_root);
         var hashAfter = await layout.ComputeHashAsync(subject, runId);
 
         Assert.NotEqual(hashBefore.Replace("sha256:", ""), hashAfter);
+    }
+
+    [Fact]
+    public async Task Hash_WhitespaceOnlyEdit_ProducesSameHash()
+    {
+        // T1.7 (v1.1) companion test: whitespace-only edits MUST NOT break the hash.
+        // This is the property that frees operators from re-running benchmarks because
+        // a JSON formatter touched the on-disk file.
+        WriteSolutionJson();
+        var store = new FileSystemOutputStore(_root);
+        var subject = DefaultSubject();
+
+        var manifest = await store.StartRunAsync(subject, DefaultContext());
+        var runId = manifest.Run.RunId;
+
+        var scenario = new ScenarioResult(
+            "s1", "Scenario", "input", "output", true, 1.0,
+            new Dictionary<string, double>(),
+            new List<AssertionResult>(),
+            TimeSpan.FromSeconds(1), 0.0);
+        await store.WriteScenarioResultAsync(runId, scenario);
+
+        var summary = new RunSummary("1.0", runId, "PASS",
+            new RunStats(1, 1, 0, 0),
+            new Dictionary<string, double> { ["score"] = 1.0 });
+        await store.CompleteRunAsync(manifest, summary);
+
+        var updatedManifest = await store.GetRunManifestAsync(runId);
+        var hashBefore = updatedManifest!.ContentHash;
+
+        var scenariosDir = Path.Combine(_root, "subjects", "agents", "HashTestAgent", "runs", runId, "scenarios");
+        var scenarioFile = Directory.GetFiles(scenariosDir, "*.json").First();
+        await File.AppendAllTextAsync(scenarioFile, "\n   \n"); // trailing whitespace
+
+        var layout = new FileSystemLayoutAccessor(_root);
+        var hashAfter = await layout.ComputeHashAsync(subject, runId);
+
+        Assert.Equal(hashBefore.Replace("sha256:", ""), hashAfter);
     }
 
     [Fact]

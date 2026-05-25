@@ -22,18 +22,23 @@ namespace AgentEval.Samples.Benchmarks;
 /// nearest ancestor with a <c>*.sln</c>, <c>*.slnx</c>, or <c>.git/</c>) and a
 /// sidecar <c>samples/AgentEval.Samples/output/{family}/run-{ts}/</c> tree for
 /// direct human consumption. Mission Control + <c>agenteval doctor</c> see the
-/// canonical workspace; this browser
-/// walks the sidecar because its bare <c>report.json</c> exposes the composite
-/// <c>Score</c> tree directly. The canonical scenarios files store the result
-/// tree as a JSON string embedded inside <c>ScenarioResult.Output</c> which
-/// requires a deeper parse to extract the same fields — surfacing subject
-/// identity + the audit hash from the canonical manifest would be a richer
-/// view, but the writing samples drop both locations together, so nothing is
-/// silently lost in the sidecar view.
+/// canonical workspace.
 /// </para>
 /// <para>
-/// Path resolution mirrors <see cref="BenchmarkSampleHelpers.EnsureRunDirectory(string)"/>
+/// <b>Option B canonical-walk (plan-13 T4.1b item 23)</b>: setting
+/// <c>AGENTEVAL_SAMPLES_REPORT_BROWSER_MODE=canonical</c> switches this browser
+/// from the sidecar walk to an Option-B canonical walk over
+/// <c>.agenteval/subjects/agents/*/runs/*/</c>. The canonical view surfaces
+/// audit-hash + subject identity from <c>manifest.json</c>; the sidecar view
+/// surfaces <c>Score</c> + <c>Label</c> directly from the bare <c>report.json</c>.
+/// Both views co-exist because the writing samples drop both — nothing is
+/// silently lost regardless of which mode is selected. Default remains the
+/// sidecar walk so existing demo flows are unchanged.
+/// </para>
+/// <para>
+/// Sidecar path resolution mirrors <see cref="BenchmarkSampleHelpers.EnsureRunDirectory(string)"/>
 /// so the browser sees exactly the directories the writing samples produce.
+/// Canonical path resolution uses <c>BenchmarkSampleHelpers.SampleAgentEvalDir</c>.
 /// </para>
 /// <para>
 /// Respects the same non-interactive sentinel as <c>OfferToOpenReports</c>: when stdin is
@@ -47,24 +52,48 @@ public static class ReportBrowserBenchmark
 
     public static Task RunAsync()
     {
+        var mode = Environment.GetEnvironmentVariable("AGENTEVAL_SAMPLES_REPORT_BROWSER_MODE");
+        var useCanonical = string.Equals(mode, "canonical", StringComparison.OrdinalIgnoreCase);
+
         BenchmarkSampleHelpers.PrintHeader(
             "Benchmarks H10: Report Browser",
-            "Browse previously generated JSON / HTML / PDF reports under samples/.../output/");
+            useCanonical
+                ? "Browse runs under .agenteval/ (canonical Option-B walk — surfaces audit hash + subject identity)"
+                : "Browse runs under samples/.../output/ (sidecar walk — surfaces score + label directly)");
 
-        var outputRoot = ResolveOutputRoot();
-        if (!Directory.Exists(outputRoot))
+        IReadOnlyList<RunEntry> runs;
+        string sourceRoot;
+
+        if (useCanonical)
         {
-            Console.WriteLine("   No report directory yet — pick a sample from the menu (e.g. Performance) to");
-            Console.WriteLine($"   generate one. Expected location: {outputRoot}");
-            return Task.CompletedTask;
+            sourceRoot = BenchmarkSampleHelpers.SampleAgentEvalDir;
+            if (!Directory.Exists(sourceRoot))
+            {
+                Console.WriteLine("   No canonical workspace yet — pick a sample from the menu (e.g. Performance) to");
+                Console.WriteLine($"   generate one. Expected location: {sourceRoot}");
+                return Task.CompletedTask;
+            }
+            runs = EnumerateCanonicalRuns(sourceRoot)
+                .OrderByDescending(r => r.Timestamp)
+                .ToList();
         }
-
-        var runs = EnumerateRuns(outputRoot)
-            .OrderByDescending(r => r.Timestamp)
-            .ToList();
+        else
+        {
+            sourceRoot = ResolveOutputRoot();
+            if (!Directory.Exists(sourceRoot))
+            {
+                Console.WriteLine("   No report directory yet — pick a sample from the menu (e.g. Performance) to");
+                Console.WriteLine($"   generate one. Expected location: {sourceRoot}");
+                return Task.CompletedTask;
+            }
+            runs = EnumerateRuns(sourceRoot)
+                .OrderByDescending(r => r.Timestamp)
+                .ToList();
+        }
         if (runs.Count == 0)
         {
             Console.WriteLine("   No runs yet — pick a sample from the menu (e.g. Performance) to generate one.");
+            Console.WriteLine($"   Mode: {(useCanonical ? "canonical (.agenteval/)" : "sidecar (output/)")}");
             return Task.CompletedTask;
         }
 
@@ -108,6 +137,120 @@ public static class ReportBrowserBenchmark
     {
         var root = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "output");
         return Path.GetFullPath(root);
+    }
+
+    // ── Option B canonical walk (plan-13 T4.1b item 23) ──────────────────────
+
+    /// <summary>
+    /// Walks <c>{workspace}/.agenteval/subjects/agents/*/runs/*/</c>. Each run dir contains a
+    /// <c>manifest.json</c> with audit hash + subject identity and a <c>summary.json</c> with
+    /// the verdict. This is the surface Mission Control + <c>agenteval doctor</c> consume.
+    /// </summary>
+    private static IEnumerable<RunEntry> EnumerateCanonicalRuns(string agentevalDir)
+    {
+        var subjectsDir = Path.Combine(agentevalDir, "subjects");
+        if (!Directory.Exists(subjectsDir)) yield break;
+
+        IEnumerable<string> kindDirs;
+        try { kindDirs = Directory.EnumerateDirectories(subjectsDir); }
+        catch { yield break; }
+
+        foreach (var kindDir in kindDirs)
+        {
+            var kindLabel = SafeFileName(kindDir);
+            IEnumerable<string> subjectDirs;
+            try { subjectDirs = Directory.EnumerateDirectories(kindDir); }
+            catch { continue; }
+
+            foreach (var subjectDir in subjectDirs)
+            {
+                var runsRoot = Path.Combine(subjectDir, "runs");
+                if (!Directory.Exists(runsRoot)) continue;
+
+                IEnumerable<string> runDirs;
+                try { runDirs = Directory.EnumerateDirectories(runsRoot); }
+                catch { continue; }
+
+                foreach (var runDir in runDirs)
+                {
+                    var entry = TryReadCanonicalRun(kindLabel, SafeFileName(subjectDir), runDir);
+                    if (entry is not null) yield return entry;
+                }
+            }
+        }
+    }
+
+    private static string SafeFileName(string path)
+    {
+        try { return Path.GetFileName(path) ?? "<unknown>"; }
+        catch { return "<unknown>"; }
+    }
+
+    private static RunEntry? TryReadCanonicalRun(string kind, string subject, string runDir)
+    {
+        var manifest = SafeFileIfExists(runDir, "manifest.json");
+        if (manifest is null) return null;
+
+        var summary = SafeFileIfExists(runDir, "summary.json");
+
+        DateTimeOffset stamp;
+        try { stamp = new DateTimeOffset(Directory.GetCreationTimeUtc(runDir), TimeSpan.Zero); }
+        catch { stamp = DateTimeOffset.MinValue; }
+
+        var (score, label) = summary is not null
+            ? TryReadCanonicalScoreAndLabel(summary)
+            : (null, null);
+
+        return new RunEntry(
+            Family: $"{kind}/{subject}",
+            Directory: runDir,
+            Timestamp: stamp,
+            JsonPath: manifest,    // open manifest in default app — JSON viewer
+            HtmlPath: SafeFileIfExists(Path.Combine(runDir, "reports"), "report.html"),
+            PdfPath: SafeFileIfExists(Path.Combine(runDir, "reports"), "report.pdf"),
+            Score: score,
+            Label: label);
+    }
+
+    private static (double? score, string? label) TryReadCanonicalScoreAndLabel(string summaryPath)
+    {
+        try
+        {
+            using var fs = File.OpenRead(summaryPath);
+            using var doc = JsonDocument.Parse(fs);
+            var root = doc.RootElement;
+            if (root.ValueKind != JsonValueKind.Object) return (null, null);
+
+            // Try both names — schema uses "verdict" in the latest version; older runs
+            // may still carry "overallStatus".
+            string? label = null;
+            if (TryGetCaseInsensitive(root, "Verdict", out var labelEl)
+                && labelEl.ValueKind == JsonValueKind.String)
+            {
+                label = labelEl.GetString();
+            }
+            else if (TryGetCaseInsensitive(root, "OverallStatus", out var statusEl)
+                && statusEl.ValueKind == JsonValueKind.String)
+            {
+                label = statusEl.GetString();
+            }
+
+            double? score = null;
+            if (TryGetCaseInsensitive(root, "Metrics", out var metricsEl)
+                && metricsEl.ValueKind == JsonValueKind.Object
+                && TryGetCaseInsensitive(metricsEl, "overallScore", out var scoreEl)
+                && scoreEl.ValueKind == JsonValueKind.Number
+                && scoreEl.TryGetDouble(out var v))
+            {
+                score = v;
+            }
+
+            return (score, label);
+        }
+        catch
+        {
+            return (null, null);
+        }
     }
 
     private static IEnumerable<RunEntry> EnumerateRuns(string outputRoot)

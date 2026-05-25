@@ -35,6 +35,19 @@ public sealed class InMemoryOutputStore : IOutputStore
     public string? WorkspaceRoot => null;
     public bool IsAvailable => true;
 
+    /// <inheritdoc/>
+    /// <remarks>
+    /// In-memory store has no on-disk run folder. Returns a synthetic
+    /// <c>memory://{kind}/{name}/runs/{runId}</c> URI for diagnostics and
+    /// log-message symmetry with the file-system store. Plan-13 T4.1b item 11.
+    /// </remarks>
+    public string ResolveRunDirectory(SubjectIdentity subject, string runId)
+    {
+        ArgumentNullException.ThrowIfNull(subject);
+        ArgumentException.ThrowIfNullOrWhiteSpace(runId);
+        return $"memory://{subject.Kind.ToString().ToLowerInvariant()}/{subject.Name}/runs/{runId}";
+    }
+
     /// <summary>Pre-initializes the solution with a specific name (optional).</summary>
     public void Initialize(string name)
     {
@@ -327,6 +340,36 @@ public sealed class InMemoryOutputStore : IOutputStore
             _redTeamCampaigns[campaignId] = (campaign.Manifest, findings);
         }
         return Task.CompletedTask;
+    }
+
+    // T3.6: in-memory enumeration of staged red-team campaigns. Snapshots
+    // the dictionary under the lock so async iteration cannot trip the
+    // lock contract.
+    public async IAsyncEnumerable<RedTeamCampaignManifest> ListRedTeamCampaignsAsync(
+        [EnumeratorCancellation] CancellationToken ct = default)
+    {
+        List<RedTeamCampaignManifest> snapshot;
+        lock (_lock)
+        {
+            snapshot = _redTeamCampaigns.Values
+                .Select(v => v.Manifest)
+                .ToList();
+        }
+        foreach (var manifest in snapshot)
+        {
+            ct.ThrowIfCancellationRequested();
+            yield return manifest;
+        }
+        await Task.CompletedTask;
+    }
+
+    public Task<RedTeamCampaignManifest?> GetRedTeamCampaignAsync(string campaignId, CancellationToken ct = default)
+    {
+        lock (_lock)
+        {
+            return Task.FromResult<RedTeamCampaignManifest?>(
+                _redTeamCampaigns.TryGetValue(campaignId, out var c) ? c.Manifest : null);
+        }
     }
 
     public async IAsyncEnumerable<RunPointer> GetRecentRunsAsync(

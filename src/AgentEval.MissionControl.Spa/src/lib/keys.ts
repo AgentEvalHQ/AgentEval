@@ -29,6 +29,8 @@ export const queryKeys = {
       ["runs", "scenario", runId, scenarioId] as const,
     scenarioTree: (runId: string, scenarioId: string) =>
       ["runs", "tree", runId, scenarioId] as const,
+    // Plan-08 T2.3 (2026-05-25): trace JSON for the waterfall page.
+    trace: (runId: string) => ["runs", "trace", runId] as const,
   },
 
   compliance: {
@@ -46,5 +48,12 @@ export const queryKeys = {
     detail: (key: string) => ["evaluators", "detail", key] as const,
     timeline: (key: string, count: number) =>
       ["evaluators", "timeline", key, { count }] as const,
+  },
+
+  // T3.6 (2026-05-25): red-team campaign cache namespace.
+  redTeam: {
+    all: () => ["red-team"] as const,
+    list: () => ["red-team", "list"] as const,
+    detail: (id: string) => ["red-team", "detail", id] as const,
   },
 };

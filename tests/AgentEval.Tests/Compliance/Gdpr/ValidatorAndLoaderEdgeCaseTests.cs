@@ -297,29 +297,34 @@ public class ValidatorAndLoaderEdgeCaseTests
     }
 
     [Fact]
-    public async Task LoadAllFromAssemblyAsync_GdprAssembly_Loads21RealArticles()
+    public async Task LoadAllFromAssemblyAsync_GdprAssembly_Loads29RealArticles()
     {
-        // The GDPR sample assembly carries the 21 article YAMLs as embedded resources.
+        // The GDPR assembly carries 29 article YAMLs (21 baseline + 8 Pillar 6
+        // Governance from plan-13 T1.1) as embedded resources.
         var sut = new ArticleScenarioYamlLoader();
         var asm = typeof(AgentEval.Compliance.Gdpr.Articles.Loading.ArticleScenarioYamlLoader).Assembly;
 
         var specs = await sut.LoadAllFromAssemblyAsync(asm, includeTestFixtures: false);
 
-        // 21 GDPR controls per the catalog (excluding the test-fixture YAML).
-        Assert.Equal(21, specs.Count);
+        // 29 GDPR controls per the catalog (excluding the test-fixture YAML).
+        Assert.Equal(29, specs.Count);
         Assert.Contains(specs, s => s.Metadata.ControlId == "gdpr.art17.erasure");
         Assert.Contains(specs, s => s.Metadata.ControlId == "gdpr.art9.special_categories");
+        // Plan-13 T1.1 Pillar 6 spot checks:
+        Assert.Contains(specs, s => s.Metadata.ControlId == "gdpr.art33.breach_notification");
+        Assert.Contains(specs, s => s.Metadata.ControlId == "gdpr.art35.dpia");
     }
 
     [Fact]
-    public async Task LoadAllFromAssemblyAsync_IncludeTestFixturesFlag_Returns22()
+    public async Task LoadAllFromAssemblyAsync_IncludeTestFixturesFlag_Returns30()
     {
         var sut = new ArticleScenarioYamlLoader();
         var asm = typeof(AgentEval.Compliance.Gdpr.Articles.Loading.ArticleScenarioYamlLoader).Assembly;
 
         var specs = await sut.LoadAllFromAssemblyAsync(asm, includeTestFixtures: true);
 
-        Assert.Equal(22, specs.Count);
+        // 29 real articles + 1 test fixture = 30.
+        Assert.Equal(30, specs.Count);
         Assert.Contains(specs, s => s.Metadata.ControlId == "gdpr.test.fixture");
     }
 

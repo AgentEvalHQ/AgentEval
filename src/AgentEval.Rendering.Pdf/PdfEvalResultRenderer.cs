@@ -234,10 +234,27 @@ public sealed class PdfEvalResultRenderer : IEvalResultRenderer
             if (leaf.Details.Evidence is { Count: > 0 } evidence)
             {
                 col.Item().PaddingTop(10).Text("Evidence").FontSize(13).Bold();
+                // Plan-13 T4.1b item 8 (F-PDF-1): truncation length is now operator-configurable
+                // via opts.EvidenceTruncationLength (default 800). When truncation fires we
+                // append a "(N more lines)" footer per evidence entry so the reader knows
+                // exactly how much was dropped. Set EvidenceTruncationLength = 0 to disable.
+                var maxLen = opts.EvidenceTruncationLength;
                 foreach (var ev in evidence)
                 {
                     var msg = ev.Message ?? string.Empty;
-                    if (msg.Length > 800) msg = msg[..800] + "…";
+                    string? overflowFooter = null;
+                    if (maxLen > 0 && msg.Length > maxLen)
+                    {
+                        var truncated = msg[..maxLen];
+                        var droppedTail = msg[maxLen..];
+                        // Approx "lines dropped" — counts \n in the dropped tail. When the dropped
+                        // tail is a single very-long line, we surface the character count instead.
+                        var droppedLines = droppedTail.Count(c => c == '\n');
+                        overflowFooter = droppedLines > 0
+                            ? $"… (truncated; {droppedLines} more line{(droppedLines == 1 ? "" : "s")}, {droppedTail.Length:N0} more chars)"
+                            : $"… (truncated; {droppedTail.Length:N0} more chars)";
+                        msg = truncated;
+                    }
                     col.Item().Text(t =>
                     {
                         if (!string.IsNullOrEmpty(ev.Source))
@@ -246,6 +263,11 @@ public sealed class PdfEvalResultRenderer : IEvalResultRenderer
                         if (!string.IsNullOrEmpty(ev.Reference))
                             t.Span($"  ({ev.Reference})").Italic();
                     });
+                    if (overflowFooter is not null)
+                    {
+                        col.Item().Text(overflowFooter)
+                            .FontSize(9).Italic().FontColor(Colors.Grey.Darken1);
+                    }
                 }
             }
 

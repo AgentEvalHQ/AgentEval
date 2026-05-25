@@ -7,6 +7,123 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed (Phase 11 — Hygiene bundle, 2026-05-25)
+
+Plan-13 T4.1 v0.10.2 polish bundle — 38 small items across 5 sub-PRs
+(samples polish / hygiene / dead code / low-priority polish). No behaviour
+changes; same number of tests + same green; new contract tests for
+`IEvalResultRenderer` + PDF audit-hash parser + `WriteReportsViaStoreAsync`
+integration; deleted `LongMemEvalOptions` (empty subclass, zero consumers);
+dropped stale `.AgenticBenchmark.Golden.` resource prefix in the agentic
+calibration loader (was carried over from the pre-v0.9.0 namespace);
+dropped unused `<InternalsVisibleTo>` in `AgentEval.MAF` (zero internal
+types); dropped unused `AgentEval.Core` `<ProjectReference>` from
+`AgentEval.Rendering.Pdf` (PDF renderer has zero Core symbols); strengthened
+XML docs on `IOutputStore` (Convention 5B canonical evidence sink),
+`IEvalResultRenderer` (Convention 5A renderer contract + `<example/>`
+block), `PerformanceBenchmarkRegistration.OptionsForPreset` (intentional
+uniformity), OWASP/MITRE `judge` ctor param (pinning-test teeth gap);
+tightened `MultiJudgeOptions` Obsolete message ("Removal scheduled for
+v0.11.0"); added `IOutputStoreReader.ResolveRunDirectory` accessor (closes
+the v0.10.1 layout-leak finding); added `EvalResultRenderOptions.EvidenceTruncationLength`
+(default 800) + per-evidence "(N more chars)" overflow footer on the PDF
+renderer; bare-`dotnet-run` `--workspace` parser now validates path
+existence (CLI parity); renamed drift goldens (`pillar5-robustness-10` →
+`-15`, `pillar6-gpai-5` → `-12`); fixed EU AI Act Art 14 / 50(1) / 50(2)
+zero-width WARN band (`warn: 0.70` → `0.60`); added `docs/redteam/owasp.md`
+(red-team-procedure-focused companion to the getting-started doc); updated
+README per-family benchmark table to enumerate all 8 families; updated
+ADR-017 verification test count (12 → 14); promoted Phase 6 evaluator
+tables (UX, adversarial, reasoning, calibration, memory, safety,
+cost-quality, QA composite) in `docs/benchmarks/agentic/evaluator-cards.md`;
+indexed ADRs 015 / 016 / 017 in `docs/adr/README.md`.
+
+### Changed (BREAKING) (Phase 10 — Architecture hardening, 2026-05-25)
+
+- **T3.1** — `EvaluatorCostMap` moved from `AgentEval.Abstractions.Evals` to
+  `AgentEval.Evals.Agentic.Cost`. The type is unchanged; only its namespace
+  + assembly home moved. External consumers using
+  `using AgentEval.Abstractions.Evals;` to reach `EvaluatorCostMap` must
+  update to `using AgentEval.Evals.Agentic.Cost;` and add a
+  `<PackageReference>` / `<ProjectReference>` to `AgentEval.Evals.Agentic`
+  if they don't already have one. Umbrella `AgentEval` NuGet consumers are
+  unaffected (both assemblies flow through transitively). Migration:
+  global find-and-replace of the namespace string.
+- **T3.4** — `AgentEval.Memory.Models.BaselineComparison` renamed to
+  `MemoryBaselineComparison` to disambiguate from
+  `AgentEval.Output.BaselineComparison` (the run-vs-saved-baseline shape on
+  `IOutputStoreReader`). External consumers of the Memory baseline type
+  must rename their usages; the type's shape + members are unchanged.
+- **T3.4** — Trace-shape types `AgentEval.Output.AgentInfo` /
+  `AgentEval.Output.ToolDefinition` renamed to `TraceAgentInfo` /
+  `TraceToolDefinition` to disambiguate from the evaluation-report
+  (`AgentEval.Models.AgentInfo`) and agentic-eval-input
+  (`AgentEval.Evals.ToolDefinition`) shapes. External consumers reading
+  `agent-trace.json` via the typed shape must rename their usages; the
+  on-disk JSON schema is unchanged.
+- **T4.1b Item 11** — `IOutputStoreReader` gains a `ResolveRunDirectory(
+  SubjectIdentity, string runId)` member (closes the v0.10.1 layout-leak
+  finding). External implementers of `IOutputStoreReader` must add the
+  method to compile against v1.1+. In-tree implementations
+  (`FileSystemOutputStore`, `InMemoryOutputStore`, `NullOutputStore`,
+  `ReadOnlyOutputStoreAdapter`) are updated; 4 test stubs updated.
+- **T0.4 (Phase 1)** — `AgentEval.MissionControl.GraphQL.ComplianceMatrixCell`
+  (public positional record) gains two trailing parameters with default
+  values: `bool ChainValid = true` and `string? ChainBreakReason = null`
+  (per plan-08 portal-review finding A1 — surfaces per-cell hash-tampering
+  in the SPA matrix). Source-compat is preserved (defaults), but appending
+  ctor parameters to a public positional record is a **binary BREAKING
+  change** for external code compiled against the pre-v1.1 ctor signature.
+  Mitigation paths: (a) recompile against the new assembly, OR (b) use
+  property-initialiser construction (`new ComplianceMatrixCell { ... }`
+  with the existing required members). The type is part of Mission
+  Control's GraphQL surface — most consumers reach it through the
+  generated GraphQL schema, not the .NET ctor, so the source-compat
+  guarantee covers the typical integration path.
+
+### Changed (Phase 10 — Architecture hardening, 2026-05-25)
+
+- **T3.5** — `RunCostBreakdown` now splits the legacy "unknown" bucket into
+  `unknownKeyCost` (in-tree leaves whose evaluator key is not registered in
+  `EvaluatorCostMap`) and `legacyFlatCost` (pre-v0.8.1-beta scenarios whose
+  `Output` payload lacks a recursive `EvalResult` tree). The invariant becomes
+  `totalCost == sum(byTier) + unknownKeyCost + legacyFlatCost`. SPA cost
+  breakdown table renders both fields with distinct copy. Resolver:
+  `src/AgentEval.MissionControl/GraphQL/{CostBreakdown.cs,Query.cs}`. SPA:
+  `src/AgentEval.MissionControl.Spa/src/pages/RunDetailPage.tsx`.
+- **T3.10** — `/api/v1/version` payload now includes `workspaceRoot` (the
+  resolved absolute path of the workspace the MC server is bound to) and
+  `workspaceInitialized` (whether `.agenteval/` exists under it). Trust
+  boundary: `workspaceRoot` leaks an absolute host path — Mode A (loopback)
+  only. Future Mode B/C must redact or omit.
+- **T3.4** — Duplicate type names resolved. The PDF-only `RiskLevel` enum
+  was merged into `AgentEval.RedTeam.Reporting.Compliance.RiskLevel`
+  (semantically identical, same assembly). The trace-shape `AgentInfo` /
+  `ToolDefinition` types under `AgentEval.Output` were renamed to
+  `TraceAgentInfo` / `TraceToolDefinition` to disambiguate from the
+  evaluation-report shape (`AgentEval.Models.AgentInfo`) and the
+  agentic-eval input shape (`AgentEval.Evals.ToolDefinition`). The Memory
+  `BaselineComparison` type was renamed to `MemoryBaselineComparison` to
+  disambiguate from `AgentEval.Output.BaselineComparison` (the
+  run-vs-saved-baseline shape on `IOutputStoreReader`). External
+  consumers binding to the renamed types must update; the original
+  shapes/members are unchanged.
+- **T3.9** — Dockerfile gains a `HEALTHCHECK` directive (30s interval,
+  curl-based probe of `/api/v1/version`). `curl` is installed in the runtime
+  stage; an opt-in integration test under `tests/AgentEval.Tests/Docker/` is
+  gated behind `AGENTEVAL_RUN_DOCKER_TESTS=1`.
+
+### Known gaps (Phase 10 — Architecture hardening, 2026-05-25)
+
+- **T3.7 prompt-file SHA pinning** — every prompt file under
+  `src/AgentEval.Evals.Agentic/Resources/Prompts/` previously carried a
+  vague date stamp (`commit main-2026-05-09` or `commit main/2026-05`).
+  This release replaces all 22 stamps with a documented placeholder
+  `<TBD-foundry-sha> see CHANGELOG T3.7` rather than inventing a fake
+  SHA. The real Foundry fork-point SHA from `Azure/azure-sdk-for-python`
+  must be substituted before v1.0 GA; the placeholder is grep-able for
+  follow-up tooling.
+
 ## [0.10.1-beta] - 2026-05-18
 
 The **Samples Consolidation + Generic Renderers** release. v0.10.1-beta introduces a

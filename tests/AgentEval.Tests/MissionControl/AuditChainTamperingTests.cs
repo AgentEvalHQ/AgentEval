@@ -332,6 +332,16 @@ public class AuditChainTamperingTests
             return Task.FromResult<ComplianceEvidence?>(null);
         }
 
+        // T3.6: red-team campaign reads — empty stub.
+        public IAsyncEnumerable<RedTeamCampaignManifest> ListRedTeamCampaignsAsync(CancellationToken ct = default) =>
+            EmptyAsync<RedTeamCampaignManifest>();
+        public Task<RedTeamCampaignManifest?> GetRedTeamCampaignAsync(string campaignId, CancellationToken ct = default) =>
+            Task.FromResult<RedTeamCampaignManifest?>(null);
+
+        // Plan-13 T4.1b item 11: deterministic path projection.
+        public string ResolveRunDirectory(SubjectIdentity subject, string runId)
+            => $"stub://{subject.Kind}/{subject.Name}/runs/{runId}";
+
         private static async IAsyncEnumerable<T> EmptyAsync<T>(
             [EnumeratorCancellation] CancellationToken ct = default)
         {
@@ -394,6 +404,13 @@ public class WorkspaceStateUninitialisedTests
         public IAsyncEnumerable<HistoryEntry> GetHistoryAsync(SubjectIdentity subject, DateRange? range = null, CancellationToken ct = default) => EmptyAsync<HistoryEntry>();
         public IAsyncEnumerable<ComplianceEvidencePointer> ListComplianceEvidenceAsync(string? regulation = null, SubjectIdentity? subject = null, CancellationToken ct = default) => EmptyAsync<ComplianceEvidencePointer>();
         public Task<ComplianceEvidence?> GetComplianceEvidenceAsync(string regulation, SubjectIdentity subject, string timestamp, CancellationToken ct = default) => Task.FromResult<ComplianceEvidence?>(null);
+        // T3.6: red-team campaign reads — empty stub.
+        public IAsyncEnumerable<RedTeamCampaignManifest> ListRedTeamCampaignsAsync(CancellationToken ct = default) => EmptyAsync<RedTeamCampaignManifest>();
+        public Task<RedTeamCampaignManifest?> GetRedTeamCampaignAsync(string campaignId, CancellationToken ct = default) => Task.FromResult<RedTeamCampaignManifest?>(null);
+
+        // Plan-13 T4.1b item 11: deterministic path projection.
+        public string ResolveRunDirectory(SubjectIdentity subject, string runId)
+            => $"stub://{subject.Kind}/{subject.Name}/runs/{runId}";
 
         private static async IAsyncEnumerable<T> EmptyAsync<T>(
             [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
@@ -422,6 +439,13 @@ public class WorkspaceStateUninitialisedTests
         public IAsyncEnumerable<HistoryEntry> GetHistoryAsync(SubjectIdentity subject, DateRange? range = null, CancellationToken ct = default) => EmptyAsync<HistoryEntry>();
         public IAsyncEnumerable<ComplianceEvidencePointer> ListComplianceEvidenceAsync(string? regulation = null, SubjectIdentity? subject = null, CancellationToken ct = default) => EmptyAsync<ComplianceEvidencePointer>();
         public Task<ComplianceEvidence?> GetComplianceEvidenceAsync(string regulation, SubjectIdentity subject, string timestamp, CancellationToken ct = default) => Task.FromResult<ComplianceEvidence?>(null);
+        // T3.6: red-team campaign reads — empty stub.
+        public IAsyncEnumerable<RedTeamCampaignManifest> ListRedTeamCampaignsAsync(CancellationToken ct = default) => EmptyAsync<RedTeamCampaignManifest>();
+        public Task<RedTeamCampaignManifest?> GetRedTeamCampaignAsync(string campaignId, CancellationToken ct = default) => Task.FromResult<RedTeamCampaignManifest?>(null);
+
+        // Plan-13 T4.1b item 11: deterministic path projection.
+        public string ResolveRunDirectory(SubjectIdentity subject, string runId)
+            => $"stub://{subject.Kind}/{subject.Name}/runs/{runId}";
 
         private static async IAsyncEnumerable<T> EmptyAsync<T>(
             [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)

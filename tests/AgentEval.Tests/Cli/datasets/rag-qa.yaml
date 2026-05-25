@@ -1,0 +1,46 @@
+# RAG Question-Answering Evaluation Dataset
+# Tests retrieval-augmented generation with context
+
+examples:
+  - id: capital_france
+    category: RAG
+    input: What is the capital of France?
+    expected: Paris is the capital of France.
+    context:
+      - France is a country in Western Europe.
+      - Paris is the capital and largest city of France.
+      - The population of Paris is approximately 2.1 million.
+
+  - id: python_creator
+    category: RAG
+    question: Who created Python?
+    answer: Python was created by Guido van Rossum.
+    context:
+      - Python is a high-level programming language.
+      - Guido van Rossum created Python in 1991.
+      - Python emphasizes code readability.
+    metadata:
+      topic: programming
+      difficulty: easy
+
+  - id: ml_definition
+    category: RAG
+    input: What is machine learning?
+    expected: Machine learning is a subset of AI that enables systems to learn from data.
+    context:
+      - Machine learning is a branch of artificial intelligence.
+      - ML algorithms learn patterns from training data.
+      - Common ML types include supervised, unsupervised, and reinforcement learning.
+    metadata:
+      topic: AI
+      difficulty: medium
+
+  - id: climate_change
+    category: RAG
+    input: What causes climate change?
+    expected: Climate change is primarily caused by greenhouse gas emissions from human activities.
+    context:
+      - Climate change refers to long-term shifts in temperatures and weather patterns.
+      - Human activities, particularly burning fossil fuels, are the main driver of climate change.
+      - Greenhouse gases like CO2 and methane trap heat in the atmosphere.
+      - Deforestation also contributes to climate change.

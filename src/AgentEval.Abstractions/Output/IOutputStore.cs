@@ -8,10 +8,34 @@ namespace AgentEval.Output;
 /// Abstracts all read/write operations against an AgentEval output folder.
 /// </summary>
 /// <remarks>
+/// <para>
 /// Inherits read methods from <see cref="IOutputStoreReader"/>. Mission Control's
 /// local viewer (Mode A) and workspace aggregator (Mode B) consume only
 /// <see cref="IOutputStoreReader"/> so they cannot accidentally write — the constraint is
 /// verified in plan-08 Phase 1 by a reflection-based test.
+/// </para>
+/// <para>
+/// <b>Convention 5B (canonical evidence sink, plan-13 T4.1b item 13)</b>:
+/// every benchmark family that writes audit-grade evidence MUST persist it through
+/// <see cref="IOutputStore"/> rather than directly to <see cref="System.IO.File"/>.
+/// This is the single chokepoint that hashes the run, threads the result through
+/// <c>ContentHasher</c>, and keeps Mission Control + <c>agenteval doctor</c>'s
+/// audit-chain validators honest. Reference call-sites:
+/// </para>
+/// <list type="bullet">
+///   <item><c>GDPRComplianceReporter.SaveReportAsync</c> (compliance evidence)</item>
+///   <item><c>EuAiActComplianceReporter.SaveReportAsync</c> (compliance evidence)</item>
+///   <item><c>OWASPComplianceReporter.SaveReportAsync</c> (red-team evidence)</item>
+///   <item><c>MITREATLASReporter.SaveReportAsync</c> (red-team evidence)</item>
+///   <item><c>BenchmarkSampleHelpers.WriteReportsViaStoreAsync</c> (sample wrapper)</item>
+///   <item><c>FileSystemOutputStore.SaveComplianceEvidenceAsync</c> (canonical sink)</item>
+/// </list>
+/// <para>
+/// Cross-references: ADR-017 Convention 5 (rendering + persistence symmetry),
+/// plan-13 §T4.1b item 11 (path resolution via <see cref="IOutputStoreReader.ResolveRunDirectory"/>),
+/// and the sample-side architecture note in
+/// <c>samples/AgentEval.Samples/Benchmarks/README.md</c>.
+/// </para>
 /// </remarks>
 public interface IOutputStore : IOutputStoreReader
 {

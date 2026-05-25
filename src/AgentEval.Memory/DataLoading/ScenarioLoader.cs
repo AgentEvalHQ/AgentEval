@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 AgentEval Contributors
 
+using System.Diagnostics;
 using System.Text.Json;
 
 namespace AgentEval.Memory.DataLoading;
@@ -17,6 +18,14 @@ public static class ScenarioLoader
         ReadCommentHandling = JsonCommentHandling.Skip,
         AllowTrailingCommas = true
     };
+
+    /// <summary>
+    /// DiagnosticSource for library-internal events such as preset-resolution fallbacks.
+    /// Subscribers can observe <c>"ScenarioLoader.PresetFallback"</c> to log or react;
+    /// the default behaviour is silent (no stderr noise for downstream consumers).
+    /// </summary>
+    public const string DiagnosticSourceName = "AgentEval.Memory.DataLoading.ScenarioLoader";
+    private static readonly DiagnosticSource s_diagnosticSource = new DiagnosticListener(DiagnosticSourceName);
 
     /// <summary>
     /// Loads a scenario definition from embedded resources.
@@ -51,7 +60,25 @@ public static class ScenarioLoader
 
         if (!scenario.Presets.TryGetValue(normalizedName, out var preset))
         {
-            // Fall back to "quick" if the requested preset doesn't exist
+            // P0-2 (Sprint 0): preset-not-found diagnostic surfaced via DiagnosticSource
+            // (library-appropriate vs Console.Error which adds stderr noise for downstream
+            // consumers). Subscribers can observe the "ScenarioLoader.PresetFallback" event
+            // by attaching a DiagnosticListener to the AgentEval.Memory.DataLoading.
+            // ScenarioLoader source name. Default behaviour is silent.
+            //
+            // Diagnostic/Overflow used to land here silently because no JSON declared
+            // a "diagnostic" / "overflow" key — the runner now routes them to "full"
+            // via MemoryBenchmark.EffectivePresetResolutionKey. This event survives as
+            // the safety net for any future preset that forgets to follow the
+            // resolution-key convention.
+            s_diagnosticSource.Write(
+                "ScenarioLoader.PresetFallback",
+                new
+                {
+                    RequestedPreset = normalizedName,
+                    ScenarioName = scenario.Name,
+                    FallbackPreset = "quick",
+                });
             if (!scenario.Presets.TryGetValue("quick", out preset))
                 throw new InvalidOperationException(
                     $"Scenario '{scenario.Name}' has no preset '{normalizedName}' and no 'quick' fallback.");

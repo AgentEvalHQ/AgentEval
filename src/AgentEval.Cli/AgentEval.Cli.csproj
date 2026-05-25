@@ -1,12 +1,46 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
+    <!-- Phase 4 R4 review (2026-05-24): dropped net9 TFM. .NET 9 is STS, EOL May 2026;
+         net8 LTS covers the wide install base; net10 is needed for mc serve. Two TFMs
+         instead of three cuts the packed tool size by ~33% vs. the 3-TFM build. -->
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
     <OutputType>Exe</OutputType>
     <RootNamespace>AgentEval.Cli</RootNamespace>
     <AssemblyName>AgentEval.Cli</AssemblyName>
-    <IsPackable>false</IsPackable>
     <Nullable>enable</Nullable>
+
+    <!-- T1.5 (v1.1): publish as a global dotnet tool so users install with one command
+         instead of cloning the repo and running from source. The tool multi-targets
+         net8/net10 so install works on the widest set of .NET runtimes; the dotnet tool
+         installer picks the highest compatible TFM. The mc serve subcommand is net10-only
+         (Hot Chocolate 16 + MapStaticAssets); on net8 it prints a graceful "requires .NET
+         10" message via the existing #if NET10_0_OR_GREATER guards. -->
+    <IsPackable>true</IsPackable>
+    <PackAsTool>true</PackAsTool>
+    <ToolCommandName>agenteval</ToolCommandName>
+    <PackageId>AgentEval.Cli</PackageId>
+    <!-- Version intentionally NOT hardcoded — release.yml sets -p:PackageVersion=... on CI.
+         Local packs default to 1.0.0 unless overridden, which keeps experimental local
+         packs out of accidental drift with the umbrella's authoritative version. -->
+    <Description>AgentEval CLI — terminal + CI/CD entry point for the .NET evaluation toolkit. The agenteval init command bootstraps a .agenteval/ workspace; agenteval bench {gdpr|eu-ai-act|agentic|owasp|mitre|perf|longmemeval|memory} runs benchmark families; agenteval mc serve launches the local Mission Control portal (requires .NET 10); agenteval doctor verifies workspace integrity via canonical-JSON audit-chain hashing.</Description>
+    <PackageTags>ai;agent;evaluation;cli;dotnet-tool;testing;benchmarking;gdpr;eu-ai-act;owasp;mitre;atlas;compliance</PackageTags>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageReleaseNotes>v0.10.1-beta + v1.1 prerelease: first published version of the CLI as a dotnet tool. Install with: dotnet tool install --global AgentEval.Cli --prerelease. Provides bench, init, doctor, migrate, and mc commands. Audit chain v2 (canonical-JSON re-hash) is BREAKING for pre-v1.1 workspaces — re-run agenteval bench to regenerate.</PackageReleaseNotes>
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <EmbedUntrackedSources>true</EmbedUntrackedSources>
+    <!-- snupkg symbol package for parity with the umbrella package. SourceLink lets users
+         step INTO the CLI source while debugging from their own code that depends on it. -->
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
   </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.SourceLink.GitHub" PrivateAssets="All" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="../../README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="../AgentEval.Abstractions/AgentEval.Abstractions.csproj" />
@@ -20,6 +54,14 @@
          appear in bench list / per-family help. -->
     <ProjectReference Include="..\AgentEval.Evals.Performance\AgentEval.Evals.Performance.csproj" />
     <ProjectReference Include="..\AgentEval.Memory\AgentEval.Memory.csproj" />
+    <!-- T0.5 (v1.1): generic IEvalResultRenderer for OWASP / MITRE / Perf CLI report parity
+         with GDPR / EuAiAct / Agentic. QuestPDF is bundled PrivateAssets in Rendering.Pdf. -->
+    <ProjectReference Include="..\AgentEval.Rendering.Pdf\AgentEval.Rendering.Pdf.csproj" />
+    <!-- v1.1 CLI consolidation: MAFEvaluationHarness is the runtime hosting the eval pipeline
+         for the ported `agenteval eval` command (and only that command). Other commands talk
+         to the harness via DataLoaders / Compliance / RedTeam abstractions and do not need
+         this reference directly. -->
+    <ProjectReference Include="..\AgentEval.MAF\AgentEval.MAF.csproj" />
   </ItemGroup>
 
   <!-- Plan-08 MC1.7.1: AgentEval.MissionControl is net10-only (Hot Chocolate 16

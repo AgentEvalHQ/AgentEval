@@ -836,6 +836,8 @@ Benchmark families register in one of two shapes, depending on whether their nat
 
 Most benchmark families (Agentic, GDPR, EU AI Act, OWASP, MITRE, Performance) ship a static factory class in the `AgentEval.Benchmarks` namespace whose preset methods return `CompositeEval`. The composite flows through the unified `EvaluateAsync(EvalInput) → EvalResult` pipeline (Convention 2).
 
+> **Note (plan-13 T4.1b item 16)**: OWASP / MITRE / Performance register as **hybrid Shape A/B** — they expose both a runner-style entry point (`OwaspBenchmark.Top10` returns `OwaspBenchmarkRun`, not `CompositeEval`) AND a Convention-2 `EvaluateAsync` adapter that flattens to `EvalResult`. The example below shows that hybrid registration. Strictly Shape-A families (Agentic, GDPR, EU AI Act) supply a `CompositeFactory` instead of a `RunnerFactory` and skip `runnerType`/`runnerFactory` entirely.
+
 ```csharp
 // Factory — partial class declared per-assembly, all under AgentEval.Benchmarks
 namespace AgentEval.Benchmarks;
@@ -967,9 +969,12 @@ The cost-tier gradient (Low → Medium → High → High) is surfaced by `bench 
 
 ## See Also
 
+- [**Eval & Benchmark Architecture**](eval-benchmark-architecture.md) — synthesis view of how `IEval`, composites, benchmarks, calibration, and golden datasets fit together end-to-end (with the golden-dataset / calibration deep dive)
+- [Composite Evaluations](composite-evals.md) - Composite mechanics and aggregation strategies in depth
 - [Extensibility Guide](extensibility.md) - Creating custom metrics and plugins
 - [Embedding Metrics](embedding-metrics.md) - Semantic similarity evaluation
 - [Benchmarks Guide](benchmarks.md) - Running standard benchmarks
 - [Metrics Reference](metrics-reference.md) - Complete metric catalog
 - [Evaluation Guide](evaluation-guide.md) - Metric selection guidance
 - [ADR-017: Unified Benchmarks Namespace](adr/017-unified-benchmarks-namespace.md) - Architectural rationale for the registry + namespace + conventions
+- [ADR-008: Calibrated Judge Multi-Model](adr/008-calibrated-judge-multi-model.md) - The calibration architecture decision

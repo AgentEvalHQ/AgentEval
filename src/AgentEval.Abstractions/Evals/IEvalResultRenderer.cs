@@ -21,6 +21,28 @@ namespace AgentEval.Evals;
 /// Control, samples) write to any sink they like (filesystem, blob storage, HTTP response).
 /// </para>
 /// <para>
+/// <b>Convention 5A (canonical renderer contract, ADR-017 / plan-13 T4.1b item 12)</b>:
+/// every renderer that targets the unified <see cref="EvalResult"/> shape MUST
+/// implement this interface. Three contract guarantees:
+/// </para>
+/// <list type="number">
+///   <item><b>Pure projection</b>: <see cref="RenderAsync"/> must not write to disk,
+///         contact the network, or mutate its <c>result</c> argument. Persistence is
+///         the caller's job (see <see cref="IOutputStore"/> Convention 5B).</item>
+///   <item><b>Deterministic format id</b>: <see cref="FormatId"/> + <see cref="FileExtension"/>
+///         must be stable across versions so report-browser UIs can persist user
+///         preferences ("default to PDF when present").</item>
+///   <item><b>Honour <see cref="EvalResultRenderOptions.IncludeProvenance"/></b>:
+///         when <c>false</c>, the renderer must omit judge-model id, prompt id, and
+///         token-cost rows so the artefact is safe to share with non-trusted readers.</item>
+/// </list>
+/// <para>
+/// Reference implementations: <c>HtmlEvalResultRenderer</c> (in
+/// <c>AgentEval.Core/Evals/Rendering/</c>, no native deps) and
+/// <c>PdfEvalResultRenderer</c> (in <c>AgentEval.Rendering.Pdf/</c>, QuestPDF dep).
+/// Contract tests live in <c>tests/AgentEval.Tests/Evals/Rendering/</c>.
+/// </para>
+/// <para>
 /// <b>Relationship to family-specific renderers</b>: existing
 /// <c>GDPRPdfRenderer</c> / <c>EuAiActPdfRenderer</c> / <c>AgenticPdfRenderer</c> stay
 /// in place — they consume the family-specific evidence envelope
@@ -30,6 +52,36 @@ namespace AgentEval.Evals;
 /// choice for cross-family scenarios — discovery walkthroughs, custom sample apps,
 /// third-party benchmark plugins.
 /// </para>
+/// <para>
+/// <b>Why <c>HtmlEvalResultRenderer</c> ships in <c>AgentEval.Core</c> but
+/// <c>PdfEvalResultRenderer</c> sits in its own <c>AgentEval.Rendering.Pdf</c>
+/// project</b> (plan-13 T4.1b item 14 — placement asymmetry): the HTML
+/// renderer has zero native dependencies (string concatenation + razor-style
+/// templating), so shipping it in Core keeps the umbrella package small and
+/// lets consumers render reports without taking on QuestPDF's ~70 MB of
+/// native QuestPDF.SkiaSharp runtimes. The PDF renderer's QuestPDF dependency
+/// is meaningful enough (and the CLI-as-tool size concern in T3.12 explicit
+/// enough) that PDF lives in its own ProjectReference-opt-in package. Moving
+/// <c>HtmlEvalResultRenderer</c> into a parallel <c>AgentEval.Rendering.Html</c>
+/// project would be a BREAKING change for namespace consumers without a
+/// corresponding size or coupling win — symmetry-for-symmetry's-sake is
+/// rejected here.
+/// </para>
+/// <example>
+/// Render a composite evaluation result to HTML bytes:
+/// <code>
+/// var renderer = new HtmlEvalResultRenderer();   // or new PdfEvalResultRenderer();
+/// var opts = new EvalResultRenderOptions(
+///     Subject: new SubjectIdentity(SubjectKind.Agent, "BookingAgent", "1.0.0", null, null, null, null),
+///     Title: "Tool-Call Accuracy",
+///     RegulationOrBenchmark: "Agentic Smoke",
+///     RunId: manifest.Run.RunId,
+///     AuditHash: manifest.ContentHash,
+///     AgentEvalVersion: "0.10.1-beta");
+/// byte[] bytes = await renderer.RenderAsync(evalResult, opts, ct);
+/// await File.WriteAllBytesAsync($"report{renderer.FileExtension}", bytes, ct);
+/// </code>
+/// </example>
 /// </remarks>
 public interface IEvalResultRenderer
 {
@@ -75,6 +127,16 @@ public interface IEvalResultRenderer
 /// <param name="AgentEvalVersion">
 /// Optional AgentEval version string, surfaced in the footer for audit traceability.
 /// </param>
+/// <param name="EvidenceTruncationLength">
+/// Maximum length (in characters) of an individual evidence message before the
+/// renderer truncates it with a friendly "… (truncated)" suffix. Default is
+/// <c>800</c>, the v0.10.1 hardcoded value (plan-13 T4.1b item 8 — F-PDF-1).
+/// Set <c>0</c> (or any non-positive value) to disable truncation entirely
+/// — long evidence will then flow across multiple PDF / HTML page-breaks
+/// untouched. The HTML renderer ignores this option today (it streams evidence
+/// directly into <c>&lt;pre&gt;</c> blocks); PDF renderers honour it for layout
+/// reasons (QuestPDF page-overflow on multi-KB single-cell text).
+/// </param>
 public sealed record EvalResultRenderOptions(
     SubjectIdentity Subject,
     string? Title = null,
@@ -83,4 +145,5 @@ public sealed record EvalResultRenderOptions(
     DateTimeOffset? GeneratedAt = null,
     bool IncludeProvenance = true,
     string? AuditHash = null,
-    string? AgentEvalVersion = null);
+    string? AgentEvalVersion = null,
+    int EvidenceTruncationLength = 800);
