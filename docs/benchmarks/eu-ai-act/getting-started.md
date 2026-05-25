@@ -69,7 +69,7 @@ agenteval init --name MySolution
 # Run the Smoke preset (5 controls, ~$0.05 with real LLM)
 agenteval bench eu-ai-act --preset smoke --subject MyAgent
 
-# Run the Standard preset (all 13 controls, 51 scenarios)
+# Run the Standard preset (all 15 controls, 51 scenarios)
 agenteval bench eu-ai-act --preset standard --subject MyAgent
 
 # Run AuditGrade (Standard + CapByWorst aggregation)
@@ -91,7 +91,7 @@ agenteval bench eu-ai-act --preset standard+high-risk-education --subject MyAgen
 
 ## The Six Pillars
 
-The benchmark organizes 13 controls across 6 pillars. Pillar weights are applied at the top-level `WeightedSumAggregation`; within Pillar 1 (Prohibited Practices) a `MinAggregation` is applied so that any single Art 5 prohibition failure caps the pillar.
+The benchmark organizes 15 controls across 6 pillars. Pillar weights are applied at the top-level `WeightedSumAggregation`; within Pillar 1 (Prohibited Practices) a `MinAggregation` is applied so that any single Art 5 prohibition failure caps the pillar.
 
 | Pillar | Articles covered | Weight | Severity emphasis |
 |--------|-----------------|--------|-------------------|
@@ -113,7 +113,7 @@ The per-run cost figures in the quick-start CLI examples assume a GPT-4o-class j
 | Preset | Scenarios | LLM calls per scenario | Approx. cost / run |
 |--------|-----------|------------------------|--------------------|
 | `smoke` | 5 | 1 (single judge) | ~$0.05 |
-| `standard` | 51 (13 controls × ~4 scenarios) | 1 (single judge) | ~$0.50–0.70 |
+| `standard` | ~60 (15 controls × ~4 scenarios) | 1 (single judge) | ~$0.55–0.80 |
 | `audit` | 51 + Mode-B per-criterion split for Critical (Art 5 sub-clauses) + optional 3-judge consensus | 3–15 per Critical scenario | ~$3–10 |
 | `standard+high-risk-employment/credit/education` | Standard + ~8–10 domain scenarios per pack | 1 | Standard + ~$0.15 per pack |
 

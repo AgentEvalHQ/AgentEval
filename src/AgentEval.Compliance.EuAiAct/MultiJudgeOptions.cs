@@ -14,13 +14,13 @@ namespace AgentEval.Compliance.EuAiAct;
 /// over Critical-severity articles. Typically 3 judges with equal weights.
 /// </param>
 /// <remarks>
-/// Phase-8 Task 8.5: this record is <see cref="ObsoleteAttribute"/>-marked
-/// because Mode-B per-criterion multi-judge fan-out has moved into
-/// <c>ScenarioToAtomicEval</c> ctor flags. A removal is scheduled for v0.11.0
-/// (plan-13 T4.1b item 3). Tracked in
-/// <c>strategy/futurefeatures/todo/13-pending-issues-tasks.md</c>.
+/// This record is <see cref="ObsoleteAttribute"/>-marked because Mode-B
+/// per-criterion multi-judge fan-out has moved into <c>ScenarioToAtomicEval</c>
+/// ctor flags. Retained for source compatibility within the v1.x line;
+/// removal is planned for a future release. See <c>CHANGELOG.md</c> for the
+/// migration guide.
 /// </remarks>
 [Obsolete("MultiJudgeOptions is deprecated; configure multi-judge via ScenarioToAtomicEval Mode-B flags instead. " +
-          "Pass `null` to AuditGrade to retain single-judge behaviour. Removal scheduled for v0.11.0 (plan-13 T4.1b item 3).")]
+          "Pass `null` to AuditGrade to retain single-judge behaviour. Will be removed in a future release; see CHANGELOG.md.")]
 public sealed record MultiJudgeOptions(
     IReadOnlyList<(IEvaluator Judge, double Weight)> Judges);

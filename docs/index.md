@@ -313,10 +313,12 @@ dotnet run --project samples/AgentEval.Samples
 Mission Control is the read-only web portal over your `.agenteval/` workspace —
 GraphQL, REST, and SPA on one port. Eight benchmark families ship: the three
 compliance + agentic benchmarks (**Agentic** 60 evaluators / 11 presets, **EU
-AI Act** 6 pillars / 13 controls, **GDPR** 6 pillars / 24 articles + 3 domain
+AI Act** 6 pillars / 15 controls, **GDPR** 6 pillars / 29 articles + 3 domain
 packs) plus the security + performance + memory families (**OWASP** LLM Top 10
 v2.0, **MITRE ATLAS**, **Performance**, **LongMemEval**, **Memory**). All
-benchmarks produce audit-chained evidence under `.agenteval/`.
+benchmarks produce audit-chained evidence under `.agenteval/`. (For
+version-specific counts, run `agenteval bench --list` against the installed
+tool.)
 
 ```bash
 agenteval init                       # one-time workspace bootstrap
@@ -324,7 +326,7 @@ agenteval bench agentic   --preset agentic-execution --subject MyAgent
 agenteval bench eu-ai-act --preset standard          --subject MyAgent
 agenteval bench gdpr      --preset standard          --subject MyAgent
 agenteval bench owasp     --preset top10             --subject MyAgent
-agenteval bench mc serve                   # browse runs + evidence at http://localhost:5000
+agenteval mc serve                         # browse runs + evidence at http://localhost:5000
 ```
 
 [Mission Control →](missioncontrol/getting-started.md) ·
