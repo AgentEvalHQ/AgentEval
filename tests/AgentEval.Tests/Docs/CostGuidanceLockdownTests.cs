@@ -5,6 +5,7 @@
 using System.IO;
 using System.Text.RegularExpressions;
 using AgentEval.Evals;
+using AgentEval.Evals.Agentic.Cost; // T3.1: EvaluatorCostMap relocated here.
 using Xunit;
 
 namespace AgentEval.Tests.Docs;

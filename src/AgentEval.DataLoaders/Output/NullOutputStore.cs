@@ -83,6 +83,17 @@ public sealed class NullOutputStore : IOutputStore
     public Task CompleteRedTeamCampaignAsync(string campaignId, RedTeamFindings findings, CancellationToken ct = default)
         => Task.CompletedTask;
 
+    // T3.6: no-op store yields no campaigns.
+    public async IAsyncEnumerable<RedTeamCampaignManifest> ListRedTeamCampaignsAsync(
+        [EnumeratorCancellation] CancellationToken ct = default)
+    {
+        await Task.CompletedTask;
+        yield break;
+    }
+
+    public Task<RedTeamCampaignManifest?> GetRedTeamCampaignAsync(string campaignId, CancellationToken ct = default)
+        => Task.FromResult<RedTeamCampaignManifest?>(null);
+
     public async IAsyncEnumerable<RunPointer> GetRecentRunsAsync(
         int count = 50,
         [EnumeratorCancellation] CancellationToken ct = default)

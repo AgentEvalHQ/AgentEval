@@ -11,6 +11,11 @@ using Xunit;
 
 namespace AgentEval.Tests.Compliance.Gdpr;
 
+// T3.3 (2026-05-25): joined the "ConsoleIO" xUnit collection — at least
+// one test below redirects Console.Error to capture judge-failure
+// diagnostics; parallel runs against other Console-capturing tests
+// silently swallowed the captured stream.
+[Collection("ConsoleIO")]
 public class CalibrationRunnerTests
 {
     // ── Helpers ───────────────────────────────────────────────────────────────

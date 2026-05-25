@@ -329,6 +329,36 @@ public sealed class InMemoryOutputStore : IOutputStore
         return Task.CompletedTask;
     }
 
+    // T3.6: in-memory enumeration of staged red-team campaigns. Snapshots
+    // the dictionary under the lock so async iteration cannot trip the
+    // lock contract.
+    public async IAsyncEnumerable<RedTeamCampaignManifest> ListRedTeamCampaignsAsync(
+        [EnumeratorCancellation] CancellationToken ct = default)
+    {
+        List<RedTeamCampaignManifest> snapshot;
+        lock (_lock)
+        {
+            snapshot = _redTeamCampaigns.Values
+                .Select(v => v.Manifest)
+                .ToList();
+        }
+        foreach (var manifest in snapshot)
+        {
+            ct.ThrowIfCancellationRequested();
+            yield return manifest;
+        }
+        await Task.CompletedTask;
+    }
+
+    public Task<RedTeamCampaignManifest?> GetRedTeamCampaignAsync(string campaignId, CancellationToken ct = default)
+    {
+        lock (_lock)
+        {
+            return Task.FromResult<RedTeamCampaignManifest?>(
+                _redTeamCampaigns.TryGetValue(campaignId, out var c) ? c.Manifest : null);
+        }
+    }
+
     public async IAsyncEnumerable<RunPointer> GetRecentRunsAsync(
         int count = 50,
         [EnumeratorCancellation] CancellationToken ct = default)

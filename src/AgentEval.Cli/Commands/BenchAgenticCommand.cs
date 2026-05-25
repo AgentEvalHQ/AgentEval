@@ -62,13 +62,15 @@ public static class BenchAgenticCommand
         }
 
         // ── Judge / evaluator ────────────────────────────────────────────────
-        // `judgeModelName` discarded here because `AgenticBenchmark.<Preset>(judge)`
-        // factories internally wire the judge into individual evals without exposing
-        // a `judgeModel` parameter, and BenchAgenticCommand does not write a
-        // compliance Attestation block (those land for GDPR / EU AI Act bench).
-        // Threading the deployment name through every preset factory is tracked
-        // as T3.2 in strategy/futurefeatures/todo/13-pending-issues-tasks.md.
-        var (resolvedJudge, _, exitCode) = JudgeFactory.Resolve(evaluatorOverride, "agentic benchmark");
+        // T3.2 (2026-05-25): thread `judgeModelName` through into the preset
+        // factory so every leaf IEval records the deployment id on its
+        // provenance. The factories were already updated (Plan 06) to accept
+        // `judgeModel`; the CLI was discarding the value because BenchAgentic
+        // historically wrote no Attestation block. The threading is now
+        // honest for the bench-agentic path; calibration paths and the
+        // remaining bench commands (perf / red-team) inherit the same
+        // wiring through ResolvePreset.
+        var (resolvedJudge, judgeModelName, exitCode) = JudgeFactory.Resolve(evaluatorOverride, "agentic benchmark");
         if (resolvedJudge is null) return exitCode;
         IEvaluator judge = resolvedJudge;
 
@@ -76,7 +78,7 @@ public static class BenchAgenticCommand
         CompositeEval benchmark;
         try
         {
-            benchmark = ResolvePreset(preset, judge, subject);
+            benchmark = ResolvePreset(preset, judge, subject, judgeModelName);
         }
         catch (Exception ex)
         {
@@ -216,18 +218,34 @@ public static class BenchAgenticCommand
     /// Subject identifier used by the <c>safety</c> preset for policy resolution.
     /// Defaults to <c>"default-agent"</c> when not supplied.
     /// </param>
+    /// <param name="judgeModel">
+    /// T3.2 (2026-05-25): the deployment / model identifier returned by
+    /// <see cref="JudgeFactory.Resolve(IEvaluator?, string, string?)"/>. Forwarded to the
+    /// preset factories so every leaf evaluator records the judge model on
+    /// its provenance. <c>null</c> when not threaded (preserves the legacy
+    /// behaviour for the calibration / fixture paths that do not need it).
+    /// </param>
     /// <returns>The resolved <see cref="CompositeEval"/>.</returns>
     /// <exception cref="ArgumentException">Thrown for unknown preset identifiers.</exception>
-    internal static CompositeEval ResolvePreset(string presetSpec, IEvaluator judge, string? subjectId = null)
+    internal static CompositeEval ResolvePreset(
+        string presetSpec,
+        IEvaluator judge,
+        string? subjectId = null,
+        string? judgeModel = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(presetSpec);
         ArgumentNullException.ThrowIfNull(judge);
 
+        // T3.2 (2026-05-25): `judgeModel` is the deployment identifier
+        // returned by JudgeFactory.Resolve (e.g. "gpt-4o-mini" or "stub" /
+        // "override"); the preset factories accept it as an optional second
+        // parameter and forward it to every leaf evaluator so the provenance
+        // chain records WHO judged the response.
         return presetSpec.ToLowerInvariant() switch
         {
-            "agentic-execution" => AgenticBenchmark.AgenticExecution(judge),
-            "tool-call-accuracy" => AgenticBenchmark.ToolCallAccuracy(judge),
-            "rag-quality" => AgenticBenchmark.RagQuality(judge),
+            "agentic-execution" => AgenticBenchmark.AgenticExecution(judge, judgeModel),
+            "tool-call-accuracy" => AgenticBenchmark.ToolCallAccuracy(judge, judgeModel),
+            "rag-quality" => AgenticBenchmark.RagQuality(judge, judgeModel),
             "judge-quality" => AgenticBenchmark.JudgeQuality(),
             "safety" => AgenticBenchmark.Safety(
                 judge,
@@ -243,13 +261,14 @@ public static class BenchAgenticCommand
                     "Safety preset requires an explicit subjectId for policy resolution. " +
                     "Pass subjectId: <agent-name> to ResolvePreset, or use the CLI which " +
                     "now requires --subject."),
-                contentSafetyClient: null),
+                contentSafetyClient: null,
+                judgeModel: judgeModel),
             "telemetry" => AgenticBenchmark.Telemetry(),
             "stochastic-stability" => AgenticBenchmark.StochasticStability(),
-            "conversational" => AgenticBenchmark.Conversational(judge),
-            "reasoning" => AgenticBenchmark.Reasoning(judge),
-            "user-experience" => AgenticBenchmark.UserExperience(judge),
-            "adversarial-direct" => AgenticBenchmark.AdversarialDirect(judge),
+            "conversational" => AgenticBenchmark.Conversational(judge, judgeModel),
+            "reasoning" => AgenticBenchmark.Reasoning(judge, judgeModel),
+            "user-experience" => AgenticBenchmark.UserExperience(judge, judgeModel),
+            "adversarial-direct" => AgenticBenchmark.AdversarialDirect(judge, judgeModel),
             _ => throw new ArgumentException($"Unknown agentic preset '{presetSpec}'. " +
                 "Known presets: agentic-execution, tool-call-accuracy, rag-quality, judge-quality, safety, telemetry, stochastic-stability, conversational, reasoning, user-experience, adversarial-direct.",
                 nameof(presetSpec))

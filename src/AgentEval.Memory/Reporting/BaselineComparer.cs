@@ -11,7 +11,7 @@ namespace AgentEval.Memory.Reporting;
 /// </summary>
 public class BaselineComparer : IBaselineComparer
 {
-    public BaselineComparison Compare(IReadOnlyList<MemoryBaseline> baselines)
+    public MemoryBaselineComparison Compare(IReadOnlyList<MemoryBaseline> baselines)
     {
         ArgumentNullException.ThrowIfNull(baselines);
         if (baselines.Count == 0)
@@ -50,7 +50,7 @@ public class BaselineComparer : IBaselineComparer
             }).ToList()
         };
 
-        return new BaselineComparison
+        return new MemoryBaselineComparison
         {
             Baselines = baselines,
             Dimensions = dimensions,

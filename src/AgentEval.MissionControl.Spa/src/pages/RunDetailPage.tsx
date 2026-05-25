@@ -64,6 +64,7 @@ interface RunDetailResponse {
     totalCost: number;
     byTier: { trivial: number; low: number; medium: number; high: number };
     unknownKeyCost: number;
+    legacyFlatCost: number;
     filteredOut: string[];
   } | null;
 }
@@ -106,6 +107,7 @@ const RUN_DETAIL_QUERY = /* GraphQL */ `
       totalCost
       byTier { trivial low medium high }
       unknownKeyCost
+      legacyFlatCost
       filteredOut
     }
   }
@@ -221,13 +223,38 @@ export function RunDetailPage() {
                   Total: {formatCost(d.runCostBreakdown.totalCost)} —
                   derived from each leaf evaluator's <code>provenance.estimatedCost</code>
                   in the recursive <code>EvalResult</code> tree.
-                  {d.runCostBreakdown.unknownKeyCost > 0 && (
-                    <span className="ml-1 text-amber-700">
-                      ({formatCost(d.runCostBreakdown.unknownKeyCost)} from
-                      keys not registered in <code>EvaluatorCostMap</code>.)
-                    </span>
-                  )}
                 </p>
+                {(d.runCostBreakdown.unknownKeyCost > 0 ||
+                  d.runCostBreakdown.legacyFlatCost > 0) && (
+                  <dl className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1 text-xs">
+                    {d.runCostBreakdown.unknownKeyCost > 0 && (
+                      <div className="flex items-baseline gap-2">
+                        <dt className="text-slate-500 font-medium">
+                          Unknown bucket
+                        </dt>
+                        <dd className="font-mono text-amber-700">
+                          {formatCost(d.runCostBreakdown.unknownKeyCost)}
+                        </dd>
+                        <span className="text-slate-400">
+                          modern entries without category mapping
+                        </span>
+                      </div>
+                    )}
+                    {d.runCostBreakdown.legacyFlatCost > 0 && (
+                      <div className="flex items-baseline gap-2">
+                        <dt className="text-slate-500 font-medium">
+                          Legacy flat
+                        </dt>
+                        <dd className="font-mono text-slate-600">
+                          {formatCost(d.runCostBreakdown.legacyFlatCost)}
+                        </dd>
+                        <span className="text-slate-400">
+                          pre-v0.8.1-beta evidence without per-leaf cost attribution
+                        </span>
+                      </div>
+                    )}
+                  </dl>
+                )}
               </section>
             )}
 

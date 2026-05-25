@@ -620,6 +620,68 @@ public sealed class FileSystemOutputStore : IOutputStore
         await WriteJsonAsync(_layout.RedTeamFindingsFile(nameWithUnderscore, ts), findings, ct);
     }
 
+    // T3.6 (2026-05-25) — Read-side enumeration of red-team campaigns. The
+    // on-disk shape is `.agenteval/red-team/{sanitizedName}_{ts}/manifest.json`;
+    // we walk the red-team directory and emit one RedTeamCampaignManifest per
+    // child folder that contains a manifest.json. Missing or corrupt manifests
+    // skip silently with a stderr warning so a single bad campaign does not
+    // hide the whole list. Used by the MC `redTeamCampaigns` GraphQL resolver
+    // (T3.6) and the `/red-team` SPA page.
+    public async IAsyncEnumerable<RedTeamCampaignManifest> ListRedTeamCampaignsAsync(
+        [EnumeratorCancellation] CancellationToken ct = default)
+    {
+        var redTeamRoot = Path.Combine(_layout.Root, "red-team");
+        if (!Directory.Exists(redTeamRoot)) yield break;
+
+        foreach (var campaignDir in Directory.EnumerateDirectories(redTeamRoot))
+        {
+            ct.ThrowIfCancellationRequested();
+            var manifestPath = Path.Combine(campaignDir, "manifest.json");
+            if (!File.Exists(manifestPath)) continue;
+
+            RedTeamCampaignManifest? manifest = null;
+            try
+            {
+                manifest = await ReadJsonAsync<RedTeamCampaignManifest>(manifestPath, ct);
+            }
+            catch (Exception ex) when (ex is JsonException or IOException)
+            {
+                Console.Error.WriteLine(
+                    $"⚠ red-team manifest at {manifestPath} could not be deserialised: {ex.Message}");
+                continue;
+            }
+            if (manifest is not null) yield return manifest;
+        }
+    }
+
+    // T3.6 (2026-05-25) — Single-campaign lookup. Returns null when the
+    // campaign id violates path-safety rules (rejects `../`, embedded
+    // separators) or when no manifest exists for that id.
+    public async Task<RedTeamCampaignManifest?> GetRedTeamCampaignAsync(
+        string campaignId,
+        CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(campaignId)) return null;
+        // Defense-in-depth path-safety: the campaignId becomes a folder name
+        // under .agenteval/red-team/, so reject any segment that contains
+        // path-separator characters or starts with `..`.
+        if (!FileSystemLayout.IsSafePathSegment(campaignId)) return null;
+
+        var manifestPath = Path.Combine(_layout.Root, "red-team", campaignId, "manifest.json");
+        if (!File.Exists(manifestPath)) return null;
+
+        try
+        {
+            return await ReadJsonAsync<RedTeamCampaignManifest>(manifestPath, ct);
+        }
+        catch (Exception ex) when (ex is JsonException or IOException)
+        {
+            Console.Error.WriteLine(
+                $"⚠ red-team manifest at {manifestPath} could not be deserialised: {ex.Message}");
+            return null;
+        }
+    }
+
     // ─── Cross-cutting ────────────────────────────────────────────────────────
 
     public async IAsyncEnumerable<RunPointer> GetRecentRunsAsync(

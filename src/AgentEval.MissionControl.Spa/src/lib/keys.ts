@@ -49,4 +49,11 @@ export const queryKeys = {
     timeline: (key: string, count: number) =>
       ["evaluators", "timeline", key, { count }] as const,
   },
+
+  // T3.6 (2026-05-25): red-team campaign cache namespace.
+  redTeam: {
+    all: () => ["red-team"] as const,
+    list: () => ["red-team", "list"] as const,
+    detail: (id: string) => ["red-team", "detail", id] as const,
+  },
 };

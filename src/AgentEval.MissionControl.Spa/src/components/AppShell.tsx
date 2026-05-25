@@ -1,6 +1,6 @@
 import { NavLink, Outlet } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { LayoutDashboard, ShieldCheck, ListChecks, Activity, History } from "lucide-react";
+import { LayoutDashboard, ShieldCheck, ListChecks, Activity, History, Swords } from "lucide-react";
 import { ErrorBoundary } from "./ErrorBoundary";
 import { gqlRequest } from "@/lib/graphql-client";
 import { queryKeys } from "@/lib/keys";
@@ -41,6 +41,8 @@ const navItems = [
   { to: "/runs", label: "Runs", icon: History, end: false },
   { to: "/compliance", label: "Compliance", icon: ShieldCheck, end: false },
   { to: "/evaluators", label: "Evaluators", icon: Activity, end: false },
+  // T3.6 (2026-05-25) — red-team campaigns list view.
+  { to: "/red-team", label: "Red-team", icon: Swords, end: false },
 ];
 
 export function AppShell() {

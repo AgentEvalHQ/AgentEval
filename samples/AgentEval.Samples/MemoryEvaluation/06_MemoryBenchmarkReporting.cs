@@ -174,7 +174,7 @@ public static class MemoryBenchmarkReporting
         Console.WriteLine();
     }
 
-    private static void PrintComparison(BaselineComparison comparison, List<MemoryBaseline> baselines)
+    private static void PrintComparison(MemoryBaselineComparison comparison, List<MemoryBaseline> baselines)
     {
         if (comparison.Baselines.Count < 2)
         {

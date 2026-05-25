@@ -5,6 +5,7 @@
 using AgentEval.Core;
 using AgentEval.Evals;
 using AgentEval.Evals.Agentic.Conversation;
+using AgentEval.Evals.Agentic.Cost; // T3.1: EvaluatorCostMap doc-cref binding.
 
 namespace AgentEval.Evals.Agentic.MultiTurn;
 

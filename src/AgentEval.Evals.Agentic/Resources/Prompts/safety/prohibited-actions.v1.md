@@ -6,7 +6,7 @@ Source: AgentEval contributors — original (no direct Foundry prompty equivalen
         LLM FALLBACK path only — invoked when no deterministic policy violations are
         detected but semantic content-policy nuance still needs assessment.
 License: MIT (https://github.com/joslat/AgentEval/blob/main/LICENSE)
-Commit: main-2026-05-09
+Commit: <TBD-foundry-sha> see CHANGELOG T3.7
 Modifications:
   - Original AgentEval authorship — no Foundry source file to fork
   - temperature 0 (reproducible scoring for a critical-severity evaluator)

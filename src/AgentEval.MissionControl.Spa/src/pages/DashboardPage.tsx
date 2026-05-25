@@ -7,18 +7,35 @@ import { SubjectCard, type SubjectCardData } from "@/components/SubjectCard";
 import type { Verdict } from "@/components/VerdictBadge";
 
 // Plan-08 Wave 2: dashboard with SubjectCard tiles + recent runs trend.
+//
+// T3.8 (2026-05-25): switched from `subjects { ... }` to the paginated
+// `subjectsConnection(first: 200) { edges { node { ... } } }` shape so the
+// Dashboard does not blow the response payload on workspaces with hundreds
+// of subjects. We pull the max-allowed page (200) and rely on the totalCount
+// field to surface a hint when more subjects exist beyond the first page —
+// the dashboard intentionally only renders the first page (a future story
+// can wire infinite-scroll or a dedicated subjects list page).
 
-interface SubjectsQueryResponse {
-  subjects: {
-    identity: {
-      kind: "AGENT" | "WORKFLOW";
-      name: string;
+interface SubjectsConnectionResponse {
+  subjectsConnection: {
+    totalCount: number;
+    edges: {
+      node: {
+        identity: {
+          kind: "AGENT" | "WORKFLOW";
+          name: string;
+        };
+        lastRun: {
+          runId: string;
+          verdict: Verdict;
+        } | null;
+      };
+    }[];
+    pageInfo: {
+      hasNextPage: boolean;
+      endCursor: string | null;
     };
-    lastRun: {
-      runId: string;
-      verdict: Verdict;
-    } | null;
-  }[];
+  };
 }
 
 interface RecentRunsResponse {
@@ -32,16 +49,28 @@ interface RecentRunsResponse {
   }[];
 }
 
+// T3.8 — paginated Connection shape (max page = 200, per the server-side
+// MaxFirst cap). The dashboard renders only the first page; the totalCount
+// surfaces overflow without forcing a follow-up round-trip.
 const SUBJECTS_QUERY = /* GraphQL */ `
   query SubjectsList {
-    subjects {
-      identity {
-        kind
-        name
+    subjectsConnection(first: 200) {
+      totalCount
+      edges {
+        node {
+          identity {
+            kind
+            name
+          }
+          lastRun {
+            runId
+            verdict
+          }
+        }
       }
-      lastRun {
-        runId
-        verdict
+      pageInfo {
+        hasNextPage
+        endCursor
       }
     }
   }
@@ -68,7 +97,7 @@ export function DashboardPage() {
 
   const subjectsQ = useQuery({
     queryKey: queryKeys.subjects.list(),
-    queryFn: () => gqlRequest<SubjectsQueryResponse>(SUBJECTS_QUERY),
+    queryFn: () => gqlRequest<SubjectsConnectionResponse>(SUBJECTS_QUERY),
   });
 
   const recentRunsQ = useQuery({
@@ -80,13 +109,18 @@ export function DashboardPage() {
   // Phase-7 Task 7.9: key by `${kind}::${name}` so an agent and a workflow
   // with the same name don't share a sparkline.
   const trendBySubject = buildTrendIndex(recentRunsQ.data?.recentRuns ?? []);
-  const cards: SubjectCardData[] = (subjectsQ.data?.subjects ?? []).map((s) => ({
+  // T3.8 — pull node out of each Connection edge. Connection shape
+  // gives us totalCount + hasNextPage which we surface in the section
+  // header below when the operator has more than 200 subjects.
+  const conn = subjectsQ.data?.subjectsConnection;
+  const cards: SubjectCardData[] = (conn?.edges ?? []).map(({ node: s }) => ({
     kind: s.identity.kind,
     name: s.identity.name,
     lastVerdict: s.lastRun?.verdict ?? null,
     lastRunId: s.lastRun?.runId ?? null,
     trend: trendBySubject.get(`${s.identity.kind}::${s.identity.name}`) ?? [],
   }));
+  const subjectsOverflow = conn ? conn.totalCount > cards.length : false;
 
   return (
     <div className="space-y-6">
@@ -123,9 +157,9 @@ export function DashboardPage() {
       <section>
         <header className="flex items-baseline justify-between mb-3">
           <h3 className="text-sm font-semibold text-slate-700">
-            Subjects {subjectsQ.data && (
+            Subjects {conn && (
               <span className="text-slate-400 font-normal">
-                ({subjectsQ.data.subjects.length})
+                ({cards.length}{subjectsOverflow ? ` of ${conn.totalCount}` : ""})
               </span>
             )}
           </h3>
@@ -136,7 +170,7 @@ export function DashboardPage() {
           isError={subjectsQ.isError}
           error={subjectsQ.error}
           data={subjectsQ.data}
-          isEmpty={(d) => d.subjects.length === 0}
+          isEmpty={(d) => d.subjectsConnection.totalCount === 0}
           loadingMessage="Querying GraphQL…"
           errorPrefix="GraphQL request failed"
           emptyMessage={
@@ -148,11 +182,20 @@ export function DashboardPage() {
           }
         >
           {() => (
-            <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-              {cards.map((c) => (
-                <SubjectCard key={`${c.kind}-${c.name}`} subject={c} />
-              ))}
-            </div>
+            <>
+              <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+                {cards.map((c) => (
+                  <SubjectCard key={`${c.kind}-${c.name}`} subject={c} />
+                ))}
+              </div>
+              {subjectsOverflow && (
+                <p className="mt-3 text-xs text-slate-500 italic">
+                  Showing the first {cards.length} of {conn?.totalCount} subjects.
+                  Use the GraphQL <code>subjectsConnection(first, after)</code>{" "}
+                  cursor to fetch the next page.
+                </p>
+              )}
+            </>
           )}
         </DataState>
       </section>

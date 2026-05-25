@@ -14,5 +14,5 @@ public interface IBaselineComparer
     /// <summary>
     /// Compares the provided baselines and returns a structured comparison.
     /// </summary>
-    BaselineComparison Compare(IReadOnlyList<MemoryBaseline> baselines);
+    MemoryBaselineComparison Compare(IReadOnlyList<MemoryBaseline> baselines);
 }

@@ -34,7 +34,7 @@ public class TimeTravelTrace
 
     /// <summary>Agent(s) involved in this execution.</summary>
     [JsonPropertyName("agents")]
-    public required List<AgentInfo> Agents { get; init; }
+    public required List<TraceAgentInfo> Agents { get; init; }
 
     /// <summary>Final result summary.</summary>
     [JsonPropertyName("summary")]
@@ -92,9 +92,15 @@ public class EvaluationMetadata
 }
 
 /// <summary>
-/// Information about an agent in the execution.
+/// Information about an agent in the execution (time-travel trace).
 /// </summary>
-public class AgentInfo
+/// <remarks>
+/// T3.4 (LR1-002, 2026-05-25): renamed from <c>AgentInfo</c> to disambiguate
+/// from <see cref="AgentEval.Models.AgentInfo"/> (the EvaluationReport shape).
+/// The trace shape has agentId + availableTools; the report shape has Name +
+/// Model + Endpoint. They are NOT interchangeable.
+/// </remarks>
+public class TraceAgentInfo
 {
     /// <summary>Unique identifier for this agent.</summary>
     [JsonPropertyName("agentId")]
@@ -114,13 +120,19 @@ public class AgentInfo
 
     /// <summary>Tools available to this agent.</summary>
     [JsonPropertyName("availableTools")]
-    public List<ToolDefinition>? AvailableTools { get; init; }
+    public List<TraceToolDefinition>? AvailableTools { get; init; }
 }
 
 /// <summary>
-/// Definition of a tool available to an agent.
+/// Definition of a tool available to an agent (time-travel trace).
 /// </summary>
-public class ToolDefinition
+/// <remarks>
+/// T3.4 (LR1-002, 2026-05-25): renamed from <c>ToolDefinition</c> to
+/// disambiguate from <see cref="AgentEval.Evals.ToolDefinition"/>, the eval
+/// input shape used by the agentic IEval suite (positional record vs named
+/// init properties; the trace shape carries a nested ToolParameter dictionary).
+/// </remarks>
+public class TraceToolDefinition
 {
     /// <summary>Tool name.</summary>
     [JsonPropertyName("name")]

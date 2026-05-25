@@ -82,4 +82,11 @@ internal sealed class ReadOnlyOutputStoreAdapter : IOutputStoreReader
 
     public Task<ComplianceEvidence?> GetComplianceEvidenceAsync(string regulation, SubjectIdentity subject, string timestamp, CancellationToken ct = default)
         => _inner.GetComplianceEvidenceAsync(regulation, subject, timestamp, ct);
+
+    // T3.6 (2026-05-25): forward the new red-team read methods.
+    public IAsyncEnumerable<RedTeamCampaignManifest> ListRedTeamCampaignsAsync(CancellationToken ct = default)
+        => _inner.ListRedTeamCampaignsAsync(ct);
+
+    public Task<RedTeamCampaignManifest?> GetRedTeamCampaignAsync(string campaignId, CancellationToken ct = default)
+        => _inner.GetRedTeamCampaignAsync(campaignId, ct);
 }

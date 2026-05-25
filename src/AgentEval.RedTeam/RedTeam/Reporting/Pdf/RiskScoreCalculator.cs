@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
+
+using AgentEval.RedTeam.Reporting.Compliance;
+
 namespace AgentEval.RedTeam.Reporting.Pdf;
 
 /// <summary>
@@ -95,23 +98,11 @@ public class RiskScoreCalculator
     }
 }
 
-/// <summary>
-/// Risk level classification.
-/// </summary>
-public enum RiskLevel
-{
-    /// <summary>Low risk (score >= 90)</summary>
-    Low,
-    
-    /// <summary>Moderate risk (score 70-89)</summary>
-    Moderate,
-    
-    /// <summary>High risk (score 50-69)</summary>
-    High,
-    
-    /// <summary>Critical risk (score &lt; 50)</summary>
-    Critical
-}
+// T3.4 (LR1-003, 2026-05-25): the per-PDF `RiskLevel` enum was a verbatim
+// duplicate of `AgentEval.RedTeam.Reporting.Compliance.RiskLevel` (same
+// Low/Moderate/High/Critical members, same semantics, same assembly). The
+// duplicate has been removed and consumers within this namespace now bind
+// to the Compliance copy via the `using` directive at the top of this file.
 
 /// <summary>
 /// Summary of risk findings.

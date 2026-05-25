@@ -296,6 +296,13 @@ public class ComplianceEvidenceAuditChainResolverTests
             return Task.FromResult<ComplianceEvidence?>(null);
         }
 
+        // T3.6: red-team campaign reads — empty stub.
+        public IAsyncEnumerable<RedTeamCampaignManifest> ListRedTeamCampaignsAsync(CancellationToken ct = default) =>
+            EmptyAsync<RedTeamCampaignManifest>();
+
+        public Task<RedTeamCampaignManifest?> GetRedTeamCampaignAsync(string campaignId, CancellationToken ct = default) =>
+            Task.FromResult<RedTeamCampaignManifest?>(null);
+
         private static async IAsyncEnumerable<T> EmptyAsync<T>(
             [EnumeratorCancellation] CancellationToken ct = default)
         {

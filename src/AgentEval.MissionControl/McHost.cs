@@ -182,18 +182,42 @@ public static class McHost
         // instead of being hard-coded. Mode A on loopback reports `"local"`;
         // Mode B/C (when they ship) report `"aggregator"` / `"server"`. The
         // default remains `"local"` so existing local-only operators see no
-        // behaviour change. Subsumes the version-enrichment work tracked as
-        // T3.10 (workspaceRoot + workspaceInitialized — deferred).
+        // behaviour change.
+        //
+        // Plan-08 T3.10 (2026-05-25): version payload also enrichs with the
+        // resolved workspace root + an initialised flag so the SPA's "About"
+        // panel can show whether the active workspace already carries an
+        // `.agenteval/` folder. Trust boundary: `workspaceRoot` leaks an
+        // ABSOLUTE host filesystem path. This is acceptable in Mode A
+        // (loopback, single operator, same trust domain as the host) and
+        // ONLY in Mode A. Future Mode B (aggregator) or Mode C (server)
+        // MUST redact or omit this field — operators of a multi-tenant
+        // surface should never expose other tenants' filesystem layouts.
+        // The resolved root is computed once at startup (workspace can't be
+        // hot-swapped without restarting the process) and captured in the
+        // closure below.
         var configuredMode = app.Configuration["AgentEval:Mode"];
         var resolvedMode = string.IsNullOrWhiteSpace(configuredMode) ? "local" : configuredMode;
+        var configuredWorkspaceRoot = app.Configuration["AgentEval:Root"];
+        var resolvedWorkspaceRoot = !string.IsNullOrWhiteSpace(configuredWorkspaceRoot)
+            ? System.IO.Path.GetFullPath(configuredWorkspaceRoot)
+            : DiscoverWorkspaceRoot(Directory.GetCurrentDirectory());
         app.MapGet("/api/v1/version", () =>
         {
+            // Re-check `workspaceInitialized` on every request — operators
+            // can `agenteval init` after the server is already up, and the
+            // SPA needs to see the flag flip without a restart.
+            var workspaceInitialized = Directory.Exists(
+                System.IO.Path.Combine(resolvedWorkspaceRoot, ".agenteval"));
             return Results.Json(new
             {
                 mode = resolvedMode,
                 agentEvalVersion = typeof(AgentEval.Output.IOutputStoreReader).Assembly
                     .GetName().Version?.ToString() ?? "0.0.0",
                 graphqlEndpoint = "/graphql",
+                // T3.10: Mode A only — see trust-boundary comment above.
+                workspaceRoot = resolvedWorkspaceRoot,
+                workspaceInitialized,
             });
         });
 

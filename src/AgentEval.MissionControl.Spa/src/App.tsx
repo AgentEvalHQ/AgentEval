@@ -11,6 +11,7 @@ import { ComplianceMatrixPage } from "@/pages/ComplianceMatrixPage";
 import { EvidenceDetailPage } from "@/pages/EvidenceDetailPage";
 import { EvaluatorsPage } from "@/pages/EvaluatorsPage";
 import { EvaluatorDetailPage } from "@/pages/EvaluatorDetailPage";
+import { RedTeamCampaigns } from "@/pages/RedTeamCampaigns";
 import { NotFoundPage } from "@/pages/NotFoundPage";
 
 // Plan-08 MC1.6.2 + Waves 2-5: routing.
@@ -43,6 +44,9 @@ export function App() {
         />
         <Route path="evaluators" element={<EvaluatorsPage />} />
         <Route path="evaluators/:key" element={<EvaluatorDetailPage />} />
+        {/* T3.6 (2026-05-25) — red-team campaigns list view. Detail
+            page is deferred to a follow-up. */}
+        <Route path="red-team" element={<RedTeamCampaigns />} />
         <Route path="*" element={<NotFoundPage />} />
       </Route>
     </Routes>

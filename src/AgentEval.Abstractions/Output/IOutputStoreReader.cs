@@ -77,6 +77,24 @@ public interface IOutputStoreReader
     /// <summary>Retrieves a specific compliance evidence document by regulation, subject, and timestamp.</summary>
     Task<ComplianceEvidence?> GetComplianceEvidenceAsync(string regulation, SubjectIdentity subject, string timestamp, CancellationToken ct = default);
 
+    // ─── Red-team campaigns (read) ───────────────────────────────────────────
+
+    /// <summary>
+    /// T3.6 (2026-05-25) — enumerates all red-team campaign manifests stored
+    /// under <c>.agenteval/red-team/{campaign-id}/manifest.json</c>. Empty
+    /// when the directory is missing or unreadable. Manifest IDs are
+    /// <c>{sanitizedName}_{timestamp}</c> and round-trip back through
+    /// <see cref="GetRedTeamCampaignAsync"/>.
+    /// </summary>
+    IAsyncEnumerable<RedTeamCampaignManifest> ListRedTeamCampaignsAsync(CancellationToken ct = default);
+
+    /// <summary>
+    /// T3.6 (2026-05-25) — fetches a single red-team campaign manifest by
+    /// campaign id, or <c>null</c> when the campaign does not exist or the
+    /// id violates path-safety rules.
+    /// </summary>
+    Task<RedTeamCampaignManifest?> GetRedTeamCampaignAsync(string campaignId, CancellationToken ct = default);
+
     // ─── Workspace ────────────────────────────────────────────────────────────
 
     /// <summary>The resolved workspace root path, or null when the store is unavailable.</summary>

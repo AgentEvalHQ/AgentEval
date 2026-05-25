@@ -7,6 +7,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed (Phase 10 — Architecture hardening, 2026-05-25)
+
+- **T3.5** — `RunCostBreakdown` now splits the legacy "unknown" bucket into
+  `unknownKeyCost` (in-tree leaves whose evaluator key is not registered in
+  `EvaluatorCostMap`) and `legacyFlatCost` (pre-v0.8.1-beta scenarios whose
+  `Output` payload lacks a recursive `EvalResult` tree). The invariant becomes
+  `totalCost == sum(byTier) + unknownKeyCost + legacyFlatCost`. SPA cost
+  breakdown table renders both fields with distinct copy. Resolver:
+  `src/AgentEval.MissionControl/GraphQL/{CostBreakdown.cs,Query.cs}`. SPA:
+  `src/AgentEval.MissionControl.Spa/src/pages/RunDetailPage.tsx`.
+- **T3.10** — `/api/v1/version` payload now includes `workspaceRoot` (the
+  resolved absolute path of the workspace the MC server is bound to) and
+  `workspaceInitialized` (whether `.agenteval/` exists under it). Trust
+  boundary: `workspaceRoot` leaks an absolute host path — Mode A (loopback)
+  only. Future Mode B/C must redact or omit.
+- **T3.4** — Duplicate type names resolved. The PDF-only `RiskLevel` enum
+  was merged into `AgentEval.RedTeam.Reporting.Compliance.RiskLevel`
+  (semantically identical, same assembly). The trace-shape `AgentInfo` /
+  `ToolDefinition` types under `AgentEval.Output` were renamed to
+  `TraceAgentInfo` / `TraceToolDefinition` to disambiguate from the
+  evaluation-report shape (`AgentEval.Models.AgentInfo`) and the
+  agentic-eval input shape (`AgentEval.Evals.ToolDefinition`). The Memory
+  `BaselineComparison` type was renamed to `MemoryBaselineComparison` to
+  disambiguate from `AgentEval.Output.BaselineComparison` (the
+  run-vs-saved-baseline shape on `IOutputStoreReader`). External
+  consumers binding to the renamed types must update; the original
+  shapes/members are unchanged.
+- **T3.9** — Dockerfile gains a `HEALTHCHECK` directive (30s interval,
+  curl-based probe of `/api/v1/version`). `curl` is installed in the runtime
+  stage; an opt-in integration test under `tests/AgentEval.Tests/Docker/` is
+  gated behind `AGENTEVAL_RUN_DOCKER_TESTS=1`.
+
+### Known gaps (Phase 10 — Architecture hardening, 2026-05-25)
+
+- **T3.7 prompt-file SHA pinning** — every prompt file under
+  `src/AgentEval.Evals.Agentic/Resources/Prompts/` previously carried a
+  vague date stamp (`commit main-2026-05-09` or `commit main/2026-05`).
+  This release replaces all 22 stamps with a documented placeholder
+  `<TBD-foundry-sha> see CHANGELOG T3.7` rather than inventing a fake
+  SHA. The real Foundry fork-point SHA from `Azure/azure-sdk-for-python`
+  must be substituted before v1.0 GA; the placeholder is grep-able for
+  follow-up tooling.
+
 ## [0.10.1-beta] - 2026-05-18
 
 The **Samples Consolidation + Generic Renderers** release. v0.10.1-beta introduces a

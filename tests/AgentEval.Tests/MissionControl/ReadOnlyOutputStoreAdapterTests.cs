@@ -97,6 +97,13 @@ public class ReadOnlyOutputStoreAdapterTests
 
         public Task<ComplianceEvidence?> GetComplianceEvidenceAsync(string regulation, SubjectIdentity subject, string timestamp, CancellationToken ct = default)
             => Task.FromResult<ComplianceEvidence?>(null);
+
+        // T3.6: new red-team campaign read methods.
+        public IAsyncEnumerable<RedTeamCampaignManifest> ListRedTeamCampaignsAsync(CancellationToken ct = default)
+            => AsyncEnumerable.Empty<RedTeamCampaignManifest>();
+
+        public Task<RedTeamCampaignManifest?> GetRedTeamCampaignAsync(string campaignId, CancellationToken ct = default)
+            => Task.FromResult<RedTeamCampaignManifest?>(null);
     }
 }
 

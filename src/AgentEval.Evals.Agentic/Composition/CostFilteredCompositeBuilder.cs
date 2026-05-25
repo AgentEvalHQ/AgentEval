@@ -3,6 +3,7 @@
 // Licensed under the MIT License.
 
 using AgentEval.Evals;
+using AgentEval.Evals.Agentic.Cost; // T3.1: EvaluatorCostMap relocated here.
 
 namespace AgentEval.Evals.Agentic.Composition;
 

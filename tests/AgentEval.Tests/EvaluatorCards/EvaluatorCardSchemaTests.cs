@@ -6,6 +6,7 @@ using System.Reflection;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using AgentEval.Evals;
+using AgentEval.Evals.Agentic.Cost; // T3.1: EvaluatorCostMap relocated here.
 using Json.Schema;
 using Xunit;
 

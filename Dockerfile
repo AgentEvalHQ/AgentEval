@@ -71,6 +71,14 @@ RUN dotnet publish -c Release -o /app/publish --no-restore /p:UseAppHost=false
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 WORKDIR /app
 
+# Install curl for HEALTHCHECK. The minimal aspnet runtime image does not
+# ship curl by default, and rolling our own probe binary is overkill for a
+# single /api/v1/version GET. Do this as root BEFORE switching to the
+# non-root app user.
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends curl \
+ && rm -rf /var/lib/apt/lists/*
+
 # Run as a non-root user. The official aspnet image ships an `app` user at
 # UID 1654 — refer to it numerically so the image still works under
 # `--read-only` policies that block name resolution.
@@ -86,5 +94,13 @@ ENV AgentEval__Root=/workspace \
     DOTNET_NOLOGO=true
 
 EXPOSE 5000
+
+# T3.9 — Container health probe. `/api/v1/version` is the cheapest 200-OK
+# endpoint and exercises Kestrel + the GraphQL host wiring (the version
+# resolver itself is constant-time). Loopback (127.0.0.1) because the
+# container ASPNETCORE_URLS bind is 0.0.0.0:5000 and we don't want the
+# probe to leave the netns.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
+    CMD curl -fsS http://127.0.0.1:5000/api/v1/version || exit 1
 
 ENTRYPOINT ["dotnet", "AgentEval.MissionControl.dll"]
