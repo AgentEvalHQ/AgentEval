@@ -6,7 +6,9 @@
 
 ## What this measures
 
-LongMemEval is an external academic benchmark for evaluating long-term memory in LLM-based agents. It exercises 6 question types (information_extraction, multi_session_reasoning, knowledge_update, temporal_reasoning, single_session_user, single_session_assistant) and reports overall accuracy + task-averaged accuracy.
+LongMemEval is an external academic benchmark for evaluating long-term memory in LLM-based agents. It exercises 6 question-type labels in the cleaned dataset (information_extraction, multi_session_reasoning, knowledge_update, temporal_reasoning, single_session_user, single_session_assistant) and reports overall accuracy + task-averaged accuracy.
+
+> **Reconciliation with the LongMemEval paper (arXiv 2410.10813).** The published paper defines **5 question categories** by treating the `single_session_*` family as one bucket ("single-session"). The cleaned dataset (`longmemeval_s_cleaned.json` on Hugging Face) splits that bucket into the 2 `single_session_*` labels you see above, yielding **6 type labels** at the data level. Both views are valid; the doc and runner work in terms of the 6 dataset labels (because that's what the JSONL carries) but paper-comparable results aggregate them as 5. When citing results to reviewers, prefer the paper's 5-category framing; when reading per-type breakdowns in `report-native.json`, expect the 6 dataset labels.
 
 The runner replays each entry's `haystack_sessions` (multi-turn conversation history) into the agent under test via `AsEvaluableAgent(includeHistory: true)`, then asks the question and grades the answer with a per-question-type LLM judge using LongMemEval's official binary correctness criterion. ~2 LLM calls per question (one for the agent's query response + one for the judge).
 

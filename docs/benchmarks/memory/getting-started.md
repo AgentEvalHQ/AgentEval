@@ -33,13 +33,15 @@ Sourced verbatim from `BenchmarkFamilyRegistry` (see `src/AgentEval.Memory/Memor
 
 | Preset | Description (verbatim) | Cost tier | Typical entry count | Approx. LLM cost |
 |---|---|---|---|---|
-| `quick` | 3 categories (basic retention, temporal, noise) - CI-friendly | Medium | ~3 categories x ~5 scenarios each = ~15 scenario invocations | ~$0.20 - $0.80 against gpt-4o-mini |
+| `quick` | 3 categories (basic retention, temporal, noise) — CI-friendly | Medium | ~3 categories x ~5 scenarios each = ~15 scenario invocations | ~$0.20 - $0.80 against gpt-4o-mini |
 | `standard` | 8 categories including Abstention + Preference Extraction | High | ~8 categories x ~5-10 scenarios = ~40-80 invocations | ~$1.00 - $4.00 |
 | `full` | 12 categories including cross-session, conflict resolution, multi-session reasoning | High | ~12 categories x ~5-10 scenarios = ~60-120 invocations | ~$2.00 - $8.00 |
 | `diagnostic` | Same categories as Full with maximum context pressure (~50K+ tokens) | High | Full's 12 categories with extended context — POWER-USER preset | ~$5.00 - $20.00 (context-pressure inflates judge prompt sizes) |
 | `overflow` | 8 categories with context overflow (192K target on 128K window) | High | Standard's 8 categories with deliberate context-window saturation — POWER-USER preset | ~$5.00 - $20.00 (context overflow + extended interactions per scenario) |
 
 Cost estimates assume `gpt-4o-mini` judge pricing and depend heavily on the agent's response length + the chosen context-pressure target. Diagnostic and overflow presets are POWER-USER — they stress the agent's reducer / summarisation / vector-store path past nominal limits and are designed to surface failure modes that the standard preset masks; expect notably higher cost.
+
+> **Why is `quick` `CostTier.Medium` if it's CI-friendly?** `quick` makes ~15 LLM round-trips (~$0.20 - $0.80 at gpt-4o-mini pricing) — small in absolute terms but well above the `CostTier.Low` budget used by `bench owasp smoke` (zero LLM cost) or `bench perf latency` (telemetry-only). It IS CI-tractable when the CI budget allows ~$1/run; consider running `quick` on the main branch + nightly rather than on every commit if the budget is tighter. The other 4 presets are `High` and not intended for any commit-time CI.
 
 ## CLI usage
 
