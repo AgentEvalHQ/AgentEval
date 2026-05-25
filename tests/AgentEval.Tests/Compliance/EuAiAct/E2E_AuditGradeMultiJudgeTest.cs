@@ -2,8 +2,10 @@
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 
-// Phase-8 Task 8.5: MultiJudgeOptions is now [Obsolete] but this E2E test
-// is the regression net for the existing AuditGrade(multiJudge) path — we
+// plan-13 T2.8 (v1.1 — EU AI Act parity with GDPR sibling): E2E coverage
+// for the AuditGrade multi-judge path. MultiJudgeOptions is [Obsolete] (the
+// historical Phase-8 Task 8.5 deprecation), but this E2E test is the
+// regression net for the existing AuditGrade(multiJudge) surface — we
 // intentionally keep exercising the deprecated surface to prove backward
 // compatibility while it remains available in v1.
 #pragma warning disable CS0618 // MultiJudgeOptions is obsolete

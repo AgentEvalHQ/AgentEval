@@ -26,14 +26,20 @@ namespace AgentEval.Evals.Agentic.Adjudication;
 /// </list>
 /// </para>
 /// <para>
-/// <b>Output metadata keys</b> (in <c>Details</c> via <c>Dimensions</c> and the result
-/// <c>Score</c> state):
+/// <b>Output metadata keys</b> emitted in <c>Details.Dimensions</c>
+/// (<see cref="System.Collections.Generic.IReadOnlyDictionary{TKey, TValue}"/> of
+/// <c>string</c>→<c>double</c>):
 /// <list type="bullet">
 ///   <item><c>agreement</c> — numeric agreement score (kappa or pairwise rate).</item>
-///   <item><c>agreement_method</c> — <c>"cohens_kappa"</c> or <c>"pairwise"</c>.</item>
 ///   <item><c>disputed</c> — <c>1.0</c> when adjudication was triggered, <c>0.0</c> otherwise.</item>
 ///   <item><c>adjudicated</c> — same as <c>disputed</c>.</item>
 /// </list>
+/// The canonical agreement-method signal (<c>"cohens_kappa"</c> vs <c>"pairwise"</c>)
+/// is NOT emitted to <c>Dimensions</c> — that bag is <c>string</c>→<c>double</c> and
+/// cannot carry a string value. Until a follow-up persists it to <c>Evidence</c>, the
+/// nearest canonical signal is <see cref="EvalDetails.AggregationStrategy"/>
+/// (e.g. <c>"WeightedMedian"</c> for adjudicated multi-judge runs, pinned by
+/// <c>AgreementMethodSerialisationTests</c>).
 /// </para>
 /// </summary>
 public sealed class AdjudicatedMultiJudgeWrapper : IEval
