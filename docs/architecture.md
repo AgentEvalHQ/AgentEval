@@ -969,9 +969,12 @@ The cost-tier gradient (Low → Medium → High → High) is surfaced by `bench 
 
 ## See Also
 
+- [**Eval & Benchmark Architecture**](eval-benchmark-architecture.md) — synthesis view of how `IEval`, composites, benchmarks, calibration, and golden datasets fit together end-to-end (with the golden-dataset / calibration deep dive)
+- [Composite Evaluations](composite-evals.md) - Composite mechanics and aggregation strategies in depth
 - [Extensibility Guide](extensibility.md) - Creating custom metrics and plugins
 - [Embedding Metrics](embedding-metrics.md) - Semantic similarity evaluation
 - [Benchmarks Guide](benchmarks.md) - Running standard benchmarks
 - [Metrics Reference](metrics-reference.md) - Complete metric catalog
 - [Evaluation Guide](evaluation-guide.md) - Metric selection guidance
 - [ADR-017: Unified Benchmarks Namespace](adr/017-unified-benchmarks-namespace.md) - Architectural rationale for the registry + namespace + conventions
+- [ADR-008: Calibrated Judge Multi-Model](adr/008-calibrated-judge-multi-model.md) - The calibration architecture decision

@@ -66,6 +66,8 @@
   items:
   - name: Benchmarks Guide
     href: benchmarks.md
+  - name: Eval & Benchmark Architecture
+    href: eval-benchmark-architecture.md
   - name: Agentic Benchmark
     items:
     - name: How It Works (Plain-English)
