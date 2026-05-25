@@ -117,7 +117,7 @@ The benchmark samples (H2–H9) also respect a preset tier via `--preset {smoke|
 | 9 | **Run Single Benchmark** | Pick Quick/Standard/Full, run, save baseline, view report | Yes | 8 min |
 | 10 | **LongMemEval Baseline Repro** | Reproduce the GPT-4o paper baseline (TextBlob mode) | Yes | 20 min |
 
-### H — Benchmarks (v0.10.1)  ★ JSON + HTML (+ PDF) for every registered family (10 samples)
+### H — Benchmarks (v1.1)  ★ JSON + HTML (+ PDF) for every registered family (10 samples)
 
 End-to-end walkthroughs of the eight families registered via `BenchmarkFamilyRegistry`. Each sample resolves
 its preset tier (smoke / standard / audit-grade) at runtime via `BenchmarkSampleHelpers.ResolvePreset`

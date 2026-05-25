@@ -21,27 +21,16 @@ namespace AgentEval.Cli.Commands;
 
 /// <summary>
 /// Implements the <c>agenteval bench agentic calibrate</c> subcommand.
-/// Loads golden calibration datasets for the 11 agentic evaluators (5 system + 6 process),
-/// evaluates them through the configured LLM judge, and writes a Markdown report.
-/// Exits with 2 if any category fails accuracy or Cohen's kappa thresholds.
+/// Loads golden calibration datasets for 40 dispatched agentic evaluators across
+/// 9 categories (system, process, ux, adversarial, reasoning, calibration, quality,
+/// safety; memory fully carved per Path A' R2 — see <c>s_carveOutKeys</c> below for
+/// the full 20-evaluator carve-out list), evaluates them through the configured LLM
+/// judge, and writes a Markdown report. Exits with 2 if any category fails accuracy
+/// or Cohen's kappa thresholds.
 /// </summary>
 /// <remarks>
-/// TODO (Program.cs wiring): If the <c>benchAgenticCmd</c> block was not yet added to
-/// Program.cs by the time this file was compiled, wire the subcommand by adding:
-/// <code>
-/// var agenticCalibrateRootOpt = new Option&lt;string?&gt;("--root") { ... };
-/// var agenticCalibrateOutOpt  = new Option&lt;string?&gt;("--out")  { ... };
-/// var agenticCalibrateCmd = new Command("calibrate", "Run agentic judge calibration ...");
-/// agenticCalibrateCmd.Add(agenticCalibrateRootOpt);
-/// agenticCalibrateCmd.Add(agenticCalibrateOutOpt);
-/// agenticCalibrateCmd.SetAction(async (ParseResult p, CancellationToken ct) =>
-/// {
-///     var root = p.GetValue(agenticCalibrateRootOpt);
-///     var outPath = p.GetValue(agenticCalibrateOutOpt);
-///     return await BenchAgenticCalibrateCommand.RunAsync(root, outPath);
-/// });
-/// benchAgenticCmd.Add(agenticCalibrateCmd);
-/// </code>
+/// Wiring: <c>benchAgenticCmd</c> is registered in
+/// <c>src/AgentEval.Cli/Program.cs</c> (search for <c>BenchAgenticCalibrateCommand.RunAsync</c>).
 /// </remarks>
 public static class BenchAgenticCalibrateCommand
 {

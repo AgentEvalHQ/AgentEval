@@ -14,7 +14,7 @@
 | **01** | `.agenteval/` Output Store | ✅ shipped | Workspace contract, audit-chain hashing, three store impls, `agenteval init/doctor/migrate` CLI |
 | **02** | Composite Evaluations | ✅ shipped | Recursive `IEval` model, atomic + composite primitives, 7 aggregations, depth cap, DI |
 | **03** | GDPR Compliance Benchmark | ✅ shipped (5/5 pillars PASS calibration) — Pillar 6 governance probes deferred to v1.1 | 21 article YAMLs, 5 pillars, evidence + PDF reporter, calibration suite |
-| **04** | EU AI Act Compliance Benchmark | ✅ shipped (6/6 pillars PASS calibration with 2 documented threshold overrides) — Art 9/10 awareness probes deferred to v1.1 | EU AI Act articles + pillars; honest scope for GPAI / admin obligations |
+| **04** | EU AI Act Compliance Benchmark | ✅ shipped (6/6 pillars PASS calibration with 2 documented threshold overrides — Pillar 1 at 0.65/0.35 per Path A' R5 judge-model-drift, Pillar 6 GPAI at 0.60/0.25) — Art 9/10 awareness probes shipped in v1.1 T1.2 | EU AI Act articles + pillars; honest scope for GPAI / admin obligations |
 | **05** | Foundry-equivalent Agentic Suite | ✅ shipped — calibration coverage is partial today (headline system-and-process + RAG-quality categories meet the strict gate; remaining categories await calibration evidence in v1.1) | Broad agentic evaluator suite across 10 categories; relationship to upstream Foundry is prompt-provenance-only (cited per-file) |
 | **06** | Memory / Multi-turn / Reasoning / UX | ✅ shipped | Memory recall, multi-turn coherence, reasoning, UX evaluators wired into the 60-suite |
 | **07** | Mission Control — Design | ✅ design-doc | Phase-1 viewer + Phase-2 server architecture; identity, audit, ingestion contracts |
