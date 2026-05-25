@@ -58,7 +58,9 @@ jobs:
 
     # T1.5 (v1.1): also pack the CLI as a dotnet-tool nupkg so users can
     # `dotnet tool install --global AgentEval.Cli --prerelease`. Multi-TFM
-    # (net8/net9/net10) — the installer picks the highest compatible runtime.
+    # (net8.0;net10.0 — net9 STS was dropped in Phase 4 R4 review per
+    # AgentEval.Cli.csproj; the dotnet-tool installer picks the highest
+    # compatible runtime, so net10 hosts get net10 + net8 hosts get net8).
     - name: Pack CLI as dotnet tool
       run: dotnet pack src/AgentEval.Cli/AgentEval.Cli.csproj --configuration Release --no-restore -p:PackageVersion=${{ steps.version.outputs.version }} --output ./nupkgs
 
