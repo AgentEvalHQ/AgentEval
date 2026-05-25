@@ -64,7 +64,7 @@
 - **Deferred indefinitely**: multi-language scenarios (English-only honest scope), Art 88 Member-State variants, external compliance-platform integrations.
 
 ### Plan 04 — EU AI Act Compliance Benchmark
-**Status**: Shipped in v0.8.1-beta. **6 of 6 calibration pillars PASS** — 4 at default thresholds + 2 with documented per-pillar overrides (`pillar1-prohibited-25` at 0.75/0.50 absorbs Art 5 prohibited-practice stochasticity; `pillar6-gpai-5` at 0.60/0.25 reflects Art 51–55 GPAI scope ambiguity).
+**Status**: Shipped in v0.8.1-beta. **6 of 6 calibration pillars PASS** — 4 at default thresholds + 2 with documented per-pillar overrides (`pillar1-prohibited-25` at 0.75/0.50 absorbs Art 5 prohibited-practice stochasticity; `pillar6-gpai-12` at 0.60/0.25 reflects Art 51–55 GPAI scope ambiguity).
 **Scope**: Same shape as GDPR, EU AI Act articles + pillars.
 **Highlights**:
 - Pillars cover prohibited practices (Art 5), high-risk-system obligations (Art 13/14/15/17/26/27), deployer-side awareness (Art 50), GPAI awareness (Art 51–55).

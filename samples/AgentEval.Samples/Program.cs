@@ -94,14 +94,22 @@ public static class Program
         new('H', "Benchmarks (v0.10.1)", "★ JSON + HTML (+ PDF) outputs for every registered family",
         [
             new("Registry Discovery",        "Walk BenchmarkFamilyRegistry — no Azure required",                     RegistryDiscoveryBenchmark.RunAsync),
-            new("Performance",               "Latency / throughput / cost against a real Azure agent — JSON+HTML+PDF",PerformanceBenchmarkSample.RunAsync),
-            new("Agentic",                   "Real agent + judge; preset-driven (smoke / standard / audit-grade)",  AgenticBenchmarkSample.RunAsync),
+            // Item 4 (plan-13 T4.1a): description now matches the actual runtime behaviour
+            // — real Azure agent when creds are present, friendly-skip box otherwise.
+            new("Performance",               "Real Azure agent if creds present; friendly-skip otherwise — JSON+HTML+PDF",PerformanceBenchmarkSample.RunAsync),
+            // Item 5 (plan-13 T4.1a): preset names dropped from the description string —
+            // each sample resolves its own preset tier via BenchmarkSampleHelpers.ResolvePreset
+            // (env var / CLI flag / interactive prompt). The previously-hardcoded preset list
+            // ("smoke / standard / audit-grade") drifted from registry truth; canonical preset
+            // names now flow from BenchmarkFamilyRegistry.TryGet({family}).Presets at runtime
+            // (see Benchmarks/01_RegistryDiscovery.cs for the discovery walk).
+            new("Agentic",                   "Real agent + judge; preset-driven (see H1 Registry Discovery)",       AgenticBenchmarkSample.RunAsync),
             new("GDPR",                      "Per-scenario agent probing; preset-driven; full audit-chain evidence", GdprBenchmarkSample.RunAsync),
             new("EU AI Act",                 "Per-scenario agent probing; preset-driven; full audit-chain evidence", EuAiActBenchmarkSample.RunAsync),
-            new("OWASP LLM Top 10",          "Real attack pipeline; preset-driven (smoke / audit-grade)",           OwaspBenchmarkSample.RunAsync),
-            new("MITRE ATLAS",               "ATLAS technique-level probes; preset-driven (smoke / audit-grade)",   MitreBenchmarkSample.RunAsync),
-            new("LongMemEval",               "Real history-injectable agent + judge; Subset / Full presets (ICLR 2025)", LongMemEvalBenchmarkSample.RunAsync),
-            new("Memory",                    "Comprehensive memory benchmark — Quick/Standard/Full presets",        MemoryBenchmarkSample.RunAsync),
+            new("OWASP LLM Top 10",          "Real attack pipeline; preset-driven (see H1 Registry Discovery)",     OwaspBenchmarkSample.RunAsync),
+            new("MITRE ATLAS",               "ATLAS technique-level probes; preset-driven (see H1 Registry Discovery)", MitreBenchmarkSample.RunAsync),
+            new("LongMemEval",               "Real history-injectable agent + judge (ICLR 2025); preset-driven",    LongMemEvalBenchmarkSample.RunAsync),
+            new("Memory",                    "Comprehensive memory benchmark — preset-driven",                      MemoryBenchmarkSample.RunAsync),
             new("Report Browser",            "Open previously-generated JSON / HTML / PDF runs",                    ReportBrowserBenchmark.RunAsync),
         ]),
     ];

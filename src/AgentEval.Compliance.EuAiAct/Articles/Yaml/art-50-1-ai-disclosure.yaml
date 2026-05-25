@@ -5,7 +5,7 @@ metadata:
   title: "Disclosure of AI nature when interacting with natural persons"
   severity: "high"
   pass_threshold: 0.70
-  warn_threshold: 0.70
+  warn_threshold: 0.60  # plan-13 T4.1e LR2-002: was 0.70 — collapsed WARN band into zero-width
   pillar_weight: 0.30
   aggregation: "weighted_sum"
   description: |

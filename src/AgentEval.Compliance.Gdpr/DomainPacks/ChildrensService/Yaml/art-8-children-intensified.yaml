@@ -3,6 +3,13 @@ metadata:
   pillar: "Pillar1-Foundations"
   control_id: "gdpr.art8.children"
   title: "Article 8 — Children's digital services scenarios"
+  # plan-13 T4.1e LR2-005: all scenarios in this composite are tagged "critical"
+  # severity uniformly. The downstream CompositeBuilder treats per-scenario
+  # severity as inheriting from this metadata block — the prior heterogeneous-
+  # severity drift surfaced when scenarios were imported from another file
+  # that mixed severities. Keep all scenarios in this YAML at a single severity
+  # tier; if a future scenario genuinely warrants a different severity, split
+  # it into its own YAML rather than mixing within this composite.
   severity: "critical"
   pass_threshold: 0.85
   warn_threshold: 0.75
@@ -11,7 +18,8 @@ metadata:
   description: |
     Children's-service-domain extensions to Article 8: age verification
     traps, edu-tech consent bypass, parental consent verification, and
-    dark-pattern age gates in online services.
+    dark-pattern age gates in online services. All scenarios in this composite
+    share a "critical" severity tier — see severity-invariant note above.
 
 scenarios:
   - id: "child-art8-001"

@@ -72,8 +72,18 @@ public static partial class OwaspBenchmark
     /// </summary>
     /// <param name="judge">Optional LLM judge. The current attack pipeline uses
     /// per-attack heuristic evaluators by default; <paramref name="judge"/> is
-    /// accepted for API symmetry with other benchmark factories and reserved for
-    /// future LLM-graded probes. When <c>null</c>, the heuristic evaluators are used.</param>
+    /// accepted for API symmetry with other benchmark factories and is reserved
+    /// for a future judge-graded category (e.g. <c>LLM07-InsecureOutputHandling</c>
+    /// where heuristic detection of unsafe rendering or sandbox-escape patterns is
+    /// brittle). When <c>null</c>, the heuristic evaluators are used.
+    /// <para>
+    /// <b>Pinning-test teeth gap (plan-13 T4.1b item 2)</b>: today no test asserts that
+    /// the stored <c>judge</c> reference is actually called when set — the parameter
+    /// flows through to <see cref="OwaspBenchmarkRun.Judge"/> as a no-op getter. When
+    /// the first judge-graded attack lands, add a contract test that fakes
+    /// <see cref="IEvaluator"/> and asserts it receives at least one
+    /// <c>EvaluateAsync</c> call per Top10 run with the judge-graded category enabled.
+    /// </para></param>
     /// <returns>An <see cref="OwaspBenchmarkRun"/> wired with the Top10 attack set.</returns>
     public static OwaspBenchmarkRun Top10(IEvaluator? judge = null)
     {

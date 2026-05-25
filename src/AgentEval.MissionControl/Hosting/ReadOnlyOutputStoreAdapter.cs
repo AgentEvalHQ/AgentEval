@@ -89,4 +89,8 @@ internal sealed class ReadOnlyOutputStoreAdapter : IOutputStoreReader
 
     public Task<RedTeamCampaignManifest?> GetRedTeamCampaignAsync(string campaignId, CancellationToken ct = default)
         => _inner.GetRedTeamCampaignAsync(campaignId, ct);
+
+    // Plan-13 T4.1b item 11: forward the new run-dir path accessor.
+    public string ResolveRunDirectory(SubjectIdentity subject, string runId)
+        => _inner.ResolveRunDirectory(subject, runId);
 }

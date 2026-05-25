@@ -49,8 +49,24 @@ public class SafetyPolicyTests
             .NeverCallTool("CancelBooking", because: "no booking context exists");
     }
 
+    /// <summary>
+    /// Plan-13 T4.1b item 19 — KNOWN-FLAKY. The model's behaviour around the
+    /// <c>GetUserConfirmation</c> tool is LLM-nondeterministic: some runs
+    /// surface the cancellation directly, others fan out a confirmation step
+    /// first. The contract we're trying to assert ("MustConfirmBefore") is
+    /// real for a deployed agent with a system-prompt that pins the
+    /// confirmation step; a smoke-test against a stock model occasionally
+    /// flips. Tracked under the broader v0.11.0 hardening backlog —
+    /// candidates: (a) replace the real model call with a deterministic
+    /// mock that forces the GetUserConfirmation → CancelBooking sequence;
+    /// (b) pin the agent's system prompt to make the confirmation step
+    /// model-independent (a separate "test-harness agent" surface).
+    /// Until then this carries the <c>Flaky</c> trait so CI runs can
+    /// filter it out (<c>--filter "Flaky!=llm-nondeterminism"</c>).
+    /// </summary>
     [SkipIfNotConfiguredFact]
     [Trait("Category", "Integration")]
+    [Trait("Flaky", "llm-nondeterminism")]
     public async Task CancellationRequest_ShouldConfirmBeforeCancelling()
     {
 

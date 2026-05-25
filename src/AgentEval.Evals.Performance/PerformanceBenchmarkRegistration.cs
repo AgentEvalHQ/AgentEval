@@ -85,11 +85,31 @@ internal static class PerformanceBenchmarkRegistration
     /// <summary>Returns a config object documenting the preset's shape without an agent attached.</summary>
     private static object CreateUnboundConfig(string preset) => OptionsForPreset(preset);
 
+    /// <summary>
+    /// Maps a preset name to a <see cref="PerformanceBenchmarkOptions"/> instance.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// All three presets (<c>latency</c> / <c>throughput</c> / <c>cost</c>) deliberately
+    /// return the same default options today. The preset name selects which leaf of the
+    /// composite the operator wants to focus on — the underlying
+    /// <see cref="PerformanceBenchmark"/> runs the full three-leaf evaluation
+    /// (latency + throughput + cost) regardless of preset; downstream consumers project
+    /// onto the preset-named leaf when rendering. This uniformity is intentional, not a
+    /// stub: per-preset divergence (e.g. <c>latency</c>-only skipping throughput probes)
+    /// would force lossy results — operators who want a single-leaf-only run should call
+    /// <see cref="PerformanceBenchmark"/>'s focused methods directly.
+    /// </para>
+    /// <para>
+    /// Tracked under plan-13 T4.1b item 1.
+    /// </para>
+    /// </remarks>
     private static PerformanceBenchmarkOptions OptionsForPreset(string preset)
     {
         var opts = new PerformanceBenchmarkOptions { Verbose = false };
         return preset.Trim().ToLowerInvariant() switch
         {
+            // All three presets return identical defaults intentionally — see <remarks/> above.
             "latency"    => opts,  // Latency uses the defaults (P99 threshold 5000 ms).
             "throughput" => opts,
             "cost"       => opts,

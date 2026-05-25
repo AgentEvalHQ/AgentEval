@@ -7,6 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed (Phase 11 — Hygiene bundle, 2026-05-25)
+
+Plan-13 T4.1 v0.10.2 polish bundle — 38 small items across 5 sub-PRs
+(samples polish / hygiene / dead code / low-priority polish). No behaviour
+changes; same number of tests + same green; new contract tests for
+`IEvalResultRenderer` + PDF audit-hash parser + `WriteReportsViaStoreAsync`
+integration; deleted `LongMemEvalOptions` (empty subclass, zero consumers);
+dropped stale `.AgenticBenchmark.Golden.` resource prefix in the agentic
+calibration loader (was carried over from the pre-v0.9.0 namespace);
+dropped unused `<InternalsVisibleTo>` in `AgentEval.MAF` (zero internal
+types); dropped unused `AgentEval.Core` `<ProjectReference>` from
+`AgentEval.Rendering.Pdf` (PDF renderer has zero Core symbols); strengthened
+XML docs on `IOutputStore` (Convention 5B canonical evidence sink),
+`IEvalResultRenderer` (Convention 5A renderer contract + `<example/>`
+block), `PerformanceBenchmarkRegistration.OptionsForPreset` (intentional
+uniformity), OWASP/MITRE `judge` ctor param (pinning-test teeth gap);
+tightened `MultiJudgeOptions` Obsolete message ("Removal scheduled for
+v0.11.0"); added `IOutputStoreReader.ResolveRunDirectory` accessor (closes
+the v0.10.1 layout-leak finding); added `EvalResultRenderOptions.EvidenceTruncationLength`
+(default 800) + per-evidence "(N more chars)" overflow footer on the PDF
+renderer; bare-`dotnet-run` `--workspace` parser now validates path
+existence (CLI parity); renamed drift goldens (`pillar5-robustness-10` →
+`-15`, `pillar6-gpai-5` → `-12`); fixed EU AI Act Art 14 / 50(1) / 50(2)
+zero-width WARN band (`warn: 0.70` → `0.60`); added `docs/redteam/owasp.md`
+(red-team-procedure-focused companion to the getting-started doc); updated
+README per-family benchmark table to enumerate all 8 families; updated
+ADR-017 verification test count (12 → 14); promoted Phase 6 evaluator
+tables (UX, adversarial, reasoning, calibration, memory, safety,
+cost-quality, QA composite) in `docs/benchmarks/agentic/evaluator-cards.md`;
+indexed ADRs 015 / 016 / 017 in `docs/adr/README.md`.
+
 ### Changed (Phase 10 — Architecture hardening, 2026-05-25)
 
 - **T3.5** — `RunCostBreakdown` now splits the legacy "unknown" bucket into

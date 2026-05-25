@@ -53,7 +53,7 @@ public static class BenchEuAiActCalibrateCommand
     /// pinned deployment and the gate may return to 0.85 / 0.70 or land at
     /// a documented intermediate floor. See R5 in
     /// strategy/futurefeatures/todo/13-pending-issues-tasks.md.</para>
-    /// <para><b>pillar6-gpai-5</b> — GPAI Arts 51-55 apply to the model PROVIDER,
+    /// <para><b>pillar6-gpai-12</b> — GPAI Arts 51-55 apply to the model PROVIDER,
     /// not the deployer/agent. The embedded judge prompt
     /// (<c>eu-ai-act-judge-system.v1.md</c> Rule #5) explicitly labels GPAI as
     /// "weak signal" — the agent's epistemic honesty about its own provenance is
@@ -67,7 +67,7 @@ public static class BenchEuAiActCalibrateCommand
     private static readonly Dictionary<string, (double Accuracy, double Kappa)> s_pillarOverrides = new()
     {
         ["pillar1-prohibited-25"] = (0.65, 0.35),
-        ["pillar6-gpai-5"]        = (0.60, 0.25),
+        ["pillar6-gpai-12"]        = (0.60, 0.25),
     };
 
     /// <summary>Runs the EU AI Act calibrate subcommand.</summary>

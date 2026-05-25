@@ -74,13 +74,17 @@ public sealed class CalibrationDatasetLoader
 
     /// <summary>
     /// Loads all calibration datasets from JSONL files embedded in <paramref name="assembly"/>,
-    /// grouped by agentic category (system / process). Only resources whose name contains
-    /// <c>.AgenticBenchmark.Golden.</c> or <c>.Agentic.Calibration.Golden.</c>
-    /// and ends with <c>.jsonl</c> are considered.
+    /// grouped by agentic category. Only resources whose name contains
+    /// <c>.Agentic.Calibration.Golden.</c> and ends with <c>.jsonl</c> are considered.
     /// </summary>
+    /// <remarks>
+    /// The legacy <c>.AgenticBenchmark.Golden.</c> prefix (pre-v0.9.0 namespace) is no longer
+    /// recognised — all goldens migrated to the <c>Agentic.Calibration.Golden</c> resource
+    /// path in the v0.9.0 namespace-move (ADR-017, plan-13 T4.1d item 26).
+    /// </remarks>
     /// <param name="assembly">The assembly that contains the embedded JSONL resources.</param>
     /// <param name="ct">Cancellation token.</param>
-    /// <returns>All loaded datasets, one per category (system, process).</returns>
+    /// <returns>All loaded datasets, one per derived category.</returns>
     public async Task<IReadOnlyList<CalibrationDataset>> LoadAllFromAssemblyAsync(
         Assembly assembly, CancellationToken ct = default)
     {
@@ -88,8 +92,7 @@ public sealed class CalibrationDatasetLoader
 
         var resourceNames = assembly.GetManifestResourceNames()
             .Where(n => n.EndsWith(".jsonl", StringComparison.OrdinalIgnoreCase) &&
-                        (n.Contains(".AgenticBenchmark.Golden.", StringComparison.OrdinalIgnoreCase) ||
-                         n.Contains(".Agentic.Calibration.Golden.", StringComparison.OrdinalIgnoreCase)))
+                        n.Contains(".Agentic.Calibration.Golden.", StringComparison.OrdinalIgnoreCase))
             .ToList();
 
         // Load every file and accumulate all entries, then group by implied category.

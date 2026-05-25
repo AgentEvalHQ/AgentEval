@@ -68,8 +68,18 @@ public static partial class MitreBenchmark
     /// </summary>
     /// <param name="judge">Optional LLM judge. The current attack pipeline uses
     /// per-attack heuristic evaluators by default; <paramref name="judge"/> is
-    /// accepted for API symmetry with other benchmark factories and reserved for
-    /// future LLM-graded probes. When <c>null</c>, the heuristic evaluators are used.</param>
+    /// accepted for API symmetry with other benchmark factories and is reserved
+    /// for a future judge-graded category (e.g. <c>AML.T0048</c> Exfiltration via
+    /// ML Inference API, where heuristic detection of subtle data-leakage patterns
+    /// is brittle). When <c>null</c>, the heuristic evaluators are used.
+    /// <para>
+    /// <b>Pinning-test teeth gap (plan-13 T4.1b item 2)</b>: today no test asserts
+    /// that the stored <c>judge</c> reference is actually called when set — the
+    /// parameter flows through to <see cref="MitreBenchmarkRun.Judge"/> as a no-op
+    /// getter. When the first judge-graded technique lands, add a contract test that
+    /// fakes <see cref="IEvaluator"/> and asserts at least one <c>EvaluateAsync</c>
+    /// call per AtlasBaseline run with the judge-graded technique enabled.
+    /// </para></param>
     /// <returns>A <see cref="MitreBenchmarkRun"/> wired with the AtlasBaseline attack set.</returns>
     public static MitreBenchmarkRun AtlasBaseline(IEvaluator? judge = null)
     {

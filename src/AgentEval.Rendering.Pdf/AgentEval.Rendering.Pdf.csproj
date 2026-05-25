@@ -11,7 +11,13 @@
 
   <ItemGroup>
     <ProjectReference Include="..\AgentEval.Abstractions\AgentEval.Abstractions.csproj" />
-    <ProjectReference Include="..\AgentEval.Core\AgentEval.Core.csproj" />
+    <!--
+      Plan-13 T4.1e item 38 / lastreview/29 §5: AgentEval.Core ProjectReference dropped —
+      PdfEvalResultRenderer.cs references zero Core symbols (only AgentEval.Evals from
+      Abstractions + QuestPDF). Re-adding the reference would re-introduce a ~3 MB
+      transitive size impact for downstream consumers that pull this package without
+      Core. If a future renderer addition needs Core symbols, add the reference back here.
+    -->
   </ItemGroup>
 
   <ItemGroup>

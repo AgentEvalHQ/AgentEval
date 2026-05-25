@@ -328,12 +328,11 @@ internal static class BenchmarkSampleHelpers
         }
 
         // ── 8. Resolve the canonical run dir for the print-paths helper ────────
-        // Use FileSystemLayout.RunDir directly so the path matches exactly what the
-        // FileSystemOutputStore writes — including the collision-resistant hash
-        // suffix Sanitize appends when a subject name contains Windows-invalid
-        // characters (':', '/', '\', '<', '>', '"', '|', '?', '*'). Re-implementing
-        // the layout locally is fragile and was a Copilot review finding on PR #30.
-        var canonicalRunDir = new FileSystemLayout(SampleAgentEvalDir).RunDir(subject, runId);
+        // Plan-13 T4.1b item 11: route through IOutputStoreReader.ResolveRunDirectory
+        // rather than reaching for FileSystemLayout directly. Same path output,
+        // but no layer-leak — and works against any IOutputStore implementation
+        // (in-memory test doubles, future cloud-backed stores).
+        var canonicalRunDir = store.ResolveRunDirectory(subject, runId);
 
         return new SampleRunPaths(
             CanonicalRunDir: canonicalRunDir,

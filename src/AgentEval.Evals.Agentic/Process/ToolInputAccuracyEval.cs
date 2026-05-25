@@ -117,10 +117,15 @@ public sealed class ToolInputAccuracyEval : IEval
 
             if (input.ToolDefinitions is null or { Count: 0 })
             {
-                // TODO (A1.7): implement full JSON Schema validation once ToolDefinition.Parameters
-                // carries a schema object that can be validated against. For now, when no definitions
-                // are provided we skip schema validation and pass through (score=1.0) so the composite
-                // does not penalise callers that only supply ToolCalls without ToolDefinitions.
+                // TODO (A1.7 / plan-13 T4.1e item 37 / lastreview/19 §2):
+                // Implement full JSON Schema validation once `ToolDefinition.Parameters`
+                // carries a schema object that can be validated against (today it's a
+                // free-form `IReadOnlyDictionary<string, object>` — see ToolDefinition
+                // in AgentEval.Abstractions). For now, when no definitions are provided
+                // we skip schema validation and pass through (score=1.0) so the composite
+                // does not penalise callers that only supply ToolCalls without
+                // ToolDefinitions. Deferred until the ToolDefinition.Parameters typing
+                // sweep lands in v0.11+ (no concrete task ID yet).
                 return Build(1.0, true, "none",
                     evidence: new[]
                     {
@@ -154,9 +159,13 @@ public sealed class ToolInputAccuracyEval : IEval
 
                 // Check that every required parameter (declared in ToolDefinition.Parameters)
                 // is present in the call's Arguments.
-                // TODO (A1.7): when ToolDefinition.Parameters carries a full JSON Schema object
-                // (with "required" and "properties" keys), validate types as well. For now we
-                // perform a simple required-key presence check.
+                // TODO (A1.7 / plan-13 T4.1e item 37 / lastreview/19 §2):
+                // when ToolDefinition.Parameters carries a full JSON Schema object
+                // (with "required" and "properties" keys), validate types as well — including
+                // enum constraints, regex `pattern` matches, numeric bounds, and nested-object
+                // shape. For now we perform a simple required-key presence check; type / shape
+                // violations slip through with a passing score. Deferred until the
+                // ToolDefinition.Parameters typing sweep lands.
                 var schemaParams = def.Parameters;
                 if (schemaParams is null)
                 {

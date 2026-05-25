@@ -16,10 +16,11 @@ namespace AgentEval.Compliance.EuAiAct;
 /// <remarks>
 /// Phase-8 Task 8.5: this record is <see cref="ObsoleteAttribute"/>-marked
 /// because Mode-B per-criterion multi-judge fan-out has moved into
-/// <c>ScenarioToAtomicEval</c> ctor flags. Tracked in
+/// <c>ScenarioToAtomicEval</c> ctor flags. A removal is scheduled for v0.11.0
+/// (plan-13 T4.1b item 3). Tracked in
 /// <c>strategy/futurefeatures/todo/13-pending-issues-tasks.md</c>.
 /// </remarks>
 [Obsolete("MultiJudgeOptions is deprecated; configure multi-judge via ScenarioToAtomicEval Mode-B flags instead. " +
-          "Pass `null` to AuditGrade to retain single-judge behaviour. Removal scheduled for v1.1.")]
+          "Pass `null` to AuditGrade to retain single-judge behaviour. Removal scheduled for v0.11.0 (plan-13 T4.1b item 3).")]
 public sealed record MultiJudgeOptions(
     IReadOnlyList<(IEvaluator Judge, double Weight)> Judges);

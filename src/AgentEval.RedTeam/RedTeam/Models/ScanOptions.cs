@@ -42,10 +42,18 @@ public class ScanOptions
     /// Default: 1 (sequential for easier debugging).
     /// </summary>
     /// <remarks>
-    /// Parallel execution is not yet implemented. This property is reserved for future use.
-    /// Currently, probes are always executed sequentially regardless of this value.
+    /// <para>
+    /// Reserved for future use — parallel scan execution is not yet implemented; the scanner
+    /// executes probes sequentially regardless of this value. Setting it today is silently
+    /// ignored at runtime.
+    /// </para>
+    /// <para>
+    /// Tracked under v0.11.0 hardening (plan-13 T4.1d item 25). The setter is preserved so
+    /// existing test fixtures and call-sites continue to compile; once the scheduler grows a
+    /// real worker pool this property will become live without a source-breaking rename.
+    /// </para>
     /// </remarks>
-    [Obsolete("Parallel execution is not yet implemented. This property is reserved for future use.")]
+    [Obsolete("Parallel execution is not yet implemented. This property is reserved for future use; setting it has no effect today.")]
     public int Parallelism { get; init; } = 1;
 
     /// <summary>

@@ -35,6 +35,19 @@ public sealed class InMemoryOutputStore : IOutputStore
     public string? WorkspaceRoot => null;
     public bool IsAvailable => true;
 
+    /// <inheritdoc/>
+    /// <remarks>
+    /// In-memory store has no on-disk run folder. Returns a synthetic
+    /// <c>memory://{kind}/{name}/runs/{runId}</c> URI for diagnostics and
+    /// log-message symmetry with the file-system store. Plan-13 T4.1b item 11.
+    /// </remarks>
+    public string ResolveRunDirectory(SubjectIdentity subject, string runId)
+    {
+        ArgumentNullException.ThrowIfNull(subject);
+        ArgumentException.ThrowIfNullOrWhiteSpace(runId);
+        return $"memory://{subject.Kind.ToString().ToLowerInvariant()}/{subject.Name}/runs/{runId}";
+    }
+
     /// <summary>Pre-initializes the solution with a specific name (optional).</summary>
     public void Initialize(string name)
     {

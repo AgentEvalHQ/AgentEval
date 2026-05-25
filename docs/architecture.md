@@ -836,6 +836,8 @@ Benchmark families register in one of two shapes, depending on whether their nat
 
 Most benchmark families (Agentic, GDPR, EU AI Act, OWASP, MITRE, Performance) ship a static factory class in the `AgentEval.Benchmarks` namespace whose preset methods return `CompositeEval`. The composite flows through the unified `EvaluateAsync(EvalInput) → EvalResult` pipeline (Convention 2).
 
+> **Note (plan-13 T4.1b item 16)**: OWASP / MITRE / Performance register as **hybrid Shape A/B** — they expose both a runner-style entry point (`OwaspBenchmark.Top10` returns `OwaspBenchmarkRun`, not `CompositeEval`) AND a Convention-2 `EvaluateAsync` adapter that flattens to `EvalResult`. The example below shows that hybrid registration. Strictly Shape-A families (Agentic, GDPR, EU AI Act) supply a `CompositeFactory` instead of a `RunnerFactory` and skip `runnerType`/`runnerFactory` entirely.
+
 ```csharp
 // Factory — partial class declared per-assembly, all under AgentEval.Benchmarks
 namespace AgentEval.Benchmarks;

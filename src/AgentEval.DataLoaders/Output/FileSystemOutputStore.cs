@@ -105,6 +105,21 @@ public sealed class FileSystemOutputStore : IOutputStore
     public string? WorkspaceRoot => _layout.Root;
     public bool IsAvailable => File.Exists(_layout.SolutionFile);
 
+    /// <inheritdoc/>
+    /// <remarks>
+    /// Plan-13 T4.1b item 11. Delegates to <see cref="FileSystemLayout.RunDir"/>
+    /// — pure path projection, no I/O. The returned path includes the layout's
+    /// <c>Sanitize</c> rewrites for Windows-invalid subject-name characters
+    /// (<c>:</c>, <c>/</c>, <c>\</c>, <c>&lt;</c>, <c>&gt;</c>, <c>"</c>, <c>|</c>, <c>?</c>, <c>*</c>),
+    /// so callers no longer need to reach for <see cref="FileSystemLayout"/> directly.
+    /// </remarks>
+    public string ResolveRunDirectory(SubjectIdentity subject, string runId)
+    {
+        ArgumentNullException.ThrowIfNull(subject);
+        ArgumentException.ThrowIfNullOrWhiteSpace(runId);
+        return _layout.RunDir(subject, runId);
+    }
+
     /// <summary>
     /// Returns the canonical traces directory for a given subject and run, creating it if absent.
     /// </summary>

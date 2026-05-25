@@ -6,10 +6,11 @@
     <RootNamespace>AgentEval</RootNamespace>
   </PropertyGroup>
 
-  <ItemGroup>
-    <InternalsVisibleTo Include="AgentEval" />
-    <InternalsVisibleTo Include="AgentEval.Tests" />
-  </ItemGroup>
+  <!--
+    No <InternalsVisibleTo> entries — AgentEval.MAF has zero `internal` types, so the prior
+    InternalsVisibleTo("AgentEval") + InternalsVisibleTo("AgentEval.Tests") entries were no-ops.
+    Dropped under plan-13 T4.1d item 27.
+  -->
 
   <ItemGroup>
     <ProjectReference Include="../AgentEval.Abstractions/AgentEval.Abstractions.csproj" />
