@@ -388,7 +388,7 @@ public class MissionControlEndToEndTests : IClassFixture<EndToEndFixture>
         // (cost 0.0009 + 0.0011 = 0.002) attributed to `unknownKeyCost` because
         // composite-root, policy_compliance, response_quality are not in
         // EvaluatorCostMap. Total should be ≥ 0.012 + 0.002 = 0.014.
-        Assert.True(total >= 0.013, $"total cost ({total}) is suspiciously low — expected ≥ 0.013.");
+        Assert.True(total >= 0.014, $"total cost ({total}) is suspiciously low — expected ≥ 0.014 (0.012 legacyFlat + 0.002 unknownKey).");
     }
 
     // ─── run / runSummary / scenarios / scenario resolver coverage ─────────

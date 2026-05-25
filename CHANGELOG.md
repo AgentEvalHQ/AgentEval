@@ -67,6 +67,19 @@ indexed ADRs 015 / 016 / 017 in `docs/adr/README.md`.
   method to compile against v1.1+. In-tree implementations
   (`FileSystemOutputStore`, `InMemoryOutputStore`, `NullOutputStore`,
   `ReadOnlyOutputStoreAdapter`) are updated; 4 test stubs updated.
+- **T0.4 (Phase 1)** — `AgentEval.MissionControl.GraphQL.ComplianceMatrixCell`
+  (public positional record) gains two trailing parameters with default
+  values: `bool ChainValid = true` and `string? ChainBreakReason = null`
+  (per plan-08 portal-review finding A1 — surfaces per-cell hash-tampering
+  in the SPA matrix). Source-compat is preserved (defaults), but appending
+  ctor parameters to a public positional record is a **binary BREAKING
+  change** for external code compiled against the pre-v1.1 ctor signature.
+  Mitigation paths: (a) recompile against the new assembly, OR (b) use
+  property-initialiser construction (`new ComplianceMatrixCell { ... }`
+  with the existing required members). The type is part of Mission
+  Control's GraphQL surface — most consumers reach it through the
+  generated GraphQL schema, not the .NET ctor, so the source-compat
+  guarantee covers the typical integration path.
 
 ### Changed (Phase 10 — Architecture hardening, 2026-05-25)
 

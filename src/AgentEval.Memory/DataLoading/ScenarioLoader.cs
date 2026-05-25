@@ -62,12 +62,15 @@ public static class ScenarioLoader
         {
             // P0-2 (Sprint 0): preset-not-found diagnostic surfaced via DiagnosticSource
             // (library-appropriate vs Console.Error which adds stderr noise for downstream
-            // consumers). Subscribers can observe the "ScenarioLoader.PresetFallback" event;
-            // ResolvedPreset.ResolvedFromFallback below also exposes the same signal
-            // structurally for callers that prefer to introspect the result.
+            // consumers). Subscribers can observe the "ScenarioLoader.PresetFallback" event
+            // by attaching a DiagnosticListener to the AgentEval.Memory.DataLoading.
+            // ScenarioLoader source name. Default behaviour is silent.
+            //
             // Diagnostic/Overflow used to land here silently because no JSON declared
             // a "diagnostic" / "overflow" key — the runner now routes them to "full"
-            // via MemoryBenchmark.EffectivePresetResolutionKey.
+            // via MemoryBenchmark.EffectivePresetResolutionKey. This event survives as
+            // the safety net for any future preset that forgets to follow the
+            // resolution-key convention.
             s_diagnosticSource.Write(
                 "ScenarioLoader.PresetFallback",
                 new
