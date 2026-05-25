@@ -107,14 +107,24 @@ public static class BenchPerfCommand
         }
 
         // ── Build EvalInput from prompt(s) ───────────────────────────────────
+        // P0-1: when running against a real Azure OpenAI deployment we know the
+        // model name from AZURE_OPENAI_DEPLOYMENT. Surface it as costModelName so
+        // the perf cost-leaf can do a real pricing-table lookup rather than falling
+        // back to agent.Name (which never matches a pricing entry → silent $0 / PASS).
         var resolvedPrompt = string.IsNullOrWhiteSpace(prompt) ? "Hello!" : prompt;
+        var metadata = new Dictionary<string, object>
+        {
+            ["agent"] = agent,
+            ["preset"] = preset,
+        };
+        var deploymentEnv = Environment.GetEnvironmentVariable("AZURE_OPENAI_DEPLOYMENT");
+        if (azureFromEnv && !string.IsNullOrWhiteSpace(deploymentEnv))
+        {
+            metadata["costModelName"] = deploymentEnv;
+        }
         var input = new EvalInput(
             Query: resolvedPrompt,
-            Metadata: new Dictionary<string, object>
-            {
-                ["agent"] = agent,
-                ["preset"] = preset,
-            });
+            Metadata: metadata);
 
         // ── Run via the registry's EvaluateAsync adapter ─────────────────────
         var store = new FileSystemOutputStore(agentEvalDir);

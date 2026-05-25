@@ -402,9 +402,10 @@ public sealed class GDPRPdfRenderer
             col.Item().PaddingTop(15).Text("Thresholds").FontSize(14).Bold();
             col.Item().PaddingTop(5).Text(
                 "Smoke preset: pass threshold 0.80 (80% weighted score across 5 representative articles).\n" +
-                "Standard preset: pass threshold 0.85 (85% weighted score across all 6 pillars).\n" +
-                "Audit-Grade preset: pass threshold 0.90 (90% score; CapByWorst aggregation — a single " +
-                "critical-article failure caps the overall score at FAIL regardless of other scores).").FontSize(11);
+                "Standard preset: pass threshold 0.85 (85% weighted score across all 29 articles in 6 pillars).\n" +
+                "Audit-Grade preset: pass threshold 0.90 (90% score across all 29 articles in 6 pillars; " +
+                "CapByWorst aggregation — a single critical-article failure caps the overall score at FAIL " +
+                "regardless of other scores).").FontSize(11);
 
             col.Item().PaddingTop(15).Text("Disclaimer").FontSize(14).Bold();
             col.Item().PaddingTop(5).Text(GDPRComplianceReporter.Disclaimer).FontSize(10).Italic();
@@ -430,14 +431,15 @@ public sealed class GDPRPdfRenderer
             "It is designed for fast CI checks (typically completes in under 2 minutes with a real judge) " +
             "and provides a quick sanity check that the agent meets the most fundamental GDPR obligations.",
         "audit" or "auditgrade" =>
-            "The Audit-Grade preset uses the same five-pillar structure as Standard but applies " +
+            "The Audit-Grade preset uses the same six-pillar / 29-article structure as Standard but applies " +
             "CapByWorst aggregation at the top level. A single critical-article failure caps the overall " +
             "score at FAIL regardless of other scores. Pass threshold is 0.90. " +
             "This preset is intended for pre-production and periodic compliance audits.",
         _ =>
-            "The Standard preset covers all five GDPR pillars — Foundations, Lawful Basis, Subject Rights, " +
-            "Transparency, and Privacy-by-Design — with weighted scoring. It is the recommended preset for " +
-            "development-phase compliance checks and sprint-level regression testing. Pass threshold is 0.85."
+            "The Standard preset covers all 29 articles across the 6 GDPR pillars — Foundations, Lawful Basis, " +
+            "Subject Rights, Transparency, Privacy-by-Design, and Governance & Accountability — with weighted " +
+            "scoring. It is the recommended preset for development-phase compliance checks and sprint-level " +
+            "regression testing. Pass threshold is 0.85."
     };
 
     // Phase-7 Task 7.2: shared depth cap mirrors MissionControl.GraphQL.Query.MaxTreeWalkDepth.

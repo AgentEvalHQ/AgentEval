@@ -91,9 +91,16 @@ public class MemoryBenchmark
     /// Diagnostic benchmark: same categories as Full but with maximum context pressure (~50K+ tokens).
     /// Use for deep analysis of memory limits. Takes significantly longer to run.
     /// </summary>
+    /// <remarks>
+    /// P0-2 (Sprint 0): the runner resolves scenario JSON / corpus selection / reach-back depths
+    /// using <see cref="PresetResolutionKey"/>; for Diagnostic this is "Full" so the JSON-driven
+    /// preset chain (Quick → Standard → Full) and the context-stress corpus are actually loaded
+    /// instead of silently degrading to Quick (which never declared "diagnostic" in any JSON).
+    /// </remarks>
     public static MemoryBenchmark Diagnostic => new()
     {
         Name = "Diagnostic",
+        PresetResolutionKey = "Full",
         Description = "Maximum context pressure diagnostic (11 categories, ~50K+ token context)",
         Categories = Full.Categories
     };
@@ -103,14 +110,43 @@ public class MemoryBenchmark
     /// forcing context overflow on models with 128K windows (e.g., GPT-4o-mini).
     /// Tests the agent's memory architecture (reducer, vector store) rather than LLM attention.
     /// </summary>
+    /// <remarks>
+    /// P0-2 (Sprint 0): resolution key routed to "Full" so JSON scenarios + corpus stress chain
+    /// load instead of silently falling back to Quick. <see cref="TargetTokensOverride"/> raised
+    /// from 128_000 → 192_000 to match the documented "192K total target, 75% (~144K) injected
+    /// via history blob, remaining ~48K driven via real InvokeAsync overflow calls" semantic and
+    /// to actually force overflow on a 128K-window model.
+    /// </remarks>
     public static MemoryBenchmark Overflow => new()
     {
         Name = "Overflow",
-        Description = "Gradual context overflow — fills 75% of 128K via injection, then filler calls push past the limit.",
+        PresetResolutionKey = "Full",
+        Description = "Gradual context overflow — fills 75% of 192K via injection, then filler calls push past the 128K window.",
         Categories = Standard.Categories,
-        TargetTokensOverride = 128_000,
+        TargetTokensOverride = 192_000,
         OverflowCallsOverride = 20
     };
+
+    /// <summary>
+    /// Internal preset resolution key used by the runner when looking up scenario JSON,
+    /// selecting corpus stress level, and choosing reach-back depths. Defaults to
+    /// <see cref="Name"/> but presets such as Diagnostic / Overflow override it to
+    /// route resolution through an existing JSON preset ("Full") while keeping the
+    /// public <see cref="Name"/> stable for reports and CLI selection.
+    /// </summary>
+    /// <remarks>
+    /// Without this split, <see cref="Name"/> "Diagnostic" flowed into
+    /// <c>ScenarioLoader.ResolvePreset</c> which silently fell back to "quick" when
+    /// no JSON declared a "diagnostic" key — making the marquee 50K+ token claim a
+    /// false advertisement (the runner actually used the ~8K context-small corpus).
+    /// </remarks>
+    public string? PresetResolutionKey { get; init; }
+
+    /// <summary>
+    /// Returns the resolved preset key the runner should pass to
+    /// <c>ScenarioLoader.ResolvePreset</c> and the per-category preset switches.
+    /// </summary>
+    internal string EffectivePresetResolutionKey => PresetResolutionKey ?? Name;
 
     /// <summary>
     /// When set, overrides context_pressure.target_tokens for all categories in this benchmark.

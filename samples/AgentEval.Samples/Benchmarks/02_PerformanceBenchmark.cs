@@ -63,6 +63,10 @@ public static class PerformanceBenchmarkSample
                 WarmupIterations = warmup,
                 ThroughputConcurrentRequests = concurrent,
                 ThroughputDuration = throughputDur,
+                // P0-1: pin the cost-leaf to the actual Azure deployment so the
+                // pricing-table lookup hits a real entry. Without this, the cost
+                // leaf falls back to agent.Name → pricing miss → silent $0 / PASS.
+                CostModelName = AIConfig.ModelDeployment,
             }
         };
         var bench = new PerformanceBenchmark(agent, options);

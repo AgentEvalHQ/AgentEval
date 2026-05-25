@@ -28,7 +28,7 @@ You can also run a specific sample directly from the command line by its **legac
 ```bash
 dotnet run -- 1    # Hello World            (A1)
 dotnet run -- 23   # Red Team Basic         (E2)
-dotnet run -- 42   # Performance benchmark  (H2)
+dotnet run -- 43   # Performance benchmark  (H2)
 dotnet run -- 51   # Report Browser         (H10)
 ```
 

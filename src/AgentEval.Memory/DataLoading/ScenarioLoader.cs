@@ -51,7 +51,16 @@ public static class ScenarioLoader
 
         if (!scenario.Presets.TryGetValue(normalizedName, out var preset))
         {
-            // Fall back to "quick" if the requested preset doesn't exist
+            // P0-2 (Sprint 0): defensive log when we have to fall back to "quick".
+            // Diagnostic/Overflow used to land here silently because no JSON declared
+            // a "diagnostic" / "overflow" key — the runner now routes them to "full"
+            // via MemoryBenchmark.EffectivePresetResolutionKey, but if a new preset
+            // ever forgets to follow the same convention we want this to be visible.
+            Console.Error.WriteLine(
+                $"[memory] preset '{normalizedName}' not found in scenario '{scenario.Name}', " +
+                "falling back to 'quick'. If this is an internal preset (e.g. Diagnostic, " +
+                "Overflow), set MemoryBenchmark.PresetResolutionKey to an existing JSON key " +
+                "such as 'full' to avoid silently degrading the content.");
             if (!scenario.Presets.TryGetValue("quick", out preset))
                 throw new InvalidOperationException(
                     $"Scenario '{scenario.Name}' has no preset '{normalizedName}' and no 'quick' fallback.");

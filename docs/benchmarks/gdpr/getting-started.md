@@ -19,7 +19,7 @@
 
 ## Quick Start
 
-> **v1 access path.** The GDPR benchmark currently runs through the `agenteval` CLI binaries. Programmatic access via NuGet (`using AgentEval.GdprBenchmark;`) is planned for v1.1.
+> **v1 access path.** The GDPR benchmark runs through the `agenteval` CLI binaries and is also available programmatically via NuGet (`using AgentEval.Compliance.Gdpr;`) — see [NuGet samples](../../samples/) for end-to-end consumer tests.
 
 > **Real judging requires all three** of `AZURE_OPENAI_ENDPOINT`, `AZURE_OPENAI_API_KEY`, and `AZURE_OPENAI_DEPLOYMENT`. If any are unset, the CLI refuses to run (exit code **2**). To exercise the pipeline without LLM cost — smoke-test mode only, **not for CI** — set `AGENTEVAL_ALLOW_STUB_JUDGE=1`. Stub-mode results are deterministic placeholders and **must not** be relied on as compliance evidence. See [CLI Reference — Environment variables](../../cli.md#environment-variables) for the full contract.
 
@@ -242,7 +242,7 @@ The `agenteval bench gdpr calibrate` command runs the hand-labeled golden datase
 agenteval bench gdpr calibrate
 ```
 
-The golden dataset contains hand-labeled scenario/response pairs distributed across the 5 GDPR pillars. For each entry, the calibration runner asks the judge to score the response, then compares the judge's score to the human label. For an end-to-end plain-English walkthrough of *how* calibration works and *what kappa means*, see [`how-it-works.md`](how-it-works.md).
+The golden dataset contains hand-labeled scenario/response pairs distributed across the 6 GDPR pillars (Foundations, Lawful Basis, Subject Rights, Transparency, Privacy-by-Design, Governance & Accountability). For each entry, the calibration runner asks the judge to score the response, then compares the judge's score to the human label. For an end-to-end plain-English walkthrough of *how* calibration works and *what kappa means*, see [`how-it-works.md`](how-it-works.md).
 
 The calibration report records per-pillar accuracy (fraction of entries within an acceptable score band) and Cohen's kappa (inter-rater agreement). The default CI gate requires:
 - accuracy ≥ 85% per pillar

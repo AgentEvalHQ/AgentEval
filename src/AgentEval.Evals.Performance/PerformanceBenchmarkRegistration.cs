@@ -63,7 +63,21 @@ internal static class PerformanceBenchmarkRegistration
                         "perf",
                         "PerformanceBenchmark requires an IEvaluableAgent at EvalInput.Metadata[\"agent\"].");
                 }
-                var bench = new PerformanceBenchmark(agent, new PerformanceBenchmarkOptions { Verbose = false });
+                // P0-1: thread an optional costModelName through Metadata so the CLI can pass
+                // AZURE_OPENAI_DEPLOYMENT into the pricing-table lookup. Without this the
+                // cost-leaf silently falls back to agent.Name → pricing miss → $0 cost → PASS.
+                var evalOpts = new PerformanceBenchmarkEvaluateOptions();
+                if (input.Metadata?.TryGetValue("costModelName", out var rawModel) == true
+                    && rawModel is string modelName
+                    && !string.IsNullOrWhiteSpace(modelName))
+                {
+                    evalOpts.CostModelName = modelName;
+                }
+                var bench = new PerformanceBenchmark(agent, new PerformanceBenchmarkOptions
+                {
+                    Verbose = false,
+                    EvaluateOptions = evalOpts,
+                });
                 return await bench.EvaluateAsync(input, ct);
             },
             docLinkUrl: "https://github.com/joslat/AgentEval/blob/main/docs/perf-benchmark.md",
