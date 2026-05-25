@@ -16,6 +16,7 @@ namespace AgentEval.Tests.Cli.Classic;
 /// <summary>
 /// Tests for the InitCommand — scaffold a starter evaluation dataset.
 /// </summary>
+[Collection("ConsoleTests")]
 public class DatasetInitCommandTests : IDisposable
 {
     private readonly string _tempDir;

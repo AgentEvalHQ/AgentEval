@@ -15,6 +15,7 @@ namespace AgentEval.Tests.Cli.Classic;
 /// <summary>
 /// Tests for the ListCommand — list available metrics, attacks, exporters, datasets.
 /// </summary>
+[Collection("ConsoleTests")]
 public class ListCommandTests
 {
     private (string Output, int ExitCode) CaptureOutput(string? type)

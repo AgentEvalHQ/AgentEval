@@ -38,6 +38,36 @@ tables (UX, adversarial, reasoning, calibration, memory, safety,
 cost-quality, QA composite) in `docs/benchmarks/agentic/evaluator-cards.md`;
 indexed ADRs 015 / 016 / 017 in `docs/adr/README.md`.
 
+### Changed (BREAKING) (Phase 10 — Architecture hardening, 2026-05-25)
+
+- **T3.1** — `EvaluatorCostMap` moved from `AgentEval.Abstractions.Evals` to
+  `AgentEval.Evals.Agentic.Cost`. The type is unchanged; only its namespace
+  + assembly home moved. External consumers using
+  `using AgentEval.Abstractions.Evals;` to reach `EvaluatorCostMap` must
+  update to `using AgentEval.Evals.Agentic.Cost;` and add a
+  `<PackageReference>` / `<ProjectReference>` to `AgentEval.Evals.Agentic`
+  if they don't already have one. Umbrella `AgentEval` NuGet consumers are
+  unaffected (both assemblies flow through transitively). Migration:
+  global find-and-replace of the namespace string.
+- **T3.4** — `AgentEval.Memory.Models.BaselineComparison` renamed to
+  `MemoryBaselineComparison` to disambiguate from
+  `AgentEval.Output.BaselineComparison` (the run-vs-saved-baseline shape on
+  `IOutputStoreReader`). External consumers of the Memory baseline type
+  must rename their usages; the type's shape + members are unchanged.
+- **T3.4** — Trace-shape types `AgentEval.Output.AgentInfo` /
+  `AgentEval.Output.ToolDefinition` renamed to `TraceAgentInfo` /
+  `TraceToolDefinition` to disambiguate from the evaluation-report
+  (`AgentEval.Models.AgentInfo`) and agentic-eval-input
+  (`AgentEval.Evals.ToolDefinition`) shapes. External consumers reading
+  `agent-trace.json` via the typed shape must rename their usages; the
+  on-disk JSON schema is unchanged.
+- **T4.1b Item 11** — `IOutputStoreReader` gains a `ResolveRunDirectory(
+  SubjectIdentity, string runId)` member (closes the v0.10.1 layout-leak
+  finding). External implementers of `IOutputStoreReader` must add the
+  method to compile against v1.1+. In-tree implementations
+  (`FileSystemOutputStore`, `InMemoryOutputStore`, `NullOutputStore`,
+  `ReadOnlyOutputStoreAdapter`) are updated; 4 test stubs updated.
+
 ### Changed (Phase 10 — Architecture hardening, 2026-05-25)
 
 - **T3.5** — `RunCostBreakdown` now splits the legacy "unknown" bucket into

@@ -11,6 +11,8 @@ using Xunit;
 
 namespace AgentEval.Tests.Compliance.EuAiAct.Calibration;
 
+[Collection("ConsoleTests")]
+
 public class CalibrationRunnerTests
 {
     // ── Helpers ───────────────────────────────────────────────────────────────

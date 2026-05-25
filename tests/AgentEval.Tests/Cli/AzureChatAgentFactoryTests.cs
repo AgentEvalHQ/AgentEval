@@ -23,7 +23,7 @@ namespace AgentEval.Tests.Cli;
 /// (MigrateCommandTests, CalibrationRunner regression tests, etc.) on
 /// concurrent parallel workers.
 /// </remarks>
-[Collection("ConsoleIO")]
+[Collection("ConsoleTests")]
 public class AzureChatAgentFactoryTests
 {
     [Fact]

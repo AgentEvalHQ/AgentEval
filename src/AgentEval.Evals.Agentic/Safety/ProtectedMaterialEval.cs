@@ -26,7 +26,7 @@ namespace AgentEval.Evals.Agentic.Safety;
 /// for copyrighted content, which is itself a signal).
 /// </para>
 /// <para>
-/// Source: forked from Azure/azure-sdk-for-python (commit main-2026-05-09)
+/// Source: forked from Azure/azure-sdk-for-python (commit <TBD-foundry-sha> see CHANGELOG T3.7)
 /// https://raw.githubusercontent.com/Azure/azure-sdk-for-python/main/sdk/evaluation/azure-ai-evaluation/azure/ai/evaluation/_evaluators/_protected_material/protected_material.prompty
 /// License: MIT. Modifications: temperature=0, structured evidence[], severity=high,
 /// label table, AgentEval envelope.

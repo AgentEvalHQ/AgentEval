@@ -220,9 +220,19 @@ export function RunDetailPage() {
                   unknown={d.runCostBreakdown.unknownKeyCost}
                 />
                 <p className="text-xs text-slate-500 mt-2">
-                  Total: {formatCost(d.runCostBreakdown.totalCost)} —
-                  derived from each leaf evaluator's <code>provenance.estimatedCost</code>
-                  in the recursive <code>EvalResult</code> tree.
+                  Tier-attributed total: {formatCost(
+                    d.runCostBreakdown.totalCost - d.runCostBreakdown.legacyFlatCost
+                  )}
+                  {d.runCostBreakdown.legacyFlatCost > 0 && (
+                    <>
+                      {" "}(+ {formatCost(d.runCostBreakdown.legacyFlatCost)} legacy flat){" "}
+                    </>
+                  )}
+                  {" "}— derived from each leaf evaluator's{" "}
+                  <code>provenance.estimatedCost</code> in the recursive{" "}
+                  <code>EvalResult</code> tree. Inclusive total{" "}
+                  {formatCost(d.runCostBreakdown.totalCost)} (chart segments above
+                  exclude the legacy-flat slice; see breakdown below).
                 </p>
                 {(d.runCostBreakdown.unknownKeyCost > 0 ||
                   d.runCostBreakdown.legacyFlatCost > 0) && (

@@ -15,7 +15,7 @@ namespace AgentEval.Tests.Compliance.Gdpr;
 // one test below redirects Console.Error to capture judge-failure
 // diagnostics; parallel runs against other Console-capturing tests
 // silently swallowed the captured stream.
-[Collection("ConsoleIO")]
+[Collection("ConsoleTests")]
 public class CalibrationRunnerTests
 {
     // ── Helpers ───────────────────────────────────────────────────────────────

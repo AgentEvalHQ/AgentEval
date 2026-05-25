@@ -13,7 +13,7 @@ namespace AgentEval.Tests.Cli;
 // tests (e.g. AzureChatAgentFactoryTests) silently swallows the other test's
 // output. Pin into the "ConsoleIO" xUnit collection so the runner serialises
 // every test class that touches the Console streams.
-[Collection("ConsoleIO")]
+[Collection("ConsoleTests")]
 public class MigrateCommandTests : IDisposable
 {
     private readonly string _root;

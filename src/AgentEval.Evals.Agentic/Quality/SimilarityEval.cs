@@ -25,7 +25,7 @@ namespace AgentEval.Evals.Agentic.Quality;
 /// <see cref="EvalInput.Response"/>, and <see cref="EvalInput.GroundTruth"/>.
 /// </para>
 /// <para>
-/// Source: forked from Azure/azure-sdk-for-python (commit main-2026-05-09)
+/// Source: forked from Azure/azure-sdk-for-python (commit <TBD-foundry-sha> see CHANGELOG T3.7)
 /// sdk/evaluation/azure-ai-evaluation/azure/ai/evaluation/_evaluators/_similarity/similarity.prompty
 /// License: MIT. Modifications: temperature=0, structured evidence[], label assignment table,
 /// explicit missing-ground-truth handling, severity=medium.

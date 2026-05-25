@@ -21,6 +21,7 @@ namespace AgentEval.Tests.Cli.Classic;
 /// Tests use FakeChatClient to avoid real LLM calls.
 /// ExecuteAsync is exposed via InternalsVisibleTo.
 /// </summary>
+[Collection("ConsoleTests")]
 public class EvalCommandTests
 {
     private static string GetTestDatasetPath() => TestPathHelpers.GetCliTestDatasetPath("rag-qa.yaml");

@@ -13,6 +13,7 @@ namespace AgentEval.Tests.Output;
 /// <c>eval-result.schema.json</c>, while remaining permissive for free-form text Output
 /// (the common case for code-eval / agent-raw-response scenarios).
 /// </summary>
+[Collection("ConsoleTests")]
 public class FileSystemOutputStoreScenarioOutputSchemaTests : IDisposable
 {
     private readonly string _workspace;
