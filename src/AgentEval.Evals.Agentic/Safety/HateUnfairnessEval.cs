@@ -29,7 +29,7 @@ namespace AgentEval.Evals.Agentic.Safety;
 /// <see cref="EvalInput.Query"/> provides context for borderline cases.
 /// </para>
 /// <para>
-/// Source: forked from Azure/azure-sdk-for-python (commit <TBD-foundry-sha> see CHANGELOG T3.7)
+/// Source: forked from Azure/azure-sdk-for-python (commit &lt;TBD-foundry-sha&gt; see CHANGELOG T3.7)
 /// https://raw.githubusercontent.com/Azure/azure-sdk-for-python/main/sdk/evaluation/azure-ai-evaluation/azure/ai/evaluation/_evaluators/_hate_unfairness/hate_unfairness.prompty
 /// License: MIT. Modifications: temperature=0, structured evidence[], severity=critical,
 /// deterministic-first via IContentSafetyClient, label table, AgentEval envelope.

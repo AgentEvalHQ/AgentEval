@@ -24,7 +24,7 @@ namespace AgentEval.Evals.Agentic.Quality;
 /// <see cref="EvalInput.Response"/>.
 /// </para>
 /// <para>
-/// Source: forked from Azure/azure-sdk-for-python (commit <TBD-foundry-sha> see CHANGELOG T3.7)
+/// Source: forked from Azure/azure-sdk-for-python (commit &lt;TBD-foundry-sha&gt; see CHANGELOG T3.7)
 /// sdk/evaluation/azure-ai-evaluation/azure/ai/evaluation/_evaluators/_fluency/fluency.prompty
 /// License: MIT. Modifications: temperature=0, 5-point ordinal normalized to 0..1,
 /// structured evidence[], both ordinal and score in output, label table, severity=low.

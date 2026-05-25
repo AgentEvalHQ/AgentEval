@@ -32,7 +32,7 @@ namespace AgentEval.Evals.Agentic.Quality;
 /// response alone and will typically return low scores for grounded claims.
 /// </para>
 /// <para>
-/// Source: forked from Azure/azure-sdk-for-python (commit <TBD-foundry-sha> see CHANGELOG T3.7)
+/// Source: forked from Azure/azure-sdk-for-python (commit &lt;TBD-foundry-sha&gt; see CHANGELOG T3.7)
 /// sdk/evaluation/azure-ai-evaluation/azure/ai/evaluation/_evaluators/_groundedness/groundedness.prompty
 /// License: MIT. Modifications: temperature=0, 4 sub-dimensions, structured evidence[], severity rubric.
 /// </para>
