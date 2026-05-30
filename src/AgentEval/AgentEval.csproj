@@ -67,6 +67,12 @@ v0.10.0-beta: Unified Benchmarks Architecture (ADR-017). Eight benchmark familie
     <!-- MAF -->
     <PackageReference Include="Microsoft.Agents.AI" />
     <PackageReference Include="Microsoft.Agents.AI.Workflows" />
+    <!-- Security: surface the OpenTelemetry.Api >=1.15.3 floor (GHSA-g94r-2vxg-569j) to
+         downstream NuGet consumers. AgentEval.MAF references it directly, but PrivateAssets=all
+         on the sub-project embeds the DLL without propagating the dependency, and CPM transitive
+         pinning does not travel inside the .nupkg — so without this the package would otherwise
+         let consumers resolve the vulnerable 1.15.0 transitively via Microsoft.Agents.AI. -->
+    <PackageReference Include="OpenTelemetry.Api" />
     <!-- RedTeam -->
     <PackageReference Include="PdfSharp-MigraDoc" />
   </ItemGroup>
