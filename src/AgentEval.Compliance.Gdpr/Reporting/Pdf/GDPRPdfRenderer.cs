@@ -82,8 +82,7 @@ public sealed class GDPRPdfRenderer
             var pillarSubResults = evidence.CompositeTree.Details.SubResults ?? Array.Empty<EvalResult>();
             foreach (var pillarResult in pillarSubResults)
             {
-                if (pillarResult.Metric.Key.Contains("Pillar", StringComparison.OrdinalIgnoreCase)
-                    || pillarResult.Metric.Category.Contains("pillar", StringComparison.OrdinalIgnoreCase))
+                if (IsPillarNode(pillarResult))
                 {
                     doc.Page(p => RenderL1Pillar(p, pillarResult, evidence));
                 }
@@ -176,6 +175,15 @@ public sealed class GDPRPdfRenderer
             });
         });
     }
+
+    /// <summary>
+    /// True when <paramref name="node"/> is a pillar grouping node — identified by its Key
+    /// starting with "Pillar" (matching SummaryBuilder). Article nodes must NOT match: their
+    /// category is "compliance.{Pillar}" (which contains "pillar"), so the previous
+    /// Category.Contains check rendered every article as a mislabeled pillar page too (BUG-03).
+    /// </summary>
+    internal static bool IsPillarNode(EvalResult node) =>
+        node.Metric.Key.StartsWith("Pillar", StringComparison.OrdinalIgnoreCase);
 
     // ── G6.4 Per-pillar detail page ──────────────────────────────────────────
 
