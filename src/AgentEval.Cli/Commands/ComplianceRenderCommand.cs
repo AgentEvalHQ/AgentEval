@@ -83,7 +83,7 @@ public static class ComplianceRenderCommand
         }
 
         var agentEvalDir = Path.Combine(workspaceRoot, ".agenteval");
-        var sanitizedSubject = SanitizeForPath(subject);
+        var sanitizedSubject = FileSystemLayout.Sanitize(subject);
         var regulationFolder = isGdpr ? "GDPR" : "EU-AI-Act";
         var complianceDir = Path.Combine(agentEvalDir, "compliance", regulationFolder, sanitizedSubject);
 
@@ -262,13 +262,6 @@ public static class ComplianceRenderCommand
             Console.Error.WriteLine($"Failed to render PDF: {ex.Message}");
             return 1;
         }
-    }
-
-    private static string SanitizeForPath(string name)
-    {
-        var invalid = Path.GetInvalidFileNameChars().Concat(new[] { '/', '\\' }).ToArray();
-        var s = string.Concat(name.Select(c => invalid.Contains(c) ? '-' : c));
-        return s.Trim('.', ' ');
     }
 
     /// <summary>

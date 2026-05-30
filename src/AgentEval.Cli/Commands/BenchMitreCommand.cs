@@ -223,7 +223,7 @@ public static class BenchMitreCommand
         }
 
         // ── Emit JSON + Markdown reports alongside ───────────────────────────
-        var sanitizedSubject = SanitizeForPath(subject);
+        var sanitizedSubject = FileSystemLayout.Sanitize(subject);
         var ts = report.GeneratedAt.ToString("yyyy-MM-dd_HH-mm-ss");
         var outputDir = Path.Combine(agentEvalDir, "compliance", "MITRE-ATLAS", sanitizedSubject, ts);
         Directory.CreateDirectory(outputDir);
@@ -300,13 +300,6 @@ public static class BenchMitreCommand
                 "atlas-audit-grade (=atlas-audit / audit / auditgrade).",
                 nameof(presetSpec))
         };
-    }
-
-    private static string SanitizeForPath(string name)
-    {
-        var invalid = Path.GetInvalidFileNameChars().Concat(new[] { '/', '\\' }).ToArray();
-        var s = string.Concat(name.Select(c => invalid.Contains(c) ? '-' : c));
-        return s.Trim('.', ' ');
     }
 
     /// <summary>

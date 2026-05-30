@@ -222,7 +222,7 @@ public static class BenchOwaspCommand
         }
 
         // ── Emit JSON + Markdown reports alongside ───────────────────────────
-        var sanitizedSubject = SanitizeForPath(subject);
+        var sanitizedSubject = FileSystemLayout.Sanitize(subject);
         var ts = report.GeneratedAt.ToString("yyyy-MM-dd_HH-mm-ss");
         var outputDir = Path.Combine(agentEvalDir, "compliance", "OWASP-LLM-Top10", sanitizedSubject, ts);
         Directory.CreateDirectory(outputDir);
@@ -298,13 +298,6 @@ public static class BenchOwaspCommand
                 "Known presets: top10, smoke, audit (=auditgrade), top10-rag (=top10forrag).",
                 nameof(presetSpec))
         };
-    }
-
-    private static string SanitizeForPath(string name)
-    {
-        var invalid = Path.GetInvalidFileNameChars().Concat(new[] { '/', '\\' }).ToArray();
-        var s = string.Concat(name.Select(c => invalid.Contains(c) ? '-' : c));
-        return s.Trim('.', ' ');
     }
 
     /// <summary>

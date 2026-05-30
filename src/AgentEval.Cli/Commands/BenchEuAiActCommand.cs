@@ -189,7 +189,7 @@ public static class BenchEuAiActCommand
         }
 
         // Derive output directory (mirrors FileSystemOutputStore path convention)
-        var sanitizedSubject = SanitizeForPath(subject);
+        var sanitizedSubject = FileSystemLayout.Sanitize(subject);
         var ts = evidence.Base.GeneratedAt.ToString("yyyy-MM-dd_HH-mm-ss");
         var outputDir = Path.Combine(agentEvalDir, "compliance", "EU-AI-Act", sanitizedSubject, ts);
         Directory.CreateDirectory(outputDir);
@@ -298,13 +298,6 @@ public static class BenchEuAiActCommand
             kv => (IReadOnlyList<EvalComponent>)kv.Value);
 
         return basePreset.WithExtraScenarios(merged);
-    }
-
-    private static string SanitizeForPath(string name)
-    {
-        var invalid = Path.GetInvalidFileNameChars().Concat(new[] { '/', '\\' }).ToArray();
-        var s = string.Concat(name.Select(c => invalid.Contains(c) ? '-' : c));
-        return s.Trim('.', ' ');
     }
 
 }

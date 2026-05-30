@@ -158,7 +158,7 @@ public static class BenchAgenticCommand
         }
 
         // Derive output directory (mirrors AgenticBenchmarkReporter path convention)
-        var sanitizedSubject = SanitizeForPath(subject);
+        var sanitizedSubject = FileSystemLayout.Sanitize(subject);
         var ts = result.GeneratedAt.ToString("yyyy-MM-dd_HH-mm-ss");
         var outputDir = Path.Combine(agentEvalDir, "benchmarks", "agentic", sanitizedSubject, ts);
         Directory.CreateDirectory(outputDir);
@@ -273,13 +273,6 @@ public static class BenchAgenticCommand
                 "Known presets: agentic-execution, tool-call-accuracy, rag-quality, judge-quality, safety, telemetry, stochastic-stability, conversational, reasoning, user-experience, adversarial-direct.",
                 nameof(presetSpec))
         };
-    }
-
-    private static string SanitizeForPath(string name)
-    {
-        var invalid = Path.GetInvalidFileNameChars().Concat(new[] { '/', '\\' }).ToArray();
-        var s = string.Concat(name.Select(c => invalid.Contains(c) ? '-' : c));
-        return s.Trim('.', ' ');
     }
 
     /// <summary>

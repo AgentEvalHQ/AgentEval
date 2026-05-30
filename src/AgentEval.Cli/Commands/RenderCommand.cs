@@ -62,7 +62,7 @@ public static class RenderCommand
         }
 
         var agentEvalDir = Path.Combine(workspaceRoot, ".agenteval");
-        var sanitizedSubject = SanitizeForPath(subject);
+        var sanitizedSubject = FileSystemLayout.Sanitize(subject);
         var benchmarkDir = Path.Combine(agentEvalDir, "benchmarks", "agentic", sanitizedSubject);
 
         if (!Directory.Exists(benchmarkDir))
@@ -158,12 +158,5 @@ public static class RenderCommand
         }
 
         return 0;
-    }
-
-    private static string SanitizeForPath(string name)
-    {
-        var invalid = Path.GetInvalidFileNameChars().Concat(new[] { '/', '\\' }).ToArray();
-        var s = string.Concat(name.Select(c => invalid.Contains(c) ? '-' : c));
-        return s.Trim('.', ' ');
     }
 }
