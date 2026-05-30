@@ -180,11 +180,16 @@ public static class ModelPricing
         if (string.IsNullOrEmpty(modelName))
             return null;
         
-        // Try exact match first, then partial match
+        // Try exact match first, then partial match. Scan candidate keys LONGEST-FIRST so the
+        // most specific overlapping key wins (e.g. "gpt-4o-mini" before "gpt-4o" before "gpt-4").
+        // The previous FirstOrDefault over a ConcurrentDictionary had undefined enumeration order,
+        // so a deployment embedding "gpt-4o-mini" could resolve to "gpt-4" — a ~200x cost error.
+        // Mirrors JudgeCostMap.GetRate (BUG-11).
         if (!_pricing.TryGetValue(modelName, out var price))
         {
-            var match = _pricing.Keys.FirstOrDefault(k => 
-                modelName.Contains(k, StringComparison.OrdinalIgnoreCase));
+            var match = _pricing.Keys
+                .OrderByDescending(k => k.Length)
+                .FirstOrDefault(k => modelName.Contains(k, StringComparison.OrdinalIgnoreCase));
             if (match == null)
                 return null;
             price = _pricing[match];

@@ -25,6 +25,32 @@ public class ModelPricingTests
         Assert.Equal(expectedCost, cost.Value, precision: 5);
     }
     
+    [Theory]
+    // BUG-11: a deployment name embedding a long, specific key must resolve to that key —
+    // never to a shorter overlapping substring (gpt-4 ⊂ gpt-4o ⊂ gpt-4o-mini) depending on
+    // ConcurrentDictionary enumeration order. gpt-4o-mini is ~200x cheaper than gpt-4.
+    [InlineData("my-gpt-4o-mini-deployment")]
+    [InlineData("prod_gpt-4o-mini_v2")]
+    [InlineData("gpt-4o-mini")]
+    public void GetPricing_OverlappingKeys_PrefersLongestMatch_Deterministically(string deployment)
+    {
+        var pricing = ModelPricing.GetPricing(deployment);
+
+        Assert.NotNull(pricing);
+        // gpt-4o-mini input = 0.00015/1K, NOT gpt-4 (0.03) or gpt-4o (0.005).
+        Assert.Equal(0.00015m, pricing!.Value.InputPer1K);
+        Assert.Equal(0.0006m, pricing.Value.OutputPer1K);
+    }
+
+    [Fact]
+    public void GetPricing_DeploymentEmbeddingGpt4o_ResolvesToGpt4o_NotGpt4()
+    {
+        var pricing = ModelPricing.GetPricing("eastus-gpt-4o-chat");
+
+        Assert.NotNull(pricing);
+        Assert.Equal(0.005m, pricing!.Value.InputPer1K); // gpt-4o, not gpt-4 (0.03)
+    }
+
     [Fact]
     public void EstimateCost_WithUnknownModel_ReturnsNull()
     {
