@@ -58,9 +58,13 @@ public sealed class AgenticSummaryBuilder
                 PerEvaluator: perEvaluator);
         }
 
-        // Determine tree shape: check whether any L1 node is a recognised category node
-        // (its Category or Key matches a known agentic category string).
-        bool hasCategoryLayer = l1Children.Any(c => IsKnownCategory(c));
+        // Determine tree shape. A genuine category layer exists only when an L1 node is
+        // itself a category *grouping* node — identified by its own Key being a known
+        // category id. Flat presets (root → evaluators → criteria) carry the category on
+        // each evaluator leaf's Metric.Category; that tag must NOT be mistaken for a
+        // grouping layer, or every flat-preset report mislabels evaluators as categories
+        // and collapses same-category siblings (BUG-02).
+        bool hasCategoryLayer = l1Children.Any(IsCategoryNode);
 
         if (hasCategoryLayer)
         {
@@ -99,7 +103,15 @@ public sealed class AgenticSummaryBuilder
         }
         else
         {
-            // Flat 2-layer tree: root → evaluators → (optional) criteria
+            // Flat 2-layer tree: root → evaluators → (optional) criteria.
+            // Roll evaluators up into synthetic category buckets using a true running mean
+            // (sum / count). The previous pairwise `(existing + score) / 2` re-average
+            // silently over-weighted the last evaluator added to each bucket (BUG-16).
+            var catScoreSum = new Dictionary<string, double>(StringComparer.Ordinal);
+            var catCount = new Dictionary<string, int>(StringComparer.Ordinal);
+            var catStatus = new Dictionary<string, string>(StringComparer.Ordinal);
+            var catCriticals = new Dictionary<string, List<string>>(StringComparer.Ordinal);
+
             foreach (var evaluator in l1Children)
             {
                 var evalKey = evaluator.Metric.Key;
@@ -113,9 +125,28 @@ public sealed class AgenticSummaryBuilder
                     Severity: evaluator.Score.Severity ?? "none",
                     Confidence: confidence);
 
-                // Accumulate into synthetic category buckets.
-                AccumulateSyntheticCategory(perCategory, categoryKey, evaluator.Score.Value, status,
-                    evaluator.Score.Severity == "critical" && status == "FAIL" ? evalKey : null);
+                catScoreSum[categoryKey] = catScoreSum.GetValueOrDefault(categoryKey) + evaluator.Score.Value;
+                catCount[categoryKey] = catCount.GetValueOrDefault(categoryKey) + 1;
+                catStatus[categoryKey] = catStatus.TryGetValue(categoryKey, out var prior)
+                    ? CombineStatus(prior, status)
+                    : status;
+
+                if (evaluator.Score.Severity == "critical" && status == "FAIL")
+                {
+                    if (!catCriticals.TryGetValue(categoryKey, out var fails))
+                        catCriticals[categoryKey] = fails = new List<string>();
+                    fails.Add(evalKey);
+                }
+            }
+
+            foreach (var (categoryKey, count) in catCount)
+            {
+                perCategory[categoryKey] = new AgenticCategorySummary(
+                    Score: catScoreSum[categoryKey] / count,
+                    Status: catStatus[categoryKey],
+                    CriticalFails: catCriticals.TryGetValue(categoryKey, out var fails)
+                        ? fails
+                        : (IReadOnlyList<string>)Array.Empty<string>());
             }
         }
 
@@ -128,19 +159,22 @@ public sealed class AgenticSummaryBuilder
 
     // ── Helpers ────────────────────────────────────────────────────────────────
 
-    private static bool IsKnownCategory(EvalResult node)
-    {
-        var cat = node.Metric.Category;
-        if (!string.IsNullOrWhiteSpace(cat) && s_knownCategories.Contains(cat))
-            return true;
-        return s_knownCategories.Contains(node.Metric.Key);
-    }
+    /// <summary>
+    /// True when <paramref name="node"/> is a category <i>grouping</i> node — i.e. its own
+    /// <see cref="EvalMetadata.Key"/> is a known agentic category id. Evaluator leaves
+    /// (whose Key is an evaluator id and whose Category merely tags their bucket) are
+    /// deliberately excluded so flat presets are not misread as a category layer.
+    /// </summary>
+    private static bool IsCategoryNode(EvalResult node) =>
+        s_knownCategories.Contains(node.Metric.Key);
 
     private static string ResolveCategoryKey(EvalResult node)
     {
+        // A grouping node's identity is its (known-category) Key; fall back to Category,
+        // then Key, for resilience against non-canonical trees.
+        if (s_knownCategories.Contains(node.Metric.Key)) return node.Metric.Key;
         var cat = node.Metric.Category;
-        if (!string.IsNullOrWhiteSpace(cat)) return cat;
-        return node.Metric.Key;
+        return !string.IsNullOrWhiteSpace(cat) ? cat : node.Metric.Key;
     }
 
     /// <summary>
@@ -169,46 +203,6 @@ public sealed class AgenticSummaryBuilder
             return "judge-quality";
 
         return "operational";
-    }
-
-    /// <summary>
-    /// Accumulates a single evaluator result into the in-progress category dictionary.
-    /// Scores are averaged incrementally using a running count stored as a negative sentinel
-    /// (not ideal for large-scale; acceptable for the benchmark tree sizes expected here).
-    /// </summary>
-    private static void AccumulateSyntheticCategory(
-        Dictionary<string, AgenticCategorySummary> perCategory,
-        string categoryKey,
-        double score,
-        string status,
-        string? criticalFailKey)
-    {
-        if (!perCategory.TryGetValue(categoryKey, out var existing))
-        {
-            perCategory[categoryKey] = new AgenticCategorySummary(
-                Score: score,
-                Status: status,
-                CriticalFails: criticalFailKey is null
-                    ? Array.Empty<string>()
-                    : new[] { criticalFailKey });
-        }
-        else
-        {
-            // Simple re-average: not perfectly accurate without a running count,
-            // but for the flat preset case this is a best-effort roll-up.
-            var newCriticals = criticalFailKey is null
-                ? existing.CriticalFails
-                : existing.CriticalFails.Concat(new[] { criticalFailKey }).ToList();
-
-            // Combine existing and new score with equal weight approximation.
-            var combined = (existing.Score + score) / 2.0;
-            var combinedStatus = CombineStatus(existing.Status, status);
-
-            perCategory[categoryKey] = new AgenticCategorySummary(
-                Score: combined,
-                Status: combinedStatus,
-                CriticalFails: newCriticals);
-        }
     }
 
     private static string CombineStatus(string a, string b)
