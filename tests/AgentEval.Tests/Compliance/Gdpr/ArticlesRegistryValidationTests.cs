@@ -59,6 +59,19 @@ public class ArticlesRegistryValidationTests
         Assert.Contains("weights", ex.Message);
     }
 
+    [Fact]
+    public void ValidateOrThrow_DuplicateControlId_ThrowsDescriptively()
+    {
+        // BUG-33: two individually-valid specs sharing a control_id must throw a descriptive error
+        // naming the duplicate, not a non-diagnostic ArgumentException from ToDictionary.
+        var specs = new[] { Spec("gdpr.dup", scenarioWeight: 1.0), Spec("gdpr.dup", scenarioWeight: 1.0) };
+
+        var ex = Assert.Throws<InvalidOperationException>(() => ArticlesRegistry.ValidateOrThrow(specs));
+
+        Assert.Contains("Duplicate", ex.Message);
+        Assert.Contains("gdpr.dup", ex.Message);
+    }
+
     // Note: the production registry constructor now calls ValidateOrThrow against every embedded
     // YAML; that real-data path is already exercised by the GDPR end-to-end / registry tests,
     // which would fail if any shipped spec were invalid.

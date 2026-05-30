@@ -60,14 +60,29 @@ public sealed class ArticlesRegistry
     /// </summary>
     internal static void ValidateOrThrow(IEnumerable<ArticleSpec> specs)
     {
+        var specList = specs as IReadOnlyList<ArticleSpec> ?? specs.ToList();
+
         var validator = new ArticleYamlValidator();
-        foreach (var spec in specs)
+        foreach (var spec in specList)
         {
             var result = validator.Validate(spec);
             if (!result.IsValid)
                 throw new InvalidOperationException(
                     $"Invalid GDPR article spec '{spec.Metadata.ControlId}': {result.ErrorsJoined}");
         }
+
+        // Cross-file duplicate control_id check. The per-article validator only dedups scenario
+        // ids WITHIN an article; two embedded YAMLs sharing a control_id would otherwise throw a
+        // non-diagnostic ArgumentException inside ToDictionary (no control_id / file named) (BUG-33).
+        var duplicates = specList
+            .GroupBy(s => s.Metadata.ControlId, StringComparer.Ordinal)
+            .Where(g => g.Count() > 1)
+            .Select(g => g.Key)
+            .ToList();
+        if (duplicates.Count > 0)
+            throw new InvalidOperationException(
+                $"Duplicate GDPR article control_id(s) across embedded YAMLs: {string.Join(", ", duplicates)}. " +
+                "Each control_id must be unique — check for copy-pasted article files.");
     }
 
     /// <summary>Returns the <see cref="CompositeEval"/> for the given GDPR control identifier.</summary>

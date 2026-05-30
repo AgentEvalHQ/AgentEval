@@ -54,14 +54,28 @@ public sealed class EuAiActArticlesRegistry
     /// </summary>
     internal static void ValidateOrThrow(IEnumerable<ArticleSpec> specs)
     {
+        var specList = specs as IReadOnlyList<ArticleSpec> ?? specs.ToList();
+
         var validator = new ArticleYamlValidator();
-        foreach (var spec in specs)
+        foreach (var spec in specList)
         {
             var result = validator.Validate(spec);
             if (!result.IsValid)
                 throw new InvalidOperationException(
                     $"Invalid EU AI Act article spec '{spec.Metadata.ControlId}': {result.ErrorsJoined}");
         }
+
+        // Cross-file duplicate control_id check — see BUG-33 (the per-article validator only dedups
+        // scenario ids within an article; ToDictionary would otherwise throw non-diagnostically).
+        var duplicates = specList
+            .GroupBy(s => s.Metadata.ControlId, StringComparer.Ordinal)
+            .Where(g => g.Count() > 1)
+            .Select(g => g.Key)
+            .ToList();
+        if (duplicates.Count > 0)
+            throw new InvalidOperationException(
+                $"Duplicate EU AI Act article control_id(s) across embedded YAMLs: {string.Join(", ", duplicates)}. " +
+                "Each control_id must be unique — check for copy-pasted article files.");
     }
 
     /// <summary>Returns the <see cref="CompositeEval"/> for the given EU AI Act control identifier.</summary>

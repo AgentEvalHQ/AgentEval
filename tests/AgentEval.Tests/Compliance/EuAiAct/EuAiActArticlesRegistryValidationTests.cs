@@ -55,4 +55,17 @@ public class EuAiActArticlesRegistryValidationTests
         Assert.Contains("eu_ai.bad_weights", ex.Message);
         Assert.Contains("weights", ex.Message);
     }
+
+    [Fact]
+    public void ValidateOrThrow_DuplicateControlId_ThrowsDescriptively()
+    {
+        // BUG-33: duplicate control_id across YAMLs → descriptive error, not ToDictionary's
+        // non-diagnostic ArgumentException.
+        var specs = new[] { Spec("eu_ai.dup", scenarioWeight: 1.0), Spec("eu_ai.dup", scenarioWeight: 1.0) };
+
+        var ex = Assert.Throws<InvalidOperationException>(() => EuAiActArticlesRegistry.ValidateOrThrow(specs));
+
+        Assert.Contains("Duplicate", ex.Message);
+        Assert.Contains("eu_ai.dup", ex.Message);
+    }
 }
