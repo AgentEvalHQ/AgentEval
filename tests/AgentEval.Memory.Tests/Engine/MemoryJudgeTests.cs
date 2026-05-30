@@ -209,6 +209,19 @@ public class MemoryJudgeTests
     }
 
     [Fact]
+    public async Task JudgeAsync_WhenCancelled_PropagatesOce_NotScoreZero()
+    {
+        // BUG-06: cancellation during the LLM call must propagate, not be swallowed into a
+        // fabricated score-0 result (which deflates the run and keeps spending LLM calls).
+        var chatClient = new CancellingChatClient();
+        var judge = new MemoryJudge(chatClient, NullLogger<MemoryJudge>.Instance);
+        var query = MemoryQuery.Create("What is my name?", MemoryFact.Create("My name is John"));
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => judge.JudgeAsync("response", query));
+    }
+
+    [Fact]
     public async Task JudgeAsync_WithForbiddenFacts_MatchesForbiddenFound()
     {
         var chatClient = new CustomResponseChatClient("""
@@ -395,6 +408,30 @@ internal class ThrowingChatClient : IChatClient
         ChatOptions? options = null,
         CancellationToken cancellationToken = default) =>
         throw new InvalidOperationException("Simulated LLM failure");
+
+    public IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(
+        IEnumerable<ChatMessage> chatMessages,
+        ChatOptions? options = null,
+        CancellationToken cancellationToken = default) => throw new NotImplementedException();
+
+    public TService? GetService<TService>(object? key = null) where TService : class => null;
+    public object? GetService(Type serviceType, object? key = null) => null;
+    public void Dispose() { }
+}
+
+/// <summary>
+/// FakeChatClient that always throws OperationCanceledException, simulating cancellation
+/// during the LLM call.
+/// </summary>
+internal sealed class CancellingChatClient : IChatClient
+{
+    public ChatClientMetadata Metadata { get; } = new("test-model", new Uri("http://localhost"));
+
+    public Task<ChatResponse> GetResponseAsync(
+        IEnumerable<ChatMessage> chatMessages,
+        ChatOptions? options = null,
+        CancellationToken cancellationToken = default) =>
+        throw new OperationCanceledException();
 
     public IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(
         IEnumerable<ChatMessage> chatMessages,

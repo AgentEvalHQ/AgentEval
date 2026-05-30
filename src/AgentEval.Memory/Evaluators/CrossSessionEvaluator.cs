@@ -117,7 +117,7 @@ public class CrossSessionEvaluator : ICrossSessionEvaluator
 
             return result;
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             _logger.LogError(ex, "Error during cross-session evaluation");
             stopwatch.Stop();

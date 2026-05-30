@@ -238,7 +238,7 @@ public class MemoryBenchmarkRunner : IMemoryBenchmarkRunner
                 SkipReason = score.SkipReason
             };
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             _logger.LogWarning(ex, "Error running benchmark category: {CategoryName}", category.Name);
             catStopwatch.Stop();

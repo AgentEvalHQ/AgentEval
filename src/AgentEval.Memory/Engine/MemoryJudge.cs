@@ -72,6 +72,12 @@ public class MemoryJudge : IMemoryJudge
                 
             return result;
         }
+        catch (OperationCanceledException)
+        {
+            // Caller cancellation must propagate, not be recorded as a genuine score-0
+            // judgment (which would deflate the run and waste subsequent LLM calls) (BUG-06).
+            throw;
+        }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error during memory judgment for query: {Question}", query.Question);
