@@ -75,22 +75,32 @@ public static class AgentEvalServiceCollectionExtensions
             sp => new ChatClientEvaluator(sp.GetRequiredService<IChatClient>()),
             options.ServiceLifetime));
 
-        // Register runners and comparers with appropriate lifetimes
+        // Register runners and comparers with appropriate lifetimes.
+        // IStochasticRunner is built via a factory that resolves IEvaluationHarness with a clear,
+        // actionable error when it is absent — instead of the cryptic "Unable to resolve
+        // IEvaluationHarness" at first resolve. The harness has no default in core (it lives in the
+        // MAF package), and registration order is host-controlled, so this is fail-fast-at-resolve
+        // with guidance rather than a registration-time guard that could race the harness (GAP-08).
+        static IStochasticRunner BuildRunner(IServiceProvider sp) =>
+            new StochasticRunner(
+                ResolveHarnessOrThrow(sp),
+                sp.GetService<IStatisticsCalculator>(),
+                sp.GetService<EvaluationOptions>());
         switch (options.ServiceLifetime)
         {
             case ServiceLifetime.Singleton:
-                services.TryAddSingleton<IStochasticRunner, StochasticRunner>();
-                services.TryAddSingleton<IModelComparer>(sp => 
+                services.TryAddSingleton<IStochasticRunner>(BuildRunner);
+                services.TryAddSingleton<IModelComparer>(sp =>
                     new ModelComparer(sp.GetRequiredService<IStochasticRunner>()));
                 break;
             case ServiceLifetime.Scoped:
-                services.TryAddScoped<IStochasticRunner, StochasticRunner>();
-                services.TryAddScoped<IModelComparer>(sp => 
+                services.TryAddScoped<IStochasticRunner>(BuildRunner);
+                services.TryAddScoped<IModelComparer>(sp =>
                     new ModelComparer(sp.GetRequiredService<IStochasticRunner>()));
                 break;
             case ServiceLifetime.Transient:
-                services.TryAddTransient<IStochasticRunner, StochasticRunner>();
-                services.TryAddTransient<IModelComparer>(sp => 
+                services.TryAddTransient<IStochasticRunner>(BuildRunner);
+                services.TryAddTransient<IModelComparer>(sp =>
                     new ModelComparer(sp.GetRequiredService<IStochasticRunner>()));
                 break;
         }
@@ -147,4 +157,18 @@ public static class AgentEvalServiceCollectionExtensions
     {
         return services.AddAgentEval(options => options.ServiceLifetime = ServiceLifetime.Transient);
     }
+
+    /// <summary>
+    /// Resolves <see cref="IEvaluationHarness"/> or throws a clear, actionable error explaining how
+    /// to register one. IStochasticRunner/IModelComparer depend on it, but the core package ships no
+    /// default harness (it lives in the MAF package), so a parameterless AddAgentEval otherwise fails
+    /// with a cryptic DI error at first resolve (GAP-08).
+    /// </summary>
+    private static IEvaluationHarness ResolveHarnessOrThrow(IServiceProvider sp)
+        => sp.GetService<IEvaluationHarness>()
+           ?? throw new InvalidOperationException(
+               "AgentEval's IStochasticRunner/IModelComparer require an IEvaluationHarness, but none is " +
+               "registered. Register one before resolving — e.g. call services.AddAgentEvalMaf() (MAF package), " +
+               "set AgentEvalServiceOptions.EvaluationHarnessFactory, or register your own via " +
+               "services.AddSingleton<IEvaluationHarness>(...).");
 }

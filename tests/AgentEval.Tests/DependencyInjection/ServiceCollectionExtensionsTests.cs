@@ -40,6 +40,33 @@ public class ServiceCollectionExtensionsTests
     }
 
     [Fact]
+    public void AddAgentEval_NoHarness_ResolvingComparer_ThrowsActionableError()
+    {
+        // GAP-08: IStochasticRunner/IModelComparer need IEvaluationHarness, which has no default in
+        // core. Without one, resolving must throw a clear, actionable error (naming how to register
+        // a harness) rather than the cryptic default "Unable to resolve IEvaluationHarness".
+        var services = new ServiceCollection();
+        services.AddAgentEvalSingleton(); // no harness, no factory
+
+        var provider = services.BuildServiceProvider();
+
+        var ex = Assert.Throws<InvalidOperationException>(() => provider.GetRequiredService<IModelComparer>());
+        Assert.Contains("AddAgentEvalMaf", ex.Message); // our guidance, not the default DI message
+    }
+
+    [Fact]
+    public void AddAgentEval_WithHarness_ResolvesComparer()
+    {
+        var services = new ServiceCollection();
+        services.AddSingleton<IEvaluationHarness, FakeTestHarness>();
+        services.AddAgentEvalSingleton();
+
+        var provider = services.BuildServiceProvider();
+
+        Assert.NotNull(provider.GetRequiredService<IModelComparer>());
+    }
+
+    [Fact]
     public void AddAgentEval_RegistersCoreServices()
     {
         // Arrange
