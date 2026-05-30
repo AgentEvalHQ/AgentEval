@@ -64,7 +64,10 @@ public class ToolUsageAssertions
                     because: because));
         }
         
-        var call = _report.GetCallsByName(toolName).First();
+        // FirstOrDefault (not First): in scope mode FailWith above returns, so when the tool was
+        // not called this would otherwise throw InvalidOperationException on an empty sequence and
+        // crash the whole scope evaluation instead of collecting the soft failure (BUG-15).
+        var call = _report.GetCallsByName(toolName).FirstOrDefault();
         return new ToolCallAssertion(this, _report, call, toolName);
     }
     
@@ -473,10 +476,13 @@ public class ToolCallAssertion
 {
     private readonly ToolUsageAssertions _parent;
     private readonly ToolUsageReport _report;
-    private readonly ToolCallRecord _call;
+    // Nullable: HaveCalledTool returns this builder even when the tool was NOT called (in scope
+    // mode FailWith records the soft failure and returns), in which case _call is null and the
+    // chained assertions below short-circuit instead of dereferencing null (BUG-15).
+    private readonly ToolCallRecord? _call;
     private readonly string _toolName;
-    
-    internal ToolCallAssertion(ToolUsageAssertions parent, ToolUsageReport report, ToolCallRecord call, string toolName)
+
+    internal ToolCallAssertion(ToolUsageAssertions parent, ToolUsageReport report, ToolCallRecord? call, string toolName)
     {
         _parent = parent;
         _report = report;
@@ -490,6 +496,7 @@ public class ToolCallAssertion
     [StackTraceHidden]
     public ToolCallAssertion BeforeTool(string otherToolName, string? because = null)
     {
+        if (_call is null) return this; // not called → soft-fail already recorded (BUG-15)
         var otherOrder = _report.GetToolOrder(otherToolName);
         if (otherOrder == 0)
         {
@@ -523,6 +530,7 @@ public class ToolCallAssertion
     [StackTraceHidden]
     public ToolCallAssertion AfterTool(string otherToolName, string? because = null)
     {
+        if (_call is null) return this; // not called → soft-fail already recorded (BUG-15)
         var otherOrder = _report.GetToolOrder(otherToolName);
         if (otherOrder == 0)
         {
@@ -557,6 +565,7 @@ public class ToolCallAssertion
     [StackTraceHidden]
     public ToolCallAssertion WithArgument(string paramName, object expectedValue, string? because = null)
     {
+        if (_call is null) return this; // not called → soft-fail already recorded (BUG-15)
         object? actualValue = null;
         var hasArgument = _call.Arguments?.TryGetValue(paramName, out actualValue) ?? false;
         
@@ -600,6 +609,7 @@ public class ToolCallAssertion
     [StackTraceHidden]
     public ToolCallAssertion WithArgumentContaining(string paramName, string substring, string? because = null)
     {
+        if (_call is null) return this; // not called → soft-fail already recorded (BUG-15)
         object? actualValue = null;
         var hasArgument = _call.Arguments?.TryGetValue(paramName, out actualValue) ?? false;
         
@@ -636,6 +646,7 @@ public class ToolCallAssertion
     [StackTraceHidden]
     public ToolCallAssertion WithResultContaining(string substring, string? because = null)
     {
+        if (_call is null) return this; // not called → soft-fail already recorded (BUG-15)
         var resultStr = _call.Result?.ToString();
         
         if (resultStr == null || !resultStr.Contains(substring, StringComparison.OrdinalIgnoreCase))
@@ -656,6 +667,7 @@ public class ToolCallAssertion
     [StackTraceHidden]
     public ToolCallAssertion WithoutError(string? because = null)
     {
+        if (_call is null) return this; // not called → soft-fail already recorded (BUG-15)
         if (_call.HasError)
         {
             AgentEvalScope.FailWith(
@@ -681,6 +693,7 @@ public class ToolCallAssertion
     [StackTraceHidden]
     public ToolCallAssertion WithDurationUnder(TimeSpan max, string? because = null)
     {
+        if (_call is null) return this; // not called → soft-fail already recorded (BUG-15)
         if (!_call.HasTiming)
         {
             // Skip gracefully - timing requires streaming mode

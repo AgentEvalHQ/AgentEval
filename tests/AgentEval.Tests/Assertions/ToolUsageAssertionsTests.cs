@@ -14,6 +14,34 @@ namespace AgentEval.Tests;
 public class ToolUsageAssertionsTests
 {
     [Fact]
+    public void HaveCalledTool_MissingTool_InScope_RecordsSoftFailure_NoInvalidOperation()
+    {
+        // BUG-15: inside an AgentEvalScope, FailWith records and RETURNS, so HaveCalledTool used to
+        // fall through to GetCallsByName(...).First() on an empty sequence and throw
+        // InvalidOperationException — crashing the whole scope instead of collecting a soft failure.
+        var report = new ToolUsageReport(); // no calls
+
+        try
+        {
+            using var scope = new AgentEvalScope();
+
+            // The chain must NOT throw InvalidOperationException; it records soft failures and the
+            // null-tolerant ToolCallAssertion short-circuits the chained assertions.
+            report.Should().HaveCalledTool("MissingTool").WithArgument("x", "y").WithoutError();
+
+            Assert.True(scope.HasFailures); // the "tool not called" soft failure was collected
+        }
+        catch (InvalidOperationException)
+        {
+            Assert.Fail("HaveCalledTool chain threw InvalidOperationException (BUG-15) instead of a soft failure.");
+        }
+        catch (AgentEvalAssertionException)
+        {
+            // Expected on scope Dispose: soft failures were collected (correct scope behaviour).
+        }
+    }
+
+    [Fact]
     public void HaveCalledTool_WhenToolExists_DoesNotThrow()
     {
         var report = new ToolUsageReport();
