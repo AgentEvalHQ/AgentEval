@@ -6,6 +6,7 @@ using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 using AgentEval.Memory.Models;
 using AgentEval.Output;
+using Microsoft.Extensions.Logging;
 
 namespace AgentEval.Memory.Reporting;
 
@@ -20,6 +21,7 @@ public partial class JsonFileBaselineStore : IBaselineStore
     private readonly MemoryReportingOptions _options;
     private readonly IOutputStore? _outputStore;
     private readonly SubjectIdentity? _subject;
+    private readonly ILogger? _logger;
 
     internal static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -50,11 +52,13 @@ public partial class JsonFileBaselineStore : IBaselineStore
     /// <param name="options">Reporting options for legacy-path writes.</param>
     /// <param name="outputStore">Canonical output store for dual-write. Stores where <see cref="IOutputStoreReader.IsAvailable"/> is false are skipped.</param>
     /// <param name="subject">Optional pre-resolved subject identity. If null, derived from the first save call.</param>
-    public JsonFileBaselineStore(MemoryReportingOptions options, IOutputStore outputStore, SubjectIdentity? subject = null)
+    /// <param name="logger">Optional logger; canonical dual-write failures are logged at Error (GAP-04).</param>
+    public JsonFileBaselineStore(MemoryReportingOptions options, IOutputStore outputStore, SubjectIdentity? subject = null, ILogger? logger = null)
     {
         _options = options ?? throw new ArgumentNullException(nameof(options));
         _outputStore = outputStore ?? throw new ArgumentNullException(nameof(outputStore));
         _subject = subject;
+        _logger = logger;
     }
 
     public async Task SaveAsync(MemoryBaseline baseline, CancellationToken ct = default)
@@ -93,9 +97,21 @@ public partial class JsonFileBaselineStore : IBaselineStore
                 // Also persist as the "current" (non-pinned) baseline so LoadBaselineAsync works.
                 await _outputStore.SaveBaselineAsync(subject, summary, versionTag: null, ct: ct);
             }
+            catch (OperationCanceledException)
+            {
+                throw; // cancellation must surface, not be swallowed (GAP-04)
+            }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"[AgentEval.Memory] Canonical baseline write failed: {ex.Message}");
+                // The canonical dual-write is secondary to the legacy-path write, so we do not fail
+                // the whole SaveAsync — but the failure must be VISIBLE. Debug.WriteLine is compiled
+                // out in Release, so a failed canonical write (disk full, permissions, serialization)
+                // was completely invisible while SaveAsync returned success (GAP-04). Log at Error;
+                // fall back to Trace (on in Release) when no logger was injected.
+                if (_logger is not null)
+                    _logger.LogError(ex, "Canonical baseline dual-write failed for baseline {BaselineId}", baseline.Id);
+                else
+                    System.Diagnostics.Trace.TraceError($"[AgentEval.Memory] Canonical baseline write failed: {ex}");
             }
         }
     }
