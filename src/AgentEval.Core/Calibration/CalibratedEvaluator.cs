@@ -115,6 +115,19 @@ public class CalibratedEvaluator : IEvaluator
                     input, output, criteriaList, cts.Token);
                 return (evaluator.Name, Result: (EvaluationResult?)result, Error: (Exception?)null);
             }
+            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+            {
+                // Per-judge timeout: our linked CTS fired via CancelAfter, NOT caller
+                // cancellation. Treat it as a judge failure so one slow judge cannot abort
+                // the whole calibrated evaluation (honouring the per-judge Timeout +
+                // ContinueOnJudgeFailure contract). Caller cancellation still propagates,
+                // because that OCE is excluded by the filter above (BUG-05).
+                var timeout = new TimeoutException(
+                    $"Judge '{evaluator.Name}' exceeded the per-judge timeout of {_options.Timeout}.");
+                if (!_options.ContinueOnJudgeFailure)
+                    throw timeout;
+                return (evaluator.Name, Result: (EvaluationResult?)null, Error: (Exception?)timeout);
+            }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 if (!_options.ContinueOnJudgeFailure)

@@ -148,8 +148,19 @@ public class CalibratedJudge : ICalibratedJudge
                 
                 var metric = metricFactory(judge.Name);
                 var result = await metric.EvaluateAsync(context, cts.Token);
-                
+
                 return (Judge: judge.Name, Score: (double?)result.Score, Error: (Exception?)null);
+            }
+            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+            {
+                // Per-judge timeout (linked CTS fired via CancelAfter), not caller cancellation.
+                // Degrade gracefully instead of aborting the whole evaluation; caller
+                // cancellation still propagates via the filter exclusion above (BUG-05).
+                var timeout = new TimeoutException(
+                    $"Judge '{judge.Name}' exceeded the per-judge timeout of {_options.Timeout}.");
+                if (!_options.ContinueOnJudgeFailure)
+                    throw timeout;
+                return (Judge: judge.Name, Score: (double?)null, Error: (Exception?)timeout);
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
