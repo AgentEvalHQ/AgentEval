@@ -131,8 +131,12 @@ public class StochasticRunner : IStochasticRunner
             // For parallel execution, report progress as tasks complete
             if (options.OnProgress != null)
             {
+                // Drain the task list directly. Using `tasks.Count` as the loop
+                // bound while also Remove()-ing from `tasks` inside the body caused
+                // the two counters to converge at the midpoint, dropping ~half the
+                // runs (BUG-01). `options.Runs` is the authoritative total for ETA.
                 var completedCount = 0;
-                while (completedCount < tasks.Count)
+                while (tasks.Count > 0)
                 {
                     var completed = await Task.WhenAny(tasks);
                     completedCount++;

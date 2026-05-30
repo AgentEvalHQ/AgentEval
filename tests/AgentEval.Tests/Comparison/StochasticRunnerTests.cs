@@ -124,6 +124,36 @@ public class StochasticRunnerTests
     }
     
     [Fact]
+    public async Task RunStochasticTestAsync_Parallel_WithOnProgress_CollectsAllRuns()
+    {
+        // Regression for BUG-01: in the parallel branch the loop bound
+        // `while (completedCount < tasks.Count)` was mutated by `tasks.Remove`,
+        // so the counters converged at the midpoint and ~half the runs were
+        // silently dropped (corrupting every downstream statistic). This only
+        // fires when MaxParallelism > 1 AND OnProgress is set.
+
+        // Arrange
+        var progressReports = new List<StochasticProgress>();
+        var options = new StochasticOptions(
+            Runs: 10,
+            MaxParallelism: 4,
+            OnProgress: progress => progressReports.Add(progress));
+
+        var agent = new MockAgent();
+        var testCase = new TestCase { Name = "Test", Input = "input" };
+
+        // Act
+        var result = await _runner.RunStochasticTestAsync(agent, testCase, options);
+
+        // Assert - all 10 runs collected and reported, none dropped
+        Assert.Equal(10, result.IndividualResults.Count);
+        Assert.Equal(10, progressReports.Count);
+        Assert.Equal(10, progressReports[^1].CurrentRun);
+        Assert.All(progressReports, p => Assert.Equal(10, p.TotalRuns));
+        Assert.Equal(TimeSpan.Zero, progressReports[^1].EstimatedRemaining);
+    }
+
+    [Fact]
     public async Task RunStochasticTestAsync_WithFactory_OnProgressCalled()
     {
         // Arrange
