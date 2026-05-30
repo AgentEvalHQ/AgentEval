@@ -166,11 +166,46 @@ public class MicrosoftEvaluatorAdapterTests
         // Arrange
         var evaluator = new Microsoft.Extensions.AI.Evaluation.Quality.FluencyEvaluator();
         var fakeChatClient = new FakeChatClient();
-        
+
         // Act
         var adapter = new MicrosoftEvaluatorAdapter(evaluator, fakeChatClient);
-        
+
         // Assert
         Assert.Equal("Fluency", adapter.Name); // "Evaluator" suffix removed
+    }
+
+    [Fact]
+    public async Task EvaluateAsync_NullNumericScore_ReportsIndeterminate_NotFabricatedScore()
+    {
+        // BUG-26: a NumericMetric with a null Value (unparseable judge output, content filter,
+        // evaluator error) must be reported as indeterminate — not coerced to 1.0 (a confident
+        // lowest-quality Fail with the evaluator's reasoning, which corrupts pass/fail aggregation).
+        var adapter = new MicrosoftEvaluatorAdapter(
+            new NullScoreMsEvaluator(), new FakeChatClient(), name: "Fluency");
+
+        var result = await adapter.EvaluateAsync(new EvaluationContext { Input = "q", Output = "a" });
+
+        Assert.False(result.Passed);
+        Assert.Contains("indeterminate", result.Explanation ?? "", StringComparison.OrdinalIgnoreCase);
+        Assert.NotNull(result.Details);
+        Assert.True(result.Details!.TryGetValue("indeterminate", out var flag) && flag is true);
+    }
+
+    /// <summary>Microsoft evaluator that returns a NumericMetric with a null Value.</summary>
+    private sealed class NullScoreMsEvaluator : Microsoft.Extensions.AI.Evaluation.IEvaluator
+    {
+        public IReadOnlyCollection<string> EvaluationMetricNames => new[] { "Fluency" };
+
+        public ValueTask<Microsoft.Extensions.AI.Evaluation.EvaluationResult> EvaluateAsync(
+            IEnumerable<Microsoft.Extensions.AI.ChatMessage> messages,
+            Microsoft.Extensions.AI.ChatResponse modelResponse,
+            Microsoft.Extensions.AI.Evaluation.ChatConfiguration? chatConfiguration = null,
+            IEnumerable<Microsoft.Extensions.AI.Evaluation.EvaluationContext>? additionalContext = null,
+            CancellationToken cancellationToken = default)
+        {
+            var result = new Microsoft.Extensions.AI.Evaluation.EvaluationResult();
+            result.Metrics["Fluency"] = new Microsoft.Extensions.AI.Evaluation.NumericMetric("Fluency", value: null);
+            return new ValueTask<Microsoft.Extensions.AI.Evaluation.EvaluationResult>(result);
+        }
     }
 }
