@@ -218,7 +218,21 @@ public class WorkflowAssertionBuilder
     public WorkflowAssertionBuilder HaveFinalOutputMatching(string pattern, string? because = null)
     {
         _currentBecause = because;
-        if (!System.Text.RegularExpressions.Regex.IsMatch(_result.FinalOutput, pattern))
+        bool matched;
+        try
+        {
+            // Bounded to avoid ReDoS hangs on a catastrophic pattern + adversarial output (SEC-07).
+            matched = System.Text.RegularExpressions.Regex.IsMatch(
+                _result.FinalOutput, pattern,
+                System.Text.RegularExpressions.RegexOptions.None, TimeSpan.FromSeconds(1));
+        }
+        catch (System.Text.RegularExpressions.RegexMatchTimeoutException)
+        {
+            AddFailure($"Final-output pattern '{pattern}' could not be evaluated: regex timed out " +
+                          "(possible catastrophic backtracking / ReDoS).");
+            return this;
+        }
+        if (!matched)
         {
             AddFailure($"Expected final output to match pattern '{pattern}' " +
                           $"but output was: \"{Truncate(_result.FinalOutput, 100)}\"");

@@ -138,7 +138,25 @@ public class ResponseAssertions
     [StackTraceHidden]
     public ResponseAssertions MatchPattern(string pattern, RegexOptions options = RegexOptions.IgnoreCase, string? because = null)
     {
-        if (!Regex.IsMatch(_response, pattern, options))
+        bool matched;
+        try
+        {
+            // Bounded to avoid ReDoS hangs on a catastrophic pattern + adversarial response (SEC-07).
+            matched = Regex.IsMatch(_response, pattern, options, TimeSpan.FromSeconds(1));
+        }
+        catch (RegexMatchTimeoutException)
+        {
+            AgentEvalScope.FailWith(
+                ResponseAssertionException.Create(
+                    "Pattern could not be evaluated: regex timed out (possible catastrophic backtracking / ReDoS).",
+                    responsePreview: Truncate(_response, 200),
+                    expected: $"Matches pattern: /{pattern}/",
+                    actual: "Regex evaluation timed out",
+                    suggestions: new[] { "Simplify the regex pattern to avoid catastrophic backtracking" },
+                    because: because));
+            return this;
+        }
+        if (!matched)
         {
             AgentEvalScope.FailWith(
                 ResponseAssertionException.Create(

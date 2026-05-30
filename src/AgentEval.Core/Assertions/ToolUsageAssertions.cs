@@ -308,16 +308,40 @@ public class ToolUsageAssertions
         ArgumentNullException.ThrowIfNull(pattern);
         ArgumentNullException.ThrowIfNull(because);
         
-        var regex = new Regex(pattern, options);
-        
+        // Bound regex evaluation: a catastrophic-backtracking pattern over attacker-influenced
+        // argument values could otherwise hang the evaluation thread (ReDoS). Matches the
+        // project convention (RegexMatchEvaluator etc.). (SEC-07)
+        var regex = new Regex(pattern, options, TimeSpan.FromSeconds(1));
+
         foreach (var call in _report.Calls)
         {
             if (call.Arguments == null) continue;
-            
+
             foreach (var (argName, argValue) in call.Arguments)
             {
                 var stringValue = argValue?.ToString() ?? "";
-                var match = regex.Match(stringValue);
+                Match match;
+                try
+                {
+                    match = regex.Match(stringValue);
+                }
+                catch (RegexMatchTimeoutException)
+                {
+                    // Fail-closed: a timeout means we could not prove the argument is clean.
+                    AgentEvalScope.FailWith(
+                        BehavioralPolicyViolationException.Create(
+                            message: $"Policy check for tool '{call.Name}' argument '{argName}' could not complete: pattern '{pattern}' timed out (possible catastrophic backtracking / ReDoS).",
+                            policyName: $"NeverPassArgumentMatching({pattern})",
+                            violationType: "RegexTimeout",
+                            violatingAction: $"Regex evaluation exceeded the time budget for argument '{argName}'",
+                            matchedPattern: pattern,
+                            redactedValue: "(not evaluated — regex timed out)",
+                            argumentName: argName,
+                            toolName: call.Name,
+                            because: because,
+                            suggestions: new[] { "Simplify the forbidden-pattern regex to avoid catastrophic backtracking." }));
+                    continue;
+                }
                 if (match.Success)
                 {
                     var redacted = BehavioralPolicyViolationException.RedactSensitiveData(
