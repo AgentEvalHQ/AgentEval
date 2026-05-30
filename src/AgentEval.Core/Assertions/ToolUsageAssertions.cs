@@ -166,41 +166,50 @@ public class ToolUsageAssertions
     [StackTraceHidden]
     public ToolUsageAssertions HaveCallOrder(params string[] expectedOrder)
     {
+        // Subsequence match with a consumed-position cursor. Each expected tool must appear in
+        // the actual call sequence (ordered by Order) strictly AFTER the previously matched call.
+        // The previous implementation resolved every occurrence to GetToolOrder()'s FIRST call,
+        // so a repeated expected tool (e.g. [Search, Book, Search]) mis-validated and
+        // "A then B then A again" was inexpressible (BUG-14).
+        var actualCalls = _report.Calls.OrderBy(c => c.Order).ToList();
+        var cursor = 0; // index of the next unmatched call
+
         for (int i = 0; i < expectedOrder.Length; i++)
         {
             var expectedTool = expectedOrder[i];
-            var actualOrder = _report.GetToolOrder(expectedTool);
-            
-            if (actualOrder == 0)
+
+            var matchIndex = -1;
+            for (int j = cursor; j < actualCalls.Count; j++)
             {
-                var timeline = BuildTimeline();
-                AgentEvalScope.FailWith(
-                    ToolAssertionException.Create(
-                        $"Expected tool '{expectedTool}' at position {i + 1}, but it was never called.",
-                        toolName: expectedTool,
-                        calledTools: _report.UniqueToolNames.ToList(),
-                        expected: $"Tool order: [{string.Join(" → ", expectedOrder)}]",
-                        actual: $"Tool '{expectedTool}' not found in call sequence",
-                        context: timeline));
-            }
-            
-            if (i > 0)
-            {
-                var previousTool = expectedOrder[i - 1];
-                var previousOrder = _report.GetToolOrder(previousTool);
-                
-                if (actualOrder <= previousOrder)
+                if (actualCalls[j].Name.Equals(expectedTool, StringComparison.OrdinalIgnoreCase))
                 {
-                    var timeline = BuildTimeline();
-                    AgentEvalScope.FailWith(
-                        ToolAssertionException.Create(
-                            $"Expected '{expectedTool}' to be called after '{previousTool}', but order was reversed.",
-                            calledTools: _report.UniqueToolNames.ToList(),
-                            expected: $"'{previousTool}' (#{previousOrder}) → '{expectedTool}' (after #{previousOrder})",
-                            actual: $"'{previousTool}' (#{previousOrder}) → '{expectedTool}' (#{actualOrder})",
-                            context: timeline));
+                    matchIndex = j;
+                    break;
                 }
             }
+
+            if (matchIndex < 0)
+            {
+                var timeline = BuildTimeline();
+                var everCalled = actualCalls.Any(c =>
+                    c.Name.Equals(expectedTool, StringComparison.OrdinalIgnoreCase));
+                var message = everCalled
+                    ? $"Expected '{expectedTool}' at position {i + 1} to occur after the previously matched call, " +
+                      "but no further occurrence of it appears later in the call sequence."
+                    : $"Expected tool '{expectedTool}' at position {i + 1}, but it was never called.";
+
+                AgentEvalScope.FailWith(
+                    ToolAssertionException.Create(
+                        message,
+                        toolName: expectedTool,
+                        calledTools: _report.UniqueToolNames.ToList(),
+                        expected: $"Tool order (subsequence): [{string.Join(" → ", expectedOrder)}]",
+                        actual: $"Could not match '{expectedTool}' at/after call #{cursor + 1} in the sequence",
+                        context: timeline));
+                return this; // first failure reported; stop (FailWith may accumulate rather than throw)
+            }
+
+            cursor = matchIndex + 1; // the next expected tool must come strictly after this match
         }
         return this;
     }

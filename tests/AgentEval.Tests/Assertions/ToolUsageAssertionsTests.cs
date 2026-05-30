@@ -143,6 +143,52 @@ public class ToolUsageAssertionsTests
     }
     
     [Fact]
+    public void HaveCallOrder_RepeatedTool_AllOccurrencesInOrder_DoesNotThrow()
+    {
+        // BUG-14: ["Search","Book","Search"] must match two DISTINCT Search calls via a cursor,
+        // not resolve both to the first Search.
+        var report = new ToolUsageReport();
+        report.AddCall(new ToolCallRecord { Name = "Search", CallId = "c1", Order = 1 });
+        report.AddCall(new ToolCallRecord { Name = "Book", CallId = "c2", Order = 2 });
+        report.AddCall(new ToolCallRecord { Name = "Search", CallId = "c3", Order = 3 });
+
+        var exception = Record.Exception(() =>
+            report.Should().HaveCallOrder("Search", "Book", "Search"));
+
+        Assert.Null(exception);
+    }
+
+    [Fact]
+    public void HaveCallOrder_RepeatedTool_SecondOccurrenceMissing_Throws()
+    {
+        // Only one Search was called, so the second expected "Search" cannot be matched after Book.
+        var report = new ToolUsageReport();
+        report.AddCall(new ToolCallRecord { Name = "Search", CallId = "c1", Order = 1 });
+        report.AddCall(new ToolCallRecord { Name = "Book", CallId = "c2", Order = 2 });
+
+        var exception = Assert.Throws<ToolAssertionException>(() =>
+            report.Should().HaveCallOrder("Search", "Book", "Search"));
+
+        Assert.Contains("Search", exception.Message);
+    }
+
+    [Fact]
+    public void HaveCallOrder_RepeatedTool_OnlyFirstOccurrence_DoesNotFalselyPass()
+    {
+        // "A then B then A again" must require a real second A AFTER B; B,A,A (no A after the
+        // matched first A-before-B) — here A,B with a trailing A satisfies; A,A,B must FAIL the
+        // final "...,Book" because no Book occurs after the second Search.
+        var report = new ToolUsageReport();
+        report.AddCall(new ToolCallRecord { Name = "Search", CallId = "c1", Order = 1 });
+        report.AddCall(new ToolCallRecord { Name = "Search", CallId = "c2", Order = 2 });
+
+        var exception = Assert.Throws<ToolAssertionException>(() =>
+            report.Should().HaveCallOrder("Search", "Book"));
+
+        Assert.Contains("Book", exception.Message);
+    }
+
+    [Fact]
     public void HaveCalledAnyTool_WithCalls_DoesNotThrow()
     {
         var report = new ToolUsageReport();
