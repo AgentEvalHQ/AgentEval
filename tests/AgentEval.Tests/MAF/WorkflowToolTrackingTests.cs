@@ -657,6 +657,47 @@ public class WorkflowToolTrackingTests
     }
 
     [Fact]
+    public void WorkflowScoped_BeforeTool_AcrossExecutors_UsesGlobalOrder_NotPerExecutorOrder()
+    {
+        // BUG-13: GetInfoAbout (TripPlanner, per-executor Order 1) is genuinely called
+        // before SearchFlights (FlightAgent, per-executor Order 1). Comparing the
+        // per-executor Order gives 1 >= 1 → a spurious failure. The global execution
+        // position (flattened across executors) must be used instead.
+        var result = CreateResultWithTools(
+            ("TripPlanner", "plan", [("GetInfoAbout", "c1", "info")]),
+            ("FlightAgent", "flights", [("SearchFlights", "c2", "found"), ("BookFlight", "c3", "booked")]));
+
+        var exception = Record.Exception(() =>
+            result.Should()
+                .HaveCalledTool("GetInfoAbout")
+                    .BeforeTool("SearchFlights", because: "research precedes flight search")
+                .And()
+                .Validate());
+
+        Assert.Null(exception);
+    }
+
+    [Fact]
+    public void WorkflowScoped_AfterTool_AcrossExecutors_DetectsTrueGlobalOrder()
+    {
+        var result = CreateResultWithTools(
+            ("TripPlanner", "plan", [("GetInfoAbout", "c1", "info")]),
+            ("FlightAgent", "flights", [("BookFlight", "c2", "booked")]));
+
+        // BookFlight (global #2) AfterTool GetInfoAbout (global #1) → correct → passes,
+        // even though both carry per-executor Order 1.
+        var ok = Record.Exception(() =>
+            result.Should().HaveCalledTool("BookFlight").AfterTool("GetInfoAbout").And().Validate());
+        Assert.Null(ok);
+
+        // The reverse must still be detected as a real ordering violation.
+        var bad = Record.Exception(() =>
+            result.Should().HaveCalledTool("GetInfoAbout").AfterTool("BookFlight").And().Validate());
+        Assert.NotNull(bad);
+        Assert.IsType<WorkflowAssertionException>(bad);
+    }
+
+    [Fact]
     public void ForToolCall_WithoutError_WhenNoError_Passes()
     {
         var result = CreateResultWithTools(

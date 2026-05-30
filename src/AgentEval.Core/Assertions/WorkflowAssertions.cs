@@ -1113,8 +1113,21 @@ public class WorkflowToolCallAssertionBuilder
     }
 
     /// <summary>
+    /// Tool calls flattened across all executors in workflow-execution order. The list
+    /// index is the only valid <i>global</i> ordinal: <see cref="ToolCallRecord.Order"/>
+    /// is assigned per-executor and resets to 1 at each executor step, so it cannot be
+    /// compared across executors for workflow-scoped ordering (BUG-13).
+    /// </summary>
+    private List<ToolCallRecord> GlobalToolCallSequence() =>
+        _result.Steps
+            .Where(s => s.HasToolCalls)
+            .SelectMany(s => s.ToolCalls!)
+            .ToList();
+
+    /// <summary>
     /// Assert this tool was called before another tool anywhere in the workflow.
-    /// Uses the tool call Order property for comparison across all executors.
+    /// Comparison uses the global execution position across all executors (not the
+    /// per-executor <see cref="ToolCallRecord.Order"/>, which resets each step).
     /// </summary>
     /// <param name="otherToolName">The tool that should have been called after.</param>
     /// <param name="because">Optional reason for the assertion.</param>
@@ -1123,25 +1136,22 @@ public class WorkflowToolCallAssertionBuilder
     {
         if (_call == null) return this; // Already reported missing
 
-        var allToolCalls = _result.Steps
-            .Where(s => s.HasToolCalls)
-            .SelectMany(s => s.ToolCalls!)
-            .ToList();
-
-        var otherCall = allToolCalls.FirstOrDefault(tc =>
+        var sequence = GlobalToolCallSequence();
+        var thisIndex = sequence.FindIndex(tc => ReferenceEquals(tc, _call));
+        var otherIndex = sequence.FindIndex(tc =>
             tc.Name.Equals(otherToolName, StringComparison.OrdinalIgnoreCase));
 
-        if (otherCall == null)
+        if (otherIndex < 0)
         {
             AddFailure(
                 $"Expected '{_toolName}' to be called before '{otherToolName}' in workflow, " +
                 $"but '{otherToolName}' was never called.",
                 because);
         }
-        else if (_call.Order >= otherCall.Order)
+        else if (thisIndex < 0 || thisIndex >= otherIndex)
         {
             AddFailure(
-                $"Expected '{_toolName}' (#{_call.Order}) to be called before '{otherToolName}' (#{otherCall.Order}) " +
+                $"Expected '{_toolName}' (#{thisIndex + 1}) to be called before '{otherToolName}' (#{otherIndex + 1}) " +
                 $"in workflow.",
                 because);
         }
@@ -1158,25 +1168,22 @@ public class WorkflowToolCallAssertionBuilder
     {
         if (_call == null) return this;
 
-        var allToolCalls = _result.Steps
-            .Where(s => s.HasToolCalls)
-            .SelectMany(s => s.ToolCalls!)
-            .ToList();
-
-        var otherCall = allToolCalls.FirstOrDefault(tc =>
+        var sequence = GlobalToolCallSequence();
+        var thisIndex = sequence.FindIndex(tc => ReferenceEquals(tc, _call));
+        var otherIndex = sequence.FindIndex(tc =>
             tc.Name.Equals(otherToolName, StringComparison.OrdinalIgnoreCase));
 
-        if (otherCall == null)
+        if (otherIndex < 0)
         {
             AddFailure(
                 $"Expected '{_toolName}' to be called after '{otherToolName}' in workflow, " +
                 $"but '{otherToolName}' was never called.",
                 because);
         }
-        else if (_call.Order <= otherCall.Order)
+        else if (thisIndex < 0 || thisIndex <= otherIndex)
         {
             AddFailure(
-                $"Expected '{_toolName}' (#{_call.Order}) to be called after '{otherToolName}' (#{otherCall.Order}) " +
+                $"Expected '{_toolName}' (#{thisIndex + 1}) to be called after '{otherToolName}' (#{otherIndex + 1}) " +
                 $"in workflow.",
                 because);
         }
