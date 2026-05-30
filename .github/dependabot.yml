@@ -1,0 +1,26 @@
+# Dependabot configuration (SEC-04).
+# Keeps GitHub Actions (which are SHA-pinned in the workflows) and NuGet dependencies current,
+# so pinning third-party actions to commit SHAs does not leave them frozen on stale versions.
+version: 2
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    commit-message:
+      prefix: "ci"
+    groups:
+      actions:
+        patterns:
+          - "*"
+
+  - package-ecosystem: "nuget"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    commit-message:
+      prefix: "chore"
+    groups:
+      nuget:
+        patterns:
+          - "*"

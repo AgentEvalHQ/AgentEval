@@ -88,7 +88,9 @@ jobs:
 
     - name: Upload coverage reports
       if: matrix.dotnet-version == '10.0.x'
-      uses: codecov/codecov-action@v5
+      # SHA-pinned (SEC-04): third-party action runs in CI with the workflow token. Dependabot
+      # (github-actions ecosystem) keeps this current. Resolved from the v5 moving tag.
+      uses: codecov/codecov-action@75cd11691c0faa626561e295848008c8a7dddffe # v5
       with:
         # Find all coverage files in the coverage directory
         files: ./coverage/**/coverage.cobertura.xml

@@ -127,7 +127,8 @@ jobs:
         retention-days: 30
 
     - name: Publish Test Summary
-      uses: dorny/test-reporter@v1
+      # SHA-pinned (SEC-04): third-party action; resolved from the v1 moving tag, kept current by Dependabot.
+      uses: dorny/test-reporter@d61b558e8df85cb60d09ca3e5b09653b4477cea7 # v1
       if: always()
       with:
         name: LLM Integration Test Results

@@ -43,9 +43,10 @@ jobs:
       run: dotnet restore
 
     - name: Run Security DevSkim Analyzer
-      # Using v1 tag which tracks latest v1.x release (currently v1.0.16)
+      # SHA-pinned (SEC-04): third-party action; resolved from the v1 moving tag (was v1.0.16).
+      # Dependabot (github-actions ecosystem) keeps it current.
       # See: https://github.com/microsoft/DevSkim-Action/releases
-      uses: microsoft/DevSkim-Action@v1
+      uses: microsoft/DevSkim-Action@4b5047945a44163b94642a1cecc0d93a3f428cc6 # v1
       with:
         directory-to-scan: .
         output-filename: devskim-results.sarif
