@@ -6,6 +6,7 @@ using AgentEval.Evals;
 using AgentEval.Compliance.Gdpr.Articles.Building;
 using AgentEval.Compliance.Gdpr.Articles.Loading;
 using AgentEval.Compliance.Gdpr.Articles.Models;
+using AgentEval.Compliance.Gdpr.Articles.Validation;
 
 namespace AgentEval.Compliance.Gdpr.Articles;
 
@@ -41,8 +42,32 @@ public sealed class ArticlesRegistry
             .GetAwaiter()
             .GetResult();
 
+        // Validate every loaded spec against the schema rules before building composites.
+        // The validator was previously exercised only by tests, so a hand-edited YAML with
+        // (e.g.) scenario weights not summing to 1.0, a bad pillar, or a missing criterion
+        // flowed into the composite and mis-scored with no error (GAP-01).
+        ValidateOrThrow(specs);
+
         _specs = specs.ToDictionary(s => s.Metadata.ControlId, s => s);
         _articles = specs.ToDictionary(s => s.Metadata.ControlId, s => builder.Build(s));
+    }
+
+    /// <summary>
+    /// Validates each loaded <see cref="ArticleSpec"/> against the GDPR schema rules and throws
+    /// <see cref="InvalidOperationException"/> (naming the offending control id) on the first
+    /// invalid spec. Runs at registry construction so malformed YAML fails fast at startup
+    /// rather than silently mis-scoring at audit time.
+    /// </summary>
+    internal static void ValidateOrThrow(IEnumerable<ArticleSpec> specs)
+    {
+        var validator = new ArticleYamlValidator();
+        foreach (var spec in specs)
+        {
+            var result = validator.Validate(spec);
+            if (!result.IsValid)
+                throw new InvalidOperationException(
+                    $"Invalid GDPR article spec '{spec.Metadata.ControlId}': {result.ErrorsJoined}");
+        }
     }
 
     /// <summary>Returns the <see cref="CompositeEval"/> for the given GDPR control identifier.</summary>

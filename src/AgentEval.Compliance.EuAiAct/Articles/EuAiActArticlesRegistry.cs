@@ -6,6 +6,7 @@ using AgentEval.Evals;
 using AgentEval.Compliance.EuAiAct.Articles.Building;
 using AgentEval.Compliance.EuAiAct.Articles.Loading;
 using AgentEval.Compliance.EuAiAct.Articles.Models;
+using AgentEval.Compliance.EuAiAct.Articles.Validation;
 
 namespace AgentEval.Compliance.EuAiAct.Articles;
 
@@ -38,8 +39,29 @@ public sealed class EuAiActArticlesRegistry
             .GetAwaiter()
             .GetResult();
 
+        // Validate every loaded spec before building composites — see GAP-01. The validator
+        // was previously only exercised by tests, so malformed YAML mis-scored silently.
+        ValidateOrThrow(specs);
+
         _specs = specs.ToDictionary(s => s.Metadata.ControlId, s => s);
         _articles = specs.ToDictionary(s => s.Metadata.ControlId, s => builder.Build(s));
+    }
+
+    /// <summary>
+    /// Validates each loaded <see cref="ArticleSpec"/> against the EU AI Act schema rules and
+    /// throws <see cref="InvalidOperationException"/> (naming the offending control id) on the
+    /// first invalid spec, so malformed YAML fails fast at startup (GAP-01).
+    /// </summary>
+    internal static void ValidateOrThrow(IEnumerable<ArticleSpec> specs)
+    {
+        var validator = new ArticleYamlValidator();
+        foreach (var spec in specs)
+        {
+            var result = validator.Validate(spec);
+            if (!result.IsValid)
+                throw new InvalidOperationException(
+                    $"Invalid EU AI Act article spec '{spec.Metadata.ControlId}': {result.ErrorsJoined}");
+        }
     }
 
     /// <summary>Returns the <see cref="CompositeEval"/> for the given EU AI Act control identifier.</summary>
