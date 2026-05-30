@@ -113,7 +113,7 @@ benchGdprCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =>
     var runs = parseResult.GetValue(benchRunsOpt) ?? 1;
     var response = await ResolveBenchResponseAsync(parseResult.GetValue(benchResponseOpt), parseResult.GetValue(benchResponseFileOpt), ct);
     if (response.Error) return 1;
-    return await BenchCommand.RunGdprAsync(preset, subject, root, input, runs: runs, responseText: response.Text);
+    return await BenchCommand.RunGdprAsync(preset, subject, root, input, runs: runs, responseText: response.Text, ct: ct);
 });
 
 // bench gdpr calibrate
@@ -126,7 +126,7 @@ calibrateCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =>
 {
     var root = parseResult.GetValue(calibrateRootOpt);
     var outPath = parseResult.GetValue(calibrateOutOpt);
-    return await BenchCalibrateCommand.RunAsync(root, outPath);
+    return await BenchCalibrateCommand.RunAsync(root, outPath, ct: ct);
 });
 benchGdprCmd.Add(calibrateCmd);
 
@@ -165,7 +165,7 @@ benchEuAiActCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) 
     var root = parseResult.GetValue(benchEuAiActRootOpt);
     var response = await ResolveBenchResponseAsync(parseResult.GetValue(benchEuAiActResponseOpt), parseResult.GetValue(benchEuAiActResponseFileOpt), ct);
     if (response.Error) return 1;
-    return await BenchEuAiActCommand.RunAsync(preset, subject, root, input, responseText: response.Text);
+    return await BenchEuAiActCommand.RunAsync(preset, subject, root, input, responseText: response.Text, ct: ct);
 });
 // bench eu-ai-act calibrate
 var euCalibrateRootOpt = new Option<string?>("--root") { Description = "Workspace root path (default: current directory)" };
@@ -177,7 +177,7 @@ euCalibrateCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =
 {
     var root = parseResult.GetValue(euCalibrateRootOpt);
     var outPath = parseResult.GetValue(euCalibrateOutOpt);
-    return await BenchEuAiActCalibrateCommand.RunAsync(root, outPath);
+    return await BenchEuAiActCalibrateCommand.RunAsync(root, outPath, ct: ct);
 });
 benchEuAiActCmd.Add(euCalibrateCmd);
 
@@ -207,7 +207,7 @@ benchAgenticCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) 
     var root = parseResult.GetValue(benchAgenticRootOpt);
     var input = parseResult.GetValue(benchAgenticInputOpt);
     var budgetTier = parseResult.GetValue(benchAgenticBudgetTierOpt);
-    return await BenchAgenticCommand.RunAsync(preset, subject, root, input, budgetTier);
+    return await BenchAgenticCommand.RunAsync(preset, subject, root, input, budgetTier, ct);
 });
 // bench agentic calibrate
 var agenticCalibrateRootOpt = new Option<string?>("--root") { Description = "Workspace root path (default: current directory)" };
@@ -219,7 +219,7 @@ agenticCalibrateCmd.SetAction(async (ParseResult parseResult, CancellationToken 
 {
     var root = parseResult.GetValue(agenticCalibrateRootOpt);
     var outPath = parseResult.GetValue(agenticCalibrateOutOpt);
-    return await BenchAgenticCalibrateCommand.RunAsync(root, outPath);
+    return await BenchAgenticCalibrateCommand.RunAsync(root, outPath, ct: ct);
 });
 benchAgenticCmd.Add(agenticCalibrateCmd);
 
@@ -250,7 +250,7 @@ benchOwaspCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =>
     var root = parseResult.GetValue(benchOwaspRootOpt);
     var input = parseResult.GetValue(benchOwaspInputOpt);
     var azureFromEnv = parseResult.GetValue(benchOwaspAzureFromEnvOpt);
-    return await BenchOwaspCommand.RunAsync(preset, subject, root, input, azureFromEnv);
+    return await BenchOwaspCommand.RunAsync(preset, subject, root, input, azureFromEnv, ct);
 });
 benchCmd.Add(benchOwaspCmd);
 
@@ -279,7 +279,7 @@ benchMitreCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =>
     var root = parseResult.GetValue(benchMitreRootOpt);
     var input = parseResult.GetValue(benchMitreInputOpt);
     var azureFromEnv = parseResult.GetValue(benchMitreAzureFromEnvOpt);
-    return await BenchMitreCommand.RunAsync(preset, subject, root, input, azureFromEnv);
+    return await BenchMitreCommand.RunAsync(preset, subject, root, input, azureFromEnv, ct);
 });
 benchCmd.Add(benchMitreCmd);
 
@@ -312,7 +312,7 @@ benchCmd.Add(benchMitreCmd);
                 return 1;
             }
             var root = parseResult.GetValue(benchLmeRootOpt);
-            return await BenchLongMemEvalCommand.RunAsync(preset, subject, root);
+            return await BenchLongMemEvalCommand.RunAsync(preset, subject, root, ct);
         });
         benchCmd.Add(benchLmeCmd);
     }
@@ -337,7 +337,7 @@ benchCmd.Add(benchMitreCmd);
                 return 1;
             }
             var root = parseResult.GetValue(benchMemRootOpt);
-            return await BenchMemoryCommand.RunAsync(preset, subject, root);
+            return await BenchMemoryCommand.RunAsync(preset, subject, root, ct);
         });
         benchCmd.Add(benchMemCmd);
     }
@@ -363,7 +363,7 @@ benchCmd.Add(benchMitreCmd);
             var prompt = parseResult.GetValue(benchPerfPromptOpt);
             var root = parseResult.GetValue(benchPerfRootOpt);
             var azureFromEnv = parseResult.GetValue(benchPerfAzureFromEnvOpt);
-            return await BenchPerfCommand.RunAsync(capturedPreset, subject, prompt, root, azureFromEnv);
+            return await BenchPerfCommand.RunAsync(capturedPreset, subject, prompt, root, azureFromEnv, ct);
         });
         benchPerfCmd.Add(presetCmd);
     }

@@ -41,15 +41,16 @@ namespace AgentEval.Cli.Commands;
 public static class BenchLongMemEvalCommand
 {
     /// <summary>Runs the bench longmemeval command using auto-discovered workspace root.</summary>
-    public static Task<int> RunAsync(string preset, string subject, string? rootOverride)
-        => RunAsync(preset, subject, rootOverride, chatClientOverride: null);
+    public static Task<int> RunAsync(string preset, string subject, string? rootOverride, CancellationToken ct = default)
+        => RunAsync(preset, subject, rootOverride, chatClientOverride: null, ct);
 
     /// <summary>Internal overload exposed for tests; allows chat-client injection.</summary>
     internal static async Task<int> RunAsync(
         string preset,
         string subject,
         string? rootOverride,
-        Microsoft.Extensions.AI.IChatClient? chatClientOverride)
+        Microsoft.Extensions.AI.IChatClient? chatClientOverride,
+        CancellationToken ct = default)
     {
         // ── Workspace setup ──────────────────────────────────────────────────
         if (rootOverride is not null)
@@ -146,7 +147,7 @@ public static class BenchLongMemEvalCommand
 
         // ── Persist setup ────────────────────────────────────────────────────
         var store = new FileSystemOutputStore(agentEvalDir);
-        await store.SweepStaleSentinelsAsync(TimeSpan.FromHours(24));
+        await store.SweepStaleSentinelsAsync(TimeSpan.FromHours(24), ct);
         var subjectIdentity = new SubjectIdentity(SubjectKind.Agent, subject);
         await store.EnsureSolutionAsync();
         await store.EnsureSubjectAsync(subjectIdentity);
@@ -160,7 +161,7 @@ public static class BenchLongMemEvalCommand
         ExternalBenchmarkResult result;
         try
         {
-            result = await runner.RunAsync(agent, benchmarkConfig, options);
+            result = await runner.RunAsync(agent, benchmarkConfig, options, ct);
         }
         catch (LongMemEvalDatasetNotFoundException ex)
         {
@@ -209,7 +210,7 @@ public static class BenchLongMemEvalCommand
                     ["overall_accuracy"] = result.OverallAccuracy,
                     ["task_averaged_accuracy"] = result.TaskAveragedAccuracy,
                 });
-            await store.CompleteRunAsync(manifest, summary);
+            await store.CompleteRunAsync(manifest, summary, ct);
 
             // Write the native ExternalBenchmarkResult JSON alongside the manifest.
             // Resolve via the store so the report path matches the manifest exactly; hand-building

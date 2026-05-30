@@ -32,8 +32,9 @@ public static class BenchCommand
         string? rootOverride,
         string? inputText,
         int runs = 1,
-        string? responseText = null) =>
-        RunGdprAsync(preset, subject, rootOverride, inputText, evaluatorOverride: null, runs: runs, responseText: responseText);
+        string? responseText = null,
+        CancellationToken ct = default) =>
+        RunGdprAsync(preset, subject, rootOverride, inputText, evaluatorOverride: null, runs: runs, responseText: responseText, ct: ct);
 
     /// <summary>Runs the bench gdpr command with optional overrides (used in tests).</summary>
     internal static async Task<int> RunGdprAsync(
@@ -43,7 +44,8 @@ public static class BenchCommand
         string? inputText,
         IEvaluator? evaluatorOverride,
         int runs = 1,
-        string? responseText = null)
+        string? responseText = null,
+        CancellationToken ct = default)
     {
         // ── Workspace setup ──────────────────────────────────────────────────
         if (rootOverride is not null)
@@ -137,7 +139,7 @@ public static class BenchCommand
         // Workspace hygiene: sweep stale 24h+ sentinels (.invalid.json / .lock
         // / .tmp) left behind by killed benchmark processes. Only CLI writer
         // entry points sweep — Mission Control (read-only viewer) must not.
-        await store.SweepStaleSentinelsAsync(TimeSpan.FromHours(24));
+        await store.SweepStaleSentinelsAsync(TimeSpan.FromHours(24), ct);
         var subjectIdentity = new SubjectIdentity(SubjectKind.Agent, subject);
 
         Console.WriteLine($"Running GDPR benchmark ({preset}) for subject '{subject}'" +
@@ -150,14 +152,14 @@ public static class BenchCommand
             if (runs > 1)
             {
                 // Stochastic mode: run N times, aggregate via MajorityVote.
-                compositeResult = await StochasticBenchRunner.RunNAsync(store, subjectIdentity, benchmark, evalInput, runs);
+                compositeResult = await StochasticBenchRunner.RunNAsync(store, subjectIdentity, benchmark, evalInput, runs, ct);
                 // Use the benchmark key as the run ID for reporting purposes.
                 runId = $"{benchmark.Key}.runs{runs}.{DateTimeOffset.UtcNow:yyyyMMddHHmmss}";
             }
             else
             {
                 var runner = new GdprBenchmarkRunner();
-                (runId, compositeResult) = await runner.RunAsync(store, subjectIdentity, benchmark, evalInput);
+                (runId, compositeResult) = await runner.RunAsync(store, subjectIdentity, benchmark, evalInput, ct: ct);
             }
         }
         catch (Exception ex)

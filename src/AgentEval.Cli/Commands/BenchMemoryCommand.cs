@@ -27,15 +27,16 @@ namespace AgentEval.Cli.Commands;
 /// </remarks>
 public static class BenchMemoryCommand
 {
-    public static Task<int> RunAsync(string preset, string subject, string? rootOverride)
-        => RunAsync(preset, subject, rootOverride, chatClientOverride: null);
+    public static Task<int> RunAsync(string preset, string subject, string? rootOverride, CancellationToken ct = default)
+        => RunAsync(preset, subject, rootOverride, chatClientOverride: null, ct);
 
     /// <summary>Internal overload exposed for tests; allows chat-client injection.</summary>
     internal static async Task<int> RunAsync(
         string preset,
         string subject,
         string? rootOverride,
-        Microsoft.Extensions.AI.IChatClient? chatClientOverride)
+        Microsoft.Extensions.AI.IChatClient? chatClientOverride,
+        CancellationToken ct = default)
     {
         // ── Workspace setup ──────────────────────────────────────────────────
         if (rootOverride is not null)
@@ -103,7 +104,7 @@ public static class BenchMemoryCommand
 
         // ── Persist setup ────────────────────────────────────────────────────
         var store = new FileSystemOutputStore(agentEvalDir);
-        await store.SweepStaleSentinelsAsync(TimeSpan.FromHours(24));
+        await store.SweepStaleSentinelsAsync(TimeSpan.FromHours(24), ct);
         var subjectIdentity = new SubjectIdentity(SubjectKind.Agent, subject);
         await store.EnsureSolutionAsync();
         await store.EnsureSubjectAsync(subjectIdentity);
@@ -115,7 +116,7 @@ public static class BenchMemoryCommand
         MemoryBenchmarkResult result;
         try
         {
-            result = await runner.RunBenchmarkAsync(agent, benchmark);
+            result = await runner.RunBenchmarkAsync(agent, benchmark, ct);
         }
         catch (Exception ex)
         {
@@ -156,7 +157,7 @@ public static class BenchMemoryCommand
                 {
                     ["overall_score"] = result.OverallScore,
                 });
-            await store.CompleteRunAsync(manifest, summary);
+            await store.CompleteRunAsync(manifest, summary, ct);
 
             // Native MemoryBenchmarkResult JSON alongside the manifest (Shape B per ADR-017).
             // Resolve via the store so the report path matches the manifest exactly; hand-building

@@ -25,8 +25,9 @@ public static class BenchPerfCommand
         string subject,
         string? prompt,
         string? rootOverride,
-        bool azureFromEnv = false) =>
-        RunAsync(preset, subject, prompt, rootOverride, agentOverride: null, azureFromEnv);
+        bool azureFromEnv = false,
+        CancellationToken ct = default) =>
+        RunAsync(preset, subject, prompt, rootOverride, agentOverride: null, azureFromEnv, ct);
 
     /// <summary>
     /// Internal overload exposed for tests; allows agent injection. <paramref name="azureFromEnv"/>
@@ -40,7 +41,8 @@ public static class BenchPerfCommand
         string? prompt,
         string? rootOverride,
         IEvaluableAgent? agentOverride,
-        bool azureFromEnv = false)
+        bool azureFromEnv = false,
+        CancellationToken ct = default)
     {
         // ── Workspace setup ──────────────────────────────────────────────────
         if (rootOverride is not null)
@@ -128,7 +130,7 @@ public static class BenchPerfCommand
 
         // ── Run via the registry's EvaluateAsync adapter ─────────────────────
         var store = new FileSystemOutputStore(agentEvalDir);
-        await store.SweepStaleSentinelsAsync(TimeSpan.FromHours(24));
+        await store.SweepStaleSentinelsAsync(TimeSpan.FromHours(24), ct);
         var subjectIdentity = new SubjectIdentity(SubjectKind.Agent, subject);
         await store.EnsureSolutionAsync();
         await store.EnsureSubjectAsync(subjectIdentity);
@@ -138,7 +140,7 @@ public static class BenchPerfCommand
         EvalResult result;
         try
         {
-            result = await family.EvaluateAsync!(input, null, default);
+            result = await family.EvaluateAsync!(input, null, ct);
         }
         catch (Exception ex)
         {
@@ -185,7 +187,7 @@ public static class BenchPerfCommand
                 {
                     ["overallScore"] = result.Score.Value,
                 });
-            await store.CompleteRunAsync(manifest, summary);
+            await store.CompleteRunAsync(manifest, summary, ct);
             Console.WriteLine($"Persisted run {runId} to {agentEvalDir}");
 
             // T0.5 (v1.1): emit JSON + HTML + PDF reports alongside the canonical run.

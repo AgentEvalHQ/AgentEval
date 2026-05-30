@@ -78,13 +78,15 @@ public static class BenchEuAiActCalibrateCommand
     public static Task<int> RunAsync(
         string? rootOverride = null,
         string? outPathOverride = null,
-        IEvaluator? evaluatorOverride = null)
-        => RunCoreAsync(rootOverride, outPathOverride, evaluatorOverride);
+        IEvaluator? evaluatorOverride = null,
+        CancellationToken ct = default)
+        => RunCoreAsync(rootOverride, outPathOverride, evaluatorOverride, ct);
 
     internal static async Task<int> RunCoreAsync(
         string? rootOverride,
         string? outPathOverride,
-        IEvaluator? evaluatorOverride)
+        IEvaluator? evaluatorOverride,
+        CancellationToken ct = default)
     {
         // ── Judge / evaluator ────────────────────────────────────────────────
         // Calibration requires AGENTEVAL_ALLOW_STUB_JUDGE=1 to use stub mode —
@@ -162,7 +164,7 @@ public static class BenchEuAiActCalibrateCommand
         try
         {
             var runner = new CalibrationRunner(articles, judge);
-            report = await runner.RunAsync(datasets);
+            report = await runner.RunAsync(datasets, ct);
         }
         catch (Exception ex)
         {

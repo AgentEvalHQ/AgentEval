@@ -31,8 +31,9 @@ public static class BenchEuAiActCommand
         string subject,
         string? rootOverride,
         string? inputText,
-        string? responseText = null) =>
-        RunAsync(preset, subject, rootOverride, inputText, evaluatorOverride: null, responseText: responseText);
+        string? responseText = null,
+        CancellationToken ct = default) =>
+        RunAsync(preset, subject, rootOverride, inputText, evaluatorOverride: null, responseText: responseText, ct: ct);
 
     /// <summary>Runs the bench eu-ai-act command with optional overrides (used in tests).</summary>
     internal static async Task<int> RunAsync(
@@ -41,7 +42,8 @@ public static class BenchEuAiActCommand
         string? rootOverride,
         string? inputText,
         IEvaluator? evaluatorOverride,
-        string? responseText = null)
+        string? responseText = null,
+        CancellationToken ct = default)
     {
         // ── Workspace setup ──────────────────────────────────────────────────
         if (rootOverride is not null)
@@ -144,7 +146,7 @@ public static class BenchEuAiActCommand
         var store = new FileSystemOutputStore(agentEvalDir);
         // Workspace hygiene: sweep stale 24h+ sentinels (.invalid.json / .lock
         // / .tmp). Phase-0 0.9: only CLI writer paths sweep; MC does not.
-        await store.SweepStaleSentinelsAsync(TimeSpan.FromHours(24));
+        await store.SweepStaleSentinelsAsync(TimeSpan.FromHours(24), ct);
         var subjectIdentity = new SubjectIdentity(SubjectKind.Agent, subject);
 
         Console.WriteLine($"Running EU AI Act benchmark ({preset}) for subject '{subject}'...");
@@ -154,7 +156,7 @@ public static class BenchEuAiActCommand
         try
         {
             var runner = new EuAiActBenchmarkRunner();
-            (runId, compositeResult) = await runner.RunAsync(store, subjectIdentity, benchmark, evalInput);
+            (runId, compositeResult) = await runner.RunAsync(store, subjectIdentity, benchmark, evalInput, ct: ct);
         }
         catch (Exception ex)
         {

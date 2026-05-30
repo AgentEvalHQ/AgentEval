@@ -53,13 +53,15 @@ public static class BenchCalibrateCommand
     public static Task<int> RunAsync(
         string? rootOverride = null,
         string? outPathOverride = null,
-        IEvaluator? evaluatorOverride = null)
-        => RunCoreAsync(rootOverride, outPathOverride, evaluatorOverride);
+        IEvaluator? evaluatorOverride = null,
+        CancellationToken ct = default)
+        => RunCoreAsync(rootOverride, outPathOverride, evaluatorOverride, ct);
 
     internal static async Task<int> RunCoreAsync(
         string? rootOverride,
         string? outPathOverride,
-        IEvaluator? evaluatorOverride)
+        IEvaluator? evaluatorOverride,
+        CancellationToken ct = default)
     {
         // ── Workspace root canonicalisation ──────────────────────────────────
         if (rootOverride is not null)
@@ -130,7 +132,7 @@ public static class BenchCalibrateCommand
         try
         {
             var runner = new CalibrationRunner(articles, judge);
-            report = await runner.RunAsync(datasets);
+            report = await runner.RunAsync(datasets, ct);
         }
         catch (Exception ex)
         {

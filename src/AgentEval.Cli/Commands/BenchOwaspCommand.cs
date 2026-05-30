@@ -27,9 +27,10 @@ public static class BenchOwaspCommand
         string subject,
         string? rootOverride,
         string? inputText,
-        bool azureFromEnv = false)
+        bool azureFromEnv = false,
+        CancellationToken ct = default)
     {
-        var (exitCode, _) = await RunAsync(preset, subject, rootOverride, inputText, evaluatorOverride: null, agentOverride: null, azureFromEnv).ConfigureAwait(false);
+        var (exitCode, _) = await RunAsync(preset, subject, rootOverride, inputText, evaluatorOverride: null, agentOverride: null, azureFromEnv, ct).ConfigureAwait(false);
         return exitCode;
     }
 
@@ -54,7 +55,8 @@ public static class BenchOwaspCommand
         string? inputText,
         IEvaluator? evaluatorOverride,
         IEvaluableAgent? agentOverride,
-        bool azureFromEnv = false)
+        bool azureFromEnv = false,
+        CancellationToken ct = default)
     {
         // ── Workspace setup ──────────────────────────────────────────────────
         if (rootOverride is not null)
@@ -128,7 +130,7 @@ public static class BenchOwaspCommand
 
         // ── Run benchmark ────────────────────────────────────────────────────
         var store = new FileSystemOutputStore(agentEvalDir);
-        await store.SweepStaleSentinelsAsync(TimeSpan.FromHours(24));
+        await store.SweepStaleSentinelsAsync(TimeSpan.FromHours(24), ct);
         var subjectIdentity = new SubjectIdentity(SubjectKind.Agent, subject);
         await store.EnsureSolutionAsync();
         await store.EnsureSubjectAsync(subjectIdentity);
@@ -145,7 +147,7 @@ public static class BenchOwaspCommand
             // report from the same result — both derived from a single pipeline
             // execution. Closes the Phase-5 double-scan smell flagged in
             // lastreview/13-phase5-gate-review.md §6 (Anti-patterns).
-            redTeamResult = await benchmark.ScanAsync(agent);
+            redTeamResult = await benchmark.ScanAsync(agent, ct);
             compositeEval = benchmark.BuildEvalResult(redTeamResult);
         }
         catch (Exception ex)
@@ -201,7 +203,7 @@ public static class BenchOwaspCommand
                     ["overallScore"] = compositeEval.Score.Value,
                     ["overallPassRate"] = report.Summary.OverallPassRate / 100.0,
                 });
-            await store.CompleteRunAsync(manifest, summary);
+            await store.CompleteRunAsync(manifest, summary, ct);
             Console.WriteLine($"Persisted run {runId} to {agentEvalDir}");
         }
         catch (Exception ex)
