@@ -92,6 +92,17 @@ public class CachingEmbeddingsDecorator : IAgentEvalEmbeddings
         {
             var freshEmbeddings = await _inner.GetEmbeddingsAsync(missTexts, cancellationToken).ConfigureAwait(false);
 
+            // The positional zip below assumes one embedding per requested text, in order. A
+            // misbehaving provider returning a different count would throw IndexOutOfRange (fewer)
+            // or silently poison the cache with mismatched text→vector pairs (BUG-43). Fail fast
+            // with a clear message instead.
+            if (freshEmbeddings.Count != missTexts.Count)
+            {
+                throw new InvalidOperationException(
+                    $"Embeddings provider returned {freshEmbeddings.Count} embeddings for {missTexts.Count} inputs. " +
+                    "The provider must return exactly one embedding per input, in the same order.");
+            }
+
             for (int j = 0; j < missIndices.Count; j++)
             {
                 results[missIndices[j]] = freshEmbeddings[j];
