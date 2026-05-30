@@ -237,6 +237,30 @@ public class FileSystemOutputStoreTests : IDisposable
         Assert.Equal("scenario-01", scenarios[0].Id);
     }
 
+    [Fact]
+    public async Task GetRunManifestAsync_TraversalRunId_ReturnsNull_DoesNotResolveRealRun()
+    {
+        // SEC-06: a runId like "foo/../{realRunId}" would, without the safe-segment guard,
+        // Path.Combine + normalize back into the real run dir and resolve it. The store must
+        // reject non-single-segment runIds before combining (safe-by-construction).
+        WriteSolutionJson();
+        var store = new FileSystemOutputStore(_root);
+        var subject = DefaultSubject();
+
+        var manifest = await store.StartRunAsync(subject, DefaultContext());
+        var runId = manifest.Run.RunId;
+        await store.CompleteRunAsync(manifest,
+            new RunSummary("1.0", runId, "PASS", new RunStats(1, 1, 0, 0), new Dictionary<string, double>()));
+
+        // Sanity: the legitimate single-segment id resolves.
+        Assert.NotNull(await store.GetRunManifestAsync(runId));
+
+        // Traversal forms that normalize back to the same dir (or escape) must be rejected.
+        Assert.Null(await store.GetRunManifestAsync($"foo/../{runId}"));
+        Assert.Null(await store.GetRunManifestAsync(".."));
+        Assert.Null(await store.GetRunManifestAsync($"..\\{runId}"));
+    }
+
     // ── Case-insensitive collision (batch-5 surface) ─────────────────────────
 
     [Fact]

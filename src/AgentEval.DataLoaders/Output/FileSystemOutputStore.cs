@@ -938,6 +938,14 @@ public sealed class FileSystemOutputStore : IOutputStore
 
     private async Task<SubjectIdentity?> TryLocateRunAsync(string runId, CancellationToken ct)
     {
+        // Defence-in-depth: reject runIds that are not safe single path segments before they are
+        // combined into a filesystem path. Live callers (GraphQL/REST) already gate with
+        // IsSafePathSegment, but the store core was not safe-by-construction — and asymmetric,
+        // since regulation/campaignId ARE validated internally. This closes a path-traversal gap
+        // that a future internal caller (or multi-tenant Mode B) could otherwise reintroduce (SEC-06).
+        if (!FileSystemLayout.IsSafePathSegment(runId))
+            return null;
+
         if (_runSubjectCache.TryGetValue(runId, out var cached))
             return cached;
 
