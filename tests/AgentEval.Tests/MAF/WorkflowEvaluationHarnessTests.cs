@@ -6,6 +6,7 @@ using Xunit;
 using AgentEval.MAF;
 using AgentEval.Models;
 using AgentEval.Core;
+using System.Runtime.CompilerServices;
 
 namespace AgentEval.Tests.MAF;
 
@@ -14,6 +15,34 @@ namespace AgentEval.Tests.MAF;
 /// </summary>
 public class WorkflowEvaluationHarnessTests
 {
+    // ═══════════════════════════════════════════════════════════════════════════
+    // CANCELLATION (BUG-20)
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    private static async IAsyncEnumerable<WorkflowEvent> CancelAwareStream(
+        [EnumeratorCancellation] CancellationToken ct)
+    {
+        ct.ThrowIfCancellationRequested();
+        await Task.Yield();
+        yield return new ExecutorOutputEvent("agent1", "out");
+        yield return new WorkflowCompleteEvent();
+    }
+
+    [Fact]
+    public async Task RunWorkflowTestAsync_CallerCancellation_Propagates_NotRecordedAsFailure()
+    {
+        // BUG-20: a caller-requested cancellation must propagate as OperationCanceledException,
+        // not be swallowed by the generic catch into a fabricated Passed=false result.
+        var adapter = new MAFWorkflowAdapter("CancelTest", (_, ct) => CancelAwareStream(ct), new[] { "agent1" });
+        var harness = new WorkflowEvaluationHarness(verbose: false);
+        var testCase = new WorkflowTestCase { Name = "t", Input = "in" };
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => harness.RunWorkflowTestAsync(adapter, testCase, cancellationToken: cts.Token));
+    }
+
     // ═══════════════════════════════════════════════════════════════════════════
     // BASIC EXECUTION
     // ═══════════════════════════════════════════════════════════════════════════

@@ -100,6 +100,13 @@ public class WorkflowEvaluationHarness
             failureMessages.Add($"Timeout: Workflow did not complete within {options.Timeout.TotalSeconds}s");
             _logger.LogError($"⏱️ Timeout: Workflow did not complete within {options.Timeout.TotalSeconds}s");
         }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            // Caller-requested cancellation must propagate, not be recorded as a fabricated
+            // failed test result (BUG-20). Only the per-test timeout above is converted to a
+            // TimeoutException; an external cancel aborts the run.
+            throw;
+        }
         catch (Exception ex)
         {
             error = ex;
@@ -348,6 +355,10 @@ public class WorkflowEvaluationHarness
 
         foreach (var testCase in testCases)
         {
+            // Honour cancellation between tests so a cancelled suite stops promptly instead of
+            // running every remaining case and reporting fabricated failures (BUG-20).
+            cancellationToken.ThrowIfCancellationRequested();
+
             var result = await RunWorkflowTestAsync(workflow, testCase, options, cancellationToken);
             results.Add(result);
 
