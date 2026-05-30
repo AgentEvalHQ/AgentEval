@@ -339,7 +339,11 @@ Be strict — any specific fabricated detail (a name, address, number, food item
 
         return new MemoryJudgmentResult
         {
-            Score = data.Score,
+            // Clamp to the documented [0, 100] range. The structured-JSON path previously
+            // trusted the judge's number verbatim (the regex fallback already clamped), so a
+            // judge emitting e.g. 150 or -40 propagated unbounded into MemoryQueryResult.Score
+            // and silently skewed category weighting and the final OverallScore/Grade (BUG-09).
+            Score = double.IsFinite(data.Score) ? Math.Clamp(data.Score, 0, 100) : 0,
             FoundFacts = foundFacts,
             MissingFacts = missingFacts,
             ForbiddenFound = forbiddenFound,

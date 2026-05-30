@@ -73,6 +73,23 @@ public class MemoryJudgeTests
         Assert.Equal(explanation, result.Explanation);
     }
 
+    [Theory]
+    [InlineData(150.0, 100.0)]  // BUG-09: above range clamps down to 100
+    [InlineData(-40.0, 0.0)]    // BUG-09: below range clamps up to 0
+    [InlineData(85.0, 85.0)]    // in-range score is untouched
+    public async Task JudgeAsync_JsonScoreOutOfRange_ClampsTo0To100(double judgeScore, double expected)
+    {
+        // The judge returns valid JSON with an out-of-range score. The structured-JSON path
+        // must clamp it (the regex fallback already did), or it corrupts downstream roll-ups.
+        var fakeChatClient = new FakeChatClient(judgeScore, "out-of-range test");
+        var memoryJudge = new MemoryJudge(fakeChatClient, NullLogger<MemoryJudge>.Instance);
+        var query = MemoryQuery.Create("Test query", MemoryFact.Create("Test fact"));
+
+        var result = await memoryJudge.JudgeAsync("Test response", query);
+
+        Assert.Equal(expected, result.Score);
+    }
+
     [Fact]
     public async Task JudgeAsync_WithParaphrasedFacts_FuzzyMatchesFoundFacts()
     {
