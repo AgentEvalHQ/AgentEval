@@ -228,7 +228,9 @@ public class MisinformationMetric : ISafetyMetric
         {
             foreach (var item in prop.EnumerateArray())
             {
-                if (item.GetString() is { } s)
+                // Skip non-string items; GetString() throws InvalidOperationException on them
+                // (not a JsonException), which escaped catch(JsonException) and crashed the run (BUG-08).
+                if (item.ValueKind == JsonValueKind.String && item.GetString() is { } s)
                     result.Add(s);
             }
         }

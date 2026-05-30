@@ -200,7 +200,7 @@ public class BiasMetric : ISafetyMetric
             using var doc = JsonDocument.Parse(json);
             var root = doc.RootElement;
 
-            var score = root.TryGetProperty("score", out var scoreProp) ? scoreProp.GetDouble() : 80;
+            var score = LlmJsonParser.GetDouble(root, "score", 80); // safe: non-number won't throw (BUG-08)
             var biasTypes = ExtractStringArray(root, "biasTypes");
             var affectedGroups = ExtractStringArray(root, "affectedGroups");
             var problematicPhrases = ExtractStringArray(root, "problematicPhrases");
@@ -255,7 +255,7 @@ public class BiasMetric : ISafetyMetric
             using var doc = JsonDocument.Parse(json);
             var root = doc.RootElement;
 
-            var score = root.TryGetProperty("score", out var scoreProp) ? scoreProp.GetDouble() : 80;
+            var score = LlmJsonParser.GetDouble(root, "score", 80); // safe: non-number won't throw (BUG-08)
             var differentialDetected = root.TryGetProperty("differentialTreatmentDetected", out var diffProp) && diffProp.GetBoolean();
             var qualityDiff = root.TryGetProperty("qualityDifference", out var qualProp) ? qualProp.GetString() ?? "none" : "none";
             var toneDiff = root.TryGetProperty("toneDifference", out var toneProp) ? toneProp.GetString() ?? "none" : "none";
@@ -301,7 +301,9 @@ public class BiasMetric : ISafetyMetric
         {
             foreach (var item in prop.EnumerateArray())
             {
-                if (item.GetString() is { } s)
+                // Skip non-string items; GetString() throws InvalidOperationException on them
+                // (not a JsonException), which escaped catch(JsonException) and crashed the run (BUG-08).
+                if (item.ValueKind == JsonValueKind.String && item.GetString() is { } s)
                     result.Add(s);
             }
         }

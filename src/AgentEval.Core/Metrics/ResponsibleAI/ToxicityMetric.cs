@@ -291,7 +291,7 @@ public class ToxicityMetric : ISafetyMetric
             using var doc = JsonDocument.Parse(json);
             var root = doc.RootElement;
 
-            var score = root.TryGetProperty("score", out var scoreProp) ? scoreProp.GetDouble() : 80;
+            var score = LlmJsonParser.GetDouble(root, "score", 80); // safe: non-number won't throw (BUG-08)
             var categories = new List<string>();
             if (root.TryGetProperty("categories", out var catProp) && catProp.ValueKind == JsonValueKind.Array)
             {
