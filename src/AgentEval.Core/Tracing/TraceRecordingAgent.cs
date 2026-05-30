@@ -179,8 +179,30 @@ public sealed class TraceRecordingAgent : IEvaluableAgent, IStreamableAgent, IAs
 
         try
         {
-            await foreach (var chunk in _innerStreaming.InvokeStreamingAsync(prompt, cancellationToken))
+            // Enumerate manually (rather than `await foreach`) so we can catch a fault or
+            // cancellation raised by MoveNextAsync. An iterator cannot `yield return` inside a
+            // try/catch, so the per-chunk catch wraps only the advance; yielding stays outside.
+            await using var enumerator = _innerStreaming
+                .InvokeStreamingAsync(prompt, cancellationToken)
+                .GetAsyncEnumerator(cancellationToken);
+
+            while (true)
             {
+                try
+                {
+                    if (!await enumerator.MoveNextAsync())
+                        break;
+                }
+                catch (Exception ex)
+                {
+                    // The stream faulted or was cancelled mid-enumeration. Record the error on
+                    // the response entry so replay reproduces the failure instead of healing it
+                    // into a successful run (BUG-24); the finally still finalizes + appends it.
+                    responseEntry.Error = CreateTraceError(ex);
+                    throw;
+                }
+
+                var chunk = enumerator.Current;
                 var currentTime = stopwatch.ElapsedMilliseconds;
                 var delay = (int)(currentTime - previousChunkTime);
 
