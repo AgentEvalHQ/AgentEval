@@ -12,6 +12,15 @@ namespace AgentEval.Tests;
 /// </summary>
 public class ScoreNormalizerTests
 {
+    [Fact]
+    public void FromSimilarity_NaN_ReturnsZero()
+    {
+        // BUG-10 defense-in-depth: Math.Clamp(NaN, ...) returns NaN, so without a guard a NaN
+        // similarity would propagate into the 0-100 score.
+        Assert.Equal(0.0, ScoreNormalizer.FromSimilarity(double.NaN));
+        Assert.Equal(0.0, ScoreNormalizer.FromSimilarity(float.NaN));
+    }
+
     [Theory]
     [InlineData(1.0, 0.0)]
     [InlineData(2.0, 25.0)]

@@ -26,7 +26,19 @@ public static class EmbeddingSimilarity
             throw new ArgumentException(
                 $"Embedding dimensions must match. Got {a.Length} and {b.Length}.");
         }
-        
+
+        // Guard zero/near-zero vectors. TensorPrimitives.CosineSimilarity divides by the
+        // product of L2 norms, so a zero (or empty) embedding yields NaN — which is NOT
+        // sanitized by Math.Clamp and silently poisons score normalization and vector-store
+        // ranking downstream (every NaN comparison is false) (BUG-10). An undefined angle is
+        // treated as "no similarity".
+        var normA = TensorPrimitives.Norm(a);
+        var normB = TensorPrimitives.Norm(b);
+        if (normA < 1e-12f || normB < 1e-12f)
+        {
+            return 0f;
+        }
+
         return TensorPrimitives.CosineSimilarity(a, b);
     }
     
