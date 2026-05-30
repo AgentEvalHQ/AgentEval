@@ -361,17 +361,19 @@ public class BehavioralPolicyAssertionsTests
     }
     
     [Fact]
-    public void BehavioralPolicyViolationException_RedactSensitiveData_MasksMiddleCharacters()
+    public void BehavioralPolicyViolationException_RedactSensitiveData_MasksAllCharacters()
     {
-        // Test cases for redaction
+        // BUG-53: no original character of the secret may survive (the old "{first}***{last}" form
+        // leaked the first and last chars of the SSN into the audit trail). Only the length is shown.
         var result1 = BehavioralPolicyViolationException.RedactSensitiveData("123-45-6789", 0, 11);
-        Assert.StartsWith("1", result1);
-        Assert.EndsWith("9", result1);
-        Assert.Contains("***", result1);
-        
-        // Short values get fully masked
+        // No secret substring survives (length digits "11" are disclosed, but no SSN content).
+        Assert.DoesNotContain("123", result1);
+        Assert.DoesNotContain("6789", result1);
+        Assert.Equal("[REDACTED:11chars]", result1);
+
+        // Short values are likewise fully masked (length disclosed only).
         var result2 = BehavioralPolicyViolationException.RedactSensitiveData("ab", 0, 2);
-        Assert.Equal("****", result2);
+        Assert.Equal("[REDACTED:2chars]", result2);
     }
     
     #endregion

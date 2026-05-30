@@ -76,7 +76,7 @@ public class BehavioralPolicyViolationException : AgentEvalAssertionException
     /// Gets the redacted value that matched the pattern.
     /// Sensitive data is automatically masked for security.
     /// </summary>
-    /// <example>1***4 (for SSN 123-45-6789)</example>
+    /// <example>[REDACTED:11chars] (for SSN 123-45-6789) — no original characters are exposed.</example>
     public string? RedactedValue { get; init; }
 
     /// <summary>
@@ -188,18 +188,17 @@ public class BehavioralPolicyViolationException : AgentEvalAssertionException
     }
 
     /// <summary>
-    /// Redacts sensitive data by masking middle characters.
+    /// Redacts sensitive data by masking ALL matched characters, disclosing only the length.
     /// </summary>
-    /// <param name="value">The value to redact.</param>
-    /// <param name="matchStart">Start index of the match.</param>
+    /// <param name="value">The value containing the match (not echoed).</param>
+    /// <param name="matchStart">Start index of the match (unused; kept for call-site compatibility).</param>
     /// <param name="matchLength">Length of the match.</param>
-    /// <returns>A redacted version of the matched value.</returns>
+    /// <returns>A redacted token of the form <c>[REDACTED:{n}chars]</c>.</returns>
     public static string RedactSensitiveData(string value, int matchStart, int matchLength)
     {
-        if (matchLength <= 4)
-            return "****";
-
-        var matched = value.Substring(matchStart, matchLength);
-        return $"{matched[0]}***{matched[^1]}";
+        // Mask ALL matched characters. The previous "{first}***{last}" form leaked the first and
+        // last characters of the secret into the exception message / audit trail (BUG-53). Only the
+        // (non-sensitive) length is disclosed, which is enough for diagnostics.
+        return $"[REDACTED:{Math.Max(0, matchLength)}chars]";
     }
 }
