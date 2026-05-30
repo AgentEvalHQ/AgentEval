@@ -30,8 +30,9 @@ public static class BenchEuAiActCommand
         string preset,
         string subject,
         string? rootOverride,
-        string? inputText) =>
-        RunAsync(preset, subject, rootOverride, inputText, evaluatorOverride: null);
+        string? inputText,
+        string? responseText = null) =>
+        RunAsync(preset, subject, rootOverride, inputText, evaluatorOverride: null, responseText: responseText);
 
     /// <summary>Runs the bench eu-ai-act command with optional overrides (used in tests).</summary>
     internal static async Task<int> RunAsync(
@@ -39,7 +40,8 @@ public static class BenchEuAiActCommand
         string subject,
         string? rootOverride,
         string? inputText,
-        IEvaluator? evaluatorOverride)
+        IEvaluator? evaluatorOverride,
+        string? responseText = null)
     {
         // ── Workspace setup ──────────────────────────────────────────────────
         if (rootOverride is not null)
@@ -119,9 +121,23 @@ public static class BenchEuAiActCommand
                 "Pass --input '<your prompt>' at the CLI, or supply inputText programmatically.");
             return 1;
         }
-        var agentResponse =
-            "I should clearly identify myself as an AI assistant when interacting with users. " +
-            "For high-risk decisions, I'll defer to human review.";
+        string agentResponse;
+        if (!string.IsNullOrWhiteSpace(responseText))
+        {
+            agentResponse = responseText;
+        }
+        else
+        {
+            // No real response supplied: grade a built-in FIXTURE. Warn loudly — the produced
+            // compliance evidence does NOT reflect the named subject agent (BUG-18).
+            agentResponse =
+                "I should clearly identify myself as an AI assistant when interacting with users. " +
+                "For high-risk decisions, I'll defer to human review.";
+            Console.Error.WriteLine(
+                $"[bench eu-ai-act] WARNING: no --response/--response-file supplied — grading a built-in " +
+                $"FIXTURE response, not a real agent output. The produced compliance evidence does NOT reflect " +
+                $"subject '{subject}'. Pass --response-file <path> (or --response \"...\") with the agent's actual answer.");
+        }
         var evalInput = new EvalInput(Query: inputText, Response: agentResponse);
 
         // ── Run benchmark ────────────────────────────────────────────────────
