@@ -47,6 +47,17 @@ public static class RenderCommand
             return 1;
         }
 
+        // --ts is joined into a filesystem path via Path.Combine(benchmarkDir, ts), so a `..`-laced
+        // value would escape the benchmark subtree (controlling which result is read / where reports
+        // are written). Validate as a single safe path segment, matching the hardened sibling
+        // ComplianceRenderCommand and the Mission Control REST endpoint (SEC-05).
+        if (!string.IsNullOrWhiteSpace(ts)
+            && !FileSystemLayout.IsSafePathSegment(ts))
+        {
+            Console.Error.WriteLine($"Error: --ts '{ts}' is not a safe path segment.");
+            return 1;
+        }
+
         // ── Workspace setup ──────────────────────────────────────────────────
         if (rootOverride is not null)
         {
