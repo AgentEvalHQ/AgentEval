@@ -5,6 +5,7 @@
 using AgentEval.Calibration;
 using AgentEval.Comparison;
 using AgentEval.Core;
+using AgentEval.Embeddings;
 using AgentEval.DataLoaders;
 using AgentEval.DependencyInjection;
 using AgentEval.Exporters;
@@ -19,6 +20,25 @@ namespace AgentEval.Tests.DependencyInjection;
 
 public class ServiceCollectionExtensionsTests
 {
+    [Theory]
+    [InlineData(ServiceLifetime.Scoped)]
+    [InlineData(ServiceLifetime.Singleton)]
+    [InlineData(ServiceLifetime.Transient)]
+    public void AddAgentEval_EvaluatorAndEmbeddings_HonorConfiguredLifetime(ServiceLifetime lifetime)
+    {
+        // BUG-41: IEvaluator / IAgentEvalEmbeddings were always Singleton regardless of the
+        // configured lifetime, so a Singleton evaluator wrapping a Scoped/Transient IChatClient /
+        // IEmbeddingGenerator became a captive dependency. They must follow options.ServiceLifetime.
+        var services = new ServiceCollection();
+
+        services.AddAgentEval(o => o.ServiceLifetime = lifetime);
+
+        var evaluator = services.Single(d => d.ServiceType == typeof(IEvaluator));
+        var embeddings = services.Single(d => d.ServiceType == typeof(IAgentEvalEmbeddings));
+        Assert.Equal(lifetime, evaluator.Lifetime);
+        Assert.Equal(lifetime, embeddings.Lifetime);
+    }
+
     [Fact]
     public void AddAgentEval_RegistersCoreServices()
     {

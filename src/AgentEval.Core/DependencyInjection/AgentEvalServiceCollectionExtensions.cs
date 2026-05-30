@@ -55,26 +55,25 @@ public static class AgentEvalServiceCollectionExtensions
             return registry;
         });
 
-        // Register IAgentEvalEmbeddings: wraps IEmbeddingGenerator if available (G4)
-        // Optionally wrapped with CachingEmbeddingsDecorator when EnableEmbeddingCaching is true
-        if (options.EnableEmbeddingCaching)
-        {
-            services.TryAddSingleton<IAgentEvalEmbeddings>(sp =>
-                new CachingEmbeddingsDecorator(
-                    new MEAIEmbeddingAdapter(
-                        sp.GetRequiredService<IEmbeddingGenerator<string, Embedding<float>>>()),
-                    options.EmbeddingCacheMaxSize));
-        }
-        else
-        {
-            services.TryAddSingleton<IAgentEvalEmbeddings>(sp =>
-                new MEAIEmbeddingAdapter(
-                    sp.GetRequiredService<IEmbeddingGenerator<string, Embedding<float>>>()));
-        }
+        // Register IAgentEvalEmbeddings: wraps IEmbeddingGenerator if available (G4),
+        // optionally behind CachingEmbeddingsDecorator when EnableEmbeddingCaching is true.
+        // Honor options.ServiceLifetime (default Scoped) rather than forcing Singleton: a
+        // Singleton wrapping a Scoped/Transient IEmbeddingGenerator (common in ASP.NET hosting)
+        // becomes a captive dependency that throws under validateScopes (BUG-41). With caching
+        // enabled the cache then follows the chosen lifetime (per-scope for Scoped).
+        Func<IServiceProvider, object> embeddingsFactory = options.EnableEmbeddingCaching
+            ? sp => new CachingEmbeddingsDecorator(
+                new MEAIEmbeddingAdapter(sp.GetRequiredService<IEmbeddingGenerator<string, Embedding<float>>>()),
+                options.EmbeddingCacheMaxSize)
+            : sp => new MEAIEmbeddingAdapter(sp.GetRequiredService<IEmbeddingGenerator<string, Embedding<float>>>());
+        services.TryAdd(new ServiceDescriptor(typeof(IAgentEvalEmbeddings), embeddingsFactory, options.ServiceLifetime));
 
-        // Register IEvaluator: default ChatClientEvaluator using IChatClient (G9)
-        services.TryAddSingleton<IEvaluator>(sp =>
-            new ChatClientEvaluator(sp.GetRequiredService<IChatClient>()));
+        // Register IEvaluator: default ChatClientEvaluator using IChatClient (G9). Same configured
+        // lifetime, so the evaluator does not capture a Scoped/Transient IChatClient (BUG-41).
+        services.TryAdd(new ServiceDescriptor(
+            typeof(IEvaluator),
+            sp => new ChatClientEvaluator(sp.GetRequiredService<IChatClient>()),
+            options.ServiceLifetime));
 
         // Register runners and comparers with appropriate lifetimes
         switch (options.ServiceLifetime)
