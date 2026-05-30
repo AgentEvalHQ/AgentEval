@@ -399,4 +399,35 @@ public class PerformanceBenchmarkTests
     }
 
     #endregion
+
+    #region Cost pricing-warning (BUG-29)
+
+    [Fact]
+    public async Task RunCostBenchmarkAsync_UnknownModelName_EmitsPricingWarning()
+    {
+        // BUG-29: a typo'd / unrecognised model name yields null pricing. The warning previously
+        // fired only when the name equalled the agent name, so the operator's most-likely mistake
+        // (e.g. "gpt4o" instead of "gpt-4o") silently produced a $0 pass with no diagnostic.
+        var agent = new MockTestableAgent("TestAgent", "Hello");
+        var benchmark = new PerformanceBenchmark(agent,
+            new PerformanceBenchmarkOptions { Verbose = false, DelayBetweenIterations = TimeSpan.Zero });
+
+        var originalErr = Console.Error;
+        var captured = new StringWriter();
+        try
+        {
+            Console.SetError(captured);
+            await benchmark.RunCostBenchmarkAsync(new[] { "prompt" }, modelName: "gpt4o");
+        }
+        finally
+        {
+            Console.SetError(originalErr);
+        }
+
+        var stderr = captured.ToString();
+        Assert.Contains("WARNING", stderr);
+        Assert.Contains("gpt4o", stderr); // the unrecognised name is surfaced
+    }
+
+    #endregion
 }

@@ -361,13 +361,17 @@ public class PerformanceBenchmark
             }
         }
 
-        if (pricing == null && string.Equals(resolvedModelName, _agent.Name, StringComparison.Ordinal))
+        // Warn whenever pricing could not be resolved, NOT only when the operator passed
+        // nothing (resolvedModelName == agent name). A typo'd/unrecognised CostModelName
+        // ('gpt4o' vs 'gpt-4o') also yields null pricing, and the cost leaf then passes at $0 —
+        // so the operator's most-likely mistake must still surface this diagnostic (BUG-29).
+        if (pricing == null)
         {
             Console.Error.WriteLine(
                 $"[perf-cost] WARNING: no pricing entry found for '{resolvedModelName}'. " +
-                "Agent name is not a model id; cost lookup may be inaccurate. " +
-                "Pass PerformanceBenchmarkEvaluateOptions.CostModelName (e.g. 'gpt-4o-mini') " +
-                "or ensure your IEvaluableAgent populates AgentResponse.ModelId.");
+                "Cost will be reported as $0 and the cost leaf will pass by default. " +
+                "Check PerformanceBenchmarkEvaluateOptions.CostModelName for a typo (e.g. 'gpt-4o', not 'gpt4o'), " +
+                "pass a known model id, or ensure your IEvaluableAgent populates AgentResponse.ModelId.");
         }
 
         var estimatedCost = pricing != null
