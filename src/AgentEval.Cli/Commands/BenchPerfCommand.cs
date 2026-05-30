@@ -191,7 +191,10 @@ public static class BenchPerfCommand
             // T0.5 (v1.1): emit JSON + HTML + PDF reports alongside the canonical run.
             // Perf previously emitted nothing beyond the store; this brings it to parity
             // with the compliance commands. Reports land in the canonical run dir.
-            var runDir = Path.Combine(agentEvalDir, "subjects", "agents", subject, "runs", runId);
+            // Resolve via the store so the path matches the manifest exactly — hand-building
+            // it from the RAW subject diverges whenever FileSystemLayout.Sanitize rewrites the
+            // name (BUG-17), orphaning the report or throwing on a non-existent directory.
+            var runDir = store.ResolveRunDirectory(subjectIdentity, runId);
             try
             {
                 var jsonPath = Path.Combine(runDir, "report.json");

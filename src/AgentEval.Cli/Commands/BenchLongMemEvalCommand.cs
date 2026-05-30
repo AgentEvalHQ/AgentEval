@@ -212,7 +212,9 @@ public static class BenchLongMemEvalCommand
             await store.CompleteRunAsync(manifest, summary);
 
             // Write the native ExternalBenchmarkResult JSON alongside the manifest.
-            var runDir = Path.Combine(agentEvalDir, "subjects", "agents", subject, "runs", runId);
+            // Resolve via the store so the report path matches the manifest exactly; hand-building
+            // from the RAW subject diverges when FileSystemLayout.Sanitize rewrites the name (BUG-17).
+            var runDir = store.ResolveRunDirectory(subjectIdentity, runId);
             await File.WriteAllTextAsync(
                 Path.Combine(runDir, "report-native.json"),
                 JsonSerializer.Serialize(result, new JsonSerializerOptions { WriteIndented = true }));
