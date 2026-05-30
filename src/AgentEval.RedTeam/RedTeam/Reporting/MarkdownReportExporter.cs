@@ -62,7 +62,7 @@ public sealed class MarkdownReportExporter : IReportExporter
             var statusIcon = score >= 80 ? "✅" : score >= 50 ? "⚠️" : "❌";
             var severityBadge = SeverityToBadge(attack.Severity);
 
-            sb.AppendLine($"| {statusIcon} {attack.AttackDisplayName} | {attack.OwaspId} | {severityBadge} | {score:F0}% | {attack.ResistedCount} | {attack.SucceededCount} |");
+            sb.AppendLine($"| {statusIcon} {EscapeInline(attack.AttackDisplayName)} | {EscapeInline(attack.OwaspId)} | {severityBadge} | {score:F0}% | {attack.ResistedCount} | {attack.SucceededCount} |");
         }
         sb.AppendLine();
 
@@ -77,9 +77,9 @@ public sealed class MarkdownReportExporter : IReportExporter
                 : 100;
             var statusIcon = score >= 80 ? "✅" : score >= 50 ? "⚠️" : "❌";
 
-            sb.AppendLine($"### {statusIcon} {attack.AttackDisplayName}");
+            sb.AppendLine($"### {statusIcon} {EscapeInline(attack.AttackDisplayName)}");
             sb.AppendLine();
-            sb.AppendLine($"**OWASP:** {attack.OwaspId} | **Severity:** {attack.Severity} | **Score:** {score:F0}%");
+            sb.AppendLine($"**OWASP:** {EscapeInline(attack.OwaspId)} | **Severity:** {attack.Severity} | **Score:** {score:F0}%");
             sb.AppendLine();
 
             if (attack.MitreAtlasIds?.Length > 0)
@@ -107,13 +107,16 @@ public sealed class MarkdownReportExporter : IReportExporter
 
                 foreach (var probe in compromisedProbes)
                 {
-                    sb.AppendLine($"**{probe.ProbeId}** ({probe.Technique ?? "unknown"}) - {probe.Difficulty}");
+                    sb.AppendLine($"**{EscapeInline(probe.ProbeId)}** ({EscapeInline(probe.Technique ?? "unknown")}) - {probe.Difficulty}");
                     sb.AppendLine();
-                    sb.AppendLine("```");
-                    sb.AppendLine(TruncateString(probe.Prompt, 300));
-                    sb.AppendLine("```");
+                    // Adaptive fence so an embedded ``` in the payload cannot terminate it early.
+                    var promptText = TruncateString(probe.Prompt, 300);
+                    var fence = CodeFenceFor(promptText);
+                    sb.AppendLine(fence);
+                    sb.AppendLine(promptText);
+                    sb.AppendLine(fence);
                     sb.AppendLine();
-                    sb.AppendLine($"> **Reason:** {probe.Reason}");
+                    sb.AppendLine($"> **Reason:** {EscapeInline(probe.Reason)}");
                     sb.AppendLine();
                 }
 
@@ -144,7 +147,7 @@ public sealed class MarkdownReportExporter : IReportExporter
                 sb.AppendLine();
                 foreach (var attack in highSeverityCompromises)
                 {
-                    sb.AppendLine($"- **{attack.AttackDisplayName}** ({attack.OwaspId}): {attack.SucceededCount} vulnerabilities found. Review OWASP guidance for {attack.OwaspId}.");
+                    sb.AppendLine($"- **{EscapeInline(attack.AttackDisplayName)}** ({EscapeInline(attack.OwaspId)}): {attack.SucceededCount} vulnerabilities found. Review OWASP guidance for {EscapeInline(attack.OwaspId)}.");
                 }
                 sb.AppendLine();
             }
@@ -196,5 +199,48 @@ public sealed class MarkdownReportExporter : IReportExporter
         if (string.IsNullOrEmpty(input)) return "";
         if (input.Length <= maxLength) return input;
         return input[..(maxLength - 3)] + "...";
+    }
+
+    /// <summary>
+    /// Escapes untrusted inline text (probe ids, attack/technique names, evaluator reasons)
+    /// for safe embedding in Markdown that may later be rendered to HTML (GitHub PR, MkDocs,
+    /// Confluence). Red-team probe prompts and regex-derived reasons deliberately carry markup
+    /// payloads (e.g. &lt;script&gt;, SVG); without escaping they become active markup or break
+    /// out of table cells / blockquotes (SEC-09). HTML-encodes &amp;/&lt;/&gt;, escapes the
+    /// table-cell pipe, and collapses newlines so the text stays on one logical line.
+    /// </summary>
+    private static string EscapeInline(string? input)
+    {
+        if (string.IsNullOrEmpty(input)) return string.Empty;
+        return input
+            .Replace("&", "&amp;")
+            .Replace("<", "&lt;")
+            .Replace(">", "&gt;")
+            .Replace("|", "\\|")
+            .Replace("\r", " ")
+            .Replace("\n", " ");
+    }
+
+    /// <summary>
+    /// Returns a backtick fence guaranteed longer than the longest backtick run in
+    /// <paramref name="content"/> (minimum 3), per CommonMark, so an embedded <c>```</c> cannot
+    /// close the fence early and let following payload text render as active markup (SEC-09).
+    /// </summary>
+    private static string CodeFenceFor(string content)
+    {
+        int longest = 0, current = 0;
+        foreach (var c in content)
+        {
+            if (c == '`')
+            {
+                current++;
+                if (current > longest) longest = current;
+            }
+            else
+            {
+                current = 0;
+            }
+        }
+        return new string('`', Math.Max(3, longest + 1));
     }
 }
