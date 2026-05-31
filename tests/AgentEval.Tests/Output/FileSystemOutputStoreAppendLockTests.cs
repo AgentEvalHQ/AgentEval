@@ -50,7 +50,10 @@ public sealed class FileSystemOutputStoreAppendLockTests : IDisposable
             finally { m.ReleaseMutex(); }
         }) { IsBackground = true, Name = "mutex-holder" };
         thread.Start();
-        Assert.True(acquired.Wait(TimeSpan.FromSeconds(5)), "holder thread failed to acquire the mutex");
+        // Generous ceiling: the holder is a dedicated thread acquiring an uncontended mutex, so this
+        // only guards against the thread never starting. A tight bound can flake when the OS scheduler
+        // is saturated by the rest of the parallel suite on a constrained CI runner.
+        Assert.True(acquired.Wait(TimeSpan.FromSeconds(30)), "holder thread failed to acquire the mutex");
 
         return new Releaser(() =>
         {
@@ -84,8 +87,12 @@ public sealed class FileSystemOutputStoreAppendLockTests : IDisposable
             () => store.AppendHistoryEntryAsync(subject, entry, cts.Token));
         sw.Stop();
 
-        Assert.True(sw.Elapsed < TimeSpan.FromSeconds(10),
-            $"cancellation should interrupt the wait promptly, took {sw.Elapsed}");
+        // The pre-fix bug blocked FOREVER, so this bound only has to prove the wait returned at all
+        // rather than that it returned within a few ms. It must stay under the 30s default lock
+        // timeout (so a lock-timeout can't masquerade as success); 25s gives headroom over the
+        // thread-pool/timer starvation seen on the loaded CI runner without reaching that ceiling.
+        Assert.True(sw.Elapsed < TimeSpan.FromSeconds(25),
+            $"cancellation should interrupt the wait, not block indefinitely; took {sw.Elapsed}");
     }
 
     [Fact]
@@ -108,8 +115,11 @@ public sealed class FileSystemOutputStoreAppendLockTests : IDisposable
                 () => store.AppendHistoryEntryAsync(subject, entry, CancellationToken.None));
             sw.Stop();
 
-            Assert.True(sw.Elapsed < TimeSpan.FromSeconds(10),
-                $"timeout should fire near the 300ms deadline, took {sw.Elapsed}");
+            // The 300ms lock timeout fires as soon as the polling loop runs past its deadline; under
+            // CI starvation that next iteration can be delayed several seconds. The bound only proves
+            // the timeout fired rather than blocking indefinitely, so 25s is deliberately generous.
+            Assert.True(sw.Elapsed < TimeSpan.FromSeconds(25),
+                $"timeout should fire without blocking indefinitely, took {sw.Elapsed}");
         }
         finally
         {

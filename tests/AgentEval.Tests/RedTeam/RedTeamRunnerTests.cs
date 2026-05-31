@@ -87,8 +87,15 @@ public class RedTeamRunnerTests
 
         await runner.ScanAsync(agent, options, progress);
 
-        // Allow time for progress reports to be processed
-        await Task.Delay(100);
+        // Progress<T> marshals its callbacks through the captured SynchronizationContext (here the
+        // thread pool), so they can lag the awaited scan. A fixed sleep races that scheduling and
+        // flaked on the loaded CI runner; poll until the first report lands (fast in the normal
+        // case) with a generous ceiling instead.
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        while (progressReports.Count == 0 && sw.Elapsed < TimeSpan.FromSeconds(30))
+        {
+            await Task.Delay(25);
+        }
 
         Assert.NotEmpty(progressReports);
         Assert.All(progressReports, p => Assert.True(p.TotalProbes > 0));

@@ -619,7 +619,12 @@ public class CalibratedEvaluatorTests
             },
             new CalibratedJudgeOptions
             {
-                Timeout = TimeSpan.FromSeconds(30),
+                // Far longer than any plausible CI scheduling delay so the caller-cancel below is
+                // unambiguously the cause of the OCE. With a tight per-judge timeout, thread-pool
+                // starvation could let the timeout fire first; it would then be swallowed by
+                // ContinueOnJudgeFailure and no OCE would propagate — a flake, not the behaviour
+                // under test (caller cancellation must still propagate).
+                Timeout = TimeSpan.FromMinutes(10),
                 ContinueOnJudgeFailure = true,
             });
 
