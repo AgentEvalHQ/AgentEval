@@ -82,24 +82,12 @@ public static class JudgeCostMap
     /// </returns>
     public static ModelRate GetRate(string? judgeModel)
     {
-        if (string.IsNullOrWhiteSpace(judgeModel))
-            return new ModelRate(DefaultInputRatePer1K, DefaultOutputRatePer1K);
-
-        if (s_rates.TryGetValue(judgeModel, out var exact))
-            return exact;
-
-        // Walk registered keys longest-first so that more specific keys (e.g. "gpt-4o-mini")
-        // win over less specific ones (e.g. "gpt-4") when the judge identifier carries a
-        // dated suffix such as "gpt-4o-mini-2024-07-18". Equal-length keys retain their
-        // ConcurrentDictionary ordering (insertion-time, effectively undefined) but in
-        // practice the table has no collisions at the same length.
-        foreach (var kv in s_rates.OrderByDescending(p => p.Key.Length))
-        {
-            if (judgeModel.Contains(kv.Key, StringComparison.OrdinalIgnoreCase))
-                return kv.Value;
-        }
-
-        return new ModelRate(DefaultInputRatePer1K, DefaultOutputRatePer1K);
+        // ARC-07: exact-then-longest-substring match via the single shared matcher (same rule as
+        // ModelPricing.GetPricing — BUG-11), then fall back to the default rate on a miss (this table,
+        // unlike ModelPricing, never returns null — see DefaultInputRatePer1K remarks).
+        return AgentEval.Models.ModelKeyMatcher.TryMatchLongestFirst(s_rates, judgeModel, out var rate)
+            ? rate
+            : new ModelRate(DefaultInputRatePer1K, DefaultOutputRatePer1K);
     }
 
     /// <summary>
