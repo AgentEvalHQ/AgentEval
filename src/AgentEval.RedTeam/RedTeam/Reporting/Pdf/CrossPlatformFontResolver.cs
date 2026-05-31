@@ -17,6 +17,14 @@ public sealed class CrossPlatformFontResolver : IFontResolver
     private static bool s_isRegistered;
     private static readonly object s_lock = new();
 
+    // PERF-11: cache resolved font bytes per face name. GetFont previously File.ReadAllBytes'd on every
+    // call and, on Linux/macOS, fell back to a recursive Directory.EnumerateFiles(AllDirectories) scan per
+    // requested face — so a single PDF (many faces × many glyph requests) re-read and re-scanned
+    // repeatedly. Fonts do not change during a process and the resolver is a singleton, so memoizing by
+    // face name (including the not-found null result) is safe and eliminates the repeated disk IO/scans.
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, byte[]?> _fontCache =
+        new(StringComparer.Ordinal);
+
     /// <summary>Gets the singleton instance of the font resolver.</summary>
     public static CrossPlatformFontResolver Instance => s_instance.Value;
 
@@ -66,6 +74,10 @@ public sealed class CrossPlatformFontResolver : IFontResolver
 
     /// <inheritdoc />
     public byte[]? GetFont(string faceName)
+        => _fontCache.GetOrAdd(faceName, LoadFontBytes);
+
+    // Loads font bytes from disk for a face name (the uncached path). Memoized by <see cref="GetFont"/>.
+    private static byte[]? LoadFontBytes(string faceName)
     {
         if (OperatingSystem.IsWindows())
         {
