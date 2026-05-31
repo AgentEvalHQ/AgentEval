@@ -108,6 +108,15 @@ public sealed class ArticlesRegistry
         return spec;
     }
 
+    /// <summary>Non-throwing lookup of the raw <see cref="ArticleSpec"/> for a control identifier —
+    /// for callers (e.g. PDF rendering of an evidence-only archive) where a registry miss is an
+    /// expected, recoverable condition rather than an error (MNT-09).</summary>
+    public bool TryGetSpec(string controlId, out ArticleSpec? spec)
+    {
+        spec = null;
+        return !string.IsNullOrWhiteSpace(controlId) && _specs.TryGetValue(controlId, out spec);
+    }
+
     /// <summary>All registered composites, keyed by control id.</summary>
     public IReadOnlyDictionary<string, CompositeEval> All => _articles;
 }

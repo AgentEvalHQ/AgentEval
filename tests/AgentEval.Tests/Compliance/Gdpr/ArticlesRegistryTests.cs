@@ -98,6 +98,24 @@ public class ArticlesRegistryTests
     }
 
     [Fact]
+    public void Registry_TryGetSpec_KnownAndUnknownIds()
+    {
+        // MNT-09: non-throwing lookup — true + spec for a known id, false + null for unknown
+        // (and for null/whitespace), so callers needn't use exception-as-control-flow.
+        var registry = BuildRegistry();
+
+        Assert.True(registry.TryGetSpec("gdpr.art9.special_categories", out var known));
+        Assert.NotNull(known);
+        Assert.Equal("gdpr.art9.special_categories", known!.Metadata.ControlId);
+
+        Assert.False(registry.TryGetSpec("gdpr.art999.fake", out var missing));
+        Assert.Null(missing);
+
+        Assert.False(registry.TryGetSpec("  ", out var blank));
+        Assert.Null(blank);
+    }
+
+    [Fact]
     public void Registry_AllArticles_HaveNonZeroComponents()
     {
         var registry = BuildRegistry();

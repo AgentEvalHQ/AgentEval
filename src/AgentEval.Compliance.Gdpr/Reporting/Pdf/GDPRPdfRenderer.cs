@@ -246,6 +246,14 @@ public sealed class GDPRPdfRenderer
         GdprComplianceEvidence ev)
     {
         page.Margin(40);
+        // Resolve the article spec once via the non-throwing lookup. A registry miss is an expected,
+        // recoverable condition (e.g. re-rendering an evidence-only archive without the GDPR sample
+        // on the classpath) — previously this was done with exception-as-control-flow at two sites
+        // (the second re-resolving per scenario), with a bare catch that also hid real lookup
+        // failures (MNT-09).
+        ArticleSpec? spec = null;
+        _articles?.TryGetSpec(articleKey, out spec);
+
         page.Content().Column(col =>
         {
             col.Item().Text($"Article: {articleKey}").FontSize(18).Bold();
@@ -267,10 +275,6 @@ public sealed class GDPRPdfRenderer
                         c.RelativeColumn();
                         c.RelativeColumn();
                     });
-
-                    // Try to get article spec for sensitive-flag + Phase-6 Task 6.9 lookup.
-                    ArticleSpec? spec = null;
-                    try { spec = _articles?.GetSpec(articleKey); } catch { /* registry miss — skip redaction */ }
 
                     // Phase-6 Task 6.9: prefer the actual scenario input from the
                     // article spec when available; fall back to judge-reasoning when
@@ -329,8 +333,6 @@ public sealed class GDPRPdfRenderer
                     col.Item().PaddingTop(20).Text("Illustrative scenario verbatims").FontSize(14).Bold();
                     foreach (var scenario in illustrated)
                     {
-                        ArticleSpec? spec = null;
-                        try { spec = _articles?.GetSpec(articleKey); } catch { }
                         var scenarioSpec = spec?.Scenarios.FirstOrDefault(s => s.Id == scenario.Metric.Key);
                         bool sensitive = scenarioSpec?.Sensitive ?? false;
 
