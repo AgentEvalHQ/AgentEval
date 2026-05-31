@@ -140,9 +140,7 @@ public sealed class WorkflowTraceReplayingAgent : IWorkflowEvaluableAgent
             {
                 Name = tc.Name,
                 CallId = $"replay-{tc.Name}-{s.StepIndex}",
-                Arguments = !string.IsNullOrEmpty(tc.Arguments)
-                    ? System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, object?>>(tc.Arguments)
-                    : null,
+                Arguments = ParseRecordedArgumentsOrNull(tc.Arguments),
                 Result = tc.Result,
                 Exception = tc.Succeeded ? null : new Exception(tc.Error ?? "Unknown error"),
                 Order = 0,
@@ -286,6 +284,25 @@ public sealed class WorkflowTraceReplayingAgent : IWorkflowEvaluableAgent
         if (string.IsNullOrEmpty(text) || text.Length <= maxLength)
             return text ?? string.Empty;
         return text.Substring(0, maxLength) + "...";
+    }
+
+    /// <summary>
+    /// Deserializes recorded tool-call arguments to a dictionary, tolerating a malformed /
+    /// schema-drifted / hand-edited trace (a non-object JSON root, etc.). Returns null instead of
+    /// throwing JsonException so deterministic replay cannot crash on a bad trace (BUG-46).
+    /// </summary>
+    private static Dictionary<string, object?>? ParseRecordedArgumentsOrNull(string? arguments)
+    {
+        if (string.IsNullOrEmpty(arguments))
+            return null;
+        try
+        {
+            return System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, object?>>(arguments);
+        }
+        catch (System.Text.Json.JsonException)
+        {
+            return null;
+        }
     }
 }
 

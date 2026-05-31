@@ -283,6 +283,36 @@ public class WorkflowTraceTests
     }
 
     [Fact]
+    public async Task WorkflowTraceReplayingAgent_MalformedToolArguments_DoesNotThrow_DegradesToNull()
+    {
+        // BUG-46: a schema-drifted / hand-edited trace with a non-object Arguments JSON (here a
+        // JSON array) must not crash deterministic replay with a JsonException; it degrades to null.
+        var trace = new WorkflowTrace
+        {
+            TraceName = "malformed_args",
+            FinalOutput = "done",
+            Steps = new List<WorkflowTraceStep>
+            {
+                new()
+                {
+                    ExecutorId = "agent1", Output = "out", StepIndex = 0, DurationMs = 10,
+                    ToolCalls = new List<TraceToolCall>
+                    {
+                        new() { Name = "ToolA", Result = "r", Succeeded = true, Arguments = "[1,2,3]" }
+                    }
+                }
+            }
+        };
+        var replayer = new WorkflowTraceReplayingAgent(trace);
+
+        var result = await replayer.ExecuteWorkflowAsync("any"); // must not throw
+
+        var tool = result.Steps[0].ToolCalls![0];
+        Assert.Equal("ToolA", tool.Name);
+        Assert.Null(tool.Arguments); // malformed args degraded to null instead of crashing replay
+    }
+
+    [Fact]
     public async Task WorkflowTraceReplayingAgent_ReplaysStepDetails()
     {
         // Arrange
