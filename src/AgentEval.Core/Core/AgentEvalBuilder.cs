@@ -169,13 +169,32 @@ public sealed class AgentEvalBuilder
         // Create plugin context
         var context = new PluginContextImpl(registry, _logger, _configuration);
 
-        // Initialize plugins in dependency order
+        // Initialize plugins in dependency order. If any InitializeAsync throws, shut down + dispose
+        // the already-initialized plugins in reverse order before rethrowing, so a partial build does
+        // not leak their resources (BUG-40).
         var orderedPlugins = OrderByDependencies(_plugins);
-        foreach (var plugin in orderedPlugins)
+        var initialized = new List<IAgentEvalPlugin>();
+        try
         {
-            _logger.LogDebug($"Initializing plugin: {plugin.Name} v{plugin.Version}");
-            await plugin.InitializeAsync(context, cancellationToken);
-            _logger.LogDebug($"Plugin initialized: {plugin.Name}");
+            foreach (var plugin in orderedPlugins)
+            {
+                _logger.LogDebug($"Initializing plugin: {plugin.Name} v{plugin.Version}");
+                await plugin.InitializeAsync(context, cancellationToken);
+                initialized.Add(plugin);
+                _logger.LogDebug($"Plugin initialized: {plugin.Name}");
+            }
+        }
+        catch
+        {
+            for (int i = initialized.Count - 1; i >= 0; i--)
+            {
+                var p = initialized[i];
+                try { await p.ShutdownAsync(); }
+                catch (Exception ex) { _logger.LogError(ex, $"Error shutting down plugin {p.Name} after failed build"); }
+                try { p.Dispose(); }
+                catch (Exception ex) { _logger.LogError(ex, $"Error disposing plugin {p.Name} after failed build"); }
+            }
+            throw;
         }
 
         // Order transformers by priority
@@ -449,6 +468,17 @@ public sealed class AgentEvalRunner : IAsyncDisposable
             catch (Exception ex)
             {
                 _logger.LogError(ex, $"Error shutting down plugin {plugin.Name}");
+            }
+
+            // IAgentEvalPlugin extends IDisposable, so a plugin may release native/IDisposable
+            // resources only in Dispose(). ShutdownAsync alone leaked those for process life (BUG-40).
+            try
+            {
+                plugin.Dispose();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error disposing plugin {plugin.Name}");
             }
         }
     }

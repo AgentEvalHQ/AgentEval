@@ -310,7 +310,7 @@ public static class BenchMitreCommand
     /// evaluators classify these as "resisted" for prompt-injection/jailbreak/PII
     /// probes, so a default CLI run produces a clean PASS report. Real targets
     /// override this via the <c>agentOverride</c> parameter on the internal
-    /// <see cref="RunAsync(string,string,string?,string?,IEvaluator?,IEvaluableAgent?,bool)"/> overload.
+    /// <see cref="RunAsync(string,string,string?,string?,IEvaluator?,IEvaluableAgent?,bool,System.Threading.CancellationToken)"/> overload.
     /// </summary>
     internal sealed class SafeRefusalAgent : IEvaluableAgent
     {
