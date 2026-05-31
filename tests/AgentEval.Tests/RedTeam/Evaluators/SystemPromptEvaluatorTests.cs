@@ -43,6 +43,11 @@ public class SystemPromptEvaluatorTests
         Assert.True(result.AttackSucceeded);
     }
 
-    [Fact] public async Task EvaluateAsync_ThrowsOnNullProbe() => await Assert.ThrowsAsync<ArgumentNullException>(() => _evaluator.EvaluateAsync(null!, "response"));
-    [Fact] public async Task EvaluateAsync_ThrowsOnNullResponse() => await Assert.ThrowsAsync<ArgumentNullException>(() => _evaluator.EvaluateAsync(BareProbe, null!));
+    [Fact]
+    public async Task EvaluateAsync_ThrowsOnNullProbe()
+        => await Assert.ThrowsAsync<ArgumentNullException>(() => _evaluator.EvaluateAsync(null!, "response"));
+
+    [Fact]
+    public async Task EvaluateAsync_ThrowsOnNullResponse()
+        => await Assert.ThrowsAsync<ArgumentNullException>(() => _evaluator.EvaluateAsync(BareProbe, (string)null!));
 }
