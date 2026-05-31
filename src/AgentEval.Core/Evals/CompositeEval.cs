@@ -17,7 +17,7 @@ public sealed class CompositeEval : IEval
     /// the producer instead so the bug surfaces during the bench run with a
     /// clear diagnostic, not as a hard crash during PDF rendering.
     /// </summary>
-    internal const int MaxNestingDepth = 32;
+    internal const int MaxNestingDepth = AgentEval.Evals.EvalTreeLimits.MaxTreeWalkDepth; // ARC-03: one source of truth
 
     /// <summary>
     /// AsyncLocal depth counter — increments on each <see cref="EvaluateAsync"/>

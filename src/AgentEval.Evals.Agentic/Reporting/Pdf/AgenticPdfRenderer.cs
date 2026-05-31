@@ -452,7 +452,7 @@ public sealed class AgenticPdfRenderer
     };
 
     // Phase-7 Task 7.2: shared depth cap mirrors MissionControl.GraphQL.Query.MaxTreeWalkDepth.
-    private const int MaxRenderWalkDepth = 32;
+    private const int MaxRenderWalkDepth = EvalTreeLimits.MaxTreeWalkDepth; // ARC-03: one source of truth
 
     private static EvalResult? FindResultByKey(EvalResult root, string key, int depth = 0)
     {

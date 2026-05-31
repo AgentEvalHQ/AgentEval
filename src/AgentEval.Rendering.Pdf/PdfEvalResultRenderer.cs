@@ -49,7 +49,7 @@ public sealed class PdfEvalResultRenderer : IEvalResultRenderer
     /// <inheritdoc/>
     public string FileExtension => ".pdf";
 
-    private const int MaxRenderWalkDepth = 32;
+    private const int MaxRenderWalkDepth = EvalTreeLimits.MaxTreeWalkDepth; // ARC-03: one source of truth
 
     /// <inheritdoc/>
     public Task<byte[]> RenderAsync(EvalResult result, EvalResultRenderOptions options, CancellationToken ct = default)

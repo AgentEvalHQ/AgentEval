@@ -527,7 +527,7 @@ public sealed class Query
     /// pathological / attacker-shaped trees that would overflow the stack.
     /// Set to 32 to comfortably exceed the GraphQL depth cap (10) and any
     /// realistic composite (root → pillar → article → multi-judge ≤ 5).</summary>
-    internal const int MaxTreeWalkDepth = 32;
+    internal const int MaxTreeWalkDepth = EvalTreeLimits.MaxTreeWalkDepth; // ARC-03: one source of truth
 
     internal static void WalkAndAccumulate(
         EvalResult node,
