@@ -98,6 +98,19 @@ public static class McHost
             // The 5.2 introspection-based regression tests will need an
             // alternative pin (e.g. schema dump snapshot) in that world.
             .AddMaxExecutionDepthRule(10, skipIntrospectionFields: true)
+            // SEC-11: the depth rule alone does not bound a request that invokes expensive resolvers
+            // many times via field aliases within depth<=10 (e.g. dozens of aliased evaluatorTimeline /
+            // subjectsConnection fields). Enforce Hot Chocolate's operation-cost analysis with explicit
+            // caps so such a fan-out is rejected before execution. Caps are generous enough for the SPA's
+            // real drill-down queries (validated by the GraphQL read/smoke tests) while rejecting
+            // alias-multiplied abuse. Cost defaults are applied so list/connection fields are weighted.
+            .ModifyCostOptions(o =>
+            {
+                o.ApplyCostDefaults = true;
+                o.EnforceCostLimits = true;
+                o.MaxFieldCost = 1_000;
+                o.MaxTypeCost = 1_000;
+            })
             .ModifyRequestOptions(opts => opts.ExecutionTimeout = TimeSpan.FromSeconds(30));
     }
 

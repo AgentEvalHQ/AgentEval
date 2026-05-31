@@ -8,6 +8,7 @@ using AgentEval.Evals.Agentic.Cost; // T3.1: EvaluatorCostMap relocated here.
 using AgentEval.MissionControl.GraphQL;
 using AgentEval.MissionControl.Services;
 using AgentEval.Output;
+using HotChocolate.CostAnalysis.Types; // SEC-11: [Cost] weights for expensive resolvers.
 
 namespace AgentEval.MissionControl.GraphQL;
 
@@ -151,6 +152,7 @@ public sealed class Query
     /// <summary>
     /// Lists all known subjects in the local solution, optionally filtered by kind.
     /// </summary>
+    [Cost(100.0)] // SEC-11: bound alias-multiplication of this expensive resolver
     public async IAsyncEnumerable<SubjectInfo> Subjects(
         [Service] IOutputStoreReader store,
         SubjectKind? kind = null,
@@ -172,6 +174,7 @@ public sealed class Query
     /// sizes for large workspaces without forcing a deprecation of the
     /// existing <see cref="Subjects"/> resolver.
     /// </summary>
+    [Cost(100.0)] // SEC-11: bound alias-multiplication of this expensive resolver
     public async Task<Connection<SubjectInfo>> SubjectsConnection(
         [Service] IOutputStoreReader store,
         SubjectKind? kind = null,
@@ -475,6 +478,7 @@ public sealed class Query
     /// without per-request tree caching. Folding this into the GreenDonut DataLoader batching / a
     /// parsed-tree cache is deferred to MC1.4.7 alongside the other tree-walking resolvers.
     /// </remarks>
+    [Cost(100.0)] // SEC-11: bound alias-multiplication of this expensive resolver
     public async Task<RunCostBreakdown?> RunCostBreakdown(
         [Service] IOutputStoreReader store,
         string runId,
@@ -631,6 +635,7 @@ public sealed class Query
     /// lands, this resolver becomes a natural batching candidate.
     /// </para>
     /// </remarks>
+    [Cost(100.0)] // SEC-11: bound alias-multiplication of this expensive resolver
     public async IAsyncEnumerable<EvaluatorTimelinePoint> EvaluatorTimeline(
         [Service] IOutputStoreReader store,
         string evaluatorKey,
