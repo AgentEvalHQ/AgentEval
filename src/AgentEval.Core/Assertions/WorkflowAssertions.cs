@@ -1248,15 +1248,8 @@ public class WorkflowToolCallAssertionBuilder
     [StackTraceHidden]
     public WorkflowToolCallAssertionBuilder WithoutError(string? because = null)
     {
-        if (_call == null) return this;
-
-        if (_call.HasError)
-        {
-            AddFailure(
-                $"Expected '{_toolName}' in workflow to complete without error, " +
-                $"but got: {_call.Exception?.Message ?? "(unknown error)"}",
-                because);
-        }
+        if (_call != null)
+            WorkflowToolCallChecks.WithoutError(_call, _toolName, "in workflow", because, (m, b) => AddFailure(m, b));
         return this;
     }
 
@@ -1269,33 +1262,8 @@ public class WorkflowToolCallAssertionBuilder
     [StackTraceHidden]
     public WorkflowToolCallAssertionBuilder WithArgument(string paramName, object expectedValue, string? because = null)
     {
-        if (_call == null) return this;
-
-        object? actualValue = null;
-        var hasArgument = _call.Arguments?.TryGetValue(paramName, out actualValue) ?? false;
-
-        if (!hasArgument)
-        {
-            var available = _call.Arguments?.Keys.Any() == true
-                ? string.Join(", ", _call.Arguments.Keys)
-                : "(none)";
-            AddFailure(
-                $"Expected '{_toolName}' in workflow to have argument '{paramName}', " +
-                $"but available arguments: [{available}]",
-                because);
-        }
-        else
-        {
-            // Type-aware comparison (BUG-21): numbers numerically, booleans by value, strings
-            // by unquoted content — no GetRawText().Trim('"') mangling.
-            if (!ToolArgumentComparison.Matches(actualValue, expectedValue))
-            {
-                AddFailure(
-                    $"Expected '{_toolName}' in workflow argument '{paramName}' = \"{expectedValue}\" " +
-                    $"but was \"{ToolArgumentComparison.Canonical(actualValue)}\"",
-                    because);
-            }
-        }
+        if (_call != null)
+            WorkflowToolCallChecks.WithArgument(_call, _toolName, "in workflow", paramName, expectedValue, because, (m, b) => AddFailure(m, b));
         return this;
     }
 
@@ -1308,32 +1276,8 @@ public class WorkflowToolCallAssertionBuilder
     [StackTraceHidden]
     public WorkflowToolCallAssertionBuilder WithArgumentContaining(string paramName, string substring, string? because = null)
     {
-        if (_call == null) return this;
-
-        object? actualValue = null;
-        var hasArgument = _call.Arguments?.TryGetValue(paramName, out actualValue) ?? false;
-
-        if (!hasArgument)
-        {
-            AddFailure(
-                $"Expected '{_toolName}' in workflow to have argument '{paramName}' containing " +
-                $"'{substring}', but argument was not found.",
-                because);
-        }
-        else
-        {
-            var actualStr = actualValue is System.Text.Json.JsonElement je
-                ? je.GetString()
-                : actualValue?.ToString();
-
-            if (actualStr == null || !actualStr.Contains(substring, StringComparison.OrdinalIgnoreCase))
-            {
-                AddFailure(
-                    $"Expected '{_toolName}' in workflow argument '{paramName}' to contain " +
-                    $"'{substring}' but was \"{Truncate(actualStr ?? "(null)", 100)}\"",
-                    because);
-            }
-        }
+        if (_call != null)
+            WorkflowToolCallChecks.WithArgumentContaining(_call, _toolName, "in workflow", paramName, substring, because, (m, b) => AddFailure(m, b));
         return this;
     }
 
@@ -1345,16 +1289,8 @@ public class WorkflowToolCallAssertionBuilder
     [StackTraceHidden]
     public WorkflowToolCallAssertionBuilder WithResultContaining(string substring, string? because = null)
     {
-        if (_call == null) return this;
-
-        var resultStr = _call.Result?.ToString();
-        if (resultStr == null || !resultStr.Contains(substring, StringComparison.OrdinalIgnoreCase))
-        {
-            AddFailure(
-                $"Expected '{_toolName}' in workflow result to contain '{substring}' " +
-                $"but was \"{Truncate(resultStr ?? "(null)", 100)}\"",
-                because);
-        }
+        if (_call != null)
+            WorkflowToolCallChecks.WithResultContaining(_call, _toolName, "in workflow", substring, because, (m, b) => AddFailure(m, b));
         return this;
     }
 
@@ -1367,23 +1303,8 @@ public class WorkflowToolCallAssertionBuilder
     [StackTraceHidden]
     public WorkflowToolCallAssertionBuilder WithDurationUnder(TimeSpan max, string? because = null)
     {
-        if (_call == null) return this;
-
-        if (!_call.HasTiming)
-        {
-            System.Diagnostics.Debug.WriteLine(
-                $"[AgentEval] Skipping duration assertion for '{_toolName}' in workflow " +
-                "- timing not available.");
-            return this;
-        }
-
-        if (_call.Duration > max)
-        {
-            AddFailure(
-                $"Expected '{_toolName}' in workflow duration under {max.TotalMilliseconds:F0}ms " +
-                $"but was {_call.Duration!.Value.TotalMilliseconds:F0}ms",
-                because);
-        }
+        if (_call != null)
+            WorkflowToolCallChecks.WithDurationUnder(_call, _toolName, "in workflow", max, because, (m, b) => AddFailure(m, b));
         return this;
     }
 
@@ -1398,13 +1319,6 @@ public class WorkflowToolCallAssertionBuilder
             ? $"{message} because {because}"
             : message;
         _parent.AddFailure(fullMessage, hint);
-    }
-
-    private static string Truncate(string text, int maxLength)
-    {
-        if (string.IsNullOrEmpty(text)) return "(empty)";
-        if (text.Length <= maxLength) return text;
-        return text[..(maxLength - 3)] + "...";
     }
 }
 
@@ -1517,15 +1431,8 @@ public class ExecutorToolCallAssertionBuilder
     [StackTraceHidden]
     public ExecutorToolCallAssertionBuilder WithoutError(string? because = null)
     {
-        if (_call == null) return this;
-
-        if (_call.HasError)
-        {
-            AddFailure(
-                $"Expected '{_toolName}' in executor '{_executorId}' to complete without error, " +
-                $"but got: {_call.Exception?.Message ?? "(unknown error)"}",
-                because);
-        }
+        if (_call != null)
+            WorkflowToolCallChecks.WithoutError(_call, _toolName, $"in executor '{_executorId}'", because, (m, b) => AddFailure(m, b));
         return this;
     }
 
@@ -1538,33 +1445,8 @@ public class ExecutorToolCallAssertionBuilder
     [StackTraceHidden]
     public ExecutorToolCallAssertionBuilder WithArgument(string paramName, object expectedValue, string? because = null)
     {
-        if (_call == null) return this;
-
-        object? actualValue = null;
-        var hasArgument = _call.Arguments?.TryGetValue(paramName, out actualValue) ?? false;
-
-        if (!hasArgument)
-        {
-            var available = _call.Arguments?.Keys.Any() == true
-                ? string.Join(", ", _call.Arguments.Keys)
-                : "(none)";
-            AddFailure(
-                $"Expected '{_toolName}' in executor '{_executorId}' to have argument '{paramName}', " +
-                $"but available arguments: [{available}]",
-                because);
-        }
-        else
-        {
-            // Type-aware comparison (BUG-21): numbers numerically, booleans by value, strings
-            // by unquoted content — no GetRawText().Trim('"') mangling.
-            if (!ToolArgumentComparison.Matches(actualValue, expectedValue))
-            {
-                AddFailure(
-                    $"Expected '{_toolName}' in executor '{_executorId}' argument '{paramName}' = \"{expectedValue}\" " +
-                    $"but was \"{ToolArgumentComparison.Canonical(actualValue)}\"",
-                    because);
-            }
-        }
+        if (_call != null)
+            WorkflowToolCallChecks.WithArgument(_call, _toolName, $"in executor '{_executorId}'", paramName, expectedValue, because, (m, b) => AddFailure(m, b));
         return this;
     }
 
@@ -1577,32 +1459,8 @@ public class ExecutorToolCallAssertionBuilder
     [StackTraceHidden]
     public ExecutorToolCallAssertionBuilder WithArgumentContaining(string paramName, string substring, string? because = null)
     {
-        if (_call == null) return this;
-
-        object? actualValue = null;
-        var hasArgument = _call.Arguments?.TryGetValue(paramName, out actualValue) ?? false;
-
-        if (!hasArgument)
-        {
-            AddFailure(
-                $"Expected '{_toolName}' in executor '{_executorId}' to have argument '{paramName}' containing " +
-                $"'{substring}', but argument was not found.",
-                because);
-        }
-        else
-        {
-            var actualStr = actualValue is System.Text.Json.JsonElement je
-                ? je.GetString()
-                : actualValue?.ToString();
-
-            if (actualStr == null || !actualStr.Contains(substring, StringComparison.OrdinalIgnoreCase))
-            {
-                AddFailure(
-                    $"Expected '{_toolName}' in executor '{_executorId}' argument '{paramName}' to contain " +
-                    $"'{substring}' but was \"{Truncate(actualStr ?? "(null)", 100)}\"",
-                    because);
-            }
-        }
+        if (_call != null)
+            WorkflowToolCallChecks.WithArgumentContaining(_call, _toolName, $"in executor '{_executorId}'", paramName, substring, because, (m, b) => AddFailure(m, b));
         return this;
     }
 
@@ -1614,16 +1472,8 @@ public class ExecutorToolCallAssertionBuilder
     [StackTraceHidden]
     public ExecutorToolCallAssertionBuilder WithResultContaining(string substring, string? because = null)
     {
-        if (_call == null) return this;
-
-        var resultStr = _call.Result?.ToString();
-        if (resultStr == null || !resultStr.Contains(substring, StringComparison.OrdinalIgnoreCase))
-        {
-            AddFailure(
-                $"Expected '{_toolName}' in executor '{_executorId}' result to contain '{substring}' " +
-                $"but was \"{Truncate(resultStr ?? "(null)", 100)}\"",
-                because);
-        }
+        if (_call != null)
+            WorkflowToolCallChecks.WithResultContaining(_call, _toolName, $"in executor '{_executorId}'", substring, because, (m, b) => AddFailure(m, b));
         return this;
     }
 
@@ -1636,23 +1486,8 @@ public class ExecutorToolCallAssertionBuilder
     [StackTraceHidden]
     public ExecutorToolCallAssertionBuilder WithDurationUnder(TimeSpan max, string? because = null)
     {
-        if (_call == null) return this;
-
-        if (!_call.HasTiming)
-        {
-            System.Diagnostics.Debug.WriteLine(
-                $"[AgentEval] Skipping duration assertion for '{_toolName}' in executor '{_executorId}' " +
-                "- timing not available.");
-            return this;
-        }
-
-        if (_call.Duration > max)
-        {
-            AddFailure(
-                $"Expected '{_toolName}' in executor '{_executorId}' duration under {max.TotalMilliseconds:F0}ms " +
-                $"but was {_call.Duration!.Value.TotalMilliseconds:F0}ms",
-                because);
-        }
+        if (_call != null)
+            WorkflowToolCallChecks.WithDurationUnder(_call, _toolName, $"in executor '{_executorId}'", max, because, (m, b) => AddFailure(m, b));
         return this;
     }
 
@@ -1686,13 +1521,6 @@ public class ExecutorToolCallAssertionBuilder
             ? $"{message} because {because}"
             : message;
         _parent.AddFailureFromChild(fullMessage, hint);
-    }
-
-    private static string Truncate(string text, int maxLength)
-    {
-        if (string.IsNullOrEmpty(text)) return "(empty)";
-        if (text.Length <= maxLength) return text;
-        return text[..(maxLength - 3)] + "...";
     }
 }
 
