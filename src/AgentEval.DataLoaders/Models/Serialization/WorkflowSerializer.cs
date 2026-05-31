@@ -91,7 +91,7 @@ public static class WorkflowSerializer
         {
             var shape = node.IsEntryPoint ? "([" : node.IsExitNode ? "[[" : "[";
             var shapeEnd = node.IsEntryPoint ? "])" : node.IsExitNode ? "]]" : "]";
-            sb.AppendLine($"    {SanitizeId(node.NodeId)}{shape}{node.DisplayName ?? node.NodeId}{shapeEnd}");
+            sb.AppendLine($"    {SanitizeId(node.NodeId)}{shape}{SanitizeLabel(node.DisplayName ?? node.NodeId)}{shapeEnd}");
         }
 
         sb.AppendLine();
@@ -349,6 +349,25 @@ public static class WorkflowSerializer
     {
         // Mermaid IDs can't have certain characters
         return id.Replace("-", "_").Replace(" ", "_").Replace(".", "_");
+    }
+
+    /// <summary>
+    /// Renders a developer-authored display name as a SAFE Mermaid quoted node label (GAP-15). A raw
+    /// DisplayName containing Mermaid metacharacters (<c>]</c>, <c>|</c>, a newline) or a markdown code
+    /// fence could otherwise corrupt the diagram or inject extra nodes/edges. Wrapping in double quotes
+    /// makes those characters literal label text; we additionally strip line breaks (which quotes do not
+    /// neutralize) and replace backticks (which could break out of the enclosing <c>```mermaid</c> fence)
+    /// and embedded quotes (Mermaid's <c>#quot;</c> entity).
+    /// </summary>
+    private static string SanitizeLabel(string label)
+    {
+        if (string.IsNullOrEmpty(label)) return "\"\"";
+        var cleaned = label
+            .Replace("\r", " ")
+            .Replace("\n", " ")
+            .Replace("`", "'")        // neutralize ``` so it can't escape the markdown mermaid fence
+            .Replace("\"", "#quot;"); // Mermaid HTML entity for a literal double-quote inside the label
+        return $"\"{cleaned}\"";
     }
 
     #endregion
