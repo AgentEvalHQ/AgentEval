@@ -429,7 +429,10 @@ strategy/
 
 # MAF source reference (local only - not for distribution)
 /MAF/
-/MAFvnext/
+# On-disk dir is MAFVnext (capital V). The old lowercase /MAFvnext/ matched only on
+# case-insensitive (Windows) filesystems; on a case-sensitive FS (Linux CI/contributor) the
+# vendored tree would not be ignored and could be staged wholesale (GAP-20).
+/MAFVnext/
 
 # LongMemEval large dataset files (download separately from HuggingFace)
 src/AgentEval.Memory/Data/longmemeval/longmemeval_s_cleaned.json
