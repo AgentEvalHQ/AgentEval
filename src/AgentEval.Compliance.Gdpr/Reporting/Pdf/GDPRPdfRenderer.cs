@@ -114,8 +114,10 @@ public sealed class GDPRPdfRenderer
         {
             col.Item().Text("GDPR Compliance Report").FontSize(28).Bold();
             col.Item().Text($"Preset: {Capitalize(ev.Preset)}").FontSize(14);
-            col.Item().PaddingTop(20).Text($"Subject: {ev.Base.Subject.Name} ({ev.Base.Subject.Kind})");
-            col.Item().Text($"Run ID: {ev.Base.SourceRun.RunId}");
+            // Cap free-form Subject.Name / RunId length so an oversized agent-controlled value
+            // cannot blow the PDF layout (SEC-16). PDF text needs no Markdown escaping.
+            col.Item().PaddingTop(20).Text($"Subject: {AgentEval.Core.Reporting.MarkdownText.Truncate(ev.Base.Subject.Name)} ({ev.Base.Subject.Kind})");
+            col.Item().Text($"Run ID: {AgentEval.Core.Reporting.MarkdownText.Truncate(ev.Base.SourceRun.RunId)}");
             col.Item().Text($"Generated: {ev.Base.GeneratedAt:O}");
 
             col.Item().PaddingTop(30)

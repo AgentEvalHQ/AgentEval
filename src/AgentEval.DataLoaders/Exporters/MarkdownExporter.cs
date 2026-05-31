@@ -158,14 +158,9 @@ public class MarkdownExporter : IResultExporter
         return $"{duration.TotalMinutes:F1}m";
     }
 
-    private static string EscapeMarkdown(string text)
-    {
-        return text
-            .Replace("|", "\\|")
-            .Replace("*", "\\*")
-            .Replace("_", "\\_")
-            .Replace("`", "\\`");
-    }
+    // Delegates to the centralised helper so there is a single Markdown-escape implementation
+    // (SEC-16). Behaviour is identical to the previous inline version (escapes | * _ `).
+    private static string EscapeMarkdown(string text) => AgentEval.Core.Reporting.MarkdownText.Escape(text);
 }
 
 /// <summary>

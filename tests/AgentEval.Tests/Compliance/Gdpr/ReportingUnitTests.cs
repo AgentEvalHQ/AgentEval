@@ -252,6 +252,26 @@ public class ReportingUnitTests
     }
 
     [Fact]
+    public void MarkdownRenderer_MaliciousSubjectName_DoesNotBreakOut()
+    {
+        // SEC-16: a free-form subject name with a backtick / pipe / newline / brackets must be
+        // escaped so it cannot break the code span, inject a header, or smuggle a link.
+        var renderer = new MarkdownRenderer();
+        var evidence = MakeSampleEvidence(subjectName: "evil`name|x\n## Injected [link](http://x)");
+
+        var md = renderer.Render(evidence);
+
+        // Newline collapsed → no standalone injected header line.
+        Assert.DoesNotContain(md.Split('\n'), line => line.TrimStart().StartsWith("## Injected"));
+        // Backtick replaced (apostrophe) so the `code span` around the subject is not broken.
+        var subjectLine = md.Split('\n').First(l => l.Contains("**Subject**"));
+        Assert.Contains("evil'name", subjectLine);
+        Assert.DoesNotContain("`name", subjectLine); // no raw backtick inside the name
+        // Link brackets escaped.
+        Assert.Contains("\\[link\\]", subjectLine);
+    }
+
+    [Fact]
     public void MarkdownRenderer_NoCriticalFindings_SectionAbsent()
     {
         var renderer = new MarkdownRenderer();
@@ -416,12 +436,13 @@ public class ReportingUnitTests
     private static GdprComplianceEvidence MakeSampleEvidence(
         string preset = "standard",
         IReadOnlyList<EvalResult>? criticalFindings = null,
-        IReadOnlyList<AgentEval.Compliance.Gdpr.Reporting.Recommendation>? recommendations = null)
+        IReadOnlyList<AgentEval.Compliance.Gdpr.Reporting.Recommendation>? recommendations = null,
+        string subjectName = "TestAgent")
     {
         criticalFindings ??= [];
         recommendations ??= [];
 
-        var subject = new SubjectIdentity(SubjectKind.Agent, "TestAgent");
+        var subject = new SubjectIdentity(SubjectKind.Agent, subjectName);
         var baseEvidence = new ComplianceEvidence(
             SchemaVersion: "1.0",
             Regulation: "GDPR",
