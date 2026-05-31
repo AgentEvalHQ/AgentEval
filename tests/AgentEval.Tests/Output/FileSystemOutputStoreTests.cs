@@ -198,6 +198,28 @@ public class FileSystemOutputStoreTests : IDisposable
     }
 
     [Fact]
+    public async Task WriteScenarioResult_MalformedStructuredOutput_Throws()
+    {
+        // GAP-16: clearly-structured Output ('{'/'['-prefixed) that is not valid JSON is genuine
+        // corruption and must fail the write; valid JSON and raw text must still persist.
+        WriteSolutionJson();
+        var store = new FileSystemOutputStore(_root);
+        var manifest = await store.StartRunAsync(DefaultSubject(), DefaultContext());
+        var runId = manifest.Run.RunId;
+
+        static ScenarioResult Make(string id, string output) => new(
+            id, "S", "input", output, true, 1.0,
+            new Dictionary<string, double>(), new List<AssertionResult>(), TimeSpan.Zero, 0.0);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => store.WriteScenarioResultAsync(runId, Make("bad", "{ this is not json")));
+
+        // Valid JSON and raw (non-structured) text must NOT throw.
+        await store.WriteScenarioResultAsync(runId, Make("okjson", "{\"k\":1}"));
+        await store.WriteScenarioResultAsync(runId, Make("raw", "answer is 42"));
+    }
+
+    [Fact]
     public async Task RoundTrip_StartWriteScenarioComplete_PersistsAll()
     {
         WriteSolutionJson();

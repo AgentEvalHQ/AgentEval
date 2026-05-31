@@ -384,8 +384,13 @@ public sealed class FileSystemOutputStore : IOutputStore
                 }
                 catch (System.Text.Json.JsonException ex)
                 {
-                    Console.Error.WriteLine(
-                        $"warning: scenario '{result.Id}' Output looks JSON-shaped (starts with '{{' or '[') but is malformed: {ex.Message}");
+                    // Clearly-structured Output (starts with '{' or '[') that does not even parse as
+                    // JSON is genuine corruption — a truncated write or injected garbage — not the
+                    // schema-looseness T2.6 deliberately tolerates (legitimate structured writers
+                    // always emit well-formed JSON). Fail the write rather than silently persisting a
+                    // broken artifact (GAP-16).
+                    throw new InvalidOperationException(
+                        $"Scenario '{result.Id}' Output looks JSON-shaped (starts with '{{' or '[') but is not valid JSON: {ex.Message}", ex);
                 }
             }
         }

@@ -8,10 +8,11 @@ using Xunit;
 namespace AgentEval.Tests.Output;
 
 /// <summary>
-/// Pins plan-13 T2.6 (v1.1) — <see cref="FileSystemOutputStore.WriteScenarioResultAsync"/>
-/// rejects JSON-shaped <see cref="ScenarioResult.Output"/> that doesn't validate against
-/// <c>eval-result.schema.json</c>, while remaining permissive for free-form text Output
-/// (the common case for code-eval / agent-raw-response scenarios).
+/// Pins plan-13 T2.6 (v1.1), revised by GAP-16 — <see cref="FileSystemOutputStore.WriteScenarioResultAsync"/>
+/// rejects <see cref="ScenarioResult.Output"/> that is clearly intended to be structured (starts
+/// with <c>{</c>/<c>[</c>) but is not well-formed JSON, while remaining permissive for free-form
+/// text Output (the common code-eval / agent-raw-response case) and for schema-loose-but-well-formed
+/// JSON (the doctor read-path carries strict schema validation).
 /// </summary>
 [Collection("ConsoleTests")]
 public class FileSystemOutputStoreScenarioOutputSchemaTests : IDisposable
@@ -54,13 +55,13 @@ public class FileSystemOutputStoreScenarioOutputSchemaTests : IDisposable
     }
 
     [Fact]
-    public async Task WriteScenarioResultAsync_MalformedJsonShapedOutput_LogsWarningAndPersists()
+    public async Task WriteScenarioResultAsync_MalformedJsonShapedOutput_Throws()
     {
-        // T2.6 pragmatic stance (post-Phase-3 review): the EvalResult JSON shape that the
-        // production writer emits is intentionally looser than eval-result.schema.json, so
-        // T2.6 is a WARN-only path at write time. Malformed JSON-shaped Output writes a
-        // warning to stderr but persists — the run still completes; the doctor read-path
-        // (T1.6) carries the strict gate for files that must validate.
+        // GAP-16 (revises the original T2.6 warn-only stance): Output that is clearly INTENDED to be
+        // structured (starts with '{' or '[') but is not even well-formed JSON is genuine corruption
+        // — a truncated write or injected garbage — not the schema-looseness T2.6 tolerates. Such a
+        // write now fails fast rather than silently persisting a broken artifact. (Schema-loose-but-
+        // well-formed JSON still persists; the doctor read-path carries strict schema validation.)
         var (store, subject) = await SeedStoreAsync();
         var manifest = await store.StartRunAsync(subject, new RunContext("TP", "/p", "xunit", null, null, "eval"));
         var scenario = new ScenarioResult(
@@ -75,23 +76,10 @@ public class FileSystemOutputStoreScenarioOutputSchemaTests : IDisposable
             Duration: TimeSpan.FromMilliseconds(10),
             EstimatedCost: 0.0);
 
-        // Act — must not throw; should log a warning
-        var stderr = new StringWriter();
-        var prev = Console.Error;
-        Console.SetError(stderr);
-        try
-        {
-            await store.WriteScenarioResultAsync(manifest.Run.RunId, scenario);
-        }
-        finally
-        {
-            Console.SetError(prev);
-        }
-
-        // Assert — warning surfaced with scenario id + JSON-shape note
-        var stderrText = stderr.ToString();
-        Assert.Contains("sc-malformed", stderrText);
-        Assert.Contains("JSON", stderrText, StringComparison.OrdinalIgnoreCase);
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => store.WriteScenarioResultAsync(manifest.Run.RunId, scenario));
+        Assert.Contains("sc-malformed", ex.Message);
+        Assert.Contains("JSON", ex.Message, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
