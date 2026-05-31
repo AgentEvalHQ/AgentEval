@@ -184,6 +184,64 @@ public class ToolSelectionMetricTests
         Assert.True(metric.RequiresToolUsage);
     }
     
+    // ── BUG-30: strict-order = ordered subsequence, independent of completeness ──
+
+    [Fact]
+    public async Task EvaluateAsync_StrictOrder_InterleavedExtraAtFront_NoOrderPenalty()
+    {
+        // Expected A,B in order; an allowed extra tool runs first. Relative order of A,B is correct,
+        // so there must be NO order penalty (only the extra-tool penalty). Before BUG-30 the
+        // positional compare flagged the leading extra as an order violation (over-strict).
+        var metric = new ToolSelectionMetric(new[] { "ToolA", "ToolB" }, strictOrder: true);
+        var context = new EvaluationContext
+        {
+            Input = "x", Output = "y",
+            ToolUsage = CreateToolUsage("ExtraTool", "ToolA", "ToolB")
+        };
+
+        var result = await metric.EvaluateAsync(context);
+
+        // 100 (2/2 matched) - 10 (one extra) - 0 (order OK) = 90.
+        Assert.Equal(90, result.Score);
+        Assert.True(result.Passed);
+    }
+
+    [Fact]
+    public async Task EvaluateAsync_StrictOrder_MissingToolButPresentOnesOutOfOrder_AppliesOrderPenalty()
+    {
+        // ToolC missing AND the present tools (A,B) are swapped. Strict ordering must still be
+        // evaluated despite the missing tool (previously a missing tool skipped ordering entirely,
+        // under-applying the penalty).
+        var strict = new ToolSelectionMetric(new[] { "ToolA", "ToolB", "ToolC" }, strictOrder: true);
+        var lenient = new ToolSelectionMetric(new[] { "ToolA", "ToolB", "ToolC" }, strictOrder: false);
+        var ctx = new EvaluationContext { Input = "x", Output = "y", ToolUsage = CreateToolUsage("ToolB", "ToolA") };
+
+        var strictResult = await strict.EvaluateAsync(ctx);
+        var lenientResult = await lenient.EvaluateAsync(ctx);
+
+        // Both score 2/3 ≈ 66.67 for matching; strict subtracts the 20-pt order penalty.
+        Assert.True(strictResult.Score < lenientResult.Score,
+            $"strict ({strictResult.Score}) should be penalized for order vs lenient ({lenientResult.Score})");
+        Assert.Equal(lenientResult.Score - 20, strictResult.Score, 4);
+    }
+
+    [Fact]
+    public async Task EvaluateAsync_StrictOrder_AllPresentButOutOfOrder_AppliesOrderPenalty()
+    {
+        // Regression guard: a genuine out-of-order (B before A) is still penalized.
+        var metric = new ToolSelectionMetric(new[] { "ToolA", "ToolB" }, strictOrder: true);
+        var context = new EvaluationContext
+        {
+            Input = "x", Output = "y",
+            ToolUsage = CreateToolUsage("ToolB", "ToolA")
+        };
+
+        var result = await metric.EvaluateAsync(context);
+
+        // 100 - 0 extra - 20 order = 80.
+        Assert.Equal(80, result.Score);
+    }
+
     // Helper to create tool usage report
     private static ToolUsageReport CreateToolUsage(params string[] toolNames)
     {

@@ -81,20 +81,15 @@ public class ToolSelectionMetric : IAgenticMetric
         var extraPenalty = extra.Count * EvaluationDefaults.ExtraToolPenaltyPercent;
         var finalScore = Math.Max(0, matchScore - extraPenalty);
         
-        // Check order if required
-        if (_strictOrder && matched.Count == _expectedTools.Count)
+        // Strict-order penalty (BUG-30): the expected tools that were actually called must appear in
+        // calledTools in their expected relative order — i.e. as an ordered subsequence. This is
+        // checked INDEPENDENTLY of completeness (a missing tool no longer skips ordering, which
+        // previously under-applied the penalty) and is tolerant of interleaved extra tools (an
+        // allowed extra at the front is no longer a false order violation, which was over-strict).
+        if (_strictOrder)
         {
-            var orderedMatch = true;
-            for (int i = 0; i < expectedLower.Count; i++)
-            {
-                if (i >= calledTools.Count || calledTools[i] != expectedLower[i])
-                {
-                    orderedMatch = false;
-                    break;
-                }
-            }
-            
-            if (!orderedMatch)
+            var expectedPresent = expectedLower.Where(calledTools.Contains).ToList();
+            if (!IsOrderedSubsequence(expectedPresent, calledTools))
             {
                 finalScore = Math.Max(0, finalScore - EvaluationDefaults.OrderPenaltyPercent);
             }
@@ -120,6 +115,23 @@ public class ToolSelectionMetric : IAgenticMetric
             var msg = $"Tool selection issues. Missed: [{string.Join(", ", missed)}]. Extra: [{string.Join(", ", extra)}]";
             return Task.FromResult(MetricResult.Fail(Name, msg, finalScore, metadata));
         }
+    }
+
+    /// <summary>
+    /// Returns <see langword="true"/> when every element of <paramref name="needle"/> appears in
+    /// <paramref name="haystack"/> in the same relative order (an ordered subsequence); interleaved
+    /// elements in <paramref name="haystack"/> are ignored. Empty <paramref name="needle"/> matches
+    /// vacuously.
+    /// </summary>
+    private static bool IsOrderedSubsequence(IReadOnlyList<string> needle, IReadOnlyList<string> haystack)
+    {
+        var n = 0;
+        foreach (var item in haystack)
+        {
+            if (n < needle.Count && item == needle[n])
+                n++;
+        }
+        return n == needle.Count;
     }
 }
 
