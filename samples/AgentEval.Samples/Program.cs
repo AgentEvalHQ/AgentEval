@@ -112,6 +112,11 @@ public static class Program
             new("Memory",                    "Comprehensive memory benchmark — preset-driven",                      MemoryBenchmarkSample.RunAsync),
             new("Report Browser",            "Open previously-generated JSON / HTML / PDF runs",                    ReportBrowserBenchmark.RunAsync),
         ]),
+
+        new('I', "Observability (Glass Box)", "★ no credentials needed",
+        [
+            new("Glass Box Full Stack",      "Per-turn tracing + injection pre-gate + PII post-gate + wrapped tool + Trace Fidelity (offline)", GlassBoxFullStack.RunAsync),
+        ]),
     ];
 
     // ──────────────────────────────────────────────────────────
