@@ -93,6 +93,38 @@ public class AgenticSummaryBuilderTests
         Assert.Equal(0.80, summary.PerCategory["agentic-process"].Score, 6);
     }
 
+    // ── BUG-27: synthetic-category roll-up must be order-independent ───────────
+
+    [Fact]
+    public void Build_FlatPreset_CategoryScore_IsOrderIndependent()
+    {
+        // Same five system-outcome leaves, two different child orderings. The old pairwise
+        // (existing + score) / 2 re-average weighted the last-added evaluator far more, making
+        // the bucket score depend on insertion order (BUG-27). A true mean must not.
+        var ascending = Node("agentic.standard", "agentic", 0.70, subResults: new[]
+        {
+            Node("task_completion",            "system-outcome", 0.30),
+            Node("task_adherence",             "system-outcome", 0.50),
+            Node("intent_resolution",          "system-outcome", 0.60),
+            Node("task_navigation_efficiency", "system-outcome", 0.70),
+            Node("intent_identification",      "system-outcome", 0.90),
+        });
+        var descending = Node("agentic.standard", "agentic", 0.70, subResults: new[]
+        {
+            Node("intent_identification",      "system-outcome", 0.90),
+            Node("task_navigation_efficiency", "system-outcome", 0.70),
+            Node("intent_resolution",          "system-outcome", 0.60),
+            Node("task_adherence",             "system-outcome", 0.50),
+            Node("task_completion",            "system-outcome", 0.30),
+        });
+
+        var asc = new AgenticSummaryBuilder().Build(ascending).PerCategory["system-outcome"].Score;
+        var desc = new AgenticSummaryBuilder().Build(descending).PerCategory["system-outcome"].Score;
+
+        Assert.Equal(0.60, asc, 6);
+        Assert.Equal(asc, desc, 6); // identical regardless of order
+    }
+
     // ── Genuine category layer (L1 node keyed by a known category) still works ─
 
     [Fact]
