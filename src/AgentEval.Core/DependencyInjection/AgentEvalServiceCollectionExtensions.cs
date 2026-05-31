@@ -113,11 +113,23 @@ public static class AgentEvalServiceCollectionExtensions
                 break;
         }
 
-        // Register CalibratedJudge factory (parameterized construction)
+        // Calibrated judge/evaluator factory delegates (MNT-12).
+        //
+        // These are a deliberate DOWNSTREAM-CONSUMER extension point, not core wiring — nothing in this
+        // library resolves them (a host injects them where it needs to build a calibrated judge at
+        // request time, when the named-judge set is only known at runtime, not at container build).
+        // Because the set of judges is per-call data rather than a registered dependency, the natural
+        // shape is a parameterized factory delegate rather than a directly-registered ICalibratedJudge.
+        //
+        // The (string Name, IChatClient Client) tuple is NOT primitive obsession local to DI: it is the
+        // public constructor contract of CalibratedJudge / CalibratedEvaluator (and their Create overloads
+        // and the Judges property). The delegate intentionally mirrors that signature so it stays a thin
+        // pass-through with no divergent contract to keep in sync. Promoting it to an
+        // ICalibratedJudgeFactory + typed JudgeSpec record would be a source-breaking public-API change
+        // (it would have to ripple to those constructors to be coherent) and is tracked as vNext.
         services.TryAddSingleton<Func<IEnumerable<(string Name, IChatClient Client)>, CalibratedJudgeOptions?, ICalibratedJudge>>(
             _ => (judges, judgeOptions) => new CalibratedJudge(judges, judgeOptions));
 
-        // Register CalibratedEvaluator factory (parameterized construction)
         services.TryAddSingleton<Func<IEnumerable<(string Name, IChatClient Client)>, CalibratedJudgeOptions?, IEvaluator>>(
             _ => (judges, judgeOptions) => new CalibratedEvaluator(judges, judgeOptions));
 
