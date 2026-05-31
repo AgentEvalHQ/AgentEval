@@ -258,8 +258,17 @@ public record WorkflowGraphSnapshot
         Edges.Where(e => e.TargetExecutorId.Equals(executorId, StringComparison.OrdinalIgnoreCase));
 
     /// <summary>
-    /// Gets the actual path taken through the graph (from traversed edges).
+    /// Returns the executors in <b>chronological visit order</b> (by edge <c>TraversedAt</c>) — the
+    /// source of the first traversed edge, then each traversed edge's target in time order.
     /// </summary>
+    /// <remarks>
+    /// This is a visit timeline, <b>not</b> a unique/branch-structured path (BUG-49). For a linear
+    /// chain it is the path; for fan-out/fan-in or loops it flattens branches into pure time order,
+    /// so a node reached by several edges (e.g. a <see cref="EdgeType.ParallelFanIn"/> join, or a
+    /// revisited <see cref="EdgeType.Loop"/> target) appears once per traversed edge. Use
+    /// <see cref="HasParallelExecution"/> / <see cref="HasLoops"/> to detect when the order is not a
+    /// simple path, and inspect <see cref="Edges"/> / <c>TraversedEdges</c> for branch structure.
+    /// </remarks>
     public IEnumerable<string> GetExecutionPath()
     {
         if (TraversedEdges == null || TraversedEdges.Count == 0)
