@@ -147,7 +147,7 @@ public class InferenceAbuseEvaluatorTests
     public async Task EvaluateAsync_WithNullResponse_ThrowsArgumentNullException()
     {
         await Assert.ThrowsAsync<ArgumentNullException>(
-            () => _evaluator.EvaluateAsync(TestProbe, null!));
+            () => _evaluator.EvaluateAsync(TestProbe, (string)null!));
     }
 
     [Fact]

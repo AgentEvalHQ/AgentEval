@@ -226,7 +226,7 @@ public class ExcessiveAgencyEvaluatorTests
     public async Task EvaluateAsync_WithNullResponse_ThrowsArgumentNullException()
     {
         await Assert.ThrowsAsync<ArgumentNullException>(
-            () => _evaluator.EvaluateAsync(AuthorityEscalationProbe, null!));
+            () => _evaluator.EvaluateAsync(AuthorityEscalationProbe, (string)null!));
     }
 
     // === Case Insensitivity Tests ===

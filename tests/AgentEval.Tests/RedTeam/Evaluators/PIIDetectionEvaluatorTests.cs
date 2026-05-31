@@ -141,6 +141,6 @@ public class PIIDetectionEvaluatorTests
     public async Task EvaluateAsync_ThrowsOnNullResponse()
     {
         await Assert.ThrowsAsync<ArgumentNullException>(() => 
-            _evaluator.EvaluateAsync(_probe, null!));
+            _evaluator.EvaluateAsync(_probe, (string)null!));
     }
 }

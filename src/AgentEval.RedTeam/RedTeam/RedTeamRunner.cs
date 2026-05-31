@@ -224,8 +224,27 @@ public sealed class RedTeamRunner : IRedTeamRunner
             var response = await agent.InvokeAsync(probe.Prompt, probeCts.Token);
             var responseText = response.Text;
 
-            // Evaluate response
-            var evalResult = await evaluator.EvaluateAsync(probe, responseText, probeCts.Token);
+            // Evaluate response. RC-1: hand the evaluator the FULL AgentResponse so tool-aware
+            // evaluators can read RawMessages; text-only evaluators ignore it via the default member.
+            var evalResult = await evaluator.EvaluateAsync(probe, response, probeCts.Token);
+
+            // RC-1: classify the evidence the verdict rests on (Verbal / IntentToAct / Behavioral).
+            var fidelity = ResolveFidelity(evalResult);
+
+            // GAP-19 / RC-1: LLM-judge fallback — only when Inconclusive AND a judge client is configured.
+            // The judge reasons over text only, so a judge-derived verdict is capped at IntentToAct.
+            if (evalResult.Outcome == EvaluationOutcome.Inconclusive && options.JudgeClient is not null)
+            {
+                var judge = new Evaluators.LLMJudgeEvaluator(options.JudgeClient);
+                var judged = await judge.EvaluateAsync(probe, responseText, probeCts.Token);
+                if (judged.Outcome != EvaluationOutcome.Inconclusive)
+                {
+                    evalResult = judged;
+                    fidelity = judged.Outcome == EvaluationOutcome.Succeeded
+                        ? EvidenceFidelity.IntentToAct
+                        : EvidenceFidelity.Verbal;
+                }
+            }
 
             probeSw.Stop();
 
@@ -240,7 +259,8 @@ public sealed class RedTeamRunner : IRedTeamRunner
                 Technique = probe.Technique,
                 Difficulty = probe.Difficulty,
                 Duration = probeSw.Elapsed,
-                Severity = attackSeverity
+                Severity = attackSeverity,
+                Fidelity = fidelity
             };
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -289,6 +309,25 @@ public sealed class RedTeamRunner : IRedTeamRunner
             or TimeoutException
             or IOException
             or System.Net.Sockets.SocketException;
+
+    /// <summary>
+    /// RC-1: classify the evidence behind a verdict. Trusts only an explicit hint in
+    /// <c>EvaluationResult.Metadata["fidelity"]</c> (stamped by tool-aware evaluators such as
+    /// <c>ToolInvocationEvaluator</c>). All other verdicts are text-derived and default to
+    /// <see cref="EvidenceFidelity.Verbal"/> — an incidental, unrelated tool call in the trace is NOT
+    /// behavioral proof of the matched outcome, so it must not upgrade fidelity.
+    /// </summary>
+    private static EvidenceFidelity ResolveFidelity(EvaluationResult result)
+    {
+        if (result.Metadata is { } meta &&
+            meta.TryGetValue("fidelity", out var raw) &&
+            raw is EvidenceFidelity explicitFidelity)
+        {
+            return explicitFidelity;
+        }
+
+        return EvidenceFidelity.Verbal;
+    }
 
     /// <summary>
     /// Builds an Inconclusive <see cref="ProbeResult"/> for a failed probe execution. The exception

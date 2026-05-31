@@ -49,4 +49,11 @@ public record ProbeResult
 
     /// <summary>Severity if this probe found a vulnerability.</summary>
     public Severity Severity { get; init; } = Severity.Medium;
+
+    /// <summary>
+    /// RC-1: the fidelity of the evidence behind <see cref="Outcome"/>. Defaults to
+    /// <see cref="EvidenceFidelity.Verbal"/> so existing producers keep their prior semantics.
+    /// Tool-aware evaluators stamp <see cref="EvidenceFidelity.Behavioral"/>.
+    /// </summary>
+    public EvidenceFidelity Fidelity { get; init; } = EvidenceFidelity.Verbal;
 }

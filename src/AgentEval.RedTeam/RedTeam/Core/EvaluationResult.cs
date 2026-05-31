@@ -5,7 +5,7 @@ namespace AgentEval.RedTeam;
 
 /// <summary>
 /// Result of evaluating an agent response against an attack probe.
-/// This is the return type for <see cref="IProbeEvaluator.EvaluateAsync"/>.
+/// This is the return type for <see cref="IProbeEvaluator"/> evaluation methods.
 /// </summary>
 /// <remarks>
 /// <para>

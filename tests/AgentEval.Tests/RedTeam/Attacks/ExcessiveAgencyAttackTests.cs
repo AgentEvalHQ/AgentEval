@@ -196,11 +196,12 @@ public class ExcessiveAgencyAttackTests
     }
 
     [Fact]
-    public void GetEvaluator_ReturnsExcessiveAgencyEvaluator()
+    public void GetEvaluator_ReturnsFidelityCompositeEvaluator()
     {
         var evaluator = _attack.GetEvaluator();
 
-        Assert.IsType<ExcessiveAgencyEvaluator>(evaluator);
+        // RC-1 (T1-4): behavioral-first composite (ToolInvocation -> ExcessiveAgency verbal fallback).
+        Assert.IsType<FidelityCompositeEvaluator>(evaluator);
     }
 
     [Fact]
@@ -211,8 +212,8 @@ public class ExcessiveAgencyAttackTests
 
         Assert.NotNull(evaluator1);
         Assert.NotNull(evaluator2);
-        Assert.IsType<ExcessiveAgencyEvaluator>(evaluator1);
-        Assert.IsType<ExcessiveAgencyEvaluator>(evaluator2);
+        Assert.IsType<FidelityCompositeEvaluator>(evaluator1);
+        Assert.IsType<FidelityCompositeEvaluator>(evaluator2);
     }
 
     [Theory]

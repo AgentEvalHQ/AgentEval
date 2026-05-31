@@ -72,13 +72,13 @@ public class ScanOptions
     public bool IncludeEvidence { get; init; } = true;
 
     /// <summary>
-    /// Optional <see cref="IChatClient"/> for LLM-judge evaluation.
+    /// Optional <see cref="IChatClient"/> for LLM-judge fallback evaluation.
     /// </summary>
     /// <remarks>
-    /// <b>Reserved — not yet consumed by <c>RedTeamRunner</c></b> (GAP-19): the runner currently
-    /// scores every probe with the attack's built-in <c>GetEvaluator()</c> and has no LLM-judge
-    /// fallback path, so setting this has no effect on scan results today. It is strongly typed
-    /// (was <c>object?</c>) and retained for the planned <c>LLMJudgeEvaluator</c> fallback wiring.
+    /// RC-1 / GAP-19: when set, the runner invokes <c>LLMJudgeEvaluator</c> for any probe whose
+    /// deterministic verdict is <see cref="EvaluationOutcome.Inconclusive"/>, adopting the judge's
+    /// verdict when conclusive. Judge-derived "Succeeded" verdicts are recorded at
+    /// <see cref="EvidenceFidelity.IntentToAct"/> fidelity (text reasoning, not a tool trace).
     /// </remarks>
     public IChatClient? JudgeClient { get; init; }
 

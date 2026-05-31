@@ -167,7 +167,7 @@ public class CompositeEvaluatorTests
     public async Task EvaluateAsync_WithNullResponse_ThrowsArgumentNullException()
     {
         var composite = new CompositeEvaluator(new ContainsTokenEvaluator("TOKEN"));
-        await Assert.ThrowsAsync<ArgumentNullException>(() => composite.EvaluateAsync(TestProbe, null!));
+        await Assert.ThrowsAsync<ArgumentNullException>(() => composite.EvaluateAsync(TestProbe, (string)null!));
     }
 
     [Fact]

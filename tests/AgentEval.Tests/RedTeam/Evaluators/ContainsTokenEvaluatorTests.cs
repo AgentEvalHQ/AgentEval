@@ -114,7 +114,7 @@ public class ContainsTokenEvaluatorTests
     public async Task EvaluateAsync_WithNullResponse_ThrowsArgumentNullException()
     {
         var evaluator = new ContainsTokenEvaluator("PWNED");
-        await Assert.ThrowsAsync<ArgumentNullException>(() => evaluator.EvaluateAsync(TestProbe, null!));
+        await Assert.ThrowsAsync<ArgumentNullException>(() => evaluator.EvaluateAsync(TestProbe, (string)null!));
     }
 
     [Fact]
