@@ -105,10 +105,13 @@ public sealed class Query
     /// </summary>
     public async Task<WorkspaceState> Workspace(
         [Service] IOutputStoreReader store,
+        [Service] Microsoft.Extensions.Configuration.IConfiguration configuration,
         CancellationToken ct = default)
     {
         var version = typeof(IOutputStoreReader).Assembly.GetName().Version?.ToString() ?? "0.0.0";
-        var root = store.WorkspaceRoot;
+        // SEC-12: expose the absolute workspace root ONLY in Mode A (loopback, single operator); redact it
+        // for Mode B/C, mirroring the /api/v1/version endpoint. Enforced, not just documented.
+        var root = McHost.IsModeA(configuration["AgentEval:Mode"]) ? store.WorkspaceRoot : null;
 
         // The store reports `IsAvailable=false` until solution.json + at
         // least the .agenteval/ folder are present. Treat anything else as

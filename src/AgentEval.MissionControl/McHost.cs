@@ -202,6 +202,11 @@ public static class McHost
         var resolvedWorkspaceRoot = !string.IsNullOrWhiteSpace(configuredWorkspaceRoot)
             ? System.IO.Path.GetFullPath(configuredWorkspaceRoot)
             : DiscoverWorkspaceRoot(Directory.GetCurrentDirectory());
+        // SEC-12: the absolute workspaceRoot is exposed ONLY in Mode A (loopback, single operator). For
+        // Mode B (aggregator) / Mode C (server) it is redacted — the trust-boundary comment above is now
+        // ENFORCED here rather than relying on a future maintainer to remember it. Mode A is the default
+        // ("local"); anything else redacts.
+        var exposeWorkspaceRoot = IsModeA(resolvedMode);
         app.MapGet("/api/v1/version", () =>
         {
             // Re-check `workspaceInitialized` on every request — operators
@@ -215,8 +220,8 @@ public static class McHost
                 agentEvalVersion = typeof(AgentEval.Output.IOutputStoreReader).Assembly
                     .GetName().Version?.ToString() ?? "0.0.0",
                 graphqlEndpoint = "/graphql",
-                // T3.10: Mode A only — see trust-boundary comment above.
-                workspaceRoot = resolvedWorkspaceRoot,
+                // SEC-12: absolute path in Mode A only; null (redacted) otherwise.
+                workspaceRoot = exposeWorkspaceRoot ? resolvedWorkspaceRoot : null,
                 workspaceInitialized,
             });
         });
@@ -243,6 +248,15 @@ public static class McHost
     // (MapStaticAssets, MapFallbackToFile) expects the entry assembly to BE
     // the web project. The CLI's `mc serve` therefore spawns the MC executable
     // as a subprocess instead — see McServeCommand.cs in AgentEval.Cli.
+
+    /// <summary>
+    /// SEC-12: whether the resolved deployment mode is Mode A (loopback, single operator) — the only
+    /// mode in which the absolute workspace filesystem path may be exposed. Mode A is the default
+    /// (<c>"local"</c>, or unset); Mode B (<c>"aggregator"</c>) / Mode C (<c>"server"</c>) redact it.
+    /// </summary>
+    internal static bool IsModeA(string? resolvedMode) =>
+        string.IsNullOrWhiteSpace(resolvedMode) ||
+        string.Equals(resolvedMode, "local", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>
     /// Walks up from <paramref name="startDir"/> looking for the nearest
