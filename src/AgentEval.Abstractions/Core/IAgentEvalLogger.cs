@@ -124,7 +124,12 @@ public static class AgentEvalLoggerExtensions
     /// </summary>
     public static void LogToolCall(this IAgentEvalLogger logger, string toolName, bool success, TimeSpan duration, string? error = null)
     {
-        if (logger.IsEnabled(LogLevel.Debug))
+        // Gate on the level actually used (Debug for success, Warning for failure). Previously the
+        // whole body was gated on Debug, so failed-tool-call WARNINGS were dropped whenever Debug was
+        // off but Warning enabled — the common production config, hiding the escalated events an
+        // operator most wants to see (BUG-48).
+        var level = success ? LogLevel.Debug : LogLevel.Warning;
+        if (logger.IsEnabled(level))
         {
             var status = success ? "succeeded" : "failed";
             var message = $"Tool '{toolName}' {status} in {duration.TotalMilliseconds:F0}ms";
@@ -132,7 +137,7 @@ public static class AgentEvalLoggerExtensions
             {
                 message += $": {error}";
             }
-            logger.Log(success ? LogLevel.Debug : LogLevel.Warning, message);
+            logger.Log(level, message);
         }
     }
 }

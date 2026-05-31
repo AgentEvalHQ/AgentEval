@@ -232,6 +232,33 @@ public class AgentEvalLoggerTests
     }
 
     [Fact]
+    public void LogToolCall_Failure_LoggedAtWarning_EvenWhenDebugDisabled()
+    {
+        // BUG-48: with Debug off but Warning enabled (common production config) a failed tool call's
+        // warning must still be emitted — previously the whole body was gated on Debug and dropped it.
+        var output = CaptureConsoleOutput(logger =>
+        {
+            logger.LogToolCall("calculator", success: false, TimeSpan.FromMilliseconds(50), "Division by zero");
+        }, LogLevel.Warning);
+
+        Assert.Contains("calculator", output);
+        Assert.Contains("failed", output);
+        Assert.Contains("[Warning]", output);
+    }
+
+    [Fact]
+    public void LogToolCall_Success_SuppressedWhenDebugDisabled()
+    {
+        // Successful tool calls stay at Debug level and are suppressed when Debug is off.
+        var output = CaptureConsoleOutput(logger =>
+        {
+            logger.LogToolCall("search", success: true, TimeSpan.FromMilliseconds(10));
+        }, LogLevel.Warning);
+
+        Assert.Empty(output);
+    }
+
+    [Fact]
     public void ConsoleLogger_LevelBelowMinimum_DoesNotLog()
     {
         var output = CaptureConsoleOutput(logger =>
