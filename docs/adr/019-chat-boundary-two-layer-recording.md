@@ -47,3 +47,11 @@ We need a second capture layer one level down — at the `Microsoft.Extensions.A
 - **A hand-rolled `IChatClient` decorator shim.** Rejected: MEAI 10.5.0 already ships `DelegatingChatClient`/`ChatClientBuilder.Use` (verified by reflection), so the shim is unnecessary.
 - **Recorder in `AgentEval.MAF`.** Rejected: would tie chat-boundary capture to MAF and forfeit SK/raw-loop reach; Core placement keeps it universal.
 - **Subclassing `TraceEntry` for chat-turn/tool entries.** Rejected: the trace serializes a flat `List<TraceEntry>` with reflection-based STJ; subclasses would break it. Additive nullable fields + static factory methods are used instead (see [ADR-020](020-agenttrace-v1_1-schema.md)).
+
+## Invariants (do not "fix" these)
+
+These are load-bearing and easy to mistake for accidents:
+
+- **Two `AgentTrace` types are intentional.** `AgentEval.Tracing.AgentTrace` (the working class used by recorders/replay) is distinct from `AgentEval.Output.AgentTrace` (the IOutputStore record). They are *not* duplication — do not merge them.
+- **The recorder must be composed *inner* of `UseFunctionInvocation`.** `ChatClientBuilder.Use` applies first-registered-outermost, so the recorder sits inside the tool loop and captures one entry per model round-trip; placed outer it records a single entry for the whole loop. Pinned by `TraceRecordingChatClientTests.ComposedInnerOfFunctionInvocation*` and checked by the `doctor` command. For MAF agents the runtime adds the loop, so wrapping the *raw model* with `UseTraceRecording` already lands the recorder inside it.
+- **Agent-boundary reconstruction shares the recorder's serialization.** `AgentBoundaryTraceBuilder.FromAgentResponse(...)` rebuilds the framework's self-report (from MAF `AgentResponse.Messages`/`.Usage`/`.FinishReason`) for a Trace Fidelity reconciliation. It and the chat recorder both map tool calls via `TraceMapping.ToToolCall` so arguments serialize byte-identically — otherwise a clean run would show a *fabricated* `argument_drift`. Empirically (pinned by `AgentBoundaryTraceBuilderTests`), MEAI's function-invocation loop preserves every tool call in the final messages and **sums** token usage, so on a normal run the framework *agrees* on totals: it **hides** per-turn detail, it does not lie. The `Real vs Framework` observability samples demonstrate exactly this.

@@ -108,6 +108,24 @@ public class TraceRecordingChatClientTests
     }
 
     [Fact]
+    public async Task ExtractsSystemPrompt_FromChatOptionsInstructions_NotOnlySystemMessages()
+    {
+        // Arrange — MAF's ChatClientAgent passes agent instructions via ChatOptions.Instructions, NOT as a
+        // System-role message. The conversation here has only a User message.
+        var scripted = new ScriptedChatClient().AddText("ok");
+        var trace = new AgentTrace();
+        var recorder = new TraceRecordingChatClient(scripted, "agent", trace);
+        var options = new ChatOptions { Instructions = "You are a careful travel agent." };
+
+        // Act
+        await recorder.GetResponseAsync(new List<ChatMessage> { new(ChatRole.User, "hi") }, options);
+
+        // Assert — the instructions are captured as the system prompt (would be null if we only read System messages)
+        var request = trace.Entries.First(e => e.Type == TraceEntryType.Request);
+        Assert.Contains("careful travel agent", request.SystemPrompt);
+    }
+
+    [Fact]
     public async Task WhenInnerThrows_RecordsChatTurnErrorEntryAndRethrows()
     {
         // Arrange
@@ -191,10 +209,11 @@ public class TraceRecordingChatClientTests
 
         // Assert — the Request must NOT be left dangling: a streaming Response entry is finalized on break
         Assert.Equal(1, trace.Entries.Count(e => e.Type == TraceEntryType.Request));
-        var response = Assert.Single(trace.Entries.Where(e => e.Type == TraceEntryType.Response));
+        var response = Assert.Single(trace.Entries, e => e.Type == TraceEntryType.Response);
         Assert.True(response.IsStreaming);
         Assert.Equal("partial", response.Text);   // what streamed before the break is captured
     }
+
 
     [Fact]
     public async Task WhenInsideCorrelationScope_AllEntriesShareCorrelationId_ElseNull()

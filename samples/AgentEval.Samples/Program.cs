@@ -113,10 +113,11 @@ public static class Program
             new("Report Browser",            "Open previously-generated JSON / HTML / PDF runs",                    ReportBrowserBenchmark.RunAsync),
         ]),
 
-        new('I', "Observability (Glass Box)", "★ no credentials needed",
+        new('I', "Observability (Glass Box)", "★ 1-2 offline · 3 needs Azure",
         [
-            new("Glass Box Full Stack",      "Per-turn tracing + injection pre-gate + PII post-gate + wrapped tool + Trace Fidelity (offline)", GlassBoxFullStack.RunAsync),
-            new("Auto-Audit",                "Benchmark 3 endpoints on honesty + safety + cost in one pass — ranked comparison (offline)", AutoAudit.RunAsync),
+            new("Glass Box Full Stack",      "Per-turn tracing + injection pre-gate + PII post-gate + wrapped tool (offline; API tour)",     GlassBoxFullStack.RunAsync),
+            new("Auto-Audit (synthetic)",    "Ranked honesty/safety/cost over 3 SCRIPTED endpoints — offline preview of the table shape",     AutoAudit.RunAsync),
+            new("Real vs Framework: Agent",  "REAL travel agent — MAF's account vs Glass Box: what the framework HIDES per turn (needs Azure)", RealVsFrameworkTravelAgent.RunAsync),
         ]),
     ];
 

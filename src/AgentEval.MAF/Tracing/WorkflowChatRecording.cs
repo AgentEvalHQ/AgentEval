@@ -17,8 +17,17 @@ namespace AgentEval.MAF.Tracing;
 /// This is the explicit-instrumentation form. A fully transparent adapter hook (zero pre-wiring) would
 /// require intercepting MAF's per-executor chat-client construction, which depends on MAF-internal surface
 /// not exposed by <c>MAFWorkflowAdapter</c> today; it is tracked as a follow-up and would not be
-/// byte-identical to direct chat-boundary capture. For MAF executors the agent runtime drives the tool
-/// loop, so wrapping the raw model with recording yields one entry per model round-trip.
+/// byte-identical to direct chat-boundary capture.
+/// <para>
+/// ⚠️ <b>Validated caveat (2026-05-31).</b> Wrapping a model client and handing it to a
+/// <c>ChatClientAgent</c> captures correctly when the agent is invoked <b>directly</b>
+/// (<c>RunAsync</c>/<c>RunStreamingAsync</c> — pinned by tests). But when that same agent is
+/// <c>BindAsExecutor</c>-ed into a MAF <c>Workflow</c> and run via <c>InProcessExecution</c>, the executor
+/// path did <b>not</b> reliably route the model response back through the instrumented <see cref="IChatClient"/>
+/// in testing (per-executor traces came back without Response entries). Per-executor chat-boundary capture
+/// <i>inside a live Workflow</i> is therefore deferred pending a MAF-level hook; for now capture at the
+/// individual-agent boundary, which works. See ADR-019.
+/// </para>
 /// </remarks>
 public sealed class WorkflowChatRecording
 {

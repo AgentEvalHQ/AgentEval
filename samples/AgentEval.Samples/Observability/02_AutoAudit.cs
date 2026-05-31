@@ -7,16 +7,21 @@ using AgentEval.Benchmarks;
 namespace AgentEval.Samples;
 
 /// <summary>
-/// Glass Box — Auto-Audit (Observability). Offline (no credentials): benchmarks three "endpoints"
-/// (clean / silent-retry / PII+content-filter) on honesty (Trace Fidelity), safety (gate blocks), and
-/// cost (tokens/latency) in one pass, then prints a ranked cross-endpoint comparison.
+/// Glass Box — Auto-Audit (Observability). Offline PREVIEW of the table shape (no credentials): the three
+/// "endpoints" (clean / silent-retry / PII+content-filter) are <b>scripted</b> with pre-baked behaviours, so
+/// this shows what a ranked honesty/safety/cost comparison LOOKS like — it is not a real endpoint comparison.
+/// For real, run "Real vs Framework: Agent / Workflow" against a live model.
 /// </summary>
 public static class AutoAudit
 {
     /// <summary>Runs the offline auto-audit demonstration.</summary>
     public static async Task RunAsync()
     {
-        Console.WriteLine("=== Glass Box — Auto-Audit (offline, 3 endpoints) ===\n");
+        Console.WriteLine("=== Glass Box — Auto-Audit (OFFLINE PREVIEW, 3 scripted endpoints) ===\n");
+        Console.ForegroundColor = ConsoleColor.DarkYellow;
+        Console.WriteLine("  [synthetic — these endpoints are scripted to show the table shape, not a real comparison]");
+        Console.WriteLine("  [for a real framework-vs-Glass-Box audit, run \"Real vs Framework: Agent / Workflow\"]\n");
+        Console.ResetColor();
 
         var report = await AutoAuditDemo.BuildOfflineReportAsync();
 

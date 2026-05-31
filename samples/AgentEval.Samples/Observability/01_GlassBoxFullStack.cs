@@ -15,10 +15,12 @@ using ChatRole = Microsoft.Extensions.AI.ChatRole;
 namespace AgentEval.Samples;
 
 /// <summary>
-/// Glass Box — Full Stack (Observability). Offline (no credentials): a single
-/// <see cref="ScriptedChatClient"/> drives a pipeline composed of an injection pre-gate, the MEAI tool
-/// loop, the chat-boundary recorder, and a PII post-gate; one tool is wrapped to capture its execution.
-/// Then a Trace Fidelity reconciliation surfaces a hidden retry the agent boundary would have hidden.
+/// Glass Box — Full Stack (Observability). Offline API tour (no credentials): a single
+/// <see cref="ScriptedChatClient"/> drives a REAL pipeline — injection pre-gate, the MEAI tool loop, the
+/// chat-boundary recorder, and a PII post-gate — with one tool wrapped to capture its execution. Everything
+/// up to the redaction is genuine. The closing Trace Fidelity section is <b>illustrative</b>: it scores two
+/// <b>hand-built</b> traces to show what the reconciler reports — it is NOT a real detection.
+/// For a real framework-vs-Glass-Box comparison on a live model, run "Real vs Framework: Agent / Workflow".
 /// </summary>
 public static class GlassBoxFullStack
 {
@@ -74,7 +76,12 @@ public static class GlassBoxFullStack
         var gateKeys = trace.Metadata?.Keys.Where(k => k.StartsWith("gate.", StringComparison.Ordinal)).ToList() ?? new List<string>();
         Console.WriteLine($"Gate verdicts recorded             : {string.Join(", ", gateKeys)}");
 
-        // 5) Trace Fidelity: the agent boundary reported ONE Lookup; the chat boundary saw a retry.
+        // 5) Trace Fidelity — ILLUSTRATIVE ONLY. The two traces below are HAND-BUILT to show what the
+        //    reconciler reports for a hidden retry; this is NOT a detection from the run above. For a REAL
+        //    framework-vs-Glass-Box comparison on a live model, run "Real vs Framework: Agent / Workflow".
+        Console.ForegroundColor = ConsoleColor.DarkYellow;
+        Console.WriteLine("\n[illustrative — synthetic hand-built traces, not a real detection]");
+        Console.ResetColor();
         var agentBoundary = new AgentTrace
         {
             Entries =
@@ -95,6 +102,7 @@ public static class GlassBoxFullStack
         Console.WriteLine($"\nTrace Fidelity score               : {report.OverallScore * 100:F0}%");
         Console.WriteLine($"  hidden_retries ({hidden.Severity})         : count={hidden.Count} — {(hidden.Examples.Count > 0 ? hidden.Examples[0] : "none")}");
 
-        Console.WriteLine("\nGlass Box: recorded what actually happened, policed what was about to happen, and audited the framework's account.");
+        Console.WriteLine("\nGlass Box (this sample): recorded every round-trip, captured the tool execution, and redacted PII inline.");
+        Console.WriteLine("For the framework-vs-Glass-Box audit on a REAL model, run \"Real vs Framework: Agent / Workflow\".");
     }
 }
