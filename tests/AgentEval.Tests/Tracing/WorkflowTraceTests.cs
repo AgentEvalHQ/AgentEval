@@ -248,6 +248,46 @@ public class WorkflowTraceTests
         }
     }
 
+    [Fact]
+    public async Task WorkflowTraceRecorder_CopiesPerStepErrorProvenance()
+    {
+        // BUG-35: per-step error provenance (WorkflowExecutionResult.Errors, keyed by ExecutorId)
+        // was never propagated into WorkflowTraceStep.Error, so a failed step recorded no error in
+        // the trace. It must now be mapped.
+        var mockWorkflow = new MockWorkflowAgent(new WorkflowExecutionResult
+        {
+            FinalOutput = "partial",
+            Steps = new List<ExecutorStep>
+            {
+                new() { ExecutorId = "ok-step", Output = "fine", StepIndex = 0, Duration = TimeSpan.FromMilliseconds(10) },
+                new() { ExecutorId = "bad-step", Output = "", StepIndex = 1, Duration = TimeSpan.FromMilliseconds(5) }
+            },
+            Errors = new List<WorkflowError>
+            {
+                new()
+                {
+                    ExecutorId = "bad-step",
+                    Message = "tool blew up",
+                    ExceptionType = "InvalidOperationException",
+                    StackTrace = "at Bad.Step()"
+                }
+            },
+            TotalDuration = TimeSpan.FromMilliseconds(15)
+        });
+
+        await using var recorder = new WorkflowTraceRecorder(mockWorkflow, "err_workflow");
+        await recorder.ExecuteWorkflowAsync("go");
+
+        var trace = recorder.Trace;
+        var okStep = trace.Steps.Single(s => s.ExecutorId == "ok-step");
+        var badStep = trace.Steps.Single(s => s.ExecutorId == "bad-step");
+
+        Assert.Null(okStep.Error); // no error recorded for this executor
+        Assert.NotNull(badStep.Error); // error provenance now survives into the trace (BUG-35)
+        Assert.Equal("tool blew up", badStep.Error!.Message);
+        Assert.Equal("InvalidOperationException", badStep.Error.Type);
+    }
+
     #endregion
 
     #region WorkflowTraceReplayingAgent Tests

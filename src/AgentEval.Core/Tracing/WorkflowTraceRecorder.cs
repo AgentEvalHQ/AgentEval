@@ -186,6 +186,22 @@ public sealed class WorkflowTraceRecorder : IWorkflowEvaluableAgent, IAsyncDispo
                 }).ToList();
             }
 
+            // Map any workflow-level error recorded for this executor into the step trace so
+            // step-level error provenance survives (BUG-35). ExecutorStep itself carries no Error
+            // property; per-step errors are recorded on WorkflowExecutionResult.Errors keyed by
+            // ExecutorId, and were previously never propagated into WorkflowTraceStep.Error.
+            var stepError = result.Errors?.FirstOrDefault(e =>
+                string.Equals(e.ExecutorId, step.ExecutorId, StringComparison.Ordinal));
+            if (stepError != null)
+            {
+                traceStep.Error = new TraceError
+                {
+                    Type = stepError.ExceptionType,
+                    Message = stepError.Message,
+                    StackTrace = SanitizeText(stepError.StackTrace)
+                };
+            }
+
             _trace.Steps.Add(traceStep);
         }
 
