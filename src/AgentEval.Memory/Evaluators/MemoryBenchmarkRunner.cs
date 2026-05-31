@@ -63,8 +63,14 @@ public class MemoryBenchmarkRunner : IMemoryBenchmarkRunner
     private readonly ITemporalMemoryScenarios _temporalScenarios;
     private readonly ICrossSessionScenarios _crossSessionScenarios;
     private readonly ILogger<MemoryBenchmarkRunner> _logger;
-    private int? _targetTokensOverride;
-    private int? _overflowCallsOverride;
+
+    /// <summary>
+    /// Per-run scenario overrides derived from the benchmark, threaded as a parameter rather than
+    /// stored on the instance. Previously these were mutable instance fields written at the top of
+    /// every RunBenchmarkAsync and read deep inside TryRunFromJsonAsync, which raced when the same
+    /// (AddScoped, reusable) runner ran several benchmarks concurrently (BUG-56).
+    /// </summary>
+    private readonly record struct ScenarioOverrides(int? TargetTokens, int? OverflowCalls);
 
     public MemoryBenchmarkRunner(
         IMemoryTestRunner runner,
@@ -123,8 +129,7 @@ public class MemoryBenchmarkRunner : IMemoryBenchmarkRunner
         ArgumentNullException.ThrowIfNull(agent);
         ArgumentNullException.ThrowIfNull(benchmark);
 
-        _targetTokensOverride = benchmark.TargetTokensOverride;
-        _overflowCallsOverride = benchmark.OverflowCallsOverride;
+        var overrides = new ScenarioOverrides(benchmark.TargetTokensOverride, benchmark.OverflowCallsOverride);
         var totalStopwatch = Stopwatch.StartNew();
         var categoryResults = new List<BenchmarkCategoryResult>();
         var totalCategories = benchmark.Categories.Count;
@@ -150,7 +155,7 @@ public class MemoryBenchmarkRunner : IMemoryBenchmarkRunner
             // than silently degrading to Quick (no JSON file declares "diagnostic" or
             // "overflow" — both fell back to "quick" via the ScenarioLoader default).
             var catResult = await RunCategoryAsync(
-                agent, category, benchmark.EffectivePresetResolutionKey, cancellationToken);
+                agent, category, benchmark.EffectivePresetResolutionKey, overrides, cancellationToken);
             categoryResults.Add(catResult);
 
             _logger.LogDebug("Category '{CategoryName}': Score={Score:F1}%, Skipped={Skipped}",
@@ -202,6 +207,7 @@ public class MemoryBenchmarkRunner : IMemoryBenchmarkRunner
         IEvaluableAgent agent,
         MemoryBenchmarkCategory category,
         string presetName,
+        ScenarioOverrides overrides,
         CancellationToken cancellationToken)
     {
         var catStopwatch = Stopwatch.StartNew();
@@ -210,18 +216,18 @@ public class MemoryBenchmarkRunner : IMemoryBenchmarkRunner
         {
             var score = category.ScenarioType switch
             {
-                BenchmarkScenarioType.BasicRetention => await RunBasicRetentionAsync(agent, presetName, cancellationToken),
-                BenchmarkScenarioType.TemporalReasoning => await RunTemporalReasoningAsync(agent, presetName, cancellationToken),
-                BenchmarkScenarioType.NoiseResilience => await RunNoiseResilienceAsync(agent, presetName, cancellationToken),
+                BenchmarkScenarioType.BasicRetention => await RunBasicRetentionAsync(agent, presetName, overrides, cancellationToken),
+                BenchmarkScenarioType.TemporalReasoning => await RunTemporalReasoningAsync(agent, presetName, overrides, cancellationToken),
+                BenchmarkScenarioType.NoiseResilience => await RunNoiseResilienceAsync(agent, presetName, overrides, cancellationToken),
                 BenchmarkScenarioType.ReachBackDepth => await RunReachBackAsync(agent, presetName, cancellationToken),
                 BenchmarkScenarioType.FactUpdateHandling => await RunFactUpdateAsync(agent, presetName, cancellationToken),
-                BenchmarkScenarioType.MultiTopic => await RunMultiTopicAsync(agent, presetName, cancellationToken),
+                BenchmarkScenarioType.MultiTopic => await RunMultiTopicAsync(agent, presetName, overrides, cancellationToken),
                 BenchmarkScenarioType.CrossSession => await RunCrossSessionAsync(agent, presetName, cancellationToken),
                 BenchmarkScenarioType.ReducerFidelity => await RunReducerFidelityAsync(agent, presetName, cancellationToken),
-                BenchmarkScenarioType.Abstention => await RunAbstentionAsync(agent, presetName, cancellationToken),
-                BenchmarkScenarioType.ConflictResolution => await RunConflictResolutionAsync(agent, presetName, cancellationToken),
+                BenchmarkScenarioType.Abstention => await RunAbstentionAsync(agent, presetName, overrides, cancellationToken),
+                BenchmarkScenarioType.ConflictResolution => await RunConflictResolutionAsync(agent, presetName, overrides, cancellationToken),
                 BenchmarkScenarioType.MultiSessionReasoning => await RunMultiSessionReasoningAsync(agent, presetName, cancellationToken),
-                BenchmarkScenarioType.PreferenceExtraction => await RunPreferenceExtractionAsync(agent, presetName, cancellationToken),
+                BenchmarkScenarioType.PreferenceExtraction => await RunPreferenceExtractionAsync(agent, presetName, overrides, cancellationToken),
                 _ => (Score: 0.0, Skipped: true, SkipReason: $"Unknown scenario type: {category.ScenarioType}")
             };
 
@@ -272,20 +278,21 @@ public class MemoryBenchmarkRunner : IMemoryBenchmarkRunner
     /// matching the LongMemEval approach. No IHistoryInjectableAgent dependency.
     /// </summary>
     private async Task<(double Score, bool Skipped, string? SkipReason)?> TryRunFromJsonAsync(
-        IEvaluableAgent agent, string scenarioName, string presetName, CancellationToken ct)
+        IEvaluableAgent agent, string scenarioName, string presetName, ScenarioOverrides overrides, CancellationToken ct)
     {
         try
         {
             var scenarioDef = DataLoading.ScenarioLoader.Load(scenarioName);
             var preset = DataLoading.ScenarioLoader.ResolvePreset(scenarioDef, presetName);
 
-            // Apply overrides from benchmark (e.g., Overflow preset)
+            // Apply per-run overrides from the benchmark (e.g., Overflow preset), threaded in as a
+            // parameter rather than read from shared instance fields (BUG-56).
             if (preset.ContextPressure != null)
             {
-                if (_targetTokensOverride.HasValue)
-                    preset.ContextPressure.TargetTokens = _targetTokensOverride.Value;
-                if (_overflowCallsOverride.HasValue)
-                    preset.ContextPressure.OverflowCalls = _overflowCallsOverride.Value;
+                if (overrides.TargetTokens.HasValue)
+                    preset.ContextPressure.TargetTokens = overrides.TargetTokens.Value;
+                if (overrides.OverflowCalls.HasValue)
+                    preset.ContextPressure.OverflowCalls = overrides.OverflowCalls.Value;
             }
 
             // Load corpus turns (if configured)
@@ -614,9 +621,9 @@ public class MemoryBenchmarkRunner : IMemoryBenchmarkRunner
     /// Falls back to SyntheticHistoryGenerator if corpus files are not available.
     /// </summary>
     private async Task<(double Score, bool Skipped, string? SkipReason)> RunPreferenceExtractionAsync(
-        IEvaluableAgent agent, string presetName, CancellationToken ct)
+        IEvaluableAgent agent, string presetName, ScenarioOverrides overrides, CancellationToken ct)
     {
-        var jsonResult = await TryRunFromJsonAsync(agent, "preference-extraction", presetName, ct);
+        var jsonResult = await TryRunFromJsonAsync(agent, "preference-extraction", presetName, overrides, ct);
         if (jsonResult.HasValue) return jsonResult.Value;
 
         // No hardcoded fallback — preference extraction is JSON-only
@@ -680,10 +687,10 @@ public class MemoryBenchmarkRunner : IMemoryBenchmarkRunner
     // ═══════════════════════════════════════════════════════════════
 
     private async Task<(double Score, bool Skipped, string? SkipReason)> RunBasicRetentionAsync(
-        IEvaluableAgent agent, string presetName, CancellationToken ct)
+        IEvaluableAgent agent, string presetName, ScenarioOverrides overrides, CancellationToken ct)
     {
         // Try JSON-driven scenario first
-        var jsonResult = await TryRunFromJsonAsync(agent, "basic-retention", presetName, ct);
+        var jsonResult = await TryRunFromJsonAsync(agent, "basic-retention", presetName, overrides, ct);
         if (jsonResult.HasValue) return jsonResult.Value;
 
         // Fallback: hardcoded scenario (legacy — will be removed once JSON migration is verified)
@@ -745,9 +752,9 @@ public class MemoryBenchmarkRunner : IMemoryBenchmarkRunner
     }
 
     private async Task<(double Score, bool Skipped, string? SkipReason)> RunTemporalReasoningAsync(
-        IEvaluableAgent agent, string presetName, CancellationToken ct)
+        IEvaluableAgent agent, string presetName, ScenarioOverrides overrides, CancellationToken ct)
     {
-        var jsonResult = await TryRunFromJsonAsync(agent, "temporal-reasoning", presetName, ct);
+        var jsonResult = await TryRunFromJsonAsync(agent, "temporal-reasoning", presetName, overrides, ct);
         if (jsonResult.HasValue) return jsonResult.Value;
 
         var scores = new List<double>();
@@ -805,9 +812,9 @@ public class MemoryBenchmarkRunner : IMemoryBenchmarkRunner
     }
 
     private async Task<(double Score, bool Skipped, string? SkipReason)> RunNoiseResilienceAsync(
-        IEvaluableAgent agent, string presetName, CancellationToken ct)
+        IEvaluableAgent agent, string presetName, ScenarioOverrides overrides, CancellationToken ct)
     {
-        var jsonResult = await TryRunFromJsonAsync(agent, "noise-resilience", presetName, ct);
+        var jsonResult = await TryRunFromJsonAsync(agent, "noise-resilience", presetName, overrides, ct);
         if (jsonResult.HasValue) return jsonResult.Value;
 
         var scores = new List<double>();
@@ -919,9 +926,9 @@ public class MemoryBenchmarkRunner : IMemoryBenchmarkRunner
     }
 
     private async Task<(double Score, bool Skipped, string? SkipReason)> RunMultiTopicAsync(
-        IEvaluableAgent agent, string presetName, CancellationToken ct)
+        IEvaluableAgent agent, string presetName, ScenarioOverrides overrides, CancellationToken ct)
     {
-        var jsonResult = await TryRunFromJsonAsync(agent, "multi-topic", presetName, ct);
+        var jsonResult = await TryRunFromJsonAsync(agent, "multi-topic", presetName, overrides, ct);
         if (jsonResult.HasValue) return jsonResult.Value;
 
         var scores = new List<double>();
@@ -1102,9 +1109,9 @@ public class MemoryBenchmarkRunner : IMemoryBenchmarkRunner
     }
 
     private async Task<(double Score, bool Skipped, string? SkipReason)> RunConflictResolutionAsync(
-        IEvaluableAgent agent, string presetName, CancellationToken ct)
+        IEvaluableAgent agent, string presetName, ScenarioOverrides overrides, CancellationToken ct)
     {
-        var jsonResult = await TryRunFromJsonAsync(agent, "conflict-resolution", presetName, ct);
+        var jsonResult = await TryRunFromJsonAsync(agent, "conflict-resolution", presetName, overrides, ct);
         if (jsonResult.HasValue) return jsonResult.Value;
 
         // No hardcoded fallback — conflict resolution is JSON-only
@@ -1112,9 +1119,9 @@ public class MemoryBenchmarkRunner : IMemoryBenchmarkRunner
     }
 
     private async Task<(double Score, bool Skipped, string? SkipReason)> RunAbstentionAsync(
-        IEvaluableAgent agent, string presetName, CancellationToken ct)
+        IEvaluableAgent agent, string presetName, ScenarioOverrides overrides, CancellationToken ct)
     {
-        var jsonResult = await TryRunFromJsonAsync(agent, "abstention", presetName, ct);
+        var jsonResult = await TryRunFromJsonAsync(agent, "abstention", presetName, overrides, ct);
         if (jsonResult.HasValue) return jsonResult.Value;
 
         // Fallback: hardcoded abstention
