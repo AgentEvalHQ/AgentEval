@@ -20,6 +20,10 @@
 # put an authenticating reverse proxy in front.
 
 # ─── Stage 1: SPA build ───────────────────────────────────────────────────────
+# SEC-14: base images use floating major tags for readability. For reproducible
+# builds, pin each FROM to a digest (e.g. `node:22-alpine@sha256:<digest>`) and
+# let Dependabot keep the digests current — `.github/dependabot.yml` enables the
+# `docker` ecosystem for this file, which opens PRs to refresh the pinned digests.
 FROM node:22-alpine AS spa
 WORKDIR /spa
 
@@ -71,13 +75,10 @@ RUN dotnet publish -c Release -o /app/publish --no-restore /p:UseAppHost=false
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 WORKDIR /app
 
-# Install curl for HEALTHCHECK. The minimal aspnet runtime image does not
-# ship curl by default, and rolling our own probe binary is overkill for a
-# single /api/v1/version GET. Do this as root BEFORE switching to the
-# non-root app user.
-RUN apt-get update \
- && apt-get install -y --no-install-recommends curl \
- && rm -rf /var/lib/apt/lists/*
+# SEC-14: no curl. The HEALTHCHECK below uses a self-contained internal probe
+# (`dotnet AgentEval.MissionControl.dll --health-check`) instead of curl, so
+# the runtime stage installs NO extra apt packages — smaller attack surface,
+# no unpinned package, no apt cache to clean.
 
 # Run as a non-root user. The official aspnet image ships an `app` user at
 # UID 1654 — refer to it numerically so the image still works under
@@ -95,12 +96,13 @@ ENV AgentEval__Root=/workspace \
 
 EXPOSE 5000
 
-# T3.9 — Container health probe. `/api/v1/version` is the cheapest 200-OK
-# endpoint and exercises Kestrel + the GraphQL host wiring (the version
-# resolver itself is constant-time). Loopback (127.0.0.1) because the
-# container ASPNETCORE_URLS bind is 0.0.0.0:5000 and we don't want the
-# probe to leave the netns.
+# T3.9 / SEC-14 — Container health probe. `/api/v1/version` is the cheapest
+# 200-OK endpoint and exercises Kestrel + the GraphQL host wiring (the version
+# resolver itself is constant-time). The probe is the app itself in
+# `--health-check` mode (McHealthCheck): it always targets loopback
+# (127.0.0.1) — even though ASPNETCORE_URLS binds 0.0.0.0 — so it never leaves
+# the netns, and it adds no curl/wget binary to the image.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
-    CMD curl -fsS http://127.0.0.1:5000/api/v1/version || exit 1
+    CMD ["dotnet", "AgentEval.MissionControl.dll", "--health-check"]
 
 ENTRYPOINT ["dotnet", "AgentEval.MissionControl.dll"]

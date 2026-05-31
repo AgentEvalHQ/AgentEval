@@ -24,3 +24,17 @@ updates:
       nuget:
         patterns:
           - "*"
+
+  # SEC-14: keep the Dockerfile base images (and their pinned digests, once pinned) current. The
+  # Dockerfile uses floating major tags for readability; pin each FROM to a digest and Dependabot
+  # will open PRs to refresh the digests.
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    commit-message:
+      prefix: "chore"
+    groups:
+      docker:
+        patterns:
+          - "*"

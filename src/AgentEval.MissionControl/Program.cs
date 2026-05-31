@@ -13,6 +13,16 @@ using AgentEval.Output;
 // statements below are the equivalent path for `dotnet run --project
 // src/AgentEval.MissionControl` (still useful for development).
 
+// SEC-14: self-contained container health probe. The Docker HEALTHCHECK invokes
+// `dotnet AgentEval.MissionControl.dll --health-check`, which performs a loopback HTTP GET against the
+// running server and exits 0 (healthy) / 1 (unhealthy) — so the runtime image no longer needs curl.
+// Handled before any web-host setup so the probe process starts and exits quickly.
+if (args.Any(a => string.Equals(a, McHealthCheck.Flag, StringComparison.OrdinalIgnoreCase)))
+{
+    Environment.Exit(await McHealthCheck.RunAsync());
+    return;
+}
+
 // Honour `--workspace <path>` from the command line on the bare-dotnet-run
 // path. The CLI form (`agenteval mc serve --workspace ...`) translates this
 // flag to the `AgentEval__Root` env var inside `McServeCommand`; do the same
