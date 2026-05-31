@@ -250,6 +250,58 @@ public class ConversationRunnerTests
     }
 
     [Fact]
+    public async Task RunAsync_AgentThrows_RecordsExplicitFailedAssertion()
+    {
+        // BUG-36: a crash must record an explicit failed assertion (not leave Assertions empty) and
+        // preserve the full exception, so callers can tell an infra crash from a legit failure.
+        var agent = new MockConversationAgent(shouldThrow: true);
+        var runner = new ConversationRunner(agent); // defaults: ContinueOnError=false, MaxRetries=0
+
+        var testCase = ConversationalTestCase.Create("Error Test").AddUserTurn("go").Build();
+
+        var result = await runner.RunAsync(testCase);
+
+        Assert.False(result.Success);
+        Assert.Contains(result.Assertions, a => a.Name == "AgentInvocation" && !a.Passed);
+        Assert.Contains("InvalidOperationException", result.Error); // full exception preserved
+        Assert.Equal(1, agent.ReceivedPrompts.Count); // no retries by default
+    }
+
+    [Fact]
+    public async Task RunAsync_MaxRetries_RetriesAgentInvocation()
+    {
+        // BUG-36: MaxRetries was a dead option; the agent invocation must now be retried.
+        var agent = new MockConversationAgent(shouldThrow: true);
+        var runner = new ConversationRunner(agent, new ConversationRunnerOptions { MaxRetries = 2 });
+
+        var testCase = ConversationalTestCase.Create("Retry Test").AddUserTurn("go").Build();
+
+        var result = await runner.RunAsync(testCase);
+
+        Assert.Equal(3, agent.ReceivedPrompts.Count); // 1 initial + 2 retries
+        Assert.False(result.Success);
+    }
+
+    [Fact]
+    public async Task RunAsync_ContinueOnError_ProcessesRemainingTurns()
+    {
+        // BUG-36: ContinueOnError was a dead option; a failed turn must not stop the remaining ones.
+        var agent = new ThrowOnceAgent();
+        var runner = new ConversationRunner(agent, new ConversationRunnerOptions { ContinueOnError = true });
+
+        var testCase = ConversationalTestCase.Create("Continue Test")
+            .AddUserTurn("turn1")
+            .AddUserTurn("turn2")
+            .Build();
+
+        var result = await runner.RunAsync(testCase);
+
+        Assert.Equal(2, agent.ReceivedPrompts.Count); // both turns attempted despite turn1 failing
+        Assert.Contains(result.Assertions, a => a.Name == "AgentInvocation" && !a.Passed);
+        Assert.False(result.Success);
+    }
+
+    [Fact]
     public async Task RunAsync_Cancellation_PropagatesException()
     {
         var agent = new MockConversationAgent("Response");
@@ -302,6 +354,22 @@ public class ConversationRunnerTests
     #endregion
 
     #region Helper Mock
+
+    /// <summary>Throws on the first invocation, then succeeds — for ContinueOnError coverage (BUG-36).</summary>
+    private sealed class ThrowOnceAgent : IEvaluableAgent
+    {
+        private int _calls;
+        public string Name => "ThrowOnceAgent";
+        public List<string> ReceivedPrompts { get; } = new();
+
+        public Task<AgentResponse> InvokeAsync(string prompt, CancellationToken cancellationToken = default)
+        {
+            ReceivedPrompts.Add(prompt);
+            if (_calls++ == 0)
+                throw new InvalidOperationException("first turn boom");
+            return Task.FromResult(new AgentResponse { Text = "ok" });
+        }
+    }
 
     private class MockConversationAgent : IEvaluableAgent
     {
