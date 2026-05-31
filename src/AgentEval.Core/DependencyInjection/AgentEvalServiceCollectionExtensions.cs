@@ -61,6 +61,14 @@ public static class AgentEvalServiceCollectionExtensions
         // Singleton wrapping a Scoped/Transient IEmbeddingGenerator (common in ASP.NET hosting)
         // becomes a captive dependency that throws under validateScopes (BUG-41). With caching
         // enabled the cache then follows the chosen lifetime (per-scope for Scoped).
+        //
+        // Validate the cache bound before wiring the decorator — a zero/negative value bound from
+        // config would otherwise flow through silently and disable/break caching (GAP-18).
+        if (options.EnableEmbeddingCaching && options.EmbeddingCacheMaxSize <= 0)
+            throw new ArgumentOutOfRangeException(
+                nameof(options.EmbeddingCacheMaxSize), options.EmbeddingCacheMaxSize,
+                "EmbeddingCacheMaxSize must be greater than 0 when embedding caching is enabled.");
+
         Func<IServiceProvider, object> embeddingsFactory = options.EnableEmbeddingCaching
             ? sp => new CachingEmbeddingsDecorator(
                 new MEAIEmbeddingAdapter(sp.GetRequiredService<IEmbeddingGenerator<string, Embedding<float>>>()),

@@ -39,6 +39,37 @@ public class ServiceCollectionExtensionsTests
         Assert.Equal(lifetime, embeddings.Lifetime);
     }
 
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-5)]
+    public void AddAgentEval_NonPositiveEmbeddingCacheSize_WithCachingEnabled_Throws(int badSize)
+    {
+        // GAP-18: a zero/negative EmbeddingCacheMaxSize bound from config must fail fast rather than
+        // silently disabling/breaking the cache.
+        var services = new ServiceCollection();
+
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            services.AddAgentEval(o =>
+            {
+                o.EnableEmbeddingCaching = true;
+                o.EmbeddingCacheMaxSize = badSize;
+            }));
+    }
+
+    [Fact]
+    public void AddAgentEval_NonPositiveCacheSize_WithCachingDisabled_DoesNotThrow()
+    {
+        // The bound only matters when caching is enabled.
+        var services = new ServiceCollection();
+        var ex = Record.Exception(() =>
+            services.AddAgentEval(o =>
+            {
+                o.EnableEmbeddingCaching = false;
+                o.EmbeddingCacheMaxSize = 0;
+            }));
+        Assert.Null(ex);
+    }
+
     [Fact]
     public void AddAgentEval_NoHarness_ResolvingComparer_ThrowsActionableError()
     {
