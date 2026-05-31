@@ -149,6 +149,7 @@ public sealed class WorkflowTraceRecorder : IWorkflowEvaluableAgent, IAsyncDispo
                     Result = SanitizeText(tc.Result?.ToString()),
                     Succeeded = tc.Exception == null,
                     Error = tc.Exception?.Message,
+                    StartedAt = tc.StartTime, // persist per-tool start so replay can reconstruct timing (BUG-45)
                     DurationMs = (long?)tc.Duration?.TotalMilliseconds
                 }).ToList();
             }

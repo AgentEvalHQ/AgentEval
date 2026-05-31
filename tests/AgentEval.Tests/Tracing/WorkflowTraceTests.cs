@@ -353,6 +353,48 @@ public class WorkflowTraceTests
     }
 
     [Fact]
+    public async Task WorkflowTraceReplayingAgent_ReconstructsGlobalToolCallOrder()
+    {
+        // BUG-45: replay hard-coded ToolCallRecord.Order = 0 for every call, making cross-step
+        // tool-ordering assertions meaningless. It now reconstructs a workflow-global 1-based order.
+        var trace = new WorkflowTrace
+        {
+            TraceName = "tool-order",
+            FinalOutput = "done",
+            Steps = new List<WorkflowTraceStep>
+            {
+                new()
+                {
+                    ExecutorId = "s1", Output = "o1", StepIndex = 0,
+                    ToolCalls = new List<TraceToolCall>
+                    {
+                        new() { Name = "A", Result = "r", Succeeded = true },
+                        new() { Name = "B", Result = "r", Succeeded = true },
+                    }
+                },
+                new()
+                {
+                    ExecutorId = "s2", Output = "o2", StepIndex = 1,
+                    ToolCalls = new List<TraceToolCall>
+                    {
+                        new() { Name = "C", Result = "r", Succeeded = true },
+                    }
+                },
+            }
+        };
+        var replayer = new WorkflowTraceReplayingAgent(trace);
+
+        var result = await replayer.ExecuteWorkflowAsync("any");
+
+        var orders = result.Steps
+            .Where(s => s.ToolCalls is { Count: > 0 })
+            .SelectMany(s => s.ToolCalls!)
+            .Select(tc => tc.Order)
+            .ToList();
+        Assert.Equal(new[] { 1, 2, 3 }, orders);
+    }
+
+    [Fact]
     public async Task WorkflowTraceReplayingAgent_ReplaysStepDetails()
     {
         // Arrange

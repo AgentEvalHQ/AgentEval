@@ -126,6 +126,12 @@ public sealed class WorkflowTraceReplayingAgent : IWorkflowEvaluableAgent
 
     private WorkflowExecutionResult BuildWorkflowResult()
     {
+        // Reconstruct a workflow-global 1-based tool-call order across all steps so replay-based
+        // cross-step tool-ordering assertions are meaningful — the recorder doesn't persist an
+        // explicit order, and the previous hard-coded Order=0 collapsed every call to 0 (BUG-45).
+        // The outer .ToList() below forces a single sequential pass, so this counter increments in
+        // step order then per-step list order.
+        var globalToolOrder = 0;
         var steps = _trace.Steps.Select(s => new ExecutorStep
         {
             ExecutorId = s.ExecutorId,
@@ -143,7 +149,7 @@ public sealed class WorkflowTraceReplayingAgent : IWorkflowEvaluableAgent
                 Arguments = ParseRecordedArgumentsOrNull(tc.Arguments),
                 Result = tc.Result,
                 Exception = tc.Succeeded ? null : new Exception(tc.Error ?? "Unknown error"),
-                Order = 0,
+                Order = ++globalToolOrder,
                 StartTime = tc.StartedAt,
                 EndTime = tc.StartedAt?.AddMilliseconds(tc.DurationMs ?? 0)
             }).ToList(),
