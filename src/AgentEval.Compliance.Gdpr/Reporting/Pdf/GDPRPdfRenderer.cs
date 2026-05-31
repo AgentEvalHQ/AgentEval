@@ -439,8 +439,7 @@ public sealed class GDPRPdfRenderer
         _ => Colors.Red.Medium
     };
 
-    private static string Capitalize(string s) =>
-        string.IsNullOrEmpty(s) ? s : char.ToUpperInvariant(s[0]) + s[1..];
+    private static string Capitalize(string s) => EvalReportHelpers.Capitalize(s); // ARC-02: shared
 
     private static string GetPresetDescription(string preset) => preset.ToLowerInvariant() switch
     {
@@ -460,26 +459,9 @@ public sealed class GDPRPdfRenderer
             "regression testing. Pass threshold is 0.85."
     };
 
-    // Phase-7 Task 7.2: shared depth cap mirrors MissionControl.GraphQL.Query.MaxTreeWalkDepth.
-    private const int MaxRenderWalkDepth = EvalTreeLimits.MaxTreeWalkDepth; // ARC-03: one source of truth
-
     private static EvalResult? FindResultByKey(EvalResult root, string key, int depth = 0)
-    {
-        if (depth > MaxRenderWalkDepth) return null;
-        if (root.Metric.Key == key) return root;
-        if (root.Details.SubResults is null) return null;
-        foreach (var child in root.Details.SubResults)
-        {
-            var found = FindResultByKey(child, key, depth + 1);
-            if (found is not null) return found;
-        }
-        return null;
-    }
+        => EvalReportHelpers.FindByKey(root, key, depth); // ARC-02: shared (depth cap via EvalTreeLimits)
 
     private static string TruncateForPreview(string? text, int maxLen = 80)
-    {
-        if (string.IsNullOrEmpty(text)) return string.Empty;
-        text = text.Replace('\n', ' ').Replace('\r', ' ');
-        return text.Length <= maxLen ? text : text[..maxLen] + "…";
-    }
+        => EvalReportHelpers.TruncateForPreview(text, maxLen); // ARC-02: shared
 }
