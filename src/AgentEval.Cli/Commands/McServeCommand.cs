@@ -146,6 +146,7 @@ public static class McServeCommand
 
         try
         {
+            var startStopwatch = System.Diagnostics.Stopwatch.StartNew();
             using var proc = Process.Start(psi)
                 ?? throw new InvalidOperationException("Process.Start returned null.");
             procHandle = proc;
@@ -172,6 +173,19 @@ public static class McServeCommand
                     }
                 }
                 return 0;
+            }
+
+            // A fast non-zero exit right after a passing pre-flight port probe almost always means
+            // the port was grabbed in the TOCTOU window between probe-release and the child's bind —
+            // the child then dies with an opaque Kestrel "address in use" error. Re-surface the
+            // friendly hint so the operator isn't left with a bare exit code (BUG-54).
+            if (proc.ExitCode != 0 && startStopwatch.Elapsed < TimeSpan.FromSeconds(5))
+            {
+                Console.Error.WriteLine(
+                    $"✖ Mission Control exited immediately (code {proc.ExitCode}).");
+                Console.Error.WriteLine(
+                    $"    Port {port} may have been taken after the pre-flight check. " +
+                    $"Try a different port: `agenteval mc serve --port {port + 1}`.");
             }
             return proc.ExitCode;
         }
