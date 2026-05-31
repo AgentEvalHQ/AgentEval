@@ -75,10 +75,17 @@ public class AgentEvalBuilderSyncBuildTests
 
         thread.Start();
 
-        Assert.True(completed.Wait(TimeSpan.FromSeconds(10)),
+        // A real PERF-01 deadlock NEVER completes, so this wait only has to distinguish
+        // "completes eventually" from "never completes". The generous 60s ceiling (vs the build's
+        // sub-second cost) is deliberate: Build() offloads via Task.Run, and on a thread-pool that
+        // is saturated by the rest of the parallel suite the offloaded task can be queued for
+        // several seconds before it gets a thread. A 10s ceiling raced that starvation and flaked
+        // on the loaded Windows/net8.0 CI job; 60s gives ample headroom while a genuine deadlock
+        // still fails loudly (just later).
+        Assert.True(completed.Wait(TimeSpan.FromSeconds(60)),
             "Build() deadlocked under a captured SynchronizationContext (PERF-01).");
         Assert.Null(error);
         Assert.True(built);
-        thread.Join(TimeSpan.FromSeconds(2));
+        thread.Join(TimeSpan.FromSeconds(5));
     }
 }
