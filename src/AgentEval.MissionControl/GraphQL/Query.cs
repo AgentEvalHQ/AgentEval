@@ -465,6 +465,13 @@ public sealed class Query
     /// <see cref="EvalProvenance.EstimatedCost"/> to that tier's bucket.
     /// Drives the SPA's <c>&lt;CostTierBreakdownChart/&gt;</c> stacked bar.
     /// </summary>
+    /// <remarks>
+    /// PERF-05 (accept-and-document): the scenario trees are reconstituted and walked uncached on every
+    /// request. Cost is O(scenarios × tree-depth) but bounded to a SINGLE run (unlike
+    /// <see cref="EvaluatorTimeline"/>, which scans up to 200), so for the v1 scale this is acceptable
+    /// without per-request tree caching. Folding this into the GreenDonut DataLoader batching / a
+    /// parsed-tree cache is deferred to MC1.4.7 alongside the other tree-walking resolvers.
+    /// </remarks>
     public async Task<RunCostBreakdown?> RunCostBreakdown(
         [Service] IOutputStoreReader store,
         string runId,
