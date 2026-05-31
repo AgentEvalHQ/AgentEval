@@ -508,8 +508,13 @@ public sealed class FileSystemOutputStore : IOutputStore
             {
                 entry = JsonSerializer.Deserialize<HistoryEntry>(line, _jsonl);
             }
-            catch
+            catch (JsonException ex)
             {
+                // Don't fail the whole stream on a single bad line, but surface the corruption so a
+                // partially-corrupt audit history isn't silently read as a shorter clean one — the
+                // dangerous failure mode for an audit tool (GAP-05). Matches GetRecentRunsAsync.
+                Console.Error.WriteLine(
+                    $"⚠ history.jsonl: skipping malformed line in {historyFile}: {ex.Message}");
                 continue;
             }
 
