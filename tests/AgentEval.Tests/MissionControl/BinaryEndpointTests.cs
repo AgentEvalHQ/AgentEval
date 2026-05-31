@@ -62,6 +62,23 @@ public class BinaryEndpointTests : IClassFixture<FilesystemSeededFactory>, IDisp
     }
 
     [Fact]
+    public async Task Reports_UnknownFormat_RejectionMessage_ListsAllAcceptedFormats()
+    {
+        // MNT-13: the rejection message is derived from the single allow-list source of truth, so it
+        // includes 'md' and 'xml' (previously omitted) — and can never drift from IsAllowedReportFormat.
+        using var client = _factory.CreateClient();
+        var runId = await _factory.GetSeededRunIdAsync();
+
+        var response = await client.GetAsync($"/api/v1/runs/{runId}/reports/exotic-format");
+        var body = await response.Content.ReadAsStringAsync();
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Contains("md", body);
+        Assert.Contains("xml", body);
+        Assert.Contains("markdown", body);
+    }
+
+    [Fact]
     public async Task Reports_NoFileGenerated_Returns404()
     {
         // The seed writes `report.md` + `report.html`; everything else is 404.

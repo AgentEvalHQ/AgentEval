@@ -33,9 +33,10 @@ namespace AgentEval.Evals.Agentic.StochasticStability;
 ///     A stable, capable agent should pass consistently.
 ///   </item>
 ///   <item>
-///     <b>score_variance_inverse</b> (weight 0.30): <c>1 / (variance + ε)</c>, normalized to
-///     [0, 1] using a reference variance of 0.10. Low score variance indicates the agent
-///     produces consistently calibrated outputs rather than wildly oscillating.
+///     <b>score_variance_inverse</b> (weight 0.30): <c>clamp(1 - variance / referenceVariance, 0, 1)</c>
+///     — a linear inverse using a reference variance of 0.10 (variance 0 → 1.0; variance ≥ 0.10 → 0.0).
+///     Low score variance indicates the agent produces consistently calibrated outputs rather than
+///     wildly oscillating.
 ///   </item>
 ///   <item>
 ///     <b>failure_mode_consistency</b> (weight 0.20): when failures exist, measures whether

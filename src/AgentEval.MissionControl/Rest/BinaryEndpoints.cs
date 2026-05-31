@@ -68,7 +68,7 @@ internal static class BinaryEndpoints
             // already rejects it. Defence-in-depth.
             if (!FileSystemLayout.IsSafePathSegment(format)) return Results.BadRequest("Invalid format.");
             if (!IsAllowedReportFormat(format))
-                return Results.BadRequest($"Unsupported report format '{format}'. Allowed: markdown, html, junit, sarif.");
+                return Results.BadRequest($"Unsupported report format '{format}'. Allowed: {string.Join(", ", AllowedReportFormats)}.");
 
             // Mode A: locate via filesystem path. We need the subject (kind + name)
             // to build the path; resolve via the run manifest first.
@@ -188,11 +188,11 @@ internal static class BinaryEndpoints
         });
     }
 
-    private static bool IsAllowedReportFormat(string format) => format switch
-    {
-        "markdown" or "md" or "html" or "junit" or "sarif" or "xml" => true,
-        _ => false,
-    };
+    // Single source of truth for accepted report formats — the rejection message is derived from
+    // this so it can never drift from the allow-list (MNT-13).
+    private static readonly string[] AllowedReportFormats = { "markdown", "md", "html", "junit", "sarif", "xml" };
+
+    private static bool IsAllowedReportFormat(string format) => Array.IndexOf(AllowedReportFormats, format) >= 0;
 
     private static string ContentTypeFor(string format) => format switch
     {
