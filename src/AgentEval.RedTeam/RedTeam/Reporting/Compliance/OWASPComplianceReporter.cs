@@ -28,6 +28,17 @@ public class OWASPComplianceReporter : IComplianceReporter<OWASPComplianceReport
         new("LLM10", "Unbounded Consumption", "Resource-intensive operations degrade service or drain budgets", true),
     ];
 
+    /// <summary>
+    /// Public, read-only map of OWASP LLM Top 10 category id → whether AgentEval has applicable
+    /// coverage for it. Exposed so compliance crosswalks can be validated against the canonical set.
+    /// </summary>
+    public static IReadOnlyDictionary<string, bool> CategoryApplicability { get; } =
+        AllCategories.ToDictionary(c => c.Id, c => c.IsApplicable, StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>All canonical OWASP LLM Top 10 category ids (LLM01..LLM10).</summary>
+    public static IReadOnlyList<string> AllCategoryIds { get; } =
+        AllCategories.Select(c => c.Id).ToList();
+
     /// <inheritdoc />
     public OWASPComplianceReport GenerateReport(RedTeamResult result, ComplianceReportOptions? options = null)
     {

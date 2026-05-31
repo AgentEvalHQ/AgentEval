@@ -348,4 +348,12 @@ public class OWASPComplianceReporterTests
         Assert.Contains("2025 (v2.0)", md);
         Assert.DoesNotContain("OWASP LLM Top 10 2023", md);
     }
+
+    [Fact]
+    public void CategoryApplicability_Contains10Categories_WithApplicableFlags()
+    {
+        Assert.Equal(10, OWASPComplianceReporter.AllCategoryIds.Count);
+        Assert.True(OWASPComplianceReporter.CategoryApplicability["LLM01"]);
+        Assert.False(OWASPComplianceReporter.CategoryApplicability["LLM08"]); // not yet applicable
+    }
 }

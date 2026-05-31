@@ -58,6 +58,19 @@ public class MITREATLASReporter : IComplianceReporter<MITREATLASReport>
             : throw new InvalidOperationException(
                 $"Tactic '{tacticId}' is referenced by a technique but is not defined in AllTactics.");
 
+    /// <summary>
+    /// Public, read-only catalog of every MITRE ATLAS technique this reporter knows (incl.
+    /// non-applicable). Exposed so the technique→tactic invariant can be validated exhaustively.
+    /// </summary>
+    public static IReadOnlyList<MITREAtlasTechnique> TechniqueCatalog { get; } =
+        AllTechniques
+            .Select(t => new MITREAtlasTechnique(t.Id, t.Name, t.TacticId, TacticNameFor(t.TacticId), t.Description, t.IsApplicable))
+            .ToList();
+
+    /// <summary>Public, read-only catalog of every MITRE ATLAS tactic (id → name).</summary>
+    public static IReadOnlyDictionary<string, string> TacticCatalog { get; } =
+        AllTactics.ToDictionary(t => t.Id, t => t.Name, StringComparer.OrdinalIgnoreCase);
+
     /// <inheritdoc />
     public MITREATLASReport GenerateReport(RedTeamResult result, ComplianceReportOptions? options = null)
     {
@@ -329,6 +342,12 @@ public class MITREATLASReporter : IComplianceReporter<MITREATLASReport>
     /// <summary>Definition of a MITRE ATLAS tactic.</summary>
     private record TacticDefinition(string Id, string Name);
 }
+
+/// <summary>
+/// Public, immutable view of a MITRE ATLAS technique definition, suitable for invariant testing.
+/// </summary>
+public sealed record MITREAtlasTechnique(
+    string Id, string Name, string TacticId, string TacticName, string Description, bool IsApplicable);
 
 /// <summary>
 /// Extension methods for generating MITRE ATLAS compliance reports.
