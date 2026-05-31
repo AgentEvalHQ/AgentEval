@@ -49,6 +49,19 @@ public sealed class MRRMetricTests
     }
 
     [Fact]
+    public async Task EvaluateAsync_MaxPassRank_ControlsPassDisposition()
+    {
+        // BUG-44: first relevant at rank 2. The rank-based pass disposition is now configurable —
+        // default maxPassRank=3 passes; maxPassRank=1 fails.
+        var ctx = new EvaluationContext { Input = "q", Output = "o" };
+        ctx.SetProperty("RetrievedDocumentIds", new[] { "doc1", "doc2", "doc3" });
+        ctx.SetProperty("RelevantDocumentIds", new[] { "doc2" }); // first relevant at rank 2
+
+        Assert.True((await new MRRMetric().EvaluateAsync(ctx)).Passed);              // rank 2 <= 3
+        Assert.False((await new MRRMetric(maxPassRank: 1).EvaluateAsync(ctx)).Passed); // rank 2 > 1
+    }
+
+    [Fact]
     public async Task EvaluateAsync_SecondDocRelevant_Returns50()
     {
         // Arrange - Relevant doc at rank 2, MRR = 1/2 = 50%
