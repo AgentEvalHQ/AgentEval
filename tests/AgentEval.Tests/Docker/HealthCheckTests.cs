@@ -33,12 +33,12 @@ public sealed class HealthCheckTests
 
         var contents = await File.ReadAllTextAsync(dockerfile);
         Assert.Contains("HEALTHCHECK", contents);
-        Assert.Contains("/api/v1/version", contents);
-        // Sanity: confirm the probe binary (curl or wget) is wired.
-        Assert.True(
-            contents.Contains("curl", StringComparison.OrdinalIgnoreCase)
-            || contents.Contains("wget", StringComparison.OrdinalIgnoreCase),
-            "HEALTHCHECK probe binary (curl or wget) must be installed in the runtime stage.");
+        // SEC-14: the HEALTHCHECK uses the self-contained internal probe (no curl/wget). Assert the probe
+        // is the app in --health-check mode, and that the runtime stage installs NO apt packages (the curl
+        // install was the unpinned attack surface we removed).
+        Assert.Contains("--health-check", contents);
+        Assert.Contains("AgentEval.MissionControl.dll", contents);
+        Assert.DoesNotContain("apt-get install", contents);
     }
 
     [Fact]
@@ -69,7 +69,8 @@ public sealed class HealthCheckTests
                 timeoutMs: 30_000);
             Assert.True(inspect.ExitCode == 0, $"docker inspect failed: {inspect.Stderr}");
             Assert.Contains("Test", inspect.Stdout);
-            Assert.Contains("api/v1/version", inspect.Stdout);
+            // SEC-14: the configured healthcheck CMD is the internal probe, not a curl GET.
+            Assert.Contains("--health-check", inspect.Stdout);
         }
         finally
         {
