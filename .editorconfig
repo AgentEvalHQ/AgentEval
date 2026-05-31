@@ -70,6 +70,14 @@ csharp_space_after_keywords_in_control_flow_statements = true
 csharp_space_between_method_declaration_parameter_list_parentheses = false
 csharp_space_between_method_call_parameter_list_parentheses = false
 
+# PERF-01: surface missing ConfigureAwait(false) in library source so the inconsistency the review
+# flagged (the embeddings layer uses it, other awaits don't) is no longer SILENT — the analyzer now
+# flags every call site in the IDE. Scoped to src/ (test code legitimately omits ConfigureAwait) and kept
+# at 'suggestion' (matching CA2254 above) so it guides incremental cleanup without flooding the build with
+# ~168 warnings. The actual sync-over-async deadlock (AgentEvalBuilder.Build) is already fixed + tested.
+[src/**.cs]
+dotnet_diagnostic.CA2007.severity = suggestion
+
 # XML and JSON files
 [*.{xml,csproj,props,targets}]
 indent_size = 2
