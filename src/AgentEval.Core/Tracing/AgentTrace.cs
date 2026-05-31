@@ -14,10 +14,13 @@ namespace AgentEval.Tracing;
 public sealed class AgentTrace
 {
     /// <summary>
-    /// Schema version for forward compatibility.
+    /// Schema version — the highest schema version of any content the trace may contain.
+    /// "1.1" (Glass Box) means it may carry v1.1 fields (Scope, CorrelationId, ToolDefinitions,
+    /// FinishReason, RequestOptions, ProviderMetadata); individual entries may still be v1.0-shaped.
+    /// Consumers branch on per-entry data (e.g. <see cref="TraceEntry.EffectiveScope"/>), not this string.
     /// </summary>
     [JsonPropertyName("version")]
-    public string Version { get; set; } = "1.0";
+    public string Version { get; set; } = "1.1";
 
     /// <summary>
     /// Human-readable name for this trace.
@@ -132,6 +135,115 @@ public class TraceEntry
     /// </summary>
     [JsonPropertyName("error")]
     public TraceError? Error { get; set; }
+
+    // ── AgentTrace v1.1 (Glass Box) additive fields — all nullable; absent ⇒ v1.0 semantics. ──
+
+    /// <summary>
+    /// Recording layer this entry was captured at (Glass Box, v1.1). Null on v1.0 traces and on
+    /// agent-boundary entries — interpret null as <see cref="TraceEntryScope.AgentInvocation"/>.
+    /// </summary>
+    [JsonPropertyName("scope")]
+    public TraceEntryScope? Scope { get; set; }
+
+    /// <summary>
+    /// Per-invocation correlation id (v1.1). Stamped identically on every ChatTurn and ToolExecution
+    /// entry produced during one agent invocation so consumers can group an invocation's evidence and
+    /// link tool executions to the invocation that triggered them. Not a pairing key — see <see cref="Index"/>.
+    /// </summary>
+    [JsonPropertyName("correlationId")]
+    public string? CorrelationId { get; set; }
+
+    /// <summary>Verbatim system prompt sent to the model on this turn (v1.1, ChatTurn requests).</summary>
+    [JsonPropertyName("systemPrompt")]
+    public string? SystemPrompt { get; set; }
+
+    /// <summary>Tool definitions advertised to the model on this turn (v1.1, ChatTurn requests).</summary>
+    [JsonPropertyName("toolDefinitions")]
+    public List<TraceToolDefinition>? ToolDefinitions { get; set; }
+
+    /// <summary>Provider finish reason for this turn, e.g. "stop"/"tool_calls"/"length"/"content_filter" (v1.1).</summary>
+    [JsonPropertyName("finishReason")]
+    public string? FinishReason { get; set; }
+
+    /// <summary>Sampling / request options captured per turn (v1.1): temperature, maxOutputTokens, responseFormat, modelId.</summary>
+    [JsonPropertyName("requestOptions")]
+    public Dictionary<string, object?>? RequestOptions { get; set; }
+
+    /// <summary>Provider-specific metadata (e.g. Azure content-filter verdicts) (v1.1).</summary>
+    [JsonPropertyName("providerMetadata")]
+    public Dictionary<string, object?>? ProviderMetadata { get; set; }
+
+    /// <summary>Convenience: the effective scope, treating null as <see cref="TraceEntryScope.AgentInvocation"/>. Not serialized.</summary>
+    [JsonIgnore]
+    public TraceEntryScope EffectiveScope => Scope ?? TraceEntryScope.AgentInvocation;
+
+    // ── v1.1 factory helpers — return a populated base TraceEntry (serialization-safe; no subclassing). ──
+
+    /// <summary>Builds a ChatTurn request entry from the messages and options sent to the model.</summary>
+    public static TraceEntry ForChatRequest(
+        int index, string? correlationId,
+        string? systemPrompt, string? promptText,
+        List<TraceToolDefinition>? toolDefinitions,
+        Dictionary<string, object?>? requestOptions) => new()
+    {
+        Type = TraceEntryType.Request,
+        Scope = TraceEntryScope.ChatTurn,
+        Index = index,
+        CorrelationId = correlationId,
+        Timestamp = DateTimeOffset.UtcNow,
+        SystemPrompt = systemPrompt,
+        Prompt = promptText,
+        ToolDefinitions = toolDefinitions,
+        RequestOptions = requestOptions,
+    };
+
+    /// <summary>Builds a ChatTurn response entry from the model's reply.</summary>
+    public static TraceEntry ForChatResponse(
+        int index, string? correlationId, string? text, long durationMs,
+        TraceTokenUsage? usage, List<TraceToolCall>? toolCalls,
+        string? finishReason, Dictionary<string, object?>? providerMetadata) => new()
+    {
+        Type = TraceEntryType.Response,
+        Scope = TraceEntryScope.ChatTurn,
+        Index = index,
+        CorrelationId = correlationId,
+        Timestamp = DateTimeOffset.UtcNow,
+        Text = text,
+        DurationMs = durationMs,
+        TokenUsage = usage,
+        ToolCalls = toolCalls,
+        FinishReason = finishReason,
+        ProviderMetadata = providerMetadata,
+    };
+
+    /// <summary>Builds an error entry for a failed ChatTurn round-trip.</summary>
+    public static TraceEntry ForChatError(int index, string? correlationId, Exception ex, long durationMs) => new()
+    {
+        Type = TraceEntryType.Response,
+        Scope = TraceEntryScope.ChatTurn,
+        Index = index,
+        CorrelationId = correlationId,
+        Timestamp = DateTimeOffset.UtcNow,
+        DurationMs = durationMs,
+        Error = new TraceError { Type = ex.GetType().Name, Message = ex.Message, StackTrace = ex.StackTrace },
+    };
+
+    /// <summary>Builds a ToolExecution entry (Glass Box Phase 2). Type is <see cref="TraceEntryType.ToolCall"/>.</summary>
+    public static TraceEntry ForToolExecution(
+        int index, string? correlationId, string toolName, string? arguments,
+        string? result, long durationMs, bool succeeded, string? error) => new()
+    {
+        Type = TraceEntryType.ToolCall,
+        Scope = TraceEntryScope.ToolExecution,
+        Index = index,
+        CorrelationId = correlationId,
+        Timestamp = DateTimeOffset.UtcNow,
+        DurationMs = durationMs,
+        ToolCalls = new List<TraceToolCall>
+        {
+            new() { Name = toolName, Arguments = arguments, Result = result, DurationMs = durationMs, Succeeded = succeeded, Error = error },
+        },
+    };
 }
 
 /// <summary>
@@ -151,6 +263,42 @@ public enum TraceEntryType
 
     /// <summary>A streaming chunk received.</summary>
     StreamChunk
+}
+
+/// <summary>
+/// The recording layer an entry was captured at (Glass Box, AgentTrace v1.1).
+/// Declared after <see cref="TraceEntryType"/>; <see cref="AgentInvocation"/> = 0 preserves v1.0 semantics
+/// when the field is absent/null.
+/// </summary>
+[JsonConverter(typeof(JsonStringEnumConverter))]
+public enum TraceEntryScope
+{
+    /// <summary>Agent-boundary entry (TraceRecordingAgent). v1.0 default semantics.</summary>
+    AgentInvocation = 0,
+
+    /// <summary>One LLM round-trip at the IChatClient boundary (TraceRecordingChatClient).</summary>
+    ChatTurn = 1,
+
+    /// <summary>One tool/function execution (EvaluatingAIFunction).</summary>
+    ToolExecution = 2,
+}
+
+/// <summary>
+/// A tool/function definition as advertised to the model on a chat turn (AgentTrace v1.1).
+/// </summary>
+public class TraceToolDefinition
+{
+    /// <summary>Tool name.</summary>
+    [JsonPropertyName("name")]
+    public string Name { get; set; } = string.Empty;
+
+    /// <summary>Human-readable tool description.</summary>
+    [JsonPropertyName("description")]
+    public string? Description { get; set; }
+
+    /// <summary>JSON schema of the parameters, as a JSON string (verbatim). Null when de-duplicated (Smoke/Standard presets).</summary>
+    [JsonPropertyName("parametersSchema")]
+    public string? ParametersSchema { get; set; }
 }
 
 /// <summary>
