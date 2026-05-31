@@ -51,22 +51,24 @@ public record StochasticResult(
     /// <summary>Aggregate duration statistics (ms).</summary>
     public DistributionStatistics DurationStats => DistributionStatisticsFactory.Create(GetDurations());
 
+    // PERF-06: each nullable stat below evaluates its source list ONCE (the source getters
+    // re-materialize from IndividualResults), instead of calling GetX() twice — once for the count
+    // guard and again for Create.
+
     /// <summary>Aggregate time-to-first-token statistics (ms), null when unavailable.</summary>
-    public DistributionStatistics? TimeToFirstTokenStats => GetTimeToFirstToken().Count == 0
-        ? null
-        : DistributionStatisticsFactory.Create(GetTimeToFirstToken());
+    public DistributionStatistics? TimeToFirstTokenStats => StatsOrNull(GetTimeToFirstToken());
 
     /// <summary>Aggregate prompt token statistics.</summary>
-    public DistributionStatistics? PromptTokenStats => GetPromptTokens().Count == 0 ? null : DistributionStatisticsFactory.Create(GetPromptTokens());
+    public DistributionStatistics? PromptTokenStats => StatsOrNull(GetPromptTokens());
 
     /// <summary>Aggregate completion token statistics.</summary>
-    public DistributionStatistics? CompletionTokenStats => GetCompletionTokens().Count == 0 ? null : DistributionStatisticsFactory.Create(GetCompletionTokens());
+    public DistributionStatistics? CompletionTokenStats => StatsOrNull(GetCompletionTokens());
 
     /// <summary>Aggregate total token statistics.</summary>
-    public DistributionStatistics? TotalTokenStats => GetTotalTokens().Count == 0 ? null : DistributionStatisticsFactory.Create(GetTotalTokens());
+    public DistributionStatistics? TotalTokenStats => StatsOrNull(GetTotalTokens());
 
     /// <summary>Aggregate cost statistics (USD).</summary>
-    public DistributionStatistics? CostStats => GetCosts().Count == 0 ? null : DistributionStatisticsFactory.Create(GetCosts());
+    public DistributionStatistics? CostStats => StatsOrNull(GetCosts());
 
     /// <summary>Aggregate tool call count statistics across runs.</summary>
     public DistributionStatistics ToolCallCountStats => DistributionStatisticsFactory.Create(GetToolCallCounts());
@@ -124,6 +126,14 @@ public record StochasticResult(
             CallRate: callRate,
             ErrorRate: errorRate);
     }
+
+    // PERF-06: build stats from a single materialization, returning null for an empty source.
+    private static DistributionStatistics? StatsOrNull(IReadOnlyList<double> values)
+        => values.Count == 0 ? null : DistributionStatisticsFactory.Create(values);
+    private static DistributionStatistics? StatsOrNull(IReadOnlyList<int> values)
+        => values.Count == 0 ? null : DistributionStatisticsFactory.Create(values);
+    private static DistributionStatistics? StatsOrNull(IReadOnlyList<decimal> values)
+        => values.Count == 0 ? null : DistributionStatisticsFactory.Create(values);
 
     private List<TimeSpan> GetDurations() => IndividualResults
         .Where(r => r.Performance?.TotalDuration != null)

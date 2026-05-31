@@ -26,14 +26,21 @@ public static class DistributionStatisticsFactory
             return new DistributionStatistics(0, 0, 0, 0, 0, 0, 0, 0);
         }
 
+        // PERF-06: sort ONCE and reuse the ordered array for Min/Max/Median/percentiles. Previously each
+        // of Median + Percentile(25/75/95) called values.OrderBy().ToList() independently — four full sorts
+        // per Create, plus separate Min()/Max() passes.
+        var sorted = new double[values.Count];
+        for (int i = 0; i < values.Count; i++) sorted[i] = values[i];
+        Array.Sort(sorted);
+
         return new DistributionStatistics(
-            Min: values.Min(),
-            Max: values.Max(),
+            Min: sorted[0],
+            Max: sorted[^1],
             Mean: Mean(values),
-            Median: Median(values),
-            Percentile25: Percentile(values, 25),
-            Percentile75: Percentile(values, 75),
-            Percentile95: Percentile(values, 95),
+            Median: MedianSorted(sorted),
+            Percentile25: PercentileSorted(sorted, 25),
+            Percentile75: PercentileSorted(sorted, 75),
+            Percentile95: PercentileSorted(sorted, 95),
             SampleSize: values.Count);
     }
 
@@ -69,28 +76,25 @@ public static class DistributionStatisticsFactory
         return values.Sum() / values.Count;
     }
 
-    private static double Median(IReadOnlyList<double> values)
+    // The Median/Percentile helpers now take an ALREADY-SORTED span so Create sorts only once (PERF-06).
+    private static double MedianSorted(ReadOnlySpan<double> sorted)
     {
-        if (values.Count == 0) return 0;
+        if (sorted.Length == 0) return 0;
+        int mid = sorted.Length / 2;
 
-        var sorted = values.OrderBy(v => v).ToList();
-        int mid = sorted.Count / 2;
-
-        return sorted.Count % 2 == 0
+        return sorted.Length % 2 == 0
             ? (sorted[mid - 1] + sorted[mid]) / 2.0
             : sorted[mid];
     }
 
-    private static double Percentile(IReadOnlyList<double> values, double percentile)
+    private static double PercentileSorted(ReadOnlySpan<double> sorted, double percentile)
     {
-        if (values.Count == 0) return 0;
-
-        var sorted = values.OrderBy(v => v).ToList();
+        if (sorted.Length == 0) return 0;
 
         if (percentile == 0) return sorted[0];
         if (percentile == 100) return sorted[^1];
 
-        double index = (percentile / 100.0) * (sorted.Count - 1);
+        double index = (percentile / 100.0) * (sorted.Length - 1);
         int lower = (int)Math.Floor(index);
         int upper = (int)Math.Ceiling(index);
 

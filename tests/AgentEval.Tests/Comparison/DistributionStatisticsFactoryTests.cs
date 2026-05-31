@@ -38,6 +38,24 @@ public class DistributionStatisticsFactoryTests
         Assert.Equal(1, result.SampleSize);
     }
 
+    // PERF-06: the implementation now sorts ONCE and derives Min/Max/Median/percentiles from that ordered
+    // array (rather than 4 independent OrderBy passes + separate Min/Max). Pin that the values are correct
+    // for an UNSORTED input — i.e. the single sort is still applied.
+    [Fact]
+    public void Create_UnsortedInput_ComputesOrderedStatistics()
+    {
+        // Deliberately unsorted; sorted = [1,2,3,4,5], n=5.
+        var result = DistributionStatisticsFactory.Create(new[] { 3.0, 1.0, 4.0, 5.0, 2.0 });
+
+        Assert.Equal(1.0, result.Min);
+        Assert.Equal(5.0, result.Max);
+        Assert.Equal(3.0, result.Mean);
+        Assert.Equal(3.0, result.Median);                 // middle of 1..5
+        Assert.Equal(2.0, result.Percentile25, 6);        // index 0.25*4 = 1 → sorted[1] = 2
+        Assert.Equal(4.0, result.Percentile75, 6);        // index 0.75*4 = 3 → sorted[3] = 4
+        Assert.Equal(5, result.SampleSize);
+    }
+
     [Fact]
     public void Create_EvenCountValues_CalculatesCorrectMedian()
     {
