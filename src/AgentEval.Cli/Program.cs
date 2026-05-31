@@ -380,6 +380,16 @@ benchCmd.Add(benchMitreCmd);
         benchCmd.Add(benchTraceFidelityCmd);
     }
 
+    // bench autoaudit — Glass Box flagship: cross-endpoint honesty/safety/cost comparison (offline demo).
+    {
+        var aaOutOpt = new Option<string?>("--out") { Description = "Path to write the Markdown comparison report (optional; also printed to stdout)." };
+        var benchAutoAuditCmd = new Command("autoaudit", "Cross-endpoint Glass Box comparison — honesty (Trace Fidelity) + safety (gate blocks) + cost (tokens/latency), ranked. Offline demo over 3 scripted endpoints (no credentials).");
+        benchAutoAuditCmd.Add(aaOutOpt);
+        benchAutoAuditCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =>
+            await BenchAutoAuditCommand.RunAsync(parseResult.GetValue(aaOutOpt), ct));
+        benchCmd.Add(benchAutoAuditCmd);
+    }
+
     var benchPerfCmd = new Command("perf", "Run a performance benchmark (latency, throughput, cost)");
 
     foreach (var presetName in new[] { "latency", "throughput", "cost" })

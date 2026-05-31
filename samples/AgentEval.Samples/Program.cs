@@ -116,6 +116,7 @@ public static class Program
         new('I', "Observability (Glass Box)", "★ no credentials needed",
         [
             new("Glass Box Full Stack",      "Per-turn tracing + injection pre-gate + PII post-gate + wrapped tool + Trace Fidelity (offline)", GlassBoxFullStack.RunAsync),
+            new("Auto-Audit",                "Benchmark 3 endpoints on honesty + safety + cost in one pass — ranked comparison (offline)", AutoAudit.RunAsync),
         ]),
     ];
 
