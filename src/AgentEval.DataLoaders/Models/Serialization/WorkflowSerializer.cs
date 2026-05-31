@@ -209,9 +209,14 @@ public static class WorkflowSerializer
     /// Deserializes a workflow execution from JSON (for replay/comparison).
     /// </summary>
     /// <param name="json">JSON string previously exported via ToJson.</param>
-    /// <returns>Deserialized export object.</returns>
+    /// <returns>Deserialized export object (may be <see langword="null"/> for the JSON literal <c>null</c>).</returns>
+    /// <exception cref="ArgumentException">Thrown when <paramref name="json"/> is null, empty, or whitespace.</exception>
+    /// <exception cref="System.Text.Json.JsonException">Thrown when <paramref name="json"/> is not valid JSON.</exception>
     public static WorkflowExecutionExport? FromJson(string json)
     {
+        // Guard the input like the sibling serializer methods rather than letting null produce a bare
+        // framework ArgumentNullException; malformed JSON still surfaces as JsonException (GAP-17).
+        ArgumentException.ThrowIfNullOrWhiteSpace(json);
         return JsonSerializer.Deserialize<WorkflowExecutionExport>(json, JsonOptions);
     }
 
