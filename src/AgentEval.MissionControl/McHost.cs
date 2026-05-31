@@ -261,23 +261,14 @@ public static class McHost
     /// <summary>
     /// Walks up from <paramref name="startDir"/> looking for the nearest
     /// ancestor containing a <c>*.sln</c>, <c>*.slnx</c>, or <c>.git/</c> —
-    /// the documented canonical-workspace convention (see
-    /// <c>WorkspaceRootDiscovery</c> in <c>AgentEval.DataLoaders</c>; that type
-    /// is internal so MC re-implements the 6-line walk locally rather than
-    /// bumping the public surface area). Falls back to <paramref name="startDir"/>
-    /// when no anchor is found.
+    /// the documented canonical-workspace convention. Falls back to
+    /// <paramref name="startDir"/> when no anchor is found.
     /// </summary>
-    private static string DiscoverWorkspaceRoot(string startDir)
-    {
-        var dir = new DirectoryInfo(startDir);
-        while (dir is not null)
-        {
-            if (dir.GetFiles("*.sln").Length > 0 ||
-                dir.GetFiles("*.slnx").Length > 0 ||
-                dir.GetDirectories(".git").Length > 0)
-                return dir.FullName;
-            dir = dir.Parent;
-        }
-        return startDir;
-    }
+    /// <remarks>
+    /// MNT-03: delegates to the canonical <c>WorkspaceRootDiscovery.Find</c> in
+    /// <c>AgentEval.DataLoaders</c> (made visible to MC via <c>InternalsVisibleTo</c>) rather than
+    /// re-implementing the walk, so the discovery rule lives in one place.
+    /// </remarks>
+    private static string DiscoverWorkspaceRoot(string startDir) =>
+        AgentEval.Output.WorkspaceRootDiscovery.Find(startDir) ?? startDir;
 }

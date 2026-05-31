@@ -51,6 +51,55 @@ public class WorkspaceRootDiscoveryTests
         }
     }
 
+    // MNT-03: the shared canonicalise+exist helper used by both the CLI --root validator and the MC
+    // --workspace startup path.
+    [Fact]
+    public void CanonicaliseExistingDirectory_Blank_IsOkWithNullCanonical()
+    {
+        var (canonical, status, _) = WorkspaceRootDiscovery.CanonicaliseExistingDirectory("   ");
+        Assert.Equal(WorkspaceRootDiscovery.PathStatus.Ok, status);
+        Assert.Null(canonical);
+    }
+
+    [Fact]
+    public void CanonicaliseExistingDirectory_ExistingDir_IsOkCanonical()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dir);
+        try
+        {
+            var (canonical, status, _) = WorkspaceRootDiscovery.CanonicaliseExistingDirectory(dir);
+            Assert.Equal(WorkspaceRootDiscovery.PathStatus.Ok, status);
+            Assert.Equal(Path.GetFullPath(dir), canonical);
+        }
+        finally { Directory.Delete(dir, recursive: true); }
+    }
+
+    [Fact]
+    public void CanonicaliseExistingDirectory_NonExistent_IsNotFound()
+    {
+        var missing = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"), "nope");
+        var (canonical, status, detail) = WorkspaceRootDiscovery.CanonicaliseExistingDirectory(missing);
+        Assert.Equal(WorkspaceRootDiscovery.PathStatus.NotFound, status);
+        Assert.Null(canonical);
+        Assert.Equal(Path.GetFullPath(missing), detail); // detail carries the canonical path
+    }
+
+    [Fact]
+    public void CanonicaliseExistingDirectory_RelativeWithBasePath_ResolvesAgainstBase()
+    {
+        var baseDir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        var child = Path.Combine(baseDir, "ws");
+        Directory.CreateDirectory(child);
+        try
+        {
+            var (canonical, status, _) = WorkspaceRootDiscovery.CanonicaliseExistingDirectory("ws", basePath: baseDir);
+            Assert.Equal(WorkspaceRootDiscovery.PathStatus.Ok, status);
+            Assert.Equal(Path.GetFullPath(child), canonical);
+        }
+        finally { Directory.Delete(baseDir, recursive: true); }
+    }
+
     [Fact]
     public void Find_NoMarkersInSubtree_DoesNotReturnSubtreeDir()
     {

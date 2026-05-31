@@ -41,29 +41,22 @@ for (var i = 0; i < args.Length - 1; i++)
     if (string.Equals(args[i], "--workspace", StringComparison.OrdinalIgnoreCase))
     {
         var raw = args[i + 1];
+        // MNT-03: share the canonicalise+exist rule with the CLI --root validator via
+        // WorkspaceRootDiscovery.CanonicaliseExistingDirectory. Relative paths resolve against the shell's
+        // PWD (preserved even when `dotnet run --project` repoints CurrentDirectory). This path owns only
+        // the --workspace-specific messaging + exit(1) contract (Plan-13 T4.1b item 7 / F-MC-1).
         var basePath = Environment.GetEnvironmentVariable("PWD") ?? Directory.GetCurrentDirectory();
-        string resolved;
-        try
+        var (resolved, status, detail) =
+            AgentEval.Output.WorkspaceRootDiscovery.CanonicaliseExistingDirectory(raw, basePath);
+        if (status == AgentEval.Output.WorkspaceRootDiscovery.PathStatus.Malformed)
         {
-            resolved = System.IO.Path.IsPathRooted(raw)
-                ? System.IO.Path.GetFullPath(raw)
-                : System.IO.Path.GetFullPath(raw, basePath);
-        }
-        catch (Exception ex) when (ex is ArgumentException or System.IO.PathTooLongException or System.Security.SecurityException or NotSupportedException)
-        {
-            // Plan-13 T4.1b item 7 (F-MC-1): symmetry with the CLI form
-            // (`agenteval mc serve --workspace …`) which validates via
-            // `WorkspaceRootValidator.CanonicaliseOrNull` and exits with code 1
-            // on a malformed / nonexistent path. The bare-dotnet-run path
-            // previously accepted a bad path silently and let the SPA render
-            // an empty-state landing instead.
-            Console.Error.WriteLine($"--workspace path '{raw}' is malformed: {ex.Message}");
+            Console.Error.WriteLine($"--workspace path '{raw}' is malformed: {detail}");
             Environment.Exit(1);
             return;
         }
-        if (!System.IO.Directory.Exists(resolved))
+        if (status == AgentEval.Output.WorkspaceRootDiscovery.PathStatus.NotFound)
         {
-            Console.Error.WriteLine($"--workspace path '{raw}' (canonicalised to '{resolved}') does not exist.");
+            Console.Error.WriteLine($"--workspace path '{raw}' (canonicalised to '{detail}') does not exist.");
             Console.Error.WriteLine("    Run `agenteval init` to create a workspace at that path, or point --workspace at an existing one.");
             Environment.Exit(1);
             return;

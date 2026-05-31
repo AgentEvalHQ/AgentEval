@@ -24,22 +24,21 @@ internal static class WorkspaceRootValidator
     /// <returns>Canonical existing path, or <c>null</c> if the override was bad.</returns>
     internal static string? CanonicaliseOrNull(string? rootOverride)
     {
-        if (string.IsNullOrWhiteSpace(rootOverride)) return null;
-        string canonical;
-        try
+        // MNT-03: the canonicalise + existence rule is shared with Mission Control via
+        // WorkspaceRootDiscovery.CanonicaliseExistingDirectory; this method only owns the --root-specific
+        // stderr wording. A blank override means "use auto-discovery" → null.
+        var (canonical, status, detail) =
+            AgentEval.Output.WorkspaceRootDiscovery.CanonicaliseExistingDirectory(rootOverride);
+        switch (status)
         {
-            canonical = System.IO.Path.GetFullPath(rootOverride);
+            case AgentEval.Output.WorkspaceRootDiscovery.PathStatus.Malformed:
+                Console.Error.WriteLine($"--root path '{rootOverride}' is malformed: {detail}");
+                return null;
+            case AgentEval.Output.WorkspaceRootDiscovery.PathStatus.NotFound:
+                Console.Error.WriteLine($"--root path '{rootOverride}' (canonicalised to '{detail}') does not exist.");
+                return null;
+            default:
+                return canonical; // null when blank (auto-discovery), else the canonical existing path
         }
-        catch (Exception ex) when (ex is ArgumentException or System.IO.PathTooLongException or System.Security.SecurityException or NotSupportedException)
-        {
-            Console.Error.WriteLine($"--root path '{rootOverride}' is malformed: {ex.Message}");
-            return null;
-        }
-        if (!System.IO.Directory.Exists(canonical))
-        {
-            Console.Error.WriteLine($"--root path '{rootOverride}' (canonicalised to '{canonical}') does not exist.");
-            return null;
-        }
-        return canonical;
     }
 }
