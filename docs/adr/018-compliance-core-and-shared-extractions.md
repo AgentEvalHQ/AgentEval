@@ -1,8 +1,8 @@
-# ADR-018: Compliance.Core and Cross-Cutting Shared Extractions (v1.1 hardening wave)
+# ADR-018: Compliance.Core and Cross-Cutting Shared Extractions
 
 ## Status
 
-**Accepted / Implemented in v1.1** — delivered on branch `fix/thorough-review-findings` as part of the 128-finding thorough-review hardening wave. Extends [ADR-016](016-monolith-modularization.md) (the original monolith→multi-project split).
+**Accepted** — delivered on branch `fix/thorough-review-findings` as part of the thorough-review hardening wave (no release version cut yet). Extends [ADR-016](016-monolith-modularization.md) (the original monolith→multi-project split).
 
 ## Date
 
@@ -10,17 +10,17 @@
 
 ## Context
 
-A repository-wide thorough review (148 raw → 128 deduplicated findings) flagged a cluster of **DRY / SOLID architecture** issues (the `ARC-*` findings) where the same logic was reimplemented across assemblies and could silently drift. The most acute:
+A repository-wide thorough review flagged a cluster of **DRY / SOLID architecture** issues (the `ARC-*` findings) where the same logic was reimplemented across assemblies and could silently drift. The most acute:
 
-- **ARC-01 (score 42)** — the GDPR and EU AI Act compliance packs are near-verbatim parallel hierarchies (loader, validator, builders, reporters, ~470-line PDF renderers, model records). A fix to shared mechanics had to be made twice and had already drifted.
+- **ARC-01** — the GDPR and EU AI Act compliance packs are near-verbatim parallel hierarchies (loader, validator, builders, reporters, PDF renderers, model records). A fix to shared mechanics had to be made twice and had already drifted.
 - **ARC-02/03/04/05/07/08/11, MNT-02/03/05** — duplicated tree-walk depth caps, PDF helpers, calibration statistics, tool-call assertion checks, model-pricing key matching, OWASP/MITRE leaf scoring, workspace-root discovery, and the memory god-class.
-- **ARC-10 (score 20)** — the umbrella re-declares each embedded sub-project's external `PackageReference`s by hand (because `PrivateAssets="all"` suppresses transitive propagation), with **no compile/CI signal** when a sub-project adds a dependency the umbrella forgets to mirror (SEC-02 was a concrete instance).
+- **ARC-10** — the umbrella re-declares each embedded sub-project's external `PackageReference`s by hand (because `PrivateAssets="all"` suppresses transitive propagation), with **no compile/CI signal** when a sub-project adds a dependency the umbrella forgets to mirror (SEC-02 was a concrete instance).
 
 The hard constraint: the compliance gates were carefully calibrated over a prior arc (GDPR 5/5; EU AI Act with documented carve-outs — Pillar 1 / Art 5 at 0.65/0.35, GPAI at 0.60/0.25). **No refactor may change any scoring weight, pass threshold, pillar/article definition, aggregation rule, or judge constant.**
 
 ## Decision
 
-1. **Create `AgentEval.Compliance.Core`** — a new embedded sub-project holding the regulation-neutral building blocks shared by both compliance packs. The v1.1 wave seeds it with the provably-identical, self-contained, calibration-neutral types (`CompositeExtensions`, `Recommendation`, `CriticalFindingExtractor`); the remaining entangled files (models, loaders, validators, builders, runners, renderers, calibration) migrate into it incrementally as test-gated follow-ups.
+1. **Create `AgentEval.Compliance.Core`** — a new embedded sub-project holding the regulation-neutral building blocks shared by both compliance packs. The wave seeds it with the provably-identical, self-contained, calibration-neutral types (`CompositeExtensions`, `Recommendation`, `CriticalFindingExtractor`); the remaining entangled files (models, loaders, validators, builders, runners, renderers, calibration) migrate into it incrementally as test-gated follow-ups.
 
 2. **Consolidate cross-cutting logic into single owners**, each close to its domain and validated by the existing test suites (behaviour preserved, not changed):
    - `EvalTreeLimits` (Abstractions) — one tree-walk depth cap referenced by the producer and every consumer.
@@ -39,7 +39,7 @@ The hard constraint: the compliance gates were carefully calibrated over a prior
 **Positive**
 - Shared logic has one owner; a fix lands once. The most drift-prone duplications (depth cap, calibration math, leaf scoring, pricing match) can no longer diverge.
 - The umbrella's NuGet dependency closure is now guarded — a forgotten transitive dependency fails a test instead of shipping a broken/silently-vulnerable package.
-- Zero behaviour/calibration change: the 585 GDPR/EU-AI-Act compliance tests and the full suite (4372/0/1) pass identically; an independent adversarial re-review confirmed the wave is behaviour-preserving and calibration-safe.
+- Zero behaviour/calibration change: the GDPR/EU-AI-Act compliance tests and the full suite pass identically; an independent adversarial re-review confirmed the wave is behaviour-preserving and calibration-safe.
 
 **Negative / costs**
 - One more embedded sub-project (`AgentEval.Compliance.Core`) in the umbrella's `PrivateAssets="all"` list (and in the closure guard).

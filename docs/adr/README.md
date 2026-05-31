@@ -38,7 +38,7 @@ Each ADR follows this structure:
 | [015](015-extension-registration-manual-vs-auto-discovery.md) | Extension Registration — Manual vs Auto-Discovery | Accepted | 2026-02-25 |
 | [016](016-monolith-modularization.md) | Monolith Modularization | Accepted | 2026-02-26 |
 | [017](017-unified-benchmarks-namespace.md) | Unified Benchmarks Namespace (Convention 1-4) | Implemented (v0.10.0-beta) | 2026-05-17 |
-| [018](018-compliance-core-and-shared-extractions.md) | Compliance.Core and Cross-Cutting Shared Extractions | Implemented (v1.1) | 2026-05-31 |
+| [018](018-compliance-core-and-shared-extractions.md) | Compliance.Core and Cross-Cutting Shared Extractions | Accepted | 2026-05-31 |
 
 ---
 

@@ -549,7 +549,7 @@ var llm01 = attacks.GetByOwaspId("LLM01"); // All attacks for OWASP LLM01
 
 ## Package Structure
 
-The codebase is organized into internal projects shipped as a single NuGet package (`AgentEval`), which embeds **12 sub-project DLLs** (`PrivateAssets="all"`). The CLI and Mission Control server/SPA are separate, non-packaged applications.
+The codebase is organized into internal projects shipped as a single NuGet package (`AgentEval`), which embeds its sub-project DLLs (`PrivateAssets="all"`). The CLI and Mission Control server/SPA are separate, non-packaged applications.
 
 ```
 src/
@@ -567,7 +567,7 @@ src/
 ├── AgentEval.Memory/             # Memory evaluation, benchmarks, LongMemEval, HTML reporting
 ├── AgentEval.RedTeam/            # Security testing: attacks, evaluators, OWASP/MITRE compliance reports
 │
-├── AgentEval/                    # Umbrella — embeds the 12 sub-projects + AddAgentEvalAll()
+├── AgentEval/                    # Umbrella — embeds the sub-projects + AddAgentEvalAll()
 │
 │   # Applications (NOT in the NuGet package):
 ├── AgentEval.Cli/                # `agenteval` CLI (init/eval/list/bench/redteam/mc/doctor)
@@ -575,7 +575,7 @@ src/
 └── AgentEval.MissionControl.Spa/ # React SPA served by Mission Control
 ```
 
-Cross-cutting shared types introduced by the v1.1 hardening wave live close to their domain: `EvalTreeLimits` (Abstractions — single tree-walk depth cap), `EvalReportHelpers` (Abstractions — shared PDF/report helpers), `ModelKeyMatcher` (Abstractions — shared model-pricing key match), `CalibrationMath` (Core), `WorkflowToolCallChecks` (Core), `AgenticCategoryResolver` (Evals.Agentic), `RedTeamComplianceLeaf` (RedTeam), and `AgentEval.Compliance.Core` (shared by both compliance packs).
+Cross-cutting shared types introduced by the thorough-review hardening wave live close to their domain: `EvalTreeLimits` (Abstractions — single tree-walk depth cap), `EvalReportHelpers` (Abstractions — shared PDF/report helpers), `ModelKeyMatcher` (Abstractions — shared model-pricing key match), `CalibrationMath` (Core), `WorkflowToolCallChecks` (Core), `AgenticCategoryResolver` (Evals.Agentic), `RedTeamComplianceLeaf` (RedTeam), and `AgentEval.Compliance.Core` (shared by both compliance packs).
 
 ---
 
@@ -774,12 +774,12 @@ catch (BehavioralPolicyViolationException ex)
 
 ## Internal Project Structure
 
-AgentEval ships as a **single NuGet package** (`AgentEval`) but is internally organized into focused projects for maintainability and compile-time dependency enforcement (see [ADR-016](adr/016-monolith-modularization.md) for the original split and [ADR-018](adr/018-compliance-core-and-shared-extractions.md) for the v1.1 `Compliance.Core` extraction).
+AgentEval ships as a **single NuGet package** (`AgentEval`) but is internally organized into focused projects for maintainability and compile-time dependency enforcement (see [ADR-016](adr/016-monolith-modularization.md) for the original split and [ADR-018](adr/018-compliance-core-and-shared-extractions.md) for the `Compliance.Core` extraction).
 
 ### Dependency Graph (embedded sub-projects)
 
 ```
-AgentEval (NuGet package — umbrella, embeds all 12 below via PrivateAssets="all")
+AgentEval (NuGet package — umbrella, embeds all of the below via PrivateAssets="all")
 ├── AgentEval.Abstractions      → M.E.AI.Abstractions
 ├── AgentEval.Core              → Abstractions + M.E.AI + M.E.AI.Eval.Quality + S.N.Tensors + M.E.DI
 ├── AgentEval.Compliance.Core   → Abstractions + Core
@@ -794,7 +794,7 @@ AgentEval (NuGet package — umbrella, embeds all 12 below via PrivateAssets="al
 └── AgentEval.RedTeam           → Abstractions + Core + M.E.AI + M.E.DI + PdfSharp-MigraDoc
 ```
 
-Because the umbrella embeds the sub-project DLLs with `PrivateAssets="all"`, each sub-project's external `PackageReference`s must be re-declared on the umbrella by hand. `UmbrellaDependencyClosureTests` (added in v1.1, ARC-10) is a build-time guard that fails when a sub-project adds a runtime package the umbrella does not mirror, so a missing transitive dependency can no longer ship silently (SEC-02 class of bug).
+Because the umbrella embeds the sub-project DLLs with `PrivateAssets="all"`, each sub-project's external `PackageReference`s must be re-declared on the umbrella by hand. `UmbrellaDependencyClosureTests` (ARC-10) is a build-time guard that fails when a sub-project adds a runtime package the umbrella does not mirror, so a missing transitive dependency can no longer ship silently (SEC-02 class of bug).
 
 ### Project Responsibilities
 

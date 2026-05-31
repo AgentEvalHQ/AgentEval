@@ -12,11 +12,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 A repository-wide thorough review produced 128 deduplicated findings (bugs, gaps, security,
 performance, architecture). **All 128 were fixed one-per-commit** on `fix/thorough-review-findings`,
 each built + run against the full suite with a regression test (and negative control) added where a
-behaviour assertion applied. Net result: **main suite 4372/0/1 + Memory 500/0**; full-solution build
-(net8/9/10) clean. No compliance/calibration value, threshold, pillar definition, aggregation rule, or
-judge constant changed (the GDPR 5/5 and EU-AI-Act gates — including the P1 0.65/0.35 and GPAI 0.60/0.25
-carve-outs — are byte-for-byte preserved and verified by 585 compliance tests). An independent 27-agent
-adversarial re-review confirmed the wave is behaviour-preserving and calibration-safe.
+behaviour assertion applied. Full-solution build (net8/9/10) clean; full suite green. No
+compliance/calibration value, threshold, pillar definition, aggregation rule, or judge constant changed
+(the GDPR and EU-AI-Act gates — including the Art 5 / GPAI carve-outs — are byte-for-byte preserved and
+verified by the compliance test suite). An independent adversarial re-review confirmed the wave is
+behaviour-preserving and calibration-safe.
 
 #### Security
 - **SEC-11** — GraphQL now enforces operation-cost limits (`ModifyCostOptions`) with `[Cost]` weights on
