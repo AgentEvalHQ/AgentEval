@@ -107,7 +107,10 @@ public record WorkflowExecutionResult
                     timeline.AddInvocation(new ToolInvocation
                     {
                         ToolName = $"{step.ExecutorId}/{tc.Name}",
-                        StartTime = step.StartOffset + (tc.Duration ?? TimeSpan.Zero),
+                        // Use the step start offset as the tool's start. Adding the tool's own
+                        // duration yielded its END time, shifting the timeline bar one full duration
+                        // to the right whenever per-tool timing was present (BUG-42).
+                        StartTime = step.StartOffset,
                         Duration = tc.Duration ?? TimeSpan.Zero,
                         Succeeded = !tc.HasError,
                         ErrorMessage = tc.Exception?.Message,
