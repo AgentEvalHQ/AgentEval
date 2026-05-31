@@ -193,7 +193,7 @@ public static class Program
             var group = Groups.FirstOrDefault(g => g.Key.ToString() == raw);
             if (group is not null) return group;
 
-            Console.WriteLine("  Enter a letter A–H or Q to quit.\n");
+            Console.WriteLine("  Enter a letter A–I or Q to quit.\n");
         }
     }
 

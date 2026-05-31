@@ -63,6 +63,32 @@ public sealed class AgentTrace
     /// </summary>
     [JsonPropertyName("metadata")]
     public Dictionary<string, object>? Metadata { get; set; }
+
+    // Glass Box recorders may write from concurrent tool invocations (MEAI AllowConcurrentInvocation) or
+    // from parallel chat calls that share one trace; List<>/Dictionary<> are not thread-safe, so funnel all
+    // mutating writes through these guarded helpers. Reads (serialization, FinalizePerformance) run after
+    // recording has completed, so they need no lock.
+    private readonly object _writeLock = new();
+
+    /// <summary>Appends an entry to <see cref="Entries"/> under a lock — safe under concurrent recording.</summary>
+    public void AddEntry(TraceEntry entry)
+    {
+        ArgumentNullException.ThrowIfNull(entry);
+        lock (_writeLock)
+        {
+            Entries.Add(entry);
+        }
+    }
+
+    /// <summary>Sets a <see cref="Metadata"/> key under a lock, lazily creating the dictionary — safe under concurrent recording.</summary>
+    public void SetMetadata(string key, object value)
+    {
+        lock (_writeLock)
+        {
+            Metadata ??= new Dictionary<string, object>();
+            Metadata[key] = value;
+        }
+    }
 }
 
 /// <summary>

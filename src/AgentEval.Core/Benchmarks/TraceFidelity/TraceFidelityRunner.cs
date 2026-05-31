@@ -153,11 +153,14 @@ public sealed class TraceFidelityRunner
             return Build(TraceFidelityRubric.TokenUnderReporting, 0, Array.Empty<string>());
         }
 
+        // Directional: the class is "token UNDER-reporting", so flag only when the agent boundary reports
+        // FEWER tokens than were actually consumed at the chat boundary (chat > agent). Over-reporting
+        // (agent > chat) is a different, non-deceptive discrepancy and is not penalised here.
         var denom = Math.Max(chatTokens, 1);
-        var drift = Math.Abs(chatTokens - agentTokens) / (double)denom;
-        var count = drift > TraceFidelityRubric.TokenToleranceFraction ? 1 : 0;
+        var shortfall = (chatTokens - agentTokens) / (double)denom;
+        var count = shortfall > TraceFidelityRubric.TokenToleranceFraction ? 1 : 0;
         var examples = count > 0
-            ? new[] { $"token totals disagree: chat={chatTokens}, agent={agentTokens} ({drift:P1} > {TraceFidelityRubric.TokenToleranceFraction:P0})" }
+            ? new[] { $"agent under-reports tokens: chat={chatTokens}, agent={agentTokens} ({shortfall:P1} short, tolerance {TraceFidelityRubric.TokenToleranceFraction:P0})" }
             : Array.Empty<string>();
         return Build(TraceFidelityRubric.TokenUnderReporting, count, examples);
     }

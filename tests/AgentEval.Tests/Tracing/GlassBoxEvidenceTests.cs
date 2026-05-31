@@ -64,4 +64,27 @@ public class GlassBoxEvidenceTests
         Assert.Equal(2, evidence.GateBlockCount);
         Assert.Equal(new[] { "pii-detection" }, evidence.GateBlockPolicies);
     }
+
+    [Fact]
+    public async Task FromTrace_CountsGateBlocks_AfterSerializeReloadRoundTrip()
+    {
+        // Arrange — gate verdicts recorded in Metadata, then persisted and reloaded (compliance reads .trace.json,
+        // where Metadata values deserialize to JsonElement, not the in-memory dictionary shape).
+        var trace = new AgentTrace();
+        trace.Entries.Add(TraceEntry.ForChatResponse(0, "inv", "a", 5, null, null, "stop", null));
+        trace.Metadata = new Dictionary<string, object>
+        {
+            ["gate.pre.1.prompt-injection"] = new Dictionary<string, object?> { ["action"] = "Allow" },
+            ["gate.post.2.pii-detection"] = new Dictionary<string, object?> { ["action"] = "Block" },
+            ["gate.post.3.pii-detection"] = new Dictionary<string, object?> { ["action"] = "Block" },
+        };
+
+        // Act — round-trip through the canonical trace serializer, then extract
+        var reloaded = await TraceSerializer.DeserializeFromStringAsync(await TraceSerializer.SerializeToStringAsync(trace));
+        var evidence = GlassBoxEvidence.FromTrace(reloaded)!;
+
+        // Assert — the reloaded trace reports the SAME block count as the in-memory one (no silent zero)
+        Assert.Equal(2, evidence.GateBlockCount);
+        Assert.Equal(new[] { "pii-detection" }, evidence.GateBlockPolicies);
+    }
 }

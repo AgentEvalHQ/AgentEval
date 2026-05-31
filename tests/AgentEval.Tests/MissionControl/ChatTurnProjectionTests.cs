@@ -2,6 +2,10 @@
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 
+// MissionControl is net10.0-only (its ProjectReference is guarded in the test csproj), so these tests
+// only compile/run on net10.0 — matching every other tests/MissionControl/*.cs file.
+#if NET10_0_OR_GREATER
+
 using AgentEval.MissionControl.GraphQL;
 using AgentEval.Tracing;
 
@@ -53,3 +57,5 @@ public class ChatTurnProjectionTests
         Assert.Empty(ChatTurnProjection.FromTrace(trace));
     }
 }
+
+#endif

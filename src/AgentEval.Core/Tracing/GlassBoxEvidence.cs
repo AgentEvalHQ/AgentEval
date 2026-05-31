@@ -56,7 +56,7 @@ public sealed record GlassBoxEvidence
         var toolExecutions = trace.Entries.Count(e => e.EffectiveScope == TraceEntryScope.ToolExecution);
 
         var hasGateMetadata = trace.Metadata is not null
-            && trace.Metadata.Keys.Any(k => k.StartsWith("gate.", StringComparison.Ordinal));
+            && trace.Metadata.Keys.Any(GateMetadataReader.IsGateKey);
 
         if (chatResponses.Count == 0 && toolExecutions == 0 && !hasGateMetadata)
         {
@@ -90,20 +90,16 @@ public sealed record GlassBoxEvidence
         var policies = new HashSet<string>(StringComparer.Ordinal);
         foreach (var kv in trace.Metadata)
         {
-            if (!kv.Key.StartsWith("gate.", StringComparison.Ordinal)
-                || kv.Value is not IReadOnlyDictionary<string, object?> dict
-                || !dict.TryGetValue("action", out var action)
-                || !string.Equals(action as string, "Block", StringComparison.Ordinal))
+            // Handles both the in-memory dictionary shape and the JsonElement shape of a reloaded trace.
+            if (!GateMetadataReader.IsGateKey(kv.Key) || !GateMetadataReader.IsBlock(kv.Value))
             {
                 continue;
             }
 
             count++;
-            // Key shape: gate.{stage}.{seq}.{policy}
-            var parts = kv.Key.Split('.');
-            if (parts.Length >= 4)
+            if (GateMetadataReader.PolicyFromKey(kv.Key) is { } policy)
             {
-                policies.Add(string.Join('.', parts[3..]));
+                policies.Add(policy);
             }
         }
 

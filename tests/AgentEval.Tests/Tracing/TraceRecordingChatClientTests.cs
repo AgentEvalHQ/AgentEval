@@ -144,6 +144,59 @@ public class TraceRecordingChatClientTests
     }
 
     [Fact]
+    public async Task Streaming_WithToolCallAndUsage_RecordsToolCallsAndTokenUsage_LikeNonStreaming()
+    {
+        // Arrange — a streamed tool-call turn that also reports token usage (in a trailing usage chunk, as
+        // real providers do). Before the fix, the streaming path hard-coded toolCalls/usage to null.
+        var scripted = new ScriptedChatClient().Add(new ScriptedTurn
+        {
+            ToolCallId = "c1",
+            ToolName = "SearchFlights",
+            ToolArgs = new Dictionary<string, object?> { ["to"] = "NRT" },
+            FinishReason = ChatFinishReason.ToolCalls,
+            InputTokens = 80,
+            OutputTokens = 12,
+        });
+        var trace = new AgentTrace();
+        var recorder = new TraceRecordingChatClient(scripted, "planner", trace);
+
+        // Act — drain the full stream
+        await foreach (var _ in recorder.GetStreamingResponseAsync(Conversation(), OptionsWithTool()))
+        {
+            // drain
+        }
+
+        // Assert — streaming now captures tool calls + usage + finish reason, matching the non-streaming path
+        var response = trace.Entries.First(e => e.Type == TraceEntryType.Response);
+        Assert.True(response.IsStreaming);
+        Assert.Equal("SearchFlights", Assert.Single(response.ToolCalls!).Name);
+        Assert.Equal(80, response.TokenUsage!.PromptTokens);
+        Assert.Equal(12, response.TokenUsage.CompletionTokens);
+        Assert.Equal("tool_calls", response.FinishReason);
+    }
+
+    [Fact]
+    public async Task Streaming_ConsumerBreaksEarly_StillFinalizesResponseEntry_NoDanglingRequest()
+    {
+        // Arrange — a streamed text turn (text chunk + trailing usage chunk = 2 updates)
+        var scripted = new ScriptedChatClient().AddText("partial", inTok: 5, outTok: 5);
+        var trace = new AgentTrace();
+        var recorder = new TraceRecordingChatClient(scripted, "planner", trace);
+
+        // Act — consume only the first update, then break (an abandoned/short-circuited stream)
+        await foreach (var _ in recorder.GetStreamingResponseAsync(Conversation()))
+        {
+            break;
+        }
+
+        // Assert — the Request must NOT be left dangling: a streaming Response entry is finalized on break
+        Assert.Equal(1, trace.Entries.Count(e => e.Type == TraceEntryType.Request));
+        var response = Assert.Single(trace.Entries.Where(e => e.Type == TraceEntryType.Response));
+        Assert.True(response.IsStreaming);
+        Assert.Equal("partial", response.Text);   // what streamed before the break is captured
+    }
+
+    [Fact]
     public async Task WhenInsideCorrelationScope_AllEntriesShareCorrelationId_ElseNull()
     {
         // Arrange

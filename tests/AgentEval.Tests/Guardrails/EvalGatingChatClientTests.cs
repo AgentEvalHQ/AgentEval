@@ -171,6 +171,79 @@ public class EvalGatingChatClientTests
         Assert.Equal(GateAction.Allow, allowed.Action);
     }
 
+    [Fact]
+    public async Task PostGate_NonMaskableBlock_UnderRedact_SubstitutesPlaceholder_NotOriginalContent()
+    {
+        // Arrange — a post-gate that Blocks but cannot mask (RedactedText null, e.g. a toxicity/safety gate).
+        // Under Redact this previously fell through and delivered the offending content unchanged.
+        var scripted = new ScriptedChatClient().AddText("toxic original answer");
+        var client = scripted.AsBuilder()
+            .UseEvalGate(post: new IChatGate[] { new AlwaysBlockGate() }, policy: EvalGatePolicy.Redact)
+            .Build();
+
+        // Act
+        var response = await client.GetResponseAsync(UserSays("hi"));
+
+        // Assert — Redact must never silently pass a Block: a safe placeholder stands in for the content
+        Assert.DoesNotContain("toxic original answer", response.Text);
+        Assert.Contains("withheld by EvalGate", response.Text);
+        Assert.Contains("always_block", response.Text);
+    }
+
+    [Fact]
+    public async Task PostGate_Redact_PreservesResponseCorrelationFields()
+    {
+        // Arrange — a response carrying correlation/threading identity plus maskable PII
+        var inner = new ChatResponse(new ChatMessage(ChatRole.Assistant, "SSN 123-45-6789"))
+        {
+            ResponseId = "resp-1",
+            ConversationId = "conv-1",
+            ModelId = "m-1",
+        };
+        var client = new FixedResponseClient(inner).AsBuilder()
+            .UseEvalGate(post: new IChatGate[] { new RegexPiiGate() }, policy: EvalGatePolicy.Redact)
+            .Build();
+
+        // Act
+        var response = await client.GetResponseAsync(UserSays("hi"));
+
+        // Assert — content is redacted IN PLACE, so response-level identity survives (a fresh rebuild dropped it)
+        Assert.DoesNotContain("123-45-6789", response.Text);
+        Assert.Equal("resp-1", response.ResponseId);
+        Assert.Equal("conv-1", response.ConversationId);
+        Assert.Equal("m-1", response.ModelId);
+    }
+
+    /// <summary>A gate that always Blocks and cannot mask (no <c>RedactedText</c>) — models a toxicity/safety gate.</summary>
+    private sealed class AlwaysBlockGate : IChatGate
+    {
+        public string PolicyName => "always_block";
+
+        public ValueTask<GateVerdict> InspectAsync(string text, CancellationToken cancellationToken = default)
+            => new(GateVerdict.Block(PolicyName, "non-maskable policy violation"));
+    }
+
+    /// <summary>Returns a fixed <see cref="ChatResponse"/> so a test can assert response-level field preservation.</summary>
+    private sealed class FixedResponseClient : IChatClient
+    {
+        private readonly ChatResponse _response;
+
+        public FixedResponseClient(ChatResponse response) => _response = response;
+
+        public Task<ChatResponse> GetResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default)
+            => Task.FromResult(_response);
+
+        public IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default)
+            => throw new NotSupportedException();
+
+        public object? GetService(Type serviceType, object? serviceKey = null) => null;
+
+        public void Dispose()
+        {
+            // Nothing to dispose.
+        }
+    }
+
     /// <summary>Hand-rolled <see cref="ISafetyMetric"/> double (repo convention favours fakes over a mocking lib).</summary>
     private sealed class FakeSafetyMetric : ISafetyMetric
     {

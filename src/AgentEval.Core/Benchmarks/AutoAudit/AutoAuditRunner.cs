@@ -63,15 +63,9 @@ public static class AutoAuditRunner
         var blocks = 0;
         foreach (var kv in trace.Metadata)
         {
-            if (!kv.Key.StartsWith("gate.", StringComparison.Ordinal))
-            {
-                continue;
-            }
-
-            // In-memory the gate stores a Dictionary<string, object?> with an "action" of "Block".
-            if (kv.Value is IReadOnlyDictionary<string, object?> dict
-                && dict.TryGetValue("action", out var action)
-                && string.Equals(action as string, "Block", StringComparison.Ordinal))
+            // GateMetadataReader handles both the in-memory dictionary and the JsonElement of a reloaded trace,
+            // so a persisted-trace auto-audit reports the same block count as an in-memory one.
+            if (GateMetadataReader.IsGateKey(kv.Key) && GateMetadataReader.IsBlock(kv.Value))
             {
                 blocks++;
             }

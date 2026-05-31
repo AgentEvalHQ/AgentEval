@@ -146,20 +146,27 @@ public sealed class EvalGatingChatClient : DelegatingChatClient
                 throw new EvalGateRefusalException(verdict, "post");
             }
 
-            if (_policy == EvalGatePolicy.Redact && verdict.RedactedText is not null)
+            if (_policy == EvalGatePolicy.Redact)
             {
-                response = new ChatResponse(new ChatMessage(ChatRole.Assistant, verdict.RedactedText))
-                {
-                    FinishReason = response.FinishReason,
-                    ModelId = response.ModelId,
-                    Usage = response.Usage,
-                };
-                text = verdict.RedactedText;
+                // Replace the response content IN PLACE so response-level correlation/threading fields
+                // (ResponseId, ConversationId, CreatedAt, AdditionalProperties, RawRepresentation, …) survive —
+                // rebuilding a fresh ChatResponse silently dropped them. When the gate cannot produce redacted
+                // text (a non-maskable Block, e.g. a toxicity/safety gate), substitute a safe placeholder rather
+                // than delivering the offending content unchanged — Redact must never silently pass a Block.
+                var replacement = verdict.RedactedText ?? BlockedPlaceholder(verdict);
+                response.Messages = new List<ChatMessage> { new(ChatRole.Assistant, replacement) };
+                text = replacement;
             }
         }
 
         return response;
     }
+
+    /// <summary>Safe stand-in delivered under <see cref="EvalGatePolicy.Redact"/> when a Block cannot be masked.</summary>
+    private static string BlockedPlaceholder(GateVerdict verdict)
+        => string.IsNullOrEmpty(verdict.Reason)
+            ? $"[content withheld by EvalGate policy '{verdict.PolicyName}']"
+            : $"[content withheld by EvalGate policy '{verdict.PolicyName}': {verdict.Reason}]";
 
     /// <summary>
     /// Records a gate verdict into the trace's top-level <see cref="AgentTrace.Metadata"/> under a unique
@@ -173,15 +180,14 @@ public sealed class EvalGatingChatClient : DelegatingChatClient
             return;
         }
 
-        _trace.Metadata ??= new Dictionary<string, object>();
         var seq = Interlocked.Increment(ref _gateSeq);
-        _trace.Metadata[$"gate.{stage}.{seq}.{verdict.PolicyName}"] = new Dictionary<string, object?>
+        _trace.SetMetadata($"gate.{stage}.{seq}.{verdict.PolicyName}", new Dictionary<string, object?>
         {
             ["action"] = verdict.Action.ToString(),
             ["reason"] = verdict.Reason,
             ["matches"] = verdict.Matches,
             ["correlationId"] = ToolCorrelationScope.Current,
-        };
+        });
     }
 
     private static int LastIndexOfRole(IList<ChatMessage> messages, ChatRole role)

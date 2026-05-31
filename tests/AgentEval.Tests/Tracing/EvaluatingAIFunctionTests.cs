@@ -77,10 +77,14 @@ public class EvaluatingAIFunctionTests
         // Act
         var wrapped = inner.WithEvaluation(new AgentTrace());
 
-        // Assert — the model must see the inner function's name/description/schema unchanged
+        // Assert — the model (and any tool introspection: schema regen, telemetry) must see the inner
+        // function's full declaration surface unchanged, not the wrapper's defaults.
         Assert.Equal(inner.Name, wrapped.Name);
         Assert.Equal(inner.Description, wrapped.Description);
         Assert.Equal(inner.JsonSchema.GetRawText(), wrapped.JsonSchema.GetRawText());
+        Assert.Equal(inner.UnderlyingMethod, wrapped.UnderlyingMethod);
+        Assert.Equal(inner.ReturnJsonSchema?.GetRawText(), wrapped.ReturnJsonSchema?.GetRawText());
+        Assert.Equal(inner.AdditionalProperties, wrapped.AdditionalProperties);
     }
 
     [Fact]

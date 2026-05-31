@@ -97,6 +97,16 @@ public sealed class ScriptedChatClient : IChatClient
                 ModelId = response.ModelId,
             };
         }
+
+        // Real providers surface token usage in a trailing streamed chunk (as a UsageContent), not on the
+        // text updates — mirror that so streaming recorders can be exercised for usage capture.
+        if (response.Usage is not null)
+        {
+            yield return new ChatResponseUpdate(ChatRole.Assistant, new List<AIContent> { new UsageContent(response.Usage) })
+            {
+                ModelId = response.ModelId,
+            };
+        }
     }
 
     /// <inheritdoc />

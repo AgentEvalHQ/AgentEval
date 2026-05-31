@@ -57,7 +57,7 @@ public sealed class TraceRecordingChatClient : DelegatingChatClient
         var msgs = messages as IList<ChatMessage> ?? messages.ToList();
         var i = Interlocked.Increment(ref _index) - 1;   // distinct per round-trip (pairing key)
         var corr = ToolCorrelationScope.Current;          // per-invocation grouping key (best-effort; may be null)
-        _trace.Entries.Add(TraceEntry.ForChatRequest(
+        _trace.AddEntry(TraceEntry.ForChatRequest(
             i, corr,
             systemPrompt: ExtractSystemPrompt(msgs),
             promptText: ExtractLastUserText(msgs),
@@ -70,7 +70,7 @@ public sealed class TraceRecordingChatClient : DelegatingChatClient
             var resp = await base.GetResponseAsync(msgs, options, cancellationToken).ConfigureAwait(false);
             sw.Stop();
             _trace.ModelId ??= resp.ModelId;
-            _trace.Entries.Add(TraceEntry.ForChatResponse(
+            _trace.AddEntry(TraceEntry.ForChatResponse(
                 i, corr, resp.Text, sw.ElapsedMilliseconds,
                 MapUsage(resp.Usage), MapToolCalls(resp),
                 resp.FinishReason?.Value, ExtractProviderMetadata(resp)));
@@ -79,7 +79,7 @@ public sealed class TraceRecordingChatClient : DelegatingChatClient
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             sw.Stop();
-            _trace.Entries.Add(TraceEntry.ForChatError(i, corr, ex, sw.ElapsedMilliseconds));
+            _trace.AddEntry(TraceEntry.ForChatError(i, corr, ex, sw.ElapsedMilliseconds));
             throw;
         }
     }
@@ -92,53 +92,69 @@ public sealed class TraceRecordingChatClient : DelegatingChatClient
         var msgs = messages as IList<ChatMessage> ?? messages.ToList();
         var i = Interlocked.Increment(ref _index) - 1;
         var corr = ToolCorrelationScope.Current;
-        _trace.Entries.Add(TraceEntry.ForChatRequest(
+        _trace.AddEntry(TraceEntry.ForChatRequest(
             i, corr, ExtractSystemPrompt(msgs), ExtractLastUserText(msgs),
             _dedup.Process(ExtractToolDefinitions(options)), ExtractRequestOptions(options)));
 
         var sw = Stopwatch.StartNew();
         var chunks = new List<TraceStreamChunk>();
-        var text = new System.Text.StringBuilder();
-        string? finish = null;
+        var updates = new List<ChatResponseUpdate>();
         var idx = 0;
+        var errorRecorded = false;
         await using var enumerator = base.GetStreamingResponseAsync(msgs, options, cancellationToken)
             .GetAsyncEnumerator(cancellationToken);
-        while (true)
+        try
         {
-            ChatResponseUpdate cur;
-            try
+            while (true)
             {
-                if (!await enumerator.MoveNextAsync().ConfigureAwait(false))
+                ChatResponseUpdate cur;
+                try
                 {
-                    break;
+                    if (!await enumerator.MoveNextAsync().ConfigureAwait(false))
+                    {
+                        break;
+                    }
+
+                    cur = enumerator.Current;
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    sw.Stop();
+                    _trace.AddEntry(TraceEntry.ForChatError(i, corr, ex, sw.ElapsedMilliseconds));
+                    errorRecorded = true;
+                    throw;
                 }
 
-                cur = enumerator.Current;
-            }
-            catch (Exception ex) when (ex is not OperationCanceledException)
-            {
-                sw.Stop();
-                _trace.Entries.Add(TraceEntry.ForChatError(i, corr, ex, sw.ElapsedMilliseconds));
-                throw;
-            }
+                updates.Add(cur);
+                if (!string.IsNullOrEmpty(cur.Text))
+                {
+                    chunks.Add(new TraceStreamChunk { Index = idx++, Text = cur.Text });
+                }
 
-            if (!string.IsNullOrEmpty(cur.Text))
-            {
-                text.Append(cur.Text);
-                chunks.Add(new TraceStreamChunk { Index = idx++, Text = cur.Text });
+                yield return cur;
             }
-
-            finish ??= cur.FinishReason?.Value;
-            yield return cur;
         }
-
-        sw.Stop();
-        var responseEntry = TraceEntry.ForChatResponse(
-            i, corr, text.ToString(), sw.ElapsedMilliseconds,
-            usage: null, toolCalls: null, finishReason: finish, providerMetadata: null);
-        responseEntry.IsStreaming = true;
-        responseEntry.StreamingChunks = chunks;
-        _trace.Entries.Add(responseEntry);
+        finally
+        {
+            sw.Stop();
+            // Finalize on EVERY exit path — natural completion, early consumer break, or disposal — so a
+            // partially-consumed stream never leaves a dangling, unpaired Request entry. Two exceptions: an
+            // error entry was already recorded above, or the caller cancelled (the non-streaming path records
+            // neither a response nor an error on OperationCanceledException — match that). The accumulated
+            // updates are folded back into a ChatResponse so tool calls / usage / finish reason / provider
+            // metadata are captured exactly as on the non-streaming path (they ride in ChatResponseUpdate.Contents).
+            if (!errorRecorded && !cancellationToken.IsCancellationRequested)
+            {
+                var resp = updates.ToChatResponse();
+                _trace.ModelId ??= resp.ModelId;
+                var responseEntry = TraceEntry.ForChatResponse(
+                    i, corr, resp.Text, sw.ElapsedMilliseconds,
+                    MapUsage(resp.Usage), MapToolCalls(resp), resp.FinishReason?.Value, ExtractProviderMetadata(resp));
+                responseEntry.IsStreaming = true;
+                responseEntry.StreamingChunks = chunks;
+                _trace.AddEntry(responseEntry);
+            }
+        }
     }
 
     /// <summary>Computes aggregate <see cref="TracePerformance"/> from the recorded ChatTurn entries.</summary>
@@ -211,7 +227,7 @@ public sealed class TraceRecordingChatClient : DelegatingChatClient
 
     private static List<TraceToolCall>? MapToolCalls(ChatResponse response)
     {
-        var calls = response.Messages.SelectMany(m => m.Contents).OfType<FunctionCallContent>().ToList();
+        var calls = (response.Messages ?? []).SelectMany(m => m.Contents).OfType<FunctionCallContent>().ToList();
         if (calls.Count == 0)
         {
             return null;

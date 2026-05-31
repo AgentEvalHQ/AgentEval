@@ -3,6 +3,7 @@
 // Licensed under the MIT License.
 
 using System.Diagnostics;
+using System.Reflection;
 using System.Text.Json;
 using AgentEval.Tracing;
 using Microsoft.Extensions.AI;
@@ -43,6 +44,15 @@ public sealed class EvaluatingAIFunction : AIFunction
     public override JsonElement JsonSchema => _inner.JsonSchema;
 
     /// <inheritdoc />
+    public override JsonElement? ReturnJsonSchema => _inner.ReturnJsonSchema;
+
+    /// <inheritdoc />
+    public override MethodInfo? UnderlyingMethod => _inner.UnderlyingMethod;
+
+    /// <inheritdoc />
+    public override IReadOnlyDictionary<string, object?> AdditionalProperties => _inner.AdditionalProperties;
+
+    /// <inheritdoc />
     protected override async ValueTask<object?> InvokeCoreAsync(AIFunctionArguments arguments, CancellationToken cancellationToken)
     {
         // Settled (see plan §1.2 / C14): call the PUBLIC InvokeAsync, NOT the protected InvokeCoreAsync —
@@ -56,14 +66,14 @@ public sealed class EvaluatingAIFunction : AIFunction
         {
             var result = await _inner.InvokeAsync(arguments, cancellationToken).ConfigureAwait(false);
             sw.Stop();
-            _trace.Entries.Add(TraceEntry.ForToolExecution(
+            _trace.AddEntry(TraceEntry.ForToolExecution(
                 index, correlationId, _inner.Name, argsJson, SafeSerialize(result), sw.ElapsedMilliseconds, succeeded: true, error: null));
             return result;
         }
         catch (Exception ex)
         {
             sw.Stop();
-            _trace.Entries.Add(TraceEntry.ForToolExecution(
+            _trace.AddEntry(TraceEntry.ForToolExecution(
                 index, correlationId, _inner.Name, argsJson, result: null, sw.ElapsedMilliseconds, succeeded: false, error: ex.Message));
             throw;
         }
