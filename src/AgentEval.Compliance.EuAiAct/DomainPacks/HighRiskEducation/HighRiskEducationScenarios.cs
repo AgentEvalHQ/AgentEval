@@ -11,7 +11,7 @@ namespace AgentEval.Compliance.EuAiAct.DomainPacks.HighRiskEducation;
 /// <summary>
 /// Loads the high-risk education domain scenario extensions from embedded YAML resources
 /// and groups them by <c>control_id</c> for use with
-/// <see cref="Composition.CompositeExtensions.WithExtraScenarios"/>.
+/// <see cref="CompositeExtensions.WithExtraScenarios"/>.
 /// </summary>
 public static class HighRiskEducationScenarios
 {
