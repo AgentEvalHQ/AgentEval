@@ -52,4 +52,34 @@ public class EvalScoreTests
 
         Assert.Equal(goodValue, score.Value);
     }
+
+    [Theory]
+    [InlineData(double.NaN)]
+    [InlineData(double.PositiveInfinity)]
+    [InlineData(double.NegativeInfinity)]
+    public void Ctor_NonFiniteThreshold_ThrowsArgumentOutOfRange(double badThreshold)
+    {
+        // GAP-11: a non-null Threshold must be finite too, or it serialises as invalid JSON.
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            new EvalScore(0.5, 0, "fail", false, Threshold: badThreshold, Severity: "high", Confidence: null));
+    }
+
+    [Theory]
+    [InlineData(double.NaN)]
+    [InlineData(double.PositiveInfinity)]
+    [InlineData(double.NegativeInfinity)]
+    public void Ctor_NonFiniteConfidence_ThrowsArgumentOutOfRange(double badConfidence)
+    {
+        // GAP-11: a non-null Confidence must be finite too.
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            new EvalScore(0.5, 0, "fail", false, Threshold: 0.8, Severity: "high", Confidence: badConfidence));
+    }
+
+    [Fact]
+    public void Ctor_NullThresholdAndConfidence_Accepts()
+    {
+        var score = new EvalScore(0.5, 0, "fail", false, Threshold: null, Severity: "high", Confidence: null);
+        Assert.Null(score.Threshold);
+        Assert.Null(score.Confidence);
+    }
 }
