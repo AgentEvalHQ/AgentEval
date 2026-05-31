@@ -497,27 +497,10 @@ public sealed class AgenticPdfRenderer
         if (result?.Metric.Category is { Length: > 0 } cat)
             return cat;
 
-        // Fallback: infer from key naming conventions
-        return evaluatorKey.ToLowerInvariant() switch
-        {
-            var k when k.Contains("task") || k.Contains("outcome") || k.Contains("completion") =>
-                "system-outcome",
-            var k when k.Contains("tool") || k.Contains("planning") || k.Contains("reasoning") ||
-                       k.Contains("step") || k.Contains("action") =>
-                "agentic-process",
-            var k when k.Contains("rag") || k.Contains("retrieval") || k.Contains("grounded") ||
-                       k.Contains("citation") || k.Contains("relevance") =>
-                "rag",
-            var k when k.Contains("safety") || k.Contains("harm") || k.Contains("jailbreak") ||
-                       k.Contains("prompt-injection") || k.Contains("pii") =>
-                "safety-security",
-            var k when k.Contains("latency") || k.Contains("cost") || k.Contains("operational") ||
-                       k.Contains("retry") || k.Contains("reliability") =>
-                "operational",
-            var k when k.Contains("judge") || k.Contains("calibration") || k.Contains("consistency") =>
-                "judge-quality",
-            _ => "agentic"
-        };
+        // ARC-11: shared last-resort heuristic (one keyword map across summary + PDF reports), instead of
+        // a divergent Contains set + "agentic" default that could bucket an evaluator differently from
+        // AgenticSummaryBuilder.
+        return AgenticCategoryResolver.InferCategoryFromKey(evaluatorKey);
     }
 
     private static string TruncateForPreview(string? text, int maxLen = 80)

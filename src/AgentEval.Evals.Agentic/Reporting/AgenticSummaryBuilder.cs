@@ -187,22 +187,8 @@ public sealed class AgenticSummaryBuilder
         if (!string.IsNullOrWhiteSpace(cat) && s_knownCategories.Contains(cat))
             return cat;
 
-        var key = node.Metric.Key ?? string.Empty;
-        if (key.StartsWith("task_", StringComparison.OrdinalIgnoreCase) ||
-            key.StartsWith("intent_", StringComparison.OrdinalIgnoreCase))
-            return "system-outcome";
-        if (key.StartsWith("tool_", StringComparison.OrdinalIgnoreCase))
-            return "agentic-process";
-        if (key.StartsWith("safety_", StringComparison.OrdinalIgnoreCase) ||
-            key.StartsWith("refusal_", StringComparison.OrdinalIgnoreCase))
-            return "safety-security";
-        if (key.StartsWith("rag_", StringComparison.OrdinalIgnoreCase) ||
-            key.StartsWith("retrieval_", StringComparison.OrdinalIgnoreCase))
-            return "rag";
-        if (key.StartsWith("judge_", StringComparison.OrdinalIgnoreCase))
-            return "judge-quality";
-
-        return "operational";
+        // ARC-11: shared last-resort heuristic (one keyword map across summary + PDF reports).
+        return AgenticCategoryResolver.InferCategoryFromKey(node.Metric.Key);
     }
 
     private static string CombineStatus(string a, string b)
