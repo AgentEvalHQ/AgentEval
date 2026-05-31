@@ -586,17 +586,16 @@ public class ToolCallAssertion
             return this; // Return if in scope mode
         }
         
-        var actualStr = actualValue is JsonElement je ? je.GetRawText().Trim('"') : actualValue?.ToString();
-        var expectedStr = expectedValue?.ToString();
-        
-        if (!string.Equals(actualStr, expectedStr, StringComparison.Ordinal))
+        // Type-aware comparison (BUG-21): numbers compare numerically, booleans by value,
+        // strings by their unquoted content — no GetRawText().Trim('"') mangling.
+        if (!ToolArgumentComparison.Matches(actualValue, expectedValue))
         {
             AgentEvalScope.FailWith(
                 ToolAssertionException.Create(
                     $"Expected '{_toolName}' argument '{paramName}' to have a different value.",
                     toolName: _toolName,
                     expected: $"'{paramName}' = \"{expectedValue}\"",
-                    actual: $"'{paramName}' = \"{actualValue}\"",
+                    actual: $"'{paramName}' = \"{ToolArgumentComparison.Canonical(actualValue)}\"",
                     because: because));
         }
         return this;

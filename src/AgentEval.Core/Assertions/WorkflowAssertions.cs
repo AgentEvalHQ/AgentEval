@@ -1249,16 +1249,13 @@ public class WorkflowToolCallAssertionBuilder
         }
         else
         {
-            var actualStr = actualValue is System.Text.Json.JsonElement je
-                ? je.GetRawText().Trim('"')
-                : actualValue?.ToString();
-            var expectedStr = expectedValue?.ToString();
-
-            if (!string.Equals(actualStr, expectedStr, StringComparison.Ordinal))
+            // Type-aware comparison (BUG-21): numbers numerically, booleans by value, strings
+            // by unquoted content — no GetRawText().Trim('"') mangling.
+            if (!ToolArgumentComparison.Matches(actualValue, expectedValue))
             {
                 AddFailure(
                     $"Expected '{_toolName}' in workflow argument '{paramName}' = \"{expectedValue}\" " +
-                    $"but was \"{actualValue}\"",
+                    $"but was \"{ToolArgumentComparison.Canonical(actualValue)}\"",
                     because);
             }
         }
@@ -1521,16 +1518,13 @@ public class ExecutorToolCallAssertionBuilder
         }
         else
         {
-            var actualStr = actualValue is System.Text.Json.JsonElement je
-                ? je.GetRawText().Trim('"')
-                : actualValue?.ToString();
-            var expectedStr = expectedValue?.ToString();
-
-            if (!string.Equals(actualStr, expectedStr, StringComparison.Ordinal))
+            // Type-aware comparison (BUG-21): numbers numerically, booleans by value, strings
+            // by unquoted content — no GetRawText().Trim('"') mangling.
+            if (!ToolArgumentComparison.Matches(actualValue, expectedValue))
             {
                 AddFailure(
                     $"Expected '{_toolName}' in executor '{_executorId}' argument '{paramName}' = \"{expectedValue}\" " +
-                    $"but was \"{actualValue}\"",
+                    $"but was \"{ToolArgumentComparison.Canonical(actualValue)}\"",
                     because);
             }
         }
