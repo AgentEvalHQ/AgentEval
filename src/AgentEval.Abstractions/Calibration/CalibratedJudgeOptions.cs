@@ -87,5 +87,18 @@ public class CalibratedJudgeOptions
         
         if (MinimumJudgesRequired < 1)
             throw new ArgumentException("MinimumJudgesRequired must be at least 1.", nameof(MinimumJudgesRequired));
+
+        // Reject negative / NaN / Infinity judge weights so a bad weight fails fast rather than
+        // silently producing a finite-but-wrong weighted score (GAP-10).
+        if (JudgeWeights is { Count: > 0 })
+        {
+            foreach (var (judge, weight) in JudgeWeights)
+            {
+                if (!double.IsFinite(weight) || weight < 0)
+                    throw new ArgumentException(
+                        $"JudgeWeights['{judge}'] must be a finite, non-negative number (was {weight}).",
+                        nameof(JudgeWeights));
+            }
+        }
     }
 }

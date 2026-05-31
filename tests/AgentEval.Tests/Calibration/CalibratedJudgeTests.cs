@@ -100,6 +100,17 @@ public class CalibratedJudgeTests
         // MinimumJudgesRequired < 1
         Assert.Throws<ArgumentException>(() =>
             new CalibratedJudgeOptions { MinimumJudgesRequired = 0 }.Validate());
+
+        // GAP-10: negative / NaN / Infinity judge weights must fail fast.
+        Assert.Throws<ArgumentException>(() =>
+            new CalibratedJudgeOptions { JudgeWeights = new() { ["j1"] = -0.5 } }.Validate());
+        Assert.Throws<ArgumentException>(() =>
+            new CalibratedJudgeOptions { JudgeWeights = new() { ["j1"] = double.NaN } }.Validate());
+        Assert.Throws<ArgumentException>(() =>
+            new CalibratedJudgeOptions { JudgeWeights = new() { ["j1"] = double.PositiveInfinity } }.Validate());
+
+        // Valid non-negative finite weights do not throw.
+        new CalibratedJudgeOptions { JudgeWeights = new() { ["j1"] = 0.5, ["j2"] = 1.5 } }.Validate();
     }
     
     #endregion
