@@ -281,6 +281,7 @@ public sealed class RedTeamRunner : IRedTeamRunner
                 Difficulty = probe.Difficulty,
                 Duration = probeSw.Elapsed,
                 Error = "Timeout",
+                ErrorKind = ProbeErrorKind.Timeout,
                 Severity = attackSeverity
             };
         }
@@ -290,7 +291,7 @@ public sealed class RedTeamRunner : IRedTeamRunner
             // Inconclusive, but still counted as an execution error at the scan level so a broken
             // transport is not silently reported as a clean Pass (GAP-07).
             probeSw.Stop();
-            return BuildErrorResult(probe, options, attackSeverity, probeSw.Elapsed, "Transport error", ex);
+            return BuildErrorResult(probe, options, attackSeverity, probeSw.Elapsed, "Transport error", ProbeErrorKind.Transport, ex);
         }
         catch (Exception ex)
         {
@@ -298,7 +299,7 @@ public sealed class RedTeamRunner : IRedTeamRunner
             // execution error; ex.Message is gated behind IncludeEvidence to avoid leaking internal
             // endpoint/stack detail (GAP-07).
             probeSw.Stop();
-            return BuildErrorResult(probe, options, attackSeverity, probeSw.Elapsed, "Execution error", ex);
+            return BuildErrorResult(probe, options, attackSeverity, probeSw.Elapsed, "Execution error", ProbeErrorKind.Execution, ex);
         }
     }
 
@@ -335,7 +336,8 @@ public sealed class RedTeamRunner : IRedTeamRunner
     /// is set; otherwise a category-only message is used so internal detail is not leaked (GAP-07).
     /// </summary>
     private static ProbeResult BuildErrorResult(
-        AttackProbe probe, ScanOptions options, Severity severity, TimeSpan elapsed, string category, Exception ex)
+        AttackProbe probe, ScanOptions options, Severity severity, TimeSpan elapsed,
+        string category, ProbeErrorKind kind, Exception ex)
     {
         var includeEvidence = options.IncludeEvidence;
         return new ProbeResult
@@ -351,6 +353,7 @@ public sealed class RedTeamRunner : IRedTeamRunner
             Difficulty = probe.Difficulty,
             Duration = elapsed,
             Error = includeEvidence ? $"{category}: {ex.Message}" : category,
+            ErrorKind = kind,
             Severity = severity
         };
     }

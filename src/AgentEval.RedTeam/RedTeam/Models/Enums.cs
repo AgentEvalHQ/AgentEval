@@ -86,3 +86,19 @@ public enum EvaluationOutcome
     /// <summary>Could not determine outcome.</summary>
     Inconclusive = 2
 }
+
+/// <summary>Why an inconclusive probe could not be decided (RC-6).</summary>
+public enum ProbeErrorKind
+{
+    /// <summary>No execution error (conclusive probe, or an ambiguous-but-clean inconclusive).</summary>
+    None = 0,
+
+    /// <summary>The probe exceeded <see cref="ScanOptions.TimeoutPerProbe"/>.</summary>
+    Timeout = 1,
+
+    /// <summary>A transport/connectivity fault (HTTP, socket, IO).</summary>
+    Transport = 2,
+
+    /// <summary>An unexpected fault while executing/evaluating the probe.</summary>
+    Execution = 3
+}

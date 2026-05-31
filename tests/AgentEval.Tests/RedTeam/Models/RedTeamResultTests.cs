@@ -179,6 +179,162 @@ public class RedTeamResultTests
         Assert.Contains("2/10", result.Summary);
         Assert.Contains("80", result.Summary);
     }
+
+    [Fact]
+    public void Verdict_MoreInconclusiveThanResisted_IsInconclusive()
+    {
+        var result = new RedTeamResult
+        {
+            AgentName = "TestAgent",
+            AttackResults = [CreateAttackResult("Attack1", resisted: 3, succeeded: 0, inconclusive: 7)],
+            TotalProbes = 10,
+            ResistedProbes = 3,
+            SucceededProbes = 0,
+            InconclusiveProbes = 7
+        };
+
+        Assert.Equal(Verdict.Inconclusive, result.Verdict);
+        Assert.False(result.Passed);
+    }
+
+    [Fact]
+    public void Verdict_EqualInconclusiveAndResisted_StaysPass()
+    {
+        var result = new RedTeamResult
+        {
+            AgentName = "TestAgent",
+            AttackResults = [CreateAttackResult("Attack1", resisted: 5, succeeded: 0, inconclusive: 5)],
+            TotalProbes = 10,
+            ResistedProbes = 5,
+            SucceededProbes = 0,
+            InconclusiveProbes = 5
+        };
+
+        Assert.Equal(Verdict.Pass, result.Verdict);
+    }
+
+    [Fact]
+    public void Verdict_CriticalCompromise_ForcesFail_EvenAtHighScore()
+    {
+        var probes = new List<ProbeResult>();
+        for (int i = 0; i < 95; i++)
+            probes.Add(new() { ProbeId = $"r{i}", Prompt = "p", Response = "r", Outcome = EvaluationOutcome.Resisted, Reason = "ok", Severity = Severity.Critical });
+        for (int i = 0; i < 5; i++)
+            probes.Add(new() { ProbeId = $"s{i}", Prompt = "p", Response = "r", Outcome = EvaluationOutcome.Succeeded, Reason = "pwned", Severity = Severity.Critical });
+
+        var attack = new AttackResult { AttackName = "PIILeakage", OwaspId = "LLM02", Severity = Severity.Critical, ProbeResults = probes, ResistedCount = 95, SucceededCount = 5, InconclusiveCount = 0 };
+        var result = new RedTeamResult { AgentName = "TestAgent", AttackResults = [attack], TotalProbes = 100, ResistedProbes = 95, SucceededProbes = 5, InconclusiveProbes = 0 };
+
+        Assert.Equal(95.0, result.OverallScore);
+        Assert.Equal(Severity.Critical, result.HighestCompromisedSeverity);
+        Assert.Equal(Verdict.Fail, result.Verdict);
+    }
+
+    [Fact]
+    public void Verdict_MediumCompromiseAtHighScore_RemainsPartialPass()
+    {
+        var result = new RedTeamResult
+        {
+            AgentName = "TestAgent",
+            AttackResults = [CreateAttackResult("Attack1", resisted: 85, succeeded: 15, inconclusive: 0)],
+            TotalProbes = 100,
+            ResistedProbes = 85,
+            SucceededProbes = 15,
+            InconclusiveProbes = 0
+        };
+
+        Assert.Equal(Verdict.PartialPass, result.Verdict);
+    }
+
+    [Fact]
+    public void ConclusiveScore_IgnoresInconclusiveProbes()
+    {
+        var result = new RedTeamResult
+        {
+            AgentName = "TestAgent",
+            AttackResults = [CreateAttackResult("Attack1", resisted: 6, succeeded: 2, inconclusive: 2)],
+            TotalProbes = 10,
+            ResistedProbes = 6,
+            SucceededProbes = 2,
+            InconclusiveProbes = 2
+        };
+
+        Assert.Equal(60.0, result.OverallScore);
+        Assert.Equal(75.0, result.ConclusiveScore, precision: 4);
+        Assert.Equal(80.0, result.Coverage, precision: 4);
+        Assert.Equal(8, result.ConclusiveProbes);
+    }
+
+    [Fact]
+    public void ConclusiveScore_NoConclusiveProbes_Returns100()
+    {
+        var result = new RedTeamResult
+        {
+            AgentName = "TestAgent",
+            AttackResults = [CreateAttackResult("Attack1", resisted: 0, succeeded: 0, inconclusive: 5)],
+            TotalProbes = 5,
+            ResistedProbes = 0,
+            SucceededProbes = 0,
+            InconclusiveProbes = 5
+        };
+
+        Assert.Equal(0.0, result.OverallScore);
+        Assert.Equal(100.0, result.ConclusiveScore);
+        Assert.Equal(0.0, result.Coverage);
+    }
+
+    [Fact]
+    public void Summary_SurfacesInconclusiveAndExecutionErrors()
+    {
+        var probes = new List<ProbeResult>
+        {
+            new() { ProbeId = "e1", Prompt = "p", Response = "[TIMEOUT]", Outcome = EvaluationOutcome.Inconclusive, Reason = "timed out", Error = "Timeout" },
+            new() { ProbeId = "r1", Prompt = "p", Response = "r", Outcome = EvaluationOutcome.Resisted, Reason = "ok" }
+        };
+        var attack = new AttackResult { AttackName = "A", OwaspId = "LLM01", ProbeResults = probes, ResistedCount = 1, SucceededCount = 0, InconclusiveCount = 1 };
+        var result = new RedTeamResult { AgentName = "TestAgent", AttackResults = [attack], TotalProbes = 2, ResistedProbes = 1, SucceededProbes = 0, InconclusiveProbes = 1, ErroredProbes = 1 };
+
+        Assert.Contains("Inconclusive: 1/2", result.Summary);
+        Assert.Contains("execution error", result.Summary);
+        Assert.Contains("ConclusiveScore", result.Summary);
+    }
+
+    [Fact]
+    public void ConclusiveAttackSuccessRate_ExcludesInconclusive()
+    {
+        var result = new RedTeamResult
+        {
+            AgentName = "TestAgent",
+            AttackResults = [CreateAttackResult("Attack1", resisted: 4, succeeded: 4, inconclusive: 92)],
+            TotalProbes = 100,
+            ResistedProbes = 4,
+            SucceededProbes = 4,
+            InconclusiveProbes = 92
+        };
+
+        Assert.Equal(0.04, result.AttackSuccessRate, precision: 4);
+        Assert.Equal(0.5, result.ConclusiveAttackSuccessRate, precision: 4);
+    }
+
+    [Fact]
+    public void Result_SplitsTimeoutFromAmbiguousInconclusive()
+    {
+        var probes = new List<ProbeResult>
+        {
+            new() { ProbeId = "t1", Outcome = EvaluationOutcome.Inconclusive, Prompt = "p", Response = "[TIMEOUT]", Reason = "t", Error = "Timeout", ErrorKind = ProbeErrorKind.Timeout },
+            new() { ProbeId = "x1", Outcome = EvaluationOutcome.Inconclusive, Prompt = "p", Response = "[TRANSPORT ERROR]", Reason = "t", Error = "Transport error: reset", ErrorKind = ProbeErrorKind.Transport },
+            new() { ProbeId = "a1", Outcome = EvaluationOutcome.Inconclusive, Prompt = "p", Response = "huh", Reason = "judge unsure" },
+            new() { ProbeId = "r1", Outcome = EvaluationOutcome.Resisted, Prompt = "p", Response = "no", Reason = "ok" }
+        };
+        var attack = new AttackResult { AttackName = "A", OwaspId = "LLM01", ProbeResults = probes, ResistedCount = 1, SucceededCount = 0, InconclusiveCount = 3 };
+        var result = new RedTeamResult { AgentName = "TestAgent", AttackResults = [attack], TotalProbes = 4, ResistedProbes = 1, SucceededProbes = 0, InconclusiveProbes = 3 };
+
+        Assert.Equal(1, result.TimedOutProbes);
+        Assert.Equal(1, result.TransportErrorProbes);
+        Assert.Equal(1, result.AmbiguousProbes);
+        Assert.True(probes[2].IsAmbiguous);
+        Assert.False(probes[0].IsAmbiguous);
+    }
 }
 
 /// <summary>
@@ -264,5 +420,23 @@ public class AttackResultTests
         };
 
         Assert.Equal(Severity.Informational, result.HighestSeverity);
+    }
+
+    [Fact]
+    public void AttackResult_ConclusiveAttackSuccessRate_ExcludesInconclusive()
+    {
+        var probes = new List<ProbeResult>
+        {
+            new() { ProbeId = "r1", Prompt = "p", Response = "r", Outcome = EvaluationOutcome.Resisted, Reason = "ok" },
+            new() { ProbeId = "s1", Prompt = "p", Response = "r", Outcome = EvaluationOutcome.Succeeded, Reason = "pwned" }
+        };
+        for (int i = 0; i < 8; i++)
+            probes.Add(new() { ProbeId = $"i{i}", Prompt = "p", Response = "?", Outcome = EvaluationOutcome.Inconclusive, Reason = "unknown" });
+
+        var attack = new AttackResult { AttackName = "A", OwaspId = "LLM01", ProbeResults = probes, ResistedCount = 1, SucceededCount = 1, InconclusiveCount = 8 };
+
+        Assert.Equal(0.1, attack.AttackSuccessRate, precision: 4);
+        Assert.Equal(0.5, attack.ConclusiveAttackSuccessRate, precision: 4);
+        Assert.Equal(2, attack.ConclusiveCount);
     }
 }

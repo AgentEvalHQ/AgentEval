@@ -33,23 +33,39 @@ public record RedTeamComparison
     /// <summary>Per-attack comparison.</summary>
     public required IReadOnlyList<AttackComparison> AttackComparisons { get; init; }
 
+    /// <summary>Thresholds used to classify this comparison. Defaults to <see cref="ComparisonThresholds.Default"/> (RC-6).</summary>
+    public ComparisonThresholds Thresholds { get; init; } = ComparisonThresholds.Default;
+
+    /// <summary>
+    /// Drop in coverage (conclusive fraction) from baseline to current, 0-1. A captured baseline recorded
+    /// only conclusive counts (coverage 1.0), so any inconclusive probes in the current run are lost coverage (RC-6).
+    /// </summary>
+    public double CoverageDrop => 1.0 - Current.ConclusiveRate;
+
     /// <summary>Overall regression status.</summary>
     public RegressionStatus Status => DetermineStatus();
 
     /// <summary>Is this a regression (worse than baseline)?</summary>
-    public bool IsRegression => NewVulnerabilities.Count > 0 || ScoreDelta < -5;
+    public bool IsRegression =>
+        NewVulnerabilities.Count > 0
+        || ScoreDelta < -Thresholds.RegressionScoreDrop
+        || CoverageDrop >= Thresholds.RegressionCoverageDrop;
 
     /// <summary>Is this an improvement over baseline?</summary>
-    public bool IsImprovement => ResolvedVulnerabilities.Count > 0 && NewVulnerabilities.Count == 0;
+    public bool IsImprovement =>
+        ResolvedVulnerabilities.Count > 0 && NewVulnerabilities.Count == 0 && CoverageDrop < Thresholds.RegressionCoverageDrop;
 
     /// <summary>Is this stable (no significant change)?</summary>
-    public bool IsStable => Math.Abs(ScoreDelta) < 1 && NewVulnerabilities.Count == 0;
+    public bool IsStable =>
+        Math.Abs(ScoreDelta) < Thresholds.StableScoreBand && NewVulnerabilities.Count == 0 && CoverageDrop < Thresholds.RegressionCoverageDrop;
 
     private RegressionStatus DetermineStatus()
     {
         if (NewVulnerabilities.Count > 0) return RegressionStatus.Regression;
+        if (CoverageDrop >= Thresholds.RegressionCoverageDrop) return RegressionStatus.Regression;
+        if (ScoreDelta < -Thresholds.RegressionScoreDrop) return RegressionStatus.Regression;
         if (ResolvedVulnerabilities.Count > 0) return RegressionStatus.Improved;
-        if (Math.Abs(ScoreDelta) < 1) return RegressionStatus.Stable;
+        if (Math.Abs(ScoreDelta) < Thresholds.StableScoreBand) return RegressionStatus.Stable;
         return ScoreDelta > 0 ? RegressionStatus.Improved : RegressionStatus.Degraded;
     }
 
@@ -113,6 +129,9 @@ public record AttackComparison
     /// <summary>Probe IDs that passed in current but failed in baseline.</summary>
     public required IReadOnlyList<string> Resolved { get; init; }
 
+    /// <summary>Rate delta below which this attack is shown unchanged.</summary>
+    public double StableBand { get; init; } = 0.01;
+
     /// <summary>Status emoji based on change.</summary>
     public string StatusEmoji
     {
@@ -120,7 +139,7 @@ public record AttackComparison
         {
             if (NewFailures.Count > 0) return "❌";
             if (Resolved.Count > 0) return "✅";
-            if (Math.Abs(RateDelta) < 0.01) return "➡️";
+            if (Math.Abs(RateDelta) < StableBand) return "➡️";
             return RateDelta > 0 ? "📈" : "📉";
         }
     }

@@ -44,8 +44,17 @@ public record ProbeResult
     /// <summary>Error message if the probe execution failed.</summary>
     public string? Error { get; init; }
 
+    /// <summary>Classifies an inconclusive probe (recoverable timeout vs ambiguous evaluation vs transport fault) (RC-6).</summary>
+    public ProbeErrorKind ErrorKind { get; init; } = ProbeErrorKind.None;
+
     /// <summary>Whether this probe had an error.</summary>
     public bool HasError => !string.IsNullOrEmpty(Error);
+
+    /// <summary>True when this inconclusive probe is a timeout specifically (subset of <see cref="HasError"/>).</summary>
+    public bool IsTimeout => ErrorKind == ProbeErrorKind.Timeout;
+
+    /// <summary>True when the probe is inconclusive with no execution error — the evaluator genuinely could not decide.</summary>
+    public bool IsAmbiguous => Outcome == EvaluationOutcome.Inconclusive && ErrorKind == ProbeErrorKind.None;
 
     /// <summary>Severity if this probe found a vulnerability.</summary>
     public Severity Severity { get; init; } = Severity.Medium;

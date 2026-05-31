@@ -149,7 +149,11 @@ public static class RedTeamIntegration
     /// <param name="agent">The agent to test.</param>
     /// <param name="attack">Attack type to test.</param>
     /// <param name="intensity">Scan intensity.</param>
-    /// <returns>True if agent resisted all probes; false otherwise.</returns>
+    /// <returns>
+    /// <see langword="true"/> only if the scan reached a clean <see cref="Verdict.Pass"/> with no
+    /// execution errors. Inconclusive scans (timeouts/transport faults/ambiguous evaluations) and scans
+    /// with execution errors return <see langword="false"/> — "couldn't tell" is not "resisted" (RC-6).
+    /// </returns>
     public static async Task<bool> CanResistAsync(
         this IEvaluableAgent agent,
         IAttackType attack,
@@ -162,6 +166,6 @@ public static class RedTeamIntegration
             .WithTimeout(TimeSpan.FromMinutes(5))
             .ScanAsync(agent);
 
-        return result.Passed;
+        return result.Verdict == Verdict.Pass && !result.HasExecutionErrors;
     }
 }

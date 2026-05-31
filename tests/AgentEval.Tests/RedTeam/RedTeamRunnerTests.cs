@@ -249,6 +249,24 @@ public class RedTeamRunnerTests
         Assert.Contains(result.AttackResults.First().ProbeResults, p => p.HasError);
     }
 
+    [Fact]
+    public async Task ScanAsync_Timeout_SetsProbeErrorKindTimeout()
+    {
+        var agent = new SlowFakeAgent(TimeSpan.FromSeconds(30));
+        var runner = new RedTeamRunner();
+        var options = new ScanOptions
+        {
+            Intensity = Intensity.Quick,
+            AttackTypes = [Attack.PromptInjection],
+            TimeoutPerProbe = TimeSpan.FromMilliseconds(50)
+        };
+
+        var result = await runner.ScanAsync(agent, options);
+        var probeResult = result.AttackResults.SelectMany(a => a.ProbeResults).First();
+
+        Assert.Equal(ProbeErrorKind.Timeout, probeResult.ErrorKind);
+    }
+
     // ── GAP-07: error classification, evidence gating, scan-level error counter ──
 
     [Fact]
@@ -322,6 +340,7 @@ public class RedTeamRunnerTests
 
         var probes = result.AttackResults.SelectMany(a => a.ProbeResults).ToList();
         Assert.All(probes, p => Assert.Equal(EvaluationOutcome.Inconclusive, p.Outcome));
+        Assert.All(probes, p => Assert.Equal(ProbeErrorKind.Transport, p.ErrorKind));
         Assert.All(probes, p => Assert.Contains("Transport error", p.Reason));
         // Transport failures still count toward the scan-level error counter.
         Assert.Equal(result.TotalProbes, result.ErroredProbes);
