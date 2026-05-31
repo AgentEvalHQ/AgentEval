@@ -12,7 +12,9 @@ namespace AgentEval.Embeddings;
 /// like Azure AI Search, Pinecone, Qdrant, or Milvus for real applications.
 /// </summary>
 /// <remarks>
-/// Thread-safe for concurrent reads, but not for concurrent writes.
+/// Thread-safe via a single lock: writes (Add/AddRange/Clear) are mutually exclusive, and
+/// <see cref="Search"/> snapshots the document set under a brief lock then scores/sorts OUTSIDE the
+/// lock so a long O(n) scan does not block writes (PERF-08). Intended for demos/testing only.
 /// </remarks>
 public class MemoryVectorStore
 {
@@ -75,19 +77,30 @@ public class MemoryVectorStore
     /// <returns>Top-K most similar documents ordered by similarity (descending).</returns>
     public IReadOnlyList<SearchResult> Search(ReadOnlyMemory<float> queryEmbedding, int topK = 3, float minScore = 0.0f)
     {
+        // PERF-08: snapshot the document set under a brief lock, then do the O(n) projection/score/sort
+        // OUTSIDE the lock. The full scan no longer blocks concurrent Add/AddRange/Clear writers. The
+        // snapshot copies references only (VectorDocument holds a ReadOnlyMemory<float>), so it is cheap
+        // and the embeddings are not deep-copied.
+        List<VectorDocument> snapshot;
         lock (_lock)
         {
-            return _documents
-                .Select(doc => new SearchResult(
-                    doc.Id,
-                    doc.Text,
-                    EmbeddingSimilarity.CosineSimilarity(queryEmbedding, doc.Embedding),
-                    doc.Metadata))
-                .Where(r => r.Score >= minScore)
-                .OrderByDescending(r => r.Score)
-                .Take(topK)
-                .ToList();
+            snapshot = new List<VectorDocument>(_documents);
         }
+
+        return snapshot
+            .Select(doc => new SearchResult(
+                doc.Id,
+                doc.Text,
+                EmbeddingSimilarity.CosineSimilarity(queryEmbedding, doc.Embedding),
+                doc.Metadata))
+            // Explicitly drop NaN scores (a NaN element in an embedding propagates through CosineSimilarity)
+            // before ranking. `r.Score >= minScore` already excludes NaN today (every NaN comparison is
+            // false, for any minScore), so this is defensive/intent-documenting: it keeps NaN out of
+            // OrderByDescending even if the predicate is ever reordered or relaxed.
+            .Where(r => !float.IsNaN(r.Score) && r.Score >= minScore)
+            .OrderByDescending(r => r.Score)
+            .Take(topK)
+            .ToList();
     }
 
     /// <summary>
