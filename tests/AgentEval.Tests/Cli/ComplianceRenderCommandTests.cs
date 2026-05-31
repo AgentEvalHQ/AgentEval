@@ -11,6 +11,7 @@ using AgentEval.Compliance.Gdpr.Articles.Loading;
 using AgentEval.Compliance.Gdpr.Reporting;
 using AgentEval.Output;
 using Xunit;
+using AgentEval.Compliance.Core;
 
 namespace AgentEval.Tests.Cli;
 
@@ -107,7 +108,7 @@ public class ComplianceRenderCommandTests : IDisposable
                     ["gdpr.art17.erasure"] = new(0.90, "PASS", 1, 0, "high")
                 }),
             CriticalFindings: [],
-            Recommendations: Array.Empty<AgentEval.Compliance.Gdpr.Reporting.Recommendation>(),
+            Recommendations: Array.Empty<AgentEval.Compliance.Core.Recommendation>(),
             Disclaimer: GDPRComplianceReporter.Disclaimer,
             GdprAttestation: new GdprAttestation(
                 "mode-a",

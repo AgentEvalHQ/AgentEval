@@ -30,9 +30,10 @@ public class UmbrellaDependencyClosureTests
     // The sub-projects embedded into the umbrella package (AgentEval.csproj ProjectReferences).
     private static readonly string[] EmbeddedSubProjects =
     [
-        "AgentEval.Abstractions", "AgentEval.Core", "AgentEval.DataLoaders", "AgentEval.Evals.Agentic",
-        "AgentEval.Compliance.Gdpr", "AgentEval.Compliance.EuAiAct", "AgentEval.Evals.Performance",
-        "AgentEval.Rendering.Pdf", "AgentEval.MAF", "AgentEval.Memory", "AgentEval.RedTeam",
+        "AgentEval.Abstractions", "AgentEval.Core", "AgentEval.Compliance.Core", "AgentEval.DataLoaders",
+        "AgentEval.Evals.Agentic", "AgentEval.Compliance.Gdpr", "AgentEval.Compliance.EuAiAct",
+        "AgentEval.Evals.Performance", "AgentEval.Rendering.Pdf", "AgentEval.MAF", "AgentEval.Memory",
+        "AgentEval.RedTeam",
     ];
 
     [Fact]

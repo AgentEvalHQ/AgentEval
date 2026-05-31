@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
+    <RootNamespace>AgentEval.Compliance.Core</RootNamespace>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="AgentEval.Tests" />
+  </ItemGroup>
+
+  <!-- ARC-01: shared, regulation-neutral building blocks extracted from the near-verbatim GDPR and
+       EU AI Act compliance packs. Only Abstractions/Core types are needed here. -->
+  <ItemGroup>
+    <ProjectReference Include="..\AgentEval.Abstractions\AgentEval.Abstractions.csproj" />
+    <ProjectReference Include="..\AgentEval.Core\AgentEval.Core.csproj" />
+  </ItemGroup>
+</Project>

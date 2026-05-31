@@ -7,6 +7,7 @@ using AgentEval.Compliance.EuAiAct.Reporting;
 using AgentEval.Compliance.Gdpr.Reporting;
 using AgentEval.Output;
 using Xunit;
+using AgentEval.Compliance.Core;
 
 namespace AgentEval.Tests.Compliance.EuAiAct.Reporting;
 
@@ -54,7 +55,7 @@ public class CrossRegulationLinkerTests
             CompositeTree: compositeTree,
             Summary: summary,
             CriticalFindings: Array.Empty<EvalResult>(),
-            Recommendations: Array.Empty<AgentEval.Compliance.Gdpr.Reporting.Recommendation>(),
+            Recommendations: Array.Empty<AgentEval.Compliance.Core.Recommendation>(),
             Disclaimer: "stub",
             GdprAttestation: new GdprAttestation("mode-a", new Dictionary<string, string>()));
     }
@@ -96,7 +97,7 @@ public class CrossRegulationLinkerTests
             CompositeTree: compositeTree,
             Summary: summary,
             CriticalFindings: Array.Empty<EvalResult>(),
-            Recommendations: Array.Empty<AgentEval.Compliance.EuAiAct.Reporting.Recommendation>(),
+            Recommendations: Array.Empty<AgentEval.Compliance.Core.Recommendation>(),
             Disclaimer: "stub",
             EuAiActAttestation: new EuAiActAttestation("mode-a", new Dictionary<string, string>()));
     }

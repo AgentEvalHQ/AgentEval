@@ -10,6 +10,7 @@ using AgentEval.Compliance.Gdpr.Articles.Loading;
 using AgentEval.Compliance.Gdpr.Reporting;
 using AgentEval.Output;
 using Xunit;
+using AgentEval.Compliance.Core;
 
 namespace AgentEval.Tests.Compliance.Gdpr;
 
@@ -436,7 +437,7 @@ public class ReportingUnitTests
     private static GdprComplianceEvidence MakeSampleEvidence(
         string preset = "standard",
         IReadOnlyList<EvalResult>? criticalFindings = null,
-        IReadOnlyList<AgentEval.Compliance.Gdpr.Reporting.Recommendation>? recommendations = null,
+        IReadOnlyList<AgentEval.Compliance.Core.Recommendation>? recommendations = null,
         string subjectName = "TestAgent")
     {
         criticalFindings ??= [];

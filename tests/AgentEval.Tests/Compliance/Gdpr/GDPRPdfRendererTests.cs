@@ -10,6 +10,7 @@ using AgentEval.Compliance.Gdpr.Reporting;
 using AgentEval.Compliance.Gdpr.Reporting.Pdf;
 using AgentEval.Output;
 using Xunit;
+using AgentEval.Compliance.Core;
 
 namespace AgentEval.Tests.Compliance.Gdpr;
 
@@ -93,7 +94,7 @@ public class GDPRPdfRendererTests : IDisposable
             CompositeTree: compositeTree,
             Summary: summary,
             CriticalFindings: [],
-            Recommendations: Array.Empty<AgentEval.Compliance.Gdpr.Reporting.Recommendation>(),
+            Recommendations: Array.Empty<AgentEval.Compliance.Core.Recommendation>(),
             Disclaimer: GDPRComplianceReporter.Disclaimer,
             GdprAttestation: new GdprAttestation(
                 "mode-a",

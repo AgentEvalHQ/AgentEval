@@ -4,6 +4,7 @@
 
 using AgentEval.Evals;
 using AgentEval.Compliance.EuAiAct.Articles.Building;
+using AgentEval.Compliance.Core;
 
 namespace AgentEval.Compliance.EuAiAct.DomainPacks.HighRiskCredit;
 

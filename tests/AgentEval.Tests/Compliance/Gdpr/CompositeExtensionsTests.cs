@@ -3,7 +3,7 @@
 // Licensed under the MIT License.
 
 using AgentEval.Evals;
-using AgentEval.Compliance.Gdpr.Composition;
+using AgentEval.Compliance.Core;
 using Xunit;
 
 namespace AgentEval.Tests.Compliance.Gdpr;

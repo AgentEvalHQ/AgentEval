@@ -41,6 +41,7 @@ v0.10.0-beta: Unified Benchmarks Architecture (ADR-017). Eight benchmark familie
   <ItemGroup>
     <ProjectReference Include="../AgentEval.Abstractions/AgentEval.Abstractions.csproj" PrivateAssets="all" />
     <ProjectReference Include="../AgentEval.Core/AgentEval.Core.csproj" PrivateAssets="all" />
+    <ProjectReference Include="../AgentEval.Compliance.Core/AgentEval.Compliance.Core.csproj" PrivateAssets="all" />
     <ProjectReference Include="../AgentEval.DataLoaders/AgentEval.DataLoaders.csproj" PrivateAssets="all" />
     <ProjectReference Include="../AgentEval.Evals.Agentic/AgentEval.Evals.Agentic.csproj" PrivateAssets="all" />
     <ProjectReference Include="../AgentEval.Compliance.Gdpr/AgentEval.Compliance.Gdpr.csproj" PrivateAssets="all" />

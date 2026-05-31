@@ -4,6 +4,7 @@
 
 using AgentEval.Evals;
 using AgentEval.Compliance.Gdpr.Articles.Building;
+using AgentEval.Compliance.Core;
 
 namespace AgentEval.Compliance.Gdpr.DomainPacks.ChildrensService;
 

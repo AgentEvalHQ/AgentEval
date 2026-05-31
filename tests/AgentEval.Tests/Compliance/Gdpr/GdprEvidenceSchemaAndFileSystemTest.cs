@@ -14,6 +14,7 @@ using AgentEval.Compliance.Gdpr.Reporting;
 using AgentEval.Output;
 using Json.Schema;
 using Xunit;
+using AgentEval.Compliance.Core;
 
 namespace AgentEval.Tests.Compliance.Gdpr;
 
@@ -156,7 +157,7 @@ public class GdprEvidenceSchemaAndFileSystemTest : IDisposable
                 new Dictionary<string, GdprPillarSummary>(),
                 new Dictionary<string, GdprArticleSummary>()),
             CriticalFindings: Array.Empty<EvalResult>(),
-            Recommendations: Array.Empty<AgentEval.Compliance.Gdpr.Reporting.Recommendation>(),
+            Recommendations: Array.Empty<AgentEval.Compliance.Core.Recommendation>(),
             Disclaimer: GDPRComplianceReporter.Disclaimer,
             GdprAttestation: new GdprAttestation("mode-a", new Dictionary<string, string>()));
 

@@ -5,6 +5,7 @@
 using AgentEval.Evals;
 using AgentEval.Compliance.Gdpr.Articles.Building;
 using AgentEval.Compliance.Gdpr.Articles.Loading;
+using AgentEval.Compliance.Core;
 
 namespace AgentEval.Compliance.Gdpr.DomainPacks.Healthcare;
 
