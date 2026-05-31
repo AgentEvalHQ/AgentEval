@@ -402,9 +402,9 @@ public class MemoryBenchmarkRunnerTests
         Assert.Equal("Full", diagnostic.EffectivePresetResolutionKey);
 
         // Act — build context blobs using both keys; this is what the runner does
-        // internally per category. (BuildContextPressureBlob is internal for tests.)
-        var quickBlob = MemoryBenchmarkRunner.BuildContextPressureBlob("Quick");
-        var diagnosticBlob = MemoryBenchmarkRunner.BuildContextPressureBlob(
+        // internally per category. (MNT-05: BuildContextPressureBlob moved to MemoryScenarioContextBuilder.)
+        var quickBlob = MemoryScenarioContextBuilder.BuildContextPressureBlob("Quick");
+        var diagnosticBlob = MemoryScenarioContextBuilder.BuildContextPressureBlob(
             diagnostic.EffectivePresetResolutionKey);
 
         // Assert — both blobs exist
