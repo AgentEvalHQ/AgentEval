@@ -157,6 +157,26 @@ public class GDPRPdfRendererTests : IDisposable
     }
 
     [Fact]
+    public async Task RenderAsync_AlreadyCancelledToken_ThrowsWithoutCreatingOutputDirectory()
+    {
+        // GAP-12: a token cancelled before render must be honored ahead of the synchronous QuestPDF
+        // build AND the Directory.CreateDirectory side-effect — not after. The output directory must
+        // not be created.
+        var renderer = new GDPRPdfRenderer();
+        var evidence = MakeMinimalEvidence();
+        var freshDir = Path.Combine(_tempDir, "should-not-be-created");
+        var outputPath = Path.Combine(freshDir, "report.pdf");
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => renderer.RenderAsync(evidence, outputPath, cts.Token));
+
+        Assert.False(Directory.Exists(freshDir),
+            "a cancelled render must not create the output directory (GAP-12)");
+    }
+
+    [Fact]
     public async Task RenderAsync_NullOutputPath_Throws()
     {
         // Arrange

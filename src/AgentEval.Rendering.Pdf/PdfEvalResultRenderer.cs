@@ -56,9 +56,11 @@ public sealed class PdfEvalResultRenderer : IEvalResultRenderer
     {
         ArgumentNullException.ThrowIfNull(result);
         ArgumentNullException.ThrowIfNull(options);
+        ct.ThrowIfCancellationRequested(); // honor cancellation requested before render (GAP-12)
 
         return Task.Run(() =>
         {
+            ct.ThrowIfCancellationRequested(); // GAP-12 — don't start the synchronous render if cancelled
             var doc = Document.Create(d =>
             {
                 d.Page(p => RenderCover(p, result, options));

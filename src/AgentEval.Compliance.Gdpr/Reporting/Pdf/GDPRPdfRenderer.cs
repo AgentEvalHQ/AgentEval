@@ -69,6 +69,7 @@ public sealed class GDPRPdfRenderer
     {
         ArgumentNullException.ThrowIfNull(evidence);
         ArgumentException.ThrowIfNullOrWhiteSpace(outputPath);
+        ct.ThrowIfCancellationRequested(); // honor cancellation requested before render (GAP-12)
 
         var pdf = Document.Create(doc =>
         {
@@ -101,8 +102,13 @@ public sealed class GDPRPdfRenderer
             doc.Page(p => RenderMethodologyAppendix(p, evidence));
         });
 
+        ct.ThrowIfCancellationRequested(); // GAP-12
         Directory.CreateDirectory(Path.GetDirectoryName(outputPath)!);
-        return Task.Run(() => pdf.GeneratePdf(outputPath), ct);
+        return Task.Run(() =>
+        {
+            ct.ThrowIfCancellationRequested(); // GAP-12 — don't start the synchronous render if cancelled
+            pdf.GeneratePdf(outputPath);
+        }, ct);
     }
 
     // ── G6.2 Cover page ──────────────────────────────────────────────────────

@@ -55,6 +55,7 @@ public sealed class AgenticPdfRenderer
     {
         ArgumentNullException.ThrowIfNull(result);
         ArgumentException.ThrowIfNullOrWhiteSpace(outputPath);
+        ct.ThrowIfCancellationRequested(); // honor cancellation requested before render (GAP-12)
 
         var pdf = Document.Create(doc =>
         {
@@ -93,11 +94,16 @@ public sealed class AgenticPdfRenderer
             doc.Page(p => RenderMethodologyAppendix(p, result));
         });
 
+        ct.ThrowIfCancellationRequested(); // GAP-12
         var dir = Path.GetDirectoryName(outputPath);
         if (!string.IsNullOrEmpty(dir))
             Directory.CreateDirectory(dir);
 
-        return Task.Run(() => pdf.GeneratePdf(outputPath), ct);
+        return Task.Run(() =>
+        {
+            ct.ThrowIfCancellationRequested(); // GAP-12 — don't start the synchronous render if cancelled
+            pdf.GeneratePdf(outputPath);
+        }, ct);
     }
 
     // ── L0 Cover page ────────────────────────────────────────────────────────
