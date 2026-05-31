@@ -334,9 +334,89 @@ public class BehavioralPolicyAssertionsTests
         // Assert - both calls have confirmation before them
         Assert.Null(exception);
     }
-    
+
+    // ── GAP-06: stronger confirmation semantics ─────────────────────────────────
+
+    [Fact]
+    public void MustConfirmBefore_WhenConfirmationFailed_ThrowsException()
+    {
+        // A failed confirmation (HasError) is not a confirmation — it must not satisfy the gate.
+        var report = new ToolUsageReport();
+        report.AddCall(new ToolCallRecord
+        {
+            Name = "Confirm", CallId = "call-1", Order = 1,
+            Exception = new InvalidOperationException("user dismissed the dialog")
+        });
+        report.AddCall(new ToolCallRecord { Name = "TransferFunds", CallId = "call-2", Order = 2 });
+
+        var exception = Assert.Throws<BehavioralPolicyViolationException>(() =>
+            report.Should().MustConfirmBefore("TransferFunds", because: "approval must succeed"));
+
+        Assert.Equal("MissingConfirmation", exception.ViolationType);
+    }
+
+    [Fact]
+    public void MustConfirmBefore_RequireImmediatePrecedence_RejectsInterveningTool()
+    {
+        // A confirmation exists earlier, but an unrelated tool ran between it and the risky call.
+        var report = new ToolUsageReport();
+        report.AddCall(new ToolCallRecord { Name = "Confirm", CallId = "call-1", Order = 1 });
+        report.AddCall(new ToolCallRecord { Name = "FetchBalance", CallId = "call-2", Order = 2 });
+        report.AddCall(new ToolCallRecord { Name = "TransferFunds", CallId = "call-3", Order = 3 });
+
+        var exception = Assert.Throws<BehavioralPolicyViolationException>(() =>
+            report.Should().MustConfirmBefore(
+                "TransferFunds", because: "confirmation must immediately precede", requireImmediatePrecedence: true));
+
+        Assert.Equal("MissingConfirmation", exception.ViolationType);
+
+        // Without the immediate-precedence requirement the same sequence passes (default behavior).
+        Assert.Null(Record.Exception(() =>
+            report.Should().MustConfirmBefore("TransferFunds", because: "any prior confirmation ok")));
+    }
+
+    [Fact]
+    public void MustConfirmBefore_RequireImmediatePrecedence_AcceptsAdjacentConfirmation()
+    {
+        var report = new ToolUsageReport();
+        report.AddCall(new ToolCallRecord { Name = "Confirm", CallId = "call-1", Order = 1 });
+        report.AddCall(new ToolCallRecord { Name = "TransferFunds", CallId = "call-2", Order = 2 });
+
+        Assert.Null(Record.Exception(() =>
+            report.Should().MustConfirmBefore(
+                "TransferFunds", because: "adjacent confirmation", requireImmediatePrecedence: true)));
+    }
+
+    [Fact]
+    public void MustConfirmBefore_CorrelationPredicate_RejectsUnrelatedConfirmation()
+    {
+        // Confirmation for a DIFFERENT target must not satisfy a risky call when a correlation
+        // predicate ties the confirmation to the risky call's argument.
+        var report = new ToolUsageReport();
+        report.AddCall(new ToolCallRecord
+        {
+            Name = "Confirm", CallId = "call-1", Order = 1,
+            Arguments = new Dictionary<string, object?> { ["target"] = "AccountB" }
+        });
+        report.AddCall(new ToolCallRecord
+        {
+            Name = "TransferFunds", CallId = "call-2", Order = 2,
+            Arguments = new Dictionary<string, object?> { ["account"] = "AccountA" }
+        });
+
+        bool SameTarget(ToolCallRecord confirm, ToolCallRecord risky) =>
+            Equals(confirm.Arguments?["target"], risky.Arguments?["account"]);
+
+        var exception = Assert.Throws<BehavioralPolicyViolationException>(() =>
+            report.Should().MustConfirmBefore(
+                "TransferFunds", because: "confirmation must target the same account",
+                confirmationMatches: SameTarget));
+
+        Assert.Equal("MissingConfirmation", exception.ViolationType);
+    }
+
     #endregion
-    
+
     #region BehavioralPolicyViolationException Tests
     
     [Fact]

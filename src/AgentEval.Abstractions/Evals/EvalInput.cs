@@ -21,20 +21,20 @@ public sealed record ToolDefinition(string Name, string? Description, IReadOnlyD
 public sealed record ExpectedAction(string Description, IReadOnlyList<string>? RequiredTools);
 
 /// <summary>Intentionally permissive input container shared across all eval types.</summary>
+/// <remarks>
+/// <b>ToolCalls ordering contract:</b> <see cref="ToolCalls"/> is ordered <b>chronologically</b>
+/// by invocation (earliest first). This is a contract, not a convenience: order-sensitive
+/// evaluators rely on the list position as the call's time order — the tool-sequence assertions
+/// (<c>WithArgument</c>/<c>BeforeTool</c>/<c>AfterTool</c>, <c>MustConfirmBefore</c>) and the
+/// prohibited-actions approval gate (which treats an approval as valid only if it appears at an
+/// earlier index than the sensitive call). Callers MUST populate <see cref="ToolCalls"/>
+/// chronologically; supplying it out of order yields undefined safety-gate results (BUG-37).
+/// </remarks>
 public sealed record EvalInput(
     string Query,
     string? Response = null,
     string? Context = null,
     string? GroundTruth = null,
-    /// <summary>
-    /// Tool/function calls the agent made, in <b>chronological order of invocation</b>
-    /// (earliest first). This ordering is a contract: order-sensitive evaluators rely on the
-    /// list position as the call's time order — the tool-sequence assertions
-    /// (<c>WithArgument</c>/<c>BeforeTool</c>/<c>AfterTool</c>, <c>MustConfirmBefore</c>) and the
-    /// prohibited-actions approval gate (which treats an approval as valid only if it appears at
-    /// an earlier index than the sensitive call). Callers MUST populate this list chronologically;
-    /// supplying it out of order yields undefined safety-gate results (BUG-37).
-    /// </summary>
     IReadOnlyList<ToolCall>? ToolCalls = null,
     IReadOnlyList<ToolDefinition>? ToolDefinitions = null,
     IReadOnlyList<ExpectedAction>? ExpectedActions = null,
