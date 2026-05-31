@@ -39,6 +39,8 @@ Each ADR follows this structure:
 | [016](016-monolith-modularization.md) | Monolith Modularization | Accepted | 2026-02-26 |
 | [017](017-unified-benchmarks-namespace.md) | Unified Benchmarks Namespace (Convention 1-4) | Implemented (v0.10.0-beta) | 2026-05-17 |
 | [018](018-compliance-core-and-shared-extractions.md) | Compliance.Core and Cross-Cutting Shared Extractions | Accepted | 2026-05-31 |
+| [019](019-chat-boundary-two-layer-recording.md) | Chat-Boundary Tracing and the Two-Layer Recording Model (Glass Box) | Accepted | 2026-05-31 |
+| [020](020-agenttrace-v1_1-schema.md) | AgentTrace v1.1 Schema (Glass Box additive fields) | Accepted | 2026-05-31 |
 
 ---
 
