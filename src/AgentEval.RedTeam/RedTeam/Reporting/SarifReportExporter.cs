@@ -10,6 +10,12 @@ namespace AgentEval.RedTeam.Reporting;
 /// Exports red team results to SARIF format for integration with security tools.
 /// SARIF Spec: https://sarifweb.azurewebsites.net/
 /// </summary>
+/// <remarks>
+/// Result entries include the probe <c>Prompt</c> and agent <c>Response</c>, which are the raw
+/// attack payload / response only when the scan ran with <c>ScanOptions.IncludeEvidence = true</c>
+/// (otherwise the runner has already redacted them). Treat evidence-on reports as sensitive and
+/// store them accordingly — see SEC-10. The convenience scan helpers default to evidence-off.
+/// </remarks>
 public sealed class SarifReportExporter : IReportExporter
 {
     private const string SarifVersion = "2.1.0";

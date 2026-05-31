@@ -9,6 +9,13 @@ namespace AgentEval.RedTeam.Reporting;
 /// <summary>
 /// Exports red team results to JSON format.
 /// </summary>
+/// <remarks>
+/// Failure entries include the probe <c>Prompt</c> and agent <c>Response</c>. These are only the
+/// raw attack payload / response when the scan ran with <c>ScanOptions.IncludeEvidence = true</c>;
+/// otherwise the runner has already replaced them with <c>[REDACTED]</c>. Treat any report produced
+/// from an evidence-on scan as sensitive (it may contain attack payloads and raw model output) and
+/// store it accordingly — see SEC-10. The convenience scan helpers default to evidence-off.
+/// </remarks>
 public sealed class JsonReportExporter : IReportExporter
 {
     private static readonly JsonSerializerOptions Options = new()
