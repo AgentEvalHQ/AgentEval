@@ -436,6 +436,18 @@ After the run, each per-executor `AgentTrace` can be reconciled with its agent-b
 
 > ⚠️ **v0.11 fit-gap:** this pre-wiring is manual per executor. The v0.12 `MAFWorkflowAdapter` hook injects it automatically; until then, executors you don't pre-wire won't have chat-boundary detail.
 
+**v0.12 helper — `WorkflowChatRecording` (`AgentEval.MAF.Tracing`).** Makes the per-executor pre-wiring a one-liner and collects one `AgentTrace` per executor (for per-executor Trace Fidelity):
+
+```csharp
+var recording = new WorkflowChatRecording(SamplePreset.AuditGrade);
+var plannerClient = recording.Instrument("TripPlanner", rawPlannerModel);   // wrap before building the agent
+// … build each executor's agent from recording.Instrument(id, rawModel) …
+// after the run:
+var plannerTrace = recording.TraceFor("TripPlanner");   // reconcile with Trace Fidelity per executor
+```
+
+(Fully transparent injection — zero pre-wiring — awaits a MAF adapter extension point and would not be byte-identical to direct capture.)
+
 ## Workflow Evaluation Patterns
 
 ### Basic Sequential Workflow Evaluation
