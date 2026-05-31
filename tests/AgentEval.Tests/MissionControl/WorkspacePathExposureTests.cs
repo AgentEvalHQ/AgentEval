@@ -2,6 +2,8 @@
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 
+#if NET10_0_OR_GREATER
+
 using AgentEval.MissionControl;
 using Xunit;
 
@@ -36,3 +38,5 @@ public class WorkspacePathExposureTests
         Assert.False(McHost.IsModeA(mode));
     }
 }
+
+#endif

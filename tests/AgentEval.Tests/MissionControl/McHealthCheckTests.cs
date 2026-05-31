@@ -2,6 +2,8 @@
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 
+#if NET10_0_OR_GREATER
+
 using System.Net;
 using AgentEval.MissionControl;
 using Xunit;
@@ -67,3 +69,5 @@ public class McHealthCheckTests
         }
     }
 }
+
+#endif
