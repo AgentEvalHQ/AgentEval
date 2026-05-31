@@ -17,13 +17,50 @@ AgentEval provides powerful **Record & Replay** capabilities that enable determi
 
 | Component | Description |
 |-----------|-------------|
-| `TraceRecordingAgent` | Wraps an agent to capture executions |
+| `TraceRecordingAgent` | Wraps an agent to capture executions (agent boundary) |
+| `TraceRecordingChatClient` | Wraps an `IChatClient` to capture **every LLM round-trip** (chat boundary, Glass Box) |
 | `TraceReplayingAgent` | Replays recorded traces deterministically |
 | `ChatTraceRecorder` | Records multi-turn conversations |
 | `WorkflowTraceRecorder` | Records multi-agent workflow orchestrations |
 | `WorkflowTraceReplayingAgent` | Replays workflow traces |
 | `TraceSerializer` | Saves/loads `AgentTrace` to/from JSON |
 | `WorkflowTraceSerializer` | Saves/loads `WorkflowTrace` to/from JSON |
+
+## Two recording layers (Glass Box)
+
+AgentEval records at **two** layers, and they are complementary — not alternatives:
+
+| | `ChatTraceRecorder` | `TraceRecordingChatClient` (Glass Box) |
+|---|---|---|
+| Wraps | An agent / chat agent | An `IChatClient` |
+| Records at | The application **conversation** level | The model **round-trip** level |
+| Granularity | One entry per user turn you submit (`AddUserTurnAsync`) | One entry per LLM call — including the agent's internal turns the user never issued |
+| Sees internal retries / hidden turns | No | **Yes** |
+| Sees tool schemas sent to the model | No | **Yes** (per turn, with finish reason, request options, provider metadata) |
+| Primary use | Replay a scripted conversation | Forensic / compliance evidence and Trace Fidelity |
+
+`ChatTraceRecorder` answers *"replay this conversation"*; `TraceRecordingChatClient` answers *"what did the model actually see on every call."* Chat-boundary entries carry `Scope = TraceEntryScope.ChatTurn` in the v1.1 trace schema.
+
+> ⚠️ **Composition is load-bearing.** MEAI's `ChatClientBuilder` makes the **first** `.Use(...)` the **outermost** layer, and `FunctionInvokingChatClient` (FICC) calls its inner client once per round-trip. To capture *every* round-trip, place `UseTraceRecording` **inner** of `UseFunctionInvocation` (i.e. *after* it in the chain). Placing it outer records only one entry for the whole tool loop.
+
+```csharp
+using AgentEval.Tracing;
+
+var trace = new AgentTrace();
+var traced = rawChatClient
+    .AsBuilder()
+    .UseFunctionInvocation()                       // the tool loop
+    .UseTraceRecording("planner", trace)           // INNER of FICC → one entry per real model round-trip
+    .Build();
+
+// Optional: group all entries of one invocation under a correlation id.
+using (new ToolCorrelationScope("invocation-1"))
+{
+    var response = await traced.GetResponseAsync(messages, options);
+}
+
+await TraceSerializer.SaveToFileAsync(trace, "chat-boundary.trace.json");
+```
 
 ## Quick Start
 

@@ -7,6 +7,10 @@ using System.Text.Json;
 using System.Threading;
 using Microsoft.Extensions.AI;
 
+// AgentEval.Tracing also declares its own ChatRole (ChatExecutionResult); alias the MEAI one so the
+// unqualified local enum cannot silently shadow it in role comparisons below.
+using MeaiChatRole = Microsoft.Extensions.AI.ChatRole;
+
 namespace AgentEval.Tracing;
 
 /// <summary>
@@ -156,13 +160,13 @@ public sealed class TraceRecordingChatClient : DelegatingChatClient
     // ── helpers (private static) ──
     private static string? ExtractSystemPrompt(IList<ChatMessage> messages)
     {
-        var system = string.Join("\n", messages.Where(m => m.Role.Equals(ChatRole.System))
+        var system = string.Join("\n", messages.Where(m => m.Role.Equals(MeaiChatRole.System))
             .Select(m => m.Text).Where(t => !string.IsNullOrEmpty(t)));
         return string.IsNullOrEmpty(system) ? null : system;
     }
 
     private static string? ExtractLastUserText(IList<ChatMessage> messages)
-        => messages.LastOrDefault(m => m.Role.Equals(ChatRole.User))?.Text;
+        => messages.LastOrDefault(m => m.Role.Equals(MeaiChatRole.User))?.Text;
 
     private static List<TraceToolDefinition>? ExtractToolDefinitions(ChatOptions? options)
     {
