@@ -146,9 +146,14 @@ public sealed class FailureReport
     /// <summary>
     /// The most critical failure reason.
     /// </summary>
+    // Index-based stable tiebreak (PERF-09): the previous ThenBy(r => _reasons.IndexOf(r)) was
+    // O(n^2) and, since FailureReason has value equality, IndexOf returned the first match so equal
+    // reasons scrambled the order. Project the original index up front instead.
     public FailureReason? PrimaryReason => _reasons
-        .OrderByDescending(r => r.Severity)
-        .ThenBy(r => _reasons.IndexOf(r))
+        .Select((r, i) => (Reason: r, Index: i))
+        .OrderByDescending(x => x.Reason.Severity)
+        .ThenBy(x => x.Index)
+        .Select(x => x.Reason)
         .FirstOrDefault();
 
     /// <summary>
