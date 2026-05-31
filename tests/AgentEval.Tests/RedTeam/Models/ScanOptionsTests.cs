@@ -90,4 +90,16 @@ public class ScanOptionsTests
         var options = new ScanOptions();
         Assert.True(options.IncludeEvidence);
     }
+
+    [Theory]
+    [InlineData(0, 1)]
+    [InlineData(-5, 1)]
+    [InlineData(1, 1)]
+    [InlineData(5, 5)]
+    public void ProgressReportInterval_ClampsNonPositiveToOne(int input, int expected)
+        => Assert.Equal(expected, new ScanOptions { ProgressReportInterval = input }.ProgressReportInterval);
+
+    [Fact]
+    public void ProgressReportInterval_DefaultIsOne()
+        => Assert.Equal(1, new ScanOptions().ProgressReportInterval);
 }

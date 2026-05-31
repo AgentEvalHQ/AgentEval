@@ -305,4 +305,21 @@ public class MITREATLASReporterTests
             SucceededCount = total - resisted
         };
     }
+
+    [Fact]
+    public void GenerateReport_TacticNameAlwaysMatchesTacticId()
+    {
+        var report = new MITREATLASReporter().GenerateReport(CreateTestResult());
+        var tacticNamesById = report.Tactics.ToDictionary(t => t.Id, t => t.Name);
+        Assert.All(report.Techniques, t => Assert.Equal(tacticNamesById[t.TacticId], t.TacticName));
+    }
+
+    [Fact]
+    public void GenerateReport_PromptInjection_TacticIsInitialAccess_NotReconnaissance()
+    {
+        var report = new MITREATLASReporter().GenerateReport(CreateTestResult());
+        var t0051 = report.Techniques.First(t => t.Id == "AML.T0051");
+        Assert.Equal("TA0001", t0051.TacticId);
+        Assert.Equal("Initial Access", t0051.TacticName); // was the contradictory "Reconnaissance"
+    }
 }

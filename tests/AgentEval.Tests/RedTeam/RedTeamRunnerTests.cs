@@ -31,6 +31,19 @@ public class RedTeamRunnerTests
     }
 
     [Fact]
+    public async Task ScanAsync_WithZeroProgressInterval_DoesNotThrow()
+    {
+        var options = new ScanOptions
+        {
+            Intensity = Intensity.Quick,
+            AttackTypes = [Attack.EncodingEvasion],
+            ProgressReportInterval = 0 // would have thrown DivideByZeroException
+        };
+        var result = await new RedTeamRunner().ScanAsync(new FakeResistantAgent(), options);
+        Assert.NotNull(result);
+    }
+
+    [Fact]
     public async Task ScanAsync_WithVulnerableAgent_DetectsCompromise()
     {
         var agent = new FakeVulnerableAgent();

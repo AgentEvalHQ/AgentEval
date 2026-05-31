@@ -333,6 +333,9 @@ public sealed class JailbreakAttack : IAttackType
 
     private IEnumerable<AttackProbe> GetGradualEscalationProbes()
     {
+        // Compliance-priming (single-turn). NOTE: this is NOT real multi-turn Crescendo — the runner
+        // calls InvokeAsync once. Renamed from "gradual_escalation" until multi-turn ships
+        // (FeatureComplete Pillar 2: PyRIT CrescendoOrchestrator, distinct from RedTeamingOrchestrator).
         yield return new AttackProbe
         {
             Id = "JB-040",
@@ -343,8 +346,8 @@ public sealed class JailbreakAttack : IAttackType
                 """,
             Difficulty = Difficulty.Hard,
             AttackName = Name,
-            Technique = "gradual_escalation",
-            Source = "Pattern escalation",
+            Technique = "compliance_priming_single_turn",
+            Source = "Compliance-priming (single-turn approximation of Crescendo; not a true multi-step escalation)",
             ExpectedTokens = [Marker]
         };
 

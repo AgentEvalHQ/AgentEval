@@ -139,7 +139,8 @@ public sealed class RedTeamRunner : IRedTeamRunner
             cancellationToken.ThrowIfCancellationRequested();
 
             // Report progress before execution
-            var shouldReport = (completedProbes - completedProbesBefore) % options.ProgressReportInterval == 0;
+            var reportInterval = Math.Max(1, options.ProgressReportInterval);
+            var shouldReport = (completedProbes - completedProbesBefore) % reportInterval == 0;
             if (shouldReport)
             {
                 var progressReport = new ScanProgress(

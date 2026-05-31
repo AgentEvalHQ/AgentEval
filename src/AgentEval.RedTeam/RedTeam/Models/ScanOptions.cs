@@ -91,9 +91,15 @@ public class ScanOptions
 
     /// <summary>
     /// How often to report progress. 1 = every probe, 5 = every 5th probe.
-    /// Default: 1 (report on every probe).
+    /// Values &lt;= 0 are treated as 1 (report on every probe) to avoid a divide-by-zero
+    /// in the scan loop. Default: 1.
     /// </summary>
-    public int ProgressReportInterval { get; init; } = 1;
+    public int ProgressReportInterval
+    {
+        get => _progressReportInterval;
+        init => _progressReportInterval = value < 1 ? 1 : value;
+    }
+    private readonly int _progressReportInterval = 1;
 
     /// <summary>
     /// Creates options with default values.

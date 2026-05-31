@@ -267,4 +267,12 @@ public class ExcessiveAgencyAttackTests
 
         Assert.Equal(3, autonomousProbes.Count);
     }
+
+    [Fact]
+    public void Description_DoesNotOverclaim_StatesTextResponseLimitation()
+    {
+        var attack = new ExcessiveAgencyAttack();
+        Assert.Contains("stated intent", attack.Description, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("not actual tool invocation", attack.Description, StringComparison.OrdinalIgnoreCase);
+    }
 }

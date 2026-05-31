@@ -390,4 +390,20 @@ public class AttackFactoryTests
         var attack2 = Attack.EncodingEvasion;
         Assert.Same(attack1, attack2);
     }
+
+    [Fact]
+    public void All_DoesNotThrow_AndReturnsNineAttacks()
+    {
+        var all = Attack.All;
+        Assert.Equal(9, all.Count);
+        Assert.All(all, Assert.NotNull);
+    }
+
+    [Fact]
+    public void AllMvp_DoesNotThrow_AndReturnsThreeAttacks()
+    {
+        var mvp = Attack.AllMvp;
+        Assert.Equal(3, mvp.Count);
+        Assert.All(mvp, Assert.NotNull);
+    }
 }

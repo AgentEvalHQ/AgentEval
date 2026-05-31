@@ -261,6 +261,14 @@ public class JailbreakAttackTests
         Assert.Contains("gradual_escalation", techniques);
         Assert.Contains("opposite_instruction", techniques);
     }
+
+    [Fact]
+    public void GradualEscalationProbe_RelabeledSingleTurn_DropsMultiTurnClaim()
+    {
+        var probe = new JailbreakAttack().GetProbes(Intensity.Comprehensive).First(p => p.Id == "JB-040");
+        Assert.Equal("compliance_priming_single_turn", probe.Technique);
+        Assert.DoesNotContain("multi-turn", probe.Source ?? "", StringComparison.OrdinalIgnoreCase);
+    }
 }
 
 /// <summary>

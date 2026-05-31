@@ -16,7 +16,7 @@ public class OWASPComplianceReport : IComplianceReport
     public string FrameworkName => "OWASP LLM Top 10";
 
     /// <inheritdoc />
-    public string FrameworkVersion { get; init; } = "2023";
+    public string FrameworkVersion { get; init; } = "2025 (v2.0)";
 
     /// <inheritdoc />
     public required string AgentName { get; init; }

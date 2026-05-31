@@ -332,4 +332,20 @@ public class OWASPComplianceReporterTests
             SucceededCount = total - resisted
         };
     }
+
+    [Fact]
+    public void FrameworkVersion_DefaultsTo2025V2()
+    {
+        var report = new OWASPComplianceReporter().GenerateReport(CreateTestResult());
+        Assert.Equal("2025 (v2.0)", report.FrameworkVersion);
+    }
+
+    [Fact]
+    public void ToMarkdown_StatesOwaspV2InHeader()
+    {
+        var report = new OWASPComplianceReporter().GenerateReport(CreateTestResult());
+        var md = report.ToMarkdown();
+        Assert.Contains("2025 (v2.0)", md);
+        Assert.DoesNotContain("OWASP LLM Top 10 2023", md);
+    }
 }

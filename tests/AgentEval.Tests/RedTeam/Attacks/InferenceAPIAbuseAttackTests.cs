@@ -29,7 +29,7 @@ public class InferenceAPIAbuseAttackTests
     {
         Assert.NotNull(_attack.Description);
         Assert.NotEmpty(_attack.Description);
-        Assert.Contains("API", _attack.Description, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("inference", _attack.Description, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("resource", _attack.Description, StringComparison.OrdinalIgnoreCase);
     }
 
@@ -209,5 +209,13 @@ public class InferenceAPIAbuseAttackTests
         var probe = probes.First(p => p.Id == probeId);
 
         Assert.Equal(expectedTechnique, probe.Technique);
+    }
+
+    [Fact]
+    public void Description_DoesNotOverclaim_StatesResponseTextOnly()
+    {
+        var attack = new InferenceAPIAbuseAttack();
+        Assert.Contains("response text only", attack.Description, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("does not set real inference", attack.Description, StringComparison.OrdinalIgnoreCase);
     }
 }

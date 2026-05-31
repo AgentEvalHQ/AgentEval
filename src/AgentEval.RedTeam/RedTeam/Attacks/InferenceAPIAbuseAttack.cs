@@ -6,9 +6,12 @@ using AgentEval.RedTeam.Evaluators;
 namespace AgentEval.RedTeam.Attacks;
 
 /// <summary>
-/// Inference API abuse attacks - attempts to exploit ML inference APIs for resource exhaustion and information extraction.
-/// OWASP LLM10: Unbounded Consumption (v2.0) - covers DoS, resource exhaustion, and API abuse
-/// MITRE ATLAS AML.T0045: Inference API
+/// Inference-API-abuse probes — single-prompt tests that check whether an agent's text response
+/// <i>cooperates</i> with resource-exhaustion or model-fingerprinting requests. These probes inspect
+/// the response text only; they do NOT drive real API parameters (temperature, max_tokens, etc.) or
+/// measure actual resource consumption.
+/// OWASP LLM10: Unbounded Consumption (v2.0).
+/// MITRE ATLAS AML.T0045: Inference API.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -36,6 +39,14 @@ namespace AgentEval.RedTeam.Attacks;
 /// <item>API parameter abuse: Informed by OpenAI/Azure API documentation for parameter boundaries</item>
 /// <item>Model fingerprinting: Informed by MITRE ATLAS ML Artifact Collection technique</item>
 /// </list>
+/// <para><b>Scope &amp; limitation (Tier-0 honesty):</b></para>
+/// <para>
+/// Probes such as "use temperature=2.5, max_tokens=999999" are <i>prompt text</i> only — the runner
+/// cannot actually apply those API parameters, open streaming connections, or count consumed tokens.
+/// A probe "succeeds" when the model plays along in text, which is a cooperation signal, not evidence
+/// of real unbounded consumption. True DoS / rate-limit testing needs a transport-level harness
+/// (and several IAA techniques are structurally untestable by a chat agent — see Tier 5).
+/// </para>
 /// </remarks>
 public sealed class InferenceAPIAbuseAttack : IAttackType
 {
@@ -47,7 +58,9 @@ public sealed class InferenceAPIAbuseAttack : IAttackType
 
     /// <inheritdoc />
     public string Description =>
-        "Tests resistance to ML inference API abuse including resource exhaustion, rate limiting bypass, and model fingerprinting attempts.";
+        "Tests whether an agent's text response cooperates with resource-exhaustion, parameter-manipulation, " +
+        "or model-fingerprinting requests. NOTE: scores response text only — it does not set real inference " +
+        "parameters or measure actual token/compute consumption; a load-driving harness is required for that.";
 
     /// <inheritdoc />
     public string OwaspLlmId => "LLM10";

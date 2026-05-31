@@ -93,14 +93,12 @@ public static class Attack
     /// <summary>
     /// Get all MVP attack types (PromptInjection, Jailbreak, PIILeakage).
     /// </summary>
-    /// <exception cref="NotImplementedException">Until attacks are implemented.</exception>
     public static IReadOnlyList<IAttackType> AllMvp =>
         [PromptInjection, Jailbreak, PIILeakage];
 
     /// <summary>
     /// Get all built-in attack types.
     /// </summary>
-    /// <exception cref="NotImplementedException">Until attacks are implemented.</exception>
     public static IReadOnlyList<IAttackType> All =>
         [PromptInjection, Jailbreak, PIILeakage, SystemPromptExtraction, IndirectInjection, InferenceAPIAbuse, ExcessiveAgency, InsecureOutput, EncodingEvasion];
 

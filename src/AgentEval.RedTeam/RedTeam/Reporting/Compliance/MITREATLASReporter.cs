@@ -16,18 +16,18 @@ public class MITREATLASReporter : IComplianceReporter<MITREATLASReport>
     /// </summary>
     private static readonly MITRETechniqueDefinition[] AllTechniques =
     [
-        new("AML.T0051", "LLM Prompt Injection", "Reconnaissance", "TA0001", "Attackers inject prompts to manipulate LLM behavior", true),
-        new("AML.T0054", "LLM Jailbreak", "Defense Evasion", "TA0005", "Bypass LLM safety constraints and guardrails", true),
-        new("AML.T0043", "Craft Adversarial Data", "ML Attack Staging", "TA0040", "Create inputs designed to cause misclassification", true),
-        new("AML.T0024", "Develop Capabilities", "Resource Development", "TA0042", "Build tools and payloads for ML attacks", true),
-        new("AML.T0037", "Data from Information Repositories", "Collection", "TA0009", "Extract data via repeated queries", true),
-        new("AML.T0045", "Inference API Access", "Initial Access", "TA0001", "Access ML inference APIs for exploitation", true),
-        new("AML.T0047", "ML Artifact Collection", "Collection", "TA0009", "Collect ML artifacts like models or training data", true),
-        new("AML.T0048", "Exfiltration via ML Inference API", "Exfiltration", "TA0010", "Exfiltrate data through ML inference queries", true),
-        new("AML.T0052", "Phishing via AI-Generated Content", "Initial Access", "TA0001", "Use AI to generate convincing phishing content", false),
-        new("AML.T0044", "Full ML Model Replication", "Exfiltration", "TA0010", "Replicate a model through repeated queries", false),
-        new("AML.T0046", "Publish Poisoned Dataset", "Persistence", "TA0003", "Introduce malicious training data", false),
-        new("AML.T0053", "Adversarial SEO", "Defense Evasion", "TA0005", "Manipulate search results via adversarial content", false),
+        new("AML.T0051", "LLM Prompt Injection", "TA0001", "Attackers inject prompts to manipulate LLM behavior", true),
+        new("AML.T0054", "LLM Jailbreak", "TA0005", "Bypass LLM safety constraints and guardrails", true),
+        new("AML.T0043", "Craft Adversarial Data", "TA0040", "Create inputs designed to cause misclassification", true),
+        new("AML.T0024", "Develop Capabilities", "TA0042", "Build tools and payloads for ML attacks", true),
+        new("AML.T0037", "Data from Information Repositories", "TA0009", "Extract data via repeated queries", true),
+        new("AML.T0045", "Inference API Access", "TA0001", "Access ML inference APIs for exploitation", true),
+        new("AML.T0047", "ML Artifact Collection", "TA0009", "Collect ML artifacts like models or training data", true),
+        new("AML.T0048", "Exfiltration via ML Inference API", "TA0010", "Exfiltrate data through ML inference queries", true),
+        new("AML.T0052", "Phishing via AI-Generated Content", "TA0001", "Use AI to generate convincing phishing content", false),
+        new("AML.T0044", "Full ML Model Replication", "TA0010", "Replicate a model through repeated queries", false),
+        new("AML.T0046", "Publish Poisoned Dataset", "TA0003", "Introduce malicious training data", false),
+        new("AML.T0053", "Adversarial SEO", "TA0005", "Manipulate search results via adversarial content", false),
     ];
 
     /// <summary>
@@ -43,6 +43,20 @@ public class MITREATLASReporter : IComplianceReporter<MITREATLASReport>
         new("TA0040", "ML Attack Staging"),
         new("TA0042", "Resource Development"),
     ];
+
+    /// <summary>Tactic ID → canonical name, derived once from <see cref="AllTactics"/>.</summary>
+    private static readonly IReadOnlyDictionary<string, string> TacticNamesById =
+        AllTactics.ToDictionary(t => t.Id, t => t.Name, StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Resolves the canonical tactic name for a tactic ID. Throws on an unknown ID so a typo surfaces
+    /// at report time instead of silently emitting a contradictory record.
+    /// </summary>
+    private static string TacticNameFor(string tacticId) =>
+        TacticNamesById.TryGetValue(tacticId, out var name)
+            ? name
+            : throw new InvalidOperationException(
+                $"Tactic '{tacticId}' is referenced by a technique but is not defined in AllTactics.");
 
     /// <inheritdoc />
     public MITREATLASReport GenerateReport(RedTeamResult result, ComplianceReportOptions? options = null)
@@ -78,7 +92,7 @@ public class MITREATLASReporter : IComplianceReporter<MITREATLASReport>
                     Name = tech.Name,
                     Description = tech.Description,
                     TacticId = tech.TacticId,
-                    TacticName = tech.TacticName,
+                    TacticName = TacticNameFor(tech.TacticId),
                     Status = TechniqueTestStatus.NotApplicable,
                     TotalTests = 0,
                     PassedTests = 0,
@@ -94,7 +108,7 @@ public class MITREATLASReporter : IComplianceReporter<MITREATLASReport>
                     Name = tech.Name,
                     Description = tech.Description,
                     TacticId = tech.TacticId,
-                    TacticName = tech.TacticName,
+                    TacticName = TacticNameFor(tech.TacticId),
                     Status = TechniqueTestStatus.NotTested,
                     TotalTests = 0,
                     PassedTests = 0,
@@ -116,7 +130,7 @@ public class MITREATLASReporter : IComplianceReporter<MITREATLASReport>
                 Name = tech.Name,
                 Description = tech.Description,
                 TacticId = tech.TacticId,
-                TacticName = tech.TacticName,
+                TacticName = TacticNameFor(tech.TacticId),
                 Status = TechniqueTestStatus.Tested,
                 TotalTests = totalTests,
                 PassedTests = passedTests,
@@ -305,8 +319,12 @@ public class MITREATLASReporter : IComplianceReporter<MITREATLASReport>
         return recommendations;
     }
 
-    /// <summary>Definition of a MITRE ATLAS technique.</summary>
-    private record MITRETechniqueDefinition(string Id, string Name, string TacticName, string TacticId, string Description, bool IsApplicable = true);
+    /// <summary>
+    /// Definition of a MITRE ATLAS technique. <see cref="TacticNameFor"/> derives
+    /// the tactic name from <see cref="MITRETechniqueDefinition.TacticId"/> so the technique table can never
+    /// contradict the tactic table (Tier-0 "stop the lies").
+    /// </summary>
+    private record MITRETechniqueDefinition(string Id, string Name, string TacticId, string Description, bool IsApplicable = true);
 
     /// <summary>Definition of a MITRE ATLAS tactic.</summary>
     private record TacticDefinition(string Id, string Name);
