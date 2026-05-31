@@ -411,8 +411,11 @@ public class MemoryBenchmarkRunner : IMemoryBenchmarkRunner
                     var forbidden = (q.ForbiddenFacts ?? [])
                         .Select(f => MemoryFact.Create(f)).ToArray();
                     var absQuery = MemoryQuery.CreateAbstention(queryQuestion, forbidden);
-                    if (q.QueryType != null)
-                        absQuery.Metadata!["query_type"] = q.QueryType;
+                    // An abstention query must always be scored with the abstention prompt. Copying a
+                    // stray q.QueryType (e.g. "temporal") here would win GetQueryType's top-priority
+                    // lookup and route to the standard/temporal prompt against an empty expected list,
+                    // skipping hallucination detection (GAP-14). Force "abstention".
+                    absQuery.Metadata!["query_type"] = "abstention";
                     queries.Add(absQuery);
                 }
                 else
