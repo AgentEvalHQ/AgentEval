@@ -1,0 +1,278 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 AgentEval Contributors
+// Licensed under the MIT License.
+
+using System.Diagnostics;
+using System.Text.Json;
+using System.Threading;
+using Microsoft.Extensions.AI;
+
+// AgentEval.Tracing also declares its own ChatRole (ChatExecutionResult); alias the MEAI one so the
+// unqualified local enum cannot silently shadow it in role comparisons below.
+using MeaiChatRole = Microsoft.Extensions.AI.ChatRole;
+
+namespace AgentEval.Tracing;
+
+/// <summary>
+/// Records every LLM round-trip at the <see cref="IChatClient"/> boundary into an <see cref="AgentTrace"/>
+/// (<see cref="TraceEntryScope.ChatTurn"/>) — the Glass Box chat-boundary recorder. Complements
+/// <see cref="TraceRecordingAgent"/> (agent boundary) and is distinct from <see cref="ChatTraceRecorder"/>
+/// (conversation replay). See <c>docs/tracing.md</c> §"Two recording layers".
+/// </summary>
+/// <remarks>
+/// <b>Composition is load-bearing.</b> To capture <em>every</em> round-trip, this client must be composed
+/// <b>inner</b> of <c>UseFunctionInvocation</c> (i.e. appear <em>after</em> <c>.UseFunctionInvocation()</c>
+/// in the <c>.Use(...)</c> chain) so the tool loop calls it once per model round-trip. Placing it outer of
+/// the function-invocation loop records only one entry for the whole loop. A recorder instance wraps one
+/// invocation/session and is invoked sequentially (single-threaded contract, like the other recorders).
+/// </remarks>
+public sealed class TraceRecordingChatClient : DelegatingChatClient
+{
+    private readonly AgentTrace _trace;
+    private readonly ToolDefinitionDeduplicator _dedup;
+    private int _index;
+
+    /// <summary>Wraps <paramref name="inner"/>, recording each round-trip into <paramref name="trace"/>.</summary>
+    /// <param name="inner">The inner chat client (closest to the raw model when composed inner of FICC).</param>
+    /// <param name="agentName">Agent name, applied to the trace only if not already set.</param>
+    /// <param name="trace">The accumulating trace (shared with tool-execution recording when correlated).</param>
+    /// <param name="preset">Capture preset; <see cref="SamplePreset.AuditGrade"/> disables tool-definition de-dup.</param>
+    public TraceRecordingChatClient(IChatClient inner, string agentName, AgentTrace trace, SamplePreset preset = SamplePreset.Standard)
+        : base(inner)
+    {
+        _trace = trace ?? throw new ArgumentNullException(nameof(trace));
+        // Set the agent name only if not already provided (e.g. when wrapped by another recorder).
+        _trace.AgentName ??= agentName;
+        _trace.Version = "1.1";
+        _dedup = new ToolDefinitionDeduplicator(enabled: preset != SamplePreset.AuditGrade);
+    }
+
+    /// <summary>The accumulating trace. Call <see cref="FinalizePerformance"/> before reading aggregate performance.</summary>
+    public AgentTrace Trace => _trace;
+
+    /// <inheritdoc />
+    public override async Task<ChatResponse> GetResponseAsync(
+        IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default)
+    {
+        var msgs = messages as IList<ChatMessage> ?? messages.ToList();
+        var i = Interlocked.Increment(ref _index) - 1;   // distinct per round-trip (pairing key)
+        var corr = ToolCorrelationScope.Current;          // per-invocation grouping key (best-effort; may be null)
+        _trace.AddEntry(TraceEntry.ForChatRequest(
+            i, corr,
+            systemPrompt: ExtractSystemPrompt(msgs, options),
+            promptText: ExtractLastUserText(msgs),
+            toolDefinitions: _dedup.Process(ExtractToolDefinitions(options)),
+            requestOptions: ExtractRequestOptions(options)));
+
+        var sw = Stopwatch.StartNew();
+        try
+        {
+            var resp = await base.GetResponseAsync(msgs, options, cancellationToken).ConfigureAwait(false);
+            sw.Stop();
+            _trace.ModelId ??= resp.ModelId;
+            _trace.AddEntry(TraceEntry.ForChatResponse(
+                i, corr, resp.Text, sw.ElapsedMilliseconds,
+                MapUsage(resp.Usage), MapToolCalls(resp),
+                resp.FinishReason?.Value, ExtractProviderMetadata(resp)));
+            return resp;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            sw.Stop();
+            _trace.AddEntry(TraceEntry.ForChatError(i, corr, ex, sw.ElapsedMilliseconds));
+            throw;
+        }
+    }
+
+    /// <inheritdoc />
+    public override async IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(
+        IEnumerable<ChatMessage> messages, ChatOptions? options = null,
+        [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        var msgs = messages as IList<ChatMessage> ?? messages.ToList();
+        var i = Interlocked.Increment(ref _index) - 1;
+        var corr = ToolCorrelationScope.Current;
+        _trace.AddEntry(TraceEntry.ForChatRequest(
+            i, corr, ExtractSystemPrompt(msgs, options), ExtractLastUserText(msgs),
+            _dedup.Process(ExtractToolDefinitions(options)), ExtractRequestOptions(options)));
+
+        var sw = Stopwatch.StartNew();
+        var chunks = new List<TraceStreamChunk>();
+        var updates = new List<ChatResponseUpdate>();
+        var idx = 0;
+        var errorRecorded = false;
+        var completedNaturally = false;
+        await using var enumerator = base.GetStreamingResponseAsync(msgs, options, cancellationToken)
+            .GetAsyncEnumerator(cancellationToken);
+        try
+        {
+            while (true)
+            {
+                ChatResponseUpdate cur;
+                try
+                {
+                    if (!await enumerator.MoveNextAsync().ConfigureAwait(false))
+                    {
+                        completedNaturally = true;
+                        break;
+                    }
+
+                    cur = enumerator.Current;
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    sw.Stop();
+                    _trace.AddEntry(TraceEntry.ForChatError(i, corr, ex, sw.ElapsedMilliseconds));
+                    errorRecorded = true;
+                    throw;
+                }
+
+                updates.Add(cur);
+                if (!string.IsNullOrEmpty(cur.Text))
+                {
+                    chunks.Add(new TraceStreamChunk { Index = idx++, Text = cur.Text });
+                }
+
+                yield return cur;
+            }
+        }
+        finally
+        {
+            sw.Stop();
+            // Finalize the (possibly partial) response unless an error entry already won. Record when the stream
+            // COMPLETED naturally — even if the consumer cancels/disposes the token afterwards (which MAF agent
+            // streaming does), `completedNaturally` still holds — OR when we exited early for a non-cancellation
+            // reason (a consumer break). Skip only a genuine mid-stream cancellation (matches the non-streaming
+            // path, which records neither response nor error on OperationCanceledException). The whole stream is
+            // enumerated by the consumer, so the accumulated updates are folded into a ChatResponse and tool
+            // calls / usage / finish reason / provider metadata are captured exactly as on the non-streaming
+            // path (they ride in ChatResponseUpdate.Contents). NOTE: this depends on the consumer disposing the
+            // enumerator (the standard `await foreach` / agent-streaming contract); see WorkflowChatRecording for
+            // the in-Workflow caveat where that does not hold.
+            if (!errorRecorded && (completedNaturally || !cancellationToken.IsCancellationRequested))
+            {
+                var resp = updates.ToChatResponse();
+                _trace.ModelId ??= resp.ModelId;
+                var responseEntry = TraceEntry.ForChatResponse(
+                    i, corr, resp.Text, sw.ElapsedMilliseconds,
+                    MapUsage(resp.Usage), MapToolCalls(resp), resp.FinishReason?.Value, ExtractProviderMetadata(resp));
+                responseEntry.IsStreaming = true;
+                responseEntry.StreamingChunks = chunks;
+                _trace.AddEntry(responseEntry);
+            }
+        }
+    }
+
+    /// <summary>Computes aggregate <see cref="TracePerformance"/> from the recorded ChatTurn entries.</summary>
+    public void FinalizePerformance()
+    {
+        var responses = _trace.Entries
+            .Where(e => e.EffectiveScope == TraceEntryScope.ChatTurn && e.Type == TraceEntryType.Response)
+            .ToList();
+        _trace.Performance = new TracePerformance
+        {
+            TotalDurationMs = responses.Sum(r => r.DurationMs ?? 0),
+            TotalPromptTokens = responses.Sum(r => r.TokenUsage?.PromptTokens ?? 0),
+            TotalCompletionTokens = responses.Sum(r => r.TokenUsage?.CompletionTokens ?? 0),
+            CallCount = responses.Count,
+            ToolCallCount = responses.Sum(r => r.ToolCalls?.Count ?? 0),
+        };
+    }
+
+    // ── helpers (private static) ──
+    private static string? ExtractSystemPrompt(IList<ChatMessage> messages, ChatOptions? options)
+    {
+        // Capture instructions from BOTH places a system prompt can live: System-role messages AND
+        // ChatOptions.Instructions — MAF's ChatClientAgent passes agent instructions via the latter, so a
+        // messages-only extraction would miss them entirely (the system prompt would read as empty).
+        var parts = new List<string>();
+        if (!string.IsNullOrEmpty(options?.Instructions))
+        {
+            parts.Add(options.Instructions);
+        }
+
+        parts.AddRange(messages.Where(m => m.Role.Equals(MeaiChatRole.System))
+            .Select(m => m.Text).Where(t => !string.IsNullOrEmpty(t))!);
+
+        var system = string.Join("\n", parts);
+        return string.IsNullOrEmpty(system) ? null : system;
+    }
+
+    private static string? ExtractLastUserText(IList<ChatMessage> messages)
+        => messages.LastOrDefault(m => m.Role.Equals(MeaiChatRole.User))?.Text;
+
+    private static List<TraceToolDefinition>? ExtractToolDefinitions(ChatOptions? options)
+    {
+        if (options?.Tools is null || options.Tools.Count == 0)
+        {
+            return null;
+        }
+
+        return options.Tools.OfType<AIFunction>().Select(f => new TraceToolDefinition
+        {
+            Name = f.Name,
+            Description = f.Description,
+            // JsonSchema is a non-nullable JsonElement; a default/Undefined element throws from GetRawText().
+            ParametersSchema = f.JsonSchema.ValueKind == JsonValueKind.Undefined ? null : f.JsonSchema.GetRawText(),
+        }).ToList();
+    }
+
+    private static Dictionary<string, object?>? ExtractRequestOptions(ChatOptions? options)
+    {
+        if (options is null)
+        {
+            return null;
+        }
+
+        return new Dictionary<string, object?>
+        {
+            ["temperature"] = options.Temperature,
+            ["maxOutputTokens"] = options.MaxOutputTokens,
+            ["responseFormat"] = options.ResponseFormat?.GetType().Name,
+            ["modelId"] = options.ModelId,
+        };
+    }
+
+    // Both helpers delegate to TraceMapping so the chat boundary and the agent-boundary reconstruction
+    // serialize tool-call arguments byte-identically (see TraceMapping remarks — prevents fabricated drift).
+    private static TraceTokenUsage? MapUsage(UsageDetails? usage) => TraceMapping.ToTokenUsage(usage);
+
+    private static List<TraceToolCall>? MapToolCalls(ChatResponse response)
+    {
+        var calls = (response.Messages ?? []).SelectMany(m => m.Contents).OfType<FunctionCallContent>().ToList();
+        return calls.Count == 0 ? null : calls.Select(TraceMapping.ToToolCall).ToList();
+    }
+
+    private static Dictionary<string, object?>? ExtractProviderMetadata(ChatResponse response)
+        => response.AdditionalProperties is null || response.AdditionalProperties.Count == 0
+            ? null
+            : response.AdditionalProperties.ToDictionary(kv => kv.Key, kv => ToJsonSafe(kv.Value));
+
+    // ChatResponse.AdditionalProperties values are typed object and can be arbitrary provider objects (raw
+    // response types, etc.). TraceSerializer uses plain System.Text.Json without polymorphic support, so
+    // storing those verbatim could make trace persistence THROW at runtime. Coerce to JSON-safe shapes here:
+    // primitives/string/JsonElement pass through; anything else is round-tripped to a JsonElement (best effort),
+    // falling back to ToString() if it cannot be serialized — so persistence can never fail on provider metadata.
+    private static object? ToJsonSafe(object? value) => value switch
+    {
+        null => null,
+        string or bool or sbyte or byte or short or ushort or int or uint or long or ulong or float or double or decimal or JsonElement => value,
+        _ => TrySerializeToElement(value),
+    };
+
+    private static object? TrySerializeToElement(object value)
+    {
+        try
+        {
+            return JsonSerializer.SerializeToElement(value);
+        }
+        catch (NotSupportedException)
+        {
+            return value.ToString();
+        }
+        catch (JsonException)
+        {
+            return value.ToString();
+        }
+    }
+}

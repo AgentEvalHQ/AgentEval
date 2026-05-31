@@ -329,11 +329,62 @@ public static class DoctorCommand
             errors++;
         }
 
+        // ─── Glass Box: double-wrapping check (Phase 8) ────────────────────
+        warnings += await CheckDoubleWrappingAsync(dir);
+
         // ─── Summary ─────────────────────────────────────────────────────────
         Console.WriteLine();
         Console.WriteLine($"Errors: {errors} | Warnings: {warnings} | OK: {ok}");
 
         return errors > 0 ? 2 : 0;
+    }
+
+    /// <summary>
+    /// Warns when a trace was recorded at BOTH the agent boundary and the chat boundary for the same agent
+    /// (a <c>TraceRecordingAgent</c> wrapping an agent whose <c>IChatClient</c> also has <c>UseTraceRecording</c>) —
+    /// the entries are then duplicated. See docs/tracing.md §"Two recording layers".
+    /// </summary>
+    internal static async Task<int> CheckDoubleWrappingAsync(string agentEvalDir)
+    {
+        IEnumerable<string> traceFiles;
+        try
+        {
+            traceFiles = Directory.EnumerateFiles(agentEvalDir, "*.trace.json", SearchOption.AllDirectories);
+        }
+        catch (DirectoryNotFoundException)
+        {
+            return 0;
+        }
+
+        var warnings = 0;
+        foreach (var file in traceFiles)
+        {
+            AgentEval.Tracing.AgentTrace trace;
+            try
+            {
+                trace = await AgentEval.Tracing.TraceSerializer.LoadFromFileAsync(file);
+            }
+            catch
+            {
+                continue;   // not a Tracing.AgentTrace / unparseable — skip.
+            }
+
+            var hasAgentBoundary = trace.Entries.Any(e =>
+                e.EffectiveScope == AgentEval.Tracing.TraceEntryScope.AgentInvocation &&
+                (e.Type == AgentEval.Tracing.TraceEntryType.Request || e.Type == AgentEval.Tracing.TraceEntryType.Response));
+            var hasChatBoundary = trace.Entries.Any(e => e.EffectiveScope == AgentEval.Tracing.TraceEntryScope.ChatTurn);
+
+            if (hasAgentBoundary && hasChatBoundary)
+            {
+                Console.WriteLine(
+                    $"  ⚠ Possible double-wrapping in {Path.GetFileName(file)}: the trace has both agent-boundary and " +
+                    "chat-boundary entries (TraceRecordingAgent + UseTraceRecording on the same agent duplicates entries). " +
+                    "Make the chat-client wrapper the source of truth — see docs/tracing.md §\"Two recording layers\".");
+                warnings++;
+            }
+        }
+
+        return warnings;
     }
 
     private static async Task<T?> ReadJsonAsync<T>(string path)

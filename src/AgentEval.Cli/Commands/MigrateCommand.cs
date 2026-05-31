@@ -42,14 +42,22 @@ public static class MigrateCommand
             return 1;
         }
 
+        var tag = apply ? "[APPLIED]" : "[DRY-RUN]";
+
+        // Glass Box (Phase 8): bump AgentTrace files from schema v1.0 → v1.1 (additive, so this is just
+        // a header stamp). Runs independently of legacy-path findings.
+        var traceBumps = await MigrateTraceSchemaAsync(Path.Combine(workspaceRoot, ".agenteval"), apply, tag);
+
         var findings = LegacyPathScanner.Scan(workspaceRoot).ToList();
         if (findings.Count == 0)
         {
-            Console.WriteLine("Nothing to migrate.");
+            if (traceBumps == 0)
+            {
+                Console.WriteLine("Nothing to migrate.");
+            }
+
             return 0;
         }
-
-        var tag = apply ? "[APPLIED]" : "[DRY-RUN]";
 
         foreach (var finding in findings)
         {
@@ -145,6 +153,56 @@ public static class MigrateCommand
         }
 
         return Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// Migrates AgentTrace files from schema v1.0 to v1.1 (Glass Box). v1.0 traces already load (the v1.1
+    /// fields are additive/nullable); this only stamps <c>Version="1.1"</c> so the header reflects the current
+    /// schema. Reports per file; writes only when <paramref name="apply"/> is true. Returns the count of v1.0 traces found.
+    /// </summary>
+    internal static async Task<int> MigrateTraceSchemaAsync(string agentEvalDir, bool apply, string tag)
+    {
+        if (!Directory.Exists(agentEvalDir))
+        {
+            return 0;
+        }
+
+        var count = 0;
+        foreach (var file in Directory.EnumerateFiles(agentEvalDir, "*.trace.json", SearchOption.AllDirectories))
+        {
+            AgentEval.Tracing.AgentTrace trace;
+            try
+            {
+                trace = await AgentEval.Tracing.TraceSerializer.LoadFromFileAsync(file);
+            }
+            catch
+            {
+                continue;   // not a Tracing.AgentTrace / unparseable — skip.
+            }
+
+            if (trace.Version != "1.0")
+            {
+                continue;
+            }
+
+            Console.WriteLine($"{tag} Trace schema v1.0 → v1.1: {Path.GetFileName(file)}");
+            count++;
+            if (apply)
+            {
+                trace.Version = "1.1";
+                try
+                {
+                    await AgentEval.Tracing.TraceSerializer.SaveToFileAsync(trace, file);
+                    Console.WriteLine("  ✔ Bumped");
+                }
+                catch (Exception ex)
+                {
+                    Console.Error.WriteLine($"  ✖ Write failed: {ex.Message}");
+                }
+            }
+        }
+
+        return count;
     }
 
     private static async Task HandleTraceArtifactsAsync(string workspaceRoot, LegacyPathScanner.Finding finding, bool apply, string tag)

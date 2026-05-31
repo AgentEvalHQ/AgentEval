@@ -403,6 +403,24 @@ var toolAdapter = MAFWorkflowAdapter.FromMAFWorkflow(
     ["TripPlanner", "FlightReservation", "HotelReservation", "Presenter"]);
 ```
 
+## Chat-boundary capture inside workflows (Glass Box)
+
+`WorkflowChatRecording` (`AgentEval.MAF.Tracing`) pre-wires each executor's `IChatClient` with `UseTraceRecording` and collects one `AgentTrace` per executor:
+
+```csharp
+var recording = new WorkflowChatRecording(SamplePreset.AuditGrade);
+var plannerClient = recording.Instrument("TripPlanner", rawPlannerModel);   // wrap before building the agent
+// … build each executor's agent from recording.Instrument(id, rawModel), then BindAsExecutor …
+// after the run:
+var plannerTrace = recording.TraceFor("TripPlanner");
+```
+
+> ⚠️ **Known limitation (validated).** When an instrumented agent is invoked **directly** (`RunAsync`/`RunStreamingAsync`) the recorder captures the full per-turn chat boundary. But when that agent is `BindAsExecutor`-ed into a MAF `Workflow` and run via `InProcessExecution`, the executor consumes the agent's result internally and does **not** route the response back through the instrumented client — so the per-executor trace sees the *request* but not the *response* (no per-turn tokens/finish/tool-calls inside the workflow). This is a MAF executor-boundary behaviour, not a Glass Box bug.
+
+**What is reachable inside a workflow today (no MAF change):** the per-executor **cost ledger** — tokens + finish reason — is already extracted from MAF's public `WorkflowEvent` stream by `MAFWorkflowEventBridge` into an `ExecutorAgentResponseEvent`; wiring that into a workflow-level reconciliation gives per-agent cost attribution without touching MAF. Full per-turn *chat-boundary* parity inside a live workflow requires an upstream MAF extension point (a per-executor trace hook). See `strategy/FutureFeatures/GlassBox/GlassBox-pendingTopics.md` §4 for the analysis and the ranked paths.
+
+For a **directly-invoked** agent, each `AgentTrace` reconciles with its agent-boundary trace via the [Trace Fidelity](benchmarks/trace-fidelity.md) family, and the per-turn detail surfaces in Mission Control's trace waterfall.
+
 ## Workflow Evaluation Patterns
 
 ### Basic Sequential Workflow Evaluation

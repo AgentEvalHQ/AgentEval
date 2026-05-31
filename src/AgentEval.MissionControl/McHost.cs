@@ -97,6 +97,10 @@ public static class McHost
             //   3. Keep enabled in the local Mode-A path.
             // The 5.2 introspection-based regression tests will need an
             // alternative pin (e.g. schema dump snapshot) in that world.
+            // Glass Box (Phase 7): the per-turn ChatTurn DTO + projection ship as additive groundwork and are
+            // NOT yet exposed through the GraphQL Query type, so no query can nest a ChatTurn drill-down under
+            // the EvalResult tree. The execution-depth limit therefore stays at 10 (a ChatTurn-aware raise
+            // belongs with the v0.13 timeline UI that actually wires the resolver).
             .AddMaxExecutionDepthRule(10, skipIntrospectionFields: true)
             // SEC-11: the depth rule alone does not bound a request that invokes expensive resolvers
             // many times via field aliases within depth<=10 (e.g. dozens of aliased evaluatorTimeline /

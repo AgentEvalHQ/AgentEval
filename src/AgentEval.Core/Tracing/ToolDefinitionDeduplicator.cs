@@ -1,0 +1,50 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 AgentEval Contributors
+// Licensed under the MIT License.
+
+namespace AgentEval.Tracing;
+
+/// <summary>
+/// Collapses repeated tool-definition payloads across turns to control trace size (Glass Box v1.1).
+/// The first occurrence of a <c>(name, schema)</c> pair is kept verbatim; later identical occurrences
+/// are replaced by a name-only stub (<see cref="TraceToolDefinition.ParametersSchema"/> = null).
+/// </summary>
+/// <remarks>
+/// Disabled for the <c>AuditGrade</c> preset (auditors want verbatim payloads every turn). One instance
+/// per recorder, so the "seen" set is scoped to a single trace. De-dup affects only the recorded
+/// <see cref="TraceToolDefinition"/> list — it never touches tool <em>calls</em>, so it has no effect on
+/// Trace Fidelity reconciliation (which compares calls/finish-reasons/usage, not definition schemas).
+/// </remarks>
+public sealed class ToolDefinitionDeduplicator
+{
+    private readonly HashSet<string> _seen = new(StringComparer.Ordinal);
+    private readonly bool _enabled;
+
+    /// <summary>Creates a deduplicator. When <paramref name="enabled"/> is false, <see cref="Process"/> is a pass-through.</summary>
+    public ToolDefinitionDeduplicator(bool enabled) => _enabled = enabled;
+
+    /// <summary>
+    /// Returns the list to record: verbatim on first sight of each <c>(name, schema)</c>, or a name-only
+    /// stub (schema nulled) when the same pair was already seen. Returns the input unchanged when disabled or null.
+    /// </summary>
+    public List<TraceToolDefinition>? Process(List<TraceToolDefinition>? defs)
+    {
+        if (!_enabled || defs is null)
+        {
+            return defs;
+        }
+
+        var output = new List<TraceToolDefinition>(defs.Count);
+        foreach (var def in defs)
+        {
+            // NUL separator: a tool name cannot contain it, so distinct (name, schema) pairs never collide
+            // (e.g. name "a b" + empty schema vs name "a" + schema "b" would both key to "a b" under a space).
+            var key = def.Name + "\0" + (def.ParametersSchema ?? string.Empty);
+            output.Add(_seen.Add(key)
+                ? def
+                : new TraceToolDefinition { Name = def.Name, Description = def.Description, ParametersSchema = null });
+        }
+
+        return output;
+    }
+}
