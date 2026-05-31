@@ -229,6 +229,84 @@ public class RedTeamRunnerTests
         Assert.Contains(result.AttackResults.First().ProbeResults, p => p.HasError);
     }
 
+    // ── GAP-07: error classification, evidence gating, scan-level error counter ──
+
+    [Fact]
+    public async Task ScanAsync_AllProbesError_VerdictInconclusiveNotSilentlyPassable()
+    {
+        var agent = new FakeThrowingAgent(new InvalidOperationException("boom"));
+        var runner = new RedTeamRunner();
+        var options = new ScanOptions { Intensity = Intensity.Quick, AttackTypes = [Attack.PromptInjection] };
+
+        var result = await runner.ScanAsync(agent, options);
+
+        Assert.True(result.HasExecutionErrors);
+        Assert.Equal(result.TotalProbes, result.ErroredProbes);
+        Assert.Equal(0, result.SucceededProbes);
+        // Previously this returned a clean Pass despite the whole scan failing to run (GAP-07).
+        Assert.Equal(Verdict.Inconclusive, result.Verdict);
+        Assert.False(result.Passed);
+    }
+
+    [Fact]
+    public async Task ScanAsync_ExcludeEvidence_DoesNotLeakExceptionMessage()
+    {
+        var agent = new FakeThrowingAgent(new InvalidOperationException("SECRET-ENDPOINT-12345"));
+        var runner = new RedTeamRunner();
+        var options = new ScanOptions
+        {
+            Intensity = Intensity.Quick,
+            AttackTypes = [Attack.PromptInjection],
+            IncludeEvidence = false
+        };
+
+        var result = await runner.ScanAsync(agent, options);
+
+        var probes = result.AttackResults.SelectMany(a => a.ProbeResults).ToList();
+        Assert.NotEmpty(probes);
+        Assert.All(probes, p =>
+        {
+            Assert.DoesNotContain("SECRET-ENDPOINT-12345", p.Error ?? "");
+            Assert.DoesNotContain("SECRET-ENDPOINT-12345", p.Response);
+            Assert.DoesNotContain("SECRET-ENDPOINT-12345", p.Reason);
+            Assert.Equal("Execution error", p.Error); // category only, no detail
+        });
+    }
+
+    [Fact]
+    public async Task ScanAsync_IncludeEvidence_SurfacesExceptionMessage()
+    {
+        var agent = new FakeThrowingAgent(new InvalidOperationException("DIAGNOSTIC-DETAIL-99"));
+        var runner = new RedTeamRunner();
+        var options = new ScanOptions
+        {
+            Intensity = Intensity.Quick,
+            AttackTypes = [Attack.PromptInjection],
+            IncludeEvidence = true
+        };
+
+        var result = await runner.ScanAsync(agent, options);
+
+        var probes = result.AttackResults.SelectMany(a => a.ProbeResults).ToList();
+        Assert.Contains(probes, p => (p.Error ?? "").Contains("DIAGNOSTIC-DETAIL-99"));
+    }
+
+    [Fact]
+    public async Task ScanAsync_TransportError_ClassifiedAsTransportButStillCounted()
+    {
+        var agent = new FakeThrowingAgent(new System.Net.Http.HttpRequestException("connection refused"));
+        var runner = new RedTeamRunner();
+        var options = new ScanOptions { Intensity = Intensity.Quick, AttackTypes = [Attack.PromptInjection] };
+
+        var result = await runner.ScanAsync(agent, options);
+
+        var probes = result.AttackResults.SelectMany(a => a.ProbeResults).ToList();
+        Assert.All(probes, p => Assert.Equal(EvaluationOutcome.Inconclusive, p.Outcome));
+        Assert.All(probes, p => Assert.Contains("Transport error", p.Reason));
+        // Transport failures still count toward the scan-level error counter.
+        Assert.Equal(result.TotalProbes, result.ErroredProbes);
+    }
+
     [Fact]
     public async Task ScanAsync_DefaultOptions_UsesAllAttacks()
     {
