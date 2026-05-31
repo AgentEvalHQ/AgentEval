@@ -449,5 +449,43 @@ public class PerformanceBenchmarkTests
         Assert.Contains("gpt4o", stderr); // the unrecognised name is surfaced
     }
 
+    // ARC-08: when an IAgentEvalLogger is injected, the no-pricing warning is routed to it (at Warning)
+    // instead of straight to Console.Error — so a host can capture/redirect it rather than losing it.
+    [Fact]
+    public async Task RunCostBenchmarkAsync_WithInjectedLogger_RoutesWarningToLogger()
+    {
+        var agent = new MockTestableAgent("TestAgent", "Hello");
+        var logger = new CapturingLogger();
+        var benchmark = new PerformanceBenchmark(agent,
+            new PerformanceBenchmarkOptions { Verbose = false, DelayBetweenIterations = TimeSpan.Zero, Logger = logger });
+
+        // Capture stderr too, to prove the warning did NOT also leak straight to the console.
+        var originalErr = Console.Error;
+        var stderrSink = new StringWriter();
+        try
+        {
+            Console.SetError(stderrSink);
+            await benchmark.RunCostBenchmarkAsync(new[] { "prompt" }, modelName: "gpt4o");
+        }
+        finally { Console.SetError(originalErr); }
+
+        Assert.Contains(logger.Entries, e => e.Level == LogLevel.Warning && e.Message.Contains("gpt4o"));
+        Assert.DoesNotContain("WARNING", stderrSink.ToString()); // not written to Console.Error when a logger is set
+    }
+
+    private sealed class CapturingLogger : IAgentEvalLogger
+    {
+        public List<(LogLevel Level, string Message)> Entries { get; } = [];
+        public void Log(LogLevel level, string message) => Entries.Add((level, message));
+        public void Log(LogLevel level, Exception exception, string message) => Entries.Add((level, message));
+        public void Log(LogLevel level, string message, params (string Key, object? Value)[] properties) => Entries.Add((level, message));
+        public void LogMetricResult(MetricResult result) { }
+        public void LogFailure(FailureReport report) { }
+        public void LogTimeline(ToolCallTimeline timeline) { }
+        public bool IsEnabled(LogLevel level) => true;
+        public IDisposable BeginScope(string scopeName, params (string Key, object? Value)[] properties) => new Scope();
+        private sealed class Scope : IDisposable { public void Dispose() { } }
+    }
+
     #endregion
 }

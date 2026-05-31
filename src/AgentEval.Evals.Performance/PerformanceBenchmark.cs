@@ -15,11 +15,33 @@ public class PerformanceBenchmark
 {
     private readonly IEvaluableAgent _agent;
     private readonly PerformanceBenchmarkOptions _options;
-    
+    private readonly IAgentEvalLogger? _logger;
+
     public PerformanceBenchmark(IEvaluableAgent agent, PerformanceBenchmarkOptions? options = null)
     {
         _agent = agent ?? throw new ArgumentNullException(nameof(agent));
         _options = options ?? new PerformanceBenchmarkOptions();
+        _logger = _options.Logger;
+    }
+
+    // ARC-08: route progress/warnings through the injected IAgentEvalLogger so hosts can capture or
+    // redirect them. When no logger is supplied, preserve the original Console behaviour exactly —
+    // progress to stdout only when Verbose; the critical no-pricing warning to stderr ALWAYS (it is a
+    // correctness diagnostic, BUG-29, and must not be silenced by a non-verbose run).
+    private void LogProgress(string message)
+    {
+        if (_logger is not null)
+            _logger.Log(LogLevel.Information, message);
+        else if (_options.Verbose)
+            Console.WriteLine(message);
+    }
+
+    private void LogWarning(string message)
+    {
+        if (_logger is not null)
+            _logger.Log(LogLevel.Warning, message);
+        else
+            Console.Error.WriteLine(message);
     }
     
     /// <summary>
@@ -51,11 +73,8 @@ public class PerformanceBenchmark
         // Actual runs
         for (int i = 0; i < iterations; i++)
         {
-            if (_options.Verbose)
-            {
-                Console.WriteLine($"   Running iteration {i + 1}/{iterations}...");
-            }
-            
+            LogProgress($"   Running iteration {i + 1}/{iterations}...");
+
             try
             {
                 var startTime = DateTimeOffset.UtcNow;
@@ -212,11 +231,8 @@ public class PerformanceBenchmark
         var latencies = new List<TimeSpan>();
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         
-        if (_options.Verbose)
-        {
-            Console.WriteLine($"   Running throughput test for {duration.TotalSeconds}s with {concurrentRequests} concurrent requests...");
-        }
-        
+        LogProgress($"   Running throughput test for {duration.TotalSeconds}s with {concurrentRequests} concurrent requests...");
+
         var startTime = DateTimeOffset.UtcNow;
         
         // Create worker tasks
@@ -373,7 +389,7 @@ public class PerformanceBenchmark
         // so the operator's most-likely mistake must still surface this diagnostic (BUG-29).
         if (pricing == null)
         {
-            Console.Error.WriteLine(
+            LogWarning(
                 $"[perf-cost] WARNING: no pricing entry found for '{resolvedModelName}'. " +
                 "Cost will be reported as $0 and the cost leaf will pass by default. " +
                 "Check PerformanceBenchmarkEvaluateOptions.CostModelName for a typo (e.g. 'gpt-4o', not 'gpt4o'), " +
@@ -758,9 +774,18 @@ public class PerformanceBenchmark
 public class PerformanceBenchmarkOptions
 {
     /// <summary>
-    /// Whether to print progress to console.
+    /// Whether to print progress to console. Only consulted when <see cref="Logger"/> is null
+    /// (the Console fallback); an injected logger receives progress at Information regardless.
     /// </summary>
     public bool Verbose { get; set; } = true;
+
+    /// <summary>
+    /// ARC-08: optional logger for progress (Information) and the no-pricing warning (Warning). When set,
+    /// all benchmark output is routed here so hosts can capture/redirect it instead of it going straight
+    /// to the process Console. When null, the original Console behaviour is preserved (progress to stdout
+    /// only when <see cref="Verbose"/>; the no-pricing warning to stderr always).
+    /// </summary>
+    public IAgentEvalLogger? Logger { get; set; }
 
     /// <summary>
     /// Delay between benchmark iterations.
