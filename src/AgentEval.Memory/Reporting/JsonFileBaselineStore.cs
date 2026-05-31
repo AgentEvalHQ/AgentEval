@@ -338,6 +338,11 @@ public partial class JsonFileBaselineStore : IBaselineStore
     /// <returns>The server process, or null if no server could be started.</returns>
     public System.Diagnostics.Process? OpenReport(string agentName, int port = 8080)
     {
+        // SEC-15: a valid, non-privileged TCP port. Privileged ports (<1024) need elevation and are not
+        // appropriate for this local desktop-convenience helper.
+        ArgumentOutOfRangeException.ThrowIfLessThan(port, 1024);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(port, 65535);
+
         var reportDir = Path.GetFullPath(ResolveRootPath(agentName));
         var reportFile = Path.Combine(reportDir, "report.html");
 
@@ -347,16 +352,13 @@ public partial class JsonFileBaselineStore : IBaselineStore
             return null;
         }
 
-        var url = $"http://localhost:{port}/report.html";
+        var url = $"http://127.0.0.1:{port}/report.html";
 
-        // Try python first, then npx, then dotnet serve
-        var serverCommands = new[]
-        {
-            ("python", $"-m http.server {port}"),
-            ("python3", $"-m http.server {port}"),
-            ("npx", $"serve -l {port} -s ."),
-            ("dotnet", $"serve -p {port}"),
-        };
+        // SEC-15: every command binds the loopback interface (127.0.0.1), so the report server — which
+        // serves baselines containing prompt/response content — is NOT exposed to the LAN. (python's
+        // http.server defaults to 0.0.0.0; serve/dotnet-serve are pinned explicitly too.) NB: the binaries
+        // are still resolved via PATH (a desktop convenience); run this only on a trusted machine.
+        var serverCommands = BuildServerCommands(port);
 
         System.Diagnostics.Process? serverProcess = null;
 
@@ -422,10 +424,23 @@ public partial class JsonFileBaselineStore : IBaselineStore
         Console.WriteLine($"\n   Could not start a local server automatically.");
         Console.WriteLine($"   Install Python, Node.js, or dotnet-serve, then run:");
         Console.WriteLine($"     cd \"{reportDir}\"");
-        Console.WriteLine($"     python -m http.server {port}");
+        Console.WriteLine($"     python -m http.server {port} --bind 127.0.0.1");
         Console.WriteLine($"   Then open: {url}\n");
         return null;
     }
+
+    /// <summary>
+    /// Builds the ordered list of (command, arguments) candidates for serving the report directory, each
+    /// pinned to the loopback interface (SEC-15). Extracted for testability — the security-relevant
+    /// invariant is that every command binds 127.0.0.1 and the requested port.
+    /// </summary>
+    internal static IReadOnlyList<(string Cmd, string Args)> BuildServerCommands(int port) =>
+    [
+        ("python",  $"-m http.server {port} --bind 127.0.0.1"),
+        ("python3", $"-m http.server {port} --bind 127.0.0.1"),
+        ("npx",     $"serve -l 127.0.0.1:{port} -s ."),
+        ("dotnet",  $"serve -p {port} --address 127.0.0.1"),
+    ];
 
     internal string ResolveRootPath(string agentName)
     {

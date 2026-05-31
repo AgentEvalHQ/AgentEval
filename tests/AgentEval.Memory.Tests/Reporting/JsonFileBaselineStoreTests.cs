@@ -280,6 +280,37 @@ public class JsonFileBaselineStoreTests : IDisposable
         Assert.Contains("\"agent_config\"", content);
     }
 
+    // --- SEC-15: report server binds loopback + port validation ---
+
+    [Fact]
+    public void BuildServerCommands_AllBindLoopbackAndIncludePort()
+    {
+        var commands = JsonFileBaselineStore.BuildServerCommands(8080);
+
+        Assert.NotEmpty(commands);
+        foreach (var (cmd, args) in commands)
+        {
+            // Every candidate must pin the loopback interface so baselines are not LAN-exposed.
+            Assert.Contains("127.0.0.1", args);
+            Assert.DoesNotContain("0.0.0.0", args);
+            Assert.Contains("8080", args);
+        }
+
+        // python's http.server defaults to 0.0.0.0 — verify the explicit --bind is present.
+        var python = commands.First(c => c.Cmd == "python");
+        Assert.Contains("--bind 127.0.0.1", python.Args);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(80)]      // privileged
+    [InlineData(1023)]    // privileged
+    [InlineData(70000)]   // out of TCP range
+    public void OpenReport_InvalidPort_Throws(int port)
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(() => _store.OpenReport("TestAgent", port));
+    }
+
     // --- Helpers ---
 
     private static MemoryBaseline CreateBaseline(
