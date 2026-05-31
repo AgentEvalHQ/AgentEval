@@ -825,8 +825,11 @@ public sealed class FileSystemOutputStore : IOutputStore
             {
                 // Could not write the sidecar (disk full, permissions). Rethrow
                 // the original validation error so the caller still gets the
-                // primary signal; the secondary failure is suppressed.
-                throw ex;
+                // primary signal; the secondary failure is suppressed. Use
+                // ExceptionDispatchInfo so the original stack trace / throw site is
+                // preserved rather than reset by `throw ex;` (MNT-10).
+                System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(ex).Throw();
+                throw; // unreachable — keeps the compiler's definite-assignment/flow analysis happy
             }
         }
         await WriteJsonAsync(path, value, ct);
