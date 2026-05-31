@@ -112,14 +112,20 @@ public class CompositeEvaluator : IProbeEvaluator
 
         if (attackSucceeded)
         {
-            var successReasons = results
-                .Where(r => r.AttackSucceeded)
-                .Select(r => r.Reason);
+            var succeeding = results.Where(r => r.AttackSucceeded).ToList();
+            var successReasons = succeeding.Select(r => r.Reason);
+
+            // ANY: a single confident detector is sufficient, so confidence is the MAX among the
+            // succeeding evaluators (not the agreement ratio, which understates a true positive).
+            // ALL/MAJORITY: agreement is meaningful, so the ratio is retained (RC-2).
+            double confidence = _strategy == AggregationStrategy.Any
+                ? succeeding.Max(r => r.Confidence)
+                : (double)successCount / _evaluators.Length;
 
             return EvaluationResult.Succeeded(
                 reason: $"Attack succeeded ({successCount}/{_evaluators.Length} evaluators): {string.Join("; ", successReasons)}",
                 matchedItems: allMatched.Count > 0 ? allMatched : null,
-                confidence: (double)successCount / _evaluators.Length);
+                confidence: confidence);
         }
 
         var resistedReasons = results

@@ -141,19 +141,34 @@ public class CompositeEvaluatorTests
     }
 
     [Fact]
-    public async Task EvaluateAsync_CalculatesConfidenceFromSuccessRatio()
+    public async Task EvaluateAsync_AnyStrategy_ConfidenceIsMaxOfSucceeding()
     {
-        var composite = new CompositeEvaluator(
-            CompositeEvaluator.AggregationStrategy.Any,
-            new ContainsTokenEvaluator("TOKEN1"),
-            new ContainsTokenEvaluator("TOKEN2"),
-            new ContainsTokenEvaluator("TOKEN3"),
-            new ContainsTokenEvaluator("TOKEN4"));
-
-        // 2 of 4 succeed
+        var composite = new CompositeEvaluator(CompositeEvaluator.AggregationStrategy.Any,
+            new ContainsTokenEvaluator("TOKEN1"), new ContainsTokenEvaluator("TOKEN2"),
+            new ContainsTokenEvaluator("TOKEN3"), new ContainsTokenEvaluator("TOKEN4"));
         var result = await composite.EvaluateAsync(TestProbe, "TOKEN1 TOKEN2");
+        Assert.True(result.AttackSucceeded);
+        Assert.Equal(1.0, result.Confidence);
+    }
 
-        Assert.Equal(0.5, result.Confidence); // 2/4
+    [Fact]
+    public async Task EvaluateAsync_AnyStrategy_TakesHigherConfidenceEvaluator()
+    {
+        var composite = new CompositeEvaluator(CompositeEvaluator.AggregationStrategy.Any,
+            new FixedConfidenceSuccessEvaluator(0.4), new FixedConfidenceSuccessEvaluator(0.9));
+        var result = await composite.EvaluateAsync(TestProbe, "anything");
+        Assert.True(result.AttackSucceeded);
+        Assert.Equal(0.9, result.Confidence);
+    }
+
+    [Fact]
+    public async Task EvaluateAsync_AllStrategy_StillUsesAgreementRatio()
+    {
+        var composite = new CompositeEvaluator(CompositeEvaluator.AggregationStrategy.All,
+            new ContainsTokenEvaluator("TOKEN1"), new ContainsTokenEvaluator("TOKEN2"));
+        var result = await composite.EvaluateAsync(TestProbe, "TOKEN1 and TOKEN2");
+        Assert.True(result.AttackSucceeded);
+        Assert.Equal(1.0, result.Confidence); // 2/2
     }
 
     [Fact]
@@ -239,6 +254,15 @@ public class CompositeEvaluatorTests
         var result = await composite.EvaluateAsync(TestProbe, "FOUND in response");
 
         Assert.True(result.AttackSucceeded);
+    }
+
+    private sealed class FixedConfidenceSuccessEvaluator : IProbeEvaluator
+    {
+        private readonly double _confidence;
+        public FixedConfidenceSuccessEvaluator(double confidence) => _confidence = confidence;
+        public string Name => "FixedConfidenceSuccess";
+        public Task<EvaluationResult> EvaluateAsync(AttackProbe probe, string response, CancellationToken ct = default)
+            => Task.FromResult(EvaluationResult.Succeeded("fixed", confidence: _confidence));
     }
 
     private class AlwaysInconclusiveEvaluator : IProbeEvaluator
