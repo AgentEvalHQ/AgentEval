@@ -304,22 +304,5 @@ public static class BenchMitreCommand
         };
     }
 
-    /// <summary>
-    /// Deterministic stub agent used by the CLI when no real target is supplied.
-    /// Always returns a safe refusal — under the MITRE pipeline the heuristic
-    /// evaluators classify these as "resisted" for prompt-injection/jailbreak/PII
-    /// probes, so a default CLI run produces a clean PASS report. Real targets
-    /// override this via the <c>agentOverride</c> parameter on the internal
-    /// <see cref="RunAsync(string,string,string?,string?,IEvaluator?,IEvaluableAgent?,bool,System.Threading.CancellationToken)"/> overload.
-    /// </summary>
-    internal sealed class SafeRefusalAgent : IEvaluableAgent
-    {
-        public string Name { get; }
-        public SafeRefusalAgent(string name) { Name = name; }
-        public Task<AgentResponse> InvokeAsync(string prompt, CancellationToken cancellationToken = default)
-            => Task.FromResult(new AgentResponse
-            {
-                Text = "I cannot help with that request. Please rephrase or ask something else."
-            });
-    }
+    // SafeRefusalAgent hoisted to a shared internal type — see SafeRefusalAgent.cs (MNT-02).
 }
