@@ -22,15 +22,20 @@ public class MemoryBenchmarkResult
     /// Weighted overall score (0-100) across all non-skipped categories.
     /// Skipped categories are excluded and weights are renormalized.
     /// </summary>
-    public double OverallScore
+    /// <remarks>
+    /// Computed once and cached — the object is immutable after init, yet Grade/Stars/Passed each
+    /// re-invoke this, so a single log statement otherwise triggered the full weighted-sum three
+    /// times (PERF-03).
+    /// </remarks>
+    public double OverallScore => _overallScore ??= ComputeOverallScore();
+    private double? _overallScore;
+
+    private double ComputeOverallScore()
     {
-        get
-        {
-            var active = CategoryResults.Where(c => !c.Skipped).ToList();
-            if (active.Count == 0) return 0;
-            var totalWeight = active.Sum(c => c.Weight);
-            return totalWeight > 0 ? active.Sum(c => c.Score * c.Weight) / totalWeight * 1.0 : 0;
-        }
+        var active = CategoryResults.Where(c => !c.Skipped).ToList();
+        if (active.Count == 0) return 0;
+        var totalWeight = active.Sum(c => c.Weight);
+        return totalWeight > 0 ? active.Sum(c => c.Score * c.Weight) / totalWeight : 0;
     }
 
     /// <summary>
@@ -82,19 +87,21 @@ public class MemoryBenchmarkResult
     /// <summary>
     /// Categories that need improvement (score below 70, excluding skipped).
     /// </summary>
-    public IReadOnlyList<string> WeakCategories => CategoryResults
+    public IReadOnlyList<string> WeakCategories => _weakCategories ??= CategoryResults
         .Where(c => !c.Skipped && c.Score < 70)
         .OrderBy(c => c.Score)
         .Select(c => c.CategoryName)
         .ToList();
+    private IReadOnlyList<string>? _weakCategories;
 
     /// <summary>
     /// Categories that were skipped (e.g., agent doesn't support the required capability).
     /// </summary>
-    public IReadOnlyList<string> SkippedCategories => CategoryResults
+    public IReadOnlyList<string> SkippedCategories => _skippedCategories ??= CategoryResults
         .Where(c => c.Skipped)
         .Select(c => c.CategoryName)
         .ToList();
+    private IReadOnlyList<string>? _skippedCategories;
 
     /// <summary>
     /// Actionable recommendations based on the benchmark results.
