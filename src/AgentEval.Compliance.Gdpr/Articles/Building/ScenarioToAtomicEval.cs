@@ -106,10 +106,14 @@ public sealed class ScenarioToAtomicEval
     {
         var judgeComponents = _judges!.Select((entry, idx) =>
             new EvalComponent(
+                // BUG-34: record the REAL judge model (not a positional "judge-N" label) so
+                // EstimatedCost resolves the correct JudgeCostMap rate and provenance is audit-grade.
+                // The positional label lives in the eval key ("-j{n}"), which keeps the per-judge
+                // components distinguishable without corrupting the model id.
                 Eval: BuildAtomic(
                     article, scenario,
                     entry.Judge,
-                    judgeModel: $"judge-{idx + 1}",
+                    judgeModel: _judgeModel,
                     promptId: _systemPromptId,
                     key: $"{scenario.Id}-j{idx + 1}"),
                 Weight: entry.Weight,

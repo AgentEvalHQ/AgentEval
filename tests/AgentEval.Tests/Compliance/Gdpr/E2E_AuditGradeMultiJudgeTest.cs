@@ -203,6 +203,39 @@ public class E2E_AuditGradeMultiJudgeTest
         Assert.NotEmpty(multiJudgeLeaves);
     }
 
+    [Fact]
+    public async Task AuditGrade_MultiJudge_PerJudgeProvenance_RecordsRealModelNotPositionalLabel()
+    {
+        // BUG-34: each per-judge atomic must record the REAL judge model ("stub") in provenance,
+        // not a positional "judge-1/2/3" label — otherwise EstimatedCost resolves the default rate
+        // and the audit trail misstates the deployment. The positional index lives in the key.
+        var judge = new FixedScoreJudge(95);
+        var judges = new (AgentEval.Core.IEvaluator Judge, double Weight)[]
+        {
+            (judge, 1.0),
+            (judge, 1.0),
+            (judge, 1.0),
+        };
+
+        var registry = BuildMultiJudgeRegistry(judge, judges); // judgeModel: "stub"
+        var auditGrade = GdprBenchmark.AuditGrade(registry, new MultiJudgeOptions(judges));
+
+        var result = await auditGrade.EvaluateAsync(BenchmarkInput);
+
+        var multiJudgeLeaves = FindMultiJudgeLeaves(result, minSubResults: 3);
+        Assert.NotEmpty(multiJudgeLeaves);
+
+        var perJudgeResults = multiJudgeLeaves
+            .SelectMany(leaf => leaf.Details.SubResults!)
+            .ToList();
+        Assert.NotEmpty(perJudgeResults);
+        Assert.All(perJudgeResults, r =>
+        {
+            Assert.Equal("stub", r.Provenance.JudgeModel);
+            Assert.DoesNotContain("judge-", r.Provenance.JudgeModel ?? "");
+        });
+    }
+
     private static List<EvalResult> FindMultiJudgeLeaves(EvalResult node, int minSubResults)
     {
         var found = new List<EvalResult>();
