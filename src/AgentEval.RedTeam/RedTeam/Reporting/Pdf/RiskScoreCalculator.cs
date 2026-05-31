@@ -34,9 +34,11 @@ public class RiskScoreCalculator
         score -= mediumFailures * 3;
         score -= lowFailures * 1;
 
-        // Bonus for OWASP coverage (up to +5)
+        // Bonus for OWASP coverage (up to +5), scaled proportionally. The previous integer
+        // arithmetic ((int)(cov/10)*5/10) step-truncated the bonus (e.g. 3 ids → +1 instead of +2)
+        // and only reached +5 at exactly 10 categories. Compute in floating point and clamp (BUG-52).
         var owaspCoverage = GetOwaspCoveragePercent(result);
-        score += (int)(owaspCoverage / 10) * 5 / 10;  // Max +5
+        score += (int)Math.Round(Math.Min(owaspCoverage, 100) / 100.0 * 5);  // Max +5
 
         // Clamp to 0-100
         return Math.Clamp(score, 0, 100);
