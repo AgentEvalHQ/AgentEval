@@ -209,6 +209,31 @@ public class TraceRecordingAndReplayTests
         Assert.Contains("mismatch", ex.Message);
     }
 
+    // GAP-09: on MismatchBehavior.Warn, the warning (which includes truncated prompt text) is routed to
+    // the configurable OnWarning sink instead of leaking to stdout — a host can redirect, redact, or
+    // suppress it.
+    [Fact]
+    public async Task TraceReplayingAgent_Warn_RoutesToOnWarningSink()
+    {
+        var trace = CreateBasicTrace("Expected prompt", "Response");
+        var captured = new List<string>();
+        var replayer = new TraceReplayingAgent(trace, new TraceReplayOptions
+        {
+            ValidateRequests = true,
+            RequestMatchingMode = RequestMatchingMode.Exact,
+            MismatchBehavior = MismatchBehavior.Warn,
+            OnWarning = captured.Add
+        });
+
+        // Different prompt → mismatch, but Warn must NOT throw; the warning goes to the sink.
+        var response = await replayer.InvokeAsync("Different prompt");
+
+        Assert.Equal("Response", response.Text);
+        Assert.Single(captured);
+        Assert.Contains("TraceReplayer Warning", captured[0]);
+        Assert.Contains("mismatch", captured[0], StringComparison.OrdinalIgnoreCase);
+    }
+
     [Fact]
     public async Task TraceReplayingAgent_AllowsAnyMatchByDefault()
     {

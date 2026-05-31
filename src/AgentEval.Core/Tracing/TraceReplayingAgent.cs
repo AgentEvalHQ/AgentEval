@@ -283,8 +283,15 @@ public sealed class TraceReplayingAgent : IEvaluableAgent, IStreamableAgent
                 throw new TraceReplayMismatchException(message, actual, recorded, index);
 
             case MismatchBehavior.Warn:
-                // Log warning (could integrate with ILogger if available)
-                Console.WriteLine($"[TraceReplayer Warning] {message}");
+                // GAP-09: route through the configurable sink (ILogger/redact/suppress) when provided,
+                // else fall back to Console for backward compatibility.
+                // GAP-09: route through the configurable sink (ILogger/redact/suppress) when provided,
+                // else fall back to Console for backward compatibility.
+                var warning = $"[TraceReplayer Warning] {message}";
+                if (_options.OnWarning is not null)
+                    _options.OnWarning(warning);
+                else
+                    Console.WriteLine(warning);
                 break;
 
             case MismatchBehavior.Ignore:
@@ -356,6 +363,15 @@ public class TraceReplayOptions
     /// Default is 20ms.
     /// </summary>
     public int DefaultChunkDelayMs { get; set; } = 20;
+
+    /// <summary>
+    /// Optional sink for <see cref="MismatchBehavior.Warn"/> messages (GAP-09). When set, mismatch
+    /// warnings — which include (truncated) prompt text — are routed here instead of
+    /// <see cref="Console.WriteLine(string)"/>, so a host can forward them to an <c>ILogger</c>, redact
+    /// them, or suppress them entirely (set to a no-op) rather than leaking prompt content to stdout
+    /// (often captured into CI logs). Defaults to null (legacy Console behavior).
+    /// </summary>
+    public Action<string>? OnWarning { get; set; }
 }
 
 /// <summary>

@@ -266,7 +266,12 @@ public sealed class WorkflowTraceReplayingAgent : IWorkflowEvaluableAgent
                 throw new WorkflowTraceReplayMismatchException(message, actual, recorded);
 
             case MismatchBehavior.Warn:
-                Console.WriteLine($"[WorkflowTraceReplayer Warning] {message}");
+                // GAP-09: route through the configurable sink when provided, else fall back to Console.
+                var warning = $"[WorkflowTraceReplayer Warning] {message}";
+                if (_options.OnWarning is not null)
+                    _options.OnWarning(warning);
+                else
+                    Console.WriteLine(warning);
                 break;
 
             case MismatchBehavior.Ignore:
@@ -347,6 +352,14 @@ public class WorkflowTraceReplayOptions
     /// Default is 0.1.
     /// </summary>
     public double DelayMultiplier { get; set; } = 0.1;
+
+    /// <summary>
+    /// Optional sink for <see cref="MismatchBehavior.Warn"/> messages (GAP-09). When set, mismatch
+    /// warnings — which include (truncated) prompt text — are routed here instead of
+    /// <see cref="Console.WriteLine(string)"/>, so a host can forward to an <c>ILogger</c>, redact, or
+    /// suppress them rather than leaking prompt content to stdout. Defaults to null (legacy Console behavior).
+    /// </summary>
+    public Action<string>? OnWarning { get; set; }
 }
 
 /// <summary>
