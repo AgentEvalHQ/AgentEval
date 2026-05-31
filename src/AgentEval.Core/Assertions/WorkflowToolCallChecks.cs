@@ -66,6 +66,12 @@ internal static class WorkflowToolCallChecks
 
         if (!hasArgument)
         {
+            // MNT-08 (review follow-up): this "argument was not found" failure is intentionally emitted
+            // WITHOUT a WorkflowFailureHint. The pre-MNT-08 substring rule (message.Contains("not found"))
+            // attached the "verify the executor or node ID" suggestion here, but that was a FALSE POSITIVE
+            // — a missing tool-call ARGUMENT is not an executor/node-ID problem — so the structured-hint
+            // migration deliberately stops emitting it. (Genuine ID failures, e.g. HaveRoutingDecision, ARE
+            // tagged IdNotFound.)
             addFailure(
                 $"Expected '{toolName}' {context} to have argument '{paramName}' containing " +
                 $"'{substring}', but argument was not found.",

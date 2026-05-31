@@ -255,6 +255,23 @@ public class WorkflowAssertionsTests
         Assert.Contains("Verify the executor or node ID matches the workflow configuration", exception.Suggestions!);
     }
 
+    // MNT-08 (review follow-up): a missing routing decision ("...not found") is an ID failure and must
+    // also surface the ID-verification suggestion. The hint migration originally left this site untagged,
+    // dropping the suggestion the old substring rule produced — restored by tagging it IdNotFound.
+    [Fact]
+    public void HaveRoutingDecision_WhenMissing_SurfacesIdNotFoundSuggestion()
+    {
+        var result = CreateTestResult(("researcher", "Some output"));
+
+        var exception = Assert.Throws<WorkflowAssertionException>(() =>
+            result.Should()
+                .HaveRoutingDecision("router", "edge-unknown")
+                .Validate());
+
+        Assert.NotNull(exception.Suggestions);
+        Assert.Contains("Verify the executor or node ID matches the workflow configuration", exception.Suggestions!);
+    }
+
     // ═══════════════════════════════════════════════════════════════════════════
     // ERROR ASSERTIONS
     // ═══════════════════════════════════════════════════════════════════════════

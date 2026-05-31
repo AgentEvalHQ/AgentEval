@@ -523,7 +523,7 @@ public class WorkflowAssertionBuilder
             d.SelectedEdgeId.Equals(selectedEdgeId, StringComparison.OrdinalIgnoreCase)))
         {
             AddFailure($"Expected routing decision from '{deciderExecutorId}' selecting '{selectedEdgeId}' " +
-                          $"but it was not found");
+                          $"but it was not found", WorkflowFailureHint.IdNotFound);
         }
         return this;
     }
