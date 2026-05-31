@@ -502,6 +502,9 @@ public sealed class FileSystemOutputStore : IOutputStore
         var historyFile = _layout.HistoryFile(subject);
         if (!File.Exists(historyFile)) yield break;
 
+        // PERF-12 (accept-and-document): reads the whole history.jsonl, then applies the optional date
+        // `range` filter per line below. Per-subject history is short-lined and small in practice; a
+        // streaming read that filters by date while reading is the documented vNext optimisation.
         var lines = await File.ReadAllLinesAsync(historyFile, ct);
         foreach (var line in lines)
         {
@@ -716,6 +719,10 @@ public sealed class FileSystemOutputStore : IOutputStore
         var recentFile = _layout.RecentRunsFile;
         if (!File.Exists(recentFile)) yield break;
 
+        // PERF-12 (accept-and-document): reads the whole recent.jsonl, then keeps the tail of `count`.
+        // recent.jsonl holds one short pointer line per run and is regenerated, so the full read is
+        // cheap in practice. A streaming bounded-tail read (ring buffer over ReadLinesAsync) is the
+        // documented vNext optimisation if this file ever grows large.
         var lines = await File.ReadAllLinesAsync(recentFile, ct);
         var pointers = new List<RunPointer>();
 
@@ -883,6 +890,15 @@ public sealed class FileSystemOutputStore : IOutputStore
     /// absolute path's SHA-256, plus an in-process <see cref="SemaphoreSlim"/>
     /// to short-circuit when the contention is within one process.
     /// </summary>
+    /// <remarks>
+    /// PERF-12 / cancellation contract: <paramref name="ct"/> cancels the <em>wait</em> to acquire the
+    /// in-process semaphore and the cross-process mutex (the bounded poll loop honours it), but it does
+    /// NOT interrupt the in-flight synchronous <see cref="File.AppendAllText(string,string)"/> once the
+    /// mutex is held. That write runs to completion on purpose: <c>WaitOne</c>/<c>ReleaseMutex</c> require
+    /// the same thread, so the acquire→write→release sequence runs inside one <see cref="Task.Run(Action,CancellationToken)"/>
+    /// with no <c>await</c>, and aborting mid-write would risk a torn JSONL line. Lines are short
+    /// (one record each), so the uninterruptible window is tiny.
+    /// </remarks>
     private async Task AppendJsonlLineAsync<T>(string path, T value, CancellationToken ct)
     {
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
@@ -986,6 +1002,10 @@ public sealed class FileSystemOutputStore : IOutputStore
         if (_runSubjectCache.TryGetValue(runId, out var cached))
             return cached;
 
+        // PERF-12 (accept-and-document): on a cache miss this walks every subject directory looking for
+        // the run. Each candidate is gated by a cheap Directory.Exists probe BEFORE any JSON is read, so
+        // the miss path is a stat-only scan and resolved hits are memoised in _runSubjectCache. Resolving
+        // the runId directly via the runs index (instead of a directory walk) is the documented vNext fix.
         foreach (var kind in new[] { SubjectKind.Agent, SubjectKind.Workflow })
         {
             var kindDir = _layout.SubjectKindDir(kind);
