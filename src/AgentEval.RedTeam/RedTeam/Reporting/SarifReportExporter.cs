@@ -113,14 +113,17 @@ public sealed class SarifReportExporter : IReportExporter
     {
         var results = new List<SarifResult>();
 
-        foreach (var attack in result.AttackResults)
+        // Enumerate with an index so RuleIndex is O(1) per finding rather than materialising the
+        // attack list and scanning it per finding (O(n^2)) (PERF-04).
+        for (int attackIndex = 0; attackIndex < result.AttackResults.Count; attackIndex++)
         {
+            var attack = result.AttackResults[attackIndex];
             foreach (var probe in attack.ProbeResults.Where(p => p.Outcome == EvaluationOutcome.Succeeded))
             {
                 results.Add(new SarifResult
                 {
                     RuleId = attack.AttackName,
-                    RuleIndex = result.AttackResults.ToList().IndexOf(attack),
+                    RuleIndex = attackIndex,
                     Level = SeverityToLevel(attack.Severity),
                     Message = new SarifMessage
                     {
