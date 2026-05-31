@@ -152,6 +152,26 @@ public class PerformanceBenchmarkTests
     }
 
     [Fact]
+    public async Task RunThroughputBenchmarkAsync_RpsUsesConfiguredDuration_NotWallClock()
+    {
+        // BUG-51: RPS must divide by the configured measurement window, not the wall-clock that
+        // also covers worker startup + the post-cancel drain (which under-reports RPS).
+        var agent = new MockTestableAgent("TestAgent", "Hello");
+        var benchmark = new PerformanceBenchmark(agent, new PerformanceBenchmarkOptions { Verbose = false });
+        var duration = TimeSpan.FromMilliseconds(200);
+
+        var result = await benchmark.RunThroughputBenchmarkAsync(
+            "test", concurrentRequests: 2, duration: duration);
+
+        // RPS is exactly completed / configured-duration (the old code divided by the larger
+        // wall-clock Duration, which would not match).
+        Assert.Equal(result.CompletedRequests / duration.TotalSeconds, result.RequestsPerSecond, 6);
+        // The reported wall-clock Duration exceeds the configured window — confirming the two
+        // denominators genuinely differ.
+        Assert.True(result.Duration > duration);
+    }
+
+    [Fact]
     public async Task RunThroughputBenchmarkAsync_AgentThrows_RecordsErrors()
     {
         // Arrange

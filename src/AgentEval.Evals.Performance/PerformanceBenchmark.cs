@@ -277,7 +277,7 @@ public class PerformanceBenchmark
         
         var endTime = DateTimeOffset.UtcNow;
         var actualDuration = endTime - startTime;
-        
+
         return new ThroughputBenchmarkResult
         {
             AgentName = _agent.Name,
@@ -287,7 +287,13 @@ public class PerformanceBenchmark
             CompletedRequests = completedRequests,
             ErrorCount = errors.Count,
             Errors = errors,
-            RequestsPerSecond = completedRequests / actualDuration.TotalSeconds,
+            // Divide by the configured measurement window, not actualDuration: the latter is taken
+            // before workers spin up and after the post-cancel drain (Task.WhenAll), so it includes
+            // startup scheduling + one in-flight request per worker, systematically under-reporting
+            // RPS and able to flip a borderline pass/fail (BUG-51).
+            RequestsPerSecond = duration.TotalSeconds > 0
+                ? completedRequests / duration.TotalSeconds
+                : 0,
             MeanLatency = latencies.Count > 0 
                 ? TimeSpan.FromMilliseconds(latencies.Average(t => t.TotalMilliseconds)) 
                 : TimeSpan.Zero
