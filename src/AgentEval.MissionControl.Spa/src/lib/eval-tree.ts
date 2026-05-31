@@ -111,3 +111,18 @@ export function severityClass(s: Severity): string {
       return "bg-slate-50 text-slate-700 border-slate-200";
   }
 }
+
+// Glass Box (Phase 7): per-turn chat-boundary drill-down (mirrors the GraphQL ChatTurn type).
+// Chat-turn entries also render today via the REST /api/v1/runs/{runId}/trace waterfall; this typed
+// shape backs the eval-tree-integrated timeline.
+export interface ChatTurnNode {
+  index: number;
+  correlationId: string | null;
+  finishReason: string | null;
+  text: string | null;
+  toolNames: string[];
+  toolDefinitions: string[];
+  promptTokens: number;
+  completionTokens: number;
+  latencyMs: number;
+}

@@ -97,7 +97,9 @@ public static class McHost
             //   3. Keep enabled in the local Mode-A path.
             // The 5.2 introspection-based regression tests will need an
             // alternative pin (e.g. schema dump snapshot) in that world.
-            .AddMaxExecutionDepthRule(10, skipIntrospectionFields: true)
+            // Glass Box (Phase 7): raised 10 → 12 to accommodate the per-turn ChatTurn drill-down nested
+            // under the EvalResult tree. Cost analysis below still bounds aliased-resolver abuse.
+            .AddMaxExecutionDepthRule(12, skipIntrospectionFields: true)
             // SEC-11: the depth rule alone does not bound a request that invokes expensive resolvers
             // many times via field aliases within depth<=10 (e.g. dozens of aliased evaluatorTimeline /
             // subjectsConnection fields). Enforce Hot Chocolate's operation-cost analysis with explicit
