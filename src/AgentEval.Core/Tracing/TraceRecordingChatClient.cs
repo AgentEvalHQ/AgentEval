@@ -246,5 +246,33 @@ public sealed class TraceRecordingChatClient : DelegatingChatClient
     private static Dictionary<string, object?>? ExtractProviderMetadata(ChatResponse response)
         => response.AdditionalProperties is null || response.AdditionalProperties.Count == 0
             ? null
-            : response.AdditionalProperties.ToDictionary(kv => kv.Key, kv => kv.Value);
+            : response.AdditionalProperties.ToDictionary(kv => kv.Key, kv => ToJsonSafe(kv.Value));
+
+    // ChatResponse.AdditionalProperties values are typed object and can be arbitrary provider objects (raw
+    // response types, etc.). TraceSerializer uses plain System.Text.Json without polymorphic support, so
+    // storing those verbatim could make trace persistence THROW at runtime. Coerce to JSON-safe shapes here:
+    // primitives/string/JsonElement pass through; anything else is round-tripped to a JsonElement (best effort),
+    // falling back to ToString() if it cannot be serialized — so persistence can never fail on provider metadata.
+    private static object? ToJsonSafe(object? value) => value switch
+    {
+        null => null,
+        string or bool or sbyte or byte or short or ushort or int or uint or long or ulong or float or double or decimal or JsonElement => value,
+        _ => TrySerializeToElement(value),
+    };
+
+    private static object? TrySerializeToElement(object value)
+    {
+        try
+        {
+            return JsonSerializer.SerializeToElement(value);
+        }
+        catch (NotSupportedException)
+        {
+            return value.ToString();
+        }
+        catch (JsonException)
+        {
+            return value.ToString();
+        }
+    }
 }

@@ -148,13 +148,23 @@ public sealed class EvalGatingChatClient : DelegatingChatClient
 
             if (_policy == EvalGatePolicy.Redact)
             {
-                // Replace the response content IN PLACE so response-level correlation/threading fields
-                // (ResponseId, ConversationId, CreatedAt, AdditionalProperties, RawRepresentation, …) survive —
-                // rebuilding a fresh ChatResponse silently dropped them. When the gate cannot produce redacted
-                // text (a non-maskable Block, e.g. a toxicity/safety gate), substitute a safe placeholder rather
-                // than delivering the offending content unchanged — Redact must never silently pass a Block.
+                // Redact the response IN PLACE so response-level correlation/threading fields (ResponseId,
+                // ConversationId, CreatedAt, AdditionalProperties, RawRepresentation, …) survive — rebuilding a
+                // fresh ChatResponse silently dropped them. When the gate cannot produce redacted text (a
+                // non-maskable Block, e.g. a toxicity/safety gate), substitute a safe placeholder rather than
+                // delivering the offending content unchanged — Redact must never silently pass a Block.
+                //
+                // Replace only the TEXT with the redacted text and PRESERVE every non-text content (especially
+                // FunctionCallContent): if this gate sits inner of UseFunctionInvocation, dropping the tool calls
+                // on a tool-call turn would desync the tool loop (finish reason says tool_calls but no calls remain).
                 var replacement = verdict.RedactedText ?? BlockedPlaceholder(verdict);
-                response.Messages = new List<ChatMessage> { new(ChatRole.Assistant, replacement) };
+                var preserved = response.Messages
+                    .SelectMany(m => m.Contents)
+                    .Where(c => c is not TextContent)
+                    .ToList();
+                var contents = new List<AIContent>(preserved.Count + 1) { new TextContent(replacement) };
+                contents.AddRange(preserved);
+                response.Messages = new List<ChatMessage> { new(ChatRole.Assistant, contents) };
                 text = replacement;
             }
         }

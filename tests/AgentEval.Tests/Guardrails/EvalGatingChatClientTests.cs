@@ -214,6 +214,34 @@ public class EvalGatingChatClientTests
         Assert.Equal("m-1", response.ModelId);
     }
 
+    [Fact]
+    public async Task PostGate_Redact_PreservesFunctionCallContent_SoToolLoopIsNotBroken()
+    {
+        // Arrange — a tool-call turn (finish reason tool_calls) that ALSO carries redactable text. If Redact
+        // dropped the FunctionCallContent, a gate composed inner of UseFunctionInvocation would desync the tool
+        // loop (finish reason says tool_calls but no calls remain).
+        var inner = new ChatResponse(new ChatMessage(ChatRole.Assistant, new List<AIContent>
+        {
+            new TextContent("calling it — your ssn is 123-45-6789"),
+            new FunctionCallContent("c1", "SearchFlights", new Dictionary<string, object?> { ["to"] = "NRT" }),
+        }))
+        {
+            FinishReason = ChatFinishReason.ToolCalls,
+        };
+        var client = new FixedResponseClient(inner).AsBuilder()
+            .UseEvalGate(post: new IChatGate[] { new RegexPiiGate() }, policy: EvalGatePolicy.Redact)
+            .Build();
+
+        // Act
+        var response = await client.GetResponseAsync(UserSays("hi"));
+
+        // Assert — the SSN is redacted, but the tool call survives intact
+        Assert.DoesNotContain("123-45-6789", response.Text);
+        var call = response.Messages.SelectMany(m => m.Contents).OfType<FunctionCallContent>().SingleOrDefault();
+        Assert.NotNull(call);
+        Assert.Equal("SearchFlights", call!.Name);
+    }
+
     /// <summary>A gate that always Blocks and cannot mask (no <c>RedactedText</c>) — models a toxicity/safety gate.</summary>
     private sealed class AlwaysBlockGate : IChatGate
     {

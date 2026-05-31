@@ -279,6 +279,30 @@ public class TraceRecordingChatClientTests
     }
 
     [Fact]
+    public async Task ProviderMetadata_WithNonSerializableValue_StillSerializesTraceSafely()
+    {
+        // Arrange — a provider response whose AdditionalProperties holds a non-JSON-serializable object (a
+        // reference cycle). Stored verbatim it would make TraceSerializer throw; the recorder must coerce it.
+        var cyclic = new Cyclic();
+        cyclic.Self = cyclic;
+        var response = new ChatResponse(new ChatMessage(ChatRole.Assistant, "ok"))
+        {
+            AdditionalProperties = new AdditionalPropertiesDictionary { ["raw"] = cyclic, ["model"] = "x" },
+        };
+        var trace = new AgentTrace();
+        var recorder = new TraceRecordingChatClient(new FixedResponseClient(response), "agent", trace);
+
+        // Act
+        await recorder.GetResponseAsync(Conversation());
+
+        // Assert — trace persistence must NOT throw on the coerced provider metadata, and round-trips
+        var json = await TraceSerializer.SerializeToStringAsync(trace);
+        Assert.Contains("raw", json);
+        var reloaded = await TraceSerializer.DeserializeFromStringAsync(json);
+        Assert.NotNull(reloaded);
+    }
+
+    [Fact]
     public async Task ComposedOuterOfFunctionInvocation_RecordsOnlyOneEntry_DocumentingWhyInnerIsRequired()
     {
         // Arrange — the WRONG order: recorder outer of FICC. The loop runs below it, invisible.
@@ -297,5 +321,32 @@ public class TraceRecordingChatClientTests
         // Assert — only ONE response recorded, proving the inner-of-FICC composition rule
         var responses = trace.Entries.Count(e => e is { Scope: TraceEntryScope.ChatTurn, Type: TraceEntryType.Response });
         Assert.Equal(1, responses);
+    }
+
+    /// <summary>A self-referential object that <see cref="System.Text.Json.JsonSerializer"/> cannot serialize (cycle).</summary>
+    private sealed class Cyclic
+    {
+        public Cyclic? Self { get; set; }
+    }
+
+    /// <summary>Returns a fixed <see cref="ChatResponse"/> (lets a test inject provider metadata).</summary>
+    private sealed class FixedResponseClient : IChatClient
+    {
+        private readonly ChatResponse _response;
+
+        public FixedResponseClient(ChatResponse response) => _response = response;
+
+        public Task<ChatResponse> GetResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default)
+            => Task.FromResult(_response);
+
+        public IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default)
+            => throw new NotSupportedException();
+
+        public object? GetService(Type serviceType, object? serviceKey = null) => null;
+
+        public void Dispose()
+        {
+            // Nothing to dispose.
+        }
     }
 }
