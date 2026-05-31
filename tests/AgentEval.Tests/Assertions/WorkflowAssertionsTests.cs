@@ -215,6 +215,46 @@ public class WorkflowAssertionsTests
         Assert.Contains("10", exception.Message);
     }
 
+    // MNT-08: the workflow-level HaveCompletedWithin failure suggestion was previously UNREACHABLE — the
+    // message emits "but took …s" with no "expected under", yet GetSuggestions required both substrings.
+    // Suggestions are now derived from a structured WorkflowFailureHint, so the timing suggestion fires.
+    [Fact]
+    public void HaveCompletedWithin_WhenExceeded_SurfacesTimingSuggestion()
+    {
+        var result = new WorkflowExecutionResult
+        {
+            FinalOutput = "output",
+            Steps = new List<ExecutorStep>(),
+            TotalDuration = TimeSpan.FromSeconds(15)
+        };
+
+        var exception = Assert.Throws<WorkflowAssertionException>(() =>
+            result.Should()
+                .HaveCompletedWithin(TimeSpan.FromSeconds(10))
+                .Validate());
+
+        Assert.NotNull(exception.Suggestions);
+        Assert.Contains("Consider increasing timeout or optimizing executor performance", exception.Suggestions!);
+    }
+
+    // MNT-08: an executor-step assertion against a missing executor emits "...was not found", which now
+    // carries the IdNotFound hint → the ID-verification suggestion (previously matched only by text).
+    [Fact]
+    public void ForExecutor_WhenMissing_SurfacesIdNotFoundSuggestion()
+    {
+        var result = CreateTestResult(("researcher", "Some output"));
+
+        var exception = Assert.Throws<WorkflowAssertionException>(() =>
+            result.Should()
+                .ForExecutor("ghost-executor")
+                    .HaveNonEmptyOutput()
+                .And()
+                .Validate());
+
+        Assert.NotNull(exception.Suggestions);
+        Assert.Contains("Verify the executor or node ID matches the workflow configuration", exception.Suggestions!);
+    }
+
     // ═══════════════════════════════════════════════════════════════════════════
     // ERROR ASSERTIONS
     // ═══════════════════════════════════════════════════════════════════════════

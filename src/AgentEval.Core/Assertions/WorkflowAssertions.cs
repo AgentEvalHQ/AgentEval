@@ -38,12 +38,30 @@ public static class WorkflowAssertionsExtensions
 }
 
 /// <summary>
+/// Structured category attached to a workflow-assertion failure at the point it is recorded, so
+/// remediation suggestions are derived from a typed signal rather than by reverse-engineering the
+/// formatted failure message (MNT-08). Adding a new hint here is a compile-time, switch-exhaustive
+/// signal — a message-text edit can no longer silently break suggestions.
+/// </summary>
+public enum WorkflowFailureHint
+{
+    /// <summary>No specific remediation hint.</summary>
+    None = 0,
+    /// <summary>An executor / node / edge ID could not be located.</summary>
+    IdNotFound,
+    /// <summary>A duration / timing budget was exceeded.</summary>
+    Timing,
+    /// <summary>An execution-path / routing expectation was not met.</summary>
+    ExecutionPath,
+}
+
+/// <summary>
 /// Fluent assertion builder for workflow execution results.
 /// </summary>
 public class WorkflowAssertionBuilder
 {
     private readonly WorkflowExecutionResult _result;
-    private readonly List<(string Message, string? Because)> _failures = [];
+    private readonly List<(string Message, string? Because, WorkflowFailureHint Hint)> _failures = [];
     private string? _currentBecause;
 
     /// <summary>
@@ -153,7 +171,7 @@ public class WorkflowAssertionBuilder
         if (_result.TotalDuration > maxDuration)
         {
             AddFailure($"Expected completion within {maxDuration.TotalSeconds:F1}s " +
-                          $"but took {_result.TotalDuration.TotalSeconds:F1}s");
+                          $"but took {_result.TotalDuration.TotalSeconds:F1}s", WorkflowFailureHint.Timing);
         }
         return this;
     }
@@ -522,7 +540,7 @@ public class WorkflowAssertionBuilder
         if (!actualPath.SequenceEqual(expectedPath, StringComparer.OrdinalIgnoreCase))
         {
             AddFailure($"Expected execution path [{string.Join(" → ", expectedPath)}] " +
-                          $"but actual path was [{string.Join(" → ", actualPath)}]");
+                          $"but actual path was [{string.Join(" → ", actualPath)}]", WorkflowFailureHint.ExecutionPath);
         }
         return this;
     }
@@ -558,7 +576,7 @@ public class WorkflowAssertionBuilder
         if (missingNodes.Count > 0)
         {
             AddFailure($"Expected nodes [{string.Join(", ", missingNodes)}] not found in graph. " +
-                          $"Available nodes: [{string.Join(", ", graphNodeIds)}]");
+                          $"Available nodes: [{string.Join(", ", graphNodeIds)}]", WorkflowFailureHint.IdNotFound);
         }
         return this;
     }
@@ -663,24 +681,42 @@ public class WorkflowAssertionBuilder
     /// <summary>
     /// Get the list of failure details including 'because' context.
     /// </summary>
-    public IReadOnlyList<(string Message, string? Because)> FailureDetails => _failures;
+    public IReadOnlyList<(string Message, string? Because)> FailureDetails =>
+        _failures.Select(f => (f.Message, f.Because)).ToList();
 
-    internal void AddFailure(string failure) => _failures.Add((failure, _currentBecause));
+    internal void AddFailure(string failure) => AddFailure(failure, WorkflowFailureHint.None);
+
+    internal void AddFailure(string failure, WorkflowFailureHint hint) =>
+        _failures.Add((failure, _currentBecause, hint));
 
     private IReadOnlyList<string>? GetSuggestions()
     {
+        // MNT-08: derive suggestions from the structured hint recorded with each failure, not from
+        // substring-matching the formatted message. The old text match required both "took" AND
+        // "expected under", but the workflow-level HaveCompletedWithin message emits "but took …s" with
+        // no "expected under", so its timing suggestion was unreachable. A typed hint cannot drift out
+        // of sync with message wording.
         var suggestions = new List<string>();
-        
-        foreach (var (message, _) in _failures)
+
+        foreach (var (_, _, hint) in _failures)
         {
-            if (message.Contains("not found"))
-                suggestions.Add("Verify the executor or node ID matches the workflow configuration");
-            if (message.Contains("took") && message.Contains("expected under"))
-                suggestions.Add("Consider increasing timeout or optimizing executor performance");
-            if (message.Contains("execution path"))
-                suggestions.Add("Check workflow routing logic and edge conditions");
+            switch (hint)
+            {
+                case WorkflowFailureHint.IdNotFound:
+                    suggestions.Add("Verify the executor or node ID matches the workflow configuration");
+                    break;
+                case WorkflowFailureHint.Timing:
+                    suggestions.Add("Consider increasing timeout or optimizing executor performance");
+                    break;
+                case WorkflowFailureHint.ExecutionPath:
+                    suggestions.Add("Check workflow routing logic and edge conditions");
+                    break;
+                case WorkflowFailureHint.None:
+                default:
+                    break;
+            }
         }
-        
+
         return suggestions.Count > 0 ? suggestions.Distinct().ToList() : null;
     }
 
@@ -719,20 +755,21 @@ public class ExecutorStepAssertionBuilder
         return this;
     }
 
-    private void AddFailure(string message)
+    private void AddFailure(string message, WorkflowFailureHint hint = WorkflowFailureHint.None)
     {
         // Append because to message if available
-        var fullMessage = !string.IsNullOrEmpty(_currentBecause) 
+        var fullMessage = !string.IsNullOrEmpty(_currentBecause)
             ? $"{message} because {_currentBecause}"
             : message;
-        _parent.AddFailure(fullMessage);
+        _parent.AddFailure(fullMessage, hint);
         _currentBecause = null; // Reset after use
     }
 
     /// <summary>
     /// Adds a failure message from a child assertion builder (e.g., ExecutorToolCallAssertionBuilder).
     /// </summary>
-    internal void AddFailureFromChild(string message) => _parent.AddFailure(message);
+    internal void AddFailureFromChild(string message, WorkflowFailureHint hint = WorkflowFailureHint.None)
+        => _parent.AddFailure(message, hint);
 
     /// <summary>
     /// Assert the executor's output contains a string.
@@ -746,7 +783,7 @@ public class ExecutorStepAssertionBuilder
         if (because != null) _currentBecause = because;
         if (_step == null)
         {
-            AddFailure($"Executor '{_executorId}' was not found");
+            AddFailure($"Executor '{_executorId}' was not found", WorkflowFailureHint.IdNotFound);
         }
         else
         {
@@ -771,12 +808,12 @@ public class ExecutorStepAssertionBuilder
         if (because != null) _currentBecause = because;
         if (_step == null)
         {
-            AddFailure($"Executor '{_executorId}' was not found");
+            AddFailure($"Executor '{_executorId}' was not found", WorkflowFailureHint.IdNotFound);
         }
         else if (_step.Duration > maxDuration)
         {
             AddFailure($"Executor '{_executorId}' took {_step.Duration.TotalMilliseconds:F0}ms, " +
-                               $"expected under {maxDuration.TotalMilliseconds:F0}ms");
+                               $"expected under {maxDuration.TotalMilliseconds:F0}ms", WorkflowFailureHint.Timing);
         }
         return this;
     }
@@ -811,7 +848,7 @@ public class ExecutorStepAssertionBuilder
         ToolCallRecord? call = null;
         if (_step == null)
         {
-            AddFailure($"Executor '{_executorId}' was not found");
+            AddFailure($"Executor '{_executorId}' was not found", WorkflowFailureHint.IdNotFound);
         }
         else
         {
@@ -839,7 +876,7 @@ public class ExecutorStepAssertionBuilder
         if (because != null) _currentBecause = because;
         if (_step == null)
         {
-            AddFailure($"Executor '{_executorId}' was not found");
+            AddFailure($"Executor '{_executorId}' was not found", WorkflowFailureHint.IdNotFound);
         }
         else
         {
@@ -866,7 +903,7 @@ public class ExecutorStepAssertionBuilder
         if (because != null) _currentBecause = because;
         if (_step == null)
         {
-            AddFailure($"Executor '{_executorId}' was not found");
+            AddFailure($"Executor '{_executorId}' was not found", WorkflowFailureHint.IdNotFound);
         }
         else
         {
@@ -908,7 +945,7 @@ public class ExecutorStepAssertionBuilder
         if (because != null) _currentBecause = because;
         if (_step == null)
         {
-            AddFailure($"Executor '{_executorId}' was not found");
+            AddFailure($"Executor '{_executorId}' was not found", WorkflowFailureHint.IdNotFound);
         }
         else if (string.IsNullOrWhiteSpace(_step.Output))
         {
@@ -927,7 +964,7 @@ public class ExecutorStepAssertionBuilder
         if (because != null) _currentBecause = because;
         if (_step == null)
         {
-            AddFailure($"Executor '{_executorId}' was not found");
+            AddFailure($"Executor '{_executorId}' was not found", WorkflowFailureHint.IdNotFound);
         }
         else
         {
@@ -956,7 +993,7 @@ public class ExecutorStepAssertionBuilder
         if (because != null) _currentBecause = because;
         if (_step == null)
         {
-            AddFailure($"Executor '{_executorId}' was not found");
+            AddFailure($"Executor '{_executorId}' was not found", WorkflowFailureHint.IdNotFound);
         }
         else if (!_step.WasConditionallyRouted)
         {
@@ -975,7 +1012,7 @@ public class ExecutorStepAssertionBuilder
         if (because != null) _currentBecause = because;
         if (_step == null)
         {
-            AddFailure($"Executor '{_executorId}' was not found");
+            AddFailure($"Executor '{_executorId}' was not found", WorkflowFailureHint.IdNotFound);
         }
         else if (!_step.IsParallelBranch)
         {
@@ -995,7 +1032,7 @@ public class ExecutorStepAssertionBuilder
         if (because != null) _currentBecause = because;
         if (_step == null)
         {
-            AddFailure($"Executor '{_executorId}' was not found");
+            AddFailure($"Executor '{_executorId}' was not found", WorkflowFailureHint.IdNotFound);
         }
         else if (!string.Equals(_step.ParallelBranchId, branchId, StringComparison.OrdinalIgnoreCase))
         {
@@ -1014,7 +1051,7 @@ public class ExecutorStepAssertionBuilder
         if (because != null) _currentBecause = because;
         if (_step == null)
         {
-            AddFailure($"Executor '{_executorId}' was not found");
+            AddFailure($"Executor '{_executorId}' was not found", WorkflowFailureHint.IdNotFound);
         }
         else if (_step.IncomingEdge == null)
         {
@@ -1034,7 +1071,7 @@ public class ExecutorStepAssertionBuilder
         if (because != null) _currentBecause = because;
         if (_step == null)
         {
-            AddFailure($"Executor '{_executorId}' was not found");
+            AddFailure($"Executor '{_executorId}' was not found", WorkflowFailureHint.IdNotFound);
         }
         else
         {
@@ -1062,7 +1099,7 @@ public class ExecutorStepAssertionBuilder
         if (because != null) _currentBecause = because;
         if (_step == null)
         {
-            AddFailure($"Executor '{_executorId}' was not found");
+            AddFailure($"Executor '{_executorId}' was not found", WorkflowFailureHint.IdNotFound);
         }
         else if (_step.IncomingEdge == null)
         {
@@ -1355,12 +1392,12 @@ public class WorkflowToolCallAssertionBuilder
     /// </summary>
     public WorkflowAssertionBuilder And() => _parent;
 
-    private void AddFailure(string message, string? because)
+    private void AddFailure(string message, string? because, WorkflowFailureHint hint = WorkflowFailureHint.None)
     {
         var fullMessage = !string.IsNullOrEmpty(because)
             ? $"{message} because {because}"
             : message;
-        _parent.AddFailure(fullMessage);
+        _parent.AddFailure(fullMessage, hint);
     }
 
     private static string Truncate(string text, int maxLength)
@@ -1643,12 +1680,12 @@ public class ExecutorToolCallAssertionBuilder
     /// </remarks>
     public WorkflowAssertionBuilder Done() => _parent.And();
 
-    private void AddFailure(string message, string? because)
+    private void AddFailure(string message, string? because, WorkflowFailureHint hint = WorkflowFailureHint.None)
     {
         var fullMessage = !string.IsNullOrEmpty(because)
             ? $"{message} because {because}"
             : message;
-        _parent.AddFailureFromChild(fullMessage);
+        _parent.AddFailureFromChild(fullMessage, hint);
     }
 
     private static string Truncate(string text, int maxLength)
@@ -1808,12 +1845,12 @@ public class EdgeAssertionBuilder
         return this;
     }
 
-    private void AddFailure(string message)
+    private void AddFailure(string message, WorkflowFailureHint hint = WorkflowFailureHint.None)
     {
-        var fullMessage = !string.IsNullOrEmpty(_currentBecause) 
+        var fullMessage = !string.IsNullOrEmpty(_currentBecause)
             ? $"{message} because {_currentBecause}"
             : message;
-        _parent.AddFailure(fullMessage);
+        _parent.AddFailure(fullMessage, hint);
         _currentBecause = null;
     }
 
@@ -1843,7 +1880,7 @@ public class EdgeAssertionBuilder
         if (because != null) _currentBecause = because;
         if (_edge == null)
         {
-            AddFailure($"Edge '{_sourceId}' → '{_targetId}' was not found");
+            AddFailure($"Edge '{_sourceId}' → '{_targetId}' was not found", WorkflowFailureHint.IdNotFound);
         }
         else if (_edge.EdgeType != expectedType)
         {
@@ -1863,7 +1900,7 @@ public class EdgeAssertionBuilder
         if (because != null) _currentBecause = because;
         if (_edge == null)
         {
-            AddFailure($"Edge '{_sourceId}' → '{_targetId}' was not found");
+            AddFailure($"Edge '{_sourceId}' → '{_targetId}' was not found", WorkflowFailureHint.IdNotFound);
         }
         else if (_edge.ConditionResult != expectedResult)
         {
@@ -1884,7 +1921,7 @@ public class EdgeAssertionBuilder
         if (because != null) _currentBecause = because;
         if (_edge == null)
         {
-            AddFailure($"Edge '{_sourceId}' → '{_targetId}' was not found");
+            AddFailure($"Edge '{_sourceId}' → '{_targetId}' was not found", WorkflowFailureHint.IdNotFound);
         }
         else if (!string.Equals(_edge.MatchedSwitchLabel, expectedLabel, StringComparison.OrdinalIgnoreCase))
         {
@@ -1905,7 +1942,7 @@ public class EdgeAssertionBuilder
         if (because != null) _currentBecause = because;
         if (_edge == null)
         {
-            AddFailure($"Edge '{_sourceId}' → '{_targetId}' was not found");
+            AddFailure($"Edge '{_sourceId}' → '{_targetId}' was not found", WorkflowFailureHint.IdNotFound);
         }
         else if (_edge.TransferredData == null || !_edge.TransferredData.Contains(expectedData, StringComparison.OrdinalIgnoreCase))
         {
