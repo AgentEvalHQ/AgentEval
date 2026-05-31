@@ -476,6 +476,43 @@ public class WorkflowTraceTests
             () => replayer.ExecuteWorkflowAsync("Different prompt"));
     }
 
+    // GAP-09 (review follow-up): the workflow replay agent's MismatchBehavior.Warn branch must route the
+    // warning (which includes truncated prompt text) through the configurable OnWarning sink instead of
+    // straight to Console — symmetric with TraceReplayingAgent. (Previously only the non-workflow agent
+    // had a test.)
+    [Fact]
+    public async Task WorkflowTraceReplayingAgent_Warn_RoutesToOnWarningSink()
+    {
+        var trace = new WorkflowTrace
+        {
+            TraceName = "warn_sink",
+            OriginalPrompt = "Expected prompt",
+            FinalOutput = "Result",
+            Steps = new List<WorkflowTraceStep>
+            {
+                new() { ExecutorId = "step1", Output = "Out", StepIndex = 0 }
+            }
+        };
+        var captured = new List<string>();
+        var options = new WorkflowTraceReplayOptions
+        {
+            ValidatePrompt = true,
+            PromptMatchingMode = PromptMatchingMode.Exact,
+            MismatchBehavior = MismatchBehavior.Warn,
+            OnWarning = captured.Add
+        };
+
+        var replayer = new WorkflowTraceReplayingAgent(trace, options);
+
+        // Different prompt → mismatch, but Warn must NOT throw; the warning goes to the sink.
+        var result = await replayer.ExecuteWorkflowAsync("Different prompt");
+
+        Assert.Equal("Result", result.FinalOutput);
+        Assert.Single(captured);
+        Assert.Contains("WorkflowTraceReplayer Warning", captured[0]);
+        Assert.Contains("mismatch", captured[0], StringComparison.OrdinalIgnoreCase);
+    }
+
     [Fact]
     public async Task WorkflowTraceReplayingAgent_SimulatesExecutionDelay()
     {

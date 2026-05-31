@@ -285,8 +285,6 @@ public sealed class TraceReplayingAgent : IEvaluableAgent, IStreamableAgent
             case MismatchBehavior.Warn:
                 // GAP-09: route through the configurable sink (ILogger/redact/suppress) when provided,
                 // else fall back to Console for backward compatibility.
-                // GAP-09: route through the configurable sink (ILogger/redact/suppress) when provided,
-                // else fall back to Console for backward compatibility.
                 var warning = $"[TraceReplayer Warning] {message}";
                 if (_options.OnWarning is not null)
                     _options.OnWarning(warning);
