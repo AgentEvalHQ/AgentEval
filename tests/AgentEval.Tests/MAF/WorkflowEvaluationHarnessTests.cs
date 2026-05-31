@@ -438,7 +438,13 @@ public class WorkflowEvaluationHarnessTests
     private static async IAsyncEnumerable<WorkflowEvent> SlowWorkflow(
         [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct)
     {
-        await Task.Delay(TimeSpan.FromSeconds(10), ct);
+        // Wait indefinitely until the per-test timeout cancels us. A finite delay (e.g. 10s)
+        // races the harness's CancelAfter timer: under severe thread-pool starvation on a loaded
+        // CI runner the cancel callback can be starved past the delay, letting the workflow
+        // COMPLETE on its own (result.Passed == true) and flipping Assert.False — an observed
+        // flake on the Windows/net8.0 job. An infinite delay makes the timeout the only exit,
+        // so the outcome is deterministic regardless of scheduling latency.
+        await Task.Delay(Timeout.InfiniteTimeSpan, ct);
         yield return new ExecutorOutputEvent("executor", "output");
         yield return new WorkflowCompleteEvent();
     }
