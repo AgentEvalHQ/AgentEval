@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
+using Microsoft.Extensions.AI;
+
 namespace AgentEval.RedTeam;
 
 /// <summary>
@@ -70,10 +72,15 @@ public class ScanOptions
     public bool IncludeEvidence { get; init; } = true;
 
     /// <summary>
-    /// IChatClient for LLM-judge evaluators (optional).
-    /// Required only if using LLMJudgeEvaluator.
+    /// Optional <see cref="IChatClient"/> for LLM-judge evaluation.
     /// </summary>
-    public object? JudgeClient { get; init; }
+    /// <remarks>
+    /// <b>Reserved — not yet consumed by <c>RedTeamRunner</c></b> (GAP-19): the runner currently
+    /// scores every probe with the attack's built-in <c>GetEvaluator()</c> and has no LLM-judge
+    /// fallback path, so setting this has no effect on scan results today. It is strongly typed
+    /// (was <c>object?</c>) and retained for the planned <c>LLMJudgeEvaluator</c> fallback wiring.
+    /// </remarks>
+    public IChatClient? JudgeClient { get; init; }
 
     /// <summary>
     /// Optional callback invoked after each probe completes.

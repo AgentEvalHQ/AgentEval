@@ -196,7 +196,7 @@ internal static class RedTeamCommand
             Intensity = intensity,
             FailFast = opts.FailFast,
             MaxProbesPerAttack = opts.MaxProbes,
-            JudgeClient = (object?)judgeClient,
+            JudgeClient = judgeClient, // reserved — not yet consumed by the runner (GAP-19)
             IncludeEvidence = true,
         };
 
