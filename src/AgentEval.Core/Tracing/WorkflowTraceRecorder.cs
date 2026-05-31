@@ -25,6 +25,10 @@ namespace AgentEval.Tracing;
 /// await recorder.SaveAsync("./traces/research_workflow.trace.json");
 /// </code>
 /// </example>
+/// <remarks>
+/// <b>Threading:</b> not thread-safe — designed to record a single workflow execution invoked
+/// sequentially. Use a separate instance per concurrent flow (BUG-58).
+/// </remarks>
 public sealed class WorkflowTraceRecorder : IWorkflowEvaluableAgent, IAsyncDisposable
 {
     private readonly IWorkflowEvaluableAgent _inner;

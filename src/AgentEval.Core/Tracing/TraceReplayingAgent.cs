@@ -20,6 +20,10 @@ namespace AgentEval.Tracing;
 /// // Response is from the trace, not from the actual agent
 /// </code>
 /// </example>
+/// <remarks>
+/// <b>Threading:</b> not thread-safe — it advances an unsynchronised replay cursor and is designed
+/// to replay a single session sequentially. Use a separate instance per concurrent flow (BUG-58).
+/// </remarks>
 public sealed class TraceReplayingAgent : IEvaluableAgent, IStreamableAgent
 {
     private readonly AgentTrace _trace;

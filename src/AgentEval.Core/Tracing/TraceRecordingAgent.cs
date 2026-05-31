@@ -11,6 +11,12 @@ namespace AgentEval.Tracing;
 /// Wraps an IEvaluableAgent to record all invocations for later replay.
 /// This enables deterministic, fast, and cost-free test execution.
 /// </summary>
+/// <remarks>
+/// <b>Threading:</b> a recorder instance is NOT thread-safe and is designed to record a single
+/// conversation/session invoked sequentially. It mutates an unsynchronised index and entry list, so
+/// invoking one instance from multiple threads concurrently can corrupt the trace or throw. For
+/// parallel evaluation, use a separate recorder instance per concurrent flow (BUG-58).
+/// </remarks>
 /// <example>
 /// <code>
 /// // Record mode
