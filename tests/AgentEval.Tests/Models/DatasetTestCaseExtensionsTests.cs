@@ -41,6 +41,21 @@ public class DatasetTestCaseExtensionsTests
         Assert.Equal(80, tc.PassingScore);
     }
 
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    [InlineData(null)]
+    public void ToTestCase_EmptyOrNullInput_ThrowsInputFocusedArgumentException(string? input)
+    {
+        // BUG-47: empty Input previously produced an empty Name and a confusing Name-focused
+        // validation error later; null Input threw a bare NullReferenceException. Fail fast with a
+        // clear Input-focused message instead.
+        var dc = new DatasetTestCase { Id = "", Input = input! };
+
+        var ex = Assert.Throws<ArgumentException>(() => dc.ToTestCase());
+        Assert.Contains("Input", ex.Message);
+    }
+
     [Fact]
     public void ToTestCase_EmptyId_UsesInputTruncated()
     {

@@ -34,6 +34,16 @@ public static class DatasetTestCaseExtensions
         this DatasetTestCase d,
         Func<GroundTruthToolCall?, string?>? groundTruthProjection = null)
     {
+        ArgumentNullException.ThrowIfNull(d);
+
+        // Fail fast with a clear, Input-focused message. Previously a null Input threw a bare
+        // NullReferenceException at the Name slice below, and an empty Input produced an empty Name
+        // that later failed TestCaseValidator with a Name-focused message hiding the real cause —
+        // the empty Input (BUG-47).
+        if (string.IsNullOrWhiteSpace(d.Input))
+            throw new ArgumentException(
+                "DatasetTestCase.Input must be non-empty to convert to a TestCase.", nameof(d));
+
         return new TestCase
         {
             Name = string.IsNullOrEmpty(d.Id) ? d.Input[..Math.Min(50, d.Input.Length)] : d.Id,
