@@ -116,6 +116,31 @@ public class MemoryJudgeTests
     }
 
     [Fact]
+    public async Task JudgeAsync_EmptyFoundFactString_DoesNotSpuriouslyMatch()
+    {
+        // BUG-55: an empty/whitespace entry in found_facts (LLM padding) must be skipped. Previously
+        // fact.Content.Contains("") was always true and the empty string matched the first fact,
+        // skewing the FoundFacts diagnostics.
+        var chatClient = new CustomResponseChatClient("""
+        {
+          "found_facts": ["   ", ""],
+          "missing_facts": [],
+          "forbidden_found": [],
+          "score": 50,
+          "explanation": "padding entries only"
+        }
+        """);
+        var judge = new MemoryJudge(chatClient, NullLogger<MemoryJudge>.Instance);
+        var originalFact = MemoryFact.Create("My name is John");
+        var query = MemoryQuery.Create("What is my name?", originalFact);
+
+        var result = await judge.JudgeAsync("No idea.", query);
+
+        // The empty/whitespace entries must not match the real fact.
+        Assert.Empty(result.FoundFacts);
+    }
+
+    [Fact]
     public async Task JudgeAsync_WithContainsMatch_MatchesFoundFacts()
     {
         // LLM returns a substring of the original fact

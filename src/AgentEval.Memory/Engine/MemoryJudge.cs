@@ -377,6 +377,11 @@ Be strict — any specific fabricated detail (a name, address, number, food item
 
         foreach (var content in factContents)
         {
+            // Skip empty/whitespace entries (LLM padding in found_facts/missing_facts). A
+            // fact.Content.Contains("") is always true and would spuriously match the first
+            // not-yet-matched fact, skewing the FoundFacts/MissingFacts diagnostics (BUG-55).
+            if (string.IsNullOrWhiteSpace(content)) continue;
+
             // Try exact match first, then contains-based, then keyword overlap
             var matchIndex = -1;
 
