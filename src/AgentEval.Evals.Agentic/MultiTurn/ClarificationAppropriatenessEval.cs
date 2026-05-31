@@ -72,11 +72,10 @@ public sealed class ClarificationAppropriatenessEval : IEval
         // History is optional for this evaluator — fall back to single-turn evaluation if absent.
         var history = ConversationHistoryHelper.TryGetHistory(input);
 
+        // Preserve every other EvalInput field via WithEnrichedQuery (BUG-57).
         var evalInput = history is { Count: > 0 }
-            ? new EvalInput(
-                Query: $"{ConversationHistoryHelper.FormatTranscript(history)}\n\nCurrent user query: {input.Query}",
-                Response: input.Response,
-                Metadata: input.Metadata)
+            ? ConversationHistoryHelper.WithEnrichedQuery(
+                input, ConversationHistoryHelper.FormatTranscript(history))
             : input;
 
         return await _inner.EvaluateAsync(evalInput, ct);

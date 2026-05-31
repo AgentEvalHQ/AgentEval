@@ -90,4 +90,17 @@ public static class ConversationHistoryHelper
         ArgumentNullException.ThrowIfNull(turn);
         return $"=== Previous turn ===\n[{turn.Role}]: {turn.Content}\n=== End of previous turn ===";
     }
+
+    /// <summary>
+    /// Returns a copy of <paramref name="input"/> whose Query is prefixed with the given
+    /// <paramref name="transcript"/>, preserving every other field via the record <c>with</c>
+    /// expression. The conversational evaluators previously rebuilt EvalInput with only
+    /// Query/Response/Metadata, silently dropping SystemMessage/ToolCalls/ToolDefinitions/
+    /// Context/GroundTruth/ExpectedActions (BUG-57).
+    /// </summary>
+    public static EvalInput WithEnrichedQuery(EvalInput input, string transcript)
+    {
+        ArgumentNullException.ThrowIfNull(input);
+        return input with { Query = $"{transcript}\n\nCurrent user query: {input.Query}" };
+    }
 }
