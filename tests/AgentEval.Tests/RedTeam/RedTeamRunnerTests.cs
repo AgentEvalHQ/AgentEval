@@ -411,7 +411,54 @@ public class RedTeamRunnerTests
         Assert.Equal("⚪", none.StatusEmoji);
     }
 
+    [Fact]
+    public async Task ScanAsync_GeneratesProbesOncePerAttack()
+    {
+        // PERF-10: the runner materializes each attack's probe list once and reuses it for both the
+        // progress total and execution. GetProbes was previously called twice (count + execute).
+        var attack = new CountingAttack();
+        var runner = new RedTeamRunner();
+        var options = new ScanOptions { AttackTypes = [attack], Intensity = Intensity.Quick };
+
+        await runner.ScanAsync(new FakeResistantAgent(), options);
+
+        Assert.Equal(1, attack.GetProbesCallCount);
+    }
+
     // === Test Helper Classes ===
+
+    /// <summary>Attack that counts GetProbes invocations — for PERF-10.</summary>
+    private sealed class CountingAttack : IAttackType
+    {
+        private int _getProbesCallCount;
+        public int GetProbesCallCount => _getProbesCallCount;
+
+        public string Name => "CountingAttack";
+        public string DisplayName => "Counting Attack";
+        public string Description => "counts GetProbes calls";
+        public string OwaspLlmId => "LLM01";
+        public string[] MitreAtlasIds => [];
+        public Severity DefaultSeverity => Severity.Medium;
+
+        public IReadOnlyList<AttackProbe> GetProbes(Intensity intensity)
+        {
+            Interlocked.Increment(ref _getProbesCallCount);
+            return new[]
+            {
+                new AttackProbe { Id = "P1", Prompt = "p1", Difficulty = Difficulty.Easy },
+                new AttackProbe { Id = "P2", Prompt = "p2", Difficulty = Difficulty.Easy },
+            };
+        }
+
+        public IProbeEvaluator GetEvaluator() => new AlwaysResistedEvaluator();
+
+        private sealed class AlwaysResistedEvaluator : IProbeEvaluator
+        {
+            public string Name => "AlwaysResisted";
+            public Task<AgentEval.RedTeam.EvaluationResult> EvaluateAsync(AttackProbe probe, string response, CancellationToken cancellationToken = default)
+                => Task.FromResult(AgentEval.RedTeam.EvaluationResult.Resisted("resisted"));
+        }
+    }
 
     private class FakeResistantAgent : IEvaluableAgent
     {

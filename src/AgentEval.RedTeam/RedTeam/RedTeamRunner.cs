@@ -43,12 +43,21 @@ public sealed class RedTeamRunner : IRedTeamRunner
         // Resolve attacks to run
         var attacks = ResolveAttacks(options);
 
+        // Materialize each attack's probe list ONCE and reuse it for both the progress total and
+        // execution — GetProbes builds a fresh List per call, so the previous count-then-execute
+        // pattern ran every generator at least twice per scan (PERF-10).
+        var probesByAttack = attacks.ToDictionary(
+            a => a,
+            a =>
+            {
+                var probes = a.GetProbes(options.Intensity).ToList();
+                if (options.MaxProbesPerAttack > 0 && probes.Count > options.MaxProbesPerAttack)
+                    probes = probes.Take(options.MaxProbesPerAttack).ToList();
+                return (IReadOnlyList<AttackProbe>)probes;
+            });
+
         // Count total probes for progress
-        var totalProbes = attacks.Sum(a => 
-        {
-            var count = a.GetProbes(options.Intensity).Count();
-            return options.MaxProbesPerAttack > 0 ? Math.Min(count, options.MaxProbesPerAttack) : count;
-        });
+        var totalProbes = probesByAttack.Values.Sum(p => p.Count);
         var completedProbes = 0;
 
         foreach (var attack in attacks)
@@ -58,6 +67,7 @@ public sealed class RedTeamRunner : IRedTeamRunner
             var (attackResult, probesExecuted) = await ExecuteAttackAsync(
                 agent,
                 attack,
+                probesByAttack[attack],
                 options,
                 progress,
                 completedProbes,
@@ -107,6 +117,7 @@ public sealed class RedTeamRunner : IRedTeamRunner
     private async Task<(AttackResult Result, int ProbesExecuted)> ExecuteAttackAsync(
         IEvaluableAgent agent,
         IAttackType attack,
+        IReadOnlyList<AttackProbe> probes,
         ScanOptions options,
         IProgress<ScanProgress>? progress,
         int completedProbesBefore,
@@ -116,13 +127,7 @@ public sealed class RedTeamRunner : IRedTeamRunner
     {
         var probeResults = new List<ProbeResult>();
         var evaluator = attack.GetEvaluator();
-        var probes = attack.GetProbes(options.Intensity).ToList();
-
-        // Apply MaxProbesPerAttack limit if set
-        if (options.MaxProbesPerAttack > 0 && probes.Count > options.MaxProbesPerAttack)
-        {
-            probes = probes.Take(options.MaxProbesPerAttack).ToList();
-        }
+        // `probes` is materialized once by the caller (incl. MaxProbesPerAttack) — see PERF-10.
 
         var completedProbes = completedProbesBefore;
         var totalResisted = 0;
