@@ -403,6 +403,39 @@ var toolAdapter = MAFWorkflowAdapter.FromMAFWorkflow(
     ["TripPlanner", "FlightReservation", "HotelReservation", "Presenter"]);
 ```
 
+## Chat-boundary capture inside workflows (Glass Box v0.11 pattern)
+
+To capture per-LLM-round-trip evidence (and feed Trace Fidelity) for each executor in a MAF workflow, **pre-wire** each executor's `IChatClient` with `UseTraceRecording` *before* handing it to `WorkflowBuilder`. This works today with no AgentEval code change. (v0.12 adds a transparent adapter hook so this is automatic — see the roadmap.)
+
+```csharp
+using AgentEval.Tracing;
+
+// One trace per executor (TripPlanner / FlightReservation / HotelReservation / Presenter).
+var plannerTrace = new AgentTrace();
+var plannerClient = rawPlannerModel
+    .AsBuilder()
+    .UseFunctionInvocation()                              // the tool loop
+    .UseTraceRecording("TripPlanner", plannerTrace)       // INNER of FICC → one entry per real round-trip
+    .Build();
+
+// Optionally wrap each tool so tool-execution timing is captured too:
+var tools = rawTools.Select(t => t.WithEvaluation(plannerTrace));   // AgentEval.MAF.Tracing
+
+// Build the executor's agent from the traced client, then bind as usual:
+var plannerAgent = plannerClient.CreateAIAgent(instructions: "...", tools: tools);
+// workflowBuilder.BindAsExecutor("TripPlanner", plannerAgent) ...
+
+// Group all of an invocation's entries under one correlation id:
+using (new ToolCorrelationScope("trip-run-1"))
+{
+    // run the workflow
+}
+```
+
+After the run, each per-executor `AgentTrace` can be reconciled with its agent-boundary trace via the [Trace Fidelity](benchmarks/trace-fidelity.md) family, and the per-turn detail surfaces in Mission Control's trace waterfall.
+
+> ⚠️ **v0.11 fit-gap:** this pre-wiring is manual per executor. The v0.12 `MAFWorkflowAdapter` hook injects it automatically; until then, executors you don't pre-wire won't have chat-boundary detail.
+
 ## Workflow Evaluation Patterns
 
 ### Basic Sequential Workflow Evaluation
