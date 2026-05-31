@@ -41,6 +41,7 @@ public class BenchmarkNamespaceContractTests
     [InlineData(typeof(AgentEval.Benchmarks.PerformanceBenchmark))]
     [InlineData(typeof(AgentEval.Benchmarks.OwaspBenchmark))]
     [InlineData(typeof(AgentEval.Benchmarks.MitreBenchmark))]
+    [InlineData(typeof(AgentEval.Benchmarks.TraceFidelityBenchmark))]
     public void BenchmarkType_LivesIn_AgentEvalBenchmarksNamespace(Type benchmarkType)
     {
         Assert.Equal(ExpectedNamespace, benchmarkType.Namespace);
@@ -53,6 +54,7 @@ public class BenchmarkNamespaceContractTests
     [InlineData(typeof(AgentEval.Benchmarks.PerformanceBenchmark))]
     [InlineData(typeof(AgentEval.Benchmarks.OwaspBenchmark))]
     [InlineData(typeof(AgentEval.Benchmarks.MitreBenchmark))]
+    [InlineData(typeof(AgentEval.Benchmarks.TraceFidelityBenchmark))]
     public void BenchmarkType_IsPublic(Type benchmarkType)
     {
         Assert.True(benchmarkType.IsPublic, $"{benchmarkType.FullName} must be public");
@@ -69,6 +71,7 @@ public class BenchmarkNamespaceContractTests
     [InlineData(typeof(AgentEval.Benchmarks.EuAiActBenchmark))]
     [InlineData(typeof(AgentEval.Benchmarks.OwaspBenchmark))]
     [InlineData(typeof(AgentEval.Benchmarks.MitreBenchmark))]
+    [InlineData(typeof(AgentEval.Benchmarks.TraceFidelityBenchmark))]
     public void StaticBenchmarkFactory_IsAbstractSealed(Type factoryType)
     {
         // C# static classes compile to abstract+sealed in IL.

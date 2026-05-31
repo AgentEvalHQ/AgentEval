@@ -86,5 +86,6 @@ public static class BenchListCommand
         _ = typeof(AgentEval.Benchmarks.PerformanceBenchmark).Assembly;
         _ = typeof(AgentEval.Benchmarks.MemoryBenchmark).Assembly;
         _ = typeof(AgentEval.Benchmarks.LongMemEvalBenchmark).Assembly;
+        _ = typeof(AgentEval.Benchmarks.TraceFidelityBenchmark).Assembly;   // Glass Box (lives in AgentEval.Core)
     }
 }

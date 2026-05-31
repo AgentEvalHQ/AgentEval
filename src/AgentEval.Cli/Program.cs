@@ -342,6 +342,44 @@ benchCmd.Add(benchMitreCmd);
         benchCmd.Add(benchMemCmd);
     }
 
+    // bench trace-fidelity — Glass Box: reconcile an agent-boundary vs chat-boundary trace pair.
+    {
+        var tfAgentOpt = new Option<string?>("--agent-trace") { Description = "Path to the agent-boundary .trace.json (the framework's self-report). REQUIRED." };
+        var tfChatOpt = new Option<string?>("--chat-trace") { Description = "Path to the chat-boundary .trace.json (ground truth at the model interface). REQUIRED." };
+        var tfPresetOpt = new Option<string?>("--preset") { Description = "smoke | standard | audit-grade. Default: standard." };
+        var tfSubjectOpt = new Option<string?>("--subject") { Description = "Subject name (agent under evaluation). REQUIRED." };
+        var tfRootOpt = new Option<string?>("--root") { Description = "Workspace root path (default: auto-detected)" };
+
+        var benchTraceFidelityCmd = new Command("trace-fidelity", "Reconcile an agent-boundary trace against a chat-boundary trace; flags missing/phantom tool calls, hidden retries, argument drift, token under-reporting, suppressed finish reasons. Pure code (no LLM cost).");
+        benchTraceFidelityCmd.Add(tfAgentOpt);
+        benchTraceFidelityCmd.Add(tfChatOpt);
+        benchTraceFidelityCmd.Add(tfPresetOpt);
+        benchTraceFidelityCmd.Add(tfSubjectOpt);
+        benchTraceFidelityCmd.Add(tfRootOpt);
+        benchTraceFidelityCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =>
+        {
+            var agentTrace = parseResult.GetValue(tfAgentOpt);
+            var chatTrace = parseResult.GetValue(tfChatOpt);
+            var subject = parseResult.GetValue(tfSubjectOpt);
+            if (string.IsNullOrWhiteSpace(agentTrace) || string.IsNullOrWhiteSpace(chatTrace))
+            {
+                Console.Error.WriteLine("Error: --agent-trace and --chat-trace are required.");
+                return 1;
+            }
+
+            if (string.IsNullOrWhiteSpace(subject))
+            {
+                Console.Error.WriteLine("Error: --subject is required.");
+                return 1;
+            }
+
+            var preset = parseResult.GetValue(tfPresetOpt) ?? "standard";
+            var root = parseResult.GetValue(tfRootOpt);
+            return await BenchTraceFidelityCommand.RunAsync(agentTrace, chatTrace, preset, subject, root, ct);
+        });
+        benchCmd.Add(benchTraceFidelityCmd);
+    }
+
     var benchPerfCmd = new Command("perf", "Run a performance benchmark (latency, throughput, cost)");
 
     foreach (var presetName in new[] { "latency", "throughput", "cost" })
