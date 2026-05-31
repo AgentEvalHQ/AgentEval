@@ -549,51 +549,33 @@ var llm01 = attacks.GetByOwaspId("LLM01"); // All attacks for OWASP LLM01
 
 ## Package Structure
 
-The codebase is organized into 6 internal projects (single NuGet package):
+The codebase is organized into internal projects shipped as a single NuGet package (`AgentEval`), which embeds **12 sub-project DLLs** (`PrivateAssets="all"`). The CLI and Mission Control server/SPA are separate, non-packaged applications.
 
 ```
 src/
-├── AgentEval.Abstractions/       # Public contracts
-│   ├── Core/                     # IMetric, IEvaluableAgent, IEvaluationHarness, etc.
-│   ├── Models/                   # TestCase, TestResult, ToolCallRecord, PerformanceMetrics
-│   ├── Embeddings/               # IAgentEvalEmbeddings
-│   ├── Snapshots/                # ISnapshotComparer, ISnapshotStore
-│   └── DependencyInjection/      # AgentEvalServiceOptions
+├── AgentEval.Abstractions/       # Public contracts (IMetric, IEvaluableAgent, models, EvalResult, EvalTreeLimits)
+├── AgentEval.Core/               # Implementations: metrics, assertions, comparison, tracing, calibration, DI
+├── AgentEval.Compliance.Core/    # NEW (ARC-01): shared, regulation-neutral compliance building blocks
+│                                 #   (CompositeExtensions, Recommendation, CriticalFindingExtractor)
+├── AgentEval.DataLoaders/        # Data loaders (JSON/JSONL/YAML/CSV), exporters, output store
+├── AgentEval.Evals.Agentic/      # Agentic benchmark family + agentic PDF/summary reporting
+├── AgentEval.Compliance.Gdpr/    # GDPR compliance benchmark pack (pillars/articles/reporters)
+├── AgentEval.Compliance.EuAiAct/ # EU AI Act compliance benchmark pack
+├── AgentEval.Evals.Performance/  # PerformanceBenchmark (latency/throughput/cost)
+├── AgentEval.Rendering.Pdf/      # Generic QuestPDF EvalResult renderer
+├── AgentEval.MAF/                # Microsoft Agent Framework adapters + harnesses
+├── AgentEval.Memory/             # Memory evaluation, benchmarks, LongMemEval, HTML reporting
+├── AgentEval.RedTeam/            # Security testing: attacks, evaluators, OWASP/MITRE compliance reports
 │
-├── AgentEval.Core/               # Implementations
-│   ├── Assertions/               # ToolUsageAssertions, PerformanceAssertions, ResponseAssertions
-│   ├── Metrics/                  # RAG/, Agentic/, Retrieval/, Safety/, Embedding
-│   ├── Comparison/               # StochasticRunner, ModelComparer, StatisticsCalculator
-│   ├── Tracing/                  # TraceRecordingAgent, TraceReplayingAgent, ChatTraceRecorder
-│   ├── Calibration/              # CalibratedJudge, VotingStrategy
-│   ├── Benchmarks/               # PerformanceBenchmark (the agentic preset factory lives in AgentEval.Evals.Agentic)
-│   ├── Adapters/                 # MicrosoftEvaluatorAdapter, ChatClientAgentAdapter
-│   ├── Testing/                  # FakeChatClient
-│   └── DependencyInjection/      # AddAgentEval()
+├── AgentEval/                    # Umbrella — embeds the 12 sub-projects + AddAgentEvalAll()
 │
-├── AgentEval.DataLoaders/        # Data loading and export
-│   ├── DataLoaders/              # JSON, JSONL, YAML, CSV loaders
-│   ├── Exporters/                # JUnit XML, Markdown, JSON, CSV, TRX exporters
-│   ├── Output/                   # TableFormatter, AgentEvalTestBase, TimeTravelTrace
-│   └── DependencyInjection/      # AddAgentEvalDataLoaders()
-│
-├── AgentEval.MAF/                # Microsoft Agent Framework
-│   ├── MAFAgentAdapter.cs        # Wraps AIAgent → IStreamableAgent
-│   ├── MAFEvaluationHarness.cs   # MAF-specific evaluation harness
-│   ├── MAFWorkflowAdapter.cs     # Workflow integration
-│   └── WorkflowEvaluationHarness.cs
-│
-├── AgentEval.RedTeam/            # Security testing
-│   ├── RedTeamRunner.cs          # Orchestrator
-│   ├── AttackPipeline.cs         # Attack execution
-│   ├── Attacks/                  # 9 built-in attack types
-│   ├── Evaluators/               # Probe evaluators
-│   ├── ResponsibleAI/            # Toxicity, Bias, Misinformation metrics
-│   └── DependencyInjection/      # AddAgentEvalRedTeam()
-│
-└── AgentEval/                    # Umbrella (packaging only)
-    └── AddAgentEvalAll()         # Registers all services from all sub-projects
+│   # Applications (NOT in the NuGet package):
+├── AgentEval.Cli/                # `agenteval` CLI (init/eval/list/bench/redteam/mc/doctor)
+├── AgentEval.MissionControl/     # Read-only portal (GraphQL + REST, net10.0-only)
+└── AgentEval.MissionControl.Spa/ # React SPA served by Mission Control
 ```
+
+Cross-cutting shared types introduced by the v1.1 hardening wave live close to their domain: `EvalTreeLimits` (Abstractions — single tree-walk depth cap), `EvalReportHelpers` (Abstractions — shared PDF/report helpers), `ModelKeyMatcher` (Abstractions — shared model-pricing key match), `CalibrationMath` (Core), `WorkflowToolCallChecks` (Core), `AgenticCategoryResolver` (Evals.Agentic), `RedTeamComplianceLeaf` (RedTeam), and `AgentEval.Compliance.Core` (shared by both compliance packs).
 
 ---
 
@@ -792,31 +774,46 @@ catch (BehavioralPolicyViolationException ex)
 
 ## Internal Project Structure
 
-AgentEval ships as a **single NuGet package** (`AgentEval`) but is internally organized into 6 projects for maintainability and compile-time dependency enforcement (see [ADR-016](adr/016-monolith-modularization.md)).
+AgentEval ships as a **single NuGet package** (`AgentEval`) but is internally organized into focused projects for maintainability and compile-time dependency enforcement (see [ADR-016](adr/016-monolith-modularization.md) for the original split and [ADR-018](adr/018-compliance-core-and-shared-extractions.md) for the v1.1 `Compliance.Core` extraction).
 
-### Dependency Graph
+### Dependency Graph (embedded sub-projects)
 
 ```
-AgentEval (NuGet package — umbrella)
-├── AgentEval.Abstractions     → M.E.AI.Abstractions
-├── AgentEval.Core             → Abstractions + M.E.AI + M.E.AI.Eval.Quality + S.N.Tensors
-├── AgentEval.DataLoaders      → Abstractions + Core + YamlDotNet
-├── AgentEval.MAF              → Abstractions + Core + M.Agents.AI + M.Agents.AI.Workflows
-└── AgentEval.RedTeam          → Abstractions + Core + M.E.AI + M.E.DI + PdfSharp-MigraDoc
+AgentEval (NuGet package — umbrella, embeds all 12 below via PrivateAssets="all")
+├── AgentEval.Abstractions      → M.E.AI.Abstractions
+├── AgentEval.Core              → Abstractions + M.E.AI + M.E.AI.Eval.Quality + S.N.Tensors + M.E.DI
+├── AgentEval.Compliance.Core   → Abstractions + Core
+├── AgentEval.DataLoaders       → Abstractions + Core + YamlDotNet + JsonSchema.Net
+├── AgentEval.Evals.Agentic     → Abstractions + Core + JsonSchema.Net + QuestPDF + YamlDotNet + M.E.DI
+├── AgentEval.Compliance.Gdpr   → Abstractions + Core + Compliance.Core + DataLoaders + YamlDotNet + JsonSchema.Net + QuestPDF
+├── AgentEval.Compliance.EuAiAct→ Abstractions + Core + Compliance.Core + DataLoaders + YamlDotNet + JsonSchema.Net + QuestPDF
+├── AgentEval.Evals.Performance → Abstractions + Core
+├── AgentEval.Rendering.Pdf     → Abstractions + QuestPDF
+├── AgentEval.MAF               → Abstractions + Core + M.Agents.AI + M.Agents.AI.Workflows + OpenTelemetry.Api
+├── AgentEval.Memory            → Abstractions + Core + M.E.AI + M.E.DI
+└── AgentEval.RedTeam           → Abstractions + Core + M.E.AI + M.E.DI + PdfSharp-MigraDoc
 ```
+
+Because the umbrella embeds the sub-project DLLs with `PrivateAssets="all"`, each sub-project's external `PackageReference`s must be re-declared on the umbrella by hand. `UmbrellaDependencyClosureTests` (added in v1.1, ARC-10) is a build-time guard that fails when a sub-project adds a runtime package the umbrella does not mirror, so a missing transitive dependency can no longer ship silently (SEC-02 class of bug).
 
 ### Project Responsibilities
 
-| Project | Files | Purpose |
-|---|---|---|
-| `AgentEval.Abstractions` | ~48 | Public contracts: `IMetric`, `IEvaluableAgent`, models, enums |
-| `AgentEval.Core` | ~63 | Implementations: metrics, assertions, comparison, tracing, testing |
-| `AgentEval.DataLoaders` | ~23 | Data loaders (JSON/YAML/CSV/JSONL), exporters, output formatting |
-| `AgentEval.MAF` | 7 | Microsoft Agent Framework adapters and harnesses |
-| `AgentEval.RedTeam` | 61 | Security scanning, attack types, evaluators, compliance reports |
-| `AgentEval` (umbrella) | 1 | Packaging + `AddAgentEvalAll()` DI convenience method |
+| Project | Purpose |
+|---|---|
+| `AgentEval.Abstractions` | Public contracts: `IMetric`, `IEvaluableAgent`, models, `EvalResult`, `EvalTreeLimits`, shared report helpers |
+| `AgentEval.Core` | Implementations: metrics, assertions, comparison, tracing, calibration (`CalibrationMath`), DI |
+| `AgentEval.Compliance.Core` | Shared, regulation-neutral compliance building blocks for the GDPR/EU-AI-Act packs (ARC-01) |
+| `AgentEval.DataLoaders` | Data loaders (JSON/YAML/CSV/JSONL), exporters, canonical output store |
+| `AgentEval.Evals.Agentic` | Agentic benchmark family + agentic reporting (`AgenticCategoryResolver`) |
+| `AgentEval.Compliance.Gdpr` / `.EuAiAct` | Regulation-specific pillars/articles, scenarios, reporters, PDF renderers |
+| `AgentEval.Evals.Performance` | Latency/throughput/cost benchmark |
+| `AgentEval.Rendering.Pdf` | Generic QuestPDF `EvalResult` renderer |
+| `AgentEval.MAF` | Microsoft Agent Framework adapters and harnesses |
+| `AgentEval.Memory` | Memory evaluation, benchmarks, LongMemEval |
+| `AgentEval.RedTeam` | Security scanning, attack types, evaluators, OWASP/MITRE compliance reports |
+| `AgentEval` (umbrella) | Packaging + `AddAgentEvalAll()` DI convenience method |
 
-All projects use `RootNamespace=AgentEval` so consumers see no namespace changes.
+All packaged projects use `RootNamespace=AgentEval` so consumers see no namespace changes.
 
 ---
 
