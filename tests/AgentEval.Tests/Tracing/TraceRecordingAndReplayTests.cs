@@ -209,6 +209,31 @@ public class TraceRecordingAndReplayTests
         Assert.Contains("mismatch", ex.Message);
     }
 
+    // GAP-09: on MismatchBehavior.Warn, the warning (which includes truncated prompt text) is routed to
+    // the configurable OnWarning sink instead of leaking to stdout — a host can redirect, redact, or
+    // suppress it.
+    [Fact]
+    public async Task TraceReplayingAgent_Warn_RoutesToOnWarningSink()
+    {
+        var trace = CreateBasicTrace("Expected prompt", "Response");
+        var captured = new List<string>();
+        var replayer = new TraceReplayingAgent(trace, new TraceReplayOptions
+        {
+            ValidateRequests = true,
+            RequestMatchingMode = RequestMatchingMode.Exact,
+            MismatchBehavior = MismatchBehavior.Warn,
+            OnWarning = captured.Add
+        });
+
+        // Different prompt → mismatch, but Warn must NOT throw; the warning goes to the sink.
+        var response = await replayer.InvokeAsync("Different prompt");
+
+        Assert.Equal("Response", response.Text);
+        Assert.Single(captured);
+        Assert.Contains("TraceReplayer Warning", captured[0]);
+        Assert.Contains("mismatch", captured[0], StringComparison.OrdinalIgnoreCase);
+    }
+
     [Fact]
     public async Task TraceReplayingAgent_AllowsAnyMatchByDefault()
     {
@@ -450,6 +475,34 @@ public class TraceRecordingAndReplayTests
         Assert.True(responseEntry.IsStreaming);
         Assert.NotNull(responseEntry.StreamingChunks);
         Assert.Equal(4, responseEntry.StreamingChunks.Count);
+    }
+
+    [Fact]
+    public async Task TraceRecordingAgent_StreamingThrowsMidStream_RecordsErrorOnResponseEntry()
+    {
+        // BUG-24: when the underlying stream faults mid-enumeration, the recorder must record a
+        // TraceError on the response entry (like the non-streaming path). Otherwise replay —
+        // which keys failure on Error != null — heals a failed run into a successful one.
+        var mockAgent = new ThrowingStreamingAgent(
+            new[] { "partial", " text" },
+            new InvalidOperationException("stream boom"));
+        await using var recorder = new TraceRecordingAgent(mockAgent, "streaming_error_test");
+
+        // Act — enumeration must propagate the original exception.
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(async () =>
+        {
+            await foreach (var _ in recorder.InvokeStreamingAsync("Test"))
+            {
+                // drain
+            }
+        });
+        Assert.Equal("stream boom", ex.Message);
+
+        // Assert — the response entry carries the error, not a clean (Error == null) response.
+        var responseEntry = recorder.Trace.Entries.First(e => e.Type == TraceEntryType.Response);
+        Assert.NotNull(responseEntry.Error);
+        Assert.Equal("InvalidOperationException", responseEntry.Error!.Type);
+        Assert.Contains("stream boom", responseEntry.Error.Message);
     }
 
     [Fact]
@@ -892,6 +945,38 @@ public class TraceRecordingAndReplayTests
     #endregion
 
     #region Mock Streaming Agent
+
+    /// <summary>Streaming agent that yields the given chunks and then throws, to exercise the
+    /// mid-stream failure path (BUG-24).</summary>
+    private sealed class ThrowingStreamingAgent : IEvaluableAgent, IStreamableAgent
+    {
+        private readonly string[] _chunks;
+        private readonly Exception _ex;
+
+        public ThrowingStreamingAgent(string[] chunks, Exception ex)
+        {
+            _chunks = chunks;
+            _ex = ex;
+        }
+
+        public string Name => "ThrowingStreamingAgent";
+
+        public Task<AgentResponse> InvokeAsync(string prompt, CancellationToken cancellationToken = default)
+            => Task.FromResult(new AgentResponse { Text = string.Concat(_chunks) });
+
+        public async IAsyncEnumerable<AgentResponseChunk> InvokeStreamingAsync(
+            string prompt,
+            [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
+        {
+            foreach (var text in _chunks)
+            {
+                await Task.Yield();
+                yield return new AgentResponseChunk { Text = text, IsComplete = false };
+            }
+            await Task.Yield();
+            throw _ex;
+        }
+    }
 
     private class MockStreamingAgent : IEvaluableAgent, IStreamableAgent
     {

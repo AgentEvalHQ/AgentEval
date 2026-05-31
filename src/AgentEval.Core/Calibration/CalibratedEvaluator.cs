@@ -115,6 +115,19 @@ public class CalibratedEvaluator : IEvaluator
                     input, output, criteriaList, cts.Token);
                 return (evaluator.Name, Result: (EvaluationResult?)result, Error: (Exception?)null);
             }
+            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+            {
+                // Per-judge timeout: our linked CTS fired via CancelAfter, NOT caller
+                // cancellation. Treat it as a judge failure so one slow judge cannot abort
+                // the whole calibrated evaluation (honouring the per-judge Timeout +
+                // ContinueOnJudgeFailure contract). Caller cancellation still propagates,
+                // because that OCE is excluded by the filter above (BUG-05).
+                var timeout = new TimeoutException(
+                    $"Judge '{evaluator.Name}' exceeded the per-judge timeout of {_options.Timeout}.");
+                if (!_options.ContinueOnJudgeFailure)
+                    throw timeout;
+                return (evaluator.Name, Result: (EvaluationResult?)null, Error: (Exception?)timeout);
+            }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 if (!_options.ContinueOnJudgeFailure)
@@ -252,62 +265,19 @@ public class CalibratedEvaluator : IEvaluator
         };
     }
 
+    // ARC-04: shared with CalibratedJudge via CalibrationMath.
     private double CalculateWeightedScore(Dictionary<string, double> judgeScores)
-    {
-        if (_options.JudgeWeights == null || _options.JudgeWeights.Count == 0)
-            return judgeScores.Values.Average();
-
-        var totalWeight = 0.0;
-        var weightedSum = 0.0;
-
-        foreach (var (judgeName, score) in judgeScores)
-        {
-            var weight = _options.JudgeWeights.GetValueOrDefault(judgeName, 1.0);
-            weightedSum += score * weight;
-            totalWeight += weight;
-        }
-
-        return totalWeight > 0 ? weightedSum / totalWeight : judgeScores.Values.Average();
-    }
+        => CalibrationMath.WeightedScore(judgeScores, _options.JudgeWeights);
 
     private static double CalculateMedian(List<double> scores)
-    {
-        var sorted = scores.OrderBy(s => s).ToList();
-        var count = sorted.Count;
-
-        if (count == 0) return 0;
-        if (count % 2 == 0)
-            return (sorted[count / 2 - 1] + sorted[count / 2]) / 2.0;
-        return sorted[count / 2];
-    }
+        => CalibrationMath.Median(scores);
 
     private static double CalculateStandardDeviation(List<double> scores)
-    {
-        if (scores.Count < 2) return 0;
-
-        var mean = scores.Average();
-        var sumSquares = scores.Sum(s => (s - mean) * (s - mean));
-        return Math.Sqrt(sumSquares / (scores.Count - 1));
-    }
+        => CalibrationMath.StandardDeviation(scores);
 
     private static double CalculateAgreement(List<double> scores, double stdDev)
-    {
-        if (scores.Count < 2) return 100;
-
-        var mean = scores.Average();
-        if (mean == 0) return scores.All(s => s == 0) ? 100 : 0;
-
-        var cv = stdDev / mean;
-        var agreement = Math.Max(0, 100 - (cv * 100));
-        return Math.Min(100, agreement);
-    }
+        => CalibrationMath.Agreement(scores, stdDev);
 
     private bool CheckConsensus(List<double> scores)
-    {
-        if (scores.Count < 2) return true;
-
-        var min = scores.Min();
-        var max = scores.Max();
-        return (max - min) <= _options.ConsensusTolerance;
-    }
+        => CalibrationMath.WithinConsensus(scores, _options.ConsensusTolerance);
 }

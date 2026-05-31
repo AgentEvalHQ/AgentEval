@@ -51,6 +51,19 @@ public sealed class RecallAtKMetricTests
     }
 
     [Fact]
+    public async Task EvaluateAsync_PassThreshold_ControlsPassDisposition()
+    {
+        // BUG-44: recall 0.25 (1 of 4). The pass threshold is now configurable — default 0.7 fails;
+        // a lenient 0.2 passes.
+        var ctx = new EvaluationContext { Input = "q", Output = "o" };
+        ctx.SetProperty("RetrievedDocumentIds", new[] { "doc1", "doc2", "doc3" });
+        ctx.SetProperty("RelevantDocumentIds", new[] { "doc1", "doc4", "doc5", "doc6" }); // 1 of 4 = 0.25
+
+        Assert.False((await new RecallAtKMetric().EvaluateAsync(ctx)).Passed);                 // 0.25 < 0.7
+        Assert.True((await new RecallAtKMetric(passThreshold: 0.2).EvaluateAsync(ctx)).Passed); // 0.25 >= 0.2
+    }
+
+    [Fact]
     public async Task EvaluateAsync_SomeRelevantInTopK_ReturnsPartialScore()
     {
         // Arrange

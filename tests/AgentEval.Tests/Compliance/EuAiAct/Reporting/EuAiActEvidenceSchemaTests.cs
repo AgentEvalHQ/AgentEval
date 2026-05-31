@@ -10,6 +10,7 @@ using AgentEval.Compliance.EuAiAct.Reporting;
 using AgentEval.Output;
 using Json.Schema;
 using Xunit;
+using AgentEval.Compliance.Core;
 
 namespace AgentEval.Tests.Compliance.EuAiAct.Reporting;
 
@@ -85,7 +86,7 @@ public class EuAiActEvidenceSchemaTests
                 PerPillar: new Dictionary<string, EuAiActPillarSummary>(),
                 PerArticle: new Dictionary<string, EuAiActArticleSummary>()),
             CriticalFindings: Array.Empty<EvalResult>(),
-            Recommendations: Array.Empty<AgentEval.Compliance.EuAiAct.Reporting.Recommendation>(),
+            Recommendations: Array.Empty<AgentEval.Compliance.Core.Recommendation>(),
             Disclaimer: EuAiActComplianceReporter.Disclaimer,
             EuAiActAttestation: new EuAiActAttestation(
                 JudgeMode: "mode-a",

@@ -7,7 +7,7 @@ using AgentEval.Evals;
 using AgentEval.Compliance.EuAiAct;
 using AgentEval.Compliance.EuAiAct.Articles;
 using AgentEval.Compliance.EuAiAct.Articles.Building;
-using AgentEval.Compliance.EuAiAct.Composition;
+using AgentEval.Compliance.Core;
 using AgentEval.Compliance.EuAiAct.DomainPacks.HighRiskCredit;
 using AgentEval.Compliance.EuAiAct.DomainPacks.HighRiskEducation;
 using AgentEval.Compliance.EuAiAct.DomainPacks.HighRiskEmployment;

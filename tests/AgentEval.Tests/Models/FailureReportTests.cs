@@ -64,6 +64,18 @@ public class FailureReportTests
     }
 
     [Fact]
+    public void PrimaryReason_EqualSeverity_TieBreaksByInsertionOrder()
+    {
+        // PERF-09: equal-severity reasons must tie-break deterministically by insertion order, not by
+        // the old value-equality IndexOf (which returned the first match and could scramble equals).
+        var report = new FailureReport { WhyItFailed = "Test failure" }
+            .AddReason("First", "first error", FailureSeverity.Error)
+            .AddReason("Second", "second error", FailureSeverity.Error);
+
+        Assert.Equal("First", report.PrimaryReason!.Category);
+    }
+
+    [Fact]
     public void IsCritical_ReturnsTrueWhenCriticalReasonExists()
     {
         var report = new FailureReport { WhyItFailed = "Test failure" }

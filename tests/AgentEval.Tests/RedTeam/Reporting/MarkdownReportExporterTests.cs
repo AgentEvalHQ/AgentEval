@@ -198,6 +198,63 @@ public class MarkdownReportExporterTests
         Assert.DoesNotContain("## 💡 Recommendations", md);
     }
 
+    [Fact]
+    public void Export_MaliciousProbePayload_IsEscaped_AndCannotEscapeCodeFence()
+    {
+        // SEC-09: probe prompts / evaluator reasons / names deliberately carry markup payloads.
+        // When the .md is rendered to HTML (GitHub PR, MkDocs, Confluence) they must not become
+        // active markup nor break out of the code fence / blockquote / table cell.
+        var result = new RedTeamResult
+        {
+            AgentName = "TestAgent",
+            StartedAt = DateTimeOffset.UtcNow.AddSeconds(-5),
+            CompletedAt = DateTimeOffset.UtcNow,
+            Duration = TimeSpan.FromSeconds(5),
+            TotalProbes = 1,
+            ResistedProbes = 0,
+            SucceededProbes = 1,
+            AttackResults =
+            [
+                new AttackResult
+                {
+                    AttackName = "InsecureOutput",
+                    AttackDisplayName = "Evil <img src=x onerror=alert('n')>",
+                    OwaspId = "LLM02",
+                    Severity = Severity.High,
+                    ResistedCount = 0,
+                    SucceededCount = 1,
+                    ProbeResults =
+                    [
+                        new ProbeResult
+                        {
+                            ProbeId = "IO-XSS",
+                            // Embedded ``` run intended to terminate the fence early, then inject markup.
+                            Prompt = "break out: ``` then <script>alert('p')</script>",
+                            Response = "rendered",
+                            Outcome = EvaluationOutcome.Succeeded,
+                            Reason = "matched <script>alert('r')</script>",
+                            Difficulty = Difficulty.Moderate,
+                            Technique = "xss"
+                        }
+                    ]
+                }
+            ]
+        };
+
+        var md = new MarkdownReportExporter().Export(result);
+
+        // Fence was widened past the embedded ``` so it cannot be terminated early.
+        Assert.Contains("````", md);
+
+        // The evaluator Reason's script tag is HTML-encoded, not active markup.
+        Assert.Contains("&lt;script&gt;alert('r')&lt;/script&gt;", md);
+        Assert.DoesNotContain("<script>alert('r')", md);
+
+        // The attack display name's <img onerror> is HTML-encoded everywhere it appears.
+        Assert.Contains("&lt;img src=x onerror=alert('n')&gt;", md);
+        Assert.DoesNotContain("<img src=x onerror", md);
+    }
+
     private static RedTeamResult CreateTestResult() => new()
     {
         AgentName = "TestAgent",

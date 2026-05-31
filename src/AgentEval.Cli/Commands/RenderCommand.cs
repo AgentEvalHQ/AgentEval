@@ -47,6 +47,17 @@ public static class RenderCommand
             return 1;
         }
 
+        // --ts is joined into a filesystem path via Path.Combine(benchmarkDir, ts), so a `..`-laced
+        // value would escape the benchmark subtree (controlling which result is read / where reports
+        // are written). Validate as a single safe path segment, matching the hardened sibling
+        // ComplianceRenderCommand and the Mission Control REST endpoint (SEC-05).
+        if (!string.IsNullOrWhiteSpace(ts)
+            && !FileSystemLayout.IsSafePathSegment(ts))
+        {
+            Console.Error.WriteLine($"Error: --ts '{ts}' is not a safe path segment.");
+            return 1;
+        }
+
         // ── Workspace setup ──────────────────────────────────────────────────
         if (rootOverride is not null)
         {
@@ -62,7 +73,7 @@ public static class RenderCommand
         }
 
         var agentEvalDir = Path.Combine(workspaceRoot, ".agenteval");
-        var sanitizedSubject = SanitizeForPath(subject);
+        var sanitizedSubject = FileSystemLayout.Sanitize(subject);
         var benchmarkDir = Path.Combine(agentEvalDir, "benchmarks", "agentic", sanitizedSubject);
 
         if (!Directory.Exists(benchmarkDir))
@@ -158,12 +169,5 @@ public static class RenderCommand
         }
 
         return 0;
-    }
-
-    private static string SanitizeForPath(string name)
-    {
-        var invalid = Path.GetInvalidFileNameChars().Concat(new[] { '/', '\\' }).ToArray();
-        var s = string.Concat(name.Select(c => invalid.Contains(c) ? '-' : c));
-        return s.Trim('.', ' ');
     }
 }

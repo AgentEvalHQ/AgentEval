@@ -53,13 +53,15 @@ public static class BenchCalibrateCommand
     public static Task<int> RunAsync(
         string? rootOverride = null,
         string? outPathOverride = null,
-        IEvaluator? evaluatorOverride = null)
-        => RunCoreAsync(rootOverride, outPathOverride, evaluatorOverride);
+        IEvaluator? evaluatorOverride = null,
+        CancellationToken ct = default)
+        => RunCoreAsync(rootOverride, outPathOverride, evaluatorOverride, ct);
 
     internal static async Task<int> RunCoreAsync(
         string? rootOverride,
         string? outPathOverride,
-        IEvaluator? evaluatorOverride)
+        IEvaluator? evaluatorOverride,
+        CancellationToken ct = default)
     {
         // ── Workspace root canonicalisation ──────────────────────────────────
         if (rootOverride is not null)
@@ -98,12 +100,10 @@ public static class BenchCalibrateCommand
         try
         {
             // The golden JSONL files are embedded in the test assembly.
-            var testAssembly = LoadTestAssembly();
+            var testAssembly = CalibrationGoldenAssembly.TryLocate();
             if (testAssembly is null)
             {
-                Console.Error.WriteLine(
-                    "Could not locate AgentEval.Tests assembly. " +
-                    "Ensure the solution has been built before running calibrate.");
+                Console.Error.WriteLine(CalibrationGoldenAssembly.NotFoundMessage);
                 return 1;
             }
 
@@ -130,7 +130,7 @@ public static class BenchCalibrateCommand
         try
         {
             var runner = new CalibrationRunner(articles, judge);
-            report = await runner.RunAsync(datasets);
+            report = await runner.RunAsync(datasets, ct);
         }
         catch (Exception ex)
         {
@@ -199,23 +199,6 @@ public static class BenchCalibrateCommand
     private static string FormatKappa(double kappa)
         => double.IsNaN(kappa) ? "UNDEFINED" : kappa.ToString("F3", System.Globalization.CultureInfo.InvariantCulture);
 
-    private static Assembly? LoadTestAssembly()
-    {
-        // Try already-loaded assemblies first.
-        var loaded = AppDomain.CurrentDomain.GetAssemblies()
-            .FirstOrDefault(a => a.GetName().Name == "AgentEval.Tests");
-        if (loaded is not null) return loaded;
-
-        // Try to locate the assembly on disk relative to this binary.
-        var thisDir = Path.GetDirectoryName(typeof(BenchCalibrateCommand).Assembly.Location);
-        if (thisDir is null) return null;
-
-        var candidate = Path.Combine(thisDir, "AgentEval.Tests.dll");
-        if (File.Exists(candidate))
-            return Assembly.LoadFrom(candidate);
-
-        return null;
-    }
 
     private static string BuildMarkdownReport(CalibrationReport report)
     {

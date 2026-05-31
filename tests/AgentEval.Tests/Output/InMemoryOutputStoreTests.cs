@@ -126,6 +126,34 @@ public class InMemoryOutputStoreTests
     }
 
     [Fact]
+    public async Task CompleteRun_RecentRunPointer_PopulatesAllAdditiveFields()
+    {
+        // BUG-32: InMemoryOutputStore built RunPointer with only the 4 v1.0 positional args,
+        // leaving Kind/Score/DurationMs/EstimatedCost null — so the documented test double returned
+        // a different shape than FileSystemOutputStore. All four must now be populated.
+        var store = new InMemoryOutputStore();
+        var subject = new SubjectIdentity(SubjectKind.Workflow, "ParitySubject");
+
+        var manifest = await store.StartRunAsync(subject, DefaultContext());
+        var summary = new RunSummary("1.0", manifest.Run.RunId, "PASS",
+            new RunStats(Total: 2, Passed: 1, Failed: 1, Warnings: 0),
+            new Dictionary<string, double> { ["score"] = 0.5 },
+            Cost: new RunCostInfo(EstimatedCost: 0.0123, PromptTokens: 100, CompletionTokens: 50));
+        await store.CompleteRunAsync(manifest, summary);
+
+        var recent = new List<RunPointer>();
+        await foreach (var rp in store.GetRecentRunsAsync())
+            recent.Add(rp);
+
+        var pointer = Assert.Single(recent);
+        Assert.Equal(SubjectKind.Workflow, pointer.Kind);
+        Assert.Equal(0.5, pointer.Score);                 // Passed/Total = 1/2
+        Assert.NotNull(pointer.DurationMs);
+        Assert.True(pointer.DurationMs >= 0);
+        Assert.Equal(0.0123, pointer.EstimatedCost);
+    }
+
+    [Fact]
     public async Task History_AppendAndReadBack()
     {
         var store = new InMemoryOutputStore();

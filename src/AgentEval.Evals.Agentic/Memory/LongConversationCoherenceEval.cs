@@ -75,11 +75,10 @@ public sealed class LongConversationCoherenceEval : IEval
             return EvalResult.Skipped(this,
                 $"LongConversationCoherenceEval requires EvalInput.Metadata[\"{ConversationHistoryHelper.MetadataKey}\"] with at least 1 prior turn.");
 
-        // Synthesize an enriched query that includes the full history for the judge.
-        var enriched = new EvalInput(
-            Query: $"{ConversationHistoryHelper.FormatTranscript(history)}\n\nCurrent user query: {input.Query}",
-            Response: input.Response,
-            Metadata: input.Metadata);
+        // Synthesize an enriched query that includes the full history for the judge — preserving
+        // every other EvalInput field via WithEnrichedQuery (BUG-57).
+        var enriched = ConversationHistoryHelper.WithEnrichedQuery(
+            input, ConversationHistoryHelper.FormatTranscript(history));
 
         return await _inner.EvaluateAsync(enriched, ct);
     }

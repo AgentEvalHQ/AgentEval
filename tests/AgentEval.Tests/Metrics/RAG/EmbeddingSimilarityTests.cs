@@ -13,6 +13,29 @@ namespace AgentEval.Tests;
 public class EmbeddingSimilarityTests
 {
     [Fact]
+    public void CosineSimilarity_ZeroVector_ReturnsZero_NotNaN()
+    {
+        // BUG-10: a zero (or near-zero) embedding makes the cosine denominator 0 → NaN, which
+        // is not sanitized by Math.Clamp and silently poisons downstream scoring/ranking.
+        var zero = new float[] { 0f, 0f, 0f };
+        var normal = new float[] { 1.0f, 2.0f, 3.0f };
+
+        var result = EmbeddingSimilarity.CosineSimilarity(zero, normal);
+
+        Assert.False(float.IsNaN(result), "Cosine similarity with a zero vector must not be NaN.");
+        Assert.Equal(0f, result);
+    }
+
+    [Fact]
+    public void CosineSimilarity_BothZeroVectors_ReturnsZero()
+    {
+        var result = EmbeddingSimilarity.CosineSimilarity(new float[] { 0f, 0f }, new float[] { 0f, 0f });
+
+        Assert.False(float.IsNaN(result));
+        Assert.Equal(0f, result);
+    }
+
+    [Fact]
     public void CosineSimilarity_IdenticalVectors_ReturnsOne()
     {
         // Arrange

@@ -128,6 +128,11 @@ internal static class LlmJsonParser
         {
             foreach (var item in prop.EnumerateArray())
             {
+                // Guard ValueKind: JsonElement.GetString() throws InvalidOperationException on a
+                // non-string item (e.g. a number/object the LLM put in the array). That is NOT a
+                // JsonException, so it escaped the metrics' catch(JsonException) and crashed the
+                // whole evaluation instead of degrading gracefully (BUG-08). Skip non-strings.
+                if (item.ValueKind != JsonValueKind.String) continue;
                 var text = item.GetString();
                 if (!string.IsNullOrEmpty(text))
                 {
@@ -135,10 +140,26 @@ internal static class LlmJsonParser
                 }
             }
         }
-        
+
         return list;
     }
-    
+
+    /// <summary>
+    /// Gets a numeric property as a double, returning <paramref name="defaultValue"/> when the
+    /// property is missing or is not a JSON number. Unlike <see cref="JsonElement.GetDouble()"/>
+    /// this never throws <see cref="InvalidOperationException"/> on a non-number value (BUG-08).
+    /// </summary>
+    public static double GetDouble(JsonElement element, string propertyName, double defaultValue = 0)
+    {
+        if (element.TryGetProperty(propertyName, out var prop)
+            && prop.ValueKind == JsonValueKind.Number
+            && prop.TryGetDouble(out var value))
+        {
+            return value;
+        }
+        return defaultValue;
+    }
+
     /// <summary>
     /// Gets a boolean property value with a default.
     /// </summary>

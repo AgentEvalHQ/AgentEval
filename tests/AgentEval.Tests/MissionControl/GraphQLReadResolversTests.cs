@@ -591,6 +591,27 @@ public class GraphQLReadResolversTests : IClassFixture<SeededMissionControlFacto
     }
 
     [Fact]
+    public async Task GraphQL_CostLimit_RejectsAliasMultipliedExpensiveQuery()
+    {
+        // SEC-11: depth<=10 alone does not stop a request that invokes an expensive resolver many times
+        // via field aliases. The enforced operation-cost analysis (ModifyCostOptions) must reject a query
+        // that fans out far past the cost cap, even though it is shallow.
+        using var client = _factory.CreateClient();
+
+        // 60 aliased subjectsConnection(first: 200) fields — shallow (depth 4) but a huge field cost.
+        var aliases = string.Join("\n", Enumerable.Range(0, 60).Select(i =>
+            $"a{i}: subjectsConnection(first: 200) {{ edges {{ node {{ identity {{ kind name }} }} }} }}"));
+        var query = "{\n" + aliases + "\n}";
+
+        var resp = await client.PostAsJsonAsync("/graphql", new { query });
+        var body = await resp.Content.ReadAsStringAsync();
+
+        // Hot Chocolate returns 200 + GraphQL `errors` on a cost-limit rejection (spec norm).
+        Assert.Contains("errors", body, StringComparison.Ordinal);
+        Assert.Contains("cost", body, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task ComplianceEvidence_FetchesSpecificEvidence()
     {
         // First, find the timestamp of the seeded gdpr evidence via the matrix endpoint.

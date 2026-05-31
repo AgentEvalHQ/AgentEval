@@ -5,6 +5,14 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+
+    <!-- MNT-04: enable .NET analyzers + code-style enforcement so CA / nullable / IDE correctness
+         findings surface in the build (and in CI logs / IDE) instead of accumulating silently. Kept
+         NON-FATAL on purpose — TreatWarningsAsErrors stays false above, so these are warnings, not build
+         breaks; flipping warnings-as-errors is a separate, larger cleanup once the backlog is burned down. -->
+    <EnableNETAnalyzers>true</EnableNETAnalyzers>
+    <AnalysisLevel>latest</AnalysisLevel>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
     
     <!-- Generate documentation for all projects -->
     <GenerateDocumentationFile>true</GenerateDocumentationFile>

@@ -8,7 +8,7 @@ using AgentEval.Evals;
 using AgentEval.Compliance.Gdpr.Articles;
 using AgentEval.Compliance.Gdpr.Articles.Building;
 using AgentEval.Compliance.Gdpr.Articles.Loading;
-using AgentEval.Compliance.Gdpr.Composition;
+using AgentEval.Compliance.Core;
 using AgentEval.Compliance.Gdpr.DomainPacks.ChildrensService;
 using AgentEval.Compliance.Gdpr.DomainPacks.Healthcare;
 using AgentEval.Compliance.Gdpr.DomainPacks.HR;

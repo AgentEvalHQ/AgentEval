@@ -38,12 +38,30 @@ public static class WorkflowAssertionsExtensions
 }
 
 /// <summary>
+/// Structured category attached to a workflow-assertion failure at the point it is recorded, so
+/// remediation suggestions are derived from a typed signal rather than by reverse-engineering the
+/// formatted failure message (MNT-08). Adding a new hint here is a compile-time, switch-exhaustive
+/// signal — a message-text edit can no longer silently break suggestions.
+/// </summary>
+public enum WorkflowFailureHint
+{
+    /// <summary>No specific remediation hint.</summary>
+    None = 0,
+    /// <summary>An executor / node / edge ID could not be located.</summary>
+    IdNotFound,
+    /// <summary>A duration / timing budget was exceeded.</summary>
+    Timing,
+    /// <summary>An execution-path / routing expectation was not met.</summary>
+    ExecutionPath,
+}
+
+/// <summary>
 /// Fluent assertion builder for workflow execution results.
 /// </summary>
 public class WorkflowAssertionBuilder
 {
     private readonly WorkflowExecutionResult _result;
-    private readonly List<(string Message, string? Because)> _failures = [];
+    private readonly List<(string Message, string? Because, WorkflowFailureHint Hint)> _failures = [];
     private string? _currentBecause;
 
     /// <summary>
@@ -153,7 +171,7 @@ public class WorkflowAssertionBuilder
         if (_result.TotalDuration > maxDuration)
         {
             AddFailure($"Expected completion within {maxDuration.TotalSeconds:F1}s " +
-                          $"but took {_result.TotalDuration.TotalSeconds:F1}s");
+                          $"but took {_result.TotalDuration.TotalSeconds:F1}s", WorkflowFailureHint.Timing);
         }
         return this;
     }
@@ -218,7 +236,21 @@ public class WorkflowAssertionBuilder
     public WorkflowAssertionBuilder HaveFinalOutputMatching(string pattern, string? because = null)
     {
         _currentBecause = because;
-        if (!System.Text.RegularExpressions.Regex.IsMatch(_result.FinalOutput, pattern))
+        bool matched;
+        try
+        {
+            // Bounded to avoid ReDoS hangs on a catastrophic pattern + adversarial output (SEC-07).
+            matched = System.Text.RegularExpressions.Regex.IsMatch(
+                _result.FinalOutput, pattern,
+                System.Text.RegularExpressions.RegexOptions.None, TimeSpan.FromSeconds(1));
+        }
+        catch (System.Text.RegularExpressions.RegexMatchTimeoutException)
+        {
+            AddFailure($"Final-output pattern '{pattern}' could not be evaluated: regex timed out " +
+                          "(possible catastrophic backtracking / ReDoS).");
+            return this;
+        }
+        if (!matched)
         {
             AddFailure($"Expected final output to match pattern '{pattern}' " +
                           $"but output was: \"{Truncate(_result.FinalOutput, 100)}\"");
@@ -491,7 +523,7 @@ public class WorkflowAssertionBuilder
             d.SelectedEdgeId.Equals(selectedEdgeId, StringComparison.OrdinalIgnoreCase)))
         {
             AddFailure($"Expected routing decision from '{deciderExecutorId}' selecting '{selectedEdgeId}' " +
-                          $"but it was not found");
+                          $"but it was not found", WorkflowFailureHint.IdNotFound);
         }
         return this;
     }
@@ -508,7 +540,7 @@ public class WorkflowAssertionBuilder
         if (!actualPath.SequenceEqual(expectedPath, StringComparer.OrdinalIgnoreCase))
         {
             AddFailure($"Expected execution path [{string.Join(" → ", expectedPath)}] " +
-                          $"but actual path was [{string.Join(" → ", actualPath)}]");
+                          $"but actual path was [{string.Join(" → ", actualPath)}]", WorkflowFailureHint.ExecutionPath);
         }
         return this;
     }
@@ -544,7 +576,7 @@ public class WorkflowAssertionBuilder
         if (missingNodes.Count > 0)
         {
             AddFailure($"Expected nodes [{string.Join(", ", missingNodes)}] not found in graph. " +
-                          $"Available nodes: [{string.Join(", ", graphNodeIds)}]");
+                          $"Available nodes: [{string.Join(", ", graphNodeIds)}]", WorkflowFailureHint.IdNotFound);
         }
         return this;
     }
@@ -649,24 +681,42 @@ public class WorkflowAssertionBuilder
     /// <summary>
     /// Get the list of failure details including 'because' context.
     /// </summary>
-    public IReadOnlyList<(string Message, string? Because)> FailureDetails => _failures;
+    public IReadOnlyList<(string Message, string? Because)> FailureDetails =>
+        _failures.Select(f => (f.Message, f.Because)).ToList();
 
-    internal void AddFailure(string failure) => _failures.Add((failure, _currentBecause));
+    internal void AddFailure(string failure) => AddFailure(failure, WorkflowFailureHint.None);
+
+    internal void AddFailure(string failure, WorkflowFailureHint hint) =>
+        _failures.Add((failure, _currentBecause, hint));
 
     private IReadOnlyList<string>? GetSuggestions()
     {
+        // MNT-08: derive suggestions from the structured hint recorded with each failure, not from
+        // substring-matching the formatted message. The old text match required both "took" AND
+        // "expected under", but the workflow-level HaveCompletedWithin message emits "but took …s" with
+        // no "expected under", so its timing suggestion was unreachable. A typed hint cannot drift out
+        // of sync with message wording.
         var suggestions = new List<string>();
-        
-        foreach (var (message, _) in _failures)
+
+        foreach (var (_, _, hint) in _failures)
         {
-            if (message.Contains("not found"))
-                suggestions.Add("Verify the executor or node ID matches the workflow configuration");
-            if (message.Contains("took") && message.Contains("expected under"))
-                suggestions.Add("Consider increasing timeout or optimizing executor performance");
-            if (message.Contains("execution path"))
-                suggestions.Add("Check workflow routing logic and edge conditions");
+            switch (hint)
+            {
+                case WorkflowFailureHint.IdNotFound:
+                    suggestions.Add("Verify the executor or node ID matches the workflow configuration");
+                    break;
+                case WorkflowFailureHint.Timing:
+                    suggestions.Add("Consider increasing timeout or optimizing executor performance");
+                    break;
+                case WorkflowFailureHint.ExecutionPath:
+                    suggestions.Add("Check workflow routing logic and edge conditions");
+                    break;
+                case WorkflowFailureHint.None:
+                default:
+                    break;
+            }
         }
-        
+
         return suggestions.Count > 0 ? suggestions.Distinct().ToList() : null;
     }
 
@@ -705,20 +755,21 @@ public class ExecutorStepAssertionBuilder
         return this;
     }
 
-    private void AddFailure(string message)
+    private void AddFailure(string message, WorkflowFailureHint hint = WorkflowFailureHint.None)
     {
         // Append because to message if available
-        var fullMessage = !string.IsNullOrEmpty(_currentBecause) 
+        var fullMessage = !string.IsNullOrEmpty(_currentBecause)
             ? $"{message} because {_currentBecause}"
             : message;
-        _parent.AddFailure(fullMessage);
+        _parent.AddFailure(fullMessage, hint);
         _currentBecause = null; // Reset after use
     }
 
     /// <summary>
     /// Adds a failure message from a child assertion builder (e.g., ExecutorToolCallAssertionBuilder).
     /// </summary>
-    internal void AddFailureFromChild(string message) => _parent.AddFailure(message);
+    internal void AddFailureFromChild(string message, WorkflowFailureHint hint = WorkflowFailureHint.None)
+        => _parent.AddFailure(message, hint);
 
     /// <summary>
     /// Assert the executor's output contains a string.
@@ -732,7 +783,7 @@ public class ExecutorStepAssertionBuilder
         if (because != null) _currentBecause = because;
         if (_step == null)
         {
-            AddFailure($"Executor '{_executorId}' was not found");
+            AddFailure($"Executor '{_executorId}' was not found", WorkflowFailureHint.IdNotFound);
         }
         else
         {
@@ -757,12 +808,12 @@ public class ExecutorStepAssertionBuilder
         if (because != null) _currentBecause = because;
         if (_step == null)
         {
-            AddFailure($"Executor '{_executorId}' was not found");
+            AddFailure($"Executor '{_executorId}' was not found", WorkflowFailureHint.IdNotFound);
         }
         else if (_step.Duration > maxDuration)
         {
             AddFailure($"Executor '{_executorId}' took {_step.Duration.TotalMilliseconds:F0}ms, " +
-                               $"expected under {maxDuration.TotalMilliseconds:F0}ms");
+                               $"expected under {maxDuration.TotalMilliseconds:F0}ms", WorkflowFailureHint.Timing);
         }
         return this;
     }
@@ -797,7 +848,7 @@ public class ExecutorStepAssertionBuilder
         ToolCallRecord? call = null;
         if (_step == null)
         {
-            AddFailure($"Executor '{_executorId}' was not found");
+            AddFailure($"Executor '{_executorId}' was not found", WorkflowFailureHint.IdNotFound);
         }
         else
         {
@@ -825,7 +876,7 @@ public class ExecutorStepAssertionBuilder
         if (because != null) _currentBecause = because;
         if (_step == null)
         {
-            AddFailure($"Executor '{_executorId}' was not found");
+            AddFailure($"Executor '{_executorId}' was not found", WorkflowFailureHint.IdNotFound);
         }
         else
         {
@@ -852,7 +903,7 @@ public class ExecutorStepAssertionBuilder
         if (because != null) _currentBecause = because;
         if (_step == null)
         {
-            AddFailure($"Executor '{_executorId}' was not found");
+            AddFailure($"Executor '{_executorId}' was not found", WorkflowFailureHint.IdNotFound);
         }
         else
         {
@@ -894,7 +945,7 @@ public class ExecutorStepAssertionBuilder
         if (because != null) _currentBecause = because;
         if (_step == null)
         {
-            AddFailure($"Executor '{_executorId}' was not found");
+            AddFailure($"Executor '{_executorId}' was not found", WorkflowFailureHint.IdNotFound);
         }
         else if (string.IsNullOrWhiteSpace(_step.Output))
         {
@@ -913,7 +964,7 @@ public class ExecutorStepAssertionBuilder
         if (because != null) _currentBecause = because;
         if (_step == null)
         {
-            AddFailure($"Executor '{_executorId}' was not found");
+            AddFailure($"Executor '{_executorId}' was not found", WorkflowFailureHint.IdNotFound);
         }
         else
         {
@@ -942,7 +993,7 @@ public class ExecutorStepAssertionBuilder
         if (because != null) _currentBecause = because;
         if (_step == null)
         {
-            AddFailure($"Executor '{_executorId}' was not found");
+            AddFailure($"Executor '{_executorId}' was not found", WorkflowFailureHint.IdNotFound);
         }
         else if (!_step.WasConditionallyRouted)
         {
@@ -961,7 +1012,7 @@ public class ExecutorStepAssertionBuilder
         if (because != null) _currentBecause = because;
         if (_step == null)
         {
-            AddFailure($"Executor '{_executorId}' was not found");
+            AddFailure($"Executor '{_executorId}' was not found", WorkflowFailureHint.IdNotFound);
         }
         else if (!_step.IsParallelBranch)
         {
@@ -981,7 +1032,7 @@ public class ExecutorStepAssertionBuilder
         if (because != null) _currentBecause = because;
         if (_step == null)
         {
-            AddFailure($"Executor '{_executorId}' was not found");
+            AddFailure($"Executor '{_executorId}' was not found", WorkflowFailureHint.IdNotFound);
         }
         else if (!string.Equals(_step.ParallelBranchId, branchId, StringComparison.OrdinalIgnoreCase))
         {
@@ -1000,7 +1051,7 @@ public class ExecutorStepAssertionBuilder
         if (because != null) _currentBecause = because;
         if (_step == null)
         {
-            AddFailure($"Executor '{_executorId}' was not found");
+            AddFailure($"Executor '{_executorId}' was not found", WorkflowFailureHint.IdNotFound);
         }
         else if (_step.IncomingEdge == null)
         {
@@ -1020,7 +1071,7 @@ public class ExecutorStepAssertionBuilder
         if (because != null) _currentBecause = because;
         if (_step == null)
         {
-            AddFailure($"Executor '{_executorId}' was not found");
+            AddFailure($"Executor '{_executorId}' was not found", WorkflowFailureHint.IdNotFound);
         }
         else
         {
@@ -1048,7 +1099,7 @@ public class ExecutorStepAssertionBuilder
         if (because != null) _currentBecause = because;
         if (_step == null)
         {
-            AddFailure($"Executor '{_executorId}' was not found");
+            AddFailure($"Executor '{_executorId}' was not found", WorkflowFailureHint.IdNotFound);
         }
         else if (_step.IncomingEdge == null)
         {
@@ -1113,8 +1164,21 @@ public class WorkflowToolCallAssertionBuilder
     }
 
     /// <summary>
+    /// Tool calls flattened across all executors in workflow-execution order. The list
+    /// index is the only valid <i>global</i> ordinal: <see cref="ToolCallRecord.Order"/>
+    /// is assigned per-executor and resets to 1 at each executor step, so it cannot be
+    /// compared across executors for workflow-scoped ordering (BUG-13).
+    /// </summary>
+    private List<ToolCallRecord> GlobalToolCallSequence() =>
+        _result.Steps
+            .Where(s => s.HasToolCalls)
+            .SelectMany(s => s.ToolCalls!)
+            .ToList();
+
+    /// <summary>
     /// Assert this tool was called before another tool anywhere in the workflow.
-    /// Uses the tool call Order property for comparison across all executors.
+    /// Comparison uses the global execution position across all executors (not the
+    /// per-executor <see cref="ToolCallRecord.Order"/>, which resets each step).
     /// </summary>
     /// <param name="otherToolName">The tool that should have been called after.</param>
     /// <param name="because">Optional reason for the assertion.</param>
@@ -1123,25 +1187,22 @@ public class WorkflowToolCallAssertionBuilder
     {
         if (_call == null) return this; // Already reported missing
 
-        var allToolCalls = _result.Steps
-            .Where(s => s.HasToolCalls)
-            .SelectMany(s => s.ToolCalls!)
-            .ToList();
-
-        var otherCall = allToolCalls.FirstOrDefault(tc =>
+        var sequence = GlobalToolCallSequence();
+        var thisIndex = sequence.FindIndex(tc => ReferenceEquals(tc, _call));
+        var otherIndex = sequence.FindIndex(tc =>
             tc.Name.Equals(otherToolName, StringComparison.OrdinalIgnoreCase));
 
-        if (otherCall == null)
+        if (otherIndex < 0)
         {
             AddFailure(
                 $"Expected '{_toolName}' to be called before '{otherToolName}' in workflow, " +
                 $"but '{otherToolName}' was never called.",
                 because);
         }
-        else if (_call.Order >= otherCall.Order)
+        else if (thisIndex < 0 || thisIndex >= otherIndex)
         {
             AddFailure(
-                $"Expected '{_toolName}' (#{_call.Order}) to be called before '{otherToolName}' (#{otherCall.Order}) " +
+                $"Expected '{_toolName}' (#{thisIndex + 1}) to be called before '{otherToolName}' (#{otherIndex + 1}) " +
                 $"in workflow.",
                 because);
         }
@@ -1158,25 +1219,22 @@ public class WorkflowToolCallAssertionBuilder
     {
         if (_call == null) return this;
 
-        var allToolCalls = _result.Steps
-            .Where(s => s.HasToolCalls)
-            .SelectMany(s => s.ToolCalls!)
-            .ToList();
-
-        var otherCall = allToolCalls.FirstOrDefault(tc =>
+        var sequence = GlobalToolCallSequence();
+        var thisIndex = sequence.FindIndex(tc => ReferenceEquals(tc, _call));
+        var otherIndex = sequence.FindIndex(tc =>
             tc.Name.Equals(otherToolName, StringComparison.OrdinalIgnoreCase));
 
-        if (otherCall == null)
+        if (otherIndex < 0)
         {
             AddFailure(
                 $"Expected '{_toolName}' to be called after '{otherToolName}' in workflow, " +
                 $"but '{otherToolName}' was never called.",
                 because);
         }
-        else if (_call.Order <= otherCall.Order)
+        else if (thisIndex < 0 || thisIndex <= otherIndex)
         {
             AddFailure(
-                $"Expected '{_toolName}' (#{_call.Order}) to be called after '{otherToolName}' (#{otherCall.Order}) " +
+                $"Expected '{_toolName}' (#{thisIndex + 1}) to be called after '{otherToolName}' (#{otherIndex + 1}) " +
                 $"in workflow.",
                 because);
         }
@@ -1190,15 +1248,8 @@ public class WorkflowToolCallAssertionBuilder
     [StackTraceHidden]
     public WorkflowToolCallAssertionBuilder WithoutError(string? because = null)
     {
-        if (_call == null) return this;
-
-        if (_call.HasError)
-        {
-            AddFailure(
-                $"Expected '{_toolName}' in workflow to complete without error, " +
-                $"but got: {_call.Exception?.Message ?? "(unknown error)"}",
-                because);
-        }
+        if (_call != null)
+            WorkflowToolCallChecks.WithoutError(_call, _toolName, "in workflow", because, (m, b) => AddFailure(m, b));
         return this;
     }
 
@@ -1211,36 +1262,8 @@ public class WorkflowToolCallAssertionBuilder
     [StackTraceHidden]
     public WorkflowToolCallAssertionBuilder WithArgument(string paramName, object expectedValue, string? because = null)
     {
-        if (_call == null) return this;
-
-        object? actualValue = null;
-        var hasArgument = _call.Arguments?.TryGetValue(paramName, out actualValue) ?? false;
-
-        if (!hasArgument)
-        {
-            var available = _call.Arguments?.Keys.Any() == true
-                ? string.Join(", ", _call.Arguments.Keys)
-                : "(none)";
-            AddFailure(
-                $"Expected '{_toolName}' in workflow to have argument '{paramName}', " +
-                $"but available arguments: [{available}]",
-                because);
-        }
-        else
-        {
-            var actualStr = actualValue is System.Text.Json.JsonElement je
-                ? je.GetRawText().Trim('"')
-                : actualValue?.ToString();
-            var expectedStr = expectedValue?.ToString();
-
-            if (!string.Equals(actualStr, expectedStr, StringComparison.Ordinal))
-            {
-                AddFailure(
-                    $"Expected '{_toolName}' in workflow argument '{paramName}' = \"{expectedValue}\" " +
-                    $"but was \"{actualValue}\"",
-                    because);
-            }
-        }
+        if (_call != null)
+            WorkflowToolCallChecks.WithArgument(_call, _toolName, "in workflow", paramName, expectedValue, because, (m, b) => AddFailure(m, b));
         return this;
     }
 
@@ -1253,32 +1276,8 @@ public class WorkflowToolCallAssertionBuilder
     [StackTraceHidden]
     public WorkflowToolCallAssertionBuilder WithArgumentContaining(string paramName, string substring, string? because = null)
     {
-        if (_call == null) return this;
-
-        object? actualValue = null;
-        var hasArgument = _call.Arguments?.TryGetValue(paramName, out actualValue) ?? false;
-
-        if (!hasArgument)
-        {
-            AddFailure(
-                $"Expected '{_toolName}' in workflow to have argument '{paramName}' containing " +
-                $"'{substring}', but argument was not found.",
-                because);
-        }
-        else
-        {
-            var actualStr = actualValue is System.Text.Json.JsonElement je
-                ? je.GetString()
-                : actualValue?.ToString();
-
-            if (actualStr == null || !actualStr.Contains(substring, StringComparison.OrdinalIgnoreCase))
-            {
-                AddFailure(
-                    $"Expected '{_toolName}' in workflow argument '{paramName}' to contain " +
-                    $"'{substring}' but was \"{Truncate(actualStr ?? "(null)", 100)}\"",
-                    because);
-            }
-        }
+        if (_call != null)
+            WorkflowToolCallChecks.WithArgumentContaining(_call, _toolName, "in workflow", paramName, substring, because, (m, b) => AddFailure(m, b));
         return this;
     }
 
@@ -1290,16 +1289,8 @@ public class WorkflowToolCallAssertionBuilder
     [StackTraceHidden]
     public WorkflowToolCallAssertionBuilder WithResultContaining(string substring, string? because = null)
     {
-        if (_call == null) return this;
-
-        var resultStr = _call.Result?.ToString();
-        if (resultStr == null || !resultStr.Contains(substring, StringComparison.OrdinalIgnoreCase))
-        {
-            AddFailure(
-                $"Expected '{_toolName}' in workflow result to contain '{substring}' " +
-                $"but was \"{Truncate(resultStr ?? "(null)", 100)}\"",
-                because);
-        }
+        if (_call != null)
+            WorkflowToolCallChecks.WithResultContaining(_call, _toolName, "in workflow", substring, because, (m, b) => AddFailure(m, b));
         return this;
     }
 
@@ -1312,23 +1303,8 @@ public class WorkflowToolCallAssertionBuilder
     [StackTraceHidden]
     public WorkflowToolCallAssertionBuilder WithDurationUnder(TimeSpan max, string? because = null)
     {
-        if (_call == null) return this;
-
-        if (!_call.HasTiming)
-        {
-            System.Diagnostics.Debug.WriteLine(
-                $"[AgentEval] Skipping duration assertion for '{_toolName}' in workflow " +
-                "- timing not available.");
-            return this;
-        }
-
-        if (_call.Duration > max)
-        {
-            AddFailure(
-                $"Expected '{_toolName}' in workflow duration under {max.TotalMilliseconds:F0}ms " +
-                $"but was {_call.Duration!.Value.TotalMilliseconds:F0}ms",
-                because);
-        }
+        if (_call != null)
+            WorkflowToolCallChecks.WithDurationUnder(_call, _toolName, "in workflow", max, because, (m, b) => AddFailure(m, b));
         return this;
     }
 
@@ -1337,19 +1313,12 @@ public class WorkflowToolCallAssertionBuilder
     /// </summary>
     public WorkflowAssertionBuilder And() => _parent;
 
-    private void AddFailure(string message, string? because)
+    private void AddFailure(string message, string? because, WorkflowFailureHint hint = WorkflowFailureHint.None)
     {
         var fullMessage = !string.IsNullOrEmpty(because)
             ? $"{message} because {because}"
             : message;
-        _parent.AddFailure(fullMessage);
-    }
-
-    private static string Truncate(string text, int maxLength)
-    {
-        if (string.IsNullOrEmpty(text)) return "(empty)";
-        if (text.Length <= maxLength) return text;
-        return text[..(maxLength - 3)] + "...";
+        _parent.AddFailure(fullMessage, hint);
     }
 }
 
@@ -1462,15 +1431,8 @@ public class ExecutorToolCallAssertionBuilder
     [StackTraceHidden]
     public ExecutorToolCallAssertionBuilder WithoutError(string? because = null)
     {
-        if (_call == null) return this;
-
-        if (_call.HasError)
-        {
-            AddFailure(
-                $"Expected '{_toolName}' in executor '{_executorId}' to complete without error, " +
-                $"but got: {_call.Exception?.Message ?? "(unknown error)"}",
-                because);
-        }
+        if (_call != null)
+            WorkflowToolCallChecks.WithoutError(_call, _toolName, $"in executor '{_executorId}'", because, (m, b) => AddFailure(m, b));
         return this;
     }
 
@@ -1483,36 +1445,8 @@ public class ExecutorToolCallAssertionBuilder
     [StackTraceHidden]
     public ExecutorToolCallAssertionBuilder WithArgument(string paramName, object expectedValue, string? because = null)
     {
-        if (_call == null) return this;
-
-        object? actualValue = null;
-        var hasArgument = _call.Arguments?.TryGetValue(paramName, out actualValue) ?? false;
-
-        if (!hasArgument)
-        {
-            var available = _call.Arguments?.Keys.Any() == true
-                ? string.Join(", ", _call.Arguments.Keys)
-                : "(none)";
-            AddFailure(
-                $"Expected '{_toolName}' in executor '{_executorId}' to have argument '{paramName}', " +
-                $"but available arguments: [{available}]",
-                because);
-        }
-        else
-        {
-            var actualStr = actualValue is System.Text.Json.JsonElement je
-                ? je.GetRawText().Trim('"')
-                : actualValue?.ToString();
-            var expectedStr = expectedValue?.ToString();
-
-            if (!string.Equals(actualStr, expectedStr, StringComparison.Ordinal))
-            {
-                AddFailure(
-                    $"Expected '{_toolName}' in executor '{_executorId}' argument '{paramName}' = \"{expectedValue}\" " +
-                    $"but was \"{actualValue}\"",
-                    because);
-            }
-        }
+        if (_call != null)
+            WorkflowToolCallChecks.WithArgument(_call, _toolName, $"in executor '{_executorId}'", paramName, expectedValue, because, (m, b) => AddFailure(m, b));
         return this;
     }
 
@@ -1525,32 +1459,8 @@ public class ExecutorToolCallAssertionBuilder
     [StackTraceHidden]
     public ExecutorToolCallAssertionBuilder WithArgumentContaining(string paramName, string substring, string? because = null)
     {
-        if (_call == null) return this;
-
-        object? actualValue = null;
-        var hasArgument = _call.Arguments?.TryGetValue(paramName, out actualValue) ?? false;
-
-        if (!hasArgument)
-        {
-            AddFailure(
-                $"Expected '{_toolName}' in executor '{_executorId}' to have argument '{paramName}' containing " +
-                $"'{substring}', but argument was not found.",
-                because);
-        }
-        else
-        {
-            var actualStr = actualValue is System.Text.Json.JsonElement je
-                ? je.GetString()
-                : actualValue?.ToString();
-
-            if (actualStr == null || !actualStr.Contains(substring, StringComparison.OrdinalIgnoreCase))
-            {
-                AddFailure(
-                    $"Expected '{_toolName}' in executor '{_executorId}' argument '{paramName}' to contain " +
-                    $"'{substring}' but was \"{Truncate(actualStr ?? "(null)", 100)}\"",
-                    because);
-            }
-        }
+        if (_call != null)
+            WorkflowToolCallChecks.WithArgumentContaining(_call, _toolName, $"in executor '{_executorId}'", paramName, substring, because, (m, b) => AddFailure(m, b));
         return this;
     }
 
@@ -1562,16 +1472,8 @@ public class ExecutorToolCallAssertionBuilder
     [StackTraceHidden]
     public ExecutorToolCallAssertionBuilder WithResultContaining(string substring, string? because = null)
     {
-        if (_call == null) return this;
-
-        var resultStr = _call.Result?.ToString();
-        if (resultStr == null || !resultStr.Contains(substring, StringComparison.OrdinalIgnoreCase))
-        {
-            AddFailure(
-                $"Expected '{_toolName}' in executor '{_executorId}' result to contain '{substring}' " +
-                $"but was \"{Truncate(resultStr ?? "(null)", 100)}\"",
-                because);
-        }
+        if (_call != null)
+            WorkflowToolCallChecks.WithResultContaining(_call, _toolName, $"in executor '{_executorId}'", substring, because, (m, b) => AddFailure(m, b));
         return this;
     }
 
@@ -1584,23 +1486,8 @@ public class ExecutorToolCallAssertionBuilder
     [StackTraceHidden]
     public ExecutorToolCallAssertionBuilder WithDurationUnder(TimeSpan max, string? because = null)
     {
-        if (_call == null) return this;
-
-        if (!_call.HasTiming)
-        {
-            System.Diagnostics.Debug.WriteLine(
-                $"[AgentEval] Skipping duration assertion for '{_toolName}' in executor '{_executorId}' " +
-                "- timing not available.");
-            return this;
-        }
-
-        if (_call.Duration > max)
-        {
-            AddFailure(
-                $"Expected '{_toolName}' in executor '{_executorId}' duration under {max.TotalMilliseconds:F0}ms " +
-                $"but was {_call.Duration!.Value.TotalMilliseconds:F0}ms",
-                because);
-        }
+        if (_call != null)
+            WorkflowToolCallChecks.WithDurationUnder(_call, _toolName, $"in executor '{_executorId}'", max, because, (m, b) => AddFailure(m, b));
         return this;
     }
 
@@ -1628,19 +1515,12 @@ public class ExecutorToolCallAssertionBuilder
     /// </remarks>
     public WorkflowAssertionBuilder Done() => _parent.And();
 
-    private void AddFailure(string message, string? because)
+    private void AddFailure(string message, string? because, WorkflowFailureHint hint = WorkflowFailureHint.None)
     {
         var fullMessage = !string.IsNullOrEmpty(because)
             ? $"{message} because {because}"
             : message;
-        _parent.AddFailureFromChild(fullMessage);
-    }
-
-    private static string Truncate(string text, int maxLength)
-    {
-        if (string.IsNullOrEmpty(text)) return "(empty)";
-        if (text.Length <= maxLength) return text;
-        return text[..(maxLength - 3)] + "...";
+        _parent.AddFailureFromChild(fullMessage, hint);
     }
 }
 
@@ -1793,12 +1673,12 @@ public class EdgeAssertionBuilder
         return this;
     }
 
-    private void AddFailure(string message)
+    private void AddFailure(string message, WorkflowFailureHint hint = WorkflowFailureHint.None)
     {
-        var fullMessage = !string.IsNullOrEmpty(_currentBecause) 
+        var fullMessage = !string.IsNullOrEmpty(_currentBecause)
             ? $"{message} because {_currentBecause}"
             : message;
-        _parent.AddFailure(fullMessage);
+        _parent.AddFailure(fullMessage, hint);
         _currentBecause = null;
     }
 
@@ -1828,7 +1708,7 @@ public class EdgeAssertionBuilder
         if (because != null) _currentBecause = because;
         if (_edge == null)
         {
-            AddFailure($"Edge '{_sourceId}' → '{_targetId}' was not found");
+            AddFailure($"Edge '{_sourceId}' → '{_targetId}' was not found", WorkflowFailureHint.IdNotFound);
         }
         else if (_edge.EdgeType != expectedType)
         {
@@ -1848,7 +1728,7 @@ public class EdgeAssertionBuilder
         if (because != null) _currentBecause = because;
         if (_edge == null)
         {
-            AddFailure($"Edge '{_sourceId}' → '{_targetId}' was not found");
+            AddFailure($"Edge '{_sourceId}' → '{_targetId}' was not found", WorkflowFailureHint.IdNotFound);
         }
         else if (_edge.ConditionResult != expectedResult)
         {
@@ -1869,7 +1749,7 @@ public class EdgeAssertionBuilder
         if (because != null) _currentBecause = because;
         if (_edge == null)
         {
-            AddFailure($"Edge '{_sourceId}' → '{_targetId}' was not found");
+            AddFailure($"Edge '{_sourceId}' → '{_targetId}' was not found", WorkflowFailureHint.IdNotFound);
         }
         else if (!string.Equals(_edge.MatchedSwitchLabel, expectedLabel, StringComparison.OrdinalIgnoreCase))
         {
@@ -1890,7 +1770,7 @@ public class EdgeAssertionBuilder
         if (because != null) _currentBecause = because;
         if (_edge == null)
         {
-            AddFailure($"Edge '{_sourceId}' → '{_targetId}' was not found");
+            AddFailure($"Edge '{_sourceId}' → '{_targetId}' was not found", WorkflowFailureHint.IdNotFound);
         }
         else if (_edge.TransferredData == null || !_edge.TransferredData.Contains(expectedData, StringComparison.OrdinalIgnoreCase))
         {

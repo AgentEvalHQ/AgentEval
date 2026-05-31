@@ -1,3 +1,4 @@
+using AgentEval.Core;
 using AgentEval.Memory.Engine;
 using AgentEval.Memory.Evaluators;
 using AgentEval.Memory.Models;
@@ -32,6 +33,39 @@ public class ReachBackEvaluatorTests
         Assert.NotNull(result);
         Assert.Equal(2, result.DepthResults.Count);
         Assert.True(result.Duration > TimeSpan.Zero);
+    }
+
+    [Fact]
+    public async Task EvaluateAsync_WhenRunnerCancels_PropagatesInsteadOfScoreZeroDepth()
+    {
+        // BUG-07: an OperationCanceledException raised mid-run must propagate, not be swallowed
+        // by the per-depth catch into a fabricated Score=0 DepthResult (which keeps spending
+        // LLM calls on subsequent depths).
+        var judge = new MemoryJudge(new FakeChatClient(), NullLogger<MemoryJudge>.Instance);
+        var evaluator = new ReachBackEvaluator(
+            new CancellingRunner(), judge, NullLogger<ReachBackEvaluator>.Instance);
+        var fact = MemoryFact.Create("My name is Alice");
+        var query = MemoryQuery.Create("What is my name?", fact);
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => evaluator.EvaluateAsync(_agent, fact, query, [2]));
+    }
+
+    /// <summary>Runner that always cancels, to exercise the per-depth cancellation path.</summary>
+    private sealed class CancellingRunner : IMemoryTestRunner
+    {
+        public Task<MemoryEvaluationResult> RunAsync(
+            IEvaluableAgent agent, MemoryTestScenario scenario, CancellationToken cancellationToken = default) =>
+            throw new OperationCanceledException();
+
+        public Task<MemoryEvaluationResult> RunMemoryTestAsync(
+            IEvaluableAgent agent, MemoryTestScenario scenario, CancellationToken cancellationToken = default) =>
+            throw new NotImplementedException();
+
+        public Task<MemoryEvaluationResult> RunMemoryQueriesAsync(
+            IEvaluableAgent agent, IEnumerable<MemoryQuery> queries, string scenarioName,
+            CancellationToken cancellationToken = default) =>
+            throw new NotImplementedException();
     }
 
     [Fact]

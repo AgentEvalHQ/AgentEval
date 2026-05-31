@@ -169,13 +169,32 @@ public sealed class AgentEvalBuilder
         // Create plugin context
         var context = new PluginContextImpl(registry, _logger, _configuration);
 
-        // Initialize plugins in dependency order
+        // Initialize plugins in dependency order. If any InitializeAsync throws, shut down + dispose
+        // the already-initialized plugins in reverse order before rethrowing, so a partial build does
+        // not leak their resources (BUG-40).
         var orderedPlugins = OrderByDependencies(_plugins);
-        foreach (var plugin in orderedPlugins)
+        var initialized = new List<IAgentEvalPlugin>();
+        try
         {
-            _logger.LogDebug($"Initializing plugin: {plugin.Name} v{plugin.Version}");
-            await plugin.InitializeAsync(context, cancellationToken);
-            _logger.LogDebug($"Plugin initialized: {plugin.Name}");
+            foreach (var plugin in orderedPlugins)
+            {
+                _logger.LogDebug($"Initializing plugin: {plugin.Name} v{plugin.Version}");
+                await plugin.InitializeAsync(context, cancellationToken).ConfigureAwait(false);
+                initialized.Add(plugin);
+                _logger.LogDebug($"Plugin initialized: {plugin.Name}");
+            }
+        }
+        catch
+        {
+            for (int i = initialized.Count - 1; i >= 0; i--)
+            {
+                var p = initialized[i];
+                try { await p.ShutdownAsync().ConfigureAwait(false); }
+                catch (Exception ex) { _logger.LogError(ex, $"Error shutting down plugin {p.Name} after failed build"); }
+                try { p.Dispose(); }
+                catch (Exception ex) { _logger.LogError(ex, $"Error disposing plugin {p.Name} after failed build"); }
+            }
+            throw;
         }
 
         // Order transformers by priority
@@ -191,11 +210,18 @@ public sealed class AgentEvalBuilder
     }
 
     /// <summary>
-    /// Builds synchronously (blocks until initialization completes).
+    /// Builds synchronously (blocks the calling thread until initialization completes).
     /// </summary>
+    /// <remarks>
+    /// Prefer <see cref="BuildAsync"/>. This blocking overload offloads the async build onto a
+    /// thread-pool thread via <see cref="Task.Run{TResult}(Func{Task{TResult}})"/> so plugin
+    /// <c>InitializeAsync</c> continuations resume on the pool rather than a captured
+    /// <see cref="SynchronizationContext"/> — avoiding the classic sync-over-async deadlock on a
+    /// UI/legacy-ASP.NET thread (PERF-01).
+    /// </remarks>
     public AgentEvalRunner Build()
     {
-        return BuildAsync().GetAwaiter().GetResult();
+        return Task.Run(() => BuildAsync()).GetAwaiter().GetResult();
     }
 
     private static List<IAgentEvalPlugin> OrderByDependencies(List<IAgentEvalPlugin> plugins)
@@ -322,11 +348,11 @@ public sealed class AgentEvalRunner : IAsyncDisposable
         // Run before hooks
         foreach (var plugin in _plugins)
         {
-            await plugin.OnBeforeEvaluationAsync(context, cancellationToken);
+            await plugin.OnBeforeEvaluationAsync(context, cancellationToken).ConfigureAwait(false);
         }
 
         // Run metric
-        var result = await metric.EvaluateAsync(context, cancellationToken);
+        var result = await metric.EvaluateAsync(context, cancellationToken).ConfigureAwait(false);
 
         // Apply transformers
         foreach (var transformer in _transformers)
@@ -338,7 +364,7 @@ public sealed class AgentEvalRunner : IAsyncDisposable
         var results = new List<MetricResult> { result };
         foreach (var plugin in _plugins)
         {
-            await plugin.OnAfterEvaluationAsync(context, results, cancellationToken);
+            await plugin.OnAfterEvaluationAsync(context, results, cancellationToken).ConfigureAwait(false);
         }
 
         _logger.LogMetricResult(result);
@@ -372,14 +398,14 @@ public sealed class AgentEvalRunner : IAsyncDisposable
         // Run before hooks
         foreach (var plugin in _plugins)
         {
-            await plugin.OnBeforeEvaluationAsync(context, cancellationToken);
+            await plugin.OnBeforeEvaluationAsync(context, cancellationToken).ConfigureAwait(false);
         }
 
         // Run all metrics
         foreach (var metricName in metricNames)
         {
             var metric = _registry.GetRequired(metricName);
-            var result = await metric.EvaluateAsync(context, cancellationToken);
+            var result = await metric.EvaluateAsync(context, cancellationToken).ConfigureAwait(false);
 
             // Apply transformers
             foreach (var transformer in _transformers)
@@ -394,7 +420,7 @@ public sealed class AgentEvalRunner : IAsyncDisposable
         // Run after hooks
         foreach (var plugin in _plugins)
         {
-            await plugin.OnAfterEvaluationAsync(context, results, cancellationToken);
+            await plugin.OnAfterEvaluationAsync(context, results, cancellationToken).ConfigureAwait(false);
         }
 
         return results;
@@ -444,11 +470,22 @@ public sealed class AgentEvalRunner : IAsyncDisposable
         {
             try
             {
-                await plugin.ShutdownAsync();
+                await plugin.ShutdownAsync().ConfigureAwait(false);
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, $"Error shutting down plugin {plugin.Name}");
+            }
+
+            // IAgentEvalPlugin extends IDisposable, so a plugin may release native/IDisposable
+            // resources only in Dispose(). ShutdownAsync alone leaked those for process life (BUG-40).
+            try
+            {
+                plugin.Dispose();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error disposing plugin {plugin.Name}");
             }
         }
     }

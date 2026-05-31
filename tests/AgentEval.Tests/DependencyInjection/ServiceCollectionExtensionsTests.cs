@@ -5,6 +5,7 @@
 using AgentEval.Calibration;
 using AgentEval.Comparison;
 using AgentEval.Core;
+using AgentEval.Embeddings;
 using AgentEval.DataLoaders;
 using AgentEval.DependencyInjection;
 using AgentEval.Exporters;
@@ -19,6 +20,83 @@ namespace AgentEval.Tests.DependencyInjection;
 
 public class ServiceCollectionExtensionsTests
 {
+    [Theory]
+    [InlineData(ServiceLifetime.Scoped)]
+    [InlineData(ServiceLifetime.Singleton)]
+    [InlineData(ServiceLifetime.Transient)]
+    public void AddAgentEval_EvaluatorAndEmbeddings_HonorConfiguredLifetime(ServiceLifetime lifetime)
+    {
+        // BUG-41: IEvaluator / IAgentEvalEmbeddings were always Singleton regardless of the
+        // configured lifetime, so a Singleton evaluator wrapping a Scoped/Transient IChatClient /
+        // IEmbeddingGenerator became a captive dependency. They must follow options.ServiceLifetime.
+        var services = new ServiceCollection();
+
+        services.AddAgentEval(o => o.ServiceLifetime = lifetime);
+
+        var evaluator = services.Single(d => d.ServiceType == typeof(IEvaluator));
+        var embeddings = services.Single(d => d.ServiceType == typeof(IAgentEvalEmbeddings));
+        Assert.Equal(lifetime, evaluator.Lifetime);
+        Assert.Equal(lifetime, embeddings.Lifetime);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-5)]
+    public void AddAgentEval_NonPositiveEmbeddingCacheSize_WithCachingEnabled_Throws(int badSize)
+    {
+        // GAP-18: a zero/negative EmbeddingCacheMaxSize bound from config must fail fast rather than
+        // silently disabling/breaking the cache.
+        var services = new ServiceCollection();
+
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            services.AddAgentEval(o =>
+            {
+                o.EnableEmbeddingCaching = true;
+                o.EmbeddingCacheMaxSize = badSize;
+            }));
+    }
+
+    [Fact]
+    public void AddAgentEval_NonPositiveCacheSize_WithCachingDisabled_DoesNotThrow()
+    {
+        // The bound only matters when caching is enabled.
+        var services = new ServiceCollection();
+        var ex = Record.Exception(() =>
+            services.AddAgentEval(o =>
+            {
+                o.EnableEmbeddingCaching = false;
+                o.EmbeddingCacheMaxSize = 0;
+            }));
+        Assert.Null(ex);
+    }
+
+    [Fact]
+    public void AddAgentEval_NoHarness_ResolvingComparer_ThrowsActionableError()
+    {
+        // GAP-08: IStochasticRunner/IModelComparer need IEvaluationHarness, which has no default in
+        // core. Without one, resolving must throw a clear, actionable error (naming how to register
+        // a harness) rather than the cryptic default "Unable to resolve IEvaluationHarness".
+        var services = new ServiceCollection();
+        services.AddAgentEvalSingleton(); // no harness, no factory
+
+        var provider = services.BuildServiceProvider();
+
+        var ex = Assert.Throws<InvalidOperationException>(() => provider.GetRequiredService<IModelComparer>());
+        Assert.Contains("AddAgentEvalMaf", ex.Message); // our guidance, not the default DI message
+    }
+
+    [Fact]
+    public void AddAgentEval_WithHarness_ResolvesComparer()
+    {
+        var services = new ServiceCollection();
+        services.AddSingleton<IEvaluationHarness, FakeTestHarness>();
+        services.AddAgentEvalSingleton();
+
+        var provider = services.BuildServiceProvider();
+
+        Assert.NotNull(provider.GetRequiredService<IModelComparer>());
+    }
+
     [Fact]
     public void AddAgentEval_RegistersCoreServices()
     {

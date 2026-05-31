@@ -160,7 +160,23 @@ public sealed class InMemoryOutputStore : IOutputStore
             }
             list.Add(HistoryEntry.From(updated, summary));
 
-            _recentRuns.Add(new RunPointer(runId, subject.Name, summary.Verdict, manifest.Run.Timestamp));
+            // Populate the additive v1.7 fields (Kind/Score/DurationMs/EstimatedCost) exactly as
+            // FileSystemOutputStore does — all the data is available in-memory here. Leaving them
+            // null made GetRecentRunsAsync return a different RunPointer shape per backend, so a
+            // consumer relying on Score/Duration/Cost/Kind passed against the in-memory test double
+            // while silently getting nulls (BUG-32).
+            var score = summary.Stats.Total > 0
+                ? (double)summary.Stats.Passed / summary.Stats.Total
+                : 0.0;
+            _recentRuns.Add(new RunPointer(
+                RunId: runId,
+                SubjectName: subject.Name,
+                Verdict: summary.Verdict,
+                Timestamp: manifest.Run.Timestamp,
+                Kind: subject.Kind,
+                Score: score,
+                DurationMs: (long)updated.Run.Duration.TotalMilliseconds,
+                EstimatedCost: summary.Cost?.EstimatedCost));
         }
         return Task.CompletedTask;
     }

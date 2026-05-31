@@ -26,10 +26,15 @@ public static class RedTeamIntegration
     /// Runs a quick red team scan with all attacks at Quick intensity.
     /// </summary>
     /// <param name="agent">The agent to scan.</param>
+    /// <param name="includeEvidence">Whether to retain raw attack prompts and agent responses in
+    /// the results (and therefore in any persisted JSON/SARIF report). Defaults to
+    /// <see langword="false"/> so this convenience entry point does not write attack payloads or raw
+    /// responses to disk unless explicitly opted in (SEC-10).</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>Red team scan results.</returns>
     public static Task<RedTeamResult> QuickRedTeamScanAsync(
         this IEvaluableAgent agent,
+        bool includeEvidence = false,
         CancellationToken cancellationToken = default)
     {
         return AttackPipeline
@@ -37,6 +42,7 @@ public static class RedTeamIntegration
             .WithAllAttacks()
             .WithIntensity(Intensity.Quick)
             .WithTimeout(TimeSpan.FromMinutes(5))
+            .WithEvidence(includeEvidence)
             .ScanAsync(agent, cancellationToken);
     }
 
@@ -45,18 +51,22 @@ public static class RedTeamIntegration
     /// </summary>
     /// <param name="agent">The agent to scan.</param>
     /// <param name="progress">Optional progress reporter.</param>
+    /// <param name="includeEvidence">Whether to retain raw attack prompts and agent responses in the
+    /// results (and any persisted report). Defaults to <see langword="false"/> (SEC-10).</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>Red team scan results.</returns>
     public static Task<RedTeamResult> ModerateRedTeamScanAsync(
         this IEvaluableAgent agent,
         IProgress<ScanProgress>? progress = null,
+        bool includeEvidence = false,
         CancellationToken cancellationToken = default)
     {
         var pipeline = AttackPipeline
             .Create()
             .WithAllAttacks()
             .WithIntensity(Intensity.Moderate)
-            .WithTimeout(TimeSpan.FromMinutes(15));
+            .WithTimeout(TimeSpan.FromMinutes(15))
+            .WithEvidence(includeEvidence);
 
         if (progress != null)
         {
@@ -71,18 +81,22 @@ public static class RedTeamIntegration
     /// </summary>
     /// <param name="agent">The agent to scan.</param>
     /// <param name="progress">Optional progress reporter.</param>
+    /// <param name="includeEvidence">Whether to retain raw attack prompts and agent responses in the
+    /// results (and any persisted report). Defaults to <see langword="false"/> (SEC-10).</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>Red team scan results.</returns>
     public static Task<RedTeamResult> ComprehensiveRedTeamScanAsync(
         this IEvaluableAgent agent,
         IProgress<ScanProgress>? progress = null,
+        bool includeEvidence = false,
         CancellationToken cancellationToken = default)
     {
         var pipeline = AttackPipeline
             .Create()
             .WithAllAttacks()
             .WithIntensity(Intensity.Comprehensive)
-            .WithTimeout(TimeSpan.FromMinutes(30));
+            .WithTimeout(TimeSpan.FromMinutes(30))
+            .WithEvidence(includeEvidence);
 
         if (progress != null)
         {
@@ -93,7 +107,9 @@ public static class RedTeamIntegration
     }
 
     /// <summary>
-    /// Runs specific attacks against the agent.
+    /// Runs specific attacks against the agent. Evidence (raw attack prompts / agent responses) is
+    /// not retained — use the <see cref="RedTeamAsync(IEvaluableAgent, ScanOptions, CancellationToken)"/>
+    /// overload with <c>IncludeEvidence = true</c> to opt in (SEC-10).
     /// </summary>
     /// <param name="agent">The agent to scan.</param>
     /// <param name="attacks">Attack types to run.</param>
@@ -107,6 +123,7 @@ public static class RedTeamIntegration
             .WithAttacks(attacks)
             .WithIntensity(Intensity.Moderate)
             .WithTimeout(TimeSpan.FromMinutes(10))
+            .WithEvidence(false)
             .ScanAsync(agent);
     }
 

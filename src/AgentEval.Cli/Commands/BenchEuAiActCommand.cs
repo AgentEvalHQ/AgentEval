@@ -8,7 +8,7 @@ using AgentEval.Evals;
 using AgentEval.Compliance.EuAiAct.Articles;
 using AgentEval.Compliance.EuAiAct.Articles.Building;
 using AgentEval.Compliance.EuAiAct.Articles.Loading;
-using AgentEval.Compliance.EuAiAct.Composition;
+using AgentEval.Compliance.Core;
 using AgentEval.Compliance.EuAiAct.DomainPacks.HighRiskCredit;
 using AgentEval.Compliance.EuAiAct.DomainPacks.HighRiskEducation;
 using AgentEval.Compliance.EuAiAct.DomainPacks.HighRiskEmployment;
@@ -30,8 +30,10 @@ public static class BenchEuAiActCommand
         string preset,
         string subject,
         string? rootOverride,
-        string? inputText) =>
-        RunAsync(preset, subject, rootOverride, inputText, evaluatorOverride: null);
+        string? inputText,
+        string? responseText = null,
+        CancellationToken ct = default) =>
+        RunAsync(preset, subject, rootOverride, inputText, evaluatorOverride: null, responseText: responseText, ct: ct);
 
     /// <summary>Runs the bench eu-ai-act command with optional overrides (used in tests).</summary>
     internal static async Task<int> RunAsync(
@@ -39,7 +41,9 @@ public static class BenchEuAiActCommand
         string subject,
         string? rootOverride,
         string? inputText,
-        IEvaluator? evaluatorOverride)
+        IEvaluator? evaluatorOverride,
+        string? responseText = null,
+        CancellationToken ct = default)
     {
         // ── Workspace setup ──────────────────────────────────────────────────
         if (rootOverride is not null)
@@ -119,16 +123,30 @@ public static class BenchEuAiActCommand
                 "Pass --input '<your prompt>' at the CLI, or supply inputText programmatically.");
             return 1;
         }
-        var agentResponse =
-            "I should clearly identify myself as an AI assistant when interacting with users. " +
-            "For high-risk decisions, I'll defer to human review.";
+        string agentResponse;
+        if (!string.IsNullOrWhiteSpace(responseText))
+        {
+            agentResponse = responseText;
+        }
+        else
+        {
+            // No real response supplied: grade a built-in FIXTURE. Warn loudly — the produced
+            // compliance evidence does NOT reflect the named subject agent (BUG-18).
+            agentResponse =
+                "I should clearly identify myself as an AI assistant when interacting with users. " +
+                "For high-risk decisions, I'll defer to human review.";
+            Console.Error.WriteLine(
+                $"[bench eu-ai-act] WARNING: no --response/--response-file supplied — grading a built-in " +
+                $"FIXTURE response, not a real agent output. The produced compliance evidence does NOT reflect " +
+                $"subject '{subject}'. Pass --response-file <path> (or --response \"...\") with the agent's actual answer.");
+        }
         var evalInput = new EvalInput(Query: inputText, Response: agentResponse);
 
         // ── Run benchmark ────────────────────────────────────────────────────
         var store = new FileSystemOutputStore(agentEvalDir);
         // Workspace hygiene: sweep stale 24h+ sentinels (.invalid.json / .lock
         // / .tmp). Phase-0 0.9: only CLI writer paths sweep; MC does not.
-        await store.SweepStaleSentinelsAsync(TimeSpan.FromHours(24));
+        await store.SweepStaleSentinelsAsync(TimeSpan.FromHours(24), ct);
         var subjectIdentity = new SubjectIdentity(SubjectKind.Agent, subject);
 
         Console.WriteLine($"Running EU AI Act benchmark ({preset}) for subject '{subject}'...");
@@ -138,7 +156,7 @@ public static class BenchEuAiActCommand
         try
         {
             var runner = new EuAiActBenchmarkRunner();
-            (runId, compositeResult) = await runner.RunAsync(store, subjectIdentity, benchmark, evalInput);
+            (runId, compositeResult) = await runner.RunAsync(store, subjectIdentity, benchmark, evalInput, ct: ct);
         }
         catch (Exception ex)
         {
@@ -173,7 +191,7 @@ public static class BenchEuAiActCommand
         }
 
         // Derive output directory (mirrors FileSystemOutputStore path convention)
-        var sanitizedSubject = SanitizeForPath(subject);
+        var sanitizedSubject = FileSystemLayout.Sanitize(subject);
         var ts = evidence.Base.GeneratedAt.ToString("yyyy-MM-dd_HH-mm-ss");
         var outputDir = Path.Combine(agentEvalDir, "compliance", "EU-AI-Act", sanitizedSubject, ts);
         Directory.CreateDirectory(outputDir);
@@ -282,13 +300,6 @@ public static class BenchEuAiActCommand
             kv => (IReadOnlyList<EvalComponent>)kv.Value);
 
         return basePreset.WithExtraScenarios(merged);
-    }
-
-    private static string SanitizeForPath(string name)
-    {
-        var invalid = Path.GetInvalidFileNameChars().Concat(new[] { '/', '\\' }).ToArray();
-        var s = string.Concat(name.Select(c => invalid.Contains(c) ? '-' : c));
-        return s.Trim('.', ' ');
     }
 
 }

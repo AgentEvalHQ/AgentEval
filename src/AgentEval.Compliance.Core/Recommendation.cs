@@ -2,19 +2,20 @@
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 
-namespace AgentEval.Compliance.EuAiAct.Reporting;
+namespace AgentEval.Compliance.Core;
 
 /// <summary>
-/// A single structured recommendation produced by <see cref="RecommendationExtractor"/>.
+/// A single structured remediation recommendation produced by a compliance pack's RecommendationExtractor.
+/// Shared by the GDPR and EU AI Act packs (ARC-01) — the record shape was identical in both.
 /// </summary>
 /// <remarks>
-/// Introduced in v1.1 (task 1.5) to replace the legacy <c>string[]</c> shape. The schema
-/// uses <c>anyOf</c> at the <c>items</c> level so existing <c>*-evidence.json</c> files
-/// written against the v0.8.1-beta strings-only shape still validate.
+/// Introduced in v1.1 (task 1.5) to replace the legacy <c>string[]</c> shape. The evidence schema uses
+/// <c>anyOf</c> at the <c>items</c> level so existing <c>*-evidence.json</c> files written against the
+/// v0.8.1-beta strings-only shape still validate.
 /// </remarks>
 /// <param name="ControlId">
-/// The EU AI Act article control key (e.g. <c>"eu_ai.art14.human_oversight"</c>) for which this
-/// recommendation was generated. Corresponds to the evaluator key on the failed article node.
+/// The regulation control key (e.g. <c>"gdpr.art17.erasure"</c> / <c>"euaiact.art14.human_oversight"</c>)
+/// for which this recommendation was generated. Corresponds to the evaluator key on the failed node.
 /// </param>
 /// <param name="Severity">
 /// Inherited severity of the failed control: one of <c>"low"</c>, <c>"medium"</c>,

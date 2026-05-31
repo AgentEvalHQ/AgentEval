@@ -4,12 +4,13 @@
 
 using AgentEval.Evals;
 
-namespace AgentEval.Compliance.EuAiAct.Reporting;
+namespace AgentEval.Compliance.Core;
 
 /// <summary>
 /// Walks the composite result tree depth-first and returns all leaf
 /// <see cref="EvalResult"/> nodes where <c>Score.Severity == "critical"</c>
 /// and <c>!Score.Passed</c>, ordered by <c>Score.Value</c> ascending (worst first).
+/// Shared by the GDPR and EU AI Act compliance packs (ARC-01) — the implementation was byte-identical.
 /// </summary>
 public sealed class CriticalFindingExtractor
 {

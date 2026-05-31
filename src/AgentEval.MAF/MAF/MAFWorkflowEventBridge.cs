@@ -92,13 +92,6 @@ public static class MAFWorkflowEventBridge
             run = await MAFWorkflows.InProcessExecution
                 .RunStreamingAsync(workflow, new ChatMessage(ChatRole.User, input), cancellationToken: cancellationToken)
                 .ConfigureAwait(false);
-
-            // ChatProtocolExecutor uses a two-phase protocol: messages are accumulated first,
-            // then processed only when a TurnToken is received. RunStreamingAsync does NOT auto-send
-            // a TurnToken (only RunAsync does). We must send it manually.
-            // emitEvents: true ensures executor events are emitted regardless of binding defaults.
-            // Subsequent executors receive the TurnToken automatically via downstream forwarding.
-            await run.TrySendMessageAsync(new MAFWorkflows.TurnToken(emitEvents: true)).ConfigureAwait(false);
         }
         else
         {
@@ -108,7 +101,20 @@ public static class MAFWorkflowEventBridge
                 .ConfigureAwait(false);
         }
 
+        // Register disposal immediately after run is assigned — BEFORE the chat-protocol
+        // TurnToken send below. Previously the send happened inside the if-branch before this
+        // `await using`, so a send failure leaked the in-process workflow run (BUG-50).
         await using var _ = run;
+
+        if (isChatProtocol)
+        {
+            // ChatProtocolExecutor uses a two-phase protocol: messages are accumulated first,
+            // then processed only when a TurnToken is received. RunStreamingAsync does NOT auto-send
+            // a TurnToken (only RunAsync does). We must send it manually.
+            // emitEvents: true ensures executor events are emitted regardless of binding defaults.
+            // Subsequent executors receive the TurnToken automatically via downstream forwarding.
+            await run.TrySendMessageAsync(new MAFWorkflows.TurnToken(emitEvents: true)).ConfigureAwait(false);
+        }
 
         // Watch the MAF event stream and translate each event
         await foreach (var mafEvent in run.WatchStreamAsync(cancellationToken).ConfigureAwait(false))

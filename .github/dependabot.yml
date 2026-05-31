@@ -1,0 +1,40 @@
+# Dependabot configuration (SEC-04).
+# Keeps GitHub Actions (which are SHA-pinned in the workflows) and NuGet dependencies current,
+# so pinning third-party actions to commit SHAs does not leave them frozen on stale versions.
+version: 2
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    commit-message:
+      prefix: "ci"
+    groups:
+      actions:
+        patterns:
+          - "*"
+
+  - package-ecosystem: "nuget"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    commit-message:
+      prefix: "chore"
+    groups:
+      nuget:
+        patterns:
+          - "*"
+
+  # SEC-14: keep the Dockerfile base images (and their pinned digests, once pinned) current. The
+  # Dockerfile uses floating major tags for readability; pin each FROM to a digest and Dependabot
+  # will open PRs to refresh the digests.
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    commit-message:
+      prefix: "chore"
+    groups:
+      docker:
+        patterns:
+          - "*"

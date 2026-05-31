@@ -248,6 +248,46 @@ public class WorkflowTraceTests
         }
     }
 
+    [Fact]
+    public async Task WorkflowTraceRecorder_CopiesPerStepErrorProvenance()
+    {
+        // BUG-35: per-step error provenance (WorkflowExecutionResult.Errors, keyed by ExecutorId)
+        // was never propagated into WorkflowTraceStep.Error, so a failed step recorded no error in
+        // the trace. It must now be mapped.
+        var mockWorkflow = new MockWorkflowAgent(new WorkflowExecutionResult
+        {
+            FinalOutput = "partial",
+            Steps = new List<ExecutorStep>
+            {
+                new() { ExecutorId = "ok-step", Output = "fine", StepIndex = 0, Duration = TimeSpan.FromMilliseconds(10) },
+                new() { ExecutorId = "bad-step", Output = "", StepIndex = 1, Duration = TimeSpan.FromMilliseconds(5) }
+            },
+            Errors = new List<WorkflowError>
+            {
+                new()
+                {
+                    ExecutorId = "bad-step",
+                    Message = "tool blew up",
+                    ExceptionType = "InvalidOperationException",
+                    StackTrace = "at Bad.Step()"
+                }
+            },
+            TotalDuration = TimeSpan.FromMilliseconds(15)
+        });
+
+        await using var recorder = new WorkflowTraceRecorder(mockWorkflow, "err_workflow");
+        await recorder.ExecuteWorkflowAsync("go");
+
+        var trace = recorder.Trace;
+        var okStep = trace.Steps.Single(s => s.ExecutorId == "ok-step");
+        var badStep = trace.Steps.Single(s => s.ExecutorId == "bad-step");
+
+        Assert.Null(okStep.Error); // no error recorded for this executor
+        Assert.NotNull(badStep.Error); // error provenance now survives into the trace (BUG-35)
+        Assert.Equal("tool blew up", badStep.Error!.Message);
+        Assert.Equal("InvalidOperationException", badStep.Error.Type);
+    }
+
     #endregion
 
     #region WorkflowTraceReplayingAgent Tests
@@ -280,6 +320,78 @@ public class WorkflowTraceTests
         Assert.Equal("step1", result.Steps[0].ExecutorId);
         Assert.Equal("Step 1 output", result.Steps[0].Output);
         Assert.Equal(1, replayer.ExecutionCount);
+    }
+
+    [Fact]
+    public async Task WorkflowTraceReplayingAgent_MalformedToolArguments_DoesNotThrow_DegradesToNull()
+    {
+        // BUG-46: a schema-drifted / hand-edited trace with a non-object Arguments JSON (here a
+        // JSON array) must not crash deterministic replay with a JsonException; it degrades to null.
+        var trace = new WorkflowTrace
+        {
+            TraceName = "malformed_args",
+            FinalOutput = "done",
+            Steps = new List<WorkflowTraceStep>
+            {
+                new()
+                {
+                    ExecutorId = "agent1", Output = "out", StepIndex = 0, DurationMs = 10,
+                    ToolCalls = new List<TraceToolCall>
+                    {
+                        new() { Name = "ToolA", Result = "r", Succeeded = true, Arguments = "[1,2,3]" }
+                    }
+                }
+            }
+        };
+        var replayer = new WorkflowTraceReplayingAgent(trace);
+
+        var result = await replayer.ExecuteWorkflowAsync("any"); // must not throw
+
+        var tool = result.Steps[0].ToolCalls![0];
+        Assert.Equal("ToolA", tool.Name);
+        Assert.Null(tool.Arguments); // malformed args degraded to null instead of crashing replay
+    }
+
+    [Fact]
+    public async Task WorkflowTraceReplayingAgent_ReconstructsGlobalToolCallOrder()
+    {
+        // BUG-45: replay hard-coded ToolCallRecord.Order = 0 for every call, making cross-step
+        // tool-ordering assertions meaningless. It now reconstructs a workflow-global 1-based order.
+        var trace = new WorkflowTrace
+        {
+            TraceName = "tool-order",
+            FinalOutput = "done",
+            Steps = new List<WorkflowTraceStep>
+            {
+                new()
+                {
+                    ExecutorId = "s1", Output = "o1", StepIndex = 0,
+                    ToolCalls = new List<TraceToolCall>
+                    {
+                        new() { Name = "A", Result = "r", Succeeded = true },
+                        new() { Name = "B", Result = "r", Succeeded = true },
+                    }
+                },
+                new()
+                {
+                    ExecutorId = "s2", Output = "o2", StepIndex = 1,
+                    ToolCalls = new List<TraceToolCall>
+                    {
+                        new() { Name = "C", Result = "r", Succeeded = true },
+                    }
+                },
+            }
+        };
+        var replayer = new WorkflowTraceReplayingAgent(trace);
+
+        var result = await replayer.ExecuteWorkflowAsync("any");
+
+        var orders = result.Steps
+            .Where(s => s.ToolCalls is { Count: > 0 })
+            .SelectMany(s => s.ToolCalls!)
+            .Select(tc => tc.Order)
+            .ToList();
+        Assert.Equal(new[] { 1, 2, 3 }, orders);
     }
 
     [Fact]
@@ -362,6 +474,43 @@ public class WorkflowTraceTests
         replayer.Reset();
         await Assert.ThrowsAsync<WorkflowTraceReplayMismatchException>(
             () => replayer.ExecuteWorkflowAsync("Different prompt"));
+    }
+
+    // GAP-09 (review follow-up): the workflow replay agent's MismatchBehavior.Warn branch must route the
+    // warning (which includes truncated prompt text) through the configurable OnWarning sink instead of
+    // straight to Console — symmetric with TraceReplayingAgent. (Previously only the non-workflow agent
+    // had a test.)
+    [Fact]
+    public async Task WorkflowTraceReplayingAgent_Warn_RoutesToOnWarningSink()
+    {
+        var trace = new WorkflowTrace
+        {
+            TraceName = "warn_sink",
+            OriginalPrompt = "Expected prompt",
+            FinalOutput = "Result",
+            Steps = new List<WorkflowTraceStep>
+            {
+                new() { ExecutorId = "step1", Output = "Out", StepIndex = 0 }
+            }
+        };
+        var captured = new List<string>();
+        var options = new WorkflowTraceReplayOptions
+        {
+            ValidatePrompt = true,
+            PromptMatchingMode = PromptMatchingMode.Exact,
+            MismatchBehavior = MismatchBehavior.Warn,
+            OnWarning = captured.Add
+        };
+
+        var replayer = new WorkflowTraceReplayingAgent(trace, options);
+
+        // Different prompt → mismatch, but Warn must NOT throw; the warning goes to the sink.
+        var result = await replayer.ExecuteWorkflowAsync("Different prompt");
+
+        Assert.Equal("Result", result.FinalOutput);
+        Assert.Single(captured);
+        Assert.Contains("WorkflowTraceReplayer Warning", captured[0]);
+        Assert.Contains("mismatch", captured[0], StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

@@ -23,9 +23,18 @@ namespace AgentEval.Assertions;
 /// </example>
 public sealed class AgentEvalScope : IDisposable
 {
-    [ThreadStatic]
-    private static AgentEvalScope? _current;
-    
+    // _current uses AsyncLocal (not [ThreadStatic]) so a scope created before an await is still
+    // visible to assertions that run on the continuation thread. With [ThreadStatic] such an
+    // assertion saw no scope and threw immediately — a gotcha for an async framework (MNT-07).
+    // Within a synchronous using-block the behaviour is identical to thread-local.
+    private static readonly AsyncLocal<AgentEvalScope?> _currentScope = new();
+
+    private static AgentEvalScope? _current
+    {
+        get => _currentScope.Value;
+        set => _currentScope.Value = value;
+    }
+
     private readonly AgentEvalScope? _parent;
     private readonly List<AgentEvalAssertionException> _failures = new();
     private readonly string? _context;
@@ -125,16 +134,11 @@ public sealed class AgentEvalScope : IDisposable
         {
             if (_context != null)
             {
-                // Add context to first failure if provided
-                var contextMessage = $"Within scope: {_context}";
-                var firstFailure = _failures[0];
-                
-                // Wrap failures with context
+                // Prefix each collected failure with the scope context.
                 var wrappedFailures = _failures
                     .Select(f => new AgentEvalAssertionException($"[{_context}] {f.Message}"))
-                    .Cast<AgentEvalAssertionException>()
                     .ToList();
-                
+
                 throw new AgentEvalScopeException(wrappedFailures);
             }
             
@@ -151,8 +155,17 @@ public sealed class AgentEvalScope : IDisposable
     }
     
     /// <summary>
-    /// Adds a context description to subsequent failures.
+    /// Opens a <b>new child</b> assertion scope annotated with <paramref name="context"/> and makes
+    /// it current. This does NOT annotate the existing scope — it returns a fresh scope that the
+    /// caller MUST dispose (use it in a <c>using</c> block); failing to dispose it leaves the child
+    /// registered as the current scope and never restores the parent (MNT-07).
     /// </summary>
+    /// <example>
+    /// <code>
+    /// using var outer = new AgentEvalScope();
+    /// using (outer.WithContext("phase 1")) { /* assertions tagged [phase 1] */ }
+    /// </code>
+    /// </example>
     public AgentEvalScope WithContext(string context)
     {
         return new AgentEvalScope(context);

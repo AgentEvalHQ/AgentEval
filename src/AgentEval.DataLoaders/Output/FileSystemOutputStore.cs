@@ -384,8 +384,13 @@ public sealed class FileSystemOutputStore : IOutputStore
                 }
                 catch (System.Text.Json.JsonException ex)
                 {
-                    Console.Error.WriteLine(
-                        $"warning: scenario '{result.Id}' Output looks JSON-shaped (starts with '{{' or '[') but is malformed: {ex.Message}");
+                    // Clearly-structured Output (starts with '{' or '[') that does not even parse as
+                    // JSON is genuine corruption — a truncated write or injected garbage — not the
+                    // schema-looseness T2.6 deliberately tolerates (legitimate structured writers
+                    // always emit well-formed JSON). Fail the write rather than silently persisting a
+                    // broken artifact (GAP-16).
+                    throw new InvalidOperationException(
+                        $"Scenario '{result.Id}' Output looks JSON-shaped (starts with '{{' or '[') but is not valid JSON: {ex.Message}", ex);
                 }
             }
         }
@@ -497,6 +502,9 @@ public sealed class FileSystemOutputStore : IOutputStore
         var historyFile = _layout.HistoryFile(subject);
         if (!File.Exists(historyFile)) yield break;
 
+        // PERF-12 (accept-and-document): reads the whole history.jsonl, then applies the optional date
+        // `range` filter per line below. Per-subject history is short-lined and small in practice; a
+        // streaming read that filters by date while reading is the documented vNext optimisation.
         var lines = await File.ReadAllLinesAsync(historyFile, ct);
         foreach (var line in lines)
         {
@@ -508,8 +516,13 @@ public sealed class FileSystemOutputStore : IOutputStore
             {
                 entry = JsonSerializer.Deserialize<HistoryEntry>(line, _jsonl);
             }
-            catch
+            catch (JsonException ex)
             {
+                // Don't fail the whole stream on a single bad line, but surface the corruption so a
+                // partially-corrupt audit history isn't silently read as a shorter clean one — the
+                // dangerous failure mode for an audit tool (GAP-05). Matches GetRecentRunsAsync.
+                Console.Error.WriteLine(
+                    $"⚠ history.jsonl: skipping malformed line in {historyFile}: {ex.Message}");
                 continue;
             }
 
@@ -706,6 +719,10 @@ public sealed class FileSystemOutputStore : IOutputStore
         var recentFile = _layout.RecentRunsFile;
         if (!File.Exists(recentFile)) yield break;
 
+        // PERF-12 (accept-and-document): reads the whole recent.jsonl, then keeps the tail of `count`.
+        // recent.jsonl holds one short pointer line per run and is regenerated, so the full read is
+        // cheap in practice. A streaming bounded-tail read (ring buffer over ReadLinesAsync) is the
+        // documented vNext optimisation if this file ever grows large.
         var lines = await File.ReadAllLinesAsync(recentFile, ct);
         var pointers = new List<RunPointer>();
 
@@ -825,8 +842,11 @@ public sealed class FileSystemOutputStore : IOutputStore
             {
                 // Could not write the sidecar (disk full, permissions). Rethrow
                 // the original validation error so the caller still gets the
-                // primary signal; the secondary failure is suppressed.
-                throw ex;
+                // primary signal; the secondary failure is suppressed. Use
+                // ExceptionDispatchInfo so the original stack trace / throw site is
+                // preserved rather than reset by `throw ex;` (MNT-10).
+                System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(ex).Throw();
+                throw; // unreachable — keeps the compiler's definite-assignment/flow analysis happy
             }
         }
         await WriteJsonAsync(path, value, ct);
@@ -870,6 +890,15 @@ public sealed class FileSystemOutputStore : IOutputStore
     /// absolute path's SHA-256, plus an in-process <see cref="SemaphoreSlim"/>
     /// to short-circuit when the contention is within one process.
     /// </summary>
+    /// <remarks>
+    /// PERF-12 / cancellation contract: <paramref name="ct"/> cancels the <em>wait</em> to acquire the
+    /// in-process semaphore and the cross-process mutex (the bounded poll loop honours it), but it does
+    /// NOT interrupt the in-flight synchronous <see cref="File.AppendAllText(string,string)"/> once the
+    /// mutex is held. That write runs to completion on purpose: <c>WaitOne</c>/<c>ReleaseMutex</c> require
+    /// the same thread, so the acquire→write→release sequence runs inside one <see cref="Task.Run(Action,CancellationToken)"/>
+    /// with no <c>await</c>, and aborting mid-write would risk a torn JSONL line. Lines are short
+    /// (one record each), so the uninterruptible window is tiny.
+    /// </remarks>
     private async Task AppendJsonlLineAsync<T>(string path, T value, CancellationToken ct)
     {
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
@@ -901,12 +930,28 @@ public sealed class FileSystemOutputStore : IOutputStore
                 bool owned = false;
                 try
                 {
-                    try { owned = crossProc.WaitOne(); }
-                    catch (System.Threading.AbandonedMutexException)
+                    // Bounded, cancellable acquisition. The previous parameterless WaitOne()
+                    // blocked forever if another *live* process held the mutex (no
+                    // AbandonedMutexException ever fires for a hung-but-alive holder), and ct was
+                    // passed only to Task.Run — cancelling scheduling, not the in-flight wait. Poll
+                    // in short slices so ct and an overall deadline are honoured, mirroring the
+                    // subject.json lock's 30s deadline (BUG-31). No await inside this delegate, so
+                    // WaitOne and ReleaseMutex keep their required same-thread affinity.
+                    var deadline = DateTimeOffset.UtcNow + JsonlAppendLockTimeout;
+                    while (!owned)
                     {
-                        // A prior holder exited without releasing — we still
-                        // own the mutex now. Carry on with the append.
-                        owned = true;
+                        ct.ThrowIfCancellationRequested();
+                        try { owned = crossProc.WaitOne(JsonlAppendLockPollInterval); }
+                        catch (System.Threading.AbandonedMutexException)
+                        {
+                            // A prior holder exited without releasing — we still
+                            // own the mutex now. Carry on with the append.
+                            owned = true;
+                        }
+                        if (!owned && DateTimeOffset.UtcNow >= deadline)
+                            throw new TimeoutException(
+                                $"Timed out after {JsonlAppendLockTimeout.TotalSeconds:0}s acquiring the cross-process " +
+                                $"JSONL append lock for '{path}'. Another process may be holding it.");
                     }
                     File.AppendAllText(path, line);
                 }
@@ -920,6 +965,14 @@ public sealed class FileSystemOutputStore : IOutputStore
     }
 
     private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, SemaphoreSlim> s_appendLocks = new(StringComparer.Ordinal);
+
+    /// <summary>Overall deadline for acquiring the cross-process JSONL append mutex (BUG-31),
+    /// mirroring the subject.json lock's 30s budget.</summary>
+    internal static TimeSpan JsonlAppendLockTimeout { get; set; } = TimeSpan.FromSeconds(30);
+
+    /// <summary>Poll slice for the cross-process JSONL append mutex wait — short enough that
+    /// cancellation and the overall deadline are observed promptly (BUG-31).</summary>
+    internal static readonly TimeSpan JsonlAppendLockPollInterval = TimeSpan.FromMilliseconds(50);
 
     private async Task<T?> ReadJsonAsync<T>(string path, CancellationToken ct)
     {
@@ -938,9 +991,21 @@ public sealed class FileSystemOutputStore : IOutputStore
 
     private async Task<SubjectIdentity?> TryLocateRunAsync(string runId, CancellationToken ct)
     {
+        // Defence-in-depth: reject runIds that are not safe single path segments before they are
+        // combined into a filesystem path. Live callers (GraphQL/REST) already gate with
+        // IsSafePathSegment, but the store core was not safe-by-construction — and asymmetric,
+        // since regulation/campaignId ARE validated internally. This closes a path-traversal gap
+        // that a future internal caller (or multi-tenant Mode B) could otherwise reintroduce (SEC-06).
+        if (!FileSystemLayout.IsSafePathSegment(runId))
+            return null;
+
         if (_runSubjectCache.TryGetValue(runId, out var cached))
             return cached;
 
+        // PERF-12 (accept-and-document): on a cache miss this walks every subject directory looking for
+        // the run. Each candidate is gated by a cheap Directory.Exists probe BEFORE any JSON is read, so
+        // the miss path is a stat-only scan and resolved hits are memoised in _runSubjectCache. Resolving
+        // the runId directly via the runs index (instead of a directory walk) is the documented vNext fix.
         foreach (var kind in new[] { SubjectKind.Agent, SubjectKind.Workflow })
         {
             var kindDir = _layout.SubjectKindDir(kind);

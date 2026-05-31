@@ -107,6 +107,25 @@ public class VerbosityConfigurationTests
         Assert.Equal(VerbosityLevel.Detailed, VerbosityConfiguration.Current);
     }
 
+    // MNT-06: the override is flow-scoped (AsyncLocal), not a process-global field. An override set inside
+    // a child async flow must NOT leak back to the parent flow. With the old static field, the child's
+    // SetOverride would mutate the shared field and the parent would observe Full.
+    [Fact]
+    public async Task VerbosityConfiguration_Override_DoesNotLeakFromChildFlowToParent()
+    {
+        VerbosityConfiguration.ClearOverride();
+        Assert.Equal(VerbosityLevel.Detailed, VerbosityConfiguration.Current);
+
+        await Task.Run(() =>
+        {
+            VerbosityConfiguration.SetOverride(VerbosityLevel.Full);
+            Assert.Equal(VerbosityLevel.Full, VerbosityConfiguration.Current); // visible within the child flow
+        });
+
+        // The parent flow is unaffected by the child's override (no cross-flow leakage).
+        Assert.Equal(VerbosityLevel.Detailed, VerbosityConfiguration.Current);
+    }
+
     [Fact]
     public void VerbosityConfiguration_SaveTraceArtifacts_TrueByDefault()
     {

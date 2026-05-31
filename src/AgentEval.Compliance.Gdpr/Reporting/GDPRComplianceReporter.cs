@@ -9,6 +9,7 @@ using AgentEval.Evals;
 using AgentEval.Compliance.Gdpr.Articles;
 using AgentEval.Output;
 using Json.Schema;
+using AgentEval.Compliance.Core;
 
 namespace AgentEval.Compliance.Gdpr.Reporting;
 

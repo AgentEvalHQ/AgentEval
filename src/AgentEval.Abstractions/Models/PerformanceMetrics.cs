@@ -180,16 +180,11 @@ public static class ModelPricing
         if (string.IsNullOrEmpty(modelName))
             return null;
         
-        // Try exact match first, then partial match
-        if (!_pricing.TryGetValue(modelName, out var price))
-        {
-            var match = _pricing.Keys.FirstOrDefault(k => 
-                modelName.Contains(k, StringComparison.OrdinalIgnoreCase));
-            if (match == null)
-                return null;
-            price = _pricing[match];
-        }
-        
+        // ARC-07: exact-then-longest-substring match via the single shared matcher (BUG-11 fix lives there
+        // now, shared with JudgeCostMap.GetRate so the rule cannot drift between the two tables).
+        if (!ModelKeyMatcher.TryMatchLongestFirst(_pricing, modelName, out var price))
+            return null;
+
         return (price.InputPer1K, price.OutputPer1K, price.InputPer1K * 1000, price.OutputPer1K * 1000);
     }
     

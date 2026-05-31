@@ -4,6 +4,7 @@
 
 using AgentEval.Evals;
 using AgentEval.Output;
+using AgentEval.Compliance.Core;
 
 namespace AgentEval.Compliance.EuAiAct.Reporting;
 

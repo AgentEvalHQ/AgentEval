@@ -15,6 +15,12 @@ env:
   DOTNET_CLI_TELEMETRY_OPTOUT: true
   DOTNET_NOLOGO: true
 
+# Least-privilege default token (SEC-03). The publish job pushes to nuget.org via
+# NUGET_API_KEY (a secret, not GITHUB_TOKEN) and only uploads build artifacts, so the
+# default token needs no more than read access to repository contents.
+permissions:
+  contents: read
+
 jobs:
   publish:
     runs-on: ubuntu-latest

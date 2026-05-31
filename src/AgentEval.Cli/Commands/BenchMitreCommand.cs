@@ -34,9 +34,10 @@ public static class BenchMitreCommand
         string subject,
         string? rootOverride,
         string? inputText,
-        bool azureFromEnv = false)
+        bool azureFromEnv = false,
+        CancellationToken ct = default)
     {
-        var (exitCode, _) = await RunAsync(preset, subject, rootOverride, inputText, evaluatorOverride: null, agentOverride: null, azureFromEnv).ConfigureAwait(false);
+        var (exitCode, _) = await RunAsync(preset, subject, rootOverride, inputText, evaluatorOverride: null, agentOverride: null, azureFromEnv, ct).ConfigureAwait(false);
         return exitCode;
     }
 
@@ -60,7 +61,8 @@ public static class BenchMitreCommand
         string? inputText,
         IEvaluator? evaluatorOverride,
         IEvaluableAgent? agentOverride,
-        bool azureFromEnv = false)
+        bool azureFromEnv = false,
+        CancellationToken ct = default)
     {
         // ── Workspace setup ──────────────────────────────────────────────────
         if (rootOverride is not null)
@@ -133,7 +135,7 @@ public static class BenchMitreCommand
 
         // ── Run benchmark ────────────────────────────────────────────────────
         var store = new FileSystemOutputStore(agentEvalDir);
-        await store.SweepStaleSentinelsAsync(TimeSpan.FromHours(24));
+        await store.SweepStaleSentinelsAsync(TimeSpan.FromHours(24), ct);
         var subjectIdentity = new SubjectIdentity(SubjectKind.Agent, subject);
         await store.EnsureSolutionAsync();
         await store.EnsureSubjectAsync(subjectIdentity);
@@ -146,7 +148,7 @@ public static class BenchMitreCommand
         {
             // Single-scan pattern (Phase 6): one pipeline execution; the
             // RedTeamResult feeds both BuildEvalResult and GenerateReport.
-            redTeamResult = await benchmark.ScanAsync(agent);
+            redTeamResult = await benchmark.ScanAsync(agent, ct);
             compositeEval = benchmark.BuildEvalResult(redTeamResult);
         }
         catch (Exception ex)
@@ -202,7 +204,7 @@ public static class BenchMitreCommand
                     ["overallScore"] = compositeEval.Score.Value,
                     ["overallPassRate"] = report.Summary.OverallPassRate / 100.0,
                 });
-            await store.CompleteRunAsync(manifest, summary);
+            await store.CompleteRunAsync(manifest, summary, ct);
             Console.WriteLine($"Persisted run {runId} to {agentEvalDir}");
         }
         catch (Exception ex)
@@ -223,7 +225,7 @@ public static class BenchMitreCommand
         }
 
         // ── Emit JSON + Markdown reports alongside ───────────────────────────
-        var sanitizedSubject = SanitizeForPath(subject);
+        var sanitizedSubject = FileSystemLayout.Sanitize(subject);
         var ts = report.GeneratedAt.ToString("yyyy-MM-dd_HH-mm-ss");
         var outputDir = Path.Combine(agentEvalDir, "compliance", "MITRE-ATLAS", sanitizedSubject, ts);
         Directory.CreateDirectory(outputDir);
@@ -302,29 +304,5 @@ public static class BenchMitreCommand
         };
     }
 
-    private static string SanitizeForPath(string name)
-    {
-        var invalid = Path.GetInvalidFileNameChars().Concat(new[] { '/', '\\' }).ToArray();
-        var s = string.Concat(name.Select(c => invalid.Contains(c) ? '-' : c));
-        return s.Trim('.', ' ');
-    }
-
-    /// <summary>
-    /// Deterministic stub agent used by the CLI when no real target is supplied.
-    /// Always returns a safe refusal — under the MITRE pipeline the heuristic
-    /// evaluators classify these as "resisted" for prompt-injection/jailbreak/PII
-    /// probes, so a default CLI run produces a clean PASS report. Real targets
-    /// override this via the <c>agentOverride</c> parameter on the internal
-    /// <see cref="RunAsync(string,string,string?,string?,IEvaluator?,IEvaluableAgent?,bool)"/> overload.
-    /// </summary>
-    internal sealed class SafeRefusalAgent : IEvaluableAgent
-    {
-        public string Name { get; }
-        public SafeRefusalAgent(string name) { Name = name; }
-        public Task<AgentResponse> InvokeAsync(string prompt, CancellationToken cancellationToken = default)
-            => Task.FromResult(new AgentResponse
-            {
-                Text = "I cannot help with that request. Please rephrase or ask something else."
-            });
-    }
+    // SafeRefusalAgent hoisted to a shared internal type — see SafeRefusalAgent.cs (MNT-02).
 }

@@ -64,7 +64,10 @@ public class ToolUsageAssertions
                     because: because));
         }
         
-        var call = _report.GetCallsByName(toolName).First();
+        // FirstOrDefault (not First): in scope mode FailWith above returns, so when the tool was
+        // not called this would otherwise throw InvalidOperationException on an empty sequence and
+        // crash the whole scope evaluation instead of collecting the soft failure (BUG-15).
+        var call = _report.GetCallsByName(toolName).FirstOrDefault();
         return new ToolCallAssertion(this, _report, call, toolName);
     }
     
@@ -166,41 +169,50 @@ public class ToolUsageAssertions
     [StackTraceHidden]
     public ToolUsageAssertions HaveCallOrder(params string[] expectedOrder)
     {
+        // Subsequence match with a consumed-position cursor. Each expected tool must appear in
+        // the actual call sequence (ordered by Order) strictly AFTER the previously matched call.
+        // The previous implementation resolved every occurrence to GetToolOrder()'s FIRST call,
+        // so a repeated expected tool (e.g. [Search, Book, Search]) mis-validated and
+        // "A then B then A again" was inexpressible (BUG-14).
+        var actualCalls = _report.Calls.OrderBy(c => c.Order).ToList();
+        var cursor = 0; // index of the next unmatched call
+
         for (int i = 0; i < expectedOrder.Length; i++)
         {
             var expectedTool = expectedOrder[i];
-            var actualOrder = _report.GetToolOrder(expectedTool);
-            
-            if (actualOrder == 0)
+
+            var matchIndex = -1;
+            for (int j = cursor; j < actualCalls.Count; j++)
             {
-                var timeline = BuildTimeline();
-                AgentEvalScope.FailWith(
-                    ToolAssertionException.Create(
-                        $"Expected tool '{expectedTool}' at position {i + 1}, but it was never called.",
-                        toolName: expectedTool,
-                        calledTools: _report.UniqueToolNames.ToList(),
-                        expected: $"Tool order: [{string.Join(" → ", expectedOrder)}]",
-                        actual: $"Tool '{expectedTool}' not found in call sequence",
-                        context: timeline));
-            }
-            
-            if (i > 0)
-            {
-                var previousTool = expectedOrder[i - 1];
-                var previousOrder = _report.GetToolOrder(previousTool);
-                
-                if (actualOrder <= previousOrder)
+                if (actualCalls[j].Name.Equals(expectedTool, StringComparison.OrdinalIgnoreCase))
                 {
-                    var timeline = BuildTimeline();
-                    AgentEvalScope.FailWith(
-                        ToolAssertionException.Create(
-                            $"Expected '{expectedTool}' to be called after '{previousTool}', but order was reversed.",
-                            calledTools: _report.UniqueToolNames.ToList(),
-                            expected: $"'{previousTool}' (#{previousOrder}) → '{expectedTool}' (after #{previousOrder})",
-                            actual: $"'{previousTool}' (#{previousOrder}) → '{expectedTool}' (#{actualOrder})",
-                            context: timeline));
+                    matchIndex = j;
+                    break;
                 }
             }
+
+            if (matchIndex < 0)
+            {
+                var timeline = BuildTimeline();
+                var everCalled = actualCalls.Any(c =>
+                    c.Name.Equals(expectedTool, StringComparison.OrdinalIgnoreCase));
+                var message = everCalled
+                    ? $"Expected '{expectedTool}' at position {i + 1} to occur after the previously matched call, " +
+                      "but no further occurrence of it appears later in the call sequence."
+                    : $"Expected tool '{expectedTool}' at position {i + 1}, but it was never called.";
+
+                AgentEvalScope.FailWith(
+                    ToolAssertionException.Create(
+                        message,
+                        toolName: expectedTool,
+                        calledTools: _report.UniqueToolNames.ToList(),
+                        expected: $"Tool order (subsequence): [{string.Join(" → ", expectedOrder)}]",
+                        actual: $"Could not match '{expectedTool}' at/after call #{cursor + 1} in the sequence",
+                        context: timeline));
+                return this; // first failure reported; stop (FailWith may accumulate rather than throw)
+            }
+
+            cursor = matchIndex + 1; // the next expected tool must come strictly after this match
         }
         return this;
     }
@@ -308,16 +320,40 @@ public class ToolUsageAssertions
         ArgumentNullException.ThrowIfNull(pattern);
         ArgumentNullException.ThrowIfNull(because);
         
-        var regex = new Regex(pattern, options);
-        
+        // Bound regex evaluation: a catastrophic-backtracking pattern over attacker-influenced
+        // argument values could otherwise hang the evaluation thread (ReDoS). Matches the
+        // project convention (RegexMatchEvaluator etc.). (SEC-07)
+        var regex = new Regex(pattern, options, TimeSpan.FromSeconds(1));
+
         foreach (var call in _report.Calls)
         {
             if (call.Arguments == null) continue;
-            
+
             foreach (var (argName, argValue) in call.Arguments)
             {
                 var stringValue = argValue?.ToString() ?? "";
-                var match = regex.Match(stringValue);
+                Match match;
+                try
+                {
+                    match = regex.Match(stringValue);
+                }
+                catch (RegexMatchTimeoutException)
+                {
+                    // Fail-closed: a timeout means we could not prove the argument is clean.
+                    AgentEvalScope.FailWith(
+                        BehavioralPolicyViolationException.Create(
+                            message: $"Policy check for tool '{call.Name}' argument '{argName}' could not complete: pattern '{pattern}' timed out (possible catastrophic backtracking / ReDoS).",
+                            policyName: $"NeverPassArgumentMatching({pattern})",
+                            violationType: "RegexTimeout",
+                            violatingAction: $"Regex evaluation exceeded the time budget for argument '{argName}'",
+                            matchedPattern: pattern,
+                            redactedValue: "(not evaluated — regex timed out)",
+                            argumentName: argName,
+                            toolName: call.Name,
+                            because: because,
+                            suggestions: new[] { "Simplify the forbidden-pattern regex to avoid catastrophic backtracking." }));
+                    continue;
+                }
                 if (match.Success)
                 {
                     var redacted = BehavioralPolicyViolationException.RedactSensitiveData(
@@ -348,19 +384,37 @@ public class ToolUsageAssertions
     }
     
     /// <summary>
-    /// Assert that a confirmation step occurred before calling a specific tool.
+    /// Assert that a <b>successful</b> confirmation step occurred before calling a specific tool.
     /// Use for actions that require user approval before execution.
     /// </summary>
     /// <param name="toolName">The tool that requires confirmation before being called.</param>
     /// <param name="because">Required reason for the policy.</param>
-    /// <param name="confirmationToolName">Optional custom confirmation tool name. 
-    /// If not specified, looks for common confirmation tools: Confirm, RequestConfirmation, AskForConfirmation.</param>
+    /// <param name="confirmationToolName">Optional custom confirmation tool name. If not specified,
+    /// the check falls back to a heuristic English-language allowlist
+    /// (<c>Confirm, RequestConfirmation, AskForConfirmation, GetUserApproval, ConfirmAction</c>).
+    /// This default is a best-effort heuristic — pass an explicit name (or
+    /// <paramref name="confirmationMatches"/>) for non-English or domain-specific confirmation
+    /// tools.</param>
+    /// <param name="requireImmediatePrecedence">When <see langword="true"/>, the qualifying
+    /// confirmation must be the call <i>immediately</i> preceding the risky call (not merely some
+    /// earlier call), so an unrelated tool cannot intervene between confirmation and action.</param>
+    /// <param name="confirmationMatches">Optional correlation predicate
+    /// <c>(confirmationCall, riskyCall) =&gt; bool</c>. When supplied, a confirmation counts only if
+    /// the predicate returns <see langword="true"/> — use it to require that the confirmation
+    /// referred to the same target/arguments as the risky call. When <see langword="null"/>, any
+    /// successful confirmation by name qualifies.</param>
     /// <returns>The assertions instance for chaining.</returns>
-    /// <exception cref="BehavioralPolicyViolationException">Thrown when the tool was called without prior confirmation.</exception>
+    /// <exception cref="BehavioralPolicyViolationException">Thrown when the tool was called without a
+    /// prior successful (and, if requested, immediately-preceding/correlated) confirmation.</exception>
+    /// <remarks>
+    /// GAP-06: confirmations that failed (<see cref="ToolCallRecord.HasError"/>) never satisfy the
+    /// gate — a failed approval is not an approval. The default name list is a documented heuristic,
+    /// not an exhaustive contract.
+    /// </remarks>
     /// <example>
     /// <code>
     /// result.ToolUsage!.Should()
-    ///     .MustConfirmBefore("TransferFunds", 
+    ///     .MustConfirmBefore("TransferFunds",
     ///         because: "financial transactions require explicit user confirmation")
     ///     .MustConfirmBefore("DeleteRecord",
     ///         because: "data deletion requires user acknowledgment",
@@ -369,32 +423,57 @@ public class ToolUsageAssertions
     /// </example>
     [StackTraceHidden]
     public ToolUsageAssertions MustConfirmBefore(
-        string toolName, 
+        string toolName,
         string because,
-        string? confirmationToolName = null)
+        string? confirmationToolName = null,
+        bool requireImmediatePrecedence = false,
+        Func<ToolCallRecord, ToolCallRecord, bool>? confirmationMatches = null)
     {
         ArgumentNullException.ThrowIfNull(toolName);
         ArgumentNullException.ThrowIfNull(because);
-        
+
         var targetCalls = _report.GetCallsByName(toolName).ToList();
-        if (targetCalls.Count == 0) 
+        if (targetCalls.Count == 0)
         {
             // Tool wasn't called, policy not applicable
             return this;
         }
-        
-        // Default confirmation tool names to look for
+
+        // Default confirmation tool names to look for. Heuristic English-language allowlist —
+        // documented as best-effort; callers with other naming should pass confirmationToolName
+        // or confirmationMatches (GAP-06).
         var confirmTools = confirmationToolName != null
             ? new[] { confirmationToolName }
             : new[] { "Confirm", "RequestConfirmation", "AskForConfirmation", "GetUserApproval", "ConfirmAction" };
-        
+
         foreach (var targetCall in targetCalls)
         {
-            // Check if any confirmation tool was called BEFORE this call
-            var confirmationFound = _report.Calls
+            // A qualifying confirmation is one that (a) precedes this call, (b) matches the
+            // confirmation-tool name, (c) SUCCEEDED — a failed confirmation is not a confirmation
+            // (GAP-06), and (d) satisfies the optional correlation predicate.
+            var qualifying = _report.Calls
                 .Where(c => c.Order < targetCall.Order)
-                .Any(c => confirmTools.Contains(c.Name, StringComparer.OrdinalIgnoreCase));
-            
+                .Where(c => confirmTools.Contains(c.Name, StringComparer.OrdinalIgnoreCase))
+                .Where(c => !c.HasError)
+                .Where(c => confirmationMatches is null || confirmationMatches(c, targetCall))
+                .ToList();
+
+            bool confirmationFound;
+            if (requireImmediatePrecedence)
+            {
+                // The qualifying confirmation must be the call immediately before the risky one.
+                var immediatelyBefore = _report.Calls
+                    .Where(c => c.Order < targetCall.Order)
+                    .OrderByDescending(c => c.Order)
+                    .FirstOrDefault();
+                confirmationFound = immediatelyBefore is not null
+                    && qualifying.Any(c => c.Order == immediatelyBefore.Order);
+            }
+            else
+            {
+                confirmationFound = qualifying.Count > 0;
+            }
+
             if (!confirmationFound)
             {
                 var timeline = BuildTimeline();
@@ -440,10 +519,13 @@ public class ToolCallAssertion
 {
     private readonly ToolUsageAssertions _parent;
     private readonly ToolUsageReport _report;
-    private readonly ToolCallRecord _call;
+    // Nullable: HaveCalledTool returns this builder even when the tool was NOT called (in scope
+    // mode FailWith records the soft failure and returns), in which case _call is null and the
+    // chained assertions below short-circuit instead of dereferencing null (BUG-15).
+    private readonly ToolCallRecord? _call;
     private readonly string _toolName;
-    
-    internal ToolCallAssertion(ToolUsageAssertions parent, ToolUsageReport report, ToolCallRecord call, string toolName)
+
+    internal ToolCallAssertion(ToolUsageAssertions parent, ToolUsageReport report, ToolCallRecord? call, string toolName)
     {
         _parent = parent;
         _report = report;
@@ -457,6 +539,7 @@ public class ToolCallAssertion
     [StackTraceHidden]
     public ToolCallAssertion BeforeTool(string otherToolName, string? because = null)
     {
+        if (_call is null) return this; // not called → soft-fail already recorded (BUG-15)
         var otherOrder = _report.GetToolOrder(otherToolName);
         if (otherOrder == 0)
         {
@@ -490,6 +573,7 @@ public class ToolCallAssertion
     [StackTraceHidden]
     public ToolCallAssertion AfterTool(string otherToolName, string? because = null)
     {
+        if (_call is null) return this; // not called → soft-fail already recorded (BUG-15)
         var otherOrder = _report.GetToolOrder(otherToolName);
         if (otherOrder == 0)
         {
@@ -524,6 +608,7 @@ public class ToolCallAssertion
     [StackTraceHidden]
     public ToolCallAssertion WithArgument(string paramName, object expectedValue, string? because = null)
     {
+        if (_call is null) return this; // not called → soft-fail already recorded (BUG-15)
         object? actualValue = null;
         var hasArgument = _call.Arguments?.TryGetValue(paramName, out actualValue) ?? false;
         
@@ -544,17 +629,16 @@ public class ToolCallAssertion
             return this; // Return if in scope mode
         }
         
-        var actualStr = actualValue is JsonElement je ? je.GetRawText().Trim('"') : actualValue?.ToString();
-        var expectedStr = expectedValue?.ToString();
-        
-        if (!string.Equals(actualStr, expectedStr, StringComparison.Ordinal))
+        // Type-aware comparison (BUG-21): numbers compare numerically, booleans by value,
+        // strings by their unquoted content — no GetRawText().Trim('"') mangling.
+        if (!ToolArgumentComparison.Matches(actualValue, expectedValue))
         {
             AgentEvalScope.FailWith(
                 ToolAssertionException.Create(
                     $"Expected '{_toolName}' argument '{paramName}' to have a different value.",
                     toolName: _toolName,
                     expected: $"'{paramName}' = \"{expectedValue}\"",
-                    actual: $"'{paramName}' = \"{actualValue}\"",
+                    actual: $"'{paramName}' = \"{ToolArgumentComparison.Canonical(actualValue)}\"",
                     because: because));
         }
         return this;
@@ -567,6 +651,7 @@ public class ToolCallAssertion
     [StackTraceHidden]
     public ToolCallAssertion WithArgumentContaining(string paramName, string substring, string? because = null)
     {
+        if (_call is null) return this; // not called → soft-fail already recorded (BUG-15)
         object? actualValue = null;
         var hasArgument = _call.Arguments?.TryGetValue(paramName, out actualValue) ?? false;
         
@@ -603,6 +688,7 @@ public class ToolCallAssertion
     [StackTraceHidden]
     public ToolCallAssertion WithResultContaining(string substring, string? because = null)
     {
+        if (_call is null) return this; // not called → soft-fail already recorded (BUG-15)
         var resultStr = _call.Result?.ToString();
         
         if (resultStr == null || !resultStr.Contains(substring, StringComparison.OrdinalIgnoreCase))
@@ -623,6 +709,7 @@ public class ToolCallAssertion
     [StackTraceHidden]
     public ToolCallAssertion WithoutError(string? because = null)
     {
+        if (_call is null) return this; // not called → soft-fail already recorded (BUG-15)
         if (_call.HasError)
         {
             AgentEvalScope.FailWith(
@@ -648,6 +735,7 @@ public class ToolCallAssertion
     [StackTraceHidden]
     public ToolCallAssertion WithDurationUnder(TimeSpan max, string? because = null)
     {
+        if (_call is null) return this; // not called → soft-fail already recorded (BUG-15)
         if (!_call.HasTiming)
         {
             // Skip gracefully - timing requires streaming mode

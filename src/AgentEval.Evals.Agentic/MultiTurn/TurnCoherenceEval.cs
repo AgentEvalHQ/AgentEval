@@ -76,10 +76,9 @@ public sealed class TurnCoherenceEval : IEval
                 $"TurnCoherenceEval requires EvalInput.Metadata[\"{ConversationHistoryHelper.MetadataKey}\"] with at least 1 prior turn.");
 
         // Only the immediately-preceding turn is needed (MEDIUM cost tier — small context).
-        var enriched = new EvalInput(
-            Query: $"{ConversationHistoryHelper.FormatPreviousTurn(history[^1])}\n\nCurrent user query: {input.Query}",
-            Response: input.Response,
-            Metadata: input.Metadata);
+        // Preserve every other EvalInput field via WithEnrichedQuery (BUG-57).
+        var enriched = ConversationHistoryHelper.WithEnrichedQuery(
+            input, ConversationHistoryHelper.FormatPreviousTurn(history[^1]));
 
         return await _inner.EvaluateAsync(enriched, ct);
     }

@@ -47,16 +47,24 @@ public class MRRMetric : IRAGMetric
     public const string RelevantDocumentIdsKey = "RelevantDocumentIds";
     
     private readonly int? _maxRank;
-    
+    private readonly int _maxPassRank;
+
     /// <summary>
     /// Initializes a new instance of the MRRMetric.
     /// </summary>
     /// <param name="maxRank">Optional: Maximum rank to consider (null = no limit).</param>
-    public MRRMetric(int? maxRank = null)
+    /// <param name="maxPassRank">The deepest rank of the first relevant document that still counts
+    /// as a pass (default 3). MRR's pass disposition is rank-based, not a score threshold: a
+    /// score-vs-threshold rule would conflate ranks (MRR=1/2=50, 1/3=33), so the rank is exposed
+    /// explicitly here instead of being hard-coded (BUG-44).</param>
+    public MRRMetric(int? maxRank = null, int maxPassRank = 3)
     {
         if (maxRank.HasValue && maxRank.Value <= 0)
             throw new ArgumentOutOfRangeException(nameof(maxRank), "maxRank must be positive");
+        if (maxPassRank <= 0)
+            throw new ArgumentOutOfRangeException(nameof(maxPassRank), "maxPassRank must be positive");
         _maxRank = maxRank;
+        _maxPassRank = maxPassRank;
     }
 
     /// <inheritdoc />
@@ -166,8 +174,8 @@ public class MRRMetric : IRAGMetric
             explanation = $"First relevant document at position {firstRelevantRank} (MRR = 1/{firstRelevantRank} = {mrr:F3})";
         }
         
-        // Pass if first relevant is in top 3
-        var passed = firstRelevantRank > 0 && firstRelevantRank <= 3;
+        // Pass if the first relevant document is within the configured maxPassRank (default 3).
+        var passed = firstRelevantRank > 0 && firstRelevantRank <= _maxPassRank;
         
         return Task.FromResult(new MetricResult
         {

@@ -25,6 +25,10 @@ namespace AgentEval.Tracing;
 /// await recorder.SaveAsync("./traces/research_workflow.trace.json");
 /// </code>
 /// </example>
+/// <remarks>
+/// <b>Threading:</b> not thread-safe — designed to record a single workflow execution invoked
+/// sequentially. Use a separate instance per concurrent flow (BUG-58).
+/// </remarks>
 public sealed class WorkflowTraceRecorder : IWorkflowEvaluableAgent, IAsyncDisposable
 {
     private readonly IWorkflowEvaluableAgent _inner;
@@ -149,6 +153,7 @@ public sealed class WorkflowTraceRecorder : IWorkflowEvaluableAgent, IAsyncDispo
                     Result = SanitizeText(tc.Result?.ToString()),
                     Succeeded = tc.Exception == null,
                     Error = tc.Exception?.Message,
+                    StartedAt = tc.StartTime, // persist per-tool start so replay can reconstruct timing (BUG-45)
                     DurationMs = (long?)tc.Duration?.TotalMilliseconds
                 }).ToList();
             }
@@ -184,6 +189,22 @@ public sealed class WorkflowTraceRecorder : IWorkflowEvaluableAgent, IAsyncDispo
                     EdgeType = e.EdgeType.ToString(),
                     Condition = e.RoutingReason
                 }).ToList();
+            }
+
+            // Map any workflow-level error recorded for this executor into the step trace so
+            // step-level error provenance survives (BUG-35). ExecutorStep itself carries no Error
+            // property; per-step errors are recorded on WorkflowExecutionResult.Errors keyed by
+            // ExecutorId, and were previously never propagated into WorkflowTraceStep.Error.
+            var stepError = result.Errors?.FirstOrDefault(e =>
+                string.Equals(e.ExecutorId, step.ExecutorId, StringComparison.Ordinal));
+            if (stepError != null)
+            {
+                traceStep.Error = new TraceError
+                {
+                    Type = stepError.ExceptionType,
+                    Message = stepError.Message,
+                    StackTrace = SanitizeText(stepError.StackTrace)
+                };
             }
 
             _trace.Steps.Add(traceStep);

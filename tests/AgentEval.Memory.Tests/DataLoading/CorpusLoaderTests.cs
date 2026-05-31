@@ -76,6 +76,51 @@ public class CorpusLoaderTests
         Assert.True(available.Count >= 2);
     }
 
+    // ═══════════════════════════════════════════════════════════════
+    // LoadToTargetTokens — bounded repetition (PERF-07)
+    // ═══════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void LoadToTargetTokens_ModestTarget_RepeatsToReachTarget()
+    {
+        var baseTurns = CorpusLoader.Load("context-small");
+        // A target a few times the base size should produce more than one copy.
+        var baseChars = baseTurns.Sum(t => t.UserMessage.Length + t.AssistantResponse.Length);
+        var result = CorpusLoader.LoadToTargetTokens("context-small", targetTokens: (baseChars / 4) * 3);
+
+        Assert.True(result.Count > baseTurns.Count);
+        Assert.Equal(0, result.Count % baseTurns.Count); // whole-corpus repeats
+    }
+
+    [Fact]
+    public void LoadToTargetTokens_HugeTargetTinyMaxRepeats_IsCappedNotUnbounded()
+    {
+        var baseTurns = CorpusLoader.Load("context-small");
+
+        // A target large enough to overflow int if multiplied out — must be bounded by maxRepeats,
+        // NOT allocate an astronomically large list (PERF-07).
+        var result = CorpusLoader.LoadToTargetTokens("context-small", targetTokens: int.MaxValue, maxRepeats: 3);
+
+        Assert.Equal(baseTurns.Count * 3, result.Count);
+    }
+
+    [Fact]
+    public void LoadToTargetTokens_DefaultCap_BoundsResult()
+    {
+        var baseTurns = CorpusLoader.Load("context-small");
+        var result = CorpusLoader.LoadToTargetTokens("context-small", targetTokens: int.MaxValue);
+
+        // Capped at the default maximum (never the runaway int.MaxValue / tinyTokens repeats).
+        Assert.Equal(baseTurns.Count * CorpusLoader.DefaultMaxRepeats, result.Count);
+    }
+
+    [Fact]
+    public void LoadToTargetTokens_NegativeTarget_Throws()
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(
+            () => CorpusLoader.LoadToTargetTokens("context-small", targetTokens: -1));
+    }
+
     [Fact]
     public void Load_MediumIsSupersetOfSmallTopics()
     {

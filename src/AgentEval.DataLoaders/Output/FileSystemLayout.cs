@@ -84,7 +84,13 @@ public sealed class FileSystemLayout
     public string SyncedFile => Path.Combine(PortalDir, "synced.jsonl");
 
     // Helpers
-    internal static string Sanitize(string name)
+    /// <summary>
+    /// Canonical subject/segment sanitizer used for all on-disk path segments. Promoted to
+    /// public (MNT-01) so CLI commands deriving report paths use the SAME rule as the store —
+    /// rewriting cross-platform-invalid chars (&lt;&gt;:"|?*/\) and hash-appending lossy names —
+    /// instead of weaker copy-pasted variants that produced divergent paths.
+    /// </summary>
+    public static string Sanitize(string name)
     {
         if (string.IsNullOrWhiteSpace(name))
             throw new ArgumentException("Name cannot be null/empty/whitespace.", nameof(name));

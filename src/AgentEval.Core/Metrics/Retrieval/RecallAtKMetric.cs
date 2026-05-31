@@ -41,15 +41,21 @@ public class RecallAtKMetric : IRAGMetric
     public const string RelevantDocumentIdsKey = "RelevantDocumentIds";
     
     private readonly int _k;
-    
+    private readonly double _passThreshold;
+
     /// <summary>
     /// Initializes a new instance of the RecallAtKMetric.
     /// </summary>
     /// <param name="k">Number of top results to consider (default: 10).</param>
-    public RecallAtKMetric(int k = 10)
+    /// <param name="passThreshold">Minimum recall fraction (0..1) required to pass (default 0.7).
+    /// Exposed as a ctor parameter rather than hard-coded (BUG-44).</param>
+    public RecallAtKMetric(int k = 10, double passThreshold = 0.7)
     {
         if (k <= 0) throw new ArgumentOutOfRangeException(nameof(k), "K must be positive");
+        if (passThreshold is < 0 or > 1)
+            throw new ArgumentOutOfRangeException(nameof(passThreshold), "passThreshold must be between 0 and 1");
         _k = k;
+        _passThreshold = passThreshold;
     }
 
     /// <inheritdoc />
@@ -133,8 +139,8 @@ public class RecallAtKMetric : IRAGMetric
             ? $"Found all {relevantSet.Count} relevant documents in top {_k}"
             : $"Found {relevantFound} of {relevantSet.Count} relevant documents in top {_k} (missed: {relevantSet.Count - relevantFound})";
         
-        // Pass if recall >= 70% (configurable threshold could be added)
-        var passed = recall >= 0.7;
+        // Pass if recall >= the configured threshold (default 0.7).
+        var passed = recall >= _passThreshold;
         
         return Task.FromResult(new MetricResult
         {

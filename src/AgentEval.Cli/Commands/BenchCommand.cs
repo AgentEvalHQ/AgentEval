@@ -8,7 +8,7 @@ using AgentEval.Evals;
 using AgentEval.Compliance.Gdpr.Articles;
 using AgentEval.Compliance.Gdpr.Articles.Building;
 using AgentEval.Compliance.Gdpr.Articles.Loading;
-using AgentEval.Compliance.Gdpr.Composition;
+using AgentEval.Compliance.Core;
 using AgentEval.Compliance.Gdpr.DomainPacks.ChildrensService;
 using AgentEval.Compliance.Gdpr.DomainPacks.Healthcare;
 using AgentEval.Compliance.Gdpr.DomainPacks.HR;
@@ -31,8 +31,10 @@ public static class BenchCommand
         string subject,
         string? rootOverride,
         string? inputText,
-        int runs = 1) =>
-        RunGdprAsync(preset, subject, rootOverride, inputText, evaluatorOverride: null, runs: runs);
+        int runs = 1,
+        string? responseText = null,
+        CancellationToken ct = default) =>
+        RunGdprAsync(preset, subject, rootOverride, inputText, evaluatorOverride: null, runs: runs, responseText: responseText, ct: ct);
 
     /// <summary>Runs the bench gdpr command with optional overrides (used in tests).</summary>
     internal static async Task<int> RunGdprAsync(
@@ -41,7 +43,9 @@ public static class BenchCommand
         string? rootOverride,
         string? inputText,
         IEvaluator? evaluatorOverride,
-        int runs = 1)
+        int runs = 1,
+        string? responseText = null,
+        CancellationToken ct = default)
     {
         // ── Workspace setup ──────────────────────────────────────────────────
         if (rootOverride is not null)
@@ -111,9 +115,23 @@ public static class BenchCommand
         // ── Build input ──────────────────────────────────────────────────────
         var query = inputText ??
             "Please help me understand what personal data you store about me and how I can request its deletion.";
-        var agentResponse =
-            "I can help with that. We store your name and email. " +
-            "You can request deletion by contacting privacy@example.com.";
+        string agentResponse;
+        if (!string.IsNullOrWhiteSpace(responseText))
+        {
+            agentResponse = responseText;
+        }
+        else
+        {
+            // No real response supplied: grade a built-in FIXTURE. Warn loudly — the produced
+            // compliance evidence does NOT reflect the named subject agent (BUG-18).
+            agentResponse =
+                "I can help with that. We store your name and email. " +
+                "You can request deletion by contacting privacy@example.com.";
+            Console.Error.WriteLine(
+                $"[bench gdpr] WARNING: no --response/--response-file supplied — grading a built-in FIXTURE " +
+                $"response, not a real agent output. The produced compliance evidence does NOT reflect subject " +
+                $"'{subject}'. Pass --response-file <path> (or --response \"...\") with the agent's actual answer.");
+        }
         var evalInput = new EvalInput(Query: query, Response: agentResponse);
 
         // ── Run benchmark ────────────────────────────────────────────────────
@@ -121,7 +139,7 @@ public static class BenchCommand
         // Workspace hygiene: sweep stale 24h+ sentinels (.invalid.json / .lock
         // / .tmp) left behind by killed benchmark processes. Only CLI writer
         // entry points sweep — Mission Control (read-only viewer) must not.
-        await store.SweepStaleSentinelsAsync(TimeSpan.FromHours(24));
+        await store.SweepStaleSentinelsAsync(TimeSpan.FromHours(24), ct);
         var subjectIdentity = new SubjectIdentity(SubjectKind.Agent, subject);
 
         Console.WriteLine($"Running GDPR benchmark ({preset}) for subject '{subject}'" +
@@ -134,14 +152,14 @@ public static class BenchCommand
             if (runs > 1)
             {
                 // Stochastic mode: run N times, aggregate via MajorityVote.
-                compositeResult = await StochasticBenchRunner.RunNAsync(store, subjectIdentity, benchmark, evalInput, runs);
+                compositeResult = await StochasticBenchRunner.RunNAsync(store, subjectIdentity, benchmark, evalInput, runs, ct);
                 // Use the benchmark key as the run ID for reporting purposes.
                 runId = $"{benchmark.Key}.runs{runs}.{DateTimeOffset.UtcNow:yyyyMMddHHmmss}";
             }
             else
             {
                 var runner = new GdprBenchmarkRunner();
-                (runId, compositeResult) = await runner.RunAsync(store, subjectIdentity, benchmark, evalInput);
+                (runId, compositeResult) = await runner.RunAsync(store, subjectIdentity, benchmark, evalInput, ct: ct);
             }
         }
         catch (Exception ex)
@@ -184,7 +202,7 @@ public static class BenchCommand
         }
 
         // Derive output directory (mirrors FileSystemOutputStore path convention)
-        var sanitizedSubject = SanitizeForPath(subject);
+        var sanitizedSubject = FileSystemLayout.Sanitize(subject);
         var ts = evidence.Base.GeneratedAt.ToString("yyyy-MM-dd_HH-mm-ss");
         var outputDir = Path.Combine(agentEvalDir, "compliance", "GDPR", sanitizedSubject, ts);
         Directory.CreateDirectory(outputDir);
@@ -292,13 +310,6 @@ public static class BenchCommand
             kv => (IReadOnlyList<EvalComponent>)kv.Value);
 
         return basePreset.WithExtraScenarios(merged);
-    }
-
-    private static string SanitizeForPath(string name)
-    {
-        var invalid = Path.GetInvalidFileNameChars().Concat(new[] { '/', '\\' }).ToArray();
-        var s = string.Concat(name.Select(c => invalid.Contains(c) ? '-' : c));
-        return s.Trim('.', ' ');
     }
 
 }

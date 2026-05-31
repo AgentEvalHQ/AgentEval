@@ -152,6 +152,26 @@ public class PerformanceBenchmarkTests
     }
 
     [Fact]
+    public async Task RunThroughputBenchmarkAsync_RpsUsesConfiguredDuration_NotWallClock()
+    {
+        // BUG-51: RPS must divide by the configured measurement window, not the wall-clock that
+        // also covers worker startup + the post-cancel drain (which under-reports RPS).
+        var agent = new MockTestableAgent("TestAgent", "Hello");
+        var benchmark = new PerformanceBenchmark(agent, new PerformanceBenchmarkOptions { Verbose = false });
+        var duration = TimeSpan.FromMilliseconds(200);
+
+        var result = await benchmark.RunThroughputBenchmarkAsync(
+            "test", concurrentRequests: 2, duration: duration);
+
+        // RPS is exactly completed / configured-duration (the old code divided by the larger
+        // wall-clock Duration, which would not match).
+        Assert.Equal(result.CompletedRequests / duration.TotalSeconds, result.RequestsPerSecond, 6);
+        // The reported wall-clock Duration exceeds the configured window — confirming the two
+        // denominators genuinely differ.
+        Assert.True(result.Duration > duration);
+    }
+
+    [Fact]
     public async Task RunThroughputBenchmarkAsync_AgentThrows_RecordsErrors()
     {
         // Arrange
@@ -396,6 +416,75 @@ public class PerformanceBenchmarkTests
         Assert.Contains("TestAgent", str);
         Assert.Contains("gpt-4o", str);
         Assert.Contains("450", str);
+    }
+
+    #endregion
+
+    #region Cost pricing-warning (BUG-29)
+
+    [Fact]
+    public async Task RunCostBenchmarkAsync_UnknownModelName_EmitsPricingWarning()
+    {
+        // BUG-29: a typo'd / unrecognised model name yields null pricing. The warning previously
+        // fired only when the name equalled the agent name, so the operator's most-likely mistake
+        // (e.g. "gpt4o" instead of "gpt-4o") silently produced a $0 pass with no diagnostic.
+        var agent = new MockTestableAgent("TestAgent", "Hello");
+        var benchmark = new PerformanceBenchmark(agent,
+            new PerformanceBenchmarkOptions { Verbose = false, DelayBetweenIterations = TimeSpan.Zero });
+
+        var originalErr = Console.Error;
+        var captured = new StringWriter();
+        try
+        {
+            Console.SetError(captured);
+            await benchmark.RunCostBenchmarkAsync(new[] { "prompt" }, modelName: "gpt4o");
+        }
+        finally
+        {
+            Console.SetError(originalErr);
+        }
+
+        var stderr = captured.ToString();
+        Assert.Contains("WARNING", stderr);
+        Assert.Contains("gpt4o", stderr); // the unrecognised name is surfaced
+    }
+
+    // ARC-08: when an IAgentEvalLogger is injected, the no-pricing warning is routed to it (at Warning)
+    // instead of straight to Console.Error — so a host can capture/redirect it rather than losing it.
+    [Fact]
+    public async Task RunCostBenchmarkAsync_WithInjectedLogger_RoutesWarningToLogger()
+    {
+        var agent = new MockTestableAgent("TestAgent", "Hello");
+        var logger = new CapturingLogger();
+        var benchmark = new PerformanceBenchmark(agent,
+            new PerformanceBenchmarkOptions { Verbose = false, DelayBetweenIterations = TimeSpan.Zero, Logger = logger });
+
+        // Capture stderr too, to prove the warning did NOT also leak straight to the console.
+        var originalErr = Console.Error;
+        var stderrSink = new StringWriter();
+        try
+        {
+            Console.SetError(stderrSink);
+            await benchmark.RunCostBenchmarkAsync(new[] { "prompt" }, modelName: "gpt4o");
+        }
+        finally { Console.SetError(originalErr); }
+
+        Assert.Contains(logger.Entries, e => e.Level == LogLevel.Warning && e.Message.Contains("gpt4o"));
+        Assert.DoesNotContain("WARNING", stderrSink.ToString()); // not written to Console.Error when a logger is set
+    }
+
+    private sealed class CapturingLogger : IAgentEvalLogger
+    {
+        public List<(LogLevel Level, string Message)> Entries { get; } = [];
+        public void Log(LogLevel level, string message) => Entries.Add((level, message));
+        public void Log(LogLevel level, Exception exception, string message) => Entries.Add((level, message));
+        public void Log(LogLevel level, string message, params (string Key, object? Value)[] properties) => Entries.Add((level, message));
+        public void LogMetricResult(MetricResult result) { }
+        public void LogFailure(FailureReport report) { }
+        public void LogTimeline(ToolCallTimeline timeline) { }
+        public bool IsEnabled(LogLevel level) => true;
+        public IDisposable BeginScope(string scopeName, params (string Key, object? Value)[] properties) => new Scope();
+        private sealed class Scope : IDisposable { public void Dispose() { } }
     }
 
     #endregion

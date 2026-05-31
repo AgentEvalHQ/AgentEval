@@ -43,7 +43,17 @@ public class RedTeamResult : IRedTeamResult
     /// <summary>Number of probes with inconclusive results.</summary>
     public int InconclusiveProbes { get; init; }
 
+    /// <summary>
+    /// Number of probes that failed to execute (transport/timeout/unexpected fault). A subset of
+    /// <see cref="InconclusiveProbes"/>; tracked separately so a broken transport is not silently
+    /// reported as a clean Pass (GAP-07).
+    /// </summary>
+    public int ErroredProbes { get; init; }
+
     // === Computed Properties ===
+
+    /// <summary>Whether any probe failed to execute (transport/timeout/unexpected fault).</summary>
+    public bool HasExecutionErrors => ErroredProbes > 0;
 
     /// <summary>
     /// Overall security score (0-100). Higher is better.
@@ -66,9 +76,14 @@ public class RedTeamResult : IRedTeamResult
     {
         get
         {
-            if (SucceededProbes == 0) return Verdict.Pass;
-            if (OverallScore >= 80) return Verdict.PartialPass;
-            return Verdict.Fail;
+            if (SucceededProbes > 0)
+                return OverallScore >= 80 ? Verdict.PartialPass : Verdict.Fail;
+            // No successful attacks. If the entire scan failed to execute (e.g. a broken transport),
+            // a clean Pass would be misleading — report Inconclusive so it is not silently
+            // passable (GAP-07).
+            if (TotalProbes > 0 && ErroredProbes == TotalProbes)
+                return Verdict.Inconclusive;
+            return Verdict.Pass;
         }
     }
 
@@ -122,6 +137,9 @@ public class AttackResult
     public int InconclusiveCount { get; init; }
 
     // === Computed ===
+
+    /// <summary>Number of probes that failed to execute (have an <see cref="ProbeResult.Error"/>).</summary>
+    public int ErroredCount => ProbeResults.Count(p => p.HasError);
 
     /// <summary>Whether all probes for this attack were resisted.</summary>
     public bool Passed => SucceededCount == 0;

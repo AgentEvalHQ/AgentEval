@@ -42,6 +42,24 @@ migrateCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =>
     return await MigrateCommand.RunAsync(apply, root);
 });
 
+// Resolves the agent response to grade for compliance benchmarks from --response / --response-file
+// (BUG-18). Returns Error=true (after printing) if --response-file is given but missing.
+static async Task<(bool Error, string? Text)> ResolveBenchResponseAsync(string? response, string? responseFile, CancellationToken ct)
+{
+    if (!string.IsNullOrWhiteSpace(response))
+        return (false, response);
+    if (!string.IsNullOrWhiteSpace(responseFile))
+    {
+        if (!File.Exists(responseFile))
+        {
+            Console.Error.WriteLine($"Error: --response-file not found: {responseFile}");
+            return (true, null);
+        }
+        return (false, await File.ReadAllTextAsync(responseFile, ct));
+    }
+    return (false, null);
+}
+
 // ─── bench ───────────────────────────────────────────────────────────────────
 var benchCmd = new Command("bench", "Run a benchmark against an agent");
 
@@ -70,12 +88,16 @@ var benchPresetOpt = new Option<string?>("--preset") { Description = PresetsHelp
 var benchSubjectOpt = new Option<string?>("--subject") { Description = "Subject name (agent or workflow under evaluation). REQUIRED — no default; previously defaulted to 'default-agent'." };
 var benchRootOpt = new Option<string?>("--root") { Description = "Workspace root path (default: auto-detected)" };
 var benchInputOpt = new Option<string?>("--input") { Description = "Agent input text for the evaluation (default: built-in fixture)" };
+var benchResponseOpt = new Option<string?>("--response") { Description = "The agent's actual RESPONSE to grade. If omitted, a built-in fixture is graded and a warning is emitted (the evidence then reflects no real agent)." };
+var benchResponseFileOpt = new Option<string?>("--response-file") { Description = "Path to a file containing the agent's actual response to grade (alternative to --response, for multi-line output)." };
 var benchRunsOpt = new Option<int?>("--runs") { Description = "Number of stochastic runs (default: 1). When > 1, runs the benchmark N times and aggregates via MajorityVote." };
 var benchGdprCmd = new Command("gdpr", "Run the GDPR compliance benchmark");
 benchGdprCmd.Add(benchPresetOpt);
 benchGdprCmd.Add(benchSubjectOpt);
 benchGdprCmd.Add(benchRootOpt);
 benchGdprCmd.Add(benchInputOpt);
+benchGdprCmd.Add(benchResponseOpt);
+benchGdprCmd.Add(benchResponseFileOpt);
 benchGdprCmd.Add(benchRunsOpt);
 benchGdprCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =>
 {
@@ -89,7 +111,9 @@ benchGdprCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =>
     var root = parseResult.GetValue(benchRootOpt);
     var input = parseResult.GetValue(benchInputOpt);
     var runs = parseResult.GetValue(benchRunsOpt) ?? 1;
-    return await BenchCommand.RunGdprAsync(preset, subject, root, input, runs: runs);
+    var response = await ResolveBenchResponseAsync(parseResult.GetValue(benchResponseOpt), parseResult.GetValue(benchResponseFileOpt), ct);
+    if (response.Error) return 1;
+    return await BenchCommand.RunGdprAsync(preset, subject, root, input, runs: runs, responseText: response.Text, ct: ct);
 });
 
 // bench gdpr calibrate
@@ -102,7 +126,7 @@ calibrateCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =>
 {
     var root = parseResult.GetValue(calibrateRootOpt);
     var outPath = parseResult.GetValue(calibrateOutOpt);
-    return await BenchCalibrateCommand.RunAsync(root, outPath);
+    return await BenchCalibrateCommand.RunAsync(root, outPath, ct: ct);
 });
 benchGdprCmd.Add(calibrateCmd);
 
@@ -114,11 +138,15 @@ var benchEuAiActPresetOpt = new Option<string?>("--preset") { Description = Pres
 var benchEuAiActSubjectOpt = new Option<string?>("--subject") { Description = "Subject name. REQUIRED — no default; previously defaulted to 'default-agent'." };
 var benchEuAiActRootOpt = new Option<string?>("--root") { Description = "Workspace root path (default: auto-detected)" };
 var benchEuAiActInputOpt = new Option<string?>("--input") { Description = "Agent input text for the evaluation. REQUIRED — no default; previously a hard-coded fixture was used." };
+var benchEuAiActResponseOpt = new Option<string?>("--response") { Description = "The agent's actual RESPONSE to grade. If omitted, a built-in fixture is graded and a warning is emitted (the evidence then reflects no real agent)." };
+var benchEuAiActResponseFileOpt = new Option<string?>("--response-file") { Description = "Path to a file containing the agent's actual response to grade (alternative to --response)." };
 var benchEuAiActCmd = new Command("eu-ai-act", "Run the EU AI Act compliance benchmark");
 benchEuAiActCmd.Add(benchEuAiActPresetOpt);
 benchEuAiActCmd.Add(benchEuAiActSubjectOpt);
 benchEuAiActCmd.Add(benchEuAiActRootOpt);
 benchEuAiActCmd.Add(benchEuAiActInputOpt);
+benchEuAiActCmd.Add(benchEuAiActResponseOpt);
+benchEuAiActCmd.Add(benchEuAiActResponseFileOpt);
 benchEuAiActCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =>
 {
     var preset = parseResult.GetValue(benchEuAiActPresetOpt) ?? "standard";
@@ -135,7 +163,9 @@ benchEuAiActCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) 
         return 1;
     }
     var root = parseResult.GetValue(benchEuAiActRootOpt);
-    return await BenchEuAiActCommand.RunAsync(preset, subject, root, input);
+    var response = await ResolveBenchResponseAsync(parseResult.GetValue(benchEuAiActResponseOpt), parseResult.GetValue(benchEuAiActResponseFileOpt), ct);
+    if (response.Error) return 1;
+    return await BenchEuAiActCommand.RunAsync(preset, subject, root, input, responseText: response.Text, ct: ct);
 });
 // bench eu-ai-act calibrate
 var euCalibrateRootOpt = new Option<string?>("--root") { Description = "Workspace root path (default: current directory)" };
@@ -147,7 +177,7 @@ euCalibrateCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =
 {
     var root = parseResult.GetValue(euCalibrateRootOpt);
     var outPath = parseResult.GetValue(euCalibrateOutOpt);
-    return await BenchEuAiActCalibrateCommand.RunAsync(root, outPath);
+    return await BenchEuAiActCalibrateCommand.RunAsync(root, outPath, ct: ct);
 });
 benchEuAiActCmd.Add(euCalibrateCmd);
 
@@ -177,7 +207,7 @@ benchAgenticCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) 
     var root = parseResult.GetValue(benchAgenticRootOpt);
     var input = parseResult.GetValue(benchAgenticInputOpt);
     var budgetTier = parseResult.GetValue(benchAgenticBudgetTierOpt);
-    return await BenchAgenticCommand.RunAsync(preset, subject, root, input, budgetTier);
+    return await BenchAgenticCommand.RunAsync(preset, subject, root, input, budgetTier, ct);
 });
 // bench agentic calibrate
 var agenticCalibrateRootOpt = new Option<string?>("--root") { Description = "Workspace root path (default: current directory)" };
@@ -189,7 +219,7 @@ agenticCalibrateCmd.SetAction(async (ParseResult parseResult, CancellationToken 
 {
     var root = parseResult.GetValue(agenticCalibrateRootOpt);
     var outPath = parseResult.GetValue(agenticCalibrateOutOpt);
-    return await BenchAgenticCalibrateCommand.RunAsync(root, outPath);
+    return await BenchAgenticCalibrateCommand.RunAsync(root, outPath, ct: ct);
 });
 benchAgenticCmd.Add(agenticCalibrateCmd);
 
@@ -220,7 +250,7 @@ benchOwaspCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =>
     var root = parseResult.GetValue(benchOwaspRootOpt);
     var input = parseResult.GetValue(benchOwaspInputOpt);
     var azureFromEnv = parseResult.GetValue(benchOwaspAzureFromEnvOpt);
-    return await BenchOwaspCommand.RunAsync(preset, subject, root, input, azureFromEnv);
+    return await BenchOwaspCommand.RunAsync(preset, subject, root, input, azureFromEnv, ct);
 });
 benchCmd.Add(benchOwaspCmd);
 
@@ -249,7 +279,7 @@ benchMitreCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =>
     var root = parseResult.GetValue(benchMitreRootOpt);
     var input = parseResult.GetValue(benchMitreInputOpt);
     var azureFromEnv = parseResult.GetValue(benchMitreAzureFromEnvOpt);
-    return await BenchMitreCommand.RunAsync(preset, subject, root, input, azureFromEnv);
+    return await BenchMitreCommand.RunAsync(preset, subject, root, input, azureFromEnv, ct);
 });
 benchCmd.Add(benchMitreCmd);
 
@@ -282,7 +312,7 @@ benchCmd.Add(benchMitreCmd);
                 return 1;
             }
             var root = parseResult.GetValue(benchLmeRootOpt);
-            return await BenchLongMemEvalCommand.RunAsync(preset, subject, root);
+            return await BenchLongMemEvalCommand.RunAsync(preset, subject, root, ct);
         });
         benchCmd.Add(benchLmeCmd);
     }
@@ -307,7 +337,7 @@ benchCmd.Add(benchMitreCmd);
                 return 1;
             }
             var root = parseResult.GetValue(benchMemRootOpt);
-            return await BenchMemoryCommand.RunAsync(preset, subject, root);
+            return await BenchMemoryCommand.RunAsync(preset, subject, root, ct);
         });
         benchCmd.Add(benchMemCmd);
     }
@@ -333,7 +363,7 @@ benchCmd.Add(benchMitreCmd);
             var prompt = parseResult.GetValue(benchPerfPromptOpt);
             var root = parseResult.GetValue(benchPerfRootOpt);
             var azureFromEnv = parseResult.GetValue(benchPerfAzureFromEnvOpt);
-            return await BenchPerfCommand.RunAsync(capturedPreset, subject, prompt, root, azureFromEnv);
+            return await BenchPerfCommand.RunAsync(capturedPreset, subject, prompt, root, azureFromEnv, ct);
         });
         benchPerfCmd.Add(presetCmd);
     }

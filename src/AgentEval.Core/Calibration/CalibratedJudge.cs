@@ -148,8 +148,19 @@ public class CalibratedJudge : ICalibratedJudge
                 
                 var metric = metricFactory(judge.Name);
                 var result = await metric.EvaluateAsync(context, cts.Token);
-                
+
                 return (Judge: judge.Name, Score: (double?)result.Score, Error: (Exception?)null);
+            }
+            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+            {
+                // Per-judge timeout (linked CTS fired via CancelAfter), not caller cancellation.
+                // Degrade gracefully instead of aborting the whole evaluation; caller
+                // cancellation still propagates via the filter exclusion above (BUG-05).
+                var timeout = new TimeoutException(
+                    $"Judge '{judge.Name}' exceeded the per-judge timeout of {_options.Timeout}.");
+                if (!_options.ContinueOnJudgeFailure)
+                    throw timeout;
+                return (Judge: judge.Name, Score: (double?)null, Error: (Exception?)timeout);
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
@@ -222,57 +233,19 @@ public class CalibratedJudge : ICalibratedJudge
         };
     }
     
+    // ARC-04: shared with CalibratedEvaluator via CalibrationMath.
     private double CalculateWeightedScore(Dictionary<string, double> judgeScores)
-    {
-        if (_options.JudgeWeights == null || _options.JudgeWeights.Count == 0)
-            return judgeScores.Values.Average();
-        
-        var totalWeight = 0.0;
-        var weightedSum = 0.0;
-        
-        foreach (var (judgeName, score) in judgeScores)
-        {
-            var weight = _options.JudgeWeights.GetValueOrDefault(judgeName, 1.0);
-            weightedSum += score * weight;
-            totalWeight += weight;
-        }
-        
-        return totalWeight > 0 ? weightedSum / totalWeight : judgeScores.Values.Average();
-    }
-    
+        => CalibrationMath.WeightedScore(judgeScores, _options.JudgeWeights);
+
     private static double CalculateMedian(List<double> scores)
-    {
-        var sorted = scores.OrderBy(s => s).ToList();
-        var count = sorted.Count;
-        
-        if (count == 0) return 0;
-        if (count % 2 == 0)
-            return (sorted[count / 2 - 1] + sorted[count / 2]) / 2.0;
-        return sorted[count / 2];
-    }
-    
+        => CalibrationMath.Median(scores);
+
     private static double CalculateStandardDeviation(List<double> scores)
-    {
-        if (scores.Count < 2) return 0;
-        
-        var mean = scores.Average();
-        var sumSquares = scores.Sum(s => (s - mean) * (s - mean));
-        return Math.Sqrt(sumSquares / (scores.Count - 1));
-    }
-    
+        => CalibrationMath.StandardDeviation(scores);
+
     private static double CalculateAgreement(List<double> scores, double stdDev)
-    {
-        if (scores.Count < 2) return 100;
-        
-        var mean = scores.Average();
-        if (mean == 0) return scores.All(s => s == 0) ? 100 : 0;
-        
-        // Agreement is inverse of coefficient of variation, scaled to 0-100
-        var cv = stdDev / mean;
-        var agreement = Math.Max(0, 100 - (cv * 100));
-        return Math.Min(100, agreement);
-    }
-    
+        => CalibrationMath.Agreement(scores, stdDev);
+
     private (double? Lower, double? Upper) CalculateConfidenceInterval(List<double> scores, double stdDev)
     {
         if (!_options.CalculateConfidenceInterval || scores.Count < 2)
@@ -291,51 +264,9 @@ public class CalibratedJudge : ICalibratedJudge
         return (lower, upper);
     }
     
-    /// <summary>
-    /// Returns the two-tailed t-distribution critical value for the given 
-    /// degrees of freedom and confidence level.
-    /// </summary>
     private static double GetTValue(int degreesOfFreedom, double confidenceLevel)
-    {
-        if (confidenceLevel >= 0.99)
-        {
-            return degreesOfFreedom switch
-            {
-                1 => 63.657, 2 => 9.925, 3 => 5.841, 4 => 4.604,
-                5 => 4.032, 6 => 3.707, 7 => 3.499, 8 => 3.355,
-                9 => 3.250, 10 => 3.169,
-                <= 20 => 2.845, <= 30 => 2.756, _ => 2.576
-            };
-        }
-        if (confidenceLevel >= 0.95)
-        {
-            return degreesOfFreedom switch
-            {
-                1 => 12.706, 2 => 4.303, 3 => 3.182, 4 => 2.776,
-                5 => 2.571, 6 => 2.447, 7 => 2.365, 8 => 2.306,
-                9 => 2.262, 10 => 2.228,
-                <= 20 => 2.086, <= 30 => 2.045, _ => 1.960
-            };
-        }
-        if (confidenceLevel >= 0.90)
-        {
-            return degreesOfFreedom switch
-            {
-                1 => 6.314, 2 => 2.920, 3 => 2.353, 4 => 2.132,
-                5 => 2.015, 6 => 1.943, 7 => 1.895, 8 => 1.860,
-                9 => 1.833, 10 => 1.812,
-                <= 20 => 1.725, <= 30 => 1.699, _ => 1.645
-            };
-        }
-        return 1.5;
-    }
-    
+        => CalibrationMath.GetTValue(degreesOfFreedom, confidenceLevel);
+
     private bool CheckConsensus(List<double> scores)
-    {
-        if (scores.Count < 2) return true;
-        
-        var min = scores.Min();
-        var max = scores.Max();
-        return (max - min) <= _options.ConsensusTolerance;
-    }
+        => CalibrationMath.WithinConsensus(scores, _options.ConsensusTolerance);
 }

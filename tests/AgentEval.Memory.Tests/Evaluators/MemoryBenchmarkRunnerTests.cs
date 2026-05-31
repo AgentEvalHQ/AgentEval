@@ -402,9 +402,9 @@ public class MemoryBenchmarkRunnerTests
         Assert.Equal("Full", diagnostic.EffectivePresetResolutionKey);
 
         // Act — build context blobs using both keys; this is what the runner does
-        // internally per category. (BuildContextPressureBlob is internal for tests.)
-        var quickBlob = MemoryBenchmarkRunner.BuildContextPressureBlob("Quick");
-        var diagnosticBlob = MemoryBenchmarkRunner.BuildContextPressureBlob(
+        // internally per category. (MNT-05: BuildContextPressureBlob moved to MemoryScenarioContextBuilder.)
+        var quickBlob = MemoryScenarioContextBuilder.BuildContextPressureBlob("Quick");
+        var diagnosticBlob = MemoryScenarioContextBuilder.BuildContextPressureBlob(
             diagnostic.EffectivePresetResolutionKey);
 
         // Assert — both blobs exist
@@ -430,6 +430,42 @@ public class MemoryBenchmarkRunnerTests
     /// (b) carries the bumped <c>TargetTokensOverride = 192_000</c> needed to
     ///     force overflow on a 128K-window model (was 128_000 before the fix).
     /// </summary>
+    // ═══════════════════════════════════════════════════════════════
+    // BUG-56 — per-run overrides threaded, not stored on the instance
+    // ═══════════════════════════════════════════════════════════════
+
+    [Fact]
+    public async Task RunBenchmarkAsync_ConcurrentReuseDifferentPresets_AllCompleteConsistently()
+    {
+        // BUG-56: the runner is AddScoped/reusable. The override fields it used to write at the top
+        // of every RunBenchmarkAsync and read deep in TryRunFromJsonAsync raced under concurrent
+        // reentrancy. They are now threaded as a parameter, so the same instance is safe to run
+        // several benchmarks concurrently. Each run uses its own agent (the agent, not the runner,
+        // holds per-conversation state).
+        var quick = _runner.RunBenchmarkAsync(new TestMemoryAgent(), MemoryBenchmark.Quick);
+        var overflow = _runner.RunBenchmarkAsync(new TestMemoryAgent(), MemoryBenchmark.Overflow);
+        var standard = _runner.RunBenchmarkAsync(new TestMemoryAgent(), MemoryBenchmark.Standard);
+
+        var results = await Task.WhenAll(quick, overflow, standard);
+
+        Assert.Equal(3, results[0].CategoryResults.Count);   // Quick
+        Assert.Equal("Quick", results[0].BenchmarkName);
+        Assert.Equal(8, results[1].CategoryResults.Count);   // Overflow (Standard-shaped categories)
+        Assert.Equal(8, results[2].CategoryResults.Count);   // Standard
+        Assert.All(results, r => Assert.InRange(r.OverallScore, 0, 100));
+    }
+
+    [Fact]
+    public async Task RunBenchmarkAsync_OverflowOverrides_StillAppliedAfterThreadingRefactor()
+    {
+        // Guards that threading the overrides as a parameter (instead of instance fields) did not
+        // drop them: the Overflow benchmark still runs end-to-end with valid results (BUG-56).
+        var result = await _runner.RunBenchmarkAsync(new TestMemoryAgent(), MemoryBenchmark.Overflow);
+
+        Assert.Equal(8, result.CategoryResults.Count); // Overflow reuses Standard's category set
+        Assert.All(result.CategoryResults.Where(c => !c.Skipped), c => Assert.InRange(c.Score, 0, 100));
+    }
+
     [Fact]
     public void RunBenchmarkAsync_OverflowPreset_LoadsContextStressCorpus()
     {

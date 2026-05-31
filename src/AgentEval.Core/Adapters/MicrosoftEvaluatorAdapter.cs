@@ -109,9 +109,25 @@ public class MicrosoftEvaluatorAdapter : IMetric
             
             if (metricValue is NumericMetric numericMetric)
             {
-                // Microsoft uses 1-5 scale, convert to 0-100
-                // Handle nullable Value
-                score = ScoreNormalizer.FromOneToFive(numericMetric.Value ?? 1.0);
+                if (numericMetric.Value is null)
+                {
+                    // The evaluator produced NO numeric score (unparseable judge output, content
+                    // filter, or evaluator error). Coercing null → 1.0 (lowest 1/5) reported a
+                    // genuinely indeterminate result as a confident low-quality Fail, corrupting
+                    // pass/fail aggregation (BUG-26). Surface it explicitly instead.
+                    return MetricResult.Fail(
+                        Name,
+                        "Evaluator produced no numeric score (indeterminate: unparseable output, content filter, or evaluator error).",
+                        score: 0,
+                        new Dictionary<string, object>
+                        {
+                            ["microsoftMetricName"] = firstMetric.Key,
+                            ["indeterminate"] = true,
+                        });
+                }
+
+                // Microsoft uses a 1-5 scale; convert to 0-100.
+                score = ScoreNormalizer.FromOneToFive(numericMetric.Value.Value);
                 reasoning = numericMetric.Interpretation?.ToString();
             }
             else if (metricValue is BooleanMetric boolMetric)

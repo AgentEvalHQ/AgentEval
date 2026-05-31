@@ -259,8 +259,11 @@ public class MAFWorkflowAdapterTests
     // ═══════════════════════════════════════════════════════════════════════════
 
     [Fact]
-    public async Task ExecuteWorkflowAsync_WhenCancelled_CapturesAsError()
+    public async Task ExecuteWorkflowAsync_WhenCancelled_Propagates()
     {
+        // BUG-20: cancellation must propagate (so the harness can distinguish a per-test timeout
+        // from a caller-requested cancel), NOT be swallowed into a completed-with-errors result
+        // — which made cancelled suites keep running and report fabricated failures.
         var cts = new CancellationTokenSource();
         var adapter = new MAFWorkflowAdapter(
             "TestWorkflow",
@@ -268,12 +271,8 @@ public class MAFWorkflowAdapterTests
 
         cts.Cancel();
 
-        // Cancellation is caught and recorded as an error in the result
-        var result = await adapter.ExecuteWorkflowAsync("test", cts.Token);
-
-        Assert.NotNull(result.Errors);
-        Assert.Single(result.Errors);
-        Assert.Contains("cancel", result.Errors[0].Message, StringComparison.OrdinalIgnoreCase);
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => adapter.ExecuteWorkflowAsync("test", cts.Token));
     }
 
     private static async IAsyncEnumerable<WorkflowEvent> SlowWorkflow(

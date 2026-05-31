@@ -185,6 +185,25 @@ public class WorkflowToolTrackingTests
         Assert.Equal("TripPlanner/GetInfoAbout", invocation.ToolName);
     }
 
+    [Fact]
+    public void Timeline_ToolStartTime_IsStepStartOffset_NotShiftedByDuration()
+    {
+        // BUG-42: with per-tool timing present, StartTime was step.StartOffset + tc.Duration — the
+        // tool's END time — shifting the timeline bar one full duration to the right.
+        var result = CreateResultWithTools(
+            ("Agent1", "out1", [("ToolA", "c1", "r1")]),   // step 0 → StartOffset 0
+            ("Agent2", "out2", [("ToolB", "c2", "r2")]));  // step 1 → StartOffset 500ms
+
+        var timeline = result.Timeline!;
+        var toolA = timeline.Invocations.First(i => i.ToolName.Contains("ToolA"));
+        var toolB = timeline.Invocations.First(i => i.ToolName.Contains("ToolB"));
+
+        // The helper sets per-tool StartTime/EndTime, so Duration is non-null (the bug path).
+        Assert.True(toolA.Duration > TimeSpan.Zero);
+        Assert.Equal(result.Steps[0].StartOffset, toolA.StartTime);
+        Assert.Equal(result.Steps[1].StartOffset, toolB.StartTime);
+    }
+
     // ═══════════════════════════════════════════════════════════════════════════
     // TOOLCALLRECORD.EXECUTORID
     // ═══════════════════════════════════════════════════════════════════════════
@@ -654,6 +673,47 @@ public class WorkflowToolTrackingTests
                 .Validate());
 
         Assert.Null(exception);
+    }
+
+    [Fact]
+    public void WorkflowScoped_BeforeTool_AcrossExecutors_UsesGlobalOrder_NotPerExecutorOrder()
+    {
+        // BUG-13: GetInfoAbout (TripPlanner, per-executor Order 1) is genuinely called
+        // before SearchFlights (FlightAgent, per-executor Order 1). Comparing the
+        // per-executor Order gives 1 >= 1 → a spurious failure. The global execution
+        // position (flattened across executors) must be used instead.
+        var result = CreateResultWithTools(
+            ("TripPlanner", "plan", [("GetInfoAbout", "c1", "info")]),
+            ("FlightAgent", "flights", [("SearchFlights", "c2", "found"), ("BookFlight", "c3", "booked")]));
+
+        var exception = Record.Exception(() =>
+            result.Should()
+                .HaveCalledTool("GetInfoAbout")
+                    .BeforeTool("SearchFlights", because: "research precedes flight search")
+                .And()
+                .Validate());
+
+        Assert.Null(exception);
+    }
+
+    [Fact]
+    public void WorkflowScoped_AfterTool_AcrossExecutors_DetectsTrueGlobalOrder()
+    {
+        var result = CreateResultWithTools(
+            ("TripPlanner", "plan", [("GetInfoAbout", "c1", "info")]),
+            ("FlightAgent", "flights", [("BookFlight", "c2", "booked")]));
+
+        // BookFlight (global #2) AfterTool GetInfoAbout (global #1) → correct → passes,
+        // even though both carry per-executor Order 1.
+        var ok = Record.Exception(() =>
+            result.Should().HaveCalledTool("BookFlight").AfterTool("GetInfoAbout").And().Validate());
+        Assert.Null(ok);
+
+        // The reverse must still be detected as a real ordering violation.
+        var bad = Record.Exception(() =>
+            result.Should().HaveCalledTool("GetInfoAbout").AfterTool("BookFlight").And().Validate());
+        Assert.NotNull(bad);
+        Assert.IsType<WorkflowAssertionException>(bad);
     }
 
     [Fact]

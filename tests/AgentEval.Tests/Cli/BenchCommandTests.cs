@@ -79,7 +79,68 @@ public class BenchCommandTests : IDisposable
         }
     }
 
+    /// <summary>Stub evaluator that records the most recent graded output (the agent response).</summary>
+    private sealed class CapturingStubEvaluator : IEvaluator
+    {
+        public string? LastOutput { get; private set; }
+
+        public Task<EvaluationResult> EvaluateAsync(
+            string input, string output, IEnumerable<string> criteria,
+            CancellationToken cancellationToken = default)
+        {
+            LastOutput = output;
+            var criteriaList = criteria.ToList();
+            return Task.FromResult(new EvaluationResult
+            {
+                OverallScore = 100,
+                Summary = "stub-capture",
+                CriteriaResults = criteriaList
+                    .Select(c => new CriterionResult { Criterion = c, Met = true, Explanation = "stub" })
+                    .ToList()
+            });
+        }
+    }
+
     // ── Tests ─────────────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task BenchGdpr_WithResponseText_GradesSuppliedResponse_NotFixture()
+    {
+        // BUG-18: the graded response must be the operator-supplied one, not the canned fixture.
+        InitWorkspace();
+        var capturing = new CapturingStubEvaluator();
+        const string realResponse = "MY-REAL-AGENT-RESPONSE-XYZ unique marker";
+
+        var exitCode = await BenchCommand.RunGdprAsync(
+            preset: "smoke",
+            subject: "ResponseAgent",
+            rootOverride: _root,
+            inputText: "What personal data do you store?",
+            evaluatorOverride: capturing,
+            responseText: realResponse);
+
+        Assert.True(exitCode == 0 || exitCode == 2);
+        Assert.Equal(realResponse, capturing.LastOutput);
+        Assert.DoesNotContain("privacy@example.com", capturing.LastOutput ?? ""); // not the fixture
+    }
+
+    [Fact]
+    public async Task BenchGdpr_NoResponseText_GradesBuiltInFixture()
+    {
+        InitWorkspace();
+        var capturing = new CapturingStubEvaluator();
+
+        var exitCode = await BenchCommand.RunGdprAsync(
+            preset: "smoke",
+            subject: "FixtureAgent",
+            rootOverride: _root,
+            inputText: "What personal data do you store?",
+            evaluatorOverride: capturing,
+            responseText: null);
+
+        Assert.True(exitCode == 0 || exitCode == 2);
+        Assert.Contains("privacy@example.com", capturing.LastOutput ?? ""); // the built-in fixture
+    }
 
     [Fact]
     public async Task BenchGdpr_MissingWorkspace_ReturnsExitCode1()

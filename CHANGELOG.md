@@ -7,6 +7,59 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Thorough-review hardening wave (128 findings, 2026-05-31)
+
+A repository-wide thorough review produced 128 deduplicated findings (bugs, gaps, security,
+performance, architecture). **All 128 were fixed one-per-commit** on `fix/thorough-review-findings`,
+each built + run against the full suite with a regression test (and negative control) added where a
+behaviour assertion applied. Full-solution build (net8/9/10) clean; full suite green. No
+compliance/calibration value, threshold, pillar definition, aggregation rule, or judge constant changed
+(the GDPR and EU-AI-Act gates — including the Art 5 / GPAI carve-outs — are byte-for-byte preserved and
+verified by the compliance test suite). An independent adversarial re-review confirmed the wave is
+behaviour-preserving and calibration-safe.
+
+#### Security
+- **SEC-11** — GraphQL now enforces operation-cost limits (`ModifyCostOptions`) with `[Cost]` weights on
+  the expensive resolvers, so alias-multiplied fan-out is rejected pre-execution (depth limit alone did
+  not bound it).
+- **SEC-12** — the absolute workspace filesystem path is now redacted outside Mode A at `/api/v1/version`
+  and the GraphQL `Workspace` resolver (was always exposed).
+- **SEC-14** — removed `curl` from the Docker runtime image; the `HEALTHCHECK` now uses a self-contained
+  internal probe (`McHealthCheck`), and base images are tracked for digest-pinning via Dependabot.
+- **SEC-15** — `OpenReport` binds the local report server to loopback (was 0.0.0.0) and validates the port.
+- **GAP-15** — `WorkflowSerializer.ToMermaid` sanitizes node `DisplayName` (Mermaid label injection).
+- **BUG-38 / BUG-39** — RedTeam: detect genuine embedded-newline header/log injection; supply-chain
+  evaluator now flags only suspicious package recommendations (fewer false positives/negatives).
+
+#### Fixed (correctness)
+- Retrieval pass thresholds (MRR/RecallAtK) made configurable (BUG-44); F1 token-multiset alignment
+  (BUG-59); malformed-output write now fails fast (GAP-16); `VerbosityConfiguration` override is
+  flow-scoped via `AsyncLocal` (MNT-06); replay agents gain an `OnWarning` sink instead of hardcoded
+  Console prompt logging (GAP-09); plus the remaining P0–P3 bug/gap fixes (see review tracking doc).
+
+#### Performance
+- `MemoryVectorStore.Search` scores/sorts outside the lock + NaN guard (PERF-08); single-sort
+  distribution statistics (PERF-06); bounded `CorpusLoader` repeats (PERF-07); cached font bytes
+  (PERF-11); compiled-once snapshot scrub regexes (MNT-11); deadlock-safe `Build()` + `ConfigureAwait`
+  hygiene surfaced via CA2007 (PERF-01).
+
+#### Architecture (see [ADR-018](docs/adr/018-compliance-core-and-shared-extractions.md))
+- **New project `AgentEval.Compliance.Core`** (ARC-01) — shared regulation-neutral building blocks for the
+  GDPR/EU-AI-Act packs (embedded in the umbrella via `PrivateAssets="all"`).
+- Cross-cutting duplication consolidated into single owners: `EvalTreeLimits` (ARC-03), `ModelKeyMatcher`
+  (ARC-07), `CalibrationMath` (ARC-04), `EvalReportHelpers` (ARC-02), `WorkflowToolCallChecks` (ARC-05),
+  `AgenticCategoryResolver` (ARC-11), `RedTeamComplianceLeaf` (MNT-02), `MemoryScenarioContextBuilder`
+  (MNT-05), `WorkspaceRootDiscovery.CanonicaliseExistingDirectory` (MNT-03), and `PerformanceBenchmark`
+  logging seam (ARC-08).
+- **`UmbrellaDependencyClosureTests`** (ARC-10) — build-time guard that fails when a sub-project's runtime
+  package is not re-declared on the umbrella (prevents the SEC-02 class of silent-transitive bug).
+
+#### Build / tooling
+- `global.json` pinned deterministically — no prerelease, no major roll-forward (MNT-14).
+- .NET analyzers + code-style enforcement enabled non-fatally (MNT-04).
+- Calibrate commands no longer depend implicitly on the test assembly; the maintainer/CI-only contract is
+  centralized and documented (ARC-09).
+
 ### Changed (Phase 11 — Hygiene bundle, 2026-05-25)
 
 Plan-13 T4.1 v0.10.2 polish bundle — 38 small items across 5 sub-PRs

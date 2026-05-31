@@ -27,8 +27,9 @@ public static class BenchAgenticCommand
         string subject,
         string? rootOverride,
         string? inputText,
-        string? budgetTier = null) =>
-        RunAsync(preset, subject, rootOverride, inputText, evaluatorOverride: null, budgetTier);
+        string? budgetTier = null,
+        CancellationToken ct = default) =>
+        RunAsync(preset, subject, rootOverride, inputText, evaluatorOverride: null, budgetTier, ct);
 
     /// <summary>Runs the bench agentic command with optional overrides (used in tests).</summary>
     internal static async Task<int> RunAsync(
@@ -37,7 +38,8 @@ public static class BenchAgenticCommand
         string? rootOverride,
         string? inputText,
         IEvaluator? evaluatorOverride,
-        string? budgetTier = null)
+        string? budgetTier = null,
+        CancellationToken ct = default)
     {
         // ── Workspace setup ──────────────────────────────────────────────────
         if (rootOverride is not null)
@@ -125,7 +127,7 @@ public static class BenchAgenticCommand
         var store = new FileSystemOutputStore(agentEvalDir);
         // Workspace hygiene: sweep stale 24h+ sentinels. Phase-0 0.9: only
         // CLI writer paths sweep; MC (read-only viewer) does not.
-        await store.SweepStaleSentinelsAsync(TimeSpan.FromHours(24));
+        await store.SweepStaleSentinelsAsync(TimeSpan.FromHours(24), ct);
         var subjectIdentity = new SubjectIdentity(SubjectKind.Agent, subject);
 
         Console.WriteLine($"Running agentic benchmark ({preset}) for subject '{subject}'...");
@@ -135,7 +137,7 @@ public static class BenchAgenticCommand
         try
         {
             var runner = new AgenticBenchmarkRunner();
-            (runId, compositeResult) = await runner.RunAsync(store, subjectIdentity, benchmark, evalInput);
+            (runId, compositeResult) = await runner.RunAsync(store, subjectIdentity, benchmark, evalInput, ct: ct);
         }
         catch (Exception ex)
         {
@@ -158,7 +160,7 @@ public static class BenchAgenticCommand
         }
 
         // Derive output directory (mirrors AgenticBenchmarkReporter path convention)
-        var sanitizedSubject = SanitizeForPath(subject);
+        var sanitizedSubject = FileSystemLayout.Sanitize(subject);
         var ts = result.GeneratedAt.ToString("yyyy-MM-dd_HH-mm-ss");
         var outputDir = Path.Combine(agentEvalDir, "benchmarks", "agentic", sanitizedSubject, ts);
         Directory.CreateDirectory(outputDir);
@@ -273,13 +275,6 @@ public static class BenchAgenticCommand
                 "Known presets: agentic-execution, tool-call-accuracy, rag-quality, judge-quality, safety, telemetry, stochastic-stability, conversational, reasoning, user-experience, adversarial-direct.",
                 nameof(presetSpec))
         };
-    }
-
-    private static string SanitizeForPath(string name)
-    {
-        var invalid = Path.GetInvalidFileNameChars().Concat(new[] { '/', '\\' }).ToArray();
-        var s = string.Concat(name.Select(c => invalid.Contains(c) ? '-' : c));
-        return s.Trim('.', ' ');
     }
 
     /// <summary>

@@ -48,6 +48,23 @@ public class F1Score_Tests
     }
 
     [Fact]
+    public async Task EvaluateAsync_OverEmittedDuplicateTokens_PenalizedByMultisetF1()
+    {
+        // BUG-59: standard SQuAD token-F1 is multiset, so over-emission is penalised. "the the the
+        // cat" vs "the cat": overlap = min(the:3,1)+min(cat:1,1)=2; precision=2/4=0.5, recall=2/2=1.0,
+        // F1=2*0.5*1/1.5≈0.667 — NOT 1.0 (which the old set-based intersection produced).
+        var eval = AgenticEvaluatorFixture.BuildEvaluator("f1_score", new FixedScoreEvaluator(100));
+        var input = new EvalInput(
+            Query: "q",
+            Response: "the the the cat",
+            GroundTruth: "the cat");
+
+        var result = await eval.EvaluateAsync(input);
+
+        Assert.InRange(result.Score.Value, 0.66, 0.67);
+    }
+
+    [Fact]
     public async Task EvaluateAsync_CompletelyDifferentStrings_ReportsFail()
     {
         // Completely different tokens → F1 = 0.0 → fail (threshold 0.50).

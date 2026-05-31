@@ -14,6 +14,34 @@ namespace AgentEval.Tests;
 public class ToolUsageAssertionsTests
 {
     [Fact]
+    public void HaveCalledTool_MissingTool_InScope_RecordsSoftFailure_NoInvalidOperation()
+    {
+        // BUG-15: inside an AgentEvalScope, FailWith records and RETURNS, so HaveCalledTool used to
+        // fall through to GetCallsByName(...).First() on an empty sequence and throw
+        // InvalidOperationException — crashing the whole scope instead of collecting a soft failure.
+        var report = new ToolUsageReport(); // no calls
+
+        try
+        {
+            using var scope = new AgentEvalScope();
+
+            // The chain must NOT throw InvalidOperationException; it records soft failures and the
+            // null-tolerant ToolCallAssertion short-circuits the chained assertions.
+            report.Should().HaveCalledTool("MissingTool").WithArgument("x", "y").WithoutError();
+
+            Assert.True(scope.HasFailures); // the "tool not called" soft failure was collected
+        }
+        catch (InvalidOperationException)
+        {
+            Assert.Fail("HaveCalledTool chain threw InvalidOperationException (BUG-15) instead of a soft failure.");
+        }
+        catch (AgentEvalAssertionException)
+        {
+            // Expected on scope Dispose: soft failures were collected (correct scope behaviour).
+        }
+    }
+
+    [Fact]
     public void HaveCalledTool_WhenToolExists_DoesNotThrow()
     {
         var report = new ToolUsageReport();
@@ -142,6 +170,52 @@ public class ToolUsageAssertionsTests
         Assert.Contains("order", exception.Message.ToLower());
     }
     
+    [Fact]
+    public void HaveCallOrder_RepeatedTool_AllOccurrencesInOrder_DoesNotThrow()
+    {
+        // BUG-14: ["Search","Book","Search"] must match two DISTINCT Search calls via a cursor,
+        // not resolve both to the first Search.
+        var report = new ToolUsageReport();
+        report.AddCall(new ToolCallRecord { Name = "Search", CallId = "c1", Order = 1 });
+        report.AddCall(new ToolCallRecord { Name = "Book", CallId = "c2", Order = 2 });
+        report.AddCall(new ToolCallRecord { Name = "Search", CallId = "c3", Order = 3 });
+
+        var exception = Record.Exception(() =>
+            report.Should().HaveCallOrder("Search", "Book", "Search"));
+
+        Assert.Null(exception);
+    }
+
+    [Fact]
+    public void HaveCallOrder_RepeatedTool_SecondOccurrenceMissing_Throws()
+    {
+        // Only one Search was called, so the second expected "Search" cannot be matched after Book.
+        var report = new ToolUsageReport();
+        report.AddCall(new ToolCallRecord { Name = "Search", CallId = "c1", Order = 1 });
+        report.AddCall(new ToolCallRecord { Name = "Book", CallId = "c2", Order = 2 });
+
+        var exception = Assert.Throws<ToolAssertionException>(() =>
+            report.Should().HaveCallOrder("Search", "Book", "Search"));
+
+        Assert.Contains("Search", exception.Message);
+    }
+
+    [Fact]
+    public void HaveCallOrder_RepeatedTool_OnlyFirstOccurrence_DoesNotFalselyPass()
+    {
+        // "A then B then A again" must require a real second A AFTER B; B,A,A (no A after the
+        // matched first A-before-B) — here A,B with a trailing A satisfies; A,A,B must FAIL the
+        // final "...,Book" because no Book occurs after the second Search.
+        var report = new ToolUsageReport();
+        report.AddCall(new ToolCallRecord { Name = "Search", CallId = "c1", Order = 1 });
+        report.AddCall(new ToolCallRecord { Name = "Search", CallId = "c2", Order = 2 });
+
+        var exception = Assert.Throws<ToolAssertionException>(() =>
+            report.Should().HaveCallOrder("Search", "Book"));
+
+        Assert.Contains("Book", exception.Message);
+    }
+
     [Fact]
     public void HaveCalledAnyTool_WithCalls_DoesNotThrow()
     {

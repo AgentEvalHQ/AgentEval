@@ -26,12 +26,11 @@ namespace AgentEval.Evals.Agentic;
 /// </para>
 /// <para>
 /// <b>Shape A (CompositeEval-native)</b> registration: all eleven presets return a
-/// <see cref="CompositeEval"/>. Five of the eleven (Safety, Conversational, RAG, Reasoning,
+/// <see cref="CompositeEval"/>. Eight of the eleven (Safety, Conversational, RAG, Reasoning,
 /// User-Experience, AgenticExecution, ToolCallAccuracy, AdversarialDirect) require an
-/// <see cref="IEvaluator"/> judge; three (JudgeQuality, Telemetry, StochasticStability) are
-/// pure-code. Three (Conversational, Reasoning, UserExperience, AdversarialDirect) require a
-/// judge; the registry's <c>CompositeFactory</c> delegate rejects calls that omit a judge
-/// for those presets with a clear error.
+/// <see cref="IEvaluator"/> judge; the other three (JudgeQuality, Telemetry, StochasticStability)
+/// are pure-code. The registry's <c>CompositeFactory</c> delegate rejects calls that omit a judge
+/// for the judge-requiring presets with a clear error.
 /// </para>
 /// </remarks>
 internal static class AgenticBenchmarkRegistration

@@ -49,6 +49,48 @@ public class BenchPerfCommandTests
     }
 
     [Fact]
+    public async Task RunAsync_SubjectRequiringSanitization_ReportCoLocatesWithManifest()
+    {
+        // BUG-17: the store writes the manifest/summary under the SANITIZED subject dir,
+        // but the command hand-built the report path from the RAW subject. For any name
+        // Sanitize rewrites (here ':' '*' '?' → '-' plus a hash suffix), the report path
+        // diverged — orphaning the report or failing the write (false exit 1). The command
+        // must resolve the run dir via the store so the report co-locates with the manifest.
+        var workspace = CreateTempWorkspace();
+        try
+        {
+            const string messySubject = "perf:subject*needs?sanitize";
+            var stubAgent = new StubAgent(messySubject);
+
+            var exitCode = await BenchPerfCommand.RunAsync(
+                preset: "latency",
+                subject: messySubject,
+                prompt: "hello",
+                rootOverride: workspace,
+                agentOverride: stubAgent);
+
+            Assert.True(exitCode == 0 || exitCode == 2,
+                $"Expected exit 0/2, got {exitCode} — a divergent report path made the run fail.");
+
+            // Exactly one run was persisted; the report must live in that same run dir.
+            var subjectsDir = Path.Combine(workspace, ".agenteval", "subjects");
+            var summaryFiles = Directory
+                .EnumerateFiles(subjectsDir, "summary.json", SearchOption.AllDirectories)
+                .ToList();
+            Assert.Single(summaryFiles);
+
+            var runDir = Path.GetDirectoryName(summaryFiles[0])!;
+            Assert.True(
+                File.Exists(Path.Combine(runDir, "report.json")),
+                $"report.json must co-locate with summary.json in the store-resolved run dir ({runDir}).");
+        }
+        finally
+        {
+            Cleanup(workspace);
+        }
+    }
+
+    [Fact]
     public async Task RunAsync_UnknownPreset_ReturnsError()
     {
         var workspace = CreateTempWorkspace();

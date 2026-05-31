@@ -49,16 +49,18 @@ public sealed class PdfEvalResultRenderer : IEvalResultRenderer
     /// <inheritdoc/>
     public string FileExtension => ".pdf";
 
-    private const int MaxRenderWalkDepth = 32;
+    private const int MaxRenderWalkDepth = EvalTreeLimits.MaxTreeWalkDepth; // ARC-03: one source of truth
 
     /// <inheritdoc/>
     public Task<byte[]> RenderAsync(EvalResult result, EvalResultRenderOptions options, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(result);
         ArgumentNullException.ThrowIfNull(options);
+        ct.ThrowIfCancellationRequested(); // honor cancellation requested before render (GAP-12)
 
         return Task.Run(() =>
         {
+            ct.ThrowIfCancellationRequested(); // GAP-12 — don't start the synchronous render if cancelled
             var doc = Document.Create(d =>
             {
                 d.Page(p => RenderCover(p, result, options));

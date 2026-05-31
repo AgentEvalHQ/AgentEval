@@ -74,6 +74,7 @@ public class ConversationRunner
     {
         var result = new ConversationResult { TestCase = testCase };
         var startTime = DateTime.UtcNow;
+        var aborted = false;
 
         try
         {
@@ -82,44 +83,79 @@ public class ConversationRunner
                 ct.ThrowIfCancellationRequested();
                 var turnStart = DateTime.UtcNow;
 
-                switch (turn.Role.ToLowerInvariant())
+                if (string.Equals(turn.Role, "user", StringComparison.OrdinalIgnoreCase))
                 {
-                    case "system":
-                        // System prompts should be configured on the agent directly.
-                        result.ActualTurns.Add(turn);
-                        break;
+                    result.ActualTurns.Add(turn);
 
-                    case "user":
-                        result.ActualTurns.Add(turn);
-                        
-                        // Invoke the agent
-                        var agentResponse = await _agent.InvokeAsync(turn.Content, ct);
-                        var toolCalls = ExtractToolCalls(agentResponse);
-                        
-                        result.ActualTurns.Add(Turn.Assistant(agentResponse.Text, toolCalls.ToArray()));
-                        
-                        foreach (var tc in toolCalls)
-                        {
-                            result.ToolsCalled.Add(tc.Name);
-                        }
-                        break;
+                    AgentResponse agentResponse;
+                    try
+                    {
+                        // Honor MaxRetries on agent invocation (BUG-36 — was a dead option).
+                        agentResponse = await InvokeWithRetryAsync(turn.Content, ct);
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        throw;
+                    }
+                    catch (Exception ex)
+                    {
+                        // Preserve the FULL exception and record an explicit failed assertion so
+                        // callers can distinguish an infrastructure crash from a legitimate failure —
+                        // previously the error was reduced to ex.Message with empty Assertions
+                        // (BUG-36).
+                        result.Error = ex.ToString();
+                        result.Assertions.Add(new AssertionResult(
+                            "AgentInvocation",
+                            false,
+                            $"Agent invocation failed after {_options.MaxRetries + 1} attempt(s): " +
+                            $"{ex.GetType().Name}: {ex.Message}"));
+                        result.TurnDurations.Add(DateTime.UtcNow - turnStart);
 
-                    case "tool":
-                        // Tool responses are handled internally by the agent.
-                        result.ActualTurns.Add(turn);
+                        // Honor ContinueOnError (BUG-36 — was a dead option): keep processing the
+                        // remaining turns, otherwise stop and finalize with the recorded failure.
+                        if (_options.ContinueOnError)
+                            continue;
+                        aborted = true;
                         break;
+                    }
 
-                    case "assistant":
-                        // Expected assistant turns are for validation, not sent to agent
-                        break;
+                    var toolCalls = ExtractToolCalls(agentResponse);
+                    result.ActualTurns.Add(Turn.Assistant(agentResponse.Text, toolCalls.ToArray()));
+                    foreach (var tc in toolCalls)
+                    {
+                        result.ToolsCalled.Add(tc.Name);
+                    }
+
+                    result.TurnDurations.Add(DateTime.UtcNow - turnStart);
                 }
+                else
+                {
+                    switch (turn.Role.ToLowerInvariant())
+                    {
+                        case "system": // System prompts should be configured on the agent directly.
+                        case "tool":   // Tool responses are handled internally by the agent.
+                            result.ActualTurns.Add(turn);
+                            break;
+                        case "assistant":
+                            // Expected assistant turns are for validation, not sent to agent.
+                            break;
+                    }
 
-                result.TurnDurations.Add(DateTime.UtcNow - turnStart);
+                    result.TurnDurations.Add(DateTime.UtcNow - turnStart);
+                }
             }
 
             result.Duration = DateTime.UtcNow - startTime;
-            RunAssertions(testCase, result);
-            result.Success = result.Assertions.All(a => a.Passed);
+            if (aborted)
+            {
+                // An explicit AgentInvocation failure assertion was already recorded above.
+                result.Success = false;
+            }
+            else
+            {
+                RunAssertions(testCase, result);
+                result.Success = result.Assertions.All(a => a.Passed);
+            }
         }
         catch (OperationCanceledException)
         {
@@ -129,11 +165,43 @@ public class ConversationRunner
         }
         catch (Exception ex)
         {
-            result.Error = ex.Message;
+            // Unexpected (non-invocation) error: preserve the full exception and record an explicit
+            // failed assertion rather than reducing it to ex.Message with empty Assertions (BUG-36).
+            result.Error = ex.ToString();
+            result.Assertions.Add(new AssertionResult("RunnerError", false, $"{ex.GetType().Name}: {ex.Message}"));
             result.Success = false;
         }
 
         return result;
+    }
+
+    /// <summary>
+    /// Invokes the agent, retrying up to <see cref="ConversationRunnerOptions.MaxRetries"/> times on
+    /// failure before rethrowing the last exception. <see cref="OperationCanceledException"/> is
+    /// never retried (BUG-36).
+    /// </summary>
+    private async Task<AgentResponse> InvokeWithRetryAsync(string content, CancellationToken ct)
+    {
+        var attempts = _options.MaxRetries + 1;
+        Exception? last = null;
+        for (var attempt = 0; attempt < attempts; attempt++)
+        {
+            ct.ThrowIfCancellationRequested();
+            try
+            {
+                return await _agent.InvokeAsync(content, ct);
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                last = ex; // retry until attempts are exhausted
+            }
+        }
+
+        throw last!; // all attempts failed
     }
 
     /// <summary>

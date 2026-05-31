@@ -196,6 +196,23 @@ public class CachingEmbeddingsDecoratorTests
     }
 
     #endregion
+
+    #region Count-mismatch guard (BUG-43)
+
+    [Fact]
+    public async Task GetEmbeddingsAsync_ProviderReturnsWrongCount_ThrowsInvalidOperation()
+    {
+        // BUG-43: a provider returning a different count than requested must fail fast — not
+        // throw IndexOutOfRange (fewer) or silently mis-pair text→vector into the cache.
+        var decorator = new CachingEmbeddingsDecorator(new MiscountingEmbeddingsProvider());
+
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => decorator.GetEmbeddingsAsync(new[] { "a", "b", "c" }));
+
+        Assert.Contains("one embedding per input", ex.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    #endregion
 }
 
 #region Test Helpers
@@ -231,6 +248,22 @@ internal class FakeEmbeddingsProvider : IAgentEvalEmbeddings
         // Deterministic vector from hash code — unique per distinct text
         var hash = text.GetHashCode();
         return new ReadOnlyMemory<float>([hash * 0.001f, hash * 0.002f, hash * 0.003f]);
+    }
+}
+
+/// <summary>Misbehaving provider that returns ONE FEWER embedding than requested (BUG-43).</summary>
+internal sealed class MiscountingEmbeddingsProvider : IAgentEvalEmbeddings
+{
+    public Task<ReadOnlyMemory<float>> GetEmbeddingAsync(string text, CancellationToken cancellationToken = default)
+        => Task.FromResult(new ReadOnlyMemory<float>([1f]));
+
+    public Task<IReadOnlyList<ReadOnlyMemory<float>>> GetEmbeddingsAsync(
+        IEnumerable<string> texts, CancellationToken cancellationToken = default)
+    {
+        var list = texts.ToList();
+        IReadOnlyList<ReadOnlyMemory<float>> r =
+            list.Skip(1).Select(_ => new ReadOnlyMemory<float>([1f])).ToList();
+        return Task.FromResult(r);
     }
 }
 

@@ -69,6 +69,7 @@ public sealed class GDPRPdfRenderer
     {
         ArgumentNullException.ThrowIfNull(evidence);
         ArgumentException.ThrowIfNullOrWhiteSpace(outputPath);
+        ct.ThrowIfCancellationRequested(); // honor cancellation requested before render (GAP-12)
 
         var pdf = Document.Create(doc =>
         {
@@ -82,8 +83,7 @@ public sealed class GDPRPdfRenderer
             var pillarSubResults = evidence.CompositeTree.Details.SubResults ?? Array.Empty<EvalResult>();
             foreach (var pillarResult in pillarSubResults)
             {
-                if (pillarResult.Metric.Key.Contains("Pillar", StringComparison.OrdinalIgnoreCase)
-                    || pillarResult.Metric.Category.Contains("pillar", StringComparison.OrdinalIgnoreCase))
+                if (IsPillarNode(pillarResult))
                 {
                     doc.Page(p => RenderL1Pillar(p, pillarResult, evidence));
                 }
@@ -102,8 +102,13 @@ public sealed class GDPRPdfRenderer
             doc.Page(p => RenderMethodologyAppendix(p, evidence));
         });
 
+        ct.ThrowIfCancellationRequested(); // GAP-12
         Directory.CreateDirectory(Path.GetDirectoryName(outputPath)!);
-        return Task.Run(() => pdf.GeneratePdf(outputPath), ct);
+        return Task.Run(() =>
+        {
+            ct.ThrowIfCancellationRequested(); // GAP-12 — don't start the synchronous render if cancelled
+            pdf.GeneratePdf(outputPath);
+        }, ct);
     }
 
     // ── G6.2 Cover page ──────────────────────────────────────────────────────
@@ -115,8 +120,10 @@ public sealed class GDPRPdfRenderer
         {
             col.Item().Text("GDPR Compliance Report").FontSize(28).Bold();
             col.Item().Text($"Preset: {Capitalize(ev.Preset)}").FontSize(14);
-            col.Item().PaddingTop(20).Text($"Subject: {ev.Base.Subject.Name} ({ev.Base.Subject.Kind})");
-            col.Item().Text($"Run ID: {ev.Base.SourceRun.RunId}");
+            // Cap free-form Subject.Name / RunId length so an oversized agent-controlled value
+            // cannot blow the PDF layout (SEC-16). PDF text needs no Markdown escaping.
+            col.Item().PaddingTop(20).Text($"Subject: {AgentEval.Core.Reporting.MarkdownText.Truncate(ev.Base.Subject.Name)} ({ev.Base.Subject.Kind})");
+            col.Item().Text($"Run ID: {AgentEval.Core.Reporting.MarkdownText.Truncate(ev.Base.SourceRun.RunId)}");
             col.Item().Text($"Generated: {ev.Base.GeneratedAt:O}");
 
             col.Item().PaddingTop(30)
@@ -177,6 +184,15 @@ public sealed class GDPRPdfRenderer
         });
     }
 
+    /// <summary>
+    /// True when <paramref name="node"/> is a pillar grouping node — identified by its Key
+    /// starting with "Pillar" (matching SummaryBuilder). Article nodes must NOT match: their
+    /// category is "compliance.{Pillar}" (which contains "pillar"), so the previous
+    /// Category.Contains check rendered every article as a mislabeled pillar page too (BUG-03).
+    /// </summary>
+    internal static bool IsPillarNode(EvalResult node) =>
+        node.Metric.Key.StartsWith("Pillar", StringComparison.OrdinalIgnoreCase);
+
     // ── G6.4 Per-pillar detail page ──────────────────────────────────────────
 
     private static void RenderL1Pillar(PageDescriptor page, EvalResult pillar, GdprComplianceEvidence ev)
@@ -230,6 +246,14 @@ public sealed class GDPRPdfRenderer
         GdprComplianceEvidence ev)
     {
         page.Margin(40);
+        // Resolve the article spec once via the non-throwing lookup. A registry miss is an expected,
+        // recoverable condition (e.g. re-rendering an evidence-only archive without the GDPR sample
+        // on the classpath) — previously this was done with exception-as-control-flow at two sites
+        // (the second re-resolving per scenario), with a bare catch that also hid real lookup
+        // failures (MNT-09).
+        ArticleSpec? spec = null;
+        _articles?.TryGetSpec(articleKey, out spec);
+
         page.Content().Column(col =>
         {
             col.Item().Text($"Article: {articleKey}").FontSize(18).Bold();
@@ -251,10 +275,6 @@ public sealed class GDPRPdfRenderer
                         c.RelativeColumn();
                         c.RelativeColumn();
                     });
-
-                    // Try to get article spec for sensitive-flag + Phase-6 Task 6.9 lookup.
-                    ArticleSpec? spec = null;
-                    try { spec = _articles?.GetSpec(articleKey); } catch { /* registry miss — skip redaction */ }
 
                     // Phase-6 Task 6.9: prefer the actual scenario input from the
                     // article spec when available; fall back to judge-reasoning when
@@ -313,8 +333,6 @@ public sealed class GDPRPdfRenderer
                     col.Item().PaddingTop(20).Text("Illustrative scenario verbatims").FontSize(14).Bold();
                     foreach (var scenario in illustrated)
                     {
-                        ArticleSpec? spec = null;
-                        try { spec = _articles?.GetSpec(articleKey); } catch { }
                         var scenarioSpec = spec?.Scenarios.FirstOrDefault(s => s.Id == scenario.Metric.Key);
                         bool sensitive = scenarioSpec?.Sensitive ?? false;
 
@@ -421,8 +439,7 @@ public sealed class GDPRPdfRenderer
         _ => Colors.Red.Medium
     };
 
-    private static string Capitalize(string s) =>
-        string.IsNullOrEmpty(s) ? s : char.ToUpperInvariant(s[0]) + s[1..];
+    private static string Capitalize(string s) => EvalReportHelpers.Capitalize(s); // ARC-02: shared
 
     private static string GetPresetDescription(string preset) => preset.ToLowerInvariant() switch
     {
@@ -442,26 +459,9 @@ public sealed class GDPRPdfRenderer
             "regression testing. Pass threshold is 0.85."
     };
 
-    // Phase-7 Task 7.2: shared depth cap mirrors MissionControl.GraphQL.Query.MaxTreeWalkDepth.
-    private const int MaxRenderWalkDepth = 32;
-
     private static EvalResult? FindResultByKey(EvalResult root, string key, int depth = 0)
-    {
-        if (depth > MaxRenderWalkDepth) return null;
-        if (root.Metric.Key == key) return root;
-        if (root.Details.SubResults is null) return null;
-        foreach (var child in root.Details.SubResults)
-        {
-            var found = FindResultByKey(child, key, depth + 1);
-            if (found is not null) return found;
-        }
-        return null;
-    }
+        => EvalReportHelpers.FindByKey(root, key, depth); // ARC-02: shared (depth cap via EvalTreeLimits)
 
     private static string TruncateForPreview(string? text, int maxLen = 80)
-    {
-        if (string.IsNullOrEmpty(text)) return string.Empty;
-        text = text.Replace('\n', ' ').Replace('\r', ' ');
-        return text.Length <= maxLen ? text : text[..maxLen] + "…";
-    }
+        => EvalReportHelpers.TruncateForPreview(text, maxLen); // ARC-02: shared
 }

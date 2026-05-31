@@ -3,6 +3,7 @@
 // Licensed under the MIT License.
 
 using AgentEval.Evals;
+using AgentEval.Compliance.Core;
 
 namespace AgentEval.Compliance.EuAiAct.Reporting;
 

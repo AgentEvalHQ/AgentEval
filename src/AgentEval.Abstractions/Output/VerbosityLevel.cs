@@ -84,7 +84,11 @@ public class VerbositySettings
 /// </summary>
 public static class VerbosityConfiguration
 {
-    private static VerbosityLevel? _overrideLevel;
+    // MNT-06: flow-scoped, not a process-global mutable field. AsyncLocal confines an override to the
+    // logical async flow that set it, so it no longer leaks between concurrent evaluations or across
+    // parallel unit tests (xUnit runs test classes in parallel), and a child flow's override does not
+    // propagate back to its parent. Each flow reads/writes its own value with no lock needed.
+    private static readonly AsyncLocal<VerbosityLevel?> _overrideLevel = new();
 
     /// <summary>
     /// Gets the current verbosity level from configuration.
@@ -94,8 +98,8 @@ public static class VerbosityConfiguration
     {
         get
         {
-            if (_overrideLevel.HasValue)
-                return _overrideLevel.Value;
+            if (_overrideLevel.Value.HasValue)
+                return _overrideLevel.Value.Value;
 
             var envVar = Environment.GetEnvironmentVariable("AGENTEVAL_VERBOSITY");
             if (!string.IsNullOrEmpty(envVar) && Enum.TryParse<VerbosityLevel>(envVar, ignoreCase: true, out var level))
@@ -138,13 +142,14 @@ public static class VerbosityConfiguration
     }
 
     /// <summary>
-    /// Temporarily override the verbosity level.
-    /// Use in tests or specific scenarios.
+    /// Temporarily override the verbosity level for the current async flow.
+    /// Use in tests or specific scenarios. The override is flow-scoped (AsyncLocal) — it does not leak
+    /// to sibling flows, concurrent evaluations, or back to a parent flow (MNT-06).
     /// </summary>
-    public static void SetOverride(VerbosityLevel level) => _overrideLevel = level;
+    public static void SetOverride(VerbosityLevel level) => _overrideLevel.Value = level;
 
     /// <summary>
-    /// Clear any verbosity override.
+    /// Clear any verbosity override for the current async flow.
     /// </summary>
-    public static void ClearOverride() => _overrideLevel = null;
+    public static void ClearOverride() => _overrideLevel.Value = null;
 }

@@ -68,6 +68,7 @@ public sealed class EuAiActPdfRenderer
     {
         ArgumentNullException.ThrowIfNull(evidence);
         ArgumentException.ThrowIfNullOrWhiteSpace(outputPath);
+        ct.ThrowIfCancellationRequested(); // honor cancellation requested before render (GAP-12)
 
         var pdf = Document.Create(doc =>
         {
@@ -81,8 +82,7 @@ public sealed class EuAiActPdfRenderer
             var pillarSubResults = evidence.CompositeTree.Details.SubResults ?? Array.Empty<EvalResult>();
             foreach (var pillarResult in pillarSubResults)
             {
-                if (pillarResult.Metric.Key.Contains("Pillar", StringComparison.OrdinalIgnoreCase)
-                    || pillarResult.Metric.Category.Contains("pillar", StringComparison.OrdinalIgnoreCase))
+                if (IsPillarNode(pillarResult))
                 {
                     doc.Page(p => RenderL1Pillar(p, pillarResult, evidence));
                 }
@@ -101,8 +101,13 @@ public sealed class EuAiActPdfRenderer
             doc.Page(p => RenderMethodologyAppendix(p, evidence));
         });
 
+        ct.ThrowIfCancellationRequested(); // GAP-12
         Directory.CreateDirectory(Path.GetDirectoryName(outputPath)!);
-        return Task.Run(() => pdf.GeneratePdf(outputPath), ct);
+        return Task.Run(() =>
+        {
+            ct.ThrowIfCancellationRequested(); // GAP-12 — don't start the synchronous render if cancelled
+            pdf.GeneratePdf(outputPath);
+        }, ct);
     }
 
     // ── L0 Cover page ────────────────────────────────────────────────────────
@@ -175,6 +180,14 @@ public sealed class EuAiActPdfRenderer
             });
         });
     }
+
+    /// <summary>
+    /// True when <paramref name="node"/> is a pillar grouping node — identified by its Key
+    /// starting with "Pillar". Article nodes (category "compliance.{Pillar}") must NOT match,
+    /// or the flat Smoke preset renders each article as a mislabeled pillar page too (BUG-03).
+    /// </summary>
+    internal static bool IsPillarNode(EvalResult node) =>
+        node.Metric.Key.StartsWith("Pillar", StringComparison.OrdinalIgnoreCase);
 
     // ── Per-pillar detail page ───────────────────────────────────────────────
 
@@ -441,8 +454,7 @@ public sealed class EuAiActPdfRenderer
         _ => Colors.Red.Medium
     };
 
-    private static string Capitalize(string s) =>
-        string.IsNullOrEmpty(s) ? s : char.ToUpperInvariant(s[0]) + s[1..];
+    private static string Capitalize(string s) => EvalReportHelpers.Capitalize(s); // ARC-02: shared
 
     private static string GetJudgeModeDescription(string judgeMode) => judgeMode.ToLowerInvariant() switch
     {
@@ -476,26 +488,9 @@ public sealed class EuAiActPdfRenderer
             "testing against Regulation (EU) 2024/1689. Pass threshold is 0.85."
     };
 
-    // Phase-7 Task 7.2: shared depth cap mirrors MissionControl.GraphQL.Query.MaxTreeWalkDepth.
-    private const int MaxRenderWalkDepth = 32;
-
     private static EvalResult? FindResultByKey(EvalResult root, string key, int depth = 0)
-    {
-        if (depth > MaxRenderWalkDepth) return null;
-        if (root.Metric.Key == key) return root;
-        if (root.Details.SubResults is null) return null;
-        foreach (var child in root.Details.SubResults)
-        {
-            var found = FindResultByKey(child, key, depth + 1);
-            if (found is not null) return found;
-        }
-        return null;
-    }
+        => EvalReportHelpers.FindByKey(root, key, depth); // ARC-02: shared (depth cap via EvalTreeLimits)
 
     private static string TruncateForPreview(string? text, int maxLen = 80)
-    {
-        if (string.IsNullOrEmpty(text)) return string.Empty;
-        text = text.Replace('\n', ' ').Replace('\r', ' ');
-        return text.Length <= maxLen ? text : text[..maxLen] + "…";
-    }
+        => EvalReportHelpers.TruncateForPreview(text, maxLen); // ARC-02: shared
 }

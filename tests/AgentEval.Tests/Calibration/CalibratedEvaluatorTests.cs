@@ -561,4 +561,103 @@ public class CalibratedEvaluatorTests
     }
 
     #endregion
+
+    #region Per-judge timeout vs caller cancellation (BUG-05)
+
+    [Fact]
+    public async Task EvaluateAsync_PerJudgeTimeout_DegradesGracefully_DoesNotAbortRun()
+    {
+        // BUG-05: a per-judge timeout (our linked CTS fires via CancelAfter) must be treated
+        // as a judge failure, NOT propagated through Task.WhenAll to fail the whole run.
+        var evaluator = new CalibratedEvaluator(
+            new (string Name, IEvaluator Evaluator)[]
+            {
+                ("Fast", new StubEvaluator(overallScore: 85)),
+                ("Slow", new HangingEvaluator()),
+            },
+            new CalibratedJudgeOptions
+            {
+                Timeout = TimeSpan.FromMilliseconds(100),
+                ContinueOnJudgeFailure = true,
+                MinimumJudgesRequired = 1,
+                Strategy = VotingStrategy.Median,
+            });
+
+        // Act — must complete (not throw) using the fast judge alone.
+        var result = await evaluator.EvaluateAsync("input", "output", new[] { "Is accurate" });
+
+        // Assert — only the fast judge contributed its score.
+        Assert.Equal(85, result.OverallScore);
+    }
+
+    [Fact]
+    public async Task EvaluateAsync_PerJudgeTimeout_WithContinueDisabled_Throws()
+    {
+        var evaluator = new CalibratedEvaluator(
+            new (string Name, IEvaluator Evaluator)[]
+            {
+                ("Slow", new HangingEvaluator()),
+            },
+            new CalibratedJudgeOptions
+            {
+                Timeout = TimeSpan.FromMilliseconds(100),
+                ContinueOnJudgeFailure = false,
+            });
+
+        await Assert.ThrowsAsync<TimeoutException>(
+            () => evaluator.EvaluateAsync("input", "output", new[] { "Is accurate" }));
+    }
+
+    [Fact]
+    public async Task EvaluateAsync_CallerCancellation_StillPropagates()
+    {
+        // The fix must NOT swallow caller cancellation — only the per-judge timeout path.
+        var evaluator = new CalibratedEvaluator(
+            new (string Name, IEvaluator Evaluator)[]
+            {
+                ("Slow", new HangingEvaluator()),
+            },
+            new CalibratedJudgeOptions
+            {
+                // Far longer than any plausible CI scheduling delay so the caller-cancel below is
+                // unambiguously the cause of the OCE. With a tight per-judge timeout, thread-pool
+                // starvation could let the timeout fire first; it would then be swallowed by
+                // ContinueOnJudgeFailure and no OCE would propagate — a flake, not the behaviour
+                // under test (caller cancellation must still propagate).
+                Timeout = TimeSpan.FromMinutes(10),
+                ContinueOnJudgeFailure = true,
+            });
+
+        using var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(100));
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => evaluator.EvaluateAsync("input", "output", new[] { "Is accurate" }, cts.Token));
+    }
+
+    private sealed class StubEvaluator(int overallScore) : IEvaluator
+    {
+        public Task<EvaluationResult> EvaluateAsync(
+            string input, string output, IEnumerable<string> criteria, CancellationToken ct = default) =>
+            Task.FromResult(new EvaluationResult
+            {
+                OverallScore = overallScore,
+                Summary = "stub",
+                CriteriaResults = criteria
+                    .Select(c => new CriterionResult { Criterion = c, Met = true, Explanation = "stub" })
+                    .ToList(),
+            });
+    }
+
+    private sealed class HangingEvaluator : IEvaluator
+    {
+        public async Task<EvaluationResult> EvaluateAsync(
+            string input, string output, IEnumerable<string> criteria, CancellationToken ct = default)
+        {
+            // Honours the token: cancelled by the per-judge CTS or the caller token.
+            await Task.Delay(TimeSpan.FromMinutes(5), ct);
+            throw new InvalidOperationException("unreachable");
+        }
+    }
+
+    #endregion
 }

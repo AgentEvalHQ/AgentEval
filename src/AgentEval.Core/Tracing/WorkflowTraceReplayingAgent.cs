@@ -126,6 +126,12 @@ public sealed class WorkflowTraceReplayingAgent : IWorkflowEvaluableAgent
 
     private WorkflowExecutionResult BuildWorkflowResult()
     {
+        // Reconstruct a workflow-global 1-based tool-call order across all steps so replay-based
+        // cross-step tool-ordering assertions are meaningful — the recorder doesn't persist an
+        // explicit order, and the previous hard-coded Order=0 collapsed every call to 0 (BUG-45).
+        // The outer .ToList() below forces a single sequential pass, so this counter increments in
+        // step order then per-step list order.
+        var globalToolOrder = 0;
         var steps = _trace.Steps.Select(s => new ExecutorStep
         {
             ExecutorId = s.ExecutorId,
@@ -140,12 +146,10 @@ public sealed class WorkflowTraceReplayingAgent : IWorkflowEvaluableAgent
             {
                 Name = tc.Name,
                 CallId = $"replay-{tc.Name}-{s.StepIndex}",
-                Arguments = !string.IsNullOrEmpty(tc.Arguments)
-                    ? System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, object?>>(tc.Arguments)
-                    : null,
+                Arguments = ParseRecordedArgumentsOrNull(tc.Arguments),
                 Result = tc.Result,
                 Exception = tc.Succeeded ? null : new Exception(tc.Error ?? "Unknown error"),
-                Order = 0,
+                Order = ++globalToolOrder,
                 StartTime = tc.StartedAt,
                 EndTime = tc.StartedAt?.AddMilliseconds(tc.DurationMs ?? 0)
             }).ToList(),
@@ -262,7 +266,12 @@ public sealed class WorkflowTraceReplayingAgent : IWorkflowEvaluableAgent
                 throw new WorkflowTraceReplayMismatchException(message, actual, recorded);
 
             case MismatchBehavior.Warn:
-                Console.WriteLine($"[WorkflowTraceReplayer Warning] {message}");
+                // GAP-09: route through the configurable sink when provided, else fall back to Console.
+                var warning = $"[WorkflowTraceReplayer Warning] {message}";
+                if (_options.OnWarning is not null)
+                    _options.OnWarning(warning);
+                else
+                    Console.WriteLine(warning);
                 break;
 
             case MismatchBehavior.Ignore:
@@ -286,6 +295,25 @@ public sealed class WorkflowTraceReplayingAgent : IWorkflowEvaluableAgent
         if (string.IsNullOrEmpty(text) || text.Length <= maxLength)
             return text ?? string.Empty;
         return text.Substring(0, maxLength) + "...";
+    }
+
+    /// <summary>
+    /// Deserializes recorded tool-call arguments to a dictionary, tolerating a malformed /
+    /// schema-drifted / hand-edited trace (a non-object JSON root, etc.). Returns null instead of
+    /// throwing JsonException so deterministic replay cannot crash on a bad trace (BUG-46).
+    /// </summary>
+    private static Dictionary<string, object?>? ParseRecordedArgumentsOrNull(string? arguments)
+    {
+        if (string.IsNullOrEmpty(arguments))
+            return null;
+        try
+        {
+            return System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, object?>>(arguments);
+        }
+        catch (System.Text.Json.JsonException)
+        {
+            return null;
+        }
     }
 }
 
@@ -324,6 +352,14 @@ public class WorkflowTraceReplayOptions
     /// Default is 0.1.
     /// </summary>
     public double DelayMultiplier { get; set; } = 0.1;
+
+    /// <summary>
+    /// Optional sink for <see cref="MismatchBehavior.Warn"/> messages (GAP-09). When set, mismatch
+    /// warnings — which include (truncated) prompt text — are routed here instead of
+    /// <see cref="Console.WriteLine(string)"/>, so a host can forward to an <c>ILogger</c>, redact, or
+    /// suppress them rather than leaking prompt content to stdout. Defaults to null (legacy Console behavior).
+    /// </summary>
+    public Action<string>? OnWarning { get; set; }
 }
 
 /// <summary>

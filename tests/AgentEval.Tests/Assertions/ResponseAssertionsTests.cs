@@ -10,6 +10,24 @@ namespace AgentEval.Tests;
 
 public class ResponseAssertionsTests
 {
+    [Fact]
+    public void MatchPattern_CatastrophicBacktrackingPattern_FailsFast_DoesNotHang()
+    {
+        // SEC-07: a catastrophic-backtracking regex over a long non-matching input would hang
+        // the evaluation thread without a MatchTimeout. The 1s timeout converts the hang into a
+        // bounded assertion failure naming the timeout.
+        var adversarial = new string('a', 50) + "!"; // forces backtracking against ^(a+)+$
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+
+        var ex = Assert.Throws<ResponseAssertionException>(
+            () => adversarial.Should().MatchPattern("^(a+)+$"));
+
+        sw.Stop();
+        Assert.True(sw.Elapsed < TimeSpan.FromSeconds(15),
+            $"MatchPattern should fail fast via MatchTimeout, but took {sw.Elapsed}.");
+        Assert.Contains("timed out", ex.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
     #region Constructor Tests
 
     [Fact]

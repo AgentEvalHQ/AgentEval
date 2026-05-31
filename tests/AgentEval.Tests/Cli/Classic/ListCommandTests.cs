@@ -20,8 +20,13 @@ public class ListCommandTests
 {
     private (string Output, int ExitCode) CaptureOutput(string? type)
     {
+        // GAP-16/GAP-13: catalog data now goes to stdout (so `agenteval list | grep` works); the
+        // unknown-type diagnostic stays on stderr. Capture BOTH so these assertions cover the
+        // combined surface regardless of which stream each line uses.
+        var originalOut = Console.Out;
         var originalErr = Console.Error;
         using var sw = new StringWriter();
+        Console.SetOut(sw);
         Console.SetError(sw);
         try
         {
@@ -30,6 +35,7 @@ public class ListCommandTests
         }
         finally
         {
+            Console.SetOut(originalOut);
             Console.SetError(originalErr);
         }
     }
@@ -99,6 +105,33 @@ public class ListCommandTests
     // ═══════════════════════════════════════════════════════════════════════════
     // METRICS
     // ═══════════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void Execute_Metrics_WritesCatalogToStdout()
+    {
+        // GAP-13: the catalog IS the command's data, so it must go to STDOUT (so `agenteval list |
+        // grep` and `> file` work) — not stderr. Capture stdout only.
+        var originalOut = Console.Out;
+        using var sw = new StringWriter();
+        Console.SetOut(sw);
+        try { ListCommand.Execute("metrics"); }
+        finally { Console.SetOut(originalOut); }
+
+        Assert.Contains("llm_faithfulness", sw.ToString());
+    }
+
+    [Fact]
+    public void Execute_UnknownType_WritesDiagnosticToStderr()
+    {
+        // The error diagnostic remains on stderr (reserved for diagnostics), not stdout.
+        var originalErr = Console.Error;
+        using var sw = new StringWriter();
+        Console.SetError(sw);
+        try { ListCommand.Execute("bogus"); }
+        finally { Console.SetError(originalErr); }
+
+        Assert.Contains("Unknown type", sw.ToString());
+    }
 
     [Fact]
     public void Execute_Metrics_ListsAllMetricCategories()

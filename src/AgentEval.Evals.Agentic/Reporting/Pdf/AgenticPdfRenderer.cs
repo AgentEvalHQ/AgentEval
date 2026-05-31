@@ -55,6 +55,7 @@ public sealed class AgenticPdfRenderer
     {
         ArgumentNullException.ThrowIfNull(result);
         ArgumentException.ThrowIfNullOrWhiteSpace(outputPath);
+        ct.ThrowIfCancellationRequested(); // honor cancellation requested before render (GAP-12)
 
         var pdf = Document.Create(doc =>
         {
@@ -93,11 +94,16 @@ public sealed class AgenticPdfRenderer
             doc.Page(p => RenderMethodologyAppendix(p, result));
         });
 
+        ct.ThrowIfCancellationRequested(); // GAP-12
         var dir = Path.GetDirectoryName(outputPath);
         if (!string.IsNullOrEmpty(dir))
             Directory.CreateDirectory(dir);
 
-        return Task.Run(() => pdf.GeneratePdf(outputPath), ct);
+        return Task.Run(() =>
+        {
+            ct.ThrowIfCancellationRequested(); // GAP-12 — don't start the synchronous render if cancelled
+            pdf.GeneratePdf(outputPath);
+        }, ct);
     }
 
     // ── L0 Cover page ────────────────────────────────────────────────────────
@@ -445,21 +451,8 @@ public sealed class AgenticPdfRenderer
             "and aggregation rules."
     };
 
-    // Phase-7 Task 7.2: shared depth cap mirrors MissionControl.GraphQL.Query.MaxTreeWalkDepth.
-    private const int MaxRenderWalkDepth = 32;
-
     private static EvalResult? FindResultByKey(EvalResult root, string key, int depth = 0)
-    {
-        if (depth > MaxRenderWalkDepth) return null;
-        if (root.Metric.Key == key) return root;
-        if (root.Details.SubResults is null) return null;
-        foreach (var child in root.Details.SubResults)
-        {
-            var found = FindResultByKey(child, key, depth + 1);
-            if (found is not null) return found;
-        }
-        return null;
-    }
+        => EvalReportHelpers.FindByKey(root, key, depth); // ARC-02: shared (depth cap via EvalTreeLimits)
 
     /// <summary>
     /// Returns per-category entries in canonical order: known categories first
@@ -491,33 +484,12 @@ public sealed class AgenticPdfRenderer
         if (result?.Metric.Category is { Length: > 0 } cat)
             return cat;
 
-        // Fallback: infer from key naming conventions
-        return evaluatorKey.ToLowerInvariant() switch
-        {
-            var k when k.Contains("task") || k.Contains("outcome") || k.Contains("completion") =>
-                "system-outcome",
-            var k when k.Contains("tool") || k.Contains("planning") || k.Contains("reasoning") ||
-                       k.Contains("step") || k.Contains("action") =>
-                "agentic-process",
-            var k when k.Contains("rag") || k.Contains("retrieval") || k.Contains("grounded") ||
-                       k.Contains("citation") || k.Contains("relevance") =>
-                "rag",
-            var k when k.Contains("safety") || k.Contains("harm") || k.Contains("jailbreak") ||
-                       k.Contains("prompt-injection") || k.Contains("pii") =>
-                "safety-security",
-            var k when k.Contains("latency") || k.Contains("cost") || k.Contains("operational") ||
-                       k.Contains("retry") || k.Contains("reliability") =>
-                "operational",
-            var k when k.Contains("judge") || k.Contains("calibration") || k.Contains("consistency") =>
-                "judge-quality",
-            _ => "agentic"
-        };
+        // ARC-11: shared last-resort heuristic (one keyword map across summary + PDF reports), instead of
+        // a divergent Contains set + "agentic" default that could bucket an evaluator differently from
+        // AgenticSummaryBuilder.
+        return AgenticCategoryResolver.InferCategoryFromKey(evaluatorKey);
     }
 
     private static string TruncateForPreview(string? text, int maxLen = 80)
-    {
-        if (string.IsNullOrEmpty(text)) return string.Empty;
-        text = text.Replace('\n', ' ').Replace('\r', ' ');
-        return text.Length <= maxLen ? text : text[..maxLen] + "…";
-    }
+        => EvalReportHelpers.TruncateForPreview(text, maxLen); // ARC-02: shared
 }

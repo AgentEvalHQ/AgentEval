@@ -4,10 +4,11 @@
 
 using AgentEval.Evals;
 
-namespace AgentEval.Compliance.Gdpr.Composition;
+namespace AgentEval.Compliance.Core;
 
 /// <summary>
-/// Extension methods for composing and augmenting <see cref="CompositeEval"/> benchmark trees.
+/// Extension methods for composing and augmenting <see cref="CompositeEval"/> benchmark trees. Shared by
+/// the GDPR and EU AI Act compliance packs (ARC-01) — the implementation was byte-identical in both.
 /// </summary>
 public static class CompositeExtensions
 {

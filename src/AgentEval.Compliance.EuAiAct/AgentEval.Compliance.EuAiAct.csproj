@@ -8,8 +8,13 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="AgentEval.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\AgentEval.Abstractions\AgentEval.Abstractions.csproj" />
     <ProjectReference Include="..\AgentEval.Core\AgentEval.Core.csproj" />
+    <ProjectReference Include="..\AgentEval.Compliance.Core\AgentEval.Compliance.Core.csproj" />
     <ProjectReference Include="..\AgentEval.DataLoaders\AgentEval.DataLoaders.csproj" />
     <ProjectReference Include="..\AgentEval.Compliance.Gdpr\AgentEval.Compliance.Gdpr.csproj" />
   </ItemGroup>

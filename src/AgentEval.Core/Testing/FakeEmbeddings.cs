@@ -63,9 +63,12 @@ public sealed class FakeEmbeddings : IAgentEvalEmbeddings
     private ReadOnlyMemory<float> GenerateDeterministicEmbedding(string text)
     {
         var embedding = new float[_dimensions];
-        
-        // Use text hash as seed for reproducibility
-        var textSeed = text.GetHashCode();
+
+        // Use a STABLE hash as the RNG seed for reproducibility. String.GetHashCode() is
+        // randomized per process on .NET Core+, so it produced different embeddings across
+        // runs and broke the documented cross-process determinism (BUG-25). FNV-1a over the
+        // UTF-8 bytes is deterministic across processes and platforms.
+        var textSeed = unchecked((int)StableHash(text));
         var textRandom = new Random(textSeed);
         
         // Generate base embedding from text hash
@@ -79,8 +82,8 @@ public sealed class FakeEmbeddings : IAgentEvalEmbeddings
         var words = text.ToLowerInvariant().Split(' ', StringSplitOptions.RemoveEmptyEntries);
         foreach (var word in words)
         {
-            // Use unsigned to avoid negative hash issues (Math.Abs(int.MinValue) overflows)
-            var wordHash = unchecked((uint)word.GetHashCode());
+            // Stable per-word hash (see textSeed note above); GetHashCode() would vary per process.
+            var wordHash = StableHash(word);
             var indices = new[] 
             { 
                 (int)(wordHash % (uint)_dimensions),
@@ -102,5 +105,23 @@ public sealed class FakeEmbeddings : IAgentEvalEmbeddings
         }
         
         return embedding;
+    }
+
+    /// <summary>
+    /// Deterministic, process-stable 32-bit FNV-1a hash of the UTF-8 bytes of <paramref name="s"/>.
+    /// Used instead of <see cref="string.GetHashCode()"/> (which is randomized per process on
+    /// .NET Core+) so the same text always yields the same fake embedding across runs (BUG-25).
+    /// </summary>
+    internal static uint StableHash(string s)
+    {
+        const uint offsetBasis = 2166136261;
+        const uint prime = 16777619;
+        var hash = offsetBasis;
+        foreach (var b in System.Text.Encoding.UTF8.GetBytes(s))
+        {
+            hash ^= b;
+            hash *= prime;
+        }
+        return hash;
     }
 }

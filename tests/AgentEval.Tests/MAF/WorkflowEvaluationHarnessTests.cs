@@ -6,6 +6,7 @@ using Xunit;
 using AgentEval.MAF;
 using AgentEval.Models;
 using AgentEval.Core;
+using System.Runtime.CompilerServices;
 
 namespace AgentEval.Tests.MAF;
 
@@ -14,6 +15,34 @@ namespace AgentEval.Tests.MAF;
 /// </summary>
 public class WorkflowEvaluationHarnessTests
 {
+    // ═══════════════════════════════════════════════════════════════════════════
+    // CANCELLATION (BUG-20)
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    private static async IAsyncEnumerable<WorkflowEvent> CancelAwareStream(
+        [EnumeratorCancellation] CancellationToken ct)
+    {
+        ct.ThrowIfCancellationRequested();
+        await Task.Yield();
+        yield return new ExecutorOutputEvent("agent1", "out");
+        yield return new WorkflowCompleteEvent();
+    }
+
+    [Fact]
+    public async Task RunWorkflowTestAsync_CallerCancellation_Propagates_NotRecordedAsFailure()
+    {
+        // BUG-20: a caller-requested cancellation must propagate as OperationCanceledException,
+        // not be swallowed by the generic catch into a fabricated Passed=false result.
+        var adapter = new MAFWorkflowAdapter("CancelTest", (_, ct) => CancelAwareStream(ct), new[] { "agent1" });
+        var harness = new WorkflowEvaluationHarness(verbose: false);
+        var testCase = new WorkflowTestCase { Name = "t", Input = "in" };
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => harness.RunWorkflowTestAsync(adapter, testCase, cancellationToken: cts.Token));
+    }
+
     // ═══════════════════════════════════════════════════════════════════════════
     // BASIC EXECUTION
     // ═══════════════════════════════════════════════════════════════════════════
@@ -409,7 +438,13 @@ public class WorkflowEvaluationHarnessTests
     private static async IAsyncEnumerable<WorkflowEvent> SlowWorkflow(
         [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct)
     {
-        await Task.Delay(TimeSpan.FromSeconds(10), ct);
+        // Wait indefinitely until the per-test timeout cancels us. A finite delay (e.g. 10s)
+        // races the harness's CancelAfter timer: under severe thread-pool starvation on a loaded
+        // CI runner the cancel callback can be starved past the delay, letting the workflow
+        // COMPLETE on its own (result.Passed == true) and flipping Assert.False — an observed
+        // flake on the Windows/net8.0 job. An infinite delay makes the timeout the only exit,
+        // so the outcome is deterministic regardless of scheduling latency.
+        await Task.Delay(Timeout.InfiniteTimeSpan, ct);
         yield return new ExecutorOutputEvent("executor", "output");
         yield return new WorkflowCompleteEvent();
     }

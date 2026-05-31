@@ -8,6 +8,7 @@ using AgentEval.Evals.Agentic.Cost; // T3.1: EvaluatorCostMap relocated here.
 using AgentEval.MissionControl.GraphQL;
 using AgentEval.MissionControl.Services;
 using AgentEval.Output;
+using HotChocolate.CostAnalysis.Types; // SEC-11: [Cost] weights for expensive resolvers.
 
 namespace AgentEval.MissionControl.GraphQL;
 
@@ -105,10 +106,13 @@ public sealed class Query
     /// </summary>
     public async Task<WorkspaceState> Workspace(
         [Service] IOutputStoreReader store,
+        [Service] Microsoft.Extensions.Configuration.IConfiguration configuration,
         CancellationToken ct = default)
     {
         var version = typeof(IOutputStoreReader).Assembly.GetName().Version?.ToString() ?? "0.0.0";
-        var root = store.WorkspaceRoot;
+        // SEC-12: expose the absolute workspace root ONLY in Mode A (loopback, single operator); redact it
+        // for Mode B/C, mirroring the /api/v1/version endpoint. Enforced, not just documented.
+        var root = McHost.IsModeA(configuration["AgentEval:Mode"]) ? store.WorkspaceRoot : null;
 
         // The store reports `IsAvailable=false` until solution.json + at
         // least the .agenteval/ folder are present. Treat anything else as
@@ -148,6 +152,7 @@ public sealed class Query
     /// <summary>
     /// Lists all known subjects in the local solution, optionally filtered by kind.
     /// </summary>
+    [Cost(100.0)] // SEC-11: bound alias-multiplication of this expensive resolver
     public async IAsyncEnumerable<SubjectInfo> Subjects(
         [Service] IOutputStoreReader store,
         SubjectKind? kind = null,
@@ -169,6 +174,7 @@ public sealed class Query
     /// sizes for large workspaces without forcing a deprecation of the
     /// existing <see cref="Subjects"/> resolver.
     /// </summary>
+    [Cost(100.0)] // SEC-11: bound alias-multiplication of this expensive resolver
     public async Task<Connection<SubjectInfo>> SubjectsConnection(
         [Service] IOutputStoreReader store,
         SubjectKind? kind = null,
@@ -465,6 +471,14 @@ public sealed class Query
     /// <see cref="EvalProvenance.EstimatedCost"/> to that tier's bucket.
     /// Drives the SPA's <c>&lt;CostTierBreakdownChart/&gt;</c> stacked bar.
     /// </summary>
+    /// <remarks>
+    /// PERF-05 (accept-and-document): the scenario trees are reconstituted and walked uncached on every
+    /// request. Cost is O(scenarios × tree-depth) but bounded to a SINGLE run (unlike
+    /// <see cref="EvaluatorTimeline"/>, which scans up to 200), so for the v1 scale this is acceptable
+    /// without per-request tree caching. Folding this into the GreenDonut DataLoader batching / a
+    /// parsed-tree cache is deferred to MC1.4.7 alongside the other tree-walking resolvers.
+    /// </remarks>
+    [Cost(100.0)] // SEC-11: bound alias-multiplication of this expensive resolver
     public async Task<RunCostBreakdown?> RunCostBreakdown(
         [Service] IOutputStoreReader store,
         string runId,
@@ -517,7 +531,7 @@ public sealed class Query
     /// pathological / attacker-shaped trees that would overflow the stack.
     /// Set to 32 to comfortably exceed the GraphQL depth cap (10) and any
     /// realistic composite (root → pillar → article → multi-judge ≤ 5).</summary>
-    internal const int MaxTreeWalkDepth = 32;
+    internal const int MaxTreeWalkDepth = EvalTreeLimits.MaxTreeWalkDepth; // ARC-03: one source of truth
 
     internal static void WalkAndAccumulate(
         EvalResult node,
@@ -621,6 +635,7 @@ public sealed class Query
     /// lands, this resolver becomes a natural batching candidate.
     /// </para>
     /// </remarks>
+    [Cost(100.0)] // SEC-11: bound alias-multiplication of this expensive resolver
     public async IAsyncEnumerable<EvaluatorTimelinePoint> EvaluatorTimeline(
         [Service] IOutputStoreReader store,
         string evaluatorKey,

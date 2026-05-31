@@ -89,9 +89,12 @@ public sealed class GdprBenchmarkRunner
     {
         var leaves = EnumerateAtomicLeaves(root).ToList();
         var passed   = leaves.Count(l => l.Result.Score.Passed);
-        var failed   = leaves.Count(l => !l.Result.Score.Passed && l.Result.Score.Label != "warn");
         var warnings = leaves.Count(l => l.Result.Score.Label == "warn");
-        var stats = new RunStats(leaves.Count, passed, failed, warnings);
+        var skipped  = leaves.Count(l => l.Result.Score.Label == "skipped");
+        // Skipped leaves are not failures (BUG-04, identical to the agentic runner).
+        var failed   = leaves.Count(l => !l.Result.Score.Passed
+                                         && l.Result.Score.Label is not ("warn" or "skipped"));
+        var stats = new RunStats(leaves.Count, passed, failed, warnings, skipped);
 
         var verdict = root.Score.Label.ToUpperInvariant() switch
         {

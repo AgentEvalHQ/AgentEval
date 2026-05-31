@@ -40,11 +40,20 @@ public class MEAIEmbeddingAdapter : IAgentEvalEmbeddings
         CancellationToken cancellationToken = default)
     {
         var textList = texts.ToList();
-        
+
         // Use the core interface method for batch embedding generation
         var results = await _generator.GenerateAsync(textList, cancellationToken: cancellationToken)
             .ConfigureAwait(false);
-        
+
+        // Guard the one-embedding-per-input, in-order contract so a count mismatch fails fast
+        // here rather than silently mis-pairing text→vector downstream (BUG-43).
+        if (results.Count != textList.Count)
+        {
+            throw new InvalidOperationException(
+                $"Embedding generator returned {results.Count} embeddings for {textList.Count} inputs. " +
+                "Expected exactly one embedding per input, in the same order.");
+        }
+
         return results.Select(e => e.Vector).ToList();
     }
 }

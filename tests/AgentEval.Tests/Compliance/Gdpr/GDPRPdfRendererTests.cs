@@ -10,6 +10,7 @@ using AgentEval.Compliance.Gdpr.Reporting;
 using AgentEval.Compliance.Gdpr.Reporting.Pdf;
 using AgentEval.Output;
 using Xunit;
+using AgentEval.Compliance.Core;
 
 namespace AgentEval.Tests.Compliance.Gdpr;
 
@@ -93,7 +94,7 @@ public class GDPRPdfRendererTests : IDisposable
             CompositeTree: compositeTree,
             Summary: summary,
             CriticalFindings: [],
-            Recommendations: Array.Empty<AgentEval.Compliance.Gdpr.Reporting.Recommendation>(),
+            Recommendations: Array.Empty<AgentEval.Compliance.Core.Recommendation>(),
             Disclaimer: GDPRComplianceReporter.Disclaimer,
             GdprAttestation: new GdprAttestation(
                 "mode-a",
@@ -154,6 +155,26 @@ public class GDPRPdfRendererTests : IDisposable
         // Act & Assert
         await Assert.ThrowsAsync<ArgumentNullException>(
             () => renderer.RenderAsync(null!, outputPath));
+    }
+
+    [Fact]
+    public async Task RenderAsync_AlreadyCancelledToken_ThrowsWithoutCreatingOutputDirectory()
+    {
+        // GAP-12: a token cancelled before render must be honored ahead of the synchronous QuestPDF
+        // build AND the Directory.CreateDirectory side-effect — not after. The output directory must
+        // not be created.
+        var renderer = new GDPRPdfRenderer();
+        var evidence = MakeMinimalEvidence();
+        var freshDir = Path.Combine(_tempDir, "should-not-be-created");
+        var outputPath = Path.Combine(freshDir, "report.pdf");
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => renderer.RenderAsync(evidence, outputPath, cts.Token));
+
+        Assert.False(Directory.Exists(freshDir),
+            "a cancelled render must not create the output directory (GAP-12)");
     }
 
     [Fact]

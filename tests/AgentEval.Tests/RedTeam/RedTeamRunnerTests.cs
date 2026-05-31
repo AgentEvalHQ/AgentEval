@@ -87,8 +87,15 @@ public class RedTeamRunnerTests
 
         await runner.ScanAsync(agent, options, progress);
 
-        // Allow time for progress reports to be processed
-        await Task.Delay(100);
+        // Progress<T> marshals its callbacks through the captured SynchronizationContext (here the
+        // thread pool), so they can lag the awaited scan. A fixed sleep races that scheduling and
+        // flaked on the loaded CI runner; poll until the first report lands (fast in the normal
+        // case) with a generous ceiling instead.
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        while (progressReports.Count == 0 && sw.Elapsed < TimeSpan.FromSeconds(30))
+        {
+            await Task.Delay(25);
+        }
 
         Assert.NotEmpty(progressReports);
         Assert.All(progressReports, p => Assert.True(p.TotalProbes > 0));
@@ -229,6 +236,84 @@ public class RedTeamRunnerTests
         Assert.Contains(result.AttackResults.First().ProbeResults, p => p.HasError);
     }
 
+    // ── GAP-07: error classification, evidence gating, scan-level error counter ──
+
+    [Fact]
+    public async Task ScanAsync_AllProbesError_VerdictInconclusiveNotSilentlyPassable()
+    {
+        var agent = new FakeThrowingAgent(new InvalidOperationException("boom"));
+        var runner = new RedTeamRunner();
+        var options = new ScanOptions { Intensity = Intensity.Quick, AttackTypes = [Attack.PromptInjection] };
+
+        var result = await runner.ScanAsync(agent, options);
+
+        Assert.True(result.HasExecutionErrors);
+        Assert.Equal(result.TotalProbes, result.ErroredProbes);
+        Assert.Equal(0, result.SucceededProbes);
+        // Previously this returned a clean Pass despite the whole scan failing to run (GAP-07).
+        Assert.Equal(Verdict.Inconclusive, result.Verdict);
+        Assert.False(result.Passed);
+    }
+
+    [Fact]
+    public async Task ScanAsync_ExcludeEvidence_DoesNotLeakExceptionMessage()
+    {
+        var agent = new FakeThrowingAgent(new InvalidOperationException("SECRET-ENDPOINT-12345"));
+        var runner = new RedTeamRunner();
+        var options = new ScanOptions
+        {
+            Intensity = Intensity.Quick,
+            AttackTypes = [Attack.PromptInjection],
+            IncludeEvidence = false
+        };
+
+        var result = await runner.ScanAsync(agent, options);
+
+        var probes = result.AttackResults.SelectMany(a => a.ProbeResults).ToList();
+        Assert.NotEmpty(probes);
+        Assert.All(probes, p =>
+        {
+            Assert.DoesNotContain("SECRET-ENDPOINT-12345", p.Error ?? "");
+            Assert.DoesNotContain("SECRET-ENDPOINT-12345", p.Response);
+            Assert.DoesNotContain("SECRET-ENDPOINT-12345", p.Reason);
+            Assert.Equal("Execution error", p.Error); // category only, no detail
+        });
+    }
+
+    [Fact]
+    public async Task ScanAsync_IncludeEvidence_SurfacesExceptionMessage()
+    {
+        var agent = new FakeThrowingAgent(new InvalidOperationException("DIAGNOSTIC-DETAIL-99"));
+        var runner = new RedTeamRunner();
+        var options = new ScanOptions
+        {
+            Intensity = Intensity.Quick,
+            AttackTypes = [Attack.PromptInjection],
+            IncludeEvidence = true
+        };
+
+        var result = await runner.ScanAsync(agent, options);
+
+        var probes = result.AttackResults.SelectMany(a => a.ProbeResults).ToList();
+        Assert.Contains(probes, p => (p.Error ?? "").Contains("DIAGNOSTIC-DETAIL-99"));
+    }
+
+    [Fact]
+    public async Task ScanAsync_TransportError_ClassifiedAsTransportButStillCounted()
+    {
+        var agent = new FakeThrowingAgent(new System.Net.Http.HttpRequestException("connection refused"));
+        var runner = new RedTeamRunner();
+        var options = new ScanOptions { Intensity = Intensity.Quick, AttackTypes = [Attack.PromptInjection] };
+
+        var result = await runner.ScanAsync(agent, options);
+
+        var probes = result.AttackResults.SelectMany(a => a.ProbeResults).ToList();
+        Assert.All(probes, p => Assert.Equal(EvaluationOutcome.Inconclusive, p.Outcome));
+        Assert.All(probes, p => Assert.Contains("Transport error", p.Reason));
+        // Transport failures still count toward the scan-level error counter.
+        Assert.Equal(result.TotalProbes, result.ErroredProbes);
+    }
+
     [Fact]
     public async Task ScanAsync_DefaultOptions_UsesAllAttacks()
     {
@@ -333,7 +418,54 @@ public class RedTeamRunnerTests
         Assert.Equal("⚪", none.StatusEmoji);
     }
 
+    [Fact]
+    public async Task ScanAsync_GeneratesProbesOncePerAttack()
+    {
+        // PERF-10: the runner materializes each attack's probe list once and reuses it for both the
+        // progress total and execution. GetProbes was previously called twice (count + execute).
+        var attack = new CountingAttack();
+        var runner = new RedTeamRunner();
+        var options = new ScanOptions { AttackTypes = [attack], Intensity = Intensity.Quick };
+
+        await runner.ScanAsync(new FakeResistantAgent(), options);
+
+        Assert.Equal(1, attack.GetProbesCallCount);
+    }
+
     // === Test Helper Classes ===
+
+    /// <summary>Attack that counts GetProbes invocations — for PERF-10.</summary>
+    private sealed class CountingAttack : IAttackType
+    {
+        private int _getProbesCallCount;
+        public int GetProbesCallCount => _getProbesCallCount;
+
+        public string Name => "CountingAttack";
+        public string DisplayName => "Counting Attack";
+        public string Description => "counts GetProbes calls";
+        public string OwaspLlmId => "LLM01";
+        public string[] MitreAtlasIds => [];
+        public Severity DefaultSeverity => Severity.Medium;
+
+        public IReadOnlyList<AttackProbe> GetProbes(Intensity intensity)
+        {
+            Interlocked.Increment(ref _getProbesCallCount);
+            return new[]
+            {
+                new AttackProbe { Id = "P1", Prompt = "p1", Difficulty = Difficulty.Easy },
+                new AttackProbe { Id = "P2", Prompt = "p2", Difficulty = Difficulty.Easy },
+            };
+        }
+
+        public IProbeEvaluator GetEvaluator() => new AlwaysResistedEvaluator();
+
+        private sealed class AlwaysResistedEvaluator : IProbeEvaluator
+        {
+            public string Name => "AlwaysResisted";
+            public Task<AgentEval.RedTeam.EvaluationResult> EvaluateAsync(AttackProbe probe, string response, CancellationToken cancellationToken = default)
+                => Task.FromResult(AgentEval.RedTeam.EvaluationResult.Resisted("resisted"));
+        }
+    }
 
     private class FakeResistantAgent : IEvaluableAgent
     {

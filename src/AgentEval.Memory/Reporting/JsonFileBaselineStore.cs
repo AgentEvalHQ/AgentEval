@@ -6,6 +6,7 @@ using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 using AgentEval.Memory.Models;
 using AgentEval.Output;
+using Microsoft.Extensions.Logging;
 
 namespace AgentEval.Memory.Reporting;
 
@@ -20,6 +21,7 @@ public partial class JsonFileBaselineStore : IBaselineStore
     private readonly MemoryReportingOptions _options;
     private readonly IOutputStore? _outputStore;
     private readonly SubjectIdentity? _subject;
+    private readonly ILogger? _logger;
 
     internal static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -50,11 +52,13 @@ public partial class JsonFileBaselineStore : IBaselineStore
     /// <param name="options">Reporting options for legacy-path writes.</param>
     /// <param name="outputStore">Canonical output store for dual-write. Stores where <see cref="IOutputStoreReader.IsAvailable"/> is false are skipped.</param>
     /// <param name="subject">Optional pre-resolved subject identity. If null, derived from the first save call.</param>
-    public JsonFileBaselineStore(MemoryReportingOptions options, IOutputStore outputStore, SubjectIdentity? subject = null)
+    /// <param name="logger">Optional logger; canonical dual-write failures are logged at Error (GAP-04).</param>
+    public JsonFileBaselineStore(MemoryReportingOptions options, IOutputStore outputStore, SubjectIdentity? subject = null, ILogger? logger = null)
     {
         _options = options ?? throw new ArgumentNullException(nameof(options));
         _outputStore = outputStore ?? throw new ArgumentNullException(nameof(outputStore));
         _subject = subject;
+        _logger = logger;
     }
 
     public async Task SaveAsync(MemoryBaseline baseline, CancellationToken ct = default)
@@ -93,9 +97,21 @@ public partial class JsonFileBaselineStore : IBaselineStore
                 // Also persist as the "current" (non-pinned) baseline so LoadBaselineAsync works.
                 await _outputStore.SaveBaselineAsync(subject, summary, versionTag: null, ct: ct);
             }
+            catch (OperationCanceledException)
+            {
+                throw; // cancellation must surface, not be swallowed (GAP-04)
+            }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"[AgentEval.Memory] Canonical baseline write failed: {ex.Message}");
+                // The canonical dual-write is secondary to the legacy-path write, so we do not fail
+                // the whole SaveAsync — but the failure must be VISIBLE. Debug.WriteLine is compiled
+                // out in Release, so a failed canonical write (disk full, permissions, serialization)
+                // was completely invisible while SaveAsync returned success (GAP-04). Log at Error;
+                // fall back to Trace (on in Release) when no logger was injected.
+                if (_logger is not null)
+                    _logger.LogError(ex, "Canonical baseline dual-write failed for baseline {BaselineId}", baseline.Id);
+                else
+                    System.Diagnostics.Trace.TraceError($"[AgentEval.Memory] Canonical baseline write failed: {ex}");
             }
         }
     }
@@ -322,6 +338,11 @@ public partial class JsonFileBaselineStore : IBaselineStore
     /// <returns>The server process, or null if no server could be started.</returns>
     public System.Diagnostics.Process? OpenReport(string agentName, int port = 8080)
     {
+        // SEC-15: a valid, non-privileged TCP port. Privileged ports (<1024) need elevation and are not
+        // appropriate for this local desktop-convenience helper.
+        ArgumentOutOfRangeException.ThrowIfLessThan(port, 1024);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(port, 65535);
+
         var reportDir = Path.GetFullPath(ResolveRootPath(agentName));
         var reportFile = Path.Combine(reportDir, "report.html");
 
@@ -331,16 +352,13 @@ public partial class JsonFileBaselineStore : IBaselineStore
             return null;
         }
 
-        var url = $"http://localhost:{port}/report.html";
+        var url = $"http://127.0.0.1:{port}/report.html";
 
-        // Try python first, then npx, then dotnet serve
-        var serverCommands = new[]
-        {
-            ("python", $"-m http.server {port}"),
-            ("python3", $"-m http.server {port}"),
-            ("npx", $"serve -l {port} -s ."),
-            ("dotnet", $"serve -p {port}"),
-        };
+        // SEC-15: every command binds the loopback interface (127.0.0.1), so the report server — which
+        // serves baselines containing prompt/response content — is NOT exposed to the LAN. (python's
+        // http.server defaults to 0.0.0.0; serve/dotnet-serve are pinned explicitly too.) NB: the binaries
+        // are still resolved via PATH (a desktop convenience); run this only on a trusted machine.
+        var serverCommands = BuildServerCommands(port);
 
         System.Diagnostics.Process? serverProcess = null;
 
@@ -406,10 +424,23 @@ public partial class JsonFileBaselineStore : IBaselineStore
         Console.WriteLine($"\n   Could not start a local server automatically.");
         Console.WriteLine($"   Install Python, Node.js, or dotnet-serve, then run:");
         Console.WriteLine($"     cd \"{reportDir}\"");
-        Console.WriteLine($"     python -m http.server {port}");
+        Console.WriteLine($"     python -m http.server {port} --bind 127.0.0.1");
         Console.WriteLine($"   Then open: {url}\n");
         return null;
     }
+
+    /// <summary>
+    /// Builds the ordered list of (command, arguments) candidates for serving the report directory, each
+    /// pinned to the loopback interface (SEC-15). Extracted for testability — the security-relevant
+    /// invariant is that every command binds 127.0.0.1 and the requested port.
+    /// </summary>
+    internal static IReadOnlyList<(string Cmd, string Args)> BuildServerCommands(int port) =>
+    [
+        ("python",  $"-m http.server {port} --bind 127.0.0.1"),
+        ("python3", $"-m http.server {port} --bind 127.0.0.1"),
+        ("npx",     $"serve -l 127.0.0.1:{port} -s ."),
+        ("dotnet",  $"serve -p {port} --address 127.0.0.1"),
+    ];
 
     internal string ResolveRootPath(string agentName)
     {

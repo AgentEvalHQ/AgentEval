@@ -7,6 +7,7 @@
 using System.Runtime.CompilerServices;
 using AgentEval.MissionControl.Services;
 using AgentEval.Output;
+using Microsoft.Extensions.Configuration;
 using Xunit;
 
 namespace AgentEval.Tests.MissionControl;
@@ -365,7 +366,7 @@ public class WorkspaceStateUninitialisedTests
     public async Task Workspace_StoreUnavailable_ReportsInitializedFalse()
     {
         var reader = new UnavailableReader();
-        var ws = await new AgentEval.MissionControl.GraphQL.Query().Workspace(reader, CancellationToken.None);
+        var ws = await new AgentEval.MissionControl.GraphQL.Query().Workspace(reader, ModeConfig(null), CancellationToken.None);
 
         Assert.False(ws.Initialized);
         Assert.Null(ws.Solution);
@@ -378,12 +379,30 @@ public class WorkspaceStateUninitialisedTests
         // Folder-exists-but-uninitialised path: IsAvailable=true,
         // EnsureSolutionAsync throws InvalidOperationException ("no solution.json").
         var reader = new ThrowingSolutionReader();
-        var ws = await new AgentEval.MissionControl.GraphQL.Query().Workspace(reader, CancellationToken.None);
+        var ws = await new AgentEval.MissionControl.GraphQL.Query().Workspace(reader, ModeConfig("local"), CancellationToken.None);
 
         Assert.False(ws.Initialized);
         Assert.Null(ws.Solution);
-        Assert.Equal("/some-root", ws.Root);
+        Assert.Equal("/some-root", ws.Root); // Mode A exposes the absolute root
     }
+
+    // SEC-12: in Mode B (aggregator) / Mode C (server) the GraphQL Workspace resolver must REDACT the
+    // absolute workspace root, even though the store knows it.
+    [Theory]
+    [InlineData("server")]
+    [InlineData("aggregator")]
+    public async Task Workspace_NonLocalMode_RedactsRoot(string mode)
+    {
+        var reader = new ThrowingSolutionReader(); // WorkspaceRoot = "/some-root"
+        var ws = await new AgentEval.MissionControl.GraphQL.Query().Workspace(reader, ModeConfig(mode), CancellationToken.None);
+
+        Assert.Null(ws.Root);
+    }
+
+    private static IConfiguration ModeConfig(string? mode) =>
+        new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?> { ["AgentEval:Mode"] = mode })
+            .Build();
 
     private sealed class UnavailableReader : IOutputStoreReader
     {

@@ -44,6 +44,9 @@ public static class ScoreNormalizer
     /// <returns>Score in range 0-100.</returns>
     public static double FromSimilarity(double similarity)
     {
+        // Defense-in-depth: Math.Clamp(NaN, ...) returns NaN, so a NaN similarity (e.g. from a
+        // degenerate cosine computation) would otherwise propagate into the score (BUG-10).
+        if (double.IsNaN(similarity)) return 0.0;
         var clamped = Math.Clamp(similarity, 0.0, 1.0);
         return clamped * 100.0;
     }

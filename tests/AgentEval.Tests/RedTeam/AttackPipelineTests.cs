@@ -152,8 +152,14 @@ public class AttackPipelineTests
             .WithProgress(progress)
             .ScanAsync(agent);
 
-        // Allow time for progress reports
-        await Task.Delay(100);
+        // Progress<T> marshals its callbacks through the captured SynchronizationContext (here the
+        // thread pool), so they can lag the awaited scan. A fixed sleep races that scheduling and can
+        // flake under CI load; poll until the first report lands with a generous ceiling instead.
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        while (progressReports.Count == 0 && sw.Elapsed < TimeSpan.FromSeconds(30))
+        {
+            await Task.Delay(25);
+        }
 
         Assert.NotEmpty(progressReports);
     }

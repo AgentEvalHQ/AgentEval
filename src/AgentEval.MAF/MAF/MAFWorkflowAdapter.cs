@@ -297,6 +297,14 @@ public class MAFWorkflowAdapter : IWorkflowEvaluableAgent
 
             overallStopwatch.Stop();
         }
+        catch (OperationCanceledException)
+        {
+            // Cancellation (caller-requested OR per-test timeout) must propagate, not be recorded
+            // as a normal workflow error and returned as a completed-with-errors result. The
+            // caller/harness decides whether it was a timeout or an external cancel (BUG-20).
+            overallStopwatch.Stop();
+            throw;
+        }
         catch (Exception ex)
         {
             overallStopwatch.Stop();

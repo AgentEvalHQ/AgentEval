@@ -77,11 +77,10 @@ public sealed class GoalTrackingEval : IEval
             return EvalResult.Skipped(this,
                 $"GoalTrackingEval requires EvalInput.Metadata[\"{ConversationHistoryHelper.MetadataKey}\"] with at least 1 prior turn.");
 
-        // Embed the full history so the judge can identify the original goal from turn 1.
-        var enriched = new EvalInput(
-            Query: $"{ConversationHistoryHelper.FormatTranscript(history)}\n\nCurrent user query: {input.Query}",
-            Response: input.Response,
-            Metadata: input.Metadata);
+        // Embed the full history so the judge can identify the original goal from turn 1 —
+        // preserving every other EvalInput field via WithEnrichedQuery (BUG-57).
+        var enriched = ConversationHistoryHelper.WithEnrichedQuery(
+            input, ConversationHistoryHelper.FormatTranscript(history));
 
         return await _inner.EvaluateAsync(enriched, ct);
     }

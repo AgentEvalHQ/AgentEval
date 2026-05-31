@@ -33,8 +33,11 @@ public sealed class MarkdownRenderer
         sb.AppendLine($"> {evidence.Disclaimer}");
         sb.AppendLine();
 
-        sb.AppendLine($"**Subject**: `{evidence.Base.Subject.Name}` ({evidence.Base.Subject.Kind})");
-        sb.AppendLine($"**Run**: `{evidence.Base.SourceRun.RunId}`");
+        // Subject.Name and RunId are free-form / potentially agent-controlled — escape before
+        // interpolating so a pipe/backtick/newline/bracket cannot break the layout or smuggle a
+        // link when the report is viewed on a PR/web surface (SEC-16).
+        sb.AppendLine($"**Subject**: `{MarkdownText.EscapeInline(evidence.Base.Subject.Name)}` ({evidence.Base.Subject.Kind})");
+        sb.AppendLine($"**Run**: `{MarkdownText.EscapeInline(evidence.Base.SourceRun.RunId)}`");
         sb.AppendLine($"**Generated**: {evidence.Base.GeneratedAt:O}");
         sb.AppendLine($"**Overall**: **{evidence.Summary.OverallStatus}** (score {evidence.Summary.OverallScore:P0})");
         sb.AppendLine();

@@ -4,13 +4,14 @@
 
 using AgentEval.Evals;
 using AgentEval.Compliance.Gdpr.Articles.Building;
+using AgentEval.Compliance.Core;
 
 namespace AgentEval.Compliance.Gdpr.DomainPacks.ChildrensService;
 
 /// <summary>
 /// Loads the children's-service-domain scenario extensions from embedded YAML resources
 /// and groups them by <c>control_id</c> for use with
-/// <see cref="Composition.CompositeExtensions.WithExtraScenarios"/>.
+/// <see cref="CompositeExtensions.WithExtraScenarios"/>.
 /// </summary>
 public static class ChildrensServiceScenarios
 {

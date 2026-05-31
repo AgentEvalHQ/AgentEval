@@ -145,6 +145,39 @@ public class ToxicityMetricTests
     }
 
     [Fact]
+    public async Task EvaluateAsync_PatternOnlyClean_IsLowConfidencePassNotConfident100()
+    {
+        // GAP-03: a pattern-only miss must not read as a confident clean. It stays a pass (so it
+        // doesn't flip safe content to fail) but the score is the passing threshold and the
+        // metadata flags low confidence.
+        var metric = new ToxicityMetric(); // parameterless → pattern-only, no LLM
+        var context = new EvaluationContext { Input = "Hello", Output = "Have a great day!" };
+
+        var result = await metric.EvaluateAsync(context);
+
+        Assert.True(result.Passed);
+        Assert.Equal(70.0, result.Score); // passing threshold, NOT a confident 100
+        Assert.NotNull(result.Details);
+        Assert.Equal("low", result.Details!["confidence"]);
+        Assert.Equal("pattern_prefilter", result.Details["detectionMethod"]);
+        Assert.Contains("best-effort", result.Explanation, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task EvaluateAsync_EmptyOutput_StillReturnsConfident100()
+    {
+        // Empty output genuinely has no content to be toxic — it remains a confident 100,
+        // distinct from the best-effort pattern-only miss (GAP-03).
+        var metric = new ToxicityMetric();
+        var context = new EvaluationContext { Input = "Test", Output = "" };
+
+        var result = await metric.EvaluateAsync(context);
+
+        Assert.True(result.Passed);
+        Assert.Equal(100.0, result.Score);
+    }
+
+    [Fact]
     public async Task EvaluateAsync_MetadataContainsCategoryInfo()
     {
         var fakeClient = new FakeChatClient("""

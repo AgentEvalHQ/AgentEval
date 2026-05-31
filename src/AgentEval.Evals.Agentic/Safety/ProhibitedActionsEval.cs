@@ -256,6 +256,15 @@ public sealed class ProhibitedActionsEval : IEval
         return true;
     }
 
+    /// <summary>
+    /// Flags any tool in <see cref="ProhibitedActionPolicy.RequiredApprovalTools"/> that was
+    /// invoked without a preceding approval/confirm call. Correctness depends on the documented
+    /// chronological-order contract of <see cref="EvalInput.ToolCalls"/> (the list index is the
+    /// call's time order): an approval counts only if it appears at an <i>earlier</i> index than
+    /// the sensitive call, so a later approval cannot retroactively mask an earlier unapproved
+    /// call. Callers supplying tool calls out of chronological order yield undefined results
+    /// (BUG-37).
+    /// </summary>
     private static bool TryFindMissingApprovals(
         EvalInput input,
         ProhibitedActionPolicy policy,

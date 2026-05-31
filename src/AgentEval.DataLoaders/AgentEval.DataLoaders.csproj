@@ -10,6 +10,9 @@
     <InternalsVisibleTo Include="AgentEval" />
     <InternalsVisibleTo Include="AgentEval.Tests" />
     <InternalsVisibleTo Include="AgentEval.Cli" />
+    <!-- MNT-03: MC reuses WorkspaceRootDiscovery (Find + CanonicaliseExistingDirectory) instead of
+         re-implementing the workspace-root walk and the workspace-path canonicalisation. -->
+    <InternalsVisibleTo Include="AgentEval.MissionControl" />
   </ItemGroup>
 
   <ItemGroup>

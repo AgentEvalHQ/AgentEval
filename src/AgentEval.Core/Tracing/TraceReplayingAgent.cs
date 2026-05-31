@@ -20,6 +20,10 @@ namespace AgentEval.Tracing;
 /// // Response is from the trace, not from the actual agent
 /// </code>
 /// </example>
+/// <remarks>
+/// <b>Threading:</b> not thread-safe — it advances an unsynchronised replay cursor and is designed
+/// to replay a single session sequentially. Use a separate instance per concurrent flow (BUG-58).
+/// </remarks>
 public sealed class TraceReplayingAgent : IEvaluableAgent, IStreamableAgent
 {
     private readonly AgentTrace _trace;
@@ -279,8 +283,13 @@ public sealed class TraceReplayingAgent : IEvaluableAgent, IStreamableAgent
                 throw new TraceReplayMismatchException(message, actual, recorded, index);
 
             case MismatchBehavior.Warn:
-                // Log warning (could integrate with ILogger if available)
-                Console.WriteLine($"[TraceReplayer Warning] {message}");
+                // GAP-09: route through the configurable sink (ILogger/redact/suppress) when provided,
+                // else fall back to Console for backward compatibility.
+                var warning = $"[TraceReplayer Warning] {message}";
+                if (_options.OnWarning is not null)
+                    _options.OnWarning(warning);
+                else
+                    Console.WriteLine(warning);
                 break;
 
             case MismatchBehavior.Ignore:
@@ -352,6 +361,15 @@ public class TraceReplayOptions
     /// Default is 20ms.
     /// </summary>
     public int DefaultChunkDelayMs { get; set; } = 20;
+
+    /// <summary>
+    /// Optional sink for <see cref="MismatchBehavior.Warn"/> messages (GAP-09). When set, mismatch
+    /// warnings — which include (truncated) prompt text — are routed here instead of
+    /// <see cref="Console.WriteLine(string)"/>, so a host can forward them to an <c>ILogger</c>, redact
+    /// them, or suppress them entirely (set to a no-op) rather than leaking prompt content to stdout
+    /// (often captured into CI logs). Defaults to null (legacy Console behavior).
+    /// </summary>
+    public Action<string>? OnWarning { get; set; }
 }
 
 /// <summary>

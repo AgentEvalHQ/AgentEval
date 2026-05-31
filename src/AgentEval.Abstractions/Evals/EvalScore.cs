@@ -29,4 +29,19 @@ public sealed record EvalScore(
         ? Value
         : throw new ArgumentOutOfRangeException(nameof(Value), Value,
             "EvalScore.Value must be a finite number (NaN / Infinity are rejected; downstream JSON + schema validation cannot represent them).");
+
+    /// <inheritdoc cref="EvalScore"/>
+    /// <remarks>Like <see cref="Value"/>, a non-null Threshold must be finite — NaN/Infinity would
+    /// serialise as invalid JSON and fail the very schema validation Value's guard prevents (GAP-11).</remarks>
+    public double? Threshold { get; init; } = Threshold is null || double.IsFinite(Threshold.Value)
+        ? Threshold
+        : throw new ArgumentOutOfRangeException(nameof(Threshold), Threshold,
+            "EvalScore.Threshold must be a finite number when set (NaN / Infinity are rejected).");
+
+    /// <inheritdoc cref="EvalScore"/>
+    /// <remarks>A non-null Confidence must be finite for the same reason as <see cref="Threshold"/> (GAP-11).</remarks>
+    public double? Confidence { get; init; } = Confidence is null || double.IsFinite(Confidence.Value)
+        ? Confidence
+        : throw new ArgumentOutOfRangeException(nameof(Confidence), Confidence,
+            "EvalScore.Confidence must be a finite number when set (NaN / Infinity are rejected).");
 }

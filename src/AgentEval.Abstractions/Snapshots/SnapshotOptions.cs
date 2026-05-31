@@ -17,9 +17,12 @@ public class SnapshotOptions
         "timestamp", "duration", "elapsed", "startTime", "endTime", "id", "requestId", "created"
     };
 
-    /// <summary>Patterns to scrub from string values.</summary>
-    public List<(Regex Pattern, string Replacement)> ScrubPatterns { get; set; } = new()
-    {
+    // MNT-11: compile the default scrub patterns ONCE per process. RegexOptions.Compiled JITs each
+    // pattern, and the previous inline initializer re-compiled all six on every `new SnapshotOptions()`.
+    // Regex is immutable and thread-safe for matching, so instances safely share these objects; each
+    // instance still gets its OWN list (below) so adding/removing patterns does not affect others.
+    private static readonly (Regex Pattern, string Replacement)[] DefaultScrubPatterns =
+    [
         // OpenAI/Azure response IDs
         (new Regex(@"chatcmpl-[a-zA-Z0-9]+", RegexOptions.Compiled), "chatcmpl-[SCRUBBED]"),
         (new Regex(@"resp_[a-zA-Z0-9]+", RegexOptions.Compiled), "resp_[SCRUBBED]"),
@@ -33,7 +36,11 @@ public class SnapshotOptions
 
         // Durations in various formats (with word boundary to avoid matching "100seconds" inside a word)
         (new Regex(@"\b\d+(\.\d+)?\s*(ms|s|seconds|milliseconds)\b", RegexOptions.Compiled), "[DURATION]"),
-    };
+    ];
+
+    /// <summary>Patterns to scrub from string values. Defaults to a per-instance copy of the shared,
+    /// pre-compiled default patterns (MNT-11).</summary>
+    public List<(Regex Pattern, string Replacement)> ScrubPatterns { get; set; } = new(DefaultScrubPatterns);
 
     /// <summary>Enable semantic similarity comparison for text fields.</summary>
     public bool UseSemanticComparison { get; set; } = false;

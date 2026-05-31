@@ -198,6 +198,28 @@ public class FileSystemOutputStoreTests : IDisposable
     }
 
     [Fact]
+    public async Task WriteScenarioResult_MalformedStructuredOutput_Throws()
+    {
+        // GAP-16: clearly-structured Output ('{'/'['-prefixed) that is not valid JSON is genuine
+        // corruption and must fail the write; valid JSON and raw text must still persist.
+        WriteSolutionJson();
+        var store = new FileSystemOutputStore(_root);
+        var manifest = await store.StartRunAsync(DefaultSubject(), DefaultContext());
+        var runId = manifest.Run.RunId;
+
+        static ScenarioResult Make(string id, string output) => new(
+            id, "S", "input", output, true, 1.0,
+            new Dictionary<string, double>(), new List<AssertionResult>(), TimeSpan.Zero, 0.0);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => store.WriteScenarioResultAsync(runId, Make("bad", "{ this is not json")));
+
+        // Valid JSON and raw (non-structured) text must NOT throw.
+        await store.WriteScenarioResultAsync(runId, Make("okjson", "{\"k\":1}"));
+        await store.WriteScenarioResultAsync(runId, Make("raw", "answer is 42"));
+    }
+
+    [Fact]
     public async Task RoundTrip_StartWriteScenarioComplete_PersistsAll()
     {
         WriteSolutionJson();
@@ -235,6 +257,30 @@ public class FileSystemOutputStoreTests : IDisposable
 
         Assert.Single(scenarios);
         Assert.Equal("scenario-01", scenarios[0].Id);
+    }
+
+    [Fact]
+    public async Task GetRunManifestAsync_TraversalRunId_ReturnsNull_DoesNotResolveRealRun()
+    {
+        // SEC-06: a runId like "foo/../{realRunId}" would, without the safe-segment guard,
+        // Path.Combine + normalize back into the real run dir and resolve it. The store must
+        // reject non-single-segment runIds before combining (safe-by-construction).
+        WriteSolutionJson();
+        var store = new FileSystemOutputStore(_root);
+        var subject = DefaultSubject();
+
+        var manifest = await store.StartRunAsync(subject, DefaultContext());
+        var runId = manifest.Run.RunId;
+        await store.CompleteRunAsync(manifest,
+            new RunSummary("1.0", runId, "PASS", new RunStats(1, 1, 0, 0), new Dictionary<string, double>()));
+
+        // Sanity: the legitimate single-segment id resolves.
+        Assert.NotNull(await store.GetRunManifestAsync(runId));
+
+        // Traversal forms that normalize back to the same dir (or escape) must be rejected.
+        Assert.Null(await store.GetRunManifestAsync($"foo/../{runId}"));
+        Assert.Null(await store.GetRunManifestAsync(".."));
+        Assert.Null(await store.GetRunManifestAsync($"..\\{runId}"));
     }
 
     // ── Case-insensitive collision (batch-5 surface) ─────────────────────────

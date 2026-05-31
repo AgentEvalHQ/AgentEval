@@ -159,7 +159,7 @@ public class ReachBackEvaluator : IReachBackEvaluator
                 Duration = depthStopwatch.Elapsed
             };
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             _logger.LogWarning(ex, "Error during reach-back evaluation at depth {Depth}", depth);
             depthStopwatch.Stop();

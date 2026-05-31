@@ -2,6 +2,7 @@
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 using System.Diagnostics;
+using System.IO;
 using AgentEval.Core;
 
 namespace AgentEval.RedTeam;
@@ -42,12 +43,21 @@ public sealed class RedTeamRunner : IRedTeamRunner
         // Resolve attacks to run
         var attacks = ResolveAttacks(options);
 
+        // Materialize each attack's probe list ONCE and reuse it for both the progress total and
+        // execution — GetProbes builds a fresh List per call, so the previous count-then-execute
+        // pattern ran every generator at least twice per scan (PERF-10).
+        var probesByAttack = attacks.ToDictionary(
+            a => a,
+            a =>
+            {
+                var probes = a.GetProbes(options.Intensity).ToList();
+                if (options.MaxProbesPerAttack > 0 && probes.Count > options.MaxProbesPerAttack)
+                    probes = probes.Take(options.MaxProbesPerAttack).ToList();
+                return (IReadOnlyList<AttackProbe>)probes;
+            });
+
         // Count total probes for progress
-        var totalProbes = attacks.Sum(a => 
-        {
-            var count = a.GetProbes(options.Intensity).Count();
-            return options.MaxProbesPerAttack > 0 ? Math.Min(count, options.MaxProbesPerAttack) : count;
-        });
+        var totalProbes = probesByAttack.Values.Sum(p => p.Count);
         var completedProbes = 0;
 
         foreach (var attack in attacks)
@@ -57,6 +67,7 @@ public sealed class RedTeamRunner : IRedTeamRunner
             var (attackResult, probesExecuted) = await ExecuteAttackAsync(
                 agent,
                 attack,
+                probesByAttack[attack],
                 options,
                 progress,
                 completedProbes,
@@ -87,7 +98,8 @@ public sealed class RedTeamRunner : IRedTeamRunner
             TotalProbes = attackResults.Sum(a => a.TotalCount),
             SucceededProbes = attackResults.Sum(a => a.SucceededCount),
             ResistedProbes = attackResults.Sum(a => a.ResistedCount),
-            InconclusiveProbes = attackResults.Sum(a => a.InconclusiveCount)
+            InconclusiveProbes = attackResults.Sum(a => a.InconclusiveCount),
+            ErroredProbes = attackResults.Sum(a => a.ErroredCount)
         };
     }
 
@@ -105,6 +117,7 @@ public sealed class RedTeamRunner : IRedTeamRunner
     private async Task<(AttackResult Result, int ProbesExecuted)> ExecuteAttackAsync(
         IEvaluableAgent agent,
         IAttackType attack,
+        IReadOnlyList<AttackProbe> probes,
         ScanOptions options,
         IProgress<ScanProgress>? progress,
         int completedProbesBefore,
@@ -114,13 +127,7 @@ public sealed class RedTeamRunner : IRedTeamRunner
     {
         var probeResults = new List<ProbeResult>();
         var evaluator = attack.GetEvaluator();
-        var probes = attack.GetProbes(options.Intensity).ToList();
-
-        // Apply MaxProbesPerAttack limit if set
-        if (options.MaxProbesPerAttack > 0 && probes.Count > options.MaxProbesPerAttack)
-        {
-            probes = probes.Take(options.MaxProbesPerAttack).ToList();
-        }
+        // `probes` is materialized once by the caller (incl. MaxProbesPerAttack) — see PERF-10.
 
         var completedProbes = completedProbesBefore;
         var totalResisted = 0;
@@ -256,22 +263,55 @@ public sealed class RedTeamRunner : IRedTeamRunner
                 Severity = attackSeverity
             };
         }
+        catch (Exception ex) when (IsTransportError(ex))
+        {
+            // Expected transport/connectivity errors (network blip, socket reset, remote timeout).
+            // Inconclusive, but still counted as an execution error at the scan level so a broken
+            // transport is not silently reported as a clean Pass (GAP-07).
+            probeSw.Stop();
+            return BuildErrorResult(probe, options, attackSeverity, probeSw.Elapsed, "Transport error", ex);
+        }
         catch (Exception ex)
         {
+            // Unexpected fault (likely a bug in the agent/evaluator wiring). Surfaced as an
+            // execution error; ex.Message is gated behind IncludeEvidence to avoid leaking internal
+            // endpoint/stack detail (GAP-07).
             probeSw.Stop();
-            return new ProbeResult
-            {
-                ProbeId = probe.Id,
-                Prompt = options.IncludeEvidence ? probe.Prompt : "[REDACTED]",
-                Response = $"[ERROR: {ex.Message}]",
-                Outcome = EvaluationOutcome.Inconclusive,
-                Reason = $"Exception during probe execution: {ex.Message}",
-                Technique = probe.Technique,
-                Difficulty = probe.Difficulty,
-                Duration = probeSw.Elapsed,
-                Error = ex.Message,
-                Severity = attackSeverity
-            };
+            return BuildErrorResult(probe, options, attackSeverity, probeSw.Elapsed, "Execution error", ex);
         }
+    }
+
+    /// <summary>Transport/connectivity exceptions treated as expected (Inconclusive) rather than
+    /// unexpected faults — see GAP-07.</summary>
+    private static bool IsTransportError(Exception ex) =>
+        ex is System.Net.Http.HttpRequestException
+            or TimeoutException
+            or IOException
+            or System.Net.Sockets.SocketException;
+
+    /// <summary>
+    /// Builds an Inconclusive <see cref="ProbeResult"/> for a failed probe execution. The exception
+    /// message is included in Response/Reason/Error only when <see cref="ScanOptions.IncludeEvidence"/>
+    /// is set; otherwise a category-only message is used so internal detail is not leaked (GAP-07).
+    /// </summary>
+    private static ProbeResult BuildErrorResult(
+        AttackProbe probe, ScanOptions options, Severity severity, TimeSpan elapsed, string category, Exception ex)
+    {
+        var includeEvidence = options.IncludeEvidence;
+        return new ProbeResult
+        {
+            ProbeId = probe.Id,
+            Prompt = includeEvidence ? probe.Prompt : "[REDACTED]",
+            Response = includeEvidence ? $"[{category.ToUpperInvariant()}: {ex.Message}]" : $"[{category.ToUpperInvariant()}]",
+            Outcome = EvaluationOutcome.Inconclusive,
+            Reason = includeEvidence
+                ? $"{category} during probe execution: {ex.Message}"
+                : $"{category} during probe execution (details suppressed; enable IncludeEvidence to see them)",
+            Technique = probe.Technique,
+            Difficulty = probe.Difficulty,
+            Duration = elapsed,
+            Error = includeEvidence ? $"{category}: {ex.Message}" : category,
+            Severity = severity
+        };
     }
 }
