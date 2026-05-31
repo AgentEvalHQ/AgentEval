@@ -901,12 +901,28 @@ public sealed class FileSystemOutputStore : IOutputStore
                 bool owned = false;
                 try
                 {
-                    try { owned = crossProc.WaitOne(); }
-                    catch (System.Threading.AbandonedMutexException)
+                    // Bounded, cancellable acquisition. The previous parameterless WaitOne()
+                    // blocked forever if another *live* process held the mutex (no
+                    // AbandonedMutexException ever fires for a hung-but-alive holder), and ct was
+                    // passed only to Task.Run — cancelling scheduling, not the in-flight wait. Poll
+                    // in short slices so ct and an overall deadline are honoured, mirroring the
+                    // subject.json lock's 30s deadline (BUG-31). No await inside this delegate, so
+                    // WaitOne and ReleaseMutex keep their required same-thread affinity.
+                    var deadline = DateTimeOffset.UtcNow + JsonlAppendLockTimeout;
+                    while (!owned)
                     {
-                        // A prior holder exited without releasing — we still
-                        // own the mutex now. Carry on with the append.
-                        owned = true;
+                        ct.ThrowIfCancellationRequested();
+                        try { owned = crossProc.WaitOne(JsonlAppendLockPollInterval); }
+                        catch (System.Threading.AbandonedMutexException)
+                        {
+                            // A prior holder exited without releasing — we still
+                            // own the mutex now. Carry on with the append.
+                            owned = true;
+                        }
+                        if (!owned && DateTimeOffset.UtcNow >= deadline)
+                            throw new TimeoutException(
+                                $"Timed out after {JsonlAppendLockTimeout.TotalSeconds:0}s acquiring the cross-process " +
+                                $"JSONL append lock for '{path}'. Another process may be holding it.");
                     }
                     File.AppendAllText(path, line);
                 }
@@ -920,6 +936,14 @@ public sealed class FileSystemOutputStore : IOutputStore
     }
 
     private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, SemaphoreSlim> s_appendLocks = new(StringComparer.Ordinal);
+
+    /// <summary>Overall deadline for acquiring the cross-process JSONL append mutex (BUG-31),
+    /// mirroring the subject.json lock's 30s budget.</summary>
+    internal static TimeSpan JsonlAppendLockTimeout { get; set; } = TimeSpan.FromSeconds(30);
+
+    /// <summary>Poll slice for the cross-process JSONL append mutex wait — short enough that
+    /// cancellation and the overall deadline are observed promptly (BUG-31).</summary>
+    internal static readonly TimeSpan JsonlAppendLockPollInterval = TimeSpan.FromMilliseconds(50);
 
     private async Task<T?> ReadJsonAsync<T>(string path, CancellationToken ct)
     {
