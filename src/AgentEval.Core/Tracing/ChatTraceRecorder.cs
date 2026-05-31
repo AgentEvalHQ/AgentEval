@@ -139,6 +139,12 @@ public sealed class ChatTraceRecorder : IAsyncDisposable
             _totalCompletionTokens += response.TokenUsage.CompletionTokens;
         }
 
+        // Capture tool calls from the response (honoring TrackToolCalls) into both this turn and
+        // the conversation-wide report. Previously ChatTurn.ToolCalls and _combinedToolUsage were
+        // never populated, so the advertised TrackToolCalls option / CombinedToolUsage field were
+        // inert (BUG-28).
+        var toolCalls = _options.TrackToolCalls ? CaptureToolCalls(response) : null;
+
         // Record agent turn
         _turns.Add(new ChatTurn
         {
@@ -147,6 +153,7 @@ public sealed class ChatTraceRecorder : IAsyncDisposable
             TurnIndex = _turnIndex++,
             Timestamp = _sessionStopwatch.Elapsed,
             Duration = turnStopwatch.Elapsed,
+            ToolCalls = toolCalls,
             TokenUsage = response.TokenUsage != null ? new TraceTokenUsage
             {
                 PromptTokens = response.TokenUsage.PromptTokens,
@@ -155,6 +162,44 @@ public sealed class ChatTraceRecorder : IAsyncDisposable
         });
 
         return response.Text;
+    }
+
+    /// <summary>
+    /// Extracts tool calls from <paramref name="response"/> via the canonical
+    /// <see cref="ToolUsageExtractor"/> (pairing FunctionCallContent with FunctionResultContent),
+    /// accumulates each into <see cref="_combinedToolUsage"/> with a conversation-global 1-based
+    /// order, and returns them as <see cref="TraceToolCall"/>s for the turn. Returns
+    /// <see langword="null"/> when the response made no tool calls.
+    /// </summary>
+    private IReadOnlyList<TraceToolCall>? CaptureToolCalls(AgentResponse response)
+    {
+        var report = ToolUsageExtractor.Extract(response);
+        if (report.Count == 0)
+            return null;
+
+        var traceToolCalls = new List<TraceToolCall>(report.Count);
+        foreach (var call in report.Calls)
+        {
+            _combinedToolUsage.AddCall(new ToolCallRecord
+            {
+                Name = call.Name,
+                CallId = call.CallId,
+                Arguments = call.Arguments,
+                Result = call.Result,
+                Exception = call.Exception,
+                Order = _combinedToolUsage.Count + 1
+            });
+
+            traceToolCalls.Add(new TraceToolCall
+            {
+                Name = call.Name,
+                Arguments = call.Arguments is { Count: > 0 } ? call.GetArgumentsAsJson() : null,
+                Result = call.Result?.ToString(),
+                Succeeded = !call.HasError
+            });
+        }
+
+        return traceToolCalls;
     }
 
     /// <summary>
