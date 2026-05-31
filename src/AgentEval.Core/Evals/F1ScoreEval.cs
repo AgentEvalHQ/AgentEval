@@ -14,10 +14,13 @@ namespace AgentEval.Evals;
 /// <c>using AgentEval.Evals;</c> — no re-export wrapper is needed.
 /// </para>
 /// <para>
-/// <b>Algorithm</b>: whitespace-tokenized, lowercased word sets.
+/// <b>Algorithm</b>: whitespace-tokenized, lowercased <b>multiset</b> (bag-of-tokens) F1 — the
+/// standard SQuAD token-F1. Token multiplicity is preserved, so over-emission is penalised
+/// (e.g. "the the the cat" vs "the cat" scores below 1.0). The overlap is the multiset
+/// intersection: for each distinct token, <c>min(count_in_response, count_in_truth)</c>.
 /// <list type="bullet">
-///   <item>Precision = |response_tokens ∩ ground_truth_tokens| / |response_tokens|</item>
-///   <item>Recall    = |response_tokens ∩ ground_truth_tokens| / |ground_truth_tokens|</item>
+///   <item>Precision = overlap / |response_tokens| (counting duplicates)</item>
+///   <item>Recall    = overlap / |ground_truth_tokens| (counting duplicates)</item>
 ///   <item>F1        = 2 × (precision × recall) / (precision + recall)</item>
 /// </list>
 /// Edge cases: empty response → F1=0; empty ground truth → F1=0; both empty → F1=1.0.
@@ -116,7 +119,17 @@ public sealed class F1ScoreEval : AtomicCodeEval
                 message: "Ground truth is empty; F1 = 0.0.");
         }
 
-        var intersection = responseTokens.Intersect(truthTokens).Count();
+        // Multiset (bag-of-tokens) overlap — standard SQuAD token-F1. For each distinct token the
+        // overlap contributes min(count in response, count in truth), so duplicated/over-emitted
+        // tokens are penalised rather than collapsed by a set intersection (BUG-59).
+        // Multiset (bag-of-tokens) overlap — standard SQuAD token-F1. For each distinct token the
+        // overlap contributes min(count in response, count in truth), so duplicated/over-emitted
+        // tokens are penalised rather than collapsed by a set intersection (BUG-59).
+        var responseCounts = responseTokens.GroupBy(t => t).ToDictionary(g => g.Key, g => g.Count());
+        var truthCounts = truthTokens.GroupBy(t => t).ToDictionary(g => g.Key, g => g.Count());
+        var intersection = responseCounts.Keys
+            .Where(truthCounts.ContainsKey)
+            .Sum(k => Math.Min(responseCounts[k], truthCounts[k]));
         var precision = (double)intersection / responseTokens.Count;
         var recall = (double)intersection / truthTokens.Count;
         var f1 = precision + recall == 0.0
@@ -187,6 +200,6 @@ public sealed class F1ScoreEval : AtomicCodeEval
             .Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries)
             .Select(t => t.ToLowerInvariant().Trim('.', ',', '!', '?', ';', ':', '"', '\'', '(', ')', '[', ']'))
             .Where(t => t.Length > 0)
-            .ToHashSet();
+            .ToList(); // multiset — preserve token multiplicity for standard token-F1 (BUG-59)
     }
 }
