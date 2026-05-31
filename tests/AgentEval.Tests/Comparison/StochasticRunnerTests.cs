@@ -172,8 +172,67 @@ public class StochasticRunnerTests
         Assert.Equal(3, progressReports.Count);
     }
     
+    [Fact]
+    public async Task RunStochasticTestAsync_Parallel_OnFault_CancelsAndObservesSiblings()
+    {
+        // PERF-02: when one parallel run faults, the siblings must be cancelled and awaited (not
+        // left running unobserved). In the progress path the first fault is detected early; the
+        // runner then cancels the linked CTS so the delaying siblings observe cancellation before
+        // the original exception is rethrown.
+        var harness = new FaultThenDelayHarness();
+        var runner = new StochasticRunner(harness, statisticsCalculator: null);
+        var options = new StochasticOptions(
+            Runs: 4,
+            MaxParallelism: 4,
+            OnProgress: _ => { }); // progress path → early fault detection
+        var agent = new MockAgent();
+        var testCase = new TestCase { Name = "Test", Input = "input" };
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => runner.RunStochasticTestAsync(agent, testCase, options));
+
+        // The 3 non-faulting siblings observed cancellation by the time the call returned. Without
+        // the linked-CTS fix they would still be delaying, unobserved (CancelledCount would be 0).
+        Assert.Equal(3, harness.CancelledCount);
+    }
+
     #region Test Doubles
-    
+
+    /// <summary>Faults on the first invocation; every other invocation delays (cancellably) so the
+    /// sibling-cancellation behaviour of the parallel runner can be observed (PERF-02).</summary>
+    private sealed class FaultThenDelayHarness : IEvaluationHarness
+    {
+        private int _calls;
+        private int _cancelled;
+        public int CancelledCount => _cancelled;
+
+        public Task<TestResult> RunEvaluationAsync(
+            IEvaluableAgent agent,
+            TestCase testCase,
+            EvaluationOptions? options = null,
+            CancellationToken cancellationToken = default)
+        {
+            var idx = Interlocked.Increment(ref _calls); // 1-based
+            if (idx == 1)
+                throw new InvalidOperationException("first run faulted");
+            return DelayThenResultAsync(testCase, cancellationToken);
+        }
+
+        private async Task<TestResult> DelayThenResultAsync(TestCase testCase, CancellationToken ct)
+        {
+            try
+            {
+                await Task.Delay(TimeSpan.FromSeconds(5), ct);
+            }
+            catch (OperationCanceledException)
+            {
+                Interlocked.Increment(ref _cancelled);
+                throw;
+            }
+            return new TestResult { TestName = testCase.Name, Passed = true, Score = 100, ActualOutput = "out" };
+        }
+    }
+
     private class MockEvaluationHarness : IEvaluationHarness
     {
         public Task<TestResult> RunEvaluationAsync(

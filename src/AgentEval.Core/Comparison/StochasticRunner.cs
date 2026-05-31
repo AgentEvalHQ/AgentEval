@@ -112,53 +112,69 @@ public class StochasticRunner : IStochasticRunner
         }
         else
         {
-            // Parallel execution with throttling
-            var semaphore = new SemaphoreSlim(options.MaxParallelism);
-            var tasks = new List<Task<TestResult>>();
-            
+            // Parallel execution with throttling. Dispose the semaphore deterministically (it
+            // previously leaked a kernel handle per invocation) and link a CTS so that if one run
+            // faults the siblings are cancelled and awaited rather than left running unobserved
+            // (PERF-02).
+            using var semaphore = new SemaphoreSlim(options.MaxParallelism);
+            using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+
+            var tasks = new List<Task<TestResult>>(options.Runs);
             for (int i = 0; i < options.Runs; i++)
             {
-                cancellationToken.ThrowIfCancellationRequested();
-                
+                linkedCts.Token.ThrowIfCancellationRequested();
+
                 tasks.Add(RunSingleTestWithThrottlingAsync(
                     agentProvider,
                     testCase,
                     semaphore,
                     options.DelayBetweenRuns,
-                    cancellationToken));
+                    linkedCts.Token));
             }
-            
-            // For parallel execution, report progress as tasks complete
-            if (options.OnProgress != null)
+
+            try
             {
-                // Drain the task list directly. Using `tasks.Count` as the loop
-                // bound while also Remove()-ing from `tasks` inside the body caused
-                // the two counters to converge at the midpoint, dropping ~half the
-                // runs (BUG-01). `options.Runs` is the authoritative total for ETA.
-                var completedCount = 0;
-                while (tasks.Count > 0)
+                // For parallel execution, report progress as tasks complete.
+                if (options.OnProgress != null)
                 {
-                    var completed = await Task.WhenAny(tasks);
-                    completedCount++;
-                    var result = await completed;
-                    results.Add(result);
-                    tasks.Remove(completed);
-                    
-                    var avgDuration = stopwatch.Elapsed / completedCount;
-                    var remaining = TimeSpan.FromTicks(avgDuration.Ticks * (options.Runs - completedCount));
-                    
-                    options.OnProgress(new StochasticProgress(
-                        CurrentRun: completedCount,
-                        TotalRuns: options.Runs,
-                        LastResult: result,
-                        Elapsed: stopwatch.Elapsed,
-                        EstimatedRemaining: remaining));
+                    var completedCount = 0;
+#if NET9_0_OR_GREATER
+                    // Task.WhenEach yields each task as it completes — avoids the O(n^2) cost of
+                    // WhenAny + List.Remove on every completion.
+                    await foreach (var completed in Task.WhenEach(tasks).ConfigureAwait(false))
+                    {
+                        var result = await completed.ConfigureAwait(false);
+                        results.Add(result);
+                        ReportProgress(options, stopwatch, ++completedCount, result);
+                    }
+#else
+                    // net8.0 has no Task.WhenEach; drain via WhenAny. `options.Runs` is the
+                    // authoritative total for ETA (BUG-01).
+                    var pending = new List<Task<TestResult>>(tasks);
+                    while (pending.Count > 0)
+                    {
+                        var completed = await Task.WhenAny(pending).ConfigureAwait(false);
+                        pending.Remove(completed);
+                        var result = await completed.ConfigureAwait(false);
+                        results.Add(result);
+                        ReportProgress(options, stopwatch, ++completedCount, result);
+                    }
+#endif
+                }
+                else
+                {
+                    var completedResults = await Task.WhenAll(tasks).ConfigureAwait(false);
+                    results.AddRange(completedResults);
                 }
             }
-            else
+            catch
             {
-                var completedResults = await Task.WhenAll(tasks);
-                results.AddRange(completedResults);
+                // A run faulted (or was cancelled): cancel the siblings and await them all so no
+                // task keeps running unobserved, then rethrow the original exception (PERF-02).
+                linkedCts.Cancel();
+                try { await Task.WhenAll(tasks).ConfigureAwait(false); }
+                catch { /* secondary faults / cancellations are subsumed by the rethrow below */ }
+                throw;
             }
         }
         
@@ -180,6 +196,18 @@ public class StochasticRunner : IStochasticRunner
             Passed: passed);
     }
     
+    private static void ReportProgress(StochasticOptions options, Stopwatch stopwatch, int completedCount, TestResult result)
+    {
+        var avgDuration = stopwatch.Elapsed / completedCount;
+        var remaining = TimeSpan.FromTicks(avgDuration.Ticks * (options.Runs - completedCount));
+        options.OnProgress!(new StochasticProgress(
+            CurrentRun: completedCount,
+            TotalRuns: options.Runs,
+            LastResult: result,
+            Elapsed: stopwatch.Elapsed,
+            EstimatedRemaining: remaining));
+    }
+
     private async Task<TestResult> RunSingleTestWithThrottlingAsync(
         Func<IEvaluableAgent> agentProvider,
         TestCase testCase,
