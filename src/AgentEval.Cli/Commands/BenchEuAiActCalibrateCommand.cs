@@ -123,12 +123,10 @@ public static class BenchEuAiActCalibrateCommand
         try
         {
             // The golden JSONL files are embedded in the test assembly.
-            var testAssembly = LoadTestAssembly();
+            var testAssembly = CalibrationGoldenAssembly.TryLocate();
             if (testAssembly is null)
             {
-                Console.Error.WriteLine(
-                    "Could not locate AgentEval.Tests assembly. " +
-                    "Ensure the solution has been built before running calibrate.");
+                Console.Error.WriteLine(CalibrationGoldenAssembly.NotFoundMessage);
                 return 1;
             }
 
@@ -232,23 +230,6 @@ public static class BenchEuAiActCalibrateCommand
     private static string FormatKappa(double kappa)
         => double.IsNaN(kappa) ? "UNDEFINED" : kappa.ToString("F3", System.Globalization.CultureInfo.InvariantCulture);
 
-    private static Assembly? LoadTestAssembly()
-    {
-        // Try already-loaded assemblies first.
-        var loaded = AppDomain.CurrentDomain.GetAssemblies()
-            .FirstOrDefault(a => a.GetName().Name == "AgentEval.Tests");
-        if (loaded is not null) return loaded;
-
-        // Try to locate the assembly on disk relative to this binary.
-        var thisDir = Path.GetDirectoryName(typeof(BenchEuAiActCalibrateCommand).Assembly.Location);
-        if (thisDir is null) return null;
-
-        var candidate = Path.Combine(thisDir, "AgentEval.Tests.dll");
-        if (File.Exists(candidate))
-            return Assembly.LoadFrom(candidate);
-
-        return null;
-    }
 
     private static string BuildMarkdownReport(CalibrationReport report)
     {

@@ -360,12 +360,10 @@ public static class BenchAgenticCalibrateCommand
         IReadOnlyList<AgentEval.Evals.Agentic.Calibration.CalibrationDataset> datasets;
         try
         {
-            var testAssembly = LoadTestAssembly();
+            var testAssembly = CalibrationGoldenAssembly.TryLocate();
             if (testAssembly is null)
             {
-                Console.Error.WriteLine(
-                    "Could not locate AgentEval.Tests assembly. " +
-                    "Ensure the solution has been built before running calibrate.");
+                Console.Error.WriteLine(CalibrationGoldenAssembly.NotFoundMessage);
                 return 1;
             }
 
@@ -476,23 +474,6 @@ public static class BenchAgenticCalibrateCommand
     private static string FormatKappa(double kappa)
         => double.IsNaN(kappa) ? "UNDEFINED" : kappa.ToString("F3", System.Globalization.CultureInfo.InvariantCulture);
 
-    private static Assembly? LoadTestAssembly()
-    {
-        // Try already-loaded assemblies first.
-        var loaded = AppDomain.CurrentDomain.GetAssemblies()
-            .FirstOrDefault(a => a.GetName().Name == "AgentEval.Tests");
-        if (loaded is not null) return loaded;
-
-        // Try to locate the assembly on disk relative to this binary.
-        var thisDir = Path.GetDirectoryName(typeof(BenchAgenticCalibrateCommand).Assembly.Location);
-        if (thisDir is null) return null;
-
-        var candidate = Path.Combine(thisDir, "AgentEval.Tests.dll");
-        if (File.Exists(candidate))
-            return Assembly.LoadFrom(candidate);
-
-        return null;
-    }
 
     private static string BuildMarkdownReport(
         AgentEval.Evals.Agentic.Calibration.CalibrationReport report)
