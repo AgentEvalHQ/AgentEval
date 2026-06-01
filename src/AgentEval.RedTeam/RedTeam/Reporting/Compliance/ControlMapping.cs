@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
+using AgentEval.RedTeam;
+
 namespace AgentEval.RedTeam.Reporting.Compliance;
 
 /// <summary>
@@ -23,8 +25,43 @@ public record ControlMapping
     /// <summary>Attack types that test this control.</summary>
     public required string[] RelevantAttacks { get; init; }
 
-    /// <summary>OWASP LLM categories that map to this control.</summary>
-    public required string[] OwaspCategories { get; init; }
+    private readonly string[]? _owaspCategories;
+
+    /// <summary>
+    /// OWASP LLM categories that map to this control. "Derive, don't duplicate" (RC-5): when not
+    /// explicitly supplied, projected from the canonical <see cref="IAttackType.OwaspLlmId"/> of each
+    /// entry in <see cref="RelevantAttacks"/> via <see cref="ControlMappingCrosswalk.DeriveOwaspCategories"/>,
+    /// so the crosswalk can never drift from the attack classes.
+    /// </summary>
+    public string[] OwaspCategories
+    {
+        get => _owaspCategories ?? ControlMappingCrosswalk.DeriveOwaspCategories(RelevantAttacks);
+        init => _owaspCategories = value;
+    }
+}
+
+/// <summary>
+/// Crosswalk helpers that project framework control mappings from the canonical attack taxonomy (RC-5).
+/// Single source of truth: <see cref="Attack.ByName(string)"/>.
+/// </summary>
+public static class ControlMappingCrosswalk
+{
+    /// <summary>
+    /// Projects the distinct, sorted set of OWASP LLM Top 10 ids covered by the supplied attacks, reading
+    /// <see cref="IAttackType.OwaspLlmId"/> via <see cref="Attack.ByName(string)"/>. Unknown names are skipped.
+    /// </summary>
+    public static string[] DeriveOwaspCategories(IEnumerable<string> relevantAttacks)
+    {
+        ArgumentNullException.ThrowIfNull(relevantAttacks);
+        return relevantAttacks
+            .Select(Attack.ByName)
+            .Where(a => a is not null)
+            .Select(a => a!.OwaspLlmId)
+            .Where(id => !string.IsNullOrEmpty(id))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(id => id, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+    }
 }
 
 /// <summary>
@@ -83,7 +120,7 @@ public enum ControlEvaluationStatus
 /// </summary>
 public static class SOC2Controls
 {
-    /// <summary>All SOC2 control mappings relevant to AI security.</summary>
+    /// <summary>All SOC2 control mappings relevant to AI security. OwaspCategories derive from the canonical attack taxonomy (RC-5).</summary>
     public static readonly ControlMapping[] All =
     [
         new()
@@ -92,8 +129,8 @@ public static class SOC2Controls
             ControlName = "Logical and Physical Access Controls",
             Description = "The entity implements logical access security software, infrastructure, and architectures over protected information assets to protect them from security events.",
             Framework = "SOC2",
-            RelevantAttacks = ["SystemPromptExtraction", "PIILeakage"],
-            OwaspCategories = ["LLM06", "LLM07"]
+            RelevantAttacks = ["SystemPromptExtraction", "PIILeakage"]
+            // OwaspCategories derived → ["LLM02", "LLM07"]
         },
         new()
         {
@@ -101,8 +138,8 @@ public static class SOC2Controls
             ControlName = "Access Restrictions",
             Description = "Prior to issuing system credentials and granting system access, the entity registers and authorizes new internal and external users.",
             Framework = "SOC2",
-            RelevantAttacks = ["ExcessiveAgency"],
-            OwaspCategories = ["LLM08"]
+            RelevantAttacks = ["ExcessiveAgency"]
+            // OwaspCategories derived → ["LLM06"] (was hand-authored "LLM08"). RC-5.
         },
         new()
         {
@@ -110,8 +147,8 @@ public static class SOC2Controls
             ControlName = "Unauthorized Access Prevention",
             Description = "The entity authorizes, modifies, or removes access to data, software, functions, and other protected information assets based on roles, responsibilities, or the system design and changes.",
             Framework = "SOC2",
-            RelevantAttacks = ["PromptInjection", "Jailbreak"],
-            OwaspCategories = ["LLM01"]
+            RelevantAttacks = ["PromptInjection", "Jailbreak"]
+            // OwaspCategories derived → ["LLM01"]
         },
         new()
         {
@@ -119,8 +156,8 @@ public static class SOC2Controls
             ControlName = "System Boundaries",
             Description = "The entity implements logical access security measures to protect against threats from sources outside its system boundaries.",
             Framework = "SOC2",
-            RelevantAttacks = ["IndirectInjection", "EncodingEvasion"],
-            OwaspCategories = ["LLM01"]
+            RelevantAttacks = ["IndirectInjection", "EncodingEvasion"]
+            // OwaspCategories derived → ["LLM01"]
         },
         new()
         {
@@ -128,8 +165,8 @@ public static class SOC2Controls
             ControlName = "Information Transmission",
             Description = "The entity restricts the transmission, movement, and removal of information to authorized internal and external users and processes.",
             Framework = "SOC2",
-            RelevantAttacks = ["PIILeakage", "InsecureOutput"],
-            OwaspCategories = ["LLM02", "LLM06"]
+            RelevantAttacks = ["PIILeakage", "InsecureOutput"]
+            // OwaspCategories derived → ["LLM02", "LLM05"]
         },
         new()
         {
@@ -137,8 +174,8 @@ public static class SOC2Controls
             ControlName = "System Monitoring",
             Description = "The entity monitors system components and the operation of those components for anomalies that are indicative of malicious acts, natural disasters, and errors.",
             Framework = "SOC2",
-            RelevantAttacks = ["InferenceAPIAbuse"],
-            OwaspCategories = ["LLM04"]
+            RelevantAttacks = ["InferenceAPIAbuse"]
+            // OwaspCategories derived → ["LLM10"] (was hand-authored "LLM04"). RC-5.
         },
         new()
         {
@@ -146,8 +183,7 @@ public static class SOC2Controls
             ControlName = "Change Management",
             Description = "The entity authorizes, designs, develops or acquires, configures, documents, tests, approves, and implements changes to infrastructure, data, software, and procedures.",
             Framework = "SOC2",
-            RelevantAttacks = [], // Baseline comparison feature
-            OwaspCategories = []
+            RelevantAttacks = [] // Baseline comparison feature; OwaspCategories derived → []
         }
     ];
 
@@ -161,7 +197,7 @@ public static class SOC2Controls
 /// </summary>
 public static class ISO27001Controls
 {
-    /// <summary>All ISO 27001 control mappings relevant to AI security.</summary>
+    /// <summary>All ISO 27001 control mappings relevant to AI security. OwaspCategories derive from the canonical attack taxonomy (RC-5).</summary>
     public static readonly ControlMapping[] All =
     [
         new()
@@ -170,8 +206,8 @@ public static class ISO27001Controls
             ControlName = "Policies for Information Security",
             Description = "Information security policy and topic-specific policies shall be defined, approved by management, published, communicated to and acknowledged by relevant personnel and relevant interested parties.",
             Framework = "ISO27001",
-            RelevantAttacks = ["PromptInjection", "Jailbreak", "PIILeakage"],
-            OwaspCategories = ["LLM01", "LLM06"]
+            RelevantAttacks = ["PromptInjection", "Jailbreak", "PIILeakage"]
+            // OwaspCategories derived → ["LLM01", "LLM02"]
         },
         new()
         {
@@ -179,8 +215,8 @@ public static class ISO27001Controls
             ControlName = "Access Control",
             Description = "Rules to control physical and logical access to information and other associated assets shall be established and implemented based on business and information security requirements.",
             Framework = "ISO27001",
-            RelevantAttacks = ["ExcessiveAgency", "SystemPromptExtraction"],
-            OwaspCategories = ["LLM07", "LLM08"]
+            RelevantAttacks = ["ExcessiveAgency", "SystemPromptExtraction"]
+            // OwaspCategories derived → ["LLM06", "LLM07"] (was hand-authored incl. "LLM08"). RC-5.
         },
         new()
         {
@@ -188,8 +224,8 @@ public static class ISO27001Controls
             ControlName = "Protection of Records",
             Description = "Records shall be protected from loss, destruction, falsification, unauthorized access, and unauthorized release.",
             Framework = "ISO27001",
-            RelevantAttacks = ["PIILeakage"],
-            OwaspCategories = ["LLM06"]
+            RelevantAttacks = ["PIILeakage"]
+            // OwaspCategories derived → ["LLM02"]
         },
         new()
         {
@@ -197,8 +233,8 @@ public static class ISO27001Controls
             ControlName = "Information Access Restriction",
             Description = "Access to information and other associated assets shall be restricted in accordance with the established topic-specific policy on access control.",
             Framework = "ISO27001",
-            RelevantAttacks = ["PromptInjection", "Jailbreak"],
-            OwaspCategories = ["LLM01"]
+            RelevantAttacks = ["PromptInjection", "Jailbreak"]
+            // OwaspCategories derived → ["LLM01"]
         },
         new()
         {
@@ -206,8 +242,8 @@ public static class ISO27001Controls
             ControlName = "Data Masking",
             Description = "Data masking shall be used in accordance with the organization's topic-specific policy on access control and other related topic-specific policies, and business requirements, taking applicable legislation into consideration.",
             Framework = "ISO27001",
-            RelevantAttacks = ["PIILeakage"],
-            OwaspCategories = ["LLM06"]
+            RelevantAttacks = ["PIILeakage"]
+            // OwaspCategories derived → ["LLM02"]
         },
         new()
         {
@@ -215,17 +251,19 @@ public static class ISO27001Controls
             ControlName = "Data Leakage Prevention",
             Description = "Data leakage prevention measures shall be applied to systems, networks and any other devices that process, store or transmit sensitive information.",
             Framework = "ISO27001",
-            RelevantAttacks = ["PIILeakage", "SystemPromptExtraction", "InsecureOutput"],
-            OwaspCategories = ["LLM02", "LLM06", "LLM07"]
+            RelevantAttacks = ["PIILeakage", "SystemPromptExtraction", "InsecureOutput"]
+            // OwaspCategories derived → ["LLM02", "LLM05", "LLM07"]
         },
         new()
         {
-            ControlId = "A.8.24",
-            ControlName = "Use of Cryptography",
-            Description = "Rules for the effective use of cryptography, including cryptographic key management, shall be defined and implemented.",
+            // RC-5: EncodingEvasion is obfuscation of injection payloads, not cryptography.
+            // ISO 27001:2022 A.8.24 (Use of Cryptography) was wrong; mapped to A.8.8.
+            ControlId = "A.8.8",
+            ControlName = "Management of Technical Vulnerabilities",
+            Description = "Information about technical vulnerabilities of information systems in use shall be obtained, the organization's exposure to such vulnerabilities evaluated, and appropriate measures taken.",
             Framework = "ISO27001",
-            RelevantAttacks = ["EncodingEvasion"],
-            OwaspCategories = ["LLM01"]
+            RelevantAttacks = ["EncodingEvasion"]
+            // OwaspCategories derived → ["LLM01"]
         },
         new()
         {
@@ -233,8 +271,8 @@ public static class ISO27001Controls
             ControlName = "Secure Coding",
             Description = "Secure coding principles shall be applied to software development.",
             Framework = "ISO27001",
-            RelevantAttacks = ["InsecureOutput"],
-            OwaspCategories = ["LLM02"]
+            RelevantAttacks = ["InsecureOutput"]
+            // OwaspCategories derived → ["LLM05"] (was hand-authored "LLM02"). RC-5.
         }
     ];
 

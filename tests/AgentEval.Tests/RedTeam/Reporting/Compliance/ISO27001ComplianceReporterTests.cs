@@ -113,7 +113,7 @@ public class ISO27001ComplianceReporterTests
         Assert.Contains("A.8.3", controlIds);   // Information access restriction
         Assert.Contains("A.8.11", controlIds);  // Data masking
         Assert.Contains("A.8.12", controlIds);  // Data leakage prevention
-        Assert.Contains("A.8.24", controlIds);  // Use of cryptography
+        Assert.Contains("A.8.8", controlIds);  // Management of Technical Vulnerabilities (was A.8.24; RC-5)
         Assert.Contains("A.8.28", controlIds);  // Secure coding
 
         // Verify framework is ISO27001 (no space)
