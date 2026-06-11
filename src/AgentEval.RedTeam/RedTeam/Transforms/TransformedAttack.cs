@@ -33,6 +33,16 @@ public sealed class TransformedAttack : IAttackType
         _transformers = transformers ?? throw new ArgumentNullException(nameof(transformers));
         if (_transformers.Count == 0)
             throw new ArgumentException("At least one transformer is required.", nameof(transformers));
+        // Enforce the IProbeTransformer.Name contract at composition time: '+' and '>' are reserved delimiters for
+        // probe-Id suffixes (id+name) and chain provenance (name>name), so a Name containing either would make the
+        // chain string ambiguous to parse back. Built-in transformers are safe; this guards third-party ones.
+        foreach (var t in _transformers)
+        {
+            if (t.Name.IndexOfAny(['+', '>']) >= 0)
+                throw new ArgumentException(
+                    $"Transformer Name '{t.Name}' contains a reserved delimiter ('+' or '>'); see IProbeTransformer.Name.",
+                    nameof(transformers));
+        }
         _mode = mode;
         _keepOriginal = keepOriginal;
     }

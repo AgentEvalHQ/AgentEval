@@ -18,8 +18,8 @@ public class AttackPipelineTransformTests
             .WithTransform(new Base64Transformer())
             .WithIntensity(Intensity.Quick).GetProbePreview();
 
+        Assert.NotEmpty(seeds);                                                         // premise: there ARE seeds to transform (non-vacuous)
         Assert.Equal(seeds.Count, transformed.Count);                                   // 1 transformer, no keepOriginal
-        Assert.NotEmpty(transformed);
         Assert.All(transformed, p => Assert.DoesNotContain("PWNED", p.Prompt, StringComparison.Ordinal));
         Assert.All(transformed, p => Assert.Equal("base64", p.Metadata![TransformProvenance.ChainKey]));
     }

@@ -253,6 +253,19 @@ public class MultiTurnOrchestrationTests
     }
 
     [Fact]
+    public async Task OuterCancellation_Propagates_NotSwallowedAsTruncation()
+    {
+        // An OUTER (scan) cancel must propagate, NOT be folded as a per-turn timeout. TimeoutPerTurn stays at its
+        // large default so the per-turn cap can't fire first; the outer token cancels mid-turn.
+        var attack = new EndlessAttack();
+        var agent = new DelayingConversableAgent(TimeSpan.FromSeconds(10));
+        using var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(40));
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            new TurnOrchestrator(agent, ScanOptions.Default).RunAsync(attack, Seed, attack.GetEvaluator(), cts.Token));
+    }
+
+    [Fact]
     public async Task MaxConversationDuration_SoftStops_Truncated()
     {
         var attack = new EndlessAttack();

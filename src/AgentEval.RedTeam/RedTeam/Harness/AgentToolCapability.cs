@@ -23,6 +23,11 @@ public enum AgentToolCapability
     /// <summary>Can carry tool results across multiple turns (reserved for Wave C multi-turn).</summary>
     MultiTurnTools = 1 << 2,
 
-    /// <summary>Supports Pillar-4 tool-output injection (an attacker payload spliced into a tool result).</summary>
+    /// <summary>
+    /// Advertises that the agent supports Pillar-4 tool-output injection — an attacker payload delivered through a
+    /// tool result (e.g. <see cref="InstrumentedCanaryAgent"/>, whose <see cref="CanaryTool.Execute"/> can return
+    /// attacker-controlled output). A declarative capability marker for callers/reporting; the runner does not branch
+    /// on it today (the IndirectInjection tool-output path is driven by the canary's own <c>Execute</c> body).
+    /// </summary>
     ToolOutputInjection = 1 << 3,
 }

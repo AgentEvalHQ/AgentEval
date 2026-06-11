@@ -24,6 +24,22 @@ public class HarnessTierTests
             => Task.FromResult(new AgentResponse { Text = "I refuse." });
     }
 
+    // ---- CanaryTool + capability flags ----
+
+    [Fact]
+    public void CanaryTool_Severity_DefaultsHigh_AndIsPreserved()
+    {
+        var def = new CanaryTool { Name = "x", Description = "d", ForbiddenCategory = "c" };
+        Assert.Equal(Severity.High, def.Severity);
+        var low = new CanaryTool { Name = "y", Description = "d", ForbiddenCategory = "c", Severity = Severity.Low };
+        Assert.Equal(Severity.Low, low.Severity);
+    }
+
+    [Fact]
+    public void InstrumentedCanaryAgent_AdvertisesToolOutputInjection()
+        => Assert.True(new InstrumentedCanaryAgent(new ScriptedChatClient())
+            .Capabilities.HasFlag(AgentToolCapability.ToolOutputInjection));
+
     // ---- TierNegotiator ----
 
     [Fact]

@@ -94,4 +94,15 @@ public class TransformedAttackTests
     [Fact]
     public void EmptyTransformers_Throws() =>
         Assert.Throws<ArgumentException>(() => new TransformedAttack(new FakeAttack(), [], TransformMode.Expand));
+
+    private sealed class BadNameTransformer : IProbeTransformer
+    {
+        public string Name => "bad>name";   // '>' is a reserved chain-provenance delimiter
+        public DifficultyDelta DifficultyImpact => DifficultyDelta.Raise;
+        public IEnumerable<AttackProbe> Transform(AttackProbe probe) => [probe];
+    }
+
+    [Fact]
+    public void ReservedDelimiterInTransformerName_Throws() =>
+        Assert.Throws<ArgumentException>(() => new TransformedAttack(new FakeAttack(), [new BadNameTransformer()], TransformMode.Expand));
 }
