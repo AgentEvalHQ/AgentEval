@@ -37,6 +37,16 @@ public class RedTeamBaselineComparer
                 "or call Compare(..., requireMatchingIntensity: false) to override (RC-6).");
         }
 
+        // RA3-06 / T5-2: a FailFast-truncated scan executed only a partial probe set, so its score/ASR
+        // denominators are not comparable to a full baseline. Refuse by default; the explicit override stands.
+        if (requireMatchingIntensity && current.WasTruncated)
+        {
+            throw new InvalidOperationException(
+                $"Cannot compare a FailFast-truncated scan ({current.TotalProbes}/{current.PlannedProbes} probes " +
+                "executed) against a baseline: the truncated probe set makes score/ASR deltas non-comparable (RA3-06). " +
+                "Re-run without FailFast, or call Compare(..., requireMatchingIntensity: false) to override.");
+        }
+
         var effectiveThresholds = thresholds ?? ComparisonThresholds.Default;
 
         // Collect current vulnerabilities

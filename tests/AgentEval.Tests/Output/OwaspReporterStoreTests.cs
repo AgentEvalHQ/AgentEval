@@ -148,5 +148,9 @@ public class OwaspReporterStoreTests : IDisposable
         Assert.Contains("\"regulation\"", json);
         Assert.Contains(OWASPComplianceReporter.Regulation, json);
         Assert.Contains("\"LLM01\"", json);
+        // T4-4 / review: the honesty disclaimer is a report-surface footer, NOT a synthetic control row.
+        // It must never be persisted into the structured evidence Controls (which downstream consumers
+        // like the MissionControl compliance matrix iterate as real, scored controls).
+        Assert.DoesNotContain("DISCLAIMER", json);
     }
 }

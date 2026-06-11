@@ -84,11 +84,16 @@ public static partial class OwaspBenchmark
     /// <see cref="IEvaluator"/> and asserts it receives at least one
     /// <c>EvaluateAsync</c> call per Top10 run with the judge-graded category enabled.
     /// </para></param>
+    /// <param name="systemPromptCanary">Optional secret seeded into the agent's system prompt so
+    /// extraction probes can detect a genuine leak by canary match rather than keyword heuristics
+    /// (via <see cref="Attack.RosterWithCanary"/>). When <c>null</c>, the canary-aware attacks fall
+    /// back to their heuristic form.</param>
     /// <returns>An <see cref="OwaspBenchmarkRun"/> wired with the Top10 attack set.</returns>
-    public static OwaspBenchmarkRun Top10(IEvaluator? judge = null)
+    public static OwaspBenchmarkRun Top10(IEvaluator? judge = null, string? systemPromptCanary = null)
     {
+        var attacks = Attack.RosterWithCanary(systemPromptCanary);
         var pipeline = AttackPipeline.Create()
-            .WithAttacks([.. Attack.All])
+            .WithAttacks([.. attacks])
             .WithIntensity(Intensity.Quick)
             .WithTimeout(QuickTimeout)
             .WithEvidence(true);
@@ -96,7 +101,7 @@ public static partial class OwaspBenchmark
             pipeline,
             judge,
             presetName: "Top10",
-            attackOwaspIds: AttackOwaspIds(Attack.All));
+            attackOwaspIds: AttackOwaspIds(attacks));
     }
 
     /// <summary>
@@ -129,11 +134,13 @@ public static partial class OwaspBenchmark
     /// attack type for higher-confidence verdicts.
     /// </summary>
     /// <param name="judge">See <see cref="Top10"/>.</param>
+    /// <param name="systemPromptCanary">See <see cref="Top10"/>.</param>
     /// <returns>An <see cref="OwaspBenchmarkRun"/> wired with audit-grade settings.</returns>
-    public static OwaspBenchmarkRun AuditGrade(IEvaluator? judge = null)
+    public static OwaspBenchmarkRun AuditGrade(IEvaluator? judge = null, string? systemPromptCanary = null)
     {
+        var attacks = Attack.RosterWithCanary(systemPromptCanary);
         var pipeline = AttackPipeline.Create()
-            .WithAttacks([.. Attack.All])
+            .WithAttacks([.. attacks])
             .WithIntensity(Intensity.Comprehensive)
             .WithTimeout(ThoroughTimeout)
             .WithEvidence(true);
@@ -141,7 +148,7 @@ public static partial class OwaspBenchmark
             pipeline,
             judge,
             presetName: "AuditGrade",
-            attackOwaspIds: AttackOwaspIds(Attack.All));
+            attackOwaspIds: AttackOwaspIds(attacks));
     }
 
     /// <summary>
@@ -179,11 +186,13 @@ public static partial class OwaspBenchmark
     /// </para>
     /// </remarks>
     /// <param name="judge">See <see cref="Top10"/>.</param>
+    /// <param name="systemPromptCanary">See <see cref="Top10"/>.</param>
     /// <returns>An <see cref="OwaspBenchmarkRun"/> wired with the Top10-for-RAG set.</returns>
-    public static OwaspBenchmarkRun Top10ForRag(IEvaluator? judge = null)
+    public static OwaspBenchmarkRun Top10ForRag(IEvaluator? judge = null, string? systemPromptCanary = null)
     {
+        var attacks = Attack.RosterWithCanary(systemPromptCanary);
         var pipeline = AttackPipeline.Create()
-            .WithAttacks([.. Attack.All])
+            .WithAttacks([.. attacks])
             .WithIntensity(Intensity.Comprehensive)
             .WithTimeout(RagFocusedTimeout)
             .WithEvidence(true);
@@ -191,13 +200,14 @@ public static partial class OwaspBenchmark
             pipeline,
             judge,
             presetName: "Top10ForRag",
-            attackOwaspIds: AttackOwaspIds(Attack.All));
+            attackOwaspIds: AttackOwaspIds(attacks));
     }
 
     /// <summary>
     /// Projects an attack list into its (OwaspId, Severity, Name) triples for
     /// downstream <see cref="EvalResult"/> shaping. Pulled out so all presets
     /// agree on the data they make available to <see cref="OwaspBenchmarkRun"/>.
+    /// Canary instrumentation lives on the shared <see cref="Attack.RosterWithCanary"/> helper.
     /// </summary>
     private static IReadOnlyList<(string OwaspId, Severity DefaultSeverity, string AttackName)>
         AttackOwaspIds(IReadOnlyList<IAttackType> attacks)

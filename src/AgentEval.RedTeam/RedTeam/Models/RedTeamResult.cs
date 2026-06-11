@@ -50,7 +50,23 @@ public class RedTeamResult : IRedTeamResult
     /// </summary>
     public int ErroredProbes { get; init; }
 
+    /// <summary>
+    /// True if the scan stopped early due to <see cref="ScanOptions.FailFast"/>, leaving planned probes
+    /// unexecuted (RA3-06). A truncated scan's executed-probe counts and scores are NOT comparable to a
+    /// full scan's — the denominator is a partial probe set.
+    /// </summary>
+    public bool WasTruncated { get; init; }
+
+    /// <summary>Probes that were never executed because FailFast stopped the scan early (RA3-06).</summary>
+    public int SkippedProbes { get; init; }
+
     // === Computed Properties ===
+
+    /// <summary>
+    /// Planned probe total (executed + skipped). Use this — not <see cref="TotalProbes"/> — when comparing a
+    /// FailFast-truncated scan against a full baseline; a truncated scan's executed count is not comparable (RA3-06).
+    /// </summary>
+    public int PlannedProbes => TotalProbes + SkippedProbes;
 
     /// <summary>Whether any probe failed to execute (transport/timeout/unexpected fault).</summary>
     public bool HasExecutionErrors => ErroredProbes > 0;
@@ -115,6 +131,26 @@ public class RedTeamResult : IRedTeamResult
     /// <summary>Number of ambiguous inconclusive probes across all attacks.</summary>
     public int AmbiguousProbes => AttackResults.Sum(a => a.AmbiguousCount);
 
+    /// <summary>
+    /// Outcome counts broken down by injection delivery surface (Wave B, Pillar 4) — only probes that carry a
+    /// <see cref="ProbeResult.Surface"/> are included. Keeps an inlined-proxy (<see cref="InjectionSurface.UserMessage"/>)
+    /// result honestly distinct from a real-boundary (<see cref="InjectionSurface.ToolOutput"/> /
+    /// <see cref="InjectionSurface.RetrievedDocument"/>) result so the two are never conflated in a single aggregate.
+    /// </summary>
+    public IReadOnlyList<SurfaceBreakdown> BySurface =>
+        AttackResults
+            .SelectMany(a => a.ProbeResults)
+            .Where(p => p.Surface is not null)
+            .GroupBy(p => p.Surface!.Value)
+            .OrderBy(g => g.Key)
+            .Select(g => new SurfaceBreakdown(
+                g.Key,
+                g.Count(),
+                g.Count(p => p.Outcome == EvaluationOutcome.Succeeded),
+                g.Count(p => p.Outcome == EvaluationOutcome.Resisted),
+                g.Count(p => p.Outcome == EvaluationOutcome.Inconclusive)))
+            .ToList();
+
     /// <summary>Overall verdict based on results.</summary>
     public Verdict Verdict
     {
@@ -154,10 +190,17 @@ public class RedTeamResult : IRedTeamResult
             if (HasExecutionErrors)
                 summary += $" [!] {ErroredProbes} execution error(s)";
 
+            if (WasTruncated)
+                summary += $" [TRUNCATED: FailFast stopped after {TotalProbes}/{PlannedProbes} probes; " +
+                           $"{SkippedProbes} skipped — scores not comparable to a full scan]";
+
             return summary;
         }
     }
 }
+
+/// <summary>Per-<see cref="InjectionSurface"/> outcome counts for the <c>by_surface</c> breakdown (Wave B, Pillar 4).</summary>
+public sealed record SurfaceBreakdown(InjectionSurface Surface, int Total, int Succeeded, int Resisted, int Inconclusive);
 
 /// <summary>
 /// Result for a single attack type across all its probes.

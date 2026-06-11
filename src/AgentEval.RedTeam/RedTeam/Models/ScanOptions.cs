@@ -40,23 +40,61 @@ public class ScanOptions
     public TimeSpan DelayBetweenProbes { get; init; } = TimeSpan.Zero;
 
     /// <summary>
-    /// Number of parallel probe executions.
-    /// Default: 1 (sequential for easier debugging).
+    /// Timeout per individual agent turn within a multi-turn conversation (Wave C). Defaults to
+    /// <see cref="TimeoutPerProbe"/>. A per-turn timeout ends that turn gracefully and folds the partial conversation
+    /// as truncated (it does not abort the probe). Unlike a single-turn probe — which is bounded by
+    /// <see cref="TimeoutPerProbe"/> — a multi-turn conversation's hard outer bound is sized for the whole
+    /// conversation: <see cref="MaxConversationDuration"/> if set, otherwise <c>MaxTurns × TimeoutPerTurn</c>. (So set
+    /// <see cref="TimeoutPerTurn"/>, not <see cref="TimeoutPerProbe"/>, to bound multi-turn scans.)
+    /// </summary>
+    public TimeSpan TimeoutPerTurn
+    {
+        get => _timeoutPerTurn ?? TimeoutPerProbe;
+        init => _timeoutPerTurn = value;
+    }
+    private readonly TimeSpan? _timeoutPerTurn;
+
+    /// <summary>
+    /// Soft ceiling on total wall-clock for a single multi-turn conversation (Wave C). Enforced as an elapsed-time
+    /// check <i>between</i> turns (never a hard mid-turn cancel), so it is deterministic-friendly — but a conversation
+    /// can therefore overshoot this ceiling by up to one in-flight turn (worst case <c>MaxConversationDuration +
+    /// TimeoutPerTurn</c>). <see cref="TimeSpan.Zero"/> (the default) means no soft cap — only <c>MaxTurns</c> and the
+    /// hard <c>MaxTurns × TimeoutPerTurn</c> bound apply.
+    /// </summary>
+    public TimeSpan MaxConversationDuration { get; init; } = TimeSpan.Zero;
+
+    /// <summary>
+    /// Maximum number of probes executed concurrently within an attack (RA3-05). Values &lt;= 1 are
+    /// clamped to 1 and run sequentially (the default — byte-for-byte the prior behavior). Higher values
+    /// use a bounded <see cref="System.Threading.SemaphoreSlim"/> worker pool; results are reordered to the
+    /// original probe order so reports stay deterministic regardless of completion order.
     /// </summary>
     /// <remarks>
     /// <para>
-    /// Reserved for future use — parallel scan execution is not yet implemented; the scanner
-    /// executes probes sequentially regardless of this value. Setting it today is silently
-    /// ignored at runtime.
+    /// <b>Agent thread-safety (required for &gt; 1):</b> the same <c>IEvaluableAgent</c> instance is
+    /// invoked from multiple worker threads concurrently. <c>IEvaluableAgent</c> declares no thread-safety
+    /// contract, so an agent that mutates per-call state (e.g. an accumulating conversation history, a
+    /// non-reentrant SDK client) MUST keep <c>Parallelism = 1</c>; only supply a higher value when the agent and
+    /// its evaluator are safe for concurrent invocation.
     /// </para>
     /// <para>
-    /// Tracked under v0.11.0 hardening (plan-13 T4.1d item 25). The setter is preserved so
-    /// existing test fixtures and call-sites continue to compile; once the scheduler grows a
-    /// real worker pool this property will become live without a source-breaking rename.
+    /// <b>FailFast:</b> stops scheduling NEW probes once a success is seen but cannot cancel probes already in
+    /// flight — those complete and are recorded. A consequence is that under <c>Parallelism &gt; 1</c> the exact
+    /// executed/skipped probe count (and hence <c>RedTeamResult.WasTruncated</c>) is timing-dependent. For strict,
+    /// deterministic probe-level fail-fast semantics, keep <c>Parallelism = 1</c>.
+    /// </para>
+    /// <para>
+    /// <b>Rate limiting:</b> <see cref="DelayBetweenProbes"/> is honored under parallelism as inter-dispatch
+    /// spacing (the semaphore caps concurrency, the delay caps dispatch rate). Progress callbacks fire after each
+    /// probe completes, so the reported "current probe" is the just-completed one rather than the next to run.
     /// </para>
     /// </remarks>
-    [Obsolete("Parallel execution is not yet implemented. This property is reserved for future use; setting it has no effect today.")]
-    public int Parallelism { get; init; } = 1;
+    public int Parallelism
+    {
+        get => _parallelism;
+        init => _parallelism = value < 1 ? 1 : value;
+    }
+    private readonly int _parallelism = 1;
 
     /// <summary>
     /// Whether to stop on first failure.

@@ -166,9 +166,9 @@ public class RiskScoreCalculatorTests
             InconclusiveProbes = 0,
             AttackResults =
             [
-                new AttackResult { AttackName = "A1", OwaspId = "LLM01", Severity = Severity.Medium, SucceededCount = 1, ProbeResults = [] },
-                new AttackResult { AttackName = "A2", OwaspId = "LLM05", Severity = Severity.Medium, SucceededCount = 1, ProbeResults = [] },
-                new AttackResult { AttackName = "A3", OwaspId = "LLM02", Severity = Severity.Medium, SucceededCount = 1, ProbeResults = [] },
+                new AttackResult { AttackName = "A1", OwaspId = "LLM01", Severity = Severity.Medium, SucceededCount = 1, ProbeResults = SucceededProbes(1, Severity.Medium) },
+                new AttackResult { AttackName = "A2", OwaspId = "LLM05", Severity = Severity.Medium, SucceededCount = 1, ProbeResults = SucceededProbes(1, Severity.Medium) },
+                new AttackResult { AttackName = "A3", OwaspId = "LLM02", Severity = Severity.Medium, SucceededCount = 1, ProbeResults = SucceededProbes(1, Severity.Medium) },
             ]
         };
 
@@ -213,7 +213,8 @@ public class RiskScoreCalculatorTests
                 Response = "compromised",
                 Outcome = EvaluationOutcome.Succeeded,
                 Reason = "Attack succeeded",
-                Difficulty = Difficulty.Easy
+                Difficulty = Difficulty.Easy,
+                Severity = severity   // RC-7 / T4-5: the score now reads per-probe severity
             });
         }
 
@@ -309,7 +310,7 @@ public class RiskScoreCalculatorTests
                     Severity = Severity.Critical,
                     ResistedCount = 0,
                     SucceededCount = 2,
-                    ProbeResults = []
+                    ProbeResults = SucceededProbes(2, Severity.Critical)
                 },
                 new AttackResult
                 {
@@ -318,7 +319,7 @@ public class RiskScoreCalculatorTests
                     Severity = Severity.High,
                     ResistedCount = 0,
                     SucceededCount = 3,
-                    ProbeResults = []
+                    ProbeResults = SucceededProbes(3, Severity.High)
                 },
                 new AttackResult
                 {
@@ -327,9 +328,115 @@ public class RiskScoreCalculatorTests
                     Severity = Severity.Medium,
                     ResistedCount = 4,
                     SucceededCount = 1,
-                    ProbeResults = []
+                    ProbeResults = [.. ResistedProbes(4), .. SucceededProbes(1, Severity.Medium)]
                 }
             ]
         };
+    }
+
+    // RC-7 / T4-5: the score reads per-probe severity, so fixtures must carry real probes
+    // (not just AttackResult.SucceededCount + empty ProbeResults as before).
+    private static List<ProbeResult> SucceededProbes(int count, Severity severity)
+    {
+        var probes = new List<ProbeResult>();
+        for (int i = 0; i < count; i++)
+        {
+            probes.Add(new ProbeResult
+            {
+                ProbeId = $"F-{severity}-{i:D3}",
+                Prompt = "test",
+                Response = "compromised",
+                Outcome = EvaluationOutcome.Succeeded,
+                Reason = "Attack succeeded",
+                Difficulty = Difficulty.Easy,
+                Severity = severity
+            });
+        }
+        return probes;
+    }
+
+    private static List<ProbeResult> ResistedProbes(int count)
+    {
+        var probes = new List<ProbeResult>();
+        for (int i = 0; i < count; i++)
+        {
+            probes.Add(new ProbeResult
+            {
+                ProbeId = $"R-{i:D3}",
+                Prompt = "test",
+                Response = "safe",
+                Outcome = EvaluationOutcome.Resisted,
+                Reason = "Safe response",
+                Difficulty = Difficulty.Easy
+            });
+        }
+        return probes;
+    }
+
+    [Fact]
+    public void CalculateScore_UsesPerProbeSeverity_NotAttackDefault()
+    {
+        // Attack default Critical, but the single succeeded probe is Low → deduct Low (-1), not Critical (-15).
+        var probes = new List<ProbeResult>
+        {
+            new() { ProbeId = "F-0", Prompt = "x", Response = "y", Reason = "r", Outcome = EvaluationOutcome.Succeeded, Severity = Severity.Low }
+        };
+        var result = new RedTeamResult
+        {
+            AgentName = "TestAgent",
+            StartedAt = DateTimeOffset.UtcNow.AddMinutes(-1),
+            CompletedAt = DateTimeOffset.UtcNow,
+            Duration = TimeSpan.FromMinutes(1),
+            TotalProbes = 1,
+            ResistedProbes = 0,
+            SucceededProbes = 1,
+            InconclusiveProbes = 0,
+            AttackResults =
+            [
+                new AttackResult { AttackName = "A", OwaspId = "LLM01", Severity = Severity.Critical, ResistedCount = 0, SucceededCount = 1, ProbeResults = probes }
+            ]
+        };
+
+        var score = _calculator.CalculateScore(result);
+
+        // Per-probe Low deducts only -1 (NOT the attack-default Critical -15). The 1-category
+        // coverage bonus is round(10/100*5) = round(0.5) = 0 under banker's rounding, so 100 - 1 = 99.
+        Assert.Equal(99, score);
+        Assert.Equal(1, _calculator.GetSummary(result).LowFindings);
+        Assert.Equal(0, _calculator.GetSummary(result).CriticalFindings);
+    }
+
+    [Fact]
+    public void GetSummary_PopulatesInconclusiveProbes()
+    {
+        var result = new RedTeamResult
+        {
+            AgentName = "TestAgent",
+            StartedAt = DateTimeOffset.UtcNow.AddMinutes(-1),
+            CompletedAt = DateTimeOffset.UtcNow,
+            Duration = TimeSpan.FromMinutes(1),
+            TotalProbes = 5,
+            ResistedProbes = 3,
+            SucceededProbes = 0,
+            InconclusiveProbes = 2,
+            AttackResults =
+            [
+                new AttackResult { AttackName = "A", OwaspId = "LLM01", ResistedCount = 3, SucceededCount = 0, InconclusiveCount = 2, ProbeResults = [] }
+            ]
+        };
+
+        Assert.Equal(2, _calculator.GetSummary(result).InconclusiveProbes);
+    }
+
+    [Fact]
+    public void Summary_InconclusiveBucket_IsNeverNegative()
+    {
+        var summary = new RiskSummary
+        {
+            Score = 100, Level = RiskLevel.Low, CriticalFindings = 0, HighFindings = 0, MediumFindings = 0, LowFindings = 0,
+            TotalProbes = 1, PassedProbes = 5, FailedProbes = 5, InconclusiveProbes = -3, OwaspCoveragePercent = 0
+        };
+
+        Assert.True(Math.Max(0, summary.InconclusiveProbes) >= 0);
     }
 }

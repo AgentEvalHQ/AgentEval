@@ -23,31 +23,36 @@ public class MITREATLASReporterTests
     }
 
     [Fact]
-    public void GenerateReport_Contains12Techniques()
+    public void GenerateReport_Contains13Techniques()
     {
         var reporter = new MITREATLASReporter();
         var result = CreateTestResult();
 
         var report = reporter.GenerateReport(result);
 
-        Assert.Equal(12, report.Techniques.Count);
+        // RC-5/T4-2: roster grew 12→13 (T0024 retired; T0056 + T0057 added).
+        Assert.Equal(13, report.Techniques.Count);
         Assert.Contains(report.Techniques, t => t.Id == "AML.T0051");
         Assert.Contains(report.Techniques, t => t.Id == "AML.T0054");
-        Assert.Contains(report.Techniques, t => t.Id == "AML.T0043");
+        Assert.Contains(report.Techniques, t => t.Id == "AML.T0056");
+        Assert.Contains(report.Techniques, t => t.Id == "AML.T0057");
     }
 
     [Fact]
-    public void GenerateReport_Contains7Tactics()
+    public void GenerateReport_Contains9Tactics()
     {
         var reporter = new MITREATLASReporter();
         var result = CreateTestResult();
 
         var report = reporter.GenerateReport(result);
 
-        Assert.Equal(7, report.Tactics.Count);
+        // RC-5/T4-2: tactic table grew 7→9 (added ML Model Access, Privilege Escalation, Discovery;
+        // retired the orphaned Resource-Development/Persistence duplication).
+        Assert.Equal(9, report.Tactics.Count);
         Assert.Contains(report.Tactics, t => t.Name == "Initial Access");
         Assert.Contains(report.Tactics, t => t.Name == "Defense Evasion");
         Assert.Contains(report.Tactics, t => t.Name == "Collection");
+        Assert.Contains(report.Tactics, t => t.Name == "Discovery");
     }
 
     [Fact]
@@ -59,7 +64,8 @@ public class MITREATLASReporterTests
         var report = reporter.GenerateReport(result);
 
         var notApplicable = report.Techniques.Where(t => t.Status == TechniqueTestStatus.NotApplicable).ToList();
-        Assert.Equal(4, notApplicable.Count); // AML.T0044, AML.T0046, AML.T0052, AML.T0053
+        // RC-5/T4-2: 7 out-of-band techniques: T0043, T0044, T0046, T0047, T0048, T0052, T0053.
+        Assert.Equal(7, notApplicable.Count);
     }
 
     [Fact]
@@ -183,6 +189,15 @@ public class MITREATLASReporterTests
         var collection = report.Tactics.First(t => t.Name == "Collection");
 
         Assert.True(collection.TotalCount > 0);
+    }
+
+    [Fact]
+    public void MitreReport_FrameworkVersion_DoesNotClaimFabricatedVersion()
+    {
+        // N-08: ATLAS publishes no "v4.5"; the version descriptor must not fabricate one.
+        var report = new MITREATLASReporter().GenerateReport(CreateTestResult());
+        Assert.DoesNotContain("v4.5", report.FrameworkVersion);
+        Assert.Contains("ATLAS", report.FrameworkVersion);
     }
 
     // === Helper Methods ===
@@ -322,4 +337,48 @@ public class MITREATLASReporterTests
         Assert.Equal("TA0001", t0051.TacticId);
         Assert.Equal("Initial Access", t0051.TacticName); // was the contradictory "Reconnaissance"
     }
+
+    // === RC-5/T4-2: ATLAS technique→tactic remap ===
+
+    [Fact]
+    public void Report_SystemPromptExtraction_MapsToT0056AndT0057_NotT0043()
+    {
+        var report = new MITREATLASReporter().GenerateReport(CreateResultForMitreIds("AML.T0056", "AML.T0057"));
+        var t0056 = report.Techniques.Single(t => t.Id == "AML.T0056");
+        var t0057 = report.Techniques.Single(t => t.Id == "AML.T0057");
+        Assert.Equal(TechniqueTestStatus.Tested, t0056.Status);
+        Assert.Equal(TechniqueTestStatus.Tested, t0057.Status);
+        Assert.Equal("Discovery", t0056.TacticName);
+        Assert.Equal("Exfiltration", t0057.TacticName);
+        var t0043 = report.Techniques.Single(t => t.Id == "AML.T0043");
+        Assert.Equal(TechniqueTestStatus.NotApplicable, t0043.Status);
+        Assert.DoesNotContain("Prompt Extraction", t0043.Name);
+    }
+
+    [Fact]
+    public void Report_DoesNotContainRetiredT0024()
+        => Assert.DoesNotContain(new MITREATLASReporter().GenerateReport(CreateResultForMitreIds("AML.T0037")).Techniques, t => t.Id == "AML.T0024");
+
+    [Fact]
+    public void Report_OutOfBandTechniques_AreNotApplicable()
+    {
+        var report = new MITREATLASReporter().GenerateReport(CreateResultForMitreIds("AML.T0051"));
+        foreach (var id in new[] { "AML.T0043", "AML.T0044", "AML.T0046", "AML.T0047", "AML.T0048", "AML.T0052", "AML.T0053" })
+            Assert.Equal(TechniqueTestStatus.NotApplicable, report.Techniques.Single(t => t.Id == id).Status);
+    }
+
+    [Fact]
+    public void Report_EveryTechniqueTactic_IsDefinedInTacticTable()
+    {
+        var report = new MITREATLASReporter().GenerateReport(CreateResultForMitreIds("AML.T0051"));
+        var tacticIds = report.Tactics.Select(t => t.Id).ToHashSet();
+        Assert.All(report.Techniques, t => Assert.Contains(t.TacticId, tacticIds));
+    }
+
+    private static RedTeamResult CreateResultForMitreIds(params string[] mitreIds) => new()
+    {
+        AgentName = "TestAgent", TotalProbes = 1, ResistedProbes = 1, SucceededProbes = 0,
+        AttackResults = [ new AttackResult { AttackName = "Probe", OwaspId = "LLM01", MitreAtlasIds = mitreIds, ResistedCount = 1, SucceededCount = 0,
+            ProbeResults = [ new ProbeResult { ProbeId = "p0", Prompt = "x", Response = "y", Reason = "r", Outcome = EvaluationOutcome.Resisted } ] } ]
+    };
 }

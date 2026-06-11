@@ -304,6 +304,48 @@ public class RedTeamBaselineComparerTests
     }
 
     [Fact]
+    public void Compare_TruncatedScan_ThrowsByDefault()
+    {
+        // RA3-06 / T5-2: a FailFast-truncated scan's partial probe set is non-comparable to a full baseline.
+        var baseline = CreateResult(succeededProbes: 0).ToBaseline("v1.0.0");
+        var current = new RedTeamResult
+        {
+            AgentName = "TestAgent",
+            Duration = TimeSpan.FromSeconds(1),
+            TotalProbes = 1,
+            ResistedProbes = 1,
+            SucceededProbes = 0,
+            InconclusiveProbes = 0,
+            WasTruncated = true,
+            SkippedProbes = 19,
+            AttackResults = []
+        };
+
+        var ex = Assert.Throws<InvalidOperationException>(() => new RedTeamBaselineComparer().Compare(current, baseline));
+        Assert.Contains("non-comparable", ex.Message);
+    }
+
+    [Fact]
+    public void Compare_TruncatedScan_OverrideAllowed()
+    {
+        var baseline = CreateResult(succeededProbes: 0).ToBaseline("v1.0.0");
+        var current = new RedTeamResult
+        {
+            AgentName = "TestAgent",
+            Duration = TimeSpan.FromSeconds(1),
+            TotalProbes = 1,
+            ResistedProbes = 1,
+            SucceededProbes = 0,
+            InconclusiveProbes = 0,
+            WasTruncated = true,
+            SkippedProbes = 19,
+            AttackResults = []
+        };
+
+        Assert.NotNull(new RedTeamBaselineComparer().Compare(current, baseline, requireMatchingIntensity: false));
+    }
+
+    [Fact]
     public void Compare_CustomThresholds_TightenRegression()
     {
         var baseline = CreateResult(succeededProbes: 0).ToBaseline("v1.0.0");

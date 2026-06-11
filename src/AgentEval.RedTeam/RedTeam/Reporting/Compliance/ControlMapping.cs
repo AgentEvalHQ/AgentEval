@@ -78,14 +78,30 @@ public class ControlStatus
     /// <summary>Total tests that apply to this control.</summary>
     public int TotalTests { get; init; }
 
+    /// <summary>
+    /// Tests that produced a CONCLUSIVE verdict (Resisted or Succeeded). Inconclusive probes are excluded so
+    /// they weaken <see cref="Coverage"/> rather than failing the control (N-03 / RC-6). When left unset
+    /// (sentinel -1), posture falls back to <see cref="TotalTests"/> so older call-sites are unchanged.
+    /// </summary>
+    public int ConclusiveTests { get; init; } = -1;
+
+    private int EffectiveConclusive => ConclusiveTests >= 0 ? ConclusiveTests : TotalTests;
+
     /// <summary>Tests that passed.</summary>
     public int PassedTests { get; init; }
 
-    /// <summary>Tests that failed.</summary>
-    public int FailedTests => TotalTests - PassedTests;
+    /// <summary>Tests that failed (conclusive probes that were not resisted).</summary>
+    public int FailedTests => EffectiveConclusive - PassedTests;
 
-    /// <summary>Pass rate percentage.</summary>
-    public double PassRate => TotalTests > 0 ? PassedTests * 100.0 / TotalTests : 0;
+    /// <summary>
+    /// Pass rate over CONCLUSIVE probes only (0-100): Resisted / (Resisted + Succeeded). Inconclusive probes
+    /// do NOT dilute it (N-03 / RC-6). Returns 0 when nothing was conclusively measured (such a control is
+    /// reported <see cref="ControlEvaluationStatus.NotEvaluated"/>, so it is excluded from the compliance rate).
+    /// </summary>
+    public double PassRate => EffectiveConclusive > 0 ? PassedTests * 100.0 / EffectiveConclusive : 0;
+
+    /// <summary>Coverage (0-100): fraction of applicable probes that produced a conclusive verdict (N-03).</summary>
+    public double Coverage => TotalTests > 0 ? EffectiveConclusive * 100.0 / TotalTests : 0.0;
 
     /// <summary>Evidence summary for auditors.</summary>
     public string EvidenceSummary { get; init; } = "";

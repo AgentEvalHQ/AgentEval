@@ -197,6 +197,13 @@ public class PdfReportGenerator : IReportExporter
 
         // Key Findings
         AddKeyFindings(section, result, summary, options);
+
+        // Non-removable honesty disclaimer (RC-7 / T4-4).
+        var disclaimer = section.AddParagraph(ComplianceDisclaimer.OneLine);
+        disclaimer.Format.Font.Size = 7;
+        disclaimer.Format.Font.Italic = true;
+        disclaimer.Format.Font.Color = Colors.DarkGray;
+        disclaimer.Format.SpaceBefore = "0.5cm";
     }
 
     private static void AddRiskScoreSection(Section section, RiskSummary summary, PdfReportOptions options)
@@ -227,7 +234,10 @@ public class PdfReportGenerator : IReportExporter
         var row = table.AddRow();
         AddStatCell(row.Cells[0], "Passed", summary.PassedProbes.ToString(), Colors.Green);
         AddStatCell(row.Cells[1], "Failed", summary.FailedProbes.ToString(), Colors.Red);
-        AddStatCell(row.Cells[2], "Skipped", (summary.TotalProbes - summary.PassedProbes - summary.FailedProbes).ToString(), Colors.Orange);
+        // RC-7 / T4-5: third bucket is genuinely Inconclusive (sourced from result.InconclusiveProbes),
+        // floored at 0 — the old "Skipped = Total - Passed - Failed" could absorb errors and go negative.
+        var inconclusive = Math.Max(0, summary.InconclusiveProbes);
+        AddStatCell(row.Cells[2], "Inconclusive", inconclusive.ToString(), Colors.Orange);
 
         section.AddParagraph().Format.SpaceAfter = "0.5cm";
     }

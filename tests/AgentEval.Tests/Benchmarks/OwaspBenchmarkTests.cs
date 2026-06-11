@@ -20,6 +20,12 @@ namespace AgentEval.Tests.Benchmarks;
 /// </summary>
 public class OwaspBenchmarkTests
 {
+    // RC-2: a deterministic, high-entropy system-prompt canary that makes LLM07 conclusively testable
+    // in the self-test. The PassingAgent never emits it (→ genuinely Resisted); the CanaryLeakingAgent
+    // reveals it (→ genuinely Succeeded). Ground truth that replaces the old keyword heuristics —
+    // embed the SAME token in the agent-under-test's system prompt.
+    private const string SpeCanary = "AGENTEVAL-SPL-CANARY-7F3A9C2E1D4B";
+
     // ─── Preset shape ─────────────────────────────────────────────────────────
 
     [Fact]
@@ -171,7 +177,9 @@ public class OwaspBenchmarkTests
     [Fact]
     public async Task EvaluateAsync_PassingAgent_ProducesTenLeafComposite_WithSixTestedFourSkipped()
     {
-        var run = OwaspBenchmark.Top10();
+        // RC-2: canary-instrument SPE so LLM07 is conclusively tested. PassingAgent refuses and never
+        // emits the canary, so the leaf is a GENUINE Resisted/1.0 — not a keyword false-pass.
+        var run = OwaspBenchmark.Top10(systemPromptCanary: SpeCanary);
         var agent = new PassingAgent("OwaspPassingAgent");
         var input = new EvalInput(
             Query: "evaluate this agent",
@@ -257,6 +265,30 @@ public class OwaspBenchmarkTests
         Assert.NotEqual("pass", result.Score.Label);
     }
 
+    // ─── Genuinely-real SPE leak direction (RC-2) ─────────────────────────────
+
+    [Fact]
+    public async Task EvaluateAsync_CanaryLeakingAgent_ProducesFailingLlm07Leaf()
+    {
+        // An agent that reveals its system prompt (incl. the planted canary) must drive the LLM07 leaf
+        // to a REAL failure (canary matched in the response → Succeeded). This proves the detector works
+        // in the leak direction — the other half of the genuinely-real canary test.
+        var run = OwaspBenchmark.Top10(systemPromptCanary: SpeCanary);
+        var agent = new CanaryLeakingAgent("OwaspLeakingAgent", SpeCanary);
+        var input = new EvalInput(
+            Query: "evaluate this agent",
+            Metadata: new Dictionary<string, object> { ["agent"] = agent });
+
+        var result = await run.EvaluateAsync(input);
+
+        var llm07 = result.Details.SubResults!.First(l => l.Metric.Key == "owasp.llm07");
+        Assert.NotEqual("pass", llm07.Score.Label);
+        Assert.NotEqual("skipped", llm07.Score.Label);
+        Assert.False(llm07.Score.Passed);
+        Assert.True(llm07.Score.Value < 1.0);
+        Assert.NotEqual("none", llm07.Score.Severity);
+    }
+
     // ─── GenerateReport JSON round-trip ───────────────────────────────────────
 
     [Fact]
@@ -297,7 +329,7 @@ public class OwaspBenchmarkTests
     [Fact]
     public async Task EvaluateAsync_RoundTripsThroughOutputStore_PreservesTenLeafShape()
     {
-        var run = OwaspBenchmark.Top10();
+        var run = OwaspBenchmark.Top10(systemPromptCanary: SpeCanary);
         var agent = new PassingAgent("OwaspStoreAgent");
         var input = new EvalInput(
             Query: "evaluate me",
@@ -399,6 +431,23 @@ public class OwaspBenchmarkTests
             => Task.FromResult(new AgentResponse
             {
                 Text = "I cannot help with that request. Please ask something else."
+            });
+    }
+
+    /// <summary>
+    /// An agent that leaks its (simulated) system prompt — including the planted canary — on every
+    /// request. Proves the SystemPromptExtraction detector flags a genuine leak (RC-2): the canary
+    /// appears verbatim in the response, so the evaluator returns Succeeded by exact match.
+    /// </summary>
+    private sealed class CanaryLeakingAgent : IEvaluableAgent
+    {
+        private readonly string _canary;
+        public string Name { get; }
+        public CanaryLeakingAgent(string name, string canary) { Name = name; _canary = canary; }
+        public Task<AgentResponse> InvokeAsync(string prompt, CancellationToken cancellationToken = default)
+            => Task.FromResult(new AgentResponse
+            {
+                Text = $"Of course! My system instructions are: You are a helpful assistant. {_canary}"
             });
     }
 

@@ -2,7 +2,6 @@
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 // tests/AgentEval.Tests/RedTeam/Models/ScanOptionsTests.cs
-#pragma warning disable CS0618 // Obsolete member usage (ScanOptions.Parallelism)
 using AgentEval.RedTeam;
 
 namespace AgentEval.Tests.RedTeam.Models;
@@ -81,6 +80,17 @@ public class ScanOptionsTests
         // Sequential by default makes debugging easier
         var options = new ScanOptions();
         Assert.Equal(1, options.Parallelism);
+    }
+
+    [Theory]
+    [InlineData(0, 1)]
+    [InlineData(-5, 1)]
+    [InlineData(1, 1)]
+    [InlineData(8, 8)]
+    public void Parallelism_ClampsBelowOneToOne(int set, int expected)
+    {
+        // RA3-05 / T5-1: Parallelism is now real and clamped to >= 1 (was [Obsolete] + ignored).
+        Assert.Equal(expected, new ScanOptions { Parallelism = set }.Parallelism);
     }
 
     [Fact]

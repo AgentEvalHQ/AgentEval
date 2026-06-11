@@ -2,6 +2,7 @@
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 using AgentEval.Core;
+using AgentEval.RedTeam.Transforms;
 
 namespace AgentEval.RedTeam;
 
@@ -155,6 +156,54 @@ public sealed class AttackPipeline
     {
         _progress = progress;
         return this;
+    }
+
+    /// <summary>
+    /// Amplifies the most-recently-added attack by FANNING OUT each of its probes through each transformer
+    /// (Expand) — Wave A. The original probes are dropped.
+    /// </summary>
+    /// <param name="transformers">The transformers to apply independently to each probe.</param>
+    public AttackPipeline WithTransform(params IProbeTransformer[] transformers)
+        => WithTransform(keepOriginal: false, transformers);
+
+    /// <summary>
+    /// Amplifies the most-recently-added attack by FANNING OUT each probe through each transformer (Expand).
+    /// </summary>
+    /// <param name="keepOriginal">When true, the untransformed probes are emitted alongside the transformed ones.</param>
+    /// <param name="transformers">The transformers to apply independently to each probe.</param>
+    public AttackPipeline WithTransform(bool keepOriginal, params IProbeTransformer[] transformers)
+    {
+        ArgumentNullException.ThrowIfNull(transformers);
+        ReplaceLast(a => new TransformedAttack(a, transformers, TransformMode.Expand, keepOriginal));
+        return this;
+    }
+
+    /// <summary>
+    /// Amplifies the most-recently-added attack by COMPOSING the transformers (Chain): the second encodes the first's
+    /// output, etc. (e.g. base64-of-rot13).
+    /// </summary>
+    /// <param name="transformers">The transformers to compose, in apply order (left = first).</param>
+    public AttackPipeline WithChainedTransform(params IProbeTransformer[] transformers)
+        => WithChainedTransform(keepOriginal: false, transformers);
+
+    /// <summary>
+    /// Amplifies the most-recently-added attack by COMPOSING the transformers (Chain).
+    /// </summary>
+    /// <param name="keepOriginal">When true, the untransformed seed probes are emitted alongside the composed ones
+    /// (e.g. to keep a plaintext control next to the encoded variant).</param>
+    /// <param name="transformers">The transformers to compose, in apply order (left = first).</param>
+    public AttackPipeline WithChainedTransform(bool keepOriginal, params IProbeTransformer[] transformers)
+    {
+        ArgumentNullException.ThrowIfNull(transformers);
+        ReplaceLast(a => new TransformedAttack(a, transformers, TransformMode.Chain, keepOriginal));
+        return this;
+    }
+
+    private void ReplaceLast(Func<IAttackType, IAttackType> wrap)
+    {
+        if (_attacks.Count == 0)
+            throw new InvalidOperationException("WithTransform/WithChainedTransform must follow a WithAttack call.");
+        _attacks[^1] = wrap(_attacks[^1]);
     }
 
     /// <summary>

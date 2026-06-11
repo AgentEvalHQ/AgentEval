@@ -33,9 +33,16 @@ public static class ToolUsageExtractor
             .OfType<FunctionCallContent>()
             .ToList();
         
-        var functionResults = allContents
-            .OfType<FunctionResultContent>()
-            .ToDictionary(r => r.CallId, r => r);
+        // Duplicate-/null-tolerant pairing: a CallId may legitimately repeat across turns (multi-turn tool loops)
+        // or be reused/omitted by some providers. Last-wins instead of ToDictionary (which throws on a duplicate
+        // key); a null/empty CallId can't be paired, so it stays unpaired (WasExecuted = false — the safe, honest
+        // direction: under-claim execution rather than over-claim it).
+        var functionResults = new Dictionary<string, FunctionResultContent>(StringComparer.Ordinal);
+        foreach (var r in allContents.OfType<FunctionResultContent>())
+        {
+            if (!string.IsNullOrEmpty(r.CallId))
+                functionResults[r.CallId] = r;
+        }
         
         int order = 0;
         foreach (var call in functionCalls)
@@ -49,10 +56,11 @@ public static class ToolUsageExtractor
                 Order = order
             };
             
-            if (functionResults.TryGetValue(call.CallId, out var result))
+            if (!string.IsNullOrEmpty(call.CallId) && functionResults.TryGetValue(call.CallId, out var result))
             {
                 record.Result = result.Result;
                 record.Exception = result.Exception;
+                record.WasExecuted = true;   // a paired result was observed ⇒ the tool actually ran (even if Result is null)
             }
             
             report.AddCall(record);

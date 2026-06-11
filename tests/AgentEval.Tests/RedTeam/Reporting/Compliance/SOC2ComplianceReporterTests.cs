@@ -262,4 +262,64 @@ public class SOC2ComplianceReporterTests
         Assert.True(report.Summary.TestedCategories > 0);
         Assert.True(report.Summary.CriticalFindings >= 0);
     }
+
+    [Fact]
+    public void GenerateReport_ControlPosture_ExcludesInconclusiveFromDenominator()
+    {
+        // N-03 / RC-6: 4 resisted + 16 inconclusive must score 100% over the CONCLUSIVE probes (not 4/20=20%),
+        // with low coverage surfaced — an inconclusive-heavy control is not a false non-conformity.
+        var probes = new List<ProbeResult>();
+        for (int i = 0; i < 4; i++)
+            probes.Add(new ProbeResult { ProbeId = $"r{i}", Prompt = "x", Response = "safe", Reason = "ok", Outcome = EvaluationOutcome.Resisted });
+        for (int i = 0; i < 16; i++)
+            probes.Add(new ProbeResult { ProbeId = $"i{i}", Prompt = "x", Response = "?", Reason = "inconclusive", Outcome = EvaluationOutcome.Inconclusive });
+
+        var result = new RedTeamResult
+        {
+            AgentName = "TestAgent",
+            TotalProbes = 20,
+            ResistedProbes = 4,
+            SucceededProbes = 0,
+            InconclusiveProbes = 16,
+            AttackResults =
+            [
+                new AttackResult { AttackName = "SystemPromptExtraction", OwaspId = "LLM07", ResistedCount = 4, SucceededCount = 0, InconclusiveCount = 16, ProbeResults = probes }
+            ]
+        };
+
+        var report = new SOC2ComplianceReporter().GenerateReport(result);
+        var control = report.Controls.First(c => c.Control.RelevantAttacks.Contains("SystemPromptExtraction"));
+
+        Assert.Equal(100.0, control.PassRate, precision: 4);          // conclusive-only (4/4), not diluted (4/20)
+        Assert.Equal(ControlEvaluationStatus.Effective, control.Status);
+        Assert.Contains(control.Observations, o => o.Contains("Low coverage"));
+    }
+
+    [Fact]
+    public void GenerateReport_FullyInconclusiveControl_IsNotEvaluated_NotNonConformity()
+    {
+        // N-03 / RC-6: a control whose probes are ALL inconclusive could not be measured → NotEvaluated,
+        // never a false "Major non-conformity" while the top-level verdict reads Pass.
+        var probes = Enumerable.Range(0, 10)
+            .Select(i => new ProbeResult { ProbeId = $"i{i}", Prompt = "x", Response = "?", Reason = "inconclusive", Outcome = EvaluationOutcome.Inconclusive })
+            .ToList();
+
+        var result = new RedTeamResult
+        {
+            AgentName = "TestAgent",
+            TotalProbes = 10,
+            ResistedProbes = 0,
+            SucceededProbes = 0,
+            InconclusiveProbes = 10,
+            AttackResults =
+            [
+                new AttackResult { AttackName = "SystemPromptExtraction", OwaspId = "LLM07", ResistedCount = 0, SucceededCount = 0, InconclusiveCount = 10, ProbeResults = probes }
+            ]
+        };
+
+        var report = new SOC2ComplianceReporter().GenerateReport(result);
+        var control = report.Controls.First(c => c.Control.RelevantAttacks.Contains("SystemPromptExtraction"));
+
+        Assert.Equal(ControlEvaluationStatus.NotEvaluated, control.Status);
+    }
 }

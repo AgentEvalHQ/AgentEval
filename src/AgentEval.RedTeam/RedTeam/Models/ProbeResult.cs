@@ -65,4 +65,18 @@ public record ProbeResult
     /// Tool-aware evaluators stamp <see cref="EvidenceFidelity.Behavioral"/>.
     /// </summary>
     public EvidenceFidelity Fidelity { get; init; } = EvidenceFidelity.Verbal;
+
+    /// <summary>
+    /// The injection delivery surface this result came from (Wave B, Pillar 4), carried over from
+    /// <see cref="AttackProbe.Surface"/>. <c>null</c> when the probe had no surface. Lets reports break results
+    /// down <c>by_surface</c> and keep an inlined-proxy result distinct from a real-boundary one.
+    /// </summary>
+    public InjectionSurface? Surface { get; init; }
+
+    /// <summary>
+    /// For a folded multi-turn probe (Wave C, Pillar 2): how faithfully the conversation was carried — Native (the
+    /// SUT held a real session) vs Flattened (a one-shot agent driven by a re-sent transcript). <c>null</c> for
+    /// single-turn probes. Keeps a flattened-conversation pass honestly distinct from a native one.
+    /// </summary>
+    public ConversationFidelity? ConversationFidelity { get; init; }
 }

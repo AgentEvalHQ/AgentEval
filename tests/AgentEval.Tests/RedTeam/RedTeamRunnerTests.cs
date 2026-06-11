@@ -85,6 +85,36 @@ public class RedTeamRunnerTests
     }
 
     [Fact]
+    public async Task ScanAsync_StructurallyUntestableInferenceProbes_RecordedInconclusive_NotScored()
+    {
+        // T5-4 / Status §8: the sampler/decode/stream/tool probes a text agent cannot exercise are recorded
+        // Inconclusive with a clear reason — never a fabricated pass/fail — and are NOT execution errors.
+        var options = new ScanOptions
+        {
+            Intensity = Intensity.Comprehensive,
+            AttackTypes = [Attack.InferenceAPIAbuse]
+        };
+
+        var result = await new RedTeamRunner().ScanAsync(new FakeResistantAgent(), options);
+
+        var attack = result.AttackResults.Single();
+        var untestable = attack.ProbeResults
+            .Where(p => p.Reason.Contains("structurally untestable", StringComparison.OrdinalIgnoreCase))
+            .ToList();
+        Assert.NotEmpty(untestable);
+        Assert.All(untestable, p =>
+        {
+            Assert.Equal(EvaluationOutcome.Inconclusive, p.Outcome);
+            Assert.Null(p.Error); // a deliberate "can't test here", not a transport/timeout failure
+        });
+
+        var untestableTechniques = untestable.Select(p => p.Technique).ToHashSet();
+        Assert.Contains("hyperparameter_abuse", untestableTechniques);
+        Assert.Contains("function_abuse", untestableTechniques);
+        Assert.Contains("stream_manipulation", untestableTechniques);
+    }
+
+    [Fact]
     public async Task ScanAsync_ReportsProgress()
     {
         var agent = new FakeResistantAgent();
@@ -149,6 +179,59 @@ public class RedTeamRunnerTests
 
         // Should stop after first successful attack
         Assert.Equal(1, result.SucceededProbes);
+    }
+
+    [Fact]
+    public async Task ScanAsync_FailFast_MarksTruncated_AndCountsSkipped()
+    {
+        // RA3-06 / T5-2: a FailFast scan that stops early is honestly marked truncated, with the skipped
+        // probe count tracked so PlannedProbes == executed + skipped and the summary flags non-comparability.
+        var options = new ScanOptions
+        {
+            Intensity = Intensity.Comprehensive,
+            AttackTypes = [Attack.PromptInjection],
+            FailFast = true
+        };
+
+        var result = await new RedTeamRunner().ScanAsync(new FakeVulnerableAgent(), options);
+
+        Assert.True(result.WasTruncated);
+        Assert.True(result.SkippedProbes > 0);
+        Assert.Equal(result.PlannedProbes, result.TotalProbes + result.SkippedProbes);
+        Assert.Contains("TRUNCATED", result.Summary);
+    }
+
+    [Fact]
+    public async Task ScanAsync_FullScan_IsNotMarkedTruncated()
+    {
+        var options = new ScanOptions { Intensity = Intensity.Quick, AttackTypes = [Attack.EncodingEvasion] };
+
+        var result = await new RedTeamRunner().ScanAsync(new FakeResistantAgent(), options);
+
+        Assert.False(result.WasTruncated);
+        Assert.Equal(0, result.SkippedProbes);
+        Assert.Equal(result.TotalProbes, result.PlannedProbes);
+    }
+
+    [Fact]
+    public async Task ScanAsync_WithParallelism_ProducesSameResultsAsSequential()
+    {
+        // RA3-05 / T5-1: bounded-concurrency execution yields the same probe set, counts, and (reordered)
+        // deterministic probe ordering as the sequential path.
+        var agent = new FakeResistantAgent();
+        var seqOptions = new ScanOptions { Intensity = Intensity.Comprehensive, AttackTypes = [Attack.EncodingEvasion], Parallelism = 1 };
+        var parOptions = new ScanOptions { Intensity = Intensity.Comprehensive, AttackTypes = [Attack.EncodingEvasion], Parallelism = 4 };
+
+        var seq = await new RedTeamRunner().ScanAsync(agent, seqOptions);
+        var par = await new RedTeamRunner().ScanAsync(agent, parOptions);
+
+        Assert.Equal(seq.TotalProbes, par.TotalProbes);
+        Assert.Equal(seq.ResistedProbes, par.ResistedProbes);
+        Assert.Equal(seq.SucceededProbes, par.SucceededProbes);
+        Assert.Equal(seq.InconclusiveProbes, par.InconclusiveProbes);
+        Assert.Equal(
+            seq.AttackResults.Single().ProbeResults.Select(p => p.ProbeId),
+            par.AttackResults.Single().ProbeResults.Select(p => p.ProbeId)); // deterministic ordering preserved
     }
 
     [Fact]

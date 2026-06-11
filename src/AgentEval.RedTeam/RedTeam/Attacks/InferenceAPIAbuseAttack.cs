@@ -74,6 +74,22 @@ public sealed class InferenceAPIAbuseAttack : IAttackType
     /// <inheritdoc />
     public IProbeEvaluator GetEvaluator() => new InferenceAbuseEvaluator();
 
+    /// <summary>
+    /// Techniques a single text chat agent physically cannot exercise — setting sampler params
+    /// (temperature/top_p/penalties/seed), decode-time stop sequences, reading logprob fields, opening a
+    /// streaming socket, or invoking a tool. Scoring these as live pass/fail is a lie (the evaluator can only
+    /// match the agent uttering the parameter name). T5-4 / Status §8: flag them so the runner records them
+    /// Inconclusive ("not testable here"), keeping coverage honest until a transport/tool-level harness exists
+    /// (FeatureComplete). Genuinely text-testable techniques (token_flooding, context_exhaustion,
+    /// model_fingerprinting, format_injection) are left as live probes.
+    /// </summary>
+    private static readonly HashSet<string> StructurallyUntestableTechniques =
+        new(StringComparer.OrdinalIgnoreCase)
+        {
+            "hyperparameter_abuse", "rate_limit_bypass", "penalty_evasion", "stop_sequence_bypass",
+            "logprob_extraction", "seed_exploitation", "stream_manipulation", "function_abuse",
+        };
+
     /// <inheritdoc />
     public IReadOnlyList<AttackProbe> GetProbes(Intensity intensity)
     {
@@ -81,7 +97,7 @@ public sealed class InferenceAPIAbuseAttack : IAttackType
 
         // === EASY: Basic resource exhaustion ===
         probes.AddRange(GetResourceExhaustionProbes());
-        
+
         if (intensity >= Intensity.Moderate)
         {
             // === MODERATE: API parameter manipulation ===
@@ -95,7 +111,21 @@ public sealed class InferenceAPIAbuseAttack : IAttackType
             probes.AddRange(GetAdvancedExploitationProbes());
         }
 
-        return probes;
+        // T5-4 (Status §8): stamp the structurally-untestable techniques so the runner records them
+        // Inconclusive rather than emitting a fabricated pass/fail from a text-only substring match.
+        return [.. probes.Select(p =>
+            StructurallyUntestableTechniques.Contains(p.Technique ?? string.Empty)
+                ? p with { Metadata = WithUntestableFlag(p.Metadata) }
+                : p)];
+    }
+
+    private static IReadOnlyDictionary<string, object> WithUntestableFlag(IReadOnlyDictionary<string, object>? existing)
+    {
+        var d = existing is null
+            ? new Dictionary<string, object>(StringComparer.Ordinal)
+            : new Dictionary<string, object>(existing, StringComparer.Ordinal);
+        d[AttackProbe.StructurallyUntestableMetadataKey] = true;
+        return d;
     }
 
     private IEnumerable<AttackProbe> GetResourceExhaustionProbes()

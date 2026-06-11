@@ -46,13 +46,20 @@ public sealed class MarkdownReportExporter : IReportExporter
         sb.AppendLine($"| ✅ Resisted | {result.ResistedProbes} |");
         sb.AppendLine($"| ❌ Compromised | {result.SucceededProbes} |");
         sb.AppendLine($"| ⚠️ Inconclusive | {result.InconclusiveProbes} |");
+        // N-09: surface coverage + conclusive-only score so a green Verdict on a low-coverage scan is visibly caveated.
+        sb.AppendLine($"| Coverage (conclusive) | {result.Coverage:F0}% |");
+        sb.AppendLine($"| Conclusive Score | {result.ConclusiveScore:F1}% |");
+        // Review: surface FailFast truncation so the executed counts are not read as the full planned scan.
+        if (result.WasTruncated)
+            sb.AppendLine($"| ⚠️ Truncated (FailFast) | {result.SkippedProbes} of {result.PlannedProbes} planned probes skipped |");
         sb.AppendLine();
 
         // Attack Summary Table
         sb.AppendLine("## 🎯 Attack Results Overview");
         sb.AppendLine();
-        sb.AppendLine("| Attack | OWASP | Severity | Score | Resisted | Compromised |");
-        sb.AppendLine("|--------|-------|----------|-------|----------|-------------|");
+        // N-09: an Inconclusive column so a low score driven by inconclusive (not compromised) probes is visible.
+        sb.AppendLine("| Attack | OWASP | Severity | Score | Resisted | Compromised | Inconclusive |");
+        sb.AppendLine("|--------|-------|----------|-------|----------|-------------|--------------|");
 
         foreach (var attack in result.AttackResults)
         {
@@ -62,7 +69,7 @@ public sealed class MarkdownReportExporter : IReportExporter
             var statusIcon = score >= 80 ? "✅" : score >= 50 ? "⚠️" : "❌";
             var severityBadge = SeverityToBadge(attack.Severity);
 
-            sb.AppendLine($"| {statusIcon} {EscapeInline(attack.AttackDisplayName)} | {EscapeInline(attack.OwaspId)} | {severityBadge} | {score:F0}% | {attack.ResistedCount} | {attack.SucceededCount} |");
+            sb.AppendLine($"| {statusIcon} {EscapeInline(attack.AttackDisplayName)} | {EscapeInline(attack.OwaspId)} | {severityBadge} | {score:F0}% | {attack.ResistedCount} | {attack.SucceededCount} | {attack.InconclusiveCount} |");
         }
         sb.AppendLine();
 

@@ -99,7 +99,12 @@ public class RedTeamOutputFormatter
         WriteLine($"║  {icon}Overall Score: {scoreColor}{result.OverallScore:F1}%{_theme.Reset}");
         WriteLine($"║  Verdict: {_theme.StatusIcon(result.Passed, _options.UseEmoji)} {result.Verdict}");
         WriteLine($"║  Duration: {result.Duration.TotalSeconds:F1}s | Agent: {result.AgentName}");
-        WriteLine($"║  Probes: {result.TotalProbes} total, {result.ResistedProbes} resisted, {result.SucceededProbes} compromised");
+        WriteLine($"║  Probes: {result.TotalProbes} total, {result.ResistedProbes} resisted, {result.SucceededProbes} compromised, {result.InconclusiveProbes} inconclusive");
+        // N-09: surface coverage + conclusive-only score so a green Verdict on a low-coverage scan is visibly caveated.
+        WriteLine($"║  Coverage: {result.Coverage:F0}% (conclusive) | Conclusive Score: {result.ConclusiveScore:F1}%");
+        // Review: a FailFast-truncated scan executed only part of its plan — say so, so the counts above are not read as the whole scan.
+        if (result.WasTruncated)
+            WriteLine($"║  {_theme.Warning}[TRUNCATED] FailFast stopped after {result.TotalProbes}/{result.PlannedProbes} probes; {result.SkippedProbes} skipped — coverage understated.{_theme.Reset}");
         WriteLine($"╠{border}╣");
     }
 

@@ -32,8 +32,11 @@ public class PIILeakageAttackTests
     [Fact]
     public void MitreAtlasIds_ContainsExpectedIds()
     {
-        Assert.Contains("AML.T0024", _attack.MitreAtlasIds);
+        // RC-5/T4-2: drop the misused AML.T0024 ("Develop Capabilities"); PII elicitation →
+        // AML.T0037 (Data from Information Repositories) + AML.T0057 (LLM Data Leakage).
         Assert.Contains("AML.T0037", _attack.MitreAtlasIds);
+        Assert.Contains("AML.T0057", _attack.MitreAtlasIds);
+        Assert.DoesNotContain("AML.T0024", _attack.MitreAtlasIds);
     }
 
     [Fact]

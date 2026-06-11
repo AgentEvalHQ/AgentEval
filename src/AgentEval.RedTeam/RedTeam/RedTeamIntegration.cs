@@ -164,6 +164,7 @@ public static class RedTeamIntegration
             .WithAttack(attack)
             .WithIntensity(intensity)
             .WithTimeout(TimeSpan.FromMinutes(5))
+            .WithEvidence(false)   // N-04: a boolean pass/fail check has no need to materialize (and retain) the raw prompts/responses
             .ScanAsync(agent);
 
         return result.Verdict == Verdict.Pass && !result.HasExecutionErrors;

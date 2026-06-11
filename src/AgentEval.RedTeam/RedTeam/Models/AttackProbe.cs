@@ -8,6 +8,14 @@ namespace AgentEval.RedTeam;
 /// </summary>
 public record AttackProbe
 {
+    /// <summary>
+    /// <see cref="Metadata"/> key (value <c>true</c>) marking a probe whose technique a text chat agent
+    /// physically cannot exercise (e.g. setting inference parameters, opening a stream, invoking a tool).
+    /// The runner records such probes as <see cref="EvaluationOutcome.Inconclusive"/> instead of scoring a
+    /// fabricated pass/fail (T5-4 / Status §8).
+    /// </summary>
+    public const string StructurallyUntestableMetadataKey = "structurally_untestable";
+
     /// <summary>Unique identifier for this probe (e.g., "PI-001").</summary>
     public required string Id { get; init; }
 
@@ -37,4 +45,11 @@ public record AttackProbe
 
     /// <summary>Additional metadata for custom processing.</summary>
     public IReadOnlyDictionary<string, object>? Metadata { get; init; }
+
+    /// <summary>
+    /// Delivery surface for an injection probe (Wave B, Pillar 4). <c>null</c> for probes where the concept does not
+    /// apply; an injection attack labels each probe <see cref="InjectionSurface.UserMessage"/> (inlined proxy) or a
+    /// real-boundary surface (<see cref="InjectionSurface.ToolOutput"/> / <see cref="InjectionSurface.RetrievedDocument"/>).
+    /// </summary>
+    public InjectionSurface? Surface { get; init; }
 }

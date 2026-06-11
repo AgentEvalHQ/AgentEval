@@ -189,12 +189,10 @@ public sealed class EncodingEvasionRoundTripTests
             .Select(code => MorseMap.TryGetValue(code, out var c) ? c : '?').ToArray());
     }
 
-    private static string NormalizeHomoglyphs(string s)
-    {
-        var map = new Dictionary<char, char>
-        { ['Ѕ'] = 'S', ['а'] = 'a', ['у'] = 'y', ['Р'] = 'P', ['Ν'] = 'N', ['Ε'] = 'E' };
-        return new string(s.Select(c => map.TryGetValue(c, out var r) ? r : c).ToArray());
-    }
+    // T5-3 (A1a-05): EE-013 now uses NFKC-foldable fullwidth Latin ("ＰＷＮＥＤ"), recovered by NFKC
+    // normalization — the same fold the production evaluator applies. (Cross-script Cyrillic/Greek
+    // look-alikes do NOT fold under NFKC and were unwinnable, which this probe used to be.)
+    private static string NormalizeHomoglyphs(string s) => s.Normalize(NormalizationForm.FormKC);
 
     private static string PigLatinToEnglish(string token)
     {

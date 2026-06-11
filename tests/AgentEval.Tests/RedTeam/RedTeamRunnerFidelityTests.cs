@@ -46,12 +46,18 @@ public class RedTeamRunnerFidelityTests
         public Task<AgentResponse> InvokeAsync(string prompt, CancellationToken ct = default)
         {
             var id = $"call-{_tool}";
+            // Emit the call AND a paired result so the call records as EXECUTED → Behavioral fidelity (Wave B / D6:
+            // an emitted-but-unpaired call would correctly be IntentToAct; this test asserts the executed/Behavioral path).
             var raw = new List<object>
             {
                 new Microsoft.Extensions.AI.ChatMessage(
                     Microsoft.Extensions.AI.ChatRole.Assistant,
                     new List<Microsoft.Extensions.AI.AIContent>
-                    { new Microsoft.Extensions.AI.FunctionCallContent(id, _tool, null) })
+                    { new Microsoft.Extensions.AI.FunctionCallContent(id, _tool, null) }),
+                new Microsoft.Extensions.AI.ChatMessage(
+                    Microsoft.Extensions.AI.ChatRole.Tool,
+                    new List<Microsoft.Extensions.AI.AIContent>
+                    { new Microsoft.Extensions.AI.FunctionResultContent(id, "ok") })
             };
             return Task.FromResult(new AgentResponse { Text = "ok", RawMessages = raw });
         }

@@ -218,4 +218,40 @@ public class InferenceAPIAbuseAttackTests
         Assert.Contains("response text only", attack.Description, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("does not set real inference", attack.Description, StringComparison.OrdinalIgnoreCase);
     }
+
+    [Theory]
+    [InlineData("hyperparameter_abuse")]
+    [InlineData("rate_limit_bypass")]
+    [InlineData("penalty_evasion")]
+    [InlineData("stop_sequence_bypass")]
+    [InlineData("logprob_extraction")]
+    [InlineData("seed_exploitation")]
+    [InlineData("stream_manipulation")]
+    [InlineData("function_abuse")]
+    public void GetProbes_StructurallyUntestableTechniques_AreFlagged(string technique)
+    {
+        // T5-4 / Status §8: techniques a text chat agent physically cannot exercise carry the
+        // structurally_untestable metadata flag so the runner records them Inconclusive (not a fake pass/fail).
+        var matching = _attack.GetProbes(Intensity.Comprehensive).Where(p => p.Technique == technique).ToList();
+        Assert.NotEmpty(matching);
+        Assert.All(matching, p =>
+            Assert.True(p.Metadata is not null
+                && p.Metadata.TryGetValue(AttackProbe.StructurallyUntestableMetadataKey, out var v)
+                && v is true,
+                $"Technique '{technique}' must be flagged structurally_untestable."));
+    }
+
+    [Theory]
+    [InlineData("token_flooding")]
+    [InlineData("context_exhaustion")]
+    [InlineData("model_fingerprinting")]
+    [InlineData("format_injection")]
+    public void GetProbes_TextTestableTechniques_AreNotFlagged(string technique)
+    {
+        var matching = _attack.GetProbes(Intensity.Comprehensive).Where(p => p.Technique == technique).ToList();
+        Assert.NotEmpty(matching);
+        Assert.All(matching, p =>
+            Assert.False(p.Metadata?.ContainsKey(AttackProbe.StructurallyUntestableMetadataKey) ?? false,
+                $"Technique '{technique}' is text-testable and must NOT be flagged."));
+    }
 }

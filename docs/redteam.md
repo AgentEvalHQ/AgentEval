@@ -19,7 +19,7 @@ AgentEval RedTeam is built on two foundational cybersecurity taxonomies that pro
 - **Source**: [MITRE ATLAS Framework](https://atlas.mitre.org/)
 - **License**: Apache License 2.0
 - **Why**: Comprehensive ML/AI attack taxonomy with tactics, techniques, procedures (TTPs) used by cybersecurity professionals worldwide
-- **Coverage**: **6 technique IDs** mapped to attack implementations (AML.T0024, AML.T0037, AML.T0043, AML.T0045, AML.T0051, AML.T0054)
+- **Coverage**: **6 technique IDs** mapped to attack implementations (AML.T0037, AML.T0045, AML.T0051, AML.T0054, AML.T0056, AML.T0057)
 - **Attribution**: *Attack techniques classified using MITRE ATLAS framework. © 2023 The MITRE Corporation.*
 
 ### AgentEval's Approach: Original Implementation with Taxonomy Mapping
@@ -57,8 +57,8 @@ The MVP includes **9 core attack types** covering the most critical OWASP LLM 20
 |--------|-----------|-------------|-------------|--------|
 | **PromptInjection** | LLM01 | AML.T0051 | Direct instruction override attempts | 27 |
 | **Jailbreak** | LLM01 | AML.T0051, AML.T0054 | Roleplay, DAN, hypothetical bypasses | 24 |
-| **PIILeakage** | LLM02 | AML.T0024, AML.T0037 | Data extraction and memorization probes | 19 |
-| **SystemPromptExtraction** | LLM07 | AML.T0043 | Attempts to reveal system instructions | 19 |
+| **PIILeakage** | LLM02 | AML.T0037, AML.T0057 | Data extraction and memorization probes | 19 |
+| **SystemPromptExtraction** | LLM07 | AML.T0056, AML.T0057 | Attempts to reveal system instructions | 19 |
 | **IndirectInjection** | LLM01 | AML.T0051 | Injection via documents, tools, RAG | 17 |
 | **ExcessiveAgency** | LLM06 | AML.T0051, AML.T0054 | Scope expansion, privilege escalation, unauthorized actions | 15 |
 | **InsecureOutput** | LLM05 | AML.T0051 | XSS, SQL, command injection, SSRF, CSRF, deserialization, supply chain | 33 |
@@ -546,7 +546,7 @@ Supported compliance frameworks:
 - **OWASP LLM Top 10** — 10 categories, 6 testable via red team
 - **ISO 27001** — 8 Annex A controls (A.5.1 through A.8.28)
 - **SOC 2 Type II** — 7 Common Criteria controls (CC6.1 through CC8.1)
-- **MITRE ATLAS** — 12 techniques, 8 applicable to LLM security
+- **MITRE ATLAS** — 13 techniques, 6 applicable to LLM security
 
 ### Console Output (Live Progress)
 
@@ -687,7 +687,7 @@ When your agent resists an attack:
     {
       "attack_name": "PIILeakage", 
       "owasp_id": "LLM02",
-      "mitre_atlas": ["AML.T0024", "AML.T0037"],
+      "mitre_atlas": ["AML.T0037", "AML.T0057"],
       "probes_total": 15,
       "probes_resisted": 15,
       "probes_succeeded": 0,

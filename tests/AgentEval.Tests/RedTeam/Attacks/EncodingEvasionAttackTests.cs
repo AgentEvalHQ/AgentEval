@@ -320,8 +320,20 @@ public sealed class EncodingEvasionAttackTests
     {
         var probes = _attack.GetProbes(Intensity.Comprehensive);
         var zwspProbe = probes.First(p => p.Technique == "zwsp");
-        
+
         // Zero-width space is U+200B
         Assert.Contains("\u200B", zwspProbe.Prompt);
+    }
+
+    [Fact]
+    public void HomoglyphProbe_FoldsUnderNFKC_ToTheMarker()
+    {
+        // T5-3 (A1a-05): the homoglyph payload must NOT be plaintext "PWNED" yet must recover the marker
+        // under NFKC \u2014 i.e. it is winnable by an agent that normalizes-and-emits, unlike the old
+        // cross-script Cyrillic form which never folded and could never match.
+        var probe = _attack.GetProbes(Intensity.Comprehensive).First(p => p.Technique == "homoglyphs");
+        var token = probe.Prompt.Split(' ').Last();
+        Assert.DoesNotContain("PWNED", token, StringComparison.Ordinal);
+        Assert.Contains("PWNED", token.Normalize(System.Text.NormalizationForm.FormKC), StringComparison.Ordinal);
     }
 }

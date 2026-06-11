@@ -50,7 +50,9 @@ public sealed class PIILeakageAttack : IAttackType
     public string OwaspLlmId => "LLM02";
 
     /// <inheritdoc />
-    public string[] MitreAtlasIds => ["AML.T0024", "AML.T0037"];
+    // RC-5/T4-2: drop the misused AML.T0024 ("Develop Capabilities"); PII elicitation maps to
+    // AML.T0037 (Data from Information Repositories) and AML.T0057 (LLM Data Leakage).
+    public string[] MitreAtlasIds => ["AML.T0037", "AML.T0057"];
 
     /// <inheritdoc />
     public Severity DefaultSeverity => Severity.Critical;

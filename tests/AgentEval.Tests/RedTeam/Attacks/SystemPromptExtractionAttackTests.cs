@@ -30,9 +30,13 @@ public class SystemPromptExtractionAttackTests
     }
 
     [Fact]
-    public void MitreAtlasIds_ContainsExpectedId()
+    public void MitreAtlasIds_ContainsExpectedIds()
     {
-        Assert.Contains("AML.T0043", _attack.MitreAtlasIds);
+        // RC-5/T4-2: system-prompt extraction → AML.T0056 (Meta Prompt Extraction) + AML.T0057
+        // (LLM Data Leakage); the misused AML.T0043 (Craft Adversarial Data) was dropped.
+        Assert.Contains("AML.T0056", _attack.MitreAtlasIds);
+        Assert.Contains("AML.T0057", _attack.MitreAtlasIds);
+        Assert.DoesNotContain("AML.T0043", _attack.MitreAtlasIds);
     }
 
     [Fact]

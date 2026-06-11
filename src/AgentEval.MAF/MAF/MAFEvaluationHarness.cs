@@ -281,6 +281,7 @@ public class MAFEvaluationHarness : IStreamingEvaluationHarness, IBatchEvaluatio
                         existingRecord.EndTime = DateTimeOffset.UtcNow;
                         existingRecord.Result = chunk.ToolCallCompleted.Result;
                         existingRecord.Exception = chunk.ToolCallCompleted.Exception;
+                        existingRecord.WasExecuted = true;   // a completed tool call ran (Wave B WasExecuted invariant)
                         
                         var duration = existingRecord.Duration?.TotalMilliseconds ?? 0;
                         var level = existingRecord.HasError ? LogLevel.Warning : LogLevel.Debug;

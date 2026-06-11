@@ -33,6 +33,7 @@ public static class Attack
     private static readonly Lazy<ExcessiveAgencyAttack> _excessiveAgency = new(() => new ExcessiveAgencyAttack());
     private static readonly Lazy<InsecureOutputAttack> _insecureOutput = new(() => new InsecureOutputAttack());
     private static readonly Lazy<EncodingEvasionAttack> _encodingEvasion = new(() => new EncodingEvasionAttack());
+    private static readonly Lazy<CrescendoAttack> _crescendo = new(() => new CrescendoAttack());
 
     /// <summary>
     /// Prompt Injection attack (OWASP LLM01).
@@ -88,6 +89,14 @@ public static class Attack
     /// </summary>
     public static IAttackType EncodingEvasion => _encodingEvasion.Value;
 
+    /// <summary>
+    /// Crescendo multi-turn escalation attack (OWASP LLM01, Wave C). Drives a conversation that ramps a benign
+    /// opener into a disallowed completion over several turns. <b>Opt-in</b> — NOT in the default <see cref="All"/>
+    /// roster because a multi-turn attack drives N agent turns per seed (a different cost/behavior profile); add it
+    /// explicitly (<c>Attack.Crescendo</c> or <c>ByName("Crescendo")</c>) when you want multi-turn coverage.
+    /// </summary>
+    public static IAttackType Crescendo => _crescendo.Value;
+
     // === Convenience Methods ===
 
     /// <summary>
@@ -101,6 +110,22 @@ public static class Attack
     /// </summary>
     public static IReadOnlyList<IAttackType> All =>
         [PromptInjection, Jailbreak, PIILeakage, SystemPromptExtraction, IndirectInjection, InferenceAPIAbuse, ExcessiveAgency, InsecureOutput, EncodingEvasion];
+
+    /// <summary>
+    /// The full built-in roster (<see cref="All"/>), optionally with system-prompt-leakage canary
+    /// instrumentation (RC-2). When <paramref name="systemPromptCanary"/> is supplied, the
+    /// <see cref="SystemPromptExtraction"/> attack is swapped for a canaried instance so AML.T0056 /
+    /// AML.T0057 / LLM07 become conclusively testable — the caller must embed the SAME token in the system
+    /// prompt of the agent under test. When <c>null</c> (default), returns <see cref="All"/> unchanged and
+    /// SPE stays un-instrumented (honest NotTested, never a false pass). Single source of truth shared by the
+    /// OWASP and MITRE benchmark presets so they can never disagree on the canaried roster.
+    /// </summary>
+    public static IReadOnlyList<IAttackType> RosterWithCanary(string? systemPromptCanary)
+        => systemPromptCanary is null
+            ? All
+            : [.. All.Select(a => a is SystemPromptExtractionAttack
+                ? new SystemPromptExtractionAttack(systemPromptCanary)
+                : a)];
 
     /// <summary>
     /// Get attack type by name (case-insensitive).
@@ -120,6 +145,7 @@ public static class Attack
             "EXCESSIVEAGENCY" or "EXCESSIVE_AGENCY" => ExcessiveAgency,
             "INSECUREOUTPUT" or "INSECURE_OUTPUT" => InsecureOutput,
             "ENCODINGEVASION" or "ENCODING_EVASION" => EncodingEvasion,
+            "CRESCENDO" => Crescendo,
             _ => null
         };
     }

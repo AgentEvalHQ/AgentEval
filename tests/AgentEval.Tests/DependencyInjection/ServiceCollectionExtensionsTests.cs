@@ -522,6 +522,45 @@ public class ServiceCollectionExtensionsTests
     }
 
     [Fact]
+    public void AddAgentEvalRedTeam_RegistersBuiltInAttackTypes_InDI()
+    {
+        // N-11: the individual IAttackTypes are now registered in DI. Previously AddAgentEvalRedTeam
+        // registered only IAttackTypeRegistry, so GetServices<IAttackType>() resolved EMPTY — a consumer
+        // enumerating attack types from the container got nothing.
+        var provider = new ServiceCollection().AddAgentEvalRedTeam().BuildServiceProvider();
+
+        var attacks = provider.GetServices<IAttackType>().ToList();
+        Assert.Equal(Attack.All.Count, attacks.Count);
+        Assert.Contains(attacks, a => a.Name == "PromptInjection");
+
+        // And the registry (already pre-populated) resolves and contains the built-ins.
+        Assert.True(provider.GetRequiredService<IAttackTypeRegistry>().Contains("PromptInjection"));
+    }
+
+    [Fact]
+    public void AddAgentEvalRedTeam_RestrictedSet_RegistersOnlyRequested()
+    {
+        var provider = new ServiceCollection()
+            .AddAgentEvalRedTeam([Attack.PromptInjection])
+            .BuildServiceProvider();
+
+        Assert.Single(provider.GetServices<IAttackType>());
+    }
+
+    [Fact]
+    public void AddAgentEvalRedTeam_CalledTwice_DoesNotDuplicateAttackTypes()
+    {
+        // Review: registration must be idempotent (TryAddEnumerable) — a second call (or AddAgentEvalAll +
+        // an explicit AddAgentEvalRedTeam) must not double the IAttackType roster.
+        var provider = new ServiceCollection()
+            .AddAgentEvalRedTeam()
+            .AddAgentEvalRedTeam()
+            .BuildServiceProvider();
+
+        Assert.Equal(Attack.All.Count, provider.GetServices<IAttackType>().Count());
+    }
+
+    [Fact]
     public void AddAgentEvalDataLoaders_DatasetLoaderFactory_AutoWiresDILoaders()
     {
         // Arrange

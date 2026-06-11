@@ -12,36 +12,44 @@ public class MITREATLASReporter : IComplianceReporter<MITREATLASReport>
     public const string Regulation = "MITRE-ATLAS";
 
     /// <summary>
-    /// All MITRE ATLAS techniques relevant to LLM security.
+    /// All MITRE ATLAS techniques relevant to LLM security, aligned verbatim with the MITRE ATLAS matrix
+    /// (atlas.mitre.org). RC-5/T4-2: system-prompt/data extraction → AML.T0056/T0057 (not the misused
+    /// AML.T0043); AML.T0024 "Develop Capabilities" removed (not detectable by a black-box prompt scanner);
+    /// out-of-band techniques are IsApplicable=false (a conversational scanner cannot exercise them → Not
+    /// Applicable, not Not Tested). TacticName is derived from TacticId via TacticNameFor (see T0-2).
     /// </summary>
     private static readonly MITRETechniqueDefinition[] AllTechniques =
     [
-        new("AML.T0051", "LLM Prompt Injection", "TA0001", "Attackers inject prompts to manipulate LLM behavior", true),
-        new("AML.T0054", "LLM Jailbreak", "TA0005", "Bypass LLM safety constraints and guardrails", true),
-        new("AML.T0043", "Craft Adversarial Data", "TA0040", "Create inputs designed to cause misclassification", true),
-        new("AML.T0024", "Develop Capabilities", "TA0042", "Build tools and payloads for ML attacks", true),
-        new("AML.T0037", "Data from Information Repositories", "TA0009", "Extract data via repeated queries", true),
-        new("AML.T0045", "Inference API Access", "TA0001", "Access ML inference APIs for exploitation", true),
-        new("AML.T0047", "ML Artifact Collection", "TA0009", "Collect ML artifacts like models or training data", true),
-        new("AML.T0048", "Exfiltration via ML Inference API", "TA0010", "Exfiltrate data through ML inference queries", true),
-        new("AML.T0052", "Phishing via AI-Generated Content", "TA0001", "Use AI to generate convincing phishing content", false),
-        new("AML.T0044", "Full ML Model Replication", "TA0010", "Replicate a model through repeated queries", false),
-        new("AML.T0046", "Publish Poisoned Dataset", "TA0003", "Introduce malicious training data", false),
-        new("AML.T0053", "Adversarial SEO", "TA0005", "Manipulate search results via adversarial content", false),
+        // --- Applicable: exercised by conversational red-team probes ---
+        new("AML.T0051", "LLM Prompt Injection", "TA0001", "Inject prompts (direct or indirect) to manipulate LLM behavior.", true),
+        new("AML.T0054", "LLM Jailbreak", "TA0004", "Bypass LLM safety constraints and guardrails to elicit restricted behavior.", true),
+        new("AML.T0056", "LLM Meta Prompt Extraction", "TA0007", "Coerce the model into disclosing its system / meta prompt.", true),
+        new("AML.T0057", "LLM Data Leakage", "TA0010", "Elicit sensitive or memorized data the model should not reveal.", true),
+        new("AML.T0037", "Data from Information Repositories", "TA0009", "Extract data the system can reach via repeated targeted queries.", true),
+        new("AML.T0045", "ML Intellectual Property Theft / Inference API Access", "TA0000", "Abuse inference-API access for extraction or resource exhaustion.", true),
+
+        // --- Not applicable: out-of-band for a black-box conversational scanner ---
+        new("AML.T0043", "Craft Adversarial Data", "TA0040", "Author adversarial inputs designed to cause misclassification (offline staging).", false),
+        new("AML.T0047", "ML Artifact Collection", "TA0009", "Collect ML artifacts such as models or training data from the environment.", false),
+        new("AML.T0048", "Exfiltration via ML Inference API", "TA0010", "Reconstruct training data or model via crafted inference queries.", false),
+        new("AML.T0052", "Phishing via AI-Generated Content", "TA0001", "Use AI to generate convincing phishing content.", false),
+        new("AML.T0044", "Full ML Model Replication", "TA0010", "Replicate a model through repeated queries.", false),
+        new("AML.T0046", "Publish Poisoned Dataset", "TA0003", "Introduce malicious training data into a public dataset.", false),
+        new("AML.T0053", "Adversarial SEO", "TA0005", "Manipulate search results via adversarial content.", false),
     ];
 
-    /// <summary>
-    /// All MITRE ATLAS tactics.
-    /// </summary>
+    /// <summary>All MITRE ATLAS tactics referenced by <see cref="AllTechniques"/> (atlas.mitre.org). RC-5: kept in sync so no technique is orphaned.</summary>
     private static readonly TacticDefinition[] AllTactics =
     [
+        new("TA0000", "ML Model Access"),
         new("TA0001", "Initial Access"),
-        new("TA0003", "Persistence"),
+        new("TA0003", "Resource Development"),
+        new("TA0004", "Privilege Escalation"),
         new("TA0005", "Defense Evasion"),
+        new("TA0007", "Discovery"),
         new("TA0009", "Collection"),
         new("TA0010", "Exfiltration"),
         new("TA0040", "ML Attack Staging"),
-        new("TA0042", "Resource Development"),
     ];
 
     /// <summary>Tactic ID → canonical name, derived once from <see cref="AllTactics"/>.</summary>
@@ -130,7 +138,31 @@ public class MITREATLASReporter : IComplianceReporter<MITREATLASReport>
             }
 
             var totalTests = techniqueResults.Sum(r => r.TotalCount);
-            var passedTests = techniqueResults.Sum(r => r.ResistedCount);
+
+            // RC-6 / review: a technique can be co-tagged by multiple attacks (AML.T0057 is shared by
+            // SystemPromptExtraction + PIILeakage). An attack that produced NO conclusive verdict — every
+            // probe Inconclusive, e.g. un-canaried SystemPromptExtraction — must NOT drag a shared leaf's
+            // pass-rate down. Score the leaf over the contributors that actually measured something.
+            var measured = techniqueResults.Where(r => r.ConclusiveCount > 0).ToList();
+
+            // RC-2 honesty: probes ran but NONE produced a conclusive verdict (all Inconclusive) — e.g.
+            // system-prompt leakage with no planted canary. Report NotTested rather than a passRate-0
+            // "pass" leaf that would falsely imply the agent resisted a technique we could not measure.
+            if (measured.Count == 0)
+            {
+                return new MITRETechniqueStatus
+                {
+                    Id = tech.Id,
+                    Name = tech.Name,
+                    Description = tech.Description,
+                    TacticId = tech.TacticId,
+                    TacticName = TacticNameFor(tech.TacticId),
+                    Status = TechniqueTestStatus.NotTested,
+                    TotalTests = totalTests,
+                    PassedTests = 0,
+                    Findings = []
+                };
+            }
 
             // Build findings from failed probes
             var findings = options.IncludeDetailedFindings
@@ -145,8 +177,8 @@ public class MITREATLASReporter : IComplianceReporter<MITREATLASReport>
                 TacticId = tech.TacticId,
                 TacticName = TacticNameFor(tech.TacticId),
                 Status = TechniqueTestStatus.Tested,
-                TotalTests = totalTests,
-                PassedTests = passedTests,
+                TotalTests = measured.Sum(r => r.TotalCount),
+                PassedTests = measured.Sum(r => r.ResistedCount),
                 Findings = findings
             };
         }).ToList();
@@ -242,6 +274,10 @@ public class MITREATLASReporter : IComplianceReporter<MITREATLASReport>
         var failed = testedControls.Count(t => t.PassRate == 0 && t.TotalTests > 0);
         var overallStatus = failed > 0 ? "FAIL" : warnings > 0 ? "WARN" : "PASS";
 
+        // T4-4: the honesty disclaimer is rendered into the human-facing report surfaces (markdown footer
+        // + PDF), NOT injected as a synthetic control row here. A "DISCLAIMER" EvidenceControl would pollute
+        // every consumer that iterates Controls (e.g. MissionControl's regulation-agnostic compliance matrix
+        // renders it as a phantom 0%-passrate column). ControlsTotal == Controls.Count stays a true invariant.
         var evidence = new AgentEval.Output.ComplianceEvidence(
             SchemaVersion: "1.0",
             Regulation: Regulation,

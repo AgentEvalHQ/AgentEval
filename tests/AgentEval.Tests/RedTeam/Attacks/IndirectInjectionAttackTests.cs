@@ -44,8 +44,8 @@ public class IndirectInjectionAttackTests
 
     [Theory]
     [InlineData(Intensity.Quick, 4)]
-    [InlineData(Intensity.Moderate, 12)]
-    [InlineData(Intensity.Comprehensive, 17)]
+    [InlineData(Intensity.Moderate, 14)]        // +2 real tool-output boundary probes (Wave B, IND-040/041)
+    [InlineData(Intensity.Comprehensive, 19)]   // 17 classic + 2 boundary
     public void GetProbes_ReturnsExpectedCountForIntensity(Intensity intensity, int expectedCount)
     {
         var probes = _attack.GetProbes(intensity);
@@ -108,25 +108,30 @@ public class IndirectInjectionAttackTests
     [Fact]
     public void GetProbes_MostProbesContainMarkerInPrompt()
     {
-        var probes = _attack.GetProbes(Intensity.Comprehensive);
-        
-        // Most probes should contain a visible marker in the prompt
-        // Exception: IND-033 uses invisible unicode tag characters
-        var probesWithVisibleMarkers = probes.Where(p => 
-            p.Prompt.Contains("41414141") || 
-            p.Prompt.Contains("INJECTED") || 
+        // Scope to the inlined UserMessage probes: the real-boundary (ToolOutput) probes carry NO prompt marker
+        // by design — their payload is delivered through the tool output, not inlined into the prompt (Wave B).
+        var probes = _attack.GetProbes(Intensity.Comprehensive)
+            .Where(p => p.Surface == InjectionSurface.UserMessage)
+            .ToList();
+
+        // Most inlined probes should contain a visible marker in the prompt.
+        // Exception: IND-033 uses invisible unicode tag characters.
+        var probesWithVisibleMarkers = probes.Where(p =>
+            p.Prompt.Contains("41414141") ||
+            p.Prompt.Contains("INJECTED") ||
             p.Prompt.Contains("CONTROLLED")).ToList();
-        
+
         // At least 90% should have visible markers
         Assert.True(probesWithVisibleMarkers.Count >= probes.Count * 0.9,
-            $"Expected at least 90% of probes to have visible markers, got {probesWithVisibleMarkers.Count}/{probes.Count}");
+            $"Expected at least 90% of inlined probes to have visible markers, got {probesWithVisibleMarkers.Count}/{probes.Count}");
     }
 
     [Fact]
-    public void GetEvaluator_ReturnsContainsTokenEvaluator()
+    public void GetEvaluator_ReturnsFidelityCompositeEvaluator()
     {
+        // Wave B: behavioral-first (ToolInvocation on attacker tools) → verbal marker fallback.
         var evaluator = _attack.GetEvaluator();
-        Assert.IsType<ContainsTokenEvaluator>(evaluator);
+        Assert.IsType<FidelityCompositeEvaluator>(evaluator);
     }
 
     [Fact]

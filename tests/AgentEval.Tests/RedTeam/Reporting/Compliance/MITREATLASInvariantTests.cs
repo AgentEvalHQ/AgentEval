@@ -11,15 +11,18 @@ public sealed class MITREATLASInvariantTests
     // Independently-authored expectation of each ATLAS technique's tactic assignment.
     // Pinning the technique -> tactic-ID edge against a separate literal makes the
     // invariant catch real drift (a mis-edited TacticId) rather than a self-projection.
+    // RC-5/T4-2: remapped verbatim against the ATLAS matrix — SPE/PII extraction → T0056/T0057,
+    // T0024 retired, T0043/T0047/T0048 demoted to out-of-band (NotApplicable).
     private static readonly IReadOnlyDictionary<string, string> ExpectedTechniqueTacticId =
         new Dictionary<string, string>(StringComparer.Ordinal)
         {
             ["AML.T0051"] = "TA0001",
-            ["AML.T0054"] = "TA0005",
-            ["AML.T0043"] = "TA0040",
-            ["AML.T0024"] = "TA0042",
+            ["AML.T0054"] = "TA0004",
+            ["AML.T0056"] = "TA0007",
+            ["AML.T0057"] = "TA0010",
             ["AML.T0037"] = "TA0009",
-            ["AML.T0045"] = "TA0001",
+            ["AML.T0045"] = "TA0000",
+            ["AML.T0043"] = "TA0040",
             ["AML.T0047"] = "TA0009",
             ["AML.T0048"] = "TA0010",
             ["AML.T0052"] = "TA0001",
@@ -32,13 +35,15 @@ public sealed class MITREATLASInvariantTests
     private static readonly IReadOnlyDictionary<string, string> ExpectedTacticName =
         new Dictionary<string, string>(StringComparer.Ordinal)
         {
+            ["TA0000"] = "ML Model Access",
             ["TA0001"] = "Initial Access",
-            ["TA0003"] = "Persistence",
+            ["TA0003"] = "Resource Development",
+            ["TA0004"] = "Privilege Escalation",
             ["TA0005"] = "Defense Evasion",
+            ["TA0007"] = "Discovery",
             ["TA0009"] = "Collection",
             ["TA0010"] = "Exfiltration",
             ["TA0040"] = "ML Attack Staging",
-            ["TA0042"] = "Resource Development",
         };
 
     public static IEnumerable<object[]> AllTechniques() =>

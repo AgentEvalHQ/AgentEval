@@ -255,4 +255,32 @@ public class MisinformationMetricTests
 
         Assert.NotNull(result);
     }
+
+    [Fact]
+    public async Task EvaluateAsync_JudgeReturnsWrongJsonTypes_DoesNotThrow()
+    {
+        // N-01 / BUG-08: a judge that returns score/flags/strings in the WRONG JSON type must not crash the
+        // evaluation with an uncaught InvalidOperationException — raw GetDouble/GetBoolean/GetString would
+        // throw (it is not a JsonException, so the existing catch would not catch it). Hardened accessors
+        // fall back to defaults instead.
+        var fakeClient = new FakeChatClient("""
+            {
+                "score": "high",
+                "unsupportedClaims": [],
+                "overconfidentStatements": [],
+                "potentialFabrications": [],
+                "speculationAsFactInstances": [],
+                "properUncertaintyMarkers": "yes",
+                "citationsPractice": 5,
+                "overallRisk": 3,
+                "reasoning": false
+            }
+            """);
+        var metric = new MisinformationMetric(fakeClient);
+        var context = new EvaluationContext { Input = "q", Output = "a" };
+
+        var result = await metric.EvaluateAsync(context); // must not throw
+
+        Assert.NotNull(result);
+    }
 }
