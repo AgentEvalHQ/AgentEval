@@ -18,13 +18,13 @@ public class OWASPComplianceReporter : IComplianceReporter<OWASPComplianceReport
     [
         new("LLM01", "Prompt Injection", "Crafted inputs manipulate LLM to execute unintended actions", true),
         new("LLM02", "Sensitive Information Disclosure", "LLM reveals confidential or personal information", true),
-        new("LLM03", "Supply Chain Vulnerabilities", "Compromised components or dependencies introduce risks", false),
-        new("LLM04", "Data and Model Poisoning", "Malicious data corrupts model training or fine-tuning", false),
+        new("LLM03", "Supply Chain Vulnerabilities", "Compromised components or dependencies introduce risks", true),
+        new("LLM04", "Data and Model Poisoning", "Malicious data corrupts model training or fine-tuning", true),
         new("LLM05", "Improper Output Handling", "LLM output enables attacks on downstream components", true),
         new("LLM06", "Excessive Agency", "LLM takes actions beyond intended scope", true),
         new("LLM07", "System Prompt Leakage", "Vulnerabilities that expose system prompts", true),
-        new("LLM08", "Vector and Embedding Weaknesses", "RAG and embedding-based attack vectors", false),
-        new("LLM09", "Misinformation", "LLM generates false or misleading information", false),
+        new("LLM08", "Vector and Embedding Weaknesses", "RAG and embedding-based attack vectors", true),
+        new("LLM09", "Misinformation", "LLM generates false or misleading information", true),
         new("LLM10", "Unbounded Consumption", "Resource-intensive operations degrade service or drain budgets", true),
     ];
 

@@ -28,11 +28,11 @@ namespace AgentEval.Benchmarks;
 ///         <see cref="OWASPComplianceReport"/> for compliance evidence packs.</item>
 /// </list>
 /// <para>
-/// <b>Coverage</b>: 6 of 10 OWASP LLM Top 10 v2.0 categories are exercised today via 9 attack types.
-/// LLM03 (Supply Chain), LLM04 (Data and Model Poisoning), LLM08 (Vector / Embedding weaknesses), and
-/// LLM09 (Misinformation) are not testable at the agent-API layer; the <see cref="EvalResult"/>
-/// produced by <see cref="OwaspBenchmarkRun.EvaluateAsync"/> includes those four categories as
-/// honest "skipped" leaves rather than passing them by default.
+/// <b>Coverage</b>: all 10 OWASP LLM Top 10 v2.0 categories are exercised via 13 attack types (Wave D closed the
+/// last four — LLM03 Supply Chain, LLM04 Data and Model Poisoning, LLM08 Vector / Embedding weaknesses, LLM09
+/// Misinformation — with deterministic, agent-API-layer-testable evaluators). The <see cref="EvalResult"/> produced
+/// by <see cref="OwaspBenchmarkRun.EvaluateAsync"/> therefore has no "skipped" leaves for an in-scope roster; a
+/// category only renders as skipped/NotApplicable when its attack is deliberately omitted from the roster.
 /// </para>
 /// <para>
 /// <b>Attack → OWASP mapping</b>:
@@ -40,9 +40,13 @@ namespace AgentEval.Benchmarks;
 ///   <listheader><term>OWASP category</term><description>Wired attacks</description></listheader>
 ///   <item><term>LLM01 Prompt Injection</term><description><see cref="PromptInjectionAttack"/>, <see cref="JailbreakAttack"/>, <see cref="IndirectInjectionAttack"/>, <see cref="EncodingEvasionAttack"/></description></item>
 ///   <item><term>LLM02 Sensitive Info Disclosure</term><description><see cref="PIILeakageAttack"/></description></item>
+///   <item><term>LLM03 Supply Chain</term><description><see cref="SupplyChainAttack"/></description></item>
+///   <item><term>LLM04 Data and Model Poisoning</term><description><see cref="DataPoisoningAttack"/></description></item>
 ///   <item><term>LLM05 Improper Output Handling</term><description><see cref="InsecureOutputAttack"/></description></item>
 ///   <item><term>LLM06 Excessive Agency</term><description><see cref="ExcessiveAgencyAttack"/></description></item>
 ///   <item><term>LLM07 System Prompt Leakage</term><description><see cref="SystemPromptExtractionAttack"/></description></item>
+///   <item><term>LLM08 Vector / Embedding Weaknesses</term><description><see cref="VectorEmbeddingAttack"/></description></item>
+///   <item><term>LLM09 Misinformation</term><description><see cref="MisinformationAttack"/></description></item>
 ///   <item><term>LLM10 Unbounded Consumption</term><description><see cref="InferenceAPIAbuseAttack"/></description></item>
 /// </list>
 /// </para>
@@ -63,12 +67,10 @@ public static partial class OwaspBenchmark
     private static readonly TimeSpan RagFocusedTimeout = TimeSpan.FromMinutes(20);
 
     /// <summary>
-    /// All nine implemented attacks at <see cref="Intensity.Quick"/> intensity,
-    /// covering 6 of the 10 OWASP LLM Top 10 categories (LLM01, LLM02, LLM05,
-    /// LLM06, LLM07, LLM10). The remaining four categories (LLM03 Supply Chain,
-    /// LLM04 Data/Model Poisoning, LLM08 Vector weaknesses, LLM09 Misinformation)
-    /// are not testable at the agent-API layer and appear as "skipped" leaves in
-    /// <see cref="OwaspBenchmarkRun.EvaluateAsync"/> output.
+    /// The full built-in roster at <see cref="Intensity.Quick"/> intensity, covering all 10 OWASP LLM Top 10 v2.0
+    /// categories (LLM01–LLM10). Wave D added the final four — LLM03 Supply Chain, LLM04 Data/Model Poisoning,
+    /// LLM08 Vector / Embedding weaknesses, LLM09 Misinformation — as deterministic agent-API-layer attacks, so the
+    /// <see cref="OwaspBenchmarkRun.EvaluateAsync"/> composite has no "skipped" leaves for the full roster.
     /// </summary>
     /// <param name="judge">Optional LLM judge. The current attack pipeline uses
     /// per-attack heuristic evaluators by default; <paramref name="judge"/> is
@@ -152,7 +154,7 @@ public static partial class OwaspBenchmark
     }
 
     /// <summary>
-    /// RAG-focused variant of <see cref="Top10"/>: all 9 attacks at
+    /// RAG-focused variant of <see cref="Top10"/>: the full roster at
     /// <see cref="Intensity.Comprehensive"/> intensity with a 20-minute overall
     /// timeout. Materially distinct from <see cref="Top10"/> (Quick intensity)
     /// and <see cref="AuditGrade"/> (Comprehensive at 30 min).
@@ -175,10 +177,9 @@ public static partial class OwaspBenchmark
     /// stay in the roster.
     /// </para>
     /// <para>
-    /// <b>Coverage gap (LLM08)</b>: dedicated retrieval-corpus-poisoning and vector-store
-    /// probes for LLM08 (Vector / Embedding weaknesses) are not yet implemented and
-    /// remain on the roadmap. LLM08 appears as a skipped leaf in
-    /// <see cref="OwaspBenchmarkRun.EvaluateAsync"/> output, same as <see cref="Top10"/>.
+    /// <b>LLM08 coverage</b>: <see cref="VectorEmbeddingAttack"/> (Wave D) exercises the RAG trust boundary directly
+    /// — retrieval-priority override, source-authority spoof, and context pollution injected via the
+    /// retrieved-document surface — so LLM08 is a tested leaf in this preset, not a skipped one.
     /// </para>
     /// <para>
     /// <b>Cost positioning</b>: between <see cref="Top10"/> and <see cref="AuditGrade"/>.

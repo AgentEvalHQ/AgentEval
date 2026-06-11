@@ -46,7 +46,11 @@ public class OwaspBenchmarkTests
         Assert.Contains("LLM06", covered);
         Assert.Contains("LLM07", covered);
         Assert.Contains("LLM10", covered);
-        Assert.Equal(6, covered.Count);
+        Assert.Contains("LLM03", covered);   // Wave D
+        Assert.Contains("LLM04", covered);
+        Assert.Contains("LLM08", covered);
+        Assert.Contains("LLM09", covered);
+        Assert.Equal(10, covered.Count);     // Wave D: 10/10 OWASP coverage
     }
 
     [Fact]
@@ -85,11 +89,12 @@ public class OwaspBenchmarkTests
         Assert.Equal("Top10ForRag", run.PresetName);
         Assert.Equal(Attack.All.Count, run.Pipeline.GetProbePreview().Select(p => p.AttackName).Distinct().Count());
 
-        // Coverage parity with Top10: same 6 OWASP categories tested at the agent-API layer
-        // (LLM08 retrieval-corpus-poisoning probes are roadmap, not yet shipped).
+        // Coverage parity with Top10: all 10 OWASP categories now covered (Wave D shipped LLM03/04/08/09,
+        // including LLM08 RAG trust-boundary probes).
         var covered = run.CoveredOwaspIds;
-        Assert.Equal(6, covered.Count);
+        Assert.Equal(10, covered.Count);
         Assert.Contains("LLM01", covered);
+        Assert.Contains("LLM08", covered);
     }
 
     /// <summary>
@@ -175,7 +180,7 @@ public class OwaspBenchmarkTests
     }
 
     [Fact]
-    public async Task EvaluateAsync_PassingAgent_ProducesTenLeafComposite_WithSixTestedFourSkipped()
+    public async Task EvaluateAsync_PassingAgent_ProducesTenLeafComposite_AllTenTested()
     {
         // RC-2: canary-instrument SPE so LLM07 is conclusively tested. PassingAgent refuses and never
         // emits the canary, so the leaf is a GENUINE Resisted/1.0 — not a keyword false-pass.
@@ -196,17 +201,12 @@ public class OwaspBenchmarkTests
         var leaves = result.Details.SubResults!;
         Assert.Equal(10, leaves.Count);                                // canonical 10-leaf shape
 
-        // 4 categories untested (LLM03/04/08/09) must appear as skipped leaves.
-        var skipped = leaves.Where(l => l.Score.Label == "skipped").ToList();
-        Assert.Equal(4, skipped.Count);
-        var skippedKeys = skipped.Select(l => l.Metric.Key).OrderBy(x => x).ToList();
-        Assert.Equal(
-            new[] { "owasp.llm03", "owasp.llm04", "owasp.llm08", "owasp.llm09" },
-            skippedKeys);
+        // Wave D: all 10 OWASP categories are now implemented → 0 skipped leaves.
+        Assert.Empty(leaves.Where(l => l.Score.Label == "skipped"));
 
-        // 6 tested categories must pass against an always-passing agent.
+        // All 10 categories must pass against an always-passing (refusing) agent.
         var tested = leaves.Where(l => l.Score.Label != "skipped").ToList();
-        Assert.Equal(6, tested.Count);
+        Assert.Equal(10, tested.Count);
         Assert.All(tested, leaf =>
         {
             Assert.Equal("pass", leaf.Score.Label);
@@ -356,15 +356,8 @@ public class OwaspBenchmarkTests
         Assert.NotNull(restored.Details.SubResults);
         Assert.Equal(10, restored.Details.SubResults!.Count);
 
-        // The 4 untested categories must remain as skipped leaves after round-trip.
-        var restoredSkipped = restored.Details.SubResults
-            .Where(l => l.Score.Label == "skipped")
-            .Select(l => l.Metric.Key)
-            .OrderBy(x => x)
-            .ToList();
-        Assert.Equal(
-            new[] { "owasp.llm03", "owasp.llm04", "owasp.llm08", "owasp.llm09" },
-            restoredSkipped);
+        // Wave D: all 10 categories are now tested (10/10) → no skipped leaves survive the round-trip.
+        Assert.Empty(restored.Details.SubResults.Where(l => l.Score.Label == "skipped"));
     }
 
     // ─── Convention-2 adapter equivalence ─────────────────────────────────────

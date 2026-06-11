@@ -23,7 +23,7 @@ public class AttackFactoryTests
     [Fact]
     public void AvailableNames_ContainsAllBuiltInAttacks()
     {
-        Assert.Equal(9, Attack.AvailableNames.Count);
+        Assert.Equal(13, Attack.AvailableNames.Count);   // Wave D: +LLM03/04/08/09 → 10/10 OWASP
         Assert.Contains("SystemPromptExtraction", Attack.AvailableNames);
         Assert.Contains("IndirectInjection", Attack.AvailableNames);
         Assert.Contains("InferenceAPIAbuse", Attack.AvailableNames);
@@ -180,7 +180,7 @@ public class AttackFactoryTests
     public void All_ReturnsNineAttacks()
     {
         var attacks = Attack.All;
-        Assert.Equal(9, attacks.Count);
+        Assert.Equal(13, attacks.Count);   // Wave D: 9 + LLM03/04/08/09
         Assert.Contains(attacks, a => a.Name == "PromptInjection");
         Assert.Contains(attacks, a => a.Name == "Jailbreak");
         Assert.Contains(attacks, a => a.Name == "PIILeakage");
@@ -395,7 +395,7 @@ public class AttackFactoryTests
     public void All_DoesNotThrow_AndReturnsNineAttacks()
     {
         var all = Attack.All;
-        Assert.Equal(9, all.Count);
+        Assert.Equal(13, all.Count);
         Assert.All(all, Assert.NotNull);
     }
 

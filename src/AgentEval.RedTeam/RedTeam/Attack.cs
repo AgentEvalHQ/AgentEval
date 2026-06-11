@@ -34,6 +34,10 @@ public static class Attack
     private static readonly Lazy<InsecureOutputAttack> _insecureOutput = new(() => new InsecureOutputAttack());
     private static readonly Lazy<EncodingEvasionAttack> _encodingEvasion = new(() => new EncodingEvasionAttack());
     private static readonly Lazy<CrescendoAttack> _crescendo = new(() => new CrescendoAttack());
+    private static readonly Lazy<MisinformationAttack> _misinformation = new(() => new MisinformationAttack());
+    private static readonly Lazy<VectorEmbeddingAttack> _vectorEmbedding = new(() => new VectorEmbeddingAttack());
+    private static readonly Lazy<SupplyChainAttack> _supplyChain = new(() => new SupplyChainAttack());
+    private static readonly Lazy<DataPoisoningAttack> _dataPoisoning = new(() => new DataPoisoningAttack());
 
     /// <summary>
     /// Prompt Injection attack (OWASP LLM01).
@@ -97,6 +101,18 @@ public static class Attack
     /// </summary>
     public static IAttackType Crescendo => _crescendo.Value;
 
+    /// <summary>Misinformation attack (OWASP LLM09). Nonexistent-entity confabulation (fabrication vs refusal).</summary>
+    public static IAttackType Misinformation => _misinformation.Value;
+
+    /// <summary>Vector &amp; Embedding attack (OWASP LLM08). RAG trust-boundary via injected retrieval context.</summary>
+    public static IAttackType VectorEmbedding => _vectorEmbedding.Value;
+
+    /// <summary>Supply Chain attack (OWASP LLM03). Uncaveated recommendation of a planted typosquat/fake package.</summary>
+    public static IAttackType SupplyChain => _supplyChain.Value;
+
+    /// <summary>Data &amp; Model Poisoning attack (OWASP LLM04). In-context poisoning (trigger / false-fact / few-shot).</summary>
+    public static IAttackType DataPoisoning => _dataPoisoning.Value;
+
     // === Convenience Methods ===
 
     /// <summary>
@@ -109,7 +125,8 @@ public static class Attack
     /// Get all built-in attack types.
     /// </summary>
     public static IReadOnlyList<IAttackType> All =>
-        [PromptInjection, Jailbreak, PIILeakage, SystemPromptExtraction, IndirectInjection, InferenceAPIAbuse, ExcessiveAgency, InsecureOutput, EncodingEvasion];
+        [PromptInjection, Jailbreak, PIILeakage, SystemPromptExtraction, IndirectInjection, InferenceAPIAbuse, ExcessiveAgency, InsecureOutput, EncodingEvasion,
+         SupplyChain, DataPoisoning, VectorEmbedding, Misinformation];
 
     /// <summary>
     /// The full built-in roster (<see cref="All"/>), optionally with system-prompt-leakage canary
@@ -146,6 +163,10 @@ public static class Attack
             "INSECUREOUTPUT" or "INSECURE_OUTPUT" => InsecureOutput,
             "ENCODINGEVASION" or "ENCODING_EVASION" => EncodingEvasion,
             "CRESCENDO" => Crescendo,
+            "MISINFORMATION" => Misinformation,
+            "VECTOREMBEDDING" or "VECTOR_EMBEDDING" => VectorEmbedding,
+            "SUPPLYCHAIN" or "SUPPLY_CHAIN" => SupplyChain,
+            "DATAPOISONING" or "DATA_POISONING" => DataPoisoning,
             _ => null
         };
     }
@@ -163,9 +184,13 @@ public static class Attack
         {
             "LLM01" => [PromptInjection, Jailbreak, IndirectInjection, EncodingEvasion],
             "LLM02" => [PIILeakage],        // Sensitive Information Disclosure
+            "LLM03" => [SupplyChain],       // Supply Chain
+            "LLM04" => [DataPoisoning],     // Data and Model Poisoning
             "LLM05" => [InsecureOutput],    // Improper Output Handling
             "LLM06" => [ExcessiveAgency],   // Excessive Agency
             "LLM07" => [SystemPromptExtraction],
+            "LLM08" => [VectorEmbedding],   // Vector and Embedding Weaknesses
+            "LLM09" => [Misinformation],    // Misinformation
             "LLM10" => [InferenceAPIAbuse], // Unbounded Consumption
             _ => []
         };
@@ -175,7 +200,8 @@ public static class Attack
 
     /// <summary>Available attack names for autocomplete/validation.</summary>
     public static IReadOnlyList<string> AvailableNames =>
-        ["PromptInjection", "Jailbreak", "PIILeakage", "SystemPromptExtraction", "IndirectInjection", "InferenceAPIAbuse", "ExcessiveAgency", "InsecureOutput", "EncodingEvasion"];
+        ["PromptInjection", "Jailbreak", "PIILeakage", "SystemPromptExtraction", "IndirectInjection", "InferenceAPIAbuse", "ExcessiveAgency", "InsecureOutput", "EncodingEvasion",
+         "SupplyChain", "DataPoisoning", "VectorEmbedding", "Misinformation"];
 
     /// <summary>MVP attack names.</summary>
     public static IReadOnlyList<string> MvpNames =>

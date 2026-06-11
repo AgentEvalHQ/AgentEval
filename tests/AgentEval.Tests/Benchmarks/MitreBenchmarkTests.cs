@@ -52,7 +52,9 @@ public class MitreBenchmarkTests
         Assert.Contains("AML.T0054", covered);
         Assert.Contains("AML.T0056", covered);
         Assert.Contains("AML.T0057", covered);
-        Assert.Equal(6, covered.Count);
+        Assert.Contains("AML.T0010", covered);   // Wave D: SupplyChain (LLM03)
+        Assert.Contains("AML.T0020", covered);   // Wave D: DataPoisoning (LLM04)
+        Assert.Equal(8, covered.Count);
     }
 
     [Fact]

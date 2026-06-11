@@ -76,7 +76,7 @@ public class RedTeamRunnerTests
 
         var result = await runner.ScanAsync(agent, options);
 
-        Assert.Equal(9, result.AttackResults.Count);
+        Assert.Equal(13, result.AttackResults.Count);
         Assert.Contains(result.AttackResults, a => a.AttackName == "PromptInjection");
         Assert.Contains(result.AttackResults, a => a.AttackName == "Jailbreak");
         Assert.Contains(result.AttackResults, a => a.AttackName == "PIILeakage");
@@ -439,7 +439,7 @@ public class RedTeamRunnerTests
 
         var result = await runner.ScanAsync(agent, options);
 
-        Assert.Equal(9, result.AttackResults.Count);
+        Assert.Equal(13, result.AttackResults.Count);
     }
 
     [Fact]

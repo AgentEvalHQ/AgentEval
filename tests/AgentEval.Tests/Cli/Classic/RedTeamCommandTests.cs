@@ -204,9 +204,9 @@ public class RedTeamCommandTests
     }
 
     [Fact]
-    public void Attack_All_Returns9Types()
+    public void Attack_All_Returns13Types()
     {
-        Assert.Equal(9, Attack.All.Count);
+        Assert.Equal(13, Attack.All.Count);   // Wave D: 10/10 OWASP
     }
 
     [Fact]

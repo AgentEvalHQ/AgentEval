@@ -282,7 +282,7 @@ public class ListCommandTests
 
         Assert.Equal(0, exitCode);
         Assert.Contains("Total:", output);
-        Assert.Contains("9 attack types", output);
+        Assert.Contains("13 attack types", output);   // Wave D: 10/10 OWASP
     }
 
     // ═══════════════════════════════════════════════════════════════════════════

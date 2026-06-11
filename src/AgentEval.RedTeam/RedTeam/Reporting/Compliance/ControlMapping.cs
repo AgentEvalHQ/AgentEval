@@ -25,6 +25,14 @@ public record ControlMapping
     /// <summary>Attack types that test this control.</summary>
     public required string[] RelevantAttacks { get; init; }
 
+    /// <summary>
+    /// Honesty taxonomy (§4): how strongly a red-team run substantiates this control. <see cref="ControlFidelity.Tested"/>
+    /// (real pass/fail evidence), <see cref="ControlFidelity.Supporting"/> (partial/contributory — capped at
+    /// PartiallyEffective even at 100% pass), or <see cref="ControlFidelity.Governance"/> (organizational control with
+    /// no attack behind it — listed for traceability, NEVER PASS). Default <see cref="ControlFidelity.Tested"/>.
+    /// </summary>
+    public ControlFidelity Fidelity { get; init; } = ControlFidelity.Tested;
+
     private readonly string[]? _owaspCategories;
 
     /// <summary>
@@ -62,6 +70,22 @@ public static class ControlMappingCrosswalk
             .OrderBy(id => id, StringComparer.OrdinalIgnoreCase)
             .ToArray();
     }
+}
+
+/// <summary>
+/// Honesty taxonomy for a mapped control (§4 framework-mapping discipline): how strongly a red-team run
+/// substantiates the control. Keeps governance/organizational controls from ever being marked PASS.
+/// </summary>
+public enum ControlFidelity
+{
+    /// <summary>A red-team attack directly exercises this control — real pass/fail evidence.</summary>
+    Tested,
+
+    /// <summary>Partial/contributory evidence; the control is broader than what we probe. Capped at PartiallyEffective.</summary>
+    Supporting,
+
+    /// <summary>Organizational/governance control (policy/lifecycle/oversight). Listed for traceability; NEVER PASS.</summary>
+    Governance,
 }
 
 /// <summary>

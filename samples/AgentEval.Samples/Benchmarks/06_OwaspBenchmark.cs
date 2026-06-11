@@ -97,10 +97,10 @@ public static class OwaspBenchmarkSample
         Console.WriteLine();
         Console.WriteLine("   KEY TAKEAWAYS:");
         Console.WriteLine("   - OWASP is a Shape B / runner-style benchmark — the pipeline drives the agent itself.");
-        Console.WriteLine("   - Skipped LLM categories (LLM03 supply chain, LLM04 data + model poisoning,");
-        Console.WriteLine("     LLM08 vector + embedding weaknesses, LLM09 misinformation) render honestly —");
-        Console.WriteLine("     they are not testable at the agent-API layer.");
-        Console.WriteLine("   - Smoke = 3 attacks @ Quick; Standard = Top10 (9 @ Quick); AuditGrade = Top10 @ Comprehensive.");
+        Console.WriteLine("   - All 10 OWASP LLM Top 10 v2.0 categories are now covered: Wave D added LLM03 supply");
+        Console.WriteLine("     chain, LLM04 data + model poisoning, LLM08 vector + embedding weaknesses, and LLM09");
+        Console.WriteLine("     misinformation as deterministic agent-API-layer attacks — no skipped leaves.");
+        Console.WriteLine("   - Smoke = 3 attacks @ Quick; Standard = Top10 (13 @ Quick); AuditGrade = Top10 @ Comprehensive.");
     }
 
     private static IEvaluableAgent CreateAgent()

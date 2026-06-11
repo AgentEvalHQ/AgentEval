@@ -36,7 +36,7 @@ public class AttackPipelineTests
             .WithIntensity(Intensity.Quick)
             .ScanAsync(agent);
 
-        Assert.Equal(9, result.AttackResults.Count);
+        Assert.Equal(13, result.AttackResults.Count);   // Wave D: 10/10 OWASP
     }
 
     [Fact]
@@ -106,7 +106,7 @@ public class AttackPipelineTests
 
         var count = pipeline.TotalProbeCount;
 
-        Assert.True(count <= 18); // 9 attacks × 2 probes max
+        Assert.True(count <= 26); // 13 attacks × 2 probes max
     }
 
     [Fact]

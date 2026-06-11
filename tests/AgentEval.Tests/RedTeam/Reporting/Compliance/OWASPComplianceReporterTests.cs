@@ -39,19 +39,21 @@ public class OWASPComplianceReporterTests
     }
 
     [Fact]
-    public void GenerateReport_MarksNotApplicableCategories()
+    public void GenerateReport_MarksUntestedCategoriesNotTested()
     {
         var reporter = new OWASPComplianceReporter();
-        var result = CreateTestResult();
+        var result = CreateTestResult();   // does not include the LLM03/04/08/09 attacks
 
         var report = reporter.GenerateReport(result);
 
-        var notApplicable = report.Categories.Where(c => c.Status == CategoryTestStatus.NotApplicable).ToList();
-        Assert.Equal(4, notApplicable.Count); // LLM03, LLM04, LLM08, LLM09 (v2.0)
-        Assert.Contains(notApplicable, c => c.Id == "LLM03");
-        Assert.Contains(notApplicable, c => c.Id == "LLM04");
-        Assert.Contains(notApplicable, c => c.Id == "LLM08");
-        Assert.Contains(notApplicable, c => c.Id == "LLM09");
+        // Wave D: all 10 categories are now applicable; categories with no results in this run are NotTested,
+        // never NotApplicable (we no longer disclaim them as un-coverable).
+        Assert.Empty(report.Categories.Where(c => c.Status == CategoryTestStatus.NotApplicable));
+        var notTested = report.Categories.Where(c => c.Status == CategoryTestStatus.NotTested).Select(c => c.Id).ToList();
+        Assert.Contains("LLM03", notTested);
+        Assert.Contains("LLM04", notTested);
+        Assert.Contains("LLM08", notTested);
+        Assert.Contains("LLM09", notTested);
     }
 
     [Fact]
@@ -350,10 +352,11 @@ public class OWASPComplianceReporterTests
     }
 
     [Fact]
-    public void CategoryApplicability_Contains10Categories_WithApplicableFlags()
+    public void CategoryApplicability_Contains10Categories_AllApplicable()
     {
         Assert.Equal(10, OWASPComplianceReporter.AllCategoryIds.Count);
         Assert.True(OWASPComplianceReporter.CategoryApplicability["LLM01"]);
-        Assert.False(OWASPComplianceReporter.CategoryApplicability["LLM08"]); // not yet applicable
+        Assert.True(OWASPComplianceReporter.CategoryApplicability["LLM08"]); // Wave D: now applicable
+        Assert.All(OWASPComplianceReporter.CategoryApplicability.Values, applicable => Assert.True(applicable)); // 10/10
     }
 }

@@ -77,10 +77,10 @@ public sealed class InsecureOutputAttackTests
     }
 
     [Fact]
-    public void GetProbes_ComprehensiveIntensity_Returns33Probes()
+    public void GetProbes_ComprehensiveIntensity_Returns31Probes()
     {
         var probes = _attack.GetProbes(Intensity.Comprehensive);
-        Assert.Equal(33, probes.Count); // All probes including advanced techniques
+        Assert.Equal(31, probes.Count); // All probes (supply-chain relocated to SupplyChainAttack in Wave D)
     }
 
     // === Probe ID Tests ===
@@ -104,7 +104,9 @@ public sealed class InsecureOutputAttackTests
     public void GetProbes_ProbeIdsAreSequential()
     {
         var probes = _attack.GetProbes(Intensity.Comprehensive);
-        var expectedIds = Enumerable.Range(1, 33).Select(i => $"IO-{i:D3}").ToList();
+        // IO-028/IO-029 (supply-chain) were RELOCATED to SupplyChainAttack (Wave D); the remaining IDs are kept
+        // stable (no renumber → no baseline churn), so the set is IO-001..033 minus 028/029.
+        var expectedIds = Enumerable.Range(1, 33).Where(i => i is not (28 or 29)).Select(i => $"IO-{i:D3}").ToList();
         var actualIds = probes.Select(p => p.Id).OrderBy(id => id).ToList();
         Assert.Equal(expectedIds, actualIds);
     }
@@ -121,7 +123,6 @@ public sealed class InsecureOutputAttackTests
     [InlineData("csrf_injection")]
     [InlineData("nosql_injection")]
     [InlineData("deserialization_injection")]
-    [InlineData("supply_chain_injection")]
     [InlineData("http_header_injection")]
     [InlineData("privilege_escalation")]
     public void GetProbes_ContainsTechnique(string technique)
@@ -333,28 +334,7 @@ public sealed class InsecureOutputAttackTests
                 p.Prompt.Contains(pattern, StringComparison.OrdinalIgnoreCase)));
     }
 
-    // === Supply Chain Injection Probe Tests ===
-
-    [Fact]
-    public void GetProbes_SupplyChainProbesExistAtComprehensiveIntensity()
-    {
-        var probes = _attack.GetProbes(Intensity.Comprehensive);
-        var supplyChainProbes = probes.Where(p => p.Technique == "supply_chain_injection").ToList();
-        Assert.Equal(2, supplyChainProbes.Count);
-    }
-
-    [Fact]
-    public void GetProbes_SupplyChainProbesContainPackagePatterns()
-    {
-        var probes = _attack.GetProbes(Intensity.Comprehensive)
-            .Where(p => p.Technique == "supply_chain_injection")
-            .ToList();
-        
-        var supplyPatterns = new[] { "package", "npm", "Python" };
-        Assert.All(probes, p => 
-            Assert.Contains(supplyPatterns, pattern => 
-                p.Prompt.Contains(pattern, StringComparison.OrdinalIgnoreCase)));
-    }
+    // Supply-chain probe tests RELOCATED to SupplyChainAttackTests (OWASP LLM03) in Wave D.
 
     // === HTTP Header Injection Probe Tests ===
 
