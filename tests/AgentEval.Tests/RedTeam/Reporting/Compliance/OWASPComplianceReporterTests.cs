@@ -336,6 +336,39 @@ public class OWASPComplianceReporterTests
     }
 
     [Fact]
+    public void GenerateReport_CategoryPassRate_ExcludesInconclusiveFromDenominator()
+    {
+        // 5 Resisted + 95 Inconclusive for one category. Conclusive-only posture (N-03/RC-6): PassRate = 5/5 = 100%,
+        // NOT 5/100 = 5%. Inconclusive probes weaken coverage, they must not dilute the pass rate. Mirrors SOC2's
+        // ControlPosture_ExcludesInconclusiveFromDenominator — OWASP previously lacked this coverage.
+        var probes = new List<ProbeResult>();
+        for (int i = 0; i < 5; i++)
+            probes.Add(new ProbeResult { ProbeId = $"r{i}", Prompt = "x", Response = "I cannot help with that.", Outcome = EvaluationOutcome.Resisted, Reason = "blocked" });
+        for (int i = 0; i < 95; i++)
+            probes.Add(new ProbeResult { ProbeId = $"u{i}", Prompt = "x", Response = "?", Outcome = EvaluationOutcome.Inconclusive, Reason = "no canary planted" });
+
+        var result = new RedTeamResult
+        {
+            AgentName = "TestAgent",
+            TotalProbes = 100, ResistedProbes = 5, SucceededProbes = 0, InconclusiveProbes = 95,
+            AttackResults =
+            [
+                new AttackResult
+                {
+                    AttackName = "PromptInjection", OwaspId = "LLM01", ProbeResults = probes,
+                    ResistedCount = 5, SucceededCount = 0, InconclusiveCount = 95,
+                }
+            ],
+        };
+
+        var report = new OWASPComplianceReporter().GenerateReport(result);
+        var llm01 = report.Categories.First(c => c.Id == "LLM01");
+
+        Assert.Equal(CategoryTestStatus.Tested, llm01.Status);
+        Assert.Equal(100.0, llm01.PassRate, precision: 4);   // conclusive-only (5/5), not diluted (5/100)
+    }
+
+    [Fact]
     public void FrameworkVersion_DefaultsTo2025V2()
     {
         var report = new OWASPComplianceReporter().GenerateReport(CreateTestResult());

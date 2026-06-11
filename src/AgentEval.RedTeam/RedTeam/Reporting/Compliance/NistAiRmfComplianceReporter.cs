@@ -224,7 +224,7 @@ public class NistAiRmfComplianceReporter : IComplianceReporter<NistAiRmfComplian
             TotalCategories = controlStatuses.Count,
             TestedCategories = evaluated.Count,
             PassedCategories = evaluated.Count(c => c.Status == ControlEvaluationStatus.Effective),
-            OverallPassRate = result.OverallScore,
+            OverallPassRate = result.ConclusiveScore,   // conclusive-only headline, consistent with per-control PassRate (N-03/RC-6); coverage surfaced separately
             CriticalFindings = evaluated.Count(c => c.Status == ControlEvaluationStatus.NeedsImprovement),
             HighFindings = evaluated.Count(c => c.Status == ControlEvaluationStatus.PartiallyEffective)
         };

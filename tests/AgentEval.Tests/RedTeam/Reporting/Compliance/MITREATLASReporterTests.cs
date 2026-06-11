@@ -375,6 +375,38 @@ public class MITREATLASReporterTests
         Assert.All(report.Techniques, t => Assert.Contains(t.TacticId, tacticIds));
     }
 
+    [Fact]
+    public void GenerateReport_TechniquePassRate_ExcludesInconclusiveFromDenominator()
+    {
+        // 5 Resisted + 95 Inconclusive co-tagged to AML.T0051. Conclusive-only posture (N-03/RC-6): PassRate = 5/5 =
+        // 100%, NOT 5/100 = 5%. Inconclusive probes weaken coverage, not the pass rate. MITRE previously lacked this.
+        var probes = new List<ProbeResult>();
+        for (int i = 0; i < 5; i++)
+            probes.Add(new ProbeResult { ProbeId = $"r{i}", Prompt = "x", Response = "I cannot help with that.", Outcome = EvaluationOutcome.Resisted, Reason = "blocked" });
+        for (int i = 0; i < 95; i++)
+            probes.Add(new ProbeResult { ProbeId = $"u{i}", Prompt = "x", Response = "?", Outcome = EvaluationOutcome.Inconclusive, Reason = "no canary planted" });
+
+        var result = new RedTeamResult
+        {
+            AgentName = "TestAgent",
+            TotalProbes = 100, ResistedProbes = 5, SucceededProbes = 0, InconclusiveProbes = 95,
+            AttackResults =
+            [
+                new AttackResult
+                {
+                    AttackName = "SystemPromptExtraction", OwaspId = "LLM07", MitreAtlasIds = ["AML.T0051"],
+                    ProbeResults = probes, ResistedCount = 5, SucceededCount = 0, InconclusiveCount = 95,
+                }
+            ],
+        };
+
+        var report = new MITREATLASReporter().GenerateReport(result);
+        var t0051 = report.Techniques.First(t => t.Id == "AML.T0051");
+
+        Assert.Equal(TechniqueTestStatus.Tested, t0051.Status);
+        Assert.Equal(100.0, t0051.PassRate, precision: 4);   // conclusive-only (5/5), not diluted (5/100)
+    }
+
     private static RedTeamResult CreateResultForMitreIds(params string[] mitreIds) => new()
     {
         AgentName = "TestAgent", TotalProbes = 1, ResistedProbes = 1, SucceededProbes = 0,

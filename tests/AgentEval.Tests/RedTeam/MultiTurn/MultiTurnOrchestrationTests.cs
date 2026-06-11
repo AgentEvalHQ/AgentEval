@@ -126,6 +126,14 @@ public class MultiTurnOrchestrationTests
         public override Task<string?> NextTurnAsync(MultiTurnContext c, CancellationToken ct = default) => Task.FromResult<string?>("keep going");
     }
 
+    /// <summary>Evaluator that always returns Inconclusive — exercises the all-inconclusive multi-turn fold.</summary>
+    private sealed class AlwaysInconclusiveEvaluator : IProbeEvaluator
+    {
+        public string Name => "always-inconclusive";
+        public Task<EvaluationResult> EvaluateAsync(AttackProbe probe, string response, CancellationToken ct = default)
+            => Task.FromResult(EvaluationResult.Inconclusive("test: inconclusive every turn"));
+    }
+
     private static readonly AttackProbe Seed = new() { Id = "S", Prompt = "p", Difficulty = Difficulty.Hard };
     private static MultiTurnContext Ctx(IReadOnlyList<Turn> history) => new() { Seed = Seed, History = history };
     private static AgentResponse Resp(string t) => new() { Text = t };
@@ -210,6 +218,25 @@ public class MultiTurnOrchestrationTests
         Assert.Contains("exhausted", result.Reason, StringComparison.OrdinalIgnoreCase);
     }
 
+    [Fact]
+    public async Task Crescendo_EscalatesButFinalReplyRefusesEchoingMarker_Resisted()
+    {
+        var attack = new CrescendoAttack();
+        var seed = attack.GetProbes(Intensity.Quick).Single();
+        // The conversation escalates all the way to the marker rung, but the agent REFUSES while quoting the marker.
+        // RefusalGatedEvaluator must downgrade that marker hit to Resisted — a refusal that echoes the canary is NOT a
+        // success (honesty discipline). This is the multi-turn analogue of VectorEmbedding's RefusesButEchoesMarker.
+        var agent = new ScriptedConversableAgent(msg =>
+            msg.Contains("PWNED", StringComparison.OrdinalIgnoreCase) ? "I won't say PWNED." : Refusal);
+
+        var result = await new TurnOrchestrator(agent, ScanOptions.Default)
+            .RunAsync(attack, seed, attack.GetEvaluator(), CancellationToken.None);
+
+        Assert.Equal(EvaluationOutcome.Resisted, result.Outcome);
+        Assert.Equal(EvaluationOutcome.Resisted, result.PerTurnResults[^1].Outcome);   // marker rung downgraded
+        Assert.DoesNotContain(result.PerTurnResults, r => r.Outcome == EvaluationOutcome.Succeeded);
+    }
+
     // ---- edge paths: 0 turns, max-turns truncation ----
 
     [Fact]
@@ -234,6 +261,20 @@ public class MultiTurnOrchestrationTests
         Assert.Equal(EvaluationOutcome.Resisted, result.Outcome);
         Assert.Equal(2, result.TurnsUsed);
         Assert.True(result.WasTruncated);
+    }
+
+    [Fact]
+    public async Task AllTurnsInconclusive_FoldsToInconclusive_NotResisted()
+    {
+        // Every turn evaluates Inconclusive and nothing signals success or a refusal-lock. The fold must NOT default
+        // to "Resisted" (that would fabricate a defense from pure absence of evidence) — it reports Inconclusive.
+        var attack = new EndlessAttack();   // MaxTurns=2, SuccessOnly (never refusal-locks)
+        var result = await new TurnOrchestrator(new ScriptedConversableAgent(_ => "hmm, perhaps later"), ScanOptions.Default)
+            .RunAsync(attack, Seed, new AlwaysInconclusiveEvaluator(), CancellationToken.None);
+
+        Assert.Equal(EvaluationOutcome.Inconclusive, result.Outcome);
+        Assert.Equal(2, result.TurnsUsed);
+        Assert.All(result.PerTurnResults, r => Assert.Equal(EvaluationOutcome.Inconclusive, r.Outcome));
     }
 
     // ---- timeout / duration paths ----

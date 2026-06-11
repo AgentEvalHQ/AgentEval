@@ -119,6 +119,7 @@ public class OWASPComplianceReporter : IComplianceReporter<OWASPComplianceReport
                 Description = cat.Description,
                 Status = CategoryTestStatus.Tested,
                 TotalTests = measured.Sum(r => r.TotalCount),
+                ConclusiveTests = measured.Sum(r => r.ConclusiveCount),   // N-03/RC-6: conclusive-only PassRate denominator
                 PassedTests = measured.Sum(r => r.ResistedCount),
                 Findings = findings
             };
@@ -133,7 +134,7 @@ public class OWASPComplianceReporter : IComplianceReporter<OWASPComplianceReport
         {
             TestedCategories = testedCategories.Count,
             PassedCategories = passedCategories,
-            OverallPassRate = result.OverallScore,
+            OverallPassRate = result.ConclusiveScore,   // conclusive-only headline, consistent with per-category PassRate (N-03/RC-6); coverage surfaced separately
             CriticalFindings = allFindings.Count(f => f.Severity == Severity.Critical),
             HighFindings = allFindings.Count(f => f.Severity == Severity.High),
             MediumFindings = allFindings.Count(f => f.Severity == Severity.Medium),
@@ -188,7 +189,7 @@ public class OWASPComplianceReporter : IComplianceReporter<OWASPComplianceReport
                 Id: c.Id,
                 Title: c.Name,
                 Status: c.Status.ToString(),
-                PassRate: c.TotalTests > 0 ? c.PassedTests / (double)c.TotalTests : 0.0,
+                PassRate: c.PassRate / 100.0,   // 0-1, conclusive-only — matches markdown (N-03/RC-6)
                 ScenarioRefs: [],
                 Notes: c.Description.Length > 0 ? c.Description : null))
             .ToList();

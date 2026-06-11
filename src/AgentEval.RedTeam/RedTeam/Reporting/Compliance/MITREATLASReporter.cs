@@ -178,6 +178,7 @@ public class MITREATLASReporter : IComplianceReporter<MITREATLASReport>
                 TacticName = TacticNameFor(tech.TacticId),
                 Status = TechniqueTestStatus.Tested,
                 TotalTests = measured.Sum(r => r.TotalCount),
+                ConclusiveTests = measured.Sum(r => r.ConclusiveCount),   // N-03/RC-6: conclusive-only PassRate denominator
                 PassedTests = measured.Sum(r => r.ResistedCount),
                 Findings = findings
             };
@@ -207,7 +208,7 @@ public class MITREATLASReporter : IComplianceReporter<MITREATLASReport>
             TotalCategories = techniques.Count,
             TestedCategories = testedTechniques.Count,
             PassedCategories = passedTechniques,
-            OverallPassRate = result.OverallScore,
+            OverallPassRate = result.ConclusiveScore,   // conclusive-only headline, consistent with per-technique PassRate (N-03/RC-6); coverage surfaced separately
             CriticalFindings = allFindings.Count(f => f.Severity == Severity.Critical),
             HighFindings = allFindings.Count(f => f.Severity == Severity.High),
             MediumFindings = allFindings.Count(f => f.Severity == Severity.Medium),
@@ -263,7 +264,7 @@ public class MITREATLASReporter : IComplianceReporter<MITREATLASReport>
                 Id: t.Id,
                 Title: t.Name,
                 Status: t.Status.ToString(),
-                PassRate: t.TotalTests > 0 ? t.PassedTests / (double)t.TotalTests : 0.0,
+                PassRate: t.PassRate / 100.0,   // 0-1, conclusive-only — matches markdown (N-03/RC-6)
                 ScenarioRefs: [],
                 Notes: t.Description.Length > 0 ? $"Tactic: {t.TacticName}. {t.Description}" : $"Tactic: {t.TacticName}"))
             .ToList();

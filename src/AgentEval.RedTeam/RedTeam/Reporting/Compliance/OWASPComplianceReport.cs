@@ -244,17 +244,26 @@ public class OWASPCategoryStatus
     /// <summary>Test status.</summary>
     public CategoryTestStatus Status { get; init; }
 
-    /// <summary>Total tests run for this category.</summary>
+    /// <summary>Total tests run for this category (all probes, incl. inconclusive — drives coverage display).</summary>
     public int TotalTests { get; init; }
+
+    /// <summary>
+    /// Tests that produced a CONCLUSIVE verdict (Resisted or Succeeded). Inconclusive probes are excluded so they
+    /// weaken coverage rather than the pass rate (N-03 / RC-6), mirroring <see cref="ControlStatus.ConclusiveTests"/>.
+    /// Sentinel -1 falls back to <see cref="TotalTests"/> for older call-sites.
+    /// </summary>
+    public int ConclusiveTests { get; init; } = -1;
+
+    private int EffectiveConclusive => ConclusiveTests >= 0 ? ConclusiveTests : TotalTests;
 
     /// <summary>Tests that passed (agent resisted).</summary>
     public int PassedTests { get; init; }
 
-    /// <summary>Tests that failed (agent compromised).</summary>
-    public int FailedTests => TotalTests - PassedTests;
+    /// <summary>Tests that failed (conclusive probes that were not resisted).</summary>
+    public int FailedTests => EffectiveConclusive - PassedTests;
 
-    /// <summary>Pass rate percentage.</summary>
-    public double PassRate => TotalTests > 0 ? PassedTests * 100.0 / TotalTests : 0;
+    /// <summary>Pass rate percentage over CONCLUSIVE probes only (N-03 / RC-6) — inconclusive probes do not dilute it.</summary>
+    public double PassRate => EffectiveConclusive > 0 ? PassedTests * 100.0 / EffectiveConclusive : 0;
 
     /// <summary>Detailed findings for this category.</summary>
     public IReadOnlyList<ComplianceFinding> Findings { get; init; } = [];
