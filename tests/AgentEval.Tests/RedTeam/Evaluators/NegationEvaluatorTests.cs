@@ -107,7 +107,7 @@ public class NegationEvaluatorTests
         var probe = CreateTestProbe();
 
         await Assert.ThrowsAsync<ArgumentNullException>(() => 
-            negated.EvaluateAsync(probe, null!));
+            negated.EvaluateAsync(probe, (string)null!));
     }
 
     [Fact]

@@ -27,13 +27,13 @@ internal static class MitreBenchmarkRegistration
     {
         BenchmarkFamilyRegistry.Register(new BenchmarkFamily(
             name: "mitre",
-            description: "MITRE ATLAS red-team benchmark (6 of 8 applicable techniques covered)",
+            description: "MITRE ATLAS red-team benchmark (all 8 agent-API-applicable techniques covered, of 15 cataloged)",
             defaultCostTier: CostTier.Medium,
             presets:
             [
-                new("atlas-baseline", "All 9 implemented attacks at Quick intensity (default)", CostTier.Medium),
+                new("atlas-baseline", "All 13 built-in attacks at Quick intensity (default)", CostTier.Medium),
                 new("atlas-smoke", "3 MVP attacks at Quick intensity — CI-friendly", CostTier.Low),
-                new("atlas-audit-grade", "All 9 attacks at Comprehensive intensity — audit-grade evidence", CostTier.High),
+                new("atlas-audit-grade", "All 13 attacks at Comprehensive intensity — audit-grade evidence", CostTier.High),
             ],
             runnerType: typeof(MitreBenchmarkRun),
             runnerFactory: preset => ResolvePresetRun(preset, judge: null),

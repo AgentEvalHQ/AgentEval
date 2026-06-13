@@ -33,6 +33,14 @@ public static class Attack
     private static readonly Lazy<ExcessiveAgencyAttack> _excessiveAgency = new(() => new ExcessiveAgencyAttack());
     private static readonly Lazy<InsecureOutputAttack> _insecureOutput = new(() => new InsecureOutputAttack());
     private static readonly Lazy<EncodingEvasionAttack> _encodingEvasion = new(() => new EncodingEvasionAttack());
+    private static readonly Lazy<CrescendoAttack> _crescendo = new(() => new CrescendoAttack());
+    private static readonly Lazy<PairAttack> _pair = new(() => new PairAttack());
+    private static readonly Lazy<TapAttack> _tap = new(() => new TapAttack());
+    private static readonly Lazy<MisinformationAttack> _misinformation = new(() => new MisinformationAttack());
+    private static readonly Lazy<VectorEmbeddingAttack> _vectorEmbedding = new(() => new VectorEmbeddingAttack());
+    private static readonly Lazy<SupplyChainAttack> _supplyChain = new(() => new SupplyChainAttack());
+    private static readonly Lazy<DataPoisoningAttack> _dataPoisoning = new(() => new DataPoisoningAttack());
+    private static readonly Lazy<ToolEscalationAttack> _toolEscalation = new(() => new ToolEscalationAttack());
 
     /// <summary>
     /// Prompt Injection attack (OWASP LLM01).
@@ -88,21 +96,78 @@ public static class Attack
     /// </summary>
     public static IAttackType EncodingEvasion => _encodingEvasion.Value;
 
+    /// <summary>
+    /// Crescendo multi-turn escalation attack (OWASP LLM01, Wave C). Drives a conversation that ramps a benign
+    /// opener into a disallowed completion over several turns. <b>Opt-in</b> — NOT in the default <see cref="All"/>
+    /// roster because a multi-turn attack drives N agent turns per seed (a different cost/behavior profile); add it
+    /// explicitly (<c>Attack.Crescendo</c> or <c>ByName("Crescendo")</c>) when you want multi-turn coverage.
+    /// </summary>
+    public static IAttackType Crescendo => _crescendo.Value;
+
+    /// <summary>
+    /// PAIR — iterative attacker-LLM refinement jailbreak (OWASP LLM01, Wave C′). <b>Opt-in</b> — NOT in the default
+    /// <see cref="All"/> roster (it drives a second LLM and is non-deterministic). Requires
+    /// <see cref="ScanOptions.AttackerClient"/>; add it explicitly (<c>Attack.Pair</c> / <c>ByName("PAIR")</c>).
+    /// </summary>
+    public static IAttackType Pair => _pair.Value;
+
+    /// <summary>
+    /// TAP — tree-of-attacks-with-pruning attacker-LLM jailbreak (OWASP LLM01, Wave C′). <b>Opt-in</b> — NOT in the
+    /// default <see cref="All"/> roster (it drives a second LLM and is non-deterministic). Requires
+    /// <see cref="ScanOptions.AttackerClient"/>; add it explicitly (<c>Attack.Tap</c> / <c>ByName("TAP")</c>).
+    /// </summary>
+    public static IAttackType Tap => _tap.Value;
+
+    /// <summary>Misinformation attack (OWASP LLM09). Nonexistent-entity confabulation (fabrication vs refusal).</summary>
+    public static IAttackType Misinformation => _misinformation.Value;
+
+    /// <summary>Vector &amp; Embedding attack (OWASP LLM08). RAG trust-boundary via injected retrieval context.</summary>
+    public static IAttackType VectorEmbedding => _vectorEmbedding.Value;
+
+    /// <summary>Supply Chain attack (OWASP LLM03). Uncaveated recommendation of a planted typosquat/fake package.</summary>
+    public static IAttackType SupplyChain => _supplyChain.Value;
+
+    /// <summary>Data &amp; Model Poisoning attack (OWASP LLM04). In-context poisoning (trigger / false-fact / few-shot).</summary>
+    public static IAttackType DataPoisoning => _dataPoisoning.Value;
+
+    /// <summary>
+    /// Tool-Escalation attack (OWASP LLM06, multi-turn + tool-aware). <b>Opt-in</b> — NOT in the default
+    /// <see cref="All"/> roster (it drives N turns and is meaningful only against a tool-capable SUT, ideally
+    /// <c>--sut-tier instrumented</c>). Lures the agent into calling a forbidden canary tool over a conversation;
+    /// add it explicitly (<c>Attack.ToolEscalation</c> / <c>ByName("ToolEscalation")</c>).
+    /// </summary>
+    public static IAttackType ToolEscalation => _toolEscalation.Value;
+
     // === Convenience Methods ===
 
     /// <summary>
     /// Get all MVP attack types (PromptInjection, Jailbreak, PIILeakage).
     /// </summary>
-    /// <exception cref="NotImplementedException">Until attacks are implemented.</exception>
     public static IReadOnlyList<IAttackType> AllMvp =>
         [PromptInjection, Jailbreak, PIILeakage];
 
     /// <summary>
     /// Get all built-in attack types.
     /// </summary>
-    /// <exception cref="NotImplementedException">Until attacks are implemented.</exception>
     public static IReadOnlyList<IAttackType> All =>
-        [PromptInjection, Jailbreak, PIILeakage, SystemPromptExtraction, IndirectInjection, InferenceAPIAbuse, ExcessiveAgency, InsecureOutput, EncodingEvasion];
+        [PromptInjection, Jailbreak, PIILeakage, SystemPromptExtraction, IndirectInjection, InferenceAPIAbuse, ExcessiveAgency, InsecureOutput, EncodingEvasion,
+         SupplyChain, DataPoisoning, VectorEmbedding, Misinformation];
+
+    /// <summary>
+    /// The full built-in roster (<see cref="All"/>), optionally with system-prompt-leakage canary
+    /// instrumentation (RC-2). When <paramref name="systemPromptCanary"/> is supplied, the
+    /// <see cref="SystemPromptExtraction"/> attack is swapped for a canaried instance so AML.T0056 /
+    /// AML.T0057 / LLM07 become conclusively testable — the caller must embed the SAME token in the system
+    /// prompt of the agent under test. When <c>null</c> (default), returns <see cref="All"/> unchanged and
+    /// SPE stays un-instrumented (honest NotTested, never a false pass). Single source of truth shared by the
+    /// OWASP and MITRE benchmark presets so they can never disagree on the canaried roster.
+    /// </summary>
+    public static IReadOnlyList<IAttackType> RosterWithCanary(string? systemPromptCanary)
+        => systemPromptCanary is null
+            ? All
+            : [.. All.Select(a => a is SystemPromptExtractionAttack
+                ? new SystemPromptExtractionAttack(systemPromptCanary)
+                : a)];
 
     /// <summary>
     /// Get attack type by name (case-insensitive).
@@ -122,6 +187,14 @@ public static class Attack
             "EXCESSIVEAGENCY" or "EXCESSIVE_AGENCY" => ExcessiveAgency,
             "INSECUREOUTPUT" or "INSECURE_OUTPUT" => InsecureOutput,
             "ENCODINGEVASION" or "ENCODING_EVASION" => EncodingEvasion,
+            "CRESCENDO" => Crescendo,
+            "PAIR" => Pair,
+            "TAP" => Tap,
+            "MISINFORMATION" => Misinformation,
+            "VECTOREMBEDDING" or "VECTOR_EMBEDDING" => VectorEmbedding,
+            "SUPPLYCHAIN" or "SUPPLY_CHAIN" => SupplyChain,
+            "DATAPOISONING" or "DATA_POISONING" => DataPoisoning,
+            "TOOLESCALATION" or "TOOL_ESCALATION" => ToolEscalation,
             _ => null
         };
     }
@@ -139,9 +212,13 @@ public static class Attack
         {
             "LLM01" => [PromptInjection, Jailbreak, IndirectInjection, EncodingEvasion],
             "LLM02" => [PIILeakage],        // Sensitive Information Disclosure
+            "LLM03" => [SupplyChain],       // Supply Chain
+            "LLM04" => [DataPoisoning],     // Data and Model Poisoning
             "LLM05" => [InsecureOutput],    // Improper Output Handling
             "LLM06" => [ExcessiveAgency],   // Excessive Agency
             "LLM07" => [SystemPromptExtraction],
+            "LLM08" => [VectorEmbedding],   // Vector and Embedding Weaknesses
+            "LLM09" => [Misinformation],    // Misinformation
             "LLM10" => [InferenceAPIAbuse], // Unbounded Consumption
             _ => []
         };
@@ -149,9 +226,15 @@ public static class Attack
 
     // === Attack Names for Convenience ===
 
-    /// <summary>Available attack names for autocomplete/validation.</summary>
+    /// <summary>Available attack names for autocomplete/validation (the <see cref="All"/> roster).</summary>
     public static IReadOnlyList<string> AvailableNames =>
-        ["PromptInjection", "Jailbreak", "PIILeakage", "SystemPromptExtraction", "IndirectInjection", "InferenceAPIAbuse", "ExcessiveAgency", "InsecureOutput", "EncodingEvasion"];
+        ["PromptInjection", "Jailbreak", "PIILeakage", "SystemPromptExtraction", "IndirectInjection", "InferenceAPIAbuse", "ExcessiveAgency", "InsecureOutput", "EncodingEvasion",
+         "SupplyChain", "DataPoisoning", "VectorEmbedding", "Misinformation"];
+
+    /// <summary>Opt-in multi-turn attack names resolvable via <see cref="ByName"/> but excluded from <see cref="All"/>
+    /// (non-deterministic / require extra config: PAIR and TAP need <c>ScanOptions.AttackerClient</c>, CLI <c>--attacker</c>).</summary>
+    public static IReadOnlyList<string> OptInNames =>
+        ["Crescendo", "PAIR", "TAP", "ToolEscalation"];
 
     /// <summary>MVP attack names.</summary>
     public static IReadOnlyList<string> MvpNames =>

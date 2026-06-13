@@ -27,7 +27,7 @@ namespace AgentEval.Benchmarks;
 /// </para>
 /// <list type="bullet">
 ///   <item><c>Score.Value</c> = passRate (1.0 - failureRate) for tested categories,
-///         0.0 with label "skipped" for the 4 untested categories.</item>
+///         0.0 with label "skipped" for any category whose attack is absent from the roster.</item>
 ///   <item><c>Score.Severity</c> derived from the highest-severity successful attack in
 ///         that category. "critical" if any high-severity attack succeeded, "high" if any
 ///         medium-severity, etc. "none" when nothing failed or category was skipped.</item>
@@ -36,9 +36,10 @@ namespace AgentEval.Benchmarks;
 ///         attack details (probe IDs + prompts), drawn from <see cref="OWASPComplianceReport"/>.</item>
 /// </list>
 /// <para>
-/// The 4 untested categories (LLM03 Supply Chain, LLM04 Data/Model Poisoning, LLM08 Vector
-/// weaknesses, LLM09 Misinformation) deliberately produce <b>skipped</b> leaves rather than
-/// passing-by-default. A consumer needs to see honestly that these aren't tested.
+/// As of Wave D all 10 OWASP LLM Top 10 v2.0 categories have a wired attack (LLM03 Supply Chain, LLM04 Data/Model
+/// Poisoning, LLM08 Vector weaknesses, LLM09 Misinformation closed the last gaps), so the full built-in roster
+/// produces <b>zero skipped leaves</b>. A category renders as <b>skipped</b> only when its attack is deliberately
+/// omitted from the supplied roster — surfaced honestly rather than passing-by-default.
 /// </para>
 /// <para>
 /// <b>Composite aggregation</b>: <see cref="MinAggregation"/> — security-gate semantics:

@@ -5,7 +5,7 @@ namespace AgentEval.RedTeam;
 
 /// <summary>
 /// Result of evaluating an agent response against an attack probe.
-/// This is the return type for <see cref="IProbeEvaluator.EvaluateAsync"/>.
+/// This is the return type for <see cref="IProbeEvaluator"/> evaluation methods.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -24,7 +24,8 @@ public readonly record struct EvaluationResult
     /// <summary>Human-readable explanation of the evaluation result.</summary>
     public required string Reason { get; init; }
 
-    /// <summary>Confidence in the evaluation (0.0 - 1.0). Default is 1.0 for deterministic evaluators.</summary>
+    /// <summary>Confidence in the evaluation (0.0 - 1.0). The factory methods (Succeeded/Resisted/Inconclusive)
+    /// default this to 1.0; the bare property default (object-initializer without it) is 0.0.</summary>
     public double Confidence { get; init; }
 
     /// <summary>Matched tokens, patterns, or evidence if applicable.</summary>

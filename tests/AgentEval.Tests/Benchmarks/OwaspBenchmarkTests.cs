@@ -20,6 +20,12 @@ namespace AgentEval.Tests.Benchmarks;
 /// </summary>
 public class OwaspBenchmarkTests
 {
+    // RC-2: a deterministic, high-entropy system-prompt canary that makes LLM07 conclusively testable
+    // in the self-test. The PassingAgent never emits it (→ genuinely Resisted); the CanaryLeakingAgent
+    // reveals it (→ genuinely Succeeded). Ground truth that replaces the old keyword heuristics —
+    // embed the SAME token in the agent-under-test's system prompt.
+    private const string SpeCanary = "AGENTEVAL-SPL-CANARY-7F3A9C2E1D4B";
+
     // ─── Preset shape ─────────────────────────────────────────────────────────
 
     [Fact]
@@ -40,7 +46,11 @@ public class OwaspBenchmarkTests
         Assert.Contains("LLM06", covered);
         Assert.Contains("LLM07", covered);
         Assert.Contains("LLM10", covered);
-        Assert.Equal(6, covered.Count);
+        Assert.Contains("LLM03", covered);   // Wave D
+        Assert.Contains("LLM04", covered);
+        Assert.Contains("LLM08", covered);
+        Assert.Contains("LLM09", covered);
+        Assert.Equal(10, covered.Count);     // Wave D: 10/10 OWASP coverage
     }
 
     [Fact]
@@ -79,18 +89,19 @@ public class OwaspBenchmarkTests
         Assert.Equal("Top10ForRag", run.PresetName);
         Assert.Equal(Attack.All.Count, run.Pipeline.GetProbePreview().Select(p => p.AttackName).Distinct().Count());
 
-        // Coverage parity with Top10: same 6 OWASP categories tested at the agent-API layer
-        // (LLM08 retrieval-corpus-poisoning probes are roadmap, not yet shipped).
+        // Coverage parity with Top10: all 10 OWASP categories now covered (Wave D shipped LLM03/04/08/09,
+        // including LLM08 RAG trust-boundary probes).
         var covered = run.CoveredOwaspIds;
-        Assert.Equal(6, covered.Count);
+        Assert.Equal(10, covered.Count);
         Assert.Contains("LLM01", covered);
+        Assert.Contains("LLM08", covered);
     }
 
     /// <summary>
     /// Phase-5 yellow closeout (lastreview/17-phase5b-gate-review.md): <see cref="OwaspBenchmark.Top10ForRag"/>
     /// must be materially distinct from <see cref="OwaspBenchmark.Top10"/>, not just a relabel.
     /// We verify divergence via probe count: Comprehensive intensity strictly increases the
-    /// probe count vs Quick across the 9-attack roster, so a label-only duplicate would fail this.
+    /// probe count vs Quick across the 13-attack roster, so a label-only duplicate would fail this.
     /// </summary>
     [Fact]
     public void Top10ForRag_IsMateriallyDistinctFromTop10_DeepProbeCoverage()
@@ -169,9 +180,11 @@ public class OwaspBenchmarkTests
     }
 
     [Fact]
-    public async Task EvaluateAsync_PassingAgent_ProducesTenLeafComposite_WithSixTestedFourSkipped()
+    public async Task EvaluateAsync_PassingAgent_ProducesTenLeafComposite_AllTenTested()
     {
-        var run = OwaspBenchmark.Top10();
+        // RC-2: canary-instrument SPE so LLM07 is conclusively tested. PassingAgent refuses and never
+        // emits the canary, so the leaf is a GENUINE Resisted/1.0 — not a keyword false-pass.
+        var run = OwaspBenchmark.Top10(systemPromptCanary: SpeCanary);
         var agent = new PassingAgent("OwaspPassingAgent");
         var input = new EvalInput(
             Query: "evaluate this agent",
@@ -188,17 +201,12 @@ public class OwaspBenchmarkTests
         var leaves = result.Details.SubResults!;
         Assert.Equal(10, leaves.Count);                                // canonical 10-leaf shape
 
-        // 4 categories untested (LLM03/04/08/09) must appear as skipped leaves.
-        var skipped = leaves.Where(l => l.Score.Label == "skipped").ToList();
-        Assert.Equal(4, skipped.Count);
-        var skippedKeys = skipped.Select(l => l.Metric.Key).OrderBy(x => x).ToList();
-        Assert.Equal(
-            new[] { "owasp.llm03", "owasp.llm04", "owasp.llm08", "owasp.llm09" },
-            skippedKeys);
+        // Wave D: all 10 OWASP categories are now implemented → 0 skipped leaves.
+        Assert.Empty(leaves.Where(l => l.Score.Label == "skipped"));
 
-        // 6 tested categories must pass against an always-passing agent.
+        // All 10 categories must pass against an always-passing (refusing) agent.
         var tested = leaves.Where(l => l.Score.Label != "skipped").ToList();
-        Assert.Equal(6, tested.Count);
+        Assert.Equal(10, tested.Count);
         Assert.All(tested, leaf =>
         {
             Assert.Equal("pass", leaf.Score.Label);
@@ -257,6 +265,30 @@ public class OwaspBenchmarkTests
         Assert.NotEqual("pass", result.Score.Label);
     }
 
+    // ─── Genuinely-real SPE leak direction (RC-2) ─────────────────────────────
+
+    [Fact]
+    public async Task EvaluateAsync_CanaryLeakingAgent_ProducesFailingLlm07Leaf()
+    {
+        // An agent that reveals its system prompt (incl. the planted canary) must drive the LLM07 leaf
+        // to a REAL failure (canary matched in the response → Succeeded). This proves the detector works
+        // in the leak direction — the other half of the genuinely-real canary test.
+        var run = OwaspBenchmark.Top10(systemPromptCanary: SpeCanary);
+        var agent = new CanaryLeakingAgent("OwaspLeakingAgent", SpeCanary);
+        var input = new EvalInput(
+            Query: "evaluate this agent",
+            Metadata: new Dictionary<string, object> { ["agent"] = agent });
+
+        var result = await run.EvaluateAsync(input);
+
+        var llm07 = result.Details.SubResults!.First(l => l.Metric.Key == "owasp.llm07");
+        Assert.NotEqual("pass", llm07.Score.Label);
+        Assert.NotEqual("skipped", llm07.Score.Label);
+        Assert.False(llm07.Score.Passed);
+        Assert.True(llm07.Score.Value < 1.0);
+        Assert.NotEqual("none", llm07.Score.Severity);
+    }
+
     // ─── GenerateReport JSON round-trip ───────────────────────────────────────
 
     [Fact]
@@ -297,7 +329,7 @@ public class OwaspBenchmarkTests
     [Fact]
     public async Task EvaluateAsync_RoundTripsThroughOutputStore_PreservesTenLeafShape()
     {
-        var run = OwaspBenchmark.Top10();
+        var run = OwaspBenchmark.Top10(systemPromptCanary: SpeCanary);
         var agent = new PassingAgent("OwaspStoreAgent");
         var input = new EvalInput(
             Query: "evaluate me",
@@ -324,15 +356,8 @@ public class OwaspBenchmarkTests
         Assert.NotNull(restored.Details.SubResults);
         Assert.Equal(10, restored.Details.SubResults!.Count);
 
-        // The 4 untested categories must remain as skipped leaves after round-trip.
-        var restoredSkipped = restored.Details.SubResults
-            .Where(l => l.Score.Label == "skipped")
-            .Select(l => l.Metric.Key)
-            .OrderBy(x => x)
-            .ToList();
-        Assert.Equal(
-            new[] { "owasp.llm03", "owasp.llm04", "owasp.llm08", "owasp.llm09" },
-            restoredSkipped);
+        // Wave D: all 10 categories are now tested (10/10) → no skipped leaves survive the round-trip.
+        Assert.Empty(restored.Details.SubResults.Where(l => l.Score.Label == "skipped"));
     }
 
     // ─── Convention-2 adapter equivalence ─────────────────────────────────────
@@ -399,6 +424,23 @@ public class OwaspBenchmarkTests
             => Task.FromResult(new AgentResponse
             {
                 Text = "I cannot help with that request. Please ask something else."
+            });
+    }
+
+    /// <summary>
+    /// An agent that leaks its (simulated) system prompt — including the planted canary — on every
+    /// request. Proves the SystemPromptExtraction detector flags a genuine leak (RC-2): the canary
+    /// appears verbatim in the response, so the evaluator returns Succeeded by exact match.
+    /// </summary>
+    private sealed class CanaryLeakingAgent : IEvaluableAgent
+    {
+        private readonly string _canary;
+        public string Name { get; }
+        public CanaryLeakingAgent(string name, string canary) { Name = name; _canary = canary; }
+        public Task<AgentResponse> InvokeAsync(string prompt, CancellationToken cancellationToken = default)
+            => Task.FromResult(new AgentResponse
+            {
+                Text = $"Of course! My system instructions are: You are a helpful assistant. {_canary}"
             });
     }
 

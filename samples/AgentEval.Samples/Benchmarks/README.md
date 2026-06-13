@@ -86,7 +86,7 @@ scales from a CI smoke check to a full audit:
 | **H3 Agentic**      | `ToolCallAccuracy` (5 evals) | `AgenticExecution` (6 evals)| `AgenticExecution` + stronger judge   |
 | **H4 GDPR**         | `Smoke` (5 articles)         | `Standard` (29 articles / 6 pillars) | `AuditGrade` (29 articles / 6 pillars, cap-by-worst) |
 | **H5 EU AI Act**    | `Smoke` (5 controls)         | `Standard` (6 pillars)      | `AuditGrade` (6 pillars, cap-by-worst)   |
-| **H6 OWASP**        | `Smoke` (3 attacks @ Quick)  | `Top10` (9 attacks @ Quick) | `AuditGrade` (9 @ Comprehensive)      |
+| **H6 OWASP**        | `Smoke` (3 attacks @ Quick)  | `Top10` (13 attacks @ Quick) | `AuditGrade` (13 @ Comprehensive)      |
 | **H7 MITRE ATLAS**  | `AtlasSmoke`                 | `AtlasBaseline`             | `AtlasAuditGrade`                    |
 | **H8 LongMemEval**  | `Subset` w/ MaxQuestions=10  | `Subset` w/ MaxQuestions=50 | `Full` (~500Q, requires env var)     |
 | **H9 Memory**       | `Quick` (3 categories)       | `Standard` (8 categories)   | `Full` (12 categories)               |

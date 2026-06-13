@@ -235,6 +235,253 @@ public class RedTeamBaselineComparerTests
         Assert.Equal(baseline, comparison.Baseline);
         Assert.Equal(current, comparison.Current);
     }
+
+    [Fact]
+    public void Compare_CoverageLoss_IsRegression_EvenWithoutNewVulnerabilities()
+    {
+        var baseline = CreateResult(succeededProbes: 0).ToBaseline("v1.0.0");
+        var current = new RedTeamResult
+        {
+            AgentName = "TestAgent",
+            Duration = TimeSpan.FromSeconds(10),
+            TotalProbes = 20,
+            ResistedProbes = 10,
+            SucceededProbes = 0,
+            InconclusiveProbes = 10,
+            AttackResults =
+            [
+                CreateCoverageLossAttack("PromptInjection", "Prompt Injection", "PI"),
+                CreateCoverageLossAttack("Jailbreak", "Jailbreak", "JB")
+            ]
+        };
+
+        var comparison = new RedTeamBaselineComparer().Compare(current, baseline);
+
+        Assert.Empty(comparison.NewVulnerabilities);
+        Assert.True(comparison.CoverageDrop >= 0.10);
+        Assert.True(comparison.IsRegression);
+        Assert.Equal(RegressionStatus.Regression, comparison.Status);
+    }
+
+    [Fact]
+    public void Compare_BaselineWithInconclusiveProbes_IdenticalRerun_IsStableNotRegression()
+    {
+        // RC-6 honesty: a baseline captured from an inconclusive-laden run records coverage < 1.0
+        // (here 0.70). An identical re-run must NOT be flagged as a coverage regression. The gate
+        // previously hard-coded baseline coverage = 1.0, turning every such comparison into a
+        // permanent exit-4 false alarm.
+        var baseline = CreateMixedCoverageResult().ToBaseline("v1.0.0");
+        var current = CreateMixedCoverageResult();
+
+        var comparison = new RedTeamBaselineComparer().Compare(current, baseline);
+
+        Assert.Equal(0.70, comparison.BaselineCoverage, 3);
+        Assert.Equal(0.0, comparison.CoverageDrop, 3);
+        Assert.False(comparison.IsRegression);
+        Assert.Equal(RegressionStatus.Stable, comparison.Status);
+    }
+
+    [Fact]
+    public void Compare_ConclusiveBaseline_VsInconclusiveCurrent_StillRegression()
+    {
+        // The fail-closed direction is preserved: a genuinely lower-coverage current run (0.70)
+        // against a fully-conclusive baseline (1.0) is still a regression.
+        var baseline = CreateResult(succeededProbes: 0).ToBaseline("v1.0.0"); // coverage 1.0
+        var current = CreateMixedCoverageResult();                            // coverage 0.70
+
+        var comparison = new RedTeamBaselineComparer().Compare(current, baseline);
+
+        Assert.Equal(1.0, comparison.BaselineCoverage, 3);
+        Assert.True(comparison.CoverageDrop >= 0.10);
+        Assert.True(comparison.IsRegression);
+    }
+
+    [Fact]
+    public void Compare_NarrowedCurrent_ExcludesNotReRunAttackFromResolved()
+    {
+        // 5e: baseline has known vulns in PromptInjection (10) AND Jailbreak (1). The current run re-runs ONLY
+        // PromptInjection (all resisted). Jailbreak's known vuln must NOT be counted as "Resolved" (it wasn't
+        // tested) and must surface under NotReTested.
+        var baseline = CreateResult(succeededProbes: 11).ToBaseline("v1.0.0"); // PI:10 + JB:1 succeeded
+        var current = new RedTeamResult
+        {
+            AgentName = "TestAgent",
+            Duration = TimeSpan.FromSeconds(1),
+            TotalProbes = 10, ResistedProbes = 10, SucceededProbes = 0, InconclusiveProbes = 0,
+            AttackResults =
+            [
+                new AttackResult
+                {
+                    AttackName = "PromptInjection", AttackDisplayName = "Prompt Injection", OwaspId = "LLM01", Severity = Severity.High,
+                    ResistedCount = 10, SucceededCount = 0,
+                    ProbeResults = Enumerable.Range(1, 10).Select(i => new ProbeResult
+                    { ProbeId = $"PI-{i:D3}", Prompt = "p", Response = "safe", Outcome = EvaluationOutcome.Resisted, Reason = "ok", Severity = Severity.High }).ToList()
+                }
+            ]
+        };
+
+        var comparison = new RedTeamBaselineComparer().Compare(current, baseline, requireMatchingIntensity: false);
+
+        Assert.DoesNotContain("JB-001", comparison.ResolvedVulnerabilities);   // not re-run ≠ fixed
+        Assert.Contains(comparison.NotReTested, n => n.AttackName == "Jailbreak" && n.KnownVulnerabilities == 1);
+    }
+
+    // Two attacks, 10 probes each: 7 resisted + 3 inconclusive => coverage 14/20 = 0.70.
+    private static RedTeamResult CreateMixedCoverageResult() => new()
+    {
+        AgentName = "TestAgent",
+        Duration = TimeSpan.FromSeconds(10),
+        TotalProbes = 20,
+        ResistedProbes = 14,
+        SucceededProbes = 0,
+        InconclusiveProbes = 6,
+        AttackResults =
+        [
+            CreateMixedAttack("PromptInjection", "Prompt Injection", "PI"),
+            CreateMixedAttack("Jailbreak", "Jailbreak", "JB")
+        ]
+    };
+
+    private static AttackResult CreateMixedAttack(string name, string display, string prefix) => new()
+    {
+        AttackName = name,
+        AttackDisplayName = display,
+        OwaspId = "LLM01",
+        Severity = Severity.High,
+        ResistedCount = 7,
+        SucceededCount = 0,
+        InconclusiveCount = 3,
+        ProbeResults = Enumerable.Range(1, 10).Select(i => new ProbeResult
+        {
+            ProbeId = $"{prefix}-{i:D3}",
+            Prompt = $"Test {i}",
+            Response = i <= 7 ? "Safe" : "[TIMEOUT]",
+            Outcome = i <= 7 ? EvaluationOutcome.Resisted : EvaluationOutcome.Inconclusive,
+            Reason = i <= 7 ? "No marker" : "Timed out",
+            Severity = Severity.High
+        }).ToList()
+    };
+
+    [Fact]
+    public void Compare_IntensityMismatch_Throws()
+    {
+        var baseline = CreateResult(succeededProbes: 0).ToBaseline("v1.0.0") with { Intensity = Intensity.Comprehensive };
+        var current = new RedTeamResult
+        {
+            AgentName = "TestAgent",
+            Options = new ScanOptions { Intensity = Intensity.Quick },
+            Duration = TimeSpan.FromSeconds(1),
+            TotalProbes = 4,
+            ResistedProbes = 4,
+            SucceededProbes = 0,
+            InconclusiveProbes = 0,
+            AttackResults = []
+        };
+
+        var ex = Assert.Throws<InvalidOperationException>(() => new RedTeamBaselineComparer().Compare(current, baseline));
+
+        Assert.Contains("different probe sets", ex.Message);
+    }
+
+    [Fact]
+    public void Compare_IntensityMismatch_OverrideAllowed()
+    {
+        var baseline = CreateResult(succeededProbes: 0).ToBaseline("v1.0.0") with { Intensity = Intensity.Comprehensive };
+        var current = new RedTeamResult
+        {
+            AgentName = "TestAgent",
+            Options = new ScanOptions { Intensity = Intensity.Quick },
+            Duration = TimeSpan.FromSeconds(1),
+            TotalProbes = 4,
+            ResistedProbes = 4,
+            SucceededProbes = 0,
+            InconclusiveProbes = 0,
+            AttackResults = []
+        };
+
+        Assert.NotNull(new RedTeamBaselineComparer().Compare(current, baseline, requireMatchingIntensity: false));
+    }
+
+    [Fact]
+    public void Compare_TruncatedScan_ThrowsByDefault()
+    {
+        // RA3-06 / T5-2: a FailFast-truncated scan's partial probe set is non-comparable to a full baseline.
+        var baseline = CreateResult(succeededProbes: 0).ToBaseline("v1.0.0");
+        var current = new RedTeamResult
+        {
+            AgentName = "TestAgent",
+            Duration = TimeSpan.FromSeconds(1),
+            TotalProbes = 1,
+            ResistedProbes = 1,
+            SucceededProbes = 0,
+            InconclusiveProbes = 0,
+            WasTruncated = true,
+            SkippedProbes = 19,
+            AttackResults = []
+        };
+
+        var ex = Assert.Throws<InvalidOperationException>(() => new RedTeamBaselineComparer().Compare(current, baseline));
+        Assert.Contains("non-comparable", ex.Message);
+    }
+
+    [Fact]
+    public void Compare_TruncatedScan_OverrideAllowed()
+    {
+        var baseline = CreateResult(succeededProbes: 0).ToBaseline("v1.0.0");
+        var current = new RedTeamResult
+        {
+            AgentName = "TestAgent",
+            Duration = TimeSpan.FromSeconds(1),
+            TotalProbes = 1,
+            ResistedProbes = 1,
+            SucceededProbes = 0,
+            InconclusiveProbes = 0,
+            WasTruncated = true,
+            SkippedProbes = 19,
+            AttackResults = []
+        };
+
+        Assert.NotNull(new RedTeamBaselineComparer().Compare(current, baseline, requireMatchingIntensity: false));
+    }
+
+    [Fact]
+    public void Compare_CustomThresholds_TightenRegression()
+    {
+        var baseline = CreateResult(succeededProbes: 0).ToBaseline("v1.0.0");
+        var dropped = CreateResult(succeededProbes: 1);
+
+        var comparison = new RedTeamBaselineComparer().Compare(
+            dropped,
+            baseline,
+            new ComparisonThresholds { RegressionScoreDrop = 2.0 });
+
+        Assert.True(comparison.IsRegression);
+    }
+
+    private static AttackResult CreateCoverageLossAttack(string name, string displayName, string prefix)
+    {
+        var probes = new List<ProbeResult>();
+        for (int i = 1; i <= 5; i++)
+        {
+            probes.Add(new() { ProbeId = $"{prefix}-{i:D3}", Prompt = "p", Response = "safe", Outcome = EvaluationOutcome.Resisted, Reason = "ok" });
+        }
+        for (int i = 6; i <= 10; i++)
+        {
+            probes.Add(new() { ProbeId = $"{prefix}-{i:D3}", Prompt = "p", Response = "[TIMEOUT]", Outcome = EvaluationOutcome.Inconclusive, Reason = "timeout", Error = "Timeout", ErrorKind = ProbeErrorKind.Timeout });
+        }
+
+        return new AttackResult
+        {
+            AttackName = name,
+            AttackDisplayName = displayName,
+            OwaspId = "LLM01",
+            Severity = Severity.High,
+            ResistedCount = 5,
+            SucceededCount = 0,
+            InconclusiveCount = 5,
+            ProbeResults = probes
+        };
+    }
 }
 
 public class BaselineAssertionsTests

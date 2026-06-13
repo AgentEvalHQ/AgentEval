@@ -45,4 +45,11 @@ public static class ExitCodes
 
     /// <summary>Runtime error (connection failure, file not found, etc.).</summary>
     public const int RuntimeError = 3;
+
+    /// <summary>
+    /// A regression was detected versus a supplied <c>--baseline</c> (new vulnerabilities, or a score/coverage drop
+    /// beyond the comparison thresholds). Distinct from <see cref="TestFailure"/> (1) so CI can tell "a NEW finding
+    /// appeared" apart from "pre-existing findings remain". Used by the red-team command's <c>--fail-on</c> gate.
+    /// </summary>
+    public const int RegressionFailure = 4;
 }

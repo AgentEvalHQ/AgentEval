@@ -166,10 +166,19 @@ public static class RedTeamResultBaselineExtensions
     /// <summary>
     /// Compares this result to a baseline.
     /// </summary>
-    public static RedTeamComparison CompareToBaseline(this RedTeamResult result, RedTeamBaseline baseline)
+    /// <param name="result">The current RedTeam result.</param>
+    /// <param name="baseline">The baseline to compare against.</param>
+    /// <param name="thresholds">Optional thresholds used to classify the comparison.</param>
+    /// <param name="requireMatchingIntensity">Whether current and baseline intensity must match.</param>
+    /// <returns>Comparison result showing deltas and regressions.</returns>
+    public static RedTeamComparison CompareToBaseline(
+        this RedTeamResult result,
+        RedTeamBaseline baseline,
+        ComparisonThresholds? thresholds = null,
+        bool requireMatchingIntensity = true)
     {
         var comparer = new RedTeamBaselineComparer();
-        return comparer.Compare(result, baseline);
+        return comparer.Compare(result, baseline, thresholds, requireMatchingIntensity);
     }
 
     /// <summary>

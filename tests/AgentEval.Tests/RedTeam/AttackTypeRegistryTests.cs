@@ -17,8 +17,8 @@ public class AttackTypeRegistryTests
     {
         var registry = new AttackTypeRegistry();
 
-        // All 9 built-in attacks should be registered
-        Assert.Equal(9, registry.Count);
+        // All 13 built-in attacks should be registered (Wave D: 10/10 OWASP)
+        Assert.Equal(13, registry.Count);
         Assert.True(registry.Contains("PromptInjection"));
         Assert.True(registry.Contains("Jailbreak"));
         Assert.True(registry.Contains("PIILeakage"));
@@ -36,7 +36,7 @@ public class AttackTypeRegistryTests
         var customAttack = new FakeAttackType("CustomAttack", "LLM99");
         var registry = new AttackTypeRegistry([customAttack]);
 
-        Assert.Equal(10, registry.Count); // 9 built-in + 1 custom
+        Assert.Equal(14, registry.Count); // 13 built-in + 1 custom
         Assert.True(registry.Contains("CustomAttack"));
     }
 
@@ -126,7 +126,7 @@ public class AttackTypeRegistryTests
 
         var all = registry.GetAll().ToList();
 
-        Assert.Equal(9, all.Count);
+        Assert.Equal(13, all.Count);
     }
 
     [Fact]

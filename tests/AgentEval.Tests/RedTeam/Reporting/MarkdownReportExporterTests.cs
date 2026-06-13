@@ -291,4 +291,41 @@ public class MarkdownReportExporterTests
             }
         ]
     };
+
+    [Fact]
+    public void Export_SurfacesInconclusiveAndCoverage()
+    {
+        // N-09: a low-coverage scan must visibly surface Inconclusive + Coverage, not just a green Verdict.
+        var result = new RedTeamResult
+        {
+            AgentName = "TestAgent",
+            StartedAt = DateTimeOffset.UtcNow.AddSeconds(-5),
+            CompletedAt = DateTimeOffset.UtcNow,
+            Duration = TimeSpan.FromSeconds(5),
+            TotalProbes = 10,
+            ResistedProbes = 6,
+            SucceededProbes = 0,
+            InconclusiveProbes = 4,
+            AttackResults =
+            [
+                new AttackResult
+                {
+                    AttackName = "SystemPromptExtraction",
+                    AttackDisplayName = "System Prompt Extraction",
+                    OwaspId = "LLM07",
+                    Severity = Severity.Medium,
+                    ResistedCount = 6,
+                    SucceededCount = 0,
+                    InconclusiveCount = 4,
+                    ProbeResults = []
+                }
+            ]
+        };
+
+        var md = new MarkdownReportExporter().Export(result);
+
+        Assert.Contains("Coverage", md);
+        Assert.Contains("Inconclusive", md);
+        Assert.Contains("| 4 |", md); // the inconclusive count is visible (summary + per-attack column)
+    }
 }

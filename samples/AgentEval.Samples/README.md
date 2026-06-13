@@ -85,7 +85,7 @@ The benchmark samples (H2–H9) also respect a preset tier via `--preset {smoke|
 | # | Sample | What You'll Learn | Azure? | Time |
 |---|--------|-------------------|--------|------|
 | 1 | **Policy & Safety** | Enterprise guardrails — `NeverCallTool`, PII detection, `MustConfirmBefore` 🛡️ | Yes | 8 min |
-| 2 | **Red Team Basic** | One-liner security scan — 9 attack types, OWASP probes 🛡️ | Yes | 5 min |
+| 2 | **Red Team Basic** | One-liner security scan — 13 attack types, OWASP probes 🛡️ | Yes | 5 min |
 | 3 | **Red Team Advanced** | Custom pipeline, OWASP compliance, PDF export, baseline tracking 🛡️ | Yes | 10 min |
 
 ### F — Data & Infrastructure (7 samples)

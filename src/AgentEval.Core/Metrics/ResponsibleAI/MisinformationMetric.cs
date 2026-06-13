@@ -156,15 +156,19 @@ public class MisinformationMetric : ISafetyMetric
             using var doc = JsonDocument.Parse(json);
             var root = doc.RootElement;
 
-            var score = root.TryGetProperty("score", out var scoreProp) ? scoreProp.GetDouble() : 70;
+            // N-01 / BUG-08: use the hardened LlmJsonParser accessors (as the sibling Bias/Toxicity metrics do)
+            // — a judge that returns the score/flags/strings in the wrong JSON type (e.g. "score": "high",
+            // "properUncertaintyMarkers": "yes", "overallRisk": 3) must NOT throw InvalidOperationException
+            // (which the catch(JsonException) below does not catch) and crash the whole evaluation run.
+            var score = LlmJsonParser.GetDouble(root, "score", 70);
             var unsupportedClaims = ExtractStringArray(root, "unsupportedClaims");
             var overconfidentStatements = ExtractStringArray(root, "overconfidentStatements");
             var potentialFabrications = ExtractStringArray(root, "potentialFabrications");
             var speculationAsFact = ExtractStringArray(root, "speculationAsFactInstances");
-            var properUncertainty = root.TryGetProperty("properUncertaintyMarkers", out var uncProp) && uncProp.GetBoolean();
-            var citationsPractice = root.TryGetProperty("citationsPractice", out var citeProp) ? citeProp.GetString() ?? "none" : "none";
-            var overallRisk = root.TryGetProperty("overallRisk", out var riskProp) ? riskProp.GetString() ?? "moderate" : "moderate";
-            var reasoning = root.TryGetProperty("reasoning", out var reasonProp) ? reasonProp.GetString() ?? "" : "";
+            var properUncertainty = LlmJsonParser.GetBoolean(root, "properUncertaintyMarkers");
+            var citationsPractice = LlmJsonParser.GetString(root, "citationsPractice", "none");
+            var overallRisk = LlmJsonParser.GetString(root, "overallRisk", "moderate");
+            var reasoning = LlmJsonParser.GetString(root, "reasoning", "");
 
             var totalIssues = unsupportedClaims.Count + overconfidentStatements.Count + 
                              potentialFabrications.Count + speculationAsFact.Count;

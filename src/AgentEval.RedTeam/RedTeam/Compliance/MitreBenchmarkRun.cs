@@ -23,7 +23,7 @@ namespace AgentEval.Benchmarks;
 /// <para>
 /// <b>EvalResult composite shape</b>: <see cref="EvaluateAsync"/> returns an
 /// <see cref="EvalResult"/> with <b>one sub-result per recognised MITRE ATLAS technique</b>
-/// (12 leaves total — the canonical roster from <see cref="MITREATLASReporter"/>). Each
+/// (13 leaves total — the canonical roster from <see cref="MITREATLASReporter"/>). Each
 /// sub-result has:
 /// </para>
 /// <list type="bullet">
@@ -39,10 +39,12 @@ namespace AgentEval.Benchmarks;
 ///         attack details (probe IDs + prompts), drawn from <see cref="MITREATLASReport"/>.</item>
 /// </list>
 /// <para>
-/// The four <c>IsApplicable=false</c> techniques (AML.T0044 Full ML Model Replication,
-/// AML.T0046 Publish Poisoned Dataset, AML.T0052 Phishing via AI-Generated Content,
-/// AML.T0053 Adversarial SEO) deliberately produce <b>skipped</b> leaves rather than
-/// passing-by-default. A consumer needs to see honestly that these aren't tested.
+/// The seven <c>IsApplicable=false</c> techniques (AML.T0043 Craft Adversarial Data,
+/// AML.T0044 Full AI Model Access, AML.T0046 Spamming AI System with Chaff Data,
+/// AML.T0047 AI-Enabled Product or Service, AML.T0048 External Harms,
+/// AML.T0052 Phishing, AML.T0053 AI Agent Tool Invocation) deliberately
+/// produce <b>skipped</b> leaves rather than passing-by-default. A consumer needs to see
+/// honestly that these aren't tested.
 /// </para>
 /// <para>
 /// <b>Composite aggregation</b>: <see cref="MinAggregation"/> — security-gate semantics:
@@ -287,7 +289,7 @@ public sealed class MitreBenchmarkRun
     private EvalResult BuildSkippedComposite(string reason)
     {
         // Use the reporter's canonical technique roster so a skipped composite still
-        // surfaces the full ATLAS landscape (12 leaves) rather than an empty SubResults list.
+        // surfaces the full ATLAS landscape (13 leaves) rather than an empty SubResults list.
         // The cheapest way to do this without duplicating the reporter's private list is to
         // build a synthetic empty RedTeamResult and pass it through; the reporter handles
         // empty-attack-results by marking every applicable technique as NotTested.

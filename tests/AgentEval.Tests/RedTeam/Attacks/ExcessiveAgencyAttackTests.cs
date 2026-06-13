@@ -196,11 +196,12 @@ public class ExcessiveAgencyAttackTests
     }
 
     [Fact]
-    public void GetEvaluator_ReturnsExcessiveAgencyEvaluator()
+    public void GetEvaluator_ReturnsFidelityCompositeEvaluator()
     {
         var evaluator = _attack.GetEvaluator();
 
-        Assert.IsType<ExcessiveAgencyEvaluator>(evaluator);
+        // RC-1 (T1-4): behavioral-first composite (ToolInvocation -> ExcessiveAgency verbal fallback).
+        Assert.IsType<FidelityCompositeEvaluator>(evaluator);
     }
 
     [Fact]
@@ -211,8 +212,8 @@ public class ExcessiveAgencyAttackTests
 
         Assert.NotNull(evaluator1);
         Assert.NotNull(evaluator2);
-        Assert.IsType<ExcessiveAgencyEvaluator>(evaluator1);
-        Assert.IsType<ExcessiveAgencyEvaluator>(evaluator2);
+        Assert.IsType<FidelityCompositeEvaluator>(evaluator1);
+        Assert.IsType<FidelityCompositeEvaluator>(evaluator2);
     }
 
     [Theory]
@@ -266,5 +267,15 @@ public class ExcessiveAgencyAttackTests
         var autonomousProbes = probes.Where(p => p.Technique == "autonomous_decision").ToList();
 
         Assert.Equal(3, autonomousProbes.Count);
+    }
+
+    [Fact]
+    public void Description_StatesBothFidelities_BehavioralAndVerbal()
+    {
+        // #4: the attack now engages the real tool channel on a tool-capable SUT (Behavioral) and only falls
+        // back to stated-intent scoring (verbal) on a text-only SUT. The Description must state both honestly.
+        var attack = new ExcessiveAgencyAttack();
+        Assert.Contains("behaviorally", attack.Description, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("stated intent", attack.Description, StringComparison.OrdinalIgnoreCase);
     }
 }

@@ -522,6 +522,75 @@ public class ServiceCollectionExtensionsTests
     }
 
     [Fact]
+    public void AddAgentEvalRedTeam_RegistersBuiltInAttackTypes_InDI()
+    {
+        // N-11: the individual IAttackTypes are now registered in DI. Previously AddAgentEvalRedTeam
+        // registered only IAttackTypeRegistry, so GetServices<IAttackType>() resolved EMPTY — a consumer
+        // enumerating attack types from the container got nothing.
+        var provider = new ServiceCollection().AddAgentEvalRedTeam().BuildServiceProvider();
+
+        var attacks = provider.GetServices<IAttackType>().ToList();
+        Assert.Equal(Attack.All.Count, attacks.Count);
+        Assert.Contains(attacks, a => a.Name == "PromptInjection");
+
+        // And the registry (already pre-populated) resolves and contains the built-ins.
+        Assert.True(provider.GetRequiredService<IAttackTypeRegistry>().Contains("PromptInjection"));
+    }
+
+    [Fact]
+    public void AddAgentEvalRedTeam_RestrictedSet_RegistersOnlyRequested()
+    {
+        var provider = new ServiceCollection()
+            .AddAgentEvalRedTeam([Attack.PromptInjection])
+            .BuildServiceProvider();
+
+        Assert.Single(provider.GetServices<IAttackType>());
+    }
+
+    [Fact]
+    public void AddAgentEvalRedTeam_CalledTwice_DoesNotDuplicateAttackTypes()
+    {
+        // Review: registration must be idempotent (TryAddEnumerable) — a second call (or AddAgentEvalAll +
+        // an explicit AddAgentEvalRedTeam) must not double the IAttackType roster.
+        var provider = new ServiceCollection()
+            .AddAgentEvalRedTeam()
+            .AddAgentEvalRedTeam()
+            .BuildServiceProvider();
+
+        Assert.Equal(Attack.All.Count, provider.GetServices<IAttackType>().Count());
+    }
+
+    [Fact]
+    public void AddAgentEvalRedTeam_RegistersIRedTeamRunner()
+    {
+        // 5e: the umbrella DI now registers IRedTeamRunner (previously only a parallel extension nothing called did).
+        var provider = new ServiceCollection().AddAgentEvalRedTeam().BuildServiceProvider();
+        Assert.NotNull(provider.GetRequiredService<IRedTeamRunner>());
+    }
+
+    [Fact]
+    public void AddAgentEvalAll_ResolvesIRedTeamRunner()
+    {
+        var provider = new ServiceCollection().AddAgentEvalAll().BuildServiceProvider();
+        Assert.NotNull(provider.GetRequiredService<IRedTeamRunner>());
+    }
+
+    [Fact]
+    public void AddAgentEvalRedTeam_TwoInstancesOfSameType_BothRegistered()
+    {
+        // 5e: idempotency is by REFERENCE identity, not implementation TYPE — two distinct instances of the same
+        // CLR class (e.g. TransformedAttack wrappers / canaried SPEs) must both register, not be deduped to one.
+        var a = new FakeAttackType("AttackA", "LLM01");
+        var b = new FakeAttackType("AttackB", "LLM02");
+        var provider = new ServiceCollection().AddAgentEvalRedTeam([a, b]).BuildServiceProvider();
+
+        var registered = provider.GetServices<IAttackType>().ToList();
+        Assert.Equal(2, registered.Count);
+        Assert.Contains(a, registered);
+        Assert.Contains(b, registered);
+    }
+
+    [Fact]
     public void AddAgentEvalDataLoaders_DatasetLoaderFactory_AutoWiresDILoaders()
     {
         // Arrange

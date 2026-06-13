@@ -94,6 +94,55 @@ public class OwaspReporterStoreTests : IDisposable
             Duration = TimeSpan.FromSeconds(5)
         };
 
+    private static RedTeamResult BuildAllInconclusiveResult() =>
+        new()
+        {
+            AgentName = "OWASPTestAgent",
+            AttackResults = new[]
+            {
+                new AttackResult
+                {
+                    AttackName = "PromptInjection",
+                    OwaspId = "LLM01",
+                    MitreAtlasIds = ["AML.T0051"],
+                    InconclusiveCount = 2,
+                    ProbeResults = new[]
+                    {
+                        new ProbeResult { ProbeId = "pi-01", Outcome = EvaluationOutcome.Inconclusive, Severity = Severity.High, Prompt = "x", Response = "[TIMEOUT]", Reason = "timed out", Error = "Timeout" },
+                        new ProbeResult { ProbeId = "pi-02", Outcome = EvaluationOutcome.Inconclusive, Severity = Severity.High, Prompt = "y", Response = "[TIMEOUT]", Reason = "timed out", Error = "Timeout" },
+                    }
+                }
+            },
+            TotalProbes = 2,
+            ResistedProbes = 0,
+            SucceededProbes = 0,
+            InconclusiveProbes = 2,
+            StartedAt = DateTimeOffset.UtcNow.AddSeconds(-5),
+            CompletedAt = DateTimeOffset.UtcNow,
+            Duration = TimeSpan.FromSeconds(5)
+        };
+
+    [Fact]
+    public async Task OwaspReporter_SaveReport_AllInconclusive_PersistsNotEvaluated_NotFabricatedPass()
+    {
+        // #5/#6 (RC-6): a run that conclusively evaluated ZERO categories (e.g. a timed-out SUT → all probes
+        // Inconclusive) must persist overallStatus = NOT_EVALUATED into the audit-grade evidence — never a
+        // fabricated green PASS. This is the CLI-wired bench-owasp persistence path.
+        var store = new FileSystemOutputStore(_root);
+        var subject = DefaultSubject();
+        var runId = await CreateCompletedRunAsync(store);
+        var reporter = new OWASPComplianceReporter();
+
+        await reporter.SaveReportAsync(store, subject, runId, BuildAllInconclusiveResult());
+
+        var evidenceFile = Directory
+            .EnumerateFiles(Path.Combine(_root, "compliance", OWASPComplianceReporter.Regulation), "evidence.json", SearchOption.AllDirectories)
+            .Single();
+        var json = await File.ReadAllTextAsync(evidenceFile);
+
+        Assert.Contains("NOT_EVALUATED", json);   // a fabricated PASS would not contain this token
+    }
+
     [Fact]
     public async Task OwaspReporter_SaveReport_PersistsEvidenceAtCanonicalPath()
     {
@@ -148,5 +197,9 @@ public class OwaspReporterStoreTests : IDisposable
         Assert.Contains("\"regulation\"", json);
         Assert.Contains(OWASPComplianceReporter.Regulation, json);
         Assert.Contains("\"LLM01\"", json);
+        // T4-4 / review: the honesty disclaimer is a report-surface footer, NOT a synthetic control row.
+        // It must never be persisted into the structured evidence Controls (which downstream consumers
+        // like the MissionControl compliance matrix iterate as real, scored controls).
+        Assert.DoesNotContain("DISCLAIMER", json);
     }
 }

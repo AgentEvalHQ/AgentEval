@@ -10,7 +10,7 @@ Built first for **Microsoft Agent Framework (MAF)** and **Microsoft.Extensions.A
 - ✅ **Fluent Assertions** — Expressive assertions with rich failure messages, `because` reasons, and assertion scopes
 - 📊 **Performance Metrics** — TTFT, latency, tokens, cost estimation for 8+ models
 - 🔬 **RAG Metrics** — Faithfulness, relevance, context precision/recall, answer correctness
-- 🛡️ **Red Team Security** — 9 attack types, 192 probes, OWASP LLM Top 10 coverage
+- 🛡️ **Red Team Security** — 13 attack types, 258 probes, full OWASP LLM Top 10 coverage
 - ⚖️ **Responsible AI** — Toxicity, bias, and misinformation detection metrics
 - 📈 **Stochastic Evaluation** — Statistical model comparison with multi-run analysis
 - 🔄 **Trace Record & Replay** — Deterministic CI testing without LLM calls

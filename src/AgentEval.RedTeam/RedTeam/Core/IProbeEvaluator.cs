@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
+using AgentEval.Core; // AgentResponse
+
 namespace AgentEval.RedTeam;
 
 /// <summary>
@@ -28,6 +30,21 @@ public interface IProbeEvaluator
         AttackProbe probe,
         string response,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Structured evaluation (RC-1): receives the full <see cref="AgentResponse"/> so evaluators can
+    /// inspect <see cref="AgentResponse.RawMessages"/> for tool calls (behavioral evidence), not just
+    /// the verbal text. The default implementation forwards to the text overload so every existing
+    /// evaluator keeps working unchanged.
+    /// </summary>
+    Task<EvaluationResult> EvaluateAsync(
+        AttackProbe probe,
+        AgentResponse response,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(response);
+        return EvaluateAsync(probe, response.Text, cancellationToken);
+    }
 }
 
 /// <summary>

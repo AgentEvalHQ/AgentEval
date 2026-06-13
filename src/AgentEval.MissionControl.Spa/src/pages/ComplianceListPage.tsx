@@ -9,7 +9,7 @@ import { formatDate } from "@/lib/format";
 // Plan-08 Wave 4 (MC1.6.7 partial): list of regulations with at least one
 // stored evidence + their per-regulation summary. Click into the matrix.
 
-type OverallStatus = "pass" | "warn" | "fail";
+type OverallStatus = "pass" | "warn" | "fail" | "not_evaluated";
 
 interface ComplianceListResponse {
   compliance: {
@@ -33,11 +33,18 @@ const COMPLIANCE_QUERY = /* GraphQL */ `
   }
 `;
 
-const STATUS_TONE: Record<OverallStatus, string> = {
+const STATUS_TONE: Record<string, string> = {
   pass: "bg-green-100 text-green-800",
   warn: "bg-amber-100 text-amber-800",
   fail: "bg-red-100 text-red-800",
+  // A run that conclusively evaluated zero controls is honestly NOT_EVALUATED, not a green pass.
+  not_evaluated: "bg-slate-100 text-slate-600",
 };
+
+// Tolerate any backend casing and unknown values (e.g. "NOT_EVALUATED") with a neutral tone
+// rather than rendering an unstyled badge.
+const toneFor = (status: string | null | undefined): string =>
+  STATUS_TONE[(status ?? "").toLowerCase()] ?? "bg-slate-100 text-slate-600";
 
 export function ComplianceListPage() {
   const compQ = useQuery({
@@ -90,7 +97,7 @@ export function ComplianceListPage() {
                   </div>
                   {c.overallStatus && (
                     <span
-                      className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded ${STATUS_TONE[c.overallStatus]}`}
+                      className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded ${toneFor(c.overallStatus)}`}
                     >
                       <ShieldCheck size={12} />
                       {c.overallStatus}

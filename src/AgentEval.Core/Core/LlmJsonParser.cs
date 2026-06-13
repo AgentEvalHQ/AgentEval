@@ -165,10 +165,24 @@ internal static class LlmJsonParser
     /// </summary>
     public static bool GetBoolean(JsonElement element, string propertyName, bool defaultValue = false)
     {
-        if (element.TryGetProperty(propertyName, out var prop) && 
+        if (element.TryGetProperty(propertyName, out var prop) &&
             (prop.ValueKind == JsonValueKind.True || prop.ValueKind == JsonValueKind.False))
         {
             return prop.GetBoolean();
+        }
+        return defaultValue;
+    }
+
+    /// <summary>
+    /// Gets a string property value, returning <paramref name="defaultValue"/> when the property is missing
+    /// or is not a JSON string. Unlike <see cref="JsonElement.GetString()"/> this never throws
+    /// <see cref="InvalidOperationException"/> on a non-string value (BUG-08 / N-01).
+    /// </summary>
+    public static string GetString(JsonElement element, string propertyName, string defaultValue = "")
+    {
+        if (element.TryGetProperty(propertyName, out var prop) && prop.ValueKind == JsonValueKind.String)
+        {
+            return prop.GetString() ?? defaultValue;
         }
         return defaultValue;
     }

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
+using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
@@ -42,8 +43,8 @@ public sealed class JsonReportExporter : IReportExporter
 
         var report = new JsonReport
         {
-            SchemaVersion = "0.1.0",
-            ReportId = Guid.NewGuid().ToString(),
+            SchemaVersion = "0.2.0",   // 0.2.0: added coverage/conclusive + truncation honesty fields + per-probe fidelity (5d)
+            ReportId = DeriveReportId(result),   // LOW: deterministic so re-exporting the same result is byte-identical (diffable)
             CreatedUtc = result.CompletedAt.UtcDateTime,
             Target = new JsonTarget
             {
@@ -56,9 +57,17 @@ public sealed class JsonReportExporter : IReportExporter
                 Succeeded = result.SucceededProbes,
                 Resisted = result.ResistedProbes,
                 Inconclusive = result.InconclusiveProbes,
+                Errored = result.ErroredProbes,
                 AttackSuccessRate = result.AttackSuccessRate,
+                ConclusiveAttackSuccessRate = result.ConclusiveAttackSuccessRate,
                 OverallScore = result.OverallScore,
+                ConclusiveScore = result.ConclusiveScore,
+                Coverage = result.Coverage,
                 Verdict = result.Verdict.ToString(),
+                // 5d: a FailFast-truncated or low-coverage scan must be distinguishable from a clean full scan.
+                WasTruncated = result.WasTruncated,
+                SkippedProbes = result.SkippedProbes,
+                PlannedProbes = result.PlannedProbes,
                 Duration = result.Duration.TotalSeconds
             },
             ByAttack = result.AttackResults.Select(a => new JsonAttackSummary
@@ -85,7 +94,13 @@ public sealed class JsonReportExporter : IReportExporter
                         Response = p.Response,
                         Technique = p.Technique,
                         Difficulty = p.Difficulty.ToString(),
-                        Reason = p.Reason
+                        Reason = p.Reason,
+                        Rationale = p.Rationale,   // --explain: LLM rationale narrating verdict + fidelity (null unless requested)
+                        // 5d: surface the emitted-vs-executed / by-surface evidence so a Behavioral/ToolOutput
+                        // compromise is machine-distinguishable from a Verbal/UserMessage proxy.
+                        Fidelity = p.Fidelity.ToString(),
+                        Surface = p.Surface?.ToString(),
+                        ConversationFidelity = p.ConversationFidelity?.ToString()
                     }))
                 .ToList()
         };
@@ -98,6 +113,16 @@ public sealed class JsonReportExporter : IReportExporter
     {
         var json = Export(result);
         await File.WriteAllTextAsync(filePath, json, cancellationToken);
+    }
+
+    // LOW: derive a stable report id from the result's content (agent + start + probe ids) so exporting the same
+    // result twice yields the same id — Guid.NewGuid() made byte-identical re-exports impossible (breaks diffing).
+    private static string DeriveReportId(RedTeamResult result)
+    {
+        var seed = result.AgentName + "|" + result.StartedAt.UtcDateTime.ToString("O", CultureInfo.InvariantCulture)
+            + "|" + string.Join(",", result.AttackResults.SelectMany(a => a.ProbeResults.Select(p => p.ProbeId)));
+        var hash = System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(seed));
+        return Convert.ToHexString(hash)[..16].ToLowerInvariant();
     }
 
     // Internal DTOs for JSON structure
@@ -135,14 +160,33 @@ public sealed class JsonReportExporter : IReportExporter
         public int Succeeded { get; init; }
         public int Resisted { get; init; }
         public int Inconclusive { get; init; }
+        public int Errored { get; init; }
 
         [JsonPropertyName("attack_success_rate")]
         public double AttackSuccessRate { get; init; }
 
+        [JsonPropertyName("conclusive_attack_success_rate")]
+        public double ConclusiveAttackSuccessRate { get; init; }
+
         [JsonPropertyName("overall_score")]
         public double OverallScore { get; init; }
 
+        [JsonPropertyName("conclusive_score")]
+        public double ConclusiveScore { get; init; }
+
+        /// <summary>Conclusive coverage as a 0-100 percentage; pair with scores to judge trustworthiness (RC-6).</summary>
+        public double Coverage { get; init; }
+
         public string Verdict { get; init; } = "";
+
+        [JsonPropertyName("was_truncated")]
+        public bool WasTruncated { get; init; }
+
+        [JsonPropertyName("skipped_probes")]
+        public int SkippedProbes { get; init; }
+
+        [JsonPropertyName("planned_probes")]
+        public int PlannedProbes { get; init; }
 
         [JsonPropertyName("duration_seconds")]
         public double Duration { get; init; }
@@ -183,5 +227,17 @@ public sealed class JsonReportExporter : IReportExporter
         public string? Technique { get; init; }
         public string Difficulty { get; init; } = "";
         public string Reason { get; init; } = "";
+
+        /// <summary>--explain: LLM rationale narrating the verdict + fidelity. Omitted (null) unless requested.</summary>
+        public string? Rationale { get; init; }
+
+        /// <summary>Evidence tier behind the verdict: Verbal / IntentToAct / Behavioral (RC-1).</summary>
+        public string Fidelity { get; init; } = "";
+
+        /// <summary>Delivery surface (UserMessage / ToolOutput / RetrievedDocument), when labeled.</summary>
+        public string? Surface { get; init; }
+
+        [JsonPropertyName("conversation_fidelity")]
+        public string? ConversationFidelity { get; init; }
     }
 }

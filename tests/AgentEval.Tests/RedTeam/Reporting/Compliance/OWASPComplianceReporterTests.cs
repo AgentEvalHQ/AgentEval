@@ -39,19 +39,21 @@ public class OWASPComplianceReporterTests
     }
 
     [Fact]
-    public void GenerateReport_MarksNotApplicableCategories()
+    public void GenerateReport_MarksUntestedCategoriesNotTested()
     {
         var reporter = new OWASPComplianceReporter();
-        var result = CreateTestResult();
+        var result = CreateTestResult();   // does not include the LLM03/04/08/09 attacks
 
         var report = reporter.GenerateReport(result);
 
-        var notApplicable = report.Categories.Where(c => c.Status == CategoryTestStatus.NotApplicable).ToList();
-        Assert.Equal(4, notApplicable.Count); // LLM03, LLM04, LLM08, LLM09 (v2.0)
-        Assert.Contains(notApplicable, c => c.Id == "LLM03");
-        Assert.Contains(notApplicable, c => c.Id == "LLM04");
-        Assert.Contains(notApplicable, c => c.Id == "LLM08");
-        Assert.Contains(notApplicable, c => c.Id == "LLM09");
+        // Wave D: all 10 categories are now applicable; categories with no results in this run are NotTested,
+        // never NotApplicable (we no longer disclaim them as un-coverable).
+        Assert.Empty(report.Categories.Where(c => c.Status == CategoryTestStatus.NotApplicable));
+        var notTested = report.Categories.Where(c => c.Status == CategoryTestStatus.NotTested).Select(c => c.Id).ToList();
+        Assert.Contains("LLM03", notTested);
+        Assert.Contains("LLM04", notTested);
+        Assert.Contains("LLM08", notTested);
+        Assert.Contains("LLM09", notTested);
     }
 
     [Fact]
@@ -331,5 +333,85 @@ public class OWASPComplianceReporterTests
             ResistedCount = resisted,
             SucceededCount = total - resisted
         };
+    }
+
+    [Fact]
+    public void GenerateReport_AllInconclusive_NoStrongPostureRecommendation()
+    {
+        // RC-6: a run that conclusively tested nothing must not be told it has a "Strong security posture"
+        // (the OverallPassRate sits at the 100-on-empty sentinel; the recommendation is gated on TestedCategories).
+        var probes = Enumerable.Range(0, 6).Select(i => new ProbeResult
+        { ProbeId = $"u{i}", Prompt = "x", Response = "[TIMEOUT]", Outcome = EvaluationOutcome.Inconclusive, Reason = "timed out" }).ToList();
+        var result = new RedTeamResult
+        {
+            AgentName = "TestAgent",
+            TotalProbes = 6, ResistedProbes = 0, SucceededProbes = 0, InconclusiveProbes = 6,
+            AttackResults =
+            [
+                new AttackResult { AttackName = "PromptInjection", OwaspId = "LLM01", ProbeResults = probes, ResistedCount = 0, SucceededCount = 0, InconclusiveCount = 6 }
+            ],
+        };
+
+        var report = new OWASPComplianceReporter().GenerateReport(result, new ComplianceReportOptions { IncludeRecommendations = true });
+
+        Assert.DoesNotContain(report.Recommendations, r => r.Contains("Strong security posture"));
+    }
+
+    [Fact]
+    public void GenerateReport_CategoryPassRate_ExcludesInconclusiveFromDenominator()
+    {
+        // 5 Resisted + 95 Inconclusive for one category. Conclusive-only posture (N-03/RC-6): PassRate = 5/5 = 100%,
+        // NOT 5/100 = 5%. Inconclusive probes weaken coverage, they must not dilute the pass rate. Mirrors SOC2's
+        // ControlPosture_ExcludesInconclusiveFromDenominator — OWASP previously lacked this coverage.
+        var probes = new List<ProbeResult>();
+        for (int i = 0; i < 5; i++)
+            probes.Add(new ProbeResult { ProbeId = $"r{i}", Prompt = "x", Response = "I cannot help with that.", Outcome = EvaluationOutcome.Resisted, Reason = "blocked" });
+        for (int i = 0; i < 95; i++)
+            probes.Add(new ProbeResult { ProbeId = $"u{i}", Prompt = "x", Response = "?", Outcome = EvaluationOutcome.Inconclusive, Reason = "no canary planted" });
+
+        var result = new RedTeamResult
+        {
+            AgentName = "TestAgent",
+            TotalProbes = 100, ResistedProbes = 5, SucceededProbes = 0, InconclusiveProbes = 95,
+            AttackResults =
+            [
+                new AttackResult
+                {
+                    AttackName = "PromptInjection", OwaspId = "LLM01", ProbeResults = probes,
+                    ResistedCount = 5, SucceededCount = 0, InconclusiveCount = 95,
+                }
+            ],
+        };
+
+        var report = new OWASPComplianceReporter().GenerateReport(result);
+        var llm01 = report.Categories.First(c => c.Id == "LLM01");
+
+        Assert.Equal(CategoryTestStatus.Tested, llm01.Status);
+        Assert.Equal(100.0, llm01.PassRate, precision: 4);   // conclusive-only (5/5), not diluted (5/100)
+    }
+
+    [Fact]
+    public void FrameworkVersion_DefaultsTo2025V2()
+    {
+        var report = new OWASPComplianceReporter().GenerateReport(CreateTestResult());
+        Assert.Equal("2025 (v2.0)", report.FrameworkVersion);
+    }
+
+    [Fact]
+    public void ToMarkdown_StatesOwaspV2InHeader()
+    {
+        var report = new OWASPComplianceReporter().GenerateReport(CreateTestResult());
+        var md = report.ToMarkdown();
+        Assert.Contains("2025 (v2.0)", md);
+        Assert.DoesNotContain("OWASP LLM Top 10 2023", md);
+    }
+
+    [Fact]
+    public void CategoryApplicability_Contains10Categories_AllApplicable()
+    {
+        Assert.Equal(10, OWASPComplianceReporter.AllCategoryIds.Count);
+        Assert.True(OWASPComplianceReporter.CategoryApplicability["LLM01"]);
+        Assert.True(OWASPComplianceReporter.CategoryApplicability["LLM08"]); // Wave D: now applicable
+        Assert.All(OWASPComplianceReporter.CategoryApplicability.Values, applicable => Assert.True(applicable)); // 10/10
     }
 }

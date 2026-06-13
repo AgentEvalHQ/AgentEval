@@ -29,7 +29,7 @@ public class InferenceAPIAbuseAttackTests
     {
         Assert.NotNull(_attack.Description);
         Assert.NotEmpty(_attack.Description);
-        Assert.Contains("API", _attack.Description, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("inference", _attack.Description, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("resource", _attack.Description, StringComparison.OrdinalIgnoreCase);
     }
 
@@ -40,10 +40,11 @@ public class InferenceAPIAbuseAttackTests
     }
 
     [Fact]
-    public void MitreAtlasIds_ContainsT0045()
+    public void MitreAtlasIds_ContainsT0034CostHarvesting()
     {
+        // H13: the former AML.T0045 was retired from ATLAS; LLM10 Unbounded Consumption → AML.T0034 Cost Harvesting.
         Assert.Single(_attack.MitreAtlasIds);
-        Assert.Contains("AML.T0045", _attack.MitreAtlasIds);
+        Assert.Contains("AML.T0034", _attack.MitreAtlasIds);
     }
 
     [Fact]
@@ -209,5 +210,49 @@ public class InferenceAPIAbuseAttackTests
         var probe = probes.First(p => p.Id == probeId);
 
         Assert.Equal(expectedTechnique, probe.Technique);
+    }
+
+    [Fact]
+    public void Description_DoesNotOverclaim_StatesResponseTextOnly()
+    {
+        var attack = new InferenceAPIAbuseAttack();
+        Assert.Contains("response text only", attack.Description, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("does not set real inference", attack.Description, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Theory]
+    [InlineData("hyperparameter_abuse")]
+    [InlineData("rate_limit_bypass")]
+    [InlineData("penalty_evasion")]
+    [InlineData("stop_sequence_bypass")]
+    [InlineData("logprob_extraction")]
+    [InlineData("seed_exploitation")]
+    [InlineData("stream_manipulation")]
+    [InlineData("function_abuse")]
+    public void GetProbes_StructurallyUntestableTechniques_AreFlagged(string technique)
+    {
+        // T5-4 / Status §8: techniques a text chat agent physically cannot exercise carry the
+        // structurally_untestable metadata flag so the runner records them Inconclusive (not a fake pass/fail).
+        var matching = _attack.GetProbes(Intensity.Comprehensive).Where(p => p.Technique == technique).ToList();
+        Assert.NotEmpty(matching);
+        Assert.All(matching, p =>
+            Assert.True(p.Metadata is not null
+                && p.Metadata.TryGetValue(AttackProbe.StructurallyUntestableMetadataKey, out var v)
+                && v is true,
+                $"Technique '{technique}' must be flagged structurally_untestable."));
+    }
+
+    [Theory]
+    [InlineData("token_flooding")]
+    [InlineData("context_exhaustion")]
+    [InlineData("model_fingerprinting")]
+    [InlineData("format_injection")]
+    public void GetProbes_TextTestableTechniques_AreNotFlagged(string technique)
+    {
+        var matching = _attack.GetProbes(Intensity.Comprehensive).Where(p => p.Technique == technique).ToList();
+        Assert.NotEmpty(matching);
+        Assert.All(matching, p =>
+            Assert.False(p.Metadata?.ContainsKey(AttackProbe.StructurallyUntestableMetadataKey) ?? false,
+                $"Technique '{technique}' is text-testable and must NOT be flagged."));
     }
 }

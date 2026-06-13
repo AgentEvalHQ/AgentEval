@@ -245,6 +245,103 @@ public class JUnitReportExporterTests
         Assert.Equal("Inconclusive", error.Attribute("type")?.Value);
     }
 
+    [Fact]
+    public void Export_ProbeContentWithXmlInvalidControlChars_DoesNotThrowAndRoundTrips()
+    {
+        // A red-team SUT (encoding-evasion / insecure-output attacks) can echo ANSI escapes
+        // (0x1B) and NUL (0x00) - characters illegal in XML 1.0. Before sanitisation the
+        // XmlWriter threw ArgumentException and the whole report was lost exactly when a
+        // vulnerability was found. Every SUT-derived field must survive export. Control chars
+        // are built via (char) casts so no escape sequence appears in source.
+        var esc = ((char)0x1b).ToString(); // ESC - illegal in XML 1.0
+        var nul = ((char)0x00).ToString(); // NUL - illegal in XML 1.0
+        var result = new RedTeamResult
+        {
+            AgentName = "Agent" + esc + "[0m",
+            StartedAt = DateTimeOffset.UtcNow.AddSeconds(-5),
+            CompletedAt = DateTimeOffset.UtcNow,
+            Duration = TimeSpan.FromSeconds(5),
+            TotalProbes = 2,
+            SucceededProbes = 1,
+            InconclusiveProbes = 1,
+            AttackResults =
+            [
+                new AttackResult
+                {
+                    AttackName = "InsecureOutput",
+                    AttackDisplayName = "Insecure Output",
+                    OwaspId = "LLM05",
+                    Severity = Severity.High,
+                    SucceededCount = 1,
+                    InconclusiveCount = 1,
+                    ProbeResults =
+                    [
+                        new ProbeResult
+                        {
+                            ProbeId = "IO-001",
+                            Prompt = "Echo " + esc + "[31m red " + nul + " nul",
+                            Response = esc + "[31mPWNED" + esc + "[0m" + nul,
+                            Outcome = EvaluationOutcome.Succeeded,
+                            Reason = "Marker leaked " + esc + "]8;;evil",
+                            Technique = "ansiescape",
+                            Difficulty = Difficulty.Moderate
+                        },
+                        new ProbeResult
+                        {
+                            ProbeId = "IO-002",
+                            Prompt = "p",
+                            Response = "r",
+                            Outcome = EvaluationOutcome.Inconclusive,
+                            Reason = "weird " + nul + " reason",
+                            Error = "boom " + esc + "[1m",
+                            Difficulty = Difficulty.Easy
+                        }
+                    ]
+                }
+            ]
+        };
+
+        var exporter = new JUnitReportExporter();
+
+        var xml = exporter.Export(result); // must not throw
+        var doc = XDocument.Parse(xml);     // must round-trip
+        Assert.NotNull(doc);
+        // The raw escape / NUL bytes must not survive into the output. Use ordinal char search:
+        // xUnit's string DoesNotContain is culture-sensitive and treats control chars as ignorable
+        // (spurious match at pos 0), whereas string.Contains(char) is ordinal.
+        Assert.False(xml.Contains((char)0x1b), "ESC (0x1B) must be sanitized out of the XML");
+        Assert.False(xml.Contains((char)0x00), "NUL (0x00) must be sanitized out of the XML");
+    }
+
+    [Fact]
+    public void Export_TruncatedScan_SurfacesRootSkipped_AndTruncationNotice()
+    {
+        // 5d: a FailFast-truncated scan must NOT render as a complete green run — surface a root skipped count
+        // and a visible TruncationNotice testsuite/testcase.
+        var result = new RedTeamResult
+        {
+            AgentName = "TestAgent",
+            StartedAt = DateTimeOffset.UtcNow.AddSeconds(-5),
+            CompletedAt = DateTimeOffset.UtcNow,
+            Duration = TimeSpan.FromSeconds(5),
+            TotalProbes = 2, ResistedProbes = 2, WasTruncated = true, SkippedProbes = 8,
+            AttackResults =
+            [
+                new AttackResult { AttackName = "PromptInjection", AttackDisplayName = "PI", OwaspId = "LLM01", Severity = Severity.High, ResistedCount = 2, ProbeResults =
+                [
+                    new ProbeResult { ProbeId = "PI-001", Prompt = "p", Response = "r", Outcome = EvaluationOutcome.Resisted, Reason = "ok", Difficulty = Difficulty.Easy }
+                ] }
+            ]
+        };
+
+        var doc = XDocument.Parse(new JUnitReportExporter().Export(result));
+
+        Assert.Equal("8", doc.Root!.Attribute("skipped")?.Value);
+        var notice = doc.Root!.Elements("testsuite").FirstOrDefault(s => s.Attribute("name")?.Value == "RedTeam.TruncationNotice");
+        Assert.NotNull(notice);
+        Assert.NotNull(notice!.Element("testcase")!.Element("skipped"));
+    }
+
     private static RedTeamResult CreateTestResult() => new()
     {
         AgentName = "TestAgent",

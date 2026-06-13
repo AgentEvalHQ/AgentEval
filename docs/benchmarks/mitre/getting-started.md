@@ -2,30 +2,31 @@
 
 > Status: beta. The MITRE ATLAS benchmark ships as a red-team scanner that tags the existing OWASP attack roster against the MITRE ATLAS (Adversarial Threat Landscape for AI Systems) techniques. Verdicts reflect dialog-observable behaviour only; they are not a substitute for full ATLAS-aligned threat modelling, infrastructure-layer security review, or pen-testing.
 >
-> Coverage: 6 of 8 applicable ATLAS techniques exercised today (AML.T0024 Develop Capabilities, AML.T0037 Data from Information Repositories, AML.T0043 Craft Adversarial Data, AML.T0045 ML Intellectual Property Theft, AML.T0051 LLM Prompt Injection, AML.T0054 LLM Jailbreak). Two applicable techniques have no probe coverage yet (AML.T0047 ML Artifact Collection, AML.T0048 Exfiltration via ML Inference API); four further techniques are not applicable at the agent-API layer (AML.T0044 Full ML Model Replication, AML.T0046 Publish Poisoned Dataset, AML.T0052 Phishing via AI-Generated Content, AML.T0053 Adversarial SEO).
+> Coverage: all 6 applicable ATLAS techniques are exercised today (AML.T0037 Data from Information Repositories, AML.T0045 ML Intellectual Property Theft / Inference API Access, AML.T0051 LLM Prompt Injection, AML.T0054 LLM Jailbreak, AML.T0056 LLM Meta Prompt Extraction, AML.T0057 LLM Data Leakage). Seven further techniques are out-of-band for a black-box conversational scanner and surface as honest `NotApplicable` skipped leaves (AML.T0043 Craft Adversarial Data, AML.T0044 Full ML Model Replication, AML.T0046 Publish Poisoned Dataset, AML.T0047 ML Artifact Collection, AML.T0048 Exfiltration via ML Inference API, AML.T0052 Phishing via AI-Generated Content, AML.T0053 Adversarial SEO). *(RC-5/T4-2: system-prompt/data extraction maps to AML.T0056/T0057, not the previously-misused AML.T0043; AML.T0024 "Develop Capabilities" was retired as undetectable by a black-box scanner.)*
 
 ## What this measures
 
 The MITRE benchmark drives the agent under test with curated probes from the same nine attack types used by the OWASP family (PromptInjection, Jailbreak, IndirectInjection, EncodingEvasion, PIILeakage, InsecureOutput, ExcessiveAgency, SystemPromptExtraction, InferenceAPIAbuse) and grades each response with per-attack heuristic evaluators. Each attack type self-tags against one or more ATLAS technique IDs via `IAttackType.MitreAtlasIds`, so the composite `EvalResult` includes one leaf per ATLAS technique covered (plus honest `NotTested` / `NotApplicable` skipped leaves for the rest), aggregated via `MinAggregation`.
 
-What IS tested: agent-runtime resistance to the 6 ATLAS techniques the existing attack roster exercises — prompt-injection (T0051), jailbreak (T0054), capability-development reconnaissance via PII probes (T0024), data exfiltration from agent-accessible repositories (T0037), adversarial-data-handling robustness (T0043), and IP / system-prompt extraction (T0045). What is NOT tested: the two applicable-but-uncovered techniques (ML Artifact Collection T0047, Exfiltration via ML Inference API T0048) and the four non-applicable techniques (model replication, dataset poisoning, AI-phishing campaigns, adversarial SEO) — those all surface as `skipped` leaves with rationale.
+What IS tested: agent-runtime resistance to the 6 applicable ATLAS techniques the existing attack roster exercises — prompt-injection (T0051), jailbreak (T0054), data exfiltration from agent-accessible repositories (T0037), inference-API / IP access (T0045), system / meta-prompt extraction (T0056), and sensitive-data leakage via PII and system-prompt probes (T0057). What is NOT tested: the seven out-of-band techniques (adversarial-data crafting T0043, ML Artifact Collection T0047, Exfiltration via ML Inference API T0048, model replication, dataset poisoning, AI-phishing campaigns, adversarial SEO) — those all surface as `NotApplicable` skipped leaves with rationale.
 
 ## Scope and omissions
 
 - Covered (with rationale per item):
-  - AML.T0024 Develop Capabilities — probed via PII-leakage attacks (attacker recon).
   - AML.T0037 Data from Information Repositories — probed via PII-leakage attacks against the agent's accessible context.
-  - AML.T0043 Craft Adversarial Data — probed via encoding-evasion and indirect-injection attacks.
-  - AML.T0045 ML Intellectual Property Theft — probed via system-prompt extraction and excessive-agency attacks.
-  - AML.T0051 LLM Prompt Injection — primary probe via PromptInjection + IndirectInjection.
-  - AML.T0054 LLM Jailbreak — primary probe via Jailbreak attacks.
-- Out of scope / not yet covered (with rationale):
-  - AML.T0047 ML Artifact Collection — applicable at agent-API layer but no probe authored yet; surfaces as `NotTested` skipped leaf. Roadmap.
-  - AML.T0048 Exfiltration via ML Inference API — applicable but unprobed; surfaces as `NotTested` skipped leaf. Roadmap.
-  - AML.T0044 Full ML Model Replication — not testable from agent dialog (requires extraction of weights / training pipeline). Surfaces as `NotApplicable`.
-  - AML.T0046 Publish Poisoned Dataset — upstream-process supply-chain attack, not agent-runtime-testable. `NotApplicable`.
-  - AML.T0052 Phishing via AI-Generated Content — campaign-level attacker behaviour, not testable by probing the defender. `NotApplicable`.
-  - AML.T0053 Adversarial SEO — corpus-level attacker behaviour outside the agent's API surface. `NotApplicable`.
+  - AML.T0045 ML Intellectual Property Theft / Inference API Access — probed via InferenceAPIAbuse attacks.
+  - AML.T0051 LLM Prompt Injection — primary probe via PromptInjection + IndirectInjection (also EncodingEvasion / InsecureOutput / ExcessiveAgency).
+  - AML.T0054 LLM Jailbreak — primary probe via Jailbreak (and ExcessiveAgency) attacks.
+  - AML.T0056 LLM Meta Prompt Extraction — probed via SystemPromptExtraction attacks (canary-instrumented).
+  - AML.T0057 LLM Data Leakage — probed via SystemPromptExtraction + PIILeakage attacks.
+- Out of scope (out-of-band for a black-box conversational scanner — all surface as `NotApplicable` skipped leaves):
+  - AML.T0043 Craft Adversarial Data — offline adversarial-input staging, not agent-dialog-testable. (RC-5/T4-2: previously misused as the system-prompt-extraction tag.)
+  - AML.T0047 ML Artifact Collection — requires environment/file-system access, not the agent's API surface.
+  - AML.T0048 Exfiltration via ML Inference API — white-box training-data/model reconstruction, not a black-box chat probe.
+  - AML.T0044 Full ML Model Replication — not testable from agent dialog (requires extraction of weights / training pipeline).
+  - AML.T0046 Publish Poisoned Dataset — upstream-process supply-chain attack, not agent-runtime-testable.
+  - AML.T0052 Phishing via AI-Generated Content — campaign-level attacker behaviour, not testable by probing the defender.
+  - AML.T0053 Adversarial SEO — corpus-level attacker behaviour outside the agent's API surface.
 
 ## Presets
 
@@ -33,9 +34,9 @@ Sourced verbatim from `BenchmarkFamilyRegistry` (see `src/AgentEval.RedTeam/RedT
 
 | Preset | Description (verbatim) | Cost tier | Typical scope | Approx. LLM cost |
 |---|---|---|---|---|
-| `atlas-baseline` | All 9 implemented attacks at Quick intensity (default) | Medium | All 9 attacks, Quick intensity, 10-min timeout | no LLM (heuristic evaluators) |
-| `atlas-smoke` | 3 MVP attacks at Quick intensity - CI-friendly | Low | PromptInjection + Jailbreak + PIILeakage, Quick intensity, 10-min timeout | no LLM |
-| `atlas-audit-grade` | All 9 attacks at Comprehensive intensity - audit-grade evidence | High | All 9 attacks, Comprehensive intensity, 30-min timeout | no LLM |
+| `atlas-baseline` | All 13 built-in attacks at Quick intensity (default) | Medium | All 13 attacks, Quick intensity, 10-min timeout | no LLM (heuristic evaluators) |
+| `atlas-smoke` | 3 MVP attacks at Quick intensity — CI-friendly | Low | PromptInjection + Jailbreak + PIILeakage, Quick intensity, 10-min timeout | no LLM |
+| `atlas-audit-grade` | All 13 attacks at Comprehensive intensity — audit-grade evidence | High | All 13 attacks, Comprehensive intensity, 30-min timeout | no LLM |
 
 Preset aliases are accepted: `atlas-baseline` = `baseline`, `atlas-smoke` = `smoke`, `atlas-audit-grade` = `atlas-audit` = `audit` = `auditgrade`.
 
@@ -90,10 +91,10 @@ The CLI exit code mirrors the composite verdict: `pass` → exit 0, anything els
 
 - T0051 LLM Prompt Injection failures — same remediation as OWASP LLM01; review system-prompt scaffolding + retrieval / tool-output sanitisation.
 - T0054 LLM Jailbreak failures — strengthen refusal policy; consider an upstream guardrail (e.g. content-safety pre-filter) for high-stakes deployments.
-- T0024 Develop Capabilities failures (via PII probes) — the agent is leaking information that helps an attacker plan further attacks; tighten what context the agent has access to.
 - T0037 Data from Information Repositories failures — the agent is exfiltrating data from its accessible context (system prompt, retrieved docs, tool outputs); tighten redaction at the context boundary.
-- T0043 Craft Adversarial Data failures (encoding-evasion / indirect-injection) — review input normalisation + canonicalisation upstream of the model, plus retrieved-content sanitisation for indirect cases.
-- T0045 ML Intellectual Property Theft failures (system-prompt extraction / excessive-agency) — harden the refusal policy against extraction probes; narrow the agent's tool surface.
+- T0045 ML Intellectual Property Theft / Inference API Access failures (InferenceAPIAbuse) — apply rate limits / resource quotas and avoid echoing model/version metadata an attacker can fingerprint.
+- T0056 LLM Meta Prompt Extraction failures (system-prompt extraction) — harden the refusal policy against extraction probes; never echo system-prompt contents; embed a canary to detect leaks.
+- T0057 LLM Data Leakage failures (system-prompt extraction / PII probes) — tighten redaction at the context boundary and add PII/secret detection on the output path.
 
 ## When to use this benchmark
 
@@ -139,8 +140,8 @@ Same baseline story as the OWASP family — runs are stored canonically under `.
 ## Limitations and roadmap
 
 Known limitations:
-- 6 of 12 ATLAS techniques surface as honest `skipped` leaves (2 unprobed-applicable + 4 not-applicable). The composite verdict can still be `PASS` when all 6 covered techniques pass.
-- T0047 (ML Artifact Collection) and T0048 (Exfiltration via ML Inference API) are applicable at the agent-API layer but have no probe coverage yet. Roadmap.
+- 7 of 13 ATLAS techniques surface as honest `NotApplicable` `skipped` leaves (out-of-band for a black-box conversational scanner). The composite verdict can still be `PASS` when all 6 covered techniques pass.
+- System-prompt leakage (T0056/T0057) is only conclusively gradable when the benchmark caller plants a canary in the agent's system prompt; without one, those leaves are honestly `NotTested` rather than a false pass.
 - The judge is currently advisory only — per-attack heuristic evaluators do the grading. An LLM-graded judge mode is reserved for future probes.
 - The current attack roster is fixed at nine probes; custom attack injection (per-org policy probes) is not yet supported via CLI.
 

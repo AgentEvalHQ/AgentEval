@@ -156,7 +156,7 @@ public class LLMJudgeEvaluatorTests
         var probe = CreateTestProbe();
 
         await Assert.ThrowsAsync<ArgumentNullException>(() =>
-            evaluator.EvaluateAsync(probe, null!));
+            evaluator.EvaluateAsync(probe, (string)null!));
     }
 
     [Fact]

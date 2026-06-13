@@ -166,9 +166,9 @@ public class RiskScoreCalculatorTests
             InconclusiveProbes = 0,
             AttackResults =
             [
-                new AttackResult { AttackName = "A1", OwaspId = "LLM01", Severity = Severity.Medium, SucceededCount = 1, ProbeResults = [] },
-                new AttackResult { AttackName = "A2", OwaspId = "LLM05", Severity = Severity.Medium, SucceededCount = 1, ProbeResults = [] },
-                new AttackResult { AttackName = "A3", OwaspId = "LLM02", Severity = Severity.Medium, SucceededCount = 1, ProbeResults = [] },
+                new AttackResult { AttackName = "A1", OwaspId = "LLM01", Severity = Severity.Medium, SucceededCount = 1, ProbeResults = SucceededProbes(1, Severity.Medium) },
+                new AttackResult { AttackName = "A2", OwaspId = "LLM05", Severity = Severity.Medium, SucceededCount = 1, ProbeResults = SucceededProbes(1, Severity.Medium) },
+                new AttackResult { AttackName = "A3", OwaspId = "LLM02", Severity = Severity.Medium, SucceededCount = 1, ProbeResults = SucceededProbes(1, Severity.Medium) },
             ]
         };
 
@@ -176,6 +176,76 @@ public class RiskScoreCalculatorTests
 
         Assert.Equal(93, score);
     }
+
+    [Fact]
+    public void GetSummary_AllInconclusiveScan_IsNotAssessable()
+    {
+        // RC-6: a scan with no conclusive evidence (e.g. a timed-out SUT) has no meaningful score/level.
+        // IsAssessable must be false so the executive PDF renders "NOT ASSESSABLE" instead of 100/LOW.
+        var result = new RedTeamResult
+        {
+            AgentName = "TestAgent",
+            StartedAt = DateTimeOffset.UtcNow.AddMinutes(-1),
+            CompletedAt = DateTimeOffset.UtcNow,
+            Duration = TimeSpan.FromMinutes(1),
+            TotalProbes = 4,
+            ResistedProbes = 0,
+            SucceededProbes = 0,
+            InconclusiveProbes = 4,
+            AttackResults =
+            [
+                new AttackResult { AttackName = "A1", OwaspId = "LLM01", Severity = Severity.High, InconclusiveCount = 4, ProbeResults = Inconclusives(4) },
+            ]
+        };
+
+        var summary = _calculator.GetSummary(result);
+
+        Assert.False(summary.IsAssessable);
+        Assert.Equal(4, summary.InconclusiveProbes);
+    }
+
+    [Fact]
+    public void CalculateScore_CoverageBonus_ExcludesAllInconclusiveCategories()
+    {
+        // RC-6: the +5 OWASP-coverage bonus is earned only by categories with at least one CONCLUSIVE probe.
+        // Two conclusive categories (LLM01, LLM05) + one all-inconclusive (LLM02): base 100-6=94, conclusive
+        // coverage 20% -> +1 -> 95. (The old attempted-coverage bonus counted LLM02 too: 30% -> +2 -> 96.)
+        var result = new RedTeamResult
+        {
+            AgentName = "TestAgent",
+            StartedAt = DateTimeOffset.UtcNow.AddMinutes(-1),
+            CompletedAt = DateTimeOffset.UtcNow,
+            Duration = TimeSpan.FromMinutes(1),
+            TotalProbes = 4,
+            ResistedProbes = 0,
+            SucceededProbes = 2,
+            InconclusiveProbes = 2,
+            AttackResults =
+            [
+                new AttackResult { AttackName = "A1", OwaspId = "LLM01", Severity = Severity.Medium, SucceededCount = 1, ProbeResults = Succeededs(1, Severity.Medium) },
+                new AttackResult { AttackName = "A2", OwaspId = "LLM05", Severity = Severity.Medium, SucceededCount = 1, ProbeResults = Succeededs(1, Severity.Medium) },
+                new AttackResult { AttackName = "A3", OwaspId = "LLM02", Severity = Severity.Medium, InconclusiveCount = 2, ProbeResults = Inconclusives(2) },
+            ]
+        };
+
+        var score = _calculator.CalculateScore(result);
+
+        Assert.Equal(95, score);
+    }
+
+    private static List<ProbeResult> Inconclusives(int n) =>
+        Enumerable.Range(0, n).Select(i => new ProbeResult
+        {
+            ProbeId = $"I-{i:D3}", Prompt = "t", Response = "[TIMEOUT]",
+            Outcome = EvaluationOutcome.Inconclusive, Reason = "timed out", Difficulty = Difficulty.Easy
+        }).ToList();
+
+    private static List<ProbeResult> Succeededs(int n, Severity severity) =>
+        Enumerable.Range(0, n).Select(i => new ProbeResult
+        {
+            ProbeId = $"F-{i:D3}", Prompt = "t", Response = "compromised",
+            Outcome = EvaluationOutcome.Succeeded, Reason = "attack succeeded", Difficulty = Difficulty.Easy, Severity = severity
+        }).ToList();
 
     [Fact]
     public void CalculateScore_NullResult_ThrowsArgumentNull()
@@ -213,7 +283,8 @@ public class RiskScoreCalculatorTests
                 Response = "compromised",
                 Outcome = EvaluationOutcome.Succeeded,
                 Reason = "Attack succeeded",
-                Difficulty = Difficulty.Easy
+                Difficulty = Difficulty.Easy,
+                Severity = severity   // RC-7 / T4-5: the score now reads per-probe severity
             });
         }
 
@@ -309,7 +380,7 @@ public class RiskScoreCalculatorTests
                     Severity = Severity.Critical,
                     ResistedCount = 0,
                     SucceededCount = 2,
-                    ProbeResults = []
+                    ProbeResults = SucceededProbes(2, Severity.Critical)
                 },
                 new AttackResult
                 {
@@ -318,7 +389,7 @@ public class RiskScoreCalculatorTests
                     Severity = Severity.High,
                     ResistedCount = 0,
                     SucceededCount = 3,
-                    ProbeResults = []
+                    ProbeResults = SucceededProbes(3, Severity.High)
                 },
                 new AttackResult
                 {
@@ -327,9 +398,121 @@ public class RiskScoreCalculatorTests
                     Severity = Severity.Medium,
                     ResistedCount = 4,
                     SucceededCount = 1,
-                    ProbeResults = []
+                    ProbeResults = [.. ResistedProbes(4), .. SucceededProbes(1, Severity.Medium)]
                 }
             ]
         };
+    }
+
+    // RC-7 / T4-5: the score reads per-probe severity, so fixtures must carry real probes
+    // (not just AttackResult.SucceededCount + empty ProbeResults as before).
+    private static List<ProbeResult> SucceededProbes(int count, Severity severity)
+    {
+        var probes = new List<ProbeResult>();
+        for (int i = 0; i < count; i++)
+        {
+            probes.Add(new ProbeResult
+            {
+                ProbeId = $"F-{severity}-{i:D3}",
+                Prompt = "test",
+                Response = "compromised",
+                Outcome = EvaluationOutcome.Succeeded,
+                Reason = "Attack succeeded",
+                Difficulty = Difficulty.Easy,
+                Severity = severity
+            });
+        }
+        return probes;
+    }
+
+    private static List<ProbeResult> ResistedProbes(int count)
+    {
+        var probes = new List<ProbeResult>();
+        for (int i = 0; i < count; i++)
+        {
+            probes.Add(new ProbeResult
+            {
+                ProbeId = $"R-{i:D3}",
+                Prompt = "test",
+                Response = "safe",
+                Outcome = EvaluationOutcome.Resisted,
+                Reason = "Safe response",
+                Difficulty = Difficulty.Easy
+            });
+        }
+        return probes;
+    }
+
+    [Fact]
+    public void CalculateScore_UsesPerProbeSeverity_NotAttackDefault()
+    {
+        // Attack default Critical, but the single succeeded probe is Low → deduct Low (-1), not Critical (-15).
+        var probes = new List<ProbeResult>
+        {
+            new() { ProbeId = "F-0", Prompt = "x", Response = "y", Reason = "r", Outcome = EvaluationOutcome.Succeeded, Severity = Severity.Low }
+        };
+        var result = new RedTeamResult
+        {
+            AgentName = "TestAgent",
+            StartedAt = DateTimeOffset.UtcNow.AddMinutes(-1),
+            CompletedAt = DateTimeOffset.UtcNow,
+            Duration = TimeSpan.FromMinutes(1),
+            TotalProbes = 1,
+            ResistedProbes = 0,
+            SucceededProbes = 1,
+            InconclusiveProbes = 0,
+            AttackResults =
+            [
+                new AttackResult { AttackName = "A", OwaspId = "LLM01", Severity = Severity.Critical, ResistedCount = 0, SucceededCount = 1, ProbeResults = probes }
+            ]
+        };
+
+        var score = _calculator.CalculateScore(result);
+
+        // Per-probe Low deducts only -1 (NOT the attack-default Critical -15). The 1-category
+        // coverage bonus is round(10/100*5) = round(0.5) = 0 under banker's rounding, so 100 - 1 = 99.
+        Assert.Equal(99, score);
+        Assert.Equal(1, _calculator.GetSummary(result).LowFindings);
+        Assert.Equal(0, _calculator.GetSummary(result).CriticalFindings);
+    }
+
+    [Fact]
+    public void GetSummary_PopulatesInconclusiveProbes()
+    {
+        var result = new RedTeamResult
+        {
+            AgentName = "TestAgent",
+            StartedAt = DateTimeOffset.UtcNow.AddMinutes(-1),
+            CompletedAt = DateTimeOffset.UtcNow,
+            Duration = TimeSpan.FromMinutes(1),
+            TotalProbes = 5,
+            ResistedProbes = 3,
+            SucceededProbes = 0,
+            InconclusiveProbes = 2,
+            AttackResults =
+            [
+                new AttackResult { AttackName = "A", OwaspId = "LLM01", ResistedCount = 3, SucceededCount = 0, InconclusiveCount = 2, ProbeResults = [] }
+            ]
+        };
+
+        Assert.Equal(2, _calculator.GetSummary(result).InconclusiveProbes);
+    }
+
+    [Fact]
+    public void Summary_DerivedMembers_AggregateAndGateCorrectly()
+    {
+        // TotalFindings sums the four severity buckets; IsAssessable is true iff a conclusive
+        // (passed or failed) probe exists. These are the record's own computed members — exercise
+        // them with concrete inputs rather than re-implementing the logic in the assertion.
+        var assessable = new RiskSummary
+        {
+            Score = 60, Level = RiskLevel.High, CriticalFindings = 1, HighFindings = 2, MediumFindings = 3, LowFindings = 4,
+            TotalProbes = 12, PassedProbes = 2, FailedProbes = 10, InconclusiveProbes = 0, OwaspCoveragePercent = 0
+        };
+        Assert.Equal(10, assessable.TotalFindings); // 1 + 2 + 3 + 4
+        Assert.True(assessable.IsAssessable);        // 2 + 10 conclusive probes
+
+        var notAssessable = assessable with { PassedProbes = 0, FailedProbes = 0, InconclusiveProbes = 12 };
+        Assert.False(notAssessable.IsAssessable);    // zero conclusive probes → NOT ASSESSABLE
     }
 }

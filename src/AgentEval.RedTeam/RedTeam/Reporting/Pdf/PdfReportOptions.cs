@@ -105,11 +105,15 @@ public record BrandingOptions
         if (hex.Length != 6)
             return Colors.DarkBlue;
 
-        var r = Convert.ToByte(hex[..2], 16);
-        var g = Convert.ToByte(hex[2..4], 16);
-        var b = Convert.ToByte(hex[4..6], 16);
+        // LOW: tolerate malformed input — a non-hex 6-char branding string previously threw FormatException.
+        if (byte.TryParse(hex[..2], System.Globalization.NumberStyles.HexNumber, System.Globalization.CultureInfo.InvariantCulture, out var r) &&
+            byte.TryParse(hex[2..4], System.Globalization.NumberStyles.HexNumber, System.Globalization.CultureInfo.InvariantCulture, out var g) &&
+            byte.TryParse(hex[4..6], System.Globalization.NumberStyles.HexNumber, System.Globalization.CultureInfo.InvariantCulture, out var b))
+        {
+            return new Color(r, g, b);
+        }
 
-        return new Color(r, g, b);
+        return Colors.DarkBlue;
     }
 }
 

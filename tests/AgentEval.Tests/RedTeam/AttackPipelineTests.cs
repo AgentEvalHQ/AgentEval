@@ -36,7 +36,7 @@ public class AttackPipelineTests
             .WithIntensity(Intensity.Quick)
             .ScanAsync(agent);
 
-        Assert.Equal(9, result.AttackResults.Count);
+        Assert.Equal(13, result.AttackResults.Count);   // Wave D: 10/10 OWASP
     }
 
     [Fact]
@@ -96,17 +96,45 @@ public class AttackPipelineTests
     }
 
     [Fact]
-    public void TotalProbeCount_WithMaxProbes_RespectsLimit()
+    public void TotalProbeCount_WithMaxProbes_CapsPerAttackNotGlobally()
     {
+        const int max = 2;
         var pipeline = AttackPipeline
             .Create()
             .WithAllAttacks()
             .WithIntensity(Intensity.Comprehensive)
-            .WithMaxProbesPerAttack(2);
+            .WithMaxProbesPerAttack(max);
 
-        var count = pipeline.TotalProbeCount;
+        // Independently recompute the runner's per-attack Take(max) semantics:
+        // sum of min(perAttackProbes, max) — NOT a single global Math.Min(total, count*max).
+        var expected = Attack.All.Sum(a => Math.Min(a.GetProbes(Intensity.Comprehensive).Count(), max));
 
-        Assert.True(count <= 18); // 9 attacks × 2 probes max
+        Assert.Equal(expected, pipeline.TotalProbeCount);
+        // The preview must report the exact same plan the count claims.
+        Assert.Equal(expected, pipeline.GetProbePreview().Count);
+    }
+
+    [Fact]
+    public void GetProbePreview_HonorsMaxProbesPerAttack()
+    {
+        var uncapped = AttackPipeline
+            .Create()
+            .WithAllAttacks()
+            .WithIntensity(Intensity.Comprehensive)
+            .GetProbePreview();
+
+        var capped = AttackPipeline
+            .Create()
+            .WithAllAttacks()
+            .WithIntensity(Intensity.Comprehensive)
+            .WithMaxProbesPerAttack(1)
+            .GetProbePreview();
+
+        // Capping must actually shrink the preview (previously it was ignored entirely).
+        Assert.True(capped.Count < uncapped.Count,
+            $"Capped preview ({capped.Count}) should be smaller than uncapped ({uncapped.Count}).");
+        // One probe per attack at max=1.
+        Assert.Equal(Attack.All.Count, capped.Count);
     }
 
     [Fact]

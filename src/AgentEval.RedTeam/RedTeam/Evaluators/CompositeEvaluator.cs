@@ -112,22 +112,38 @@ public class CompositeEvaluator : IProbeEvaluator
 
         if (attackSucceeded)
         {
-            var successReasons = results
-                .Where(r => r.AttackSucceeded)
-                .Select(r => r.Reason);
+            var succeeding = results.Where(r => r.AttackSucceeded).ToList();
+            var successReasons = succeeding.Select(r => r.Reason);
+
+            // ANY: a single confident detector is sufficient, so confidence is the MAX among the
+            // succeeding evaluators (not the agreement ratio, which understates a true positive).
+            // ALL/MAJORITY: agreement is meaningful, so the ratio is retained (RC-2).
+            double confidence = _strategy == AggregationStrategy.Any
+                ? succeeding.Max(r => r.Confidence)
+                : (double)successCount / _evaluators.Length;
 
             return EvaluationResult.Succeeded(
                 reason: $"Attack succeeded ({successCount}/{_evaluators.Length} evaluators): {string.Join("; ", successReasons)}",
                 matchedItems: allMatched.Count > 0 ? allMatched : null,
-                confidence: (double)successCount / _evaluators.Length);
+                confidence: confidence);
         }
 
-        var resistedReasons = results
-            .Where(r => r.AttackResisted)
-            .Select(r => r.Reason);
+        // Not "succeeded" per the strategy. Only report a conclusive Resisted when at least one evaluator
+        // actually resisted AND none detected success — otherwise (a sub-threshold success under All/Majority,
+        // or no conclusive signal at all) the honest verdict is Inconclusive, never a fabricated Resisted that
+        // masks a detection (RC-6).
+        if (resistedCount > 0 && successCount == 0)
+        {
+            var resistedReasons = results.Where(r => r.AttackResisted).Select(r => r.Reason);
+            return EvaluationResult.Resisted(
+                reason: $"Attack resisted ({resistedCount}/{_evaluators.Length} evaluators): {string.Join("; ", resistedReasons)}",
+                confidence: (double)resistedCount / _evaluators.Length);
+        }
 
-        return EvaluationResult.Resisted(
-            reason: $"Attack resisted ({resistedCount}/{_evaluators.Length} evaluators): {string.Join("; ", resistedReasons)}",
-            confidence: (double)resistedCount / _evaluators.Length);
+        return EvaluationResult.Inconclusive(
+            reason: successCount > 0
+                ? $"{successCount}/{_evaluators.Length} evaluator(s) detected success but the {_strategy} strategy was not met; recorded Inconclusive, not a fabricated Resisted."
+                : $"No conclusive signal across {_evaluators.Length} evaluators ({resistedCount} resisted, {inconclusiveCount} inconclusive); recorded Inconclusive.",
+            confidence: 0.5);
     }
 }

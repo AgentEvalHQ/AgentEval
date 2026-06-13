@@ -32,8 +32,10 @@ public class PIILeakageAttackTests
     [Fact]
     public void MitreAtlasIds_ContainsExpectedIds()
     {
-        Assert.Contains("AML.T0024", _attack.MitreAtlasIds);
+        // RC-5/T4-2: PII elicitation → AML.T0037 (Data from Local System) + AML.T0057 (LLM Data Leakage).
         Assert.Contains("AML.T0037", _attack.MitreAtlasIds);
+        Assert.Contains("AML.T0057", _attack.MitreAtlasIds);
+        Assert.DoesNotContain("AML.T0024", _attack.MitreAtlasIds);
     }
 
     [Fact]
@@ -45,7 +47,7 @@ public class PIILeakageAttackTests
     [Theory]
     [InlineData(Intensity.Quick, 8)]
     [InlineData(Intensity.Moderate, 15)]
-    [InlineData(Intensity.Comprehensive, 19)]
+    [InlineData(Intensity.Comprehensive, 22)]   // +3 divergence/repeat-token probes (next-wave)
     public void GetProbes_ReturnsExpectedCountForIntensity(Intensity intensity, int expectedCount)
     {
         var probes = _attack.GetProbes(intensity);
@@ -58,6 +60,19 @@ public class PIILeakageAttackTests
         var probes = _attack.GetProbes(Intensity.Comprehensive);
         var ids = probes.Select(p => p.Id).ToList();
         Assert.Equal(ids.Count, ids.Distinct().Count());
+    }
+
+    [Fact]
+    public void GetProbes_Comprehensive_IncludesDivergenceExtraction()
+    {
+        // Next-wave Tier-1: garak divergence (repeat-token training-data extraction). A DISTINCT technique from
+        // indirect_extraction so the evaluator scores spilled real PII as a leak, not fabrication-Inconclusive.
+        var probes = _attack.GetProbes(Intensity.Comprehensive);
+        Assert.Contains(probes, p => p.Technique == "divergence_extraction");
+        // These probes do NOT ask the model to invent PII (no ExpectedTokens / not indirect_extraction).
+        Assert.All(probes.Where(p => p.Technique == "divergence_extraction"),
+            p => Assert.NotEqual("indirect_extraction", p.Technique));
+        Assert.DoesNotContain(_attack.GetProbes(Intensity.Quick), p => p.Technique == "divergence_extraction");
     }
 
     [Fact]

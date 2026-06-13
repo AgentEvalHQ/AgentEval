@@ -22,9 +22,17 @@ public class ToolCallRecord
     
     /// <summary>Result returned by the tool (null if pending or failed).</summary>
     public object? Result { get; set; }
-    
+
     /// <summary>Exception if tool execution failed.</summary>
     public Exception? Exception { get; set; }
+
+    /// <summary>
+    /// True iff a paired tool RESULT was observed for this call (i.e. the tool actually executed), as opposed to a
+    /// call that was only emitted (intent-to-act). Distinct from <see cref="Result"/> being non-null: a void- or
+    /// null-returning tool still executes, so absence of a result value does NOT mean non-execution — only absence
+    /// of a paired result does. Set by the extractor when it matches a FunctionResultContent by CallId.
+    /// </summary>
+    public bool WasExecuted { get; set; }
     
     /// <summary>Order in which this tool was called (1-based).</summary>
     public int Order { get; init; }

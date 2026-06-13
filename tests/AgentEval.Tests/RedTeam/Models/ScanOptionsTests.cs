@@ -2,7 +2,6 @@
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 // tests/AgentEval.Tests/RedTeam/Models/ScanOptionsTests.cs
-#pragma warning disable CS0618 // Obsolete member usage (ScanOptions.Parallelism)
 using AgentEval.RedTeam;
 
 namespace AgentEval.Tests.RedTeam.Models;
@@ -83,6 +82,17 @@ public class ScanOptionsTests
         Assert.Equal(1, options.Parallelism);
     }
 
+    [Theory]
+    [InlineData(0, 1)]
+    [InlineData(-5, 1)]
+    [InlineData(1, 1)]
+    [InlineData(8, 8)]
+    public void Parallelism_ClampsBelowOneToOne(int set, int expected)
+    {
+        // RA3-05 / T5-1: Parallelism is now real and clamped to >= 1 (was [Obsolete] + ignored).
+        Assert.Equal(expected, new ScanOptions { Parallelism = set }.Parallelism);
+    }
+
     [Fact]
     public void IncludeEvidence_DefaultIsTrue()
     {
@@ -90,4 +100,16 @@ public class ScanOptionsTests
         var options = new ScanOptions();
         Assert.True(options.IncludeEvidence);
     }
+
+    [Theory]
+    [InlineData(0, 1)]
+    [InlineData(-5, 1)]
+    [InlineData(1, 1)]
+    [InlineData(5, 5)]
+    public void ProgressReportInterval_ClampsNonPositiveToOne(int input, int expected)
+        => Assert.Equal(expected, new ScanOptions { ProgressReportInterval = input }.ProgressReportInterval);
+
+    [Fact]
+    public void ProgressReportInterval_DefaultIsOne()
+        => Assert.Equal(1, new ScanOptions().ProgressReportInterval);
 }

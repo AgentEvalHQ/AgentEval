@@ -16,6 +16,8 @@ public class RedTeamAssertionsTests
         int totalProbes = 10,
         int resistedProbes = 10,
         int succeededProbes = 0,
+        int inconclusiveProbes = 0,
+        int erroredProbes = 0,
         IReadOnlyList<AttackResult>? attackResults = null)
         => new()
         {
@@ -23,6 +25,8 @@ public class RedTeamAssertionsTests
             TotalProbes = totalProbes,
             ResistedProbes = resistedProbes,
             SucceededProbes = succeededProbes,
+            InconclusiveProbes = inconclusiveProbes,
+            ErroredProbes = erroredProbes,
             AttackResults = attackResults ?? []
         };
 
@@ -33,6 +37,7 @@ public class RedTeamAssertionsTests
         int resistedCount = 0,
         int succeededCount = 0,
         Severity severity = Severity.Medium,
+        int inconclusiveCount = 0,
         IReadOnlyList<ProbeResult>? probeResults = null)
         => new()
         {
@@ -40,6 +45,7 @@ public class RedTeamAssertionsTests
             OwaspId = owaspId,
             ResistedCount = resistedCount,
             SucceededCount = succeededCount,
+            InconclusiveCount = inconclusiveCount,
             Severity = severity,
             ProbeResults = probeResults ?? []
         };
@@ -133,6 +139,21 @@ public class RedTeamAssertionsTests
         
         Assert.Contains("5", ex.Message); // 5% threshold
         Assert.Contains("10", ex.Message); // 10% actual
+    }
+
+    [Fact]
+    public void HaveASRBelow_InconclusiveDilution_StillThrowsOnConclusiveASR()
+    {
+        var result = CreateResult(
+            totalProbes: 100,
+            resistedProbes: 4,
+            succeededProbes: 4,
+            inconclusiveProbes: 92,
+            attackResults: [CreateAttack(name: "PromptInjection", resistedCount: 4, succeededCount: 4)]);
+
+        var ex = Assert.Throws<RedTeamAssertionException>(() => result.Should().HaveASRBelow(0.05));
+
+        Assert.Contains("50", ex.Message);
     }
 
     #endregion
@@ -300,6 +321,55 @@ public class RedTeamAssertionsTests
         Assert.Contains("PromptInjection", ex.Message);
         Assert.Contains("5", ex.Message); // Threshold
         Assert.Contains("20", ex.Message); // Actual
+    }
+
+    #endregion
+
+    #region Conclusive and Execution Error Tests
+
+    [Fact]
+    public void HaveNoExecutionErrors_WhenClean_DoesNotThrow()
+        => Assert.Null(Record.Exception(() => CreateResult(totalProbes: 10, resistedProbes: 10).Should().HaveNoExecutionErrors()));
+
+    [Fact]
+    public void HaveNoExecutionErrors_WhenErrors_Throws()
+    {
+        var probes = new List<ProbeResult>
+        {
+            new() { ProbeId = "e1", Outcome = EvaluationOutcome.Inconclusive, Prompt = "p", Response = "[TIMEOUT]", Reason = "t", Error = "Timeout" }
+        };
+        var result = CreateResult(
+            totalProbes: 1,
+            resistedProbes: 0,
+            inconclusiveProbes: 1,
+            erroredProbes: 1,
+            attackResults: [CreateAttack(name: "A", inconclusiveCount: 1, probeResults: probes)]);
+
+        var ex = Assert.Throws<RedTeamAssertionException>(() => result.Should().HaveNoExecutionErrors());
+
+        Assert.Contains("execution error", ex.Message);
+    }
+
+    [Fact]
+    public void BeConclusive_WhenMostlyInconclusive_Throws()
+    {
+        var ex = Assert.Throws<RedTeamAssertionException>(() =>
+            CreateResult(totalProbes: 10, resistedProbes: 2, inconclusiveProbes: 8).Should().BeConclusive());
+
+        Assert.Contains("inconclusive", ex.Message);
+    }
+
+    [Fact]
+    public void BeConclusive_WhenMostlyConclusive_DoesNotThrow()
+        => Assert.Null(Record.Exception(() => CreateResult(totalProbes: 10, resistedProbes: 9, inconclusiveProbes: 1).Should().BeConclusive()));
+
+    [Fact]
+    public void HavePassed_WhenMostlyInconclusive_Throws()
+    {
+        var ex = Assert.Throws<RedTeamAssertionException>(() =>
+            CreateResult(totalProbes: 10, resistedProbes: 4, inconclusiveProbes: 6).Should().HavePassed());
+
+        Assert.Contains("inconclusive", ex.Message);
     }
 
     #endregion
