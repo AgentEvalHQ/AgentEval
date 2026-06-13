@@ -78,6 +78,10 @@ internal static class RedTeamCommand
         // Baseline / CI regression gating (Wave E)
         var saveBaselineOpt = new Option<FileInfo?>("--save-baseline")
             { Description = "After the scan, write a regression baseline (JSON) to this path." };
+        var baselineVersionOpt = new Option<string?>("--baseline-version")
+            { Description = "Version identifier stamped into the saved baseline (e.g. a release tag or commit SHA). Default: \"unspecified\"." };
+        var baselineNoteOpt = new Option<string?>("--baseline-note")
+            { Description = "Free-text note stored in the saved baseline (--save-baseline)." };
         var baselineOpt = new Option<FileInfo?>("--baseline")
             { Description = "Compare the scan to this baseline (JSON), print the diff, and gate the exit code on regression." };
         var failOnOpt = new Option<string>("--fail-on")
@@ -104,6 +108,8 @@ internal static class RedTeamCommand
         command.Options.Add(formatOpt);
         command.Options.Add(outputOpt);
         command.Options.Add(saveBaselineOpt);
+        command.Options.Add(baselineVersionOpt);
+        command.Options.Add(baselineNoteOpt);
         command.Options.Add(baselineOpt);
         command.Options.Add(failOnOpt);
         command.Options.Add(verboseFlag);
@@ -130,6 +136,8 @@ internal static class RedTeamCommand
                 Format = parseResult.GetValue(formatOpt)!,
                 Output = parseResult.GetValue(outputOpt),
                 SaveBaseline = parseResult.GetValue(saveBaselineOpt),
+                BaselineVersion = parseResult.GetValue(baselineVersionOpt),
+                BaselineNote = parseResult.GetValue(baselineNoteOpt),
                 Baseline = parseResult.GetValue(baselineOpt),
                 FailOn = parseResult.GetValue(failOnOpt)!,
                 Verbose = parseResult.GetValue(verboseFlag),
@@ -313,7 +321,9 @@ internal static class RedTeamCommand
         // 9. Baseline capture (W-E1) — write a snapshot the next run can diff against.
         if (opts.SaveBaseline is not null)
         {
-            await RedTeamBaseline.FromResult(result, version: "1.0").SaveAsync(opts.SaveBaseline.FullName, ct);
+            await RedTeamBaseline
+                .FromResult(result, version: string.IsNullOrWhiteSpace(opts.BaselineVersion) ? "unspecified" : opts.BaselineVersion, notes: opts.BaselineNote)
+                .SaveAsync(opts.SaveBaseline.FullName, ct);
             if (!opts.Quiet)
             {
                 Console.Error.WriteLine($"  Baseline written to: {opts.SaveBaseline.FullName}");
@@ -413,6 +423,8 @@ internal sealed class RedTeamOptions
     public required string Format { get; init; }
     public FileInfo? Output { get; init; }
     public FileInfo? SaveBaseline { get; init; }
+    public string? BaselineVersion { get; init; }
+    public string? BaselineNote { get; init; }
     public FileInfo? Baseline { get; init; }
     public string FailOn { get; init; } = "vuln";
     public bool Verbose { get; init; }

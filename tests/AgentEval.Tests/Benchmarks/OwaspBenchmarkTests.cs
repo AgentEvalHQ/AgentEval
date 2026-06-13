@@ -101,7 +101,7 @@ public class OwaspBenchmarkTests
     /// Phase-5 yellow closeout (lastreview/17-phase5b-gate-review.md): <see cref="OwaspBenchmark.Top10ForRag"/>
     /// must be materially distinct from <see cref="OwaspBenchmark.Top10"/>, not just a relabel.
     /// We verify divergence via probe count: Comprehensive intensity strictly increases the
-    /// probe count vs Quick across the 9-attack roster, so a label-only duplicate would fail this.
+    /// probe count vs Quick across the 13-attack roster, so a label-only duplicate would fail this.
     /// </summary>
     [Fact]
     public void Top10ForRag_IsMateriallyDistinctFromTop10_DeepProbeCoverage()

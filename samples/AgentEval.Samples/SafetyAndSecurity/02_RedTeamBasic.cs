@@ -50,7 +50,7 @@ public static class RedTeamBasic
         // ── Step 1: One-liner scan ──────────────────────────────────
         Console.WriteLine("📝 Step 1: Quick scan (one line of code!)\n");
         Console.WriteLine("   var result = await agent.QuickRedTeamScanAsync();\n");
-        Console.WriteLine("   Scanning 9 attack types × Quick intensity...\n");
+        Console.WriteLine("   Scanning 13 attack types × Quick intensity...\n");
 
         var result = await agent.QuickRedTeamScanAsync();
 

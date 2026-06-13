@@ -254,7 +254,7 @@ if (faithfulness.Score < 70)
 
 ### Red Team Security Evaluation: Find Vulnerabilities Before Production
 
-AgentEval includes comprehensive red team security evaluation with **192 probes across 9 attack types**, covering **6/10 OWASP LLM Top 10 2025** categories and **6 MITRE ATLAS** techniques:
+AgentEval includes comprehensive red team security evaluation with **247 probes across 13 attack types** (Comprehensive intensity), covering **all 10 OWASP LLM Top 10 2025** categories and **8 MITRE ATLAS** techniques:
 
 ```csharp
 // Sample20: Basic RedTeam evaluation
@@ -398,7 +398,7 @@ await result.ExportHtmlReportAsync("memory-report.html");
 | "Is my RAG hallucinating?" | **Faithfulness metrics** - grounding verification |
 | "What's the latency/cost?" | **Performance metrics** - TTFT, tokens, estimated cost |
 | "How do I debug failures?" | **Trace recording** - capture executions for step-by-step analysis |
-| "Is my agent secure?" | **Red Team evaluation** - 192 probes, OWASP LLM 2025 coverage |
+| "Is my agent secure?" | **Red Team evaluation** - 247 probes, full OWASP LLM Top 10 2025 coverage |
 | "Is content safe and unbiased?" | **ResponsibleAI metrics** - toxicity, bias, misinformation |
 | "Does my agent actually remember?" | **Memory evaluation** - retention, reach-back, temporal, LongMemEval (ICLR 2025) |
 
@@ -437,7 +437,7 @@ await result.ExportHtmlReportAsync("memory-report.html");
 - Performance assertions - latency, TTFT, tokens, cost
 
 ### Evaluation Coverage
-- Red Team security - 192 probes, OWASP LLM 2025, MITRE ATLAS coverage
+- Red Team security - 247 probes, full OWASP LLM Top 10 2025, MITRE ATLAS coverage
 - Responsible AI - toxicity, bias, misinformation detection
 - **Memory evaluation** - retention, reach-back, temporal, cross-session, HTML pentagon reports, LongMemEval (ICLR 2025)
 - Multi-turn conversations - full conversation flow evaluation
@@ -480,8 +480,8 @@ Every family auto-registers via `[ModuleInitializer]` into `BenchmarkFamilyRegis
 | **GDPR** | `smoke` / `standard` / `audit` + 3 domain packs (healthcare / HR / children) | ✅ end-to-end | 22 article YAMLs across 5 pillars | Medium |
 | **EU AI Act** | `smoke` / `standard` / `audit` + 3 domain packs (high-risk-employment / -credit / -education) | ✅ end-to-end | 13 article YAMLs across 6 pillars (Reg (EU) 2024/1689) | Medium |
 | **Agentic** | 11 presets (`tool-call-accuracy` / `agentic-execution` / `audit-grade` / `--budget-tier {free,low,medium,high}` filter etc.) | ✅ end-to-end | Foundry-equivalent 60-evaluator universe — system / process / UX / quality / safety / adversarial / reasoning / calibration / memory | Medium |
-| **OWASP LLM Top 10** | `top10` / `smoke` / `audit` / `top10-rag` | ✅ end-to-end (`--azure-from-env` for real agents; stub fallback) | 9 attack types covering 6 of 10 OWASP LLM Top 10 v2.0 categories; LLM03/04/08/09 surface as honest `skipped` leaves | Medium |
-| **MITRE ATLAS** | `atlas-baseline` / `atlas-smoke` / `atlas-audit-grade` | ✅ end-to-end | Same 9 attacks mapped via `IAttackType.MitreAtlasIds` covering 6 of 8 applicable ATLAS techniques | Medium |
+| **OWASP LLM Top 10** | `top10` / `smoke` / `audit` / `top10-rag` | ✅ end-to-end (`--azure-from-env` for real agents; stub fallback) | 13 attack types covering all 10 OWASP LLM Top 10 v2.0 categories (LLM03/04/08/09 added in Wave D) | Medium |
+| **MITRE ATLAS** | `atlas-baseline` / `atlas-smoke` / `atlas-audit-grade` | ✅ end-to-end | Same 13 attacks mapped via `IAttackType.MitreAtlasIds` covering 8 applicable ATLAS techniques | Medium |
 | **LongMemEval** | `subset` / `full` (ICLR 2025) | ✅ end-to-end | Cross-platform memory benchmark — paper-published GPT-4o baseline ≈ 57.7% | Medium |
 | **Memory** | `quick` / `standard` / `full` / `diagnostic` / `overflow` | ✅ end-to-end | Native AgentEval memory benchmark — 3/8/12 categories, weighted grading | Medium |
 | **Performance** | `latency` / `throughput` / `cost` | ✅ end-to-end (`--azure-from-env`) | P99 latency / concurrent throughput / per-prompt cost against your deployment | Low |

@@ -539,7 +539,7 @@ var exporters = serviceProvider.GetRequiredService<IExporterRegistry>();
 var jsonExporter = exporters.GetRequired("Json");
 var allFormats = exporters.GetRegisteredFormats(); // Json, Junit, Markdown, Csv, Trx, ...
 
-// Attack type registry (pre-populated with 9 built-in + DI-registered)
+// Attack type registry (pre-populated with the 13 built-in attacks + DI-registered)
 var attacks = serviceProvider.GetRequiredService<IAttackTypeRegistry>();
 var promptInjection = attacks.GetRequired("PromptInjection");
 var llm01 = attacks.GetByOwaspId("LLM01"); // All attacks for OWASP LLM01
@@ -861,10 +861,10 @@ internal static class OwaspBenchmarkRegistration
             defaultCostTier: CostTier.Medium,
             presets:
             [
-                new("top10",     "All 9 attacks at Quick intensity (default)", CostTier.Medium),
-                new("smoke",     "3 MVP attacks — CI-friendly",                 CostTier.Low),
-                new("audit",     "All 9 attacks at Comprehensive intensity",    CostTier.High),
-                new("top10-rag", "Comprehensive intensity, RAG-vector depth",  CostTier.High),
+                new("top10",     "All 13 built-in attacks at Quick intensity (default)", CostTier.Medium),
+                new("smoke",     "3 MVP attacks — CI-friendly",                          CostTier.Low),
+                new("audit",     "All 13 attacks at Comprehensive intensity",            CostTier.High),
+                new("top10-rag", "Comprehensive intensity, RAG-vector depth",           CostTier.High),
             ],
             runnerType: typeof(OwaspBenchmarkRun),
             runnerFactory: preset => ResolvePresetRun(preset, judge: null),
@@ -949,14 +949,14 @@ Done. The CLI's `bench --list` will pick up the new family on next run; `bench h
 
 ### OWASP preset cost gradient (concrete example)
 
-The four `OwaspBenchmark` presets demonstrate a clean depth/cost gradient on the same 9-attack roster:
+The four `OwaspBenchmark` presets demonstrate a clean depth/cost gradient on the same 13-attack roster:
 
 | Preset | Attacks | Intensity | Timeout | Cost tier | Use case |
 |---|---|---|---|---|---|
 | `Smoke` | 3 | Quick | 10 min | Low | CI-friendly quick check (PromptInjection + Jailbreak + PIILeakage) |
-| `Top10` | 9 | Quick | 10 min | Medium | Standard OWASP LLM Top 10 sweep |
-| `Top10ForRag` | 9 | **Comprehensive** | **20 min** | **High** | RAG threat model — indirect-injection coverage depth |
-| `AuditGrade` | 9 | Comprehensive | 30 min | High | Full audit-grade evidence pack |
+| `Top10` | 13 | Quick | 10 min | Medium | Standard OWASP LLM Top 10 sweep |
+| `Top10ForRag` | 13 | **Comprehensive** | **20 min** | **High** | RAG threat model — indirect-injection coverage depth |
+| `AuditGrade` | 13 | Comprehensive | 30 min | High | Full audit-grade evidence pack |
 
 `Top10ForRag` sits between `Top10` and `AuditGrade` — same Comprehensive intensity as `AuditGrade` (an attacker needs only one working poisoned-document payload, so the defender needs *coverage depth* on injection techniques), but a tighter 20-minute timeout to differentiate it as RAG-triage rather than audit-grade evidence. Two divergence-pinning tests (`Top10ForRag_IsMateriallyDistinctFromTop10_DeepProbeCoverage` + `Top10ForRag_ProbeDepth_MatchesAuditGrade_NotTop10`) prevent future regressions from collapsing it back to a label-only duplicate of `Top10`.
 

@@ -51,7 +51,7 @@ result.Should()
 
 ## Attack Types
 
-The MVP includes **9 core attack types** covering the most critical OWASP LLM 2025 vulnerabilities:
+AgentEval includes **13 built-in attack types** covering **all 10 OWASP LLM Top 10 2025** categories (probe counts shown at `Comprehensive` intensity):
 
 | Attack | OWASP ID | MITRE ATLAS | Description | Probes |
 |--------|-----------|-------------|-------------|--------|
@@ -59,18 +59,22 @@ The MVP includes **9 core attack types** covering the most critical OWASP LLM 20
 | **Jailbreak** | LLM01 | AML.T0051, AML.T0054 | Roleplay, DAN, hypothetical bypasses | 24 |
 | **PIILeakage** | LLM02 | AML.T0037, AML.T0057 | Data extraction and memorization probes | 19 |
 | **SystemPromptExtraction** | LLM07 | AML.T0056, AML.T0057 | Attempts to reveal system instructions | 19 |
-| **IndirectInjection** | LLM01 | AML.T0051 | Injection via documents, tools, RAG | 17 |
+| **IndirectInjection** | LLM01 | AML.T0051 | Injection via documents, tools, RAG | 19 |
 | **ExcessiveAgency** | LLM06 | AML.T0051, AML.T0054 | Scope expansion, privilege escalation, unauthorized actions | 15 |
-| **InsecureOutput** | LLM05 | AML.T0051 | XSS, SQL, command injection, SSRF, CSRF, deserialization, supply chain | 33 |
+| **InsecureOutput** | LLM05 | AML.T0051 | XSS, SQL, command injection, SSRF, CSRF, deserialization | 31 |
 | **InferenceAPIAbuse** | LLM10 | AML.T0045 | ML inference API abuse and resource exhaustion | 15 |
 | **EncodingEvasion** | LLM01 | AML.T0051 | Encoded/obfuscated payload delivery | 23 |
+| **SupplyChain** | LLM03 | AML.T0010 | Hallucinated / typosquatted package recommendations | 14 |
+| **DataPoisoning** | LLM04 | AML.T0020, AML.T0051 | Training/RAG data poisoning and backdoor priming | 12 |
+| **VectorEmbedding** | LLM08 | AML.T0051 | Vector/embedding-store injection (RAG retrieval poisoning) | 13 |
+| **Misinformation** | LLM09 | — | Fabrication / overconfident-falsehood elicitation | 16 |
 
 ### Detailed Coverage by Category
 
-#### LLM01: Prompt Injection (91 probes total)
+#### LLM01: Prompt Injection (93 probes total)
 - **Direct Override**: `"Ignore previous instructions..."` (27 probes)
 - **Jailbreak Personas**: DAN, STAN, roleplay scenarios (24 probes)
-- **Indirect Injection**: Document/RAG/tool poisoning (17 probes)
+- **Indirect Injection**: Document/RAG/tool poisoning (19 probes)
 - **Encoding Evasion**: Base64, ROT13, hex, unicode obfuscation (23 probes)
 
 #### LLM02: Sensitive Information Disclosure (19 probes)
@@ -95,7 +99,7 @@ The MVP includes **9 core attack types** covering the most critical OWASP LLM 20
 - **Implicit Delegation**: Self-granted permissions
 - **Autonomous Decision**: Making unsanctioned choices
 
-#### LLM05: Improper Output Handling (33 probes)
+#### LLM05: Improper Output Handling (31 probes)
 - **XSS Injection**: Script tags, event handlers in output
 - **SQL Injection**: SQL code in responses
 - **Command Injection**: Shell commands in output
@@ -105,11 +109,31 @@ The MVP includes **9 core attack types** covering the most critical OWASP LLM 20
 - **CSRF Injection**: Cross-site request forgery forms
 - **NoSQL Injection**: MongoDB/CouchDB operators for auth bypass
 - **Deserialization**: Pickle/YAML payloads for RCE
-- **Supply Chain**: Hallucinated/typosquatted package names
 - **HTTP Header Injection**: Response splitting attacks
 - **Privilege Escalation**: Admin role/JWT claims injection
 
-**Total Coverage**: **192 probes** across **9 attack types** covering **6 OWASP categories** (LLM01, LLM02, LLM05, LLM06, LLM07, LLM10)
+#### LLM03: Supply Chain (14 probes)
+- **Package Hallucination**: Elicit install/import of non-existent packages
+- **Typosquatting**: Recommend look-alike malicious package names
+- **Dependency Confusion**: Internal-vs-public name collision priming
+> Relocated here from LLM05 in Wave D. The deeper `PackageHallucinationDetector` exists; the shipped attack uses the in-context recommendation proxy.
+
+#### LLM04: Data & Model Poisoning (12 probes)
+- **Training-data Poisoning**: Inject false facts framed as ground truth
+- **RAG Poisoning**: Plant adversarial content for later retrieval
+- **Backdoor Priming**: Establish a trigger phrase to subvert later turns
+
+#### LLM08: Vector & Embedding Weaknesses (13 probes)
+- **Retrieval Poisoning**: Payloads crafted to dominate embedding similarity
+- **Cross-context Leakage**: Embedding-store boundary-crossing probes
+- **Inlined-payload Surface**: VectorEmbedding inlines its payload (no external store required)
+
+#### LLM09: Misinformation (16 probes)
+- **Fabrication Elicitation**: Coax confident answers to unanswerable prompts
+- **Overconfident Falsehood**: Detect asserted-as-fact hallucinations
+- **Honesty Evaluator**: Scored for fabricated certainty, not keyword matches
+
+**Total Coverage**: **247 probes** (at `Comprehensive`) across **13 attack types** covering **all 10 OWASP categories** (LLM01–LLM10) and **8 MITRE ATLAS** techniques
 
 ## Intensity Levels
 
@@ -153,7 +177,7 @@ var result = await AttackPipeline
 |--------|-------------|
 | `WithAttack<T>()` | Add a specific attack type |
 | `WithAttack(attack)` | Add a pre-configured attack instance |
-| `WithAllAttacks()` | Add all 9 MVP attack types |
+| `WithAllAttacks()` | Add all 13 built-in attack types |
 | `WithMvpAttacks()` | Add PromptInjection, Jailbreak, PIILeakage |
 | `WithIntensity(level)` | Set probe generation intensity |
 | `WithTimeout(duration)` | Overall scan timeout |

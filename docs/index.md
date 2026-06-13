@@ -246,7 +246,7 @@ await result.ExportHtmlReportAsync("memory-report.html");
 
 -   **🔴 Red Team Security**
     
-    192 probes, 9 attack types, 60% OWASP LLM 2025 coverage, MITRE ATLAS mapping
+    247 probes, 13 attack types, full OWASP LLM Top 10 2025 coverage, MITRE ATLAS mapping
 
 -   **🛡️ Responsible AI**
     

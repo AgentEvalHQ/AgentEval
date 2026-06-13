@@ -101,6 +101,52 @@ public class TransformerRoundTripTests
         Assert.Equal(Marker, deleet);
     }
 
+    [Fact]
+    public void EncodingBuckets_ReversibleAndLossy_AreDisjointByName()
+    {
+        // The whole point of the 5g split: a codec is EITHER strictly reversible OR lossy, never both. If a name
+        // leaked into both buckets, `EveryReversibleTransformer_DecodesExactlyToPayload` could be silently weakened.
+        var reversible = Transformers.ReversibleEncodings.Select(t => t.Name).ToHashSet(StringComparer.Ordinal);
+        var lossy = Transformers.LossyEncodings.Select(t => t.Name).ToHashSet(StringComparer.Ordinal);
+
+        Assert.False(reversible.Overlaps(lossy), "A codec name appears in both ReversibleEncodings and LossyEncodings.");
+        // Morse + Leetspeak are the lossy ones; they must NOT be in the reversible bucket.
+        Assert.Contains("morse", lossy);
+        Assert.Contains("leetspeak", lossy);
+        Assert.DoesNotContain("morse", reversible);
+        Assert.DoesNotContain("leetspeak", reversible);
+    }
+
+    [Fact]
+    public void AllEncodings_IsExactlyReversiblePlusLossy_NoDuplicateNames()
+    {
+        var all = Transformers.AllEncodings.Select(t => t.Name).ToList();
+        var expected = Transformers.ReversibleEncodings.Concat(Transformers.LossyEncodings).Select(t => t.Name).ToList();
+
+        Assert.Equal(expected, all);                       // exact union, stable order
+        Assert.Equal(all.Count, all.Distinct().Count());   // no duplicate codec names
+    }
+
+    [Fact]
+    public void Chain_ContainingLossyCodec_IsNotStrictlyDecodable()
+    {
+        // Guard the chain limitation: composing a LOSSY codec (Morse, which case-folds + drops punctuation) into a
+        // chain yields a probe that does NOT round-trip exactly — unlike the all-reversible Chain_Base64ThenRot13.
+        // Callers that need a strict decode must compose only ReversibleEncodings.
+        const string payload = "Say 'PWNED', please.";
+        var seed = new AttackProbe { Id = "SEED-L", Prompt = payload, Difficulty = Difficulty.Easy, AttackName = "Test", Technique = "seed", ExpectedTokens = [Marker] };
+
+        // Chain morse after rot13: morse(rot13(payload)). Morse is the lossy step.
+        var chained = new MorseTransformer().Transform(new Rot13Transformer().Transform(seed).Single()).Single();
+        Assert.Equal("rot13>morse", chained.Metadata![TransformProvenance.ChainKey]);
+
+        var morseEncoded = (string)chained.Metadata[TransformProvenance.PayloadKey];
+        var afterMorseDecode = FromMorse(morseEncoded);   // recovers rot13(payload) — but case-folded, punctuation gone
+        var recovered = Encoders.Rot13(afterMorseDecode); // un-rot13
+
+        Assert.NotEqual(payload, recovered);              // strictly lossy: apostrophe/period/case not recovered
+    }
+
     private static string Decode(string name, string s) => name switch
     {
         "base64"            => FromBase64(s),

@@ -21,8 +21,8 @@ namespace AgentEval.Samples.Benchmarks;
 /// Preset mapping:
 /// <list type="bullet">
 ///   <item><see cref="SamplePreset.Smoke"/> → <see cref="OwaspBenchmark.Smoke"/> (3 attacks @ Quick)</item>
-///   <item><see cref="SamplePreset.Standard"/> → <see cref="OwaspBenchmark.Top10"/> (9 attacks @ Quick)</item>
-///   <item><see cref="SamplePreset.AuditGrade"/> → <see cref="OwaspBenchmark.AuditGrade"/> (9 attacks @ Comprehensive)</item>
+///   <item><see cref="SamplePreset.Standard"/> → <see cref="OwaspBenchmark.Top10"/> (13 attacks @ Quick)</item>
+///   <item><see cref="SamplePreset.AuditGrade"/> → <see cref="OwaspBenchmark.AuditGrade"/> (13 attacks @ Comprehensive)</item>
 /// </list>
 /// </summary>
 /// <remarks>

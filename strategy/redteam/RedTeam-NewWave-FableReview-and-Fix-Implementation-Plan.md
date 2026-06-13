@@ -21,7 +21,7 @@ Test baseline at start: net8.0 4776/0, net10.0 4979/0/1 (clean). After the HIGH 
 |------|-------|--------|
 | HIGH | 18 findings (15 distinct issues) | **Fixed** — code + regression tests, both TFMs green. 2 external-standard *renames* softened + deferred to SME (see §4). |
 | MEDIUM | 59 | **Substantially fixed** — 5a/5b/5d/5f/5g complete; 5c (TAP) + 5e (DI/dedup/comparer) complete; residual 5e CLI tier-wiring + pipeline Judge/Attacker options deferred to §4/architecture. See §5. |
-| LOW | 45 | **High-value + LOW-2 batch fixed** (see §6 ✅); remaining = dead-code, residual doc drift, architecture-gap LOWs. |
+| LOW | 45 | **Substantially fixed** — high-value + LOW-2 + LOW-3 batches done (see §6 ✅; doc-count sync, ResolveFidelity doc, tautological-test, baseline metadata, lossy-chain guard). Remaining = dead-code removal + architecture-gap LOWs (deferred, need a design call). |
 
 **Independent verification (2026-06-13):** an adversarial re-verification pass (12 agents, refute-by-default) re-checked each HIGH fix against its original finding + the actual code + the test. Result: **all confirmed properly fixed at high confidence.** Two test-coverage gaps were surfaced and closed: (a) #5/#6 had no test pinning the *persisted* `SaveReportAsync` `OverallStatus == NOT_EVALUATED` — added `OwaspReporterStoreTests.OwaspReporter_SaveReport_AllInconclusive_PersistsNotEvaluated_NotFabricatedPass`; (b) #10 (`--verbose` AttackerClient) is structurally fixed (single `ScanOptions` construction site) but a verbose+attacker guard test would need a runner seam — tracked as a known minor test gap (no code defect).
 
@@ -195,13 +195,16 @@ These were adversarially confirmed but not yet fixed. Grouped by the cheapest-to
 - ✅ **JB-041/042 stale `gradual_escalation` label** — renamed to `rapport_priming_single_turn` / `progressive_priming_single_turn` (JB-040 already `compliance_priming_single_turn`); tests now assert the honest single-turn names **and** that no probe re-introduces `gradual_escalation` (real multi-turn is `CrescendoAttack`).
 - ✅ **Stale doc comments** — `AttackTypeRegistry` "9 built-in" → "the built-in attacks from `Attack.All` (13 as of Wave D)"; `EvaluationResult.Confidence` doc clarified (factory default 1.0 vs bare-property default 0.0).
 
-**⏳ Remaining LOW backlog (cosmetic / low-risk; catalogued, not yet individually committed):**
-- **Dead/unwired** — `PackageHallucinationDetector` fully built+tested but wired into nothing (SupplyChain ships only the weaker in-context proxy); `RedTeamReport` is a dead duplicate of `JsonReportExporter`.
-- **Residual doc drift** — README/getting-started/architecture attack counts; `ResolveFidelity` XML doc detached by a Wave C′ insertion; any remaining "9 built-in" prose outside `AttackTypeRegistry`.
-- **Minor correctness/cosmetic** — `RiskScoreCalculator` tautological test; `--save-baseline` hardcodes Version "1.0"/discards Notes; lossy-codec chain compatibility guard.
-- **Architecture-gap LOWs** (larger, overlap §5e/deferred) — multi-turn↔tool-harness don't compose (no canary tools over the conversation channel); single `--api-key` reused for target/judge/attacker; `AttackPipeline` can't set Judge/Attacker/multi-turn options.
+**✅ Fixed (LOW-3 batch — count-drift sync + remaining cosmetics, full net8.0 suite 4854/0):**
+- ✅ **Attack-count / coverage drift across current-state docs** — synced the authoritative figures (**13 built-in attacks, 247 probes @ Comprehensive, 10/10 OWASP LLM Top 10, 8 MITRE ATLAS**) into `README.md` (×4), `docs/index.md`, `src/AgentEval/README.md`, `docs/architecture.md` (×3), the OWASP/MITRE `getting-started.md` preset tables + the OWASP front-matter coverage claim (no longer "6/10 + four skipped"), both sample READMEs, three sample-code doc strings, and a stale `OwaspBenchmarkTests` comment. **`docs/redteam.md` attack table fully rebuilt** for all 13 attacks with per-attack Comprehensive probe counts + the four new OWASP sections (LLM03/04/08/09). Historical CHANGELOG/ADR-017 entries deliberately left intact (point-in-time records).
+- ✅ **`ResolveFidelity` XML doc detached** — a Wave C′ insertion of `BuildFoldedProbeResult` had split the `<summary>` from `ResolveFidelity`; the doc was moved back onto `ResolveFidelity` and `BuildFoldedProbeResult` given its own summary.
+- ✅ **`RiskScoreCalculator` tautological test** — `Summary_InconclusiveBucket_IsNeverNegative` asserted `Math.Max(0,-3) >= 0` (tested `Math.Max`, not the SUT); replaced with `Summary_DerivedMembers_AggregateAndGateCorrectly` exercising the record's real `TotalFindings`/`IsAssessable` members.
+- ✅ **`--save-baseline` hardcoded Version "1.0" / discarded Notes** — added `--baseline-version` (default "unspecified") and `--baseline-note`, threaded into `RedTeamBaseline.FromResult(version, notes)`; option count 21→23, with name + count test guards updated.
+- ✅ **Lossy-codec chain guard** — added structural tests: `ReversibleEncodings`/`LossyEncodings` are disjoint by name, `AllEncodings` is exactly their union with no dupes, and a chain containing a lossy codec (Morse) is demonstrably NOT strictly decodable (callers needing strict round-trip must compose only reversible codecs).
 
-(The exhaustive per-finding raw list — all 122 with evidence + adversarial verdicts — is preserved in the review workflow transcript for this session; the thematic groupings here and in §5 capture every confirmed finding.)
+**⏳ Remaining LOW backlog (deferred — dead-code removal + larger architecture gaps):**
+- **Dead/unwired** — `PackageHallucinationDetector` fully built+tested but wired into nothing (SupplyChain ships only the weaker in-context proxy); `RedTeamReport` is a dead duplicate of `JsonReportExporter`. (Deletion/wiring needs a design call — kept for a follow-up.)
+- **Architecture-gap LOWs** (larger, overlap §5e/deferred) — multi-turn↔tool-harness don't compose (no canary tools over the conversation channel); single `--api-key` reused for target/judge/attacker; `AttackPipeline` can't set Judge/Attacker/multi-turn options.
 
 (The exhaustive per-finding raw list — all 122 with evidence + adversarial verdicts — is preserved in the review workflow transcript for this session; the thematic groupings above and in §5 capture every confirmed finding.)
 

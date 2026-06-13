@@ -2,11 +2,11 @@
 
 > Status: beta. The OWASP LLM Top 10 benchmark ships as a red-team scanner with heuristic per-attack evaluators. Verdicts reflect dialog-observable behaviour only; they are not a substitute for code-level security review, threat modelling, or pen-testing.
 >
-> Coverage: 6 of 10 OWASP LLM Top 10 v2.0 categories testable at the agent-API layer (LLM01 Prompt Injection, LLM02 Sensitive Info Disclosure, LLM05 Improper Output Handling, LLM06 Excessive Agency, LLM07 System Prompt Leakage, LLM10 Unbounded Consumption). The remaining four categories (LLM03 Supply Chain, LLM04 Data/Model Poisoning, LLM08 Vector/Embedding Weaknesses, LLM09 Misinformation) surface as honest skipped leaves rather than passing by default.
+> Coverage: all 10 OWASP LLM Top 10 v2.0 categories now have a dedicated attack at the agent-API layer (LLM01 Prompt Injection, LLM02 Sensitive Info Disclosure, LLM03 Supply Chain, LLM04 Data/Model Poisoning, LLM05 Improper Output Handling, LLM06 Excessive Agency, LLM07 System Prompt Leakage, LLM08 Vector/Embedding Weaknesses, LLM09 Misinformation, LLM10 Unbounded Consumption). LLM03/04/08/09 were added in Wave D. Verdicts remain dialog-observable only — a category whose evidence is weak (e.g. SupplyChain ships the in-context recommendation proxy, not the deeper `PackageHallucinationDetector`) reports `Inconclusive` rather than a fabricated pass.
 
 ## What this measures
 
-The OWASP benchmark drives the agent under test with curated probes drawn from nine attack types (PromptInjection, Jailbreak, IndirectInjection, EncodingEvasion, PIILeakage, InsecureOutput, ExcessiveAgency, SystemPromptExtraction, InferenceAPIAbuse) and grades each response with the per-attack heuristic evaluator. The composite `EvalResult` aggregates the ten OWASP categories with a `MinAggregation` so any single category fail caps the verdict.
+The OWASP benchmark drives the agent under test with curated probes drawn from 13 attack types (PromptInjection, Jailbreak, IndirectInjection, EncodingEvasion, PIILeakage, InsecureOutput, ExcessiveAgency, SystemPromptExtraction, InferenceAPIAbuse, SupplyChain, DataPoisoning, VectorEmbedding, Misinformation) and grades each response with the per-attack heuristic evaluator. The composite `EvalResult` aggregates the ten OWASP categories with a `MinAggregation` so any single category fail caps the verdict.
 
 What IS tested: the agent's runtime dialog behaviour under adversarial prompts — refusal quality, prompt-injection resistance, output-handling discipline, agency-bounding, system-prompt protection, and unbounded-consumption guardrails. What is NOT tested: the model's training-data provenance, third-party plug-in supply-chain trust, vector-store hardening, or factual misinformation accuracy. Those categories appear as `skipped` leaves with rationale, not as silent passes.
 
@@ -31,10 +31,10 @@ Sourced verbatim from `BenchmarkFamilyRegistry` (see `src/AgentEval.RedTeam/RedT
 
 | Preset | Description (verbatim) | Cost tier | Typical scope | Approx. LLM cost |
 |---|---|---|---|---|
-| `top10` | All 9 implemented attacks at Quick intensity (default) | Medium | All 9 attacks, Quick intensity, 10-min timeout | no LLM (heuristic evaluators) |
-| `smoke` | 3 MVP attacks (PromptInjection + Jailbreak + PIILeakage) - CI-friendly | Low | 3 attacks, Quick intensity, 10-min timeout | no LLM |
-| `audit` | All 9 attacks at Comprehensive intensity - audit-grade evidence | High | All 9 attacks, Comprehensive intensity, 30-min timeout | no LLM |
-| `top10-rag` | All 9 attacks at Comprehensive intensity, 20-min timeout - RAG-vector depth (LLM01 indirect-injection emphasis); LLM08 remains roadmap | High | All 9 attacks, Comprehensive intensity, 20-min timeout, RAG-tuned probe selection | no LLM |
+| `top10` | All 13 built-in attacks at Quick intensity (default) | Medium | All 13 attacks, Quick intensity, 10-min timeout | no LLM (heuristic evaluators) |
+| `smoke` | 3 MVP attacks (PromptInjection + Jailbreak + PIILeakage) — CI-friendly | Low | 3 attacks, Quick intensity, 10-min timeout | no LLM |
+| `audit` | All 13 attacks at Comprehensive intensity — audit-grade evidence | High | All 13 attacks, Comprehensive intensity, 30-min timeout | no LLM |
+| `top10-rag` | All 13 attacks at Comprehensive intensity, 20-min timeout — RAG-vector depth (LLM01 indirect-injection + LLM08 vector-embedding emphasis) | High | All 13 attacks, Comprehensive intensity, 20-min timeout, RAG-tuned probe selection | no LLM |
 
 The current OWASP attack pipeline uses heuristic per-attack evaluators (see `src/AgentEval.RedTeam/RedTeam/Evaluators/`), not an LLM judge. The `--azure-from-env` flag still resolves the judge (for API symmetry with other commands and to honour the `AZURE_OPENAI_*` env gate), but the judge does not consume tokens during the scan. The dominant cost is the agent-under-test's per-probe inference calls — usually a few dozen calls for `smoke`, a few hundred for `top10`, and ~thousand+ for `audit`/`top10-rag`.
 

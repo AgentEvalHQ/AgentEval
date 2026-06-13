@@ -499,14 +499,20 @@ public class RiskScoreCalculatorTests
     }
 
     [Fact]
-    public void Summary_InconclusiveBucket_IsNeverNegative()
+    public void Summary_DerivedMembers_AggregateAndGateCorrectly()
     {
-        var summary = new RiskSummary
+        // TotalFindings sums the four severity buckets; IsAssessable is true iff a conclusive
+        // (passed or failed) probe exists. These are the record's own computed members — exercise
+        // them with concrete inputs rather than re-implementing the logic in the assertion.
+        var assessable = new RiskSummary
         {
-            Score = 100, Level = RiskLevel.Low, CriticalFindings = 0, HighFindings = 0, MediumFindings = 0, LowFindings = 0,
-            TotalProbes = 1, PassedProbes = 5, FailedProbes = 5, InconclusiveProbes = -3, OwaspCoveragePercent = 0
+            Score = 60, Level = RiskLevel.High, CriticalFindings = 1, HighFindings = 2, MediumFindings = 3, LowFindings = 4,
+            TotalProbes = 12, PassedProbes = 2, FailedProbes = 10, InconclusiveProbes = 0, OwaspCoveragePercent = 0
         };
+        Assert.Equal(10, assessable.TotalFindings); // 1 + 2 + 3 + 4
+        Assert.True(assessable.IsAssessable);        // 2 + 10 conclusive probes
 
-        Assert.True(Math.Max(0, summary.InconclusiveProbes) >= 0);
+        var notAssessable = assessable with { PassedProbes = 0, FailedProbes = 0, InconclusiveProbes = 12 };
+        Assert.False(notAssessable.IsAssessable);    // zero conclusive probes → NOT ASSESSABLE
     }
 }

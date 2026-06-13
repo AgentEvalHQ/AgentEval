@@ -540,14 +540,10 @@ public sealed class RedTeamRunner : IRedTeamRunner
             or System.Net.Sockets.SocketException;
 
     /// <summary>
-    /// RC-1: classify the evidence behind a verdict. Trusts only an explicit hint in
-    /// <c>EvaluationResult.Metadata["fidelity"]</c> (stamped by tool-aware evaluators such as
-    /// <c>ToolInvocationEvaluator</c>). All other verdicts are text-derived and default to
-    /// <see cref="EvidenceFidelity.Verbal"/> — an incidental, unrelated tool call in the trace is NOT
-    /// behavioral proof of the matched outcome, so it must not upgrade fidelity.
+    /// Folds a multi-turn / tree search (one <see cref="MultiTurnResult"/>) into one <see cref="ProbeResult"/> —
+    /// shared by the linear TurnOrchestrator (Wave C) and the TreeOrchestrator (Wave C′ TAP) paths so they can
+    /// never drift.
     /// </summary>
-    // Folds a multi-turn / tree search (one MultiTurnResult) into one ProbeResult — shared by the linear
-    // TurnOrchestrator (Wave C) and the TreeOrchestrator (Wave C′ TAP) paths so they can never drift.
     private static ProbeResult BuildFoldedProbeResult(AttackProbe probe, MultiTurnResult mt, Severity attackSeverity, TimeSpan elapsed, ScanOptions options)
     {
         var transcript = string.Join("\n", mt.Transcript.Select(t => $"{t.Role}: {t.Content}"));
@@ -569,6 +565,13 @@ public sealed class RedTeamRunner : IRedTeamRunner
         };
     }
 
+    /// <summary>
+    /// RC-1: classify the evidence behind a verdict. Trusts only an explicit hint in
+    /// <c>EvaluationResult.Metadata["fidelity"]</c> (stamped by tool-aware evaluators such as
+    /// <c>ToolInvocationEvaluator</c>). All other verdicts are text-derived and default to
+    /// <see cref="EvidenceFidelity.Verbal"/> — an incidental, unrelated tool call in the trace is NOT
+    /// behavioral proof of the matched outcome, so it must not upgrade fidelity.
+    /// </summary>
     private static EvidenceFidelity ResolveFidelity(EvaluationResult result)
     {
         if (result.Metadata is { } meta &&

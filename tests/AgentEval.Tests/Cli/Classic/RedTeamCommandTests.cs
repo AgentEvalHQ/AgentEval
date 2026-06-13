@@ -39,12 +39,13 @@ public class RedTeamCommandTests
     }
 
     [Fact]
-    public void Create_Has21Options()
+    public void Create_Has23Options()
     {
         // 16 base + Wave E (save-baseline, baseline, fail-on) = 19
         // + Wave C′ (attacker, attacker-model) = 21
+        // + baseline metadata (baseline-version, baseline-note) = 23
         var command = RedTeamCommand.Create();
-        Assert.Equal(21, command.Options.Count);
+        Assert.Equal(23, command.Options.Count);
     }
 
     [Theory]
@@ -64,6 +65,8 @@ public class RedTeamCommandTests
     [InlineData("quiet")]
     [InlineData("save-baseline")]   // Wave E
     [InlineData("baseline")]        // Wave E
+    [InlineData("baseline-version")] // baseline metadata
+    [InlineData("baseline-note")]    // baseline metadata
     [InlineData("fail-on")]         // Wave E
     [InlineData("attacker")]        // Wave C′
     [InlineData("attacker-model")]  // Wave C′
