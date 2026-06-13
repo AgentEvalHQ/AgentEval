@@ -341,4 +341,41 @@ public class ISO27001ComplianceReporterTests
         var relatedNCs = report.NonConformities.Where(n => n.ControlId == control.Control.ControlId);
         Assert.All(relatedNCs, n => Assert.NotEqual(NonConformitySeverity.Major, n.Severity));
     }
+
+    // L16 — a NotApplicable (governance) control: excluded from the assessed numerator and rendered (for Annex-A
+    // traceability) WITHOUT the misleading "Test Count 0 / Pass Rate 0.0%" metrics.
+    [Fact]
+    public void Markdown_GovernanceControl_NotCountedAndNoFakeMetrics()
+    {
+        var gov = new ControlStatus
+        {
+            Control = new ControlMapping { ControlId = "A.5.2", ControlName = "AI Policy", Description = "Governance", Framework = "ISO27001", RelevantAttacks = [], Fidelity = ControlFidelity.Governance },
+            Status = ControlEvaluationStatus.NotApplicable,
+            EvidenceSummary = "Governance control",
+        };
+        var tested = new ControlStatus
+        {
+            Control = new ControlMapping { ControlId = "A.5.1", ControlName = "Policy", Description = "x", Framework = "ISO27001", RelevantAttacks = ["PromptInjection"] },
+            Status = ControlEvaluationStatus.Effective,
+            TotalTests = 4, ConclusiveTests = 4, PassedTests = 4,
+        };
+        var report = new ISO27001ComplianceReport { AgentName = "t", Controls = [gov, tested], Summary = new ComplianceSummary() };
+
+        var md = report.ToMarkdown();
+
+        Assert.Contains("| Annex A Controls Assessed | 1 / 2 |", md);   // NA excluded from numerator, still in denominator
+        var section = Section(md, "A.5.2");
+        Assert.Contains("NotApplicable", section);        // row kept for traceability
+        Assert.DoesNotContain("Pass Rate", section);      // but no fake 0% metrics
+        Assert.DoesNotContain("Test Count", section);
+    }
+
+    // Slices a control's markdown section (from its "### {id}" header to the next "### "), for per-section asserts.
+    private static string Section(string md, string controlId)
+    {
+        var start = md.IndexOf($"### {controlId}", StringComparison.Ordinal);
+        if (start < 0) return "";
+        var next = md.IndexOf("### ", start + 4, StringComparison.Ordinal);
+        return next < 0 ? md[start..] : md[start..next];
+    }
 }

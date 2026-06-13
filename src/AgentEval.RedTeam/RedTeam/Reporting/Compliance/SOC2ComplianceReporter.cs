@@ -94,7 +94,7 @@ public class SOC2ComplianceReport : IComplianceReport
         var needsImprovementCount = Controls.Count(c => c.Status == ControlEvaluationStatus.NeedsImprovement);
         sb.AppendLine("| Metric | Value |");
         sb.AppendLine("|--------|-------|");
-        sb.AppendLine($"| Controls Evaluated | {Controls.Count(c => c.Status != ControlEvaluationStatus.NotEvaluated)} |");
+        sb.AppendLine($"| Controls Evaluated | {Controls.Count(c => c.Status is not ControlEvaluationStatus.NotEvaluated and not ControlEvaluationStatus.NotApplicable)} |");
         sb.AppendLine($"| Effective | {effectiveCount} |");
         sb.AppendLine($"| Partially Effective | {partialCount} |");
         sb.AppendLine($"| Needs Improvement | {needsImprovementCount} |");
@@ -105,7 +105,10 @@ public class SOC2ComplianceReport : IComplianceReport
         sb.AppendLine("## Control Evidence");
         sb.AppendLine();
 
-        foreach (var control in Controls.Where(c => c.Status != ControlEvaluationStatus.NotEvaluated))
+        // M13: exclude NotApplicable (governance) controls — counting/rendering them inflates "Controls Evaluated"
+        // and prints a misleading "Tests 0 / Pass Rate 0.0%", conflating not-measured with measured-and-failed.
+        // Latent today (no SOC2 control is Governance), but the reporter already maps Governance ⇒ NotApplicable.
+        foreach (var control in Controls.Where(c => c.Status is not ControlEvaluationStatus.NotEvaluated and not ControlEvaluationStatus.NotApplicable))
         {
             var statusIcon = control.Status switch
             {

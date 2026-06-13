@@ -93,7 +93,7 @@ public class ISO27001ComplianceReport : IComplianceReport
         sb.AppendLine();
         sb.AppendLine("| Metric | Value |");
         sb.AppendLine("|--------|-------|");
-        sb.AppendLine($"| Annex A Controls Assessed | {Controls.Count(c => c.Status != ControlEvaluationStatus.NotEvaluated)} / {Controls.Count} |");
+        sb.AppendLine($"| Annex A Controls Assessed | {Controls.Count(c => c.Status is not ControlEvaluationStatus.NotEvaluated and not ControlEvaluationStatus.NotApplicable)} / {Controls.Count} |");
         sb.AppendLine($"| Compliance Rate | {ComplianceRate:F1}% |");
         sb.AppendLine($"| Non-Conformities (Major) | {NonConformities.Count(n => n.Severity == NonConformitySeverity.Major)} |");
         sb.AppendLine($"| Non-Conformities (Minor) | {NonConformities.Count(n => n.Severity == NonConformitySeverity.Minor)} |");
@@ -149,8 +149,13 @@ public class ISO27001ComplianceReport : IComplianceReport
             sb.AppendLine($"### {control.Control.ControlId} - {control.Control.ControlName}");
             sb.AppendLine();
             sb.AppendLine($"**Assessment:** {statusIcon} {control.Status}  ");
-            sb.AppendLine($"**Test Count:** {control.TotalTests}  ");
-            sb.AppendLine($"**Pass Rate:** {control.PassRate:F1}%");
+            // L16: a NotApplicable (governance) control is kept for Annex-A traceability (with its ⬜ icon + evidence),
+            // but printing "Test Count 0 / Pass Rate 0.0%" would conflate not-measured with measured-and-failed.
+            if (control.Status is not ControlEvaluationStatus.NotApplicable and not ControlEvaluationStatus.NotEvaluated)
+            {
+                sb.AppendLine($"**Test Count:** {control.TotalTests}  ");
+                sb.AppendLine($"**Pass Rate:** {control.PassRate:F1}%");
+            }
             sb.AppendLine();
             sb.AppendLine("**Evidence Summary:**");
             sb.AppendLine(control.EvidenceSummary);

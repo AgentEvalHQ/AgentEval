@@ -322,4 +322,36 @@ public class SOC2ComplianceReporterTests
 
         Assert.Equal(ControlEvaluationStatus.NotEvaluated, control.Status);
     }
+
+    // M13 — a NotApplicable (governance) control must not inflate "Controls Evaluated" or print fake 0% metrics.
+    [Fact]
+    public void Markdown_GovernanceControl_ExcludedFromCountAndRender()
+    {
+        var gov = new ControlStatus
+        {
+            Control = new ControlMapping { ControlId = "GOV.1", ControlName = "Org Policy", Description = "x", Framework = "SOC2", RelevantAttacks = [], Fidelity = ControlFidelity.Governance },
+            Status = ControlEvaluationStatus.NotApplicable,
+            EvidenceSummary = "Governance control",
+        };
+        var eff = new ControlStatus
+        {
+            Control = new ControlMapping { ControlId = "CC6.1", ControlName = "Access", Description = "x", Framework = "SOC2", RelevantAttacks = ["PromptInjection"] },
+            Status = ControlEvaluationStatus.Effective,
+            TotalTests = 4, ConclusiveTests = 4, PassedTests = 4,
+        };
+        var report = new SOC2ComplianceReport { AgentName = "t", Controls = [gov, eff], Summary = new ComplianceSummary() };
+
+        var md = report.ToMarkdown();
+
+        Assert.Contains("| Controls Evaluated | 1 |", md);   // only the Effective control counted
+        Assert.DoesNotContain("### GOV.1", md);              // governance row not rendered (no fake 0% metrics)
+    }
+
+    [Fact]
+    public void GenerateReport_NoSoc2GovernanceControl_HoldsLatentPrecondition()
+    {
+        // Documents the precondition the M13 fix guards: today no SOC2 control maps to NotApplicable.
+        var report = new SOC2ComplianceReporter().GenerateReport(CreateTestResult(("PromptInjection", 4, 4)));
+        Assert.DoesNotContain(report.Controls, c => c.Status == ControlEvaluationStatus.NotApplicable);
+    }
 }
