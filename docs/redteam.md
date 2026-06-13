@@ -872,7 +872,7 @@ The low-level scanner. **Everything the library can do is reachable from the CLI
 | Group | Options |
 |-------|---------|
 | **Target / auth** | `--endpoint`, `--azure`, `--model`, `--deployment-name`, `--api-key`, `--system-prompt` |
-| **Attacks** | `--attacks` (comma-list; default all 13; opt-in `Crescendo,PAIR,TAP`), `--intensity quick\|moderate\|comprehensive`, `--max-probes`, `--fail-fast` |
+| **Attacks** | `--attacks` (comma-list; default all 13; opt-in `Crescendo,PAIR,TAP`), `--intensity quick\|moderate\|comprehensive`, `--max-probes`, `--fail-fast`, `--import-probes <file.json>` (run an imported seed-prompt dataset alongside the built-ins) |
 | **Real attack surface** | `--sut-tier text\|function-calling\|instrumented`, `--system-prompt-canary <token>` |
 | **Attacker-LLM (multi-turn)** | `--attacker <url>`, `--attacker-model`, `--attacker-api-key`, `--judge <url>`, `--judge-model`, `--judge-api-key` |
 | **Output** | `--format json\|sarif\|markdown\|md\|junit\|nist\|nist-md`, `-o/--output` |

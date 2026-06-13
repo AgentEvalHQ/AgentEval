@@ -14,6 +14,7 @@ using AgentEval.Core;
 using AgentEval.RedTeam;
 using AgentEval.RedTeam.Attacks;
 using AgentEval.RedTeam.Baseline;
+using AgentEval.RedTeam.Importers;
 using AgentEval.RedTeam.Reporting;
 using AgentEval.RedTeam.Reporting.Compliance;
 using Microsoft.Extensions.AI;
@@ -56,6 +57,8 @@ internal static class RedTeamCommand
         // Attack selection
         var attacksOpt = new Option<string?>("--attacks")
             { Description = "Comma-separated attack types (e.g., PromptInjection,Jailbreak). Default: all. Opt-in multi-turn: Crescendo, PAIR, TAP (PAIR/TAP require --attacker)." };
+        var importProbesOpt = new Option<FileInfo?>("--import-probes")
+            { Description = "Import a JSON seed-prompt dataset (HarmBench/JailbreakBench/etc.) and run it alongside the built-in attacks. Probes without an expected-token oracle are Inconclusive unless --judge is set." };
 
         // Intensity
         var intensityOpt = new Option<string>("--intensity")
@@ -115,6 +118,7 @@ internal static class RedTeamCommand
         command.Options.Add(sutTierOpt);
         command.Options.Add(systemPromptCanaryOpt);
         command.Options.Add(attacksOpt);
+        command.Options.Add(importProbesOpt);
         command.Options.Add(intensityOpt);
         command.Options.Add(failFastFlag);
         command.Options.Add(maxProbesOpt);
@@ -147,6 +151,7 @@ internal static class RedTeamCommand
                 SutTier = parseResult.GetValue(sutTierOpt)!,
                 SystemPromptCanary = parseResult.GetValue(systemPromptCanaryOpt),
                 Attacks = parseResult.GetValue(attacksOpt),
+                ImportProbes = parseResult.GetValue(importProbesOpt),
                 Intensity = parseResult.GetValue(intensityOpt)!,
                 FailFast = parseResult.GetValue(failFastFlag),
                 MaxProbes = parseResult.GetValue(maxProbesOpt),
@@ -264,6 +269,21 @@ internal static class RedTeamCommand
             attacks = attacks is null
                 ? Attack.RosterWithCanary(canary)
                 : attacks.Select(a => a is SystemPromptExtractionAttack ? new SystemPromptExtractionAttack(canary) : a).ToList();
+        }
+
+        // 3b. Import an external seed-prompt dataset (Wave-F breadth seam) and run it alongside the built-ins.
+        if (opts.ImportProbes is not null)
+        {
+            if (!opts.ImportProbes.Exists)
+                throw new InvalidOperationException($"Import dataset not found: {opts.ImportProbes.FullName}");
+            var datasetName = Path.GetFileNameWithoutExtension(opts.ImportProbes.Name);
+            var content = await File.ReadAllTextAsync(opts.ImportProbes.FullName, ct);
+            var imported = new JsonProbeDatasetImporter().Import(content, datasetName);   // throws FormatException on bad JSON
+            var importedAttack = new ImportedProbeAttack(datasetName, imported);
+            attacks = (attacks ?? Attack.All).Append(importedAttack).ToList();
+            if (!opts.Quiet)
+                Console.Error.WriteLine($"  Imported {imported.Count} probe(s) from '{datasetName}'" +
+                    (string.IsNullOrWhiteSpace(opts.JudgeEndpoint) ? " — note: probes without an expected-token oracle are Inconclusive without --judge." : "."));
         }
 
         // 4. Resolve intensity
@@ -538,6 +558,7 @@ internal sealed class RedTeamOptions
     public string SutTier { get; init; } = "text";
     public string? SystemPromptCanary { get; init; }
     public string? Attacks { get; init; }
+    public FileInfo? ImportProbes { get; init; }
     public required string Intensity { get; init; }
     public bool FailFast { get; init; }
     public int MaxProbes { get; init; }

@@ -39,15 +39,16 @@ public class RedTeamCommandTests
     }
 
     [Fact]
-    public void Create_Has27Options()
+    public void Create_Has28Options()
     {
         // 16 base + Wave E (save-baseline, baseline, fail-on) = 19
         // + Wave C′ (attacker, attacker-model) = 21
         // + baseline metadata (baseline-version, baseline-note) = 23
         // + per-role API keys (judge-api-key, attacker-api-key) = 25
         // + real-surface harness (sut-tier, system-prompt-canary) = 27
+        // + dataset import (import-probes) = 28
         var command = RedTeamCommand.Create();
-        Assert.Equal(27, command.Options.Count);
+        Assert.Equal(28, command.Options.Count);
     }
 
     [Theory]
@@ -76,6 +77,7 @@ public class RedTeamCommandTests
     [InlineData("attacker-api-key")] // per-role keys
     [InlineData("sut-tier")]        // real-surface harness
     [InlineData("system-prompt-canary")] // real-surface harness
+    [InlineData("import-probes")]   // dataset import (Wave-F seam)
     public void Create_ContainsExpectedOption(string optionName)
     {
         var command = RedTeamCommand.Create();
