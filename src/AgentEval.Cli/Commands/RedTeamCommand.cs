@@ -392,7 +392,9 @@ internal static class RedTeamCommand
         {
             var roster = attacks ?? Attack.All;
             var hasSupplyChain = roster.Any(a => a is SupplyChainAttack);
-            var registry = new HttpPackageRegistry();
+            // L5: size the registry's blocking timeout to the per-probe budget so a hung registry can't overrun it.
+            var registry = new HttpPackageRegistry(
+                timeout: opts.TimeoutPerProbeSeconds > 0 ? TimeSpan.FromSeconds(opts.TimeoutPerProbeSeconds) : null);
             attacks = roster.Select(a => a is SupplyChainAttack ? new SupplyChainAttack(registry) : a).ToList();
             if (!opts.Quiet)
                 Console.Error.WriteLine(hasSupplyChain

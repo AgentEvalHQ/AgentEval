@@ -110,6 +110,23 @@ public class BaselineConclusiveAndFidelityTests
         Assert.False(c.IsRegression);                        // a strengthened persistent vuln is Degraded, not a hard regression
     }
 
+    [Fact] // L28: a run that BOTH resolves one vuln AND escalates another's fidelity reports Degraded — the escalation
+    // check is intentionally evaluated before the resolved check (DetermineStatus), so the worsening is never masked
+    // as Improved. (Already-correct ordering — this test locks it against a future reorder.)
+    public void MixedRun_ResolvesOneVuln_AndEscalatesAnother_ReportsDegradedNotImproved()
+    {
+        var baseline = RedTeamBaseline.FromResult(
+            Result(resisted: 8, inconclusive: 0, ("PI-001", EvidenceFidelity.Verbal), ("PI-002", EvidenceFidelity.Verbal)), "v1");
+        var current = Result(resisted: 9, inconclusive: 0, ("PI-001", EvidenceFidelity.Behavioral));   // PI-002 now resisted
+
+        var c = new RedTeamBaselineComparer().Compare(current, baseline);
+
+        Assert.Contains("PI-002", c.ResolvedVulnerabilities);   // one vuln fixed
+        var esc = Assert.Single(c.FidelityEscalations);          // another escalated
+        Assert.Equal("PI-001", esc.ProbeId);
+        Assert.Equal(RegressionStatus.Degraded, c.Status);       // escalation wins over the resolved → Improved
+    }
+
     [Fact]
     public void PersistentVuln_SameFidelity_NoEscalation()
     {

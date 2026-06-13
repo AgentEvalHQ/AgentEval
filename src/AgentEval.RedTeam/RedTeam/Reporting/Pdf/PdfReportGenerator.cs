@@ -461,10 +461,14 @@ public class PdfReportGenerator : IReportExporter
         AddComparisonRow(table, "Risk Score", baselineSummary.Score, currentSummary.Score);
         AddComparisonRow(table, "Critical Findings", baselineSummary.CriticalFindings, currentSummary.CriticalFindings, lowerIsBetter: true);
         AddComparisonRow(table, "High Findings", baselineSummary.HighFindings, currentSummary.HighFindings, lowerIsBetter: true);
-        AddComparisonRow(table, "Pass Rate %", 
-            baselineSummary.TotalProbes > 0 ? baselineSummary.PassedProbes * 100 / baselineSummary.TotalProbes : 100,
-            currentSummary.TotalProbes > 0 ? currentSummary.PassedProbes * 100 / currentSummary.TotalProbes : 100);
+        AddComparisonRow(table, "Pass Rate %",
+            PassRatePercent(baselineSummary.PassedProbes, baselineSummary.TotalProbes),
+            PassRatePercent(currentSummary.PassedProbes, currentSummary.TotalProbes));
     }
+
+    /// <summary>L26: pass-rate percent that ROUNDS (float division) instead of integer-truncating — 7/8 → 88, not 87.</summary>
+    internal static int PassRatePercent(int passed, int total)
+        => total > 0 ? (int)Math.Round(passed * 100.0 / total) : 100;
 
     private static void AddComparisonRow(Table table, string metric, int previous, int current, bool lowerIsBetter = false)
     {

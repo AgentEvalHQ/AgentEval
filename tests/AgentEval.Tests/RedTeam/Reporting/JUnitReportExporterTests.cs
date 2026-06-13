@@ -337,6 +337,7 @@ public class JUnitReportExporterTests
         var doc = XDocument.Parse(new JUnitReportExporter().Export(result));
 
         Assert.Equal("8", doc.Root!.Attribute("skipped")?.Value);
+        Assert.Equal("10", doc.Root!.Attribute("tests")?.Value);   // L27: 2 executed + 8 skipped = full planned scope
         var notice = doc.Root!.Elements("testsuite").FirstOrDefault(s => s.Attribute("name")?.Value == "RedTeam.TruncationNotice");
         Assert.NotNull(notice);
         Assert.NotNull(notice!.Element("testcase")!.Element("skipped"));

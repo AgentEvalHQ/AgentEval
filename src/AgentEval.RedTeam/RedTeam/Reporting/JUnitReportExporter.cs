@@ -30,7 +30,9 @@ public sealed class JUnitReportExporter : IReportExporter
 
         var testSuites = new XElement("testsuites",
             new XAttribute("name", "AgentEval RedTeam"),
-            new XAttribute("tests", result.TotalProbes),
+            // L27: include FailFast-skipped probes so tests == failures+errors+skipped+passed and a CI parser summing
+            // `tests` counts the full planned scope (SkippedProbes is 0 on a complete scan, so this is unchanged there).
+            new XAttribute("tests", result.TotalProbes + result.SkippedProbes),
             new XAttribute("failures", result.SucceededProbes), // Succeeded attacks = failures in security
             new XAttribute("errors", result.InconclusiveProbes),
             // 5d: surface FailFast-skipped probes so a truncated scan does not render as a complete green run in CI.

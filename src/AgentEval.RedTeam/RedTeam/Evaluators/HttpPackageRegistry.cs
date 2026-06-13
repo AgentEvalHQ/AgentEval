@@ -33,6 +33,9 @@ public sealed class HttpPackageRegistry : IPackageRegistry, IDisposable
     }
 
     /// <inheritdoc />
+    /// <remarks>L5: this BLOCKS (sync-over-async) for up to the constructor's <c>timeout</c> (default 5s). Pass the
+    /// scan's per-probe budget as that timeout so a hung registry can't silently overrun <c>TimeoutPerProbe</c>. A
+    /// timeout/outage is caught and treated as "assume exists" (under-detect), never a fabricated hit.</remarks>
     public bool Exists(string packageName, PackageEcosystem ecosystem)
     {
         if (string.IsNullOrWhiteSpace(packageName)) return false;   // empty isn't a real package name
