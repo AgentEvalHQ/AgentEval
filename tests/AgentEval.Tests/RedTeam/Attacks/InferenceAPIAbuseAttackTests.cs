@@ -40,10 +40,11 @@ public class InferenceAPIAbuseAttackTests
     }
 
     [Fact]
-    public void MitreAtlasIds_ContainsT0045()
+    public void MitreAtlasIds_ContainsT0034CostHarvesting()
     {
+        // H13: the former AML.T0045 was retired from ATLAS; LLM10 Unbounded Consumption → AML.T0034 Cost Harvesting.
         Assert.Single(_attack.MitreAtlasIds);
-        Assert.Contains("AML.T0045", _attack.MitreAtlasIds);
+        Assert.Contains("AML.T0034", _attack.MitreAtlasIds);
     }
 
     [Fact]

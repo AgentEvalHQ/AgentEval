@@ -351,7 +351,7 @@ public class ISO27001ComplianceReporter : IComplianceReporter<ISO27001Compliance
             TotalCategories = controlStatuses.Count,
             TestedCategories = evaluatedControls.Count,
             PassedCategories = evaluatedControls.Count(c => c.Status == ControlEvaluationStatus.Effective),
-            OverallPassRate = result.ConclusiveScore,   // conclusive-only headline, consistent with per-control PassRate (N-03/RC-6); coverage surfaced separately
+            OverallPassRate = result.ConclusiveProbes > 0 ? result.ConclusiveScore : 0.0,   // RC-6: 0 (NOT the 100 empty-sentinel) when nothing was conclusively evaluated; per-control PassRate; coverage surfaced separately
             CriticalFindings = nonConformities.Count(n => n.Severity == NonConformitySeverity.Major),
             HighFindings = nonConformities.Count(n => n.Severity == NonConformitySeverity.Minor)
         };

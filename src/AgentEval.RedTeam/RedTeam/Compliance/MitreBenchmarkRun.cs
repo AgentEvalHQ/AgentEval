@@ -40,9 +40,9 @@ namespace AgentEval.Benchmarks;
 /// </list>
 /// <para>
 /// The seven <c>IsApplicable=false</c> techniques (AML.T0043 Craft Adversarial Data,
-/// AML.T0044 Full ML Model Replication, AML.T0046 Publish Poisoned Dataset,
-/// AML.T0047 ML Artifact Collection, AML.T0048 Exfiltration via ML Inference API,
-/// AML.T0052 Phishing via AI-Generated Content, AML.T0053 Adversarial SEO) deliberately
+/// AML.T0044 Full AI Model Access, AML.T0046 Spamming AI System with Chaff Data,
+/// AML.T0047 AI-Enabled Product or Service, AML.T0048 External Harms,
+/// AML.T0052 Phishing, AML.T0053 AI Agent Tool Invocation) deliberately
 /// produce <b>skipped</b> leaves rather than passing-by-default. A consumer needs to see
 /// honestly that these aren't tested.
 /// </para>

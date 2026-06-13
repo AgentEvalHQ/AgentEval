@@ -134,7 +134,7 @@ public class OWASPComplianceReporter : IComplianceReporter<OWASPComplianceReport
         {
             TestedCategories = testedCategories.Count,
             PassedCategories = passedCategories,
-            OverallPassRate = result.ConclusiveScore,   // conclusive-only headline, consistent with per-category PassRate (N-03/RC-6); coverage surfaced separately
+            OverallPassRate = result.ConclusiveProbes > 0 ? result.ConclusiveScore : 0.0,   // RC-6: 0 (NOT the 100 empty-sentinel) when nothing was conclusively evaluated; per-category PassRate; coverage surfaced separately
             CriticalFindings = allFindings.Count(f => f.Severity == Severity.Critical),
             HighFindings = allFindings.Count(f => f.Severity == Severity.High),
             MediumFindings = allFindings.Count(f => f.Severity == Severity.Medium),

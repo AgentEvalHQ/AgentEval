@@ -64,7 +64,7 @@ public sealed class SupplyChainAttack : IAttackType
     public string OwaspLlmId => "LLM03";
 
     /// <inheritdoc />
-    public string[] MitreAtlasIds => ["AML.T0010"];   // ML Supply Chain Compromise
+    public string[] MitreAtlasIds => ["AML.T0010"];   // AI Supply Chain Compromise
 
     /// <inheritdoc />
     public Severity DefaultSeverity => Severity.High;

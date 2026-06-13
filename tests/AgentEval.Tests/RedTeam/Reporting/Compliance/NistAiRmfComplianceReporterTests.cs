@@ -56,10 +56,12 @@ public class NistAiRmfComplianceReporterTests
     [Fact]
     public void TestedControl_AllResisted_IsEffective()
     {
+        // H13/H14: the adversarial-security attacks map to MEASURE.2.7 (Security and Resilience) — 2.6 is SAFETY
+        // (no attacks). Verified vs NIST AI 100-1 AI RMF 1.0 Core 2026-06-13.
         var report = new NistAiRmfComplianceReporter().GenerateReport(Result(AllSecurityResisted));
-        var ms26 = report.Controls.First(c => c.Control.ControlId == "MEASURE.2.6");
-        Assert.Equal(ControlFidelity.Tested, ms26.Control.Fidelity);
-        Assert.Equal(ControlEvaluationStatus.Effective, ms26.Status);
+        var ms27 = report.Controls.First(c => c.Control.ControlId == "MEASURE.2.7");
+        Assert.Equal(ControlFidelity.Tested, ms27.Control.Fidelity);
+        Assert.Equal(ControlEvaluationStatus.Effective, ms27.Status);
     }
 
     private static AttackResult Inconclusive(string name, string owaspId, int n)
@@ -96,16 +98,20 @@ public class NistAiRmfComplianceReporterTests
             Result(Inconclusive("PromptInjection", "LLM01", 4), Inconclusive("Jailbreak", "LLM01", 4)));
 
         Assert.Equal(0.0, report.ComplianceRate);
+        // Section-2 review MEDIUM: the summary OverallPassRate must NOT be the 100-on-empty ConclusiveScore sentinel.
+        Assert.Equal(0.0, report.Summary.OverallPassRate);
+        Assert.DoesNotContain("\"overallPassRate\": 100", report.ToJson());
         Assert.DoesNotContain(report.Recommendations, r => r.StartsWith("✅"));
     }
 
     [Fact]
     public void SupportingControl_AllResisted_CappedAtPartiallyEffective()
     {
+        // H14: confabulation/output-reliability maps to MEASURE.2.5 (Validity and Reliability), Supporting.
         var report = new NistAiRmfComplianceReporter().GenerateReport(Result(Resisted("Misinformation", "LLM09", 4)));
-        var ms23 = report.Controls.First(c => c.Control.ControlId == "MEASURE.2.3");
-        Assert.Equal(ControlFidelity.Supporting, ms23.Control.Fidelity);
-        Assert.Equal(ControlEvaluationStatus.PartiallyEffective, ms23.Status);   // never Effective despite 100% pass
+        var ms25 = report.Controls.First(c => c.Control.ControlId == "MEASURE.2.5");
+        Assert.Equal(ControlFidelity.Supporting, ms25.Control.Fidelity);
+        Assert.Equal(ControlEvaluationStatus.PartiallyEffective, ms25.Status);   // never Effective despite 100% pass
     }
 
     [Fact]

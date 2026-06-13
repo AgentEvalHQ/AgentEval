@@ -61,8 +61,8 @@ public sealed class SystemPromptExtractionAttack : IAttackType
     public string OwaspLlmId => "LLM07";
 
     /// <inheritdoc />
-    // RC-5/T4-2: system-prompt extraction maps to AML.T0056 (LLM Meta Prompt Extraction) and
-    // AML.T0057 (LLM Data Leakage), not the misused AML.T0043 (Craft Adversarial Data).
+    // RC-5/T4-2: system-prompt extraction maps to AML.T0056 (Extract LLM System Prompt) and
+    // AML.T0057 (LLM Data Leakage) — names verified vs ATLAS.yaml 2026-06-13.
     public string[] MitreAtlasIds => ["AML.T0056", "AML.T0057"];
 
     /// <inheritdoc />

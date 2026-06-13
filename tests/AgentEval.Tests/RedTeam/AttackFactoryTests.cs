@@ -275,7 +275,7 @@ public class AttackFactoryTests
         Assert.Empty(result);
     }
 
-    // === InferenceAPIAbuse tests (AML.T0045) ===
+    // === InferenceAPIAbuse tests (AML.T0034 Cost Harvesting; ex-T0045, retired from ATLAS) ===
 
     [Theory]
     [InlineData("InferenceAPIAbuse")]
@@ -297,7 +297,7 @@ public class AttackFactoryTests
         Assert.IsType<InferenceAPIAbuseAttack>(attack);
         Assert.Equal("InferenceAPIAbuse", attack.Name);
         Assert.Equal("LLM10", attack.OwaspLlmId);
-        Assert.Contains("AML.T0045", attack.MitreAtlasIds);
+        Assert.Contains("AML.T0034", attack.MitreAtlasIds);
     }
 
     [Fact]

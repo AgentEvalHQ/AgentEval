@@ -12,53 +12,53 @@ public class MITREATLASReporter : IComplianceReporter<MITREATLASReport>
     public const string Regulation = "MITRE-ATLAS";
 
     /// <summary>
-    /// MITRE ATLAS techniques relevant to LLM security, MAPPED to ATLAS technique IDs. The IDs are authoritative;
-    /// the human-readable names here are best-effort and MUST be verified against a pinned ATLAS release
-    /// (mitre-atlas/atlas-data dist/ATLAS.yaml at atlas.mitre.org) before audit use — several names below are
-    /// approximate and a few of the IsApplicable=false entries may not match the current ATLAS matrix verbatim.
-    /// RC-5/T4-2: system-prompt/data extraction → AML.T0056/T0057 (not the misused
-    /// AML.T0043); AML.T0024 "Develop Capabilities" removed (not detectable by a black-box prompt scanner);
-    /// out-of-band techniques are IsApplicable=false (a conversational scanner cannot exercise them → Not
-    /// Applicable, not Not Tested). TacticName is derived from TacticId via TacticNameFor (see T0-2).
+    /// MITRE ATLAS techniques relevant to LLM security, mapped to ATLAS technique IDs and TACTICS. H13: names, IDs and
+    /// tactic assignments were verified on 2026-06-13 against the authoritative <c>mitre-atlas/atlas-data</c>
+    /// <c>dist/ATLAS.yaml</c> (atlas.mitre.org) — ATLAS renamed its "ML*" techniques/tactics to "AI*", and the former
+    /// AML.T0045 was retired (so InferenceAPIAbuse → AML.T0034 Cost Harvesting). The IsApplicable=false rows are real
+    /// ATLAS techniques a black-box conversational scanner cannot exercise (Not Applicable, not Not Tested).
+    /// TacticName is derived from TacticId via TacticNamesById.
     /// </summary>
     private static readonly MITRETechniqueDefinition[] AllTechniques =
     [
-        // --- Applicable: exercised by conversational red-team probes ---
-        new("AML.T0051", "LLM Prompt Injection", "TA0001", "Inject prompts (direct or indirect) to manipulate LLM behavior.", true),
-        new("AML.T0054", "LLM Jailbreak", "TA0004", "Bypass LLM safety constraints and guardrails to elicit restricted behavior.", true),
-        new("AML.T0056", "LLM Meta Prompt Extraction", "TA0007", "Coerce the model into disclosing its system / meta prompt.", true),
+        // --- Applicable: exercised by conversational red-team probes (names/IDs/tactics verified vs ATLAS.yaml 2026-06-13) ---
+        new("AML.T0051", "LLM Prompt Injection", "TA0005", "Inject prompts (direct or indirect) to manipulate LLM behavior.", true),
+        new("AML.T0054", "LLM Jailbreak", "TA0007", "Bypass LLM safety constraints and guardrails to elicit restricted behavior.", true),
+        new("AML.T0056", "Extract LLM System Prompt", "TA0010", "Coerce the model into disclosing its system prompt.", true),
         new("AML.T0057", "LLM Data Leakage", "TA0010", "Elicit sensitive or memorized data the model should not reveal.", true),
-        new("AML.T0037", "Data from Information Repositories", "TA0009", "Extract data the system can reach via repeated targeted queries.", true),
-        new("AML.T0045", "ML Intellectual Property Theft / Inference API Access", "TA0000", "Abuse inference-API access for extraction or resource exhaustion.", true),
+        new("AML.T0037", "Data from Local System", "TA0009", "Extract data the system can reach via repeated targeted queries.", true),
+        // H13: the former AML.T0045 was RETIRED from ATLAS; InferenceAPIAbuse (OWASP LLM10 Unbounded Consumption)
+        // now maps to AML.T0034 Cost Harvesting — abusing inference access to drive unbounded resource/cost use.
+        new("AML.T0034", "Cost Harvesting", "TA0011", "Abuse inference-API access to drive unbounded resource/cost consumption (OWASP LLM10).", true),
         // #9: SupplyChain (LLM03) tags AML.T0010 and DataPoisoning (LLM04) tags AML.T0020. These were missing from
         // the catalog, so a compromised supply-chain / data-poisoning probe was SILENTLY DROPPED from the ATLAS
         // report rows and composite (it could not fail the MITRE benchmark). Both are black-box PROXIES of the real
         // technique (typosquat-recommendation / in-context poisoning), hence IsApplicable=true with that caveat.
-        new("AML.T0010", "ML Supply Chain Compromise", "TA0001", "Compromise the ML supply chain (black-box proxy: typosquatted/hallucinated package recommendations).", true),
+        new("AML.T0010", "AI Supply Chain Compromise", "TA0004", "Compromise the AI supply chain (black-box proxy: typosquatted/hallucinated package recommendations).", true),
         new("AML.T0020", "Poison Training Data", "TA0003", "Poison training/grounding data (black-box proxy: in-context / RAG poisoning, not real training-set tampering).", true),
 
-        // --- Not applicable: out-of-band for a black-box conversational scanner ---
-        new("AML.T0043", "Craft Adversarial Data", "TA0040", "Author adversarial inputs designed to cause misclassification (offline staging).", false),
-        new("AML.T0047", "ML Artifact Collection", "TA0009", "Collect ML artifacts such as models or training data from the environment.", false),
-        new("AML.T0048", "Exfiltration via ML Inference API", "TA0010", "Reconstruct training data or model via crafted inference queries.", false),
-        new("AML.T0052", "Phishing via AI-Generated Content", "TA0001", "Use AI to generate convincing phishing content.", false),
-        new("AML.T0044", "Full ML Model Replication", "TA0010", "Replicate a model through repeated queries.", false),
-        new("AML.T0046", "Publish Poisoned Dataset", "TA0003", "Introduce malicious training data into a public dataset.", false),
-        new("AML.T0053", "Adversarial SEO", "TA0005", "Manipulate search results via adversarial content.", false),
+        // --- Not applicable: real ATLAS techniques out-of-band for a black-box conversational scanner (verified vs ATLAS.yaml) ---
+        new("AML.T0043", "Craft Adversarial Data", "TA0001", "Author adversarial inputs designed to cause misclassification (offline staging).", false),
+        new("AML.T0047", "AI-Enabled Product or Service", "TA0000", "Recon/abuse of the target's AI-enabled product or service surface.", false),
+        new("AML.T0048", "External Harms", "TA0011", "Cause harm outside the AI system itself (financial, reputational, societal).", false),
+        new("AML.T0052", "Phishing", "TA0004", "Phishing (incl. spearphishing) for access — out of band for a prompt scanner.", false),
+        new("AML.T0044", "Full AI Model Access", "TA0000", "Obtain full white-box access to the model.", false),
+        new("AML.T0046", "Spamming AI System with Chaff Data", "TA0011", "Flood the system with chaff data to degrade or evade it.", false),
+        new("AML.T0053", "AI Agent Tool Invocation", "TA0005", "Drive an AI agent to invoke tools (no probe maps to this technique specifically).", false),
     ];
 
     /// <summary>All MITRE ATLAS tactics referenced by <see cref="AllTechniques"/> (atlas.mitre.org). RC-5: kept in sync so no technique is orphaned.</summary>
     private static readonly TacticDefinition[] AllTactics =
     [
-        new("TA0000", "ML Model Access"),
-        new("TA0001", "Initial Access"),
+        new("TA0000", "AI Model Access"),
+        new("TA0001", "AI Attack Staging"),
         new("TA0003", "Resource Development"),
-        new("TA0004", "Privilege Escalation"),
-        new("TA0005", "Defense Evasion"),
-        new("TA0007", "Discovery"),
+        new("TA0004", "Initial Access"),
+        new("TA0005", "Execution"),
+        new("TA0007", "Defense Evasion"),
         new("TA0009", "Collection"),
         new("TA0010", "Exfiltration"),
-        new("TA0040", "ML Attack Staging"),
+        new("TA0011", "Impact"),
     ];
 
     /// <summary>Tactic ID → canonical name, derived once from <see cref="AllTactics"/>.</summary>
@@ -217,7 +217,7 @@ public class MITREATLASReporter : IComplianceReporter<MITREATLASReport>
             TotalCategories = techniques.Count,
             TestedCategories = testedTechniques.Count,
             PassedCategories = passedTechniques,
-            OverallPassRate = result.ConclusiveScore,   // conclusive-only headline, consistent with per-technique PassRate (N-03/RC-6); coverage surfaced separately
+            OverallPassRate = result.ConclusiveProbes > 0 ? result.ConclusiveScore : 0.0,   // RC-6: 0 (NOT the 100 empty-sentinel) when nothing was conclusively evaluated; per-technique PassRate; coverage surfaced separately
             CriticalFindings = allFindings.Count(f => f.Severity == Severity.Critical),
             HighFindings = allFindings.Count(f => f.Severity == Severity.High),
             MediumFindings = allFindings.Count(f => f.Severity == Severity.Medium),
@@ -357,7 +357,7 @@ public class MITREATLASReporter : IComplianceReporter<MITREATLASReport>
                 "AML.T0054" => "Strengthen jailbreak detection: roleplay filtering, safety classification, context analysis",
                 "AML.T0043" => "Add adversarial input detection and sanitization layers",
                 "AML.T0037" => "Implement rate limiting and data access controls to prevent extraction",
-                "AML.T0045" => "Add API abuse detection: rate limiting, anomaly detection, resource quotas",
+                "AML.T0034" => "Add API abuse / cost-harvesting defenses: rate limiting, anomaly detection, resource quotas",
                 "AML.T0048" => "Prevent data exfiltration: output filtering, PII detection, monitoring",
                 _ => $"Review {technique.Name} mitigations and implement appropriate controls"
             };

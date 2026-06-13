@@ -11,43 +11,42 @@ public sealed class MITREATLASInvariantTests
 {
     // Expectation of each ATLAS technique's tactic assignment, pinned against a separate literal so the invariant
     // catches a mis-edited TacticId (a drift guard) rather than self-projecting the reporter's own field.
-    // 5g/H13 CAVEAT: these IDs/tactic pairings are NOT yet verified against the official ATLAS matrix — several
-    // technique NAMES in the catalog are best-effort (see MITREATLASReporter), so this map pins the CURRENT catalog
-    // shape, not a source-of-truth. When the catalog is corrected against mitre-atlas/atlas-data, re-author this
-    // map from that release (cite the version) — do not treat it as independently authoritative.
+    // H13: re-authored 2026-06-13 from the authoritative mitre-atlas/atlas-data dist/ATLAS.yaml (atlas.mitre.org) —
+    // these technique→tactic pairings and the tactic names below are now source-verified (ATLAS renamed ML*→AI*;
+    // AML.T0045 was retired → InferenceAPIAbuse maps to AML.T0034 Cost Harvesting).
     private static readonly IReadOnlyDictionary<string, string> ExpectedTechniqueTacticId =
         new Dictionary<string, string>(StringComparer.Ordinal)
         {
-            ["AML.T0051"] = "TA0001",
-            ["AML.T0054"] = "TA0004",
-            ["AML.T0056"] = "TA0007",
-            ["AML.T0057"] = "TA0010",
-            ["AML.T0037"] = "TA0009",
-            ["AML.T0045"] = "TA0000",
-            ["AML.T0043"] = "TA0040",
-            ["AML.T0047"] = "TA0009",
-            ["AML.T0048"] = "TA0010",
-            ["AML.T0052"] = "TA0001",
-            ["AML.T0044"] = "TA0010",
-            ["AML.T0046"] = "TA0003",
-            ["AML.T0053"] = "TA0005",
-            ["AML.T0010"] = "TA0001",   // #9: SupplyChain (LLM03) — was silently dropped from the catalog
-            ["AML.T0020"] = "TA0003",   // #9: DataPoisoning (LLM04) — was silently dropped from the catalog
+            ["AML.T0051"] = "TA0005",   // LLM Prompt Injection → Execution
+            ["AML.T0054"] = "TA0007",   // LLM Jailbreak → Defense Evasion
+            ["AML.T0056"] = "TA0010",   // Extract LLM System Prompt → Exfiltration
+            ["AML.T0057"] = "TA0010",   // LLM Data Leakage → Exfiltration
+            ["AML.T0037"] = "TA0009",   // Data from Local System → Collection
+            ["AML.T0034"] = "TA0011",   // Cost Harvesting → Impact (replaces retired AML.T0045)
+            ["AML.T0043"] = "TA0001",   // Craft Adversarial Data → AI Attack Staging
+            ["AML.T0047"] = "TA0000",   // AI-Enabled Product or Service → AI Model Access
+            ["AML.T0048"] = "TA0011",   // External Harms → Impact
+            ["AML.T0052"] = "TA0004",   // Phishing → Initial Access
+            ["AML.T0044"] = "TA0000",   // Full AI Model Access → AI Model Access
+            ["AML.T0046"] = "TA0011",   // Spamming AI System with Chaff Data → Impact
+            ["AML.T0053"] = "TA0005",   // AI Agent Tool Invocation → Execution
+            ["AML.T0010"] = "TA0004",   // AI Supply Chain Compromise → Initial Access
+            ["AML.T0020"] = "TA0003",   // Poison Training Data → Resource Development
         };
 
-    // Independently-authored ATLAS tactic ID -> canonical name.
+    // Independently-authored ATLAS tactic ID -> canonical name (verified vs ATLAS.yaml 2026-06-13).
     private static readonly IReadOnlyDictionary<string, string> ExpectedTacticName =
         new Dictionary<string, string>(StringComparer.Ordinal)
         {
-            ["TA0000"] = "ML Model Access",
-            ["TA0001"] = "Initial Access",
+            ["TA0000"] = "AI Model Access",
+            ["TA0001"] = "AI Attack Staging",
             ["TA0003"] = "Resource Development",
-            ["TA0004"] = "Privilege Escalation",
-            ["TA0005"] = "Defense Evasion",
-            ["TA0007"] = "Discovery",
+            ["TA0004"] = "Initial Access",
+            ["TA0005"] = "Execution",
+            ["TA0007"] = "Defense Evasion",
             ["TA0009"] = "Collection",
             ["TA0010"] = "Exfiltration",
-            ["TA0040"] = "ML Attack Staging",
+            ["TA0011"] = "Impact",
         };
 
     public static IEnumerable<object[]> AllTechniques() =>

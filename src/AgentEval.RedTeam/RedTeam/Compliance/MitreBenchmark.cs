@@ -54,14 +54,12 @@ public static partial class MitreBenchmark
     private static readonly TimeSpan ThoroughTimeout = TimeSpan.FromMinutes(30);
 
     /// <summary>
-    /// All nine implemented attacks at <see cref="Intensity.Quick"/> intensity,
-    /// covering all 6 applicable MITRE ATLAS techniques recognised by
-    /// <see cref="MITREATLASReporter"/> (AML.T0037, T0045, T0051, T0054, T0056, T0057).
-    /// The seven non-applicable techniques (AML.T0043 Craft Adversarial Data,
-    /// AML.T0044 Full ML Model Replication, AML.T0046 Publish Poisoned Dataset,
-    /// AML.T0047 ML Artifact Collection, AML.T0048 Exfiltration via ML Inference API,
-    /// AML.T0052 Phishing via AI-Generated Content, AML.T0053 Adversarial SEO)
-    /// are not testable at the agent-API layer and appear as <c>NotApplicable</c>
+    /// All built-in attacks at <see cref="Intensity.Quick"/> intensity, covering the 8 applicable MITRE ATLAS
+    /// techniques recognised by <see cref="MITREATLASReporter"/> (AML.T0010, T0020, T0034, T0037, T0051, T0054,
+    /// T0056, T0057 — names/IDs verified vs ATLAS.yaml 2026-06-13). The non-applicable techniques (AML.T0043 Craft
+    /// Adversarial Data, AML.T0044 Full AI Model Access, AML.T0046 Spamming AI System with Chaff Data,
+    /// AML.T0047 AI-Enabled Product or Service, AML.T0048 External Harms, AML.T0052 Phishing, AML.T0053 AI Agent
+    /// Tool Invocation) are not testable at the agent-API layer and appear as <c>NotApplicable</c>
     /// skipped leaves in <see cref="MitreBenchmarkRun.EvaluateAsync"/> output.
     /// </summary>
     /// <param name="judge">Optional LLM judge. The current attack pipeline uses
@@ -102,8 +100,8 @@ public static partial class MitreBenchmark
     /// Three-attack MVP preset (PromptInjection + Jailbreak + PIILeakage) at
     /// <see cref="Intensity.Quick"/>. Exercises 4 distinct ATLAS techniques —
     /// AML.T0051 (LLM Prompt Injection), AML.T0054 (LLM Jailbreak),
-    /// AML.T0037 (Data from Information Repositories — via PII probes),
-    /// AML.T0057 (LLM Data Leakage — via PII probes). The other 9 techniques appear
+    /// AML.T0037 (Data from Local System — via PII probes),
+    /// AML.T0057 (LLM Data Leakage — via PII probes). The other techniques appear
     /// as "skipped" leaves. Intended for CI fast feedback.
     /// </summary>
     /// <param name="judge">See <see cref="AtlasBaseline"/>.</param>

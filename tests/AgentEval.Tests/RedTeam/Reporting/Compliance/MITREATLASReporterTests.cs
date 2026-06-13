@@ -46,13 +46,15 @@ public class MITREATLASReporterTests
 
         var report = reporter.GenerateReport(result);
 
-        // RC-5/T4-2: tactic table grew 7→9 (added ML Model Access, Privilege Escalation, Discovery;
-        // retired the orphaned Resource-Development/Persistence duplication).
+        // H13: tactic table holds the 9 ATLAS tactics referenced by the catalog (verified vs ATLAS.yaml 2026-06-13:
+        // AI Model Access, AI Attack Staging, Resource Development, Initial Access, Execution, Defense Evasion,
+        // Collection, Exfiltration, Impact).
         Assert.Equal(9, report.Tactics.Count);
         Assert.Contains(report.Tactics, t => t.Name == "Initial Access");
         Assert.Contains(report.Tactics, t => t.Name == "Defense Evasion");
         Assert.Contains(report.Tactics, t => t.Name == "Collection");
-        Assert.Contains(report.Tactics, t => t.Name == "Discovery");
+        Assert.Contains(report.Tactics, t => t.Name == "Impact");
+        Assert.Contains(report.Tactics, t => t.Name == "Execution");
     }
 
     [Fact]
@@ -330,12 +332,13 @@ public class MITREATLASReporterTests
     }
 
     [Fact]
-    public void GenerateReport_PromptInjection_TacticIsInitialAccess_NotReconnaissance()
+    public void GenerateReport_PromptInjection_TacticIsExecution()
     {
+        // H13 (verified vs ATLAS.yaml 2026-06-13): AML.T0051 LLM Prompt Injection → TA0005 Execution.
         var report = new MITREATLASReporter().GenerateReport(CreateTestResult());
         var t0051 = report.Techniques.First(t => t.Id == "AML.T0051");
-        Assert.Equal("TA0001", t0051.TacticId);
-        Assert.Equal("Initial Access", t0051.TacticName); // was the contradictory "Reconnaissance"
+        Assert.Equal("TA0005", t0051.TacticId);
+        Assert.Equal("Execution", t0051.TacticName);
     }
 
     // === RC-5/T4-2: ATLAS technique→tactic remap ===
@@ -348,7 +351,7 @@ public class MITREATLASReporterTests
         var t0057 = report.Techniques.Single(t => t.Id == "AML.T0057");
         Assert.Equal(TechniqueTestStatus.Tested, t0056.Status);
         Assert.Equal(TechniqueTestStatus.Tested, t0057.Status);
-        Assert.Equal("Discovery", t0056.TacticName);
+        Assert.Equal("Exfiltration", t0056.TacticName); // H13: Extract LLM System Prompt → TA0010 Exfiltration
         Assert.Equal("Exfiltration", t0057.TacticName);
         var t0043 = report.Techniques.Single(t => t.Id == "AML.T0043");
         Assert.Equal(TechniqueTestStatus.NotApplicable, t0043.Status);

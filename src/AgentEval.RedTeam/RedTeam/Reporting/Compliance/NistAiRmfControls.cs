@@ -9,10 +9,15 @@ namespace AgentEval.RedTeam.Reporting.Compliance;
 /// <see cref="ControlFidelity.Governance"/> and no attacks — they can never be marked PASS. <c>OwaspCategories</c>
 /// derive from the canonical attack taxonomy (RC-5: derive, don't duplicate).
 /// <para>
-/// #10 CAVEAT: the MEASURE sub-action IDs, titles, and attack assignments below are a BEST-EFFORT mapping and
-/// MUST be verified against the official NIST AI 100-1 / AI RMF Playbook text before audit use. In particular
-/// the security-vs-safety split across MEASURE.2.6 / 2.7 and the assignments of 2.9 / 4.2 are unverified here;
-/// a tested-Effective verdict on a mis-assigned sub-action would misrepresent an unevaluated official subcategory.
+/// H14 (verified 2026-06-13 against NIST AI 100-1 AI RMF 1.0 Core, nvlpubs.nist.gov/nistpubs/ai/nist.ai.100-1.pdf):
+/// the prior best-effort mapping mis-assigned subcategories. Corrections: <b>MEASURE 2.6 is SAFETY</b> ("evaluated
+/// regularly for safety risks … can fail safely") — a black-box red-team does NOT assess it, so it carries no
+/// attacks; <b>MEASURE 2.7 is SECURITY AND RESILIENCE</b> — the home for ALL adversarial-robustness attacks (prompt
+/// injection, jailbreak, indirect/encoding, excessive agency, insecure output, supply-chain, data poisoning,
+/// vector/RAG, inference abuse); red-teaming is the evaluation METHOD for 2.7, not a separate subcategory. The
+/// mislabeled MEASURE 2.9 (which is explainability/interpretability) and MEASURE 4.2 (domain-expert validation) were
+/// removed; their evidence folds into 2.7 (security) or 2.5 (validity/reliability). Supply-chain governance is
+/// surfaced via GOVERN.6.1 (third-party risk), a no-attack governance row.
 /// </para>
 /// </summary>
 public static class NistAiRmfControls
@@ -25,59 +30,50 @@ public static class NistAiRmfControls
     [
         new()
         {
-            ControlId = "MEASURE.2.6",
-            ControlName = "AI System Robustness & Information Security",
-            Description = "AI system is evaluated for security and resilience to adversarial manipulation of inputs, tools, retrieval context, and dependencies.",
+            ControlId = "MEASURE.2.7",
+            ControlName = "Security and Resilience",
+            Description = "AI system security and resilience are evaluated (and documented) via red-teaming — adversarial manipulation of inputs, tools, retrieval context, and dependencies (prompt injection, jailbreak, obfuscation, supply-chain, poisoning, inference abuse).",
             Framework = Framework,
             Fidelity = ControlFidelity.Tested,
             RelevantAttacks = ["PromptInjection", "Jailbreak", "IndirectInjection", "EncodingEvasion", "ExcessiveAgency", "InsecureOutput", "SupplyChain", "DataPoisoning", "VectorEmbedding", "InferenceAPIAbuse"],
         },
         new()
         {
-            ControlId = "MEASURE.2.7",
-            ControlName = "Adversarial / Red-Team Testing",
-            Description = "AI system security and resilience are evaluated via red-teaming (adversarial prompt manipulation, jailbreaks, obfuscation).",
-            Framework = Framework,
-            Fidelity = ControlFidelity.Tested,
-            RelevantAttacks = ["PromptInjection", "Jailbreak", "EncodingEvasion"],
-        },
-        new()
-        {
             ControlId = "MEASURE.2.10",
-            ControlName = "Privacy & Data Leakage",
-            Description = "AI system is evaluated for disclosure of sensitive/personal information and system-prompt leakage.",
+            ControlName = "Privacy Risk",
+            Description = "Privacy risk of the AI system is examined and documented — disclosure of sensitive/personal information and system-prompt leakage.",
             Framework = Framework,
             Fidelity = ControlFidelity.Tested,
             RelevantAttacks = ["PIILeakage", "SystemPromptExtraction"],
         },
         new()
         {
-            ControlId = "MEASURE.2.3",
-            ControlName = "Confabulation / Output Reliability",
-            Description = "AI system is evaluated for fabrication of authoritative detail about nonexistent entities (a confabulation proxy).",
+            ControlId = "MEASURE.2.5",
+            ControlName = "Validity and Reliability",
+            Description = "AI system is demonstrated valid and reliable — here, a confabulation/output-reliability proxy (fabrication of authoritative detail about nonexistent entities).",
             Framework = Framework,
             Fidelity = ControlFidelity.Supporting,
             RelevantAttacks = ["Misinformation"],
         },
         new()
         {
-            ControlId = "MEASURE.2.9",
-            ControlName = "Information Integrity",
-            Description = "AI system is evaluated for in-context poisoning susceptibility and adoption of injected false information.",
+            ControlId = "MEASURE.2.6",
+            ControlName = "Safety",
+            Description = "AI system is evaluated regularly for safety risks and can fail safely. A black-box conversational red-team does NOT assess fail-safe/safety behaviour — listed for traceability with no attacks (never PASS).",
             Framework = Framework,
-            Fidelity = ControlFidelity.Supporting,
-            RelevantAttacks = ["DataPoisoning", "Misinformation", "VectorEmbedding"],
-        },
-        new()
-        {
-            ControlId = "MEASURE.4.2",
-            ControlName = "Value-Chain / Supply-Chain Integrity",
-            Description = "AI system is evaluated for uncaveated recommendation of fake/typosquatted packages or models (a supply-chain proxy).",
-            Framework = Framework,
-            Fidelity = ControlFidelity.Supporting,
-            RelevantAttacks = ["SupplyChain"],
+            Fidelity = ControlFidelity.Governance,
+            RelevantAttacks = [],
         },
         // ── Governance / Map / Manage: traceability only, NEVER PASS (no attack behind them) ──
+        new()
+        {
+            ControlId = "GOVERN.6.1",
+            ControlName = "Third-Party / Supply-Chain Risk Policies",
+            Description = "Policies and procedures address AI risks arising from third-party software, data, and supply-chain. Process/governance; the SupplyChain attack provides supporting evidence but the control itself is not testable at inference time.",
+            Framework = Framework,
+            Fidelity = ControlFidelity.Governance,
+            RelevantAttacks = [],
+        },
         new()
         {
             ControlId = "GOVERN.1.1",

@@ -43,11 +43,11 @@ public class MitreBenchmarkTests
         // AtlasBaseline wires the full 9-attack roster from Attack.All.
         Assert.Equal(Attack.All.Count, run.Pipeline.GetProbePreview().Select(p => p.AttackName).Distinct().Count());
 
-        // RC-5/T4-2: 6 ATLAS technique IDs are covered by the 9 attacks
-        // (AML.T0037, T0045, T0051, T0054, T0056, T0057).
+        // H13 (verified vs ATLAS.yaml 2026-06-13): 8 ATLAS technique IDs are covered by the built-in attacks
+        // (AML.T0010, T0020, T0034, T0037, T0051, T0054, T0056, T0057). AML.T0045 was retired → T0034 Cost Harvesting.
         var covered = run.CoveredAtlasIds;
         Assert.Contains("AML.T0037", covered);
-        Assert.Contains("AML.T0045", covered);
+        Assert.Contains("AML.T0034", covered);
         Assert.Contains("AML.T0051", covered);
         Assert.Contains("AML.T0054", covered);
         Assert.Contains("AML.T0056", covered);
@@ -149,11 +149,11 @@ public class MitreBenchmarkTests
             Assert.Equal("compliance.mitre", leaf.Metric.Category);
         });
 
-        // RC-5/T4-2 + #9: the 8 applicable techniques should be tested-and-passed against an always-refusing
-        // agent (AML.T0037, T0045, T0051, T0054, T0056, T0057, plus the newly-cataloged T0010, T0020).
+        // H13 (verified vs ATLAS.yaml 2026-06-13): the 8 applicable techniques tested-and-passed against an
+        // always-refusing agent (AML.T0010, T0020, T0034, T0037, T0051, T0054, T0056, T0057). T0045 was retired → T0034.
         var expectedTested = new[]
         {
-            "mitre.aml.t0010", "mitre.aml.t0020", "mitre.aml.t0037", "mitre.aml.t0045", "mitre.aml.t0051",
+            "mitre.aml.t0010", "mitre.aml.t0020", "mitre.aml.t0034", "mitre.aml.t0037", "mitre.aml.t0051",
             "mitre.aml.t0054", "mitre.aml.t0056", "mitre.aml.t0057"
         };
         var testedLeaves = leaves.Where(l => l.Score.Label == "pass").ToList();
@@ -233,8 +233,8 @@ public class MitreBenchmarkTests
     {
         // An agent that reveals its system prompt (incl. the planted canary) must drive the SPE-mapped
         // ATLAS leaves to a REAL failure (canary matched in the response → Succeeded). RC-5/T4-2: SPE now
-        // maps to AML.T0056 (LLM Meta Prompt Extraction) + AML.T0057 (LLM Data Leakage), not the demoted
-        // AML.T0043. This proves the detector works in the leak direction — the other half of the canary test.
+        // maps to AML.T0056 (Extract LLM System Prompt) + AML.T0057 (LLM Data Leakage). This proves the
+        // detector works in the leak direction — the other half of the canary test.
         var run = MitreBenchmark.AtlasBaseline(systemPromptCanary: SpeCanary);
         var agent = new CanaryLeakingAgent("MitreLeakingAgent", SpeCanary);
         var input = new EvalInput(

@@ -11,7 +11,7 @@ namespace AgentEval.RedTeam.Attacks;
 /// the response text only; they do NOT drive real API parameters (temperature, max_tokens, etc.) or
 /// measure actual resource consumption.
 /// OWASP LLM10: Unbounded Consumption (v2.0).
-/// MITRE ATLAS AML.T0045: Inference API.
+/// MITRE ATLAS AML.T0034: Cost Harvesting (the former AML.T0045 was retired from ATLAS — verified vs ATLAS.yaml 2026-06-13).
 /// </summary>
 /// <remarks>
 /// <para>
@@ -34,10 +34,10 @@ namespace AgentEval.RedTeam.Attacks;
 /// <para>All 15 probes are original implementations for AgentEval.</para>
 /// <para>Technique inspirations:</para>
 /// <list type="bullet">
-/// <item>MITRE ATLAS AML.T0045: MITRE ATLAS framework (Apache 2.0) — https://atlas.mitre.org/techniques/AML.T0045</item>
+/// <item>MITRE ATLAS AML.T0034 Cost Harvesting: MITRE ATLAS framework (Apache 2.0) — https://atlas.mitre.org/techniques/AML.T0034</item>
 /// <item>Resource exhaustion: Informed by garak probes.continuation module (NVIDIA, Apache 2.0) — https://github.com/NVIDIA/garak</item>
 /// <item>API parameter abuse: Informed by OpenAI/Azure API documentation for parameter boundaries</item>
-/// <item>Model fingerprinting: Informed by MITRE ATLAS ML Artifact Collection technique</item>
+/// <item>Model fingerprinting: Informed by MITRE ATLAS AI Model Inference API Access (AML.T0040)</item>
 /// </list>
 /// <para><b>Scope &amp; limitation (Tier-0 honesty):</b></para>
 /// <para>
@@ -66,7 +66,7 @@ public sealed class InferenceAPIAbuseAttack : IAttackType
     public string OwaspLlmId => "LLM10";
 
     /// <inheritdoc />
-    public string[] MitreAtlasIds => ["AML.T0045"];
+    public string[] MitreAtlasIds => ["AML.T0034"];   // Cost Harvesting (LLM10 Unbounded Consumption); ex-AML.T0045 retired
 
     /// <inheritdoc />
     public Severity DefaultSeverity => Severity.Medium;
