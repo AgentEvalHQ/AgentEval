@@ -30,6 +30,27 @@ AgentEval RedTeam is built on two foundational cybersecurity taxonomies that pro
 4. **Not Copied From**: We do NOT copy *prompts* or *code* from garak, PyRIT, or specific papers — concepts we adopt (e.g. garak's z-score calibration) are re-implemented natively and credited
 5. **Generate Reports**: Export findings mapped to industry frameworks for SOC/compliance teams
 
+## How AgentEval compares
+
+The LLM red-team space is mostly Python/Node. AgentEval is the **.NET-native** option, and it leans into trustworthiness and CI/CD rather than chasing raw probe count. This is a factual positioning summary — each tool is excellent at what it's built for; pick the one that fits your stack and goal.
+
+| Capability | **AgentEval** | garak (NVIDIA) | PyRIT (Microsoft) | DeepTeam | Promptfoo |
+|------------|:-------------:|:--------------:|:-----------------:|:--------:|:---------:|
+| Language / runtime | **.NET** | Python | Python | Python | Node.js |
+| OWASP LLM Top 10 coverage | **10/10** | ~8/10 | ~7/10 | ~5/10 | ~6/10 |
+| Probe breadth | 258 built-in (+ imported packs) | **~500+** | ~200+ (×converters) | 50+ vulns | ~100+ |
+| Multi-turn (Crescendo / PAIR / TAP) | ✅ | ⚠️ limited | ✅ | ✅ | ⚠️ |
+| Real tool / RAG behavioral testing | ✅ (evidence-fidelity tiers) | ❌ | ⚠️ | ⚠️ | ❌ |
+| Evidence-fidelity labeling (Verbal/IntentToAct/Behavioral) | ✅ **unique** | ❌ | ❌ | ❌ | ❌ |
+| Conclusive-only scoring + Inconclusive state | ✅ **unique** | ❌ | ⚠️ | ❌ | ❌ |
+| Compliance reporters (OWASP/MITRE/SOC2/ISO27001/NIST) | ✅ **5** | ❌ | ❌ | ❌ | ❌ |
+| SARIF + JUnit + baseline regression gate | ✅ | ❌ | ❌ | ❌ | ⚠️ |
+| Relative (z-score) calibration | ✅ | ✅ | ❌ | ❌ | ❌ |
+| Multi-modal / GCG suffix | ❌ (roadmap) | ✅ | ✅ | ❌ | ❌ |
+| License | MIT | Apache-2.0 | MIT | Apache-2.0 (red-team **Enterprise-paid**) | MIT |
+
+**Where AgentEval is the strongest fit:** .NET/Azure shops; security gates in CI (SARIF, JUnit, baseline regression); audit/compliance evidence across five frameworks; and results you can trust — a green verdict is *conclusive-only* and labels whether the evidence was verbal, intent-to-act, or behavioral, so a passing probe is never a guess. **Where the others lead:** garak on raw probe breadth and multi-modal; PyRIT on attacker-LLM orchestration depth; both remain excellent for deep security research. AgentEval closes the breadth gap by *importing* their datasets (`--pack`, `--import-probes`) rather than re-implementing them. Calibration is credited to garak (Apache-2.0); we copy concepts, not code or prompts.
+
 ## Quick Start
 
 ```csharp
