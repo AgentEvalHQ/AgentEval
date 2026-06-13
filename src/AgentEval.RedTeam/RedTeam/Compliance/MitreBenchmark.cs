@@ -30,12 +30,13 @@ namespace AgentEval.Benchmarks;
 ///         <see cref="MITREATLASReport"/> for compliance evidence packs.</item>
 /// </list>
 /// <para>
-/// <b>Coverage</b>: 13 ATLAS techniques are defined in <see cref="MITREATLASReporter"/>:
-/// 6 are <c>IsApplicable=true</c> at the agent-API layer, 7 are <c>IsApplicable=false</c>
+/// <b>Coverage</b>: 15 ATLAS techniques are defined in <see cref="MITREATLASReporter"/>:
+/// 8 are <c>IsApplicable=true</c> at the agent-API layer, 7 are <c>IsApplicable=false</c>
 /// (RC-5/T4-2: adversarial-data crafting, ML-artifact collection, inference-API exfiltration,
-/// AI-phishing, model replication, dataset poisoning, adversarial SEO). The existing nine
+/// AI-phishing, model replication, dataset poisoning, adversarial SEO). The built-in
 /// attack types in this assembly self-tag <see cref="IAttackType.MitreAtlasIds"/> against
-/// all 6 applicable techniques (AML.T0037, T0045, T0051, T0054, T0056, T0057). The
+/// all 8 applicable techniques (AML.T0010, T0020, T0034, T0037, T0051, T0054, T0056, T0057 —
+/// AML.T0045 was retired → AML.T0034 Cost Harvesting, verified vs ATLAS.yaml 2026-06-13). The
 /// 7 non-applicable techniques surface as <c>NotApplicable</c> leaves — <c>skipped</c>-labelled
 /// <see cref="EvalResult"/> leaves rather than passing-by-default.
 /// </para>

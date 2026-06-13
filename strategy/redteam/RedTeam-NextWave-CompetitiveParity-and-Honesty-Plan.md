@@ -1,5 +1,18 @@
 # RedTeam Next-Wave — Competitive Parity & Honesty Plan
 
+> ## 📍 STATUS (audited 2026-06-13, `feature/redteam-newwave-fixes`) — ACTIVE PLAN, partially shipped
+> **This is the current forward plan.** It supersedes the FeatureComplete plan's §Wave F/G backlog and owns everything still open.
+>
+> **✅ DONE (verified in code):**
+> - **Tier 1** (all 5): graded `LikertJudgeEvaluator` · Skeleton-Key + Many-shot probes (`JailbreakAttack`) · divergence/repeat-token probes (`PIILeakageAttack`) · `IProbeDatasetImporter`+`JsonProbeDatasetImporter`+`--import-probes` · `--explain` LLM rationale.
+> - **Tier 2** (both gap-closers): **#7** LLM03 `HttpPackageRegistry` + `--package-registry live` · **#8** LLM08 `VectorEmbeddingAttack : IToolAwareAttack` w/ `retrieve_context` canary + probe-aware `VectorEmbeddingEvaluator` (Behavioral RAG evidence).
+> - **Tier 3 #9** z-score calibration: `Calibration/CalibrationProfile.cs` + `Calibrator.cs` + `--calibration` (garak-inspired, Apache-2.0 credited).
+> - Probes **247→258**; CLI **27→31** options. Commits `6c8f4fb`/`578235c`/`1dd4ac5`/`2cbd9f2`/`b5c2804`/`cd97a11`. Tests green: **net8/9 4963, net10 5166/0/1**.
+>
+> **⏭️ PENDING NEXT (not yet in code — this is the remaining backlog):**
+> **#6** leakreplay replay/membership probes · **#10** PackDownloader + `--accept-license` license gate (HarmBench/JailbreakBench/CyberSecEval) · **#11** BadLikertJudge multi-turn · **#12** LLM-driven converters (paraphrase/persuasion/tense) · **#13** tool-aware multi-turn attack (Wave-B↔C DIM) · **#14** LLM10 transport-level metering harness · **#15** atkgen adaptive generation · **#16** memory-poisoning + multi-agent (Wave G).
+> **Parked:** GCG (GPU), multi-modal (`202-P19`, needs MAF vision). **PR-to-main NOT authorized.** Keep this doc top-level (not in `done/`).
+
 > **✅ TIER 1 SHIPPED (2026-06-13, `feature/redteam-newwave-fixes`).** All 5 low-hanging-fruit items landed in 3 commits (`6c8f4fb`/`578235c`/`1dd4ac5`): Skeleton-Key + Many-shot probes, divergence/repeat-token probes, the graded `LikertJudgeEvaluator`, the seed-prompt dataset importer (`IProbeDatasetImporter` + `--import-probes`), and `--explain` LLM rationale (Succeeded/Inconclusive, judge-gated). Probe total 247→255; CLI 27→29 options; +27 tests. All TFMs green: net8/9 4927, net10 5130/0/1. **Next: Tier 2** (LLM03 registry oracle + LLM08 RAG harness — the two real gap-closers).
 
 > **✅ TIER 2 COMPLETE 2026-06-13 — both real gap-closers shipped.**

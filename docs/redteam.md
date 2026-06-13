@@ -19,7 +19,7 @@ AgentEval RedTeam is built on two foundational cybersecurity taxonomies that pro
 - **Source**: [MITRE ATLAS Framework](https://atlas.mitre.org/)
 - **License**: Apache License 2.0
 - **Why**: Comprehensive ML/AI attack taxonomy with tactics, techniques, procedures (TTPs) used by cybersecurity professionals worldwide
-- **Coverage**: **8 technique IDs** mapped to attack implementations (AML.T0010, AML.T0020, AML.T0037, AML.T0045, AML.T0051, AML.T0054, AML.T0056, AML.T0057)
+- **Coverage**: **8 technique IDs** mapped to attack implementations (AML.T0010, AML.T0020, AML.T0034, AML.T0037, AML.T0051, AML.T0054, AML.T0056, AML.T0057)
 - **Attribution**: *Attack techniques classified using MITRE ATLAS framework. © 2023 The MITRE Corporation.*
 
 ### AgentEval's Approach: Original Implementation with Taxonomy Mapping
