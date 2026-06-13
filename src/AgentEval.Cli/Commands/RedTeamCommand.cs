@@ -82,6 +82,12 @@ internal static class RedTeamCommand
             { Description = "Version identifier stamped into the saved baseline (e.g. a release tag or commit SHA). Default: \"unspecified\"." };
         var baselineNoteOpt = new Option<string?>("--baseline-note")
             { Description = "Free-text note stored in the saved baseline (--save-baseline)." };
+
+        // Per-role API keys (fall back to --api-key when omitted) — judge/attacker may live behind a different gateway.
+        var judgeApiKeyOpt = new Option<string?>("--judge-api-key")
+            { Description = "API key for the judge endpoint (--judge). Falls back to --api-key if omitted." };
+        var attackerApiKeyOpt = new Option<string?>("--attacker-api-key")
+            { Description = "API key for the attacker endpoint (--attacker). Falls back to --api-key if omitted." };
         var baselineOpt = new Option<FileInfo?>("--baseline")
             { Description = "Compare the scan to this baseline (JSON), print the diff, and gate the exit code on regression." };
         var failOnOpt = new Option<string>("--fail-on")
@@ -103,8 +109,10 @@ internal static class RedTeamCommand
         command.Options.Add(maxProbesOpt);
         command.Options.Add(judgeEndpointOpt);
         command.Options.Add(judgeModelOpt);
+        command.Options.Add(judgeApiKeyOpt);
         command.Options.Add(attackerEndpointOpt);
         command.Options.Add(attackerModelOpt);
+        command.Options.Add(attackerApiKeyOpt);
         command.Options.Add(formatOpt);
         command.Options.Add(outputOpt);
         command.Options.Add(saveBaselineOpt);
@@ -131,8 +139,10 @@ internal static class RedTeamCommand
                 MaxProbes = parseResult.GetValue(maxProbesOpt),
                 JudgeEndpoint = parseResult.GetValue(judgeEndpointOpt),
                 JudgeModel = parseResult.GetValue(judgeModelOpt),
+                JudgeApiKey = parseResult.GetValue(judgeApiKeyOpt),
                 AttackerEndpoint = parseResult.GetValue(attackerEndpointOpt),
                 AttackerModel = parseResult.GetValue(attackerModelOpt),
+                AttackerApiKey = parseResult.GetValue(attackerApiKeyOpt),
                 Format = parseResult.GetValue(formatOpt)!,
                 Output = parseResult.GetValue(outputOpt),
                 SaveBaseline = parseResult.GetValue(saveBaselineOpt),
@@ -232,15 +242,16 @@ internal static class RedTeamCommand
         };
 
         // 5. Create ScanOptions
+        // Per-role keys fall back to the target --api-key so the common single-gateway case stays a one-flag setup.
         IChatClient? judgeClient = opts.JudgeEndpoint is not null
             ? EndpointFactory.CreateOpenAICompatible(
-                opts.JudgeEndpoint, opts.JudgeModel ?? resolvedName, opts.ApiKey)
+                opts.JudgeEndpoint, opts.JudgeModel ?? resolvedName, opts.JudgeApiKey ?? opts.ApiKey)
             : null;
 
         // Wave C′: the attacker LLM drives Crescendo/PAIR/TAP. Distinct from the judge (it generates, the judge scores).
         IChatClient? attackerClient = opts.AttackerEndpoint is not null
             ? EndpointFactory.CreateOpenAICompatible(
-                opts.AttackerEndpoint, opts.AttackerModel ?? resolvedName, opts.ApiKey)
+                opts.AttackerEndpoint, opts.AttackerModel ?? resolvedName, opts.AttackerApiKey ?? opts.ApiKey)
             : null;
 
         // Fail fast: PAIR/TAP are fundamentally attacker-driven and would error mid-scan without an attacker.
@@ -418,8 +429,10 @@ internal sealed class RedTeamOptions
     public int MaxProbes { get; init; }
     public string? JudgeEndpoint { get; init; }
     public string? JudgeModel { get; init; }
+    public string? JudgeApiKey { get; init; }
     public string? AttackerEndpoint { get; init; }
     public string? AttackerModel { get; init; }
+    public string? AttackerApiKey { get; init; }
     public required string Format { get; init; }
     public FileInfo? Output { get; init; }
     public FileInfo? SaveBaseline { get; init; }

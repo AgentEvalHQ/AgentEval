@@ -5,7 +5,7 @@ using System.Diagnostics;
 using AgentEval.Core;       // IEvaluableAgent, AgentResponse
 using AgentEval.Testing;    // Turn
 
-namespace AgentEval.RedTeam;
+namespace AgentEval.RedTeam;   // CanaryTool / IToolAwareAttack share this namespace (multi-turn tool composition)
 
 /// <summary>
 /// Drives an <see cref="IMultiTurnAttack"/> against an agent as a conversation (Wave C, Pillar 2), evaluating per
@@ -38,6 +38,10 @@ public sealed class TurnOrchestrator
             : new StatelessConversationAdapter(_agent);
 
         var detector = attack.ConvergenceDetector ?? DefaultConvergenceDetector.Instance;
+        // Wave B↔C: a multi-turn attack that is ALSO tool-aware advertises canary tools for the whole conversation.
+        // These are routed over the conversation channel's tool-aware SendAsync; a channel that can't carry tools
+        // (the default DIM) degrades honestly to text-only. Fetched once — the tool surface is conversation-scoped.
+        var canaryTools = attack is IToolAwareAttack toolAware ? toolAware.GetCanaryTools(_options.Intensity) : null;
         var history = new List<Turn>();
         var perTurn = new List<EvaluationResult>();
         var outcome = EvaluationOutcome.Resisted;   // no turn succeeded ⇒ resisted (folded to Inconclusive below if 0 turns ran or every turn was inconclusive)
@@ -108,7 +112,9 @@ public sealed class TurnOrchestrator
             AgentResponse response;
             try
             {
-                response = await convo.SendAsync(userMessage, turnCts.Token).ConfigureAwait(false);
+                response = canaryTools is { Count: > 0 }
+                    ? await convo.SendAsync(userMessage, canaryTools, turnCts.Token).ConfigureAwait(false)
+                    : await convo.SendAsync(userMessage, turnCts.Token).ConfigureAwait(false);
             }
             catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
             {

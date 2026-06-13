@@ -4,7 +4,7 @@
 using AgentEval.Core;       // IEvaluableAgent, AgentResponse
 using AgentEval.Testing;    // Turn (referenced in place — not relocated)
 
-namespace AgentEval.RedTeam;
+namespace AgentEval.RedTeam;   // CanaryTool / IToolAwareAttack share this namespace (under RedTeam/Harness)
 
 /// <summary>
 /// How faithfully a multi-turn conversation was carried (Wave C, Pillar 2 — anti-overclaim). A flattened conversation
@@ -44,4 +44,15 @@ public interface IAgentConversation : IAsyncDisposable
 
     /// <summary>Sends the next user message and returns the agent's reply.</summary>
     Task<AgentResponse> SendAsync(string userMessage, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Sends the next user message with a set of canary tools available to the agent for this turn — the Wave B↔C
+    /// composition that lets a multi-turn <see cref="IToolAwareAttack"/> exercise a real tool boundary over the
+    /// conversation channel. The default implementation IGNORES <paramref name="tools"/> and falls back to the
+    /// text-only <see cref="SendAsync(string, CancellationToken)"/>: a conversation channel that cannot carry a tool
+    /// surface degrades honestly to text-only (Verbal evidence) rather than fabricating tool execution. A tool-capable
+    /// conversation overrides this to route the tools to the SUT (Behavioral evidence when a canary is invoked).
+    /// </summary>
+    Task<AgentResponse> SendAsync(string userMessage, IReadOnlyList<CanaryTool> tools, CancellationToken cancellationToken = default)
+        => SendAsync(userMessage, cancellationToken);
 }

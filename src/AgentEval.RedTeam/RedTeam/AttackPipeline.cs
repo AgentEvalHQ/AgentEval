@@ -3,6 +3,7 @@
 // Licensed under the MIT License.
 using AgentEval.Core;
 using AgentEval.RedTeam.Transforms;
+using Microsoft.Extensions.AI;
 
 namespace AgentEval.RedTeam;
 
@@ -31,6 +32,11 @@ public sealed class AttackPipeline
     private int _maxProbesPerAttack = 0;
     private bool _failFast = false;
     private bool _includeEvidence = true;
+    private IChatClient? _judgeClient;
+    private IChatClient? _attackerClient;
+    private TimeSpan? _timeoutPerTurn;
+    private TimeSpan _maxConversationDuration = TimeSpan.Zero;
+    private int _parallelism = 1;
 
     private AttackPipeline() { }
 
@@ -159,6 +165,59 @@ public sealed class AttackPipeline
     }
 
     /// <summary>
+    /// Sets the LLM judge client used to re-evaluate <see cref="EvaluationOutcome.Inconclusive"/> probes
+    /// (single-turn and multi-turn fallback, GAP-19). Distinct from <see cref="WithAttacker"/>.
+    /// </summary>
+    public AttackPipeline WithJudge(IChatClient judgeClient)
+    {
+        ArgumentNullException.ThrowIfNull(judgeClient);
+        _judgeClient = judgeClient;
+        return this;
+    }
+
+    /// <summary>
+    /// Sets the attacker LLM client that GENERATES adversarial turns for LLM-driven multi-turn attacks
+    /// (attacker-rung Crescendo / PAIR / TAP, Wave C′). Without it those attacks fall back to their scripted path.
+    /// This is the attacker (generates), distinct from <see cref="WithJudge"/> (scores). PAIR/TAP require this.
+    /// </summary>
+    public AttackPipeline WithAttacker(IChatClient attackerClient)
+    {
+        ArgumentNullException.ThrowIfNull(attackerClient);
+        _attackerClient = attackerClient;
+        return this;
+    }
+
+    /// <summary>
+    /// Sets the per-turn timeout for multi-turn conversations (Wave C). Defaults to the per-probe timeout.
+    /// A multi-turn conversation's hard bound is <c>MaxTurns × TimeoutPerTurn</c> (or <see cref="WithMaxConversationDuration"/>).
+    /// </summary>
+    public AttackPipeline WithTimeoutPerTurn(TimeSpan timeoutPerTurn)
+    {
+        _timeoutPerTurn = timeoutPerTurn;
+        return this;
+    }
+
+    /// <summary>
+    /// Sets a soft ceiling on total wall-clock per multi-turn conversation (checked between turns; never a hard
+    /// mid-turn cancel). <see cref="TimeSpan.Zero"/> (default) means no soft cap.
+    /// </summary>
+    public AttackPipeline WithMaxConversationDuration(TimeSpan maxConversationDuration)
+    {
+        _maxConversationDuration = maxConversationDuration;
+        return this;
+    }
+
+    /// <summary>
+    /// Sets the maximum number of probes executed concurrently within an attack (RA3-05). Values &lt;= 1 run
+    /// sequentially (the default). Only raise this when the agent and evaluator are safe for concurrent invocation.
+    /// </summary>
+    public AttackPipeline WithParallelism(int parallelism)
+    {
+        _parallelism = parallelism;
+        return this;
+    }
+
+    /// <summary>
     /// Amplifies the most-recently-added attack by FANNING OUT each of its probes through each transformer
     /// (Expand) — Wave A. The original probes are dropped.
     /// </summary>
@@ -236,7 +295,13 @@ public sealed class AttackPipeline
             TimeoutPerProbe = _timeoutPerProbe,
             MaxProbesPerAttack = _maxProbesPerAttack,
             FailFast = _failFast,
-            IncludeEvidence = _includeEvidence
+            IncludeEvidence = _includeEvidence,
+            JudgeClient = _judgeClient,
+            AttackerClient = _attackerClient,
+            // _timeoutPerTurn null ⇒ ScanOptions.TimeoutPerTurn falls back to TimeoutPerProbe (same as unset).
+            TimeoutPerTurn = _timeoutPerTurn ?? _timeoutPerProbe,
+            MaxConversationDuration = _maxConversationDuration,
+            Parallelism = _parallelism,
         };
 
         var runner = new RedTeamRunner();
