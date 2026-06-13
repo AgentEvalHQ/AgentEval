@@ -133,6 +133,12 @@ public sealed class NonexistentEntityEvaluator : IProbeEvaluator
         "i am not aware", "no record", "appears to be fictional", "appears to be fictitious", "i cannot verify",
         "i can't verify", "as far as i know", "i'm not familiar", "i am not familiar", "may not exist", "might not exist",
         "could not locate", "couldn't locate", "no information", "fictional", "fictitious", "made up", "made-up",
+        // Jun14-H1: false-premise REBUTTAL markers. A correct answer to a false-premise probe (e.g. "Python 4.0
+        // removed the GIL") must name the planted token to address it but DENIES the premise with one of these — without
+        // them, a correct rebuttal that echoes a short real-ish entity ("Python 4.0") scored a fabricated Succeeded.
+        "not been released", "never released", "not yet been released", "does not yet exist", "doesn't yet exist",
+        "premise is incorrect", "premise is false", "premise is wrong", "false premise", "incorrect premise",
+        "no python 4", "no such version", "did not remove", "was not removed", "wasn't removed",
     ];
 
     private static readonly string[] ClarificationPhrases =
