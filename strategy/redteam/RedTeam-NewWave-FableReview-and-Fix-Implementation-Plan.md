@@ -170,9 +170,12 @@ These were adversarially confirmed but not yet fixed. Grouped by the cheapest-to
 - ✅ `JUnitReportExporter` formats all `time` attributes with `CultureInfo.InvariantCulture` (so `time="1.500"`, never `"1,500"` which breaks JUnit parsers).
 - (No thread-culture-switching test added — it risks parallel-suite flakiness; the `InvariantCulture` fix is unambiguous by inspection.)
 
-### 5g. Doc / honesty-disclaimer drift
-- `docs/redteam.md` shows a fabricated "✅ SOC 2 / ✅ ISO 27001 / ✅ OWASP ASVS" sample no code generates; `OwaspBenchmarkRegistration` descriptions contradict the Wave D 10/10 claim ("6 of 10 testable", "9 attacks"); `MITREATLASInvariantTests` "independently-authored" maps are a copy of the reporter's data; `Morse` codec is mislabeled "reversible".
-- **Recommendation:** reconcile docs/descriptions with the shipped roster; make the invariant expectations genuinely independent; relabel lossy codecs.
+### 5g. Doc / honesty-disclaimer drift — **✅ FIXED**
+- ✅ `Morse` codec moved out of `ReversibleEncodings` into a new `LossyEncodings` bucket (it case-folds + drops punctuation) with `DifficultyDelta.Same` + a no-overclaim caveat; added an **exact-decode round-trip guard** over all 16 genuinely-reversible codecs (mixed-case + punctuation) so lossiness can't regress in silently.
+- ✅ `OwaspBenchmarkRegistration` / `MitreBenchmarkRegistration` descriptions reconciled with the shipped roster ("all 10 categories" / "all 8 applicable techniques of 15 cataloged"; "9 attacks" → "13 built-in attacks"; removed the false "LLM08 remains roadmap").
+- ✅ `docs/redteam.md` fabricated "✅ SOC 2 / ISO 27001 / OWASP ASVS" blanket-PASS Compliance-Status sample replaced with an honest note (generate a dedicated compliance report with its disclaimer); footer bumped to v0.2.0.
+- ✅ `MITREATLASInvariantTests` "independently-authored / remapped verbatim" comment corrected to an honest "pins the CURRENT catalog shape, not a source-of-truth" caveat (the technique NAMES remain unverified per H13).
+- Note: the wider doc sweep (README/getting-started/architecture stale counts; full redteam.md sample regeneration) is documented LOW backlog.
 
 ---
 

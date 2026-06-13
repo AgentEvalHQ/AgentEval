@@ -9,11 +9,12 @@ namespace AgentEval.Tests.RedTeam.Reporting.Compliance;
 
 public sealed class MITREATLASInvariantTests
 {
-    // Independently-authored expectation of each ATLAS technique's tactic assignment.
-    // Pinning the technique -> tactic-ID edge against a separate literal makes the
-    // invariant catch real drift (a mis-edited TacticId) rather than a self-projection.
-    // RC-5/T4-2: remapped verbatim against the ATLAS matrix — SPE/PII extraction → T0056/T0057,
-    // T0024 retired, T0043/T0047/T0048 demoted to out-of-band (NotApplicable).
+    // Expectation of each ATLAS technique's tactic assignment, pinned against a separate literal so the invariant
+    // catches a mis-edited TacticId (a drift guard) rather than self-projecting the reporter's own field.
+    // 5g/H13 CAVEAT: these IDs/tactic pairings are NOT yet verified against the official ATLAS matrix — several
+    // technique NAMES in the catalog are best-effort (see MITREATLASReporter), so this map pins the CURRENT catalog
+    // shape, not a source-of-truth. When the catalog is corrected against mitre-atlas/atlas-data, re-author this
+    // map from that release (cite the version) — do not treat it as independently authoritative.
     private static readonly IReadOnlyDictionary<string, string> ExpectedTechniqueTacticId =
         new Dictionary<string, string>(StringComparer.Ordinal)
         {

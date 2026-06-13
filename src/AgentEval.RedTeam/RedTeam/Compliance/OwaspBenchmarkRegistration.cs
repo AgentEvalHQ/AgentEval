@@ -39,14 +39,14 @@ internal static class OwaspBenchmarkRegistration
     {
         BenchmarkFamilyRegistry.Register(new BenchmarkFamily(
             name: "owasp",
-            description: "OWASP LLM Top 10 v2.0 red-team benchmark (6 of 10 categories testable at agent-API layer)",
+            description: "OWASP LLM Top 10 v2.0 red-team benchmark (all 10 categories covered — Wave D)",
             defaultCostTier: CostTier.Medium,
             presets:
             [
-                new("top10", "All 9 implemented attacks at Quick intensity (default)", CostTier.Medium),
+                new("top10", "All 13 built-in attacks at Quick intensity (default)", CostTier.Medium),
                 new("smoke", "3 MVP attacks (PromptInjection + Jailbreak + PIILeakage) — CI-friendly", CostTier.Low),
-                new("audit", "All 9 attacks at Comprehensive intensity — audit-grade evidence", CostTier.High),
-                new("top10-rag", "All 9 attacks at Comprehensive intensity, 20-min timeout — RAG-vector depth (LLM01 indirect-injection emphasis); LLM08 remains roadmap", CostTier.High),
+                new("audit", "All 13 attacks at Comprehensive intensity — audit-grade evidence", CostTier.High),
+                new("top10-rag", "All 13 attacks at Comprehensive intensity, 20-min timeout — RAG-vector depth (LLM01 indirect-injection + LLM08 vector-embedding emphasis)", CostTier.High),
             ],
             // Shape B (primary): return the OwaspBenchmarkRun directly so consumers can call ScanAsync / GenerateReport.
             runnerType: typeof(OwaspBenchmarkRun),
