@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
+using AgentEval.Core; // AgentResponse
+
 namespace AgentEval.RedTeam.Evaluators;
 
 /// <summary>
@@ -67,20 +69,38 @@ public class CompositeEvaluator : IProbeEvaluator
     public IReadOnlyList<IProbeEvaluator> Evaluators => _evaluators;
 
     /// <inheritdoc />
-    public async Task<EvaluationResult> EvaluateAsync(
+    public Task<EvaluationResult> EvaluateAsync(
         AttackProbe probe,
         string response,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(probe);
         ArgumentNullException.ThrowIfNull(response);
+        return EvaluateCoreAsync(e => e.EvaluateAsync(probe, response, cancellationToken));
+    }
 
+    /// <summary>
+    /// H2: structured overload — forward the full <see cref="AgentResponse"/> to every child evaluator so a
+    /// tool-aware child keeps its behavioral evidence (a missing override would collapse it to verbal text).
+    /// </summary>
+    public Task<EvaluationResult> EvaluateAsync(
+        AttackProbe probe,
+        AgentResponse response,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(probe);
+        ArgumentNullException.ThrowIfNull(response);
+        return EvaluateCoreAsync(e => e.EvaluateAsync(probe, response, cancellationToken));
+    }
+
+    private async Task<EvaluationResult> EvaluateCoreAsync(Func<IProbeEvaluator, Task<EvaluationResult>> runOne)
+    {
         var results = new List<EvaluationResult>();
         var allMatched = new List<string>();
 
         foreach (var evaluator in _evaluators)
         {
-            var result = await evaluator.EvaluateAsync(probe, response, cancellationToken);
+            var result = await runOne(evaluator).ConfigureAwait(false);
             results.Add(result);
 
             if (result.MatchedItems is not null)

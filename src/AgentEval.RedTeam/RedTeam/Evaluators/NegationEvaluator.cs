@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
+using AgentEval.Core; // AgentResponse
+
 namespace AgentEval.RedTeam.Evaluators;
 
 /// <summary>
@@ -45,9 +47,25 @@ public class NegationEvaluator : IProbeEvaluator
     {
         ArgumentNullException.ThrowIfNull(probe);
         ArgumentNullException.ThrowIfNull(response);
+        return Invert(await _inner.EvaluateAsync(probe, response, cancellationToken).ConfigureAwait(false));
+    }
 
-        var innerResult = await _inner.EvaluateAsync(probe, response, cancellationToken);
+    /// <summary>
+    /// H2: structured overload — forward the full <see cref="AgentResponse"/> to the inner evaluator (so a
+    /// tool-aware inner keeps its behavioral evidence) and then invert its verdict.
+    /// </summary>
+    public async Task<EvaluationResult> EvaluateAsync(
+        AttackProbe probe,
+        AgentResponse response,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(probe);
+        ArgumentNullException.ThrowIfNull(response);
+        return Invert(await _inner.EvaluateAsync(probe, response, cancellationToken).ConfigureAwait(false));
+    }
 
+    private static EvaluationResult Invert(EvaluationResult innerResult)
+    {
         // Inconclusive remains inconclusive
         if (innerResult.Outcome == EvaluationOutcome.Inconclusive)
         {
