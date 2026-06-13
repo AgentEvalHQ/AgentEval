@@ -39,7 +39,7 @@ public class RedTeamCommandTests
     }
 
     [Fact]
-    public void Create_Has35Options()
+    public void Create_Has39Options()
     {
         // 16 base + Wave E (save-baseline, baseline, fail-on) = 19
         // + Wave C′ (attacker, attacker-model) = 21
@@ -52,8 +52,9 @@ public class RedTeamCommandTests
         // + --calibration (garak-inspired relative z-score scoring) = 31
         // + benchmark packs (--pack, --accept-license) = 33
         // + import dispatch fields (import-prompt-field, import-id-column) = 35 (M10)
+        // + throttle/timeout knobs (delay, parallelism, timeout-per-probe, max-turn-timeout) = 39 (L21)
         var command = RedTeamCommand.Create();
-        Assert.Equal(35, command.Options.Count);
+        Assert.Equal(39, command.Options.Count);
     }
 
     [Theory]
@@ -85,6 +86,10 @@ public class RedTeamCommandTests
     [InlineData("import-probes")]   // dataset import (Wave-F seam)
     [InlineData("import-prompt-field")] // CSV/JSON prompt-field dispatch (M10)
     [InlineData("import-id-column")]    // optional upstream id (M10)
+    [InlineData("delay")]               // throttle (L21)
+    [InlineData("parallelism")]         // within-attack concurrency (L21)
+    [InlineData("timeout-per-probe")]   // per-probe timeout (L21)
+    [InlineData("max-turn-timeout")]    // per-turn timeout (L21)
     [InlineData("explain")]         // --explain LLM rationale
     [InlineData("package-registry")] // LLM03 live registry oracle
     [InlineData("calibration")]     // garak-inspired relative z-score scoring
@@ -712,5 +717,55 @@ public class RedTeamCommandTests
 
         Assert.Same(judge, scan.JudgeClient);
         Assert.Null(scan.OnProgress);                 // --quiet suppresses progress even under --verbose
+    }
+
+    // L21: throttle/timeout knobs thread through the BuildScanOptions seam.
+    [Fact]
+    public void BuildScanOptions_ThreadsThrottleKnobs()
+    {
+        var opts = new RedTeamOptions
+        {
+            Intensity = "quick", Format = "json",
+            DelaySeconds = 2, Parallelism = 4, TimeoutPerProbeSeconds = 10,
+        };
+
+        var scan = RedTeamCommand.BuildScanOptions(opts, attacks: null, Intensity.Quick, judgeClient: null, attackerClient: null);
+
+        Assert.Equal(TimeSpan.FromSeconds(2), scan.DelayBetweenProbes);
+        Assert.Equal(4, scan.Parallelism);
+        Assert.Equal(TimeSpan.FromSeconds(10), scan.TimeoutPerProbe);
+    }
+
+    [Fact]
+    public void BuildScanOptions_TimeoutPerTurnDefaultsToProbe_WhenZero()
+    {
+        var opts = new RedTeamOptions { Intensity = "quick", Format = "json", TimeoutPerProbeSeconds = 15, TimeoutPerTurnSeconds = 0 };
+
+        var scan = RedTeamCommand.BuildScanOptions(opts, attacks: null, Intensity.Quick, null, null);
+
+        Assert.Equal(scan.TimeoutPerProbe, scan.TimeoutPerTurn);
+    }
+
+    [Fact]
+    public void BuildScanOptions_NegativeThrottle_Throws()
+        => Assert.Throws<ArgumentException>(() => RedTeamCommand.BuildScanOptions(
+            new RedTeamOptions { Intensity = "quick", Format = "json", DelaySeconds = -1 }, null, Intensity.Quick, null, null));
+
+    // L22: an unknown --package-registry value fails fast in step 1, before any import/download.
+    [Fact]
+    public async Task ExecuteAsync_InvalidPackageRegistry_Throws_BeforeAnyScan()
+    {
+        var opts = new RedTeamOptions
+        {
+            Endpoint = "http://localhost:11434/v1",
+            Model = "gpt-4o",
+            Intensity = "moderate",
+            Format = "json",
+            PackageRegistry = "pypi",
+        };
+
+        var ex = await Assert.ThrowsAsync<ArgumentException>(
+            () => RedTeamCommand.ExecuteAsync(opts, CancellationToken.None));
+        Assert.Contains("--package-registry", ex.Message);
     }
 }

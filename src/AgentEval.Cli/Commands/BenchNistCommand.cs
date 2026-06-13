@@ -227,11 +227,7 @@ public static class BenchNistCommand
             $"({report.Summary.CriticalFindings} needs-improvement / {report.Summary.HighFindings} partially-effective); " +
             $"composite verdict {compositeEval.Score.Label.ToUpperInvariant()}");
 
-        var finalExit = compositeEval.Score.Label.ToLowerInvariant() switch
-        {
-            "pass" => 0,
-            _      => 2  // fail/warn/skipped → non-zero for CI strictness
-        };
+        var finalExit = BenchExitCodes.FromLabel(compositeEval.Score.Label);  // pass → 0, fail/warn/skipped → 2
         return (finalExit, outputDir);
     }
 

@@ -86,6 +86,16 @@ internal static class RedTeamCommand
         var maxProbesOpt = new Option<int>("--max-probes")
             { DefaultValueFactory = _ => 0, Description = "Maximum probes per attack (0 = unlimited)" };
 
+        // L21: throttle / timeout escape hatches for a rate-limited gateway or a long multi-turn run.
+        var delayOpt = new Option<double>("--delay")
+            { DefaultValueFactory = _ => 0, Description = "Seconds to wait between probes (0 = none); throttle for a rate-limited gateway." };
+        var parallelismOpt = new Option<int>("--parallelism")
+            { DefaultValueFactory = _ => 1, Description = "Concurrent probes WITHIN an attack (default 1). >1 requires a thread-safe agent — see ScanOptions.Parallelism." };
+        var timeoutPerProbeOpt = new Option<double>("--timeout-per-probe")
+            { DefaultValueFactory = _ => 30, Description = "Per-probe timeout in seconds (default 30)." };
+        var maxTurnTimeoutOpt = new Option<double>("--max-turn-timeout")
+            { DefaultValueFactory = _ => 0, Description = "Per-turn timeout (seconds) for multi-turn attacks (0 = inherit --timeout-per-probe)." };
+
         // Judge (LLM-as-judge for evaluation)
         var judgeEndpointOpt = new Option<string?>("--judge")
             { Description = "Separate endpoint for LLM judge (evaluates attack success)" };
@@ -149,6 +159,10 @@ internal static class RedTeamCommand
         command.Options.Add(intensityOpt);
         command.Options.Add(failFastFlag);
         command.Options.Add(maxProbesOpt);
+        command.Options.Add(delayOpt);
+        command.Options.Add(parallelismOpt);
+        command.Options.Add(timeoutPerProbeOpt);
+        command.Options.Add(maxTurnTimeoutOpt);
         command.Options.Add(judgeEndpointOpt);
         command.Options.Add(judgeModelOpt);
         command.Options.Add(judgeApiKeyOpt);
@@ -189,6 +203,10 @@ internal static class RedTeamCommand
                 Intensity = parseResult.GetValue(intensityOpt)!,
                 FailFast = parseResult.GetValue(failFastFlag),
                 MaxProbes = parseResult.GetValue(maxProbesOpt),
+                DelaySeconds = parseResult.GetValue(delayOpt),
+                Parallelism = parseResult.GetValue(parallelismOpt),
+                TimeoutPerProbeSeconds = parseResult.GetValue(timeoutPerProbeOpt),
+                TimeoutPerTurnSeconds = parseResult.GetValue(maxTurnTimeoutOpt),
                 JudgeEndpoint = parseResult.GetValue(judgeEndpointOpt),
                 JudgeModel = parseResult.GetValue(judgeModelOpt),
                 JudgeApiKey = parseResult.GetValue(judgeApiKeyOpt),
@@ -266,6 +284,12 @@ internal static class RedTeamCommand
         // Likewise for the calibration cohort — fail before the scan, not after.
         if (opts.Calibration is not null && !opts.Calibration.Exists)
             throw new InvalidOperationException($"Calibration profile not found: {opts.Calibration.FullName}");
+
+        // L22: validate --package-registry here (step 1), before the --import-probes read and --pack download in
+        // step 3 — a typo should fail fast, not after a possibly-expensive import/network fetch.
+        var packageRegistry = (opts.PackageRegistry ?? "none").Trim().ToLowerInvariant();
+        if (packageRegistry is not ("none" or "live"))
+            throw new ArgumentException($"Unknown --package-registry: '{opts.PackageRegistry}'. Valid: none | live");
 
         // Resolved identifier: deployment name for Azure, model name for OpenAI-compatible
         var resolvedName = opts.Azure ? opts.DeploymentName! : opts.Model!;
@@ -364,7 +388,7 @@ internal static class RedTeamCommand
         // LLM03 Tier-2: swap SupplyChain for the live-registry-backed evaluator so it ALSO flags model-invented
         // hallucinated packages (queries PyPI/npm/NuGet), not just a planted fake. Caution-proximity still gates
         // every flag; a registry-confirmed package is never flagged (RC-6).
-        if (string.Equals(opts.PackageRegistry?.Trim(), "live", StringComparison.OrdinalIgnoreCase))
+        if (packageRegistry == "live")   // already validated to none|live in step 1 (L22)
         {
             var roster = attacks ?? Attack.All;
             var hasSupplyChain = roster.Any(a => a is SupplyChainAttack);
@@ -374,10 +398,6 @@ internal static class RedTeamCommand
                 Console.Error.WriteLine(hasSupplyChain
                     ? "  SupplyChain: live package registry (PyPI/npm/NuGet) enabled — a registry outage under-detects rather than false-flagging."
                     : "  Warning: --package-registry live has no effect — the SupplyChain attack is not in the selected --attacks set.");
-        }
-        else if (!string.IsNullOrWhiteSpace(opts.PackageRegistry) && !string.Equals(opts.PackageRegistry.Trim(), "none", StringComparison.OrdinalIgnoreCase))
-        {
-            throw new ArgumentException($"Unknown --package-registry: '{opts.PackageRegistry}'. Valid: none | live");
         }
 
         // 4. Resolve intensity
@@ -622,6 +642,10 @@ internal static class RedTeamCommand
                 $"{progress.CurrentAttack} — {progress.LastOutcome}")
             : null;
 
+        // L21: a negative throttle/timeout would silently disable bounding — reject it.
+        if (opts.DelaySeconds < 0 || opts.TimeoutPerProbeSeconds < 0 || opts.TimeoutPerTurnSeconds < 0)
+            throw new ArgumentException("--delay, --timeout-per-probe and --max-turn-timeout must be non-negative.");
+
         return new ScanOptions
         {
             AttackTypes = attacks,
@@ -634,6 +658,12 @@ internal static class RedTeamCommand
             ExplainFindings = opts.Explain && judgeClient is not null,
             IncludeEvidence = true,
             OnProgress = onProgress,
+            // L21: throttle / timeout escape hatches. TimeoutPerTurn falls back to TimeoutPerProbe when --max-turn-timeout
+            // is 0 (set it equal here — same as ScanOptions' own get-fallback).
+            DelayBetweenProbes = TimeSpan.FromSeconds(opts.DelaySeconds),
+            Parallelism = opts.Parallelism,
+            TimeoutPerProbe = TimeSpan.FromSeconds(opts.TimeoutPerProbeSeconds),
+            TimeoutPerTurn = TimeSpan.FromSeconds(opts.TimeoutPerTurnSeconds > 0 ? opts.TimeoutPerTurnSeconds : opts.TimeoutPerProbeSeconds),
         };
     }
 
@@ -712,6 +742,10 @@ internal sealed class RedTeamOptions
     public FileInfo? ImportProbes { get; init; }
     public string? ImportPromptField { get; init; }
     public string? ImportIdColumn { get; init; }
+    public double DelaySeconds { get; init; }
+    public int Parallelism { get; init; } = 1;
+    public double TimeoutPerProbeSeconds { get; init; } = 30;
+    public double TimeoutPerTurnSeconds { get; init; }
     public string PackageRegistry { get; init; } = "none";
     public string? Pack { get; init; }
     public bool AcceptLicense { get; init; }
