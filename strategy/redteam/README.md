@@ -135,6 +135,8 @@ Content safety metrics complementing security testing (`src/AgentEval.Core/Metri
 | [202 P19: Multi-Modal](202-P19-multi-modal-attacks-impplan.md) | Multi-modal image attacks. | 📋 Not started (parked — needs MAF vision support) |
 | [redteam_todo.md](done/redteam_todo.md) | MVP-era forward-planning TODO. | ✅ Superseded → moved to `done/` |
 
+> Competitive-intelligence deep-dives live in `strategy/` (parent dir) and are kept **local / internal (do-not-publish)** — not tracked in this public repo.
+
 ### Completed Plans — See [`done/`](done/) folder
 
 All MVP plans (P0–P22), the NewWave per-wave plans (Waves A–E, C′, FixesImprovement), and the Fable-review fix arc are in `done/`. The two **umbrella** plans above (FeatureComplete, NextWave) stay at top level because they still carry pending backlog.

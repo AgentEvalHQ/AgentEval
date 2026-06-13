@@ -33,28 +33,41 @@ We are **not** chasing garak's raw probe count head-on; we win on .NET-native, c
 
 ---
 
+## ⭐ Recommended next step (2026-06-13)
+
+The two **real category gaps** vs the leaders are now closed (LLM03 live registry #7, LLM08 RAG boundary #8), multi-turn is shipped (Waves C/C′), and the marquee honesty feature (z-score calibration #9) landed. **8 of 16 backlog items are done — every high-value gap-closer among them.** What remains is breadth (#6, #10) and differentiators/depth (#13, #15, #16). My recommendation, in order:
+
+1. **Merge first, then build.** The entire feature-complete arc + NextWave Tiers 1–3 are committed, pushed, and green (net8/9 4963, net10 5166/0/1) but **unmerged** on a long-lived branch (`feature/redteam-newwave-fixes`). The highest-value next action is to **open the PR-to-main** to lock in the value and stop the branch diverging. *(Needs your authorization — currently not granted.)*
+2. **#10 PackDownloader + license gate** — the single highest-leverage remaining feature. It turns the already-shipped importer seam (#4 ✅) into a curated benchmark library (HarmBench / JailbreakBench / CyberSecEval), closing the raw-breadth gap vs garak **via imports, not hand-written probes**, behind an `--accept-license` gate (no harmful data bundled). Well-bounded, builds on done work.
+3. **#13 tool-aware multi-turn attack** — medium effort, and the best *showcase* of our unique architecture (it exercises the Wave-B↔C compose path no competitor pairs). Strong differentiator demo.
+4. **Defer** #6/#11/#12 (incremental), #14 (field ceiling — neither garak nor PyRIT does real black-box metering), and #15/#16 (heavy Wave-G differentiators) until after a merge + a breadth/showcase win.
+
+> **Bottom line:** feature-wise we are at competitive parity on everything that matters and ahead on honesty + compliance + .NET/CI-CD. The most valuable move right now is **landing the PR**, not writing more code.
+
 ## 1. Prioritized backlog (the whole wave at a glance)
 
 Effort: **🟢 LHF** (small, no new infra) · **🟡 Moderate** (new harness/infra or LLM-in-loop) · **🔴 Complex** (large / blocked).
 
-| # | Item | Source | Effort | Value | Depends on | Honesty note |
-|---|------|--------|--------|-------|------------|--------------|
-| 1 | **Graded scorers** (Likert / SelfAsk / refusal / FloatScale) | PyRIT | 🟢 | High — graded confidence; unlocks #2, #11; intent-vs-echo on every marker test | LLM judge (exists) | rationale-bearing; fidelity-capped at IntentToAct |
-| 2 | **Skeleton-Key** + **Many-shot** jailbreak probes | PyRIT/MSRC | 🟢 | High — two strong, well-known techniques we lack | none | deterministic; refusal-gated |
-| 3 | **`--explain` rationale** on findings | PyRIT scorers | 🟢→🟡 | High — explains *why* + *which fidelity*; auditor-facing | LLM judge | opt-in LLM call; never invents a verdict |
-| 4 | **Seed-prompt dataset importer** (`IProbeDatasetImporter`, JSON/CSV/YAML) | garak+PyRIT | 🟢→🟡 | **Very High** — +hundreds of attributable probes from one seam | none (core); license gate is #10 | provenance + license attribution per probe |
-| 5 | **`divergence` / repeat-token extraction** probes | garak | 🟢 | Med — real training-data-leak vector (LLM02/06) | none | deterministic detector (repetition/PII) |
-| 6 | **`leakreplay`-style** training-data replay probes | garak | 🟡 | Med — membership/replay (LLM02/04 adjacent) | none | conclusive only on verbatim hit |
-| 7 | **LLM03 registry oracle** (live PyPI/npm/NuGet adapter or bundled full snapshot) | garak | 🟡 | **High — closes a real gap** | `RegistryBackedSupplyChainEvaluator` (exists) | **see ⚠️ false-positive trap below** |
-| 8 | **LLM08 RAG/retrieval harness** + `latentinjection`-style probes | garak/PyRIT | 🟡 | **High — closes a real gap** | InjectionSurface.RetrievedDocument (exists) + a RAG test agent | Behavioral evidence via real retrieval boundary |
-| 9 | ✅ **z-score calibration** (relative-to-reference scoring) — SHIPPED `cd97a11` | garak | 🟡 | Med-High — best honesty feature we lack | baseline infra (exists) | "unusually vulnerable vs cohort", not absolute |
-| 10 | **PackDownloader + license gate** (HarmBench/JailbreakBench/CyberSecEval) | PyRIT/garak | 🟡 | High — turns #4 into a curated benchmark library | #4 | `--accept-license`; no harmful data bundled by default |
-| 11 | **BadLikertJudge** multi-turn attack | PyRIT | 🟡 | Med | #1 | graded; multi-turn fold |
-| 12 | **LLM-driven converters** (paraphrase/persuasion/tense) | PyRIT | 🟡 | Med — amplifies every probe | transform pipeline (exists, deterministic) | **breaks determinism → opt-in + labeled** |
-| 13 | **Tool-aware multi-turn attack** (exercise the Wave-B↔C DIM) | — (our gap) | 🟡 | Med — proves the compose path with a shipped attack | DIM (exists) | Behavioral over the conversation channel |
-| 14 | **LLM10 transport-level metering harness** | — (field gap) | 🟡→🔴 | Med — only way to make LLM10 real | a real metered endpoint | measures tokens/latency/cost, not text cooperation |
-| 15 | **atkgen** adaptive generation | garak | 🔴 | High but heavy | #1, attacker-LLM (exists) | non-deterministic, labeled |
-| 16 | **Memory-poisoning + multi-agent surfaces** | — (Wave G) | 🔴 | High, differentiator | new surfaces | — |
+> **Status:** ✅ shipped & verified in code · ❌ not started. **8 of 16 done** (all of Tier 1 + both Tier-2 gap-closers + Tier-3 calibration).
+
+| # | Item | Status | Source | Effort | Value | Honesty note |
+|---|------|:------:|--------|--------|-------|--------------|
+| 1 | **Graded scorers** (Likert / SelfAsk / refusal / FloatScale) | ✅ | PyRIT | 🟢 | High — graded confidence; unlocks #2, #11; intent-vs-echo on every marker test | rationale-bearing; fidelity-capped at IntentToAct |
+| 2 | **Skeleton-Key** + **Many-shot** jailbreak probes | ✅ | PyRIT/MSRC | 🟢 | High — two strong, well-known techniques we lack | deterministic; refusal-gated |
+| 3 | **`--explain` rationale** on findings | ✅ | PyRIT scorers | 🟢→🟡 | High — explains *why* + *which fidelity*; auditor-facing | opt-in LLM call; never invents a verdict |
+| 4 | **Seed-prompt dataset importer** (`IProbeDatasetImporter`, JSON/CSV/YAML) | ✅ | garak+PyRIT | 🟢→🟡 | **Very High** — +hundreds of attributable probes from one seam | provenance + license attribution per probe |
+| 5 | **`divergence` / repeat-token extraction** probes | ✅ | garak | 🟢 | Med — real training-data-leak vector (LLM02/06) | deterministic detector (repetition/PII) |
+| 7 | **LLM03 registry oracle** (live PyPI/npm/NuGet) | ✅ | garak | 🟡 | **High — closed a real gap** | `HttpPackageRegistry`; outage under-detects, never false-flags |
+| 8 | **LLM08 RAG/retrieval harness** + `latentinjection`-style probes | ✅ | garak/PyRIT | 🟡 | **High — closed a real gap** | Behavioral evidence via real retrieval boundary |
+| 9 | **z-score calibration** (relative-to-reference scoring) | ✅ | garak | 🟡 | Med-High — best honesty feature we lacked | "unusually vulnerable vs cohort", not absolute |
+| 6 | **`leakreplay`-style** training-data replay probes | ❌ | garak | 🟡 | Med — membership/replay (LLM02/04 adjacent) | conclusive only on verbatim hit |
+| 10 | **PackDownloader + license gate** (HarmBench/JailbreakBench/CyberSecEval) | ❌ | PyRIT/garak | 🟡 | High — turns #4 into a curated benchmark library | `--accept-license`; no harmful data bundled by default |
+| 11 | **BadLikertJudge** multi-turn attack | ❌ | PyRIT | 🟡 | Med | graded; multi-turn fold (builds on #1 ✅) |
+| 12 | **LLM-driven converters** (paraphrase/persuasion/tense) | ❌ | PyRIT | 🟡 | Med — amplifies every probe | **breaks determinism → opt-in + labeled** |
+| 13 | **Tool-aware multi-turn attack** (exercise the Wave-B↔C DIM) | ❌ | — (our gap) | 🟡 | Med — proves the compose path with a shipped attack | Behavioral over the conversation channel |
+| 14 | **LLM10 transport-level metering harness** | ❌ | — (field gap) | 🟡→🔴 | Med — only way to make LLM10 real | measures tokens/latency/cost, not text cooperation |
+| 15 | **atkgen** adaptive generation | ❌ | garak | 🔴 | High but heavy | non-deterministic, labeled (builds on attacker-LLM ✅) |
+| 16 | **Memory-poisoning + multi-agent surfaces** | ❌ | — (Wave G) | 🔴 | High, differentiator | new surfaces |
 
 **Parked (KEEP-CUT):** GCG/adversarial-suffix (needs gradients/GPU); multi-modal (blocked on MAF vision); running garak/PyRIT as external Python *processes* (import patterns/data, never processes); DeepTeam import (enterprise-gated).
 
