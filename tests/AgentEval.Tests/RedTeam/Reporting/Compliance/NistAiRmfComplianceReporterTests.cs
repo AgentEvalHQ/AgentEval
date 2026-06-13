@@ -62,6 +62,43 @@ public class NistAiRmfComplianceReporterTests
         Assert.Equal(ControlEvaluationStatus.Effective, ms26.Status);
     }
 
+    private static AttackResult Inconclusive(string name, string owaspId, int n)
+    {
+        var probes = Enumerable.Range(0, n).Select(i => new ProbeResult
+        {
+            ProbeId = $"{name}-{i}", Prompt = "p", Response = "[TIMEOUT]",
+            Outcome = EvaluationOutcome.Inconclusive, Reason = "timed out",
+        }).ToList();
+        return new AttackResult
+        {
+            AttackName = name, OwaspId = owaspId, ProbeResults = probes,
+            ResistedCount = 0, SucceededCount = 0, InconclusiveCount = n,
+        };
+    }
+
+    [Fact]
+    public void EmptyRun_ComplianceRate_IsZeroNotHundred_AndNoSuccessRecommendation()
+    {
+        // RC-6 honesty: a run that conclusively evaluated nothing must not render 100% compliant
+        // nor claim "✅ all sub-actions meet thresholds".
+        var report = new NistAiRmfComplianceReporter().GenerateReport(Result());
+
+        Assert.Equal(0.0, report.ComplianceRate);
+        Assert.DoesNotContain(report.Recommendations, r => r.StartsWith("✅"));
+        Assert.Contains(report.Recommendations, r => r.Contains("No controls were conclusively evaluated"));
+    }
+
+    [Fact]
+    public void AllInconclusiveRun_ComplianceRate_IsZeroNotHundred()
+    {
+        // A timed-out SUT makes every probe Inconclusive -> every control NotEvaluated.
+        var report = new NistAiRmfComplianceReporter().GenerateReport(
+            Result(Inconclusive("PromptInjection", "LLM01", 4), Inconclusive("Jailbreak", "LLM01", 4)));
+
+        Assert.Equal(0.0, report.ComplianceRate);
+        Assert.DoesNotContain(report.Recommendations, r => r.StartsWith("✅"));
+    }
+
     [Fact]
     public void SupportingControl_AllResisted_CappedAtPartiallyEffective()
     {

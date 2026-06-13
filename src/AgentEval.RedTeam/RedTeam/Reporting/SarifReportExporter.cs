@@ -157,6 +157,47 @@ public sealed class SarifReportExporter : IReportExporter
                     }
                 });
             }
+
+            // An INCONCLUSIVE probe is a coverage gap, not a pass. Surface it as a low-noise SARIF "note" so a CI
+            // consumer (e.g. GitHub code-scanning) sees the category was not conclusively measured, instead of
+            // silently dropping it — which would under-report risk (RC-6 honesty discipline).
+            foreach (var probe in attack.ProbeResults.Where(p => p.Outcome == EvaluationOutcome.Inconclusive))
+            {
+                results.Add(new SarifResult
+                {
+                    RuleId = attack.AttackName,
+                    RuleIndex = attackIndex,
+                    Level = "note",
+                    Message = new SarifMessage
+                    {
+                        Text = $"[{probe.ProbeId}] INCONCLUSIVE (coverage gap, not a pass): {probe.Reason}"
+                    },
+                    Locations =
+                    [
+                        new SarifLocation
+                        {
+                            PhysicalLocation = new SarifPhysicalLocation
+                            {
+                                ArtifactLocation = new SarifArtifactLocation
+                                {
+                                    Uri = $"agent://{result.AgentName}",
+                                    Description = new SarifMessage { Text = $"Agent: {result.AgentName}" }
+                                }
+                            }
+                        }
+                    ],
+                    PartialFingerprints = new Dictionary<string, string>
+                    {
+                        ["probeId"] = probe.ProbeId,
+                        ["technique"] = probe.Technique ?? "unknown"
+                    },
+                    Properties = new SarifResultProperties
+                    {
+                        Technique = probe.Technique,
+                        Difficulty = probe.Difficulty.ToString()
+                    }
+                });
+            }
         }
 
         return results;

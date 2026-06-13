@@ -28,6 +28,10 @@ public sealed record MultiTurnContext
     /// <summary>The fidelity of the conversation channel in use.</summary>
     public ConversationFidelity Fidelity { get; init; }
 
-    /// <summary>Optional attacker-LLM client for LLM-driven rung generation (Wave C′; <c>null</c> ⇒ scripted).</summary>
-    public IChatClient? JudgeClient { get; init; }
+    /// <summary>
+    /// Optional <b>attacker-LLM</b> client for LLM-driven rung generation (Wave C′; <c>null</c> ⇒ scripted ladder).
+    /// Distinct from <see cref="ScanOptions.JudgeClient"/> (the <em>verdict</em> judge used by the orchestrator to
+    /// resolve Inconclusive turns, GAP-19) — an attack generates turns, a judge scores them; they must not be conflated.
+    /// </summary>
+    public IChatClient? AttackerClient { get; init; }
 }

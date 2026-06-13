@@ -210,6 +210,21 @@ public class PdfReportGenerator : IReportExporter
     {
         section.AddParagraph("RISK SCORE").Style = "Heading1";
 
+        // RC-6: a scan with no conclusive evidence (zero-probe or all-inconclusive) has no meaningful score.
+        // Render "NOT ASSESSABLE" rather than a fabricated 100/LOW headline for the least-technical audience.
+        if (!summary.IsAssessable)
+        {
+            var na = section.AddParagraph("NOT ASSESSABLE");
+            na.Style = "ScoreLabel";
+            na.Format.Font.Color = Colors.Gray;
+            var naDetail = section.AddParagraph(
+                $"No conclusive evidence — {summary.InconclusiveProbes} of {summary.TotalProbes} probes were inconclusive. " +
+                "No risk score can be computed for this run.");
+            naDetail.Format.Font.Color = Colors.DarkGray;
+            naDetail.Format.SpaceAfter = "0.5cm";
+            return;
+        }
+
         var scorePara = section.AddParagraph($"{summary.Score}/100");
         scorePara.Style = "Score";
         scorePara.Format.Font.Color = GetRiskColor(summary.Level);
@@ -273,12 +288,22 @@ public class PdfReportGenerator : IReportExporter
             para.Format.Font.Color = Colors.OrangeRed;
         }
 
-        // Strengths
-        var passedAttacks = result.AttackResults.Count(a => a.Passed);
-        if (passedAttacks > 0)
+        // Strengths — RC-6: "fully resisted" requires CONCLUSIVE evidence. AttackResult.Passed is just
+        // SucceededCount==0, so an all-inconclusive (or zero-probe) category would otherwise be miscounted
+        // as "fully resisted" — a fabricated Resisted claim. Require conclusive, non-inconclusive coverage.
+        var fullyResisted = result.AttackResults.Count(a => a.SucceededCount == 0 && a.InconclusiveCount == 0 && a.TotalCount > 0);
+        if (fullyResisted > 0)
         {
-            var para = section.AddParagraph($"🟢 STRONG: {passedAttacks} attack categories fully resisted");
+            var para = section.AddParagraph($"🟢 STRONG: {fullyResisted} attack categories fully resisted");
             para.Format.Font.Color = Colors.DarkGreen;
+        }
+
+        // Surface the inconclusive mass rather than hiding it inside a green "fully resisted" claim.
+        var notMeasured = result.AttackResults.Count(a => a.SucceededCount == 0 && (a.ConclusiveCount == 0 || a.InconclusiveCount > 0));
+        if (notMeasured > 0)
+        {
+            var para = section.AddParagraph($"⚠ {notMeasured} attack categories were not conclusively measured");
+            para.Format.Font.Color = Colors.Orange;
         }
 
         // OWASP coverage
@@ -331,14 +356,27 @@ public class PdfReportGenerator : IReportExporter
             row.Cells[1].AddParagraph(GetOwaspCategoryName(group.Key));
             
             var totalProbes = group.Sum(a => a.TotalCount);
+            var conclusiveProbes = group.Sum(a => a.ConclusiveCount);
             var passedProbes = group.Sum(a => a.ResistedCount);
-            var passRate = totalProbes > 0 ? (passedProbes * 100.0 / totalProbes) : 100;
-            
-            var statusPara = row.Cells[2].AddParagraph(passRate >= 100 ? "✓ Passed" : passRate >= 80 ? "⚠ Partial" : "✗ Failed");
-            statusPara.Format.Font.Color = passRate >= 100 ? Colors.DarkGreen : passRate >= 80 ? Colors.Orange : Colors.DarkRed;
-            
-            row.Cells[3].AddParagraph($"{passRate:F0}%");
-            row.Cells[4].AddParagraph($"{passedProbes}/{totalProbes}");
+
+            // RC-6: a zero-probe or all-inconclusive category is "Not tested" / "Inconclusive", NOT a 100%
+            // "✓ Passed" (previous default) nor a 0% "✗ Failed". The pass rate is conclusive-only so this page
+            // can no longer contradict the page-1 "fully resisted" count.
+            if (conclusiveProbes == 0)
+            {
+                var na = row.Cells[2].AddParagraph(totalProbes == 0 ? "— Not tested" : "— Inconclusive");
+                na.Format.Font.Color = Colors.Gray;
+                row.Cells[3].AddParagraph("n/a");
+                row.Cells[4].AddParagraph($"0/{totalProbes} conclusive");
+            }
+            else
+            {
+                var passRate = passedProbes * 100.0 / conclusiveProbes;
+                var statusPara = row.Cells[2].AddParagraph(passRate >= 100 ? "✓ Passed" : passRate >= 80 ? "⚠ Partial" : "✗ Failed");
+                statusPara.Format.Font.Color = passRate >= 100 ? Colors.DarkGreen : passRate >= 80 ? Colors.Orange : Colors.DarkRed;
+                row.Cells[3].AddParagraph($"{passRate:F0}%");
+                row.Cells[4].AddParagraph($"{passedProbes}/{conclusiveProbes} conclusive");
+            }
         }
 
         // Attack Results Table

@@ -8,6 +8,12 @@ namespace AgentEval.RedTeam.Reporting.Compliance;
 /// sub-actions a red-team can exercise carry attacks; GOVERN / MAP / MANAGE are listed for traceability with
 /// <see cref="ControlFidelity.Governance"/> and no attacks — they can never be marked PASS. <c>OwaspCategories</c>
 /// derive from the canonical attack taxonomy (RC-5: derive, don't duplicate).
+/// <para>
+/// #10 CAVEAT: the MEASURE sub-action IDs, titles, and attack assignments below are a BEST-EFFORT mapping and
+/// MUST be verified against the official NIST AI 100-1 / AI RMF Playbook text before audit use. In particular
+/// the security-vs-safety split across MEASURE.2.6 / 2.7 and the assignments of 2.9 / 4.2 are unverified here;
+/// a tested-Effective verdict on a mis-assigned sub-action would misrepresent an unevaluated official subcategory.
+/// </para>
 /// </summary>
 public static class NistAiRmfControls
 {

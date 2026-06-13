@@ -47,7 +47,7 @@ public class SOC2ComplianceReport : IComplianceReport
         get
         {
             var evaluatedControls = Controls.Where(c => c.Status is not ControlEvaluationStatus.NotEvaluated and not ControlEvaluationStatus.NotApplicable).ToList();
-            if (evaluatedControls.Count == 0) return 100.0;
+            if (evaluatedControls.Count == 0) return 0.0; // RC-6: nothing evaluated is not 100% compliant. Markdown renders "N/A".
             var effectiveCount = evaluatedControls.Count(c => c.Status == ControlEvaluationStatus.Effective);
             return effectiveCount * 100.0 / evaluatedControls.Count;
         }
@@ -336,7 +336,9 @@ public class SOC2ComplianceReporter : IComplianceReporter<SOC2ComplianceReport>
         var passed = controls.Count(x => x.Status == ControlEvaluationStatus.Effective.ToString());
         var warnings = controls.Count(x => x.Status == ControlEvaluationStatus.PartiallyEffective.ToString());
         var failed = controls.Count(x => x.Status == ControlEvaluationStatus.NeedsImprovement.ToString());
-        var overallStatus = failed > 0 ? "FAIL" : warnings > 0 ? "WARN" : "PASS";
+        // Honesty (RC-6): never persist PASS when nothing was conclusively evaluated (all-inconclusive run
+        // yields passed=warnings=failed=0). Record NOT_EVALUATED instead of a fabricated green PASS.
+        var overallStatus = failed > 0 ? "FAIL" : warnings > 0 ? "WARN" : passed > 0 ? "PASS" : "NOT_EVALUATED";
 
         // T4-4: the honesty disclaimer is rendered into the human-facing report surfaces (markdown footer
         // + PDF), NOT injected as a synthetic control row here. A "DISCLAIMER" EvidenceControl would pollute
@@ -375,7 +377,12 @@ public class SOC2ComplianceReporter : IComplianceReporter<SOC2ComplianceReport>
 
         if (recommendations.Count == 0)
         {
-            recommendations.Add("✅ All evaluated controls meet SOC2 requirements. Continue monitoring.");
+            // Don't claim success over an empty set: distinguish "all evaluated controls passed" from
+            // "nothing was conclusively evaluated".
+            var anyEvaluated = controls.Any(c => c.Status is ControlEvaluationStatus.Effective or ControlEvaluationStatus.PartiallyEffective);
+            recommendations.Add(anyEvaluated
+                ? "✅ All evaluated controls meet SOC2 requirements. Continue monitoring."
+                : "⚠️ No controls were conclusively evaluated — this run produced no SOC2 evidence (all probes inconclusive or no mapped attacks ran).");
         }
 
         return recommendations;

@@ -77,15 +77,12 @@ public sealed class EncodingEvasionRoundTripTests
         return matches.Count > 0 ? matches[^1].Value : text;
     }
 
-    // Decodes the leetspeak payload (text after the final ':') back to plain letters.
+    // Decodes the leetspeak payload (text after the final ':') back to plain letters. EE-015 now derives its payload
+    // from Encoders.Leetspeak (single source of truth), so this is exactly that codec's inverse glyph map.
     private static string DecodeLeetspeak(string prompt)
     {
         var payload = prompt[(prompt.LastIndexOf(':') + 1)..].Trim();
-        // Multi-character glyphs first, then single-character substitutions.
         payload = payload
-            .Replace("\\^/", "W")
-            .Replace("|\\|", "N")
-            .Replace("|>", "P")
             .Replace("3", "E")
             .Replace("4", "A")
             .Replace("0", "O")

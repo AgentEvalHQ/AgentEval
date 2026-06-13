@@ -12,6 +12,7 @@ using System.CommandLine.Parsing;
 using AgentEval.Cli.Infrastructure;
 using AgentEval.Core;
 using AgentEval.RedTeam;
+using AgentEval.RedTeam.Baseline;
 using AgentEval.RedTeam.Reporting;
 using Microsoft.Extensions.AI;
 
@@ -63,10 +64,24 @@ internal static class RedTeamCommand
         var judgeModelOpt = new Option<string?>("--judge-model")
             { Description = "Model for judge (default: same as --model)" };
 
+        // Attacker (LLM that drives attacker-LLM multi-turn attacks: Crescendo / PAIR / TAP)
+        var attackerEndpointOpt = new Option<string?>("--attacker")
+            { Description = "Endpoint for the attacker LLM (drives Crescendo/PAIR/TAP; non-deterministic). Required by PAIR/TAP." };
+        var attackerModelOpt = new Option<string?>("--attacker-model")
+            { Description = "Model for the attacker LLM (default: same as --model)" };
+
         // Output
         var formatOpt = new Option<string>("--format")
             { DefaultValueFactory = _ => "markdown", Description = "Export format: json | sarif | markdown | md | junit" };
         var outputOpt = new Option<FileInfo?>("-o", "--output") { Description = "Output file (default: stdout)" };
+
+        // Baseline / CI regression gating (Wave E)
+        var saveBaselineOpt = new Option<FileInfo?>("--save-baseline")
+            { Description = "After the scan, write a regression baseline (JSON) to this path." };
+        var baselineOpt = new Option<FileInfo?>("--baseline")
+            { Description = "Compare the scan to this baseline (JSON), print the diff, and gate the exit code on regression." };
+        var failOnOpt = new Option<string>("--fail-on")
+            { DefaultValueFactory = _ => "vuln", Description = "Exit-code gate: vuln (any vulnerability) | regression (new vs --baseline) | never." };
 
         // Verbosity
         var verboseFlag = new Option<bool>("--verbose") { Description = "Show detailed progress" };
@@ -84,8 +99,13 @@ internal static class RedTeamCommand
         command.Options.Add(maxProbesOpt);
         command.Options.Add(judgeEndpointOpt);
         command.Options.Add(judgeModelOpt);
+        command.Options.Add(attackerEndpointOpt);
+        command.Options.Add(attackerModelOpt);
         command.Options.Add(formatOpt);
         command.Options.Add(outputOpt);
+        command.Options.Add(saveBaselineOpt);
+        command.Options.Add(baselineOpt);
+        command.Options.Add(failOnOpt);
         command.Options.Add(verboseFlag);
         command.Options.Add(quietFlag);
 
@@ -105,8 +125,13 @@ internal static class RedTeamCommand
                 MaxProbes = parseResult.GetValue(maxProbesOpt),
                 JudgeEndpoint = parseResult.GetValue(judgeEndpointOpt),
                 JudgeModel = parseResult.GetValue(judgeModelOpt),
+                AttackerEndpoint = parseResult.GetValue(attackerEndpointOpt),
+                AttackerModel = parseResult.GetValue(attackerModelOpt),
                 Format = parseResult.GetValue(formatOpt)!,
                 Output = parseResult.GetValue(outputOpt),
+                SaveBaseline = parseResult.GetValue(saveBaselineOpt),
+                Baseline = parseResult.GetValue(baselineOpt),
+                FailOn = parseResult.GetValue(failOnOpt)!,
                 Verbose = parseResult.GetValue(verboseFlag),
                 Quiet = parseResult.GetValue(quietFlag),
             };
@@ -142,6 +167,19 @@ internal static class RedTeamCommand
         if (!opts.Azure && string.IsNullOrWhiteSpace(opts.Model))
             throw new InvalidOperationException(
                 "--model is required when using --endpoint.");
+
+        // Validate --fail-on up front so a typo fails fast, before an expensive scan runs.
+        var failOn = opts.FailOn.ToLowerInvariant();
+        if (failOn is not ("vuln" or "regression" or "never"))
+            throw new InvalidOperationException(
+                $"Unknown --fail-on value: '{opts.FailOn}'. Valid: vuln, regression, never.");
+        if (failOn == "regression" && opts.Baseline is null && !opts.Quiet)
+            Console.Error.WriteLine(
+                "  Warning: --fail-on regression has no effect without --baseline <file>; the run will always exit 0.");
+
+        // Fail fast on a missing baseline BEFORE running an expensive scan, rather than scanning then erroring.
+        if (opts.Baseline is not null && !opts.Baseline.Exists)
+            throw new InvalidOperationException($"Baseline file not found: {opts.Baseline.FullName}");
 
         // Resolved identifier: deployment name for Azure, model name for OpenAI-compatible
         var resolvedName = opts.Azure ? opts.DeploymentName! : opts.Model!;
@@ -190,14 +228,37 @@ internal static class RedTeamCommand
                 opts.JudgeEndpoint, opts.JudgeModel ?? resolvedName, opts.ApiKey)
             : null;
 
+        // Wave C′: the attacker LLM drives Crescendo/PAIR/TAP. Distinct from the judge (it generates, the judge scores).
+        IChatClient? attackerClient = opts.AttackerEndpoint is not null
+            ? EndpointFactory.CreateOpenAICompatible(
+                opts.AttackerEndpoint, opts.AttackerModel ?? resolvedName, opts.ApiKey)
+            : null;
+
+        // Fail fast: PAIR/TAP are fundamentally attacker-driven and would error mid-scan without an attacker.
+        if (attackerClient is null && attacks is not null &&
+            attacks.FirstOrDefault(a => a.Name is "PAIR" or "TAP") is { } needsAttacker)
+            throw new InvalidOperationException(
+                $"Attack '{needsAttacker.Name}' requires an attacker LLM — pass --attacker <url> (and optionally --attacker-model).");
+
+        // Build the verbose progress callback up front so it can go into the single ScanOptions
+        // initializer below. (Previously a second construction site rebuilt ScanOptions and silently
+        // dropped any property not copied — e.g. AttackerClient — breaking PAIR/TAP under --verbose.)
+        Action<ScanProgress>? onProgress = opts.Verbose && !opts.Quiet
+            ? progress => Console.Error.WriteLine(
+                $"  [{progress.CompletedProbes}/{progress.TotalProbes}] " +
+                $"{progress.CurrentAttack} — {progress.LastOutcome}")
+            : null;
+
         var scanOptions = new ScanOptions
         {
             AttackTypes = attacks,
             Intensity = intensity,
             FailFast = opts.FailFast,
             MaxProbesPerAttack = opts.MaxProbes,
-            JudgeClient = judgeClient, // reserved — not yet consumed by the runner (GAP-19)
+            JudgeClient = judgeClient, // GAP-19: the runner re-evaluates Inconclusive probes with this judge (capped at IntentToAct)
+            AttackerClient = attackerClient, // Wave C′: drives attacker-LLM multi-turn attacks (Crescendo/PAIR/TAP)
             IncludeEvidence = true,
+            OnProgress = onProgress,
         };
 
         // 6. Run scan
@@ -205,31 +266,19 @@ internal static class RedTeamCommand
         {
             Console.Error.WriteLine();
             Console.Error.WriteLine($"  AgentEval Red Team Scanner");
-            Console.Error.WriteLine($"  Model: {opts.Model}");
-            Console.Error.WriteLine($"  Attacks: {(attacks is null ? "all (9)" : string.Join(", ", attacks.Select(a => a.Name)))}");
+            Console.Error.WriteLine($"  Model: {resolvedName}");
+            Console.Error.WriteLine($"  Attacks: {(attacks is null ? $"all ({Attack.All.Count})" : string.Join(", ", attacks.Select(a => a.Name)))}");
             Console.Error.WriteLine($"  Intensity: {intensity}");
+            // GAP-19: the judge IS consumed — it re-evaluates probes the deterministic evaluators left Inconclusive.
+            if (opts.JudgeEndpoint is not null)
+                Console.Error.WriteLine($"  Judge: {opts.JudgeModel ?? resolvedName} (LLM-judge fallback on inconclusive probes, capped at IntentToAct fidelity)");
+            // Wave C′: an attacker LLM makes Crescendo/PAIR/TAP LLM-driven — and therefore non-deterministic.
+            if (opts.AttackerEndpoint is not null)
+                Console.Error.WriteLine($"  Attacker: {opts.AttackerModel ?? resolvedName} (LLM-driven attacks — NON-DETERMINISTIC; not a stable baseline)");
             Console.Error.WriteLine();
         }
 
         var runner = new RedTeamRunner();
-
-        // Progress callback for verbose mode
-        if (opts.Verbose && !opts.Quiet)
-        {
-            scanOptions = new ScanOptions
-            {
-                AttackTypes = scanOptions.AttackTypes,
-                Intensity = scanOptions.Intensity,
-                FailFast = scanOptions.FailFast,
-                MaxProbesPerAttack = scanOptions.MaxProbesPerAttack,
-                JudgeClient = scanOptions.JudgeClient,
-                IncludeEvidence = scanOptions.IncludeEvidence,
-                OnProgress = progress =>
-                    Console.Error.WriteLine(
-                        $"  [{progress.CompletedProbes}/{progress.TotalProbes}] " +
-                        $"{progress.CurrentAttack} — {progress.LastOutcome}"),
-            };
-        }
 
         var result = await runner.ScanAsync(agent, scanOptions, ct);
 
@@ -254,12 +303,74 @@ internal static class RedTeamCommand
             Console.Error.WriteLine();
             Console.Error.WriteLine($"  === Red Team Summary ===");
             Console.Error.WriteLine($"  {result.Summary}");
-            Console.Error.WriteLine($"  Score: {result.OverallScore:F1}/100");
-            Console.Error.WriteLine($"  Verdict: {result.Verdict}");
+            // RC-6 honesty: lead with the conclusive-only score + coverage, not the inconclusive-diluted OverallScore.
+            Console.Error.WriteLine($"  Verdict: {result.Verdict}  (score {result.ConclusiveScore:F1}/100 over {result.Coverage:F0}% conclusive coverage)");
+            if (result.InconclusiveProbes > 0)
+                Console.Error.WriteLine($"  Note: {result.InconclusiveProbes}/{result.TotalProbes} probes were inconclusive — that lowers coverage, not the pass rate.");
         }
 
-        // 9. Exit code: 0 = passed, 1 = vulnerabilities found
-        return result.Passed ? ExitCodes.Success : ExitCodes.TestFailure;
+        // 9. Baseline capture (W-E1) — write a snapshot the next run can diff against.
+        if (opts.SaveBaseline is not null)
+        {
+            await RedTeamBaseline.FromResult(result, version: "1.0").SaveAsync(opts.SaveBaseline.FullName, ct);
+            if (!opts.Quiet)
+            {
+                Console.Error.WriteLine($"  Baseline written to: {opts.SaveBaseline.FullName}");
+                // Honesty: a baseline captured from a low-coverage run carries that coverage forward;
+                // future comparisons measure drops relative to it, not relative to a perfect 100%.
+                if (result.ConclusiveRate < 1.0 - ComparisonThresholds.Default.RegressionCoverageDrop)
+                    Console.Error.WriteLine(
+                        $"  Note: this baseline's coverage is only {result.ConclusiveRate * 100:F0}% conclusive — " +
+                        "future runs are compared against that level, not 100%.");
+            }
+        }
+
+        // 10. Regression gate (W-E2) — diff against a baseline. A non-comparable scan (intensity mismatch / FailFast
+        // truncation) throws from Compare and is surfaced honestly as a runtime error by the caller's try/catch.
+        RegressionStatus? regression = null;
+        if (opts.Baseline is not null)
+        {
+            var baseline = await RedTeamBaseline.LoadAsync(opts.Baseline.FullName, ct);
+            var comparison = new RedTeamBaselineComparer().Compare(result, baseline);
+            regression = comparison.Status;
+            if (!opts.Quiet)
+                PrintComparison(comparison);
+        }
+
+        // 11. Honest exit-code gate (W-E3).
+        return ComputeExitCode(failOn, regression, result.Passed);
+    }
+
+    /// <summary>
+    /// Pure exit-code gate (W-E3), separated from the scan for testability. A regression versus the baseline is the
+    /// strongest signal (<see cref="ExitCodes.RegressionFailure"/> = 4) and takes precedence over the absolute
+    /// vulnerability gate (<see cref="ExitCodes.TestFailure"/> = 1); <paramref name="failOn"/> selects which gate
+    /// applies. <c>never</c> always passes; <c>regression</c> ignores absolute vulnerabilities.
+    /// </summary>
+    internal static int ComputeExitCode(string failOn, RegressionStatus? regression, bool passed)
+    {
+        var isRegression = regression == RegressionStatus.Regression;
+        return failOn.ToLowerInvariant() switch
+        {
+            "never" => ExitCodes.Success,
+            "regression" => isRegression ? ExitCodes.RegressionFailure : ExitCodes.Success,
+            _ /* vuln */ => isRegression
+                ? ExitCodes.RegressionFailure
+                : (passed ? ExitCodes.Success : ExitCodes.TestFailure),
+        };
+    }
+
+    /// <summary>Renders a baseline comparison (new / fixed / persistent findings + deltas) to stderr.</summary>
+    private static void PrintComparison(RedTeamComparison c)
+    {
+        Console.Error.WriteLine();
+        Console.Error.WriteLine($"  === Baseline Comparison ===");
+        Console.Error.WriteLine($"  Status: {c.StatusEmoji} {c.Status}  (score {c.ScoreDelta:+0.0;-0.0;0.0} vs baseline {c.Baseline.OverallScore:F1})");
+        Console.Error.WriteLine($"  New: {c.NewVulnerabilities.Count}   Fixed: {c.ResolvedVulnerabilities.Count}   Persistent: {c.PersistentVulnerabilities.Count}");
+        if (c.CoverageDrop > 0)
+            Console.Error.WriteLine($"  Coverage drop: {c.CoverageDrop * 100:F0}% (current conclusive {c.Current.ConclusiveRate * 100:F0}% vs baseline {c.BaselineCoverage * 100:F0}%).");
+        foreach (var v in c.NewVulnerabilities)
+            Console.Error.WriteLine($"    + NEW [{v.Severity}] {v.AttackName} / {v.ProbeId}: {v.Reason}");
     }
 
     /// <summary>
@@ -294,8 +405,13 @@ internal sealed class RedTeamOptions
     public int MaxProbes { get; init; }
     public string? JudgeEndpoint { get; init; }
     public string? JudgeModel { get; init; }
+    public string? AttackerEndpoint { get; init; }
+    public string? AttackerModel { get; init; }
     public required string Format { get; init; }
     public FileInfo? Output { get; init; }
+    public FileInfo? SaveBaseline { get; init; }
+    public FileInfo? Baseline { get; init; }
+    public string FailOn { get; init; } = "vuln";
     public bool Verbose { get; init; }
     public bool Quiet { get; init; }
 }

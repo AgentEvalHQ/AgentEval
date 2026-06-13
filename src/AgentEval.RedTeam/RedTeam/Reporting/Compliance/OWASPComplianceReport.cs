@@ -44,7 +44,7 @@ public class OWASPComplianceReport : IComplianceReport
     /// <inheritdoc />
     public double ComplianceRate => Summary.TestedCategories > 0
         ? Summary.PassedCategories * 100.0 / Summary.TestedCategories
-        : 100.0;
+        : 0.0; // RC-6: nothing conclusively tested is not 100% compliant.
 
     /// <inheritdoc />
     public RiskLevel RiskLevel => Summary.CriticalFindings switch

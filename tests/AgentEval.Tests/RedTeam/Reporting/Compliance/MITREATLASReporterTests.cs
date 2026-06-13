@@ -30,8 +30,8 @@ public class MITREATLASReporterTests
 
         var report = reporter.GenerateReport(result);
 
-        // RC-5/T4-2: roster grew 12→13 (T0024 retired; T0056 + T0057 added).
-        Assert.Equal(13, report.Techniques.Count);
+        // RC-5/T4-2: roster grew to 15 (T0024 retired; T0056 + T0057 added).
+        Assert.Equal(15, report.Techniques.Count);
         Assert.Contains(report.Techniques, t => t.Id == "AML.T0051");
         Assert.Contains(report.Techniques, t => t.Id == "AML.T0054");
         Assert.Contains(report.Techniques, t => t.Id == "AML.T0056");

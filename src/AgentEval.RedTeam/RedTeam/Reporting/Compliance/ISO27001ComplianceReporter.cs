@@ -50,7 +50,7 @@ public class ISO27001ComplianceReport : IComplianceReport
         get
         {
             var evaluatedControls = Controls.Where(c => c.Status is not ControlEvaluationStatus.NotEvaluated and not ControlEvaluationStatus.NotApplicable).ToList();
-            if (evaluatedControls.Count == 0) return 100.0;
+            if (evaluatedControls.Count == 0) return 0.0; // RC-6: nothing evaluated is not 100% compliant. Markdown renders "N/A".
             var effectiveCount = evaluatedControls.Count(c => c.Status == ControlEvaluationStatus.Effective);
             return effectiveCount * 100.0 / evaluatedControls.Count;
         }
@@ -412,7 +412,9 @@ public class ISO27001ComplianceReporter : IComplianceReporter<ISO27001Compliance
         var passed = controls.Count(x => x.Status == ControlEvaluationStatus.Effective.ToString());
         var warnings = controls.Count(x => x.Status == ControlEvaluationStatus.PartiallyEffective.ToString());
         var failed = controls.Count(x => x.Status == ControlEvaluationStatus.NeedsImprovement.ToString());
-        var overallStatus = failed > 0 ? "FAIL" : warnings > 0 ? "WARN" : "PASS";
+        // Honesty (RC-6): never persist PASS when nothing was conclusively evaluated (all-inconclusive run
+        // yields passed=warnings=failed=0). Record NOT_EVALUATED instead of a fabricated green PASS.
+        var overallStatus = failed > 0 ? "FAIL" : warnings > 0 ? "WARN" : passed > 0 ? "PASS" : "NOT_EVALUATED";
 
         // T4-4: the honesty disclaimer is rendered into the human-facing report surfaces (markdown footer
         // + PDF), NOT injected as a synthetic control row here. A "DISCLAIMER" EvidenceControl would pollute
@@ -501,7 +503,11 @@ public class ISO27001ComplianceReporter : IComplianceReporter<ISO27001Compliance
 
         if (recommendations.Count == 1) // Only the NIST recommendation
         {
-            recommendations.Insert(0, "✅ All assessed controls meet ISO 27001:2022 requirements");
+            // Don't claim success over an empty set: only assert compliance if something was actually assessed.
+            var anyEvaluated = controls.Any(c => c.Status is ControlEvaluationStatus.Effective or ControlEvaluationStatus.PartiallyEffective);
+            recommendations.Insert(0, anyEvaluated
+                ? "✅ All assessed controls meet ISO 27001:2022 requirements"
+                : "⚠️ No controls were conclusively assessed — this run produced no ISO 27001 evidence (all probes inconclusive or no mapped attacks ran).");
         }
 
         return recommendations;

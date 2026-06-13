@@ -121,6 +121,18 @@ public class ScanOptions
     public IChatClient? JudgeClient { get; init; }
 
     /// <summary>
+    /// Optional <b>attacker</b>-LLM client for LLM-driven multi-turn attacks (Wave C′: Crescendo / PAIR / TAP).
+    /// </summary>
+    /// <remarks>
+    /// Distinct from <see cref="JudgeClient"/> (the verdict judge): the attacker <em>generates</em> the next
+    /// adversarial turn, the judge <em>scores</em> the target's reply — they must never be conflated (an attack must
+    /// not score itself). When <c>null</c>, Crescendo falls back to its scripted ladder and PAIR/TAP report a clear
+    /// "requires an attacker" error. An attacker-LLM run is <b>non-deterministic</b> in production (reproducible only
+    /// with a deterministic attacker client, e.g. in tests).
+    /// </remarks>
+    public IChatClient? AttackerClient { get; init; }
+
+    /// <summary>
     /// Optional callback invoked after each probe completes.
     /// Use this for real-time progress display. 
     /// Alternative to IProgress for simpler API.

@@ -16,9 +16,11 @@ public class MITREATLASReport : IComplianceReport
     public string FrameworkName => "MITRE ATLAS";
 
     /// <inheritdoc />
-    // N-08: ATLAS does not publish a "v4.5" (that read like an ATT&CK version number). Reference the
-    // matrix by snapshot date instead of a fabricated version, so the report makes no false claim.
-    public string FrameworkVersion { get; init; } = "MITRE ATLAS matrix (snapshot 2026-05)";
+    // N-08: ATLAS does not publish a "v4.5" (that read like an ATT&CK version number). Reference the matrix
+    // by ID mapping instead of a fabricated/aspirational version, so the report makes no false precision claim:
+    // technique IDs are authoritative, but the human-readable names must be verified against a pinned ATLAS
+    // release before audit use (#8).
+    public string FrameworkVersion { get; init; } = "MITRE ATLAS (technique-ID mapping; names pending verification vs pinned release)";
 
     /// <inheritdoc />
     public required string AgentName { get; init; }
@@ -49,7 +51,7 @@ public class MITREATLASReport : IComplianceReport
     /// <inheritdoc />
     public double ComplianceRate => Summary.TestedCategories > 0
         ? Summary.PassedCategories * 100.0 / Summary.TestedCategories
-        : 100.0;
+        : 0.0; // RC-6: nothing conclusively tested is not 100% compliant.
 
     /// <inheritdoc />
     public RiskLevel RiskLevel => Summary.CriticalFindings switch

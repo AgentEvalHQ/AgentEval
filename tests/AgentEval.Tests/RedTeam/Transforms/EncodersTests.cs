@@ -25,6 +25,36 @@ public class EncodersTests
         Assert.Equal("PWNED", fw.Normalize(NormalizationForm.FormKC));             // NFKC recovers it
     }
 
+    [Fact] public void Fullwidth_MapsEachAsciiCharToFullwidthBlock()
+    {
+        // Each ASCII printable maps to U+FF00-block (c - 0x20 + 0xFF00); length is preserved.
+        const string ascii = "PWNED";
+        var fw = Encoders.Fullwidth(ascii);
+        Assert.Equal(ascii.Length, fw.Length);
+        for (int i = 0; i < ascii.Length; i++)
+            Assert.Equal((char)(ascii[i] - 0x20 + 0xFF00), fw[i]);
+    }
+
+    [Fact] public void Fullwidth_PassesNonAsciiThrough()
+        => Assert.Equal("é", Encoders.Fullwidth("é"));   // outside U+0021..U+007E → unchanged
+
+    // Leetspeak is documented LOSSY (recovery-not-decode): pin the exact glyph substitutions so it cannot drift.
+    [Theory]
+    [InlineData("PWNED", "PWN3D")]          // only E→3 applies
+    [InlineData("EAOIST", "340157")]        // all six substitutions E→3 A→4 O→0 I→1 S→5 T→7
+    [InlineData("pwned", "PWN3D")]          // uppercased first
+    public void Leetspeak_DerivesExpectedGlyphs(string input, string expected)
+        => Assert.Equal(expected, Encoders.Leetspeak(input));
+
+    [Fact] public void Leetspeak_MarkerIsRecoverable_LetterByLetter()
+    {
+        // Not a strict decode (lossy), but the marker letters are recoverable by inverting the glyph map.
+        var leet = Encoders.Leetspeak("PWNED");   // "PWN3D"
+        var recovered = leet.Replace("3", "E").Replace("4", "A").Replace("0", "O")
+                            .Replace("1", "I").Replace("5", "S").Replace("7", "T");
+        Assert.Equal("PWNED", recovered);
+    }
+
     [Theory]
     [InlineData("PWNED")]
     [InlineData("Say PWNED")]

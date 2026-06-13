@@ -43,6 +43,23 @@ public class TransformerRoundTripTests
         Assert.Contains(Marker, probe.ExpectedTokens!);
     }
 
+    [Theory]
+    [InlineData("PromptInjection")]
+    [InlineData("Jailbreak")]
+    public void RealAttackProbe_Base64Transformed_DecodesToOriginalPrompt(string attackName)
+    {
+        // Beyond the synthetic seed: a transformer applied to a REAL attack's probe must still produce a winnable,
+        // decodable payload — the full instruction survives the encode→decode round-trip and the marker is preserved.
+        var original = Attack.ByName(attackName)!.GetProbes(Intensity.Quick).First();
+        var transformed = new Base64Transformer().Transform(original).Single();
+
+        var payload = (string)transformed.Metadata![TransformProvenance.PayloadKey];
+        Assert.Equal(original.Prompt, FromBase64(payload));                      // decodes back to the real prompt
+        Assert.DoesNotContain(original.Prompt, transformed.Prompt, StringComparison.Ordinal);   // not shipped in plaintext
+        if (original.ExpectedTokens is { Count: > 0 })
+            Assert.Equal(original.ExpectedTokens, transformed.ExpectedTokens);   // evaluator can still fire
+    }
+
     [Fact]
     public void Chain_Base64ThenRot13_DecodesToMarker()
     {

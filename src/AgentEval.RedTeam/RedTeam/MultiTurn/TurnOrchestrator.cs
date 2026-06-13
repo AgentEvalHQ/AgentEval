@@ -58,7 +58,10 @@ public sealed class TurnOrchestrator
                 TurnIndex = i,
                 LastResponse = last,
                 Fidelity = convo.Fidelity,
-                JudgeClient = _options.JudgeClient,
+                // Wave C′: hand the attacker LLM to the attack's NextTurnAsync for LLM-driven rung generation. This is
+                // the ATTACKER (generates turns), distinct from _options.JudgeClient (the verdict judge, consumed below
+                // for the Inconclusive fallback) — they must never be conflated. null ⇒ the attack uses its scripted path.
+                AttackerClient = _options.AttackerClient,
             };
 
             var userMessage = await attack.NextTurnAsync(ctx, cancellationToken).ConfigureAwait(false);
@@ -92,8 +95,37 @@ public sealed class TurnOrchestrator
             history.Add(Turn.Assistant(response.Text));
 
             var result = await evaluator.EvaluateAsync(seed, response, cancellationToken).ConfigureAwait(false);
+            var turnFidelity = FidelityOf(result);
+
+            // GAP-19 (multi-turn): resolve an Inconclusive turn with the LLM judge when one is configured, mirroring
+            // the single-turn runner path. The judge reasons over text only, so a judge-derived verdict is capped at
+            // IntentToAct (Succeeded ⇒ IntentToAct, Resisted ⇒ Verbal). A judge that errors/times out/is unsure leaves
+            // the turn's honest Inconclusive verdict untouched — never a fabricated verdict, never an aborted scan.
+            if (result.Outcome == EvaluationOutcome.Inconclusive && _options.JudgeClient is not null)
+            {
+                try
+                {
+                    // Use the per-turn budget (turnCts), like the agent call and the single-turn runner's per-probe
+                    // token — a slow judge must not silently consume the whole conversation budget.
+                    var judged = await new Evaluators.LLMJudgeEvaluator(_options.JudgeClient)
+                        .EvaluateAsync(seed, response.Text, turnCts.Token).ConfigureAwait(false);
+                    if (judged.Outcome != EvaluationOutcome.Inconclusive)
+                    {
+                        result = judged;
+                        turnFidelity = judged.Outcome == EvaluationOutcome.Succeeded
+                            ? EvidenceFidelity.IntentToAct
+                            : EvidenceFidelity.Verbal;
+                    }
+                }
+                catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+                {
+                    // The judge exceeded the per-turn timeout (a per-turn cap, NOT a scan cancel) — keep the turn's
+                    // honest Inconclusive verdict and carry on, instead of aborting the whole conversation.
+                }
+            }
+
             perTurn.Add(result);
-            fidelity = Max(fidelity, FidelityOf(result));
+            fidelity = Max(fidelity, turnFidelity);
 
             var decision = detector.Evaluate(ctx with { History = history, LastResponse = response }, response, result);
             if (decision.Signal == ConvergenceSignal.SucceededStop)

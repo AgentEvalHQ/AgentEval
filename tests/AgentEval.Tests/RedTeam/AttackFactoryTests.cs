@@ -30,6 +30,11 @@ public class AttackFactoryTests
         Assert.Contains("ExcessiveAgency", Attack.AvailableNames);
         Assert.Contains("InsecureOutput", Attack.AvailableNames);
         Assert.Contains("EncodingEvasion", Attack.AvailableNames);
+        // Wave D — the four attacks that closed OWASP 10/10 must be advertised too.
+        Assert.Contains("SupplyChain", Attack.AvailableNames);
+        Assert.Contains("DataPoisoning", Attack.AvailableNames);
+        Assert.Contains("VectorEmbedding", Attack.AvailableNames);
+        Assert.Contains("Misinformation", Attack.AvailableNames);
     }
 
     [Fact]
@@ -177,7 +182,7 @@ public class AttackFactoryTests
     }
 
     [Fact]
-    public void All_ReturnsNineAttacks()
+    public void All_Returns13Attacks_IncludingWaveD()
     {
         var attacks = Attack.All;
         Assert.Equal(13, attacks.Count);   // Wave D: 9 + LLM03/04/08/09
@@ -190,6 +195,20 @@ public class AttackFactoryTests
         Assert.Contains(attacks, a => a.Name == "ExcessiveAgency");
         Assert.Contains(attacks, a => a.Name == "InsecureOutput");
         Assert.Contains(attacks, a => a.Name == "EncodingEvasion");
+        Assert.Contains(attacks, a => a.Name == "SupplyChain");      // LLM03
+        Assert.Contains(attacks, a => a.Name == "DataPoisoning");    // LLM04
+        Assert.Contains(attacks, a => a.Name == "VectorEmbedding");  // LLM08
+        Assert.Contains(attacks, a => a.Name == "Misinformation");   // LLM09
+    }
+
+    [Fact]
+    public void All_OwaspIds_CoverTop10_NoGaps()
+    {
+        // The full roster must cover OWASP LLM01–LLM10 with no missing category (Wave D closed 6/10 → 10/10).
+        var covered = Attack.All.Select(a => a.OwaspLlmId).Distinct().OrderBy(x => x).ToList();
+        Assert.Equal(
+            new[] { "LLM01", "LLM02", "LLM03", "LLM04", "LLM05", "LLM06", "LLM07", "LLM08", "LLM09", "LLM10" },
+            covered);
     }
 
     [Fact]
@@ -391,8 +410,59 @@ public class AttackFactoryTests
         Assert.Same(attack1, attack2);
     }
 
+    // === Wave D attacks (LLM03 SupplyChain, LLM04 DataPoisoning, LLM08 VectorEmbedding, LLM09 Misinformation) ===
+
+    [Theory]
+    [InlineData("SupplyChain", "SupplyChain")]
+    [InlineData("SUPPLY_CHAIN", "SupplyChain")]
+    [InlineData("DataPoisoning", "DataPoisoning")]
+    [InlineData("data_poisoning", "DataPoisoning")]
+    [InlineData("VectorEmbedding", "VectorEmbedding")]
+    [InlineData("VECTOR_EMBEDDING", "VectorEmbedding")]
+    [InlineData("Misinformation", "Misinformation")]
+    [InlineData("MISINFORMATION", "Misinformation")]
+    public void ByName_WaveDAttacks_ResolveCaseInsensitive_WithAliases(string name, string expected)
+    {
+        var attack = Attack.ByName(name);
+        Assert.NotNull(attack);
+        Assert.Equal(expected, attack!.Name);
+    }
+
+    [Theory]
+    [InlineData("LLM03", "SupplyChain")]
+    [InlineData("LLM04", "DataPoisoning")]
+    [InlineData("LLM08", "VectorEmbedding")]
+    [InlineData("LLM09", "Misinformation")]
+    public void ByOwaspId_WaveDCategories_ResolveToTheirAttack(string owaspId, string expectedAttack)
+    {
+        var attacks = Attack.ByOwaspId(owaspId);
+        Assert.Single(attacks);
+        Assert.Equal(expectedAttack, attacks[0].Name);
+        Assert.Equal(owaspId, attacks[0].OwaspLlmId);
+    }
+
     [Fact]
-    public void All_DoesNotThrow_AndReturnsNineAttacks()
+    public void WaveDProperties_ReturnTypedSingletons_WithCorrectOwaspIds()
+    {
+        Assert.IsType<SupplyChainAttack>(Attack.SupplyChain);
+        Assert.Equal("LLM03", Attack.SupplyChain.OwaspLlmId);
+        Assert.Same(Attack.SupplyChain, Attack.SupplyChain);
+
+        Assert.IsType<DataPoisoningAttack>(Attack.DataPoisoning);
+        Assert.Equal("LLM04", Attack.DataPoisoning.OwaspLlmId);
+        Assert.Same(Attack.DataPoisoning, Attack.DataPoisoning);
+
+        Assert.IsType<VectorEmbeddingAttack>(Attack.VectorEmbedding);
+        Assert.Equal("LLM08", Attack.VectorEmbedding.OwaspLlmId);
+        Assert.Same(Attack.VectorEmbedding, Attack.VectorEmbedding);
+
+        Assert.IsType<MisinformationAttack>(Attack.Misinformation);
+        Assert.Equal("LLM09", Attack.Misinformation.OwaspLlmId);
+        Assert.Same(Attack.Misinformation, Attack.Misinformation);
+    }
+
+    [Fact]
+    public void All_DoesNotThrow_AndReturns13Attacks()
     {
         var all = Attack.All;
         Assert.Equal(13, all.Count);

@@ -199,4 +199,41 @@ public class HarnessTierTests
         var tool = (AIFunction)client.ReceivedOptions[0]!.Tools!.Single();
         await Assert.ThrowsAnyAsync<Exception>(() => tool.InvokeAsync(new AIFunctionArguments()).AsTask());
     }
+
+    // ---- Tier 2 edge paths ----
+
+    [Fact]
+    public async Task Tier2_LoopHitsMaxToolTurns_AppendsHonestTruncationNote()
+    {
+        // The model keeps requesting a tool every turn. The loop must stop at maxToolTurns and HONESTLY mark the
+        // response as truncated rather than silently swallowing the cut-short loop (mirrors RedTeamResult.WasTruncated).
+        var canary = Forbidden("loop_tool", (_, _) => Task.FromResult("again"));
+        var client = new ScriptedChatClient()
+            .AddToolCall("c1", "loop_tool", new Dictionary<string, object?>())
+            .AddToolCall("c2", "loop_tool", new Dictionary<string, object?>())
+            .AddToolCall("c3", "loop_tool", new Dictionary<string, object?>());
+        var agent = new InstrumentedCanaryAgent(client, maxToolTurns: 2);
+
+        var response = await agent.InvokeWithToolsAsync("loop forever", [canary]);
+
+        Assert.Contains("[truncated:", response.Text, StringComparison.Ordinal);
+        Assert.Contains("maxToolTurns=2", response.Text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Tier2_UnknownToolCall_NotExecuted_StaysEmittedOnly()
+    {
+        // The model emits a call to a tool that was never advertised as a canary. The agent must NOT execute or pair
+        // it — the call is recorded as emitted-only (WasExecuted = false), never faked as behavioral.
+        var client = new ScriptedChatClient()
+            .AddToolCall("c1", "ghost_tool", new Dictionary<string, object?>())
+            .AddText("done");
+        var agent = new InstrumentedCanaryAgent(client);
+
+        var response = await agent.InvokeWithToolsAsync("call a ghost", [Forbidden("delete_file", (_, _) => Task.FromResult("x"))]);
+
+        var report = ProbeToolCalls.Extract(response);
+        Assert.True(report.WasToolCalled("ghost_tool"));                                   // emitted...
+        Assert.False(ProbeToolCalls.ExecutedForbiddenTool(response, ["ghost_tool"]));      // ...but never executed
+    }
 }

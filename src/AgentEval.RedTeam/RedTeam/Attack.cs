@@ -34,6 +34,8 @@ public static class Attack
     private static readonly Lazy<InsecureOutputAttack> _insecureOutput = new(() => new InsecureOutputAttack());
     private static readonly Lazy<EncodingEvasionAttack> _encodingEvasion = new(() => new EncodingEvasionAttack());
     private static readonly Lazy<CrescendoAttack> _crescendo = new(() => new CrescendoAttack());
+    private static readonly Lazy<PairAttack> _pair = new(() => new PairAttack());
+    private static readonly Lazy<TapAttack> _tap = new(() => new TapAttack());
     private static readonly Lazy<MisinformationAttack> _misinformation = new(() => new MisinformationAttack());
     private static readonly Lazy<VectorEmbeddingAttack> _vectorEmbedding = new(() => new VectorEmbeddingAttack());
     private static readonly Lazy<SupplyChainAttack> _supplyChain = new(() => new SupplyChainAttack());
@@ -101,6 +103,20 @@ public static class Attack
     /// </summary>
     public static IAttackType Crescendo => _crescendo.Value;
 
+    /// <summary>
+    /// PAIR — iterative attacker-LLM refinement jailbreak (OWASP LLM01, Wave C′). <b>Opt-in</b> — NOT in the default
+    /// <see cref="All"/> roster (it drives a second LLM and is non-deterministic). Requires
+    /// <see cref="ScanOptions.AttackerClient"/>; add it explicitly (<c>Attack.Pair</c> / <c>ByName("PAIR")</c>).
+    /// </summary>
+    public static IAttackType Pair => _pair.Value;
+
+    /// <summary>
+    /// TAP — tree-of-attacks-with-pruning attacker-LLM jailbreak (OWASP LLM01, Wave C′). <b>Opt-in</b> — NOT in the
+    /// default <see cref="All"/> roster (it drives a second LLM and is non-deterministic). Requires
+    /// <see cref="ScanOptions.AttackerClient"/>; add it explicitly (<c>Attack.Tap</c> / <c>ByName("TAP")</c>).
+    /// </summary>
+    public static IAttackType Tap => _tap.Value;
+
     /// <summary>Misinformation attack (OWASP LLM09). Nonexistent-entity confabulation (fabrication vs refusal).</summary>
     public static IAttackType Misinformation => _misinformation.Value;
 
@@ -163,6 +179,8 @@ public static class Attack
             "INSECUREOUTPUT" or "INSECURE_OUTPUT" => InsecureOutput,
             "ENCODINGEVASION" or "ENCODING_EVASION" => EncodingEvasion,
             "CRESCENDO" => Crescendo,
+            "PAIR" => Pair,
+            "TAP" => Tap,
             "MISINFORMATION" => Misinformation,
             "VECTOREMBEDDING" or "VECTOR_EMBEDDING" => VectorEmbedding,
             "SUPPLYCHAIN" or "SUPPLY_CHAIN" => SupplyChain,

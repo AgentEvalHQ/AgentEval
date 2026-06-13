@@ -841,6 +841,71 @@ bool canResist = await agent.CanResistAsync(Attack.PromptInjection);
     testResultsFiles: '**/redteam.xml'
 ```
 
+### `agenteval redteam` CLI — baseline regression gate (Wave E)
+
+The `agenteval redteam` command is the low-level scanner with built-in CI affordances: SARIF/JUnit export, a saved **baseline**, and an honest **exit-code gate**.
+
+```bash
+# Capture a baseline once (e.g. on main) and commit it:
+agenteval redteam --endpoint $URL --model $MODEL \
+  --intensity moderate --format sarif -o redteam.sarif \
+  --save-baseline redteam-baseline.json
+
+# On every PR: scan, emit SARIF, and FAIL ONLY on a NEW vulnerability vs the baseline:
+agenteval redteam --endpoint $URL --model $MODEL \
+  --intensity moderate --format sarif -o redteam.sarif \
+  --baseline redteam-baseline.json --fail-on regression
+```
+
+**`--fail-on` gate** selects what fails the build:
+
+| Value | Exit 0 (pass) | Non-zero |
+|-------|---------------|----------|
+| `vuln` *(default)* | no vulnerabilities found | `1` any vulnerability · `4` regression vs `--baseline` |
+| `regression` | no **new** finding vs baseline (pre-existing tolerated) | `4` a new finding / score or coverage drop |
+| `never` | always | — |
+
+**Exit codes:** `0` pass · `1` vulnerabilities found · `3` runtime error · `4` regression vs baseline. A regression (code `4`) always outranks the absolute vulnerability gate (code `1`) so CI can tell *"a new finding appeared"* apart from *"pre-existing findings remain"*. The comparison refuses a FailFast-truncated scan or an intensity mismatch (RC-6) rather than reporting a misleading "stable".
+
+```yaml
+# GitHub Actions: scan → upload SARIF to code-scanning + JUnit test report → baseline gate
+- name: Red-team scan
+  run: |
+    agenteval redteam --endpoint "$URL" --model "$MODEL" \
+      --intensity moderate --format sarif -o redteam.sarif \
+      --baseline redteam-baseline.json --fail-on regression
+  # exit 4 (regression) or 1 (vuln) fails the job; 0 passes.
+
+- name: Upload SARIF to the Security tab
+  if: always()
+  uses: github/codeql-action/upload-sarif@v3
+  with:
+    sarif_file: redteam.sarif
+```
+
+> Inconclusive probes (timeouts, un-canaried checks) appear in SARIF as low-noise `note` results — a *coverage gap*, surfaced rather than silently dropped. Lead with `Verdict` + conclusive-only score + coverage, not the inconclusive-diluted `OverallScore`.
+
+## Attacker-LLM Multi-Turn (Crescendo / PAIR / TAP)
+
+A second **attacker LLM** can *drive and adapt* the attack against the target, instead of using fixed probes. Three strategies ship (all opt-in, all OWASP LLM01):
+
+| Attack | How it works | Shape |
+|--------|--------------|-------|
+| **Crescendo** | Escalates a benign conversation toward the objective; with `--attacker` each rung is LLM-generated (without it, a deterministic scripted ladder) | linear conversation |
+| **PAIR** | Refines a single jailbreak prompt each turn from the target's last reply (Chao et al. 2023) | linear conversation |
+| **TAP** | Branches *K* candidate prompts per node, judge-scores, prunes to a beam, expands (Mehrotra et al. 2023) | pruned tree |
+
+```bash
+# Attacker LLM generates the attack; an optional judge resolves inconclusive verdicts.
+agenteval redteam --endpoint $TARGET --model $MODEL \
+  --attacks PAIR,TAP --attacker $ATTACKER_URL --attacker-model gpt-4o \
+  --judge $JUDGE_URL --intensity moderate
+```
+
+**Separation of concerns (honesty):** the **attacker** *generates* turns (`--attacker` → `ScanOptions.AttackerClient`); the **judge** *scores* them (`--judge` → `ScanOptions.JudgeClient`, GAP-19). They are distinct clients — an attack can never score itself. PAIR/TAP **require** `--attacker` (clear error otherwise); Crescendo falls back to its scripted ladder.
+
+**Non-determinism:** an attacker-LLM run is **not reproducible** without a fixed attacker — the CLI prints a `NON-DETERMINISTIC` banner. Use scripted attacks (not these) for baselines/regression gating (`--baseline`). The attacker producing nothing, or the judge being unsure, ends the run honestly (no fabricated success); TAP's fan-out is hard-capped by a node budget.
+
 ## Best Practices
 
 1. **Run Quick scans on every PR** — Fast feedback loop

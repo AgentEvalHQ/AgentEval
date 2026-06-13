@@ -86,7 +86,7 @@ public sealed class JUnitReportExporter : IReportExporter
                         new XAttribute("value", attack.Severity.ToString())),
                     new XElement("property",
                         new XAttribute("name", "agent"),
-                        new XAttribute("value", result.AgentName ?? ""))
+                        new XAttribute("value", SanitizeForXml(result.AgentName)))
                 ),
                 GetTestCases(attack, result.AgentName ?? "UnknownAgent")
             );
@@ -110,20 +110,20 @@ public sealed class JUnitReportExporter : IReportExporter
                 case EvaluationOutcome.Succeeded:
                     // A successful attack is a FAILURE from security perspective
                     testCase.Add(new XElement("failure",
-                        new XAttribute("message", $"Security vulnerability: {probe.Reason}"),
+                        new XAttribute("message", $"Security vulnerability: {SanitizeForXml(probe.Reason)}"),
                         new XAttribute("type", $"VulnerabilityFound"),
                         $"""
-                        Probe: {probe.ProbeId}
-                        Technique: {probe.Technique ?? "unknown"}
+                        Probe: {SanitizeForXml(probe.ProbeId)}
+                        Technique: {SanitizeForXml(probe.Technique ?? "unknown")}
                         Difficulty: {probe.Difficulty}
-                        
+
                         ATTACK SUCCEEDED - Agent was compromised!
-                        
-                        Reason: {probe.Reason}
-                        
+
+                        Reason: {SanitizeForXml(probe.Reason)}
+
                         Prompt:
                         {TruncateForXml(probe.Prompt, 500)}
-                        
+
                         Response:
                         {TruncateForXml(probe.Response, 500)}
                         """
@@ -132,9 +132,9 @@ public sealed class JUnitReportExporter : IReportExporter
 
                 case EvaluationOutcome.Inconclusive:
                     testCase.Add(new XElement("error",
-                        new XAttribute("message", probe.Error ?? probe.Reason),
+                        new XAttribute("message", SanitizeForXml(probe.Error ?? probe.Reason)),
                         new XAttribute("type", "Inconclusive"),
-                        $"Could not determine outcome: {probe.Reason}"
+                        $"Could not determine outcome: {SanitizeForXml(probe.Reason)}"
                     ));
                     break;
 
@@ -153,14 +153,56 @@ public sealed class JUnitReportExporter : IReportExporter
     private static string TruncateForXml(string? text, int maxLength)
     {
         if (string.IsNullOrEmpty(text)) return "";
-        
-        // Replace problematic characters
-        text = text
+
+        // Strip XML-invalid control characters first, then normalise newlines, so the
+        // replacement does not throw off the length budget below.
+        text = SanitizeForXml(text)
             .Replace("\r\n", "\n")
             .Replace("\r", "\n");
 
         if (text.Length <= maxLength) return text;
         return text[..(maxLength - 3)] + "...";
+    }
+
+    /// <summary>
+    /// Replaces characters that are illegal in XML 1.0 (e.g. an ANSI escape <c>0x1B</c>
+    /// or a NUL byte echoed by the SUT) with the Unicode replacement character.
+    /// Without this, <see cref="XmlWriter"/> throws <see cref="ArgumentException"/> and the
+    /// entire report — emitted only when a vulnerability is found — is lost. A red-team tool
+    /// deliberately elicits exactly this class of output (encoding-evasion / insecure-output),
+    /// so every piece of SUT-derived text must pass through here.
+    /// </summary>
+    private static string SanitizeForXml(string? text)
+    {
+        if (string.IsNullOrEmpty(text)) return "";
+
+        var sb = new StringBuilder(text.Length);
+        for (var i = 0; i < text.Length; i++)
+        {
+            var c = text[i];
+            if (char.IsHighSurrogate(c))
+            {
+                // A valid surrogate pair is always a legal XML supplementary character.
+                if (i + 1 < text.Length && char.IsLowSurrogate(text[i + 1]))
+                {
+                    sb.Append(c);
+                    sb.Append(text[i + 1]);
+                    i++;
+                }
+                else
+                {
+                    sb.Append('�'); // unpaired high surrogate
+                }
+                continue;
+            }
+            if (char.IsLowSurrogate(c))
+            {
+                sb.Append('�'); // unpaired low surrogate
+                continue;
+            }
+            sb.Append(XmlConvert.IsXmlChar(c) ? c : '�');
+        }
+        return sb.ToString();
     }
 
     /// <summary>

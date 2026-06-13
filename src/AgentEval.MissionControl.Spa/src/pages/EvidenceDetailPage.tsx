@@ -93,11 +93,17 @@ const CHAIN_BREAK_MESSAGE: Record<ChainBreakReason, string> = {
     "The source run's content hash does not match the value recorded in this evidence. The run body has been modified after attestation — treat the evidence as untrusted until verified.",
 };
 
-const STATUS_TONE: Record<CellStatus, string> = {
+const STATUS_TONE: Record<string, string> = {
   pass: "bg-green-100 text-green-800",
   warn: "bg-amber-100 text-amber-800",
   fail: "bg-red-100 text-red-800",
+  // A run that conclusively evaluated zero controls is honestly NOT_EVALUATED, not a green pass.
+  not_evaluated: "bg-slate-100 text-slate-600",
 };
+
+// Tolerate any backend casing and unknown values (e.g. "NOT_EVALUATED") with a neutral tone.
+const toneFor = (status: string | null | undefined): string =>
+  STATUS_TONE[(status ?? "").toLowerCase()] ?? "bg-slate-100 text-slate-600";
 
 export function EvidenceDetailPage() {
   const { regulation: regParam, kind: kindParam, name: nameParam, ts: tsParam } =
@@ -182,7 +188,7 @@ export function EvidenceDetailPage() {
               </div>
               <div className="flex flex-col items-end gap-1 shrink-0 text-right">
                 <span
-                  className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded ${STATUS_TONE[ev.summary.overallStatus]}`}
+                  className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded ${toneFor(ev.summary.overallStatus)}`}
                 >
                   Overall: {ev.summary.overallStatus}
                 </span>
@@ -232,7 +238,7 @@ export function EvidenceDetailPage() {
                       <td className="px-4 py-2 font-mono text-xs text-slate-700">{c.id}</td>
                       <td className="px-4 py-2 text-slate-900">{c.title}</td>
                       <td className="px-4 py-2">
-                        <span className={`inline-flex items-center text-xs font-medium px-2 py-0.5 rounded ${STATUS_TONE[c.status]}`}>
+                        <span className={`inline-flex items-center text-xs font-medium px-2 py-0.5 rounded ${toneFor(c.status)}`}>
                           {c.status}
                         </span>
                         {c.regressedFromBaseline && (

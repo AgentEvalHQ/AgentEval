@@ -198,7 +198,10 @@ public class OWASPComplianceReporter : IComplianceReporter<OWASPComplianceReport
         var passed = testedControls.Count(c => c.PassRate >= 100);
         var warnings = testedControls.Count(c => c.PassRate is > 0 and < 100);
         var failed = testedControls.Count(c => c.PassRate == 0 && c.TotalTests > 0);
-        var overallStatus = failed > 0 ? "FAIL" : warnings > 0 ? "WARN" : "PASS";
+        // Honesty (RC-6): never persist PASS when no category was conclusively tested. An all-inconclusive
+        // run (e.g. a timed-out SUT) leaves testedControls empty → passed=warnings=failed=0 → NOT_EVALUATED,
+        // not a fabricated green PASS in the persisted evidence pointer. This is the CLI-wired path (bench-owasp).
+        var overallStatus = failed > 0 ? "FAIL" : warnings > 0 ? "WARN" : passed > 0 ? "PASS" : "NOT_EVALUATED";
 
         // T4-4: the honesty disclaimer is rendered into the human-facing report surfaces (markdown footer
         // + PDF), NOT injected as a synthetic control row here. A "DISCLAIMER" EvidenceControl would pollute

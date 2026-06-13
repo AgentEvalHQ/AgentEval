@@ -264,6 +264,75 @@ public class RedTeamBaselineComparerTests
     }
 
     [Fact]
+    public void Compare_BaselineWithInconclusiveProbes_IdenticalRerun_IsStableNotRegression()
+    {
+        // RC-6 honesty: a baseline captured from an inconclusive-laden run records coverage < 1.0
+        // (here 0.70). An identical re-run must NOT be flagged as a coverage regression. The gate
+        // previously hard-coded baseline coverage = 1.0, turning every such comparison into a
+        // permanent exit-4 false alarm.
+        var baseline = CreateMixedCoverageResult().ToBaseline("v1.0.0");
+        var current = CreateMixedCoverageResult();
+
+        var comparison = new RedTeamBaselineComparer().Compare(current, baseline);
+
+        Assert.Equal(0.70, comparison.BaselineCoverage, 3);
+        Assert.Equal(0.0, comparison.CoverageDrop, 3);
+        Assert.False(comparison.IsRegression);
+        Assert.Equal(RegressionStatus.Stable, comparison.Status);
+    }
+
+    [Fact]
+    public void Compare_ConclusiveBaseline_VsInconclusiveCurrent_StillRegression()
+    {
+        // The fail-closed direction is preserved: a genuinely lower-coverage current run (0.70)
+        // against a fully-conclusive baseline (1.0) is still a regression.
+        var baseline = CreateResult(succeededProbes: 0).ToBaseline("v1.0.0"); // coverage 1.0
+        var current = CreateMixedCoverageResult();                            // coverage 0.70
+
+        var comparison = new RedTeamBaselineComparer().Compare(current, baseline);
+
+        Assert.Equal(1.0, comparison.BaselineCoverage, 3);
+        Assert.True(comparison.CoverageDrop >= 0.10);
+        Assert.True(comparison.IsRegression);
+    }
+
+    // Two attacks, 10 probes each: 7 resisted + 3 inconclusive => coverage 14/20 = 0.70.
+    private static RedTeamResult CreateMixedCoverageResult() => new()
+    {
+        AgentName = "TestAgent",
+        Duration = TimeSpan.FromSeconds(10),
+        TotalProbes = 20,
+        ResistedProbes = 14,
+        SucceededProbes = 0,
+        InconclusiveProbes = 6,
+        AttackResults =
+        [
+            CreateMixedAttack("PromptInjection", "Prompt Injection", "PI"),
+            CreateMixedAttack("Jailbreak", "Jailbreak", "JB")
+        ]
+    };
+
+    private static AttackResult CreateMixedAttack(string name, string display, string prefix) => new()
+    {
+        AttackName = name,
+        AttackDisplayName = display,
+        OwaspId = "LLM01",
+        Severity = Severity.High,
+        ResistedCount = 7,
+        SucceededCount = 0,
+        InconclusiveCount = 3,
+        ProbeResults = Enumerable.Range(1, 10).Select(i => new ProbeResult
+        {
+            ProbeId = $"{prefix}-{i:D3}",
+            Prompt = $"Test {i}",
+            Response = i <= 7 ? "Safe" : "[TIMEOUT]",
+            Outcome = i <= 7 ? EvaluationOutcome.Resisted : EvaluationOutcome.Inconclusive,
+            Reason = i <= 7 ? "No marker" : "Timed out",
+            Severity = Severity.High
+        }).ToList()
+    };
+
+    [Fact]
     public void Compare_IntensityMismatch_Throws()
     {
         var baseline = CreateResult(succeededProbes: 0).ToBaseline("v1.0.0") with { Intensity = Intensity.Comprehensive };

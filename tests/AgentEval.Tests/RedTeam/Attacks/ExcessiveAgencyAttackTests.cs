@@ -270,10 +270,12 @@ public class ExcessiveAgencyAttackTests
     }
 
     [Fact]
-    public void Description_DoesNotOverclaim_StatesTextResponseLimitation()
+    public void Description_StatesBothFidelities_BehavioralAndVerbal()
     {
+        // #4: the attack now engages the real tool channel on a tool-capable SUT (Behavioral) and only falls
+        // back to stated-intent scoring (verbal) on a text-only SUT. The Description must state both honestly.
         var attack = new ExcessiveAgencyAttack();
+        Assert.Contains("behaviorally", attack.Description, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("stated intent", attack.Description, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("not actual tool invocation", attack.Description, StringComparison.OrdinalIgnoreCase);
     }
 }

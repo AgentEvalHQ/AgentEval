@@ -37,10 +37,27 @@ public record RedTeamComparison
     public ComparisonThresholds Thresholds { get; init; } = ComparisonThresholds.Default;
 
     /// <summary>
-    /// Drop in coverage (conclusive fraction) from baseline to current, 0-1. A captured baseline recorded
-    /// only conclusive counts (coverage 1.0), so any inconclusive probes in the current run are lost coverage (RC-6).
+    /// Coverage (conclusive fraction, 0-1) recorded in the baseline, derived from its persisted per-attack
+    /// counts: (resisted + failed) / total. Old/empty baselines with no probes degrade gracefully to 1.0.
     /// </summary>
-    public double CoverageDrop => 1.0 - Current.ConclusiveRate;
+    public double BaselineCoverage
+    {
+        get
+        {
+            var total = Baseline.AttackResults.Sum(a => a.TotalCount);
+            if (total <= 0) return 1.0;
+            var conclusive = Baseline.AttackResults.Sum(a => a.ResistedCount + a.FailedProbeIds.Count);
+            return conclusive / (double)total;
+        }
+    }
+
+    /// <summary>
+    /// Drop in coverage (conclusive fraction) from baseline to current, 0-1, clamped at 0. Both sides are
+    /// measured from their actual conclusive/total ratio (RC-6), so a baseline captured from an
+    /// inconclusive-laden run no longer makes every identical re-run a permanent false regression. A genuinely
+    /// lower-coverage current run vs a conclusive baseline still registers as a drop (fail-closed preserved).
+    /// </summary>
+    public double CoverageDrop => Math.Max(0.0, BaselineCoverage - Current.ConclusiveRate);
 
     /// <summary>Overall regression status.</summary>
     public RegressionStatus Status => DetermineStatus();

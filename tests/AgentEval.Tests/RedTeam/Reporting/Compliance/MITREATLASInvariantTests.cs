@@ -2,6 +2,7 @@
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 // tests/AgentEval.Tests/RedTeam/Reporting/Compliance/MITREATLASInvariantTests.cs
+using AgentEval.RedTeam;
 using AgentEval.RedTeam.Reporting.Compliance;
 
 namespace AgentEval.Tests.RedTeam.Reporting.Compliance;
@@ -29,6 +30,8 @@ public sealed class MITREATLASInvariantTests
             ["AML.T0044"] = "TA0010",
             ["AML.T0046"] = "TA0003",
             ["AML.T0053"] = "TA0005",
+            ["AML.T0010"] = "TA0001",   // #9: SupplyChain (LLM03) — was silently dropped from the catalog
+            ["AML.T0020"] = "TA0003",   // #9: DataPoisoning (LLM04) — was silently dropped from the catalog
         };
 
     // Independently-authored ATLAS tactic ID -> canonical name.
@@ -83,4 +86,21 @@ public sealed class MITREATLASInvariantTests
         => Assert.Equal(
             ExpectedTechniqueTacticId.Keys.OrderBy(k => k, StringComparer.Ordinal),
             MITREATLASReporter.TechniqueCatalog.Select(t => t.Id).OrderBy(k => k, StringComparer.Ordinal));
+
+    [Fact]
+    public void Catalog_ContainsEveryAtlasIdTaggedByAnAttack()
+    {
+        // #9 anti-drift: every AML.T id an attack advertises MUST exist in the technique catalog. Otherwise that
+        // attack's results are silently dropped from the ATLAS report rows and composite — exactly the bug where
+        // a compromised SupplyChain (T0010) / DataPoisoning (T0020) probe could not fail the MITRE benchmark.
+        var catalogIds = MITREATLASReporter.TechniqueCatalog.Select(t => t.Id).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var missing = Attack.All
+            .SelectMany(a => a.MitreAtlasIds)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Where(id => !catalogIds.Contains(id))
+            .ToList();
+
+        Assert.True(missing.Count == 0,
+            $"Attack-tagged ATLAS IDs missing from MITREATLASReporter.TechniqueCatalog: {string.Join(", ", missing)}");
+    }
 }

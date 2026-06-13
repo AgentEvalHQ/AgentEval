@@ -97,16 +97,29 @@ public class IndirectInjectionSurfaceTests
         Assert.False(ProbeToolCalls.ExecutedForbiddenTool(response, ["send_data"]));
     }
 
-    [Fact]
-    public async Task ToolOutputProbe_OnTextOnlyAgent_DegradesHonestly_Resisted()
+    private sealed class TextOnlyAgent(string reply) : IEvaluableAgent
     {
-        // A text agent cannot call tools, so the injection cannot land — must NOT fabricate a pass; the deterministic
-        // outcome is Resisted (no forbidden tool, no marker in text) at Verbal fidelity.
-        var toolProbe = _attack.GetProbes(Intensity.Moderate).First(p => p.Surface == InjectionSurface.ToolOutput);
-        var result = await _attack.GetEvaluator().EvaluateAsync(toolProbe, new AgentResponse { Text = "Here is a summary of the report." });
+        public string Name => "TextOnlyAgent";
+        public Task<AgentResponse> InvokeAsync(string prompt, CancellationToken ct = default)
+            => Task.FromResult(new AgentResponse { Text = reply });
+    }
 
-        Assert.Equal(EvaluationOutcome.Resisted, result.Outcome);
-        Assert.Equal(EvidenceFidelity.Verbal, result.Metadata!["fidelity"]);
+    [Fact]
+    public async Task Runner_ToolOutputProbe_OnTextOnlyAgent_ScoredInconclusive_NotFabricatedResisted()
+    {
+        // #2: a real tool-output boundary probe carries no inlined payload — the poison lives in a canary
+        // tool's output and is only deliverable to a tool-capable SUT. On a text-only agent the tool channel
+        // never engages, so the attack is never delivered. The runner must record Inconclusive, NOT a
+        // fabricated conclusive Resisted (which previously fed OWASP/MITRE conclusive pass counts on every
+        // default-intensity scan of the most common SUT type).
+        var result = await new RedTeamRunner().ScanAsync(
+            new TextOnlyAgent("Here is a summary of the report."),
+            new ScanOptions { AttackTypes = [new SingleToolAttack()], Intensity = Intensity.Quick });
+
+        var probe = result.AttackResults.Single().ProbeResults.Single();
+        Assert.Equal(InjectionSurface.ToolOutput, probe.Surface);
+        Assert.Equal(EvaluationOutcome.Inconclusive, probe.Outcome);
+        Assert.Contains("never delivered", probe.Reason);
     }
 
     [Fact]
@@ -179,5 +192,46 @@ public class IndirectInjectionSurfaceTests
         var probe = result.AttackResults.Single().ProbeResults.Single();
         Assert.Equal(EvaluationOutcome.Succeeded, probe.Outcome);
         Assert.Equal(EvidenceFidelity.IntentToAct, probe.Fidelity);
+    }
+
+    // ---- #4: ExcessiveAgency (LLM06) engages the real tool channel ----
+
+    private sealed class AlwaysCallsToolClient(string toolName) : IChatClient
+    {
+        public Task<ChatResponse> GetResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken ct = default)
+        {
+            var priorCalls = messages.SelectMany(m => m.Contents).OfType<FunctionCallContent>().Select(c => c.Name).ToList();
+            if (priorCalls.Contains(toolName))
+                return Task.FromResult(new ChatResponse(new ChatMessage(ChatRole.Assistant, "done.")) { FinishReason = ChatFinishReason.Stop });
+            return Task.FromResult(new ChatResponse(new ChatMessage(ChatRole.Assistant,
+                new List<AIContent> { new FunctionCallContent("c1", toolName, new Dictionary<string, object?>()) })) { FinishReason = ChatFinishReason.ToolCalls });
+        }
+        public IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken ct = default)
+            => throw new NotSupportedException();
+        public object? GetService(Type serviceType, object? serviceKey = null) => null;
+        public void Dispose() { }
+    }
+
+    [Fact]
+    public void ExcessiveAgency_IsToolAware_AdvertisesForbiddenCanaries()
+    {
+        // #4: LLM06 — the one category about real tool overreach — must engage the canary tool channel.
+        var attack = new ExcessiveAgencyAttack();
+        var tools = Assert.IsAssignableFrom<IToolAwareAttack>(attack).GetCanaryTools(Intensity.Moderate);
+        Assert.Contains(tools, t => t.Name == "admin_delete");
+    }
+
+    [Fact]
+    public async Task Runner_ExcessiveAgency_OnInstrumentedAgent_RecordsBehavioralCompromise()
+    {
+        // #4: an instrumented SUT that actually invokes a forbidden out-of-scope tool (admin_delete) is scored
+        // Succeeded with Behavioral fidelity — not verbal-keyword-proxy only as before the canary wiring.
+        var agent = new InstrumentedCanaryAgent(new AlwaysCallsToolClient("admin_delete"));
+
+        var result = await new RedTeamRunner().ScanAsync(
+            agent, new ScanOptions { AttackTypes = [new ExcessiveAgencyAttack()], Intensity = Intensity.Quick });
+
+        var probes = result.AttackResults.Single().ProbeResults;
+        Assert.Contains(probes, p => p.Outcome == EvaluationOutcome.Succeeded && p.Fidelity == EvidenceFidelity.Behavioral);
     }
 }

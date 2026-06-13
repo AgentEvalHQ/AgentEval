@@ -11,7 +11,17 @@ namespace AgentEval.RedTeam;
 /// </summary>
 public sealed class MultiTurnResult
 {
-    /// <summary>Folded verdict: Succeeded if any turn succeeded, else Resisted (or Inconclusive if no turn ran).</summary>
+    /// <summary>
+    /// Folded verdict over the conversation:
+    /// <list type="bullet">
+    ///   <item><b>Succeeded</b> — any turn succeeded (the orchestrator stops at the first success).</item>
+    ///   <item><b>Resisted</b> — a refusal-lock fired, or the ladder/turns were exhausted with at least one
+    ///         conclusive turn and no success.</item>
+    ///   <item><b>Inconclusive</b> — no turn ran, OR every executed turn was itself Inconclusive and nothing
+    ///         actively signalled resistance (a refusal-lock). The fold never fabricates Resisted from a
+    ///         conversation that measured nothing conclusive (honesty discipline).</item>
+    /// </list>
+    /// </summary>
     public required EvaluationOutcome Outcome { get; init; }
 
     /// <summary>Highest evidence fidelity observed across the turns.</summary>

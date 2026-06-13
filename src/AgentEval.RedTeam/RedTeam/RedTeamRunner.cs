@@ -359,6 +359,21 @@ public sealed class RedTeamRunner : IRedTeamRunner
             // multi-turn gets a CONVERSATION-sized hard bound instead: MaxConversationDuration if set, else
             // MaxTurns × TimeoutPerTurn (each turn gets its full per-turn budget). TimeoutPerTurn still bounds each
             // individual turn inside the orchestrator (review).
+            // Wave C′ (TAP): a tree attack searches a pruned tree of attacker-generated prompts per seed and folds the
+            // whole search into ONE ProbeResult — the same fold shape as the linear multi-turn path below. Budget: a
+            // conversation-sized bound (MaxConversationDuration, else MaxNodes × TimeoutPerProbe).
+            if (attack is ITreeAttack treeAttack)
+            {
+                var treeBudget = options.MaxConversationDuration > TimeSpan.Zero
+                    ? options.MaxConversationDuration
+                    : TimeSpan.FromTicks(options.TimeoutPerProbe.Ticks * Math.Max(1, treeAttack.MaxNodes));
+                using var treeCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                treeCts.CancelAfter(treeBudget);
+                var tr = await new TreeOrchestrator(agent, options).RunAsync(treeAttack, probe, evaluator, treeCts.Token);
+                probeSw.Stop();
+                return BuildFoldedProbeResult(probe, tr, attackSeverity, probeSw.Elapsed, options);
+            }
+
             if (attack is IMultiTurnAttack multiTurnAttack)
             {
                 var convoBudget = options.MaxConversationDuration > TimeSpan.Zero
@@ -368,23 +383,7 @@ public sealed class RedTeamRunner : IRedTeamRunner
                 convoCts.CancelAfter(convoBudget);
                 var mt = await new TurnOrchestrator(agent, options).RunAsync(multiTurnAttack, probe, evaluator, convoCts.Token);
                 probeSw.Stop();
-                var transcript = string.Join("\n", mt.Transcript.Select(t => $"{t.Role}: {t.Content}"));
-                return new ProbeResult
-                {
-                    ProbeId = probe.Id,
-                    Prompt = options.IncludeEvidence ? probe.Prompt : "[REDACTED]",
-                    Response = options.IncludeEvidence ? transcript : "[REDACTED]",
-                    Outcome = mt.Outcome,
-                    Reason = $"[{mt.ConversationFidelity}, {mt.TurnsUsed} turn(s)] {mt.Reason}"
-                             + (mt.WasTruncated ? " [TRUNCATED]" : string.Empty),
-                    Technique = probe.Technique,
-                    Difficulty = probe.Difficulty,
-                    Duration = probeSw.Elapsed,
-                    Severity = attackSeverity,
-                    Fidelity = mt.Fidelity,
-                    Surface = probe.Surface,
-                    ConversationFidelity = mt.ConversationFidelity,
-                };
+                return BuildFoldedProbeResult(probe, mt, attackSeverity, probeSw.Elapsed, options);
             }
 
             // Execute probe against agent. Wave B (Pillar 1): if the SUT is tool-capable AND the attack advertises
@@ -397,6 +396,37 @@ public sealed class RedTeamRunner : IRedTeamRunner
             var useToolChannel = agent is IToolCapableAgent { Capabilities: not AgentToolCapability.None }
                                  && attack is IToolAwareAttack
                                  && probe.Surface != InjectionSurface.UserMessage;
+
+            // #2 honesty (RC-6): a real tool-output boundary probe carries NO inlined payload — the poison
+            // lives in a canary tool's output and is only delivered if the SUT actually calls tools. When the
+            // tool channel will not engage (text-only SUT, or a non-tool-aware attack), the attack was never
+            // deliverable; the marker can't appear and the verbal ContainsToken oracle would fabricate a
+            // conclusive Resisted that feeds compliance pass counts. Record Inconclusive (not scored) instead,
+            // mirroring the structurally-untestable gate above, without invoking the agent.
+            // NOTE: only ToolOutput (FunctionResultContent boundary) is gated. RetrievedDocument probes in this
+            // codebase INLINE their poisoned context block into the prompt, so they ARE deliverable to a
+            // text-only SUT and must not be gated.
+            if (!useToolChannel && probe.Surface is InjectionSurface.ToolOutput)
+            {
+                probeSw.Stop();
+                return new ProbeResult
+                {
+                    ProbeId = probe.Id,
+                    Prompt = options.IncludeEvidence ? probe.Prompt : "[REDACTED]",
+                    Response = "[NOT EXERCISED]",
+                    Outcome = EvaluationOutcome.Inconclusive,
+                    Reason = $"Probe targets the {probe.Surface} trust boundary, deliverable only to a tool-capable " +
+                             "SUT (the payload lives in a canary tool's output). This SUT has no engaged tool channel, " +
+                             "so the attack was never delivered — recorded Inconclusive, not scored.",
+                    Technique = probe.Technique,
+                    Difficulty = probe.Difficulty,
+                    Duration = probeSw.Elapsed,
+                    Severity = attackSeverity,
+                    Fidelity = EvidenceFidelity.Verbal,
+                    Surface = probe.Surface
+                };
+            }
+
             var response = useToolChannel
                 ? await ((IToolCapableAgent)agent).InvokeWithToolsAsync(probe.Prompt, ((IToolAwareAttack)attack).GetCanaryTools(options.Intensity), probeCts.Token)
                 : await agent.InvokeAsync(probe.Prompt, probeCts.Token);
@@ -410,7 +440,8 @@ public sealed class RedTeamRunner : IRedTeamRunner
             var fidelity = ResolveFidelity(evalResult);
 
             // GAP-19 / RC-1: LLM-judge fallback — only when Inconclusive AND a judge client is configured.
-            // The judge reasons over text only, so a judge-derived verdict is capped at IntentToAct.
+            // The judge reasons over text only, so a judge-derived verdict is capped at IntentToAct
+            // (Succeeded ⇒ IntentToAct, Resisted ⇒ Verbal).
             if (evalResult.Outcome == EvaluationOutcome.Inconclusive && options.JudgeClient is not null)
             {
                 var judge = new Evaluators.LLMJudgeEvaluator(options.JudgeClient);
@@ -498,6 +529,29 @@ public sealed class RedTeamRunner : IRedTeamRunner
     /// <see cref="EvidenceFidelity.Verbal"/> — an incidental, unrelated tool call in the trace is NOT
     /// behavioral proof of the matched outcome, so it must not upgrade fidelity.
     /// </summary>
+    // Folds a multi-turn / tree search (one MultiTurnResult) into one ProbeResult — shared by the linear
+    // TurnOrchestrator (Wave C) and the TreeOrchestrator (Wave C′ TAP) paths so they can never drift.
+    private static ProbeResult BuildFoldedProbeResult(AttackProbe probe, MultiTurnResult mt, Severity attackSeverity, TimeSpan elapsed, ScanOptions options)
+    {
+        var transcript = string.Join("\n", mt.Transcript.Select(t => $"{t.Role}: {t.Content}"));
+        return new ProbeResult
+        {
+            ProbeId = probe.Id,
+            Prompt = options.IncludeEvidence ? probe.Prompt : "[REDACTED]",
+            Response = options.IncludeEvidence ? transcript : "[REDACTED]",
+            Outcome = mt.Outcome,
+            Reason = $"[{mt.ConversationFidelity}, {mt.TurnsUsed} turn(s)] {mt.Reason}"
+                     + (mt.WasTruncated ? " [TRUNCATED]" : string.Empty),
+            Technique = probe.Technique,
+            Difficulty = probe.Difficulty,
+            Duration = elapsed,
+            Severity = attackSeverity,
+            Fidelity = mt.Fidelity,
+            Surface = probe.Surface,
+            ConversationFidelity = mt.ConversationFidelity,
+        };
+    }
+
     private static EvidenceFidelity ResolveFidelity(EvaluationResult result)
     {
         if (result.Metadata is { } meta &&

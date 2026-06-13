@@ -113,8 +113,8 @@ public class MitreBenchmarkTests
         Assert.NotNull(result);
         Assert.Equal("skipped", result.Score.Label);
         Assert.NotNull(result.Details.SubResults);
-        Assert.Equal(13, result.Details.SubResults!.Count);   // RC-5/T4-2: 13-technique roster
-        // All 13 leaves should be skipped when no agent is supplied.
+        Assert.Equal(15, result.Details.SubResults!.Count);   // RC-5/T4-2: 15-technique roster (incl. #9 T0010/T0020)
+        // All 15 leaves should be skipped when no agent is supplied.
         Assert.All(result.Details.SubResults, leaf => Assert.Equal("skipped", leaf.Score.Label));
     }
 
@@ -138,7 +138,7 @@ public class MitreBenchmarkTests
         Assert.NotNull(result.Details.SubResults);
 
         var leaves = result.Details.SubResults!;
-        Assert.Equal(13, leaves.Count);                                // RC-5/T4-2: canonical 13-leaf shape
+        Assert.Equal(15, leaves.Count);                                // RC-5/T4-2: canonical 15-leaf shape
 
         // Every leaf's Metric.Key should be 'mitre.aml.t0xxx' — preserving the
         // ATLAS technique ID through the audit chain. This is the headline Phase-6
@@ -149,11 +149,11 @@ public class MitreBenchmarkTests
             Assert.Equal("compliance.mitre", leaf.Metric.Category);
         });
 
-        // RC-5/T4-2: the 6 applicable techniques covered by the 9 attacks should be tested-and-passed
-        // against an always-refusing agent (AML.T0037, T0045, T0051, T0054, T0056, T0057).
+        // RC-5/T4-2 + #9: the 8 applicable techniques should be tested-and-passed against an always-refusing
+        // agent (AML.T0037, T0045, T0051, T0054, T0056, T0057, plus the newly-cataloged T0010, T0020).
         var expectedTested = new[]
         {
-            "mitre.aml.t0037", "mitre.aml.t0045", "mitre.aml.t0051",
+            "mitre.aml.t0010", "mitre.aml.t0020", "mitre.aml.t0037", "mitre.aml.t0045", "mitre.aml.t0051",
             "mitre.aml.t0054", "mitre.aml.t0056", "mitre.aml.t0057"
         };
         var testedLeaves = leaves.Where(l => l.Score.Label == "pass").ToList();
@@ -204,7 +204,7 @@ public class MitreBenchmarkTests
         Assert.NotNull(result);
         Assert.NotNull(result.Details.SubResults);
         var leaves = result.Details.SubResults!;
-        Assert.Equal(13, leaves.Count);   // RC-5/T4-2: 13-technique roster
+        Assert.Equal(15, leaves.Count);   // RC-5/T4-2: 15-technique roster (incl. #9 T0010/T0020)
 
         // The T0051 (Prompt Injection) leaf should reflect probe failures.
         var t0051 = leaves.FirstOrDefault(l => l.Metric.Key == "mitre.aml.t0051");
@@ -306,7 +306,7 @@ public class MitreBenchmarkTests
         var report = run.GenerateReport(redTeamResult);
 
         Assert.NotNull(report);
-        Assert.Equal(13, report.Techniques.Count);                            // RC-5/T4-2: all 13 canonical
+        Assert.Equal(15, report.Techniques.Count);                            // RC-5/T4-2: all 15 canonical
         // Spot-check that the key technique IDs are present in the report.
         var techniqueIds = report.Techniques.Select(t => t.Id).ToHashSet(StringComparer.OrdinalIgnoreCase);
         Assert.Contains("AML.T0051", techniqueIds);
@@ -345,7 +345,7 @@ public class MitreBenchmarkTests
 
         var result = await run.EvaluateAsync(input);
         Assert.NotNull(result.Details.SubResults);
-        Assert.Equal(13, result.Details.SubResults!.Count);   // RC-5/T4-2
+        Assert.Equal(15, result.Details.SubResults!.Count);   // RC-5/T4-2
 
         // Persist + read back through ScenarioResult.
         var scenarioResult = EvalResultPersistence.ToScenarioResult(
@@ -362,7 +362,7 @@ public class MitreBenchmarkTests
         Assert.Equal(result.Score.Label, restored.Score.Label);
         Assert.Equal(result.Score.Severity, restored.Score.Severity);
         Assert.NotNull(restored.Details.SubResults);
-        Assert.Equal(13, restored.Details.SubResults!.Count);   // RC-5/T4-2
+        Assert.Equal(15, restored.Details.SubResults!.Count);   // RC-5/T4-2
 
         // Headline Phase-6 invariant: ATLAS technique IDs survive round-trip
         // through the output-store. This is the audit-chain tag preservation
@@ -420,7 +420,7 @@ public class MitreBenchmarkTests
         Assert.NotNull(viaAdapter.Details.SubResults);
         Assert.NotNull(viaBuilder.Details.SubResults);
         Assert.Equal(viaAdapter.Details.SubResults!.Count, viaBuilder.Details.SubResults!.Count);
-        Assert.Equal(13, viaAdapter.Details.SubResults.Count);   // RC-5/T4-2
+        Assert.Equal(15, viaAdapter.Details.SubResults.Count);   // RC-5/T4-2
 
         // ATLAS technique-ID parity preserved
         var adapterKeys = viaAdapter.Details.SubResults.Select(l => l.Metric.Key).ToList();

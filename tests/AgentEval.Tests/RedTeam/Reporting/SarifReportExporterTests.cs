@@ -78,7 +78,7 @@ public class SarifReportExporterTests
     }
 
     [Fact]
-    public void Export_IncludesResultsOnlyForSucceeded()
+    public void Export_SucceededProbe_BecomesResult()
     {
         var result = CreateTestResult();
         var exporter = new SarifReportExporter();
@@ -87,8 +87,44 @@ public class SarifReportExporterTests
         var doc = JsonDocument.Parse(sarif);
 
         var results = doc.RootElement.GetProperty("runs")[0].GetProperty("results");
-        // Only succeeded probes become results
+        // This fixture has 1 succeeded + 0 inconclusive probes → exactly 1 result (the vulnerability).
         Assert.Equal(1, results.GetArrayLength());
+    }
+
+    [Fact]
+    public void Export_InconclusiveProbe_BecomesNoteLevelResult_NotDropped()
+    {
+        // W-E5 honesty: an inconclusive probe is a coverage gap, not a pass — SARIF must surface it as a low-noise
+        // "note" so a CI consumer (GitHub code-scanning) sees it, instead of silently dropping it.
+        var result = new RedTeamResult
+        {
+            AgentName = "TestAgent",
+            StartedAt = DateTimeOffset.UtcNow.AddSeconds(-1), CompletedAt = DateTimeOffset.UtcNow, Duration = TimeSpan.FromSeconds(1),
+            TotalProbes = 2, ResistedProbes = 1, SucceededProbes = 0, InconclusiveProbes = 1,
+            AttackResults =
+            [
+                new AttackResult
+                {
+                    AttackName = "SystemPromptExtraction", AttackDisplayName = "System Prompt Extraction",
+                    OwaspId = "LLM07", Severity = Severity.High, ResistedCount = 1, SucceededCount = 0,
+                    ProbeResults =
+                    [
+                        new ProbeResult { ProbeId = "SPE-001", Prompt = "x", Response = "no", Outcome = EvaluationOutcome.Resisted, Reason = "refused", Difficulty = Difficulty.Easy },
+                        new ProbeResult { ProbeId = "SPE-002", Prompt = "x", Response = "?", Outcome = EvaluationOutcome.Inconclusive, Reason = "no canary planted", Difficulty = Difficulty.Easy, Technique = "leak" },
+                    ],
+                }
+            ],
+        };
+
+        var doc = JsonDocument.Parse(new SarifReportExporter().Export(result));
+        var results = doc.RootElement.GetProperty("runs")[0].GetProperty("results");
+
+        Assert.Equal(1, results.GetArrayLength());
+        var note = results[0];
+        Assert.Equal("note", note.GetProperty("level").GetString());
+        Assert.Equal("SystemPromptExtraction", note.GetProperty("ruleId").GetString());
+        Assert.Equal(0, note.GetProperty("ruleIndex").GetInt32());   // references the (only) rule in tool.driver.rules
+        Assert.Contains("INCONCLUSIVE", note.GetProperty("message").GetProperty("text").GetString());
     }
 
     [Fact]
