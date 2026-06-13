@@ -117,4 +117,22 @@ public class TapAttackTests
 
         Assert.NotEqual(EvaluationOutcome.Succeeded, result.Outcome);
     }
+
+    // ---- 5c: TAP beam-pruning score ordering ----
+
+    [Fact]
+    public void Classify_PruningScore_LeastConfidentResist_OutranksMostConfidentResist()
+    {
+        // TAP keeps the MORE-promising branches: among refusals, the LEAST-confident one (most likely to crack
+        // under further refinement) must outrank the most-confident one. And the band order Resisted < Inconclusive
+        // < Succeeded must hold. (Previously Resisted used raw confidence — keeping the most-confident refusals.)
+        var weakResist = TreeOrchestrator.Classify(AgentEval.RedTeam.EvaluationResult.Resisted("r", confidence: 0.85)).Item2;
+        var strongResist = TreeOrchestrator.Classify(AgentEval.RedTeam.EvaluationResult.Resisted("r", confidence: 1.0)).Item2;
+        var inconclusive = TreeOrchestrator.Classify(AgentEval.RedTeam.EvaluationResult.Inconclusive("i", confidence: 0.0)).Item2;
+        var succeeded = TreeOrchestrator.Classify(AgentEval.RedTeam.EvaluationResult.Succeeded("s")).Item2;
+
+        Assert.True(weakResist > strongResist, "least-confident refusal must rank above most-confident refusal");
+        Assert.True(weakResist < inconclusive, "any refusal must rank below an inconclusive node");
+        Assert.True(inconclusive < succeeded, "an inconclusive node must rank below a success");
+    }
 }

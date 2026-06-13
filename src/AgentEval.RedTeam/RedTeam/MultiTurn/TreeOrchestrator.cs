@@ -136,7 +136,8 @@ public sealed class TreeOrchestrator
     }
 
     // Fidelity + a pruning score (Succeeded > Inconclusive > Resisted; success returns before pruning anyway).
-    private static (EvidenceFidelity, double) Classify(EvaluationResult v)
+    // internal for direct unit-testing of the pruning-score ordering (5c).
+    internal static (EvidenceFidelity, double) Classify(EvaluationResult v)
     {
         var fidelity = v.Metadata is { } m && m.TryGetValue("fidelity", out var raw) && raw is EvidenceFidelity f
             ? f : EvidenceFidelity.Verbal;
@@ -144,7 +145,10 @@ public sealed class TreeOrchestrator
         {
             EvaluationOutcome.Succeeded => 2.0 + v.Confidence,
             EvaluationOutcome.Inconclusive => 1.0 + v.Confidence,
-            _ => v.Confidence,   // Resisted: keep the least-confident resists as marginally more promising
+            // 5c: Resisted is monotone-DECREASING in confidence so the LEAST-confident refusals (the most
+            // promising branches to keep probing) rank highest, while staying below the Inconclusive band [1,2).
+            // (Previously this was `v.Confidence`, which kept the MOST-confident refusals — the opposite of TAP intent.)
+            _ => 1.0 - Math.Clamp(v.Confidence, 0.0, 1.0),
         };
         return (fidelity, score);
     }

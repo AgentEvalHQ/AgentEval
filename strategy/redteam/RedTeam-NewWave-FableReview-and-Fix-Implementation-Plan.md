@@ -140,9 +140,9 @@ These were adversarially confirmed but not yet fixed. Grouped by the cheapest-to
 - ⏳ `PIIDetectionEvaluator` email-shaped FP (refusal→Inconclusive, RFC-2606 exclusion, Luhn). **(5b-ii)**
 - Note: OWASP persisted-evidence FAIL-only-at-0% (10%-pass = WARN) — deferred; it follows the framework WARN/FAIL banding convention and needs a product decision on the threshold.
 
-### 5c. Multi-turn / Wave C′ correctness
-- **TAP beam pruning is inverted** — it keeps the *most-confident refusals* (`TreeOrchestrator`), contradicting its own comment and TAP intent. *(Highest-impact MEDIUM in this group.)*
-- Attacker-LLM rung generation (PAIR / Crescendo) and the per-turn budget: the attacker call escapes the per-turn timeout → a hung attacker burns the whole conversation budget; the partial transcript is discarded with a wrong timeout duration.
+### 5c. Multi-turn / Wave C′ correctness — **✅ TAP pruning FIXED; rest pending**
+- ✅ **TAP beam pruning was inverted** — it kept the *most-confident refusals* (`TreeOrchestrator.Classify`), contradicting its own comment and TAP intent. Resisted score is now monotone-DECREASING in confidence (`1.0 - confidence`), so the least-confident refusals rank highest while staying below the Inconclusive band. `Classify` made `internal` + a direct score-ordering test added.
+- ⏳ Attacker-LLM rung generation (PAIR / Crescendo) and the per-turn budget: the attacker call escapes the per-turn timeout → a hung attacker burns the whole conversation budget; the partial transcript is discarded with a wrong timeout duration.
 - `AttackerPlanner` conflates attacker FAILURE with EXHAUSTION → a broken attacker endpoint silently degenerates PAIR to a single static seed, reported as "exhausted its rungs".
 - Multi-turn fold: `Fidelity` is the MAX across turns (not the verdict-bearing turn's); a Succeeded turn the detector doesn't stop on folds to Resisted; folded probes never carry Error/ErrorKind.
 - Stale `CrescendoAttack` doc still claims rung generation is "gated on a judge client / deferred" (the exact judge/attacker conflation Wave C′ removed).
