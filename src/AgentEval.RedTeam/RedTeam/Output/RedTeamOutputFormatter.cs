@@ -60,7 +60,9 @@ public class RedTeamOutputFormatter
         if (_options.Verbosity >= VerbosityLevel.Detailed)
             PrintFailedProbes(result);
 
-        if (_options.Verbosity == VerbosityLevel.Full && _options.ShowSensitiveContent)
+        // LOW: VerbosityLevel.Full lists ALL probes; PrintAllProbes guards payloads behind ShowSensitiveContent
+        // internally (line ~205), so Full without ShowSensitiveContent shows probe ids/outcomes (not prompts).
+        if (_options.Verbosity == VerbosityLevel.Full)
             PrintAllProbes(result);
 
         PrintFooter(result);

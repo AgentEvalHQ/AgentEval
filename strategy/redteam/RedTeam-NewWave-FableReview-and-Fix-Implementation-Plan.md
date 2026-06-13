@@ -20,8 +20,8 @@ Test baseline at start: net8.0 4776/0, net10.0 4979/0/1 (clean). After the HIGH 
 | Tier | Count | Status |
 |------|-------|--------|
 | HIGH | 18 findings (15 distinct issues) | **Fixed** — code + regression tests, both TFMs green. 2 external-standard *renames* softened + deferred to SME (see §4). |
-| MEDIUM | 59 | **Open** — recommendations in §5. |
-| LOW | 45 | **Open** — list in §6. |
+| MEDIUM | 59 | **Substantially fixed** — 5a/5b/5d/5f/5g complete; 5c (TAP) + 5e (DI/dedup/comparer) complete; residual 5e CLI tier-wiring + pipeline Judge/Attacker options deferred to §4/architecture. See §5. |
+| LOW | 45 | **High-value + LOW-2 batch fixed** (see §6 ✅); remaining = dead-code, residual doc drift, architecture-gap LOWs. |
 
 **Independent verification (2026-06-13):** an adversarial re-verification pass (12 agents, refute-by-default) re-checked each HIGH fix against its original finding + the actual code + the test. Result: **all confirmed properly fixed at high confidence.** Two test-coverage gaps were surfaced and closed: (a) #5/#6 had no test pinning the *persisted* `SaveReportAsync` `OverallStatus == NOT_EVALUATED` — added `OwaspReporterStoreTests.OwaspReporter_SaveReport_AllInconclusive_PersistsNotEvaluated_NotFabricatedPass`; (b) #10 (`--verbose` AttackerClient) is structurally fixed (single `ScanOptions` construction site) but a verbose+attacker guard test would need a runner seam — tracked as a known minor test gap (no code defect).
 
@@ -186,11 +186,19 @@ These were adversarially confirmed but not yet fixed. Grouped by the cheapest-to
 - ✅ **Determinism** — JSON `report_id` is now a deterministic SHA-256 of (agent + StartedAt + probe ids), so re-exporting the same result is byte-identical/diffable (was `Guid.NewGuid()`).
 - ✅ **Unescaped output** — Markdown H1 agent name now `EscapeInline`d (SEC-09); SARIF `artifactLocation.uri` now `Uri.EscapeDataString`d.
 
+**✅ Fixed (LOW-2 batch — minor correctness + doc drift, full net8.0 suite 4849/0):**
+- ✅ **Wrong timeout reporting** — `RedTeamRunner` timeout catch now selects the effective budget by attack kind (`ITreeAttack` → tree-search budget, `IMultiTurnAttack` → conversation budget, else per-probe) and names it in `Reason` ("Probe exceeded its {label} ({budget}s)"), instead of always reporting `TimeoutPerProbe`.
+- ✅ **`AttackPipeline.TotalProbeCount` + `GetProbePreview` ignored `MaxProbesPerAttack`** — both now route through one `EnumerateEffectiveProbes()` helper that mirrors the runner's **per-attack** `Take(max)` (was a wrong global `Math.Min(total, count*max)`); replaced the tautological `count <= 26` test with an independent per-attack recompute + a preview-honors-cap test.
+- ✅ **`RegexMatchEvaluator` swallowed regex timeouts** — a no-match after a `RegexMatchTimeoutException` now returns `Inconclusive` (input not fully evaluated), not a confident `Resisted` (mirrors `InsecureOutput`).
+- ✅ **`BrandingOptions.ParseHexColor` threw on bad input** — now `byte.TryParse(NumberStyles.HexNumber, InvariantCulture)` with a `Colors.DarkBlue` fallback (no `FormatException` on a malformed branding string).
+- ✅ **`VerbosityLevel.Full` silently downgraded** — Full now always lists all probes; payload prompts/responses stay gated behind `ShowSensitiveContent` inside `PrintAllProbes` (SEC-verified — ids/outcomes only without the flag).
+- ✅ **JB-041/042 stale `gradual_escalation` label** — renamed to `rapport_priming_single_turn` / `progressive_priming_single_turn` (JB-040 already `compliance_priming_single_turn`); tests now assert the honest single-turn names **and** that no probe re-introduces `gradual_escalation` (real multi-turn is `CrescendoAttack`).
+- ✅ **Stale doc comments** — `AttackTypeRegistry` "9 built-in" → "the built-in attacks from `Attack.All` (13 as of Wave D)"; `EvaluationResult.Confidence` doc clarified (factory default 1.0 vs bare-property default 0.0).
+
 **⏳ Remaining LOW backlog (cosmetic / low-risk; catalogued, not yet individually committed):**
-- **Wrong timeout reporting** — multi-turn/tree budget overrun reports `TimeoutPerProbe` and discards the partial transcript (appears ~5×; one runner-side fix threading the effective budget into the catch).
 - **Dead/unwired** — `PackageHallucinationDetector` fully built+tested but wired into nothing (SupplyChain ships only the weaker in-context proxy); `RedTeamReport` is a dead duplicate of `JsonReportExporter`.
-- **Stale doc comments** — "9 built-in attacks" / "Pre-populated with the 9" (roster is 13); `EvaluationResult.Confidence` default doc says 1.0 but struct default is 0.0; `AttackTypeRegistry` doc; README/getting-started/architecture counts; `ResolveFidelity` XML doc detached by a Wave C′ insertion.
-- **Minor correctness/cosmetic** — `AttackPipeline.TotalProbeCount` formula + `GetProbePreview` ignores `MaxProbesPerAttack`; `RegexMatchEvaluator` swallows regex timeouts; `BrandingOptions.ParseHexColor` throws on bad input; `VerbosityLevel.Full` silently downgrades; `RiskScoreCalculator`/`PdfReportOptions` tautological tests; JB-041/042 stale `gradual_escalation` technique label; `--save-baseline` hardcodes Version "1.0"/discards Notes; lossy-codec chain compatibility guard.
+- **Residual doc drift** — README/getting-started/architecture attack counts; `ResolveFidelity` XML doc detached by a Wave C′ insertion; any remaining "9 built-in" prose outside `AttackTypeRegistry`.
+- **Minor correctness/cosmetic** — `RiskScoreCalculator` tautological test; `--save-baseline` hardcodes Version "1.0"/discards Notes; lossy-codec chain compatibility guard.
 - **Architecture-gap LOWs** (larger, overlap §5e/deferred) — multi-turn↔tool-harness don't compose (no canary tools over the conversation channel); single `--api-key` reused for target/judge/attacker; `AttackPipeline` can't set Judge/Attacker/multi-turn options.
 
 (The exhaustive per-finding raw list — all 122 with evidence + adversarial verdicts — is preserved in the review workflow transcript for this session; the thematic groupings here and in §5 capture every confirmed finding.)

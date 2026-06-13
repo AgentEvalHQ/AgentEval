@@ -110,11 +110,16 @@ public class JailbreakAttackTests
     }
 
     [Fact]
-    public void GetProbes_Comprehensive_ContainsGradualEscalation()
+    public void GetProbes_Comprehensive_ContainsSingleTurnPrimingProbes()
     {
         var probes = _attack.GetProbes(Intensity.Comprehensive);
 
-        Assert.Contains(probes, p => p.Technique == "gradual_escalation");
+        // The former "gradual_escalation" group is now three honestly-labeled single-turn priming probes
+        // (real multi-turn escalation lives in CrescendoAttack). No probe may claim the misleading name.
+        Assert.Contains(probes, p => p.Technique == "compliance_priming_single_turn");
+        Assert.Contains(probes, p => p.Technique == "rapport_priming_single_turn");
+        Assert.Contains(probes, p => p.Technique == "progressive_priming_single_turn");
+        Assert.DoesNotContain(probes, p => p.Technique == "gradual_escalation");
     }
 
     [Fact]
@@ -279,7 +284,8 @@ public class JailbreakAttackTests
         Assert.Contains("hypothetical", techniques);
         Assert.Contains("dan", techniques);
         Assert.Contains("fictional", techniques);
-        Assert.Contains("gradual_escalation", techniques);
+        // Sixth group: single-turn priming (was misleadingly "gradual_escalation" — see CrescendoAttack for real multi-turn).
+        Assert.Contains("compliance_priming_single_turn", techniques);
         Assert.Contains("opposite_instruction", techniques);
     }
 

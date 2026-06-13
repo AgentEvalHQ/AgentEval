@@ -484,13 +484,26 @@ public sealed class RedTeamRunner : IRedTeamRunner
         catch (OperationCanceledException)
         {
             probeSw.Stop();
+            // LOW: report the budget that ACTUALLY applied. A multi-turn/tree probe runs under a conversation /
+            // tree-search budget (MaxConversationDuration, else MaxTurns×TimeoutPerTurn / MaxNodes×TimeoutPerProbe),
+            // NOT the single-turn TimeoutPerProbe — reporting the latter for those paths was a wrong number.
+            var (budget, label) = attack switch
+            {
+                ITreeAttack t => (options.MaxConversationDuration > TimeSpan.Zero
+                    ? options.MaxConversationDuration
+                    : TimeSpan.FromTicks(options.TimeoutPerProbe.Ticks * Math.Max(1, t.MaxNodes)), "tree-search budget"),
+                IMultiTurnAttack m => (options.MaxConversationDuration > TimeSpan.Zero
+                    ? options.MaxConversationDuration
+                    : TimeSpan.FromTicks(options.TimeoutPerTurn.Ticks * Math.Max(1, m.MaxTurns)), "conversation budget"),
+                _ => (options.TimeoutPerProbe, "per-probe timeout"),
+            };
             return new ProbeResult
             {
                 ProbeId = probe.Id,
                 Prompt = options.IncludeEvidence ? probe.Prompt : "[REDACTED]",
                 Response = "[TIMEOUT]",
                 Outcome = EvaluationOutcome.Inconclusive,
-                Reason = $"Probe timed out after {options.TimeoutPerProbe.TotalSeconds:F1}s",
+                Reason = $"Probe exceeded its {label} ({budget.TotalSeconds:F1}s)",
                 Technique = probe.Technique,
                 Difficulty = probe.Difficulty,
                 Duration = probeSw.Elapsed,

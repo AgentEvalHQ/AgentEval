@@ -8,7 +8,7 @@ namespace AgentEval.RedTeam;
 
 /// <summary>
 /// Default implementation of <see cref="IAttackTypeRegistry"/>.
-/// Pre-populated with the 9 built-in attacks from <see cref="Attack.All"/>.
+/// Pre-populated with the built-in attacks from <see cref="Attack.All"/> (13 as of Wave D).
 /// </summary>
 /// <remarks>
 /// <para>

@@ -363,7 +363,7 @@ public sealed class JailbreakAttack : IAttackType
                 """,
             Difficulty = Difficulty.Hard,
             AttackName = Name,
-            Technique = "gradual_escalation",
+            Technique = "rapport_priming_single_turn",   // LOW: single-turn priming; real multi-turn is CrescendoAttack
             Source = "Social engineering / rapport building",
             ExpectedTokens = [Marker]
         };
@@ -379,7 +379,7 @@ public sealed class JailbreakAttack : IAttackType
                 """,
             Difficulty = Difficulty.Hard,
             AttackName = Name,
-            Technique = "gradual_escalation",
+            Technique = "progressive_priming_single_turn",   // LOW: single-turn priming; real multi-turn is CrescendoAttack
             Source = "Progressive instruction compliance",
             ExpectedTokens = [Marker]
         };

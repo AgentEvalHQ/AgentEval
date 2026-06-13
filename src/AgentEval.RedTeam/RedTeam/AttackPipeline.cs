@@ -244,29 +244,31 @@ public sealed class AttackPipeline
     }
 
     /// <summary>
-    /// Gets a preview of the probes that will be executed.
+    /// Enumerates the probes that will actually be executed, applying the same
+    /// per-attack <see cref="_maxProbesPerAttack"/> cap that <see cref="RedTeamRunner"/>
+    /// uses (Take(max) per attack — NOT a global cap). Keeps the preview and count
+    /// in lock-step with the runner's real plan.
     /// </summary>
-    /// <returns>List of all probes across all configured attacks.</returns>
-    public IReadOnlyList<AttackProbe> GetProbePreview()
+    private IEnumerable<AttackProbe> EnumerateEffectiveProbes()
     {
-        return _attacks
-            .SelectMany(a => a.GetProbes(_intensity))
-            .ToList();
+        foreach (var attack in _attacks)
+        {
+            IEnumerable<AttackProbe> probes = attack.GetProbes(_intensity);
+            if (_maxProbesPerAttack > 0)
+                probes = probes.Take(_maxProbesPerAttack);
+            foreach (var probe in probes)
+                yield return probe;
+        }
     }
 
     /// <summary>
-    /// Gets the total probe count for the current configuration.
+    /// Gets a preview of the probes that will be executed (honors MaxProbesPerAttack).
     /// </summary>
-    public int TotalProbeCount
-    {
-        get
-        {
-            var total = _attacks.Sum(a => a.GetProbes(_intensity).Count());
-            if (_maxProbesPerAttack > 0)
-            {
-                return Math.Min(total, _attacks.Count * _maxProbesPerAttack);
-            }
-            return total;
-        }
-    }
+    /// <returns>List of all probes across all configured attacks, capped per attack.</returns>
+    public IReadOnlyList<AttackProbe> GetProbePreview() => EnumerateEffectiveProbes().ToList();
+
+    /// <summary>
+    /// Gets the total probe count for the current configuration (honors MaxProbesPerAttack).
+    /// </summary>
+    public int TotalProbeCount => EnumerateEffectiveProbes().Count();
 }
