@@ -929,6 +929,45 @@ agenteval redteam --endpoint $TARGET --model $MODEL \
 
 **Non-determinism:** an attacker-LLM run is **not reproducible** without a fixed attacker — the CLI prints a `NON-DETERMINISTIC` banner. Use scripted attacks (not these) for baselines/regression gating (`--baseline`). The attacker producing nothing, or the judge being unsure, ends the run honestly (no fabricated success); TAP's fan-out is hard-capped by a node budget.
 
+## Real-Attack-Surface Harness (`--sut-tier`) & System-Prompt Canary
+
+By default the CLI scans a **text-only** SUT (Tier-0): the only evidence is the model's words (`EvidenceFidelity.Verbal`). To exercise a **real tool boundary** — so `ExcessiveAgency` / `IndirectInjection` are scored on what the agent *does*, not just says — raise the tier:
+
+| `--sut-tier` | Tier | What it does | Evidence |
+|---|---|---|---|
+| `text` *(default)* | 0 | Plain chat; no tools advertised | Verbal |
+| `function-calling` | 1 | Canary tools advertised; the model **emitting** a forbidden call is the signal (not executed) | IntentToAct |
+| `instrumented` | 2 | Canary tools **execute** and record the call (act + effect), and can return attacker-controlled output | Behavioral |
+
+```bash
+# Tier-2: canary tools actually run — measures emitted-vs-executed, not just verbal compliance.
+agenteval redteam --endpoint $URL --model $MODEL --sut-tier instrumented --intensity moderate
+
+# Prove a system-prompt LEAK (not a guess): plant a secret in the SUT prompt; SystemPromptExtraction
+# scores Succeeded only when that exact token appears in a response (otherwise Inconclusive, not a fake pass).
+agenteval redteam --endpoint $URL --model $MODEL \
+  --system-prompt-canary "CANARY-7f3a9c21" --attacks SystemPromptExtraction
+```
+
+## Compliance report formats & per-role keys
+
+```bash
+# Emit a NIST AI RMF compliance report straight from a scan (OWASP/MITRE have `bench` subcommands; NIST surfaces here):
+agenteval redteam --endpoint $URL --model $MODEL --format nist    -o nist-airmf.json   # JSON
+agenteval redteam --endpoint $URL --model $MODEL --format nist-md -o nist-airmf.md     # Markdown
+
+# Judge / attacker behind a different gateway? Give each its own key (each falls back to --api-key):
+agenteval redteam --endpoint $URL --model $MODEL \
+  --judge $JUDGE_URL --judge-api-key $JUDGE_KEY \
+  --attacker $ATK_URL --attacker-api-key $ATK_KEY --attacks PAIR
+
+# Stamp a saved baseline with provenance:
+agenteval redteam --endpoint $URL --model $MODEL \
+  --save-baseline base.json --baseline-version "$(git rev-parse --short HEAD)" --baseline-note "nightly main"
+```
+
+`--format` accepts `json | sarif | markdown | md | junit | nist | nist-md`. The baseline diff additionally reports a **conclusive-only score delta** and flags **evidence-fidelity escalations** (a persistent vuln that went Verbal→Behavioral), not just new/resolved probe IDs.
+
 ## Best Practices
 
 1. **Run Quick scans on every PR** — Fast feedback loop
