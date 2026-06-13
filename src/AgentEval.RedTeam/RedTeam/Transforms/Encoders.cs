@@ -78,15 +78,17 @@ public static class Encoders
     /// <summary>ROT13 of <paramref name="value"/> (letters only; others pass through). Self-inverse.</summary>
     public static string Rot13(string value) => Caesar(value, 13);
 
-    /// <summary>Caesar shift of <paramref name="value"/> by <paramref name="shift"/> (letters only).</summary>
+    /// <summary>Caesar shift of <paramref name="value"/> by <paramref name="shift"/> (ASCII letters only).</summary>
+    // Gate on the ASCII letter ranges, NOT char.IsUpper/IsLower — those return true for Latin-1/Unicode letters
+    // (e.g. 'é'), which the ASCII shift math would then corrupt, breaking reversibility for non-ASCII input (M11).
     public static string Caesar(string value, int shift) => new(value.Select(c =>
-        char.IsUpper(c) ? (char)((c - 'A' + (shift % 26 + 26)) % 26 + 'A') :
-        char.IsLower(c) ? (char)((c - 'a' + (shift % 26 + 26)) % 26 + 'a') : c).ToArray());
+        c is >= 'A' and <= 'Z' ? (char)((c - 'A' + (shift % 26 + 26)) % 26 + 'A') :
+        c is >= 'a' and <= 'z' ? (char)((c - 'a' + (shift % 26 + 26)) % 26 + 'a') : c).ToArray());
 
-    /// <summary>Atbash (A↔Z) of <paramref name="value"/> (letters only). Self-inverse.</summary>
+    /// <summary>Atbash (A↔Z) of <paramref name="value"/> (ASCII letters only). Self-inverse.</summary>
     public static string Atbash(string value) => new(value.Select(c =>
-        char.IsUpper(c) ? (char)('Z' - (c - 'A')) :
-        char.IsLower(c) ? (char)('z' - (c - 'a')) : c).ToArray());
+        c is >= 'A' and <= 'Z' ? (char)('Z' - (c - 'A')) :
+        c is >= 'a' and <= 'z' ? (char)('z' - (c - 'a')) : c).ToArray());
 
     /// <summary>Character-reversed <paramref name="value"/>. Self-inverse.</summary>
     public static string Reversed(string value) => new(value.Reverse().ToArray());
