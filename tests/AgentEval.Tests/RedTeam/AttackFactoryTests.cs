@@ -23,14 +23,14 @@ public class AttackFactoryTests
     [Fact]
     public void OptInNames_ResolveViaByName_AndDoNotDriftFromAdvertisedSet()
     {
-        // LOW: Crescendo/PAIR/TAP are resolvable via ByName but excluded from All. They are advertised separately
-        // (OptInNames) so the CLI no longer hides them. Guard: every advertised name resolves, and the
-        // AvailableNames ∪ OptInNames union has no duplicates and exactly matches the resolvable set (16).
+        // LOW: Crescendo/PAIR/TAP/ToolEscalation are resolvable via ByName but excluded from All. They are advertised
+        // separately (OptInNames) so the CLI no longer hides them. Guard: every advertised name resolves, and the
+        // AvailableNames ∪ OptInNames union has no duplicates and exactly matches the resolvable set (17).
         Assert.All(Attack.OptInNames, n => Assert.NotNull(Attack.ByName(n)));
         Assert.DoesNotContain(Attack.OptInNames, n => Attack.AvailableNames.Contains(n));   // disjoint
         var union = Attack.AvailableNames.Concat(Attack.OptInNames).ToList();
         Assert.Equal(union.Count, union.Distinct().Count());                                // no dupes
-        Assert.Equal(16, union.Count);                                                       // 13 built-in + 3 opt-in
+        Assert.Equal(17, union.Count);                                                       // 13 built-in + 4 opt-in (Crescendo/PAIR/TAP/ToolEscalation)
         Assert.All(union, n => Assert.NotNull(Attack.ByName(n)));
     }
 

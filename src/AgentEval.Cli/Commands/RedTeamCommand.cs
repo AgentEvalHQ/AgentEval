@@ -14,6 +14,7 @@ using AgentEval.Core;
 using AgentEval.RedTeam;
 using AgentEval.RedTeam.Attacks;
 using AgentEval.RedTeam.Baseline;
+using AgentEval.RedTeam.Benchmarks;
 using AgentEval.RedTeam.Calibration;
 using AgentEval.RedTeam.Evaluators;
 using AgentEval.RedTeam.Importers;
@@ -58,11 +59,18 @@ internal static class RedTeamCommand
 
         // Attack selection
         var attacksOpt = new Option<string?>("--attacks")
-            { Description = "Comma-separated attack types (e.g., PromptInjection,Jailbreak). Default: all. Opt-in multi-turn: Crescendo, PAIR, TAP (PAIR/TAP require --attacker)." };
+            { Description = "Comma-separated attack types (e.g., PromptInjection,Jailbreak). Default: all. Opt-in multi-turn: Crescendo, PAIR, TAP (PAIR/TAP require --attacker), ToolEscalation (best at --sut-tier instrumented)." };
         var importProbesOpt = new Option<FileInfo?>("--import-probes")
             { Description = "Import a JSON seed-prompt dataset (HarmBench/JailbreakBench/etc.) and run it alongside the built-in attacks. Probes without an expected-token oracle are Inconclusive unless --judge is set." };
         var packageRegistryOpt = new Option<string>("--package-registry")
             { DefaultValueFactory = _ => "none", Description = "SupplyChain (LLM03) package check: none (planted-fake proxy, default) | live (query PyPI/npm/NuGet to also flag model-invented hallucinated packages)." };
+
+        // Benchmark packs (NextWave #10): download an external pack (HarmBench/JailbreakBench/CyberSecEval) and run it
+        // alongside the built-ins. Gated by --accept-license — these datasets carry harmful content; nothing is bundled.
+        var packOpt = new Option<string?>("--pack")
+            { Description = $"Download + run an external benchmark pack ({PackCatalog.Names}), or 'list' to show the catalog. Requires --accept-license (no data is bundled)." };
+        var acceptLicenseOpt = new Option<bool>("--accept-license")
+            { Description = "Accept the upstream license of a --pack before downloading it (these datasets contain harmful content by design)." };
 
         // Intensity
         var intensityOpt = new Option<string>("--intensity")
@@ -130,6 +138,8 @@ internal static class RedTeamCommand
         command.Options.Add(attacksOpt);
         command.Options.Add(importProbesOpt);
         command.Options.Add(packageRegistryOpt);
+        command.Options.Add(packOpt);
+        command.Options.Add(acceptLicenseOpt);
         command.Options.Add(intensityOpt);
         command.Options.Add(failFastFlag);
         command.Options.Add(maxProbesOpt);
@@ -166,6 +176,8 @@ internal static class RedTeamCommand
                 Attacks = parseResult.GetValue(attacksOpt),
                 ImportProbes = parseResult.GetValue(importProbesOpt),
                 PackageRegistry = parseResult.GetValue(packageRegistryOpt)!,
+                Pack = parseResult.GetValue(packOpt),
+                AcceptLicense = parseResult.GetValue(acceptLicenseOpt),
                 Intensity = parseResult.GetValue(intensityOpt)!,
                 FailFast = parseResult.GetValue(failFastFlag),
                 MaxProbes = parseResult.GetValue(maxProbesOpt),
@@ -207,6 +219,16 @@ internal static class RedTeamCommand
     /// </summary>
     internal static async Task<int> ExecuteAsync(RedTeamOptions opts, CancellationToken ct)
     {
+        // 0. `--pack list`: print the benchmark-pack catalog and exit (no scan, no endpoint required).
+        if (string.Equals(opts.Pack?.Trim(), "list", StringComparison.OrdinalIgnoreCase))
+        {
+            Console.WriteLine("Available benchmark packs (run with --pack <name> --accept-license to download + scan):");
+            foreach (var p in PackCatalog.All)
+                Console.WriteLine($"  {p.Name,-16} {p.License,-8} {p.Description}  [{p.HomeUrl}]");
+            Console.WriteLine("  AgentEval bundles no benchmark data; packs are downloaded on demand under their own license.");
+            return ExitCodes.Success;
+        }
+
         // 1. Validate
         if (opts.Endpoint is null && !opts.Azure)
             throw new InvalidOperationException("Specify --endpoint <url> or --azure.");
@@ -303,6 +325,24 @@ internal static class RedTeamCommand
             attacks = (attacks ?? Attack.All).Append(importedAttack).ToList();
             if (!opts.Quiet)
                 Console.Error.WriteLine($"  Imported {imported.Count} probe(s) from '{datasetName}'" +
+                    (string.IsNullOrWhiteSpace(opts.JudgeEndpoint) ? " — note: probes without an expected-token oracle are Inconclusive without --judge." : "."));
+        }
+
+        // 3c. Benchmark pack (NextWave #10): download an external pack and run it alongside the built-ins, behind the
+        // --accept-license gate (nothing is bundled; the gate is checked before any network call).
+        if (!string.IsNullOrWhiteSpace(opts.Pack))
+        {
+            var pack = PackCatalog.Find(opts.Pack!.Trim())
+                ?? throw new ArgumentException($"Unknown --pack '{opts.Pack}'. Known: {PackCatalog.Names}. Use --pack list to see the catalog.");
+            if (pack.RequiresLicenseAcceptance && !opts.AcceptLicense)
+                throw new InvalidOperationException(
+                    $"Pack '{pack.Name}' is under license '{pack.License}' ({pack.LicenseUrl}) and contains external " +
+                    "(often harmful) content. Re-run with --accept-license to download it. AgentEval bundles no data.");
+            using var downloader = new PackDownloader();
+            var packAttack = await downloader.DownloadAsync(pack, opts.AcceptLicense, ct);   // throws on download/parse failure
+            attacks = (attacks ?? Attack.All).Append(packAttack).ToList();
+            if (!opts.Quiet)
+                Console.Error.WriteLine($"  Downloaded pack '{pack.Name}' ({pack.License}) — {packAttack.GetProbes(Intensity.Comprehensive).Count} probe(s)" +
                     (string.IsNullOrWhiteSpace(opts.JudgeEndpoint) ? " — note: probes without an expected-token oracle are Inconclusive without --judge." : "."));
         }
 
@@ -643,6 +683,8 @@ internal sealed class RedTeamOptions
     public string? Attacks { get; init; }
     public FileInfo? ImportProbes { get; init; }
     public string PackageRegistry { get; init; } = "none";
+    public string? Pack { get; init; }
+    public bool AcceptLicense { get; init; }
     public required string Intensity { get; init; }
     public bool FailFast { get; init; }
     public int MaxProbes { get; init; }

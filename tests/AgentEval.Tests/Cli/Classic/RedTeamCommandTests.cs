@@ -50,8 +50,9 @@ public class RedTeamCommandTests
         // + --explain rationale = 29
         // + --package-registry (LLM03 live registry) = 30
         // + --calibration (garak-inspired relative z-score scoring) = 31
+        // + benchmark packs (--pack, --accept-license) = 33
         var command = RedTeamCommand.Create();
-        Assert.Equal(31, command.Options.Count);
+        Assert.Equal(33, command.Options.Count);
     }
 
     [Theory]
@@ -84,6 +85,8 @@ public class RedTeamCommandTests
     [InlineData("explain")]         // --explain LLM rationale
     [InlineData("package-registry")] // LLM03 live registry oracle
     [InlineData("calibration")]     // garak-inspired relative z-score scoring
+    [InlineData("pack")]            // benchmark pack downloader (#10)
+    [InlineData("accept-license")]  // benchmark pack license gate (#10)
     public void Create_ContainsExpectedOption(string optionName)
     {
         var command = RedTeamCommand.Create();

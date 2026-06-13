@@ -40,6 +40,7 @@ public static class Attack
     private static readonly Lazy<VectorEmbeddingAttack> _vectorEmbedding = new(() => new VectorEmbeddingAttack());
     private static readonly Lazy<SupplyChainAttack> _supplyChain = new(() => new SupplyChainAttack());
     private static readonly Lazy<DataPoisoningAttack> _dataPoisoning = new(() => new DataPoisoningAttack());
+    private static readonly Lazy<ToolEscalationAttack> _toolEscalation = new(() => new ToolEscalationAttack());
 
     /// <summary>
     /// Prompt Injection attack (OWASP LLM01).
@@ -129,6 +130,14 @@ public static class Attack
     /// <summary>Data &amp; Model Poisoning attack (OWASP LLM04). In-context poisoning (trigger / false-fact / few-shot).</summary>
     public static IAttackType DataPoisoning => _dataPoisoning.Value;
 
+    /// <summary>
+    /// Tool-Escalation attack (OWASP LLM06, multi-turn + tool-aware). <b>Opt-in</b> — NOT in the default
+    /// <see cref="All"/> roster (it drives N turns and is meaningful only against a tool-capable SUT, ideally
+    /// <c>--sut-tier instrumented</c>). Lures the agent into calling a forbidden canary tool over a conversation;
+    /// add it explicitly (<c>Attack.ToolEscalation</c> / <c>ByName("ToolEscalation")</c>).
+    /// </summary>
+    public static IAttackType ToolEscalation => _toolEscalation.Value;
+
     // === Convenience Methods ===
 
     /// <summary>
@@ -185,6 +194,7 @@ public static class Attack
             "VECTOREMBEDDING" or "VECTOR_EMBEDDING" => VectorEmbedding,
             "SUPPLYCHAIN" or "SUPPLY_CHAIN" => SupplyChain,
             "DATAPOISONING" or "DATA_POISONING" => DataPoisoning,
+            "TOOLESCALATION" or "TOOL_ESCALATION" => ToolEscalation,
             _ => null
         };
     }
@@ -224,7 +234,7 @@ public static class Attack
     /// <summary>Opt-in multi-turn attack names resolvable via <see cref="ByName"/> but excluded from <see cref="All"/>
     /// (non-deterministic / require extra config: PAIR and TAP need <c>ScanOptions.AttackerClient</c>, CLI <c>--attacker</c>).</summary>
     public static IReadOnlyList<string> OptInNames =>
-        ["Crescendo", "PAIR", "TAP"];
+        ["Crescendo", "PAIR", "TAP", "ToolEscalation"];
 
     /// <summary>MVP attack names.</summary>
     public static IReadOnlyList<string> MvpNames =>
