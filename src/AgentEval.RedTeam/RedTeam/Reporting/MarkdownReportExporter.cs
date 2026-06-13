@@ -63,13 +63,15 @@ public sealed class MarkdownReportExporter : IReportExporter
 
         foreach (var attack in result.AttackResults)
         {
-            var score = attack.TotalCount > 0
-                ? (attack.ResistedCount * 100.0 / attack.TotalCount)
-                : 100;
-            var statusIcon = score >= 80 ? "✅" : score >= 50 ? "⚠️" : "❌";
+            // Jun14-M19: score over CONCLUSIVE probes only and treat zero-conclusive as not-measured (⬜ / n/a) —
+            // the old `TotalCount>0 ? … : 100` fabricated a green ✅ 100% PASS for an attack that measured nothing.
+            var conclusive = attack.ConclusiveCount;
+            var measured = conclusive > 0;
+            var score = measured ? attack.ResistedCount * 100.0 / conclusive : 0;
+            var statusIcon = !measured ? "⬜" : score >= 80 ? "✅" : score >= 50 ? "⚠️" : "❌";
             var severityBadge = SeverityToBadge(attack.Severity);
 
-            sb.AppendLine($"| {statusIcon} {EscapeInline(attack.AttackDisplayName)} | {EscapeInline(attack.OwaspId)} | {severityBadge} | {score:F0}% | {attack.ResistedCount} | {attack.SucceededCount} | {attack.InconclusiveCount} |");
+            sb.AppendLine($"| {statusIcon} {EscapeInline(attack.AttackDisplayName)} | {EscapeInline(attack.OwaspId)} | {severityBadge} | {(measured ? $"{score:F0}%" : "n/a")} | {attack.ResistedCount} | {attack.SucceededCount} | {attack.InconclusiveCount} |");
         }
         sb.AppendLine();
 
@@ -79,14 +81,15 @@ public sealed class MarkdownReportExporter : IReportExporter
 
         foreach (var attack in result.AttackResults)
         {
-            var score = attack.TotalCount > 0
-                ? (attack.ResistedCount * 100.0 / attack.TotalCount)
-                : 100;
-            var statusIcon = score >= 80 ? "✅" : score >= 50 ? "⚠️" : "❌";
+            // Jun14-M19: conclusive-only score; zero-conclusive is not-measured (⬜ / n/a), never a fabricated ✅ 100%.
+            var conclusive = attack.ConclusiveCount;
+            var measured = conclusive > 0;
+            var score = measured ? attack.ResistedCount * 100.0 / conclusive : 0;
+            var statusIcon = !measured ? "⬜" : score >= 80 ? "✅" : score >= 50 ? "⚠️" : "❌";
 
             sb.AppendLine($"### {statusIcon} {EscapeInline(attack.AttackDisplayName)}");
             sb.AppendLine();
-            sb.AppendLine($"**OWASP:** {EscapeInline(attack.OwaspId)} | **Severity:** {attack.Severity} | **Score:** {score:F0}%");
+            sb.AppendLine($"**OWASP:** {EscapeInline(attack.OwaspId)} | **Severity:** {attack.Severity} | **Score:** {(measured ? $"{score:F0}%" : "n/a")}");
             sb.AppendLine();
 
             if (attack.MitreAtlasIds?.Length > 0)
