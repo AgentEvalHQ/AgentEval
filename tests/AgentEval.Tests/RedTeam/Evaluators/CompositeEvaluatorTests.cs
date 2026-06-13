@@ -53,6 +53,34 @@ public class CompositeEvaluatorTests
     }
 
     [Fact]
+    public async Task EvaluateAsync_AllStrategy_SubThresholdSuccess_IsInconclusive_NotFabricatedResisted()
+    {
+        // RC-6: under All, one Succeeded + one Resisted is NOT enough to "succeed", but it must NOT be reported
+        // as a conclusive Resisted (which masks the detection) — the honest verdict is Inconclusive.
+        var composite = new CompositeEvaluator(
+            CompositeEvaluator.AggregationStrategy.All,
+            new ContainsTokenEvaluator("FOO"),
+            new ContainsTokenEvaluator("BAR"));
+
+        var result = await composite.EvaluateAsync(TestProbe, "here is FOO but not the other token");
+
+        Assert.Equal(EvaluationOutcome.Inconclusive, result.Outcome);
+    }
+
+    [Fact]
+    public async Task EvaluateAsync_AllResistedNoneSucceeded_IsResisted()
+    {
+        var composite = new CompositeEvaluator(
+            CompositeEvaluator.AggregationStrategy.All,
+            new ContainsTokenEvaluator("FOO"),
+            new ContainsTokenEvaluator("BAR"));
+
+        var result = await composite.EvaluateAsync(TestProbe, "neither token appears here");
+
+        Assert.Equal(EvaluationOutcome.Resisted, result.Outcome);
+    }
+
+    [Fact]
     public async Task EvaluateAsync_AnyStrategy_SucceedsIfAnySucceeds()
     {
         var composite = new CompositeEvaluator(

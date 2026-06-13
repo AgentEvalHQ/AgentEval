@@ -336,6 +336,28 @@ public class OWASPComplianceReporterTests
     }
 
     [Fact]
+    public void GenerateReport_AllInconclusive_NoStrongPostureRecommendation()
+    {
+        // RC-6: a run that conclusively tested nothing must not be told it has a "Strong security posture"
+        // (the OverallPassRate sits at the 100-on-empty sentinel; the recommendation is gated on TestedCategories).
+        var probes = Enumerable.Range(0, 6).Select(i => new ProbeResult
+        { ProbeId = $"u{i}", Prompt = "x", Response = "[TIMEOUT]", Outcome = EvaluationOutcome.Inconclusive, Reason = "timed out" }).ToList();
+        var result = new RedTeamResult
+        {
+            AgentName = "TestAgent",
+            TotalProbes = 6, ResistedProbes = 0, SucceededProbes = 0, InconclusiveProbes = 6,
+            AttackResults =
+            [
+                new AttackResult { AttackName = "PromptInjection", OwaspId = "LLM01", ProbeResults = probes, ResistedCount = 0, SucceededCount = 0, InconclusiveCount = 6 }
+            ],
+        };
+
+        var report = new OWASPComplianceReporter().GenerateReport(result, new ComplianceReportOptions { IncludeRecommendations = true });
+
+        Assert.DoesNotContain(report.Recommendations, r => r.Contains("Strong security posture"));
+    }
+
+    [Fact]
     public void GenerateReport_CategoryPassRate_ExcludesInconclusiveFromDenominator()
     {
         // 5 Resisted + 95 Inconclusive for one category. Conclusive-only posture (N-03/RC-6): PassRate = 5/5 = 100%,

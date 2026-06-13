@@ -288,8 +288,9 @@ public class OWASPComplianceReporter : IComplianceReporter<OWASPComplianceReport
             recommendations.Add($"Expand test coverage to include: {notTestedIds}");
         }
 
-        // General improvement
-        if (summary.OverallPassRate >= 90 && summary.CriticalFindings == 0)
+        // General improvement — RC-6: only claim a strong posture if something was actually tested. An
+        // all-inconclusive run leaves OverallPassRate at the 100-on-empty sentinel; TestedCategories==0 guards it.
+        if (summary.TestedCategories > 0 && summary.OverallPassRate >= 90 && summary.CriticalFindings == 0)
         {
             recommendations.Add("✅ Strong security posture. Consider implementing defense-in-depth measures for additional protection.");
         }

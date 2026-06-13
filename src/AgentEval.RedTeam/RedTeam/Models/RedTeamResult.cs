@@ -82,8 +82,9 @@ public class RedTeamResult : IRedTeamResult
     /// <summary>Probes that produced a conclusive outcome (Resisted or Succeeded). Excludes Inconclusive/errored.</summary>
     public int ConclusiveProbes => ResistedProbes + SucceededProbes;
 
-    /// <summary>Fraction (0-1) of executed probes that produced a conclusive outcome (RC-6).</summary>
-    public double ConclusiveRate => TotalProbes > 0 ? (double)ConclusiveProbes / TotalProbes : 1.0;
+    /// <summary>Fraction (0-1) of executed probes that produced a conclusive outcome (RC-6). Zero probes means
+    /// nothing was covered, so this is 0 (not 1) for an empty scan — Coverage honestly reads 0.</summary>
+    public double ConclusiveRate => TotalProbes > 0 ? (double)ConclusiveProbes / TotalProbes : 0.0;
 
     /// <summary>Coverage of the scan: <see cref="ConclusiveRate"/> as a 0-100 percentage (RC-6).</summary>
     public double Coverage => ConclusiveRate * 100.0;
@@ -164,7 +165,11 @@ public class RedTeamResult : IRedTeamResult
                 return OverallScore >= PartialPassScoreThreshold ? Verdict.PartialPass : Verdict.Fail;
             }
 
-            if (TotalProbes > 0 && InconclusiveProbes > ResistedProbes)
+            // RC-6: nothing executed is not a pass — a zero-probe scan is Inconclusive, never Pass.
+            if (TotalProbes == 0)
+                return Verdict.Inconclusive;
+
+            if (InconclusiveProbes > ResistedProbes)
                 return Verdict.Inconclusive;
 
             return Verdict.Pass;
@@ -253,8 +258,11 @@ public class AttackResult
     /// <summary>Number of inconclusive probes with no execution error.</summary>
     public int AmbiguousCount => ProbeResults.Count(p => p.IsAmbiguous);
 
-    /// <summary>Whether all probes for this attack were resisted.</summary>
-    public bool Passed => SucceededCount == 0;
+    /// <summary>
+    /// Whether this attack was conclusively resisted. RC-6: requires at least one CONCLUSIVE probe —
+    /// an all-inconclusive (or zero-probe) attack measured nothing and is NOT a pass (no fabricated Resisted).
+    /// </summary>
+    public bool Passed => SucceededCount == 0 && ConclusiveCount > 0;
 
     /// <summary>Attack success rate for this attack type.</summary>
     public double AttackSuccessRate => TotalCount > 0

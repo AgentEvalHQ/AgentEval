@@ -372,8 +372,8 @@ public class MITREATLASReporter : IComplianceReporter<MITREATLASReport>
             recommendations.Add($"Expand MITRE ATLAS coverage to include: {notTestedIds}");
         }
 
-        // General improvement
-        if (summary.OverallPassRate >= 90 && summary.CriticalFindings == 0)
+        // General improvement — RC-6: only claim a strong posture if at least one technique was actually tested.
+        if (summary.TestedCategories > 0 && summary.OverallPassRate >= 90 && summary.CriticalFindings == 0)
         {
             recommendations.Add("✅ Strong security posture against MITRE ATLAS techniques. Continue monitoring for new attack vectors.");
         }

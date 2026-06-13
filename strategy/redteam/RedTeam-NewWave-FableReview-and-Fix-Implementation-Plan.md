@@ -131,14 +131,14 @@ These were adversarially confirmed but not yet fixed. Grouped by the cheapest-to
 - **Fix applied:** `PromptInjectionAttack`/`EncodingEvasionAttack` evaluators wrapped in `RefusalGatedEvaluator`; `IndirectInjectionAttack` gates **only the verbal fallback** (the behavioral leg stays un-gated — an executed forbidden tool call with apologetic text is still a compromise); `Jailbreak` was already refusal-gated by H1. `ExcessiveAgencyEvaluator` now computes `RefusalDetector.IsRefusal` **before** the danger-keyword Succeeded branch (a refusal that names the action → Resisted). `RefusalDetector` framing phrases now only count as a refusal when paired with a real refusal verb.
 - **Tests:** PromptInjection/EncodingEvasion `GetEvaluator_IsRefusalGated` + decode-to-refuse / marker-in-refusal → Resisted; `ExcessiveAgencyEvaluator` danger-keyword-in-refusal → Resisted (×3) + a real-compliance control still Succeeds; `RefusalDetector` framing-without-verb → not-refusal (×3) + framing-with-verb → refusal + a `RefusalGated` compliance-quoting-marker stays Succeeded.
 
-### 5b. Fabricated Resisted / PASS in other evaluators & reporters (same class as H4–H8)
-- `CompositeEvaluator` (All/Majority) can emit Resisted with **zero** children resisting.
-- `InferenceAbuseEvaluator` defaults a neutral/empty response to Resisted at confidence 1.0; model-name whitelist fabricates Resisted for non-whitelisted models.
-- `InContextPoisonEvaluator` is mis-scored in both directions (a correct rebuttal scores Succeeded; an adoption scores Resisted).
-- `PIIDetectionEvaluator` flags any email-shaped string (incl. placeholders in refusals) as leaked PII.
-- OWASP/MITRE reports render "Overall Pass Rate 100% / Risk Low / Strong posture" for a zero-conclusive scan (the report-object layer, parallel to the H4/H6 reporter fix); OWASP persisted evidence marks FAIL only at exactly 0% (10%-pass = WARN).
-- `AttackResult.Passed` and the zero-probe `Verdict.Pass`/`Coverage 100` model-level conventions feed PDF/markdown/console "✓ Passed".
-- **Recommendation:** apply the conclusive-only / refusal-gated pattern consistently to these evaluators and the report objects; add the by-surface/coverage honesty fields (below).
+### 5b. Fabricated Resisted / PASS in other evaluators & reporters (same class as H4–H8) — **✅ model layer + CompositeEvaluator + posture-gate FIXED; evaluator-specific items (5b-ii) pending**
+- ✅ `CompositeEvaluator` (All/Majority) could emit Resisted with **zero** children resisting → now returns Inconclusive for a sub-threshold success or no-conclusive-signal case; Resisted only when something genuinely resisted and nothing succeeded.
+- ✅ `AttackResult.Passed` now requires `ConclusiveCount > 0`; the zero-probe `Verdict` is **Inconclusive** (not Pass) and `ConclusiveRate`/`Coverage` read 0 on an empty scan.
+- ✅ OWASP/MITRE "Strong security posture" recommendation gated on `TestedCategories > 0` (the report-object `ComplianceRate`-on-empty was already fixed in H6).
+- ⏳ `InferenceAbuseEvaluator` default-Resisted fallback + model-name whitelist (technique-branch to Inconclusive for model_fingerprinting/format_injection). **(5b-ii)**
+- ⏳ `InContextPoisonEvaluator` mis-scored in both directions (negation-proximity adoption check). **(5b-ii)**
+- ⏳ `PIIDetectionEvaluator` email-shaped FP (refusal→Inconclusive, RFC-2606 exclusion, Luhn). **(5b-ii)**
+- Note: OWASP persisted-evidence FAIL-only-at-0% (10%-pass = WARN) — deferred; it follows the framework WARN/FAIL banding convention and needs a product decision on the threshold.
 
 ### 5c. Multi-turn / Wave C′ correctness
 - **TAP beam pruning is inverted** — it keeps the *most-confident refusals* (`TreeOrchestrator`), contradicting its own comment and TAP intent. *(Highest-impact MEDIUM in this group.)*

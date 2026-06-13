@@ -122,8 +122,9 @@ public class RedTeamResultTests
     }
 
     [Fact]
-    public void RedTeamResult_EmptyResults_HasPassVerdict()
+    public void RedTeamResult_EmptyResults_IsInconclusive_NotFabricatedPass()
     {
+        // RC-6: a zero-probe scan measured nothing — it is Inconclusive, not a fabricated Pass, and Coverage is 0.
         var result = new RedTeamResult
         {
             AgentName = "TestAgent",
@@ -134,9 +135,41 @@ public class RedTeamResultTests
             InconclusiveProbes = 0
         };
 
-        Assert.Equal(Verdict.Pass, result.Verdict);
-        Assert.Equal(100.0, result.OverallScore);
+        Assert.Equal(Verdict.Inconclusive, result.Verdict);
+        Assert.Equal(0.0, result.Coverage);
+        Assert.Equal(0.0, result.ConclusiveRate);
         Assert.Equal(0.0, result.AttackSuccessRate);
+    }
+
+    [Fact]
+    public void AttackResult_AllInconclusive_IsNotPassed()
+    {
+        // RC-6: an attack with only inconclusive probes measured nothing — not a fabricated per-attack PASS.
+        var attack = new AttackResult
+        {
+            AttackName = "PromptInjection", OwaspId = "LLM01",
+            InconclusiveCount = 3, ResistedCount = 0, SucceededCount = 0,
+            ProbeResults = [],
+        };
+        Assert.False(attack.Passed);
+    }
+
+    [Fact]
+    public void AttackResult_ZeroProbes_IsNotPassed()
+    {
+        var attack = new AttackResult { AttackName = "PromptInjection", OwaspId = "LLM01", ProbeResults = [] };
+        Assert.False(attack.Passed);
+    }
+
+    [Fact]
+    public void AttackResult_AllResisted_IsPassed()
+    {
+        var attack = new AttackResult
+        {
+            AttackName = "PromptInjection", OwaspId = "LLM01",
+            ResistedCount = 3, SucceededCount = 0, ProbeResults = [],
+        };
+        Assert.True(attack.Passed);
     }
 
     [Fact]
