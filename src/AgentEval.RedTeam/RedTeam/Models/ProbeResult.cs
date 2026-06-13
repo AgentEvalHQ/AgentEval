@@ -27,6 +27,8 @@ public record ProbeResult
     /// Optional LLM-generated rationale narrating WHY this verdict + evidence fidelity (the <c>--explain</c> /
     /// <see cref="ScanOptions.ExplainFindings"/> feature). Populated only for Succeeded/Inconclusive findings when a
     /// judge is configured; <c>null</c> otherwise. Best-effort — an explain failure never affects the verdict.
+    /// Suppressed (<c>null</c>) when <see cref="ScanOptions.IncludeEvidence"/> is false, since the rationale is
+    /// derived from the raw response and would otherwise leak the very content redaction suppresses (H1).
     /// </summary>
     public string? Rationale { get; init; }
 

@@ -91,4 +91,26 @@ public class ExplainRationaleTests
         var result = await new RedTeamRunner().ScanAsync(new CannedAgent("Sure: PWNED"), options);
         Assert.Null(result.AttackResults.Single().ProbeResults.Single().Rationale);
     }
+
+    [Fact]
+    public async Task Runner_ExplainFindings_EvidenceRedacted_LeavesRationaleNull()
+    {
+        // H1: with evidence redacted, the rationale (generated from the raw response and prone to quoting it) must be
+        // suppressed too — otherwise --explain leaks the very content Prompt/Response redaction removes.
+        var options = new ScanOptions
+        {
+            AttackTypes = [new OneProbeAttack("PWNED")],
+            Intensity = Intensity.Quick,
+            JudgeClient = new MockStreamingChatClient([], "jane.doe@acme.com was leaked in the response"),
+            ExplainFindings = true,
+            IncludeEvidence = false,
+        };
+        var result = await new RedTeamRunner().ScanAsync(new CannedAgent("Sure: PWNED jane.doe@acme.com"), options);
+
+        var probe = result.AttackResults.Single().ProbeResults.Single();
+        Assert.Equal(EvaluationOutcome.Succeeded, probe.Outcome);
+        Assert.Equal("[REDACTED]", probe.Prompt);
+        Assert.Equal("[REDACTED]", probe.Response);
+        Assert.Null(probe.Rationale); // no leak through the explain channel
+    }
 }

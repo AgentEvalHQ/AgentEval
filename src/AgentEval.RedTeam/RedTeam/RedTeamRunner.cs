@@ -462,8 +462,11 @@ public sealed class RedTeamRunner : IRedTeamRunner
             // --explain (ExplainFindings): attach a best-effort LLM rationale narrating the verdict + fidelity for
             // Succeeded/Inconclusive findings only (the user-selected scope). Opt-in, judge-gated, never changes the
             // verdict, and a failure/timeout here is swallowed so it can never fail the probe.
+            // H1: the rationale is generated from the RAW response/prompt and routinely quotes sensitive content, so it
+            // is gated on IncludeEvidence exactly like Prompt/Response below — a redacted scan must not leak via the
+            // explain channel. Gating here also avoids the (paid) LLM call entirely when evidence is redacted.
             string? rationale = null;
-            if (options.ExplainFindings && options.JudgeClient is not null
+            if (options.IncludeEvidence && options.ExplainFindings && options.JudgeClient is not null
                 && evalResult.Outcome is EvaluationOutcome.Succeeded or EvaluationOutcome.Inconclusive)
             {
                 try
