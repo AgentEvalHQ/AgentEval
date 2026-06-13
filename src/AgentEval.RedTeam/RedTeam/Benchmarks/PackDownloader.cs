@@ -87,6 +87,14 @@ public sealed class PackDownloader : IDisposable
                 $"Pack '{pack.Name}' returned an HTML page, not data ({pack.DataUrl}) — the source may be gated, " +
                 "rate-limited, or moved. Download it manually and pass the raw file via --pack <url> or --import-probes.");
 
+        // L14: a CSV pack that comes back as a JSON envelope (a login-wall / rate-limit error object like
+        // {"error":...}) would otherwise surface as a confusing "no 'X' column" parse error — name the cause instead.
+        if (string.Equals(pack.Format?.Trim(), "csv", StringComparison.OrdinalIgnoreCase)
+            && (head.StartsWith('{') || head.StartsWith('[')))
+            throw new FormatException(
+                $"Pack '{pack.Name}' returned JSON, not the expected CSV ({pack.DataUrl}) — the source may be gated, " +
+                "rate-limited, or moved. Download it manually and pass the raw file via --pack <url> or --import-probes.");
+
         // The importer throws FormatException on bad data — surfaced honestly, never a silent empty set.
         var probes = importer.Import(content, pack.Name);
         return new ImportedProbeAttack(pack.Name, probes, pack.OwaspLlmId);

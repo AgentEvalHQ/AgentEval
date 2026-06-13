@@ -64,7 +64,10 @@ public static class PackCatalog
     public static BenchmarkPack ForUrl(string url)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(url);
-        var isCsv = url.TrimEnd().EndsWith(".csv", StringComparison.OrdinalIgnoreCase);
+        // L15: infer the format from the URL PATH only — a query/fragment ("...harmful-behaviors.csv?ref=main")
+        // must not defeat the .csv suffix check.
+        var path = Uri.TryCreate(url, UriKind.Absolute, out var uri) ? uri.AbsolutePath : url;
+        var isCsv = path.TrimEnd().EndsWith(".csv", StringComparison.OrdinalIgnoreCase);
         return new BenchmarkPack
         {
             Name = "custom",

@@ -171,6 +171,8 @@ public class PackDownloaderTests
     [Theory]
     [InlineData("https://example.test/seed.json", "json")]
     [InlineData("https://example.test/data.csv", "csv")]
+    [InlineData("https://example.test/harmful-behaviors.csv?ref=main", "csv")]   // L15: query must not defeat .csv
+    [InlineData("https://example.test/data.csv#frag", "csv")]                    // L15: fragment too
     public void ForUrl_InfersFormat_AndIsNotLicenseGated(string url, string expectedFormat)
     {
         var pack = PackCatalog.ForUrl(url);
@@ -192,5 +194,14 @@ public class PackDownloaderTests
         using var d = Downloader(new StubHandler(HttpStatusCode.OK, "<!DOCTYPE html><html><body>login</body></html>"));
         var ex = await Assert.ThrowsAsync<FormatException>(() => d.DownloadAsync(TestPack(), licenseAccepted: true));
         Assert.Contains("HTML", ex.Message);
+    }
+
+    [Fact] // L14: a CSV pack that comes back as a JSON envelope (login wall / rate-limit error) names the cause.
+    public async Task CsvPack_ReturnsJsonEnvelope_Surfaces_ClearFormatException()
+    {
+        using var d = Downloader(new StubHandler(HttpStatusCode.OK, """{"error":"rate limited"}"""));
+        var pack = TestPack() with { Format = "csv", PromptField = "Behavior" };
+        var ex = await Assert.ThrowsAsync<FormatException>(() => d.DownloadAsync(pack, licenseAccepted: true));
+        Assert.Contains("JSON, not the expected CSV", ex.Message);
     }
 }
