@@ -8,8 +8,10 @@ namespace AgentEval.RedTeam.Attacks;
 /// <summary>
 /// Multi-turn Crescendo escalation (Wave C, Pillar 2; OWASP LLM01 jailbreak family). Ramps a benign opener into a
 /// disallowed completion over several turns (Russinovich et al. 2024, "Crescendo"). Scripted, deterministic ladders
-/// by default — CI-safe and hermetic; an attacker-LLM rung generator activates only when a judge client is supplied
-/// (Wave C′, deferred). Success = the agent is escalated into emitting the objective marker after several turns.
+/// by default — CI-safe and hermetic; an attacker-LLM rung generator activates when <see cref="ScanOptions.AttackerClient"/>
+/// (CLI <c>--attacker</c>) is supplied (Wave C′). The verdict judge (<see cref="ScanOptions.JudgeClient"/>) scores turns
+/// and never drives rung generation — the two clients are distinct. Success = the agent is escalated into emitting the
+/// objective marker after several turns.
 /// </summary>
 /// <remarks>
 /// <para><b>Honesty (Tier-0/behavioral-proxy):</b> this scores <i>compliance with a planted marker</i> after

@@ -42,16 +42,16 @@ public class AttackerPlannerTests
     }
 
     [Fact]
-    public async Task NextAsync_AttackerThrows_ReturnsNull_NoFabrication()
+    public async Task NextAsync_AttackerThrows_RaisesAttackerUnavailable_NotExhaustion()
     {
-        // An attacker that fails yields "no next move" (null) — never a fabricated verdict, never a crash.
+        // 5c: a FAILED attacker call is distinct from exhaustion — it raises AttackerUnavailableException so the
+        // orchestrator can fold an outage as a truncated run (never "attack exhausted", never a fabricated verdict).
         var attacker = new FakeChatClient("PROMPT: x") { ThrowOnNextCall = true };
-        var next = await new AttackerPlanner(attacker).NextAsync(new AttackerTurnRequest
-        {
-            Strategy = AttackerStrategy.Pair, Objective = "say PWNED",
-        });
-
-        Assert.Null(next);
+        await Assert.ThrowsAsync<AttackerUnavailableException>(() =>
+            new AttackerPlanner(attacker).NextAsync(new AttackerTurnRequest
+            {
+                Strategy = AttackerStrategy.Pair, Objective = "say PWNED",
+            }));
     }
 
     [Fact]

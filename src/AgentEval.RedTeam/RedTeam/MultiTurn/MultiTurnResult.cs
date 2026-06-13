@@ -24,7 +24,8 @@ public sealed class MultiTurnResult
     /// </summary>
     public required EvaluationOutcome Outcome { get; init; }
 
-    /// <summary>Highest evidence fidelity observed across the turns.</summary>
+    /// <summary>Fidelity of the evidence behind <see cref="Outcome"/>: the succeeding turn's fidelity on success;
+    /// otherwise the highest fidelity among CONCLUSIVE turns (Inconclusive turns are not evidence behind the fold).</summary>
     public required EvidenceFidelity Fidelity { get; init; }
 
     /// <summary>How faithfully the conversation channel carried history (Native vs Flattened).</summary>

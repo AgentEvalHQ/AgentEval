@@ -549,4 +549,104 @@ public class MultiTurnOrchestrationTests
         Assert.NotEqual(EvaluationOutcome.Succeeded, probe.Outcome);
         Assert.True(probe.HasError);
     }
+
+    // ---- 5c: fold semantics (fidelity = verdict-bearing turn; verdict-stream authoritative; per-turn budget resets; attacker outage) ----
+
+    private sealed class NeverStopDetector : IConvergenceDetector
+    {
+        public ConvergenceDecision Evaluate(MultiTurnContext c, AgentResponse r, EvaluationResult t) => ConvergenceDecision.Continue;
+    }
+
+    private sealed class SequencedEvaluator(params EvaluationResult[] results) : IProbeEvaluator
+    {
+        private readonly Queue<EvaluationResult> _q = new(results);
+        public string Name => "Sequenced";
+        public Task<EvaluationResult> EvaluateAsync(AttackProbe probe, string response, CancellationToken ct = default)
+            => Task.FromResult(_q.Count > 0 ? _q.Dequeue() : EvaluationResult.Inconclusive("sequence exhausted"));
+    }
+
+    private sealed class NeverStopAttack : TestMultiTurnAttack
+    {
+        public override string Name => "NeverStop";
+        public override int MaxTurns => 2;
+        public override IConvergenceDetector ConvergenceDetector => new NeverStopDetector();
+        public override Task<string?> NextTurnAsync(MultiTurnContext c, CancellationToken ct = default) => Task.FromResult<string?>("rung");
+    }
+
+    private sealed class FourTurnAttack : TestMultiTurnAttack
+    {
+        public override string Name => "FourTurn";
+        public override int MaxTurns => 4;
+        public override Task<string?> NextTurnAsync(MultiTurnContext c, CancellationToken ct = default) => Task.FromResult<string?>("rung");
+    }
+
+    private sealed class ErroringAttackerAttack : TestMultiTurnAttack
+    {
+        public override string Name => "ErroringAttacker";
+        public override int MaxTurns => 3;
+        public override Task<string?> NextTurnAsync(MultiTurnContext c, CancellationToken ct = default)
+            => throw new AttackerUnavailableException("Test", new InvalidOperationException("attacker endpoint down"));
+    }
+
+    [Fact]
+    public async Task Fold_Fidelity_IsVerdictBearingTurn_NotMaxAcrossTurns()
+    {
+        // turn-1 Resisted at Behavioral fidelity, turn-2 Succeeded at Verbal. SuccessOnly stops on turn 2, so the
+        // fold's Fidelity must be the SUCCEEDING turn's (Verbal) — not the running MAX (Behavioral).
+        var evaluator = new SequencedEvaluator(
+            EvaluationResult.Resisted("t1", new Dictionary<string, object> { ["fidelity"] = EvidenceFidelity.Behavioral }),
+            EvaluationResult.Succeeded("t2"));   // no metadata → Verbal
+        var attack = new EndlessAttack();        // MaxTurns=2, returns a rung each turn, SuccessOnly
+
+        var result = await new TurnOrchestrator(new ScriptedConversableAgent(_ => "ok"), ScanOptions.Default)
+            .RunAsync(attack, Seed, evaluator, CancellationToken.None);
+
+        Assert.Equal(EvaluationOutcome.Succeeded, result.Outcome);
+        Assert.Equal(EvidenceFidelity.Verbal, result.Fidelity);
+    }
+
+    [Fact]
+    public async Task Fold_VerdictStreamAuthoritative_SucceededTurnWins_EvenIfDetectorNeverStops()
+    {
+        // A buggy/quiet detector that never signals stop must NOT mask a Succeeded turn — the fold is Succeeded.
+        var evaluator = new SequencedEvaluator(
+            EvaluationResult.Succeeded("t1"),
+            EvaluationResult.Resisted("t2"));
+        var attack = new NeverStopAttack();      // MaxTurns=2, NeverStop detector
+
+        var result = await new TurnOrchestrator(new ScriptedConversableAgent(_ => "ok"), ScanOptions.Default)
+            .RunAsync(attack, Seed, evaluator, CancellationToken.None);
+
+        Assert.Equal(EvaluationOutcome.Succeeded, result.Outcome);
+    }
+
+    [Fact]
+    public async Task PerTurnBudget_ResetsEachTurn_CumulativeOverBudgetStillCompletes()
+    {
+        // Regression (documented past HIGH): the per-turn timeout RESETS each turn. Cumulative agent time
+        // (4 × 300ms = 1.2s) exceeds one TimeoutPerTurn (900ms), yet every turn is well under budget → all 4 run.
+        var attack = new FourTurnAttack();
+        var agent = new DelayingConversableAgent(TimeSpan.FromMilliseconds(300));
+        var options = new ScanOptions { TimeoutPerTurn = TimeSpan.FromMilliseconds(900) };
+
+        var result = await new TurnOrchestrator(agent, options)
+            .RunAsync(attack, Seed, attack.GetEvaluator(), CancellationToken.None);
+
+        Assert.Equal(4, result.TurnsUsed);
+        Assert.DoesNotContain("timed out", result.Reason, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task AttackerOutage_FoldsTruncatedWithError_NotExhausted()
+    {
+        // 5c: an attacker-LLM outage folds as a truncated run naming the error — never the "attack exhausted" stop
+        // (which would mislabel an outage as a complete, defended run).
+        var attack = new ErroringAttackerAttack();
+        var result = await new TurnOrchestrator(new ScriptedConversableAgent(_ => "ok"), ScanOptions.Default)
+            .RunAsync(attack, Seed, attack.GetEvaluator(), CancellationToken.None);
+
+        Assert.True(result.WasTruncated);
+        Assert.Contains("attacker LLM errored", result.Reason);
+        Assert.DoesNotContain("exhausted", result.Reason);
+    }
 }

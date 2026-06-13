@@ -142,11 +142,11 @@ These were adversarially confirmed but not yet fixed. Grouped by the cheapest-to
 
 ### 5c. Multi-turn / Wave C′ correctness — **✅ TAP pruning FIXED; rest pending**
 - ✅ **TAP beam pruning was inverted** — it kept the *most-confident refusals* (`TreeOrchestrator.Classify`), contradicting its own comment and TAP intent. Resisted score is now monotone-DECREASING in confidence (`1.0 - confidence`), so the least-confident refusals rank highest while staying below the Inconclusive band. `Classify` made `internal` + a direct score-ordering test added.
-- ⏳ Attacker-LLM rung generation (PAIR / Crescendo) and the per-turn budget: the attacker call escapes the per-turn timeout → a hung attacker burns the whole conversation budget; the partial transcript is discarded with a wrong timeout duration.
-- `AttackerPlanner` conflates attacker FAILURE with EXHAUSTION → a broken attacker endpoint silently degenerates PAIR to a single static seed, reported as "exhausted its rungs".
-- Multi-turn fold: `Fidelity` is the MAX across turns (not the verdict-bearing turn's); a Succeeded turn the detector doesn't stop on folds to Resisted; folded probes never carry Error/ErrorKind.
-- Stale `CrescendoAttack` doc still claims rung generation is "gated on a judge client / deferred" (the exact judge/attacker conflation Wave C′ removed).
-- **Recommendation:** fix the TAP pruning sign first; bound the attacker call by the per-turn timeout; distinguish attacker-failure from exhaustion; fold the verdict-bearing turn's fidelity. Add the missing attacker+judge end-to-end test and the per-turn-budget-resets test.
+- ✅ Attacker-LLM rung generation now runs inside the per-turn budget (`TurnOrchestrator` hoists `turnCts` above `NextTurnAsync`); a hung attacker folds the partial transcript as truncated with an "attacker turn generation timed out" reason instead of burning the conversation budget.
+- ✅ `AttackerPlanner` now raises `AttackerUnavailableException` on a FAILED call (distinct from the `null` = exhaustion); `TurnOrchestrator`/`TreeOrchestrator` fold an outage as truncated with an "attacker LLM errored" reason, never "attack exhausted".
+- ✅ Multi-turn fold: `Fidelity` is the **verdict-bearing** turn's (succeeding turn on success; else max over CONCLUSIVE turns) — no longer the running MAX; and the fold is **verdict-stream authoritative** (a Succeeded turn the detector doesn't stop on still folds Succeeded).
+- ✅ `CrescendoAttack` doc corrected (rung generation activates on `ScanOptions.AttackerClient`, judge is a distinct client).
+- Note: folded probes carrying `Error`/`ErrorKind`, and the runner's wrong-budget timeout-duration report, remain in the **5c/LOW backlog** (runner-side timeout-reporting cleanup).
 
 ### 5d. Coverage/honesty fields missing from machine-readable artifacts
 - `EvidenceFidelity`/`ConversationFidelity`/`Surface` and `RedTeamResult.BySurface` never reach any exporter (JSON/SARIF/PDF) — a Behavioral compromise serializes identically to a Verbal proxy.

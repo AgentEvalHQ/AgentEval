@@ -47,10 +47,27 @@ public sealed record AttackerTurnRequest
 }
 
 /// <summary>
+/// Thrown when the attacker LLM call FAILS (transport/parse error) — distinct from genuine EXHAUSTION (the attacker
+/// returned empty/unusable output, which <see cref="AttackerPlanner.NextAsync"/> signals with a <c>null</c> return).
+/// Lets the orchestrators fold an attacker OUTAGE as a truncated run with an honest error reason, rather than
+/// silently degenerating PAIR/TAP to a single static seed and mislabeling it "attack exhausted".
+/// </summary>
+public sealed class AttackerUnavailableException : Exception
+{
+    /// <summary>Creates the exception, naming the failure <paramref name="category"/> and wrapping the cause.</summary>
+    public AttackerUnavailableException(string category, Exception inner)
+        : base($"Attacker LLM unavailable ({category})", inner) => Category = category;
+
+    /// <summary>A short category for the failure (e.g. the inner exception type name).</summary>
+    public string Category { get; }
+}
+
+/// <summary>
 /// Wraps the attacker <see cref="IChatClient"/>: builds its messages, calls it, and parses the reply into the next
-/// adversarial prompt. Deterministic given a deterministic client (a <c>FakeChatClient</c> in tests). Honesty: if the
-/// attacker errors or produces nothing usable, <see cref="NextAsync"/> returns <c>null</c> — the caller treats that as
-/// "attacker exhausted" (an honest stop), NEVER a fabricated success.
+/// adversarial prompt. Deterministic given a deterministic client (a <c>FakeChatClient</c> in tests). Honesty:
+/// EXHAUSTION (the attacker produced nothing usable) returns <c>null</c>; a real FAILURE (the call threw) raises
+/// <see cref="AttackerUnavailableException"/> so the caller can fold an outage distinctly. Neither path ever
+/// fabricates a success.
 /// </summary>
 public sealed class AttackerPlanner
 {
@@ -60,7 +77,8 @@ public sealed class AttackerPlanner
     public AttackerPlanner(IChatClient attacker) =>
         _attacker = attacker ?? throw new ArgumentNullException(nameof(attacker));
 
-    /// <summary>Asks the attacker for the next adversarial prompt; <c>null</c> ⇒ nothing usable (honest stop).</summary>
+    /// <summary>Asks the attacker for the next adversarial prompt; <c>null</c> ⇒ exhausted (nothing usable). Throws
+    /// <see cref="AttackerUnavailableException"/> if the attacker CALL fails (a distinct outage, not exhaustion).</summary>
     public async Task<string?> NextAsync(AttackerTurnRequest request, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
@@ -74,9 +92,11 @@ public sealed class AttackerPlanner
         {
             throw;   // a real timeout/cancel must propagate; the orchestrator decides how to fold it
         }
-        catch (Exception)
+        catch (Exception ex)
         {
-            return null;   // the attacker failed → no next move, never a fabricated verdict
+            // FAILURE, not exhaustion: surface it distinctly so the orchestrator folds an attacker outage as a
+            // truncated run with an error reason — never silently degenerating to the static seed labeled "exhausted".
+            throw new AttackerUnavailableException(ex.GetType().Name, ex);
         }
     }
 

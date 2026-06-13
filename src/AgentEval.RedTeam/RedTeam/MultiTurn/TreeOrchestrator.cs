@@ -89,6 +89,14 @@ public sealed class TreeOrchestrator
                     {
                         continue;   // this node exceeded its per-node budget → dead-end it and keep searching
                     }
+                    catch (AttackerUnavailableException ex)
+                    {
+                        // 5c: the attacker LLM FAILED (outage) — fold the search so far as truncated with an error
+                        // reason (preserving any conclusive verdicts), never the "attacker exhausted" stop.
+                        var outcome = anyResisted ? EvaluationOutcome.Resisted : EvaluationOutcome.Inconclusive;
+                        return Fold(outcome, fidelity, transcript, verdicts,
+                            $"TAP attacker LLM errored ({ex.Category}) after {nodes} node(s) explored", truncated: true);
+                    }
 
                     transcript.Add(Turn.User(prompt));
                     transcript.Add(Turn.Assistant(reply.Text));
