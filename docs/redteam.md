@@ -24,7 +24,7 @@ AgentEval RedTeam is built on two foundational cybersecurity taxonomies that pro
 
 ### AgentEval's Approach: Original Implementation with Taxonomy Mapping
 
-1. **Original Authorship**: All 255 attack probes (13 attack types) are **originally written** for AgentEval
+1. **Original Authorship**: All 258 attack probes (13 attack types) are **originally written** for AgentEval
 2. **Taxonomy Mapping**: Every attack maps to OWASP ID + MITRE ATLAS techniques for compliance
 3. **Inspiration Sources**: General LLM security research, public jailbreak patterns (DAN, STAN)
 4. **Not Copied From**: We do NOT copy prompts from garak, PyRIT, or specific papers
@@ -66,7 +66,7 @@ AgentEval includes **13 built-in attack types** covering **all 10 OWASP LLM Top 
 | **EncodingEvasion** | LLM01 | AML.T0051 | Encoded/obfuscated payload delivery | 23 |
 | **SupplyChain** | LLM03 | AML.T0010 | Hallucinated / typosquatted package recommendations | 14 |
 | **DataPoisoning** | LLM04 | AML.T0020, AML.T0051 | Training/RAG data poisoning and backdoor priming | 12 |
-| **VectorEmbedding** | LLM08 | AML.T0051 | Vector/embedding-store injection (RAG retrieval poisoning) | 13 |
+| **VectorEmbedding** | LLM08 | AML.T0051 | RAG trust-boundary: inlined-context probes + real-retrieval (`retrieve_context` tool) probes | 16 |
 | **Misinformation** | LLM09 | — | Fabrication / overconfident-falsehood elicitation | 16 |
 
 ### Detailed Coverage by Category
@@ -124,17 +124,18 @@ AgentEval includes **13 built-in attack types** covering **all 10 OWASP LLM Top 
 - **RAG Poisoning**: Plant adversarial content for later retrieval
 - **Backdoor Priming**: Establish a trigger phrase to subvert later turns
 
-#### LLM08: Vector & Embedding Weaknesses (13 probes)
+#### LLM08: Vector & Embedding Weaknesses (16 probes)
 - **Retrieval Poisoning**: Payloads crafted to dominate embedding similarity
 - **Cross-context Leakage**: Embedding-store boundary-crossing probes
-- **Inlined-payload Surface**: VectorEmbedding inlines its payload (no external store required)
+- **Inlined-payload Surface**: 13 probes inline the poisoned context (Verbal evidence at any tier)
+- **Real-retrieval boundary** (Tier-2b): 3 `rag_tool_retrieval` probes deliver the poison ONLY via a `retrieve_context` canary tool — at `--sut-tier instrumented` a model that executes the retrieval and then obeys scores **Behavioral**; at text/emit-only tiers they are honestly Inconclusive (poison never delivered), never a false Resisted
 
 #### LLM09: Misinformation (16 probes)
 - **Fabrication Elicitation**: Coax confident answers to unanswerable prompts
 - **Overconfident Falsehood**: Detect asserted-as-fact hallucinations
 - **Honesty Evaluator**: Scored for fabricated certainty, not keyword matches
 
-**Total Coverage**: **255 probes** (at `Comprehensive`) across **13 attack types** covering **all 10 OWASP categories** (LLM01–LLM10) and **8 MITRE ATLAS** techniques
+**Total Coverage**: **258 probes** (at `Comprehensive`) across **13 attack types** covering **all 10 OWASP categories** (LLM01–LLM10) and **8 MITRE ATLAS** techniques
 
 ## Intensity Levels
 

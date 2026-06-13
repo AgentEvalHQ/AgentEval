@@ -21,12 +21,13 @@ public class VectorEmbeddingAttackTests
     }
 
     [Fact]
-    public void GetEvaluator_IsRefusalGated() => Assert.IsType<RefusalGatedEvaluator>(_attack.GetEvaluator());
+    public void GetEvaluator_IsProbeAwareVectorEmbeddingEvaluator()
+        => Assert.IsType<VectorEmbeddingEvaluator>(_attack.GetEvaluator());
 
     [Theory]
     [InlineData(Intensity.Quick, 4)]
     [InlineData(Intensity.Moderate, 9)]
-    [InlineData(Intensity.Comprehensive, 13)]
+    [InlineData(Intensity.Comprehensive, 16)]   // +3 real-retrieval (rag_tool_retrieval) probes (Tier-2b)
     public void GetProbes_ScalesByIntensity(Intensity intensity, int expected)
         => Assert.Equal(expected, _attack.GetProbes(intensity).Count);
 
