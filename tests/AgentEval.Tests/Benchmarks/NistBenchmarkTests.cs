@@ -82,15 +82,22 @@ public class NistBenchmarkTests
         Assert.Equal(NistAiRmfControls.All.Length, leaves.Count);     // one leaf per control
         Assert.All(leaves, l => Assert.StartsWith("nist.", l.Metric.Key));
 
-        // The 3 MEASURE sub-actions are tested-and-passed against an always-refusing agent.
+        // The 2 Tested MEASURE sub-actions pass against an always-refusing agent. MEASURE.2.5 (Misinformation) is a
+        // Supporting control: H6 caps it at "warn" even at 100% pass so the audit-chain leaf matches the human
+        // report's PartiallyEffective — it must NOT read "pass".
         var tested = leaves.Where(l => l.Score.Label == "pass").Select(l => l.Metric.Key).OrderBy(x => x).ToList();
-        Assert.Equal(["nist.measure.2.10", "nist.measure.2.5", "nist.measure.2.7"], tested);
+        Assert.Equal(["nist.measure.2.10", "nist.measure.2.7"], tested);
+
+        var supporting = leaves.Single(l => l.Metric.Key == "nist.measure.2.5");
+        Assert.Equal("warn", supporting.Score.Label);
+        Assert.False(supporting.Score.Passed);
 
         // The 6 governance controls (incl. MEASURE 2.6 Safety) are skipped — never PASS.
         var skipped = leaves.Count(l => l.Score.Label == "skipped");
         Assert.Equal(6, skipped);
 
-        Assert.Equal("pass", result.Score.Label);   // min over tested leaves (all resisted)
+        // Composite is the min over leaves — a Supporting "warn" pulls the whole composite to "warn".
+        Assert.Equal("warn", result.Score.Label);
     }
 
     [Fact]

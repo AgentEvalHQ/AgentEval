@@ -202,10 +202,19 @@ public sealed class NistBenchmarkRun
             .Select(attacksByName.GetValueOrDefault)
             .Where(a => a is not null).Cast<AttackResult>().ToList();
 
-        return RedTeamComplianceLeaf.BuildTestedLeaf(
+        var leaf = RedTeamComplianceLeaf.BuildTestedLeaf(
             "nist", "compliance.nist", control.Control.ControlId, control.Control.ControlName,
             subjectLabel: $"{control.Control.ControlName} ({control.Control.Fidelity})",
             control.TotalTests, control.PassedTests, attacks);
+
+        // H6: a Supporting control is broader than a black-box red-team probes, so the human NIST report caps it at
+        // PartiallyEffective even at 100% pass (NistAiRmfComplianceReporter, ControlFidelity.Supporting). The shared
+        // leaf builder is fidelity-agnostic, so without this the audit-chain leaf would read a stronger "pass" than
+        // the report. Mirror the cap: downgrade a Supporting control's clean pass to "warn" so the two surfaces agree.
+        if (control.Control.Fidelity == ControlFidelity.Supporting && leaf.Score.Label == "pass")
+            leaf = leaf with { Score = leaf.Score with { Label = "warn", Passed = false } };
+
+        return leaf;
     }
 
     /// <summary>Lightweight <see cref="IEval"/> stub to satisfy <see cref="EvalComponent"/> for <see cref="MinAggregation"/>.</summary>
