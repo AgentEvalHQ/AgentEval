@@ -174,6 +174,7 @@ public sealed class TreeOrchestrator
         TurnsUsed = transcript.Count / 2,
         Reason = reason,
         WasTruncated = truncated && outcome != EvaluationOutcome.Succeeded,
+        AttackerDriven = true,   // L10: TAP always uses an attacker LLM to generate nodes — inherently non-deterministic
     };
 
     // No node succeeded: the agent RESISTED every measurable variation ⇒ Resisted; if we could only ever measure

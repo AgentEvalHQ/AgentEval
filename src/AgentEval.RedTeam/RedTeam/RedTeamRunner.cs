@@ -575,7 +575,8 @@ public sealed class RedTeamRunner : IRedTeamRunner
             Response = options.IncludeEvidence ? transcript : "[REDACTED]",
             Outcome = mt.Outcome,
             Reason = $"[{mt.ConversationFidelity}, {mt.TurnsUsed} turn(s)] {mt.Reason}"
-                     + (mt.WasTruncated ? " [TRUNCATED]" : string.Empty),
+                     + (mt.WasTruncated ? " [TRUNCATED]" : string.Empty)
+                     + (mt.AttackerDriven ? " [ATTACKER-DRIVEN]" : string.Empty),   // L10: human-visible non-determinism marker
             Technique = probe.Technique,
             Difficulty = probe.Difficulty,
             Duration = elapsed,
@@ -583,6 +584,7 @@ public sealed class RedTeamRunner : IRedTeamRunner
             Fidelity = mt.Fidelity,
             Surface = probe.Surface,
             ConversationFidelity = mt.ConversationFidelity,
+            AttackerDriven = mt.AttackerDriven,   // L10: machine-readable provenance for the baseline/SARIF consumer
         };
     }
 

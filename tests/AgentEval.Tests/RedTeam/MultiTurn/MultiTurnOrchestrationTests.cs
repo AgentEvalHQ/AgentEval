@@ -649,4 +649,27 @@ public class MultiTurnOrchestrationTests
         Assert.Contains("attacker LLM errored", result.Reason);
         Assert.DoesNotContain("exhausted", result.Reason);
     }
+
+    /// <summary>Evaluator that blocks forever until cancelled — exercises the per-turn evaluator budget (L7).</summary>
+    private sealed class HangingEvaluator : IProbeEvaluator
+    {
+        public string Name => "Hanging";
+        public async Task<EvaluationResult> EvaluateAsync(AttackProbe probe, string response, CancellationToken ct = default)
+        {
+            await Task.Delay(Timeout.Infinite, ct).ConfigureAwait(false);
+            return EvaluationResult.Inconclusive("unreachable");
+        }
+    }
+
+    [Fact] // L7: a slow per-turn evaluator must honor the per-turn budget and fold as truncated, not hang the probe.
+    public async Task PerTurnEvaluator_RespectsTimeoutPerTurn()
+    {
+        var agent = new ScriptedConversableAgent(_ => "ok");
+        var options = new ScanOptions { Intensity = Intensity.Quick, TimeoutPerTurn = TimeSpan.FromMilliseconds(50) };
+
+        var result = await new TurnOrchestrator(agent, options).RunAsync(new EndlessAttack(), Seed, new HangingEvaluator(), default);
+
+        Assert.True(result.WasTruncated);
+        Assert.Contains("evaluation timed out", result.Reason);
+    }
 }

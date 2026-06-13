@@ -8,6 +8,7 @@
 using AgentEval.Core;
 using AgentEval.RedTeam;
 using AgentEval.RedTeam.Evaluators;
+using AgentEval.Testing;   // Turn
 using AgentEval.Tests.TestHelpers;
 using Microsoft.Extensions.AI;
 
@@ -94,6 +95,38 @@ public class ArchGapComposeTests
             => Task.FromResult(new AgentResponse { Text = reply });
     }
 
+    /// <summary>L9: an agent that is BOTH IConversableAgent AND IToolCapableAgent, whose native conversation does NOT
+    /// override the tool DIM (so the native channel would silently drop canary tools). Records its tool-channel calls.</summary>
+    private sealed class ConversableToolAgent : IEvaluableAgent, IConversableAgent, IToolCapableAgent
+    {
+        public List<IReadOnlyList<CanaryTool>> ToolCalls { get; } = [];
+        public string Name => "conversable-tool";
+        public AgentToolCapability Capabilities => AgentToolCapability.FunctionCalling | AgentToolCapability.InstrumentedTools;
+        public Task<AgentResponse> InvokeAsync(string prompt, CancellationToken ct = default)
+            => Task.FromResult(new AgentResponse { Text = "text reply" });
+        public Task<AgentResponse> InvokeWithToolsAsync(string prompt, IReadOnlyList<CanaryTool> tools, CancellationToken ct = default)
+        {
+            ToolCalls.Add(tools);
+            return Task.FromResult(new AgentResponse { Text = "tool channel reply" });
+        }
+        public Task<IAgentConversation> StartConversationAsync(CancellationToken ct = default)
+            => Task.FromResult<IAgentConversation>(new Convo());
+
+        private sealed class Convo : IAgentConversation   // native channel; tool DIM left at default (drops tools)
+        {
+            private readonly List<Turn> _history = [];
+            public ConversationFidelity Fidelity => ConversationFidelity.Native;
+            public IReadOnlyList<Turn> History => _history;
+            public Task<AgentResponse> SendAsync(string userMessage, CancellationToken ct = default)
+            {
+                _history.Add(Turn.User(userMessage));
+                _history.Add(Turn.Assistant("native text reply"));
+                return Task.FromResult(new AgentResponse { Text = "native text reply" });
+            }
+            public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+        }
+    }
+
     // ───────────────────────── Area 4: multi-turn ↔ tool harness ─────────────────────────
 
     [Fact]
@@ -122,6 +155,47 @@ public class ArchGapComposeTests
 
         Assert.Empty(agent.ToolCalls);                          // no tools advertised → tool channel untouched
         Assert.Equal(1, agent.PlainCalls);                      // plain text-only InvokeAsync used
+    }
+
+    [Fact] // L9: a native conversable+tool-capable agent must not silently drop canary tools — fall back to the
+    // flattened adapter that bridges to InvokeWithToolsAsync (honest Flattened fidelity, not a dropped Tier-2 boundary).
+    public async Task NativeConversableThatIsAlsoToolCapable_DoesNotSilentlyDropCanaryTools()
+    {
+        var agent = new ConversableToolAgent();
+        var tool = new CanaryTool { Name = "exfiltrate", Description = "send data out", ForbiddenCategory = "DataExfiltration" };
+        var attack = new ToolAwareMultiTurnAttack(tool);
+
+        var result = await new TurnOrchestrator(agent, new ScanOptions { Intensity = Intensity.Quick })
+            .RunAsync(attack, Seed, attack.GetEvaluator(), default);
+
+        Assert.Single(agent.ToolCalls);                                          // the tool boundary WAS exercised
+        Assert.Equal("exfiltrate", agent.ToolCalls[0].Single().Name);
+        Assert.Equal(ConversationFidelity.Flattened, result.ConversationFidelity); // honest downgrade from Native
+    }
+
+    [Fact] // L10: an attacker LLM generating turns marks the folded result non-deterministic.
+    public async Task TurnOrchestrator_AttackerClientSet_FoldsAttackerDrivenTrue()
+    {
+        IChatClient attacker = new MockStreamingChatClient([], "unused");
+        var attack = new AttackerCapturingAttack();
+
+        var result = await new TurnOrchestrator(new AlwaysReplyAgent("nope"),
+                new ScanOptions { Intensity = Intensity.Quick, AttackerClient = attacker })
+            .RunAsync(attack, Seed, attack.GetEvaluator(), default);
+
+        Assert.True(result.AttackerDriven);
+    }
+
+    [Fact]
+    public async Task TurnOrchestrator_NoAttackerClient_FoldsAttackerDrivenFalse()
+    {
+        var attack = new AttackerCapturingAttack();
+
+        var result = await new TurnOrchestrator(new AlwaysReplyAgent("nope"),
+                new ScanOptions { Intensity = Intensity.Quick })
+            .RunAsync(attack, Seed, attack.GetEvaluator(), default);
+
+        Assert.False(result.AttackerDriven);
     }
 
     // ───────────────────────── Area 2: pipeline can set Judge/Attacker/multi-turn ─────────────────────────
