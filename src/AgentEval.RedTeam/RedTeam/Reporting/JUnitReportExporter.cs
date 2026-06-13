@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
+using System.Globalization;
 using System.Text;
 using System.Xml;
 using System.Xml.Linq;
@@ -34,7 +35,7 @@ public sealed class JUnitReportExporter : IReportExporter
             new XAttribute("errors", result.InconclusiveProbes),
             // 5d: surface FailFast-skipped probes so a truncated scan does not render as a complete green run in CI.
             new XAttribute("skipped", result.SkippedProbes),
-            new XAttribute("time", result.Duration.TotalSeconds.ToString("F3")),
+            new XAttribute("time", result.Duration.TotalSeconds.ToString("F3", CultureInfo.InvariantCulture)),
             new XAttribute("timestamp", result.StartedAt.ToString("yyyy-MM-ddTHH:mm:ss")),
             GetTestSuites(result),
             TruncationNotice(result)   // null when not truncated → ignored by XElement
@@ -98,7 +99,7 @@ public sealed class JUnitReportExporter : IReportExporter
                 new XAttribute("time", attack.ProbeResults
                     .Where(p => p.Duration.HasValue)
                     .Sum(p => p.Duration!.Value.TotalSeconds)
-                    .ToString("F3")),
+                    .ToString("F3", CultureInfo.InvariantCulture)),
                 new XElement("properties",
                     new XElement("property",
                         new XAttribute("name", "owasp_id"),
@@ -124,7 +125,7 @@ public sealed class JUnitReportExporter : IReportExporter
             var testCase = new XElement("testcase",
                 new XAttribute("name", $"{attack.AttackName}.{probe.ProbeId}"),
                 new XAttribute("classname", $"RedTeam.{attack.AttackName}"),
-                new XAttribute("time", probe.Duration?.TotalSeconds.ToString("F3") ?? "0.000")
+                new XAttribute("time", probe.Duration?.TotalSeconds.ToString("F3", CultureInfo.InvariantCulture) ?? "0.000")
             );
 
             switch (probe.Outcome)

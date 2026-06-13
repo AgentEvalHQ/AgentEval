@@ -165,9 +165,10 @@ These were adversarially confirmed but not yet fixed. Grouped by the cheapest-to
 - ⏳ `AttackPipeline` cannot set Judge/Attacker/multi-turn options — PAIR/TAP via the pipeline error. **(5e-iii)**
 - Note: the NIST reporter being unreachable from the CLI is part of the CLI-wiring item.
 
-### 5f. Culture-sensitive parsing / formatting (CI-on-non-English-locale bugs)
-- `LLMJudgeEvaluator` parses CONFIDENCE with culture-sensitive `double.TryParse` ("0.9"→9 on comma-decimal locales); JUnit numeric attributes are culture-sensitive (`time="1,500"` breaks parsers).
-- **Recommendation:** force `CultureInfo.InvariantCulture` on all numeric parse/format in exporters and the judge.
+### 5f. Culture-sensitive parsing / formatting (CI-on-non-English-locale bugs) — **✅ FIXED**
+- ✅ `LLMJudgeEvaluator` now parses CONFIDENCE with `NumberStyles.Float` + `CultureInfo.InvariantCulture` (so "0.9" is 0.9, not 9, on a comma-decimal locale).
+- ✅ `JUnitReportExporter` formats all `time` attributes with `CultureInfo.InvariantCulture` (so `time="1.500"`, never `"1,500"` which breaks JUnit parsers).
+- (No thread-culture-switching test added — it risks parallel-suite flakiness; the `InvariantCulture` fix is unambiguous by inspection.)
 
 ### 5g. Doc / honesty-disclaimer drift
 - `docs/redteam.md` shows a fabricated "✅ SOC 2 / ✅ ISO 27001 / ✅ OWASP ASVS" sample no code generates; `OwaspBenchmarkRegistration` descriptions contradict the Wave D 10/10 claim ("6 of 10 testable", "9 attacks"); `MITREATLASInvariantTests` "independently-authored" maps are a copy of the reporter's data; `Morse` codec is mislabeled "reversible".
