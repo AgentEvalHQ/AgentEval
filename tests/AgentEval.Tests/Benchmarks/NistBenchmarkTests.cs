@@ -129,6 +129,22 @@ public class NistBenchmarkTests
         Assert.Equal("RmfSmoke", AgentEval.Cli.Commands.BenchNistCommand.ResolvePreset("smoke", stub).PresetName);
     }
 
+    [Fact]
+    public async Task EvaluateAsync_VulnerableAgent_CompositeFails_OnSecurityControl()
+    {
+        // An echo agent gets compromised by injection/jailbreak → MEASURE.2.7 (Security & Resilience) fails →
+        // the MinAggregation composite fails. This exercises the warn/fail label path (not just all-pass/all-skip).
+        var run = NistBenchmark.RmfBaseline();
+        var input = new EvalInput(
+            Query: "x", Metadata: new Dictionary<string, object> { ["agent"] = new EchoAgent("VulnAgent") });
+
+        var result = await run.EvaluateAsync(input);
+
+        Assert.Equal("fail", result.Score.Label);
+        var security = result.Details.SubResults!.Single(l => l.Metric.Key == "nist.measure.2.7");
+        Assert.Equal("fail", security.Score.Label);
+    }
+
     // ─── fakes ────────────────────────────────────────────────────────────────
 
     private sealed class PassingAgent(string name) : IEvaluableAgent
@@ -136,6 +152,14 @@ public class NistBenchmarkTests
         public string Name { get; } = name;
         public Task<AgentResponse> InvokeAsync(string prompt, CancellationToken cancellationToken = default)
             => Task.FromResult(new AgentResponse { Text = "I cannot help with that request. Please ask something else." });
+    }
+
+    // Echoes the prompt — the red-team marker probes (e.g. "say PWNED") are then reflected back ⇒ compromised.
+    private sealed class EchoAgent(string name) : IEvaluableAgent
+    {
+        public string Name { get; } = name;
+        public Task<AgentResponse> InvokeAsync(string prompt, CancellationToken cancellationToken = default)
+            => Task.FromResult(new AgentResponse { Text = prompt });
     }
 
     private sealed class PassingStubEvaluator : IEvaluator

@@ -79,6 +79,14 @@ public sealed class PackDownloader : IDisposable
         response.EnsureSuccessStatusCode();
         var content = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
 
+        // A gated/rate-limited source (e.g. a HuggingFace login wall) can return an HTML page with a 200 status —
+        // name that cause clearly instead of a confusing "no 'X' column" parse error downstream.
+        var head = content.TrimStart();
+        if (head.StartsWith("<!", StringComparison.Ordinal) || head.StartsWith("<html", StringComparison.OrdinalIgnoreCase))
+            throw new FormatException(
+                $"Pack '{pack.Name}' returned an HTML page, not data ({pack.DataUrl}) — the source may be gated, " +
+                "rate-limited, or moved. Download it manually and pass the raw file via --pack <url> or --import-probes.");
+
         // The importer throws FormatException on bad data — surfaced honestly, never a silent empty set.
         var probes = importer.Import(content, pack.Name);
         return new ImportedProbeAttack(pack.Name, probes, pack.OwaspLlmId);

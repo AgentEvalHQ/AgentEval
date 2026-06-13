@@ -119,8 +119,11 @@ public sealed class JsonProbeDatasetImporter : IProbeDatasetImporter
         var probes = new List<AttackProbe>(array.Count);
         for (var i = 0; i < array.Count; i++)
         {
-            var prompt = array[i]?[_promptField]?.GetValue<string>();
-            if (string.IsNullOrWhiteSpace(prompt)) continue;       // object missing the field — skip
+            // Read the configured field only when it's a JSON string; a missing/null/non-string field is skipped
+            // (never throws mid-array — one odd record must not abort importing a large dataset).
+            var node = array[i]?[_promptField];
+            var prompt = node?.GetValueKind() == JsonValueKind.String ? node.GetValue<string>() : null;
+            if (string.IsNullOrWhiteSpace(prompt)) continue;       // object missing/empty/non-string field — skip
             probes.Add(new AttackProbe
             {
                 Id = $"{datasetName}-{i:D4}",

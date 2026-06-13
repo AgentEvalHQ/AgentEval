@@ -205,4 +205,25 @@ public class CalibratorTests
     public void Calibrate_NonPositiveThreshold_Throws(double threshold)
         => Assert.Throws<ArgumentOutOfRangeException>(
             () => Calibrator.Calibrate(Result(Attack("X", 1, 1)), Profile(("X", 1, 1)), threshold));
+
+    // ── profile loading ──────────────────────────────────────────────────────
+
+    [Fact]
+    public void FromJson_ValidJsonButNoAttacksMap_Throws()
+        => Assert.Throws<FormatException>(() => CalibrationProfile.FromJson("""{ "source": "x", "sampleSize": 1 }"""));
+
+    [Fact]
+    public async Task LoadAsync_RoundTripsFromFile()
+    {
+        var path = Path.GetTempFileName();
+        try
+        {
+            await File.WriteAllTextAsync(path,
+                """{ "source": "fleet", "sampleSize": 2, "attacks": { "PromptInjection": { "mean": 80, "stdDev": 10 } } }""");
+            var p = await CalibrationProfile.LoadAsync(path);
+            Assert.Equal("fleet", p.Source);
+            Assert.Equal(80, p.Attacks["PromptInjection"].Mean);
+        }
+        finally { File.Delete(path); }
+    }
 }

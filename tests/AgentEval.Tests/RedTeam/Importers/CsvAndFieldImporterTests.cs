@@ -117,4 +117,63 @@ public class CsvAndFieldImporterTests
         Assert.Equal("N-1", probes[0].Id);
         Assert.Equal(["PWNED"], probes[0].ExpectedTokens!);
     }
+
+    [Fact]
+    public void Json_CustomField_NonStringValue_IsSkipped_NotThrown()
+    {
+        // A non-string field (e.g. a number) must be skipped, not abort the whole import (M2 fix).
+        const string json = """[ { "test_case_prompt": 123 }, { "test_case_prompt": "ok" } ]""";
+        Assert.Equal("ok", Assert.Single(new JsonProbeDatasetImporter("test_case_prompt").Import(json, "ds")).Prompt);
+    }
+
+    [Fact]
+    public void Json_DefaultField_NullLiteral_Throws()
+        => Assert.Throws<FormatException>(() => new JsonProbeDatasetImporter().Import("null", "ds"));
+
+    // ── RFC-4180 regression: quote handling, BOM, CRLF, ragged rows ────────────
+
+    [Fact]
+    public void Csv_LiteralQuoteMidField_DoesNotSwallowTheDelimiter()
+    {
+        // BUG (fixed): a '"' mid-field used to toggle quoting and swallow the following comma, merging columns.
+        var rows = CsvProbeDatasetImporter.ParseCsv("a,b\n5\"6,foo\n");
+        Assert.Equal(["5\"6", "foo"], rows[1]);
+    }
+
+    [Fact]
+    public void Csv_TextAfterClosingQuote_IsAppendedLiterally()
+        => Assert.Equal("abcdef", CsvProbeDatasetImporter.ParseCsv("\"abc\"def\n")[0][0]);
+
+    [Fact]
+    public void Csv_StripsLeadingBom_SoFirstColumnResolves()
+    {
+        // A BOM-poisoned header ("﻿Behavior") would otherwise throw "no 'Behavior' column".
+        var probes = new CsvProbeDatasetImporter("Behavior").Import("﻿Behavior\nharmful\n", "HarmBench");
+        Assert.Single(probes);
+    }
+
+    [Fact]
+    public void Csv_HandlesCrlf_WithNoTrailingNewline_NoStrayCarriageReturn()
+    {
+        var probes = new CsvProbeDatasetImporter("Goal").Import("Goal\r\nrow one\r\nrow two", "JBB");
+        Assert.Equal(2, probes.Count);
+        Assert.Equal("row one", probes[0].Prompt);   // no trailing '\r'
+        Assert.Equal("row two", probes[1].Prompt);   // last row flushed without a trailing newline
+    }
+
+    [Fact]
+    public void Csv_PromptColumnNotFirst_WithQuotedCommaField_ReadsCorrectColumn()
+    {
+        // HarmBench/JBB put the prompt column AFTER an id column — a swallowed comma would shift the columns.
+        var csv = "Index,Behavior,Category\n1,\"do X, then Y\",jailbreak\n";
+        Assert.Equal("do X, then Y", Assert.Single(new CsvProbeDatasetImporter("Behavior").Import(csv, "HB")).Prompt);
+    }
+
+    [Fact]
+    public void Csv_RaggedRow_IsSkipped_NoCrash()
+        => Assert.Single(new CsvProbeDatasetImporter("Goal").Import("A,Goal\nx,real goal\nonly-one-col\n", "ds"));
+
+    [Fact]
+    public void Csv_EmptyContent_Throws()
+        => Assert.Throws<ArgumentException>(() => new CsvProbeDatasetImporter("Goal").Import("", "ds"));
 }

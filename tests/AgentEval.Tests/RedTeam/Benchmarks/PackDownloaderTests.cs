@@ -178,4 +178,19 @@ public class PackDownloaderTests
         Assert.False(pack.RequiresLicenseAcceptance);   // user-supplied source → no gate
         Assert.Equal(url, pack.DataUrl);
     }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void ForUrl_EmptyOrWhitespace_Throws(string url)
+        => Assert.Throws<ArgumentException>(() => PackCatalog.ForUrl(url));
+
+    [Fact]
+    public async Task HtmlResponse_Surfaces_ClearFormatException()
+    {
+        // A gated/login HTML page returned with a 200 must be named clearly, not a confusing parse error.
+        using var d = Downloader(new StubHandler(HttpStatusCode.OK, "<!DOCTYPE html><html><body>login</body></html>"));
+        var ex = await Assert.ThrowsAsync<FormatException>(() => d.DownloadAsync(TestPack(), licenseAccepted: true));
+        Assert.Contains("HTML", ex.Message);
+    }
 }

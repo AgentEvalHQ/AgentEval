@@ -357,11 +357,14 @@ internal static class RedTeamCommand
         // every flag; a registry-confirmed package is never flagged (RC-6).
         if (string.Equals(opts.PackageRegistry?.Trim(), "live", StringComparison.OrdinalIgnoreCase))
         {
+            var roster = attacks ?? Attack.All;
+            var hasSupplyChain = roster.Any(a => a is SupplyChainAttack);
             var registry = new HttpPackageRegistry();
-            attacks = (attacks ?? Attack.All)
-                .Select(a => a is SupplyChainAttack ? new SupplyChainAttack(registry) : a).ToList();
+            attacks = roster.Select(a => a is SupplyChainAttack ? new SupplyChainAttack(registry) : a).ToList();
             if (!opts.Quiet)
-                Console.Error.WriteLine("  SupplyChain: live package registry (PyPI/npm/NuGet) enabled — a registry outage under-detects rather than false-flagging.");
+                Console.Error.WriteLine(hasSupplyChain
+                    ? "  SupplyChain: live package registry (PyPI/npm/NuGet) enabled — a registry outage under-detects rather than false-flagging."
+                    : "  Warning: --package-registry live has no effect — the SupplyChain attack is not in the selected --attacks set.");
         }
         else if (!string.IsNullOrWhiteSpace(opts.PackageRegistry) && !string.Equals(opts.PackageRegistry.Trim(), "none", StringComparison.OrdinalIgnoreCase))
         {
@@ -637,8 +640,8 @@ internal static class RedTeamCommand
     /// <summary>
     /// Renders a compliance-reporter format (NIST AI RMF) that is NOT an <see cref="IReportExporter"/>, routing
     /// through the reporter's own <c>ToJson</c>/<c>ToMarkdown</c>. Returns false for the standard exporter formats.
-    /// This is the CLI on-ramp for the NIST AI RMF reporter (the bench owasp/mitre subcommands cover those two;
-    /// NIST has no benchmark-preset family, so it surfaces here as a redteam export format).
+    /// This is the inline `redteam` on-ramp for the NIST AI RMF reporter; NIST also has a first-class benchmark
+    /// family (`agenteval bench nist`), so this export and that preset family are two routes to the same report.
     /// </summary>
     internal static bool TryRenderComplianceReport(string format, RedTeamResult result, out string content)
     {

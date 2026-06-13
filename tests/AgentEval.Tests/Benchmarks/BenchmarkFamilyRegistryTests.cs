@@ -223,14 +223,15 @@ public class BenchmarkFamilyRegistryTests
 
     /// <summary>
     /// Integration: after the CLI's anchor step (touching one type from each expected
-    /// assembly), all 8 default families are present in <see cref="BenchmarkFamilyRegistry.All"/>.
+    /// assembly), all default families — including the newly-added <c>nist</c> — are present in
+    /// <see cref="BenchmarkFamilyRegistry.All"/>.
     /// </summary>
     [Fact]
-    public void AllEightDefaultFamilies_AppearInRegistry()
+    public void AllDefaultFamilies_AppearInRegistry()
     {
         AgentEval.Cli.Commands.BenchListCommand.AnchorAssemblies();
 
-        var expectedNames = new[] { "agentic", "gdpr", "eu-ai-act", "owasp", "mitre", "longmemeval", "memory", "perf" };
+        var expectedNames = new[] { "agentic", "gdpr", "eu-ai-act", "owasp", "mitre", "nist", "longmemeval", "memory", "perf" };
         foreach (var name in expectedNames)
         {
             Assert.NotNull(BenchmarkFamilyRegistry.TryGet(name));

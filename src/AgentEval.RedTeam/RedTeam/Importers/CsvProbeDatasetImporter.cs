@@ -96,10 +96,15 @@ public sealed class CsvProbeDatasetImporter : IProbeDatasetImporter
     // Minimal RFC-4180 parser: quoted fields, "" escapes, commas/newlines inside quotes.
     internal static List<string[]> ParseCsv(string text)
     {
+        // Strip a leading UTF-8 BOM — the download path's ReadAsStringAsync does NOT strip it, which would otherwise
+        // poison the first header cell (e.g. "﻿Behavior") and break the prompt-column lookup.
+        if (text.Length > 0 && text[0] == '﻿') text = text[1..];
+
         var rows = new List<string[]>();
         var field = new StringBuilder();
         var record = new List<string>();
         var inQuotes = false;
+        var fieldStart = true;   // RFC-4180: a double-quote is only special at the START of a field
 
         for (var i = 0; i < text.Length; i++)
         {
@@ -109,19 +114,24 @@ public sealed class CsvProbeDatasetImporter : IProbeDatasetImporter
                 if (c == '"')
                 {
                     if (i + 1 < text.Length && text[i + 1] == '"') { field.Append('"'); i++; }   // escaped quote
-                    else inQuotes = false;
+                    else inQuotes = false;                                                       // closing quote
                 }
                 else field.Append(c);
+            }
+            else if (c == '"' && fieldStart)
+            {
+                inQuotes = true;       // opening quote (only when the field is empty so far)
+                fieldStart = false;
             }
             else
             {
                 switch (c)
                 {
-                    case '"': inQuotes = true; break;
-                    case ',': record.Add(field.ToString()); field.Clear(); break;
+                    case ',': record.Add(field.ToString()); field.Clear(); fieldStart = true; break;
                     case '\r': break;                                                   // swallow CR (handle CRLF)
-                    case '\n': record.Add(field.ToString()); field.Clear(); rows.Add(record.ToArray()); record = []; break;
-                    default: field.Append(c); break;
+                    case '\n': record.Add(field.ToString()); field.Clear(); rows.Add(record.ToArray()); record = []; fieldStart = true; break;
+                    // A '"' here is mid-field (not at field start) → a literal quote in an unquoted field (RFC-4180).
+                    default: field.Append(c); fieldStart = false; break;
                 }
             }
         }
