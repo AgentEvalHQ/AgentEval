@@ -782,7 +782,7 @@ When your agent resists an attack:
   ],
   "compliance_mapping": {
     "owasp_coverage": ["LLM01", "LLM02", "LLM07"],
-    "mitre_atlas_coverage": ["AML.T0051", "AML.T0054", "AML.T0048"],
+    "mitre_atlas_coverage": ["AML.T0051", "AML.T0054", "AML.T0056"],
     "risk_categories_tested": 3,
     "total_owasp_categories": 10,
     "coverage_percentage": 30.0
