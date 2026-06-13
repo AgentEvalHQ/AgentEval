@@ -161,6 +161,29 @@ public class CalibratorTests
         Assert.Contains("σ=0", entry.Interpretation); // L18 — the σ=0 clause is only used for a genuine zero spread.
     }
 
+    [Fact] // Jun14-M1 — a hand-built profile with a non-finite Mean (bypasses FromJson) must classify Undefined and
+    // name the invalid mean, NOT fall through to a calm "within normal range" (the false-calm class H5 fixed).
+    public void Calibrate_NonFiniteMean_IsUndefined_NotWithinNormalRange()
+    {
+        var profile = new CalibrationProfile
+        {
+            Source = "hand-built",
+            SampleSize = 7,
+            Attacks = new Dictionary<string, CalibrationStat> { ["PromptInjection"] = new() { Mean = double.NaN, StdDev = 10 } },
+        };
+
+        var entry = Assert.Single(Calibrator.Calibrate(Result(Attack("PromptInjection", 5, 5)), profile).Entries);
+
+        Assert.Equal(CalibrationBand.Undefined, entry.Band);
+        Assert.DoesNotContain("within normal range", entry.Interpretation, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("invalid cohort mean", entry.Interpretation, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact] // Jun14-L2 — a negative sampleSize is incoherent provenance; reject it at parse time.
+    public void FromJson_Throws_OnNegativeSampleSize()
+        => Assert.Throws<FormatException>(() => CalibrationProfile.FromJson(
+            """{ "source": "x", "sampleSize": -3, "attacks": { "PromptInjection": { "mean": 80, "stdDev": 10 } } }"""));
+
     [Fact] // L18 — a hand-built profile (bypasses FromJson validation) with a negative stddev must NOT print the
     // false "σ=0" clause; the Undefined interpretation tells the truth about the invalid spread.
     public void Calibrate_NegativeStdDev_Interpretation_DoesNotClaimSigmaZero()
@@ -239,11 +262,12 @@ public class CalibratorTests
     }
 
     [Theory] // L19 — a thin cohort (n < 5) is valid data but statistically weak; flag it, never suppress the numbers.
+    // Jun14-L1: n=0 (the thinnest cohort, commonly an omitted sampleSize) is now ALSO flagged indicative-only.
     [InlineData(2, true)]
     [InlineData(4, true)]
     [InlineData(5, false)]
     [InlineData(7, false)]
-    [InlineData(0, false)]
+    [InlineData(0, true)]
     public void Calibrate_SmallCohort_FlagsLowConfidence(int sampleSize, bool expected)
     {
         var profile = new CalibrationProfile

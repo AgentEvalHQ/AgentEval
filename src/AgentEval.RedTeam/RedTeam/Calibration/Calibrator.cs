@@ -79,8 +79,9 @@ public sealed record CalibrationReport
 
     /// <summary>True when the reference cohort is too small (n &lt; <see cref="Calibrator.LowConfidenceSampleSize"/>)
     /// for z-scores to be statistically robust. Surfaced as a caveat — it never suppresses the numbers, only warns
-    /// that a small-cohort z is indicative rather than reliable.</summary>
-    public bool IsLowConfidence => SampleSize is > 0 and < Calibrator.LowConfidenceSampleSize;
+    /// that a small-cohort z is indicative rather than reliable. Jun14-L1: includes n=0 (the thinnest cohort, commonly
+    /// an omitted sampleSize) — the old <c>&gt; 0</c> lower bound let the least-founded cohort escape the caveat.</summary>
+    public bool IsLowConfidence => SampleSize < Calibrator.LowConfidenceSampleSize;
 }
 
 /// <summary>An attack that was present in the scan but excluded from calibration, with the reason why.</summary>
@@ -165,6 +166,11 @@ public static class Calibrator
     {
         if (z is null)
             return CalibrationBand.Undefined;
+        // Jun14-M1: a NaN z (from a non-finite cohort Mean on a hand-built profile that bypassed FromJson) must NOT
+        // fall through to WithinNormalRange — all NaN comparisons are false, which would fabricate a calm "within
+        // normal range" for an undefined comparison. Classify it Undefined regardless of construction route.
+        if (double.IsNaN(z.Value))
+            return CalibrationBand.Undefined;
         if (z <= -threshold)
             return CalibrationBand.UnusuallyVulnerable;
         if (z >= threshold)
@@ -174,11 +180,14 @@ public static class Calibrator
 
     private static string Interpret(double score, CalibrationStat stat, double? z, CalibrationBand band) => band switch
     {
-        // FromJson now rejects non-finite/negative StdDev, so σ=0 is the only legitimate Undefined cause for a
-        // parsed profile; this branch stays honest even for a hand-built CalibrationStat that bypasses FromJson.
-        CalibrationBand.Undefined => stat.StdDev == 0
-            ? $"score {score:F1} vs cohort mean {stat.Mean:F1} (σ=0 — z undefined, no cohort spread to normalize against)"
-            : $"score {score:F1} vs cohort mean {stat.Mean:F1} (z undefined — invalid cohort stdDev {stat.StdDev:F2})",
+        // FromJson rejects non-finite Mean / non-finite-or-negative StdDev, so for a PARSED profile σ=0 is the only
+        // legitimate Undefined cause. This three-way branch stays honest even for a hand-built CalibrationStat that
+        // bypasses FromJson (Jun14-M1: an invalid Mean is named, not rendered as a calm "within normal range").
+        CalibrationBand.Undefined => !double.IsFinite(stat.Mean)
+            ? $"score {score:F1} (z undefined — invalid cohort mean {stat.Mean})"
+            : stat.StdDev == 0
+                ? $"score {score:F1} vs cohort mean {stat.Mean:F1} (σ=0 — z undefined, no cohort spread to normalize against)"
+                : $"score {score:F1} vs cohort mean {stat.Mean:F1} (z undefined — invalid cohort stdDev {stat.StdDev:F2})",
         CalibrationBand.UnusuallyVulnerable =>
             $"unusually vulnerable: {Sigma(z)} below the reference cohort (score {score:F1} vs mean {stat.Mean:F1})",
         CalibrationBand.UnusuallyRobust =>

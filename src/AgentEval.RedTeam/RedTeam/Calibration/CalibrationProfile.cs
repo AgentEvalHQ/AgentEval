@@ -56,7 +56,7 @@ public sealed record CalibrationProfile
                 ?? throw new FormatException("Calibration profile deserialized to null.");
             if (profile.Attacks is null)
                 throw new FormatException("Calibration profile has no 'attacks' map.");
-            ValidateAttacks(profile.Attacks);
+            ValidateProfile(profile);
             return profile;
         }
         catch (JsonException ex)
@@ -73,6 +73,15 @@ public sealed record CalibrationProfile
     //   • a NaN/negative stdDev would render the false "σ=0 — z undefined" interpretation,
     //   • a case-differing duplicate key ("PromptInjection" + "promptinjection") survives deserialization and
     //     then throws ArgumentException (the WRONG type) at the OrdinalIgnoreCase lookup copy in Calibrator.
+    // Jun14-L2: a negative cohort size is incoherent provenance; reject it at parse time so a "(n=-3)" garbage line
+    // can never reach the report (the module leans on the provenance line for its z-is-relative honesty story).
+    private static void ValidateProfile(CalibrationProfile profile)
+    {
+        if (profile.SampleSize < 0)
+            throw new FormatException($"Calibration profile has a negative sampleSize ({profile.SampleSize}).");
+        ValidateAttacks(profile.Attacks);
+    }
+
     private static void ValidateAttacks(IReadOnlyDictionary<string, CalibrationStat> attacks)
     {
         foreach (var (name, stat) in attacks)
