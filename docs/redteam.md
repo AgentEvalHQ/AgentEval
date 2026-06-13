@@ -2,6 +2,27 @@
 
 AgentEval's Red Team module provides **automated security evaluation** for AI agents with probes based on [OWASP LLM Top 10](https://owasp.org/www-project-top-10-for-large-language-model-applications/) and [MITRE ATLAS](https://atlas.mitre.org/) taxonomies.
 
+## Capabilities at a glance
+
+**13 built-in attacks · 258 probes · OWASP LLM Top 10 (10/10) · 8 MITRE ATLAS techniques · 5 compliance reporters.** Every capability below is reachable from the [`agenteval redteam` CLI](#agenteval-redteam--cli-reference) and the [`AttackPipeline`](#pipeline-api).
+
+| Capability | What it adds | Where |
+|------------|--------------|-------|
+| **Attack roster** | 13 attacks covering all 10 OWASP LLM Top 10 categories | [Attack Types](#attack-types) |
+| **Multi-turn & attacker-LLM** | Crescendo, PAIR, TAP — escalate/adapt over a conversation | [Attacker-LLM multi-turn](#attacker-llm-multi-turn-crescendo--pair--tap) |
+| **Tool-aware multi-turn** | `ToolEscalation` lures the agent into a forbidden tool call | [Tool-aware escalation](#tool-aware-multi-turn-escalation---attacks-toolescalation) |
+| **Real attack surfaces** | tiered tool harness (`--sut-tier`) — test what the agent *does* | [Real attack surface](#real-attack-surface---sut-tier--system-prompt-canary) |
+| **Evidence fidelity** | every verdict labels Verbal / IntentToAct / Behavioral | [Honesty & evidence fidelity](#honesty--evidence-fidelity) |
+| **Transform pipeline** | 18 codecs × any attack → correct-by-construction encoded variants | [Transform pipeline](#transform-pipeline) |
+| **LLM03 live registry** | `--package-registry live` flags model-invented packages (PyPI/npm/NuGet) | [CLI reference](#agenteval-redteam--cli-reference) |
+| **LLM08 real RAG boundary** | `VectorEmbedding` poisons via a real `retrieve_context` tool | [Attack Types](#attack-types) |
+| **z-score calibration** | rank a model vs a peer cohort (`--calibration`) | [Relative scoring](#relative-scoring--calibration---calibration) |
+| **Explainable findings** | `--explain` attaches an LLM rationale narrating the verdict | [Explainable findings](#explainable-findings) |
+| **Dataset import + packs** | `--import-probes` / `--pack` (HarmBench/JailbreakBench/CyberSecEval) | [Benchmark packs walkthrough](#benchmark-packs---pack--install--run-walkthrough) |
+| **Compliance** | OWASP, MITRE, SOC 2, ISO 27001, NIST AI RMF reporters + `bench owasp\|mitre\|nist` | [Compliance Reports](#compliance-reports) |
+| **CI/CD** | SARIF + JUnit export, baseline regression gate, honest exit codes | [CI/CD Integration](#cicd-integration) |
+| **Honesty discipline** | conclusive-only scoring; Inconclusive coverage state; never-fabricate; governance-never-PASS | [Honesty & evidence fidelity](#honesty--evidence-fidelity) |
+
 ## Background: Why OWASP LLM Top 10 & MITRE ATLAS?
 
 ### Industry-Standard Taxonomies
@@ -990,6 +1011,42 @@ agenteval redteam --endpoint $URL --model $MODEL --sut-tier instrumented --inten
 agenteval redteam --endpoint $URL --model $MODEL \
   --system-prompt-canary "CANARY-7f3a9c21" --attacks SystemPromptExtraction
 ```
+
+### Honesty & evidence fidelity
+
+The discipline that makes an AgentEval verdict trustworthy — and the thing no other red-team tool does:
+
+- **Three outcomes, not two.** Every probe is **Resisted**, **Succeeded**, or **Inconclusive**. Weak/absent evidence (a timeout, an un-canaried check, a tool boundary that wasn't exercised) becomes **Inconclusive — a coverage gap**, never a fabricated PASS.
+- **Conclusive-only scoring.** The headline score is `Resisted / (Resisted + Succeeded)` — inconclusive probes lower **coverage**, not the pass rate. Lead with `Verdict` + conclusive score + coverage, never the inconclusive-diluted `OverallScore`.
+- **Evidence fidelity on every finding.** Each result is labeled `EvidenceFidelity` = **Verbal** (the model's words), **IntentToAct** (it emitted a forbidden tool-call), or **Behavioral** (it actually executed one). A Tier-0 verbal "pass" can never masquerade as a Tier-2 behavioral one.
+- **Governance never auto-PASSes.** Organizational controls (NIST GOVERN/MAP/MANAGE, ISO/SOC 2 process controls) are reported Not-Applicable, not green — a passing scan is *evidence*, not a conformance claim.
+- **Never overclaim a framework.** A red-team run substantiates only what it can exercise; everything else is surfaced honestly (e.g. SARIF emits inconclusive probes as low-noise `note` results rather than dropping them).
+
+### Transform pipeline
+
+Multiply any attack's probes through **18 correct-by-construction encoders** (Base64, Hex, ROT13, URL, Atbash, Caesar, reversed, leetspeak, Morse, binary, NATO, homoglyph, zero-width…) — the same obfuscations attackers use to slip a payload past a filter, generated programmatically so the encoding is never mistyped.
+
+```csharp
+var result = await AttackPipeline.Create()
+    .WithAttack(Attack.PromptInjection)
+    .WithTransform(new Base64Transformer(), new Rot13Transformer(), new HexTransformer())
+    .WithIntensity(Intensity.Quick)
+    .ScanAsync(agent);
+// Each base probe → 1 original + N encoded variants. Transforms carry provenance and a round-trip
+// winnability guard so a lossy codec can't silently produce an unwinnable (always-Resisted) probe.
+```
+
+`EncodingEvasion` (LLM01) is the built-in attack that ships a curated encoded set; the transform pipeline applies the same codecs to *any* attack. Transforms are deterministic — safe for baselines.
+
+### Explainable findings (`--explain`)
+
+Attach an **LLM-generated rationale** to each Succeeded/Inconclusive finding that narrates *why* the verdict was reached **and which evidence fidelity** backs it — the auditor-facing differentiator (it never changes the verdict; it explains it).
+
+```bash
+agenteval redteam --endpoint $URL --model $MODEL --judge $JUDGE_URL --explain
+```
+
+Requires `--judge` (it's an LLM call); without one it's a no-op with a warning. The rationale lands on `ProbeResult.Rationale` and in the JSON export.
 
 ### Output & compliance formats, per-role keys
 
