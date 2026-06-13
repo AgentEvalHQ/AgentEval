@@ -33,14 +33,32 @@ public sealed class TransformedAttack : IAttackType
         _transformers = transformers ?? throw new ArgumentNullException(nameof(transformers));
         if (_transformers.Count == 0)
             throw new ArgumentException("At least one transformer is required.", nameof(transformers));
-        // Enforce the IProbeTransformer.Name contract at composition time: '+' and '>' are reserved delimiters for
-        // probe-Id suffixes (id+name) and chain provenance (name>name), so a Name containing either would make the
-        // chain string ambiguous to parse back. Built-in transformers are safe; this guards third-party ones.
+
+        // H3: TransformedAttack only rewrites single-turn text probes. A multi-turn / tool-aware / tree attack would
+        // be silently downgraded to single-turn — the runner dispatches those capabilities via concrete `is` checks
+        // that this decorator does NOT forward, so the rung ladder / tool channel would never run while the preserved
+        // OWASP/MITRE ids + GetEvaluator() still made the result LOOK legitimate. Reject loudly rather than masquerade.
+        if (inner is IMultiTurnAttack or IToolAwareAttack or ITreeAttack)
+            throw new ArgumentException(
+                $"Cannot transform a multi-turn/tool-aware/tree attack ('{inner.Name}'): TransformedAttack only rewrites " +
+                "single-turn text probes and would silently downgrade it. Transform a single-turn attack instead.",
+                nameof(inner));
+
+        // One pass enforcing the IProbeTransformer.Name contract:
+        //  • '+' and '>' are reserved delimiters for probe-Id suffixes (id+name) and chain provenance (name>name),
+        //    so a Name containing either would make the chain string ambiguous to parse back (built-ins are safe).
+        //  • two transformers sharing a Name (or the SAME instance twice) would emit duplicate probe Ids
+        //    (seed+base64 for each) → result-map / baseline collisions, so reject duplicates loudly (L13).
+        var names = new HashSet<string>(StringComparer.Ordinal);
         foreach (var t in _transformers)
         {
             if (t.Name.IndexOfAny(['+', '>']) >= 0)
                 throw new ArgumentException(
                     $"Transformer Name '{t.Name}' contains a reserved delimiter ('+' or '>'); see IProbeTransformer.Name.",
+                    nameof(transformers));
+            if (!names.Add(t.Name))
+                throw new ArgumentException(
+                    $"Duplicate transformer Name '{t.Name}'; transformed probe Ids would collide (id+{t.Name}).",
                     nameof(transformers));
         }
         _mode = mode;

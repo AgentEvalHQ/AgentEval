@@ -105,4 +105,76 @@ public class TransformedAttackTests
     [Fact]
     public void ReservedDelimiterInTransformerName_Throws() =>
         Assert.Throws<ArgumentException>(() => new TransformedAttack(new FakeAttack(), [new BadNameTransformer()], TransformMode.Expand));
+
+    // === H3: reject capability attacks that TransformedAttack would silently downgrade to single-turn ===
+
+    private class StubAttack : IAttackType
+    {
+        public string Name => "Stub";
+        public string DisplayName => "Stub";
+        public string Description => "stub";
+        public string OwaspLlmId => "LLM01";
+        public string[] MitreAtlasIds => [];
+        public Severity DefaultSeverity => Severity.Medium;
+        public IProbeEvaluator GetEvaluator() => new ContainsTokenEvaluator("X");
+        public IReadOnlyList<AttackProbe> GetProbes(Intensity intensity) => [];
+    }
+
+    private sealed class FakeMultiTurnAttack : StubAttack, IMultiTurnAttack
+    {
+        public int MaxTurns => 3;
+        public Task<string?> NextTurnAsync(MultiTurnContext context, CancellationToken cancellationToken = default)
+            => Task.FromResult<string?>(null);
+    }
+
+    private sealed class FakeToolAwareAttack : StubAttack, IToolAwareAttack
+    {
+        public IReadOnlyList<CanaryTool> GetCanaryTools(Intensity intensity) => [];
+    }
+
+    private sealed class FakeTreeAttack : StubAttack, ITreeAttack
+    {
+        public int MaxDepth => 2;
+        public int Branching => 2;
+        public int Beam => 1;
+        public int MaxNodes => 4;
+        public string Objective(AttackProbe seed) => "obj";
+    }
+
+    [Fact]
+    public void TransformingMultiTurnAttack_Throws()
+    {
+        var ex = Assert.Throws<ArgumentException>(() => new TransformedAttack(new FakeMultiTurnAttack(), [new Base64Transformer()], TransformMode.Expand));
+        Assert.Equal("inner", ex.ParamName);
+    }
+
+    [Fact]
+    public void TransformingToolAwareAttack_Throws()
+    {
+        var ex = Assert.Throws<ArgumentException>(() => new TransformedAttack(new FakeToolAwareAttack(), [new Base64Transformer()], TransformMode.Expand));
+        Assert.Equal("inner", ex.ParamName);
+    }
+
+    [Fact]
+    public void TransformingTreeAttack_Throws()
+    {
+        var ex = Assert.Throws<ArgumentException>(() => new TransformedAttack(new FakeTreeAttack(), [new Base64Transformer()], TransformMode.Expand));
+        Assert.Equal("inner", ex.ParamName);
+    }
+
+    // === L13: reject duplicate transformer Names (transformed probe Ids would collide) ===
+
+    [Fact]
+    public void DuplicateTransformerName_Throws()
+    {
+        var ex = Assert.Throws<ArgumentException>(() => new TransformedAttack(new FakeAttack(), [new Base64Transformer(), new Base64Transformer()], TransformMode.Expand));
+        Assert.Equal("transformers", ex.ParamName);
+    }
+
+    [Fact]
+    public void SameTransformerInstanceTwice_Throws()
+    {
+        var b = new Base64Transformer();
+        Assert.Throws<ArgumentException>(() => new TransformedAttack(new FakeAttack(), [b, b], TransformMode.Expand));
+    }
 }
