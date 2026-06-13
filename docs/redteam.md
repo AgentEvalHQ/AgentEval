@@ -24,7 +24,7 @@ AgentEval RedTeam is built on two foundational cybersecurity taxonomies that pro
 
 ### AgentEval's Approach: Original Implementation with Taxonomy Mapping
 
-1. **Original Authorship**: All 247 attack probes (13 attack types) are **originally written** for AgentEval
+1. **Original Authorship**: All 255 attack probes (13 attack types) are **originally written** for AgentEval
 2. **Taxonomy Mapping**: Every attack maps to OWASP ID + MITRE ATLAS techniques for compliance
 3. **Inspiration Sources**: General LLM security research, public jailbreak patterns (DAN, STAN)
 4. **Not Copied From**: We do NOT copy prompts from garak, PyRIT, or specific papers
@@ -56,13 +56,13 @@ AgentEval includes **13 built-in attack types** covering **all 10 OWASP LLM Top 
 | Attack | OWASP ID | MITRE ATLAS | Description | Probes |
 |--------|-----------|-------------|-------------|--------|
 | **PromptInjection** | LLM01 | AML.T0051 | Direct instruction override attempts | 27 |
-| **Jailbreak** | LLM01 | AML.T0051, AML.T0054 | Roleplay, DAN, hypothetical bypasses | 24 |
-| **PIILeakage** | LLM02 | AML.T0037, AML.T0057 | Data extraction and memorization probes | 19 |
+| **Jailbreak** | LLM01 | AML.T0051, AML.T0054 | Roleplay, DAN, hypothetical, Skeleton Key, many-shot bypasses | 29 |
+| **PIILeakage** | LLM02 | AML.T0037, AML.T0057 | Extraction, memorization, divergence/repeat-token probes | 22 |
 | **SystemPromptExtraction** | LLM07 | AML.T0056, AML.T0057 | Attempts to reveal system instructions | 19 |
 | **IndirectInjection** | LLM01 | AML.T0051 | Injection via documents, tools, RAG | 19 |
 | **ExcessiveAgency** | LLM06 | AML.T0051, AML.T0054 | Scope expansion, privilege escalation, unauthorized actions | 15 |
 | **InsecureOutput** | LLM05 | AML.T0051 | XSS, SQL, command injection, SSRF, CSRF, deserialization | 31 |
-| **InferenceAPIAbuse** | LLM10 | AML.T0045 | ML inference API abuse and resource exhaustion | 15 |
+| **InferenceAPIAbuse** | LLM10 | AML.T0034 | ML inference API abuse and resource exhaustion | 15 |
 | **EncodingEvasion** | LLM01 | AML.T0051 | Encoded/obfuscated payload delivery | 23 |
 | **SupplyChain** | LLM03 | AML.T0010 | Hallucinated / typosquatted package recommendations | 14 |
 | **DataPoisoning** | LLM04 | AML.T0020, AML.T0051 | Training/RAG data poisoning and backdoor priming | 12 |
@@ -71,15 +71,16 @@ AgentEval includes **13 built-in attack types** covering **all 10 OWASP LLM Top 
 
 ### Detailed Coverage by Category
 
-#### LLM01: Prompt Injection (93 probes total)
+#### LLM01: Prompt Injection (98 probes total)
 - **Direct Override**: `"Ignore previous instructions..."` (27 probes)
-- **Jailbreak Personas**: DAN, STAN, roleplay scenarios (24 probes)
+- **Jailbreak Personas**: DAN, roleplay, hypothetical, **Skeleton Key** (MSRC 2024), **many-shot** (Anthropic 2024) (29 probes)
 - **Indirect Injection**: Document/RAG/tool poisoning (19 probes)
 - **Encoding Evasion**: Base64, ROT13, hex, unicode obfuscation (23 probes)
 
-#### LLM02: Sensitive Information Disclosure (19 probes)
+#### LLM02: Sensitive Information Disclosure (22 probes)
 - **PII Extraction**: Names, emails, SSNs, addresses
 - **Memory Probes**: Training data leakage attempts
+- **Divergence / repeat-token**: garak-style "repeat a token forever" memorization spill (3 probes)
 - **Inference Attacks**: Social engineering for personal data
 
 #### LLM07: System Prompt Leakage (19 probes)
@@ -133,7 +134,7 @@ AgentEval includes **13 built-in attack types** covering **all 10 OWASP LLM Top 
 - **Overconfident Falsehood**: Detect asserted-as-fact hallucinations
 - **Honesty Evaluator**: Scored for fabricated certainty, not keyword matches
 
-**Total Coverage**: **247 probes** (at `Comprehensive`) across **13 attack types** covering **all 10 OWASP categories** (LLM01–LLM10) and **8 MITRE ATLAS** techniques
+**Total Coverage**: **255 probes** (at `Comprehensive`) across **13 attack types** covering **all 10 OWASP categories** (LLM01–LLM10) and **8 MITRE ATLAS** techniques
 
 ## Intensity Levels
 

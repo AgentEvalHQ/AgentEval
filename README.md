@@ -254,7 +254,7 @@ if (faithfulness.Score < 70)
 
 ### Red Team Security Evaluation: Find Vulnerabilities Before Production
 
-AgentEval includes comprehensive red team security evaluation with **247 probes across 13 attack types** (Comprehensive intensity), covering **all 10 OWASP LLM Top 10 2025** categories and **8 MITRE ATLAS** techniques:
+AgentEval includes comprehensive red team security evaluation with **255 probes across 13 attack types** (Comprehensive intensity), covering **all 10 OWASP LLM Top 10 2025** categories and **8 MITRE ATLAS** techniques:
 
 ```csharp
 // Sample20: Basic RedTeam evaluation
@@ -398,7 +398,7 @@ await result.ExportHtmlReportAsync("memory-report.html");
 | "Is my RAG hallucinating?" | **Faithfulness metrics** - grounding verification |
 | "What's the latency/cost?" | **Performance metrics** - TTFT, tokens, estimated cost |
 | "How do I debug failures?" | **Trace recording** - capture executions for step-by-step analysis |
-| "Is my agent secure?" | **Red Team evaluation** - 247 probes, full OWASP LLM Top 10 2025 coverage |
+| "Is my agent secure?" | **Red Team evaluation** - 255 probes, full OWASP LLM Top 10 2025 coverage |
 | "Is content safe and unbiased?" | **ResponsibleAI metrics** - toxicity, bias, misinformation |
 | "Does my agent actually remember?" | **Memory evaluation** - retention, reach-back, temporal, LongMemEval (ICLR 2025) |
 
@@ -437,7 +437,7 @@ await result.ExportHtmlReportAsync("memory-report.html");
 - Performance assertions - latency, TTFT, tokens, cost
 
 ### Evaluation Coverage
-- Red Team security - 247 probes, full OWASP LLM Top 10 2025, MITRE ATLAS coverage
+- Red Team security - 255 probes, full OWASP LLM Top 10 2025, MITRE ATLAS coverage
 - Responsible AI - toxicity, bias, misinformation detection
 - **Memory evaluation** - retention, reach-back, temporal, cross-session, HTML pentagon reports, LongMemEval (ICLR 2025)
 - Multi-turn conversations - full conversation flow evaluation

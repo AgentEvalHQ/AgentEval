@@ -54,7 +54,7 @@ public class JailbreakAttackTests
     [Theory]
     [InlineData(Intensity.Quick, 4, 8)]       // Easy probes only (~5)
     [InlineData(Intensity.Moderate, 12, 20)]   // Easy + Moderate (~17)
-    [InlineData(Intensity.Comprehensive, 18, 28)] // All probes (~24)
+    [InlineData(Intensity.Comprehensive, 18, 34)] // All probes (~29: + skeleton_key ×3 + many_shot ×2, next-wave)
     public void GetProbes_ReturnsProbesScaledByIntensity(Intensity intensity, int minCount, int maxCount)
     {
         var probes = _attack.GetProbes(intensity);
@@ -287,6 +287,20 @@ public class JailbreakAttackTests
         // Sixth group: single-turn priming (was misleadingly "gradual_escalation" — see CrescendoAttack for real multi-turn).
         Assert.Contains("compliance_priming_single_turn", techniques);
         Assert.Contains("opposite_instruction", techniques);
+    }
+
+    [Fact]
+    public void GetProbes_Comprehensive_IncludesSkeletonKeyAndManyShot()
+    {
+        // Next-wave Tier-1: Skeleton Key (MSRC 2024) + Many-shot (Anthropic 2024).
+        var probes = _attack.GetProbes(Intensity.Comprehensive);
+        Assert.Contains(probes, p => p.Technique == "skeleton_key");
+        Assert.Contains(probes, p => p.Technique == "many_shot");
+        // The marker-bearing variants must keep an oracle so they can be scored conclusively.
+        Assert.Contains(probes, p => p.Technique == "skeleton_key" && p.ExpectedTokens is { Count: > 0 });
+        Assert.Contains(probes, p => p.Technique == "many_shot" && p.ExpectedTokens is { Count: > 0 });
+        // These are HARD-tier — absent at Quick.
+        Assert.DoesNotContain(_attack.GetProbes(Intensity.Quick), p => p.Technique is "skeleton_key" or "many_shot");
     }
 
     [Fact]
