@@ -283,6 +283,34 @@ benchMitreCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =>
 });
 benchCmd.Add(benchMitreCmd);
 
+// bench nist — NIST AI RMF (AI 100-1) red-team evidence. Presets: rmf-baseline | rmf-smoke | rmf-audit-grade.
+var benchNistPresetOpt = new Option<string?>("--preset") { Description = PresetsHelpFromRegistry("nist") + Environment.NewLine + "Default: rmf-baseline. rmf-smoke uses 3 attacks (PromptInjection + Jailbreak + PIILeakage); rmf-audit-grade runs at Comprehensive intensity. Scores only MEASURE security/privacy/validity sub-actions; GOVERN/MAP/MANAGE are Not Applicable." };
+var benchNistSubjectOpt = new Option<string?>("--subject") { Description = "Subject name (agent or workflow under evaluation). REQUIRED." };
+var benchNistRootOpt = new Option<string?>("--root") { Description = "Workspace root path (default: auto-detected)" };
+var benchNistInputOpt = new Option<string?>("--input") { Description = "Provenance text for the run (the attack pipeline generates its own probes; --input is recorded for traceability, not consumed by attacks)." };
+var benchNistAzureFromEnvOpt = new Option<bool>("--azure-from-env") { Description = "Build an Azure OpenAI chat agent from AZURE_OPENAI_* env vars instead of scanning the built-in stub. Requires AZURE_OPENAI_ENDPOINT + AZURE_OPENAI_API_KEY + AZURE_OPENAI_DEPLOYMENT." };
+var benchNistCmd = new Command("nist", "Run the NIST AI RMF (AI 100-1) red-team benchmark");
+benchNistCmd.Add(benchNistPresetOpt);
+benchNistCmd.Add(benchNistSubjectOpt);
+benchNistCmd.Add(benchNistRootOpt);
+benchNistCmd.Add(benchNistInputOpt);
+benchNistCmd.Add(benchNistAzureFromEnvOpt);
+benchNistCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =>
+{
+    var preset = parseResult.GetValue(benchNistPresetOpt) ?? "rmf-baseline";
+    var subject = parseResult.GetValue(benchNistSubjectOpt);
+    if (string.IsNullOrWhiteSpace(subject))
+    {
+        Console.Error.WriteLine("Error: --subject is required.");
+        return 1;
+    }
+    var root = parseResult.GetValue(benchNistRootOpt);
+    var input = parseResult.GetValue(benchNistInputOpt);
+    var azureFromEnv = parseResult.GetValue(benchNistAzureFromEnvOpt);
+    return await BenchNistCommand.RunAsync(preset, subject, root, input, azureFromEnv, ct);
+});
+benchCmd.Add(benchNistCmd);
+
 // bench perf — Phase 8 (v0.10.0-beta): Performance benchmark CLI surface (previously CLI-less).
 // Sub-commands resolve the "perf" family from BenchmarkFamilyRegistry and dispatch to its
 // Convention-2 EvaluateAsync adapter.
