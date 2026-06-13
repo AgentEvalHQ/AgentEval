@@ -27,14 +27,18 @@ public sealed class JsonProbeDatasetImporter : IProbeDatasetImporter
     public const string LicenseKey = "dataset.license";
 
     private readonly string _promptField;
+    private readonly string? _idField;
 
     /// <summary>Creates a JSON importer. <paramref name="promptField"/> is the object key holding the prompt text —
     /// the default <c>"prompt"</c> uses the native AgentEval seed schema; pass a custom key (e.g.
-    /// <c>"test_case_prompt"</c> for CyberSecEval) to import a dataset whose prompt lives under a different key.</summary>
-    public JsonProbeDatasetImporter(string promptField = "prompt")
+    /// <c>"test_case_prompt"</c> for CyberSecEval) to import a dataset whose prompt lives under a different key.
+    /// <paramref name="idField"/> (custom-field path only) optionally names an upstream id key (e.g.
+    /// <c>"prompt_id"</c>); when set and present it is namespaced as <c>{dataset}-{id}</c>, else the array index is used.</summary>
+    public JsonProbeDatasetImporter(string promptField = "prompt", string? idField = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(promptField);
         _promptField = promptField;
+        _idField = idField;
     }
 
     /// <inheritdoc />
@@ -110,23 +114,34 @@ public sealed class JsonProbeDatasetImporter : IProbeDatasetImporter
         if (root is not JsonArray array)
             throw new FormatException($"Dataset '{datasetName}' must be a JSON array of objects.");
 
-        var meta = new Dictionary<string, object>
-        {
-            [DatasetKey] = datasetName,
-            [LicenseKey] = "unspecified",
-        };
-
         var probes = new List<AttackProbe>(array.Count);
         for (var i = 0; i < array.Count; i++)
         {
+            var obj = array[i];
             // Read the configured field only when it's a JSON string; a missing/null/non-string field is skipped
             // (never throws mid-array — one odd record must not abort importing a large dataset).
-            var node = array[i]?[_promptField];
+            var node = obj?[_promptField];
             var prompt = node?.GetValueKind() == JsonValueKind.String ? node.GetValue<string>() : null;
             if (string.IsNullOrWhiteSpace(prompt)) continue;       // object missing/empty/non-string field — skip
+
+            // L12: honor an optional upstream id field (string or number), namespaced like the CSV importer; else index.
+            var idNode = _idField is null ? null : obj?[_idField];
+            var rawId = idNode is not null && idNode.GetValueKind() is JsonValueKind.String or JsonValueKind.Number
+                ? idNode.ToString()
+                : null;
+            var id = string.IsNullOrWhiteSpace(rawId) ? $"{datasetName}-{i:D4}" : $"{datasetName}-{rawId}";
+
+            // L11: build per-probe metadata INSIDE the loop so the dictionary is not aliased across every probe
+            // (matches the native-schema path above; a future per-probe stamp would otherwise mutate all of them).
+            var meta = new Dictionary<string, object>
+            {
+                [DatasetKey] = datasetName,
+                [LicenseKey] = "unspecified",
+            };
+
             probes.Add(new AttackProbe
             {
-                Id = $"{datasetName}-{i:D4}",
+                Id = id,
                 Prompt = prompt,
                 Difficulty = Difficulty.Hard,
                 AttackName = datasetName,

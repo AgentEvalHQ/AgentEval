@@ -39,7 +39,7 @@ public class RedTeamCommandTests
     }
 
     [Fact]
-    public void Create_Has33Options()
+    public void Create_Has35Options()
     {
         // 16 base + Wave E (save-baseline, baseline, fail-on) = 19
         // + Wave C′ (attacker, attacker-model) = 21
@@ -51,8 +51,9 @@ public class RedTeamCommandTests
         // + --package-registry (LLM03 live registry) = 30
         // + --calibration (garak-inspired relative z-score scoring) = 31
         // + benchmark packs (--pack, --accept-license) = 33
+        // + import dispatch fields (import-prompt-field, import-id-column) = 35 (M10)
         var command = RedTeamCommand.Create();
-        Assert.Equal(33, command.Options.Count);
+        Assert.Equal(35, command.Options.Count);
     }
 
     [Theory]
@@ -82,6 +83,8 @@ public class RedTeamCommandTests
     [InlineData("sut-tier")]        // real-surface harness
     [InlineData("system-prompt-canary")] // real-surface harness
     [InlineData("import-probes")]   // dataset import (Wave-F seam)
+    [InlineData("import-prompt-field")] // CSV/JSON prompt-field dispatch (M10)
+    [InlineData("import-id-column")]    // optional upstream id (M10)
     [InlineData("explain")]         // --explain LLM rationale
     [InlineData("package-registry")] // LLM03 live registry oracle
     [InlineData("calibration")]     // garak-inspired relative z-score scoring
@@ -93,6 +96,14 @@ public class RedTeamCommandTests
         Assert.Contains(command.Options,
             o => o.Name.Contains(optionName, StringComparison.OrdinalIgnoreCase));
     }
+
+    [Theory] // M10: --import-probes dispatches the importer by file extension (mirrors PackDownloader.ImporterFor).
+    [InlineData(".csv", "csv")]
+    [InlineData(".CSV", "csv")]
+    [InlineData(".json", "json")]
+    [InlineData(".txt", "json")]   // unknown extension → JSON default
+    public void SelectImporter_DispatchesByExtension(string extension, string expectedFormat)
+        => Assert.Equal(expectedFormat, RedTeamCommand.SelectImporter(extension, null, null).Format);
 
     // ═══════════════════════════════════════════════════════════════════════════
     // VALIDATION

@@ -61,7 +61,11 @@ internal static class RedTeamCommand
         var attacksOpt = new Option<string?>("--attacks")
             { Description = "Comma-separated attack types (e.g., PromptInjection,Jailbreak). Default: all. Opt-in multi-turn: Crescendo, PAIR, TAP (PAIR/TAP require --attacker), ToolEscalation (best at --sut-tier instrumented)." };
         var importProbesOpt = new Option<FileInfo?>("--import-probes")
-            { Description = "Import a JSON seed-prompt dataset (HarmBench/JailbreakBench/etc.) and run it alongside the built-in attacks. Probes without an expected-token oracle are Inconclusive unless --judge is set." };
+            { Description = "Import a JSON or CSV seed-prompt dataset (HarmBench/JailbreakBench/etc.; dispatched by .json/.csv extension) and run it alongside the built-in attacks. Probes without an expected-token oracle are Inconclusive unless --judge is set." };
+        var importPromptFieldOpt = new Option<string?>("--import-prompt-field")
+            { Description = "Column/field holding the prompt in --import-probes (default: 'Behavior' for .csv, 'prompt' for .json)." };
+        var importIdColumnOpt = new Option<string?>("--import-id-column")
+            { Description = "Optional id column/field for --import-probes (falls back to row/array index)." };
         var packageRegistryOpt = new Option<string>("--package-registry")
             { DefaultValueFactory = _ => "none", Description = "SupplyChain (LLM03) package check: none (planted-fake proxy, default) | live (query PyPI/npm/NuGet to also flag model-invented hallucinated packages)." };
 
@@ -137,6 +141,8 @@ internal static class RedTeamCommand
         command.Options.Add(systemPromptCanaryOpt);
         command.Options.Add(attacksOpt);
         command.Options.Add(importProbesOpt);
+        command.Options.Add(importPromptFieldOpt);
+        command.Options.Add(importIdColumnOpt);
         command.Options.Add(packageRegistryOpt);
         command.Options.Add(packOpt);
         command.Options.Add(acceptLicenseOpt);
@@ -175,6 +181,8 @@ internal static class RedTeamCommand
                 SystemPromptCanary = parseResult.GetValue(systemPromptCanaryOpt),
                 Attacks = parseResult.GetValue(attacksOpt),
                 ImportProbes = parseResult.GetValue(importProbesOpt),
+                ImportPromptField = parseResult.GetValue(importPromptFieldOpt),
+                ImportIdColumn = parseResult.GetValue(importIdColumnOpt),
                 PackageRegistry = parseResult.GetValue(packageRegistryOpt)!,
                 Pack = parseResult.GetValue(packOpt),
                 AcceptLicense = parseResult.GetValue(acceptLicenseOpt),
@@ -320,7 +328,8 @@ internal static class RedTeamCommand
                 throw new InvalidOperationException($"Import dataset not found: {opts.ImportProbes.FullName}");
             var datasetName = Path.GetFileNameWithoutExtension(opts.ImportProbes.Name);
             var content = await File.ReadAllTextAsync(opts.ImportProbes.FullName, ct);
-            var imported = new JsonProbeDatasetImporter().Import(content, datasetName);   // throws FormatException on bad JSON
+            var importer = SelectImporter(opts.ImportProbes.Extension, opts.ImportPromptField, opts.ImportIdColumn);
+            var imported = importer.Import(content, datasetName);   // throws FormatException on bad input
             var importedAttack = new ImportedProbeAttack(datasetName, imported);
             attacks = (attacks ?? Attack.All).Append(importedAttack).ToList();
             if (!opts.Quiet)
@@ -560,6 +569,14 @@ internal static class RedTeamCommand
     /// is RELATIVE to the stated cohort, not an absolute pass/fail; attacks that couldn't be calibrated are listed
     /// with their reason so a partial calibration is never read as a full one.
     /// </summary>
+    /// <summary>Selects the dataset importer for <c>--import-probes</c> by file extension: <c>.csv</c> → CSV
+    /// (default prompt column "Behavior"), anything else → JSON (default prompt field "prompt"). Mirrors
+    /// <c>PackDownloader.ImporterFor</c> so the CSV importer is reachable from the CLI, not just from <c>--pack</c>.</summary>
+    internal static IProbeDatasetImporter SelectImporter(string extension, string? promptField, string? idColumn)
+        => extension.Equals(".csv", StringComparison.OrdinalIgnoreCase)
+            ? new CsvProbeDatasetImporter(promptField ?? "Behavior", idColumn)
+            : new JsonProbeDatasetImporter(promptField ?? "prompt", idColumn);
+
     private static void PrintCalibration(CalibrationReport c)
     {
         Console.Error.WriteLine();
@@ -693,6 +710,8 @@ internal sealed class RedTeamOptions
     public string? SystemPromptCanary { get; init; }
     public string? Attacks { get; init; }
     public FileInfo? ImportProbes { get; init; }
+    public string? ImportPromptField { get; init; }
+    public string? ImportIdColumn { get; init; }
     public string PackageRegistry { get; init; } = "none";
     public string? Pack { get; init; }
     public bool AcceptLicense { get; init; }

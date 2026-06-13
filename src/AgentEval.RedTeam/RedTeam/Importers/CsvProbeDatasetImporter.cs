@@ -50,12 +50,6 @@ public sealed class CsvProbeDatasetImporter : IProbeDatasetImporter
                 $"Dataset '{datasetName}' CSV has no '{_promptColumn}' column (header: {string.Join(", ", header)}).");
         var idIdx = _idColumn is null ? -1 : IndexOf(header, _idColumn);
 
-        var meta = new Dictionary<string, object>
-        {
-            [JsonProbeDatasetImporter.DatasetKey] = datasetName,
-            [JsonProbeDatasetImporter.LicenseKey] = "unspecified",
-        };
-
         var probes = new List<AttackProbe>(rows.Count - 1);
         for (var i = 1; i < rows.Count; i++)
         {
@@ -67,6 +61,13 @@ public sealed class CsvProbeDatasetImporter : IProbeDatasetImporter
             var id = idIdx >= 0 && idIdx < row.Length && !string.IsNullOrWhiteSpace(row[idIdx])
                 ? $"{datasetName}-{row[idIdx]}"
                 : $"{datasetName}-{i:D4}";
+
+            // L11: build per-probe metadata INSIDE the loop so the dictionary is not aliased across every probe.
+            var meta = new Dictionary<string, object>
+            {
+                [JsonProbeDatasetImporter.DatasetKey] = datasetName,
+                [JsonProbeDatasetImporter.LicenseKey] = "unspecified",
+            };
 
             probes.Add(new AttackProbe
             {

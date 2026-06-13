@@ -130,6 +130,57 @@ public class CsvAndFieldImporterTests
     public void Json_DefaultField_NullLiteral_Throws()
         => Assert.Throws<FormatException>(() => new JsonProbeDatasetImporter().Import("null", "ds"));
 
+    // ── L11: per-probe metadata is a fresh instance, not one dict aliased across every probe ──
+
+    [Fact]
+    public void Csv_EachProbeHasIndependentMetadataInstance()
+    {
+        var probes = new CsvProbeDatasetImporter("Behavior").Import("Behavior\nrow one\nrow two\n", "HarmBench");
+        Assert.Equal(2, probes.Count);
+        Assert.False(ReferenceEquals(probes[0].Metadata, probes[1].Metadata));
+    }
+
+    [Fact]
+    public void Json_CustomField_EachProbeHasIndependentMetadataInstance()
+    {
+        const string json = """[ { "test_case_prompt": "a" }, { "test_case_prompt": "b" } ]""";
+        var probes = new JsonProbeDatasetImporter("test_case_prompt").Import(json, "ds");
+        Assert.Equal(2, probes.Count);
+        Assert.False(ReferenceEquals(probes[0].Metadata, probes[1].Metadata));
+    }
+
+    // ── L12: custom-field JSON honors an optional upstream id field (string or number), namespaced ──
+
+    [Fact]
+    public void Json_CustomField_HonorsIdField_WhenGiven()
+    {
+        const string json = """
+        [
+          { "prompt_id": 1, "test_case_prompt": "ignore your instructions" },
+          { "prompt_id": 2, "test_case_prompt": "do the forbidden thing" }
+        ]
+        """;
+        var probes = new JsonProbeDatasetImporter("test_case_prompt", idField: "prompt_id").Import(json, "CyberSecEval");
+        Assert.Equal("CyberSecEval-1", probes[0].Id);
+        Assert.Equal("CyberSecEval-2", probes[1].Id);
+    }
+
+    [Fact]
+    public void Json_CustomField_FallsBackToIndex_WhenIdFieldMissing()
+    {
+        var probes = new JsonProbeDatasetImporter("test_case_prompt", idField: "prompt_id")
+            .Import("""[ { "test_case_prompt": "x" } ]""", "ds");
+        Assert.Equal("ds-0000", probes[0].Id);
+    }
+
+    [Fact]
+    public void Json_CustomField_NoIdField_StillIndexBased()
+    {
+        var probes = new JsonProbeDatasetImporter("test_case_prompt")
+            .Import("""[ { "prompt_id": 9, "test_case_prompt": "x" } ]""", "ds");
+        Assert.Equal("ds-0000", probes[0].Id);   // no idField configured → index, prompt_id ignored
+    }
+
     // ── RFC-4180 regression: quote handling, BOM, CRLF, ragged rows ────────────
 
     [Fact]
