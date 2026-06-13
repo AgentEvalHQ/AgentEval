@@ -14,6 +14,7 @@ using AgentEval.Core;
 using AgentEval.RedTeam;
 using AgentEval.RedTeam.Attacks;
 using AgentEval.RedTeam.Baseline;
+using AgentEval.RedTeam.Calibration;
 using AgentEval.RedTeam.Evaluators;
 using AgentEval.RedTeam.Importers;
 using AgentEval.RedTeam.Reporting;
@@ -108,6 +109,10 @@ internal static class RedTeamCommand
         var failOnOpt = new Option<string>("--fail-on")
             { DefaultValueFactory = _ => "vuln", Description = "Exit-code gate: vuln (any vulnerability) | regression (new vs --baseline) | never." };
 
+        // Calibration (garak-inspired relative scoring): standardize per-attack scores against a user-supplied cohort.
+        var calibrationOpt = new Option<FileInfo?>("--calibration")
+            { Description = "Calibrate the scan against a reference cohort (JSON: per-attack mean/stddev). Prints a z-score per attack — flags ones unusually vulnerable (≤−2σ) vs the cohort. The cohort is yours (no built-in)." };
+
         // Verbosity
         var verboseFlag = new Option<bool>("--verbose") { Description = "Show detailed progress" };
         var quietFlag = new Option<bool>("--quiet") { Description = "Suppress all output except the export" };
@@ -141,6 +146,7 @@ internal static class RedTeamCommand
         command.Options.Add(baselineNoteOpt);
         command.Options.Add(baselineOpt);
         command.Options.Add(failOnOpt);
+        command.Options.Add(calibrationOpt);
         command.Options.Add(verboseFlag);
         command.Options.Add(explainFlag);
         command.Options.Add(quietFlag);
@@ -176,6 +182,7 @@ internal static class RedTeamCommand
                 BaselineNote = parseResult.GetValue(baselineNoteOpt),
                 Baseline = parseResult.GetValue(baselineOpt),
                 FailOn = parseResult.GetValue(failOnOpt)!,
+                Calibration = parseResult.GetValue(calibrationOpt),
                 Verbose = parseResult.GetValue(verboseFlag),
                 Explain = parseResult.GetValue(explainFlag),
                 Quiet = parseResult.GetValue(quietFlag),
@@ -225,6 +232,10 @@ internal static class RedTeamCommand
         // Fail fast on a missing baseline BEFORE running an expensive scan, rather than scanning then erroring.
         if (opts.Baseline is not null && !opts.Baseline.Exists)
             throw new InvalidOperationException($"Baseline file not found: {opts.Baseline.FullName}");
+
+        // Likewise for the calibration cohort — fail before the scan, not after.
+        if (opts.Calibration is not null && !opts.Calibration.Exists)
+            throw new InvalidOperationException($"Calibration profile not found: {opts.Calibration.FullName}");
 
         // Resolved identifier: deployment name for Azure, model name for OpenAI-compatible
         var resolvedName = opts.Azure ? opts.DeploymentName! : opts.Model!;
@@ -413,6 +424,16 @@ internal static class RedTeamCommand
                 Console.Error.WriteLine($"  Note: {result.InconclusiveProbes}/{result.TotalProbes} probes were inconclusive — that lowers coverage, not the pass rate.");
         }
 
+        // 8b. Calibration (garak-inspired relative scoring): standardize per-attack scores against a user-supplied
+        // cohort and report a z-score. Informational only — it never changes the verdict or exit code (a model can be
+        // "unusually vulnerable" relative to peers yet still pass absolutely, and vice-versa).
+        if (opts.Calibration is not null && !opts.Quiet)
+        {
+            var profile = await CalibrationProfile.LoadAsync(opts.Calibration.FullName, ct);
+            var calibration = Calibrator.Calibrate(result, profile);
+            PrintCalibration(calibration);
+        }
+
         // 9. Baseline capture (W-E1) — write a snapshot the next run can diff against.
         if (opts.SaveBaseline is not null)
         {
@@ -483,6 +504,37 @@ internal static class RedTeamCommand
             Console.Error.WriteLine($"    + NEW [{v.Severity}] {v.AttackName} / {v.ProbeId}: {v.Reason}");
         foreach (var e in c.FidelityEscalations)
             Console.Error.WriteLine($"    ↑ EVIDENCE STRENGTHENED {e.AttackName} / {e.ProbeId}: {e.From} → {e.To} (same vuln, stronger proof).");
+    }
+
+    /// <summary>
+    /// Renders a calibration report (per-attack z-scores vs the reference cohort) to stderr. Honest framing: a z-score
+    /// is RELATIVE to the stated cohort, not an absolute pass/fail; attacks that couldn't be calibrated are listed
+    /// with their reason so a partial calibration is never read as a full one.
+    /// </summary>
+    private static void PrintCalibration(CalibrationReport c)
+    {
+        Console.Error.WriteLine();
+        Console.Error.WriteLine($"  === Calibration (relative to cohort) ===");
+        Console.Error.WriteLine($"  Reference: {c.Source} (n={c.SampleSize}); flagged at ±{c.Threshold:F1}σ. z-scores are RELATIVE to this cohort, not absolute.");
+        foreach (var e in c.Entries.OrderBy(e => e.ZScore ?? double.MaxValue))
+        {
+            var z = e.ZScore is { } zv ? $"z={zv:+0.00;-0.00;0.00}" : "z=undefined";
+            var marker = e.Band switch
+            {
+                CalibrationBand.UnusuallyVulnerable => "[!]",
+                CalibrationBand.UnusuallyRobust => "[+]",
+                _ => "   ",
+            };
+            Console.Error.WriteLine($"  {marker} {e.AttackName}: {z} — {e.Interpretation}");
+        }
+        if (c.Entries.Count == 0)
+            Console.Error.WriteLine("  (no attacks could be calibrated — none had both a conclusive score and a matching cohort entry)");
+        if (c.Uncalibrated.Count > 0)
+        {
+            Console.Error.WriteLine($"  Not calibrated ({c.Uncalibrated.Count}):");
+            foreach (var u in c.Uncalibrated)
+                Console.Error.WriteLine($"    - {u.AttackName}: {u.Reason}");
+        }
     }
 
     /// <summary>
@@ -607,6 +659,7 @@ internal sealed class RedTeamOptions
     public string? BaselineNote { get; init; }
     public FileInfo? Baseline { get; init; }
     public string FailOn { get; init; } = "vuln";
+    public FileInfo? Calibration { get; init; }
     public bool Verbose { get; init; }
     public bool Explain { get; init; }
     public bool Quiet { get; init; }

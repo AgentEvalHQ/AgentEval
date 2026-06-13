@@ -26,8 +26,8 @@ AgentEval RedTeam is built on two foundational cybersecurity taxonomies that pro
 
 1. **Original Authorship**: All 258 attack probes (13 attack types) are **originally written** for AgentEval
 2. **Taxonomy Mapping**: Every attack maps to OWASP ID + MITRE ATLAS techniques for compliance
-3. **Inspiration Sources**: General LLM security research, public jailbreak patterns (DAN, STAN)
-4. **Not Copied From**: We do NOT copy prompts from garak, PyRIT, or specific papers
+3. **Inspiration Sources**: General LLM security research, public jailbreak patterns (DAN, STAN); the **calibration / relative-scoring mechanism is inspired by [NVIDIA garak](https://github.com/NVIDIA/garak) (Apache-2.0)** — see [Relative scoring / calibration](#relative-scoring--calibration---calibration)
+4. **Not Copied From**: We do NOT copy *prompts* or *code* from garak, PyRIT, or specific papers — concepts we adopt (e.g. garak's z-score calibration) are re-implemented natively and credited
 5. **Generate Reports**: Export findings mapped to industry frameworks for SOC/compliance teams
 
 ## Quick Start
@@ -878,6 +878,7 @@ The low-level scanner. **Everything the library can do is reachable from the CLI
 | **Attacker-LLM (multi-turn)** | `--attacker <url>`, `--attacker-model`, `--attacker-api-key`, `--judge <url>`, `--judge-model`, `--judge-api-key` |
 | **Output** | `--format json\|sarif\|markdown\|md\|junit\|nist\|nist-md`, `-o/--output` |
 | **CI / baseline gate** | `--save-baseline`, `--baseline`, `--fail-on vuln\|regression\|never`, `--baseline-version`, `--baseline-note` |
+| **Calibration** | `--calibration <cohort.json>` (per-attack z-score vs a *your-own* reference cohort — flags the model where it's unusually vulnerable relative to peers) |
 | **Verbosity** | `--verbose`, `--quiet`, `--explain` (attach an LLM rationale to Succeeded/Inconclusive findings — narrates the verdict + evidence fidelity; requires `--judge`) |
 
 > The OWASP and MITRE ATLAS benchmarks also have curated preset wrappers: `agenteval bench owasp` and `agenteval bench mitre`. NIST AI RMF has no preset family — it surfaces as `--format nist` (below).
@@ -985,6 +986,44 @@ agenteval redteam --endpoint $URL --model $MODEL \
 ```
 
 `--format` accepts `json | sarif | markdown | md | junit | nist | nist-md`. The baseline diff additionally reports a **conclusive-only score delta** and flags **evidence-fidelity escalations** (a persistent vuln that went Verbal→Behavioral), not just new/resolved probe IDs.
+
+### Relative scoring / calibration (`--calibration`)
+
+A baseline answers *"is this model worse than its own past self?"*. **Calibration** answers a different question: *"is this model unusually vulnerable **relative to its peers**?"* It standardizes each attack's conclusive-resistance score against a **reference cohort** and reports a **z-score** per attack — e.g. `z = -2.3` means this model resisted PromptInjection 2.3 standard deviations *worse* than the cohort.
+
+> **Credit — inspired by garak.** This feature is a native re-implementation of the calibration / relative-scoring idea from [**NVIDIA garak**](https://github.com/NVIDIA/garak), the LLM vulnerability scanner (**Apache-2.0**). garak's `--calibration` popularized scoring a model *relative to a reference distribution* rather than only absolutely; we found the idea genuinely useful and built our own .NET implementation of the concept. We re-implement the mechanism — we do **not** copy garak's code or ship its data.
+
+```bash
+# Compare the scan against your own measured cohort:
+agenteval redteam --endpoint $URL --model $MODEL --intensity moderate \
+  --calibration cohort.json
+```
+
+The cohort file is **yours** — we ship **no built-in cohort** (a fabricated one would make every z-score a lie). Format: per-attack `mean` + `stdDev` of the conclusive-resistance score (0–100), keyed by attack name, with provenance:
+
+```json
+{
+  "source": "internal 8-model fleet, 2026-Q2",
+  "sampleSize": 8,
+  "attacks": {
+    "PromptInjection": { "mean": 82.4, "stdDev": 9.1 },
+    "Jailbreak":       { "mean": 71.0, "stdDev": 12.3 }
+  }
+}
+```
+
+Output (stderr, suppressed by `--quiet`):
+
+```
+  === Calibration (relative to cohort) ===
+  Reference: internal 8-model fleet, 2026-Q2 (n=8); flagged at ±2.0σ. z-scores are RELATIVE to this cohort, not absolute.
+  [!] PromptInjection: z=-2.31 — unusually vulnerable: 2.31σ below the reference cohort (score 61.4 vs mean 82.4)
+      Jailbreak: z=+0.12 — within normal range: 0.12σ from the reference cohort mean (score 72.5 vs mean 71.0)
+  Not calibrated (1):
+    - DataPoisoning: no conclusive probes (nothing measured to calibrate)
+```
+
+**Honesty rules:** calibration is **informational** — it never changes the verdict or exit code (a model can be "unusually vulnerable" vs peers yet still pass absolutely). Only **conclusive** probes feed the score; an all-inconclusive attack is listed as *not calibrated* rather than scored 0/100. A zero-σ cohort entry yields an explicit `z=undefined` (no divide-by-zero, no fabricated z). Attacks absent from the profile are surfaced too — a partial calibration is never read as a full one.
 
 ## Best Practices
 

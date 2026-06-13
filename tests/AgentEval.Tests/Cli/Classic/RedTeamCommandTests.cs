@@ -49,8 +49,9 @@ public class RedTeamCommandTests
         // + dataset import (import-probes) = 28
         // + --explain rationale = 29
         // + --package-registry (LLM03 live registry) = 30
+        // + --calibration (garak-inspired relative z-score scoring) = 31
         var command = RedTeamCommand.Create();
-        Assert.Equal(30, command.Options.Count);
+        Assert.Equal(31, command.Options.Count);
     }
 
     [Theory]
@@ -82,6 +83,7 @@ public class RedTeamCommandTests
     [InlineData("import-probes")]   // dataset import (Wave-F seam)
     [InlineData("explain")]         // --explain LLM rationale
     [InlineData("package-registry")] // LLM03 live registry oracle
+    [InlineData("calibration")]     // garak-inspired relative z-score scoring
     public void Create_ContainsExpectedOption(string optionName)
     {
         var command = RedTeamCommand.Create();
