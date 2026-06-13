@@ -24,7 +24,7 @@ AgentEval RedTeam is built on two foundational cybersecurity taxonomies that pro
 
 ### AgentEval's Approach: Original Implementation with Taxonomy Mapping
 
-1. **Original Authorship**: All 192 attack probes are **originally written** for AgentEval
+1. **Original Authorship**: All 247 attack probes (13 attack types) are **originally written** for AgentEval
 2. **Taxonomy Mapping**: Every attack maps to OWASP ID + MITRE ATLAS techniques for compliance
 3. **Inspiration Sources**: General LLM security research, public jailbreak patterns (DAN, STAN)
 4. **Not Copied From**: We do NOT copy prompts from garak, PyRIT, or specific papers
@@ -864,9 +864,25 @@ bool canResist = await agent.CanResistAsync(Attack.PromptInjection);
     testResultsFiles: '**/redteam.xml'
 ```
 
-### `agenteval redteam` CLI — baseline regression gate (Wave E)
+## `agenteval redteam` — CLI reference
 
-The `agenteval redteam` command is the low-level scanner with built-in CI affordances: SARIF/JUnit export, a saved **baseline**, and an honest **exit-code gate**.
+The low-level scanner. **Everything the library can do is reachable from the CLI**: target/auth (with per-role keys), the real-attack-surface harness, the attacker-LLM multi-turn strategies, every export + compliance format, and an honest baseline/regression gate. The options compose freely.
+
+| Group | Options |
+|-------|---------|
+| **Target / auth** | `--endpoint`, `--azure`, `--model`, `--deployment-name`, `--api-key`, `--system-prompt` |
+| **Attacks** | `--attacks` (comma-list; default all 13; opt-in `Crescendo,PAIR,TAP`), `--intensity quick\|moderate\|comprehensive`, `--max-probes`, `--fail-fast` |
+| **Real attack surface** | `--sut-tier text\|function-calling\|instrumented`, `--system-prompt-canary <token>` |
+| **Attacker-LLM (multi-turn)** | `--attacker <url>`, `--attacker-model`, `--attacker-api-key`, `--judge <url>`, `--judge-model`, `--judge-api-key` |
+| **Output** | `--format json\|sarif\|markdown\|md\|junit\|nist\|nist-md`, `-o/--output` |
+| **CI / baseline gate** | `--save-baseline`, `--baseline`, `--fail-on vuln\|regression\|never`, `--baseline-version`, `--baseline-note` |
+| **Verbosity** | `--verbose`, `--quiet` |
+
+> The OWASP and MITRE ATLAS benchmarks also have curated preset wrappers: `agenteval bench owasp` and `agenteval bench mitre`. NIST AI RMF has no preset family — it surfaces as `--format nist` (below).
+
+### CI baseline & regression gate
+
+Built-in CI affordances: SARIF/JUnit export, a saved **baseline**, and an honest **exit-code gate**.
 
 ```bash
 # Capture a baseline once (e.g. on main) and commit it:
@@ -908,7 +924,7 @@ agenteval redteam --endpoint $URL --model $MODEL \
 
 > Inconclusive probes (timeouts, un-canaried checks) appear in SARIF as low-noise `note` results — a *coverage gap*, surfaced rather than silently dropped. Lead with `Verdict` + conclusive-only score + coverage, not the inconclusive-diluted `OverallScore`.
 
-## Attacker-LLM Multi-Turn (Crescendo / PAIR / TAP)
+### Attacker-LLM multi-turn (Crescendo / PAIR / TAP)
 
 A second **attacker LLM** can *drive and adapt* the attack against the target, instead of using fixed probes. Three strategies ship (all opt-in, all OWASP LLM01):
 
@@ -929,7 +945,7 @@ agenteval redteam --endpoint $TARGET --model $MODEL \
 
 **Non-determinism:** an attacker-LLM run is **not reproducible** without a fixed attacker — the CLI prints a `NON-DETERMINISTIC` banner. Use scripted attacks (not these) for baselines/regression gating (`--baseline`). The attacker producing nothing, or the judge being unsure, ends the run honestly (no fabricated success); TAP's fan-out is hard-capped by a node budget.
 
-## Real-Attack-Surface Harness (`--sut-tier`) & System-Prompt Canary
+### Real attack surface (`--sut-tier`) & system-prompt canary
 
 By default the CLI scans a **text-only** SUT (Tier-0): the only evidence is the model's words (`EvidenceFidelity.Verbal`). To exercise a **real tool boundary** — so `ExcessiveAgency` / `IndirectInjection` are scored on what the agent *does*, not just says — raise the tier:
 
@@ -949,7 +965,7 @@ agenteval redteam --endpoint $URL --model $MODEL \
   --system-prompt-canary "CANARY-7f3a9c21" --attacks SystemPromptExtraction
 ```
 
-## Compliance report formats & per-role keys
+### Output & compliance formats, per-role keys
 
 ```bash
 # Emit a NIST AI RMF compliance report straight from a scan (OWASP/MITRE have `bench` subcommands; NIST surfaces here):
