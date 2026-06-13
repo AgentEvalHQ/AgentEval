@@ -155,13 +155,15 @@ These were adversarially confirmed but not yet fixed. Grouped by the cheapest-to
 - ✅ `ComplianceDisclaimer` now serialized on all five report objects' JSON (`Disclaimer` get-only property → `ToJson`).
 - Note: persisting per-probe fidelity into `RedTeamBaseline` (a gateable Behavioral→Verbal regression) remains a backlog enhancement.
 
-### 5e. CLI / DI / pipeline wiring gaps
-- The CLI cannot reach any real-surface capability (no tier/canary-tool wiring, no `--system-prompt-canary`) — every `agenteval redteam` scan is Tier-0 verbal.
-- `AddAgentEvalRedTeam`/`AddAgentEvalAll` never register `IRedTeamRunner`; `TryAddEnumerable` dedupes attacks by *type* (drops `TransformedAttack` wrappers / canaried SPE).
-- `AttackPipeline` cannot set Judge/Attacker/multi-turn options — PAIR/TAP via the pipeline always error.
-- Duplicate `--attacks` names crash the scan (bare dictionary error, exit 3).
-- The Wave D NIST reporter is unreachable from any CLI surface; `RedTeamComparison` score gate diffs the inconclusive-diluted `OverallScore`; the comparer fabricates "Resolved" for attacks simply not run.
-- **Recommendation:** wire tier/canary + `--system-prompt-canary` into the CLI; fix the DI registrations; expand `AttackPipeline`; dedupe `--attacks` with a clear error.
+### 5e. CLI / DI / pipeline wiring gaps — **✅ DI + dedup + comparer FIXED; CLI tier-wiring + pipeline options pending**
+- ✅ `AddAgentEvalRedTeam` now registers `IRedTeamRunner` (`TryAddSingleton`); `AddAgentEvalAll` resolves it.
+- ✅ Attack DI registration is now idempotent by REFERENCE identity (not implementation type), so multiple distinct instances of the same CLR class (TransformedAttack wrappers / canaried SPEs) all register.
+- ✅ Duplicate `--attacks` no longer crash — `RedTeamRunner.ResolveAttacks` `Distinct()`s the instances (the same singleton twice de-dups instead of failing the per-attack `ToDictionary`).
+- ✅ Comparer no longer fabricates "Resolved/Fixed" for not-run attacks (restricted to attacks in BOTH runs) + a `NotReTested` list surfaces the omission in `PrintComparison`.
+- ⏳ Regression gate still diffs `OverallScore` (inconclusive-diluted) rather than a conclusive-only `ConclusiveScoreDelta` — needs a `ConclusiveScore` field on `RedTeamBaseline` (schema add); deferred. **(5e backlog)**
+- ⏳ The CLI cannot reach real-surface capability (no `--canary-tools`/`--system-prompt-canary`) — every `agenteval redteam` scan is Tier-0 verbal. **(5e-iii)**
+- ⏳ `AttackPipeline` cannot set Judge/Attacker/multi-turn options — PAIR/TAP via the pipeline error. **(5e-iii)**
+- Note: the NIST reporter being unreachable from the CLI is part of the CLI-wiring item.
 
 ### 5f. Culture-sensitive parsing / formatting (CI-on-non-English-locale bugs)
 - `LLMJudgeEvaluator` parses CONFIDENCE with culture-sensitive `double.TryParse` ("0.9"→9 on comma-decimal locales); JUnit numeric attributes are culture-sensitive (`time="1,500"` breaks parsers).

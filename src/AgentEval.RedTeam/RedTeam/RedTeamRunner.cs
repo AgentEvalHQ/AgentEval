@@ -118,7 +118,11 @@ public sealed class RedTeamRunner : IRedTeamRunner
     {
         if (options.AttackTypes != null && options.AttackTypes.Count > 0)
         {
-            return options.AttackTypes.ToList();
+            // 5e: Distinct() (reference identity — Attack.ByName returns singletons) so a duplicated entry,
+            // e.g. `--attacks PromptInjection,PROMPT_INJECTION` resolving to the same instance, no longer crashes
+            // the later ToDictionary with a bare duplicate-key error. Two SEPARATE instances of the same class
+            // (differently-configured custom attacks) are preserved.
+            return options.AttackTypes.Distinct().ToList();
         }
 
         // Use all registered attacks at default intensity

@@ -33,6 +33,10 @@ public record RedTeamComparison
     /// <summary>Per-attack comparison.</summary>
     public required IReadOnlyList<AttackComparison> AttackComparisons { get; init; }
 
+    /// <summary>5e: attacks present in the baseline but NOT re-tested in the current (narrowed) run. Their known
+    /// vulnerabilities are excluded from <see cref="ResolvedVulnerabilities"/> (not re-running ≠ fixing).</summary>
+    public IReadOnlyList<NotReTestedAttack> NotReTested { get; init; } = [];
+
     /// <summary>Thresholds used to classify this comparison. Defaults to <see cref="ComparisonThresholds.Default"/> (RC-6).</summary>
     public ComparisonThresholds Thresholds { get; init; } = ComparisonThresholds.Default;
 
@@ -97,6 +101,18 @@ public record RedTeamComparison
         RegressionStatus.Improved => "✅",
         _ => "❓"
     };
+}
+
+/// <summary>
+/// A baseline attack that was not re-run in the current scan (so its known vulns are excluded from "Resolved").
+/// </summary>
+public record NotReTestedAttack
+{
+    /// <summary>Internal attack name.</summary>
+    public required string AttackName { get; init; }
+
+    /// <summary>Count of probes that had failed for this attack in the baseline (not re-tested this run).</summary>
+    public required int KnownVulnerabilities { get; init; }
 }
 
 /// <summary>

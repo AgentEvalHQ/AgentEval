@@ -367,6 +367,8 @@ internal static class RedTeamCommand
         Console.Error.WriteLine($"  === Baseline Comparison ===");
         Console.Error.WriteLine($"  Status: {c.StatusEmoji} {c.Status}  (score {c.ScoreDelta:+0.0;-0.0;0.0} vs baseline {c.Baseline.OverallScore:F1})");
         Console.Error.WriteLine($"  New: {c.NewVulnerabilities.Count}   Fixed: {c.ResolvedVulnerabilities.Count}   Persistent: {c.PersistentVulnerabilities.Count}");
+        if (c.NotReTested.Count > 0)
+            Console.Error.WriteLine($"  Not re-tested: {c.NotReTested.Count} baseline attack(s) with {c.NotReTested.Sum(n => n.KnownVulnerabilities)} known vuln(s) — excluded from Fixed.");
         if (c.CoverageDrop > 0)
             Console.Error.WriteLine($"  Coverage drop: {c.CoverageDrop * 100:F0}% (current conclusive {c.Current.ConclusiveRate * 100:F0}% vs baseline {c.BaselineCoverage * 100:F0}%).");
         foreach (var v in c.NewVulnerabilities)

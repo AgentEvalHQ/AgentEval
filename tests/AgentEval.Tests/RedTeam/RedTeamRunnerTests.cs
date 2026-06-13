@@ -31,6 +31,22 @@ public class RedTeamRunnerTests
     }
 
     [Fact]
+    public async Task ScanAsync_DuplicateAttackInstances_AreDeduped_NoCrash()
+    {
+        // 5e: the same attack instance twice (e.g. CLI `--attacks PromptInjection,PROMPT_INJECTION` resolving to
+        // the same singleton) must dedup, not crash the per-attack ToDictionary with a duplicate-key error.
+        var options = new ScanOptions
+        {
+            Intensity = Intensity.Quick,
+            AttackTypes = [Attack.PromptInjection, Attack.PromptInjection]
+        };
+
+        var result = await new RedTeamRunner().ScanAsync(new FakeResistantAgent(), options);
+
+        Assert.Single(result.AttackResults);
+    }
+
+    [Fact]
     public async Task ScanAsync_WithZeroProgressInterval_DoesNotThrow()
     {
         var options = new ScanOptions

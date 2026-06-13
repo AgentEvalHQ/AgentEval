@@ -36,13 +36,18 @@ public static class RedTeamServiceCollectionExtensions
         // Ensure core services are registered (idempotent via TryAdd*)
         services.AddAgentEval();
 
+        // 5e: register the runner so a configured container can resolve IRedTeamRunner (the umbrella DI never did —
+        // the only registration lived in a parallel extension nothing called). TryAdd is idempotent and respects a
+        // pre-registered custom runner.
+        services.TryAddSingleton<IRedTeamRunner, RedTeamRunner>();
+
         // N-11: register the attack types as IAttackType services. Without this, GetServices<IAttackType>()
-        // resolves EMPTY — a consumer enumerating attack types from the container gets nothing. (The
-        // IAttackTypeRegistry is already pre-seeded with Attack.All in its ctor, so scans themselves were
-        // unaffected; this makes the raw DI enumerable consistent.) TryAddEnumerable keeps registration
-        // idempotent (dedup by implementation type) so calling AddAgentEvalRedTeam twice does not double the roster.
+        // resolves EMPTY. 5e: idempotency is by REFERENCE identity (Attack.All entries are stable singletons, so
+        // repeated calls don't double the roster) — NOT dedup-by-implementation-type, which silently dropped
+        // multiple distinct instances of the same CLR type (TransformedAttack wrappers, differently-canaried SPEs).
         foreach (var attack in attacks ?? Attack.All)
-            services.TryAddEnumerable(ServiceDescriptor.Singleton<IAttackType>(attack));
+            if (!services.Any(d => d.ServiceType == typeof(IAttackType) && ReferenceEquals(d.ImplementationInstance, attack)))
+                services.AddSingleton<IAttackType>(attack);
 
         services.TryAddSingleton<IAttackTypeRegistry>(sp =>
             new AttackTypeRegistry(sp.GetServices<IAttackType>()));

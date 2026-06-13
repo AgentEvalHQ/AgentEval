@@ -561,6 +561,36 @@ public class ServiceCollectionExtensionsTests
     }
 
     [Fact]
+    public void AddAgentEvalRedTeam_RegistersIRedTeamRunner()
+    {
+        // 5e: the umbrella DI now registers IRedTeamRunner (previously only a parallel extension nothing called did).
+        var provider = new ServiceCollection().AddAgentEvalRedTeam().BuildServiceProvider();
+        Assert.NotNull(provider.GetRequiredService<IRedTeamRunner>());
+    }
+
+    [Fact]
+    public void AddAgentEvalAll_ResolvesIRedTeamRunner()
+    {
+        var provider = new ServiceCollection().AddAgentEvalAll().BuildServiceProvider();
+        Assert.NotNull(provider.GetRequiredService<IRedTeamRunner>());
+    }
+
+    [Fact]
+    public void AddAgentEvalRedTeam_TwoInstancesOfSameType_BothRegistered()
+    {
+        // 5e: idempotency is by REFERENCE identity, not implementation TYPE — two distinct instances of the same
+        // CLR class (e.g. TransformedAttack wrappers / canaried SPEs) must both register, not be deduped to one.
+        var a = new FakeAttackType("AttackA", "LLM01");
+        var b = new FakeAttackType("AttackB", "LLM02");
+        var provider = new ServiceCollection().AddAgentEvalRedTeam([a, b]).BuildServiceProvider();
+
+        var registered = provider.GetServices<IAttackType>().ToList();
+        Assert.Equal(2, registered.Count);
+        Assert.Contains(a, registered);
+        Assert.Contains(b, registered);
+    }
+
+    [Fact]
     public void AddAgentEvalDataLoaders_DatasetLoaderFactory_AutoWiresDILoaders()
     {
         // Arrange

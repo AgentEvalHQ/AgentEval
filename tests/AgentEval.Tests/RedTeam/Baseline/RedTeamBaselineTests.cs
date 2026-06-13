@@ -296,6 +296,36 @@ public class RedTeamBaselineComparerTests
         Assert.True(comparison.IsRegression);
     }
 
+    [Fact]
+    public void Compare_NarrowedCurrent_ExcludesNotReRunAttackFromResolved()
+    {
+        // 5e: baseline has known vulns in PromptInjection (10) AND Jailbreak (1). The current run re-runs ONLY
+        // PromptInjection (all resisted). Jailbreak's known vuln must NOT be counted as "Resolved" (it wasn't
+        // tested) and must surface under NotReTested.
+        var baseline = CreateResult(succeededProbes: 11).ToBaseline("v1.0.0"); // PI:10 + JB:1 succeeded
+        var current = new RedTeamResult
+        {
+            AgentName = "TestAgent",
+            Duration = TimeSpan.FromSeconds(1),
+            TotalProbes = 10, ResistedProbes = 10, SucceededProbes = 0, InconclusiveProbes = 0,
+            AttackResults =
+            [
+                new AttackResult
+                {
+                    AttackName = "PromptInjection", AttackDisplayName = "Prompt Injection", OwaspId = "LLM01", Severity = Severity.High,
+                    ResistedCount = 10, SucceededCount = 0,
+                    ProbeResults = Enumerable.Range(1, 10).Select(i => new ProbeResult
+                    { ProbeId = $"PI-{i:D3}", Prompt = "p", Response = "safe", Outcome = EvaluationOutcome.Resisted, Reason = "ok", Severity = Severity.High }).ToList()
+                }
+            ]
+        };
+
+        var comparison = new RedTeamBaselineComparer().Compare(current, baseline, requireMatchingIntensity: false);
+
+        Assert.DoesNotContain("JB-001", comparison.ResolvedVulnerabilities);   // not re-run ≠ fixed
+        Assert.Contains(comparison.NotReTested, n => n.AttackName == "Jailbreak" && n.KnownVulnerabilities == 1);
+    }
+
     // Two attacks, 10 probes each: 7 resisted + 3 inconclusive => coverage 14/20 = 0.70.
     private static RedTeamResult CreateMixedCoverageResult() => new()
     {

@@ -59,7 +59,7 @@ public class RedTeamBaselineComparer
         var currentVulnIds = currentVulns.Select(v => v.Probe.ProbeId).ToHashSet();
         var baselineVulnIds = baseline.KnownVulnerabilities.ToHashSet();
 
-        // Find new vulnerabilities
+        // Find new vulnerabilities (a current vuln not known in the baseline is real regardless of attack set).
         var newVulns = currentVulns
             .Where(v => !baselineVulnIds.Contains(v.Probe.ProbeId))
             .Select(v => new NewVulnerability
@@ -72,14 +72,24 @@ public class RedTeamBaselineComparer
             })
             .ToList();
 
-        // Find resolved vulnerabilities
-        var resolved = baselineVulnIds
-            .Where(id => !currentVulnIds.Contains(id))
-            .ToList();
+        // 5e: Resolved/Persistent are only meaningful for attacks present in BOTH runs. A narrowed --attacks scan
+        // that simply did NOT re-run an attack must not have that attack's known vulns counted as "Resolved/Fixed"
+        // (a fabricated improvement). Build the comparable baseline-vuln set from per-attack FailedProbeIds restricted
+        // to the attack-name intersection (KnownVulnerabilities is flat and not attack-attributed, so it can't be filtered).
+        var currentAttackNames = current.AttackResults.Select(a => a.AttackName).ToHashSet();
+        var comparableBaselineVulnIds = baseline.AttackResults
+            .Where(a => currentAttackNames.Contains(a.AttackName))
+            .SelectMany(a => a.FailedProbeIds)
+            .ToHashSet();
 
-        // Find persistent vulnerabilities
-        var persistent = baselineVulnIds
-            .Where(id => currentVulnIds.Contains(id))
+        var resolved = comparableBaselineVulnIds.Where(id => !currentVulnIds.Contains(id)).ToList();
+        var persistent = comparableBaselineVulnIds.Where(id => currentVulnIds.Contains(id)).ToList();
+
+        // Attacks in the baseline that were NOT re-tested in this (narrowed) run — surfaced rather than silently
+        // dropped, so the user sees that "Fixed" excludes them.
+        var notReTested = baseline.AttackResults
+            .Where(a => !currentAttackNames.Contains(a.AttackName))
+            .Select(a => new NotReTestedAttack { AttackName = a.AttackName, KnownVulnerabilities = a.FailedProbeIds.Count })
             .ToList();
 
         // Compare attacks
@@ -93,7 +103,8 @@ public class RedTeamBaselineComparer
             NewVulnerabilities = newVulns,
             ResolvedVulnerabilities = resolved,
             PersistentVulnerabilities = persistent,
-            AttackComparisons = attackComparisons
+            AttackComparisons = attackComparisons,
+            NotReTested = notReTested,
         };
     }
 
