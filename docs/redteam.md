@@ -877,7 +877,7 @@ The low-level scanner. **Everything the library can do is reachable from the CLI
 | **Attacker-LLM (multi-turn)** | `--attacker <url>`, `--attacker-model`, `--attacker-api-key`, `--judge <url>`, `--judge-model`, `--judge-api-key` |
 | **Output** | `--format json\|sarif\|markdown\|md\|junit\|nist\|nist-md`, `-o/--output` |
 | **CI / baseline gate** | `--save-baseline`, `--baseline`, `--fail-on vuln\|regression\|never`, `--baseline-version`, `--baseline-note` |
-| **Verbosity** | `--verbose`, `--quiet` |
+| **Verbosity** | `--verbose`, `--quiet`, `--explain` (attach an LLM rationale to Succeeded/Inconclusive findings — narrates the verdict + evidence fidelity; requires `--judge`) |
 
 > The OWASP and MITRE ATLAS benchmarks also have curated preset wrappers: `agenteval bench owasp` and `agenteval bench mitre`. NIST AI RMF has no preset family — it surfaces as `--format nist` (below).
 

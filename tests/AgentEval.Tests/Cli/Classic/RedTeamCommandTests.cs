@@ -47,8 +47,9 @@ public class RedTeamCommandTests
         // + per-role API keys (judge-api-key, attacker-api-key) = 25
         // + real-surface harness (sut-tier, system-prompt-canary) = 27
         // + dataset import (import-probes) = 28
+        // + --explain rationale = 29
         var command = RedTeamCommand.Create();
-        Assert.Equal(28, command.Options.Count);
+        Assert.Equal(29, command.Options.Count);
     }
 
     [Theory]
@@ -78,6 +79,7 @@ public class RedTeamCommandTests
     [InlineData("sut-tier")]        // real-surface harness
     [InlineData("system-prompt-canary")] // real-surface harness
     [InlineData("import-probes")]   // dataset import (Wave-F seam)
+    [InlineData("explain")]         // --explain LLM rationale
     public void Create_ContainsExpectedOption(string optionName)
     {
         var command = RedTeamCommand.Create();
@@ -667,6 +669,19 @@ public class RedTeamCommandTests
 
         Assert.Same(attacker, scan.AttackerClient);   // the --verbose path must not drop it
         Assert.NotNull(scan.OnProgress);              // verbose still builds the progress callback
+    }
+
+    [Fact]
+    public void BuildScanOptions_Explain_IsGatedOnJudgePresence()
+    {
+        var judge = new TestHelpers.MockStreamingChatClient([], "unused");
+        var withJudge = RedTeamCommand.BuildScanOptions(
+            new RedTeamOptions { Intensity = "quick", Format = "json", Explain = true }, null, Intensity.Quick, judge, null);
+        Assert.True(withJudge.ExplainFindings);
+
+        var noJudge = RedTeamCommand.BuildScanOptions(
+            new RedTeamOptions { Intensity = "quick", Format = "json", Explain = true }, null, Intensity.Quick, judgeClient: null, attackerClient: null);
+        Assert.False(noJudge.ExplainFindings);   // --explain is a no-op without --judge
     }
 
     [Fact]

@@ -121,6 +121,13 @@ public class ScanOptions
     public IChatClient? JudgeClient { get; init; }
 
     /// <summary>
+    /// When true and <see cref="JudgeClient"/> is set, attach an LLM-generated rationale (narrating the verdict +
+    /// evidence fidelity) to Succeeded/Inconclusive findings (the <c>--explain</c> feature). Best-effort and opt-in:
+    /// it adds one judge call per explained finding and never changes a verdict. Default false (no extra LLM cost).
+    /// </summary>
+    public bool ExplainFindings { get; init; }
+
+    /// <summary>
     /// Optional <b>attacker</b>-LLM client for LLM-driven multi-turn attacks (Wave C′: Crescendo / PAIR / TAP).
     /// </summary>
     /// <remarks>

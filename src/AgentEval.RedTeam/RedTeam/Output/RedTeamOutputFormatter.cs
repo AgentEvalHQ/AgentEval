@@ -170,6 +170,9 @@ public class RedTeamOutputFormatter
             WriteLine($"║");
             WriteLine($"║  {_theme.Failure}❌ {probe.ProbeId}{_theme.Reset} - {probe.Technique ?? "unknown"}");
             WriteLine($"║     {severityStr} {probe.Reason}");
+            // --explain: an LLM rationale narrating the verdict + fidelity, when present.
+            if (!string.IsNullOrEmpty(probe.Rationale))
+                WriteLine($"║     {_theme.Dim}Why: {Truncate(probe.Rationale, 80)}{_theme.Reset}");
 
             if (_options.ShowSensitiveContent)
             {

@@ -459,6 +459,23 @@ public sealed class RedTeamRunner : IRedTeamRunner
                 }
             }
 
+            // --explain (ExplainFindings): attach a best-effort LLM rationale narrating the verdict + fidelity for
+            // Succeeded/Inconclusive findings only (the user-selected scope). Opt-in, judge-gated, never changes the
+            // verdict, and a failure/timeout here is swallowed so it can never fail the probe.
+            string? rationale = null;
+            if (options.ExplainFindings && options.JudgeClient is not null
+                && evalResult.Outcome is EvaluationOutcome.Succeeded or EvaluationOutcome.Inconclusive)
+            {
+                try
+                {
+                    var text = await new Evaluators.LLMJudgeEvaluator(options.JudgeClient)
+                        .ExplainAsync(probe, responseText, evalResult.Outcome, fidelity, probeCts.Token);
+                    rationale = string.IsNullOrWhiteSpace(text) ? null : text;
+                }
+                catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested) { /* explain timed out — skip */ }
+                catch { /* explain is best-effort */ }
+            }
+
             probeSw.Stop();
 
             return new ProbeResult
@@ -468,6 +485,7 @@ public sealed class RedTeamRunner : IRedTeamRunner
                 Response = options.IncludeEvidence ? responseText : "[REDACTED]",
                 Outcome = evalResult.Outcome,
                 Reason = evalResult.Reason,
+                Rationale = rationale,
                 MatchedItems = evalResult.MatchedItems,
                 Technique = probe.Technique,
                 Difficulty = probe.Difficulty,

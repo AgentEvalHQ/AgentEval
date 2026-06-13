@@ -108,6 +108,8 @@ internal static class RedTeamCommand
         // Verbosity
         var verboseFlag = new Option<bool>("--verbose") { Description = "Show detailed progress" };
         var quietFlag = new Option<bool>("--quiet") { Description = "Suppress all output except the export" };
+        var explainFlag = new Option<bool>("--explain")
+            { Description = "Attach an LLM rationale to each Succeeded/Inconclusive finding, narrating the verdict + evidence fidelity. Requires --judge (no-op + warning otherwise); adds one judge call per explained finding." };
 
         command.Options.Add(endpointOpt);
         command.Options.Add(azureFlag);
@@ -136,6 +138,7 @@ internal static class RedTeamCommand
         command.Options.Add(baselineOpt);
         command.Options.Add(failOnOpt);
         command.Options.Add(verboseFlag);
+        command.Options.Add(explainFlag);
         command.Options.Add(quietFlag);
 
         command.SetAction(async (parseResult, ct) =>
@@ -169,6 +172,7 @@ internal static class RedTeamCommand
                 Baseline = parseResult.GetValue(baselineOpt),
                 FailOn = parseResult.GetValue(failOnOpt)!,
                 Verbose = parseResult.GetValue(verboseFlag),
+                Explain = parseResult.GetValue(explainFlag),
                 Quiet = parseResult.GetValue(quietFlag),
             };
 
@@ -302,6 +306,10 @@ internal static class RedTeamCommand
             ? EndpointFactory.CreateOpenAICompatible(
                 opts.JudgeEndpoint, opts.JudgeModel ?? resolvedName, opts.JudgeApiKey ?? opts.ApiKey)
             : null;
+
+        // --explain needs a judge (it's an LLM call). Surface the no-op honestly rather than silently ignoring the flag.
+        if (opts.Explain && judgeClient is null && !opts.Quiet)
+            Console.Error.WriteLine("  Warning: --explain has no effect without --judge <url>; findings will carry no LLM rationale.");
 
         // Wave C′: the attacker LLM drives Crescendo/PAIR/TAP. Distinct from the judge (it generates, the judge scores).
         IChatClient? attackerClient = opts.AttackerEndpoint is not null
@@ -481,6 +489,8 @@ internal static class RedTeamCommand
             MaxProbesPerAttack = opts.MaxProbes,
             JudgeClient = judgeClient, // GAP-19: the runner re-evaluates Inconclusive probes with this judge (capped at IntentToAct)
             AttackerClient = attackerClient, // Wave C′: drives attacker-LLM multi-turn attacks (Crescendo/PAIR/TAP)
+            // --explain: only effective with a judge (the runner gates on JudgeClient too); a no-op flag without one.
+            ExplainFindings = opts.Explain && judgeClient is not null,
             IncludeEvidence = true,
             OnProgress = onProgress,
         };
@@ -576,5 +586,6 @@ internal sealed class RedTeamOptions
     public FileInfo? Baseline { get; init; }
     public string FailOn { get; init; } = "vuln";
     public bool Verbose { get; init; }
+    public bool Explain { get; init; }
     public bool Quiet { get; init; }
 }

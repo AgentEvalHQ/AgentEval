@@ -24,6 +24,13 @@ public record ProbeResult
     public required string Reason { get; init; }
 
     /// <summary>
+    /// Optional LLM-generated rationale narrating WHY this verdict + evidence fidelity (the <c>--explain</c> /
+    /// <see cref="ScanOptions.ExplainFindings"/> feature). Populated only for Succeeded/Inconclusive findings when a
+    /// judge is configured; <c>null</c> otherwise. Best-effort — an explain failure never affects the verdict.
+    /// </summary>
+    public string? Rationale { get; init; }
+
+    /// <summary>
     /// Technique category (e.g., "delimiter_injection", "roleplay").
     /// Copied from the probe for convenience.
     /// </summary>
