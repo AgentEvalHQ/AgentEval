@@ -20,7 +20,7 @@ Test baseline at start: net8.0 4776/0, net10.0 4979/0/1 (clean). After the HIGH 
 | Tier | Count | Status |
 |------|-------|--------|
 | HIGH | 18 findings (15 distinct issues) | **Fixed** — code + regression tests, both TFMs green. 2 external-standard *renames* softened + deferred to SME (see §4). |
-| MEDIUM | 59 | **Substantially fixed** — 5a/5b/5d/5f/5g complete; 5c (TAP) + 5e (DI/dedup/comparer) complete; residual 5e CLI tier-wiring + pipeline Judge/Attacker options deferred to §4/architecture. See §5. |
+| MEDIUM | 59 | **Complete** — 5a/5b/5c/5d/5f/5g done; **5e now FULLY closed** (Section-2 wave 2026-06-13): CLI real-surface harness (`--sut-tier`), `--system-prompt-canary`, NIST `--format` on-ramp, `ConclusiveScoreDelta`, per-probe fidelity, `AttackPipeline` Judge/Attacker/multi-turn builders. See §5. |
 | LOW | 45 | **Complete** — high-value + LOW-2/3/4 batches done (see §6 ✅). LOW-4 closed the last items: deleted the `RedTeamReport` dead duplicate, wired `PackageHallucinationDetector` (opt-in, honesty-preserving), gave `AttackPipeline` Judge/Attacker/multi-turn builders, added per-role API keys, and made multi-turn↔tool-harness compose. No material LOWs remain. |
 
 **Independent verification (2026-06-13):** an adversarial re-verification pass (12 agents, refute-by-default) re-checked each HIGH fix against its original finding + the actual code + the test. Result: **all confirmed properly fixed at high confidence.** Two test-coverage gaps were surfaced and closed: (a) #5/#6 had no test pinning the *persisted* `SaveReportAsync` `OverallStatus == NOT_EVALUATED` — added `OwaspReporterStoreTests.OwaspReporter_SaveReport_AllInconclusive_PersistsNotEvaluated_NotFabricatedPass`; (b) #10 (`--verbose` AttackerClient) is structurally fixed (single `ScanOptions` construction site) but a verbose+attacker guard test would need a runner seam — tracked as a known minor test gap (no code defect).
@@ -155,15 +155,17 @@ These were adversarially confirmed but not yet fixed. Grouped by the cheapest-to
 - ✅ `ComplianceDisclaimer` now serialized on all five report objects' JSON (`Disclaimer` get-only property → `ToJson`).
 - Note: persisting per-probe fidelity into `RedTeamBaseline` (a gateable Behavioral→Verbal regression) remains a backlog enhancement.
 
-### 5e. CLI / DI / pipeline wiring gaps — **✅ DI + dedup + comparer FIXED; CLI tier-wiring + pipeline options pending**
+### 5e. CLI / DI / pipeline wiring gaps — **✅ FULLY CLOSED (Section-2 wave, 2026-06-13)**
 - ✅ `AddAgentEvalRedTeam` now registers `IRedTeamRunner` (`TryAddSingleton`); `AddAgentEvalAll` resolves it.
 - ✅ Attack DI registration is now idempotent by REFERENCE identity (not implementation type), so multiple distinct instances of the same CLR class (TransformedAttack wrappers / canaried SPEs) all register.
 - ✅ Duplicate `--attacks` no longer crash — `RedTeamRunner.ResolveAttacks` `Distinct()`s the instances (the same singleton twice de-dups instead of failing the per-attack `ToDictionary`).
 - ✅ Comparer no longer fabricates "Resolved/Fixed" for not-run attacks (restricted to attacks in BOTH runs) + a `NotReTested` list surfaces the omission in `PrintComparison`.
-- ⏳ Regression gate still diffs `OverallScore` (inconclusive-diluted) rather than a conclusive-only `ConclusiveScoreDelta` — needs a `ConclusiveScore` field on `RedTeamBaseline` (schema add); deferred. **(5e backlog)**
-- ⏳ The CLI cannot reach real-surface capability (no `--canary-tools`/`--system-prompt-canary`) — every `agenteval redteam` scan is Tier-0 verbal. **(5e-iii)**
-- ⏳ `AttackPipeline` cannot set Judge/Attacker/multi-turn options — PAIR/TAP via the pipeline error. **(5e-iii)**
-- Note: the NIST reporter being unreachable from the CLI is part of the CLI-wiring item.
+- ✅ **Conclusive-only regression dimension** — `RedTeamBaseline.ConclusiveScore` persisted (nullable, back-compat) + `RedTeamComparison.ConclusiveScoreDelta`; the gate fires on the worse of overall/conclusive drop and the delta is surfaced in `PrintComparison`. (Same probe set ⇒ it co-fires with the overall trigger; its value is transparency + diffability, documented honestly.)
+- ✅ **Per-probe fidelity in the baseline** — `AttackBaselineResult.FailedProbeFidelities`; the comparer flags `FidelityEscalations` (a persistent vuln whose evidence strengthened Verbal→Behavioral) as at least `Degraded`, surfaced in `PrintComparison`.
+- ✅ **CLI real-surface harness** — `--sut-tier {text|function-calling|instrumented}` constructs `CanaryToolChatClientAgent` (Tier-1) / `InstrumentedCanaryAgent` (Tier-2) so IToolAwareAttacks exercise a real tool boundary; `--system-prompt-canary` embeds a secret into the SUT prompt + instruments SystemPromptExtraction (via `RosterWithCanary` / in-place swap) to prove an exact-token leak.
+- ✅ **`AttackPipeline` Judge/Attacker/multi-turn options** — `WithJudge`/`WithAttacker`/`WithTimeoutPerTurn`/`WithMaxConversationDuration`/`WithParallelism` (shipped in LOW-4); PAIR/TAP reachable via the pipeline.
+- ✅ **NIST reporter CLI on-ramp** — `agenteval redteam --format nist` / `nist-md` routes through `NistAiRmfComplianceReporter` (`TryRenderComplianceReport`). A full `bench nist` preset family was deliberately NOT built (no `NistBenchmarkRun` infra; NIST is a crosswalk reporter, so the redteam export format is the proportionate on-ramp).
+- ✅ **Per-role API keys** — `--judge-api-key` / `--attacker-api-key` (fall back to `--api-key`) (shipped in LOW-4).
 
 ### 5f. Culture-sensitive parsing / formatting (CI-on-non-English-locale bugs) — **✅ FIXED**
 - ✅ `LLMJudgeEvaluator` now parses CONFIDENCE with `NumberStyles.Float` + `CultureInfo.InvariantCulture` (so "0.9" is 0.9, not 9, on a comma-decimal locale).
@@ -217,12 +219,14 @@ These were adversarially confirmed but not yet fixed. Grouped by the cheapest-to
 
 ## 7. Recommended next steps (prioritized)
 
-1. **MEDIUM 5a (refusal-gating) + 5b (fabricated-Resisted evaluators)** — same honesty class as the HIGH wave, cheap, high-leverage, fully testable. Do first.
-2. **MEDIUM 5c TAP pruning sign + attacker-timeout** — a correctness bug in the headline Wave C′ feature; the rest of 5c follows.
-3. **MEDIUM 5d (coverage/fidelity fields in JSON/SARIF/JUnit)** — makes the honesty work visible to CI consumers, not just the model layer.
-4. **MEDIUM 5e (CLI real-surface wiring + DI)** — without it the shipped CLI can only do Tier-0 verbal scans, undercutting the whole real-attack-surface goal.
-5. **MEDIUM 5f (invariant-culture)** — small, prevents silent CI breakage on non-English runners.
-6. **H13/H14 + 5g** — schedule an SME pass with the ATLAS YAML / AI 100-1 source to finish the MITRE/NIST name accuracy and reconcile the docs.
-7. **LOW backlog** — batch the timeout-reporting fix (one place), the opt-in-attack visibility, and the determinism/escaping items; defer pure-cosmetic doc drift.
+**Status (2026-06-13): items 1–5 + 7 below are SHIPPED.** The HIGH tier, the full MEDIUM tier (5a–5g), the entire LOW backlog (LOW-2/3/4), and the Section-2 closure (CLI real-surface harness + `--system-prompt-canary`, NIST `--format` on-ramp, `ConclusiveScoreDelta`, per-probe fidelity persistence, `--verbose`/`--attacker` guard seam, PromptInjection winnability sweep) are all committed and green on `feature/redteam-newwave-fixes`. Only item 6 (SME-blocked) remains.
 
-A sensible cut line for a follow-up PR: **§7 items 1–3** (the remaining honesty + the TAP correctness bug) are the highest value and lowest risk; items 4–5 are a second PR; the SME items (6) gate on external input.
+1. ✅ **MEDIUM 5a + 5b** — shipped (refusal-gating + fabricated-Resisted evaluators).
+2. ✅ **MEDIUM 5c** — shipped (TAP pruning sign + attacker per-turn timeout).
+3. ✅ **MEDIUM 5d** — shipped (coverage/fidelity fields in JSON/SARIF/JUnit).
+4. ✅ **MEDIUM 5e (CLI real-surface wiring + DI)** — shipped; `--sut-tier` reaches the Tier-1/Tier-2 harness, `--system-prompt-canary` instruments SPE, `--format nist` surfaces the NIST reporter, `AttackPipeline` gained Judge/Attacker/multi-turn builders.
+5. ✅ **MEDIUM 5f (invariant-culture)** — shipped.
+6. ⏳ **H13/H14 + the contested 5g remaps** — STILL OPEN: schedule an SME pass with the pinned ATLAS YAML / NIST AI 100-1 source to finish MITRE technique-name / NIST sub-action accuracy. Overclaims already softened + disclaimed in code; do not pin unverified literals. **This is the only remaining in-plan work.**
+7. ✅ **LOW backlog** — shipped (LOW-2/3/4: timeout reporting, opt-in-attack visibility, determinism/escaping, doc-count sync, dead-code removal, architecture-gap LOWs).
+
+**Out-of-scope / future (tracked elsewhere, not part of "review complete"):** FeatureComplete Wave F (attack-pack ecosystem / importers / benchmark packs / NuGet split) and Wave G (memory-poisoning, multi-agent, atkgen, replay); multi-modal image attacks (`202-P19`); MITRE technique expansion (`181-P12`); `futures/` P19–P21 (CI/CD extensions, Slack/Teams dashboards, custom probe templates); a live network-backed `IPackageRegistry` (consumer-supplied); live-tool-calling `RawMessages` end-to-end (gated behind `AIConfig`).

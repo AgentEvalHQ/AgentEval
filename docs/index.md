@@ -137,7 +137,7 @@ var response = await replayer.ReplayNextAsync();  // Identical every time
 
 ## Red Team Security Evaluation
 
-**Is your AI agent secure?** AgentEval's Red Team module evaluates against **192 attack probes** covering **6 OWASP LLM Top 10 vulnerabilities** (60% coverage) with **MITRE ATLAS** technique mapping.
+**Is your AI agent secure?** AgentEval's Red Team module evaluates against **247 attack probes** covering **all 10 OWASP LLM Top 10 vulnerabilities** with **MITRE ATLAS** technique mapping.
 
 ```csharp
 // One-line security scan
@@ -209,7 +209,7 @@ await result.ExportHtmlReportAsync("memory-report.html");
 | "Evaluations fail randomly!" | **stochastic evaluation** - assert on pass *rate*, not single run |
 | "Which model should I use?" | **Model comparison** with cost/quality recommendations |
 | "Is my agent compliant?" | **Behavioral policies** - guardrails as code |
-| "Is my agent secure?" | **Red team evaluation** - 192 OWASP LLM 2025 security probes |
+| "Is my agent secure?" | **Red team evaluation** - 247 OWASP LLM 2025 security probes (all 10 categories) |
 | "Is content safe/unbiased?" | **ResponsibleAI metrics** - toxicity, bias, misinformation |
 | "Is my RAG hallucinating?" | **Faithfulness metrics** - grounding verification |
 | "How do I debug CI failures?" | **Trace replay** - capture and reproduce executions |

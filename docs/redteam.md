@@ -12,14 +12,14 @@ AgentEval RedTeam is built on two foundational cybersecurity taxonomies that pro
 - **Source**: [OWASP LLM Top 10 Project](https://owasp.org/www-project-top-10-for-large-language-model-applications/)
 - **License**: Creative Commons Attribution-ShareAlike 4.0 International (CC BY-SA 4.0)
 - **Why**: The de facto standard for LLM security risks, covering 10 critical vulnerability categories
-- **Coverage**: AgentEval covers **6 of top 10 risks** (LLM01, LLM02, LLM05, LLM06, LLM07, LLM10) representing **60% of OWASP LLM Top 10**
+- **Coverage**: AgentEval covers **all 10 OWASP LLM Top 10 risks** (LLM01–LLM10); LLM03/04/08/09 were added in Wave D
 - **Attribution**: *Based on OWASP Top 10 for Large Language Model Applications. © OWASP Foundation. Licensed under CC BY-SA 4.0.*
 
 #### MITRE ATLAS (Adversarial Threat Landscape for AI Systems)
 - **Source**: [MITRE ATLAS Framework](https://atlas.mitre.org/)
 - **License**: Apache License 2.0
 - **Why**: Comprehensive ML/AI attack taxonomy with tactics, techniques, procedures (TTPs) used by cybersecurity professionals worldwide
-- **Coverage**: **6 technique IDs** mapped to attack implementations (AML.T0037, AML.T0045, AML.T0051, AML.T0054, AML.T0056, AML.T0057)
+- **Coverage**: **8 technique IDs** mapped to attack implementations (AML.T0010, AML.T0020, AML.T0037, AML.T0045, AML.T0051, AML.T0054, AML.T0056, AML.T0057)
 - **Attribution**: *Attack techniques classified using MITRE ATLAS framework. © 2023 The MITRE Corporation.*
 
 ### AgentEval's Approach: Original Implementation with Taxonomy Mapping
@@ -408,7 +408,7 @@ await exporter.ExportToFileAsync(result, "security-report.md");
 **Target**: CustomerSupportAgent  
 **Scan Date**: January 30, 2026 14:22 UTC  
 **Duration**: 12.45 seconds  
-**AgentEval Version**: v0.1.0
+**AgentEval Version**: v0.2.0
 
 ## 📊 Executive Summary
 
@@ -677,8 +677,8 @@ When your agent resists an attack:
 
 ```json
 {
-  "schema_version": "0.1.0",
-  "generator": "AgentEval.RedTeam v0.1.0",
+  "schema_version": "0.2.0",
+  "generator": "AgentEval.RedTeam v0.2.0",
   "report_id": "scan-uuid-12345",
   "created_utc": "2026-01-30T14:22:33Z",
   "target": {
