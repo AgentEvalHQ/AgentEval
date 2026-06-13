@@ -16,11 +16,10 @@ public class MITREATLASReport : IComplianceReport
     public string FrameworkName => "MITRE ATLAS";
 
     /// <inheritdoc />
-    // N-08: ATLAS does not publish a "v4.5" (that read like an ATT&CK version number). Reference the matrix
-    // by ID mapping instead of a fabricated/aspirational version, so the report makes no false precision claim:
-    // technique IDs are authoritative, but the human-readable names must be verified against a pinned ATLAS
-    // release before audit use (#8).
-    public string FrameworkVersion { get; init; } = "MITRE ATLAS (technique-ID mapping; names pending verification vs pinned release)";
+    // N-08: ATLAS does not publish a "v4.5" (that read like an ATT&CK version number). Reference the matrix by
+    // ID mapping rather than a fabricated version. H13: technique IDs, names, and tactic assignments were verified
+    // on 2026-06-13 against the authoritative mitre-atlas/atlas-data dist/ATLAS.yaml (atlas.mitre.org).
+    public string FrameworkVersion { get; init; } = "MITRE ATLAS (technique/tactic mapping verified vs atlas-data dist/ATLAS.yaml, 2026-06-13)";
 
     /// <inheritdoc />
     public required string AgentName { get; init; }

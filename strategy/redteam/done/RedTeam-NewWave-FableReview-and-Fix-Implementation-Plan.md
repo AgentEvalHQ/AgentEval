@@ -1,5 +1,7 @@
 # Fable New-Wave Review & Fix Implementation Plan
 
+> **✅ COMPLETE (2026-06-13).** All 122 findings resolved: HIGH (15 distinct) + the full MEDIUM tier (5a–5g, incl. the §5e CLI real-surface wiring) + the entire LOW backlog (LOW-2/3/4) + the two former SME items **H13 (MITRE ATLAS) and H14 (NIST AI RMF), now source-verified and fixed** (§4). The only items not addressed are explicitly out-of-scope / future (FeatureComplete Wave F/G, multi-modal, `futures/` P19–P21) and a consumer-supplied live `IPackageRegistry`. Final suite: **net8.0 4900/0, net9.0 4900/0, net10.0 5076/0/1**. All on `feature/redteam-newwave-fixes` (PR-to-main not yet authorized).
+
 **Date:** 2026-06-13  **Branch:** `feature/redteam-newwave-fixes`
 **Scope:** the full RedTeam feature surface (~76 production `.cs` files) — every wave from the FixesImprovement base through Wave C′ (attacker-LLM multi-turn).
 
@@ -19,7 +21,7 @@ Test baseline at start: net8.0 4776/0, net10.0 4979/0/1 (clean). After the HIGH 
 
 | Tier | Count | Status |
 |------|-------|--------|
-| HIGH | 18 findings (15 distinct issues) | **Fixed** — code + regression tests, both TFMs green. 2 external-standard *renames* softened + deferred to SME (see §4). |
+| HIGH | 18 findings (15 distinct issues) | **Fixed** — code + regression tests, all TFMs green. The 2 external-standard items (H13 MITRE / H14 NIST) are now **source-verified and fully fixed** (no longer deferred — see §4). |
 | MEDIUM | 59 | **Complete** — 5a/5b/5c/5d/5f/5g done; **5e now FULLY closed** (Section-2 wave 2026-06-13): CLI real-surface harness (`--sut-tier`), `--system-prompt-canary`, NIST `--format` on-ramp, `ConclusiveScoreDelta`, per-probe fidelity, `AttackPipeline` Judge/Attacker/multi-turn builders. See §5. |
 | LOW | 45 | **Complete** — high-value + LOW-2/3/4 batches done (see §6 ✅). LOW-4 closed the last items: deleted the `RedTeamReport` dead duplicate, wired `PackageHallucinationDetector` (opt-in, honesty-preserving), gave `AttackPipeline` Judge/Attacker/multi-turn builders, added per-role API keys, and made multi-turn↔tool-harness compose. No material LOWs remain. |
 
@@ -111,12 +113,16 @@ Each is labeled **FIXED** with the change made, the files touched, and the regre
 
 ---
 
-## 4. Deferred — needs an SME with the standards source
+## 4. SME-source items — ✅ RESOLVED 2026-06-13 (sources fetched directly)
 
-| Item | What's needed |
-|------|---------------|
-| MITRE ATLAS technique/tactic **names** | Re-derive `AllTechniques`/`AllTactics` from `mitre-atlas/atlas-data` `dist/ATLAS.yaml` at a pinned release; fix T0048/T0037/T0044/T0046/T0047/T0053 names, retag deprecated T0045, use `AML.TA`-prefixed tactic IDs; then transcribe `MITREATLASInvariantTests` literals from the YAML. |
-| NIST AI 100-1 **MEASURE sub-action** assignments | Verify 2.6 (safety) vs 2.7 (security) split and the 2.9/4.2 assignments against the official AI 100-1 / AI RMF Playbook; remap `NistAiRmfControls`, fix the reporter footer, update `NistAiRmfComplianceReporterTests`. |
+Both formerly-deferred items are now closed: I fetched the authoritative sources and corrected the mappings (commit `fa26c46`). No SME hand-off needed.
+
+| Item | Resolution |
+|------|------------|
+| **H13 — MITRE ATLAS technique/tactic names + IDs** | ✅ Re-authored `AllTechniques`/`AllTactics` in `MITREATLASReporter` from `mitre-atlas/atlas-data` `dist/ATLAS.yaml` (fetched 2026-06-13): ML*→AI* renames (T0010 "AI Supply Chain Compromise", T0056 "Extract LLM System Prompt", T0037 "Data from Local System"), corrected the mis-numbered tactic table (TA0001 "AI Attack Staging", TA0005 "Execution", TA0007 "Defense Evasion", TA0011 "Impact" …), and **retired AML.T0045 → AML.T0034 Cost Harvesting** for InferenceAPIAbuse. Re-authored the not-applicable rows + `MITREATLASInvariantTests` literals from the YAML; `MITREATLASReport.FrameworkVersion` now states "verified vs atlas-data dist/ATLAS.yaml, 2026-06-13". 8 distinct techniques unchanged. |
+| **H14 — NIST AI 100-1 MEASURE sub-actions** | ✅ Verified vs NIST AI 100-1 (AI RMF 1.0) Core: **MEASURE 2.6 = Safety** (no attacks — black-box red-team doesn't assess fail-safe), **2.7 = Security and Resilience** (all adversarial-robustness attacks), 2.10 = Privacy, 2.5 = Validity/Reliability (confabulation). Dropped the mislabeled 2.9 (explainability) / 4.2 (domain-expert validation); added GOVERN.6.1 (third-party/supply-chain). `NistAiRmfControls` remapped, reporter footer + tests updated. |
+
+Also fixed alongside (Section-2 adversarial review, RC-6): all 5 compliance reporters gate `OverallPassRate` to `0.0` (not the 100-on-empty `ConclusiveScore` sentinel) when nothing was conclusively evaluated.
 
 ---
 

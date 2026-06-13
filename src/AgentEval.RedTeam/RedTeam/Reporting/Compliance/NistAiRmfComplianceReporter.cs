@@ -131,9 +131,9 @@ public class NistAiRmfComplianceReport : IComplianceReport
         sb.AppendLine("> **NIST AI RMF scope:** this report substantiates only the MEASURE sub-actions a black-box red-team " +
                       "can exercise (security/adversarial-robustness and privacy MEASURE sub-actions). GOVERN / MAP / most " +
                       "MANAGE sub-actions are organizational and are reported Not Applicable. **A passing run is one input " +
-                      "into an AI RMF program, not RMF conformance.** _The specific MEASURE sub-action assignments and titles " +
-                      "below are a best-effort mapping and should be verified against the official AI 100-1 / AI RMF Playbook " +
-                      "text before audit use (#10)._");
+                      "into an AI RMF program, not RMF conformance.** _The MEASURE sub-action IDs/titles below were verified " +
+                      "on 2026-06-13 against the NIST AI 100-1 (AI RMF 1.0) Core (e.g. MEASURE 2.6 = Safety, 2.7 = Security " +
+                      "and Resilience, 2.10 = Privacy)._");
         sb.AppendLine();
         sb.AppendLine(ComplianceDisclaimer.ToMarkdown());
         return sb.ToString();
