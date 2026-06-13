@@ -56,12 +56,42 @@ public sealed record CalibrationProfile
                 ?? throw new FormatException("Calibration profile deserialized to null.");
             if (profile.Attacks is null)
                 throw new FormatException("Calibration profile has no 'attacks' map.");
+            ValidateAttacks(profile.Attacks);
             return profile;
         }
         catch (JsonException ex)
         {
             throw new FormatException($"Invalid calibration profile JSON: {ex.Message}", ex);
         }
+    }
+
+    // Validates the deserialized cohort up-front so FromJson's documented FormatException contract holds and a
+    // malformed cohort can never reach a (possibly long / paid) scan. System.Text.Json enforces neither
+    // non-nullable references nor numeric invariants at runtime, so without this:
+    //   • a null stat value would NullReferenceException at scan time (Calibrator stat.StdDev),
+    //   • a NaN mean would classify as the calm "within normal range" (NaN comparisons are all false),
+    //   • a NaN/negative stdDev would render the false "σ=0 — z undefined" interpretation,
+    //   • a case-differing duplicate key ("PromptInjection" + "promptinjection") survives deserialization and
+    //     then throws ArgumentException (the WRONG type) at the OrdinalIgnoreCase lookup copy in Calibrator.
+    private static void ValidateAttacks(IReadOnlyDictionary<string, CalibrationStat> attacks)
+    {
+        foreach (var (name, stat) in attacks)
+        {
+            if (stat is null)
+                throw new FormatException($"Calibration profile entry '{name}' is null.");
+            if (!double.IsFinite(stat.Mean))
+                throw new FormatException($"Calibration profile entry '{name}' has a non-finite mean.");
+            if (!double.IsFinite(stat.StdDev))
+                throw new FormatException($"Calibration profile entry '{name}' has a non-finite stdDev.");
+            if (stat.StdDev < 0)
+                throw new FormatException($"Calibration profile entry '{name}' has a negative stdDev ({stat.StdDev}).");
+        }
+
+        var duplicate = attacks.Keys
+            .GroupBy(k => k, StringComparer.OrdinalIgnoreCase)
+            .FirstOrDefault(g => g.Count() > 1);
+        if (duplicate is not null)
+            throw new FormatException($"Calibration profile has case-insensitive duplicate attack key '{duplicate.Key}'.");
     }
 
     /// <summary>Loads a calibration profile from a JSON file.</summary>

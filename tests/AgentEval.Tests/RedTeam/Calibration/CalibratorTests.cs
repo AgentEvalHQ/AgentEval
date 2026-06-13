@@ -80,6 +80,35 @@ public class CalibratorTests
     public void FromJson_Throws_OnEmptyInput(string json)
         => Assert.Throws<ArgumentException>(() => CalibrationProfile.FromJson(json));
 
+    [Fact] // H4 — a null stat value passes deserialization but would NRE at scan time without the guard.
+    public void FromJson_Throws_OnNullStatEntry()
+        => Assert.Throws<FormatException>(() => CalibrationProfile.FromJson(
+            """{ "source": "x", "sampleSize": 1, "attacks": { "PromptInjection": null } }"""));
+
+    [Fact] // H5 — a negative stddev is meaningless; reject at parse time, not silently absorb as "σ=0".
+    public void FromJson_Throws_OnNegativeStdDev()
+        => Assert.Throws<FormatException>(() => CalibrationProfile.FromJson(
+            """{ "source": "x", "sampleSize": 1, "attacks": { "PromptInjection": { "mean": 80, "stdDev": -1 } } }"""));
+
+    [Fact] // H5 — a non-finite stat (overflow → ±Infinity / NaN) must not reach the scorer as "within normal range".
+    public void FromJson_Throws_OnNonFiniteStat()
+        => Assert.Throws<FormatException>(() => CalibrationProfile.FromJson(
+            """{ "source": "x", "sampleSize": 1, "attacks": { "PromptInjection": { "mean": 1e400, "stdDev": 10 } } }"""));
+
+    [Fact] // L20 — case-differing duplicate keys survive deserialization, then throw the WRONG exception type at the
+    // OrdinalIgnoreCase lookup copy; reject them here as a FormatException, before any (paid) scan runs.
+    public void FromJson_Throws_OnCaseInsensitiveDuplicateKeys()
+        => Assert.Throws<FormatException>(() => CalibrationProfile.FromJson(
+            """
+            {
+              "source": "x", "sampleSize": 1,
+              "attacks": {
+                "PromptInjection": { "mean": 80, "stdDev": 10 },
+                "promptinjection": { "mean": 70, "stdDev": 5 }
+              }
+            }
+            """));
+
     // ── z-score bands ────────────────────────────────────────────────────────
 
     [Fact]
@@ -129,6 +158,26 @@ public class CalibratorTests
         Assert.Null(entry.ZScore);
         Assert.Equal(CalibrationBand.Undefined, entry.Band);
         Assert.Contains("undefined", entry.Interpretation, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("σ=0", entry.Interpretation); // L18 — the σ=0 clause is only used for a genuine zero spread.
+    }
+
+    [Fact] // L18 — a hand-built profile (bypasses FromJson validation) with a negative stddev must NOT print the
+    // false "σ=0" clause; the Undefined interpretation tells the truth about the invalid spread.
+    public void Calibrate_NegativeStdDev_Interpretation_DoesNotClaimSigmaZero()
+    {
+        // Constructed directly (not via FromJson, which would reject it) to exercise the Interpret belt-and-suspenders.
+        var profile = new CalibrationProfile
+        {
+            Source = "hand-built",
+            SampleSize = 7,
+            Attacks = new Dictionary<string, CalibrationStat> { ["PromptInjection"] = new() { Mean = 50, StdDev = -1 } },
+        };
+
+        var entry = Assert.Single(Calibrator.Calibrate(Result(Attack("PromptInjection", 5, 5)), profile).Entries);
+
+        Assert.Equal(CalibrationBand.Undefined, entry.Band);
+        Assert.DoesNotContain("σ=0", entry.Interpretation);
+        Assert.Contains("invalid cohort stdDev", entry.Interpretation, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -187,6 +236,26 @@ public class CalibratorTests
         Assert.Equal("unit-test cohort", report.Source);
         Assert.Equal(7, report.SampleSize);
         Assert.Equal(Calibrator.DefaultThreshold, report.Threshold);
+    }
+
+    [Theory] // L19 — a thin cohort (n < 5) is valid data but statistically weak; flag it, never suppress the numbers.
+    [InlineData(2, true)]
+    [InlineData(4, true)]
+    [InlineData(5, false)]
+    [InlineData(7, false)]
+    [InlineData(0, false)]
+    public void Calibrate_SmallCohort_FlagsLowConfidence(int sampleSize, bool expected)
+    {
+        var profile = new CalibrationProfile
+        {
+            Source = "cohort",
+            SampleSize = sampleSize,
+            Attacks = new Dictionary<string, CalibrationStat> { ["PromptInjection"] = new() { Mean = 80, StdDev = 10 } },
+        };
+
+        var report = Calibrator.Calibrate(Result(Attack("PromptInjection", 8, 2)), profile);
+
+        Assert.Equal(expected, report.IsLowConfidence);
     }
 
     // ── argument validation ───────────────────────────────────────────────────

@@ -565,6 +565,8 @@ internal static class RedTeamCommand
         Console.Error.WriteLine();
         Console.Error.WriteLine($"  === Calibration (relative to cohort) ===");
         Console.Error.WriteLine($"  Reference: {c.Source} (n={c.SampleSize}); flagged at ±{c.Threshold:F1}σ. z-scores are RELATIVE to this cohort, not absolute.");
+        if (c.IsLowConfidence)
+            Console.Error.WriteLine($"  Caveat: reference cohort n={c.SampleSize} (<{Calibrator.LowConfidenceSampleSize}) — z-scores are indicative only, not statistically robust.");
         foreach (var e in c.Entries.OrderBy(e => e.ZScore ?? double.MaxValue))
         {
             var z = e.ZScore is { } zv ? $"z={zv:+0.00;-0.00;0.00}" : "z=undefined";
