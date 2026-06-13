@@ -68,9 +68,20 @@ public sealed class SarifReportExporter : IReportExporter
                     [
                         new SarifInvocation
                         {
-                            ExecutionSuccessful = true,
+                            // 5d: SARIF §3.20.14 — executionSuccessful means the tool ran without abnormal
+                            // termination. A by-design FailFast truncation is still a successful run; only genuine
+                            // transport/timeout faults (HasExecutionErrors) are a partial execution. Truncation +
+                            // coverage are surfaced in the invocation property bag so a partial run is visible.
+                            ExecutionSuccessful = !result.HasExecutionErrors,
                             StartTimeUtc = result.StartedAt.UtcDateTime,
-                            EndTimeUtc = result.CompletedAt.UtcDateTime
+                            EndTimeUtc = result.CompletedAt.UtcDateTime,
+                            Properties = new SarifInvocationProperties
+                            {
+                                WasTruncated = result.WasTruncated,
+                                SkippedProbes = result.SkippedProbes,
+                                PlannedProbes = result.PlannedProbes,
+                                ErroredProbes = result.ErroredProbes,
+                            }
                         }
                     ]
                 }
@@ -153,7 +164,9 @@ public sealed class SarifReportExporter : IReportExporter
                         Prompt = probe.Prompt,
                         Response = probe.Response,
                         Technique = probe.Technique,
-                        Difficulty = probe.Difficulty.ToString()
+                        Difficulty = probe.Difficulty.ToString(),
+                        Fidelity = probe.Fidelity.ToString(),
+                        Surface = probe.Surface?.ToString()
                     }
                 });
             }
@@ -194,7 +207,9 @@ public sealed class SarifReportExporter : IReportExporter
                     Properties = new SarifResultProperties
                     {
                         Technique = probe.Technique,
-                        Difficulty = probe.Difficulty.ToString()
+                        Difficulty = probe.Difficulty.ToString(),
+                        Fidelity = probe.Fidelity.ToString(),
+                        Surface = probe.Surface?.ToString()
                     }
                 });
             }
@@ -282,6 +297,8 @@ public sealed class SarifReportExporter : IReportExporter
         public string? Response { get; init; }
         public string? Technique { get; init; }
         public string? Difficulty { get; init; }
+        public string? Fidelity { get; init; }   // 5d: Verbal / IntentToAct / Behavioral
+        public string? Surface { get; init; }     // 5d: UserMessage / ToolOutput / RetrievedDocument
     }
 
     private sealed record SarifMessage
@@ -310,5 +327,14 @@ public sealed class SarifReportExporter : IReportExporter
         public bool ExecutionSuccessful { get; init; }
         public DateTime StartTimeUtc { get; init; }
         public DateTime EndTimeUtc { get; init; }
+        public SarifInvocationProperties? Properties { get; init; }
+    }
+
+    private sealed record SarifInvocationProperties
+    {
+        public bool WasTruncated { get; init; }
+        public int SkippedProbes { get; init; }
+        public int PlannedProbes { get; init; }
+        public int ErroredProbes { get; init; }
     }
 }

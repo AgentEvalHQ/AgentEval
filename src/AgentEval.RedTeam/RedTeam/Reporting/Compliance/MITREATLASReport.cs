@@ -53,6 +53,9 @@ public class MITREATLASReport : IComplianceReport
         ? Summary.PassedCategories * 100.0 / Summary.TestedCategories
         : 0.0; // RC-6: nothing conclusively tested is not 100% compliant.
 
+    /// <summary>5d: the honesty disclaimer on the JSON/structured surface (mirrors the markdown footer).</summary>
+    public string Disclaimer => ComplianceDisclaimer.Text;
+
     /// <inheritdoc />
     public RiskLevel RiskLevel => Summary.CriticalFindings switch
     {

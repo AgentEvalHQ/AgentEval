@@ -42,7 +42,7 @@ public sealed class JsonReportExporter : IReportExporter
 
         var report = new JsonReport
         {
-            SchemaVersion = "0.1.0",
+            SchemaVersion = "0.2.0",   // 0.2.0: added coverage/conclusive + truncation honesty fields + per-probe fidelity (5d)
             ReportId = Guid.NewGuid().ToString(),
             CreatedUtc = result.CompletedAt.UtcDateTime,
             Target = new JsonTarget
@@ -56,9 +56,17 @@ public sealed class JsonReportExporter : IReportExporter
                 Succeeded = result.SucceededProbes,
                 Resisted = result.ResistedProbes,
                 Inconclusive = result.InconclusiveProbes,
+                Errored = result.ErroredProbes,
                 AttackSuccessRate = result.AttackSuccessRate,
+                ConclusiveAttackSuccessRate = result.ConclusiveAttackSuccessRate,
                 OverallScore = result.OverallScore,
+                ConclusiveScore = result.ConclusiveScore,
+                Coverage = result.Coverage,
                 Verdict = result.Verdict.ToString(),
+                // 5d: a FailFast-truncated or low-coverage scan must be distinguishable from a clean full scan.
+                WasTruncated = result.WasTruncated,
+                SkippedProbes = result.SkippedProbes,
+                PlannedProbes = result.PlannedProbes,
                 Duration = result.Duration.TotalSeconds
             },
             ByAttack = result.AttackResults.Select(a => new JsonAttackSummary
@@ -85,7 +93,12 @@ public sealed class JsonReportExporter : IReportExporter
                         Response = p.Response,
                         Technique = p.Technique,
                         Difficulty = p.Difficulty.ToString(),
-                        Reason = p.Reason
+                        Reason = p.Reason,
+                        // 5d: surface the emitted-vs-executed / by-surface evidence so a Behavioral/ToolOutput
+                        // compromise is machine-distinguishable from a Verbal/UserMessage proxy.
+                        Fidelity = p.Fidelity.ToString(),
+                        Surface = p.Surface?.ToString(),
+                        ConversationFidelity = p.ConversationFidelity?.ToString()
                     }))
                 .ToList()
         };
@@ -135,14 +148,33 @@ public sealed class JsonReportExporter : IReportExporter
         public int Succeeded { get; init; }
         public int Resisted { get; init; }
         public int Inconclusive { get; init; }
+        public int Errored { get; init; }
 
         [JsonPropertyName("attack_success_rate")]
         public double AttackSuccessRate { get; init; }
 
+        [JsonPropertyName("conclusive_attack_success_rate")]
+        public double ConclusiveAttackSuccessRate { get; init; }
+
         [JsonPropertyName("overall_score")]
         public double OverallScore { get; init; }
 
+        [JsonPropertyName("conclusive_score")]
+        public double ConclusiveScore { get; init; }
+
+        /// <summary>Conclusive coverage as a 0-100 percentage; pair with scores to judge trustworthiness (RC-6).</summary>
+        public double Coverage { get; init; }
+
         public string Verdict { get; init; } = "";
+
+        [JsonPropertyName("was_truncated")]
+        public bool WasTruncated { get; init; }
+
+        [JsonPropertyName("skipped_probes")]
+        public int SkippedProbes { get; init; }
+
+        [JsonPropertyName("planned_probes")]
+        public int PlannedProbes { get; init; }
 
         [JsonPropertyName("duration_seconds")]
         public double Duration { get; init; }
@@ -183,5 +215,14 @@ public sealed class JsonReportExporter : IReportExporter
         public string? Technique { get; init; }
         public string Difficulty { get; init; } = "";
         public string Reason { get; init; } = "";
+
+        /// <summary>Evidence tier behind the verdict: Verbal / IntentToAct / Behavioral (RC-1).</summary>
+        public string Fidelity { get; init; } = "";
+
+        /// <summary>Delivery surface (UserMessage / ToolOutput / RetrievedDocument), when labeled.</summary>
+        public string? Surface { get; init; }
+
+        [JsonPropertyName("conversation_fidelity")]
+        public string? ConversationFidelity { get; init; }
     }
 }

@@ -148,11 +148,12 @@ These were adversarially confirmed but not yet fixed. Grouped by the cheapest-to
 - ✅ `CrescendoAttack` doc corrected (rung generation activates on `ScanOptions.AttackerClient`, judge is a distinct client).
 - Note: folded probes carrying `Error`/`ErrorKind`, and the runner's wrong-budget timeout-duration report, remain in the **5c/LOW backlog** (runner-side timeout-reporting cleanup).
 
-### 5d. Coverage/honesty fields missing from machine-readable artifacts
-- `EvidenceFidelity`/`ConversationFidelity`/`Surface` and `RedTeamResult.BySurface` never reach any exporter (JSON/SARIF/PDF) — a Behavioral compromise serializes identically to a Verbal proxy.
-- JSON report omits all truncation/coverage fields; SARIF hardcodes `executionSuccessful=true` even for truncated/errored scans; JUnit hardcodes `skipped="0"` (a FailFast-truncated scan looks like a complete green run).
-- `ComplianceDisclaimer` absent from all JSON/structured surfaces despite the class doc.
-- **Recommendation:** emit `fidelity`/`surface`/`conversation_fidelity` + a `by_surface` block in JSON & SARIF; honor truncation in SARIF `executionSuccessful` and JUnit `skipped`; add the disclaimer to structured surfaces.
+### 5d. Coverage/honesty fields missing from machine-readable artifacts — **✅ FIXED**
+- ✅ JSON exporter (schema 0.2.0): summary now carries `coverage`, `conclusive_score`, `conclusive_attack_success_rate`, `was_truncated`, `skipped_probes`, `planned_probes`, `errored`; each failure carries `fidelity` + (when labeled) `surface` + `conversation_fidelity` — a Behavioral/ToolOutput compromise is now machine-distinguishable from a Verbal/UserMessage proxy.
+- ✅ SARIF: `executionSuccessful = !HasExecutionErrors` (a by-design FailFast stop is not abnormal termination; genuine faults are); an invocation property bag carries `wasTruncated`/`skippedProbes`/`plannedProbes`/`erroredProbes`; per-result properties carry `fidelity`/`surface`.
+- ✅ JUnit: root `skipped` from `SkippedProbes`; a truncated scan appends a visible `RedTeam.TruncationNotice` testsuite with a `<skipped>` testcase, so it no longer renders as a complete green run.
+- ✅ `ComplianceDisclaimer` now serialized on all five report objects' JSON (`Disclaimer` get-only property → `ToJson`).
+- Note: persisting per-probe fidelity into `RedTeamBaseline` (a gateable Behavioral→Verbal regression) remains a backlog enhancement.
 
 ### 5e. CLI / DI / pipeline wiring gaps
 - The CLI cannot reach any real-surface capability (no tier/canary-tool wiring, no `--system-prompt-canary`) — every `agenteval redteam` scan is Tier-0 verbal.

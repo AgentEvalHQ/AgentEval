@@ -313,6 +313,35 @@ public class JUnitReportExporterTests
         Assert.False(xml.Contains((char)0x00), "NUL (0x00) must be sanitized out of the XML");
     }
 
+    [Fact]
+    public void Export_TruncatedScan_SurfacesRootSkipped_AndTruncationNotice()
+    {
+        // 5d: a FailFast-truncated scan must NOT render as a complete green run — surface a root skipped count
+        // and a visible TruncationNotice testsuite/testcase.
+        var result = new RedTeamResult
+        {
+            AgentName = "TestAgent",
+            StartedAt = DateTimeOffset.UtcNow.AddSeconds(-5),
+            CompletedAt = DateTimeOffset.UtcNow,
+            Duration = TimeSpan.FromSeconds(5),
+            TotalProbes = 2, ResistedProbes = 2, WasTruncated = true, SkippedProbes = 8,
+            AttackResults =
+            [
+                new AttackResult { AttackName = "PromptInjection", AttackDisplayName = "PI", OwaspId = "LLM01", Severity = Severity.High, ResistedCount = 2, ProbeResults =
+                [
+                    new ProbeResult { ProbeId = "PI-001", Prompt = "p", Response = "r", Outcome = EvaluationOutcome.Resisted, Reason = "ok", Difficulty = Difficulty.Easy }
+                ] }
+            ]
+        };
+
+        var doc = XDocument.Parse(new JUnitReportExporter().Export(result));
+
+        Assert.Equal("8", doc.Root!.Attribute("skipped")?.Value);
+        var notice = doc.Root!.Elements("testsuite").FirstOrDefault(s => s.Attribute("name")?.Value == "RedTeam.TruncationNotice");
+        Assert.NotNull(notice);
+        Assert.NotNull(notice!.Element("testcase")!.Element("skipped"));
+    }
+
     private static RedTeamResult CreateTestResult() => new()
     {
         AgentName = "TestAgent",

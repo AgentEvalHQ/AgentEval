@@ -155,6 +155,34 @@ public class SarifReportExporterTests
     }
 
     [Fact]
+    public void Export_ExecutionErrors_SetExecutionSuccessfulFalse_AndSurfaceTruncation()
+    {
+        // 5d: a genuine execution fault makes executionSuccessful=false; a FailFast truncation is surfaced in the
+        // invocation property bag (a by-design stop is NOT an abnormal termination).
+        var result = new RedTeamResult
+        {
+            AgentName = "TestAgent",
+            StartedAt = DateTimeOffset.UtcNow.AddSeconds(-5),
+            CompletedAt = DateTimeOffset.UtcNow,
+            Duration = TimeSpan.FromSeconds(5),
+            TotalProbes = 4, ResistedProbes = 2, InconclusiveProbes = 2, ErroredProbes = 2,
+            WasTruncated = true, SkippedProbes = 3,
+            AttackResults =
+            [
+                new AttackResult { AttackName = "PromptInjection", AttackDisplayName = "PI", OwaspId = "LLM01", Severity = Severity.High, ResistedCount = 2, InconclusiveCount = 2, ProbeResults = [] }
+            ]
+        };
+
+        var inv = JsonDocument.Parse(new SarifReportExporter().Export(result)).RootElement
+            .GetProperty("runs")[0].GetProperty("invocations")[0];
+
+        Assert.False(inv.GetProperty("executionSuccessful").GetBoolean());
+        var props = inv.GetProperty("properties");
+        Assert.True(props.GetProperty("wasTruncated").GetBoolean());
+        Assert.Equal(3, props.GetProperty("skippedProbes").GetInt32());
+    }
+
+    [Fact]
     public void FileExtension_ReturnsSarif()
     {
         var exporter = new SarifReportExporter();

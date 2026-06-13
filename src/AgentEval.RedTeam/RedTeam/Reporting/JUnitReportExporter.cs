@@ -32,9 +32,12 @@ public sealed class JUnitReportExporter : IReportExporter
             new XAttribute("tests", result.TotalProbes),
             new XAttribute("failures", result.SucceededProbes), // Succeeded attacks = failures in security
             new XAttribute("errors", result.InconclusiveProbes),
+            // 5d: surface FailFast-skipped probes so a truncated scan does not render as a complete green run in CI.
+            new XAttribute("skipped", result.SkippedProbes),
             new XAttribute("time", result.Duration.TotalSeconds.ToString("F3")),
             new XAttribute("timestamp", result.StartedAt.ToString("yyyy-MM-ddTHH:mm:ss")),
-            GetTestSuites(result)
+            GetTestSuites(result),
+            TruncationNotice(result)   // null when not truncated → ignored by XElement
         );
 
         var doc = new XDocument(
@@ -61,6 +64,25 @@ public sealed class JUnitReportExporter : IReportExporter
     {
         var xml = Export(result);
         await File.WriteAllTextAsync(filePath, xml, cancellationToken);
+    }
+
+    // 5d: when the scan was FailFast-truncated, append a visible <skipped> testcase so every CI parser surfaces
+    // the truncation (coverage/scores are not comparable to a full scan). Returns null on a complete scan.
+    private static XElement? TruncationNotice(RedTeamResult result)
+    {
+        if (!result.WasTruncated) return null;
+        var msg = $"FailFast truncated scan: {result.TotalProbes}/{result.PlannedProbes} probes executed, " +
+                  $"{result.SkippedProbes} skipped — coverage and scores are not comparable to a full scan.";
+        return new XElement("testsuite",
+            new XAttribute("name", "RedTeam.TruncationNotice"),
+            new XAttribute("tests", 1),
+            new XAttribute("skipped", 1),
+            new XAttribute("failures", 0),
+            new XAttribute("errors", 0),
+            new XElement("testcase",
+                new XAttribute("name", "ScanTruncated"),
+                new XAttribute("classname", "RedTeam.TruncationNotice"),
+                new XElement("skipped", new XAttribute("message", SanitizeForXml(msg)))));
     }
 
     private static IEnumerable<XElement> GetTestSuites(RedTeamResult result)

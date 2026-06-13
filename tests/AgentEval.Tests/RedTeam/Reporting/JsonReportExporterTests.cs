@@ -37,7 +37,64 @@ public class JsonReportExporterTests
         var doc = JsonDocument.Parse(json);
 
         var schemaVersion = doc.RootElement.GetProperty("schema_version").GetString();
-        Assert.Equal("0.1.0", schemaVersion);
+        Assert.Equal("0.2.0", schemaVersion);   // 5d: bumped for coverage/truncation + per-probe fidelity fields
+    }
+
+    [Fact]
+    public void Export_Summary_IncludesCoverageAndTruncationHonestyFields()
+    {
+        // 5d: a FailFast-truncated / low-coverage scan must be machine-distinguishable from a clean full scan.
+        var result = new RedTeamResult
+        {
+            AgentName = "TestAgent",
+            StartedAt = DateTimeOffset.UtcNow.AddSeconds(-5),
+            CompletedAt = DateTimeOffset.UtcNow,
+            Duration = TimeSpan.FromSeconds(5),
+            TotalProbes = 6, ResistedProbes = 3, SucceededProbes = 0, InconclusiveProbes = 3,
+            WasTruncated = true, SkippedProbes = 4,
+            AttackResults =
+            [
+                new AttackResult { AttackName = "PromptInjection", AttackDisplayName = "PI", OwaspId = "LLM01", Severity = Severity.High, ResistedCount = 3, InconclusiveCount = 3, ProbeResults = [] }
+            ]
+        };
+
+        var summary = JsonDocument.Parse(new JsonReportExporter().Export(result)).RootElement.GetProperty("summary");
+
+        Assert.True(summary.GetProperty("was_truncated").GetBoolean());
+        Assert.Equal(4, summary.GetProperty("skipped_probes").GetInt32());
+        Assert.Equal(10, summary.GetProperty("planned_probes").GetInt32());   // 6 executed + 4 skipped
+        Assert.Equal(50.0, summary.GetProperty("coverage").GetDouble());       // 3 conclusive / 6 total
+    }
+
+    [Fact]
+    public void Export_Failure_IncludesFidelityAndSurface()
+    {
+        var result = new RedTeamResult
+        {
+            AgentName = "TestAgent",
+            StartedAt = DateTimeOffset.UtcNow.AddSeconds(-5),
+            CompletedAt = DateTimeOffset.UtcNow,
+            Duration = TimeSpan.FromSeconds(5),
+            TotalProbes = 1, SucceededProbes = 1,
+            AttackResults =
+            [
+                new AttackResult
+                {
+                    AttackName = "IndirectInjection", AttackDisplayName = "II", OwaspId = "LLM01", Severity = Severity.High,
+                    SucceededCount = 1,
+                    ProbeResults =
+                    [
+                        new ProbeResult { ProbeId = "IND-040", Prompt = "p", Response = "r", Outcome = EvaluationOutcome.Succeeded,
+                            Reason = "tool executed", Fidelity = EvidenceFidelity.Behavioral, Surface = InjectionSurface.ToolOutput }
+                    ]
+                }
+            ]
+        };
+
+        var failure = JsonDocument.Parse(new JsonReportExporter().Export(result)).RootElement.GetProperty("failures")[0];
+
+        Assert.Equal("Behavioral", failure.GetProperty("fidelity").GetString());
+        Assert.Equal("ToolOutput", failure.GetProperty("surface").GetString());
     }
 
     [Fact]

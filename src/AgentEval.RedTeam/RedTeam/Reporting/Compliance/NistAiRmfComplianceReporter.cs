@@ -48,6 +48,9 @@ public class NistAiRmfComplianceReport : IComplianceReport
         }
     }
 
+    /// <summary>5d: the honesty disclaimer on the JSON/structured surface (mirrors the markdown footer).</summary>
+    public string Disclaimer => ComplianceDisclaimer.Text;
+
     /// <inheritdoc />
     public RiskLevel RiskLevel
     {
