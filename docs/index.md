@@ -153,7 +153,7 @@ result.Should()
     .HaveMinimumScore(80);
 ```
 
-**Attack types included:** Prompt Injection, Jailbreaks, PII Leakage, System Prompt Extraction, Indirect Injection, Excessive Agency, Insecure Output Handling, API Abuse, Encoding Evasion.
+**Attack types included (13):** Prompt Injection, Jailbreaks, PII Leakage, System Prompt Extraction, Indirect Injection, Excessive Agency, Insecure Output Handling, Inference API Abuse, Encoding Evasion, Supply Chain, Data & Model Poisoning, Vector & Embedding (RAG), Misinformation — covering all 10 OWASP LLM Top 10 categories. Plus opt-in multi-turn attacks (Crescendo, PAIR, TAP, ToolEscalation).
 
 ```csharp
 // Advanced: Full pipeline control

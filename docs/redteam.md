@@ -567,11 +567,12 @@ var mitreReporter = new MITREATLASReporter();
 var mitreReport = mitreReporter.GenerateReport(result);
 ```
 
-Supported compliance frameworks:
-- **OWASP LLM Top 10** — 10 categories, 6 testable via red team
-- **ISO 27001** — 8 Annex A controls (A.5.1 through A.8.28)
-- **SOC 2 Type II** — 7 Common Criteria controls (CC6.1 through CC8.1)
-- **MITRE ATLAS** — 13 techniques, 6 applicable to LLM security
+Supported compliance frameworks (**5 reporters**):
+- **OWASP LLM Top 10** — all 10 categories covered (Wave D)
+- **MITRE ATLAS** — 8 techniques applicable to LLM security (source-verified vs ATLAS.yaml)
+- **NIST AI RMF** — MEASURE/GOVERN/MAP/MANAGE controls (also via `--format nist` / `nist-md`)
+- **ISO 27001** — Annex A controls (A.5.1 through A.8.28)
+- **SOC 2 Type II** — Common Criteria controls (CC6.1 through CC8.1)
 
 ### Console Output (Live Progress)
 

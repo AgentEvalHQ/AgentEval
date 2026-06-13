@@ -17,8 +17,8 @@ namespace AgentEval.Benchmarks;
 /// <remarks>
 /// <para>
 /// <see cref="MitreBenchmark"/> is a thin façade over <see cref="AttackPipeline"/>
-/// in <c>AgentEval.RedTeam</c>. Each preset wires a curated subset of the nine
-/// attack types implemented today and returns a <see cref="MitreBenchmarkRun"/>
+/// in <c>AgentEval.RedTeam</c>. Each preset wires a curated subset of the 13 built-in
+/// attack types and returns a <see cref="MitreBenchmarkRun"/>
 /// that exposes:
 /// </para>
 /// <list type="bullet">
@@ -124,7 +124,7 @@ public static partial class MitreBenchmark
     }
 
     /// <summary>
-    /// Audit-grade preset — all nine attacks at <see cref="Intensity.Comprehensive"/>
+    /// Audit-grade preset — all 13 built-in attacks at <see cref="Intensity.Comprehensive"/>
     /// intensity with a 30-minute overall timeout and evidence-on. Same ATLAS coverage
     /// as <see cref="AtlasBaseline"/> but exercises more probes per attack type for
     /// higher-confidence verdicts. Intended for formal compliance evidence packs.
