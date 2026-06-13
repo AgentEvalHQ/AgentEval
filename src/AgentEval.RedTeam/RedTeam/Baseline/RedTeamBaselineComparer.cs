@@ -85,6 +85,29 @@ public class RedTeamBaselineComparer
         var resolved = comparableBaselineVulnIds.Where(id => !currentVulnIds.Contains(id)).ToList();
         var persistent = comparableBaselineVulnIds.Where(id => currentVulnIds.Contains(id)).ToList();
 
+        // Item 5: among PERSISTENT vulns, flag any whose evidence STRENGTHENED since the baseline (e.g. the same
+        // probe went Verbal→Behavioral — described → actually executed). Skipped for baselines that did not persist
+        // per-probe fidelity (older baselines: FailedProbeFidelities == null).
+        var currentFidelityById = currentVulns
+            .GroupBy(v => v.Probe.ProbeId)
+            .ToDictionary(g => g.Key, g => (g.First().Attack.AttackDisplayName, Fidelity: g.Max(v => v.Probe.Fidelity)));
+        var baselineFidelityById = baseline.AttackResults
+            .Where(a => currentAttackNames.Contains(a.AttackName) && a.FailedProbeFidelities is not null)
+            .SelectMany(a => a.FailedProbeFidelities!)
+            .GroupBy(kv => kv.Key)
+            .ToDictionary(g => g.Key, g => g.Max(kv => kv.Value));
+        var fidelityEscalations = persistent
+            .Where(id => baselineFidelityById.TryGetValue(id, out var bf)
+                         && currentFidelityById.TryGetValue(id, out var cf) && cf.Fidelity > bf)
+            .Select(id => new FidelityEscalation
+            {
+                ProbeId = id,
+                AttackName = currentFidelityById[id].AttackDisplayName,
+                From = baselineFidelityById[id],
+                To = currentFidelityById[id].Fidelity,
+            })
+            .ToList();
+
         // Attacks in the baseline that were NOT re-tested in this (narrowed) run — surfaced rather than silently
         // dropped, so the user sees that "Fixed" excludes them.
         var notReTested = baseline.AttackResults
@@ -105,6 +128,7 @@ public class RedTeamBaselineComparer
             PersistentVulnerabilities = persistent,
             AttackComparisons = attackComparisons,
             NotReTested = notReTested,
+            FidelityEscalations = fidelityEscalations,
         };
     }
 

@@ -39,14 +39,15 @@ public class RedTeamCommandTests
     }
 
     [Fact]
-    public void Create_Has25Options()
+    public void Create_Has27Options()
     {
         // 16 base + Wave E (save-baseline, baseline, fail-on) = 19
         // + Wave C′ (attacker, attacker-model) = 21
         // + baseline metadata (baseline-version, baseline-note) = 23
         // + per-role API keys (judge-api-key, attacker-api-key) = 25
+        // + real-surface harness (sut-tier, system-prompt-canary) = 27
         var command = RedTeamCommand.Create();
-        Assert.Equal(25, command.Options.Count);
+        Assert.Equal(27, command.Options.Count);
     }
 
     [Theory]
@@ -73,6 +74,8 @@ public class RedTeamCommandTests
     [InlineData("attacker-model")]  // Wave C′
     [InlineData("judge-api-key")]   // per-role keys
     [InlineData("attacker-api-key")] // per-role keys
+    [InlineData("sut-tier")]        // real-surface harness
+    [InlineData("system-prompt-canary")] // real-surface harness
     public void Create_ContainsExpectedOption(string optionName)
     {
         var command = RedTeamCommand.Create();
@@ -587,5 +590,92 @@ public class RedTeamCommandTests
         var attack = Attack.ByName(names[0]);
         Assert.NotNull(attack);
         Assert.Equal("EncodingEvasion", attack.Name);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // REAL-SURFACE HARNESS: --sut-tier / --system-prompt-canary (items 1+2)
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    [Theory]
+    [InlineData("text", SutTier.TextOnly)]
+    [InlineData("verbal", SutTier.TextOnly)]
+    [InlineData("function-calling", SutTier.FunctionCalling)]
+    [InlineData("tier1", SutTier.FunctionCalling)]
+    [InlineData("instrumented", SutTier.InstrumentedAgent)]
+    [InlineData("TIER2", SutTier.InstrumentedAgent)]
+    public void ParseSutTier_MapsKnownValues(string s, SutTier expected)
+        => Assert.Equal(expected, RedTeamCommand.ParseSutTier(s));
+
+    [Fact]
+    public void ParseSutTier_Unknown_Throws()
+        => Assert.Throws<ArgumentException>(() => RedTeamCommand.ParseSutTier("bogus"));
+
+    [Fact]
+    public void EmbedSystemPromptCanary_NoBasePrompt_CreatesPromptContainingCanary()
+    {
+        var sp = RedTeamCommand.EmbedSystemPromptCanary(null, "CANARY-xyz123");
+        Assert.Contains("CANARY-xyz123", sp);
+    }
+
+    [Fact]
+    public void EmbedSystemPromptCanary_PreservesBasePromptAndAddsCanary()
+    {
+        var sp = RedTeamCommand.EmbedSystemPromptCanary("You are a helpful bot.", "CANARY-xyz123");
+        Assert.Contains("You are a helpful bot.", sp);
+        Assert.Contains("CANARY-xyz123", sp);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // NIST AI RMF CLI ON-RAMP: --format nist / nist-md (item 3)
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void TryRenderComplianceReport_Nist_RendersNistJson()
+    {
+        Assert.True(RedTeamCommand.TryRenderComplianceReport("nist", MakeResult("PI-001"), out var content));
+        Assert.Contains("NIST AI RMF", content);
+    }
+
+    [Fact]
+    public void TryRenderComplianceReport_NistMd_RendersMarkdown()
+    {
+        Assert.True(RedTeamCommand.TryRenderComplianceReport("nist-md", MakeResult(), out var content));
+        Assert.Contains("NIST AI RMF", content);
+        Assert.Contains("#", content); // a markdown heading
+    }
+
+    [Theory]
+    [InlineData("json")]
+    [InlineData("sarif")]
+    [InlineData("markdown")]
+    public void TryRenderComplianceReport_StandardFormat_ReturnsFalse(string format)
+        => Assert.False(RedTeamCommand.TryRenderComplianceReport(format, MakeResult(), out _));
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // ScanOptions seam: --verbose must not drop the attacker/judge client (item 6)
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void BuildScanOptions_VerboseWithAttacker_KeepsAttackerClient()
+    {
+        Microsoft.Extensions.AI.IChatClient attacker = new TestHelpers.MockStreamingChatClient([], "unused");
+        var opts = new RedTeamOptions { Intensity = "quick", Format = "json", Verbose = true };
+
+        var scan = RedTeamCommand.BuildScanOptions(opts, attacks: null, Intensity.Quick, judgeClient: null, attackerClient: attacker);
+
+        Assert.Same(attacker, scan.AttackerClient);   // the --verbose path must not drop it
+        Assert.NotNull(scan.OnProgress);              // verbose still builds the progress callback
+    }
+
+    [Fact]
+    public void BuildScanOptions_Quiet_SuppressesProgressButKeepsJudge()
+    {
+        Microsoft.Extensions.AI.IChatClient judge = new TestHelpers.MockStreamingChatClient([], "unused");
+        var opts = new RedTeamOptions { Intensity = "quick", Format = "json", Verbose = true, Quiet = true };
+
+        var scan = RedTeamCommand.BuildScanOptions(opts, attacks: null, Intensity.Quick, judgeClient: judge, attackerClient: null);
+
+        Assert.Same(judge, scan.JudgeClient);
+        Assert.Null(scan.OnProgress);                 // --quiet suppresses progress even under --verbose
     }
 }

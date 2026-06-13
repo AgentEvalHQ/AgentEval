@@ -23,6 +23,13 @@ public record RedTeamBaseline
     /// <summary>Overall security score (0-100).</summary>
     public required double OverallScore { get; init; }
 
+    /// <summary>
+    /// Conclusive-only score (resisted / conclusive × 100, RC-6) at capture time — the honest score dimension the
+    /// inconclusive-diluted <see cref="OverallScore"/> can mask. Nullable: baselines captured before this field
+    /// existed deserialize to <c>null</c>, and the comparer then falls back to the <see cref="OverallScore"/> delta.
+    /// </summary>
+    public double? ConclusiveScore { get; init; }
+
     /// <summary>Attack success rate (lower is better).</summary>
     public required double AttackSuccessRate { get; init; }
 
@@ -55,21 +62,29 @@ public record RedTeamBaseline
             CapturedAt = DateTimeOffset.UtcNow,
             AgentName = result.AgentName,
             OverallScore = result.OverallScore,
+            ConclusiveScore = result.ConclusiveScore,
             AttackSuccessRate = result.AttackSuccessRate,
             TotalProbes = result.TotalProbes,
             SucceededProbes = result.SucceededProbes,
-            AttackResults = result.AttackResults.Select(a => new AttackBaselineResult
+            AttackResults = result.AttackResults.Select(a =>
             {
-                AttackName = a.AttackName,
-                AttackDisplayName = a.AttackDisplayName,
-                OwaspId = a.OwaspId,
-                Severity = a.Severity,
-                ResistedCount = a.ResistedCount,
-                TotalCount = a.TotalCount,
-                FailedProbeIds = a.ProbeResults
-                    .Where(p => p.Outcome == EvaluationOutcome.Succeeded)
-                    .Select(p => p.ProbeId)
-                    .ToList()
+                var failed = a.ProbeResults.Where(p => p.Outcome == EvaluationOutcome.Succeeded).ToList();
+                return new AttackBaselineResult
+                {
+                    AttackName = a.AttackName,
+                    AttackDisplayName = a.AttackDisplayName,
+                    OwaspId = a.OwaspId,
+                    Severity = a.Severity,
+                    ResistedCount = a.ResistedCount,
+                    TotalCount = a.TotalCount,
+                    FailedProbeIds = failed.Select(p => p.ProbeId).ToList(),
+                    // Per-failed-probe evidence fidelity (item 5): lets the comparer flag a persistent vuln whose
+                    // evidence STRENGTHENED (e.g. Verbal→Behavioral = talked-about → actually executed). Keyed by
+                    // probe id; on a (rare) duplicate id within one attack, keep the strongest fidelity seen.
+                    FailedProbeFidelities = failed
+                        .GroupBy(p => p.ProbeId)
+                        .ToDictionary(g => g.Key, g => g.Max(p => p.Fidelity)),
+                };
             }).ToList(),
             KnownVulnerabilities = result.FailedAttacks
                 .SelectMany(a => a.ProbeResults.Where(p => p.Outcome == EvaluationOutcome.Succeeded))
@@ -118,6 +133,12 @@ public record AttackBaselineResult
 
     /// <summary>IDs of probes that failed (vulnerabilities).</summary>
     public required IReadOnlyList<string> FailedProbeIds { get; init; }
+
+    /// <summary>
+    /// Evidence fidelity of each failed probe, keyed by probe id (item 5). Nullable: baselines captured before this
+    /// field existed deserialize to <c>null</c>, and the comparer skips fidelity-escalation detection for them.
+    /// </summary>
+    public IReadOnlyDictionary<string, EvidenceFidelity>? FailedProbeFidelities { get; init; }
 
     /// <summary>Resistance rate (higher is better).</summary>
     [JsonIgnore]
