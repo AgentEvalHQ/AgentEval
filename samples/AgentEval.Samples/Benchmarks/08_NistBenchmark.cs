@@ -88,6 +88,9 @@ public static class NistBenchmarkSample
         Console.WriteLine("   - GOVERN / MAP / MANAGE controls (and MEASURE 2.6 Safety) render as NOT APPLICABLE —");
         Console.WriteLine("     they are organizational and never PASS.");
         Console.WriteLine("   - A passing run is ONE input into an AI RMF program, not RMF conformance.");
+
+        // Advanced red-team capabilities — folded in at Standard/AuditGrade tiers.
+        await AdvancedRedTeamShowcase.RunAsync(preset);
     }
 
     private static IEvaluableAgent CreateAgent()

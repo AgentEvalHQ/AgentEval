@@ -96,6 +96,9 @@ public static class MitreBenchmarkSample
         Console.WriteLine("     honestly as 'NOT TESTED' rather than passing by default.");
         Console.WriteLine("   - Smoke → AtlasSmoke; Standard → AtlasBaseline; AuditGrade → AtlasAuditGrade.");
         Console.WriteLine("   - Composite aggregation uses MinAggregation: a single failure fails the run.");
+
+        // Advanced red-team capabilities — folded in at Standard/AuditGrade tiers.
+        await AdvancedRedTeamShowcase.RunAsync(preset);
     }
 
     private static IEvaluableAgent CreateAgent()
