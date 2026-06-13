@@ -216,10 +216,15 @@ public static class Attack
 
     // === Attack Names for Convenience ===
 
-    /// <summary>Available attack names for autocomplete/validation.</summary>
+    /// <summary>Available attack names for autocomplete/validation (the <see cref="All"/> roster).</summary>
     public static IReadOnlyList<string> AvailableNames =>
         ["PromptInjection", "Jailbreak", "PIILeakage", "SystemPromptExtraction", "IndirectInjection", "InferenceAPIAbuse", "ExcessiveAgency", "InsecureOutput", "EncodingEvasion",
          "SupplyChain", "DataPoisoning", "VectorEmbedding", "Misinformation"];
+
+    /// <summary>Opt-in multi-turn attack names resolvable via <see cref="ByName"/> but excluded from <see cref="All"/>
+    /// (non-deterministic / require extra config: PAIR and TAP need <c>ScanOptions.AttackerClient</c>, CLI <c>--attacker</c>).</summary>
+    public static IReadOnlyList<string> OptInNames =>
+        ["Crescendo", "PAIR", "TAP"];
 
     /// <summary>MVP attack names.</summary>
     public static IReadOnlyList<string> MvpNames =>

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
+using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
@@ -43,7 +44,7 @@ public sealed class JsonReportExporter : IReportExporter
         var report = new JsonReport
         {
             SchemaVersion = "0.2.0",   // 0.2.0: added coverage/conclusive + truncation honesty fields + per-probe fidelity (5d)
-            ReportId = Guid.NewGuid().ToString(),
+            ReportId = DeriveReportId(result),   // LOW: deterministic so re-exporting the same result is byte-identical (diffable)
             CreatedUtc = result.CompletedAt.UtcDateTime,
             Target = new JsonTarget
             {
@@ -111,6 +112,16 @@ public sealed class JsonReportExporter : IReportExporter
     {
         var json = Export(result);
         await File.WriteAllTextAsync(filePath, json, cancellationToken);
+    }
+
+    // LOW: derive a stable report id from the result's content (agent + start + probe ids) so exporting the same
+    // result twice yields the same id — Guid.NewGuid() made byte-identical re-exports impossible (breaks diffing).
+    private static string DeriveReportId(RedTeamResult result)
+    {
+        var seed = result.AgentName + "|" + result.StartedAt.UtcDateTime.ToString("O", CultureInfo.InvariantCulture)
+            + "|" + string.Join(",", result.AttackResults.SelectMany(a => a.ProbeResults.Select(p => p.ProbeId)));
+        var hash = System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(seed));
+        return Convert.ToHexString(hash)[..16].ToLowerInvariant();
     }
 
     // Internal DTOs for JSON structure

@@ -46,7 +46,7 @@ internal static class RedTeamCommand
 
         // Attack selection
         var attacksOpt = new Option<string?>("--attacks")
-            { Description = "Comma-separated attack types (e.g., PromptInjection,Jailbreak). Default: all" };
+            { Description = "Comma-separated attack types (e.g., PromptInjection,Jailbreak). Default: all. Opt-in multi-turn: Crescendo, PAIR, TAP (PAIR/TAP require --attacker)." };
 
         // Intensity
         var intensityOpt = new Option<string>("--intensity")
@@ -206,7 +206,8 @@ internal static class RedTeamCommand
                 var attack = Attack.ByName(name);
                 if (attack is null)
                     throw new ArgumentException(
-                        $"Unknown attack type: '{name}'. Available: {string.Join(", ", Attack.AvailableNames)}");
+                        $"Unknown attack type: '{name}'. Available: {string.Join(", ", Attack.AvailableNames)}. " +
+                        $"Opt-in multi-turn (PAIR/TAP require --attacker): {string.Join(", ", Attack.OptInNames)}");
                 resolvedAttacks.Add(attack);
             }
             attacks = resolvedAttacks;

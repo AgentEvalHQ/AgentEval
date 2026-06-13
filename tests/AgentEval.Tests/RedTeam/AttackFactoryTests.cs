@@ -21,6 +21,20 @@ public class AttackFactoryTests
     }
 
     [Fact]
+    public void OptInNames_ResolveViaByName_AndDoNotDriftFromAdvertisedSet()
+    {
+        // LOW: Crescendo/PAIR/TAP are resolvable via ByName but excluded from All. They are advertised separately
+        // (OptInNames) so the CLI no longer hides them. Guard: every advertised name resolves, and the
+        // AvailableNames ∪ OptInNames union has no duplicates and exactly matches the resolvable set (16).
+        Assert.All(Attack.OptInNames, n => Assert.NotNull(Attack.ByName(n)));
+        Assert.DoesNotContain(Attack.OptInNames, n => Attack.AvailableNames.Contains(n));   // disjoint
+        var union = Attack.AvailableNames.Concat(Attack.OptInNames).ToList();
+        Assert.Equal(union.Count, union.Distinct().Count());                                // no dupes
+        Assert.Equal(16, union.Count);                                                       // 13 built-in + 3 opt-in
+        Assert.All(union, n => Assert.NotNull(Attack.ByName(n)));
+    }
+
+    [Fact]
     public void AvailableNames_ContainsAllBuiltInAttacks()
     {
         Assert.Equal(13, Attack.AvailableNames.Count);   // Wave D: +LLM03/04/08/09 → 10/10 OWASP

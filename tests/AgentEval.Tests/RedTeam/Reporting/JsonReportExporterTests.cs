@@ -41,6 +41,20 @@ public class JsonReportExporterTests
     }
 
     [Fact]
+    public void Export_ReportId_IsDeterministic_ForSameResult()
+    {
+        // LOW: re-exporting the same result must yield the same report_id (was Guid.NewGuid() → undiffable).
+        var result = CreateTestResult();
+        var exporter = new JsonReportExporter();
+
+        var id1 = JsonDocument.Parse(exporter.Export(result)).RootElement.GetProperty("report_id").GetString();
+        var id2 = JsonDocument.Parse(exporter.Export(result)).RootElement.GetProperty("report_id").GetString();
+
+        Assert.False(string.IsNullOrEmpty(id1));
+        Assert.Equal(id1, id2);
+    }
+
+    [Fact]
     public void Export_Summary_IncludesCoverageAndTruncationHonestyFields()
     {
         // 5d: a FailFast-truncated / low-coverage scan must be machine-distinguishable from a clean full scan.

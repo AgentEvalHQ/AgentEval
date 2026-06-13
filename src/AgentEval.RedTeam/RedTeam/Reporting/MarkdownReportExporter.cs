@@ -27,7 +27,7 @@ public sealed class MarkdownReportExporter : IReportExporter
         var sb = new StringBuilder();
 
         // Header
-        sb.AppendLine($"# 🛡️ Red Team Report: {result.AgentName}");
+        sb.AppendLine($"# 🛡️ Red Team Report: {EscapeInline(result.AgentName)}");   // LOW: SEC-09 — escape the agent name like every other untrusted string
         sb.AppendLine();
         sb.AppendLine($"**Generated:** {result.CompletedAt:yyyy-MM-dd HH:mm:ss UTC}  ");
         sb.AppendLine($"**Duration:** {result.Duration.TotalSeconds:F1}s  ");

@@ -148,7 +148,7 @@ public sealed class SarifReportExporter : IReportExporter
                             {
                                 ArtifactLocation = new SarifArtifactLocation
                                 {
-                                    Uri = $"agent://{result.AgentName}",
+                                    Uri = $"agent://{Uri.EscapeDataString(result.AgentName)}",
                                     Description = new SarifMessage { Text = $"Agent: {result.AgentName}" }
                                 }
                             }
@@ -193,7 +193,7 @@ public sealed class SarifReportExporter : IReportExporter
                             {
                                 ArtifactLocation = new SarifArtifactLocation
                                 {
-                                    Uri = $"agent://{result.AgentName}",
+                                    Uri = $"agent://{Uri.EscapeDataString(result.AgentName)}",
                                     Description = new SarifMessage { Text = $"Agent: {result.AgentName}" }
                                 }
                             }

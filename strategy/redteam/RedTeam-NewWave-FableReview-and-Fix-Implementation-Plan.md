@@ -179,16 +179,21 @@ These were adversarially confirmed but not yet fixed. Grouped by the cheapest-to
 
 ---
 
-## 6. LOW (45) — cleanup backlog
+## 6. LOW — cleanup backlog (the high-value items fixed; remaining cosmetic items catalogued)
 
-Mostly doc drift, dead/untested public API, minor formatting, and tautological tests. Notable clusters:
-- **Opt-in attacks invisible:** `Attack.AvailableNames`/`ByOwaspId`/CLI list/error/DI all omit Crescendo/PAIR/TAP though `ByName` resolves them.
-- **Wrong timeout reporting:** multi-turn/tree budget overrun reports `TimeoutPerProbe` and discards the partial transcript (appears ~5× across files — fix once in the runner).
-- **Determinism / diffing:** JSON `report_id = Guid.NewGuid()` breaks artifact diffing; non-reproducible.
-- **Unescaped output:** Markdown H1 / SARIF `agent://{AgentName}` not escaped.
-- **Dead/unwired:** `PackageHallucinationDetector` fully built+tested but wired into nothing; `RedTeamReport` dead duplicate of `JsonReportExporter`.
-- **Tautological tests:** several PDF/risk/CLI tests assert `Math.Max(0,x)>=0` or re-implement production logic.
-- **Stale docs:** "9 built-in attacks" (roster is 13), `EvaluationResult.Confidence` default mismatch, etc.
+**✅ Fixed (the real-bug-ish LOWs):**
+- ✅ **Opt-in attacks invisible** — added `Attack.OptInNames` (Crescendo/PAIR/TAP), surfaced in the CLI unknown-attack error + `--attacks` help, with a drift-guard test (every advertised name resolves via `ByName`; the union is exactly 16, disjoint, no dupes). (`AvailableNames` deliberately unchanged to keep the pinned roster count.)
+- ✅ **Determinism** — JSON `report_id` is now a deterministic SHA-256 of (agent + StartedAt + probe ids), so re-exporting the same result is byte-identical/diffable (was `Guid.NewGuid()`).
+- ✅ **Unescaped output** — Markdown H1 agent name now `EscapeInline`d (SEC-09); SARIF `artifactLocation.uri` now `Uri.EscapeDataString`d.
+
+**⏳ Remaining LOW backlog (cosmetic / low-risk; catalogued, not yet individually committed):**
+- **Wrong timeout reporting** — multi-turn/tree budget overrun reports `TimeoutPerProbe` and discards the partial transcript (appears ~5×; one runner-side fix threading the effective budget into the catch).
+- **Dead/unwired** — `PackageHallucinationDetector` fully built+tested but wired into nothing (SupplyChain ships only the weaker in-context proxy); `RedTeamReport` is a dead duplicate of `JsonReportExporter`.
+- **Stale doc comments** — "9 built-in attacks" / "Pre-populated with the 9" (roster is 13); `EvaluationResult.Confidence` default doc says 1.0 but struct default is 0.0; `AttackTypeRegistry` doc; README/getting-started/architecture counts; `ResolveFidelity` XML doc detached by a Wave C′ insertion.
+- **Minor correctness/cosmetic** — `AttackPipeline.TotalProbeCount` formula + `GetProbePreview` ignores `MaxProbesPerAttack`; `RegexMatchEvaluator` swallows regex timeouts; `BrandingOptions.ParseHexColor` throws on bad input; `VerbosityLevel.Full` silently downgrades; `RiskScoreCalculator`/`PdfReportOptions` tautological tests; JB-041/042 stale `gradual_escalation` technique label; `--save-baseline` hardcodes Version "1.0"/discards Notes; lossy-codec chain compatibility guard.
+- **Architecture-gap LOWs** (larger, overlap §5e/deferred) — multi-turn↔tool-harness don't compose (no canary tools over the conversation channel); single `--api-key` reused for target/judge/attacker; `AttackPipeline` can't set Judge/Attacker/multi-turn options.
+
+(The exhaustive per-finding raw list — all 122 with evidence + adversarial verdicts — is preserved in the review workflow transcript for this session; the thematic groupings here and in §5 capture every confirmed finding.)
 
 (The exhaustive per-finding raw list — all 122 with evidence + adversarial verdicts — is preserved in the review workflow transcript for this session; the thematic groupings above and in §5 capture every confirmed finding.)
 
