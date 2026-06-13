@@ -2,6 +2,7 @@
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 
 namespace AgentEval.RedTeam.Importers;
@@ -25,6 +26,17 @@ public sealed class JsonProbeDatasetImporter : IProbeDatasetImporter
     /// <summary><see cref="AttackProbe.Metadata"/> key for the dataset license.</summary>
     public const string LicenseKey = "dataset.license";
 
+    private readonly string _promptField;
+
+    /// <summary>Creates a JSON importer. <paramref name="promptField"/> is the object key holding the prompt text —
+    /// the default <c>"prompt"</c> uses the native AgentEval seed schema; pass a custom key (e.g.
+    /// <c>"test_case_prompt"</c> for CyberSecEval) to import a dataset whose prompt lives under a different key.</summary>
+    public JsonProbeDatasetImporter(string promptField = "prompt")
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(promptField);
+        _promptField = promptField;
+    }
+
     /// <inheritdoc />
     public string Format => "json";
 
@@ -40,6 +52,11 @@ public sealed class JsonProbeDatasetImporter : IProbeDatasetImporter
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(content);
         ArgumentException.ThrowIfNullOrWhiteSpace(datasetName);
+
+        // Custom prompt field (e.g. CyberSecEval's "test_case_prompt"): read it loosely via JsonNode so any
+        // array-of-objects dataset works, without forcing the native AgentEval seed schema.
+        if (!string.Equals(_promptField, "prompt", StringComparison.OrdinalIgnoreCase))
+            return ImportWithField(content, datasetName);
 
         List<SeedRecord>? records;
         try
@@ -78,6 +95,45 @@ public sealed class JsonProbeDatasetImporter : IProbeDatasetImporter
                 Metadata = meta,
             });
         }
+        return probes;
+    }
+
+    // Loose import: a JSON array of objects, reading the prompt from the configured custom field.
+    private IReadOnlyList<AttackProbe> ImportWithField(string content, string datasetName)
+    {
+        JsonNode? root;
+        try { root = JsonNode.Parse(content); }
+        catch (JsonException ex)
+        {
+            throw new FormatException($"Dataset '{datasetName}' is not valid JSON: {ex.Message}", ex);
+        }
+        if (root is not JsonArray array)
+            throw new FormatException($"Dataset '{datasetName}' must be a JSON array of objects.");
+
+        var meta = new Dictionary<string, object>
+        {
+            [DatasetKey] = datasetName,
+            [LicenseKey] = "unspecified",
+        };
+
+        var probes = new List<AttackProbe>(array.Count);
+        for (var i = 0; i < array.Count; i++)
+        {
+            var prompt = array[i]?[_promptField]?.GetValue<string>();
+            if (string.IsNullOrWhiteSpace(prompt)) continue;       // object missing the field — skip
+            probes.Add(new AttackProbe
+            {
+                Id = $"{datasetName}-{i:D4}",
+                Prompt = prompt,
+                Difficulty = Difficulty.Hard,
+                AttackName = datasetName,
+                Technique = "imported",
+                Source = datasetName,
+                Metadata = meta,
+            });
+        }
+        if (probes.Count == 0)
+            throw new FormatException($"Dataset '{datasetName}' has no objects with a non-empty '{_promptField}' field.");
         return probes;
     }
 

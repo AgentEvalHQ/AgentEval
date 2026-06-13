@@ -68,7 +68,7 @@ internal static class RedTeamCommand
         // Benchmark packs (NextWave #10): download an external pack (HarmBench/JailbreakBench/CyberSecEval) and run it
         // alongside the built-ins. Gated by --accept-license — these datasets carry harmful content; nothing is bundled.
         var packOpt = new Option<string?>("--pack")
-            { Description = $"Download + run an external benchmark pack ({PackCatalog.Names}), or 'list' to show the catalog. Requires --accept-license (no data is bundled)." };
+            { Description = $"Download + run an external benchmark pack: a catalog name ({PackCatalog.Names}), a data URL (.json/.csv), or 'list' to show the catalog. Named packs require --accept-license (no data is bundled)." };
         var acceptLicenseOpt = new Option<bool>("--accept-license")
             { Description = "Accept the upstream license of a --pack before downloading it (these datasets contain harmful content by design)." };
 
@@ -328,12 +328,18 @@ internal static class RedTeamCommand
                     (string.IsNullOrWhiteSpace(opts.JudgeEndpoint) ? " — note: probes without an expected-token oracle are Inconclusive without --judge." : "."));
         }
 
-        // 3c. Benchmark pack (NextWave #10): download an external pack and run it alongside the built-ins, behind the
-        // --accept-license gate (nothing is bundled; the gate is checked before any network call).
+        // 3c. Benchmark pack (NextWave #10): download an external pack — a known catalog name OR an arbitrary data URL —
+        // and run it alongside the built-ins, behind the --accept-license gate (nothing is bundled; the gate is checked
+        // before any network call). A user-supplied URL is the caller's own choice and is not license-gated.
         if (!string.IsNullOrWhiteSpace(opts.Pack))
         {
-            var pack = PackCatalog.Find(opts.Pack!.Trim())
-                ?? throw new ArgumentException($"Unknown --pack '{opts.Pack}'. Known: {PackCatalog.Names}. Use --pack list to see the catalog.");
+            var packArg = opts.Pack!.Trim();
+            var isUrl = packArg.StartsWith("http://", StringComparison.OrdinalIgnoreCase)
+                     || packArg.StartsWith("https://", StringComparison.OrdinalIgnoreCase);
+            var pack = isUrl
+                ? PackCatalog.ForUrl(packArg)
+                : PackCatalog.Find(packArg)
+                  ?? throw new ArgumentException($"Unknown --pack '{opts.Pack}'. Known: {PackCatalog.Names}. Use --pack list to see the catalog, or pass a data URL.");
             if (pack.RequiresLicenseAcceptance && !opts.AcceptLicense)
                 throw new InvalidOperationException(
                     $"Pack '{pack.Name}' is under license '{pack.License}' ({pack.LicenseUrl}) and contains external " +

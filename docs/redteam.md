@@ -1029,15 +1029,30 @@ Output (stderr, suppressed by `--quiet`):
 
 ### Benchmark packs (`--pack`)
 
-Beyond the 258 built-in probes, you can run an external **benchmark pack** alongside the built-ins. AgentEval bundles **no** pack data — packs are downloaded on demand from their upstream source, and only after you accept their license (`--accept-license`), because these datasets contain harmful content by design.
+Beyond the 258 built-in probes, you can run an external **benchmark pack** alongside the built-ins. **AgentEval bundles no pack data** — packs are downloaded on demand from their upstream project, and only after you accept their license (`--accept-license`), because these datasets contain harmful content by design.
 
 ```bash
-agenteval redteam --pack list                                  # show the catalog (no scan, no endpoint)
+agenteval redteam --pack list                                   # show the catalog (no scan, no endpoint)
+
+# Named pack — downloaded from its real upstream source + parsed in its native format:
 agenteval redteam --endpoint $URL --model $MODEL \
-  --pack JailbreakBench --accept-license --intensity moderate  # download + run alongside the built-ins
+  --pack HarmBench --accept-license --judge $JUDGE_URL --intensity moderate
+
+# Any normalized seed set by URL (.json or .csv) — your own source, no license gate:
+agenteval redteam --endpoint $URL --model $MODEL --pack https://example.com/my-prompts.json
 ```
 
-Catalog: **HarmBench**, **JailbreakBench**, **CyberSecEval** (metadata + provenance only). A pack flows through the same importer as `--import-probes`, so probes without an expected-token oracle are **Inconclusive** unless `--judge` is set (never a fabricated verdict). A download or parse failure is surfaced honestly (error, not a silent empty set). Packs must serve the importer's JSON seed schema (or be normalized to it).
+**Catalog** (metadata + provenance only — no data bundled), downloaded from each project's real, verified data file:
+
+| Pack | Source | Format | License |
+|------|--------|:------:|:-------:|
+| **HarmBench** | Center for AI Safety — `harmbench_behaviors_text_all.csv` (`Behavior` column) | CSV | MIT |
+| **JailbreakBench** | JBB-Behaviors — `harmful-behaviors.csv` (`Goal` column) | CSV | MIT |
+| **CyberSecEval** | Meta PurpleLlama — `prompt_injection.json` (`test_case_prompt` field) | JSON | MIT |
+
+Each pack declares its format (JSON/CSV) and prompt column/key, so it's parsed natively — no manual conversion. A pack runs through the same evaluator as `--import-probes`: imported probes have no expected-token oracle, so they're **Inconclusive** unless `--judge` is set (never a fabricated verdict — pair `--pack` with `--judge`). A download or parse failure surfaces honestly (an error, not a silent empty set). Upstream paths can move; if a named pack 404s, pass the current raw URL directly to `--pack <url>`. For a **local** file, use `--import-probes <file.json>`.
+
+**Why we don't ship the packs:** even where the upstream license (MIT) permits redistribution, some datasets are access-gated or carry use-restrictions, and bundling harmful jailbreak content into a public package is a responsible-AI and platform-policy problem. On-demand download behind `--accept-license` (the same stance as garak/PyRIT) is the deliberate, safer design.
 
 ### Tool-aware multi-turn escalation (`--attacks ToolEscalation`)
 

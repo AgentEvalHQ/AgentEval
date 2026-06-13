@@ -120,6 +120,62 @@ public class PackDownloaderTests
             Assert.True(p.RequiresLicenseAcceptance);    // harmful-content packs are gated by default
             Assert.False(string.IsNullOrWhiteSpace(p.License));
             Assert.False(string.IsNullOrWhiteSpace(p.DataUrl));
+            Assert.False(string.IsNullOrWhiteSpace(p.PromptField));
+            Assert.True(p.Format is "json" or "csv");
         });
+    }
+
+    [Fact]
+    public void Catalog_RealFormatsAndColumns_AreSet()
+    {
+        var harm = PackCatalog.Find("HarmBench")!;
+        Assert.Equal("csv", harm.Format);
+        Assert.Equal("Behavior", harm.PromptField);
+        var jbb = PackCatalog.Find("JailbreakBench")!;
+        Assert.Equal("csv", jbb.Format);
+        Assert.Equal("Goal", jbb.PromptField);
+        var cse = PackCatalog.Find("CyberSecEval")!;
+        Assert.Equal("json", cse.Format);
+        Assert.Equal("test_case_prompt", cse.PromptField);
+    }
+
+    // ── format dispatch (csv vs json) ─────────────────────────────────────────
+
+    [Fact]
+    public void ImporterFor_SelectsByFormat()
+    {
+        Assert.Equal("csv", PackDownloader.ImporterFor(PackCatalog.Find("HarmBench")!).Format);
+        Assert.Equal("json", PackDownloader.ImporterFor(PackCatalog.Find("CyberSecEval")!).Format);
+    }
+
+    [Fact]
+    public async Task Downloads_CsvPack_AndParsesConfiguredColumn()
+    {
+        const string csv = "Behavior,FunctionalCategory\nharmful one,standard\nharmful two,standard\n";
+        using var d = Downloader(new StubHandler(HttpStatusCode.OK, csv));
+        var pack = TestPack() with { Format = "csv", PromptField = "Behavior" };
+        var attack = await d.DownloadAsync(pack, licenseAccepted: true);
+        Assert.Equal(2, attack.GetProbes(Intensity.Comprehensive).Count);
+    }
+
+    [Fact]
+    public async Task UnsupportedFormat_Surfaces_FormatException()
+    {
+        using var d = Downloader(new StubHandler(HttpStatusCode.OK, "x"));
+        var pack = TestPack() with { Format = "parquet" };
+        await Assert.ThrowsAsync<FormatException>(() => d.DownloadAsync(pack, licenseAccepted: true));
+    }
+
+    // ── --pack <url> ad-hoc pack ──────────────────────────────────────────────
+
+    [Theory]
+    [InlineData("https://example.test/seed.json", "json")]
+    [InlineData("https://example.test/data.csv", "csv")]
+    public void ForUrl_InfersFormat_AndIsNotLicenseGated(string url, string expectedFormat)
+    {
+        var pack = PackCatalog.ForUrl(url);
+        Assert.Equal(expectedFormat, pack.Format);
+        Assert.False(pack.RequiresLicenseAcceptance);   // user-supplied source → no gate
+        Assert.Equal(url, pack.DataUrl);
     }
 }

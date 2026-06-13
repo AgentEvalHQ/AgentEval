@@ -39,16 +39,25 @@ public sealed class PackDownloader : IDisposable
 {
     private readonly HttpClient _http;
     private readonly bool _ownsHttp;
-    private readonly IProbeDatasetImporter _importer;
+    private readonly IProbeDatasetImporter? _importerOverride;
 
     /// <summary>Creates a downloader. A null <paramref name="httpClient"/> creates (and disposes) a real client;
-    /// an injected one is borrowed and left for the caller to dispose. A null importer uses the JSON importer.</summary>
+    /// an injected one is borrowed and left for the caller to dispose. A non-null <paramref name="importer"/> overrides
+    /// the per-pack importer (tests); otherwise the importer is selected from each pack's <see cref="BenchmarkPack.Format"/>.</summary>
     public PackDownloader(HttpClient? httpClient = null, IProbeDatasetImporter? importer = null, TimeSpan? timeout = null)
     {
         _ownsHttp = httpClient is null;
         _http = httpClient ?? new HttpClient { Timeout = timeout ?? TimeSpan.FromSeconds(30) };
-        _importer = importer ?? new JsonProbeDatasetImporter();
+        _importerOverride = importer;
     }
+
+    /// <summary>Selects the importer for a pack from its <see cref="BenchmarkPack.Format"/> + <see cref="BenchmarkPack.PromptField"/>.</summary>
+    internal static IProbeDatasetImporter ImporterFor(BenchmarkPack pack) => pack.Format?.Trim().ToLowerInvariant() switch
+    {
+        "csv" => new CsvProbeDatasetImporter(pack.PromptField),
+        "json" or null or "" => new JsonProbeDatasetImporter(pack.PromptField),
+        var other => throw new FormatException($"Pack '{pack.Name}' has unsupported format '{other}' (expected json or csv)."),
+    };
 
     /// <summary>
     /// Downloads <paramref name="pack"/> (gated on <paramref name="licenseAccepted"/>) and returns it as an
@@ -63,13 +72,15 @@ public sealed class PackDownloader : IDisposable
         if (pack.RequiresLicenseAcceptance && !licenseAccepted)
             throw new LicenseNotAcceptedException(pack);
 
+        var importer = _importerOverride ?? ImporterFor(pack);   // per-pack format dispatch (csv/json)
+
         using var request = new HttpRequestMessage(HttpMethod.Get, pack.DataUrl);
         using var response = await _http.SendAsync(request, cancellationToken).ConfigureAwait(false);
         response.EnsureSuccessStatusCode();
         var content = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
 
-        // Reuse the existing importer (throws FormatException on bad data — surfaced honestly, never a silent empty set).
-        var probes = _importer.Import(content, pack.Name);
+        // The importer throws FormatException on bad data — surfaced honestly, never a silent empty set.
+        var probes = importer.Import(content, pack.Name);
         return new ImportedProbeAttack(pack.Name, probes, pack.OwaspLlmId);
     }
 
