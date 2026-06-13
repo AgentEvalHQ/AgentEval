@@ -1,5 +1,7 @@
 # RedTeam Next-Wave — Competitive Parity & Honesty Plan
 
+> **✅ TIER 1 SHIPPED (2026-06-13, `feature/redteam-newwave-fixes`).** All 5 low-hanging-fruit items landed in 3 commits (`6c8f4fb`/`578235c`/`1dd4ac5`): Skeleton-Key + Many-shot probes, divergence/repeat-token probes, the graded `LikertJudgeEvaluator`, the seed-prompt dataset importer (`IProbeDatasetImporter` + `--import-probes`), and `--explain` LLM rationale (Succeeded/Inconclusive, judge-gated). Probe total 247→255; CLI 27→29 options; +27 tests. All TFMs green: net8/9 4927, net10 5130/0/1. **Next: Tier 2** (LLM03 registry oracle + LLM08 RAG harness — the two real gap-closers).
+
 **Date:** 2026-06-13  **Branch target:** `feature/redteam-newwave-fixes` (or a fresh `feature/redteam-nextwave`)
 **Premise:** the Fable-review arc is complete (HIGH + all MEDIUM + all LOW + Section-2 + H13/H14, all green: net8/9 4900, net10 5103/0/1). This plan is the *forward* wave, derived directly from the 2026-06-13 garak/PyRIT competitive analysis. It supersedes the relevant bits of `RedTeam-NewWave-FeatureComplete-Implementation-Plan.md` §Wave F/G with a concrete, effort-tiered, value-ranked backlog.
 
