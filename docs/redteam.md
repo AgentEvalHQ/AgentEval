@@ -117,7 +117,7 @@ AgentEval includes **13 built-in attack types** covering **all 10 OWASP LLM Top 
 - **Package Hallucination**: Elicit install/import of non-existent packages
 - **Typosquatting**: Recommend look-alike malicious package names
 - **Dependency Confusion**: Internal-vs-public name collision priming
-> Relocated here from LLM05 in Wave D. The deeper `PackageHallucinationDetector` exists; the shipped attack uses the in-context recommendation proxy.
+> Relocated here from LLM05 in Wave D. Default is the in-context planted-fake proxy; **`--package-registry live`** upgrades it to query PyPI/npm/NuGet so it also flags model-*invented* hallucinated packages (a registry outage under-detects rather than false-flagging).
 
 #### LLM04: Data & Model Poisoning (12 probes)
 - **Training-data Poisoning**: Inject false facts framed as ground truth
@@ -873,7 +873,7 @@ The low-level scanner. **Everything the library can do is reachable from the CLI
 |-------|---------|
 | **Target / auth** | `--endpoint`, `--azure`, `--model`, `--deployment-name`, `--api-key`, `--system-prompt` |
 | **Attacks** | `--attacks` (comma-list; default all 13; opt-in `Crescendo,PAIR,TAP`), `--intensity quick\|moderate\|comprehensive`, `--max-probes`, `--fail-fast`, `--import-probes <file.json>` (run an imported seed-prompt dataset alongside the built-ins) |
-| **Real attack surface** | `--sut-tier text\|function-calling\|instrumented`, `--system-prompt-canary <token>` |
+| **Real attack surface** | `--sut-tier text\|function-calling\|instrumented`, `--system-prompt-canary <token>`, `--package-registry none\|live` (LLM03: `live` queries PyPI/npm/NuGet to flag model-invented hallucinated packages) |
 | **Attacker-LLM (multi-turn)** | `--attacker <url>`, `--attacker-model`, `--attacker-api-key`, `--judge <url>`, `--judge-model`, `--judge-api-key` |
 | **Output** | `--format json\|sarif\|markdown\|md\|junit\|nist\|nist-md`, `-o/--output` |
 | **CI / baseline gate** | `--save-baseline`, `--baseline`, `--fail-on vuln\|regression\|never`, `--baseline-version`, `--baseline-note` |

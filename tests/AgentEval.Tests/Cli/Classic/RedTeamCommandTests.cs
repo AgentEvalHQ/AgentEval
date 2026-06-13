@@ -48,8 +48,9 @@ public class RedTeamCommandTests
         // + real-surface harness (sut-tier, system-prompt-canary) = 27
         // + dataset import (import-probes) = 28
         // + --explain rationale = 29
+        // + --package-registry (LLM03 live registry) = 30
         var command = RedTeamCommand.Create();
-        Assert.Equal(29, command.Options.Count);
+        Assert.Equal(30, command.Options.Count);
     }
 
     [Theory]
@@ -80,6 +81,7 @@ public class RedTeamCommandTests
     [InlineData("system-prompt-canary")] // real-surface harness
     [InlineData("import-probes")]   // dataset import (Wave-F seam)
     [InlineData("explain")]         // --explain LLM rationale
+    [InlineData("package-registry")] // LLM03 live registry oracle
     public void Create_ContainsExpectedOption(string optionName)
     {
         var command = RedTeamCommand.Create();

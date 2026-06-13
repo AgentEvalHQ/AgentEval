@@ -14,6 +14,7 @@ using AgentEval.Core;
 using AgentEval.RedTeam;
 using AgentEval.RedTeam.Attacks;
 using AgentEval.RedTeam.Baseline;
+using AgentEval.RedTeam.Evaluators;
 using AgentEval.RedTeam.Importers;
 using AgentEval.RedTeam.Reporting;
 using AgentEval.RedTeam.Reporting.Compliance;
@@ -59,6 +60,8 @@ internal static class RedTeamCommand
             { Description = "Comma-separated attack types (e.g., PromptInjection,Jailbreak). Default: all. Opt-in multi-turn: Crescendo, PAIR, TAP (PAIR/TAP require --attacker)." };
         var importProbesOpt = new Option<FileInfo?>("--import-probes")
             { Description = "Import a JSON seed-prompt dataset (HarmBench/JailbreakBench/etc.) and run it alongside the built-in attacks. Probes without an expected-token oracle are Inconclusive unless --judge is set." };
+        var packageRegistryOpt = new Option<string>("--package-registry")
+            { DefaultValueFactory = _ => "none", Description = "SupplyChain (LLM03) package check: none (planted-fake proxy, default) | live (query PyPI/npm/NuGet to also flag model-invented hallucinated packages)." };
 
         // Intensity
         var intensityOpt = new Option<string>("--intensity")
@@ -121,6 +124,7 @@ internal static class RedTeamCommand
         command.Options.Add(systemPromptCanaryOpt);
         command.Options.Add(attacksOpt);
         command.Options.Add(importProbesOpt);
+        command.Options.Add(packageRegistryOpt);
         command.Options.Add(intensityOpt);
         command.Options.Add(failFastFlag);
         command.Options.Add(maxProbesOpt);
@@ -155,6 +159,7 @@ internal static class RedTeamCommand
                 SystemPromptCanary = parseResult.GetValue(systemPromptCanaryOpt),
                 Attacks = parseResult.GetValue(attacksOpt),
                 ImportProbes = parseResult.GetValue(importProbesOpt),
+                PackageRegistry = parseResult.GetValue(packageRegistryOpt)!,
                 Intensity = parseResult.GetValue(intensityOpt)!,
                 FailFast = parseResult.GetValue(failFastFlag),
                 MaxProbes = parseResult.GetValue(maxProbesOpt),
@@ -288,6 +293,22 @@ internal static class RedTeamCommand
             if (!opts.Quiet)
                 Console.Error.WriteLine($"  Imported {imported.Count} probe(s) from '{datasetName}'" +
                     (string.IsNullOrWhiteSpace(opts.JudgeEndpoint) ? " — note: probes without an expected-token oracle are Inconclusive without --judge." : "."));
+        }
+
+        // LLM03 Tier-2: swap SupplyChain for the live-registry-backed evaluator so it ALSO flags model-invented
+        // hallucinated packages (queries PyPI/npm/NuGet), not just a planted fake. Caution-proximity still gates
+        // every flag; a registry-confirmed package is never flagged (RC-6).
+        if (string.Equals(opts.PackageRegistry?.Trim(), "live", StringComparison.OrdinalIgnoreCase))
+        {
+            var registry = new HttpPackageRegistry();
+            attacks = (attacks ?? Attack.All)
+                .Select(a => a is SupplyChainAttack ? new SupplyChainAttack(registry) : a).ToList();
+            if (!opts.Quiet)
+                Console.Error.WriteLine("  SupplyChain: live package registry (PyPI/npm/NuGet) enabled — a registry outage under-detects rather than false-flagging.");
+        }
+        else if (!string.IsNullOrWhiteSpace(opts.PackageRegistry) && !string.Equals(opts.PackageRegistry.Trim(), "none", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new ArgumentException($"Unknown --package-registry: '{opts.PackageRegistry}'. Valid: none | live");
         }
 
         // 4. Resolve intensity
@@ -569,6 +590,7 @@ internal sealed class RedTeamOptions
     public string? SystemPromptCanary { get; init; }
     public string? Attacks { get; init; }
     public FileInfo? ImportProbes { get; init; }
+    public string PackageRegistry { get; init; } = "none";
     public required string Intensity { get; init; }
     public bool FailFast { get; init; }
     public int MaxProbes { get; init; }
