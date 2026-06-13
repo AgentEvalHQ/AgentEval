@@ -7,6 +7,8 @@
 > **Tier-2b (LLM08) shipped:** VectorEmbedding now implements `IToolAwareAttack` exposing a `retrieve_context` canary whose execution returns the poisoned doc; 3 benign `rag_tool_retrieval` probes deliver poison ONLY via that tool; the probe-aware `VectorEmbeddingEvaluator` scores **Behavioral** when the retrieval is actually executed and the marker then appears, **Inconclusive** (never a false Resisted) at text/emit-only tiers. Genuine Behavioral RAG evidence at `--sut-tier instrumented`. Probe total 255→258; +8 tests.
 > **Final: net8 4944, net10 5142/0/1.** Tier 3 (LLM10 metering, atkgen, memory/multi-agent) remains.
 
+> **✅ TIER 3 — z-score calibration SHIPPED 2026-06-13 (`cd97a11`).** garak's relative-scoring honesty feature, re-implemented natively (Apache-2.0, credited in code + docs). `CalibrationProfile`/`CalibrationStat` (user-supplied cohort JSON, per-attack mean+stdDev, provenance; NO built-in cohort shipped) + `Calibrator.Calibrate` (conclusive-only score, z=undefined when stdDev=0, attacks-with-no-conclusive-probes/absent-from-profile surfaced as "not calibrated") + CLI `--calibration <cohort.json>` (informational; never changes verdict/exit code; fails fast on missing file). CLI 30→31 options; +19 tests. **net8/9 4963, net10 5166/0/1.** Remaining Tier-3 (item #9 done): #10 PackDownloader+license gate, #6 leakreplay, #11 BadLikertJudge, #12 LLM-driven converters, #13 tool-aware multi-turn, #14 LLM10 metering, Wave-G memory/multi-agent.
+
 **Date:** 2026-06-13  **Branch target:** `feature/redteam-newwave-fixes` (or a fresh `feature/redteam-nextwave`)
 **Premise:** the Fable-review arc is complete (HIGH + all MEDIUM + all LOW + Section-2 + H13/H14, all green: net8/9 4900, net10 5103/0/1). This plan is the *forward* wave, derived directly from the 2026-06-13 garak/PyRIT competitive analysis. It supersedes the relevant bits of `RedTeam-NewWave-FeatureComplete-Implementation-Plan.md` §Wave F/G with a concrete, effort-tiered, value-ranked backlog.
 
@@ -32,7 +34,7 @@ Effort: **🟢 LHF** (small, no new infra) · **🟡 Moderate** (new harness/inf
 | 6 | **`leakreplay`-style** training-data replay probes | garak | 🟡 | Med — membership/replay (LLM02/04 adjacent) | none | conclusive only on verbatim hit |
 | 7 | **LLM03 registry oracle** (live PyPI/npm/NuGet adapter or bundled full snapshot) | garak | 🟡 | **High — closes a real gap** | `RegistryBackedSupplyChainEvaluator` (exists) | **see ⚠️ false-positive trap below** |
 | 8 | **LLM08 RAG/retrieval harness** + `latentinjection`-style probes | garak/PyRIT | 🟡 | **High — closes a real gap** | InjectionSurface.RetrievedDocument (exists) + a RAG test agent | Behavioral evidence via real retrieval boundary |
-| 9 | **z-score calibration** (relative-to-reference scoring) | garak | 🟡 | Med-High — best honesty feature we lack | baseline infra (exists) | "unusually vulnerable vs cohort", not absolute |
+| 9 | ✅ **z-score calibration** (relative-to-reference scoring) — SHIPPED `cd97a11` | garak | 🟡 | Med-High — best honesty feature we lack | baseline infra (exists) | "unusually vulnerable vs cohort", not absolute |
 | 10 | **PackDownloader + license gate** (HarmBench/JailbreakBench/CyberSecEval) | PyRIT/garak | 🟡 | High — turns #4 into a curated benchmark library | #4 | `--accept-license`; no harmful data bundled by default |
 | 11 | **BadLikertJudge** multi-turn attack | PyRIT | 🟡 | Med | #1 | graded; multi-turn fold |
 | 12 | **LLM-driven converters** (paraphrase/persuasion/tense) | PyRIT | 🟡 | Med — amplifies every probe | transform pipeline (exists, deterministic) | **breaks determinism → opt-in + labeled** |
@@ -111,9 +113,9 @@ Two distinct sources, two mechanisms — this distinction matters:
 - **Effort:** 🟡 Moderate — a retrieval harness + `latentinjection`-style probe variants. Reuses the existing surface + tool-channel machinery.
 - **Value:** High — Behavioral evidence for LLM08 instead of an inlined proxy.
 
-### 9. z-score calibration (copy garak's best honesty feature)
-- **What:** report each model's conclusive score **relative to a reference cohort/baseline** ("this model is N std-devs more vulnerable than the reference on LLM01"). garak's z-score/calibration is the one honesty feature it has and we don't.
-- **Effort:** 🟡 Moderate — we already persist baselines; add a reference-cohort comparison + a z-score field in the report.
+### 9. ✅ z-score calibration (copy garak's best honesty feature) — SHIPPED `cd97a11`
+- **What:** report each model's conclusive score **relative to a reference cohort** ("this model is N std-devs more vulnerable than the reference on LLM01"). garak's z-score/calibration is the one honesty feature it has and we don't.
+- **Shipped:** `Calibration/CalibrationProfile`+`CalibrationStat` (user-supplied cohort JSON: per-attack `mean`/`stdDev` + `Source`/`SampleSize` provenance; **no built-in cohort** — a fabricated one would make z a lie) + `Calibrator.Calibrate(result, profile, threshold=2.0)` → per-attack z bands (UnusuallyVulnerable ≤−2σ / WithinNormalRange / UnusuallyRobust ≥+2σ / Undefined when σ=0) + CLI `--calibration <cohort.json>` (informational — never changes verdict/exit code; conclusive-only; surfaces "not calibrated" attacks). Credited to garak (Apache-2.0) in code + `docs/redteam.md`. CLI 30→31; +19 tests; net8/9 4963, net10 5166/0/1.
 
 ### 6 / 10 / 11 / 12 / 13: see the backlog table — all 🟡, sequenced after the gap-closers.
 
@@ -142,7 +144,7 @@ Two distinct sources, two mechanisms — this distinction matters:
 
 **PR-2 (close the real gaps):** #7 LLM03 registry oracle · #8 LLM08 RAG harness + latentinjection. This is the headline competitive move — it removes the only two categories where garak genuinely beats us.
 
-**PR-3 (breadth + calibration):** #10 PackDownloader + license gate (HarmBench/JailbreakBench/CyberSecEval) · #9 z-score calibration · #6 leakreplay · #11 BadLikertJudge · #12 LLM-driven converters.
+**PR-3 (breadth + calibration):** #10 PackDownloader + license gate (HarmBench/JailbreakBench/CyberSecEval) · ✅ #9 z-score calibration (SHIPPED `cd97a11`) · #6 leakreplay · #11 BadLikertJudge · #12 LLM-driven converters.
 
 **Later (Wave G):** #13 tool-aware multi-turn attack · #14 LLM10 metering · #15 atkgen · #16 memory/multi-agent.
 
