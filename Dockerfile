@@ -21,7 +21,7 @@
 
 # ─── Stage 1: SPA build ───────────────────────────────────────────────────────
 # SEC-14: base images use floating major tags for readability. For reproducible
-# builds, pin each FROM to a digest (e.g. `node:22-alpine@sha256:<digest>`) and
+# builds, pin each FROM to a digest (e.g. `node:26-alpine@sha256:<digest>`) and
 # let Dependabot keep the digests current — `.github/dependabot.yml` enables the
 # `docker` ecosystem for this file, which opens PRs to refresh the pinned digests.
 FROM node:26-alpine AS spa

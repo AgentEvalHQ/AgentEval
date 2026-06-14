@@ -100,7 +100,7 @@ and `--force` to overwrite an existing target.
 | Code | Meaning |
 |------|---------|
 | `0` | Dataset written successfully. |
-| `1` | Invalid format or the target file already exists. |
+| `2` | Invalid format or the target file already exists. |
 
 ---
 
