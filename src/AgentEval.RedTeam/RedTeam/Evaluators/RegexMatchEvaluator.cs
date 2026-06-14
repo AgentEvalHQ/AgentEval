@@ -140,7 +140,7 @@ public class RegexMatchEvaluator : IProbeEvaluator
     }
 
     // Jun14v2-L2: a non-reversible digest of a sensitive capture — keeps enough to correlate findings (first/last char +
-    // length) without emitting the raw PII/secret into a Reason/MatchedItems field that reaches JSON/SARIF unredacted.
+    // length) without emitting the raw PII/secret into a Reason string that reaches JSON/SARIF unredacted.
     private static string Mask(string value)
     {
         if (string.IsNullOrEmpty(value)) return "(empty)";
