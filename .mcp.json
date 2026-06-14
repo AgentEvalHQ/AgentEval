@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "maf-doctor": {
+      "type": "stdio",
+      "command": "maf-doctor",
+      "args": [],
+      "env": {}
+    }
+  }
+}
