@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Dependencies — Microsoft Agent Framework 1.10.0 upgrade
+
+Bumped the repo from MAF 1.3.0 to **1.10.0** (latest), with the matching Microsoft.Extensions.AI
+stack. No source changes were required — none of the 1.4→1.10 breaking surfaces are used; the
+full build is clean (net8/9/10, 0 warnings, 0 errors) and the entire test suite is green
+(18,353 passed, 0 failed). maf-doctor health remained grade **B** (0 errors, 0 warnings, 0
+fan-out starvation risks).
+
+#### Changed
+- **MAF 1.3.0 → 1.10.0** (central, via `Directory.Packages.props`): `Microsoft.Agents.AI`,
+  `Microsoft.Agents.AI.OpenAI`, `Microsoft.Agents.AI.Workflows`, `Microsoft.Agents.AI.Workflows.Generators`.
+- **Microsoft.Extensions.AI 10.5.0 → 10.6.0**: base, `.OpenAI`, `.Evaluation.Quality`.
+- **System.Numerics.Tensors 10.0.6 → 10.0.8** — floor raised by Microsoft.Extensions.AI 10.6.0
+  (resolves NU1109 downgrade).
+- **`AgentEval.TravelDemo`** consolidated into Central Package Management (dropped its inline
+  pins and `ManagePackageVersionsCentrally=false`); now resolves MAF 1.10.0 from the central props.
+- **`AgentEval.TravelDemo.Evals`** upgraded to MAF 1.10.0 and switched from the published
+  `AgentEval` NuGet package (still built on 1.3.0) to direct `ProjectReference`s on the AgentEval
+  sub-projects (Abstractions, Core, MAF), keeping it in lockstep with the demo it evaluates.
+
+#### Preserved
+- Security pins retained: `OpenTelemetry.Api` 1.15.3 (GHSA-g94r-2vxg-569j), `Azure.AI.OpenAI` 2.8.0-beta.1.
+- NuGet-consumer samples (`AgentEval.NuGetConsumer`, `.NuGetConsumer.Tests`) intentionally left on
+  the published 1.3.0-based AgentEval package — they exist specifically to validate consumption of
+  the published package, so they move once a 1.10.0-based AgentEval release is published.
+
 ### Red Team — feature-complete + oracle-honesty hardening (2026-06-14)
 
 The red-team module went from MVP to feature-complete and **honesty-hardened**. See
