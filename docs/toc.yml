@@ -20,8 +20,6 @@
     href: cross-framework.md
   - name: Fluent Assertions
     href: assertions.md
-  - name: Runtime Policy Gate
-    href: guardrails.md
   - name: LLM as a Judge
     href: llm-as-judge.md
   - name: Stochastic Evaluation
