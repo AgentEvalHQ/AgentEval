@@ -1,4 +1,4 @@
-﻿name: LLM Integration Tests (On-Demand)
+name: LLM Integration Tests (On-Demand)
 
 # This workflow runs integration tests that require actual LLM API calls.
 # It's designed to be run on-demand (manually) or before releases to minimize costs.
@@ -63,16 +63,16 @@ jobs:
 
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
 
     - name: Setup .NET 10
-      uses: actions/setup-dotnet@v4
+      uses: actions/setup-dotnet@v5
       with:
         dotnet-version: '10.0.x'
         dotnet-quality: 'preview'
 
     - name: Cache NuGet packages
-      uses: actions/cache@v4
+      uses: actions/cache@v5
       with:
         path: ~/.nuget/packages
         key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj', '**/Directory.Packages.props') }}
@@ -117,7 +117,7 @@ jobs:
         AZURE_OPENAI_DEPLOYMENT_2: ${{ inputs.model == 'gpt-4o' && 'gpt-4o-mini' || 'gpt-4o' }}
 
     - name: Upload Test Results
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       if: always()
       with:
         name: integration-test-results
@@ -128,7 +128,7 @@ jobs:
 
     - name: Publish Test Summary
       # SHA-pinned (SEC-04): third-party action; resolved from the v1 moving tag, kept current by Dependabot.
-      uses: dorny/test-reporter@d61b558e8df85cb60d09ca3e5b09653b4477cea7 # v1
+      uses: dorny/test-reporter@29672c52a8220c09bd9f79b5b6cf6315f1763996 # v1
       if: always()
       with:
         name: LLM Integration Test Results
@@ -157,16 +157,16 @@ jobs:
 
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
 
     - name: Setup .NET 10
-      uses: actions/setup-dotnet@v4
+      uses: actions/setup-dotnet@v5
       with:
         dotnet-version: '10.0.x'
         dotnet-quality: 'preview'
 
     - name: Cache NuGet packages
-      uses: actions/cache@v4
+      uses: actions/cache@v5
       with:
         path: ~/.nuget/packages
         key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj', '**/Directory.Packages.props') }}
