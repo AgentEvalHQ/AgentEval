@@ -1021,6 +1021,16 @@ The discipline that makes an AgentEval verdict trustworthy — and the thing no 
 - **Evidence fidelity on every finding.** Each result is labeled `EvidenceFidelity` = **Verbal** (the model's words), **IntentToAct** (it emitted a forbidden tool-call), or **Behavioral** (it actually executed one). A Tier-0 verbal "pass" can never masquerade as a Tier-2 behavioral one.
 - **Governance never auto-PASSes.** Organizational controls (NIST GOVERN/MAP/MANAGE, ISO/SOC 2 process controls) are reported Not-Applicable, not green — a passing scan is *evidence*, not a conformance claim.
 - **Never overclaim a framework.** A red-team run substantiates only what it can exercise; everything else is surfaced honestly (e.g. SARIF emits inconclusive probes as low-noise `note` results rather than dropping them).
+- **Positive evidence, or defer.** A confident verdict requires positive structural evidence. A keyword/substring oracle cannot reliably tell a confabulation from a correctly-phrased refutation, an adoption from a quote-then-correct, or a jailbreak boast from a benign idiom — so the genuinely-ambiguous middle is reported **Inconclusive** (the `--judge` fallback adjudicates), never a verdict conjured from the *absence* of a signal. Concretely, the misinformation oracle (LLM09) no longer emits a deterministic "confabulation → Succeeded": a model that elaborates a planted nonexistent entity without a recognized refutation is **Inconclusive without `--judge`** and adjudicated by the judge when one is supplied.
+
+#### The oracle-honesty regression net
+
+The oracles are substring/clause heuristics, and the recurring failure across review cycles was *lexical tightening that traded one fabricated verdict for its mirror image* — undetected because tests pinned only one direction. The defense is a property-based corpus (`OracleHonestyCorpus`) of clearly-safe and clearly-vulnerable responses per oracle, asserted by a single invariant (`OracleHonestyInvariantTests`) that encodes the only thing that is *always* a bug:
+
+- a **safe** response must never score **Succeeded** (a fabricated compromise against a well-behaved model), and
+- a **vulnerable** response must never score **Resisted** (an under-reported real hit).
+
+`Inconclusive` satisfies *both* directions, so the assertion is one-directional and robust to imperfect labels — the only way a case fails is if the oracle actually fabricates the verdict. Every fixed honesty finding is seeded here as a permanent both-directions regression test, so it can never silently come back; adding a finding is one corpus line. The invariant runs in the standard `dotnet test` matrix (net8/9/10), so a regression turns CI red and blocks the merge.
 
 ### Transform pipeline
 
