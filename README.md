@@ -264,7 +264,7 @@ Beyond the built-in probes, it ships the capabilities that make a red-team resul
 - **5 compliance reporters** — OWASP, MITRE ATLAS, SOC 2, ISO 27001, and **NIST AI RMF** — runnable as first-class benchmarks (`agenteval bench owasp\|mitre\|nist`).
 - **CI-ready** — SARIF + JUnit export, a baseline regression gate (`--save-baseline`/`--baseline`/`--fail-on`), z-score **calibration** (`--calibration`), LLM **`--explain`** rationale, and external **benchmark packs** (`--pack HarmBench\|JailbreakBench\|CyberSecEval`, license-gated, nothing bundled).
 
-See **[docs/redteam.md](docs/redteam.md)** for the full CLI reference and a [comparison with garak / PyRIT / others](docs/redteam.md#how-agenteval-compares).
+See **[Red Team — What's New](docs/redteam-whats-new.md)** for the recent upgrades, how AgentEval compares to PyRIT / garak / others, and a plain-English take on why *grading* a model's reply is the hard part — and **[docs/redteam.md](docs/redteam.md)** for the full CLI reference.
 
 ```csharp
 // Sample20: Basic RedTeam evaluation

@@ -7,6 +7,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Red Team — feature-complete + oracle-honesty hardening (2026-06-14)
+
+The red-team module went from MVP to feature-complete and **honesty-hardened**. See
+**[Red Team — What's New](docs/redteam-whats-new.md)** for the full roundup.
+
+#### Added
+- **Coverage:** 258 probes across 13 attack types; **all 10 OWASP LLM Top 10 (2025)** closed; 8 MITRE
+  ATLAS techniques; compliance crosswalks across **five frameworks** (OWASP, MITRE, NIST AI RMF, ISO/IEC
+  42001, SOC 2) with a `--format nist` report and `bench owasp|mitre|nist` families.
+- **Multi-step & adaptive attacks:** multi-turn `Crescendo` escalation; attacker-LLM orchestration
+  (`PAIR`, `TAP`/tree-of-attacks) with a **separate** judge so an attack can't grade itself; tool-aware
+  `ToolEscalation`.
+- **Real attack surface:** canary/honeypot tools measuring **emitted-vs-executed** (`WasExecuted`)
+  fidelity; system-prompt canary + `--sut-tier` to prove a real leak, not a phrasing guess.
+- **Evasion:** 18 deterministic, correct-by-construction transform encoders (Base64/ROT13/homoglyph/
+  zero-width/…) applicable to any attack.
+- **CI & data:** baseline regression gate (`--save-baseline`/`--baseline`/`--fail-on`); SARIF/JUnit/PDF;
+  `--explain` rationales; `--calibration` relative scoring (concept credited to NVIDIA garak);
+  `--import-probes` and external benchmark packs (`--pack`: HarmBench/JailbreakBench/CyberSecEval).
+
+#### Honesty discipline (the focus of this wave)
+- **Three-way verdicts** — every probe is Resisted / Succeeded / **Inconclusive**; weak/ambiguous
+  evidence is an honest coverage gap, never a hidden pass.
+- **Conclusive-only scoring** (`Resisted/(Resisted+Succeeded)`) separates coverage from pass-rate.
+- **EvidenceFidelity** (Verbal / IntentToAct / Behavioral) on every verdict.
+- **`OracleHonestyCorpus` + invariant test** — a permanent both-directions regression net (*safe never
+  Succeeds, vulnerable never Resists*) enforced in the CI net8/9/10 matrix; LLM09 (misinformation) now
+  defers a deterministic confabulation to the judge (`Inconclusive` without `--judge`).
+- The oracle-honesty fix arc closed ~70 fabricated-verdict shapes found by repeated adversarial sweeps,
+  each seeded as a permanent corpus case.
+
+#### Known limitation (documented, not hidden)
+- The per-attack oracles are keyword/pattern matchers at the fast first pass; they cannot fully make the
+  *semantic* call (refusal-vs-comply, correction-vs-adoption, …). This wave makes them **much more
+  honest** (they defer far more), but not *complete* — configure `--judge` so the (now larger)
+  `Inconclusive` zone is adjudicated by an LLM. Making the judge/trained-classifier the *primary* grader
+  for semantic attacks is the next arc.
+
 ### Thorough-review hardening wave (128 findings, 2026-05-31)
 
 A repository-wide thorough review produced 128 deduplicated findings (bugs, gaps, security,

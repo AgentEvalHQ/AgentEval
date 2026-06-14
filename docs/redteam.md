@@ -2,6 +2,8 @@
 
 AgentEval's Red Team module provides **automated security evaluation** for AI agents with probes based on [OWASP LLM Top 10](https://owasp.org/www-project-top-10-for-large-language-model-applications/) and [MITRE ATLAS](https://atlas.mitre.org/) taxonomies.
 
+> 🆕 **New here, or catching up on recent changes?** Read **[Red Team — What's New](redteam-whats-new.md)** for the recent coverage/multi-turn/real-tool upgrades, how AgentEval compares to PyRIT/garak and others, and a plain-English take on the hardest problem in red-teaming (trusting the verdict).
+
 ## Capabilities at a glance
 
 **13 built-in attacks · 258 probes · OWASP LLM Top 10 (10/10) · 8 MITRE ATLAS techniques · 5 compliance reporters.** Every capability below is reachable from the [`agenteval redteam` CLI](#agenteval-redteam--cli-reference) and the [`AttackPipeline`](#pipeline-api).
