@@ -73,23 +73,58 @@ Honoured **only** when launching Mission Control directly (`dotnet run --project
 
 ### `agenteval init`
 
-Initialize the `.agenteval/` workspace for the current solution.
+Initialize a starter evaluation dataset in the current directory.
 
 **Synopsis**
 
 ```
-agenteval init [--name <display-name>]
+agenteval init [--format yaml|json] [-o <path>] [--force]
 ```
 
 **What it does**
 
-Walks up from the current directory until it finds a `.sln`, `.slnx`, or `.git` marker and treats that directory as the workspace root. Creates `.agenteval/` if it does not exist, then writes three files:
+Writes a sample dataset file for the legacy `eval` command surface. The default output is
+`agenteval.yaml`; pass `--format json` for a JSON starter, `-o` to choose a different file,
+and `--force` to overwrite an existing target.
+
+**Options**
+
+| Option | Description |
+|--------|-------------|
+| `--format <yaml|json>` | Output format. Default: `yaml`. |
+| `-o, --output <path>` | Output file path. Default: `agenteval.{format}`. |
+| `--force` | Overwrite an existing file. |
+
+**Exit codes**
+
+| Code | Meaning |
+|------|---------|
+| `0` | Dataset written successfully. |
+| `1` | Invalid format or the target file already exists. |
+
+---
+
+### `agenteval init-workspace`
+
+Initialize the canonical `.agenteval/` workspace for the current solution.
+
+**Synopsis**
+
+```
+agenteval init-workspace [--name <display-name>]
+```
+
+**What it does**
+
+Walks up from the current directory until it finds a `.sln`, `.slnx`, or `.git` marker and treats
+that directory as the workspace root. Creates `.agenteval/` if it does not exist, then writes:
 
 - `solution.json` — solution-level identity: a random UUID, the display name, and `schemaVersion: "1.0"`.
 - `README.md` — overview of the workspace layout.
 - `.gitignore` — excludes per-run artifacts and red-team outputs from source control.
 
-If `solution.json` already exists, the command reports that the workspace is already initialized and exits cleanly.
+If `solution.json` already exists, the command reports that the workspace is already initialized and
+exits cleanly.
 
 **Options**
 
@@ -97,19 +132,55 @@ If `solution.json` already exists, the command reports that the workspace is alr
 |--------|-------------|
 | `--name <display-name>` | Display name to record in `solution.json`. Defaults to the directory name of the solution root. |
 
-**Example**
-
-```
-$ agenteval init --name "MyProject"
-✔ Initialized .agenteval/ at /home/user/myproject/.agenteval
-```
-
 **Exit codes**
 
 | Code | Meaning |
 |------|---------|
 | `0` | Initialized successfully (or already initialized). |
 | `1` | Could not locate a solution root. |
+
+---
+
+### `agenteval eval`
+
+Evaluate an AI agent against a dataset.
+
+**Synopsis**
+
+```
+agenteval eval --dataset <path> --endpoint <url> [--model <name>] [--azure --deployment-name <name>] [options]
+```
+
+**What it does**
+
+Loads a YAML, JSON, JSONL, CSV, or TSV dataset, evaluates the agent, and exports results as JSON,
+JUnit/XML, Markdown, TRX, CSV, or a structured directory. It supports stochastic reruns,
+LLM-as-judge, custom metrics, and the `--output-dir` ADR-002 directory export.
+
+**Key options**
+
+| Option | Description |
+|--------|-------------|
+| `--dataset <path>` | Required. Input dataset file. |
+| `--endpoint <url>` / `--azure` / `--deployment-name <name>` | Choose OpenAI-compatible or Azure OpenAI mode. |
+| `--model <name>` | Required for non-Azure endpoints. |
+| `--api-key <key>` | API key or environment variable fallback. |
+| `--system-prompt` / `--system-prompt-file` | Set the agent system prompt inline or from file. |
+| `--temperature` / `--max-tokens` | Sampling and output-length controls. |
+| `--metrics <list>` | Comma-separated metric names to run. |
+| `--runs <N>` / `--success-threshold <N>` | Stochastic evaluation controls. |
+| `--judge` / `--judge-model` | Separate LLM-as-judge endpoint/model. |
+| `--format <fmt>` | Export format. |
+| `-o, --output <path>` | Output file for single-file formats. |
+| `--output-dir <path>` | Structured directory output (`results.jsonl`, `summary.json`, `run.json`). |
+
+**Exit codes**
+
+| Code | Meaning |
+|------|---------|
+| `0` | Evaluation completed successfully. |
+| `1` | Test failure or validation error. |
+| `3` | Runtime error. |
 
 ---
 
@@ -208,35 +279,94 @@ Warnings (e.g. a subject folder with a missing `subject.json`) do not affect the
 
 ### `agenteval bench`
 
-Run a benchmark against a subject (agent or workflow). Three benchmark families ship: `gdpr`, `eu-ai-act`, and `agentic`. Each writes results under `.agenteval/compliance/{regulation}/...` (or `.agenteval/benchmarks/agentic/...` for the agentic family) and an audit-chained evidence file the portal and `agenteval doctor` can read.
+Run benchmark families against a subject (agent or workflow). The benchmark registry now includes
+GDPR, EU AI Act, Agentic, OWASP, MITRE, NIST, Performance, LongMemEval, Memory, Trace Fidelity,
+and AutoAudit. Results flow into `.agenteval/` so Mission Control and `agenteval doctor` can read
+them.
 
 **Synopsis**
 
 ```
-agenteval bench gdpr      [--preset <name>] [--subject <name>] [--root <path>] [--input <text>] [--runs <N>]
-agenteval bench gdpr      calibrate [--root <path>] [--out <path>]
-agenteval bench eu-ai-act [--preset <name>] [--subject <name>] [--root <path>] [--input <text>]
+agenteval bench --list
+agenteval bench <family> [family-specific options]
+agenteval bench gdpr calibrate [--root <path>] [--out <path>]
 agenteval bench eu-ai-act calibrate [--root <path>] [--out <path>]
-agenteval bench agentic   [--preset <name>] [--subject <name>] [--root <path>] [--input <text>] [--budget-tier <tier>]
-agenteval bench agentic   calibrate [--root <path>] [--out <path>]
+agenteval bench agentic calibrate [--root <path>] [--out <path>]
 ```
 
-**Common options**
+**Families**
+
+| Family | Purpose |
+|--------|---------|
+| `gdpr` | GDPR compliance benchmark. |
+| `eu-ai-act` | EU AI Act compliance benchmark. |
+| `agentic` | Agentic tool-use benchmark family. |
+| `owasp` | OWASP LLM Top 10 red-team benchmark. |
+| `mitre` | MITRE ATLAS red-team benchmark. |
+| `nist` | NIST AI RMF-style red-team benchmark. |
+| `perf` | Latency / throughput / cost benchmark. |
+| `longmemeval` | Long-context memory benchmark. |
+| `memory` | Memory retention / cross-session benchmark. |
+| `trace-fidelity` | Chat-boundary vs agent-boundary trace reconciliation. |
+| `autoaudit` | GlassBox-style multi-endpoint workflow auto-audit. |
+
+**Notes**
+
+- `agenteval bench --list` prints the registry-backed family catalog.
+- Compliance and agentic families support calibration helpers where available.
+- Family-specific options and presets are documented under [Benchmarks](benchmarks.md) and the family pages in the TOC.
+- For the Trace Fidelity and AutoAudit families, see the GlassBox docs under `docs/GlassBox/` (now linked in the TOC).
+
+---
+
+### `agenteval list`
+
+List the legacy command-surface catalogues used by `eval` / `redteam`.
+
+**Synopsis**
+
+```
+agenteval list [--type metrics|attacks|exporters|datasets]
+```
+
+**What it does**
+
+Prints the available metrics, attack types, export formats, and dataset formats. With no filter it
+prints all four catalogues.
+
+**Options**
 
 | Option | Description |
 |--------|-------------|
-| `--preset <name>` | Preset selector. GDPR: `smoke` / `standard` / `audit`, plus `+healthcare` / `+hr` / `+childrens` domain packs. EU AI Act: `smoke` / `standard` / `audit`, plus `+high-risk-employment` / `+high-risk-credit` / `+high-risk-education` domain packs. Agentic: `agentic-execution` / `tool-call-accuracy` / `rag-quality` / `judge-quality` / `safety` / `telemetry` / `stochastic-stability` / `conversational` / `reasoning` / `user-experience` / `adversarial-direct`. |
-| `--subject <name>` | Subject name (agent or workflow) under evaluation. Default: `default-agent`. |
-| `--root <path>` | Workspace root path. Default: auto-detected (walks up to `.sln` / `.slnx` / `.git`). |
-| `--input <text>` | Agent input text. Default: built-in fixture. |
-| `--budget-tier <tier>` | _Agentic only._ Filter by cost tier: `trivial` / `low` / `medium` / `high` / `all`. Components above the tier are removed and remaining weights renormalised. See [Cost Guidance](benchmarks/agentic/cost-guidance.md). |
-| `--runs <N>` | _GDPR only._ Run the benchmark N times and aggregate via `MajorityVote`. Default: 1. |
+| `--type <metrics|attacks|exporters|datasets>` | Print a single catalogue instead of all four. |
 
-**Reference docs**
+---
 
-- GDPR: [Getting Started](benchmarks/gdpr/getting-started.md)
-- EU AI Act: [Getting Started](benchmarks/eu-ai-act/getting-started.md)
-- Agentic: [Getting Started](benchmarks/agentic/getting-started.md) · [Cost Guidance](benchmarks/agentic/cost-guidance.md) · [Evaluator Cards](benchmarks/agentic/evaluator-cards.md)
+### `agenteval redteam`
+
+Run low-level red-team scans against an agent. This is the fully parameterised scanner surface; the
+`bench owasp` and `bench mitre` families wrap curated presets around it.
+
+**Synopsis**
+
+```
+agenteval redteam [--azure] [--endpoint <url>] [--model <name>] [--deployment-name <name>] [--attacks <list>] [--format <fmt>] ...
+```
+
+**Key options**
+
+| Option | Description |
+|--------|-------------|
+| `--azure` / `--endpoint` / `--deployment-name` | Azure OpenAI mode. |
+| `--endpoint` / `--model` | OpenAI-compatible mode (OpenAI, Ollama, Groq, vLLM, LM Studio, etc.). |
+| `--attacks` | Comma-separated attack list; `--pack` imports external benchmark packs. |
+| `--judge` / `--attacker` | Separate judge/attacker models for LLM-as-judge and attacker-LLM flows. |
+| `--format` / `-o` | Export format and output destination. |
+| `--baseline`, `--save-baseline`, `--fail-on` | Regression gating for CI. |
+| `--calibration` | Relative scoring against a reference cohort. |
+| `--explain` | Attach an LLM rationale to each finding (requires `--judge`). |
+
+For the full flag matrix and examples, see [Red Team Security](redteam.md).
 
 ---
 
