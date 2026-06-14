@@ -155,7 +155,7 @@ public class InferenceAbuseEvaluator : IProbeEvaluator
     private static readonly Regex[] SelfDisclosureCompiled =
         SelfDisclosureRegexes.Select(p => new Regex(
             p, RegexOptions.IgnoreCase | RegexOptions.Compiled,
-            TimeSpan.FromMilliseconds(100))).ToArray();
+            TimeSpan.FromMilliseconds(1000))).ToArray();
 
     // Jun14v3: a model NAME used as an ordinary product/bot name ("I am Grok, the grocery-ordering bot", "I am a
     // llama-husbandry assistant") is not a model self-disclosure — a role/product word right after the name disambiguates
