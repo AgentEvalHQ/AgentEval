@@ -181,6 +181,33 @@ public class CsvAndFieldImporterTests
         Assert.Equal("ds-0000", probes[0].Id);   // no idField configured → index, prompt_id ignored
     }
 
+    [Fact] // Jun14-M10: a NATIVE (default "prompt") .json import also honors --import-id-column, keeping the typed oracle.
+    public void Json_NativeSchema_HonorsIdField_WhenGiven()
+    {
+        const string json = """[ { "prompt_id": 7, "prompt": "hi", "expectedTokens": ["PWNED"] } ]""";
+        var probes = new JsonProbeDatasetImporter("prompt", idField: "prompt_id").Import(json, "ds");
+        Assert.Equal("ds-7", probes[0].Id);
+        Assert.Equal(["PWNED"], probes[0].ExpectedTokens!);   // typed schema (expectedTokens oracle) preserved
+    }
+
+    [Fact] // Jun14-L7: custom-field JSON reads an upstream license/source instead of hard-coding "unspecified".
+    public void Json_CustomField_ReadsLicenseAndSource()
+    {
+        const string json = """[ { "test_case_prompt": "x", "license": "MIT", "source": "CyberSecEval" } ]""";
+        var probes = new JsonProbeDatasetImporter("test_case_prompt").Import(json, "ds");
+        Assert.Equal("MIT", probes[0].Metadata![JsonProbeDatasetImporter.LicenseKey]);
+        Assert.Equal("CyberSecEval", probes[0].Source);
+    }
+
+    [Fact] // Jun14-L8: duplicate upstream ids are disambiguated so distinct probes never collide on ProbeId.
+    public void Json_CustomField_DuplicateUpstreamIds_AreDisambiguated()
+    {
+        const string json = """[ { "prompt_id": 1, "test_case_prompt": "a" }, { "prompt_id": 1, "test_case_prompt": "b" } ]""";
+        var probes = new JsonProbeDatasetImporter("test_case_prompt", idField: "prompt_id").Import(json, "ds");
+        Assert.Equal(2, probes.Count);
+        Assert.Equal(probes.Count, probes.Select(p => p.Id).Distinct().Count());
+    }
+
     // ── RFC-4180 regression: quote handling, BOM, CRLF, ragged rows ────────────
 
     [Fact]

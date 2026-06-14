@@ -74,6 +74,16 @@ public sealed class JsonProbeDatasetImporter : IProbeDatasetImporter
         if (records is null)
             throw new FormatException($"Dataset '{datasetName}' deserialized to null.");
 
+        // Jun14-M10: --import-id-column names a CUSTOM upstream id field (e.g. "prompt_id"). Honor it on the native
+        // typed path too — otherwise the documented option silently no-ops on a plain .json import and ids fall back
+        // to the index. Parse a parallel JsonArray once for the lookup; the typed deserialize above already validated shape.
+        JsonArray? idArray = null;
+        if (_idField is not null)
+        {
+            try { idArray = JsonNode.Parse(content) as JsonArray; }
+            catch (JsonException) { /* fall back to r.Id / index */ }
+        }
+
         var probes = new List<AttackProbe>(records.Count);
         for (var i = 0; i < records.Count; i++)
         {
@@ -89,7 +99,7 @@ public sealed class JsonProbeDatasetImporter : IProbeDatasetImporter
 
             probes.Add(new AttackProbe
             {
-                Id = string.IsNullOrWhiteSpace(r.Id) ? $"{datasetName}-{i:D4}" : r.Id!,
+                Id = ResolveNativeId(r, idArray, i, datasetName),
                 Prompt = r.Prompt!,
                 Difficulty = ParseDifficulty(r.Difficulty),
                 AttackName = datasetName,
@@ -99,6 +109,31 @@ public sealed class JsonProbeDatasetImporter : IProbeDatasetImporter
                 Metadata = meta,
             });
         }
+        return DisambiguateDuplicateIds(probes);
+    }
+
+    // Native-path id: a configured --import-id-column wins (namespaced like the custom-field path), else the dataset's
+    // own typed "id" field, else the array index.
+    private string ResolveNativeId(SeedRecord r, JsonArray? idArray, int i, string datasetName)
+    {
+        if (_idField is not null && idArray is not null && i < idArray.Count)
+        {
+            var idNode = idArray[i]?[_idField];
+            if (idNode is not null && idNode.GetValueKind() is JsonValueKind.String or JsonValueKind.Number)
+                return $"{datasetName}-{idNode}";
+        }
+        return string.IsNullOrWhiteSpace(r.Id) ? $"{datasetName}-{i:D4}" : r.Id!;
+    }
+
+    /// <summary>Jun14-L8: ensure unique probe Ids — duplicate / odd upstream ids would let a baseline or SARIF consumer
+    /// merge distinct findings. Appends <c>#{index}</c> to the second+ occurrence of any duplicated Id (deterministic
+    /// for a fixed dataset). Shared with the CSV importer.</summary>
+    internal static IReadOnlyList<AttackProbe> DisambiguateDuplicateIds(List<AttackProbe> probes)
+    {
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        for (var i = 0; i < probes.Count; i++)
+            if (!seen.Add(probes[i].Id))
+                probes[i] = probes[i] with { Id = $"{probes[i].Id}#{i}" };
         return probes;
     }
 
@@ -133,10 +168,12 @@ public sealed class JsonProbeDatasetImporter : IProbeDatasetImporter
 
             // L11: build per-probe metadata INSIDE the loop so the dictionary is not aliased across every probe
             // (matches the native-schema path above; a future per-probe stamp would otherwise mutate all of them).
+            // Jun14-L7: read an optional upstream license/source the same way as the id (the native path stamps these
+            // from the typed record; the custom-field path previously hard-coded "unspecified").
             var meta = new Dictionary<string, object>
             {
                 [DatasetKey] = datasetName,
-                [LicenseKey] = "unspecified",
+                [LicenseKey] = StringField(obj, "license") ?? "unspecified",
             };
 
             probes.Add(new AttackProbe
@@ -146,14 +183,18 @@ public sealed class JsonProbeDatasetImporter : IProbeDatasetImporter
                 Difficulty = Difficulty.Hard,
                 AttackName = datasetName,
                 Technique = "imported",
-                Source = datasetName,
+                Source = StringField(obj, "source") ?? datasetName,
                 Metadata = meta,
             });
         }
         if (probes.Count == 0)
             throw new FormatException($"Dataset '{datasetName}' has no objects with a non-empty '{_promptField}' field.");
-        return probes;
+        return DisambiguateDuplicateIds(probes);
     }
+
+    // Reads a string-valued field from a JSON object node, or null if absent/non-string.
+    private static string? StringField(JsonNode? obj, string field)
+        => obj?[field] is { } n && n.GetValueKind() == JsonValueKind.String ? n.GetValue<string>() : null;
 
     private static Difficulty ParseDifficulty(string? d) => (d ?? "").Trim().ToLowerInvariant() switch
     {

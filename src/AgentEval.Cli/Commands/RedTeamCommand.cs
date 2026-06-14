@@ -92,7 +92,7 @@ internal static class RedTeamCommand
         var parallelismOpt = new Option<int>("--parallelism")
             { DefaultValueFactory = _ => 1, Description = "Concurrent probes WITHIN an attack (default 1). >1 requires a thread-safe agent — see ScanOptions.Parallelism." };
         var timeoutPerProbeOpt = new Option<double>("--timeout-per-probe")
-            { DefaultValueFactory = _ => 30, Description = "Per-probe timeout in seconds (default 30)." };
+            { DefaultValueFactory = _ => 30, Description = "Per-probe timeout in seconds (default 30; must be > 0 and <= 86400)." };
         var maxTurnTimeoutOpt = new Option<double>("--max-turn-timeout")
             { DefaultValueFactory = _ => 0, Description = "Per-turn timeout (seconds) for multi-turn attacks (0 = inherit --timeout-per-probe)." };
 
@@ -645,8 +645,16 @@ internal static class RedTeamCommand
             : null;
 
         // L21: a negative throttle/timeout would silently disable bounding — reject it.
-        if (opts.DelaySeconds < 0 || opts.TimeoutPerProbeSeconds < 0 || opts.TimeoutPerTurnSeconds < 0)
-            throw new ArgumentException("--delay, --timeout-per-probe and --max-turn-timeout must be non-negative.");
+        if (opts.DelaySeconds < 0 || opts.TimeoutPerTurnSeconds < 0)
+            throw new ArgumentException("--delay and --max-turn-timeout must be non-negative.");
+        // Jun14-M12: a 0s per-probe timeout cancels EVERY probe immediately (0%-coverage scan with no error) — reject it.
+        if (opts.TimeoutPerProbeSeconds <= 0)
+            throw new ArgumentException("--timeout-per-probe must be positive (a 0s timeout cancels every probe).");
+        // Jun14-L11: above ~1 day, CancelAfter / TimeoutPerTurn.Ticks*MaxTurns overflow and surface as per-probe
+        // faults mid-scan — fail fast at validation with a clear ceiling instead.
+        const double MaxTimeoutSeconds = 86_400;
+        if (opts.TimeoutPerProbeSeconds > MaxTimeoutSeconds || opts.TimeoutPerTurnSeconds > MaxTimeoutSeconds)
+            throw new ArgumentException($"--timeout-per-probe / --max-turn-timeout must be <= {MaxTimeoutSeconds:F0} seconds (1 day).");
 
         return new ScanOptions
         {

@@ -83,7 +83,7 @@ public sealed class CsvProbeDatasetImporter : IProbeDatasetImporter
 
         if (probes.Count == 0)
             throw new FormatException($"Dataset '{datasetName}' CSV had a header but no usable '{_promptColumn}' rows.");
-        return probes;
+        return JsonProbeDatasetImporter.DisambiguateDuplicateIds(probes);   // Jun14-L8: unique probe Ids
     }
 
     private static int IndexOf(string[] header, string column)

@@ -751,6 +751,16 @@ public class RedTeamCommandTests
         => Assert.Throws<ArgumentException>(() => RedTeamCommand.BuildScanOptions(
             new RedTeamOptions { Intensity = "quick", Format = "json", DelaySeconds = -1 }, null, Intensity.Quick, null, null));
 
+    [Fact] // Jun14-M12: a 0s per-probe timeout would silently zero a whole scan's coverage — reject it.
+    public void BuildScanOptions_ZeroTimeoutPerProbe_Throws()
+        => Assert.Throws<ArgumentException>(() => RedTeamCommand.BuildScanOptions(
+            new RedTeamOptions { Intensity = "quick", Format = "json", TimeoutPerProbeSeconds = 0 }, null, Intensity.Quick, null, null));
+
+    [Fact] // Jun14-L11: an extreme timeout overflows CancelAfter / tick math mid-scan — fail fast at validation.
+    public void BuildScanOptions_ExtremeTimeout_Throws()
+        => Assert.Throws<ArgumentException>(() => RedTeamCommand.BuildScanOptions(
+            new RedTeamOptions { Intensity = "quick", Format = "json", TimeoutPerProbeSeconds = 5_000_000 }, null, Intensity.Quick, null, null));
+
     // L22: an unknown --package-registry value fails fast in step 1, before any import/download.
     [Fact]
     public async Task ExecuteAsync_InvalidPackageRegistry_Throws_BeforeAnyScan()
