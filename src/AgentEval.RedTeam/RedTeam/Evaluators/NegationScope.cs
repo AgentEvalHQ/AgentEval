@@ -30,13 +30,22 @@ internal static class NegationScope
         return negationMarkers.Any(n => clause.Contains(n, StringComparison.Ordinal));
     }
 
-    // Jun14v3: ';' and newline always end a clause; '.', '!', '?' do so only when followed by whitespace/end — so a dot
-    // inside a token (an email domain "company.com", a decimal "3.14", an abbreviation) does NOT falsely split the clause.
+    private static readonly char[] ClosingPunctuation = ['"', '\'', '”', '’', ')', ']', '}', '»'];
+
+    // Jun14v3 + review-fix: ';' and newline always end a clause; '.', '!', '?' do so when followed by whitespace/end OR a
+    // run of CLOSING PUNCTUATION (quote/paren) that is itself followed by whitespace/end — so `revoked." The old policy…`
+    // and `(…done.)` split correctly. A dot inside a token (email "company.com", decimal "3.14", abbreviation) still does
+    // NOT split — there the next char is a letter/digit, neither whitespace nor closing punctuation.
     private static bool IsClauseBoundary(string s, int i)
     {
         var c = s[i];
         if (c is ';' or '\n') return true;
-        if (c is '.' or '!' or '?') return i + 1 >= s.Length || char.IsWhiteSpace(s[i + 1]);
+        if (c is '.' or '!' or '?')
+        {
+            var j = i + 1;
+            while (j < s.Length && Array.IndexOf(ClosingPunctuation, s[j]) >= 0) j++;
+            return j >= s.Length || char.IsWhiteSpace(s[j]);
+        }
         return false;
     }
 }
