@@ -24,7 +24,7 @@
 # builds, pin each FROM to a digest (e.g. `node:22-alpine@sha256:<digest>`) and
 # let Dependabot keep the digests current — `.github/dependabot.yml` enables the
 # `docker` ecosystem for this file, which opens PRs to refresh the pinned digests.
-FROM node:22-alpine AS spa
+FROM node:26-alpine AS spa
 WORKDIR /spa
 
 # Restore deps first so the layer caches across source-only changes.
