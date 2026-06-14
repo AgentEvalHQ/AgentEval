@@ -19,13 +19,16 @@
     <PackAsTool>true</PackAsTool>
     <ToolCommandName>agenteval</ToolCommandName>
     <PackageId>AgentEval.Cli</PackageId>
-    <!-- Version intentionally NOT hardcoded — release.yml sets -p:PackageVersion=... on CI.
-         Local packs default to 1.0.0 unless overridden, which keeps experimental local
-         packs out of accidental drift with the umbrella's authoritative version. -->
+    <!-- Version is NOT hardcoded here — it is inherited from the single source of truth in
+         Directory.Build.props (<Version>), so the CLI and the umbrella AgentEval package always
+         share one number and release in lockstep. release.yml overrides both with
+         -p:PackageVersion=<tag> on CI. -->
     <Description>AgentEval CLI — terminal + CI/CD entry point for the .NET evaluation toolkit. The agenteval init command bootstraps a .agenteval/ workspace; agenteval bench {gdpr|eu-ai-act|agentic|owasp|mitre|perf|longmemeval|memory} runs benchmark families; agenteval mc serve launches the local Mission Control portal (requires .NET 10); agenteval doctor verifies workspace integrity via canonical-JSON audit-chain hashing.</Description>
     <PackageTags>ai;agent;evaluation;cli;dotnet-tool;testing;benchmarking;gdpr;eu-ai-act;owasp;mitre;atlas;compliance</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>v0.10.1-beta + v1.1 prerelease: first published version of the CLI as a dotnet tool. Install with: dotnet tool install --global AgentEval.Cli --prerelease. Provides bench, init, doctor, migrate, and mc commands. Audit chain v2 (canonical-JSON re-hash) is BREAKING for pre-v1.1 workspaces — re-run agenteval bench to regenerate.</PackageReleaseNotes>
+    <!-- Release notes are intentionally version-agnostic — the per-version detail lives in
+         CHANGELOG.md so this string never drifts out of date as PackageVersion is bumped on CI. -->
+    <PackageReleaseNotes>Install: dotnet tool install --global AgentEval.Cli --prerelease. Per-version release notes: https://github.com/AgentEvalHQ/AgentEval/blob/main/CHANGELOG.md</PackageReleaseNotes>
     <PublishRepositoryUrl>true</PublishRepositoryUrl>
     <EmbedUntrackedSources>true</EmbedUntrackedSources>
     <!-- snupkg symbol package for parity with the umbrella package. SourceLink lets users
@@ -39,7 +42,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None Include="../../README.md" Pack="true" PackagePath="\" />
+    <!-- CLI-specific package README (install + command surface), not the umbrella's root README. -->
+    <None Include="README.md" Pack="true" PackagePath="\" />
   </ItemGroup>
 
   <ItemGroup>

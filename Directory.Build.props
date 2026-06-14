@@ -26,7 +26,14 @@
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageProjectUrl>https://github.com/joslat/AgentEval</PackageProjectUrl>
     <Copyright>Copyright © 2026 Jose Luis Latorre</Copyright>
-    
+
+    <!-- Single source of truth for the package version. The umbrella AgentEval package and the
+         AgentEval.Cli dotnet tool are built from one source tree and released together on one
+         tag, so they version in lockstep. Keeping the number here (and nowhere else) makes that
+         parity structural — there is no second number to drift. CI overrides this for releases
+         via `dotnet pack -p:PackageVersion=<tag>`. -->
+    <Version>0.12.0-beta</Version>
+
     <!-- Package icon for NuGet -->
     <PackageIcon>AgentEvalNugetLogoAE.png</PackageIcon>
   </PropertyGroup>

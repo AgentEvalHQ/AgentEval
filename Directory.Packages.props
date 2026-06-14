@@ -9,15 +9,15 @@
   
   <ItemGroup>
     <!-- Microsoft Agent Framework -->
-    <PackageVersion Include="Microsoft.Agents.AI" Version="1.3.0" />
-    <PackageVersion Include="Microsoft.Agents.AI.OpenAI" Version="1.3.0" />
-    <PackageVersion Include="Microsoft.Agents.AI.Workflows" Version="1.3.0" />
-    <PackageVersion Include="Microsoft.Agents.AI.Workflows.Generators" Version="1.3.0" />
+    <PackageVersion Include="Microsoft.Agents.AI" Version="1.10.0" />
+    <PackageVersion Include="Microsoft.Agents.AI.OpenAI" Version="1.10.0" />
+    <PackageVersion Include="Microsoft.Agents.AI.Workflows" Version="1.10.0" />
+    <PackageVersion Include="Microsoft.Agents.AI.Workflows.Generators" Version="1.10.0" />
     
     <!-- Microsoft Extensions AI -->
-    <PackageVersion Include="Microsoft.Extensions.AI" Version="10.5.0" />
-    <PackageVersion Include="Microsoft.Extensions.AI.OpenAI" Version="10.5.0" />
-    <PackageVersion Include="Microsoft.Extensions.AI.Evaluation.Quality" Version="10.5.0" />
+    <PackageVersion Include="Microsoft.Extensions.AI" Version="10.6.0" />
+    <PackageVersion Include="Microsoft.Extensions.AI.OpenAI" Version="10.6.0" />
+    <PackageVersion Include="Microsoft.Extensions.AI.Evaluation.Quality" Version="10.6.0" />
 
     <!-- Azure -->
     <!-- SEC-13: Azure.AI.OpenAI is a direct ref of AgentEval.Cli (packed/published as a global
@@ -31,7 +31,8 @@
     <PackageVersion Include="Azure.Identity" Version="1.18.0" />
     
     <!-- Core -->
-    <PackageVersion Include="System.Numerics.Tensors" Version="10.0.6" />
+    <PackageVersion Include="System.Numerics.Tensors" Version="10.0.8" /><!-- floor raised by Microsoft.Extensions.AI 10.6.0 (MAF 1.10.0) -->
+    <PackageVersion Include="System.Memory.Data" Version="10.0.3" />
     <!-- Security: pin to patch that resolves GHSA-g94r-2vxg-569j (transitive via MAF 1.3.0) -->
     <PackageVersion Include="OpenTelemetry.Api" Version="1.15.3" />
     <PackageVersion Include="System.CommandLine" Version="2.0.3" />
