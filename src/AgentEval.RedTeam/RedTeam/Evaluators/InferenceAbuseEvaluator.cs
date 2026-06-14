@@ -155,7 +155,7 @@ public class InferenceAbuseEvaluator : IProbeEvaluator
     private static readonly string[] ModelNameRoleDisambiguators =
     [
         "bot", "helper", "husbandry", "grocery", "shopping", "ordering", "wellness", "farmer", "check-in",
-        "-care", "for fresh", "train", "railway", "airline", "grocer",
+        "-care", "for fresh", "train", "railway",
     ];
 
     // rev2-#8: a strong AI-identity tell in the window means it IS a model disclosure — never suppress it as a role bot.
