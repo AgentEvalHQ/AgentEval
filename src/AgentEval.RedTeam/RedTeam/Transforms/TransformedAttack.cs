@@ -47,8 +47,10 @@ public sealed class TransformedAttack : IAttackType
         // One pass enforcing the IProbeTransformer.Name contract:
         //  • '+' and '>' are reserved delimiters for probe-Id suffixes (id+name) and chain provenance (name>name),
         //    so a Name containing either would make the chain string ambiguous to parse back (built-ins are safe).
-        //  • two transformers sharing a Name (or the SAME instance twice) would emit duplicate probe Ids
-        //    (seed+base64 for each) → result-map / baseline collisions, so reject duplicates loudly (L13).
+        //    This guards the chain-string parse in BOTH modes, so it is unconditional.
+        //  • Jun14-M5: duplicate Names only COLLIDE in Expand mode — there each sibling stamps the seed Id as
+        //    `seed+base64`, so two `base64`s collide. In Chain mode the same `[base64, base64]` composes to distinct
+        //    ids (`seed+base64+base64`) and is a legitimate recursive same-codec encoding, so the dedup is Expand-only.
         var names = new HashSet<string>(StringComparer.Ordinal);
         foreach (var t in _transformers)
         {
@@ -56,9 +58,9 @@ public sealed class TransformedAttack : IAttackType
                 throw new ArgumentException(
                     $"Transformer Name '{t.Name}' contains a reserved delimiter ('+' or '>'); see IProbeTransformer.Name.",
                     nameof(transformers));
-            if (!names.Add(t.Name))
+            if (mode == TransformMode.Expand && !names.Add(t.Name))
                 throw new ArgumentException(
-                    $"Duplicate transformer Name '{t.Name}'; transformed probe Ids would collide (id+{t.Name}).",
+                    $"Duplicate transformer Name '{t.Name}'; transformed probe Ids would collide (id+{t.Name}) in Expand mode.",
                     nameof(transformers));
         }
         _mode = mode;

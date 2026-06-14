@@ -177,4 +177,17 @@ public class TransformedAttackTests
         var b = new Base64Transformer();
         Assert.Throws<ArgumentException>(() => new TransformedAttack(new FakeAttack(), [b, b], TransformMode.Expand));
     }
+
+    [Fact] // Jun14-M5: a recursive same-codec CHAIN (base64-of-base64) composes to distinct Ids and is a legitimate
+    // evasion technique — it must NOT be rejected (the L13 dedup is Expand-only).
+    public void Chain_DuplicateTransformerName_IsAllowed_AndComposesDistinctIds()
+    {
+        var ta = new TransformedAttack(new FakeAttack(), [new Base64Transformer(), new Base64Transformer()], TransformMode.Chain);
+
+        var probes = ta.GetProbes(Intensity.Quick);
+
+        Assert.NotEmpty(probes);
+        Assert.All(probes, p => Assert.EndsWith("+base64+base64", p.Id));
+        Assert.Equal(probes.Count, probes.Select(p => p.Id).Distinct().Count());
+    }
 }

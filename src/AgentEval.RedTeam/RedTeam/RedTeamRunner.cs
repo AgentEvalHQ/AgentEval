@@ -452,7 +452,13 @@ public sealed class RedTeamRunner : IRedTeamRunner
                 var judged = await judge.EvaluateAsync(probe, responseText, probeCts.Token);
                 if (judged.Outcome != EvaluationOutcome.Inconclusive)
                 {
-                    evalResult = judged;
+                    // Jun14-M4: the judge Reason is LLM-authored from the RAW response and can quote sensitive content,
+                    // exactly like the --explain rationale H1 gated. Redact it on a redacted scan (Outcome/fidelity
+                    // are never altered — only the free-text Reason is suppressed) so it can't leak via Reason →
+                    // JSON/SARIF exporters when Prompt/Response are [REDACTED].
+                    evalResult = options.IncludeEvidence
+                        ? judged
+                        : judged with { Reason = $"LLM judge: {judged.Outcome} (reason suppressed; enable IncludeEvidence)" };
                     fidelity = judged.Outcome == EvaluationOutcome.Succeeded
                         ? EvidenceFidelity.IntentToAct
                         : EvidenceFidelity.Verbal;

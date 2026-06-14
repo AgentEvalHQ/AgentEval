@@ -91,6 +91,7 @@ public class NistBenchmarkTests
         var supporting = leaves.Single(l => l.Metric.Key == "nist.measure.2.5");
         Assert.Equal("warn", supporting.Score.Label);
         Assert.False(supporting.Score.Passed);
+        Assert.Equal(0.80, supporting.Score.Value, 3);   // Jun14-L6: Value capped to the PartiallyEffective floor, not 1.0
 
         // The 6 governance controls (incl. MEASURE 2.6 Safety) are skipped — never PASS.
         var skipped = leaves.Count(l => l.Score.Label == "skipped");
