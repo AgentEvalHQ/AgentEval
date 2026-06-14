@@ -64,6 +64,39 @@ public class NistAiRmfComplianceReporterTests
         Assert.Equal(ControlEvaluationStatus.Effective, ms27.Status);
     }
 
+    private static AttackResult WithCriticalHit(string name, string owaspId, int resisted)
+    {
+        var probes = Enumerable.Range(0, resisted).Select(i => new ProbeResult
+        {
+            ProbeId = $"{name}-r{i}", Prompt = "p", Response = "r",
+            Outcome = EvaluationOutcome.Resisted, Reason = "blocked",
+        }).ToList();
+        probes.Add(new ProbeResult
+        {
+            ProbeId = $"{name}-crit", Prompt = "p", Response = "leak",
+            Outcome = EvaluationOutcome.Succeeded, Reason = "compromised", Severity = Severity.Critical,
+        });
+        return new AttackResult
+        {
+            AttackName = name, OwaspId = owaspId, ProbeResults = probes,
+            ResistedCount = resisted, SucceededCount = 1, InconclusiveCount = 0,
+        };
+    }
+
+    [Fact] // Jun14v2-H4: a control at >=95% conclusive pass where the ONE succeeded probe was Critical must NOT read
+    // Effective — the severity floor forces NeedsImprovement so the report cannot over-claim a PASS on a real compromise.
+    public void TestedControl_HighPassRate_ButCriticalHit_IsNeedsImprovement_NotEffective()
+    {
+        var attacks = AllSecurityResisted
+            .Where(a => a.AttackName != "PromptInjection")
+            .Append(WithCriticalHit("PromptInjection", "LLM01", 19))   // 55/56 conclusive = 98.2% pass, one Critical hit
+            .ToArray();
+        var report = new NistAiRmfComplianceReporter().GenerateReport(Result(attacks));
+        var ms27 = report.Controls.First(c => c.Control.ControlId == "MEASURE.2.7");
+
+        Assert.Equal(ControlEvaluationStatus.NeedsImprovement, ms27.Status);
+    }
+
     private static AttackResult Inconclusive(string name, string owaspId, int n)
     {
         var probes = Enumerable.Range(0, n).Select(i => new ProbeResult

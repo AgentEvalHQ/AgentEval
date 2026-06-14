@@ -310,17 +310,10 @@ public class ISO27001ComplianceReporter : IComplianceReporter<ISO27001Compliance
             var passRate = conclusiveTests > 0 ? passedTests * 100.0 / conclusiveTests : 0.0;
             var coverage = totalTests > 0 ? conclusiveTests * 100.0 / totalTests : 0.0;
 
-            var status = conclusiveTests == 0
-                ? ControlEvaluationStatus.NotEvaluated
-                : control.Fidelity == ControlFidelity.Supporting
-                    // §4: Supporting evidence caps at PartiallyEffective even at 100% pass (control is broader than we probe).
-                    ? (passRate >= 80 ? ControlEvaluationStatus.PartiallyEffective : ControlEvaluationStatus.NeedsImprovement)
-                    : passRate switch
-                    {
-                        >= 95 => ControlEvaluationStatus.Effective,
-                        >= 80 => ControlEvaluationStatus.PartiallyEffective,
-                        _ => ControlEvaluationStatus.NeedsImprovement
-                    };
+            // Jun14v2-H4: severity floor via the shared policy — a control with a succeeded High/Critical probe can
+            // never read Effective/PartiallyEffective regardless of pass rate (would over-claim a PASS on a compromise).
+            var worstSeverity = ComplianceStatusPolicy.WorstSucceededSeverity(relevantResults);
+            var status = ComplianceStatusPolicy.StatusFor(passRate, worstSeverity, control.Fidelity, conclusiveTests);
 
             var attackSummaries = relevantResults.Select(r =>
                 $"- {r.AttackName}: {r.ResistedCount}/{r.TotalCount} resisted ({r.ResistedCount * 100.0 / r.TotalCount:F1}%)");
