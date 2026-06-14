@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.12.0-beta] - 2026-06-14
+
 ### Dependencies — Microsoft Agent Framework 1.10.0 upgrade
 
 Bumped the repo from MAF 1.3.0 to **1.10.0** (latest), with the matching Microsoft.Extensions.AI
@@ -26,6 +28,13 @@ fan-out starvation risks).
 - **`AgentEval.TravelDemo.Evals`** upgraded to MAF 1.10.0 and switched from the published
   `AgentEval` NuGet package (still built on 1.3.0) to direct `ProjectReference`s on the AgentEval
   sub-projects (Abstractions, Core, MAF), keeping it in lockstep with the demo it evaluates.
+- **Version parity:** the package version is centralized in `Directory.Build.props` (`0.12.0-beta`);
+  the umbrella `AgentEval` package and the `AgentEval.Cli` dotnet tool now version in lockstep
+  (CI overrides both via `-p:PackageVersion`). Hardcoded `PackageReleaseNotes` on both packages
+  were replaced with a `CHANGELOG.md` pointer to stop version drift.
+- **CLI packaging:** `AgentEval.Cli` now ships a CLI-specific `README.md` + `AgentEvalCli.png`
+  banner (instead of the umbrella README); the NuGet icon (`AgentEvalNugetLogoAE.png`) is inherited
+  centrally from `Directory.Build.props`.
 
 #### Preserved
 - Security pins retained: `OpenTelemetry.Api` 1.15.3 (GHSA-g94r-2vxg-569j), `Azure.AI.OpenAI` 2.8.0-beta.1.

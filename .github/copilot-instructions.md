@@ -17,7 +17,7 @@ AgentEval/
 └── samples/AgentEval.Samples/   # 41 runnable samples (organised in groups A–G)
 ```
 
-All 5 library sub-projects use `RootNamespace=AgentEval` to preserve original namespaces. Only the umbrella is `IsPackable=true`; the single NuGet package contains all 5 DLLs per TFM. The CLI lives in **this** repository at `src/AgentEval.Cli/` and is the canonical source for the `AgentEval.Cli` NuGet package (packed as the `agenteval` dotnet tool); the former external `AgentEvalHQ/AgentEval.Cli` repository is being retired.
+All library sub-projects use `RootNamespace=AgentEval` to preserve original namespaces. Only the umbrella is `IsPackable=true`; the single NuGet package embeds every sub-project DLL per TFM. The CLI lives in **this** repository at `src/AgentEval.Cli/` and is the canonical source for the `AgentEval.Cli` NuGet package (packed as the `agenteval` dotnet tool); the former external `AgentEvalHQ/AgentEval.Cli` repository is being retired.
 
 ## Environment Setup
 
