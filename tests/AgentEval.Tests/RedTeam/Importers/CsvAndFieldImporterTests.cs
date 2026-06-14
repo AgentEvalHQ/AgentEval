@@ -208,6 +208,19 @@ public class CsvAndFieldImporterTests
         Assert.Equal(probes.Count, probes.Select(p => p.Id).Distinct().Count());
     }
 
+    [Fact] // Jun14v2-L3: the dedup is fixed-point — a renamed "A#1" must not collide with a later NATURAL "A#1".
+    public void DisambiguateDuplicateIds_RenamedId_DoesNotCollideWithNaturalSibling()
+    {
+        var probes = new List<AttackProbe>
+        {
+            new() { Id = "A", Prompt = "a", Difficulty = Difficulty.Easy },
+            new() { Id = "A", Prompt = "b", Difficulty = Difficulty.Easy },     // collides → renamed "A#1"
+            new() { Id = "A#1", Prompt = "c", Difficulty = Difficulty.Easy },   // natural id equals the rename
+        };
+        var result = JsonProbeDatasetImporter.DisambiguateDuplicateIds(probes);
+        Assert.Equal(result.Count, result.Select(p => p.Id).Distinct().Count());
+    }
+
     // ── RFC-4180 regression: quote handling, BOM, CRLF, ragged rows ────────────
 
     [Fact]

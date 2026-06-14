@@ -196,6 +196,39 @@ public class RedTeamCommandTests
         Assert.Contains("--fail-on", ex.Message);
     }
 
+    [Fact] // Jun14v2-L4: a zero / over-ceiling timeout is a static config error — ExecuteAsync must fail fast in step 1
+    // (before the --import-probes read and --pack download), not after BuildScanOptions runs post-import.
+    public async Task ExecuteAsync_ZeroTimeoutPerProbe_FailsFast_BeforeAnyImport()
+    {
+        var opts = new RedTeamOptions
+        {
+            Endpoint = "http://localhost:11434/v1",
+            Model = "gpt-4o",
+            Intensity = "moderate",
+            Format = "json",
+            ImportProbes = new FileInfo("/no/such/file/should/not/be/read.json"),   // would throw if reached
+            TimeoutPerProbeSeconds = 0,
+        };
+
+        var ex = await Assert.ThrowsAsync<ArgumentException>(
+            () => RedTeamCommand.ExecuteAsync(opts, CancellationToken.None));
+        Assert.Contains("--timeout-per-probe", ex.Message);
+    }
+
+    [Theory] // Direct contract on the hoisted validator.
+    [InlineData(0, 1, 0)]        // zero per-probe
+    [InlineData(100000, 1, 0)]   // over the 1-day ceiling
+    [InlineData(1, 1, -5)]       // negative delay
+    public void ValidateTimeouts_RejectsOutOfRangeValues(double perProbe, double perTurn, double delay)
+    {
+        var opts = new RedTeamOptions
+        {
+            Model = "gpt-4o", Intensity = "moderate", Format = "json",
+            TimeoutPerProbeSeconds = perProbe, TimeoutPerTurnSeconds = perTurn, DelaySeconds = delay,
+        };
+        Assert.Throws<ArgumentException>(() => RedTeamCommand.ValidateTimeouts(opts));
+    }
+
     // ═══════════════════════════════════════════════════════════════════════════
     // WAVE E — CI ON-RAMP: exit-code gate + baseline regression
     // ═══════════════════════════════════════════════════════════════════════════

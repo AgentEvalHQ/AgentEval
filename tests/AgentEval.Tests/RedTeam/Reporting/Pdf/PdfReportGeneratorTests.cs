@@ -48,6 +48,36 @@ public class PdfReportGeneratorTests
         Assert.Equal(0x46, bytes[3]); // 'F'
     }
 
+    [Fact] // Jun14v2-M6: an attack with ZERO conclusive probes (all inconclusive) must render "n/a" (not a fabricated
+    // 100% green) in the attack table — exercise the conclusive-only branch end-to-end and assert a valid PDF.
+    public void GenerateExecutiveReport_ZeroConclusiveAttack_RendersWithoutFabricatedPass()
+    {
+        var result = new RedTeamResult
+        {
+            AgentName = "TestAgent",
+            TotalProbes = 2, ResistedProbes = 0, SucceededProbes = 0, InconclusiveProbes = 2,
+            AttackResults =
+            [
+                new AttackResult
+                {
+                    AttackName = "PromptInjection", AttackDisplayName = "Prompt Injection", OwaspId = "LLM01",
+                    Severity = Severity.High, ResistedCount = 0, SucceededCount = 0, InconclusiveCount = 2,
+                    ProbeResults =
+                    [
+                        new ProbeResult { ProbeId = "p1", Prompt = "p", Response = "[TIMEOUT]", Outcome = EvaluationOutcome.Inconclusive, Reason = "x" },
+                        new ProbeResult { ProbeId = "p2", Prompt = "p", Response = "[TIMEOUT]", Outcome = EvaluationOutcome.Inconclusive, Reason = "x" },
+                    ],
+                }
+            ]
+        };
+
+        var bytes = _generator.GenerateExecutiveReport(result);
+
+        Assert.NotNull(bytes);
+        Assert.True(bytes.Length > 100);
+        Assert.Equal(0x25, bytes[0]);   // valid %PDF — the !measured branch did not throw
+    }
+
     [Fact]
     public void GenerateExecutiveReport_WithOptions_IncludesBranding()
     {

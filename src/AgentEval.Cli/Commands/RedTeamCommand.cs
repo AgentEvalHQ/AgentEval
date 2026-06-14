@@ -291,6 +291,11 @@ internal static class RedTeamCommand
         if (packageRegistry is not ("none" or "live"))
             throw new ArgumentException($"Unknown --package-registry: '{opts.PackageRegistry}'. Valid: none | live");
 
+        // Jun14v2-L4: the timeout/throttle bounds are a static config error knowable before any I/O — validate here in
+        // step 1 (matching L22) so `--timeout-per-probe 0` / an over-the-ceiling value fails fast, not after the
+        // --import-probes read and --pack download. BuildScanOptions re-runs this (idempotent) for library callers.
+        ValidateTimeouts(opts);
+
         // Resolved identifier: deployment name for Azure, model name for OpenAI-compatible
         var resolvedName = opts.Azure ? opts.DeploymentName! : opts.Model!;
 
@@ -631,6 +636,23 @@ internal static class RedTeamCommand
     /// Single construction site for <see cref="ScanOptions"/> (item 6 seam). Folds in the verbose progress callback,
     /// the judge and the attacker client together so every code path — including <c>--verbose</c> — keeps them.
     /// </summary>
+    // Jun14v2-L4: pure timeout/throttle range validation, hoisted so it can run in step 1 (before the import/download)
+    // AND inside BuildScanOptions (for library callers). Idempotent — throwing the same ArgumentException either way.
+    internal static void ValidateTimeouts(RedTeamOptions opts)
+    {
+        // L21: a negative throttle/timeout would silently disable bounding — reject it.
+        if (opts.DelaySeconds < 0 || opts.TimeoutPerTurnSeconds < 0)
+            throw new ArgumentException("--delay and --max-turn-timeout must be non-negative.");
+        // Jun14-M12: a 0s per-probe timeout cancels EVERY probe immediately (0%-coverage scan with no error) — reject it.
+        if (opts.TimeoutPerProbeSeconds <= 0)
+            throw new ArgumentException("--timeout-per-probe must be positive (a 0s timeout cancels every probe).");
+        // Jun14-L11: above ~1 day, CancelAfter / TimeoutPerTurn.Ticks*MaxTurns overflow and surface as per-probe
+        // faults mid-scan — fail fast at validation with a clear ceiling instead.
+        const double MaxTimeoutSeconds = 86_400;
+        if (opts.TimeoutPerProbeSeconds > MaxTimeoutSeconds || opts.TimeoutPerTurnSeconds > MaxTimeoutSeconds)
+            throw new ArgumentException($"--timeout-per-probe / --max-turn-timeout must be <= {MaxTimeoutSeconds:F0} seconds (1 day).");
+    }
+
     internal static ScanOptions BuildScanOptions(
         RedTeamOptions opts,
         IReadOnlyList<IAttackType>? attacks,
@@ -644,17 +666,9 @@ internal static class RedTeamCommand
                 $"{progress.CurrentAttack} — {progress.LastOutcome}")
             : null;
 
-        // L21: a negative throttle/timeout would silently disable bounding — reject it.
-        if (opts.DelaySeconds < 0 || opts.TimeoutPerTurnSeconds < 0)
-            throw new ArgumentException("--delay and --max-turn-timeout must be non-negative.");
-        // Jun14-M12: a 0s per-probe timeout cancels EVERY probe immediately (0%-coverage scan with no error) — reject it.
-        if (opts.TimeoutPerProbeSeconds <= 0)
-            throw new ArgumentException("--timeout-per-probe must be positive (a 0s timeout cancels every probe).");
-        // Jun14-L11: above ~1 day, CancelAfter / TimeoutPerTurn.Ticks*MaxTurns overflow and surface as per-probe
-        // faults mid-scan — fail fast at validation with a clear ceiling instead.
-        const double MaxTimeoutSeconds = 86_400;
-        if (opts.TimeoutPerProbeSeconds > MaxTimeoutSeconds || opts.TimeoutPerTurnSeconds > MaxTimeoutSeconds)
-            throw new ArgumentException($"--timeout-per-probe / --max-turn-timeout must be <= {MaxTimeoutSeconds:F0} seconds (1 day).");
+        // Jun14v2-L4: idempotent — also runs in step 1 of ExecuteAsync (fail-fast before any I/O). Kept here so a
+        // library caller building ScanOptions directly is still guarded.
+        ValidateTimeouts(opts);
 
         return new ScanOptions
         {

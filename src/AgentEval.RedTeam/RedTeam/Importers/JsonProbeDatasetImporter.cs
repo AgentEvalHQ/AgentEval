@@ -127,13 +127,22 @@ public sealed class JsonProbeDatasetImporter : IProbeDatasetImporter
 
     /// <summary>Jun14-L8: ensure unique probe Ids — duplicate / odd upstream ids would let a baseline or SARIF consumer
     /// merge distinct findings. Appends <c>#{index}</c> to the second+ occurrence of any duplicated Id (deterministic
-    /// for a fixed dataset). Shared with the CSV importer.</summary>
+    /// for a fixed dataset). Shared with the CSV importer. Jun14v2-L3: the dedup is now a FIXED POINT — the renamed id
+    /// is registered and re-probed, so a renamed <c>id#{i}</c> that happens to equal a later NATURAL id (e.g. an upstream
+    /// id already shaped <c>"{id}#{index}"</c>) can no longer manufacture a fresh collision.</summary>
     internal static IReadOnlyList<AttackProbe> DisambiguateDuplicateIds(List<AttackProbe> probes)
     {
         var seen = new HashSet<string>(StringComparer.Ordinal);
         for (var i = 0; i < probes.Count; i++)
-            if (!seen.Add(probes[i].Id))
-                probes[i] = probes[i] with { Id = $"{probes[i].Id}#{i}" };
+        {
+            var id = probes[i].Id;
+            if (seen.Add(id)) continue;
+            var candidate = $"{id}#{i}";
+            var n = i;
+            while (!seen.Add(candidate))
+                candidate = $"{id}#{i}.{++n}";
+            probes[i] = probes[i] with { Id = candidate };
+        }
         return probes;
     }
 

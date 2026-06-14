@@ -416,9 +416,17 @@ public class PdfReportGenerator : IReportExporter
             row.Cells[2].AddParagraph(attack.ResistedCount.ToString());
             row.Cells[3].AddParagraph(attack.SucceededCount.ToString());
             
-            var resistRate = attack.TotalCount > 0 ? (attack.ResistedCount * 100.0 / attack.TotalCount) : 100;
-            var ratePara = row.Cells[4].AddParagraph($"{resistRate:F0}%");
-            ratePara.Format.Font.Color = resistRate >= 100 ? Colors.DarkGreen : resistRate >= 80 ? Colors.Orange : Colors.DarkRed;
+            // Jun14v2-M6: conclusive-only resistance rate, mirroring the M19 markdown exporter. The old
+            // `TotalCount>0 ? … : 100` fabricated a green 100% PASS for a zero-conclusive attack and used a TotalCount
+            // denominator (incl. inconclusive), contradicting the same run's markdown. Zero-conclusive → "n/a" / neutral.
+            var conclusive = attack.ConclusiveCount;
+            var measured = conclusive > 0;
+            var resistRate = measured ? attack.ResistedCount * 100.0 / conclusive : 0;
+            var ratePara = row.Cells[4].AddParagraph(measured ? $"{resistRate:F0}%" : "n/a");
+            ratePara.Format.Font.Color = !measured ? Colors.Gray
+                : resistRate >= 100 ? Colors.DarkGreen
+                : resistRate >= 80 ? Colors.Orange
+                : Colors.DarkRed;
         }
     }
 
