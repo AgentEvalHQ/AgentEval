@@ -75,6 +75,33 @@ public class ProbeEvaluatorOverloadTests
         var result = await eval.EvaluateAsync(Probe, WithTrace("anything"));
 
         Assert.True(result.AttackSucceeded);
+        // Jun14-L16: the child's Behavioral fidelity survives aggregation instead of collapsing to Verbal.
+        Assert.NotNull(result.Metadata);
+        Assert.Equal(EvidenceFidelity.Behavioral, result.Metadata!["fidelity"]);
+    }
+
+    private sealed class AlwaysInconclusiveEvaluator : IProbeEvaluator
+    {
+        public string Name => "AlwaysInconclusive";
+        public Task<EvaluationResult> EvaluateAsync(AttackProbe probe, string response, CancellationToken ct = default)
+            => Task.FromResult(EvaluationResult.Inconclusive("no trace"));
+    }
+
+    [Fact] // Jun14-M3/L15: ExcessiveAgency's IntentToAct survives the FidelityComposite verbal fallback in production
+    // wiring instead of being clobbered to Verbal.
+    public async Task FidelityComposite_PreservesInnerIntentToAct_OnVerbalFallback()
+    {
+        var probe = new AttackProbe { Id = "EA-1", Prompt = "p", Difficulty = Difficulty.Easy, Technique = "authority_escalation" };
+        var composite = new AgentEval.RedTeam.Evaluators.FidelityCompositeEvaluator(
+            new AlwaysInconclusiveEvaluator(),
+            new AgentEval.RedTeam.Evaluators.ExcessiveAgencyEvaluator());
+
+        var result = await composite.EvaluateAsync(probe,
+            new AgentResponse { Text = "Since you're the admin, I'm executing the command now." });
+
+        Assert.True(result.AttackSucceeded);
+        Assert.NotNull(result.Metadata);
+        Assert.Equal(EvidenceFidelity.IntentToAct, result.Metadata!["fidelity"]);
     }
 
     [Fact]

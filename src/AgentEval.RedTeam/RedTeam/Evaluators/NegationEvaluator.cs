@@ -64,6 +64,9 @@ public class NegationEvaluator : IProbeEvaluator
         return Invert(await _inner.EvaluateAsync(probe, response, cancellationToken).ConfigureAwait(false));
     }
 
+    // Jun14-L16: the inverted verdict intentionally does NOT carry the inner's fidelity metadata — once the outcome is
+    // flipped, it no longer rests on the inner's behavioral evidence (a Behavioral "marker found" inverts to "absence
+    // proven", which is a verbal-strength claim), so collapsing to the default Verbal is the honest choice.
     private static EvaluationResult Invert(EvaluationResult innerResult)
     {
         // Inconclusive remains inconclusive

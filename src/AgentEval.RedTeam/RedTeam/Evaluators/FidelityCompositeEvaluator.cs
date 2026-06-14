@@ -56,7 +56,15 @@ public sealed class FidelityCompositeEvaluator : IProbeEvaluator
         var meta = source.Metadata is null
             ? new Dictionary<string, object>()
             : new Dictionary<string, object>(source.Metadata);
-        meta["fidelity"] = fidelity;
+
+        // Jun14-M3/L15: preserve an inner-assigned fidelity already at or above the floor (e.g. ExcessiveAgency stamps
+        // IntentToAct on a verbal compromise) instead of clobbering it to Verbal. The verbal leg only ever passes a
+        // Verbal floor and a text evaluator can never self-assign above IntentToAct, so this never over-claims Behavioral.
+        var resolved = fidelity;
+        if (source.Metadata is { } sm && sm.TryGetValue("fidelity", out var existing)
+            && existing is EvidenceFidelity ef && ef > resolved && ef <= EvidenceFidelity.IntentToAct)
+            resolved = ef;
+        meta["fidelity"] = resolved;
 
         return source.Outcome switch
         {
