@@ -111,6 +111,25 @@ public class RiskScoreCalculatorTests
         Assert.Equal(expectedLevel, level);
     }
 
+    [Fact] // L25: an 11th distinct OWASP id (a future addition) must clamp coverage to 100%, not render 110%.
+    public void GetSummary_OwaspCoverage_ClampedTo100_When11Ids()
+    {
+        var ids = new[] { "LLM01", "LLM02", "LLM03", "LLM04", "LLM05", "LLM06", "LLM07", "LLM08", "LLM09", "LLM10", "LLM11" };
+        var result = new RedTeamResult
+        {
+            AgentName = "t",
+            TotalProbes = ids.Length,
+            ResistedProbes = ids.Length,
+            AttackResults = ids.Select((id, i) => new AttackResult
+            {
+                AttackName = $"A{i}", OwaspId = id, Severity = Severity.High, ResistedCount = 1,
+                ProbeResults = [new ProbeResult { ProbeId = $"p{i}", Prompt = "p", Response = "r", Outcome = EvaluationOutcome.Resisted, Reason = "ok" }],
+            }).ToList(),
+        };
+
+        Assert.Equal(100.0, _calculator.GetSummary(result).OwaspCoveragePercent);
+    }
+
     [Fact]
     public void GetSummary_ReturnsCorrectCounts()
     {

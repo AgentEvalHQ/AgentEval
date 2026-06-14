@@ -27,6 +27,8 @@ public record ProbeResult
     /// Optional LLM-generated rationale narrating WHY this verdict + evidence fidelity (the <c>--explain</c> /
     /// <see cref="ScanOptions.ExplainFindings"/> feature). Populated only for Succeeded/Inconclusive findings when a
     /// judge is configured; <c>null</c> otherwise. Best-effort — an explain failure never affects the verdict.
+    /// Suppressed (<c>null</c>) when <see cref="ScanOptions.IncludeEvidence"/> is false, since the rationale is
+    /// derived from the raw response and would otherwise leak the very content redaction suppresses (H1).
     /// </summary>
     public string? Rationale { get; init; }
 
@@ -86,4 +88,12 @@ public record ProbeResult
     /// single-turn probes. Keeps a flattened-conversation pass honestly distinct from a native one.
     /// </summary>
     public ConversationFidelity? ConversationFidelity { get; init; }
+
+    /// <summary>
+    /// L10: true when an attacker LLM (PAIR / TAP / attacker-driven Crescendo) generated the conversation — the run is
+    /// non-deterministic. Always false for single-turn / scripted probes. Jun14-L4: currently surfaced only as the
+    /// human-readable <c>[ATTACKER-DRIVEN]</c> marker appended to <see cref="Reason"/>; it is RESERVED for a future
+    /// baseline/regression-gate consumer (no comparer reads it yet, and it is not serialized into JSON/SARIF).
+    /// </summary>
+    public bool AttackerDriven { get; init; }
 }

@@ -120,6 +120,100 @@ public class PackDownloaderTests
             Assert.True(p.RequiresLicenseAcceptance);    // harmful-content packs are gated by default
             Assert.False(string.IsNullOrWhiteSpace(p.License));
             Assert.False(string.IsNullOrWhiteSpace(p.DataUrl));
+            Assert.False(string.IsNullOrWhiteSpace(p.PromptField));
+            Assert.True(p.Format is "json" or "csv");
         });
+    }
+
+    [Fact]
+    public void Catalog_RealFormatsAndColumns_AreSet()
+    {
+        var harm = PackCatalog.Find("HarmBench")!;
+        Assert.Equal("csv", harm.Format);
+        Assert.Equal("Behavior", harm.PromptField);
+        var jbb = PackCatalog.Find("JailbreakBench")!;
+        Assert.Equal("csv", jbb.Format);
+        Assert.Equal("Goal", jbb.PromptField);
+        var cse = PackCatalog.Find("CyberSecEval")!;
+        Assert.Equal("json", cse.Format);
+        Assert.Equal("test_case_prompt", cse.PromptField);
+    }
+
+    // ── format dispatch (csv vs json) ─────────────────────────────────────────
+
+    [Fact]
+    public void ImporterFor_SelectsByFormat()
+    {
+        Assert.Equal("csv", PackDownloader.ImporterFor(PackCatalog.Find("HarmBench")!).Format);
+        Assert.Equal("json", PackDownloader.ImporterFor(PackCatalog.Find("CyberSecEval")!).Format);
+    }
+
+    [Fact]
+    public async Task Downloads_CsvPack_AndParsesConfiguredColumn()
+    {
+        const string csv = "Behavior,FunctionalCategory\nharmful one,standard\nharmful two,standard\n";
+        using var d = Downloader(new StubHandler(HttpStatusCode.OK, csv));
+        var pack = TestPack() with { Format = "csv", PromptField = "Behavior" };
+        var attack = await d.DownloadAsync(pack, licenseAccepted: true);
+        Assert.Equal(2, attack.GetProbes(Intensity.Comprehensive).Count);
+    }
+
+    [Fact]
+    public async Task UnsupportedFormat_Surfaces_FormatException()
+    {
+        using var d = Downloader(new StubHandler(HttpStatusCode.OK, "x"));
+        var pack = TestPack() with { Format = "parquet" };
+        await Assert.ThrowsAsync<FormatException>(() => d.DownloadAsync(pack, licenseAccepted: true));
+    }
+
+    // ── --pack <url> ad-hoc pack ──────────────────────────────────────────────
+
+    [Theory]
+    [InlineData("https://example.test/seed.json", "json")]
+    [InlineData("https://example.test/data.csv", "csv")]
+    [InlineData("https://example.test/harmful-behaviors.csv?ref=main", "csv")]   // L15: query must not defeat .csv
+    [InlineData("https://example.test/data.csv#frag", "csv")]                    // L15: fragment too
+    public void ForUrl_InfersFormat_AndIsNotLicenseGated(string url, string expectedFormat)
+    {
+        var pack = PackCatalog.ForUrl(url);
+        Assert.Equal(expectedFormat, pack.Format);
+        Assert.False(pack.RequiresLicenseAcceptance);   // user-supplied source → no gate
+        Assert.Equal(url, pack.DataUrl);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void ForUrl_EmptyOrWhitespace_Throws(string url)
+        => Assert.Throws<ArgumentException>(() => PackCatalog.ForUrl(url));
+
+    [Fact]
+    public async Task HtmlResponse_Surfaces_ClearFormatException()
+    {
+        // A gated/login HTML page returned with a 200 must be named clearly, not a confusing parse error.
+        using var d = Downloader(new StubHandler(HttpStatusCode.OK, "<!DOCTYPE html><html><body>login</body></html>"));
+        var ex = await Assert.ThrowsAsync<FormatException>(() => d.DownloadAsync(TestPack(), licenseAccepted: true));
+        Assert.Contains("HTML", ex.Message);
+    }
+
+    [Fact] // L14: a CSV pack that comes back as a JSON ERROR ENVELOPE (login wall / rate-limit) names the cause.
+    public async Task CsvPack_ReturnsJsonEnvelope_Surfaces_ClearFormatException()
+    {
+        using var d = Downloader(new StubHandler(HttpStatusCode.OK, """{"error":"rate limited"}"""));
+        var pack = TestPack() with { Format = "csv", PromptField = "Behavior" };
+        var ex = await Assert.ThrowsAsync<FormatException>(() => d.DownloadAsync(pack, licenseAccepted: true));
+        Assert.Contains("JSON error envelope", ex.Message);
+    }
+
+    [Fact] // Jun14-L14: a LEGITIMATE CSV whose first cell begins with '[' (or '{') must NOT be false-rejected.
+    public async Task CsvPack_StartingWithBracket_IsNotFalseRejected()
+    {
+        const string csv = "Behavior,Category\n\"[INST] do the bad thing [/INST]\",jailbreak\n\"{role:user}\",chat\n";
+        using var d = Downloader(new StubHandler(HttpStatusCode.OK, csv));
+        var pack = TestPack() with { Format = "csv", PromptField = "Behavior" };
+
+        var attack = await d.DownloadAsync(pack, licenseAccepted: true);
+
+        Assert.Equal(2, attack.GetProbes(Intensity.Comprehensive).Count);
     }
 }

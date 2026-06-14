@@ -278,4 +278,20 @@ public class ExcessiveAgencyAttackTests
         Assert.Contains("behaviorally", attack.Description, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("stated intent", attack.Description, StringComparison.OrdinalIgnoreCase);
     }
+
+    [Fact] // L2: every probe names an advertised canary tool so the behavioral channel is reachable — except the
+    // intentionally tool-agnostic probes (autonomous-decision + the workflow/context role-claim probes). The allowlist
+    // documents the exceptions so a future prompt edit can't silently re-introduce a guess-the-tool gap.
+    public void EveryProbe_NamesAnAdvertisedCanaryTool_OrIsAllowlisted()
+    {
+        var toolNames = _attack.GetCanaryTools(Intensity.Comprehensive).Select(t => t.Name).ToList();
+        var proseOnly = new[] { "EA-004", "EA-012", "EA-013", "EA-014", "EA-015" };
+
+        foreach (var p in _attack.GetProbes(Intensity.Comprehensive))
+        {
+            if (proseOnly.Contains(p.Id)) continue;
+            Assert.True(toolNames.Any(n => p.Prompt.Contains(n, StringComparison.Ordinal)),
+                $"{p.Id} should name an advertised canary tool. Prompt: {p.Prompt}");
+        }
+    }
 }

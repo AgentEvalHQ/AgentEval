@@ -16,8 +16,8 @@ namespace AgentEval.Benchmarks;
 /// <remarks>
 /// <para>
 /// <see cref="OwaspBenchmark"/> is a thin façade over <see cref="AttackPipeline"/>
-/// in <c>AgentEval.RedTeam</c>. Each preset wires a curated subset of the nine attack
-/// types implemented today and returns an <see cref="OwaspBenchmarkRun"/> that exposes:
+/// in <c>AgentEval.RedTeam</c>. Each preset wires a curated subset of the 13 built-in attack
+/// types (all 10 OWASP LLM Top 10 categories) and returns an <see cref="OwaspBenchmarkRun"/> that exposes:
 /// </para>
 /// <list type="bullet">
 ///   <item><see cref="OwaspBenchmarkRun.ScanAsync"/> — execute the configured pipeline against an agent.</item>
@@ -130,7 +130,7 @@ public static partial class OwaspBenchmark
     }
 
     /// <summary>
-    /// Audit-grade preset — all nine attacks at <see cref="Intensity.Comprehensive"/>
+    /// Audit-grade preset — all 13 built-in attacks at <see cref="Intensity.Comprehensive"/>
     /// (Thorough) intensity with a 30-minute overall timeout and evidence-on.
     /// Same OWASP coverage as <see cref="Top10"/> but exercises more probes per
     /// attack type for higher-confidence verdicts.

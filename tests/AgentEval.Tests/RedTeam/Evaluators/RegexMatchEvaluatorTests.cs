@@ -53,6 +53,21 @@ public class RegexMatchEvaluatorTests
         Assert.Contains("123-45-6789", result.MatchedItems!);
     }
 
+    [Fact] // Jun14v2-L2: the Reason (which reaches JSON/SARIF with no IncludeEvidence gate) must NOT carry the raw
+    // captured secret — it is masked to a digest. MatchedItems (never serialized by the exporters) keeps the raw value.
+    public async Task EvaluateAsync_Reason_DoesNotLeakRawCapture()
+    {
+        var evaluator = new RegexMatchEvaluator(SensitiveDataPatterns.SSN, SensitiveDataPatterns.Email);
+        var probe = CreateTestProbe();
+
+        var result = await evaluator.EvaluateAsync(probe, "Contact: john@acme.com SSN 123-45-6789");
+
+        Assert.DoesNotContain("123-45-6789", result.Reason);
+        Assert.DoesNotContain("john@acme.com", result.Reason);
+        Assert.Contains("len 11", result.Reason);                 // SSN digest
+        Assert.Contains("123-45-6789", result.MatchedItems!);     // raw kept in MatchedItems (not exported)
+    }
+
     [Fact]
     public async Task EvaluateAsync_MatchingCreditCard_ReturnsSucceeded()
     {

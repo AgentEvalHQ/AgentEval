@@ -232,7 +232,7 @@ var benchOwaspSubjectOpt = new Option<string?>("--subject") { Description = "Sub
 var benchOwaspRootOpt = new Option<string?>("--root") { Description = "Workspace root path (default: auto-detected)" };
 var benchOwaspInputOpt = new Option<string?>("--input") { Description = "Provenance text for the run (the OWASP attack pipeline generates its own probes; --input is recorded for traceability, not consumed by attacks)." };
 var benchOwaspAzureFromEnvOpt = new Option<bool>("--azure-from-env") { Description = "Build an Azure OpenAI chat agent from AZURE_OPENAI_* env vars instead of scanning the built-in stub. Requires AZURE_OPENAI_ENDPOINT + AZURE_OPENAI_API_KEY + AZURE_OPENAI_DEPLOYMENT." };
-var benchOwaspCmd = new Command("owasp", "Run the OWASP LLM Top 10 red-team benchmark");
+var benchOwaspCmd = new Command("owasp", "Run the OWASP LLM Top 10 red-team benchmark. Target is the built-in stub agent unless --azure-from-env is set (AZURE_OPENAI_* env vars); there is no OpenAI-compatible --endpoint/--model or --judge here — use `agenteval redteam` for a fully-parameterised scan.");
 benchOwaspCmd.Add(benchOwaspPresetOpt);
 benchOwaspCmd.Add(benchOwaspSubjectOpt);
 benchOwaspCmd.Add(benchOwaspRootOpt);
@@ -261,7 +261,7 @@ var benchMitreSubjectOpt = new Option<string?>("--subject") { Description = "Sub
 var benchMitreRootOpt = new Option<string?>("--root") { Description = "Workspace root path (default: auto-detected)" };
 var benchMitreInputOpt = new Option<string?>("--input") { Description = "Provenance text for the run (the MITRE ATLAS attack pipeline generates its own probes; --input is recorded for traceability, not consumed by attacks)." };
 var benchMitreAzureFromEnvOpt = new Option<bool>("--azure-from-env") { Description = "Build an Azure OpenAI chat agent from AZURE_OPENAI_* env vars instead of scanning the built-in stub. Requires AZURE_OPENAI_ENDPOINT + AZURE_OPENAI_API_KEY + AZURE_OPENAI_DEPLOYMENT." };
-var benchMitreCmd = new Command("mitre", "Run the MITRE ATLAS red-team benchmark");
+var benchMitreCmd = new Command("mitre", "Run the MITRE ATLAS red-team benchmark. Target is the built-in stub agent unless --azure-from-env is set (AZURE_OPENAI_* env vars); there is no OpenAI-compatible --endpoint/--model or --judge here — use `agenteval redteam` for a fully-parameterised scan.");
 benchMitreCmd.Add(benchMitrePresetOpt);
 benchMitreCmd.Add(benchMitreSubjectOpt);
 benchMitreCmd.Add(benchMitreRootOpt);
@@ -282,6 +282,34 @@ benchMitreCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =>
     return await BenchMitreCommand.RunAsync(preset, subject, root, input, azureFromEnv, ct);
 });
 benchCmd.Add(benchMitreCmd);
+
+// bench nist — NIST AI RMF (AI 100-1) red-team evidence. Presets: rmf-baseline | rmf-smoke | rmf-audit-grade.
+var benchNistPresetOpt = new Option<string?>("--preset") { Description = PresetsHelpFromRegistry("nist") + Environment.NewLine + "Default: rmf-baseline. rmf-smoke uses 3 attacks (PromptInjection + Jailbreak + PIILeakage); rmf-audit-grade runs at Comprehensive intensity. Scores only MEASURE security/privacy/validity sub-actions; GOVERN/MAP/MANAGE are Not Applicable." };
+var benchNistSubjectOpt = new Option<string?>("--subject") { Description = "Subject name (agent or workflow under evaluation). REQUIRED." };
+var benchNistRootOpt = new Option<string?>("--root") { Description = "Workspace root path (default: auto-detected)" };
+var benchNistInputOpt = new Option<string?>("--input") { Description = "Provenance text for the run (the attack pipeline generates its own probes; --input is recorded for traceability, not consumed by attacks)." };
+var benchNistAzureFromEnvOpt = new Option<bool>("--azure-from-env") { Description = "Build an Azure OpenAI chat agent from AZURE_OPENAI_* env vars instead of scanning the built-in stub. Requires AZURE_OPENAI_ENDPOINT + AZURE_OPENAI_API_KEY + AZURE_OPENAI_DEPLOYMENT." };
+var benchNistCmd = new Command("nist", "Run the NIST AI RMF (AI 100-1) red-team benchmark. Target is the built-in stub agent unless --azure-from-env is set (AZURE_OPENAI_* env vars); there is no OpenAI-compatible --endpoint/--model or --judge here — use `agenteval redteam` for a fully-parameterised scan.");
+benchNistCmd.Add(benchNistPresetOpt);
+benchNistCmd.Add(benchNistSubjectOpt);
+benchNistCmd.Add(benchNistRootOpt);
+benchNistCmd.Add(benchNistInputOpt);
+benchNistCmd.Add(benchNistAzureFromEnvOpt);
+benchNistCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =>
+{
+    var preset = parseResult.GetValue(benchNistPresetOpt) ?? "rmf-baseline";
+    var subject = parseResult.GetValue(benchNistSubjectOpt);
+    if (string.IsNullOrWhiteSpace(subject))
+    {
+        Console.Error.WriteLine("Error: --subject is required.");
+        return 1;
+    }
+    var root = parseResult.GetValue(benchNistRootOpt);
+    var input = parseResult.GetValue(benchNistInputOpt);
+    var azureFromEnv = parseResult.GetValue(benchNistAzureFromEnvOpt);
+    return await BenchNistCommand.RunAsync(preset, subject, root, input, azureFromEnv, ct);
+});
+benchCmd.Add(benchNistCmd);
 
 // bench perf — Phase 8 (v0.10.0-beta): Performance benchmark CLI surface (previously CLI-less).
 // Sub-commands resolve the "perf" family from BenchmarkFamilyRegistry and dispatch to its

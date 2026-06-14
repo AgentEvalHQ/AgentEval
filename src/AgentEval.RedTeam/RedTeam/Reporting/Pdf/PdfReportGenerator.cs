@@ -416,9 +416,17 @@ public class PdfReportGenerator : IReportExporter
             row.Cells[2].AddParagraph(attack.ResistedCount.ToString());
             row.Cells[3].AddParagraph(attack.SucceededCount.ToString());
             
-            var resistRate = attack.TotalCount > 0 ? (attack.ResistedCount * 100.0 / attack.TotalCount) : 100;
-            var ratePara = row.Cells[4].AddParagraph($"{resistRate:F0}%");
-            ratePara.Format.Font.Color = resistRate >= 100 ? Colors.DarkGreen : resistRate >= 80 ? Colors.Orange : Colors.DarkRed;
+            // Jun14v2-M6: conclusive-only resistance rate, mirroring the M19 markdown exporter. The old
+            // `TotalCount>0 ? … : 100` fabricated a green 100% PASS for a zero-conclusive attack and used a TotalCount
+            // denominator (incl. inconclusive), contradicting the same run's markdown. Zero-conclusive → "n/a" / neutral.
+            var conclusive = attack.ConclusiveCount;
+            var measured = conclusive > 0;
+            var resistRate = measured ? attack.ResistedCount * 100.0 / conclusive : 0;
+            var ratePara = row.Cells[4].AddParagraph(measured ? $"{resistRate:F0}%" : "n/a");
+            ratePara.Format.Font.Color = !measured ? Colors.Gray
+                : resistRate >= 100 ? Colors.DarkGreen
+                : resistRate >= 80 ? Colors.Orange
+                : Colors.DarkRed;
         }
     }
 
@@ -461,10 +469,14 @@ public class PdfReportGenerator : IReportExporter
         AddComparisonRow(table, "Risk Score", baselineSummary.Score, currentSummary.Score);
         AddComparisonRow(table, "Critical Findings", baselineSummary.CriticalFindings, currentSummary.CriticalFindings, lowerIsBetter: true);
         AddComparisonRow(table, "High Findings", baselineSummary.HighFindings, currentSummary.HighFindings, lowerIsBetter: true);
-        AddComparisonRow(table, "Pass Rate %", 
-            baselineSummary.TotalProbes > 0 ? baselineSummary.PassedProbes * 100 / baselineSummary.TotalProbes : 100,
-            currentSummary.TotalProbes > 0 ? currentSummary.PassedProbes * 100 / currentSummary.TotalProbes : 100);
+        AddComparisonRow(table, "Pass Rate %",
+            PassRatePercent(baselineSummary.PassedProbes, baselineSummary.TotalProbes),
+            PassRatePercent(currentSummary.PassedProbes, currentSummary.TotalProbes));
     }
+
+    /// <summary>L26: pass-rate percent that ROUNDS (float division) instead of integer-truncating — 7/8 → 88, not 87.</summary>
+    internal static int PassRatePercent(int passed, int total)
+        => total > 0 ? (int)Math.Round(passed * 100.0 / total) : 100;
 
     private static void AddComparisonRow(Table table, string metric, int previous, int current, bool lowerIsBetter = false)
     {

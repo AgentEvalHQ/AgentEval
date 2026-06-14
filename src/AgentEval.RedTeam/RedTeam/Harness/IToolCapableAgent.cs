@@ -21,6 +21,10 @@ public interface IToolCapableAgent : IEvaluableAgent
     /// when a tool is executed, the paired <c>FunctionResultContent</c> (Tier 2) — that pairing is what lets the
     /// evaluator distinguish <see cref="EvidenceFidelity.IntentToAct"/> (emitted) from
     /// <see cref="EvidenceFidelity.Behavioral"/> (executed).
+    /// <para>Implementations SHOULD emit a unique <c>CallId</c> per emitted call. <c>ToolUsageExtractor</c> pairs
+    /// results to calls by CallId in message order, one result per call; a CallId reused across turns is paired to the
+    /// nearest preceding still-unpaired call (real providers issue globally-unique ids, so this only matters for a
+    /// synthetic agent).</para>
     /// </summary>
     Task<AgentResponse> InvokeWithToolsAsync(
         string prompt, IReadOnlyList<CanaryTool> tools, CancellationToken cancellationToken = default);

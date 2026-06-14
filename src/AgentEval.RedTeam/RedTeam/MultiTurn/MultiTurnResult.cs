@@ -45,4 +45,9 @@ public sealed class MultiTurnResult
 
     /// <summary>True if the conversation hit a turn/duration cap without converging (not a clean win or refusal-lock).</summary>
     public bool WasTruncated { get; init; }
+
+    /// <summary>L10: true when an attacker LLM (PAIR / TAP / attacker-driven Crescendo) generated the turns — the run
+    /// is NON-deterministic. A baseline diff / regression gate should treat a change as potentially non-reproducible
+    /// rather than a real regression. Purely informational provenance — it never affects <see cref="Outcome"/>.</summary>
+    public bool AttackerDriven { get; init; }
 }

@@ -2,7 +2,7 @@
 
 One sample per registered benchmark family. The **running** benchmark samples
 (H2 Performance, H3 Agentic, H4 GDPR, H5 EU AI Act, H6 OWASP, H7 MITRE,
-H8 LongMemEval, H9 Memory) each exercise the **real** production code path
+H8 NIST AI RMF, H9 LongMemEval, H10 Memory) each exercise the **real** production code path
 end-to-end:
 
 - Build a real Azure OpenAI–backed agent (when credentials are configured).
@@ -88,8 +88,11 @@ scales from a CI smoke check to a full audit:
 | **H5 EU AI Act**    | `Smoke` (5 controls)         | `Standard` (6 pillars)      | `AuditGrade` (6 pillars, cap-by-worst)   |
 | **H6 OWASP**        | `Smoke` (3 attacks @ Quick)  | `Top10` (13 attacks @ Quick) | `AuditGrade` (13 @ Comprehensive)      |
 | **H7 MITRE ATLAS**  | `AtlasSmoke`                 | `AtlasBaseline`             | `AtlasAuditGrade`                    |
-| **H8 LongMemEval**  | `Subset` w/ MaxQuestions=10  | `Subset` w/ MaxQuestions=50 | `Full` (~500Q, requires env var)     |
-| **H9 Memory**       | `Quick` (3 categories)       | `Standard` (8 categories)   | `Full` (12 categories)               |
+| **H8 NIST AI RMF**  | `RmfSmoke`                   | `RmfBaseline`               | `RmfAuditGrade`                      |
+| **H9 LongMemEval**  | `Subset` w/ MaxQuestions=10  | `Subset` w/ MaxQuestions=50 | `Full` (~500Q, requires env var)     |
+| **H10 Memory**      | `Quick` (3 categories)       | `Standard` (8 categories)   | `Full` (12 categories)               |
+
+> **Advanced red-team capabilities** are folded into H6/H7/H8 at **Standard** and **AuditGrade**: multi-turn (Crescendo) + z-score calibration + the 5 compliance reporters at Standard; plus the **instrumented tool harness** (Behavioral evidence via `ToolEscalation`), a transform-pipeline preview, and the benchmark-pack catalog at AuditGrade. Run a red-team benchmark at a higher tier to see them.
 
 ### Selecting a preset
 
@@ -155,9 +158,10 @@ zero verdict. **H1 Registry Discovery** runs without credentials.
 | H5  | EU AI Act               | Same per-scenario probing as GDPR; pillar-nested presets descend recursively.                            |
 | H6  | OWASP LLM Top 10        | Real agent driven by the OWASP adversarial pipeline (Shape B runner — pipeline owns the probe loop).    |
 | H7  | MITRE ATLAS             | Real agent driven by the ATLAS adversarial pipeline (Shape B runner).                                    |
-| H8  | LongMemEval             | Real history-injectable agent + LLM judge against the REAL `longmemeval_s_cleaned.json` dataset (no fake fallback). Smoke=10Q, Standard=50Q, AuditGrade=~500Q (requires `LONGMEMEVAL_DATASET_PATH`). Shape-B result synthesised into an `EvalResult` tree; native shape preserved in `report-native.json`. Friendly download-instructions box when dataset missing. |
-| H9  | Memory                  | Real history-injectable agent + LLM judge running the canonical Memory benchmark suite. Quick/Standard/Full presets map to 3/8/12 categories. Shape-B `MemoryBenchmarkResult` synthesised into an `EvalResult` tree; native shape preserved in `report-native.json` (grade, stars, weak categories, recommendations). |
-| H10 | Report Browser          | No agent. Opens previously-generated JSON / HTML / PDF artefacts.                                       |
+| H8  | NIST AI RMF             | Real agent driven by the red-team pipeline → NIST AI RMF MEASURE evidence (Shape B runner). Governance/MAP/MANAGE controls render Not Applicable (never PASS). |
+| H9  | LongMemEval             | Real history-injectable agent + LLM judge against the REAL `longmemeval_s_cleaned.json` dataset (no fake fallback). Smoke=10Q, Standard=50Q, AuditGrade=~500Q (requires `LONGMEMEVAL_DATASET_PATH`). Shape-B result synthesised into an `EvalResult` tree; native shape preserved in `report-native.json`. Friendly download-instructions box when dataset missing. |
+| H10 | Memory                  | Real history-injectable agent + LLM judge running the canonical Memory benchmark suite. Quick/Standard/Full presets map to 3/8/12 categories. Shape-B `MemoryBenchmarkResult` synthesised into an `EvalResult` tree; native shape preserved in `report-native.json` (grade, stars, weak categories, recommendations). |
+| H11 | Report Browser          | No agent. Opens previously-generated JSON / HTML / PDF artefacts.                                       |
 
 ---
 
@@ -228,11 +232,12 @@ evidence document via `GDPRComplianceReporter` / `EuAiActComplianceReporter`:
 - `.agenteval/compliance/GDPR/{subject}/{ts}/evidence.json`
 - `.agenteval/compliance/EU-AI-Act/{subject}/{ts}/evidence.json`
 
-For H6 (OWASP) and H7 (MITRE) the same shape lands via
-`OWASPComplianceReporter` / `MITREATLASReporter`:
+For H6 (OWASP), H7 (MITRE) and H8 (NIST) the same shape lands via
+`OWASPComplianceReporter` / `MITREATLASReporter` / `NistAiRmfComplianceReporter`:
 
 - `.agenteval/compliance/OWASP-LLM-Top10/{subject}/{ts}/evidence.json`
 - `.agenteval/compliance/MITRE-ATLAS/{subject}/{ts}/evidence.json`
+- `.agenteval/compliance/NIST-AI-RMF/{subject}/{ts}/evidence.json`
 
 Each evidence file references the source run's `ContentHash`, so an auditor can
 re-verify the chain end-to-end.

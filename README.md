@@ -254,7 +254,17 @@ if (faithfulness.Score < 70)
 
 ### Red Team Security Evaluation: Find Vulnerabilities Before Production
 
-AgentEval includes comprehensive red team security evaluation with **258 probes across 13 attack types** (Comprehensive intensity), covering **all 10 OWASP LLM Top 10 2025** categories and **8 MITRE ATLAS** techniques:
+AgentEval includes comprehensive red team security evaluation with **258 probes across 13 attack types** (Comprehensive intensity), covering **all 10 OWASP LLM Top 10 2025** categories and **8 MITRE ATLAS** techniques.
+
+Beyond the built-in probes, it ships the capabilities that make a red-team result *trustworthy* and *CI-ready*:
+
+- **Multi-turn & attacker-LLM attacks** — Crescendo, PAIR, TAP, and a tool-aware `ToolEscalation` attack (opt-in).
+- **Real attack surfaces** — a tiered tool harness (`--sut-tier text\|function-calling\|instrumented`) with **evidence-fidelity** labeling (Verbal / IntentToAct / Behavioral), plus a live package-registry oracle (`--package-registry live`) and a real RAG-retrieval boundary.
+- **Honesty discipline** — conclusive-only scoring, an explicit *Inconclusive* coverage state, and never-fabricate verdicts (a green result is never a guess).
+- **5 compliance reporters** — OWASP, MITRE ATLAS, SOC 2, ISO 27001, and **NIST AI RMF** — runnable as first-class benchmarks (`agenteval bench owasp\|mitre\|nist`).
+- **CI-ready** — SARIF + JUnit export, a baseline regression gate (`--save-baseline`/`--baseline`/`--fail-on`), z-score **calibration** (`--calibration`), LLM **`--explain`** rationale, and external **benchmark packs** (`--pack HarmBench\|JailbreakBench\|CyberSecEval`, license-gated, nothing bundled).
+
+See **[Red Team — What's New](docs/redteam-whats-new.md)** for the recent upgrades, how AgentEval compares to PyRIT / garak / others, and a plain-English take on why *grading* a model's reply is the hard part — and **[docs/redteam.md](docs/redteam.md)** for the full CLI reference.
 
 ```csharp
 // Sample20: Basic RedTeam evaluation

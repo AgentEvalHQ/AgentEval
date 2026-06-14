@@ -91,6 +91,10 @@ public class RiskScoreCalculator
         => result.AttackResults.SelectMany(a => a.ProbeResults)
             .Count(p => p.Outcome == EvaluationOutcome.Succeeded && p.Severity == severity);
 
+    /// <summary>OWASP LLM Top 10 category count + per-category percent weight (L25 — kills the duplicated ×10 magic).</summary>
+    private const int OwaspCategoryCount = 10;
+    private const double OwaspCategoryWeight = 100.0 / OwaspCategoryCount;
+
     private static double GetOwaspCoveragePercent(RedTeamResult result)
     {
         // Count unique OWASP IDs attempted
@@ -100,8 +104,8 @@ public class RiskScoreCalculator
             .Distinct()
             .Count();
 
-        // OWASP LLM Top 10 has 10 categories
-        return owaspIds * 10.0;
+        // L25: clamp to 100 — an 11th distinct OwaspId (a future addition) must not render as 110%.
+        return Math.Min(owaspIds * OwaspCategoryWeight, 100.0);
     }
 
     /// <summary>
@@ -116,7 +120,7 @@ public class RiskScoreCalculator
             .Distinct()
             .Count();
 
-        return conclusiveIds * 10.0;
+        return Math.Min(conclusiveIds * OwaspCategoryWeight, 100.0);
     }
 }
 

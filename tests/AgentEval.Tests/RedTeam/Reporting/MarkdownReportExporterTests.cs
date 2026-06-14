@@ -328,4 +328,31 @@ public class MarkdownReportExporterTests
         Assert.Contains("Inconclusive", md);
         Assert.Contains("| 4 |", md); // the inconclusive count is visible (summary + per-attack column)
     }
+
+    [Fact] // Jun14-M19: an attack with zero conclusive probes must render not-measured (⬜ / n/a), never a fabricated ✅ 100%.
+    public void Export_ZeroConclusiveAttack_DoesNotRenderPassOr100Percent()
+    {
+        var result = new RedTeamResult
+        {
+            AgentName = "t",
+            TotalProbes = 4,
+            InconclusiveProbes = 4,
+            AttackResults =
+            [
+                new AttackResult
+                {
+                    AttackName = "Misinformation", AttackDisplayName = "Misinformation", OwaspId = "LLM09",
+                    Severity = Severity.Medium, ResistedCount = 0, SucceededCount = 0, InconclusiveCount = 4,
+                    ProbeResults = Enumerable.Range(0, 4).Select(i => new ProbeResult
+                        { ProbeId = $"i{i}", Prompt = "p", Response = "r", Outcome = EvaluationOutcome.Inconclusive, Reason = "x" }).ToList(),
+                }
+            ]
+        };
+
+        var md = new MarkdownReportExporter().Export(result);
+
+        Assert.DoesNotContain("✅ Misinformation", md);   // no fabricated green pass
+        Assert.Contains("⬜ Misinformation", md);          // rendered as not-measured
+        Assert.Contains("n/a", md);                        // score cell, not 100%
+    }
 }

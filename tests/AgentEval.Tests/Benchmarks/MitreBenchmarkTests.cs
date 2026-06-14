@@ -20,7 +20,7 @@ namespace AgentEval.Tests.Benchmarks;
 /// </summary>
 /// <remarks>
 /// Phase 6 (v0.10.0-beta). Mirrors <c>OwaspBenchmarkTests</c> in shape but
-/// asserts MITRE ATLAS technique-IDs and the 12-leaf composite shape (= the
+/// asserts MITRE ATLAS technique-IDs and the 15-leaf composite (8 applicable + 7 NA) shape (= the
 /// <see cref="MITREATLASReporter"/> roster), not OWASP categories.
 /// </remarks>
 public class MitreBenchmarkTests
@@ -392,7 +392,7 @@ public class MitreBenchmarkTests
     /// Phase-10 completeness audit (LR#21): pins the Convention-2 invariant that
     /// <see cref="MitreBenchmarkRun.EvaluateAsync"/> is functionally equivalent to
     /// <c>BuildEvalResult(await ScanAsync(agent))</c> — the two code paths must produce
-    /// the same 12-leaf composite shape and scoring. Catches a regression where one
+    /// the same 15-leaf composite (8 applicable + 7 NA) shape and scoring. Catches a regression where one
     /// path drifts from the other.
     /// </summary>
     [Fact]
@@ -416,7 +416,7 @@ public class MitreBenchmarkTests
         Assert.Equal(viaAdapter.Metric.Category, viaBuilder.Metric.Category);
         Assert.Equal(viaAdapter.Details.AggregationStrategy, viaBuilder.Details.AggregationStrategy);
 
-        // Sub-results parity (both 12-leaf composites)
+        // Sub-results parity (both 15-leaf composite (8 applicable + 7 NA)s)
         Assert.NotNull(viaAdapter.Details.SubResults);
         Assert.NotNull(viaBuilder.Details.SubResults);
         Assert.Equal(viaAdapter.Details.SubResults!.Count, viaBuilder.Details.SubResults!.Count);

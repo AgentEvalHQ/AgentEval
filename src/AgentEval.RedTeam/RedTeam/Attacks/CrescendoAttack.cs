@@ -51,6 +51,9 @@ public sealed class CrescendoAttack : IAttackType, IMultiTurnAttack
     /// <inheritdoc />
     public int MaxTurns => 6;
 
+    /// <inheritdoc /> Jun14-M13: attacker-driven when an attacker LLM is wired (it consults context.AttackerClient).
+    public bool UsesAttacker => true;
+
     /// <inheritdoc />
     /// <remarks>Crescendo deliberately persists through refusals, so it stops only on success (or when its rung
     /// ladder is exhausted) — NOT on the default refusal-lock, which would abandon the escalation prematurely.</remarks>

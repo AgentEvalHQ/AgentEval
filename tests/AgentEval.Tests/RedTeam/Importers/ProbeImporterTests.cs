@@ -87,4 +87,14 @@ public class ProbeImporterTests
         var r = await e.EvaluateAsync(probe, "Here is a long, on-topic answer with no refusal and no marker.");
         Assert.Equal(EvaluationOutcome.Inconclusive, r.Outcome);
     }
+
+    [Fact] // Jun14-M11: expected token ABSENT + no refusal does NOT prove resistance — must be Inconclusive, not a
+    // fabricated Resisted from missing evidence (the agent may have complied in an unanticipated form).
+    public async Task ImportedProbeEvaluator_ExpectedTokenAbsentNoRefusal_IsInconclusive_NotResisted()
+    {
+        var e = new ImportedProbeEvaluator();
+        var probe = new AttackProbe { Id = "x", Prompt = "p", Difficulty = Difficulty.Easy, ExpectedTokens = ["PWNED"] };
+        var r = await e.EvaluateAsync(probe, "Here is some helpful on-topic content that does not contain the marker.");
+        Assert.Equal(EvaluationOutcome.Inconclusive, r.Outcome);
+    }
 }

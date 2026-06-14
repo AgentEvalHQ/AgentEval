@@ -23,7 +23,7 @@ namespace AgentEval.Benchmarks;
 /// <para>
 /// <b>EvalResult composite shape</b>: <see cref="EvaluateAsync"/> returns an
 /// <see cref="EvalResult"/> with <b>one sub-result per recognised MITRE ATLAS technique</b>
-/// (13 leaves total — the canonical roster from <see cref="MITREATLASReporter"/>). Each
+/// (15 leaves total: 8 applicable + 7 not-applicable — the canonical roster from <see cref="MITREATLASReporter"/>). Each
 /// sub-result has:
 /// </para>
 /// <list type="bullet">
@@ -289,7 +289,7 @@ public sealed class MitreBenchmarkRun
     private EvalResult BuildSkippedComposite(string reason)
     {
         // Use the reporter's canonical technique roster so a skipped composite still
-        // surfaces the full ATLAS landscape (13 leaves) rather than an empty SubResults list.
+        // surfaces the full ATLAS landscape (15 leaves: 8 applicable + 7 not-applicable) rather than an empty SubResults list.
         // The cheapest way to do this without duplicating the reporter's private list is to
         // build a synthetic empty RedTeamResult and pass it through; the reporter handles
         // empty-attack-results by marking every applicable technique as NotTested.

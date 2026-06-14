@@ -61,14 +61,18 @@ internal static class RedTeamCommand
         var attacksOpt = new Option<string?>("--attacks")
             { Description = "Comma-separated attack types (e.g., PromptInjection,Jailbreak). Default: all. Opt-in multi-turn: Crescendo, PAIR, TAP (PAIR/TAP require --attacker), ToolEscalation (best at --sut-tier instrumented)." };
         var importProbesOpt = new Option<FileInfo?>("--import-probes")
-            { Description = "Import a JSON seed-prompt dataset (HarmBench/JailbreakBench/etc.) and run it alongside the built-in attacks. Probes without an expected-token oracle are Inconclusive unless --judge is set." };
+            { Description = "Import a JSON or CSV seed-prompt dataset (HarmBench/JailbreakBench/etc.; dispatched by .json/.csv extension) and run it alongside the built-in attacks. Probes without an expected-token oracle are Inconclusive unless --judge is set." };
+        var importPromptFieldOpt = new Option<string?>("--import-prompt-field")
+            { Description = "Column/field holding the prompt in --import-probes (default: 'Behavior' for .csv, 'prompt' for .json)." };
+        var importIdColumnOpt = new Option<string?>("--import-id-column")
+            { Description = "Optional id column/field for --import-probes (falls back to row/array index)." };
         var packageRegistryOpt = new Option<string>("--package-registry")
             { DefaultValueFactory = _ => "none", Description = "SupplyChain (LLM03) package check: none (planted-fake proxy, default) | live (query PyPI/npm/NuGet to also flag model-invented hallucinated packages)." };
 
         // Benchmark packs (NextWave #10): download an external pack (HarmBench/JailbreakBench/CyberSecEval) and run it
         // alongside the built-ins. Gated by --accept-license — these datasets carry harmful content; nothing is bundled.
         var packOpt = new Option<string?>("--pack")
-            { Description = $"Download + run an external benchmark pack ({PackCatalog.Names}), or 'list' to show the catalog. Requires --accept-license (no data is bundled)." };
+            { Description = $"Download + run an external benchmark pack: a catalog name ({PackCatalog.Names}), a data URL (.json/.csv), or 'list' to show the catalog. Named packs require --accept-license (no data is bundled)." };
         var acceptLicenseOpt = new Option<bool>("--accept-license")
             { Description = "Accept the upstream license of a --pack before downloading it (these datasets contain harmful content by design)." };
 
@@ -81,6 +85,16 @@ internal static class RedTeamCommand
             { Description = "Stop scanning on first successful attack" };
         var maxProbesOpt = new Option<int>("--max-probes")
             { DefaultValueFactory = _ => 0, Description = "Maximum probes per attack (0 = unlimited)" };
+
+        // L21: throttle / timeout escape hatches for a rate-limited gateway or a long multi-turn run.
+        var delayOpt = new Option<double>("--delay")
+            { DefaultValueFactory = _ => 0, Description = "Seconds to wait between probes (0 = none); throttle for a rate-limited gateway." };
+        var parallelismOpt = new Option<int>("--parallelism")
+            { DefaultValueFactory = _ => 1, Description = "Concurrent probes WITHIN an attack (default 1). >1 requires a thread-safe agent — see ScanOptions.Parallelism." };
+        var timeoutPerProbeOpt = new Option<double>("--timeout-per-probe")
+            { DefaultValueFactory = _ => 30, Description = "Per-probe timeout in seconds (default 30; must be > 0 and <= 86400)." };
+        var maxTurnTimeoutOpt = new Option<double>("--max-turn-timeout")
+            { DefaultValueFactory = _ => 0, Description = "Per-turn timeout (seconds) for multi-turn attacks (0 = inherit --timeout-per-probe)." };
 
         // Judge (LLM-as-judge for evaluation)
         var judgeEndpointOpt = new Option<string?>("--judge")
@@ -137,12 +151,18 @@ internal static class RedTeamCommand
         command.Options.Add(systemPromptCanaryOpt);
         command.Options.Add(attacksOpt);
         command.Options.Add(importProbesOpt);
+        command.Options.Add(importPromptFieldOpt);
+        command.Options.Add(importIdColumnOpt);
         command.Options.Add(packageRegistryOpt);
         command.Options.Add(packOpt);
         command.Options.Add(acceptLicenseOpt);
         command.Options.Add(intensityOpt);
         command.Options.Add(failFastFlag);
         command.Options.Add(maxProbesOpt);
+        command.Options.Add(delayOpt);
+        command.Options.Add(parallelismOpt);
+        command.Options.Add(timeoutPerProbeOpt);
+        command.Options.Add(maxTurnTimeoutOpt);
         command.Options.Add(judgeEndpointOpt);
         command.Options.Add(judgeModelOpt);
         command.Options.Add(judgeApiKeyOpt);
@@ -175,12 +195,18 @@ internal static class RedTeamCommand
                 SystemPromptCanary = parseResult.GetValue(systemPromptCanaryOpt),
                 Attacks = parseResult.GetValue(attacksOpt),
                 ImportProbes = parseResult.GetValue(importProbesOpt),
+                ImportPromptField = parseResult.GetValue(importPromptFieldOpt),
+                ImportIdColumn = parseResult.GetValue(importIdColumnOpt),
                 PackageRegistry = parseResult.GetValue(packageRegistryOpt)!,
                 Pack = parseResult.GetValue(packOpt),
                 AcceptLicense = parseResult.GetValue(acceptLicenseOpt),
                 Intensity = parseResult.GetValue(intensityOpt)!,
                 FailFast = parseResult.GetValue(failFastFlag),
                 MaxProbes = parseResult.GetValue(maxProbesOpt),
+                DelaySeconds = parseResult.GetValue(delayOpt),
+                Parallelism = parseResult.GetValue(parallelismOpt),
+                TimeoutPerProbeSeconds = parseResult.GetValue(timeoutPerProbeOpt),
+                TimeoutPerTurnSeconds = parseResult.GetValue(maxTurnTimeoutOpt),
                 JudgeEndpoint = parseResult.GetValue(judgeEndpointOpt),
                 JudgeModel = parseResult.GetValue(judgeModelOpt),
                 JudgeApiKey = parseResult.GetValue(judgeApiKeyOpt),
@@ -259,6 +285,17 @@ internal static class RedTeamCommand
         if (opts.Calibration is not null && !opts.Calibration.Exists)
             throw new InvalidOperationException($"Calibration profile not found: {opts.Calibration.FullName}");
 
+        // L22: validate --package-registry here (step 1), before the --import-probes read and --pack download in
+        // step 3 — a typo should fail fast, not after a possibly-expensive import/network fetch.
+        var packageRegistry = (opts.PackageRegistry ?? "none").Trim().ToLowerInvariant();
+        if (packageRegistry is not ("none" or "live"))
+            throw new ArgumentException($"Unknown --package-registry: '{opts.PackageRegistry}'. Valid: none | live");
+
+        // Jun14v2-L4: the timeout/throttle bounds are a static config error knowable before any I/O — validate here in
+        // step 1 (matching L22) so `--timeout-per-probe 0` / an over-the-ceiling value fails fast, not after the
+        // --import-probes read and --pack download. BuildScanOptions re-runs this (idempotent) for library callers.
+        ValidateTimeouts(opts);
+
         // Resolved identifier: deployment name for Azure, model name for OpenAI-compatible
         var resolvedName = opts.Azure ? opts.DeploymentName! : opts.Model!;
 
@@ -320,7 +357,8 @@ internal static class RedTeamCommand
                 throw new InvalidOperationException($"Import dataset not found: {opts.ImportProbes.FullName}");
             var datasetName = Path.GetFileNameWithoutExtension(opts.ImportProbes.Name);
             var content = await File.ReadAllTextAsync(opts.ImportProbes.FullName, ct);
-            var imported = new JsonProbeDatasetImporter().Import(content, datasetName);   // throws FormatException on bad JSON
+            var importer = SelectImporter(opts.ImportProbes.Extension, opts.ImportPromptField, opts.ImportIdColumn);
+            var imported = importer.Import(content, datasetName);   // throws FormatException on bad input
             var importedAttack = new ImportedProbeAttack(datasetName, imported);
             attacks = (attacks ?? Attack.All).Append(importedAttack).ToList();
             if (!opts.Quiet)
@@ -328,12 +366,18 @@ internal static class RedTeamCommand
                     (string.IsNullOrWhiteSpace(opts.JudgeEndpoint) ? " — note: probes without an expected-token oracle are Inconclusive without --judge." : "."));
         }
 
-        // 3c. Benchmark pack (NextWave #10): download an external pack and run it alongside the built-ins, behind the
-        // --accept-license gate (nothing is bundled; the gate is checked before any network call).
+        // 3c. Benchmark pack (NextWave #10): download an external pack — a known catalog name OR an arbitrary data URL —
+        // and run it alongside the built-ins, behind the --accept-license gate (nothing is bundled; the gate is checked
+        // before any network call). A user-supplied URL is the caller's own choice and is not license-gated.
         if (!string.IsNullOrWhiteSpace(opts.Pack))
         {
-            var pack = PackCatalog.Find(opts.Pack!.Trim())
-                ?? throw new ArgumentException($"Unknown --pack '{opts.Pack}'. Known: {PackCatalog.Names}. Use --pack list to see the catalog.");
+            var packArg = opts.Pack!.Trim();
+            var isUrl = packArg.StartsWith("http://", StringComparison.OrdinalIgnoreCase)
+                     || packArg.StartsWith("https://", StringComparison.OrdinalIgnoreCase);
+            var pack = isUrl
+                ? PackCatalog.ForUrl(packArg)
+                : PackCatalog.Find(packArg)
+                  ?? throw new ArgumentException($"Unknown --pack '{opts.Pack}'. Known: {PackCatalog.Names}. Use --pack list to see the catalog, or pass a data URL.");
             if (pack.RequiresLicenseAcceptance && !opts.AcceptLicense)
                 throw new InvalidOperationException(
                     $"Pack '{pack.Name}' is under license '{pack.License}' ({pack.LicenseUrl}) and contains external " +
@@ -349,17 +393,18 @@ internal static class RedTeamCommand
         // LLM03 Tier-2: swap SupplyChain for the live-registry-backed evaluator so it ALSO flags model-invented
         // hallucinated packages (queries PyPI/npm/NuGet), not just a planted fake. Caution-proximity still gates
         // every flag; a registry-confirmed package is never flagged (RC-6).
-        if (string.Equals(opts.PackageRegistry?.Trim(), "live", StringComparison.OrdinalIgnoreCase))
+        if (packageRegistry == "live")   // already validated to none|live in step 1 (L22)
         {
-            var registry = new HttpPackageRegistry();
-            attacks = (attacks ?? Attack.All)
-                .Select(a => a is SupplyChainAttack ? new SupplyChainAttack(registry) : a).ToList();
+            var roster = attacks ?? Attack.All;
+            var hasSupplyChain = roster.Any(a => a is SupplyChainAttack);
+            // L5: size the registry's blocking timeout to the per-probe budget so a hung registry can't overrun it.
+            var registry = new HttpPackageRegistry(
+                timeout: opts.TimeoutPerProbeSeconds > 0 ? TimeSpan.FromSeconds(opts.TimeoutPerProbeSeconds) : null);
+            attacks = roster.Select(a => a is SupplyChainAttack ? new SupplyChainAttack(registry) : a).ToList();
             if (!opts.Quiet)
-                Console.Error.WriteLine("  SupplyChain: live package registry (PyPI/npm/NuGet) enabled — a registry outage under-detects rather than false-flagging.");
-        }
-        else if (!string.IsNullOrWhiteSpace(opts.PackageRegistry) && !string.Equals(opts.PackageRegistry.Trim(), "none", StringComparison.OrdinalIgnoreCase))
-        {
-            throw new ArgumentException($"Unknown --package-registry: '{opts.PackageRegistry}'. Valid: none | live");
+                Console.Error.WriteLine(hasSupplyChain
+                    ? "  SupplyChain: live package registry (PyPI/npm/NuGet) enabled — a registry outage under-detects rather than false-flagging."
+                    : "  Warning: --package-registry live has no effect — the SupplyChain attack is not in the selected --attacks set.");
         }
 
         // 4. Resolve intensity
@@ -551,11 +596,21 @@ internal static class RedTeamCommand
     /// is RELATIVE to the stated cohort, not an absolute pass/fail; attacks that couldn't be calibrated are listed
     /// with their reason so a partial calibration is never read as a full one.
     /// </summary>
+    /// <summary>Selects the dataset importer for <c>--import-probes</c> by file extension: <c>.csv</c> → CSV
+    /// (default prompt column "Behavior"), anything else → JSON (default prompt field "prompt"). Mirrors
+    /// <c>PackDownloader.ImporterFor</c> so the CSV importer is reachable from the CLI, not just from <c>--pack</c>.</summary>
+    internal static IProbeDatasetImporter SelectImporter(string extension, string? promptField, string? idColumn)
+        => extension.Equals(".csv", StringComparison.OrdinalIgnoreCase)
+            ? new CsvProbeDatasetImporter(promptField ?? "Behavior", idColumn)
+            : new JsonProbeDatasetImporter(promptField ?? "prompt", idColumn);
+
     private static void PrintCalibration(CalibrationReport c)
     {
         Console.Error.WriteLine();
         Console.Error.WriteLine($"  === Calibration (relative to cohort) ===");
         Console.Error.WriteLine($"  Reference: {c.Source} (n={c.SampleSize}); flagged at ±{c.Threshold:F1}σ. z-scores are RELATIVE to this cohort, not absolute.");
+        if (c.IsLowConfidence)
+            Console.Error.WriteLine($"  Caveat: reference cohort n={c.SampleSize} (<{Calibrator.LowConfidenceSampleSize}) — z-scores are indicative only, not statistically robust.");
         foreach (var e in c.Entries.OrderBy(e => e.ZScore ?? double.MaxValue))
         {
             var z = e.ZScore is { } zv ? $"z={zv:+0.00;-0.00;0.00}" : "z=undefined";
@@ -581,6 +636,23 @@ internal static class RedTeamCommand
     /// Single construction site for <see cref="ScanOptions"/> (item 6 seam). Folds in the verbose progress callback,
     /// the judge and the attacker client together so every code path — including <c>--verbose</c> — keeps them.
     /// </summary>
+    // Jun14v2-L4: pure timeout/throttle range validation, hoisted so it can run in step 1 (before the import/download)
+    // AND inside BuildScanOptions (for library callers). Idempotent — throwing the same ArgumentException either way.
+    internal static void ValidateTimeouts(RedTeamOptions opts)
+    {
+        // L21: a negative throttle/timeout would silently disable bounding — reject it.
+        if (opts.DelaySeconds < 0 || opts.TimeoutPerTurnSeconds < 0)
+            throw new ArgumentException("--delay and --max-turn-timeout must be non-negative.");
+        // Jun14-M12: a 0s per-probe timeout cancels EVERY probe immediately (0%-coverage scan with no error) — reject it.
+        if (opts.TimeoutPerProbeSeconds <= 0)
+            throw new ArgumentException("--timeout-per-probe must be positive (a 0s timeout cancels every probe).");
+        // Jun14-L11: above ~1 day, CancelAfter / TimeoutPerTurn.Ticks*MaxTurns overflow and surface as per-probe
+        // faults mid-scan — fail fast at validation with a clear ceiling instead.
+        const double MaxTimeoutSeconds = 86_400;
+        if (opts.TimeoutPerProbeSeconds > MaxTimeoutSeconds || opts.TimeoutPerTurnSeconds > MaxTimeoutSeconds)
+            throw new ArgumentException($"--timeout-per-probe / --max-turn-timeout must be <= {MaxTimeoutSeconds:F0} seconds (1 day).");
+    }
+
     internal static ScanOptions BuildScanOptions(
         RedTeamOptions opts,
         IReadOnlyList<IAttackType>? attacks,
@@ -594,6 +666,10 @@ internal static class RedTeamCommand
                 $"{progress.CurrentAttack} — {progress.LastOutcome}")
             : null;
 
+        // Jun14v2-L4: idempotent — also runs in step 1 of ExecuteAsync (fail-fast before any I/O). Kept here so a
+        // library caller building ScanOptions directly is still guarded.
+        ValidateTimeouts(opts);
+
         return new ScanOptions
         {
             AttackTypes = attacks,
@@ -606,6 +682,12 @@ internal static class RedTeamCommand
             ExplainFindings = opts.Explain && judgeClient is not null,
             IncludeEvidence = true,
             OnProgress = onProgress,
+            // L21: throttle / timeout escape hatches. TimeoutPerTurn falls back to TimeoutPerProbe when --max-turn-timeout
+            // is 0 (set it equal here — same as ScanOptions' own get-fallback).
+            DelayBetweenProbes = TimeSpan.FromSeconds(opts.DelaySeconds),
+            Parallelism = opts.Parallelism,
+            TimeoutPerProbe = TimeSpan.FromSeconds(opts.TimeoutPerProbeSeconds),
+            TimeoutPerTurn = TimeSpan.FromSeconds(opts.TimeoutPerTurnSeconds > 0 ? opts.TimeoutPerTurnSeconds : opts.TimeoutPerProbeSeconds),
         };
     }
 
@@ -631,8 +713,8 @@ internal static class RedTeamCommand
     /// <summary>
     /// Renders a compliance-reporter format (NIST AI RMF) that is NOT an <see cref="IReportExporter"/>, routing
     /// through the reporter's own <c>ToJson</c>/<c>ToMarkdown</c>. Returns false for the standard exporter formats.
-    /// This is the CLI on-ramp for the NIST AI RMF reporter (the bench owasp/mitre subcommands cover those two;
-    /// NIST has no benchmark-preset family, so it surfaces here as a redteam export format).
+    /// This is the inline `redteam` on-ramp for the NIST AI RMF reporter; NIST also has a first-class benchmark
+    /// family (`agenteval bench nist`), so this export and that preset family are two routes to the same report.
     /// </summary>
     internal static bool TryRenderComplianceReport(string format, RedTeamResult result, out string content)
     {
@@ -682,6 +764,12 @@ internal sealed class RedTeamOptions
     public string? SystemPromptCanary { get; init; }
     public string? Attacks { get; init; }
     public FileInfo? ImportProbes { get; init; }
+    public string? ImportPromptField { get; init; }
+    public string? ImportIdColumn { get; init; }
+    public double DelaySeconds { get; init; }
+    public int Parallelism { get; init; } = 1;
+    public double TimeoutPerProbeSeconds { get; init; } = 30;
+    public double TimeoutPerTurnSeconds { get; init; }
     public string PackageRegistry { get; init; } = "none";
     public string? Pack { get; init; }
     public bool AcceptLicense { get; init; }

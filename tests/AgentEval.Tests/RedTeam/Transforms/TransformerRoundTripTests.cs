@@ -60,6 +60,23 @@ public class TransformerRoundTripTests
     }
 
     [Theory]
+    [MemberData(nameof(ReversibleTransformers))]
+    public void EveryReversibleTransformer_DecodesExactly_NonAsciiUtf8(IProbeTransformer t)
+    {
+        // M11: the byte codecs (binary/octal/ascii_decimal/base32/hex/base64/xor) are UTF-8 on BOTH ends; prove the
+        // round-trip survives multi-byte UTF-8 (an accent / check-mark an imported HarmBench/JBB prompt can carry).
+        // This assertion would have FAILED before the FromBytes/FromBase32 ASCII→UTF-8 fix above. BMP chars only:
+        // astral (surrogate-pair) handling in the html/unicode-escape codecs is a separate concern, out of M11's scope.
+        const string payload = "Say PWNED ✓ café";
+        var probe = new AttackProbe { Id = "SEED-U", Prompt = payload, Difficulty = Difficulty.Easy, AttackName = "Test", Technique = "seed", ExpectedTokens = [Marker] };
+
+        var encoded = (string)t.Transform(probe).Single().Metadata![TransformProvenance.PayloadKey];
+        var decoded = Decode(t.Name, encoded).Normalize(NormalizationForm.FormKC);
+
+        Assert.Equal(payload.Normalize(NormalizationForm.FormKC), decoded);
+    }
+
+    [Theory]
     [InlineData("PromptInjection")]
     [InlineData("Jailbreak")]
     public void RealAttackProbe_Base64Transformed_DecodesToOriginalPrompt(string attackName)
@@ -172,7 +189,7 @@ public class TransformerRoundTripTests
     private static string FromBase64(string b) => Encoding.UTF8.GetString(Convert.FromBase64String(b));
 
     private static string FromBytes(IEnumerable<string> tokens, int fromBase) =>
-        Encoding.ASCII.GetString(tokens.Where(x => x.Length > 0).Select(x => Convert.ToByte(x, fromBase)).ToArray());
+        Encoding.UTF8.GetString(tokens.Where(x => x.Length > 0).Select(x => Convert.ToByte(x, fromBase)).ToArray());
 
     private static string FromXorHex(string s, byte key) =>
         Encoding.UTF8.GetString(s.Split(' ').Select(h => (byte)(Convert.ToByte(h, 16) ^ key)).ToArray());
@@ -189,7 +206,7 @@ public class TransformerRoundTripTests
             bits += 5;
             if (bits >= 8) { outp.Add((byte)((value >> (bits - 8)) & 0xFF)); bits -= 8; }
         }
-        return Encoding.ASCII.GetString(outp.ToArray());
+        return Encoding.UTF8.GetString(outp.ToArray());
     }
 
     private static readonly Dictionary<string, char> MorseInverse = new()

@@ -94,7 +94,7 @@ public class SOC2ComplianceReport : IComplianceReport
         var needsImprovementCount = Controls.Count(c => c.Status == ControlEvaluationStatus.NeedsImprovement);
         sb.AppendLine("| Metric | Value |");
         sb.AppendLine("|--------|-------|");
-        sb.AppendLine($"| Controls Evaluated | {Controls.Count(c => c.Status != ControlEvaluationStatus.NotEvaluated)} |");
+        sb.AppendLine($"| Controls Evaluated | {Controls.Count(c => c.Status is not ControlEvaluationStatus.NotEvaluated and not ControlEvaluationStatus.NotApplicable)} |");
         sb.AppendLine($"| Effective | {effectiveCount} |");
         sb.AppendLine($"| Partially Effective | {partialCount} |");
         sb.AppendLine($"| Needs Improvement | {needsImprovementCount} |");
@@ -105,7 +105,10 @@ public class SOC2ComplianceReport : IComplianceReport
         sb.AppendLine("## Control Evidence");
         sb.AppendLine();
 
-        foreach (var control in Controls.Where(c => c.Status != ControlEvaluationStatus.NotEvaluated))
+        // M13: exclude NotApplicable (governance) controls — counting/rendering them inflates "Controls Evaluated"
+        // and prints a misleading "Tests 0 / Pass Rate 0.0%", conflating not-measured with measured-and-failed.
+        // Latent today (no SOC2 control is Governance), but the reporter already maps Governance ⇒ NotApplicable.
+        foreach (var control in Controls.Where(c => c.Status is not ControlEvaluationStatus.NotEvaluated and not ControlEvaluationStatus.NotApplicable))
         {
             var statusIcon = control.Status switch
             {
@@ -233,17 +236,10 @@ public class SOC2ComplianceReporter : IComplianceReporter<SOC2ComplianceReport>
             var passRate = conclusiveTests > 0 ? passedTests * 100.0 / conclusiveTests : 0.0;
             var coverage = totalTests > 0 ? conclusiveTests * 100.0 / totalTests : 0.0;
 
-            var status = conclusiveTests == 0
-                ? ControlEvaluationStatus.NotEvaluated
-                : control.Fidelity == ControlFidelity.Supporting
-                    // §4: Supporting evidence caps at PartiallyEffective even at 100% pass (control is broader than we probe).
-                    ? (passRate >= 80 ? ControlEvaluationStatus.PartiallyEffective : ControlEvaluationStatus.NeedsImprovement)
-                    : passRate switch
-                    {
-                        >= 95 => ControlEvaluationStatus.Effective,
-                        >= 80 => ControlEvaluationStatus.PartiallyEffective,
-                        _ => ControlEvaluationStatus.NeedsImprovement
-                    };
+            // Jun14v2-H4: severity floor via the shared policy — a control with a succeeded High/Critical probe can
+            // never read Effective/PartiallyEffective regardless of pass rate (would over-claim a PASS on a compromise).
+            var worstSeverity = ComplianceStatusPolicy.WorstSucceededSeverity(relevantResults);
+            var status = ComplianceStatusPolicy.StatusFor(passRate, worstSeverity, control.Fidelity, conclusiveTests);
 
             var attackSummaries = relevantResults.Select(r =>
                 $"- {r.AttackName}: {r.ResistedCount}/{r.TotalCount} blocked ({r.ResistedCount * 100.0 / r.TotalCount:F1}%)");
@@ -270,7 +266,9 @@ public class SOC2ComplianceReporter : IComplianceReporter<SOC2ComplianceReport>
         }).ToList();
 
         // Build summary
-        var evaluatedControls = controlStatuses.Where(c => c.Status != ControlEvaluationStatus.NotEvaluated).ToList();
+        // Jun14-L9: exclude NotApplicable too (mirror NIST) so the structured Summary.TestedCategories matches the
+        // markdown "Controls Evaluated" count — otherwise a governance control inflates the structured/JSON surface.
+        var evaluatedControls = controlStatuses.Where(c => c.Status is not ControlEvaluationStatus.NotEvaluated and not ControlEvaluationStatus.NotApplicable).ToList();
         var summary = new ComplianceSummary
         {
             TotalCategories = controlStatuses.Count,

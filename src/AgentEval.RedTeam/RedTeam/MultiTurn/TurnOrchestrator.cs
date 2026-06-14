@@ -33,15 +33,32 @@ public sealed class TurnOrchestrator
         ArgumentNullException.ThrowIfNull(seed);
         ArgumentNullException.ThrowIfNull(evaluator);
 
-        await using var convo = _agent is IConversableAgent conversable
-            ? await conversable.StartConversationAsync(cancellationToken).ConfigureAwait(false)
-            : new StatelessConversationAdapter(_agent);
-
         var detector = attack.ConvergenceDetector ?? DefaultConvergenceDetector.Instance;
         // Wave B↔C: a multi-turn attack that is ALSO tool-aware advertises canary tools for the whole conversation.
         // These are routed over the conversation channel's tool-aware SendAsync; a channel that can't carry tools
-        // (the default DIM) degrades honestly to text-only. Fetched once — the tool surface is conversation-scoped.
+        // (the default DIM) degrades honestly to text-only. Fetched once (conversation-scoped) and BEFORE channel
+        // selection so the L9 capability check below can see whether tools are in play.
         var canaryTools = attack is IToolAwareAttack toolAware ? toolAware.GetCanaryTools(_options.Intensity) : null;
+
+        // L9/Jun14-L12: a native IConversableAgent's channel ignores canary tools unless it overrides the
+        // SendAsync(string, tools, ct) DIM (signalled by IAgentConversation.CarriesTools). When the agent is ALSO
+        // IToolCapableAgent and advertises tools but its STARTED native channel does NOT carry them, fall back to the
+        // flattened adapter (which bridges to InvokeWithToolsAsync) so the tool boundary is exercised — honestly
+        // labeled Flattened. A native channel that DOES carry tools (CarriesTools==true) keeps Native fidelity.
+        await using var convo = await AcquireChannelAsync().ConfigureAwait(false);
+
+        async Task<IAgentConversation> AcquireChannelAsync()
+        {
+            if (_agent is not IConversableAgent conversable)
+                return new StatelessConversationAdapter(_agent);
+            var native = await conversable.StartConversationAsync(cancellationToken).ConfigureAwait(false);
+            if (canaryTools is { Count: > 0 } && !native.CarriesTools && _agent is IToolCapableAgent)
+            {
+                await native.DisposeAsync().ConfigureAwait(false);
+                return new StatelessConversationAdapter(_agent);
+            }
+            return native;
+        }
         var history = new List<Turn>();
         var perTurn = new List<EvaluationResult>();
         var outcome = EvaluationOutcome.Resisted;   // no turn succeeded ⇒ resisted (folded to Inconclusive below if 0 turns ran or every turn was inconclusive)
@@ -128,7 +145,20 @@ public sealed class TurnOrchestrator
             last = response;
             history.Add(Turn.Assistant(response.Text));
 
-            var result = await evaluator.EvaluateAsync(seed, response, cancellationToken).ConfigureAwait(false);
+            // L7: the per-turn evaluator call honors the per-turn budget (turnCts), like the agent call and the judge
+            // fallback below — a slow async evaluator must not escape the documented per-turn timeout. A per-turn
+            // evaluator timeout folds the partial transcript as truncated rather than aborting the whole probe.
+            EvaluationResult result;
+            try
+            {
+                result = await evaluator.EvaluateAsync(seed, response, turnCts.Token).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+            {
+                reason = $"per-turn evaluation timed out after {_options.TimeoutPerTurn.TotalSeconds:F1}s";
+                truncated = true;
+                break;
+            }
             var turnFidelity = FidelityOf(result);
 
             // GAP-19 (multi-turn): resolve an Inconclusive turn with the LLM judge when one is configured, mirroring
@@ -230,6 +260,11 @@ public sealed class TurnOrchestrator
             TurnsUsed = perTurn.Count,
             Reason = reason,
             WasTruncated = truncated && outcome != EvaluationOutcome.Succeeded,
+            // L10 / Jun14-M13: AttackerDriven is true only when an attacker LLM was BOTH wired AND actually consumed by
+            // this attack (attack.UsesAttacker), not merely because --attacker was supplied scan-wide. Otherwise a
+            // SCRIPTED multi-turn attack (e.g. ToolEscalation) run alongside --attacker would be falsely marked
+            // non-deterministic, which a baseline gate could use to suppress a real regression on it.
+            AttackerDriven = _options.AttackerClient is not null && attack.UsesAttacker,
         };
     }
 

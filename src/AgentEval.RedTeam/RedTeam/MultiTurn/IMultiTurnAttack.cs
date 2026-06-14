@@ -20,4 +20,10 @@ public interface IMultiTurnAttack : IAttackType
 
     /// <summary>The stop policy. Default: stop on the first success or after a refusal-lock.</summary>
     IConvergenceDetector ConvergenceDetector => DefaultConvergenceDetector.Instance;
+
+    /// <summary>Jun14-M13: true when this attack actually generates its turns from an attacker LLM (so a run is
+    /// non-deterministic). Default <c>false</c> for scripted ladders (e.g. ToolEscalation), so the folded result's
+    /// <c>AttackerDriven</c> provenance reflects real non-determinism — not merely that <c>--attacker</c> was supplied
+    /// scan-wide. Overridden <c>true</c> by the attacker-driven attacks (PAIR, attacker-Crescendo).</summary>
+    bool UsesAttacker => false;
 }

@@ -431,9 +431,12 @@ internal static class BenchmarkSampleHelpers
             case "mitre":
                 await new MITREATLASReporter().SaveReportAsync(store, subject, runId, redTeamResult, options: null, ct);
                 break;
+            case "nist":
+                await new NistAiRmfComplianceReporter().SaveReportAsync(store, subject, runId, redTeamResult, options: null, ct);
+                break;
             default:
                 throw new ArgumentException(
-                    $"Unknown red-team regulationCode '{regulationCode}'. Known: owasp, mitre.",
+                    $"Unknown red-team regulationCode '{regulationCode}'. Known: owasp, mitre, nist.",
                     nameof(regulationCode));
         }
     }

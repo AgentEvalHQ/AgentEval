@@ -27,15 +27,22 @@ internal static class EndpointFactory
     /// </summary>
     /// <param name="endpoint">The API endpoint URL.</param>
     /// <param name="model">The model/deployment name.</param>
-    /// <param name="apiKey">Optional API key (some local providers like Ollama don't require one).</param>
+    /// <param name="apiKey">Optional API key; falls back to the OPENAI_API_KEY env var, then "no-key-needed"
+    /// (some local providers like Ollama don't require one).</param>
     /// <returns>An <see cref="IChatClient"/> ready for evaluation.</returns>
     public static IChatClient CreateOpenAICompatible(string endpoint, string model, string? apiKey)
     {
-        var credential = new ApiKeyCredential(apiKey ?? "no-key-needed");
+        var credential = new ApiKeyCredential(ResolveOpenAIKey(apiKey));
         var options = new OpenAIClientOptions { Endpoint = new Uri(endpoint) };
         var client = new OpenAIClient(credential, options);
         return client.GetChatClient(model).AsIChatClient();
     }
+
+    /// <summary>M14: resolves the OpenAI-compatible key — explicit <paramref name="apiKey"/> wins, else the
+    /// <c>OPENAI_API_KEY</c> env var (the documented fallback the help promises), else the no-key-needed sentinel
+    /// for keyless local providers. Mirrors the Azure path's AZURE_OPENAI_API_KEY behavior.</summary>
+    internal static string ResolveOpenAIKey(string? apiKey)
+        => apiKey ?? Environment.GetEnvironmentVariable("OPENAI_API_KEY") ?? "no-key-needed";
 
     /// <summary>
     /// Creates an <see cref="IChatClient"/> for Azure OpenAI.

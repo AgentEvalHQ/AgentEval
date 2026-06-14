@@ -452,7 +452,13 @@ public sealed class RedTeamRunner : IRedTeamRunner
                 var judged = await judge.EvaluateAsync(probe, responseText, probeCts.Token);
                 if (judged.Outcome != EvaluationOutcome.Inconclusive)
                 {
-                    evalResult = judged;
+                    // Jun14-M4: the judge Reason is LLM-authored from the RAW response and can quote sensitive content,
+                    // exactly like the --explain rationale H1 gated. Redact it on a redacted scan (Outcome/fidelity
+                    // are never altered — only the free-text Reason is suppressed) so it can't leak via Reason →
+                    // JSON/SARIF exporters when Prompt/Response are [REDACTED].
+                    evalResult = options.IncludeEvidence
+                        ? judged
+                        : judged with { Reason = $"LLM judge: {judged.Outcome} (reason suppressed; enable IncludeEvidence)" };
                     fidelity = judged.Outcome == EvaluationOutcome.Succeeded
                         ? EvidenceFidelity.IntentToAct
                         : EvidenceFidelity.Verbal;
@@ -462,8 +468,11 @@ public sealed class RedTeamRunner : IRedTeamRunner
             // --explain (ExplainFindings): attach a best-effort LLM rationale narrating the verdict + fidelity for
             // Succeeded/Inconclusive findings only (the user-selected scope). Opt-in, judge-gated, never changes the
             // verdict, and a failure/timeout here is swallowed so it can never fail the probe.
+            // H1: the rationale is generated from the RAW response/prompt and routinely quotes sensitive content, so it
+            // is gated on IncludeEvidence exactly like Prompt/Response below — a redacted scan must not leak via the
+            // explain channel. Gating here also avoids the (paid) LLM call entirely when evidence is redacted.
             string? rationale = null;
-            if (options.ExplainFindings && options.JudgeClient is not null
+            if (options.IncludeEvidence && options.ExplainFindings && options.JudgeClient is not null
                 && evalResult.Outcome is EvaluationOutcome.Succeeded or EvaluationOutcome.Inconclusive)
             {
                 try
@@ -572,7 +581,8 @@ public sealed class RedTeamRunner : IRedTeamRunner
             Response = options.IncludeEvidence ? transcript : "[REDACTED]",
             Outcome = mt.Outcome,
             Reason = $"[{mt.ConversationFidelity}, {mt.TurnsUsed} turn(s)] {mt.Reason}"
-                     + (mt.WasTruncated ? " [TRUNCATED]" : string.Empty),
+                     + (mt.WasTruncated ? " [TRUNCATED]" : string.Empty)
+                     + (mt.AttackerDriven ? " [ATTACKER-DRIVEN]" : string.Empty),   // L10: human-visible non-determinism marker
             Technique = probe.Technique,
             Difficulty = probe.Difficulty,
             Duration = elapsed,
@@ -580,6 +590,7 @@ public sealed class RedTeamRunner : IRedTeamRunner
             Fidelity = mt.Fidelity,
             Surface = probe.Surface,
             ConversationFidelity = mt.ConversationFidelity,
+            AttackerDriven = mt.AttackerDriven,   // L10: provenance flag (reserved for a future baseline gate; see ProbeResult.AttackerDriven)
         };
     }
 

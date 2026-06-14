@@ -101,6 +101,9 @@ public static class OwaspBenchmarkSample
         Console.WriteLine("     chain, LLM04 data + model poisoning, LLM08 vector + embedding weaknesses, and LLM09");
         Console.WriteLine("     misinformation as deterministic agent-API-layer attacks — no skipped leaves.");
         Console.WriteLine("   - Smoke = 3 attacks @ Quick; Standard = Top10 (13 @ Quick); AuditGrade = Top10 @ Comprehensive.");
+
+        // Advanced red-team capabilities — folded in at Standard/AuditGrade tiers.
+        await AdvancedRedTeamShowcase.RunAsync(preset);
     }
 
     private static IEvaluableAgent CreateAgent()

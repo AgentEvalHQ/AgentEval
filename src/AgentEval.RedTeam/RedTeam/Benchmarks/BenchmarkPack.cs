@@ -11,11 +11,11 @@ namespace AgentEval.RedTeam.Benchmarks;
 /// (CLI <c>--accept-license</c>) — most of these datasets contain harmful/offensive content by design.
 /// </summary>
 /// <remarks>
-/// <see cref="DataUrl"/> must serve the importer's JSON seed-prompt schema (a JSON array of
-/// <c>{ prompt, id?, technique?, source?, license?, expectedTokens? }</c>). Several upstream benchmarks publish a
-/// different native format (CSV / parquet / custom JSON); for those, point <see cref="DataUrl"/> at a normalized export
-/// or supply a dedicated <see cref="Importers.IProbeDatasetImporter"/>. Imported probes without an expected-token oracle
-/// are Inconclusive unless an LLM judge (<c>--judge</c>) is configured — never a fabricated verdict.
+/// <see cref="Format"/> + <see cref="PromptField"/> select the importer and the prompt column/key, so a pack's native
+/// JSON-or-CSV format (e.g. HarmBench's <c>Behavior</c> CSV column, JBB's <c>Goal</c>, CyberSecEval's
+/// <c>test_case_prompt</c> JSON key) is parsed directly — no manual normalization needed. Imported probes carry no
+/// expected-token oracle, so they are Inconclusive unless an LLM judge (<c>--judge</c>) is configured — never a
+/// fabricated verdict.
 /// </remarks>
 public sealed record BenchmarkPack
 {
@@ -34,8 +34,16 @@ public sealed record BenchmarkPack
     /// <summary>Project home page (for attribution and provenance).</summary>
     public required string HomeUrl { get; init; }
 
-    /// <summary>URL the probe data is fetched from. Must serve the importer's JSON seed-prompt schema.</summary>
+    /// <summary>URL the probe data is fetched from.</summary>
     public required string DataUrl { get; init; }
+
+    /// <summary>Upstream data format: <c>"json"</c> (array of objects) or <c>"csv"</c>. Selects the importer.</summary>
+    public string Format { get; init; } = "json";
+
+    /// <summary>The object key (JSON) or column name (CSV) holding the prompt text. Defaults to <c>"prompt"</c> (native
+    /// seed schema); set per pack for upstream formats (HarmBench <c>Behavior</c>, JBB <c>Goal</c>, CyberSecEval
+    /// <c>test_case_prompt</c>).</summary>
+    public string PromptField { get; init; } = "prompt";
 
     /// <summary>OWASP LLM Top-10 id the imported set is classified under (defaults to LLM01).</summary>
     public string OwaspLlmId { get; init; } = "LLM01";

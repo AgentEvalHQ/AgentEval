@@ -267,12 +267,7 @@ public static class BenchOwaspCommand
             $"({report.Summary.CriticalFindings} critical / {report.Summary.HighFindings} high findings); " +
             $"composite verdict {compositeEval.Score.Label.ToUpperInvariant()}");
 
-        var finalExit = compositeEval.Score.Label.ToLowerInvariant() switch
-        {
-            "pass" => 0,
-            "fail" => 2,
-            _      => 2  // WARN/skipped also returns non-zero for CI strictness
-        };
+        var finalExit = BenchExitCodes.FromLabel(compositeEval.Score.Label);  // pass → 0, fail/warn/skipped → 2
         return (finalExit, outputDir);
     }
 

@@ -56,7 +56,7 @@ public sealed class PackageHallucinationDetector : IProbeEvaluator
 {
     private readonly IPackageRegistry _registry;
     private readonly PackageEcosystem _ecosystem;
-    private static readonly TimeSpan RegexTimeout = TimeSpan.FromMilliseconds(100);
+    private static readonly TimeSpan RegexTimeout = TimeSpan.FromMilliseconds(1000);
 
     private static readonly Regex[] PythonExtractors =
     [

@@ -80,6 +80,35 @@ public class CalibratorTests
     public void FromJson_Throws_OnEmptyInput(string json)
         => Assert.Throws<ArgumentException>(() => CalibrationProfile.FromJson(json));
 
+    [Fact] // H4 — a null stat value passes deserialization but would NRE at scan time without the guard.
+    public void FromJson_Throws_OnNullStatEntry()
+        => Assert.Throws<FormatException>(() => CalibrationProfile.FromJson(
+            """{ "source": "x", "sampleSize": 1, "attacks": { "PromptInjection": null } }"""));
+
+    [Fact] // H5 — a negative stddev is meaningless; reject at parse time, not silently absorb as "σ=0".
+    public void FromJson_Throws_OnNegativeStdDev()
+        => Assert.Throws<FormatException>(() => CalibrationProfile.FromJson(
+            """{ "source": "x", "sampleSize": 1, "attacks": { "PromptInjection": { "mean": 80, "stdDev": -1 } } }"""));
+
+    [Fact] // H5 — a non-finite stat (overflow → ±Infinity / NaN) must not reach the scorer as "within normal range".
+    public void FromJson_Throws_OnNonFiniteStat()
+        => Assert.Throws<FormatException>(() => CalibrationProfile.FromJson(
+            """{ "source": "x", "sampleSize": 1, "attacks": { "PromptInjection": { "mean": 1e400, "stdDev": 10 } } }"""));
+
+    [Fact] // L20 — case-differing duplicate keys survive deserialization, then throw the WRONG exception type at the
+    // OrdinalIgnoreCase lookup copy; reject them here as a FormatException, before any (paid) scan runs.
+    public void FromJson_Throws_OnCaseInsensitiveDuplicateKeys()
+        => Assert.Throws<FormatException>(() => CalibrationProfile.FromJson(
+            """
+            {
+              "source": "x", "sampleSize": 1,
+              "attacks": {
+                "PromptInjection": { "mean": 80, "stdDev": 10 },
+                "promptinjection": { "mean": 70, "stdDev": 5 }
+              }
+            }
+            """));
+
     // ── z-score bands ────────────────────────────────────────────────────────
 
     [Fact]
@@ -129,6 +158,69 @@ public class CalibratorTests
         Assert.Null(entry.ZScore);
         Assert.Equal(CalibrationBand.Undefined, entry.Band);
         Assert.Contains("undefined", entry.Interpretation, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("σ=0", entry.Interpretation); // L18 — the σ=0 clause is only used for a genuine zero spread.
+    }
+
+    [Fact] // Jun14-M1 — a hand-built profile with a non-finite Mean (bypasses FromJson) must classify Undefined and
+    // name the invalid mean, NOT fall through to a calm "within normal range" (the false-calm class H5 fixed).
+    public void Calibrate_NonFiniteMean_IsUndefined_NotWithinNormalRange()
+    {
+        var profile = new CalibrationProfile
+        {
+            Source = "hand-built",
+            SampleSize = 7,
+            Attacks = new Dictionary<string, CalibrationStat> { ["PromptInjection"] = new() { Mean = double.NaN, StdDev = 10 } },
+        };
+
+        var entry = Assert.Single(Calibrator.Calibrate(Result(Attack("PromptInjection", 5, 5)), profile).Entries);
+
+        Assert.Equal(CalibrationBand.Undefined, entry.Band);
+        Assert.DoesNotContain("within normal range", entry.Interpretation, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("invalid cohort mean", entry.Interpretation, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Theory] // Jun14v2-L1 — an INFINITE cohort Mean yields z = ±Infinity (not NaN), which the old NaN-only guard let
+    // through to fabricate a confident "unusually vulnerable/robust". A non-finite z must classify Undefined too.
+    [InlineData(double.PositiveInfinity)]
+    [InlineData(double.NegativeInfinity)]
+    public void Calibrate_InfiniteMean_IsUndefined_NotAConfidentBand(double mean)
+    {
+        var profile = new CalibrationProfile
+        {
+            Source = "hand-built",
+            SampleSize = 7,
+            Attacks = new Dictionary<string, CalibrationStat> { ["PromptInjection"] = new() { Mean = mean, StdDev = 10 } },
+        };
+
+        var entry = Assert.Single(Calibrator.Calibrate(Result(Attack("PromptInjection", 5, 5)), profile).Entries);
+
+        Assert.Equal(CalibrationBand.Undefined, entry.Band);
+        Assert.DoesNotContain("unusually", entry.Interpretation, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("invalid cohort mean", entry.Interpretation, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact] // Jun14-L2 — a negative sampleSize is incoherent provenance; reject it at parse time.
+    public void FromJson_Throws_OnNegativeSampleSize()
+        => Assert.Throws<FormatException>(() => CalibrationProfile.FromJson(
+            """{ "source": "x", "sampleSize": -3, "attacks": { "PromptInjection": { "mean": 80, "stdDev": 10 } } }"""));
+
+    [Fact] // L18 — a hand-built profile (bypasses FromJson validation) with a negative stddev must NOT print the
+    // false "σ=0" clause; the Undefined interpretation tells the truth about the invalid spread.
+    public void Calibrate_NegativeStdDev_Interpretation_DoesNotClaimSigmaZero()
+    {
+        // Constructed directly (not via FromJson, which would reject it) to exercise the Interpret belt-and-suspenders.
+        var profile = new CalibrationProfile
+        {
+            Source = "hand-built",
+            SampleSize = 7,
+            Attacks = new Dictionary<string, CalibrationStat> { ["PromptInjection"] = new() { Mean = 50, StdDev = -1 } },
+        };
+
+        var entry = Assert.Single(Calibrator.Calibrate(Result(Attack("PromptInjection", 5, 5)), profile).Entries);
+
+        Assert.Equal(CalibrationBand.Undefined, entry.Band);
+        Assert.DoesNotContain("σ=0", entry.Interpretation);
+        Assert.Contains("invalid cohort stdDev", entry.Interpretation, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -189,6 +281,27 @@ public class CalibratorTests
         Assert.Equal(Calibrator.DefaultThreshold, report.Threshold);
     }
 
+    [Theory] // L19 — a thin cohort (n < 5) is valid data but statistically weak; flag it, never suppress the numbers.
+    // Jun14-L1: n=0 (the thinnest cohort, commonly an omitted sampleSize) is now ALSO flagged indicative-only.
+    [InlineData(2, true)]
+    [InlineData(4, true)]
+    [InlineData(5, false)]
+    [InlineData(7, false)]
+    [InlineData(0, true)]
+    public void Calibrate_SmallCohort_FlagsLowConfidence(int sampleSize, bool expected)
+    {
+        var profile = new CalibrationProfile
+        {
+            Source = "cohort",
+            SampleSize = sampleSize,
+            Attacks = new Dictionary<string, CalibrationStat> { ["PromptInjection"] = new() { Mean = 80, StdDev = 10 } },
+        };
+
+        var report = Calibrator.Calibrate(Result(Attack("PromptInjection", 8, 2)), profile);
+
+        Assert.Equal(expected, report.IsLowConfidence);
+    }
+
     // ── argument validation ───────────────────────────────────────────────────
 
     [Fact]
@@ -205,4 +318,25 @@ public class CalibratorTests
     public void Calibrate_NonPositiveThreshold_Throws(double threshold)
         => Assert.Throws<ArgumentOutOfRangeException>(
             () => Calibrator.Calibrate(Result(Attack("X", 1, 1)), Profile(("X", 1, 1)), threshold));
+
+    // ── profile loading ──────────────────────────────────────────────────────
+
+    [Fact]
+    public void FromJson_ValidJsonButNoAttacksMap_Throws()
+        => Assert.Throws<FormatException>(() => CalibrationProfile.FromJson("""{ "source": "x", "sampleSize": 1 }"""));
+
+    [Fact]
+    public async Task LoadAsync_RoundTripsFromFile()
+    {
+        var path = Path.GetTempFileName();
+        try
+        {
+            await File.WriteAllTextAsync(path,
+                """{ "source": "fleet", "sampleSize": 2, "attacks": { "PromptInjection": { "mean": 80, "stdDev": 10 } } }""");
+            var p = await CalibrationProfile.LoadAsync(path);
+            Assert.Equal("fleet", p.Source);
+            Assert.Equal(80, p.Attacks["PromptInjection"].Mean);
+        }
+        finally { File.Delete(path); }
+    }
 }
