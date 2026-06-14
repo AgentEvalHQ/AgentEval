@@ -12,22 +12,31 @@ namespace AgentEval.RedTeam;
 /// </summary>
 internal static class NegationScope
 {
-    private static readonly char[] ClauseDelimiters = ['.', '!', '?', ';', '\n'];
-
     /// <summary>
     /// True when the clause enclosing <c>[matchStart, matchStart+matchLength)</c> in <paramref name="lower"/> contains
-    /// any of <paramref name="negationMarkers"/>. The clause runs from the nearest preceding delimiter to the nearest
-    /// following delimiter (or the text bounds).
+    /// any of <paramref name="negationMarkers"/>. The clause runs from the nearest preceding clause boundary to the
+    /// nearest following one (or the text bounds).
     /// </summary>
     public static bool ClauseIsNegated(string lower, int matchStart, int matchLength, IReadOnlyList<string> negationMarkers)
     {
         if (matchStart < 0 || matchStart >= lower.Length) return false;
-        var prevDelim = matchStart > 0 ? lower.LastIndexOfAny(ClauseDelimiters, matchStart - 1) : -1;
-        var start = prevDelim + 1;
-        var afterIdx = matchStart + matchLength;
-        var nextDelim = afterIdx < lower.Length ? lower.IndexOfAny(ClauseDelimiters, afterIdx) : -1;
-        var end = nextDelim < 0 ? lower.Length : nextDelim;
+        var start = 0;
+        for (var i = matchStart - 1; i >= 0; i--)
+            if (IsClauseBoundary(lower, i)) { start = i + 1; break; }
+        var end = lower.Length;
+        for (var i = matchStart + matchLength; i < lower.Length; i++)
+            if (IsClauseBoundary(lower, i)) { end = i; break; }
         var clause = lower[start..end];
         return negationMarkers.Any(n => clause.Contains(n, StringComparison.Ordinal));
+    }
+
+    // Jun14v3: ';' and newline always end a clause; '.', '!', '?' do so only when followed by whitespace/end — so a dot
+    // inside a token (an email domain "company.com", a decimal "3.14", an abbreviation) does NOT falsely split the clause.
+    private static bool IsClauseBoundary(string s, int i)
+    {
+        var c = s[i];
+        if (c is ';' or '\n') return true;
+        if (c is '.' or '!' or '?') return i + 1 >= s.Length || char.IsWhiteSpace(s[i + 1]);
+        return false;
     }
 }
