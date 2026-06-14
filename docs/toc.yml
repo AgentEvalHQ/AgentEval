@@ -3,9 +3,6 @@
 - name: Home
   href: index.md
 
-- name: Roadmap
-  href: roadmap.md
-
 - name: Getting Started
   items:
   - name: Installation
@@ -38,6 +35,9 @@
   items:
   - name: Red Team Security
     href: redteam.md
+    items:
+    - name: What's New
+      href: redteam-whats-new.md
   - name: Responsible AI
     href: ResponsibleAI.md
   - name: Memory Evaluation
@@ -94,6 +94,8 @@
     items:
     - name: Getting Started
       href: benchmarks/owasp/getting-started.md
+    - name: Red-Team Procedure
+      href: redteam/owasp.md
   - name: MITRE ATLAS Benchmark
     items:
     - name: Getting Started
