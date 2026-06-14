@@ -49,6 +49,9 @@ public sealed class PairAttack : IAttackType, IMultiTurnAttack
     /// <inheritdoc />
     public int MaxTurns => 6;   // the refinement budget (attacker attempts per seed)
 
+    /// <inheritdoc /> Jun14-M13: PAIR always generates its refinements from the attacker LLM.
+    public bool UsesAttacker => true;
+
     /// <inheritdoc />
     /// <remarks>PAIR persists through refusals (it refines), so it stops only on success or when the budget is spent.</remarks>
     public IConvergenceDetector ConvergenceDetector => SuccessOnlyConvergenceDetector.Instance;

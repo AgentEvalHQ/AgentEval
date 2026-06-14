@@ -1046,7 +1046,7 @@ Attach an **LLM-generated rationale** to each Succeeded/Inconclusive finding tha
 agenteval redteam --endpoint $URL --model $MODEL --judge $JUDGE_URL --explain
 ```
 
-Requires `--judge` (it's an LLM call); without one it's a no-op with a warning. The rationale lands on `ProbeResult.Rationale` and in the JSON export.
+Requires `--judge` (it's an LLM call); without one it's a no-op with a warning. The rationale lands on `ProbeResult.Rationale` and in the JSON export. It also requires evidence to be unredacted (`--explain` is suppressed when evidence is redacted, since the rationale quotes the raw response). Currently the rationale is attached to **single-turn** findings only; folded multi-turn / Crescendo / TAP findings do not carry one.
 
 ### Output & compliance formats, per-role keys
 

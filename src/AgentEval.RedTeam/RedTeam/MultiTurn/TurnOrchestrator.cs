@@ -40,16 +40,25 @@ public sealed class TurnOrchestrator
         // selection so the L9 capability check below can see whether tools are in play.
         var canaryTools = attack is IToolAwareAttack toolAware ? toolAware.GetCanaryTools(_options.Intensity) : null;
 
-        // L9: a native IConversableAgent's conversation channel ignores canary tools unless it overrides the
-        // SendAsync(string, tools, ct) DIM — so an agent that is ALSO IToolCapableAgent would have its tool boundary
-        // silently dropped (a Tier-2 SUT measured at Tier-0). When that combo advertises tools, prefer the flattened
-        // adapter, which bridges to InvokeWithToolsAsync and exercises the real tool boundary (honestly labeled
-        // ConversationFidelity.Flattened). A native conversation that wants to carry tools must override that DIM.
-        var preferFlattenedForTools = canaryTools is { Count: > 0 } && _agent is IConversableAgent and IToolCapableAgent;
+        // L9/Jun14-L12: a native IConversableAgent's channel ignores canary tools unless it overrides the
+        // SendAsync(string, tools, ct) DIM (signalled by IAgentConversation.CarriesTools). When the agent is ALSO
+        // IToolCapableAgent and advertises tools but its STARTED native channel does NOT carry them, fall back to the
+        // flattened adapter (which bridges to InvokeWithToolsAsync) so the tool boundary is exercised — honestly
+        // labeled Flattened. A native channel that DOES carry tools (CarriesTools==true) keeps Native fidelity.
+        await using var convo = await AcquireChannelAsync().ConfigureAwait(false);
 
-        await using var convo = _agent is IConversableAgent conversable && !preferFlattenedForTools
-            ? await conversable.StartConversationAsync(cancellationToken).ConfigureAwait(false)
-            : new StatelessConversationAdapter(_agent);
+        async Task<IAgentConversation> AcquireChannelAsync()
+        {
+            if (_agent is not IConversableAgent conversable)
+                return new StatelessConversationAdapter(_agent);
+            var native = await conversable.StartConversationAsync(cancellationToken).ConfigureAwait(false);
+            if (canaryTools is { Count: > 0 } && !native.CarriesTools && _agent is IToolCapableAgent)
+            {
+                await native.DisposeAsync().ConfigureAwait(false);
+                return new StatelessConversationAdapter(_agent);
+            }
+            return native;
+        }
         var history = new List<Turn>();
         var perTurn = new List<EvaluationResult>();
         var outcome = EvaluationOutcome.Resisted;   // no turn succeeded ⇒ resisted (folded to Inconclusive below if 0 turns ran or every turn was inconclusive)
@@ -251,10 +260,11 @@ public sealed class TurnOrchestrator
             TurnsUsed = perTurn.Count,
             Reason = reason,
             WasTruncated = truncated && outcome != EvaluationOutcome.Succeeded,
-            // L10: a non-null attacker client means an attacker LLM generated the turns (PAIR / attacker-driven
-            // Crescendo) — the run is non-deterministic. Stamp it so a baseline gate can treat a diff as possibly
-            // non-reproducible rather than a real regression. (Purely informational — never changes Outcome.)
-            AttackerDriven = _options.AttackerClient is not null,
+            // L10 / Jun14-M13: AttackerDriven is true only when an attacker LLM was BOTH wired AND actually consumed by
+            // this attack (attack.UsesAttacker), not merely because --attacker was supplied scan-wide. Otherwise a
+            // SCRIPTED multi-turn attack (e.g. ToolEscalation) run alongside --attacker would be falsely marked
+            // non-deterministic, which a baseline gate could use to suppress a real regression on it.
+            AttackerDriven = _options.AttackerClient is not null && attack.UsesAttacker,
         };
     }
 

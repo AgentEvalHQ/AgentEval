@@ -33,8 +33,10 @@ public sealed class HttpPackageRegistry : IPackageRegistry, IDisposable
     }
 
     /// <inheritdoc />
-    /// <remarks>L5: this BLOCKS (sync-over-async) for up to the constructor's <c>timeout</c> (default 5s). Pass the
-    /// scan's per-probe budget as that timeout so a hung registry can't silently overrun <c>TimeoutPerProbe</c>. A
+    /// <remarks>L5: this BLOCKS (sync-over-async) for up to the constructor's <c>timeout</c> (default 5s) PER CALL.
+    /// Pass the scan's per-probe budget as that timeout. Jun14-L13: note a single supply-chain probe may resolve
+    /// several package names across up to 3 ecosystems, so against a fully-hung registry the AGGREGATE block can reach
+    /// ~3×N×timeout — the per-call bound is honored but the per-probe budget can be exceeded by that multiple. A
     /// timeout/outage is caught and treated as "assume exists" (under-detect), never a fabricated hit.</remarks>
     public bool Exists(string packageName, PackageEcosystem ecosystem)
     {

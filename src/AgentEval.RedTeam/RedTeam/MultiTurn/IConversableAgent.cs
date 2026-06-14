@@ -39,6 +39,12 @@ public interface IAgentConversation : IAsyncDisposable
     /// <summary>How faithfully this channel carries history (Native vs Flattened).</summary>
     ConversationFidelity Fidelity { get; }
 
+    /// <summary>Jun14-L12: true when this channel actually routes canary tools to the SUT (i.e. it overrides the
+    /// tool-aware <see cref="SendAsync(string, IReadOnlyList{CanaryTool}, CancellationToken)"/> DIM). Default
+    /// <c>false</c> — matching the DIM that ignores tools — so the orchestrator only falls back to the flattened tool
+    /// path when the native channel genuinely can't carry tools, and a native channel that CAN keeps Native fidelity.</summary>
+    bool CarriesTools => false;
+
     /// <summary>The turns exchanged so far (oldest → newest).</summary>
     IReadOnlyList<Turn> History { get; }
 

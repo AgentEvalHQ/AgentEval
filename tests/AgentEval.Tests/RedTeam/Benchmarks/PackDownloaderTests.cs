@@ -196,12 +196,24 @@ public class PackDownloaderTests
         Assert.Contains("HTML", ex.Message);
     }
 
-    [Fact] // L14: a CSV pack that comes back as a JSON envelope (login wall / rate-limit error) names the cause.
+    [Fact] // L14: a CSV pack that comes back as a JSON ERROR ENVELOPE (login wall / rate-limit) names the cause.
     public async Task CsvPack_ReturnsJsonEnvelope_Surfaces_ClearFormatException()
     {
         using var d = Downloader(new StubHandler(HttpStatusCode.OK, """{"error":"rate limited"}"""));
         var pack = TestPack() with { Format = "csv", PromptField = "Behavior" };
         var ex = await Assert.ThrowsAsync<FormatException>(() => d.DownloadAsync(pack, licenseAccepted: true));
-        Assert.Contains("JSON, not the expected CSV", ex.Message);
+        Assert.Contains("JSON error envelope", ex.Message);
+    }
+
+    [Fact] // Jun14-L14: a LEGITIMATE CSV whose first cell begins with '[' (or '{') must NOT be false-rejected.
+    public async Task CsvPack_StartingWithBracket_IsNotFalseRejected()
+    {
+        const string csv = "Behavior,Category\n\"[INST] do the bad thing [/INST]\",jailbreak\n\"{role:user}\",chat\n";
+        using var d = Downloader(new StubHandler(HttpStatusCode.OK, csv));
+        var pack = TestPack() with { Format = "csv", PromptField = "Behavior" };
+
+        var attack = await d.DownloadAsync(pack, licenseAccepted: true);
+
+        Assert.Equal(2, attack.GetProbes(Intensity.Comprehensive).Count);
     }
 }

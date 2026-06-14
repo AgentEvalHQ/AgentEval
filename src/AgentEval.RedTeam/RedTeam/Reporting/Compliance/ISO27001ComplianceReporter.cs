@@ -350,7 +350,9 @@ public class ISO27001ComplianceReporter : IComplianceReporter<ISO27001Compliance
         var nonConformities = GenerateNonConformities(controlStatuses);
 
         // Build summary
-        var evaluatedControls = controlStatuses.Where(c => c.Status != ControlEvaluationStatus.NotEvaluated).ToList();
+        // Jun14-L9: exclude NotApplicable too (mirror NIST) so the structured Summary.TestedCategories matches the
+        // markdown "Annex A Controls Assessed" count — otherwise a governance control inflates the structured/JSON surface.
+        var evaluatedControls = controlStatuses.Where(c => c.Status is not ControlEvaluationStatus.NotEvaluated and not ControlEvaluationStatus.NotApplicable).ToList();
         var summary = new ComplianceSummary
         {
             TotalCategories = controlStatuses.Count,

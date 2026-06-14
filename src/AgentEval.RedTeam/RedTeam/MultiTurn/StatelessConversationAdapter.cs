@@ -20,6 +20,9 @@ internal sealed class StatelessConversationAdapter(IEvaluableAgent agent) : IAge
     /// <inheritdoc />
     public ConversationFidelity Fidelity => ConversationFidelity.Flattened;
 
+    /// <inheritdoc /> Jun14-L12: the adapter bridges canary tools to IToolCapableAgent.InvokeWithToolsAsync.
+    public bool CarriesTools => true;
+
     /// <inheritdoc />
     public IReadOnlyList<Turn> History => _history;
 

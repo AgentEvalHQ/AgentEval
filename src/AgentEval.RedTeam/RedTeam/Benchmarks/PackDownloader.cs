@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
+using System.Text.Json;
 using AgentEval.RedTeam.Importers;
 
 namespace AgentEval.RedTeam.Benchmarks;
@@ -87,13 +88,15 @@ public sealed class PackDownloader : IDisposable
                 $"Pack '{pack.Name}' returned an HTML page, not data ({pack.DataUrl}) — the source may be gated, " +
                 "rate-limited, or moved. Download it manually and pass the raw file via --pack <url> or --import-probes.");
 
-        // L14: a CSV pack that comes back as a JSON envelope (a login-wall / rate-limit error object like
-        // {"error":...}) would otherwise surface as a confusing "no 'X' column" parse error — name the cause instead.
+        // L14 / Jun14-L14: a CSV pack that comes back as a JSON ERROR ENVELOPE (a login-wall / rate-limit object like
+        // {"error":...}) would otherwise surface as a confusing "no 'X' column" parse error. Only fire on a small
+        // top-level JSON OBJECT carrying an error/message/detail key — NOT any leading bracket (a valid CSV can begin
+        // with '[' or '{', e.g. a first cell '[INST] …'), so a legitimate CSV is no longer false-rejected.
         if (string.Equals(pack.Format?.Trim(), "csv", StringComparison.OrdinalIgnoreCase)
-            && (head.StartsWith('{') || head.StartsWith('[')))
+            && head.StartsWith('{') && LooksLikeJsonErrorEnvelope(head))
             throw new FormatException(
-                $"Pack '{pack.Name}' returned JSON, not the expected CSV ({pack.DataUrl}) — the source may be gated, " +
-                "rate-limited, or moved. Download it manually and pass the raw file via --pack <url> or --import-probes.");
+                $"Pack '{pack.Name}' returned a JSON error envelope, not the expected CSV ({pack.DataUrl}) — the source " +
+                "may be gated, rate-limited, or moved. Download it manually and pass the raw file via --pack <url> or --import-probes.");
 
         // The importer throws FormatException on bad data — surfaced honestly, never a silent empty set.
         var probes = importer.Import(content, pack.Name);
@@ -101,6 +104,26 @@ public sealed class PackDownloader : IDisposable
     }
 
     /// <inheritdoc />
+    // Jun14-L14: true when the (small) head parses as a JSON object carrying a top-level error/message/detail key —
+    // i.e. an API error envelope, not data. Bounds the parse to the first 4KB so a huge body is never fully parsed.
+    private static bool LooksLikeJsonErrorEnvelope(string head)
+    {
+        var slice = head.Length > 4096 ? head[..4096] : head;
+        try
+        {
+            using var doc = JsonDocument.Parse(slice);
+            if (doc.RootElement.ValueKind != JsonValueKind.Object) return false;
+            foreach (var key in (ReadOnlySpan<string>)["error", "message", "detail", "errors"])
+                if (doc.RootElement.TryGetProperty(key, out _)) return true;
+            return false;
+        }
+        catch (JsonException)
+        {
+            // Not parseable as a complete small JSON object (e.g. a large CSV that merely starts with '{') — not an envelope.
+            return false;
+        }
+    }
+
     public void Dispose()
     {
         if (_ownsHttp) _http.Dispose();

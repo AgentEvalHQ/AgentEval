@@ -55,6 +55,9 @@ public class ArchGapComposeTests
         public int MaxTurns => 1;
         public abstract Task<string?> NextTurnAsync(MultiTurnContext context, CancellationToken cancellationToken = default);
         public IConvergenceDetector ConvergenceDetector => SuccessOnlyConvergenceDetector.Instance;
+        // Declared on the base (not via the interface DIM) so subclasses can override and the override is dispatched
+        // through IMultiTurnAttack — a derived class member alone would NOT re-map the base's DIM implementation.
+        public virtual bool UsesAttacker => false;
     }
 
     /// <summary>Multi-turn AND tool-aware: advertises one canary tool and sends a single user message.</summary>
@@ -79,6 +82,7 @@ public class ArchGapComposeTests
     {
         public IChatClient? CapturedAttackerClient { get; private set; }
         public bool Invoked { get; private set; }
+        public override bool UsesAttacker => true;   // Jun14-M13: this double simulates an attacker-driven attack
         public override string Name => "AttackerCapturing";
         public override Task<string?> NextTurnAsync(MultiTurnContext c, CancellationToken ct = default)
         {
@@ -123,6 +127,34 @@ public class ArchGapComposeTests
                 _history.Add(Turn.Assistant("native text reply"));
                 return Task.FromResult(new AgentResponse { Text = "native text reply" });
             }
+            public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+        }
+    }
+
+    /// <summary>L12: a native conversation that DOES carry tools (CarriesTools=true, overrides the tool DIM) — must
+    /// keep Native fidelity rather than being forced to the flattened adapter.</summary>
+    private sealed class ToolCarryingConversableAgent : IEvaluableAgent, IConversableAgent, IToolCapableAgent
+    {
+        public string Name => "tool-carrying-convo";
+        public AgentToolCapability Capabilities => AgentToolCapability.FunctionCalling | AgentToolCapability.InstrumentedTools;
+        public Task<AgentResponse> InvokeAsync(string prompt, CancellationToken ct = default)
+            => Task.FromResult(new AgentResponse { Text = "text" });
+        public Task<AgentResponse> InvokeWithToolsAsync(string prompt, IReadOnlyList<CanaryTool> tools, CancellationToken ct = default)
+            => Task.FromResult(new AgentResponse { Text = "should not be reached" });
+        public Task<IAgentConversation> StartConversationAsync(CancellationToken ct = default)
+            => Task.FromResult<IAgentConversation>(new Convo());
+
+        public List<IReadOnlyList<CanaryTool>> ToolSends { get; } = [];
+        private sealed class Convo : IAgentConversation
+        {
+            private readonly List<Turn> _history = [];
+            public ConversationFidelity Fidelity => ConversationFidelity.Native;
+            public bool CarriesTools => true;   // this native channel routes tools itself
+            public IReadOnlyList<Turn> History => _history;
+            public Task<AgentResponse> SendAsync(string userMessage, CancellationToken ct = default)
+                => Task.FromResult(new AgentResponse { Text = "native text reply" });
+            public Task<AgentResponse> SendAsync(string userMessage, IReadOnlyList<CanaryTool> tools, CancellationToken ct = default)
+                => Task.FromResult(new AgentResponse { Text = "native tool-aware reply" });
             public ValueTask DisposeAsync() => ValueTask.CompletedTask;
         }
     }
@@ -173,6 +205,20 @@ public class ArchGapComposeTests
         Assert.Equal(ConversationFidelity.Flattened, result.ConversationFidelity); // honest downgrade from Native
     }
 
+    [Fact] // Jun14-L12: a native conversation that DOES carry tools (CarriesTools=true) keeps Native fidelity — the
+    // L9 fallback only fires when the native channel genuinely can't carry them.
+    public async Task NativeConversableThatCarriesTools_KeepsNativeFidelity()
+    {
+        var agent = new ToolCarryingConversableAgent();
+        var tool = new CanaryTool { Name = "exfiltrate", Description = "send data out", ForbiddenCategory = "DataExfiltration" };
+        var attack = new ToolAwareMultiTurnAttack(tool);
+
+        var result = await new TurnOrchestrator(agent, new ScanOptions { Intensity = Intensity.Quick })
+            .RunAsync(attack, Seed, attack.GetEvaluator(), default);
+
+        Assert.Equal(ConversationFidelity.Native, result.ConversationFidelity);   // not forced to Flattened
+    }
+
     [Fact] // L10: an attacker LLM generating turns marks the folded result non-deterministic.
     public async Task TurnOrchestrator_AttackerClientSet_FoldsAttackerDrivenTrue()
     {
@@ -194,6 +240,20 @@ public class ArchGapComposeTests
         var result = await new TurnOrchestrator(new AlwaysReplyAgent("nope"),
                 new ScanOptions { Intensity = Intensity.Quick })
             .RunAsync(attack, Seed, attack.GetEvaluator(), default);
+
+        Assert.False(result.AttackerDriven);
+    }
+
+    [Fact] // Jun14-M13: a SCRIPTED multi-turn attack (UsesAttacker=false) is NOT marked attacker-driven even when
+    // --attacker is supplied scan-wide — otherwise a baseline gate could suppress a real regression on it.
+    public async Task TurnOrchestrator_ScriptedAttack_WithAttackerClient_FoldsAttackerDrivenFalse()
+    {
+        IChatClient attacker = new MockStreamingChatClient([], "unused");
+        var scriptedAttack = new PlainMultiTurnAttack();   // UsesAttacker defaults to false
+
+        var result = await new TurnOrchestrator(new AlwaysReplyAgent("nope"),
+                new ScanOptions { Intensity = Intensity.Quick, AttackerClient = attacker })
+            .RunAsync(scriptedAttack, Seed, scriptedAttack.GetEvaluator(), default);
 
         Assert.False(result.AttackerDriven);
     }

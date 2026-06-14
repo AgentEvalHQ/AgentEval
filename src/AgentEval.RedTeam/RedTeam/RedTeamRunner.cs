@@ -590,7 +590,7 @@ public sealed class RedTeamRunner : IRedTeamRunner
             Fidelity = mt.Fidelity,
             Surface = probe.Surface,
             ConversationFidelity = mt.ConversationFidelity,
-            AttackerDriven = mt.AttackerDriven,   // L10: machine-readable provenance for the baseline/SARIF consumer
+            AttackerDriven = mt.AttackerDriven,   // L10: provenance flag (reserved for a future baseline gate; see ProbeResult.AttackerDriven)
         };
     }
 
