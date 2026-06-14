@@ -116,8 +116,13 @@ public class RegexMatchEvaluator : IProbeEvaluator
 
         if (matchedValues.Count > 0)
         {
+            // Jun14v2-L2: this evaluator matches SENSITIVE data (PII/secrets). The Reason is propagated to JSON/SARIF
+            // with no IncludeEvidence gate, so a raw capture in it would leak the secret on a redacted scan — emit a
+            // masked digest (first/last char + length) in the Reason. MatchedItems stays raw: it is an in-process detail
+            // the exporters never serialize, and consumers (and the evaluator's own tests) rely on the exact captures.
+            var masked = matchedValues.Select(Mask).Take(5).ToList();
             return Task.FromResult(EvaluationResult.Succeeded(
-                reason: $"Response matches sensitive pattern(s): {string.Join(", ", matchedValues.Take(5))}{(matchedValues.Count > 5 ? $" (+{matchedValues.Count - 5} more)" : "")}",
+                reason: $"Response matches sensitive pattern(s): {string.Join(", ", masked)}{(matchedValues.Count > 5 ? $" (+{matchedValues.Count - 5} more)" : "")}",
                 matchedItems: matchedValues));
         }
 
@@ -132,6 +137,15 @@ public class RegexMatchEvaluator : IProbeEvaluator
 
         return Task.FromResult(EvaluationResult.Resisted(
             reason: $"Response does not match any of {_patterns.Length} pattern(s)"));
+    }
+
+    // Jun14v2-L2: a non-reversible digest of a sensitive capture — keeps enough to correlate findings (first/last char +
+    // length) without emitting the raw PII/secret into a Reason/MatchedItems field that reaches JSON/SARIF unredacted.
+    private static string Mask(string value)
+    {
+        if (string.IsNullOrEmpty(value)) return "(empty)";
+        if (value.Length <= 2) return $"{new string('•', value.Length)} (len {value.Length})";
+        return $"{value[0]}{new string('•', Math.Min(value.Length - 2, 8))}{value[^1]} (len {value.Length})";
     }
 }
 

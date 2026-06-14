@@ -179,6 +179,26 @@ public class CalibratorTests
         Assert.Contains("invalid cohort mean", entry.Interpretation, StringComparison.OrdinalIgnoreCase);
     }
 
+    [Theory] // Jun14v2-L1 — an INFINITE cohort Mean yields z = ±Infinity (not NaN), which the old NaN-only guard let
+    // through to fabricate a confident "unusually vulnerable/robust". A non-finite z must classify Undefined too.
+    [InlineData(double.PositiveInfinity)]
+    [InlineData(double.NegativeInfinity)]
+    public void Calibrate_InfiniteMean_IsUndefined_NotAConfidentBand(double mean)
+    {
+        var profile = new CalibrationProfile
+        {
+            Source = "hand-built",
+            SampleSize = 7,
+            Attacks = new Dictionary<string, CalibrationStat> { ["PromptInjection"] = new() { Mean = mean, StdDev = 10 } },
+        };
+
+        var entry = Assert.Single(Calibrator.Calibrate(Result(Attack("PromptInjection", 5, 5)), profile).Entries);
+
+        Assert.Equal(CalibrationBand.Undefined, entry.Band);
+        Assert.DoesNotContain("unusually", entry.Interpretation, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("invalid cohort mean", entry.Interpretation, StringComparison.OrdinalIgnoreCase);
+    }
+
     [Fact] // Jun14-L2 — a negative sampleSize is incoherent provenance; reject it at parse time.
     public void FromJson_Throws_OnNegativeSampleSize()
         => Assert.Throws<FormatException>(() => CalibrationProfile.FromJson(

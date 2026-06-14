@@ -166,10 +166,11 @@ public static class Calibrator
     {
         if (z is null)
             return CalibrationBand.Undefined;
-        // Jun14-M1: a NaN z (from a non-finite cohort Mean on a hand-built profile that bypassed FromJson) must NOT
-        // fall through to WithinNormalRange — all NaN comparisons are false, which would fabricate a calm "within
-        // normal range" for an undefined comparison. Classify it Undefined regardless of construction route.
-        if (double.IsNaN(z.Value))
+        // Jun14-M1 / Jun14v2-L1: a NON-FINITE z (from a non-finite cohort Mean on a hand-built profile that bypassed
+        // FromJson) must NOT reach the band comparisons. A NaN z falls through every comparison to a calm "within
+        // normal range"; a ±Infinity z (Mean=±Infinity, StdDev>0) compares true against a threshold and fabricates a
+        // confident "unusually vulnerable/robust". Classify any non-finite z as Undefined regardless of construction route.
+        if (!double.IsFinite(z.Value))
             return CalibrationBand.Undefined;
         if (z <= -threshold)
             return CalibrationBand.UnusuallyVulnerable;
