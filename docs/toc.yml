@@ -20,6 +20,8 @@
     href: cross-framework.md
   - name: Fluent Assertions
     href: assertions.md
+  - name: Runtime Policy Gate
+    href: guardrails.md
   - name: LLM as a Judge
     href: llm-as-judge.md
   - name: Stochastic Evaluation
@@ -35,6 +37,9 @@
   items:
   - name: Red Team Security
     href: redteam.md
+    items:
+    - name: What's New
+      href: redteam-whats-new.md
   - name: Responsible AI
     href: ResponsibleAI.md
   - name: Memory Evaluation
@@ -91,6 +96,8 @@
     items:
     - name: Getting Started
       href: benchmarks/owasp/getting-started.md
+    - name: Red-Team Procedure
+      href: redteam/owasp.md
   - name: MITRE ATLAS Benchmark
     items:
     - name: Getting Started
