@@ -132,7 +132,7 @@ public class MemoryHealthCheck(IMemoryBenchmarkRunner runner) { /* … */ }
 
 ### 🔗 MAF Pipeline Compatibility
 
-AgentEval.Memory works **without modification** with MAF 1.3.0's pipeline (`ChatHistoryProvider`, `AIContextProvider`, `CompactionStrategy`). It evaluates *behavior*, not *mechanism*. See [MAF Memory Integration](maf-memory-integration.md) for the concept-mapping table.
+AgentEval.Memory works **without modification** with MAF 1.10.0's pipeline (`ChatHistoryProvider`, `AIContextProvider`, `CompactionStrategy`). It evaluates *behavior*, not *mechanism*. See [MAF Memory Integration](maf-memory-integration.md) for the concept-mapping table.
 
 ---
 
@@ -195,8 +195,8 @@ See [Sample G3 — Memory Scenarios](../samples/AgentEval.Samples/MemoryEvaluati
 
 ## See Also
 
-- [MAF Memory Integration](maf-memory-integration.md) — how AgentEval.Memory maps to MAF 1.3.0's pipeline (`AIContextProvider`, `CompactionStrategy`, `ChatHistoryProvider`)
-- [Upgrading MAF](maf-1.3.0-migration-guide.md) — the complete MAF 1.3.0 migration guide
+- [MAF Memory Integration](maf-memory-integration.md) — how AgentEval.Memory maps to MAF 1.10.0's pipeline (`AIContextProvider`, `CompactionStrategy`, `ChatHistoryProvider`)
+- [MAF 1.10.0 Upgrade Notes](maf-1.10.0-upgrade-plan.md) — the current repo-specific MAF upgrade reference
 - [Architecture](architecture.md) — where the Memory module fits
 - [Naming Conventions](naming-conventions.md) — `llm_*` / `code_*` / `embed_*` metric prefixes
 

@@ -349,7 +349,7 @@ agenteval mc serve                         # browse runs + evidence at http://lo
 | [Quick Start](getting-started.md) | [Red Team Security](redteam.md) | [Model Comparison](model-comparison.md) |
 |  | [Responsible AI](ResponsibleAI.md) | [Trace Record/Replay](tracing.md) |
 | [Walkthrough](walkthrough.md) | [Memory Evaluation](memory-evaluation.md) | [Architecture](architecture.md) |
-|  | [Metrics Reference](metrics-reference.md) | [Upgrading MAF](maf-1.3.0-migration-guide.md) |
+|  | [Metrics Reference](metrics-reference.md) | [MAF 1.10.0 Upgrade Notes](maf-1.10.0-upgrade-plan.md) |
 |  | [Benchmarks](benchmarks.md) | [Composite Evaluations](composite-evals.md) |
 |  | [Workflows](workflows.md) | [The .agenteval Workspace](agenteval-workspace.md) |
 |  | [GDPR Benchmark](benchmarks/gdpr/getting-started.md) | [Mission Control](missioncontrol/getting-started.md) |

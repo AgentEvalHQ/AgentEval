@@ -11,7 +11,7 @@
 | **Date** | 2026-05-30 |
 | **Author** | Jose Luis Latorre Millas (proposal & direction); Claude Opus 4.7 (drafting, codebase grounding & analysis); Daniel (originating idea) |
 | **Scope** | AgentEval v0.11.x → v0.13.x, phased delivery, plus AgentEval-repo CLI consolidation |
-| **Verified against** | `AgentEvalHQ/AgentEval` — README, `docs/tracing.md`, `docs/assertions.md`, `docs/architecture.md` (incl. ADR-007/008/016/017). MAF 1.3.0, MEAI 10.5.0, .NET 8/9/10 |
+| **Verified against** | Historical baseline: `AgentEvalHQ/AgentEval` — README, `docs/tracing.md`, `docs/assertions.md`, `docs/architecture.md` (incl. ADR-007/008/016/017). MAF 1.3.0, MEAI 10.5.0, .NET 8/9/10 |
 
 ---
 
