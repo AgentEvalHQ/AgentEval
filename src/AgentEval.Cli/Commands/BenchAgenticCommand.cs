@@ -27,9 +27,10 @@ public static class BenchAgenticCommand
         string subject,
         string? rootOverride,
         string? inputText,
+        string? responseText = null,
         string? budgetTier = null,
         CancellationToken ct = default) =>
-        RunAsync(preset, subject, rootOverride, inputText, evaluatorOverride: null, budgetTier, ct);
+        RunAsync(preset, subject, rootOverride, inputText, responseText, evaluatorOverride: null, budgetTier, ct);
 
     /// <summary>Runs the bench agentic command with optional overrides (used in tests).</summary>
     internal static async Task<int> RunAsync(
@@ -37,6 +38,7 @@ public static class BenchAgenticCommand
         string subject,
         string? rootOverride,
         string? inputText,
+        string? responseText,
         IEvaluator? evaluatorOverride,
         string? budgetTier = null,
         CancellationToken ct = default)
@@ -116,11 +118,27 @@ public static class BenchAgenticCommand
         // ── Build input ──────────────────────────────────────────────────────
         var query = inputText ??
             "Search for the latest quarterly earnings report for ACME Corp and summarize the key financial metrics.";
-        var agentResponse =
-            "I'll help you find the quarterly earnings report for ACME Corp. " +
-            "Based on the retrieved data, here are the key financial metrics: " +
-            "Revenue grew 12% year-over-year to $4.2B, operating margin was 18.3%, " +
-            "and EPS was $2.47, beating consensus estimates by $0.12.";
+        string agentResponse;
+        if (!string.IsNullOrWhiteSpace(responseText))
+        {
+            agentResponse = responseText;
+        }
+        else
+        {
+            // No real response supplied: grade a built-in FIXTURE. Warn loudly — the
+            // produced evidence does NOT reflect the named subject agent. Mirrors the
+            // gdpr / eu-ai-act fixture-warning behaviour so agentic can grade a real
+            // agent's answer via --response / --response-file (was previously hardcoded).
+            agentResponse =
+                "I'll help you find the quarterly earnings report for ACME Corp. " +
+                "Based on the retrieved data, here are the key financial metrics: " +
+                "Revenue grew 12% year-over-year to $4.2B, operating margin was 18.3%, " +
+                "and EPS was $2.47, beating consensus estimates by $0.12.";
+            Console.Error.WriteLine(
+                "[bench agentic] WARNING: no --response/--response-file supplied — grading a built-in " +
+                "FIXTURE response, not a real agent output. The produced evidence does NOT reflect subject " +
+                $"'{subject}'. Pass --response-file <path> (or --response \"...\") with the agent's actual answer.");
+        }
         var evalInput = new EvalInput(Query: query, Response: agentResponse);
 
         // ── Run benchmark ────────────────────────────────────────────────────

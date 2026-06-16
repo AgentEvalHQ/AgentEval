@@ -188,12 +188,16 @@ var benchAgenticPresetOpt = new Option<string?>("--preset") { Description = Pres
 var benchAgenticSubjectOpt = new Option<string?>("--subject") { Description = "Subject name. REQUIRED — no default; previously defaulted to 'default-agent'." };
 var benchAgenticRootOpt = new Option<string?>("--root") { Description = "Workspace root path (default: auto-detected)" };
 var benchAgenticInputOpt = new Option<string?>("--input") { Description = "Agent input text for the evaluation (default: built-in fixture)" };
+var benchAgenticResponseOpt = new Option<string?>("--response") { Description = "The agent's actual RESPONSE to grade. If omitted, a built-in fixture is graded and a warning is emitted (the evidence then reflects no real agent)." };
+var benchAgenticResponseFileOpt = new Option<string?>("--response-file") { Description = "Path to a file containing the agent's actual response to grade (alternative to --response, for multi-line output)." };
 var benchAgenticBudgetTierOpt = new Option<string?>("--budget-tier") { Description = "Budget tier filter: trivial | low | medium | high | all (default: all). Components with a cost tier above the budget are filtered out and remaining weights are renormalized. Use 'low' or 'medium' for fast feedback loops; 'all' for full audit runs." };
 var benchAgenticCmd = new Command("agentic", "Run the agentic behavior benchmark");
 benchAgenticCmd.Add(benchAgenticPresetOpt);
 benchAgenticCmd.Add(benchAgenticSubjectOpt);
 benchAgenticCmd.Add(benchAgenticRootOpt);
 benchAgenticCmd.Add(benchAgenticInputOpt);
+benchAgenticCmd.Add(benchAgenticResponseOpt);
+benchAgenticCmd.Add(benchAgenticResponseFileOpt);
 benchAgenticCmd.Add(benchAgenticBudgetTierOpt);
 benchAgenticCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =>
 {
@@ -206,8 +210,10 @@ benchAgenticCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) 
     }
     var root = parseResult.GetValue(benchAgenticRootOpt);
     var input = parseResult.GetValue(benchAgenticInputOpt);
+    var response = await ResolveBenchResponseAsync(parseResult.GetValue(benchAgenticResponseOpt), parseResult.GetValue(benchAgenticResponseFileOpt), ct);
+    if (response.Error) return 1;
     var budgetTier = parseResult.GetValue(benchAgenticBudgetTierOpt);
-    return await BenchAgenticCommand.RunAsync(preset, subject, root, input, budgetTier, ct);
+    return await BenchAgenticCommand.RunAsync(preset, subject, root, input, response.Text, budgetTier, ct);
 });
 // bench agentic calibrate
 var agenticCalibrateRootOpt = new Option<string?>("--root") { Description = "Workspace root path (default: current directory)" };
