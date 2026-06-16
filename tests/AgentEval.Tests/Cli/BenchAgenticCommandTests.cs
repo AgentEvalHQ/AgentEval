@@ -84,6 +84,7 @@ public class BenchAgenticCommandTests : IDisposable
             subject: "AgenticGateTestAgent",
             rootOverride: _root,
             inputText: null,
+            responseText: null,
             evaluatorOverride: null,                            // exercise the env-gate path
             budgetTier: null);
         Assert.Equal(2, exit);
@@ -101,6 +102,7 @@ public class BenchAgenticCommandTests : IDisposable
             subject: "AgenticPartialAgent",
             rootOverride: _root,
             inputText: null,
+            responseText: null,
             evaluatorOverride: null,
             budgetTier: null);
         Assert.Equal(2, exit);
@@ -124,6 +126,7 @@ public class BenchAgenticCommandTests : IDisposable
             subject: "AgenticTelemetryAgent",
             rootOverride: _root,
             inputText: null,
+            responseText: null,
             evaluatorOverride: new PassingStubEvaluator(),
             budgetTier: null);
 
@@ -150,6 +153,7 @@ public class BenchAgenticCommandTests : IDisposable
             subject: "MissingWorkspaceAgent",
             rootOverride: noWorkspaceRoot,
             inputText: null,
+            responseText: null,
             evaluatorOverride: new PassingStubEvaluator(),
             budgetTier: null);
 
