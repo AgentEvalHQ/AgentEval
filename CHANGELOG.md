@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.12.2-beta] - 2026-06-18
+
+### Fixed
+- **Throughput-benchmark timing** — `PerformanceBenchmark.RunThroughputBenchmarkAsync` now measures
+  the reported `Duration` with a high-resolution `Stopwatch` instead of `DateTimeOffset.UtcNow`
+  (~15.6 ms granularity on Windows), improving `Duration` accuracy and removing an intermittent
+  net8.0/Windows CI flake. Requests-per-second was unaffected — it divides by the configured window.
+
 ## [0.12.1-beta] - 2026-06-18
 
 > Our first community-contributor release — huge thanks to **@bmerkle** and **@Javierif**. 🎉
