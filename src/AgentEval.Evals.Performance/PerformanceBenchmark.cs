@@ -233,8 +233,13 @@ public class PerformanceBenchmark
         
         LogProgress($"   Running throughput test for {duration.TotalSeconds}s with {concurrentRequests} concurrent requests...");
 
-        var startTime = DateTimeOffset.UtcNow;
-        
+        // High-resolution, monotonic timing. DateTimeOffset.UtcNow has ~15.6ms granularity on
+        // Windows, so a short (~200ms) measurement window can quantize to a measured Duration
+        // *below* the configured window and break the "Duration > configured" invariant
+        // (intermittent failure on the loaded net8.0 Windows CI leg). Stopwatch is high-resolution
+        // and never reads below true elapsed.
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+
         // Create worker tasks
         var workers = Enumerable.Range(0, concurrentRequests).Select(async _ =>
         {
@@ -291,8 +296,8 @@ public class PerformanceBenchmark
             // Expected cancellation
         }
         
-        var endTime = DateTimeOffset.UtcNow;
-        var actualDuration = endTime - startTime;
+        stopwatch.Stop();
+        var actualDuration = stopwatch.Elapsed;
 
         return new ThroughputBenchmarkResult
         {

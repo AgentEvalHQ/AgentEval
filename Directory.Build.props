@@ -21,10 +21,10 @@
     <!-- Common package metadata -->
     <Authors>Jose Luis Latorre</Authors>
     <Company>AgentEval</Company>
-    <RepositoryUrl>https://github.com/joslat/AgentEval</RepositoryUrl>
+    <RepositoryUrl>https://github.com/AgentEvalHQ/AgentEval</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageProjectUrl>https://github.com/joslat/AgentEval</PackageProjectUrl>
+    <PackageProjectUrl>https://github.com/AgentEvalHQ/AgentEval</PackageProjectUrl>
     <Copyright>Copyright © 2026 Jose Luis Latorre</Copyright>
 
     <!-- Single source of truth for the package version. The umbrella AgentEval package and the
@@ -32,7 +32,7 @@
          tag, so they version in lockstep. Keeping the number here (and nowhere else) makes that
          parity structural — there is no second number to drift. CI overrides this for releases
          via `dotnet pack -p:PackageVersion=<tag>`. -->
-    <Version>0.12.0-beta</Version>
+    <Version>0.12.2-beta</Version>
 
     <!-- Package icon for NuGet -->
     <PackageIcon>AgentEvalNugetLogoAE.png</PackageIcon>

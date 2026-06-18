@@ -3,6 +3,7 @@
 // Licensed under the MIT License.
 
 using System.Diagnostics;
+using System.Globalization;
 using System.Runtime.CompilerServices;
 using AgentEval.Models;
 
@@ -35,8 +36,8 @@ public class PerformanceAssertions
                 PerformanceAssertionException.Create(
                     "Expected total duration to be under the specified maximum.",
                     metricName: "TotalDuration",
-                    threshold: $"< {max.TotalMilliseconds:F0}ms",
-                    measuredValue: $"{_metrics.TotalDuration.TotalMilliseconds:F0}ms (exceeded by {overage.TotalMilliseconds:F0}ms)",
+                    threshold: string.Create(CultureInfo.InvariantCulture, $"< {max.TotalMilliseconds:F0}ms"),
+                    measuredValue: string.Create(CultureInfo.InvariantCulture, $"{_metrics.TotalDuration.TotalMilliseconds:F0}ms (exceeded by {overage.TotalMilliseconds:F0}ms)"),
                     suggestions: new[] 
                     { 
                         "Consider optimizing slow tool operations",
@@ -60,8 +61,8 @@ public class PerformanceAssertions
                 PerformanceAssertionException.Create(
                     "Expected total duration to be at least the specified minimum.",
                     metricName: "TotalDuration",
-                    threshold: $"≥ {min.TotalMilliseconds:F0}ms",
-                    measuredValue: $"{_metrics.TotalDuration.TotalMilliseconds:F0}ms",
+                    threshold: string.Create(CultureInfo.InvariantCulture, $"≥ {min.TotalMilliseconds:F0}ms"),
+                    measuredValue: string.Create(CultureInfo.InvariantCulture, $"{_metrics.TotalDuration.TotalMilliseconds:F0}ms"),
                     because: because));
         }
         return this;
@@ -93,8 +94,8 @@ public class PerformanceAssertions
                 PerformanceAssertionException.Create(
                     "Expected time to first token (TTFT) to be under the specified maximum.",
                     metricName: "TimeToFirstToken",
-                    threshold: $"< {max.TotalMilliseconds:F0}ms",
-                    measuredValue: $"{_metrics.TimeToFirstToken.Value.TotalMilliseconds:F0}ms (exceeded by {overage.TotalMilliseconds:F0}ms)",
+                    threshold: string.Create(CultureInfo.InvariantCulture, $"< {max.TotalMilliseconds:F0}ms"),
+                    measuredValue: string.Create(CultureInfo.InvariantCulture, $"{_metrics.TimeToFirstToken.Value.TotalMilliseconds:F0}ms (exceeded by {overage.TotalMilliseconds:F0}ms)"),
                     suggestions: new[] 
                     { 
                         "TTFT is affected by model load time and prompt processing",
@@ -118,8 +119,8 @@ public class PerformanceAssertions
                 PerformanceAssertionException.Create(
                     "Expected total token count to be under the specified maximum.",
                     metricName: "TotalTokens",
-                    threshold: $"< {max:N0}",
-                    measuredValue: $"{_metrics.TotalTokens:N0}",
+                    threshold: string.Create(CultureInfo.InvariantCulture, $"< {max:N0}"),
+                    measuredValue: string.Create(CultureInfo.InvariantCulture, $"{_metrics.TotalTokens:N0}"),
                     context: breakdown,
                     suggestions: new[] 
                     { 
@@ -144,8 +145,8 @@ public class PerformanceAssertions
                 PerformanceAssertionException.Create(
                     "Expected prompt tokens to be under the specified maximum.",
                     metricName: "PromptTokens",
-                    threshold: $"< {max:N0}",
-                    measuredValue: $"{_metrics.PromptTokens:N0}",
+                    threshold: string.Create(CultureInfo.InvariantCulture, $"< {max:N0}"),
+                    measuredValue: string.Create(CultureInfo.InvariantCulture, $"{_metrics.PromptTokens:N0}"),
                     suggestions: new[] 
                     { 
                         "Shorten system prompt",
@@ -169,8 +170,8 @@ public class PerformanceAssertions
                 PerformanceAssertionException.Create(
                     "Expected completion tokens to be under the specified maximum.",
                     metricName: "CompletionTokens",
-                    threshold: $"< {max:N0}",
-                    measuredValue: $"{_metrics.CompletionTokens:N0}",
+                    threshold: string.Create(CultureInfo.InvariantCulture, $"< {max:N0}"),
+                    measuredValue: string.Create(CultureInfo.InvariantCulture, $"{_metrics.CompletionTokens:N0}"),
                     suggestions: new[] 
                     { 
                         "Use max_tokens parameter to limit response length",
@@ -203,13 +204,13 @@ public class PerformanceAssertions
         if (_metrics.EstimatedCost!.Value > maxUsd)
         {
             var overage = _metrics.EstimatedCost.Value - maxUsd;
-            var breakdown = $"Prompt: {_metrics.PromptTokens:N0} tokens, Completion: {_metrics.CompletionTokens:N0} tokens";
+            var breakdown = string.Create(CultureInfo.InvariantCulture, $"Prompt: {_metrics.PromptTokens:N0} tokens, Completion: {_metrics.CompletionTokens:N0} tokens");
             AgentEvalScope.FailWith(
                 PerformanceAssertionException.Create(
                     "Expected estimated cost to be under the specified maximum.",
                     metricName: "EstimatedCost",
-                    threshold: $"< ${maxUsd:F4}",
-                    measuredValue: $"${_metrics.EstimatedCost.Value:F4} (exceeded by ${overage:F4})",
+                    threshold: string.Create(CultureInfo.InvariantCulture, $"< ${maxUsd:F4}"),
+                    measuredValue: string.Create(CultureInfo.InvariantCulture, $"${_metrics.EstimatedCost.Value:F4} (exceeded by ${overage:F4})"),
                     context: breakdown,
                     suggestions: new[] 
                     { 
@@ -247,9 +248,9 @@ public class PerformanceAssertions
                 PerformanceAssertionException.Create(
                     "Expected average tool execution time to be under the specified maximum.",
                     metricName: "AverageToolTime",
-                    threshold: $"< {max.TotalMilliseconds:F0}ms",
-                    measuredValue: $"{_metrics.AverageToolTime.TotalMilliseconds:F0}ms",
-                    context: $"Total tool time: {_metrics.TotalToolTime.TotalMilliseconds:F0}ms across {_metrics.ToolCallCount} call(s)",
+                    threshold: string.Create(CultureInfo.InvariantCulture, $"< {max.TotalMilliseconds:F0}ms"),
+                    measuredValue: string.Create(CultureInfo.InvariantCulture, $"{_metrics.AverageToolTime.TotalMilliseconds:F0}ms"),
+                    context: string.Create(CultureInfo.InvariantCulture, $"Total tool time: {_metrics.TotalToolTime.TotalMilliseconds:F0}ms across {_metrics.ToolCallCount} call(s)"),
                     suggestions: new[] 
                     { 
                         "Optimize individual tool implementations",
@@ -287,9 +288,9 @@ public class PerformanceAssertions
                 PerformanceAssertionException.Create(
                     "Expected total tool execution time to be under the specified maximum.",
                     metricName: "TotalToolTime",
-                    threshold: $"< {max.TotalMilliseconds:F0}ms",
-                    measuredValue: $"{_metrics.TotalToolTime.TotalMilliseconds:F0}ms (exceeded by {overage.TotalMilliseconds:F0}ms)",
-                    context: $"{_metrics.ToolCallCount} tool call(s), average: {_metrics.AverageToolTime.TotalMilliseconds:F0}ms",
+                    threshold: string.Create(CultureInfo.InvariantCulture, $"< {max.TotalMilliseconds:F0}ms"),
+                    measuredValue: string.Create(CultureInfo.InvariantCulture, $"{_metrics.TotalToolTime.TotalMilliseconds:F0}ms (exceeded by {overage.TotalMilliseconds:F0}ms)"),
+                    context: string.Create(CultureInfo.InvariantCulture, $"{_metrics.ToolCallCount} tool call(s), average: {_metrics.AverageToolTime.TotalMilliseconds:F0}ms"),
                     suggestions: new[] 
                     { 
                         "Reduce number of tool calls",

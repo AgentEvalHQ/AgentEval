@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
+using System.Globalization;
 namespace AgentEval.RedTeam.Output;
 
 /// <summary>
@@ -75,7 +76,7 @@ public class RedTeamOutputFormatter
             : (result.Passed ? "[PASS]" : "[FAIL]");
 
         var scoreColor = result.Passed ? _theme.Success : _theme.Failure;
-        WriteLine($"RedTeam: {scoreColor}{result.OverallScore:F1}%{_theme.Reset} {icon} {result.Verdict} " +
+        WriteLine(string.Create(CultureInfo.InvariantCulture, $"RedTeam: {scoreColor}{result.OverallScore:F1}%{_theme.Reset} {icon} {result.Verdict} ") +
             $"({result.TotalProbes} probes, {result.ResistedProbes} resisted)");
     }
 
@@ -98,12 +99,12 @@ public class RedTeamOutputFormatter
             ? (result.Passed ? "🛡️ " : "⚠️ ")
             : "";
 
-        WriteLine($"║  {icon}Overall Score: {scoreColor}{result.OverallScore:F1}%{_theme.Reset}");
+        WriteLine(string.Create(CultureInfo.InvariantCulture, $"║  {icon}Overall Score: {scoreColor}{result.OverallScore:F1}%{_theme.Reset}"));
         WriteLine($"║  Verdict: {_theme.StatusIcon(result.Passed, _options.UseEmoji)} {result.Verdict}");
-        WriteLine($"║  Duration: {result.Duration.TotalSeconds:F1}s | Agent: {result.AgentName}");
+        WriteLine(string.Create(CultureInfo.InvariantCulture, $"║  Duration: {result.Duration.TotalSeconds:F1}s | Agent: {result.AgentName}"));
         WriteLine($"║  Probes: {result.TotalProbes} total, {result.ResistedProbes} resisted, {result.SucceededProbes} compromised, {result.InconclusiveProbes} inconclusive");
         // N-09: surface coverage + conclusive-only score so a green Verdict on a low-coverage scan is visibly caveated.
-        WriteLine($"║  Coverage: {result.Coverage:F0}% (conclusive) | Conclusive Score: {result.ConclusiveScore:F1}%");
+        WriteLine(string.Create(CultureInfo.InvariantCulture, $"║  Coverage: {result.Coverage:F0}% (conclusive) | Conclusive Score: {result.ConclusiveScore:F1}%"));
         // Review: a FailFast-truncated scan executed only part of its plan — say so, so the counts above are not read as the whole scan.
         if (result.WasTruncated)
             WriteLine($"║  {_theme.Warning}[TRUNCATED] FailFast stopped after {result.TotalProbes}/{result.PlannedProbes} probes; {result.SkippedProbes} skipped — coverage understated.{_theme.Reset}");
@@ -129,7 +130,7 @@ public class RedTeamOutputFormatter
             var rate = attack.TotalCount > 0
                 ? (double)attack.ResistedCount / attack.TotalCount
                 : 1.0;
-            var rateStr = $"{rate:P0}".PadRight(rateCol);
+            var rateStr = rate.ToString("P0", CultureInfo.InvariantCulture).PadRight(rateCol);
             var icon = _theme.RateIcon(rate, _options.UseEmoji);
 
             var severityStr = _theme.Colorize(attack.Severity.ToString(), attack.Severity);

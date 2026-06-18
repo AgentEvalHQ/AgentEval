@@ -3,6 +3,7 @@
 // Licensed under the MIT License.
 
 using System.Collections.Concurrent;
+using System.Globalization;
 
 namespace AgentEval.Models;
 
@@ -59,17 +60,17 @@ public class PerformanceMetrics
     {
         var parts = new List<string>
         {
-            $"Duration: {TotalDuration.TotalMilliseconds:F0}ms"
+            string.Create(CultureInfo.InvariantCulture, $"Duration: {TotalDuration.TotalMilliseconds:F0}ms")
         };
         
         if (TimeToFirstToken.HasValue)
-            parts.Add($"TTFT: {TimeToFirstToken.Value.TotalMilliseconds:F0}ms");
+            parts.Add(string.Create(CultureInfo.InvariantCulture, $"TTFT: {TimeToFirstToken.Value.TotalMilliseconds:F0}ms"));
         
         if (TotalTokens > 0)
             parts.Add($"Tokens: {TotalTokens}");
         
         if (EstimatedCost.HasValue)
-            parts.Add($"Cost: ${EstimatedCost:F4}");
+            parts.Add(string.Create(CultureInfo.InvariantCulture, $"Cost: ${EstimatedCost:F4}"));
         
         if (ToolCallCount > 0)
             parts.Add($"Tools: {ToolCallCount}");

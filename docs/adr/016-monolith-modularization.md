@@ -100,10 +100,4 @@ See `strategy/impl/` for detailed phase plans.
 
 ## References
 
-- [Strategy Document](../../strategy/AgentEval-Monolith-Modularization-ArchitectureRefactor.md)
-- [Phase 0: Fix Coupling Anomalies](../../strategy/impl/Phase-0-Fix-Coupling-Anomalies.md)
-- [Phase 1: Extract Abstractions](../../strategy/impl/Phase-1-Extract-Abstractions.md)
-- [Phase 2: Extract Core + DataLoaders](../../strategy/impl/Phase-2-Extract-Core-DataLoaders.md)
-- [Phase 3: Extract MAF + RedTeam](../../strategy/impl/Phase-3-Extract-MAF-RedTeam.md)
-- [Phase 4: Validate, Document, CI](../../strategy/impl/Phase-4-Validate-Document.md)
 - [ADR-006: Service-Based Architecture with DI](006-service-based-architecture-di.md)

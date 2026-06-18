@@ -166,7 +166,7 @@ Introduce `TestCaseSource { FromFile(DatasetTestCase), Inline(TestCase) }` and h
 
 ## Implementation
 
-See [strategy/AgentEval-dataloader-Implementation-Review-and-Refinement.md](../../strategy/AgentEval-dataloader-Implementation-Review-and-Refinement.md) for the full implementation plan, specifically:
+The full implementation plan covers specifically:
 
 - **M3** â€” `DatasetTestCase` extended model + `ToTestCase()` adapter
 - **M4** â€” `RunBatchAsync` on `MAFEvaluationHarness` accepting `DatasetTestCase`

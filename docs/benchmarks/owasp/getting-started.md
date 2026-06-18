@@ -8,22 +8,24 @@
 
 The OWASP benchmark drives the agent under test with curated probes drawn from 13 attack types (PromptInjection, Jailbreak, IndirectInjection, EncodingEvasion, PIILeakage, InsecureOutput, ExcessiveAgency, SystemPromptExtraction, InferenceAPIAbuse, SupplyChain, DataPoisoning, VectorEmbedding, Misinformation) and grades each response with the per-attack heuristic evaluator. The composite `EvalResult` aggregates the ten OWASP categories with a `MinAggregation` so any single category fail caps the verdict.
 
-What IS tested: the agent's runtime dialog behaviour under adversarial prompts — refusal quality, prompt-injection resistance, output-handling discipline, agency-bounding, system-prompt protection, and unbounded-consumption guardrails. What is NOT tested: the model's training-data provenance, third-party plug-in supply-chain trust, vector-store hardening, or factual misinformation accuracy. Those categories appear as `skipped` leaves with rationale, not as silent passes.
+What IS tested: the agent's runtime dialog behaviour under adversarial prompts across all 10 categories — refusal quality, prompt-injection resistance, output-handling discipline, agency-bounding, system-prompt protection, unbounded-consumption guardrails, plus the Wave D additions (supply-chain recommendation, data/model poisoning, vector/embedding retrieval boundary, and misinformation). What is NOT tested: the deeper, beyond-dialog assurance behind some categories — the model's training-data provenance, third-party plug-in supply-chain attestation, or vector-store internals. Where a category's evidence is only dialog-weak (e.g. SupplyChain's in-context recommendation proxy, or Misinformation's semantic confabulation), the leaf reports `Inconclusive` — never a fabricated pass.
 
-## Scope and omissions
+## Coverage and evidence strength
 
-- Covered (with rationale per item):
+All 10 OWASP LLM Top 10 v2.0 categories have a dedicated attack at the agent-API layer. They differ in how *structural* the evidence is — strong-signal dialog tests vs. categories where the deeper assurance lives upstream and the dialog probe is a proxy that defers to `Inconclusive` when it cannot be sure:
+
+- Strong-signal dialog tests:
   - LLM01 Prompt Injection — direct + indirect + encoding-evasion probes; high-signal dialog test.
   - LLM02 Sensitive Information Disclosure — PII-leakage probes against system-prompt / context.
   - LLM05 Improper Output Handling — encoded-payload-in-output probes (the v2.0 rename of v1.0's LLM02 Insecure Output Handling).
   - LLM06 Excessive Agency — bounded-action probes (over-permissive tool use).
   - LLM07 System Prompt Leakage — extraction probes against system prompts and operator policy.
   - LLM10 Unbounded Consumption — inference-API-abuse probes (cost / token / loop runaway).
-- Out of scope (with rationale):
-  - LLM03 Supply Chain — model-provider, fine-tune-pipeline, and dependency-graph attestation lives upstream of any dialog probe; not testable at agent-API layer.
-  - LLM04 Data and Model Poisoning — training-data integrity is an upstream-process obligation; the benchmark cannot inspect training corpora.
-  - LLM08 Vector and Embedding Weaknesses — dedicated retrieval-corpus poisoning and vector-store probes are on the roadmap; current attacks do not exercise the RAG store directly.
-  - LLM09 Misinformation — factual-hallucination grading requires a per-domain ground-truth dataset; not in scope here (see `agentic` family for hallucination-adjacent groundedness metrics).
+- Covered via a proxy or judge-deferred evidence (Wave D + NextWave additions):
+  - LLM03 Supply Chain — in-context dependency-recommendation probe; the deeper `PackageHallucinationDetector` with live registry lookups is opt-in via `--package-registry`. Reports `Inconclusive` rather than asserting the upstream attestation it cannot observe.
+  - LLM04 Data and Model Poisoning — poisoned-context probes at the dialog boundary; training-corpus integrity itself remains an upstream-process obligation outside the agent-API layer.
+  - LLM08 Vector and Embedding Weaknesses — exercises a real retrieval boundary via the `retrieve_context` canary tool (NextWave), not just a verbal proxy; deeper corpus-poisoning probe packs remain on the roadmap.
+  - LLM09 Misinformation — adversarial false-premise probes; deterministic confabulation grading defers to the LLM judge (`--judge`) and otherwise reports `Inconclusive`, since factual grading needs ground truth (see the `agentic` family's groundedness evaluators).
 
 ## Presets
 
@@ -76,8 +78,12 @@ The full mapping lives on `IAttackType.OwaspLlmId` per attack class; the table b
 | `ExcessiveAgencyAttack` | LLM06 Excessive Agency | High |
 | `SystemPromptExtractionAttack` | LLM07 System Prompt Leakage | High |
 | `InferenceAPIAbuseAttack` | LLM10 Unbounded Consumption | Medium |
+| `SupplyChainAttack` | LLM03 Supply Chain | High |
+| `DataPoisoningAttack` | LLM04 Data and Model Poisoning | High |
+| `VectorEmbeddingAttack` | LLM08 Vector and Embedding Weaknesses | Medium |
+| `MisinformationAttack` | LLM09 Misinformation | Medium |
 
-Source of truth: `src/AgentEval.RedTeam/RedTeam/Attacks/*.cs` (each attack class declares its `OwaspLlmId`). Categories without an attack mapping (LLM03 / LLM04 / LLM08 / LLM09) appear as honest `skipped` leaves in the composite `EvalResult`.
+Source of truth: `src/AgentEval.RedTeam/RedTeam/Attacks/*.cs` (each attack class declares its `OwaspLlmId`). All 10 categories now have at least one attack; a category whose probes yield only dialog-weak evidence reports `Inconclusive` (not a fabricated `pass`), and a category with no probes selected in a given preset still appears as an honest `skipped` leaf.
 
 ## Output
 
@@ -164,16 +170,16 @@ For per-attack baseline + regression detection, `AgentEval.RedTeam` ships `RedTe
 ## Limitations and roadmap
 
 Known limitations:
-- 4 of 10 OWASP categories surface as honest `skipped` leaves (LLM03, LLM04, LLM08, LLM09). The composite verdict can still be `PASS` when all 6 covered categories pass.
-- The judge is currently advisory only — per-attack heuristic evaluators do the grading. An LLM-graded judge mode is reserved for future probes (the `--azure-from-env` plumbing is already in place).
-- LLM08 (Vector / Embedding Weaknesses) is on the roadmap for a dedicated retrieval-corpus poisoning probe pack.
-- The current attack roster is fixed at nine probes; custom attack injection (per-org policy probes) is not yet supported via CLI.
+- All 10 OWASP categories have a dedicated attack, but LLM03/04/08/09 lean on proxy or judge-deferred evidence, so they frequently report `Inconclusive` rather than a confident `pass` — read those leaves with their evidence caveat, not as silent passes.
+- Per-attack heuristic (keyword/structural) evaluators do the first-pass grading; the LLM judge is currently an `Inconclusive`-gated fallback, not the primary grader. A judge-primary mode (the real fix for semantic categories) is the next architectural step — see [redteam-whats-new.md](../../redteam-whats-new.md).
+- LLM08 (Vector / Embedding Weaknesses) exercises a real retrieval boundary via the `retrieve_context` canary; a deeper retrieval-corpus-poisoning probe pack remains on the roadmap.
+- The built-in attack roster (13 attacks) is fixed; custom attack-type injection beyond the built-in roster plus `--import-probes` dataset packs is not yet exposed via CLI.
 
-Tracking backlog (see `strategy/FutureFeatures/todo/13-pending-issues-tasks.md`):
+Tracking backlog:
 - T0.2 — `--azure-from-env` flag on `bench owasp` (shipped 2026-05-24).
 - T0.5 — `report.html` + `report.pdf` parity with the compliance benchmarks (shipped 2026-05-24 via `GenericReportRenderer`).
 - T3.11 — Multi-provider agent-manifest schema (would let `--agent-config <path>` resolve non-Azure agents like OpenAI direct, Anthropic, Bedrock, custom subprocess).
-- A dedicated LLM08 vector-store probe pack remains roadmap.
+- A deeper LLM08 retrieval-corpus-poisoning probe pack (beyond the current `retrieve_context` retrieval-boundary canary) remains on the roadmap.
 
 See also:
 - [GDPR getting-started](../gdpr/getting-started.md) — for dialog-based compliance benchmarking.

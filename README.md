@@ -15,7 +15,7 @@
   <a href="https://joslat.github.io/AgentEval/"><img src="https://img.shields.io/badge/docs-GitHub%20Pages-blue" alt="Documentation" /></a>
   <a href="https://www.nuget.org/packages/AgentEval"><img src="https://img.shields.io/nuget/v/AgentEval.svg" alt="NuGet" /></a>
   <a href="https://github.com/AgentEvalHQ/AgentEval/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="License" /></a>
-  <img src="https://img.shields.io/badge/MAF-1.3.0-blueviolet" alt="MAF 1.3.0" />
+  <img src="https://img.shields.io/badge/MAF-1.10.0-blueviolet" alt="MAF 1.10.0" />
   <img src="https://img.shields.io/badge/.NET-8.0%20|%209.0%20|%2010.0-512BD4" alt=".NET 8.0 | 9.0 | 10.0" />
 </p>
 
@@ -525,8 +525,8 @@ dotnet add package AgentEval --prerelease
 
 | Dependency | Version |
 |------------|----------|
-| Microsoft Agent Framework (MAF) | `1.3.0` |
-| Microsoft.Extensions.AI | `10.5.0` |
+| Microsoft Agent Framework (MAF) | `1.10.0` |
+| Microsoft.Extensions.AI | `10.6.0` |
 | .NET | 8.0, 9.0, 10.0 |
 
 **Single package, modular internals:**
@@ -583,7 +583,7 @@ See the **[Getting Started Guide](docs/getting-started.md)** for a complete walk
 | [Red Team Security](docs/redteam.md) | Security probes, OWASP/MITRE coverage |
 | [Responsible AI](docs/ResponsibleAI.md) | Toxicity, bias, misinformation detection |
 | [Memory Evaluation](docs/memory-evaluation.md) | Retention, reach-back, temporal, LongMemEval, HTML reports |
-| [MAF Memory Integration](docs/maf-memory-integration.md) | How AgentEval.Memory maps to MAF 1.3.0 pipelines |
+| [MAF Memory Integration](docs/maf-memory-integration.md) | How AgentEval.Memory maps to MAF 1.10.0 pipelines |
 | [Cross-Framework](docs/cross-framework.md) | Semantic Kernel, IChatClient adapters |
 | [CLI Tool](docs/cli.md) | Command-line evaluation guide |
 | [Migration Guide](docs/comparison.md) | Coming from Python/Node.js frameworks |
@@ -631,6 +631,13 @@ We welcome contributions! Please see:
 - [CONTRIBUTING.md](CONTRIBUTING.md)
 - [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)
 - [SECURITY.md](SECURITY.md)
+
+### Contributors
+
+A heartfelt thank you to everyone who has contributed to AgentEval. 🙏
+
+- **[Bernhard Merkle (@bmerkle)](https://github.com/bmerkle)** — *first community contributor*, for making numeric/currency formatting culture-invariant (so scores render as `0.95`, not `0,95`, on comma-decimal locales) and for cleaning up the DocFX documentation build.
+- **[Javier Iniesta Fernández (@Javierif)](https://github.com/Javierif)** — *second community contributor*, for adding `--response` / `--response-file` to `agenteval bench agentic`, so you can grade a supplied agent response instead of the built-in stub.
 
 ---
 

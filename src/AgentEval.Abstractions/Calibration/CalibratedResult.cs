@@ -2,6 +2,8 @@
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 
+using System.Globalization;
+
 namespace AgentEval.Calibration;
 
 /// <summary>
@@ -83,12 +85,12 @@ public record CalibratedResult
         get
         {
             var ciText = ConfidenceLower.HasValue && ConfidenceUpper.HasValue
-                ? $"95% CI: [{ConfidenceLower:F1}, {ConfidenceUpper:F1}]"
+                ? string.Create(CultureInfo.InvariantCulture, $"95% CI: [{ConfidenceLower:F1}, {ConfidenceUpper:F1}]")
                 : "CI: N/A";
             
             var consensusIcon = HasConsensus ? "✅" : "⚠️";
             
-            return $"Score: {Score:F1} | Agreement: {Agreement:F0}% | {ciText} | Consensus: {consensusIcon}";
+            return string.Create(CultureInfo.InvariantCulture, $"Score: {Score:F1} | Agreement: {Agreement:F0}% | {ciText} | Consensus: {consensusIcon}");
         }
     }
     
@@ -102,7 +104,7 @@ public record CalibratedResult
             var lines = new List<string> { "Judge Scores:" };
             foreach (var (judge, score) in JudgeScores.OrderByDescending(kvp => kvp.Value))
             {
-                lines.Add($"  {judge}: {score:F1}");
+                lines.Add(string.Create(CultureInfo.InvariantCulture, $"  {judge}: {score:F1}"));
             }
             return string.Join(Environment.NewLine, lines);
         }
