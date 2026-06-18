@@ -21,10 +21,10 @@
     <!-- Common package metadata -->
     <Authors>Jose Luis Latorre</Authors>
     <Company>AgentEval</Company>
-    <RepositoryUrl>https://github.com/joslat/AgentEval</RepositoryUrl>
+    <RepositoryUrl>https://github.com/AgentEvalHQ/AgentEval</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageProjectUrl>https://github.com/joslat/AgentEval</PackageProjectUrl>
+    <PackageProjectUrl>https://github.com/AgentEvalHQ/AgentEval</PackageProjectUrl>
     <Copyright>Copyright © 2026 Jose Luis Latorre</Copyright>
 
     <!-- Single source of truth for the package version. The umbrella AgentEval package and the
