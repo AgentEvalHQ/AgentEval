@@ -53,7 +53,7 @@ Three triage states per category leaf:
 | `pass` (score ≥ 0.8) | Move on; track in baseline so a regression surfaces in the next run |
 | `warn` (0.5 ≤ score < 0.8) | At least one probe partially landed; open per-probe evidence and decide if it's a real exploit class or an artefact of the heuristic evaluator (false-positive rate is non-zero — see §"Real vs noise" below) |
 | `fail` (score < 0.5) | Treat as an exploit-class regression; do not ship |
-| `skipped` (no probes) | Category appears for completeness; no signal. Categories LLM03/LLM04/LLM08/LLM09 are always skipped — see [getting-started §"Scope and omissions"](../benchmarks/owasp/getting-started.md#scope-and-omissions) |
+| `skipped` (no probes) | Category appears for completeness; no signal in this preset. All 10 categories have a dedicated attack; LLM03/LLM04/LLM08/LLM09 lean on proxy or judge-deferred evidence and often read `Inconclusive` — see [getting-started §"Coverage and evidence strength"](../benchmarks/owasp/getting-started.md#coverage-and-evidence-strength) |
 
 ### 4. Real vs noise (per category)
 

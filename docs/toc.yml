@@ -28,6 +28,12 @@
     href: model-comparison.md
   - name: Trace Recording
     href: tracing.md
+  - name: Trace Fidelity
+    href: benchmarks/trace-fidelity.md
+  - name: Guardrails (Runtime Gate)
+    href: guardrails.md
+  - name: Auto-Audit
+    href: showcase/auto-audit.md
   - name: Composite Evaluations
     href: composite-evals.md
 
