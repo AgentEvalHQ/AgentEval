@@ -166,7 +166,10 @@ public sealed class SarifReportExporter : IReportExporter
                         Technique = probe.Technique,
                         Difficulty = probe.Difficulty.ToString(),
                         Fidelity = probe.Fidelity.ToString(),
-                        Surface = probe.Surface?.ToString()
+                        Surface = probe.Surface?.ToString(),
+                        GradedBy = probe.Grading?.ShippedBy.ToString(),
+                        GraderDisagreed = probe.Grading is { } g ? g.Disagreed : null,
+                        AttackerDriven = probe.AttackerDriven ? true : null
                     }
                 });
             }
@@ -209,7 +212,10 @@ public sealed class SarifReportExporter : IReportExporter
                         Technique = probe.Technique,
                         Difficulty = probe.Difficulty.ToString(),
                         Fidelity = probe.Fidelity.ToString(),
-                        Surface = probe.Surface?.ToString()
+                        Surface = probe.Surface?.ToString(),
+                        GradedBy = probe.Grading?.ShippedBy.ToString(),
+                        GraderDisagreed = probe.Grading is { } g ? g.Disagreed : null,
+                        AttackerDriven = probe.AttackerDriven ? true : null
                     }
                 });
             }
@@ -299,6 +305,9 @@ public sealed class SarifReportExporter : IReportExporter
         public string? Difficulty { get; init; }
         public string? Fidelity { get; init; }   // 5d: Verbal / IntentToAct / Behavioral
         public string? Surface { get; init; }     // 5d: UserMessage / ToolOutput / RetrievedDocument
+        public string? GradedBy { get; init; }    // ADR-021 §5: Heuristic / Judge / Classifier (judge-primary only)
+        public bool? GraderDisagreed { get; init; } // ADR-021 §5: keyword-vs-judge disagreement
+        public bool? AttackerDriven { get; init; }  // L10: attacker-LLM generated the conversation
     }
 
     private sealed record SarifMessage

@@ -50,4 +50,10 @@ public sealed class MultiTurnResult
     /// is NON-deterministic. A baseline diff / regression gate should treat a change as potentially non-reproducible
     /// rather than a real regression. Purely informational provenance — it never affects <see cref="Outcome"/>.</summary>
     public bool AttackerDriven { get; init; }
+
+    /// <summary>ADR-021 (§5): grading provenance of the representative graded turn/node — selected by the
+    /// same rule as <see cref="Fidelity"/> (the succeeding turn on success, else the highest-fidelity
+    /// conclusive turn, else <c>null</c>). <c>null</c> when no judge-primary grading occurred; lifted into
+    /// <c>ProbeResult.Grading</c> by <c>BuildFoldedProbeResult</c>, so a non-judge run stays byte-identical.</summary>
+    public GraderProvenance? Grading { get; init; }
 }

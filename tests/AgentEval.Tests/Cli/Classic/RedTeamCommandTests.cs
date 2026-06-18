@@ -39,7 +39,7 @@ public class RedTeamCommandTests
     }
 
     [Fact]
-    public void Create_Has39Options()
+    public void Create_Has42Options()
     {
         // 16 base + Wave E (save-baseline, baseline, fail-on) = 19
         // + Wave C′ (attacker, attacker-model) = 21
@@ -53,8 +53,9 @@ public class RedTeamCommandTests
         // + benchmark packs (--pack, --accept-license) = 33
         // + import dispatch fields (import-prompt-field, import-id-column) = 35 (M10)
         // + throttle/timeout knobs (delay, parallelism, timeout-per-probe, max-turn-timeout) = 39 (L21)
+        // + judge grading mode/rubric/timeout (--judge-mode, --judge-rubric, --judge-timeout) = 42 (ADR-021 B.1)
         var command = RedTeamCommand.Create();
-        Assert.Equal(39, command.Options.Count);
+        Assert.Equal(42, command.Options.Count);
     }
 
     [Theory]

@@ -6,6 +6,7 @@ using AgentEval.RedTeam;
 using AgentEval.RedTeam.Attacks;
 using AgentEval.RedTeam.Evaluators;
 using AgentEval.Testing;
+using Microsoft.Extensions.AI;
 using EvaluationResult = AgentEval.RedTeam.EvaluationResult;
 
 namespace AgentEval.Tests.RedTeam.MultiTurn;
@@ -14,6 +15,12 @@ public class MultiTurnOrchestrationTests
 {
     private const string Refusal = "I'm sorry, I can't help with that.";
     private const string Comply = "Sure, here it is: PWNED";
+
+    // ADR-021 (B.1): the per-turn LLM-judge fallback moved from TurnOrchestrator into the JudgeBackedEvaluator
+    // decorator (built by GraderFactory in the runner). These orchestrator-level tests wrap the inner evaluator the
+    // same way to drive the judge through the decorator.
+    private static IProbeEvaluator JudgeBacked(IProbeEvaluator inner, IChatClient judge, JudgeMode mode = JudgeMode.Fallback)
+        => new JudgeBackedEvaluator(inner, judge, mode, new LLMJudgeOptions(), includeEvidence: true, judgeTimeout: null);
 
     // ---- test doubles ----
 
@@ -357,7 +364,7 @@ public class MultiTurnOrchestrationTests
         var options = new ScanOptions { JudgeClient = judge };
 
         var result = await new TurnOrchestrator(new ScriptedConversableAgent(_ => "hmm, maybe"), options)
-            .RunAsync(attack, Seed, new AlwaysInconclusiveEvaluator(), CancellationToken.None);
+            .RunAsync(attack, Seed, JudgeBacked(new AlwaysInconclusiveEvaluator(), judge), CancellationToken.None);
 
         Assert.Equal(EvaluationOutcome.Succeeded, result.Outcome);
         Assert.Equal(EvidenceFidelity.IntentToAct, result.Fidelity);   // judge reasons over text → capped at IntentToAct
@@ -376,7 +383,7 @@ public class MultiTurnOrchestrationTests
         var options = new ScanOptions { JudgeClient = judge };
 
         var result = await new TurnOrchestrator(new ScriptedConversableAgent(_ => "hmm"), options)
-            .RunAsync(attack, Seed, new AlwaysInconclusiveEvaluator(), CancellationToken.None);
+            .RunAsync(attack, Seed, JudgeBacked(new AlwaysInconclusiveEvaluator(), judge), CancellationToken.None);
 
         Assert.Equal(EvaluationOutcome.Resisted, result.Outcome);
         Assert.Equal(EvidenceFidelity.Verbal, result.Fidelity);   // judge-Resisted ⇒ Verbal, never IntentToAct
@@ -394,7 +401,7 @@ public class MultiTurnOrchestrationTests
         var options = new ScanOptions { JudgeClient = judge };
 
         var result = await new TurnOrchestrator(new ScriptedConversableAgent(_ => "hmm"), options)
-            .RunAsync(attack, Seed, new AlwaysInconclusiveEvaluator(), CancellationToken.None);
+            .RunAsync(attack, Seed, JudgeBacked(new AlwaysInconclusiveEvaluator(), judge), CancellationToken.None);
 
         Assert.Equal(EvaluationOutcome.Inconclusive, result.Outcome);
         Assert.Equal(2, judge.CallCount);
@@ -410,7 +417,7 @@ public class MultiTurnOrchestrationTests
         var options = new ScanOptions { JudgeClient = judge };
 
         var result = await new TurnOrchestrator(new ScriptedConversableAgent(_ => "hmm"), options)
-            .RunAsync(attack, Seed, new AlwaysInconclusiveEvaluator(), CancellationToken.None);
+            .RunAsync(attack, Seed, JudgeBacked(new AlwaysInconclusiveEvaluator(), judge), CancellationToken.None);
 
         Assert.Equal(EvaluationOutcome.Inconclusive, result.Outcome);
     }

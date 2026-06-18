@@ -140,7 +140,11 @@ public sealed class RedTeamRunner : IRedTeamRunner
         Stopwatch sw,
         CancellationToken cancellationToken)
     {
-        var evaluator = attack.GetEvaluator();
+        // ADR-021 (B.1): resolve grading once at this seam. GraderFactory wraps the oracle in a
+        // JudgeBackedEvaluator when a JudgeClient is configured (owning the former inline judge blocks
+        // for the single-turn runner AND both orchestrators); with no judge it returns the bare oracle,
+        // so a no-judge run is byte-identical. The wrapped evaluator flows to all three paths below.
+        var evaluator = GraderFactory.For(attack, options);
         // `probes` is materialized once by the caller (incl. MaxProbesPerAttack) — see PERF-10.
 
         // RA3-05 / T5-1: bounded-concurrency path only when the caller opts in; Parallelism <= 1 keeps the
@@ -440,30 +444,13 @@ public sealed class RedTeamRunner : IRedTeamRunner
             // evaluators can read RawMessages; text-only evaluators ignore it via the default member.
             var evalResult = await evaluator.EvaluateAsync(probe, response, probeCts.Token);
 
-            // RC-1: classify the evidence the verdict rests on (Verbal / IntentToAct / Behavioral).
+            // ADR-021 (B.1): the LLM-judge fallback + judge-primary routing now live in the
+            // JudgeBackedEvaluator decorator (resolved at the GraderFactory seam). The evaluator has
+            // already applied the judge verdict, the IntentToAct/Verbal cap (stamped into
+            // Metadata["fidelity"]), and any redaction; here we just classify the (possibly capped)
+            // evidence and lift the per-probe grading provenance (null unless judge-primary graded it).
             var fidelity = ResolveFidelity(evalResult);
-
-            // GAP-19 / RC-1: LLM-judge fallback — only when Inconclusive AND a judge client is configured.
-            // The judge reasons over text only, so a judge-derived verdict is capped at IntentToAct
-            // (Succeeded ⇒ IntentToAct, Resisted ⇒ Verbal).
-            if (evalResult.Outcome == EvaluationOutcome.Inconclusive && options.JudgeClient is not null)
-            {
-                var judge = new Evaluators.LLMJudgeEvaluator(options.JudgeClient);
-                var judged = await judge.EvaluateAsync(probe, responseText, probeCts.Token);
-                if (judged.Outcome != EvaluationOutcome.Inconclusive)
-                {
-                    // Jun14-M4: the judge Reason is LLM-authored from the RAW response and can quote sensitive content,
-                    // exactly like the --explain rationale H1 gated. Redact it on a redacted scan (Outcome/fidelity
-                    // are never altered — only the free-text Reason is suppressed) so it can't leak via Reason →
-                    // JSON/SARIF exporters when Prompt/Response are [REDACTED].
-                    evalResult = options.IncludeEvidence
-                        ? judged
-                        : judged with { Reason = $"LLM judge: {judged.Outcome} (reason suppressed; enable IncludeEvidence)" };
-                    fidelity = judged.Outcome == EvaluationOutcome.Succeeded
-                        ? EvidenceFidelity.IntentToAct
-                        : EvidenceFidelity.Verbal;
-                }
-            }
+            var grading = GradingMetadata.ProvenanceOf(evalResult);
 
             // --explain (ExplainFindings): attach a best-effort LLM rationale narrating the verdict + fidelity for
             // Succeeded/Inconclusive findings only (the user-selected scope). Opt-in, judge-gated, never changes the
@@ -501,7 +488,8 @@ public sealed class RedTeamRunner : IRedTeamRunner
                 Duration = probeSw.Elapsed,
                 Severity = attackSeverity,
                 Fidelity = fidelity,
-                Surface = probe.Surface
+                Surface = probe.Surface,
+                Grading = grading
             };
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -591,6 +579,7 @@ public sealed class RedTeamRunner : IRedTeamRunner
             Surface = probe.Surface,
             ConversationFidelity = mt.ConversationFidelity,
             AttackerDriven = mt.AttackerDriven,   // L10: provenance flag (reserved for a future baseline gate; see ProbeResult.AttackerDriven)
+            Grading = mt.Grading,                 // ADR-021 §5: judge-primary grading provenance, carried across the fold
         };
     }
 

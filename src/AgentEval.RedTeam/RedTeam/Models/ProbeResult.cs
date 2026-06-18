@@ -96,4 +96,16 @@ public record ProbeResult
     /// baseline/regression-gate consumer (no comparer reads it yet, and it is not serialized into JSON/SARIF).
     /// </summary>
     public bool AttackerDriven { get; init; }
+
+    /// <summary>
+    /// ADR-021 (§5): grading provenance for a judge-primary verdict — which grader shipped, and the
+    /// keyword-vs-judge disagreement. <c>null</c> on every non-judge-primary path (the default), so a
+    /// fallback run is byte-identical. Lifted from the decorator's <c>grader_provenance</c> metadata by
+    /// <c>ResolveGrading</c> at the conclusive construction sites.
+    /// </summary>
+    public GraderProvenance? Grading { get; init; }
+
+    /// <summary>True when a judge-primary verdict disagreed with the advisory keyword oracle (§5).
+    /// Computed from <see cref="Grading"/>; <c>false</c> when no judge ran.</summary>
+    public bool GraderDisagreed => Grading is { } g && g.Disagreed;
 }

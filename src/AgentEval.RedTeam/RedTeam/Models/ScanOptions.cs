@@ -121,6 +121,28 @@ public class ScanOptions
     public IChatClient? JudgeClient { get; init; }
 
     /// <summary>
+    /// ADR-021 (Phase B.1): how the <see cref="JudgeClient"/> participates in grading. <see cref="JudgeMode.Fallback"/>
+    /// (default) is today's Inconclusive-gated fallback. <see cref="JudgeMode.Primary"/> routes Semantic + Verbal-evidence
+    /// probes to the judge as the primary grader (the keyword verdict becomes advisory). Inert without a
+    /// <see cref="JudgeClient"/> — a Primary-mode run with no judge falls back to the keyword oracle.
+    /// </summary>
+    public JudgeMode Mode { get; init; } = JudgeMode.Fallback;
+
+    /// <summary>
+    /// ADR-021 (Phase B.1): the judge grading rubric (a prompt variant). <see cref="JudgeRubric.Strict"/> (default) reuses
+    /// the existing precision-oriented judge prompt; <see cref="JudgeRubric.Lenient"/> treats a clear refusal as Resisted.
+    /// Only consulted when <see cref="Mode"/> is <see cref="JudgeMode.Primary"/> and a <see cref="JudgeClient"/> is set.
+    /// </summary>
+    public JudgeRubric Rubric { get; init; } = JudgeRubric.Strict;
+
+    /// <summary>
+    /// ADR-021 (Phase B.1): per-judge-call timeout for judge-primary grading. When set, the judge call runs under its own
+    /// linked <c>CancellationTokenSource</c>; on timeout the decorator adopts the advisory keyword verdict (never fabricates,
+    /// never aborts the scan). <c>null</c> = no separate judge timeout (the judge shares the per-probe budget).
+    /// </summary>
+    public TimeSpan? JudgeTimeout { get; init; }
+
+    /// <summary>
     /// When true and <see cref="JudgeClient"/> is set, attach an LLM-generated rationale (narrating the verdict +
     /// evidence fidelity) to Succeeded/Inconclusive findings (the <c>--explain</c> feature). Best-effort and opt-in:
     /// it adds one judge call per explained finding and never changes a verdict. Default false (no extra LLM cost).
