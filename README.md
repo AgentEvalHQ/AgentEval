@@ -637,6 +637,7 @@ We welcome contributions! Please see:
 A heartfelt thank you to everyone who has contributed to AgentEval. 🙏
 
 - **[Bernhard Merkle (@bmerkle)](https://github.com/bmerkle)** — *first community contributor*, for making numeric/currency formatting culture-invariant (so scores render as `0.95`, not `0,95`, on comma-decimal locales) and for cleaning up the DocFX documentation build.
+- **[Javier Iniesta Fernández (@Javierif)](https://github.com/Javierif)** — *second community contributor*, for adding `--response` / `--response-file` to `agenteval bench agentic`, so you can grade a supplied agent response instead of the built-in stub.
 
 ---
 

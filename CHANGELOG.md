@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.12.1-beta] - 2026-06-18
+
+> Our first community-contributor release — huge thanks to **@bmerkle** and **@Javierif**. 🎉
+
+### Added
+- **`agenteval bench agentic --response <text>` / `--response-file <path>`** — grade a supplied
+  agent response directly instead of the built-in stub. Thanks to our second community contributor
+  **[Javier Iniesta Fernández (@Javierif)](https://github.com/Javierif)** (#47).
+
 ### Fixed
 - **Locale-dependent number/currency formatting** — scores, durations, costs and CI/exporter
   output now format with `CultureInfo.InvariantCulture`, so a comma-decimal system locale no
@@ -17,6 +26,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **DocFX build warnings** — removed dead markdown links to the (gitignored) `strategy/`
   directory from ADR-014/015/016 and the extensibility guide, and mapped `samples/**/*.cs`
   as a DocFX resource so sample cross-references resolve. Thanks to **@bmerkle** (#18).
+- **Pre-release accuracy pass** — README MAF badge + compatibility table and the installation
+  docs now read MAF `1.10.0` / Microsoft.Extensions.AI `10.6.0` (the shipped versions); package
+  `RepositoryUrl`/`PackageProjectUrl` corrected to the canonical `AgentEvalHQ/AgentEval`; the
+  OWASP getting-started guide reconciled to the shipped 10/10 category coverage; and three
+  observability docs (Trace Fidelity, Guardrails, Auto-Audit) surfaced in the docs navigation.
 
 ## [0.12.0-beta] - 2026-06-14
 
