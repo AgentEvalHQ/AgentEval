@@ -632,6 +632,12 @@ We welcome contributions! Please see:
 - [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)
 - [SECURITY.md](SECURITY.md)
 
+### Contributors
+
+A heartfelt thank you to everyone who has contributed to AgentEval. 🙏
+
+- **[Bernhard Merkle (@bmerkle)](https://github.com/bmerkle)** — *first community contributor*, for making numeric/currency formatting culture-invariant (so scores render as `0.95`, not `0,95`, on comma-decimal locales) and for cleaning up the DocFX documentation build.
+
 ---
 
 ## Commercial & Enterprise 

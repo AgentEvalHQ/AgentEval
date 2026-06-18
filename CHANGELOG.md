@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Locale-dependent number/currency formatting** — scores, durations, costs and CI/exporter
+  output now format with `CultureInfo.InvariantCulture`, so a comma-decimal system locale no
+  longer emits `0,95` instead of `0.95` (which corrupted CSV/JSON/XML output). Thanks to our
+  first community contributor **[Bernhard Merkle (@bmerkle)](https://github.com/bmerkle)** (#20).
+
+### Documentation
+- **DocFX build warnings** — removed dead markdown links to the (gitignored) `strategy/`
+  directory from ADR-014/015/016 and the extensibility guide, and mapped `samples/**/*.cs`
+  as a DocFX resource so sample cross-references resolve. Thanks to **@bmerkle** (#18).
+
 ## [0.12.0-beta] - 2026-06-14
 
 ### Dependencies — Microsoft Agent Framework 1.10.0 upgrade
