@@ -41,6 +41,7 @@ Each ADR follows this structure:
 | [018](018-compliance-core-and-shared-extractions.md) | Compliance.Core and Cross-Cutting Shared Extractions | Accepted | 2026-05-31 |
 | [019](019-chat-boundary-two-layer-recording.md) | Chat-Boundary Tracing and the Two-Layer Recording Model (Glass Box) | Accepted | 2026-05-31 |
 | [020](020-agenttrace-v1_1-schema.md) | AgentTrace v1.1 Schema (Glass Box additive fields) | Accepted | 2026-05-31 |
+| [021](021-judge-primary-semantic-oracles.md) | Judge-Primary Grading for Semantic Red-Team Oracles (RedTeam Phase B) | Proposed | 2026-06-18 |
 
 ---
 
