@@ -756,7 +756,6 @@ public MyMetric(double threshold = 70)
 
 - [Architecture Overview](architecture.md) - Understanding the metric hierarchy
 - [Embedding Metrics](embedding-metrics.md) - Fast similarity evaluation
-- [Extensibility Strategy](../strategy/AgentEval-Extensibility-Implementation-Review-and-Refinement.md) - Full extensibility architecture and roadmap
 - [Benchmarks Guide](benchmarks.md) - Performance benchmarking
 - [Snapshots](snapshots.md) - Snapshot comparison with `ISnapshotComparer` interface
-- [Sample 26: Extensibility](https://github.com/AgentEvalHQ/AgentEval/blob/main/samples/AgentEval.Samples/Sample26_Extensibility.cs) - End-to-end extensibility demo with custom metrics, exporters, loaders, and attack types
+- [Sample 26: Extensibility](../samples/AgentEval.Samples/Sample26_Extensibility.cs) - End-to-end extensibility demo with custom metrics, exporters, loaders, and attack types
