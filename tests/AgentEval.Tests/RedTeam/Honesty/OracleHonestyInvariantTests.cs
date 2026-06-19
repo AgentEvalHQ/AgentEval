@@ -7,6 +7,8 @@
 // clearly-vulnerable response must never score Resisted. Inconclusive satisfies both, so a failure is always a genuine
 // honesty violation (a fabricated compromise or an under-reported hit), never a label nit.
 using AgentEval.RedTeam;
+using AgentEval.RedTeam.Evaluators;   // LLMJudgeOptions
+using AgentEval.Testing;              // FakeChatClient
 using AgentEval.Tests.RedTeam.Honesty;
 
 namespace AgentEval.Tests.RedTeam.Honesty;
@@ -32,6 +34,32 @@ public class OracleHonestyInvariantTests
         else
             Assert.False(result.Outcome == EvaluationOutcome.Resisted,
                 $"HONESTY VIOLATION — a VULNERABLE response was scored Resisted (under-reported hit).\n  {where}");
+    }
+
+    // ADR-021 (B.1 §6) routing/plumbing invariant: under judge-primary with an ABSTAINING judge, a Semantic+Verbal
+    // probe routes to the judge, the judge abstains (Inconclusive), and the advisory keyword verdict must ship
+    // UNCORRUPTED — the routing, the IntentToAct/Verbal cap, and the asymmetric guard must not themselves manufacture
+    // or mask a verdict. (This tests the plumbing, NOT the judge's judgment — the fake abstains on every case.)
+    [Theory]
+    [MemberData(nameof(Cases))]
+    public async Task JudgePrimary_AbstainingJudge_RoutingNeverFabricates(int index)
+    {
+        var c = OracleHonestyCorpus.All[index];
+        var abstaining = new FakeChatClient("VERDICT: INCONCLUSIVE\nCONFIDENCE: 0.3\nREASON: cannot tell");
+        var grader = new JudgeBackedEvaluator(
+            c.Evaluator, abstaining, JudgeMode.Primary, new LLMJudgeOptions(), includeEvidence: true, judgeTimeout: null);
+
+        var result = await grader.EvaluateAsync(c.Probe, c.Response);
+
+        var snippet = c.Response.Length <= 90 ? c.Response : c.Response[..90] + "…";
+        var where = $"[{c.Oracle}] {c.Origin} → {result.Outcome} (judge-primary, abstaining)\n  response: \"{snippet}\"";
+
+        if (c.Expect == HonestyExpectation.SafeMustNotSucceed)
+            Assert.False(result.Outcome == EvaluationOutcome.Succeeded,
+                $"ROUTING HONESTY VIOLATION — judge-primary routing fabricated Succeeded on a SAFE response.\n  {where}");
+        else
+            Assert.False(result.Outcome == EvaluationOutcome.Resisted,
+                $"ROUTING HONESTY VIOLATION — judge-primary routing masked a hit (Resisted) on a VULNERABLE response.\n  {where}");
     }
 
     [Fact]
