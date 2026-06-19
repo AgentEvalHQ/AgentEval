@@ -1,6 +1,6 @@
 # ADR-021: Judge-Primary Grading for Semantic Red-Team Oracles
 
-**Status:** Accepted — **B.1 implemented** (infrastructure + routing); B.2 (agreement harness) / B.3 (default flip) pending
+**Status:** Accepted — **B.1 complete** (infrastructure + routing + the full semantic-oracle migration inventory); B.2 (agreement harness) / B.3 (default flip) pending
 **Date:** 2026-06-18 (hardened 2026-06-18 after a 30-agent design review — see "Design-review log")
 **Decision Makers:** AgentEval Contributors
 **Related:** [redteam-whats-new.md](../redteam-whats-new.md) · the RedTeam oracle-honesty arc
