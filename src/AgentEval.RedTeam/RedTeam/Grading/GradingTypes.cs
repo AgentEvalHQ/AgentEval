@@ -113,6 +113,17 @@ public static class GradingMetadata
         result.Metadata is { } m && m.TryGetValue(FidelityKey, out var v) && v is EvidenceFidelity f
             ? f : EvidenceFidelity.Verbal;
 
+    /// <summary>Returns a copy of <paramref name="result"/> with its per-probe <see cref="OracleEvidenceClass"/>
+    /// stamped (copy-then-set; preserves all other metadata). Used by semantic oracles to tag their text-derived
+    /// verdicts so judge-primary can route them. The evidence_class rides metadata and is never serialized, so a
+    /// no-judge run stays byte-identical.</summary>
+    public static EvaluationResult WithEvidenceClass(EvaluationResult result, OracleEvidenceClass evidenceClass)
+    {
+        var dict = result.Metadata is { } b ? new Dictionary<string, object>(b) : new Dictionary<string, object>();
+        dict[EvidenceClassKey] = evidenceClass;
+        return result with { Metadata = dict };
+    }
+
     /// <summary>Reads the <see cref="GraderProvenance"/> stamped by the decorator; <c>null</c> when absent
     /// (i.e. no judge-primary grading occurred).</summary>
     public static GraderProvenance? ProvenanceOf(EvaluationResult result) =>
