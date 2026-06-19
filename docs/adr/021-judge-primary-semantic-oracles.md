@@ -1,6 +1,6 @@
 # ADR-021: Judge-Primary Grading for Semantic Red-Team Oracles
 
-**Status:** Accepted — **B.1 complete** (infrastructure + routing + the full semantic-oracle migration inventory); B.2 (agreement harness) / B.3 (default flip) pending
+**Status:** Accepted — **B.1 + B.2 complete** (infrastructure + routing + oracle migration; agreement harness + κ/F1 + the directional B.3 gate). **B.3** (flip the default to `primary`) remains deferred: its *gate mechanism* is implemented (`JudgeAgreementReport.DirectionalFabrications`), but the actual default flip is a **major-version** change gated on a **live-judge** measurement showing zero directional fabrications — it cannot be executed without a real judge run.
 **Date:** 2026-06-18 (hardened 2026-06-18 after a 30-agent design review — see "Design-review log")
 **Decision Makers:** AgentEval Contributors
 **Related:** [redteam-whats-new.md](../redteam-whats-new.md) · the RedTeam oracle-honesty arc
