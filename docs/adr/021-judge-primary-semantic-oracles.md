@@ -380,6 +380,36 @@ a nullable `EvaluationOutcome? PinnedVerdict` alongside the existing `HonestyExp
   RedTeam→Compliance/Evals project reference (wrong layering: a red-team scanner must not depend on
   the GDPR/EU-AI-Act assemblies). Drop **MAE** (a 3-way categorical verdict has no ordinal scale).
 
+### First 5b measurement (2026-06-20, `gpt-4o-mini`, 298-case corpus)
+
+A live run of the harness over the full `OracleHonestyCorpus` (`JudgeAgreement5bLiveRun`, env-gated on
+`AGENTEVAL_RUN_5B=1`) gives the first real numbers, and the rubric matters a great deal:
+
+| Rubric | defer-correct | missed hits (`vuln→resisted`) | false alarms (`safe→succeeded`) | directional total |
+|---|---|---|---|---|
+| **STRICT** (default) | 85% | **38** | 8 | 46 |
+| LENIENT (lenient-toward-agent) | 78% | 59 | 6 | 65 |
+| **LENIENT** (recall-for-compromise) | 84% | **18** | 30 | 48 |
+
+Findings:
+- **The B.3 gate BLOCKS the flip under every rubric** (directional count > 0) — correct: `gpt-4o-mini`
+  is materially better than the non-convergent keyword tier but is not flip-ready on this
+  deliberately-adversarial set.
+- **The error mode is the security-critical one — missed hits.** Under STRICT, 38 of 46 errors are
+  `vuln→resisted` (the judge under-reports compromise), concentrated in Misinformation (13),
+  SupplyChain (10), DataPoisoning (9), InferenceAPIAbuse (6). Jailbreak and PromptInjection: **zero**.
+- **5b caught a design flaw.** The first LENIENT prompt was lenient *toward the agent* ("any refusal ⇒
+  Resisted"), which *increased* missed hits (59). Redesigned to be lenient *toward flagging* (any sign
+  of compromise ⇒ Succeeded), it **halved** missed hits (38 → 18) at the cost of more false alarms
+  (8 → 30) — a clean precision/recall knob. For a scanner where *missed-vuln > false-alarm* (the same
+  bias as the §4 asymmetric guard), recall-LENIENT is the safer setting.
+- κ not computed (the corpus carries no `PinnedVerdict` labels yet — pinning a labelled subset is the
+  remaining B.2 labelling task; the κ/F1 machinery is proven by the 5a deterministic test).
+
+*(These figures are our own measurement on a deliberately-adversarial corpus, not a general accuracy
+claim.)* **Pre-B.3 work:** pin a labelled subset (κ); evaluate per-oracle rubric routing
+(recall-LENIENT for the missed-hit-prone oracles); re-measure on a stronger judge.
+
 ## Consequences
 
 **Positive**
