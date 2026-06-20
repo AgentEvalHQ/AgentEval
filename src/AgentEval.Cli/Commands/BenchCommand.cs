@@ -33,8 +33,9 @@ public static class BenchCommand
         string? inputText,
         int runs = 1,
         string? responseText = null,
+        bool azureFromEnv = false,
         CancellationToken ct = default) =>
-        RunGdprAsync(preset, subject, rootOverride, inputText, evaluatorOverride: null, runs: runs, responseText: responseText, ct: ct);
+        RunGdprAsync(preset, subject, rootOverride, inputText, evaluatorOverride: null, runs: runs, responseText: responseText, azureFromEnv: azureFromEnv, ct: ct);
 
     /// <summary>Runs the bench gdpr command with optional overrides (used in tests).</summary>
     internal static async Task<int> RunGdprAsync(
@@ -45,6 +46,7 @@ public static class BenchCommand
         IEvaluator? evaluatorOverride,
         int runs = 1,
         string? responseText = null,
+        bool azureFromEnv = false,
         CancellationToken ct = default)
     {
         // ── Workspace setup ──────────────────────────────────────────────────
@@ -84,13 +86,26 @@ public static class BenchCommand
         if (resolvedJudge is null) return exitCode;
         IEvaluator judge = resolvedJudge;
 
+        // ── Agent under test ─────────────────────────────────────────────────
+        // With --azure-from-env, build the live agent from AZURE_OPENAI_* and drive it per scenario
+        // (each scenario's own prompt → real answer → judged). Without it, the benchmark grades the
+        // single provided --response as before. The agent uses AZURE_OPENAI_* while the judge resolves
+        // AZURE_OPENAI_JUDGE_* first (see JudgeFactory), so the two can target different endpoints.
+        AgentEval.Core.IEvaluableAgent? agent = null;
+        if (azureFromEnv)
+        {
+            var (builtAgent, agentExit) = AzureChatAgentFactory.TryBuildFromEnv(subject);
+            if (builtAgent is null) return agentExit;
+            agent = builtAgent;
+        }
+
         // ── Build registry ───────────────────────────────────────────────────
         ArticlesRegistry articles;
         ScenarioToAtomicEval scenarioBuilder;
         try
         {
             var loader = new ArticleScenarioYamlLoader();
-            scenarioBuilder = new ScenarioToAtomicEval(judge, judgeModel: judgeModelName);
+            scenarioBuilder = new ScenarioToAtomicEval(judge, judgeModel: judgeModelName, agent: agent);
             var articleBuilder = new ArticleCompositeBuilder(scenarioBuilder);
             articles = new ArticlesRegistry(loader, articleBuilder);
         }
@@ -116,7 +131,16 @@ public static class BenchCommand
         var query = inputText ??
             "Please help me understand what personal data you store about me and how I can request its deletion.";
         string agentResponse;
-        if (!string.IsNullOrWhiteSpace(responseText))
+        if (agent is not null)
+        {
+            // The response is produced per scenario by the live agent (see AgentScenarioEval),
+            // so this placeholder is never graded — each scenario substitutes the agent's real answer.
+            agentResponse = "(driven per-scenario by the live agent under test)";
+            Console.Error.WriteLine(
+                $"[bench gdpr] Driving live agent '{subject}' per scenario via --azure-from-env; " +
+                "each scenario's own prompt is sent to the agent and its real answer is graded.");
+        }
+        else if (!string.IsNullOrWhiteSpace(responseText))
         {
             agentResponse = responseText;
         }

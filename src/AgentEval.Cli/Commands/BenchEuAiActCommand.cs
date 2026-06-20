@@ -32,8 +32,9 @@ public static class BenchEuAiActCommand
         string? rootOverride,
         string? inputText,
         string? responseText = null,
+        bool azureFromEnv = false,
         CancellationToken ct = default) =>
-        RunAsync(preset, subject, rootOverride, inputText, evaluatorOverride: null, responseText: responseText, ct: ct);
+        RunAsync(preset, subject, rootOverride, inputText, evaluatorOverride: null, responseText: responseText, azureFromEnv: azureFromEnv, ct: ct);
 
     /// <summary>Runs the bench eu-ai-act command with optional overrides (used in tests).</summary>
     internal static async Task<int> RunAsync(
@@ -43,6 +44,7 @@ public static class BenchEuAiActCommand
         string? inputText,
         IEvaluator? evaluatorOverride,
         string? responseText = null,
+        bool azureFromEnv = false,
         CancellationToken ct = default)
     {
         // ── Workspace setup ──────────────────────────────────────────────────
@@ -80,13 +82,25 @@ public static class BenchEuAiActCommand
         if (resolvedJudge is null) return exitCode;
         IEvaluator judge = resolvedJudge;
 
+        // ── Agent under test ─────────────────────────────────────────────────
+        // With --azure-from-env, drive the live agent (AZURE_OPENAI_*) per scenario; otherwise grade
+        // the single provided --response. The judge resolves AZURE_OPENAI_JUDGE_* first (see
+        // JudgeFactory) so agent and judge can point at different endpoints.
+        AgentEval.Core.IEvaluableAgent? agent = null;
+        if (azureFromEnv)
+        {
+            var (builtAgent, agentExit) = AzureChatAgentFactory.TryBuildFromEnv(subject);
+            if (builtAgent is null) return agentExit;
+            agent = builtAgent;
+        }
+
         // ── Build registry ───────────────────────────────────────────────────
         EuAiActArticlesRegistry articles;
         ScenarioToAtomicEval scenarioBuilder;
         try
         {
             var loader = new ArticleScenarioYamlLoader();
-            scenarioBuilder = new ScenarioToAtomicEval(judge, judgeModel: judgeModelName);
+            scenarioBuilder = new ScenarioToAtomicEval(judge, judgeModel: judgeModelName, agent: agent);
             var articleBuilder = new ArticleCompositeBuilder(scenarioBuilder);
             articles = new EuAiActArticlesRegistry(loader, articleBuilder);
         }
@@ -124,7 +138,16 @@ public static class BenchEuAiActCommand
             return 1;
         }
         string agentResponse;
-        if (!string.IsNullOrWhiteSpace(responseText))
+        if (agent is not null)
+        {
+            // Response is produced per scenario by the live agent (see AgentScenarioEval);
+            // this placeholder is never graded.
+            agentResponse = "(driven per-scenario by the live agent under test)";
+            Console.Error.WriteLine(
+                $"[bench eu-ai-act] Driving live agent '{subject}' per scenario via --azure-from-env; " +
+                "each scenario's own prompt is sent to the agent and its real answer is graded.");
+        }
+        else if (!string.IsNullOrWhiteSpace(responseText))
         {
             agentResponse = responseText;
         }

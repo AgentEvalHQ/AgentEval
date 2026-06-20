@@ -74,25 +74,75 @@ public class ChatClientEvaluator : IEvaluator
             new(ChatRole.User, prompt)
         };
 
-        var response = await _chatClient.GetResponseAsync(messages, cancellationToken: cancellationToken);
+        // Ask for a JSON object response so models that honour response_format stop wrapping
+        // the verdict in prose or markdown fences — the single biggest source of parse failures
+        // with smaller judge models. Not all endpoints/models support it, so the call falls back
+        // to an unconstrained request when the option is rejected.
+        long? inputTokens = null, outputTokens = null;
 
-        var parsed = ParseEvaluationResponse(response.Text);
+        var (parsed, firstResponse) = await InvokeAndParseAsync(messages, cancellationToken);
+        Accumulate(ref inputTokens, ref outputTokens, firstResponse?.Usage);
 
-        // Lift token usage (when reported by the model) so downstream consumers — primarily
-        // AtomicLlmEval — can attribute real judge spend to EvalProvenance.EstimatedCost.
-        // Plumbed in v1.1 task 1.7 (6-plan F-002). When Usage is null or partial, the
-        // EvaluationResult fields stay null and AtomicLlmEval falls back to the unknown-rate
-        // path in JudgeCostMap.
-        var usage = response.Usage;
+        // One corrective retry when the verdict could not be parsed. A nudge to emit ONLY a
+        // valid JSON object recovers the common "explained in prose then appended JSON" and
+        // "trailing commentary" failures without masking a genuinely broken judge (still flagged
+        // as EvaluationFailed if the retry also fails).
+        if (parsed.EvaluationFailed)
+        {
+            var retryMessages = new List<ChatMessage>(messages)
+            {
+                new(ChatRole.User,
+                    "Your previous response could not be parsed. Respond with ONLY a single valid "
+                    + "JSON object matching the required schema — no prose, no markdown code fences, "
+                    + "nothing before or after the JSON."),
+            };
+            var (retryParsed, retryResponse) = await InvokeAndParseAsync(retryMessages, cancellationToken);
+            Accumulate(ref inputTokens, ref outputTokens, retryResponse?.Usage);
+            if (!retryParsed.EvaluationFailed)
+                parsed = retryParsed;
+        }
+
         return new EvaluationResult
         {
             OverallScore = parsed.OverallScore,
             Summary = parsed.Summary,
             Improvements = parsed.Improvements,
             CriteriaResults = parsed.CriteriaResults,
-            InputTokenCount = usage?.InputTokenCount,
-            OutputTokenCount = usage?.OutputTokenCount,
+            EvaluationFailed = parsed.EvaluationFailed,
+            // Lift token usage (when reported by the model) so downstream consumers — primarily
+            // AtomicLlmEval — can attribute real judge spend to EvalProvenance.EstimatedCost.
+            // Summed across the initial call and any corrective retry so cost stays honest.
+            InputTokenCount = inputTokens,
+            OutputTokenCount = outputTokens,
         };
+    }
+
+    /// <summary>Issues one judge call (JSON response-format when supported, falling back to an
+    /// unconstrained request) and parses the result. Returns the parsed verdict and the raw
+    /// response so the caller can attribute token usage.</summary>
+    private async Task<(EvaluationResult Parsed, ChatResponse? Response)> InvokeAndParseAsync(
+        List<ChatMessage> messages, CancellationToken cancellationToken)
+    {
+        ChatResponse response;
+        try
+        {
+            var jsonOptions = new ChatOptions { ResponseFormat = ChatResponseFormat.Json };
+            response = await _chatClient.GetResponseAsync(messages, jsonOptions, cancellationToken);
+        }
+        catch
+        {
+            // Endpoint/model rejected response_format (older API version or unsupported model):
+            // retry once unconstrained rather than failing the whole evaluation.
+            response = await _chatClient.GetResponseAsync(messages, cancellationToken: cancellationToken);
+        }
+        return (ParseEvaluationResponse(response.Text), response);
+    }
+
+    private static void Accumulate(ref long? input, ref long? output, UsageDetails? usage)
+    {
+        if (usage is null) return;
+        if (usage.InputTokenCount is { } i) input = (input ?? 0) + i;
+        if (usage.OutputTokenCount is { } o) output = (output ?? 0) + o;
     }
 
     private static EvaluationResult ParseEvaluationResponse(string responseText)
@@ -102,26 +152,62 @@ public class ChatClientEvaluator : IEvaluator
             var json = LlmJsonParser.ExtractJson(responseText);
             if (json == null)
             {
-                return new EvaluationResult { OverallScore = EvaluationDefaults.DefaultFailureScore, Summary = "Failed to parse evaluation - no JSON found" };
+                return new EvaluationResult { OverallScore = EvaluationDefaults.DefaultFailureScore, Summary = "Failed to parse evaluation - no JSON found", EvaluationFailed = true };
             }
 
-            var result = System.Text.Json.JsonSerializer.Deserialize<EvaluationResultDto>(json,
-                new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-            
-            if (result == null)
-                return new EvaluationResult { OverallScore = EvaluationDefaults.DefaultFailureScore, Summary = "Failed to parse evaluation" };
+            using var doc = System.Text.Json.JsonDocument.Parse(json);
+            var root = doc.RootElement;
+            if (root.ValueKind != System.Text.Json.JsonValueKind.Object)
+                return new EvaluationResult { OverallScore = EvaluationDefaults.DefaultFailureScore, Summary = "Failed to parse evaluation", EvaluationFailed = true };
+
+            // Judge prompts are not consistent about casing: the generic evaluator prompt emits
+            // camelCase (overallScore / criteriaResults / explanation / improvements) while the
+            // compliance judge prompts (gdpr-judge-system.v1, eu-ai-act) emit snake_case
+            // (overall_score / criteria_results / reasoning). JsonSerializer's case-insensitive
+            // option does NOT bridge snake_case↔camelCase, so a verbatim DTO deserialize silently
+            // dropped every compliance verdict to the int default (0) with empty criteria — making
+            // a real, token-spending judgement look identical to a non-response. Match on keys
+            // normalised (lower-cased, underscores stripped) so both shapes round-trip.
+            var props = NormalisedProps(root);
+
+            // A recognisable score field must be present; its absence means the model did not
+            // produce a verdict in the expected shape → preserve the failure-score signal.
+            if (!TryGetNumber(props, out var score, "overallscore", "score"))
+                return new EvaluationResult { OverallScore = EvaluationDefaults.DefaultFailureScore, Summary = "Failed to parse evaluation - no score field", EvaluationFailed = true };
+
+            var criteria = new List<CriterionResult>();
+            if (props.TryGetValue("criteriaresults", out var critEl) && critEl.ValueKind == System.Text.Json.JsonValueKind.Array)
+            {
+                foreach (var item in critEl.EnumerateArray())
+                {
+                    if (item.ValueKind != System.Text.Json.JsonValueKind.Object) continue;
+                    var cprops = NormalisedProps(item);
+                    criteria.Add(new CriterionResult
+                    {
+                        Criterion = GetString(cprops, "criterion") ?? "",
+                        Met = GetBool(cprops, "met"),
+                        // compliance prompts call this "reasoning"; the generic prompt "explanation".
+                        Explanation = GetString(cprops, "explanation", "reasoning") ?? "",
+                    });
+                }
+            }
+
+            var improvements = new List<string>();
+            if (props.TryGetValue("improvements", out var impEl) && impEl.ValueKind == System.Text.Json.JsonValueKind.Array)
+            {
+                foreach (var item in impEl.EnumerateArray())
+                {
+                    if (item.ValueKind == System.Text.Json.JsonValueKind.String)
+                        improvements.Add(item.GetString() ?? "");
+                }
+            }
 
             return new EvaluationResult
             {
-                OverallScore = result.OverallScore,
-                Summary = result.Summary ?? "",
-                Improvements = result.Improvements ?? [],
-                CriteriaResults = result.CriteriaResults?.Select(c => new CriterionResult
-                {
-                    Criterion = c.Criterion ?? "",
-                    Met = c.Met,
-                    Explanation = c.Explanation ?? ""
-                }).ToList() ?? []
+                OverallScore = (int)Math.Round(Math.Clamp(score, 0, 100)),
+                Summary = GetString(props, "summary") ?? "",
+                Improvements = improvements,
+                CriteriaResults = criteria,
             };
         }
         catch
@@ -130,24 +216,59 @@ public class ChatClientEvaluator : IEvaluator
             return new EvaluationResult
             {
                 OverallScore = EvaluationDefaults.DefaultFailureScore,
-                Summary = "Failed to parse evaluation result"
+                Summary = "Failed to parse evaluation result",
+                EvaluationFailed = true
             };
         }
     }
 
-    // DTO for JSON deserialization
-    private class EvaluationResultDto
+    /// <summary>Map a JSON object's properties keyed by a normalised name (lower-cased, underscores
+    /// stripped) so snake_case and camelCase keys collapse to the same lookup.</summary>
+    private static Dictionary<string, System.Text.Json.JsonElement> NormalisedProps(System.Text.Json.JsonElement obj)
     {
-        public int OverallScore { get; set; }
-        public string? Summary { get; set; }
-        public List<string>? Improvements { get; set; }
-        public List<CriterionResultDto>? CriteriaResults { get; set; }
+        var map = new Dictionary<string, System.Text.Json.JsonElement>(StringComparer.Ordinal);
+        foreach (var prop in obj.EnumerateObject())
+        {
+            var key = prop.Name.Replace("_", "").ToLowerInvariant();
+            map[key] = prop.Value; // last write wins; judge JSON does not duplicate keys
+        }
+        return map;
     }
 
-    private class CriterionResultDto
+    private static bool TryGetNumber(Dictionary<string, System.Text.Json.JsonElement> props, out double value, params string[] keys)
     {
-        public string? Criterion { get; set; }
-        public bool Met { get; set; }
-        public string? Explanation { get; set; }
+        foreach (var key in keys)
+        {
+            if (!props.TryGetValue(key, out var el)) continue;
+            if (el.ValueKind == System.Text.Json.JsonValueKind.Number && el.TryGetDouble(out value))
+                return true;
+            if (el.ValueKind == System.Text.Json.JsonValueKind.String
+                && double.TryParse(el.GetString(), System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out value))
+                return true;
+        }
+        value = 0;
+        return false;
+    }
+
+    private static string? GetString(Dictionary<string, System.Text.Json.JsonElement> props, params string[] keys)
+    {
+        foreach (var key in keys)
+        {
+            if (props.TryGetValue(key, out var el) && el.ValueKind == System.Text.Json.JsonValueKind.String)
+                return el.GetString();
+        }
+        return null;
+    }
+
+    private static bool GetBool(Dictionary<string, System.Text.Json.JsonElement> props, string key)
+    {
+        if (!props.TryGetValue(key, out var el)) return false;
+        return el.ValueKind switch
+        {
+            System.Text.Json.JsonValueKind.True => true,
+            System.Text.Json.JsonValueKind.False => false,
+            System.Text.Json.JsonValueKind.String => bool.TryParse(el.GetString(), out var b) && b,
+            _ => false,
+        };
     }
 }

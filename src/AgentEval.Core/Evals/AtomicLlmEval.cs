@@ -136,6 +136,29 @@ public sealed class AtomicLlmEval : AtomicEval
             .ToList()
             ?? new List<EvalEvidence>();
 
+        // An evaluation that failed to produce a usable judgement (no/malformed JSON from the
+        // judge) is an INFRASTRUCTURE error, not a low-scoring agent. Surface it as a distinct
+        // "error" label with severity "none" so it is visibly separable from a real low score and
+        // does not masquerade as a confirmed (e.g. critical) violation in roll-ups. It still counts
+        // as not-passed (value 0) — an un-evaluated control cannot be attested as compliant.
+        if (er.EvaluationFailed)
+        {
+            value = 0.0;
+            passed = false;
+            severity = "none";
+            label = "error";
+            // Replace per-criterion evidence (there is none) with a single diagnostic note so the
+            // reason the eval errored is visible in the evidence file rather than silently lost.
+            evidence = new List<EvalEvidence>
+            {
+                new(Source: "evaluation-error", Reference: Key,
+                    Message: string.IsNullOrWhiteSpace(er.Summary)
+                        ? "The judge did not return a parseable verdict for this scenario."
+                        : er.Summary),
+            };
+            dimensions = new Dictionary<string, double>();
+        }
+
         return new EvalResult(
             Metric: new(Key, Name, Category, Version),
             Score: new(value, null, label, passed, _passThreshold, severity, null),
@@ -144,7 +167,12 @@ public sealed class AtomicLlmEval : AtomicEval
                 Evidence: evidence.Count > 0 ? evidence : null,
                 Recommendations: er.Improvements?.Count > 0 ? er.Improvements : null,
                 SubResults: null,
-                AggregationStrategy: null),
+                AggregationStrategy: null)
+            {
+                // Carry the judge's narrative summary (rationale, article citations) so it
+                // reaches the evidence file and reports instead of being dropped on the floor.
+                Summary = string.IsNullOrWhiteSpace(er.Summary) ? null : er.Summary,
+            },
             Provenance: new(
                 Type: "atomic-llm",
                 JudgeModel: _judgeModel,
