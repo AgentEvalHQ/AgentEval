@@ -153,10 +153,14 @@ public sealed class TurnOrchestrator
             // L7: the per-turn evaluator call honors the per-turn budget (turnCts), like the agent call and the judge
             // fallback below — a slow async evaluator must not escape the documented per-turn timeout. A per-turn
             // evaluator timeout folds the partial transcript as truncated rather than aborting the whole probe.
+            // Grade against a per-turn probe carrying the ACTUAL eliciting rung (userMessage), not the benign seed
+            // opener — otherwise a judge-primary grader (which reads probe.Prompt as context) sees the wrong prompt.
+            // The keyword oracles read the response + probe.Metadata/ExpectedTokens (not Prompt), so they are unaffected.
+            var turnProbe = seed with { Prompt = userMessage };
             EvaluationResult result;
             try
             {
-                result = await evaluator.EvaluateAsync(seed, response, turnCts.Token).ConfigureAwait(false);
+                result = await evaluator.EvaluateAsync(turnProbe, response, turnCts.Token).ConfigureAwait(false);
             }
             catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
             {

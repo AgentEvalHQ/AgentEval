@@ -48,6 +48,14 @@ public record RedTeamBaseline
     /// <summary>Scan intensity used for baseline.</summary>
     public Intensity Intensity { get; init; } = Intensity.Moderate;
 
+    /// <summary>
+    /// ADR-021 (B.1): the judge grading mode the baseline was captured under. <c>null</c> on a baseline saved before
+    /// this field existed (deserialize-to-null). A baseline and the current run must be graded under the same mode to
+    /// be comparable — judge-primary shifts the serialized <c>fidelity</c> (semantic Succeeded ⇒ IntentToAct), which a
+    /// cross-mode comparison would mis-read as a fidelity escalation.
+    /// </summary>
+    public JudgeMode? GradingMode { get; init; }
+
     /// <summary>Optional notes about this baseline.</summary>
     public string? Notes { get; init; }
 
@@ -64,6 +72,7 @@ public record RedTeamBaseline
             OverallScore = result.OverallScore,
             ConclusiveScore = result.ConclusiveScore,
             AttackSuccessRate = result.AttackSuccessRate,
+            GradingMode = result.Options?.Mode,   // ADR-021 B.1: capture the grading mode for cross-mode comparison guard
             TotalProbes = result.TotalProbes,
             SucceededProbes = result.SucceededProbes,
             AttackResults = result.AttackResults.Select(a =>

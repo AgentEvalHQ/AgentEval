@@ -105,7 +105,7 @@ internal static class RedTeamCommand
         var judgeModeOpt = new Option<string>("--judge-mode")
             { DefaultValueFactory = _ => "fallback", Description = "How the judge grades: 'fallback' (default — judge only adjudicates Inconclusive verdicts) or 'primary' (judge grades semantic, text-only probes first; the keyword oracle becomes advisory). 'primary' requires --judge; without it, it is a no-op." };
         var judgeRubricOpt = new Option<string>("--judge-rubric")
-            { DefaultValueFactory = _ => "strict", Description = "Judge rubric for --judge-mode primary: 'strict' (default; only clear compromise ⇒ Succeeded) or 'lenient' (a clear refusal anywhere ⇒ Resisted)." };
+            { DefaultValueFactory = _ => "strict", Description = "Judge rubric for --judge-mode primary: 'strict' (default; precision-oriented — only clear compromise ⇒ Succeeded, so fewer false alarms but MORE missed hits) or 'lenient' (recall-oriented — any sign of compromise ⇒ Succeeded, so it catches more real compromises at the cost of more false alarms). For a scan where a missed vulnerability matters more than a false alarm, prefer 'lenient'." };
         var judgeTimeoutOpt = new Option<double>("--judge-timeout")
             { DefaultValueFactory = _ => 0, Description = "Per-judge-call timeout (seconds) for judge-primary grading; on timeout the advisory keyword verdict is kept. 0 = share the per-probe budget." };
 
@@ -465,9 +465,12 @@ internal static class RedTeamCommand
             Console.Error.WriteLine($"  Model: {resolvedName}");
             Console.Error.WriteLine($"  Attacks: {(attacks is null ? $"all ({Attack.All.Count})" : string.Join(", ", attacks.Select(a => a.Name)))}");
             Console.Error.WriteLine($"  Intensity: {intensity}");
-            // GAP-19: the judge IS consumed — it re-evaluates probes the deterministic evaluators left Inconclusive.
+            // GAP-19 / ADR-021 B.1: the judge IS consumed. In 'fallback' mode it re-evaluates probes the deterministic
+            // evaluators left Inconclusive; in 'primary' mode it grades Semantic, text-only probes first.
             if (opts.JudgeEndpoint is not null)
-                Console.Error.WriteLine($"  Judge: {opts.JudgeModel ?? resolvedName} (LLM-judge fallback on inconclusive probes, capped at IntentToAct fidelity)");
+                Console.Error.WriteLine(ParseJudgeMode(opts.JudgeMode) == JudgeMode.Primary
+                    ? $"  Judge: {opts.JudgeModel ?? resolvedName} (judge-PRIMARY for semantic probes [{opts.JudgeRubric}] — keyword oracle advisory; capped at IntentToAct fidelity)"
+                    : $"  Judge: {opts.JudgeModel ?? resolvedName} (LLM-judge fallback on inconclusive probes, capped at IntentToAct fidelity)");
             // Wave C′: an attacker LLM makes Crescendo/PAIR/TAP LLM-driven — and therefore non-deterministic.
             if (opts.AttackerEndpoint is not null)
                 Console.Error.WriteLine($"  Attacker: {opts.AttackerModel ?? resolvedName} (LLM-driven attacks — NON-DETERMINISTIC; not a stable baseline)");

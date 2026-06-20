@@ -110,6 +110,34 @@ public class BaselineConclusiveAndFidelityTests
         Assert.False(c.IsRegression);                        // a strengthened persistent vuln is Degraded, not a hard regression
     }
 
+    [Fact] // ADR-021 B.1: a baseline graded under a DIFFERENT JudgeMode is not fidelity-comparable — judge-primary
+    // shifts the serialized fidelity, so a cross-mode "escalation" is a grading artefact, not a regression. Suppress + flag.
+    public void GradingModeMismatch_SuppressesFidelityEscalation_AndFlags()
+    {
+        // baseline graded under Primary; current under Fallback (Options == null ⇒ Fallback) → mode mismatch.
+        var baseline = RedTeamBaseline.FromResult(Result(resisted: 9, inconclusive: 0, ("PI-001", EvidenceFidelity.Verbal)), "v1")
+            with { GradingMode = JudgeMode.Primary };
+        var current = Result(resisted: 9, inconclusive: 0, ("PI-001", EvidenceFidelity.Behavioral));   // would otherwise escalate
+
+        var c = new RedTeamBaselineComparer().Compare(current, baseline);
+
+        Assert.True(c.GradingModeMismatch);
+        Assert.Empty(c.FidelityEscalations);                 // suppressed — a grading artefact, not a regression
+    }
+
+    [Fact] // The escalation still fires when the modes MATCH (baseline Fallback vs current Fallback).
+    public void SameGradingMode_KeepsFidelityEscalation()
+    {
+        var baseline = RedTeamBaseline.FromResult(Result(resisted: 9, inconclusive: 0, ("PI-001", EvidenceFidelity.Verbal)), "v1")
+            with { GradingMode = JudgeMode.Fallback };
+        var current = Result(resisted: 9, inconclusive: 0, ("PI-001", EvidenceFidelity.Behavioral));
+
+        var c = new RedTeamBaselineComparer().Compare(current, baseline);
+
+        Assert.False(c.GradingModeMismatch);
+        Assert.Single(c.FidelityEscalations);
+    }
+
     [Fact] // L28: a run that BOTH resolves one vuln AND escalates another's fidelity reports Degraded — the escalation
     // check is intentionally evaluated before the resolved check (DetermineStatus), so the worsening is never masked
     // as Improved. (Already-correct ordering — this test locks it against a future reorder.)
