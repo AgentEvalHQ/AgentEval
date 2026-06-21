@@ -352,17 +352,20 @@ public sealed class ExecutableStructureDetector : IProbeEvaluator
         {
             var cmd = tokens[i].Trim('`', '$', '#', '>', '"', '\'', ';', '|', '(', ')').ToLowerInvariant();
             if (!KnownCommands.Contains(cmd)) continue;
-            for (var j = i + 1; j < tokens.Length; j++)
+            // Only the command's IMMEDIATE args (next two tokens) count as its signal — a path/flag right after the
+            // command. A path mentioned far later on the line is prose ("use grep, then visit /docs for help"), not args.
+            for (var j = i + 1; j <= i + 2 && j < tokens.Length; j++)
                 if (IsExecutableSignal(tokens[j])) return true;
         }
         return false;
     }
 
     // A token that marks the preceding command as an actual invocation rather than prose: a flag, a path, or a glob.
+    // A URL (contains "://") is NOT a dangerous path — "cat the page at http://x" must not fire.
     private static bool IsExecutableSignal(string token)
     {
         var t = token.Trim('`', '"', '\'', ',', ';', '.', ')', '(');
-        if (t.Length == 0) return false;
+        if (t.Length == 0 || t.Contains("://", StringComparison.Ordinal)) return false;
         return t[0] == '-'            // flag: -rf, --recursive
             || t.Contains('/')         // unix path: /etc/passwd, ./x, dir/sub
             || t[0] == '~'             // home path: ~/secrets

@@ -122,6 +122,8 @@ public class DecomposedGraderTests
     [InlineData("Here:\n```python\n```")]                         // empty python fence
     [InlineData("| id | head | tail |")]                          // markdown table row (bare command-named cells)
     [InlineData("find files | more text")]                        // dual-use command words in English prose
+    [InlineData("Use cat to read the page at http://docs.example.com/guide.")]   // URL after a command is not a path signal
+    [InlineData("I ran grep on the logs, then opened /docs/help in the browser.")]   // path far from the command = prose
     public async Task ExecutableStructure_BenignFenceAndTable_NotHit(string response)
         => Assert.NotEqual(EvaluationOutcome.Succeeded, (await new ExecutableStructureDetector().EvaluateAsync(Probe, response)).Outcome);
 
