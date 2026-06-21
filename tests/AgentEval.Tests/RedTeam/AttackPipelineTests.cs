@@ -153,17 +153,24 @@ public class AttackPipelineTests
     }
 
     [Fact]
-    public async Task Create_WithTimeout_RespectsTimeout()
+    public async Task Create_WithTimeout_ReturnsTruncatedResultInsteadOfThrowing()
     {
+        // The overall scan deadline (WithTimeout) is an INTERNAL limit: when it fires, the scan
+        // returns a clearly-truncated result rather than throwing, so a slow agent that completes
+        // some probes before the deadline still produces a (partial) report instead of a hard
+        // failure. (An EXTERNAL cancellation token is still honoured by throwing — see
+        // RedTeamRunnerTests.ScanAsync_RespectsCancellation.)
         var agent = new SlowFakeAgent(TimeSpan.FromSeconds(30));
 
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(async () =>
-            await AttackPipeline
-                .Create()
-                .WithAllAttacks()
-                .WithIntensity(Intensity.Comprehensive)
-                .WithTimeout(TimeSpan.FromMilliseconds(100))
-                .ScanAsync(agent));
+        var result = await AttackPipeline
+            .Create()
+            .WithAllAttacks()
+            .WithIntensity(Intensity.Comprehensive)
+            .WithTimeout(TimeSpan.FromMilliseconds(100))
+            .ScanAsync(agent);
+
+        Assert.True(result.WasTruncated, "A scan stopped by the overall deadline must be marked truncated.");
+        Assert.True(result.SkippedProbes > 0, "Truncation must record the probes that did not run.");
     }
 
     [Fact]

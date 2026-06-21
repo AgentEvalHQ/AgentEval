@@ -60,41 +60,61 @@ public sealed class RedTeamRunner : IRedTeamRunner
         var plannedProbes = probesByAttack.Values.Sum(p => p.Count);
         var completedProbes = 0;
         var failFastTriggered = false;
+        var timedOut = false;
 
-        foreach (var attack in attacks)
+        // Apply the overall scan deadline as an INTERNAL linked token. Cancelling this does not
+        // cancel the caller's token — letting us tell "the scan ran out of time" (salvage a
+        // truncated result) apart from "the caller aborted" (rethrow, honouring the standard
+        // cancellation contract).
+        using var scanCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        if (options.OverallTimeout is { } overallTimeout && overallTimeout > TimeSpan.Zero)
+            scanCts.CancelAfter(overallTimeout);
+        var scanToken = scanCts.Token;
+
+        try
         {
-            cancellationToken.ThrowIfCancellationRequested();
-
-            var (attackResult, probesExecuted) = await ExecuteAttackAsync(
-                agent,
-                attack,
-                probesByAttack[attack],
-                options,
-                progress,
-                completedProbes,
-                plannedProbes,
-                sw,
-                cancellationToken);
-
-            completedProbes += probesExecuted;
-            attackResults.Add(attackResult);
-
-            // FailFast check
-            if (options.FailFast && attackResult.SucceededCount > 0)
+            foreach (var attack in attacks)
             {
-                failFastTriggered = true;
-                break;
+                scanToken.ThrowIfCancellationRequested();
+
+                var (attackResult, probesExecuted) = await ExecuteAttackAsync(
+                    agent,
+                    attack,
+                    probesByAttack[attack],
+                    options,
+                    progress,
+                    completedProbes,
+                    plannedProbes,
+                    sw,
+                    scanToken);
+
+                completedProbes += probesExecuted;
+                attackResults.Add(attackResult);
+
+                // FailFast check
+                if (options.FailFast && attackResult.SucceededCount > 0)
+                {
+                    failFastTriggered = true;
+                    break;
+                }
             }
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            // The overall scan deadline (OverallTimeout) fired mid-scan — NOT an external cancel.
+            // Salvage the attacks that completed rather than discarding the whole scan: a slow
+            // agent-under-test that finishes most probes before the deadline should still produce
+            // a (clearly-truncated) report instead of a hard zero. The in-flight attack's partial
+            // probes are not recoverable here, but every fully completed attack is in attackResults.
+            // An external cancellation is deliberately NOT caught here, so it propagates as usual.
+            timedOut = true;
         }
 
         sw.Stop();
 
-        // RA3-06 / T5-2: be honest about truncation. When FailFast stops the scan early, the executed
-        // probe set (and every rate/score over it) is NOT comparable to a full scan. Record how many
-        // probes were skipped so PlannedProbes and the baseline comparer can reason about it.
         var executedProbes = attackResults.Sum(a => a.TotalCount);
         var skippedProbes = Math.Max(0, plannedProbes - executedProbes);
-        var wasTruncated = failFastTriggered && skippedProbes > 0;
+        var wasTruncated = (failFastTriggered || timedOut) && skippedProbes > 0;
 
         return new RedTeamResult
         {
