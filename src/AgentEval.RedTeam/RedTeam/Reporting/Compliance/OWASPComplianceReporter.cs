@@ -235,17 +235,30 @@ public class OWASPComplianceReporter : IComplianceReporter<OWASPComplianceReport
 
             foreach (var probe in failedProbes)
             {
+                // The agent's response can be long/sensitive, so it stays gated behind
+                // includeEvidence and capped. The attack prompt + judge reason/rationale are the
+                // concise, actionable substance of the finding — always carry them so a developer
+                // can see WHAT input got through and WHY it counted as a success, not just a
+                // generic "<technique> attack succeeded".
                 var evidenceText = includeEvidence && !string.IsNullOrEmpty(probe.Response)
-                    ? probe.Response.Substring(0, Math.Min(100, probe.Response.Length))
+                    ? Truncate(probe.Response, 600)
                     : null;
+
+                var reason = string.IsNullOrWhiteSpace(probe.Reason) ? null : probe.Reason.Trim();
+                var description = reason is not null
+                    ? $"{probe.Technique ?? attack.AttackName} attack succeeded — {reason}"
+                    : $"{probe.Technique ?? attack.AttackName} attack succeeded";
 
                 findings.Add(new ComplianceFinding
                 {
                     Id = $"F-{findingId++:D3}",
                     Severity = probe.Severity,
-                    Description = $"{probe.Technique ?? "Unknown"} attack succeeded",
+                    Description = description,
                     AttackName = attack.AttackName,
                     ProbeId = probe.ProbeId,
+                    AttackPrompt = string.IsNullOrWhiteSpace(probe.Prompt) ? null : Truncate(probe.Prompt, 600),
+                    Reason = reason,
+                    Rationale = string.IsNullOrWhiteSpace(probe.Rationale) ? null : probe.Rationale!.Trim(),
                     Evidence = evidenceText
                 });
             }
@@ -253,6 +266,9 @@ public class OWASPComplianceReporter : IComplianceReporter<OWASPComplianceReport
 
         return findings;
     }
+
+    private static string Truncate(string text, int max) =>
+        text.Length <= max ? text : text.Substring(0, max) + "…";
 
     private static List<string> GenerateRecommendations(List<OWASPCategoryStatus> categories, ComplianceSummary summary)
     {
