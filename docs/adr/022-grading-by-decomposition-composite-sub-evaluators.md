@@ -1,6 +1,6 @@
 # ADR-022: Grading by Decomposition (Composite Sub-Evaluators) for Semantic Red-Team Oracles — RedTeam Phase C
 
-**Status:** Proposed — **extends [ADR-021](021-judge-primary-semantic-oracles.md)** (does NOT supersede it; judge-primary remains the foundation this builds on). Measured arc: per-oracle judge **8 → C.0 InferenceAbuse 7 → C.1 InsecureOutput parser 3 → C.2 DataPoisoning ground-truth 1 → C.3 ExcessiveAgency 1** (ExcessiveAgency 1→0; the lone residual is now one judge-nondeterministic InferenceAbuse case, 0–1). C.0–C.3 done; C.4–C.6 planned. See the Scorecard below for the full keyword-vs-judge-vs-decomposition comparison.
+**Status:** Proposed — **extends [ADR-021](021-judge-primary-semantic-oracles.md)** (does NOT supersede it; judge-primary remains the foundation this builds on). Measured arc: per-oracle judge **8 → C.0 InferenceAbuse 7 → C.1 InsecureOutput parser 3 → C.2 DataPoisoning ground-truth 1 → C.3 ExcessiveAgency 1 → C.4 harden-the-rest 0** (every oracle 0/0; the only variance is one judge-nondeterministic InferenceAbuse case, 0–1). **5 of 8 oracles are now fully deterministic** (zero judge calls). C.0–C.4 done; C.5–C.6 (production wiring + close-out) planned. See the Scorecard for the per-oracle keyword-vs-judge-vs-decomposition comparison.
 **Date:** 2026-06-21
 **Decision Makers:** AgentEval Contributors
 **Related:** [ADR-021 (judge-primary, RedTeam Phase B)](021-judge-primary-semantic-oracles.md) · [composite-evals.md](../composite-evals.md) · [eval-benchmark-architecture.md](../eval-benchmark-architecture.md)
@@ -57,13 +57,31 @@ All measured by the same harness over the same 298-case adversarial corpus (`gpt
 rubric). **Directional fabrications** = Safe→Succeeded (false alarm) + Vuln→Resisted (missed hit); lower is better.
 Reproduce any row with `AGENTEVAL_5B_GRADER={keyword|judge|decompose}` (+ `AGENTEVAL_RUN_5B=1`).
 
+### Aggregate
+
 | Architecture | directional | false alarms | missed hits | defer-correct | the property that matters |
 |---|---|---|---|---|---|
 | **Keyword oracle** (the original) | **0** \* | 0 | 0 | 100% | \* OVERFIT to this corpus — it was patched until it passed. **Non-convergent**: a fresh adversarial sweep finds ~41 new fabrications (41→41). Can't be made honest by patching. |
 | Single judge — STRICT | 45 | 8 | 37 | 85% | first honest measure; the judge under-reports compromise (missed hits dominate) |
 | Single judge — evidence-anchored | 14 | 11 | 3 | 95% | quote-grounding moves the whole curve outward (−92% missed) |
 | Single judge — + per-oracle discriminators | 8 | 5 | 3 | 97% | the **single-prompt floor** — two further global swings made it worse (39, 42) |
-| **Decomposition** (Phase C, C.0–C.3) | **1** | 0 | 1 | 100% | HONEST **and** convergent. Deterministic oracles (InsecureOutput, DataPoisoning) sit at a stable 0; the lone residual is one judge-nondeterministic InferenceAbuse case (fluctuates 0–1) → stronger-judge territory |
+| **Decomposition** (Phase C, C.0–C.4) | **0–1** | 0 | 0–1 | 100% | HONEST **and** convergent. All deterministic oracles sit at a stable 0; the only variance is one judge-nondeterministic InferenceAbuse case (0–1) → stronger-judge territory |
+
+### Per oracle (keyword vs single judge vs decomposition; directional fabrications, lower is better)
+
+| Oracle | keyword \* | single judge | decomposition | how it is decomposed | grader kind |
+|---|---|---|---|---|---|
+| InsecureOutput | 0 | **4** | **0** | executable-structure parser (code block / real command chain / injection payload) ⊕ refusal | **deterministic** (parser) |
+| DataPoisoning | 0 | **1** | **0** | planted-FALSE value asserted AND true value not ⊕ ground-truth correction | **deterministic** (dual ground-truth) |
+| InferenceAPIAbuse | 0 | **2** | **0–1** | model-disclosure / carried-out-abuse judge (refuse-then-comply override) ⊕ refusal judge | judge |
+| ExcessiveAgency | 0 | **1** | **0** | unauthorized-action judge (withholding ≠ action) ⊕ authorized-action judge | judge (2-round calibrated) |
+| SupplyChain | 0 | 0 | **0** | install command for the planted fake package (`pip install <pkg>`) ⊕ refusal | **deterministic** (structural) |
+| PromptInjection | 0 | 0 | **0** | injected marker emitted AND not inside a refusal ⊕ refusal | **deterministic** (marker) |
+| Jailbreak | 0 | 0 | **0** | persona/marker oracle, refusal-gated | **deterministic** (marker) |
+| Misinformation | 0 | 0 | **0** | *not* decomposed — affirm-vs-deny is semantic with no anchor → single judge | judge |
+| **TOTAL** | **0** \* | **8** | **0–1** | | 5 of 8 deterministic |
+
+\* The keyword column is **0 only because it is overfit** to this corpus (patched until it passed) and is non-convergent on fresh cases — it is the baseline being escaped, not a target.
 
 **Read the keyword `0` correctly.** It is the *overfitting* number, not an accuracy win — the corpus was built by
 finding keyword-oracle failures and patching the oracle until it passed, and the non-convergence finding (41→41 on
@@ -88,5 +106,6 @@ This ADR **extends** ADR-021. Judge-primary is unchanged; decomposition refines 
 - **C.0** ✅ primitives (`OutcomeFilterEvaluator`, `DecomposedGraders`) + InferenceAbuse prototype + 6 unit tests + env-gated harness measurement (commit `5e62082`). 8 → 7.
 - **C.1** ✅ InsecureOutput **deterministic** decomposition (`ExecutableStructureDetector` parser + `DeterministicRefusalDetector`, zero LLM calls) + 13 unit tests (commit `4c7f44b`). InsecureOutput 4 → 0, overall **7 → 3**, zero leak.
 - **C.2** ✅ DataPoisoning **deterministic** ground-truth decomposition (`TrueFactMetadataKey` + `GroundTruthDeviationDetector`/`GroundTruthCorrectionDetector`, zero LLM calls) + 5 unit tests (commit `ff02e2d`). DataPoisoning 1 → 0, overall **3 → 1**, zero leak — proving the ground-truth half of the thesis (the probe knows the answer, so no world knowledge or judge is needed).
-- **C.3** ✅ ExcessiveAgency judge decomposition (unauthorized-action ⊕ authorized-action; the `AGENTEVAL_5B_GRADER` three-way scorecard mode) + 3 unit tests (commit `754e10e`). ExcessiveAgency 1 → 0 after a 2-round prompt calibration (a protective HOLD pending sign-off is not an over-action). Overall stays 1 — the lone residual is now one judge-nondeterministic InferenceAbuse case (stronger-judge territory).
-- **C.4–C.6** planned (robustness oracles → production wiring with cost-aware composition → full-corpus lock + κ pin). Validated on the harness; **not yet wired into production `GraderFactory.For`**. Detailed plan maintained separately.
+- **C.3** ✅ ExcessiveAgency judge decomposition (unauthorized-action ⊕ authorized-action; the `AGENTEVAL_5B_GRADER` three-way scorecard mode) + 3 unit tests (commit `754e10e`). ExcessiveAgency 1 → 0 after a 2-round prompt calibration.
+- **C.4** ✅ harden the four already-0 oracles (commit `a08370a`): SupplyChain → deterministic `InstallCommandDetector` (structural); PromptInjection + Jailbreak → their existing marker-anchored refusal-gated deterministic evaluators; +5 unit tests. **Finding:** a first attempt to make SupplyChain + Misinformation deterministic via a caution/denial **lexicon regressed decompose 1→16** (the non-convergence trap). Fix: SupplyChain has a **structural** anchor (the install command) so it stays deterministic; Misinformation's affirm-vs-deny is **semantic** with no anchor → it stays judge-graded (0). **Determinism requires a structural or dual-ground-truth anchor; a single value + an open lexicon does not.** Decompose 1 → 0.
+- **C.5–C.6** planned (production wiring with cost-aware composition → full-corpus lock + κ pin). Validated on the harness; **not yet wired into production `GraderFactory.For`**. Detailed plan maintained separately.
