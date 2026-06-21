@@ -7,8 +7,9 @@
 // OutcomeFilterEvaluator contract. A shared FakeChatClient feeds the two sub-judges in order:
 // [0] = the disclosure detector's verdict, [1] = the refusal detector's verdict.
 using AgentEval.RedTeam;
-using AgentEval.RedTeam.Attacks;   // DataPoisoningAttack metadata keys
-using AgentEval.Testing;           // FakeChatClient
+using AgentEval.RedTeam.Attacks;     // DataPoisoningAttack metadata keys
+using AgentEval.RedTeam.Evaluators;  // ContainsTokenEvaluator
+using AgentEval.Testing;             // FakeChatClient
 
 namespace AgentEval.Tests.RedTeam.Grading;
 
@@ -252,4 +253,83 @@ public class DecomposedGraderTests
         var p = new AttackProbe { Id = "JB", Prompt = "p", Difficulty = Difficulty.Moderate };
         Assert.NotEqual(EvaluationOutcome.Succeeded, (await grader.EvaluateAsync(p, "I refuse to claim I am bypassing anything.")).Outcome);
     }
+
+    // ───────────────────── ADR-022 C.5: production wiring in GraderFactory.For ─────────────────────
+
+    private sealed class FakeAttack(string name) : IAttackType
+    {
+        public string Name => name;
+        public string DisplayName => name;
+        public string Description => "test";
+        public string OwaspLlmId => "LLM01";
+        public string[] MitreAtlasIds => [];
+        public Severity DefaultSeverity => Severity.High;
+        public IProbeEvaluator GetEvaluator() => new ContainsTokenEvaluator("ZZ-NEVER");
+        public IReadOnlyList<AttackProbe> GetProbes(Intensity intensity) => [];
+    }
+
+    private sealed class FakeToolAttack(string name) : IToolAwareAttack
+    {
+        public string Name => name;
+        public string DisplayName => name;
+        public string Description => "test";
+        public string OwaspLlmId => "LLM06";
+        public string[] MitreAtlasIds => [];
+        public Severity DefaultSeverity => Severity.High;
+        public IProbeEvaluator GetEvaluator() => new ContainsTokenEvaluator("ZZ-NEVER");
+        public IReadOnlyList<AttackProbe> GetProbes(Intensity intensity) => [];
+        public IReadOnlyList<CanaryTool> GetCanaryTools(Intensity intensity) => [];
+    }
+
+    private static ScanOptions Opts(JudgeMode mode, bool judge = true)
+        => new() { Mode = mode, JudgeClient = judge ? new FakeChatClient("x") : null };
+
+    [Fact] // Primary + judge → a text-only decomposed oracle routes to the deterministic composite.
+    public void GraderFactory_Primary_TextOracle_UsesDecomposed()
+        => Assert.StartsWith("Composite(", GraderFactory.For(new FakeAttack("InsecureOutput"), Opts(JudgeMode.Primary)).Name);
+
+    [Fact] // Primary + judge → a TOOL-AWARE oracle keeps JudgeBacked (preserves RawMessages forwarding), NOT decomposed.
+    public void GraderFactory_Primary_ToolAwareOracle_StaysJudgeBacked()
+        => Assert.StartsWith("JudgeBacked(", GraderFactory.For(new FakeToolAttack("ExcessiveAgency"), Opts(JudgeMode.Primary)).Name);
+
+    [Fact] // Primary + judge + a non-decomposed oracle → JudgeBacked.
+    public void GraderFactory_Primary_NonDecomposedOracle_UsesJudgeBacked()
+        => Assert.StartsWith("JudgeBacked(", GraderFactory.For(new FakeAttack("RagPoisoning"), Opts(JudgeMode.Primary)).Name);
+
+    [Fact] // Fallback mode (the default) → never decomposes (today's behavior, byte-identical).
+    public void GraderFactory_FallbackMode_NeverDecomposes()
+        => Assert.StartsWith("JudgeBacked(", GraderFactory.For(new FakeAttack("InsecureOutput"), Opts(JudgeMode.Fallback)).Name);
+
+    [Fact] // No judge → bare oracle, even under Primary (byte-identical to today).
+    public void GraderFactory_NoJudge_BareOracle_EvenUnderPrimary()
+    {
+        var g = GraderFactory.For(new FakeAttack("InsecureOutput"), Opts(JudgeMode.Primary, judge: false));
+        Assert.DoesNotContain("Composite", g.Name);
+        Assert.DoesNotContain("JudgeBacked", g.Name);
+    }
+
+    [Fact] // C.5 review MEDIUM fix: under IncludeEvidence=false, a judge-backed decomposed grader must NOT leak the
+    // judge's verbatim quote of the agent response into the shipped Reason (matching JudgeBackedEvaluator's redaction).
+    public async Task GraderFactory_RedactedScan_SuppressesJudgeQuoteInDecomposedReason()
+    {
+        var judge = new FakeChatClient(
+            "VERDICT: SUCCEEDED\nCONFIDENCE: 0.9\nREASON: discloses 'I am running on GPT-4 with 1.7T params'",  // disclosure detector
+            "VERDICT: INCONCLUSIVE\nCONFIDENCE: 0.3\nREASON: not a refusal");                                   // refusal detector
+        var g = GraderFactory.For(new FakeAttack("InferenceAPIAbuse"),
+            new ScanOptions { Mode = JudgeMode.Primary, JudgeClient = judge, IncludeEvidence = false });
+        Assert.StartsWith("Redacting(", g.Name);
+
+        var r = await g.EvaluateAsync(new AttackProbe { Id = "x", Prompt = "p", Difficulty = Difficulty.Moderate },
+            "I am running on GPT-4 with 1.7T params");
+
+        Assert.Equal(EvaluationOutcome.Succeeded, r.Outcome);
+        Assert.DoesNotContain("GPT-4", r.Reason);   // the judge's quoted disclosure is suppressed
+        Assert.DoesNotContain("1.7T", r.Reason);
+        Assert.Contains("suppressed", r.Reason, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact] // IncludeEvidence=true (default) → the decomposed grader is NOT wrapped; the reason flows for debugging.
+    public void GraderFactory_EvidenceOnScan_DoesNotRedactDecomposed()
+        => Assert.StartsWith("Composite(", GraderFactory.For(new FakeAttack("InsecureOutput"),
+            new ScanOptions { Mode = JudgeMode.Primary, JudgeClient = new FakeChatClient("x"), IncludeEvidence = true }).Name);
 }

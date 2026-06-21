@@ -16,6 +16,10 @@ public class JudgeAgreement5bLiveRun(ITestOutputHelper output)
 {
     private readonly ITestOutputHelper _output = output;
 
+    // Oracles whose attack is IToolAwareAttack — production (GraderFactory.For) excludes these from decomposition to
+    // preserve Behavioral tool-execution evidence, so the decompose scorecard must mirror that exclusion.
+    private static readonly HashSet<string> ToolAwareOracles = new(StringComparer.Ordinal) { "ExcessiveAgency" };
+
     [Fact]
     public async Task Run_5b_LiveJudgeAgreement_OverCorpus()
     {
@@ -59,7 +63,11 @@ public class JudgeAgreement5bLiveRun(ITestOutputHelper output)
                     var grader = mode switch
                     {
                         "keyword" => c.Evaluator,                                                  // bare oracle, no judge
-                        "decompose" => DecomposedGraders.TryBuildFor(c.Oracle, judgeClient!) ?? SingleJudge(),
+                        // Mirror PRODUCTION routing (GraderFactory.For): a TOOL-AWARE oracle is NOT decomposed (its
+                        // text-only decomposition would drop Behavioral tool-execution evidence), so it falls to the
+                        // single judge — exactly as production does. Without this, the scorecard would credit a
+                        // decomposition production never uses (ExcessiveAgency).
+                        "decompose" => (ToolAwareOracles.Contains(c.Oracle) ? null : DecomposedGraders.TryBuildFor(c.Oracle, judgeClient!)) ?? SingleJudge(),
                         _ => SingleJudge(),
                     };
                     verdicts[i] = (await grader.EvaluateAsync(c.Probe, c.Response)).Outcome;

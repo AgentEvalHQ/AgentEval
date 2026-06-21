@@ -230,6 +230,34 @@ public sealed class OutcomeFilterEvaluator : IProbeEvaluator
 }
 
 /// <summary>
+/// ADR-022 C.5: redaction decorator applied around a decomposed grader when <see cref="ScanOptions.IncludeEvidence"/>
+/// is <c>false</c>. A decomposed verdict's Reason/MatchedItems are response-derived (an LLM judge's verbatim quote of
+/// the disclosing span, or a deterministic detector's matched payload/token), and — unlike
+/// <see cref="JudgeBackedEvaluator"/> — the decomposed path does not self-redact. This restores the
+/// <c>IncludeEvidence</c> contract: on a CONCLUSIVE verdict the Reason is replaced with a generic message and
+/// MatchedItems are dropped, exactly as <c>JudgeBackedEvaluator.AdoptJudge</c> does. Inconclusive (generic abstain)
+/// reasons are left intact for debugging.
+/// </summary>
+public sealed class ReasonRedactingEvaluator(IProbeEvaluator inner) : IProbeEvaluator
+{
+    /// <inheritdoc />
+    public string Name => $"Redacting({inner.Name})";
+
+    /// <inheritdoc />
+    public async Task<EvaluationResult> EvaluateAsync(AttackProbe probe, string response, CancellationToken cancellationToken = default)
+        => Redact(await inner.EvaluateAsync(probe, response, cancellationToken).ConfigureAwait(false));
+
+    /// <inheritdoc />
+    public async Task<EvaluationResult> EvaluateAsync(AttackProbe probe, AgentResponse response, CancellationToken cancellationToken = default)
+        => Redact(await inner.EvaluateAsync(probe, response, cancellationToken).ConfigureAwait(false));
+
+    private static EvaluationResult Redact(EvaluationResult r) =>
+        r.Outcome == EvaluationOutcome.Inconclusive
+            ? r
+            : r with { Reason = $"{r.Outcome} (reason suppressed; enable IncludeEvidence)", MatchedItems = null };
+}
+
+/// <summary>
 /// ADR-022 C.1: DETERMINISTIC positive-only detector for InsecureOutput (LLM05). Raises Succeeded only on an
 /// EXECUTABLE structure (a real command chain, a fenced code-block command, a shell prompt, or a known injection
 /// payload) — NOT on a command merely named or described in prose ("The command is whoami; it shows the logged-in

@@ -28,6 +28,19 @@ public static class GraderFactory
         if (options.JudgeClient is null)
             return inner;   // no judge → nothing to do; default offline run is byte-identical
 
+        // ADR-022 C.5: under judge-PRIMARY (the opt-in), prefer a DECOMPOSED grader where one exists — cost-aware,
+        // since 5 of the decomposed oracles are fully deterministic (zero judge calls) and the rest narrow the judge's
+        // questions. Excluded for a TOOL-AWARE attack: its inner oracle reads RawMessages for Behavioral
+        // tool-execution evidence, which a text-only decomposed grader would drop — so it keeps the JudgeBackedEvaluator
+        // path (which forwards the full AgentResponse). Default Fallback mode and the no-judge path are unchanged, so
+        // the default offline run stays byte-identical.
+        if (options.Mode == JudgeMode.Primary
+            && attack is not IToolAwareAttack
+            && DecomposedGraders.TryBuildFor(attack.Name, options.JudgeClient) is { } decomposed)
+            // A decomposed verdict's Reason/MatchedItems are response-derived (a judge's quoted span or a matched
+            // payload); restore the IncludeEvidence redaction contract that JudgeBackedEvaluator applies internally.
+            return options.IncludeEvidence ? decomposed : new ReasonRedactingEvaluator(decomposed);
+
         return new JudgeBackedEvaluator(
             inner, options.JudgeClient, options.Mode, OptionsFor(options.Rubric, attack.Name), options.IncludeEvidence, options.JudgeTimeout);
     }
