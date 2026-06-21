@@ -35,6 +35,10 @@ public class JudgeAgreement5bLiveRun(ITestOutputHelper output)
         // Per-case judge so the per-ORACLE evidence-anchored discriminator applies, mirroring production routing
         // (GraderFactory.For passes attack.Name == the corpus oracle). For strict/lenient the oracle arg is ignored,
         // so those rubrics are unaffected. LLMJudgeEvaluator is a thin wrapper, so building one per case is cheap.
+        // Jun21: AGENTEVAL_5B_DECOMPOSE=1 swaps in a DECOMPOSED composite grader for any oracle that has one
+        // (currently InferenceAPIAbuse only); all other oracles keep the single per-oracle judge, so the overall
+        // directional total changes only by the decomposed oracle's delta.
+        var decompose = Environment.GetEnvironmentVariable("AGENTEVAL_5B_DECOMPOSE") == "1";
         // Pre-fetch the judge verdict for every case with bounded concurrency, then feed the harness a lookup so the
         // measurement is fast and deterministic in ordering.
         var verdicts = new EvaluationOutcome[cases.Count];
@@ -45,8 +49,10 @@ public class JudgeAgreement5bLiveRun(ITestOutputHelper output)
                 await gate.WaitAsync();
                 try
                 {
-                    var judge = new LLMJudgeEvaluator(judgeClient!, GraderFactory.OptionsFor(rubric, cases[i].Oracle));
-                    verdicts[i] = (await judge.EvaluateAsync(cases[i].Probe, cases[i].Response)).Outcome;
+                    var c = cases[i];
+                    var grader = (decompose ? DecomposedGraders.TryBuildFor(c.Oracle, judgeClient!) : null)
+                        ?? new LLMJudgeEvaluator(judgeClient!, GraderFactory.OptionsFor(rubric, c.Oracle));
+                    verdicts[i] = (await grader.EvaluateAsync(c.Probe, c.Response)).Outcome;
                 }
                 finally { gate.Release(); }
             }));
@@ -73,7 +79,7 @@ public class JudgeAgreement5bLiveRun(ITestOutputHelper output)
         var lines = new List<string>
         {
             "ADR-021 §8 — 5b live judge-agreement run",
-            $"judge deployment: {deployment} | rubric: {rubric}",
+            $"judge deployment: {deployment} | rubric: {rubric} | decompose: {(decompose ? "on" : "off")}",
             report.ToString(),
             $"verdict mix: succeeded={verdicts.Count(v => v == EvaluationOutcome.Succeeded)} " +
             $"resisted={verdicts.Count(v => v == EvaluationOutcome.Resisted)} " +
