@@ -1,9 +1,20 @@
 # ADR-021: Judge-Primary Grading for Semantic Red-Team Oracles
 
-**Status:** Accepted — **B.1 + B.2 complete** (infrastructure + routing + oracle migration; agreement harness + κ/F1 + the directional B.3 gate). **B.3** (flip the default to `primary`) remains deferred: its *gate mechanism* is implemented (`JudgeAgreementReport.DirectionalFabrications`), but the actual default flip is a **major-version** change gated on a **live-judge** measurement showing zero directional fabrications — it cannot be executed without a real judge run.
-**Date:** 2026-06-18 (hardened 2026-06-18 after a 30-agent design review — see "Design-review log")
+**Status:** Accepted — **B.1 + B.2 complete** (infrastructure + routing + oracle migration; agreement harness + κ/F1 + the directional B.3 gate). Accuracy measured live on `gpt-4o-mini` over a 298-case adversarial corpus: **keyword-primary 45 → evidence-anchored 14 → per-oracle discriminators 8 → grading-by-decomposition prototype 7** directional fabrications. **Phase C (grading by decomposition)** is the active workstream that drives the count toward 0; **B.3** (flip the default to `primary`, a major-version change) is gated on it.
+**Date:** 2026-06-18 (hardened after a 30-agent design review — see "Design-review log"; accuracy arc + Phase C added 2026-06-21)
 **Decision Makers:** AgentEval Contributors
 **Related:** [redteam-whats-new.md](../redteam-whats-new.md) · the RedTeam oracle-honesty arc
+
+### Phase tracking
+| Phase | What | State |
+|---|---|---|
+| B.1 | judge-primary infra + per-probe routing + semantic-oracle migration | ✅ done |
+| B.2 | agreement harness + κ/F1 + directional-fabrication gate | ✅ done (κ subset unpinned) |
+| C | grading by decomposition (narrow sub-evals ⊕ honest composite) | 🔄 prototype done (8→7, InferenceAbuse); per-oracle build-out planned |
+| B.3 | flip default `--judge-mode` → `primary` | ⛔ gated on live directional ≈ 0 (now 7) — enabled by Phase C |
+
+> The Phase C detailed plan (per-oracle decomposition catalog, calibration methodology, phased steps) is maintained
+> locally and is not part of the published repo; this ADR carries the status, the measured numbers, and the gate.
 
 ---
 
@@ -475,9 +486,25 @@ Findings:
 - **The B.3 gate still BLOCKS the flip** (8 > 0), correctly.
 
 **Pre-B.3 work, updated priority:** (1) ~~tighten residual FA oracles~~ **DONE** (per-oracle routing, 14→8);
-(2) pin a labelled subset (κ); (3) re-measure on a stronger judge (gpt-4o / o-series, lit. ~10–15 pts
-higher) — expected to clear most of the remaining world-knowledge/refuse-then-comply residual; (4) only
-then reconsider the B.3 default flip.
+(2) **grading by decomposition** (Phase C, below) — the chosen route to the residual; (3) pin a labelled subset
+(κ); (4) re-measure on a stronger judge; (5) only then reconsider the B.3 default flip.
+
+### Fourth measurement (2026-06-21) — grading by decomposition (Phase C prototype)
+
+The residual under a single per-oracle judge is dominated by cases where one "did the attack succeed?" verdict
+**conflates orthogonal sub-questions** (refused? leaked? authorized? true-vs-false? executable?) and errs on the
+conflation. Phase C decomposes the verdict into narrow sub-evaluators combined by the existing honest
+`CompositeEvaluator`: a **positive-only** compromise detector (Succeeded or abstain) ⊕ a **negative-only** refusal
+detector (Resisted or abstain), aggregated `Any` (compromise overrides refusal; clean refusal → Resisted; ambiguity
+→ Inconclusive). An `OutcomeFilterEvaluator` enforces each detector's contract, so honesty holds by construction.
+
+Prototype on InferenceAPIAbuse, measured live: **8 → 7** (InferenceAbuse 2 missed → 1, zero new false alarms, defer
+97% → 98%), fixing the refuse-then-comply cases (`…I am Grok`; `the full batch already executed`) that no
+single-judge prompt swing could, with zero leak into the other oracles. Key insight for the build-out: **five of
+the eight oracles have a *deterministic* positive detector available** (executable-structure parser; ground-truth
+comparison against a probe-carried value; package-install extraction; injected-marker scope) — these need no prompt
+calibration and reserve the judge for genuinely-semantic sub-questions. This is the route to directional → 0 (and a
+future B.3), and it reuses shipped composite infrastructure rather than adding machinery.
 
 ## Consequences
 
