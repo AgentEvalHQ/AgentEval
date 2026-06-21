@@ -73,7 +73,7 @@ internal static class AzureChatAgentFactory
 
         try
         {
-            var azureClient = new AzureOpenAIClient(new Uri(endpoint!), new AzureKeyCredential(apiKey!));
+            var azureClient = new AzureOpenAIClient(new Uri(endpoint!), new AzureKeyCredential(apiKey!), BuildClientOptions());
             IChatClient chatClient = azureClient.GetChatClient(deployment!).AsIChatClient();
             IEvaluableAgent agent = new ChatClientAgentAdapter(
                 chatClient,
@@ -119,7 +119,7 @@ internal static class AzureChatAgentFactory
 
         try
         {
-            var azureClient = new AzureOpenAIClient(new Uri(endpoint!), new AzureKeyCredential(apiKey!));
+            var azureClient = new AzureOpenAIClient(new Uri(endpoint!), new AzureKeyCredential(apiKey!), BuildClientOptions());
             IChatClient chatClient = azureClient.GetChatClient(deployment!).AsIChatClient();
             return (chatClient, deployment, 0);
         }
@@ -144,6 +144,21 @@ internal static class AzureChatAgentFactory
     /// (e.g., "06_OwaspBenchmark.cs"). Surfaces the right file to read for the operator's
     /// specific command, not always OWASP.
     /// </param>
+    /// <summary>
+    /// Builds Azure OpenAI client options with a generous network timeout. The default
+    /// per-attempt NetworkTimeout (100s) can fire when the agent under test is a slow real
+    /// agent fronted by an adapter — a deliberate turn plus a model cooldown can exceed it,
+    /// and the resulting "operation was canceled" aborts the whole red-team scan. Allowing
+    /// more time per attempt keeps a single slow probe from failing the entire benchmark.
+    /// Override with <c>AGENTEVAL_AGENT_NETWORK_TIMEOUT_S</c>.
+    /// </summary>
+    private static AzureOpenAIClientOptions BuildClientOptions()
+    {
+        var raw = Environment.GetEnvironmentVariable("AGENTEVAL_AGENT_NETWORK_TIMEOUT_S");
+        var seconds = double.TryParse(raw, out var parsed) && parsed > 0 ? parsed : 180.0;
+        return new AzureOpenAIClientOptions { NetworkTimeout = TimeSpan.FromSeconds(seconds) };
+    }
+
     public static void PrintStubAgentWarning(string benchmarkName, string stubAgentDescription, string sampleFileName = "06_OwaspBenchmark.cs")
     {
         const int innerWidth = 77; // total line width minus the two "│" borders + spacing
