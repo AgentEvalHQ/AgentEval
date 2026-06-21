@@ -63,11 +63,12 @@ public class JudgeAgreement5bLiveRun(ITestOutputHelper output)
                     var grader = mode switch
                     {
                         "keyword" => c.Evaluator,                                                  // bare oracle, no judge
-                        // Mirror PRODUCTION routing (GraderFactory.For): a TOOL-AWARE oracle is NOT decomposed (its
-                        // text-only decomposition would drop Behavioral tool-execution evidence), so it falls to the
-                        // single judge — exactly as production does. Without this, the scorecard would credit a
-                        // decomposition production never uses (ExcessiveAgency).
-                        "decompose" => (ToolAwareOracles.Contains(c.Oracle) ? null : DecomposedGraders.TryBuildFor(c.Oracle, judgeClient!)) ?? SingleJudge(),
+                        // Mirror PRODUCTION routing (GraderFactory.For): a TOOL-AWARE oracle routes to its TOOL-AWARE
+                        // decomposition (composing the attack's inner evaluator c.Evaluator so the Behavioral leg
+                        // survives — inert on the text corpus); other oracles use the text decomposition.
+                        "decompose" => (ToolAwareOracles.Contains(c.Oracle)
+                            ? DecomposedGraders.TryBuildToolAwareFor(c.Oracle, c.Evaluator, judgeClient!)
+                            : DecomposedGraders.TryBuildFor(c.Oracle, judgeClient!)) ?? SingleJudge(),
                         _ => SingleJudge(),
                     };
                     verdicts[i] = (await grader.EvaluateAsync(c.Probe, c.Response)).Outcome;

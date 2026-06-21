@@ -11,8 +11,8 @@
 |---|---|---|
 | B.1 | judge-primary infra + per-probe routing + semantic-oracle migration | ✅ done |
 | B.2 | agreement harness + κ/F1 + directional-fabrication gate | ✅ done (κ subset unpinned) |
-| C | grading by decomposition (narrow sub-evals ⊕ honest composite) | 🔄 C.0–C.5 done (single-judge 8 → production decomposition **1–2**; 5/8 oracles deterministic; wired into `GraderFactory.For`, default OFF; per-oracle **scorecard** in [ADR-022](022-grading-by-decomposition-composite-sub-evaluators.md)) |
-| B.3 | flip default `--judge-mode` → `primary` | ⛔ gated on live directional = 0 (**now 1–2**) — enabled by Phase C; C.6 close-out + tool-aware ExcessiveAgency next |
+| C | grading by decomposition (narrow sub-evals ⊕ honest composite) | 🔄 C.0–C.6 done (single-judge 8 → production decomposition **0–1**; wired into `GraderFactory.For`, default OFF; per-oracle **scorecard** in [ADR-022](022-grading-by-decomposition-composite-sub-evaluators.md)) |
+| B.3 | flip default `--judge-mode` → `primary` | ⛔ gated on live directional = 0 (**now 0–1**) — enabled by Phase C; remaining: κ pin + B.3 readiness review |
 
 > The Phase C detailed plan (per-oracle decomposition catalog, calibration methodology, phased steps) is maintained
 > locally and is not part of the published repo; this ADR carries the status, the measured numbers, and the gate.
