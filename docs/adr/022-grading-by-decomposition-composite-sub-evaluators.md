@@ -1,6 +1,6 @@
 # ADR-022: Grading by Decomposition (Composite Sub-Evaluators) for Semantic Red-Team Oracles — RedTeam Phase C
 
-**Status:** Proposed — **extends [ADR-021](021-judge-primary-semantic-oracles.md)** (does NOT supersede it; judge-primary remains the foundation this builds on). Measured arc: per-oracle judge **8 → C.0 InferenceAbuse 7 → C.1 InsecureOutput deterministic parser 3 → C.2 DataPoisoning deterministic ground-truth 1** directional fabrication. C.0–C.2 done; C.3–C.6 planned. (The two deterministic decompositions sit at a stable 0; the lone remaining fabrication is in a judge-graded oracle, ExcessiveAgency / C.3.)
+**Status:** Proposed — **extends [ADR-021](021-judge-primary-semantic-oracles.md)** (does NOT supersede it; judge-primary remains the foundation this builds on). Measured arc: per-oracle judge **8 → C.0 InferenceAbuse 7 → C.1 InsecureOutput parser 3 → C.2 DataPoisoning ground-truth 1 → C.3 ExcessiveAgency 1** (ExcessiveAgency 1→0; the lone residual is now one judge-nondeterministic InferenceAbuse case, 0–1). C.0–C.3 done; C.4–C.6 planned. See the Scorecard below for the full keyword-vs-judge-vs-decomposition comparison.
 **Date:** 2026-06-21
 **Decision Makers:** AgentEval Contributors
 **Related:** [ADR-021 (judge-primary, RedTeam Phase B)](021-judge-primary-semantic-oracles.md) · [composite-evals.md](../composite-evals.md) · [eval-benchmark-architecture.md](../eval-benchmark-architecture.md)
@@ -51,9 +51,31 @@ InferenceAPIAbuse decomposed as `disclosure/abuse detector ⊕ refusal detector`
 
 Calibrate **incrementally, per-oracle, harness-gated, dump-driven — never big-bang, never implement-all-first.** Only one oracle changes at a time (so the directional delta is attributable). **Deterministic sub-evals are unit-tested, not calibrated.** Judge sub-evals get a ≤3-round loop (draft from the dump → measure → tighten the exact over/under-firing clause → re-measure); if it won't converge, the residual is genuine judge-territory → escalate to a stronger judge, don't keep tuning. Keep a decomposition only if it lowers the directional count with no leak; seed new failures as permanent corpus cases.
 
+## Scorecard — keyword oracle vs single judge vs decomposition
+
+All measured by the same harness over the same 298-case adversarial corpus (`gpt-4o-mini`, evidence-anchored
+rubric). **Directional fabrications** = Safe→Succeeded (false alarm) + Vuln→Resisted (missed hit); lower is better.
+Reproduce any row with `AGENTEVAL_5B_GRADER={keyword|judge|decompose}` (+ `AGENTEVAL_RUN_5B=1`).
+
+| Architecture | directional | false alarms | missed hits | defer-correct | the property that matters |
+|---|---|---|---|---|---|
+| **Keyword oracle** (the original) | **0** \* | 0 | 0 | 100% | \* OVERFIT to this corpus — it was patched until it passed. **Non-convergent**: a fresh adversarial sweep finds ~41 new fabrications (41→41). Can't be made honest by patching. |
+| Single judge — STRICT | 45 | 8 | 37 | 85% | first honest measure; the judge under-reports compromise (missed hits dominate) |
+| Single judge — evidence-anchored | 14 | 11 | 3 | 95% | quote-grounding moves the whole curve outward (−92% missed) |
+| Single judge — + per-oracle discriminators | 8 | 5 | 3 | 97% | the **single-prompt floor** — two further global swings made it worse (39, 42) |
+| **Decomposition** (Phase C, C.0–C.3) | **1** | 0 | 1 | 100% | HONEST **and** convergent. Deterministic oracles (InsecureOutput, DataPoisoning) sit at a stable 0; the lone residual is one judge-nondeterministic InferenceAbuse case (fluctuates 0–1) → stronger-judge territory |
+
+**Read the keyword `0` correctly.** It is the *overfitting* number, not an accuracy win — the corpus was built by
+finding keyword-oracle failures and patching the oracle until it passed, and the non-convergence finding (41→41 on
+fresh sweeps) is the documented proof it does not generalize. The decomposition `1` is the opposite: an *honest*
+number whose deterministic half (parser, ground-truth) **generalizes** — a parser or a ground-truth comparison
+cannot overfit a corpus the way a substring lexicon does. **The progression that matters is the single-judge column
+(45 → 14 → 8) and then decomposition (→ 1) — each an honest measure, trending to zero, while gaining determinism,
+convergence, and lower cost.**
+
 ## Relationship to ADR-021 and B.3
 
-This ADR **extends** ADR-021. Judge-primary is unchanged; decomposition refines *how* the semantic verdict is produced. **B.3** (flip the default `--judge-mode` to `primary`, a major-version change) remains defined in ADR-021 and is **gated on the live directional count reaching 0**; Phase C is the means to drive it there (7 today). C precedes and enables B.3.
+This ADR **extends** ADR-021. Judge-primary is unchanged; decomposition refines *how* the semantic verdict is produced. **B.3** (flip the default `--judge-mode` to `primary`, a major-version change) remains defined in ADR-021 and is **gated on the live directional count reaching 0**; Phase C is the means to drive it there — **1 today**, from 8. C precedes and enables B.3.
 
 ## Consequences
 
@@ -66,4 +88,5 @@ This ADR **extends** ADR-021. Judge-primary is unchanged; decomposition refines 
 - **C.0** ✅ primitives (`OutcomeFilterEvaluator`, `DecomposedGraders`) + InferenceAbuse prototype + 6 unit tests + env-gated harness measurement (commit `5e62082`). 8 → 7.
 - **C.1** ✅ InsecureOutput **deterministic** decomposition (`ExecutableStructureDetector` parser + `DeterministicRefusalDetector`, zero LLM calls) + 13 unit tests (commit `4c7f44b`). InsecureOutput 4 → 0, overall **7 → 3**, zero leak.
 - **C.2** ✅ DataPoisoning **deterministic** ground-truth decomposition (`TrueFactMetadataKey` + `GroundTruthDeviationDetector`/`GroundTruthCorrectionDetector`, zero LLM calls) + 5 unit tests (commit `ff02e2d`). DataPoisoning 1 → 0, overall **3 → 1**, zero leak — proving the ground-truth half of the thesis (the probe knows the answer, so no world knowledge or judge is needed).
-- **C.3–C.6** planned (ExcessiveAgency → robustness oracles → production wiring with cost-aware composition → full-corpus lock + κ pin). Validated on the harness; **not yet wired into production `GraderFactory.For`**. Detailed plan maintained separately.
+- **C.3** ✅ ExcessiveAgency judge decomposition (unauthorized-action ⊕ authorized-action; the `AGENTEVAL_5B_GRADER` three-way scorecard mode) + 3 unit tests (commit `754e10e`). ExcessiveAgency 1 → 0 after a 2-round prompt calibration (a protective HOLD pending sign-off is not an over-action). Overall stays 1 — the lone residual is now one judge-nondeterministic InferenceAbuse case (stronger-judge territory).
+- **C.4–C.6** planned (robustness oracles → production wiring with cost-aware composition → full-corpus lock + κ pin). Validated on the harness; **not yet wired into production `GraderFactory.For`**. Detailed plan maintained separately.

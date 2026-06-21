@@ -11,7 +11,7 @@
 |---|---|---|
 | B.1 | judge-primary infra + per-probe routing + semantic-oracle migration | ✅ done |
 | B.2 | agreement harness + κ/F1 + directional-fabrication gate | ✅ done (κ subset unpinned) |
-| C | grading by decomposition (narrow sub-evals ⊕ honest composite) | 🔄 C.0+C.1+C.2 done (8→7→3→1); per-oracle build-out continuing — see [ADR-022](022-grading-by-decomposition-composite-sub-evaluators.md) |
+| C | grading by decomposition (narrow sub-evals ⊕ honest composite) | 🔄 C.0–C.3 done (8→7→3→1; keyword/judge/decompose **scorecard** in [ADR-022](022-grading-by-decomposition-composite-sub-evaluators.md)) |
 | B.3 | flip default `--judge-mode` → `primary` | ⛔ gated on live directional ≈ 0 (now 1) — enabled by Phase C |
 
 > The Phase C detailed plan (per-oracle decomposition catalog, calibration methodology, phased steps) is maintained
