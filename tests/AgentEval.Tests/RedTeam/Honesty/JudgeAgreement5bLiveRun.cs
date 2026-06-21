@@ -35,10 +35,15 @@ public class JudgeAgreement5bLiveRun(ITestOutputHelper output)
         // Per-case judge so the per-ORACLE evidence-anchored discriminator applies, mirroring production routing
         // (GraderFactory.For passes attack.Name == the corpus oracle). For strict/lenient the oracle arg is ignored,
         // so those rubrics are unaffected. LLMJudgeEvaluator is a thin wrapper, so building one per case is cheap.
-        // Jun21: AGENTEVAL_5B_DECOMPOSE=1 swaps in a DECOMPOSED composite grader for any oracle that has one
-        // (currently InferenceAPIAbuse only); all other oracles keep the single per-oracle judge, so the overall
-        // directional total changes only by the decomposed oracle's delta.
-        var decompose = Environment.GetEnvironmentVariable("AGENTEVAL_5B_DECOMPOSE") == "1";
+        // Jun21/C.* scorecard — AGENTEVAL_5B_GRADER selects the architecture under measurement so the three can be
+        // compared head-to-head on the SAME corpus:
+        //   keyword   = the bare per-attack keyword/structural oracle (c.Evaluator), no judge;
+        //   judge     = the single per-oracle judge (the Phase B grader, the default);
+        //   decompose = grading-by-decomposition (Phase C) where an oracle has a composite, else the single judge.
+        // Back-compat: AGENTEVAL_5B_DECOMPOSE=1 still selects decompose.
+        var mode = (Environment.GetEnvironmentVariable("AGENTEVAL_5B_GRADER")
+            ?? (Environment.GetEnvironmentVariable("AGENTEVAL_5B_DECOMPOSE") == "1" ? "decompose" : "judge"))
+            .Trim().ToLowerInvariant();
         // Pre-fetch the judge verdict for every case with bounded concurrency, then feed the harness a lookup so the
         // measurement is fast and deterministic in ordering.
         var verdicts = new EvaluationOutcome[cases.Count];
@@ -50,8 +55,13 @@ public class JudgeAgreement5bLiveRun(ITestOutputHelper output)
                 try
                 {
                     var c = cases[i];
-                    var grader = (decompose ? DecomposedGraders.TryBuildFor(c.Oracle, judgeClient!) : null)
-                        ?? new LLMJudgeEvaluator(judgeClient!, GraderFactory.OptionsFor(rubric, c.Oracle));
+                    IProbeEvaluator SingleJudge() => new LLMJudgeEvaluator(judgeClient!, GraderFactory.OptionsFor(rubric, c.Oracle));
+                    var grader = mode switch
+                    {
+                        "keyword" => c.Evaluator,                                                  // bare oracle, no judge
+                        "decompose" => DecomposedGraders.TryBuildFor(c.Oracle, judgeClient!) ?? SingleJudge(),
+                        _ => SingleJudge(),
+                    };
                     verdicts[i] = (await grader.EvaluateAsync(c.Probe, c.Response)).Outcome;
                 }
                 finally { gate.Release(); }
@@ -79,7 +89,7 @@ public class JudgeAgreement5bLiveRun(ITestOutputHelper output)
         var lines = new List<string>
         {
             "ADR-021 §8 — 5b live judge-agreement run",
-            $"judge deployment: {deployment} | rubric: {rubric} | decompose: {(decompose ? "on" : "off")}",
+            $"judge deployment: {deployment} | rubric: {rubric} | grader: {mode}",
             report.ToString(),
             $"verdict mix: succeeded={verdicts.Count(v => v == EvaluationOutcome.Succeeded)} " +
             $"resisted={verdicts.Count(v => v == EvaluationOutcome.Resisted)} " +
