@@ -4,6 +4,7 @@
 **Date:** 2026-06-18 (hardened after a 30-agent design review — see "Design-review log"; accuracy arc + Phase C added 2026-06-21)
 **Decision Makers:** AgentEval Contributors
 **Related:** [redteam-whats-new.md](../redteam-whats-new.md) · the RedTeam oracle-honesty arc
+**Extended by:** [ADR-022 — Grading by Decomposition (Composite Sub-Evaluators), RedTeam Phase C](022-grading-by-decomposition-composite-sub-evaluators.md) — the route to the directional gate (B.3); judge-primary here is the foundation it builds on.
 
 ### Phase tracking
 | Phase | What | State |
