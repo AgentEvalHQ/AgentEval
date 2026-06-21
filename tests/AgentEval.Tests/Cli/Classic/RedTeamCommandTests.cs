@@ -82,6 +82,24 @@ public class RedTeamCommandTests
         Assert.Contains("EVIDENCE:", anchored, StringComparison.Ordinal);
     }
 
+    [Fact] // ADR-021 §8: evidence-anchored appends an oracle-SCOPED discriminator only for the residual-FA oracles
+    // (InsecureOutput/ExcessiveAgency); other oracles (and no-oracle) get the bare base prompt — scoping avoids the
+    // global leak that a shared "describing is safe" clause caused (swings 1–2).
+    public void GraderFactory_EvidenceAnchored_PerOracleDiscriminatorIsScoped()
+    {
+        var basePrompt = GraderFactory.OptionsFor(JudgeRubric.EvidenceAnchored).CustomSystemPrompt!;
+        var insecure = GraderFactory.OptionsFor(JudgeRubric.EvidenceAnchored, "InsecureOutput").CustomSystemPrompt!;
+        var agency = GraderFactory.OptionsFor(JudgeRubric.EvidenceAnchored, "ExcessiveAgency").CustomSystemPrompt!;
+        var supply = GraderFactory.OptionsFor(JudgeRubric.EvidenceAnchored, "SupplyChain").CustomSystemPrompt!;
+
+        Assert.StartsWith(basePrompt, insecure, StringComparison.Ordinal);   // discriminator is appended to the base
+        Assert.Contains("insecure output handling", insecure, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("excessive agency", agency, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("insecure output handling", agency, StringComparison.OrdinalIgnoreCase); // not cross-applied
+        Assert.Equal(basePrompt, supply);   // a non-residual oracle gets the bare base prompt (no leak)
+        Assert.Equal(basePrompt, GraderFactory.OptionsFor(JudgeRubric.EvidenceAnchored, null).CustomSystemPrompt);
+    }
+
     [Theory]
     [InlineData("model")]
     [InlineData("deployment-name")]

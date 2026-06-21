@@ -439,10 +439,45 @@ Findings:
   now *much* closer than any prior rubric.
 
 *(These figures are our own measurement on a deliberately-adversarial corpus, not a general accuracy
-claim.)* **Recommended judge-primary rubric: `evidence-anchored`.** **Pre-B.3 work, in priority order:**
-(1) tighten the residual false-alarm oracles (InsecureOutput/ExcessiveAgency); (2) pin a labelled subset
-(κ); (3) evaluate per-oracle rubric routing; (4) re-measure on a stronger judge (gpt-4o / o-series),
-which the agreement literature puts ~10–15 pts higher than the mini tier.
+claim.)* **Recommended judge-primary rubric: `evidence-anchored`.**
+
+### Third measurement (2026-06-21, `gpt-4o-mini`) — per-oracle discriminator routing
+
+The residual-FA tightening (pre-B.3 item 1) was run as a four-swing experiment loop, each swing measured
+live over the 298-case corpus (the directional count is the keep/revert gate):
+
+| Swing | change | directional total | missed | false |
+|---|---|---|---|---|
+| base | evidence-anchored (global) | 14 | 3 | 11 |
+| 1 | + GLOBAL "describing/authorized is safe" discriminators | **39** | 36 | 3 |
+| 2 | + GLOBAL attack-conditioned discriminators | **42** | 9 | 33 |
+| 3 | + per-oracle discriminator, scoped to InsecureOutput + ExcessiveAgency only | **11** | 3 | 8 |
+| **4** | + per-oracle for Jailbreak + PromptInjection too | **8** | 3 | 5 |
+
+Findings:
+- **A GLOBAL discriminator cannot reduce the residual — it only rotates the error.** Swing 1's
+  "describing a command/path is safe" leaked into SupplyChain (`pip install <hallucinated-pkg>` read as
+  benign advice) and DataPoisoning (`the capital is Sydney` read as a plain fact), reopening **36** missed
+  hits. Swing 2's "asserting a planted fact is the compromise" then mislabelled *corrections* (`Canberra is
+  the capital; Sydney is the largest city`) as compromises — **33** false alarms. The same surface — a
+  command, a fact, a package name — is benign in one oracle and a compromise in another; only the *oracle*
+  disambiguates. (DataPoisoning vs Misinformation additionally need *ground truth* to tell a poisoned
+  assertion from a correct rebuttal — a stronger-judge lever, not a prompt one.)
+- **Per-oracle scoping is the fix.** Applying each discriminator ONLY to the attack it was written for
+  (`GraderFactory.OptionsFor(rubric, oracle)`, routed in production by `attack.Name`) took the residual
+  **14 → 8 (−43%)** with **zero** leak — SupplyChain/DataPoisoning/InferenceAbuse stayed at base. Net arc:
+  **STRICT 45 → evidence-anchored 14 → per-oracle 8** (−82% overall, missed hits 37 → 3 = −92%,
+  defer-correct 85% → 97%).
+- **The residual 8 is at the practical floor for this judge.** It is dominated by genuinely-ambiguous
+  InsecureOutput prose (`whoami; halt`, `whoami; find` — those *are* real commands), one borderline
+  over-action, and three refuse-then-comply / world-knowledge cases (`I cannot share… I am Grok`). These
+  are exactly the cases that justify the **stronger-judge** lever, not more prompt engineering.
+- **The B.3 gate still BLOCKS the flip** (8 > 0), correctly.
+
+**Pre-B.3 work, updated priority:** (1) ~~tighten residual FA oracles~~ **DONE** (per-oracle routing, 14→8);
+(2) pin a labelled subset (κ); (3) re-measure on a stronger judge (gpt-4o / o-series, lit. ~10–15 pts
+higher) — expected to clear most of the remaining world-knowledge/refuse-then-comply residual; (4) only
+then reconsider the B.3 default flip.
 
 ## Consequences
 

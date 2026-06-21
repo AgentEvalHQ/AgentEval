@@ -32,8 +32,9 @@ public class JudgeAgreement5bLiveRun(ITestOutputHelper output)
             "evidence-anchored" or "anchored" or "evidence" => JudgeRubric.EvidenceAnchored,
             _ => JudgeRubric.Strict,
         };
-        var judge = new LLMJudgeEvaluator(judgeClient!, GraderFactory.OptionsFor(rubric));
-
+        // Per-case judge so the per-ORACLE evidence-anchored discriminator applies, mirroring production routing
+        // (GraderFactory.For passes attack.Name == the corpus oracle). For strict/lenient the oracle arg is ignored,
+        // so those rubrics are unaffected. LLMJudgeEvaluator is a thin wrapper, so building one per case is cheap.
         // Pre-fetch the judge verdict for every case with bounded concurrency, then feed the harness a lookup so the
         // measurement is fast and deterministic in ordering.
         var verdicts = new EvaluationOutcome[cases.Count];
@@ -42,7 +43,11 @@ public class JudgeAgreement5bLiveRun(ITestOutputHelper output)
             await Task.WhenAll(Enumerable.Range(0, cases.Count).Select(async i =>
             {
                 await gate.WaitAsync();
-                try { verdicts[i] = (await judge.EvaluateAsync(cases[i].Probe, cases[i].Response)).Outcome; }
+                try
+                {
+                    var judge = new LLMJudgeEvaluator(judgeClient!, GraderFactory.OptionsFor(rubric, cases[i].Oracle));
+                    verdicts[i] = (await judge.EvaluateAsync(cases[i].Probe, cases[i].Response)).Outcome;
+                }
                 finally { gate.Release(); }
             }));
         }
@@ -76,6 +81,27 @@ public class JudgeAgreement5bLiveRun(ITestOutputHelper output)
             "per-oracle directional fabrications:",
         };
         lines.AddRange(byOracle);
+
+        // AGENTEVAL_5B_DUMP=1: list the SPECIFIC directional-fabrication cases so a prompt/rubric fix can be designed
+        // against the real failures (not guessed). Each line = direction + oracle + origin + a response snippet.
+        if (Environment.GetEnvironmentVariable("AGENTEVAL_5B_DUMP") == "1")
+        {
+            var misses = cases
+                .Select((c, i) => (c, v: verdicts[i]))
+                .Where(t => (t.c.Expect == HonestyExpectation.SafeMustNotSucceed && t.v == EvaluationOutcome.Succeeded)
+                         || (t.c.Expect == HonestyExpectation.VulnerableMustNotResist && t.v == EvaluationOutcome.Resisted))
+                .OrderBy(t => t.c.Oracle)
+                .Select(t =>
+                {
+                    var dir = t.c.Expect == HonestyExpectation.SafeMustNotSucceed ? "FALSE-ALARM (safe→succeeded)" : "MISSED-HIT (vuln→resisted)";
+                    var snip = t.c.Response.Length <= 220 ? t.c.Response : t.c.Response[..220] + "…";
+                    return $"  [{t.c.Oracle}] {dir} origin={t.c.Origin}\n      response: {snip}";
+                });
+            lines.Add("");
+            lines.Add("directional-fabrication cases (AGENTEVAL_5B_DUMP):");
+            lines.AddRange(misses);
+        }
+
         var text = string.Join("\n", lines);
 
         _output.WriteLine(text);
