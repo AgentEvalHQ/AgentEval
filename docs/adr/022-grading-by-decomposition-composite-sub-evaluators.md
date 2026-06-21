@@ -1,6 +1,6 @@
 # ADR-022: Grading by Decomposition (Composite Sub-Evaluators) for Semantic Red-Team Oracles — RedTeam Phase C
 
-**Status:** Proposed — **extends [ADR-021](021-judge-primary-semantic-oracles.md)** (does NOT supersede it; judge-primary remains the foundation this builds on). C.0 prototype validated (InferenceAPIAbuse, 8 → 7 directional fabrications); C.1–C.6 build-out planned.
+**Status:** Proposed — **extends [ADR-021](021-judge-primary-semantic-oracles.md)** (does NOT supersede it; judge-primary remains the foundation this builds on). Measured arc: per-oracle judge **8 → C.0 InferenceAbuse decomposition 7 → C.1 InsecureOutput deterministic parser 3** directional fabrications. C.0 + C.1 done; C.2–C.6 planned.
 **Date:** 2026-06-21
 **Decision Makers:** AgentEval Contributors
 **Related:** [ADR-021 (judge-primary, RedTeam Phase B)](021-judge-primary-semantic-oracles.md) · [composite-evals.md](../composite-evals.md) · [eval-benchmark-architecture.md](../eval-benchmark-architecture.md)
@@ -63,5 +63,6 @@ This ADR **extends** ADR-021. Judge-primary is unchanged; decomposition refines 
 
 ## Status of work
 
-- **C.0** ✅ primitives (`OutcomeFilterEvaluator`, `DecomposedGraders`) + InferenceAbuse prototype + 6 unit tests + env-gated harness measurement (commit `5e62082`). Validated on the harness; **not yet wired into production `GraderFactory.For`**.
-- **C.1–C.6** planned (InsecureOutput deterministic parser → DataPoisoning ground-truth → ExcessiveAgency → robustness oracles → production wiring with cost-aware composition → full-corpus lock + κ pin). Detailed plan maintained separately.
+- **C.0** ✅ primitives (`OutcomeFilterEvaluator`, `DecomposedGraders`) + InferenceAbuse prototype + 6 unit tests + env-gated harness measurement (commit `5e62082`). 8 → 7.
+- **C.1** ✅ InsecureOutput **deterministic** decomposition (`ExecutableStructureDetector` parser + `DeterministicRefusalDetector`, zero LLM calls) + 13 unit tests (commit `4c7f44b`). InsecureOutput 4 → 0, overall **7 → 3**, zero leak — proving the deterministic-sub-signal half of the thesis (a parser beat the judge, for free).
+- **C.2–C.6** planned (DataPoisoning ground-truth → ExcessiveAgency → robustness oracles → production wiring with cost-aware composition → full-corpus lock + κ pin). Validated on the harness; **not yet wired into production `GraderFactory.For`**. Detailed plan maintained separately.
