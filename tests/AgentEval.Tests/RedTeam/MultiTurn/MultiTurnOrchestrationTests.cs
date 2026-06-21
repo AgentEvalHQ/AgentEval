@@ -141,6 +141,16 @@ public class MultiTurnOrchestrationTests
             => Task.FromResult(EvaluationResult.Inconclusive("test: inconclusive every turn"));
     }
 
+    /// <summary>Inner oracle that stamps Semantic + (default) Verbal and returns Resisted, so a judge-primary decorator
+    /// ROUTES it to the judge — used to prove the multi-turn fold carries the decorator's GraderProvenance.</summary>
+    private sealed class SemanticResistedEvaluator : IProbeEvaluator
+    {
+        public string Name => "semantic-resisted";
+        public Task<EvaluationResult> EvaluateAsync(AttackProbe probe, string response, CancellationToken ct = default)
+            => Task.FromResult(GradingMetadata.WithEvidenceClass(
+                EvaluationResult.Resisted("keyword: refused"), OracleEvidenceClass.Semantic));
+    }
+
     private static readonly AttackProbe Seed = new() { Id = "S", Prompt = "p", Difficulty = Difficulty.Hard };
     private static MultiTurnContext Ctx(IReadOnlyList<Turn> history) => new() { Seed = Seed, History = history };
     private static AgentResponse Resp(string t) => new() { Text = t };
@@ -420,6 +430,25 @@ public class MultiTurnOrchestrationTests
             .RunAsync(attack, Seed, JudgeBacked(new AlwaysInconclusiveEvaluator(), judge), CancellationToken.None);
 
         Assert.Equal(EvaluationOutcome.Inconclusive, result.Outcome);
+    }
+
+    [Fact] // ADR-021 §5: a judge-primary verdict produced per-turn must carry its GraderProvenance through the fold
+    // onto MultiTurnResult.Grading (the carrier the runner lifts onto the folded single ProbeResult.Grading).
+    public async Task MultiTurn_JudgePrimaryUpgrade_FoldCarriesGraderProvenance()
+    {
+        var judge = new FakeChatClient("VERDICT: SUCCEEDED\nCONFIDENCE: 0.9\nREASON: the agent complied.");
+        var attack = new EndlessAttack();   // SuccessOnly: a judge-Succeeded turn converges + stops
+        var evaluator = JudgeBacked(new SemanticResistedEvaluator(), judge, JudgeMode.Primary);
+
+        var result = await new TurnOrchestrator(new ScriptedConversableAgent(_ => "ok"), new ScanOptions { JudgeClient = judge })
+            .RunAsync(attack, Seed, evaluator, CancellationToken.None);
+
+        Assert.Equal(EvaluationOutcome.Succeeded, result.Outcome);
+        Assert.NotNull(result.Grading);
+        Assert.Equal(GradingProvenanceKind.Judge, result.Grading!.ShippedBy);
+        Assert.True(result.Grading.Disagreed);                               // keyword Resisted vs judge Succeeded
+        Assert.Equal(EvaluationOutcome.Resisted, result.Grading.KeywordOutcome);
+        Assert.Equal(EvaluationOutcome.Succeeded, result.Grading.JudgeOutcome);
     }
 
     [Fact]

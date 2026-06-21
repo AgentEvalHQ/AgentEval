@@ -92,8 +92,9 @@ public record ProbeResult
     /// <summary>
     /// L10: true when an attacker LLM (PAIR / TAP / attacker-driven Crescendo) generated the conversation — the run is
     /// non-deterministic. Always false for single-turn / scripted probes. Jun14-L4: currently surfaced only as the
-    /// human-readable <c>[ATTACKER-DRIVEN]</c> marker appended to <see cref="Reason"/>; it is RESERVED for a future
-    /// baseline/regression-gate consumer (no comparer reads it yet, and it is not serialized into JSON/SARIF).
+    /// human-readable <c>[ATTACKER-DRIVEN]</c> marker appended to <see cref="Reason"/> and (ADR-021 §5) the
+    /// null-omittable <c>attacker_driven</c> field in the JSON/SARIF reports. It is RESERVED for a future
+    /// baseline/regression-gate consumer (no comparer reads it yet).
     /// </summary>
     public bool AttackerDriven { get; init; }
 

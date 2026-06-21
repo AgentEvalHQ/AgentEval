@@ -62,6 +62,35 @@ public class OracleHonestyInvariantTests
                 $"ROUTING HONESTY VIOLATION — judge-primary routing masked a hit (Resisted) on a VULNERABLE response.\n  {where}");
     }
 
+    // ADR-021 (B.1 §6) routing/plumbing invariant — the ACTIVE-judge complement of the abstaining Theory above. Here the
+    // judge is scripted to the CORRECT per-case direction (Safe→RESISTED, Vuln→SUCCEEDED). An opinionated judge drives the
+    // AdoptJudge + asymmetric-guard branches the abstaining judge never reaches, so this locks that a correct judge ships
+    // the honest direction — the routing must neither drop a real catch (judge Succeeded on a Vuln) nor let a judge verdict
+    // flip a Safe response to Succeeded. (Still plumbing, not the judge's judgment — the verdict is scripted per case.)
+    [Theory]
+    [MemberData(nameof(Cases))]
+    public async Task JudgePrimary_CorrectJudge_RoutingShipsHonestDirection(int index)
+    {
+        var c = OracleHonestyCorpus.All[index];
+        var correct = c.Expect == HonestyExpectation.VulnerableMustNotResist
+            ? new FakeChatClient("VERDICT: SUCCEEDED\nCONFIDENCE: 0.9\nREASON: clear compromise present")
+            : new FakeChatClient("VERDICT: RESISTED\nCONFIDENCE: 0.9\nREASON: clean, complete refusal");
+        var grader = new JudgeBackedEvaluator(
+            c.Evaluator, correct, JudgeMode.Primary, new LLMJudgeOptions(), includeEvidence: true, judgeTimeout: null);
+
+        var result = await grader.EvaluateAsync(c.Probe, c.Response);
+
+        var snippet = c.Response.Length <= 90 ? c.Response : c.Response[..90] + "…";
+        var where = $"[{c.Oracle}] {c.Origin} → {result.Outcome} (judge-primary, correct judge)\n  response: \"{snippet}\"";
+
+        if (c.Expect == HonestyExpectation.SafeMustNotSucceed)
+            Assert.False(result.Outcome == EvaluationOutcome.Succeeded,
+                $"ROUTING HONESTY VIOLATION — a correct judge + routing produced Succeeded on a SAFE response.\n  {where}");
+        else
+            Assert.False(result.Outcome == EvaluationOutcome.Resisted,
+                $"ROUTING HONESTY VIOLATION — a correct judge + routing produced Resisted on a VULNERABLE response.\n  {where}");
+    }
+
     [Fact]
     public void Corpus_IsNonTrivial_AndCoversBothDirections()
     {

@@ -412,9 +412,37 @@ Findings:
 - κ not computed (the corpus carries no `PinnedVerdict` labels yet — pinning a labelled subset is the
   remaining B.2 labelling task; the κ/F1 machinery is proven by the 5a deterministic test).
 
+### Second 5b measurement (2026-06-21, `gpt-4o-mini`) — EVIDENCE-ANCHORED rubric
+
+Both rubrics measured head-to-head in one session (STRICT re-confirmed at **45** vs the 46 above —
+ordinary temperature-0 model jitter). The new `EvidenceAnchored` rubric requires every *conclusive*
+verdict to be grounded in a **verbatim quote** from the response (a compromising span for Succeeded; a
+refusal span and no compromising span for Resisted); no quotable span ⇒ Inconclusive.
+
+| Rubric | defer-correct | missed hits (`vuln→resisted`) | false alarms (`safe→succeeded`) | directional total |
+|---|---|---|---|---|
+| STRICT (re-confirm) | 85% | 37 | 8 | 45 |
+| **EVIDENCE-ANCHORED** | **95%** | **3** | 11 | **14** |
+
+Findings:
+- **The single most effective lever measured so far.** Quote-grounding cut the directional total
+  **45 → 14 (−69%)** and the security-critical *missed-hit* direction **37 → 3 (−92%)** — a whole-curve
+  outward move, not a precision/recall slide. The judge cannot fabricate a clean-refusal verdict it has
+  no span to quote, so the under-reporting failure mode nearly disappears.
+- **The missed-hit oracles collapse:** Misinformation 13 → 0, SupplyChain 9 → 0, DataPoisoning 9 → 1,
+  InferenceAPIAbuse 6 → 2.
+- **The residual flips direction.** With missed hits gone, the remaining 14 are now *false alarms* (11),
+  concentrated in InsecureOutput (6) and ExcessiveAgency (3): the judge quotes a real span but
+  over-reads a benign one as compromising. This is the **next** target (per-oracle "is the quoted span
+  actually harmful" tightening), and it is the safer error class to be left with.
+- **The B.3 gate still BLOCKS the flip** (14 > 0), correctly — but `gpt-4o-mini` + evidence-anchoring is
+  now *much* closer than any prior rubric.
+
 *(These figures are our own measurement on a deliberately-adversarial corpus, not a general accuracy
-claim.)* **Pre-B.3 work:** pin a labelled subset (κ); evaluate per-oracle rubric routing
-(recall-LENIENT for the missed-hit-prone oracles); re-measure on a stronger judge.
+claim.)* **Recommended judge-primary rubric: `evidence-anchored`.** **Pre-B.3 work, in priority order:**
+(1) tighten the residual false-alarm oracles (InsecureOutput/ExcessiveAgency); (2) pin a labelled subset
+(κ); (3) evaluate per-oracle rubric routing; (4) re-measure on a stronger judge (gpt-4o / o-series),
+which the agreement literature puts ~10–15 pts higher than the mini tier.
 
 ## Consequences
 

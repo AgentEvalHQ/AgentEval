@@ -26,8 +26,12 @@ public class JudgeAgreement5bLiveRun(ITestOutputHelper output)
         Assert.True(judgeClient is not null, $"no judge client from env (exit {exit}); set AZURE_OPENAI_* env vars");
 
         var cases = OracleHonestyCorpus.All;
-        var rubric = string.Equals(Environment.GetEnvironmentVariable("AGENTEVAL_5B_RUBRIC"), "lenient", StringComparison.OrdinalIgnoreCase)
-            ? JudgeRubric.Lenient : JudgeRubric.Strict;
+        var rubric = (Environment.GetEnvironmentVariable("AGENTEVAL_5B_RUBRIC") ?? "").Trim().ToLowerInvariant() switch
+        {
+            "lenient" => JudgeRubric.Lenient,
+            "evidence-anchored" or "anchored" or "evidence" => JudgeRubric.EvidenceAnchored,
+            _ => JudgeRubric.Strict,
+        };
         var judge = new LLMJudgeEvaluator(judgeClient!, GraderFactory.OptionsFor(rubric));
 
         // Pre-fetch the judge verdict for every case with bounded concurrency, then feed the harness a lookup so the

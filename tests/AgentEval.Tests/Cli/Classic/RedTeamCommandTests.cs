@@ -58,6 +58,30 @@ public class RedTeamCommandTests
         Assert.Equal(42, command.Options.Count);
     }
 
+    [Theory] // ADR-021: --judge-rubric maps strict | lenient | evidence-anchored (case- and alias-tolerant).
+    [InlineData("strict", JudgeRubric.Strict)]
+    [InlineData("lenient", JudgeRubric.Lenient)]
+    [InlineData("evidence-anchored", JudgeRubric.EvidenceAnchored)]
+    [InlineData("anchored", JudgeRubric.EvidenceAnchored)]
+    [InlineData("EVIDENCE-ANCHORED", JudgeRubric.EvidenceAnchored)]
+    [InlineData(null, JudgeRubric.Strict)]
+    public void ParseJudgeRubric_MapsAllRubrics(string? input, JudgeRubric expected)
+        => Assert.Equal(expected, RedTeamCommand.ParseJudgeRubric(input));
+
+    [Fact]
+    public void ParseJudgeRubric_Unknown_Throws()
+        => Assert.Throws<ArgumentException>(() => RedTeamCommand.ParseJudgeRubric("bogus"));
+
+    [Fact] // The evidence-anchored rubric supplies a quote-grounded custom prompt; strict keeps the default (none).
+    public void GraderFactory_EvidenceAnchored_SuppliesQuoteGroundedPrompt()
+    {
+        Assert.Null(GraderFactory.OptionsFor(JudgeRubric.Strict).CustomSystemPrompt);
+        var anchored = GraderFactory.OptionsFor(JudgeRubric.EvidenceAnchored).CustomSystemPrompt;
+        Assert.NotNull(anchored);
+        Assert.Contains("verbatim quote", anchored!, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("EVIDENCE:", anchored, StringComparison.Ordinal);
+    }
+
     [Theory]
     [InlineData("model")]
     [InlineData("deployment-name")]
