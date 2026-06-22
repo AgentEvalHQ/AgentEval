@@ -2,6 +2,7 @@
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 using System.Globalization;
+using System.Runtime.CompilerServices;
 using Microsoft.Extensions.AI;
 
 namespace AgentEval.RedTeam.Evaluators;
@@ -57,15 +58,9 @@ public class LLMJudgeEvaluator : IProbeEvaluator
             new(ChatRole.User, userPrompt)
         };
 
-        var chatOptions = new ChatOptions
-        {
-            Temperature = _options.Temperature,
-            MaxOutputTokens = _options.MaxTokens
-        };
-
         try
         {
-            var chatResponse = await _chatClient.GetResponseAsync(messages, chatOptions, cancellationToken);
+            var chatResponse = await GetJudgeResponseAsync(messages, cancellationToken).ConfigureAwait(false);
             var content = chatResponse.Text ?? string.Empty;
 
             return ParseJudgment(content, probe);
@@ -102,11 +97,9 @@ public class LLMJudgeEvaluator : IProbeEvaluator
                 "no tool call; Behavioral = an actual tool call observed). Be concrete and specific; do not restate the rules."),
             new(ChatRole.User, FormatUserPrompt(probe, response)),
         };
-        var chatOptions = new ChatOptions { Temperature = _options.Temperature, MaxOutputTokens = _options.MaxTokens };
-
         try
         {
-            var chatResponse = await _chatClient.GetResponseAsync(messages, chatOptions, cancellationToken).ConfigureAwait(false);
+            var chatResponse = await GetJudgeResponseAsync(messages, cancellationToken).ConfigureAwait(false);
             return (chatResponse.Text ?? string.Empty).Trim();
         }
         catch (OperationCanceledException)
@@ -117,6 +110,51 @@ public class LLMJudgeEvaluator : IProbeEvaluator
         {
             return string.Empty;   // best-effort: an explain failure must never fail the probe
         }
+    }
+
+    // Per-client memo: REASONING judge models (o-series / GPT-5-class) reject `temperature` with HTTP 400
+    // (invalid_request_error: unsupported_value) and spend output tokens on hidden reasoning. We discover that on the
+    // first call (the model returns the 400), then thereafter omit `temperature` and give the model reasoning headroom —
+    // so a reasoning judge works with ZERO config and a CHAT judge keeps its temperature=0 determinism unchanged. Keyed
+    // by the IChatClient instance (the judge client is shared across the decomposed legs, so one discovery covers all).
+    private static readonly ConditionalWeakTable<IChatClient, StrongBox<bool>> ReasoningClients = new();
+    private const int ReasoningMaxTokens = 4096;   // headroom for hidden reasoning + the short verdict (observed ~312)
+
+    /// <summary>Calls the judge, transparently adapting to a reasoning model: send <c>temperature</c> normally, but if the
+    /// model rejects it (HTTP 400 unsupported_value), remember that for this client and retry without temperature plus a
+    /// larger output budget. Idempotent per client; the chat-model path is byte-identical to before.</summary>
+    private async Task<ChatResponse> GetJudgeResponseAsync(List<ChatMessage> messages, CancellationToken cancellationToken)
+    {
+        var omitTemperature = ReasoningClients.TryGetValue(_chatClient, out var box) && box.Value;
+        try
+        {
+            return await _chatClient.GetResponseAsync(messages, BuildOptions(omitTemperature), cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (!omitTemperature && IsUnsupportedTemperature(ex))
+        {
+            // Reasoning model: it rejected `temperature`. Remember it, then retry without temperature (+ reasoning headroom).
+            ReasoningClients.AddOrUpdate(_chatClient, new StrongBox<bool>(true));
+            return await _chatClient.GetResponseAsync(messages, BuildOptions(omitTemperature: true), cancellationToken).ConfigureAwait(false);
+        }
+    }
+
+    private ChatOptions BuildOptions(bool omitTemperature) => omitTemperature
+        ? new ChatOptions { MaxOutputTokens = Math.Max(_options.MaxTokens, ReasoningMaxTokens) }   // reasoning: no temperature, headroom
+        : new ChatOptions { Temperature = _options.Temperature, MaxOutputTokens = _options.MaxTokens };
+
+    // A reasoning deployment that rejects a custom `temperature` surfaces an HTTP 400 invalid_request_error whose message
+    // is "...unsupported_value..." (the observed Azure OpenAI form; the parameter name is NOT always in the short Message).
+    // Since `temperature` is the only rejectable parameter we send (MaxOutputTokens→max_completion_tokens is accepted),
+    // treat an unsupported-value/unsupported-parameter 400 (or any message naming temperature) as the trigger to retry
+    // WITHOUT temperature. If the 400 was actually about something else, the retry still fails and falls through to the
+    // outer Inconclusive catch — same as before, no harm.
+    private static bool IsUnsupportedTemperature(Exception ex)
+    {
+        var m = ex.Message;
+        return m.Contains("unsupported_value", StringComparison.OrdinalIgnoreCase)
+            || m.Contains("temperature", StringComparison.OrdinalIgnoreCase)
+            || (m.Contains("400", StringComparison.OrdinalIgnoreCase)
+                && m.Contains("unsupported", StringComparison.OrdinalIgnoreCase));
     }
 
     private static string GetDefaultSystemPrompt()
