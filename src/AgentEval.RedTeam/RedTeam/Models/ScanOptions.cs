@@ -121,12 +121,15 @@ public class ScanOptions
     public IChatClient? JudgeClient { get; init; }
 
     /// <summary>
-    /// ADR-021 (Phase B.1): how the <see cref="JudgeClient"/> participates in grading. <see cref="JudgeMode.Fallback"/>
-    /// (default) is today's Inconclusive-gated fallback. <see cref="JudgeMode.Primary"/> routes Semantic + Verbal-evidence
-    /// probes to the judge as the primary grader (the keyword verdict becomes advisory). Inert without a
-    /// <see cref="JudgeClient"/> — a Primary-mode run with no judge falls back to the keyword oracle.
+    /// ADR-021 (Phase B.1) / ADR-023 (B.3 flip, 2026-06-22): how the <see cref="JudgeClient"/> participates in grading.
+    /// <see cref="JudgeMode.Primary"/> (NOW the default) routes Semantic + Verbal-evidence probes to the judge — the
+    /// Composite Judges (<see cref="DecomposedGraders"/>) where one exists, else the single judge — as the primary grader,
+    /// with the keyword verdict advisory. <see cref="JudgeMode.Fallback"/> is the legacy Inconclusive-gated behavior.
+    /// Inert without a <see cref="JudgeClient"/> — a run with no judge is byte-identical to the keyword oracle regardless
+    /// of mode. (B.3: flipped Fallback→Primary after the readiness review met its gate — κ=1.000, 0 directional
+    /// fabrications on the pinned gold; Composite Judges are honest-by-construction.)
     /// </summary>
-    public JudgeMode Mode { get; init; } = JudgeMode.Fallback;
+    public JudgeMode Mode { get; init; } = JudgeMode.Primary;
 
     /// <summary>
     /// ADR-021 (Phase B.1): the judge grading rubric (a prompt variant). <see cref="JudgeRubric.EvidenceAnchored"/>

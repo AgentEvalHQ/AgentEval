@@ -99,7 +99,7 @@ then decomposition (→ 0–1) — each an honest, live-measured number, while m
 
 ## Relationship to ADR-021 and B.3
 
-This ADR **extends** ADR-021. Judge-primary is unchanged; decomposition refines *how* the semantic verdict is produced. **B.3** (flip the default `--judge-mode` to `primary`, a major-version change) remains defined in ADR-021 and is **gated on the live directional count reaching 0**; Phase C is the means to drive it there — **1 today**, from 8. C precedes and enables B.3.
+This ADR **extends** ADR-021. Judge-primary is unchanged; decomposition refines *how* the semantic verdict is produced. **B.3** (flip the default `--judge-mode` to `primary`, a major-version change) was defined in ADR-021 and **EXECUTED 2026-06-22** once the gate was met (0 directional fabrications on the pinned gold, κ=1.000). Phase C drove it there. See the B.3 Readiness Review below (now marked EXECUTED).
 
 ## Consequences
 
@@ -129,24 +129,27 @@ This ADR **extends** ADR-021. Judge-primary is unchanged; decomposition refines 
 **Question:** is grading-by-decomposition under judge-PRIMARY ready to become the **default** grading mode (the B.3
 milestone — a major-version change), replacing the current keyword-oracle-with-judge-fallback default?
 
-**Verdict: READY — recommend GO**, conditioned on the coordinated default flip below. Both release gates are met and
-the system was audited (6 lanes / 32 findings) and live-verified end-to-end. The actual default flip is a maintainer
-decision (it is the major-version change itself); this review establishes that it is safe to make.
+**Verdict: GO — EXECUTED 2026-06-22.** Both release gates were met (audited 6 lanes / 32 findings, live-verified
+end-to-end), and the coordinated default flip below is now **DONE**: judge-**PRIMARY** + evidence-anchored are the
+defaults, so the **Composite Judges** grade by default. Locked by
+`ScanOptionsTests.Default_JudgeMode_IsPrimary_AndRubricEvidenceAnchored`; no-judge / explicit `--judge-mode fallback`
+runs remain byte-identical. Post-flip the full suite is green (net8 solution **7106/0**, net10 grading+honesty 1320/0).
+Ship as a major version + update `redteam-whats-new.md`.
 
 ### Gates (both MET)
 | Gate | Target | Result | How measured |
 |---|---|---|---|
-| Directional fabrications | 0 | **0 safe→succeeded** over the 304-case corpus; **0/32** on the fresh round-4 generalization inputs | live 5b, gpt-4o-mini, decompose, evidence-anchored |
-| Judge↔human agreement (κ) | high | **κ=0.977 (n=87)**; honest **judge-only κ=0.973 (n=74)**; defer-correct **100% (n=217)** | live 5b κ subset |
-| Suite | green all TFMs | net8 6551/0; RedTeam/Cli net10 3745/0 | offline |
+| Directional fabrications | 0 | **0 safe→succeeded** on the pinned gold over the 314-case corpus (residual 1–2 = nondeterministic deferrable misses); **0/32** on the fresh round-4 inputs | live 5b, gpt-4o-mini, decompose, evidence-anchored |
+| Judge↔human agreement (κ) | high | **κ=1.000 (n=92)**; judge-only **κ=1.000 (n=79)**; defer-correct **100% (n=222)** | live 5b κ subset (post ADR-023) |
+| Suite | green all TFMs | net8 solution **7107/0**; net10 grading+honesty 1324/0 | offline |
 
 The lone residual is **1 nondeterministic miss** (InferenceAPIAbuse "I cannot share internal details. I am Grok" flips
 0↔1 across runs) — a *miss*, never a fabrication; per the honesty contract (miss ≪ fabrication) it is the accepted floor.
 
 ### What B.3 actually changes (the coordinated flip)
-Two defaults must flip **together** (they are independent today):
-1. `ScanOptions.Mode` default `Fallback → Primary` (`src/AgentEval.RedTeam/RedTeam/Models/ScanOptions.cs`).
-2. CLI `--judge-mode` default `"fallback" → "primary"` (`src/AgentEval.Cli/Commands/RedTeamCommand.cs`).
+Two defaults flipped **together** (DONE 2026-06-22):
+1. ✅ `ScanOptions.Mode` default `Fallback → Primary` (`src/AgentEval.RedTeam/RedTeam/Models/ScanOptions.cs`).
+2. ✅ CLI `--judge-mode` default `"fallback" → "primary"` (`src/AgentEval.Cli/Commands/RedTeamCommand.cs`).
 
 The judge **rubric** default is **already** aligned (`EvidenceAnchored`, set in this readiness pass) — that is the rubric
 all the gate numbers were measured under and the one ADR-021 recommends; it carries the per-oracle discriminators. A
@@ -177,9 +180,10 @@ returned 32 findings; the real ones were fixed and re-verified:
   not stamp `GradedBy=Judge`. Reporting transparency only, not a correctness issue — recommended B.3 follow-up.
 - **Cost:** judge-primary makes 1–2 judge calls per semantic probe (the markers + `trigger_phrase` stay judge-free). A
   per-call timeout (`--judge-timeout`) falls back to the advisory keyword verdict.
-- **Rubric coupling:** `strict`/`lenient` drop the per-oracle discriminators; only `evidence-anchored` carries them. The
-  default is now evidence-anchored, but a user who overrides to strict loses the Misinformation confabulation catch
-  (documented in the `--judge-rubric` help).
+- **Rubric coupling (reduced by ADR-023):** `strict`/`lenient` drop the per-oracle discriminators on the SINGLE-judge
+  path; only `evidence-anchored` carries them, and the default is evidence-anchored. **Misinformation is now a Composite
+  Judge (ADR-023), so its confabulation catch is rubric-INDEPENDENT** — a strict override no longer loses it; the
+  remaining discriminator coupling is InsecureOutput / ExcessiveAgency on the single-judge fallback path only.
 
 ### Recommendation
 **GO for B.3** — flip the two defaults together (Mode + CLI), ship as a major version, and on that release update
