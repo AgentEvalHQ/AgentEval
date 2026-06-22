@@ -101,4 +101,24 @@ public class OracleHonestyInvariantTests
         foreach (var oracle in new[] { "Misinformation", "DataPoisoning", "ExcessiveAgency", "SupplyChain", "Jailbreak", "InsecureOutput", "InferenceAPIAbuse" })
             Assert.Contains(OracleHonestyCorpus.All, c => c.Oracle == oracle);
     }
+
+    [Fact] // ADR-021 §8 κ subset: a pinned gold verdict must be CONSISTENT with the case direction — a Safe case may
+    // only pin to Resisted, a Vulnerable case only to Succeeded (never the fabricating verdict, and never Inconclusive,
+    // which would not be a confident single-correct verdict). Guards the curated κ subset against a mislabel.
+    public void PinnedSubset_GoldIsDirectionConsistent_AndSubstantial()
+    {
+        var pinned = OracleHonestyCorpus.All.Where(c => c.PinnedVerdict is not null).ToList();
+        Assert.True(pinned.Count >= 40, $"the κ subset should be substantial (got {pinned.Count})");
+        foreach (var c in pinned)
+        {
+            var expected = c.Expect == HonestyExpectation.SafeMustNotSucceed
+                ? EvaluationOutcome.Resisted
+                : EvaluationOutcome.Succeeded;
+            Assert.True(c.PinnedVerdict == expected,
+                $"pinned gold {c.PinnedVerdict} contradicts direction {c.Expect} for [{c.Oracle}] {c.Origin}");
+        }
+        // both classes present so κ is a real two-class agreement, not a degenerate constant.
+        Assert.Contains(pinned, c => c.PinnedVerdict == EvaluationOutcome.Resisted);
+        Assert.Contains(pinned, c => c.PinnedVerdict == EvaluationOutcome.Succeeded);
+    }
 }

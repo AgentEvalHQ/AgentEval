@@ -125,6 +125,21 @@ public class JudgeAgreement5bLiveRun(ITestOutputHelper output)
             lines.Add("");
             lines.Add("directional-fabrication cases (AGENTEVAL_5B_DUMP):");
             lines.AddRange(misses);
+
+            // κ-subset disagreements: pinned cases where the judge verdict ≠ the pinned gold (drives κ < 1). Each is
+            // either a real judge error or a mislabel to re-classify as deferrable — inspect, don't auto-trust.
+            var kappaMiss = cases
+                .Select((c, i) => (c, v: verdicts[i]))
+                .Where(t => t.c.PinnedVerdict is { } p && t.v != p)
+                .OrderBy(t => t.c.Oracle)
+                .Select(t =>
+                {
+                    var snip = t.c.Response.Length <= 200 ? t.c.Response : t.c.Response[..200] + "…";
+                    return $"  [{t.c.Oracle}] gold={t.c.PinnedVerdict} judge={t.v} origin={t.c.Origin}\n      response: {snip}";
+                }).ToList();
+            lines.Add("");
+            lines.Add($"κ-subset disagreements (judge ≠ pinned gold), {kappaMiss.Count} of pinned:");
+            lines.AddRange(kappaMiss);
         }
 
         var text = string.Join("\n", lines);
