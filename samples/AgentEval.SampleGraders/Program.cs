@@ -1,11 +1,14 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 AgentEval Contributors
 //
-// AgentEval.SampleGraders — a self-contained head-to-head of three red-team GRADERS on the
-// InferenceAPIAbuse (OWASP LLM10) family: keyword oracle vs single LLM-as-judge vs the composite
-// (disclosure ⊕ refusal) decomposition. It scores each against a small hand-labelled corpus,
-// reports DIRECTIONAL FABRICATIONS (false alarms + missed hits), and — for the judge-based graders —
-// runs N times and reports mean ± stddev + a 95% CI diff. Consumes AgentEval; modifies nothing in it.
+// AgentEval.SampleGraders — a self-contained head-to-head of red-team GRADERS on the InferenceAPIAbuse
+// (OWASP LLM10) family, showing the BEFORE→AFTER arc: keyword oracle → single LLM-as-judge → flat
+// composite (disclosure ⊕ refusal) → CALIBRATED composite → the ADR-024 GATED TREE (the "divide-and-
+// conquer differently" decomposition that closes the "I am Grok" product-bot-vs-model floor without a
+// stronger judge). It scores each against a small hand-labelled corpus, reports DIRECTIONAL FABRICATIONS
+// (false alarms + missed hits), and — for the judge-based graders — runs N times with mean ± stddev +
+// a 95% CI diff. Consumes AgentEval; modifies nothing in it. Runs standalone (offline heuristic stand-in
+// without AZURE_OPENAI_* env; real Azure judge when they are set).
 using AgentEval.RedTeam;             // Attack, IProbeEvaluator, GraderFactory, JudgeRubric, DecomposedGraders
 using AgentEval.RedTeam.Evaluators;  // LLMJudgeEvaluator
 using AgentEval.SampleGraders;
@@ -33,14 +36,23 @@ IProbeEvaluator keyword = Attack.InferenceAPIAbuse.GetEvaluator();              
 IProbeEvaluator single = new LLMJudgeEvaluator(judge, GraderFactory.OptionsFor(JudgeRubric.EvidenceAnchored, "InferenceAPIAbuse"));
 IProbeEvaluator compositePrototype = DecomposedGraders.TryBuildFor("InferenceAPIAbuse", judge)
     ?? throw new InvalidOperationException("DecomposedGraders has no build for InferenceAPIAbuse.");
+// NOTE: CALIBRATED V1 is a SAMPLE-LOCAL EXPERIMENT — its V1 prompts live ONLY in this companion (CalibrationHarness),
+// NOT in production. (V0 / single / flat / gated below all use the REAL shipping AgentEval graders & prompts.)
+// It's here to illustrate dump-driven calibration, not to represent a shipping grader.
 IProbeEvaluator compositeCalibrated = CalibrationHarness.BuildComposite(judge, CalibrationHarness.V1);
+// ADR-024 "divide-and-conquer differently": the GATED TREE — D1 names-a-model ∧ D2 it's-the-AI-not-a-product (disclosure),
+// B1 abuse-done ∧ B2 real-not-hypothetical (abuse), C1 declines ∧ C2 no-leak (refusal), under a top OR. Isolating the one
+// hard call (D2) closes the "I am Grok" floor — the real disclosure is caught, the product-bot decoy is vetoed — on
+// gpt-4o-mini, no stronger model needed. Built explicitly so it shows regardless of the AGENTEVAL_INFERENCE_TREE toggle.
+IProbeEvaluator gatedTree = DecomposedGraders.BuildInferenceAbuseTree(judge);
 
 (string Name, string Short, IProbeEvaluator Grader, bool Stochastic)[] graders =
 [
     ("Keyword oracle", "keyword", keyword, false),
     ("Single judge (evidence-anchored)", "single", single, true),
-    ("Composite - prototype (uncalibrated)", "comp(proto)", compositePrototype, true),
-    ("Composite - CALIBRATED (V1)", "comp(calib)", compositeCalibrated, true),
+    ("Composite - flat (disclosure⊕refusal)", "comp(flat)", compositePrototype, true),
+    ("Composite - CALIBRATED V1 (sample experiment, NOT shipping)", "comp(calib*)", compositeCalibrated, true),
+    ("Composite - GATED TREE (ADR-024)", "comp(gated)", gatedTree, true),
 ];
 
 IReadOnlyList<GraderCase> corpus = GraderCorpus.InferenceApiAbuse();
