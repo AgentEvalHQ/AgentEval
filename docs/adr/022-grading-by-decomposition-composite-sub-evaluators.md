@@ -65,7 +65,7 @@ Reproduce any row with `AGENTEVAL_5B_GRADER={keyword|judge|decompose}` (+ `AGENT
 | Single judge — STRICT | 45 | 8 | 37 | 85% | first honest measure; the judge under-reports compromise (missed hits dominate) |
 | Single judge — evidence-anchored | 14 | 11 | 3 | 95% | quote-grounding moves the whole curve outward (−92% missed) |
 | Single judge — + per-oracle discriminators | 8 | 5 | 3 | 97% | the **single-prompt floor** — two further global swings made it worse (39, 42) |
-| **Decomposition** (Phase C, C.0–C.6, **production routing**) | **0–1** | 0 | 0–1 | 100% | HONEST **and** convergent. The 5 deterministic oracles + tool-aware ExcessiveAgency sit at a stable 0; the only residual is one judge-nondeterministic InferenceAbuse case (0–1) → stronger-judge territory |
+| **Decomposition** (Phase C + **R4 live-verified**, **production routing**) | **0–1** | 0 | 0–1 | 100% | HONEST **and** convergent — LIVE-measured on the full 298-corpus (gpt-4o-mini, evidence-anchored): **0 fabrications**, κ=0.975 (n=87 pins). The deterministic legs are now the markers + Behavioral tool leg (NOT the retired parser/ground-truth detectors); the lone residual is one judge-nondeterministic InferenceAbuse "I am Grok" miss (0↔1 across runs) |
 
 ### Per oracle (keyword vs single judge vs decomposition; directional fabrications, lower is better)
 
@@ -87,11 +87,15 @@ Reproduce any row with `AGENTEVAL_5B_GRADER={keyword|judge|decompose}` (+ `AGENT
 
 **Read the keyword `0` correctly.** It is the *overfitting* number, not an accuracy win — the corpus was built by
 finding keyword-oracle failures and patching the oracle until it passed, and the non-convergence finding (41→41 on
-fresh sweeps) is the documented proof it does not generalize. The decomposition `1` is the opposite: an *honest*
-number whose deterministic half (parser, ground-truth) **generalizes** — a parser or a ground-truth comparison
-cannot overfit a corpus the way a substring lexicon does. **The progression that matters is the single-judge column
-(45 → 14 → 8) and then decomposition (→ 1) — each an honest measure, trending to zero, while gaining determinism,
-convergence, and lower cost.**
+fresh sweeps) is the documented proof it does not generalize. **R4 correction (Jun 22):** an earlier draft of this
+section claimed the decomposition's "deterministic half (parser, ground-truth) generalizes." That was WRONG and is the
+core R4 finding — the executable-structure *parser* and the ground-truth detectors were themselves non-convergent (a
+fourth adversarial round diverged 10→32 fabrications) and were **retired**. The decomposition's honest `0–1` now comes
+from the **positive-only JUDGES** (which the live 5b measurement validated at 0 fabrications / κ=0.975), with
+determinism retained ONLY for the genuinely-structural markers (PromptInjection/Jailbreak canary, DataPoisoning
+trigger_phrase) and the Behavioral tool leg. **The progression that matters is the single-judge column (45 → 14 → 8) and
+then decomposition (→ 0–1) — each an honest, live-measured number, while moving the SEMANTIC sub-questions to judges
+(the only convergent answer) and keeping determinism only where a true structural anchor exists.**
 
 ## Relationship to ADR-021 and B.3
 

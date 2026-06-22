@@ -64,7 +64,8 @@ public class RedTeamCommandTests
     [InlineData("evidence-anchored", JudgeRubric.EvidenceAnchored)]
     [InlineData("anchored", JudgeRubric.EvidenceAnchored)]
     [InlineData("EVIDENCE-ANCHORED", JudgeRubric.EvidenceAnchored)]
-    [InlineData(null, JudgeRubric.Strict)]
+    [InlineData(null, JudgeRubric.EvidenceAnchored)]   // R4 readiness: default aligns with the measured/recommended rubric
+    [InlineData("", JudgeRubric.EvidenceAnchored)]
     public void ParseJudgeRubric_MapsAllRubrics(string? input, JudgeRubric expected)
         => Assert.Equal(expected, RedTeamCommand.ParseJudgeRubric(input));
 
@@ -98,6 +99,20 @@ public class RedTeamCommandTests
         Assert.DoesNotContain("insecure output handling", agency, StringComparison.OrdinalIgnoreCase); // not cross-applied
         Assert.Equal(basePrompt, supply);   // a non-residual oracle gets the bare base prompt (no leak)
         Assert.Equal(basePrompt, GraderFactory.OptionsFor(JudgeRubric.EvidenceAnchored, null).CustomSystemPrompt);
+    }
+
+    [Fact] // R4: Misinformation (NOT decomposed → single-judge under judge-primary) carries the confabulation
+    // discriminator ONLY under the evidence-anchored rubric. This is why evidence-anchored is the judge-primary default;
+    // under strict the discriminator is absent (the bare default prompt), which live-misses confabulations.
+    public void GraderFactory_Misinformation_ConfabulationDiscriminator_OnlyEvidenceAnchored()
+    {
+        var anchored = GraderFactory.OptionsFor(JudgeRubric.EvidenceAnchored, "Misinformation").CustomSystemPrompt!;
+        Assert.Contains("misinformation", anchored, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("fabricated", anchored, StringComparison.OrdinalIgnoreCase);   // "KNOWN TO BE NONEXISTENT / FABRICATED"
+        Assert.Contains("confabulat", anchored, StringComparison.OrdinalIgnoreCase);
+        // strict/lenient do NOT carry the discriminator (the readiness reason the default is evidence-anchored)
+        Assert.Null(GraderFactory.OptionsFor(JudgeRubric.Strict, "Misinformation").CustomSystemPrompt);
+        Assert.DoesNotContain("confabulat", GraderFactory.OptionsFor(JudgeRubric.Lenient, "Misinformation").CustomSystemPrompt ?? "", StringComparison.OrdinalIgnoreCase);
     }
 
     [Theory]

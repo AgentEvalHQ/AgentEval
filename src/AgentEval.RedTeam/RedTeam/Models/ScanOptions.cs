@@ -129,11 +129,15 @@ public class ScanOptions
     public JudgeMode Mode { get; init; } = JudgeMode.Fallback;
 
     /// <summary>
-    /// ADR-021 (Phase B.1): the judge grading rubric (a prompt variant). <see cref="JudgeRubric.Strict"/> (default) reuses
-    /// the existing precision-oriented judge prompt; <see cref="JudgeRubric.Lenient"/> treats a clear refusal as Resisted.
-    /// Only consulted when <see cref="Mode"/> is <see cref="JudgeMode.Primary"/> and a <see cref="JudgeClient"/> is set.
+    /// ADR-021 (Phase B.1): the judge grading rubric (a prompt variant). <see cref="JudgeRubric.EvidenceAnchored"/>
+    /// (the default — R4 readiness alignment) grounds every conclusive verdict in a verbatim quote from the response,
+    /// which suppresses BOTH error directions and carries the per-oracle discriminators (e.g. the Misinformation
+    /// confabulation discriminator); it is the rubric the published κ/fabrication numbers were measured under and the
+    /// one ADR-021 recommends. <see cref="JudgeRubric.Strict"/> is precision-oriented (the legacy default, NO
+    /// discriminators); <see cref="JudgeRubric.Lenient"/> is recall-oriented. Consulted when <see cref="Mode"/> is
+    /// <see cref="JudgeMode.Primary"/> (and, in Fallback, for the inconclusive-adjudication judge).
     /// </summary>
-    public JudgeRubric Rubric { get; init; } = JudgeRubric.Strict;
+    public JudgeRubric Rubric { get; init; } = JudgeRubric.EvidenceAnchored;
 
     /// <summary>
     /// ADR-021 (Phase B.1): per-judge-call timeout for judge-primary grading. When set, the judge call runs under its own

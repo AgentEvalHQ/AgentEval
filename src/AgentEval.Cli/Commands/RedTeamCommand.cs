@@ -105,7 +105,7 @@ internal static class RedTeamCommand
         var judgeModeOpt = new Option<string>("--judge-mode")
             { DefaultValueFactory = _ => "fallback", Description = "How the judge grades: 'fallback' (default — judge only adjudicates Inconclusive verdicts) or 'primary' (judge grades semantic, text-only probes first; the keyword oracle becomes advisory). 'primary' requires --judge; without it, it is a no-op." };
         var judgeRubricOpt = new Option<string>("--judge-rubric")
-            { DefaultValueFactory = _ => "strict", Description = "Judge rubric for --judge-mode primary: 'strict' (default; precision-oriented — only clear compromise ⇒ Succeeded, so fewer false alarms but MORE missed hits), 'lenient' (recall-oriented — any sign of compromise ⇒ Succeeded, so it catches more real compromises at the cost of more false alarms), or 'evidence-anchored' (a conclusive verdict must be grounded in a verbatim quote from the response — targets both false alarms and missed hits by refusing ungrounded verdicts). For a scan where a missed vulnerability matters more than a false alarm, prefer 'lenient'." };
+            { DefaultValueFactory = _ => "evidence-anchored", Description = "Judge rubric for --judge-mode primary: 'evidence-anchored' (default — a conclusive verdict must be grounded in a verbatim quote from the response, which targets BOTH false alarms and missed hits, carries the per-oracle discriminators, and is the rubric the published κ/fabrication numbers were measured under), 'strict' (precision-oriented — only clear compromise ⇒ Succeeded; fewer false alarms but more missed hits; no discriminators), or 'lenient' (recall-oriented — any sign of compromise ⇒ Succeeded; catches more real compromises at the cost of more false alarms). For a scan where a missed vulnerability matters more than a false alarm, prefer 'lenient'." };
         var judgeTimeoutOpt = new Option<double>("--judge-timeout")
             { DefaultValueFactory = _ => 0, Description = "Per-judge-call timeout (seconds) for judge-primary grading; on timeout the advisory keyword verdict is kept. 0 = share the per-probe budget." };
 
@@ -721,9 +721,10 @@ internal static class RedTeamCommand
     };
 
     /// <summary>Maps <c>--judge-rubric</c> to a <see cref="JudgeRubric"/> (ADR-021 B.1; case-tolerant).</summary>
-    internal static JudgeRubric ParseJudgeRubric(string? rubric) => (rubric ?? "strict").Trim().ToLowerInvariant() switch
+    internal static JudgeRubric ParseJudgeRubric(string? rubric) => (rubric ?? "evidence-anchored").Trim().ToLowerInvariant() switch
     {
-        "" or "strict" => JudgeRubric.Strict,
+        "" => JudgeRubric.EvidenceAnchored,   // R4 readiness: the recommended/measured default
+        "strict" => JudgeRubric.Strict,
         "lenient" => JudgeRubric.Lenient,
         "evidence-anchored" or "anchored" or "evidence" => JudgeRubric.EvidenceAnchored,
         _ => throw new ArgumentException($"Unknown --judge-rubric '{rubric}'. Use 'strict', 'lenient', or 'evidence-anchored'."),

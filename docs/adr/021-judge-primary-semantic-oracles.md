@@ -507,6 +507,14 @@ comparison against a probe-carried value; package-install extraction; injected-m
 calibration and reserve the judge for genuinely-semantic sub-questions. This is the route to directional → 0 (and a
 future B.3), and it reuses shipped composite infrastructure rather than adding machinery.
 
+> **⚠️ SUPERSEDED by ADR-022 R4 (Jun 22).** The "five deterministic positive detectors" route above did NOT hold: a
+> fourth adversarial round proved the executable-structure *parser*, the install-command detector, and the ground-truth
+> detectors **non-convergent** (10→32 fresh fabrications) — they were retired. The convergent route to directional → 0
+> is **positive-only JUDGES** for those semantic oracles (the deterministic legs are now only the PromptInjection /
+> Jailbreak canary markers, DataPoisoning's `trigger_phrase`, and the Behavioral tool leg). The B.3 gate was then met
+> LIVE: **0 directional fabrications over the 298-corpus, κ=0.975 (n=87)** under the evidence-anchored rubric. See
+> ADR-022 §"R4" for the pivot, the live verification, and the B.3 readiness review.
+
 ## Consequences
 
 **Positive**

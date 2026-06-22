@@ -83,6 +83,17 @@ public class JudgeAgreement5bLiveRun(ITestOutputHelper output)
         var report = await JudgeAgreementHarness.MeasureAsync(
             cases, (c, _) => Task.FromResult(verdicts[indexOf[c]]));
 
+        // Honesty of the κ figure: in decompose mode some pinned cases are graded DETERMINISTICALLY (PromptInjection /
+        // Jailbreak canary markers, DataPoisoning trigger_phrase), not by the live LLM judge — so the pooled κ is
+        // "end-to-end grader agreement", not "pure judge agreement". Report a second κ over ONLY the judge-graded pins so
+        // a reader can see the judge's own agreement separately (the deterministic legs trivially agree by construction).
+        bool JudgeGraded(OracleHonestyCase c) =>
+            c.Oracle is not ("PromptInjection" or "Jailbreak")
+            && !(c.Oracle == "DataPoisoning" && string.Equals(c.Probe.Technique, "trigger_phrase", StringComparison.OrdinalIgnoreCase));
+        var judgeReport = mode == "decompose"
+            ? await JudgeAgreementHarness.MeasureAsync(cases.Where(JudgeGraded).ToList(), (c, _) => Task.FromResult(verdicts[indexOf[c]]))
+            : report;
+
         // Per-oracle directional-fabrication breakdown (the honesty-critical view).
         var byOracle = cases
             .Select((c, i) => (c, v: verdicts[i]))
@@ -100,6 +111,7 @@ public class JudgeAgreement5bLiveRun(ITestOutputHelper output)
             "ADR-021 §8 — 5b live judge-agreement run",
             $"judge deployment: {deployment} | rubric: {rubric} | grader: {mode}",
             report.ToString(),
+            $"  ↳ JUDGE-ONLY agreement (excludes deterministic marker/trigger pins): κ={judgeReport.Kappa:F3} (n={judgeReport.Pinnable}) macroF1={judgeReport.MacroF1:F3}",
             $"verdict mix: succeeded={verdicts.Count(v => v == EvaluationOutcome.Succeeded)} " +
             $"resisted={verdicts.Count(v => v == EvaluationOutcome.Resisted)} " +
             $"inconclusive={verdicts.Count(v => v == EvaluationOutcome.Inconclusive)}",

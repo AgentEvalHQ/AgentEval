@@ -91,6 +91,36 @@ public class OracleHonestyInvariantTests
                 $"ROUTING HONESTY VIOLATION — a correct judge + routing produced Resisted on a VULNERABLE response.\n  {where}");
     }
 
+    // R4 (#18): the production judge-PRIMARY path routes to the DECOMPOSED graders (DecomposedGraders.TryBuildFor /
+    // TryBuildToolAwareFor), NOT JudgeBackedEvaluator. This Theory exercises THAT routing over the whole corpus with an
+    // ABSTAINING judge: the structural honesty guarantee is that even a useless judge cannot make the decomposition
+    // fabricate a compromise on a SAFE response (the positive-only judge can't fire; the markers stay gated).
+    [Theory]
+    [MemberData(nameof(Cases))]
+    public async Task DecomposedPrimary_AbstainingJudge_NeverFabricates(int index)
+    {
+        var c = OracleHonestyCorpus.All[index];
+        var abstaining = new FakeChatClient("VERDICT: INCONCLUSIVE\nCONFIDENCE: 0.3\nREASON: cannot tell");
+        // mirror GraderFactory.For under Mode==Primary: tool-aware → tool-aware decomposition; else text decomposition;
+        // else (non-decomposed, e.g. Misinformation) → JudgeBackedEvaluator with the evidence-anchored per-oracle prompt.
+        var grader = c.Oracle == "ExcessiveAgency"
+            ? DecomposedGraders.TryBuildToolAwareFor(c.Oracle, c.Evaluator, abstaining)!
+            : DecomposedGraders.TryBuildFor(c.Oracle, abstaining)
+              ?? new JudgeBackedEvaluator(c.Evaluator, abstaining, JudgeMode.Primary,
+                     GraderFactory.OptionsFor(JudgeRubric.EvidenceAnchored, c.Oracle), includeEvidence: true, judgeTimeout: null);
+
+        var result = await grader.EvaluateAsync(c.Probe, c.Response);
+
+        var snippet = c.Response.Length <= 90 ? c.Response : c.Response[..90] + "…";
+        var where = $"[{c.Oracle}] {c.Origin} → {result.Outcome} (DECOMPOSED primary, abstaining judge)\n  response: \"{snippet}\"";
+        if (c.Expect == HonestyExpectation.SafeMustNotSucceed)
+            Assert.False(result.Outcome == EvaluationOutcome.Succeeded,
+                $"DECOMPOSED ROUTING HONESTY VIOLATION — the production decomposed grader fabricated Succeeded on a SAFE response.\n  {where}");
+        else
+            Assert.False(result.Outcome == EvaluationOutcome.Resisted,
+                $"DECOMPOSED ROUTING HONESTY VIOLATION — the production decomposed grader masked a hit (Resisted) on a VULNERABLE response.\n  {where}");
+    }
+
     [Fact]
     public void Corpus_IsNonTrivial_AndCoversBothDirections()
     {

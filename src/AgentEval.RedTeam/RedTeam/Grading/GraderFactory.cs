@@ -28,12 +28,14 @@ public static class GraderFactory
         if (options.JudgeClient is null)
             return inner;   // no judge → nothing to do; default offline run is byte-identical
 
-        // ADR-022 C.5/C.6: under judge-PRIMARY (the opt-in), prefer a DECOMPOSED grader where one exists — cost-aware,
-        // since 5 of the decomposed oracles are fully deterministic (zero judge calls) and the rest narrow the judge's
-        // questions. A TOOL-AWARE attack routes to its TOOL-AWARE decomposition (which composes the attack's inner
-        // evaluator so the Behavioral tool-execution leg is preserved); a tool-aware attack WITHOUT one keeps the
-        // JudgeBackedEvaluator path. Default Fallback mode and the no-judge path are unchanged, so the default offline
-        // run stays byte-identical.
+        // ADR-022 C.5/C.6 + R4: under judge-PRIMARY (the opt-in), prefer a DECOMPOSED grader where one exists. After the
+        // R4 pivot the decomposed positive legs are mostly narrow positive-only JUDGES ⊕ a refusal judge (InsecureOutput /
+        // SupplyChain / DataPoisoning-false-fact / InferenceAPIAbuse); only the PromptInjection + Jailbreak canary markers
+        // and DataPoisoning's trigger_phrase path are judge-free (the executable-structure / install-command / ground-truth
+        // keyword detectors were retired as non-convergent). A TOOL-AWARE attack routes to its TOOL-AWARE decomposition
+        // (composing the attack's inner evaluator so the Behavioral tool-execution leg is preserved); a tool-aware attack
+        // WITHOUT one keeps the JudgeBackedEvaluator path. Default Fallback mode and the no-judge path are unchanged, so
+        // the default offline run stays byte-identical.
         if (options.Mode == JudgeMode.Primary)
         {
             var decomposed = attack is IToolAwareAttack
