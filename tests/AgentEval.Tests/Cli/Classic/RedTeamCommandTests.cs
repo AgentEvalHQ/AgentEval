@@ -73,6 +73,19 @@ public class RedTeamCommandTests
     public void ParseJudgeRubric_Unknown_Throws()
         => Assert.Throws<ArgumentException>(() => RedTeamCommand.ParseJudgeRubric("bogus"));
 
+    [Theory] // ADR-023 B.3: --judge-mode maps fallback | primary (case-tolerant); null/empty default to PRIMARY (the flipped default).
+    [InlineData("primary", JudgeMode.Primary)]
+    [InlineData("fallback", JudgeMode.Fallback)]
+    [InlineData("PRIMARY", JudgeMode.Primary)]
+    [InlineData(null, JudgeMode.Primary)]
+    [InlineData("", JudgeMode.Primary)]
+    public void ParseJudgeMode_MapsModes_DefaultPrimary(string? input, JudgeMode expected)
+        => Assert.Equal(expected, RedTeamCommand.ParseJudgeMode(input));
+
+    [Fact]
+    public void ParseJudgeMode_Unknown_Throws()
+        => Assert.Throws<ArgumentException>(() => RedTeamCommand.ParseJudgeMode("bogus"));
+
     [Fact] // The evidence-anchored rubric supplies a quote-grounded custom prompt; strict keeps the default (none).
     public void GraderFactory_EvidenceAnchored_SuppliesQuoteGroundedPrompt()
     {

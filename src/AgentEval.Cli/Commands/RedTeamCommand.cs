@@ -107,7 +107,7 @@ internal static class RedTeamCommand
         var judgeRubricOpt = new Option<string>("--judge-rubric")
             { DefaultValueFactory = _ => "evidence-anchored", Description = "Judge rubric for --judge-mode primary: 'evidence-anchored' (default — a conclusive verdict must be grounded in a verbatim quote from the response, which targets BOTH false alarms and missed hits, carries the per-oracle discriminators, and is the rubric the published κ/fabrication numbers were measured under), 'strict' (precision-oriented — only clear compromise ⇒ Succeeded; fewer false alarms but more missed hits; no discriminators), or 'lenient' (recall-oriented — any sign of compromise ⇒ Succeeded; catches more real compromises at the cost of more false alarms). For a scan where a missed vulnerability matters more than a false alarm, prefer 'lenient'." };
         var judgeTimeoutOpt = new Option<double>("--judge-timeout")
-            { DefaultValueFactory = _ => 0, Description = "Per-judge-call timeout (seconds) for judge-primary grading; on timeout the advisory keyword verdict is kept. 0 = share the per-probe budget." };
+            { DefaultValueFactory = _ => 0, Description = "Per-judge-call timeout (seconds) for the SINGLE-judge / fallback grading path; on timeout the advisory keyword verdict is kept. (The default judge-primary COMPOSITE path is bounded by --timeout-per-probe, not by this.) 0 = share the per-probe budget." };
 
         // Attacker (LLM that drives attacker-LLM multi-turn attacks: Crescendo / PAIR / TAP)
         var attackerEndpointOpt = new Option<string?>("--attacker")
@@ -713,10 +713,10 @@ internal static class RedTeamCommand
     }
 
     /// <summary>Maps <c>--judge-mode</c> to a <see cref="JudgeMode"/> (ADR-021 B.1; case-tolerant).</summary>
-    internal static JudgeMode ParseJudgeMode(string? mode) => (mode ?? "fallback").Trim().ToLowerInvariant() switch
+    internal static JudgeMode ParseJudgeMode(string? mode) => (mode ?? "primary").Trim().ToLowerInvariant() switch
     {
-        "" or "fallback" => JudgeMode.Fallback,
-        "primary" => JudgeMode.Primary,
+        "" or "primary" => JudgeMode.Primary,   // ADR-023 B.3: default flipped to judge-primary (matches ParseJudgeRubric)
+        "fallback" => JudgeMode.Fallback,
         _ => throw new ArgumentException($"Unknown --judge-mode '{mode}'. Use 'fallback' or 'primary'."),
     };
 
@@ -818,8 +818,8 @@ internal sealed class RedTeamOptions
     public string? JudgeEndpoint { get; init; }
     public string? JudgeModel { get; init; }
     public string? JudgeApiKey { get; init; }
-    public string JudgeMode { get; init; } = "fallback";   // ADR-021 B.1: fallback | primary
-    public string JudgeRubric { get; init; } = "strict";   // ADR-021 B.1: strict | lenient
+    public string JudgeMode { get; init; } = "primary";            // ADR-023 B.3: default flipped to judge-primary
+    public string JudgeRubric { get; init; } = "evidence-anchored"; // ADR-021 B.1 / R4: the measured/recommended default
     public double JudgeTimeoutSeconds { get; init; }        // ADR-021 B.1: 0 = share per-probe budget
     public string? AttackerEndpoint { get; init; }
     public string? AttackerModel { get; init; }

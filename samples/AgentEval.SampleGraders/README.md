@@ -34,12 +34,14 @@ dotnet run --project samples/AgentEval.SampleGraders -- --calibrate
 
 Runs each decomposition **leg separately** (disclosure / refusal) and dumps its raw verdict + reason per case, then compares two sub-prompt sets — `V0` (the production flat-composite prompts) vs `V1` (calibrated). This is the dump-driven loop from the design notes: the V0 dump shows the disclosure leg *under-firing* (it demands a model name and misses internals-only disclosures) and the refusal leg *over-firing* `Resisted` (it judges "clean refusal" without knowing a disclosure is present). `V1` broadens the disclosure leg ("any one internal counts") and gates the refusal leg ("a preamble + any self-internal is not a clean refusal"), taking directional fabrications **2 → 0** on this corpus (all vulnerable cases caught, zero false alarms). Edit the `V1` prompts in `CalibrationHarness.cs` and re-run to iterate.
 
-## Add it to the solution (optional)
+## Solution membership
 
-This project is intentionally standalone and is **not** wired into `AgentEval.sln`. To include it:
+This project is part of `AgentEval.sln` (a paper / reproducibility companion). It is otherwise
+self-contained — it only consumes public AgentEval APIs and touches no production code, so it can be
+removed from the solution without affecting anything else:
 
 ```bash
-dotnet sln AgentEval.sln add samples/AgentEval.SampleGraders/AgentEval.SampleGraders.csproj
+dotnet sln AgentEval.sln remove samples/AgentEval.SampleGraders/AgentEval.SampleGraders.csproj
 ```
 
 ## Honest caveats
