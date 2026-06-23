@@ -19,6 +19,7 @@ public static class NonConvergenceRunner
         int rounds = IntArg(args, "--rounds", 6);
         int perRound = IntArg(args, "--per-round", 16);
         int seed = IntArg(args, "--seed", 1117);
+        string outDir = ResolveOutputDir(args);
 
         Console.WriteLine("AgentEval.SampleGraders — STAGE 1: non-convergence-of-patching + keyword-vs-composite contrast");
         Console.WriteLine(new string('=', 78));
@@ -61,7 +62,7 @@ public static class NonConvergenceRunner
             : "=> the gap did not appear on this run — reporting honestly; inspect generator diversity / rounds / seed.");
         Console.WriteLine();
 
-        await WriteResultsAsync(keyword, comp, rounds, perRound, seed, isReal);
+        await WriteResultsAsync(keyword, comp, rounds, perRound, seed, isReal, outDir);
         judge.Dispose();
         return 0;
     }
@@ -79,15 +80,9 @@ public static class NonConvergenceRunner
         Console.WriteLine();
     }
 
-    private static async Task WriteResultsAsync(IReadOnlyList<RoundResult> kw, IReadOnlyList<RoundResult> cp, int rounds, int perRound, int seed, bool isReal)
+    private static async Task WriteResultsAsync(IReadOnlyList<RoundResult> kw, IReadOnlyList<RoundResult> cp, int rounds, int perRound, int seed, bool isReal, string outDir)
     {
-        string dir;
-        try
-        {
-            dir = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "strategy", "redteam", "paper", "build", "results"));
-            Directory.CreateDirectory(dir);
-        }
-        catch { dir = Environment.CurrentDirectory; }
+        Directory.CreateDirectory(outDir);
 
         var sb = new StringBuilder();
         sb.AppendLine($"{{ \"experiment\": \"nonconvergence-contrast\", \"isReal\": {isReal.ToString().ToLowerInvariant()}, \"rounds\": {rounds}, \"perRound\": {perRound}, \"seed\": {seed},");
@@ -98,7 +93,7 @@ public static class NonConvergenceRunner
         sb.Append(string.Join(", ", cp.Select(r => $"{{\"round\":{r.Round},\"fresh\":{r.FreshFabrications},\"fa\":{r.FalseAlarms},\"miss\":{r.MissedHits}}}")));
         sb.AppendLine("] }");
 
-        string path = Path.Combine(dir, "nonconvergence-result.json");
+        string path = Path.Combine(outDir, "nonconvergence-result.json");
         await File.WriteAllTextAsync(path, sb.ToString());
         Console.WriteLine($"Wrote {path}");
     }
@@ -116,6 +111,8 @@ public static class NonConvergenceRunner
 
         Console.WriteLine($"Multi-seed confirmatory: keyword {kwSeeds} seeds (deterministic) + composite (gated tree) {compSeeds} seeds; {rounds} rounds x {perRound} fresh cases.");
         Console.WriteLine();
+
+        string outDir = ResolveOutputDir(args);
 
         var keyword = new List<(int Seed, int[] Fresh)>();
         for (int s = 0; s < kwSeeds; s++)
@@ -140,9 +137,8 @@ public static class NonConvergenceRunner
             Console.WriteLine($"  composite seed {seed}: [{string.Join(",", traj.Select(r => r.FreshFabrications))}]");
         }
 
-        string dir;
-        try { dir = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "strategy", "redteam", "paper", "build", "results")); Directory.CreateDirectory(dir); }
-        catch { dir = Environment.CurrentDirectory; }
+        string dir = outDir;
+        Directory.CreateDirectory(dir);
         var sb = new StringBuilder();
         sb.AppendLine("{");
         sb.AppendLine($"  \"config\": {{ \"rounds\": {rounds}, \"perRound\": {perRound}, \"keywordSeeds\": {kwSeeds}, \"compositeSeeds\": {compSeeds}, \"seedStart\": {seedStart}, \"isReal\": {isReal.ToString().ToLowerInvariant()}, \"family\": \"InferenceAPIAbuse\", \"composite\": \"ADR-024 gated tree\" }},");
@@ -155,9 +151,25 @@ public static class NonConvergenceRunner
         sb.AppendLine("}");
         string path = Path.Combine(dir, "multiseed-result.json");
         await File.WriteAllTextAsync(path, sb.ToString());
-        Console.WriteLine($"\nWrote {path}  →  run: python3 strategy/redteam/paper/build/stats/confirmatory.py");
+        Console.WriteLine($"\nWrote {path}");
         judge.Dispose();
         return 0;
+    }
+
+    private static string ResolveOutputDir(string[] args)
+    {
+        string? fromArg = StringArg(args, "--out");
+        if (!string.IsNullOrWhiteSpace(fromArg)) return Path.GetFullPath(fromArg);
+        string? fromEnv = Environment.GetEnvironmentVariable("NONCONVERGENCE_OUT");
+        if (!string.IsNullOrWhiteSpace(fromEnv)) return Path.GetFullPath(fromEnv);
+        return Environment.CurrentDirectory;
+    }
+
+    private static string? StringArg(string[] args, string name)
+    {
+        for (int i = 0; i < args.Length - 1; i++)
+            if (args[i] == name && !string.IsNullOrWhiteSpace(args[i + 1])) return args[i + 1];
+        return null;
     }
 
     private static string Trunc(string s, int n) => string.IsNullOrEmpty(s) || s.Length <= n ? s : s[..(n - 1)] + "…";
