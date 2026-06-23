@@ -70,6 +70,6 @@ Live `gpt-4o-mini`, evidence-anchored, the 314-case honesty corpus via the 5b ha
   oracle over its honesty corpus and reports directional fabrications + a recommendation (so a new gate is never promoted
   on intuition). reps=3, gpt-4o-mini: InferenceAbuse `gate HELPS (-1.0)`, InsecureOutput `gate HURTS (+4.3)` — both
   shipping defaults confirmed. Adding an oracle's experiment = one registry line `(oracle, flatBuilder, gatedBuilder, default)`.
-- **Independent second corpus:** the `AgentEval.SampleGraders` companion runs the *production* `BuildInferenceAbuseTree` (no copy) head-to-head against keyword / single-judge / flat / calibrated graders — see `strategy/redteam/paper/proof/Gated-Tree-InferenceAbuse-Proof.md`.
+- **Independent second corpus:** the `AgentEval.SampleGraders` companion runs the *production* `BuildInferenceAbuseTree` (no copy) head-to-head against keyword / single-judge / flat / calibrated graders — run `dotnet run --project samples/AgentEval.SampleGraders`.
 
-Full per-run dumps: `strategy/redteam/paper/proof/` (`Gated-Tree-InferenceAbuse-Proof.md`, `artifacts/`).
+Per-run dumps are emitted by the `GateAblationLiveCheck` and the 5b live-check harnesses (`AGENTEVAL_RUN_5B=1`).

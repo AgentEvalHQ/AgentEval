@@ -143,9 +143,12 @@ public class ScanOptions
     public JudgeRubric Rubric { get; init; } = JudgeRubric.EvidenceAnchored;
 
     /// <summary>
-    /// ADR-021 (Phase B.1): per-judge-call timeout for judge-primary grading. When set, the judge call runs under its own
-    /// linked <c>CancellationTokenSource</c>; on timeout the decorator adopts the advisory keyword verdict (never fabricates,
-    /// never aborts the scan). <c>null</c> = no separate judge timeout (the judge shares the per-probe budget).
+    /// ADR-021 (Phase B.1): grading timeout for judge-primary grading. When set, grading runs under its own linked
+    /// <c>CancellationTokenSource</c>. On the SINGLE-judge / fallback path it is a per-judge-call timeout — on timeout the
+    /// decorator adopts the advisory keyword verdict. On the judge-primary COMPOSITE path (ADR-024) it bounds the TOTAL
+    /// grading wall-clock via <c>TimeoutEvaluator</c> and abstains (<see cref="EvaluationOutcome.Inconclusive"/>) on
+    /// timeout, since a composite has no advisory keyword verdict to adopt. Either way it never fabricates or aborts the
+    /// scan. <c>null</c> = no separate grading timeout (grading shares the per-probe budget).
     /// </summary>
     public TimeSpan? JudgeTimeout { get; init; }
 

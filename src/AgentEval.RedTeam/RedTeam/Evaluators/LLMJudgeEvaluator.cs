@@ -132,8 +132,9 @@ public class LLMJudgeEvaluator : IProbeEvaluator
         }
         catch (Exception ex) when (!omitTemperature && IsUnsupportedTemperature(ex))
         {
-            // Reasoning model: it rejected `temperature`. Remember it, then retry without temperature (+ reasoning headroom).
-            ReasoningClients.AddOrUpdate(_chatClient, new StrongBox<bool>(true));
+            // Reasoning model: it rejected `temperature`. Remember it (get-or-create the per-client box, then flip it),
+            // then retry without temperature (+ reasoning headroom).
+            ReasoningClients.GetValue(_chatClient, static _ => new StrongBox<bool>(false)).Value = true;
             return await _chatClient.GetResponseAsync(messages, BuildOptions(omitTemperature: true), cancellationToken).ConfigureAwait(false);
         }
     }

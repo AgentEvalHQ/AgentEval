@@ -102,7 +102,7 @@ public record ProbeResult
     /// ADR-021 (§5): grading provenance for a judge-primary verdict — which grader shipped, and the
     /// keyword-vs-judge disagreement. <c>null</c> on every non-judge-primary path (the default), so a
     /// fallback run is byte-identical. Lifted from the decorator's <c>grader_provenance</c> metadata by
-    /// <c>ResolveGrading</c> at the conclusive construction sites.
+    /// <see cref="GradingMetadata.ProvenanceOf"/> at the conclusive construction sites.
     /// </summary>
     public GraderProvenance? Grading { get; init; }
 
