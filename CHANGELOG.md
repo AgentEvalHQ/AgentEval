@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.0-beta] - 2026-06-24
+
 ### Red-team grading: judge-primary by default + Composite Judges (ADR-021/022/023/024)
 
 The red-team grader — the component that decides whether each attack *succeeded* — moves from a
