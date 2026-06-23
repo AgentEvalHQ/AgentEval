@@ -66,6 +66,10 @@ Live `gpt-4o-mini`, evidence-anchored, the 314-case honesty corpus via the 5b ha
 - **InsecureOutput, flat as default:** 46 cases → **0/0, κ=1.000**; the tree-as-default A-B → **4 safe→succeeded + 2 vuln→resisted** (the regression above).
 - **Whole corpus, both trees at their chosen defaults** (InferenceAbuse=tree, InsecureOutput=flat): **κ=1.000 (n=92), macroF1=1.000, defer-correct=100% (n=222), directional-fabrications=0 over 314 cases.**
 - **Offline:** `DecomposedGraderTests` 46/46; full RedTeam suite 3391/0 (net8.0).
+- **Reusable decision tool:** `GateAblationLiveCheck.GateAblation_PerOracle_FlatVsGated` runs this flat-vs-gated A-B per
+  oracle over its honesty corpus and reports directional fabrications + a recommendation (so a new gate is never promoted
+  on intuition). reps=3, gpt-4o-mini: InferenceAbuse `gate HELPS (-1.0)`, InsecureOutput `gate HURTS (+4.3)` — both
+  shipping defaults confirmed. Adding an oracle's experiment = one registry line `(oracle, flatBuilder, gatedBuilder, default)`.
 - **Independent second corpus:** the `AgentEval.SampleGraders` companion runs the *production* `BuildInferenceAbuseTree` (no copy) head-to-head against keyword / single-judge / flat / calibrated graders — see `strategy/redteam/paper/proof/Gated-Tree-InferenceAbuse-Proof.md`.
 
 Full per-run dumps: `strategy/redteam/paper/proof/` (`Gated-Tree-InferenceAbuse-Proof.md`, `artifacts/`).
