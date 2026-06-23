@@ -19,31 +19,31 @@ public static class NonConvergenceRunner
         int rounds = IntArg(args, "--rounds", 6);
         int perRound = IntArg(args, "--per-round", 16);
         int seed = IntArg(args, "--seed", 1117);
-        string outDir = ResolveOutputDir(args);
+        Family fam = Families.Get(StrArg(args, "--family", "inference"));
 
         Console.WriteLine("AgentEval.SampleGraders — STAGE 1: non-convergence-of-patching + keyword-vs-composite contrast");
         Console.WriteLine(new string('=', 78));
         Console.WriteLine(isReal
             ? $"Composite judge: REAL Azure OpenAI ('{Environment.GetEnvironmentVariable("AZURE_OPENAI_DEPLOYMENT") ?? "gpt-4o-mini"}')."
             : "Composite judge: OFFLINE heuristic stand-in (set AZURE_OPENAI_* for the real run).");
-        Console.WriteLine($"Protocol: seeded generator over a fixed finite space; {rounds} rounds x {perRound} FRESH cases/round; deterministic patcher; sweep->patch->resweep.");
+        Console.WriteLine($"Family: {fam.Name}. Protocol: seeded generator over a fixed finite space; {rounds} rounds x {perRound} FRESH cases/round; deterministic patcher; sweep->patch->resweep.");
         Console.WriteLine();
 
-        IReadOnlyList<IReadOnlyList<GraderCase>> batches = CaseGenerator.GenerateRounds(seed, rounds, perRound);
+        IReadOnlyList<IReadOnlyList<GraderCase>> batches = fam.GenerateRounds(seed, rounds, perRound);
 
         // ARM A — KEYWORD ORACLE (deterministic; patched each round).
-        var oracle = new PatchableKeywordOracle();
-        var patcher = new DeterministicPatcher(oracle);
+        var oracle = new PatchableKeywordOracle(fam.SeedPositive);
+        var patcher = new DeterministicPatcher(oracle, fam.KnownTokens);
         IReadOnlyList<RoundResult> keyword = await NonConvergenceLoop.RunAsync(
             batches, oracle, patcher.PatchFalseAlarm, patcher.PatchMiss, () => (oracle.PositiveRules, oracle.NegativeRules));
 
-        // ARM B — the ADR-024 GATED TREE (the current best InferenceAPIAbuse grader — closes the product-bot floor; NOT patched).
+        // ARM B — the PRODUCTION composite for this family (Composite Judges; NOT patched).
         var compFails = new List<(string Kind, GraderCase Case)>();
-        IProbeEvaluator composite = DecomposedGraders.BuildInferenceAbuseTree(judge);
+        IProbeEvaluator composite = fam.BuildComposite(judge);
         IReadOnlyList<RoundResult> comp = await NonConvergenceLoop.RunAsync(batches, composite, null, null, null, compFails);
 
         PrintTrajectory("ARM A — KEYWORD ORACLE (patched each round)", keyword, withRules: true);
-        PrintTrajectory("ARM B — COMPOSITE JUDGES, ADR-024 gated tree (judge; NOT patched)", comp, withRules: false);
+        PrintTrajectory($"ARM B — COMPOSITE JUDGES, production {fam.Name} grader (judge; NOT patched)", comp, withRules: false);
 
         if (compFails.Count > 0)
         {
@@ -62,7 +62,7 @@ public static class NonConvergenceRunner
             : "=> the gap did not appear on this run — reporting honestly; inspect generator diversity / rounds / seed.");
         Console.WriteLine();
 
-        await WriteResultsAsync(keyword, comp, rounds, perRound, seed, isReal, outDir);
+        await WriteResultsAsync(keyword, comp, rounds, perRound, seed, isReal);
         judge.Dispose();
         return 0;
     }
@@ -80,9 +80,15 @@ public static class NonConvergenceRunner
         Console.WriteLine();
     }
 
-    private static async Task WriteResultsAsync(IReadOnlyList<RoundResult> kw, IReadOnlyList<RoundResult> cp, int rounds, int perRound, int seed, bool isReal, string outDir)
+    private static async Task WriteResultsAsync(IReadOnlyList<RoundResult> kw, IReadOnlyList<RoundResult> cp, int rounds, int perRound, int seed, bool isReal)
     {
-        Directory.CreateDirectory(outDir);
+        string dir;
+        try
+        {
+            dir = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "strategy", "redteam", "paper", "build", "results"));
+            Directory.CreateDirectory(dir);
+        }
+        catch { dir = Environment.CurrentDirectory; }
 
         var sb = new StringBuilder();
         sb.AppendLine($"{{ \"experiment\": \"nonconvergence-contrast\", \"isReal\": {isReal.ToString().ToLowerInvariant()}, \"rounds\": {rounds}, \"perRound\": {perRound}, \"seed\": {seed},");
@@ -93,7 +99,7 @@ public static class NonConvergenceRunner
         sb.Append(string.Join(", ", cp.Select(r => $"{{\"round\":{r.Round},\"fresh\":{r.FreshFabrications},\"fa\":{r.FalseAlarms},\"miss\":{r.MissedHits}}}")));
         sb.AppendLine("] }");
 
-        string path = Path.Combine(outDir, "nonconvergence-result.json");
+        string path = Path.Combine(dir, "nonconvergence-result.json");
         await File.WriteAllTextAsync(path, sb.ToString());
         Console.WriteLine($"Wrote {path}");
     }
@@ -108,19 +114,18 @@ public static class NonConvergenceRunner
         int kwSeeds = IntArg(args, "--seeds", 30);
         int compSeeds = IntArg(args, "--comp-seeds", 5);
         int seedStart = IntArg(args, "--seed-start", 2000);
+        Family fam = Families.Get(StrArg(args, "--family", "inference"));
 
-        Console.WriteLine($"Multi-seed confirmatory: keyword {kwSeeds} seeds (deterministic) + composite (gated tree) {compSeeds} seeds; {rounds} rounds x {perRound} fresh cases.");
+        Console.WriteLine($"Multi-seed [{fam.Name}]: keyword {kwSeeds} seeds (deterministic) + composite {compSeeds} seeds; {rounds} rounds x {perRound} fresh cases.");
         Console.WriteLine();
-
-        string outDir = ResolveOutputDir(args);
 
         var keyword = new List<(int Seed, int[] Fresh)>();
         for (int s = 0; s < kwSeeds; s++)
         {
             int seed = seedStart + s;
-            IReadOnlyList<IReadOnlyList<GraderCase>> batches = CaseGenerator.GenerateRounds(seed, rounds, perRound);
-            var oracle = new PatchableKeywordOracle();
-            var patcher = new DeterministicPatcher(oracle);
+            IReadOnlyList<IReadOnlyList<GraderCase>> batches = fam.GenerateRounds(seed, rounds, perRound);
+            var oracle = new PatchableKeywordOracle(fam.SeedPositive);
+            var patcher = new DeterministicPatcher(oracle, fam.KnownTokens);
             IReadOnlyList<RoundResult> traj = await NonConvergenceLoop.RunAsync(batches, oracle, patcher.PatchFalseAlarm, patcher.PatchMiss, null);
             keyword.Add((seed, traj.Select(r => r.FreshFabrications).ToArray()));
         }
@@ -130,18 +135,19 @@ public static class NonConvergenceRunner
         for (int s = 0; s < compSeeds; s++)
         {
             int seed = seedStart + s;
-            IReadOnlyList<IReadOnlyList<GraderCase>> batches = CaseGenerator.GenerateRounds(seed, rounds, perRound);
-            IProbeEvaluator tree = DecomposedGraders.BuildInferenceAbuseTree(judge);
+            IReadOnlyList<IReadOnlyList<GraderCase>> batches = fam.GenerateRounds(seed, rounds, perRound);
+            IProbeEvaluator tree = fam.BuildComposite(judge);
             IReadOnlyList<RoundResult> traj = await NonConvergenceLoop.RunAsync(batches, tree, null, null, null);
             composite.Add((seed, traj.Select(r => r.FreshFabrications).ToArray()));
             Console.WriteLine($"  composite seed {seed}: [{string.Join(",", traj.Select(r => r.FreshFabrications))}]");
         }
 
-        string dir = outDir;
-        Directory.CreateDirectory(dir);
+        string dir;
+        try { dir = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "strategy", "redteam", "paper", "build", "results")); Directory.CreateDirectory(dir); }
+        catch { dir = Environment.CurrentDirectory; }
         var sb = new StringBuilder();
         sb.AppendLine("{");
-        sb.AppendLine($"  \"config\": {{ \"rounds\": {rounds}, \"perRound\": {perRound}, \"keywordSeeds\": {kwSeeds}, \"compositeSeeds\": {compSeeds}, \"seedStart\": {seedStart}, \"isReal\": {isReal.ToString().ToLowerInvariant()}, \"family\": \"InferenceAPIAbuse\", \"composite\": \"ADR-024 gated tree\" }},");
+        sb.AppendLine($"  \"config\": {{ \"rounds\": {rounds}, \"perRound\": {perRound}, \"keywordSeeds\": {kwSeeds}, \"compositeSeeds\": {compSeeds}, \"seedStart\": {seedStart}, \"isReal\": {isReal.ToString().ToLowerInvariant()}, \"family\": \"{fam.Name}\", \"composite\": \"production composite\" }},");
         sb.AppendLine("  \"keyword\": [");
         sb.AppendLine(string.Join(",\n", keyword.Select(k => $"    {{ \"seed\": {k.Seed}, \"fresh\": [{string.Join(",", k.Fresh)}] }}")));
         sb.AppendLine("  ],");
@@ -149,30 +155,21 @@ public static class NonConvergenceRunner
         sb.AppendLine(string.Join(",\n", composite.Select(c => $"    {{ \"seed\": {c.Seed}, \"fresh\": [{string.Join(",", c.Fresh)}] }}")));
         sb.AppendLine("  ]");
         sb.AppendLine("}");
-        string path = Path.Combine(dir, "multiseed-result.json");
+        string path = Path.Combine(dir, $"multiseed-{fam.Name.ToLowerInvariant()}.json");
         await File.WriteAllTextAsync(path, sb.ToString());
-        Console.WriteLine($"\nWrote {path}");
+        Console.WriteLine($"\nWrote {path}  →  run: python3 strategy/redteam/paper/build/stats/confirmatory.py");
         judge.Dispose();
         return 0;
     }
 
-    private static string ResolveOutputDir(string[] args)
-    {
-        string? fromArg = StringArg(args, "--out");
-        if (!string.IsNullOrWhiteSpace(fromArg)) return Path.GetFullPath(fromArg);
-        string? fromEnv = Environment.GetEnvironmentVariable("NONCONVERGENCE_OUT");
-        if (!string.IsNullOrWhiteSpace(fromEnv)) return Path.GetFullPath(fromEnv);
-        return Environment.CurrentDirectory;
-    }
+    private static string Trunc(string s, int n) => string.IsNullOrEmpty(s) || s.Length <= n ? s : s[..(n - 1)] + "…";
 
-    private static string? StringArg(string[] args, string name)
+    private static string StrArg(string[] args, string name, string dflt)
     {
         for (int i = 0; i < args.Length - 1; i++)
-            if (args[i] == name && !string.IsNullOrWhiteSpace(args[i + 1])) return args[i + 1];
-        return null;
+            if (args[i] == name) return args[i + 1];
+        return dflt;
     }
-
-    private static string Trunc(string s, int n) => string.IsNullOrEmpty(s) || s.Length <= n ? s : s[..(n - 1)] + "…";
 
     private static int IntArg(string[] args, string name, int dflt)
     {

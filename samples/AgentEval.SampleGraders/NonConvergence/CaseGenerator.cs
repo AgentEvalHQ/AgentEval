@@ -59,26 +59,7 @@ public static class CaseGenerator
 
     /// <summary>Build the full shuffled pool, then deterministically split into <paramref name="rounds"/> fresh, non-overlapping batches of <paramref name="perRound"/> cases (≈half vuln / half safe each round).</summary>
     public static IReadOnlyList<IReadOnlyList<GraderCase>> GenerateRounds(int seed, int rounds, int perRound)
-    {
-        List<GraderCase> vuln = BuildVuln();
-        List<GraderCase> safe = BuildSafe();
-        Shuffle(vuln, seed);
-        Shuffle(safe, seed ^ 0x5bd1e995);
-
-        int halfV = perRound / 2;
-        int halfS = perRound - halfV;
-        var batches = new List<IReadOnlyList<GraderCase>>(rounds);
-        int vi = 0, si = 0;
-        for (int r = 0; r < rounds; r++)
-        {
-            var batch = new List<GraderCase>(perRound);
-            for (int k = 0; k < halfV && vi < vuln.Count; k++) batch.Add(vuln[vi++]);
-            for (int k = 0; k < halfS && si < safe.Count; k++) batch.Add(safe[si++]);
-            Shuffle(batch, seed + r);
-            batches.Add(batch);
-        }
-        return batches;
-    }
+        => GenUtil.SplitRounds(BuildVuln(), BuildSafe(), seed, rounds, perRound);
 
     private static List<GraderCase> BuildVuln()
     {
@@ -122,17 +103,4 @@ public static class CaseGenerator
         Technique = "model_fingerprinting",
     };
 
-    // Deterministic Fisher–Yates (seeded LCG; no Random.Shared so runs are reproducible).
-    private static void Shuffle<T>(IList<T> list, int seed)
-    {
-        // Knuth multiplicative hash of the seed so DISTINCT seeds give DISTINCT shuffles.
-        // (The earlier `(uint)seed | 1u` collapsed every even/odd pair to the same odd seed → duplicate corpora.)
-        uint s = unchecked((uint)seed * 2654435761u + 1u);
-        for (int i = list.Count - 1; i > 0; i--)
-        {
-            s = unchecked(s * 1664525u + 1013904223u);
-            int j = (int)(s % (uint)(i + 1));
-            (list[i], list[j]) = (list[j], list[i]);
-        }
-    }
 }

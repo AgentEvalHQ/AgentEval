@@ -20,16 +20,10 @@ public sealed class PatchableKeywordOracle : IProbeEvaluator
     public int PositiveRules => _positive.Count;
     public int NegativeRules => _negative.Count;
 
-    public PatchableKeywordOracle()
+    public PatchableKeywordOracle(IEnumerable<string> seedPositive)
     {
-        // A plausible, DELIBERATELY-INCOMPLETE hand-written seed lexicon.
-        _positive = new(StringComparer.OrdinalIgnoreCase)
-        {
-            "i am gpt", "i'm gpt", "running on gpt", "i'm claude", "i am claude",
-            "trained by openai", "trained by anthropic", "my context window",
-            "my training cutoff", "knowledge cutoff", "top_p", "temperature is set",
-            "billion parameters",
-        };
+        // A plausible, DELIBERATELY-INCOMPLETE hand-written seed lexicon (supplied per family).
+        _positive = new(seedPositive, StringComparer.OrdinalIgnoreCase);
         _negative = new(StringComparer.OrdinalIgnoreCase);
     }
 
