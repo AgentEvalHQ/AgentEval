@@ -62,7 +62,7 @@ public static class NonConvergenceRunner
             : "=> the gap did not appear on this run — reporting honestly; inspect generator diversity / rounds / seed.");
         Console.WriteLine();
 
-        await WriteResultsAsync(keyword, comp, rounds, perRound, seed, isReal);
+        await WriteResultsAsync(keyword, comp, rounds, perRound, seed, isReal, args);
         judge.Dispose();
         return 0;
     }
@@ -80,15 +80,9 @@ public static class NonConvergenceRunner
         Console.WriteLine();
     }
 
-    private static async Task WriteResultsAsync(IReadOnlyList<RoundResult> kw, IReadOnlyList<RoundResult> cp, int rounds, int perRound, int seed, bool isReal)
+    private static async Task WriteResultsAsync(IReadOnlyList<RoundResult> kw, IReadOnlyList<RoundResult> cp, int rounds, int perRound, int seed, bool isReal, string[] args)
     {
-        string dir;
-        try
-        {
-            dir = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "strategy", "redteam", "paper", "build", "results"));
-            Directory.CreateDirectory(dir);
-        }
-        catch { dir = Environment.CurrentDirectory; }
+        string dir = ResolveOutDir(args);
 
         var sb = new StringBuilder();
         sb.AppendLine($"{{ \"experiment\": \"nonconvergence-contrast\", \"isReal\": {isReal.ToString().ToLowerInvariant()}, \"rounds\": {rounds}, \"perRound\": {perRound}, \"seed\": {seed},");
@@ -142,9 +136,7 @@ public static class NonConvergenceRunner
             Console.WriteLine($"  composite seed {seed}: [{string.Join(",", traj.Select(r => r.FreshFabrications))}]");
         }
 
-        string dir;
-        try { dir = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "strategy", "redteam", "paper", "build", "results")); Directory.CreateDirectory(dir); }
-        catch { dir = Environment.CurrentDirectory; }
+        string dir = ResolveOutDir(args);
         var sb = new StringBuilder();
         sb.AppendLine("{");
         sb.AppendLine($"  \"config\": {{ \"rounds\": {rounds}, \"perRound\": {perRound}, \"keywordSeeds\": {kwSeeds}, \"compositeSeeds\": {compSeeds}, \"seedStart\": {seedStart}, \"isReal\": {isReal.ToString().ToLowerInvariant()}, \"family\": \"{fam.Name}\", \"composite\": \"production composite\" }},");
@@ -157,12 +149,26 @@ public static class NonConvergenceRunner
         sb.AppendLine("}");
         string path = Path.Combine(dir, $"multiseed-{fam.Name.ToLowerInvariant()}.json");
         await File.WriteAllTextAsync(path, sb.ToString());
-        Console.WriteLine($"\nWrote {path}  →  run: python3 strategy/redteam/paper/build/stats/confirmatory.py");
+        Console.WriteLine($"\nWrote {path}  →  run your confirmatory-analysis script on this file.");
         judge.Dispose();
         return 0;
     }
 
     private static string Trunc(string s, int n) => string.IsNullOrEmpty(s) || s.Length <= n ? s : s[..(n - 1)] + "…";
+
+    /// <summary>Output dir for the result JSON: <c>--out &lt;dir&gt;</c>, else the <c>AGENTEVAL_NONCONV_OUT</c> env var,
+    /// else the working directory. Never hard-codes an internal (gitignored) path in this public sample — set the env var
+    /// locally to route results into the paper pipeline.</summary>
+    private static string ResolveOutDir(string[] args)
+    {
+        var outDir = StrArg(args, "--out", "") is { Length: > 0 } a ? a : Environment.GetEnvironmentVariable("AGENTEVAL_NONCONV_OUT");
+        if (!string.IsNullOrWhiteSpace(outDir))
+        {
+            try { Directory.CreateDirectory(outDir); return Path.GetFullPath(outDir); }
+            catch { /* fall through to the working directory */ }
+        }
+        return Environment.CurrentDirectory;
+    }
 
     private static string StrArg(string[] args, string name, string dflt)
     {
