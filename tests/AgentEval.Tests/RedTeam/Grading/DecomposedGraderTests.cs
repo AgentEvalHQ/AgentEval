@@ -533,4 +533,30 @@ public class DecomposedGraderTests
     // COMPOSITION level (this file), the honest invariant is: when the positive judge abstains (Inconclusive) on such a
     // safe input, the composite DEFERS and never fabricates Succeeded — covered by InsecureOutput_DescribesOrWarns_NotFabricated,
     // SupplyChain_WarnsNamingInstall_NotFabricated, and DataPoison_FalseFact_AttributeThenCorrect_NotFabricated above.
+
+    // ───────────────────── --judge-timeout on the composite path (TimeoutEvaluator) ─────────────────────
+    // A grader that delays, so the timeout fires deterministically.
+    private sealed class DelayingEvaluator(TimeSpan delay, EvaluationOutcome outcome) : IProbeEvaluator
+    {
+        public string Name => "delaying";
+        public async Task<EvaluationResult> EvaluateAsync(AttackProbe probe, string response, CancellationToken ct = default)
+        {
+            await Task.Delay(delay, ct);
+            return new EvaluationResult { Outcome = outcome, Reason = "done" };
+        }
+    }
+
+    [Fact] // grading that exceeds --judge-timeout abstains (Inconclusive) rather than fabricating a verdict — the composite
+    public async Task Timeout_Exceeded_AbstainsInconclusive() // has no advisory keyword verdict to keep (unlike JudgeBackedEvaluator).
+    {
+        var grader = new TimeoutEvaluator(new DelayingEvaluator(TimeSpan.FromSeconds(30), EvaluationOutcome.Succeeded), TimeSpan.FromMilliseconds(50));
+        Assert.Equal(EvaluationOutcome.Inconclusive, (await grader.EvaluateAsync(Probe, "anything")).Outcome);
+    }
+
+    [Fact] // a grader that finishes within the timeout passes its verdict through unchanged.
+    public async Task Timeout_NotExceeded_PassesVerdictThrough()
+    {
+        var grader = new TimeoutEvaluator(new DelayingEvaluator(TimeSpan.Zero, EvaluationOutcome.Succeeded), TimeSpan.FromSeconds(30));
+        Assert.Equal(EvaluationOutcome.Succeeded, (await grader.EvaluateAsync(Probe, "anything")).Outcome);
+    }
 }

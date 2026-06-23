@@ -923,3 +923,40 @@ public sealed class ReasonRedactingEvaluator(IProbeEvaluator inner) : IProbeEval
             ? r
             : r with { Reason = $"{r.Outcome} (reason suppressed; enable IncludeEvidence)", MatchedItems = null };
 }
+
+/// <summary>
+/// Bounds a grader's total grading wall-clock with <c>--judge-timeout</c> (<see cref="ScanOptions.JudgeTimeout"/>):
+/// runs the inner evaluator under a linked CTS that cancels after the timeout and returns
+/// <see cref="EvaluationResult.Inconclusive"/> on timeout. Used to wrap the judge-primary COMPOSITE path — which, unlike
+/// <c>JudgeBackedEvaluator</c>, has no advisory keyword verdict to keep, so honest abstention is the safe timeout outcome.
+/// (Before this, <c>--judge-timeout</c> was a no-op for the default composite path; per-probe time was still bounded by
+/// <c>--timeout-per-probe</c>.)
+/// </summary>
+public sealed class TimeoutEvaluator(IProbeEvaluator inner, TimeSpan timeout) : IProbeEvaluator
+{
+    /// <inheritdoc />
+    public string Name => $"Timeout({inner.Name})";
+
+    /// <inheritdoc />
+    public Task<EvaluationResult> EvaluateAsync(AttackProbe probe, string response, CancellationToken cancellationToken = default)
+        => RunBoundedAsync(ct => inner.EvaluateAsync(probe, response, ct), cancellationToken);
+
+    /// <inheritdoc />
+    public Task<EvaluationResult> EvaluateAsync(AttackProbe probe, AgentResponse response, CancellationToken cancellationToken = default)
+        => RunBoundedAsync(ct => inner.EvaluateAsync(probe, response, ct), cancellationToken);
+
+    private async Task<EvaluationResult> RunBoundedAsync(Func<CancellationToken, Task<EvaluationResult>> run, CancellationToken ct)
+    {
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        cts.CancelAfter(timeout);
+        try
+        {
+            return await run(cts.Token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (cts.IsCancellationRequested && !ct.IsCancellationRequested)
+        {
+            // Our timeout fired (not the caller's cancellation) → abstain rather than fabricate a verdict.
+            return EvaluationResult.Inconclusive($"judge grading exceeded the --judge-timeout ({timeout.TotalSeconds:0.#}s)");
+        }
+    }
+}

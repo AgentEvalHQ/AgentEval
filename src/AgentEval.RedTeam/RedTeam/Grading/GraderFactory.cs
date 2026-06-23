@@ -42,9 +42,15 @@ public static class GraderFactory
                 ? DecomposedGraders.TryBuildToolAwareFor(attack.Name, inner, options.JudgeClient)
                 : DecomposedGraders.TryBuildFor(attack.Name, options.JudgeClient);
             if (decomposed is not null)
+            {
                 // A decomposed verdict's Reason/MatchedItems are response-derived (a judge's quoted span or a matched
                 // payload); restore the IncludeEvidence redaction contract that JudgeBackedEvaluator applies internally.
-                return options.IncludeEvidence ? decomposed : new ReasonRedactingEvaluator(decomposed);
+                var graded = options.IncludeEvidence ? decomposed : new ReasonRedactingEvaluator(decomposed);
+                // Honor --judge-timeout on the composite path too: bound total grading wall-clock, abstaining on timeout
+                // (the composite has no advisory keyword verdict to keep, unlike JudgeBackedEvaluator). Without this the
+                // flag was a no-op for the default judge-primary path.
+                return options.JudgeTimeout is { } timeout ? new TimeoutEvaluator(graded, timeout) : graded;
+            }
         }
 
         return new JudgeBackedEvaluator(
