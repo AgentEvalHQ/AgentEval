@@ -7,6 +7,7 @@
 using AgentEval.Core;
 using AgentEval.RedTeam;
 using AgentEval.RedTeam.Baseline;
+using AgentEval.Testing;   // FakeChatClient (judge presence for the grading-mode-mismatch tests)
 
 namespace AgentEval.Tests.RedTeam.Baseline;
 
@@ -14,6 +15,9 @@ public class BaselineConclusiveAndFidelityTests
 {
     // One-attack result: `resisted` resisted probes + the listed failed probes (each with an explicit fidelity).
     private static RedTeamResult Result(int resisted, int inconclusive, params (string Id, EvidenceFidelity Fidelity)[] failed)
+        => Result(resisted, inconclusive, null, failed);
+
+    private static RedTeamResult Result(int resisted, int inconclusive, ScanOptions? options, params (string Id, EvidenceFidelity Fidelity)[] failed)
     {
         var probes = new List<ProbeResult>();
         for (var i = 0; i < resisted; i++)
@@ -33,6 +37,7 @@ public class BaselineConclusiveAndFidelityTests
             ResistedProbes = resisted,
             SucceededProbes = failed.Length,
             InconclusiveProbes = inconclusive,
+            Options = options,
             AttackResults =
             [
                 new AttackResult
@@ -112,17 +117,34 @@ public class BaselineConclusiveAndFidelityTests
 
     [Fact] // ADR-021 B.1: a baseline graded under a DIFFERENT JudgeMode is not fidelity-comparable — judge-primary
     // shifts the serialized fidelity, so a cross-mode "escalation" is a grading artefact, not a regression. Suppress + flag.
+    // The mismatch only matters when the CURRENT run actually USED a judge (Mode is inert without one) — so this run
+    // carries a judge in Primary mode against a Fallback baseline.
     public void GradingModeMismatch_SuppressesFidelityEscalation_AndFlags()
     {
-        // baseline graded under Primary; current under Fallback (Options == null ⇒ Fallback) → mode mismatch.
         var baseline = RedTeamBaseline.FromResult(Result(resisted: 9, inconclusive: 0, ("PI-001", EvidenceFidelity.Verbal)), "v1")
-            with { GradingMode = JudgeMode.Primary };
-        var current = Result(resisted: 9, inconclusive: 0, ("PI-001", EvidenceFidelity.Behavioral));   // would otherwise escalate
+            with { GradingMode = JudgeMode.Fallback };
+        var current = Result(9, 0, new ScanOptions { Mode = JudgeMode.Primary, JudgeClient = new FakeChatClient("x") },
+            ("PI-001", EvidenceFidelity.Behavioral));   // would otherwise escalate
 
         var c = new RedTeamBaselineComparer().Compare(current, baseline);
 
         Assert.True(c.GradingModeMismatch);
         Assert.Empty(c.FidelityEscalations);                 // suppressed — a grading artefact, not a regression
+    }
+
+    [Fact] // Copilot/B.3 regression: two NO-JUDGE runs whose default modes differ (old Fallback baseline vs new Primary
+    // default) must NOT be flagged — Mode is inert without a judge, so suppressing real escalations here would be a bug.
+    public void GradingModeMismatch_NoJudge_NotFlagged_KeepsEscalation()
+    {
+        var baseline = RedTeamBaseline.FromResult(Result(resisted: 9, inconclusive: 0, ("PI-001", EvidenceFidelity.Verbal)), "v1")
+            with { GradingMode = JudgeMode.Fallback };
+        var current = Result(9, 0, new ScanOptions { Mode = JudgeMode.Primary },   // Primary default, but NO judge → Mode inert
+            ("PI-001", EvidenceFidelity.Behavioral));
+
+        var c = new RedTeamBaselineComparer().Compare(current, baseline);
+
+        Assert.False(c.GradingModeMismatch);
+        Assert.Single(c.FidelityEscalations);                // a real escalation is kept, not masked by a phantom mismatch
     }
 
     [Fact] // The escalation still fires when the modes MATCH (baseline Fallback vs current Fallback).
