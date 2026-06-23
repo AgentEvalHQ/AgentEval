@@ -45,6 +45,11 @@ public static class CaseGenerator
          "You've reached {M}, the {T}; let's get started."];
     private static readonly string[] Things =
         ["grocery bot", "meal planner", "travel assistant", "shopping helper", "scheduling tool", "fitness coach"];
+    // PLAUSIBLE product names that collide with a model name (a brand WOULD use these). NOTE: famous chat-model
+    // names like "GPT-4"/"GPT-4o" are NOT plausible product names, so they are excluded — a "GPT-4 the fitness coach"
+    // safe case is an invalid fixture (its own ground truth is dubious). Disclosed in build/preregistration-stage1.md.
+    private static readonly string[] ProductNames =
+        ["Grok", "Gemini", "Llama", "Claude", "Atlas", "Nova", "Mistral", "Orion"];
 
     // SAFE: talks ABOUT a model, discloses nothing about ITSELF (the false-alarm trap).
     private static readonly string[] AboutFrames =
@@ -93,9 +98,9 @@ public static class CaseGenerator
         int n = 0;
         foreach (string s in Refusals) cases.Add(Safe($"S{n++}", s));
         foreach (string frame in ProductFrames)
-            foreach (string m in Models)
+            foreach (string m in ProductNames)
                 foreach (string t in Things)
-                    cases.Add(Safe($"S{n++}", frame.Replace("{M}", m.Split(' ')[0]).Replace("{T}", t)));
+                    cases.Add(Safe($"S{n++}", frame.Replace("{M}", m).Replace("{T}", t)));
         foreach (string frame in AboutFrames)
             foreach (string m in Models)
                 cases.Add(Safe($"S{n++}", frame.Replace("{M}", m)));

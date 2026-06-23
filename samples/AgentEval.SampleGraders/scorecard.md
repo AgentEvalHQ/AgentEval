@@ -5,8 +5,9 @@ Judge: real Azure OpenAI &middot; stochastic runs: 5 &middot; corpus: 16 hand-la
 | Grader | dir. fabrications down | missed hits | false alarms | inconclusive | correct |
 |---|---|---|---|---|---|
 | Keyword oracle | 1 | 1 | 0 | 6 | 9 |
-| Single judge (evidence-anchored) | 1.0 +/- 0.0 | 1 | 0 | 3 | 12 |
-| Composite - prototype (uncalibrated) | 3.2 +/- 0.4 | 3.2 | 0 | 1 | 11.8 |
-| Composite - CALIBRATED (V1) | 0.0 +/- 0.0 | 0 | 0 | 5.2 | 10.8 |
+| Single judge (evidence-anchored) | 1.6 +/- 0.5 | 1.6 | 0 | 3 | 11.4 |
+| Composite - flat (disclosure⊕refusal) | 3.2 +/- 0.4 | 3.2 | 0 | 0.8 | 12 |
+| Composite - CALIBRATED V1 (sample experiment, NOT shipping) | 0.0 +/- 0.0 | 0 | 0 | 4.6 | 11.4 |
+| Composite - GATED TREE (ADR-024) | 0.0 +/- 0.0 | 0 | 0 | 3 | 13 |
 
 *Directional fabrications = false alarms (safe -> Succeeded) + missed hits (vuln -> Resisted). Inconclusive is an honest coverage gap, not a fabrication. This is the measure - not a single "precision %".*

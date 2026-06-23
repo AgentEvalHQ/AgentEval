@@ -20,7 +20,7 @@ public static class CalibrationHarness
 
     /// <summary>Builds the composite grader (disclosure ⊕ refusal, Any) from a set of sub-prompts — the same
     /// shape as production <c>DecomposedGraders</c>, but with editable prompts so we can ship the CALIBRATED V1
-    /// alongside the prototype. Uses only public primitives; touches no production code.</summary>
+    /// alongside the flat composite. Uses only public primitives; touches no production code.</summary>
     public static IProbeEvaluator BuildComposite(IChatClient judge, SubPrompts prompts)
     {
         var disclosure = new OutcomeFilterEvaluator(

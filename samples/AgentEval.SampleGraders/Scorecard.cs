@@ -97,12 +97,14 @@ public static class Scorecard
     public static void PrintStatisticalDiff(IReadOnlyList<GraderRunStats> stats, bool isReal)
     {
         GraderRunStats? single = stats.FirstOrDefault(s => s.Name.Contains("Single", StringComparison.Ordinal));
-        GraderRunStats? proto = stats.FirstOrDefault(s => s.Name.Contains("prototype", StringComparison.Ordinal));
+        GraderRunStats? flat = stats.FirstOrDefault(s => s.Name.Contains("flat", StringComparison.Ordinal));
         GraderRunStats? calib = stats.FirstOrDefault(s => s.Name.Contains("CALIBRATED", StringComparison.Ordinal));
+        GraderRunStats? gated = stats.FirstOrDefault(s => s.Name.Contains("GATED", StringComparison.Ordinal));
 
         Console.WriteLine("Statistical diff (directional fabrications; lower is better):");
         if (single is not null && calib is not null) Compare("calibrated composite vs single judge   ", single, calib);
-        if (proto is not null && calib is not null) Compare("calibration gain: prototype -> calibrated", proto, calib);
+        if (flat is not null && calib is not null) Compare("calibration gain: flat -> calibrated     ", flat, calib);
+        if (flat is not null && gated is not null) Compare("ADR-024 gain: flat -> gated tree         ", flat, gated);
         Console.WriteLine("  (CI-overlap is a quick heuristic, not a formal test" + (isReal ? "" : "; offline stand-in") + "; raise --runs for tighter intervals.)");
         Console.WriteLine();
 

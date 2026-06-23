@@ -15,6 +15,7 @@ public static class NonConvergenceRunner
 {
     public static async Task<int> RunAsync(IChatClient judge, bool isReal, string[] args)
     {
+        if (args.Contains("--seeds")) return await RunMultiSeedAsync(judge, isReal, args);
         int rounds = IntArg(args, "--rounds", 6);
         int perRound = IntArg(args, "--per-round", 16);
         int seed = IntArg(args, "--seed", 1117);
@@ -35,14 +36,13 @@ public static class NonConvergenceRunner
         IReadOnlyList<RoundResult> keyword = await NonConvergenceLoop.RunAsync(
             batches, oracle, patcher.PatchFalseAlarm, patcher.PatchMiss, () => (oracle.PositiveRules, oracle.NegativeRules));
 
-        // ARM B — COMPOSITE (PRODUCTION decompose routing — the SAME grader the proof's §5b validates; NOT patched).
+        // ARM B — the ADR-024 GATED TREE (the current best InferenceAPIAbuse grader — closes the product-bot floor; NOT patched).
         var compFails = new List<(string Kind, GraderCase Case)>();
-        IProbeEvaluator composite = DecomposedGraders.TryBuildFor("InferenceAPIAbuse", judge)
-            ?? throw new InvalidOperationException("DecomposedGraders has no build for InferenceAPIAbuse.");
+        IProbeEvaluator composite = DecomposedGraders.BuildInferenceAbuseTree(judge);
         IReadOnlyList<RoundResult> comp = await NonConvergenceLoop.RunAsync(batches, composite, null, null, null, compFails);
 
         PrintTrajectory("ARM A — KEYWORD ORACLE (patched each round)", keyword, withRules: true);
-        PrintTrajectory("ARM B — COMPOSITE, production decompose (judge; NOT patched; proof §5b grader)", comp, withRules: false);
+        PrintTrajectory("ARM B — COMPOSITE JUDGES, ADR-024 gated tree (judge; NOT patched)", comp, withRules: false);
 
         if (compFails.Count > 0)
         {
@@ -101,6 +101,63 @@ public static class NonConvergenceRunner
         string path = Path.Combine(dir, "nonconvergence-result.json");
         await File.WriteAllTextAsync(path, sb.ToString());
         Console.WriteLine($"Wrote {path}");
+    }
+
+    /// <summary>Multi-seed run for the pre-registered confirmatory analysis. Keyword arm (deterministic, free) across MANY
+    /// seeds; composite arm (judge calls) across FEWER. Emits per-(arm,seed,round) fresh-fabrication counts to JSON for the
+    /// pure-Python decay-fit + bootstrap (build/stats/confirmatory.py). Each seed = an independent corpus draw (the resampling unit).</summary>
+    private static async Task<int> RunMultiSeedAsync(IChatClient judge, bool isReal, string[] args)
+    {
+        int rounds = IntArg(args, "--rounds", 8);
+        int perRound = IntArg(args, "--per-round", 12);
+        int kwSeeds = IntArg(args, "--seeds", 30);
+        int compSeeds = IntArg(args, "--comp-seeds", 5);
+        int seedStart = IntArg(args, "--seed-start", 2000);
+
+        Console.WriteLine($"Multi-seed confirmatory: keyword {kwSeeds} seeds (deterministic) + composite (gated tree) {compSeeds} seeds; {rounds} rounds x {perRound} fresh cases.");
+        Console.WriteLine();
+
+        var keyword = new List<(int Seed, int[] Fresh)>();
+        for (int s = 0; s < kwSeeds; s++)
+        {
+            int seed = seedStart + s;
+            IReadOnlyList<IReadOnlyList<GraderCase>> batches = CaseGenerator.GenerateRounds(seed, rounds, perRound);
+            var oracle = new PatchableKeywordOracle();
+            var patcher = new DeterministicPatcher(oracle);
+            IReadOnlyList<RoundResult> traj = await NonConvergenceLoop.RunAsync(batches, oracle, patcher.PatchFalseAlarm, patcher.PatchMiss, null);
+            keyword.Add((seed, traj.Select(r => r.FreshFabrications).ToArray()));
+        }
+        Console.WriteLine($"  keyword: {kwSeeds} seeds done (deterministic).");
+
+        var composite = new List<(int Seed, int[] Fresh)>();
+        for (int s = 0; s < compSeeds; s++)
+        {
+            int seed = seedStart + s;
+            IReadOnlyList<IReadOnlyList<GraderCase>> batches = CaseGenerator.GenerateRounds(seed, rounds, perRound);
+            IProbeEvaluator tree = DecomposedGraders.BuildInferenceAbuseTree(judge);
+            IReadOnlyList<RoundResult> traj = await NonConvergenceLoop.RunAsync(batches, tree, null, null, null);
+            composite.Add((seed, traj.Select(r => r.FreshFabrications).ToArray()));
+            Console.WriteLine($"  composite seed {seed}: [{string.Join(",", traj.Select(r => r.FreshFabrications))}]");
+        }
+
+        string dir;
+        try { dir = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "strategy", "redteam", "paper", "build", "results")); Directory.CreateDirectory(dir); }
+        catch { dir = Environment.CurrentDirectory; }
+        var sb = new StringBuilder();
+        sb.AppendLine("{");
+        sb.AppendLine($"  \"config\": {{ \"rounds\": {rounds}, \"perRound\": {perRound}, \"keywordSeeds\": {kwSeeds}, \"compositeSeeds\": {compSeeds}, \"seedStart\": {seedStart}, \"isReal\": {isReal.ToString().ToLowerInvariant()}, \"family\": \"InferenceAPIAbuse\", \"composite\": \"ADR-024 gated tree\" }},");
+        sb.AppendLine("  \"keyword\": [");
+        sb.AppendLine(string.Join(",\n", keyword.Select(k => $"    {{ \"seed\": {k.Seed}, \"fresh\": [{string.Join(",", k.Fresh)}] }}")));
+        sb.AppendLine("  ],");
+        sb.AppendLine("  \"composite\": [");
+        sb.AppendLine(string.Join(",\n", composite.Select(c => $"    {{ \"seed\": {c.Seed}, \"fresh\": [{string.Join(",", c.Fresh)}] }}")));
+        sb.AppendLine("  ]");
+        sb.AppendLine("}");
+        string path = Path.Combine(dir, "multiseed-result.json");
+        await File.WriteAllTextAsync(path, sb.ToString());
+        Console.WriteLine($"\nWrote {path}  →  run: python3 strategy/redteam/paper/build/stats/confirmatory.py");
+        judge.Dispose();
+        return 0;
     }
 
     private static string Trunc(string s, int n) => string.IsNullOrEmpty(s) || s.Length <= n ? s : s[..(n - 1)] + "…";
