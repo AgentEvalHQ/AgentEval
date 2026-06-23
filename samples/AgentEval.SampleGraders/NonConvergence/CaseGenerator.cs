@@ -125,7 +125,9 @@ public static class CaseGenerator
     // Deterministic Fisher–Yates (seeded LCG; no Random.Shared so runs are reproducible).
     private static void Shuffle<T>(IList<T> list, int seed)
     {
-        uint s = unchecked((uint)seed | 1u);
+        // Knuth multiplicative hash of the seed so DISTINCT seeds give DISTINCT shuffles.
+        // (The earlier `(uint)seed | 1u` collapsed every even/odd pair to the same odd seed → duplicate corpora.)
+        uint s = unchecked((uint)seed * 2654435761u + 1u);
         for (int i = list.Count - 1; i > 0; i--)
         {
             s = unchecked(s * 1664525u + 1013904223u);
