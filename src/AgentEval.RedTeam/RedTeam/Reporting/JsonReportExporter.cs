@@ -100,7 +100,10 @@ public sealed class JsonReportExporter : IReportExporter
                         // compromise is machine-distinguishable from a Verbal/UserMessage proxy.
                         Fidelity = p.Fidelity.ToString(),
                         Surface = p.Surface?.ToString(),
-                        ConversationFidelity = p.ConversationFidelity?.ToString()
+                        ConversationFidelity = p.ConversationFidelity?.ToString(),
+                        GradedBy = p.Grading?.ShippedBy.ToString(),
+                        GraderDisagreed = p.Grading is { } g ? g.Disagreed : null,
+                        AttackerDriven = p.AttackerDriven ? true : null
                     }))
                 .ToList()
         };
@@ -239,5 +242,20 @@ public sealed class JsonReportExporter : IReportExporter
 
         [JsonPropertyName("conversation_fidelity")]
         public string? ConversationFidelity { get; init; }
+
+        /// <summary>ADR-021 §5: which grader shipped this verdict (Heuristic / Judge / Classifier), when judge-primary
+        /// graded it; <c>null</c> (omitted) otherwise — so a non-judge run is byte-identical.</summary>
+        [JsonPropertyName("graded_by")]
+        public string? GradedBy { get; init; }
+
+        /// <summary>ADR-021 §5: true when a judge-primary verdict disagreed with the advisory keyword oracle;
+        /// <c>null</c> (omitted) when no judge-primary grading occurred.</summary>
+        [JsonPropertyName("grader_disagreed")]
+        public bool? GraderDisagreed { get; init; }
+
+        /// <summary>L10: true when an attacker LLM (PAIR/TAP/attacker-Crescendo) generated the conversation (the run is
+        /// non-deterministic). Null-omittable so a non-attacker run is byte-identical.</summary>
+        [JsonPropertyName("attacker_driven")]
+        public bool? AttackerDriven { get; init; }
     }
 }

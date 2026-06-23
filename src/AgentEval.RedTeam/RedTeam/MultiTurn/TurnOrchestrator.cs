@@ -67,6 +67,11 @@ public sealed class TurnOrchestrator
         // turn's fidelity on success, else the highest fidelity among CONCLUSIVE turns (Inconclusive turns excluded).
         EvidenceFidelity? succeededTurnFidelity = null;
         var conclusiveFidelity = EvidenceFidelity.Verbal;
+        // ADR-021 (§5): grading provenance of the representative turn — paired with the same selection
+        // as fidelity (the succeeding turn on success, else the highest-fidelity conclusive turn).
+        GraderProvenance? succeededTurnGrading = null;
+        GraderProvenance? conclusiveGrading = null;
+        var haveConclusive = false;
         var reason = "max turns reached without success";
         var truncated = true;
         AgentResponse? last = null;
@@ -148,10 +153,14 @@ public sealed class TurnOrchestrator
             // L7: the per-turn evaluator call honors the per-turn budget (turnCts), like the agent call and the judge
             // fallback below — a slow async evaluator must not escape the documented per-turn timeout. A per-turn
             // evaluator timeout folds the partial transcript as truncated rather than aborting the whole probe.
+            // Grade against a per-turn probe carrying the ACTUAL eliciting rung (userMessage), not the benign seed
+            // opener — otherwise a judge-primary grader (which reads probe.Prompt as context) sees the wrong prompt.
+            // The keyword oracles read the response + probe.Metadata/ExpectedTokens (not Prompt), so they are unaffected.
+            var turnProbe = seed with { Prompt = userMessage };
             EvaluationResult result;
             try
             {
-                result = await evaluator.EvaluateAsync(seed, response, turnCts.Token).ConfigureAwait(false);
+                result = await evaluator.EvaluateAsync(turnProbe, response, turnCts.Token).ConfigureAwait(false);
             }
             catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
             {
@@ -159,42 +168,30 @@ public sealed class TurnOrchestrator
                 truncated = true;
                 break;
             }
+            // ADR-021 (B.1): the per-turn LLM-judge fallback + judge-primary routing now live in the
+            // JudgeBackedEvaluator decorator wrapping `evaluator` (the judge runs under turnCts via the
+            // EvaluateAsync call above, so the per-turn budget still applies). FidelityOf reads the
+            // decorator's (possibly capped) fidelity; ProvenanceOf lifts any judge-primary provenance.
             var turnFidelity = FidelityOf(result);
-
-            // GAP-19 (multi-turn): resolve an Inconclusive turn with the LLM judge when one is configured, mirroring
-            // the single-turn runner path. The judge reasons over text only, so a judge-derived verdict is capped at
-            // IntentToAct (Succeeded ⇒ IntentToAct, Resisted ⇒ Verbal). A judge that errors/times out/is unsure leaves
-            // the turn's honest Inconclusive verdict untouched — never a fabricated verdict, never an aborted scan.
-            if (result.Outcome == EvaluationOutcome.Inconclusive && _options.JudgeClient is not null)
-            {
-                try
-                {
-                    // Use the per-turn budget (turnCts), like the agent call and the single-turn runner's per-probe
-                    // token — a slow judge must not silently consume the whole conversation budget.
-                    var judged = await new Evaluators.LLMJudgeEvaluator(_options.JudgeClient)
-                        .EvaluateAsync(seed, response.Text, turnCts.Token).ConfigureAwait(false);
-                    if (judged.Outcome != EvaluationOutcome.Inconclusive)
-                    {
-                        result = judged;
-                        turnFidelity = judged.Outcome == EvaluationOutcome.Succeeded
-                            ? EvidenceFidelity.IntentToAct
-                            : EvidenceFidelity.Verbal;
-                    }
-                }
-                catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
-                {
-                    // The judge exceeded the per-turn timeout (a per-turn cap, NOT a scan cancel) — keep the turn's
-                    // honest Inconclusive verdict and carry on, instead of aborting the whole conversation.
-                }
-            }
+            var turnGrading = GradingMetadata.ProvenanceOf(result);
 
             perTurn.Add(result);
-            // 5c: capture the succeeding turn's fidelity (first success) and accumulate fidelity only over
-            // CONCLUSIVE turns — an Inconclusive turn's fidelity is not evidence behind the fold.
-            if (result.Outcome == EvaluationOutcome.Succeeded)
-                succeededTurnFidelity ??= turnFidelity;
+            // 5c: capture the succeeding turn's fidelity + grading (first success) and accumulate fidelity only
+            // over CONCLUSIVE turns — an Inconclusive turn's fidelity is not evidence behind the fold.
+            if (result.Outcome == EvaluationOutcome.Succeeded && succeededTurnFidelity is null)
+            {
+                succeededTurnFidelity = turnFidelity;
+                succeededTurnGrading = turnGrading;
+            }
             if (result.Outcome != EvaluationOutcome.Inconclusive)
+            {
+                if (!haveConclusive || turnFidelity > conclusiveFidelity)
+                {
+                    conclusiveGrading = turnGrading;
+                    haveConclusive = true;
+                }
                 conclusiveFidelity = Max(conclusiveFidelity, turnFidelity);
+            }
 
             var decision = detector.Evaluate(ctx with { History = history, LastResponse = response }, response, result);
             if (decision.Signal == ConvergenceSignal.SucceededStop)
@@ -249,11 +246,17 @@ public sealed class TurnOrchestrator
         var fidelity = outcome == EvaluationOutcome.Succeeded && succeededTurnFidelity.HasValue
             ? succeededTurnFidelity.Value
             : conclusiveFidelity;
+        // ADR-021 (§5): grading provenance selected with the SAME switch as fidelity (succeeding turn on
+        // success, else the highest-fidelity conclusive turn); null when no turn was judge-primary graded.
+        var grading = outcome == EvaluationOutcome.Succeeded && succeededTurnFidelity.HasValue
+            ? succeededTurnGrading
+            : conclusiveGrading;
 
         return new MultiTurnResult
         {
             Outcome = outcome,
             Fidelity = fidelity,
+            Grading = grading,
             ConversationFidelity = convo.Fidelity,
             Transcript = history,
             PerTurnResults = perTurn,

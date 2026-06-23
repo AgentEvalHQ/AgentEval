@@ -101,6 +101,13 @@ internal static class RedTeamCommand
             { Description = "Separate endpoint for LLM judge (evaluates attack success)" };
         var judgeModelOpt = new Option<string?>("--judge-model")
             { Description = "Model for judge (default: same as --model)" };
+        // ADR-021 (Phase B.1): judge grading mode + rubric + per-call timeout.
+        var judgeModeOpt = new Option<string>("--judge-mode")
+            { DefaultValueFactory = _ => "primary", Description = "How the judge grades: 'primary' (default — ADR-023 B.3 flip; the Composite Judges grade semantic/text-only probes first, keyword oracle advisory) or 'fallback' (legacy — judge only adjudicates Inconclusive verdicts). 'primary' requires --judge; without it, a run is byte-identical to the keyword oracle." };
+        var judgeRubricOpt = new Option<string>("--judge-rubric")
+            { DefaultValueFactory = _ => "evidence-anchored", Description = "Judge rubric for --judge-mode primary: 'evidence-anchored' (default — a conclusive verdict must be grounded in a verbatim quote from the response, which targets BOTH false alarms and missed hits, carries the per-oracle discriminators, and is the rubric the published κ/fabrication numbers were measured under), 'strict' (precision-oriented — only clear compromise ⇒ Succeeded; fewer false alarms but more missed hits; no discriminators), or 'lenient' (recall-oriented — any sign of compromise ⇒ Succeeded; catches more real compromises at the cost of more false alarms). For a scan where a missed vulnerability matters more than a false alarm, prefer 'lenient'." };
+        var judgeTimeoutOpt = new Option<double>("--judge-timeout")
+            { DefaultValueFactory = _ => 0, Description = "Grading timeout (seconds): bounds the single-judge/fallback path per judge call (keeps the advisory keyword verdict on timeout) AND the default judge-primary composite path as a total grading bound (abstains → Inconclusive on timeout). 0 = no separate bound; grading shares the per-probe budget (--timeout-per-probe)." };
 
         // Attacker (LLM that drives attacker-LLM multi-turn attacks: Crescendo / PAIR / TAP)
         var attackerEndpointOpt = new Option<string?>("--attacker")
@@ -165,6 +172,9 @@ internal static class RedTeamCommand
         command.Options.Add(maxTurnTimeoutOpt);
         command.Options.Add(judgeEndpointOpt);
         command.Options.Add(judgeModelOpt);
+        command.Options.Add(judgeModeOpt);
+        command.Options.Add(judgeRubricOpt);
+        command.Options.Add(judgeTimeoutOpt);
         command.Options.Add(judgeApiKeyOpt);
         command.Options.Add(attackerEndpointOpt);
         command.Options.Add(attackerModelOpt);
@@ -209,6 +219,9 @@ internal static class RedTeamCommand
                 TimeoutPerTurnSeconds = parseResult.GetValue(maxTurnTimeoutOpt),
                 JudgeEndpoint = parseResult.GetValue(judgeEndpointOpt),
                 JudgeModel = parseResult.GetValue(judgeModelOpt),
+                JudgeMode = parseResult.GetValue(judgeModeOpt)!,
+                JudgeRubric = parseResult.GetValue(judgeRubricOpt)!,
+                JudgeTimeoutSeconds = parseResult.GetValue(judgeTimeoutOpt),
                 JudgeApiKey = parseResult.GetValue(judgeApiKeyOpt),
                 AttackerEndpoint = parseResult.GetValue(attackerEndpointOpt),
                 AttackerModel = parseResult.GetValue(attackerModelOpt),
@@ -452,9 +465,12 @@ internal static class RedTeamCommand
             Console.Error.WriteLine($"  Model: {resolvedName}");
             Console.Error.WriteLine($"  Attacks: {(attacks is null ? $"all ({Attack.All.Count})" : string.Join(", ", attacks.Select(a => a.Name)))}");
             Console.Error.WriteLine($"  Intensity: {intensity}");
-            // GAP-19: the judge IS consumed — it re-evaluates probes the deterministic evaluators left Inconclusive.
+            // GAP-19 / ADR-021 B.1: the judge IS consumed. In 'fallback' mode it re-evaluates probes the deterministic
+            // evaluators left Inconclusive; in 'primary' mode it grades Semantic, text-only probes first.
             if (opts.JudgeEndpoint is not null)
-                Console.Error.WriteLine($"  Judge: {opts.JudgeModel ?? resolvedName} (LLM-judge fallback on inconclusive probes, capped at IntentToAct fidelity)");
+                Console.Error.WriteLine(ParseJudgeMode(opts.JudgeMode) == JudgeMode.Primary
+                    ? $"  Judge: {opts.JudgeModel ?? resolvedName} (judge-PRIMARY for semantic probes [{opts.JudgeRubric}] — keyword oracle advisory; capped at IntentToAct fidelity)"
+                    : $"  Judge: {opts.JudgeModel ?? resolvedName} (LLM-judge fallback on inconclusive probes, capped at IntentToAct fidelity)");
             // Wave C′: an attacker LLM makes Crescendo/PAIR/TAP LLM-driven — and therefore non-deterministic.
             if (opts.AttackerEndpoint is not null)
                 Console.Error.WriteLine($"  Attacker: {opts.AttackerModel ?? resolvedName} (LLM-driven attacks — NON-DETERMINISTIC; not a stable baseline)");
@@ -677,6 +693,11 @@ internal static class RedTeamCommand
             FailFast = opts.FailFast,
             MaxProbesPerAttack = opts.MaxProbes,
             JudgeClient = judgeClient, // GAP-19: the runner re-evaluates Inconclusive probes with this judge (capped at IntentToAct)
+            // ADR-021 (B.1): judge grading mode/rubric/timeout. Mode is orthogonal to --judge: 'primary' with no
+            // judgeClient is an inert no-op (the GraderFactory returns the bare oracle).
+            Mode = ParseJudgeMode(opts.JudgeMode),
+            Rubric = ParseJudgeRubric(opts.JudgeRubric),
+            JudgeTimeout = opts.JudgeTimeoutSeconds > 0 ? TimeSpan.FromSeconds(opts.JudgeTimeoutSeconds) : null,
             AttackerClient = attackerClient, // Wave C′: drives attacker-LLM multi-turn attacks (Crescendo/PAIR/TAP)
             // --explain: only effective with a judge (the runner gates on JudgeClient too); a no-op flag without one.
             ExplainFindings = opts.Explain && judgeClient is not null,
@@ -690,6 +711,24 @@ internal static class RedTeamCommand
             TimeoutPerTurn = TimeSpan.FromSeconds(opts.TimeoutPerTurnSeconds > 0 ? opts.TimeoutPerTurnSeconds : opts.TimeoutPerProbeSeconds),
         };
     }
+
+    /// <summary>Maps <c>--judge-mode</c> to a <see cref="JudgeMode"/> (ADR-021 B.1; case-tolerant).</summary>
+    internal static JudgeMode ParseJudgeMode(string? mode) => (mode ?? "primary").Trim().ToLowerInvariant() switch
+    {
+        "" or "primary" => JudgeMode.Primary,   // ADR-023 B.3: default flipped to judge-primary (matches ParseJudgeRubric)
+        "fallback" => JudgeMode.Fallback,
+        _ => throw new ArgumentException($"Unknown --judge-mode '{mode}'. Use 'fallback' or 'primary'."),
+    };
+
+    /// <summary>Maps <c>--judge-rubric</c> to a <see cref="JudgeRubric"/> (ADR-021 B.1; case-tolerant).</summary>
+    internal static JudgeRubric ParseJudgeRubric(string? rubric) => (rubric ?? "evidence-anchored").Trim().ToLowerInvariant() switch
+    {
+        "" => JudgeRubric.EvidenceAnchored,   // R4 readiness: the recommended/measured default
+        "strict" => JudgeRubric.Strict,
+        "lenient" => JudgeRubric.Lenient,
+        "evidence-anchored" or "anchored" or "evidence" => JudgeRubric.EvidenceAnchored,
+        _ => throw new ArgumentException($"Unknown --judge-rubric '{rubric}'. Use 'strict', 'lenient', or 'evidence-anchored'."),
+    };
 
     /// <summary>Maps the <c>--sut-tier</c> string to a <see cref="SutTier"/> (case/spelling tolerant).</summary>
     internal static SutTier ParseSutTier(string? tier) => (tier ?? "text").Trim().ToLowerInvariant() switch
@@ -779,6 +818,9 @@ internal sealed class RedTeamOptions
     public string? JudgeEndpoint { get; init; }
     public string? JudgeModel { get; init; }
     public string? JudgeApiKey { get; init; }
+    public string JudgeMode { get; init; } = "primary";            // ADR-023 B.3: default flipped to judge-primary
+    public string JudgeRubric { get; init; } = "evidence-anchored"; // ADR-021 B.1 / R4: the measured/recommended default
+    public double JudgeTimeoutSeconds { get; init; }        // ADR-021 B.1: 0 = share per-probe budget
     public string? AttackerEndpoint { get; init; }
     public string? AttackerModel { get; init; }
     public string? AttackerApiKey { get; init; }

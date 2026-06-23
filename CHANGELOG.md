@@ -7,6 +7,52 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Red-team grading: judge-primary by default + Composite Judges (ADR-021/022/023/024)
+
+The red-team grader — the component that decides whether each attack *succeeded* — moves from a
+keyword/substring oracle to **LLM-judge-primary grading with honest-by-construction "Composite
+Judges."** Each semantic verdict is split into a positive-only compromise detector and a
+negative-only refusal detector, each structurally clamped (`OutcomeFilterEvaluator`) so it can only
+raise its own direction or abstain, aggregated by `CompositeEvaluator(Any)`. This was driven by a
+reproducible finding that *iteratively patching* a keyword oracle does **not** converge to an honest
+grader (fresh fabrications keep surfacing in both directions). Human/pin agreement moves from ~56%
+(keyword) to κ=1.000 on the pinned corpus; directional fabrications drop from 8 (single judge) to 0.
+
+#### Changed — ⚠️ BREAKING (default behavior)
+- **`--judge-mode` now defaults to `primary`** (was `fallback`). When a judge is configured (`--judge`),
+  the Composite Judges now **lead** the verdict instead of only adjudicating `Inconclusive` keyword
+  results. **A scan run without `--judge` stays byte-identical to the previous keyword-oracle behavior**,
+  and `--judge-mode fallback` restores the old judge-as-tiebreaker behavior exactly. (`ScanOptions.Mode`
+  default `Fallback` → `Primary`.)
+- **Default judge rubric is now `evidence-anchored`** (was `strict`) — the configuration the per-oracle
+  discriminators are calibrated for; strict/lenient remain selectable.
+
+#### Added
+- **Composite Judges for all six semantic oracles** — InferenceAPIAbuse, InsecureOutput, SupplyChain,
+  DataPoisoning, Misinformation (ADR-023), ExcessiveAgency (tool-aware, preserves the Behavioral leg).
+  Genuinely structural signals stay deterministic (DataPoisoning `trigger_phrase`, PromptInjection /
+  Jailbreak canary markers).
+- **ADR-024 split-then-gate (gated trees)** — InferenceAPIAbuse now uses a 4-gate tree
+  (`ConjunctionGate` AND-gates under a top OR) that closes the "I am Grok" model-vs-product-bot floor on
+  `gpt-4o-mini` with **no stronger model**. ADR-024 also documents the *bound*: the same pattern was
+  measured to **regress** InsecureOutput, so it is applied only where the conflated decisions are
+  independent axes (`AGENTEVAL_INFERENCE_FLAT=1` / `AGENTEVAL_INSECURE_TREE=1` toggle the A-B).
+- **Reasoning-model judges** (o-series / GPT-5-class) — the judge auto-retries without `temperature`
+  when a model rejects it (HTTP 400 `unsupported_value`), so a reasoning model can be used as the judge.
+- **`AgentEval.SampleGraders`** companion (paper/reproducibility) — a standalone keyword-vs-judge-vs-
+  composite-vs-gated head-to-head + a keyword-oracle non-convergence demo.
+
+#### Fixed
+- **Keyword-oracle non-convergence** — retired the non-convergent positive keyword detectors
+  (executable-structure / install-command / in-context-poison lexicon) that fabricated verdicts on
+  English imperatives, payload-naming warnings, and attribute-then-correct phrasings; replaced with
+  positive-only judges ⊕ a refusal judge.
+
+#### Tooling
+- **`GateAblationLiveCheck`** — a reusable per-oracle flat-vs-gated A-B harness that reports directional
+  fabrications and recommends the structure, so a gate is never promoted on intuition (env-gated on
+  `AGENTEVAL_RUN_5B=1`).
+
 ## [0.12.2-beta] - 2026-06-18
 
 ### Fixed

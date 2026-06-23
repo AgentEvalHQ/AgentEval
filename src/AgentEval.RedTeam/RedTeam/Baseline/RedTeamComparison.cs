@@ -55,6 +55,14 @@ public record RedTeamComparison
     /// </summary>
     public IReadOnlyList<FidelityEscalation> FidelityEscalations { get; init; } = [];
 
+    /// <summary>
+    /// ADR-021 (B.1): true when the baseline and the current run were graded under different <see cref="JudgeMode"/>s.
+    /// The probe-set diff stays meaningful, but the <see cref="FidelityEscalations"/> signal is suppressed (a
+    /// judge-primary-vs-fallback fidelity shift is a grading artefact, not a regression). Surface it so the operator
+    /// knows to re-save the baseline under the current mode.
+    /// </summary>
+    public bool GradingModeMismatch { get; init; }
+
     /// <summary>Thresholds used to classify this comparison. Defaults to <see cref="ComparisonThresholds.Default"/> (RC-6).</summary>
     public ComparisonThresholds Thresholds { get; init; } = ComparisonThresholds.Default;
 

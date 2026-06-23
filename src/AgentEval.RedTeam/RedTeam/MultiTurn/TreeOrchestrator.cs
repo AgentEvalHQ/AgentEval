@@ -47,6 +47,9 @@ public sealed class TreeOrchestrator
         var verdicts = new List<EvaluationResult>();
         var frontier = new List<TapNode> { TapNode.Root() };
         var fidelity = EvidenceFidelity.Verbal;
+        // ADR-021 (§5): grading provenance paired with the highest-fidelity node (the same rule used for fidelity).
+        GraderProvenance? grading = null;
+        var haveFidelity = false;
         var anyResisted = false;
         var nodes = 0;
 
@@ -58,7 +61,7 @@ public sealed class TreeOrchestrator
                 for (var branch = 0; branch < attack.Branching; branch++)
                 {
                     if (nodes >= attack.MaxNodes)
-                        return FoldExhausted(verdicts, transcript, fidelity, anyResisted, nodes, truncated: true);
+                        return FoldExhausted(verdicts, transcript, fidelity, grading, anyResisted, nodes, truncated: true);
 
                     // Bound each node (attacker prompt + target call + judge) by the per-probe budget so one slow LLM
                     // call cannot starve the rest of the tree; a per-node timeout dead-ends that branch honestly.
@@ -94,7 +97,7 @@ public sealed class TreeOrchestrator
                         // 5c: the attacker LLM FAILED (outage) — fold the search so far as truncated with an error
                         // reason (preserving any conclusive verdicts), never the "attacker exhausted" stop.
                         var outcome = anyResisted ? EvaluationOutcome.Resisted : EvaluationOutcome.Inconclusive;
-                        return Fold(outcome, fidelity, transcript, verdicts,
+                        return Fold(outcome, fidelity, grading, transcript, verdicts,
                             $"TAP attacker LLM errored ({ex.Category}) after {nodes} node(s) explored", truncated: true);
                     }
 
@@ -103,11 +106,16 @@ public sealed class TreeOrchestrator
                     verdicts.Add(verdict);
 
                     var (turnFidelity, score) = Classify(verdict);
+                    if (!haveFidelity || turnFidelity > fidelity)
+                    {
+                        grading = GradingMetadata.ProvenanceOf(verdict);
+                        haveFidelity = true;
+                    }
                     fidelity = Max(fidelity, turnFidelity);
                     if (verdict.Outcome == EvaluationOutcome.Resisted) anyResisted = true;
 
                     if (verdict.Outcome == EvaluationOutcome.Succeeded)
-                        return Fold(verdict.Outcome, turnFidelity, transcript, verdicts,
+                        return Fold(verdict.Outcome, turnFidelity, GradingMetadata.ProvenanceOf(verdict), transcript, verdicts,
                             $"TAP success at depth {depth + 1} ({nodes} node(s) explored)", truncated: false);
 
                     children.Add(node.Extend(prompt, reply.Text, verdict.Outcome.ToString(), score));
@@ -118,30 +126,15 @@ public sealed class TreeOrchestrator
             frontier = [.. children.OrderByDescending(c => c.Score).Take(Math.Max(1, attack.Beam))];   // prune to the beam
         }
 
-        return FoldExhausted(verdicts, transcript, fidelity, anyResisted, nodes, truncated: nodes >= attack.MaxNodes);
+        return FoldExhausted(verdicts, transcript, fidelity, grading, anyResisted, nodes, truncated: nodes >= attack.MaxNodes);
     }
 
-    // Score a node: the deterministic evaluator, then the verdict judge (GAP-19) only if it left Inconclusive.
-    private async Task<EvaluationResult> ScoreAsync(IProbeEvaluator evaluator, AttackProbe seed, AgentResponse reply, CancellationToken ct)
-    {
-        var verdict = await evaluator.EvaluateAsync(seed, reply, ct).ConfigureAwait(false);
-        if (verdict.Outcome == EvaluationOutcome.Inconclusive && _options.JudgeClient is not null)
-        {
-            var judged = await new Evaluators.LLMJudgeEvaluator(_options.JudgeClient)
-                .EvaluateAsync(seed, reply.Text, ct).ConfigureAwait(false);
-            if (judged.Outcome != EvaluationOutcome.Inconclusive)
-            {
-                // Judge reasons over text → capped at IntentToAct (Succeeded) / Verbal (Resisted). PRESERVE any
-                // metadata the judge returned and only add/override the fidelity key Classify reads.
-                var meta = judged.Metadata is { } existing
-                    ? new Dictionary<string, object>(existing)
-                    : new Dictionary<string, object>();
-                meta["fidelity"] = judged.Outcome == EvaluationOutcome.Succeeded ? EvidenceFidelity.IntentToAct : EvidenceFidelity.Verbal;
-                return judged with { Metadata = meta };
-            }
-        }
-        return verdict;
-    }
+    // Score a node. ADR-021 (B.1): the per-node LLM-judge fallback + judge-primary routing now live in the
+    // JudgeBackedEvaluator decorator wrapping `evaluator` (the judge runs under the per-node budget via this
+    // call). The decorator stamps the capped fidelity into Metadata["fidelity"] (which Classify reads) and any
+    // judge-primary provenance into Metadata["grader_provenance"] (which RunAsync lifts).
+    private static Task<EvaluationResult> ScoreAsync(IProbeEvaluator evaluator, AttackProbe seed, AgentResponse reply, CancellationToken ct)
+        => evaluator.EvaluateAsync(seed, reply, ct);
 
     // Fidelity + a pruning score (Succeeded > Inconclusive > Resisted; success returns before pruning anyway).
     // internal for direct unit-testing of the pruning-score ordering (5c).
@@ -163,11 +156,12 @@ public sealed class TreeOrchestrator
 
     private static EvidenceFidelity Max(EvidenceFidelity a, EvidenceFidelity b) => (EvidenceFidelity)Math.Max((int)a, (int)b);
 
-    private static MultiTurnResult Fold(EvaluationOutcome outcome, EvidenceFidelity fidelity, IReadOnlyList<Turn> transcript,
-        IReadOnlyList<EvaluationResult> verdicts, string reason, bool truncated) => new()
+    private static MultiTurnResult Fold(EvaluationOutcome outcome, EvidenceFidelity fidelity, GraderProvenance? grading,
+        IReadOnlyList<Turn> transcript, IReadOnlyList<EvaluationResult> verdicts, string reason, bool truncated) => new()
     {
         Outcome = outcome,
         Fidelity = fidelity,
+        Grading = grading,   // ADR-021 §5: judge-primary grading provenance of the representative node
         ConversationFidelity = ConversationFidelity.Flattened,   // each node is an independent single-turn call
         Transcript = transcript,
         PerTurnResults = verdicts,
@@ -180,13 +174,13 @@ public sealed class TreeOrchestrator
     // No node succeeded: the agent RESISTED every measurable variation ⇒ Resisted; if we could only ever measure
     // Inconclusive (or nothing ran) ⇒ Inconclusive. Never a fabricated success.
     private static MultiTurnResult FoldExhausted(IReadOnlyList<EvaluationResult> verdicts, IReadOnlyList<Turn> transcript,
-        EvidenceFidelity fidelity, bool anyResisted, int nodes, bool truncated)
+        EvidenceFidelity fidelity, GraderProvenance? grading, bool anyResisted, int nodes, bool truncated)
     {
         var outcome = anyResisted ? EvaluationOutcome.Resisted : EvaluationOutcome.Inconclusive;
         var reason = nodes == 0
             ? "TAP produced no attack (attacker exhausted before any prompt)"
             : $"TAP exhausted ({nodes} node(s) explored), target was not driven to the objective";
-        return Fold(outcome, fidelity, transcript, verdicts, reason, truncated);
+        return Fold(outcome, fidelity, grading, transcript, verdicts, reason, truncated);
     }
 }
 

@@ -27,6 +27,16 @@ public class ScanOptionsTests
         Assert.Null(options.JudgeClient);
     }
 
+    [Fact] // ADR-023 (B.3 flip, 2026-06-22): judge-PRIMARY + evidence-anchored are NOW the defaults, so the Composite
+    // Judges grade by default. A no-judge run is still byte-identical (JudgeClient null ⇒ bare oracle), but the MODE
+    // itself is Primary. Locks the flip so it cannot silently revert to the legacy Fallback default.
+    public void Default_JudgeMode_IsPrimary_AndRubricEvidenceAnchored()
+    {
+        Assert.Equal(JudgeMode.Primary, new ScanOptions().Mode);
+        Assert.Equal(JudgeMode.Primary, ScanOptions.Default.Mode);
+        Assert.Equal(JudgeRubric.EvidenceAnchored, new ScanOptions().Rubric);
+    }
+
     [Fact]
     public void Quick_HasReducedTimeout()
     {
