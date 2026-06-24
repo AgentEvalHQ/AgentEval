@@ -7,6 +7,7 @@ using AgentEval.RedTeam.Attacks;
 using AgentEval.RedTeam.Evaluators;
 using AgentEval.Testing;
 using Microsoft.Extensions.AI;
+using Microsoft.Extensions.Time.Testing;   // FakeTimeProvider — deterministic per-turn-timeout tests
 using EvaluationResult = AgentEval.RedTeam.EvaluationResult;
 
 namespace AgentEval.Tests.RedTeam.MultiTurn;
@@ -83,6 +84,27 @@ public class MultiTurnOrchestrationTests
             public IReadOnlyList<Turn> History => [];
             public async Task<AgentResponse> SendAsync(string userMessage, CancellationToken ct = default)
             { await Task.Delay(delay, ct); return new AgentResponse { Text = "late" }; }
+            public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+        }
+    }
+
+    /// <summary>Conversable agent that ADVANCES a <see cref="FakeTimeProvider"/> by <c>perTurn</c> on each call instead
+    /// of really sleeping — so per-turn-timeout / conversation-duration tests are deterministic and instant (no
+    /// wall-clock race, no load-sensitive CI flake). Pair with <c>ScanOptions.TimeProvider = clock</c>.</summary>
+    private sealed class ClockAdvancingConvoAgent(FakeTimeProvider clock, TimeSpan perTurn) : IConversableAgent
+    {
+        public string Name => "clock-advancing";
+        public Task<AgentResponse> InvokeAsync(string prompt, CancellationToken ct = default)
+        { clock.Advance(perTurn); return Task.FromResult(new AgentResponse { Text = "ok" }); }
+        public Task<IAgentConversation> StartConversationAsync(CancellationToken ct = default)
+            => Task.FromResult<IAgentConversation>(new Convo(clock, perTurn));
+
+        private sealed class Convo(FakeTimeProvider clock, TimeSpan perTurn) : IAgentConversation
+        {
+            public ConversationFidelity Fidelity => ConversationFidelity.Native;
+            public IReadOnlyList<Turn> History => [];
+            public Task<AgentResponse> SendAsync(string userMessage, CancellationToken ct = default)
+            { clock.Advance(perTurn); return Task.FromResult(new AgentResponse { Text = "ok" }); }
             public ValueTask DisposeAsync() => ValueTask.CompletedTask;
         }
     }
@@ -501,9 +523,13 @@ public class MultiTurnOrchestrationTests
     [Fact]
     public async Task MaxConversationDuration_SoftStops_Truncated()
     {
+        // DETERMINISTIC via FakeTimeProvider: each turn advances 15ms; MaxConversationDuration=5ms → the soft-stop
+        // fires after the first completed turn (elapsed 15ms ≥ 5ms). TimeoutPerTurn stays at its large default so the
+        // per-turn cap can't fire first. Exercises the TimeProvider.GetElapsedTime path with no real waits.
+        var clock = new FakeTimeProvider();
         var attack = new EndlessAttack();
-        var agent = new DelayingConversableAgent(TimeSpan.FromMilliseconds(15));
-        var options = new ScanOptions { MaxConversationDuration = TimeSpan.FromMilliseconds(5) };
+        var agent = new ClockAdvancingConvoAgent(clock, TimeSpan.FromMilliseconds(15));
+        var options = new ScanOptions { MaxConversationDuration = TimeSpan.FromMilliseconds(5), TimeProvider = clock };
 
         var result = await new TurnOrchestrator(agent, options).RunAsync(attack, Seed, attack.GetEvaluator(), CancellationToken.None);
 
@@ -659,14 +685,14 @@ public class MultiTurnOrchestrationTests
     [Fact]
     public async Task PerTurnBudget_ResetsEachTurn_CumulativeOverBudgetStillCompletes()
     {
-        // Regression (documented past HIGH): the per-turn timeout RESETS each turn. Cumulative agent time
-        // (4 × 400ms = 1.6s) exceeds one TimeoutPerTurn (1400ms), yet every turn is well under budget → all 4 run.
-        // The per-turn HEADROOM is deliberately large (400ms work vs a 1400ms budget = 1s slack) so a loaded CI
-        // runner's scheduling spikes can't trip the per-turn timeout and flake this test (the 4-turn design caps the
-        // ratio near 4×, so robustness comes from absolute slack, not ratio).
+        // Regression (documented past HIGH): the per-turn timeout RESETS each turn. DETERMINISTIC via FakeTimeProvider —
+        // each turn advances the fake clock by 400ms (well under the 1400ms per-turn budget), so 4 × 400ms = 1.6s of
+        // "agent time" elapses cumulatively yet no single turn's timer fires → all 4 run. No real waits, no wall-clock
+        // race (this was the recurring net8/Windows CI flake; the injectable clock removes the flake class entirely).
+        var clock = new FakeTimeProvider();
         var attack = new FourTurnAttack();
-        var agent = new DelayingConversableAgent(TimeSpan.FromMilliseconds(400));
-        var options = new ScanOptions { TimeoutPerTurn = TimeSpan.FromMilliseconds(1400) };
+        var agent = new ClockAdvancingConvoAgent(clock, TimeSpan.FromMilliseconds(400));
+        var options = new ScanOptions { TimeoutPerTurn = TimeSpan.FromMilliseconds(1400), TimeProvider = clock };
 
         var result = await new TurnOrchestrator(agent, options)
             .RunAsync(attack, Seed, attack.GetEvaluator(), CancellationToken.None);

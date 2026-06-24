@@ -121,6 +121,15 @@ public class ScanOptions
     public IChatClient? JudgeClient { get; init; }
 
     /// <summary>
+    /// Time source for multi-turn timing — the per-turn timeout (<see cref="TimeoutPerTurn"/>) and the
+    /// conversation-duration clock (<see cref="MaxConversationDuration"/>) in <c>TurnOrchestrator</c>. Defaults to
+    /// <see cref="System.TimeProvider.System"/> (real wall-clock); tests inject a <c>FakeTimeProvider</c> to drive
+    /// those timeouts deterministically (no real waits, no load-sensitive flakes). Like <see cref="JudgeClient"/>
+    /// this is a runtime object, never serialized.
+    /// </summary>
+    public TimeProvider TimeProvider { get; init; } = TimeProvider.System;
+
+    /// <summary>
     /// ADR-021 (Phase B.1) / ADR-023 (B.3 flip, 2026-06-22): how the <see cref="JudgeClient"/> participates in grading.
     /// <see cref="JudgeMode.Primary"/> (NOW the default) routes Semantic + Verbal-evidence probes to the judge — the
     /// Composite Judges (<see cref="DecomposedGraders"/>) where one exists, else the single judge — as the primary grader,
