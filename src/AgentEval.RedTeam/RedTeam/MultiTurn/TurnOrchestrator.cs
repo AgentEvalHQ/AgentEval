@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
-using System.Diagnostics;
 using AgentEval.Core;       // IEvaluableAgent, AgentResponse
 using AgentEval.Testing;    // Turn
 
@@ -75,7 +74,7 @@ public sealed class TurnOrchestrator
         var reason = "max turns reached without success";
         var truncated = true;
         AgentResponse? last = null;
-        var sw = Stopwatch.StartNew();
+        var startTs = _options.TimeProvider.GetTimestamp();   // injectable clock (FakeTimeProvider in tests) — see ScanOptions.TimeProvider
         var maxTurns = Math.Max(1, attack.MaxTurns);
 
         for (var i = 0; i < maxTurns; i++)
@@ -97,7 +96,13 @@ public sealed class TurnOrchestrator
             // LLM (PAIR / attacker-driven Crescendo) cannot silently burn the whole conversation budget. (Scripted
             // ladders never await an LLM here, so they are unaffected.)
             using var turnCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            turnCts.CancelAfter(_options.TimeoutPerTurn);
+            // Per-turn budget via the injectable TimeProvider (real wall-clock in prod; a FakeTimeProvider drives it
+            // deterministically in tests). Equivalent to CancelAfter(TimeoutPerTurn) under TimeProvider.System. The
+            // timer is declared AFTER turnCts so `using` disposes it FIRST (stops the timer before the CTS is gone),
+            // and the callback guards a disposed CTS so an in-flight fire during disposal can't throw.
+            using var turnTimer = _options.TimeProvider.CreateTimer(
+                static s => { try { ((CancellationTokenSource)s!).Cancel(); } catch (ObjectDisposedException) { } },
+                turnCts, _options.TimeoutPerTurn, Timeout.InfiniteTimeSpan);
 
             string? userMessage;
             try
@@ -210,7 +215,7 @@ public sealed class TurnOrchestrator
                 break;
             }
 
-            if (_options.MaxConversationDuration > TimeSpan.Zero && sw.Elapsed >= _options.MaxConversationDuration)
+            if (_options.MaxConversationDuration > TimeSpan.Zero && _options.TimeProvider.GetElapsedTime(startTs) >= _options.MaxConversationDuration)
             {
                 reason = $"max conversation duration ({_options.MaxConversationDuration.TotalSeconds:F0}s) reached";
                 truncated = true;

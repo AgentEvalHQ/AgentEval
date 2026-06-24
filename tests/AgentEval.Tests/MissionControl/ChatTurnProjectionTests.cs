@@ -13,7 +13,7 @@ namespace AgentEval.Tests.MissionControl;
 
 /// <summary>
 /// Glass Box Phase 7: the Mission Control <see cref="ChatTurnProjection"/> — projects a rich v1.1
-/// <see cref="AgentTrace"/> into the per-turn <see cref="ChatTurn"/> timeline (net10-only, like Mission Control).
+/// <see cref="AgentTrace"/> into the per-turn <see cref="AgentEval.MissionControl.GraphQL.ChatTurn"/> timeline (net10-only, like Mission Control).
 /// </summary>
 public class ChatTurnProjectionTests
 {

@@ -3,9 +3,11 @@
 // Licensed under the MIT License.
 //
 // ADR-021 Jun21 grading-by-decomposition: deterministic tests for the InferenceAPIAbuse decomposed grader
-// (positive-only disclosure detector ⊕ negative-only refusal detector, aggregated Any) and the
-// OutcomeFilterEvaluator contract. A shared FakeChatClient feeds the two sub-judges in order:
-// [0] = the disclosure detector's verdict, [1] = the refusal detector's verdict.
+// (positive-only detectors ⊕ negative-only refusal, aggregated Any) and the OutcomeFilterEvaluator contract.
+// InferenceAPIAbuse now defaults to the ADR-024 GATED TREE (disclosure-by-name D1∧D2, disclosure-by-internals Dint,
+// abuse B1∧B2, refusal C1∧C2 — up to 7 leaf judges under a top Any), so the tree tests use the LeafJudge helper
+// (keyword-keyed per leaf, order/short-circuit-robust); the remaining flat composites (e.g. InsecureOutput) feed a
+// shared FakeChatClient in order [0]=emit/compromise judge, [1]=refusal judge.
 using AgentEval.RedTeam;
 using AgentEval.RedTeam.Attacks;     // DataPoisoningAttack metadata keys
 using AgentEval.RedTeam.Evaluators;  // ContainsTokenEvaluator

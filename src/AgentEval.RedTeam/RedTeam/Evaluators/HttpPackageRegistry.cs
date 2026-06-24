@@ -8,7 +8,7 @@ namespace AgentEval.RedTeam.Evaluators;
 
 /// <summary>
 /// An <see cref="IPackageRegistry"/> that resolves package existence against the LIVE public registries
-/// (PyPI / npm / NuGet) — the Tier-2 LLM03 upgrade that lets <see cref="RegistryBackedSupplyChainEvaluator"/> catch
+/// (PyPI / npm / NuGet) — the Tier-2 LLM03 upgrade that lets <see cref="Attacks.RegistryBackedSupplyChainEvaluator"/> catch
 /// model-INVENTED hallucinations (any recommended package the registry can't confirm), not just a planted fake.
 /// <para>
 /// <b>Honesty on uncertainty:</b> only a definitive <c>404</c> ⇒ "does not exist" (the hallucination signal). A

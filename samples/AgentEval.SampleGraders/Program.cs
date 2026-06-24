@@ -23,6 +23,11 @@ int runs = ParseRuns(args, defaultRuns: 5);
 if (args.Contains("--nonconvergence"))
     return await AgentEval.SampleGraders.NonConvergence.NonConvergenceRunner.RunAsync(judge, isReal, args);
 
+// STAGE 2 (paper E4, definitive C2-abl): score a gold-set corpus with keyword / single / GENERIC composite / PRODUCTION
+// task-specific graders on the SAME cases + SAME judge → verdicts.json (scored by the Python safety-asymmetric scorer).
+if (args.Contains("--head-to-head"))
+    return await HeadToHeadRunner.RunAsync(judge, isReal, args);
+
 Console.WriteLine("AgentEval.SampleGraders — InferenceAPIAbuse grader head-to-head");
 Console.WriteLine(new string('=', 70));
 Console.WriteLine(isReal

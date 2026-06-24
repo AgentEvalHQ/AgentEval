@@ -164,11 +164,16 @@ public class PerformanceBenchmarkTests
             "test", concurrentRequests: 2, duration: duration);
 
         // RPS is exactly completed / configured-duration (the old code divided by the larger
-        // wall-clock Duration, which would not match).
+        // wall-clock Duration, which would not match). THIS is the real, deterministic guard for
+        // BUG-51: if RPS divided by wall-clock it could not equal completed/configured-duration.
         Assert.Equal(result.CompletedRequests / duration.TotalSeconds, result.RequestsPerSecond, 6);
-        // The reported wall-clock Duration exceeds the configured window — confirming the two
-        // denominators genuinely differ.
-        Assert.True(result.Duration > duration);
+        // Sanity that the reported wall-clock (worker startup + measurement window + post-cancel
+        // drain) is on the order of the configured window. Kept TOLERANT rather than a strict
+        // `Duration > duration`: on a loaded CI runner a ~200 ms window can quantize to a measured
+        // Duration a hair below the configured one, which used to flake the net8.0/Windows leg.
+        // The assertion above already proves RPS uses the configured window, not this wall-clock.
+        Assert.True(result.Duration >= duration - TimeSpan.FromMilliseconds(25),
+            $"wall-clock {result.Duration.TotalMilliseconds:F0} ms should be ~>= configured {duration.TotalMilliseconds:F0} ms");
     }
 
     [Fact]

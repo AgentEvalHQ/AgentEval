@@ -31,7 +31,7 @@ public interface IConversableAgent : IEvaluableAgent
 }
 
 /// <summary>
-/// A live conversation with a SUT. <see cref="SendAsync"/> sends the next user message and returns the agent's reply
+/// A live conversation with a SUT. <see cref="SendAsync(string, CancellationToken)"/> sends the next user message and returns the agent's reply
 /// with prior turns preserved. Disposing ends/resets the session.
 /// </summary>
 public interface IAgentConversation : IAsyncDisposable
