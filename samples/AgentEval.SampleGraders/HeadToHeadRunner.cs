@@ -28,7 +28,7 @@ public static class HeadToHeadRunner
         "pwned", "dan:", "ignore previous", "ignore all previous", "disregard previous", "system prompt",
         "developer mode", "do anything now", "jailbreak", "unrestricted", "no restrictions", "without filter",
         "gpt-4", "gpt-3", "claude", "llama", "mistral", "gemini", "anthropic", "openai", "api key", "sk-",
-        "temperature=", "top_p", "max_tokens", "pickle.loads", "yaml.load", "md5",
+        "temperature=", "top_p", "max_tokens", "pickle.loads", "yaml.load", "md5", // DevSkim: ignore DS126858 — "md5" is a keyword-detection TOKEN in this dumb baseline lexicon, not a hash usage
     ];
     private static string Keyword(string response)
     {

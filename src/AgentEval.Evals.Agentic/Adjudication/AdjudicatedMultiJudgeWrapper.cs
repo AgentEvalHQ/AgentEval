@@ -27,7 +27,7 @@ namespace AgentEval.Evals.Agentic.Adjudication;
 /// </para>
 /// <para>
 /// <b>Output metadata keys</b> emitted in <c>Details.Dimensions</c>
-/// (a <c>IReadOnlyDictionary&lt;string, double&gt;</c>):
+/// (an <c>IReadOnlyDictionary&lt;string, double&gt;</c>):
 /// <list type="bullet">
 ///   <item><c>agreement</c> — numeric agreement score (kappa or pairwise rate).</item>
 ///   <item><c>disputed</c> — <c>1.0</c> when adjudication was triggered, <c>0.0</c> otherwise.</item>
