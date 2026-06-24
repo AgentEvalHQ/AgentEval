@@ -809,7 +809,7 @@ public sealed class DataPoisoningDecomposedEvaluator : IProbeEvaluator
 
 /// <summary>
 /// Decorator that enforces a sub-evaluator's outcome CONTRACT: if the inner verdict is not the single
-/// <paramref name="allowed"/> outcome, it is downgraded to <see cref="EvaluationOutcome.Inconclusive"/> (keeping
+/// <c>allowed</c> outcome, it is downgraded to <see cref="EvaluationOutcome.Inconclusive"/> (keeping
 /// the reason/metadata). This makes a positive-only detector (allowed = Succeeded) structurally unable to raise a
 /// Resisted, and a negative-only detector (allowed = Resisted) unable to raise a Succeeded — so the composite's
 /// honesty does not depend on the sub-prompt always obeying its instruction (ADR-021 Jun21 decomposition).
