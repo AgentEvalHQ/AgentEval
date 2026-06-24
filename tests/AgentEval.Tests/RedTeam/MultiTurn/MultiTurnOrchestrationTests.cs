@@ -660,10 +660,13 @@ public class MultiTurnOrchestrationTests
     public async Task PerTurnBudget_ResetsEachTurn_CumulativeOverBudgetStillCompletes()
     {
         // Regression (documented past HIGH): the per-turn timeout RESETS each turn. Cumulative agent time
-        // (4 × 300ms = 1.2s) exceeds one TimeoutPerTurn (900ms), yet every turn is well under budget → all 4 run.
+        // (4 × 400ms = 1.6s) exceeds one TimeoutPerTurn (1400ms), yet every turn is well under budget → all 4 run.
+        // The per-turn HEADROOM is deliberately large (400ms work vs a 1400ms budget = 1s slack) so a loaded CI
+        // runner's scheduling spikes can't trip the per-turn timeout and flake this test (the 4-turn design caps the
+        // ratio near 4×, so robustness comes from absolute slack, not ratio).
         var attack = new FourTurnAttack();
-        var agent = new DelayingConversableAgent(TimeSpan.FromMilliseconds(300));
-        var options = new ScanOptions { TimeoutPerTurn = TimeSpan.FromMilliseconds(900) };
+        var agent = new DelayingConversableAgent(TimeSpan.FromMilliseconds(400));
+        var options = new ScanOptions { TimeoutPerTurn = TimeSpan.FromMilliseconds(1400) };
 
         var result = await new TurnOrchestrator(agent, options)
             .RunAsync(attack, Seed, attack.GetEvaluator(), CancellationToken.None);
