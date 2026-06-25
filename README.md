@@ -260,9 +260,11 @@ Beyond the built-in probes, it ships the capabilities that make a red-team resul
 
 - **Multi-turn & attacker-LLM attacks** — Crescendo, PAIR, TAP, and a tool-aware `ToolEscalation` attack (opt-in).
 - **Real attack surfaces** — a tiered tool harness (`--sut-tier text\|function-calling\|instrumented`) with **evidence-fidelity** labeling (Verbal / IntentToAct / Behavioral), plus a live package-registry oracle (`--package-registry live`) and a real RAG-retrieval boundary.
-- **Honesty discipline** — conclusive-only scoring, an explicit *Inconclusive* coverage state, and never-fabricate verdicts (a green result is never a guess).
+- **Trustworthy verdicts — judge-primary by default + Composite Judges** *(new in v0.13)* — the grader that decides whether each attack *succeeded* is now LLM-judge-primary, using **honest-by-construction Composite Judges**: every semantic verdict is split into a positive-only *compromise* detector ⊕ a negative-only *refusal* detector, each structurally clamped so it can only raise its own direction or abstain. Plus conclusive-only scoring and an explicit *Inconclusive* coverage state — so a green result is never a guess.
 - **5 compliance reporters** — OWASP, MITRE ATLAS, SOC 2, ISO 27001, and **NIST AI RMF** — runnable as first-class benchmarks (`agenteval bench owasp\|mitre\|nist`).
 - **CI-ready** — SARIF + JUnit export, a baseline regression gate (`--save-baseline`/`--baseline`/`--fail-on`), z-score **calibration** (`--calibration`), LLM **`--explain`** rationale, and external **benchmark packs** (`--pack HarmBench\|JailbreakBench\|CyberSecEval`, license-gated, nothing bundled).
+
+> **Proof, not vibes.** Across **810 stochastic trials** — 81 independently-generated, held-out cases run **K=10×** each through the production graders — the Composite Judges fabricated **0 verdicts**: never a safe reply flagged as a compromise, never a real compromise masked as safe, at **κ = 1.000** agreement with the pinned human labels (vs. ~56% for a keyword oracle). The guiding rule: *fabrications are complete failures; honesty is never punished.* Background: [ADR-021→024](docs/adr/021-judge-primary-semantic-oracles.md) · [Red Team — What's New](docs/redteam-whats-new.md).
 
 See **[Red Team — What's New](docs/redteam-whats-new.md)** for the recent upgrades, how AgentEval compares to PyRIT / garak / others, and a plain-English take on why *grading* a model's reply is the hard part — and **[docs/redteam.md](docs/redteam.md)** for the full CLI reference.
 

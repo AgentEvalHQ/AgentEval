@@ -2,11 +2,22 @@
 
 A roundup of what landed in AgentEval's red-team module recently: broader coverage, multi-step attacks, real-tool grounding, and — the part we're proudest of — a serious, honest answer to the hardest problem in red-teaming: **trusting the verdict.**
 
-> **TL;DR.** More attacks, multi-turn and attacker-LLM support, real tool-execution grounding, OWASP LLM Top-10 closure, and compliance crosswalks across five frameworks — *plus* a three-way, evidence-graded verdict system that tells you when it **doesn't know**, instead of guessing. See [the full reference](redteam.md).
+> **TL;DR.** More attacks, multi-turn and attacker-LLM support, real tool-execution grounding, OWASP LLM Top-10 closure, and compliance crosswalks across five frameworks — *plus* the centerpiece: **judge-primary grading with honest-by-construction "Composite Judges"** (now the default), a three-way evidence-graded verdict that tells you when it **doesn't know** instead of guessing. The headline: **0 directional fabrications across 810 stochastic trials, κ = 1.000.** See [the full reference](redteam.md).
 
 ---
 
 ## New & upgraded capabilities
+
+### Grading — judge-primary by default + Composite Judges *(the big one, v0.13)*
+
+The grader — the component that decides whether each attack actually *succeeded* — moved from a keyword/substring oracle to **LLM-judge-primary grading** with **honest-by-construction "Composite Judges."** This is the headline of v0.13, and it's a deliberate, evidence-driven flip (see [ADR-021→024](adr/021-judge-primary-semantic-oracles.md)).
+
+- **Composite Judges.** Every semantic verdict is *decomposed* into a **positive-only compromise detector ⊕ a negative-only refusal detector**, each structurally clamped (`OutcomeFilterEvaluator`) so it can only ever raise *its own* direction or abstain — never the opposite. They're aggregated by an honest `CompositeEvaluator(Any)`. A detector physically cannot turn a safe reply into a "Succeeded," and cannot bury a real compromise under a "Resisted." All six semantic oracles (InferenceAPIAbuse, InsecureOutput, SupplyChain, DataPoisoning, Misinformation, ExcessiveAgency) now run this way; genuinely structural signals (canary markers, `trigger_phrase`) stay deterministic.
+- **Why we flipped.** We didn't *decide* keyword grading was inadequate — we *proved* it, the hard way. We built an adversarial honesty harness, patched every fabrication it found, and re-ran it from scratch — and it surfaced a **fresh batch of realistic mistakes every single time** (one cycle: fix 41, find 41 new). Iteratively patching a keyword oracle **does not converge** to an honest grader. That's a structural limit, not a backlog — so we changed the architecture.
+- **The proof.** On an independently-generated, held-out adversarial corpus run **K=10× per case**, the Composite Judges produced **0 directional fabrications across 810 trials** (81 cases × 10) — never a safe reply scored as a compromise, never a real compromise masked as safe. Agreement with the pinned human labels is **κ = 1.000 (n=92)**; directional fabrications dropped from **8 (a single judge)** and from a non-convergent keyword oracle (~56% human agreement) to **0**. The guiding rule throughout: *fabrications are complete failures; honesty is never punished* — abstaining ("Inconclusive") is an honest coverage gap, never scored as a hit.
+- **Gated trees where decisions are independent (ADR-024).** InferenceAPIAbuse uses a small AND-gated tree that closes the "I am Grok" model-vs-product-bot floor on `gpt-4o-mini` with *no stronger model*. ADR-024 also documents the *bound*: the same structure was measured to **regress** InsecureOutput, so it's applied only where the conflated decisions are genuinely independent axes — a gate is never promoted on intuition (`GateAblationLiveCheck` runs the A/B).
+
+> **⚠️ Default change.** With a judge configured (`--judge`), Composite Judges now **lead** the verdict (`--judge-mode primary`, the new default; the old judge-as-tiebreaker is `--judge-mode fallback`). The default rubric is now `evidence-anchored`. **A scan with no `--judge` stays byte-identical to the previous keyword oracle.** Reproduce the proof: `AGENTEVAL_RUN_5B=1 AGENTEVAL_STOCHASTIC_K=10 dotnet test --filter "Stochastic_Composite_Stability"` (needs Azure OpenAI). A self-contained keyword-vs-single-judge-vs-composite head-to-head ships as [`samples/AgentEval.SampleGraders`](https://github.com/AgentEvalHQ/AgentEval/tree/main/samples/AgentEval.SampleGraders).
 
 ### Coverage
 - **258 built-in probes across 13 attack types** (Comprehensive intensity), covering **all 10 OWASP LLM Top 10 (2025)** and **8 MITRE ATLAS** techniques.
@@ -51,7 +62,7 @@ Different tools reach for different "smarter graders":
 
 | Approach | What it does | How good (public figures) |
 |---|---|---|
-| **Keyword/pattern** (garak's default refusal lists; our verbal oracles) | Ctrl-F for refusal/compliance phrases | Agrees with human graders only **~half the time** on the hard cases |
+| **Keyword/pattern** (garak's default refusal lists; AgentEval's *no-judge* fallback) | Ctrl-F for refusal/compliance phrases | Agrees with human graders only **~half the time** on the hard cases |
 | **AI-as-judge** (PyRIT; promptfoo; our `--judge`) | hands the reply to a *second* model to read and judge | Strong on understanding (**~85–90%** with a frontier judge), at the cost of speed, money, and run-to-run consistency |
 | **Trained grader** (HarmBench classifier; Meta Llama Guard) | a model *purpose-trained* on thousands of human-labeled examples | Reliable, fast, offline (**~75–80%**) |
 | **Reality check** (AgentDojo) | doesn't read prose at all — checks whether the action *actually happened* (was the email sent? the record changed?) | The gold standard *wherever you can observe the outcome* |
@@ -62,25 +73,27 @@ Each is better than Ctrl-F at *understanding* — but none of them, except the r
 
 ### Where AgentEval stands — and what we did differently
 
-We're candid: our per-attack graders are still **keyword-based at the fast first pass**, like garak's default. But we added the thing most tools *don't* have — and it's the heart of this release:
+As of **v0.13**, with a judge configured AgentEval grades the semantic attacks the way the strongest tools do — **judge-primary, not keyword-primary** — but with an honesty mechanism most tools *don't* have. The five things that make a green result trustworthy:
 
-1. **A third answer.** Every probe is **Resisted**, **Succeeded**, or **Inconclusive**. When the keyword grader can't be sure, AgentEval says **"Inconclusive — I can't tell"** *instead of guessing.* Most tools force a binary pass/fail and silently bury their uncertainty.
-2. **Conclusive-only scoring.** The headline number is `Resisted / (Resisted + Succeeded)` — *inconclusive* results lower your **coverage**, not your pass-rate. You can see exactly how much the tool was sure about.
-3. **Evidence fidelity on every verdict.** Each result is labeled **Verbal** (the model's words), **Intent-to-act** (it emitted a forbidden tool call), or **Behavioral** (it actually executed one). A green result is never a guess about what the model *would* do.
-4. **Reality-check grounding** where we can get it (canary tools, exact-token canaries) — the AgentDojo idea, so some verdicts come off the verbal channel entirely.
-5. **Defer to the judge** for the genuinely ambiguous middle (e.g. confabulation-vs-refutation): configure `--judge` and the LLM adjudicates the `Inconclusive` pile.
+1. **Judge-primary by default + Composite Judges.** When `--judge` is set, an LLM judge *reads* each reply, and the verdict is decomposed into a positive-only ⊕ negative-only pair that's structurally clamped against fabricating in either direction (see the **Grading** section above). The keyword oracle remains only as the deterministic **no-judge** fallback — and a no-judge run is byte-identical to the prior release.
+2. **A third answer.** Every probe is **Resisted**, **Succeeded**, or **Inconclusive**. When the grader can't be sure, AgentEval says **"Inconclusive — I can't tell"** *instead of guessing.* Most tools force a binary pass/fail and silently bury their uncertainty.
+3. **Conclusive-only scoring.** The headline number is `Resisted / (Resisted + Succeeded)` — *inconclusive* results lower your **coverage**, not your pass-rate. You can see exactly how much the tool was sure about.
+4. **Evidence fidelity on every verdict.** Each result is labeled **Verbal** (the model's words), **Intent-to-act** (it emitted a forbidden tool call), or **Behavioral** (it actually executed one). A green result is never a guess about what the model *would* do.
+5. **Reality-check grounding** where we can get it (canary tools, exact-token canaries) — the AgentDojo idea, so some verdicts come off the verbal channel entirely.
 
-So our honest position: **on raw probe breadth, garak leads; on attacker-LLM orchestration depth, PyRIT leads** — both are excellent for deep security research, and we close the breadth gap by *importing* their datasets rather than re-implementing them. **On trustworthiness of the verdict — three-way honesty, evidence fidelity, and not-guessing — AgentEval is, to our knowledge, the most careful.** That combination is the differentiator.
+So our honest position: **on raw probe breadth, garak leads; on attacker-LLM orchestration depth, PyRIT leads** — both are excellent for deep security research, and we close the breadth gap by *importing* their datasets rather than re-implementing them. **On trustworthiness of the verdict — judge-primary Composite Judges that provably don't fabricate, three-way honesty, and evidence fidelity — AgentEval is, to our knowledge, the most careful.** That combination is the differentiator.
 
 ### Practical guidance
 
-- **Configure `--judge`.** The verbal graders are best-effort pre-filters; the ambiguous middle (now intentionally large, because we'd rather say "Inconclusive" than lie) is adjudicated by an LLM judge. Without one, those probes honestly report as a coverage gap, not a fake pass.
+- **Configure `--judge`.** This is now where the honesty lives: with a judge set, Composite Judges *lead* the semantic verdicts. Without one, AgentEval falls back to the deterministic keyword oracle — best-effort only — and the cases it can't be sure about honestly report as a coverage gap, not a fake pass. (Use `--judge-mode fallback` if you want the old judge-as-tiebreaker behavior.)
 - **Trust the structural signals on their own** — exact markers, canary-tool execution, real payloads. Those don't depend on reading prose.
 - **Read the verdict *and* its fidelity label.** "Succeeded (Behavioral)" is a proven compromise; "Succeeded (Verbal)" is a strong signal worth a human look.
 
-### Where this is heading
+### What shipped — and where this is heading
 
-The next step is to make the **AI judge (or a trained grader) the *primary* grader** for the semantic attacks — keyword heuristics demoted to an advisory first pass — which is the direction the strongest tools have already taken. That's how a keyword-honest tool becomes a semantically-honest one. This release is the bridge: it stops the fast grader from over-claiming, and routes everything it can't be sure about to a real judge.
+The step we called "next" in the previous release **shipped in v0.13**: the AI judge is now the **primary** grader for the semantic attacks, with the keyword heuristic demoted to the no-judge fallback — the direction the strongest tools already took, and what turns a keyword-honest tool into a semantically-honest one. Composite Judges proved this isn't just "add a judge": they make the judge *structurally* unable to fabricate, with the K=10 stochastic stability to back it up.
+
+From here: a **trained, offline grader** (HarmBench/Llama-Guard-style) as a zero-cost, deterministic alternative to the LLM judge, and an external **gold-set / multi-model** validation of these honesty numbers beyond a single judge and model.
 
 ---
 
