@@ -32,7 +32,7 @@
          tag, so they version in lockstep. Keeping the number here (and nowhere else) makes that
          parity structural — there is no second number to drift. CI overrides this for releases
          via `dotnet pack -p:PackageVersion=<tag>`. -->
-    <Version>0.13.0-beta</Version>
+    <Version>0.13.1-beta</Version>
 
     <!-- Package icon for NuGet -->
     <PackageIcon>AgentEvalNugetLogoAE.png</PackageIcon>

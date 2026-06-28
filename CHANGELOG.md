@@ -7,6 +7,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.1-beta] - 2026-06-28
+
+A maintenance release on top of the judge-primary grading flip. It adds an
+injectable clock for deterministic multi-turn timing, brings the red-team
+documentation in line with the v0.13 grading default, ships a paper /
+reproducibility companion sample, and folds in routine dependency bumps.
+**No grader-behaviour changes** — judge-primary Composite Judges shipped in
+0.13.0-beta and are unchanged here.
+
+### Added
+- **`ScanOptions.TimeProvider`** — an injectable `TimeProvider` (default
+  `TimeProvider.System`) used by `TurnOrchestrator` for per-turn timeout and
+  conversation-duration timing, so multi-turn timing can be driven
+  deterministically in tests via `FakeTimeProvider`. Runtime-only, not serialized
+  (mirrors `JudgeClient`).
+- **`AgentEval.SampleGraders` head-to-head runner** (`--head-to-head`) — scores a
+  gold-set corpus with the keyword oracle, a single LLM judge, a generic
+  composite, and the production task-specific decomposition on the same cases and
+  judge, emitting `verdicts.json` for the safety-asymmetric scorer (paper /
+  reproducibility companion; consumes public APIs only, modifies no product code).
+
+### Changed
+- **Red-team documentation** — `README.md` and `docs/redteam-whats-new.md` now
+  headline judge-primary grading + Composite Judges, replacing the stale
+  pre-flip "keyword-primary" narrative so the public docs match the shipped
+  default.
+
+### Fixed
+- **Flaky net8.0/Windows CI timing tests** — `TurnOrchestrator` now measures
+  elapsed time and arms per-turn timeouts through the injectable `TimeProvider`
+  instead of wall-clock `Stopwatch`/`CancelAfter`, removing load-sensitive
+  flakes; the two timing-sensitive multi-turn tests run on a deterministic
+  `FakeTimeProvider`. The throughput-benchmark `Duration` assertion was made
+  tolerant (the deterministic requests-per-second guard is unchanged).
+- **XML-doc warnings** — cleaned up stale `cref`/`paramref` references across the
+  codebase (documentation only, no behaviour change).
+
+### Dependencies
+- Bump the GitHub Actions group (2 updates).
+- Bump `react-router` 7.15.0 → 7.18.0 in the Mission Control SPA.
+
 ## [0.13.0-beta] - 2026-06-24
 
 ### Red-team grading: judge-primary by default + Composite Judges (ADR-021/022/023/024)
@@ -1892,7 +1933,15 @@ This release marks the transition from alpha to beta. The framework is now featu
 - `AgentEval.Tracing` (OTel + run artifacts) - planned
 - `AgentEval.Studio` (workflow visualizer / time-travel UI) - future
 
-[Unreleased]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.8.0-beta...HEAD
+[Unreleased]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.13.1-beta...HEAD
+[0.13.1-beta]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.13.0-beta...v0.13.1-beta
+[0.13.0-beta]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.12.2-beta...v0.13.0-beta
+[0.12.2-beta]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.12.1-beta...v0.12.2-beta
+[0.12.1-beta]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.12.0-beta...v0.12.1-beta
+[0.12.0-beta]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.10.1-beta...v0.12.0-beta
+[0.10.1-beta]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.10.0-beta...v0.10.1-beta
+[0.10.0-beta]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.9.0-beta...v0.10.0-beta
+[0.9.0-beta]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.8.1-beta...v0.9.0-beta
 [0.8.0-beta]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.7.0-beta...v0.8.0-beta
 [0.7.0-beta]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.6.0-beta...v0.7.0-beta
 [0.6.0-beta]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.5.4-beta...v0.6.0-beta
