@@ -9,12 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.13.1-beta] - 2026-06-28
 
-A maintenance release on top of the judge-primary grading flip. It adds an
-injectable clock for deterministic multi-turn timing, brings the red-team
-documentation in line with the v0.13 grading default, ships a paper /
-reproducibility companion sample, and folds in routine dependency bumps.
-**No grader-behaviour changes** — judge-primary Composite Judges shipped in
-0.13.0-beta and are unchanged here.
+A maintenance release on top of the judge-primary grading flip. It **upgrades
+Microsoft Agent Framework to 1.11.1**, adds an injectable clock for deterministic
+multi-turn timing, brings the red-team documentation in line with the v0.13
+grading default, ships a paper / reproducibility companion sample, and folds in
+routine dependency bumps. **No grader-behaviour changes** — judge-primary
+Composite Judges shipped in 0.13.0-beta and are unchanged here.
 
 ### Added
 - **`ScanOptions.TimeProvider`** — an injectable `TimeProvider` (default
@@ -44,8 +44,17 @@ reproducibility companion sample, and folds in routine dependency bumps.
 - **XML-doc warnings** — cleaned up stale `cref`/`paramref` references across the
   codebase (documentation only, no behaviour change).
 
+### Dependencies — Microsoft Agent Framework 1.11.1
+- **MAF 1.10.0 → 1.11.1** (central, via `Directory.Packages.props`): `Microsoft.Agents.AI`,
+  `Microsoft.Agents.AI.OpenAI`, `Microsoft.Agents.AI.Workflows`, `Microsoft.Agents.AI.Workflows.Generators`.
+  **No source changes were required** — the full net8.0 suite (6,619 tests) passes unchanged and
+  `maf-doctor` (v1.6.0) grades the tree clean of anti-pattern errors/warnings.
+- `Microsoft.Extensions.AI*` stays at **10.6.0** — MAF 1.11.1's declared dependency — and the
+  `OpenTelemetry.Api` **1.15.3** security pin (GHSA-g94r-2vxg-569j) remains valid, since the 1.11.1
+  Workflows packages still declare exactly that version.
+
 ### Dependencies
-- Bump the GitHub Actions group (2 updates).
+- Bump the GitHub Actions group (2 updates) + `actions/cache` 5 → 6.
 - Bump `react-router` 7.15.0 → 7.18.0 in the Mission Control SPA.
 
 ## [0.13.0-beta] - 2026-06-24

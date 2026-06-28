@@ -4,7 +4,7 @@
 
 [![NuGet](https://img.shields.io/nuget/vpre/AgentEval.Cli.svg)](https://www.nuget.org/packages/AgentEval.Cli)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/AgentEvalHQ/AgentEval/blob/main/LICENSE)
-![MAF 1.10.0](https://img.shields.io/badge/MAF-1.10.0-blueviolet)
+![MAF 1.11.1](https://img.shields.io/badge/MAF-1.11.1-blueviolet)
 ![.NET 8.0 | 10.0](https://img.shields.io/badge/.NET-8.0%20|%2010.0-512BD4)
 
 Command-line interface for [AgentEval](https://github.com/AgentEvalHQ/AgentEval) — the comprehensive
@@ -25,7 +25,7 @@ same version from one pipeline.
 
 | Version     | MAF    | .NET      |
 |-------------|--------|-----------|
-| 0.12.0-beta | 1.10.0 | 8.0, 10.0 |
+| 0.13.1-beta | 1.11.1 | 8.0, 10.0 |
 
 > The tool multi-targets `net8.0` and `net10.0`; the dotnet-tool installer picks the highest
 > compatible runtime. The `mc serve` portal requires .NET 10.
@@ -181,7 +181,7 @@ agenteval eval --endpoint http://localhost:11434/v1 --model llama3 --dataset age
 
 - .NET 8.0 or .NET 10.0 (`mc serve` requires .NET 10.0)
 - An AI agent endpoint (Azure OpenAI, OpenAI, Ollama, or any OpenAI-compatible API) for `eval` / `redteam` / LLM-graded benchmarks
-- Built on Microsoft Agent Framework (MAF) 1.10.0 and [Microsoft.Extensions.AI](https://github.com/dotnet/extensions)
+- Built on Microsoft Agent Framework (MAF) 1.11.1 and [Microsoft.Extensions.AI](https://github.com/dotnet/extensions)
 
 ## Documentation
 

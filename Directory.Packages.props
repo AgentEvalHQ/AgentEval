@@ -9,10 +9,10 @@
   
   <ItemGroup>
     <!-- Microsoft Agent Framework -->
-    <PackageVersion Include="Microsoft.Agents.AI" Version="1.10.0" />
-    <PackageVersion Include="Microsoft.Agents.AI.OpenAI" Version="1.10.0" />
-    <PackageVersion Include="Microsoft.Agents.AI.Workflows" Version="1.10.0" />
-    <PackageVersion Include="Microsoft.Agents.AI.Workflows.Generators" Version="1.10.0" />
+    <PackageVersion Include="Microsoft.Agents.AI" Version="1.11.1" />
+    <PackageVersion Include="Microsoft.Agents.AI.OpenAI" Version="1.11.1" />
+    <PackageVersion Include="Microsoft.Agents.AI.Workflows" Version="1.11.1" />
+    <PackageVersion Include="Microsoft.Agents.AI.Workflows.Generators" Version="1.11.1" />
     
     <!-- Microsoft Extensions AI -->
     <PackageVersion Include="Microsoft.Extensions.AI" Version="10.6.0" />
@@ -23,7 +23,7 @@
     <!-- SEC-13: Azure.AI.OpenAI is a direct ref of AgentEval.Cli (packed/published as a global
          dotnet tool), so a -beta dependency risks yank/unlist and API churn. It is pinned to beta
          deliberately: the only stable 2.x release on NuGet is 2.0.0 (Nov 2024), which predates the
-         API surface used by the Microsoft.Agents.AI 1.10.0 stack and AzureChatAgentFactory — there is
+         API surface used by the Microsoft.Agents.AI 1.11.1 stack and AzureChatAgentFactory — there is
          no recent GA to move to. Mitigations: (1) the CLI itself ships on the -prerelease channel,
          so a beta dependency is in-band; (2) the version is centrally pinned here (CPM) so it cannot
          float. ACTION: upgrade to a stable Azure.AI.OpenAI 2.x as soon as one ships (tracked, vNext). -->
@@ -31,9 +31,10 @@
     <PackageVersion Include="Azure.Identity" Version="1.18.0" />
     
     <!-- Core -->
-    <PackageVersion Include="System.Numerics.Tensors" Version="10.0.8" /><!-- floor raised by Microsoft.Extensions.AI 10.6.0 (MAF 1.10.0) -->
+    <PackageVersion Include="System.Numerics.Tensors" Version="10.0.8" /><!-- floor raised by Microsoft.Extensions.AI 10.6.0 (MAF 1.11.1 still depends on Extensions.AI 10.6.0) -->
     <PackageVersion Include="System.Memory.Data" Version="10.0.3" />
-    <!-- Security: pin to patch that resolves GHSA-g94r-2vxg-569j (transitive via MAF 1.10.0) -->
+    <!-- Security: pin to patch that resolves GHSA-g94r-2vxg-569j (transitive via MAF 1.11.1; the
+         1.11.1 Workflows packages still declare OpenTelemetry.Api 1.15.3, so this pin stays valid) -->
     <PackageVersion Include="OpenTelemetry.Api" Version="1.15.3" />
     <PackageVersion Include="System.CommandLine" Version="2.0.3" />
     <PackageVersion Include="YamlDotNet" Version="16.3.0" />

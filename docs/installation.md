@@ -36,7 +36,7 @@ AgentEval is tested and compatible with:
 
 | Dependency | Version | Notes |
 |------------|---------|-------|
-| **Microsoft Agent Framework (MAF)** | `1.10.0` | Native integration — adapters, tool tracking, workflows |
+| **Microsoft Agent Framework (MAF)** | `1.11.1` | Native integration — adapters, tool tracking, workflows |
 | **Microsoft.Extensions.AI** | `10.6.0` | Universal `IChatClient` support |
 | **.NET 8.0** | ✅ Supported | LTS |
 | **.NET 9.0** | ✅ Supported | STS |
@@ -50,8 +50,8 @@ AgentEval ships as a single NuGet package with these key dependencies:
 
 | Package | Version | Purpose |
 |---------|---------|--------|
-| Microsoft.Agents.AI | 1.10.0 | Microsoft Agent Framework integration |
-| Microsoft.Agents.AI.Workflows | 1.10.0 | Workflow orchestration support |
+| Microsoft.Agents.AI | 1.11.1 | Microsoft Agent Framework integration |
+| Microsoft.Agents.AI.Workflows | 1.11.1 | Workflow orchestration support |
 | Microsoft.Extensions.AI | 10.6.0 | AI abstractions (IChatClient) |
 | Microsoft.Extensions.AI.Evaluation.Quality | 10.6.0 | Quality evaluation metrics |
 
