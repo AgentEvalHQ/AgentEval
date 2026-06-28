@@ -181,7 +181,7 @@ agenteval eval --endpoint http://localhost:11434/v1 --model llama3 --dataset age
 
 - .NET 8.0 or .NET 10.0 (`mc serve` requires .NET 10.0)
 - An AI agent endpoint (Azure OpenAI, OpenAI, Ollama, or any OpenAI-compatible API) for `eval` / `redteam` / LLM-graded benchmarks
-- Built on Microsoft Agent Framework (MAF) 1.11.1 and [Microsoft.Extensions.AI](https://github.com/dotnet/extensions)
+- Built on Microsoft Agent Framework (MAF) and [Microsoft.Extensions.AI](https://github.com/dotnet/extensions)
 
 ## Documentation
 

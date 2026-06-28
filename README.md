@@ -585,7 +585,7 @@ See the **[Getting Started Guide](docs/getting-started.md)** for a complete walk
 | [Red Team Security](docs/redteam.md) | Security probes, OWASP/MITRE coverage |
 | [Responsible AI](docs/ResponsibleAI.md) | Toxicity, bias, misinformation detection |
 | [Memory Evaluation](docs/memory-evaluation.md) | Retention, reach-back, temporal, LongMemEval, HTML reports |
-| [MAF Memory Integration](docs/maf-memory-integration.md) | How AgentEval.Memory maps to MAF 1.11.1 pipelines |
+| [MAF Memory Integration](docs/maf-memory-integration.md) | How AgentEval.Memory maps to MAF pipelines |
 | [Cross-Framework](docs/cross-framework.md) | Semantic Kernel, IChatClient adapters |
 | [CLI Tool](docs/cli.md) | Command-line evaluation guide |
 | [Migration Guide](docs/comparison.md) | Coming from Python/Node.js frameworks |
