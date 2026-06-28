@@ -47,8 +47,8 @@ Composite Judges shipped in 0.13.0-beta and are unchanged here.
 ### Dependencies — Microsoft Agent Framework 1.11.1
 - **MAF 1.10.0 → 1.11.1** (central, via `Directory.Packages.props`): `Microsoft.Agents.AI`,
   `Microsoft.Agents.AI.OpenAI`, `Microsoft.Agents.AI.Workflows`, `Microsoft.Agents.AI.Workflows.Generators`.
-  **No source changes were required** — the full net8.0 suite (6,619 tests) passes unchanged and
-  `maf-doctor` (v1.6.0) grades the tree clean of anti-pattern errors/warnings.
+  **No source changes were required** — the full net8.0 test suite passes unchanged and
+  `maf-doctor` grades the tree clean of anti-pattern errors/warnings.
 - `Microsoft.Extensions.AI*` stays at **10.6.0** — MAF 1.11.1's declared dependency — and the
   `OpenTelemetry.Api` **1.15.3** security pin (GHSA-g94r-2vxg-569j) remains valid, since the 1.11.1
   Workflows packages still declare exactly that version.
