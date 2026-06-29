@@ -319,9 +319,10 @@ public class MITREATLASReporter : IComplianceReporter<MITREATLASReport>
 
             foreach (var probe in failedProbes)
             {
-                // Carry the attack prompt + judge reason/rationale (the actionable substance); keep
-                // the agent's response excerpt gated behind includeEvidence. See the OWASP reporter
-                // for the rationale — both project from the same ProbeResult shape.
+                // Carry the attack prompt + the concise judge reason (the actionable substance); keep
+                // the agent's response excerpt — and the judge rationale, which is derived from it and
+                // may quote it — gated behind includeEvidence. See the OWASP reporter for the
+                // rationale — both project from the same ProbeResult shape.
                 var evidenceText = includeEvidence && !string.IsNullOrEmpty(probe.Response)
                     ? Truncate(probe.Response, 600)
                     : null;
@@ -340,7 +341,7 @@ public class MITREATLASReporter : IComplianceReporter<MITREATLASReport>
                     ProbeId = probe.ProbeId,
                     AttackPrompt = string.IsNullOrWhiteSpace(probe.Prompt) ? null : Truncate(probe.Prompt, 600),
                     Reason = reason,
-                    Rationale = string.IsNullOrWhiteSpace(probe.Rationale) ? null : probe.Rationale!.Trim(),
+                    Rationale = includeEvidence && !string.IsNullOrWhiteSpace(probe.Rationale) ? Truncate(probe.Rationale!.Trim(), 600) : null,
                     Evidence = evidenceText
                 });
             }
