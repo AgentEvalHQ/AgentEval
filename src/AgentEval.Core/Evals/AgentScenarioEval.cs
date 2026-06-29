@@ -74,7 +74,7 @@ public sealed class AgentScenarioEval : IEval
                     new EvalEvidence(
                         Source: "agent-error",
                         Reference: _inner.Key,
-                        Message: message.Length > 500 ? message[..500] + "…" : message),
+                        Message: message.Length > 500 ? message[..499] + "…" : message),   // 499 + ellipsis = 500 (cap inclusive)
                 },
                 Recommendations: null,
                 SubResults: null,
