@@ -129,13 +129,37 @@ public class ChatClientEvaluator : IEvaluator
             var jsonOptions = new ChatOptions { ResponseFormat = ChatResponseFormat.Json };
             response = await _chatClient.GetResponseAsync(messages, jsonOptions, cancellationToken);
         }
-        catch
+        catch (Exception ex) when (IsResponseFormatUnsupported(ex))
         {
-            // Endpoint/model rejected response_format (older API version or unsupported model):
-            // retry once unconstrained rather than failing the whole evaluation.
+            // ONLY recover the "endpoint/model rejected response_format" case (older API version or
+            // unsupported model) by retrying unconstrained. A genuine judge error (network, timeout,
+            // overload) must propagate — otherwise a failed judge silently returns an EvaluationFailed
+            // fallback score that callers like CalibratedEvaluator cannot tell apart from a real low
+            // score (it would average the fallback in / never trip its "judges failed" guard).
             response = await _chatClient.GetResponseAsync(messages, cancellationToken: cancellationToken);
         }
         return (ParseEvaluationResponse(response.Text), response);
+    }
+
+    // A model/endpoint that does not support response_format=json surfaces an HTTP 400
+    // invalid_request_error naming the parameter. Recognise THAT (and only that) so we can retry
+    // without the constraint; any other exception is a genuine failure and is left to propagate.
+    // Mirrors the IsUnsupportedTemperature pattern in LLMJudgeEvaluator (reasoning-model work).
+    private static bool IsResponseFormatUnsupported(Exception ex)
+    {
+        var m = ex.Message;
+        bool namesFormat =
+            m.Contains("response_format", StringComparison.OrdinalIgnoreCase)
+            || m.Contains("response format", StringComparison.OrdinalIgnoreCase)
+            || m.Contains("json_object", StringComparison.OrdinalIgnoreCase)
+            || m.Contains("json mode", StringComparison.OrdinalIgnoreCase);
+        bool looksRejected =
+            m.Contains("unsupported", StringComparison.OrdinalIgnoreCase)
+            || m.Contains("not supported", StringComparison.OrdinalIgnoreCase)
+            || m.Contains("does not support", StringComparison.OrdinalIgnoreCase)
+            || m.Contains("invalid", StringComparison.OrdinalIgnoreCase)
+            || m.Contains("400", StringComparison.OrdinalIgnoreCase);
+        return namesFormat && looksRejected;
     }
 
     private static void Accumulate(ref long? input, ref long? output, UsageDetails? usage)

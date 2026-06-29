@@ -131,20 +131,6 @@ internal static class AzureChatAgentFactory
     }
 
     /// <summary>
-    /// Prints a prominent banner warning the operator that the built-in stub agent is in use
-    /// — call from any CLI command that defaults to a stub agent when neither <c>--azure-from-env</c>
-    /// nor an explicit override was provided. The banner explains how to scan a real agent so
-    /// operators don't unwittingly publish a "PASS" verdict that only reflects the stub's
-    /// hardcoded refusal posture.
-    /// </summary>
-    /// <param name="benchmarkName">Friendly benchmark name (e.g., "OWASP LLM Top 10").</param>
-    /// <param name="stubAgentDescription">Short label for the stub (e.g., "SafeRefusalAgent stub").</param>
-    /// <param name="sampleFileName">
-    /// Name of the canonical sample file demonstrating real-agent wiring for this benchmark
-    /// (e.g., "06_OwaspBenchmark.cs"). Surfaces the right file to read for the operator's
-    /// specific command, not always OWASP.
-    /// </param>
-    /// <summary>
     /// Builds Azure OpenAI client options with a generous network timeout. The default
     /// per-attempt NetworkTimeout (100s) can fire when the agent under test is a slow real
     /// agent fronted by an adapter — a deliberate turn plus a model cooldown can exceed it,
@@ -159,6 +145,20 @@ internal static class AzureChatAgentFactory
         return new AzureOpenAIClientOptions { NetworkTimeout = TimeSpan.FromSeconds(seconds) };
     }
 
+    /// <summary>
+    /// Prints a prominent banner warning the operator that the built-in stub agent is in use
+    /// — call from any CLI command that defaults to a stub agent when neither <c>--azure-from-env</c>
+    /// nor an explicit override was provided. The banner explains how to scan a real agent so
+    /// operators don't unwittingly publish a "PASS" verdict that only reflects the stub's
+    /// hardcoded refusal posture.
+    /// </summary>
+    /// <param name="benchmarkName">Friendly benchmark name (e.g., "OWASP LLM Top 10").</param>
+    /// <param name="stubAgentDescription">Short label for the stub (e.g., "SafeRefusalAgent stub").</param>
+    /// <param name="sampleFileName">
+    /// Name of the canonical sample file demonstrating real-agent wiring for this benchmark
+    /// (e.g., "06_OwaspBenchmark.cs"). Surfaces the right file to read for the operator's
+    /// specific command, not always OWASP.
+    /// </param>
     public static void PrintStubAgentWarning(string benchmarkName, string stubAgentDescription, string sampleFileName = "06_OwaspBenchmark.cs")
     {
         const int innerWidth = 77; // total line width minus the two "│" borders + spacing

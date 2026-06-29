@@ -49,6 +49,11 @@ public sealed class ScenarioToAtomicEval
     /// the scenario is wrapped with a <see cref="MultiJudgeWrapper"/> for multi-judge consensus.
     /// When <c>null</c> or empty, the primary <paramref name="judge"/> is used.
     /// </param>
+    /// <param name="agent">
+    /// Optional live agent-under-test. When supplied, each scenario drives this agent with its own
+    /// article-specific prompt and grades the agent's real answer (live-agent judging); when <c>null</c>,
+    /// the supplied fixed response is graded instead.
+    /// </param>
     public ScenarioToAtomicEval(
         AgentEval.Core.IEvaluator judge,
         string? judgeModel = null,

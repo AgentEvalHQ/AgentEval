@@ -7,6 +7,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Compliance: live-agent judging + a silent judge-parse correctness fix
+
+Community contribution — huge thanks to **[@Javierif](https://github.com/Javierif)**. 🙌
+
+#### Added
+- **Live-agent compliance judging (`AgentScenarioEval`)** — the GDPR / EU AI Act benchmarks can now
+  drive the actual agent-under-test with **each scenario's own article-specific prompt** and grade its
+  real answer, instead of grading one fixed `--response` against every scenario. An agent failure
+  surfaces as a distinct **"error" leaf** (severity `none`) rather than a confirmed violation, and the
+  wrapper delegates identity (`Key`/`Name`/`Category`/`Version`) to the inner eval so it stays
+  transparent to persistence and reporting.
+- **`EvaluationFailed` honesty primitive** (`EvalDetails` / `AtomicLlmEval`) — distinguishes "the eval
+  errored" from "the agent genuinely scored low", so an un-parseable verdict surfaces as an
+  `error`/`none` leaf and never masquerades as a critical violation in roll-ups.
+- **Richer compliance findings** — `ComplianceFinding` now carries `AttackPrompt` + `Reason` +
+  `Rationale` (response evidence capped/gated), so a triaging developer sees *what* input got through
+  and *why* it counted.
+- **Red-team scan truncation-salvage** (`ScanOptions.OverallTimeout`) — an internal linked deadline so a
+  slow agent that finishes most probes yields a clearly-*truncated* report instead of a hard zero,
+  while an external cancel still propagates.
+
+#### Fixed
+- **Silent compliance-judge parse bug** — the verdict parser used `PropertyNameCaseInsensitive`, which
+  does not bridge `snake_case` ↔ `camelCase`. The GDPR / EU AI Act judge prompts emit `snake_case`
+  (`overall_score`, `criteria_results`), so **every such verdict was being silently parsed to score `0`
+  with empty criteria**. A key-normalising parser (lower-case + strip underscores) makes both shapes
+  round-trip. (Real, token-spending judgements were being corrupted.)
+- **Lower-cost, more robust parsing** — request a JSON `response_format` (with a graceful, *narrowly
+  scoped* fallback when the endpoint rejects it) plus a single corrective retry; token usage is summed
+  across the initial call + retry so cost attribution stays honest. The `response_format` fallback only
+  catches the genuine "format unsupported" case, so a real judge error still propagates (preserving
+  `CalibratedEvaluator`'s exception-based failure handling).
+
 ## [0.13.1-beta] - 2026-06-28
 
 A maintenance release on top of the judge-primary grading flip. It **upgrades
