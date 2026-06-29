@@ -131,6 +131,47 @@ public class ScanOptions
     public IChatClient? JudgeClient { get; init; }
 
     /// <summary>
+    /// Time source for multi-turn timing — the per-turn timeout (<see cref="TimeoutPerTurn"/>) and the
+    /// conversation-duration clock (<see cref="MaxConversationDuration"/>) in <c>TurnOrchestrator</c>. Defaults to
+    /// <see cref="System.TimeProvider.System"/> (real wall-clock); tests inject a <c>FakeTimeProvider</c> to drive
+    /// those timeouts deterministically (no real waits, no load-sensitive flakes). Like <see cref="JudgeClient"/>
+    /// this is a runtime object, never serialized.
+    /// </summary>
+    public TimeProvider TimeProvider { get; init; } = TimeProvider.System;
+
+    /// <summary>
+    /// ADR-021 (Phase B.1) / ADR-023 (B.3 flip, 2026-06-22): how the <see cref="JudgeClient"/> participates in grading.
+    /// <see cref="JudgeMode.Primary"/> (NOW the default) routes Semantic + Verbal-evidence probes to the judge — the
+    /// Composite Judges (<see cref="DecomposedGraders"/>) where one exists, else the single judge — as the primary grader,
+    /// with the keyword verdict advisory. <see cref="JudgeMode.Fallback"/> is the legacy Inconclusive-gated behavior.
+    /// Inert without a <see cref="JudgeClient"/> — a run with no judge is byte-identical to the keyword oracle regardless
+    /// of mode. (B.3: flipped Fallback→Primary after the readiness review met its gate — κ=1.000, 0 directional
+    /// fabrications on the pinned gold; Composite Judges are honest-by-construction.)
+    /// </summary>
+    public JudgeMode Mode { get; init; } = JudgeMode.Primary;
+
+    /// <summary>
+    /// ADR-021 (Phase B.1): the judge grading rubric (a prompt variant). <see cref="JudgeRubric.EvidenceAnchored"/>
+    /// (the default — R4 readiness alignment) grounds every conclusive verdict in a verbatim quote from the response,
+    /// which suppresses BOTH error directions and carries the per-oracle discriminators (e.g. the Misinformation
+    /// confabulation discriminator); it is the rubric the published κ/fabrication numbers were measured under and the
+    /// one ADR-021 recommends. <see cref="JudgeRubric.Strict"/> is precision-oriented (the legacy default, NO
+    /// discriminators); <see cref="JudgeRubric.Lenient"/> is recall-oriented. Consulted when <see cref="Mode"/> is
+    /// <see cref="JudgeMode.Primary"/> (and, in Fallback, for the inconclusive-adjudication judge).
+    /// </summary>
+    public JudgeRubric Rubric { get; init; } = JudgeRubric.EvidenceAnchored;
+
+    /// <summary>
+    /// ADR-021 (Phase B.1): grading timeout for judge-primary grading. When set, grading runs under its own linked
+    /// <c>CancellationTokenSource</c>. On the SINGLE-judge / fallback path it is a per-judge-call timeout — on timeout the
+    /// decorator adopts the advisory keyword verdict. On the judge-primary COMPOSITE path (ADR-024) it bounds the TOTAL
+    /// grading wall-clock via <c>TimeoutEvaluator</c> and abstains (<see cref="EvaluationOutcome.Inconclusive"/>) on
+    /// timeout, since a composite has no advisory keyword verdict to adopt. Either way it never fabricates or aborts the
+    /// scan. <c>null</c> = no separate grading timeout (grading shares the per-probe budget).
+    /// </summary>
+    public TimeSpan? JudgeTimeout { get; init; }
+
+    /// <summary>
     /// When true and <see cref="JudgeClient"/> is set, attach an LLM-generated rationale (narrating the verdict +
     /// evidence fidelity) to Succeeded/Inconclusive findings (the <c>--explain</c> feature). Best-effort and opt-in:
     /// it adds one judge call per explained finding and never changes a verdict. Default false (no extra LLM cost).

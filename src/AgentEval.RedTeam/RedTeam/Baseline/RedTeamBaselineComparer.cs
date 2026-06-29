@@ -47,6 +47,18 @@ public class RedTeamBaselineComparer
                 "Re-run without FailFast, or call Compare(..., requireMatchingIntensity: false) to override.");
         }
 
+        // ADR-021 (B.1): a baseline graded under a different JudgeMode is not fidelity-comparable — judge-primary
+        // shifts the serialized fidelity (semantic Succeeded ⇒ IntentToAct), which a cross-mode diff would mis-read as
+        // a fidelity escalation. On a non-null mode mismatch we suppress the FidelityEscalation signal and flag it; the
+        // rest of the diff (same probe set) stays meaningful. A null baseline mode (pre-field) is treated as comparable.
+        // JudgeMode is INERT without a judge (a no-judge run is byte-identical regardless of Mode), so the mismatch only
+        // matters when the CURRENT run actually used judge grading — otherwise an old `Fallback` baseline vs the new
+        // `Primary` default (B.3) would falsely flag a mismatch and suppress FidelityEscalations on two equivalent
+        // keyword-only runs.
+        var currentMode = current.Options?.Mode ?? JudgeMode.Fallback;
+        var currentUsedJudge = current.Options?.JudgeClient is not null;
+        var gradingModeMismatch = currentUsedJudge && baseline.GradingMode is { } baselineMode && baselineMode != currentMode;
+
         var effectiveThresholds = thresholds ?? ComparisonThresholds.Default;
 
         // Collect current vulnerabilities
@@ -96,17 +108,19 @@ public class RedTeamBaselineComparer
             .SelectMany(a => a.FailedProbeFidelities!)
             .GroupBy(kv => kv.Key)
             .ToDictionary(g => g.Key, g => g.Max(kv => kv.Value));
-        var fidelityEscalations = persistent
-            .Where(id => baselineFidelityById.TryGetValue(id, out var bf)
-                         && currentFidelityById.TryGetValue(id, out var cf) && cf.Fidelity > bf)
-            .Select(id => new FidelityEscalation
-            {
-                ProbeId = id,
-                AttackName = currentFidelityById[id].AttackDisplayName,
-                From = baselineFidelityById[id],
-                To = currentFidelityById[id].Fidelity,
-            })
-            .ToList();
+        var fidelityEscalations = gradingModeMismatch
+            ? new List<FidelityEscalation>()   // ADR-021 B.1: cross-grading-mode escalations are an artefact, not a regression
+            : persistent
+                .Where(id => baselineFidelityById.TryGetValue(id, out var bf)
+                             && currentFidelityById.TryGetValue(id, out var cf) && cf.Fidelity > bf)
+                .Select(id => new FidelityEscalation
+                {
+                    ProbeId = id,
+                    AttackName = currentFidelityById[id].AttackDisplayName,
+                    From = baselineFidelityById[id],
+                    To = currentFidelityById[id].Fidelity,
+                })
+                .ToList();
 
         // Attacks in the baseline that were NOT re-tested in this (narrowed) run — surfaced rather than silently
         // dropped, so the user sees that "Fixed" excludes them.
@@ -129,6 +143,7 @@ public class RedTeamBaselineComparer
             AttackComparisons = attackComparisons,
             NotReTested = notReTested,
             FidelityEscalations = fidelityEscalations,
+            GradingModeMismatch = gradingModeMismatch,
         };
     }
 

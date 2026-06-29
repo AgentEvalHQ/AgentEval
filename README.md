@@ -15,7 +15,7 @@
   <a href="https://joslat.github.io/AgentEval/"><img src="https://img.shields.io/badge/docs-GitHub%20Pages-blue" alt="Documentation" /></a>
   <a href="https://www.nuget.org/packages/AgentEval"><img src="https://img.shields.io/nuget/v/AgentEval.svg" alt="NuGet" /></a>
   <a href="https://github.com/AgentEvalHQ/AgentEval/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="License" /></a>
-  <img src="https://img.shields.io/badge/MAF-1.10.0-blueviolet" alt="MAF 1.10.0" />
+  <a href="https://github.com/microsoft/agent-framework"><img src="https://img.shields.io/badge/built%20on-Microsoft%20Agent%20Framework-blueviolet" alt="Built on Microsoft Agent Framework" /></a>
   <img src="https://img.shields.io/badge/.NET-8.0%20|%209.0%20|%2010.0-512BD4" alt=".NET 8.0 | 9.0 | 10.0" />
 </p>
 
@@ -260,9 +260,11 @@ Beyond the built-in probes, it ships the capabilities that make a red-team resul
 
 - **Multi-turn & attacker-LLM attacks** — Crescendo, PAIR, TAP, and a tool-aware `ToolEscalation` attack (opt-in).
 - **Real attack surfaces** — a tiered tool harness (`--sut-tier text\|function-calling\|instrumented`) with **evidence-fidelity** labeling (Verbal / IntentToAct / Behavioral), plus a live package-registry oracle (`--package-registry live`) and a real RAG-retrieval boundary.
-- **Honesty discipline** — conclusive-only scoring, an explicit *Inconclusive* coverage state, and never-fabricate verdicts (a green result is never a guess).
+- **Trustworthy verdicts — judge-primary by default + Composite Judges** *(new)* — with a judge configured (`--judge`), the grader that decides whether each attack *succeeded* is now LLM-judge-primary, using **honest-by-construction Composite Judges**: every semantic verdict is split into a positive-only *compromise* detector ⊕ a negative-only *refusal* detector, each structurally clamped so it can only raise its own direction or abstain. (A no-judge scan stays the deterministic keyword oracle, byte-identical to before.) Plus conclusive-only scoring and an explicit *Inconclusive* coverage state — so a green result is never a guess.
 - **5 compliance reporters** — OWASP, MITRE ATLAS, SOC 2, ISO 27001, and **NIST AI RMF** — runnable as first-class benchmarks (`agenteval bench owasp\|mitre\|nist`).
 - **CI-ready** — SARIF + JUnit export, a baseline regression gate (`--save-baseline`/`--baseline`/`--fail-on`), z-score **calibration** (`--calibration`), LLM **`--explain`** rationale, and external **benchmark packs** (`--pack HarmBench\|JailbreakBench\|CyberSecEval`, license-gated, nothing bundled).
+
+> **Proof, not vibes.** Across **810 held-out stochastic trials** — 81 independently-generated cases (70 composite-oracle + 11 DataPoisoning deny-true) run **K=10×** each through the production graders — the Composite Judges fabricated **0 verdicts**: never a safe reply flagged as a compromise, never a real compromise masked as safe. On a separately-pinned label corpus, judge↔label agreement is **κ = 1.000** (n=92) — where keyword graders typically agree with humans only about half the time. The guiding rule: *fabrications are complete failures; honesty is never punished.* Background: [ADR-021→024](docs/adr/README.md) · [Red Team — What's New](docs/redteam-whats-new.md).
 
 See **[Red Team — What's New](docs/redteam-whats-new.md)** for the recent upgrades, how AgentEval compares to PyRIT / garak / others, and a plain-English take on why *grading* a model's reply is the hard part — and **[docs/redteam.md](docs/redteam.md)** for the full CLI reference.
 
@@ -521,13 +523,7 @@ Every evidence document is cryptographically chained to its source run; `agentev
 dotnet add package AgentEval --prerelease
 ```
 
-**Compatibility:**
-
-| Dependency | Version |
-|------------|----------|
-| Microsoft Agent Framework (MAF) | `1.10.0` |
-| Microsoft.Extensions.AI | `10.6.0` |
-| .NET | 8.0, 9.0, 10.0 |
+**Compatibility:** .NET **8.0 / 9.0 / 10.0**. The Microsoft Agent Framework (MAF) and `Microsoft.Extensions.AI` versions ship centrally pinned in [`Directory.Packages.props`](Directory.Packages.props) — see the [CHANGELOG](CHANGELOG.md) for the exact versions in each release.
 
 **Single package, modular internals:**
 - `AgentEval.Abstractions` — Public contracts and interfaces
@@ -583,7 +579,7 @@ See the **[Getting Started Guide](docs/getting-started.md)** for a complete walk
 | [Red Team Security](docs/redteam.md) | Security probes, OWASP/MITRE coverage |
 | [Responsible AI](docs/ResponsibleAI.md) | Toxicity, bias, misinformation detection |
 | [Memory Evaluation](docs/memory-evaluation.md) | Retention, reach-back, temporal, LongMemEval, HTML reports |
-| [MAF Memory Integration](docs/maf-memory-integration.md) | How AgentEval.Memory maps to MAF 1.10.0 pipelines |
+| [MAF Memory Integration](docs/maf-memory-integration.md) | How AgentEval.Memory maps to MAF pipelines |
 | [Cross-Framework](docs/cross-framework.md) | Semantic Kernel, IChatClient adapters |
 | [CLI Tool](docs/cli.md) | Command-line evaluation guide |
 | [Migration Guide](docs/comparison.md) | Coming from Python/Node.js frameworks |

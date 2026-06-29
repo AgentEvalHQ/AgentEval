@@ -39,7 +39,7 @@ public class RedTeamCommandTests
     }
 
     [Fact]
-    public void Create_Has39Options()
+    public void Create_Has42Options()
     {
         // 16 base + Wave E (save-baseline, baseline, fail-on) = 19
         // + Wave C′ (attacker, attacker-model) = 21
@@ -53,8 +53,79 @@ public class RedTeamCommandTests
         // + benchmark packs (--pack, --accept-license) = 33
         // + import dispatch fields (import-prompt-field, import-id-column) = 35 (M10)
         // + throttle/timeout knobs (delay, parallelism, timeout-per-probe, max-turn-timeout) = 39 (L21)
+        // + judge grading mode/rubric/timeout (--judge-mode, --judge-rubric, --judge-timeout) = 42 (ADR-021 B.1)
         var command = RedTeamCommand.Create();
-        Assert.Equal(39, command.Options.Count);
+        Assert.Equal(42, command.Options.Count);
+    }
+
+    [Theory] // ADR-021: --judge-rubric maps strict | lenient | evidence-anchored (case- and alias-tolerant).
+    [InlineData("strict", JudgeRubric.Strict)]
+    [InlineData("lenient", JudgeRubric.Lenient)]
+    [InlineData("evidence-anchored", JudgeRubric.EvidenceAnchored)]
+    [InlineData("anchored", JudgeRubric.EvidenceAnchored)]
+    [InlineData("EVIDENCE-ANCHORED", JudgeRubric.EvidenceAnchored)]
+    [InlineData(null, JudgeRubric.EvidenceAnchored)]   // R4 readiness: default aligns with the measured/recommended rubric
+    [InlineData("", JudgeRubric.EvidenceAnchored)]
+    public void ParseJudgeRubric_MapsAllRubrics(string? input, JudgeRubric expected)
+        => Assert.Equal(expected, RedTeamCommand.ParseJudgeRubric(input));
+
+    [Fact]
+    public void ParseJudgeRubric_Unknown_Throws()
+        => Assert.Throws<ArgumentException>(() => RedTeamCommand.ParseJudgeRubric("bogus"));
+
+    [Theory] // ADR-023 B.3: --judge-mode maps fallback | primary (case-tolerant); null/empty default to PRIMARY (the flipped default).
+    [InlineData("primary", JudgeMode.Primary)]
+    [InlineData("fallback", JudgeMode.Fallback)]
+    [InlineData("PRIMARY", JudgeMode.Primary)]
+    [InlineData(null, JudgeMode.Primary)]
+    [InlineData("", JudgeMode.Primary)]
+    public void ParseJudgeMode_MapsModes_DefaultPrimary(string? input, JudgeMode expected)
+        => Assert.Equal(expected, RedTeamCommand.ParseJudgeMode(input));
+
+    [Fact]
+    public void ParseJudgeMode_Unknown_Throws()
+        => Assert.Throws<ArgumentException>(() => RedTeamCommand.ParseJudgeMode("bogus"));
+
+    [Fact] // The evidence-anchored rubric supplies a quote-grounded custom prompt; strict keeps the default (none).
+    public void GraderFactory_EvidenceAnchored_SuppliesQuoteGroundedPrompt()
+    {
+        Assert.Null(GraderFactory.OptionsFor(JudgeRubric.Strict).CustomSystemPrompt);
+        var anchored = GraderFactory.OptionsFor(JudgeRubric.EvidenceAnchored).CustomSystemPrompt;
+        Assert.NotNull(anchored);
+        Assert.Contains("verbatim quote", anchored!, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("EVIDENCE:", anchored, StringComparison.Ordinal);
+    }
+
+    [Fact] // ADR-021 §8: evidence-anchored appends an oracle-SCOPED discriminator only for the residual-FA oracles
+    // (InsecureOutput/ExcessiveAgency); other oracles (and no-oracle) get the bare base prompt — scoping avoids the
+    // global leak that a shared "describing is safe" clause caused (swings 1–2).
+    public void GraderFactory_EvidenceAnchored_PerOracleDiscriminatorIsScoped()
+    {
+        var basePrompt = GraderFactory.OptionsFor(JudgeRubric.EvidenceAnchored).CustomSystemPrompt!;
+        var insecure = GraderFactory.OptionsFor(JudgeRubric.EvidenceAnchored, "InsecureOutput").CustomSystemPrompt!;
+        var agency = GraderFactory.OptionsFor(JudgeRubric.EvidenceAnchored, "ExcessiveAgency").CustomSystemPrompt!;
+        var supply = GraderFactory.OptionsFor(JudgeRubric.EvidenceAnchored, "SupplyChain").CustomSystemPrompt!;
+
+        Assert.StartsWith(basePrompt, insecure, StringComparison.Ordinal);   // discriminator is appended to the base
+        Assert.Contains("insecure output handling", insecure, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("excessive agency", agency, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("insecure output handling", agency, StringComparison.OrdinalIgnoreCase); // not cross-applied
+        Assert.Equal(basePrompt, supply);   // a non-residual oracle gets the bare base prompt (no leak)
+        Assert.Equal(basePrompt, GraderFactory.OptionsFor(JudgeRubric.EvidenceAnchored, null).CustomSystemPrompt);
+    }
+
+    [Fact] // R4: Misinformation (NOT decomposed → single-judge under judge-primary) carries the confabulation
+    // discriminator ONLY under the evidence-anchored rubric. This is why evidence-anchored is the judge-primary default;
+    // under strict the discriminator is absent (the bare default prompt), which live-misses confabulations.
+    public void GraderFactory_Misinformation_ConfabulationDiscriminator_OnlyEvidenceAnchored()
+    {
+        var anchored = GraderFactory.OptionsFor(JudgeRubric.EvidenceAnchored, "Misinformation").CustomSystemPrompt!;
+        Assert.Contains("misinformation", anchored, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("fabricated", anchored, StringComparison.OrdinalIgnoreCase);   // "KNOWN TO BE NONEXISTENT / FABRICATED"
+        Assert.Contains("confabulat", anchored, StringComparison.OrdinalIgnoreCase);
+        // strict/lenient do NOT carry the discriminator (the readiness reason the default is evidence-anchored)
+        Assert.Null(GraderFactory.OptionsFor(JudgeRubric.Strict, "Misinformation").CustomSystemPrompt);
+        Assert.DoesNotContain("confabulat", GraderFactory.OptionsFor(JudgeRubric.Lenient, "Misinformation").CustomSystemPrompt ?? "", StringComparison.OrdinalIgnoreCase);
     }
 
     [Theory]

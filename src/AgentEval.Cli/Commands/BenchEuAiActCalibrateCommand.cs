@@ -74,6 +74,7 @@ public static class BenchEuAiActCalibrateCommand
     /// <param name="rootOverride">Optional workspace root override (used by tests).</param>
     /// <param name="outPathOverride">Optional output path override (used by tests).</param>
     /// <param name="evaluatorOverride">Optional evaluator override (used by tests).</param>
+    /// <param name="ct">Cancellation token.</param>
     /// <returns>0 on success, 2 if thresholds not met, 1 on internal error.</returns>
     public static Task<int> RunAsync(
         string? rootOverride = null,

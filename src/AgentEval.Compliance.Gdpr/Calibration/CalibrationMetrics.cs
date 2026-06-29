@@ -21,13 +21,7 @@ public static class CalibrationMetrics
     /// A value in [0, 1]. Returns <c>0</c> for an empty collection.
     /// </returns>
     public static double Accuracy(IReadOnlyList<(string Expected, string Actual)> pairs)
-    {
-        ArgumentNullException.ThrowIfNull(pairs);
-        if (pairs.Count == 0) return 0;
-        var matches = pairs.Count(p =>
-            string.Equals(p.Expected, p.Actual, StringComparison.OrdinalIgnoreCase));
-        return (double)matches / pairs.Count;
-    }
+        => AgentEval.Calibration.AgreementMetrics.Accuracy(pairs);   // single-sourced in AgentEval.Core (ADR-021 §8)
 
     /// <summary>
     /// Computes Cohen's kappa — a measure of categorical inter-rater agreement that
@@ -60,43 +54,5 @@ public static class CalibrationMetrics
     /// <see cref="double.NaN"/> when expected agreement is degenerate (<c>pe ≈ 1.0</c>).
     /// </returns>
     public static double CohensKappa(IReadOnlyList<(string Expected, string Actual)> pairs)
-    {
-        ArgumentNullException.ThrowIfNull(pairs);
-        if (pairs.Count == 0) return 0;
-
-        var labels = pairs
-            .SelectMany(p => new[] { p.Expected, p.Actual })
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToList();
-
-        var n = pairs.Count;
-
-        // Observed agreement
-        double po = (double)pairs.Count(p =>
-            string.Equals(p.Expected, p.Actual, StringComparison.OrdinalIgnoreCase)) / n;
-
-        // Marginal proportions for each rater
-        var expectedDist = labels.ToDictionary(
-            l => l,
-            l => (double)pairs.Count(p =>
-                string.Equals(p.Expected, l, StringComparison.OrdinalIgnoreCase)) / n,
-            StringComparer.OrdinalIgnoreCase);
-
-        var actualDist = labels.ToDictionary(
-            l => l,
-            l => (double)pairs.Count(p =>
-                string.Equals(p.Actual, l, StringComparison.OrdinalIgnoreCase)) / n,
-            StringComparer.OrdinalIgnoreCase);
-
-        double pe = labels.Sum(l => expectedDist[l] * actualDist[l]);
-
-        // Degenerate guard (F-004): when pe ≈ 1.0 the kappa expression is 0/0. Returning a
-        // numeric placeholder hides the fact that the dataset cannot be calibrated against
-        // (typically because it has only one expected class). Return NaN so the consumer is
-        // forced to render "undefined" and the aggregator gate fails the pillar — exactly
-        // the audit-grade behaviour a regulator-facing report needs.
-        if (Math.Abs(1.0 - pe) < 1e-10) return double.NaN;
-
-        return (po - pe) / (1.0 - pe);
-    }
+        => AgentEval.Calibration.AgreementMetrics.CohensKappa(pairs);   // single-sourced in AgentEval.Core (ADR-021 §8)
 }

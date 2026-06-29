@@ -112,6 +112,59 @@ public class JsonReportExporterTests
     }
 
     [Fact]
+    public void Export_Failure_IncludesJudgePrimaryProvenance_AndOmitsItOnPlainProbes()
+    {
+        // ADR-021 §5: a judge-primary verdict serializes graded_by + grader_disagreed, and an attacker-driven run
+        // serializes attacker_driven. All three are null-omittable, so a plain (non-judge, non-attacker) probe carries
+        // NONE of them — a pre-judge run stays byte-identical.
+        var result = new RedTeamResult
+        {
+            AgentName = "TestAgent",
+            StartedAt = DateTimeOffset.UtcNow.AddSeconds(-5),
+            CompletedAt = DateTimeOffset.UtcNow,
+            Duration = TimeSpan.FromSeconds(5),
+            TotalProbes = 2, SucceededProbes = 2,
+            AttackResults =
+            [
+                new AttackResult
+                {
+                    AttackName = "Jailbreak", AttackDisplayName = "JB", OwaspId = "LLM01", Severity = Severity.High,
+                    SucceededCount = 2,
+                    ProbeResults =
+                    [
+                        new ProbeResult
+                        {
+                            ProbeId = "JB-judge", Prompt = "p", Response = "PWNED", Outcome = EvaluationOutcome.Succeeded,
+                            Reason = "judge upgraded the advisory keyword verdict",
+                            Grading = new GraderProvenance(
+                                EvaluationOutcome.Resisted, EvaluationOutcome.Succeeded,
+                                OracleEvidenceClass.Semantic, GradingProvenanceKind.Judge),
+                            AttackerDriven = true,
+                        },
+                        new ProbeResult
+                        {
+                            ProbeId = "JB-plain", Prompt = "p", Response = "PWNED", Outcome = EvaluationOutcome.Succeeded,
+                            Reason = "keyword marker", // no Grading, not attacker-driven
+                        },
+                    ]
+                }
+            ]
+        };
+
+        var failures = JsonDocument.Parse(new JsonReportExporter().Export(result)).RootElement.GetProperty("failures");
+        var judged = failures.EnumerateArray().First(f => f.GetProperty("probe_id").GetString() == "JB-judge");
+        var plain = failures.EnumerateArray().First(f => f.GetProperty("probe_id").GetString() == "JB-plain");
+
+        Assert.Equal("Judge", judged.GetProperty("graded_by").GetString());
+        Assert.True(judged.GetProperty("grader_disagreed").GetBoolean());   // keyword Resisted vs judge Succeeded
+        Assert.True(judged.GetProperty("attacker_driven").GetBoolean());
+
+        Assert.False(plain.TryGetProperty("graded_by", out _));
+        Assert.False(plain.TryGetProperty("grader_disagreed", out _));
+        Assert.False(plain.TryGetProperty("attacker_driven", out _));
+    }
+
+    [Fact]
     public void Export_IncludesAgentName()
     {
         var result = CreateTestResult();

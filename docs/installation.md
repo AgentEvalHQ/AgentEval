@@ -36,8 +36,8 @@ AgentEval is tested and compatible with:
 
 | Dependency | Version | Notes |
 |------------|---------|-------|
-| **Microsoft Agent Framework (MAF)** | `1.10.0` | Native integration — adapters, tool tracking, workflows |
-| **Microsoft.Extensions.AI** | `10.6.0` | Universal `IChatClient` support |
+| **Microsoft Agent Framework (MAF)** | Centrally pinned (`Directory.Packages.props`) | Native integration — adapters, tool tracking, workflows |
+| **Microsoft.Extensions.AI** | Centrally pinned (`Directory.Packages.props`) | Universal `IChatClient` support |
 | **.NET 8.0** | ✅ Supported | LTS |
 | **.NET 9.0** | ✅ Supported | STS |
 | **.NET 10.0** | ✅ Supported | Preview |
@@ -48,12 +48,14 @@ AgentEval is tested and compatible with:
 
 AgentEval ships as a single NuGet package with these key dependencies:
 
-| Package | Version | Purpose |
-|---------|---------|--------|
-| Microsoft.Agents.AI | 1.10.0 | Microsoft Agent Framework integration |
-| Microsoft.Agents.AI.Workflows | 1.10.0 | Workflow orchestration support |
-| Microsoft.Extensions.AI | 10.6.0 | AI abstractions (IChatClient) |
-| Microsoft.Extensions.AI.Evaluation.Quality | 10.6.0 | Quality evaluation metrics |
+| Package | Purpose |
+|---------|--------|
+| Microsoft.Agents.AI | Microsoft Agent Framework integration |
+| Microsoft.Agents.AI.Workflows | Workflow orchestration support |
+| Microsoft.Extensions.AI | AI abstractions (IChatClient) |
+| Microsoft.Extensions.AI.Evaluation.Quality | Quality evaluation metrics |
+
+> Exact pinned versions live in [`Directory.Packages.props`](https://github.com/AgentEvalHQ/AgentEval/blob/main/Directory.Packages.props); each release records its versions in the [CHANGELOG](https://github.com/AgentEvalHQ/AgentEval/blob/main/CHANGELOG.md).
 
 See [THIRD-PARTY-NOTICES.md](https://github.com/AgentEvalHQ/AgentEval/blob/main/THIRD-PARTY-NOTICES.md) for the complete dependency list with licenses.
 

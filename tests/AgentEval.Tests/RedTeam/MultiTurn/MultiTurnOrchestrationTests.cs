@@ -6,6 +6,8 @@ using AgentEval.RedTeam;
 using AgentEval.RedTeam.Attacks;
 using AgentEval.RedTeam.Evaluators;
 using AgentEval.Testing;
+using Microsoft.Extensions.AI;
+using Microsoft.Extensions.Time.Testing;   // FakeTimeProvider — deterministic per-turn-timeout tests
 using EvaluationResult = AgentEval.RedTeam.EvaluationResult;
 
 namespace AgentEval.Tests.RedTeam.MultiTurn;
@@ -14,6 +16,12 @@ public class MultiTurnOrchestrationTests
 {
     private const string Refusal = "I'm sorry, I can't help with that.";
     private const string Comply = "Sure, here it is: PWNED";
+
+    // ADR-021 (B.1): the per-turn LLM-judge fallback moved from TurnOrchestrator into the JudgeBackedEvaluator
+    // decorator (built by GraderFactory in the runner). These orchestrator-level tests wrap the inner evaluator the
+    // same way to drive the judge through the decorator.
+    private static IProbeEvaluator JudgeBacked(IProbeEvaluator inner, IChatClient judge, JudgeMode mode = JudgeMode.Fallback)
+        => new JudgeBackedEvaluator(inner, judge, mode, new LLMJudgeOptions(), includeEvidence: true, judgeTimeout: null);
 
     // ---- test doubles ----
 
@@ -80,6 +88,27 @@ public class MultiTurnOrchestrationTests
         }
     }
 
+    /// <summary>Conversable agent that ADVANCES a <see cref="FakeTimeProvider"/> by <c>perTurn</c> on each call instead
+    /// of really sleeping — so per-turn-timeout / conversation-duration tests are deterministic and instant (no
+    /// wall-clock race, no load-sensitive CI flake). Pair with <c>ScanOptions.TimeProvider = clock</c>.</summary>
+    private sealed class ClockAdvancingConvoAgent(FakeTimeProvider clock, TimeSpan perTurn) : IConversableAgent
+    {
+        public string Name => "clock-advancing";
+        public Task<AgentResponse> InvokeAsync(string prompt, CancellationToken ct = default)
+        { clock.Advance(perTurn); return Task.FromResult(new AgentResponse { Text = "ok" }); }
+        public Task<IAgentConversation> StartConversationAsync(CancellationToken ct = default)
+            => Task.FromResult<IAgentConversation>(new Convo(clock, perTurn));
+
+        private sealed class Convo(FakeTimeProvider clock, TimeSpan perTurn) : IAgentConversation
+        {
+            public ConversationFidelity Fidelity => ConversationFidelity.Native;
+            public IReadOnlyList<Turn> History => [];
+            public Task<AgentResponse> SendAsync(string userMessage, CancellationToken ct = default)
+            { clock.Advance(perTurn); return Task.FromResult(new AgentResponse { Text = "ok" }); }
+            public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+        }
+    }
+
     private sealed class ThrowingConversableAgent : IConversableAgent
     {
         public string Name => "throwing";
@@ -132,6 +161,16 @@ public class MultiTurnOrchestrationTests
         public string Name => "always-inconclusive";
         public Task<EvaluationResult> EvaluateAsync(AttackProbe probe, string response, CancellationToken ct = default)
             => Task.FromResult(EvaluationResult.Inconclusive("test: inconclusive every turn"));
+    }
+
+    /// <summary>Inner oracle that stamps Semantic + (default) Verbal and returns Resisted, so a judge-primary decorator
+    /// ROUTES it to the judge — used to prove the multi-turn fold carries the decorator's GraderProvenance.</summary>
+    private sealed class SemanticResistedEvaluator : IProbeEvaluator
+    {
+        public string Name => "semantic-resisted";
+        public Task<EvaluationResult> EvaluateAsync(AttackProbe probe, string response, CancellationToken ct = default)
+            => Task.FromResult(GradingMetadata.WithEvidenceClass(
+                EvaluationResult.Resisted("keyword: refused"), OracleEvidenceClass.Semantic));
     }
 
     private static readonly AttackProbe Seed = new() { Id = "S", Prompt = "p", Difficulty = Difficulty.Hard };
@@ -357,7 +396,7 @@ public class MultiTurnOrchestrationTests
         var options = new ScanOptions { JudgeClient = judge };
 
         var result = await new TurnOrchestrator(new ScriptedConversableAgent(_ => "hmm, maybe"), options)
-            .RunAsync(attack, Seed, new AlwaysInconclusiveEvaluator(), CancellationToken.None);
+            .RunAsync(attack, Seed, JudgeBacked(new AlwaysInconclusiveEvaluator(), judge), CancellationToken.None);
 
         Assert.Equal(EvaluationOutcome.Succeeded, result.Outcome);
         Assert.Equal(EvidenceFidelity.IntentToAct, result.Fidelity);   // judge reasons over text → capped at IntentToAct
@@ -376,7 +415,7 @@ public class MultiTurnOrchestrationTests
         var options = new ScanOptions { JudgeClient = judge };
 
         var result = await new TurnOrchestrator(new ScriptedConversableAgent(_ => "hmm"), options)
-            .RunAsync(attack, Seed, new AlwaysInconclusiveEvaluator(), CancellationToken.None);
+            .RunAsync(attack, Seed, JudgeBacked(new AlwaysInconclusiveEvaluator(), judge), CancellationToken.None);
 
         Assert.Equal(EvaluationOutcome.Resisted, result.Outcome);
         Assert.Equal(EvidenceFidelity.Verbal, result.Fidelity);   // judge-Resisted ⇒ Verbal, never IntentToAct
@@ -394,7 +433,7 @@ public class MultiTurnOrchestrationTests
         var options = new ScanOptions { JudgeClient = judge };
 
         var result = await new TurnOrchestrator(new ScriptedConversableAgent(_ => "hmm"), options)
-            .RunAsync(attack, Seed, new AlwaysInconclusiveEvaluator(), CancellationToken.None);
+            .RunAsync(attack, Seed, JudgeBacked(new AlwaysInconclusiveEvaluator(), judge), CancellationToken.None);
 
         Assert.Equal(EvaluationOutcome.Inconclusive, result.Outcome);
         Assert.Equal(2, judge.CallCount);
@@ -410,9 +449,28 @@ public class MultiTurnOrchestrationTests
         var options = new ScanOptions { JudgeClient = judge };
 
         var result = await new TurnOrchestrator(new ScriptedConversableAgent(_ => "hmm"), options)
-            .RunAsync(attack, Seed, new AlwaysInconclusiveEvaluator(), CancellationToken.None);
+            .RunAsync(attack, Seed, JudgeBacked(new AlwaysInconclusiveEvaluator(), judge), CancellationToken.None);
 
         Assert.Equal(EvaluationOutcome.Inconclusive, result.Outcome);
+    }
+
+    [Fact] // ADR-021 §5: a judge-primary verdict produced per-turn must carry its GraderProvenance through the fold
+    // onto MultiTurnResult.Grading (the carrier the runner lifts onto the folded single ProbeResult.Grading).
+    public async Task MultiTurn_JudgePrimaryUpgrade_FoldCarriesGraderProvenance()
+    {
+        var judge = new FakeChatClient("VERDICT: SUCCEEDED\nCONFIDENCE: 0.9\nREASON: the agent complied.");
+        var attack = new EndlessAttack();   // SuccessOnly: a judge-Succeeded turn converges + stops
+        var evaluator = JudgeBacked(new SemanticResistedEvaluator(), judge, JudgeMode.Primary);
+
+        var result = await new TurnOrchestrator(new ScriptedConversableAgent(_ => "ok"), new ScanOptions { JudgeClient = judge })
+            .RunAsync(attack, Seed, evaluator, CancellationToken.None);
+
+        Assert.Equal(EvaluationOutcome.Succeeded, result.Outcome);
+        Assert.NotNull(result.Grading);
+        Assert.Equal(GradingProvenanceKind.Judge, result.Grading!.ShippedBy);
+        Assert.True(result.Grading.Disagreed);                               // keyword Resisted vs judge Succeeded
+        Assert.Equal(EvaluationOutcome.Resisted, result.Grading.KeywordOutcome);
+        Assert.Equal(EvaluationOutcome.Succeeded, result.Grading.JudgeOutcome);
     }
 
     [Fact]
@@ -465,9 +523,13 @@ public class MultiTurnOrchestrationTests
     [Fact]
     public async Task MaxConversationDuration_SoftStops_Truncated()
     {
+        // DETERMINISTIC via FakeTimeProvider: each turn advances 15ms; MaxConversationDuration=5ms → the soft-stop
+        // fires after the first completed turn (elapsed 15ms ≥ 5ms). TimeoutPerTurn stays at its large default so the
+        // per-turn cap can't fire first. Exercises the TimeProvider.GetElapsedTime path with no real waits.
+        var clock = new FakeTimeProvider();
         var attack = new EndlessAttack();
-        var agent = new DelayingConversableAgent(TimeSpan.FromMilliseconds(15));
-        var options = new ScanOptions { MaxConversationDuration = TimeSpan.FromMilliseconds(5) };
+        var agent = new ClockAdvancingConvoAgent(clock, TimeSpan.FromMilliseconds(15));
+        var options = new ScanOptions { MaxConversationDuration = TimeSpan.FromMilliseconds(5), TimeProvider = clock };
 
         var result = await new TurnOrchestrator(agent, options).RunAsync(attack, Seed, attack.GetEvaluator(), CancellationToken.None);
 
@@ -623,11 +685,14 @@ public class MultiTurnOrchestrationTests
     [Fact]
     public async Task PerTurnBudget_ResetsEachTurn_CumulativeOverBudgetStillCompletes()
     {
-        // Regression (documented past HIGH): the per-turn timeout RESETS each turn. Cumulative agent time
-        // (4 × 300ms = 1.2s) exceeds one TimeoutPerTurn (900ms), yet every turn is well under budget → all 4 run.
+        // Regression (documented past HIGH): the per-turn timeout RESETS each turn. DETERMINISTIC via FakeTimeProvider —
+        // each turn advances the fake clock by 400ms (well under the 1400ms per-turn budget), so 4 × 400ms = 1.6s of
+        // "agent time" elapses cumulatively yet no single turn's timer fires → all 4 run. No real waits, no wall-clock
+        // race (this was the recurring net8/Windows CI flake; the injectable clock removes the flake class entirely).
+        var clock = new FakeTimeProvider();
         var attack = new FourTurnAttack();
-        var agent = new DelayingConversableAgent(TimeSpan.FromMilliseconds(300));
-        var options = new ScanOptions { TimeoutPerTurn = TimeSpan.FromMilliseconds(900) };
+        var agent = new ClockAdvancingConvoAgent(clock, TimeSpan.FromMilliseconds(400));
+        var options = new ScanOptions { TimeoutPerTurn = TimeSpan.FromMilliseconds(1400), TimeProvider = clock };
 
         var result = await new TurnOrchestrator(agent, options)
             .RunAsync(attack, Seed, attack.GetEvaluator(), CancellationToken.None);

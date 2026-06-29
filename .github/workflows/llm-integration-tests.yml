@@ -1,4 +1,4 @@
-﻿name: LLM Integration Tests (On-Demand)
+name: LLM Integration Tests (On-Demand)
 
 # This workflow runs integration tests that require actual LLM API calls.
 # It's designed to be run on-demand (manually) or before releases to minimize costs.
@@ -63,7 +63,7 @@ jobs:
 
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v6
+      uses: actions/checkout@v7
 
     - name: Setup .NET 10
       uses: actions/setup-dotnet@v5
@@ -72,7 +72,7 @@ jobs:
         dotnet-quality: 'preview'
 
     - name: Cache NuGet packages
-      uses: actions/cache@v5
+      uses: actions/cache@v6
       with:
         path: ~/.nuget/packages
         key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj', '**/Directory.Packages.props') }}
@@ -157,7 +157,7 @@ jobs:
 
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v6
+      uses: actions/checkout@v7
 
     - name: Setup .NET 10
       uses: actions/setup-dotnet@v5
@@ -166,7 +166,7 @@ jobs:
         dotnet-quality: 'preview'
 
     - name: Cache NuGet packages
-      uses: actions/cache@v4
+      uses: actions/cache@v6
       with:
         path: ~/.nuget/packages
         key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj', '**/Directory.Packages.props') }}

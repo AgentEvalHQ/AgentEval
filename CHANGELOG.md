@@ -7,6 +7,104 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.1-beta] - 2026-06-28
+
+A maintenance release on top of the judge-primary grading flip. It **upgrades
+Microsoft Agent Framework to 1.11.1**, adds an injectable clock for deterministic
+multi-turn timing, brings the red-team documentation in line with the v0.13
+grading default, ships a paper / reproducibility companion sample, and folds in
+routine dependency bumps. **No grader-behaviour changes** — judge-primary
+Composite Judges shipped in 0.13.0-beta and are unchanged here.
+
+### Added
+- **`ScanOptions.TimeProvider`** — an injectable `TimeProvider` (default
+  `TimeProvider.System`) used by `TurnOrchestrator` for per-turn timeout and
+  conversation-duration timing, so multi-turn timing can be driven
+  deterministically in tests via `FakeTimeProvider`. Runtime-only, not serialized
+  (mirrors `JudgeClient`).
+- **`AgentEval.SampleGraders` head-to-head runner** (`--head-to-head`) — scores a
+  gold-set corpus with the keyword oracle, a single LLM judge, a generic
+  composite, and the production task-specific decomposition on the same cases and
+  judge, emitting `verdicts.json` for the safety-asymmetric scorer (paper /
+  reproducibility companion; consumes public APIs only, modifies no product code).
+
+### Changed
+- **Red-team documentation** — `README.md` and `docs/redteam-whats-new.md` now
+  headline judge-primary grading + Composite Judges, replacing the stale
+  pre-flip "keyword-primary" narrative so the public docs match the shipped
+  default.
+
+### Fixed
+- **Flaky net8.0/Windows CI timing tests** — `TurnOrchestrator` now measures
+  elapsed time and arms per-turn timeouts through the injectable `TimeProvider`
+  instead of wall-clock `Stopwatch`/`CancelAfter`, removing load-sensitive
+  flakes; the two timing-sensitive multi-turn tests run on a deterministic
+  `FakeTimeProvider`. The throughput-benchmark `Duration` assertion was made
+  tolerant (the deterministic requests-per-second guard is unchanged).
+- **XML-doc warnings** — cleaned up stale `cref`/`paramref` references across the
+  codebase (documentation only, no behaviour change).
+
+### Dependencies — Microsoft Agent Framework 1.11.1
+- **MAF 1.10.0 → 1.11.1** (central, via `Directory.Packages.props`): `Microsoft.Agents.AI`,
+  `Microsoft.Agents.AI.OpenAI`, `Microsoft.Agents.AI.Workflows`, `Microsoft.Agents.AI.Workflows.Generators`.
+  **No source changes were required** — the full net8.0 test suite passes unchanged and
+  `maf-doctor` grades the tree clean of anti-pattern errors/warnings.
+- `Microsoft.Extensions.AI*` stays at **10.6.0** — MAF 1.11.1's declared dependency — and the
+  `OpenTelemetry.Api` **1.15.3** security pin (GHSA-g94r-2vxg-569j) remains valid, since the 1.11.1
+  Workflows packages still declare exactly that version.
+
+### Dependencies
+- Bump the GitHub Actions group (2 updates) + `actions/cache` 5 → 6.
+- Bump `react-router` 7.15.0 → 7.18.0 in the Mission Control SPA.
+
+## [0.13.0-beta] - 2026-06-24
+
+### Red-team grading: judge-primary by default + Composite Judges (ADR-021/022/023/024)
+
+The red-team grader — the component that decides whether each attack *succeeded* — moves from a
+keyword/substring oracle to **LLM-judge-primary grading with honest-by-construction "Composite
+Judges."** Each semantic verdict is split into a positive-only compromise detector and a
+negative-only refusal detector, each structurally clamped (`OutcomeFilterEvaluator`) so it can only
+raise its own direction or abstain, aggregated by `CompositeEvaluator(Any)`. This was driven by a
+reproducible finding that *iteratively patching* a keyword oracle does **not** converge to an honest
+grader (fresh fabrications keep surfacing in both directions). Human/pin agreement moves from ~56%
+(keyword) to κ=1.000 on the pinned corpus; directional fabrications drop from 8 (single judge) to 0.
+
+#### Changed — ⚠️ BREAKING (default behavior)
+- **`--judge-mode` now defaults to `primary`** (was `fallback`). When a judge is configured (`--judge`),
+  the Composite Judges now **lead** the verdict instead of only adjudicating `Inconclusive` keyword
+  results. **A scan run without `--judge` stays byte-identical to the previous keyword-oracle behavior**,
+  and `--judge-mode fallback` restores the old judge-as-tiebreaker behavior exactly. (`ScanOptions.Mode`
+  default `Fallback` → `Primary`.)
+- **Default judge rubric is now `evidence-anchored`** (was `strict`) — the configuration the per-oracle
+  discriminators are calibrated for; strict/lenient remain selectable.
+
+#### Added
+- **Composite Judges for all six semantic oracles** — InferenceAPIAbuse, InsecureOutput, SupplyChain,
+  DataPoisoning, Misinformation (ADR-023), ExcessiveAgency (tool-aware, preserves the Behavioral leg).
+  Genuinely structural signals stay deterministic (DataPoisoning `trigger_phrase`, PromptInjection /
+  Jailbreak canary markers).
+- **ADR-024 split-then-gate (gated trees)** — InferenceAPIAbuse now uses a 4-gate tree
+  (`ConjunctionGate` AND-gates under a top OR) that closes the "I am Grok" model-vs-product-bot floor on
+  `gpt-4o-mini` with **no stronger model**. ADR-024 also documents the *bound*: the same pattern was
+  measured to **regress** InsecureOutput, so it is applied only where the conflated decisions are
+  independent axes (`AGENTEVAL_INFERENCE_FLAT=1` / `AGENTEVAL_INSECURE_TREE=1` toggle the A-B).
+- **Reasoning-model judges** (o-series / GPT-5-class) — the judge auto-retries without `temperature`
+  when a model rejects it (HTTP 400 `unsupported_value`), so a reasoning model can be used as the judge.
+- **`AgentEval.SampleGraders`** companion (paper/reproducibility) — a standalone keyword-vs-judge-vs-
+  composite-vs-gated head-to-head + a keyword-oracle non-convergence demo.
+
+#### Fixed
+- **Keyword-oracle non-convergence** — retired the non-convergent positive keyword detectors
+  (executable-structure / install-command / in-context-poison lexicon) that fabricated verdicts on
+  English imperatives, payload-naming warnings, and attribute-then-correct phrasings; replaced with
+  positive-only judges ⊕ a refusal judge.
+
+#### Tooling
+- **`GateAblationLiveCheck`** — a reusable per-oracle flat-vs-gated A-B harness that reports directional
+  fabrications and recommends the structure, so a gate is never promoted on intuition (env-gated on
+  `AGENTEVAL_RUN_5B=1`).
+
 ## [0.12.2-beta] - 2026-06-18
 
 ### Fixed
@@ -1844,7 +1942,15 @@ This release marks the transition from alpha to beta. The framework is now featu
 - `AgentEval.Tracing` (OTel + run artifacts) - planned
 - `AgentEval.Studio` (workflow visualizer / time-travel UI) - future
 
-[Unreleased]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.8.0-beta...HEAD
+[Unreleased]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.13.1-beta...HEAD
+[0.13.1-beta]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.13.0-beta...v0.13.1-beta
+[0.13.0-beta]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.12.2-beta...v0.13.0-beta
+[0.12.2-beta]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.12.1-beta...v0.12.2-beta
+[0.12.1-beta]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.12.0-beta...v0.12.1-beta
+[0.12.0-beta]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.10.1-beta...v0.12.0-beta
+[0.10.1-beta]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.10.0-beta...v0.10.1-beta
+[0.10.0-beta]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.9.0-beta...v0.10.0-beta
+[0.9.0-beta]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.8.1-beta...v0.9.0-beta
 [0.8.0-beta]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.7.0-beta...v0.8.0-beta
 [0.7.0-beta]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.6.0-beta...v0.7.0-beta
 [0.6.0-beta]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.5.4-beta...v0.6.0-beta

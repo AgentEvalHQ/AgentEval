@@ -12,7 +12,7 @@ namespace AgentEval.Tests.Core;
 /// Regression coverage for PERF-01: the synchronous <see cref="AgentEvalBuilder.Build"/> used
 /// <c>BuildAsync().GetAwaiter().GetResult()</c>, which deadlocks on a thread with a captured
 /// <see cref="SynchronizationContext"/> when a plugin's <c>InitializeAsync</c> resumes onto it.
-/// Build() now offloads the async build via <see cref="System.Threading.Tasks.Task.Run{T}"/>.
+/// Build() now offloads the async build via <c>Task.Run</c>.
 /// </summary>
 public class AgentEvalBuilderSyncBuildTests
 {
