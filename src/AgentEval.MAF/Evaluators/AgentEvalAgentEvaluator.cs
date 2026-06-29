@@ -85,6 +85,9 @@ public sealed class AgentEvalAgentEvaluator : IAgentEvaluator
             results.Add(result);
         }
 
-        return new AgentEvaluationResults(Name, results, inputItems: items);
+        // Use the caller-supplied evalName (the MAF run/eval name) for the results; the evaluator's
+        // own identity is still available via Name. Ignoring evalName would silently drop a name the
+        // caller set on agent.EvaluateAsync(...).
+        return new AgentEvaluationResults(evalName, results, inputItems: items);
     }
 }

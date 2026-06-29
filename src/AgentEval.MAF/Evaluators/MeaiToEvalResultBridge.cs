@@ -70,7 +70,6 @@ public static class MeaiToEvalResultBridge
     private static EvalResult MetricToLeaf(string key, EvaluationMetric metric, string? judgeModel)
     {
         var reason = metric.Interpretation?.Reason ?? metric.Reason;
-        var passed = metric.Interpretation?.Failed != true;
 
         double score0To100;
         var marker = reason is null ? Match.Empty : s_scoreMarker.Match(reason);
@@ -84,8 +83,13 @@ public static class MeaiToEvalResultBridge
         }
         else
         {
-            score0To100 = passed ? 100 : 0;
+            score0To100 = metric.Interpretation?.Failed == true ? 0 : 100;
         }
+
+        // Honour an explicit Failed verdict when MEAI provides one; otherwise derive pass/fail from the
+        // recovered score (threshold 70) — so a low score (e.g. a "0/100" marker with no Interpretation)
+        // can never render as a green "pass".
+        var passed = metric.Interpretation?.Failed is bool failed ? !failed : score0To100 >= 70.0;
 
         // AgentEval metric names are prefixed code_* (deterministic, no LLM) or llm_* (LLM-as-judge).
         var isLlm = metric.Name.StartsWith("llm_", StringComparison.OrdinalIgnoreCase);

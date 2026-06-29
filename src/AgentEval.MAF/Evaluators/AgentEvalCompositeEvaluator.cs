@@ -44,7 +44,12 @@ public sealed class AgentEvalCompositeEvaluator : MEAIIEvaluator
     public AgentEvalCompositeEvaluator(IEval composite) =>
         _composite = composite ?? throw new ArgumentNullException(nameof(composite));
 
-    /// <summary>The <see cref="EvalResult"/> tree(s) produced — one per evaluated item, in call order.</summary>
+    /// <summary>
+    /// The <see cref="EvalResult"/> tree(s) produced — one per evaluated item, in call order.
+    /// <b>Accumulates across every <c>EvaluateAsync</c> call on this instance</b> and is never cleared,
+    /// so construct a fresh evaluator per evaluation run if you don't want a prior run's results to
+    /// persist (an evaluator is cheap — it just wraps the composite).
+    /// </summary>
     public IReadOnlyList<EvalResult> CapturedResults => _captured;
 
     /// <inheritdoc/>

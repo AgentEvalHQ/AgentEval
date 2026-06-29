@@ -86,4 +86,19 @@ public class MeaiToEvalResultBridgeTests
         Assert.Equal(2, leaves.Count);
         Assert.Equal(2, leaves.Select(l => l.Metric.Key).Distinct().Count());  // keys are unique
     }
+
+    [Fact]
+    public void Build_LowScoreMarker_WithoutInterpretation_IsNotPassed()
+    {
+        // Regression: a low marker score with no MEAI Interpretation must derive pass/fail from the
+        // score, never render as a green "pass".
+        var meai = ResultWith(("llm_x",
+            new NumericMetric("llm_x", 5.0, "AgentEval score: 10/100 (fail, severity high)")));
+
+        var leaf = FirstLeaf(MeaiToEvalResultBridge.Build("Eval", new[] { "q1" }, Wrap(meai)));
+
+        Assert.Equal(0.10, leaf.Score.Value, 3);
+        Assert.False(leaf.Score.Passed);
+        Assert.Equal("fail", leaf.Score.Label);
+    }
 }
