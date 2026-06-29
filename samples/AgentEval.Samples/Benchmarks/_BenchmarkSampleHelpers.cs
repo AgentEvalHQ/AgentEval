@@ -2,6 +2,7 @@
 // Copyright (c) 2026 AgentEval Contributors
 
 using System.Diagnostics;
+using System.Reflection;
 using System.Text.Json;
 using Azure.AI.OpenAI;
 using Microsoft.Extensions.AI;
@@ -61,6 +62,28 @@ internal enum SamplePreset
 /// </summary>
 internal static class BenchmarkSampleHelpers
 {
+    /// <summary>
+    /// The AgentEval package version surfaced in rendered report footers. Resolved once from the
+    /// <see cref="AssemblyInformationalVersionAttribute"/> of the assembly that owns
+    /// <see cref="EvalResult"/> — stamped at build time from Directory.Build.props <c>&lt;Version&gt;</c>,
+    /// the single source of truth — so the footer tracks the real package version instead of a
+    /// hand-edited literal that silently goes stale (it previously read a fixed "0.10.1-beta").
+    /// </summary>
+    public static string AgentEvalVersion { get; } = ResolveAgentEvalVersion();
+
+    private static string ResolveAgentEvalVersion()
+    {
+        var asm = typeof(EvalResult).Assembly;
+        var info = asm.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion;
+        if (!string.IsNullOrWhiteSpace(info))
+        {
+            // SourceLink appends "+<commit-sha>" to the informational version — strip it for display.
+            var plus = info.IndexOf('+');
+            return plus >= 0 ? info[..plus] : info;
+        }
+        return asm.GetName().Version?.ToString() ?? "unknown";
+    }
+
     /// <summary>
     /// Returns a per-benchmark, per-run output directory under
     /// <c>samples/AgentEval.Samples/output/{benchmark}/run-{utc-timestamp}-{suffix}/</c>.
@@ -313,7 +336,7 @@ internal static class BenchmarkSampleHelpers
             GeneratedAt: DateTimeOffset.UtcNow,
             IncludeProvenance: true,
             AuditHash: auditHash,
-            AgentEvalVersion: "0.10.1-beta");
+            AgentEvalVersion: AgentEvalVersion);
 
         var htmlBytes = await new HtmlEvalResultRenderer().RenderAsync(result, renderOpts, ct);
         var sidecarHtmlPath = Path.Combine(sidecarDir, "report.html");

@@ -446,3 +446,5 @@ src/AgentEval.Memory/Data/longmemeval/longmemeval_oracle.json
 .agenteval/
 # v0.10.1 Benchmarks/ sample suite emits JSON/HTML/PDF artefacts here (per-run timestamped dirs).
 samples/AgentEval.Samples/output/
+# MafEvalLightPath sample emits its HTML reports here at runtime.
+samples/AgentEval.MafEvalLightPath/output/

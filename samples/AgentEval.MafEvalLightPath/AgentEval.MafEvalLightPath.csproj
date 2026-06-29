@@ -1,0 +1,42 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <IsPackable>false</IsPackable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>preview</LangVersion>
+    <RootNamespace>AgentEval.MafEvalLightPath</RootNamespace>
+
+    <!-- Standalone demo of the MAF evaluation feature
+         (Microsoft.Agents.AI.AgentEvaluationExtensions.EvaluateAsync) driven with AgentEval's
+         Microsoft.Extensions.AI.Evaluation.IEvaluator implementations. Kept as a separate project so
+         it can use the MAF eval surface without touching the main samples app, and so the
+         MEAI -> AgentEval.EvalResult bridge that powers the HTML report lives in one obvious place.
+         References the AgentEval libraries via ProjectReference (tracks this repo's MAF build);
+         package versions resolve from Directory.Packages.props (Central Package Management). -->
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../src/AgentEval.Abstractions/AgentEval.Abstractions.csproj" />
+    <ProjectReference Include="../../src/AgentEval.Core/AgentEval.Core.csproj" />
+    <ProjectReference Include="../../src/AgentEval.MAF/AgentEval.MAF.csproj" />
+    <!-- AgenticBenchmark presets (the full composite engine) for the composite light-path mode. -->
+    <ProjectReference Include="../../src/AgentEval.Evals.Agentic/AgentEval.Evals.Agentic.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- MAF eval feature lives in Microsoft.Agents.AI; Azure-backed agent + judge need the OpenAI bits. -->
+    <PackageReference Include="Microsoft.Agents.AI" />
+    <PackageReference Include="Azure.AI.OpenAI" />
+    <PackageReference Include="Microsoft.Extensions.AI" />
+    <PackageReference Include="Microsoft.Extensions.AI.OpenAI" />
+    <!-- IEvaluator + ChatConfiguration (the MEAI evaluation contract the MAF overload consumes). -->
+    <PackageReference Include="Microsoft.Extensions.AI.Evaluation.Quality" />
+    <PackageReference Include="System.Memory.Data" />
+    <!-- Security: transitive pin (GHSA-g94r-2vxg-569j) -->
+    <PackageReference Include="OpenTelemetry.Api" />
+  </ItemGroup>
+
+</Project>
