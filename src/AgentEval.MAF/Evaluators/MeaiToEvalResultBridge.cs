@@ -53,7 +53,10 @@ public static class MeaiToEvalResultBridge
             var meai = items[i];
             var query = i < queries.Count ? queries[i] : $"query[{i}]";
 
-            var leaves = meai.Metrics.Values.Select(m => MetricToLeaf(m, judgeModel)).ToList();
+            // Iterate the dictionary (not just .Values): the key carries the disambiguation suffix
+            // (e.g. "Relevance #2") that AgentEvalCompositeEvaluator.AddMetric adds when two leaves
+            // share a metric name — using it as the leaf key keeps the EvalResult tree keys unique.
+            var leaves = meai.Metrics.Select(kv => MetricToLeaf(kv.Key, kv.Value, judgeModel)).ToList();
             queryNodes.Add(Composite(
                 key: $"maf.eval.query{i}",
                 name: $"Query: {Truncate(query, 80)}",
@@ -64,7 +67,7 @@ public static class MeaiToEvalResultBridge
         return Composite("maf.eval", evalName, "agentic", queryNodes);
     }
 
-    private static EvalResult MetricToLeaf(EvaluationMetric metric, string? judgeModel)
+    private static EvalResult MetricToLeaf(string key, EvaluationMetric metric, string? judgeModel)
     {
         var reason = metric.Interpretation?.Reason ?? metric.Reason;
         var passed = metric.Interpretation?.Failed != true;
@@ -95,7 +98,7 @@ public static class MeaiToEvalResultBridge
             : new[] { new EvalEvidence(Source: isLlm ? "judge" : "code", Reference: metric.Name, Message: reason!) };
 
         return new EvalResult(
-            Metric: new EvalMetadata(metric.Name, Prettify(metric.Name), category, "1.0.0"),
+            Metric: new EvalMetadata(key, Prettify(metric.Name), category, "1.0.0"),
             Score: new EvalScore(
                 Value: score0To100 / 100.0,
                 Ordinal: null,

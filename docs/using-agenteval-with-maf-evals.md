@@ -73,8 +73,8 @@ IChatClient judge = azure.GetChatClient(deployment).AsIChatClient();
 var chatConfig = new ChatConfiguration(judge);     // the judge AgentEval's LLM-as-judge metrics use
 ```
 
-> The full **AgenticBenchmark composite** (§3c) additionally needs the agentic suite, which is not yet
-> a programmatic NuGet API — reference the `AgentEval.Evals.Agentic` project (or run via the `agenteval`
+> The full **AgenticBenchmark composite** (§3c) additionally needs the agentic suite, which is not currently
+> exposed as a programmatic NuGet API — reference the `AgentEval.Evals.Agentic` project (or run via the `agenteval`
 > CLI). The flat-metric path (§3a/b) works entirely from the `AgentEval` NuGet.
 
 ---
