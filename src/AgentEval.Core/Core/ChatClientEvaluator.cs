@@ -187,7 +187,8 @@ public class ChatClientEvaluator : IEvaluator
             // Judge prompts are not consistent about casing: the generic evaluator prompt emits
             // camelCase (overallScore / criteriaResults / explanation / improvements) while the
             // compliance judge prompts (gdpr-judge-system.v1, eu-ai-act) emit snake_case
-            // (overall_score / criteria_results / reasoning). JsonSerializer's case-insensitive
+            // (top-level overall_score / criteria_results / summary; reasoning is nested per
+            // criterion). JsonSerializer's case-insensitive
             // option does NOT bridge snake_case↔camelCase, so a verbatim DTO deserialize silently
             // dropped every compliance verdict to the int default (0) with empty criteria — making
             // a real, token-spending judgement look identical to a non-response. Match on keys

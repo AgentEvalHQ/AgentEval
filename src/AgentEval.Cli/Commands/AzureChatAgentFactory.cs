@@ -141,7 +141,7 @@ internal static class AzureChatAgentFactory
     private static AzureOpenAIClientOptions BuildClientOptions()
     {
         var raw = Environment.GetEnvironmentVariable("AGENTEVAL_AGENT_NETWORK_TIMEOUT_S");
-        var seconds = double.TryParse(raw, out var parsed) && parsed > 0 ? parsed : 180.0;
+        var seconds = double.TryParse(raw, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var parsed) && parsed > 0 ? parsed : 180.0;
         return new AzureOpenAIClientOptions { NetworkTimeout = TimeSpan.FromSeconds(seconds) };
     }
 

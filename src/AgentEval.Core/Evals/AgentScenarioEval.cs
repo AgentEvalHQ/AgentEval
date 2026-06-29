@@ -63,6 +63,12 @@ public sealed class AgentScenarioEval : IEval
             var agentResponse = await _agent.InvokeAsync(_scenarioInput, ct);
             response = agentResponse?.Text ?? "";
         }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            // External cancellation (Ctrl+C / caller timeout) must abort the benchmark — it is NOT an
+            // agent error. Let it propagate rather than recording an "error" leaf and continuing.
+            throw;
+        }
         catch (Exception ex)
         {
             // The agent-under-test could not be reached / errored for this scenario. Surface a
