@@ -57,6 +57,29 @@ public sealed class AgentScenarioEval : IEval
     {
         ArgumentNullException.ThrowIfNull(input);
 
+        // An infrastructure-failure "error" leaf (severity none) — separable from a real low score and
+        // never silently counted as a confirmed violation. No LLM judge runs here, so provenance is
+        // "agent-error" (NOT "atomic-llm", which would misrepresent it to downstream cost/reporting),
+        // and the message is length-capped so a large exception / HTTP payload can't bloat the
+        // evidence and output files.
+        EvalResult ErrorLeaf(string message) => new(
+            Metric: new(_inner.Key, _inner.Name, _inner.Category, _inner.Version),
+            Score: new(0.0, null, "error", false, null, "none", null),
+            Details: new(
+                Dimensions: null,
+                Evidence: new[]
+                {
+                    new EvalEvidence(
+                        Source: "agent-error",
+                        Reference: _inner.Key,
+                        Message: message.Length > 500 ? message[..500] + "…" : message),
+                },
+                Recommendations: null,
+                SubResults: null,
+                AggregationStrategy: null),
+            Provenance: new("agent-error", null, null, null, null, 0, false),
+            EvaluatedAt: DateTimeOffset.UtcNow);
+
         string response;
         try
         {
@@ -71,27 +94,15 @@ public sealed class AgentScenarioEval : IEval
         }
         catch (Exception ex)
         {
-            // The agent-under-test could not be reached / errored for this scenario. Surface a
-            // distinct "error" leaf so it is separable from a real low score and does not silently
-            // count as a confirmed violation.
-            return new EvalResult(
-                Metric: new(_inner.Key, _inner.Name, _inner.Category, _inner.Version),
-                Score: new(0.0, null, "error", false, null, "none", null),
-                Details: new(
-                    Dimensions: null,
-                    Evidence: new[]
-                    {
-                        new EvalEvidence(
-                            Source: "agent-error",
-                            Reference: _inner.Key,
-                            Message: $"The agent under test did not return a response for this scenario: {ex.Message}"),
-                    },
-                    Recommendations: null,
-                    SubResults: null,
-                    AggregationStrategy: null),
-                Provenance: new("atomic-llm", null, null, null, null, 0, false),
-                EvaluatedAt: DateTimeOffset.UtcNow);
+            // The agent-under-test could not be reached / errored for this scenario.
+            return ErrorLeaf($"The agent under test did not return a response for this scenario: {ex.Message}");
         }
+
+        // A null/empty/whitespace response is a non-response (e.g. a buggy adapter returning null, or
+        // the agent emitting nothing) — not gradeable evidence. Treat it as an infrastructure error
+        // rather than grading "" as a low score / confirmed violation.
+        if (string.IsNullOrWhiteSpace(response))
+            return ErrorLeaf("The agent under test returned an empty response for this scenario.");
 
         // Substitute the scenario prompt + the agent's real answer, then judge as usual.
         var driven = input with { Query = _scenarioInput, Response = response };
