@@ -59,9 +59,11 @@ public sealed class AgentScenarioEval : IEval
 
         // An infrastructure-failure "error" leaf (severity none) — separable from a real low score and
         // never silently counted as a confirmed violation. No LLM judge runs here, so provenance is
-        // "agent-error" (NOT "atomic-llm", which would misrepresent it to downstream cost/reporting),
-        // and the message is length-capped so a large exception / HTTP payload can't bloat the
-        // evidence and output files.
+        // "atomic-code" (a deterministic, non-LLM result — NOT "atomic-llm", which would misrepresent
+        // it to downstream cost/reporting; "atomic-code" is a valid eval-result.schema.json
+        // provenance.type, so these leaves persist and validate cleanly). The evidence Source stays
+        // "agent-error" (free-form), and the message is length-capped so a large exception / HTTP
+        // payload can't bloat the evidence and output files.
         EvalResult ErrorLeaf(string message) => new(
             Metric: new(_inner.Key, _inner.Name, _inner.Category, _inner.Version),
             Score: new(0.0, null, "error", false, null, "none", null),
@@ -77,7 +79,7 @@ public sealed class AgentScenarioEval : IEval
                 Recommendations: null,
                 SubResults: null,
                 AggregationStrategy: null),
-            Provenance: new("agent-error", null, null, null, null, 0, false),
+            Provenance: new("atomic-code", null, null, null, null, 0, false),
             EvaluatedAt: DateTimeOffset.UtcNow);
 
         string response;
