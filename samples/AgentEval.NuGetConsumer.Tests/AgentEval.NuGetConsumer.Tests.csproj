@@ -19,10 +19,9 @@
 
   <ItemGroup>
     <!-- AgentEval — used directly for TestCase, EvaluationOptions, assertions, harness -->
-    <!-- P0-5 (Sprint 0): bumped 0.8.1-beta → 0.10.1-beta to track the latest shipped package
-         (was lagging two minor releases; the whole point of this project is to validate the
-         published-NuGet downstream surface). -->
-    <PackageReference Include="AgentEval" Version="0.10.1-beta" />
+    <!-- Tracks the LATEST shipped package (built on MAF 1.11.1) to validate the published-NuGet
+         downstream surface; kept in lockstep with AgentEval.NuGetConsumer's reference. -->
+    <PackageReference Include="AgentEval" Version="0.13.1-beta" />
     <!-- Security: explicit transitive pin (GHSA-g94r-2vxg-569j); CPM disabled in this project -->
     <PackageReference Include="OpenTelemetry.Api" Version="1.15.3" />
 
