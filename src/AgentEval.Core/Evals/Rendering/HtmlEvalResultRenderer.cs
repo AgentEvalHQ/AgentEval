@@ -250,6 +250,12 @@ public sealed class HtmlEvalResultRenderer : IEvalResultRenderer
         if (string.Equals(label, "skipped", StringComparison.OrdinalIgnoreCase))
             return "sev-skipped";
 
+        // An "error" leaf is an evaluation-infrastructure failure (severity "none"), not a measured
+        // result — render it neutral (like skipped) so it never reads as a green pass. Mirrors the
+        // PDF renderer, which greys "error" for the same reason.
+        if (string.Equals(label, "error", StringComparison.OrdinalIgnoreCase))
+            return "sev-skipped";
+
         // Verdict label outranks severity for the badge color: a composite that misses
         // its threshold ("fail") with all-low-severity leaves would otherwise render
         // green. Treat any explicit fail/warn label as the colour anchor; fall back to

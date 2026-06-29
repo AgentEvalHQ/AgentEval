@@ -351,7 +351,7 @@ public class MITREATLASReporter : IComplianceReporter<MITREATLASReport>
     }
 
     private static string Truncate(string text, int max) =>
-        text.Length <= max ? text : text.Substring(0, max) + "…";
+        text.Length <= max ? text : text.Substring(0, max - 1) + "…";   // -1 so the ellipsis keeps the result ≤ max
 
     private static List<string> GenerateRecommendations(List<MITRETechniqueStatus> techniques, ComplianceSummary summary)
     {
