@@ -93,9 +93,7 @@ public static class MeaiToEvalResultBridge
 
         // AgentEval metric names are prefixed code_* (deterministic, no LLM) or llm_* (LLM-as-judge).
         var isLlm = metric.Name.StartsWith("llm_", StringComparison.OrdinalIgnoreCase);
-        var category = metric.Name.Contains("tool", StringComparison.OrdinalIgnoreCase)
-            ? "agentic-process"
-            : "quality";
+        var category = CategoryFor(metric.Name);
 
         var evidence = string.IsNullOrWhiteSpace(reason)
             ? null
@@ -152,10 +150,21 @@ public static class MeaiToEvalResultBridge
             EvaluatedAt: DateTimeOffset.UtcNow);
     }
 
+    // Map an AgentEval metric name onto a coarse report category, preserving the common families
+    // (rag / safety-security / agentic-process) instead of collapsing every non-tool metric to "quality".
+    private static string CategoryFor(string name)
+    {
+        bool Has(string s) => name.Contains(s, StringComparison.OrdinalIgnoreCase);
+        if (Has("tool")) return "agentic-process";
+        if (Has("relevance") || Has("groundedness") || Has("retrieval") || Has("context") || Has("faithful")) return "rag";
+        if (Has("safety") || Has("harm") || Has("toxic") || Has("bias") || Has("hate") || Has("violence")) return "safety-security";
+        return "quality";
+    }
+
     private static string Prettify(string metricName)
     {
         var bare = metricName;
-        foreach (var prefix in new[] { "code_", "llm_" })
+        foreach (var prefix in new[] { "code_", "llm_", "embed_" })
         {
             if (bare.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
             {

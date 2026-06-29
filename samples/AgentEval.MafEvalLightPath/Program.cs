@@ -271,7 +271,7 @@ internal static class Program
     {
         Console.WriteLine();
         Console.WriteLine("╔══════════════════════════════════════════════════════════════════════════╗");
-        Console.WriteLine("║  AgentEval × MAF 1.11.1 — Evaluation light path (agent.EvaluateAsync)      ║");
+        Console.WriteLine($"║  AgentEval × MAF {s_maf} — Evaluation light path (agent.EvaluateAsync)      ║");
         Console.WriteLine("║  Flat metrics AND a full AgenticBenchmark composite, as MEAI IEvaluators   ║");
         Console.WriteLine("╚══════════════════════════════════════════════════════════════════════════╝");
         Console.WriteLine();

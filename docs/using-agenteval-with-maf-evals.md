@@ -33,10 +33,10 @@ you — every step (every tool call) is visible.
 **Why this changes tool-metric results.** When you pass an `IEvaluator`, MAF wraps it in an internal
 adapter that *splits* each conversation and forwards only the query half + the final response — the
 middle, where the agent actually **called the tools**, is dropped. So a code-based metric that checks
-"did it call `SearchFlights`?" sees nothing → **0%**. When you implement `IAgentEvaluator`, MAF gives
-you the whole `EvalItem`; AgentEval's `AgentEvalAgentEvaluator` forwards `EvalItem.Conversation`
-(tool-call turns included), so the code metric sees the real calls → **100%**. (LLM-judged metrics
-grade the answer text and work either way.)
+"did it call `SearchFlights`?" sees nothing → **it can't credit the call**. When you implement
+`IAgentEvaluator`, MAF gives you the whole `EvalItem`; AgentEval's `AgentEvalAgentEvaluator` forwards
+`EvalItem.Conversation` (tool-call turns included), so the code metric sees the real calls → **scores
+them correctly**. (LLM-judged metrics grade the answer text and work either way.)
 
 **Recommendation:** use the native path.
 
@@ -142,11 +142,11 @@ lists the tool definitions.
 | Metric kind | Native `IAgentEvaluator` (`AsAgentEvaluator`) | MEAI `IEvaluator` overload |
 |-------------|-----------------------------------------------|----------------------------|
 | LLM-judged (Relevance, Coherence, TaskCompletion, AgenticBenchmark sub-evals) | ✅ | ✅ |
-| Code-based tool metrics (`ToolSuccessMetric`, `ToolSelectionMetric`) | ✅ sees the real calls | ⚠️ `ToolSelection` → 0% |
+| Code-based tool metrics (`ToolSuccessMetric`, `ToolSelectionMetric`) | ✅ sees the real calls | ⚠️ `ToolSelection` can't see the calls |
 | Timing / TTFT / cost | ⚠️ not in the conversation | ⚠️ |
 
-**Proven in the sample:** the same agent answer scored `ToolSelection` **100%** via the native adapter
-and **0%** via the MEAI-only path. For timing/cost fidelity use AgentEval's deep path
+**Proven in the sample:** the same agent answer has its `ToolSelection` scored correctly via the native
+adapter, but missed entirely via the MEAI-only path. For timing/cost fidelity use AgentEval's deep path
 (`MAFEvaluationHarness`, which instruments the run directly).
 
 ---

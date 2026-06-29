@@ -80,7 +80,8 @@ public sealed class AgentEvalCompositeEvaluator : MEAIIEvaluator
         var result = new MEAIEvaluationResult();
         AddMetric(result, tree, isRoot: true);
         foreach (var leaf in EnumerateAtomicLeaves(tree))
-            AddMetric(result, leaf, isRoot: false);
+            if (!ReferenceEquals(leaf, tree))   // an atomic IEval is its own only "leaf" — don't add it twice
+                AddMetric(result, leaf, isRoot: false);
 
         return result;
     }
