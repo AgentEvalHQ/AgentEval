@@ -42,6 +42,27 @@ Community contribution — huge thanks to **[@Javierif](https://github.com/Javie
   catches the genuine "format unsupported" case, so a real judge error still propagates (preserving
   `CalibratedEvaluator`'s exception-based failure handling).
 
+### Microsoft Agent Framework evaluation-feature integration (`agent.EvaluateAsync`)
+
+`AgentEval.MAF` now plugs AgentEval evaluators into MAF's built-in `agent.EvaluateAsync(...)` feature —
+score a MAF agent with AgentEval metrics, or a whole AgentEval benchmark composite, in one call, and
+render the result as a self-contained HTML report.
+
+#### Added
+- **`AgentEvalAgentEvaluator`** — implements MAF's native `IAgentEvaluator` and forwards the **full**
+  `EvalItem.Conversation` (assistant tool-call turns included), so code-based tool metrics see the real
+  calls — where MAF's built-in MEAI adapter forwards only the query half and drops them.
+- **`AgentEvalCompositeEvaluator`** — runs an AgentEval composite (e.g. an `AgenticBenchmark` preset) as
+  a single MEAI `IEvaluator`; captures the rich weighted `EvalResult` tree for rendering and flattens it
+  to MEAI metrics for MAF's pass/fail roll-up.
+- **`MeaiToEvalResultBridge`** — converts MAF's `AgentEvaluationResults` back into an AgentEval
+  `EvalResult` tree (recovering score, label and severity), so the MAF-native path produces the same
+  HTML/PDF reports the benchmark engine does.
+- **`AgentEvaluatorExtensions`** — `.AsAgentEvaluator(chatConfig)` / `.AsMeaiEvaluator()` fluent helpers.
+- **`samples/AgentEval.MafEvalLightPath`** — a runnable end-to-end reference (flat metrics + a full
+  composite via `agent.EvaluateAsync`, rendered to HTML; CI-safe without credentials), plus
+  **`docs/using-agenteval-with-maf-evals.md`** documenting the integration.
+
 ## [0.13.1-beta] - 2026-06-28
 
 A maintenance release on top of the judge-primary grading flip. It **upgrades
