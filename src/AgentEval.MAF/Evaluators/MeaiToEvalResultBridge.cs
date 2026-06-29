@@ -25,8 +25,11 @@ namespace AgentEval.MAF.Evaluators;
 /// </remarks>
 public static class MeaiToEvalResultBridge
 {
+    // Captures the score and, when present, the original label + severity that AgentEvalCompositeEvaluator
+    // embeds — e.g. "AgentEval score: 50/100 (fail, severity critical)". Groups: 1=score, 2=label, 3=severity.
     private static readonly Regex s_scoreMarker =
-        new(@"AgentEval score:\s*(\d+(?:\.\d+)?)/100", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+        new(@"AgentEval score:\s*(\d+(?:\.\d+)?)/100(?:\s*\(([^,]+),\s*severity\s+([^)]+)\))?",
+            RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
     /// <summary>
     /// Builds a composite <see cref="EvalResult"/> tree: a root over one node per query, each query
@@ -72,10 +75,13 @@ public static class MeaiToEvalResultBridge
         var reason = metric.Interpretation?.Reason ?? metric.Reason;
 
         double score0To100;
+        string? markerLabel = null, markerSeverity = null;
         var marker = reason is null ? Match.Empty : s_scoreMarker.Match(reason);
         if (marker.Success)
         {
             score0To100 = Math.Clamp(double.Parse(marker.Groups[1].Value, CultureInfo.InvariantCulture), 0, 100);
+            if (marker.Groups[2].Success) markerLabel = marker.Groups[2].Value.Trim();
+            if (marker.Groups[3].Success) markerSeverity = marker.Groups[3].Value.Trim();
         }
         else if (metric is NumericMetric { Value: { } v })
         {
@@ -86,10 +92,14 @@ public static class MeaiToEvalResultBridge
             score0To100 = metric.Interpretation?.Failed == true ? 0 : 100;
         }
 
-        // Honour an explicit Failed verdict when MEAI provides one; otherwise derive pass/fail from the
-        // recovered score (threshold 70) — so a low score (e.g. a "0/100" marker with no Interpretation)
-        // can never render as a green "pass".
-        var passed = metric.Interpretation?.Failed is bool failed ? !failed : score0To100 >= 70.0;
+        // Prefer the original AgentEval verdict embedded in the marker (label + severity, so a "critical"
+        // leaf isn't flattened to "high"); else honour an explicit MEAI Failed flag; else derive pass/fail
+        // from the recovered score (threshold 70) — a low score can never render as a green "pass".
+        var passed = markerLabel is not null
+            ? string.Equals(markerLabel, "pass", StringComparison.OrdinalIgnoreCase)
+            : metric.Interpretation?.Failed is bool failed ? !failed : score0To100 >= 70.0;
+        var label = markerLabel ?? (passed ? "pass" : "fail");
+        var severity = markerSeverity ?? (passed ? "none" : "high");
 
         // AgentEval metric names are prefixed code_* (deterministic, no LLM) or llm_* (LLM-as-judge).
         var isLlm = metric.Name.StartsWith("llm_", StringComparison.OrdinalIgnoreCase);
@@ -104,10 +114,10 @@ public static class MeaiToEvalResultBridge
             Score: new EvalScore(
                 Value: score0To100 / 100.0,
                 Ordinal: null,
-                Label: passed ? "pass" : "fail",
+                Label: label,
                 Passed: passed,
                 Threshold: 0.70,
-                Severity: passed ? "none" : "high",
+                Severity: severity,
                 Confidence: null),
             Details: new EvalDetails(
                 Dimensions: null,

@@ -101,4 +101,20 @@ public class MeaiToEvalResultBridgeTests
         Assert.False(leaf.Score.Passed);
         Assert.Equal("fail", leaf.Score.Label);
     }
+
+    [Fact]
+    public void Build_RecoversLabelAndSeverity_FromMarker()
+    {
+        // The composite embeds the original verdict in the marker — recover it so a "critical" leaf
+        // isn't flattened to the binary "high".
+        var meai = ResultWith(("x",
+            new NumericMetric("x", 3.0, "AgentEval score: 40/100 (fail, severity critical)")));
+
+        var leaf = FirstLeaf(MeaiToEvalResultBridge.Build("Eval", new[] { "q1" }, Wrap(meai)));
+
+        Assert.Equal(0.40, leaf.Score.Value, 3);
+        Assert.Equal("fail", leaf.Score.Label);
+        Assert.Equal("critical", leaf.Score.Severity);
+        Assert.False(leaf.Score.Passed);
+    }
 }

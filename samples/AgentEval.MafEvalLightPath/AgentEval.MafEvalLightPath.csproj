@@ -9,12 +9,12 @@
     <LangVersion>preview</LangVersion>
     <RootNamespace>AgentEval.MafEvalLightPath</RootNamespace>
 
-    <!-- Standalone demo of the MAF 1.11.1 evaluation feature
+    <!-- Standalone demo of the MAF evaluation feature
          (Microsoft.Agents.AI.AgentEvaluationExtensions.EvaluateAsync) driven with AgentEval's
          Microsoft.Extensions.AI.Evaluation.IEvaluator implementations. Kept as a separate project so
-         it can use the just-shipped MAF eval surface without touching the main samples app, and so the
+         it can use the MAF eval surface without touching the main samples app, and so the
          MEAI -> AgentEval.EvalResult bridge that powers the HTML report lives in one obvious place.
-         References the AgentEval libraries via ProjectReference (tracks this repo's MAF 1.11.1 build);
+         References the AgentEval libraries via ProjectReference (tracks this repo's MAF build);
          package versions resolve from Directory.Packages.props (Central Package Management). -->
   </PropertyGroup>
 

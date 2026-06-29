@@ -3,9 +3,9 @@
 // Licensed under the MIT License.
 //
 // ──────────────────────────────────────────────────────────────────────────────
-//  AgentEval × MAF 1.11.1 — Evaluation "light path", end to end
+//  AgentEval × MAF — Evaluation "light path", end to end
 //
-//  Demonstrates the evaluation feature shipped in Microsoft.Agents.AI 1.11.1
+//  Demonstrates the evaluation feature shipped in Microsoft.Agents.AI
 //  (Microsoft.Agents.AI.AgentEvaluationExtensions.EvaluateAsync) using MAF's OWN
 //  native IAgentEvaluator contract — AgentEval metrics/composites are wrapped as an
 //  IAgentEvaluator (AgentEvalAgentEvaluator) and run via agent.EvaluateAsync(queries,
