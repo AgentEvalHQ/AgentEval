@@ -140,6 +140,8 @@
     href: security-scanning.md
   - name: MAF Memory Integration
     href: maf-memory-integration.md
+  - name: Using AgentEval with MAF Evals
+    href: using-agenteval-with-maf-evals.md
 
 - name: API Reference
   items:
