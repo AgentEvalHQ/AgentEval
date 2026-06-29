@@ -89,7 +89,7 @@ internal static class Program
             Kind: SubjectKind.Agent,
             Name: agent.Name ?? "TravelLightPathAgent",
             ModelId: deployment,
-            Framework: "MAF 1.11.1 (agent.EvaluateAsync)");
+            Framework: $"MAF {s_maf} (agent.EvaluateAsync)");
 
         var outputDir = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "output"));
         Directory.CreateDirectory(outputDir);
@@ -144,7 +144,7 @@ internal static class Program
         return await RenderAsync(
             tree, subject,
             title: "MAF agent.EvaluateAsync() — Flat Metrics (light path)",
-            regulation: "AgentEval flat metrics via MEAI IEvaluator (MAF 1.11.1)",
+            regulation: $"AgentEval flat metrics via MEAI IEvaluator (MAF {s_maf})",
             runId: results.RunId, fileTag: "flat", outputDir);
     }
 
@@ -175,7 +175,7 @@ internal static class Program
         return await RenderAsync(
             tree, subject,
             title: $"MAF agent.EvaluateAsync() — {composite.Name} (composite light path)",
-            regulation: "AgentEval AgenticBenchmark composite via MEAI IEvaluator (MAF 1.11.1)",
+            regulation: $"AgentEval AgenticBenchmark composite via MEAI IEvaluator (MAF {s_maf})",
             runId: results.RunId, fileTag: "composite", outputDir);
     }
 
@@ -250,9 +250,14 @@ internal static class Program
         }
     }
 
-    private static string ResolveAgentEvalVersion()
+    private static string ResolveAgentEvalVersion() => InfoVersionOf(typeof(EvalResult).Assembly);
+
+    // The actual Microsoft Agent Framework version, resolved at runtime so report metadata never goes
+    // stale against the pinned package (mirrors ResolveAgentEvalVersion).
+    private static readonly string s_maf = InfoVersionOf(typeof(AgentEvaluationResults).Assembly);
+
+    private static string InfoVersionOf(System.Reflection.Assembly asm)
     {
-        var asm = typeof(EvalResult).Assembly;
         var info = asm.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion;
         if (!string.IsNullOrWhiteSpace(info))
         {

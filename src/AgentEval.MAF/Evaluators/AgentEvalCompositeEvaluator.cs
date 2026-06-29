@@ -53,7 +53,12 @@ public sealed class AgentEvalCompositeEvaluator : MEAIIEvaluator
     public IReadOnlyList<EvalResult> CapturedResults => _captured;
 
     /// <inheritdoc/>
-    public IReadOnlyCollection<string> EvaluationMetricNames => [_composite.Name];
+    /// <remarks>
+    /// Advertises the stable root metric name <c>EvaluateAsync</c> always emits (<c>"{composite} (overall)"</c>).
+    /// The per-leaf metric names are added dynamically per evaluated item (they depend on the composite
+    /// tree), so they can't be enumerated statically here.
+    /// </remarks>
+    public IReadOnlyCollection<string> EvaluationMetricNames => [$"{_composite.Name} (overall)"];
 
     /// <inheritdoc/>
     public async ValueTask<MEAIEvaluationResult> EvaluateAsync(

@@ -75,7 +75,7 @@ public static class MeaiToEvalResultBridge
         var marker = reason is null ? Match.Empty : s_scoreMarker.Match(reason);
         if (marker.Success)
         {
-            score0To100 = double.Parse(marker.Groups[1].Value, CultureInfo.InvariantCulture);
+            score0To100 = Math.Clamp(double.Parse(marker.Groups[1].Value, CultureInfo.InvariantCulture), 0, 100);
         }
         else if (metric is NumericMetric { Value: { } v })
         {

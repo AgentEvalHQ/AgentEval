@@ -73,9 +73,9 @@ IChatClient judge = azure.GetChatClient(deployment).AsIChatClient();
 var chatConfig = new ChatConfiguration(judge);     // the judge AgentEval's LLM-as-judge metrics use
 ```
 
-> The full **AgenticBenchmark composite** (§3c) additionally needs the agentic suite, which is not currently
-> exposed as a programmatic NuGet API — reference the `AgentEval.Evals.Agentic` project (or run via the `agenteval`
-> CLI). The flat-metric path (§3a/b) works entirely from the `AgentEval` NuGet.
+> The full **AgenticBenchmark composite** (§3c) uses the agentic suite (`AgentEval.Evals.Agentic`), which ships
+> inside the `AgentEval` package, so this path works from the NuGet package too (in this repo it resolves via a
+> project reference). The flat-metric path (§3a/b) needs only the core `AgentEval` types.
 
 ---
 
@@ -98,7 +98,7 @@ var metrics = AgentEvalEvaluators.Custom(
     new ToolSuccessMetric(), new ToolSelectionMetric(["SearchFlights", "SearchHotels"]),
     new TaskCompletionMetric(judge), new RelevanceMetric(judge), new CoherenceMetric(judge));
 var results = await agent.EvaluateAsync([query], metrics.AsAgentEvaluator(chatConfig));
-// Tool Success 100% · Tool Selection 100% · Task Completion 90% · Relevance 95% · Coherence 95%
+// → one scored leaf per metric: Tool Success · Tool Selection · Task Completion · Relevance · Coherence
 ```
 
 ### 3c. A FULL AgenticBenchmark composite (weighted tree + thresholds)
