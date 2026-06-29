@@ -34,6 +34,16 @@ public class ScanOptions
     public TimeSpan TimeoutPerProbe { get; init; } = TimeSpan.FromSeconds(30);
 
     /// <summary>
+    /// Overall scan deadline. When set and exceeded, the scan stops and returns the probes
+    /// completed so far as a <i>truncated</i> result (<see cref="RedTeamResult.WasTruncated"/>)
+    /// rather than throwing — a slow agent that finishes most probes before the deadline should
+    /// still produce a (clearly-partial) report instead of a hard failure. <c>null</c> means no
+    /// overall deadline (only per-probe / per-turn limits apply). An <i>external</i> cancellation
+    /// (the caller's token) is still honoured by throwing, distinct from this internal deadline.
+    /// </summary>
+    public TimeSpan? OverallTimeout { get; init; }
+
+    /// <summary>
     /// Delay between probes (for rate limiting).
     /// Default: Zero.
     /// </summary>

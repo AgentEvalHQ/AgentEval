@@ -34,6 +34,7 @@ public sealed class ScenarioToAtomicEval
     private readonly string _perCriterionPromptId;
     private readonly bool _modeB;
     private readonly IReadOnlyList<(AgentEval.Core.IEvaluator Judge, double Weight)>? _judges;
+    private readonly AgentEval.Core.IEvaluableAgent? _agent;
 
     /// <summary>
     /// Initialises a new <see cref="ScenarioToAtomicEval"/> with a single judge (Mode A or B).
@@ -48,13 +49,19 @@ public sealed class ScenarioToAtomicEval
     /// the scenario is wrapped with a <see cref="MultiJudgeWrapper"/> for multi-judge consensus.
     /// When <c>null</c> or empty, the primary <paramref name="judge"/> is used.
     /// </param>
+    /// <param name="agent">
+    /// Optional live agent-under-test. When supplied, each scenario drives this agent with its own
+    /// article-specific prompt and grades the agent's real answer (live-agent judging); when <c>null</c>,
+    /// the supplied fixed response is graded instead.
+    /// </param>
     public ScenarioToAtomicEval(
         AgentEval.Core.IEvaluator judge,
         string? judgeModel = null,
         string promptId = "gdpr-judge-system.v1",
         string perCriterionPromptId = "per-criterion.v1",
         bool useModeB = false,
-        IReadOnlyList<(AgentEval.Core.IEvaluator Judge, double Weight)>? judges = null)
+        IReadOnlyList<(AgentEval.Core.IEvaluator Judge, double Weight)>? judges = null,
+        AgentEval.Core.IEvaluableAgent? agent = null)
     {
         _judge = judge ?? throw new ArgumentNullException(nameof(judge));
         _judgeModel = judgeModel;
@@ -62,6 +69,7 @@ public sealed class ScenarioToAtomicEval
         _perCriterionPromptId = perCriterionPromptId;
         _modeB = useModeB;
         _judges = judges;
+        _agent = agent;
     }
 
     /// <summary>
@@ -87,19 +95,29 @@ public sealed class ScenarioToAtomicEval
         // (G7.6) calls for this combination, but the v1 implementation ships single-axis
         // support (either multi-judge OR Mode-B at a time, not both). Tracked for a future
         // Phase 11+ enhancement when a real consumer demands the cost trade-off.
+        IEval built;
         if (_judges is { Count: > 1 } && article.Severity == "critical")
         {
-            return BuildMultiJudge(article, scenario);
+            built = BuildMultiJudge(article, scenario);
         }
-
         // Mode B: composite-granularity scenario → split into per-criterion CompositeEval.
-        if (_modeB && scenario.Granularity == "composite")
+        else if (_modeB && scenario.Granularity == "composite")
         {
-            return BuildModeB(article, scenario);
+            built = BuildModeB(article, scenario);
+        }
+        else
+        {
+            // Mode A — single AtomicLlmEval using the full criteria list.
+            built = BuildAtomic(article, scenario, _judge, _judgeModel, _systemPromptId, scenario.Id);
         }
 
-        // Mode A — single AtomicLlmEval using the full criteria list.
-        return BuildAtomic(article, scenario, _judge, _judgeModel, _systemPromptId, scenario.Id);
+        // When a live agent-under-test is supplied, drive it with THIS scenario's own prompt
+        // and grade the agent's real answer, instead of grading a single fixed response against
+        // every scenario. Without an agent, behaviour is unchanged (the runner's EvalInput.Response
+        // is graded as before).
+        return _agent is null
+            ? built
+            : new AgentScenarioEval(_agent, scenario.Input, built);
     }
 
     private IEval BuildMultiJudge(ArticleMetadata article, ScenarioSpec scenario)

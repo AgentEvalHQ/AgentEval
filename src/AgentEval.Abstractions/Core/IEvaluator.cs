@@ -42,6 +42,16 @@ public class EvaluationResult
     public IReadOnlyList<CriterionResult> CriteriaResults { get; init; } = [];
 
     /// <summary>
+    /// True when the evaluation itself failed to produce a usable judgement — e.g. the judge
+    /// returned no JSON, malformed JSON, or no recognisable score field. This is an INFRASTRUCTURE
+    /// failure, not a low-scoring agent: consumers must distinguish "the eval errored" from "the
+    /// agent genuinely scored low" rather than treating the fallback score as a real verdict.
+    /// When set, <see cref="OverallScore"/> carries the conventional failure-score fallback but
+    /// should not be read as a real grade.
+    /// </summary>
+    public bool EvaluationFailed { get; init; }
+
+    /// <summary>
     /// Optional input (prompt) token count reported by the underlying chat model.
     /// <c>null</c> when the evaluator did not invoke a chat model or the model did not report usage.
     /// Surfaced via v1.1 task 1.7 so AgentEval.Evals.AtomicLlmEval can populate

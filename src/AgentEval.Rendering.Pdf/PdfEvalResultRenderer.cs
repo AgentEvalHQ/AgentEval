@@ -335,6 +335,11 @@ public sealed class PdfEvalResultRenderer : IEvalResultRenderer
         if (string.Equals(label, "skipped", StringComparison.OrdinalIgnoreCase))
             return Colors.Grey.Medium;
 
+        // An "error" leaf is an evaluation-infrastructure failure, not a measured result — render
+        // it neutral (grey) so it never reads as a green pass when its severity is "none".
+        if (string.Equals(label, "error", StringComparison.OrdinalIgnoreCase))
+            return Colors.Grey.Medium;
+
         // Verdict label outranks severity for badge / cover colour: a composite that
         // misses its threshold ("fail") with all-low-severity leaves would otherwise
         // render green on the cover. Treat fail/warn labels as the colour anchor; fall

@@ -104,7 +104,10 @@ public sealed class OwaspBenchmarkRun
     public OWASPComplianceReport GenerateReport(RedTeamResult result)
     {
         ArgumentNullException.ThrowIfNull(result);
-        return _reporter.GenerateReport(result);
+        // Capture the agent's response excerpt in findings — this is a security cert run against
+        // the operator's own agent, where seeing exactly what the agent returned to a successful
+        // attack is the point. (The attack prompt + judge reason are carried regardless.)
+        return _reporter.GenerateReport(result, new ComplianceReportOptions { IncludeEvidence = true });
     }
 
     /// <summary>

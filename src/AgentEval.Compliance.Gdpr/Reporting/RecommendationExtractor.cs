@@ -71,8 +71,21 @@ public sealed class RecommendationExtractor
 
     private static void WalkArticles(EvalResult node, Dictionary<string, string> sink)
     {
-        if (node.Metric.Key.StartsWith("gdpr.art", StringComparison.Ordinal) && !node.Score.Passed)
+        // A control (article) node's severity is rolled up from its scenario leaves via
+        // SeverityRollup.Max (see WeightedSumAggregation), which does not special-case
+        // "error"-labelled leaves (evaluation-infrastructure failures, e.g. the judge/agent
+        // never produced a usable verdict) — their severity is "none", and Max(..., "none", ...)
+        // stays "none" when EVERY leaf under a control errored. The recommendations schema's
+        // severity enum only accepts low/medium/high/critical, never "none", so this control
+        // would otherwise crash the whole report's schema validation. Checking severity here
+        // (rather than this node's own Label, which is "fail"/"pass" — composites never carry
+        // "error") catches this at any level, not just direct leaves.
+        if (node.Metric.Key.StartsWith("gdpr.art", StringComparison.Ordinal)
+            && !node.Score.Passed
+            && !string.Equals(node.Score.Severity, "none", StringComparison.OrdinalIgnoreCase))
+        {
             sink.TryAdd(node.Metric.Key, node.Score.Severity);
+        }
 
         var subs = node.Details.SubResults;
         if (subs is null) return;

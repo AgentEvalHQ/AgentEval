@@ -34,6 +34,7 @@ public sealed class ScenarioToAtomicEval
     private readonly string _perCriterionPromptId;
     private readonly bool _modeB;
     private readonly IReadOnlyList<(AgentEval.Core.IEvaluator Judge, double Weight)>? _judges;
+    private readonly AgentEval.Core.IEvaluableAgent? _agent;
 
     /// <summary>
     /// Initialises a new <see cref="ScenarioToAtomicEval"/> with a single judge (Mode A or B).
@@ -48,13 +49,19 @@ public sealed class ScenarioToAtomicEval
     /// the scenario is wrapped with a <see cref="MultiJudgeWrapper"/> for multi-judge consensus.
     /// When <c>null</c> or empty, the primary <paramref name="judge"/> is used.
     /// </param>
+    /// <param name="agent">
+    /// Optional live agent-under-test. When supplied, each scenario drives this agent with its own
+    /// article-specific prompt and grades the agent's real answer (live-agent judging); when <c>null</c>,
+    /// the supplied fixed response is graded instead.
+    /// </param>
     public ScenarioToAtomicEval(
         AgentEval.Core.IEvaluator judge,
         string? judgeModel = null,
         string promptId = "eu-ai-act-judge-system.v1",
         string perCriterionPromptId = "per-criterion.v1",
         bool useModeB = false,
-        IReadOnlyList<(AgentEval.Core.IEvaluator Judge, double Weight)>? judges = null)
+        IReadOnlyList<(AgentEval.Core.IEvaluator Judge, double Weight)>? judges = null,
+        AgentEval.Core.IEvaluableAgent? agent = null)
     {
         _judge = judge ?? throw new ArgumentNullException(nameof(judge));
         _judgeModel = judgeModel;
@@ -62,6 +69,7 @@ public sealed class ScenarioToAtomicEval
         _perCriterionPromptId = perCriterionPromptId;
         _modeB = useModeB;
         _judges = judges;
+        _agent = agent;
     }
 
     /// <summary>
@@ -83,17 +91,25 @@ public sealed class ScenarioToAtomicEval
         // then wrap N judge composites in MultiJudgeWrapper — 3 judges x N criteria = 3N LLM
         // calls per scenario. Tracked as a Phase 11+ enhancement when a real consumer
         // demands the cost trade-off.
+        IEval built;
         if (_judges is { Count: > 1 } && article.Severity == "critical")
         {
-            return BuildMultiJudge(article, scenario);
+            built = BuildMultiJudge(article, scenario);
         }
-
-        if (_modeB && scenario.Granularity == "composite")
+        else if (_modeB && scenario.Granularity == "composite")
         {
-            return BuildModeB(article, scenario);
+            built = BuildModeB(article, scenario);
+        }
+        else
+        {
+            built = BuildAtomic(article, scenario, _judge, _judgeModel, _systemPromptId, scenario.Id);
         }
 
-        return BuildAtomic(article, scenario, _judge, _judgeModel, _systemPromptId, scenario.Id);
+        // When an agent is supplied, drive it with this scenario's own prompt and grade its real
+        // answer; otherwise grade the runner's fixed response as before.
+        return _agent is null
+            ? built
+            : new AgentScenarioEval(_agent, scenario.Input, built);
     }
 
     private IEval BuildMultiJudge(ArticleMetadata article, ScenarioSpec scenario)

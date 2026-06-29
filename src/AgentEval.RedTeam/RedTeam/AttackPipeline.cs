@@ -284,9 +284,6 @@ public sealed class AttackPipeline
                 "No attacks configured. Call WithAttack<T>(), WithAttack(attack), or WithAllAttacks().");
         }
 
-        using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        cts.CancelAfter(_timeout);
-
         var options = new ScanOptions
         {
             Intensity = _intensity,
@@ -302,10 +299,13 @@ public sealed class AttackPipeline
             TimeoutPerTurn = _timeoutPerTurn ?? _timeoutPerProbe,
             MaxConversationDuration = _maxConversationDuration,
             Parallelism = _parallelism,
+            // The runner applies this as an internal deadline and returns a truncated result when
+            // it fires (vs. an external cancel via cancellationToken, which still throws).
+            OverallTimeout = _timeout,
         };
 
         var runner = new RedTeamRunner();
-        return await runner.ScanAsync(agent, options, _progress, cts.Token);
+        return await runner.ScanAsync(agent, options, _progress, cancellationToken);
     }
 
     /// <summary>

@@ -63,9 +63,14 @@ internal static class JudgeFactory
         if (evaluatorOverride is not null)
             return (evaluatorOverride, "override", 0);
 
-        var endpoint   = Environment.GetEnvironmentVariable("AZURE_OPENAI_ENDPOINT");
-        var apiKey     = Environment.GetEnvironmentVariable("AZURE_OPENAI_API_KEY");
-        var deployment = Environment.GetEnvironmentVariable("AZURE_OPENAI_DEPLOYMENT");
+        // Judge-specific creds take precedence over the generic AZURE_OPENAI_* set so the judge and
+        // the agent-under-test can point at DIFFERENT endpoints in the same run — e.g. when
+        // AZURE_OPENAI_* drives the SUT agent while AZURE_OPENAI_JUDGE_* points the grader at a
+        // separate, capable judge model. When the JUDGE_* vars are unset this falls back to
+        // AZURE_OPENAI_* (unchanged single-endpoint behaviour).
+        var endpoint   = FirstSet("AZURE_OPENAI_JUDGE_ENDPOINT",   "AZURE_OPENAI_ENDPOINT");
+        var apiKey     = FirstSet("AZURE_OPENAI_JUDGE_API_KEY",    "AZURE_OPENAI_API_KEY");
+        var deployment = FirstSet("AZURE_OPENAI_JUDGE_DEPLOYMENT", "AZURE_OPENAI_DEPLOYMENT");
 
         // All three variables required for real Azure OpenAI judging.
         var allConfigured =
@@ -135,6 +140,19 @@ internal static class JudgeFactory
             $"⚠ AGENTEVAL_ALLOW_STUB_JUDGE=1 — using stub evaluator for {judgeKind}. " +
             "Results are not a real judgement; do not rely on the verdict in CI.");
         return (new StubEvaluator(), "stub", 0);
+    }
+
+    /// <summary>Returns the value of the first environment variable in <paramref name="names"/>
+    /// that is set to a non-whitespace value, or null if none are.</summary>
+    private static string? FirstSet(params string[] names)
+    {
+        foreach (var name in names)
+        {
+            var value = Environment.GetEnvironmentVariable(name);
+            if (!string.IsNullOrWhiteSpace(value))
+                return value;
+        }
+        return null;
     }
 
     /// <summary>

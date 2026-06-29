@@ -109,7 +109,9 @@ public sealed class MitreBenchmarkRun
     public MITREATLASReport GenerateReport(RedTeamResult result)
     {
         ArgumentNullException.ThrowIfNull(result);
-        return _reporter.GenerateReport(result);
+        // Capture the agent's response excerpt in findings (security cert run against the
+        // operator's own agent). The attack prompt + judge reason are carried regardless.
+        return _reporter.GenerateReport(result, new ComplianceReportOptions { IncludeEvidence = true });
     }
 
     /// <summary>

@@ -54,6 +54,14 @@ public class RecommendationStructuredShapeTests
             Provenance: new("atomic", "stub", null, null, null, 0, false),
             EvaluatedAt: DateTimeOffset.UtcNow);
 
+    private static EvalResult MakeErrorArticleNode(string key) =>
+        new(
+            Metric: new(key, key, "compliance.test", "1.0"),
+            Score: new(0.0, null, "error", false, 0.75, "none", null),
+            Details: new(null, null, null, null, null),
+            Provenance: new("atomic", "stub", null, null, null, 0, false),
+            EvaluatedAt: DateTimeOffset.UtcNow);
+
     private static EvalResult MakeRoot(params EvalResult[] children) =>
         new(
             Metric: new("root", "root", "compliance.test", "1.0"),
@@ -184,6 +192,49 @@ public class RecommendationStructuredShapeTests
 
         Assert.Single(recs);
         Assert.Equal("critical", recs[0].Severity);
+    }
+
+    [Fact]
+    public void RecommendationExtractor_LeafErrorNode_ExcludedFromRecommendations()
+    {
+        // A leaf scenario node labelled "error" never reaches WalkArticles' StartsWith("gdpr.art")
+        // check directly (scenario ids look like "gdpr-art17-001", not "gdpr.art17.erasure"), so
+        // this only matters if the article (control) tree ever places an "error"-labelled node at
+        // the control level itself. Keeping this case documents that the extractor still ignores
+        // it correctly even directly.
+        var extractor = new RecommendationExtractor();
+        var root = MakeRoot(
+            MakeErrorArticleNode("gdpr.art17.erasure"),
+            MakeArticleNode("gdpr.art9.special_categories", 0.10, false, "critical"));
+
+        var recs = extractor.Build(root);
+
+        Assert.Single(recs);
+        Assert.Equal("gdpr.art9.special_categories", recs[0].ControlId);
+        Assert.DoesNotContain(recs, r => r.ControlId == "gdpr.art17.erasure");
+    }
+
+    [Fact]
+    public void RecommendationExtractor_ControlSeverityRolledUpToNone_ExcludedFromRecommendations()
+    {
+        // Regression (the actual bug): a control (article) node's OWN Label is "pass"/"fail" —
+        // composites never carry "error", only their leaves do. When EVERY scenario under a
+        // control fails as an evaluation-infrastructure "error" (e.g. the agent never produced a
+        // real answer — see AgentScenarioEval), WeightedSumAggregation rolls up severity via
+        // SeverityRollup.Max over leaf severities, which stays "none" because none of the leaves
+        // had a real (low/medium/high/critical) severity to roll up. The schema's severity enum
+        // rejects "none" entirely, so this control crashed the whole report. Checking the
+        // control's own Severity (not Label) is what actually catches this.
+        var extractor = new RecommendationExtractor();
+        var root = MakeRoot(
+            MakeArticleNode("gdpr.art17.erasure", 0.0, false, "none"),
+            MakeArticleNode("gdpr.art9.special_categories", 0.10, false, "critical"));
+
+        var recs = extractor.Build(root);
+
+        Assert.Single(recs);
+        Assert.Equal("gdpr.art9.special_categories", recs[0].ControlId);
+        Assert.DoesNotContain(recs, r => r.ControlId == "gdpr.art17.erasure");
     }
 
     [Fact]

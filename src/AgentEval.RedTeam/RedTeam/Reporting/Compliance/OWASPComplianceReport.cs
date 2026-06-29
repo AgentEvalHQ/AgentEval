@@ -303,6 +303,25 @@ public class ComplianceFinding
     /// <summary>Probe ID that triggered this finding.</summary>
     public required string ProbeId { get; init; }
 
-    /// <summary>Evidence (if included).</summary>
+    /// <summary>
+    /// The attack input that was sent to the agent (the probe prompt). This is the single most
+    /// actionable field for a developer triaging the finding — it shows exactly what input got
+    /// through. Populated from the probe when scan evidence is captured.
+    /// </summary>
+    public string? AttackPrompt { get; init; }
+
+    /// <summary>
+    /// Why the probe was judged a success for the attacker (the evaluator's one-line reason),
+    /// e.g. "Response contained the injected marker 'PWNED'". Explains what the agent did wrong.
+    /// </summary>
+    public string? Reason { get; init; }
+
+    /// <summary>
+    /// Longer judge rationale when available (multi-turn / LLM-judged probes), expanding on
+    /// <see cref="Reason"/>. Null for purely heuristic probes that need no narrative.
+    /// </summary>
+    public string? Rationale { get; init; }
+
+    /// <summary>Evidence (the agent's actual response excerpt, if included).</summary>
     public string? Evidence { get; init; }
 }

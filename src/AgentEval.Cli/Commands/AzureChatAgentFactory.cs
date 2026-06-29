@@ -73,7 +73,7 @@ internal static class AzureChatAgentFactory
 
         try
         {
-            var azureClient = new AzureOpenAIClient(new Uri(endpoint!), new AzureKeyCredential(apiKey!));
+            var azureClient = new AzureOpenAIClient(new Uri(endpoint!), new AzureKeyCredential(apiKey!), BuildClientOptions());
             IChatClient chatClient = azureClient.GetChatClient(deployment!).AsIChatClient();
             IEvaluableAgent agent = new ChatClientAgentAdapter(
                 chatClient,
@@ -119,7 +119,7 @@ internal static class AzureChatAgentFactory
 
         try
         {
-            var azureClient = new AzureOpenAIClient(new Uri(endpoint!), new AzureKeyCredential(apiKey!));
+            var azureClient = new AzureOpenAIClient(new Uri(endpoint!), new AzureKeyCredential(apiKey!), BuildClientOptions());
             IChatClient chatClient = azureClient.GetChatClient(deployment!).AsIChatClient();
             return (chatClient, deployment, 0);
         }
@@ -128,6 +128,21 @@ internal static class AzureChatAgentFactory
             Console.Error.WriteLine($"✖ Failed to construct Azure OpenAI chat client: {ex.Message}");
             return (null, null, 2);
         }
+    }
+
+    /// <summary>
+    /// Builds Azure OpenAI client options with a generous network timeout. The default
+    /// per-attempt NetworkTimeout (100s) can fire when the agent under test is a slow real
+    /// agent fronted by an adapter — a deliberate turn plus a model cooldown can exceed it,
+    /// and the resulting "operation was canceled" aborts the whole red-team scan. Allowing
+    /// more time per attempt keeps a single slow probe from failing the entire benchmark.
+    /// Override with <c>AGENTEVAL_AGENT_NETWORK_TIMEOUT_S</c>.
+    /// </summary>
+    private static AzureOpenAIClientOptions BuildClientOptions()
+    {
+        var raw = Environment.GetEnvironmentVariable("AGENTEVAL_AGENT_NETWORK_TIMEOUT_S");
+        var seconds = double.TryParse(raw, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var parsed) && parsed > 0 ? parsed : 180.0;
+        return new AzureOpenAIClientOptions { NetworkTimeout = TimeSpan.FromSeconds(seconds) };
     }
 
     /// <summary>
