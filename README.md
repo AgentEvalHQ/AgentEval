@@ -15,7 +15,7 @@
   <a href="https://joslat.github.io/AgentEval/"><img src="https://img.shields.io/badge/docs-GitHub%20Pages-blue" alt="Documentation" /></a>
   <a href="https://www.nuget.org/packages/AgentEval"><img src="https://img.shields.io/nuget/v/AgentEval.svg" alt="NuGet" /></a>
   <a href="https://github.com/AgentEvalHQ/AgentEval/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="License" /></a>
-  <img src="https://img.shields.io/badge/MAF-1.10.0-blueviolet" alt="MAF 1.10.0" />
+  <a href="https://github.com/microsoft/agent-framework"><img src="https://img.shields.io/badge/built%20on-Microsoft%20Agent%20Framework-blueviolet" alt="Built on Microsoft Agent Framework" /></a>
   <img src="https://img.shields.io/badge/.NET-8.0%20|%209.0%20|%2010.0-512BD4" alt=".NET 8.0 | 9.0 | 10.0" />
 </p>
 
@@ -523,13 +523,7 @@ Every evidence document is cryptographically chained to its source run; `agentev
 dotnet add package AgentEval --prerelease
 ```
 
-**Compatibility:**
-
-| Dependency | Version |
-|------------|----------|
-| Microsoft Agent Framework (MAF) | `1.10.0` |
-| Microsoft.Extensions.AI | `10.6.0` |
-| .NET | 8.0, 9.0, 10.0 |
+**Compatibility:** .NET **8.0 / 9.0 / 10.0**. The Microsoft Agent Framework (MAF) and `Microsoft.Extensions.AI` versions ship centrally pinned in [`Directory.Packages.props`](Directory.Packages.props) — see the [CHANGELOG](CHANGELOG.md) for the exact versions in each release.
 
 **Single package, modular internals:**
 - `AgentEval.Abstractions` — Public contracts and interfaces
@@ -585,7 +579,7 @@ See the **[Getting Started Guide](docs/getting-started.md)** for a complete walk
 | [Red Team Security](docs/redteam.md) | Security probes, OWASP/MITRE coverage |
 | [Responsible AI](docs/ResponsibleAI.md) | Toxicity, bias, misinformation detection |
 | [Memory Evaluation](docs/memory-evaluation.md) | Retention, reach-back, temporal, LongMemEval, HTML reports |
-| [MAF Memory Integration](docs/maf-memory-integration.md) | How AgentEval.Memory maps to MAF 1.10.0 pipelines |
+| [MAF Memory Integration](docs/maf-memory-integration.md) | How AgentEval.Memory maps to MAF pipelines |
 | [Cross-Framework](docs/cross-framework.md) | Semantic Kernel, IChatClient adapters |
 | [CLI Tool](docs/cli.md) | Command-line evaluation guide |
 | [Migration Guide](docs/comparison.md) | Coming from Python/Node.js frameworks |
