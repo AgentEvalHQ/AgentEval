@@ -10,8 +10,9 @@
   <ItemGroup>
     <!-- Microsoft Agent Framework — core packages on 1.12.0 (stable), bumped from 1.11.1.
          Microsoft.Agents.AI.Foundry has no stable 1.12.0 yet (published preview-only), so it's pinned to
-         the matching 1.12.0-preview and is referenced ONLY by the AgentEval.MafEvalFoundryAlongsideLocal
-         sample — the core libraries stay provider-agnostic. Stable core 1.12.0 satisfies the preview's
+         the matching 1.12.0-preview and is referenced only by the SAMPLES (the
+         AgentEval.MafEvalFoundryAlongsideLocal standalone + the AgentEval.Samples H12/H13 benchmarks) —
+         the shipping libraries stay provider-agnostic. Stable core 1.12.0 satisfies the preview's
          Microsoft.Agents.AI dependency (a stable version outranks a same-version prerelease). -->
     <PackageVersion Include="Microsoft.Agents.AI" Version="1.12.0" />
     <PackageVersion Include="Microsoft.Agents.AI.OpenAI" Version="1.12.0" />

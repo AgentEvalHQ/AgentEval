@@ -25,7 +25,8 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.Agents.AI" />
-    <!-- Foundry evals — the only project in the repo that references it (keeps the core provider-agnostic). -->
+    <!-- Foundry evals (preview) — sample-only: this project + the AgentEval.Samples H12/H13 benchmarks.
+         The shipping AgentEval libraries never reference it, so the core stays provider-agnostic. -->
     <PackageReference Include="Microsoft.Agents.AI.Foundry" />
     <PackageReference Include="Azure.AI.Projects" />
     <!-- Aliased: Azure.AI.Projects' beta pulls Azure.Core 1.57, which also declares
