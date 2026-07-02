@@ -22,8 +22,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   into its branch and surfaces a provider report URL as branch evidence.
 - **`CircuitBreaker`** — a minimal consecutive-failure breaker (injectable clock) that skips a
   persistently-failing source fast.
+- **Sample** — `samples/AgentEval.MafEvalFoundryAlongsideLocal`: an end-to-end hybrid eval that scores one
+  MAF agent run with an AgentEval Composite Eval + Azure AI Foundry evals and renders both in one
+  source-tagged HTML report (Pattern A: MAF-native mix; Pattern B: `CompositeAgentEvaluator`).
 - **Docs** — a "several evaluators in one report" section in
   [`using-agenteval-with-maf-evals.md`](docs/using-agenteval-with-maf-evals.md).
+
+#### Changed
+- **Microsoft Agent Framework bumped to 1.12.0** (from 1.11.1) across the solution — no breaking changes
+  for AgentEval (full suite green on net8/9/10). The Foundry evals package
+  (`Microsoft.Agents.AI.Foundry`) has no stable release yet, so it's pinned to its `1.12.0-preview` and
+  referenced **only** by the hybrid sample; the core libraries remain provider-agnostic.
 
 ## [0.13.2-beta] - 2026-06-29
 
