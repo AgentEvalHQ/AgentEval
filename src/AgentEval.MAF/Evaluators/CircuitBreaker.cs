@@ -43,6 +43,12 @@ public sealed class CircuitBreaker
     public void OnFailure(string source)
     {
         var s = _states.GetOrAdd(source, _ => new State());
-        lock (s) { if (++s.Failures >= _threshold) s.OpenedUntil = _now() + _cooldown; }
+        lock (s)
+        {
+            // Once the cooldown has elapsed the breaker is closed again, so restart the consecutive-failure
+            // count — otherwise a single stale failure would immediately re-open it even when threshold > 1.
+            if (s.OpenedUntil != default && _now() >= s.OpenedUntil) { s.Failures = 0; s.OpenedUntil = default; }
+            if (++s.Failures >= _threshold) s.OpenedUntil = _now() + _cooldown;
+        }
     }
 }

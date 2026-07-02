@@ -49,6 +49,23 @@ public class CircuitBreakerTests
     }
 
     [Fact]
+    public void Cooldown_ResetsFailureCount_NextWindowNeedsThresholdAgain()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var b = new CircuitBreaker(threshold: 2, cooldown: TimeSpan.FromMinutes(1), now: () => now);
+        b.OnFailure("x"); b.OnFailure("x");   // 2 consecutive -> open
+        Assert.True(b.IsOpen("x"));
+
+        now = now.AddMinutes(2);              // cooldown elapsed -> closed
+        Assert.False(b.IsOpen("x"));
+
+        b.OnFailure("x");                     // a SINGLE stale failure must NOT immediately re-open
+        Assert.False(b.IsOpen("x"));
+        b.OnFailure("x");                     // 2 consecutive since cooldown -> open again
+        Assert.True(b.IsOpen("x"));
+    }
+
+    [Fact]
     public void IsPerSource()
     {
         var b = new CircuitBreaker(threshold: 1);

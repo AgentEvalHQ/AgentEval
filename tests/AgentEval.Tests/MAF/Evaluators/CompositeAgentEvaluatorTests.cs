@@ -16,14 +16,29 @@ namespace AgentEval.Tests.MAF.Evaluators;
 public class CompositeAgentEvaluatorTests
 {
     [Fact]
-    public async Task Concurrency_InnersRunInParallel_NotSummed()
+    public async Task Concurrency_InnersStartBeforeEitherCompletes()
     {
-        // Two 300ms inners: sequential ≈ 600ms, concurrent ≈ 300ms.
-        var comp = new CompositeAgentEvaluator([("a", Slow("a", 300), null), ("b", Slow("b", 300), null)]);
-        var sw = System.Diagnostics.Stopwatch.StartNew();
-        await comp.EvaluateAsync(Items(2), "t", CancellationToken.None);
-        sw.Stop();
-        Assert.True(sw.ElapsedMilliseconds < 500, $"expected concurrent (<500ms), took {sw.ElapsedMilliseconds}ms");
+        // Deterministic (no wall-clock): both inner bodies signal "started" then block on a shared gate.
+        // If the composite ran them sequentially, the second would never start and WhenAll would hang.
+        var aStarted = new TaskCompletionSource();
+        var bStarted = new TaskCompletionSource();
+        var release = new TaskCompletionSource();
+
+        FakeEvaluator Gated(string s, TaskCompletionSource started) => new(s, async (items, _) =>
+        {
+            started.SetResult();
+            await release.Task;
+            return Pass(items, s);
+        });
+
+        var comp = new CompositeAgentEvaluator([("a", Gated("a", aStarted), null), ("b", Gated("b", bStarted), null)]);
+        var eval = comp.EvaluateAsync(Items(1), "t", CancellationToken.None);
+
+        await Task.WhenAll(aStarted.Task, bStarted.Task).WaitAsync(TimeSpan.FromSeconds(5));   // both started
+        Assert.False(eval.IsCompleted);          // neither finished — both blocked on the gate -> concurrent
+        release.SetResult();
+        await eval;
+        Assert.Equal(2, comp.CapturedPerSource.Count);
     }
 
     [Fact]

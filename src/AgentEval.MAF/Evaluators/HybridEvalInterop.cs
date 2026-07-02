@@ -12,15 +12,20 @@ namespace AgentEval.MAF.Evaluators;
 internal static class HybridEvalInterop
 {
     /// <summary>
-    /// One failed <see cref="EvaluationResult"/> per item, so a down/timed-out source is VISIBLE in the
-    /// merged output (not a silently lost run). The metric key is prefixed with the source name.
+    /// One neutral <see cref="EvaluationResult"/> per item, so a down/timed-out or intentionally-skipped
+    /// source is VISIBLE in the merged output (not a silently lost run) WITHOUT masquerading as a real
+    /// low-scoring failure.
     /// </summary>
-    public static AgentEvaluationResults SkippedResults(IReadOnlyList<EvalItem> items, string source, string reason)
+    /// <param name="label">
+    /// <c>"error"</c> for an infrastructure failure (timeout/exception — the default), or <c>"skipped"</c>
+    /// for an intentional skip (e.g. circuit breaker open). Renders neutral (severity none) either way; the
+    /// distinction drives the rendered label and the <see cref="UnifiedEvalReport"/> branch.
+    /// </param>
+    public static AgentEvaluationResults SkippedResults(
+        IReadOnlyList<EvalItem> items, string source, string reason, string label = "error")
     {
-        // Render as a neutral "skipped"/NOT-TESTED leaf (NOT a confirmed fail): this score marker is what
-        // MeaiToEvalResultBridge parses to recover the label/severity, so a down/timed-out source doesn't
-        // masquerade as a genuine low-scoring result.
-        var marker = $"AgentEval score: 0/100 (skipped, severity none) — {reason}";
+        // The score marker is what MeaiToEvalResultBridge parses to recover the label/severity.
+        var marker = $"AgentEval score: 0/100 ({label}, severity none) — {reason}";
         var results = new List<EvaluationResult>(items.Count);
         for (int i = 0; i < items.Count; i++)
         {
@@ -33,12 +38,13 @@ internal static class HybridEvalInterop
             };
             results.Add(r);
         }
-        return new AgentEvaluationResults($"{source} (skipped)", results, inputItems: items) { Error = reason };
+        // ProviderName carries the neutral label so UnifiedEvalReport renders the matching neutral branch.
+        return new AgentEvaluationResults($"{source} ({label})", results, inputItems: items) { Error = reason };
     }
 
-    /// <summary>Convenience overload that formats an exception into the skip reason.</summary>
+    /// <summary>Convenience overload for an exception — surfaced as a neutral <c>"error"</c> branch.</summary>
     public static AgentEvaluationResults SkippedResults(IReadOnlyList<EvalItem> items, string source, Exception ex)
-        => SkippedResults(items, source, $"{ex.GetType().Name}: {ex.Message}");
+        => SkippedResults(items, source, $"{ex.GetType().Name}: {ex.Message}", label: "error");
 
     /// <summary>
     /// Per query <c>i</c>, unions each source's metrics into one <see cref="EvaluationResult"/> with a

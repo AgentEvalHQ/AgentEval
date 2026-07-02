@@ -63,7 +63,7 @@ public sealed class CompositeAgentEvaluator : IAgentEvaluator
         var perSource = await Task.WhenAll(_inners.Select(async p =>
         {
             if (_breaker?.IsOpen(p.Source) == true)                                          // breaker: skip fast, no call
-                return (p.Source, SkippedResults(items, p.Source, "circuit open"));
+                return (p.Source, SkippedResults(items, p.Source, "circuit breaker open", label: "skipped"));
 
             using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             if (p.Timeout is { } t) cts.CancelAfter(t);                                       // per-inner hard ceiling
