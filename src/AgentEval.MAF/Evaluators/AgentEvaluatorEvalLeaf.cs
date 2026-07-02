@@ -86,12 +86,13 @@ public sealed class AgentEvaluatorEvalLeaf : IEval
         }
         catch (Exception ex) when (ct.IsCancellationRequested is false)
         {
-            // Isolate a provider failure into a failing leaf — never take down the whole composite.
-            return Fail($"evaluator '{Name}' threw: {ex.Message}");
+            // Isolate a provider failure into a neutral "error" leaf — never take down the whole composite.
+            // Include the exception type: ex.Message alone can be empty and is far less diagnostic.
+            return ErrorLeaf($"evaluator '{Name}' threw {ex.GetType().Name}: {ex.Message}");
         }
 
         if (results.Error is not null || results.Items.Count == 0)
-            return Fail(results.Error ?? "no results returned");
+            return ErrorLeaf(results.Error ?? "no results returned");
 
         // Reuse the existing MEAI -> EvalResult bridge for robust metric normalisation, then re-key its
         // aggregate as THIS leaf so it participates (by weight) in the parent CompositeEval.
@@ -116,9 +117,12 @@ public sealed class AgentEvaluatorEvalLeaf : IEval
             EvaluatedAt: DateTimeOffset.UtcNow);
     }
 
-    private EvalResult Fail(string reason) => new(
+    // An infrastructure/provider failure is surfaced as a neutral "error" leaf (severity none), matching the
+    // repo convention (AtomicLlmEval / AgentScenarioEval): it must NOT masquerade as a confirmed
+    // low-scoring/violating result in roll-ups or renderers, which reserve fail/medium for real verdicts.
+    private EvalResult ErrorLeaf(string reason) => new(
         Metric: new EvalMetadata(Key, Name, Category, Version),
-        Score: new EvalScore(0.0, Ordinal: null, Label: "fail", Passed: false, Threshold: _threshold, Severity: "medium", Confidence: null),
+        Score: new EvalScore(0.0, Ordinal: null, Label: "error", Passed: false, Threshold: _threshold, Severity: "none", Confidence: null),
         Details: new EvalDetails(null, new[] { new EvalEvidence("provider", Key, reason) }, null, null, null),
         Provenance: new EvalProvenance("atomic-llm", _judgeModel, null, null, null, 0, false),
         EvaluatedAt: DateTimeOffset.UtcNow);

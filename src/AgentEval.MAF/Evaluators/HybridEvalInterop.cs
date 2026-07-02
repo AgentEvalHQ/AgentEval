@@ -17,16 +17,19 @@ internal static class HybridEvalInterop
     /// </summary>
     public static AgentEvaluationResults SkippedResults(IReadOnlyList<EvalItem> items, string source, string reason)
     {
+        // Render as a neutral "skipped"/NOT-TESTED leaf (NOT a confirmed fail): this score marker is what
+        // MeaiToEvalResultBridge parses to recover the label/severity, so a down/timed-out source doesn't
+        // masquerade as a genuine low-scoring result.
+        var marker = $"AgentEval score: 0/100 (skipped, severity none) — {reason}";
         var results = new List<EvaluationResult>(items.Count);
         for (int i = 0; i < items.Count; i++)
         {
             var r = new EvaluationResult();
-            // NumericMetric(name, value, reason) + EvaluationMetricInterpretation(rating, failed, reason):
-            // the exact ctor shapes AgentEvalCompositeEvaluator / FoundryEvals.ParseOutputItem use.
-            r.Metrics[$"{source}:status"] = new NumericMetric($"{source}:status", 0.0, reason)
+            // UNPREFIXED key: Merge() adds the "{source}:" prefix exactly once (no double-prefixing).
+            r.Metrics["status"] = new NumericMetric("status", 0.0, marker)
             {
                 Interpretation = new EvaluationMetricInterpretation(
-                    rating: EvaluationRating.Unacceptable, failed: true, reason: reason),
+                    rating: EvaluationRating.Inconclusive, failed: true, reason: marker),
             };
             results.Add(r);
         }
@@ -52,7 +55,11 @@ internal static class HybridEvalInterop
             foreach (var (source, res) in perSource)
                 if (i < res.Items.Count)
                     foreach (var kv in res.Items[i].Metrics)
-                        e.Metrics[$"{source}:{kv.Key}"] = kv.Value;   // prefix -> no cross-source collisions
+                    {
+                        // Prefix exactly once: guard against an inner that already returns source-prefixed keys.
+                        var mkey = kv.Key.StartsWith($"{source}:", StringComparison.Ordinal) ? kv.Key : $"{source}:{kv.Key}";
+                        e.Metrics[mkey] = kv.Value;   // -> no cross-source collisions, no double-prefix
+                    }
             merged.Add(e);
         }
         return new AgentEvaluationResults(evalName, merged, inputItems: items);

@@ -31,7 +31,7 @@ public class AgentEvaluatorEvalLeafTests
     }
 
     [Fact]
-    public async Task AsEvalLeaf_failing_evaluator_is_isolated_into_a_failing_leaf()
+    public async Task AsEvalLeaf_failing_evaluator_is_isolated_into_a_neutral_error_leaf()
     {
         IEval leaf = Throws("foundry").AsEvalLeaf("foundry.relevance", "Foundry Relevance");
 
@@ -39,7 +39,9 @@ public class AgentEvaluatorEvalLeafTests
 
         Assert.False(result.Score.Passed);
         Assert.Equal(0.0, result.Score.Value);
-        Assert.Contains(result.Details.Evidence!, e => e.Message.Contains("boom"));
+        Assert.Equal("error", result.Score.Label);       // infra failure != a confirmed "fail"
+        Assert.Equal("none", result.Score.Severity);     // neutral — must not masquerade as a violation
+        Assert.Contains(result.Details.Evidence!, e => e.Message.Contains("InvalidOperationException") && e.Message.Contains("boom"));
     }
 
     [Fact]

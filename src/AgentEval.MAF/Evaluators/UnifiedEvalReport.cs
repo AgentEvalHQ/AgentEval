@@ -35,10 +35,13 @@ public static class UnifiedEvalReport
                 : Enumerable.Range(0, result.Items.Count).Select(i => $"query[{i}]").ToList();
 
             EvalResult branch;
-            if (composite is not null && IsLocalAgentEval(source) && composite.CapturedResults.Count > 0)
+            if (composite is not null && IsLocalAgentEval(source) && composite.CapturedResults.Count > 0 && result.Items.Count > 0)
             {
-                // Rich branch: the composite's full weighted hierarchy (one tree per query).
-                branch = Node($"hybrid.{Sanitize(source)}", source, "agentic", composite.CapturedResults, source);
+                // Rich branch: the composite's full weighted hierarchy (one tree per query). CapturedResults
+                // ACCUMULATES across calls and is never cleared, so splice only the most recent Items.Count
+                // trees — otherwise a reused composite instance would leak prior runs' trees into this report.
+                var recent = composite.CapturedResults.TakeLast(result.Items.Count).ToList();
+                branch = Node($"hybrid.{Sanitize(source)}", source, "agentic", recent, source);
             }
             else
             {
@@ -47,10 +50,11 @@ public static class UnifiedEvalReport
                 branch = Node($"hybrid.{Sanitize(source)}", source, "agentic", new[] { bridged }, source);
             }
 
-            // Attach the Foundry portal link (when present) as evidence on the branch.
+            // Attach the provider's portal link (when present) as evidence on the branch. Use the actual
+            // source label (not a hard-coded "foundry") so a non-Foundry provider isn't misattributed.
             if (result.ReportUrl is not null)
             {
-                var evidence = new[] { new EvalEvidence("foundry", "report_url", result.ReportUrl.ToString()) };
+                var evidence = new[] { new EvalEvidence(source, "report_url", result.ReportUrl.ToString()) };
                 branch = branch with { Details = branch.Details with { Evidence = evidence } };
             }
 
