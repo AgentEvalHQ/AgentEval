@@ -22,11 +22,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   into its branch and surfaces a provider report URL as branch evidence.
 - **`CircuitBreaker`** — a minimal consecutive-failure breaker (injectable clock) that skips a
   persistently-failing source fast.
-- **Sample** — `samples/AgentEval.MafEvalFoundryAlongsideLocal`: an end-to-end hybrid eval that scores one
-  MAF agent run with an AgentEval Composite Eval + Azure AI Foundry evals and renders both in one
-  source-tagged HTML report (Pattern A: MAF-native mix; Pattern B: `CompositeAgentEvaluator`).
-- **Docs** — a "several evaluators in one report" section in
-  [`using-agenteval-with-maf-evals.md`](docs/using-agenteval-with-maf-evals.md).
+- **`AgentEvaluatorEvalLeaf` / `IAgentEvaluator.AsEvalLeaf()`** — the inverse adapter: wraps a MAF
+  `IAgentEvaluator` (e.g. a Foundry eval) as an AgentEval `IEval`, so a provider's evaluator can be a
+  **weighted leaf inside an AgentEval `CompositeEval`** — Foundry evals as first-class components of a
+  hierarchical benchmark, under the same weighting/thresholding/aggregation. Provider-agnostic
+  (AgentEval.MAF holds no Foundry reference).
+- **Samples** —
+  `samples/AgentEval.MafEvalFoundryAlongsideLocal` (standalone) plus two `AgentEval.Samples` Benchmarks
+  entries: **Foundry Hybrid** (a Foundry eval inside a `CompositeAgentEvaluator`, batched) and **Foundry
+  Hierarchy** (Foundry evals as weighted leaves interleaved in a composite benchmark tree). Each scores one
+  MAF agent run and renders a source-tagged HTML report; the Foundry branch is gated on
+  `FOUNDRY_PROJECT_ENDPOINT`.
+- **Docs** — "several evaluators in one report" (§3d) and "a provider's eval as a weighted leaf" (§3e)
+  sections in [`using-agenteval-with-maf-evals.md`](docs/using-agenteval-with-maf-evals.md).
 
 #### Changed
 - **Microsoft Agent Framework bumped to 1.12.0** (from 1.11.1) across the solution — no breaking changes

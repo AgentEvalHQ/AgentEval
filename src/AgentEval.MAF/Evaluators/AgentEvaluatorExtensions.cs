@@ -6,6 +6,7 @@ using Microsoft.Extensions.AI.Evaluation;
 using AgentEval.Evals;
 
 using MEAIIEvaluator = Microsoft.Extensions.AI.Evaluation.IEvaluator;
+using MafIAgentEvaluator = Microsoft.Agents.AI.IAgentEvaluator;
 
 namespace AgentEval.MAF.Evaluators;
 
@@ -34,4 +35,19 @@ public static class AgentEvaluatorExtensions
     /// <see cref="AgentEvalCompositeEvaluator.CapturedResults"/> for rendering.
     /// </summary>
     public static AgentEvalCompositeEvaluator AsMeaiEvaluator(this IEval composite) => new(composite);
+
+    /// <summary>
+    /// Wraps a MAF <see cref="MafIAgentEvaluator"/> (e.g. an Azure AI Foundry <c>FoundryEvals</c> instance)
+    /// as an AgentEval <see cref="IEval"/> leaf, so a provider's evaluator can be a <b>weighted component
+    /// inside an AgentEval <c>CompositeEval</c></b> — the inverse of <see cref="AsAgentEvaluator"/>. See
+    /// <see cref="AgentEvaluatorEvalLeaf"/> for the per-input cost note (prefer batching for large runs).
+    /// </summary>
+    public static IEval AsEvalLeaf(
+        this MafIAgentEvaluator evaluator,
+        string key,
+        string name,
+        string category = "hybrid",
+        string version = "1.0.0",
+        string? judgeModel = null,
+        double? threshold = 0.70) => new AgentEvaluatorEvalLeaf(evaluator, key, name, category, version, judgeModel, threshold);
 }

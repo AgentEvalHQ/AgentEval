@@ -153,6 +153,37 @@ EvalResult tree = UnifiedEvalReport.Build(hybrid.CapturedPerSource, composite); 
 - A genuine caller `CancellationToken` still propagates; only an inner evaluator's own failure/timeout is
   isolated into a "skipped" branch.
 
+### 3e. A provider's eval as a weighted LEAF inside a composite — `AsEvalLeaf`
+
+The inverse of §3a's `AsAgentEvaluator`: wrap any MAF `IAgentEvaluator` (e.g. a Foundry `FoundryEvals`
+instance) as an AgentEval `IEval` so it becomes a **weighted component inside a `CompositeEval`** — a
+Foundry eval sitting next to AgentEval leaves in one hierarchical benchmark, under the same weighting,
+thresholding, and aggregation.
+
+```csharp
+using AgentEval.Evals;          // CompositeEval, EvalComponent, WeightedSumAggregation
+using AgentEval.MAF.Evaluators; // AsEvalLeaf
+
+IEval foundryRelevance = new FoundryEvals(projectClient, model, /* … */ FoundryEvals.Relevance)
+    .AsEvalLeaf("foundry.relevance", "Foundry Relevance", judgeModel: model);
+
+var benchmark = new CompositeEval(
+    "hybrid.benchmark", "Hybrid Benchmark", "hybrid", "1.0.0",
+    components:
+    [
+        new(AgenticBenchmark.ToolCallAccuracy(judge), 0.5),   // AgentEval sub-composite (multi-dim)
+        new(foundryRelevance, 0.5),                            // Foundry eval as a weighted leaf
+    ],
+    WeightedSumAggregation.Instance, threshold: 0.75);
+
+EvalResult tree = await benchmark.EvaluateAsync(new EvalInput(query, response));
+```
+
+The leaf is provider-agnostic (AgentEval.MAF holds no Foundry reference). **Cost:** a composite evaluates
+once per input, so each leaf makes one provider call per input — fine for a benchmark; for large item
+counts prefer the batched §3d path (run the provider once over the whole set). The `AgentEval.Samples`
+Benchmarks menu has both: **Foundry Hybrid** (§3d, batched) and **Foundry Hierarchy** (this, interleaved).
+
 ---
 
 ## 4. Getting an HTML report out
@@ -201,6 +232,7 @@ adapter, but missed entirely via the MEAI-only path. For timing/cost fidelity us
 | `CompositeAgentEvaluator` | runs several `IAgentEvaluator`s concurrently over one run — isolated + per-source timeout + optional `CircuitBreaker`; merges into one result and captures per-source detail (`CapturedPerSource`) |
 | `UnifiedEvalReport` | merges per-source results into one source-tagged `EvalResult` tree (a branch per source) for rendering |
 | `CircuitBreaker` | optional consecutive-failure breaker that skips a persistently-failing source fast |
+| `AgentEvaluatorEvalLeaf` / `AsEvalLeaf` | wraps a MAF `IAgentEvaluator` (e.g. Foundry) as an AgentEval `IEval` leaf, so a provider's eval can be a weighted component inside a `CompositeEval` (inverse of `AsAgentEvaluator`) |
 
 Mapping to MAF's own samples (`dotnet/samples/.../Evaluation/`): `Evaluation_SimpleEval` →
 `AgentEvalEvaluators.Quality(judge)`; `Evaluation_CustomEvals` → `AgentEvalEvaluators.Custom(...)`;

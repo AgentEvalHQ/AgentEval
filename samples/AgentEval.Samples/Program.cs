@@ -112,6 +112,7 @@ public static class Program
             new("LongMemEval",               "Real history-injectable agent + judge (ICLR 2025); preset-driven",    LongMemEvalBenchmarkSample.RunAsync),
             new("Memory",                    "Comprehensive memory benchmark — preset-driven",                      MemoryBenchmarkSample.RunAsync),
             new("Foundry Hybrid",            "A Foundry eval INSIDE a composite eval — one run, one report",        FoundryHybridBenchmarkSample.RunAsync),
+            new("Foundry Hierarchy",         "Foundry evals as weighted leaves inside a composite benchmark tree",  FoundryHierarchyBenchmarkSample.RunAsync),
             new("Report Browser",            "Open previously-generated JSON / HTML / PDF runs",                    ReportBrowserBenchmark.RunAsync),
         ]),
 
