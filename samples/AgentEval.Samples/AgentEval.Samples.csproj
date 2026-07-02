@@ -23,7 +23,14 @@
 
   <ItemGroup>
     <PackageReference Include="Azure.AI.OpenAI" />
-    <PackageReference Include="Azure.Identity" />
+    <!-- Aliased for the Foundry benchmarks (H12/H13): Azure.AI.Projects' beta pulls Azure.Core 1.57,
+         which also declares Azure.Identity.DefaultAzureCredential — the extern alias disambiguates (CS0433).
+         Safe project-wide: the H12/H13 samples reach DefaultAzureCredential through the `azureidentity::`
+         alias, and no sample references Azure.Identity types UNALIASED. -->
+    <PackageReference Include="Azure.Identity" Aliases="azureidentity" />
+    <!-- Foundry evals (preview) — for the H12 (Foundry Hybrid) and H13 (Foundry Hierarchy) benchmarks. -->
+    <PackageReference Include="Microsoft.Agents.AI.Foundry" />
+    <PackageReference Include="Azure.AI.Projects" />
     <PackageReference Include="Microsoft.Agents.AI.OpenAI" />
     <PackageReference Include="Microsoft.Agents.AI.Workflows" />
     <PackageReference Include="Microsoft.Agents.AI.Workflows.Generators" PrivateAssets="all" />

@@ -1,0 +1,45 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <IsPackable>false</IsPackable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>preview</LangVersion>
+    <RootNamespace>AgentEval.MafEvalFoundryAlongsideLocal</RootNamespace>
+
+    <!-- Standalone demo of the hybrid eval path: score one MAF agent run with an AgentEval Composite
+         Eval AND Azure AI Foundry evals, merged into one source-tagged HTML report via
+         CompositeAgentEvaluator + UnifiedEvalReport (AgentEval.MAF). Kept as a separate project so the
+         Foundry dependency (Microsoft.Agents.AI.Foundry) stays out of the main libraries. Package
+         versions resolve from Directory.Packages.props (Central Package Management). -->
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../src/AgentEval.Abstractions/AgentEval.Abstractions.csproj" />
+    <ProjectReference Include="../../src/AgentEval.Core/AgentEval.Core.csproj" />
+    <ProjectReference Include="../../src/AgentEval.MAF/AgentEval.MAF.csproj" />
+    <ProjectReference Include="../../src/AgentEval.Evals.Agentic/AgentEval.Evals.Agentic.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Agents.AI" />
+    <!-- Foundry evals (preview) — sample-only: this project + the AgentEval.Samples H12/H13 benchmarks.
+         The shipping AgentEval libraries never reference it, so the core stays provider-agnostic. -->
+    <PackageReference Include="Microsoft.Agents.AI.Foundry" />
+    <PackageReference Include="Azure.AI.Projects" />
+    <!-- Aliased: Azure.AI.Projects' beta pulls Azure.Core 1.57, which also declares
+         Azure.Identity.DefaultAzureCredential — the extern alias disambiguates (CS0433). -->
+    <PackageReference Include="Azure.Identity" Aliases="azureidentity" />
+    <!-- Azure-backed judge + fallback SUT agent. -->
+    <PackageReference Include="Azure.AI.OpenAI" />
+    <PackageReference Include="Microsoft.Extensions.AI" />
+    <PackageReference Include="Microsoft.Extensions.AI.OpenAI" />
+    <PackageReference Include="Microsoft.Extensions.AI.Evaluation.Quality" />
+    <PackageReference Include="System.Memory.Data" />
+    <!-- Security: transitive pin (GHSA-g94r-2vxg-569j) -->
+    <PackageReference Include="OpenTelemetry.Api" />
+  </ItemGroup>
+
+</Project>
