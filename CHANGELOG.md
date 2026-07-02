@@ -33,8 +33,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Hierarchy** (Foundry evals as weighted leaves interleaved in a composite benchmark tree). Each scores one
   MAF agent run and renders a source-tagged HTML report; the Foundry branch is gated on
   `FOUNDRY_PROJECT_ENDPOINT`.
-- **Docs** — "several evaluators in one report" (§3d) and "a provider's eval as a weighted leaf" (§3e)
-  sections in [`using-agenteval-with-maf-evals.md`](docs/using-agenteval-with-maf-evals.md).
+- **Docs** — a dedicated [Foundry Evals Integration](docs/foundry-evals-integration.md) guide (surfaced in
+  the README Integration section + Documentation table), plus "several evaluators in one report" (§3d) and
+  "a provider's eval as a weighted leaf" (§3e) sections in
+  [`using-agenteval-with-maf-evals.md`](docs/using-agenteval-with-maf-evals.md).
 
 #### Changed
 - **Microsoft Agent Framework bumped to 1.12.0** (from 1.11.1) across the solution — no breaking changes

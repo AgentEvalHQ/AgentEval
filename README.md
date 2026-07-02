@@ -511,6 +511,7 @@ Every evidence document is cryptographically chained to its source run; `agentev
 - Semantic Kernel bridge via `AIFunctionFactory.Create()` (see NuGetConsumer sample)
 
 ### Integration
+- **⭐ Azure AI Foundry evals** — run Foundry evals **alongside** (batched, one source-tagged report) and **inside** (as weighted leaves in a composite benchmark) your AgentEval evals, from a single agent run. See [Foundry Evals Integration](docs/foundry-evals-integration.md).
 - CI/CD integration - JUnit XML, Markdown, JSON, SARIF export
 - Benchmarks - custom patterns with dataset loaders (JSON, YAML, CSV, JSONL)
 - Comprehensive multi-framework evaluation suite across all supported TFMs
@@ -580,6 +581,8 @@ See the **[Getting Started Guide](docs/getting-started.md)** for a complete walk
 | [Responsible AI](docs/ResponsibleAI.md) | Toxicity, bias, misinformation detection |
 | [Memory Evaluation](docs/memory-evaluation.md) | Retention, reach-back, temporal, LongMemEval, HTML reports |
 | [MAF Memory Integration](docs/maf-memory-integration.md) | How AgentEval.Memory maps to MAF pipelines |
+| [MAF Eval Integration](docs/using-agenteval-with-maf-evals.md) | Run AgentEval through MAF's `agent.EvaluateAsync()` |
+| [⭐ Foundry Evals Integration](docs/foundry-evals-integration.md) | Run Azure AI Foundry evals **alongside** and **inside** AgentEval evals |
 | [Cross-Framework](docs/cross-framework.md) | Semantic Kernel, IChatClient adapters |
 | [CLI Tool](docs/cli.md) | Command-line evaluation guide |
 | [Migration Guide](docs/comparison.md) | Coming from Python/Node.js frameworks |
