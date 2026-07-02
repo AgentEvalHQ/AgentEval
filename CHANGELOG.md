@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Microsoft Agent Framework: hybrid evaluation (several evaluators, one report)
+
+#### Added
+- **`CompositeAgentEvaluator`** (`AgentEval.MAF.Evaluators`) — runs several MAF `IAgentEvaluator`s over
+  the same agent run **concurrently**, isolating each (a failing or slow source becomes a visible
+  "skipped" branch instead of losing the whole run), with an optional per-source timeout and an optional
+  `CircuitBreaker`. Pass it as a single evaluator to `agent.EvaluateAsync` — for example an AgentEval
+  composite alongside any other provider's evaluator (such as an Azure AI Foundry `FoundryEvals`
+  instance). Metrics from each source are merged under a `"{source}:"` key prefix so identically-named
+  metrics never collide; `CapturedPerSource` exposes the untouched per-source results.
+- **`UnifiedEvalReport`** — merges the per-source results into one source-tagged `EvalResult` tree (a
+  branch per source) for the HTML/PDF renderers; splices an AgentEval composite's full weighted hierarchy
+  into its branch and surfaces a provider report URL as branch evidence.
+- **`CircuitBreaker`** — a minimal consecutive-failure breaker (injectable clock) that skips a
+  persistently-failing source fast.
+- **Docs** — a "several evaluators in one report" section in
+  [`using-agenteval-with-maf-evals.md`](docs/using-agenteval-with-maf-evals.md).
+
 ## [0.13.2-beta] - 2026-06-29
 
 ### Compliance: live-agent judging + a silent judge-parse correctness fix

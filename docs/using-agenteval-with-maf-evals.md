@@ -115,6 +115,44 @@ EvalResult tree = compositeEval.CapturedResults[0];                     // full 
 // Tool Call Accuracy → Tool Selection / Input(Schema+Semantic) / Output / Success / Efficiency
 ```
 
+### 3d. Several evaluators in one report — `CompositeAgentEvaluator` + `UnifiedEvalReport`
+
+Run more than one `IAgentEvaluator` over the **same** agent run and merge them into a single
+source-tagged report — for example an AgentEval composite alongside any other provider's evaluator
+(such as an Azure AI Foundry `FoundryEvals` instance). `CompositeAgentEvaluator` fans the inner
+evaluators out **concurrently**, isolates each one (a failing or slow source becomes a visible
+"skipped" branch rather than losing the whole run), gives each an optional per-source timeout, and can
+be guarded by a `CircuitBreaker`. You pass the composite as a *single* evaluator, so the agent still
+runs once.
+
+```csharp
+using AgentEval.MAF.Evaluators;
+using AgentEval.Benchmarks;   // AgenticBenchmark
+using AgentEval.Core;         // ChatClientEvaluator
+
+var composite = AgenticBenchmark.ToolCallAccuracy(new ChatClientEvaluator(judge)).AsMeaiEvaluator();
+var local     = composite.AsAgentEvaluator(chatConfig);           // AgentEval-local (rich composite)
+IAgentEvaluator other = /* any second IAgentEvaluator, e.g. a FoundryEvals instance */;
+
+var hybrid = new CompositeAgentEvaluator(
+[
+    ("agenteval-local", local, null),                             // no per-source timeout
+    ("foundry",         other, TimeSpan.FromMinutes(2)),          // bound a slow cloud evaluator
+]);
+
+var merged = await agent.EvaluateAsync([query], hybrid);          // one run; both sources, concurrent + isolated
+
+EvalResult tree = UnifiedEvalReport.Build(hybrid.CapturedPerSource, composite);   // one branch per source
+```
+
+- Each source's metrics are merged under a `"{source}:"` key prefix, so identically-named metrics from
+  different sources never collide.
+- Passing the `AgentEvalCompositeEvaluator` to `UnifiedEvalReport.Build` splices its full weighted
+  hierarchy into the local branch; a provider's report URL (when present) is surfaced as evidence on its
+  branch. `tree` renders with the same `HtmlEvalResultRenderer` as §4.
+- A genuine caller `CancellationToken` still propagates; only an inner evaluator's own failure/timeout is
+  isolated into a "skipped" branch.
+
 ---
 
 ## 4. Getting an HTML report out
@@ -160,6 +198,9 @@ adapter, but missed entirely via the MEAI-only path. For timing/cost fidelity us
 | `AgentEvalCompositeEvaluator` | wraps an AgentEval `IEval`/composite as an MEAI `IEvaluator`; captures the `EvalResult` tree |
 | `MeaiToEvalResultBridge` | `AgentEvaluationResults` (MEAI) → AgentEval `EvalResult` tree, for rendering |
 | `AgentEvaluatorExtensions` | `.AsAgentEvaluator(chatConfig)` / `.AsMeaiEvaluator()` fluent helpers |
+| `CompositeAgentEvaluator` | runs several `IAgentEvaluator`s concurrently over one run — isolated + per-source timeout + optional `CircuitBreaker`; merges into one result and captures per-source detail (`CapturedPerSource`) |
+| `UnifiedEvalReport` | merges per-source results into one source-tagged `EvalResult` tree (a branch per source) for rendering |
+| `CircuitBreaker` | optional consecutive-failure breaker that skips a persistently-failing source fast |
 
 Mapping to MAF's own samples (`dotnet/samples/.../Evaluation/`): `Evaluation_SimpleEval` →
 `AgentEvalEvaluators.Quality(judge)`; `Evaluation_CustomEvals` → `AgentEvalEvaluators.Custom(...)`;
