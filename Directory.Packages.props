@@ -8,11 +8,17 @@
   </PropertyGroup>
   
   <ItemGroup>
-    <!-- Microsoft Agent Framework -->
-    <PackageVersion Include="Microsoft.Agents.AI" Version="1.11.1" />
-    <PackageVersion Include="Microsoft.Agents.AI.OpenAI" Version="1.11.1" />
-    <PackageVersion Include="Microsoft.Agents.AI.Workflows" Version="1.11.1" />
-    <PackageVersion Include="Microsoft.Agents.AI.Workflows.Generators" Version="1.11.1" />
+    <!-- Microsoft Agent Framework — core packages on 1.12.0 (stable), bumped from 1.11.1.
+         Microsoft.Agents.AI.Foundry has no stable 1.12.0 yet (published preview-only), so it's pinned to
+         the matching 1.12.0-preview and is referenced ONLY by the AgentEval.MafEvalFoundryAlongsideLocal
+         sample — the core libraries stay provider-agnostic. Stable core 1.12.0 satisfies the preview's
+         Microsoft.Agents.AI dependency (a stable version outranks a same-version prerelease). -->
+    <PackageVersion Include="Microsoft.Agents.AI" Version="1.12.0" />
+    <PackageVersion Include="Microsoft.Agents.AI.OpenAI" Version="1.12.0" />
+    <PackageVersion Include="Microsoft.Agents.AI.Workflows" Version="1.12.0" />
+    <PackageVersion Include="Microsoft.Agents.AI.Workflows.Generators" Version="1.12.0" />
+    <PackageVersion Include="Microsoft.Agents.AI.Foundry" Version="1.12.0-preview.260629.1" /><!-- preview-only; sample-only -->
+    <PackageVersion Include="Azure.AI.Projects" Version="2.1.0-beta.3" /><!-- required by Microsoft.Agents.AI.Foundry -->
     
     <!-- Microsoft Extensions AI -->
     <PackageVersion Include="Microsoft.Extensions.AI" Version="10.6.0" />
