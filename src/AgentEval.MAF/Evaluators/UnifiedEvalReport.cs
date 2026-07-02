@@ -35,12 +35,14 @@ public static class UnifiedEvalReport
                 : Enumerable.Range(0, result.Items.Count).Select(i => $"query[{i}]").ToList();
 
             EvalResult branch;
-            if (result.Error is not null)
+            if (result.Error is not null || result.Items.Count == 0)
             {
-                // Neutral infra branch (timeout / exception / breaker-open). Do NOT bridge it: the bridge
-                // produces a fail/high composite that would sink the whole report. Render it neutral instead.
+                // Neutral infra branch (timeout / exception / breaker-open / empty result set). Do NOT bridge:
+                // the bridge yields a fail/high composite (an empty composite is "not passed") that would
+                // sink the whole report. Render it neutral instead.
+                var reason = result.Error ?? "no results returned";
                 var neutralLabel = result.ProviderName.EndsWith("(skipped)", StringComparison.Ordinal) ? "skipped" : "error";
-                branch = NeutralBranch($"hybrid.{Sanitize(source)}", source, neutralLabel, result.Error);
+                branch = NeutralBranch($"hybrid.{Sanitize(source)}", source, neutralLabel, reason);
             }
             else if (composite is not null && IsLocalAgentEval(source) && composite.CapturedResults.Count > 0 && result.Items.Count > 0)
             {
@@ -58,10 +60,12 @@ public static class UnifiedEvalReport
             }
 
             // Attach the provider's portal link (when present) as evidence on the branch. Use the actual
-            // source label (not a hard-coded "foundry") so a non-Foundry provider isn't misattributed.
+            // source label (not a hard-coded "foundry") so a non-Foundry provider isn't misattributed, and
+            // APPEND so it never clobbers evidence the branch already carries (e.g. a neutral error branch).
             if (result.ReportUrl is not null)
             {
-                var evidence = new[] { new EvalEvidence(source, "report_url", result.ReportUrl.ToString()) };
+                var link = new EvalEvidence(source, "report_url", result.ReportUrl.ToString());
+                var evidence = branch.Details.Evidence is { } existing ? existing.Append(link).ToArray() : new[] { link };
                 branch = branch with { Details = branch.Details with { Evidence = evidence } };
             }
 

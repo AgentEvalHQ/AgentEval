@@ -37,6 +37,21 @@ public class UnifiedEvalReportTests
     }
 
     [Fact]
+    public void Build_EmptyResultSet_IsNeutralErrorBranch_DoesNotSinkTheRoot()
+    {
+        var items = Items(1);
+        var empty = new AgentEvaluationResults(
+            "foundry", new List<Microsoft.Extensions.AI.Evaluation.EvaluationResult>(), inputItems: items);   // no Error, zero items
+
+        var report = UnifiedEvalReport.Build([("agenteval-local", Pass(items, "agenteval-local")), ("foundry", empty)]);
+
+        var foundryBranch = report.Details.SubResults!.Single(b => b.Metric.Name == "foundry");
+        Assert.Equal("error", foundryBranch.Score.Label);      // neutral, not a confirmed fail
+        Assert.Equal("none", foundryBranch.Score.Severity);
+        Assert.Equal("pass", report.Score.Label);              // the neutral branch must NOT sink the passing local branch
+    }
+
+    [Fact]
     public async Task Build_WithComposite_KeepsRichLocalHierarchy()
     {
         // A depth-2 composite tree, captured by running the AgentEvalCompositeEvaluator once.
