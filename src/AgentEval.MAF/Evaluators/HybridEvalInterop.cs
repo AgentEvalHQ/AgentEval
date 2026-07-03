@@ -16,6 +16,9 @@ internal static class HybridEvalInterop
     /// source is VISIBLE in the merged output (not a silently lost run) WITHOUT masquerading as a real
     /// low-scoring failure.
     /// </summary>
+    /// <param name="items">The eval items being scored — one status result is produced per item.</param>
+    /// <param name="source">The source label for this branch (e.g. "foundry", "agenteval-local").</param>
+    /// <param name="reason">Human-readable reason for the skip/error (timeout, exception message, breaker open).</param>
     /// <param name="label">
     /// <c>"error"</c> for an infrastructure failure (timeout/exception — the default), or <c>"skipped"</c>
     /// for an intentional skip (e.g. circuit breaker open). Renders neutral (severity none) either way; the
