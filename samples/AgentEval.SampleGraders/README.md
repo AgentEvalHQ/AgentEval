@@ -42,7 +42,7 @@ loop on two arms and contrasts them: **Arm A** is a patchable keyword oracle (re
 real production Composite Judge for that family (never patched). It reports fresh directional fabrications per round for
 each arm — the keyword arm stays elevated (patching trades a miss for a false alarm and back), the composite stays ≈0.
 
-Five OWASP families are wired, each with a seeded **ground-truth-by-construction** generator and the real production
+The wired OWASP families (below) each have a seeded **ground-truth-by-construction** generator and the real production
 composite (`DecomposedGraders.TryBuildFor`), each targeting a "same string, both directions" trap a substring oracle
 cannot escape:
 
