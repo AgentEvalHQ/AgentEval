@@ -145,5 +145,13 @@ public class WorkflowTraceFidelityReconcilerTests
         // a agrees (1.0), b token-mismatches (0.5) => mean 0.75
         Assert.Equal(0.75, root.Score.Value, precision: 5);
         Assert.All(root.Details.SubResults, leaf => Assert.StartsWith("workflow_trace_fidelity.executor.", leaf.Metric.Key));
+
+        // Severity must use the normalized lowercase vocabulary SeverityRollup recognizes, or a real
+        // mismatch (b, score 0.5) would roll up as "none" and hide the warning.
+        var recognized = new[] { "none", "low", "medium", "high", "critical" };
+        Assert.Contains(root.Score.Severity, recognized);
+        Assert.All(root.Details.SubResults, leaf => Assert.Contains(leaf.Score.Severity, recognized));
+        var bLeaf = root.Details.SubResults.Single(l => l.Metric.Key.EndsWith(".b"));
+        Assert.Equal("medium", bLeaf.Score.Severity); // score 0.5 => medium, not "Medium"
     }
 }

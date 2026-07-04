@@ -153,16 +153,18 @@ public sealed class WorkflowTraceFidelityReconciler
                 Value: e.Score, Ordinal: null,
                 Label: e.Score >= 0.99 ? "pass" : e.Score >= 0.8 ? "warn" : "fail",
                 Passed: e.Score >= 0.8, Threshold: 0.8,
-                Severity: e.Score >= 0.8 ? "Low" : e.Score >= 0.5 ? "Medium" : "High", Confidence: null),
+                Severity: e.Score >= 0.8 ? "low" : e.Score >= 0.5 ? "medium" : "high", Confidence: null),
             Details: new EvalDetails(
                 Dimensions: BuildLeafDimensions(e),
                 Evidence: new List<EvalEvidence>
                 {
                     new(Source: "workflow-ledger-vs-chat", Reference: e.DiffKind.ToString(),
-                        Message: $"executor '{e.ExecutorId}': framework={e.TokensFramework} tokens / '{e.FinishFramework}', "
+                        // Render a null finish reason explicitly as <null> (not '') — a suppressed/null finish
+                        // is a key fidelity signal, so null must not read as an empty string to consumers.
+                        Message: $"executor '{e.ExecutorId}': framework={e.TokensFramework} tokens / {FinishLabel(e.FinishFramework)}, "
                             + (e.TokensChatTruth is null
                                 ? "no chat truth (ledger-only)"
-                                : $"chat-truth={e.TokensChatTruth} tokens / '{e.FinishChatTruth}'")),
+                                : $"chat-truth={e.TokensChatTruth} tokens / {FinishLabel(e.FinishChatTruth)}")),
                 },
                 Recommendations: null, SubResults: null, AggregationStrategy: null),
             Provenance: new EvalProvenance(Type: "code", JudgeModel: null, PromptId: null, PromptHash: null, TokensUsed: null, EstimatedCost: 0.0, CacheHit: false),
@@ -174,13 +176,18 @@ public sealed class WorkflowTraceFidelityReconciler
                 Value: report.OverallScore, Ordinal: null,
                 Label: report.OverallScore >= 0.99 ? "pass" : report.OverallScore >= 0.8 ? "warn" : "fail",
                 Passed: report.OverallScore >= 0.8, Threshold: 0.8,
-                Severity: report.OverallScore >= 0.8 ? "Low" : report.OverallScore >= 0.5 ? "Medium" : "High", Confidence: null),
+                Severity: report.OverallScore >= 0.8 ? "low" : report.OverallScore >= 0.5 ? "medium" : "high", Confidence: null),
             Details: new EvalDetails(
                 Dimensions: new Dictionary<string, double> { ["score100"] = report.OverallScore * 100, ["executors"] = report.Executors.Count },
                 Evidence: null, Recommendations: null, SubResults: subResults, AggregationStrategy: "per-executor"),
             Provenance: new EvalProvenance(Type: "code", JudgeModel: null, PromptId: null, PromptHash: null, TokensUsed: null, EstimatedCost: 0.0, CacheHit: false),
             EvaluatedAt: DateTimeOffset.UtcNow);
     }
+
+    // Renders a finish reason for evidence, distinguishing a genuinely absent (null/suppressed) reason from
+    // an empty string — the null case is a load-bearing fidelity signal.
+    private static string FinishLabel(string? finishReason) =>
+        finishReason is null ? "<null>" : $"'{finishReason}'";
 
     // Per-executor leaf dimensions. chatTruthTokens/delta are OMITTED (not encoded as a -1/0 sentinel in the
     // numeric map) when there is no chat truth, so a downstream aggregator can't mistake absence for a value.
