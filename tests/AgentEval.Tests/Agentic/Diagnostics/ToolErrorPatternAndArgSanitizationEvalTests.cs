@@ -39,6 +39,17 @@ public class ToolErrorPatternAndArgSanitizationEvalTests
     }
 
     [Fact]
+    public async Task ErrorPattern_LoneOneOffFailure_IsNotAPattern_Passes()
+    {
+        // A single isolated failure (cluster size 1) is NOT a concentrated pattern → pass (ToolReliability
+        // covers lone failures). Regression for the short-trace false-positive.
+        var trace = TraceWith(("search", false, "timeout", null), ("book", true, null, null));
+        var r = await new ToolErrorPatternEval().EvaluateAsync(With(trace));
+        Assert.True(r.Score.Passed);
+        Assert.Equal(1.0, r.Score.Value);
+    }
+
+    [Fact]
     public async Task ErrorPattern_ConcentratedFailures_Fails_Medium()
     {
         // 3 of 4 calls fail the same way on 'search' → largest cluster 3/4 → score 0.25 < 0.80.

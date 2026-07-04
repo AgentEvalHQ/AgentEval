@@ -76,11 +76,15 @@ public sealed class ToolErrorPatternEval : IEval
                 "ToolErrorPatternEval: the trace has no ToolExecution entries to score."));
         }
 
-        var largestCluster = clusters.Count == 0 ? 0 : clusters.Values.Max();
+        // Only a REPEATED failure signature (>=2 identical (tool, error)) is a concentrated PATTERN; a lone
+        // one-off failure is left to ToolReliabilityEval, so a single isolated error on a short trace does
+        // not trip this eval as a "pattern".
+        var largestCluster = clusters.Values.Where(v => v >= 2).DefaultIfEmpty(0).Max();
         var score = Math.Clamp(1.0 - (double)largestCluster / totalToolCalls, 0.0, 1.0);
         var passed = score >= PassThreshold;
 
-        var worst = clusters.Count == 0 ? default : clusters.OrderByDescending(kv => kv.Value).First().Key;
+        var worstEntry = clusters.Where(kv => kv.Value >= 2).OrderByDescending(kv => kv.Value).FirstOrDefault();
+        var worst = worstEntry.Key;
         return Task.FromResult(new EvalResult(
             Metric: new(KeyValue, NameValue, CategoryValue, VersionValue),
             Score: new(score, null, passed ? "pass" : "fail", passed, PassThreshold, passed ? "none" : "medium", null),
@@ -95,7 +99,7 @@ public sealed class ToolErrorPatternEval : IEval
                 [
                     new EvalEvidence("tool-execution", "tool_error_pattern",
                         largestCluster == 0
-                            ? $"no tool failures across {totalToolCalls} execution(s)."
+                            ? $"no repeated failure pattern across {totalToolCalls} tool call(s)."
                             : $"'{worst.Name}' failed {largestCluster}x with the same error ('{worst.Error}') out of {totalToolCalls} call(s)."),
                 ],
                 Recommendations: passed ? null :

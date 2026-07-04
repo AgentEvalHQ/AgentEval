@@ -13,9 +13,9 @@ namespace AgentEval.Evals.Agentic.Performance;
 /// consuming a disproportionate share of the run's completion tokens (a formatting loop / runaway generation).
 /// <para><b>Score</b>: <c>1 - maxTurnTokens / sumTurnTokens</c> over ChatTurn Response
 /// <b><c>CompletionTokens</c></b> (not TotalTokens — prompt/context accumulates across turns, so TotalTokens
-/// structurally lets later turns dominate). <b>Threshold</b>: 0.5 (a 2-turn trace caps at 0.5 by construction,
-/// passing only at perfect balance). <b>Severity</b> on fail: <c>low</c>.</para>
-/// <para>Skipped when no trace or fewer than 2 turns carry token usage.</para>
+/// structurally lets later turns dominate). <b>Threshold</b>: 0.5. A balanced N-turn trace scores
+/// <c>1 - 1/N</c> (0.67 at N=3), so only a genuinely dominant turn fails. <b>Severity</b> on fail: <c>low</c>.</para>
+/// <para>Skipped when no trace or fewer than <b>3</b> turns carry token usage (skew is undefined below 3).</para>
 /// </summary>
 public sealed class TokenDistributionEval : IEval
 {
@@ -53,10 +53,12 @@ public sealed class TokenDistributionEval : IEval
             .Where(e => e.EffectiveScope == TraceEntryScope.ChatTurn && e.Type == TraceEntryType.Response && e.TokenUsage is not null)
             .Select(e => e.TokenUsage!.CompletionTokens)
             .ToList();
-        if (completionTokens.Count < 2)
+        // Require >=3 turns: with exactly 2, max/sum is >=0.5 by construction, so any imbalance would fail
+        // the 0.5 gate — "skew" is not meaningful below 3 turns.
+        if (completionTokens.Count < 3)
         {
             return Task.FromResult(EvalResult.Skipped(this,
-                "TokenDistributionEval needs at least 2 turns carrying token usage."));
+                "TokenDistributionEval needs at least 3 turns carrying token usage to measure skew."));
         }
 
         var sum = completionTokens.Sum();

@@ -34,16 +34,20 @@ public class TokenDistributionEvalTests
         => Assert.Equal("skipped", (await new TokenDistributionEval().EvaluateAsync(With(TraceWith(100)))).Score.Label);
 
     [Fact]
-    public async Task AllZeroTokens_Skipped()
-        => Assert.Equal("skipped", (await new TokenDistributionEval().EvaluateAsync(With(TraceWith(0, 0)))).Score.Label);
+    public async Task TwoTurns_Skipped()
+        // Below 3 turns skew is undefined (max/sum >= 0.5 by construction) → skip, not a false FAIL.
+        => Assert.Equal("skipped", (await new TokenDistributionEval().EvaluateAsync(With(TraceWith(50, 80)))).Score.Label);
 
     [Fact]
-    public async Task BalancedTurns_Passes_AtCap()
+    public async Task AllZeroTokens_ThreeTurns_Skipped()
+        => Assert.Equal("skipped", (await new TokenDistributionEval().EvaluateAsync(With(TraceWith(0, 0, 0)))).Score.Label);
+
+    [Fact]
+    public async Task BalancedThreeTurns_Passes()
     {
-        // 2 balanced turns: max/sum = 0.5 → score 0.5 == threshold → pass.
-        var r = await new TokenDistributionEval().EvaluateAsync(With(TraceWith(50, 50)));
+        // 3 balanced turns: max/sum = 1/3 → score 0.67 >= 0.5 → pass.
+        var r = await new TokenDistributionEval().EvaluateAsync(With(TraceWith(50, 50, 50)));
         Assert.True(r.Score.Passed);
-        Assert.Equal(0.5, r.Score.Value);
     }
 
     [Fact]

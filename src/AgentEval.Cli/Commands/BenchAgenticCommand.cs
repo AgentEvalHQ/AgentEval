@@ -237,12 +237,15 @@ public static class BenchAgenticCommand
         var subResults = compositeResult.Details.SubResults;
         if (subResults is { Count: > 0 } && subResults.All(s => s.Score.Label == "skipped"))
         {
+            var isGlassBox = string.Equals(preset, "glass-box-diagnostics", StringComparison.OrdinalIgnoreCase);
             Console.Error.WriteLine(
                 $"[bench agentic] NOTE: all {subResults.Count} evaluator(s) in preset '{preset}' were SKIPPED — "
                 + "no score was produced (the FAIL below reflects 'nothing ran', not a 0% result). "
-                + (traceFile is null
-                    ? "This preset reads a Glass Box trace; pass --trace <file> to activate it."
-                    : "Check that the supplied trace contains the entry scopes these evaluators read."));
+                + (isGlassBox
+                    ? (traceFile is null
+                        ? "This preset reads a Glass Box trace; pass --trace <file> to activate it."
+                        : "Check that the supplied trace contains the entry scopes these evaluators read.")
+                    : "This preset reads inputs from EvalInput.Metadata (e.g. \"agentic_telemetry\" / \"run_results\"), which this CLI path does not populate."));
         }
 
         // ── Exit code ─────────────────────────────────────────────────────────

@@ -56,7 +56,7 @@ internal static class AgenticBenchmarkRegistration
                 new("judge-quality", "Meta-evaluator: inter-rater agreement, calibration, drift", CostTier.Free),
                 new("safety", "12-evaluator safety/security composite (requires policy resolver — programmatic only)", CostTier.High),
                 new("telemetry", "6 pure-code operational evaluators (latency, tokens, cost, errors, retries)", CostTier.Free),
-                new("glass-box-diagnostics", "7 pure-code Glass Box trace evaluators (tool reliability/errors, safety interventions, truncation, prompt drift, arg leaks, token skew) — requires --trace", CostTier.Free),
+                new("glass-box-diagnostics", "8 Glass Box trace evaluators, 7 pure-code (tool reliability/errors, safety interventions, truncation, prompt drift/injection, arg leaks, token skew) — requires --trace", CostTier.Free),
                 new("stochastic-stability", "Run-to-run score consistency (requires N prior run results)", CostTier.Free),
                 new("conversational", "5-evaluator multi-turn quality composite", CostTier.Medium),
                 new("reasoning", "4-evaluator reasoning correctness composite", CostTier.Medium),
