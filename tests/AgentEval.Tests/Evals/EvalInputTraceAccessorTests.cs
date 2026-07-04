@@ -74,4 +74,17 @@ public class EvalInputTraceAccessorTests
 
         Assert.Same(second, input.GetTrace());
     }
+
+    [Fact]
+    public void WithTrace_CaseInsensitiveMetadata_PreservesComparer()
+    {
+        // A case-insensitive Metadata dictionary must stay case-insensitive after WithTrace copies it
+        // (Copilot follow-up on #72 — dropping the comparer would silently change key-lookup semantics).
+        var metadata = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase) { ["Key"] = 1 };
+        var input = new EvalInput(Query: "q", Metadata: metadata);
+
+        var withTrace = input.WithTrace(new AgentTrace());
+
+        Assert.True(withTrace.Metadata!.ContainsKey("KEY")); // case-insensitive lookup survives the copy
+    }
 }

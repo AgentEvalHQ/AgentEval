@@ -56,9 +56,14 @@ public static class EvalInputTraceAccessor
         ArgumentNullException.ThrowIfNull(input);
         ArgumentNullException.ThrowIfNull(trace);
 
-        var metadata = input.Metadata is null
-            ? new Dictionary<string, object>()
-            : new Dictionary<string, object>(input.Metadata);
+        // Preserve the source dictionary's key comparer when copying — a caller may use a case-insensitive
+        // Metadata dictionary, and dropping the comparer would silently change key-lookup semantics on the copy.
+        var metadata = input.Metadata switch
+        {
+            null => new Dictionary<string, object>(),
+            Dictionary<string, object> dict => new Dictionary<string, object>(dict, dict.Comparer),
+            _ => new Dictionary<string, object>(input.Metadata),
+        };
         metadata[EvalInput.TraceMetadataKey] = trace;
 
         return input with { Metadata = metadata };
