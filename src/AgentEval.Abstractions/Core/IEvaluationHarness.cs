@@ -96,6 +96,18 @@ public class EvaluationOptions
     /// Example: <c>["llm_relevance", "code_tool_success"]</c>.
     /// </remarks>
     public IReadOnlyList<string>? SelectedMetrics { get; set; }
+
+    /// <summary>
+    /// Optional Glass Box trace (an <c>AgentEval.Tracing.AgentTrace</c>) whose <c>ToolExecution</c> entries carry
+    /// real per-tool execution timing. When set, the MAF harness back-fills that timing onto the extracted
+    /// tool-usage report so the duration assertions (<c>WithDurationUnder</c> / <c>HaveAverageToolTimeUnder</c> /
+    /// <c>HaveTotalToolTimeUnder</c>) evaluate instead of silently skipping.
+    /// <para>
+    /// Typed as <see cref="object"/> because this Abstractions assembly cannot reference the Core trace type;
+    /// the harness casts it back. Ignored when null or not an <c>AgentTrace</c>.
+    /// </para>
+    /// </summary>
+    public object? GlassBoxTrace { get; set; }
 }
 
 /// <summary>
