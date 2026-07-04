@@ -154,4 +154,20 @@ public class WorkflowTraceFidelityReconcilerTests
         var bLeaf = root.Details.SubResults.Single(l => l.Metric.Key.EndsWith(".b"));
         Assert.Equal("medium", bLeaf.Score.Severity); // score 0.5 => medium, not "Medium"
     }
+
+    [Fact]
+    public void ReconcileToEvalResult_NullFinishReason_RendersAsAngleBracketNull_NotEmptyString()
+    {
+        // A suppressed/null finish reason is a key fidelity signal.  The evidence message must render null
+        // explicitly as "<null>" so consumers can distinguish "framework reported nothing" from an empty string.
+        var result = Result(Step("a", 0, 10, 5, finish: null));
+        var chat = new Dictionary<string, AgentTrace> { ["a"] = ChatTrace(15, finish: null) };
+
+        var root = new WorkflowTraceFidelityReconciler().ReconcileToEvalResult(result, chat);
+
+        var leaf = Assert.Single(root.Details.SubResults!);
+        var evidenceMsg = Assert.Single(leaf.Details.Evidence!).Message;
+        Assert.Contains("<null>", evidenceMsg);
+        Assert.DoesNotContain("/ ''", evidenceMsg); // must not render as empty-quoted string
+    }
 }
