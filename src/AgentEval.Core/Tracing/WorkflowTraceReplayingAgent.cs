@@ -142,6 +142,7 @@ public sealed class WorkflowTraceReplayingAgent : IWorkflowEvaluableAgent
             StartOffset = TimeSpan.FromMilliseconds(s.StartOffsetMs),
             Duration = TimeSpan.FromMilliseconds(s.DurationMs),
             ParallelBranchId = s.ParallelBranchId,
+            FinishReason = s.FinishReason,
             ToolCalls = s.ToolCalls?.Select(tc => new ToolCallRecord
             {
                 Name = tc.Name,

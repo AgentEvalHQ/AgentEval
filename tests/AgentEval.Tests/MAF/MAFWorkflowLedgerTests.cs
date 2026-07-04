@@ -111,6 +111,52 @@ public class MAFWorkflowLedgerTests
     }
 
     [Fact]
+    public async Task DoubleResponse_WithNullThenNonNullUsage_SumsViaIdentity()
+    {
+        // Exercises SumUsage's null-identity branches: a null-usage response followed by a real one must
+        // yield the real usage (null treated as identity), not throw or zero it out.
+        var adapter = new MAFWorkflowAdapter("ledger-nullusage", NullThenRealUsage);
+
+        var result = await adapter.ExecuteWorkflowAsync("go");
+
+        var step = Assert.Single(result.Steps);
+        Assert.Equal(7, step.TokenUsage!.PromptTokens);
+        Assert.Equal(3, step.TokenUsage.CompletionTokens);
+        Assert.Equal("stop", step.FinishReason); // first non-null finish (the null-usage event carried it)
+    }
+
+    private static async IAsyncEnumerable<WorkflowEvent> NullThenRealUsage(string prompt, [EnumeratorCancellation] CancellationToken ct)
+    {
+        yield return new ExecutorAgentResponseEvent("a", "part 1", Usage: null, FinishReason: "stop");
+        yield return new ExecutorAgentResponseEvent("a", "part 2", new CoreTokenUsage { PromptTokens = 7, CompletionTokens = 3 }, "length");
+        yield return new WorkflowCompleteEvent();
+        await Task.CompletedTask;
+    }
+
+    [Fact]
+    public async Task ParallelBranches_EachBranchExecutorCarriesItsOwnUsage()
+    {
+        var adapter = new MAFWorkflowAdapter("ledger-parallel", ParallelExecutor);
+
+        var result = await adapter.ExecuteWorkflowAsync("go");
+
+        var b1 = result.Steps.Single(s => s.ExecutorId == "branch1");
+        var b2 = result.Steps.Single(s => s.ExecutorId == "branch2");
+        Assert.Equal(11, b1.TokenUsage!.PromptTokens);
+        Assert.Equal(22, b2.TokenUsage!.PromptTokens); // no cross-branch contamination
+    }
+
+    private static async IAsyncEnumerable<WorkflowEvent> ParallelExecutor(string prompt, [EnumeratorCancellation] CancellationToken ct)
+    {
+        yield return new ParallelBranchStartEvent("fan", ["branch1", "branch2"]);
+        yield return new ExecutorAgentResponseEvent("branch1", "b1", new CoreTokenUsage { PromptTokens = 11, CompletionTokens = 1 }, "stop");
+        yield return new EdgeTraversedEvent("branch1", "branch2");
+        yield return new ExecutorAgentResponseEvent("branch2", "b2", new CoreTokenUsage { PromptTokens = 22, CompletionTokens = 2 }, "stop");
+        yield return new WorkflowCompleteEvent();
+        await Task.CompletedTask;
+    }
+
+    [Fact]
     public async Task NoResponseEvent_LeavesTokenUsageAndFinishReasonNull_BackCompat()
     {
         var adapter = new MAFWorkflowAdapter("ledger-plain", PlainOutputOnly);

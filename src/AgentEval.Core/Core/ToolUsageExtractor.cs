@@ -90,9 +90,15 @@ public static class ToolUsageExtractor
     /// <summary>
     /// Glass Box Part 2 (P2.A2): back-fills real per-tool execution timing onto an already-extracted
     /// <see cref="ToolUsageReport"/> from the <see cref="TraceEntryScope.ToolExecution"/> entries a Glass Box
-    /// trace captured at the actual invocation site (<c>EvaluatingAIFunction</c>). Before this, the report
-    /// carried timing only in streaming mode, so <c>WithDurationUnder</c> / <c>HaveAverageToolTimeUnder</c> /
-    /// <c>HaveTotalToolTimeUnder</c> silently skipped.
+    /// trace captured at the actual invocation site (<c>EvaluatingAIFunction</c>). Non-streaming reports carry
+    /// timing only when this runs, so <c>WithDurationUnder</c> / <c>HaveAverageToolTimeUnder</c> /
+    /// <c>HaveTotalToolTimeUnder</c> stay inert until it is called.
+    /// <para>
+    /// <b>Not yet auto-wired.</b> This is a library primitive — no harness calls it automatically today, so in
+    /// the default <c>MAFEvaluationHarness</c> flow the duration assertions are still inert. Wiring it in
+    /// (call it on <c>result.ToolUsage</c> with the captured trace before <c>PerformanceMetrics.TotalToolTime</c>
+    /// is read) is the follow-up. Call it explicitly to activate the assertions in the meantime.
+    /// </para>
     /// <para>
     /// Correlation is by tool <b>name + order</b> among <b>executed</b> calls: only calls that actually ran
     /// (<see cref="ToolCallRecord.WasExecuted"/>) have a matching <see cref="TraceEntryScope.ToolExecution"/>

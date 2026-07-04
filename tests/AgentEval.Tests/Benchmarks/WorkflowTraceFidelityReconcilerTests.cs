@@ -94,6 +94,40 @@ public class WorkflowTraceFidelityReconcilerTests
     }
 
     [Fact]
+    public void Reconcile_TokenUnderReportAndSuppressedFinish_IsBoth_ScoresZero()
+    {
+        // Both axes diverge at once: framework hides ~13% of tokens AND suppresses the finish reason.
+        var result = Result(Step("a", 0, 520, 350, finish: null));       // framework 870, no finish
+        var chat = new Dictionary<string, AgentTrace> { ["a"] = ChatTrace(1000, "content_filter") };
+
+        var rec = Assert.Single(new WorkflowTraceFidelityReconciler().Reconcile(result, chat).Executors);
+
+        Assert.Equal(WorkflowFidelityDiff.Both, rec.DiffKind);
+        Assert.Equal(0.0, rec.Score);
+    }
+
+    [Fact]
+    public void OverallScore_ExcludesNoTruthExecutors_SoDeceptionIsNotDilutedAway()
+    {
+        // One traced executor is a full deception (Both, 0.0); three others are untraced (NoTruth, 1.0).
+        // A plain mean would give 0.75 (Passed). Excluding NoTruth, the deception must dominate → 0.0.
+        var result = Result(
+            Step("a", 0, 520, 350, finish: null),
+            Step("b", 1, 10, 5, "stop"),
+            Step("c", 2, 10, 5, "stop"),
+            Step("d", 3, 10, 5, "stop"));
+        var chat = new Dictionary<string, AgentTrace> { ["a"] = ChatTrace(1000, "content_filter") };
+
+        var report = new WorkflowTraceFidelityReconciler().Reconcile(result, chat);
+
+        Assert.Equal(0.0, report.OverallScore);
+        Assert.Equal(1, report.VerifiedCount);
+
+        var root = new WorkflowTraceFidelityReconciler().ReconcileToEvalResult(result, chat);
+        Assert.False(root.Score.Passed); // the deception is NOT averaged past the 0.8 gate
+    }
+
+    [Fact]
     public void Reconcile_SuppressedFinishReason_IsFinishMismatch()
     {
         // The headline deception: chat truth hit a content filter, but the framework ledger reports no

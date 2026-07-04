@@ -51,8 +51,24 @@ public sealed record WorkflowExecutorFidelity(
 /// <summary>The whole-workflow reconciliation result.</summary>
 public sealed record WorkflowTraceFidelityReport(IReadOnlyList<WorkflowExecutorFidelity> Executors)
 {
-    /// <summary>Mean of the per-executor fidelity scores (1.0 when there are no executors).</summary>
-    public double OverallScore => Executors.Count == 0 ? 1.0 : Executors.Average(e => e.Score);
+    /// <summary>
+    /// Mean fidelity over executors that HAVE chat-boundary truth (<see cref="WorkflowFidelityDiff"/> !=
+    /// <see cref="WorkflowFidelityDiff.NoTruth"/>); 1.0 when none is verifiable. NoTruth executors are
+    /// deliberately EXCLUDED from the aggregate — otherwise, in a partial-truth workflow, a genuine deception
+    /// on one traced executor would be averaged away by many untraced (NoTruth = 1.0) executors and pass the
+    /// gate. Coverage is reported separately via <see cref="VerifiedCount"/> / <see cref="Executors"/>.Count.
+    /// </summary>
+    public double OverallScore
+    {
+        get
+        {
+            var verified = Executors.Where(e => e.DiffKind != WorkflowFidelityDiff.NoTruth).ToList();
+            return verified.Count == 0 ? 1.0 : verified.Average(e => e.Score);
+        }
+    }
+
+    /// <summary>Number of executors that had chat-boundary truth to reconcile against (not NoTruth).</summary>
+    public int VerifiedCount => Executors.Count(e => e.DiffKind != WorkflowFidelityDiff.NoTruth);
 }
 
 /// <summary>
@@ -66,6 +82,16 @@ public sealed record WorkflowTraceFidelityReport(IReadOnlyList<WorkflowExecutorF
 /// chat trace per executor for the whole run, so a loop workflow that produces multiple
 /// <see cref="ExecutorStep"/>s for one executor must have their framework tokens SUMMED before comparison
 /// — otherwise every looped executor falsely reports a TokenMismatch (fix C5).
+/// <para>
+/// <b>Chat-truth availability caveat.</b> The <paramref name="chatTraces"/> dict must contain per-executor
+/// traces that carry <see cref="TraceEntryScope.ChatTurn"/> <b>Response</b> entries. Inside a <i>live</i> MAF
+/// <c>InProcessExecution</c> workflow those are NOT available today — <c>WorkflowChatRecording</c> documents
+/// that executor responses are not routed back through the instrumented client, so per-executor traces come
+/// back without Response entries (the Glass Box Path-2 upstream-MAF-hook gap). Until that hook lands, every
+/// executor in a live run is <see cref="WorkflowFidelityDiff.NoTruth"/> (ledger-only, score 1.0); the
+/// reconciler produces real reconciliation only for <b>direct-agent / pre-wired / hand-built</b> traces.
+/// This is a library primitive: it has no registered benchmark family or CLI wiring yet (follow-up P2.B4).
+/// </para>
 /// </remarks>
 public sealed class WorkflowTraceFidelityReconciler
 {
@@ -183,7 +209,12 @@ public sealed class WorkflowTraceFidelityReconciler
                 Passed: report.OverallScore >= 0.8, Threshold: 0.8,
                 Severity: report.OverallScore >= 0.8 ? "low" : report.OverallScore >= 0.5 ? "medium" : "high", Confidence: null),
             Details: new EvalDetails(
-                Dimensions: new Dictionary<string, double> { ["score100"] = report.OverallScore * 100, ["executors"] = report.Executors.Count },
+                Dimensions: new Dictionary<string, double>
+                {
+                    ["score100"] = report.OverallScore * 100,
+                    ["executors"] = report.Executors.Count,
+                    ["verified"] = report.VerifiedCount, // executors with chat-boundary truth; the rest are NoTruth
+                },
                 Evidence: null, Recommendations: null, SubResults: subResults, AggregationStrategy: "per-executor"),
             Provenance: new EvalProvenance(Type: "code", JudgeModel: null, PromptId: null, PromptHash: null, TokensUsed: null, EstimatedCost: 0.0, CacheHit: false),
             EvaluatedAt: DateTimeOffset.UtcNow);

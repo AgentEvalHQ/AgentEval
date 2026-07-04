@@ -20,6 +20,11 @@ namespace AgentEval.Evals;
 /// NOTE: qualify <c>AgentEval.Tracing.AgentTrace</c> explicitly — a second, unrelated
 /// <c>AgentEval.Abstractions.Output.AgentTrace</c> record exists (the output-store artifact shape).
 /// </para>
+/// <para>
+/// <b>Not yet auto-wired.</b> This is the bridge; no harness attaches a trace via <see cref="WithTrace"/>
+/// and no evaluator reads it via <see cref="GetTrace"/> yet (it unblocks the Phase-A trace-aware evaluators,
+/// which are the follow-up). Callers attach explicitly at the write site until then.
+/// </para>
 /// </summary>
 public static class EvalInputTraceAccessor
 {
