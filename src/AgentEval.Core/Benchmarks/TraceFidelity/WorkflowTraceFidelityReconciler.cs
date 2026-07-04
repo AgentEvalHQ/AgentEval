@@ -107,7 +107,12 @@ public sealed class WorkflowTraceFidelityReconciler
                 var tokensChatTruth = responses.Sum(e => e.TokenUsage?.TotalTokens ?? 0);
                 var finishChatTruth = responses.Select(e => e.FinishReason).LastOrDefault(f => f is not null);
 
-                var tokenMismatch = tokensFramework != tokensChatTruth;
+                // Flag only meaningful UNDER-reporting (framework hides tokens the model actually consumed),
+                // with a tolerance — mirrors TraceFidelityRunner.TokenUnderReporting. The framework ledger
+                // (MAF's aggregate AgentResponse.Usage) and chat-boundary truth (summed per-turn) are distinct
+                // capture points, so exact equality would false-positive on rounding or benign over-reporting.
+                var shortfall = (tokensChatTruth - tokensFramework) / (double)Math.Max(tokensChatTruth, 1);
+                var tokenMismatch = shortfall > TraceFidelityRubric.TokenToleranceFraction;
 
                 // Suppressed finish reason is the headline deception: chat truth reports a terminal reason
                 // (e.g. content_filter / length) while the framework ledger reports null. So a mismatch fires

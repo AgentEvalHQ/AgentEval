@@ -68,6 +68,32 @@ public class WorkflowTraceFidelityReconcilerTests
     }
 
     [Fact]
+    public void Reconcile_FrameworkOverReportsOrRoundingDiff_IsNotTokenMismatch()
+    {
+        // Over-reporting (framework > chat truth) and a sub-tolerance (<2%) difference are NOT deceptions —
+        // only meaningful UNDER-reporting is flagged (mirrors TraceFidelityRunner).
+        var overReport = new WorkflowTraceFidelityReconciler().Reconcile(
+            Result(Step("a", 0, 60, 40, "stop")),                       // framework 100
+            new Dictionary<string, AgentTrace> { ["a"] = ChatTrace(99, "stop") }); // chat 99
+        Assert.Equal(WorkflowFidelityDiff.Agree, Assert.Single(overReport.Executors).DiffKind);
+
+        var rounding = new WorkflowTraceFidelityReconciler().Reconcile(
+            Result(Step("a", 0, 600, 400, "stop")),                     // framework 1000
+            new Dictionary<string, AgentTrace> { ["a"] = ChatTrace(1005, "stop") }); // chat 1005 (0.5% short)
+        Assert.Equal(WorkflowFidelityDiff.Agree, Assert.Single(rounding.Executors).DiffKind);
+    }
+
+    [Fact]
+    public void Reconcile_FrameworkUnderReportsBeyondTolerance_IsTokenMismatch()
+    {
+        // Framework hides ~13% of the tokens the model actually consumed → a real fidelity discrepancy.
+        var rec = Assert.Single(new WorkflowTraceFidelityReconciler().Reconcile(
+            Result(Step("a", 0, 520, 350, "stop")),                      // framework 870
+            new Dictionary<string, AgentTrace> { ["a"] = ChatTrace(1000, "stop") }).Executors); // chat 1000
+        Assert.Equal(WorkflowFidelityDiff.TokenMismatch, rec.DiffKind);
+    }
+
+    [Fact]
     public void Reconcile_SuppressedFinishReason_IsFinishMismatch()
     {
         // The headline deception: chat truth hit a content filter, but the framework ledger reports no
