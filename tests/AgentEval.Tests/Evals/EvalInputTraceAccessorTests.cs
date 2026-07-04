@@ -76,7 +76,7 @@ public class EvalInputTraceAccessorTests
     }
 
     [Fact]
-    public void WithTrace_PreservesSourceKeyComparer()
+    public void WithTrace_CaseInsensitiveMetadata_PreservesComparer()
     {
         // A case-insensitive Metadata dictionary must stay case-insensitive after WithTrace copies it
         // (Copilot follow-up on #72 — dropping the comparer would silently change key-lookup semantics).
