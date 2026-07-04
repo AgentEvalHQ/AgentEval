@@ -11,6 +11,7 @@ using AgentEval.Evals.Agentic.Reporting.Pdf;
 using AgentEval.Evals.Agentic.Safety;
 using AgentEval.Evals.Agentic.Safety.Policy;
 using AgentEval.Output;
+using AgentEval.Tracing;
 
 namespace AgentEval.Cli.Commands;
 
@@ -29,8 +30,9 @@ public static class BenchAgenticCommand
         string? inputText,
         string? responseText = null,
         string? budgetTier = null,
+        string? traceFile = null,
         CancellationToken ct = default) =>
-        RunAsync(preset, subject, rootOverride, inputText, responseText, evaluatorOverride: null, budgetTier, ct);
+        RunAsync(preset, subject, rootOverride, inputText, responseText, evaluatorOverride: null, budgetTier, traceFile, ct);
 
     /// <summary>Runs the bench agentic command with optional overrides (used in tests).</summary>
     internal static async Task<int> RunAsync(
@@ -41,6 +43,7 @@ public static class BenchAgenticCommand
         string? responseText,
         IEvaluator? evaluatorOverride,
         string? budgetTier = null,
+        string? traceFile = null,
         CancellationToken ct = default)
     {
         // ── Workspace setup ──────────────────────────────────────────────────
@@ -140,6 +143,24 @@ public static class BenchAgenticCommand
                 $"'{subject}'. Pass --response-file <path> (or --response \"...\") with the agent's actual answer.");
         }
         var evalInput = new EvalInput(Query: query, Response: agentResponse);
+
+        // Glass Box (Phase 3): attach a captured dual-boundary trace so trace-aware evaluators
+        // (e.g. the glass-box-diagnostics preset) read real chat/tool-boundary data instead of Skipping.
+        // One WithTrace here reaches every leaf, since CompositeEval forwards one EvalInput to all components.
+        if (traceFile is not null)
+        {
+            AgentEval.Tracing.AgentTrace glassBoxTrace;
+            try
+            {
+                glassBoxTrace = await TraceSerializer.LoadFromFileAsync(traceFile, ct);
+            }
+            catch (Exception ex) when (ex is IOException or System.Text.Json.JsonException or UnauthorizedAccessException)
+            {
+                Console.Error.WriteLine($"[bench agentic] Could not load --trace '{traceFile}': {ex.Message}");
+                return 1;
+            }
+            evalInput = evalInput.WithTrace(glassBoxTrace);
+        }
 
         // ── Run benchmark ────────────────────────────────────────────────────
         var store = new FileSystemOutputStore(agentEvalDir);
@@ -284,13 +305,14 @@ public static class BenchAgenticCommand
                 contentSafetyClient: null,
                 judgeModel: judgeModel),
             "telemetry" => AgenticBenchmark.Telemetry(),
+            "glass-box-diagnostics" => AgenticBenchmark.GlassBoxDiagnostics(),
             "stochastic-stability" => AgenticBenchmark.StochasticStability(),
             "conversational" => AgenticBenchmark.Conversational(judge, judgeModel),
             "reasoning" => AgenticBenchmark.Reasoning(judge, judgeModel),
             "user-experience" => AgenticBenchmark.UserExperience(judge, judgeModel),
             "adversarial-direct" => AgenticBenchmark.AdversarialDirect(judge, judgeModel),
             _ => throw new ArgumentException($"Unknown agentic preset '{presetSpec}'. " +
-                "Known presets: agentic-execution, tool-call-accuracy, rag-quality, judge-quality, safety, telemetry, stochastic-stability, conversational, reasoning, user-experience, adversarial-direct.",
+                "Known presets: agentic-execution, tool-call-accuracy, rag-quality, judge-quality, safety, telemetry, glass-box-diagnostics, stochastic-stability, conversational, reasoning, user-experience, adversarial-direct.",
                 nameof(presetSpec))
         };
     }

@@ -5,9 +5,12 @@
 using AgentEval.Core;
 using AgentEval.Evals;
 using AgentEval.Evals.Agentic.Adversarial;
+using AgentEval.Evals.Agentic.Audit;
 // Imported for the <see cref="AgenticBenchmarkRunner"/> XML-doc references below — the
 // runner lives in Composition/ while this factory now sits at the project root.
 using AgentEval.Evals.Agentic.Calibration;
+using AgentEval.Evals.Agentic.Diagnostics;
+using AgentEval.Evals.Agentic.Performance;
 using AgentEval.Evals.Agentic.JudgeQuality;
 using AgentEval.Evals.Agentic.Memory;
 using AgentEval.Evals.Agentic.MultiTurn;
@@ -16,6 +19,7 @@ using AgentEval.Evals.Agentic.Quality;
 using AgentEval.Evals.Agentic.Reasoning;
 using AgentEval.Evals.Agentic.Safety;
 using AgentEval.Evals.Agentic.Safety.Policy;
+using AgentEval.Evals.Agentic.Security;
 using AgentEval.Evals.Agentic.StochasticStability;
 using AgentEval.Evals.Agentic.System;
 using AgentEval.Evals.Agentic.Telemetry;
@@ -334,6 +338,37 @@ public static partial class AgenticBenchmark
                 new(new CostEval(),       0.15),
                 new(new RetryRateEval(),  0.10),
                 new(new ToolLatencyEval(), 0.05),
+            ],
+            aggregation: WeightedSumAggregation.Instance,
+            threshold: 0.80);
+    }
+
+    /// <summary>
+    /// Builds the Glass Box Diagnostics preset (Phase 3): seven pure-code evaluators that read the dual-boundary
+    /// Glass Box trace attached to <see cref="EvalInput"/> (via <c>--trace</c> on the CLI) to surface what the
+    /// framework's own reporting hides — per-tool reliability, concentrated failure patterns, provider safety
+    /// interventions, truncation, silent system-prompt drift, wire-level argument leaks, and token-distribution skew.
+    /// <para>No <see cref="IEvaluator"/> is required (all deterministic). Each evaluator Skips when no trace is
+    /// attached, so this preset is only meaningful on a trace-attached run.</para>
+    /// <para>Aggregation: <see cref="WeightedSumAggregation"/>. Pass threshold: 0.80.</para>
+    /// </summary>
+    /// <returns>A <see cref="CompositeEval"/> ready to run (no <see cref="IEvaluator"/> required).</returns>
+    public static CompositeEval GlassBoxDiagnostics()
+    {
+        return new CompositeEval(
+            key: "agentic.glass-box-diagnostics",
+            name: "Glass Box Diagnostics Benchmark",
+            category: "agentic-process",
+            version: "1.0.0",
+            components:
+            [
+                new(new ToolReliabilityEval(),      0.20),
+                new(new ToolErrorPatternEval(),     0.15),
+                new(new SafetyInterventionEval(),   0.15),
+                new(new ArgumentSanitizationEval(), 0.15),
+                new(new SystemPromptDriftEval(),    0.15),
+                new(new TruncationDetectionEval(),  0.10),
+                new(new TokenDistributionEval(),    0.10),
             ],
             aggregation: WeightedSumAggregation.Instance,
             threshold: 0.80);

@@ -46,7 +46,7 @@ internal static class AgenticBenchmarkRegistration
     {
         BenchmarkFamilyRegistry.Register(new BenchmarkFamily(
             name: "agentic",
-            description: "Behavioural evaluation across the agent quality dimensions (11 presets)",
+            description: "Behavioural evaluation across the agent quality dimensions (12 presets)",
             defaultCostTier: CostTier.Medium,
             presets:
             [
@@ -56,6 +56,7 @@ internal static class AgenticBenchmarkRegistration
                 new("judge-quality", "Meta-evaluator: inter-rater agreement, calibration, drift", CostTier.Free),
                 new("safety", "12-evaluator safety/security composite (requires policy resolver — programmatic only)", CostTier.High),
                 new("telemetry", "6 pure-code operational evaluators (latency, tokens, cost, errors, retries)", CostTier.Free),
+                new("glass-box-diagnostics", "7 pure-code Glass Box trace evaluators (tool reliability/errors, safety interventions, truncation, prompt drift, arg leaks, token skew) — requires --trace", CostTier.Free),
                 new("stochastic-stability", "Run-to-run score consistency (requires N prior run results)", CostTier.Free),
                 new("conversational", "5-evaluator multi-turn quality composite", CostTier.Medium),
                 new("reasoning", "4-evaluator reasoning correctness composite", CostTier.Medium),
@@ -77,6 +78,7 @@ internal static class AgenticBenchmarkRegistration
             "rag-quality"           => AgenticBenchmark.RagQuality(RequireJudge(judge, preset)),
             "judge-quality"         => AgenticBenchmark.JudgeQuality(),
             "telemetry"             => AgenticBenchmark.Telemetry(),
+            "glass-box-diagnostics" => AgenticBenchmark.GlassBoxDiagnostics(),
             "stochastic-stability"  => AgenticBenchmark.StochasticStability(),
             "conversational"        => AgenticBenchmark.Conversational(RequireJudge(judge, preset)),
             "reasoning"             => AgenticBenchmark.Reasoning(RequireJudge(judge, preset)),
@@ -87,8 +89,8 @@ internal static class AgenticBenchmarkRegistration
                 "cannot construct on its own. Call AgenticBenchmark.Safety(judge, policyResolver, subjectId, ...) directly."),
             _ => throw new ArgumentException(
                 $"Unknown agentic preset '{preset}'. Known presets: agentic-execution, tool-call-accuracy, " +
-                $"rag-quality, judge-quality, safety, telemetry, stochastic-stability, conversational, " +
-                $"reasoning, user-experience, adversarial-direct.")
+                $"rag-quality, judge-quality, safety, telemetry, glass-box-diagnostics, stochastic-stability, " +
+                $"conversational, reasoning, user-experience, adversarial-direct.")
         };
     }
 
