@@ -632,6 +632,52 @@ public class WorkflowTraceTests
         }
     }
 
+    // ── Glass Box Phase 3 (P3.4): WorkflowTrace.ExecutorTraces persistence ──
+
+    [Fact]
+    public async Task ExecutorTraces_Null_IsOmittedAndRoundTrips()
+    {
+        var trace = new WorkflowTrace { TraceName = "no_exec_traces", FinalOutput = "x" };
+        var json = await WorkflowTraceSerializer.SerializeToStringAsync(trace);
+
+        Assert.DoesNotContain("executorTraces", json);   // WhenWritingNull → omitted
+
+        var tempFile = Path.GetTempFileName() + ".trace.json";
+        try
+        {
+            await WorkflowTraceSerializer.SaveToFileAsync(trace, tempFile);
+            var loaded = await WorkflowTraceSerializer.LoadFromFileAsync(tempFile);
+            Assert.Null(loaded.ExecutorTraces);
+        }
+        finally { if (File.Exists(tempFile)) File.Delete(tempFile); }
+    }
+
+    [Fact]
+    public async Task ExecutorTraces_Populated_SurvivesRoundTrip()
+    {
+        var chat = new AgentTrace();
+        chat.Entries.Add(TraceEntry.ForChatResponse(0, null, "r", 1,
+            new TraceTokenUsage { PromptTokens = 10, CompletionTokens = 5 }, null, "stop", null));
+        var trace = new WorkflowTrace
+        {
+            TraceName = "with_exec_traces",
+            FinalOutput = "x",
+            ExecutorTraces = new Dictionary<string, AgentTrace> { ["writer"] = chat },
+        };
+
+        var tempFile = Path.GetTempFileName() + ".trace.json";
+        try
+        {
+            await WorkflowTraceSerializer.SaveToFileAsync(trace, tempFile);
+            var loaded = await WorkflowTraceSerializer.LoadFromFileAsync(tempFile);
+
+            Assert.NotNull(loaded.ExecutorTraces);
+            Assert.True(loaded.ExecutorTraces!.ContainsKey("writer"));
+            Assert.Single(loaded.ExecutorTraces["writer"].Entries);
+        }
+        finally { if (File.Exists(tempFile)) File.Delete(tempFile); }
+    }
+
     [Fact]
     public async Task WorkflowTraceReplayingAgent_ReplaysGraphStructure()
     {

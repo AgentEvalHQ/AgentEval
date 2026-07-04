@@ -3,7 +3,9 @@
 // Licensed under the MIT License.
 
 using System.Diagnostics;
+using AgentEval.Benchmarks;
 using AgentEval.Models;
+using AgentTrace = AgentEval.Tracing.AgentTrace;
 
 namespace AgentEval.Assertions;
 
@@ -204,6 +206,36 @@ public class WorkflowAssertionBuilder
         {
             var errorMsg = _result.Errors?.FirstOrDefault()?.Message ?? "Unknown error";
             AddFailure($"Expected workflow to succeed but it failed: {errorMsg}");
+        }
+        return this;
+    }
+
+    /// <summary>
+    /// Glass Box (Phase 3): assert per-executor trace fidelity. Reconciles each executor's framework-reported
+    /// ledger (summed tokens + finish reason) against the supplied per-executor chat-boundary traces and
+    /// requires the overall fidelity score to be at least <paramref name="minScore"/>. Executors without chat
+    /// truth are excluded from the aggregate (reported as <c>NoTruth</c>), so an untraced majority cannot mask
+    /// a real divergence.
+    /// </summary>
+    /// <param name="chatTraces">Per-executor chat-boundary traces keyed by executor ID (e.g. from
+    /// <c>WorkflowTrace.ExecutorTraces</c>). When <c>null</c>, every executor is <c>NoTruth</c> (score 1.0).</param>
+    /// <param name="minScore">Minimum acceptable overall fidelity score in [0, 1]. Defaults to 1.0 (exact).</param>
+    /// <param name="because">Optional reason for the assertion.</param>
+    [StackTraceHidden]
+    public WorkflowAssertionBuilder HaveTraceFidelity(
+        IReadOnlyDictionary<string, AgentTrace>? chatTraces = null,
+        double minScore = 1.0,
+        string? because = null)
+    {
+        _currentBecause = because;
+        var result = new WorkflowTraceFidelityReconciler().ReconcileToEvalResult(_result, chatTraces);
+        if (result.Score.Value < minScore)
+        {
+            var evidence = result.Details.Evidence is { Count: > 0 }
+                ? string.Join("; ", result.Details.Evidence.Select(e => e.Message))
+                : "per-executor trace-fidelity divergence detected";
+            AddFailure(
+                $"Expected workflow trace fidelity >= {minScore:F2} but scored {result.Score.Value:F2}: {evidence}");
         }
         return this;
     }
