@@ -230,4 +230,18 @@ public class WorkflowTraceFidelityReconcilerTests
         Assert.Contains("<null>", evidenceMsg);
         Assert.DoesNotContain("/ ''", evidenceMsg); // must not render as empty-quoted string
     }
+
+    [Fact]
+    public void ReconcileToEvalResult_FullPass_SeverityIsNone_NotLow()
+    {
+        // A fully-agreeing workflow must roll up severity "none" — "low" on a clean pass would surface a
+        // spurious low-severity signal in aggregations (Copilot follow-up on #72).
+        var result = Result(Step("a", 0, 10, 5, "stop"));
+        var chat = new Dictionary<string, AgentTrace> { ["a"] = ChatTrace(15, "stop") };
+
+        var root = new WorkflowTraceFidelityReconciler().ReconcileToEvalResult(result, chat);
+
+        Assert.Equal("none", root.Score.Severity);
+        Assert.All(root.Details.SubResults!, leaf => Assert.Equal("none", leaf.Score.Severity));
+    }
 }

@@ -184,7 +184,7 @@ public sealed class WorkflowTraceFidelityReconciler
                 Value: e.Score, Ordinal: null,
                 Label: e.Score >= 0.99 ? "pass" : e.Score >= 0.8 ? "warn" : "fail",
                 Passed: e.Score >= 0.8, Threshold: 0.8,
-                Severity: e.Score >= 0.8 ? "low" : e.Score >= 0.5 ? "medium" : "high", Confidence: null),
+                Severity: e.Score >= 0.99 ? "none" : e.Score >= 0.8 ? "low" : e.Score >= 0.5 ? "medium" : "high", Confidence: null),
             Details: new EvalDetails(
                 Dimensions: BuildLeafDimensions(e),
                 Evidence: new List<EvalEvidence>
@@ -207,7 +207,7 @@ public sealed class WorkflowTraceFidelityReconciler
                 Value: report.OverallScore, Ordinal: null,
                 Label: report.OverallScore >= 0.99 ? "pass" : report.OverallScore >= 0.8 ? "warn" : "fail",
                 Passed: report.OverallScore >= 0.8, Threshold: 0.8,
-                Severity: report.OverallScore >= 0.8 ? "low" : report.OverallScore >= 0.5 ? "medium" : "high", Confidence: null),
+                Severity: report.OverallScore >= 0.99 ? "none" : report.OverallScore >= 0.8 ? "low" : report.OverallScore >= 0.5 ? "medium" : "high", Confidence: null),
             Details: new EvalDetails(
                 Dimensions: new Dictionary<string, double>
                 {
