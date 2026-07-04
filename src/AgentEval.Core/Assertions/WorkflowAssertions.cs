@@ -231,8 +231,15 @@ public class WorkflowAssertionBuilder
         var result = new WorkflowTraceFidelityReconciler().ReconcileToEvalResult(_result, chatTraces);
         if (result.Score.Value < minScore)
         {
-            var evidence = result.Details.Evidence is { Count: > 0 }
-                ? string.Join("; ", result.Details.Evidence.Select(e => e.Message))
+            // The reconciler leaves the root Evidence null and attaches per-executor evidence (executor id +
+            // framework-vs-chat detail) to each sub-result; surface the DIVERGING executors' messages.
+            var divergences = (result.Details.SubResults ?? [])
+                .Where(s => s.Score.Value < 1.0)
+                .SelectMany(s => s.Details.Evidence ?? [])
+                .Select(e => e.Message)
+                .ToList();
+            var evidence = divergences.Count > 0
+                ? string.Join("; ", divergences)
                 : "per-executor trace-fidelity divergence detected";
             AddFailure(
                 $"Expected workflow trace fidelity >= {minScore:F2} but scored {result.Score.Value:F2}: {evidence}");

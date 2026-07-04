@@ -11,8 +11,8 @@ using AgentTrace = AgentEval.Tracing.AgentTrace;
 namespace AgentEval.Tests.Agentic;
 
 /// <summary>
-/// Glass Box Phase 3 (P3.3 preset + P3.3.0 wiring) — the <c>glass-box-diagnostics</c> preset surfaces the 7
-/// deterministic trace evaluators, and a single <c>WithTrace</c> on the composite's <see cref="EvalInput"/>
+/// Glass Box Phase 3 (P3.3 preset + P3.3.0 wiring) — the <c>glass-box-diagnostics</c> preset surfaces the 8
+/// trace evaluators, and a single <c>WithTrace</c> on the composite's <see cref="EvalInput"/>
 /// reaches every leaf (they are inert / all-Skipped without it).
 /// </summary>
 public class GlassBoxDiagnosticsPresetTests

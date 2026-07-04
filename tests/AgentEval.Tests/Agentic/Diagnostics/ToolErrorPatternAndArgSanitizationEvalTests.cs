@@ -73,4 +73,42 @@ public class ToolErrorPatternAndArgSanitizationEvalTests
         Assert.False(r.Score.Passed);
         Assert.Equal("high", r.Score.Severity);
     }
+
+    // ── Shared guards: wrong-scope skip + null-ToolCalls guard (both tool-execution evaluators) ──
+
+    private static AgentTrace ChatOnlyTrace()
+    {
+        var t = new AgentTrace();
+        t.Entries.Add(TraceEntry.ForChatResponse(0, null, "hi", 1, null, null, "stop", null));
+        return t;
+    }
+
+    private static AgentTrace NullToolCallsTrace()
+    {
+        var t = TraceWith(("search", true, null, null));
+        t.Entries.Add(new TraceEntry { Type = TraceEntryType.ToolCall, Scope = TraceEntryScope.ToolExecution, ToolCalls = null });
+        return t;
+    }
+
+    [Fact]
+    public async Task ErrorPattern_NoToolExecutionScope_Skipped()
+        => Assert.Equal("skipped", (await new ToolErrorPatternEval().EvaluateAsync(With(ChatOnlyTrace()))).Score.Label);
+
+    [Fact]
+    public async Task ErrorPattern_NullToolCalls_IsGuarded_NotThrown()
+    {
+        var r = await new ToolErrorPatternEval().EvaluateAsync(With(NullToolCallsTrace()));
+        Assert.True(r.Score.Passed); // the one valid success scores 1.0; the null-ToolCalls entry is ignored
+    }
+
+    [Fact]
+    public async Task ArgSanitization_NoToolExecutionScope_Skipped()
+        => Assert.Equal("skipped", (await new ArgumentSanitizationEval().EvaluateAsync(With(ChatOnlyTrace()))).Score.Label);
+
+    [Fact]
+    public async Task ArgSanitization_NullToolCalls_IsGuarded_NotThrown()
+    {
+        var r = await new ArgumentSanitizationEval().EvaluateAsync(With(NullToolCallsTrace()));
+        Assert.True(r.Score.Passed); // clean single arg; the null-ToolCalls entry is ignored
+    }
 }

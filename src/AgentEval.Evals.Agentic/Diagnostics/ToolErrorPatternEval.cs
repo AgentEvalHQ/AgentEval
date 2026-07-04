@@ -9,8 +9,8 @@ using AgentTrace = AgentEval.Tracing.AgentTrace;
 namespace AgentEval.Evals.Agentic.Diagnostics;
 
 /// <summary>
-/// Glass Box Phase 3 (A3) — pure-code evaluator (deterministic by default; a judge can optionally enhance
-/// semantic grouping) that surfaces concentrated tool-failure patterns: many executions failing the same way.
+/// Glass Box Phase 3 (A3) — pure-code (deterministic) evaluator that surfaces concentrated tool-failure
+/// patterns: many executions failing the same way, clustered by (tool name, normalized error text).
 /// <para><b>Score</b>: <c>1 - largestErrorCluster / totalToolCalls</c>, where a cluster keys on
 /// (tool name, normalized error text). <b>Threshold</b>: 0.80. <b>Severity</b> on fail: <c>medium</c>.</para>
 /// <para>Reads ToolExecution entries; skipped when no trace or no tool-execution entries. A run with no

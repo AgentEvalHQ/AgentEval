@@ -59,9 +59,9 @@ agenteval bench agentic --preset glass-box-diagnostics --subject my-agent --trac
 | **Token Distribution** | per-turn completion tokens | one turn dominating the run (a formatting loop) |
 
 Each evaluator **Skips** (and is excluded from the composite) when no trace is attached — so the preset is only
-meaningful on a `--trace`-attached run. Attach a captured trace and all eight become live; the two judge-capable
-ones (System Prompt Injection, and semantic Tool Error Pattern grouping) use an LLM judge when one is supplied,
-and otherwise run deterministically or skip.
+meaningful on a `--trace`-attached run. Attach a captured trace and all eight become live; **System Prompt
+Injection** is the one judge-capable leaf — it uses an LLM judge when one is supplied and no trusted baseline is
+present, and otherwise compares against the baseline deterministically (or skips).
 
 ## The runtime gate
 

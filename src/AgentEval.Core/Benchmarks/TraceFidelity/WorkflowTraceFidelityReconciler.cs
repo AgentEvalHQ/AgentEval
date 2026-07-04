@@ -112,14 +112,27 @@ public sealed class WorkflowTraceFidelityReconciler
 
         var records = new List<WorkflowExecutorFidelity>();
 
+        // Probe chat traces case-insensitively so a framework-reported executor id ("Writer") matches a
+        // captured-trace key ("writer") — consistent with the case-insensitive executor-id matching used
+        // across the workflow-assertion surface. Last-write-wins on a (benign) case collision.
+        Dictionary<string, AgentTrace>? chatByExecutor = null;
+        if (chatTraces is not null)
+        {
+            chatByExecutor = new Dictionary<string, AgentTrace>(StringComparer.OrdinalIgnoreCase);
+            foreach (var kv in chatTraces)
+            {
+                chatByExecutor[kv.Key] = kv.Value;
+            }
+        }
+
         foreach (var group in result.Steps.GroupBy(s => s.ExecutorId, StringComparer.Ordinal))
         {
             var executorId = group.Key;
             var tokensFramework = group.Sum(s => s.TokenUsage?.TotalTokens ?? 0);
             var finishFramework = group.Select(s => s.FinishReason).LastOrDefault(f => f is not null);
 
-            var responses = chatTraces is not null
-                && chatTraces.TryGetValue(executorId, out var chatTrace) && chatTrace is not null
+            var responses = chatByExecutor is not null
+                && chatByExecutor.TryGetValue(executorId, out var chatTrace) && chatTrace is not null
                 ? chatTrace.Entries
                     .Where(e => e.EffectiveScope == TraceEntryScope.ChatTurn && e.Type == TraceEntryType.Response)
                     .ToList()
