@@ -192,6 +192,13 @@ public record ExecutorStep
     public Core.TokenUsage? TokenUsage { get; init; }
 
     /// <summary>
+    /// Finish reason reported for this executor's agent response (e.g. "stop", "length", "content_filter"),
+    /// when available. Populated (Glass Box Part 2, P2.B1) from the per-executor ledger built off MAF's
+    /// <c>ExecutorAgentResponseEvent</c>; <c>null</c> when the executor emitted no complete agent response.
+    /// </summary>
+    public string? FinishReason { get; init; }
+
+    /// <summary>
     /// The input this executor received (may be from previous executor).
     /// </summary>
     public string? Input { get; init; }

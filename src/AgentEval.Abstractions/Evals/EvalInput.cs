@@ -39,4 +39,14 @@ public sealed record EvalInput(
     IReadOnlyList<ToolDefinition>? ToolDefinitions = null,
     IReadOnlyList<ExpectedAction>? ExpectedActions = null,
     string? SystemMessage = null,
-    IReadOnlyDictionary<string, object>? Metadata = null);
+    IReadOnlyDictionary<string, object>? Metadata = null)
+{
+    /// <summary>
+    /// Canonical <see cref="Metadata"/> key under which a Glass Box <c>AgentTrace</c> may be stashed so
+    /// trace-aware evaluators (Glass Box Part 2) can read what actually happened at the chat/tool boundary.
+    /// Kept as a string-keyed <see cref="Metadata"/> entry — not a typed field — because this Abstractions
+    /// assembly cannot reference the Core trace type. Set via <c>WithTrace</c> and read via <c>GetTrace</c>
+    /// (both in <c>AgentEval.Core</c>, namespace <c>AgentEval.Evals</c>).
+    /// </summary>
+    public const string TraceMetadataKey = "__agentTrace__";
+}

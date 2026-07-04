@@ -138,7 +138,8 @@ public sealed class WorkflowTraceRecorder : IWorkflowEvaluableAgent, IAsyncDispo
                 Output = SanitizeText(step.Output),
                 StartOffsetMs = (long)step.StartOffset.TotalMilliseconds,
                 DurationMs = (long)step.Duration.TotalMilliseconds,
-                ParallelBranchId = step.ParallelBranchId
+                ParallelBranchId = step.ParallelBranchId,
+                FinishReason = step.FinishReason
             };
 
             // Record tool calls

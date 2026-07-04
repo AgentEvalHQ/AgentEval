@@ -152,6 +152,14 @@ public class WorkflowTraceStep
     public TraceTokenUsage? TokenUsage { get; set; }
 
     /// <summary>
+    /// Finish reason for this step's agent response (e.g. "stop", "length", "content_filter"), when available.
+    /// Additive Glass Box Part 2 field; omitted from JSON when null (serializer uses WhenWritingNull), so
+    /// existing v1.x workflow-trace files round-trip byte-identically.
+    /// </summary>
+    [JsonPropertyName("finishReason")]
+    public string? FinishReason { get; set; }
+
+    /// <summary>
     /// The edge that led to this step.
     /// </summary>
     [JsonPropertyName("incomingEdge")]

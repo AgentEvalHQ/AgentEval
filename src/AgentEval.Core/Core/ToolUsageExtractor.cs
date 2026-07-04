@@ -4,6 +4,7 @@
 
 using Microsoft.Extensions.AI;
 using AgentEval.Models;
+using AgentEval.Tracing;
 
 namespace AgentEval.Core;
 
@@ -84,5 +85,62 @@ public static class ToolUsageExtractor
     {
         _ = response ?? throw new ArgumentNullException(nameof(response));
         return Extract(response.RawMessages);
+    }
+
+    /// <summary>
+    /// Glass Box Part 2 (P2.A2): back-fills real per-tool execution timing onto an already-extracted
+    /// <see cref="ToolUsageReport"/> from the <see cref="TraceEntryScope.ToolExecution"/> entries a Glass Box
+    /// trace captured at the actual invocation site (<c>EvaluatingAIFunction</c>). Before this, the report
+    /// carried timing only in streaming mode, so <c>WithDurationUnder</c> / <c>HaveAverageToolTimeUnder</c> /
+    /// <c>HaveTotalToolTimeUnder</c> silently skipped.
+    /// <para>
+    /// Correlation is by tool <b>name + order</b>: the report has no CallId link to executions, so the Nth
+    /// recorded execution of a tool is matched to the Nth report call of that tool (both are in invocation
+    /// order). A call that already has timing (streaming path) is never overwritten. Uses a deterministic
+    /// UnixEpoch anchor because only <see cref="ToolCallRecord.Duration"/> is load-bearing for the assertions,
+    /// and a fixed anchor keeps enrichment deterministic (a hand-built <c>ForToolExecution</c> entry has a
+    /// default <c>Timestamp</c>). Correlation mismatches are skipped, never thrown.
+    /// </para>
+    /// </summary>
+    /// <param name="report">The report to enrich in place.</param>
+    /// <param name="trace">The Glass Box trace whose <see cref="TraceEntryScope.ToolExecution"/> entries carry timing.</param>
+    public static void EnrichFromTrace(ToolUsageReport report, AgentTrace trace)
+    {
+        ArgumentNullException.ThrowIfNull(report);
+        ArgumentNullException.ThrowIfNull(trace);
+
+        // Per-name FIFO queue of execution durations (ms), in trace order.
+        var durationsByName = new Dictionary<string, Queue<long>>(StringComparer.Ordinal);
+        foreach (var entry in trace.Entries)
+        {
+            if (entry.EffectiveScope != TraceEntryScope.ToolExecution)
+                continue;
+
+            var toolCall = entry.ToolCalls is { Count: > 0 } ? entry.ToolCalls[0] : null;
+            var name = toolCall?.Name;
+            if (string.IsNullOrEmpty(name))
+                continue;
+
+            var durationMs = entry.DurationMs ?? toolCall?.DurationMs ?? 0;
+            if (!durationsByName.TryGetValue(name, out var queue))
+                durationsByName[name] = queue = new Queue<long>();
+            queue.Enqueue(durationMs);
+        }
+
+        if (durationsByName.Count == 0)
+            return;
+
+        foreach (var call in report.Calls)
+        {
+            if (call.HasTiming)
+                continue; // streaming path already timed this call — do not overwrite
+
+            if (durationsByName.TryGetValue(call.Name, out var queue) && queue.Count > 0)
+            {
+                var durationMs = queue.Dequeue();
+                call.StartTime = DateTimeOffset.UnixEpoch;
+                call.EndTime = DateTimeOffset.UnixEpoch + TimeSpan.FromMilliseconds(durationMs);
+            }
+        }
     }
 }
