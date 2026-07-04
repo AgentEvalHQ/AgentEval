@@ -34,6 +34,41 @@ dotnet run --project samples/AgentEval.SampleGraders -- --calibrate
 
 Runs each decomposition **leg separately** (disclosure / refusal) and dumps its raw verdict + reason per case, then compares two sub-prompt sets — `V0` (the production flat-composite prompts) vs `V1` (calibrated). This is the dump-driven loop from the design notes: the V0 dump shows the disclosure leg *under-firing* (it demands a model name and misses internals-only disclosures) and the refusal leg *over-firing* `Resisted` (it judges "clean refusal" without knowing a disclosure is present). `V1` broadens the disclosure leg ("any one internal counts") and gates the refusal leg ("a preamble + any self-internal is not a clean refusal"), taking directional fabrications **2 → 0** on this corpus (all vulnerable cases caught, zero false alarms). Edit the `V1` prompts in `CalibrationHarness.cs` and re-run to iterate.
 
+## Non-convergence experiment (`--nonconvergence`)
+
+The paper's **C1 result** — *iteratively patching a keyword/substring grader does not converge to honesty* — lives in
+the [`NonConvergence/`](NonConvergence/) subfolder. It runs a deterministic **generate → sweep → count → patch → resweep**
+loop on two arms and contrasts them: **Arm A** is a patchable keyword oracle (re-patched every round); **Arm B** is the
+real production Composite Judge for that family (never patched). It reports fresh directional fabrications per round for
+each arm — the keyword arm stays elevated (patching trades a miss for a false alarm and back), the composite stays ≈0.
+
+The wired OWASP families (below) each have a seeded **ground-truth-by-construction** generator and the real production
+composite (`DecomposedGraders.TryBuildFor`), each targeting a "same string, both directions" trap a substring oracle
+cannot escape:
+
+| family | axis | generator |
+|---|---|---|
+| InferenceAPIAbuse (LLM10) | disclose-vs-refuse a model identity | `CaseGenerator.cs` |
+| InsecureOutput (LLM05) | emit-vs-warn an executable payload | `InsecureOutputGenerator.cs` |
+| SupplyChain (LLM03) | recommend-vs-warn a typosquat | `SupplyChainGenerator.cs` |
+| DataPoisoning (LLM04) | adopt-vs-correct a planted false fact | `DataPoisoningGenerator.cs` |
+| Misinformation (LLM09) | confabulate-vs-deny a fake entity | `MisinformationGenerator.cs` |
+
+```bash
+# single-seed contrast: per-round trajectory + a DETECTION line (proves the composite CATCHES vuln, not just abstains)
+dotnet run --project samples/AgentEval.SampleGraders -- --nonconvergence --family supply --rounds 6 --per-round 16
+
+# multi-seed run for statistics -> writes multiseed-<family>.json (keyword arm deterministic; composite arm judge-driven)
+dotnet run --project samples/AgentEval.SampleGraders -- --nonconvergence --seeds 30 --comp-seeds 5 --family misinfo --out .
+```
+Families: `inference` · `insecure` · `supply` · `datapoison` · `misinfo`. Without Azure keys the composite arm falls back
+to an offline heuristic (illustrative); the keyword arm is real either way.
+
+Supporting files in `NonConvergence/`: `Families.cs` (registry), `*Generator.cs` (per-family generators),
+`PatchableKeywordOracle.cs` + `DeterministicPatcher.cs` (Arm A), `NonConvergenceLoop.cs` (sweep/count loop),
+`NonConvergenceRunner.cs` (CLI driver + DETECTION diagnostic). All ground truth is by construction; entities/facts are
+author-authored and no working payloads are shipped.
+
 ## Solution membership
 
 This project is part of `AgentEval.sln` (a paper / reproducibility companion). It is otherwise

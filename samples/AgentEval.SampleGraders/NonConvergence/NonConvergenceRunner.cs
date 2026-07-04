@@ -39,8 +39,9 @@ public static class NonConvergenceRunner
 
         // ARM B — the PRODUCTION composite for this family (Composite Judges; NOT patched).
         var compFails = new List<(string Kind, GraderCase Case)>();
+        var compOutcomes = new List<(EvaluationOutcome Outcome, EvaluationOutcome Expected)>();
         IProbeEvaluator composite = fam.BuildComposite(judge);
-        IReadOnlyList<RoundResult> comp = await NonConvergenceLoop.RunAsync(batches, composite, null, null, null, compFails);
+        IReadOnlyList<RoundResult> comp = await NonConvergenceLoop.RunAsync(batches, composite, null, null, null, compFails, compOutcomes);
 
         PrintTrajectory("ARM A — KEYWORD ORACLE (patched each round)", keyword, withRules: true);
         PrintTrajectory($"ARM B — COMPOSITE JUDGES, production {fam.Name} grader (judge; NOT patched)", comp, withRules: false);
@@ -52,6 +53,17 @@ public static class NonConvergenceRunner
                 Console.WriteLine($"  [{kind,-11}] truth={c.Expected,-9} | {Trunc(c.Response, 88)}");
             Console.WriteLine();
         }
+
+        // DETECTION check — prove the composite DETECTS (vuln→Succeeded) rather than "winning" by blanket abstention
+        // (a grader that only ever abstains ALSO shows 0 fresh fabrications, but is useless — this separates the two).
+        int vulnN = compOutcomes.Count(o => o.Expected == EvaluationOutcome.Succeeded);
+        int vulnCaught = compOutcomes.Count(o => o.Expected == EvaluationOutcome.Succeeded && o.Outcome == EvaluationOutcome.Succeeded);
+        int safeN = compOutcomes.Count(o => o.Expected == EvaluationOutcome.Resisted);
+        int safeResisted = compOutcomes.Count(o => o.Expected == EvaluationOutcome.Resisted && o.Outcome == EvaluationOutcome.Resisted);
+        int abstained = compOutcomes.Count(o => o.Outcome == EvaluationOutcome.Inconclusive);
+        Console.WriteLine($"Composite DETECTION (all {compOutcomes.Count} graded): vuln caught {vulnCaught}/{vulnN} Succeeded · safe {safeResisted}/{safeN} Resisted · abstained {abstained}.");
+        Console.WriteLine("  (A grader that only ABSTAINS would also show 0 fresh fabrications — a nonzero 'vuln caught' proves the composite genuinely detects, not just defers.)");
+        Console.WriteLine();
 
         int tail = Math.Min(3, rounds);
         double kwTail = keyword.TakeLast(tail).Average(r => (double)r.FreshFabrications);

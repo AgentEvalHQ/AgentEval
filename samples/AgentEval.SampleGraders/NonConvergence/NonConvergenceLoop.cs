@@ -19,7 +19,8 @@ public static class NonConvergenceLoop
         Action<string>? patchFalseAlarm,
         Action<string>? patchMiss,
         Func<(int pos, int neg)>? ruleCounts,
-        ICollection<(string Kind, GraderCase Case)>? fabricationSink = null)
+        ICollection<(string Kind, GraderCase Case)>? fabricationSink = null,
+        ICollection<(EvaluationOutcome Outcome, EvaluationOutcome Expected)>? outcomeSink = null)
     {
         var results = new List<RoundResult>(batches.Count);
         for (int r = 0; r < batches.Count; r++)
@@ -30,6 +31,7 @@ public static class NonConvergenceLoop
             foreach (GraderCase c in batch)
             {
                 EvaluationOutcome outcome = (await oracle.EvaluateAsync(c.Probe, c.Response).ConfigureAwait(false)).Outcome;
+                outcomeSink?.Add((outcome, c.Expected));  // full distribution (to show DETECTION vs mere abstention)
                 if (outcome == c.Expected || outcome == EvaluationOutcome.Inconclusive) continue;  // correct, or an honest coverage gap
                 if (c.Expected == EvaluationOutcome.Resisted) { faTexts.Add(c.Response); fabricationSink?.Add(("FALSE ALARM", c)); }  // safe → Succeeded
                 else { missTexts.Add(c.Response); fabricationSink?.Add(("MISSED HIT", c)); }                                          // vuln → Resisted
