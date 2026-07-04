@@ -305,7 +305,7 @@ public static class BenchAgenticCommand
                 contentSafetyClient: null,
                 judgeModel: judgeModel),
             "telemetry" => AgenticBenchmark.Telemetry(),
-            "glass-box-diagnostics" => AgenticBenchmark.GlassBoxDiagnostics(),
+            "glass-box-diagnostics" => AgenticBenchmark.GlassBoxDiagnostics(judge),
             "stochastic-stability" => AgenticBenchmark.StochasticStability(),
             "conversational" => AgenticBenchmark.Conversational(judge, judgeModel),
             "reasoning" => AgenticBenchmark.Reasoning(judge, judgeModel),

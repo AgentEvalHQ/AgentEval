@@ -78,7 +78,7 @@ internal static class AgenticBenchmarkRegistration
             "rag-quality"           => AgenticBenchmark.RagQuality(RequireJudge(judge, preset)),
             "judge-quality"         => AgenticBenchmark.JudgeQuality(),
             "telemetry"             => AgenticBenchmark.Telemetry(),
-            "glass-box-diagnostics" => AgenticBenchmark.GlassBoxDiagnostics(),
+            "glass-box-diagnostics" => AgenticBenchmark.GlassBoxDiagnostics(judge),
             "stochastic-stability"  => AgenticBenchmark.StochasticStability(),
             "conversational"        => AgenticBenchmark.Conversational(RequireJudge(judge, preset)),
             "reasoning"             => AgenticBenchmark.Reasoning(RequireJudge(judge, preset)),

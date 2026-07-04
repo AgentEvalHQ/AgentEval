@@ -18,8 +18,8 @@ namespace AgentEval.Tests.Agentic;
 public class GlassBoxDiagnosticsPresetTests
 {
     [Fact]
-    public void Factory_Has7Components()
-        => Assert.Equal(7, AgenticBenchmark.GlassBoxDiagnostics().Components.Count);
+    public void Factory_Has8Components()
+        => Assert.Equal(8, AgenticBenchmark.GlassBoxDiagnostics().Components.Count);
 
     [Fact]
     public void Registry_Resolves_GlassBoxDiagnostics()
@@ -29,7 +29,7 @@ public class GlassBoxDiagnosticsPresetTests
 
         var composite = family!.CompositeFactory!("glass-box-diagnostics", null);
 
-        Assert.Equal(7, composite.Components.Count);
+        Assert.Equal(8, composite.Components.Count);
     }
 
     private static AgentTrace RichTrace()
@@ -59,8 +59,9 @@ public class GlassBoxDiagnosticsPresetTests
         var result = await composite.EvaluateAsync(input);
 
         Assert.NotNull(result.Details.SubResults);
-        Assert.Equal(7, result.Details.SubResults!.Count);
-        Assert.True(SkippedLeafCount(result) < 7, "at least one leaf should score against the attached trace");
+        Assert.Equal(8, result.Details.SubResults!.Count);
+        // 7 leaves score against the rich trace; SystemPromptInjection skips (no baseline / no judge).
+        Assert.True(SkippedLeafCount(result) < 8, "at least one leaf should score against the attached trace");
     }
 
     [Fact]
@@ -71,6 +72,6 @@ public class GlassBoxDiagnosticsPresetTests
 
         var result = await composite.EvaluateAsync(input);
 
-        Assert.Equal(7, SkippedLeafCount(result));
+        Assert.Equal(8, SkippedLeafCount(result));
     }
 }
