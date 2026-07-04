@@ -423,6 +423,41 @@ benchCmd.Add(benchNistCmd);
         benchCmd.Add(benchTraceFidelityCmd);
     }
 
+    // bench workflow-trace-fidelity — Glass Box: per-executor ledger vs chat-boundary truth (workflows).
+    {
+        var wtfTraceOpt = new Option<string?>("--workflow-trace") { Description = "Path to a saved workflow .trace.json. Per-executor chat truth is read from its ExecutorTraces (absent → every executor is NoTruth). REQUIRED." };
+        var wtfPresetOpt = new Option<string?>("--preset") { Description = "smoke | standard | audit-grade. Default: standard." };
+        var wtfSubjectOpt = new Option<string?>("--subject") { Description = "Subject name (workflow under evaluation). REQUIRED." };
+        var wtfRootOpt = new Option<string?>("--root") { Description = "Workspace root path (default: auto-detected)" };
+
+        var benchWorkflowTraceFidelityCmd = new Command("workflow-trace-fidelity", "Reconcile each workflow executor's framework-reported per-executor ledger (tokens + finish reason) against chat-boundary truth. Pure code (no LLM cost).");
+        benchWorkflowTraceFidelityCmd.Add(wtfTraceOpt);
+        benchWorkflowTraceFidelityCmd.Add(wtfPresetOpt);
+        benchWorkflowTraceFidelityCmd.Add(wtfSubjectOpt);
+        benchWorkflowTraceFidelityCmd.Add(wtfRootOpt);
+        benchWorkflowTraceFidelityCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =>
+        {
+            var workflowTrace = parseResult.GetValue(wtfTraceOpt);
+            var subject = parseResult.GetValue(wtfSubjectOpt);
+            if (string.IsNullOrWhiteSpace(workflowTrace))
+            {
+                Console.Error.WriteLine("Error: --workflow-trace is required.");
+                return 1;
+            }
+
+            if (string.IsNullOrWhiteSpace(subject))
+            {
+                Console.Error.WriteLine("Error: --subject is required.");
+                return 1;
+            }
+
+            var preset = parseResult.GetValue(wtfPresetOpt) ?? "standard";
+            var root = parseResult.GetValue(wtfRootOpt);
+            return await BenchWorkflowTraceFidelityCommand.RunAsync(workflowTrace, preset, subject, root, ct);
+        });
+        benchCmd.Add(benchWorkflowTraceFidelityCmd);
+    }
+
     // bench autoaudit — Glass Box flagship: cross-endpoint honesty/safety/cost comparison (offline demo).
     {
         var aaOutOpt = new Option<string?>("--out") { Description = "Path to write the Markdown comparison report (optional; also printed to stdout)." };
