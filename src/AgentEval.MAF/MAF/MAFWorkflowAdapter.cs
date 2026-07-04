@@ -99,6 +99,68 @@ public class MAFWorkflowAdapter : IWorkflowEvaluableAgent
         string? currentBranchId = null;
         string? stepBranchId = null; // Branch ID captured when step started
 
+        // Glass Box Part 2 (P2.B1): per-executor ledger of the token usage + finish reason MAF only
+        // surfaces on a complete AgentResponse (ExecutorAgentResponseEvent). Keyed by executor id;
+        // consumed (and removed) when that executor's step is flushed, so a loop workflow that revisits
+        // an executor does NOT re-report an earlier iteration's usage on a later step.
+        var ledger = new Dictionary<string, (TokenUsage? Usage, string? FinishReason)>(StringComparer.Ordinal);
+
+        // Look up and REMOVE an executor's ledger entry (consume-on-flush). Returns (null, null) if absent.
+        (TokenUsage? Usage, string? FinishReason) TakeLedger(string executorId)
+        {
+            if (ledger.TryGetValue(executorId, out var value))
+            {
+                ledger.Remove(executorId);
+                return value;
+            }
+
+            return (null, null);
+        }
+
+        // The output-accumulation + executor-switch bookkeeping shared by ExecutorOutputEvent and its
+        // ExecutorAgentResponseEvent subclass. Flushes the previous executor's step (with its ledger
+        // values) when the executor changes, then begins tracking the new one.
+        void HandleExecutorOutput(ExecutorOutputEvent e)
+        {
+            if (currentExecutorId != e.ExecutorId && currentExecutorId != null)
+            {
+                var (usage, finishReason) = TakeLedger(currentExecutorId);
+                steps.Add(CreateStep(
+                    currentExecutorId,
+                    currentOutput.ToString(),
+                    stepStartOffset,
+                    executorStopwatch.Elapsed,
+                    stepIndex++,
+                    currentToolCalls,
+                    stepIncomingEdge,
+                    currentOutgoingEdges,
+                    stepBranchId,
+                    usage,
+                    finishReason));
+
+                currentToolCalls = [];
+                currentOutgoingEdges = [];
+            }
+
+            if (currentExecutorId != e.ExecutorId)
+            {
+                currentExecutorId = e.ExecutorId;
+                currentOutput.Clear();
+                stepStartOffset = overallStopwatch.Elapsed;
+                executorStopwatch.Restart();
+                stepBranchId = currentBranchId;
+                stepIncomingEdge = pendingIncomingEdge;
+                pendingIncomingEdge = null;
+
+                if (!_executorIds.Contains(currentExecutorId))
+                {
+                    _executorIds.Add(currentExecutorId);
+                }
+            }
+
+            currentOutput.Append(e.Output ?? string.Empty);
+        }
+
         try
         {
             var workflowComplete = false;
@@ -106,44 +168,28 @@ public class MAFWorkflowAdapter : IWorkflowEvaluableAgent
             {
                 switch (evt)
                 {
+                    // Derived case MUST precede the ExecutorOutputEvent case (C# first-match): capture the
+                    // per-executor token usage + finish reason MAF only surfaces on a complete AgentResponse,
+                    // then run the identical output bookkeeping. The event always arrives while this executor's
+                    // step is still open (before any flush), so the ledger is populated before it is consumed.
+                    case ExecutorAgentResponseEvent responseEvent:
+                        HandleExecutorOutput(responseEvent);
+                        if (ledger.TryGetValue(responseEvent.ExecutorId, out var prior))
+                        {
+                            // Repeat event for the same open step (retry / streamed-then-completed): SUM the
+                            // tokens, keep the FIRST non-null finish reason.
+                            ledger[responseEvent.ExecutorId] = (
+                                SumUsage(prior.Usage, responseEvent.Usage),
+                                prior.FinishReason ?? responseEvent.FinishReason);
+                        }
+                        else
+                        {
+                            ledger[responseEvent.ExecutorId] = (responseEvent.Usage, responseEvent.FinishReason);
+                        }
+                        break;
+
                     case ExecutorOutputEvent outputEvent:
-                        // When executor changes, save previous step
-                        if (currentExecutorId != outputEvent.ExecutorId && currentExecutorId != null)
-                        {
-                            steps.Add(CreateStep(
-                                currentExecutorId,
-                                currentOutput.ToString(),
-                                stepStartOffset,
-                                executorStopwatch.Elapsed,
-                                stepIndex++,
-                                currentToolCalls,
-                                stepIncomingEdge,
-                                currentOutgoingEdges,
-                                stepBranchId));
-                            
-                            currentToolCalls = [];
-                            currentOutgoingEdges = [];
-                        }
-
-                        if (currentExecutorId != outputEvent.ExecutorId)
-                        {
-                            // Start tracking new executor
-                            currentExecutorId = outputEvent.ExecutorId;
-                            currentOutput.Clear();
-                            stepStartOffset = overallStopwatch.Elapsed;
-                            executorStopwatch.Restart();
-                            stepBranchId = currentBranchId; // Capture branch at step start
-                            stepIncomingEdge = pendingIncomingEdge; // Use pending edge as incoming
-                            pendingIncomingEdge = null; // Reset pending
-
-                            // Track executor ID if not already known
-                            if (!_executorIds.Contains(currentExecutorId))
-                            {
-                                _executorIds.Add(currentExecutorId);
-                            }
-                        }
-
-                        currentOutput.Append(outputEvent.Output ?? string.Empty);
+                        HandleExecutorOutput(outputEvent);
                         break;
 
                     case EdgeTraversedEvent edgeEvent:
@@ -171,6 +217,7 @@ public class MAFWorkflowAdapter : IWorkflowEvaluableAgent
                         // the source executor's step (the original off-by-one attribution bug).
                         if (currentExecutorId != null)
                         {
+                            var (edgeUsage, edgeFinishReason) = TakeLedger(currentExecutorId);
                             steps.Add(CreateStep(
                                 currentExecutorId,
                                 currentOutput.ToString(),
@@ -180,7 +227,9 @@ public class MAFWorkflowAdapter : IWorkflowEvaluableAgent
                                 currentToolCalls,
                                 stepIncomingEdge,
                                 currentOutgoingEdges,
-                                stepBranchId));
+                                stepBranchId,
+                                edgeUsage,
+                                edgeFinishReason));
 
                             currentToolCalls = [];
                             currentOutgoingEdges = [];
@@ -258,9 +307,12 @@ public class MAFWorkflowAdapter : IWorkflowEvaluableAgent
                         break;
 
                     case WorkflowCompleteEvent:
-                        // Workflow complete - save final step
+                        // Workflow complete - save final step. This is the MOST COMMON terminal flush
+                        // (the bridge always yields WorkflowCompleteEvent), so it MUST take the ledger too,
+                        // or the final executor of every workflow loses its tokens/finish reason.
                         if (currentExecutorId != null)
                         {
+                            var (completeUsage, completeFinishReason) = TakeLedger(currentExecutorId);
                             steps.Add(CreateStep(
                                 currentExecutorId,
                                 currentOutput.ToString(),
@@ -270,7 +322,9 @@ public class MAFWorkflowAdapter : IWorkflowEvaluableAgent
                                 currentToolCalls,
                                 stepIncomingEdge,
                                 currentOutgoingEdges,
-                                stepBranchId));
+                                stepBranchId,
+                                completeUsage,
+                                completeFinishReason));
                         }
                         workflowComplete = true;
                         break;
@@ -283,6 +337,7 @@ public class MAFWorkflowAdapter : IWorkflowEvaluableAgent
             // If no WorkflowCompleteEvent was received, save final step
             if (currentExecutorId != null && !steps.Any(s => s.ExecutorId == currentExecutorId && s.StepIndex == stepIndex))
             {
+                var (finalUsage, finalFinishReason) = TakeLedger(currentExecutorId);
                 steps.Add(CreateStep(
                     currentExecutorId,
                     currentOutput.ToString(),
@@ -292,7 +347,9 @@ public class MAFWorkflowAdapter : IWorkflowEvaluableAgent
                     currentToolCalls,
                     stepIncomingEdge,
                     currentOutgoingEdges,
-                    stepBranchId));
+                    stepBranchId,
+                    finalUsage,
+                    finalFinishReason));
             }
 
             overallStopwatch.Stop();
@@ -406,7 +463,9 @@ public class MAFWorkflowAdapter : IWorkflowEvaluableAgent
         List<ToolCallRecord> toolCalls,
         EdgeExecution? incomingEdge = null,
         List<EdgeExecution>? outgoingEdges = null,
-        string? branchId = null)
+        string? branchId = null,
+        TokenUsage? tokenUsage = null,
+        string? finishReason = null)
     {
         return new ExecutorStep
         {
@@ -418,7 +477,24 @@ public class MAFWorkflowAdapter : IWorkflowEvaluableAgent
             ToolCalls = toolCalls.Count > 0 ? toolCalls.ToList() : null,
             IncomingEdge = incomingEdge,
             OutgoingEdges = outgoingEdges?.Count > 0 ? outgoingEdges.ToList() : null,
-            ParallelBranchId = branchId
+            ParallelBranchId = branchId,
+            TokenUsage = tokenUsage,
+            FinishReason = finishReason
+        };
+    }
+
+    /// <summary>
+    /// Sums two per-executor token-usage snapshots (Glass Box Part 2, P2.B1). Null-tolerant: a null operand
+    /// is treated as the identity. <see cref="TokenUsage"/> is init-only, so summing constructs a new instance.
+    /// </summary>
+    private static TokenUsage? SumUsage(TokenUsage? a, TokenUsage? b)
+    {
+        if (a is null) return b;
+        if (b is null) return a;
+        return new TokenUsage
+        {
+            PromptTokens = a.PromptTokens + b.PromptTokens,
+            CompletionTokens = a.CompletionTokens + b.CompletionTokens,
         };
     }
 
