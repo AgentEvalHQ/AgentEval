@@ -68,6 +68,36 @@ public class WorkflowTraceFidelityReconcilerTests
     }
 
     [Fact]
+    public void Reconcile_SuppressedFinishReason_IsFinishMismatch()
+    {
+        // The headline deception: chat truth hit a content filter, but the framework ledger reports no
+        // finish reason (null). This MUST be flagged, not scored as Agree.
+        var result = Result(Step("a", 0, 10, 5, finish: null));
+        var chat = new Dictionary<string, AgentTrace> { ["a"] = ChatTrace(15, "content_filter") };
+
+        var rec = Assert.Single(new WorkflowTraceFidelityReconciler().Reconcile(result, chat).Executors);
+
+        Assert.Equal(WorkflowFidelityDiff.FinishMismatch, rec.DiffKind);
+        Assert.Equal(0.5, rec.Score);
+        Assert.Null(rec.FinishFramework);
+        Assert.Equal("content_filter", rec.FinishChatTruth);
+    }
+
+    [Fact]
+    public void Reconcile_ChatTraceWithNoResponses_IsNoTruth_NotTokenMismatch()
+    {
+        // A supplied trace with zero ChatTurn responses is not "truth" — comparing framework tokens against a
+        // zero total would raise a spurious TokenMismatch.
+        var result = Result(Step("a", 0, 10, 5, "stop"));
+        var chat = new Dictionary<string, AgentTrace> { ["a"] = new AgentTrace() };
+
+        var rec = Assert.Single(new WorkflowTraceFidelityReconciler().Reconcile(result, chat).Executors);
+
+        Assert.Equal(WorkflowFidelityDiff.NoTruth, rec.DiffKind);
+        Assert.Equal(1.0, rec.Score);
+    }
+
+    [Fact]
     public void Reconcile_NoChatTrace_NoTruth_ScoresOne()
     {
         var report = new WorkflowTraceFidelityReconciler().Reconcile(Result(Step("a", 0, 10, 5, "stop")), chatTraces: null);

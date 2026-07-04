@@ -92,16 +92,28 @@ public sealed class WorkflowTraceFidelityReconciler
             var tokensFramework = group.Sum(s => s.TokenUsage?.TotalTokens ?? 0);
             var finishFramework = group.Select(s => s.FinishReason).LastOrDefault(f => f is not null);
 
-            if (chatTraces is not null && chatTraces.TryGetValue(executorId, out var chatTrace) && chatTrace is not null)
-            {
-                var responses = chatTrace.Entries
+            var responses = chatTraces is not null
+                && chatTraces.TryGetValue(executorId, out var chatTrace) && chatTrace is not null
+                ? chatTrace.Entries
                     .Where(e => e.EffectiveScope == TraceEntryScope.ChatTurn && e.Type == TraceEntryType.Response)
-                    .ToList();
+                    .ToList()
+                : null;
+
+            // Only reconcile when there is actual chat-boundary truth (≥1 ChatTurn response). A supplied
+            // trace with no responses (tool-only executor, or a partial/failed capture) is NoTruth, not a
+            // comparison against a zero total (which would raise a spurious TokenMismatch).
+            if (responses is { Count: > 0 })
+            {
                 var tokensChatTruth = responses.Sum(e => e.TokenUsage?.TotalTokens ?? 0);
                 var finishChatTruth = responses.Select(e => e.FinishReason).LastOrDefault(f => f is not null);
 
                 var tokenMismatch = tokensFramework != tokensChatTruth;
-                var finishMismatch = finishChatTruth is not null && finishFramework is not null
+
+                // Suppressed finish reason is the headline deception: chat truth reports a terminal reason
+                // (e.g. content_filter / length) while the framework ledger reports null. So a mismatch fires
+                // whenever chat truth HAS a finish reason and the framework's differs — INCLUDING when the
+                // framework's is null (suppression). Mirrors TraceFidelityRunner.SuppressedFinishReason.
+                var finishMismatch = finishChatTruth is not null
                     && !string.Equals(finishFramework, finishChatTruth, StringComparison.Ordinal);
 
                 var diff = (tokenMismatch, finishMismatch) switch
@@ -143,13 +155,7 @@ public sealed class WorkflowTraceFidelityReconciler
                 Passed: e.Score >= 0.8, Threshold: 0.8,
                 Severity: e.Score >= 0.8 ? "Low" : e.Score >= 0.5 ? "Medium" : "High", Confidence: null),
             Details: new EvalDetails(
-                Dimensions: new Dictionary<string, double>
-                {
-                    ["frameworkTokens"] = e.TokensFramework,
-                    ["chatTruthTokens"] = e.TokensChatTruth ?? -1,
-                    ["delta"] = e.TokensChatTruth is null ? 0 : e.TokensFramework - e.TokensChatTruth.Value,
-                    ["score100"] = e.Score * 100,
-                },
+                Dimensions: BuildLeafDimensions(e),
                 Evidence: new List<EvalEvidence>
                 {
                     new(Source: "workflow-ledger-vs-chat", Reference: e.DiffKind.ToString(),
@@ -174,5 +180,23 @@ public sealed class WorkflowTraceFidelityReconciler
                 Evidence: null, Recommendations: null, SubResults: subResults, AggregationStrategy: "per-executor"),
             Provenance: new EvalProvenance(Type: "code", JudgeModel: null, PromptId: null, PromptHash: null, TokensUsed: null, EstimatedCost: 0.0, CacheHit: false),
             EvaluatedAt: DateTimeOffset.UtcNow);
+    }
+
+    // Per-executor leaf dimensions. chatTruthTokens/delta are OMITTED (not encoded as a -1/0 sentinel in the
+    // numeric map) when there is no chat truth, so a downstream aggregator can't mistake absence for a value.
+    private static Dictionary<string, double> BuildLeafDimensions(WorkflowExecutorFidelity e)
+    {
+        var dimensions = new Dictionary<string, double>
+        {
+            ["frameworkTokens"] = e.TokensFramework,
+            ["score100"] = e.Score * 100,
+        };
+        if (e.TokensChatTruth is int chatTruth)
+        {
+            dimensions["chatTruthTokens"] = chatTruth;
+            dimensions["delta"] = e.TokensFramework - chatTruth;
+        }
+
+        return dimensions;
     }
 }

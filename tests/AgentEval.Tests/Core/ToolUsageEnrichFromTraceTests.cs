@@ -15,8 +15,9 @@ namespace AgentEval.Tests.Core;
 /// </summary>
 public class ToolUsageEnrichFromTraceTests
 {
+    // An EXECUTED call (has a paired result), which is what carries a matching ToolExecution trace entry.
     private static ToolCallRecord Call(string name, int order) =>
-        new() { Name = name, CallId = $"c{order}", Order = order };
+        new() { Name = name, CallId = $"c{order}", Order = order, WasExecuted = true };
 
     private static AgentTrace TraceWithExecutions(params (string name, long durationMs)[] executions)
     {
@@ -67,7 +68,7 @@ public class ToolUsageEnrichFromTraceTests
         var report = new ToolUsageReport();
         report.AddCall(new ToolCallRecord
         {
-            Name = "search", CallId = "c1", Order = 1,
+            Name = "search", CallId = "c1", Order = 1, WasExecuted = true,
             StartTime = start, EndTime = start + TimeSpan.FromMilliseconds(999),
         });
 
@@ -75,6 +76,41 @@ public class ToolUsageEnrichFromTraceTests
 
         // Streaming-path timing (999ms) is preserved, not replaced by the trace's 100ms.
         Assert.Equal(TimeSpan.FromMilliseconds(999), report.Calls[0].Duration);
+    }
+
+    [Fact]
+    public void EnrichFromTrace_EmittedNotExecutedCall_DoesNotConsumeSlot()
+    {
+        // 'foo' emitted-but-not-executed at order 1, then executed at order 2 (both untimed). The single
+        // recorded execution (30ms) must attach to the EXECUTED call, not the emit.
+        var report = new ToolUsageReport();
+        report.AddCall(new ToolCallRecord { Name = "foo", CallId = "a", Order = 1, WasExecuted = false });
+        report.AddCall(new ToolCallRecord { Name = "foo", CallId = "b", Order = 2, WasExecuted = true });
+
+        ToolUsageExtractor.EnrichFromTrace(report, TraceWithExecutions(("foo", 30)));
+
+        Assert.False(report.Calls[0].HasTiming);                              // emit: no timing
+        Assert.Equal(TimeSpan.FromMilliseconds(30), report.Calls[1].Duration); // executed call gets it
+    }
+
+    [Fact]
+    public void EnrichFromTrace_StreamingTimedThenUntimed_SameTool_StaysAligned()
+    {
+        // Executed 'search' #1 already streaming-timed (50ms real), executed 'search' #2 untimed. Trace queue
+        // is [50, 300] in execution order. #1 consumes slot 50 (kept at 50), #2 must get 300 — not 50.
+        var start = DateTimeOffset.UtcNow;
+        var report = new ToolUsageReport();
+        report.AddCall(new ToolCallRecord
+        {
+            Name = "search", CallId = "c1", Order = 1, WasExecuted = true,
+            StartTime = start, EndTime = start + TimeSpan.FromMilliseconds(50),
+        });
+        report.AddCall(new ToolCallRecord { Name = "search", CallId = "c2", Order = 2, WasExecuted = true });
+
+        ToolUsageExtractor.EnrichFromTrace(report, TraceWithExecutions(("search", 50), ("search", 300)));
+
+        Assert.Equal(TimeSpan.FromMilliseconds(50), report.Calls[0].Duration);
+        Assert.Equal(TimeSpan.FromMilliseconds(300), report.Calls[1].Duration);
     }
 
     [Fact]
