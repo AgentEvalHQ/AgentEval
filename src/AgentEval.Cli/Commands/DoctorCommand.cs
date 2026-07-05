@@ -332,6 +332,9 @@ public static class DoctorCommand
         // ─── Glass Box: double-wrapping check (Phase 8) ────────────────────
         warnings += await CheckDoubleWrappingAsync(dir);
 
+        // ─── Gatekeeper: double-gating check (Stage 2 / M2d) ───────────────
+        warnings += await CheckDoubleGatingAsync(dir);
+
         // ─── Summary ─────────────────────────────────────────────────────────
         Console.WriteLine();
         Console.WriteLine($"Errors: {errors} | Warnings: {warnings} | OK: {ok}");
@@ -381,6 +384,88 @@ public static class DoctorCommand
                     "chat-boundary entries (TraceRecordingAgent + UseTraceRecording on the same agent duplicates entries). " +
                     "Make the chat-client wrapper the source of truth — see docs/tracing.md §\"Two recording layers\".");
                 warnings++;
+            }
+        }
+
+        return warnings;
+    }
+
+    /// <summary>
+    /// Warns when the SAME gate policy recorded verdicts under BOTH a chat-seam stage (<c>pre</c>/<c>post</c>,
+    /// from <c>UseEvalGate</c>) and an agent-seam stage (<c>tool</c>/<c>run-*</c>, from the Gatekeeper
+    /// <c>UseAgentEvalToolGate</c>/<c>UseAgentEvalGate</c>) — the policy is likely gating the same run twice.
+    /// </summary>
+    internal static async Task<int> CheckDoubleGatingAsync(string agentEvalDir)
+    {
+        IEnumerable<string> traceFiles;
+        try
+        {
+            traceFiles = Directory.EnumerateFiles(agentEvalDir, "*.trace.json", SearchOption.AllDirectories);
+        }
+        catch (DirectoryNotFoundException)
+        {
+            return 0;
+        }
+
+        var chatStages = new HashSet<string>(StringComparer.Ordinal) { "pre", "post" };
+        var warnings = 0;
+
+        foreach (var file in traceFiles)
+        {
+            AgentEval.Tracing.AgentTrace trace;
+            try
+            {
+                trace = await AgentEval.Tracing.TraceSerializer.LoadFromFileAsync(file);
+            }
+            catch
+            {
+                continue;
+            }
+
+            if (trace.Metadata is null)
+            {
+                continue;
+            }
+
+            // Per policy, track whether it appeared under a chat seam and/or an agent seam.
+            var seams = new Dictionary<string, (bool Chat, bool Agent)>(StringComparer.Ordinal);
+            foreach (var key in trace.Metadata.Keys)
+            {
+                if (!AgentEval.Tracing.GateMetadataReader.IsGateKey(key))
+                {
+                    continue;
+                }
+
+                var stage = AgentEval.Tracing.GateMetadataReader.StageFromKey(key);
+                var policy = AgentEval.Tracing.GateMetadataReader.PolicyFromKey(key);
+                if (stage is null || policy is null)
+                {
+                    continue;
+                }
+
+                (bool Chat, bool Agent) seam = seams.TryGetValue(policy, out var existing) ? existing : (Chat: false, Agent: false);
+                if (chatStages.Contains(stage))
+                {
+                    seam.Chat = true;
+                }
+                else
+                {
+                    seam.Agent = true;
+                }
+
+                seams[policy] = seam;
+            }
+
+            foreach (var (policy, seam) in seams)
+            {
+                if (seam.Chat && seam.Agent)
+                {
+                    Console.WriteLine(
+                        $"  ⚠ Possible double-gating in {Path.GetFileName(file)}: policy '{policy}' recorded verdicts " +
+                        "under both a chat-seam stage (pre/post) and an agent-seam stage (tool/run-*). The same policy " +
+                        "is likely gating twice — register it once (chat gate OR agent gate).");
+                    warnings++;
+                }
             }
         }
 

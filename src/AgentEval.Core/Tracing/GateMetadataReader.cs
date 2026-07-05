@@ -32,6 +32,16 @@ public static class GateMetadataReader
         return parts.Length >= 4 ? string.Join('.', parts[3..]) : null;
     }
 
+    /// <summary>
+    /// Extracts the stage token from a <c>gate.{stage}.{seq}.{policy}</c> key, or null if malformed. Stage
+    /// tokens are dot-free (<c>pre</c>, <c>post</c>, <c>tool</c>, <c>run-pre</c>, <c>run-post</c>).
+    /// </summary>
+    public static string? StageFromKey(string key)
+    {
+        var parts = key.Split('.');
+        return parts.Length >= 4 ? parts[1] : null;
+    }
+
     private static string? ReadAction(object? value) => value switch
     {
         IReadOnlyDictionary<string, object?> dict => dict.TryGetValue("action", out var a) ? a as string : null,
