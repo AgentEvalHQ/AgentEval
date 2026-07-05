@@ -280,17 +280,17 @@ internal static class RedTeamCommand
 
         if (!isGatekeeperDemo)
         {
-        if (opts.Endpoint is null && !opts.Azure)
-            throw new InvalidOperationException("Specify --endpoint <url> or --azure (or --sut gatekeeper-demo for a credential-free demo).");
-        if (opts.Azure && opts.Endpoint is null)
-            throw new InvalidOperationException(
-                "--azure requires --endpoint <url> (your Azure OpenAI resource endpoint, e.g. https://myresource.openai.azure.com/).");
-        if (opts.Azure && string.IsNullOrWhiteSpace(opts.DeploymentName))
-            throw new InvalidOperationException(
-                "--azure requires --deployment-name <name> (your Azure OpenAI deployment name).");
-        if (!opts.Azure && string.IsNullOrWhiteSpace(opts.Model))
-            throw new InvalidOperationException(
-                "--model is required when using --endpoint.");
+            if (opts.Endpoint is null && !opts.Azure)
+                throw new InvalidOperationException("Specify --endpoint <url> or --azure (or --sut gatekeeper-demo for a credential-free demo).");
+            if (opts.Azure && opts.Endpoint is null)
+                throw new InvalidOperationException(
+                    "--azure requires --endpoint <url> (your Azure OpenAI resource endpoint, e.g. https://myresource.openai.azure.com/).");
+            if (opts.Azure && string.IsNullOrWhiteSpace(opts.DeploymentName))
+                throw new InvalidOperationException(
+                    "--azure requires --deployment-name <name> (your Azure OpenAI deployment name).");
+            if (!opts.Azure && string.IsNullOrWhiteSpace(opts.Model))
+                throw new InvalidOperationException(
+                    "--model is required when using --endpoint.");
         }
         else
         {
