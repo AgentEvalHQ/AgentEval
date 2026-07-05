@@ -27,19 +27,26 @@ public static class GateMetadataReader
 
     /// <summary>Extracts the policy name from a <c>gate.{stage}.{seq}.{policy}</c> key, or null if malformed.</summary>
     public static string? PolicyFromKey(string key)
-    {
-        var parts = key.Split('.');
-        return parts.Length >= 4 ? string.Join('.', parts[3..]) : null;
-    }
+        => TrySplitGateKey(key, out var parts) ? string.Join('.', parts[3..]) : null;
 
     /// <summary>
     /// Extracts the stage token from a <c>gate.{stage}.{seq}.{policy}</c> key, or null if malformed. Stage
     /// tokens are dot-free (<c>pre</c>, <c>post</c>, <c>tool</c>, <c>run-pre</c>, <c>run-post</c>).
     /// </summary>
     public static string? StageFromKey(string key)
+        => TrySplitGateKey(key, out var parts) ? parts[1] : null;
+
+    // A well-formed gate-verdict key is exactly gate.{stage}.{seq}.{policy} — the "gate." prefix plus non-empty
+    // stage, seq, and policy (the policy may itself contain dots). This rejects non-gate keys and empty segments
+    // so the extractors return null on a malformed key rather than misclassifying it (consistent with their docs).
+    private static bool TrySplitGateKey(string key, out string[] parts)
     {
-        var parts = key.Split('.');
-        return parts.Length >= 4 ? parts[1] : null;
+        parts = key.Split('.');
+        return parts.Length >= 4
+            && parts[0] == "gate"
+            && parts[1].Length > 0                 // stage
+            && parts[2].Length > 0                 // seq
+            && parts[3..].Any(static p => p.Length > 0);   // policy (join is non-empty)
     }
 
     private static string? ReadAction(object? value) => value switch

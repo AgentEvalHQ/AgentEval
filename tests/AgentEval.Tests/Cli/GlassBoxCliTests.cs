@@ -75,7 +75,15 @@ public class GlassBoxCliTests : IDisposable
         Assert.Equal("tool", GateMetadataReader.StageFromKey("gate.tool.1.ForbiddenToolGate"));
         Assert.Equal("run-pre", GateMetadataReader.StageFromKey("gate.run-pre.2.KeywordGate"));
         Assert.Equal("pre", GateMetadataReader.StageFromKey("gate.pre.1.pii"));
-        Assert.Null(GateMetadataReader.StageFromKey("gate.tool"));   // malformed
+        Assert.Equal("tool", GateMetadataReader.StageFromKey("gate.tool.1.My.Dotted.Policy"));   // policy may contain dots
+
+        // Malformed / non-gate keys => null (not misclassified), consistent with the XML doc.
+        Assert.Null(GateMetadataReader.StageFromKey("gate.tool"));                 // too few segments
+        Assert.Null(GateMetadataReader.StageFromKey("notgate.pre.1.Policy"));      // not a gate key
+        Assert.Null(GateMetadataReader.StageFromKey("gate..1.Policy"));            // empty stage
+        Assert.Null(GateMetadataReader.StageFromKey("gate.pre..Policy"));          // empty seq
+        Assert.Null(GateMetadataReader.StageFromKey("gate.pre.1."));               // empty policy
+        Assert.Null(GateMetadataReader.PolicyFromKey("notgate.pre.1.Policy"));     // sibling: same guard
     }
 
     [Fact]
