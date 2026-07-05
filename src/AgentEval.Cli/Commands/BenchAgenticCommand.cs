@@ -144,6 +144,13 @@ public static class BenchAgenticCommand
         }
         var evalInput = new EvalInput(Query: query, Response: agentResponse);
 
+        // Treat an empty/whitespace --trace the same as omitted (so both the load below and the all-skipped
+        // hint further down use one consistent notion of "no trace supplied").
+        if (string.IsNullOrWhiteSpace(traceFile))
+        {
+            traceFile = null;
+        }
+
         // Glass Box (Phase 3): attach a captured dual-boundary trace so trace-aware evaluators
         // (e.g. the glass-box-diagnostics preset) read real chat/tool-boundary data instead of Skipping.
         // One WithTrace here reaches every leaf, since CompositeEval forwards one EvalInput to all components.

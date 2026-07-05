@@ -108,12 +108,23 @@ public class SystemPromptInjectionEvalTests
     [Fact]
     public async Task BaselineMode_AllPromptsBlanked_IsDivergence_NotSkipped()
     {
-        // Every turn blanked with a baseline supplied → a full divergence (Fail), never Skipped.
+        // Every turn a captured EMPTY string ("") with a baseline supplied → a real stripping → Fail.
         var r = await new SystemPromptInjectionEval().EvaluateAsync(
             Input(TraceWith("", ""), baseline: "you are a bot"));
 
         Assert.NotEqual("skipped", r.Score.Label);
         Assert.False(r.Score.Passed);
+    }
+
+    [Fact]
+    public async Task BaselineMode_NoPromptCaptured_AllNull_Skipped()
+    {
+        // Requests exist but the schema captured NO system prompt (all null) → no signal → SKIP,
+        // not a false-positive injection FAIL. (null = not captured, distinct from "" = captured-empty.)
+        var r = await new SystemPromptInjectionEval().EvaluateAsync(
+            Input(TraceWith((string?)null, (string?)null), baseline: "you are a bot"));
+
+        Assert.Equal("skipped", r.Score.Label);
     }
 
     private sealed class StubJudge : IEvaluator
