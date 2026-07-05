@@ -40,7 +40,7 @@ branch keeps its full weighted composite hierarchy; the Foundry branch surfaces 
 
 - Uses the **preview** `Microsoft.Agents.AI.Foundry` package (the Foundry evals SDK has no stable release
   yet); the rest of the MAF stack is on the stable release. Foundry is **sample-only** — referenced by this
-  project and the `AgentEval.Samples` H12/H13 benchmarks, but **never** by the shipping AgentEval libraries,
+  project and the `AgentEval.Samples` H11/H12 benchmarks, but **never** by the shipping AgentEval libraries,
   which stay provider-agnostic.
 - The composer, report merge, and circuit breaker live in `AgentEval.MAF` (`CompositeAgentEvaluator`,
   `UnifiedEvalReport`, `CircuitBreaker`) and work with **any** `IAgentEvaluator`, not just Foundry.
