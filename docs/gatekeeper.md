@@ -154,7 +154,7 @@ The **Gatekeeper** sample group (`AgentEval.Samples`, menu group **J**) runs eve
 model, so every outcome is deterministic and needs no API key:
 
 - [`Gatekeeper/01_GatekeeperEnforcement`](../samples/AgentEval.Samples/Gatekeeper/01_GatekeeperEnforcement.cs) —
-  the **enforcement walkthrough** — six scenarios across the gate layers: a forbidden tool blocked, a poisoned
+  the **enforcement walkthrough** — scenarios across the gate layers: a forbidden tool blocked, a poisoned
   argument caught by a red‑team evaluator, a canary honeypot held, a shadow verdict quarantining the next run, a
   **defense‑in‑depth** scene (require an operator → reject the attack at the door → rate‑limit, all before the
   model runs), and a **more‑gates** scene (an `ArgumentPatternGate` on a poisoned argument, a `SequenceGate` on a

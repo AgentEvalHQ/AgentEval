@@ -20,6 +20,7 @@ namespace AgentEval.Samples;
 ///     boundary — the destructive action never executes, even though the model tried it.
 ///
 /// ★ No credentials needed — a scripted model makes both flows deterministic.
+/// ⏱️ Time to understand: 2 minutes
 /// </summary>
 public static class GatekeeperMafHarness
 {
@@ -61,7 +62,7 @@ public static class GatekeeperMafHarness
         var legit = await agent.RunAsync("Hi, where is my order A-1001?");
         Console.WriteLine($"   User: \"Where is my order A-1001?\"");
         Console.WriteLine($"   Agent: \"{legit.Text}\"");
-        Console.WriteLine($"   → lookup_order ran {lookups} time — the safe tool works normally. ✅");
+        Console.WriteLine($"   → lookup_order ran {lookups} time(s) — the safe tool works normally. ✅");
 
         // ── Attack request (prompt injection turns the model destructive) ──
         Section("An attack request — a prompt injection tries to delete the account");

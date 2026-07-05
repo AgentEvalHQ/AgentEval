@@ -615,7 +615,7 @@ The interactive menu lets you select a **group** (A–J), then a **sample** with
 | **I — Observability (Glass Box)** | Dual-boundary per-turn tracing, trace fidelity, auto-audit | 4 |
 | **J — Gatekeeper (Runtime Protection)** ★ no credentials | Fail-closed runtime enforcement: the gate-layer walkthrough + a realistic gated MAF agent harness | 2 |
 
-**60 samples in total.** See [samples/AgentEval.Samples/README.md](samples/AgentEval.Samples/README.md) for the full listing with per-sample descriptions, timing, and credential requirements.
+See [samples/AgentEval.Samples/README.md](samples/AgentEval.Samples/README.md) for the full listing with per-sample descriptions, timing, and credential requirements.
 
 ---
 

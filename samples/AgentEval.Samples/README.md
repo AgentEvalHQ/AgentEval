@@ -22,8 +22,8 @@ cd samples/AgentEval.Samples
 dotnet run
 ```
 
-The interactive menu organises samples into **10 groups (A–J)** with **60 samples total**. Select a group letter, then a sample number.
-You can also run a specific sample directly from the command line by its **legacy index** (1-based across the flat sample list, A1=1, A7=7, B1=8, …, J2=60):
+The interactive menu organises samples into **ten groups (A–J)**. Select a group letter, then a sample number.
+You can also run a specific sample directly from the command line by its **legacy index** (1-based across the flat sample list, A1=1, A7=7, B1=8, …):
 
 ```bash
 dotnet run -- 1    # Hello World             (A1)
@@ -40,7 +40,7 @@ The benchmark samples (H2–H9) also respect a preset tier via `--preset {smoke|
 
 ## Sample Groups
 
-### A — Getting Started  ★ mostly no credentials needed (7 samples)
+### A — Getting Started  ★ mostly no credentials needed
 
 | # | Sample | What You'll Learn | Azure? | Time |
 |---|--------|-------------------|--------|------|
@@ -52,7 +52,7 @@ The benchmark samples (H2–H9) also respect a preset tier via `--preset {smoke|
 | 6 | **Session Lifecycle** | MAF `AgentSession`: create → multi-turn → reset → isolation | Yes | 8 min |
 | 7 | **Advanced MAF Features** | ChatHistory, middleware, structured output, approval, agent-as-tool | Yes | 10 min |
 
-### B — Metrics & Quality (5 samples)
+### B — Metrics & Quality
 
 | # | Sample | What You'll Learn | Azure? | Time |
 |---|--------|-------------------|--------|------|
@@ -62,7 +62,7 @@ The benchmark samples (H2–H9) also respect a preset tier via `--preset {smoke|
 | 4 | **Responsible AI** | Toxicity, bias, misinformation with counterfactual testing 🛡️ | Yes | 5 min |
 | 5 | **Calibrated Evaluator** | Drop-in `IEvaluator` with per-criterion majority voting | Yes | 5 min |
 
-### C — Workflows & Conversations (4 samples)
+### C — Workflows & Conversations
 
 | # | Sample | What You'll Learn | Azure? | Time |
 |---|--------|-------------------|--------|------|
@@ -71,7 +71,7 @@ The benchmark samples (H2–H9) also respect a preset tier via `--preset {smoke|
 | 3 | **Workflow + Tools** | TripPlanner pipeline: 4 agents with tool call tracking ⭐ | Yes | 15 min |
 | 4 | **[MessageHandler] Executors** | Source-gen executor pipeline — deterministic, no LLM, AOT-ready | No | 8 min |
 
-### D — Performance & Statistics (5 samples)
+### D — Performance & Statistics
 
 | # | Sample | What You'll Learn | Azure? | Time |
 |---|--------|-------------------|--------|------|
@@ -81,7 +81,7 @@ The benchmark samples (H2–H9) also respect a preset tier via `--preset {smoke|
 | 4 | **Stochastic + Comparison** | Statistical rigor applied to side-by-side model comparison | Yes ×2 | 10 min |
 | 5 | **Streaming vs Async** | TTFT vs throughput — compare streaming and non-streaming | Yes | 8 min |
 
-### E — Safety & Security (3 samples)
+### E — Safety & Security
 
 | # | Sample | What You'll Learn | Azure? | Time |
 |---|--------|-------------------|--------|------|
@@ -89,7 +89,7 @@ The benchmark samples (H2–H9) also respect a preset tier via `--preset {smoke|
 | 2 | **Red Team Basic** | One-liner security scan — 13 attack types, OWASP probes 🛡️ | Yes | 5 min |
 | 3 | **Red Team Advanced** | Custom pipeline, OWASP compliance, PDF export, baseline tracking 🛡️ | Yes | 10 min |
 
-### F — Data & Infrastructure (7 samples)
+### F — Data & Infrastructure
 
 | # | Sample | What You'll Learn | Azure? | Time |
 |---|--------|-------------------|--------|------|
@@ -103,7 +103,7 @@ The benchmark samples (H2–H9) also respect a preset tier via `--preset {smoke|
 
 > *Steps 1–6 run offline; Step 7 (optional live LLM demo) requires Azure credentials.
 
-### G — Memory Evaluation (10 samples)
+### G — Memory Evaluation
 
 | # | Sample | What You'll Learn | Azure? | Time |
 |---|--------|-------------------|--------|------|
@@ -118,7 +118,7 @@ The benchmark samples (H2–H9) also respect a preset tier via `--preset {smoke|
 | 9 | **Run Single Benchmark** | Pick Quick/Standard/Full, run, save baseline, view report | Yes | 8 min |
 | 10 | **LongMemEval Baseline Repro** | Reproduce the GPT-4o paper baseline (TextBlob mode) | Yes | 20 min |
 
-### H — Benchmarks (v1.1)  ★ JSON + HTML (+ PDF) for every registered family (13 samples)
+### H — Benchmarks  ★ JSON + HTML (+ PDF) for every registered family
 
 End-to-end walkthroughs of the families registered via `BenchmarkFamilyRegistry`. Each sample resolves
 its preset tier (smoke / standard / audit-grade) at runtime via `BenchmarkSampleHelpers.ResolvePreset`
@@ -147,7 +147,7 @@ expectations, preset selection details, and where artefacts land on disk.
 
 ---
 
-### I — Observability (Glass Box) (4 samples)
+### I — Observability (Glass Box)
 
 The dual-boundary trace that records what an agent actually did, turn by turn — and what the framework hides.
 
@@ -160,7 +160,7 @@ The dual-boundary trace that records what an agent actually did, turn by turn �
 
 ---
 
-### J — Gatekeeper (Runtime Protection)  ★ no credentials — fail-closed runtime enforcement (2 samples)
+### J — Gatekeeper (Runtime Protection)  ★ no credentials — fail-closed runtime enforcement
 
 AgentEval doesn't only MEASURE agents — it can STOP them. The same probes/evaluators you red-team with become
 runtime gates that block bad actions before they happen. See **`docs/gatekeeper.md`** for the developer guide.
