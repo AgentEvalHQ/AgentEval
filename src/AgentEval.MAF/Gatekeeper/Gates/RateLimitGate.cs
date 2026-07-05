@@ -40,6 +40,12 @@ public sealed class RateLimitGate : SessionContextGate
             throw new ArgumentOutOfRangeException(nameof(maxRuns), maxRuns, "maxRuns must be at least 1.");
         }
 
+        if (window <= TimeSpan.Zero)
+        {
+            // A non-positive window would reset the counter every call — silently disabling the limit (fail-open).
+            throw new ArgumentOutOfRangeException(nameof(window), window, "window must be positive.");
+        }
+
         _maxRuns = maxRuns;
         _window = window;
         _time = timeProvider ?? TimeProvider.System;

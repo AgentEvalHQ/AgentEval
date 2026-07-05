@@ -143,33 +143,34 @@ public class RunGateTests
         Assert.Equal(0, scripted.CallCount);
     }
 
-    // ── the critical round-2 regression: SequenceGate must block across STREAMING segments with a run gate ──
+    // ── the critical round-2 regression, made LOAD-BEARING via cross-run isolation ──
+    // With per-run scoping (the fix), a fresh streaming run has its own SequenceGate state; without it (tool
+    // calls see a null scope and share the fallback set), run 1's trigger leaks and wrongly blocks run 2.
 
     [Fact]
-    public async Task Streaming_SequenceGate_BlocksGuardedToolAfterTrigger_AcrossSegments()
+    public async Task Streaming_SequenceGate_State_IsIsolatedPerRun()
     {
+        var gate = new SequenceGate(["read_secrets"], ["send_email"]);   // ONE instance reused across runs
+
+        // run 1 (streaming): fire only the trigger
         var reads = 0;
-        var sends = 0;
         var readTool = AIFunctionFactory.Create(() => { Interlocked.Increment(ref reads); return "secret"; }, "read_secrets");
+        var scripted1 = new ScriptedChatClient().AddToolCall("c1", "read_secrets", new Dictionary<string, object?>()).AddText("done");
+        var agent1 = new ChatClientAgent(scripted1, new ChatClientAgentOptions { Name = "A1", ChatOptions = new ChatOptions { Tools = [readTool] } })
+            .AsBuilder().UseAgentEvalGate().UseAgentEvalToolGate([gate], ToolGatePolicy.ReplaceResult).Build();
+        await foreach (var _ in agent1.RunStreamingAsync("go")) { }
+        Assert.Equal(1, reads);
+
+        // run 2 (separate streaming run/scope): fire ONLY the guarded tool — must be ALLOWED (run 1's trigger
+        // belongs to run 1's scope; it must NOT leak here). Fails without the stable per-run scope fix.
+        var sends = 0;
         var sendTool = AIFunctionFactory.Create((string body) => { Interlocked.Increment(ref sends); return "sent"; }, "send_email");
-        var scripted = new ScriptedChatClient()
-            .AddToolCall("c1", "read_secrets", new Dictionary<string, object?>())
-            .AddToolCall("c2", "send_email", new Dictionary<string, object?> { ["body"] = "x" })
-            .AddText("done");
-        var agent = new ChatClientAgent(scripted, new ChatClientAgentOptions
-        {
-            Name = "T",
-            ChatOptions = new ChatOptions { Tools = [readTool, sendTool] },
-        });
-        var gated = agent.AsBuilder()
-            .UseAgentEvalGate()   // outer: establishes ONE stable run scope across streaming segments
-            .UseAgentEvalToolGate([new SequenceGate(["read_secrets"], ["send_email"])], ToolGatePolicy.ReplaceResult)
-            .Build();
+        var scripted2 = new ScriptedChatClient().AddToolCall("c2", "send_email", new Dictionary<string, object?> { ["body"] = "x" }).AddText("done");
+        var agent2 = new ChatClientAgent(scripted2, new ChatClientAgentOptions { Name = "A2", ChatOptions = new ChatOptions { Tools = [sendTool] } })
+            .AsBuilder().UseAgentEvalGate().UseAgentEvalToolGate([gate], ToolGatePolicy.ReplaceResult).Build();
+        await foreach (var _ in agent2.RunStreamingAsync("go")) { }
 
-        await foreach (var _ in gated.RunStreamingAsync("go")) { }
-
-        Assert.Equal(1, reads);   // the trigger ran
-        Assert.Equal(0, sends);   // send_email after read_secrets is blocked even across streaming pumps
+        Assert.Equal(1, sends);   // fresh per-run scope: run 1's trigger did NOT leak into run 2
     }
 
     // ── test doubles ──

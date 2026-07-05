@@ -14,6 +14,11 @@ namespace AgentEval.MAF.Gatekeeper;
 /// by the run gate), so each run starts fresh and state never leaks across runs. When no run scope is present
 /// (the run gate was not registered), state falls back to a single shared set — a fresh gate instance per run
 /// is then the caller's responsibility.</para>
+/// <para>⚠️ <b>Ordering scope.</b> This detects a trigger and a guarded call across <b>separate</b> tool
+/// invocations. It does NOT order two calls emitted in the <b>same</b> model iteration and invoked
+/// <em>concurrently</em> (under <c>AllowConcurrentInvocation</c>) — the seam exposes one call at a time and no
+/// sibling-call names, so a same-batch trigger+guarded pair has no observable happens-before. For strict
+/// same-batch protection, put the trigger and guarded tools on a <see cref="ForbiddenToolGate"/> instead.</para>
 /// </summary>
 public sealed class SequenceGate : IToolGate
 {
