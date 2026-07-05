@@ -9,7 +9,7 @@
 - **Evaluation** (LLM-as-judge scores, metrics) → always real or gracefully skipped
 - **Structure** (tool ordering, workflows, conversations) → can be demonstrated with mock data
 
-Group A samples A1–A4 (all except A5 Light Path, A6 Session Lifecycle, and A7 Advanced MAF Features) and Dataset Loaders / Extensibility in Group F run fully without credentials.
+Group A samples A1–A4 run fully without credentials (A5 Light Path, A6 Session Lifecycle, and A7 Advanced MAF Features require Azure), as do Dataset Loaders / Extensibility in Group F.
 Sample H1 (Registry Discovery) and H13 (Report Browser), plus all of Group J (Gatekeeper), also run without credentials.
 Most other samples work best with Azure OpenAI — check each group's **Azure?** column for the authoritative per-sample requirement.
 

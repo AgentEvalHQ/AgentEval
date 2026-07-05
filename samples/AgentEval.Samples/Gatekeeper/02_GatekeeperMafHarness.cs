@@ -59,8 +59,9 @@ public static class GatekeeperMafHarness
 
         // ── Legit support request ──
         Section("A legitimate support request");
-        var legit = await agent.RunAsync("Hi, where is my order A-1001?");
-        Console.WriteLine($"   User: \"Where is my order A-1001?\"");
+        var legitPrompt = "Hi, where is my order A-1001?";
+        var legit = await agent.RunAsync(legitPrompt);
+        Console.WriteLine($"   User: \"{legitPrompt}\"");
         Console.WriteLine($"   Agent: \"{legit.Text}\"");
         Console.WriteLine($"   → lookup_order ran {lookups} time(s) — the safe tool works normally. ✅");
 

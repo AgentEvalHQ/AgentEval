@@ -602,18 +602,18 @@ dotnet run --project samples/AgentEval.Samples
 
 The interactive menu lets you select a **group** (A–J), then a **sample** within it.
 
-| Group | Focus | Samples |
-|-------|-------|---------|
-| **A — Getting Started** ★ mostly no credentials | Hello World, tool tracking, performance basics, MAF integration patterns | 7 |
-| **B — Metrics & Quality** | RAG evaluation, quality metrics, judge calibration, responsible AI | 5 |
-| **C — Workflows & Conversations** | Multi-turn conversations, MAF workflows, source-gen executors | 4 |
-| **D — Performance & Statistics** | Latency profiling, stochastic evaluation, model comparison, streaming | 5 |
-| **E — Safety & Security** | Policy guardrails, red team scanning, OWASP compliance | 3 |
-| **F — Data & Infrastructure** | Snapshot testing, datasets, trace replay, benchmarks, cross-framework | 7 |
-| **G — Memory Evaluation** | Memory basics, benchmarks, scenarios, DI, cross-session, HTML reports, LongMemEval (ICLR 2025) | 10 |
-| **H — Benchmarks** | Compliance & performance benchmark families → JSON / HTML / PDF reports | 13 |
-| **I — Observability (Glass Box)** | Dual-boundary per-turn tracing, trace fidelity, auto-audit | 4 |
-| **J — Gatekeeper (Runtime Protection)** ★ no credentials | Fail-closed runtime enforcement: the gate-layer walkthrough + a realistic gated MAF agent harness | 2 |
+| Group | Focus |
+|-------|-------|
+| **A — Getting Started** ★ mostly no credentials | Hello World, tool tracking, performance basics, MAF integration patterns |
+| **B — Metrics & Quality** | RAG evaluation, quality metrics, judge calibration, responsible AI |
+| **C — Workflows & Conversations** | Multi-turn conversations, MAF workflows, source-gen executors |
+| **D — Performance & Statistics** | Latency profiling, stochastic evaluation, model comparison, streaming |
+| **E — Safety & Security** | Policy guardrails, red team scanning, OWASP compliance |
+| **F — Data & Infrastructure** | Snapshot testing, datasets, trace replay, benchmarks, cross-framework |
+| **G — Memory Evaluation** | Memory basics, benchmarks, scenarios, DI, cross-session, HTML reports, LongMemEval (ICLR 2025) |
+| **H — Benchmarks** | Compliance & performance benchmark families → JSON / HTML / PDF reports |
+| **I — Observability (Glass Box)** | Dual-boundary per-turn tracing, trace fidelity, auto-audit |
+| **J — Gatekeeper (Runtime Protection)** ★ no credentials | Fail-closed runtime enforcement: the gate-layer walkthrough + a realistic gated MAF agent harness |
 
 See [samples/AgentEval.Samples/README.md](samples/AgentEval.Samples/README.md) for the full listing with per-sample descriptions, timing, and credential requirements.
 
