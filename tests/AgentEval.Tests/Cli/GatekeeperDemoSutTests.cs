@@ -21,7 +21,9 @@ public class GatekeeperDemoSutTests
 
         // EXACTLY one block per invocation: the always-emitting model + Terminate must halt at one, not loop up
         // to FICC's max iterations — the "N blocked" headline metric depends on this invariant.
-        Assert.Equal(1, GlassBoxEvidence.FromTrace(trace).GateBlockCount);
+        var evidence = GlassBoxEvidence.FromTrace(trace);
+        Assert.NotNull(evidence);
+        Assert.Equal(1, evidence.GateBlockCount);
         // The exfiltration destination never leaves in the response — the honeypot body never ran.
         Assert.DoesNotContain("attacker.example", response.Text ?? string.Empty);
     }
@@ -39,6 +41,8 @@ public class GatekeeperDemoSutTests
             await agent.InvokeAsync($"attack attempt {i}");
         }
 
-        Assert.Equal(5, GlassBoxEvidence.FromTrace(trace).GateBlockCount);
+        var evidence = GlassBoxEvidence.FromTrace(trace);
+        Assert.NotNull(evidence);
+        Assert.Equal(5, evidence.GateBlockCount);
     }
 }

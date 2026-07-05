@@ -218,6 +218,37 @@ public class RedTeamCommandTests
         Assert.Contains("--azure", ex.Message);
     }
 
+    // ── --sut gatekeeper-demo validation (the credential-free on-ramp) ──
+
+    [Fact]
+    public async Task ExecuteAsync_UnknownSut_Throws()
+    {
+        var opts = new RedTeamOptions { Sut = "bogus", Intensity = "quick", Format = "json" };
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => RedTeamCommand.ExecuteAsync(opts, CancellationToken.None));
+        Assert.Contains("--sut", ex.Message);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_GatekeeperDemo_ParallelismGreaterThanOne_Throws()
+    {
+        // The demo agent is stateful; concurrent probes would race it, so --parallelism>1 is rejected.
+        var opts = new RedTeamOptions { Sut = "gatekeeper-demo", Parallelism = 2, Intensity = "quick", Format = "json" };
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => RedTeamCommand.ExecuteAsync(opts, CancellationToken.None));
+        Assert.Contains("parallelism", ex.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_GatekeeperDemo_JudgeWithoutJudgeModel_Throws()
+    {
+        // The demo has no model of its own; --judge without --judge-model would use a non-existent model.
+        var opts = new RedTeamOptions { Sut = "gatekeeper-demo", JudgeEndpoint = "https://judge.example", Intensity = "quick", Format = "json" };
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => RedTeamCommand.ExecuteAsync(opts, CancellationToken.None));
+        Assert.Contains("--judge-model", ex.Message);
+    }
+
     [Fact]
     public async Task ExecuteAsync_AzureWithoutDeploymentName_Throws()
     {

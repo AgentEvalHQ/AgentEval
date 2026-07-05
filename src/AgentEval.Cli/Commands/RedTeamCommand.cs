@@ -274,7 +274,7 @@ internal static class RedTeamCommand
 
         // 1. Validate
         // --sut gatekeeper-demo runs a built-in, credential-free gated agent, so the endpoint checks are skipped.
-        var isGatekeeperDemo = string.Equals(opts.Sut, "gatekeeper-demo", StringComparison.OrdinalIgnoreCase);
+        var isGatekeeperDemo = string.Equals(opts.Sut?.Trim(), "gatekeeper-demo", StringComparison.OrdinalIgnoreCase);
         if (opts.Sut is not null && !isGatekeeperDemo)
             throw new InvalidOperationException($"Unknown --sut value: '{opts.Sut}'. Valid: gatekeeper-demo.");
 
@@ -577,7 +577,7 @@ internal static class RedTeamCommand
             // Gatekeeper demo: report how many attack attempts the runtime gate blocked (the closed loop).
             if (gateTrace is not null)
             {
-                var blocks = AgentEval.Tracing.GlassBoxEvidence.FromTrace(gateTrace).GateBlockCount;
+                var blocks = AgentEval.Tracing.GlassBoxEvidence.FromTrace(gateTrace)?.GateBlockCount ?? 0;
                 Console.Error.WriteLine($"  Gatekeeper: {blocks} forbidden tool call(s) blocked before execution (gate.tool.* evidence).");
             }
         }
