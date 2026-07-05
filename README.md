@@ -411,7 +411,7 @@ await result.ExportHtmlReportAsync("memory-report.html");
 | "What's the latency/cost?" | **Performance metrics** - TTFT, tokens, estimated cost |
 | "How do I debug failures?" | **Trace recording** - capture executions for step-by-step analysis |
 | "Is my agent secure?" | **Red Team evaluation** - 258 probes, full OWASP LLM Top 10 2025 coverage |
-| "Can I STOP a bad action at runtime?" | **Gatekeeper** - fail-closed runtime enforcement: block forbidden tool calls before they run, quarantine compromised sessions |
+| "Can I stop a bad action at runtime?" | **Gatekeeper** - fail-closed runtime enforcement: block forbidden tool calls before they run, quarantine compromised sessions |
 | "Is content safe and unbiased?" | **ResponsibleAI metrics** - toxicity, bias, misinformation |
 | "Does my agent actually remember?" | **Memory evaluation** - retention, reach-back, temporal, LongMemEval (ICLR 2025) |
 

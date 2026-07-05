@@ -1,6 +1,6 @@
 # ADR-025 — Gatekeeper: runtime fail-closed enforcement middleware
 
-- **Status:** Accepted (2026-07-05). Implemented (M0–M5) in `src/AgentEval.MAF/Gatekeeper/` + `src/AgentEval.RedTeam.Gatekeeper/`.
+- **Status:** Accepted (2026-07-05). Implemented in `src/AgentEval.MAF/Gatekeeper/` + `src/AgentEval.RedTeam.Gatekeeper/`.
 - **Relates to:** ADR-019/020 (Glass Box dual-boundary trace — Gatekeeper records its evidence there), the shipped chat-gate primitives (`IChatGate` / `EvalGatePolicy`), ADR-021→024 (the red-team oracles the "moat" gates reuse).
 - **One-line:** evaluation and red-teaming find problems *after the fact*; Gatekeeper puts the same checks **in the request path** so a forbidden tool call, poisoned argument, or compromised conversation is **blocked before it happens** — and it is **fail-closed by construction**, with the expensive checks moved off the hot path.
 
@@ -38,6 +38,6 @@ Inline gates **reject** `GateCost.Network`/`Llm` at construction (`GateCost` dri
 ## Consequences
 
 - Enforcement is composable and independent per layer; adding a gate under the default `WarnOnly` never changes an agent's behavior (opt into `ReplaceResult`/`Terminate` for prod).
-- The closed loop is demonstrable end-to-end: `agenteval redteam --sut gatekeeper-demo` runs the attack suite against a gated agent, credential-free, and composes with the shipped `--baseline`/`--fail-on regression` gate (attack-the-gate CI).
-- **Deferred:** workflow middleware (M6) is blocked upstream on `microsoft/agent-framework#3075` — no MAF seam exists yet.
+- The closed loop is demonstrable end-to-end: the shipped red-team attack suite runs against a Gatekeeper-gated agent (wrapped as an evaluable SUT) and composes with the `--baseline`/`--fail-on regression` gate — a probe that gets *through* a gate becomes a new conclusive failure (attack-the-gate CI).
+- Workflow-level enforcement is not covered: MAF exposes no workflow-middleware seam to hook (tracked upstream at `microsoft/agent-framework#3075`).
 - Each milestone was reviewed adversarially to convergence and through the Copilot review loop before merge; the fail-closed posture caught real defects (a JSON-escape fail-open, a streaming bypass, a composed-LLM-grader gap) that a contract/test alone would have missed.
