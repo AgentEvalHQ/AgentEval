@@ -411,6 +411,7 @@ await result.ExportHtmlReportAsync("memory-report.html");
 | "What's the latency/cost?" | **Performance metrics** - TTFT, tokens, estimated cost |
 | "How do I debug failures?" | **Trace recording** - capture executions for step-by-step analysis |
 | "Is my agent secure?" | **Red Team evaluation** - 258 probes, full OWASP LLM Top 10 2025 coverage |
+| "Can I stop a bad action at runtime?" | **Gatekeeper** - fail-closed runtime enforcement: block forbidden tool calls before they run, quarantine compromised sessions |
 | "Is content safe and unbiased?" | **ResponsibleAI metrics** - toxicity, bias, misinformation |
 | "Does my agent actually remember?" | **Memory evaluation** - retention, reach-back, temporal, LongMemEval (ICLR 2025) |
 
@@ -450,6 +451,7 @@ await result.ExportHtmlReportAsync("memory-report.html");
 
 ### Evaluation Coverage
 - Red Team security - 258 probes, full OWASP LLM Top 10 2025, MITRE ATLAS coverage
+- Gatekeeper runtime enforcement - fail-closed gates that block forbidden tool calls before they run, red-team probes as runtime guards, and an async shadow judge that quarantines compromised sessions ([docs](docs/gatekeeper.md))
 - Responsible AI - toxicity, bias, misinformation detection
 - **Memory evaluation** - retention, reach-back, temporal, cross-session, HTML pentagon reports, LongMemEval (ICLR 2025)
 - Multi-turn conversations - full conversation flow evaluation
