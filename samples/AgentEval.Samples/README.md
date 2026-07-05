@@ -9,7 +9,7 @@
 - **Evaluation** (LLM-as-judge scores, metrics) → always real or gracefully skipped
 - **Structure** (tool ordering, workflows, conversations) → can be demonstrated with mock data
 
-Group A (samples A1–A5, except A6 Session Lifecycle) and Dataset Loaders / Extensibility in Group F run fully without credentials.
+Group A samples A1–A4 (all except A5 Light Path, A6 Session Lifecycle, and A7 Advanced MAF Features) and Dataset Loaders / Extensibility in Group F run fully without credentials.
 Sample H1 (Registry Discovery) and H13 (Report Browser), plus all of Group J (Gatekeeper), also run without credentials.
 All other samples require Azure OpenAI for meaningful results.
 
@@ -167,7 +167,7 @@ runtime gates that block bad actions before they happen. See **`docs/gatekeeper.
 
 | # | Sample | What It Exercises | Azure? | Time |
 |---|--------|-------------------|--------|------|
-| 1 | **Enforcement Walkthrough** | Six scenarios across the gate layers: tool / moat / canary / shadow-judge / defense-in-depth / more gates | No | <2 min |
+| 1 | **Enforcement Walkthrough** | Scenarios across the gate layers: tool / moat / canary / shadow-judge / defense-in-depth / more gates | No | <2 min |
 | 2 | **MAF Agent Harness** | A realistic gated MAF support agent — a legit request flows, a prompt-injection attack is blocked at the tool boundary | No | <2 min |
 
 ---

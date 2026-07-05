@@ -6,7 +6,7 @@ using System.Text.Json;
 namespace AgentEval.Samples.Benchmarks;
 
 /// <summary>
-/// Benchmarks H10: Report Browser — scans the local <c>samples/AgentEval.Samples/output/</c>
+/// Benchmarks H13: Report Browser — scans the local <c>samples/AgentEval.Samples/output/</c>
 /// directory, lists the most-recent benchmark runs (newest first), and lets the user open
 /// any one of them with the OS default app.
 ///
@@ -56,7 +56,7 @@ public static class ReportBrowserBenchmark
         var useCanonical = string.Equals(mode, "canonical", StringComparison.OrdinalIgnoreCase);
 
         BenchmarkSampleHelpers.PrintHeader(
-            "Benchmarks H10: Report Browser",
+            "Benchmarks H13: Report Browser",
             useCanonical
                 ? "Browse runs under .agenteval/ (canonical Option-B walk — surfaces audit hash + subject identity)"
                 : "Browse runs under samples/.../output/ (sidecar walk — surfaces score + label directly)");
