@@ -250,6 +250,16 @@ public class RedTeamCommandTests
     }
 
     [Fact]
+    public async Task ExecuteAsync_GatekeeperDemo_AttackerWithoutAttackerModel_Throws()
+    {
+        // Symmetric to the judge check: --attacker without --attacker-model would use a non-existent model.
+        var opts = new RedTeamOptions { Sut = "gatekeeper-demo", AttackerEndpoint = "https://attacker.example", Intensity = "quick", Format = "json" };
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => RedTeamCommand.ExecuteAsync(opts, CancellationToken.None));
+        Assert.Contains("--attacker-model", ex.Message);
+    }
+
+    [Fact]
     public async Task ExecuteAsync_AzureWithoutDeploymentName_Throws()
     {
         var opts = new RedTeamOptions

