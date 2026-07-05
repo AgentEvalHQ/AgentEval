@@ -49,6 +49,16 @@ public static class AgentEvalToolGateExtensions
                     $"Gate '{g.PolicyName}' has Cost={g.Cost}, which cannot run inline on the tool-invocation hot path. " +
                     "Use shadow mode (a later milestone) for network/LLM gates.", nameof(gates));
             }
+
+            // Build-time enforcement floor: a gate whose purpose is to STOP an action (e.g. a honeypot canary)
+            // must not be silently downgraded to observe-only, which would let the forbidden action run.
+            if (EnforcementRank(policy) < EnforcementRank(g.MinimumPolicy))
+            {
+                throw new ArgumentException(
+                    $"Gate '{g.PolicyName}' requires at least policy {g.MinimumPolicy} to enforce, but was registered " +
+                    $"under {policy} (which would let a blocked call run). Register it under {g.MinimumPolicy} or stronger.",
+                    nameof(policy));
+            }
         }
 
         var gateSeq = 0;
@@ -141,6 +151,15 @@ public static class AgentEvalToolGateExtensions
 
     private static string SynthesizedRefusal(string policyName, string? reason)
         => $"BLOCKED by policy '{policyName}': {reason ?? "not permitted"}. Choose a different action.";
+
+    // Enforcement strength ordering: WarnOnly (observe) < ReplaceResult (block) < Terminate (block + stop loop).
+    private static int EnforcementRank(ToolGatePolicy policy) => policy switch
+    {
+        ToolGatePolicy.WarnOnly => 0,
+        ToolGatePolicy.ReplaceResult => 1,
+        ToolGatePolicy.Terminate => 2,
+        _ => 0,
+    };
 
     private static string SerializeArgs(IDictionary<string, object?>? args)
     {

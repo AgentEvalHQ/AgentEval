@@ -2,9 +2,11 @@
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 
+using System.Reflection;
 using System.Text.Encodings.Web;
 using System.Text.Json;
 using AgentEval.MAF.Gatekeeper;
+using Microsoft.Extensions.AI;
 
 namespace AgentEval.RedTeam.Gatekeeper;
 
@@ -12,7 +14,17 @@ namespace AgentEval.RedTeam.Gatekeeper;
 /// Gatekeeper M3 (the moat) — runs a <b>deterministic</b> red-team <see cref="IProbeEvaluator"/> as a runtime
 /// tool gate: the same evaluator that scores attack-success in an offline red-team run now BLOCKS a live tool
 /// call whose arguments would trip it. This closes the eval → red-team → enforcement loop (a probe that
-/// <em>attacks</em> now <em>guards</em>). Attack-succeeded ⇒ Block; Resisted/Inconclusive ⇒ Allow.
+/// <em>attacks</em> now <em>guards</em>).
+/// <para><b>Fail closed.</b> Only a clear <c>Resisted</c> verdict allows the call; <c>Succeeded</c> (attack
+/// detected) AND <c>Inconclusive</c> (cannot determine) both BLOCK. This deliberately inverts the grading
+/// convention (don't score abstention as failure) because a runtime security gate that cannot prove a call safe
+/// must not run it — and it turns an evaluator that silently no-ops at this seam into a loud block, not a leak.</para>
+/// <para><b>Content evaluators only.</b> Intended for self-contained CONTENT oracles (token / regex / decode
+/// marker scans) that read the response text. A <em>behavioral</em> oracle (detection on the
+/// <c>AgentResponse</c>/RawMessages overload) or a <em>probe-dependent</em> one (reads <c>probe.ExpectedTokens</c>)
+/// no-ops at this seam and — via the fail-closed rule above — blocks EVERYTHING, surfacing the misconfiguration
+/// loudly rather than leaking. For forbidden-tool-NAME detection use <see cref="CanaryToolGate"/> /
+/// <see cref="AgentEval.MAF.Gatekeeper.ForbiddenToolGate"/> instead.</para>
 /// </summary>
 /// <remarks>
 /// <para><b>Cost (PERF/SEC).</b> An <see cref="IProbeEvaluator"/> exposes no cost, so the CALLER declares the
@@ -63,13 +75,14 @@ public sealed class ProbeEvaluatorGate : IToolGate
                 "evaluators are allowed — run expensive judges as a shadow/offline evaluator instead.", nameof(cost));
         }
 
-        // Belt-and-suspenders: reject known LLM-backed evaluators even if mis-declared as cheap.
-        var typeName = evaluator.GetType().Name;
-        if (typeName is "LLMJudgeEvaluator" or "LikertJudgeEvaluator")
+        // Belt-and-suspenders: reject ANY LLM-backed evaluator even if mis-declared as cheap. Detected generically
+        // by an IChatClient field (catches LLMJudge/Likert/JudgeBacked/Decomposed graders, not a brittle name list).
+        if (HoldsChatClient(evaluator.GetType()))
         {
             throw new ArgumentException(
-                $"{typeName} is LLM-backed and cannot run inline as a tool gate; declare it as a shadow " +
-                "evaluator instead.", nameof(evaluator));
+                $"Evaluator '{evaluator.GetType().Name}' holds an IChatClient (LLM-backed) and cannot run inline as " +
+                "a tool gate — it would stall every tool call and risk a fabricated verdict. Declare it as a " +
+                "shadow evaluator instead.", nameof(evaluator));
         }
 
         _evaluator = evaluator;
@@ -85,16 +98,36 @@ public sealed class ProbeEvaluatorGate : IToolGate
         var candidate = BuildCandidateText(call);
         var result = await _evaluator.EvaluateAsync(SentinelProbe, candidate, cancellationToken).ConfigureAwait(false);
 
-        // Attack-succeeded ⇒ the call trips the evaluator ⇒ block. Resisted/Inconclusive ⇒ allow (never
-        // fabricate a block on an uncertain verdict — honesty over false positives).
-        return result.AttackSucceeded
-            ? ToolGateVerdict.Block(PolicyName, result.Reason)
-            : ToolGateVerdict.Allow(PolicyName);
+        // FAIL CLOSED on the enforcement path: only a clear RESISTED verdict allows the call. Succeeded blocks
+        // (attack detected); Inconclusive also blocks (cannot-determine ⇒ deny). This is the opposite of the
+        // GRADING convention (where abstention must not be scored as a failure) — a runtime security gate that
+        // cannot prove a call safe must not run it. Crucially, it converts an evaluator that silently no-ops on
+        // this seam (a behavioral or probe-dependent oracle returning Inconclusive) into a LOUD block, never a
+        // silent allow.
+        return result.AttackResisted
+            ? ToolGateVerdict.Allow(PolicyName)
+            : ToolGateVerdict.Block(PolicyName, result.Reason);
     }
 
     private static string BuildCandidateText(GatedToolCall call)
     {
         var args = call.Arguments is null ? "{}" : JsonSerializer.Serialize(call.Arguments, ScanOptions);
         return $"{call.FunctionName} {args}";
+    }
+
+    // True if the evaluator (or a base type) holds a field/property typed as IChatClient — i.e. it is LLM-backed.
+    private static bool HoldsChatClient(Type type)
+    {
+        for (var t = type; t is not null && t != typeof(object); t = t.BaseType)
+        {
+            const BindingFlags flags = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly;
+            if (t.GetFields(flags).Any(f => typeof(IChatClient).IsAssignableFrom(f.FieldType))
+                || t.GetProperties(flags).Any(p => typeof(IChatClient).IsAssignableFrom(p.PropertyType)))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

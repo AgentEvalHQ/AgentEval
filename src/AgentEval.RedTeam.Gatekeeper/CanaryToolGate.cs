@@ -24,6 +24,12 @@ public sealed class CanaryToolGate : IToolGate
     /// <inheritdoc/>
     public GateCost Cost => GateCost.PureCode;
 
+    /// <summary>
+    /// A honeypot must ENFORCE — running it under observe-only would let the emit through, silently breaching the
+    /// trap. So <c>UseAgentEvalToolGate</c> refuses to register this gate under <see cref="ToolGatePolicy.WarnOnly"/>.
+    /// </summary>
+    public ToolGatePolicy MinimumPolicy => ToolGatePolicy.ReplaceResult;
+
     /// <summary>Creates the gate over the canary honeypots to watch for (matched by name, case-insensitively).</summary>
     public CanaryToolGate(IEnumerable<CanaryTool> canaries)
     {
@@ -52,8 +58,12 @@ public sealed class CanaryToolGate : IToolGate
 
 /// <summary>
 /// Builds visible, schema-only lure tools from <see cref="CanaryTool"/>s to register in an agent's
-/// <c>ChatOptions.Tools</c> (so the model can SEE and be tempted by them). The stub throws if ever invoked — the
-/// paired <see cref="CanaryToolGate"/> blocks the emit first; a throw means the gate was not wired.
+/// <c>ChatOptions.Tools</c> (so the model can SEE and be tempted by them).
+/// <para>⚠️ <b>The lure alone gives NO protection — the paired <see cref="CanaryToolGate"/> is mandatory.</b>
+/// The stub's throw is a last-ditch tripwire, but MAF's <c>FunctionInvokingChatClient</c> SWALLOWS a thrown
+/// function into a tool-error result, so an unwired lure would be invoked and silently swallowed (the honeypot
+/// breached without a hard failure). Always register a <see cref="CanaryToolGate"/> (ReplaceResult/Terminate)
+/// for the same canaries — the gate blocks the emit BEFORE the stub runs.</para>
 /// </summary>
 public static class CanaryLure
 {

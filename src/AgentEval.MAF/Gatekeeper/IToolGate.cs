@@ -23,4 +23,13 @@ public interface IToolGate
 
     /// <summary>Inspect one tool call and return a verdict. Deterministic gates should complete synchronously.</summary>
     ValueTask<ToolGateVerdict> InspectAsync(GatedToolCall call, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// The weakest <see cref="ToolGatePolicy"/> under which this gate is safe to run. Defaults to
+    /// <see cref="ToolGatePolicy.WarnOnly"/> (observe-only is fine). A gate whose whole purpose is to STOP an
+    /// action — e.g. a honeypot canary gate — overrides this to at least <see cref="ToolGatePolicy.ReplaceResult"/>
+    /// so <c>UseAgentEvalToolGate</c> refuses to silently downgrade it to observe-only (which would let the
+    /// forbidden action run). Enforcement strength: WarnOnly &lt; ReplaceResult &lt; Terminate.
+    /// </summary>
+    ToolGatePolicy MinimumPolicy => ToolGatePolicy.WarnOnly;
 }
