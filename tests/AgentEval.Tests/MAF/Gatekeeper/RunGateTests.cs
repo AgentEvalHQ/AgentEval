@@ -129,7 +129,57 @@ public class RunGateTests
         Assert.Equal("T", seenDuringTool!.AgentName);
     }
 
-    // ── test double ──
+    [Fact]
+    public async Task RunGate_ThrowingPreGate_FailsClosed()
+    {
+        var scripted = new ScriptedChatClient().AddText("answer");
+        var gated = Agent(scripted).AsBuilder()
+            .UseAgentEvalGate(pre: [new ThrowingChatGate()], policy: EvalGatePolicy.WarnOnly)   // even WarnOnly must fail closed on a throw
+            .Build();
+
+        var response = await gated.RunAsync("go");
+
+        Assert.Contains("BLOCKED", response.Text);   // cannot-inspect => deny
+        Assert.Equal(0, scripted.CallCount);
+    }
+
+    // ── the critical round-2 regression: SequenceGate must block across STREAMING segments with a run gate ──
+
+    [Fact]
+    public async Task Streaming_SequenceGate_BlocksGuardedToolAfterTrigger_AcrossSegments()
+    {
+        var reads = 0;
+        var sends = 0;
+        var readTool = AIFunctionFactory.Create(() => { Interlocked.Increment(ref reads); return "secret"; }, "read_secrets");
+        var sendTool = AIFunctionFactory.Create((string body) => { Interlocked.Increment(ref sends); return "sent"; }, "send_email");
+        var scripted = new ScriptedChatClient()
+            .AddToolCall("c1", "read_secrets", new Dictionary<string, object?>())
+            .AddToolCall("c2", "send_email", new Dictionary<string, object?> { ["body"] = "x" })
+            .AddText("done");
+        var agent = new ChatClientAgent(scripted, new ChatClientAgentOptions
+        {
+            Name = "T",
+            ChatOptions = new ChatOptions { Tools = [readTool, sendTool] },
+        });
+        var gated = agent.AsBuilder()
+            .UseAgentEvalGate()   // outer: establishes ONE stable run scope across streaming segments
+            .UseAgentEvalToolGate([new SequenceGate(["read_secrets"], ["send_email"])], ToolGatePolicy.ReplaceResult)
+            .Build();
+
+        await foreach (var _ in gated.RunStreamingAsync("go")) { }
+
+        Assert.Equal(1, reads);   // the trigger ran
+        Assert.Equal(0, sends);   // send_email after read_secrets is blocked even across streaming pumps
+    }
+
+    // ── test doubles ──
+
+    private sealed class ThrowingChatGate : IChatGate
+    {
+        public string PolicyName => "ThrowingChatGate";
+        public ValueTask<GateVerdict> InspectAsync(string text, CancellationToken cancellationToken = default)
+            => throw new InvalidOperationException("boom");
+    }
 
     private sealed class KeywordGate : IChatGate
     {

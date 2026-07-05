@@ -47,6 +47,37 @@ public sealed class AgentRunScope : IDisposable
     public static AgentRunScope Begin(AgentSession? session, string? agentName, AgentTrace? trace)
         => new(session, agentName, trace);
 
+    /// <summary>
+    /// Re-assert THIS scope as <see cref="Current"/> on the calling async flow, returning a disposable that
+    /// restores the previous scope. Used by the streaming run gate to keep ONE run identity stable across
+    /// stream segments — an AsyncLocal set once does not survive a <c>yield</c>, so each segment re-enters the
+    /// SAME scope instance (so per-run state keyed on the scope, e.g. <c>SequenceGate</c>, is not fragmented).
+    /// </summary>
+    public IDisposable Enter() => new Reassertion(this);
+
+    private sealed class Reassertion : IDisposable
+    {
+        private readonly AgentRunScope? _previous;
+        private bool _disposed;
+
+        public Reassertion(AgentRunScope scope)
+        {
+            _previous = CurrentScope.Value;
+            CurrentScope.Value = scope;
+        }
+
+        public void Dispose()
+        {
+            if (_disposed)
+            {
+                return;
+            }
+
+            _disposed = true;
+            CurrentScope.Value = _previous;
+        }
+    }
+
     /// <inheritdoc/>
     public void Dispose()
     {

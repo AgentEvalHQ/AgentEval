@@ -82,14 +82,12 @@ public static class AgentEvalRunGateExtensions
                 "run (buffered), or WarnOnly post-gates.");
         }
 
-        // Establish the run scope for the pre-gates too (a SessionContextGate pre-gate must see the session on
-        // the streaming path, exactly as on the non-streaming path — otherwise it fails closed on every stream).
-        string? preRefusal;
-        using (AgentRunScope.Begin(session, innerAgent.Name, trace))
-        {
-            preRefusal = await RunGatesAsync(preGates, ConcatText(messages), "run-pre", policy, trace, seq, ct).ConfigureAwait(false);
-        }
+        // ONE scope for the whole streaming run — a STABLE identity across segments, so per-run state keyed on
+        // the scope (e.g. SequenceGate) is not fragmented. The pre-gates run under it (before any yield, so a
+        // SessionContextGate pre-gate sees the session, exactly as on the non-streaming path).
+        using var runScope = AgentRunScope.Begin(session, innerAgent.Name, trace);
 
+        var preRefusal = await RunGatesAsync(preGates, ConcatText(messages), "run-pre", policy, trace, seq, ct).ConfigureAwait(false);
         if (preRefusal is not null)
         {
             var synth = new AgentResponse(new ChatMessage(ChatRole.Assistant, preRefusal)) { AgentId = innerAgent.Id };
@@ -101,13 +99,13 @@ public static class AgentEvalRunGateExtensions
             yield break;
         }
 
-        // PERF-01: re-establish the AgentRunScope INSIDE each MoveNextAsync — an AsyncLocal set once at the top
-        // of an async iterator does not survive the first yield (later MoveNext runs on the consumer's context).
+        // PERF-01: an AsyncLocal set once atop an async iterator does not survive the first yield (later
+        // MoveNext runs on the consumer's context) — so RE-ENTER the SAME scope instance inside each segment.
         await using var e = innerAgent.RunStreamingAsync(messages, session, options, ct).GetAsyncEnumerator(ct);
         while (true)
         {
             bool has;
-            using (AgentRunScope.Begin(session, innerAgent.Name, trace))
+            using (runScope.Enter())
             {
                 has = await e.MoveNextAsync().ConfigureAwait(false);
             }
@@ -126,7 +124,20 @@ public static class AgentEvalRunGateExtensions
     {
         foreach (var gate in gates)
         {
-            var verdict = await gate.InspectAsync(text, ct).ConfigureAwait(false);
+            GateVerdict verdict;
+            try
+            {
+                verdict = await gate.InspectAsync(text, ct).ConfigureAwait(false);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                // FAIL CLOSED (cannot-inspect ⇒ deny): a gate that throws cannot prove the run safe. Record and
+                // block regardless of policy (mirrors the tool gate).
+                var failVerdict = GateVerdict.Block(gate.PolicyName, $"gate evaluation threw ({ex.GetType().Name}) — failing closed");
+                RecordGate(trace, Interlocked.Increment(ref seq[0]), stage, failVerdict, "Block");
+                return SynthRefusal(failVerdict);
+            }
+
             if (verdict.Action != GateAction.Block)
             {
                 continue;
