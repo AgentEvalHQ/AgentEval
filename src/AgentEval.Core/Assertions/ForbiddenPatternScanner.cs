@@ -24,6 +24,15 @@ public static class ForbiddenPatternScanner
     {
         ArgumentNullException.ThrowIfNull(pattern);
 
+        // ReDoS guard: the fail-closed timeout handling below is only meaningful if the pattern actually has a
+        // bounded MatchTimeout. Reject an unbounded regex rather than letting IsMatch hang on a catastrophic one.
+        if (pattern.MatchTimeout == Regex.InfiniteMatchTimeout)
+        {
+            throw new ArgumentException(
+                "pattern must be constructed with a bounded MatchTimeout (ReDoS guard); Regex.InfiniteMatchTimeout is not allowed.",
+                nameof(pattern));
+        }
+
         // Nothing to scan == clean. Guard BEFORE matching so a permissive user regex (e.g. ".*", which
         // matches the empty string) cannot report a forbidden hit on absent/empty text.
         if (string.IsNullOrEmpty(text))

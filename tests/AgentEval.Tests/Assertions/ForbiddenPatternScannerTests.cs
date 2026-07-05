@@ -35,6 +35,14 @@ public class ForbiddenPatternScannerTests
     }
 
     [Fact]
+    public void UnboundedRegex_Throws()
+    {
+        // A pattern with no MatchTimeout can't be ReDoS-safe — the helper must reject it.
+        var noTimeout = new Regex("secret"); // Regex.InfiniteMatchTimeout
+        Assert.Throws<ArgumentException>(() => ForbiddenPatternScanner.ScanForForbiddenPattern("x", noTimeout));
+    }
+
+    [Fact]
     public void Timeout_FailsClosed_ReturnsTrue()
     {
         // A catastrophic-backtracking pattern with a tiny timeout must fail closed (treated as a hit).

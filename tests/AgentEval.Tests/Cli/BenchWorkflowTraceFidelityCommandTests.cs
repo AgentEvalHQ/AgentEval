@@ -19,11 +19,11 @@ public class BenchWorkflowTraceFidelityCommandTests : IDisposable
 
     public BenchWorkflowTraceFidelityCommandTests()
     {
-        _root = Path.Combine(Path.GetTempPath(), "agenteval-wtf-test-" + Guid.NewGuid().ToString("N"));
+        _root = Path.Combine(Path.GetTempPath(), "agenteval-workflow-trace-fidelity-test-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(_root);
         var dir = Path.Combine(_root, ".agenteval");
         Directory.CreateDirectory(dir);
-        var solutionDoc = new { schemaVersion = "1.0", id = Guid.NewGuid(), name = "WtfBenchTestSolution" };
+        var solutionDoc = new { schemaVersion = "1.0", id = Guid.NewGuid(), name = "WorkflowTraceFidelityBenchTestSolution" };
         File.WriteAllText(
             Path.Combine(dir, "solution.json"),
             JsonSerializer.Serialize(solutionDoc, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase }));

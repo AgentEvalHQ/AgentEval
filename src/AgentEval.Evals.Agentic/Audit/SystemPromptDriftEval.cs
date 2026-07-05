@@ -58,9 +58,10 @@ public sealed class SystemPromptDriftEval : IEval
                 "SystemPromptDriftEval needs at least 2 ChatTurn request entries to detect drift."));
         }
 
-        // Skip only when NOTHING was captured on any request (no signal); if at least one prompt was
-        // captured, a subsequent erasure or change counts as drift (null/empty compared as "").
-        if (prompts.All(string.IsNullOrEmpty))
+        // Skip only when NOTHING was captured on any request (every prompt null = not recorded by the schema).
+        // A captured EMPTY string ("") is a real value: all-"" is evaluated as stable, and a "bot" -> ""
+        // erasure counts as drift. (null = not-captured, "" = captured-empty — consistent with the injection eval.)
+        if (prompts.All(sp => sp is null))
         {
             return Task.FromResult(EvalResult.Skipped(this,
                 "SystemPromptDriftEval: no system prompt was captured on any request — no signal to compare."));
