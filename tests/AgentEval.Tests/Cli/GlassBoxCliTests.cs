@@ -83,6 +83,9 @@ public class GlassBoxCliTests : IDisposable
         Assert.Null(GateMetadataReader.StageFromKey("gate..1.Policy"));            // empty stage
         Assert.Null(GateMetadataReader.StageFromKey("gate.pre..Policy"));          // empty seq
         Assert.Null(GateMetadataReader.StageFromKey("gate.pre.1."));               // empty policy
+        Assert.Null(GateMetadataReader.StageFromKey("gate.pre.1..Policy"));        // leading-dot policy (empty segment)
+        Assert.Null(GateMetadataReader.StageFromKey("gate.pre.1.Policy."));        // trailing-dot policy
+        Assert.Null(GateMetadataReader.PolicyFromKey("gate.pre.1..Policy"));       // would otherwise yield ".Policy"
         Assert.Null(GateMetadataReader.PolicyFromKey("notgate.pre.1.Policy"));     // sibling: same guard
     }
 

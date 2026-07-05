@@ -37,16 +37,17 @@ public static class GateMetadataReader
         => TrySplitGateKey(key, out var parts) ? parts[1] : null;
 
     // A well-formed gate-verdict key is exactly gate.{stage}.{seq}.{policy} — the "gate." prefix plus non-empty
-    // stage, seq, and policy (the policy may itself contain dots). This rejects non-gate keys and empty segments
-    // so the extractors return null on a malformed key rather than misclassifying it (consistent with their docs).
+    // stage, seq, and policy. The policy may itself contain dots (e.g. "My.Policy"), but EVERY policy segment must
+    // be non-empty, so keys with a leading/trailing/double dot in the policy (e.g. "gate.pre.1..Policy") are
+    // rejected. This keeps the extractors returning null on a malformed key rather than misclassifying it.
     private static bool TrySplitGateKey(string key, out string[] parts)
     {
         parts = key.Split('.');
         return parts.Length >= 4
             && parts[0] == "gate"
-            && parts[1].Length > 0                 // stage
-            && parts[2].Length > 0                 // seq
-            && parts[3..].Any(static p => p.Length > 0);   // policy (join is non-empty)
+            && parts[1].Length > 0                          // stage
+            && parts[2].Length > 0                          // seq
+            && parts[3..].All(static p => p.Length > 0);    // policy — no empty segments (no leading/trailing/double dot)
     }
 
     private static string? ReadAction(object? value) => value switch
