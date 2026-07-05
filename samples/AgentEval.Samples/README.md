@@ -122,8 +122,9 @@ family-specific — see H1 Registry Discovery or `Benchmarks/README.md` for the 
 ### H — Benchmarks  ★ JSON + HTML (+ PDF) for every registered family
 
 End-to-end walkthroughs of the families registered via `BenchmarkFamilyRegistry`. Each sample resolves
-its preset tier (smoke / standard / audit-grade) at runtime via `BenchmarkSampleHelpers.ResolvePreset`
-(CLI `--preset`, `AGENTEVAL_SAMPLES_PRESET` env var, or interactive prompt — see `Benchmarks/README.md`).
+its preset tier at runtime via `BenchmarkSampleHelpers.ResolvePreset` (CLI `--preset <presetName>`,
+`AGENTEVAL_SAMPLES_PRESET` env var, or interactive prompt). Preset names are **family-specific** (e.g. OWASP
+uses `Top10`/`AuditGrade`) — see `Benchmarks/README.md` or H1 Registry Discovery for the valid values.
 
 | # | Sample | What It Exercises | Azure? | Time |
 |---|--------|-------------------|--------|------|
