@@ -78,7 +78,7 @@ dotnet run --project samples/AgentEval.Samples -- 54   # Report Browser  (H13)
 
 ## Preset selection
 
-Every executing sample (H2 – H10) respects a **preset tier** so the same code
+The benchmark-family samples **H2 – H10** respect a **preset tier** so the same code
 scales from a CI smoke check to a full audit:
 
 | Sample              | Smoke (default)              | Standard                    | Audit-Grade                          |
