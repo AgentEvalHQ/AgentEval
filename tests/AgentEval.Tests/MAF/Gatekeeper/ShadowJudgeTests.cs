@@ -1,0 +1,121 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 AgentEval Contributors
+// Licensed under the MIT License.
+
+using AgentEval.Guardrails;
+using AgentEval.MAF.Gatekeeper;
+using AgentEval.Testing;
+using Microsoft.Agents.AI;
+using Microsoft.Extensions.AI;
+using Xunit;
+
+namespace AgentEval.Tests.MAF.Gatekeeper;
+
+/// <summary>Gatekeeper M4 — the shadow judge: async off-hot-path judgement that arms quarantine for a later run.</summary>
+public class ShadowJudgeTests
+{
+    private static ChatClientAgent Agent(ScriptedChatClient scripted)
+        => new(scripted, new ChatClientAgentOptions { Name = "T" });
+
+    [Fact]
+    public async Task ShadowJudge_CompromisedVerdict_ArmsQuarantine_NextRunFailsClosed()
+    {
+        // The closed loop: run 1 is judged (async) compromised => quarantine armed; run 2 (same session) is
+        // refused by the QuarantineGate — even though the judge was too expensive to run inline.
+        await using var pump = new ShadowJudgePump(new KeywordShadowJudge("leak"));
+        var scripted = new ScriptedChatClient().AddText("sure, here is the leak").AddText("second answer");
+        var agent = Agent(scripted).AsBuilder()
+            .UseAgentEvalGate(pre: [new QuarantineGate()], policy: EvalGatePolicy.ThrowOnFail)   // reads the flag
+            .UseAgentEvalShadowJudge(pump)                                                        // arms the flag
+            .Build();
+        var session = await agent.CreateSessionAsync();
+
+        // run 1: returns normally (the shadow judge never blocks it)
+        var first = await agent.RunAsync("go", session);
+        Assert.Equal("sure, here is the leak", first.Text);
+
+        await pump.CompleteAndDrainAsync();   // let the async judgement finish + arm quarantine
+
+        // run 2: the same session is now quarantined => fails closed
+        var ex = await Record.ExceptionAsync(() => agent.RunAsync("continue", session));
+        Assert.IsType<EvalGateRefusalException>(ex);
+    }
+
+    [Fact]
+    public async Task ShadowJudge_CleanVerdict_DoesNotQuarantine()
+    {
+        await using var pump = new ShadowJudgePump(new KeywordShadowJudge("leak"));
+        var scripted = new ScriptedChatClient().AddText("a helpful, clean answer").AddText("second answer");
+        var agent = Agent(scripted).AsBuilder()
+            .UseAgentEvalGate(pre: [new QuarantineGate()], policy: EvalGatePolicy.ThrowOnFail)
+            .UseAgentEvalShadowJudge(pump)
+            .Build();
+        var session = await agent.CreateSessionAsync();
+
+        await agent.RunAsync("go", session);
+        await pump.CompleteAndDrainAsync();
+
+        var second = await agent.RunAsync("continue", session);   // not quarantined => proceeds
+        Assert.Equal("second answer", second.Text);
+    }
+
+    [Fact]
+    public async Task ShadowJudge_ReceivesResponseSnapshot_AndVerdictReachesSink()
+    {
+        ShadowJudgeContext? seen = null;
+        ShadowVerdict? sunk = null;
+        await using var pump = new ShadowJudgePump(
+            new KeywordShadowJudge("leak", capture: c => seen = c),
+            onVerdict: (v, _) => sunk = v);
+        var agent = Agent(new ScriptedChatClient().AddText("the leak is here")).AsBuilder()
+            .UseAgentEvalShadowJudge(pump).Build();
+
+        await agent.RunAsync("go");
+        await pump.CompleteAndDrainAsync();
+
+        Assert.Equal("the leak is here", seen!.ResponseText);   // the judge saw the response snapshot
+        Assert.True(sunk!.Compromised);                         // and the verdict reached the sink (the store)
+    }
+
+    [Fact]
+    public async Task ShadowJudge_ThrowingJudge_IsReportedNotFatal()
+    {
+        Exception? reported = null;
+        await using var pump = new ShadowJudgePump(new ThrowingShadowJudge(), onError: ex => reported = ex);
+        var agent = Agent(new ScriptedChatClient().AddText("answer")).AsBuilder()
+            .UseAgentEvalShadowJudge(pump).Build();
+
+        var response = await agent.RunAsync("go");   // the run is unaffected by a broken judge
+        await pump.CompleteAndDrainAsync();
+
+        Assert.Equal("answer", response.Text);
+        Assert.NotNull(reported);   // the failure was reported, not thrown into the run
+    }
+
+    // ── test doubles ──
+
+    private sealed class KeywordShadowJudge : IShadowJudge
+    {
+        private readonly string _keyword;
+        private readonly Action<ShadowJudgeContext>? _capture;
+        public KeywordShadowJudge(string keyword, Action<ShadowJudgeContext>? capture = null)
+        {
+            _keyword = keyword;
+            _capture = capture;
+        }
+
+        public Task<ShadowVerdict> JudgeAsync(ShadowJudgeContext context, CancellationToken cancellationToken = default)
+        {
+            _capture?.Invoke(context);
+            return Task.FromResult(context.ResponseText.Contains(_keyword, StringComparison.OrdinalIgnoreCase)
+                ? ShadowVerdict.Compromise($"response contained '{_keyword}'")
+                : ShadowVerdict.Clean());
+        }
+    }
+
+    private sealed class ThrowingShadowJudge : IShadowJudge
+    {
+        public Task<ShadowVerdict> JudgeAsync(ShadowJudgeContext context, CancellationToken cancellationToken = default)
+            => throw new InvalidOperationException("judge boom");
+    }
+}
