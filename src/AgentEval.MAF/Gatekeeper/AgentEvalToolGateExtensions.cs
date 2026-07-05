@@ -2,6 +2,7 @@
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 
+using System.Text.Encodings.Web;
 using System.Text.Json;
 using AgentEval.Tracing;
 using Microsoft.Agents.AI;
@@ -161,6 +162,10 @@ public static class AgentEvalToolGateExtensions
         _ => 0,
     };
 
+    // Relaxed encoder so the recorded args are FAITHFUL (not JSON-escaped): default escaping would render < > & '
+    // and non-ASCII as \uXXXX, so the mutation audit would not match the values the tool actually receives.
+    private static readonly JsonSerializerOptions ArgsSerializerOptions = new() { Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping };
+
     private static string SerializeArgs(IDictionary<string, object?>? args)
     {
         if (args is null || args.Count == 0)
@@ -170,7 +175,7 @@ public static class AgentEvalToolGateExtensions
 
         try
         {
-            return JsonSerializer.Serialize(args);
+            return JsonSerializer.Serialize(args, ArgsSerializerOptions);
         }
         catch (NotSupportedException)
         {

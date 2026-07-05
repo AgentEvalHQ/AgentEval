@@ -156,6 +156,26 @@ public class ToolGateTests
     }
 
     [Fact]
+    public async Task MutateArgs_EvidenceRecordsValuesFaithfully_NotJsonEscaped()
+    {
+        // The before/after args in the Mutate audit must match what the tool actually receives — default JSON
+        // escaping would render < > & as \uXXXX and make the audit misleading.
+        var tool = AIFunctionFactory.Create((string html) => "ok", "render");
+        var (agent, _) = BuildAgent(tool, "render", new Dictionary<string, object?> { ["html"] = "x" });
+        var trace = new AgentTrace();
+        var gated = agent.AsBuilder()
+            .UseAgentEvalToolGate(
+                [new MutatingGate("render", new Dictionary<string, object?> { ["html"] = "a<b>&'c" })],
+                ToolGatePolicy.WarnOnly, trace)
+            .Build();
+
+        await gated.RunAsync("go");
+
+        var value = (IDictionary<string, object?>)trace.Metadata!["gate.tool.1.MutatingGate"];
+        Assert.Contains("a<b>&'c", (string)value["argsAfter"]!);   // raw metacharacters, not < etc.
+    }
+
+    [Fact]
     public async Task SequenceGate_BlocksGuardedToolAfterTrigger()
     {
         var reads = 0;
