@@ -1,0 +1,180 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 AgentEval Contributors
+// Licensed under the MIT License.
+
+using AgentEval.MAF.Gatekeeper;
+using AgentEval.Testing;
+using AgentEval.Tracing;
+using Microsoft.Agents.AI;
+using Microsoft.Extensions.AI;
+using Xunit;
+using AgentTrace = AgentEval.Tracing.AgentTrace;
+
+namespace AgentEval.Tests.MAF.Gatekeeper;
+
+/// <summary>Gatekeeper M1 — the full tool gate: policies (Throw/Terminate/Mutate), gates, cost rejection.</summary>
+public class ToolGateTests
+{
+    private static (ChatClientAgent Agent, ScriptedChatClient Scripted) BuildAgent(AIFunction tool, string toolName, IDictionary<string, object?> args)
+    {
+        var scripted = new ScriptedChatClient()
+            .AddToolCall("call_1", toolName, args)
+            .AddText("done");
+        var agent = new ChatClientAgent(scripted, new ChatClientAgentOptions
+        {
+            Name = "T",
+            ChatOptions = new ChatOptions { Tools = [tool] },
+        });
+        return (agent, scripted);
+    }
+
+    // ── Policies ──
+
+    [Fact]
+    public async Task Terminate_Blocks_SetsTerminate_AndCountsAsBlock()
+    {
+        var executed = 0;
+        var tool = AIFunctionFactory.Create((string path) => { Interlocked.Increment(ref executed); return "ok"; }, "delete_file");
+        var (agent, _) = BuildAgent(tool, "delete_file", new Dictionary<string, object?> { ["path"] = "/etc" });
+        var trace = new AgentTrace();
+        var gated = agent.AsBuilder()
+            .UseAgentEvalToolGate([new ForbiddenToolGate("delete_file")], ToolGatePolicy.Terminate, trace)
+            .Build();
+
+        await gated.RunAsync("go");
+
+        Assert.Equal(0, executed);
+        Assert.Equal(1, GlassBoxEvidence.FromTrace(trace).GateBlockCount);   // Terminate still counts as a block
+        var value = (IDictionary<string, object?>)trace.Metadata!["gate.tool.1.ForbiddenToolGate"];
+        Assert.Equal(true, value["terminate"]);
+    }
+
+    [Fact]
+    public async Task MutateArgs_RewritesArgs_ToolReceivesMutatedValue()
+    {
+        // EMPIRICAL: does mutating context.Arguments reach the function? (Plan gates MutateArgs on this.)
+        string? received = null;
+        var tool = AIFunctionFactory.Create((string path) => { received = path; return path; }, "read_file");
+        var (agent, _) = BuildAgent(tool, "read_file", new Dictionary<string, object?> { ["path"] = "/original" });
+        var gate = new MutatingGate("read_file", new Dictionary<string, object?> { ["path"] = "/sandbox/original" });
+        var gated = agent.AsBuilder().UseAgentEvalToolGate([gate]).Build();
+
+        await gated.RunAsync("go");
+
+        Assert.Equal("/sandbox/original", received);   // the tool ran with the MUTATED argument
+    }
+
+    // ── Build-time cost rejection ──
+
+    [Fact]
+    public void NetworkCostGate_RejectedAtConstruction()
+    {
+        var tool = AIFunctionFactory.Create((string path) => "ok", "x");
+        var agent = new ChatClientAgent(new ScriptedChatClient().AddText("hi"), new ChatClientAgentOptions
+        {
+            Name = "T",
+            ChatOptions = new ChatOptions { Tools = [tool] },
+        });
+
+        Assert.Throws<ArgumentException>(() =>
+            agent.AsBuilder().UseAgentEvalToolGate([new NetworkCostGate()]).Build());
+    }
+
+    // ── Gates ──
+
+    [Fact]
+    public async Task ArgumentPatternGate_BlocksForbiddenArgument()
+    {
+        var executed = 0;
+        var tool = AIFunctionFactory.Create((string path) => { Interlocked.Increment(ref executed); return "ok"; }, "read_file");
+        var (agent, _) = BuildAgent(tool, "read_file", new Dictionary<string, object?> { ["path"] = "/etc/shadow" });
+        var gated = agent.AsBuilder()
+            .UseAgentEvalToolGate([new ArgumentPatternGate("/etc/shadow")], ToolGatePolicy.ReplaceResult)
+            .Build();
+
+        await gated.RunAsync("go");
+
+        Assert.Equal(0, executed);
+    }
+
+    [Fact]
+    public void ArgumentPatternGate_UnboundedRegex_Throws()
+        => Assert.Throws<ArgumentException>(() => new ArgumentPatternGate(new System.Text.RegularExpressions.Regex("x")));
+
+    [Fact]
+    public async Task SequenceGate_BlocksGuardedToolAfterTrigger()
+    {
+        var reads = 0;
+        var sends = 0;
+        var readTool = AIFunctionFactory.Create(() => { Interlocked.Increment(ref reads); return "secret"; }, "read_secrets");
+        var sendTool = AIFunctionFactory.Create((string body) => { Interlocked.Increment(ref sends); return "sent"; }, "send_email");
+        var scripted = new ScriptedChatClient()
+            .AddToolCall("c1", "read_secrets", new Dictionary<string, object?>())
+            .AddToolCall("c2", "send_email", new Dictionary<string, object?> { ["body"] = "x" })
+            .AddText("done");
+        var agent = new ChatClientAgent(scripted, new ChatClientAgentOptions
+        {
+            Name = "T",
+            ChatOptions = new ChatOptions { Tools = [readTool, sendTool] },
+        });
+        var gated = agent.AsBuilder()
+            .UseAgentEvalToolGate([new SequenceGate(["read_secrets"], ["send_email"])], ToolGatePolicy.ReplaceResult)
+            .Build();
+
+        await gated.RunAsync("go");
+
+        Assert.Equal(1, reads);   // the trigger ran
+        Assert.Equal(0, sends);   // but the guarded tool after it was blocked
+    }
+
+    // ── MCP coverage: a custom (non-factory) AIFunction subclass gates identically by name ──
+
+    [Fact]
+    public async Task McpShapedTool_IsGatedByName()
+    {
+        var mcpTool = new FakeMcpTool("delete_file");
+        var (agent, _) = BuildAgent(mcpTool, "delete_file", new Dictionary<string, object?> { ["path"] = "/etc" });
+        var gated = agent.AsBuilder()
+            .UseAgentEvalToolGate([new ForbiddenToolGate("delete_file")], ToolGatePolicy.ReplaceResult)
+            .Build();
+
+        await gated.RunAsync("go");
+
+        Assert.False(mcpTool.WasInvoked);   // the MCP-shaped tool was blocked before execution
+    }
+
+    // ── Test doubles ──
+
+    private sealed class MutatingGate : IToolGate
+    {
+        private readonly string _target;
+        private readonly IReadOnlyDictionary<string, object?> _newArgs;
+        public string PolicyName => "MutatingGate";
+        public GateCost Cost => GateCost.PureCode;
+        public MutatingGate(string target, IReadOnlyDictionary<string, object?> newArgs) { _target = target; _newArgs = newArgs; }
+        public ValueTask<ToolGateVerdict> InspectAsync(GatedToolCall call, CancellationToken ct = default)
+            => new(call.FunctionName == _target
+                ? ToolGateVerdict.Mutate(PolicyName, _newArgs, "sandboxed")
+                : ToolGateVerdict.Allow(PolicyName));
+    }
+
+    private sealed class NetworkCostGate : IToolGate
+    {
+        public string PolicyName => "NetworkCostGate";
+        public GateCost Cost => GateCost.Network;
+        public ValueTask<ToolGateVerdict> InspectAsync(GatedToolCall call, CancellationToken ct = default)
+            => new(ToolGateVerdict.Allow(PolicyName));
+    }
+
+    private sealed class FakeMcpTool : AIFunction
+    {
+        public bool WasInvoked { get; private set; }
+        public override string Name { get; }
+        public FakeMcpTool(string name) => Name = name;
+        protected override ValueTask<object?> InvokeCoreAsync(AIFunctionArguments arguments, CancellationToken cancellationToken)
+        {
+            WasInvoked = true;
+            return new ValueTask<object?>("done");
+        }
+    }
+}

@@ -16,6 +16,9 @@ public sealed class ForbiddenToolGate : IToolGate
     /// <inheritdoc/>
     public string PolicyName => "ForbiddenToolGate";
 
+    /// <inheritdoc/>
+    public GateCost Cost => GateCost.PureCode;
+
     /// <summary>Creates the gate over a deny-list of tool names.</summary>
     public ForbiddenToolGate(params string[] forbiddenNames)
     {

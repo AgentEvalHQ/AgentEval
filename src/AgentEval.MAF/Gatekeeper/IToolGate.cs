@@ -14,6 +14,13 @@ public interface IToolGate
     /// <summary>Stable policy name, recorded into <c>gate.tool.*</c> trace evidence.</summary>
     string PolicyName { get; }
 
+    /// <summary>
+    /// How expensive this gate is. Only <see cref="GateCost.PureCode"/> / <see cref="GateCost.Bounded"/> gates
+    /// may run inline; <c>UseAgentEvalToolGate</c> rejects <see cref="GateCost.Network"/> / <see cref="GateCost.Llm"/>
+    /// at construction (those belong in shadow mode).
+    /// </summary>
+    GateCost Cost { get; }
+
     /// <summary>Inspect one tool call and return a verdict. Deterministic gates should complete synchronously.</summary>
     ValueTask<ToolGateVerdict> InspectAsync(GatedToolCall call, CancellationToken cancellationToken = default);
 }
