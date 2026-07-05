@@ -50,9 +50,10 @@ internal static class GatekeeperDemoSut
     }
 
     /// <summary>
-    /// A stateless, deterministic <see cref="IChatClient"/> that ALWAYS emits a call to the canary tool — so every
-    /// probe in a scan is handled identically (no consume-once script to exhaust). It models a fully compromised
-    /// agent; the Gatekeeper is what stops the exfiltration.
+    /// A deterministic <see cref="IChatClient"/> that ALWAYS emits a call to the canary tool — so every probe in a
+    /// scan is handled identically (no consume-once script to exhaust). It models a fully compromised agent; the
+    /// Gatekeeper is what stops the exfiltration. Its only state is a monotonic call-id counter (for unique tool-call
+    /// ids); it is not safe for concurrent use, which is why the CLI rejects <c>--parallelism &gt; 1</c> for the demo.
     /// </summary>
     private sealed class DemoCompromisedChatClient : IChatClient
     {
