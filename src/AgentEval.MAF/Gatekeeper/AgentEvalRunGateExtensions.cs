@@ -82,7 +82,14 @@ public static class AgentEvalRunGateExtensions
                 "run (buffered), or WarnOnly post-gates.");
         }
 
-        var preRefusal = await RunGatesAsync(preGates, ConcatText(messages), "run-pre", policy, trace, seq, ct).ConfigureAwait(false);
+        // Establish the run scope for the pre-gates too (a SessionContextGate pre-gate must see the session on
+        // the streaming path, exactly as on the non-streaming path — otherwise it fails closed on every stream).
+        string? preRefusal;
+        using (AgentRunScope.Begin(session, innerAgent.Name, trace))
+        {
+            preRefusal = await RunGatesAsync(preGates, ConcatText(messages), "run-pre", policy, trace, seq, ct).ConfigureAwait(false);
+        }
+
         if (preRefusal is not null)
         {
             var synth = new AgentResponse(new ChatMessage(ChatRole.Assistant, preRefusal)) { AgentId = innerAgent.Id };
@@ -125,7 +132,10 @@ public static class AgentEvalRunGateExtensions
                 continue;
             }
 
-            RecordGate(trace, Interlocked.Increment(ref seq[0]), stage, verdict);
+            // Honest evidence: only an ENFORCED block records action="Block" (so GateBlockCount never counts a
+            // run that proceeded). Under WarnOnly the block is recorded as action="Warn".
+            var enforced = policy != EvalGatePolicy.WarnOnly;
+            RecordGate(trace, Interlocked.Increment(ref seq[0]), stage, verdict, enforced ? "Block" : "Warn");
 
             if (policy == EvalGatePolicy.ThrowOnFail)
             {
@@ -137,7 +147,7 @@ public static class AgentEvalRunGateExtensions
                 return verdict.RedactedText ?? SynthRefusal(verdict);   // short-circuit a refusal/redacted response
             }
 
-            // WarnOnly: recorded; let the run proceed.
+            // WarnOnly: recorded as a warning; let the run proceed.
         }
 
         return null;
@@ -152,7 +162,7 @@ public static class AgentEvalRunGateExtensions
     private static string ConcatText(IEnumerable<ChatMessage> messages)
         => string.Join("\n", messages.Select(m => m.Text).Where(t => !string.IsNullOrEmpty(t)));
 
-    private static void RecordGate(AgentTrace? trace, int seq, string stage, GateVerdict verdict)
+    private static void RecordGate(AgentTrace? trace, int seq, string stage, GateVerdict verdict, string action)
     {
         if (trace is null)
         {
@@ -161,7 +171,7 @@ public static class AgentEvalRunGateExtensions
 
         trace.SetMetadata($"gate.{stage}.{seq}.{verdict.PolicyName}", new Dictionary<string, object?>
         {
-            ["action"] = "Block",
+            ["action"] = action,   // "Block" (enforced) or "Warn" (WarnOnly — recorded but the run proceeded)
             ["reason"] = verdict.Reason,
             ["matches"] = verdict.Matches,
             ["correlationId"] = ToolCorrelationScope.Current,

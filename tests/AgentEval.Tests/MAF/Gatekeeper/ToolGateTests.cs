@@ -101,6 +101,60 @@ public class ToolGateTests
     public void ArgumentPatternGate_UnboundedRegex_Throws()
         => Assert.Throws<ArgumentException>(() => new ArgumentPatternGate(new System.Text.RegularExpressions.Regex("x")));
 
+    [Theory]
+    [InlineData("<script", "<script>alert(1)</script>")]   // XSS metachars: default JSON escaping would hide these
+    [InlineData("' OR", "admin' OR 1=1--")]                // SQLi
+    [InlineData("&&", "ls && rm -rf /")]                    // command chaining
+    public async Task ArgumentPatternGate_InjectionMetachars_AreNotEscapedAway_StillBlocks(string pattern, string payload)
+    {
+        var executed = 0;
+        var tool = AIFunctionFactory.Create((string input) => { Interlocked.Increment(ref executed); return "ok"; }, "render");
+        var (agent, _) = BuildAgent(tool, "render", new Dictionary<string, object?> { ["input"] = payload });
+        var gated = agent.AsBuilder()
+            .UseAgentEvalToolGate([new ArgumentPatternGate(pattern)], ToolGatePolicy.ReplaceResult)
+            .Build();
+
+        await gated.RunAsync("go");
+
+        Assert.Equal(0, executed);   // the injection payload was caught despite JSON metacharacter escaping
+    }
+
+    [Fact]
+    public async Task ThrowingGate_FailsClosed_ToolDoesNotRun()
+    {
+        var executed = 0;
+        var tool = AIFunctionFactory.Create((string path) => { Interlocked.Increment(ref executed); return "ok"; }, "delete_file");
+        var (agent, _) = BuildAgent(tool, "delete_file", new Dictionary<string, object?> { ["path"] = "/etc" });
+        var trace = new AgentTrace();
+        var gated = agent.AsBuilder()
+            .UseAgentEvalToolGate([new ThrowingGate()], ToolGatePolicy.WarnOnly, trace)   // even WarnOnly must fail closed on a throw
+            .Build();
+
+        await gated.RunAsync("go");
+
+        Assert.Equal(0, executed);   // a gate that throws blocks the tool (cannot-inspect => deny)
+        Assert.Equal(1, GlassBoxEvidence.FromTrace(trace).GateBlockCount);   // and it IS recorded as a block
+    }
+
+    [Fact]
+    public async Task MutateThenBlock_BlockWins_TwoDistinctEvidenceKeys()
+    {
+        var executed = 0;
+        var tool = AIFunctionFactory.Create((string path) => { Interlocked.Increment(ref executed); return "ok"; }, "read_file");
+        var (agent, _) = BuildAgent(tool, "read_file", new Dictionary<string, object?> { ["path"] = "/original" });
+        var trace = new AgentTrace();
+        var gated = agent.AsBuilder()
+            .UseAgentEvalToolGate(
+                [new MutatingGate("read_file", new Dictionary<string, object?> { ["path"] = "/sandbox" }), new ForbiddenToolGate("read_file")],
+                ToolGatePolicy.ReplaceResult, trace)
+            .Build();
+
+        await gated.RunAsync("go");
+
+        Assert.Equal(0, executed);   // the second gate blocked
+        Assert.Equal(2, (trace.Metadata!.Keys.Count(k => k.StartsWith("gate.tool.", StringComparison.Ordinal))));
+    }
+
     [Fact]
     public async Task SequenceGate_BlocksGuardedToolAfterTrigger()
     {
@@ -164,6 +218,14 @@ public class ToolGateTests
         public GateCost Cost => GateCost.Network;
         public ValueTask<ToolGateVerdict> InspectAsync(GatedToolCall call, CancellationToken ct = default)
             => new(ToolGateVerdict.Allow(PolicyName));
+    }
+
+    private sealed class ThrowingGate : IToolGate
+    {
+        public string PolicyName => "ThrowingGate";
+        public GateCost Cost => GateCost.PureCode;
+        public ValueTask<ToolGateVerdict> InspectAsync(GatedToolCall call, CancellationToken ct = default)
+            => throw new InvalidOperationException("boom");
     }
 
     private sealed class FakeMcpTool : AIFunction

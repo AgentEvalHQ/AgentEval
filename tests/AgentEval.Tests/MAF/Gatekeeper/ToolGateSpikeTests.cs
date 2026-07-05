@@ -76,7 +76,10 @@ public class ToolGateSpikeTests
         await gated.RunAsync("go");
 
         Assert.Equal(1, executed); // WarnOnly: the tool still ran
-        Assert.Equal(1, GlassBoxEvidence.FromTrace(trace).GateBlockCount); // but the block was recorded
+        // Honest evidence: a WarnOnly finding is recorded as "Warn", NOT counted as a block (the tool ran).
+        Assert.Equal(0, GlassBoxEvidence.FromTrace(trace).GateBlockCount);
+        var value = (IDictionary<string, object?>)trace.Metadata!["gate.tool.1.ForbiddenToolGate"];
+        Assert.Equal("Warn", value["action"]);
     }
 
     [Fact]

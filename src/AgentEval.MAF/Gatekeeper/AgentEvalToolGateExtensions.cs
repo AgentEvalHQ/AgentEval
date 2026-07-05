@@ -67,7 +67,25 @@ public static class AgentEvalToolGateExtensions
 
             foreach (var gate in gates)
             {
-                var verdict = await gate.InspectAsync(call, ct).ConfigureAwait(false);
+                ToolGateVerdict verdict;
+                try
+                {
+                    verdict = await gate.InspectAsync(call, ct).ConfigureAwait(false);
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    // FAIL CLOSED (cannot-inspect ⇒ deny): a gate that throws cannot prove the call safe, so block
+                    // it — regardless of policy. FICC would otherwise swallow the exception and run the tool.
+                    RecordBlock(trace, Interlocked.Increment(ref gateSeq),
+                        ToolGateVerdict.Block(gate.PolicyName, $"gate evaluation threw ({ex.GetType().Name}) — failing closed"),
+                        action: "Block", terminating: policy == ToolGatePolicy.Terminate);
+                    if (policy == ToolGatePolicy.Terminate)
+                    {
+                        context.Terminate = true;
+                    }
+
+                    return SynthesizedRefusal(gate.PolicyName, "gate evaluation failed");
+                }
 
                 switch (verdict.Action)
                 {
@@ -94,12 +112,16 @@ public static class AgentEvalToolGateExtensions
                     case ToolGateAction.Block:
                     {
                         var seq = Interlocked.Increment(ref gateSeq);
-                        var terminating = policy == ToolGatePolicy.Terminate;
-                        RecordBlock(trace, seq, verdict, terminating);
+                        var enforced = policy != ToolGatePolicy.WarnOnly;
 
-                        if (policy == ToolGatePolicy.WarnOnly)
+                        // Honest evidence: only an ENFORCED block records action="Block" (so GlassBoxEvidence's
+                        // GateBlockCount never counts a call that actually ran). WarnOnly records action="Warn".
+                        RecordBlock(trace, seq, verdict, action: enforced ? "Block" : "Warn",
+                            terminating: policy == ToolGatePolicy.Terminate);
+
+                        if (!enforced)
                         {
-                            continue;   // recorded; let the tool run
+                            continue;   // WarnOnly: recorded as a warning; let the tool run
                         }
 
                         if (policy == ToolGatePolicy.Terminate)
@@ -140,7 +162,7 @@ public static class AgentEvalToolGateExtensions
     // Mirrors EvalGatingChatClient.Record's value shape — stage token "tool" (dot-free), seq via Interlocked,
     // {action,reason,matches,correlationId}. A Terminate is still action="Block" (it blocked) + terminate=true,
     // so the shipped GlassBoxEvidence.CountGateBlocks counts it.
-    private static void RecordBlock(AgentTrace? trace, int seq, ToolGateVerdict verdict, bool terminating)
+    private static void RecordBlock(AgentTrace? trace, int seq, ToolGateVerdict verdict, string action, bool terminating)
     {
         if (trace is null)
         {
@@ -149,7 +171,7 @@ public static class AgentEvalToolGateExtensions
 
         var value = new Dictionary<string, object?>
         {
-            ["action"] = "Block",
+            ["action"] = action,   // "Block" (enforced) or "Warn" (WarnOnly — recorded but the tool ran)
             ["reason"] = verdict.Reason,
             ["matches"] = null,
             ["correlationId"] = ToolCorrelationScope.Current,

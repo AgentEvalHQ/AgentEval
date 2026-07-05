@@ -9,12 +9,17 @@ using Microsoft.Agents.AI;
 namespace AgentEval.MAF.Gatekeeper;
 
 /// <summary>
-/// Fail-closed per-session rate limit: blocks once more than <c>maxRuns</c> runs occur within a rolling
-/// <c>window</c> for a session.
+/// Fail-closed per-session rate limit: blocks once more than <c>maxRuns</c> runs occur within a
+/// <b>fixed/tumbling</b> <c>window</c> for a session. (A fixed window can admit up to ~2× <c>maxRuns</c>
+/// across a boundary; use a small window if that matters.)
 /// <para><b>SEC-04:</b> the authoritative counter is kept in-process (keyed by session identity via a
 /// <see cref="ConditionalWeakTable{TKey,TValue}"/>, guarded by a per-session lock) rather than in the session
 /// <c>StateBag</c> — the StateBag has no atomic increment, so a read-modify-write counter there would lose
 /// updates under concurrent/shared sessions and become a <em>bypass</em> of the cap it implements.</para>
+/// <para>⚠️ <b>Object-identity keying.</b> The counter is keyed by the <see cref="AgentSession"/> <i>object</i>.
+/// This enforces correctly for a long-lived in-memory session, but a deployment that reloads a persisted session
+/// into a <b>fresh</b> object each turn will reset the counter (a bypass). For persisted-session deployments,
+/// enforce rate limits at a layer that has a stable logical session id, or supply one out of band.</para>
 /// <para>Time comes from an injectable <see cref="TimeProvider"/> so tests are deterministic (no wall-clock flake).</para>
 /// </summary>
 public sealed class RateLimitGate : SessionContextGate

@@ -2,6 +2,7 @@
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 
+using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using AgentEval.Assertions;
@@ -15,6 +16,11 @@ namespace AgentEval.MAF.Gatekeeper;
 /// </summary>
 public sealed class ArgumentPatternGate : IToolGate
 {
+    // CRITICAL: use the relaxed encoder. Default JSON escaping turns injection metacharacters (< > & ' +) into
+    // \uXXXX / entity forms, so a pattern like "<script" or "' OR" would NEVER match the escaped surface and the
+    // gate would fail OPEN. The relaxed encoder leaves those bytes as the tool will actually receive them.
+    private static readonly JsonSerializerOptions ScanOptions = new() { Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping };
+
     private readonly Regex _forbidden;
 
     /// <inheritdoc/>
@@ -55,7 +61,7 @@ public sealed class ArgumentPatternGate : IToolGate
         string serialized;
         try
         {
-            serialized = JsonSerializer.Serialize(call.Arguments);
+            serialized = JsonSerializer.Serialize(call.Arguments, ScanOptions);
         }
         catch (NotSupportedException)
         {

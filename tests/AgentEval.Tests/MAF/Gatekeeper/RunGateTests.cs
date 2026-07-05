@@ -68,7 +68,10 @@ public class RunGateTests
         var response = await gated.RunAsync("this is an attack");
 
         Assert.Equal("model answer", response.Text);         // the model ran
-        Assert.Equal(1, GlassBoxEvidence.FromTrace(trace).GateBlockCount);   // but the block was recorded
+        // Honest evidence: WarnOnly is recorded as "Warn", NOT counted as a block (the run proceeded).
+        Assert.Equal(0, GlassBoxEvidence.FromTrace(trace).GateBlockCount);
+        var value = (IDictionary<string, object?>)trace.Metadata!["gate.run-pre.1.KeywordGate"];
+        Assert.Equal("Warn", value["action"]);
     }
 
     // ── run-post ──
