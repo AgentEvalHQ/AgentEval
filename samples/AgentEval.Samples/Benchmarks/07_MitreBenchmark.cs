@@ -11,7 +11,7 @@ using AgentEval.Output;
 namespace AgentEval.Samples.Benchmarks;
 
 /// <summary>
-/// Benchmarks B7: MITRE ATLAS — runs an ATLAS attack pipeline against a real
+/// Benchmarks H7: MITRE ATLAS — runs an ATLAS attack pipeline against a real
 /// Azure OpenAI-backed agent and renders the resulting composite (one leaf per
 /// ATLAS technique) to JSON + HTML + PDF. Like OWASP, this is a Shape B /
 /// runner-style benchmark — the attack pipeline drives the agent itself via
@@ -32,12 +32,12 @@ public static class MitreBenchmarkSample
     public static async Task RunAsync()
     {
         BenchmarkSampleHelpers.PrintHeader(
-            "Benchmarks B7: MITRE ATLAS",
+            "Benchmarks H7: MITRE ATLAS",
             "Real agent + ATLAS adversarial pipeline. Skips without Azure credentials.");
 
         if (!AIConfig.IsConfigured)
         {
-            BenchmarkSampleHelpers.PrintMissingCredentialsBox("BENCHMARKS B7 — MITRE");
+            BenchmarkSampleHelpers.PrintMissingCredentialsBox("BENCHMARKS H7 — MITRE");
             return;
         }
 

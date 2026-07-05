@@ -12,7 +12,7 @@ using AgentEval.Output;
 namespace AgentEval.Samples.Benchmarks;
 
 /// <summary>
-/// Benchmarks B4: GDPR — runs a real Azure OpenAI–backed agent against every
+/// Benchmarks H4: GDPR — runs a real Azure OpenAI–backed agent against every
 /// scenario in the chosen preset (Smoke / Standard / Audit-Grade) and grades
 /// each live response with a real LLM judge. The composite tree is then
 /// rendered to JSON + HTML + PDF using the v0.10.1 generic renderers.
@@ -46,12 +46,12 @@ public static class GdprBenchmarkSample
     public static async Task RunAsync()
     {
         BenchmarkSampleHelpers.PrintHeader(
-            "Benchmarks B4: GDPR",
+            "Benchmarks H4: GDPR",
             "Real agent, real judge, per-scenario probing. Skips without Azure credentials.");
 
         if (!AIConfig.IsConfigured)
         {
-            BenchmarkSampleHelpers.PrintMissingCredentialsBox("BENCHMARKS B4 — GDPR");
+            BenchmarkSampleHelpers.PrintMissingCredentialsBox("BENCHMARKS H4 — GDPR");
             return;
         }
 

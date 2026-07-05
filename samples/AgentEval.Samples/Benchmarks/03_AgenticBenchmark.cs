@@ -9,7 +9,7 @@ using AgentEval.Output;
 namespace AgentEval.Samples.Benchmarks;
 
 /// <summary>
-/// Benchmarks B3: Agentic — invokes a real Azure OpenAI–backed agent with a
+/// Benchmarks H3: Agentic — invokes a real Azure OpenAI–backed agent with a
 /// representative query, captures the live response, and grades it with the
 /// agentic preset selected by <see cref="BenchmarkSampleHelpers.ResolvePreset"/>.
 /// Renders the resulting composite tree to JSON + HTML + PDF using the v0.10.1
@@ -31,12 +31,12 @@ public static class AgenticBenchmarkSample
     public static async Task RunAsync()
     {
         BenchmarkSampleHelpers.PrintHeader(
-            "Benchmarks B3: Agentic",
+            "Benchmarks H3: Agentic",
             "Real agent invocation + real judge. JSON + HTML + PDF outputs.");
 
         if (!AIConfig.IsConfigured)
         {
-            BenchmarkSampleHelpers.PrintMissingCredentialsBox("BENCHMARKS B3 — AGENTIC");
+            BenchmarkSampleHelpers.PrintMissingCredentialsBox("BENCHMARKS H3 — AGENTIC");
             return;
         }
 

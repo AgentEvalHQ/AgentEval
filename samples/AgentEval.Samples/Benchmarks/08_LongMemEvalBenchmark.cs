@@ -16,12 +16,12 @@ using AgentEval.Memory.Models;
 namespace AgentEval.Samples.Benchmarks;
 
 /// <summary>
-/// Benchmarks H8: LongMemEval — cross-platform memory evaluation
+/// Benchmarks H9: LongMemEval — cross-platform memory evaluation
 /// (ICLR 2025 paper, MIT-licensed dataset).
 ///
 /// LongMemEval is a Shape B / runner-style benchmark (ADR-017 Convention 3).
 /// This sample wires the preset-driven (Smoke / Standard / AuditGrade) running-
-/// sample shape used by H2–H7 over the LongMemEval runner: real Azure OpenAI
+/// sample shape used by H2–H8 over the LongMemEval runner: real Azure OpenAI
 /// agent (history-injectable) + LLM judge + canonical <c>.agenteval/</c> store
 /// + sidecar JSON / HTML / PDF. The native <c>ExternalBenchmarkResult</c> is
 /// also written to <c>report-native.json</c> for power users who need the
@@ -54,7 +54,7 @@ public static class LongMemEvalBenchmarkSample
     public static async Task RunAsync()
     {
         BenchmarkSampleHelpers.PrintHeader(
-            "Benchmarks H8: LongMemEval — Memory benchmark (ICLR 2025)",
+            "Benchmarks H9: LongMemEval — Memory benchmark (ICLR 2025)",
             "Smoke=10Q / Standard=50Q / AuditGrade=~500Q — all real dataset");
 
         // ── Force-load AgentEval.Memory so [ModuleInitializer] registers "longmemeval".
@@ -83,7 +83,7 @@ public static class LongMemEvalBenchmarkSample
 
         if (!AIConfig.IsConfigured)
         {
-            BenchmarkSampleHelpers.PrintMissingCredentialsBox("BENCHMARKS H8 — LongMemEval");
+            BenchmarkSampleHelpers.PrintMissingCredentialsBox("BENCHMARKS H9 — LongMemEval");
             return;
         }
 
@@ -292,7 +292,7 @@ public static class LongMemEvalBenchmarkSample
         Console.WriteLine("   +----------------------------------------------------------------------------+");
         Console.WriteLine("   |  LongMemEval dataset not found.                                            |");
         Console.WriteLine("   |                                                                            |");
-        Console.WriteLine("   |  H8 LongMemEval requires the real LongMemEval dataset — no fake data is    |");
+        Console.WriteLine("   |  H9 LongMemEval requires the real LongMemEval dataset — no fake data is    |");
         Console.WriteLine("   |  bundled (so scores stay paper-comparable).                                |");
         Console.WriteLine("   |                                                                            |");
         Console.WriteLine("   |  To run this sample:                                                       |");
@@ -301,7 +301,7 @@ public static class LongMemEvalBenchmarkSample
         Console.WriteLine("   |    2. Place the file at:                                                   |");
         Console.WriteLine($"   |       {canonical,-69}|");
         Console.WriteLine($"   |       (or set {LongMemEvalDataLoader.DatasetPathEnvVar} to point at the file)              |");
-        Console.WriteLine("   |    3. Re-run sample H8.                                                    |");
+        Console.WriteLine("   |    3. Re-run sample H9.                                                    |");
         Console.WriteLine("   |                                                                            |");
         Console.WriteLine("   |  Returning to the menu — no run executed.                                  |");
         Console.WriteLine("   +----------------------------------------------------------------------------+");

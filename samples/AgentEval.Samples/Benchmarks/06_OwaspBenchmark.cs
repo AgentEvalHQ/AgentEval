@@ -11,7 +11,7 @@ using AgentEval.Output;
 namespace AgentEval.Samples.Benchmarks;
 
 /// <summary>
-/// Benchmarks B6: OWASP LLM Top 10 — runs an OWASP attack pipeline against a
+/// Benchmarks H6: OWASP LLM Top 10 — runs an OWASP attack pipeline against a
 /// real Azure OpenAI-backed agent and renders the resulting composite tree to
 /// JSON + HTML + PDF. The OWASP family is a Shape B / runner-style benchmark —
 /// the pipeline generates its own attack probes via
@@ -34,12 +34,12 @@ public static class OwaspBenchmarkSample
     public static async Task RunAsync()
     {
         BenchmarkSampleHelpers.PrintHeader(
-            "Benchmarks B6: OWASP LLM Top 10",
+            "Benchmarks H6: OWASP LLM Top 10",
             "Real agent + adversarial probe pipeline. Skips without Azure credentials.");
 
         if (!AIConfig.IsConfigured)
         {
-            BenchmarkSampleHelpers.PrintMissingCredentialsBox("BENCHMARKS B6 — OWASP");
+            BenchmarkSampleHelpers.PrintMissingCredentialsBox("BENCHMARKS H6 — OWASP");
             return;
         }
 

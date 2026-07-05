@@ -198,9 +198,9 @@ export AZURE_OPENAI_API_KEY="your-api-key"
 export AZURE_OPENAI_DEPLOYMENT="gpt-4o"
 ```
 
-### Without Azure (mock mode — Group A + H1 + H13 + all of Group J)
+### Without Azure (mock mode — Group A samples A1–A4 + H1 + H13 + all of Group J)
 
-Samples in Group A, **H1 Registry Discovery**, **H13 Report Browser**, and all of **Group J (Gatekeeper)**
+Samples in **Group A (A1–A4)**, **H1 Registry Discovery**, **H13 Report Browser**, and all of **Group J (Gatekeeper)**
 work fully without credentials. You'll see:
 
 ```

@@ -16,7 +16,7 @@ using AgentEval.Memory;                            // → AgentEval.Memory + Lon
 namespace AgentEval.Samples.Benchmarks;
 
 /// <summary>
-/// Benchmarks B1: Registry Discovery — walk the canonical
+/// Benchmarks H1: Registry Discovery — walk the canonical
 /// <see cref="BenchmarkFamilyRegistry"/> and enumerate every registered family
 /// + preset shipped by v0.10.x. Demonstrates the discovery surface that
 /// <c>agenteval bench --list</c> and Mission Control build their family
@@ -38,7 +38,7 @@ public static class RegistryDiscoveryBenchmark
     public static Task RunAsync()
     {
         BenchmarkSampleHelpers.PrintHeader(
-            "Benchmarks B1: BenchmarkFamilyRegistry Discovery",
+            "Benchmarks H1: BenchmarkFamilyRegistry Discovery",
             "Walk every registered benchmark family + preset (no Azure required)");
 
         // Force-load: read `.Assembly` off one type per family. This is the canonical

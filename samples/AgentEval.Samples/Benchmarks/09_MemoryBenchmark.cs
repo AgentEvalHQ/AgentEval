@@ -15,11 +15,11 @@ using AgentEval.Output;
 namespace AgentEval.Samples.Benchmarks;
 
 /// <summary>
-/// Benchmarks H9: Memory — comprehensive agent-state-stressing memory benchmark.
+/// Benchmarks H10: Memory — comprehensive agent-state-stressing memory benchmark.
 ///
 /// Memory is a Shape B / runner-style benchmark (ADR-017 Convention 3). This sample
 /// wires the preset-driven (Smoke / Standard / AuditGrade) running-sample shape used
-/// by H2–H8 over the Memory runner: real Azure OpenAI agent + LLM judge + canonical
+/// by H2–H9 over the Memory runner: real Azure OpenAI agent + LLM judge + canonical
 /// <c>.agenteval/</c> store + sidecar JSON / HTML / PDF. The native
 /// <c>MemoryBenchmarkResult</c> is also written to <c>report-native.json</c> for
 /// power users who need the unaltered per-category shape (grade, stars, weak
@@ -34,7 +34,7 @@ namespace AgentEval.Samples.Benchmarks;
 /// </summary>
 /// <remarks>
 /// Requires Azure OpenAI credentials. Skips gracefully when missing. Mirrors the
-/// shape of <see cref="LongMemEvalBenchmarkSample"/> (H8) — same Shape-B-to-Shape-A
+/// shape of <see cref="LongMemEvalBenchmarkSample"/> (H9) — same Shape-B-to-Shape-A
 /// bridging via <see cref="SynthesizeEvalResult"/> so the unified canonical store +
 /// sidecar JSON / HTML / PDF artefacts come out identical to every other Group-H
 /// sample. The unaltered native shape is preserved in <c>report-native.json</c>.
@@ -44,7 +44,7 @@ public static class MemoryBenchmarkSample
     public static async Task RunAsync()
     {
         BenchmarkSampleHelpers.PrintHeader(
-            "Benchmarks H9: Memory — comprehensive memory benchmark",
+            "Benchmarks H10: Memory — comprehensive memory benchmark",
             "Quick (3 cats) / Standard (8 cats) / Full (12 cats) — real agent + LLM judge");
 
         // ── Force-load AgentEval.Memory so [ModuleInitializer] registers "memory".
@@ -71,7 +71,7 @@ public static class MemoryBenchmarkSample
 
         if (!AIConfig.IsConfigured)
         {
-            BenchmarkSampleHelpers.PrintMissingCredentialsBox("BENCHMARKS H9 — Memory");
+            BenchmarkSampleHelpers.PrintMissingCredentialsBox("BENCHMARKS H10 — Memory");
             return;
         }
 
