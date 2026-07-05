@@ -87,11 +87,15 @@ public sealed class ShadowJudgePump : IAsyncDisposable
 
     private async Task ConsumeAsync()
     {
+        // Capture the token ONCE. The CancellationToken struct stays usable even after the source is disposed,
+        // so if a drain abandons a hung judge and DisposeAsync disposes _cts, later items still judge cleanly
+        // (re-reading _cts.Token per item would throw ObjectDisposedException on the disposed source).
+        var token = _cts.Token;
         await foreach (var context in _channel.Reader.ReadAllAsync().ConfigureAwait(false))
         {
             try
             {
-                var verdict = await _judge.JudgeAsync(context, _cts.Token).ConfigureAwait(false);
+                var verdict = await _judge.JudgeAsync(context, token).ConfigureAwait(false);
                 if (verdict.Compromised)
                 {
                     ArmQuarantine(context, verdict.Reason);

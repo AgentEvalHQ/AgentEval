@@ -168,6 +168,35 @@ public class ShadowJudgeTests
         Assert.Same(dispose, finished);   // Dispose completed within the timeout, did not hang on the judge
     }
 
+    [Fact]
+    public async Task ShadowJudge_AbandonedConsumer_ResumesWithoutObjectDisposed()
+    {
+        // A judge that ignores cancellation blocks item 1; Dispose times out, cancels (ignored), abandons the
+        // consumer, and disposes _cts. When item 1 unblocks, item 2 must still judge — the captured token must
+        // not throw ObjectDisposedException off the disposed source.
+        using var gate = new ManualResetEventSlim(false);
+        var errors = new List<Exception>();
+        var secondJudged = new TaskCompletionSource();
+        var pump = new ShadowJudgePump(
+            new GatedJudge(gate, onSecond: () => secondJudged.TrySetResult()),
+            onError: ex => { lock (errors) { errors.Add(ex); } },
+            drainTimeout: TimeSpan.FromMilliseconds(100));
+        var agent = Agent(new ScriptedChatClient().AddText("first").AddText("second")).AsBuilder()
+            .UseAgentEvalShadowJudge(pump).Build();
+
+        await agent.RunAsync("go1");   // item 1 -> judge blocks on the gate, ignoring cancellation
+        await agent.RunAsync("go2");   // item 2
+        await pump.DisposeAsync();     // times out, cancels (ignored), abandons the consumer, disposes _cts
+        gate.Set();                    // unblock item 1 -> consumer advances to item 2
+
+        var done = await Task.WhenAny(secondJudged.Task, Task.Delay(TimeSpan.FromSeconds(5)));
+        Assert.Same(secondJudged.Task, done);   // item 2 was judged after the abandoned dispose
+        lock (errors)
+        {
+            Assert.DoesNotContain(errors, e => e is ObjectDisposedException);   // captured token did not throw
+        }
+    }
+
     // ── test doubles ──
 
     private sealed class KeywordShadowJudge : IShadowJudge
@@ -219,6 +248,30 @@ public class ShadowJudgeTests
         {
             await Task.Delay(Timeout.Infinite, cancellationToken).ConfigureAwait(false);   // never returns until cancelled
             return ShadowVerdict.Clean();
+        }
+    }
+
+    private sealed class GatedJudge : IShadowJudge
+    {
+        private readonly ManualResetEventSlim _gate;
+        private readonly Action _onSecond;
+        private int _calls;
+        public GatedJudge(ManualResetEventSlim gate, Action onSecond)
+        {
+            _gate = gate;
+            _onSecond = onSecond;
+        }
+
+        public Task<ShadowVerdict> JudgeAsync(ShadowJudgeContext context, CancellationToken cancellationToken = default)
+        {
+            if (Interlocked.Increment(ref _calls) == 1)
+            {
+                _gate.Wait();   // block item 1, deliberately IGNORING cancellation
+                return Task.FromResult(ShadowVerdict.Clean());
+            }
+
+            _onSecond();   // item 2 was reached and judged (no ObjectDisposedException)
+            return Task.FromResult(ShadowVerdict.Clean());
         }
     }
 }
