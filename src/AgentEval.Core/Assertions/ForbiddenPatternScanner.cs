@@ -24,9 +24,16 @@ public static class ForbiddenPatternScanner
     {
         ArgumentNullException.ThrowIfNull(pattern);
 
+        // Nothing to scan == clean. Guard BEFORE matching so a permissive user regex (e.g. ".*", which
+        // matches the empty string) cannot report a forbidden hit on absent/empty text.
+        if (string.IsNullOrEmpty(text))
+        {
+            return false;
+        }
+
         try
         {
-            return pattern.IsMatch(text ?? string.Empty);
+            return pattern.IsMatch(text);
         }
         catch (RegexMatchTimeoutException)
         {

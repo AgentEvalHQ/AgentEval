@@ -65,4 +65,16 @@ public class WorkflowTraceFidelityAssertionTests
         // chatTraces == null → every executor NoTruth → overall score 1.0 → passes.
         result.Should().HaveTraceFidelity(chatTraces: null).Validate();
     }
+
+    [Theory]
+    [InlineData(-0.1)]
+    [InlineData(1.5)]
+    [InlineData(double.NaN)]
+    public void OutOfRangeMinScore_Throws(double minScore)
+    {
+        var result = Result(Step("a", 10, 5, "stop"));
+
+        Assert.Throws<ArgumentOutOfRangeException>(
+            () => result.Should().HaveTraceFidelity(chatTraces: null, minScore: minScore));
+    }
 }

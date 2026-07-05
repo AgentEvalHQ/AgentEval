@@ -227,6 +227,12 @@ public class WorkflowAssertionBuilder
         double minScore = 1.0,
         string? because = null)
     {
+        if (minScore < 0.0 || minScore > 1.0 || double.IsNaN(minScore))
+        {
+            throw new ArgumentOutOfRangeException(nameof(minScore), minScore,
+                "minScore must be a finite value in [0, 1] (a negative bar always passes; >1 can never pass).");
+        }
+
         _currentBecause = because;
         var result = new WorkflowTraceFidelityReconciler().ReconcileToEvalResult(_result, chatTraces);
         if (result.Score.Value < minScore)

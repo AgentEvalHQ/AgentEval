@@ -25,6 +25,16 @@ public class ForbiddenPatternScannerTests
         => Assert.False(ForbiddenPatternScanner.ScanForForbiddenPattern(null, Secret));
 
     [Fact]
+    public void MatchEmptyPattern_OnNullOrEmptyText_ReturnsFalse()
+    {
+        // A permissive regex that matches the empty string must NOT report a hit on absent/empty text
+        // (nothing to scan == clean).
+        var matchAll = new Regex(".*", RegexOptions.None, TimeSpan.FromSeconds(1));
+        Assert.False(ForbiddenPatternScanner.ScanForForbiddenPattern(null, matchAll));
+        Assert.False(ForbiddenPatternScanner.ScanForForbiddenPattern("", matchAll));
+    }
+
+    [Fact]
     public void Timeout_FailsClosed_ReturnsTrue()
     {
         // A catastrophic-backtracking pattern with a tiny timeout must fail closed (treated as a hit).
