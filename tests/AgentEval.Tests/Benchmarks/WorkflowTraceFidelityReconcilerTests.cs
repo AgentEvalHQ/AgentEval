@@ -54,6 +54,35 @@ public class WorkflowTraceFidelityReconcilerTests
     }
 
     [Fact]
+    public void Reconcile_MultiStep_SuppressedFinalFinish_IsNotMaskedByEarlierStep()
+    {
+        // Executor 'a' finished "stop" on step 0 but the FINAL step's finish was suppressed (null).
+        // The terminal finish must read as null (suppressed), not be masked by the earlier "stop".
+        var result = Result(Step("a", 0, 10, 5, "stop"), Step("a", 1, 5, 5, null));
+        var chat = new Dictionary<string, AgentTrace> { ["a"] = ChatTrace(25, "content_filter") };
+
+        var rec = Assert.Single(new WorkflowTraceFidelityReconciler().Reconcile(result, chat).Executors);
+
+        Assert.Null(rec.FinishFramework);                          // last step's null, not the earlier "stop"
+        Assert.Equal(WorkflowFidelityDiff.FinishMismatch, rec.DiffKind);  // suppressed vs chat-truth content_filter
+    }
+
+    [Fact]
+    public void Reconcile_ExecutorIdCasingVaries_IsOneExecutor_NotDoubleCounted()
+    {
+        // Steps emit the same executor with inconsistent casing; the chat-trace key differs in case again.
+        // Case-insensitive grouping + lookup must treat this as ONE executor (not split/double-count).
+        var result = Result(Step("Writer", 0, 10, 5, "stop"), Step("writer", 1, 20, 10, "stop"));
+        var chat = new Dictionary<string, AgentTrace> { ["WRITER"] = ChatTrace(45, "stop") };
+
+        var report = new WorkflowTraceFidelityReconciler().Reconcile(result, chat);
+
+        var rec = Assert.Single(report.Executors);                 // one group, not two
+        Assert.Equal(45, rec.TokensFramework);                     // 15 + 30 summed
+        Assert.Equal(WorkflowFidelityDiff.Agree, rec.DiffKind);    // matches chat truth 45
+    }
+
+    [Fact]
     public void Reconcile_TokenDivergence_TokenMismatch()
     {
         var result = Result(Step("a", 0, 10, 5, "stop"));

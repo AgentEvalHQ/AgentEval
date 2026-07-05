@@ -108,10 +108,10 @@ public record WorkflowTestResult
 public record WorkflowExecutionResult  
 {
     // Final workflow output
-    public required string ActualOutput { get; init; }
+    public required string FinalOutput { get; init; }
     
     // Step-by-step execution
-    public required IReadOnlyList<ExecutorStepResult> Steps { get; init; }
+    public required IReadOnlyList<ExecutorStep> Steps { get; init; }
     
     // Performance metrics
     public required PerformanceMetrics Performance { get; init; }
@@ -129,10 +129,10 @@ public record WorkflowExecutionResult
 
 ### Executor Step Results
 
-Each agent (executor) execution is captured as an `ExecutorStepResult`:
+Each agent (executor) execution is captured as an `ExecutorStep`:
 
 ```csharp
-public record ExecutorStepResult
+public record ExecutorStep
 {
     // Agent identification
     public required string ExecutorId { get; init; }     // "Planner", "Writer", etc.
@@ -487,7 +487,6 @@ result.ExecutionResult!.Should()
         .And()
     .ForExecutor("Writer")
         .HaveNonEmptyOutput()
-        .HaveOutputLongerThan(100, because: "articles should be substantial")
         .And()
     .ForExecutor("Editor")
         .HaveNonEmptyOutput()
@@ -570,10 +569,7 @@ result.ExecutionResult!.Should()
     .ForExecutor("Planner")
         .HaveNonEmptyOutput()                           // Has output
         .HaveOutputContaining("plan")                   // Output content check
-        .HaveOutputLongerThan(50)                       // Minimum output length
         .HaveCompletedWithin(TimeSpan.FromSeconds(30))  // Individual timing
-        .HaveInputTokensLessThan(1000)                  // Resource usage
-        .HaveEstimatedCostUnder(0.05m)                  // Cost constraint
         .And()
     .ForExecutor("Writer")
         .HaveNonEmptyOutput()
@@ -622,8 +618,7 @@ result.ExecutionResult!.Performance!.Should()
 // Individual step performance
 result.ExecutionResult!.Should()
     .ForExecutor("SlowStep")
-        .HaveCompletedWithin(TimeSpan.FromSeconds(30))
-        .HaveEstimatedCostUnder(0.10m);
+        .HaveCompletedWithin(TimeSpan.FromSeconds(30));
 ```
 
 ### Complex Assertion Chaining
@@ -644,7 +639,7 @@ result.ExecutionResult!.Should()
         .HaveCompletedWithin(TimeSpan.FromSeconds(60))
         .And()
     .ForExecutor("Writer")
-        .HaveOutputLongerThan(200)
+        .HaveNonEmptyOutput()
         .And()
         
     // Graph validation

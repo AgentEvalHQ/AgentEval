@@ -169,4 +169,19 @@ public class TraceFidelityTests
         Assert.Equal(3, family.Presets.Count);
         Assert.IsType<TraceFidelityRunner>(family.RunnerFactory!("standard"));
     }
+
+    // ── P3.2a: workflow-trace-fidelity Shape-B registry registration ──
+    [Fact]
+    public void WorkflowFamily_IsRegisteredAsShapeB()
+    {
+        _ = typeof(WorkflowTraceFidelityBenchmark).Assembly;   // force module-init
+        var family = BenchmarkFamilyRegistry.TryGet("workflow-trace-fidelity");
+
+        Assert.NotNull(family);
+        Assert.Equal(typeof(WorkflowTraceFidelityReconciler), family!.RunnerType);
+        Assert.Null(family.CompositeFactory);
+        Assert.Null(family.EvaluateAsync);
+        Assert.Equal(3, family.Presets.Count);
+        Assert.IsType<WorkflowTraceFidelityReconciler>(family.RunnerFactory!("standard"));
+    }
 }

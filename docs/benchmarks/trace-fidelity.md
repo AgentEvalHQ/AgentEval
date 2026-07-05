@@ -4,6 +4,9 @@
 
 It is a **Shape-B benchmark family** (`trace-fidelity`, `CostTier.Free` — pure code, no LLM tokens).
 
+> See **[Glass Box](../glass-box.md)** for the full two-layer model, the per-executor
+> [`workflow-trace-fidelity`](workflow-trace-fidelity.md) variant, and the `glass-box-diagnostics` evaluators.
+
 ## The six discrepancy classes
 
 | Class | Detected when | Severity |

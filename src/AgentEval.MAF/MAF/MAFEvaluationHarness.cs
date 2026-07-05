@@ -93,10 +93,18 @@ public class MAFEvaluationHarness : IStreamingEvaluationHarness, IBatchEvaluatio
             if (options.TrackTools && response.RawMessages != null)
             {
                 result.ToolUsage = ToolUsageExtractor.Extract(response.RawMessages);
-                
+
+                // Glass Box Part 2 (P2.A2 activation): back-fill real per-tool execution timing from the
+                // supplied Glass Box trace, so the duration assertions evaluate instead of silently skipping.
+                // The non-streaming Extract path carries no timing on its own; enrichment supplies it.
+                if (options.GlassBoxTrace is AgentEval.Tracing.AgentTrace glassBoxTrace)
+                {
+                    ToolUsageExtractor.EnrichFromTrace(result.ToolUsage, glassBoxTrace);
+                }
+
                 // Populate timeline from tool usage
                 PopulateTimelineFromToolUsage(timeline, result.ToolUsage);
-                
+
                 if (metrics != null)
                 {
                     metrics.ToolCallCount = result.ToolUsage.Count;

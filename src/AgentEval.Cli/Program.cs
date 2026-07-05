@@ -197,6 +197,7 @@ var benchAgenticInputOpt = new Option<string?>("--input") { Description = "Agent
 var benchAgenticResponseOpt = new Option<string?>("--response") { Description = "The agent's actual RESPONSE to grade. If omitted, a built-in fixture is graded and a warning is emitted (the evidence then reflects no real agent)." };
 var benchAgenticResponseFileOpt = new Option<string?>("--response-file") { Description = "Path to a file containing the agent's actual response to grade (alternative to --response, for multi-line output)." };
 var benchAgenticBudgetTierOpt = new Option<string?>("--budget-tier") { Description = "Budget tier filter: trivial | low | medium | high | all (default: all). Components with a cost tier above the budget are filtered out and remaining weights are renormalized. Use 'low' or 'medium' for fast feedback loops; 'all' for full audit runs." };
+var benchAgenticTraceOpt = new Option<string?>("--trace") { Description = "Path to a captured Glass Box trace (JSON). Attaches the dual-boundary trace to the evaluation so trace-aware evaluators (e.g. the glass-box-diagnostics preset) read real chat/tool-boundary data instead of skipping." };
 var benchAgenticCmd = new Command("agentic", "Run the agentic behavior benchmark");
 benchAgenticCmd.Add(benchAgenticPresetOpt);
 benchAgenticCmd.Add(benchAgenticSubjectOpt);
@@ -205,6 +206,7 @@ benchAgenticCmd.Add(benchAgenticInputOpt);
 benchAgenticCmd.Add(benchAgenticResponseOpt);
 benchAgenticCmd.Add(benchAgenticResponseFileOpt);
 benchAgenticCmd.Add(benchAgenticBudgetTierOpt);
+benchAgenticCmd.Add(benchAgenticTraceOpt);
 benchAgenticCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =>
 {
     var preset = parseResult.GetValue(benchAgenticPresetOpt) ?? "agentic-execution";
@@ -219,7 +221,8 @@ benchAgenticCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) 
     var response = await ResolveBenchResponseAsync(parseResult.GetValue(benchAgenticResponseOpt), parseResult.GetValue(benchAgenticResponseFileOpt), ct);
     if (response.Error) return 1;
     var budgetTier = parseResult.GetValue(benchAgenticBudgetTierOpt);
-    return await BenchAgenticCommand.RunAsync(preset, subject, root, input, response.Text, budgetTier, ct);
+    var traceFile = parseResult.GetValue(benchAgenticTraceOpt);
+    return await BenchAgenticCommand.RunAsync(preset, subject, root, input, response.Text, budgetTier, traceFile, ct);
 });
 // bench agentic calibrate
 var agenticCalibrateRootOpt = new Option<string?>("--root") { Description = "Workspace root path (default: current directory)" };
@@ -418,6 +421,41 @@ benchCmd.Add(benchNistCmd);
             return await BenchTraceFidelityCommand.RunAsync(agentTrace, chatTrace, preset, subject, root, ct);
         });
         benchCmd.Add(benchTraceFidelityCmd);
+    }
+
+    // bench workflow-trace-fidelity — Glass Box: per-executor ledger vs chat-boundary truth (workflows).
+    {
+        var wtfTraceOpt = new Option<string?>("--workflow-trace") { Description = "Path to a saved workflow .trace.json. Per-executor chat truth is read from its ExecutorTraces (absent → every executor is NoTruth). REQUIRED." };
+        var wtfPresetOpt = new Option<string?>("--preset") { Description = "smoke | standard | audit-grade. Default: standard." };
+        var wtfSubjectOpt = new Option<string?>("--subject") { Description = "Subject name (workflow under evaluation). REQUIRED." };
+        var wtfRootOpt = new Option<string?>("--root") { Description = "Workspace root path (default: auto-detected)" };
+
+        var benchWorkflowTraceFidelityCmd = new Command("workflow-trace-fidelity", "Reconcile each workflow executor's framework-reported per-executor ledger (tokens + finish reason) against chat-boundary truth. Pure code (no LLM cost).");
+        benchWorkflowTraceFidelityCmd.Add(wtfTraceOpt);
+        benchWorkflowTraceFidelityCmd.Add(wtfPresetOpt);
+        benchWorkflowTraceFidelityCmd.Add(wtfSubjectOpt);
+        benchWorkflowTraceFidelityCmd.Add(wtfRootOpt);
+        benchWorkflowTraceFidelityCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =>
+        {
+            var workflowTrace = parseResult.GetValue(wtfTraceOpt);
+            var subject = parseResult.GetValue(wtfSubjectOpt);
+            if (string.IsNullOrWhiteSpace(workflowTrace))
+            {
+                Console.Error.WriteLine("Error: --workflow-trace is required.");
+                return 1;
+            }
+
+            if (string.IsNullOrWhiteSpace(subject))
+            {
+                Console.Error.WriteLine("Error: --subject is required.");
+                return 1;
+            }
+
+            var preset = parseResult.GetValue(wtfPresetOpt) ?? "standard";
+            var root = parseResult.GetValue(wtfRootOpt);
+            return await BenchWorkflowTraceFidelityCommand.RunAsync(workflowTrace, preset, subject, root, ct);
+        });
+        benchCmd.Add(benchWorkflowTraceFidelityCmd);
     }
 
     // bench autoaudit — Glass Box flagship: cross-endpoint honesty/safety/cost comparison (offline demo).

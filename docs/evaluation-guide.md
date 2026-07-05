@@ -222,10 +222,8 @@ result.ExecutionResult!
     .ForExecutor("Researcher")
         .HaveCompletedWithin(TimeSpan.FromMinutes(3))
         .HaveCalledTool("ResearchTool")
-        .HaveEstimatedCostUnder(0.20m)
         .And()
     .ForExecutor("Writer")
-        .HaveOutputLongerThan(500, because: "content should be substantial")
         .HaveNonEmptyOutput()
         .And();
 ```
@@ -284,8 +282,7 @@ result.ExecutionResult!.Should()
     
     // Per-agent validation (FREE)  
     .ForExecutor("Writer")
-        .HaveOutputLongerThan(200)
-        .HaveEstimatedCostUnder(0.15m)
+        .HaveNonEmptyOutput()
         .And()
         
     // Graph validation (FREE)

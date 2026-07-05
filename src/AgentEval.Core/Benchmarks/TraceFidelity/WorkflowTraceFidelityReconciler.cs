@@ -112,14 +112,33 @@ public sealed class WorkflowTraceFidelityReconciler
 
         var records = new List<WorkflowExecutorFidelity>();
 
-        foreach (var group in result.Steps.GroupBy(s => s.ExecutorId, StringComparer.Ordinal))
+        // Probe chat traces case-insensitively so a framework-reported executor id ("Writer") matches a
+        // captured-trace key ("writer") — consistent with the case-insensitive executor-id matching used
+        // across the workflow-assertion surface. Last-write-wins on a (benign) case collision.
+        Dictionary<string, AgentTrace>? chatByExecutor = null;
+        if (chatTraces is not null)
+        {
+            chatByExecutor = new Dictionary<string, AgentTrace>(StringComparer.OrdinalIgnoreCase);
+            foreach (var kv in chatTraces)
+            {
+                chatByExecutor[kv.Key] = kv.Value;
+            }
+        }
+
+        // Group case-insensitively too (not just the chat-trace lookup below): a workflow that emits an
+        // executor id with inconsistent casing across steps is ONE executor, and a case-sensitive GroupBy
+        // would split it into multiple groups that each match the same chat trace (double-counting).
+        foreach (var group in result.Steps.GroupBy(s => s.ExecutorId, StringComparer.OrdinalIgnoreCase))
         {
             var executorId = group.Key;
             var tokensFramework = group.Sum(s => s.TokenUsage?.TotalTokens ?? 0);
-            var finishFramework = group.Select(s => s.FinishReason).LastOrDefault(f => f is not null);
+            // The executor's TERMINAL finish reason is its last step's — take it as-is (may be null). Do NOT
+            // fall back to an earlier non-null finish, or a SUPPRESSED final finish would be masked by an
+            // earlier step's reason and wrongly read as Agree instead of a FinishMismatch.
+            var finishFramework = group.OrderBy(s => s.StepIndex).Select(s => s.FinishReason).LastOrDefault();
 
-            var responses = chatTraces is not null
-                && chatTraces.TryGetValue(executorId, out var chatTrace) && chatTrace is not null
+            var responses = chatByExecutor is not null
+                && chatByExecutor.TryGetValue(executorId, out var chatTrace) && chatTrace is not null
                 ? chatTrace.Entries
                     .Where(e => e.EffectiveScope == TraceEntryScope.ChatTurn && e.Type == TraceEntryType.Response)
                     .ToList()

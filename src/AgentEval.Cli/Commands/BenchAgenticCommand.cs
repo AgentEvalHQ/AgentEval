@@ -11,6 +11,7 @@ using AgentEval.Evals.Agentic.Reporting.Pdf;
 using AgentEval.Evals.Agentic.Safety;
 using AgentEval.Evals.Agentic.Safety.Policy;
 using AgentEval.Output;
+using AgentEval.Tracing;
 
 namespace AgentEval.Cli.Commands;
 
@@ -29,8 +30,9 @@ public static class BenchAgenticCommand
         string? inputText,
         string? responseText = null,
         string? budgetTier = null,
+        string? traceFile = null,
         CancellationToken ct = default) =>
-        RunAsync(preset, subject, rootOverride, inputText, responseText, evaluatorOverride: null, budgetTier, ct);
+        RunAsync(preset, subject, rootOverride, inputText, responseText, evaluatorOverride: null, budgetTier, traceFile, ct);
 
     /// <summary>Runs the bench agentic command with optional overrides (used in tests).</summary>
     internal static async Task<int> RunAsync(
@@ -41,6 +43,7 @@ public static class BenchAgenticCommand
         string? responseText,
         IEvaluator? evaluatorOverride,
         string? budgetTier = null,
+        string? traceFile = null,
         CancellationToken ct = default)
     {
         // ── Workspace setup ──────────────────────────────────────────────────
@@ -141,6 +144,32 @@ public static class BenchAgenticCommand
         }
         var evalInput = new EvalInput(Query: query, Response: agentResponse);
 
+        // Treat an empty/whitespace --trace the same as omitted (so both the load below and the all-skipped
+        // hint further down use one consistent notion of "no trace supplied").
+        if (string.IsNullOrWhiteSpace(traceFile))
+        {
+            traceFile = null;
+        }
+
+        // Glass Box (Phase 3): attach a captured dual-boundary trace so trace-aware evaluators
+        // (e.g. the glass-box-diagnostics preset) read real chat/tool-boundary data instead of Skipping.
+        // One WithTrace here reaches every leaf, since CompositeEval forwards one EvalInput to all components.
+        if (traceFile is not null)
+        {
+            AgentEval.Tracing.AgentTrace glassBoxTrace;
+            try
+            {
+                glassBoxTrace = await TraceSerializer.LoadFromFileAsync(traceFile, ct);
+            }
+            catch (Exception ex) when (ex is IOException or System.Text.Json.JsonException
+                or InvalidOperationException or ArgumentException or UnauthorizedAccessException)
+            {
+                Console.Error.WriteLine($"[bench agentic] Could not load --trace '{traceFile}': {ex.Message}");
+                return 1;
+            }
+            evalInput = evalInput.WithTrace(glassBoxTrace);
+        }
+
         // ── Run benchmark ────────────────────────────────────────────────────
         var store = new FileSystemOutputStore(agentEvalDir);
         // Workspace hygiene: sweep stale 24h+ sentinels. Phase-0 0.9: only
@@ -208,6 +237,24 @@ public static class BenchAgenticCommand
             Console.Error.WriteLine($"Warning: failed to write PDF report: {ex.Message}");
         }
 
+        // ── All-skipped diagnostic ────────────────────────────────────────────
+        // A trace-only preset (e.g. glass-box-diagnostics) run without a trace yields an all-skipped
+        // composite (weighted score 0 → "FAIL"). That is a "nothing ran" state, not a genuine regression —
+        // print a clear reason so the FAIL is not mistaken for a 0% score. (Exit stays FAIL-strict for CI.)
+        var subResults = compositeResult.Details.SubResults;
+        if (subResults is { Count: > 0 } && subResults.All(s => s.Score.Label == "skipped"))
+        {
+            var isGlassBox = string.Equals(preset, "glass-box-diagnostics", StringComparison.OrdinalIgnoreCase);
+            Console.Error.WriteLine(
+                $"[bench agentic] NOTE: all {subResults.Count} evaluator(s) in preset '{preset}' were SKIPPED — "
+                + "no score was produced (the FAIL below reflects 'nothing ran', not a 0% result). "
+                + (isGlassBox
+                    ? (traceFile is null
+                        ? "This preset reads a Glass Box trace; pass --trace <file> to activate it."
+                        : "Check that the supplied trace contains the entry scopes these evaluators read.")
+                    : "This preset reads inputs from EvalInput.Metadata (e.g. \"agentic_telemetry\" / \"run_results\"), which this CLI path does not populate."));
+        }
+
         // ── Exit code ─────────────────────────────────────────────────────────
         var overall = result.Summary.OverallStatus;
         Console.WriteLine($"Overall result: {overall} (score {result.Summary.OverallScore:P0})");
@@ -229,6 +276,7 @@ public static class BenchAgenticCommand
     ///   <item><c>judge-quality</c> — 3 meta-evaluators for inter-rater agreement, calibration accuracy, and judge drift. No LLM judge required.</item>
     ///   <item><c>safety</c> — 12-evaluator safety/security composite. Uses a default empty policy and the subject name. No real content-safety client is wired by default.</item>
     ///   <item><c>telemetry</c> — 6 pure-code operational evaluators. Supply telemetry data via EvalInput.Metadata["agentic_telemetry"].</item>
+    ///   <item><c>glass-box-diagnostics</c> — 8 Glass Box trace evaluators. Requires a trace via <c>--trace</c> (attached to EvalInput); leaves Skip without it.</item>
     ///   <item><c>stochastic-stability</c> — Single-component composite measuring run-to-run score consistency. Supply run results via EvalInput.Metadata["run_results"].</item>
     /// </list>
     /// </summary>
@@ -284,13 +332,14 @@ public static class BenchAgenticCommand
                 contentSafetyClient: null,
                 judgeModel: judgeModel),
             "telemetry" => AgenticBenchmark.Telemetry(),
+            "glass-box-diagnostics" => AgenticBenchmark.GlassBoxDiagnostics(judge, judgeModel),
             "stochastic-stability" => AgenticBenchmark.StochasticStability(),
             "conversational" => AgenticBenchmark.Conversational(judge, judgeModel),
             "reasoning" => AgenticBenchmark.Reasoning(judge, judgeModel),
             "user-experience" => AgenticBenchmark.UserExperience(judge, judgeModel),
             "adversarial-direct" => AgenticBenchmark.AdversarialDirect(judge, judgeModel),
             _ => throw new ArgumentException($"Unknown agentic preset '{presetSpec}'. " +
-                "Known presets: agentic-execution, tool-call-accuracy, rag-quality, judge-quality, safety, telemetry, stochastic-stability, conversational, reasoning, user-experience, adversarial-direct.",
+                "Known presets: agentic-execution, tool-call-accuracy, rag-quality, judge-quality, safety, telemetry, glass-box-diagnostics, stochastic-stability, conversational, reasoning, user-experience, adversarial-direct.",
                 nameof(presetSpec))
         };
     }

@@ -308,6 +308,7 @@ agenteval bench agentic calibrate [--root <path>] [--out <path>]
 | `longmemeval` | Long-context memory benchmark. |
 | `memory` | Memory retention / cross-session benchmark. |
 | `trace-fidelity` | Chat-boundary vs agent-boundary trace reconciliation. |
+| `workflow-trace-fidelity` | Per-executor workflow ledger (tokens + finish reason) vs chat-boundary truth. |
 | `autoaudit` | GlassBox-style multi-endpoint workflow auto-audit. |
 
 **Notes**

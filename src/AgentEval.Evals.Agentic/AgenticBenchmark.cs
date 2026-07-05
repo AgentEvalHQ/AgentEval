@@ -5,9 +5,12 @@
 using AgentEval.Core;
 using AgentEval.Evals;
 using AgentEval.Evals.Agentic.Adversarial;
+using AgentEval.Evals.Agentic.Audit;
 // Imported for the <see cref="AgenticBenchmarkRunner"/> XML-doc references below — the
 // runner lives in Composition/ while this factory now sits at the project root.
 using AgentEval.Evals.Agentic.Calibration;
+using AgentEval.Evals.Agentic.Diagnostics;
+using AgentEval.Evals.Agentic.Performance;
 using AgentEval.Evals.Agentic.JudgeQuality;
 using AgentEval.Evals.Agentic.Memory;
 using AgentEval.Evals.Agentic.MultiTurn;
@@ -16,6 +19,7 @@ using AgentEval.Evals.Agentic.Quality;
 using AgentEval.Evals.Agentic.Reasoning;
 using AgentEval.Evals.Agentic.Safety;
 using AgentEval.Evals.Agentic.Safety.Policy;
+using AgentEval.Evals.Agentic.Security;
 using AgentEval.Evals.Agentic.StochasticStability;
 using AgentEval.Evals.Agentic.System;
 using AgentEval.Evals.Agentic.Telemetry;
@@ -27,7 +31,7 @@ namespace AgentEval.Benchmarks;
 /// <summary>
 /// Top-level factory methods for agentic benchmark presets.
 /// <para>
-/// Eleven presets are provided:
+/// Twelve presets are provided:
 /// <list type="bullet">
 ///   <item><see cref="AgenticExecution"/> — Standard 6-evaluator composition covering system-outcome and agentic-process dimensions.</item>
 ///   <item><see cref="ToolCallAccuracy"/> — Single-evaluator preset wrapping <see cref="ToolCallAccuracyAggregateEval"/> for focused tool-call diagnostics.</item>
@@ -35,6 +39,7 @@ namespace AgentEval.Benchmarks;
 ///   <item><see cref="JudgeQuality"/> — 3-evaluator meta-benchmark covering inter-rater agreement, calibration accuracy, and judge drift.</item>
 ///   <item><see cref="Safety"/> — 12-evaluator composite covering safety/security dimensions (prohibited actions, content safety, data leakage, injection attacks).</item>
 ///   <item><see cref="Telemetry"/> — 6 pure-code operational evaluators covering latency, token usage, cost, error rate, retry rate, and per-tool latency.</item>
+///   <item><see cref="GlassBoxDiagnostics"/> — 8 Glass Box trace evaluators (tool reliability/errors, safety interventions, truncation, prompt drift/injection, argument leaks, token skew); needs <c>--trace</c>.</item>
 ///   <item><see cref="StochasticStability"/> — Single-component composite measuring run-to-run score consistency.</item>
 ///   <item><see cref="Conversational"/> — 5-evaluator composite covering memory recall, long-conversation coherence, turn coherence, goal tracking, and clarification appropriateness.</item>
 ///   <item><see cref="Reasoning"/> — 4-evaluator composite covering reasoning correctness, intermediate-step hallucination, plan formulation quality, and goal decomposition quality.</item>
@@ -334,6 +339,44 @@ public static partial class AgenticBenchmark
                 new(new CostEval(),       0.15),
                 new(new RetryRateEval(),  0.10),
                 new(new ToolLatencyEval(), 0.05),
+            ],
+            aggregation: WeightedSumAggregation.Instance,
+            threshold: 0.80);
+    }
+
+    /// <summary>
+    /// Builds the Glass Box Diagnostics preset (Phase 3): eight evaluators that read the dual-boundary
+    /// Glass Box trace attached to <see cref="EvalInput"/> (via <c>--trace</c> on the CLI) to surface what the
+    /// framework's own reporting hides — per-tool reliability, concentrated failure patterns, provider safety
+    /// interventions, truncation, silent system-prompt drift, system-prompt injection, wire-level argument
+    /// leaks, and token-distribution skew.
+    /// <para>Seven leaves are pure-code; <see cref="SystemPromptInjectionEval"/> runs deterministically against
+    /// a trusted baseline or, if a judge is supplied and no baseline is present, via that LLM judge. Each
+    /// evaluator Skips when no trace is attached, so this preset is only meaningful on a trace-attached run.</para>
+    /// <para>Aggregation: <see cref="WeightedSumAggregation"/>. Pass threshold: 0.80.</para>
+    /// </summary>
+    /// <param name="judge">Optional LLM judge. When supplied, <see cref="SystemPromptInjectionEval"/> uses it to
+    /// score injection semantically if no trusted baseline is present in the input metadata; otherwise that leaf
+    /// runs in deterministic baseline mode (and Skips when neither a baseline nor a judge is available — skipped
+    /// leaves are excluded from the weighted aggregate).</param>
+    /// <returns>A <see cref="CompositeEval"/> ready to run (no <see cref="IEvaluator"/> required).</returns>
+    public static CompositeEval GlassBoxDiagnostics(IEvaluator? judge = null, string? judgeModel = null)
+    {
+        return new CompositeEval(
+            key: "agentic.glass-box-diagnostics",
+            name: "Glass Box Diagnostics Benchmark",
+            category: "agentic-process",
+            version: "1.0.0",
+            components:
+            [
+                new(new ToolReliabilityEval(),          0.18),
+                new(new ToolErrorPatternEval(),         0.14),
+                new(new SafetyInterventionEval(),       0.14),
+                new(new ArgumentSanitizationEval(),     0.14),
+                new(new SystemPromptDriftEval(),        0.12),
+                new(new SystemPromptInjectionEval(judge, judgeModel), 0.12),
+                new(new TruncationDetectionEval(),      0.08),
+                new(new TokenDistributionEval(),        0.08),
             ],
             aggregation: WeightedSumAggregation.Instance,
             threshold: 0.80);

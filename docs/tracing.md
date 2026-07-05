@@ -2,6 +2,9 @@
 
 AgentEval provides powerful **Record & Replay** capabilities that enable deterministic evaluation of AI agents. This "time-travel debugging" feature allows you to capture agent executions once and replay them infinitely without calling the underlying LLM.
 
+> **Recording both boundaries?** See **[Glass Box](glass-box.md)** — it reconciles the framework's
+> self-report against what the model actually saw, and powers the Trace Fidelity benchmarks + diagnostics.
+
 ## Why Record & Replay?
 
 | Benefit | Description |

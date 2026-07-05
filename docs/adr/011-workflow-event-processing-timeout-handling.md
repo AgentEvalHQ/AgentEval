@@ -157,7 +157,7 @@ Build execution timeline from event stream:
 ```csharp
 public record WorkflowTimelineBuilder
 {
-    private readonly List<ExecutorStepResult> _steps = new();
+    private readonly List<ExecutorStep> _steps = new();
     private readonly Dictionary<string, DateTime> _executorStartTimes = new();
     
     public void ProcessExecutorInvokedEvent(ExecutorInvokedEvent evt)
@@ -170,7 +170,7 @@ public record WorkflowTimelineBuilder
         if (_executorStartTimes.TryGetValue(evt.ExecutorId, out var startTime))
         {
             var duration = DateTime.UtcNow - startTime;
-            _steps.Add(new ExecutorStepResult
+            _steps.Add(new ExecutorStep
             {
                 ExecutorId = evt.ExecutorId,
                 StepIndex = _steps.Count,
@@ -330,8 +330,8 @@ Minimize event processing overhead:
 
 ```csharp
 // Use object pooling for frequent event objects
-private static readonly ObjectPool<ExecutorStepResult> _stepPool = 
-    ObjectPool.Create<ExecutorStepResult>();
+private static readonly ObjectPool<ExecutorStep> _stepPool = 
+    ObjectPool.Create<ExecutorStep>();
 
 // Cache event type mappings to avoid reflection
 private static readonly Dictionary<Type, Func<WorkflowEvent, WorkflowEvaluationEvent?>> _eventConverters = 
@@ -395,7 +395,7 @@ public WorkflowTestResult CreatePartialResult(string reason, TimeSpan actualDura
         ErrorMessage = reason,
         ExecutionResult = new WorkflowExecutionResult
         {
-            ActualOutput = _lastKnownOutput ?? "Timeout before completion",
+            FinalOutput = _lastKnownOutput ?? "Timeout before completion",
             Steps = _completedSteps,  // Return whatever steps completed
             Performance = CreatePartialPerformanceMetrics(),
             GraphDefinition = _extractedGraph  // Graph extraction usually succeeds quickly

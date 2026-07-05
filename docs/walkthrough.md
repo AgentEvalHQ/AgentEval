@@ -617,11 +617,9 @@ result.ExecutionResult!.Should()
 // 7. Assert on individual agent performance
 result.ExecutionResult!
     .ForExecutor("Writer")
-        .HaveOutputLongerThan(200, because: "articles should be substantial")
-        .HaveEstimatedCostUnder(0.15m)
+        .HaveNonEmptyOutput()
         .And()
     .ForExecutor("Editor")
-        .HaveOutputNotContaining("DRAFT")
         .And();
 
 // 8. Validate workflow graph structure

@@ -3,7 +3,9 @@
 // Licensed under the MIT License.
 
 using System.Diagnostics;
+using AgentEval.Benchmarks;
 using AgentEval.Models;
+using AgentTrace = AgentEval.Tracing.AgentTrace;
 
 namespace AgentEval.Assertions;
 
@@ -204,6 +206,49 @@ public class WorkflowAssertionBuilder
         {
             var errorMsg = _result.Errors?.FirstOrDefault()?.Message ?? "Unknown error";
             AddFailure($"Expected workflow to succeed but it failed: {errorMsg}");
+        }
+        return this;
+    }
+
+    /// <summary>
+    /// Glass Box (Phase 3): assert per-executor trace fidelity. Reconciles each executor's framework-reported
+    /// ledger (summed tokens + finish reason) against the supplied per-executor chat-boundary traces and
+    /// requires the overall fidelity score to be at least <paramref name="minScore"/>. Executors without chat
+    /// truth are excluded from the aggregate (reported as <c>NoTruth</c>), so an untraced majority cannot mask
+    /// a real divergence.
+    /// </summary>
+    /// <param name="chatTraces">Per-executor chat-boundary traces keyed by executor ID (e.g. from
+    /// <c>WorkflowTrace.ExecutorTraces</c>). When <c>null</c>, every executor is <c>NoTruth</c> (score 1.0).</param>
+    /// <param name="minScore">Minimum acceptable overall fidelity score in [0, 1]. Defaults to 1.0 (exact).</param>
+    /// <param name="because">Optional reason for the assertion.</param>
+    [StackTraceHidden]
+    public WorkflowAssertionBuilder HaveTraceFidelity(
+        IReadOnlyDictionary<string, AgentTrace>? chatTraces = null,
+        double minScore = 1.0,
+        string? because = null)
+    {
+        if (minScore < 0.0 || minScore > 1.0 || double.IsNaN(minScore))
+        {
+            throw new ArgumentOutOfRangeException(nameof(minScore), minScore,
+                "minScore must be a finite value in [0, 1] (a negative bar always passes; >1 can never pass).");
+        }
+
+        _currentBecause = because;
+        var result = new WorkflowTraceFidelityReconciler().ReconcileToEvalResult(_result, chatTraces);
+        if (result.Score.Value < minScore)
+        {
+            // The reconciler leaves the root Evidence null and attaches per-executor evidence (executor id +
+            // framework-vs-chat detail) to each sub-result; surface the DIVERGING executors' messages.
+            var divergences = (result.Details.SubResults ?? [])
+                .Where(s => s.Score.Value < 1.0)
+                .SelectMany(s => s.Details.Evidence ?? [])
+                .Select(e => e.Message)
+                .ToList();
+            var evidence = divergences.Count > 0
+                ? string.Join("; ", divergences)
+                : "per-executor trace-fidelity divergence detected";
+            AddFailure(
+                $"Expected workflow trace fidelity >= {minScore:F2} but scored {result.Score.Value:F2}: {evidence}");
         }
         return this;
     }

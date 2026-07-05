@@ -6,6 +6,7 @@ using AgentEval.Core;
 using AgentEval.MAF;
 using AgentEval.Models;
 using AgentEval.Testing;
+using AgentEval.Tracing;
 using Xunit;
 
 namespace AgentEval.Tests;
@@ -265,6 +266,44 @@ public class MAFEvaluationHarnessTests
         Assert.Equal(1, summary.PassedCount);
         Assert.Equal(1, summary.FailedCount);
         Assert.False(summary.AllPassed);
+    }
+
+    #endregion
+
+    #region Glass Box tool-timing activation (Phase 3, P3.1)
+
+    [Fact]
+    public async Task RunEvaluationAsync_WithGlassBoxTrace_BackFillsToolTiming()
+    {
+        // Glass Box Part 2 activation: supplying a trace with ToolExecution timing back-fills the tool-usage
+        // report so TotalToolTime is populated and the duration assertions can evaluate (not silently skip).
+        var harness = new MAFEvaluationHarness(verbose: false);
+        var agent = new AgentWithToolCalls("agent", "done", new[] { "search" });
+        var trace = new AgentTrace();
+        trace.Entries.Add(TraceEntry.ForToolExecution(
+            index: 0, correlationId: null, toolName: "search", arguments: null,
+            result: "ok", durationMs: 250, succeeded: true, error: null));
+        var options = new EvaluationOptions { GlassBoxTrace = trace, EvaluateResponse = false };
+
+        var result = await harness.RunEvaluationAsync(agent, new TestCase { Name = "t", Input = "go" }, options);
+
+        Assert.True(result.ToolUsage!.Calls[0].HasTiming);
+        Assert.Equal(TimeSpan.FromMilliseconds(250), result.ToolUsage.TotalToolTime);
+        Assert.Equal(TimeSpan.FromMilliseconds(250), result.Performance!.TotalToolTime);
+    }
+
+    [Fact]
+    public async Task RunEvaluationAsync_WithoutGlassBoxTrace_ToolTimingStaysZero_BackCompat()
+    {
+        var harness = new MAFEvaluationHarness(verbose: false);
+        var agent = new AgentWithToolCalls("agent", "done", new[] { "search" });
+        var options = new EvaluationOptions { EvaluateResponse = false };
+
+        var result = await harness.RunEvaluationAsync(agent, new TestCase { Name = "t", Input = "go" }, options);
+
+        // No trace supplied → non-streaming path carries no timing → assertions still skip (unchanged behavior).
+        Assert.False(result.ToolUsage!.Calls[0].HasTiming);
+        Assert.Equal(TimeSpan.Zero, result.Performance!.TotalToolTime);
     }
 
     #endregion

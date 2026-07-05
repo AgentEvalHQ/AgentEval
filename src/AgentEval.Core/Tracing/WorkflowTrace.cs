@@ -90,6 +90,16 @@ public sealed class WorkflowTrace
     /// </summary>
     [JsonPropertyName("executorIds")]
     public List<string> ExecutorIds { get; set; } = new();
+
+    /// <summary>
+    /// Optional per-executor Glass Box chat/tool traces, keyed by executor ID, enabling per-executor
+    /// trace-fidelity reconciliation (see <c>WorkflowTraceFidelityReconciler</c>). Populated MAF-side from
+    /// <c>WorkflowChatRecording.Traces</c> before persistence; <c>null</c> when no per-executor chat traces
+    /// were captured (the reconciler then reports every executor as <c>NoTruth</c>).
+    /// </summary>
+    [JsonPropertyName("executorTraces")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public Dictionary<string, AgentTrace>? ExecutorTraces { get; set; }
 }
 
 /// <summary>

@@ -75,6 +75,8 @@ public class WorkflowResultAssertions
 
 #### Level 2: Per-Executor Assertions
 
+> **Note (shipped API):** This ADR documents the *designed* API. The executor-scoped cost/token asserts below (`HaveInputTokensLessThan`, `HaveEstimatedCostUnder`) and `HaveOutputLongerThan` were **not** implemented on the executor scope. Use `result.Performance!.Should().HaveEstimatedCostUnder(...)` for cost/tokens and `HaveNonEmptyOutput()` for output presence. See docs/workflows.md.
+
 ```csharp
 public class ExecutorAssertions
 {
@@ -132,8 +134,7 @@ result.ExecutionResult!.Should()
         .HaveCompletedWithin(TimeSpan.FromSeconds(60), because: "planning should be reasonably fast")
         .And()
     .ForExecutor("Writer")    
-        .HaveOutputLongerThan(200, because: "articles should be substantial")
-        .HaveEstimatedCostUnder(0.10m)
+        .HaveNonEmptyOutput()
         .And()
         
     // Level 3: Graph validation
@@ -395,11 +396,9 @@ public static class ContentPipelineAssertions
                 .HaveOutputContaining("research")
                 .And()
             .ForExecutor("Writer")
-                .HaveOutputLongerThan(500)
-                .HaveOutputNotContaining("[TODO]")
+                .HaveNonEmptyOutput()
                 .And()
             .ForExecutor("Editor")
-                .HaveOutputNotContaining("DRAFT")
                 .And();
     }
 }
