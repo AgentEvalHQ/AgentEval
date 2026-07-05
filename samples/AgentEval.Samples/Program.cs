@@ -126,7 +126,7 @@ public static class Program
 
         new('J', "Gatekeeper (Runtime Protection)", "★ no credentials — fail-closed runtime enforcement",
         [
-            new("Enforcement Walkthrough",   "The 5 gate layers: tool / moat / canary / shadow-judge / defense-in-depth", GatekeeperEnforcement.RunAsync),
+            new("Enforcement Walkthrough",   "6 scenarios: tool / moat / canary / shadow-judge / defense-in-depth / more gates", GatekeeperEnforcement.RunAsync),
             new("MAF Agent Harness",         "A realistic gated MAF support agent: normal flow works, attack flow is blocked", GatekeeperMafHarness.RunAsync),
         ]),
     ];

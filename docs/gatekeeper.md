@@ -31,8 +31,10 @@ independent and writes to one shared trace.
 | **The moat** | a tool call | anything your red‑team probes/canaries catch | pure‑code / bounded |
 | **Shadow judge** | *after* the run, async | arms quarantine for a **later** run | **anything — LLM, network** |
 
-The cost column is the load‑bearing constraint. Inline gates run on the hot path, so they **reject** network /
-LLM work at construction — an LLM judge on every tool call would stall the agent and risk a fabricated verdict.
+The cost column is the load‑bearing constraint. **Tool gates and the moat** run on the hot path and **reject**
+network / LLM work at construction (via `GateCost`) — an LLM judge on every tool call would stall the agent and
+risk a fabricated verdict. Run and session gates reuse `IChatGate`, which carries no cost, so keeping those
+pure‑code is a convention, not an enforced check.
 The **shadow judge** is where that expensive judgment goes.
 
 ## Tool gates
@@ -82,9 +84,10 @@ var agent = baseAgent.AsBuilder()
     .Build();
 ```
 
-Under a blocking policy a run‑pre attack refusal is returned *without ever calling the model*. Streaming runs
-inspect the input only; a blocking run‑post gate on a stream fails closed at stream start rather than letting
-unbuffered output through.
+Under a blocking policy a run‑pre attack refusal is returned *without ever calling the model*. On a stream, a
+blocking run‑post gate fails closed at stream start (it can't block bytes already in flight); under `WarnOnly` a
+run‑post gate still runs — it accumulates the streamed response and records its evidence *after* the stream
+(observe‑only, so the delivered response is unchanged).
 
 ## Session gates
 
@@ -153,7 +156,7 @@ model, so every outcome is deterministic and needs no API key:
 - [`Gatekeeper/01_GatekeeperEnforcement`](../samples/AgentEval.Samples/Gatekeeper/01_GatekeeperEnforcement.cs) —
   the **enforcement walkthrough** across all five layers: a forbidden tool blocked, a poisoned argument caught by
   a red‑team evaluator, a canary honeypot held, a shadow verdict quarantining the next run, and a
-  **defense‑in‑depth** scene (reject the attack at the door → require an operator → rate‑limit, all before the
+  **defense‑in‑depth** scene (require an operator → reject the attack at the door → rate‑limit, all before the
   model runs).
 - [`Gatekeeper/02_GatekeeperMafHarness`](../samples/AgentEval.Samples/Gatekeeper/02_GatekeeperMafHarness.cs) — a
   **realistic MAF support agent** with real tools: a legit request flows normally, and an attack request (a prompt
