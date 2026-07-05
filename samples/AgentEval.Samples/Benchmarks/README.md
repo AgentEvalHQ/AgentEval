@@ -29,18 +29,18 @@ reports:
 - **H13 Report Browser** — interactive browser over past runs written by the
   running samples above; opens JSON / HTML / PDF in the OS default app.
 
-**H8 LongMemEval** (ICLR 2025) and **H9 Memory** are Shape B benchmarks —
+**H9 LongMemEval** (ICLR 2025) and **H10 Memory** are Shape B benchmarks —
 their runners return native result records (`ExternalBenchmarkResult` /
 `MemoryBenchmarkResult`) rather than the `EvalResult` composite the renderers
-expect. Each sample bridges by synthesising an `EvalResult` tree (H8: root =
-overall accuracy + per-type composites + per-question leaves; H9: root =
+expect. Each sample bridges by synthesising an `EvalResult` tree (H9: root =
+overall accuracy + per-type composites + per-question leaves; H10: root =
 weighted overall score + per-category leaves) so they produce the same
 canonical store + JSON + HTML + PDF artefacts as every other running sample.
 The unaltered native shape is **also** written to `report-native.json`
 alongside `report.json`.
 
-v0.10.1+: **H8 LongMemEval** no longer ships an "embedded subset" (the prior
-hand-authored 10-entry approximation produced misleading scores). All H8
+v0.10.1+: **H9 LongMemEval** no longer ships an "embedded subset" (the prior
+hand-authored 10-entry approximation produced misleading scores). All H9
 presets read the real `longmemeval_s_cleaned.json` from
 `<workspace-root>/src/AgentEval.Memory/Data/longmemeval/` (or
 `LONGMEMEVAL_DATASET_PATH`). If the file is missing the sample prints a
@@ -78,7 +78,7 @@ dotnet run --project samples/AgentEval.Samples -- 54   # Report Browser  (H13)
 
 ## Preset selection
 
-Every executing sample (H2 – H9) respects a **preset tier** so the same code
+Every executing sample (H2 – H10) respects a **preset tier** so the same code
 scales from a CI smoke check to a full audit:
 
 | Sample              | Smoke (default)              | Standard                    | Audit-Grade                          |
@@ -205,7 +205,7 @@ without re-running the benchmark.
 
 ## Where the runs are saved
 
-Samples H2 – H9 write to **two** locations per run (v0.10.1, plan-25):
+Samples H2 – H10 write to **two** locations per run (v0.10.1, plan-25):
 
 | Artefact                                      | Location                                                           | Why                                                                                                                              |
 |-----------------------------------------------|--------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------|

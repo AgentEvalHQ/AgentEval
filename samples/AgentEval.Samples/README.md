@@ -33,7 +33,7 @@ dotnet run -- 54   # Report Browser          (H13)
 dotnet run -- 59   # Gatekeeper walkthrough  (J1)
 ```
 
-The benchmark samples (H2–H9) also respect a preset tier via `--preset {smoke|standard|audit-grade}` or the
+The benchmark samples (H2–H10) also respect a preset tier via `--preset {smoke|standard|audit-grade}` or the
 `AGENTEVAL_SAMPLES_PRESET` environment variable — see `Benchmarks/README.md` for the resolution order.
 
 ---
