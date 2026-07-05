@@ -40,6 +40,7 @@
     <ProjectReference Include="..\..\src\AgentEval.DataLoaders\AgentEval.DataLoaders.csproj" />
     <ProjectReference Include="..\..\src\AgentEval.MAF\AgentEval.MAF.csproj" />
     <ProjectReference Include="..\..\src\AgentEval.RedTeam\AgentEval.RedTeam.csproj" />
+    <ProjectReference Include="..\..\src\AgentEval.RedTeam.Gatekeeper\AgentEval.RedTeam.Gatekeeper.csproj" />
     <ProjectReference Include="..\..\src\AgentEval\AgentEval.csproj" />
     <ProjectReference Include="..\..\src\AgentEval.Cli\AgentEval.Cli.csproj" />
     <ProjectReference Include="..\..\src\AgentEval.Compliance.Gdpr\AgentEval.Compliance.Gdpr.csproj" />

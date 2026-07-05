@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Gatekeeper M3 — the moat / bridge project. The ONE place that references BOTH the Gatekeeper gate seams
+    (AgentEval.MAF) AND the red-team probes/canaries (AgentEval.RedTeam). No cycle: neither parent references
+    the other; both only point down to Abstractions/Core. Keeping this a separate assembly means the core MAF
+    package never takes a dependency on the (heavier) red-team assembly.
+  -->
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
+    <IsPackable>false</IsPackable>
+    <RootNamespace>AgentEval</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../AgentEval.MAF/AgentEval.MAF.csproj" />
+    <ProjectReference Include="../AgentEval.RedTeam/AgentEval.RedTeam.csproj" />
+  </ItemGroup>
+
+</Project>
