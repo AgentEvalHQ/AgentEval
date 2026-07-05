@@ -292,6 +292,29 @@ internal static class RedTeamCommand
             throw new InvalidOperationException(
                 "--model is required when using --endpoint.");
         }
+        else
+        {
+            // The built-in demo agent is stateful and single-threaded — a shared session/trace would be raced
+            // under concurrent probes, so reject --parallelism > 1 rather than silently corrupt the results.
+            if (opts.Parallelism > 1)
+                throw new InvalidOperationException(
+                    "--sut gatekeeper-demo runs at --parallelism 1 (the built-in demo agent is stateful). Remove --parallelism or set it to 1.");
+
+            // The demo has no model of its own, so a judge/attacker would fall back to the literal name
+            // "gatekeeper-demo" — a non-existent model the real endpoint rejects. Require an explicit model.
+            if (opts.JudgeEndpoint is not null && string.IsNullOrWhiteSpace(opts.JudgeModel))
+                throw new InvalidOperationException(
+                    "--sut gatekeeper-demo has no model of its own; pass --judge-model <name> when using --judge.");
+            if (opts.AttackerEndpoint is not null && string.IsNullOrWhiteSpace(opts.AttackerModel))
+                throw new InvalidOperationException(
+                    "--sut gatekeeper-demo has no model of its own; pass --attacker-model <name> when using --attacker.");
+
+            // Flags that only apply to a real endpoint are ignored for the demo — say so rather than mislead.
+            if (!opts.Quiet && (opts.Endpoint is not null || opts.Azure || opts.Model is not null
+                || opts.DeploymentName is not null || !string.Equals(opts.SutTier, "text", StringComparison.OrdinalIgnoreCase)))
+                Console.Error.WriteLine(
+                    "  Note: --sut gatekeeper-demo is a built-in agent; --endpoint/--azure/--model/--deployment-name/--sut-tier are ignored.");
+        }
 
         // Validate --fail-on up front so a typo fails fast, before an expensive scan runs.
         var failOn = opts.FailOn.ToLowerInvariant();
