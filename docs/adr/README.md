@@ -45,6 +45,7 @@ Each ADR follows this structure:
 | [022](022-grading-by-decomposition-composite-sub-evaluators.md) | Grading by Decomposition (Composite Sub-Evaluators) — RedTeam Phase C | Accepted (extends 021; B.3 executed) | 2026-06-21 |
 | [023](023-decompose-misinformation-confabulation-vs-denial.md) | Decompose the Misinformation Oracle (Confabulation ⊕ Existence-Denial) | Accepted | 2026-06-22 |
 | [024](024-split-then-gate-decomposition-and-its-bounds.md) | Split-then-Gate Decomposition (Gated Trees) and Its Bounds | Accepted | 2026-06-23 |
+| [025](025-gatekeeper-runtime-fail-closed-enforcement.md) | Gatekeeper — Runtime Fail-Closed Enforcement Middleware | Accepted | 2026-07-05 |
 
 ---
 

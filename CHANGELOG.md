@@ -7,6 +7,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Gatekeeper — runtime fail-closed enforcement
+
+**Glass Box tells you what your agent *did*; Gatekeeper stops it from doing the wrong thing** — at runtime,
+fail-closed. It puts the same checks you red-team with into the request path so a forbidden tool call, a
+poisoned argument, or a compromised conversation is blocked *before* it happens. Every gate is fail-closed
+(cannot-inspect ⇒ deny) and records honest `gate.*` evidence into the `AgentTrace` (a warn is never counted as
+a block). See [`docs/gatekeeper.md`](docs/gatekeeper.md) and [ADR-025](docs/adr/025-gatekeeper-runtime-fail-closed-enforcement.md).
+
+#### Added
+- **Tool gates** (`AgentEval.MAF.Gatekeeper`) — `UseAgentEvalToolGate` over the MAF function-invocation seam:
+  Allow / Block / Mutate a live tool call, enforced by `ToolGatePolicy` (WarnOnly / ReplaceResult / Terminate).
+  Built-ins: `ForbiddenToolGate`, `ArgumentPatternGate` (bounded regex), `SequenceGate` (ordered combination,
+  per-run scoped). A gate can declare a `MinimumPolicy` enforcement floor so a honeypot can't be silently
+  downgraded to observe-only. Network/LLM-cost gates are rejected inline (`GateCost`).
+- **Run gate** — `UseAgentEvalGate` inspects the run's input (incoming-attack detection) and output text,
+  reusing the shipped `IChatGate`/`EvalGatePolicy`; establishes an `AgentRunScope` (stable across streaming
+  segments) so inner gates can read the run context.
+- **Session gates** — fail-closed `OperatorAuthGate` (allow-list), `RateLimitGate` (race-safe in-process
+  counter, injectable clock), and `QuarantineGate`.
+- **The moat** (`AgentEval.RedTeam.Gatekeeper`, a bridge assembly) — `ProbeEvaluatorGate` runs a deterministic
+  red-team oracle as a runtime gate (fail-closed: only *Resisted* allows; *Succeeded*+*Inconclusive* block),
+  and `CanaryToolGate` + `CanaryLure` graduate a red-team canary into a production honeypot.
+- **Shadow judge** — `UseAgentEvalShadowJudge` + an owned `ShadowJudgePump`: runs the expensive LLM/network
+  checks the inline gates reject, off the hot path, over an immutable snapshot; an adverse verdict arms
+  quarantine for a *later* run instead of blocking the one it observed.
+- **`agenteval doctor`** double-gating check + `GateMetadataReader.StageFromKey`.
+- **`agenteval redteam --sut gatekeeper-demo`** — a credential-free, deterministic gated demo agent to run the
+  attack suite against (the attack-the-gate closed loop), composing with the `--baseline`/`--fail-on regression`
+  gate.
+- **Docs + sample** — `docs/gatekeeper.md` and the credential-free `SafetyAndSecurity/04_GatekeeperEnforcement`
+  sample.
+
 ### Microsoft Agent Framework: hybrid evaluation (several evaluators, one report)
 
 #### Added
