@@ -82,7 +82,8 @@ public static class CanaryLure
     {
         ArgumentNullException.ThrowIfNull(canary);
         Func<string> throwIfInvoked = () => throw new InvalidOperationException(
-            $"Canary '{canary.Name}' must never execute — register a CanaryToolGate (Terminate policy) to block the emit.");
+            $"Canary '{canary.Name}' must never execute — register a CanaryToolGate under an enforcing policy " +
+            "(ReplaceResult or Terminate) to block the emit.");
         return AIFunctionFactory.Create(throwIfInvoked, canary.Name, canary.Description);
     }
 }

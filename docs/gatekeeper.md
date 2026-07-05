@@ -100,8 +100,9 @@ The most direct expression of the whole toolkit: the **same** oracle that scores
 it at runtime**. This lives in `AgentEval.RedTeam.Gatekeeper`.
 
 ```csharp
-using AgentEval.RedTeam.Gatekeeper;
-using AgentEval.RedTeam.Evaluators;
+using AgentEval.MAF.Gatekeeper;      // GateCost
+using AgentEval.RedTeam.Gatekeeper;  // ProbeEvaluatorGate
+using AgentEval.RedTeam.Evaluators;  // ContainsTokenEvaluator
 
 // The ContainsToken evaluator you red-team with, now guarding a live call:
 var gate = new ProbeEvaluatorGate(new ContainsTokenEvaluator("PWNED"), GateCost.PureCode);

@@ -52,6 +52,7 @@
     <ProjectReference Include="../AgentEval.MAF/AgentEval.MAF.csproj" PrivateAssets="all" />
     <ProjectReference Include="../AgentEval.Memory/AgentEval.Memory.csproj" PrivateAssets="all" />
     <ProjectReference Include="../AgentEval.RedTeam/AgentEval.RedTeam.csproj" PrivateAssets="all" />
+    <ProjectReference Include="../AgentEval.RedTeam.Gatekeeper/AgentEval.RedTeam.Gatekeeper.csproj" PrivateAssets="all" />
   </ItemGroup>
 
   <!-- External NuGet deps (explicit because PrivateAssets=all suppresses transitive propagation) -->
