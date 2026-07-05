@@ -154,10 +154,11 @@ The **Gatekeeper** sample group (`AgentEval.Samples`, menu group **J**) runs eve
 model, so every outcome is deterministic and needs no API key:
 
 - [`Gatekeeper/01_GatekeeperEnforcement`](../samples/AgentEval.Samples/Gatekeeper/01_GatekeeperEnforcement.cs) —
-  the **enforcement walkthrough** across all five layers: a forbidden tool blocked, a poisoned argument caught by
-  a red‑team evaluator, a canary honeypot held, a shadow verdict quarantining the next run, and a
+  the **enforcement walkthrough** — six scenarios across the gate layers: a forbidden tool blocked, a poisoned
+  argument caught by a red‑team evaluator, a canary honeypot held, a shadow verdict quarantining the next run, a
   **defense‑in‑depth** scene (require an operator → reject the attack at the door → rate‑limit, all before the
-  model runs).
+  model runs), and a **more‑gates** scene (an `ArgumentPatternGate` on a poisoned argument, a `SequenceGate` on a
+  read‑then‑exfiltrate tool sequence, and a run‑post PII gate redacting a leaked card number).
 - [`Gatekeeper/02_GatekeeperMafHarness`](../samples/AgentEval.Samples/Gatekeeper/02_GatekeeperMafHarness.cs) — a
   **realistic MAF support agent** with real tools: a legit request flows normally, and an attack request (a prompt
   injection that turns the model destructive) is blocked at the tool boundary — the destructive action never

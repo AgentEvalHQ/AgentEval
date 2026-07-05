@@ -37,7 +37,7 @@ a block). See [`docs/gatekeeper.md`](docs/gatekeeper.md) and [ADR-025](docs/adr/
   attack suite against (the attack-the-gate closed loop), composing with the `--baseline`/`--fail-on regression`
   gate.
 - **Docs + samples** — `docs/gatekeeper.md` and the credential-free **Gatekeeper** sample group (menu group J):
-  `Gatekeeper/01_GatekeeperEnforcement` (the five-scenario enforcement walkthrough) and
+  `Gatekeeper/01_GatekeeperEnforcement` (the six-scenario enforcement walkthrough) and
   `Gatekeeper/02_GatekeeperMafHarness` (a realistic gated MAF support agent).
 
 ### Microsoft Agent Framework: hybrid evaluation (several evaluators, one report)
