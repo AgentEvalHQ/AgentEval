@@ -66,7 +66,9 @@ public sealed class ToolErrorPatternEval : IEval
             if (call.Succeeded)
                 continue;
 
-            var key = (call.Name ?? "(unnamed)", Normalize(call.Error));
+            // Cluster by tool name case-INSENSITIVELY (matching ToolUsageReport.GetCallsByName) so mixed
+            // casing does not split one real failure pattern into several smaller clusters.
+            var key = ((call.Name ?? "(unnamed)").ToLowerInvariant(), Normalize(call.Error));
             clusters[key] = clusters.TryGetValue(key, out var c) ? c + 1 : 1;
         }
 

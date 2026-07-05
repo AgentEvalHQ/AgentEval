@@ -86,6 +86,18 @@ public class ToolReliabilityEvalTests
     }
 
     [Fact]
+    public async Task ToolNameCasingVaries_IsOneTool_NotSkewed()
+    {
+        // "Search" and "search" are the same tool — case-insensitive grouping must not treat them as two.
+        var trace = TraceWith(("Search", true), ("search", true), ("SEARCH", true));
+
+        var result = await new ToolReliabilityEval().EvaluateAsync(Input(trace));
+
+        Assert.True(result.Score.Passed);
+        Assert.Equal(1.0, result.Details.Dimensions!["tool_count"]); // one tool, not three
+    }
+
+    [Fact]
     public async Task NullToolCallsEntry_IsGuarded_NotThrown()
     {
         // A hand-built ToolExecution entry with null ToolCalls must be skipped, not indexed [0].

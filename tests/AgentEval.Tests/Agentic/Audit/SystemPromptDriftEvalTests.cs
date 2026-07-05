@@ -45,6 +45,12 @@ public class SystemPromptDriftEvalTests
     }
 
     [Fact]
+    public async Task CapturedThenNotCaptured_IsNotFalseDrift_Skipped()
+        // ["bot", null] — one captured, one not-captured. The null must NOT count as a distinct value
+        // (false drift); with only 1 captured prompt there is no drift signal → skip.
+        => Assert.Equal("skipped", (await new SystemPromptDriftEval().EvaluateAsync(With(TraceWith("you are a bot", null)))).Score.Label);
+
+    [Fact]
     public async Task AllPromptsCapturedEmpty_IsEvaluatedStable_Passes()
         // Captured-empty ("") on all turns is a real (unchanging) value → evaluated as stable, NOT skipped.
         => Assert.True((await new SystemPromptDriftEval().EvaluateAsync(With(TraceWith("", "")))).Score.Passed);

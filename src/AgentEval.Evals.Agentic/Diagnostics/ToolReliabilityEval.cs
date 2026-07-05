@@ -53,7 +53,9 @@ public sealed class ToolReliabilityEval : IEval
         }
 
         // Per-tool (succeeded, total) over ToolExecution entries. ToolCalls is nullable — guard before [0].
-        var byTool = new Dictionary<string, (int Succeeded, int Total)>(StringComparer.Ordinal);
+        // Tool names are matched case-insensitively (matching ToolUsageReport.GetCallsByName) so mixed casing
+        // is not counted as two different tools.
+        var byTool = new Dictionary<string, (int Succeeded, int Total)>(StringComparer.OrdinalIgnoreCase);
         foreach (var entry in trace.Entries)
         {
             if (entry.EffectiveScope != TraceEntryScope.ToolExecution)

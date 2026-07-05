@@ -48,26 +48,23 @@ public sealed class SystemPromptDriftEval : IEval
                 "SystemPromptDriftEval requires a Glass Box trace attached via EvalInput.WithTrace(...)."));
         }
 
+        // Compare only CAPTURED (non-null) prompts. A null means the schema did not record the prompt on that
+        // turn (no signal) and must NOT count as a distinct value — else ["bot", null] would look like drift.
+        // A captured EMPTY string ("") IS a real value: all-"" is stable, and a "bot" -> "" erasure is drift.
+        // (null = not-captured, "" = captured-empty — consistent with the injection eval.)
         var prompts = trace.Entries
             .Where(e => e.EffectiveScope == TraceEntryScope.ChatTurn && e.Type == TraceEntryType.Request)
-            .Select(e => e.SystemPrompt)   // keep null/empty: a mid-run ERASURE ("bot" -> "") is itself drift
+            .Select(e => e.SystemPrompt)
+            .Where(sp => sp is not null)
+            .Select(sp => sp!)
             .ToList();
         if (prompts.Count < 2)
         {
             return Task.FromResult(EvalResult.Skipped(this,
-                "SystemPromptDriftEval needs at least 2 ChatTurn request entries to detect drift."));
+                "SystemPromptDriftEval needs at least 2 ChatTurn requests with a captured system prompt to detect drift."));
         }
 
-        // Skip only when NOTHING was captured on any request (every prompt null = not recorded by the schema).
-        // A captured EMPTY string ("") is a real value: all-"" is evaluated as stable, and a "bot" -> ""
-        // erasure counts as drift. (null = not-captured, "" = captured-empty — consistent with the injection eval.)
-        if (prompts.All(sp => sp is null))
-        {
-            return Task.FromResult(EvalResult.Skipped(this,
-                "SystemPromptDriftEval: no system prompt was captured on any request — no signal to compare."));
-        }
-
-        var distinct = prompts.Select(p => p ?? string.Empty).Distinct(StringComparer.Ordinal).Count();
+        var distinct = prompts.Distinct(StringComparer.Ordinal).Count();
         var drifted = distinct > 1;
         var score = drifted ? 0.0 : 1.0;
         var passed = score >= PassThreshold;

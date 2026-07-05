@@ -39,6 +39,19 @@ public class ToolErrorPatternAndArgSanitizationEvalTests
     }
 
     [Fact]
+    public async Task ErrorPattern_ToolNameCasingVaries_ClustersAsOne_Fails()
+    {
+        // "Search"/"search" failing the same way are ONE cluster (case-insensitive) — 3 of 4 → fail.
+        var trace = TraceWith(
+            ("Search", false, "timeout", null),
+            ("search", false, "timeout", null),
+            ("SEARCH", false, "timeout", null),
+            ("book", true, null, null));
+        var r = await new ToolErrorPatternEval().EvaluateAsync(With(trace));
+        Assert.False(r.Score.Passed);
+    }
+
+    [Fact]
     public async Task ErrorPattern_LoneOneOffFailure_IsNotAPattern_Passes()
     {
         // A single isolated failure (cluster size 1) is NOT a concentrated pattern → pass (ToolReliability
