@@ -54,6 +54,20 @@ public class WorkflowTraceFidelityReconcilerTests
     }
 
     [Fact]
+    public void Reconcile_MultiStep_SuppressedFinalFinish_IsNotMaskedByEarlierStep()
+    {
+        // Executor 'a' finished "stop" on step 0 but the FINAL step's finish was suppressed (null).
+        // The terminal finish must read as null (suppressed), not be masked by the earlier "stop".
+        var result = Result(Step("a", 0, 10, 5, "stop"), Step("a", 1, 5, 5, null));
+        var chat = new Dictionary<string, AgentTrace> { ["a"] = ChatTrace(25, "content_filter") };
+
+        var rec = Assert.Single(new WorkflowTraceFidelityReconciler().Reconcile(result, chat).Executors);
+
+        Assert.Null(rec.FinishFramework);                          // last step's null, not the earlier "stop"
+        Assert.Equal(WorkflowFidelityDiff.FinishMismatch, rec.DiffKind);  // suppressed vs chat-truth content_filter
+    }
+
+    [Fact]
     public void Reconcile_ExecutorIdCasingVaries_IsOneExecutor_NotDoubleCounted()
     {
         // Steps emit the same executor with inconsistent casing; the chat-trace key differs in case again.

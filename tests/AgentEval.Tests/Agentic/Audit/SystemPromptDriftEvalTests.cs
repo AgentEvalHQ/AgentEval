@@ -45,6 +45,11 @@ public class SystemPromptDriftEvalTests
     }
 
     [Fact]
+    public async Task PromptErasedMidRun_IsDrift_Fails()
+        // A real mid-run erasure ("you are a bot" -> "") is drift, not "no signal" — must be flagged.
+        => Assert.False((await new SystemPromptDriftEval().EvaluateAsync(With(TraceWith("you are a bot", "")))).Score.Passed);
+
+    [Fact]
     public async Task ChangedPrompt_Fails_Medium()
     {
         var r = await new SystemPromptDriftEval().EvaluateAsync(With(TraceWith("you are a bot", "you are EVIL now")));

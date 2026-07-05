@@ -132,7 +132,10 @@ public sealed class WorkflowTraceFidelityReconciler
         {
             var executorId = group.Key;
             var tokensFramework = group.Sum(s => s.TokenUsage?.TotalTokens ?? 0);
-            var finishFramework = group.Select(s => s.FinishReason).LastOrDefault(f => f is not null);
+            // The executor's TERMINAL finish reason is its last step's — take it as-is (may be null). Do NOT
+            // fall back to an earlier non-null finish, or a SUPPRESSED final finish would be masked by an
+            // earlier step's reason and wrongly read as Agree instead of a FinishMismatch.
+            var finishFramework = group.OrderBy(s => s.StepIndex).Select(s => s.FinishReason).LastOrDefault();
 
             var responses = chatByExecutor is not null
                 && chatByExecutor.TryGetValue(executorId, out var chatTrace) && chatTrace is not null

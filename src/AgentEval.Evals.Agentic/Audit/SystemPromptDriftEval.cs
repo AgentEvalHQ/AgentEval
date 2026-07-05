@@ -50,17 +50,23 @@ public sealed class SystemPromptDriftEval : IEval
 
         var prompts = trace.Entries
             .Where(e => e.EffectiveScope == TraceEntryScope.ChatTurn && e.Type == TraceEntryType.Request)
-            .Select(e => e.SystemPrompt)
-            .Where(sp => !string.IsNullOrEmpty(sp))   // a captured prompt is required; all-null == no signal, not "stable"
-            .Select(sp => sp!)
+            .Select(e => e.SystemPrompt)   // keep null/empty: a mid-run ERASURE ("bot" -> "") is itself drift
             .ToList();
         if (prompts.Count < 2)
         {
             return Task.FromResult(EvalResult.Skipped(this,
-                "SystemPromptDriftEval needs at least 2 ChatTurn requests with a captured system prompt to detect drift."));
+                "SystemPromptDriftEval needs at least 2 ChatTurn request entries to detect drift."));
         }
 
-        var distinct = prompts.Distinct(StringComparer.Ordinal).Count();
+        // Skip only when NOTHING was captured on any request (no signal); if at least one prompt was
+        // captured, a subsequent erasure or change counts as drift (null/empty compared as "").
+        if (prompts.All(string.IsNullOrEmpty))
+        {
+            return Task.FromResult(EvalResult.Skipped(this,
+                "SystemPromptDriftEval: no system prompt was captured on any request — no signal to compare."));
+        }
+
+        var distinct = prompts.Select(p => p ?? string.Empty).Distinct(StringComparer.Ordinal).Count();
         var drifted = distinct > 1;
         var score = drifted ? 0.0 : 1.0;
         var passed = score >= PassThreshold;
