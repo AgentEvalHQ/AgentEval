@@ -63,8 +63,8 @@ public static class AgentEvalRunGateExtensions
 
     private static async IAsyncEnumerable<AgentResponseUpdate> StreamCore(
         IEnumerable<ChatMessage> messages,
-        AgentSession session,
-        AgentRunOptions options,
+        AgentSession? session,
+        AgentRunOptions? options,
         AIAgent innerAgent,
         IReadOnlyList<IChatGate> preGates,
         IReadOnlyList<IChatGate> postGates,

@@ -37,8 +37,8 @@ public static class AgentEvalShadowJudgeExtensions
     private static async IAsyncEnumerable<AgentResponseUpdate> StreamAndEnqueue(
         ShadowJudgePump pump,
         IEnumerable<ChatMessage> messages,
-        AgentSession session,
-        AgentRunOptions options,
+        AgentSession? session,
+        AgentRunOptions? options,
         AIAgent innerAgent,
         [EnumeratorCancellation] CancellationToken ct)
     {
