@@ -92,6 +92,82 @@ public class ShadowJudgeTests
         Assert.NotNull(reported);   // the failure was reported, not thrown into the run
     }
 
+    // ── streaming seam ──
+
+    [Fact]
+    public async Task ShadowJudge_Streaming_FullyConsumed_JudgesAccumulatedText_ArmsQuarantine()
+    {
+        await using var pump = new ShadowJudgePump(new KeywordShadowJudge("leak"));
+        var scripted = new ScriptedChatClient().AddText("the leak is here").AddText("second answer");
+        var agent = Agent(scripted).AsBuilder()
+            .UseAgentEvalGate(pre: [new QuarantineGate()], policy: EvalGatePolicy.ThrowOnFail)
+            .UseAgentEvalShadowJudge(pump)
+            .Build();
+        var session = await agent.CreateSessionAsync();
+
+        // fully consume the stream (the seam accumulates text, then enqueues after the loop)
+        await foreach (var _ in agent.RunStreamingAsync("go", session)) { }
+        await pump.CompleteAndDrainAsync();
+
+        var ex = await Record.ExceptionAsync(() => agent.RunAsync("continue", session));
+        Assert.IsType<EvalGateRefusalException>(ex);   // streamed response was judged + quarantined
+    }
+
+    [Fact]
+    public async Task ShadowJudge_Streaming_AbandonedEarly_EnqueuesNothing()
+    {
+        var judged = 0;
+        await using var pump = new ShadowJudgePump(new KeywordShadowJudge("leak", capture: _ => Interlocked.Increment(ref judged)));
+        var scripted = new ScriptedChatClient().AddText("the leak is here").AddText("more");
+        var agent = Agent(scripted).AsBuilder().UseAgentEvalShadowJudge(pump).Build();
+
+        // break out of the stream before it completes — the seam must NOT enqueue a partial/absent response
+        await foreach (var _ in agent.RunStreamingAsync("go"))
+        {
+            break;
+        }
+
+        await pump.CompleteAndDrainAsync();
+        Assert.Equal(0, judged);   // an abandoned stream judges nothing
+    }
+
+    [Fact]
+    public async Task ShadowJudge_ThrowingOnError_DoesNotKillPump()
+    {
+        // A judge throws on item 1 AND the onError sink throws too — the pump must survive and still judge (and
+        // quarantine on) item 2.
+        await using var pump = new ShadowJudgePump(
+            new ThrowThenKeywordJudge("leak"),
+            onError: _ => throw new InvalidOperationException("broken sink"));
+        var scripted = new ScriptedChatClient().AddText("first").AddText("the leak").AddText("third");
+        var agent = Agent(scripted).AsBuilder()
+            .UseAgentEvalGate(pre: [new QuarantineGate()], policy: EvalGatePolicy.ThrowOnFail)
+            .UseAgentEvalShadowJudge(pump)
+            .Build();
+        var session = await agent.CreateSessionAsync();
+
+        await agent.RunAsync("go1", session);   // item 1: judge throws -> onError throws (must not kill pump)
+        await agent.RunAsync("go2", session);   // item 2: "the leak" -> compromise -> arm
+        await pump.CompleteAndDrainAsync();
+
+        var ex = await Record.ExceptionAsync(() => agent.RunAsync("go3", session));
+        Assert.IsType<EvalGateRefusalException>(ex);   // the pump survived item 1 and armed on item 2
+    }
+
+    [Fact]
+    public async Task ShadowJudge_HangingJudge_DisposeDoesNotHang()
+    {
+        // A judge that never returns must not hang Dispose — the bounded drain cancels and moves on.
+        var pump = new ShadowJudgePump(new HangingShadowJudge(), drainTimeout: TimeSpan.FromMilliseconds(200));
+        var agent = Agent(new ScriptedChatClient().AddText("answer")).AsBuilder().UseAgentEvalShadowJudge(pump).Build();
+        await agent.RunAsync("go");
+
+        var dispose = pump.DisposeAsync().AsTask();
+        var finished = await Task.WhenAny(dispose, Task.Delay(TimeSpan.FromSeconds(5)));
+
+        Assert.Same(dispose, finished);   // Dispose completed within the timeout, did not hang on the judge
+    }
+
     // ── test doubles ──
 
     private sealed class KeywordShadowJudge : IShadowJudge
@@ -117,5 +193,32 @@ public class ShadowJudgeTests
     {
         public Task<ShadowVerdict> JudgeAsync(ShadowJudgeContext context, CancellationToken cancellationToken = default)
             => throw new InvalidOperationException("judge boom");
+    }
+
+    private sealed class ThrowThenKeywordJudge : IShadowJudge
+    {
+        private readonly string _keyword;
+        private int _calls;
+        public ThrowThenKeywordJudge(string keyword) => _keyword = keyword;
+        public Task<ShadowVerdict> JudgeAsync(ShadowJudgeContext context, CancellationToken cancellationToken = default)
+        {
+            if (Interlocked.Increment(ref _calls) == 1)
+            {
+                throw new InvalidOperationException("first judgement fails");
+            }
+
+            return Task.FromResult(context.ResponseText.Contains(_keyword, StringComparison.OrdinalIgnoreCase)
+                ? ShadowVerdict.Compromise($"response contained '{_keyword}'")
+                : ShadowVerdict.Clean());
+        }
+    }
+
+    private sealed class HangingShadowJudge : IShadowJudge
+    {
+        public async Task<ShadowVerdict> JudgeAsync(ShadowJudgeContext context, CancellationToken cancellationToken = default)
+        {
+            await Task.Delay(Timeout.Infinite, cancellationToken).ConfigureAwait(false);   // never returns until cancelled
+            return ShadowVerdict.Clean();
+        }
     }
 }
