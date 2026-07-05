@@ -600,7 +600,7 @@ Run the included samples, organised into groups:
 dotnet run --project samples/AgentEval.Samples
 ```
 
-The interactive menu lets you select a **group** (A–G), then a **sample** within it.
+The interactive menu lets you select a **group** (A–J), then a **sample** within it.
 
 | Group | Focus | Samples |
 |-------|-------|---------|
@@ -611,8 +611,11 @@ The interactive menu lets you select a **group** (A–G), then a **sample** with
 | **E — Safety & Security** | Policy guardrails, red team scanning, OWASP compliance | 3 |
 | **F — Data & Infrastructure** | Snapshot testing, datasets, trace replay, benchmarks, cross-framework | 7 |
 | **G — Memory Evaluation** | Memory basics, benchmarks, scenarios, DI, cross-session, HTML reports, LongMemEval (ICLR 2025) | 10 |
+| **H — Benchmarks** | Compliance & performance benchmark families → JSON / HTML / PDF reports | 13 |
+| **I — Observability (Glass Box)** | Dual-boundary per-turn tracing, trace fidelity, auto-audit | 4 |
+| **J — Gatekeeper (Runtime Protection)** ★ no credentials | Fail-closed runtime enforcement: the gate-layer walkthrough + a realistic gated MAF agent harness | 2 |
 
-**41 samples in total.** See [samples/AgentEval.Samples/README.md](samples/AgentEval.Samples/README.md) for the full listing with per-sample descriptions, timing, and credential requirements.
+**60 samples in total.** See [samples/AgentEval.Samples/README.md](samples/AgentEval.Samples/README.md) for the full listing with per-sample descriptions, timing, and credential requirements.
 
 ---
 

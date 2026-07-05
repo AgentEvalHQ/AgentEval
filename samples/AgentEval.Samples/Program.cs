@@ -157,7 +157,7 @@ public static class Program
         if (!AIConfig.IsConfigured)
             AIConfig.PrintMissingCredentialsWarning();
 
-        // Legacy CLI: dotnet run -- <1-41>  (direct sample number, flattened in group order)
+        // Legacy CLI: dotnet run -- <n>  (direct sample number, flattened in group order)
         if (args.Length > 0 && int.TryParse(args[0], out var legacyNumber))
         {
             _interactive = false;
@@ -307,7 +307,7 @@ public static class Program
     }
 
     // ──────────────────────────────────────────────────────────
-    //  Legacy: dotnet run -- <1-32>
+    //  Legacy: dotnet run -- <n>
     // ──────────────────────────────────────────────────────────
 
     private static async Task RunLegacyNumber(int n)
