@@ -14,6 +14,7 @@
     <ProjectReference Include="..\..\src\AgentEval.MAF\AgentEval.MAF.csproj" />
     <ProjectReference Include="..\..\src\AgentEval.Memory\AgentEval.Memory.csproj" />
     <ProjectReference Include="..\..\src\AgentEval.RedTeam\AgentEval.RedTeam.csproj" />
+    <ProjectReference Include="..\..\src\AgentEval.RedTeam.Gatekeeper\AgentEval.RedTeam.Gatekeeper.csproj" />
     <ProjectReference Include="..\..\src\AgentEval.Compliance.Gdpr\AgentEval.Compliance.Gdpr.csproj" />
     <ProjectReference Include="..\..\src\AgentEval.Compliance.EuAiAct\AgentEval.Compliance.EuAiAct.csproj" />
     <ProjectReference Include="..\..\src\AgentEval.Evals.Performance\AgentEval.Evals.Performance.csproj" />

@@ -64,6 +64,7 @@ public static class Program
             new("Policy & Safety",           "Enterprise guardrails — NeverCallTool, PII detection, MustConfirmBefore", PolicySafetyEvaluation.RunAsync),
             new("Red Team Basic",            "One-liner security scan — 13 attack types, OWASP probes",              RedTeamBasic.RunAsync),
             new("Red Team Advanced",         "Custom attack pipeline, OWASP compliance, PDF export, baselines",      RedTeamAdvanced.RunAsync),
+            new("Gatekeeper Enforcement",    "★ no credentials — runtime fail-closed gates (tool/moat/canary/shadow)", GatekeeperEnforcement.RunAsync),
         ]),
 
         new('F', "Data & Infrastructure", "",
