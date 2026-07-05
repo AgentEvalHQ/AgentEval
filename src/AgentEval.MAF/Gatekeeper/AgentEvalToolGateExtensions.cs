@@ -44,6 +44,11 @@ public static class AgentEvalToolGateExtensions
         // Build-time cost rejection: Network/Llm gates belong in shadow mode, not the inline hot path.
         foreach (var g in gates)
         {
+            if (g is null)
+            {
+                throw new ArgumentException("gates contains a null element.", nameof(gates));
+            }
+
             if (g.Cost is GateCost.Network or GateCost.Llm)
             {
                 throw new ArgumentException(

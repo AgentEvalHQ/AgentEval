@@ -176,6 +176,15 @@ public class ToolGateTests
     }
 
     [Fact]
+    public void UseAgentEvalToolGate_NullGateElement_ThrowsDescriptively()
+    {
+        var agent = new ChatClientAgent(new ScriptedChatClient().AddText("hi"), new ChatClientAgentOptions { Name = "T" });
+        var ex = Assert.Throws<ArgumentException>(() =>
+            agent.AsBuilder().UseAgentEvalToolGate([new ForbiddenToolGate("x"), null!], ToolGatePolicy.WarnOnly).Build());
+        Assert.Equal("gates", ex.ParamName);
+    }
+
+    [Fact]
     public async Task SequenceGate_BlocksGuardedToolAfterTrigger()
     {
         var reads = 0;

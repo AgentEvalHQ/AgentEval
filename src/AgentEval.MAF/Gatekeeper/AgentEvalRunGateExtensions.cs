@@ -40,6 +40,16 @@ public static class AgentEvalRunGateExtensions
         ArgumentNullException.ThrowIfNull(builder);
         var preGates = pre ?? Array.Empty<IChatGate>();
         var postGates = post ?? Array.Empty<IChatGate>();
+        foreach (var g in preGates)
+        {
+            ArgumentNullException.ThrowIfNull(g, nameof(pre));
+        }
+
+        foreach (var g in postGates)
+        {
+            ArgumentNullException.ThrowIfNull(g, nameof(post));
+        }
+
         var seq = new int[1];   // shared block-seq counter across both branches
 
         return builder.Use(

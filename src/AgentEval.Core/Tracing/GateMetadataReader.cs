@@ -18,8 +18,12 @@ namespace AgentEval.Tracing;
 /// </remarks>
 public static class GateMetadataReader
 {
-    /// <summary>True when <paramref name="key"/> is a gate-verdict metadata key.</summary>
-    public static bool IsGateKey(string key) => key.StartsWith("gate.", StringComparison.Ordinal);
+    /// <summary>
+    /// True when <paramref name="key"/> is a WELL-FORMED gate-verdict metadata key (<c>gate.{stage}.{seq}.{policy}</c>).
+    /// A bare <c>gate.</c>-prefixed key that is not a verdict is rejected, so consumers that filter with this (e.g.
+    /// <c>GlassBoxEvidence.CountGateBlocks</c>) never mis-count unrelated <c>gate.*</c> metadata.
+    /// </summary>
+    public static bool IsGateKey(string key) => TrySplitGateKey(key, out _);
 
     /// <summary>True when the recorded verdict value carries <c>action == "Block"</c> (either shape).</summary>
     public static bool IsBlock(object? value)

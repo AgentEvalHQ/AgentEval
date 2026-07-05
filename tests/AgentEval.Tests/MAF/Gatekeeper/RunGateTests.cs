@@ -165,6 +165,14 @@ public class RunGateTests
         Assert.Equal(0, scripted.CallCount);
     }
 
+    [Fact]
+    public void UseAgentEvalGate_NullPreGateElement_Throws()
+    {
+        var agent = Agent(new ScriptedChatClient().AddText("hi"));
+        var ex = Assert.Throws<ArgumentNullException>(() => agent.AsBuilder().UseAgentEvalGate(pre: [null!]).Build());
+        Assert.Equal("pre", ex.ParamName);
+    }
+
     // ── the critical round-2 regression, made LOAD-BEARING via cross-run isolation ──
     // With per-run scoping (the fix), a fresh streaming run has its own SequenceGate state; without it (tool
     // calls see a null scope and share the fallback set), run 1's trigger leaks and wrongly blocks run 2.
