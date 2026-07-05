@@ -10,7 +10,7 @@ using AgentEval.Output;
 namespace AgentEval.Samples.Benchmarks;
 
 /// <summary>
-/// Benchmarks B8: NIST AI RMF (AI 100-1) — runs the red-team attack pipeline against a real Azure OpenAI-backed agent
+/// Benchmarks H8: NIST AI RMF (AI 100-1) — runs the red-team attack pipeline against a real Azure OpenAI-backed agent
 /// and renders the resulting composite (one leaf per NIST control) to JSON + HTML + PDF. Parity with the OWASP/MITRE
 /// samples; the pipeline drives the agent itself via <see cref="NistBenchmarkRun"/>.
 ///
@@ -27,12 +27,12 @@ public static class NistBenchmarkSample
     public static async Task RunAsync()
     {
         BenchmarkSampleHelpers.PrintHeader(
-            "Benchmarks B8: NIST AI RMF (AI 100-1)",
+            "Benchmarks H8: NIST AI RMF (AI 100-1)",
             "Real agent + red-team pipeline → NIST MEASURE evidence. Skips without Azure credentials.");
 
         if (!AIConfig.IsConfigured)
         {
-            BenchmarkSampleHelpers.PrintMissingCredentialsBox("BENCHMARKS B8 — NIST AI RMF");
+            BenchmarkSampleHelpers.PrintMissingCredentialsBox("BENCHMARKS H8 — NIST AI RMF");
             return;
         }
 

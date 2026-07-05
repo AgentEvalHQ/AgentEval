@@ -19,7 +19,7 @@ using FoundryEvals = Microsoft.Agents.AI.Foundry.FoundryEvals;
 namespace AgentEval.Samples.Benchmarks;
 
 /// <summary>
-/// Benchmarks H12: <b>Foundry ⊕ AgentEval hybrid</b> — puts an Azure AI Foundry eval <i>inside</i> a
+/// Benchmarks H11: <b>Foundry ⊕ AgentEval hybrid</b> — puts an Azure AI Foundry eval <i>inside</i> a
 /// composite eval (<see cref="CompositeAgentEvaluator"/>), scores one MAF agent run with both the
 /// AgentEval Composite Eval and the Foundry eval, and renders both in one source-tagged HTML report.
 /// </summary>
@@ -32,12 +32,12 @@ public static class FoundryHybridBenchmarkSample
     public static async Task RunAsync()
     {
         BenchmarkSampleHelpers.PrintHeader(
-            "Benchmarks H12: Foundry ⊕ AgentEval (hybrid)",
+            "Benchmarks H11: Foundry ⊕ AgentEval (hybrid)",
             "A Foundry eval INSIDE a composite eval — one agent run, one source-tagged report.");
 
         if (!AIConfig.IsConfigured)
         {
-            BenchmarkSampleHelpers.PrintMissingCredentialsBox("BENCHMARKS H12 — FOUNDRY HYBRID");
+            BenchmarkSampleHelpers.PrintMissingCredentialsBox("BENCHMARKS H11 — FOUNDRY HYBRID");
             return;
         }
 

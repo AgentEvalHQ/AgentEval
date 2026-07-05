@@ -9,9 +9,9 @@
 - **Evaluation** (LLM-as-judge scores, metrics) → always real or gracefully skipped
 - **Structure** (tool ordering, workflows, conversations) → can be demonstrated with mock data
 
-Group A (samples A1–A5, except A6 Session Lifecycle) and Dataset Loaders / Extensibility in Group F run fully without credentials.
-Sample H1 (Registry Discovery) and H10 (Report Browser) also run without credentials.
-All other samples require Azure OpenAI for meaningful results.
+Group A samples A1–A4 run fully without credentials (A5 Light Path, A6 Session Lifecycle, and A7 Advanced MAF Features require Azure), as do Dataset Loaders / Extensibility in Group F.
+Sample H1 (Registry Discovery) and H13 (Report Browser), plus all of Group J (Gatekeeper), also run without credentials.
+Most other samples work best with Azure OpenAI — check each group's **Azure?** column for the authoritative per-sample requirement.
 
 ---
 
@@ -22,24 +22,26 @@ cd samples/AgentEval.Samples
 dotnet run
 ```
 
-The interactive menu organises samples into **8 groups (A–H)** with **51 samples total**. Select a group letter, then a sample number.
-You can also run a specific sample directly from the command line by its **legacy index** (1-based across the flat sample list, A1=1, A7=7, B1=8, …, H10=51):
+The interactive menu organises samples into **groups (A–J)**. Select a group letter, then a sample number.
+You can also run a specific sample directly from the command line by its **legacy index** (1-based across the flat sample list, A1=1, A7=7, B1=8, …):
 
 ```bash
-dotnet run -- 1    # Hello World            (A1)
-dotnet run -- 23   # Red Team Basic         (E2)
-dotnet run -- 43   # Performance benchmark  (H2)
-dotnet run -- 51   # Report Browser         (H10)
+dotnet run -- 1    # Hello World             (A1)
+dotnet run -- 23   # Red Team Basic          (E2)
+dotnet run -- 43   # Performance benchmark   (H2)
+dotnet run -- 54   # Report Browser          (H13)
+dotnet run -- 59   # Gatekeeper walkthrough  (J1)
 ```
 
-The benchmark samples (H2–H9) also respect a preset tier via `--preset {smoke|standard|audit-grade}` or the
-`AGENTEVAL_SAMPLES_PRESET` environment variable — see `Benchmarks/README.md` for the resolution order.
+The benchmark samples (H2–H10) also respect a preset tier via `--preset <presetName>` (preset names are
+family-specific — see H1 Registry Discovery or `Benchmarks/README.md` for the valid values) or the
+`AGENTEVAL_SAMPLES_PRESET` environment variable.
 
 ---
 
 ## Sample Groups
 
-### A — Getting Started  ★ mostly no credentials needed (7 samples)
+### A — Getting Started  ★ mostly no credentials needed
 
 | # | Sample | What You'll Learn | Azure? | Time |
 |---|--------|-------------------|--------|------|
@@ -51,7 +53,7 @@ The benchmark samples (H2–H9) also respect a preset tier via `--preset {smoke|
 | 6 | **Session Lifecycle** | MAF `AgentSession`: create → multi-turn → reset → isolation | Yes | 8 min |
 | 7 | **Advanced MAF Features** | ChatHistory, middleware, structured output, approval, agent-as-tool | Yes | 10 min |
 
-### B — Metrics & Quality (5 samples)
+### B — Metrics & Quality
 
 | # | Sample | What You'll Learn | Azure? | Time |
 |---|--------|-------------------|--------|------|
@@ -61,7 +63,7 @@ The benchmark samples (H2–H9) also respect a preset tier via `--preset {smoke|
 | 4 | **Responsible AI** | Toxicity, bias, misinformation with counterfactual testing 🛡️ | Yes | 5 min |
 | 5 | **Calibrated Evaluator** | Drop-in `IEvaluator` with per-criterion majority voting | Yes | 5 min |
 
-### C — Workflows & Conversations (4 samples)
+### C — Workflows & Conversations
 
 | # | Sample | What You'll Learn | Azure? | Time |
 |---|--------|-------------------|--------|------|
@@ -70,7 +72,7 @@ The benchmark samples (H2–H9) also respect a preset tier via `--preset {smoke|
 | 3 | **Workflow + Tools** | TripPlanner pipeline: 4 agents with tool call tracking ⭐ | Yes | 15 min |
 | 4 | **[MessageHandler] Executors** | Source-gen executor pipeline — deterministic, no LLM, AOT-ready | No | 8 min |
 
-### D — Performance & Statistics (5 samples)
+### D — Performance & Statistics
 
 | # | Sample | What You'll Learn | Azure? | Time |
 |---|--------|-------------------|--------|------|
@@ -80,7 +82,7 @@ The benchmark samples (H2–H9) also respect a preset tier via `--preset {smoke|
 | 4 | **Stochastic + Comparison** | Statistical rigor applied to side-by-side model comparison | Yes ×2 | 10 min |
 | 5 | **Streaming vs Async** | TTFT vs throughput — compare streaming and non-streaming | Yes | 8 min |
 
-### E — Safety & Security (3 samples)
+### E — Safety & Security
 
 | # | Sample | What You'll Learn | Azure? | Time |
 |---|--------|-------------------|--------|------|
@@ -88,7 +90,7 @@ The benchmark samples (H2–H9) also respect a preset tier via `--preset {smoke|
 | 2 | **Red Team Basic** | One-liner security scan — 13 attack types, OWASP probes 🛡️ | Yes | 5 min |
 | 3 | **Red Team Advanced** | Custom pipeline, OWASP compliance, PDF export, baseline tracking 🛡️ | Yes | 10 min |
 
-### F — Data & Infrastructure (7 samples)
+### F — Data & Infrastructure
 
 | # | Sample | What You'll Learn | Azure? | Time |
 |---|--------|-------------------|--------|------|
@@ -102,7 +104,7 @@ The benchmark samples (H2–H9) also respect a preset tier via `--preset {smoke|
 
 > *Steps 1–6 run offline; Step 7 (optional live LLM demo) requires Azure credentials.
 
-### G — Memory Evaluation (10 samples)
+### G — Memory Evaluation
 
 | # | Sample | What You'll Learn | Azure? | Time |
 |---|--------|-------------------|--------|------|
@@ -117,11 +119,12 @@ The benchmark samples (H2–H9) also respect a preset tier via `--preset {smoke|
 | 9 | **Run Single Benchmark** | Pick Quick/Standard/Full, run, save baseline, view report | Yes | 8 min |
 | 10 | **LongMemEval Baseline Repro** | Reproduce the GPT-4o paper baseline (TextBlob mode) | Yes | 20 min |
 
-### H — Benchmarks (v1.1)  ★ JSON + HTML (+ PDF) for every registered family (10 samples)
+### H — Benchmarks  ★ JSON + HTML (+ PDF) for every registered family
 
-End-to-end walkthroughs of the eight families registered via `BenchmarkFamilyRegistry`. Each sample resolves
-its preset tier (smoke / standard / audit-grade) at runtime via `BenchmarkSampleHelpers.ResolvePreset`
-(CLI `--preset`, `AGENTEVAL_SAMPLES_PRESET` env var, or interactive prompt — see `Benchmarks/README.md`).
+End-to-end walkthroughs of the families registered via `BenchmarkFamilyRegistry`. Each sample resolves
+its preset tier at runtime via `BenchmarkSampleHelpers.ResolvePreset` (CLI `--preset <presetName>`,
+`AGENTEVAL_SAMPLES_PRESET` env var, or interactive prompt). Preset names are **family-specific** (e.g. OWASP
+uses `Top10`/`AuditGrade`) — see `Benchmarks/README.md` or H1 Registry Discovery for the valid values.
 
 | # | Sample | What It Exercises | Azure? | Time |
 |---|--------|-------------------|--------|------|
@@ -132,14 +135,42 @@ its preset tier (smoke / standard / audit-grade) at runtime via `BenchmarkSample
 | 5 | **EU AI Act** | Per-scenario agent probing across 6 pillars; full audit-chain evidence | Yes | 1–45 min |
 | 6 | **OWASP LLM Top 10** | Real attack pipeline against your agent; preset-driven (`smoke` / `top10` / `audit`) | Yes | 2–30 min |
 | 7 | **MITRE ATLAS** | ATLAS technique-level probes against your agent; preset-driven | Yes | 2–30 min |
-| 8 | **LongMemEval** | Real history-injectable agent + judge on the `longmemeval_s` dataset (ICLR 2025) | Yes | 4–60 min |
-| 9 | **Memory** | Comprehensive memory benchmark — Quick / Standard / Full / Diagnostic / Overflow | Yes | 1–30 min |
-| 10 | **Report Browser** | Interactive browser over past JSON / HTML / PDF runs under `output/{family}/` | No | <1 min |
+| 8 | **NIST AI RMF** | MEASURE security / privacy / validity evidence; governance marked Not Applicable | Yes | 1–30 min |
+| 9 | **LongMemEval** | Real history-injectable agent + judge on the `longmemeval_s` dataset (ICLR 2025) | Yes | 4–60 min |
+| 10 | **Memory** | Comprehensive memory benchmark — Quick / Standard / Full / Diagnostic / Overflow | Yes | 1–30 min |
+| 11 | **Foundry Hybrid** | A Foundry eval running INSIDE a composite eval — one run, one report | Yes | 1–15 min |
+| 12 | **Foundry Hierarchy** | Foundry evals as weighted leaves inside a composite benchmark tree | Yes | 1–15 min |
+| 13 | **Report Browser** | Interactive browser over past JSON / HTML / PDF runs under `output/{family}/` | No | <1 min |
 
-H1–H10 share a canonical `.agenteval/` workspace (auto-resolved by walking up to the nearest
+H1–H13 share a canonical `.agenteval/` workspace (auto-resolved by walking up to the nearest
 `*.sln`/`*.slnx`/`.git/` ancestor) so Mission Control and `agenteval doctor` see every run
 end-to-end. See **`Benchmarks/README.md`** for the full per-sample fidelity table, cost / time
 expectations, preset selection details, and where artefacts land on disk.
+
+---
+
+### I — Observability (Glass Box)
+
+The dual-boundary trace that records what an agent actually did, turn by turn — and what the framework hides.
+
+| # | Sample | What It Exercises | Azure? | Time |
+|---|--------|-------------------|--------|------|
+| 1 | **Glass Box Full Stack** | Per-turn tracing + injection pre-gate + PII post-gate + a wrapped tool (offline API tour) | No | <2 min |
+| 2 | **Auto-Audit (synthetic)** | Ranked honesty / safety / cost over 3 scripted endpoints — offline preview of the table shape | No | <2 min |
+| 3 | **Real vs Framework: Agent** | A REAL travel agent — MAF's account vs the Glass Box: what the framework hides per turn | Yes | 1–5 min |
+| 4 | **Real vs Framework: Workflow** | Per-executor ledger vs chat truth — what a multi-agent workflow hides (offline; scripted) | No | <2 min |
+
+---
+
+### J — Gatekeeper (Runtime Protection)  ★ no credentials — fail-closed runtime enforcement
+
+AgentEval doesn't only MEASURE agents — it can STOP them. The same probes/evaluators you red-team with become
+runtime gates that block bad actions before they happen. See **`docs/gatekeeper.md`** for the developer guide.
+
+| # | Sample | What It Exercises | Azure? | Time |
+|---|--------|-------------------|--------|------|
+| 1 | **Enforcement Walkthrough** | Scenarios across the gate layers: tool / moat / canary / shadow-judge / defense-in-depth / more gates | No | 5 min |
+| 2 | **MAF Agent Harness** | A realistic gated MAF support agent — a legit request flows, a prompt-injection attack is blocked at the tool boundary | No | 2 min |
 
 ---
 
@@ -168,10 +199,10 @@ export AZURE_OPENAI_API_KEY="your-api-key"
 export AZURE_OPENAI_DEPLOYMENT="gpt-4o"
 ```
 
-### Without Azure (mock mode — Group A + H1 + H10)
+### Without Azure (mock mode — Group A samples A1–A4 + H1 + H13 + all of Group J)
 
-Samples in Group A, **H1 Registry Discovery**, and **H10 Report Browser** work fully without credentials.
-You'll see:
+Samples in **Group A (A1–A4)**, **H1 Registry Discovery**, **H13 Report Browser**, and all of **Group J (Gatekeeper)**
+work fully without credentials. You'll see:
 
 ```
 ╔══════════════════════════════════════════════════════════════╗
@@ -292,8 +323,8 @@ result.ToolUsage.Should().HaveCalledTool("X").BeforeTool("Y").WithoutError();
 result.Performance.Should().HaveTotalDurationUnder(TimeSpan.FromSeconds(5));
 ```
 
-**BenchmarkFamilyRegistry** — single source of truth for the eight registered families
-(Agentic, GDPR, EU AI Act, OWASP, MITRE, LongMemEval, Memory, Performance). `agenteval bench --list`,
+**BenchmarkFamilyRegistry** — single source of truth for every registered benchmark family
+(Performance, Agentic, GDPR, EU AI Act, OWASP, MITRE, NIST, LongMemEval, Memory, …). `agenteval bench --list`,
 Mission Control, and **H1 Registry Discovery** all walk this registry. Plug new families via a
 `[ModuleInitializer]`-attributed registration method (ADR-017 Convention 3).
 

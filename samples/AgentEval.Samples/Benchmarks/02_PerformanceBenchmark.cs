@@ -9,7 +9,7 @@ using AgentEval.Output;
 namespace AgentEval.Samples.Benchmarks;
 
 /// <summary>
-/// Benchmarks B2: Performance — measure latency, throughput, and cost of a
+/// Benchmarks H2: Performance — measure latency, throughput, and cost of a
 /// real Azure OpenAI–backed agent using <see cref="PerformanceBenchmark"/>.
 /// Skips gracefully when credentials are missing.
 ///
@@ -32,12 +32,12 @@ public static class PerformanceBenchmarkSample
     public static async Task RunAsync()
     {
         BenchmarkSampleHelpers.PrintHeader(
-            "Benchmarks B2: Performance (latency / throughput / cost)",
+            "Benchmarks H2: Performance (latency / throughput / cost)",
             "Real Azure OpenAI agent. Skips gracefully without credentials.");
 
         if (!AIConfig.IsConfigured)
         {
-            BenchmarkSampleHelpers.PrintMissingCredentialsBox("BENCHMARKS B2 — PERFORMANCE");
+            BenchmarkSampleHelpers.PrintMissingCredentialsBox("BENCHMARKS H2 — PERFORMANCE");
             return;
         }
 

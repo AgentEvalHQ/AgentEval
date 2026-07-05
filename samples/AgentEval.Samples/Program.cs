@@ -22,7 +22,7 @@ public static class Program
 
     private static readonly IReadOnlyList<SampleGroup> Groups =
     [
-        new('A', "Getting Started", "★ no credentials needed (except Session Lifecycle)",
+        new('A', "Getting Started", "★ mostly no credentials (A5–A7 need Azure)",
         [
             new("Hello World",               "Minimal AgentEval test — TestCase, TestResult, pass/fail",               HelloWorld.RunAsync),
             new("Agent + One Tool",          "Tool tracking and fluent assertions (HaveCalledTool, WithoutError)",      AgentWithOneTool.RunAsync),
@@ -64,7 +64,6 @@ public static class Program
             new("Policy & Safety",           "Enterprise guardrails — NeverCallTool, PII detection, MustConfirmBefore", PolicySafetyEvaluation.RunAsync),
             new("Red Team Basic",            "One-liner security scan — 13 attack types, OWASP probes",              RedTeamBasic.RunAsync),
             new("Red Team Advanced",         "Custom attack pipeline, OWASP compliance, PDF export, baselines",      RedTeamAdvanced.RunAsync),
-            new("Gatekeeper Enforcement",    "★ no credentials — runtime fail-closed gates (tool/moat/canary/shadow)", GatekeeperEnforcement.RunAsync),
         ]),
 
         new('F', "Data & Infrastructure", "",
@@ -124,6 +123,12 @@ public static class Program
             new("Real vs Framework: Agent",  "REAL travel agent — MAF's account vs Glass Box: what the framework HIDES per turn (needs Azure)", RealVsFrameworkTravelAgent.RunAsync),
             new("Real vs Framework: Workflow","Per-EXECUTOR ledger vs chat truth — what a multi-agent workflow HIDES (offline; scripted)",     RealVsFrameworkWorkflow.RunAsync),
         ]),
+
+        new('J', "Gatekeeper (Runtime Protection)", "★ no credentials — fail-closed runtime enforcement",
+        [
+            new("Enforcement Walkthrough",   "6 scenarios: tool / moat / canary / shadow-judge / defense-in-depth / more gates", GatekeeperEnforcement.RunAsync),
+            new("MAF Agent Harness",         "A realistic gated MAF support agent: normal flow works, attack flow is blocked", GatekeeperMafHarness.RunAsync),
+        ]),
     ];
 
     // ──────────────────────────────────────────────────────────
@@ -152,7 +157,7 @@ public static class Program
         if (!AIConfig.IsConfigured)
             AIConfig.PrintMissingCredentialsWarning();
 
-        // Legacy CLI: dotnet run -- <1-41>  (direct sample number, flattened in group order)
+        // Legacy CLI: dotnet run -- <n>  (direct sample number, flattened in group order)
         if (args.Length > 0 && int.TryParse(args[0], out var legacyNumber))
         {
             _interactive = false;
@@ -199,7 +204,7 @@ public static class Program
             var group = Groups.FirstOrDefault(g => g.Key.ToString() == raw);
             if (group is not null) return group;
 
-            Console.WriteLine("  Enter a letter A–I or Q to quit.\n");
+            Console.WriteLine("  Enter a letter A–J or Q to quit.\n");
         }
     }
 
@@ -302,7 +307,7 @@ public static class Program
     }
 
     // ──────────────────────────────────────────────────────────
-    //  Legacy: dotnet run -- <1-32>
+    //  Legacy: dotnet run -- <n>
     // ──────────────────────────────────────────────────────────
 
     private static async Task RunLegacyNumber(int n)

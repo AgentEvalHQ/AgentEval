@@ -33,8 +33,12 @@ a block). See [`docs/gatekeeper.md`](docs/gatekeeper.md) and [ADR-025](docs/adr/
   checks the inline gates reject, off the hot path, over an immutable snapshot; an adverse verdict arms
   quarantine for a *later* run instead of blocking the one it observed.
 - **`agenteval doctor`** double-gating check + `GateMetadataReader.StageFromKey`.
-- **Docs + sample** — `docs/gatekeeper.md` and the credential-free `SafetyAndSecurity/04_GatekeeperEnforcement`
-  sample.
+- **`agenteval redteam --sut gatekeeper-demo`** — a credential-free, deterministic gated demo agent to run the
+  attack suite against (the attack-the-gate closed loop), composing with the `--baseline`/`--fail-on regression`
+  gate.
+- **Docs + samples** — `docs/gatekeeper.md` and the credential-free **Gatekeeper** sample group (menu group J):
+  `Gatekeeper/01_GatekeeperEnforcement` (the six-scenario enforcement walkthrough) and
+  `Gatekeeper/02_GatekeeperMafHarness` (a realistic gated MAF support agent).
 
 ### Microsoft Agent Framework: hybrid evaluation (several evaluators, one report)
 
@@ -71,7 +75,7 @@ a block). See [`docs/gatekeeper.md`](docs/gatekeeper.md) and [ADR-025](docs/adr/
 - **Microsoft Agent Framework bumped to 1.12.0** (from 1.11.1) across the solution — no breaking changes
   for AgentEval (full suite green on net8/9/10). The Foundry evals package
   (`Microsoft.Agents.AI.Foundry`) has no stable release yet, so it's pinned to its `1.12.0-preview` and
-  referenced **only** by the samples (the standalone hybrid sample + the `AgentEval.Samples` H12/H13
+  referenced **only** by the samples (the standalone hybrid sample + the `AgentEval.Samples` H11/H12
   benchmarks); the shipping libraries remain provider-agnostic.
 
 ## [0.13.2-beta] - 2026-06-29

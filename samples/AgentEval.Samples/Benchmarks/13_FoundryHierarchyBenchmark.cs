@@ -18,7 +18,7 @@ using FoundryEvals = Microsoft.Agents.AI.Foundry.FoundryEvals;
 namespace AgentEval.Samples.Benchmarks;
 
 /// <summary>
-/// Benchmarks H13: <b>Foundry evals INSIDE a composite hierarchy</b>. Builds one weighted AgentEval
+/// Benchmarks H12: <b>Foundry evals INSIDE a composite hierarchy</b>. Builds one weighted AgentEval
 /// <see cref="CompositeEval"/> whose components are a mix — an AgentEval sub-composite (multi-dimension,
 /// itself a tree) plus Foundry evals turned into weighted leaves via <c>IAgentEvaluator.AsEvalLeaf()</c>.
 /// The rendered report is a single benchmark hierarchy where <i>some of the leaves are Foundry evals</i>.
@@ -27,19 +27,19 @@ namespace AgentEval.Samples.Benchmarks;
 /// Requires Azure OpenAI (the judge + the SUT agent). The Foundry leaves are added only when
 /// <c>FOUNDRY_PROJECT_ENDPOINT</c> is set. NOTE: a composite evaluates once per input, so each Foundry leaf
 /// makes one cloud call per scenario — fine for a benchmark; for large runs prefer the batched
-/// "Foundry alongside local" path (Benchmarks H12 / the MafEvalFoundryAlongsideLocal sample).
+/// "Foundry alongside local" path (Benchmarks H11 / the MafEvalFoundryAlongsideLocal sample).
 /// </remarks>
 public static class FoundryHierarchyBenchmarkSample
 {
     public static async Task RunAsync()
     {
         BenchmarkSampleHelpers.PrintHeader(
-            "Benchmarks H13: Foundry evals inside a composite hierarchy",
+            "Benchmarks H12: Foundry evals inside a composite hierarchy",
             "One weighted benchmark tree: AgentEval sub-composite ⊕ Foundry evals as weighted leaves.");
 
         if (!AIConfig.IsConfigured)
         {
-            BenchmarkSampleHelpers.PrintMissingCredentialsBox("BENCHMARKS H13 — FOUNDRY HIERARCHY");
+            BenchmarkSampleHelpers.PrintMissingCredentialsBox("BENCHMARKS H12 — FOUNDRY HIERARCHY");
             return;
         }
 

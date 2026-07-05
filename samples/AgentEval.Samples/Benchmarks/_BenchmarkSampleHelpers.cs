@@ -276,8 +276,8 @@ internal static class BenchmarkSampleHelpers
 
         // ── 3. Persist every leaf as a ScenarioResult ──────────────────────────
         // The composite result was built either by CompositeEval.EvaluateAsync
-        // (B2 / B3 / B6 / B7) or by RunCompliancePresetWithAgentProbesAsync
-        // (B4 / B5). Either way, walking SubResults yields the atomic leaves.
+        // (H2 / H3 / H6 / H7) or by RunCompliancePresetWithAgentProbesAsync
+        // (H4 / H5). Either way, walking SubResults yields the atomic leaves.
         var leafIndex = 0;
         foreach (var (scenarioId, leaf) in EnumerateAtomicLeaves(result))
         {

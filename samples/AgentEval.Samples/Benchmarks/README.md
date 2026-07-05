@@ -26,21 +26,21 @@ reports:
 
 - **H1 Registry Discovery** — read-only walk of `BenchmarkFamilyRegistry.All`,
   no Azure needed.
-- **H10 Report Browser** — interactive browser over past runs written by the
+- **H13 Report Browser** — interactive browser over past runs written by the
   running samples above; opens JSON / HTML / PDF in the OS default app.
 
-**H8 LongMemEval** (ICLR 2025) and **H9 Memory** are Shape B benchmarks —
+**H9 LongMemEval** (ICLR 2025) and **H10 Memory** are Shape B benchmarks —
 their runners return native result records (`ExternalBenchmarkResult` /
 `MemoryBenchmarkResult`) rather than the `EvalResult` composite the renderers
-expect. Each sample bridges by synthesising an `EvalResult` tree (H8: root =
-overall accuracy + per-type composites + per-question leaves; H9: root =
+expect. Each sample bridges by synthesising an `EvalResult` tree (H9: root =
+overall accuracy + per-type composites + per-question leaves; H10: root =
 weighted overall score + per-category leaves) so they produce the same
 canonical store + JSON + HTML + PDF artefacts as every other running sample.
 The unaltered native shape is **also** written to `report-native.json`
 alongside `report.json`.
 
-v0.10.1+: **H8 LongMemEval** no longer ships an "embedded subset" (the prior
-hand-authored 10-entry approximation produced misleading scores). All H8
+**H9 LongMemEval** no longer ships an "embedded subset" (the prior
+hand-authored approximation produced misleading scores). All H9
 presets read the real `longmemeval_s_cleaned.json` from
 `<workspace-root>/src/AgentEval.Memory/Data/longmemeval/` (or
 `LONGMEMEVAL_DATASET_PATH`). If the file is missing the sample prints a
@@ -64,20 +64,21 @@ Pick group **H — Benchmarks (v0.10.1)** from the menu, then choose a sample.
 Or by legacy index (1-based across the flat sample list):
 
 ```bash
-dotnet run --project samples/AgentEval.Samples -- 43   # Performance
-dotnet run --project samples/AgentEval.Samples -- 44   # Agentic
-dotnet run --project samples/AgentEval.Samples -- 45   # GDPR
+dotnet run --project samples/AgentEval.Samples -- 43   # Performance     (H2)
+dotnet run --project samples/AgentEval.Samples -- 44   # Agentic         (H3)
+dotnet run --project samples/AgentEval.Samples -- 45   # GDPR            (H4)
 # …
-dotnet run --project samples/AgentEval.Samples -- 49   # LongMemEval (H8)
-dotnet run --project samples/AgentEval.Samples -- 50   # Memory (H9)
-dotnet run --project samples/AgentEval.Samples -- 51   # Report Browser (H10)
+dotnet run --project samples/AgentEval.Samples -- 49   # NIST AI RMF     (H8)
+dotnet run --project samples/AgentEval.Samples -- 50   # LongMemEval     (H9)
+dotnet run --project samples/AgentEval.Samples -- 51   # Memory          (H10)
+dotnet run --project samples/AgentEval.Samples -- 54   # Report Browser  (H13)
 ```
 
 ---
 
 ## Preset selection
 
-Every executing sample (H2 – H9) respects a **preset tier** so the same code
+The benchmark-family samples **H2 – H10** respect a **preset tier** so the same code
 scales from a CI smoke check to a full audit:
 
 | Sample              | Smoke (default)              | Standard                    | Audit-Grade                          |
@@ -161,7 +162,9 @@ zero verdict. **H1 Registry Discovery** runs without credentials.
 | H8  | NIST AI RMF             | Real agent driven by the red-team pipeline → NIST AI RMF MEASURE evidence (Shape B runner). Governance/MAP/MANAGE controls render Not Applicable (never PASS). |
 | H9  | LongMemEval             | Real history-injectable agent + LLM judge against the REAL `longmemeval_s_cleaned.json` dataset (no fake fallback). Smoke=10Q, Standard=50Q, AuditGrade=~500Q (requires `LONGMEMEVAL_DATASET_PATH`). Shape-B result synthesised into an `EvalResult` tree; native shape preserved in `report-native.json`. Friendly download-instructions box when dataset missing. |
 | H10 | Memory                  | Real history-injectable agent + LLM judge running the canonical Memory benchmark suite. Quick/Standard/Full presets map to 3/8/12 categories. Shape-B `MemoryBenchmarkResult` synthesised into an `EvalResult` tree; native shape preserved in `report-native.json` (grade, stars, weak categories, recommendations). |
-| H11 | Report Browser          | No agent. Opens previously-generated JSON / HTML / PDF artefacts.                                       |
+| H11 | Foundry Hybrid          | A Foundry eval running INSIDE a composite eval — one run, one report (Foundry is sample-only). |
+| H12 | Foundry Hierarchy       | Foundry evals as weighted leaves inside a composite benchmark tree (Foundry is sample-only). |
+| H13 | Report Browser          | No agent. Opens previously-generated JSON / HTML / PDF artefacts.                                       |
 
 ---
 
@@ -185,7 +188,7 @@ zero verdict. **H1 Registry Discovery** runs without credentials.
 
 ## Viewing past runs
 
-Sample **H10 Report Browser** (`10_ReportBrowser.cs`) lists every report under
+Sample **H13 Report Browser** (`10_ReportBrowser.cs`) lists every report under
 `samples/AgentEval.Samples/output/` and lets you re-open the HTML / PDF / JSON
 without re-running the benchmark.
 
@@ -202,7 +205,7 @@ without re-running the benchmark.
 
 ## Where the runs are saved
 
-Samples H2 – H9 write to **two** locations per run (v0.10.1, plan-25):
+Samples H2 – H10 write to **two** locations per run:
 
 | Artefact                                      | Location                                                           | Why                                                                                                                              |
 |-----------------------------------------------|--------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------|
