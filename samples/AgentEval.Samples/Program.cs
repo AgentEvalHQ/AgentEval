@@ -64,7 +64,6 @@ public static class Program
             new("Policy & Safety",           "Enterprise guardrails — NeverCallTool, PII detection, MustConfirmBefore", PolicySafetyEvaluation.RunAsync),
             new("Red Team Basic",            "One-liner security scan — 13 attack types, OWASP probes",              RedTeamBasic.RunAsync),
             new("Red Team Advanced",         "Custom attack pipeline, OWASP compliance, PDF export, baselines",      RedTeamAdvanced.RunAsync),
-            new("Gatekeeper Enforcement",    "★ no credentials — runtime fail-closed gates (tool/moat/canary/shadow)", GatekeeperEnforcement.RunAsync),
         ]),
 
         new('F', "Data & Infrastructure", "",
@@ -123,6 +122,12 @@ public static class Program
             new("Auto-Audit (synthetic)",    "Ranked honesty/safety/cost over 3 SCRIPTED endpoints — offline preview of the table shape",     AutoAudit.RunAsync),
             new("Real vs Framework: Agent",  "REAL travel agent — MAF's account vs Glass Box: what the framework HIDES per turn (needs Azure)", RealVsFrameworkTravelAgent.RunAsync),
             new("Real vs Framework: Workflow","Per-EXECUTOR ledger vs chat truth — what a multi-agent workflow HIDES (offline; scripted)",     RealVsFrameworkWorkflow.RunAsync),
+        ]),
+
+        new('J', "Gatekeeper (Runtime Protection)", "★ no credentials — fail-closed runtime enforcement",
+        [
+            new("Enforcement Walkthrough",   "The 5 gate layers: tool / moat / canary / shadow-judge / defense-in-depth", GatekeeperEnforcement.RunAsync),
+            new("MAF Agent Harness",         "A realistic gated MAF support agent: normal flow works, attack flow is blocked", GatekeeperMafHarness.RunAsync),
         ]),
     ];
 

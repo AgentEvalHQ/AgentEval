@@ -145,12 +145,24 @@ hang disposal — the drain is bounded and cancels in‑flight work.
 `agenteval doctor` warns when the **same** policy recorded verdicts at both a chat seam (`pre`/`post`) and an
 agent seam (`tool`/`run-*`) — a sign the same policy is gating twice. Register it once.
 
-## A complete, credential‑free walkthrough
+## Credential‑free demos
 
-The [`SafetyAndSecurity/04_GatekeeperEnforcement`](../samples/AgentEval.Samples/SafetyAndSecurity/04_GatekeeperEnforcement.cs)
-sample runs all of the above against a scripted model, so every outcome is deterministic and needs no API key:
-a forbidden tool blocked, a poisoned argument caught by a red‑team evaluator, a canary honeypot held, and a
-shadow verdict quarantining the next run.
+The **Gatekeeper** sample group (`AgentEval.Samples`, menu group **J**) runs everything above against a scripted
+model, so every outcome is deterministic and needs no API key:
+
+- [`Gatekeeper/01_GatekeeperEnforcement`](../samples/AgentEval.Samples/Gatekeeper/01_GatekeeperEnforcement.cs) —
+  the **enforcement walkthrough** across all five layers: a forbidden tool blocked, a poisoned argument caught by
+  a red‑team evaluator, a canary honeypot held, a shadow verdict quarantining the next run, and a
+  **defense‑in‑depth** scene (reject the attack at the door → require an operator → rate‑limit, all before the
+  model runs).
+- [`Gatekeeper/02_GatekeeperMafHarness`](../samples/AgentEval.Samples/Gatekeeper/02_GatekeeperMafHarness.cs) — a
+  **realistic MAF support agent** with real tools: a legit request flows normally, and an attack request (a prompt
+  injection that turns the model destructive) is blocked at the tool boundary — the destructive action never
+  executes.
+
+You can also run the whole loop from the CLI, credential‑free:
+`agenteval redteam --sut gatekeeper-demo` scans a built‑in gated agent with the real attack suite and reports how
+many attempts the gate blocked (composing with `--baseline`/`--fail-on regression` for attack‑the‑gate CI).
 
 ## See also
 
