@@ -53,6 +53,7 @@
     <ProjectReference Include="..\AgentEval.Compliance.Gdpr\AgentEval.Compliance.Gdpr.csproj" />
     <ProjectReference Include="..\AgentEval.Compliance.EuAiAct\AgentEval.Compliance.EuAiAct.csproj" />
     <ProjectReference Include="..\AgentEval.RedTeam\AgentEval.RedTeam.csproj" />
+    <ProjectReference Include="..\AgentEval.RedTeam.Gatekeeper\AgentEval.RedTeam.Gatekeeper.csproj" />
     <!-- Phase 8 (v0.10.0-beta): CLI needs direct refs to Performance and Memory for
          BenchPerfCommand and to anchor their module initializers so registry entries
          appear in bench list / per-family help. -->
