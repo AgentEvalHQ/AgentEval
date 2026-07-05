@@ -604,7 +604,7 @@ The interactive menu lets you select a **group** (A–J), then a **sample** with
 
 | Group | Focus | Samples |
 |-------|-------|---------|
-| **A — Getting Started** ★ no credentials | Hello World, tool tracking, performance basics, MAF integration patterns | 7 |
+| **A — Getting Started** ★ mostly no credentials | Hello World, tool tracking, performance basics, MAF integration patterns | 7 |
 | **B — Metrics & Quality** | RAG evaluation, quality metrics, judge calibration, responsible AI | 5 |
 | **C — Workflows & Conversations** | Multi-turn conversations, MAF workflows, source-gen executors | 4 |
 | **D — Performance & Statistics** | Latency profiling, stochastic evaluation, model comparison, streaming | 5 |

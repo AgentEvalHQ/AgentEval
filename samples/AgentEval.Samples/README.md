@@ -323,8 +323,8 @@ result.ToolUsage.Should().HaveCalledTool("X").BeforeTool("Y").WithoutError();
 result.Performance.Should().HaveTotalDurationUnder(TimeSpan.FromSeconds(5));
 ```
 
-**BenchmarkFamilyRegistry** — single source of truth for the eight registered families
-(Agentic, GDPR, EU AI Act, OWASP, MITRE, LongMemEval, Memory, Performance). `agenteval bench --list`,
+**BenchmarkFamilyRegistry** — single source of truth for every registered benchmark family
+(Performance, Agentic, GDPR, EU AI Act, OWASP, MITRE, NIST, LongMemEval, Memory, …). `agenteval bench --list`,
 Mission Control, and **H1 Registry Discovery** all walk this registry. Plug new families via a
 `[ModuleInitializer]`-attributed registration method (ADR-017 Convention 3).
 
