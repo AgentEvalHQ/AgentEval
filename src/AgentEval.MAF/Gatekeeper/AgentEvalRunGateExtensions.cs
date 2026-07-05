@@ -3,6 +3,7 @@
 // Licensed under the MIT License.
 
 using System.Runtime.CompilerServices;
+using System.Text;
 using AgentEval.Guardrails;
 using AgentEval.Tracing;
 using Microsoft.Agents.AI;
@@ -73,13 +74,15 @@ public static class AgentEvalRunGateExtensions
         int[] seq,
         [EnumeratorCancellation] CancellationToken ct)
     {
-        // A run-post gate cannot inspect a streamed response without buffering it (which destroys TTFT), so
-        // under a blocking policy we fail closed at stream start rather than silently letting output through.
+        // A run-post gate cannot BLOCK a streamed response without buffering the whole stream (which destroys
+        // TTFT), so under a blocking policy we fail closed at stream start rather than let output through. Under
+        // WarnOnly (observe-only) the response IS accumulated and the post-gates run AFTER the stream to record
+        // evidence — consistent with non-streaming WarnOnly (record, never block), so monitoring is never silent.
         if (postGates.Count > 0 && policy is EvalGatePolicy.Redact or EvalGatePolicy.ThrowOnFail)
         {
             throw new NotSupportedException(
-                "Run-post gates cannot inspect a streamed response under Redact/ThrowOnFail. Use a non-streaming " +
-                "run (buffered), or WarnOnly post-gates.");
+                "Run-post gates cannot block a streamed response under Redact/ThrowOnFail (that would require " +
+                "buffering the whole stream). Use a non-streaming run, or WarnOnly post-gates (recorded after the stream).");
         }
 
         // ONE scope for the whole streaming run — a STABLE identity across segments, so per-run state keyed on
@@ -99,6 +102,10 @@ public static class AgentEvalRunGateExtensions
             yield break;
         }
 
+        // Accumulate the response ONLY when WarnOnly post-gates need to inspect it (no allocation otherwise, so
+        // TTFT and the gate-less path are untouched).
+        var accumulated = postGates.Count > 0 ? new StringBuilder() : null;
+
         // PERF-01: an AsyncLocal set once atop an async iterator does not survive the first yield (later
         // MoveNext runs on the consumer's context) — so RE-ENTER the SAME scope instance inside each segment.
         await using var e = innerAgent.RunStreamingAsync(messages, session, options, ct).GetAsyncEnumerator(ct);
@@ -115,7 +122,18 @@ public static class AgentEvalRunGateExtensions
                 break;
             }
 
+            accumulated?.Append(e.Current.Text);
             yield return e.Current;
+        }
+
+        // WarnOnly post-gates: record output-monitoring evidence over the fully-streamed response. Observe-only,
+        // so the (already-delivered) response is never altered — the return is intentionally ignored.
+        if (accumulated is not null)
+        {
+            using (runScope.Enter())
+            {
+                await RunGatesAsync(postGates, accumulated.ToString(), "run-post", policy, trace, seq, ct).ConfigureAwait(false);
+            }
         }
     }
 

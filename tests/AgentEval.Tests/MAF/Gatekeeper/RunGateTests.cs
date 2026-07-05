@@ -109,6 +109,28 @@ public class RunGateTests
     }
 
     [Fact]
+    public async Task Streaming_WarnOnlyPostGate_RecordsEvidenceAfterStream()
+    {
+        // A WarnOnly post-gate on a STREAMING run must not silently do nothing — it accumulates the response
+        // and records output-monitoring evidence after the stream (consistent with non-streaming WarnOnly).
+        var scripted = new ScriptedChatClient().AddText("here is the secret_token value");
+        var trace = new AgentTrace();
+        var gated = Agent(scripted).AsBuilder()
+            .UseAgentEvalGate(post: [new KeywordGate("secret_token")], policy: EvalGatePolicy.WarnOnly, trace: trace)
+            .Build();
+
+        var chunks = new List<string>();
+        await foreach (var update in gated.RunStreamingAsync("go"))
+        {
+            chunks.Add(update.Text);
+        }
+
+        Assert.Contains("secret_token", string.Concat(chunks));   // the response still streamed unaltered (observe-only)
+        var value = (IDictionary<string, object?>)trace.Metadata!["gate.run-post.1.KeywordGate"];
+        Assert.Equal("Warn", value["action"]);                    // but the monitoring evidence WAS recorded
+    }
+
+    [Fact]
     public async Task Streaming_AgentRunScope_SurvivesAcrossYields()
     {
         // PERF-01 proof: a tool invoked AFTER the first streamed update must still see the run scope
