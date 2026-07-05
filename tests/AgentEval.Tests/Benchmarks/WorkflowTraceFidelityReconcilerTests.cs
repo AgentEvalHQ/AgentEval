@@ -54,6 +54,21 @@ public class WorkflowTraceFidelityReconcilerTests
     }
 
     [Fact]
+    public void Reconcile_ExecutorIdCasingVaries_IsOneExecutor_NotDoubleCounted()
+    {
+        // Steps emit the same executor with inconsistent casing; the chat-trace key differs in case again.
+        // Case-insensitive grouping + lookup must treat this as ONE executor (not split/double-count).
+        var result = Result(Step("Writer", 0, 10, 5, "stop"), Step("writer", 1, 20, 10, "stop"));
+        var chat = new Dictionary<string, AgentTrace> { ["WRITER"] = ChatTrace(45, "stop") };
+
+        var report = new WorkflowTraceFidelityReconciler().Reconcile(result, chat);
+
+        var rec = Assert.Single(report.Executors);                 // one group, not two
+        Assert.Equal(45, rec.TokensFramework);                     // 15 + 30 summed
+        Assert.Equal(WorkflowFidelityDiff.Agree, rec.DiffKind);    // matches chat truth 45
+    }
+
+    [Fact]
     public void Reconcile_TokenDivergence_TokenMismatch()
     {
         var result = Result(Step("a", 0, 10, 5, "stop"));

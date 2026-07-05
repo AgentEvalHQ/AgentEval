@@ -125,7 +125,10 @@ public sealed class WorkflowTraceFidelityReconciler
             }
         }
 
-        foreach (var group in result.Steps.GroupBy(s => s.ExecutorId, StringComparer.Ordinal))
+        // Group case-insensitively too (not just the chat-trace lookup below): a workflow that emits an
+        // executor id with inconsistent casing across steps is ONE executor, and a case-sensitive GroupBy
+        // would split it into multiple groups that each match the same chat trace (double-counting).
+        foreach (var group in result.Steps.GroupBy(s => s.ExecutorId, StringComparer.OrdinalIgnoreCase))
         {
             var executorId = group.Key;
             var tokensFramework = group.Sum(s => s.TokenUsage?.TotalTokens ?? 0);

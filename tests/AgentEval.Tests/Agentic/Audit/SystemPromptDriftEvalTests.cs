@@ -32,6 +32,11 @@ public class SystemPromptDriftEvalTests
         => Assert.Equal("skipped", (await new SystemPromptDriftEval().EvaluateAsync(With(TraceWith("you are a bot")))).Score.Label);
 
     [Fact]
+    public async Task AllPromptsNull_NoSignal_Skipped()
+        // Requests present but no captured system prompt == "no signal", not a false "stable" PASS.
+        => Assert.Equal("skipped", (await new SystemPromptDriftEval().EvaluateAsync(With(TraceWith(null, null)))).Score.Label);
+
+    [Fact]
     public async Task StablePrompt_Passes()
     {
         var r = await new SystemPromptDriftEval().EvaluateAsync(With(TraceWith("you are a bot", "you are a bot")));
