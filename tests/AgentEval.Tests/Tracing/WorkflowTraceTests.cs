@@ -642,7 +642,7 @@ public class WorkflowTraceTests
 
         Assert.DoesNotContain("executorTraces", json);   // WhenWritingNull → omitted
 
-        var tempFile = Path.GetTempFileName() + ".trace.json";
+        var tempFile = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N") + ".trace.json");
         try
         {
             await WorkflowTraceSerializer.SaveToFileAsync(trace, tempFile);
@@ -665,7 +665,7 @@ public class WorkflowTraceTests
             ExecutorTraces = new Dictionary<string, AgentTrace> { ["writer"] = chat },
         };
 
-        var tempFile = Path.GetTempFileName() + ".trace.json";
+        var tempFile = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N") + ".trace.json");
         try
         {
             await WorkflowTraceSerializer.SaveToFileAsync(trace, tempFile);

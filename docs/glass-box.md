@@ -17,7 +17,7 @@ Glass Box captures a run at two levels (ADR-019, ADR-020):
 | **Agent boundary** | What the framework *reports* — the `AgentRunResponse`, its usage, its tool accounting | the framework's press release |
 | **Chat / tool boundary** | What the *model and tools actually saw* — every `ChatMessage` request/response, every tool invocation, real token usage, real finish reasons | the raw footage |
 
-Both are recorded into a single **`AgentTrace`** (v1.1 schema, ADR-020) whose entries are tagged with a
+Both are recorded into a single **`AgentTrace`** (the dual-boundary schema, ADR-020) whose entries are tagged with a
 `TraceEntryScope` — `AgentInvocation`, `ChatTurn`, or `ToolExecution`. That one dual-boundary trace is the
 substrate everything else reads.
 
@@ -88,4 +88,4 @@ or replayed** traces (the offline `Real vs Framework: Workflow` sample, Observab
 
 - [Tracing](tracing.md) · [Trace Fidelity benchmark](benchmarks/trace-fidelity.md) ·
   [Workflow Trace Fidelity benchmark](benchmarks/workflow-trace-fidelity.md)
-- ADR-019 (chat-boundary two-layer recording) · ADR-020 (AgentTrace v1.1 schema)
+- ADR-019 (chat-boundary two-layer recording) · ADR-020 (AgentTrace schema)

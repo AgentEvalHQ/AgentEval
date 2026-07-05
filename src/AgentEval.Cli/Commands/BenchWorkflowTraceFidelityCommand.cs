@@ -88,7 +88,7 @@ public static class BenchWorkflowTraceFidelityCommand
         // ── Persist via the canonical output store (manifest + native report) ──
         var store = new FileSystemOutputStore(agentEvalDir);
         await store.SweepStaleSentinelsAsync(TimeSpan.FromHours(24), ct);
-        var subjectIdentity = new SubjectIdentity(SubjectKind.Agent, subject);
+        var subjectIdentity = new SubjectIdentity(SubjectKind.Workflow, subject);
         await store.EnsureSolutionAsync();
         await store.EnsureSubjectAsync(subjectIdentity);
 

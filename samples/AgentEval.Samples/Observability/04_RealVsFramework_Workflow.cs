@@ -40,14 +40,14 @@ public static class RealVsFrameworkWorkflow
         };
 
         // Chat-boundary truth (what each model actually saw / returned).
-        var chatTraths = new Dictionary<string, AgentTrace>
+        var chatTruths = new Dictionary<string, AgentTrace>
         {
             ["planner"]    = Chat(totalTokens: 120, finish: "stop"),            // matches framework 120 → Agree
             ["researcher"] = Chat(totalTokens: 350, finish: "stop"),            // truth 350 vs framework 200 → TokenMismatch
             ["writer"]     = Chat(totalTokens: 90,  finish: "content_filter"),  // truth content_filter vs framework null → FinishMismatch
         };
 
-        var report = new WorkflowTraceFidelityReconciler().Reconcile(result, chatTraths);
+        var report = new WorkflowTraceFidelityReconciler().Reconcile(result, chatTruths);
 
         Console.WriteLine($"  {"executor",-12} {"framework",-22} {"chat-truth",-24} {"verdict",-16} score");
         Console.WriteLine($"  {new string('-', 12)} {new string('-', 22)} {new string('-', 24)} {new string('-', 16)} -----");
