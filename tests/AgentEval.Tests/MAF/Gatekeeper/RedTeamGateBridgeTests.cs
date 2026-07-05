@@ -128,6 +128,25 @@ public class RedTeamGateBridgeTests
     public void ProbeEvaluatorGate_RejectsLlmBackedEvaluator_EvenIfDeclaredCheap()
         => Assert.Throws<ArgumentException>(() => new ProbeEvaluatorGate(new FakeLlmBackedEvaluator(), GateCost.PureCode));
 
+    [Fact]
+    public void ProbeEvaluatorGate_RejectsComposedLlmGrader_ViaReachability()
+        // The LLM leaf is wrapped two levels deep inside composites (as DecomposedGraders do) — the guard must
+        // recurse through IProbeEvaluator children, not just check for a directly-held IChatClient field.
+        => Assert.Throws<ArgumentException>(() => new ProbeEvaluatorGate(
+            new CompositeTestEvaluator(new CompositeTestEvaluator(new ContainsTokenEvaluator("x"), new FakeLlmBackedEvaluator())),
+            GateCost.PureCode));
+
+    [Fact]
+    public void ProbeEvaluatorGate_UnderWarnOnly_ThrowsAtConstruction()
+    {
+        // An enforcement gate must not be silently downgraded to observe-only (a flagged call would run).
+        var gate = new ProbeEvaluatorGate(new ContainsTokenEvaluator("x"), GateCost.PureCode);
+        var agent = new ChatClientAgent(new ScriptedChatClient().AddText("hi"), new ChatClientAgentOptions { Name = "T" });
+
+        Assert.Throws<ArgumentException>(() =>
+            agent.AsBuilder().UseAgentEvalToolGate([gate], ToolGatePolicy.WarnOnly).Build());
+    }
+
     // ── the closed loop, agent-level, LOAD-BEARING: gate blocks the REAL destructive body ──
 
     [Theory]
@@ -173,6 +192,17 @@ public class RedTeamGateBridgeTests
         // Holds an IChatClient — the generic reflection guard must reject it even though it's declared PureCode.
         private readonly IChatClient? _client = null;
         public string Name => "FakeLlmBacked";
+        public Task<EvaluationResult> EvaluateAsync(AttackProbe probe, string response, CancellationToken cancellationToken = default)
+            => Task.FromResult(EvaluationResult.Resisted("stub"));
+    }
+
+    private sealed class CompositeTestEvaluator : IProbeEvaluator
+    {
+        // Holds children as an IProbeEvaluator[] (like the real DecomposedGraders composites) — the reachability
+        // guard must recurse into these to find a wrapped LLM leaf.
+        private readonly IProbeEvaluator[] _children;
+        public CompositeTestEvaluator(params IProbeEvaluator[] children) => _children = children;
+        public string Name => "Composite";
         public Task<EvaluationResult> EvaluateAsync(AttackProbe probe, string response, CancellationToken cancellationToken = default)
             => Task.FromResult(EvaluationResult.Resisted("stub"));
     }

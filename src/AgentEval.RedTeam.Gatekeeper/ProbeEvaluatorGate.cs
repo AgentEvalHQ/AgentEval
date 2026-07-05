@@ -59,6 +59,12 @@ public sealed class ProbeEvaluatorGate : IToolGate
     /// <inheritdoc/>
     public GateCost Cost { get; }
 
+    /// <summary>
+    /// This gate exists to ENFORCE (a tripped probe must stop the call). Running it observe-only would let the
+    /// flagged call through, so <c>UseAgentEvalToolGate</c> refuses to register it under WarnOnly.
+    /// </summary>
+    public ToolGatePolicy MinimumPolicy => ToolGatePolicy.ReplaceResult;
+
     /// <summary>Adapts a deterministic probe evaluator as a tool gate. Network/Llm evaluators are rejected.</summary>
     /// <param name="evaluator">The red-team success oracle (must be pure-code/bounded).</param>
     /// <param name="cost">The caller-declared cost (IProbeEvaluator carries none). Must be PureCode or Bounded.</param>
@@ -76,13 +82,14 @@ public sealed class ProbeEvaluatorGate : IToolGate
         }
 
         // Belt-and-suspenders: reject ANY LLM-backed evaluator even if mis-declared as cheap. Detected generically
-        // by an IChatClient field (catches LLMJudge/Likert/JudgeBacked/Decomposed graders, not a brittle name list).
-        if (HoldsChatClient(evaluator.GetType()))
+        // by an IChatClient reachable from the instance — directly held OR wrapped inside child evaluators (the
+        // DecomposedGraders composites hold their LLM leaves as IProbeEvaluator children, not a direct field).
+        if (HoldsChatClient(evaluator, new HashSet<object>(ReferenceEqualityComparer.Instance)))
         {
             throw new ArgumentException(
-                $"Evaluator '{evaluator.GetType().Name}' holds an IChatClient (LLM-backed) and cannot run inline as " +
-                "a tool gate — it would stall every tool call and risk a fabricated verdict. Declare it as a " +
-                "shadow evaluator instead.", nameof(evaluator));
+                $"Evaluator '{evaluator.GetType().Name}' is LLM-backed (an IChatClient is reachable from it) and " +
+                "cannot run inline as a tool gate — it would stall every tool call and risk a fabricated verdict. " +
+                "Declare it as a shadow evaluator instead.", nameof(evaluator));
         }
 
         _evaluator = evaluator;
@@ -115,19 +122,69 @@ public sealed class ProbeEvaluatorGate : IToolGate
         return $"{call.FunctionName} {args}";
     }
 
-    // True if the evaluator (or a base type) holds a field/property typed as IChatClient — i.e. it is LLM-backed.
-    private static bool HoldsChatClient(Type type)
+    // True if an IChatClient is REACHABLE from the evaluator instance — either directly held, or wrapped inside
+    // child IProbeEvaluator members (composed graders). Reads field VALUES (not just declared types) so a
+    // CompositeEvaluator/OutcomeFilter/ConjunctionGate holding an LLMJudge leaf two levels deep is detected.
+    private static bool HoldsChatClient(object evaluator, HashSet<object> visited)
     {
-        for (var t = type; t is not null && t != typeof(object); t = t.BaseType)
+        if (!visited.Add(evaluator))
         {
-            const BindingFlags flags = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly;
-            if (t.GetFields(flags).Any(f => typeof(IChatClient).IsAssignableFrom(f.FieldType))
-                || t.GetProperties(flags).Any(p => typeof(IChatClient).IsAssignableFrom(p.PropertyType)))
+            return false;   // cycle guard
+        }
+
+        const BindingFlags flags = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly;
+        for (var t = evaluator.GetType(); t is not null && t != typeof(object); t = t.BaseType)
+        {
+            foreach (var f in t.GetFields(flags))
+            {
+                if (typeof(IChatClient).IsAssignableFrom(f.FieldType))
+                {
+                    return true;   // directly held
+                }
+
+                if (IsEvaluatorRef(f.FieldType) && ContainsLlmBackedChild(f.GetValue(evaluator), visited))
+                {
+                    return true;   // reachable through a child evaluator
+                }
+            }
+
+            if (t.GetProperties(flags).Any(p => typeof(IChatClient).IsAssignableFrom(p.PropertyType)))
             {
                 return true;
             }
         }
 
         return false;
+    }
+
+    // A field whose type could hold child evaluators worth recursing into (an IProbeEvaluator, or a collection of them).
+    private static bool IsEvaluatorRef(Type t)
+        => typeof(IProbeEvaluator).IsAssignableFrom(t)
+        || (t.IsArray && t.GetElementType() is { } el && typeof(IProbeEvaluator).IsAssignableFrom(el))
+        || (t.IsGenericType && t.GetGenericArguments().Any(a => typeof(IProbeEvaluator).IsAssignableFrom(a)));
+
+    private static bool ContainsLlmBackedChild(object? value, HashSet<object> visited)
+    {
+        switch (value)
+        {
+            case null:
+                return false;
+            case IChatClient:
+                return true;
+            case IProbeEvaluator child:
+                return HoldsChatClient(child, visited);
+            case System.Collections.IEnumerable seq:
+                foreach (var item in seq)
+                {
+                    if (item is IProbeEvaluator childItem && HoldsChatClient(childItem, visited))
+                    {
+                        return true;
+                    }
+                }
+
+                return false;
+            default:
+                return false;
+        }
     }
 }
