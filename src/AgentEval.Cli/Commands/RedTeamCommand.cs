@@ -311,9 +311,11 @@ internal static class RedTeamCommand
 
             // Flags that only apply to a real endpoint are ignored for the demo — say so rather than mislead.
             if (!opts.Quiet && (opts.Endpoint is not null || opts.Azure || opts.Model is not null
-                || opts.DeploymentName is not null || !string.Equals(opts.SutTier, "text", StringComparison.OrdinalIgnoreCase)))
+                || opts.DeploymentName is not null || !string.Equals(opts.SutTier, "text", StringComparison.OrdinalIgnoreCase)
+                || opts.SystemPrompt is not null || opts.SystemPromptCanary is not null))
                 Console.Error.WriteLine(
-                    "  Note: --sut gatekeeper-demo is a built-in agent; --endpoint/--azure/--model/--deployment-name/--sut-tier are ignored.");
+                    "  Note: --sut gatekeeper-demo is a built-in agent; --endpoint/--azure/--model/--deployment-name/" +
+                    "--sut-tier/--system-prompt/--system-prompt-canary are ignored.");
         }
 
         // Validate --fail-on up front so a typo fails fast, before an expensive scan runs.
@@ -401,8 +403,9 @@ internal static class RedTeamCommand
         }
 
         // Instrument SystemPromptExtraction with the canary so its evaluator can detect the exact-token leak. For the
-        // full roster, RosterWithCanary swaps the SPE instance; for a narrowed --attacks set, swap in place.
-        if (!string.IsNullOrWhiteSpace(opts.SystemPromptCanary))
+        // full roster, RosterWithCanary swaps the SPE instance; for a narrowed --attacks set, swap in place. Skipped
+        // for the gatekeeper-demo SUT, which embeds no system prompt (so a canary probe could never prove a leak).
+        if (!isGatekeeperDemo && !string.IsNullOrWhiteSpace(opts.SystemPromptCanary))
         {
             var canary = opts.SystemPromptCanary!;
             attacks = attacks is null
