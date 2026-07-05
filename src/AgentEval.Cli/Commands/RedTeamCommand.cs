@@ -56,6 +56,8 @@ internal static class RedTeamCommand
             { DefaultValueFactory = _ => "text", Description = "Tool-harness tier: text (verbal) | function-calling (Tier-1, emits canary tool-calls, not executed) | instrumented (Tier-2, canary tools execute and record effect)." };
         var systemPromptCanaryOpt = new Option<string?>("--system-prompt-canary")
             { Description = "Secret token embedded in the SUT system prompt; SystemPromptExtraction then proves a leak only when this exact token appears in a response (otherwise Inconclusive)." };
+        var sutOpt = new Option<string?>("--sut")
+            { Description = "Built-in system-under-test. 'gatekeeper-demo' runs a credential-free, deterministic Gatekeeper-gated agent (no --endpoint needed) to demonstrate the attack-the-gate closed loop." };
 
         // Attack selection
         var attacksOpt = new Option<string?>("--attacks")
@@ -155,6 +157,7 @@ internal static class RedTeamCommand
         command.Options.Add(apiKeyOpt);
         command.Options.Add(systemPromptOpt);
         command.Options.Add(sutTierOpt);
+        command.Options.Add(sutOpt);
         command.Options.Add(systemPromptCanaryOpt);
         command.Options.Add(attacksOpt);
         command.Options.Add(importProbesOpt);
@@ -202,6 +205,7 @@ internal static class RedTeamCommand
                 ApiKey = parseResult.GetValue(apiKeyOpt),
                 SystemPrompt = parseResult.GetValue(systemPromptOpt),
                 SutTier = parseResult.GetValue(sutTierOpt)!,
+                Sut = parseResult.GetValue(sutOpt),
                 SystemPromptCanary = parseResult.GetValue(systemPromptCanaryOpt),
                 Attacks = parseResult.GetValue(attacksOpt),
                 ImportProbes = parseResult.GetValue(importProbesOpt),
@@ -269,17 +273,50 @@ internal static class RedTeamCommand
         }
 
         // 1. Validate
-        if (opts.Endpoint is null && !opts.Azure)
-            throw new InvalidOperationException("Specify --endpoint <url> or --azure.");
-        if (opts.Azure && opts.Endpoint is null)
-            throw new InvalidOperationException(
-                "--azure requires --endpoint <url> (your Azure OpenAI resource endpoint, e.g. https://myresource.openai.azure.com/).");
-        if (opts.Azure && string.IsNullOrWhiteSpace(opts.DeploymentName))
-            throw new InvalidOperationException(
-                "--azure requires --deployment-name <name> (your Azure OpenAI deployment name).");
-        if (!opts.Azure && string.IsNullOrWhiteSpace(opts.Model))
-            throw new InvalidOperationException(
-                "--model is required when using --endpoint.");
+        // --sut gatekeeper-demo runs a built-in, credential-free gated agent, so the endpoint checks are skipped.
+        var isGatekeeperDemo = string.Equals(opts.Sut?.Trim(), "gatekeeper-demo", StringComparison.OrdinalIgnoreCase);
+        if (opts.Sut is not null && !isGatekeeperDemo)
+            throw new InvalidOperationException($"Unknown --sut value: '{opts.Sut}'. Valid: gatekeeper-demo.");
+
+        if (!isGatekeeperDemo)
+        {
+            if (opts.Endpoint is null && !opts.Azure)
+                throw new InvalidOperationException("Specify --endpoint <url> or --azure (or --sut gatekeeper-demo for a credential-free demo).");
+            if (opts.Azure && opts.Endpoint is null)
+                throw new InvalidOperationException(
+                    "--azure requires --endpoint <url> (your Azure OpenAI resource endpoint, e.g. https://myresource.openai.azure.com/).");
+            if (opts.Azure && string.IsNullOrWhiteSpace(opts.DeploymentName))
+                throw new InvalidOperationException(
+                    "--azure requires --deployment-name <name> (your Azure OpenAI deployment name).");
+            if (!opts.Azure && string.IsNullOrWhiteSpace(opts.Model))
+                throw new InvalidOperationException(
+                    "--model is required when using --endpoint.");
+        }
+        else
+        {
+            // The built-in demo agent is stateful and single-threaded — a shared session/trace would be raced
+            // under concurrent probes, so reject --parallelism > 1 rather than silently corrupt the results.
+            if (opts.Parallelism > 1)
+                throw new InvalidOperationException(
+                    "--sut gatekeeper-demo runs at --parallelism 1 (the built-in demo agent is stateful). Remove --parallelism or set it to 1.");
+
+            // The demo has no model of its own, so a judge/attacker would fall back to the literal name
+            // "gatekeeper-demo" — a non-existent model the real endpoint rejects. Require an explicit model.
+            if (opts.JudgeEndpoint is not null && string.IsNullOrWhiteSpace(opts.JudgeModel))
+                throw new InvalidOperationException(
+                    "--sut gatekeeper-demo has no model of its own; pass --judge-model <name> when using --judge.");
+            if (opts.AttackerEndpoint is not null && string.IsNullOrWhiteSpace(opts.AttackerModel))
+                throw new InvalidOperationException(
+                    "--sut gatekeeper-demo has no model of its own; pass --attacker-model <name> when using --attacker.");
+
+            // Flags that only apply to a real endpoint are ignored for the demo — say so rather than mislead.
+            if (!opts.Quiet && (opts.Endpoint is not null || opts.Azure || opts.Model is not null
+                || opts.DeploymentName is not null || !string.Equals(opts.SutTier, "text", StringComparison.OrdinalIgnoreCase)
+                || opts.SystemPrompt is not null || opts.SystemPromptCanary is not null))
+                Console.Error.WriteLine(
+                    "  Note: --sut gatekeeper-demo is a built-in agent; --endpoint/--azure/--model/--deployment-name/" +
+                    "--sut-tier/--system-prompt/--system-prompt-canary are ignored.");
+        }
 
         // Validate --fail-on up front so a typo fails fast, before an expensive scan runs.
         var failOn = opts.FailOn.ToLowerInvariant();
@@ -309,29 +346,41 @@ internal static class RedTeamCommand
         // --import-probes read and --pack download. BuildScanOptions re-runs this (idempotent) for library callers.
         ValidateTimeouts(opts);
 
-        // Resolved identifier: deployment name for Azure, model name for OpenAI-compatible
-        var resolvedName = opts.Azure ? opts.DeploymentName! : opts.Model!;
+        // Resolved identifier: deployment name for Azure, model name for OpenAI-compatible (or the demo name).
+        var resolvedName = isGatekeeperDemo ? "gatekeeper-demo" : (opts.Azure ? opts.DeploymentName! : opts.Model!);
 
-        // 2. Create IChatClient → IEvaluableAgent
-        IChatClient chatClient = opts.Azure
-            ? EndpointFactory.CreateAzure(opts.Endpoint, opts.DeploymentName!, opts.ApiKey)
-            : EndpointFactory.CreateOpenAICompatible(opts.Endpoint!, opts.Model!, opts.ApiKey);
-
-        // System-prompt canary: embed the secret token into the SUT's system prompt so SystemPromptExtraction can
-        // prove a leak (the exact token appearing in a response) rather than guessing from phrasing.
-        var sutSystemPrompt = string.IsNullOrWhiteSpace(opts.SystemPromptCanary)
-            ? opts.SystemPrompt
-            : EmbedSystemPromptCanary(opts.SystemPrompt, opts.SystemPromptCanary!);
-
-        // SUT tier (Wave B): text-only by default; higher tiers wrap the chat client in a canary-tool agent so
-        // IToolAwareAttacks engage a real tool boundary (the runner gates on IToolCapableAgent.Capabilities).
-        var sutTier = ParseSutTier(opts.SutTier);
-        IEvaluableAgent agent = sutTier switch
+        // 2. Build the SUT (IEvaluableAgent).
+        IEvaluableAgent agent;
+        AgentEval.Tracing.AgentTrace? gateTrace = null;
+        if (isGatekeeperDemo)
         {
-            SutTier.FunctionCalling => new CanaryToolChatClientAgent(chatClient, resolvedName, sutSystemPrompt),
-            SutTier.InstrumentedAgent => new InstrumentedCanaryAgent(chatClient, resolvedName, sutSystemPrompt),
-            _ => chatClient.AsEvaluableAgent(name: resolvedName, systemPrompt: sutSystemPrompt),
-        };
+            // Credential-free, deterministic Gatekeeper-gated agent; the trace captures gate.tool.* verdicts so
+            // we can report how many attack attempts the gate blocked.
+            gateTrace = new AgentEval.Tracing.AgentTrace();
+            agent = GatekeeperDemoSut.Build(gateTrace);
+        }
+        else
+        {
+            IChatClient chatClient = opts.Azure
+                ? EndpointFactory.CreateAzure(opts.Endpoint, opts.DeploymentName!, opts.ApiKey)
+                : EndpointFactory.CreateOpenAICompatible(opts.Endpoint!, opts.Model!, opts.ApiKey);
+
+            // System-prompt canary: embed the secret token into the SUT's system prompt so SystemPromptExtraction
+            // can prove a leak (the exact token appearing in a response) rather than guessing from phrasing.
+            var sutSystemPrompt = string.IsNullOrWhiteSpace(opts.SystemPromptCanary)
+                ? opts.SystemPrompt
+                : EmbedSystemPromptCanary(opts.SystemPrompt, opts.SystemPromptCanary!);
+
+            // SUT tier (Wave B): text-only by default; higher tiers wrap the chat client in a canary-tool agent so
+            // IToolAwareAttacks engage a real tool boundary (the runner gates on IToolCapableAgent.Capabilities).
+            var sutTier = ParseSutTier(opts.SutTier);
+            agent = sutTier switch
+            {
+                SutTier.FunctionCalling => new CanaryToolChatClientAgent(chatClient, resolvedName, sutSystemPrompt),
+                SutTier.InstrumentedAgent => new InstrumentedCanaryAgent(chatClient, resolvedName, sutSystemPrompt),
+                _ => chatClient.AsEvaluableAgent(name: resolvedName, systemPrompt: sutSystemPrompt),
+            };
+        }
 
         // 3. Resolve attacks
         IReadOnlyList<IAttackType>? attacks = null;
@@ -354,8 +403,9 @@ internal static class RedTeamCommand
         }
 
         // Instrument SystemPromptExtraction with the canary so its evaluator can detect the exact-token leak. For the
-        // full roster, RosterWithCanary swaps the SPE instance; for a narrowed --attacks set, swap in place.
-        if (!string.IsNullOrWhiteSpace(opts.SystemPromptCanary))
+        // full roster, RosterWithCanary swaps the SPE instance; for a narrowed --attacks set, swap in place. Skipped
+        // for the gatekeeper-demo SUT, which embeds no system prompt (so a canary probe could never prove a leak).
+        if (!isGatekeeperDemo && !string.IsNullOrWhiteSpace(opts.SystemPromptCanary))
         {
             var canary = opts.SystemPromptCanary!;
             attacks = attacks is null
@@ -523,6 +573,13 @@ internal static class RedTeamCommand
             Console.Error.WriteLine($"  Verdict: {result.Verdict}  (score {result.ConclusiveScore:F1}/100 over {result.Coverage:F0}% conclusive coverage)");
             if (result.InconclusiveProbes > 0)
                 Console.Error.WriteLine($"  Note: {result.InconclusiveProbes}/{result.TotalProbes} probes were inconclusive — that lowers coverage, not the pass rate.");
+
+            // Gatekeeper demo: report how many attack attempts the runtime gate blocked (the closed loop).
+            if (gateTrace is not null)
+            {
+                var blocks = AgentEval.Tracing.GlassBoxEvidence.FromTrace(gateTrace)?.GateBlockCount ?? 0;
+                Console.Error.WriteLine($"  Gatekeeper: {blocks} forbidden tool call(s) blocked before execution (gate.tool.* evidence).");
+            }
         }
 
         // 8b. Calibration (garak-inspired relative scoring): standardize per-attack scores against a user-supplied
@@ -800,6 +857,9 @@ internal sealed class RedTeamOptions
     public string? ApiKey { get; init; }
     public string? SystemPrompt { get; init; }
     public string SutTier { get; init; } = "text";
+
+    /// <summary>Built-in SUT selector (<c>--sut</c>); <c>gatekeeper-demo</c> = the credential-free gated demo agent.</summary>
+    public string? Sut { get; init; }
     public string? SystemPromptCanary { get; init; }
     public string? Attacks { get; init; }
     public FileInfo? ImportProbes { get; init; }
