@@ -67,6 +67,56 @@ public class GlassBoxCliTests : IDisposable
         Assert.Equal(0, warnings);
     }
 
+    // ── Gatekeeper M2d: double-gating check + StageFromKey ──
+
+    [Fact]
+    public void GateMetadataReader_StageFromKey_ExtractsStage()
+    {
+        Assert.Equal("tool", GateMetadataReader.StageFromKey("gate.tool.1.ForbiddenToolGate"));
+        Assert.Equal("run-pre", GateMetadataReader.StageFromKey("gate.run-pre.2.KeywordGate"));
+        Assert.Equal("pre", GateMetadataReader.StageFromKey("gate.pre.1.pii"));
+        Assert.Equal("tool", GateMetadataReader.StageFromKey("gate.tool.1.My.Dotted.Policy"));   // policy may contain dots
+
+        // Malformed / non-gate keys => null (not misclassified), consistent with the XML doc.
+        Assert.Null(GateMetadataReader.StageFromKey("gate.tool"));                 // too few segments
+        Assert.Null(GateMetadataReader.StageFromKey("notgate.pre.1.Policy"));      // not a gate key
+        Assert.Null(GateMetadataReader.StageFromKey("gate..1.Policy"));            // empty stage
+        Assert.Null(GateMetadataReader.StageFromKey("gate.pre..Policy"));          // empty seq
+        Assert.Null(GateMetadataReader.StageFromKey("gate.pre.1."));               // empty policy
+        Assert.Null(GateMetadataReader.StageFromKey("gate.pre.1..Policy"));        // leading-dot policy (empty segment)
+        Assert.Null(GateMetadataReader.StageFromKey("gate.pre.1.Policy."));        // trailing-dot policy
+        Assert.Null(GateMetadataReader.PolicyFromKey("gate.pre.1..Policy"));       // would otherwise yield ".Policy"
+        Assert.Null(GateMetadataReader.PolicyFromKey("notgate.pre.1.Policy"));     // sibling: same guard
+    }
+
+    [Fact]
+    public async Task Doctor_DoubleGatingCheck_WarnsWhenPolicyGatesAtBothSeams()
+    {
+        // The SAME policy ("Pii") recorded under a chat seam (pre) AND an agent seam (tool) — gating twice.
+        var trace = new AgentTrace();
+        trace.SetMetadata("gate.pre.1.Pii", new Dictionary<string, object?> { ["action"] = "Block" });
+        trace.SetMetadata("gate.tool.2.Pii", new Dictionary<string, object?> { ["action"] = "Block" });
+        await WriteTraceAsync("doublegate.trace.json", trace);
+
+        var warnings = await DoctorCommand.CheckDoubleGatingAsync(_dir);
+
+        Assert.Equal(1, warnings);
+    }
+
+    [Fact]
+    public async Task Doctor_DoubleGatingCheck_DoesNotWarn_WhenSeamsDiffer()
+    {
+        // Two DIFFERENT policies, one per seam — not double-gating.
+        var trace = new AgentTrace();
+        trace.SetMetadata("gate.run-pre.1.Injection", new Dictionary<string, object?> { ["action"] = "Block" });
+        trace.SetMetadata("gate.tool.2.ForbiddenToolGate", new Dictionary<string, object?> { ["action"] = "Block" });
+        await WriteTraceAsync("singlegate.trace.json", trace);
+
+        var warnings = await DoctorCommand.CheckDoubleGatingAsync(_dir);
+
+        Assert.Equal(0, warnings);
+    }
+
     [Fact]
     public async Task Migrate_TraceSchemaBump_RewritesV10ToV11WhenApplied()
     {

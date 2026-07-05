@@ -18,8 +18,12 @@ namespace AgentEval.Tracing;
 /// </remarks>
 public static class GateMetadataReader
 {
-    /// <summary>True when <paramref name="key"/> is a gate-verdict metadata key.</summary>
-    public static bool IsGateKey(string key) => key.StartsWith("gate.", StringComparison.Ordinal);
+    /// <summary>
+    /// True when <paramref name="key"/> is a WELL-FORMED gate-verdict metadata key (<c>gate.{stage}.{seq}.{policy}</c>).
+    /// A bare <c>gate.</c>-prefixed key that is not a verdict is rejected, so consumers that filter with this (e.g.
+    /// <c>GlassBoxEvidence.CountGateBlocks</c>) never mis-count unrelated <c>gate.*</c> metadata.
+    /// </summary>
+    public static bool IsGateKey(string key) => TrySplitGateKey(key, out _);
 
     /// <summary>True when the recorded verdict value carries <c>action == "Block"</c> (either shape).</summary>
     public static bool IsBlock(object? value)
@@ -27,9 +31,27 @@ public static class GateMetadataReader
 
     /// <summary>Extracts the policy name from a <c>gate.{stage}.{seq}.{policy}</c> key, or null if malformed.</summary>
     public static string? PolicyFromKey(string key)
+        => TrySplitGateKey(key, out var parts) ? string.Join('.', parts[3..]) : null;
+
+    /// <summary>
+    /// Extracts the stage token from a <c>gate.{stage}.{seq}.{policy}</c> key, or null if malformed. Stage
+    /// tokens are dot-free (<c>pre</c>, <c>post</c>, <c>tool</c>, <c>run-pre</c>, <c>run-post</c>).
+    /// </summary>
+    public static string? StageFromKey(string key)
+        => TrySplitGateKey(key, out var parts) ? parts[1] : null;
+
+    // A well-formed gate-verdict key is exactly gate.{stage}.{seq}.{policy} — the "gate." prefix plus non-empty
+    // stage, seq, and policy. The policy may itself contain dots (e.g. "My.Policy"), but EVERY policy segment must
+    // be non-empty, so keys with a leading/trailing/double dot in the policy (e.g. "gate.pre.1..Policy") are
+    // rejected. This keeps the extractors returning null on a malformed key rather than misclassifying it.
+    private static bool TrySplitGateKey(string key, out string[] parts)
     {
-        var parts = key.Split('.');
-        return parts.Length >= 4 ? string.Join('.', parts[3..]) : null;
+        parts = key.Split('.');
+        return parts.Length >= 4
+            && parts[0] == "gate"
+            && parts[1].Length > 0                          // stage
+            && parts[2].Length > 0                          // seq
+            && parts[3..].All(static p => p.Length > 0);    // policy — no empty segments (no leading/trailing/double dot)
     }
 
     private static string? ReadAction(object? value) => value switch

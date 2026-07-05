@@ -83,7 +83,7 @@ public sealed record WorkflowTraceFidelityReport(IReadOnlyList<WorkflowExecutorF
 /// <see cref="ExecutorStep"/>s for one executor must have their framework tokens SUMMED before comparison
 /// — otherwise every looped executor falsely reports a TokenMismatch (fix C5).
 /// <para>
-/// <b>Chat-truth availability caveat.</b> The <paramref name="chatTraces"/> dict must contain per-executor
+/// <b>Chat-truth availability caveat.</b> The <c>chatTraces</c> dict must contain per-executor
 /// traces that carry <see cref="TraceEntryScope.ChatTurn"/> <b>Response</b> entries. Inside a <i>live</i> MAF
 /// <c>InProcessExecution</c> workflow those are NOT available today — <c>WorkflowChatRecording</c> documents
 /// that executor responses are not routed back through the instrumented client, so per-executor traces come
