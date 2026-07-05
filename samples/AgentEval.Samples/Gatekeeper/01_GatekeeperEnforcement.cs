@@ -75,7 +75,7 @@ public static class GatekeeperEnforcement
 
         Console.WriteLine($"   Model tried to call: delete_database");
         Console.WriteLine($"   Times the database was actually deleted: {deletions}  {(deletions == 0 ? "✅ blocked" : "❌ ran")}");
-        Console.WriteLine($"   Gate blocks recorded in the trace: {GlassBoxEvidence.FromTrace(trace).GateBlockCount}");
+        Console.WriteLine($"   Gate blocks recorded in the trace: {GlassBoxEvidence.FromTrace(trace)?.GateBlockCount ?? 0}");
     }
 
     // ── 2. The moat: a real red-team evaluator guards a live call ──
@@ -139,7 +139,7 @@ public static class GatekeeperEnforcement
 
         Console.WriteLine($"   The model took the bait and called: exfiltrate_secrets");
         Console.WriteLine($"   Times secrets were exfiltrated: {exfiltrations}  {(exfiltrations == 0 ? "✅ honeypot held" : "❌ breached")}");
-        Console.WriteLine($"   Honeypot trips recorded: {GlassBoxEvidence.FromTrace(trace).GateBlockCount}");
+        Console.WriteLine($"   Honeypot trips recorded: {GlassBoxEvidence.FromTrace(trace)?.GateBlockCount ?? 0}");
     }
 
     // ── 4. Shadow judge: an expensive async check arms quarantine for a later run ──
