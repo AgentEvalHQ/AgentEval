@@ -1,0 +1,170 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 AgentEval Contributors
+// Licensed under the MIT License.
+
+using System.Runtime.CompilerServices;
+using AgentEval.Guardrails;
+using AgentEval.Tracing;
+using Microsoft.Agents.AI;
+using Microsoft.Extensions.AI;
+using AgentTrace = AgentEval.Tracing.AgentTrace;
+using ChatRole = Microsoft.Extensions.AI.ChatRole;
+
+namespace AgentEval.MAF.Gatekeeper;
+
+/// <summary>
+/// Gatekeeper (Stage 2, M2) — a RUN-level gate over the MAF agent-run seam. Reuses the shipped chat gates
+/// (<see cref="IChatGate"/>) to inspect the run's <b>input</b> (run-pre — "assess incoming attacks") and its
+/// <b>output</b> (run-post) text, records <c>gate.run-pre.*</c> / <c>gate.run-post.*</c> evidence, and
+/// establishes an <see cref="AgentRunScope"/> so inner tool/session gates can read the run context.
+/// <para>Register the run gate <b>outermost</b>. Streaming runs run-pre gates only; a run-post gate under a
+/// blocking policy throws at stream start (a stream cannot be inspected without buffering, which would destroy
+/// time-to-first-token).</para>
+/// </summary>
+public static class AgentEvalRunGateExtensions
+{
+    /// <summary>Adds run-level gates to the agent pipeline.</summary>
+    /// <param name="builder">The agent builder.</param>
+    /// <param name="pre">Gates run on the input text before the model sees it (incoming-attack detection).</param>
+    /// <param name="post">Gates run on the response text (non-streaming; streaming under a blocking policy throws).</param>
+    /// <param name="policy">How a block is enforced (WarnOnly / ThrowOnFail / Redact). Defaults to WarnOnly.</param>
+    /// <param name="trace">Optional Glass Box trace for <c>gate.run-*.*</c> evidence.</param>
+    public static AIAgentBuilder UseAgentEvalGate(
+        this AIAgentBuilder builder,
+        IReadOnlyList<IChatGate>? pre = null,
+        IReadOnlyList<IChatGate>? post = null,
+        EvalGatePolicy policy = EvalGatePolicy.WarnOnly,
+        AgentTrace? trace = null)
+    {
+        ArgumentNullException.ThrowIfNull(builder);
+        var preGates = pre ?? Array.Empty<IChatGate>();
+        var postGates = post ?? Array.Empty<IChatGate>();
+        var seq = new int[1];   // shared block-seq counter across both branches
+
+        return builder.Use(
+            runFunc: async (messages, session, options, innerAgent, ct) =>
+            {
+                using var scope = AgentRunScope.Begin(session, innerAgent.Name, trace);
+
+                var preRefusal = await RunGatesAsync(preGates, ConcatText(messages), "run-pre", policy, trace, seq, ct).ConfigureAwait(false);
+                if (preRefusal is not null)
+                {
+                    return Refusal(innerAgent, preRefusal);
+                }
+
+                var response = await innerAgent.RunAsync(messages, session, options, ct).ConfigureAwait(false);
+
+                var postRefusal = await RunGatesAsync(postGates, response.Text, "run-post", policy, trace, seq, ct).ConfigureAwait(false);
+                return postRefusal is not null ? Refusal(innerAgent, postRefusal) : response;
+            },
+            runStreamingFunc: (messages, session, options, innerAgent, ct) =>
+                StreamCore(messages, session, options, innerAgent, preGates, postGates, policy, trace, seq, ct));
+    }
+
+    private static async IAsyncEnumerable<AgentResponseUpdate> StreamCore(
+        IEnumerable<ChatMessage> messages,
+        AgentSession session,
+        AgentRunOptions options,
+        AIAgent innerAgent,
+        IReadOnlyList<IChatGate> preGates,
+        IReadOnlyList<IChatGate> postGates,
+        EvalGatePolicy policy,
+        AgentTrace? trace,
+        int[] seq,
+        [EnumeratorCancellation] CancellationToken ct)
+    {
+        // A run-post gate cannot inspect a streamed response without buffering it (which destroys TTFT), so
+        // under a blocking policy we fail closed at stream start rather than silently letting output through.
+        if (postGates.Count > 0 && policy is EvalGatePolicy.Redact or EvalGatePolicy.ThrowOnFail)
+        {
+            throw new NotSupportedException(
+                "Run-post gates cannot inspect a streamed response under Redact/ThrowOnFail. Use a non-streaming " +
+                "run (buffered), or WarnOnly post-gates.");
+        }
+
+        var preRefusal = await RunGatesAsync(preGates, ConcatText(messages), "run-pre", policy, trace, seq, ct).ConfigureAwait(false);
+        if (preRefusal is not null)
+        {
+            var synth = new AgentResponse(new ChatMessage(ChatRole.Assistant, preRefusal)) { AgentId = innerAgent.Id };
+            foreach (var update in synth.ToAgentResponseUpdates())
+            {
+                yield return update;
+            }
+
+            yield break;
+        }
+
+        // PERF-01: re-establish the AgentRunScope INSIDE each MoveNextAsync — an AsyncLocal set once at the top
+        // of an async iterator does not survive the first yield (later MoveNext runs on the consumer's context).
+        await using var e = innerAgent.RunStreamingAsync(messages, session, options, ct).GetAsyncEnumerator(ct);
+        while (true)
+        {
+            bool has;
+            using (AgentRunScope.Begin(session, innerAgent.Name, trace))
+            {
+                has = await e.MoveNextAsync().ConfigureAwait(false);
+            }
+
+            if (!has)
+            {
+                break;
+            }
+
+            yield return e.Current;
+        }
+    }
+
+    private static async ValueTask<string?> RunGatesAsync(
+        IReadOnlyList<IChatGate> gates, string text, string stage, EvalGatePolicy policy, AgentTrace? trace, int[] seq, CancellationToken ct)
+    {
+        foreach (var gate in gates)
+        {
+            var verdict = await gate.InspectAsync(text, ct).ConfigureAwait(false);
+            if (verdict.Action != GateAction.Block)
+            {
+                continue;
+            }
+
+            RecordGate(trace, Interlocked.Increment(ref seq[0]), stage, verdict);
+
+            if (policy == EvalGatePolicy.ThrowOnFail)
+            {
+                throw new EvalGateRefusalException(verdict, stage);   // propagates at the run boundary
+            }
+
+            if (policy == EvalGatePolicy.Redact)
+            {
+                return verdict.RedactedText ?? SynthRefusal(verdict);   // short-circuit a refusal/redacted response
+            }
+
+            // WarnOnly: recorded; let the run proceed.
+        }
+
+        return null;
+    }
+
+    private static AgentResponse Refusal(AIAgent innerAgent, string text)
+        => new(new ChatMessage(ChatRole.Assistant, text)) { AgentId = innerAgent.Id };
+
+    private static string SynthRefusal(GateVerdict verdict)
+        => $"BLOCKED by policy '{verdict.PolicyName}': {verdict.Reason ?? "not permitted"}. Choose a different action.";
+
+    private static string ConcatText(IEnumerable<ChatMessage> messages)
+        => string.Join("\n", messages.Select(m => m.Text).Where(t => !string.IsNullOrEmpty(t)));
+
+    private static void RecordGate(AgentTrace? trace, int seq, string stage, GateVerdict verdict)
+    {
+        if (trace is null)
+        {
+            return;
+        }
+
+        trace.SetMetadata($"gate.{stage}.{seq}.{verdict.PolicyName}", new Dictionary<string, object?>
+        {
+            ["action"] = "Block",
+            ["reason"] = verdict.Reason,
+            ["matches"] = verdict.Matches,
+            ["correlationId"] = ToolCorrelationScope.Current,
+        });
+    }
+}
