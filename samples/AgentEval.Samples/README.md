@@ -22,7 +22,7 @@ cd samples/AgentEval.Samples
 dotnet run
 ```
 
-The interactive menu organises samples into **ten groups (A–J)**. Select a group letter, then a sample number.
+The interactive menu organises samples into **groups (A–J)**. Select a group letter, then a sample number.
 You can also run a specific sample directly from the command line by its **legacy index** (1-based across the flat sample list, A1=1, A7=7, B1=8, …):
 
 ```bash
