@@ -11,7 +11,7 @@
 
 Group A samples A1–A4 (all except A5 Light Path, A6 Session Lifecycle, and A7 Advanced MAF Features) and Dataset Loaders / Extensibility in Group F run fully without credentials.
 Sample H1 (Registry Discovery) and H13 (Report Browser), plus all of Group J (Gatekeeper), also run without credentials.
-All other samples require Azure OpenAI for meaningful results.
+Most other samples work best with Azure OpenAI — check each group's **Azure?** column for the authoritative per-sample requirement.
 
 ---
 
@@ -33,8 +33,9 @@ dotnet run -- 54   # Report Browser          (H13)
 dotnet run -- 59   # Gatekeeper walkthrough  (J1)
 ```
 
-The benchmark samples (H2–H10) also respect a preset tier via `--preset {smoke|standard|audit-grade}` or the
-`AGENTEVAL_SAMPLES_PRESET` environment variable — see `Benchmarks/README.md` for the resolution order.
+The benchmark samples (H2–H10) also respect a preset tier via `--preset <presetName>` (preset names are
+family-specific — see H1 Registry Discovery or `Benchmarks/README.md` for the valid values) or the
+`AGENTEVAL_SAMPLES_PRESET` environment variable.
 
 ---
 
@@ -167,8 +168,8 @@ runtime gates that block bad actions before they happen. See **`docs/gatekeeper.
 
 | # | Sample | What It Exercises | Azure? | Time |
 |---|--------|-------------------|--------|------|
-| 1 | **Enforcement Walkthrough** | Scenarios across the gate layers: tool / moat / canary / shadow-judge / defense-in-depth / more gates | No | <2 min |
-| 2 | **MAF Agent Harness** | A realistic gated MAF support agent — a legit request flows, a prompt-injection attack is blocked at the tool boundary | No | <2 min |
+| 1 | **Enforcement Walkthrough** | Scenarios across the gate layers: tool / moat / canary / shadow-judge / defense-in-depth / more gates | No | 5 min |
+| 2 | **MAF Agent Harness** | A realistic gated MAF support agent — a legit request flows, a prompt-injection attack is blocked at the tool boundary | No | 2 min |
 
 ---
 

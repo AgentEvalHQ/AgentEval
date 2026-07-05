@@ -39,8 +39,8 @@ canonical store + JSON + HTML + PDF artefacts as every other running sample.
 The unaltered native shape is **also** written to `report-native.json`
 alongside `report.json`.
 
-v0.10.1+: **H9 LongMemEval** no longer ships an "embedded subset" (the prior
-hand-authored 10-entry approximation produced misleading scores). All H9
+**H9 LongMemEval** no longer ships an "embedded subset" (the prior
+hand-authored approximation produced misleading scores). All H9
 presets read the real `longmemeval_s_cleaned.json` from
 `<workspace-root>/src/AgentEval.Memory/Data/longmemeval/` (or
 `LONGMEMEVAL_DATASET_PATH`). If the file is missing the sample prints a
@@ -205,7 +205,7 @@ without re-running the benchmark.
 
 ## Where the runs are saved
 
-Samples H2 – H10 write to **two** locations per run (v0.10.1, plan-25):
+Samples H2 – H10 write to **two** locations per run:
 
 | Artefact                                      | Location                                                           | Why                                                                                                                              |
 |-----------------------------------------------|--------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------|
