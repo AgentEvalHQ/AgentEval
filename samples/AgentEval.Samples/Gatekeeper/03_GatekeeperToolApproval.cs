@@ -79,7 +79,10 @@ public static class GatekeeperToolApproval
 
         // A human reviews and approves → resume on the same session with the approval response.
         await large.RunAsync([new ChatMessage(ChatRole.User, [request.CreateResponse(true)])], session);
-        Console.WriteLine($"   Human approved → the refund runs. Large refunds run: {refundsIssued.Count(a => a >= 1000)}. ✅");
+        var afterApproval = refundsIssued.Count(a => a >= 1000);
+        Console.WriteLine(afterApproval > beforeApproval
+            ? $"   Human approved → the refund ran. Large refunds run: {afterApproval}. ✅"
+            : $"   Human approved, but the model didn't complete the refund (large refunds run: {afterApproval}).");
 
         Console.WriteLine("\n   Takeaway: routine actions flow, risky ones pause for a person — one gate, softer than a hard block.");
         Console.WriteLine("\n=== Gatekeeper Tool Approval Complete ===");

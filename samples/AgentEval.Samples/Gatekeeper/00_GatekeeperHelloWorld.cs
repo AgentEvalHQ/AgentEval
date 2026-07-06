@@ -66,9 +66,18 @@ public static class GatekeeperHelloWorld
             "\"Amazing service! <script>steal()</script> PWNED\"");
 
         var blocks = GlassBoxEvidence.FromTrace(trace)?.GateBlockCount ?? 0;
-        Console.WriteLine("   The model tried to publish content carrying the attack marker 'PWNED'.");
-        Console.WriteLine($"   Times write_page actually ran: {published}  {(published == 0 ? "✅ blocked by the probe-as-gate" : "❌ ran")}");
-        Console.WriteLine($"   Blocks recorded in the trace:  {blocks}");
+        if (blocks > 0)
+        {
+            Console.WriteLine($"   The model tried to publish 'PWNED' content → write_page ran {published}×, blocked {blocks}×  ✅ blocked by the probe-as-gate");
+        }
+        else if (published > 0)
+        {
+            Console.WriteLine($"   ❌ write_page ran {published}× — the poisoned publish was NOT blocked");
+        }
+        else
+        {
+            Console.WriteLine("   The model declined to publish the poisoned content this run — nothing for the gate to block (re-run to see the block).");
+        }
         Console.WriteLine("\n   That's the whole idea: your red-team oracle runs in the request path and stops the call.");
         Console.WriteLine("   → Next: the Enforcement Walkthrough adds canary honeypots, dangerous sequences, and more.");
         Console.WriteLine("\n=== Gatekeeper Hello World Complete ===");
