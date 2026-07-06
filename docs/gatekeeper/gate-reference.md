@@ -82,6 +82,30 @@ Under a blocking policy a run‑pre refusal is returned *without ever calling th
 run‑post gate fails closed at stream start (it can't unsend bytes in flight); under `WarnOnly` a run‑post gate
 accumulates the stream and records its evidence *after* — observe‑only.
 
+## The Tribunal — LLM judge gates
+
+When you need *judgment* — the clearest case is **indirect prompt injection** (retrieved content trying to
+*instruct* the agent), which keyword gates can't catch because the payload is natural language — a single‑axis LLM
+judge runs on the run‑pre/run‑post seam (which accepts model cost, unlike the inline tool gate). These live in
+`AgentEval.Guardrails.Judges`.
+
+| Gate | What it does | Rank | Honest reasoning |
+|---|---|:--:|---|
+| **CompositeJudgeGate&lt;TRubric&gt;** | Turns a single‑axis `IJudgeRubric` (prefilter → one‑question prompt → parser) into an `IChatGate` backed by a fast model. Prefilter short‑circuit → model under a hard timeout → decisive verdict; **fail‑closed** on inconclusive (timeout / error / unparseable / non‑finite confidence). | 🟢 **4** | The only gate here that catches *paraphrased / novel* attacks — no deterministic equivalent. But its value is **entirely contingent on calibration**: an un‑calibrated inline judge is a fabrication risk, which the whole toolkit argues is worse than none. The Bar (below) is what earns the rank — without it, treat this as shadow‑only. |
+| **ParallelJudgeFanOut** | Runs N judge gates over one turn concurrently (wall‑clock ≈ slowest), combined fail‑closed OR (any block blocks; a throwing judge is itself a block). | 🟡 **3** | Composition, not detection — makes a *multi‑axis* Tribunal viable on the hot path instead of serial K×latency. Compose single‑axis judges here rather than widening one rubric. Value scales with how many axes you run. |
+| **JudgeVerdictCache** | Content‑hash cache over a judge gate; caches **only allow** verdicts (a transient fail‑closed block is never cached into a permanent one), bounded. | 🟠 **2** | A token/latency saver for recurring content (RAG scale); no detection value of its own. |
+
+> **The Bar — `GateCalibrationHarness` (the moat, not a gate).** A judge must *earn* the right to block. Score it
+> with `GateCalibrationHarness.EvaluateAsync(judge, goldSet)` against a **both‑directions** per‑axis
+> `JudgeGoldSet` (attacks that must block AND benign that must be allowed). The report gives decisive accuracy, the
+> **missed‑attack (dangerous‑error) count** — the number that matters — the false‑alarm rate, Cohen's κ, and
+> (with a baseline) whether it beats a deterministic detector. `report.AssertInlineReady()` throws until it
+> passes, so an un‑calibrated judge can't be promoted inline by an honest caller. Ships with
+> `IndirectInjectionRubric` + a `StarterGoldSet()` to extend with your own data. Re‑run on any model/prompt change.
+>
+> Its accuracy is **your** measurement on **your** data — this toolkit deliberately makes no blanket accuracy
+> claim for the judge; the harness is how you find out honestly.
+
 ## Session gates
 
 Run before a run and read the run's session — **fail‑closed when the session context is absent**.

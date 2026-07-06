@@ -125,7 +125,10 @@ public static class GatekeeperBeachhead
 
         Console.WriteLine($"   Calibration on the starter gold set: accuracy {report.DecisiveAccuracy:P0}, " +
                           $"missed attacks {report.DangerousErrorCount}, κ {report.KappaVsGold:F2}");
-        Console.WriteLine($"   Inline-ready? {report.IsInlineReady}  {(report.IsInlineReady ? "✅ earned the right to block" : "❌ stays in shadow")}");
+        Console.WriteLine("   ⚠️  These numbers show the HARNESS working, not a real detector's accuracy — this demo's");
+        Console.WriteLine("       judge is a rule-based stand-in. A real judge's score depends on YOUR model and YOUR");
+        Console.WriteLine("       gold set; the whole point of the harness is to measure that honestly before you trust it.");
+        Console.WriteLine($"   Inline-ready? {report.IsInlineReady}  {(report.IsInlineReady ? "✅ earned the right to block (on this gold set)" : "❌ stays in shadow")}");
         report.AssertInlineReady();
 
         // Now it blocks a live injection in retrieved content.
