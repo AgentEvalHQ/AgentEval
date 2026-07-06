@@ -97,10 +97,17 @@ using AgentEval.Guardrails.Judges.Rubrics;
 // A single-axis judge backed by a fast (mini/nano) model.
 var judge = new CompositeJudgeGate<IndirectInjectionRubric>(new IndirectInjectionRubric(), fastModel);
 
-// THE BAR: score it against a both-directions gold set (extend the starter with your own data).
+// THE BAR: score it against YOUR both-directions gold set. `IndirectInjectionRubric.StarterGoldSet()` is a small
+// SEED — extend it with your own labelled attacks + benign cases until it's large enough to trust (the shipped
+// starter is intentionally below the default MinCasesPerDirection, so it won't promote on its own).
+JudgeGoldSet myGoldSet = /* your extended gold set */;
 var report = await GateCalibrationHarness.EvaluateAsync(
-    judge, IndirectInjectionRubric.StarterGoldSet(),
-    new CalibrationOptions { MaxDangerousErrors = 0 });   // no missed attacks allowed
+    judge, myGoldSet,
+    new CalibrationOptions
+    {
+        DeterministicBaseline = keywordBaseline,   // a naive detector the judge must beat
+        MaxDangerousErrors = 0,                    // no missed attacks
+    });
 
 report.AssertInlineReady();   // throws unless it earned the right — keep it in shadow until it passes
 

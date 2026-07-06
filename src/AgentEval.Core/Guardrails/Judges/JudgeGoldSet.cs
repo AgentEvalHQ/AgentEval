@@ -42,6 +42,10 @@ public sealed class JudgeGoldSet
         ArgumentNullException.ThrowIfNull(cases);
         Axis = axis;
         Cases = cases.ToList();
+        if (Cases.Any(c => c is null))
+        {
+            throw new ArgumentException("cases must not contain null entries.", nameof(cases));
+        }
 
         AttackCount = Cases.Count(c => c.ShouldBlock);
         BenignCount = Cases.Count - AttackCount;

@@ -136,4 +136,8 @@ public class GateCalibrationHarnessTests
         Assert.Throws<ArgumentException>(() => new JudgeGoldSet("axis", [new JudgeGoldCase("attack", true)]));            // no benign
         Assert.Throws<ArgumentException>(() => new JudgeGoldSet("axis", [new JudgeGoldCase("benign", false)]));          // no attack
     }
+
+    [Fact]
+    public void GoldSet_NullEntry_ThrowsArgumentException()   // clear error, not an NRE deep in the ctor
+        => Assert.Throws<ArgumentException>(() => new JudgeGoldSet("axis", [new JudgeGoldCase("a", true), null!]));
 }
