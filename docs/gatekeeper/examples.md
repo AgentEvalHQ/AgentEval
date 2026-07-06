@@ -194,10 +194,12 @@ var agent = baseAgent.AsBuilder()
 The judge runs *after* the run returns; an adverse verdict arms quarantine so the `QuarantineGate` refuses the
 session's **next** run.
 
-## Credential‑free demos
+## Runnable demos (real agents)
 
-The **Gatekeeper** sample group (`AgentEval.Samples`, menu group **J**) runs everything above against a scripted
-model, so every outcome is deterministic and needs no API key:
+The **Gatekeeper** sample group (`AgentEval.Samples`, menu group **J**) runs everything above against a **real MAF
+agent** on a live model — set `AZURE_OPENAI_ENDPOINT` / `AZURE_OPENAI_API_KEY` / `AZURE_OPENAI_DEPLOYMENT`. The
+gates fire on the model's actual behavior (a real loop that runs away, a real POST to an off‑host URL, a real
+judge scoring a gold set), and where a well‑aligned model resists an attack the sample reports that honestly:
 
 - [`Gatekeeper/00_GatekeeperHelloWorld`](../../samples/AgentEval.Samples/Gatekeeper/00_GatekeeperHelloWorld.cs) —
   **start here**: the simplest gate — your red‑team check blocks a live poisoned call, in three lines.

@@ -124,7 +124,7 @@ public static class Program
             new("Real vs Framework: Workflow","Per-EXECUTOR ledger vs chat truth — what a multi-agent workflow HIDES (offline; scripted)",     RealVsFrameworkWorkflow.RunAsync),
         ]),
 
-        new('J', "Gatekeeper (Runtime Protection)", "★ no credentials — fail-closed runtime enforcement",
+        new('J', "Gatekeeper (Runtime Protection)", "🔑 real MAF agents (Azure OpenAI) — fail-closed runtime enforcement",
         [
             new("Hello World",               "★ start here — the simplest gate: your red-team check blocks a live call (3 lines)", GatekeeperHelloWorld.RunAsync),
             new("Enforcement Walkthrough",   "6 scenarios: tool / moat / canary / shadow-judge / defense-in-depth / more gates", GatekeeperEnforcement.RunAsync),
