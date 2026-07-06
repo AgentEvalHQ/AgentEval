@@ -125,6 +125,7 @@ public static class AgentEvalToolApprovalExtensions
             ["action"] = "RequireApproval",
             ["function"] = functionName,
             ["reason"] = reason,
+            ["correlationId"] = ToolCorrelationScope.Current,   // stamp like gate.tool.*/gate.run-*.* for trace correlation
         });
     }
 }
