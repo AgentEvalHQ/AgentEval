@@ -117,7 +117,45 @@ public class ToolApprovalBridgeTests
         Assert.Contains(trace.Metadata!.Keys, k => k.StartsWith("gate.approval.", StringComparison.Ordinal));
     }
 
+    [Fact]
+    public async Task ArgumentPatternGate_ParameterlessCall_Escalates_NotSilentlyApproved()
+    {
+        // An argument gate has no basis to vouch for a NO-ARG call ⇒ escalate (fail-closed). A parameterless
+        // .RequiresApproval() tool must never be silently auto-approved just because there are no args to match.
+        var executed = 0;
+        var wipe = AIFunctionFactory.Create(() => { Interlocked.Increment(ref executed); return "wiped"; }, "wipe_all_data");
+        var agent = new ChatClientAgent(
+            new ScriptedChatClient().AddToolCall("c1", "wipe_all_data", new Dictionary<string, object?>()).AddText("done"),
+            new ChatClientAgentOptions { Name = "T", ChatOptions = new ChatOptions { Tools = [wipe.RequiresApproval()] } })
+            .AsBuilder().UseAgentEvalToolApproval([new ArgumentPatternApprovalGate(EscalateLargeRefund)]).Build();
+
+        var response = await agent.RunAsync("wipe everything");
+
+        Assert.Equal(0, executed);
+        Assert.Contains(response.Messages.SelectMany(m => m.Contents), c => c is ToolApprovalRequestContent);
+    }
+
+    [Fact]
+    public async Task ToolNameApprovalGate_EscalatesListedTool_RegardlessOfArgs()
+    {
+        var executed = 0;
+        var transfer = AIFunctionFactory.Create((int amount) => { Interlocked.Increment(ref executed); return "sent"; }, "wire_transfer");
+        var agent = new ChatClientAgent(
+            new ScriptedChatClient().AddToolCall("c1", "wire_transfer", new Dictionary<string, object?> { ["amount"] = 5 }).AddText("done"),
+            new ChatClientAgentOptions { Name = "T", ChatOptions = new ChatOptions { Tools = [transfer.RequiresApproval()] } })
+            .AsBuilder().UseAgentEvalToolApproval([new ToolNameApprovalGate(["wire_transfer"])]).Build();
+
+        var response = await agent.RunAsync("wire $5");
+
+        Assert.Equal(0, executed);   // escalated by identity — even a tiny transfer needs a human
+        Assert.Contains(response.Messages.SelectMany(m => m.Contents), c => c is ToolApprovalRequestContent);
+    }
+
     // ── Guards ──
+
+    [Fact]
+    public void UseAgentEvalToolApproval_EmptyGates_Throws()   // fail-closed: an empty list would auto-approve everything
+        => Assert.Throws<ArgumentException>(() => NewBuilder().UseAgentEvalToolApproval([]));
 
     [Fact]
     public void RequiresApproval_NullFunction_Throws()

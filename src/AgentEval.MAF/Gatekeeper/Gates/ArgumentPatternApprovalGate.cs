@@ -11,13 +11,15 @@ using Microsoft.Extensions.AI;
 namespace AgentEval.MAF.Gatekeeper;
 
 /// <summary>
-/// Approval gate that escalates a tool call to human review when its serialized arguments match a pattern
-/// (e.g. a high-value amount, an external destination, a sensitive keyword) — and auto-approves otherwise. It is
-/// the approval-flow counterpart of <see cref="ArgumentPatternGate"/>: a match routes the call to a human rather
-/// than blocking it. Reuses the ReDoS-safe, relaxed-encoding scanner so injection metacharacters are matched on
-/// the surface the tool will actually receive.
-/// <para><b>Fail-closed:</b> if the arguments cannot be serialized for inspection, the call is escalated (the
-/// gate cannot prove it routine).</para>
+/// Approval gate that auto-approves a tool call only on POSITIVE evidence that its arguments are routine — i.e.
+/// arguments are present and do NOT match the escalate pattern (e.g. a high-value amount, an external destination,
+/// a sensitive keyword). It is the approval-flow counterpart of <see cref="ArgumentPatternGate"/>: a match routes
+/// the call to a human rather than blocking it. Reuses the ReDoS-safe, relaxed-encoding scanner so injection
+/// metacharacters are matched on the surface the tool will actually receive.
+/// <para><b>Fail-closed:</b> a call it cannot affirm is routine is ESCALATED, never silently auto-approved. That
+/// includes arguments it cannot serialize for inspection AND a call with <i>no arguments</i> — an argument gate
+/// has no basis to vouch for a parameterless call (the risk may be intrinsic to the tool), so it escalates. To
+/// gate a sensitive parameterless tool by identity instead, use <see cref="ToolNameApprovalGate"/>.</para>
 /// </summary>
 public sealed class ArgumentPatternApprovalGate : IToolApprovalGate
 {
@@ -56,7 +58,9 @@ public sealed class ArgumentPatternApprovalGate : IToolApprovalGate
         ArgumentNullException.ThrowIfNull(call);
         if (call.Arguments is null || call.Arguments.Count == 0)
         {
-            return new ValueTask<bool>(true);   // nothing to inspect ⇒ auto-approve
+            // No arguments ⇒ no positive evidence of a routine call ⇒ escalate (fail-closed). An argument gate
+            // cannot vouch for a parameterless call; gate such tools by identity with ToolNameApprovalGate.
+            return new ValueTask<bool>(false);
         }
 
         string serialized;

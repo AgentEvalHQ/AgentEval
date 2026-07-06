@@ -93,9 +93,14 @@ await agent.RunAsync([new ChatMessage(ChatRole.User, [request.CreateResponse(app
 - **Only tools wrapped with `.RequiresApproval()`** (MAF's `ApprovalRequiredAIFunction`) enter the flow; everything
   else runs normally. Sits at the agent boundary — *outside* the tool‑gate seam — so you can hard‑block the truly
   dangerous calls **and** human‑review the borderline ones on the same agent.
-- **Fail‑closed:** a call is auto‑approved only when *every* gate agrees it is routine; a gate that throws (or
-  can't prove it routine) escalates to a human — never a silent auto‑approval. Escalations are recorded as
-  `gate.approval.*` evidence (distinct from `gate.tool.*` blocks, so they never inflate the block count).
+- **Two built‑in gates:** `ArgumentPatternApprovalGate` escalates by *argument content* (auto‑approves only on
+  positive evidence — arguments present and not matching the pattern; a **parameterless** call, or one whose args
+  can't be serialized, is escalated, since an argument gate can't vouch for it). `ToolNameApprovalGate` escalates by
+  *identity* — always route named tools (e.g. `wire_transfer`) to a human, regardless of arguments.
+- **Fail‑closed:** at least one gate is required (an empty list is rejected), and a call is auto‑approved only when
+  *every* gate agrees it is routine; a gate that throws (or can't prove it routine) escalates to a human — never a
+  silent auto‑approval. Escalations are recorded as `gate.approval.*` evidence (distinct from `gate.tool.*` blocks,
+  so they never inflate the block count).
 - **Experimental (`AEGK001`):** built on MAF's evaluation‑only `UseToolApproval` API; suppress `AEGK001` to opt in.
 
 ## Run gates

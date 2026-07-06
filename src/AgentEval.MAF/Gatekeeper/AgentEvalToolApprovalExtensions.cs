@@ -32,9 +32,7 @@ public static class AgentEvalToolApprovalExtensions
     public static AIFunction RequiresApproval(this AIFunction function)
     {
         ArgumentNullException.ThrowIfNull(function);
-#pragma warning disable MAAI001 // ApprovalRequiredAIFunction is an evaluation-only MAF/MEAI API — deliberately adopted.
         return new ApprovalRequiredAIFunction(function);
-#pragma warning restore MAAI001
     }
 
     /// <summary>
@@ -54,6 +52,16 @@ public static class AgentEvalToolApprovalExtensions
     {
         ArgumentNullException.ThrowIfNull(builder);
         ArgumentNullException.ThrowIfNull(gates);
+
+        // FAIL-CLOSED: an empty gate list would make the "all gates agree" rule vacuously true, auto-approving
+        // EVERY .RequiresApproval() tool with no human — strictly more permissive than not calling this at all
+        // (an approval-required tool escalates by default absent any auto-approval rule). Require at least one gate.
+        if (gates.Count == 0)
+        {
+            throw new ArgumentException(
+                "At least one approval gate is required — an empty list would auto-approve every call (fail-open).",
+                nameof(gates));
+        }
 
         var frozen = new IToolApprovalGate[gates.Count];
         for (var i = 0; i < gates.Count; i++)
