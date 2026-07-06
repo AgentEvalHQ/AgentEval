@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.14.0-beta] - 2026-07-06
+
 ### Gatekeeper — runtime fail-closed enforcement
 
 **Glass Box tells you what your agent *did*; Gatekeeper stops it from doing the wrong thing** — at runtime,
@@ -73,9 +75,17 @@ a block). See [`docs/gatekeeper/introduction.md`](docs/gatekeeper/introduction.m
 - **`agenteval redteam --sut gatekeeper-demo`** — a credential-free, deterministic gated demo agent to run the
   attack suite against (the attack-the-gate closed loop), composing with the `--baseline`/`--fail-on regression`
   gate.
-- **Docs + samples** — `docs/gatekeeper/introduction.md` and the credential-free **Gatekeeper** sample group (menu group J):
-  `Gatekeeper/01_GatekeeperEnforcement` (the six-scenario enforcement walkthrough) and
-  `Gatekeeper/02_GatekeeperMafHarness` (a realistic gated MAF support agent).
+- **Docs + samples** — `docs/gatekeeper/introduction.md`, the gate reference, and the **Gatekeeper** sample group
+  (menu group J), all driving **real agents** on a live model: Hello World (a red-team check as a gate), the
+  six-scenario enforcement walkthrough, a realistic gated MAF support agent (read→POST exfiltration blocked by
+  `SequenceGate`), human-in-the-loop tool approval, the **Beachhead + Tribunal** (budget · exfil · rendered-output
+  · a *calibrated* indirect-injection judge that must earn the right to block), and two **genuine MAF Agent
+  Harness** agents (`IChatClient.AsHarnessAgent(new HarnessAgentOptions { … })` — planning + todo + mode + an
+  autonomous loop) — one whose runaway loop is capped by `RunBudgetGate`, one behind full defense-in-depth.
+- **The Gatekeeper's verdict, surfaced** — each sample prints the gate's policy / action / reason (and, for the
+  Tribunal, the judge's rationale + cited evidence spans), read straight from the Glass Box `gate.*` trace via
+  `GateMetadataReader.ReadField` — so a blocked run shows *why*, not a dead "(none)". **Glass Box** is now a
+  first-class feature in the docs nav ([`docs/glass-box.md`](docs/glass-box.md)).
 
 ### Microsoft Agent Framework: hybrid evaluation (several evaluators, one report)
 
