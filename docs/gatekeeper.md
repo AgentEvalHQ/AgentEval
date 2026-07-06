@@ -7,7 +7,7 @@ checks **in the request path** so a forbidden tool call, a poisoned argument, or
 **blocked before it happens**. It plugs into the Microsoft Agent Framework agent pipeline — no rewrite — and
 every gate is **fail‑closed**: if a gate cannot prove an action safe, it does not run it.
 
-> **Three docs:** this page is the **introduction** (concepts + the layer categories). The
+> **Where to go:** this page is the **introduction** (concepts + the layer categories). The
 > [**Gate reference**](gatekeeper-gates.md) is the ranked catalogue — every gate, what it does, and *how much it
 > actually earns its keep*. The [**Examples**](gatekeeper-examples.md) page is the runnable cookbook.
 
