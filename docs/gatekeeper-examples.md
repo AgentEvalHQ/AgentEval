@@ -4,24 +4,33 @@ Runnable, **credential‑free** recipes, from a 30‑second hello‑world to the
 the concepts see the [introduction](gatekeeper.md); for what each gate does and how useful it is, the
 [gate reference](gatekeeper-gates.md).
 
-## Your first gate (30 seconds)
+## Your first gate — the moat (30 seconds)
 
-The simplest possible use — wrap an agent so one destructive tool can never run. Three lines: `.AsBuilder()`,
-`.UseAgentEvalToolGate(...)`, `.Build()`.
+The simplest use that also shows the whole point: the **same** deterministic evaluator that *scores* an attack
+offline now *blocks* it at runtime. Three lines: `.AsBuilder()`, `.UseAgentEvalToolGate(...)`, `.Build()`.
 
 ```csharp
-using AgentEval.MAF.Gatekeeper;
+using AgentEval.MAF.Gatekeeper;      // GateCost
+using AgentEval.RedTeam.Gatekeeper;  // ProbeEvaluatorGate — the moat
+using AgentEval.RedTeam.Evaluators;  // ContainsTokenEvaluator
+
+// The SAME ContainsToken check you'd use to SCORE an attack, now a LIVE guard on every tool call:
+var gate = new ProbeEvaluatorGate(new ContainsTokenEvaluator("PWNED"), GateCost.PureCode);
 
 var agent = baseAgent.AsBuilder()
-    .UseAgentEvalToolGate([new ForbiddenToolGate("delete_everything")], ToolGatePolicy.Terminate, trace)
+    .UseAgentEvalToolGate([gate], ToolGatePolicy.ReplaceResult, trace)
     .Build();
 
-await agent.RunAsync("clean up the system");   // the tool call is blocked before it runs
+await agent.RunAsync("publish the page");   // a tool call carrying "PWNED" is blocked before it runs
 ```
 
-> A deny‑list is the *simplest* gate, not the most powerful — if you control the tool list, not granting the tool
-> is stronger. The examples below are the ones that catch what a tool list can't. (Runnable: sample
-> **`Gatekeeper/00_GatekeeperHelloWorld`**.)
+`ProbeEvaluatorGate` is fail‑closed on the enforcement path — only a clear *Resisted* verdict allows; *Succeeded*
+and *Inconclusive* both block. (LLM‑backed evaluators are rejected at construction — send those to the shadow
+judge below.) Runnable: sample **`Gatekeeper/00_GatekeeperHelloWorld`**.
+
+> The plainest gate is a deny‑list (`new ForbiddenToolGate("delete_everything")`) — but it's the *simplest*, not
+> the most powerful: if you control the tool list, not granting the tool is stronger. The examples below are the
+> ones that catch what a tool list can't.
 
 ## Block data exfiltration — a dangerous *sequence*
 
@@ -37,24 +46,6 @@ var agent = baseAgent.AsBuilder()
     .Build();
 // Once the agent reads customer data, any send/POST in the same run is blocked — exfiltration stopped.
 ```
-
-## The moat — your red‑team oracle as a live guard
-
-The signature move: the **same** deterministic evaluator that *scores* an attack offline now *blocks* it at
-runtime. Test and defense are one artifact.
-
-```csharp
-using AgentEval.MAF.Gatekeeper;      // GateCost
-using AgentEval.RedTeam.Gatekeeper;  // ProbeEvaluatorGate
-using AgentEval.RedTeam.Evaluators;  // ContainsTokenEvaluator
-
-var gate = new ProbeEvaluatorGate(new ContainsTokenEvaluator("ignore previous instructions"), GateCost.PureCode);
-var agent = baseAgent.AsBuilder().UseAgentEvalToolGate([gate], ToolGatePolicy.Terminate).Build();
-```
-
-`ProbeEvaluatorGate` is fail‑closed on the enforcement path — only a clear *Resisted* verdict allows; *Succeeded*
-and *Inconclusive* both block. (LLM‑backed evaluators are rejected at construction — send those to the shadow
-judge below.)
 
 ## The honeypot — detect a compromised agent
 
@@ -135,7 +126,7 @@ The **Gatekeeper** sample group (`AgentEval.Samples`, menu group **J**) runs eve
 model, so every outcome is deterministic and needs no API key:
 
 - [`Gatekeeper/00_GatekeeperHelloWorld`](../samples/AgentEval.Samples/Gatekeeper/00_GatekeeperHelloWorld.cs) —
-  **start here**: the simplest gate, one tool, in three lines.
+  **start here**: the simplest gate — your red‑team check blocks a live poisoned call, in three lines.
 - [`Gatekeeper/01_GatekeeperEnforcement`](../samples/AgentEval.Samples/Gatekeeper/01_GatekeeperEnforcement.cs) —
   the **enforcement walkthrough**: a forbidden tool, the moat, a canary honeypot, a shadow verdict quarantining
   the next run, a **defense‑in‑depth** scene, and a **more‑gates** scene (`ArgumentPatternGate` + `SequenceGate` +

@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 AgentEval Contributors
 
-using AgentEval.MAF.Gatekeeper;
+using AgentEval.MAF.Gatekeeper;      // GateCost, UseAgentEvalToolGate, ToolGatePolicy
+using AgentEval.RedTeam.Evaluators;  // ContainsTokenEvaluator
+using AgentEval.RedTeam.Gatekeeper;  // ProbeEvaluatorGate — the moat
 using AgentEval.Testing;
 using AgentEval.Tracing;
 using Microsoft.Agents.AI;
@@ -13,11 +15,12 @@ namespace AgentEval.Samples;
 /// <summary>
 /// Gatekeeper — Hello World (the 30-second version).
 ///
-/// The simplest possible gate: wrap a MAF agent so one destructive tool can never run. Three lines change —
-/// <c>.AsBuilder()</c>, <c>.UseAgentEvalToolGate(...)</c>, <c>.Build()</c> — and the call is blocked before it
-/// executes, with an honest record in the trace. Start here, then see the Enforcement Walkthrough for the rest.
+/// The simplest gate that also shows the whole point: the <b>same</b> red-team check you test with becomes a
+/// <b>live guard</b> on every tool call. Here a token detector (`ContainsTokenEvaluator`) — an offline oracle —
+/// runs as a `ProbeEvaluatorGate`, so a tool call carrying an attack marker is blocked before it executes. Three
+/// lines change: <c>.AsBuilder()</c>, <c>.UseAgentEvalToolGate(...)</c>, <c>.Build()</c>.
 ///
-/// ★ No credentials needed — a scripted model calls the forbidden tool so the block is deterministic.
+/// ★ No credentials needed — a scripted model emits the poisoned call so the block is deterministic.
 /// ⏱️ Time to understand: 1 minute
 /// </summary>
 public static class GatekeeperHelloWorld
@@ -26,35 +29,38 @@ public static class GatekeeperHelloWorld
     {
         PrintHeader();
 
-        // A destructive tool. Its body would really run without a gate — so the demo is honest.
-        var deletions = 0;
-        var deleteEverything = AIFunctionFactory.Create(
-            () => { deletions++; return "everything deleted"; }, "delete_everything");
+        // A tool that publishes content. Without a gate, the poisoned content would go live.
+        var published = 0;
+        var writePage = AIFunctionFactory.Create(
+            (string content) => { published++; return "published"; }, "write_page");
 
-        // A scripted "model" that tries to call the forbidden tool.
+        // A scripted "model" that tries to publish content carrying an attack marker ("PWNED").
         var scripted = new ScriptedChatClient()
-            .AddToolCall("c1", "delete_everything", new Dictionary<string, object?>())
+            .AddToolCall("c1", "write_page", new Dictionary<string, object?> { ["content"] = "<script>steal()</script> PWNED" })
             .AddText("done");
 
         var trace = new AgentTrace();
 
-        // ── The only three lines that matter ──
+        // ── The only lines that matter ──
+        // The SAME ContainsToken check you'd use to SCORE an attack offline, now ENFORCING it at runtime:
+        var gate = new ProbeEvaluatorGate(new ContainsTokenEvaluator("PWNED"), GateCost.PureCode);
+
         var agent = new ChatClientAgent(scripted, new ChatClientAgentOptions
         {
             Name = "Assistant",
-            ChatOptions = new ChatOptions { Tools = [deleteEverything] },
+            ChatOptions = new ChatOptions { Tools = [writePage] },
         })
             .AsBuilder()
-            .UseAgentEvalToolGate([new ForbiddenToolGate("delete_everything")], ToolGatePolicy.Terminate, trace)
+            .UseAgentEvalToolGate([gate], ToolGatePolicy.ReplaceResult, trace)
             .Build();
 
-        await agent.RunAsync("clean up the system");
+        await agent.RunAsync("publish the page");
 
-        Console.WriteLine("   The model tried to call: delete_everything");
-        Console.WriteLine($"   Times it actually ran:   {deletions}  {(deletions == 0 ? "✅ blocked by the gate" : "❌ ran")}");
-        Console.WriteLine($"   Blocks recorded in the trace: {GlassBoxEvidence.FromTrace(trace)?.GateBlockCount ?? 0}");
-        Console.WriteLine("\n   That's it. The gate ran in the request path and stopped the call before it happened.");
-        Console.WriteLine("   → Next: the Enforcement Walkthrough shows the moat, canary, sequences, and more.");
+        Console.WriteLine("   The model tried to publish content carrying the attack marker 'PWNED'.");
+        Console.WriteLine($"   Times write_page actually ran: {published}  {(published == 0 ? "✅ blocked by the probe-as-gate" : "❌ ran")}");
+        Console.WriteLine($"   Blocks recorded in the trace:  {GlassBoxEvidence.FromTrace(trace)?.GateBlockCount ?? 0}");
+        Console.WriteLine("\n   That's the whole idea: your red-team oracle runs in the request path and stops the call.");
+        Console.WriteLine("   → Next: the Enforcement Walkthrough adds canary honeypots, dangerous sequences, and more.");
         Console.WriteLine("\n=== Gatekeeper Hello World Complete ===");
     }
 
@@ -64,7 +70,7 @@ public static class GatekeeperHelloWorld
         Console.WriteLine(@"
 ╔═══════════════════════════════════════════════════════════════════════════════╗
 ║   🚪 GATEKEEPER — HELLO WORLD                                                  ║
-║   The simplest gate: block one destructive tool before it runs                 ║
+║   The simplest gate: your red-team check, now blocking a live call             ║
 ╚═══════════════════════════════════════════════════════════════════════════════╝");
         Console.ResetColor();
     }
