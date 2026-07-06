@@ -4,10 +4,10 @@ Runnable, **credential‑free** recipes, from a 30‑second hello‑world to the
 the concepts see the [introduction](introduction.md); for what each gate does and how useful it is, the
 [gate reference](gate-reference.md).
 
-## Your first gate — the moat (30 seconds)
+## Your first gate — the moat
 
 The simplest use that also shows the whole point: the **same** deterministic evaluator that *scores* an attack
-offline now *blocks* it at runtime. Three lines: `.AsBuilder()`, `.UseAgentEvalToolGate(...)`, `.Build()`.
+offline now *blocks* it at runtime. Just the builder calls: `.AsBuilder()` → `.UseAgentEvalToolGate(...)` → `.Build()`.
 
 ```csharp
 using AgentEval.MAF.Gatekeeper;      // GateCost
