@@ -126,6 +126,7 @@ public static class Program
 
         new('J', "Gatekeeper (Runtime Protection)", "★ no credentials — fail-closed runtime enforcement",
         [
+            new("Hello World",               "★ start here — the simplest gate: block one destructive tool in 3 lines", GatekeeperHelloWorld.RunAsync),
             new("Enforcement Walkthrough",   "6 scenarios: tool / moat / canary / shadow-judge / defense-in-depth / more gates", GatekeeperEnforcement.RunAsync),
             new("MAF Agent Harness",         "A realistic gated MAF support agent: normal flow works, attack flow is blocked", GatekeeperMafHarness.RunAsync),
             new("Tool Approval (human-in-the-loop)", "Routine calls auto-approve; risky ones pause for a human (MAF UseToolApproval interop)", GatekeeperToolApproval.RunAsync),

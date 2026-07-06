@@ -328,24 +328,29 @@ result.Should()
 ### 🚪 Gatekeeper: Stop the Bad Action Before It Happens
 
 Red-teaming finds the holes. **Gatekeeper closes them at runtime** — the *same* probes and evaluators become
-**fail-closed gates in the request path**, so a forbidden tool call, a poisoned argument, or a prompt-injected
-sequence is blocked *before it runs*. No rewrite — it wraps a Microsoft Agent Framework agent.
+**fail-closed gates in the request path**. It catches the attacks you *can't* stop by "just not giving the tool":
 
 ```csharp
 var agent = baseAgent.AsBuilder()
+    .UseAgentEvalGate()   // per-run scope for the sequence gate
     .UseAgentEvalToolGate(
         [
-            new ForbiddenToolGate("delete_database"),                                       // never let this run
-            new ProbeEvaluatorGate(new ContainsTokenEvaluator("PWNED"), GateCost.PureCode), // a red-team oracle, now a live guard
+            // 🛑 Block DATA EXFILTRATION: reading customer data is fine, sending mail is fine —
+            //    the SEQUENCE is the attack. No tool-list trick catches this.
+            new SequenceGate(triggerTools: ["read_customer_data"], guardedTools: ["send_email", "http_post"]),
+
+            // 🎣 The SAME red-team oracle you test with, now a LIVE GUARD against a poisoned tool argument:
+            new ProbeEvaluatorGate(new ContainsTokenEvaluator("ignore previous instructions"), GateCost.PureCode),
         ],
         ToolGatePolicy.Terminate)   // block the call AND stop the loop
     .Build();
 ```
 
-**Fail-closed by design:** a gate that can't prove an action safe *blocks* it, and every decision is recorded as
-honest `gate.*` trace evidence (a warn is never counted as a block). Layers span **tool gates**, **run gates**,
-**session gates** (auth / rate-limit / quarantine), the red-team **moat**, an async **shadow judge** for
-expensive checks, and **human-in-the-loop approval** for the borderline actions.
+Even if a prompt injection turns *your own* agent against you, the destructive action never executes. **Fail-closed
+by design:** a gate that can't prove an action safe *blocks* it, and every decision is recorded as honest `gate.*`
+trace evidence (a warn is never counted as a block). Layers span **tool gates**, **run gates**, **session gates**
+(auth / rate-limit / quarantine), the red-team **moat**, **canary honeypots** that flag a compromised agent, an
+async **shadow judge** for expensive checks, and **human-in-the-loop approval** for the borderline actions.
 
 **✅ See it (no credentials):** `dotnet run --project samples/AgentEval.Samples` → group **J**, or `agenteval redteam --sut gatekeeper-demo` • [docs/gatekeeper.md](docs/gatekeeper.md)
 
