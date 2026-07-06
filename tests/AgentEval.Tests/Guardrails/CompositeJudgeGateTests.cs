@@ -34,6 +34,15 @@ public class CompositeJudgeGateTests
         public JudgeVerdict Parse(string reply) => JudgeVerdict.Blocked("detected", ["span"], double.NaN);
     }
 
+    // A rubric whose prefilter throws — the gate must fail toward inspecting (consult the model), not skip it.
+    private sealed class ThrowingPrefilterRubric : IJudgeRubric
+    {
+        public string Axis => "throwing-prefilter";
+        public bool Prefilter(string text) => throw new InvalidOperationException("prefilter boom");
+        public string BuildPrompt(string text) => "?";
+        public JudgeVerdict Parse(string reply) => reply.Contains("BLOCK") ? JudgeVerdict.Blocked("x", null, 0.9) : JudgeVerdict.Allowed();
+    }
+
     private static CompositeJudgeGate<KeywordRubric> Gate(IChatClient model, JudgeGateOptions? opts = null)
         => new(new KeywordRubric(), model, opts);
 
@@ -134,6 +143,33 @@ public class CompositeJudgeGateTests
     [Fact]
     public void BlockThresholdAboveOne_Throws()   // a fat-fingered "95" would otherwise silently disable all blocking
         => Assert.Throws<ArgumentOutOfRangeException>(() => Gate(new ScriptedChatClient(), new JudgeGateOptions { BlockThreshold = 95 }));
+
+    [Fact]
+    public async Task BrokenPrefilter_StillConsultsModel_FailsTowardInspecting()
+    {
+        var model = new ScriptedChatClient().AddText("BLOCK");
+        var gate = new CompositeJudgeGate<ThrowingPrefilterRubric>(new ThrowingPrefilterRubric(), model);
+
+        var v = await gate.InspectAsync("anything");
+
+        Assert.Equal(GateAction.Block, v.Action);   // a throwing prefilter must not silently disable the judge
+        Assert.NotEmpty(model.ReceivedMessages);     // the model WAS consulted
+    }
+
+    [Fact]
+    public async Task WiredRunPre_ThroughEvalGate_BlocksBeforeInnerModel()
+    {
+        // The judge as a run-pre gate through EvalGatingChatClient: a block refuses the run before the model runs.
+        var agentModel = new ScriptedChatClient().AddText("should never run");
+        var judge = new CompositeJudgeGate<KeywordRubric>(new KeywordRubric(), new ScriptedChatClient().AddText("BLOCK"));
+        var client = agentModel.AsBuilder()
+            .UseEvalGate(pre: new IChatGate[] { judge }, policy: EvalGatePolicy.ThrowOnFail)
+            .Build();
+
+        await Assert.ThrowsAsync<EvalGateRefusalException>(
+            () => client.GetResponseAsync([new ChatMessage(ChatRole.User, "please scan this input")]));
+        Assert.Equal(0, agentModel.CallCount);
+    }
 
     [Fact]
     public void NullRubric_Throws()

