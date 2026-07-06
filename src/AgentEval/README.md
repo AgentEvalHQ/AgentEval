@@ -11,6 +11,7 @@ Built first for **Microsoft Agent Framework (MAF)** and **Microsoft.Extensions.A
 - 📊 **Performance Metrics** — TTFT, latency, tokens, cost estimation for 8+ models
 - 🔬 **RAG Metrics** — Faithfulness, relevance, context precision/recall, answer correctness
 - 🛡️ **Red Team Security** — 13 attack types, 258 probes, full OWASP LLM Top 10 coverage
+- 🚪 **Gatekeeper** — Fail-closed runtime enforcement: block forbidden/poisoned tool calls before they run, red-team probes as live guards, and human-in-the-loop approval
 - ⚖️ **Responsible AI** — Toxicity, bias, and misinformation detection metrics
 - 📈 **Stochastic Evaluation** — Statistical model comparison with multi-run analysis
 - 🔄 **Trace Record & Replay** — Deterministic CI testing without LLM calls
@@ -125,6 +126,7 @@ services.AddAgentEvalRedTeam();       // Red Team security testing
 - [Fluent Assertions](https://agenteval.dev/assertions.html)
 - [Metrics Reference](https://agenteval.dev/metrics-reference.html)
 - [Red Team Security](https://agenteval.dev/redteam.html)
+- [Gatekeeper (Runtime Enforcement)](https://agenteval.dev/gatekeeper.html)
 - [Trace Record & Replay](https://agenteval.dev/tracing.html)
 - [Stochastic Evaluation](https://agenteval.dev/stochastic-evaluation.html)
 - [Architecture](https://agenteval.dev/architecture.html)

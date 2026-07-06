@@ -1,0 +1,134 @@
+# Gatekeeper — gate reference
+
+Every built‑in gate, what it does, and **how much it actually earns its keep**. For the concepts and the layer
+map, start with the [introduction](gatekeeper.md); for runnable code, see the [examples](gatekeeper-examples.md).
+
+## How to read the rank
+
+The **usefulness rank** answers one question honestly:
+
+> *How much unique value does this gate add over the **simplest alternative** — not granting the tool at all, or
+> validating inside the tool's own body?*
+
+It is a **1–5** scale. It is about **marginal value**, not whether the gate works — every gate here works.
+
+| Rank | | Meaning |
+|:--:|---|---|
+| **5** | 🟢🟢 **Essential** | A unique capability with no simpler equivalent — a *primary* reason to adopt Gatekeeper. |
+| **4** | 🟢 **High** | A distinct benefit beyond the simpler alternative — a real capability, or the audit trail. |
+| **3** | 🟡 **Situational** | Useful in the right context; overlaps with simpler approaches; often brittle. |
+| **2** | 🟠 **Supplementary** | Mostly defense‑in‑depth over a *stronger, simpler* control; earns its keep for tools/agents you don't fully control, plus audit. |
+| **1** | 🔴 **Marginal** | Rarely worth adopting on its own. |
+
+> In practice the built‑in gates land in the **2–4** band. A **5** would be unique *and* robust; a **1** purely
+> redundant. Nothing here is a silver bullet — the score tells you *where each gate pulls its weight*, so you can
+> compose a few high‑value gates rather than switching on everything.
+
+---
+
+## Tool gates
+
+Inspect one live tool call at the function‑invocation seam and return **Allow / Block / Mutate**. How a block is
+*enforced* is a separate `ToolGatePolicy` (`WarnOnly` → record only; `ReplaceResult` → refusal as the tool
+result; `Terminate` → stop the loop), so adding a gate never silently changes behavior.
+
+| Gate | What it does | Rank | Honest reasoning |
+|---|---|:--:|---|
+| **ForbiddenToolGate** | Given a tool the agent wants to call, matches the name against a deny‑list (case‑insensitive) and blocks on a match. | 🟠 **2** | If you control the tool list, *just don't give it the tool* — stronger and simpler. Real value is narrow: **tools you don't control** (MCP, plugins, runtime‑registered, multi‑agent handoff) **plus the audit record** of the block. Weak against renamed/aliased tools. → rises to ~🟢 **4** for dynamic/MCP tool sources. |
+| **ArgumentPatternGate** | Blocks a call whose serialized *arguments* match a forbidden pattern (path traversal, secret shape, injected command). Bounded‑timeout regex, relaxed JSON encoding, fail‑closed on unserializable args. | 🟡 **3** | You *want* the tool (`read_file`) — you just don't want `/etc/shadow`. "Don't give the tool" can't solve this; the danger is in the argument. But pattern‑matching args is brittle (encoding/obfuscation evades) — good for *known‑bad deterministic* patterns, not a robust filter. |
+| **SequenceGate** | Blocks a dangerous *ordered combination*: once a trigger tool runs, a guarded tool is blocked (e.g. `read_secrets` → `send_email` = exfiltration). Per‑run scoped. | 🟢 **4** | Genuinely hard to replace. Each tool alone is fine — you *want* both — but the **sequence** is the attack; no tool‑list trick or arg‑check catches it. Limits: per‑run scoped (a slow multi‑run attack evades) and deterministic (known sequences). |
+
+> **Enforcement floor.** A gate whose purpose is to *stop* an action can declare a `MinimumPolicy`; a honeypot
+> refuses to be registered `WarnOnly`, so `UseAgentEvalToolGate` throws rather than let it be downgraded to
+> observe‑only.
+
+## The moat — your red‑team probes become gates
+
+The most direct expression of the whole toolkit: the **same oracle that scores an attack offline now blocks it
+at runtime**. Lives in `AgentEval.RedTeam.Gatekeeper`.
+
+| Gate | What it does | Rank | Honest reasoning |
+|---|---|:--:|---|
+| **ProbeEvaluatorGate** | Runs a *deterministic* red‑team `IProbeEvaluator` as a runtime gate. Fail‑closed on the enforcement path: only a clear *Resisted* verdict allows — *Succeeded* (attack) **and** *Inconclusive* (can't tell) both block. Rejects LLM‑backed evaluators at construction. | 🟢 **4** | The **closed loop** — the detector you red‑team with becomes a live guard. A distinctive concept with no simpler equivalent. Ceiling set by "deterministic oracles only inline" (LLM oracles must go to the shadow judge). |
+| **CanaryToolGate** | Graduates a red‑team *canary* into a production *honeypot*: `CanaryLure.Tools(...)` advertises a lure tool, and the model *emitting* a call to it is the compromise signal — blocked before the body runs. | 🟢 **4** | A **tripwire, not a filter** — a legit agent never touches the honeypot, so a call is strong evidence the agent was manipulated (a prompt injection landed). Unique detection value. Limit: only catches an agent that takes the obvious bait. |
+
+`ProbeEvaluatorGate` deliberately **inverts** the [grading](llm-as-judge.md) convention (where abstention must
+never be scored as failure) — because a runtime gate that cannot prove a call safe must not run it.
+
+## Run gates
+
+Inspect the run's **input** text (run‑pre — assess incoming attacks) and **output** text (run‑post — catch a
+leak), reusing the shipped guardrail `IChatGate`s. Register outermost.
+
+| Gate | What it does | Rank | Honest reasoning |
+|---|---|:--:|---|
+| **TokenInjectionGate** | Run‑pre: blocks input containing any configured injection marker / phrase. | 🟠 **2** | A cheap door‑check for *known* phrases — but keyword matching is exactly what this project abandoned for red‑team grading (evadable, low ceiling). Fine as a fast pre‑filter, not a real defense. See [Extending](#extending-the-gatekeeper-llm-backed-detection) for a judge‑backed alternative. |
+| **RegexPiiGate** | Run‑post: detects/redacts PII (email, phone, SSN, card, IP) in the response. | 🟡 **3** | Output monitoring/redaction is a real compliance need nothing else here covers. Regex PII is imperfect (misses formats, false positives) but a reasonable deterministic baseline. |
+| **SafetyMetricGate** | Adapts any `ISafetyMetric` (e.g. `ToxicityMetric`) into an `IChatGate`, on input and/or output. | 🟡 **3** | Reuse your eval metrics as guards. But most safety metrics are LLM/network cost, so **inline they're rejected** and belong in the shadow judge or a fast‑model run‑pre gate. Inline value limited to cheap metrics. |
+
+Under a blocking policy a run‑pre refusal is returned *without ever calling the model*. On a stream, a blocking
+run‑post gate fails closed at stream start (it can't unsend bytes in flight); under `WarnOnly` a run‑post gate
+accumulates the stream and records its evidence *after* — observe‑only.
+
+## Session gates
+
+Run before a run and read the run's session — **fail‑closed when the session context is absent**.
+
+| Gate | What it does | Rank | Honest reasoning |
+|---|---|:--:|---|
+| **OperatorAuthGate** | Blocks the run unless the session carries an authorized operator identity (allow‑list). | 🟢 **4** | A real **access‑control** primitive — "who may drive this agent" — not solvable by tool‑list control. Only as good as whoever stamps the session identity, but that's true of all authz. |
+| **RateLimitGate** | Blocks once more than `maxRuns` runs occur within a window, per session (race‑safe in‑process counter, injectable clock). | 🟢 **4** | Abuse / cost / DoS control — a real operational need, orthogonal to everything else. Standard but genuinely useful. |
+| **QuarantineGate** | Blocks a run whose session was *armed for quarantine* by the shadow judge. | 🟡 **3** | The enforcement half of the shadow loop — only meaningful **paired with a shadow judge**. Part of a mechanism, not standalone. |
+
+## Shadow judge
+
+| Capability | What it does | Rank | Honest reasoning |
+|---|---|:--:|---|
+| **Shadow judge** (`ShadowJudgePump` + `IShadowJudge`) | Runs the expensive LLM/network checks the inline gates reject, **after** the run returns, on a bounded background pump. An adverse verdict **arms quarantine** so a `QuarantineGate` refuses the *next* run. | 🟢 **4** | The only way to use **powerful** checks (an LLM judge) without stalling the agent — a distinctive pattern. Honest limit: it's **eventual** — it blocks a *future* run, not the one it observed. Detection + future‑prevention, not real‑time block. |
+
+The pump is an **owned** object (`await using`) with a **bounded** queue: under load, items are dropped and
+reported — the returning run is never slowed, and a hung network judge cannot hang disposal.
+
+## Tool approval — human‑in‑the‑loop
+
+Routes a *borderline* call to a **human** instead of hard‑blocking, over MAF's native `UseToolApproval`. Only
+tools wrapped `.RequiresApproval()` enter the flow. *Experimental (`AEGK001`).*
+
+| Gate | What it does | Rank | Honest reasoning |
+|---|---|:--:|---|
+| **ArgumentPatternApprovalGate** | Auto‑approves *only on positive evidence* of routine arguments (present + not matching the pattern); a parameterless or unserializable‑args call is escalated. | 🟢 **4**† | Fills the gap between "auto‑run" and "block" for actions too risky to auto‑run but too legitimate to forbid (refunds, deletes, transfers). The escalation gate shares the brittleness of its blocker sibling, but the human‑in‑the‑loop *pattern* is high value. |
+| **ToolNameApprovalGate** | Escalates a call to a human whenever the tool is on an escalate list (case‑insensitive), regardless of arguments — the way to gate a sensitive *parameterless* tool. | 🟢 **4**† | Identity‑based escalation you can't express with argument patterns. Simple and robust. |
+
+† The **rank is for the human‑in‑the‑loop capability**, which is genuinely valuable; the individual classifier
+gates are supporting parts. Fail‑closed: at least one gate is required, and a call is auto‑approved only when
+*every* gate affirms it routine — a throwing gate, or a call it can't affirm, escalates.
+
+---
+
+## Extending the Gatekeeper: LLM-backed detection
+
+The inline gates are deterministic by design (they reject LLM/network cost so they never stall the hot path).
+When you need *judgment* — the clearest example is **prompt‑injection (PI) detection**, which keyword gates
+handle poorly — reach for one of two seams, both of which take a custom gate you write:
+
+- **A fast run‑pre gate.** Wrap a [Composite Judge](llm-as-judge.md) as an `IChatGate` and register it `pre:` so
+  it scores the **incoming prompt** (not the model's response) *before the model is called* and blocks a
+  detected injection at the door. Because it is on the hot path, **use a fast, small model** (a *mini* / *nano*
+  tier) and a tight rubric so the added latency is a few hundred milliseconds, not seconds.
+- **The shadow judge.** For heavier analysis that you don't want on the hot path at all, run the same judge in
+  the shadow pump — it evaluates a snapshot off‑path and arms quarantine for the next run.
+
+The same pattern applies to **`SafetyMetricGate`‑style checks on both input and output** (toxicity, jailbreak,
+data‑exfiltration intent): a cheap deterministic version can run inline, while an LLM‑judge version belongs in a
+fast run‑pre / run‑post gate or the shadow judge.
+
+> **Natural extensions the architecture already supports:** a reusable **PI‑detection Composite Judge** built for
+> speed (small model, single‑axis rubric) that drops into the run‑pre seam; and a **PI benchmark** — the same
+> judge scored against a labelled corpus of injection vs. benign prompts — that you run *in parallel* to calibrate
+> the gate's accuracy before you trust it inline. Both evaluate an **incoming prompt**, not an agent response, so
+> they slot into the run‑pre gate cleanly.
+
+## `agenteval doctor` — a double‑gating check
+
+`agenteval doctor` warns when the **same** policy recorded verdicts at both a chat seam (`pre`/`post`) and an
+agent seam (`tool`/`run-*`) — a sign the same policy is gating twice. Register it once.

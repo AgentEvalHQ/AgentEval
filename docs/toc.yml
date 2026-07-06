@@ -39,6 +39,15 @@
   - name: Composite Evaluations
     href: composite-evals.md
 
+- name: Gatekeeper (Runtime Enforcement)
+  items:
+  - name: Introduction
+    href: gatekeeper.md
+  - name: Gate Reference (ranked)
+    href: gatekeeper-gates.md
+  - name: Examples
+    href: gatekeeper-examples.md
+
 - name: Evaluation Coverage
   items:
   - name: Red Team Security

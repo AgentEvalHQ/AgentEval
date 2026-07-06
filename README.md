@@ -325,6 +325,32 @@ result.Should()
 
 ---
 
+### 🚪 Gatekeeper: Stop the Bad Action Before It Happens
+
+Red-teaming finds the holes. **Gatekeeper closes them at runtime** — the *same* probes and evaluators become
+**fail-closed gates in the request path**, so a forbidden tool call, a poisoned argument, or a prompt-injected
+sequence is blocked *before it runs*. No rewrite — it wraps a Microsoft Agent Framework agent.
+
+```csharp
+var agent = baseAgent.AsBuilder()
+    .UseAgentEvalToolGate(
+        [
+            new ForbiddenToolGate("delete_database"),                                       // never let this run
+            new ProbeEvaluatorGate(new ContainsTokenEvaluator("PWNED"), GateCost.PureCode), // a red-team oracle, now a live guard
+        ],
+        ToolGatePolicy.Terminate)   // block the call AND stop the loop
+    .Build();
+```
+
+**Fail-closed by design:** a gate that can't prove an action safe *blocks* it, and every decision is recorded as
+honest `gate.*` trace evidence (a warn is never counted as a block). Layers span **tool gates**, **run gates**,
+**session gates** (auth / rate-limit / quarantine), the red-team **moat**, an async **shadow judge** for
+expensive checks, and **human-in-the-loop approval** for the borderline actions.
+
+**✅ See it (no credentials):** `dotnet run --project samples/AgentEval.Samples` → group **J**, or `agenteval redteam --sut gatekeeper-demo` • [docs/gatekeeper.md](docs/gatekeeper.md)
+
+---
+
 ### Responsible AI: Content Safety Metrics
 
 Complementing security evaluation, AgentEval's ResponsibleAI namespace provides **content safety evaluation**:
