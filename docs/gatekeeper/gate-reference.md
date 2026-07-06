@@ -42,6 +42,17 @@ result; `Terminate` → stop the loop), so adding a gate never silently changes 
 > refuses to be registered `WarnOnly`, so `UseAgentEvalToolGate` throws rather than let it be downgraded to
 > observe‑only.
 
+### Budget & egress (off the `RunLedger`)
+
+`RunLedger` is the per‑run **cross‑hop accumulator** (total tool calls, per‑tool counts, monetary sums, observed
+ids) — the deterministic primitive these gates share. Register `UseAgentEvalGate()` so each run gets its own
+ledger.
+
+| Gate | What it does | Rank | Honest reasoning |
+|---|---|:--:|---|
+| **RunBudgetGate** | Caps a run's budget off the `RunLedger`: total tool calls, per‑tool call count, or the running sum of a monetary argument. Blocks the call that would exceed it. | 🟢🟢 **5** | **Denial‑of‑wallet / runaway‑loop** defense with no tool‑body equivalent — cost accrues across the whole orchestration, so no single tool sees the total. Pure‑code, hot‑path safe; the check + record is one atomic ledger op (correct under concurrent invocation) and a **negative amount can't manufacture headroom** (clamped to 0). It caps tool‑call volume and monetary arguments; token / cost / wall‑clock budgets are out of scope here (they require model‑usage capture). |
+| **DomainAllowListGate** | Allow‑list over the URLs in a tool call's arguments; a host not on the list (subdomains allowed) blocks the call. Catches `http(s)` / `ftp` / `ws` **and scheme‑relative** `//host`; fail‑closed on unserializable args / scan timeout. | 🟢🟢 **5** | **Exfiltration** is the payoff of most indirect injection, and an allow‑list is where the literature lands — sub‑millisecond, un‑paraphrasable, and it defends every networked tool from one policy. Resolves the userinfo trick (`https://good.com@evil.com`). **Limit:** it gates URLs it can extract — a *bare hostname* (no `//`) or a `data:` URI isn't detected (validate those in the tool / pair with an argument‑pattern gate), and open web‑browse surfaces degrade to advisory. |
+
 ## The moat — your red‑team probes become gates
 
 The most direct expression of the whole toolkit: the **same oracle that scores an attack offline now blocks it
@@ -65,10 +76,35 @@ leak), reusing the shipped guardrail `IChatGate`s. Register outermost.
 | **TokenInjectionGate** | Run‑pre: blocks input containing any configured injection marker / phrase. | 🟠 **2** | A cheap door‑check for *known* phrases — but keyword matching is exactly what this project abandoned for red‑team grading (evadable, low ceiling). Fine as a fast pre‑filter, not a real defense. See [Extending](#extending-the-gatekeeper-llm-backed-detection) for a judge‑backed alternative. |
 | **RegexPiiGate** | Run‑post: detects/redacts PII (email, phone, SSN, card, IP) in the response. | 🟡 **3** | Output monitoring/redaction is a real compliance need nothing else here covers. Regex PII is imperfect (misses formats, false positives) but a reasonable deterministic baseline. |
 | **SafetyMetricGate** | Adapts any `ISafetyMetric` (e.g. `ToxicityMetric`) into an `IChatGate`, on input and/or output. | 🟡 **3** | Reuse your eval metrics as guards. But most safety metrics are LLM/network cost, so **inline they're rejected** and belong in the shadow judge or a fast‑model run‑pre gate. Inline value limited to cheap metrics. |
+| **RenderedOutputExfilGate** | Run‑post: neutralizes exfil channels a client auto‑fetches/hides when it *renders* the answer — markdown image beacons `![](url)`, fetching HTML (`img`/`script`/…), `data:` URIs, zero‑width chars. Redacts under `Redact`. | 🟢 **4** | Closes a real, widely‑exploited channel the tool‑arg allow‑list can't see: a markdown image whose URL carries the secret is fetched *on render*, no tool call involved. Deterministic + fail‑closed on scan timeout. Pairs with `DomainAllowListGate` (args) to cover both egress paths. |
 
 Under a blocking policy a run‑pre refusal is returned *without ever calling the model*. On a stream, a blocking
 run‑post gate fails closed at stream start (it can't unsend bytes in flight); under `WarnOnly` a run‑post gate
 accumulates the stream and records its evidence *after* — observe‑only.
+
+## The Tribunal — LLM judge gates
+
+When you need *judgment* — the clearest case is **indirect prompt injection** (retrieved content trying to
+*instruct* the agent), which keyword gates can't catch because the payload is natural language — a single‑axis LLM
+judge runs on the run‑pre/run‑post seam (which accepts model cost, unlike the inline tool gate). These live in
+`AgentEval.Guardrails.Judges`.
+
+| Gate | What it does | Rank | Honest reasoning |
+|---|---|:--:|---|
+| **CompositeJudgeGate&lt;TRubric&gt;** | Turns a single‑axis `IJudgeRubric` (prefilter → one‑question prompt → parser) into an `IChatGate` backed by a fast model. Prefilter short‑circuit → model under a hard timeout → decisive verdict; **fail‑closed** on inconclusive (timeout / error / unparseable / non‑finite confidence). | 🟢 **4** | The only gate here that catches *paraphrased / novel* attacks — no deterministic equivalent. But its value is **entirely contingent on calibration**: an un‑calibrated inline judge is a fabrication risk, which the whole toolkit argues is worse than none. The Bar (below) is what earns the rank — without it, treat this as shadow‑only. |
+| **ParallelJudgeFanOut** | Runs N judge gates over one turn concurrently (wall‑clock ≈ slowest), combined fail‑closed OR (any block blocks; a throwing judge is itself a block). | 🟡 **3** | Composition, not detection — makes a *multi‑axis* Tribunal viable on the hot path instead of serial K×latency. Compose single‑axis judges here rather than widening one rubric. Value scales with how many axes you run. |
+| **JudgeVerdictCache** | Content‑hash cache over a judge gate; caches **only allow** verdicts (a transient fail‑closed block is never cached into a permanent one), bounded. | 🟠 **2** | A token/latency saver for recurring content (RAG scale); no detection value of its own. |
+
+> **The Bar — `GateCalibrationHarness` (the moat, not a gate).** A judge must *earn* the right to block. Score it
+> with `GateCalibrationHarness.EvaluateAsync(judge, goldSet)` against a **both‑directions** per‑axis
+> `JudgeGoldSet` (attacks that must block AND benign that must be allowed). The report gives decisive accuracy, the
+> **missed‑attack (dangerous‑error) count** — the number that matters — the false‑alarm rate, Cohen's κ, and
+> (with a baseline) whether it beats a deterministic detector. `report.AssertInlineReady()` throws until it
+> passes, so an un‑calibrated judge can't be promoted inline by an honest caller. Ships with
+> `IndirectInjectionRubric` + a `StarterGoldSet()` to extend with your own data. Re‑run on any model/prompt change.
+>
+> Its accuracy is **your** measurement on **your** data — this toolkit deliberately makes no blanket accuracy
+> claim for the judge; the harness is how you find out honestly.
 
 ## Session gates
 
@@ -122,11 +158,13 @@ The same pattern applies to **`SafetyMetricGate`‑style checks on both input an
 data‑exfiltration intent): a cheap deterministic version can run inline, while an LLM‑judge version belongs in a
 fast run‑pre / run‑post gate or the shadow judge.
 
-> **You can build this today with the existing seams.** For example, a **PI‑detection Composite Judge** built for
-> speed (small model, single‑axis rubric) plugs into the run‑pre seam as a custom `IChatGate`; and because a
-> judge‑as‑a‑gate is itself a detection task, you can score that same judge against a labelled corpus of injection
-> vs. benign prompts — running it *in parallel* — to calibrate its accuracy before trusting it inline. Both
-> evaluate an **incoming prompt**, not an agent response, so they fit the run‑pre gate cleanly.
+> **The primitive ships: `CompositeJudgeGate<TRubric>`.** Write a single‑axis `IJudgeRubric` — a cheap prefilter
+> (so most turns skip the model entirely) + a one‑question prompt + a parser — and wrap it in a `CompositeJudgeGate`
+> backed by a fast (*mini*/*nano*) model; it plugs into the run‑pre seam as an `IChatGate`. It runs the model under
+> a hard timeout and **fails closed** on an inconclusive verdict (timeout / model error / unparseable reply),
+> citing evidence spans in the gate verdict. **Calibrate before you trust it inline:** because a judge‑as‑a‑gate is
+> itself a detection task, score the same rubric against a labelled corpus of injection vs. benign prompts to
+> confirm it beats the deterministic baseline before it blocks live traffic (the calibration harness).
 
 ## `agenteval doctor` — a double‑gating check
 

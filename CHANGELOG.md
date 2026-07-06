@@ -21,6 +21,36 @@ a block). See [`docs/gatekeeper/introduction.md`](docs/gatekeeper/introduction.m
   Built-ins: `ForbiddenToolGate`, `ArgumentPatternGate` (bounded regex), `SequenceGate` (ordered combination,
   per-run scoped). A gate can declare a `MinimumPolicy` enforcement floor so a honeypot can't be silently
   downgraded to observe-only. Network/LLM-cost gates are rejected inline (`GateCost`).
+- **Budget & egress gates** (off the new `RunLedger` per-run cross-hop accumulator) — `RunBudgetGate` caps a run's
+  total tool calls / per-tool count / running monetary sum (denial-of-wallet, runaway-loop; atomic check+record,
+  negatives can't manufacture headroom), and `DomainAllowListGate` enforces a domain allow-list over the URLs in
+  tool arguments (exfiltration defense; catches scheme-relative `//host` and non-http schemes; resolves the
+  `user@host` trick; fail-closed on unserializable args / scan timeout).
+- **`RenderedOutputExfilGate`** (`AgentEval.Guardrails.Gates`) — a run-post `IChatGate` that neutralizes exfil
+  channels a client auto-fetches or hides when it *renders* the answer: markdown image beacons, fetching HTML
+  tags, `data:` URIs, and zero-width characters. Redacts under `EvalGatePolicy.Redact`; fail-closed on scan
+  timeout. Complements `DomainAllowListGate` (tool-argument URLs) to cover both egress paths.
+- **`CompositeJudgeGate<TRubric>`** (`AgentEval.Guardrails.Judges`) — the Tribunal primitive: a single-axis
+  `IJudgeRubric` (prefilter + prompt + parser) becomes a runtime `IChatGate` backed by a fast model. Prefilter
+  short-circuit (most turns skip the model) → model under a hard timeout → decisive `JudgeVerdict` (Allowed /
+  Blocked-with-confidence-and-evidence-spans / Inconclusive). Blocked above the confidence threshold blocks (spans
+  → `GateVerdict.Matches`); an inconclusive verdict (timeout / model error / unparseable, incl. a non-finite
+  confidence) fails closed by default. Provider-agnostic (caller supplies the `IChatClient`). Calibrate against a
+  per-axis gold set before going inline.
+- **`ParallelJudgeFanOut`** — runs several judge `IChatGate`s over one turn concurrently (wall-clock ≈ slowest),
+  combined **fail-closed OR** (any block blocks, aggregating reasons + evidence spans; a throwing judge is itself
+  a block). Compose single-axis judges here rather than widening one rubric.
+- **`JudgeVerdictCache`** — content-hash cache over a judge `IChatGate`. Caches **only Allow** verdicts (a
+  transient fail-closed block is never cached into a permanent one), bounded, no eviction of a proven-safe entry.
+- **`GateCalibrationHarness`** (the Bar) + **`JudgeGoldSet`** / **`CalibrationReport`** — scores a judge gate
+  against a both-directions per-axis gold set and decides whether it earned the right to block live traffic.
+  Reports decisive accuracy, the **missed-attack (dangerous-error) count**, false-alarm rate, Cohen's κ, and
+  (with a baseline) whether the judge beats a deterministic detector. `CalibrationReport.AssertInlineReady()`
+  refuses promotion until it passes — no judge goes inline un-calibrated.
+- **`IndirectInjectionRubric`** (`AgentEval.Guardrails.Judges.Rubrics`) — the flagship judge rubric: detects
+  indirect prompt injection in retrieved/tool-return content (the axis deterministic gates can't catch), with a
+  robust JSON parser and a `StarterGoldSet()` to calibrate against (extend with your own data). Ships as a
+  starting point — calibrate before trusting it inline.
 - **Run gate** — `UseAgentEvalGate` inspects the run's input (incoming-attack detection) and output text,
   reusing the shipped `IChatGate`/`EvalGatePolicy`; establishes an `AgentRunScope` (stable across streaming
   segments) so inner gates can read the run context.
