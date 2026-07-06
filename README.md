@@ -352,7 +352,7 @@ trace evidence (a warn is never counted as a block). Layers span **tool gates**,
 (auth / rate-limit / quarantine), the red-team **moat**, **canary honeypots** that flag a compromised agent, an
 async **shadow judge** for expensive checks, and **human-in-the-loop approval** for the borderline actions.
 
-**✅ See it (no credentials):** `dotnet run --project samples/AgentEval.Samples` → group **J**, or `agenteval redteam --sut gatekeeper-demo` • [docs/gatekeeper.md](docs/gatekeeper.md)
+**✅ See it (no credentials):** `dotnet run --project samples/AgentEval.Samples` → group **J**, or `agenteval redteam --sut gatekeeper-demo` • [docs/gatekeeper/introduction.md](docs/gatekeeper/introduction.md)
 
 ---
 
@@ -482,7 +482,7 @@ await result.ExportHtmlReportAsync("memory-report.html");
 
 ### Evaluation Coverage
 - Red Team security - 258 probes, full OWASP LLM Top 10 2025, MITRE ATLAS coverage
-- Gatekeeper runtime enforcement - fail-closed gates that block forbidden tool calls before they run, red-team probes as runtime guards, and an async shadow judge that quarantines compromised sessions ([docs](docs/gatekeeper.md))
+- Gatekeeper runtime enforcement - fail-closed gates that block forbidden tool calls before they run, red-team probes as runtime guards, and an async shadow judge that quarantines compromised sessions ([docs](docs/gatekeeper/introduction.md))
 - Responsible AI - toxicity, bias, misinformation detection
 - **Memory evaluation** - retention, reach-back, temporal, cross-session, HTML pentagon reports, LongMemEval (ICLR 2025)
 - Multi-turn conversations - full conversation flow evaluation

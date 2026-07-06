@@ -8,8 +8,8 @@ checks **in the request path** so a forbidden tool call, a poisoned argument, or
 every gate is **fail‑closed**: if a gate cannot prove an action safe, it does not run it.
 
 > **Where to go:** this page is the **introduction** (concepts + the layer categories). The
-> [**Gate reference**](gatekeeper-gates.md) is the ranked catalogue — every gate, what it does, and *how much it
-> actually earns its keep*. The [**Examples**](gatekeeper-examples.md) page is the runnable cookbook.
+> [**Gate reference**](gate-reference.md) is the ranked catalogue — every gate, what it does, and *how much it
+> actually earns its keep*. The [**Examples**](examples.md) page is the runnable cookbook.
 
 ## The design principle: fail closed, and prove it
 
@@ -18,7 +18,7 @@ two hard positions:
 
 - **Cannot‑inspect ⇒ deny.** A gate that throws, times out, or can't read its context **blocks**. A gate is
   never allowed to fail *open*.
-- **Honest evidence.** Every decision is recorded into the same [`AgentTrace`](glass-box.md) the evaluators
+- **Honest evidence.** Every decision is recorded into the same [`AgentTrace`](../glass-box.md) the evaluators
   read, under `gate.*` keys. A gate that only *warns* records `action="Warn"` — it is **never** counted as a
   block, so the evidence can never claim it stopped a call that actually ran.
 
@@ -46,7 +46,7 @@ reuse `IChatGate` (no cost member), so keeping those pure‑code is a convention
 Be honest with yourself: **a single, fully‑controlled agent barely needs most of this.** If you own the tool
 list, *don't give the agent the dangerous tool*; if a tool has an unsafe mode, *validate inside its body*. Those
 are stronger and simpler than any gate. The Gatekeeper earns its keep in four situations — and each gate's
-[usefulness rank](gatekeeper-gates.md#how-to-read-the-rank) should be read through them:
+[usefulness rank](gate-reference.md#how-to-read-the-rank) should be read through them:
 
 1. **You don't control the tools** — MCP servers, plugins, runtime‑registered tools, or a multi‑agent handoff
    where a sub‑agent's tools leak upward. You can't "just not give the tool" a tool you never see coming.
@@ -57,12 +57,12 @@ are stronger and simpler than any gate. The Gatekeeper earns its keep in four si
 4. **Genuinely unique capabilities** — dangerous *sequences*, *honeypots*, *human approval*, *expensive async*
    checks, and the closed‑loop *moat*. These have no simpler equivalent.
 
-The [**Gate reference**](gatekeeper-gates.md) ranks every gate on exactly this basis.
+The [**Gate reference**](gate-reference.md) ranks every gate on exactly this basis.
 
 ## See also
 
-- [**Gate reference**](gatekeeper-gates.md) — the ranked catalogue (what each gate does + how useful it is).
-- [**Examples**](gatekeeper-examples.md) — runnable, credential‑free cookbook + the CLI on‑ramp.
-- [Glass Box](glass-box.md) — the dual‑boundary trace Gatekeeper records its evidence into.
-- [Guardrails](guardrails.md) — the chat‑gate primitives (`IChatGate`, `EvalGatePolicy`) the run gate reuses.
-- [Red Team](redteam.md) — the probes and canaries the moat gates are built from.
+- [**Gate reference**](gate-reference.md) — the ranked catalogue (what each gate does + how useful it is).
+- [**Examples**](examples.md) — runnable, credential‑free cookbook + the CLI on‑ramp.
+- [Glass Box](../glass-box.md) — the dual‑boundary trace Gatekeeper records its evidence into.
+- [Guardrails](../guardrails.md) — the chat‑gate primitives (`IChatGate`, `EvalGatePolicy`) the run gate reuses.
+- [Red Team](../redteam.md) — the probes and canaries the moat gates are built from.

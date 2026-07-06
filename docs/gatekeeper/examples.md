@@ -1,8 +1,8 @@
 # Gatekeeper — examples
 
 Runnable, **credential‑free** recipes, from a 30‑second hello‑world to the gates with no simpler equivalent. For
-the concepts see the [introduction](gatekeeper.md); for what each gate does and how useful it is, the
-[gate reference](gatekeeper-gates.md).
+the concepts see the [introduction](introduction.md); for what each gate does and how useful it is, the
+[gate reference](gate-reference.md).
 
 ## Your first gate — the moat (30 seconds)
 
@@ -104,7 +104,7 @@ var agent = baseAgent.AsBuilder()
 
 An unauthorized operator, an injected prompt, or a rate‑limit breach is refused **before the model is ever
 called**. (For a *judge‑backed* prompt‑injection pre‑gate — a fast Composite Judge on the incoming prompt — see
-[Extending the Gatekeeper](gatekeeper-gates.md#extending-the-gatekeeper-llm-backed-detection).)
+[Extending the Gatekeeper](gate-reference.md#extending-the-gatekeeper-llm-backed-detection).)
 
 ## Expensive checks off the hot path — the shadow judge
 
@@ -125,15 +125,16 @@ session's **next** run.
 The **Gatekeeper** sample group (`AgentEval.Samples`, menu group **J**) runs everything above against a scripted
 model, so every outcome is deterministic and needs no API key:
 
-- [`Gatekeeper/00_GatekeeperHelloWorld`](../samples/AgentEval.Samples/Gatekeeper/00_GatekeeperHelloWorld.cs) —
+- [`Gatekeeper/00_GatekeeperHelloWorld`](../../samples/AgentEval.Samples/Gatekeeper/00_GatekeeperHelloWorld.cs) —
   **start here**: the simplest gate — your red‑team check blocks a live poisoned call, in three lines.
-- [`Gatekeeper/01_GatekeeperEnforcement`](../samples/AgentEval.Samples/Gatekeeper/01_GatekeeperEnforcement.cs) —
+- [`Gatekeeper/01_GatekeeperEnforcement`](../../samples/AgentEval.Samples/Gatekeeper/01_GatekeeperEnforcement.cs) —
   the **enforcement walkthrough**: a forbidden tool, the moat, a canary honeypot, a shadow verdict quarantining
   the next run, a **defense‑in‑depth** scene, and a **more‑gates** scene (`ArgumentPatternGate` + `SequenceGate` +
   a run‑post PII gate).
-- [`Gatekeeper/02_GatekeeperMafHarness`](../samples/AgentEval.Samples/Gatekeeper/02_GatekeeperMafHarness.cs) — a
-  **realistic MAF support agent**: a legit request flows, a prompt‑injection attack is blocked at the tool boundary.
-- [`Gatekeeper/03_GatekeeperToolApproval`](../samples/AgentEval.Samples/Gatekeeper/03_GatekeeperToolApproval.cs) —
+- [`Gatekeeper/02_GatekeeperMafHarness`](../../samples/AgentEval.Samples/Gatekeeper/02_GatekeeperMafHarness.cs) — a
+  **realistic MAF support agent** — **data-exfiltration defense**: every tool is legitimate, but a prompt injection's
+  read‑customer‑data → external‑POST *sequence* is blocked by `SequenceGate` (no tool‑list trick catches this).
+- [`Gatekeeper/03_GatekeeperToolApproval`](../../samples/AgentEval.Samples/Gatekeeper/03_GatekeeperToolApproval.cs) —
   **human‑in‑the‑loop approval**: a routine refund auto‑approves, a large one pauses for a human and resumes.
 
 ## From the CLI

@@ -1,7 +1,7 @@
 # Gatekeeper — gate reference
 
 Every built‑in gate, what it does, and **how much it actually earns its keep**. For the concepts and the layer
-map, start with the [introduction](gatekeeper.md); for runnable code, see the [examples](gatekeeper-examples.md).
+map, start with the [introduction](introduction.md); for runnable code, see the [examples](examples.md).
 
 ## How to read the rank
 
@@ -52,7 +52,7 @@ at runtime**. Lives in `AgentEval.RedTeam.Gatekeeper`.
 | **ProbeEvaluatorGate** | Runs a *deterministic* red‑team `IProbeEvaluator` as a runtime gate. Fail‑closed on the enforcement path: only a clear *Resisted* verdict allows — *Succeeded* (attack) **and** *Inconclusive* (can't tell) both block. Rejects LLM‑backed evaluators at construction. | 🟢 **4** | The **closed loop** — the detector you red‑team with becomes a live guard. A distinctive concept with no simpler equivalent. Ceiling set by "deterministic oracles only inline" (LLM oracles must go to the shadow judge). |
 | **CanaryToolGate** | Graduates a red‑team *canary* into a production *honeypot*: `CanaryLure.Tools(...)` advertises a lure tool, and the model *emitting* a call to it is the compromise signal — blocked before the body runs. | 🟢 **4** | A **tripwire, not a filter** — a legit agent never touches the honeypot, so a call is strong evidence the agent was manipulated (a prompt injection landed). Unique detection value. Limit: only catches an agent that takes the obvious bait. |
 
-`ProbeEvaluatorGate` deliberately **inverts** the [grading](llm-as-judge.md) convention (where abstention must
+`ProbeEvaluatorGate` deliberately **inverts** the [grading](../llm-as-judge.md) convention (where abstention must
 never be scored as failure) — because a runtime gate that cannot prove a call safe must not run it.
 
 ## Run gates
@@ -111,7 +111,7 @@ The inline gates are deterministic by design (they reject LLM/network cost so th
 When you need *judgment* — the clearest example is **prompt‑injection (PI) detection**, which keyword gates
 handle poorly — reach for one of two seams, both of which take a custom gate you write:
 
-- **A fast run‑pre gate.** Wrap a [Composite Judge](llm-as-judge.md) as an `IChatGate` and register it `pre:` so
+- **A fast run‑pre gate.** Wrap a [Composite Judge](../llm-as-judge.md) as an `IChatGate` and register it `pre:` so
   it scores the **incoming prompt** (not the model's response) *before the model is called* and blocks a
   detected injection at the door. Because it is on the hot path, **use a fast, small model** (a *mini* / *nano*
   tier) and a tight rubric so the added latency is a few hundred milliseconds, not seconds.

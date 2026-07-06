@@ -126,7 +126,7 @@ services.AddAgentEvalRedTeam();       // Red Team security testing
 - [Fluent Assertions](https://agenteval.dev/assertions.html)
 - [Metrics Reference](https://agenteval.dev/metrics-reference.html)
 - [Red Team Security](https://agenteval.dev/redteam.html)
-- [Gatekeeper (Runtime Enforcement)](https://agenteval.dev/gatekeeper.html)
+- [Gatekeeper (Runtime Enforcement)](https://agenteval.dev/gatekeeper/introduction.html)
 - [Trace Record & Replay](https://agenteval.dev/tracing.html)
 - [Stochastic Evaluation](https://agenteval.dev/stochastic-evaluation.html)
 - [Architecture](https://agenteval.dev/architecture.html)

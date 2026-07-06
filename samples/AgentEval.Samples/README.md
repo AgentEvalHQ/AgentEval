@@ -165,13 +165,13 @@ The dual-boundary trace that records what an agent actually did, turn by turn �
 ### J — Gatekeeper (Runtime Protection)  ★ no credentials — fail-closed runtime enforcement
 
 AgentEval doesn't only MEASURE agents — it can STOP them. The same probes/evaluators you red-team with become
-runtime gates that block bad actions before they happen. See **`docs/gatekeeper.md`** for the developer guide.
+runtime gates that block bad actions before they happen. See **`docs/gatekeeper/introduction.md`** for the developer guide.
 
 | # | Sample | What It Exercises | Azure? | Time |
 |---|--------|-------------------|--------|------|
 | 1 | **Hello World** | Start here — the simplest gate: your red-team check (`ProbeEvaluatorGate`) blocks a live poisoned call in 3 lines | No | 1 min |
 | 2 | **Enforcement Walkthrough** | Scenarios across the gate layers: tool / moat / canary / shadow-judge / defense-in-depth / more gates | No | 5 min |
-| 3 | **MAF Agent Harness** | A realistic gated MAF support agent — a legit request flows, a prompt-injection attack is blocked at the tool boundary | No | 2 min |
+| 3 | **MAF Agent Harness** | A realistic gated MAF support agent — **data-exfiltration defense**: a read→POST sequence is blocked by `SequenceGate` (every tool is legit; only the combination is the attack) | No | 2 min |
 | 4 | **Tool Approval (human-in-the-loop)** | Routine calls auto-approve; risky ones pause for a human via MAF's `UseToolApproval` (approve → resume) | No | 3 min |
 
 ---

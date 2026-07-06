@@ -35,5 +35,5 @@ Azure/OpenAI scenarios. If you use `[MessageHandler]` executors, add
 
 ## Docs
 
-- [Gatekeeper — Introduction](../../docs/gatekeeper.md) · [Gate Reference (ranked)](../../docs/gatekeeper-gates.md) · [Examples](../../docs/gatekeeper-examples.md)
+- [Gatekeeper — Introduction](../../docs/gatekeeper/introduction.md) · [Gate Reference (ranked)](../../docs/gatekeeper/gate-reference.md) · [Examples](../../docs/gatekeeper/examples.md)
 - [Glass Box tracing](../../docs/glass-box.md) — where the `gate.*` evidence is recorded.

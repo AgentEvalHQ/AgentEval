@@ -13,7 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 fail-closed. It puts the same checks you red-team with into the request path so a forbidden tool call, a
 poisoned argument, or a compromised conversation is blocked *before* it happens. Every gate is fail-closed
 (cannot-inspect ⇒ deny) and records honest `gate.*` evidence into the `AgentTrace` (a warn is never counted as
-a block). See [`docs/gatekeeper.md`](docs/gatekeeper.md) and [ADR-025](docs/adr/025-gatekeeper-runtime-fail-closed-enforcement.md).
+a block). See [`docs/gatekeeper/introduction.md`](docs/gatekeeper/introduction.md) and [ADR-025](docs/adr/025-gatekeeper-runtime-fail-closed-enforcement.md).
 
 #### Added
 - **Tool gates** (`AgentEval.MAF.Gatekeeper`) — `UseAgentEvalToolGate` over the MAF function-invocation seam:
@@ -43,7 +43,7 @@ a block). See [`docs/gatekeeper.md`](docs/gatekeeper.md) and [ADR-025](docs/adr/
 - **`agenteval redteam --sut gatekeeper-demo`** — a credential-free, deterministic gated demo agent to run the
   attack suite against (the attack-the-gate closed loop), composing with the `--baseline`/`--fail-on regression`
   gate.
-- **Docs + samples** — `docs/gatekeeper.md` and the credential-free **Gatekeeper** sample group (menu group J):
+- **Docs + samples** — `docs/gatekeeper/introduction.md` and the credential-free **Gatekeeper** sample group (menu group J):
   `Gatekeeper/01_GatekeeperEnforcement` (the six-scenario enforcement walkthrough) and
   `Gatekeeper/02_GatekeeperMafHarness` (a realistic gated MAF support agent).
 
