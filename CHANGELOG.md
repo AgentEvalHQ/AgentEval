@@ -37,6 +37,11 @@ a block). See [`docs/gatekeeper/introduction.md`](docs/gatekeeper/introduction.m
   → `GateVerdict.Matches`); an inconclusive verdict (timeout / model error / unparseable, incl. a non-finite
   confidence) fails closed by default. Provider-agnostic (caller supplies the `IChatClient`). Calibrate against a
   per-axis gold set before going inline.
+- **`ParallelJudgeFanOut`** — runs several judge `IChatGate`s over one turn concurrently (wall-clock ≈ slowest),
+  combined **fail-closed OR** (any block blocks, aggregating reasons + evidence spans; a throwing judge is itself
+  a block). Compose single-axis judges here rather than widening one rubric.
+- **`JudgeVerdictCache`** — content-hash cache over a judge `IChatGate`. Caches **only Allow** verdicts (a
+  transient fail-closed block is never cached into a permanent one), bounded, no eviction of a proven-safe entry.
 - **Run gate** — `UseAgentEvalGate` inspects the run's input (incoming-attack detection) and output text,
   reusing the shipped `IChatGate`/`EvalGatePolicy`; establishes an `AgentRunScope` (stable across streaming
   segments) so inner gates can read the run context.
