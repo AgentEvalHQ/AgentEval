@@ -2,6 +2,7 @@
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 
+using System.Text.Json;
 using AgentEval.MAF.Gatekeeper;
 using AgentEval.Testing;
 using Microsoft.Agents.AI;
@@ -190,11 +191,31 @@ public class BeachheadGatesTests
     }
 
     [Fact]
-    public async Task DomainAllowList_NonHttpScheme_Blocks()
+    public async Task DomainAllowList_NonHttpScheme_OffListHost_Blocks()
     {
+        // Blocks because the HOST (attacker.example) is off-list — the gate scans non-http schemes too, but it
+        // gates by host, not by scheme.
         var gate = new DomainAllowListGate(["example.com"]);
         var v = await gate.InspectAsync(Call("fetch", new Dictionary<string, object?> { ["url"] = "ftp://attacker.example/x" }));
         Assert.Equal(ToolGateAction.Block, v.Action);
+    }
+
+    [Fact]
+    public async Task DomainAllowList_IPv6Literal_MatchesHostInsideBrackets()
+    {
+        var gate = new DomainAllowListGate(["[::1]"]);
+        Assert.Equal(ToolGateAction.Allow, (await gate.InspectAsync(Call("http_post", new Dictionary<string, object?> { ["url"] = "https://[::1]:8080/x" }))).Action);
+        Assert.Equal(ToolGateAction.Block, (await gate.InspectAsync(Call("http_post", new Dictionary<string, object?> { ["url"] = "https://[fe80::2]/x" }))).Action);
+    }
+
+    [Fact]
+    public async Task RunBudget_Monetary_HandlesJsonElementArgs()
+    {
+        // Tool-call arguments often arrive as JsonElement — the monetary budget must parse them, not ignore them.
+        var gate = new RunBudgetGate(maxMonetaryPerRun: ("amount", 100m));
+        using var doc = JsonDocument.Parse("150");   // a JsonElement over the $100 cap
+        var v = await gate.InspectAsync(Call("pay", new Dictionary<string, object?> { ["amount"] = doc.RootElement.Clone() }));
+        Assert.Equal(ToolGateAction.Block, v.Action);   // 150 > 100 — would be Allow if JsonElement were treated as "no amount"
     }
 
     [Fact]

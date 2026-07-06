@@ -14,8 +14,11 @@ namespace AgentEval.Guardrails.Judges;
 /// across many runs).
 /// <para><b>Only <see cref="GateAction.Allow"/> verdicts are cached.</b> A block is re-evaluated every time — so a
 /// transient fail-closed block (a judge timeout / model error) can never be cached into a permanent block, and a
-/// real detection is always re-confirmed. The cache is bounded; once full it stops admitting new entries (it does
-/// not evict, so a cached allow never goes stale under load).</para>
+/// real detection is always re-confirmed.</para>
+/// <para><b>Tradeoffs (by design).</b> There is no TTL: an allow is memoized for the process lifetime, so if the
+/// judge is nondeterministic a first-time allow sticks and a later-improved judge won't re-block that exact
+/// content — clear/rebuild the cache on a judge change. The bound is a <i>soft</i> cap (check-then-add), so under
+/// heavy concurrency it may overshoot slightly. Both are acceptable for a same-content dedup cache.</para>
 /// </summary>
 public sealed class JudgeVerdictCache : IChatGate
 {
@@ -42,13 +45,14 @@ public sealed class JudgeVerdictCache : IChatGate
     /// <inheritdoc/>
     public async ValueTask<GateVerdict> InspectAsync(string text, CancellationToken cancellationToken = default)
     {
-        var key = HashOf(text ?? string.Empty);
+        var safe = text ?? string.Empty;
+        var key = HashOf(safe);
         if (_allowed.TryGetValue(key, out var cached))
         {
             return cached;
         }
 
-        var verdict = await _inner.InspectAsync(text!, cancellationToken).ConfigureAwait(false);
+        var verdict = await _inner.InspectAsync(safe, cancellationToken).ConfigureAwait(false);
 
         // Cache only Allow (see class remarks). Stop admitting once full — never evict a proven-safe entry.
         if (verdict.Action == GateAction.Allow && _allowed.Count < _maxEntries)

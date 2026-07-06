@@ -88,7 +88,8 @@ public class IndirectInjectionRubricTests
         var judge = new CompositeJudgeGate<IndirectInjectionRubric>(_rubric, new RuleBasedInjectionModel());
 
         var report = await GateCalibrationHarness.EvaluateAsync(
-            judge, IndirectInjectionRubric.StarterGoldSet(), new CalibrationOptions { MaxDangerousErrors = 0 });
+            judge, IndirectInjectionRubric.StarterGoldSet(),
+            new CalibrationOptions { MaxDangerousErrors = 0, MinCasesPerDirection = 5 });   // starter set is small
 
         Assert.Equal(0, report.DangerousErrorCount);   // no missed injections
         Assert.Equal(1.0, report.DecisiveAccuracy);

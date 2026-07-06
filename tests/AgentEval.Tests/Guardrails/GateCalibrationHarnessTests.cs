@@ -34,10 +34,18 @@ public class GateCalibrationHarnessTests
     private static readonly PredicateGate BlocksNothing = new(_ => false, "allow-all");
     private static readonly PredicateGate BlocksEverything = new(_ => true, "block-all");
 
+    // Small gold set → opt into a low per-direction floor + a real bar, so IsInlineReady is meaningful in tests.
+    private static CalibrationOptions ReadyOpts(CalibrationOptions? extra = null) => new()
+    {
+        MaxDangerousErrors = 0,
+        MinCasesPerDirection = 2,
+        DeterministicBaseline = extra?.DeterministicBaseline,
+    };
+
     [Fact]
     public async Task PerfectJudge_ScoresCleanly_AndIsInlineReady()
     {
-        var r = await GateCalibrationHarness.EvaluateAsync(Perfect, Gold());
+        var r = await GateCalibrationHarness.EvaluateAsync(Perfect, Gold(), ReadyOpts());
 
         Assert.Equal(1.0, r.DecisiveAccuracy);
         Assert.Equal(0, r.DangerousErrorCount);
@@ -69,7 +77,7 @@ public class GateCalibrationHarnessTests
     public async Task BeatsBaseline_TrueWhenJudgeIsBetter()
     {
         var r = await GateCalibrationHarness.EvaluateAsync(Perfect, Gold(),
-            new CalibrationOptions { DeterministicBaseline = BlocksNothing });
+            ReadyOpts(new CalibrationOptions { DeterministicBaseline = BlocksNothing }));
 
         Assert.Equal(0.5, r.BaselineAccuracy);
         Assert.True(r.BeatsBaseline);
@@ -100,8 +108,26 @@ public class GateCalibrationHarnessTests
     [Fact]
     public async Task PerfectJudge_AssertInlineReady_DoesNotThrow()
     {
-        var r = await GateCalibrationHarness.EvaluateAsync(Perfect, Gold(), new CalibrationOptions { MaxDangerousErrors = 0 });
+        var r = await GateCalibrationHarness.EvaluateAsync(Perfect, Gold(), ReadyOpts());
         r.AssertInlineReady();   // should not throw
+    }
+
+    [Fact]
+    public async Task AllDefaults_NoBarSet_IsNotInlineReady()
+    {
+        // A PERFECT judge under all-default options must NOT be inline-ready — promotion is never granted by omission.
+        var r = await GateCalibrationHarness.EvaluateAsync(Perfect, Gold());
+        Assert.False(r.PromotionCriteriaConfigured);
+        Assert.False(r.IsInlineReady);
+    }
+
+    [Fact]
+    public async Task SmallGoldSet_BelowFloor_IsNotInlineReady()
+    {
+        // Criteria set, but the gold set is below the default per-direction floor → not trusted for promotion.
+        var r = await GateCalibrationHarness.EvaluateAsync(Perfect, Gold(), new CalibrationOptions { MaxDangerousErrors = 0 });
+        Assert.False(r.SufficientData);
+        Assert.False(r.IsInlineReady);
     }
 
     [Fact]

@@ -3,6 +3,7 @@
 // Licensed under the MIT License.
 
 using System.Globalization;
+using System.Text.Json;
 
 namespace AgentEval.MAF.Gatekeeper;
 
@@ -129,6 +130,7 @@ public sealed class RunBudgetGate : IToolGate
             case float f: return TryFromDouble(f, out amount);
             case int i: amount = i; return true;
             case long l: amount = l; return true;
+            case JsonElement je: return TryFromJsonElement(je, out amount);   // tool args often arrive as JsonElement
             case string s when decimal.TryParse(s, NumberStyles.Any, CultureInfo.InvariantCulture, out var parsed):
                 amount = parsed; return true;
             default:
@@ -142,6 +144,17 @@ public sealed class RunBudgetGate : IToolGate
                     return false;   // not a usable amount ⇒ treat as no monetary component (never throw out of the gate)
                 }
         }
+    }
+
+    private static bool TryFromJsonElement(JsonElement je, out decimal amount)
+    {
+        amount = 0m;
+        return je.ValueKind switch
+        {
+            JsonValueKind.Number => je.TryGetDecimal(out amount),
+            JsonValueKind.String => decimal.TryParse(je.GetString(), NumberStyles.Any, CultureInfo.InvariantCulture, out amount),
+            _ => false,
+        };
     }
 
     private static bool TryFromDouble(double d, out decimal amount)

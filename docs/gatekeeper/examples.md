@@ -57,7 +57,8 @@ var agent = baseAgent.AsBuilder()
     .UseAgentEvalGate()   // establishes the per-run RunLedger scope
     .UseAgentEvalToolGate(
         [
-            // Denial-of-wallet: at most 20 tool calls / run, at most 1 delete, refunds sum ≤ $1000/run.
+            // Denial-of-wallet: cap total tool calls per run, cap a sensitive tool, and cap the summed refund
+            // amount (choose limits that fit your workload — the values below are only illustrative).
             new RunBudgetGate(
                 maxToolCalls: 20,
                 maxCallsPerTool: new Dictionary<string, int> { ["delete_account"] = 1 },

@@ -32,7 +32,7 @@ public sealed class DomainAllowListGate : IToolGate
     // AND scheme-relative "//attacker.example" are all caught, not just http(s). Stops at the next delimiter
     // (including ? and #, so a query/fragment isn't folded into the host). Bounded (ReDoS-safe).
     private static readonly Regex UrlAuthority = new(
-        @"(?:[a-z][a-z0-9+.\-]*:)?//([^/\s""'<>\\)\]}?#]+)", RegexOptions.Compiled | RegexOptions.IgnoreCase, TimeSpan.FromMilliseconds(100));
+        @"(?:[a-z][a-z0-9+.\-]*:)?//([^/\s""'<>\\)}?#]+)", RegexOptions.Compiled | RegexOptions.IgnoreCase, TimeSpan.FromMilliseconds(100));
 
     private readonly HashSet<string> _allowed;
 

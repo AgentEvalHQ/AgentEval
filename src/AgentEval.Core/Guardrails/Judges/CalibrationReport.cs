@@ -67,19 +67,33 @@ public sealed class CalibrationReport
     /// <summary>Whether the configured thresholds (min accuracy / max dangerous errors / max FP rate) were all met.</summary>
     public bool MeetsThresholds { get; }
 
+    /// <summary>
+    /// Whether the caller actually set a promotion bar (a baseline to beat, or a non-permissive threshold). Under
+    /// all-default options nothing is required, so this is <c>false</c> and the judge is <b>not</b> inline-ready —
+    /// promotion is never granted by omission.
+    /// </summary>
+    public bool PromotionCriteriaConfigured { get; }
+
+    /// <summary>Whether the gold set had enough cases per direction (<see cref="CalibrationOptions.MinCasesPerDirection"/>) for the metrics to be trusted.</summary>
+    public bool SufficientData { get; }
+
     /// <summary>Per-case outcomes.</summary>
     public IReadOnlyList<CalibrationCaseResult> Cases { get; }
 
     /// <summary>
-    /// The promotion verdict: <c>MeetsThresholds</c> AND (if a baseline was supplied) it beats the baseline. Only a
-    /// judge that <see cref="IsInlineReady"/> should be allowed to block live traffic.
+    /// The promotion verdict — <b>fail-closed</b>: the caller set a bar (<see cref="PromotionCriteriaConfigured"/>),
+    /// the gold set is big enough (<see cref="SufficientData"/>), the thresholds are met, AND (if a baseline was
+    /// supplied) the judge beats it. Only a judge that <see cref="IsInlineReady"/> should block live traffic.
     /// </summary>
-    public bool IsInlineReady => MeetsThresholds && (BeatsBaseline ?? true);
+    public bool IsInlineReady => PromotionCriteriaConfigured && SufficientData && MeetsThresholds && (BeatsBaseline ?? true);
 
     internal CalibrationReport(
         string axis, int tp, int tn, int fp, int fn, double kappa,
-        double? baselineAccuracy, bool? beatsBaseline, bool meetsThresholds, IReadOnlyList<CalibrationCaseResult> cases)
+        double? baselineAccuracy, bool? beatsBaseline, bool meetsThresholds,
+        bool promotionCriteriaConfigured, bool sufficientData, IReadOnlyList<CalibrationCaseResult> cases)
     {
+        PromotionCriteriaConfigured = promotionCriteriaConfigured;
+        SufficientData = sufficientData;
         Axis = axis;
         TruePositives = tp;
         TrueNegatives = tn;
@@ -101,11 +115,14 @@ public sealed class CalibrationReport
     {
         if (!IsInlineReady)
         {
+            var why =
+                !PromotionCriteriaConfigured ? "no promotion bar was set (supply a DeterministicBaseline or a non-default threshold)" :
+                !SufficientData ? "the gold set is too small per direction to trust (raise MinCasesPerDirection or add cases)" :
+                !MeetsThresholds ? "the configured thresholds were not met" :
+                BeatsBaseline == false ? "it did not beat the deterministic baseline" : "unknown";
             throw new InvalidOperationException(
-                $"Judge for axis '{Axis}' is NOT inline-ready (accuracy {DecisiveAccuracy:P1}, {DangerousErrorCount} missed attacks, " +
-                $"FP rate {FalsePositiveRate:P1}, κ {KappaVsGold:F3}" +
-                (BeatsBaseline is null ? string.Empty : $", beats-baseline={BeatsBaseline}") +
-                "). Keep it in shadow until it beats the baseline on the gold set.");
+                $"Judge for axis '{Axis}' is NOT inline-ready — {why} (accuracy {DecisiveAccuracy:P1}, " +
+                $"{DangerousErrorCount} missed attacks, FP rate {FalsePositiveRate:P1}, κ {KappaVsGold:F3}). Keep it in shadow.");
         }
     }
 }

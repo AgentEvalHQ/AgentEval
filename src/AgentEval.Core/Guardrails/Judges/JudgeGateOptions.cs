@@ -13,8 +13,13 @@ public sealed class JudgeGateOptions
     /// </summary>
     public TimeSpan Timeout { get; init; } = TimeSpan.FromSeconds(5);
 
-    /// <summary>Minimum <see cref="JudgeVerdict.Confidence"/> to act on a <see cref="JudgeDecision.Blocked"/> verdict. Default 0.5.</summary>
-    public double BlockThreshold { get; init; } = 0.5;
+    /// <summary>
+    /// Minimum <see cref="JudgeVerdict.Confidence"/> to act on a <see cref="JudgeDecision.Blocked"/> verdict.
+    /// <b>Default 0 — fail-closed: any block blocks.</b> Raising it above 0 introduces a deliberate <i>fail-open
+    /// band</i>: a <see cref="JudgeDecision.Blocked"/> verdict below the threshold is downgraded to allow (trading
+    /// safety for fewer false alarms). Only raise it if you have calibrated the cost of that band.
+    /// </summary>
+    public double BlockThreshold { get; init; }
 
     /// <summary>Cap on the judge's output tokens (a judge answers briefly). Default 256.</summary>
     public int MaxOutputTokens { get; init; } = 256;

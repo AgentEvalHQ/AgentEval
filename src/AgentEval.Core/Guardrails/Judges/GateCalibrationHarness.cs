@@ -48,7 +48,20 @@ public static class GateCalibrationHarness
             && fn <= options.MaxDangerousErrors
             && fpr <= options.MaxFalsePositiveRate;
 
-        return new CalibrationReport(goldSet.Axis, tp, tn, fp, fn, kappa, baselineAccuracy, beatsBaseline, meetsThresholds, judgeResults);
+        // Fail-closed: promotion is only granted if the caller set a real bar (a baseline or a non-permissive
+        // threshold) AND the gold set is big enough per direction to trust the metrics.
+        var criteriaConfigured =
+            options.DeterministicBaseline is not null
+            || options.MaxDangerousErrors < int.MaxValue
+            || options.MinDecisiveAccuracy > 0.0
+            || options.MaxFalsePositiveRate < 1.0;
+        var sufficientData =
+            goldSet.AttackCount >= options.MinCasesPerDirection
+            && goldSet.BenignCount >= options.MinCasesPerDirection;
+
+        return new CalibrationReport(
+            goldSet.Axis, tp, tn, fp, fn, kappa, baselineAccuracy, beatsBaseline, meetsThresholds,
+            criteriaConfigured, sufficientData, judgeResults);
     }
 
     private static async Task<IReadOnlyList<CalibrationCaseResult>> ScoreAsync(

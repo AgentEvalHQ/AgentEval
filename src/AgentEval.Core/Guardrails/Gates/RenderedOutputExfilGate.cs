@@ -15,7 +15,10 @@ namespace AgentEval.Guardrails.Gates;
 /// the <b>rendered answer</b> — an allow-list can't see that a client silently GETs a markdown image on render.
 /// <para>Post-flight it returns a <b>redacted</b> output (each channel replaced with a visible marker); under
 /// <see cref="EvalGatePolicy.Redact"/> the client delivers the sanitized text. Each regex is bounded (ReDoS-safe);
-/// a scan timeout is flagged so a blocking policy still fails closed.</para>
+/// if any scan times out the whole output is withheld (fail-closed).</para>
+/// <para><b>Scope.</b> Covers markdown image beacons, fetching HTML (incl. SVG), off-host CSS <c>url()</c>,
+/// <c>data:</c> URIs, and zero-width characters. It does <i>not</i> resolve <b>reference-style</b> markdown images
+/// (<c>![x][ref]</c>, where the URL is defined elsewhere) — pair with an allow-list on the tool side for those.</para>
 /// </summary>
 public sealed class RenderedOutputExfilGate : IChatGate
 {
@@ -25,14 +28,16 @@ public sealed class RenderedOutputExfilGate : IChatGate
     {
         // ![alt](url) — the client GETs url on render; the classic markdown-image beacon.
         ("markdown-image", new Regex(@"!\[[^\]]*\]\([^)]*\)", RegexOptions.Compiled, MatchTimeout), "[image removed]"),
-        // <img>/<script>/<iframe>/<object>/<embed>/<link>/<audio>/<video>/<source> — fetch a resource on render.
-        ("fetching-html-tag", new Regex(@"<\s*(?:img|script|iframe|object|embed|link|audio|video|source)\b[^>]*>", RegexOptions.Compiled | RegexOptions.IgnoreCase, MatchTimeout), "[markup removed]"),
+        // HTML tags that fetch a resource on render (incl. SVG <svg>/<use href>).
+        ("fetching-html-tag", new Regex(@"<\s*(?:img|script|iframe|object|embed|link|audio|video|source|svg|use)\b[^>]*>", RegexOptions.Compiled | RegexOptions.IgnoreCase, MatchTimeout), "[markup removed]"),
         // data: URI — inline payload / covert channel.
         ("data-uri", new Regex(@"data:[^\s""')>\]]+", RegexOptions.Compiled | RegexOptions.IgnoreCase, MatchTimeout), "[data-uri removed]"),
+        // CSS url() pointing off-host (e.g. background:url(//attacker/x)) — fetched on render.
+        ("css-url", new Regex(@"url\(\s*['""]?(?:https?:)?//[^)]*\)", RegexOptions.Compiled | RegexOptions.IgnoreCase, MatchTimeout), "url([removed])"),
     };
 
     // Zero-width / invisible characters used as covert channels: ZWSP, ZWNJ, ZWJ, word-joiner, BOM.
-    private static readonly char[] ZeroWidthChars = { '​', '‌', '‍', '⁠', '﻿' };
+    private static readonly char[] ZeroWidthChars = { (char)0x200B, (char)0x200C, (char)0x200D, (char)0x2060, (char)0xFEFF };
 
     /// <inheritdoc/>
     public string PolicyName => "rendered-output-exfil";

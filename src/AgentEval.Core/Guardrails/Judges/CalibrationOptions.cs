@@ -23,6 +23,14 @@ public sealed class CalibrationOptions
     /// <summary>Maximum false-positive (false-alarm) rate allowed. Default 1.0 (no cap).</summary>
     public double MaxFalsePositiveRate { get; init; } = 1.0;
 
+    /// <summary>
+    /// Minimum cases required in EACH direction (attack / benign) for the report to be trusted for promotion.
+    /// Below this, κ and accuracy are statistically meaningless, so the judge is <b>not</b> inline-ready regardless
+    /// of the numbers. Default 20 — the shipped starter gold sets are smaller on purpose (they are seeds to
+    /// extend), so promoting on them requires deliberately lowering this.
+    /// </summary>
+    public int MinCasesPerDirection { get; init; } = 20;
+
     /// <summary>Max concurrent judge calls while scoring the gold set. Default 4.</summary>
     public int MaxConcurrency { get; init; } = 4;
 }
