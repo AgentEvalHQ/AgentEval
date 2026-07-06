@@ -124,13 +124,15 @@ public static class Program
             new("Real vs Framework: Workflow","Per-EXECUTOR ledger vs chat truth — what a multi-agent workflow HIDES (offline; scripted)",     RealVsFrameworkWorkflow.RunAsync),
         ]),
 
-        new('J', "Gatekeeper (Runtime Protection)", "★ no credentials — fail-closed runtime enforcement",
+        new('J', "Gatekeeper (Runtime Protection)", "🔑 real MAF agents (Azure OpenAI) — fail-closed runtime enforcement",
         [
             new("Hello World",               "★ start here — the simplest gate: your red-team check blocks a live call (3 lines)", GatekeeperHelloWorld.RunAsync),
             new("Enforcement Walkthrough",   "6 scenarios: tool / moat / canary / shadow-judge / defense-in-depth / more gates", GatekeeperEnforcement.RunAsync),
-            new("MAF Agent Harness",         "A realistic gated MAF support agent: data-exfiltration (read→POST) blocked by SequenceGate", GatekeeperMafHarness.RunAsync),
+            new("MAF Support Agent (exfil)", "A realistic gated MAF support agent: data-exfiltration (read→POST) blocked by SequenceGate", GatekeeperMafHarness.RunAsync),
             new("Tool Approval (human-in-the-loop)", "Routine calls auto-approve; risky ones pause for a human (MAF UseToolApproval interop)", GatekeeperToolApproval.RunAsync),
             new("Beachhead + The Tribunal",  "Budget · exfil · rendered-output · a CALIBRATED indirect-injection judge", GatekeeperBeachhead.RunAsync),
+            new("Agent Harness — simple",    "Cap an autonomous, looping MAF Agent Harness agent with RunBudgetGate", GatekeeperAgentHarness.RunAsync),
+            new("Agent Harness — defended",  "Defense-in-depth around a capable harness agent: budget + sequence + exfil", GatekeeperAgentHarnessDefended.RunAsync),
         ]),
     ];
 

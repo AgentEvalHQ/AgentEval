@@ -4,23 +4,22 @@
 #pragma warning disable AEGK001 // UseAgentEvalToolApproval rides MAF's evaluation-only approval API — fine for a demo.
 
 using AgentEval.MAF.Gatekeeper;
-using AgentEval.Testing;
+using Azure.AI.OpenAI;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
-using ChatRole = Microsoft.Extensions.AI.ChatRole;
 
 namespace AgentEval.Samples;
 
 /// <summary>
-/// Gatekeeper — Tool Approval (human-in-the-loop).
+/// Gatekeeper — Tool Approval (human-in-the-loop), on a <b>real</b> agent.
 ///
-/// Not every risky action should be hard-blocked — some should pause for a person. This support agent can issue
-/// refunds: a small one is routine (auto-approved), a large one is escalated to a human. The Gatekeeper approval
-/// gate classifies each call; MAF's native <c>UseToolApproval</c> pauses the run and surfaces the request, and a
-/// human approve/reject resumes it — the softer sibling of a hard tool-gate block.
+/// For actions too risky to auto-run but too legitimate to forbid, route the <em>borderline</em> ones to a
+/// person. A real support agent has an <c>issue_refund</c> tool wrapped with <c>.RequiresApproval()</c>: a small
+/// refund auto-approves and runs; a large one pauses and surfaces a <see cref="ToolApprovalRequestContent"/> for a
+/// human, who then approves and the run resumes.
 ///
-/// ★ No credentials needed — a scripted model makes both flows deterministic.
-/// ⏱️ Time to understand: 3 minutes
+/// 🔑 Requires Azure OpenAI credentials (AZURE_OPENAI_ENDPOINT / _API_KEY / _DEPLOYMENT).
+/// ⏱️ Time to understand: 2 minutes
 /// </summary>
 public static class GatekeeperToolApproval
 {
@@ -28,14 +27,26 @@ public static class GatekeeperToolApproval
     {
         PrintHeader();
 
+        if (!AIConfig.IsConfigured)
+        {
+            AIConfig.PrintMissingCredentialsWarning();
+            return;
+        }
+
+        var chatClient = new AzureOpenAIClient(AIConfig.Endpoint, AIConfig.KeyCredential)
+            .GetChatClient(AIConfig.ModelDeployment)
+            .AsIChatClient();
+        Console.WriteLine($"   Model: {AIConfig.ModelDeployment} — a real agent whose large refunds need a human.\n");
+
         var refundsIssued = new List<int>();
         var refund = AIFunctionFactory.Create(
-            (int amount) => { refundsIssued.Add(amount); return $"Refunded ${amount}."; }, "issue_refund");
+            (int amount) => { refundsIssued.Add(amount); return $"Refunded ${amount}."; },
+            "issue_refund", "Issue a refund to the customer for the given whole-dollar amount.");
 
         // Routine refunds (under $1000) auto-approve; a 4+ digit amount ($1000+) is escalated to a human.
         var gate = new ArgumentPatternApprovalGate("\"amount\":\\s*[0-9]{4,}", "large-refund-approval");
 
-        AIAgent BuildAgent(ScriptedChatClient model) => new ChatClientAgent(model, new ChatClientAgentOptions
+        AIAgent BuildAgent() => new ChatClientAgent(chatClient, new ChatClientAgentOptions
         {
             Name = "SupportAgent",
             ChatOptions = new ChatOptions { Tools = [refund.RequiresApproval()] },
@@ -43,40 +54,42 @@ public static class GatekeeperToolApproval
 
         // ── A routine refund flows straight through ──
         Section("A routine $20 refund");
-        var small = BuildAgent(new ScriptedChatClient()
-            .AddToolCall("c1", "issue_refund", new Dictionary<string, object?> { ["amount"] = 20 })
-            .AddText("Refunded $20 — anything else?"));
-        var routine = await small.RunAsync("Please refund my $20 order.");
-        Console.WriteLine($"   Agent: \"{routine.Text}\"");
-        Console.WriteLine($"   → auto-approved, no human needed. Refunds issued: {refundsIssued.Count}. ✅");
+        var routine = await BuildAgent().RunAsync("Please refund my $20 order.");
+        Console.WriteLine($"   Agent: \"{Truncate(routine.Text)}\"");
+        Console.WriteLine($"   Refunds issued: {refundsIssued.Count}  {(refundsIssued.Contains(20) ? "→ auto-approved, no human needed ✅" : "(model chose not to refund)")}");
 
         // ── A large refund pauses for a human ──
         Section("A large $5000 refund — pauses for human approval");
-        var large = BuildAgent(new ScriptedChatClient()
-            .AddToolCall("c2", "issue_refund", new Dictionary<string, object?> { ["amount"] = 5000 })
-            .AddText("Refund issued."));
+        var large = BuildAgent();
         var session = await large.CreateSessionAsync();
-        var paused = await large.RunAsync("Refund my $5000 order.", session);
+        var paused = await large.RunAsync("Please refund my $5000 order in full.", session);
         var request = paused.Messages.SelectMany(m => m.Contents).OfType<ToolApprovalRequestContent>().FirstOrDefault();
         if (request is null)
         {
-            // The large refund MUST escalate; if it didn't, don't print a misleading "approved" success path.
             Console.ForegroundColor = ConsoleColor.Red;
-            Console.WriteLine("   ⚠️ Expected the $5000 refund to pause for approval, but no request surfaced — aborting.");
+            Console.WriteLine("   ⚠️ Expected the $5000 refund to pause for approval, but no request surfaced.");
+            Console.WriteLine($"      (The model may not have called issue_refund; it said: {Truncate(paused.Text)})");
             Console.ResetColor();
             return;
         }
-        Console.WriteLine($"   The agent wants to issue a $5000 refund — the gate escalated it.");
-        Console.WriteLine($"   Large refunds issued so far: {refundsIssued.Count(a => a == 5000)}  (paused — waiting for a human) ⏸️");
+
+        var beforeApproval = refundsIssued.Count(a => a >= 1000);
+        Console.WriteLine("   The agent wants a large refund — the gate escalated it.");
+        Console.WriteLine($"   Large refunds run so far: {beforeApproval}  (paused — waiting for a human) ⏸️");
 
         // A human reviews and approves → resume on the same session with the approval response.
         await large.RunAsync([new ChatMessage(ChatRole.User, [request.CreateResponse(true)])], session);
-        Console.WriteLine($"   Human approved → the refund runs. Large refunds issued: {refundsIssued.Count(a => a == 5000)}. ✅");
+        var afterApproval = refundsIssued.Count(a => a >= 1000);
+        Console.WriteLine(afterApproval > beforeApproval
+            ? $"   Human approved → the refund ran. Large refunds run: {afterApproval}. ✅"
+            : $"   Human approved, but the model didn't complete the refund (large refunds run: {afterApproval}).");
 
-        Console.WriteLine("\n   Takeaway: routine actions flow, risky ones pause for a person — one gate,");
-        Console.WriteLine("   softer than a hard block. (Rejecting instead would simply never run the tool.)");
+        Console.WriteLine("\n   Takeaway: routine actions flow, risky ones pause for a person — one gate, softer than a hard block.");
         Console.WriteLine("\n=== Gatekeeper Tool Approval Complete ===");
     }
+
+    private static string Truncate(string? s, int max = 140)
+        => string.IsNullOrEmpty(s) ? "(none)" : s.Length <= max ? s : s[..max] + "…";
 
     private static void Section(string title)
     {

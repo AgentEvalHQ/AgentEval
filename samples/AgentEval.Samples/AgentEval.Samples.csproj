@@ -31,6 +31,7 @@
     <PackageReference Include="Azure.Identity" Aliases="azureidentity" />
     <!-- Foundry evals (preview) — for the H12 (Foundry Hybrid) and H13 (Foundry Hierarchy) benchmarks. -->
     <PackageReference Include="Microsoft.Agents.AI.Foundry" />
+    <PackageReference Include="Microsoft.Agents.AI.Harness" />
     <PackageReference Include="Azure.AI.Projects" />
     <PackageReference Include="Microsoft.Agents.AI.OpenAI" />
     <PackageReference Include="Microsoft.Agents.AI.Workflows" />

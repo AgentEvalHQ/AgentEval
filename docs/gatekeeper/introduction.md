@@ -81,7 +81,7 @@ The [**Gate reference**](gate-reference.md) ranks every gate on exactly this bas
 ## See also
 
 - [**Gate reference**](gate-reference.md) — the ranked catalogue (what each gate does + how useful it is).
-- [**Examples**](examples.md) — runnable, credential‑free cookbook + the CLI on‑ramp.
+- [**Examples**](examples.md) — runnable cookbook (the samples drive a real model — need Azure OpenAI) + a credential‑free CLI on‑ramp.
 - [Glass Box](../glass-box.md) — the dual‑boundary trace Gatekeeper records its evidence into.
 - [Guardrails](../guardrails.md) — the chat‑gate primitives (`IChatGate`, `EvalGatePolicy`) the run gate reuses.
 - [Red Team](../redteam.md) — the probes and canaries the moat gates are built from.

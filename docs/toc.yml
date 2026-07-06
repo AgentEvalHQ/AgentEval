@@ -26,10 +26,13 @@
     href: stochastic-evaluation.md
   - name: Model Comparison
     href: model-comparison.md
-  - name: Trace Recording
-    href: tracing.md
-  - name: Trace Fidelity
-    href: benchmarks/trace-fidelity.md
+  - name: Glass Box (Observability)
+    href: glass-box.md
+    items:
+    - name: Trace Recording
+      href: tracing.md
+    - name: Trace Fidelity
+      href: benchmarks/trace-fidelity.md
   - name: Guardrails (Runtime Gate)
     href: guardrails.md
   - name: Gatekeeper (Runtime Enforcement)

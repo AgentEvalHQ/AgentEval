@@ -352,7 +352,7 @@ trace evidence (a warn is never counted as a block). Layers span **tool gates**,
 (auth / rate-limit / quarantine), the red-team **moat**, **canary honeypots** that flag a compromised agent, an
 async **shadow judge** for expensive checks, and **human-in-the-loop approval** for the borderline actions.
 
-**✅ See it (no credentials):** `dotnet run --project samples/AgentEval.Samples` → group **J**, or `agenteval redteam --sut gatekeeper-demo` • [docs/gatekeeper/introduction.md](docs/gatekeeper/introduction.md)
+**✅ See it:** `dotnet run --project samples/AgentEval.Samples` → group **J** (real agents — needs Azure OpenAI), or **credential‑free** via `agenteval redteam --sut gatekeeper-demo` • [docs/gatekeeper/introduction.md](docs/gatekeeper/introduction.md)
 
 ---
 
@@ -644,7 +644,7 @@ The interactive menu lets you select a **group** (A–J), then a **sample** with
 | **G — Memory Evaluation** | Memory basics, benchmarks, scenarios, DI, cross-session, HTML reports, LongMemEval (ICLR 2025) |
 | **H — Benchmarks** | Compliance & performance benchmark families → JSON / HTML / PDF reports |
 | **I — Observability (Glass Box)** | Dual-boundary per-turn tracing, trace fidelity, auto-audit |
-| **J — Gatekeeper (Runtime Protection)** ★ no credentials | Fail-closed runtime enforcement: the gate-layer walkthrough + a realistic gated MAF agent harness |
+| **J — Gatekeeper (Runtime Protection)** 🔑 real agents | Fail-closed runtime enforcement on live agents: the gate-layer walkthrough, a data-exfiltration support agent, human-in-the-loop approval, the Beachhead + Tribunal, and MAF Agent Harness defense |
 
 See [samples/AgentEval.Samples/README.md](samples/AgentEval.Samples/README.md) for the full listing with per-sample descriptions, timing, and credential requirements.
 

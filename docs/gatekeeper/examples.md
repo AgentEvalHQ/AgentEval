@@ -1,6 +1,7 @@
 # Gatekeeper — examples
 
-Runnable, **credential‑free** recipes, from a hello‑world to the gates with no simpler equivalent. For
+Runnable recipes, from a hello‑world to the gates with no simpler equivalent (the snippets are provider‑agnostic;
+the runnable **samples** drive a real model — see [Runnable demos](#runnable-demos-real-agents)). For
 the concepts see the [introduction](introduction.md); for what each gate does and how useful it is, the
 [gate reference](gate-reference.md).
 
@@ -194,10 +195,12 @@ var agent = baseAgent.AsBuilder()
 The judge runs *after* the run returns; an adverse verdict arms quarantine so the `QuarantineGate` refuses the
 session's **next** run.
 
-## Credential‑free demos
+## Runnable demos (real agents)
 
-The **Gatekeeper** sample group (`AgentEval.Samples`, menu group **J**) runs everything above against a scripted
-model, so every outcome is deterministic and needs no API key:
+The **Gatekeeper** sample group (`AgentEval.Samples`, menu group **J**) runs everything above against a **real MAF
+agent** on a live model — set `AZURE_OPENAI_ENDPOINT` / `AZURE_OPENAI_API_KEY` / `AZURE_OPENAI_DEPLOYMENT`. The
+gates fire on the model's actual behavior (a real loop that runs away, a real POST to an off‑host URL, a real
+judge scoring a gold set), and where a well‑aligned model resists an attack the sample reports that honestly:
 
 - [`Gatekeeper/00_GatekeeperHelloWorld`](../../samples/AgentEval.Samples/Gatekeeper/00_GatekeeperHelloWorld.cs) —
   **start here**: the simplest gate — your red‑team check blocks a live poisoned call, in three lines.
@@ -214,6 +217,13 @@ model, so every outcome is deterministic and needs no API key:
   **beachhead + the Tribunal**: `RunBudgetGate` (denial‑of‑wallet), `DomainAllowListGate` (exfil),
   `RenderedOutputExfilGate` (rendered‑output beacon), and a **calibrated** indirect‑injection judge that earns the
   right to block.
+- [`Gatekeeper/05_GatekeeperAgentHarness`](../../samples/AgentEval.Samples/Gatekeeper/05_GatekeeperAgentHarness.cs) —
+  **× MAF Agent Harness (simple)**: a genuine MAF Agent Harness agent (`IChatClient.AsHarnessAgent(new
+  HarnessAgentOptions { … })` — planning + todo + mode + an autonomous `LoopAgent`) whose runaway loop is capped by
+  `RunBudgetGate`.
+- [`Gatekeeper/06_GatekeeperAgentHarnessDefended`](../../samples/AgentEval.Samples/Gatekeeper/06_GatekeeperAgentHarnessDefended.cs) —
+  **× MAF Agent Harness (defended)**: a genuine `AsHarnessAgent` behind defense‑in‑depth (budget + `SequenceGate` +
+  `DomainAllowListGate`) — legit work flows, the read→POST exfiltration is blocked.
 
 ## From the CLI
 
