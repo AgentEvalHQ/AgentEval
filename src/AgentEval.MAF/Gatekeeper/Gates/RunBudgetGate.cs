@@ -12,8 +12,10 @@ namespace AgentEval.MAF.Gatekeeper;
 /// orchestration). Blocks the next call once a configured budget is reached: total tool calls, per-tool call
 /// count, or the running sum of a monetary argument.
 /// <para><b>Per-run scoped</b> via <see cref="RunLedger"/> — register <c>UseAgentEvalGate()</c> so each run gets
-/// its own budget. Pure-code, hot-path safe. For real enforcement register it under <c>ReplaceResult</c> /
-/// <c>Terminate</c>; under <c>WarnOnly</c> it only records breaches.</para>
+/// its own budget. Pure-code, hot-path safe, and correct under concurrent tool invocation (the check + record is
+/// one atomic ledger operation). A <b>negative</b> monetary amount can never reduce the running sum (it is
+/// clamped to zero), so it cannot manufacture budget headroom. For real enforcement register it under
+/// <c>ReplaceResult</c> / <c>Terminate</c>; under <c>WarnOnly</c> it only records breaches.</para>
 /// </summary>
 public sealed class RunBudgetGate : IToolGate
 {
@@ -28,9 +30,7 @@ public sealed class RunBudgetGate : IToolGate
     /// <inheritdoc/>
     public GateCost Cost => GateCost.PureCode;
 
-    /// <summary>
-    /// Creates the gate. At least one budget must be set.
-    /// </summary>
+    /// <summary>Creates the gate. At least one budget must be set.</summary>
     /// <param name="maxToolCalls">Cap on total tool calls per run (blocks the call that would exceed it).</param>
     /// <param name="maxCallsPerTool">Per-tool call caps (e.g. <c>["delete_account"] = 1</c>).</param>
     /// <param name="maxMonetaryPerRun">Cap on the running sum of a monetary argument, e.g. <c>("amount", 1000m)</c>.</param>
@@ -72,6 +72,11 @@ public sealed class RunBudgetGate : IToolGate
                 throw new ArgumentException("maxMonetaryPerRun.argName must be non-empty.", nameof(maxMonetaryPerRun));
             }
 
+            if (mon.max < 0m)
+            {
+                throw new ArgumentOutOfRangeException(nameof(maxMonetaryPerRun), "monetary cap must be non-negative.");
+            }
+
             _monetaryArg = mon.argName;
             _maxMonetary = mon.max;
         }
@@ -83,37 +88,31 @@ public sealed class RunBudgetGate : IToolGate
         ArgumentNullException.ThrowIfNull(call);
         var ledger = RunLedger.ForCurrentRun();
 
-        // Check BEFORE recording, so maxToolCalls=N admits exactly N calls and blocks the (N+1)th.
-        if (_maxToolCalls is int maxTotal && ledger.TotalToolCalls >= maxTotal)
+        // Clamp so a negative amount can never create headroom under the cap.
+        var amount = 0m;
+        if (_monetaryArg is not null && TryGetAmount(call.Arguments, _monetaryArg, out var raw))
         {
-            return Blocked($"run tool-call budget exhausted (max {maxTotal} per run)");
+            amount = Math.Max(0m, raw);
         }
 
-        if (_maxPerTool is not null && _maxPerTool.TryGetValue(call.FunctionName, out var perMax)
-            && ledger.ToolCallCount(call.FunctionName) >= perMax)
-        {
-            return Blocked($"per-tool budget for '{call.FunctionName}' exhausted (max {perMax} per run)");
-        }
+        var perToolCap = _maxPerTool is not null && _maxPerTool.TryGetValue(call.FunctionName, out var m) ? m : (int?)null;
 
-        var thisAmount = 0m;
-        if (_monetaryArg is not null && TryGetAmount(call.Arguments, _monetaryArg, out thisAmount)
-            && ledger.MonetarySum(_monetaryArg) + thisAmount > _maxMonetary)
-        {
-            return Blocked($"monetary budget for '{_monetaryArg}' exceeded (max {_maxMonetary.ToString(CultureInfo.InvariantCulture)} per run)");
-        }
+        // Atomic check + record — correct under concurrent invocation.
+        var decision = ledger.TryAdmitToolCall(call.FunctionName, _maxToolCalls, perToolCap, _monetaryArg, amount, _maxMonetary);
 
-        // Admitted — record this call in the shared ledger.
-        ledger.RecordToolCall(call.FunctionName);
-        if (thisAmount != 0m)
+        var verdict = decision switch
         {
-            ledger.AddMonetary(_monetaryArg!, thisAmount);
-        }
+            RunBudgetDecision.TotalExceeded =>
+                ToolGateVerdict.Block(PolicyName, $"run tool-call budget exhausted (max {_maxToolCalls} per run)"),
+            RunBudgetDecision.PerToolExceeded =>
+                ToolGateVerdict.Block(PolicyName, $"per-tool budget for '{call.FunctionName}' exhausted (max {perToolCap} per run)"),
+            RunBudgetDecision.MonetaryExceeded =>
+                ToolGateVerdict.Block(PolicyName, $"monetary budget for '{_monetaryArg}' exceeded (max {_maxMonetary.ToString(CultureInfo.InvariantCulture)} per run)"),
+            _ => ToolGateVerdict.Allow(PolicyName),
+        };
 
-        return new ValueTask<ToolGateVerdict>(ToolGateVerdict.Allow(PolicyName));
+        return new ValueTask<ToolGateVerdict>(verdict);
     }
-
-    private ValueTask<ToolGateVerdict> Blocked(string reason)
-        => new(ToolGateVerdict.Block(PolicyName, reason));
 
     private static bool TryGetAmount(IReadOnlyDictionary<string, object?>? args, string argName, out decimal amount)
     {
@@ -126,8 +125,8 @@ public sealed class RunBudgetGate : IToolGate
         switch (raw)
         {
             case decimal d: amount = d; return true;
-            case double db: amount = (decimal)db; return true;
-            case float f: amount = (decimal)f; return true;
+            case double db: return TryFromDouble(db, out amount);
+            case float f: return TryFromDouble(f, out amount);
             case int i: amount = i; return true;
             case long l: amount = l; return true;
             case string s when decimal.TryParse(s, NumberStyles.Any, CultureInfo.InvariantCulture, out var parsed):
@@ -140,8 +139,27 @@ public sealed class RunBudgetGate : IToolGate
                 }
                 catch (Exception ex) when (ex is FormatException or InvalidCastException or OverflowException)
                 {
-                    return false;
+                    return false;   // not a usable amount ⇒ treat as no monetary component (never throw out of the gate)
                 }
+        }
+    }
+
+    private static bool TryFromDouble(double d, out decimal amount)
+    {
+        amount = 0m;
+        if (double.IsNaN(d) || double.IsInfinity(d))
+        {
+            return false;
+        }
+
+        try
+        {
+            amount = (decimal)d;   // can overflow for very large magnitudes
+            return true;
+        }
+        catch (OverflowException)
+        {
+            return false;
         }
     }
 }

