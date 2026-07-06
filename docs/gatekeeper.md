@@ -80,7 +80,7 @@ pending call as *routine* (auto‑approve, no human) or *borderline* (escalate �
 ```csharp
 var agent = new ChatClientAgent(client, options)
     .AsBuilder()
-    // Small refunds auto-approve; a 4+ digit amount ($1000+) is escalated to a human.
+    // Small refunds auto-approve; a large amount (4+ digits) is escalated to a human.
     .UseAgentEvalToolApproval([new ArgumentPatternApprovalGate("\"amount\":\\s*[0-9]{4,}")])
     .Build();
 
@@ -92,8 +92,9 @@ await agent.RunAsync([new ChatMessage(ChatRole.User, [request.CreateResponse(app
 ```
 
 - **Only tools wrapped with `.RequiresApproval()`** (MAF's `ApprovalRequiredAIFunction`) enter the flow; everything
-  else runs normally. Sits at the agent boundary — *outside* the tool‑gate seam — so you can hard‑block the truly
-  dangerous calls **and** human‑review the borderline ones on the same agent.
+  else runs normally. Wrap the function where you register it in `ChatOptions.Tools` (e.g.
+  `Tools = [myFunc.RequiresApproval()]`). Sits at the agent boundary — *outside* the tool‑gate seam — so you can
+  hard‑block the truly dangerous calls **and** human‑review the borderline ones on the same agent.
 - **Two built‑in gates:** `ArgumentPatternApprovalGate` escalates by *argument content* (auto‑approves only on
   positive evidence — arguments present and not matching the pattern; a **parameterless** call, or one whose args
   can't be serialized, is escalated, since an argument gate can't vouch for it). `ToolNameApprovalGate` escalates by
