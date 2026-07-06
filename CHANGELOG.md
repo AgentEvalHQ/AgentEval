@@ -39,6 +39,12 @@ a block). See [`docs/gatekeeper/introduction.md`](docs/gatekeeper/introduction.m
   affirms the call is routine (a throwing gate, an unserializable-args or parameterless call all escalate). Tools
   opt in via `.RequiresApproval()`. Marked `[Experimental("AEGK001")]` as it rides MAF's evaluation-only approval
   API (`MAAI001`).
+- **`CompositeJudgeGate<TRubric>`** (`AgentEval.Guardrails.Judges`) — the Tribunal primitive: a single-axis
+  `IJudgeRubric` (prefilter + one-question prompt + parser) becomes a runtime `IChatGate` backed by a fast model.
+  Prefilter short-circuit (most turns cost 0 tokens) → model under a hard timeout → decisive `JudgeVerdict`
+  (Allowed / Blocked-with-confidence-and-evidence-spans / Inconclusive). Blocked≥threshold blocks (spans →
+  `GateVerdict.Matches`); an inconclusive verdict (timeout / model error / unparseable) fails closed by default.
+  Provider-agnostic (caller supplies the `IChatClient`). Calibrate against a per-axis gold set before going inline.
 - **`agenteval doctor`** double-gating check + `GateMetadataReader.StageFromKey`.
 - **`agenteval redteam --sut gatekeeper-demo`** — a credential-free, deterministic gated demo agent to run the
   attack suite against (the attack-the-gate closed loop), composing with the `--baseline`/`--fail-on regression`
