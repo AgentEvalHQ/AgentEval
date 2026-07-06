@@ -84,7 +84,7 @@ var agent = new ChatClientAgent(client, new ChatClientAgentOptions
         ChatOptions = new ChatOptions { Tools = [issueRefund.RequiresApproval()] },
     })
     .AsBuilder()
-    // Small refunds auto-approve; a large amount (4+ digits) is escalated to a human.
+    // Small refunds auto-approve; a large amount (per the pattern below) is escalated to a human.
     .UseAgentEvalToolApproval([new ArgumentPatternApprovalGate("\"amount\":\\s*[0-9]{4,}")])
     .Build();
 

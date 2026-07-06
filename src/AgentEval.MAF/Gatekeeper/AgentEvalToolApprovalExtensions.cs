@@ -66,7 +66,20 @@ public static class AgentEvalToolApprovalExtensions
         var frozen = new IToolApprovalGate[gates.Count];
         for (var i = 0; i < gates.Count; i++)
         {
-            frozen[i] = gates[i] ?? throw new ArgumentException("gates contains a null element.", nameof(gates));
+            var gate = gates[i] ?? throw new ArgumentException("gates contains a null element.", nameof(gates));
+
+            // A malformed PolicyName (empty/whitespace, or dot segments that split empty) would produce a
+            // gate.approval.<seq>.<policy> key that GateMetadataReader rejects — silently dropping the escalation
+            // evidence. Require a well-formed name at registration so evidence is always readable.
+            if (string.IsNullOrWhiteSpace(gate.PolicyName) ||
+                gate.PolicyName.Split('.').Any(static seg => seg.Length == 0))
+            {
+                throw new ArgumentException(
+                    $"Gate at index {i} has an invalid PolicyName ('{gate.PolicyName}') — it must be non-empty with no empty dot-segments.",
+                    nameof(gates));
+            }
+
+            frozen[i] = gate;
         }
 
         var seq = 0;
