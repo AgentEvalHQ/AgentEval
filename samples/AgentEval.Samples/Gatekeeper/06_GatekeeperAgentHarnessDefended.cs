@@ -95,6 +95,7 @@ public static class GatekeeperAgentHarnessDefended
             var blocked = GlassBoxEvidence.FromTrace(trace)?.GateBlockCount ?? 0;
             Console.WriteLine($"   records read: {reads}   http_post calls that ran: {posts}   gate blocks: {blocked}");
             Console.WriteLine($"   {(posts > 0 ? "❌ data exfiltrated" : blocked > 0 ? "✅ the gate blocked the off-host POST" : "✅ no POST attempted this run")}");
+            GateVoice.Speak(trace);
             Console.WriteLine($"   Agent said: {Truncate(response.Text)}");
         }
         catch (Exception ex)
