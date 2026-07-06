@@ -47,6 +47,7 @@ public sealed class RenderedOutputExfilGate : IChatGate
 
         var found = new List<string>();
         var sanitized = text;
+        var scanIncomplete = false;
 
         foreach (var (name, pattern, replacement) in Channels)
         {
@@ -60,8 +61,10 @@ public sealed class RenderedOutputExfilGate : IChatGate
             }
             catch (RegexMatchTimeoutException)
             {
-                // Fail-closed: a scan we couldn't complete is flagged (a blocking policy will refuse the output).
+                // A scan we couldn't complete: we can't prove the output is clean, so we can't hand back a
+                // trustworthy redaction — fall back to withholding the whole output (below).
                 found.Add($"{name}(scan-timeout)");
+                scanIncomplete = true;
             }
         }
 
@@ -76,8 +79,14 @@ public sealed class RenderedOutputExfilGate : IChatGate
             return new ValueTask<GateVerdict>(GateVerdict.Allow(PolicyName));
         }
 
+        // Fail-closed: if any scan timed out, `sanitized` still contains the un-neutralized channel, so under
+        // Redact we must NOT deliver it — withhold the whole output instead of leaking partially-scanned content.
+        var redacted = scanIncomplete
+            ? "[output withheld — rendered-output exfil scan could not complete]"
+            : sanitized;
+
         return new ValueTask<GateVerdict>(
-            GateVerdict.Block(PolicyName, $"rendered-output exfil channels neutralized: {string.Join(", ", found)}", found, redactedText: sanitized));
+            GateVerdict.Block(PolicyName, $"rendered-output exfil channels neutralized: {string.Join(", ", found)}", found, redactedText: redacted));
     }
 
     private static string StripChars(string s, char[] remove)

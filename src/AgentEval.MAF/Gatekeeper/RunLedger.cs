@@ -96,8 +96,9 @@ public sealed class RunLedger
 
     /// <summary>
     /// Atomically checks the run's budgets and, if all pass, records this call — a single critical section, so it
-    /// is correct even when tool calls are invoked concurrently. A <paramref name="monetaryAmount"/> must be
-    /// non-negative (the caller clamps it); a negative amount is never allowed to reduce the running sum.
+    /// is correct even when tool calls are invoked concurrently. A negative <paramref name="monetaryAmount"/> is
+    /// defensively clamped to zero here (the caller also clamps) so it can never reduce the running sum and
+    /// manufacture budget headroom.
     /// </summary>
     public RunBudgetDecision TryAdmitToolCall(
         string toolName, int? maxTotal, int? maxPerTool, string? monetaryArg, decimal monetaryAmount, decimal maxMonetary)
