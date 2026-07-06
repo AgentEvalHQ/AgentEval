@@ -352,7 +352,7 @@ trace evidence (a warn is never counted as a block). Layers span **tool gates**,
 (auth / rate-limit / quarantine), the red-team **moat**, **canary honeypots** that flag a compromised agent, an
 async **shadow judge** for expensive checks, and **human-in-the-loop approval** for the borderline actions.
 
-**✅ See it (no credentials):** `dotnet run --project samples/AgentEval.Samples` → group **J**, or `agenteval redteam --sut gatekeeper-demo` • [docs/gatekeeper/introduction.md](docs/gatekeeper/introduction.md)
+**✅ See it:** `dotnet run --project samples/AgentEval.Samples` → group **J** (real agents — needs Azure OpenAI), or **credential‑free** via `agenteval redteam --sut gatekeeper-demo` • [docs/gatekeeper/introduction.md](docs/gatekeeper/introduction.md)
 
 ---
 

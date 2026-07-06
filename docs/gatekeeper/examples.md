@@ -1,6 +1,7 @@
 # Gatekeeper — examples
 
-Runnable, **credential‑free** recipes, from a hello‑world to the gates with no simpler equivalent. For
+Runnable recipes, from a hello‑world to the gates with no simpler equivalent (the snippets are provider‑agnostic;
+the runnable **samples** drive a real model — see [Runnable demos](#runnable-demos-real-agents)). For
 the concepts see the [introduction](introduction.md); for what each gate does and how useful it is, the
 [gate reference](gate-reference.md).
 

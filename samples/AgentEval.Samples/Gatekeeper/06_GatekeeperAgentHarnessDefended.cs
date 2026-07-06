@@ -88,13 +88,21 @@ public static class GatekeeperAgentHarnessDefended
                 ToolGatePolicy.Terminate, trace)
             .Build();
 
-        var response = await agent.RunAsync(request);
-        var blocked = GlassBoxEvidence.FromTrace(trace)?.GateBlockCount ?? 0;
-
         Console.WriteLine($"\n▸ {label}");
-        Console.WriteLine($"   records read: {reads}   off-host POSTs that ran: {posts}   gate blocks: {blocked}");
-        Console.WriteLine($"   {(posts == 0 ? "✅ no data left the boundary" : "❌ data exfiltrated")}");
-        Console.WriteLine($"   Agent said: {Truncate(response.Text)}");
+        try
+        {
+            var response = await agent.RunAsync(request);
+            var blocked = GlassBoxEvidence.FromTrace(trace)?.GateBlockCount ?? 0;
+            Console.WriteLine($"   records read: {reads}   off-host POSTs that ran: {posts}   gate blocks: {blocked}");
+            Console.WriteLine($"   {(posts > 0 ? "❌ data exfiltrated" : blocked > 0 ? "✅ the gate blocked the off-host POST" : "✅ no off-host POST attempted this run")}");
+            Console.WriteLine($"   Agent said: {Truncate(response.Text)}");
+        }
+        catch (Exception ex)
+        {
+            Console.ForegroundColor = ConsoleColor.DarkYellow;
+            Console.WriteLine($"   (scene skipped — the model provider rejected the content: {ex.GetType().Name})");
+            Console.ResetColor();
+        }
     }
 
     private static string Truncate(string? s, int max = 150)
