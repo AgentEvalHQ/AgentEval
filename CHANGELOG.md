@@ -80,10 +80,12 @@ a block). See [`docs/gatekeeper/introduction.md`](docs/gatekeeper/introduction.m
   six-scenario enforcement walkthrough, a realistic gated MAF support agent (read→POST exfiltration blocked by
   `SequenceGate`), human-in-the-loop tool approval, the **Beachhead + Tribunal** (budget · exfil · rendered-output
   · a *calibrated* indirect-injection judge that must earn the right to block), and two **genuine MAF Agent
-  Harness** agents (`IChatClient.AsHarnessAgent(new HarnessAgentOptions { … })` — planning + todo + mode + an
-  autonomous loop) — one whose runaway loop is capped by `RunBudgetGate`, one behind full defense-in-depth.
-- **The Gatekeeper's verdict, surfaced** — each sample prints the gate's policy / action / reason (and, for the
-  Tribunal, the judge's rationale + cited evidence spans), read straight from the Glass Box `gate.*` trace via
+  Harness** agents (`IChatClient.AsHarnessAgent(new HarnessAgentOptions { … })` — planning + todo + mode) — one
+  adds an autonomous re-invocation loop and has its runaway loop capped by `RunBudgetGate`, one sits behind
+  defense-in-depth (`RunBudgetGate` + `SequenceGate` + `DomainAllowListGate`). The indirect-injection judge is
+  demonstrated separately (Beachhead+Tribunal) and composes on top; it is not wired into the harness samples.
+- **The Gatekeeper's verdict, surfaced** — the gated samples surface the gate's policy / action / reason (and, for
+  the Tribunal, the judge's rationale + cited evidence spans), read straight from the Glass Box `gate.*` trace via
   `GateMetadataReader.ReadField` — so a blocked run shows *why*, not a dead "(none)". **Glass Box** is now a
   first-class feature in the docs nav ([`docs/glass-box.md`](docs/glass-box.md)).
 
