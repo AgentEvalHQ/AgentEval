@@ -58,15 +58,20 @@ public static class GatekeeperToolApproval
         var session = await large.CreateSessionAsync();
         var paused = await large.RunAsync("Refund my $5000 order.", session);
         var request = paused.Messages.SelectMany(m => m.Contents).OfType<ToolApprovalRequestContent>().FirstOrDefault();
+        if (request is null)
+        {
+            // The large refund MUST escalate; if it didn't, don't print a misleading "approved" success path.
+            Console.ForegroundColor = ConsoleColor.Red;
+            Console.WriteLine("   ⚠️ Expected the $5000 refund to pause for approval, but no request surfaced — aborting.");
+            Console.ResetColor();
+            return;
+        }
         Console.WriteLine($"   The agent wants to issue a $5000 refund — the gate escalated it.");
         Console.WriteLine($"   Large refunds issued so far: {refundsIssued.Count(a => a == 5000)}  (paused — waiting for a human) ⏸️");
 
-        if (request is not null)
-        {
-            // A human reviews and approves → resume on the same session with the approval response.
-            await large.RunAsync([new ChatMessage(ChatRole.User, [request.CreateResponse(true)])], session);
-            Console.WriteLine($"   Human approved → the refund runs. Large refunds issued: {refundsIssued.Count(a => a == 5000)}. ✅");
-        }
+        // A human reviews and approves → resume on the same session with the approval response.
+        await large.RunAsync([new ChatMessage(ChatRole.User, [request.CreateResponse(true)])], session);
+        Console.WriteLine($"   Human approved → the refund runs. Large refunds issued: {refundsIssued.Count(a => a == 5000)}. ✅");
 
         Console.WriteLine("\n   Takeaway: routine actions flow, risky ones pause for a person — one gate,");
         Console.WriteLine("   softer than a hard block. (Rejecting instead would simply never run the tool.)");

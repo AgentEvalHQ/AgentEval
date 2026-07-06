@@ -78,7 +78,11 @@ pending call as *routine* (auto‑approve, no human) or *borderline* (escalate �
 `ToolApprovalRequestContent` that a human approves or rejects).
 
 ```csharp
-var agent = new ChatClientAgent(client, options)
+var agent = new ChatClientAgent(client, new ChatClientAgentOptions
+    {
+        // Opt the tool INTO the approval flow — only .RequiresApproval()-wrapped tools are gated.
+        ChatOptions = new ChatOptions { Tools = [issueRefund.RequiresApproval()] },
+    })
     .AsBuilder()
     // Small refunds auto-approve; a large amount (4+ digits) is escalated to a human.
     .UseAgentEvalToolApproval([new ArgumentPatternApprovalGate("\"amount\":\\s*[0-9]{4,}")])
