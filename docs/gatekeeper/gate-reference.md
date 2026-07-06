@@ -42,6 +42,17 @@ result; `Terminate` → stop the loop), so adding a gate never silently changes 
 > refuses to be registered `WarnOnly`, so `UseAgentEvalToolGate` throws rather than let it be downgraded to
 > observe‑only.
 
+### Budget & egress (off the `RunLedger`)
+
+`RunLedger` is the per‑run **cross‑hop accumulator** (total tool calls, per‑tool counts, monetary sums, observed
+ids) — the deterministic primitive these gates share. Register `UseAgentEvalGate()` so each run gets its own
+ledger.
+
+| Gate | What it does | Rank | Honest reasoning |
+|---|---|:--:|---|
+| **RunBudgetGate** | Caps a run's budget off the `RunLedger`: total tool calls, per‑tool call count, or the running sum of a monetary argument. Blocks the call that would exceed it. | 🟢🟢 **5** | **Denial‑of‑wallet / runaway‑loop** defense with no tool‑body equivalent — cost accrues across the whole orchestration, so no single tool sees the total. Pure‑code, hot‑path safe. (Token/$ and wall‑clock caps need a usage‑capture step — a follow‑up.) |
+| **DomainAllowListGate** | Default‑deny domain allow‑list over the URLs in a tool call's arguments; a host not on the list (subdomains allowed) blocks the call. Fail‑closed on unserializable args / scan timeout. | 🟢🟢 **5** | **Exfiltration** is the payoff of most indirect injection, and an allow‑list is where the literature lands — sub‑millisecond, un‑paraphrasable, and it defends every current and future networked tool from one policy. Resolves the userinfo trick (`https://good.com@evil.com`). Open web‑browse surfaces can't be allow‑listed and degrade to advisory. |
+
 ## The moat — your red‑team probes become gates
 
 The most direct expression of the whole toolkit: the **same oracle that scores an attack offline now blocks it

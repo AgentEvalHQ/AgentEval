@@ -47,6 +47,29 @@ var agent = baseAgent.AsBuilder()
 // Once the agent reads customer data, any send/POST in the same run is blocked — exfiltration stopped.
 ```
 
+## Cap the budget & block exfil domains
+
+Two deterministic, hot-path-safe controls off the per-run `RunLedger`: stop a runaway/hijacked agent from
+burning budget, and default-deny where its tools can reach.
+
+```csharp
+var agent = baseAgent.AsBuilder()
+    .UseAgentEvalGate()   // establishes the per-run RunLedger scope
+    .UseAgentEvalToolGate(
+        [
+            // Denial-of-wallet: at most 20 tool calls / run, at most 1 delete, refunds sum ≤ $1000/run.
+            new RunBudgetGate(
+                maxToolCalls: 20,
+                maxCallsPerTool: new Dictionary<string, int> { ["delete_account"] = 1 },
+                maxMonetaryPerRun: ("amount", 1000m)),
+
+            // Exfil: any http/email tool may only reach these hosts (subdomains allowed).
+            new DomainAllowListGate(["api.mycompany.com", "stripe.com"]),
+        ],
+        ToolGatePolicy.Terminate)
+    .Build();
+```
+
 ## The honeypot — detect a compromised agent
 
 A canary is a lure the agent has **no legitimate reason to touch**. Advertise it as a real tool; the model
