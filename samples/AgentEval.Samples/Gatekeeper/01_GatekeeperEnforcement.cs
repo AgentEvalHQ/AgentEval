@@ -71,7 +71,7 @@ public static class GatekeeperEnforcement
         catch (Exception ex)
         {
             Console.ForegroundColor = ConsoleColor.DarkYellow;
-            Console.WriteLine($"   (scene skipped — the model provider rejected the content: {ex.GetType().Name}. That's a provider-side filter, not this gate.)");
+            Console.WriteLine($"   (scene skipped — {ex.GetType().Name}. If it's an Azure content_filter, that's a provider-side defense; otherwise an unexpected error.)");
             Console.ResetColor();
         }
     }

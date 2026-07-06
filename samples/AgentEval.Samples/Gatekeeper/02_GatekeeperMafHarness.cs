@@ -88,7 +88,7 @@ public static class GatekeeperMafHarness
         catch (Exception ex)
         {
             Console.ForegroundColor = ConsoleColor.DarkYellow;
-            Console.WriteLine($"   (scene skipped — the model provider rejected the content: {ex.GetType().Name})");
+            Console.WriteLine($"   (scene skipped — {ex.GetType().Name}. If it is an Azure content_filter, that is a provider-side defense; otherwise an unexpected error.)");
             Console.ResetColor();
         }
     }
