@@ -64,16 +64,17 @@ public static class GatekeeperAgentHarness
         })
             .AsBuilder()
             .UseAgentEvalGate()                            // establishes the per-run RunLedger scope
-            .UseAgentEvalToolGate([new RunBudgetGate(maxToolCalls: Budget)], ToolGatePolicy.ReplaceResult, trace)
+            // Terminate (not ReplaceResult): a runaway loop is only truly capped if the RUN stops — otherwise the
+            // model keeps looping on blocked results and still burns tokens (which defeats denial-of-wallet).
+            .UseAgentEvalToolGate([new RunBudgetGate(maxToolCalls: Budget)], ToolGatePolicy.Terminate, trace)
             .Build();
 
         Console.WriteLine($"   Model: {AIConfig.ModelDeployment} — driving a real autonomous research loop (budget = {Budget}).\n");
         var response = await agent.RunAsync("Investigate ticket #4821 — a customer's recurring billing error.");
 
         var blocked = GlassBoxEvidence.FromTrace(trace)?.GateBlockCount ?? 0;
-        Console.WriteLine($"   `search` calls the model attempted: {searches + blocked}");
-        Console.WriteLine($"   `search` calls that actually ran:   {searches}   (blocked by budget: {blocked})");
-        Console.WriteLine($"   {(searches > Budget ? "❌ over budget" : blocked > 0 ? $"✅ the autonomous loop was capped at {Budget} by RunBudgetGate" : "the model stayed under budget on its own this run — nothing for the gate to cap (re-run to see the cap)")}");
+        Console.WriteLine($"   `search` calls that actually ran: {searches}   (over-budget call that stopped the run: {blocked})");
+        Console.WriteLine($"   {(blocked > 0 ? $"✅ RunBudgetGate terminated the run at the {Budget}-call budget — the runaway loop is capped" : "the model stayed under budget on its own this run — nothing to cap (re-run to see the cap)")}");
         Console.WriteLine($"\n   Agent's answer: {Truncate(response.Text)}");
         Console.WriteLine("\n   → The Harness makes an agent loop autonomously; the Gatekeeper keeps the loop from running away.");
         Console.WriteLine("\n=== Gatekeeper × Agent Harness (simple) Complete ===");
