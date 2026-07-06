@@ -30,8 +30,8 @@ internal static class GateVoice
                 Seq: SeqOf(kv.Key),
                 Policy: GateMetadataReader.PolicyFromKey(kv.Key) ?? kv.Key,
                 Stage: GateMetadataReader.StageFromKey(kv.Key) ?? "?",
-                Action: Field(kv.Value, "action") ?? "?",
-                Reason: Field(kv.Value, "reason")))
+                Action: GateMetadataReader.ReadField(kv.Value, "action") ?? "?",
+                Reason: GateMetadataReader.ReadField(kv.Value, "reason")))
             .OrderBy(v => v.Seq)
             .ToList();
         if (verdicts.Count == 0)
@@ -77,7 +77,4 @@ internal static class GateVoice
         var parts = key.Split('.');
         return parts.Length >= 3 && int.TryParse(parts[2], out var s) ? s : 0;
     }
-
-    private static string? Field(object? value, string name)
-        => value is IReadOnlyDictionary<string, object?> d && d.TryGetValue(name, out var v) ? v?.ToString() : null;
 }

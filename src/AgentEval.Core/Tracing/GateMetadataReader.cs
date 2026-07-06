@@ -54,11 +54,20 @@ public static class GateMetadataReader
             && parts[3..].All(static p => p.Length > 0);    // policy — no empty segments (no leading/trailing/double dot)
     }
 
-    private static string? ReadAction(object? value) => value switch
+    private static string? ReadAction(object? value) => ReadField(value, "action");
+
+    /// <summary>
+    /// Reads a named string field from a recorded gate-verdict value (e.g. <c>"action"</c>, <c>"reason"</c>),
+    /// handling BOTH the in-memory <see cref="IReadOnlyDictionary{TKey,TValue}"/> shape and the
+    /// <see cref="JsonElement"/> shape a reloaded (serialized) trace deserializes to. Returns null when absent.
+    /// </summary>
+    public static string? ReadField(object? value, string field) => value switch
     {
-        IReadOnlyDictionary<string, object?> dict => dict.TryGetValue("action", out var a) ? a as string : null,
+        IReadOnlyDictionary<string, object?> dict => dict.TryGetValue(field, out var v) ? v?.ToString() : null,
         JsonElement je when je.ValueKind == JsonValueKind.Object =>
-            je.TryGetProperty("action", out var a) && a.ValueKind == JsonValueKind.String ? a.GetString() : null,
+            je.TryGetProperty(field, out var p)
+                ? p.ValueKind switch { JsonValueKind.String => p.GetString(), JsonValueKind.Null => null, _ => p.ToString() }
+                : null,
         _ => null,
     };
 }
