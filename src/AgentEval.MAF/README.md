@@ -1,7 +1,7 @@
 # AgentEval.MAF
 
 The **Microsoft Agent Framework (MAF) integration layer** for [AgentEval](../../README.md). This is where
-AgentEval stops being an offline test harness and plugs into a live agent pipeline.
+AgentEval stops being an offline evaluation harness and plugs into a live agent pipeline.
 
 > **Packaging:** this project is `IsPackable=false`. Its DLL ships **bundled inside the `AgentEval` NuGet
 > package** (there is no separate `AgentEval.MAF` package on nuget.org) — so `dotnet add package AgentEval` gives
@@ -22,8 +22,8 @@ AgentEval stops being an offline test harness and plugs into a live agent pipeli
   - **Tool approval** — `UseAgentEvalToolApproval` routes a *borderline* call to a human over MAF's native
     `UseToolApproval` (experimental, `AEGK001`).
   - The **moat** (red-team probes as gates) lives in the sibling `AgentEval.RedTeam.Gatekeeper`.
-- **Agent adapters** — bridge a MAF `AIAgent` to AgentEval's evaluable-agent surface so the same test suites run
-  against a real MAF agent.
+- **Agent adapters** — bridge a MAF `AIAgent` to AgentEval's evaluable-agent surface so the same evaluation
+  suites run against a real MAF agent.
 - **Light path** — surface AgentEval's metrics as a `Microsoft.Extensions.AI` `IEvaluator`, so they drop into
   MAF's own evaluation pipeline (`agent.EvaluateAsync(...)`).
 
