@@ -1,6 +1,6 @@
 # Gatekeeper — examples
 
-Runnable, **credential‑free** recipes, from a 30‑second hello‑world to the gates with no simpler equivalent. For
+Runnable, **credential‑free** recipes, from a hello‑world to the gates with no simpler equivalent. For
 the concepts see the [introduction](introduction.md); for what each gate does and how useful it is, the
 [gate reference](gate-reference.md).
 
