@@ -22,9 +22,14 @@ a block). See [`docs/gatekeeper/introduction.md`](docs/gatekeeper/introduction.m
   per-run scoped). A gate can declare a `MinimumPolicy` enforcement floor so a honeypot can't be silently
   downgraded to observe-only. Network/LLM-cost gates are rejected inline (`GateCost`).
 - **Budget & egress gates** (off the new `RunLedger` per-run cross-hop accumulator) — `RunBudgetGate` caps a run's
-  total tool calls / per-tool count / running monetary sum (denial-of-wallet, runaway-loop), and
-  `DomainAllowListGate` enforces a default-deny domain allow-list over the URLs in tool arguments (exfiltration
-  defense; resolves the `user@host` trick; fail-closed on unserializable args / scan timeout).
+  total tool calls / per-tool count / running monetary sum (denial-of-wallet, runaway-loop; atomic check+record,
+  negatives can't manufacture headroom), and `DomainAllowListGate` enforces a domain allow-list over the URLs in
+  tool arguments (exfiltration defense; catches scheme-relative `//host` and non-http schemes; resolves the
+  `user@host` trick; fail-closed on unserializable args / scan timeout).
+- **`RenderedOutputExfilGate`** (`AgentEval.Guardrails.Gates`) — a run-post `IChatGate` that neutralizes exfil
+  channels a client auto-fetches or hides when it *renders* the answer: markdown image beacons, fetching HTML
+  tags, `data:` URIs, and zero-width characters. Redacts under `EvalGatePolicy.Redact`; fail-closed on scan
+  timeout. Complements `DomainAllowListGate` (tool-argument URLs) to cover both egress paths.
 - **Run gate** — `UseAgentEvalGate` inspects the run's input (incoming-attack detection) and output text,
   reusing the shipped `IChatGate`/`EvalGatePolicy`; establishes an `AgentRunScope` (stable across streaming
   segments) so inner gates can read the run context.
