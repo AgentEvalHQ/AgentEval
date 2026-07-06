@@ -58,8 +58,11 @@ public class CompositeAgentEvaluatorTests
     [Fact]
     public async Task Timeout_PerInnerCeiling_MarksSkipped_OtherSurvives()
     {
+        // The slow work is deliberately far longer than the ceiling (a wide window) so a thread-starved CI runner
+        // still fires the 50 ms ceiling before the work could finish — the ceiling cancels the work either way, so
+        // a long delay does not slow the happy path.
         var comp = new CompositeAgentEvaluator(
-            [("fast", Fast("fast"), null), ("slow", Slow("slow", 2000), TimeSpan.FromMilliseconds(50))]);
+            [("fast", Fast("fast"), null), ("slow", Slow("slow", 20000), TimeSpan.FromMilliseconds(50))]);
 
         await comp.EvaluateAsync(Items(1), "t", CancellationToken.None);
 

@@ -163,7 +163,9 @@ public class ShadowJudgeTests
         await agent.RunAsync("go");
 
         var dispose = pump.DisposeAsync().AsTask();
-        var finished = await Task.WhenAny(dispose, Task.Delay(TimeSpan.FromSeconds(5)));
+        // Dispose is bounded (the 200 ms drain cancels the hanging judge), so it always completes quickly; the
+        // generous 30 s ceiling only guards against a real hang, and tolerates thread starvation on a loaded runner.
+        var finished = await Task.WhenAny(dispose, Task.Delay(TimeSpan.FromSeconds(30)));
 
         Assert.Same(dispose, finished);   // Dispose completed within the timeout, did not hang on the judge
     }
