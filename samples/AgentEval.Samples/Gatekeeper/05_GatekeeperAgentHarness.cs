@@ -1,30 +1,27 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 AgentEval Contributors
 
+#pragma warning disable MAAI001 // Microsoft.Agents.AI.Harness (AsHarnessAgent) is experimental.
+
 using AgentEval.MAF.Gatekeeper;
 using AgentEval.Tracing;
 using Azure.AI.OpenAI;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
 using AgentTrace = AgentEval.Tracing.AgentTrace;
-using ChatRole = Microsoft.Extensions.AI.ChatRole;
 
 namespace AgentEval.Samples;
 
 /// <summary>
-/// Gatekeeper × MAF Agent Harness (simple) — cap an autonomous, looping agent.
+/// Gatekeeper × MAF Agent Harness (simple) — cap a REAL, autonomous HarnessAgent.
 ///
-/// The <b>MAF Agent Harness</b> makes a <see cref="ChatClientAgent"/> more capable by composing
-/// <see cref="AIContextProvider"/>s (mission brief, planning, file access) and letting it <b>loop</b> until the
-/// task is done. That autonomy is where a runaway loop burns budget — so the most valuable gate for a harness
-/// agent is <c>RunBudgetGate</c>.
-///
-/// A <b>real</b> model drives the loop here: a harness agent (a <see cref="ChatClientAgent"/> + an
-/// <see cref="AIContextProvider"/> mission) is told to research exhaustively, so it wants many <c>search</c>
-/// calls — and <c>RunBudgetGate</c> caps how many actually run.
+/// This uses the genuine MAF Agent Harness: <c>IChatClient.AsHarnessAgent(new HarnessAgentOptions { … })</c>,
+/// which pre-wires planning, todo, mode, and an autonomous <b>loop</b> (LoopAgent + LoopEvaluators) onto a
+/// <see cref="ChatClientAgent"/>. That autonomy is where a runaway loop burns budget — so we wrap the harness
+/// agent in <c>RunBudgetGate</c> and let it stop the run when the loop exceeds its tool-call budget.
 ///
 /// 🔑 Requires Azure OpenAI credentials (AZURE_OPENAI_ENDPOINT / _API_KEY / _DEPLOYMENT).
-/// ⏱️ Time to understand: 1 minute
+/// ⏱️ Time to understand: 2 minutes
 /// </summary>
 public static class GatekeeperAgentHarness
 {
@@ -49,32 +46,42 @@ public static class GatekeeperAgentHarness
             (string query) => { searches++; return $"[3 knowledge-base hits for '{query}']"; },
             "search", "Search the support knowledge base for a query.");
 
-        // The Harness capability-injection pattern: a provider that supplies the agent's mission each turn.
-        var brief = new MissionBriefProvider(
-            "You are an autonomous research agent. Investigate the ticket EXHAUSTIVELY: search the knowledge base " +
-            "for many distinct angles (billing system, refunds, prior tickets, edge cases, ...) — a dozen or more " +
-            "separate searches — before you answer.");
-
-        var trace = new AgentTrace();
-        var agent = new ChatClientAgent(chatClient, new ChatClientAgentOptions
+        // A REAL MAF Agent Harness agent — planning + todo + mode + an autonomous loop, via AsHarnessAgent.
+        AIAgent harness = chatClient.AsHarnessAgent(new HarnessAgentOptions
         {
-            Name = "HarnessAgent",
-            AIContextProviders = [brief],                 // ← MAF Agent Harness: capability injection
-            ChatOptions = new ChatOptions { Tools = [search] },
-        })
-            .AsBuilder()
-            .UseAgentEvalGate()                            // establishes the per-run RunLedger scope
-            // Terminate (not ReplaceResult): a runaway loop is only truly capped if the RUN stops — otherwise the
-            // model keeps looping on blocked results and still burns tokens (which defeats denial-of-wallet).
+            Name = "ResearchHarness",
+            Description = "An autonomous research agent that plans and executes.",
+            MaxContextWindowTokens = 120_000,
+            MaxOutputTokens = 4_000,
+            DisableFileAccess = true,
+            DisableWebSearch = true,   // gpt-4o-mini (chat completions) doesn't support the harness's built-in web_search_options
+            DisableFileMemory = true,  // keep the demo self-contained (no on-disk agent-files/ working dir)
+            // In "execute" mode the harness keeps re-invoking itself (its loop) until its todos are done.
+            LoopEvaluators = [new TodoCompletionLoopEvaluator(new TodoCompletionLoopEvaluatorOptions { Modes = ["execute"] })],
+            LoopAgentOptions = new LoopAgentOptions { MaxIterations = 12 },
+            ChatOptions = new ChatOptions
+            {
+                Instructions =
+                    "You are an autonomous research agent. Plan the ticket, then in execute mode use the `search` " +
+                    "tool MANY times — at least a dozen distinct queries across billing, refunds, prior tickets and " +
+                    "edge cases — before you answer.",
+                Tools = [search],
+            },
+        });
+
+        // Wrap the REAL harness agent in the Gatekeeper — cap the autonomous loop's tool calls.
+        var trace = new AgentTrace();
+        AIAgent gated = harness.AsBuilder()
+            .UseAgentEvalGate()   // establishes the per-run RunLedger scope
             .UseAgentEvalToolGate([new RunBudgetGate(maxToolCalls: Budget)], ToolGatePolicy.Terminate, trace)
             .Build();
 
-        Console.WriteLine($"   Model: {AIConfig.ModelDeployment} — driving a real autonomous research loop (budget = {Budget}).\n");
-        var response = await agent.RunAsync("Investigate ticket #4821 — a customer's recurring billing error.");
+        Console.WriteLine($"   Model: {AIConfig.ModelDeployment} — a REAL MAF HarnessAgent (AsHarnessAgent), budget = {Budget}.\n");
+        var response = await gated.RunAsync("Investigate ticket #4821 — a customer's recurring billing error.");
 
         var blocked = GlassBoxEvidence.FromTrace(trace)?.GateBlockCount ?? 0;
-        Console.WriteLine($"   `search` calls that actually ran: {searches}   (over-budget call that stopped the run: {blocked})");
-        Console.WriteLine($"   {(blocked > 0 ? $"✅ RunBudgetGate terminated the run at the {Budget}-call budget — the runaway loop is capped" : "the model stayed under budget on its own this run — nothing to cap (re-run to see the cap)")}");
+        Console.WriteLine($"   `search` calls that ran: {searches}   (over-budget call that stopped the run: {blocked})");
+        Console.WriteLine($"   {(blocked > 0 ? $"✅ RunBudgetGate terminated the harness at the {Budget}-call budget — the runaway loop is capped" : "the harness stayed under budget on its own this run")}");
         GateVoice.Speak(trace);
         Console.WriteLine($"\n   Agent's answer: {Truncate(response.Text)}");
         Console.WriteLine("\n   → The Harness makes an agent loop autonomously; the Gatekeeper keeps the loop from running away.");
@@ -84,22 +91,13 @@ public static class GatekeeperAgentHarness
     private static string Truncate(string? s, int max = 160)
         => string.IsNullOrEmpty(s) ? "(none)" : s.Length <= max ? s : s[..max] + "…";
 
-    // The MAF AIContextProvider pattern — injects the agent's mission into context before each model call.
-    private sealed class MissionBriefProvider : AIContextProvider
-    {
-        private readonly string _mission;
-        public MissionBriefProvider(string mission) => _mission = mission;
-        protected override ValueTask<AIContext> ProvideAIContextAsync(InvokingContext context, CancellationToken cancellationToken = default)
-            => new(new AIContext { Messages = [new ChatMessage(ChatRole.System, _mission)] });
-    }
-
     private static void PrintHeader()
     {
         Console.ForegroundColor = ConsoleColor.Magenta;
         Console.WriteLine(@"
 ╔═══════════════════════════════════════════════════════════════════════════════╗
 ║   🚪 GATEKEEPER × MAF AGENT HARNESS — SIMPLE                                   ║
-║   A real autonomous, looping harness agent, capped by RunBudgetGate             ║
+║   A REAL AsHarnessAgent, its autonomous loop capped by RunBudgetGate            ║
 ╚═══════════════════════════════════════════════════════════════════════════════╝");
         Console.ResetColor();
     }

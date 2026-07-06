@@ -218,10 +218,11 @@ judge scoring a gold set), and where a well‑aligned model resists an attack th
   `RenderedOutputExfilGate` (rendered‑output beacon), and a **calibrated** indirect‑injection judge that earns the
   right to block.
 - [`Gatekeeper/05_GatekeeperAgentHarness`](../../samples/AgentEval.Samples/Gatekeeper/05_GatekeeperAgentHarness.cs) —
-  **× MAF Agent Harness (simple)**: an autonomous, looping harness agent (a `ChatClientAgent` + an
-  `AIContextProvider`) capped by `RunBudgetGate`.
+  **× MAF Agent Harness (simple)**: a genuine MAF Agent Harness agent (`IChatClient.AsHarnessAgent(new
+  HarnessAgentOptions { … })` — planning + todo + mode + an autonomous `LoopAgent`) whose runaway loop is capped by
+  `RunBudgetGate`.
 - [`Gatekeeper/06_GatekeeperAgentHarnessDefended`](../../samples/AgentEval.Samples/Gatekeeper/06_GatekeeperAgentHarnessDefended.cs) —
-  **× MAF Agent Harness (defended)**: a capable harness agent behind defense‑in‑depth (budget + `SequenceGate` +
+  **× MAF Agent Harness (defended)**: a genuine `AsHarnessAgent` behind defense‑in‑depth (budget + `SequenceGate` +
   `DomainAllowListGate`) — legit work flows, the read→POST exfiltration is blocked.
 
 ## From the CLI

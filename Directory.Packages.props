@@ -19,6 +19,7 @@
     <PackageVersion Include="Microsoft.Agents.AI.Workflows" Version="1.12.0" />
     <PackageVersion Include="Microsoft.Agents.AI.Workflows.Generators" Version="1.12.0" />
     <PackageVersion Include="Microsoft.Agents.AI.Foundry" Version="1.12.0-preview.260629.1" /><!-- preview-only; sample-only -->
+    <PackageVersion Include="Microsoft.Agents.AI.Harness" Version="1.12.0-preview.260629.1" /><!-- preview-only; sample-only — the real Agent Harness (AsHarnessAgent) -->
     <PackageVersion Include="Azure.AI.Projects" Version="2.1.0-beta.3" /><!-- required by Microsoft.Agents.AI.Foundry -->
     
     <!-- Microsoft Extensions AI -->
