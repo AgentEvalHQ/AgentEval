@@ -171,6 +171,7 @@ runtime gates that block bad actions before they happen. See **`docs/gatekeeper.
 |---|--------|-------------------|--------|------|
 | 1 | **Enforcement Walkthrough** | Scenarios across the gate layers: tool / moat / canary / shadow-judge / defense-in-depth / more gates | No | 5 min |
 | 2 | **MAF Agent Harness** | A realistic gated MAF support agent — a legit request flows, a prompt-injection attack is blocked at the tool boundary | No | 2 min |
+| 3 | **Tool Approval (human-in-the-loop)** | Routine calls auto-approve; risky ones pause for a human via MAF's `UseToolApproval` (approve → resume) | No | 3 min |
 
 ---
 

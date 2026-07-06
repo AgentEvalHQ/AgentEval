@@ -32,6 +32,11 @@ a block). See [`docs/gatekeeper.md`](docs/gatekeeper.md) and [ADR-025](docs/adr/
 - **Shadow judge** — `UseAgentEvalShadowJudge` + an owned `ShadowJudgePump`: runs the expensive LLM/network
   checks the inline gates reject, off the hot path, over an immutable snapshot; an adverse verdict arms
   quarantine for a *later* run instead of blocking the one it observed.
+- **Tool approval (human-in-the-loop)** — `UseAgentEvalToolApproval` composes an `IToolApprovalGate`
+  (`ArgumentPatternApprovalGate` built-in) with MAF's native `UseToolApproval`: a routine call auto-approves, a
+  borderline call escalates to a human (fail-closed — auto-approve only when *every* gate agrees; a throwing gate
+  escalates), recorded as `gate.approval.*` evidence. Tools opt in via `.RequiresApproval()`. Marked
+  `[Experimental("AEGK001")]` as it rides MAF's evaluation-only approval API (`MAAI001`).
 - **`agenteval doctor`** double-gating check + `GateMetadataReader.StageFromKey`.
 - **`agenteval redteam --sut gatekeeper-demo`** — a credential-free, deterministic gated demo agent to run the
   attack suite against (the attack-the-gate closed loop), composing with the `--baseline`/`--fail-on regression`

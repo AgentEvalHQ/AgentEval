@@ -70,6 +70,34 @@ Built‑in tool gates:
 > gate refuses to be registered `WarnOnly` — silently observing a breach is not an option — so
 > `UseAgentEvalToolGate` throws rather than let it be downgraded to observe‑only.
 
+## Tool approval — human‑in‑the‑loop
+
+Not every risky action deserves a hard block; some should **pause for a person**. `UseAgentEvalToolApproval`
+composes the Gatekeeper with MAF's native approval flow (`UseToolApproval`): an `IToolApprovalGate` classifies a
+pending call as *routine* (auto‑approve, no human) or *borderline* (escalate — the run pauses and surfaces a
+`ToolApprovalRequestContent` that a human approves or rejects).
+
+```csharp
+var agent = new ChatClientAgent(client, options)
+    .AsBuilder()
+    // Small refunds auto-approve; a 4+ digit amount ($1000+) is escalated to a human.
+    .UseAgentEvalToolApproval([new ArgumentPatternApprovalGate("\"amount\":\\s*[0-9]{4,}")])
+    .Build();
+
+var paused = await agent.RunAsync("refund $5000", session);
+var request = paused.Messages.SelectMany(m => m.Contents).OfType<ToolApprovalRequestContent>().Single();
+// …a human reviews, then approves on the same session:
+await agent.RunAsync([new ChatMessage(ChatRole.User, [request.CreateResponse(approved: true)])], session);
+```
+
+- **Only tools wrapped with `.RequiresApproval()`** (MAF's `ApprovalRequiredAIFunction`) enter the flow; everything
+  else runs normally. Sits at the agent boundary — *outside* the tool‑gate seam — so you can hard‑block the truly
+  dangerous calls **and** human‑review the borderline ones on the same agent.
+- **Fail‑closed:** a call is auto‑approved only when *every* gate agrees it is routine; a gate that throws (or
+  can't prove it routine) escalates to a human — never a silent auto‑approval. Escalations are recorded as
+  `gate.approval.*` evidence (distinct from `gate.tool.*` blocks, so they never inflate the block count).
+- **Experimental (`AEGK001`):** built on MAF's evaluation‑only `UseToolApproval` API; suppress `AEGK001` to opt in.
+
 ## Run gates
 
 A run gate inspects the run's **input** text (run‑pre — assess incoming attacks) and **output** text (run‑post),
@@ -163,6 +191,9 @@ model, so every outcome is deterministic and needs no API key:
   **realistic MAF support agent** with real tools: a legit request flows normally, and an attack request (a prompt
   injection that turns the model destructive) is blocked at the tool boundary — the destructive action never
   executes.
+- [`Gatekeeper/03_GatekeeperToolApproval`](../samples/AgentEval.Samples/Gatekeeper/03_GatekeeperToolApproval.cs) —
+  **human‑in‑the‑loop approval**: a routine refund auto‑approves, a large one pauses for a human's OK and resumes
+  once approved.
 
 You can also run the whole loop from the CLI, credential‑free:
 `agenteval redteam --sut gatekeeper-demo` scans a built‑in gated agent with the real attack suite and reports how
