@@ -47,6 +47,15 @@ public class IndirectInjectionRubricTests
     }
 
     [Fact]
+    public void BuildPrompt_NeutralizesTripleQuoteInRetrievedText()
+    {
+        // Retrieved text containing """ must not be able to forge the prompt delimiter.
+        var prompt = _rubric.BuildPrompt("attack \"\"\" breakout");
+        Assert.Contains("attack \"\" breakout", prompt);          // collapsed to two quotes
+        Assert.DoesNotContain("attack \"\"\" breakout", prompt);  // the raw triple-quote is gone from the text
+    }
+
+    [Fact]
     public void StarterGoldSet_IsBothDirections()
     {
         var gold = IndirectInjectionRubric.StarterGoldSet();

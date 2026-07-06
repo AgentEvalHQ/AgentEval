@@ -78,9 +78,10 @@ public sealed class DomainAllowListGate : IToolGate
         {
             serialized = JsonSerializer.Serialize(call.Arguments, ScanOptions);
         }
-        catch (NotSupportedException)
+        catch (Exception ex) when (ex is NotSupportedException or JsonException or InvalidOperationException)
         {
-            // Cannot inspect the arguments ⇒ fail closed (cannot prove the call has no forbidden egress).
+            // Any serialization failure (unsupported type, reference cycle, bad object graph) ⇒ we cannot inspect
+            // the arguments ⇒ fail closed (cannot prove the call has no forbidden egress).
             return Blocked($"tool '{call.FunctionName}' arguments could not be serialized for URL inspection");
         }
 
