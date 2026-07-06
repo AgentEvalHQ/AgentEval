@@ -30,6 +30,13 @@ a block). See [`docs/gatekeeper/introduction.md`](docs/gatekeeper/introduction.m
   channels a client auto-fetches or hides when it *renders* the answer: markdown image beacons, fetching HTML
   tags, `data:` URIs, and zero-width characters. Redacts under `EvalGatePolicy.Redact`; fail-closed on scan
   timeout. Complements `DomainAllowListGate` (tool-argument URLs) to cover both egress paths.
+- **`CompositeJudgeGate<TRubric>`** (`AgentEval.Guardrails.Judges`) — the Tribunal primitive: a single-axis
+  `IJudgeRubric` (prefilter + prompt + parser) becomes a runtime `IChatGate` backed by a fast model. Prefilter
+  short-circuit (most turns skip the model) → model under a hard timeout → decisive `JudgeVerdict` (Allowed /
+  Blocked-with-confidence-and-evidence-spans / Inconclusive). Blocked above the confidence threshold blocks (spans
+  → `GateVerdict.Matches`); an inconclusive verdict (timeout / model error / unparseable, incl. a non-finite
+  confidence) fails closed by default. Provider-agnostic (caller supplies the `IChatClient`). Calibrate against a
+  per-axis gold set before going inline.
 - **Run gate** — `UseAgentEvalGate` inspects the run's input (incoming-attack detection) and output text,
   reusing the shipped `IChatGate`/`EvalGatePolicy`; establishes an `AgentRunScope` (stable across streaming
   segments) so inner gates can read the run context.

@@ -134,11 +134,13 @@ The same pattern applies to **`SafetyMetricGate`‑style checks on both input an
 data‑exfiltration intent): a cheap deterministic version can run inline, while an LLM‑judge version belongs in a
 fast run‑pre / run‑post gate or the shadow judge.
 
-> **You can build this today with the existing seams.** For example, a **PI‑detection Composite Judge** built for
-> speed (small model, single‑axis rubric) plugs into the run‑pre seam as a custom `IChatGate`; and because a
-> judge‑as‑a‑gate is itself a detection task, you can score that same judge against a labelled corpus of injection
-> vs. benign prompts — running it *in parallel* — to calibrate its accuracy before trusting it inline. Both
-> evaluate an **incoming prompt**, not an agent response, so they fit the run‑pre gate cleanly.
+> **The primitive ships: `CompositeJudgeGate<TRubric>`.** Write a single‑axis `IJudgeRubric` — a cheap prefilter
+> (so most turns skip the model entirely) + a one‑question prompt + a parser — and wrap it in a `CompositeJudgeGate`
+> backed by a fast (*mini*/*nano*) model; it plugs into the run‑pre seam as an `IChatGate`. It runs the model under
+> a hard timeout and **fails closed** on an inconclusive verdict (timeout / model error / unparseable reply),
+> citing evidence spans in the gate verdict. **Calibrate before you trust it inline:** because a judge‑as‑a‑gate is
+> itself a detection task, score the same rubric against a labelled corpus of injection vs. benign prompts to
+> confirm it beats the deterministic baseline before it blocks live traffic (the calibration harness).
 
 ## `agenteval doctor` — a double‑gating check
 
