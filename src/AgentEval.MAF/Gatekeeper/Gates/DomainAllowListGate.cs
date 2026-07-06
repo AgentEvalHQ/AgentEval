@@ -42,7 +42,11 @@ public sealed class DomainAllowListGate : IToolGate
     /// <inheritdoc/>
     public GateCost Cost => GateCost.Bounded;
 
-    /// <summary>Creates the gate from the allowed domains (bare hosts, e.g. <c>"api.example.com"</c>). Default-deny: at least one is required.</summary>
+    /// <summary>
+    /// Creates the gate from the allowed domains — bare hosts, e.g. <c>"api.example.com"</c> (an IPv6 literal must
+    /// be bracketed, e.g. <c>"[::1]"</c>; a bare <c>"::1"</c> is mis-parsed as host:port and ignored). Default-deny:
+    /// at least one is required.
+    /// </summary>
     public DomainAllowListGate(IEnumerable<string> allowedDomains, string? policyName = null)
     {
         ArgumentNullException.ThrowIfNull(allowedDomains);
