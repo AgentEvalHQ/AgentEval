@@ -13,7 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 fail-closed. It puts the same checks you red-team with into the request path so a forbidden tool call, a
 poisoned argument, or a compromised conversation is blocked *before* it happens. Every gate is fail-closed
 (cannot-inspect ⇒ deny) and records honest `gate.*` evidence into the `AgentTrace` (a warn is never counted as
-a block). See [`docs/gatekeeper.md`](docs/gatekeeper.md) and [ADR-025](docs/adr/025-gatekeeper-runtime-fail-closed-enforcement.md).
+a block). See [`docs/gatekeeper/introduction.md`](docs/gatekeeper/introduction.md) and [ADR-025](docs/adr/025-gatekeeper-runtime-fail-closed-enforcement.md).
 
 #### Added
 - **Tool gates** (`AgentEval.MAF.Gatekeeper`) — `UseAgentEvalToolGate` over the MAF function-invocation seam:
@@ -32,11 +32,18 @@ a block). See [`docs/gatekeeper.md`](docs/gatekeeper.md) and [ADR-025](docs/adr/
 - **Shadow judge** — `UseAgentEvalShadowJudge` + an owned `ShadowJudgePump`: runs the expensive LLM/network
   checks the inline gates reject, off the hot path, over an immutable snapshot; an adverse verdict arms
   quarantine for a *later* run instead of blocking the one it observed.
+- **Tool approval (human-in-the-loop)** — `UseAgentEvalToolApproval` composes `IToolApprovalGate`s
+  (`ArgumentPatternApprovalGate` by argument content, `ToolNameApprovalGate` by identity) with MAF's native
+  `UseToolApproval`: a routine call auto-approves, a borderline call escalates to a human, recorded as
+  `gate.approval.*` evidence. Fail-closed — at least one gate is required, auto-approve only when *every* gate
+  affirms the call is routine (a throwing gate, an unserializable-args or parameterless call all escalate). Tools
+  opt in via `.RequiresApproval()`. Marked `[Experimental("AEGK001")]` as it rides MAF's evaluation-only approval
+  API (`MAAI001`).
 - **`agenteval doctor`** double-gating check + `GateMetadataReader.StageFromKey`.
 - **`agenteval redteam --sut gatekeeper-demo`** — a credential-free, deterministic gated demo agent to run the
   attack suite against (the attack-the-gate closed loop), composing with the `--baseline`/`--fail-on regression`
   gate.
-- **Docs + samples** — `docs/gatekeeper.md` and the credential-free **Gatekeeper** sample group (menu group J):
+- **Docs + samples** — `docs/gatekeeper/introduction.md` and the credential-free **Gatekeeper** sample group (menu group J):
   `Gatekeeper/01_GatekeeperEnforcement` (the six-scenario enforcement walkthrough) and
   `Gatekeeper/02_GatekeeperMafHarness` (a realistic gated MAF support agent).
 
