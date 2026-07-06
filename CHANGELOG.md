@@ -42,6 +42,15 @@ a block). See [`docs/gatekeeper/introduction.md`](docs/gatekeeper/introduction.m
   a block). Compose single-axis judges here rather than widening one rubric.
 - **`JudgeVerdictCache`** — content-hash cache over a judge `IChatGate`. Caches **only Allow** verdicts (a
   transient fail-closed block is never cached into a permanent one), bounded, no eviction of a proven-safe entry.
+- **`GateCalibrationHarness`** (the Bar) + **`JudgeGoldSet`** / **`CalibrationReport`** — scores a judge gate
+  against a both-directions per-axis gold set and decides whether it earned the right to block live traffic.
+  Reports decisive accuracy, the **missed-attack (dangerous-error) count**, false-alarm rate, Cohen's κ, and
+  (with a baseline) whether the judge beats a deterministic detector. `CalibrationReport.AssertInlineReady()`
+  refuses promotion until it passes — no judge goes inline un-calibrated.
+- **`IndirectInjectionRubric`** (`AgentEval.Guardrails.Judges.Rubrics`) — the flagship judge rubric: detects
+  indirect prompt injection in retrieved/tool-return content (the axis deterministic gates can't catch), with a
+  robust JSON parser and a `StarterGoldSet()` to calibrate against (extend with your own data). Ships as a
+  starting point — calibrate before trusting it inline.
 - **Run gate** — `UseAgentEvalGate` inspects the run's input (incoming-attack detection) and output text,
   reusing the shipped `IChatGate`/`EvalGatePolicy`; establishes an `AgentRunScope` (stable across streaming
   segments) so inner gates can read the run context.
