@@ -84,6 +84,7 @@ var agent = new ChatClientAgent(client, options)
     .UseAgentEvalToolApproval([new ArgumentPatternApprovalGate("\"amount\":\\s*[0-9]{4,}")])
     .Build();
 
+var session = await agent.CreateSessionAsync();
 var paused = await agent.RunAsync("refund $5000", session);
 var request = paused.Messages.SelectMany(m => m.Contents).OfType<ToolApprovalRequestContent>().Single();
 // …a human reviews, then approves on the same session:

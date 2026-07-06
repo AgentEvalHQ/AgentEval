@@ -11,7 +11,8 @@ namespace AgentEval.MAF.Gatekeeper;
 /// regardless of its arguments. This is how you gate a sensitive tool by <i>identity</i> (including a
 /// parameterless one that <see cref="ArgumentPatternApprovalGate"/> cannot reason about): any other tool is
 /// auto-approvable as far as this gate is concerned, so compose it (AND-combined) with argument gates.
-/// <para>Comparison is ordinal and case-sensitive to match the tool names the model actually emits.</para>
+/// <para>Names are matched case-insensitively (<c>OrdinalIgnoreCase</c>, as with <see cref="ForbiddenToolGate"/> /
+/// <see cref="SequenceGate"/>) so a casing variation can't bypass the escalation.</para>
 /// </summary>
 public sealed class ToolNameApprovalGate : IToolApprovalGate
 {
@@ -24,7 +25,8 @@ public sealed class ToolNameApprovalGate : IToolApprovalGate
     public ToolNameApprovalGate(IEnumerable<string> escalateTools, string? policyName = null)
     {
         ArgumentNullException.ThrowIfNull(escalateTools);
-        _escalate = new HashSet<string>(escalateTools, StringComparer.Ordinal);
+        // Case-insensitive, matching ForbiddenToolGate/SequenceGate — a casing variation must not bypass escalation.
+        _escalate = new HashSet<string>(escalateTools, StringComparer.OrdinalIgnoreCase);
         PolicyName = policyName ?? "ToolNameApprovalGate";
     }
 
