@@ -219,6 +219,15 @@ public class BeachheadGatesTests
     }
 
     [Fact]
+    public async Task RunBudget_Monetary_UnparseableAmount_FailsClosed()
+    {
+        // The amount is PRESENT but not a number — we can't verify the budget, so block (never silently admit).
+        var gate = new RunBudgetGate(maxMonetaryPerRun: ("amount", 100m));
+        var v = await gate.InspectAsync(Call("pay", new Dictionary<string, object?> { ["amount"] = "not-a-number" }));
+        Assert.Equal(ToolGateAction.Block, v.Action);
+    }
+
+    [Fact]
     public async Task DomainAllowList_QueryString_DoesNotFoldIntoHost_Allows()
     {
         var gate = new DomainAllowListGate(["example.com"]);

@@ -89,11 +89,21 @@ public sealed class RunBudgetGate : IToolGate
         ArgumentNullException.ThrowIfNull(call);
         var ledger = RunLedger.ForCurrentRun();
 
-        // Clamp so a negative amount can never create headroom under the cap.
         var amount = 0m;
-        if (_monetaryArg is not null && TryGetAmount(call.Arguments, _monetaryArg, out var raw))
+        if (_monetaryArg is not null)
         {
-            amount = Math.Max(0m, raw);
+            switch (GetAmount(call.Arguments, _monetaryArg, out var raw))
+            {
+                case AmountParse.Unparseable:
+                    // Present but unverifiable ⇒ fail closed (an unparseable amount must not slip under the cap).
+                    return new ValueTask<ToolGateVerdict>(ToolGateVerdict.Block(PolicyName,
+                        $"monetary argument '{_monetaryArg}' is present but could not be parsed — cannot verify the run budget"));
+                case AmountParse.Parsed:
+                    amount = Math.Max(0m, raw);   // clamp: a negative amount can never create headroom under the cap
+                    break;
+                default:
+                    break;   // Absent ⇒ this call has no monetary component
+            }
         }
 
         var perToolCap = _maxPerTool is not null && _maxPerTool.TryGetValue(call.FunctionName, out var m) ? m : (int?)null;
@@ -115,33 +125,45 @@ public sealed class RunBudgetGate : IToolGate
         return new ValueTask<ToolGateVerdict>(verdict);
     }
 
-    private static bool TryGetAmount(IReadOnlyDictionary<string, object?>? args, string argName, out decimal amount)
+    private enum AmountParse
+    {
+        /// <summary>The argument is not present (or null) — no monetary component.</summary>
+        Absent,
+
+        /// <summary>The argument parsed to a usable decimal.</summary>
+        Parsed,
+
+        /// <summary>The argument is present but could not be parsed — the caller must fail closed.</summary>
+        Unparseable,
+    }
+
+    private static AmountParse GetAmount(IReadOnlyDictionary<string, object?>? args, string argName, out decimal amount)
     {
         amount = 0m;
         if (args is null || !args.TryGetValue(argName, out var raw) || raw is null)
         {
-            return false;
+            return AmountParse.Absent;
         }
 
         switch (raw)
         {
-            case decimal d: amount = d; return true;
-            case double db: return TryFromDouble(db, out amount);
-            case float f: return TryFromDouble(f, out amount);
-            case int i: amount = i; return true;
-            case long l: amount = l; return true;
-            case JsonElement je: return TryFromJsonElement(je, out amount);   // tool args often arrive as JsonElement
-            case string s when decimal.TryParse(s, NumberStyles.Any, CultureInfo.InvariantCulture, out var parsed):
-                amount = parsed; return true;
+            case decimal d: amount = d; return AmountParse.Parsed;
+            case double db: return TryFromDouble(db, out amount) ? AmountParse.Parsed : AmountParse.Unparseable;
+            case float f: return TryFromDouble(f, out amount) ? AmountParse.Parsed : AmountParse.Unparseable;
+            case int i: amount = i; return AmountParse.Parsed;
+            case long l: amount = l; return AmountParse.Parsed;
+            case JsonElement je: return TryFromJsonElement(je, out amount) ? AmountParse.Parsed : AmountParse.Unparseable;
+            case string s:
+                return decimal.TryParse(s, NumberStyles.Any, CultureInfo.InvariantCulture, out amount) ? AmountParse.Parsed : AmountParse.Unparseable;
             default:
                 try
                 {
                     amount = Convert.ToDecimal(raw, CultureInfo.InvariantCulture);
-                    return true;
+                    return AmountParse.Parsed;
                 }
                 catch (Exception ex) when (ex is FormatException or InvalidCastException or OverflowException)
                 {
-                    return false;   // not a usable amount ⇒ treat as no monetary component (never throw out of the gate)
+                    return AmountParse.Unparseable;   // present but not a usable amount ⇒ fail closed
                 }
         }
     }
