@@ -156,6 +156,8 @@
     href: maf-memory-integration.md
   - name: Using AgentEval with MAF Evals
     href: using-agenteval-with-maf-evals.md
+  - name: Foundry Evals + AgentEval (hybrid)
+    href: foundry-evals-integration.md
 
 - name: API Reference
   items:
