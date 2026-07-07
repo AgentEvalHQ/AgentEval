@@ -138,8 +138,8 @@ uses `Top10`/`AuditGrade`) — see `Benchmarks/README.md` or H1 Registry Discove
 | 8 | **NIST AI RMF** | MEASURE security / privacy / validity evidence; governance marked Not Applicable | Yes | 1–30 min |
 | 9 | **LongMemEval** | Real history-injectable agent + judge on the `longmemeval_s` dataset (ICLR 2025) | Yes | 4–60 min |
 | 10 | **Memory** | Comprehensive memory benchmark — Quick / Standard / Full / Diagnostic / Overflow | Yes | 1–30 min |
-| 11 | **Foundry Hybrid** | A Foundry eval running INSIDE a composite eval — one run, one report | Yes | 1–15 min |
-| 12 | **Foundry Hierarchy** | Foundry evals as weighted leaves inside a composite benchmark tree | Yes | 1–15 min |
+| 11 | **Foundry Hybrid** | Foundry evals running **alongside** AgentEval's (`CompositeAgentEvaluator`) — sibling sources merged into one source-tagged report, from a single agent run | Yes | 1–15 min |
+| 12 | **Foundry Hierarchy** | Foundry evals **inside** a composite as weighted leaves (`AsEvalLeaf`) — one hierarchical benchmark tree mixing providers | Yes | 1–15 min |
 | 13 | **Report Browser** | Interactive browser over past JSON / HTML / PDF runs under `output/{family}/` | No | <1 min |
 
 H1–H13 share a canonical `.agenteval/` workspace (auto-resolved by walking up to the nearest
