@@ -98,8 +98,8 @@ public sealed class AgentEvaluatorEvalLeaf : IEval
             // Return a neutral skipped leaf so it doesn't contribute a 0-score to CompositeEval
             // aggregation — it is excluded from weighted roll-ups, same as a timeout branch.
             if (string.Equals(results.Status, "skipped", StringComparison.OrdinalIgnoreCase))
-                return SkippedLeaf(results.Error ?? "skipped by provider");
-            return ErrorLeaf(results.Error ?? "no results returned");
+                return SkippedLeaf(!string.IsNullOrEmpty(results.Error) ? results.Error : "skipped by provider");
+            return ErrorLeaf(!string.IsNullOrEmpty(results.Error) ? results.Error : "no results returned");
         }
 
         // Reuse the existing MEAI -> EvalResult bridge for robust metric normalisation, then re-key its

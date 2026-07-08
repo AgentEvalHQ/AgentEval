@@ -90,10 +90,11 @@ public static class MeaiToEvalResultBridge
             //   1–5  for quality evaluators       (relevance, coherence, fluency, …)
             // AgentEval's own metrics always embed the score marker above, so they never reach here.
             // Primary: v > 1.0 → must be 1–5 scale.
-            // Edge case: v == 1.0 is ambiguous (best on 0–1 OR worst on 1–5). Consult
-            // Interpretation.Failed to disambiguate — a 1-5 metric scoring 1.0 (worst) has
-            // Failed=true, while a 0-1 metric scoring 1.0 (best) has Failed=false or null.
-            score0To100 = (v > 1.0 || metric.Interpretation?.Failed == true)
+            // Edge case: v == 1.0 is ambiguous (best on 0–1 OR worst on 1–5). ONLY for this exact
+            // value, consult Interpretation.Failed to disambiguate: Failed=true → 1–5 worst (0%);
+            // Failed=false/null → 0–1 best (100%). For all other v < 1.0 values (e.g. task_adherence
+            // returning 0.5 with Failed=true meaning partial failure), treat as 0–1 proportion.
+            score0To100 = (v > 1.0 || (v == 1.0 && metric.Interpretation?.Failed == true))
                 ? Math.Clamp((v - 1) / 4.0 * 100.0, 0, 100)
                 : Math.Clamp(v * 100.0, 0, 100);
         }

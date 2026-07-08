@@ -162,4 +162,18 @@ public class MeaiToEvalResultBridgeTests
         Assert.Equal(1.0, leaf.Score.Value, 3);
         Assert.True(leaf.Score.Passed);
     }
+
+    [Fact]
+    public void Build_NormalizesVBelow1_As0To1Proportion_EvenWhenFailed()
+    {
+        // Regression: v < 1.0 with Failed=true must use 0-1 proportion, NOT the 1-5 formula.
+        // task_adherence=0.5 (partial failure on 0-1 scale) → 50%, not clamped-to-0%.
+        var meai = ResultWith(("task_adherence",
+            new NumericMetric("task_adherence", 0.5)
+            { Interpretation = new EvaluationMetricInterpretation(EvaluationRating.Unacceptable, failed: true) }));
+
+        var leaf = FirstLeaf(MeaiToEvalResultBridge.Build("Eval", new[] { "q1" }, Wrap(meai)));
+
+        Assert.Equal(0.50, leaf.Score.Value, 3);
+    }
 }

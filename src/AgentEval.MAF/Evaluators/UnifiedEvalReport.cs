@@ -40,7 +40,7 @@ public static class UnifiedEvalReport
                 // Neutral infra branch (timeout / exception / breaker-open / empty result set). Do NOT bridge:
                 // the bridge yields a fail/high composite (an empty composite is "not passed") that would
                 // sink the whole report. Render it neutral instead.
-                var reason = result.Error ?? "no results returned";
+                var reason = !string.IsNullOrEmpty(result.Error) ? result.Error : "no results returned";
                 var neutralLabel = result.ProviderName.EndsWith("(skipped)", StringComparison.Ordinal) ? "skipped" : "error";
                 branch = NeutralBranch($"hybrid.{Sanitize(source)}", source, neutralLabel, reason);
             }
