@@ -1223,10 +1223,17 @@ internal static class BenchmarkSampleHelpers
 }
 
 /// <summary>
-/// Diagnostic wrapper around any MAF <see cref="IAgentEvaluator"/> that prints detailed console
-/// traces: the items sent, the scores returned, and the full exception chain on failure.
-/// Intended for debugging Foundry or other remote-eval integrations in sample code.
+/// Diagnostic wrapper for Foundry (and other remote) <see cref="IAgentEvaluator"/> instances used in
+/// samples 12 and 13. Prints <c>[Foundry ▶]</c> / <c>[Foundry ✔]</c> / <c>[Foundry ⚠]</c> /
+/// <c>[Foundry ✘]</c> console traces showing the items sent, scores received, and full exception chain.
 /// </summary>
+/// <remarks>
+/// The wrapper is intentionally Foundry-oriented: the console tags are hard-coded and it contains a
+/// targeted workaround for <see href="https://github.com/microsoft/agent-framework/issues/6991"/>
+/// (FoundryEvals sends <c>azure_ai_evaluator</c> criteria type rejected by current API). It is NOT a
+/// general-purpose tracing wrapper and should not be reused for non-Foundry evaluators without removing
+/// the Foundry-specific bypass logic.
+/// </remarks>
 internal sealed class TracingAgentEvaluator : IAgentEvaluator
 {
     private readonly IAgentEvaluator _inner;
