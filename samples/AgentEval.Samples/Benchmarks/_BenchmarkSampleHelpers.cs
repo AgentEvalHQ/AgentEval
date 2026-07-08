@@ -1299,8 +1299,10 @@ internal sealed class TracingAgentEvaluator : IAgentEvaluator
             Console.ResetColor();
 
             // Return an empty-but-valid result so the composite can continue cleanly.
+            // Append " (skipped)" to ProviderName — UnifiedEvalReport.Build checks for this suffix
+            // to render the branch as "skipped" (neutral, severity none) rather than "error".
             return new AgentEvaluationResults(
-                Name,
+                Name + " (skipped)",
                 [],           // no MEAI metric results
                 inputItems: items)
             {

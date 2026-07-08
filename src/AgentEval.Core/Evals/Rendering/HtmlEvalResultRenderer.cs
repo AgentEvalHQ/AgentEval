@@ -155,9 +155,10 @@ public sealed class HtmlEvalResultRenderer : IEvalResultRenderer
                         : ("source-other", WebUtility.HtmlEncode(srcPart));
             }
             if (chipCss is not null)
-                sb.Append("<span class=\"source-chip \").Append(chipCss).Append(\"\">").Append(chipText).Append("</span>\n");
+                sb.Append("<span class=\"source-chip ").Append(chipCss).Append("\">")
+                  .Append(chipText).Append("</span>\n");
         }
-        if (!isSkipped)
+        sb.Append("<span class=\"key\">").Append(WebUtility.HtmlEncode(node.Metric.Key)).Append("</span>\n");
         {
             sb.Append("<span class=\"score-inline\">").Append(FormatPct(node.Score.Value)).Append("</span>\n");
         }

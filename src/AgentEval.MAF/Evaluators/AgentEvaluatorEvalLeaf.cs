@@ -92,7 +92,15 @@ public sealed class AgentEvaluatorEvalLeaf : IEval
         }
 
         if (!string.IsNullOrEmpty(results.Error) || results.Items.Count == 0)
+        {
+            // A provider bypass (e.g. TracingAgentEvaluator's graceful workaround for upstream bugs)
+            // sets Status="skipped" to signal that the evaluator was intentionally not run.
+            // Return a neutral skipped leaf so it doesn't contribute a 0-score to CompositeEval
+            // aggregation — it is excluded from weighted roll-ups, same as a timeout branch.
+            if (string.Equals(results.Status, "skipped", StringComparison.OrdinalIgnoreCase))
+                return SkippedLeaf(results.Error ?? "skipped by provider");
             return ErrorLeaf(results.Error ?? "no results returned");
+        }
 
         // Reuse the existing MEAI -> EvalResult bridge for robust metric normalisation, then re-key its
         // aggregate as THIS leaf so it participates (by weight) in the parent CompositeEval.
@@ -131,6 +139,15 @@ public sealed class AgentEvaluatorEvalLeaf : IEval
     private EvalResult ErrorLeaf(string reason) => new(
         Metric: new EvalMetadata(Key, Name, Category, Version),
         Score: new EvalScore(0.0, Ordinal: null, Label: "error", Passed: false, Threshold: _threshold, Severity: "none", Confidence: null),
+        Details: new EvalDetails(null, new[] { new EvalEvidence("provider", Key, reason) }, null, null, null),
+        Provenance: new EvalProvenance("atomic-llm", _judgeModel, null, null, null, 0, false),
+        EvaluatedAt: DateTimeOffset.UtcNow);
+
+    // A provider that was intentionally skipped (e.g. known-bug bypass) is surfaced as a neutral
+    // "skipped" leaf — severity none, excluded from CompositeEval weighted roll-ups.
+    private EvalResult SkippedLeaf(string reason) => new(
+        Metric: new EvalMetadata(Key, Name, Category, Version),
+        Score: new EvalScore(0.0, Ordinal: null, Label: "skipped", Passed: false, Threshold: _threshold, Severity: "none", Confidence: null),
         Details: new EvalDetails(null, new[] { new EvalEvidence("provider", Key, reason) }, null, null, null),
         Provenance: new EvalProvenance("atomic-llm", _judgeModel, null, null, null, 0, false),
         EvaluatedAt: DateTimeOffset.UtcNow);
