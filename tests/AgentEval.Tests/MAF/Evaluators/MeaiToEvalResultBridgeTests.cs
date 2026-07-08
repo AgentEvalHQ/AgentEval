@@ -176,4 +176,24 @@ public class MeaiToEvalResultBridgeTests
 
         Assert.Equal(0.50, leaf.Score.Value, 3);
     }
+
+    [Theory]
+    [InlineData(1.0 - 5e-10, false, 1.0)]   // slightly below 1.0, not failed → near-1.0, treat as 0-1 best → 100%
+    [InlineData(1.0 + 5e-10, false, 1.0)]   // slightly above 1.0, not failed → near-1.0, treat as 0-1 best → 100%
+    [InlineData(1.0 - 5e-10, true,  0.0)]   // slightly below 1.0, failed → near-1.0, treat as 1-5 worst → 0%
+    [InlineData(1.0 + 5e-10, true,  0.0)]   // slightly above 1.0, failed → near-1.0, treat as 1-5 worst → 0%
+    public void Build_NearOne_EpsilonBoundary_DisambiguatesViaInterpretation(
+        double rawValue, bool failed, double expectedScore)
+    {
+        // Regression: exact equality (v==1.0) is fragile under floating-point deserialisation.
+        // Values within epsilon of 1.0 must use Interpretation.Failed for disambiguation.
+        var rating = failed ? EvaluationRating.Unacceptable : EvaluationRating.Good;
+        var meai = ResultWith(("task_adherence",
+            new NumericMetric("task_adherence", rawValue)
+            { Interpretation = new EvaluationMetricInterpretation(rating, failed: failed) }));
+
+        var leaf = FirstLeaf(MeaiToEvalResultBridge.Build("Eval", new[] { "q1" }, Wrap(meai)));
+
+        Assert.Equal(expectedScore, leaf.Score.Value, 6);
+    }
 }
