@@ -35,13 +35,18 @@ public static class UnifiedEvalReport
                 : Enumerable.Range(0, result.Items.Count).Select(i => $"query[{i}]").ToList();
 
             EvalResult branch;
-            if (result.Error is not null || result.Items.Count == 0)
+            if (!string.IsNullOrEmpty(result.Error) || result.Items.Count == 0)
             {
                 // Neutral infra branch (timeout / exception / breaker-open / empty result set). Do NOT bridge:
                 // the bridge yields a fail/high composite (an empty composite is "not passed") that would
                 // sink the whole report. Render it neutral instead.
-                var reason = result.Error ?? "no results returned";
-                var neutralLabel = result.ProviderName.EndsWith("(skipped)", StringComparison.Ordinal) ? "skipped" : "error";
+                var reason = !string.IsNullOrEmpty(result.Error) ? result.Error : "no results returned";
+                // Use result.Status as the primary discriminant (reliable, set by both TracingAgentEvaluator
+                // and HybridEvalInterop.SkippedResults). Fall back to the ProviderName suffix for results
+                // produced by older code paths that may not set Status.
+                var neutralLabel = string.Equals(result.Status, "skipped", StringComparison.OrdinalIgnoreCase)
+                    || result.ProviderName.EndsWith("(skipped)", StringComparison.Ordinal)
+                    ? "skipped" : "error";
                 branch = NeutralBranch($"hybrid.{Sanitize(source)}", source, neutralLabel, reason);
             }
             else if (composite is not null && IsLocalAgentEval(source) && composite.CapturedResults.Count > 0 && result.Items.Count > 0)
@@ -54,9 +59,28 @@ public static class UnifiedEvalReport
             }
             else
             {
-                // Flat branch: reuse the bridge (per-query -> per-metric leaves), re-tagged as this source.
+                // Flat branch: bridge the MAF results into an EvalResult tree, then flatten redundant
+                // wrapper levels so the report stays shallow and readable.
+                //
+                // MeaiToEvalResultBridge.Build produces:
+                //   maf.eval (source)
+                //     └─ maf.eval.query0  (query text)
+                //          └─ metric leaf …
+                //
+                // We want instead (single query → promote metrics directly; multi-query → keep per-query):
+                //   hybrid.<source>
+                //     └─ metric leaf …          (single query)
+                //  OR
+                //   hybrid.<source>
+                //     └─ maf.eval.query0 …      (multiple queries)
+                //          └─ metric leaf …
                 var bridged = MeaiToEvalResultBridge.Build(source, queries, result, judgeModel: null);
-                branch = Node($"hybrid.{Sanitize(source)}", source, "agentic", new[] { bridged }, source);
+                var querySubs = bridged.Details.SubResults ?? [];
+                IReadOnlyList<EvalResult> hybridChildren = querySubs.Count == 1
+                    && querySubs[0].Details.SubResults is { Count: > 0 } leafSubs
+                        ? leafSubs          // single query → expose metric leaves directly
+                        : querySubs;        // multiple queries → keep per-query level
+                branch = Node($"hybrid.{Sanitize(source)}", source, "agentic", hybridChildren, source);
             }
 
             // Attach the provider's portal link (when present) as evidence on the branch. Use the actual

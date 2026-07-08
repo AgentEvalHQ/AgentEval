@@ -67,4 +67,54 @@ public class AgentEvaluatorEvalLeafTests
         Assert.True(result.Score.Passed);          // both components pass -> weighted sum clears 0.5
         Assert.True(result.Score.Value > 0.0);
     }
+
+    // ── Skipped path (TracingAgentEvaluator bypass for known upstream bugs) ─────────────────
+
+    [Fact]
+    public async Task AsEvalLeaf_SkippedResult_ProducesNeutralSkippedLeaf_NotErrorLeaf()
+    {
+        // When TracingAgentEvaluator returns Status="skipped" the leaf must be neutral (severity none,
+        // label="skipped") so it doesn’t drag down CompositeEval weighted aggregation with a 0-score.
+        IEval leaf = Skipped("foundry", "Blocked by upstream bug #6991").AsEvalLeaf("foundry.relevance", "Foundry Relevance");
+
+        var result = await leaf.EvaluateAsync(new EvalInput("q", "r"));
+
+        Assert.Equal("skipped", result.Score.Label);
+        Assert.Equal("none", result.Score.Severity);
+        Assert.False(result.Score.Passed);
+        Assert.Equal(0.0, result.Score.Value);
+        Assert.Contains(result.Details.Evidence!, e => e.Message.Contains("#6991"));
+    }
+
+    [Fact]
+    public async Task AsEvalLeaf_SkippedLeaf_DoesNotDragDownCompositeAggregation()
+    {
+        // A skipped leaf must be neutral in CompositeEval roll-ups: only non-neutral leaves contribute.
+        IEval foundrySkipped = Skipped("foundry").AsEvalLeaf("foundry.relevance", "Foundry Relevance");
+        IEval agentEvalLeaf  = new StubComposite(Leaf("task_completion", 1.0));  // passes at 100%
+
+        var benchmark = new CompositeEval(
+            key: "hybrid.bench", name: "Hybrid", category: "hybrid", version: "1.0.0",
+            components: new[] { new EvalComponent(agentEvalLeaf, 0.5), new EvalComponent(foundrySkipped, 0.5) },
+            aggregation: WeightedSumAggregation.Instance,
+            threshold: 0.5);
+
+        var result = await benchmark.EvaluateAsync(new EvalInput("q", "r"));
+
+        // The skipped leaf has severity=none so the composite is not dragged to fail.
+        Assert.NotEqual("fail", result.Score.Label);
+    }
+
+    [Fact]
+    public async Task AsEvalLeaf_ReportUrl_SurfacedInEvidence()
+    {
+        var portalUrl = new Uri("https://ai.azure.com/foundry/eval/run/abc123");
+        IEval leaf = WithReportUrl("foundry", portalUrl).AsEvalLeaf("foundry.relevance", "Foundry Relevance");
+
+        var result = await leaf.EvaluateAsync(new EvalInput("q", "r"));
+
+        Assert.Contains(
+            result.Details.Evidence!,
+            e => e.Reference == "report_url" && e.Message == portalUrl.ToString());
+    }
 }

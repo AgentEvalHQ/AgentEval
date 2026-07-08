@@ -24,10 +24,13 @@ namespace AgentEval.Samples.Benchmarks;
 /// The rendered report is a single benchmark hierarchy where <i>some of the leaves are Foundry evals</i>.
 /// </summary>
 /// <remarks>
-/// Requires Azure OpenAI (the judge + the SUT agent). The Foundry leaves are added only when
-/// <c>FOUNDRY_PROJECT_ENDPOINT</c> is set. NOTE: a composite evaluates once per input, so each Foundry leaf
-/// makes one cloud call per scenario — fine for a benchmark; for large runs prefer the batched
-/// "Foundry alongside local" path (Benchmarks H11 / the MafEvalFoundryAlongsideLocal sample).
+/// Requires Azure OpenAI credentials and optionally an Azure AI Foundry project endpoint for the
+/// Foundry leaves. Set <c>AZURE_FOUNDRY_ENDPOINT</c> to
+/// <c>https://&lt;hub&gt;.services.ai.azure.com/api/projects/&lt;project&gt;</c> (copy from the Foundry portal).
+/// Without it only the AgentEval sub-composite runs (weight=1.0). The Foundry leaves use Azure AD
+/// (<c>DefaultAzureCredential</c>), so run <c>az login</c> first. NOTE: a composite evaluates once
+/// per input, so each Foundry leaf makes one cloud call per scenario — fine for a benchmark; for
+/// large runs prefer the batched path (the MafEvalFoundryAlongsideLocal sample).
 /// </remarks>
 public static class FoundryHierarchyBenchmarkSample
 {
@@ -47,16 +50,20 @@ public static class FoundryHierarchyBenchmarkSample
         IChatClient judgeChat = azure.GetChatClient(AIConfig.ModelDeployment).AsIChatClient();
         var judge = new ChatClientEvaluator(judgeChat);
 
-        var foundryEndpoint = Environment.GetEnvironmentVariable("FOUNDRY_PROJECT_ENDPOINT");
-        var foundryModel = Environment.GetEnvironmentVariable("FOUNDRY_MODEL") ?? AIConfig.ModelDeployment;
-        bool foundryOn = !string.IsNullOrWhiteSpace(foundryEndpoint);
+        // Foundry leaves come from AZURE_FOUNDRY_ENDPOINT (see AIConfig.FoundryEndpoint).
+        // Format: https://<hub>.services.ai.azure.com/api/projects/<project>
+        // AIProjectClient uses DefaultAzureCredential (Azure AD) — run `az login` first.
+        var foundryEndpoint = AIConfig.FoundryEndpoint;
+        var foundryModel = AIConfig.ModelDeployment;
+        bool foundryOn = foundryEndpoint is not null;
 
         AIProjectClient? projectClient = foundryOn
-            ? new AIProjectClient(new Uri(foundryEndpoint!), new azureidentity::Azure.Identity.DefaultAzureCredential())
+            ? new AIProjectClient(foundryEndpoint!, new azureidentity::Azure.Identity.DefaultAzureCredential())
             : null;
 
         // ── Build the benchmark hierarchy: an AgentEval sub-composite + (optional) Foundry leaves ──────
         // ToolCallAccuracy is itself a 5-dimension composite — so this benchmark is genuinely multi-level.
+        // One FoundryEvals per evaluator → each becomes its own weighted leaf in the tree.
         var components = new List<EvalComponent>
         {
             new(AgenticBenchmark.ToolCallAccuracy(judge, foundryModel), foundryOn ? 0.5 : 1.0),
@@ -64,13 +71,14 @@ public static class FoundryHierarchyBenchmarkSample
 
         if (projectClient is not null)
         {
-            // One FoundryEvals per evaluator → each becomes its own weighted leaf in the tree.
             components.Add(new(
-                new FoundryEvals(projectClient, foundryModel, splitter: null, pollIntervalSeconds: 5, timeoutSeconds: 120, FoundryEvals.Relevance)
+                new TracingAgentEvaluator(
+                    new FoundryEvals(projectClient, foundryModel, splitter: null, pollIntervalSeconds: 5, timeoutSeconds: 120, FoundryEvals.Relevance))
                     .AsEvalLeaf("foundry.relevance", "Foundry Relevance", judgeModel: foundryModel),
                 0.25));
             components.Add(new(
-                new FoundryEvals(projectClient, foundryModel, splitter: null, pollIntervalSeconds: 5, timeoutSeconds: 120, FoundryEvals.TaskAdherence)
+                new TracingAgentEvaluator(
+                    new FoundryEvals(projectClient, foundryModel, splitter: null, pollIntervalSeconds: 5, timeoutSeconds: 120, FoundryEvals.TaskAdherence))
                     .AsEvalLeaf("foundry.task_adherence", "Foundry Task Adherence", judgeModel: foundryModel),
                 0.25));
         }
@@ -85,7 +93,7 @@ public static class FoundryHierarchyBenchmarkSample
             threshold: 0.75);
 
         Console.WriteLine($"   Components: {string.Join(", ", components.Select(c => $"{c.Eval.Name} (w={c.Weight})"))}");
-        Console.WriteLine(foundryOn ? "" : "   (set FOUNDRY_PROJECT_ENDPOINT to weave Foundry evals into the hierarchy)");
+        Console.WriteLine(foundryOn ? $"   Foundry endpoint: {foundryEndpoint}" : "   (set AZURE_FOUNDRY_ENDPOINT to weave Foundry evals into the hierarchy)");
 
         // ── Run the SUT agent once, then score its answer with the whole benchmark tree ───────────────
         AIAgent agent = judgeChat.AsAIAgent(name: "TravelAdvisor", instructions: "You are a helpful travel advisor.");
@@ -94,8 +102,38 @@ public static class FoundryHierarchyBenchmarkSample
 
         EvalResult result = await benchmark.EvaluateAsync(new EvalInput(query, runResponse.Text));
 
+        // ── Per-component console summary ───────────────────────────────────────────────────────────
+        Console.WriteLine();
         Console.WriteLine($"   Benchmark score: {result.Score.Value:P0} ({result.Score.Label}) across "
                           + $"{result.Details.SubResults?.Count ?? 0} top-level component(s).");
+        Console.WriteLine();
+        foreach (var sub in result.Details.SubResults ?? [])
+        {
+            var isFoundry = sub.Metric.Key.StartsWith("foundry.", StringComparison.OrdinalIgnoreCase);
+            var icon = isFoundry ? "☁ " : "⚙ ";
+            var isNeutral = sub.Score.Label is "skipped" or "error";
+            if (isNeutral)
+            {
+                var isIntentional = sub.Score.Label == "skipped";
+                Console.ForegroundColor = isIntentional ? ConsoleColor.Yellow : ConsoleColor.Red;
+                var verb = isIntentional ? "SKIPPED" : "ERROR";
+                var reason = sub.Details.Evidence?.FirstOrDefault()?.Message ?? "no result";
+                Console.WriteLine($"   {icon} [{sub.Metric.Name}]  {verb} — {reason}");
+                Console.ResetColor();
+            }
+            else
+            {
+                Console.ForegroundColor = sub.Score.Passed ? ConsoleColor.Green : ConsoleColor.Red;
+                Console.WriteLine($"   {icon} [{sub.Metric.Name}]  {sub.Score.Value:P0} ({sub.Score.Label})");
+                Console.ResetColor();
+                if (sub.Details.Evidence is { } evs)
+                    foreach (var ev in evs.Where(e => string.Equals(e.Reference, "report_url", StringComparison.Ordinal)))
+                        Console.WriteLine($"               🔗 {ev.Message}");
+                if (!isFoundry && sub.Details.SubResults is { Count: > 0 } childSubs)
+                    Console.WriteLine($"               ({childSubs.Count} dimension(s))");
+            }
+        }
+        Console.WriteLine();
 
         var subject = new SubjectIdentity(SubjectKind.Agent, agent.Name ?? "agent", ModelId: foundryModel, Framework: "MAF");
         var html = await new HtmlEvalResultRenderer().RenderAsync(result, new EvalResultRenderOptions(

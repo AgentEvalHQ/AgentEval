@@ -91,13 +91,29 @@ public sealed class AgentEvaluatorEvalLeaf : IEval
             return ErrorLeaf($"evaluator '{Name}' threw {ex.GetType().Name}: {ex.Message}");
         }
 
-        if (results.Error is not null || results.Items.Count == 0)
-            return ErrorLeaf(results.Error ?? "no results returned");
+        if (!string.IsNullOrEmpty(results.Error) || results.Items.Count == 0)
+        {
+            // A provider bypass (e.g. TracingAgentEvaluator's graceful workaround for upstream bugs)
+            // sets Status="skipped" to signal that the evaluator was intentionally not run.
+            // Return a neutral skipped leaf so it doesn't contribute a 0-score to CompositeEval
+            // aggregation — it is excluded from weighted roll-ups, same as a timeout branch.
+            if (string.Equals(results.Status, "skipped", StringComparison.OrdinalIgnoreCase))
+                return SkippedLeaf(!string.IsNullOrEmpty(results.Error) ? results.Error : "skipped by provider");
+            return ErrorLeaf(!string.IsNullOrEmpty(results.Error) ? results.Error : "no results returned");
+        }
 
         // Reuse the existing MEAI -> EvalResult bridge for robust metric normalisation, then re-key its
         // aggregate as THIS leaf so it participates (by weight) in the parent CompositeEval.
         EvalResult tree = MeaiToEvalResultBridge.Build(Name, new[] { input.Query }, results, _judgeModel);
         EvalScore agg = tree.Score;
+
+        // Build evidence: pass/fail summary + optional provider portal link (e.g. Foundry report URL).
+        var evidence = new System.Collections.Generic.List<EvalEvidence>
+        {
+            new EvalEvidence("provider", Key, $"{results.Passed}/{results.Total} metric(s) passed")
+        };
+        if (results.ReportUrl is not null)
+            evidence.Add(new EvalEvidence("provider", "report_url", results.ReportUrl.ToString()));
 
         return new EvalResult(
             Metric: new EvalMetadata(Key, Name, Category, Version),
@@ -106,7 +122,7 @@ public sealed class AgentEvaluatorEvalLeaf : IEval
                 Threshold: _threshold, Severity: agg.Severity, Confidence: null),
             Details: new EvalDetails(
                 Dimensions: null,
-                Evidence: new[] { new EvalEvidence("provider", Key, $"{results.Passed}/{results.Total} metric(s) passed") },
+                Evidence: evidence.ToArray(),
                 Recommendations: null,
                 // Keep the provider's per-metric breakdown as a sub-tree so the hierarchy shows depth.
                 SubResults: tree.Details.SubResults,
@@ -123,6 +139,15 @@ public sealed class AgentEvaluatorEvalLeaf : IEval
     private EvalResult ErrorLeaf(string reason) => new(
         Metric: new EvalMetadata(Key, Name, Category, Version),
         Score: new EvalScore(0.0, Ordinal: null, Label: "error", Passed: false, Threshold: _threshold, Severity: "none", Confidence: null),
+        Details: new EvalDetails(null, new[] { new EvalEvidence("provider", Key, reason) }, null, null, null),
+        Provenance: new EvalProvenance("atomic-llm", _judgeModel, null, null, null, 0, false),
+        EvaluatedAt: DateTimeOffset.UtcNow);
+
+    // A provider that was intentionally skipped (e.g. known-bug bypass) is surfaced as a neutral
+    // "skipped" leaf — severity none, excluded from CompositeEval weighted roll-ups.
+    private EvalResult SkippedLeaf(string reason) => new(
+        Metric: new EvalMetadata(Key, Name, Category, Version),
+        Score: new EvalScore(0.0, Ordinal: null, Label: "skipped", Passed: false, Threshold: _threshold, Severity: "none", Confidence: null),
         Details: new EvalDetails(null, new[] { new EvalEvidence("provider", Key, reason) }, null, null, null),
         Provenance: new EvalProvenance("atomic-llm", _judgeModel, null, null, null, 0, false),
         EvaluatedAt: DateTimeOffset.UtcNow);
