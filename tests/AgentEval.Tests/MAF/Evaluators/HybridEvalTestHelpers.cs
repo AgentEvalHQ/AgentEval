@@ -50,6 +50,23 @@ internal static class HybridEvalTestHelpers
     public static FakeEvaluator Slow(string s, int ms) => new(s, async (items, ct) => { await Task.Delay(ms, ct); return Pass(items, s); });
     public static FakeEvaluator Throws(string s) => new(s, (_, _) => throw new InvalidOperationException($"{s} boom"));
 
+    /// <summary>Fake that returns a skipped result (Status="skipped"), simulating a graceful bypass.</summary>
+    public static FakeEvaluator Skipped(string s, string reason = "skipped by test") =>
+        new(s, (items, _) => Task.FromResult(new AgentEvaluationResults(s + " (skipped)", [], inputItems: items)
+        {
+            Status = "skipped",
+            Error = reason,
+        }));
+
+    /// <summary>Fake that returns a passing result with a portal <see cref="Uri"/> attached.</summary>
+    public static FakeEvaluator WithReportUrl(string s, Uri reportUrl) =>
+        new(s, (items, _) =>
+        {
+            var r = Pass(items, s);
+            r.ReportUrl = reportUrl;
+            return Task.FromResult(r);
+        });
+
     /// <summary>An <see cref="IEval"/> that returns a fixed tree (no LLM) — populates CapturedResults cheaply.</summary>
     public sealed class StubComposite(EvalResult tree) : IEval
     {

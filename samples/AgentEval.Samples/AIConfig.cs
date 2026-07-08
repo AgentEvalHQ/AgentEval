@@ -89,8 +89,7 @@ public static class AIConfig
     /// </summary>
     public static Uri? FoundryEndpoint =>
         Environment.GetEnvironmentVariable("AZURE_FOUNDRY_ENDPOINT") is { } v && !string.IsNullOrWhiteSpace(v)
-            ? new Uri(v)
-            : null;
+            && Uri.TryCreate(v, UriKind.Absolute, out var uri) ? uri : null;
 
     /// <summary>
     /// Returns true when <c>AZURE_FOUNDRY_ENDPOINT</c> is set in addition to the core Azure OpenAI variables.

@@ -159,6 +159,7 @@ public sealed class HtmlEvalResultRenderer : IEvalResultRenderer
                   .Append(chipText).Append("</span>\n");
         }
         sb.Append("<span class=\"key\">").Append(WebUtility.HtmlEncode(node.Metric.Key)).Append("</span>\n");
+        if (!isSkipped)
         {
             sb.Append("<span class=\"score-inline\">").Append(FormatPct(node.Score.Value)).Append("</span>\n");
         }

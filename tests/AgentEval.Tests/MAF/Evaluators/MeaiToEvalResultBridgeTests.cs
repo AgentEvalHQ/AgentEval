@@ -117,4 +117,48 @@ public class MeaiToEvalResultBridgeTests
         Assert.Equal("critical", leaf.Score.Severity);
         Assert.False(leaf.Score.Passed);
     }
-}
+
+    // ── Mixed-scale normalisation (Foundry: 0–1 vs 1–5) ───────────────────────────────────────
+
+    [Fact]
+    public void Build_NormalizesZeroToOneScale_WhenValueIsBelow1AndNotFailed()
+    {
+        // Foundry task_adherence uses 0–1; 0.5 (mid-range) should map to 50%, not a negative clamped value.
+        var meai = ResultWith(("task_adherence",
+            new NumericMetric("task_adherence", 0.5)
+            { Interpretation = new EvaluationMetricInterpretation(EvaluationRating.Good, failed: false) }));
+
+        var leaf = FirstLeaf(MeaiToEvalResultBridge.Build("Eval", new[] { "q1" }, Wrap(meai)));
+
+        Assert.Equal(0.50, leaf.Score.Value, 3);
+        Assert.True(leaf.Score.Passed);
+    }
+
+    [Fact]
+    public void Build_NormalizesAmbiguousV1_AsZero_WhenInterpretationIsFailed()
+    {
+        // v==1.0 is ambiguous: best on 0–1 scale OR worst on 1–5 scale.
+        // Interpretation.Failed=true disambiguates to 1–5 worst → (1-1)/4*100 = 0%.
+        var meai = ResultWith(("relevance",
+            new NumericMetric("relevance", 1.0)
+            { Interpretation = new EvaluationMetricInterpretation(EvaluationRating.Unacceptable, failed: true) }));
+
+        var leaf = FirstLeaf(MeaiToEvalResultBridge.Build("Eval", new[] { "q1" }, Wrap(meai)));
+
+        Assert.Equal(0.0, leaf.Score.Value, 3);
+        Assert.False(leaf.Score.Passed);
+    }
+
+    [Fact]
+    public void Build_NormalizesAmbiguousV1_As100Percent_WhenInterpretationIsNotFailed()
+    {
+        // v==1.0, Interpretation.Failed=false → 0–1 scale, best → 1.0*100 = 100%.
+        var meai = ResultWith(("task_adherence",
+            new NumericMetric("task_adherence", 1.0)
+            { Interpretation = new EvaluationMetricInterpretation(EvaluationRating.Good, failed: false) }));
+
+        var leaf = FirstLeaf(MeaiToEvalResultBridge.Build("Eval", new[] { "q1" }, Wrap(meai)));
+
+        Assert.Equal(1.0, leaf.Score.Value, 3);
+        Assert.True(leaf.Score.Passed);
+    }
