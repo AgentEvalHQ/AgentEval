@@ -5,6 +5,7 @@ using System.Diagnostics;
 using System.Reflection;
 using System.Text.Json;
 using Azure.AI.OpenAI;
+using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
 using AgentEval.Core;
 using AgentEval.Core.Evals.Rendering;
@@ -1219,4 +1220,136 @@ internal static class BenchmarkSampleHelpers
                 CacheHit: allCacheHits),
             EvaluatedAt: DateTimeOffset.UtcNow);
     }
+}
+
+/// <summary>
+/// Diagnostic wrapper around any MAF <see cref="IAgentEvaluator"/> that prints detailed console
+/// traces: the items sent, the scores returned, and the full exception chain on failure.
+/// Intended for debugging Foundry or other remote-eval integrations in sample code.
+/// </summary>
+internal sealed class TracingAgentEvaluator : IAgentEvaluator
+{
+    private readonly IAgentEvaluator _inner;
+
+    public TracingAgentEvaluator(IAgentEvaluator inner) => _inner = inner;
+
+    public string Name => _inner.Name;
+
+    public async Task<AgentEvaluationResults> EvaluateAsync(
+        IReadOnlyList<EvalItem> items,
+        string evalName = "Agent Framework Eval",
+        CancellationToken cancellationToken = default)
+    {
+        // ── BEFORE: print what we are sending ─────────────────────────────────
+        Console.ForegroundColor = ConsoleColor.Cyan;
+        Console.WriteLine($"\n   [Foundry ▶] '{Name}'  evalName={evalName}  items={items.Count}");
+        Console.ResetColor();
+        for (var i = 0; i < items.Count; i++)
+        {
+            var it = items[i];
+            Console.WriteLine($"              item[{i}] query    : {Clip(it.Query, 120)}");
+            Console.WriteLine($"              item[{i}] response : {Clip(it.Response, 120)}");
+            if (!string.IsNullOrEmpty(it.Context))
+                Console.WriteLine($"              item[{i}] context  : {Clip(it.Context, 80)}");
+        }
+
+        var sw = Stopwatch.StartNew();
+        try
+        {
+            var result = await _inner.EvaluateAsync(items, evalName, cancellationToken);
+            sw.Stop();
+
+            // ── AFTER (success): print what we received ───────────────────────
+            Console.ForegroundColor = ConsoleColor.Green;
+            Console.WriteLine($"   [Foundry ✔] '{Name}' completed in {sw.Elapsed.TotalSeconds:F1}s" +
+                              $"  passed={result.Passed}/{result.Total}" +
+                              (result.Status is { } st ? $"  status={st}" : ""));
+            Console.ResetColor();
+
+            if (result.PerEvaluator is { } pe)
+                foreach (var (ev, pr) in pe)
+                    Console.WriteLine($"              evaluator '{ev}' → passed={pr.Passed} failed={pr.Failed}");
+
+            if (result.DetailedItems is { } di)
+                foreach (var item in di)
+                    Console.WriteLine($"              item '{item.ItemId}' {item.Status}" +
+                        (item.Scores.Count > 0
+                            ? " | " + string.Join(", ", item.Scores.Select(s => $"{s.Name}={s.Score:F2} pass={s.Passed}"))
+                            : item.IsError ? $" ERROR: {item.ErrorCode} — {item.ErrorMessage}" : ""));
+
+            if (result.ReportUrl is { } url)
+                Console.WriteLine($"              Foundry report URL: {url}");
+
+            return result;
+        }
+        catch (Exception ex) when (IsKnownAzureAiEvaluatorBug(ex))
+        {
+            sw.Stop();
+            // ── WORKAROUND: microsoft/agent-framework#6991 ────────────────────
+            // FoundryEvals sends `"type": "azure_ai_evaluator"` in the testing-criteria
+            // JSON but the Foundry API at *.services.ai.azure.com no longer accepts that
+            // type (valid: label_model, text_similarity, string_check, score_model,
+            // python, endpoint).  The bug is in FoundryEvalWireModels.cs (main branch,
+            // nightly 1.12.0-preview.260629.1).  Track: https://github.com/microsoft/agent-framework/issues/6991
+            Console.ForegroundColor = ConsoleColor.Yellow;
+            Console.WriteLine($"   [Foundry ⚠] '{Name}' SKIPPED — known package bug (microsoft/agent-framework#6991)");
+            Console.WriteLine($"              The FoundryEvals package sends 'azure_ai_evaluator' but the API");
+            Console.WriteLine($"              now requires 'score_model' or another supported criteria type.");
+            Console.WriteLine($"              Fix pending upstream. Local AgentEval results are unaffected.");
+            Console.ResetColor();
+
+            // Return an empty-but-valid result so the composite can continue cleanly.
+            return new AgentEvaluationResults(
+                Name,
+                [],           // no MEAI metric results
+                inputItems: items)
+            {
+                Status = "skipped",
+                Error = "Blocked by microsoft/agent-framework#6991 — azure_ai_evaluator type rejected by API",
+            };
+        }
+        catch (Exception ex)
+        {
+            sw.Stop();
+            // ── AFTER (unexpected failure): print the full exception chain ────
+            Console.ForegroundColor = ConsoleColor.Red;
+            Console.WriteLine($"   [Foundry ✘] '{Name}' FAILED after {sw.Elapsed.TotalSeconds:F1}s");
+            Console.ResetColor();
+            PrintExceptionChain(ex);
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// Returns true when the exception is the HTTP 400 caused by the
+    /// <c>azure_ai_evaluator</c> criteria-type bug in <c>FoundryEvals</c>.
+    /// (microsoft/agent-framework#6991)
+    /// </summary>
+    private static bool IsKnownAzureAiEvaluatorBug(Exception ex)
+    {
+        // Walk the exception chain — the 400 detail may be wrapped.
+        for (var e = ex; e is not null; e = e.InnerException)
+        {
+            if (e.Message.Contains("azure_ai_evaluator", StringComparison.OrdinalIgnoreCase)
+                && e.Message.Contains("invalid_request_error", StringComparison.OrdinalIgnoreCase))
+                return true;
+        }
+        return false;
+    }
+
+    private static void PrintExceptionChain(Exception ex, int depth = 0)
+    {
+        var indent = "              " + new string(' ', depth * 2);
+        Console.ForegroundColor = ConsoleColor.Red;
+        Console.WriteLine($"{indent}{ex.GetType().FullName}: {ex.Message}");
+        Console.ResetColor();
+        if (ex.InnerException is { } inner)
+        {
+            Console.WriteLine($"{indent}  └─ inner:");
+            PrintExceptionChain(inner, depth + 1);
+        }
+    }
+
+    private static string Clip(string? s, int max) =>
+        string.IsNullOrEmpty(s) ? "(empty)" : s.Length <= max ? s : s[..max] + "\u2026";
 }

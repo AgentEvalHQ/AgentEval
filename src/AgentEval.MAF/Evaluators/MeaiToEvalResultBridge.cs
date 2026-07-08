@@ -85,7 +85,15 @@ public static class MeaiToEvalResultBridge
         }
         else if (metric is NumericMetric { Value: { } v })
         {
-            score0To100 = Math.Clamp((v - 1) / 4.0 * 100.0, 0, 100);
+            // Foundry uses mixed scales across evaluators:
+            //   0–1  for agent/binary evaluators (task_adherence, intent_resolution, …)
+            //   1–5  for quality evaluators       (relevance, coherence, fluency, …)
+            // AgentEval's own metrics always embed the score marker above, so they never reach here.
+            // Heuristic: v ≤ 1.0 → treat as a 0–1 proportion (multiply by 100);
+            //            v > 1.0 → treat as a 1–5 Likert scale (normalise via (v-1)/4).
+            score0To100 = v <= 1.0
+                ? Math.Clamp(v * 100.0, 0, 100)
+                : Math.Clamp((v - 1) / 4.0 * 100.0, 0, 100);
         }
         else
         {

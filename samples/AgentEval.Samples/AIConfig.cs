@@ -78,6 +78,25 @@ public static class AIConfig
     public static bool IsEmbeddingConfigured => 
         IsConfigured && !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("AZURE_OPENAI_EMBEDDING_DEPLOYMENT"));
 
+    // ── Azure AI Foundry project (used by samples 12 / 13) ───────────────────────────────
+
+    /// <summary>
+    /// Azure AI Foundry project endpoint. Reads from <c>AZURE_FOUNDRY_ENDPOINT</c>.
+    /// Format: <c>https://&lt;hub&gt;.services.ai.azure.com/api/projects/&lt;project&gt;</c>
+    /// (copy from Azure AI Foundry portal → your project → Settings → Endpoint).
+    /// Authentication uses Azure AD (<c>DefaultAzureCredential</c>); the API key cannot
+    /// authenticate <c>AIProjectClient</c>.
+    /// </summary>
+    public static Uri? FoundryEndpoint =>
+        Environment.GetEnvironmentVariable("AZURE_FOUNDRY_ENDPOINT") is { } v && !string.IsNullOrWhiteSpace(v)
+            ? new Uri(v)
+            : null;
+
+    /// <summary>
+    /// Returns true when <c>AZURE_FOUNDRY_ENDPOINT</c> is set in addition to the core Azure OpenAI variables.
+    /// </summary>
+    public static bool IsFoundryConfigured => IsConfigured && FoundryEndpoint is not null;
+
     public static void PrintMissingCredentialsWarning()
     {
         Console.ForegroundColor = ConsoleColor.Yellow;

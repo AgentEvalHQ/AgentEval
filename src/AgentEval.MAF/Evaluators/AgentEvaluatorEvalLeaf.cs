@@ -91,13 +91,21 @@ public sealed class AgentEvaluatorEvalLeaf : IEval
             return ErrorLeaf($"evaluator '{Name}' threw {ex.GetType().Name}: {ex.Message}");
         }
 
-        if (results.Error is not null || results.Items.Count == 0)
+        if (!string.IsNullOrEmpty(results.Error) || results.Items.Count == 0)
             return ErrorLeaf(results.Error ?? "no results returned");
 
         // Reuse the existing MEAI -> EvalResult bridge for robust metric normalisation, then re-key its
         // aggregate as THIS leaf so it participates (by weight) in the parent CompositeEval.
         EvalResult tree = MeaiToEvalResultBridge.Build(Name, new[] { input.Query }, results, _judgeModel);
         EvalScore agg = tree.Score;
+
+        // Build evidence: pass/fail summary + optional provider portal link (e.g. Foundry report URL).
+        var evidence = new System.Collections.Generic.List<EvalEvidence>
+        {
+            new EvalEvidence("provider", Key, $"{results.Passed}/{results.Total} metric(s) passed")
+        };
+        if (results.ReportUrl is not null)
+            evidence.Add(new EvalEvidence("provider", "report_url", results.ReportUrl.ToString()));
 
         return new EvalResult(
             Metric: new EvalMetadata(Key, Name, Category, Version),
@@ -106,7 +114,7 @@ public sealed class AgentEvaluatorEvalLeaf : IEval
                 Threshold: _threshold, Severity: agg.Severity, Confidence: null),
             Details: new EvalDetails(
                 Dimensions: null,
-                Evidence: new[] { new EvalEvidence("provider", Key, $"{results.Passed}/{results.Total} metric(s) passed") },
+                Evidence: evidence.ToArray(),
                 Recommendations: null,
                 // Keep the provider's per-metric breakdown as a sub-tree so the hierarchy shows depth.
                 SubResults: tree.Details.SubResults,

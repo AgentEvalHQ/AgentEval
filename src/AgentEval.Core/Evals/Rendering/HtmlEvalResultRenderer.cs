@@ -134,7 +134,29 @@ public sealed class HtmlEvalResultRenderer : IEvalResultRenderer
         sb.Append(isSkipped ? "NOT TESTED" : WebUtility.HtmlEncode(node.Score.Label.ToUpperInvariant()));
         sb.Append("</span>\n");
         sb.Append("<span class=\"name\">").Append(WebUtility.HtmlEncode(node.Metric.Name)).Append("</span>\n");
-        sb.Append("<span class=\"key\">").Append(WebUtility.HtmlEncode(node.Metric.Key)).Append("</span>\n");
+        // Source chip — emitted for source-tagged nodes so Foundry and local branches/leaves are
+        // immediately distinguishable without opening the node body.
+        //   hybrid.*       → driven by the suffix  (sample 12: CompositeAgentEvaluator branches)
+        //   foundry.*      → always ☁ Foundry chip  (sample 13: AgentEvaluatorEvalLeaf leaves)
+        {
+            string? chipCss = null, chipText = null;
+            if (node.Metric.Key.StartsWith("foundry.", StringComparison.OrdinalIgnoreCase))
+            {
+                chipCss = "source-foundry"; chipText = "&#9729; Foundry";
+            }
+            else if (node.Metric.Key.StartsWith("hybrid.", StringComparison.Ordinal))
+            {
+                var srcPart = node.Metric.Key["hybrid.".Length..];
+                (chipCss, chipText) = srcPart.Contains("foundry", StringComparison.OrdinalIgnoreCase)
+                    ? ("source-foundry", "&#9729; Foundry")
+                    : srcPart.Contains("local", StringComparison.OrdinalIgnoreCase)
+                      || srcPart.Contains("agenteval", StringComparison.OrdinalIgnoreCase)
+                        ? ("source-local", "&#9881; AgentEval")
+                        : ("source-other", WebUtility.HtmlEncode(srcPart));
+            }
+            if (chipCss is not null)
+                sb.Append("<span class=\"source-chip \").Append(chipCss).Append(\"\">").Append(chipText).Append("</span>\n");
+        }
         if (!isSkipped)
         {
             sb.Append("<span class=\"score-inline\">").Append(FormatPct(node.Score.Value)).Append("</span>\n");
@@ -331,6 +353,10 @@ details[open] > summary::before { transform: rotate(90deg); }
 .badge.sev-medium  { background: var(--med-bg);  color: var(--med-fg);  border-color: var(--med-border);  }
 .badge.sev-high    { background: var(--high-bg); color: var(--high-fg); border-color: var(--high-border); }
 .badge.sev-skipped { background: var(--skip-bg); color: var(--skip-fg); border-color: var(--skip-border); }
+.source-chip { display: inline-block; padding: 1px 7px; border-radius: 4px; font-size: 10px; font-weight: 700; letter-spacing: 0.4px; border: 1px solid; vertical-align: middle; }
+.source-foundry { background: #ddf4ff; color: #0550ae; border-color: #54aeff; }
+.source-local   { background: #dafbe1; color: #1a7f37; border-color: #4ac26b; }
+.source-other   { background: #fff8c5; color: #9a6700; border-color: #d4a72c; }
 .name { font-weight: 600; flex: 1; }
 .key { color: var(--muted); font-family: ui-monospace, monospace; font-size: 12px; }
 .score-inline { font-family: ui-monospace, monospace; font-size: 13px; color: var(--muted); }

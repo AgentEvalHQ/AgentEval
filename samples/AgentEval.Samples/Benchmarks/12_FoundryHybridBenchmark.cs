@@ -24,8 +24,11 @@ namespace AgentEval.Samples.Benchmarks;
 /// AgentEval Composite Eval and the Foundry eval, and renders both in one source-tagged HTML report.
 /// </summary>
 /// <remarks>
-/// Requires Azure OpenAI credentials (the judge + the fallback agent). The Foundry branch runs only when
-/// <c>FOUNDRY_PROJECT_ENDPOINT</c> is set; otherwise the sample runs AgentEval-local-only and says so.
+/// Requires Azure OpenAI credentials (the judge + fallback agent) and optionally an Azure AI Foundry
+/// project endpoint for the Foundry branch. Set <c>AZURE_FOUNDRY_ENDPOINT</c> to
+/// <c>https://&lt;hub&gt;.services.ai.azure.com/api/projects/&lt;project&gt;</c> (copy from the Foundry portal).
+/// Without it the sample runs AgentEval-local-only. The Foundry branch uses Azure AD
+/// (<c>DefaultAzureCredential</c>), so run <c>az login</c> first.
 /// </remarks>
 public static class FoundryHybridBenchmarkSample
 {
@@ -51,16 +54,19 @@ public static class FoundryHybridBenchmarkSample
             .AsMeaiEvaluator();
         IAgentEvaluator local = composite.AsAgentEvaluator(chatConfig);
 
-        // ── The Foundry eval — only when a Foundry project is configured ───────────────────────────
-        var foundryEndpoint = Environment.GetEnvironmentVariable("FOUNDRY_PROJECT_ENDPOINT");
-        var foundryModel = Environment.GetEnvironmentVariable("FOUNDRY_MODEL") ?? AIConfig.ModelDeployment;
-        bool foundryOn = !string.IsNullOrWhiteSpace(foundryEndpoint);
+        // ── The Foundry eval — only when AZURE_FOUNDRY_ENDPOINT is set ────────────────────────
+        // Endpoint comes from AIConfig.FoundryEndpoint (AZURE_FOUNDRY_ENDPOINT).
+        // Format: https://<hub>.services.ai.azure.com/api/projects/<project>
+        // AIProjectClient uses DefaultAzureCredential (Azure AD) — run `az login` first.
+        var foundryEndpoint = AIConfig.FoundryEndpoint;
+        var foundryModel = AIConfig.ModelDeployment;
+        bool foundryOn = foundryEndpoint is not null;
 
         AIProjectClient? projectClient = foundryOn
-            ? new AIProjectClient(new Uri(foundryEndpoint!), new azureidentity::Azure.Identity.DefaultAzureCredential())
+            ? new AIProjectClient(foundryEndpoint!, new azureidentity::Azure.Identity.DefaultAzureCredential())
             : null;
 
-        // System-under-test agent: Foundry-hosted when available, else Azure OpenAI.
+        // System-under-test agent: Foundry-hosted when available, else Azure OpenAI fallback.
         AIAgent agent = projectClient is not null
             ? projectClient.AsAIAgent(model: foundryModel, instructions: "You are a helpful travel advisor.", name: "TravelAdvisor")
             : judgeChat.AsAIAgent(name: "TravelAdvisor", instructions: "You are a helpful travel advisor.");
@@ -73,23 +79,57 @@ public static class FoundryHybridBenchmarkSample
         if (projectClient is not null)
         {
             inners.Add(("foundry",
-                new FoundryEvals(projectClient, foundryModel, splitter: null, pollIntervalSeconds: 5, timeoutSeconds: 120,
-                                 FoundryEvals.TaskAdherence, FoundryEvals.Relevance),
+                new TracingAgentEvaluator(
+                    new FoundryEvals(projectClient, foundryModel, splitter: null, pollIntervalSeconds: 5, timeoutSeconds: 120,
+                                     FoundryEvals.TaskAdherence, FoundryEvals.Relevance)),
                 TimeSpan.FromSeconds(150)));
         }
 
         var hybrid = new CompositeAgentEvaluator(inners, name: "Foundry ⊕ AgentEval");
 
         Console.WriteLine($"   Sources: {string.Join(", ", inners.Select(i => i.Source))}"
-                          + (foundryOn ? "" : "   (set FOUNDRY_PROJECT_ENDPOINT to add the Foundry branch)"));
+                          + (foundryOn ? $"  (Foundry: {foundryEndpoint})" : "   (set AZURE_FOUNDRY_ENDPOINT to add the Foundry branch)"));
 
         string[] queries = { "Plan a 3-day trip to Kyoto for a family with two kids." };
 
         // One call: the agent runs once; the composite fans out to both evaluators concurrently.
         AgentEvaluationResults results = await agent.EvaluateAsync(queries, hybrid);
 
-        Console.WriteLine($"   Merged verdict: {results.Passed}/{results.Total} passed across "
-                          + $"{hybrid.CapturedPerSource.Count} source(s).");
+        // ── Per-source console summary ────────────────────────────────────────────────────────────
+        Console.WriteLine();
+        Console.WriteLine($"   Merged verdict: {results.Passed}/{results.Total} passed across {hybrid.CapturedPerSource.Count} source(s).");
+        Console.WriteLine();
+        foreach (var (src, r) in hybrid.CapturedPerSource)
+        {
+            var isFoundry = src.Contains("foundry", StringComparison.OrdinalIgnoreCase);
+            var icon = isFoundry ? "☁ " : "⚙ ";
+            if (!string.IsNullOrEmpty(r.Error) || r.Total == 0)
+            {
+                Console.ForegroundColor = ConsoleColor.Yellow;
+                Console.WriteLine($"   {icon} [{src}]  SKIPPED — {r.Error ?? "no results returned"}");
+                Console.ResetColor();
+            }
+            else
+            {
+                Console.ForegroundColor = r.Passed == r.Total ? ConsoleColor.Green : ConsoleColor.Red;
+                Console.WriteLine($"   {icon} [{src}]  {r.Passed}/{r.Total} passed" +
+                    (r.Status is not null ? $"  status={r.Status}" : ""));
+                Console.ResetColor();
+                if (r.ReportUrl is not null)
+                    Console.WriteLine($"               🔗 {r.ReportUrl}");
+                foreach (var meai in r.Items)
+                {
+                    foreach (var (metricName, metric) in meai.Metrics)
+                    {
+                        var score = metric is Microsoft.Extensions.AI.Evaluation.NumericMetric nm
+                            ? nm.Value?.ToString("F2", System.Globalization.CultureInfo.InvariantCulture) ?? "N/A"
+                            : metric?.ToString() ?? "N/A";
+                        Console.WriteLine($"               • {metricName}: {score}");
+                    }
+                }
+            }
+        }
+        Console.WriteLine();
 
         // One source-tagged report (a branch per source; the local branch keeps its full hierarchy).
         EvalResult tree = UnifiedEvalReport.Build(hybrid.CapturedPerSource, composite);
