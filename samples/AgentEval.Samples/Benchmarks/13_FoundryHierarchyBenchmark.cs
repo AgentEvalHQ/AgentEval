@@ -111,12 +111,14 @@ public static class FoundryHierarchyBenchmarkSample
         {
             var isFoundry = sub.Metric.Key.StartsWith("foundry.", StringComparison.OrdinalIgnoreCase);
             var icon = isFoundry ? "☁ " : "⚙ ";
-            var isSkipped = sub.Score.Label is "skipped" or "error";
-            if (isSkipped)
+            var isNeutral = sub.Score.Label is "skipped" or "error";
+            if (isNeutral)
             {
-                Console.ForegroundColor = ConsoleColor.Yellow;
+                var isIntentional = sub.Score.Label == "skipped";
+                Console.ForegroundColor = isIntentional ? ConsoleColor.Yellow : ConsoleColor.Red;
+                var verb = isIntentional ? "SKIPPED" : "ERROR";
                 var reason = sub.Details.Evidence?.FirstOrDefault()?.Message ?? "no result";
-                Console.WriteLine($"   {icon} [{sub.Metric.Name}]  SKIPPED — {reason}");
+                Console.WriteLine($"   {icon} [{sub.Metric.Name}]  {verb} — {reason}");
                 Console.ResetColor();
             }
             else

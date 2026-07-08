@@ -105,8 +105,10 @@ public static class FoundryHybridBenchmarkSample
             var icon = isFoundry ? "☁ " : "⚙ ";
             if (!string.IsNullOrEmpty(r.Error) || r.Total == 0)
             {
-                Console.ForegroundColor = ConsoleColor.Yellow;
-                Console.WriteLine($"   {icon} [{src}]  SKIPPED — {r.Error ?? "no results returned"}");
+                var isIntentional = string.Equals(r.Status, "skipped", StringComparison.OrdinalIgnoreCase);
+                Console.ForegroundColor = isIntentional ? ConsoleColor.Yellow : ConsoleColor.Red;
+                var verb = isIntentional ? "SKIPPED" : "ERROR";
+                Console.WriteLine($"   {icon} [{src}]  {verb} — {(!string.IsNullOrEmpty(r.Error) ? r.Error : "no results returned")}");
                 Console.ResetColor();
             }
             else
