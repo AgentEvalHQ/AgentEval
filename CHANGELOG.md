@@ -7,7 +7,79 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.14.0-beta] - 2026-07-06
+## [0.15.0-beta] - 2026-07-08
+
+### Azure AI Foundry integration — live hybrid evals with source chips and graceful bypass
+
+Samples 12 and 13 now connect to a real Azure AI Foundry project (`AZURE_FOUNDRY_ENDPOINT`) and run
+Foundry's built-in evaluators (task adherence, relevance) **side-by-side with AgentEval-local** metrics —
+one agent run, one source-tagged HTML report, one per-source console summary. The integration is robust
+against the current upstream package bug ([microsoft/agent-framework#6991](https://github.com/microsoft/agent-framework/issues/6991))
+and against all the floating-point, scale-normalisation, and neutral-leaf aggregation edge cases that
+emerge when bridging two different evaluator ecosystems.
+
+#### Added — samples
+
+- **`AIConfig.FoundryEndpoint` / `AIConfig.IsFoundryConfigured`** — reads `AZURE_FOUNDRY_ENDPOINT`
+  (`https://<hub>.services.ai.azure.com/api/projects/<project>`); uses `Uri.TryCreate` so a malformed
+  value returns `null` rather than throwing.
+- **`TracingAgentEvaluator`** (in `_BenchmarkSampleHelpers`) — Foundry-oriented diagnostic wrapper that
+  prints `[Foundry ▶]` before each call and `[Foundry ✔]` / `[Foundry ⚠]` / `[Foundry ✘]` / `ERROR`
+  / `SKIPPED` after, with per-item query+response and per-metric scores. Intentional bypasses (upstream
+  bug) print yellow `SKIPPED`; genuine infra failures print red `ERROR`.
+- **Graceful bypass for [microsoft/agent-framework#6991](https://github.com/microsoft/agent-framework/issues/6991)** —
+  `FoundryEvals` hardcodes `"azure_ai_evaluator"` as the testing-criteria type; the current Foundry API
+  at `*.services.ai.azure.com` rejects it with HTTP 400. `TracingAgentEvaluator` detects this specific
+  error and returns a structured `Status="skipped"` result so **local AgentEval results survive
+  unaffected**. GitHub issue filed upstream.
+- **Sample 12 (`FoundryHybridBenchmark`)** — per-source console breakdown after `agent.EvaluateAsync`:
+  ☁/⚙ icons, passed/total, Foundry portal URL, per-metric scores; uses `AIConfig.FoundryEndpoint` with
+  `foundryOn` guard (runs local-only when endpoint is not set).
+- **Sample 13 (`FoundryHierarchyBenchmark`)** — equivalent per-component console breakdown; Foundry
+  leaves use `AsEvalLeaf` + `TracingAgentEvaluator` inside a weighted `CompositeEval`.
+
+#### Added — HTML renderer
+
+- **Source-provider chips** in node summary rows: `☁ Foundry` (blue pill) for `hybrid.*` and `foundry.*`
+  metric keys; `⚙ AgentEval` (green pill) for `hybrid.agenteval-local` / `hybrid.*local*`. Chips appear
+  collapsed so users can identify which source each branch belongs to without expanding the node.
+
+#### Fixed — core bridges
+
+- **`MeaiToEvalResultBridge` mixed-scale normalisation** — Foundry agent evaluators (task_adherence,
+  intent_resolution, …) use a 0–1 scale; quality evaluators (relevance, coherence, …) use 1–5. The
+  bridge previously assumed 1–5 for all, rendering `task_adherence=1.0` (perfect) as **0 %**. Now:
+  `v > 1.0 + ε → 1–5 Likert`; `|v − 1.0| ≤ ε → consult Interpretation.Failed` (disambiguates the
+  floating-point-fragile boundary); `v < 1.0 − ε → 0–1 proportion`. Epsilon = 1e-9 guards against
+  JSON deserialisation imprecision.
+- **`UnifiedEvalReport` empty-string Error treated as no-error** — Foundry returns `"error": null` in
+  the run JSON; `JsonElement.ToString()` produces `""` (not `null`), which was treated as a real error,
+  rendering successful evals as ERROR branches. Fixed with `IsNullOrEmpty` guard.
+- **`UnifiedEvalReport` hierarchy flattening** — single-query Foundry branches previously produced 4
+  levels (`hybrid.foundry → maf.eval → query0 → leaves`). Now: `hybrid.foundry → leaves` for one
+  query; `hybrid.foundry → query nodes → leaves` for multiple queries.
+- **`AgentEvaluatorEvalLeaf`** — (a) `SkippedLeaf` returned when `results.Status == "skipped"` so a
+  bypassed Foundry call does not contribute a 0-score to `CompositeEval` weighted aggregation; (b)
+  Foundry portal `ReportUrl` attached to evidence so it surfaces in reports and console; (c)
+  `IsNullOrEmpty` fallback for blank `Error` strings.
+- **`WeightedSumAggregation`** — both `"skipped"` and `"error"` leaves are now excluded from weighted
+  scoring and severity rollup. A transient Foundry network error (score=0, severity=none) can no longer
+  drag the composite below threshold.
+- **`HybridEvalInterop.SkippedResults`** — sets `Status = label` so `UnifiedEvalReport` can use
+  `result.Status` as the primary discriminant for `"skipped"` vs `"error"` neutral branches rather than
+  parsing the `ProviderName` suffix.
+- **`HtmlEvalResultRenderer`** — restore `if (!isSkipped)` guard on `score-inline` span (was lost in
+  chip refactor, causing misleading 0 % for NOT TESTED nodes); change `hybrid.*` prefix check to
+  `OrdinalIgnoreCase` for consistency.
+
+#### Tests
+
+- 21 new unit tests: 3 mixed-scale normalisation cases + 4 epsilon-boundary `Theory` cases
+  (`MeaiToEvalResultBridgeTests`); 3 skipped-path / report-URL / aggregation-neutrality cases
+  (`AgentEvaluatorEvalLeafTests`); 3 error-is-neutral `WeightedSumAggregation` cases; 2 new test fakes
+  (`Skipped`, `WithReportUrl`) in `HybridEvalTestHelpers`.
+
+
 
 ### Gatekeeper — runtime fail-closed enforcement
 
