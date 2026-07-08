@@ -41,7 +41,12 @@ public static class UnifiedEvalReport
                 // the bridge yields a fail/high composite (an empty composite is "not passed") that would
                 // sink the whole report. Render it neutral instead.
                 var reason = !string.IsNullOrEmpty(result.Error) ? result.Error : "no results returned";
-                var neutralLabel = result.ProviderName.EndsWith("(skipped)", StringComparison.Ordinal) ? "skipped" : "error";
+                // Use result.Status as the primary discriminant (reliable, set by both TracingAgentEvaluator
+                // and HybridEvalInterop.SkippedResults). Fall back to the ProviderName suffix for results
+                // produced by older code paths that may not set Status.
+                var neutralLabel = string.Equals(result.Status, "skipped", StringComparison.OrdinalIgnoreCase)
+                    || result.ProviderName.EndsWith("(skipped)", StringComparison.Ordinal)
+                    ? "skipped" : "error";
                 branch = NeutralBranch($"hybrid.{Sanitize(source)}", source, neutralLabel, reason);
             }
             else if (composite is not null && IsLocalAgentEval(source) && composite.CapturedResults.Count > 0 && result.Items.Count > 0)

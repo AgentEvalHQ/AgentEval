@@ -42,7 +42,12 @@ internal static class HybridEvalInterop
             results.Add(r);
         }
         // ProviderName carries the neutral label so UnifiedEvalReport renders the matching neutral branch.
-        return new AgentEvaluationResults($"{source} ({label})", results, inputItems: items) { Error = reason };
+        // Status is set to the same label so callers can use result.Status instead of parsing ProviderName.
+        return new AgentEvaluationResults($"{source} ({label})", results, inputItems: items)
+        {
+            Error = reason,
+            Status = label,
+        };
     }
 
     /// <summary>Convenience overload for an exception — surfaced as a neutral <c>"error"</c> branch.</summary>

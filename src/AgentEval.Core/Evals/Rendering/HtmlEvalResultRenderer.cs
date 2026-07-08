@@ -144,7 +144,7 @@ public sealed class HtmlEvalResultRenderer : IEvalResultRenderer
             {
                 chipCss = "source-foundry"; chipText = "&#9729; Foundry";
             }
-            else if (node.Metric.Key.StartsWith("hybrid.", StringComparison.Ordinal))
+            else if (node.Metric.Key.StartsWith("hybrid.", StringComparison.OrdinalIgnoreCase))
             {
                 var srcPart = node.Metric.Key["hybrid.".Length..];
                 (chipCss, chipText) = srcPart.Contains("foundry", StringComparison.OrdinalIgnoreCase)

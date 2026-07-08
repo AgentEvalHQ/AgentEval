@@ -125,4 +125,45 @@ public class WeightedSumAggregationTests
     {
         Assert.Equal("WeightedSum", _sut.Name);
     }
+
+    // ── "error" is neutral (same as "skipped") ────────────────────────────────────
+
+    private static EvalResult ErrorResult() => MakeResult(0.0, "none", "error");
+
+    [Fact]
+    public void Aggregate_OneError_ErrorContributionOmitted()
+    {
+        // An infra-failure leaf (score=0, label="error") must not drag the composite below threshold.
+        // Same semantics as "skipped": omit from weighted sum entirely.
+        var results = new[] { MakeResult(0.8), ErrorResult() };
+        var components = new[] { Comp(1), Comp(1) };
+
+        var (score, _) = _sut.Aggregate(results, components);
+
+        Assert.Equal(0.8, score, precision: 10);   // error leaf not included in denominator
+    }
+
+    [Fact]
+    public void Aggregate_AllError_ScoreIsZero_SeverityIsNone()
+    {
+        // When every leaf is an infra failure the composite should not explode: score=0, severity=none.
+        var results = new[] { ErrorResult(), ErrorResult() };
+        var components = new[] { Comp(1), Comp(1) };
+
+        var (score, severity) = _sut.Aggregate(results, components);
+
+        Assert.Equal(0, score);
+        Assert.Equal("none", severity);
+    }
+
+    [Fact]
+    public void Aggregate_MixOfSkippedAndError_BothOmitted_OnlyRealContributes()
+    {
+        var results = new[] { MakeResult(0.6), SkippedResult(), ErrorResult() };
+        var components = new[] { Comp(1), Comp(1), Comp(1) };
+
+        var (score, _) = _sut.Aggregate(results, components);
+
+        Assert.Equal(0.6, score, precision: 10);   // only the real leaf contributes
+    }
 }
