@@ -26,14 +26,21 @@ public sealed class WeightedSumAggregation : IAggregationStrategy
         double weightSum = 0, weightedScoreSum = 0;
         for (int i = 0; i < results.Count; i++)
         {
-            if (results[i].Score.Label == "skipped") continue;
+            // Exclude neutral infra leaves from weighted scoring:
+            //   "skipped" — evaluator intentionally not run (bypass, timeout, circuit-breaker)
+            //   "error"   — transient provider failure (network, quota, upstream bug)
+            // Neither represents a real quality signal; including them at 0.0 would incorrectly
+            // drag the composite below threshold (e.g. sample 13 uses threshold=0.75).
+            if (results[i].Score.Label is "skipped" or "error") continue;
             if (components[i].Weight <= 0) continue;
             weightSum        += components[i].Weight;
             weightedScoreSum += results[i].Score.Value * components[i].Weight;
         }
 
         var score = weightSum > 0 ? weightedScoreSum / weightSum : 0;
-        var severity = SeverityRollup.Max(results.Where(r => r.Score.Label != "skipped").Select(r => r.Score.Severity));
+        var severity = SeverityRollup.Max(results
+            .Where(r => r.Score.Label is not "skipped" and not "error")
+            .Select(r => r.Score.Severity));
         return (score, severity);
     }
 }
