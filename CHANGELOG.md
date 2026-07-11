@@ -7,6 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Gatekeeper — more output-guarding Tribunal judges + the run-post Panel + a live sample
+
+#### Added
+- **`ExfiltrationIntentJudge`** (`AgentEval.Guardrails.Judges`) — another Tribunal judge, showing the calibration
+  harness generalizes past indirect-injection: a one-call bundle (`Create` / `GoldSet` / `KeywordBaseline` /
+  `CalibrateAsync`) of the `ExfiltrationIntentRubric` in a `CompositeJudgeGate`. Placed **run-post** on the rendered
+  output, it flags an output whose *purpose* is to disclose sensitive/proprietary data to an external destination —
+  the "is this data sensitive *in context*" half the deterministic egress gates can't judge. Pairs with
+  `DomainAllowListGate` (destination) + `TaintTrackingGate` (known-secret provenance) for defense in depth.
+- **`ExfiltrationIntentRubric`** (`AgentEval.Guardrails.Judges.Rubrics`) — single-axis rubric (broad prefilter →
+  DLP-classifier prompt → JSON parse) with a **canonical both-directions gold set** above the default promotion
+  floor, built to expose the keyword dilemma on the exfil axis: attacks span explicit egress verbs
+  *and* paraphrased exfil (data dropped at a bare-domain/paste with no verb — an exfil keyword list misses these);
+  benigns mention `upload`/`password`/an email innocuously (a keyword list false-alarms). A judge earns inline
+  promotion only by beating the deterministic exfil keyword oracle with zero missed attacks.
+- **`SystemPromptExtractionJudge`** + **`SystemPromptExtractionRubric`** — another Tribunal axis (run-post): flags an
+  output that leaks the confidential system prompt, hidden/developer instructions, internal config, tool schemas, or a
+  secret canary. A canonical both-directions gold set with paraphrased disclosures the tell-oracle misses and
+  hard-negatives it false-alarms on — including a **refusal to reveal the prompt**, which the rubric treats as benign.
+  Hybridize with a deterministic canary token (canary catches the exact echo; the judge catches the paraphrase).
+- **`OverRefusalJudge`** + **`OverRefusalRubric`** — the **utility valve** (run-post, **advisory**): flags an output
+  that declines a request *without a legitimate reason* — the counterweight that stops a fail-closed judge fleet from
+  degrading into block-everything (operationalizes "never punish honesty"). A positive verdict is a flag, not a block:
+  wire it `WarnOnly`. Its gold set separates reasonless declines and marker-less soft refusals (flag) from *justified*
+  refusals that cite a real reason and non-refusal uses of "can't"/"sorry" (allow) — where a naive refusal-marker
+  oracle both over-flags and under-catches.
+- **Composed the output judges into a run-post `ParallelJudgeFanOut`** ("the Panel") — proven inline: a live agent
+  whose answer exfiltrates/leaks is blocked before it reaches the caller (fail-closed OR), with countable
+  `gate.run-post.*.judge-panel` evidence, while a benign answer passes through at zero token cost (neither prefilter
+  fires). Single-axis judges are composed here, not widened into one rubric.
+- **Sample `Gatekeeper/08_GatekeeperOutputPanel`** — the run-post Panel end-to-end on a **real model** (Azure OpenAI):
+  calibrates the exfil + system-prompt-extraction judges against their gold sets, shows the Panel's detection
+  (blocks exfil/leak, allows benign + a justified refusal), wires it inline run-post to redact a leak-shaped answer,
+  and demonstrates the over-refusal utility valve — every ✅/❌ keyed on the real verdict or the trace block count.
+
 ### Gatekeeper — the flagship calibrated judge
 
 #### Added

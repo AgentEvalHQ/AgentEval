@@ -134,6 +134,7 @@ public static class Program
             new("Agent Harness — simple",    "Cap an autonomous, looping MAF Agent Harness agent with RunBudgetGate", GatekeeperAgentHarness.RunAsync),
             new("Agent Harness — defended",  "Defense-in-depth around a capable harness agent: budget + sequence + exfil", GatekeeperAgentHarnessDefended.RunAsync),
             new("Defense in Depth",          "One injection campaign, a different gate per step: calibrated judge + referential-integrity + taint + allow-list", GatekeeperDefenseInDepth.RunAsync),
+            new("Output Panel (Stage-2)",    "Two calibrated run-post judges (exfil-intent ⊕ system-prompt-extract) in a fan-out + the over-refusal utility valve", GatekeeperOutputPanel.RunAsync),
         ]),
     ];
 
