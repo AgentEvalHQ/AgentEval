@@ -44,15 +44,27 @@ internal static class GateText
         {
             throw;   // honor cancellation — never swallow it
         }
-        // A defensive renderer must never throw into the gate. Serialization fails in more ways than
-        // NotSupportedException / JsonException — a stale ORM entity whose property getter throws surfaces the
-        // getter's own exception type (e.g. InvalidOperationException) — and even ToString() can throw. Degrade to a
-        // best-effort string (then empty) rather than propagate and fail the tool call closed.
+        catch (OutOfMemoryException)
+        {
+            throw;   // let a truly fatal exception bubble
+        }
+        // A defensive renderer must never throw into the gate on a common serialization / getter failure —
+        // NotSupportedException / JsonException, or a stale ORM entity whose property getter throws its own type
+        // (e.g. InvalidOperationException), or a ToString() that throws. Degrade to a best-effort string (then
+        // empty); cancellation and OutOfMemory are re-thrown above, not swallowed.
         catch
         {
             try
             {
                 return value.ToString() ?? string.Empty;
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (OutOfMemoryException)
+            {
+                throw;
             }
             catch
             {

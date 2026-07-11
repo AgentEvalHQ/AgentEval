@@ -145,6 +145,9 @@ public sealed class ReferentialIntegrityGate : IToolGate
     // Recompute the ids legitimately surfaced this run — user turns + trusted tool results — from the history.
     private HashSet<string> HarvestObserved(IReadOnlyList<ChatMessage>? messages)
     {
+        // Ordinal (case-sensitive) on PURPOSE: ids can be case-significant in the backend, so a re-cased variant of
+        // an observed id is treated as NOT-observed — the fail-closed direction for a security tripwire (a case-fold
+        // is a possible false block, measured under the WarnOnly default; case-insensitive would be over-permissive).
         var observed = new HashSet<string>(StringComparer.Ordinal);
         if (messages is null)
         {
