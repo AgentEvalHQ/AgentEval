@@ -603,4 +603,7 @@ rootCmd.Add(complianceCmd);
 rootCmd.Add(renderBenchCmd);
 rootCmd.Add(mcCmd);
 
+// Gatekeeper CLI interop bridge — invoke gates from any language via a versioned verdict JSON.
+rootCmd.Add(AgentEval.Cli.Commands.Gatekeeper.GatekeeperCommand.Create());
+
 return await rootCmd.Parse(args).InvokeAsync();

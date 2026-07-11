@@ -89,6 +89,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- The versioned gatekeeper verdict JSON schema ships beside the binary so non-.NET consumers can validate. -->
+    <Content Include="Schemas/gatekeeper-verdict.schema.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
     <!-- Grant the test assembly access to internal overloads used for testing -->
     <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
       <_Parameter1>AgentEval.Tests</_Parameter1>

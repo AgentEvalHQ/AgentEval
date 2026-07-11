@@ -52,4 +52,29 @@ public static class ExitCodes
     /// appeared" apart from "pre-existing findings remain". Used by the red-team command's <c>--fail-on</c> gate.
     /// </summary>
     public const int RegressionFailure = 4;
+
+    // ── gatekeeper CLI bridge (0–4 above are the verbatim-preserved contract; 5–7 are genuinely free) ──
+
+    /// <summary>
+    /// <c>gatekeeper inspect</c>: a gate returned <b>Block</b> on real evidence — a deterministic block, a judge block
+    /// at/above threshold, or a judge fail-closed-inconclusive that the shipped gate itself renders as Block. Distinct
+    /// from <see cref="RuntimeError"/> (3, a crash) and <see cref="Success"/> (0) so CI can gate on "policy blocked".
+    /// </summary>
+    public const int GateBlocked = 5;
+
+    /// <summary>
+    /// <c>gatekeeper inspect</c>: <b>fail-closed because the CLI could not evaluate</b> — e.g. a history-reading tool
+    /// gate was given no/malformed <c>messages</c>, or empty text where the gate requires content. Distinct from
+    /// <see cref="GateBlocked"/> (5) so CI can tell "blocked by policy" from "missing context — fix the payload".
+    /// </summary>
+    public const int GateInconclusive = 6;
+
+    /// <summary>
+    /// <c>gatekeeper inspect</c>: the <b>honesty guard refused</b> — a judge (or a judge child of a panel) is not
+    /// certified inline-ready for the given model and <c>--allow-uncalibrated</c> was not passed. Distinct from
+    /// <see cref="UsageError"/> (2, bad flags) and <see cref="GateBlocked"/> (5, a real Block) so CI can tell
+    /// "run <c>calibrate --certify</c> first" apart from a typo or a policy block. Deliberately NOT another overload
+    /// of 2 (the BUG-22 lesson).
+    /// </summary>
+    public const int NotCertified = 7;
 }
