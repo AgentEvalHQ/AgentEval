@@ -27,6 +27,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   certificate. `--model-reply <file>` evaluates a caller-supplied model reply with **no model call** and can never
   claim `inlineReady:true` without an explicit `--attest-fingerprint` (unknown provenance ⇒ advisory).
   The stateful accumulator gates arrive via `serve` (deferred, stubbed).
+- **`panel:<a,b,…>`** — a CLI-owned fan-out over comma-listed child gates (fail-closed OR). The CLI runs the children
+  itself (not `ParallelJudgeFanOut`'s flattened aggregate) so it applies the sensitive-span redaction **per child**
+  before aggregating — a redact-axis child never leaks its spans through the panel. The honesty guard requires **every**
+  judge child certified inline-ready (else exit 7); the verdict's `certificate` is an array, one per judge child.
 - **Interop proof + docs** — `samples/interop/python/gatekeeper_smoke.py` (pure stdlib) shells out to the CLI and
   asserts the whole contract from a non-.NET process (deterministic block/allow, tool flow-gate, fail-closed exit 6,
   `rendered-exfil` redaction, discovery, honesty guard). `docs/gatekeeper-cli.md` documents the command surface, the

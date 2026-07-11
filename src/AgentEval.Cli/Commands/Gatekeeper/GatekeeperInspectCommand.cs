@@ -102,8 +102,7 @@ internal static class GatekeeperInspectCommand
 
         if (gateId.StartsWith("panel:", StringComparison.Ordinal))
         {
-            stderr.WriteLine("  Error: 'panel:' gates arrive in the next build slice (the judge fan-out).");
-            return ExitCodes.UsageError;
+            return await RunPanelSingleAsync(gateId, warn, judgeArgs ?? JudgeArgs.Empty, stdin, stdout, stderr, ct);
         }
 
         var desc = GateRegistry.Find(gateId) ?? (gateId.StartsWith("keyword:", StringComparison.Ordinal) ? GateRegistry.Find("keyword") : null);
@@ -351,6 +350,128 @@ internal static class GatekeeperInspectCommand
         var jd = GateVerdictDto.FromChat(jv, gateId) with { InlineReady = inlineReady, Certificate = certObj, Warning = warning };
         stdout.WriteLine(jd.ToJson(indented: true));
         return warn ? ExitCodes.Success : ExitOf(jd);
+    }
+
+    // A CLI-owned fan-out over comma-listed child gates (fail-closed OR). The CLI runs the children itself — NOT
+    // ParallelJudgeFanOut's aggregate — so it can apply §5.3 redaction PER CHILD (by the child's judge:<axis> policy)
+    // BEFORE aggregating: ParallelJudgeFanOut flattens children to PolicyName="judge-panel" and loses per-child axis,
+    // which would leak a redact-axis child's spans through the panel. Honesty guard: EVERY judge child must be
+    // certified inline-ready for the model, else exit 7 (unless --allow-uncalibrated runs the whole panel advisory).
+    private static async Task<int> RunPanelSingleAsync(
+        string gateId, bool warn, JudgeArgs args, TextReader stdin, TextWriter stdout, TextWriter stderr, CancellationToken ct)
+    {
+        var childIds = gateId["panel:".Length..].Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        if (childIds.Length == 0)
+        {
+            stderr.WriteLine("  Error: a panel needs at least one child, e.g. panel:keyword-injection,judge:exfiltration-intent");
+            return ExitCodes.UsageError;
+        }
+
+        var json = await stdin.ReadToEndAsync(ct).ConfigureAwait(false);
+        var payload = InspectPayload.Parse(json, out var perr);
+        if (payload?.Text is null)
+        {
+            stderr.WriteLine($"  Error: panel requires a payload with a 'text' field{(perr is null ? "" : $" ({perr})")}.");
+            return ExitCodes.UsageError;
+        }
+
+        var judgeAxes = childIds.Where(c => c.StartsWith("judge:", StringComparison.Ordinal))
+            .Select(c => c["judge:".Length..]).ToList();
+        foreach (var axis in judgeAxes)
+        {
+            if (JudgeAxisRegistry.For(axis) is null) { stderr.WriteLine($"  Error: unknown judge axis '{axis}' in panel."); return ExitCodes.UsageError; }
+        }
+
+        // ── honesty guard: every judge child must be certified for the model (else 7), unless --allow-uncalibrated ──
+        Microsoft.Extensions.AI.IChatClient? model = null;
+        var provenances = new List<CertProvenance>();
+        bool? inlineReady = null;
+        string? warning = null;
+        if (judgeAxes.Count > 0)
+        {
+            var mr = GatekeeperModelResolver.Resolve(args.Azure, args.Endpoint, args.Deployment, args.Model, args.ApiKey, stderr);
+            if (mr.Client is null) { return mr.ExitCode; }
+            model = mr.Client;
+
+            var allCertified = true;
+            foreach (var axis in judgeAxes)
+            {
+                var cert = InlineReadinessStore.TryLoad(axis, mr.Fingerprint!, args.CertDir);
+                if (cert?.IsInlineReady == true) { provenances.Add(Provenance(cert)); }
+                else { allCertified = false; }
+            }
+
+            if (allCertified) { inlineReady = true; }
+            else if (args.AllowUncalibrated) { inlineReady = false; warning = "uncalibrated — advisory only"; provenances.Clear(); }
+            else
+            {
+                stderr.WriteLine($"  Error: one or more panel judge children are not certified inline-ready for model '{mr.Fingerprint}'. " +
+                                 "Certify each (gatekeeper calibrate --gate judge:<axis> --model … --certify), or pass --allow-uncalibrated.");
+                return ExitCodes.NotCertified;
+            }
+        }
+
+        // ── run each child; apply per-child redaction BEFORE aggregating; fail-closed OR ──
+        var reasons = new List<string>();
+        var matches = new List<string>();
+        var anyBlock = false;
+        foreach (var childId in childIds)
+        {
+            IChatGate child;
+            if (childId.StartsWith("judge:", StringComparison.Ordinal))
+            {
+                child = JudgeAxisRegistry.For(childId["judge:".Length..])!.Create(model!, true);
+            }
+            else
+            {
+                var resolved = GateRegistry.TryResolveChatGate(childId, new GateFlags(), out var cerr);
+                if (resolved is null) { stderr.WriteLine($"  Error: panel child '{childId}': {cerr}"); return ExitCodes.UsageError; }
+                child = resolved;
+            }
+
+            GateVerdict cv;
+            try
+            {
+                cv = await child.InspectAsync(payload.Text, ct).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                cv = GateVerdict.Block(child.PolicyName, $"child errored (fail-closed): {ex.GetType().Name}");
+            }
+
+            if (cv.Action != GateAction.Block)
+            {
+                continue;
+            }
+
+            anyBlock = true;
+            reasons.Add($"{cv.PolicyName}: {cv.Reason}");
+            var axis = GateVerdictDto.AxisOf(cv.PolicyName);
+            var redact = axis is not null && GateVerdictDto.RedactAxes.Contains(axis);
+            if (!redact && cv.Matches is not null)
+            {
+                matches.AddRange(cv.Matches);   // a redact-axis child never contributes spans — the §2.1 #12 fix
+            }
+        }
+
+        var dto = new GateVerdictDto
+        {
+            Gate = gateId,
+            Kind = "chat",
+            Action = anyBlock ? "Block" : "Allow",
+            Policy = "judge-panel",
+            Axis = null,
+            Reason = anyBlock ? string.Join("; ", reasons) : null,
+            Matches = matches.Count > 0 ? matches.Distinct(StringComparer.Ordinal).ToList() : null,
+            InlineReady = inlineReady,
+            Certificate = provenances.Count > 0 ? provenances : null,
+        };
+        stdout.WriteLine(dto.ToJson(indented: true));
+        return warn ? ExitCodes.Success : (anyBlock ? ExitCodes.GateBlocked : ExitCodes.Success);
     }
 
     private static CertProvenance Provenance(CalibrationCertificate c) =>
