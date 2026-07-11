@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Gatekeeper Stage-2 — two more calibrated Tribunal axes + the Panel
+### Gatekeeper Stage-2 — three more calibrated Tribunal axes + the Panel + a live sample
 
 #### Added
 - **`ExfiltrationIntentJudge`** (`AgentEval.Guardrails.Judges`) — the second Tribunal judge, proving the calibration
@@ -27,10 +27,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   secret canary. Canonical gold set (22 leaks + 24 benign) with paraphrased disclosures the tell-oracle misses and
   hard-negatives it false-alarms on — including a **refusal to reveal the prompt**, which the rubric treats as benign.
   Hybridize with a deterministic canary token (canary catches the exact echo; the judge catches the paraphrase).
-- **Composed the two output judges into a run-post `ParallelJudgeFanOut`** ("the Panel") — proven inline: a live agent
-  whose answer exfiltrates is blocked before it reaches the caller (fail-closed OR), with countable
+- **`OverRefusalJudge`** + **`OverRefusalRubric`** — the **utility valve** (run-post, **advisory**): flags an output
+  that declines a request *without a legitimate reason* — the counterweight that stops a fail-closed judge fleet from
+  degrading into block-everything (operationalizes "never punish honesty"). A positive verdict is a flag, not a block:
+  wire it `WarnOnly`. Its gold set separates reasonless declines and marker-less soft refusals (flag) from *justified*
+  refusals that cite a real reason and non-refusal uses of "can't"/"sorry" (allow) — where a naive refusal-marker
+  oracle both over-flags and under-catches.
+- **Composed the output judges into a run-post `ParallelJudgeFanOut`** ("the Panel") — proven inline: a live agent
+  whose answer exfiltrates/leaks is blocked before it reaches the caller (fail-closed OR), with countable
   `gate.run-post.*.judge-panel` evidence, while a benign answer passes through at zero token cost (neither prefilter
   fires). Single-axis judges are composed here, not widened into one rubric.
+- **Sample `Gatekeeper/08_GatekeeperOutputPanel`** — the run-post Panel end-to-end on a **real model** (Azure OpenAI):
+  calibrates the exfil + system-prompt-extraction judges against their gold sets, shows the Panel's detection
+  (blocks exfil/leak, allows benign + a justified refusal), wires it inline run-post to redact a leak-shaped answer,
+  and demonstrates the over-refusal utility valve — every ✅/❌ keyed on the real verdict or the trace block count.
 
 ### Gatekeeper — the flagship calibrated judge
 
