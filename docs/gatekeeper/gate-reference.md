@@ -44,14 +44,17 @@ result; `Terminate` → stop the loop), so adding a gate never silently changes 
 
 ### Budget & egress (off the `RunLedger`)
 
-`RunLedger` is the per‑run **cross‑hop accumulator** (total tool calls, per‑tool counts, monetary sums, observed
-ids) — the deterministic primitive these gates share. Register `UseAgentEvalGate()` so each run gets its own
-ledger.
+`RunLedger` is the per‑run **cross‑hop accumulator** (total tool calls, per‑tool counts, monetary sums) that the
+**budget** gate rides — register `UseAgentEvalGate()` so each run gets its own ledger. The **flow‑control** gates
+below (referential‑integrity, taint) are stateless: they recompute from the run history (`call.Messages`) per call,
+so they need no ledger and can't leak state across runs.
 
 | Gate | What it does | Rank | Honest reasoning |
 |---|---|:--:|---|
 | **RunBudgetGate** | Caps a run's budget off the `RunLedger`: total tool calls, per‑tool call count, or the running sum of a monetary argument. Blocks the call that would exceed it. | 🟢🟢 **5** | **Denial‑of‑wallet / runaway‑loop** defense with no tool‑body equivalent — cost accrues across the whole orchestration, so no single tool sees the total. Pure‑code, hot‑path safe; the check + record is one atomic ledger op (correct under concurrent invocation) and a **negative amount can't manufacture headroom** (clamped to 0). It caps tool‑call volume and monetary arguments; token / cost / wall‑clock budgets are out of scope here (they require model‑usage capture). |
 | **DomainAllowListGate** | Allow‑list over the URLs in a tool call's arguments; a host not on the list (subdomains allowed) blocks the call. Catches `http(s)` / `ftp` / `ws` **and scheme‑relative** `//host`; fail‑closed on unserializable args / scan timeout. | 🟢🟢 **5** | **Exfiltration** is the payoff of most indirect injection, and an allow‑list is where the literature lands — sub‑millisecond, un‑paraphrasable, and it defends every networked tool from one policy. Resolves the userinfo trick (`https://good.com@evil.com`). **Limit:** it gates URLs it can extract — a *bare hostname* (no `//`) or a `data:` URI isn't detected (validate those in the tool / pair with an argument‑pattern gate), and open web‑browse surfaces degrade to advisory. |
+| **ReferentialIntegrityGate** | A guarded (side-effecting) call may only reference ids the **user** provided or a **trusted** lookup surfaced this run; an id no legitimate source introduced blocks the call. | 🟢 **4** | Stops an injection **inventing** an id to act on (`refund #FAKE-9931`). The honest core is the trust model: model-generated content and *untrusted* (poisonable) tool results never confer legitimacy — else the attacker launders the id through the very document carrying the payload. A **tripwire** (heuristic id detection); run `WarnOnly` to measure false alarms first. |
+| **TaintTrackingGate** | Coarse information-flow control: a value returned by a confidential **source** tool must not appear in an external **sink** tool's arguments — the tainted call is blocked (the reason never echoes the secret). | 🟡 **3** | Closes the exfil path directly (source → sink) without a keyword list. **Coarse — a tripwire, not a proof:** substring taint, so a transformed/re-encoded value slips past and an incidental shared token can false-alarm; tune `minTaintLength` and run `WarnOnly` first. |
 
 ## The moat — your red‑team probes become gates
 

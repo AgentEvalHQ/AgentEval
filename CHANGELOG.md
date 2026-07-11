@@ -33,6 +33,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   countable `gate.run-pre.*.judge:indirect-injection` evidence (previously a 12-case seed, a 2-keyword toy baseline,
   and a standalone `InspectAsync`).
 
+### Gatekeeper — deterministic flow-control gates
+
+#### Added
+- **`ReferentialIntegrityGate`** (`AgentEval.MAF.Gatekeeper`) — a side-effecting tool call may only reference ids the
+  user provided or a *trusted* lookup surfaced this run; an invented id (e.g. introduced by an indirect injection)
+  blocks the call. Stateless — recomputes observed ids per call from the run history (no cross-run state). Trust
+  model: model-generated content and *untrusted* (poisonable) tool results never confer legitimacy — so an injection
+  can't launder an id through the document that carries it. A heuristic tripwire — run `WarnOnly` first (the default
+  `isIdentifier` only checks ids that contain a digit; supply your own for all-letter ids).
+- **`TaintTrackingGate`** (`AgentEval.MAF.Gatekeeper`) — coarse information-flow control: a value returned by a
+  confidential *source* tool must not reach an external *sink* tool's arguments (the block reason never echoes the
+  secret). A tripwire, not a proof (substring taint; tune `minTaintLength`).
+
+#### Note
+- Per-tool call caps and per-run monetary caps are **already** provided by `RunBudgetGate` (`maxCallsPerTool` /
+  `maxMonetaryPerRun`), checked atomically in one `RunLedger` operation — so no separate per-tool-budget or
+  monetary-limit gate is needed.
+
 ## [0.14.0-beta] - 2026-07-06
 
 ### Gatekeeper — runtime fail-closed enforcement
