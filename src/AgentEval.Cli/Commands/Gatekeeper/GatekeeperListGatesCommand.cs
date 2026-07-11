@@ -32,8 +32,15 @@ internal static class GatekeeperListGatesCommand
 
     internal static int Execute(bool json, string phase, TextWriter outw)
     {
+        var p = (phase ?? "all").Trim().ToLowerInvariant();
+        if (p is not ("all" or "inspect" or "serve"))
+        {
+            Console.Error.WriteLine($"  Error: --phase must be inspect | serve | all (got '{phase}').");
+            return ExitCodes.UsageError;
+        }
+
         var gates = GateRegistry.All
-            .Where(d => phase is "all" || d.Phase == phase)
+            .Where(d => p is "all" || d.Phase == p)
             .ToList();
 
         if (json)

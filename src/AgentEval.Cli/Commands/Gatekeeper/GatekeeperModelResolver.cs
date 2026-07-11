@@ -33,8 +33,16 @@ internal static class GatekeeperModelResolver
                     return new(null, null, ExitCodes.UsageError);
                 }
 
-                var c = EndpointFactory.CreateAzure(endpoint, deploymentName!, apiKey);
-                return new(c, Fingerprint("azure", endpoint ?? Env("AZURE_OPENAI_ENDPOINT"), deploymentName!), ExitCodes.Success);
+                // Fall back to AZURE_OPENAI_ENDPOINT when --endpoint is omitted (CreateAzure throws on a null endpoint).
+                var azEndpoint = string.IsNullOrWhiteSpace(endpoint) ? Env("AZURE_OPENAI_ENDPOINT") : endpoint;
+                if (string.IsNullOrWhiteSpace(azEndpoint))
+                {
+                    stderr.WriteLine("  Error: --azure needs an endpoint — pass --endpoint <url> or set AZURE_OPENAI_ENDPOINT.");
+                    return new(null, null, ExitCodes.UsageError);
+                }
+
+                var c = EndpointFactory.CreateAzure(azEndpoint, deploymentName!, apiKey);
+                return new(c, Fingerprint("azure", azEndpoint, deploymentName!), ExitCodes.Success);
             }
 
             if (!string.IsNullOrWhiteSpace(endpoint))

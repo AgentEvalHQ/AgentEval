@@ -131,7 +131,10 @@ internal static class GateRegistry
 
         if (id.StartsWith("judge:", StringComparison.Ordinal) || id.StartsWith("panel:", StringComparison.Ordinal))
         {
-            error = $"gate '{id}' is a model-backed judge gate — not available in this build slice (deterministic gates only). Use a deterministic gate, or a later build for --model.";
+            // judge/panel gates are model-backed and handled by 'inspect's model path (with the honesty guard), not
+            // this deterministic resolver — reaching here means model flags weren't supplied.
+            error = $"gate '{id}' is a model-backed judge/panel gate — supply model flags (--model / --endpoint / " +
+                    "--azure, or the AZURE_OPENAI_* env), or --model-reply.";
             return null;
         }
 

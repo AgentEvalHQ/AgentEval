@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://agenteval.dev/schemas/gatekeeper-verdict-1.0.json",
   "title": "Gatekeeper verdict",
-  "description": "The versioned JSON a non-.NET caller receives from 'agenteval gatekeeper inspect'. One object per inspect; one per line (JSONL) for --input batch. Frozen contract (mirrors the AgentTrace v1.1 discipline).",
+  "description": "The versioned JSON a non-.NET caller receives from 'agenteval gatekeeper inspect'. One object per inspect; one per line (JSONL) for --input batch. Frozen contract (mirrors the AgentTrace frozen-contract discipline).",
   "type": "object",
   "required": ["schemaVersion", "gate", "kind", "action", "policy", "inconclusive"],
   "additionalProperties": false,
