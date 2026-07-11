@@ -144,18 +144,25 @@ internal static class GatekeeperInspectCommand
             return warn ? ExitCodes.Success : exit;
         }
 
-        // Batch: one payload per line → one compact verdict per line (JSONL), aggregate exit.
-        string[] lines;
-        try { lines = await File.ReadAllLinesAsync(inputFile, ct).ConfigureAwait(false); }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { stderr.WriteLine($"  Error reading --input: {ex.Message}"); return ExitCodes.UsageError; }
-
+        // Batch: one payload per line → one compact verdict per line (JSONL), aggregate exit. Streamed line-by-line
+        // so a large corpus (e.g. a red-team dataset) never has to fit in memory.
         var worst = CatAllow;
-        foreach (var line in lines)
+        try
         {
-            if (string.IsNullOrWhiteSpace(line)) { continue; }
-            var (verdict, exit) = await EvaluateOneAsync(line, gateId, stateClass, chatGate, toolGate, ct).ConfigureAwait(false);
-            stdout.WriteLine(verdict.ToJson(indented: false));
-            worst = WorseOf(worst, exit);
+            using var reader = new StreamReader(inputFile);
+            string? line;
+            while ((line = await reader.ReadLineAsync(ct).ConfigureAwait(false)) is not null)
+            {
+                if (string.IsNullOrWhiteSpace(line)) { continue; }
+                var (verdict, exit) = await EvaluateOneAsync(line, gateId, stateClass, chatGate, toolGate, ct).ConfigureAwait(false);
+                stdout.WriteLine(verdict.ToJson(indented: false));
+                worst = WorseOf(worst, exit);
+            }
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            stderr.WriteLine($"  Error reading --input: {ex.Message}");
+            return ExitCodes.UsageError;
         }
 
         return warn ? ExitCodes.Success : worst;
@@ -212,8 +219,8 @@ internal static class GatekeeperInspectCommand
         return (cdto, ExitOf(cdto));
     }
 
-    private static int ExitOf(GateVerdictDto v) =>
-        v.Action == "Allow" ? CatAllow : v.Inconclusive ? CatInconclusive : CatBlock;
+    // Single source of truth for verdict→exit mapping (Allow/Mutate→0, inconclusive→6, Block→5).
+    private static int ExitOf(GateVerdictDto v) => v.ExitCode();
 
     private static GateVerdictDto Structural(string gateId, string kind, string message) => new()
     {
@@ -468,6 +475,7 @@ internal static class GatekeeperInspectCommand
             Reason = anyBlock ? string.Join("; ", reasons) : null,
             Matches = matches.Count > 0 ? matches.Distinct(StringComparer.Ordinal).ToList() : null,
             InlineReady = inlineReady,
+            Warning = warning,
             Certificate = provenances.Count > 0 ? provenances : null,
         };
         stdout.WriteLine(dto.ToJson(indented: true));

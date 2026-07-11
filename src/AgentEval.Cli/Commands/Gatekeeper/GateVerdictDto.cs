@@ -135,9 +135,12 @@ internal sealed record GateVerdictDto
         Warning = warning,
     };
 
-    /// <summary>The exit code this verdict maps to (§6): Allow→0, Block→5, fail-closed inconclusive→6.</summary>
+    /// <summary>
+    /// The exit code this verdict maps to (§6): Allow/Mutate→0, fail-closed inconclusive→6, Block→5. A tool
+    /// <c>Mutate</c> means the call <b>proceeds</b> with rewritten args, so it is a success (0), not a block.
+    /// </summary>
     public int ExitCode() =>
-        Action == "Allow" ? ExitCodes.Success
+        Action is "Allow" or "Mutate" ? ExitCodes.Success
         : Inconclusive ? ExitCodes.GateInconclusive
         : ExitCodes.GateBlocked;
 
