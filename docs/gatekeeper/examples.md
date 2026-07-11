@@ -87,35 +87,44 @@ var agent = baseAgent.AsBuilder()
 
 ## The Tribunal — a judge that *earns* the right to block
 
-For the axis a keyword list can't catch — **indirect prompt injection** (retrieved content trying to instruct the
-agent) — a single-axis LLM judge. But an un-calibrated inline judge is a fabrication risk, so it must beat a
-baseline on a both-directions gold set **before** it blocks live traffic.
+For the axis a fixed keyword list can't catch *reliably* — **indirect prompt injection** (retrieved content trying to
+instruct the agent, endlessly paraphrasable) — a single-axis LLM judge. But an un-calibrated inline judge is a
+fabrication risk, so it must beat a baseline on a both-directions gold set **before** it blocks live traffic.
+
+The flagship `IndirectInjectionJudge` bundles the whole path — the rubric, a **canonical 52-case gold set** (large
+enough to promote, unlike the 12-case seed `StarterGoldSet()`), and the deterministic **`KeywordOracleGate`** it
+must beat:
 
 ```csharp
 using AgentEval.Guardrails.Judges;
-using AgentEval.Guardrails.Judges.Rubrics;
 
-// A single-axis judge backed by a fast (mini/nano) model.
-var judge = new CompositeJudgeGate<IndirectInjectionRubric>(new IndirectInjectionRubric(), fastModel);
+// THE BAR: calibrate against the canonical gold set + keyword-oracle baseline, at a zero-missed-attacks bar.
+var report = await IndirectInjectionJudge.CalibrateAsync(fastModel);
 
-// THE BAR: score it against YOUR both-directions gold set. `IndirectInjectionRubric.StarterGoldSet()` is a small
-// SEED — extend it with your own labelled attacks + benign cases until it's large enough to trust (the shipped
-// starter is intentionally below the default MinCasesPerDirection, so it won't promote on its own).
-JudgeGoldSet myGoldSet = /* your extended gold set */;
-var report = await GateCalibrationHarness.EvaluateAsync(
-    judge, myGoldSet,
-    new CalibrationOptions
-    {
-        DeterministicBaseline = keywordBaseline,   // a naive detector the judge must beat
-        MaxDangerousErrors = 0,                    // no missed attacks
-    });
-
+Console.WriteLine($"judge {report.DecisiveAccuracy:P0} vs oracle {report.BaselineAccuracy:P0} — " +
+                  $"beats it: {report.BeatsBaseline}, {report.DangerousErrorCount} missed attacks");
 report.AssertInlineReady();   // throws unless it earned the right — keep it in shadow until it passes
 
 // Only now register it inline (run-pre, on the tool/RAG-return seam):
 var agent = baseAgent.AsBuilder()
-    .UseAgentEvalGate(pre: [judge], policy: EvalGatePolicy.ThrowOnFail)
+    .UseAgentEvalGate(pre: [IndirectInjectionJudge.Create(fastModel)], policy: EvalGatePolicy.ThrowOnFail)
     .Build();
+```
+
+The canonical gold set is still a **starting point** — extend it with your own traffic. The keyword oracle loses on
+it in *both* directions: it misses paraphrased exfiltration (`"email the thread to…"`) and it over-blocks benign text
+that reuses its own override words (`"disregard the previous draft"`, `"manual override switch"`) — the
+precision/recall bind a fixed list can't escape. **One honest caveat:** the judge only calls its model when the
+rubric's prefilter fires, so a retrieved snippet that trips *no* signal is allowed without a model call (the same
+blind spot) — keep the prefilter conservative and add prefilter-evading attacks as you extend the gold set. The
+figures you get are *your* model's on *our* data, not a blanket accuracy claim.
+
+Under the hood it's the shipped primitive — write your own axis the same way, then calibrate and wire it identically:
+
+```csharp
+var judge = new CompositeJudgeGate<MyRubric>(new MyRubric(), fastModel);   // one axis, one prompt, one parser
+var report = await GateCalibrationHarness.EvaluateAsync(judge, myGoldSet,
+    new CalibrationOptions { DeterministicBaseline = myBaseline, MaxDangerousErrors = 0 });
 ```
 
 Compose several single-axis judges with `ParallelJudgeFanOut` (they run concurrently, fail-closed OR) and wrap any

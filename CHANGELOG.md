@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Gatekeeper — the flagship calibrated judge
+
+#### Added
+- **`IndirectInjectionJudge`** (`AgentEval.Guardrails.Judges`) — the flagship Tribunal judge as a one-call bundle of
+  the shipped primitives: `Create(fastModel)` (the `IndirectInjectionRubric` wrapped in a `CompositeJudgeGate`,
+  cached), `GoldSet()`, `KeywordBaseline()`, and `CalibrateAsync(fastModel)` (scores the judge against the canonical
+  gold set + keyword-oracle baseline at a zero-missed-attacks bar and returns the `CalibrationReport`). It does not
+  lower the bar — a judge is inline-ready only when it beats the baseline with no missed attacks.
+- **`IndirectInjectionRubric.CalibrationGoldSet()`** — a **canonical both-directions gold set** (26 indirect-injection
+  attacks + 26 benign hard-negatives, 52 cases) sized above the default `MinCasesPerDirection` of 20, so it can
+  actually promote a judge (unlike the 12-case `StarterGoldSet()` seed). Built to expose the keyword dilemma: attacks
+  span classic overrides *and* paraphrased exfiltration the oracle misses; benigns reuse the oracle's own override
+  words (`disregard`, `override`, `system prompt`) so it false-alarms — the precision/recall bind a fixed list can't
+  escape.
+- **`KeywordOracleGate`** (`AgentEval.Guardrails.Gates`) — a reusable deterministic `IChatGate` "keyword oracle" for
+  use as a calibration `DeterministicBaseline`. It is the naive detector the repo's non-convergence finding indicts —
+  an override-focused keyword list that provably loses in both directions (misses paraphrase, over-blocks benign
+  mentions), so a judge earns promotion only by being strictly better.
+
+#### Changed
+- **Sample `Gatekeeper/04_GatekeeperBeachhead`** (the Tribunal scene) now calibrates the real judge against the
+  canonical 52-case gold set and the shipped `KeywordOracleGate` at the real promotion floor, and — once promoted —
+  enforces the judge **inline** via `UseAgentEvalGate(pre: […])`, blocking a live indirect injection run-pre with
+  countable `gate.run-pre.*.judge:indirect-injection` evidence (previously a 12-case seed, a 2-keyword toy baseline,
+  and a standalone `InspectAsync`).
+
 ## [0.14.0-beta] - 2026-07-06
 
 ### Gatekeeper — runtime fail-closed enforcement

@@ -85,9 +85,13 @@ accumulates the stream and records its evidence *after* — observe‑only.
 ## The Tribunal — LLM judge gates
 
 When you need *judgment* — the clearest case is **indirect prompt injection** (retrieved content trying to
-*instruct* the agent), which keyword gates can't catch because the payload is natural language — a single‑axis LLM
-judge runs on the run‑pre/run‑post seam (which accepts model cost, unlike the inline tool gate). These live in
-`AgentEval.Guardrails.Judges`.
+*instruct* the agent), which keyword gates can't catch *reliably* because the payload is natural language and
+endlessly paraphrasable — a single‑axis LLM judge runs on the run‑pre/run‑post seam (which accepts model cost,
+unlike the inline tool gate). These live in `AgentEval.Guardrails.Judges`.
+
+**Recall is bounded by the prefilter.** A judge's model is only consulted when its rubric prefilter fires — a
+retrieved snippet that trips no signal is allowed without a model call (the same blind spot a keyword list has). Keep
+the prefilter conservative and grow your gold set with prefilter‑evading attacks.
 
 | Gate | What it does | Rank | Honest reasoning |
 |---|---|:--:|---|
@@ -100,8 +104,10 @@ judge runs on the run‑pre/run‑post seam (which accepts model cost, unlike th
 > `JudgeGoldSet` (attacks that must block AND benign that must be allowed). The report gives decisive accuracy, the
 > **missed‑attack (dangerous‑error) count** — the number that matters — the false‑alarm rate, Cohen's κ, and
 > (with a baseline) whether it beats a deterministic detector. `report.AssertInlineReady()` throws until it
-> passes, so an un‑calibrated judge can't be promoted inline by an honest caller. Ships with
-> `IndirectInjectionRubric` + a `StarterGoldSet()` to extend with your own data. Re‑run on any model/prompt change.
+> passes, so an un‑calibrated judge can't be promoted inline by an honest caller. The flagship `IndirectInjectionJudge`
+> bundles this — `CalibrateAsync(model)` scores the `IndirectInjectionRubric` against a canonical 52‑case
+> `CalibrationGoldSet()` and the `KeywordOracleGate` baseline; extend the gold set with your own data and re‑run on any
+> model/prompt change.
 >
 > Its accuracy is **your** measurement on **your** data — this toolkit deliberately makes no blanket accuracy
 > claim for the judge; the harness is how you find out honestly.
