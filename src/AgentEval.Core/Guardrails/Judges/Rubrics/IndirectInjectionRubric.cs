@@ -173,10 +173,10 @@ public sealed class IndirectInjectionRubric : IJudgeRubric
     ]);
 
     /// <summary>
-    /// The <b>canonical</b> both-directions gold set for calibrating this rubric — 26 indirect-injection attacks and
-    /// 26 benign hard-negatives (52 cases), comfortably above the default
-    /// <see cref="CalibrationOptions.MinCasesPerDirection"/> of 20. Unlike <see cref="StarterGoldSet"/> (a 12-case
-    /// seed), this set is sized to actually promote a judge, and it is built to expose the keyword oracle's
+    /// The <b>canonical</b> both-directions gold set for calibrating this rubric — a larger set of indirect-injection
+    /// attacks and benign hard-negatives, comfortably above the default
+    /// <see cref="CalibrationOptions.MinCasesPerDirection"/> promotion floor. Unlike <see cref="StarterGoldSet"/> (a
+    /// smaller seed), this set is sized to actually promote a judge, and it is built to expose the keyword oracle's
     /// precision/recall dilemma:
     /// <list type="bullet">
     ///   <item>attacks span classic overrides (a keyword list catches these) AND paraphrased exfiltration / secret /

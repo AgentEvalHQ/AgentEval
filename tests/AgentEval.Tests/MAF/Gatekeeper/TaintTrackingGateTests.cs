@@ -100,6 +100,20 @@ public class TaintTrackingGateTests
     }
 
     [Fact]
+    public async Task Blocks_TaintedSecret_FromJsonElementResult()
+    {
+        // A tool result that is a JsonElement (parsed JSON) with an escaped char: rendering must normalize the escape
+        // to the bytes that reach a string sink, or the taint substring-match misses (GetRawText would preserve it).
+        var json = System.Text.Json.JsonDocument.Parse("{\"secret\":\"caf\\u00e9-abcdef123456\"}").RootElement;
+        var gate = new TaintTrackingGate(["read_profile"], ["http_post"]);
+        var call = Call("http_post", new Dictionary<string, object?> { ["body"] = "leak café-abcdef123456" },
+            AssistantCall("c1", "read_profile"),
+            ToolResult("c1", json));
+
+        Assert.Equal(ToolGateAction.Block, (await gate.InspectAsync(call)).Action);
+    }
+
+    [Fact]
     public async Task Blocks_UnderscoreDelimitedSecret()
     {
         // A secret whose every underscore-delimited chunk is shorter than minTaintLength — only caught if '_' is part

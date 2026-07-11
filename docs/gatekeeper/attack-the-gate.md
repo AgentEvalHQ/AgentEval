@@ -10,21 +10,21 @@ It runs **credential-free**: the built-in `--sut gatekeeper-demo` is a deliberat
 # 1. Capture the baseline once, on a known-good commit, and commit the JSON.
 agenteval redteam --sut gatekeeper-demo --intensity quick \
   --save-baseline gatekeeper-demo.baseline.json
-#   → a small, stable set of conclusive findings, every forbidden tool call blocked; exit 0; baseline written.
+#   → a small, stable set of conclusive findings, every forbidden tool call blocked; the run passes; baseline written.
 
 # 2. On every PR — fail ONLY if a NEW vulnerability appears vs the baseline (exit 4).
 agenteval redteam --sut gatekeeper-demo --intensity quick \
   --baseline gatekeeper-demo.baseline.json --fail-on regression
-#   → the gate holds → Stable → exit 0.
+#   → the gate holds → Stable → the run passes.
 ```
 
-The baseline records the *known* conclusive failures (their probe ids), the conclusive score, and the coverage. The gate on step 2 is **relative**: it does not fail because some attacks are known-hard — it fails when the *set* of failures grows. Concretely, [`RedTeamBaselineComparer`](../../src/AgentEval.RedTeam/RedTeam/Baseline/RedTeamBaselineComparer.cs) flags a **regression** (exit code `4`) when any of: a new conclusive `Succeeded` probe appears, the conclusive score drops past the threshold, or coverage drops.
+The baseline records the *known* conclusive failures (their probe ids), the conclusive score, and the coverage. The gate on step 2 is **relative**: it does not fail because some attacks are known-hard — it fails when the *set* of failures grows. Concretely, [`RedTeamBaselineComparer`](../../src/AgentEval.RedTeam/RedTeam/Baseline/RedTeamBaselineComparer.cs) flags a **regression** when any of: a new conclusive `Succeeded` probe appears, the conclusive score drops past the threshold, or coverage drops.
 
 ### The red case
 
-The build goes **red** the moment a change lets a probe through that the baseline didn't have — a weakened or removed gate, a newly-added tool that isn't gated, a regressed policy. That new conclusive `Succeeded` is a `NewVulnerability` → `--fail-on regression` returns exit `4` → CI fails. That is the whole point: **you can't quietly weaken the Gatekeeper without turning the build red.**
+The build goes **red** the moment a change lets a probe through that the baseline didn't have — a weakened or removed gate, a newly-added tool that isn't gated, a regressed policy. That new conclusive `Succeeded` is a `NewVulnerability`, so `--fail-on regression` fails the build. That is the whole point: **you can't quietly weaken the Gatekeeper without turning the build red.**
 
-> Exit codes: `0` clean · `1` vulnerabilities present (with `--fail-on vuln`, the default) · `4` regression vs baseline. A regression always outranks the absolute vuln gate.
+> The scan exits non-zero on a vulnerability (default `--fail-on vuln`) or, with `--fail-on regression`, only on a regression vs the baseline — which takes precedence over the absolute vuln gate. See `agenteval redteam --help` for the exact exit-code mapping.
 
 ## GitHub Actions recipe (credential-free)
 

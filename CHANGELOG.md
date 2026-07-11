@@ -43,7 +43,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   end-to-end (against gpt-4o-mini — see the commit).
 - **`docs/gatekeeper/attack-the-gate.md`** — the closed-loop CI recipe: baseline a *gated* agent with
   `agenteval redteam --sut gatekeeper-demo --save-baseline …`, then `--baseline … --fail-on regression` fails the
-  build (exit 4) the moment a change lets a probe through that the baseline didn't have. Credential-free, with a
+  build the moment a change lets a probe through that the baseline didn't have. Credential-free, with a
   GitHub Actions snippet.
 
 ### Gatekeeper — deterministic flow-control gates

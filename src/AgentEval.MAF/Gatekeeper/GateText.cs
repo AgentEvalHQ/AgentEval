@@ -27,7 +27,9 @@ internal static class GateText
     {
         null => string.Empty,
         string s => s,
-        JsonElement je => je.ValueKind == JsonValueKind.String ? je.GetString() ?? string.Empty : je.GetRawText(),
+        // Re-serialize a non-string element with the relaxed encoder (rather than GetRawText, which preserves the
+        // source's \uXXXX escaping) so a secret inside a JsonElement result renders as the bytes that reach a sink.
+        JsonElement je => je.ValueKind == JsonValueKind.String ? je.GetString() ?? string.Empty : JsonSerializer.Serialize(je, SerializerOptions),
         IFormattable f => f.ToString(null, CultureInfo.InvariantCulture),
         _ => SafeJson(value),
     };
