@@ -33,6 +33,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   countable `gate.run-pre.*.judge:indirect-injection` evidence (previously a 12-case seed, a 2-keyword toy baseline,
   and a standalone `InspectAsync`).
 
+### Gatekeeper — defense-in-depth sample + attack-the-gate loop
+
+#### Added
+- **Sample `Gatekeeper/07_GatekeeperDefenseInDepth`** — one real agent behind the full stack (the calibrated
+  `IndirectInjectionJudge` + `ReferentialIntegrityGate` + `TaintTrackingGate` + `DomainAllowListGate`), driven through
+  a multi-step injection campaign where a *different* gate catches each step, printed from the trace via `GateVoice`.
+  Fills the gap between sample 04 (judge only) and sample 06 (deterministic gates only). Verified live end-to-end.
+- **`docs/gatekeeper/attack-the-gate.md`** — the closed-loop CI recipe: baseline a *gated* agent with
+  `agenteval redteam --sut gatekeeper-demo --save-baseline …`, then `--baseline … --fail-on regression` fails the
+  build (exit 4) the moment a change lets a probe through that the baseline didn't have. Credential-free, with a
+  GitHub Actions snippet.
+
 ### Gatekeeper — deterministic flow-control gates
 
 #### Added

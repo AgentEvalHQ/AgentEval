@@ -233,6 +233,10 @@ judge scoring a gold set), and where a well‑aligned model resists an attack th
 - [`Gatekeeper/06_GatekeeperAgentHarnessDefended`](../../samples/AgentEval.Samples/Gatekeeper/06_GatekeeperAgentHarnessDefended.cs) —
   **× MAF Agent Harness (defended)**: a genuine `AsHarnessAgent` behind defense‑in‑depth (budget + `SequenceGate` +
   `DomainAllowListGate`) — legit work flows, the read→POST exfiltration is blocked.
+- [`Gatekeeper/07_GatekeeperDefenseInDepth`](../../samples/AgentEval.Samples/Gatekeeper/07_GatekeeperDefenseInDepth.cs) —
+  **defense in depth against one injection campaign**: the calibrated `IndirectInjectionJudge` (run‑pre) +
+  `ReferentialIntegrityGate` + `TaintTrackingGate` + `DomainAllowListGate` on one agent, where a *different* gate
+  catches each step, printed from the trace.
 
 ## From the CLI
 
@@ -241,4 +245,5 @@ agenteval redteam --sut gatekeeper-demo
 ```
 
 Scans a built‑in gated agent with the real attack suite and reports how many attempts the gate blocked —
-credential‑free, and composing with `--baseline` / `--fail-on regression` for **attack‑the‑gate CI**.
+credential‑free, and composing with `--baseline` / `--fail-on regression` for **attack‑the‑gate CI**. See
+[`attack-the-gate.md`](attack-the-gate.md) for the full red→green loop and a GitHub Actions recipe.
