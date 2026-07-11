@@ -1,0 +1,75 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 AgentEval Contributors
+// Licensed under the MIT License.
+
+using System.Globalization;
+using System.Text.Encodings.Web;
+using System.Text.Json;
+
+namespace AgentEval.MAF.Gatekeeper;
+
+/// <summary>
+/// Renders a tool-call argument value or tool result (an <see cref="object"/> that may be a string, number,
+/// <see cref="JsonElement"/>, or a complex object) to a stable, culture-invariant string for the deterministic
+/// gates to scan. Shared by the referential-integrity and taint gates so their text extraction is identical.
+/// </summary>
+internal static class GateText
+{
+    // Relaxed (non-HTML-escaping) encoder so a serialized secret is rendered with the SAME bytes that flow to a
+    // string sink — the default encoder escapes < > & ' and non-ASCII to \uXXXX, which would make a tainted token
+    // fail to substring-match the raw value the model actually sends (a silent taint miss).
+    private static readonly JsonSerializerOptions SerializerOptions = new()
+    {
+        Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
+    };
+
+    public static string Stringify(object? value) => value switch
+    {
+        null => string.Empty,
+        string s => s,
+        // Re-serialize a non-string element with the relaxed encoder (rather than GetRawText, which preserves the
+        // source's \uXXXX escaping) so a secret inside a JsonElement result renders as the bytes that reach a sink.
+        JsonElement je => je.ValueKind == JsonValueKind.String ? je.GetString() ?? string.Empty : JsonSerializer.Serialize(je, SerializerOptions),
+        IFormattable f => f.ToString(null, CultureInfo.InvariantCulture),
+        _ => SafeJson(value),
+    };
+
+    private static string SafeJson(object value)
+    {
+        try
+        {
+            return JsonSerializer.Serialize(value, SerializerOptions);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;   // honor cancellation — never swallow it
+        }
+        catch (OutOfMemoryException)
+        {
+            throw;   // let a truly fatal exception bubble
+        }
+        // A defensive renderer must never throw into the gate on a common serialization / getter failure —
+        // NotSupportedException / JsonException, or a stale ORM entity whose property getter throws its own type
+        // (e.g. InvalidOperationException), or a ToString() that throws. Degrade to a best-effort string (then
+        // empty); cancellation and OutOfMemory are re-thrown above, not swallowed.
+        catch
+        {
+            try
+            {
+                return value.ToString() ?? string.Empty;
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (OutOfMemoryException)
+            {
+                throw;
+            }
+            catch
+            {
+                return string.Empty;
+            }
+        }
+    }
+}

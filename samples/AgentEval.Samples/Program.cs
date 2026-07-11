@@ -133,6 +133,7 @@ public static class Program
             new("Beachhead + The Tribunal",  "Budget · exfil · rendered-output · a CALIBRATED indirect-injection judge", GatekeeperBeachhead.RunAsync),
             new("Agent Harness — simple",    "Cap an autonomous, looping MAF Agent Harness agent with RunBudgetGate", GatekeeperAgentHarness.RunAsync),
             new("Agent Harness — defended",  "Defense-in-depth around a capable harness agent: budget + sequence + exfil", GatekeeperAgentHarnessDefended.RunAsync),
+            new("Defense in Depth",          "One injection campaign, a different gate per step: calibrated judge + referential-integrity + taint + allow-list", GatekeeperDefenseInDepth.RunAsync),
         ]),
     ];
 

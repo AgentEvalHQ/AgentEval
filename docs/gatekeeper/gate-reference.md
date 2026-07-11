@@ -44,14 +44,17 @@ result; `Terminate` → stop the loop), so adding a gate never silently changes 
 
 ### Budget & egress (off the `RunLedger`)
 
-`RunLedger` is the per‑run **cross‑hop accumulator** (total tool calls, per‑tool counts, monetary sums, observed
-ids) — the deterministic primitive these gates share. Register `UseAgentEvalGate()` so each run gets its own
-ledger.
+`RunLedger` is the per‑run **cross‑hop accumulator** (total tool calls, per‑tool counts, monetary sums) that the
+**budget** gate rides — register `UseAgentEvalGate()` so each run gets its own ledger. The **flow‑control** gates
+below (referential‑integrity, taint) are stateless: they recompute from the run history (`call.Messages`) per call,
+so they need no ledger and can't leak state across runs.
 
 | Gate | What it does | Rank | Honest reasoning |
 |---|---|:--:|---|
 | **RunBudgetGate** | Caps a run's budget off the `RunLedger`: total tool calls, per‑tool call count, or the running sum of a monetary argument. Blocks the call that would exceed it. | 🟢🟢 **5** | **Denial‑of‑wallet / runaway‑loop** defense with no tool‑body equivalent — cost accrues across the whole orchestration, so no single tool sees the total. Pure‑code, hot‑path safe; the check + record is one atomic ledger op (correct under concurrent invocation) and a **negative amount can't manufacture headroom** (clamped to 0). It caps tool‑call volume and monetary arguments; token / cost / wall‑clock budgets are out of scope here (they require model‑usage capture). |
 | **DomainAllowListGate** | Allow‑list over the URLs in a tool call's arguments; a host not on the list (subdomains allowed) blocks the call. Catches `http(s)` / `ftp` / `ws` **and scheme‑relative** `//host`; fail‑closed on unserializable args / scan timeout. | 🟢🟢 **5** | **Exfiltration** is the payoff of most indirect injection, and an allow‑list is where the literature lands — sub‑millisecond, un‑paraphrasable, and it defends every networked tool from one policy. Resolves the userinfo trick (`https://good.com@evil.com`). **Limit:** it gates URLs it can extract — a *bare hostname* (no `//`) or a `data:` URI isn't detected (validate those in the tool / pair with an argument‑pattern gate), and open web‑browse surfaces degrade to advisory. |
+| **ReferentialIntegrityGate** | A guarded (side-effecting) call may only reference ids the **user** provided or a **trusted** lookup surfaced this run; an id no legitimate source introduced blocks the call. | 🟢 **4** | Stops an injection **inventing** an id to act on (`refund #FAKE-9931`). The honest core is the trust model: model-generated content and *untrusted* (poisonable) tool results never confer legitimacy — else the attacker launders the id through the very document carrying the payload. A **tripwire** (heuristic id detection); run `WarnOnly` to measure false alarms first. |
+| **TaintTrackingGate** | Coarse information-flow control: a value returned by a confidential **source** tool must not appear in an external **sink** tool's arguments — the tainted call is blocked (the reason never echoes the secret). | 🟡 **3** | Closes the exfil path directly (source → sink) without a keyword list. **Coarse — a tripwire, not a proof:** substring taint, so a transformed/re-encoded value slips past and an incidental shared token can false-alarm; tune `minTaintLength` and run `WarnOnly` first. |
 
 ## The moat — your red‑team probes become gates
 
@@ -85,9 +88,13 @@ accumulates the stream and records its evidence *after* — observe‑only.
 ## The Tribunal — LLM judge gates
 
 When you need *judgment* — the clearest case is **indirect prompt injection** (retrieved content trying to
-*instruct* the agent), which keyword gates can't catch because the payload is natural language — a single‑axis LLM
-judge runs on the run‑pre/run‑post seam (which accepts model cost, unlike the inline tool gate). These live in
-`AgentEval.Guardrails.Judges`.
+*instruct* the agent), which keyword gates can't catch *reliably* because the payload is natural language and
+endlessly paraphrasable — a single‑axis LLM judge runs on the run‑pre/run‑post seam (which accepts model cost,
+unlike the inline tool gate). These live in `AgentEval.Guardrails.Judges`.
+
+**Recall is bounded by the prefilter.** A judge's model is only consulted when its rubric prefilter fires — a
+retrieved snippet that trips no signal is allowed without a model call (the same blind spot a keyword list has). Keep
+the prefilter conservative and grow your gold set with prefilter‑evading attacks.
 
 | Gate | What it does | Rank | Honest reasoning |
 |---|---|:--:|---|
@@ -100,8 +107,10 @@ judge runs on the run‑pre/run‑post seam (which accepts model cost, unlike th
 > `JudgeGoldSet` (attacks that must block AND benign that must be allowed). The report gives decisive accuracy, the
 > **missed‑attack (dangerous‑error) count** — the number that matters — the false‑alarm rate, Cohen's κ, and
 > (with a baseline) whether it beats a deterministic detector. `report.AssertInlineReady()` throws until it
-> passes, so an un‑calibrated judge can't be promoted inline by an honest caller. Ships with
-> `IndirectInjectionRubric` + a `StarterGoldSet()` to extend with your own data. Re‑run on any model/prompt change.
+> passes, so an un‑calibrated judge can't be promoted inline by an honest caller. The flagship `IndirectInjectionJudge`
+> bundles this — `CalibrateAsync(model)` scores the `IndirectInjectionRubric` against the canonical both‑directions
+> `CalibrationGoldSet()` and the `KeywordOracleGate` baseline; extend the gold set with your own data and re‑run on any
+> model/prompt change.
 >
 > Its accuracy is **your** measurement on **your** data — this toolkit deliberately makes no blanket accuracy
 > claim for the judge; the harness is how you find out honestly.

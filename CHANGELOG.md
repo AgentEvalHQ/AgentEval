@@ -7,6 +7,63 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Gatekeeper — the flagship calibrated judge
+
+#### Added
+- **`IndirectInjectionJudge`** (`AgentEval.Guardrails.Judges`) — the flagship Tribunal judge as a one-call bundle of
+  the shipped primitives: `Create(fastModel)` (the `IndirectInjectionRubric` wrapped in a `CompositeJudgeGate`,
+  cached), `GoldSet()`, `KeywordBaseline()`, and `CalibrateAsync(fastModel)` (scores the judge against the canonical
+  gold set + keyword-oracle baseline at a zero-missed-attacks bar and returns the `CalibrationReport`). It does not
+  lower the bar — a judge is inline-ready only when it beats the baseline with no missed attacks.
+- **`IndirectInjectionRubric.CalibrationGoldSet()`** — a **canonical both-directions gold set** (paraphrased-injection
+  attacks + benign hard-negatives) sized above the default `MinCasesPerDirection` promotion floor, so it can actually
+  promote a judge (unlike the smaller `StarterGoldSet()` seed). Built to expose the keyword dilemma: attacks
+  span classic overrides *and* paraphrased exfiltration the oracle misses; benigns reuse the oracle's own override
+  words (`disregard`, `override`, `system prompt`) so it false-alarms — the precision/recall bind a fixed list can't
+  escape.
+- **`KeywordOracleGate`** (`AgentEval.Guardrails.Gates`) — a reusable deterministic `IChatGate` "keyword oracle" for
+  use as a calibration `DeterministicBaseline`. It is the naive detector the repo's non-convergence finding indicts —
+  an override-focused keyword list that provably loses in both directions (misses paraphrase, over-blocks benign
+  mentions), so a judge earns promotion only by being strictly better.
+
+#### Changed
+- **Sample `Gatekeeper/04_GatekeeperBeachhead`** (the Tribunal scene) now calibrates the real judge against the
+  canonical gold set and the shipped `KeywordOracleGate` at the real promotion floor, and — once promoted —
+  enforces the judge **inline** via `UseAgentEvalGate(pre: […])`, blocking a live indirect injection run-pre with
+  countable `gate.run-pre.*.judge:indirect-injection` evidence (previously a smaller seed set, a toy keyword baseline,
+  and a standalone `InspectAsync`).
+
+### Gatekeeper — defense-in-depth sample + attack-the-gate loop
+
+#### Added
+- **Sample `Gatekeeper/07_GatekeeperDefenseInDepth`** — the calibrated `IndirectInjectionJudge` (shown as standalone
+  detection) alongside a defended agent behind `ReferentialIntegrityGate` + `TaintTrackingGate` + `DomainAllowListGate`,
+  driven through a multi-step injection campaign where a *different* gate catches each step, printed from the trace via
+  `GateVoice`. Fills the gap between sample 04 (judge only) and sample 06 (deterministic gates only). Verified live
+  end-to-end (against gpt-4o-mini — see the commit).
+- **`docs/gatekeeper/attack-the-gate.md`** — the closed-loop CI recipe: baseline a *gated* agent with
+  `agenteval redteam --sut gatekeeper-demo --save-baseline …`, then `--baseline … --fail-on regression` fails the
+  build the moment a change lets a probe through that the baseline didn't have. Credential-free, with a
+  GitHub Actions snippet.
+
+### Gatekeeper — deterministic flow-control gates
+
+#### Added
+- **`ReferentialIntegrityGate`** (`AgentEval.MAF.Gatekeeper`) — a side-effecting tool call may only reference ids the
+  user provided or a *trusted* lookup surfaced this run; an invented id (e.g. introduced by an indirect injection)
+  blocks the call. Stateless — recomputes observed ids per call from the run history (no cross-run state). Trust
+  model: model-generated content and *untrusted* (poisonable) tool results never confer legitimacy — so an injection
+  can't launder an id through the document that carries it. A heuristic tripwire — run `WarnOnly` first (the default
+  `isIdentifier` only checks ids that contain a digit; supply your own for all-letter ids).
+- **`TaintTrackingGate`** (`AgentEval.MAF.Gatekeeper`) — coarse information-flow control: a value returned by a
+  confidential *source* tool must not reach an external *sink* tool's arguments (the block reason never echoes the
+  secret). A tripwire, not a proof (substring taint; tune `minTaintLength`).
+
+#### Note
+- Per-tool call caps and per-run monetary caps are **already** provided by `RunBudgetGate` (`maxCallsPerTool` /
+  `maxMonetaryPerRun`), checked atomically in one `RunLedger` operation — so no separate per-tool-budget or
+  monetary-limit gate is needed.
+
 ## [0.14.0-beta] - 2026-07-06
 
 ### Gatekeeper — runtime fail-closed enforcement
