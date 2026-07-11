@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Gatekeeper Stage-2 — two more calibrated Tribunal axes + the Panel
+
+#### Added
+- **`ExfiltrationIntentJudge`** (`AgentEval.Guardrails.Judges`) — the second Tribunal judge, proving the calibration
+  harness generalizes past indirect-injection: a one-call bundle (`Create` / `GoldSet` / `KeywordBaseline` /
+  `CalibrateAsync`) of the `ExfiltrationIntentRubric` in a `CompositeJudgeGate`. Placed **run-post** on the rendered
+  output, it flags an output whose *purpose* is to disclose sensitive/proprietary data to an external destination —
+  the "is this data sensitive *in context*" half the deterministic egress gates can't judge. Pairs with
+  `DomainAllowListGate` (destination) + `TaintTrackingGate` (known-secret provenance) for defense in depth.
+- **`ExfiltrationIntentRubric`** (`AgentEval.Guardrails.Judges.Rubrics`) — single-axis rubric (broad prefilter →
+  DLP-classifier prompt → JSON parse) with a **canonical both-directions gold set** (22 exfil + 24 benign) above the
+  default promotion floor, built to expose the keyword dilemma on the exfil axis: attacks span explicit egress verbs
+  *and* paraphrased exfil (data dropped at a bare-domain/paste with no verb — an exfil keyword list misses these);
+  benigns mention `upload`/`password`/an email innocuously (a keyword list false-alarms). A judge earns inline
+  promotion only by beating the deterministic exfil keyword oracle with zero missed attacks.
+- **`SystemPromptExtractionJudge`** + **`SystemPromptExtractionRubric`** — the third Tribunal axis (run-post): flags an
+  output that leaks the confidential system prompt, hidden/developer instructions, internal config, tool schemas, or a
+  secret canary. Canonical gold set (22 leaks + 24 benign) with paraphrased disclosures the tell-oracle misses and
+  hard-negatives it false-alarms on — including a **refusal to reveal the prompt**, which the rubric treats as benign.
+  Hybridize with a deterministic canary token (canary catches the exact echo; the judge catches the paraphrase).
+- **Composed the two output judges into a run-post `ParallelJudgeFanOut`** ("the Panel") — proven inline: a live agent
+  whose answer exfiltrates is blocked before it reaches the caller (fail-closed OR), with countable
+  `gate.run-post.*.judge-panel` evidence, while a benign answer passes through at zero token cost (neither prefilter
+  fires). Single-axis judges are composed here, not widened into one rubric.
+
 ### Gatekeeper — the flagship calibrated judge
 
 #### Added
