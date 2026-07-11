@@ -43,7 +43,7 @@ jobs:
       # Fail the PR if a change let a probe through that the committed baseline didn't have.
       - run: |
           agenteval redteam --sut gatekeeper-demo --intensity quick \
-            --baseline ci/gatekeeper-demo.baseline.json --fail-on regression
+            --baseline gatekeeper-demo.baseline.json --fail-on regression
 ```
 
 Using the published prerelease tool avoids building the multi‑target CLI in CI; if you'd rather build from source, run it with an explicit TFM — `dotnet run --project src/AgentEval.Cli -c Release -f net8.0 -- redteam …`.

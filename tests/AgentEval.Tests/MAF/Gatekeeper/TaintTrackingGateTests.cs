@@ -114,6 +114,20 @@ public class TaintTrackingGateTests
     }
 
     [Fact]
+    public async Task Allows_JsonPropertyName_NotTaintedAsValue()
+    {
+        // A JSON object result taints its VALUES, not its property NAMES — a benign sink arg mentioning a field name
+        // (without the secret value) must not be blocked.
+        var json = System.Text.Json.JsonDocument.Parse("{\"accessToken\":\"x\"}").RootElement;   // key ≥ 8 chars, short value
+        var gate = new TaintTrackingGate(["read_profile"], ["http_post"]);
+        var call = Call("http_post", new Dictionary<string, object?> { ["body"] = "please refresh the accessToken field" },
+            AssistantCall("c1", "read_profile"),
+            ToolResult("c1", json));
+
+        Assert.Equal(ToolGateAction.Allow, (await gate.InspectAsync(call)).Action);   // 'accessToken' is a key, not tainted
+    }
+
+    [Fact]
     public async Task Blocks_UnderscoreDelimitedSecret()
     {
         // A secret whose every underscore-delimited chunk is shorter than minTaintLength — only caught if '_' is part

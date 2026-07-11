@@ -2,6 +2,7 @@
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 
+using System.Text.Json;
 using System.Text.RegularExpressions;
 using Microsoft.Extensions.AI;
 
@@ -163,14 +164,17 @@ public sealed class TaintTrackingGate : IToolGate
             {
                 if (content is FunctionResultContent fr && fr.CallId is not null && sourceCallIds.Contains(fr.CallId))
                 {
-                    foreach (Match match in Token.Matches(GateText.Stringify(fr.Result)))
+                    foreach (var text in TaintTexts(fr.Result))
                     {
-                        if (match.Value.Length >= _minTaintLength)
+                        foreach (Match match in Token.Matches(text))
                         {
-                            tainted.Add(match.Value);
-                            if (tainted.Count >= MaxTaintedTokens)
+                            if (match.Value.Length >= _minTaintLength)
                             {
-                                return tainted;   // cap hit — the caller fails closed rather than scan unboundedly
+                                tainted.Add(match.Value);
+                                if (tainted.Count >= MaxTaintedTokens)
+                                {
+                                    return tainted;   // cap hit — the caller fails closed rather than scan unboundedly
+                                }
                             }
                         }
                     }
@@ -179,5 +183,57 @@ public sealed class TaintTrackingGate : IToolGate
         }
 
         return tainted;
+    }
+
+    // The text a source result contributes to the taint set. When the result is (or serializes to) JSON, only the
+    // string/number VALUES are tainted — property NAMES are field labels (accessToken, api_key) that would
+    // systematically false-alarm a sink argument mentioning the field without the secret. Non-JSON results are
+    // tainted whole.
+    private static IReadOnlyList<string> TaintTexts(object? result)
+    {
+        var rendered = GateText.Stringify(result);
+        if (rendered.Length == 0)
+        {
+            return Array.Empty<string>();
+        }
+
+        try
+        {
+            using var doc = JsonDocument.Parse(rendered);
+            var values = new List<string>();
+            CollectJsonValues(doc.RootElement, values);
+            return values;
+        }
+        catch (JsonException)
+        {
+            return new[] { rendered };   // not JSON — taint the whole rendered string
+        }
+    }
+
+    private static void CollectJsonValues(JsonElement element, List<string> into)
+    {
+        switch (element.ValueKind)
+        {
+            case JsonValueKind.String:
+                into.Add(element.GetString() ?? string.Empty);
+                break;
+            case JsonValueKind.Number:
+                into.Add(element.GetRawText());
+                break;
+            case JsonValueKind.Object:
+                foreach (var property in element.EnumerateObject())
+                {
+                    CollectJsonValues(property.Value, into);   // skip property.Name — taint values, not keys
+                }
+
+                break;
+            case JsonValueKind.Array:
+                foreach (var item in element.EnumerateArray())
+                {
+                    CollectJsonValues(item, into);
+                }
+
+                break;
+        }
     }
 }
