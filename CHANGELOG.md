@@ -15,9 +15,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   cached), `GoldSet()`, `KeywordBaseline()`, and `CalibrateAsync(fastModel)` (scores the judge against the canonical
   gold set + keyword-oracle baseline at a zero-missed-attacks bar and returns the `CalibrationReport`). It does not
   lower the bar — a judge is inline-ready only when it beats the baseline with no missed attacks.
-- **`IndirectInjectionRubric.CalibrationGoldSet()`** — a **canonical both-directions gold set** (26 indirect-injection
-  attacks + 26 benign hard-negatives, 52 cases) sized above the default `MinCasesPerDirection` of 20, so it can
-  actually promote a judge (unlike the 12-case `StarterGoldSet()` seed). Built to expose the keyword dilemma: attacks
+- **`IndirectInjectionRubric.CalibrationGoldSet()`** — a **canonical both-directions gold set** (paraphrased-injection
+  attacks + benign hard-negatives) sized above the default `MinCasesPerDirection` promotion floor, so it can actually
+  promote a judge (unlike the smaller `StarterGoldSet()` seed). Built to expose the keyword dilemma: attacks
   span classic overrides *and* paraphrased exfiltration the oracle misses; benigns reuse the oracle's own override
   words (`disregard`, `override`, `system prompt`) so it false-alarms — the precision/recall bind a fixed list can't
   escape.
@@ -28,9 +28,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 #### Changed
 - **Sample `Gatekeeper/04_GatekeeperBeachhead`** (the Tribunal scene) now calibrates the real judge against the
-  canonical 52-case gold set and the shipped `KeywordOracleGate` at the real promotion floor, and — once promoted —
+  canonical gold set and the shipped `KeywordOracleGate` at the real promotion floor, and — once promoted —
   enforces the judge **inline** via `UseAgentEvalGate(pre: […])`, blocking a live indirect injection run-pre with
-  countable `gate.run-pre.*.judge:indirect-injection` evidence (previously a 12-case seed, a 2-keyword toy baseline,
+  countable `gate.run-pre.*.judge:indirect-injection` evidence (previously a smaller seed set, a toy keyword baseline,
   and a standalone `InspectAsync`).
 
 ### Gatekeeper — defense-in-depth sample + attack-the-gate loop

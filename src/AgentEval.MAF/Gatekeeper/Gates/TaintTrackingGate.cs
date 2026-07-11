@@ -78,8 +78,8 @@ public sealed class TaintTrackingGate : IToolGate
     {
         ArgumentNullException.ThrowIfNull(call);
 
-        // Only sink tools can leak — everything else is an immediate allow (and we skip the taint scan entirely).
-        if (!_sinks.Contains(call.FunctionName) || call.Arguments is null)
+        // Only sink tools with arguments can leak — everything else is an immediate allow (skip the taint scan).
+        if (!_sinks.Contains(call.FunctionName) || call.Arguments is null || call.Arguments.Count == 0)
         {
             return new ValueTask<ToolGateVerdict>(ToolGateVerdict.Allow(PolicyName));
         }

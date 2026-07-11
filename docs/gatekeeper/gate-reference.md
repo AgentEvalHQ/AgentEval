@@ -108,7 +108,7 @@ the prefilter conservative and grow your gold set with prefilter‑evading attac
 > **missed‑attack (dangerous‑error) count** — the number that matters — the false‑alarm rate, Cohen's κ, and
 > (with a baseline) whether it beats a deterministic detector. `report.AssertInlineReady()` throws until it
 > passes, so an un‑calibrated judge can't be promoted inline by an honest caller. The flagship `IndirectInjectionJudge`
-> bundles this — `CalibrateAsync(model)` scores the `IndirectInjectionRubric` against a canonical 52‑case
+> bundles this — `CalibrateAsync(model)` scores the `IndirectInjectionRubric` against the canonical both‑directions
 > `CalibrationGoldSet()` and the `KeywordOracleGate` baseline; extend the gold set with your own data and re‑run on any
 > model/prompt change.
 >

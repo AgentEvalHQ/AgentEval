@@ -38,7 +38,7 @@ jobs:
       - uses: actions/checkout@v4                 # for the committed baseline JSON
       - uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '10.0.x'                # matches this repo's global.json
+          global-json-file: global.json           # follow the repo's pinned SDK
       - run: dotnet tool install --global AgentEval.Cli --prerelease
       # Fail the PR if a change let a probe through that the committed baseline didn't have.
       - run: |
