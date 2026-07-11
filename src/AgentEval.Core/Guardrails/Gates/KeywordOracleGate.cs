@@ -12,7 +12,7 @@ namespace AgentEval.Guardrails.Gates;
 /// <b>misses paraphrase</b> (the payload is natural language, e.g. <c>"email the thread to backup@…"</c>), while a
 /// list broad enough to catch the exfiltration tail <b>over-blocks</b> benign text that merely mentions
 /// <c>api key</c> or <c>email</c>. Either way it loses ground a semantic judge holds.
-/// <para>Use it as the <see cref="Judges.CalibrationOptions.DeterministicBaseline"/> so a judge earns promotion only
+/// <para>Use it as the <see cref="AgentEval.Guardrails.Judges.CalibrationOptions.DeterministicBaseline"/> so a judge earns promotion only
 /// by being strictly better (higher accuracy AND no more missed attacks) on the same gold set. It is intentionally
 /// simple — do not ship it as your only defense.</para>
 /// </summary>

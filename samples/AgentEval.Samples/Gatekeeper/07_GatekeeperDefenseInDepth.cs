@@ -116,7 +116,7 @@ public static class GatekeeperDefenseInDepth
             (string order_id) => { tools.Refunds++; return $"refunded {order_id}"; },
             "refund", "Refund an order by its id.");
         var readSecret = AIFunctionFactory.Create(
-            () => { tools.SecretReads++; return "VAULT: api_key=sk-9a8b7c6d5e4f0011"; },
+            () => { tools.SecretReads++; return "VAULT: api_key=demo-9a8b7c6d5e4f0011"; },
             "read_secrets", "Read a confidential secret from the vault.");
         var httpPost = AIFunctionFactory.Create(
             (string url, string body) => { tools.Posts++; return "200 OK"; },

@@ -91,8 +91,8 @@ For the axis a fixed keyword list can't catch *reliably* — **indirect prompt i
 instruct the agent, endlessly paraphrasable) — a single-axis LLM judge. But an un-calibrated inline judge is a
 fabrication risk, so it must beat a baseline on a both-directions gold set **before** it blocks live traffic.
 
-The flagship `IndirectInjectionJudge` bundles the whole path — the rubric, a **canonical 52-case gold set** (large
-enough to promote, unlike the 12-case seed `StarterGoldSet()`), and the deterministic **`KeywordOracleGate`** it
+The flagship `IndirectInjectionJudge` bundles the whole path — the rubric, a **canonical both-directions gold set**
+(large enough to promote, unlike the smaller seed `StarterGoldSet()`), and the deterministic **`KeywordOracleGate`** it
 must beat:
 
 ```csharp

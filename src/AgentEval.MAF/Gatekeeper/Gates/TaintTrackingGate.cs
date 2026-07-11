@@ -84,7 +84,19 @@ public sealed class TaintTrackingGate : IToolGate
             return new ValueTask<ToolGateVerdict>(ToolGateVerdict.Allow(PolicyName));
         }
 
-        var tainted = CollectTaintedTokens(call.Messages);
+        HashSet<string> tainted;
+        try
+        {
+            tainted = CollectTaintedTokens(call.Messages);
+        }
+        catch (RegexMatchTimeoutException)
+        {
+            // A pathological history can time out the bounded token scan. Fail closed WITHIN the policy (a WarnOnly
+            // registration still only warns) rather than let the exception become an unconditional block upstream.
+            return new ValueTask<ToolGateVerdict>(ToolGateVerdict.Block(PolicyName,
+                $"taint scan timed out for sink '{call.FunctionName}' — cannot verify, failing closed"));
+        }
+
         if (tainted.Count == 0)
         {
             return new ValueTask<ToolGateVerdict>(ToolGateVerdict.Allow(PolicyName));

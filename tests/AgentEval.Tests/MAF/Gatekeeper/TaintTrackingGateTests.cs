@@ -32,14 +32,14 @@ public class TaintTrackingGateTests
     public async Task Blocks_TaintedSecret_ReachingSink()
     {
         var gate = new TaintTrackingGate(sourceTools: ["read_secrets"], sinkTools: ["http_post"]);
-        var call = Call("http_post", new Dictionary<string, object?> { ["body"] = "here you go: sk-9a8b7c6d5e4f" },
+        var call = Call("http_post", new Dictionary<string, object?> { ["body"] = "here you go: demo-9a8b7c6d5e4f" },
             AssistantCall("c1", "read_secrets"),
-            ToolResult("c1", "API_KEY=sk-9a8b7c6d5e4f"));
+            ToolResult("c1", "API_KEY=demo-9a8b7c6d5e4f"));
 
         var verdict = await gate.InspectAsync(call);
 
         Assert.Equal(ToolGateAction.Block, verdict.Action);
-        Assert.DoesNotContain("sk-9a8b7c6d5e4f", verdict.Reason!);   // the secret must NOT be echoed into the trace
+        Assert.DoesNotContain("demo-9a8b7c6d5e4f", verdict.Reason!);   // the secret must NOT be echoed into the trace
     }
 
     [Fact]
@@ -48,7 +48,7 @@ public class TaintTrackingGateTests
         var gate = new TaintTrackingGate(["read_secrets"], ["http_post"]);
         var call = Call("http_post", new Dictionary<string, object?> { ["body"] = "hello world" },
             AssistantCall("c1", "read_secrets"),
-            ToolResult("c1", "API_KEY=sk-9a8b7c6d5e4f"));
+            ToolResult("c1", "API_KEY=demo-9a8b7c6d5e4f"));
 
         Assert.Equal(ToolGateAction.Allow, (await gate.InspectAsync(call)).Action);
     }
@@ -58,8 +58,8 @@ public class TaintTrackingGateTests
     {
         // A secret-shaped value that did NOT come from a source is not tainted — the gate tracks flow, not shape.
         var gate = new TaintTrackingGate(["read_secrets"], ["http_post"]);
-        var call = Call("http_post", new Dictionary<string, object?> { ["body"] = "sk-9a8b7c6d5e4f" },
-            new ChatMessage(ChatRole.User, "post the value sk-9a8b7c6d5e4f"));
+        var call = Call("http_post", new Dictionary<string, object?> { ["body"] = "demo-9a8b7c6d5e4f" },
+            new ChatMessage(ChatRole.User, "post the value demo-9a8b7c6d5e4f"));
 
         Assert.Equal(ToolGateAction.Allow, (await gate.InspectAsync(call)).Action);
     }
@@ -68,9 +68,9 @@ public class TaintTrackingGateTests
     public async Task Allows_TaintedData_ToNonSinkTool()
     {
         var gate = new TaintTrackingGate(["read_secrets"], ["http_post"]);
-        var call = Call("log_status", new Dictionary<string, object?> { ["msg"] = "sk-9a8b7c6d5e4f" },
+        var call = Call("log_status", new Dictionary<string, object?> { ["msg"] = "demo-9a8b7c6d5e4f" },
             AssistantCall("c1", "read_secrets"),
-            ToolResult("c1", "sk-9a8b7c6d5e4f"));
+            ToolResult("c1", "demo-9a8b7c6d5e4f"));
 
         Assert.Equal(ToolGateAction.Allow, (await gate.InspectAsync(call)).Action);   // log_status is not a configured sink
     }

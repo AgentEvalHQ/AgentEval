@@ -109,24 +109,34 @@ public sealed class ReferentialIntegrityGate : IToolGate
             return new ValueTask<ToolGateVerdict>(ToolGateVerdict.Allow(PolicyName));
         }
 
-        HashSet<string>? observed = null;   // lazily harvested only when there is an id token to check
-
-        foreach (var argName in _idArgs)
+        try
         {
-            if (!call.Arguments.TryGetValue(argName, out var raw) || raw is null)
-            {
-                continue;
-            }
+            HashSet<string>? observed = null;   // lazily harvested only when there is an id token to check
 
-            foreach (var token in Identifiers(GateText.Stringify(raw)))
+            foreach (var argName in _idArgs)
             {
-                observed ??= HarvestObserved(call.Messages);
-                if (!observed.Contains(token))
+                if (!call.Arguments.TryGetValue(argName, out var raw) || raw is null)
                 {
-                    return new ValueTask<ToolGateVerdict>(ToolGateVerdict.Block(PolicyName,
-                        $"argument '{argName}' references identifier '{token}', which the user never provided and no trusted lookup surfaced this run (a possible injected / invented id)"));
+                    continue;
+                }
+
+                foreach (var token in Identifiers(GateText.Stringify(raw)))
+                {
+                    observed ??= HarvestObserved(call.Messages);
+                    if (!observed.Contains(token))
+                    {
+                        return new ValueTask<ToolGateVerdict>(ToolGateVerdict.Block(PolicyName,
+                            $"argument '{argName}' references identifier '{token}', which the user never provided and no trusted lookup surfaced this run (a possible injected / invented id)"));
+                    }
                 }
             }
+        }
+        catch (RegexMatchTimeoutException)
+        {
+            // A pathological history/arg can time out the bounded id scan. Fail closed WITHIN the policy (a WarnOnly
+            // registration still only warns) rather than let the exception become an unconditional block upstream.
+            return new ValueTask<ToolGateVerdict>(ToolGateVerdict.Block(PolicyName,
+                $"identifier scan timed out for '{call.FunctionName}' — cannot verify, failing closed"));
         }
 
         return new ValueTask<ToolGateVerdict>(ToolGateVerdict.Allow(PolicyName));

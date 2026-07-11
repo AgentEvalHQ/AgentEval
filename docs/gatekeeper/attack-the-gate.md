@@ -10,7 +10,7 @@ It runs **credential-free**: the built-in `--sut gatekeeper-demo` is a deliberat
 # 1. Capture the baseline once, on a known-good commit, and commit the JSON.
 agenteval redteam --sut gatekeeper-demo --intensity quick \
   --save-baseline gatekeeper-demo.baseline.json
-#   → e.g. 4/71 probes conclusive, 71 forbidden tool calls blocked; exit 0; baseline written.
+#   → a small, stable set of conclusive findings, every forbidden tool call blocked; exit 0; baseline written.
 
 # 2. On every PR — fail ONLY if a NEW vulnerability appears vs the baseline (exit 4).
 agenteval redteam --sut gatekeeper-demo --intensity quick \
