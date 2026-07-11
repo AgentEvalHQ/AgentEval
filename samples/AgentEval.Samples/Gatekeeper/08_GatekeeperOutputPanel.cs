@@ -174,6 +174,10 @@ public static class GatekeeperOutputPanel
         {
             await scene();
         }
+        catch (OperationCanceledException)
+        {
+            throw;   // let Ctrl+C / cancellation terminate cleanly — never mask it as a provider error
+        }
         catch (Exception ex)
         {
             Console.ForegroundColor = ConsoleColor.DarkYellow;
