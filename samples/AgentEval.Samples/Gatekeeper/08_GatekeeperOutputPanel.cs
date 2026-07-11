@@ -117,7 +117,7 @@ public static class GatekeeperOutputPanel
         var blocked = GlassBoxEvidence.FromTrace(trace)?.GateBlockCount ?? 0;
         var redacted = response.Text.Contains("BLOCKED", StringComparison.Ordinal);
         Console.WriteLine($"   gate blocks: {blocked}   answer redacted: {redacted}");
-        Console.WriteLine($"   {(blocked > 0 && redacted ? "✅ the exfil-shaped answer was caught run-post and never reached the caller" : "the model didn't emit the exfil-shaped text this run (nothing to block)")}");
+        Console.WriteLine($"   {(blocked > 0 && redacted ? "✅ the exfil-shaped answer was caught run-post and never reached the caller" : "no run-post block this run — the agent may not have echoed the planted text, or the judge allowed it (nothing was redacted)")}");
         GateVoice.Speak(trace);
         Console.WriteLine("   (deterministic proof of the inline block: tests/…/MAF/Gatekeeper/OutputJudgePanelInlineTests.)");
     }

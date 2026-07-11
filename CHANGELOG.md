@@ -7,10 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Gatekeeper Stage-2 — more calibrated Tribunal axes + the Panel + a live sample
+### Gatekeeper — more output-guarding Tribunal judges + the run-post Panel + a live sample
 
 #### Added
-- **`ExfiltrationIntentJudge`** (`AgentEval.Guardrails.Judges`) — the second Tribunal judge, proving the calibration
+- **`ExfiltrationIntentJudge`** (`AgentEval.Guardrails.Judges`) — another Tribunal judge, showing the calibration
   harness generalizes past indirect-injection: a one-call bundle (`Create` / `GoldSet` / `KeywordBaseline` /
   `CalibrateAsync`) of the `ExfiltrationIntentRubric` in a `CompositeJudgeGate`. Placed **run-post** on the rendered
   output, it flags an output whose *purpose* is to disclose sensitive/proprietary data to an external destination —
@@ -22,7 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   *and* paraphrased exfil (data dropped at a bare-domain/paste with no verb — an exfil keyword list misses these);
   benigns mention `upload`/`password`/an email innocuously (a keyword list false-alarms). A judge earns inline
   promotion only by beating the deterministic exfil keyword oracle with zero missed attacks.
-- **`SystemPromptExtractionJudge`** + **`SystemPromptExtractionRubric`** — the third Tribunal axis (run-post): flags an
+- **`SystemPromptExtractionJudge`** + **`SystemPromptExtractionRubric`** — another Tribunal axis (run-post): flags an
   output that leaks the confidential system prompt, hidden/developer instructions, internal config, tool schemas, or a
   secret canary. A canonical both-directions gold set with paraphrased disclosures the tell-oracle misses and
   hard-negatives it false-alarms on — including a **refusal to reveal the prompt**, which the rubric treats as benign.
