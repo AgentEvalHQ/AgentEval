@@ -35,18 +35,18 @@ jobs:
   redteam-regression:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4                 # for the committed baseline JSON
       - uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '8.0.x'
-      # Build the CLI (or `dotnet tool install -g AgentEval.Cli` once published).
-      - run: dotnet build src/AgentEval.Cli -c Release
+          dotnet-version: '10.0.x'                # matches this repo's global.json
+      - run: dotnet tool install --global AgentEval.Cli --prerelease
       # Fail the PR if a change let a probe through that the committed baseline didn't have.
       - run: |
-          dotnet run --project src/AgentEval.Cli -c Release -- \
-            redteam --sut gatekeeper-demo --intensity quick \
+          agenteval redteam --sut gatekeeper-demo --intensity quick \
             --baseline ci/gatekeeper-demo.baseline.json --fail-on regression
 ```
+
+Using the published prerelease tool avoids building the multi‑target CLI in CI; if you'd rather build from source, run it with an explicit TFM — `dotnet run --project src/AgentEval.Cli -c Release -f net8.0 -- redteam …`.
 
 Regenerate the committed baseline (`--save-baseline`) whenever you intentionally change the attack suite or the gate set — otherwise an intended change reads as a regression. Keep the baseline and the run on the **same `--intensity`**; the comparer refuses a cross-intensity diff rather than compare apples to oranges.
 

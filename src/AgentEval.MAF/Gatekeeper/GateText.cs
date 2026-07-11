@@ -38,12 +38,21 @@ internal static class GateText
         {
             return JsonSerializer.Serialize(value, SerializerOptions);
         }
-        // A defensive renderer must never throw into the gate: NotSupportedException (unsupported type) and
-        // JsonException (a reference cycle or >64-deep graph — a realistic ORM/entity result) both degrade to
-        // ToString() rather than propagating and failing the tool call closed.
-        catch (Exception ex) when (ex is NotSupportedException or JsonException)
+        // A defensive renderer must never throw into the gate. Serialization fails in more ways than
+        // NotSupportedException / JsonException — a stale ORM entity whose property getter throws surfaces the
+        // getter's own exception type (e.g. InvalidOperationException) — and even ToString() can throw. Degrade to a
+        // best-effort string (then empty) rather than propagate and fail the tool call closed. OperationCanceledException
+        // is honored, not swallowed.
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            return value.ToString() ?? string.Empty;
+            try
+            {
+                return value.ToString() ?? string.Empty;
+            }
+            catch (Exception inner) when (inner is not OperationCanceledException)
+            {
+                return string.Empty;
+            }
         }
     }
 }

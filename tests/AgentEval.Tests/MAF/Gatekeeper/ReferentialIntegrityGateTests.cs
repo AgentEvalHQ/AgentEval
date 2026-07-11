@@ -136,6 +136,33 @@ public class ReferentialIntegrityGateTests
         Assert.Equal(0, GlassBoxEvidence.FromTrace(trace)?.GateBlockCount ?? 0);
     }
 
+    [Fact]
+    public async Task Inline_AllowsRefund_OfUserProvidedId_ThroughSeam()
+    {
+        // The user names the id directly — with NO trusted sources it can only be observed via the user turn, so this
+        // locks in that user turns reach the gate through the real FICC seam (not just the direct-InspectAsync tests).
+        var refunded = 0;
+        var refund = AIFunctionFactory.Create((string order_id) => { Interlocked.Increment(ref refunded); return "refunded"; }, "refund");
+        var scripted = new ScriptedChatClient()
+            .AddToolCall("c1", "refund", new Dictionary<string, object?> { ["order_id"] = "A-1042" })
+            .AddText("done");
+        var agent = new ChatClientAgent(scripted, new ChatClientAgentOptions
+        {
+            Name = "T",
+            ChatOptions = new ChatOptions { Tools = [refund] },
+        });
+        var trace = new AgentTrace();
+        var gated = agent.AsBuilder()
+            .UseAgentEvalGate()
+            .UseAgentEvalToolGate([new ReferentialIntegrityGate(["order_id"], ["refund"])], ToolGatePolicy.ReplaceResult, trace)
+            .Build();
+
+        await gated.RunAsync("Please refund order A-1042.");
+
+        Assert.Equal(1, refunded);   // the user provided A-1042 → the refund proceeded through the seam
+        Assert.Equal(0, GlassBoxEvidence.FromTrace(trace)?.GateBlockCount ?? 0);
+    }
+
     // Builds a gated agent that scripts two tool calls; the gate trusts lookup_order and guards refund.
     private static (Microsoft.Agents.AI.AIAgent Agent, AgentTrace Trace) GatedAgent(
         AITool[] tools, string call1Id, string tool1, IDictionary<string, object?> args1,

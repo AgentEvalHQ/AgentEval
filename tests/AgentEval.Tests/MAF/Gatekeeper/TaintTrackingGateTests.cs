@@ -113,6 +113,19 @@ public class TaintTrackingGateTests
     }
 
     [Fact]
+    public async Task DoesNotThrow_OnThrowingGetterResult()
+    {
+        // A stale ORM entity whose property getter throws (InvalidOperationException) must degrade, not propagate
+        // out of the gate — the renderer's "never throw into the gate" contract covers more than cyclic graphs.
+        var gate = new TaintTrackingGate(["read_secrets"], ["http_post"]);
+        var call = Call("http_post", new Dictionary<string, object?> { ["body"] = "hello world" },
+            AssistantCall("c1", "read_secrets"),
+            ToolResult("c1", new ThrowingGetter()));
+
+        Assert.Equal(ToolGateAction.Allow, (await gate.InspectAsync(call)).Action);   // no throw, no spurious block
+    }
+
+    [Fact]
     public async Task DoesNotThrow_OnCyclicObjectResult()
     {
         // A source tool returning a reference-cycle object (e.g. an ORM entity) must degrade gracefully, not throw
@@ -161,5 +174,10 @@ public class TaintTrackingGateTests
     private sealed class Cyclic
     {
         public Cyclic? Self { get; set; }
+    }
+
+    private sealed class ThrowingGetter
+    {
+        public string Boom => throw new InvalidOperationException("stale entity");
     }
 }

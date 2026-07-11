@@ -234,9 +234,9 @@ judge scoring a gold set), and where a well‑aligned model resists an attack th
   **× MAF Agent Harness (defended)**: a genuine `AsHarnessAgent` behind defense‑in‑depth (budget + `SequenceGate` +
   `DomainAllowListGate`) — legit work flows, the read→POST exfiltration is blocked.
 - [`Gatekeeper/07_GatekeeperDefenseInDepth`](../../samples/AgentEval.Samples/Gatekeeper/07_GatekeeperDefenseInDepth.cs) —
-  **defense in depth against one injection campaign**: the calibrated `IndirectInjectionJudge` (run‑pre) +
-  `ReferentialIntegrityGate` + `TaintTrackingGate` + `DomainAllowListGate` on one agent, where a *different* gate
-  catches each step, printed from the trace.
+  **defense in depth against one injection campaign**: the calibrated `IndirectInjectionJudge` (its detection verdict
+  on the injected content) alongside `ReferentialIntegrityGate` + `TaintTrackingGate` + `DomainAllowListGate` on a
+  defended agent, where a *different* gate catches each step, printed from the trace.
 
 ## From the CLI
 

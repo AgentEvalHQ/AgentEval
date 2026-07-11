@@ -24,9 +24,10 @@ public enum RunBudgetDecision
 
 /// <summary>
 /// Gatekeeper — a per-run <b>cross-hop accumulator</b>. A single tool body can't see state that spans the whole
-/// orchestration (total calls, monetary sums, which ids were legitimately observed), so gates that need it read
-/// it here. The ledger is the deterministic primitive the budget / referential-integrity / (future) taint gates
-/// share instead of each keeping its own bookkeeping.
+/// orchestration (total calls, per-tool counts, monetary sums), so the <see cref="RunBudgetGate"/> reads it here
+/// instead of keeping its own bookkeeping. (The observed-id members below are a related primitive the flow-control
+/// gates no longer use — <c>ReferentialIntegrityGate</c> and <c>TaintTrackingGate</c> recompute statelessly from the
+/// run history per call — kept for a custom cross-hop check; see <see cref="WasObserved"/>.)
 /// <para><b>Per-run scoped.</b> Keyed by the current <see cref="AgentRunScope"/> (established by the run gate), so
 /// each run gets its own ledger and state never leaks across runs. Register <c>UseAgentEvalGate()</c> to
 /// establish the scope. With no run scope present, all runs share one process-wide fallback ledger — so per-run
@@ -80,7 +81,10 @@ public sealed class RunLedger
         }
     }
 
-    /// <summary>Whether an id was legitimately surfaced by an earlier tool this run (for referential-integrity checks).</summary>
+    /// <summary>
+    /// Whether an id was legitimately surfaced by an earlier tool this run. Not consumed by a shipped gate today
+    /// (<c>ReferentialIntegrityGate</c> recomputes statelessly from the run history); available for a custom check.
+    /// </summary>
     public bool WasObserved(string? id)
     {
         if (id is null)
