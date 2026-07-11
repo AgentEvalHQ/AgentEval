@@ -12,7 +12,7 @@ agenteval redteam --sut gatekeeper-demo --intensity quick \
   --save-baseline gatekeeper-demo.baseline.json
 #   → a small, stable set of conclusive findings, every forbidden tool call blocked; the run passes; baseline written.
 
-# 2. On every PR — fail ONLY if a NEW vulnerability appears vs the baseline (exit 4).
+# 2. On every PR — fail ONLY if a NEW vulnerability appears vs the baseline.
 agenteval redteam --sut gatekeeper-demo --intensity quick \
   --baseline gatekeeper-demo.baseline.json --fail-on regression
 #   → the gate holds → Stable → the run passes.

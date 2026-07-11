@@ -32,6 +32,10 @@ public sealed class TaintTrackingGate : IToolGate
     // SECRET_TOKEN / base64url). Linear ⇒ ReDoS-safe.
     private static readonly Regex Token = new("[A-Za-z0-9][A-Za-z0-9._/+@_-]*", RegexOptions.Compiled, MatchTimeout);
 
+    // Cost bound: cap the tainted-token set so a large/poisoned source result can't make the per-sink scan
+    // (tokens × args) unexpectedly expensive. Hitting the cap fails closed (we can't fully verify the flow).
+    private const int MaxTaintedTokens = 1024;
+
     private readonly HashSet<string> _sources;
     private readonly HashSet<string> _sinks;
     private readonly int _minTaintLength;
@@ -97,6 +101,13 @@ public sealed class TaintTrackingGate : IToolGate
                 $"taint scan timed out for sink '{call.FunctionName}' — cannot verify, failing closed"));
         }
 
+        if (tainted.Count >= MaxTaintedTokens)
+        {
+            // A source flooded the taint set past the cost bound — fail closed within the policy (WarnOnly warns).
+            return new ValueTask<ToolGateVerdict>(ToolGateVerdict.Block(PolicyName,
+                $"too many tainted tokens to scan for sink '{call.FunctionName}' — cannot verify, failing closed"));
+        }
+
         if (tainted.Count == 0)
         {
             return new ValueTask<ToolGateVerdict>(ToolGateVerdict.Allow(PolicyName));
@@ -157,6 +168,10 @@ public sealed class TaintTrackingGate : IToolGate
                         if (match.Value.Length >= _minTaintLength)
                         {
                             tainted.Add(match.Value);
+                            if (tainted.Count >= MaxTaintedTokens)
+                            {
+                                return tainted;   // cap hit — the caller fails closed rather than scan unboundedly
+                            }
                         }
                     }
                 }

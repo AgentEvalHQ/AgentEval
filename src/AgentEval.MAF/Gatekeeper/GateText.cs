@@ -40,18 +40,21 @@ internal static class GateText
         {
             return JsonSerializer.Serialize(value, SerializerOptions);
         }
+        catch (OperationCanceledException)
+        {
+            throw;   // honor cancellation — never swallow it
+        }
         // A defensive renderer must never throw into the gate. Serialization fails in more ways than
         // NotSupportedException / JsonException — a stale ORM entity whose property getter throws surfaces the
         // getter's own exception type (e.g. InvalidOperationException) — and even ToString() can throw. Degrade to a
-        // best-effort string (then empty) rather than propagate and fail the tool call closed. OperationCanceledException
-        // is honored, not swallowed.
-        catch (Exception ex) when (ex is not OperationCanceledException)
+        // best-effort string (then empty) rather than propagate and fail the tool call closed.
+        catch
         {
             try
             {
                 return value.ToString() ?? string.Empty;
             }
-            catch (Exception inner) when (inner is not OperationCanceledException)
+            catch
             {
                 return string.Empty;
             }
