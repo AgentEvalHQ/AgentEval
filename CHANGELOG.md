@@ -27,6 +27,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   certificate. `--model-reply <file>` evaluates a caller-supplied model reply with **no model call** and can never
   claim `inlineReady:true` without an explicit `--attest-fingerprint` (unknown provenance ⇒ advisory).
   The stateful accumulator gates arrive via `serve` (deferred, stubbed).
+- **Interop proof + docs** — `samples/interop/python/gatekeeper_smoke.py` (pure stdlib) shells out to the CLI and
+  asserts the whole contract from a non-.NET process (deterministic block/allow, tool flow-gate, fail-closed exit 6,
+  `rendered-exfil` redaction, discovery, honesty guard). `docs/gatekeeper-cli.md` documents the command surface, the
+  verdict schema, the exit-code contract, and the credential-free CI recipe.
 - **Exit-code contract** — new `ExitCodes.GateBlocked` (5), `GateInconclusive` (6, fail-closed when the CLI can't
   evaluate — e.g. a history gate with no `messages`, overriding a gate's own fail-open), and `NotCertified` (7, the
   honesty guard) — deliberately off the BUG-22-overloaded 2. `--policy warn` forces exit 0 (verdict still emitted).
