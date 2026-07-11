@@ -19,6 +19,7 @@ internal static class GatekeeperCommand
         var cmd = new Command("gatekeeper", "Invoke Gatekeeper gates from the CLI — language-neutral policy verdicts.");
         cmd.Subcommands.Add(GatekeeperListGatesCommand.Create());
         cmd.Subcommands.Add(GatekeeperInspectCommand.Create());
+        cmd.Subcommands.Add(GatekeeperCalibrateCommand.Create());
         cmd.Subcommands.Add(CreateServeStub());
         return cmd;
     }

@@ -39,10 +39,16 @@ internal static class GatekeeperInspectCommand
         var sourceToolOpt = MultiOpt("--source-tool", "Confidential source tool (tool:taint-tracking); repeatable");
         var sinkToolOpt = MultiOpt("--sink-tool", "External sink tool (tool:taint-tracking); repeatable");
         var minTaintOpt = new Option<int?>("--min-taint-length") { Description = "Minimum tainted-value length (tool:taint-tracking)" };
+        var model = new ModelOptions();
+        var modelReplyOpt = new Option<string?>("--model-reply") { Description = "Judge gates: a file with the model's reply — evaluate without a model call" };
+        var attestOpt = new Option<string?>("--attest-fingerprint") { Description = "With --model-reply: operator-vouched model fingerprint for the certificate lookup" };
+        var allowUncalibratedOpt = new Option<bool>("--allow-uncalibrated") { Description = "Judge gates: run advisory-only if not certified inline-ready (stamps inlineReady:false)" };
 
         var cmd = new Command("inspect", "Run a Gatekeeper gate over a JSON payload and emit a verdict.");
+        model.AddTo(cmd);
         foreach (var o in new Option[] { gateOpt, inputOpt, policyOpt, keywordOpt, keywordsFileOpt, forbiddenOpt, patternOpt,
-            allowedDomainOpt, idArgOpt, guardedToolOpt, trustedToolOpt, sourceToolOpt, sinkToolOpt, minTaintOpt })
+            allowedDomainOpt, idArgOpt, guardedToolOpt, trustedToolOpt, sourceToolOpt, sinkToolOpt, minTaintOpt,
+            modelReplyOpt, attestOpt, allowUncalibratedOpt })
         {
             cmd.Options.Add(o);
         }
@@ -66,8 +72,12 @@ internal static class GatekeeperInspectCommand
             flags.SourceTools.AddRange(parse.GetValue(sourceToolOpt) ?? []);
             flags.SinkTools.AddRange(parse.GetValue(sinkToolOpt) ?? []);
 
+            var (azure, endpoint, deployment, modelName, apiKey) = model.Read(parse);
+            var judgeArgs = new JudgeArgs(azure, endpoint, deployment, modelName, apiKey,
+                parse.GetValue(modelReplyOpt), parse.GetValue(attestOpt), parse.GetValue(allowUncalibratedOpt), CertDir: null);
+
             return await RunAsync(parse.GetValue(gateOpt)!, parse.GetValue(inputOpt), parse.GetValue(policyOpt) ?? "block",
-                flags, Console.In, Console.Out, Console.Error, ct);
+                flags, Console.In, Console.Out, Console.Error, ct, judgeArgs);
         });
 
         return cmd;
@@ -76,12 +86,23 @@ internal static class GatekeeperInspectCommand
     /// <summary>Testable core: resolve the gate, read the payload(s), run, emit verdict(s), return the exit code.</summary>
     public static async Task<int> RunAsync(
         string gateId, string? inputFile, string policy, GateFlags flags,
-        TextReader stdin, TextWriter stdout, TextWriter stderr, CancellationToken ct)
+        TextReader stdin, TextWriter stdout, TextWriter stderr, CancellationToken ct, JudgeArgs? judgeArgs = null)
     {
         var warn = string.Equals(policy, "warn", StringComparison.OrdinalIgnoreCase);
         if (!warn && !string.Equals(policy, "block", StringComparison.OrdinalIgnoreCase))
         {
             stderr.WriteLine($"  Error: --policy must be 'block' or 'warn' (got '{policy}').");
+            return ExitCodes.UsageError;
+        }
+
+        if (gateId.StartsWith("judge:", StringComparison.Ordinal))
+        {
+            return await RunJudgeSingleAsync(gateId, inputFile, warn, judgeArgs ?? JudgeArgs.Empty, stdin, stdout, stderr, ct);
+        }
+
+        if (gateId.StartsWith("panel:", StringComparison.Ordinal))
+        {
+            stderr.WriteLine("  Error: 'panel:' gates arrive in the next build slice (the judge fan-out).");
             return ExitCodes.UsageError;
         }
 
@@ -213,6 +234,143 @@ internal static class GatekeeperInspectCommand
         return Rank(b) > Rank(a) ? b : a;
     }
 
+    // Judge gates (single stdin payload). --model runs the judge; --model-reply evaluates a caller-supplied reply.
+    // The honesty guard: a judge is inlineReady only when a matching certificate says so, else it refuses (exit 7)
+    // unless --allow-uncalibrated. --model-reply can never claim inlineReady:true without an explicit operator
+    // attestation (--attest-fingerprint), because the reply's model provenance is unknown.
+    private static async Task<int> RunJudgeSingleAsync(
+        string gateId, string? inputFile, bool warn, JudgeArgs args,
+        TextReader stdin, TextWriter stdout, TextWriter stderr, CancellationToken ct)
+    {
+        var axis = gateId["judge:".Length..];
+        var entry = JudgeAxisRegistry.For(axis);
+        if (entry is null)
+        {
+            stderr.WriteLine($"  Error: unknown judge axis '{axis}'. Run 'agenteval gatekeeper list-gates'.");
+            return ExitCodes.UsageError;
+        }
+
+        if (inputFile is not null)
+        {
+            stderr.WriteLine("  Error: judge gates in --input batch are not supported in this build (single stdin payload only).");
+            return ExitCodes.UsageError;
+        }
+
+        var json = await stdin.ReadToEndAsync(ct).ConfigureAwait(false);
+        var payload = InspectPayload.Parse(json, out var perr);
+        if (payload?.Text is null)
+        {
+            stderr.WriteLine($"  Error: judge gate requires a payload with a 'text' field{(perr is null ? "" : $" ({perr})")}.");
+            return ExitCodes.UsageError;
+        }
+
+        // ── --model-reply: evaluate the caller's reply, no model call (provenance rule applies) ──
+        if (args.ModelReply is not null)
+        {
+            if (args.ModelReply == "-")
+            {
+                stderr.WriteLine("  Error: --model-reply cannot be '-' (stdin carries the payload); pass a file path.");
+                return ExitCodes.UsageError;
+            }
+
+            string reply;
+            try { reply = await File.ReadAllTextAsync(args.ModelReply, ct).ConfigureAwait(false); }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                stderr.WriteLine($"  Error reading --model-reply: {ex.Message}");
+                return ExitCodes.UsageError;
+            }
+
+            var v = ParseOnlyJudge.Evaluate(entry.Rubric(), payload.Text, reply);
+            var d = GateVerdictDto.FromChat(v, gateId);
+
+            if (args.AttestFingerprint is not null)
+            {
+                var cert = InlineReadinessStore.TryLoad(axis, args.AttestFingerprint, args.CertDir);
+                if (cert?.IsInlineReady == true)
+                {
+                    d = d with { InlineReady = true, Certificate = Provenance(cert), Warning = "inline readiness is operator-attested (--attest-fingerprint), not observed by the CLI" };
+                }
+                else if (args.AllowUncalibrated)
+                {
+                    d = d with { InlineReady = false, Warning = "uncalibrated — advisory only" };
+                }
+                else
+                {
+                    stderr.WriteLine(NotCertifiedMsg(axis, args.AttestFingerprint));
+                    return ExitCodes.NotCertified;
+                }
+            }
+            else
+            {
+                d = d with { InlineReady = false, Warning = "model-reply: unknown model provenance — advisory only, cannot certify inline readiness" };
+            }
+
+            stdout.WriteLine(d.ToJson(indented: true));
+            return warn ? ExitCodes.Success : ExitOf(d);
+        }
+
+        // ── --model: the CLI makes the judge call ──
+        var mr = GatekeeperModelResolver.Resolve(args.Azure, args.Endpoint, args.Deployment, args.Model, args.ApiKey, stderr);
+        if (mr.Client is null)
+        {
+            return mr.ExitCode;
+        }
+
+        var stored = InlineReadinessStore.TryLoad(axis, mr.Fingerprint!, args.CertDir);
+        bool inlineReady;
+        object? certObj = null;
+        string? warning = null;
+        if (stored?.IsInlineReady == true)
+        {
+            inlineReady = true;
+            certObj = Provenance(stored);
+        }
+        else if (args.AllowUncalibrated)
+        {
+            inlineReady = false;
+            warning = "uncalibrated — advisory only";
+        }
+        else
+        {
+            stderr.WriteLine(NotCertifiedMsg(axis, mr.Fingerprint!));
+            return ExitCodes.NotCertified;   // 7 — the honesty guard, distinct from a policy Block (5) or bad flags (2)
+        }
+
+        GateVerdict jv;
+        try
+        {
+            jv = await entry.Create(mr.Client, true).InspectAsync(payload.Text, ct).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            stderr.WriteLine($"  Error: the judge model call failed: {ex.Message}");
+            return ExitCodes.RuntimeError;
+        }
+
+        var jd = GateVerdictDto.FromChat(jv, gateId) with { InlineReady = inlineReady, Certificate = certObj, Warning = warning };
+        stdout.WriteLine(jd.ToJson(indented: true));
+        return warn ? ExitCodes.Success : ExitOf(jd);
+    }
+
+    private static CertProvenance Provenance(CalibrationCertificate c) =>
+        new(c.ModelFingerprint, c.GoldSetHash, c.IsInlineReady, c.CertifiedAtUtc);
+
+    private static string NotCertifiedMsg(string axis, string fingerprint) =>
+        $"  Error: axis '{axis}' is not certified inline-ready for model '{fingerprint}'. " +
+        $"Run: agenteval gatekeeper calibrate --gate judge:{axis} --model … --certify, or pass --allow-uncalibrated for advisory-only.";
+
     private static Option<string[]> MultiOpt(string name, string description) =>
         new(name) { Description = description, AllowMultipleArgumentsPerToken = true };
 }
+
+/// <summary>The model-source + honesty-guard flags for judge <c>inspect</c>.</summary>
+internal sealed record JudgeArgs(
+    bool Azure, string? Endpoint, string? Deployment, string? Model, string? ApiKey,
+    string? ModelReply, string? AttestFingerprint, bool AllowUncalibrated, string? CertDir)
+{
+    public static readonly JudgeArgs Empty = new(false, null, null, null, null, null, null, false, null);
+}
+
+/// <summary>Compact certificate provenance surfaced in a judge verdict's <c>certificate</c> field.</summary>
+internal sealed record CertProvenance(string ModelFingerprint, string GoldSetHash, bool IsInlineReady, string CertifiedAtUtc);
