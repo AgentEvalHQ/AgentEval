@@ -7,6 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Gatekeeper CLI interop bridge — invoke gates from any language (deterministic core + model path & honesty guard)
+
+#### Added
+- **`agenteval gatekeeper` verb group** — expose Gatekeeper gates through the CLI so any language or CI step gets a
+  policy verdict without a .NET reference. `gatekeeper list-gates` (table or `--json`) discovers the callable gates;
+  `gatekeeper inspect --gate <id>` runs one gate over a JSON payload on stdin (or a `.jsonl` batch via `--input`) and
+  emits a **versioned verdict JSON** (`gatekeeper-verdict.schema.json`, shipped beside the binary). Covers the
+  **deterministic, credential-free gates** — `keyword-injection` / `keyword` / `keyword:<axis>` / `rendered-exfil`
+  (surfaces the sanitized `redactedText`), and the tool/flow-control gates `tool:forbidden-tool` /
+  `tool:argument-pattern` / `tool:domain-allowlist` / `tool:referential-integrity` / `tool:taint-tracking` (which
+  recompute from a caller-passed `messages` history).
+- **Judge gates + the honesty guard** — `gatekeeper inspect --gate judge:<axis> --model <name>` runs a calibrated
+  judge, but only if a **calibration certificate** proves it inline-ready for that exact model; otherwise it refuses
+  with `NotCertified` (7) unless `--allow-uncalibrated` (which stamps `inlineReady:false` + an advisory warning). This
+  carries the moat across the wire: the CLI cannot be used to *accidentally* trust an un-calibrated judge.
+  `gatekeeper calibrate --gate judge:<axis> --model … [--certify]` scores the judge against its gold set + keyword
+  baseline (honoring `--min-cases-per-direction` / `--max-concurrency` via the harness directly) and writes the
+  certificate. `--model-reply <file>` evaluates a caller-supplied model reply with **no model call** and can never
+  claim `inlineReady:true` without an explicit `--attest-fingerprint` (unknown provenance ⇒ advisory).
+  The `serve` command (stateful accumulator gates like budgets and sequences) is a stub — not implemented.
+- **`panel:<a,b,…>`** — a CLI-owned fan-out over comma-listed child gates (fail-closed OR). The CLI runs the children
+  itself (not `ParallelJudgeFanOut`'s flattened aggregate) so it applies the sensitive-span redaction **per child**
+  before aggregating — a redact-axis child never leaks its spans through the panel. The honesty guard requires **every**
+  judge child certified inline-ready (else exit 7); the verdict's `certificate` is an array, one per judge child.
+- **Interop proof + docs** — `samples/interop/python/gatekeeper_smoke.py` (pure stdlib) shells out to the CLI and
+  asserts the whole contract from a non-.NET process (deterministic block/allow, tool flow-gate, fail-closed exit 6,
+  `rendered-exfil` redaction, discovery, honesty guard). `docs/gatekeeper-cli.md` documents the command surface, the
+  verdict schema, the exit-code contract, and the credential-free CI recipe.
+- **Exit-code contract** — new `ExitCodes.GateBlocked` (5), `GateInconclusive` (6, fail-closed when the CLI can't
+  evaluate — e.g. a history gate with no `messages`, overriding a gate's own fail-open), and `NotCertified` (7, the
+  honesty guard) — deliberately off the BUG-22-overloaded 2. `--policy warn` forces exit 0 (verdict still emitted).
+- **Security-preserving by construction** — the verdict serializer forces `matches` and `redactedText` to null for
+  the `exfiltration-intent` / `system-prompt-extraction` axes (belt-and-suspenders over the rubric-level `spans:null`),
+  so a secret can never be persisted into a verdict, a JSONL file, or a CI log.
+
 ### Gatekeeper — more output-guarding Tribunal judges + the run-post Panel + a live sample
 
 #### Added
