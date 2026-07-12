@@ -92,6 +92,28 @@ public class GatekeeperJudgeBridgeTests
         finally { TryDelete(dir); }
     }
 
+    [Fact]
+    public async Task Calibrate_Then_InspectAttest_RoundTripsThroughCustomCertDir()
+    {
+        // calibrate --cert-dir <custom> writes a cert; inspect --cert-dir <custom> (via attest) reads it back.
+        var dir = TempDir();
+        try
+        {
+            const string fp = "azure:h:m@roundtrip";
+            using var so = new StringWriter();
+            using var se = new StringWriter();
+            var cexit = await GatekeeperCalibrateCommand.RunAsync("judge:exfiltration-intent",
+                new GoldLabelModel(ExfiltrationIntentJudge.GoldSet()), fp, 0, 20, 4, certify: true, certPath: null, certDir: dir, so, se, default);
+            Assert.Equal(ExitCodes.Success, cexit);
+
+            var (iexit, json, _) = await InspectJudgeReplyAsync("judge:exfiltration-intent", ExfilText, ExfilBlockReply,
+                attestFingerprint: fp, allowUncalibrated: false, certDir: dir);
+            Assert.Equal(ExitCodes.GateBlocked, iexit);
+            Assert.True(json!.RootElement.GetProperty("inlineReady").GetBoolean());   // the cert written to the custom dir was found
+        }
+        finally { TryDelete(dir); }
+    }
+
     // ── The honesty guard, via the --model-reply path (no live endpoint needed) ──
 
     private static async Task<(int exit, JsonDocument? json, string err)> InspectJudgeReplyAsync(

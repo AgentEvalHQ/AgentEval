@@ -25,12 +25,13 @@ internal static class GatekeeperCalibrateCommand
         var minCasesOpt = new Option<int>("--min-cases-per-direction") { Description = "Min gold cases per direction (default 20)", DefaultValueFactory = _ => 20 };
         var maxConcOpt = new Option<int>("--max-concurrency") { Description = "Max concurrent judge calls (default 4)", DefaultValueFactory = _ => 4 };
         var certifyOpt = new Option<bool>("--certify") { Description = "Write a calibration certificate the inspect honesty-guard reads" };
-        var certPathOpt = new Option<string?>("--cert-path") { Description = "Certificate output path (default under .agenteval/gatekeeper/certs/)" };
+        var certPathOpt = new Option<string?>("--cert-path") { Description = "Exact certificate output file (overrides --cert-dir)" };
+        var certDirOpt = new Option<string?>("--cert-dir") { Description = "Directory to write the certificate into (default .agenteval/gatekeeper/certs/); read back with inspect --cert-dir" };
 
         var cmd = new Command("calibrate", "Calibrate a judge axis against its gold set + baseline; optionally certify it.");
         cmd.Options.Add(gateOpt);
         model.AddTo(cmd);
-        foreach (var o in new Option[] { maxDangerousOpt, minCasesOpt, maxConcOpt, certifyOpt, certPathOpt })
+        foreach (var o in new Option[] { maxDangerousOpt, minCasesOpt, maxConcOpt, certifyOpt, certPathOpt, certDirOpt })
         {
             cmd.Options.Add(o);
         }
@@ -46,7 +47,7 @@ internal static class GatekeeperCalibrateCommand
 
             return await RunAsync(parse.GetValue(gateOpt)!, mr.Client, mr.Fingerprint!,
                 parse.GetValue(maxDangerousOpt), parse.GetValue(minCasesOpt), parse.GetValue(maxConcOpt),
-                parse.GetValue(certifyOpt), parse.GetValue(certPathOpt), certDir: null, Console.Out, Console.Error, ct);
+                parse.GetValue(certifyOpt), parse.GetValue(certPathOpt), parse.GetValue(certDirOpt), Console.Out, Console.Error, ct);
         });
 
         return cmd;

@@ -80,6 +80,8 @@ echo '{"text":"…the agent answer…"}' | agenteval gatekeeper inspect --gate j
 
 `--model-reply <file>` evaluates a reply your own client already produced (no model call); it is advisory unless you
 vouch for the producing model with `--attest-fingerprint`. The certificate is an unsigned local file under
-`.agenteval/gatekeeper/certs/` — it prevents *accidentally* trusting an un-calibrated judge, not a malicious operator.
+`.agenteval/gatekeeper/certs/` (override the location with `calibrate --cert-dir` / read it back with
+`inspect --cert-dir`) — it prevents *accidentally* trusting an un-calibrated judge, not a malicious operator. The
+certificate is tied to the exact model **and** gold set it was scored on; changing either invalidates it.
 
 See [`samples/interop/python`](../samples/interop/python) for a runnable Python smoke test.

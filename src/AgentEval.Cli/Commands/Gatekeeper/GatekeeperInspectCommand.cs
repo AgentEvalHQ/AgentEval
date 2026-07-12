@@ -44,12 +44,13 @@ internal static class GatekeeperInspectCommand
         var modelReplyOpt = new Option<string?>("--model-reply") { Description = "Judge gates: a file with the model's reply — evaluate without a model call" };
         var attestOpt = new Option<string?>("--attest-fingerprint") { Description = "With --model-reply: operator-vouched model fingerprint for the certificate lookup" };
         var allowUncalibratedOpt = new Option<bool>("--allow-uncalibrated") { Description = "Judge gates: run advisory-only if not certified inline-ready (stamps inlineReady:false)" };
+        var certDirOpt = new Option<string?>("--cert-dir") { Description = "Directory to load judge calibration certificates from (default .agenteval/gatekeeper/certs/)" };
 
         var cmd = new Command("inspect", "Run a Gatekeeper gate over a JSON payload and emit a verdict.");
         model.AddTo(cmd);
         foreach (var o in new Option[] { gateOpt, inputOpt, policyOpt, keywordOpt, keywordsFileOpt, forbiddenOpt, patternOpt,
             allowedDomainOpt, idArgOpt, guardedToolOpt, trustedToolOpt, sourceToolOpt, sinkToolOpt, minTaintOpt,
-            modelReplyOpt, attestOpt, allowUncalibratedOpt })
+            modelReplyOpt, attestOpt, allowUncalibratedOpt, certDirOpt })
         {
             cmd.Options.Add(o);
         }
@@ -75,7 +76,7 @@ internal static class GatekeeperInspectCommand
 
             var (azure, endpoint, deployment, modelName, apiKey) = model.Read(parse);
             var judgeArgs = new JudgeArgs(azure, endpoint, deployment, modelName, apiKey,
-                parse.GetValue(modelReplyOpt), parse.GetValue(attestOpt), parse.GetValue(allowUncalibratedOpt), CertDir: null);
+                parse.GetValue(modelReplyOpt), parse.GetValue(attestOpt), parse.GetValue(allowUncalibratedOpt), parse.GetValue(certDirOpt));
 
             return await RunAsync(parse.GetValue(gateOpt)!, parse.GetValue(inputOpt), parse.GetValue(policyOpt) ?? "block",
                 flags, Console.In, Console.Out, Console.Error, ct, judgeArgs);
