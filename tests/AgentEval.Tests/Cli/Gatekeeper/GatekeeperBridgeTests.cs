@@ -314,4 +314,33 @@ public class GatekeeperBridgeTests
         Assert.Equal(ExitCodes.UsageError, exit);
         Assert.Contains("phase must be", err.ToString(), StringComparison.OrdinalIgnoreCase);
     }
+
+    // ── Schema-copy drift guard ──
+
+    [Fact]
+    public void VerdictSchema_ShippedAndDocsCopies_AreByteIdentical()
+    {
+        // The verdict JSON schema lives in two places: the one the CLI ships (Content in the .csproj) and the docs
+        // mirror non-.NET consumers read. Nothing else keeps them in sync, so assert byte-equality here — if one is
+        // edited without the other, this fails and points at the drift before it reaches a downstream consumer.
+        var root = RepoRoot();
+        var shipped = Path.Combine(root, "src", "AgentEval.Cli", "Schemas", "gatekeeper-verdict.schema.json");
+        var docs = Path.Combine(root, "docs", "schemas", "gatekeeper-verdict.schema.json");
+
+        Assert.True(File.Exists(shipped), $"missing shipped schema at {shipped}");
+        Assert.True(File.Exists(docs), $"missing docs schema at {docs}");
+        Assert.Equal(File.ReadAllBytes(shipped), File.ReadAllBytes(docs));
+    }
+
+    private static string RepoRoot()
+    {
+        var dir = new DirectoryInfo(AppContext.BaseDirectory);
+        while (dir is not null && !File.Exists(Path.Combine(dir.FullName, "AgentEval.sln")))
+        {
+            dir = dir.Parent;
+        }
+
+        return dir?.FullName
+            ?? throw new InvalidOperationException("Could not find repo root (AgentEval.sln) walking up from the test binary directory.");
+    }
 }
