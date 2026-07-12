@@ -151,7 +151,8 @@ public class GatekeeperJudgeBridgeTests
         try
         {
             const string fp = "azure:h:m@good";
-            InlineReadinessStore.Save(new CalibrationCertificate("exfiltration-intent", fp, "sha256:g", true, "2026-07-11T00:00:00Z",
+            var goldHash = InlineReadinessStore.GoldSetHash(ExfiltrationIntentJudge.GoldSet());   // must match the CURRENT corpus
+            InlineReadinessStore.Save(new CalibrationCertificate("exfiltration-intent", fp, goldHash, true, "2026-07-11T00:00:00Z",
                 new CalibrationReportDto { Axis = "exfiltration-intent", IsInlineReady = true }), path: null, dir: dir);
 
             var (exit, json, _) = await InspectJudgeReplyAsync("judge:exfiltration-intent", ExfilText, ExfilBlockReply,
@@ -160,6 +161,27 @@ public class GatekeeperJudgeBridgeTests
             Assert.Equal(ExitCodes.GateBlocked, exit);
             Assert.True(json!.RootElement.GetProperty("inlineReady").GetBoolean());
             Assert.Equal(JsonValueKind.Object, json.RootElement.GetProperty("certificate").ValueKind);
+        }
+        finally { TryDelete(dir); }
+    }
+
+    [Fact]
+    public async Task JudgeReply_Attest_StaleGoldSetHash_Refuses_Exit7()
+    {
+        // A cert that is inline-ready for the model but was scored on a DIFFERENT (stale) gold set must not satisfy
+        // the guard — the corpus changed, so it needs re-calibration.
+        var dir = TempDir();
+        try
+        {
+            const string fp = "azure:h:m@good";
+            InlineReadinessStore.Save(new CalibrationCertificate("exfiltration-intent", fp, "sha256:stale-corpus", true, "2026-07-11T00:00:00Z",
+                new CalibrationReportDto { Axis = "exfiltration-intent", IsInlineReady = true }), path: null, dir: dir);
+
+            var (exit, _, err) = await InspectJudgeReplyAsync("judge:exfiltration-intent", ExfilText, ExfilBlockReply,
+                attestFingerprint: fp, allowUncalibrated: false, certDir: dir);
+
+            Assert.Equal(ExitCodes.NotCertified, exit);   // 7 — a stale-corpus cert doesn't count
+            Assert.Contains("not certified", err, StringComparison.OrdinalIgnoreCase);
         }
         finally { TryDelete(dir); }
     }

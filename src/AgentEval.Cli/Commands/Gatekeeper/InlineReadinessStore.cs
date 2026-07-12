@@ -37,11 +37,19 @@ internal static class InlineReadinessStore
     private static string FingerprintHash(string fingerprint) =>
         Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(fingerprint)))[..16].ToLowerInvariant();
 
-    /// <summary>A stable hash of a gold set (axis + per-direction counts) so a cert is tied to the set it was scored on.</summary>
+    /// <summary>
+    /// A stable hash of a gold set's actual <b>content</b> (axis + each case's label + text) so a certificate is tied
+    /// to the corpus it was scored on — changing the gold-set texts (even at the same counts) invalidates a stale cert.
+    /// </summary>
     public static string GoldSetHash(JudgeGoldSet gold)
     {
-        var raw = $"{gold.Axis}:{gold.AttackCount}:{gold.BenignCount}";
-        return "sha256:" + Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(raw)))[..16].ToLowerInvariant();
+        var sb = new StringBuilder(gold.Axis).Append('\n');
+        foreach (var c in gold.Cases)
+        {
+            sb.Append(c.ShouldBlock ? '1' : '0').Append('|').Append(c.Text).Append('\n');
+        }
+
+        return "sha256:" + Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(sb.ToString())))[..16].ToLowerInvariant();
     }
 
     /// <summary>Load the certificate matching <c>(axis, fingerprint)</c>, or null if none / unreadable.</summary>

@@ -4,6 +4,7 @@
 
 using System.CommandLine;
 using AgentEval.Guardrails;
+using AgentEval.Guardrails.Judges;
 using AgentEval.MAF.Gatekeeper;
 using Microsoft.Extensions.AI;
 
@@ -297,9 +298,9 @@ internal static class GatekeeperInspectCommand
             if (args.AttestFingerprint is not null)
             {
                 var cert = InlineReadinessStore.TryLoad(axis, args.AttestFingerprint, args.CertDir);
-                if (cert?.IsInlineReady == true)
+                if (CertValid(cert, entry.GoldSet()))
                 {
-                    d = d with { InlineReady = true, Certificate = Provenance(cert), Warning = "inline readiness is operator-attested (--attest-fingerprint), not observed by the CLI" };
+                    d = d with { InlineReady = true, Certificate = Provenance(cert!), Warning = "inline readiness is operator-attested (--attest-fingerprint), not observed by the CLI" };
                 }
                 else if (args.AllowUncalibrated)
                 {
@@ -331,10 +332,10 @@ internal static class GatekeeperInspectCommand
         bool inlineReady;
         object? certObj = null;
         string? warning = null;
-        if (stored?.IsInlineReady == true)
+        if (CertValid(stored, entry.GoldSet()))
         {
             inlineReady = true;
-            certObj = Provenance(stored);
+            certObj = Provenance(stored!);
         }
         else if (args.AllowUncalibrated)
         {
@@ -414,7 +415,7 @@ internal static class GatekeeperInspectCommand
             foreach (var axis in judgeAxes)
             {
                 var cert = InlineReadinessStore.TryLoad(axis, mr.Fingerprint!, args.CertDir);
-                if (cert?.IsInlineReady == true) { provenances.Add(Provenance(cert)); }
+                if (CertValid(cert, JudgeAxisRegistry.For(axis)!.GoldSet())) { provenances.Add(Provenance(cert!)); }
                 else { allCertified = false; }
             }
 
@@ -431,6 +432,7 @@ internal static class GatekeeperInspectCommand
         // ── run each child; apply per-child redaction BEFORE aggregating; fail-closed OR ──
         var reasons = new List<string>();
         var matches = new List<string>();
+        string? redactedText = null;   // a non-redact child's sanitized replacement (e.g. rendered-exfil's safe output)
         var anyBlock = false;   // a child returned Block on real evidence → policy block (5)
         var anyError = false;   // a child could not evaluate → fail-closed, but INCONCLUSIVE (6), not a policy block
         foreach (var childId in childIds)
@@ -474,9 +476,14 @@ internal static class GatekeeperInspectCommand
             reasons.Add($"{cv.PolicyName}: {cv.Reason}");
             var axis = GateVerdictDto.AxisOf(cv.PolicyName);
             var redact = axis is not null && GateVerdictDto.RedactAxes.Contains(axis);
-            if (!redact && cv.Matches is not null)
+            if (!redact)
             {
-                matches.AddRange(cv.Matches);   // a redact-axis child never contributes spans — the §2.1 #12 fix
+                if (cv.Matches is not null)
+                {
+                    matches.AddRange(cv.Matches);   // a redact-axis child never contributes spans — the §2.1 #12 fix
+                }
+
+                redactedText ??= cv.RedactedText;   // surface the first non-redact child's sanitized output
             }
         }
 
@@ -491,6 +498,7 @@ internal static class GatekeeperInspectCommand
             Axis = null,
             Reason = blocked ? string.Join("; ", reasons) : null,
             Matches = matches.Count > 0 ? matches.Distinct(StringComparer.Ordinal).ToList() : null,
+            RedactedText = redactedText,
             InlineReady = inlineReady,
             Warning = warning,
             Inconclusive = inconclusive,
@@ -503,6 +511,11 @@ internal static class GatekeeperInspectCommand
 
     private static CertProvenance Provenance(CalibrationCertificate c) =>
         new(c.ModelFingerprint, c.GoldSetHash, c.IsInlineReady, c.CertifiedAtUtc);
+
+    // A certificate only counts if it is inline-ready AND was scored on the CURRENT gold set (a corpus change
+    // invalidates a stale cert) — otherwise the guard treats the judge as un-certified.
+    private static bool CertValid(CalibrationCertificate? cert, JudgeGoldSet gold) =>
+        cert?.IsInlineReady == true && cert.GoldSetHash == InlineReadinessStore.GoldSetHash(gold);
 
     private static string NotCertifiedMsg(string axis, string fingerprint) =>
         $"  Error: axis '{axis}' is not certified inline-ready for model '{fingerprint}'. " +
