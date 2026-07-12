@@ -318,18 +318,22 @@ public class GatekeeperBridgeTests
     // ── Schema-copy drift guard ──
 
     [Fact]
-    public void VerdictSchema_ShippedAndDocsCopies_AreByteIdentical()
+    public void VerdictSchema_ShippedAndDocsCopies_AreIdentical()
     {
         // The verdict JSON schema lives in two places: the one the CLI ships (Content in the .csproj) and the docs
-        // mirror non-.NET consumers read. Nothing else keeps them in sync, so assert byte-equality here — if one is
-        // edited without the other, this fails and points at the drift before it reaches a downstream consumer.
+        // mirror non-.NET consumers read. Nothing else keeps them in sync, so assert equality here — if one is edited
+        // without the other, this fails and points at the drift before it reaches a downstream consumer.
         var root = RepoRoot();
         var shipped = Path.Combine(root, "src", "AgentEval.Cli", "Schemas", "gatekeeper-verdict.schema.json");
         var docs = Path.Combine(root, "docs", "schemas", "gatekeeper-verdict.schema.json");
 
         Assert.True(File.Exists(shipped), $"missing shipped schema at {shipped}");
         Assert.True(File.Exists(docs), $"missing docs schema at {docs}");
-        Assert.Equal(File.ReadAllBytes(shipped), File.ReadAllBytes(docs));
+        // Compare with line endings normalized so a CRLF/LF checkout difference across environments can't fail the
+        // guard on a semantically identical schema; every content divergence (whitespace, keys, description text)
+        // still fails it — the two copies are meant to stay the same contract, character-for-character.
+        static string Normalize(string s) => s.Replace("\r\n", "\n").Replace("\r", "\n");
+        Assert.Equal(Normalize(File.ReadAllText(shipped)), Normalize(File.ReadAllText(docs)));
     }
 
     private static string RepoRoot()

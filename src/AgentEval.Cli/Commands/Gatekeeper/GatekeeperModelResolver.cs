@@ -57,16 +57,16 @@ internal static class GatekeeperModelResolver
                 return new(c, Fingerprint("openai", endpoint, model!), ExitCodes.Success);
             }
 
-            // Env trio fallback — build it the same way as the explicit --azure branch (EndpointFactory.CreateAzure)
-            // rather than AzureChatAgentFactory, whose missing-config path writes benchmark-worded errors straight to
-            // Console.Error (duplicating gatekeeper's own message + bypassing the injected stderr). Any construction
-            // failure here is caught by the outer catch, which reports via the injected stderr.
+            // Env fallback — build it the same way as the explicit --azure branch (EndpointFactory.CreateAzure) rather
+            // than AzureChatAgentFactory, whose missing-config path writes benchmark-worded errors straight to
+            // Console.Error (duplicating gatekeeper's own message + bypassing the injected stderr). CreateAzure resolves
+            // the key itself (apiKey ?? AZURE_OPENAI_API_KEY), so an explicit --api-key overrides the env var — consistent
+            // with the other branches. We gate only on endpoint+deployment; a missing key surfaces via the outer catch.
             var envEndpoint   = Env("AZURE_OPENAI_ENDPOINT");
-            var envApiKey     = Env("AZURE_OPENAI_API_KEY");
             var envDeployment = Env("AZURE_OPENAI_DEPLOYMENT");
-            if (!string.IsNullOrWhiteSpace(envEndpoint) && !string.IsNullOrWhiteSpace(envApiKey) && !string.IsNullOrWhiteSpace(envDeployment))
+            if (!string.IsNullOrWhiteSpace(envEndpoint) && !string.IsNullOrWhiteSpace(envDeployment))
             {
-                var c = EndpointFactory.CreateAzure(envEndpoint!, envDeployment!, envApiKey);
+                var c = EndpointFactory.CreateAzure(envEndpoint!, envDeployment!, apiKey);   // apiKey ?? env key, resolved inside
                 return new(c, Fingerprint("azure", envEndpoint, envDeployment!), ExitCodes.Success);
             }
 
