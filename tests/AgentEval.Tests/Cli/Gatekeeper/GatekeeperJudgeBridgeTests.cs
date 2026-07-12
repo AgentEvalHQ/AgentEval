@@ -102,6 +102,17 @@ public class GatekeeperJudgeBridgeTests
         Assert.NotEqual(teamA, teamB);
     }
 
+    [Fact]
+    public void Resolve_MalformedEndpoint_IsUsageError_NotRuntimeError()
+    {
+        // A bad --endpoint URL is the caller's misconfiguration → exit 2 (fix your flags), not exit 3 (runtime failure),
+        // so CI can tell the two apart. new Uri("not a url") throws before any network call.
+        using var err = new StringWriter();
+        var r = GatekeeperModelResolver.Resolve(azure: false, endpoint: "not a url", deploymentName: null, model: "m", apiKey: "k", err);
+        Assert.Null(r.Client);
+        Assert.Equal(ExitCodes.UsageError, r.ExitCode);
+    }
+
     // ── calibrate (fake model → report + certificate) ──
 
     [Fact]

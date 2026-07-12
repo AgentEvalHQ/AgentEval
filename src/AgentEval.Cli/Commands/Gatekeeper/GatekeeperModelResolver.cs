@@ -74,6 +74,14 @@ internal static class GatekeeperModelResolver
                              "or set AZURE_OPENAI_ENDPOINT / _API_KEY / _DEPLOYMENT.");
             return new(null, null, ExitCodes.UsageError);
         }
+        catch (Exception ex) when (ex is InvalidOperationException or FormatException or ArgumentException)
+        {
+            // Config/usage errors — a malformed --endpoint URL, a missing key/deployment — so CI can tell
+            // "fix the flags/env" (exit 2) apart from an unexpected runtime failure (exit 3). FormatException
+            // covers UriFormatException; ArgumentException covers ArgumentNullException.
+            stderr.WriteLine($"  Error: {ex.Message}");
+            return new(null, null, ExitCodes.UsageError);
+        }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             stderr.WriteLine($"  Error building the model client: {ex.Message}");

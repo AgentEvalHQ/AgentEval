@@ -56,8 +56,9 @@ so `matches` and `redactedText` are **always null** — a secret can never land 
 | `3` | Runtime error (model/IO failure). |
 
 `--policy warn` forces exit `0` for any Allow/Block/Inconclusive (the verdict is still emitted) — for an advisory CI
-step. It does not suppress `7`. Note: `calibrate` returns `0` when a judge is inline-ready, else `1` — distinct from
-the `bench`/compliance `calibrate` verbs (which return `2` on gate-fail), so do not assume the same across commands.
+step. It does **not** suppress `2` (a usage/structural error is the caller's malformed input, not a policy outcome) or
+`7` (not certified). Note: `calibrate` returns `0` when a judge is inline-ready, else `1` — distinct from the
+`bench`/compliance `calibrate` verbs (which return `2` on gate-fail), so do not assume the same across commands.
 
 ## Credential-free CI recipe
 
