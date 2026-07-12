@@ -39,4 +39,7 @@ internal static class JudgeAxisRegistry
     };
 
     public static JudgeAxisEntry? For(string axis) => Map.TryGetValue(axis, out var e) ? e : null;
+
+    /// <summary>The calibrated axis ids — the single source of truth the gate registry derives from.</summary>
+    public static IReadOnlyList<string> Axes { get; } = Map.Keys.ToList();
 }

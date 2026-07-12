@@ -12,10 +12,12 @@ The deterministic gates need **no credentials** and are byte-stable, so they dro
 agenteval gatekeeper list-gates [--json] [--phase inspect|serve|all]
 agenteval gatekeeper inspect  --gate <id> [--input <file.jsonl>] [--policy block|warn] [gate flags] [model flags]
 agenteval gatekeeper calibrate --gate judge:<axis> <model flags> [--certify] [--min-cases-per-direction N] …
-agenteval gatekeeper serve [--stdio | --http <addr>]     # deferred (stateful accumulator gates)
+agenteval gatekeeper serve                               # deferred (stateful accumulator gates)
 ```
 
-`inspect` reads one JSON object from **stdin** (single) or one per line from `--input <file>.jsonl` (batch).
+`inspect` reads one JSON object from **stdin** (single) or one per line from `--input <file>.jsonl` (batch). Batch
+`--input` is supported for the **deterministic and tool gates**; the `judge:*` and `panel:*` gates are **stdin-only**
+in this build (single payload per invocation) because their model calls and honesty guard are evaluated per run.
 
 - **Text gates** take `{"text": "…"}` — `keyword-injection`, `keyword` (with `--keyword`/`--keywords`),
   `keyword:<axis>`, `rendered-exfil`, and `judge:<axis>`.

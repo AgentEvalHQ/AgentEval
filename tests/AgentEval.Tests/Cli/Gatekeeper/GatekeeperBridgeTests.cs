@@ -149,6 +149,16 @@ public class GatekeeperBridgeTests
         Assert.NotNull(GateRegistry.TryResolveChatGate("keyword:exfiltration-intent", new GateFlags(), out _));
     }
 
+    [Fact]
+    public void Registry_EveryAdvertisedJudgeAxis_ResolvesInJudgeAxisRegistry()
+    {
+        // The two registries can't drift (GateRegistry.Axes derives from JudgeAxisRegistry) — guard it anyway.
+        foreach (var axis in GateRegistry.All.Where(d => d.Id.StartsWith("judge:", StringComparison.Ordinal)).Select(d => d.Id["judge:".Length..]))
+        {
+            Assert.NotNull(JudgeAxisRegistry.For(axis));
+        }
+    }
+
     // ── End-to-end inspect (deterministic, no model) ──
 
     private static async Task<(int exit, JsonDocument? json, string err)> InspectAsync(

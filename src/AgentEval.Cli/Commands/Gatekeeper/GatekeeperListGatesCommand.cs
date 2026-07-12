@@ -15,7 +15,7 @@ internal static class GatekeeperListGatesCommand
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
         WriteIndented = true,
-        Converters = { new JsonStringEnumConverter() },
+        Converters = { new JsonStringEnumConverter(JsonNamingPolicy.CamelCase) },   // "chat"/"tool", matching the table + verdict schema
     };
 
     public static Command Create()

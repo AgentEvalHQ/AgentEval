@@ -4,7 +4,6 @@
 
 using AgentEval.Guardrails;
 using AgentEval.Guardrails.Gates;
-using AgentEval.Guardrails.Judges;
 using AgentEval.MAF.Gatekeeper;
 
 namespace AgentEval.Cli.Commands.Gatekeeper;
@@ -50,9 +49,8 @@ internal sealed class GateFlags
 /// </summary>
 internal static class GateRegistry
 {
-    /// <summary>The four calibrated judge axes.</summary>
-    public static readonly IReadOnlyList<string> Axes =
-        ["indirect-injection", "exfiltration-intent", "system-prompt-extraction", "over-refusal"];
+    /// <summary>The calibrated judge axes — derived from <see cref="JudgeAxisRegistry"/> (single source of truth, can't drift).</summary>
+    public static IReadOnlyList<string> Axes => JudgeAxisRegistry.Axes;
 
     public static IReadOnlyList<GateDescriptor> All { get; } = BuildDescriptors();
 
@@ -208,14 +206,8 @@ internal static class GateRegistry
         }
     }
 
-    private static IChatGate? AxisKeywordBaseline(string axis) => axis switch
-    {
-        "indirect-injection" => IndirectInjectionJudge.KeywordBaseline(),
-        "exfiltration-intent" => ExfiltrationIntentJudge.KeywordBaseline(),
-        "system-prompt-extraction" => SystemPromptExtractionJudge.KeywordBaseline(),
-        "over-refusal" => OverRefusalJudge.KeywordBaseline(),
-        _ => null,
-    };
+    // Delegate to the single source of truth so the axis set can't drift from JudgeAxisRegistry.
+    private static IChatGate? AxisKeywordBaseline(string axis) => JudgeAxisRegistry.For(axis)?.KeywordBaseline();
 
     private static IChatGate? Fail(out string? error, string message)
     {
