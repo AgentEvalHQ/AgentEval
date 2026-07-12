@@ -75,10 +75,10 @@ The CLI enforces the same calibration bar as the .NET API:
 
 ```bash
 # 1) calibrate once per model → writes a model-specific certificate
-agenteval gatekeeper calibrate --gate judge:exfiltration-intent --azure --deployment-name gpt-4o-mini --certify
+agenteval gatekeeper calibrate --gate judge:exfiltration-intent --azure --deployment-name <your-deployment> --certify
 
 # 2) now inspect honors it; without a certificate it refuses with exit 7
-echo '{"text":"…the agent answer…"}' | agenteval gatekeeper inspect --gate judge:exfiltration-intent --azure --deployment-name gpt-4o-mini
+echo '{"text":"…the agent answer…"}' | agenteval gatekeeper inspect --gate judge:exfiltration-intent --azure --deployment-name <your-deployment>
 ```
 
 `--model-reply <file>` evaluates a reply your own client already produced (no model call); it is advisory unless you
