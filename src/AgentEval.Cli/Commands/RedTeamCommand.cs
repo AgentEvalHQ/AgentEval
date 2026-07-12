@@ -9,6 +9,8 @@
 
 using System.CommandLine;
 using System.CommandLine.Parsing;
+using AgentEval.Cli.Commands.RedTeamTargets;
+using AgentEval.Cli.CopilotStudio;
 using AgentEval.Cli.Infrastructure;
 using AgentEval.Core;
 using AgentEval.RedTeam;
@@ -57,7 +59,12 @@ internal static class RedTeamCommand
         var systemPromptCanaryOpt = new Option<string?>("--system-prompt-canary")
             { Description = "Secret token embedded in the SUT system prompt; SystemPromptExtraction then proves a leak only when this exact token appears in a response (otherwise Inconclusive)." };
         var sutOpt = new Option<string?>("--sut")
-            { Description = "Built-in system-under-test. 'gatekeeper-demo' runs a credential-free, deterministic Gatekeeper-gated agent (no --endpoint needed) to demonstrate the attack-the-gate closed loop." };
+            { Description = "Built-in system-under-test. 'gatekeeper-demo' runs a credential-free, deterministic Gatekeeper-gated agent (no --endpoint needed) to demonstrate the attack-the-gate closed loop. 'copilot-studio' red-teams a LIVE Microsoft Copilot Studio agent (text-only/Verbal fidelity; requires --copilotstudio-config and --i-understand-live-side-effects)." };
+
+        // Built-in SUT targets (--sut <id>): each owns its own options + validation + construction (SRP; see
+        // IRedTeamBuiltInTarget). The endpoint/--azure path is NOT a target — it stays as the red-team-core default.
+        var builtInTargets = BuildBuiltInTargets();
+        var copilotStudioTarget = builtInTargets.OfType<CopilotStudioRedTeamTarget>().Single();
 
         // Attack selection
         var attacksOpt = new Option<string?>("--attacks")
@@ -158,6 +165,10 @@ internal static class RedTeamCommand
         command.Options.Add(systemPromptOpt);
         command.Options.Add(sutTierOpt);
         command.Options.Add(sutOpt);
+        foreach (var target in builtInTargets)
+        {
+            target.AddOptionsTo(command);   // each built-in SUT contributes its own flags (no-op for gatekeeper-demo)
+        }
         command.Options.Add(systemPromptCanaryOpt);
         command.Options.Add(attacksOpt);
         command.Options.Add(importProbesOpt);
@@ -206,6 +217,7 @@ internal static class RedTeamCommand
                 SystemPrompt = parseResult.GetValue(systemPromptOpt),
                 SutTier = parseResult.GetValue(sutTierOpt)!,
                 Sut = parseResult.GetValue(sutOpt),
+                CopilotStudio = copilotStudioTarget.BindOptions(parseResult),
                 SystemPromptCanary = parseResult.GetValue(systemPromptCanaryOpt),
                 Attacks = parseResult.GetValue(attacksOpt),
                 ImportProbes = parseResult.GetValue(importProbesOpt),
@@ -258,9 +270,11 @@ internal static class RedTeamCommand
     }
 
     /// <summary>
-    /// Core execution logic — separated from command wiring for testability.
+    /// Core execution logic — separated from command wiring for testability. <paramref name="sutOverride"/>, when
+    /// non-null, is used as the system-under-test instead of constructing one — the credential-free test seam that
+    /// lets a fake agent drive a full built-in-target scan offline.
     /// </summary>
-    internal static async Task<int> ExecuteAsync(RedTeamOptions opts, CancellationToken ct)
+    internal static async Task<int> ExecuteAsync(RedTeamOptions opts, CancellationToken ct, IEvaluableAgent? sutOverride = null)
     {
         // 0. `--pack list`: print the benchmark-pack catalog and exit (no scan, no endpoint required).
         if (string.Equals(opts.Pack?.Trim(), "list", StringComparison.OrdinalIgnoreCase))
@@ -272,13 +286,17 @@ internal static class RedTeamCommand
             return ExitCodes.Success;
         }
 
-        // 1. Validate
-        // --sut gatekeeper-demo runs a built-in, credential-free gated agent, so the endpoint checks are skipped.
-        var isGatekeeperDemo = string.Equals(opts.Sut?.Trim(), "gatekeeper-demo", StringComparison.OrdinalIgnoreCase);
-        if (opts.Sut is not null && !isGatekeeperDemo)
-            throw new InvalidOperationException($"Unknown --sut value: '{opts.Sut}'. Valid: gatekeeper-demo.");
+        // 1. Validate. Built-in --sut targets (gatekeeper-demo, copilot-studio) each own their validation +
+        // construction (IRedTeamBuiltInTarget). The endpoint/--azure path is the default fallback, not a target.
+        var builtInTargets = BuildBuiltInTargets();
+        var selectedTarget = opts.Sut is null
+            ? null
+            : builtInTargets.FirstOrDefault(t => string.Equals(t.Sut, opts.Sut.Trim(), StringComparison.OrdinalIgnoreCase));
+        if (opts.Sut is not null && selectedTarget is null)
+            throw new InvalidOperationException(
+                $"Unknown --sut value: '{opts.Sut}'. Valid: {string.Join(", ", builtInTargets.Select(t => t.Sut))}.");
 
-        if (!isGatekeeperDemo)
+        if (selectedTarget is null)
         {
             if (opts.Endpoint is null && !opts.Azure)
                 throw new InvalidOperationException("Specify --endpoint <url> or --azure (or --sut gatekeeper-demo for a credential-free demo).");
@@ -294,28 +312,7 @@ internal static class RedTeamCommand
         }
         else
         {
-            // The built-in demo agent is stateful and single-threaded — a shared session/trace would be raced
-            // under concurrent probes, so reject --parallelism > 1 rather than silently corrupt the results.
-            if (opts.Parallelism > 1)
-                throw new InvalidOperationException(
-                    "--sut gatekeeper-demo runs at --parallelism 1 (the built-in demo agent is stateful). Remove --parallelism or set it to 1.");
-
-            // The demo has no model of its own, so a judge/attacker would fall back to the literal name
-            // "gatekeeper-demo" — a non-existent model the real endpoint rejects. Require an explicit model.
-            if (opts.JudgeEndpoint is not null && string.IsNullOrWhiteSpace(opts.JudgeModel))
-                throw new InvalidOperationException(
-                    "--sut gatekeeper-demo has no model of its own; pass --judge-model <name> when using --judge.");
-            if (opts.AttackerEndpoint is not null && string.IsNullOrWhiteSpace(opts.AttackerModel))
-                throw new InvalidOperationException(
-                    "--sut gatekeeper-demo has no model of its own; pass --attacker-model <name> when using --attacker.");
-
-            // Flags that only apply to a real endpoint are ignored for the demo — say so rather than mislead.
-            if (!opts.Quiet && (opts.Endpoint is not null || opts.Azure || opts.Model is not null
-                || opts.DeploymentName is not null || !string.Equals(opts.SutTier, "text", StringComparison.OrdinalIgnoreCase)
-                || opts.SystemPrompt is not null || opts.SystemPromptCanary is not null))
-                Console.Error.WriteLine(
-                    "  Note: --sut gatekeeper-demo is a built-in agent; --endpoint/--azure/--model/--deployment-name/" +
-                    "--sut-tier/--system-prompt/--system-prompt-canary are ignored.");
+            selectedTarget.Validate(opts);
         }
 
         // Validate --fail-on up front so a typo fails fast, before an expensive scan runs.
@@ -346,18 +343,20 @@ internal static class RedTeamCommand
         // --import-probes read and --pack download. BuildScanOptions re-runs this (idempotent) for library callers.
         ValidateTimeouts(opts);
 
-        // Resolved identifier: deployment name for Azure, model name for OpenAI-compatible (or the demo name).
-        var resolvedName = isGatekeeperDemo ? "gatekeeper-demo" : (opts.Azure ? opts.DeploymentName! : opts.Model!);
+        // Resolved identifier: the target's own name (deployment/agent), else deployment name (Azure) / model name.
+        var resolvedName = selectedTarget?.ResolvedName(opts) ?? (opts.Azure ? opts.DeploymentName! : opts.Model!);
 
-        // 2. Build the SUT (IEvaluableAgent).
+        // 2. Build the SUT (IEvaluableAgent). A built-in target constructs itself (and, if gated, records gate.*
+        // evidence into gateTrace); the endpoint/--azure path is the default. sutOverride is the credential-free seam.
         IEvaluableAgent agent;
-        AgentEval.Tracing.AgentTrace? gateTrace = null;
-        if (isGatekeeperDemo)
+        AgentEval.Tracing.AgentTrace? gateTrace = selectedTarget is not null ? new AgentEval.Tracing.AgentTrace() : null;
+        if (selectedTarget is not null)
         {
-            // Credential-free, deterministic Gatekeeper-gated agent; the trace captures gate.tool.* verdicts so
-            // we can report how many attack attempts the gate blocked.
-            gateTrace = new AgentEval.Tracing.AgentTrace();
-            agent = GatekeeperDemoSut.Build(gateTrace);
+            agent = selectedTarget.Build(opts, sutOverride, gateTrace!);
+        }
+        else if (sutOverride is not null)
+        {
+            agent = sutOverride;   // test seam for the endpoint path too
         }
         else
         {
@@ -404,8 +403,8 @@ internal static class RedTeamCommand
 
         // Instrument SystemPromptExtraction with the canary so its evaluator can detect the exact-token leak. For the
         // full roster, RosterWithCanary swaps the SPE instance; for a narrowed --attacks set, swap in place. Skipped
-        // for the gatekeeper-demo SUT, which embeds no system prompt (so a canary probe could never prove a leak).
-        if (!isGatekeeperDemo && !string.IsNullOrWhiteSpace(opts.SystemPromptCanary))
+        // for built-in targets, which embed no system prompt (so a canary probe could never prove a leak).
+        if (selectedTarget is null && !string.IsNullOrWhiteSpace(opts.SystemPromptCanary))
         {
             var canary = opts.SystemPromptCanary!;
             attacks = attacks is null
@@ -505,7 +504,8 @@ internal static class RedTeamCommand
 
         // Single ScanOptions construction site (extracted as a seam) so no property — notably AttackerClient — can be
         // silently dropped on a code path such as --verbose (the bug a duplicate construction site once caused).
-        var scanOptions = BuildScanOptions(opts, attacks, intensity, judgeClient, attackerClient);
+        var scanOptions = BuildScanOptions(opts, attacks, intensity, judgeClient, attackerClient,
+            includeEvidence: selectedTarget?.IncludeEvidence ?? true);
 
         // 6. Run scan
         if (!opts.Quiet)
@@ -574,11 +574,10 @@ internal static class RedTeamCommand
             if (result.InconclusiveProbes > 0)
                 Console.Error.WriteLine($"  Note: {result.InconclusiveProbes}/{result.TotalProbes} probes were inconclusive — that lowers coverage, not the pass rate.");
 
-            // Gatekeeper demo: report how many attack attempts the runtime gate blocked (the closed loop).
-            if (gateTrace is not null)
+            // Built-in target post-scan summary (e.g. the gatekeeper-demo gate-block count — the closed loop).
+            if (selectedTarget is not null && gateTrace is not null)
             {
-                var blocks = AgentEval.Tracing.GlassBoxEvidence.FromTrace(gateTrace)?.GateBlockCount ?? 0;
-                Console.Error.WriteLine($"  Gatekeeper: {blocks} forbidden tool call(s) blocked before execution (gate.tool.* evidence).");
+                selectedTarget.WritePostScanSummary(result, gateTrace, Console.Error);
             }
         }
 
@@ -731,7 +730,8 @@ internal static class RedTeamCommand
         IReadOnlyList<IAttackType>? attacks,
         Intensity intensity,
         IChatClient? judgeClient,
-        IChatClient? attackerClient)
+        IChatClient? attackerClient,
+        bool includeEvidence = true)
     {
         Action<ScanProgress>? onProgress = opts.Verbose && !opts.Quiet
             ? progress => Console.Error.WriteLine(
@@ -758,7 +758,7 @@ internal static class RedTeamCommand
             AttackerClient = attackerClient, // Wave C′: drives attacker-LLM multi-turn attacks (Crescendo/PAIR/TAP)
             // --explain: only effective with a judge (the runner gates on JudgeClient too); a no-op flag without one.
             ExplainFindings = opts.Explain && judgeClient is not null,
-            IncludeEvidence = true,
+            IncludeEvidence = includeEvidence,
             OnProgress = onProgress,
             // L21: throttle / timeout escape hatches. TimeoutPerTurn falls back to TimeoutPerProbe when --max-turn-timeout
             // is 0 (set it equal here — same as ScanOptions' own get-fallback).
@@ -786,6 +786,13 @@ internal static class RedTeamCommand
         "evidence-anchored" or "anchored" or "evidence" => JudgeRubric.EvidenceAnchored,
         _ => throw new ArgumentException($"Unknown --judge-rubric '{rubric}'. Use 'strict', 'lenient', or 'evidence-anchored'."),
     };
+
+    /// <summary>
+    /// The built-in <c>--sut</c> targets, in <c>--sut</c>-value order. A fresh list per call so the option-holding
+    /// targets aren't shared across command builds; the dispatch (Validate/Build) reads only <see cref="RedTeamOptions"/>.
+    /// </summary>
+    private static IReadOnlyList<IRedTeamBuiltInTarget> BuildBuiltInTargets() =>
+        [new GatekeeperDemoRedTeamTarget(), new CopilotStudioRedTeamTarget()];
 
     /// <summary>Maps the <c>--sut-tier</c> string to a <see cref="SutTier"/> (case/spelling tolerant).</summary>
     internal static SutTier ParseSutTier(string? tier) => (tier ?? "text").Trim().ToLowerInvariant() switch
@@ -858,8 +865,11 @@ internal sealed class RedTeamOptions
     public string? SystemPrompt { get; init; }
     public string SutTier { get; init; } = "text";
 
-    /// <summary>Built-in SUT selector (<c>--sut</c>); <c>gatekeeper-demo</c> = the credential-free gated demo agent.</summary>
+    /// <summary>Built-in SUT selector (<c>--sut</c>); <c>gatekeeper-demo</c> and <c>copilot-studio</c> are the built-in targets.</summary>
     public string? Sut { get; init; }
+
+    /// <summary>Grouped <c>--sut copilot-studio</c> options (null unless that target is selected/those flags are set).</summary>
+    public CopilotStudioTargetOptions? CopilotStudio { get; init; }
     public string? SystemPromptCanary { get; init; }
     public string? Attacks { get; init; }
     public FileInfo? ImportProbes { get; init; }

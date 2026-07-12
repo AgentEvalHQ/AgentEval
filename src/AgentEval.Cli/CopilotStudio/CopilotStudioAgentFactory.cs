@@ -6,13 +6,13 @@ using AgentEval.Core;
 using AgentEval.MAF;
 using Microsoft.Agents.AI;
 
-namespace AgentEval.Cli.Commands;
+namespace AgentEval.Cli.CopilotStudio;
 
 /// <summary>
 /// Builds the system-under-test behind <c>redteam --sut copilot-studio</c>: a Microsoft Copilot Studio (MCS) agent
-/// fronted as an <see cref="IEvaluableAgent"/>. Mirrors <see cref="AzureChatAgentFactory"/> and
-/// <see cref="GatekeeperDemoSut"/> — a MAF <see cref="AIAgent"/> wrapped in a <see cref="MAFAgentAdapter"/> (the
-/// same proven seam the Foundry integration uses), rather than a bespoke <c>IChatClient</c>.
+/// fronted as an <see cref="IEvaluableAgent"/>. Mirrors <c>AzureChatAgentFactory</c> and <c>GatekeeperDemoSut</c>
+/// — a MAF <see cref="AIAgent"/> wrapped in a <see cref="MAFAgentAdapter"/> (the same proven seam the Foundry
+/// integration uses), rather than a bespoke <c>IChatClient</c>.
 /// </summary>
 /// <remarks>
 /// <para><b>Fidelity ceiling.</b> The conversation channel makes server-side tool calls structurally invisible, so an

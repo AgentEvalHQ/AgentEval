@@ -2,7 +2,7 @@
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 
-using AgentEval.Cli.Commands;
+using AgentEval.Cli.CopilotStudio;
 using AgentEval.Core;
 using AgentEval.Testing;
 using Microsoft.Agents.AI;

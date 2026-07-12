@@ -4,7 +4,7 @@
 
 using System.Text.Json;
 
-namespace AgentEval.Cli.Commands;
+namespace AgentEval.Cli.CopilotStudio;
 
 /// <summary>
 /// Connection settings for a Microsoft Copilot Studio (MCS) agent evaluated via
