@@ -32,14 +32,14 @@ internal sealed record CopilotStudioTargetOptions : IRedTeamTargetOptions
 /// bloats <c>RedTeamCommand</c>.
 /// </summary>
 /// <remarks>
-/// The live connector is deferred (<see cref="CopilotStudioAgentFactory.BuildLive"/> throws a clear error until the
-/// P0 live spike). The whole path is testable credential-free via the <c>sutOverride</c> seam.
+/// The live connector is deferred (<see cref="CopilotStudioAgentFactory.BuildLive"/> throws a clear error until it is
+/// implemented). The whole path is testable credential-free via the <c>sutOverride</c> seam.
 /// </remarks>
 internal sealed class CopilotStudioRedTeamTarget : IRedTeamBuiltInTarget
 {
     private readonly Option<FileInfo?> _configOpt = new("--copilotstudio-config")
     {
-        Description = "JSON file with the Copilot Studio connection (environmentId, schemaName, tenantId, appClientId; optional cloud, agentName). No secret — the token is acquired at run time. Required by --sut copilot-studio.",
+        Description = "JSON file with the Copilot Studio connection (environmentId, schemaName, tenantId, appClientId; optional cloud, agentName). No secret is stored here; the live connector (not implemented yet) will acquire the token at run time. Required by --sut copilot-studio.",
     };
 
     private readonly Option<bool> _ackOpt = new("--i-understand-live-side-effects")
@@ -140,7 +140,7 @@ internal sealed class CopilotStudioRedTeamTarget : IRedTeamBuiltInTarget
             return sutOverride;   // test seam: a pre-built (fake) SUT drives the whole scan credential-free
         }
 
-        // Live path — deferred: BuildLive throws a clear error until the P0 live spike wires the verified connector.
+        // Live path — deferred: BuildLive throws a clear error until the live connector is wired + verified.
         return CopilotStudioAgentFactory.BuildLive(EnsureConfig(opts));
     }
 

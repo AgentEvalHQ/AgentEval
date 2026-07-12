@@ -20,8 +20,8 @@ namespace AgentEval.Cli.CopilotStudio;
 /// Inconclusive, never a fabricated PASS. Behavioral fidelity requires the deferred L2 telemetry-enrichment path.</para>
 /// <para><b>Live connector deferred.</b> <see cref="FromAgent"/> — the seam both the live path and the CI tests go
 /// through — is complete. <see cref="BuildLive"/> (constructing the connector-backed agent from config + auth) is
-/// wired in the P0 live spike, once the Copilot Studio connector package + API are verified against the current MAF
-/// release with a real non-prod agent; until then it throws a clear, actionable error.</para>
+/// wired once the Copilot Studio connector package + API are verified against the current MAF release with a real
+/// non-prod agent; until then it throws a clear, actionable error.</para>
 /// </remarks>
 internal static class CopilotStudioAgentFactory
 {
@@ -40,8 +40,8 @@ internal static class CopilotStudioAgentFactory
     /// <summary>
     /// The LIVE path: build a MAF <see cref="AIAgent"/> from the Copilot Studio connector using
     /// <paramref name="config"/> + device-code/MSAL auth, then wrap it via <see cref="FromAgent"/>.
-    /// <b>Deferred</b> — throws until the P0 live spike verifies the connector package/API against the current MAF
-    /// release. The scaffold, safety gates, and CI path are complete without it.
+    /// <b>Deferred</b> — throws until the connector package/API are verified against the current MAF release. The
+    /// scaffold, safety gates, and CI path are complete without it.
     /// </summary>
     public static IEvaluableAgent BuildLive(CopilotStudioConfig config)
     {
@@ -49,9 +49,10 @@ internal static class CopilotStudioAgentFactory
         config.Validate();   // fail on bad config before the "not wired" message, so the error the caller sees is theirs
 
         throw new NotSupportedException(
-            "Copilot Studio live connector is not wired yet (pending the P0 live spike: verify the " +
-            "Microsoft.Agents.CopilotStudio.Client package + API against the current MAF release, with a non-prod " +
-            "agent and device-code auth). The --sut copilot-studio scaffold, safety gates, and CI path are complete " +
-            "— complete the live spike to enable a live scan.");
+            "The live Copilot Studio connector is not wired yet, so --sut copilot-studio cannot run a live scan in " +
+            "this release. The scaffold, safety gates, and credential-free CI path are complete; wiring the connector " +
+            "(the Microsoft.Agents.CopilotStudio.Client package + device-code auth, verified against the current MAF " +
+            "release) is still to come. For now, red-team an OpenAI-compatible or Azure endpoint with --endpoint / " +
+            "--azure, or try the credential-free --sut gatekeeper-demo.");
     }
 }

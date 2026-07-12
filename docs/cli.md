@@ -505,7 +505,7 @@ The CLI's exit-code contract, so CI can branch on the outcome. Source of truth: 
 | `5` | `gatekeeper inspect` — a gate **Blocked** on real evidence. |
 | `6` | `gatekeeper inspect` — **fail-closed**: the CLI could not evaluate (e.g. a history gate with no `messages`). Not a policy block. |
 | `7` | `gatekeeper inspect` — **not certified**: the honesty guard refused an un-calibrated judge (run `calibrate --certify`, or pass `--allow-uncalibrated`). |
-| `8` | **Reserved** (not emitted yet) — `redteam --sut copilot-studio` will return this when a live scan hits the `--max-credits` Copilot Credit budget cap (BudgetExceeded). The live connector and `--max-credits` enforcement are deferred to the P0 live spike, so no current run can produce it. |
+| `8` | **Reserved** (not emitted yet) — `redteam --sut copilot-studio` will return this when a live scan hits the `--max-credits` Copilot Credit budget cap (BudgetExceeded). The live connector and `--max-credits` enforcement are not implemented yet, so no current run can produce it. |
 
 `redteam` uses `1` for failure, `3` for runtime error, and `4` for a `--fail-on regression` gate. Code `8` is
 **reserved** for a live `--sut copilot-studio` scan that hits `--max-credits` (BudgetExceeded); the current scaffold
