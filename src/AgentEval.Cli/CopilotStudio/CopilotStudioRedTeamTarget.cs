@@ -50,7 +50,7 @@ internal sealed class CopilotStudioRedTeamTarget : IRedTeamBuiltInTarget
     private readonly Option<int> _maxCreditsOpt = new("--max-credits")
     {
         DefaultValueFactory = _ => 0,
-        Description = "Cap the Copilot Credits a live --sut copilot-studio scan may spend (0 = no cap). Hitting the cap stops the scan with exit 8 (BudgetExceeded). Every turn burns credits; a reasoning turn costs ~100x a scripted one.",
+        Description = "Cap the Copilot Credits a live --sut copilot-studio scan may spend (0 = no cap). Hitting the cap stops the scan with exit 8 (BudgetExceeded). Every turn burns credits, and a reasoning turn costs substantially more than a scripted one.",
     };
 
     private CopilotStudioConfig? _config;   // memoized within one ExecuteAsync call (Validate -> ResolvedName -> Build)
@@ -122,11 +122,12 @@ internal sealed class CopilotStudioRedTeamTarget : IRedTeamBuiltInTarget
         _config = CopilotStudioConfig.Load(cs.ConfigFile);   // fail fast on a bad config, before the scan; memoized
 
         if (!opts.Quiet && (opts.Endpoint is not null || opts.Azure || opts.Model is not null || opts.DeploymentName is not null
-            || !string.Equals(opts.SutTier, "text", StringComparison.OrdinalIgnoreCase) || opts.SystemPromptCanary is not null))
+            || !string.Equals(opts.SutTier, "text", StringComparison.OrdinalIgnoreCase)
+            || opts.SystemPrompt is not null || opts.SystemPromptCanary is not null))
         {
             Console.Error.WriteLine(
                 "  Note: --sut copilot-studio is a live built-in target at text-only/Verbal fidelity; " +
-                "--endpoint/--azure/--model/--deployment-name/--sut-tier/--system-prompt-canary are ignored.");
+                "--endpoint/--azure/--model/--deployment-name/--sut-tier/--system-prompt/--system-prompt-canary are ignored.");
         }
     }
 

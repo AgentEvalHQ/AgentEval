@@ -868,7 +868,8 @@ internal sealed class RedTeamOptions
     /// <summary>Built-in SUT selector (<c>--sut</c>); <c>gatekeeper-demo</c> and <c>copilot-studio</c> are the built-in targets.</summary>
     public string? Sut { get; init; }
 
-    /// <summary>Grouped <c>--sut copilot-studio</c> options (null unless that target is selected/those flags are set).</summary>
+    /// <summary>Grouped <c>--sut copilot-studio</c> options. Bound from the parse result on every run (defaulted when
+    /// the flags aren't set); only read when <c>--sut copilot-studio</c> is the selected target.</summary>
     public CopilotStudioTargetOptions? CopilotStudio { get; init; }
     public string? SystemPromptCanary { get; init; }
     public string? Attacks { get; init; }
