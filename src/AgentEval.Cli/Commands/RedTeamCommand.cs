@@ -877,12 +877,23 @@ internal sealed class RedTeamOptions
     /// and only when it is the selected <c>--sut</c>. Keeps the command from special-casing any one target's flags.
     /// </summary>
     public IReadOnlyDictionary<string, IRedTeamTargetOptions?> TargetOptions { get; init; }
-        = new Dictionary<string, IRedTeamTargetOptions?>();
+        = new Dictionary<string, IRedTeamTargetOptions?>(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>Reads the bound options a built-in target contributed (see <see cref="TargetOptions"/>) for target
-    /// <paramref name="sut"/>, cast to <typeparamref name="T"/>; <c>null</c> if the target contributed none.</summary>
+    /// <paramref name="sut"/>, cast to <typeparamref name="T"/>; <c>null</c> if the target contributed none. Matches
+    /// <paramref name="sut"/> case-insensitively regardless of how <see cref="TargetOptions"/> was built, so a caller
+    /// or test that constructs the bag with a case-sensitive comparer can't silently miss on a casing difference.</summary>
     public T? TargetOptionsFor<T>(string sut) where T : class, IRedTeamTargetOptions
-        => TargetOptions.TryGetValue(sut, out var o) ? o as T : null;
+    {
+        foreach (var (key, value) in TargetOptions)
+        {
+            if (string.Equals(key, sut, StringComparison.OrdinalIgnoreCase))
+            {
+                return value as T;
+            }
+        }
+        return null;
+    }
     public string? SystemPromptCanary { get; init; }
     public string? Attacks { get; init; }
     public FileInfo? ImportProbes { get; init; }

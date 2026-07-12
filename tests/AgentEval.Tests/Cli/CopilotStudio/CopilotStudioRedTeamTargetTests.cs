@@ -60,6 +60,28 @@ public class CopilotStudioRedTeamTargetTests
         Assert.Contains("copilot-studio", ex.Message, StringComparison.OrdinalIgnoreCase);
     }
 
+    [Fact]
+    public void TargetOptionsFor_IsCaseInsensitive_EvenWithCaseSensitiveBag()
+    {
+        // Regression (Copilot #89 round 5): TargetOptionsFor must match --sut case-insensitively regardless of how the
+        // bag was built — a caller/test that constructs a case-SENSITIVE dictionary under a differently-cased key must
+        // still resolve, matching the CLI's OrdinalIgnoreCase construction path.
+        var opts = new RedTeamOptions
+        {
+            Intensity = "moderate",
+            Format = "json",
+            TargetOptions = new Dictionary<string, IRedTeamTargetOptions?>   // case-sensitive comparer on purpose
+            {
+                ["Copilot-Studio"] = new CopilotStudioTargetOptions { MaxCredits = 7 },
+            },
+        };
+
+        var bound = opts.TargetOptionsFor<CopilotStudioTargetOptions>("copilot-studio");
+        Assert.NotNull(bound);
+        Assert.Equal(7, bound!.MaxCredits);
+        Assert.Null(opts.TargetOptionsFor<CopilotStudioTargetOptions>("gatekeeper-demo"));
+    }
+
     // ── credential-free end-to-end scan via the sutOverride seam ──
 
     [Fact]
