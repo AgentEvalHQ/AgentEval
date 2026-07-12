@@ -190,6 +190,15 @@ internal static class GatekeeperInspectCommand
                 return (Structural(gateId, "tool", policyName, "tool gate requires a 'tool' field in the payload"), CatStructural);
             }
 
+            // 'args' is part of the documented tool-gate shape. A missing/null args (as opposed to an explicit {} for a
+            // no-argument call) reaches the arg-inspecting gates as null, and several treat that as Allow — an easy
+            // fail-open if a caller forgets it. Require it present (even empty) and fail structurally otherwise.
+            if (payload.Args is null)
+            {
+                return (Structural(gateId, "tool", policyName,
+                    "tool gate requires an 'args' object in the payload (use {} for a no-argument call)"), CatStructural);
+            }
+
             IReadOnlyList<ChatMessage> messages;
             if (stateClass == "needs-history")
             {

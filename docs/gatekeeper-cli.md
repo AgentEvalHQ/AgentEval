@@ -22,9 +22,10 @@ in this build (single payload per invocation) because their model calls and hone
 - **Text gates** take `{"text": "…"}` — `keyword-injection`, `keyword` (with `--keyword`/`--keywords`),
   `keyword:<axis>`, `rendered-exfil`, and `judge:<axis>`.
 - **Tool / flow-control gates** take `{"tool": "…", "args": {…}, "messages": [ … ]}` — `tool:forbidden-tool`,
-  `tool:argument-pattern`, `tool:domain-allowlist`, `tool:referential-integrity`, `tool:taint-tracking`. The
-  history-reading gates recompute from the `messages` you pass (each message is `{role, text?, functionCall?,
-  functionResult?}`).
+  `tool:argument-pattern`, `tool:domain-allowlist`, `tool:referential-integrity`, `tool:taint-tracking`. `args` is
+  **required** (use `{}` for a no-argument call) — a missing `args` is a structural error (exit 2), not a silent
+  Allow, so forgetting it can't fail open. The history-reading gates recompute from the `messages` you pass (each
+  message is `{role, text?, functionCall?, functionResult?}`).
 
 Run `gatekeeper list-gates` to see every gate, its state class, whether it needs a model, and its span policy.
 

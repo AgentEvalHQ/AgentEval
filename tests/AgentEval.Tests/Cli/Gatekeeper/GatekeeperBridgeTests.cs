@@ -232,6 +232,27 @@ public class GatekeeperBridgeTests
     }
 
     [Fact]
+    public async Task Inspect_ToolGate_MissingArgs_IsStructuralError_Exit2()
+    {
+        // Omitting 'args' would reach the arg-inspecting gates as null and several would Allow — a fail-open bypass.
+        // Require it present; a missing args is the caller's malformed payload → structural (exit 2), not Allow.
+        var (exit, json, _) = await InspectAsync(
+            "tool:forbidden-tool", "{\"tool\":\"read_file\"}", f => f.Forbidden.Add("delete_all"));
+        Assert.Equal(ExitCodes.UsageError, exit);
+        Assert.Contains("args", json!.RootElement.GetProperty("reason").GetString()!, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task Inspect_ToolGate_ExplicitEmptyArgs_IsAccepted()
+    {
+        // An explicit {} is a legitimate no-argument call — it must proceed (here: not forbidden → Allow), not error.
+        var (exit, json, _) = await InspectAsync(
+            "tool:forbidden-tool", "{\"tool\":\"read_file\",\"args\":{}}", f => f.Forbidden.Add("delete_all"));
+        Assert.Equal(ExitCodes.Success, exit);
+        Assert.Equal("Allow", json!.RootElement.GetProperty("action").GetString());
+    }
+
+    [Fact]
     public async Task Inspect_NeedsHistory_NoMessages_FailsClosed_Exit6()
     {
         var (exit, json, _) = await InspectAsync(
