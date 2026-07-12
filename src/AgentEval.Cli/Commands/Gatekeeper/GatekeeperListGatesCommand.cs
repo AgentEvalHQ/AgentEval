@@ -52,10 +52,10 @@ internal static class GatekeeperListGatesCommand
 
         outw.WriteLine("  Gatekeeper gates");
         outw.WriteLine("  ─────────────────────────────────────────────────────────────────────────────");
-        outw.WriteLine($"  {"ID",-32} {"KIND",-5} {"STATE",-15} {"MODEL",-6} {"SPANS",-7} PHASE");
+        outw.WriteLine($"  {"ID",-32} {"KIND",-5} {"STATE",-15} {"MODEL",-6} {"SPANS",-9} PHASE");
         foreach (var d in gates)
         {
-            outw.WriteLine($"  {d.Id,-32} {d.Kind.ToString().ToLowerInvariant(),-5} {d.StateClass,-15} {(d.NeedsModel ? "yes" : "no"),-6} {d.SpanPolicy,-7} {d.Phase}");
+            outw.WriteLine($"  {d.Id,-32} {d.Kind.ToString().ToLowerInvariant(),-5} {d.StateClass,-15} {(d.NeedsModel ? "yes" : "no"),-6} {d.SpanPolicy,-9} {d.Phase}");
         }
 
         outw.WriteLine();

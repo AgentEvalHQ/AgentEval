@@ -57,10 +57,17 @@ internal static class GatekeeperModelResolver
                 return new(c, Fingerprint("openai", endpoint, model!), ExitCodes.Success);
             }
 
-            var (envClient, envDeployment, _) = AzureChatAgentFactory.TryBuildChatClientFromEnv();
-            if (envClient is not null)
+            // Env trio fallback — build it the same way as the explicit --azure branch (EndpointFactory.CreateAzure)
+            // rather than AzureChatAgentFactory, whose missing-config path writes benchmark-worded errors straight to
+            // Console.Error (duplicating gatekeeper's own message + bypassing the injected stderr). Any construction
+            // failure here is caught by the outer catch, which reports via the injected stderr.
+            var envEndpoint   = Env("AZURE_OPENAI_ENDPOINT");
+            var envApiKey     = Env("AZURE_OPENAI_API_KEY");
+            var envDeployment = Env("AZURE_OPENAI_DEPLOYMENT");
+            if (!string.IsNullOrWhiteSpace(envEndpoint) && !string.IsNullOrWhiteSpace(envApiKey) && !string.IsNullOrWhiteSpace(envDeployment))
             {
-                return new(envClient, Fingerprint("azure", Env("AZURE_OPENAI_ENDPOINT"), envDeployment ?? model ?? "unknown"), ExitCodes.Success);
+                var c = EndpointFactory.CreateAzure(envEndpoint!, envDeployment!, envApiKey);
+                return new(c, Fingerprint("azure", envEndpoint, envDeployment!), ExitCodes.Success);
             }
 
             stderr.WriteLine("  Error: no model backing. Pass --azure --deployment-name <d>, or --endpoint <url> --model <m>, " +

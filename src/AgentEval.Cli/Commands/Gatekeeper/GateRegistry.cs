@@ -22,7 +22,7 @@ internal sealed record GateDescriptor(
     string StateClass,   // stateless-text | needs-args | needs-history | needs-run-state
     bool NeedsModel,
     bool HasGoldSet,
-    string SpanPolicy,   // echo | redact
+    string SpanPolicy,   // echo | redact | per-child (panels)
     string Phase,        // inspect | serve
     string Description);
 
