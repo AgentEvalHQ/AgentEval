@@ -34,11 +34,7 @@ fixing, and migrating MAF code.
    `MafNewExecutor` for scaffolds, or `MafSimulateWorkflow` for topology
    preview. Don't reconstruct patterns from memory.
 
-5. **For deep architectural / security / migration questions** — use the
-   `@maf-best-practice-reviewer`, `@maf-auditor`, `@maf-migration`, or
-   `@maf-incident-responder` specialist agents.
-
-6. **To migrate FROM Semantic Kernel TO MAF** (a cross-framework port, NOT a
+5. **To migrate FROM Semantic Kernel TO MAF** (a cross-framework port, NOT a
    MAF version bump) — call `MafDetectSourceFramework` (CLI:
    `maf-doctor migrate-scan`) to inventory SK usage, tag each construct by
    migration strategy (bridgeable / rewrite / re-architect), and get a

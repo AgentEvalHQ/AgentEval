@@ -1,11 +1,8 @@
-## Microsoft Agent Framework code — use MAF Doctor
+## Using maf-doctor for Microsoft Agent Framework code
 
 This repository uses Microsoft Agent Framework. The maf-doctor MCP server
-is installed and exposes specialist tools for MAF code.
-
-You should defer to maf-doctor's tools over training-data knowledge for
-anything MAF-related, because MAF ships breaking changes every minor version
-and the maf-doctor registry is kept current via an AI-fill loop.
+(also called "MAF Doctor") is installed and exposes tools for diagnosing,
+fixing, and migrating MAF code.
 
 **Before answering MAF questions or proposing changes:**
 
@@ -33,11 +30,7 @@ and the maf-doctor registry is kept current via an AI-fill loop.
    `MafNewExecutor` for scaffolds, or `MafSimulateWorkflow` for topology
    preview. Don't reconstruct patterns from memory.
 
-5. **For deep architectural / security / migration questions** — use the
-   `@maf-best-practice-reviewer`, `@maf-auditor`, `@maf-migration`, or
-   `@maf-incident-responder` specialist agents.
-
-6. **To migrate FROM Semantic Kernel TO MAF** (a cross-framework port, NOT a
+5. **To migrate FROM Semantic Kernel TO MAF** (a cross-framework port, NOT a
    MAF version bump) — call `MafDetectSourceFramework` (CLI:
    `maf-doctor migrate-scan`) to inventory SK usage, tag each construct by
    migration strategy (bridgeable / rewrite / re-architect), and get a
