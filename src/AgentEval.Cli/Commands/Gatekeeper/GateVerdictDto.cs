@@ -10,7 +10,7 @@ using AgentEval.MAF.Gatekeeper;
 namespace AgentEval.Cli.Commands.Gatekeeper;
 
 /// <summary>
-/// The versioned <c>gatekeeper</c> verdict JSON — a frozen contract (mirrors the <c>AgentTrace</c> v1.1 discipline)
+/// The versioned <c>gatekeeper</c> verdict JSON — a frozen, versioned contract (the same discipline as <c>AgentTrace</c>)
 /// so any language can consume a Gatekeeper decision. One object per <c>inspect</c>; one per line for <c>--input</c>
 /// batch (JSONL). Field contract lives in <c>Schemas/gatekeeper-verdict.schema.json</c>.
 /// <para><b>Security:</b> for the two sensitive judge axes (<c>exfiltration-intent</c>, <c>system-prompt-extraction</c>)

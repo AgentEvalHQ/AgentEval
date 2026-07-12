@@ -61,8 +61,10 @@ the `bench`/compliance `calibrate` verbs (which return `2` on gate-fail), so do 
 ## Credential-free CI recipe
 
 ```bash
-# fail the build if the agent's answer trips a deterministic egress gate — no model, byte-stable
-echo "$agent_output" | agenteval gatekeeper inspect --gate rendered-exfil || exit 1
+# fail the build if the agent's answer trips a deterministic egress gate — no model, byte-stable.
+# inspect reads a JSON payload, so wrap the raw text into {"text": …} (jq handles the escaping);
+# exit 5 (Block) trips the `|| exit 1`, exit 0 (Allow) passes.
+jq -n --arg t "$agent_output" '{text: $t}' | agenteval gatekeeper inspect --gate rendered-exfil || exit 1
 ```
 
 ## Judge gates + the honesty guard
