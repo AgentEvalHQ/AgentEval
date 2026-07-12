@@ -168,7 +168,7 @@ AZURE_OPENAI_DEPLOYMENT=gpt-4o
 
 
 <!-- BEGIN maf-doctor (managed by `maf-doctor init` — overwritten on re-run) -->
-## Microsoft Agent Framework — MAF Doctor is installed
+## Using maf-doctor for Microsoft Agent Framework code
 
 This repository uses Microsoft Agent Framework. The maf-doctor MCP server
 (also called "MAF Doctor") is installed and exposes tools for diagnosing,
