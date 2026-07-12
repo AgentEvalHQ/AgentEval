@@ -3,11 +3,20 @@
 // Licensed under the MIT License.
 
 using System.CommandLine;
+using System.CommandLine.Parsing;
 using AgentEval.Core;
 using AgentEval.RedTeam;
 using AgentTrace = AgentEval.Tracing.AgentTrace;
 
 namespace AgentEval.Cli.Commands.RedTeamTargets;
+
+/// <summary>
+/// Marker for a built-in target's parsed CLI options — the object a target's <see cref="IRedTeamBuiltInTarget.BindOptions"/>
+/// returns and RedTeamCommand stores on <see cref="RedTeamOptions.TargetOptions"/>, keyed by
+/// <see cref="IRedTeamBuiltInTarget.Sut"/>. Lets the command carry every target's options polymorphically without
+/// naming any one target's option type — so a new built-in target with its own flags adds no branch to the command.
+/// </summary>
+internal interface IRedTeamTargetOptions { }
 
 /// <summary>
 /// A built-in red-team system-under-test selected via <c>--sut</c> (e.g. <c>gatekeeper-demo</c>,
@@ -28,6 +37,14 @@ internal interface IRedTeamBuiltInTarget
 
     /// <summary>Register this target's own CLI options on the redteam command. No-op if the target has none.</summary>
     void AddOptionsTo(Command command);
+
+    /// <summary>
+    /// Bind THIS target's flags from the parse result into its strongly-typed options object; <c>null</c> if the target
+    /// has no flags. RedTeamCommand calls this for every built-in target and stores the result on
+    /// <see cref="RedTeamOptions.TargetOptions"/> under <see cref="Sut"/>, so the command never special-cases one
+    /// target's binding. A target reads its own options back with <see cref="RedTeamOptions.TargetOptionsFor{T}"/>.
+    /// </summary>
+    IRedTeamTargetOptions? BindOptions(ParseResult parseResult);
 
     /// <summary>
     /// Validate the flags for THIS target; throw <see cref="InvalidOperationException"/> on a bad combination (before

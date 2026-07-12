@@ -64,7 +64,6 @@ internal static class RedTeamCommand
         // Built-in SUT targets (--sut <id>): each owns its own options + validation + construction (SRP; see
         // IRedTeamBuiltInTarget). The endpoint/--azure path is NOT a target — it stays as the red-team-core default.
         var builtInTargets = BuildBuiltInTargets();
-        var copilotStudioTarget = builtInTargets.OfType<CopilotStudioRedTeamTarget>().Single();
 
         // Attack selection
         var attacksOpt = new Option<string?>("--attacks")
@@ -217,7 +216,9 @@ internal static class RedTeamCommand
                 SystemPrompt = parseResult.GetValue(systemPromptOpt),
                 SutTier = parseResult.GetValue(sutTierOpt)!,
                 Sut = parseResult.GetValue(sutOpt),
-                CopilotStudio = copilotStudioTarget.BindOptions(parseResult),
+                // Bind every built-in target's own flags polymorphically (keyed by --sut value) — no per-target branch.
+                TargetOptions = builtInTargets.ToDictionary(
+                    t => t.Sut, t => t.BindOptions(parseResult), StringComparer.OrdinalIgnoreCase),
                 SystemPromptCanary = parseResult.GetValue(systemPromptCanaryOpt),
                 Attacks = parseResult.GetValue(attacksOpt),
                 ImportProbes = parseResult.GetValue(importProbesOpt),
@@ -868,9 +869,19 @@ internal sealed class RedTeamOptions
     /// <summary>Built-in SUT selector (<c>--sut</c>); <c>gatekeeper-demo</c> and <c>copilot-studio</c> are the built-in targets.</summary>
     public string? Sut { get; init; }
 
-    /// <summary>Grouped <c>--sut copilot-studio</c> options. Bound from the parse result on every run (defaulted when
-    /// the flags aren't set); only read when <c>--sut copilot-studio</c> is the selected target.</summary>
-    public CopilotStudioTargetOptions? CopilotStudio { get; init; }
+    /// <summary>
+    /// Per-built-in-target bound options, keyed by <see cref="IRedTeamBuiltInTarget.Sut"/> (e.g. <c>copilot-studio</c>).
+    /// RedTeamCommand populates this polymorphically from every target's <c>BindOptions</c> (bound on every run,
+    /// defaulted when the flags aren't set); each target reads its own entry back via <see cref="TargetOptionsFor{T}"/>
+    /// and only when it is the selected <c>--sut</c>. Keeps the command from special-casing any one target's flags.
+    /// </summary>
+    public IReadOnlyDictionary<string, IRedTeamTargetOptions?> TargetOptions { get; init; }
+        = new Dictionary<string, IRedTeamTargetOptions?>();
+
+    /// <summary>Reads the bound options a built-in target contributed (see <see cref="TargetOptions"/>) for target
+    /// <paramref name="sut"/>, cast to <typeparamref name="T"/>; <c>null</c> if the target contributed none.</summary>
+    public T? TargetOptionsFor<T>(string sut) where T : class, IRedTeamTargetOptions
+        => TargetOptions.TryGetValue(sut, out var o) ? o as T : null;
     public string? SystemPromptCanary { get; init; }
     public string? Attacks { get; init; }
     public FileInfo? ImportProbes { get; init; }

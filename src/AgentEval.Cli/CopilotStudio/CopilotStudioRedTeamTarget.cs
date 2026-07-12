@@ -12,8 +12,8 @@ using AgentTrace = AgentEval.Tracing.AgentTrace;
 
 namespace AgentEval.Cli.CopilotStudio;
 
-/// <summary>Parsed <c>--sut copilot-studio</c> options (grouped onto <c>RedTeamOptions.CopilotStudio</c>).</summary>
-internal sealed record CopilotStudioTargetOptions
+/// <summary>Parsed <c>--sut copilot-studio</c> options (carried on <c>RedTeamOptions.TargetOptions["copilot-studio"]</c>).</summary>
+internal sealed record CopilotStudioTargetOptions : IRedTeamTargetOptions
 {
     /// <summary><c>--copilotstudio-config</c>: the MCS connection JSON.</summary>
     public FileInfo? ConfigFile { get; init; }
@@ -67,8 +67,8 @@ internal sealed class CopilotStudioRedTeamTarget : IRedTeamBuiltInTarget
         command.Options.Add(_maxCreditsOpt);
     }
 
-    /// <summary>Bind the CS options from the parse result (called by RedTeamCommand's SetAction, unconditionally).</summary>
-    public CopilotStudioTargetOptions BindOptions(ParseResult parseResult) => new()
+    /// <summary>Bind the CS options from the parse result (called by RedTeamCommand for every built-in target, unconditionally).</summary>
+    public IRedTeamTargetOptions? BindOptions(ParseResult parseResult) => new CopilotStudioTargetOptions
     {
         ConfigFile = parseResult.GetValue(_configOpt),
         AckLiveSideEffects = parseResult.GetValue(_ackOpt),
@@ -77,7 +77,7 @@ internal sealed class CopilotStudioRedTeamTarget : IRedTeamBuiltInTarget
 
     public void Validate(RedTeamOptions opts)
     {
-        var cs = opts.CopilotStudio ?? new CopilotStudioTargetOptions();
+        var cs = opts.TargetOptionsFor<CopilotStudioTargetOptions>(Sut) ?? new CopilotStudioTargetOptions();
 
         // Consent gate — refuse BEFORE any build/network call.
         if (!cs.AckLiveSideEffects)
@@ -156,7 +156,7 @@ internal sealed class CopilotStudioRedTeamTarget : IRedTeamBuiltInTarget
             return _config;
         }
 
-        var configFile = opts.CopilotStudio?.ConfigFile
+        var configFile = opts.TargetOptionsFor<CopilotStudioTargetOptions>(Sut)?.ConfigFile
             ?? throw new InvalidOperationException("--sut copilot-studio requires --copilotstudio-config <file.json>.");
         return _config = CopilotStudioConfig.Load(configFile);
     }

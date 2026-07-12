@@ -3,6 +3,7 @@
 // Licensed under the MIT License.
 
 using System.CommandLine;
+using System.CommandLine.Parsing;
 using AgentEval.Core;
 using AgentEval.RedTeam;
 using AgentTrace = AgentEval.Tracing.AgentTrace;
@@ -22,6 +23,9 @@ internal sealed class GatekeeperDemoRedTeamTarget : IRedTeamBuiltInTarget
     public bool IncludeEvidence => true;
 
     public void AddOptionsTo(Command command) { /* no options of its own */ }
+
+    /// <summary>No flags of its own — nothing to bind.</summary>
+    public IRedTeamTargetOptions? BindOptions(ParseResult parseResult) => null;
 
     public string ResolvedName(RedTeamOptions opts) => "gatekeeper-demo";
 

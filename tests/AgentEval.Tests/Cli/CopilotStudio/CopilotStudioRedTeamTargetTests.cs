@@ -5,6 +5,7 @@
 using System.Runtime.CompilerServices;
 using AgentEval.Cli;
 using AgentEval.Cli.Commands;
+using AgentEval.Cli.Commands.RedTeamTargets;
 using AgentEval.Cli.CopilotStudio;
 using AgentEval.Core;
 using Microsoft.Agents.AI;
@@ -91,7 +92,10 @@ public class CopilotStudioRedTeamTargetTests
         string? attacks = null, int maxProbes = 0, string intensity = "moderate", FileInfo? output = null) => new()
     {
         Sut = sut,
-        CopilotStudio = new CopilotStudioTargetOptions { ConfigFile = config, AckLiveSideEffects = ackConsent, MaxCredits = 0 },
+        TargetOptions = new Dictionary<string, IRedTeamTargetOptions?>
+        {
+            ["copilot-studio"] = new CopilotStudioTargetOptions { ConfigFile = config, AckLiveSideEffects = ackConsent, MaxCredits = 0 },
+        },
         Parallelism = parallelism,
         Attacks = attacks,
         MaxProbes = maxProbes,
