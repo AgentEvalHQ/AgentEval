@@ -25,8 +25,8 @@ internal sealed record GateHistoryMessageDto(
 
 /// <summary>
 /// Maps the JSON history DTO to MEAI <see cref="ChatMessage"/>s the tool gates recompute from. MEAI content is not
-/// trivially JSON-round-trippable, so this mapping is hand-written and <b>fail-closed</b>: an unknown role or an
-/// entirely-empty message returns <c>null</c> (mapping failed) so the caller emits <c>GateInconclusive</c> (exit 6)
+/// trivially JSON-round-trippable, so this mapping is hand-written and <b>fail-closed</b>: an unknown role, an
+/// entirely-empty message, or one carrying more than one payload shape returns <c>null</c> (mapping failed) so the caller emits <c>GateInconclusive</c> (exit 6)
 /// rather than handing a gate an empty history it would read as "nothing to flag → Allow".
 /// </summary>
 internal static class GateHistoryMapper
@@ -46,6 +46,17 @@ internal static class GateHistoryMapper
             if (!TryRole(m.Role, out var role))
             {
                 error = $"unknown message role '{m.Role}' (expected user|assistant|tool|system)";
+                return null;
+            }
+
+            // Exactly one payload shape per message. Silently preferring one when several are set would drop the
+            // others and launder a caller mistake (e.g. text alongside a functionResult) — fail closed instead.
+            var shapes = (string.IsNullOrEmpty(m.Text) ? 0 : 1)
+                       + (m.FunctionCall is null ? 0 : 1)
+                       + (m.FunctionResult is null ? 0 : 1);
+            if (shapes > 1)
+            {
+                error = "history message must carry exactly one of text, functionCall, or functionResult";
                 return null;
             }
 

@@ -121,6 +121,15 @@ public class GatekeeperBridgeTests
         Assert.NotNull(err);
     }
 
+    [Fact]
+    public void HistoryMapper_MultiplePayloadShapes_FailsClosed()
+    {
+        // text alongside a functionResult is ambiguous — the mapper must not silently pick one and drop the other.
+        Assert.Null(GateHistoryMapper.ToChatMessages(
+            [new GateHistoryMessageDto("tool", Text: "here you go", FunctionResult: new FunctionResultDto("c1", "A-1042"))], out var err));
+        Assert.Contains("exactly one", err, StringComparison.OrdinalIgnoreCase);
+    }
+
     // ── Registry ──
 
     [Fact]
