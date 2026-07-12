@@ -25,7 +25,18 @@ internal static class ParseOnlyJudge
             return GateVerdict.Allow(policy);   // matches CompositeJudgeGate short-circuit — most turns cost nothing
         }
 
-        var verdict = rubric.Parse(modelReply) ?? JudgeVerdict.Inconclusive($"{rubric.Axis} rubric returned null");
+        JudgeVerdict verdict;
+        try
+        {
+            verdict = rubric.Parse(modelReply) ?? JudgeVerdict.Inconclusive($"{rubric.Axis} rubric returned null");
+        }
+        catch (Exception ex)
+        {
+            // a malformed/unsupported reply must degrade to Inconclusive (→ fail-closed Block below), matching
+            // CompositeJudgeGate.JudgeAsync — a bad --model-reply can never crash the CLI.
+            verdict = JudgeVerdict.Inconclusive($"{rubric.Axis} judge error: {ex.GetType().Name}");
+        }
+
         return verdict.Decision switch
         {
             // !(<) so a NaN confidence BLOCKS (fail-closed), matching CompositeJudgeGate
