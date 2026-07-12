@@ -1,6 +1,8 @@
 # CLI Reference
 
-AgentEval ships a CLI for managing the `.agenteval/` workspace from the terminal and CI/CD pipelines.
+AgentEval ships a CLI for managing the `.agenteval/` workspace from the terminal and CI/CD pipelines — and, via the
+`gatekeeper` verb group, a **language-neutral runtime-policy service** any process (Python, Node, bash, a CI step) can
+call for a versioned gate verdict + exit code.
 
 ## Installation
 
@@ -314,6 +316,7 @@ agenteval bench agentic calibrate [--root <path>] [--out <path>]
 **Notes**
 
 - `agenteval bench --list` prints the registry-backed family catalog.
+- **Exit codes:** `bench <family>` and `bench <regulation> calibrate` return **2** for a benchmark gate FAIL/WARN as well as for bad arguments (the BUG-22 overload — see [Exit codes](#exit-codes)); do not treat a `2` from these commands as only "invoked wrong".
 - Compliance and agentic families support calibration helpers where available.
 - Family-specific options and presets are documented under [Benchmarks](benchmarks.md) and the family pages in the TOC.
 - For the Trace Fidelity and AutoAudit families, see the GlassBox docs under `docs/GlassBox/` (now linked in the TOC).
@@ -367,7 +370,38 @@ agenteval redteam [--azure] [--endpoint <url>] [--model <name>] [--deployment-na
 | `--calibration` | Relative scoring against a reference cohort. |
 | `--explain` | Attach an LLM rationale to each finding (requires `--judge`). |
 
-For the full flag matrix and examples, see [Red Team Security](redteam.md).
+For the full flag matrix and examples, see [Red Team Security](redteam.md). Exit codes: see [Exit codes](#exit-codes).
+
+---
+
+### `agenteval gatekeeper`
+
+Run Gatekeeper runtime-enforcement gates from the terminal or any language — the same policy you red-team with,
+exposed as a **language-neutral policy service**. A process pipes a JSON payload to `gatekeeper inspect` and gets a
+versioned verdict JSON + an exit code; the deterministic gates need **no credentials** and are byte-stable, so they
+drop straight into CI.
+
+**Synopsis**
+
+```
+agenteval gatekeeper list-gates [--json] [--phase inspect|serve|all]
+agenteval gatekeeper inspect   --gate <id> [--input <file.jsonl>] [--policy block|warn] [gate flags] [model flags]
+agenteval gatekeeper calibrate --gate judge:<axis> <model flags> [--certify]
+agenteval gatekeeper serve                                # stub — not implemented
+```
+
+**Subcommands**
+
+| Subcommand | Purpose |
+|---|---|
+| `list-gates` | List every gate, its state class, whether it needs a model, and its span policy. |
+| `inspect` | Evaluate one JSON payload (stdin) or one per line (`--input` JSONL) against a gate/panel; emits a versioned verdict + exit code. |
+| `calibrate` | Score a `judge:<axis>` against its gold set + keyword-oracle baseline; `--certify` writes the certificate the honesty guard reads. |
+| `serve` | Reserved for stateful accumulator gates — **not implemented**. |
+
+`judge:*` gates read/write a per-model calibration certificate under `.agenteval/gatekeeper/certs/` (override with
+`--cert-dir`); the deterministic and tool gates are credential-free and CI-safe. For the full flag matrix, the verdict
+JSON contract, and the honesty guard, see [Gatekeeper from any language](gatekeeper-cli.md).
 
 ---
 
@@ -457,8 +491,33 @@ Prints `Errors: N | Warnings: N | OK: N` and exits `2` on any error.
 
 ---
 
+## Exit codes
+
+The CLI's exit-code contract, so CI can branch on the outcome. Source of truth: `src/AgentEval.Cli/ExitCodes.cs`.
+
+| Code | Meaning |
+|---|---|
+| `0` | Success — passed / allowed / no gate blocked. |
+| `1` | Test failure — one or more evaluations failed (`eval`, `redteam`). |
+| `2` | Usage error (bad flags). **Also** returned by `bench`/`bench <reg> calibrate` for a benchmark gate FAIL/WARN — the BUG-22 overload; `2` from those commands is not only "invoked wrong". |
+| `3` | Runtime error (connection/model/IO failure). |
+| `4` | Regression vs a supplied `--baseline` — `redteam --fail-on regression` gate (a NEW finding vs pre-existing). |
+| `5` | `gatekeeper inspect` — a gate **Blocked** on real evidence. |
+| `6` | `gatekeeper inspect` — **fail-closed**: the CLI could not evaluate (e.g. a history gate with no `messages`). Not a policy block. |
+| `7` | `gatekeeper inspect` — **not certified**: the honesty guard refused an un-calibrated judge (run `calibrate --certify`, or pass `--allow-uncalibrated`). |
+| `8` | **Reserved** (not emitted yet) — `redteam --sut copilot-studio` will return this when a live scan hits the `--max-credits` Copilot Credit budget cap (BudgetExceeded). The live connector and `--max-credits` enforcement are not implemented yet, so no current run can produce it. |
+
+`redteam` uses `1` for failure, `3` for runtime error, and `4` for a `--fail-on regression` gate. Code `8` is
+**reserved** for a live `--sut copilot-studio` scan that hits `--max-credits` (BudgetExceeded); the current scaffold
+defers the live connector and cap enforcement, so it is not emitted yet. `gatekeeper`'s `5/6/7` are deliberately
+distinct from the overloaded `2` — see [Gatekeeper from any language](gatekeeper-cli.md#exit-codes).
+
+---
+
 ## See Also
 
 - [Getting Started](getting-started.md) — C# library quickstart.
 - [The `.agenteval/` Workspace](agenteval-workspace.md) — canonical layout, schema versions, audit chain.
+- [Gatekeeper from any language](gatekeeper-cli.md) — the `gatekeeper` verb group, verdict JSON, and honesty guard.
+- [Gatekeeper (Runtime Enforcement)](gatekeeper/introduction.md) — the runtime enforcement middleware overview.
 - [Mission Control Getting Started](missioncontrol/getting-started.md) — the read-only web portal.
