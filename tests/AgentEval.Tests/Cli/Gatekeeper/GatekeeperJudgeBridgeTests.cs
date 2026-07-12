@@ -92,7 +92,14 @@ public class GatekeeperJudgeBridgeTests
 
         var https = GatekeeperModelResolver.Fingerprint("azure", "https://x.openai.azure.com", "m");
         var https443 = GatekeeperModelResolver.Fingerprint("azure", "https://x.openai.azure.com:443", "m");
+        var httpsSlash = GatekeeperModelResolver.Fingerprint("azure", "https://x.openai.azure.com/", "m");
         Assert.Equal(https, https443);                       // 443 is the https default → same endpoint
+        Assert.Equal(https, httpsSlash);                     // a trailing slash is normalized away
+
+        // Same host/port, different reverse-proxy base paths must NOT share a fingerprint (else a cert leaks across them).
+        var teamA = GatekeeperModelResolver.Fingerprint("openai", "https://proxy.example/team-a/v1", "m");
+        var teamB = GatekeeperModelResolver.Fingerprint("openai", "https://proxy.example/team-b/v1", "m");
+        Assert.NotEqual(teamA, teamB);
     }
 
     // ── calibrate (fake model → report + certificate) ──

@@ -130,6 +130,14 @@ public class GatekeeperBridgeTests
         Assert.Contains("exactly one", err, StringComparison.OrdinalIgnoreCase);
     }
 
+    [Fact]
+    public void HistoryMapper_WhitespaceOnlyText_FailsClosed()
+    {
+        // "   " is visually empty — it must not count as content (IsNullOrWhiteSpace), matching the empty-message intent.
+        Assert.Null(GateHistoryMapper.ToChatMessages([new GateHistoryMessageDto("user", Text: "   ")], out var err));
+        Assert.NotNull(err);
+    }
+
     // ── Registry ──
 
     [Fact]

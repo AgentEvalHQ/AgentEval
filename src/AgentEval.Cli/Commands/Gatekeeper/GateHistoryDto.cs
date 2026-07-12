@@ -51,7 +51,7 @@ internal static class GateHistoryMapper
 
             // Exactly one payload shape per message. Silently preferring one when several are set would drop the
             // others and launder a caller mistake (e.g. text alongside a functionResult) — fail closed instead.
-            var shapes = (string.IsNullOrEmpty(m.Text) ? 0 : 1)
+            var shapes = (string.IsNullOrWhiteSpace(m.Text) ? 0 : 1)
                        + (m.FunctionCall is null ? 0 : 1)
                        + (m.FunctionResult is null ? 0 : 1);
             if (shapes > 1)
@@ -64,7 +64,7 @@ internal static class GateHistoryMapper
             {
                 // A missing callId/name is structurally invalid — fail closed rather than coerce to empty strings
                 // (an empty callId could falsely "pair" with an empty-callId result and launder a taint/id check).
-                if (string.IsNullOrEmpty(fc.CallId) || string.IsNullOrEmpty(fc.Name))
+                if (string.IsNullOrWhiteSpace(fc.CallId) || string.IsNullOrWhiteSpace(fc.Name))
                 {
                     error = "functionCall requires a non-empty callId and name";
                     return null;
@@ -74,7 +74,7 @@ internal static class GateHistoryMapper
             }
             else if (m.FunctionResult is { } fr)
             {
-                if (string.IsNullOrEmpty(fr.CallId))
+                if (string.IsNullOrWhiteSpace(fr.CallId))
                 {
                     error = "functionResult requires a non-empty callId";
                     return null;
@@ -82,7 +82,7 @@ internal static class GateHistoryMapper
 
                 result.Add(new ChatMessage(role, [new FunctionResultContent(fr.CallId, fr.Result)]));
             }
-            else if (!string.IsNullOrEmpty(m.Text))
+            else if (!string.IsNullOrWhiteSpace(m.Text))
             {
                 result.Add(new ChatMessage(role, m.Text));
             }

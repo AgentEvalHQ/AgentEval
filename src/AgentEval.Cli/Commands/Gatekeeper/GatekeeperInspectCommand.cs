@@ -520,7 +520,8 @@ internal static class GatekeeperInspectCommand
 
     private static string NotCertifiedMsg(string axis, string fingerprint) =>
         $"  Error: axis '{axis}' is not certified inline-ready for model '{fingerprint}'. " +
-        $"Run: agenteval gatekeeper calibrate --gate judge:{axis} --model … --certify, or pass --allow-uncalibrated for advisory-only.";
+        $"Run: agenteval gatekeeper calibrate --gate judge:{axis} <model flags> --certify " +
+        "(e.g. --azure --deployment-name <d>, or --endpoint <url> --model <m>), or pass --allow-uncalibrated for advisory-only.";
 
     private static Option<string[]> MultiOpt(string name, string description) =>
         new(name) { Description = description, AllowMultipleArgumentsPerToken = true };

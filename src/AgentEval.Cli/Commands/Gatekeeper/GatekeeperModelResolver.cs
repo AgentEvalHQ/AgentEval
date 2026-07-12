@@ -81,16 +81,22 @@ internal static class GatekeeperModelResolver
         }
     }
 
-    /// <summary>A stable, secret-free fingerprint: <c>provider:authority:model@&lt;shorthash&gt;</c>.</summary>
+    /// <summary>A stable, secret-free fingerprint: <c>provider:authority+path:model@&lt;shorthash&gt;</c>.</summary>
     public static string Fingerprint(string provider, string? endpoint, string model)
     {
-        // Uri.Authority is host:port with default ports normalized away (443/80 omitted) and userinfo excluded,
-        // so localhost:8080 and localhost:8081 don't share a fingerprint (a cert can't leak across endpoints)
-        // while https://x and https://x:443 stay equal — and no secret ever enters the fingerprint.
-        var authority = Uri.TryCreate(endpoint, UriKind.Absolute, out var u) ? u.Authority : "env";
-        var raw = $"{provider}:{authority}:{model}";
+        // Uri.Authority is host:port with default ports normalized away (443/80 omitted) and userinfo excluded; we
+        // append the normalized path so both localhost:8080 vs :8081 AND same-host reverse-proxy base paths
+        // (…/team-a/v1 vs …/team-b/v1, which CreateOpenAICompatible honors) get distinct fingerprints — a cert can't
+        // leak across endpoints — while https://x, https://x:443 and a trailing slash stay equal. No secret enters it.
+        var endpointKey = "env";
+        if (Uri.TryCreate(endpoint, UriKind.Absolute, out var u))
+        {
+            endpointKey = u.Authority + u.AbsolutePath.TrimEnd('/');   // "/" and "/v1/" collapse to "" and "/v1"
+        }
+
+        var raw = $"{provider}:{endpointKey}:{model}";
         var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(raw)))[..12].ToLowerInvariant();
-        return $"{provider}:{authority}:{model}@{hash}";
+        return $"{provider}:{endpointKey}:{model}@{hash}";
     }
 
     private static string? Env(string key) => Environment.GetEnvironmentVariable(key);
