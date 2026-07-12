@@ -174,17 +174,18 @@ internal static class GatekeeperInspectCommand
     private static async Task<(GateVerdictDto verdict, int exit)> EvaluateOneAsync(
         string json, string gateId, string stateClass, IChatGate? chatGate, IToolGate? toolGate, CancellationToken ct)
     {
+        var policyName = chatGate?.PolicyName ?? toolGate?.PolicyName ?? gateId;   // the resolved gate's PolicyName
         var payload = InspectPayload.Parse(json, out var parseErr);
         if (payload is null)
         {
-            return (Structural(gateId, chatGate is not null ? "chat" : "tool", parseErr ?? "invalid payload"), CatStructural);
+            return (Structural(gateId, chatGate is not null ? "chat" : "tool", policyName, parseErr ?? "invalid payload"), CatStructural);
         }
 
         if (toolGate is not null)
         {
             if (string.IsNullOrEmpty(payload.Tool))
             {
-                return (Structural(gateId, "tool", "tool gate requires a 'tool' field in the payload"), CatStructural);
+                return (Structural(gateId, "tool", policyName, "tool gate requires a 'tool' field in the payload"), CatStructural);
             }
 
             IReadOnlyList<ChatMessage> messages;
@@ -214,7 +215,7 @@ internal static class GatekeeperInspectCommand
         // chat gate
         if (payload.Text is null)
         {
-            return (Structural(gateId, "chat", "chat gate requires a 'text' field in the payload"), CatStructural);
+            return (Structural(gateId, "chat", policyName, "chat gate requires a 'text' field in the payload"), CatStructural);
         }
 
         var cv = await chatGate!.InspectAsync(payload.Text, ct).ConfigureAwait(false);
@@ -225,12 +226,12 @@ internal static class GatekeeperInspectCommand
     // Single source of truth for verdict→exit mapping (Allow/Mutate→0, inconclusive→6, Block→5).
     private static int ExitOf(GateVerdictDto v) => v.ExitCode();
 
-    private static GateVerdictDto Structural(string gateId, string kind, string message) => new()
+    private static GateVerdictDto Structural(string gateId, string kind, string policy, string message) => new()
     {
         Gate = gateId,
         Kind = kind,
         Action = "Block",
-        Policy = gateId,
+        Policy = policy,   // the resolved gate's PolicyName (schema contract), not the raw gate id
         Reason = message,
         Inconclusive = true,
         Warning = $"structural: {message}",

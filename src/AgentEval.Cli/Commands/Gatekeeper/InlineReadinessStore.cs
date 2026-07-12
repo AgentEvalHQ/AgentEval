@@ -26,9 +26,16 @@ internal static class InlineReadinessStore
     /// <summary>Default cert directory under the workspace: <c>.agenteval/gatekeeper/certs</c>.</summary>
     public static string DefaultDir => Path.Combine(".agenteval", "gatekeeper", "certs");
 
-    /// <summary>The certificate path for an <c>(axis, fingerprint)</c> pair.</summary>
+    /// <summary>
+    /// The certificate path for an <c>(axis, fingerprint)</c> pair. The fingerprint is <b>hashed</b> into the
+    /// filename so a long user-supplied model/deployment name can't exceed the filesystem path limit — the full
+    /// fingerprint is still stored inside the cert and verified on load.
+    /// </summary>
     public static string PathFor(string axis, string fingerprint, string? dir = null) =>
-        Path.Combine(dir ?? DefaultDir, $"{Safe(axis)}@{Safe(fingerprint)}.json");
+        Path.Combine(dir ?? DefaultDir, $"{Safe(axis)}@{FingerprintHash(fingerprint)}.json");
+
+    private static string FingerprintHash(string fingerprint) =>
+        Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(fingerprint)))[..16].ToLowerInvariant();
 
     /// <summary>A stable hash of a gold set (axis + per-direction counts) so a cert is tied to the set it was scored on.</summary>
     public static string GoldSetHash(JudgeGoldSet gold)
