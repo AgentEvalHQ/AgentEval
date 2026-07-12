@@ -50,7 +50,7 @@ internal sealed class CopilotStudioRedTeamTarget : IRedTeamBuiltInTarget
     private readonly Option<int> _maxCreditsOpt = new("--max-credits")
     {
         DefaultValueFactory = _ => 0,
-        Description = "Cap the Copilot Credits a live --sut copilot-studio scan may spend (0 = no cap). Hitting the cap stops the scan with exit 8 (BudgetExceeded). Every turn burns credits, and a reasoning turn costs substantially more than a scripted one.",
+        Description = "Cap the Copilot Credits a live --sut copilot-studio scan may spend (0 = no cap). Enforcement is deferred with the live connector; once it ships, hitting the cap will stop the scan with exit 8 (BudgetExceeded). Every turn burns credits, and a reasoning turn costs substantially more than a scripted one.",
     };
 
     private CopilotStudioConfig? _config;   // memoized within one ExecuteAsync call (Validate -> ResolvedName -> Build)

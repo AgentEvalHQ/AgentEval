@@ -789,8 +789,9 @@ internal static class RedTeamCommand
     };
 
     /// <summary>
-    /// The built-in <c>--sut</c> targets, in <c>--sut</c>-value order. A fresh list per call so the option-holding
-    /// targets aren't shared across command builds; the dispatch (Validate/Build) reads only <see cref="RedTeamOptions"/>.
+    /// The built-in <c>--sut</c> targets (gatekeeper-demo — the credential-free demo — first, then copilot-studio; no
+    /// ordering is relied upon). A fresh list per call so the option-holding targets aren't shared across command
+    /// builds; the dispatch (Validate/Build) reads only <see cref="RedTeamOptions"/>.
     /// </summary>
     private static IReadOnlyList<IRedTeamBuiltInTarget> BuildBuiltInTargets() =>
         [new GatekeeperDemoRedTeamTarget(), new CopilotStudioRedTeamTarget()];
