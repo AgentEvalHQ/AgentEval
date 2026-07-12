@@ -73,6 +73,22 @@ public class CopilotStudioScaffoldTests
     }
 
     [Fact]
+    public void Config_Load_UnreadableFile_ThrowsWrapped()
+    {
+        // The file exists but is held with an exclusive lock → File.ReadAllText throws an IOException.
+        // Load must wrap it in a clear, path-tagged InvalidOperationException rather than leak the raw IO error.
+        var f = WriteTempJson("{ \"environmentId\": \"env-123\" }");
+        try
+        {
+            using var _ = new FileStream(f.FullName, FileMode.Open, FileAccess.Read, FileShare.None);
+            var ex = Assert.Throws<InvalidOperationException>(() => CopilotStudioConfig.Load(f));
+            Assert.Contains("could not be read", ex.Message, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains(f.Name, ex.Message);
+        }
+        finally { TryDelete(f); }
+    }
+
+    [Fact]
     public void Config_DisplayName_FallsBackToSchemaName()
     {
         var cfg = new CopilotStudioConfig { SchemaName = "cr1a2_agent", AgentName = null };

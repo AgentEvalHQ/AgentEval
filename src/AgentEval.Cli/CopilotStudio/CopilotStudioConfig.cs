@@ -50,10 +50,20 @@ internal sealed record CopilotStudioConfig
             throw new InvalidOperationException($"Copilot Studio config file not found: {file.FullName}");
         }
 
+        string json;
+        try
+        {
+            json = File.ReadAllText(file.FullName);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            throw new InvalidOperationException($"Copilot Studio config file could not be read ({file.Name}): {ex.Message}", ex);
+        }
+
         CopilotStudioConfig? cfg;
         try
         {
-            cfg = JsonSerializer.Deserialize<CopilotStudioConfig>(File.ReadAllText(file.FullName), JsonOpts);
+            cfg = JsonSerializer.Deserialize<CopilotStudioConfig>(json, JsonOpts);
         }
         catch (JsonException ex)
         {
