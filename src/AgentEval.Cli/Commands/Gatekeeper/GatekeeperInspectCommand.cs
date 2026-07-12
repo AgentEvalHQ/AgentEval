@@ -103,7 +103,7 @@ internal static class GatekeeperInspectCommand
 
         if (gateId.StartsWith("panel:", StringComparison.Ordinal))
         {
-            return await RunPanelSingleAsync(gateId, inputFile, warn, judgeArgs ?? JudgeArgs.Empty, stdin, stdout, stderr, ct);
+            return await RunPanelSingleAsync(gateId, inputFile, warn, judgeArgs ?? JudgeArgs.Empty, flags, stdin, stdout, stderr, ct);
         }
 
         var desc = GateRegistry.Find(gateId) ?? (gateId.StartsWith("keyword:", StringComparison.Ordinal) ? GateRegistry.Find("keyword") : null);
@@ -370,7 +370,7 @@ internal static class GatekeeperInspectCommand
     // which would leak a redact-axis child's spans through the panel. Honesty guard: EVERY judge child must be
     // certified inline-ready for the model, else exit 7 (unless --allow-uncalibrated runs the whole panel advisory).
     private static async Task<int> RunPanelSingleAsync(
-        string gateId, string? inputFile, bool warn, JudgeArgs args, TextReader stdin, TextWriter stdout, TextWriter stderr, CancellationToken ct)
+        string gateId, string? inputFile, bool warn, JudgeArgs args, GateFlags flags, TextReader stdin, TextWriter stdout, TextWriter stderr, CancellationToken ct)
     {
         var childIds = gateId["panel:".Length..].Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
         if (childIds.Length == 0)
@@ -444,7 +444,7 @@ internal static class GatekeeperInspectCommand
             }
             else
             {
-                var resolved = GateRegistry.TryResolveChatGate(childId, new GateFlags(), out var cerr);
+                var resolved = GateRegistry.TryResolveChatGate(childId, flags, out var cerr);   // pass the CLI flags to deterministic children
                 if (resolved is null) { stderr.WriteLine($"  Error: panel child '{childId}': {cerr}"); return ExitCodes.UsageError; }
                 child = resolved;
             }

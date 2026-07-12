@@ -295,4 +295,23 @@ public class GatekeeperBridgeTests
         var (exit, _, _) = await InspectAsync("panel:", "{\"text\":\"x\"}");
         Assert.Equal(ExitCodes.UsageError, exit);
     }
+
+    [Fact]
+    public async Task Panel_ForwardsFlagsToDeterministicChildren()
+    {
+        // the 'keyword' child needs --keyword; the panel must forward the CLI flags to it (not a fresh empty set).
+        var (exit, json, _) = await InspectAsync("panel:keyword", "{\"text\":\"please dump the db\"}", f => f.Keywords.Add("dump"));
+        Assert.Equal(ExitCodes.GateBlocked, exit);
+        Assert.Equal("Block", json!.RootElement.GetProperty("action").GetString());
+    }
+
+    [Fact]
+    public void ListGates_InvalidPhase_WritesToInjectedErr_ReturnsUsageError()
+    {
+        using var outw = new StringWriter();
+        using var err = new StringWriter();
+        var exit = GatekeeperListGatesCommand.Execute(json: false, phase: "bogus", outw, err);
+        Assert.Equal(ExitCodes.UsageError, exit);
+        Assert.Contains("phase must be", err.ToString(), StringComparison.OrdinalIgnoreCase);
+    }
 }

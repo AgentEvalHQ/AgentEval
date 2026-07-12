@@ -30,12 +30,13 @@ internal static class GatekeeperListGatesCommand
         return cmd;
     }
 
-    internal static int Execute(bool json, string phase, TextWriter outw)
+    internal static int Execute(bool json, string phase, TextWriter outw, TextWriter? err = null)
     {
+        err ??= Console.Error;
         var p = (phase ?? "all").Trim().ToLowerInvariant();
         if (p is not ("all" or "inspect" or "serve"))
         {
-            Console.Error.WriteLine($"  Error: --phase must be inspect | serve | all (got '{phase}').");
+            err.WriteLine($"  Error: --phase must be inspect | serve | all (got '{phase}').");
             return ExitCodes.UsageError;
         }
 
