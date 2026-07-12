@@ -68,6 +68,20 @@ public class GatekeeperBridgeTests
         Assert.True(doc.RootElement.TryGetProperty("inlineReady", out var ir) && ir.ValueKind == JsonValueKind.Null);
     }
 
+    [Fact]
+    public void ToJson_EscapesHtmlSensitiveChars_InAttackerInfluencedText()
+    {
+        // A matched span is attacker-influenced and the verdict JSON often lands in a CI log or dashboard, so the
+        // (default, HTML-safe) encoder must escape '<' rather than emit it raw — no <script> can survive verbatim.
+        var dto = GateVerdictDto.FromChat(
+            GateVerdict.Block("keyword-oracle", "match", new[] { "<script>alert(1)</script>" }), "keyword-injection");
+        var raw = dto.ToJson(indented: false);
+        Assert.DoesNotContain("<script>", raw);
+        Assert.Contains("\\u003C", raw);                 // '<' is escaped
+        Assert.Equal("<script>alert(1)</script>",        // …and still round-trips to the original string
+            JsonDocument.Parse(raw).RootElement.GetProperty("matches")[0].GetString());
+    }
+
     // ── History mapper: fail-closed ──
 
     [Fact]

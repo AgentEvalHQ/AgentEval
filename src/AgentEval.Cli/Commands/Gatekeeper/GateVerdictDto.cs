@@ -28,7 +28,10 @@ internal sealed record GateVerdictDto
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
         DefaultIgnoreCondition = JsonIgnoreCondition.Never,   // preserve nulls → the schema stays fixed
-        Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
+        // Default (HTML-safe) encoder on purpose: a verdict's reason/matches can carry attacker-influenced text
+        // (e.g. a matched keyword), and the JSON often lands in a CI log or dashboard. The relaxed encoder would
+        // leave <, >, & unescaped; the default escapes them. Consumers parse the JSON, so < vs < is identical
+        // to them — there is no functional need for relaxed escaping here, only added HTML-embedding risk.
     };
 
     private static readonly JsonSerializerOptions Pretty = new(Compact) { WriteIndented = true };
