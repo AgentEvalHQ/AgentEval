@@ -1,10 +1,11 @@
 {
   "mcpServers": {
     "maf-doctor": {
-      "type": "stdio",
       "command": "maf-doctor",
       "args": [],
-      "env": {}
+      "env": {
+        "MAF_DOCTOR_INIT_VERSION": "1.9.0"
+      }
     }
   }
 }
