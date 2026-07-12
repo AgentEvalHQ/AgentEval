@@ -22,14 +22,12 @@ and the maf-doctor registry is kept current via an AI-fill loop.
 
 3. **To fix issues** — `MafAutoFixAll --dry-run` then apply handles the
    *mechanical* rules deterministically (offer this first; the rewrites are
-   tested). To fix **everything**, run the `maf-remediate` prompt (or just
-   ask "fix all the issues maf-doctor found"): it grades → plans → autofixes
-   → then works each semantic finding. Every finding carries a **`confidence`**
-   (`certain` / `high` / `heuristic`); a **`heuristic`** finding may be a
-   **false positive** — confirm it with `MafExplainFinding` before editing.
-   Get the plan via `MafDoctor(format: "plan")` (human) or `--plan --json`
-   (structured manifest); per-rule fix + false-positive guidance lives in the
-   `maf-remediation-playbook` skill.
+   tested). For the rest, just ask "fix all the issues maf-doctor found" —
+   grade → plan (`MafDoctor(format: "plan")` human, or `--plan --json` for a
+   structured manifest) → autofix → then work each semantic finding. Every
+   finding carries a **`confidence`** (`certain` / `high` / `heuristic`); a
+   **`heuristic`** finding may be a **false positive** — confirm it with
+   `MafExplainFinding` before editing.
 
 4. **When designing a new MAF agent or workflow** — call `MafNewAgent` /
    `MafNewExecutor` for scaffolds, or `MafSimulateWorkflow` for topology
@@ -41,10 +39,9 @@ and the maf-doctor registry is kept current via an AI-fill loop.
 
 6. **To migrate FROM Semantic Kernel TO MAF** (a cross-framework port, NOT a
    MAF version bump) — call `MafDetectSourceFramework` (CLI:
-   `maf-doctor migrate-scan`) to inventory SK usage and scope it, then run the
-   `maf-migrate-from` prompt or the `@maf-cross-migration` agent. It scaffolds a
-   **new MAF project beside the original** and ports it construct-by-construct,
-   non-destructively. The mapping lives at `maf://migrate-from?source=semantic-kernel`.
+   `maf-doctor migrate-scan`) to inventory SK usage, tag each construct by
+   migration strategy (bridgeable / rewrite / re-architect), and get a
+   complexity verdict before scoping the port.
 
 maf-doctor tools are MAF-version-aware via `applies_to_codebases` markers
 in the registry — they know which fix applies to which MAF version. Defer to
