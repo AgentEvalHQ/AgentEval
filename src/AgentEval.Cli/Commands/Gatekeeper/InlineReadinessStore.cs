@@ -49,7 +49,10 @@ internal static class InlineReadinessStore
             sb.Append(c.ShouldBlock ? '1' : '0').Append('|').Append(c.Text).Append('\n');
         }
 
-        return "sha256:" + Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(sb.ToString())))[..16].ToLowerInvariant();
+        // Full digest (not truncated): this value is surfaced verbatim in the certificate/provenance, so the "sha256:"
+        // label must be honest. Unlike the fingerprint FILENAME hash it isn't path-length bounded, so there's no reason
+        // to shorten it — the full digest also removes any (already-tiny) truncated-collision risk.
+        return "sha256:" + Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(sb.ToString()))).ToLowerInvariant();
     }
 
     /// <summary>Load the certificate matching <c>(axis, fingerprint)</c>, or null if none / unreadable.</summary>
