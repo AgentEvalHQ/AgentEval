@@ -225,7 +225,7 @@ public class GatekeeperJudgeBridgeTests
     private static void TryDelete(string dir)
     {
         try { if (Directory.Exists(dir)) { Directory.Delete(dir, recursive: true); } }
-        catch (IOException) { /* best-effort temp cleanup */ }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { /* best-effort temp cleanup */ }
     }
 
     // A deterministic fake model: returns the gold label for whichever gold case's text is embedded in the prompt,

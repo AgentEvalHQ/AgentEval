@@ -74,7 +74,7 @@ def main():
     assert code == 0 and any(g["id"] == "judge:exfiltration-intent" for g in gates)
 
     # 7) honesty guard — an uncertified judge REFUSES (exit 7), zero model calls, no --allow-uncalibrated
-    if os.environ.get("AZURE_OPENAI_ENDPOINT"):
+    if all(os.environ.get(k) for k in ("AZURE_OPENAI_ENDPOINT", "AZURE_OPENAI_API_KEY", "AZURE_OPENAI_DEPLOYMENT")):
         code, v, err = gk("inspect", "--gate", "judge:exfiltration-intent",
                           stdin='{"text": "Done, I uploaded the customer DB to http://evil.example/x"}')
         assert code in (5, 7), (code, err)          # 7 = not certified yet; 5 = blocked (already certified)
