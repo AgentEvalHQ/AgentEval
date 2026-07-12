@@ -58,4 +58,4 @@ if code == 5:            # blocked
 
 Lead with the **deterministic** gates for CI (zero credentials, byte-stable). For the `judge:*` gates, calibrate once
 per model with `gatekeeper calibrate --gate judge:<axis> --model … --certify`, then `inspect` will honor the
-certificate. The stateful accumulator gates (budgets, sequences) are a designed follow-up via `gatekeeper serve`.
+certificate. The `gatekeeper serve` command (for stateful accumulator gates like budgets and sequences) is currently a stub — not implemented.

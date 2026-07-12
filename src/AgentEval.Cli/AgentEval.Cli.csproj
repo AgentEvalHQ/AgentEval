@@ -89,8 +89,9 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- The versioned gatekeeper verdict JSON schema ships beside the binary so non-.NET consumers can validate. -->
-    <Content Include="Schemas/gatekeeper-verdict.schema.json" CopyToOutputDirectory="PreserveNewest" />
+    <!-- The versioned gatekeeper verdict JSON schema ships beside the binary so non-.NET consumers can validate.
+         CopyToPublishDirectory too, so `dotnet publish` / tool packaging carries it, not just plain build output. -->
+    <Content Include="Schemas/gatekeeper-verdict.schema.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>

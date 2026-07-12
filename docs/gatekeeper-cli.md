@@ -12,7 +12,7 @@ The deterministic gates need **no credentials** and are byte-stable, so they dro
 agenteval gatekeeper list-gates [--json] [--phase inspect|serve|all]
 agenteval gatekeeper inspect  --gate <id> [--input <file.jsonl>] [--policy block|warn] [gate flags] [model flags]
 agenteval gatekeeper calibrate --gate judge:<axis> <model flags> [--certify] [--min-cases-per-direction N] …
-agenteval gatekeeper serve                               # deferred (stateful accumulator gates)
+agenteval gatekeeper serve                               # stub — not implemented
 ```
 
 `inspect` reads one JSON object from **stdin** (single) or one per line from `--input <file>.jsonl` (batch). Batch

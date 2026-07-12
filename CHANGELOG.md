@@ -26,7 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   baseline (honoring `--min-cases-per-direction` / `--max-concurrency` via the harness directly) and writes the
   certificate. `--model-reply <file>` evaluates a caller-supplied model reply with **no model call** and can never
   claim `inlineReady:true` without an explicit `--attest-fingerprint` (unknown provenance ⇒ advisory).
-  The stateful accumulator gates arrive via `serve` (deferred, stubbed).
+  The `serve` command (stateful accumulator gates like budgets and sequences) is a stub — not implemented.
 - **`panel:<a,b,…>`** — a CLI-owned fan-out over comma-listed child gates (fail-closed OR). The CLI runs the children
   itself (not `ParallelJudgeFanOut`'s flattened aggregate) so it applies the sensitive-span redaction **per child**
   before aggregating — a redact-axis child never leaks its spans through the panel. The honesty guard requires **every**
