@@ -77,4 +77,14 @@ public static class ExitCodes
     /// of 2 (the BUG-22 lesson).
     /// </summary>
     public const int NotCertified = 7;
+
+    // ── copilot studio live red-team target (0–7 above are taken; 8+ for new gated capabilities) ──
+
+    /// <summary>
+    /// <c>redteam --sut copilot-studio</c>: the run stopped because it hit the <c>--max-credits</c> budget cap — a
+    /// live Copilot Studio target burns Copilot Credits on every turn, so the scan is capped to a spend ceiling.
+    /// Distinct from a policy/gate outcome (5/6/7) and from <see cref="RuntimeError"/> (3, a crash) so CI can tell
+    /// "raise the budget / it cost more than expected" apart from a failure. Deliberately 8, not another overload of 2.
+    /// </summary>
+    public const int BudgetExceeded = 8;
 }
