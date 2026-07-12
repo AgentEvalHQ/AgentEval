@@ -102,7 +102,7 @@ internal static class GatekeeperInspectCommand
 
         if (gateId.StartsWith("panel:", StringComparison.Ordinal))
         {
-            return await RunPanelSingleAsync(gateId, warn, judgeArgs ?? JudgeArgs.Empty, stdin, stdout, stderr, ct);
+            return await RunPanelSingleAsync(gateId, inputFile, warn, judgeArgs ?? JudgeArgs.Empty, stdin, stdout, stderr, ct);
         }
 
         var desc = GateRegistry.Find(gateId) ?? (gateId.StartsWith("keyword:", StringComparison.Ordinal) ? GateRegistry.Find("keyword") : null);
@@ -141,7 +141,9 @@ internal static class GatekeeperInspectCommand
             var json = await stdin.ReadToEndAsync(ct).ConfigureAwait(false);
             var (verdict, exit) = await EvaluateOneAsync(json, gateId, stateClass, chatGate, toolGate, ct).ConfigureAwait(false);
             stdout.WriteLine(verdict.ToJson(indented: true));
-            return warn ? ExitCodes.Success : exit;
+            // warn suppresses policy outcomes (Block/Inconclusive) but NOT a structural/usage error — a malformed
+            // payload is the caller's mistake, which they should see even in advisory mode.
+            return warn && exit != CatStructural ? ExitCodes.Success : exit;
         }
 
         // Batch: one payload per line → one compact verdict per line (JSONL), aggregate exit. Streamed line-by-line
@@ -165,7 +167,8 @@ internal static class GatekeeperInspectCommand
             return ExitCodes.UsageError;
         }
 
-        return warn ? ExitCodes.Success : worst;
+        // warn suppresses policy outcomes but not a structural/usage error (a malformed line stays exit 2).
+        return warn && worst != CatStructural ? ExitCodes.Success : worst;
     }
 
     private static async Task<(GateVerdictDto verdict, int exit)> EvaluateOneAsync(
@@ -365,12 +368,18 @@ internal static class GatekeeperInspectCommand
     // which would leak a redact-axis child's spans through the panel. Honesty guard: EVERY judge child must be
     // certified inline-ready for the model, else exit 7 (unless --allow-uncalibrated runs the whole panel advisory).
     private static async Task<int> RunPanelSingleAsync(
-        string gateId, bool warn, JudgeArgs args, TextReader stdin, TextWriter stdout, TextWriter stderr, CancellationToken ct)
+        string gateId, string? inputFile, bool warn, JudgeArgs args, TextReader stdin, TextWriter stdout, TextWriter stderr, CancellationToken ct)
     {
         var childIds = gateId["panel:".Length..].Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
         if (childIds.Length == 0)
         {
             stderr.WriteLine("  Error: a panel needs at least one child, e.g. panel:keyword-injection,judge:exfiltration-intent");
+            return ExitCodes.UsageError;
+        }
+
+        if (inputFile is not null)
+        {
+            stderr.WriteLine("  Error: panel gates in --input batch are not supported in this build (single stdin payload only).");
             return ExitCodes.UsageError;
         }
 
@@ -421,7 +430,8 @@ internal static class GatekeeperInspectCommand
         // ── run each child; apply per-child redaction BEFORE aggregating; fail-closed OR ──
         var reasons = new List<string>();
         var matches = new List<string>();
-        var anyBlock = false;
+        var anyBlock = false;   // a child returned Block on real evidence → policy block (5)
+        var anyError = false;   // a child could not evaluate → fail-closed, but INCONCLUSIVE (6), not a policy block
         foreach (var childId in childIds)
         {
             IChatGate child;
@@ -447,7 +457,11 @@ internal static class GatekeeperInspectCommand
             }
             catch (Exception ex)
             {
-                cv = GateVerdict.Block(child.PolicyName, $"child errored (fail-closed): {ex.GetType().Name}");
+                // fail-closed on a child that could not evaluate — but this is an evaluation error, tracked
+                // separately so it maps to 6 (fail-closed), not 5 (a real policy block).
+                anyError = true;
+                reasons.Add($"{child.PolicyName}: child errored (fail-closed): {ex.GetType().Name}");
+                continue;
             }
 
             if (cv.Action != GateAction.Block)
@@ -465,21 +479,25 @@ internal static class GatekeeperInspectCommand
             }
         }
 
+        var blocked = anyBlock || anyError;
+        var inconclusive = anyError && !anyBlock;   // a real block dominates an evaluation error
         var dto = new GateVerdictDto
         {
             Gate = gateId,
             Kind = "chat",
-            Action = anyBlock ? "Block" : "Allow",
+            Action = blocked ? "Block" : "Allow",
             Policy = "judge-panel",
             Axis = null,
-            Reason = anyBlock ? string.Join("; ", reasons) : null,
+            Reason = blocked ? string.Join("; ", reasons) : null,
             Matches = matches.Count > 0 ? matches.Distinct(StringComparer.Ordinal).ToList() : null,
             InlineReady = inlineReady,
             Warning = warning,
+            Inconclusive = inconclusive,
             Certificate = provenances.Count > 0 ? provenances : null,
         };
         stdout.WriteLine(dto.ToJson(indented: true));
-        return warn ? ExitCodes.Success : (anyBlock ? ExitCodes.GateBlocked : ExitCodes.Success);
+        var exit = anyBlock ? ExitCodes.GateBlocked : anyError ? ExitCodes.GateInconclusive : ExitCodes.Success;
+        return warn ? ExitCodes.Success : exit;
     }
 
     private static CertProvenance Provenance(CalibrationCertificate c) =>

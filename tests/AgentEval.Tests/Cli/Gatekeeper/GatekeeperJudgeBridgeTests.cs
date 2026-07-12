@@ -118,20 +118,30 @@ public class GatekeeperJudgeBridgeTests
     [Fact]
     public async Task JudgeReply_NoAttestation_IsAdvisory_NeverInlineReady()
     {
-        var (exit, json, _) = await InspectJudgeReplyAsync("judge:exfiltration-intent", ExfilText, ExfilBlockReply,
-            attestFingerprint: null, allowUncalibrated: false, certDir: TempDir());
-        Assert.Equal(ExitCodes.GateBlocked, exit);                          // the verdict is Block…
-        Assert.False(json!.RootElement.GetProperty("inlineReady").GetBoolean());   // …but never inline-ready without attestation
-        Assert.Contains("advisory", json.RootElement.GetProperty("warning").GetString()!, StringComparison.OrdinalIgnoreCase);
+        var dir = TempDir();
+        try
+        {
+            var (exit, json, _) = await InspectJudgeReplyAsync("judge:exfiltration-intent", ExfilText, ExfilBlockReply,
+                attestFingerprint: null, allowUncalibrated: false, certDir: dir);
+            Assert.Equal(ExitCodes.GateBlocked, exit);                          // the verdict is Block…
+            Assert.False(json!.RootElement.GetProperty("inlineReady").GetBoolean());   // …but never inline-ready without attestation
+            Assert.Contains("advisory", json.RootElement.GetProperty("warning").GetString()!, StringComparison.OrdinalIgnoreCase);
+        }
+        finally { TryDelete(dir); }
     }
 
     [Fact]
     public async Task JudgeReply_Attest_NoCertificate_Refuses_Exit7()
     {
-        var (exit, _, err) = await InspectJudgeReplyAsync("judge:exfiltration-intent", ExfilText, ExfilBlockReply,
-            attestFingerprint: "azure:h:m@nope", allowUncalibrated: false, certDir: TempDir());
-        Assert.Equal(ExitCodes.NotCertified, exit);                         // 7 — not 2, not 5
-        Assert.Contains("not certified", err, StringComparison.OrdinalIgnoreCase);
+        var dir = TempDir();
+        try
+        {
+            var (exit, _, err) = await InspectJudgeReplyAsync("judge:exfiltration-intent", ExfilText, ExfilBlockReply,
+                attestFingerprint: "azure:h:m@nope", allowUncalibrated: false, certDir: dir);
+            Assert.Equal(ExitCodes.NotCertified, exit);                         // 7 — not 2, not 5
+            Assert.Contains("not certified", err, StringComparison.OrdinalIgnoreCase);
+        }
+        finally { TryDelete(dir); }
     }
 
     [Fact]
@@ -157,10 +167,15 @@ public class GatekeeperJudgeBridgeTests
     [Fact]
     public async Task JudgeReply_AllowUncalibrated_RunsAdvisory()
     {
-        var (exit, json, _) = await InspectJudgeReplyAsync("judge:exfiltration-intent", ExfilText, ExfilBlockReply,
-            attestFingerprint: "azure:h:m@nope", allowUncalibrated: true, certDir: TempDir());
-        Assert.Equal(ExitCodes.GateBlocked, exit);                          // runs (not refused)…
-        Assert.False(json!.RootElement.GetProperty("inlineReady").GetBoolean());   // …advisory only
+        var dir = TempDir();
+        try
+        {
+            var (exit, json, _) = await InspectJudgeReplyAsync("judge:exfiltration-intent", ExfilText, ExfilBlockReply,
+                attestFingerprint: "azure:h:m@nope", allowUncalibrated: true, certDir: dir);
+            Assert.Equal(ExitCodes.GateBlocked, exit);                          // runs (not refused)…
+            Assert.False(json!.RootElement.GetProperty("inlineReady").GetBoolean());   // …advisory only
+        }
+        finally { TryDelete(dir); }
     }
 
     private static void TryDelete(string dir)
