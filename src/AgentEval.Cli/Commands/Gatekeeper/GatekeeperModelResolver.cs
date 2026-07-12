@@ -74,13 +74,16 @@ internal static class GatekeeperModelResolver
         }
     }
 
-    /// <summary>A stable, secret-free fingerprint: <c>provider:host:model@&lt;shorthash&gt;</c>.</summary>
+    /// <summary>A stable, secret-free fingerprint: <c>provider:authority:model@&lt;shorthash&gt;</c>.</summary>
     public static string Fingerprint(string provider, string? endpoint, string model)
     {
-        var host = Uri.TryCreate(endpoint, UriKind.Absolute, out var u) ? u.Host : "env";
-        var raw = $"{provider}:{host}:{model}";
+        // Uri.Authority is host:port with default ports normalized away (443/80 omitted) and userinfo excluded,
+        // so localhost:8080 and localhost:8081 don't share a fingerprint (a cert can't leak across endpoints)
+        // while https://x and https://x:443 stay equal — and no secret ever enters the fingerprint.
+        var authority = Uri.TryCreate(endpoint, UriKind.Absolute, out var u) ? u.Authority : "env";
+        var raw = $"{provider}:{authority}:{model}";
         var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(raw)))[..12].ToLowerInvariant();
-        return $"{provider}:{host}:{model}@{hash}";
+        return $"{provider}:{authority}:{model}@{hash}";
     }
 
     private static string? Env(string key) => Environment.GetEnvironmentVariable(key);

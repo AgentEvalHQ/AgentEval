@@ -63,6 +63,20 @@ public class GatekeeperJudgeBridgeTests
         finally { TryDelete(dir); }
     }
 
+    [Fact]
+    public void Fingerprint_DistinguishesEndpointsByPort_NormalizesDefaultPort()
+    {
+        // Two local model servers on different ports must NOT share a fingerprint — else a cert calibrated for
+        // one endpoint would be honored for the other. But scheme-default ports must normalize away.
+        var p8080 = GatekeeperModelResolver.Fingerprint("local", "http://localhost:8080", "m");
+        var p8081 = GatekeeperModelResolver.Fingerprint("local", "http://localhost:8081", "m");
+        Assert.NotEqual(p8080, p8081);
+
+        var https = GatekeeperModelResolver.Fingerprint("azure", "https://x.openai.azure.com", "m");
+        var https443 = GatekeeperModelResolver.Fingerprint("azure", "https://x.openai.azure.com:443", "m");
+        Assert.Equal(https, https443);                       // 443 is the https default → same endpoint
+    }
+
     // ── calibrate (fake model → report + certificate) ──
 
     [Fact]
