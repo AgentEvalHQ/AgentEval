@@ -17,7 +17,7 @@
     "matches": { "type": ["array", "null"], "items": { "type": "string" }, "description": "Evidence spans. ALWAYS null for 'exfiltration-intent' and 'system-prompt-extraction' (the phrase may be the secret), including via a panel." },
     "redactedText": { "type": ["string", "null"], "description": "A masked, SAFE replacement (e.g. rendered-exfil's neutralized output). null for the two redact judge axes and when the gate set none." },
     "inlineReady": { "type": ["boolean", "null"], "description": "Judge gates only. From the calibration certificate. null (N/A) for deterministic gates." },
-    "inconclusive": { "type": "boolean", "description": "true when the outcome is a fail-closed abstention (judge inconclusive, or the CLI could not reconstruct required inputs)." },
+    "inconclusive": { "type": "boolean", "description": "true only when the CLI itself could not evaluate the gate and failed closed (required history missing/unmappable, a panel child errored, or an unmapped gate action) -> exit 6. A judge's own inconclusive verdict fails closed to a Block (exit 5) instead, so it does not set this." },
     "warning": { "type": ["string", "null"], "description": "e.g. 'uncalibrated — advisory only', 'fail-closed: required history missing'." },
     "confidence": { "type": ["number", "null"], "description": "Always null in v1 (collapsed at the IChatGate boundary; a schema-consistency choice)." },
     "certificate": {
