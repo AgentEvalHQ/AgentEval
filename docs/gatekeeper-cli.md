@@ -36,7 +36,7 @@ One object per `inspect` (JSONL for `--input`). Schema: [`schemas/gatekeeper-ver
 { "schemaVersion":"1.0", "gate":"keyword-injection", "kind":"chat", "action":"Block",
   "policy":"keyword-oracle", "axis":null, "reason":"keyword match: 'ignore previous'",
   "matches":["ignore previous"], "redactedText":null, "inlineReady":null, "inconclusive":false,
-  "warning":null, "confidence":null, "certificate":null }
+  "warning":null, "confidence":null, "certificate":null, "newArguments":null }
 ```
 
 Security: for the `exfiltration-intent` and `system-prompt-extraction` axes the offending phrase may *be* the secret,
