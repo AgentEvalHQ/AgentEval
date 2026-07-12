@@ -8,11 +8,12 @@ reference, no FFI, no model for the deterministic gates.
 
 ## Run
 
-Against a built CLI:
+Against a locally built CLI (after `dotnet build src/AgentEval.Cli`) — `AGENTEVAL_BIN` points at the built
+`AgentEval.Cli.dll` (its path varies by build config and target framework, so let the shell find it):
 
 ```bash
-# from the repo root, after `dotnet build src/AgentEval.Cli`
-AGENTEVAL_BIN="dotnet src/AgentEval.Cli/bin/Debug/net8.0/AgentEval.Cli.dll" \
+# from the repo root
+AGENTEVAL_BIN="dotnet $(ls src/AgentEval.Cli/bin/*/*/AgentEval.Cli.dll | head -1)" \
   python samples/interop/python/gatekeeper_smoke.py
 ```
 

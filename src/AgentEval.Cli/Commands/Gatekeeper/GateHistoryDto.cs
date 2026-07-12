@@ -51,11 +51,25 @@ internal static class GateHistoryMapper
 
             if (m.FunctionCall is { } fc)
             {
-                result.Add(new ChatMessage(role, [new FunctionCallContent(fc.CallId ?? string.Empty, fc.Name ?? string.Empty, arguments: null)]));
+                // A missing callId/name is structurally invalid — fail closed rather than coerce to empty strings
+                // (an empty callId could falsely "pair" with an empty-callId result and launder a taint/id check).
+                if (string.IsNullOrEmpty(fc.CallId) || string.IsNullOrEmpty(fc.Name))
+                {
+                    error = "functionCall requires a non-empty callId and name";
+                    return null;
+                }
+
+                result.Add(new ChatMessage(role, [new FunctionCallContent(fc.CallId, fc.Name, arguments: null)]));
             }
             else if (m.FunctionResult is { } fr)
             {
-                result.Add(new ChatMessage(role, [new FunctionResultContent(fr.CallId ?? string.Empty, fr.Result)]));
+                if (string.IsNullOrEmpty(fr.CallId))
+                {
+                    error = "functionResult requires a non-empty callId";
+                    return null;
+                }
+
+                result.Add(new ChatMessage(role, [new FunctionResultContent(fr.CallId, fr.Result)]));
             }
             else if (!string.IsNullOrEmpty(m.Text))
             {

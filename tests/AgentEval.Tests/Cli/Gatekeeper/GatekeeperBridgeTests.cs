@@ -99,6 +99,28 @@ public class GatekeeperBridgeTests
         Assert.NotNull(err);
     }
 
+    [Fact]
+    public void HistoryMapper_FunctionCallMissingCallIdOrName_FailsClosed()
+    {
+        // A missing callId/name is structurally invalid — must fail closed, not coerce to an empty-callId call that
+        // could falsely pair with an empty-callId result and launder a taint / referential-integrity check.
+        Assert.Null(GateHistoryMapper.ToChatMessages(
+            [new GateHistoryMessageDto("assistant", FunctionCall: new FunctionCallDto(CallId: null, Name: "lookup"))], out var e1));
+        Assert.NotNull(e1);
+
+        Assert.Null(GateHistoryMapper.ToChatMessages(
+            [new GateHistoryMessageDto("assistant", FunctionCall: new FunctionCallDto(CallId: "c1", Name: null))], out var e2));
+        Assert.NotNull(e2);
+    }
+
+    [Fact]
+    public void HistoryMapper_FunctionResultMissingCallId_FailsClosed()
+    {
+        Assert.Null(GateHistoryMapper.ToChatMessages(
+            [new GateHistoryMessageDto("tool", FunctionResult: new FunctionResultDto(CallId: null, Result: "x"))], out var err));
+        Assert.NotNull(err);
+    }
+
     // ── Registry ──
 
     [Fact]
