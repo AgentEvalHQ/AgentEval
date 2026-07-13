@@ -210,6 +210,7 @@ await result.ExportHtmlReportAsync("memory-report.html");
 | "Which model should I use?" | **Model comparison** with cost/quality recommendations |
 | "Is my agent compliant?" | **Behavioral policies** - guardrails as code |
 | "Is my agent secure?" | **Red team evaluation** - 258 OWASP LLM 2025 security probes (all 10 categories) |
+| "Can I stop a bad action before it happens?" | **Gatekeeper** - fail-closed runtime gates block a bad tool call or a leaking response before it happens |
 | "Is content safe/unbiased?" | **ResponsibleAI metrics** - toxicity, bias, misinformation |
 | "Is my RAG hallucinating?" | **Faithfulness metrics** - grounding verification |
 | "How do I debug CI failures?" | **Trace replay** - capture and reproduce executions |
@@ -244,6 +245,10 @@ await result.ExportHtmlReportAsync("memory-report.html");
     
     NeverCallTool, MustConfirmBefore, PII detection
 
+-   **⛔ Gatekeeper**
+    
+    Runtime fail-closed enforcement — deterministic gates + calibrated judges block a bad tool call or a leaking response *before* it happens
+
 -   **🔴 Red Team Security**
     
     258 probes, 13 attack types, full OWASP LLM Top 10 2025 coverage, MITRE ATLAS mapping
@@ -258,7 +263,7 @@ await result.ExportHtmlReportAsync("memory-report.html");
 
 -   **🖥️ CLI Tool**
     
-    `agenteval init / doctor / bench / mc serve` — workspace, benchmarks, Mission Control
+    `agenteval init / doctor / bench / redteam / gatekeeper / mc serve` — workspace, benchmarks, red team scans, runtime gates, Mission Control
 
 -   **🔌 Cross-Framework**
     
@@ -353,7 +358,7 @@ agenteval mc serve                         # browse runs + evidence at http://lo
 |  | [Benchmarks](benchmarks.md) | [Composite Evaluations](composite-evals.md) |
 |  | [Workflows](workflows.md) | [The .agenteval Workspace](agenteval-workspace.md) |
 |  | [GDPR Benchmark](benchmarks/gdpr/getting-started.md) | [Mission Control](missioncontrol/getting-started.md) |
-|  | [EU AI Act Benchmark](benchmarks/eu-ai-act/getting-started.md) |  |
+|  | [EU AI Act Benchmark](benchmarks/eu-ai-act/getting-started.md) | [Gatekeeper](gatekeeper/introduction.md) |
 |  | [Agentic Benchmark](benchmarks/agentic/getting-started.md) |  |
 |  | [OWASP / MITRE Benchmarks](benchmarks/owasp/getting-started.md) |  |
 |  | [Performance / Memory / LongMemEval](benchmarks/perf/getting-started.md) |  |

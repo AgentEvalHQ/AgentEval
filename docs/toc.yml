@@ -33,6 +33,8 @@
       href: tracing.md
     - name: Trace Fidelity
       href: benchmarks/trace-fidelity.md
+    - name: Workflow Trace Fidelity
+      href: benchmarks/workflow-trace-fidelity.md
   - name: Guardrails (Runtime Gate)
     href: guardrails.md
   - name: Gatekeeper (Runtime Enforcement)
@@ -52,6 +54,8 @@
     href: gatekeeper-cli.md
   - name: Examples
     href: gatekeeper/examples.md
+  - name: Attack the Gate
+    href: gatekeeper/attack-the-gate.md
 
 - name: Evaluation Coverage
   items:
@@ -60,6 +64,8 @@
     items:
     - name: What's New
       href: redteam-whats-new.md
+    - name: Copilot Studio (--sut copilot-studio)
+      href: redteam/copilot-studio.md
   - name: Responsible AI
     href: ResponsibleAI.md
   - name: Memory Evaluation
@@ -180,6 +186,8 @@
     href: naming-conventions.md
   - name: MAF 1.10.0 Upgrade Notes
     href: maf-1.10.0-upgrade-plan.md
+  - name: MAF 1.3.0 Migration Guide
+    href: maf-1.3.0-migration-guide.md
   - name: Migration Guide (from Python)
     href: comparison.md
   - name: Code Gallery

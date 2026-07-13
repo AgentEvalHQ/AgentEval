@@ -119,17 +119,28 @@ rubric's prefilter fires, so a retrieved snippet that trips *no* signal is allow
 blind spot) — keep the prefilter conservative and add prefilter-evading attacks as you extend the gold set. The
 figures you get are *your* model's on *our* data, not a blanket accuracy claim.
 
-Under the hood it's the shipped primitive — write your own axis the same way, then calibrate and wire it identically:
+`IndirectInjectionJudge` isn't the only axis that ships this way — three more come built-in, each calibrated the
+same way against its own canonical gold set and keyword-oracle baseline:
+
+- **`ExfiltrationIntentJudge`** — is the agent's rendered *output* smuggling sensitive data out (paraphrase
+  included, not just a literal upload/post)? Run-post, blocking.
+- **`SystemPromptExtractionJudge`** — is the output leaking the system prompt / config, verbatim or paraphrased?
+  Run-post, blocking.
+- **`OverRefusalJudge`** — the *utility valve*: is a refusal reasonless rather than justified? **Advisory only** —
+  wire it `EvalGatePolicy.WarnOnly`. It flags for review, it never blocks: hard-blocking a refusal would punish
+  honesty, the opposite of the Tribunal's point.
+
+Compose the two blocking axes with `ParallelJudgeFanOut` (they run concurrently, fail-closed OR) into an
+output-side Panel, wrap either in `JudgeVerdictCache` so identical content isn't re-judged, and run the valve
+alongside it under `WarnOnly`. Runnable: sample **`Gatekeeper/08_GatekeeperOutputPanel`**.
+
+For an axis genuinely beyond these four, write your own the same way, then calibrate and wire it identically:
 
 ```csharp
 var judge = new CompositeJudgeGate<MyRubric>(new MyRubric(), fastModel);   // one axis, one prompt, one parser
 var report = await GateCalibrationHarness.EvaluateAsync(judge, myGoldSet,
     new CalibrationOptions { DeterministicBaseline = myBaseline, MaxDangerousErrors = 0 });
 ```
-
-Compose several single-axis judges with `ParallelJudgeFanOut` (they run concurrently, fail-closed OR) and wrap any
-of them in `JudgeVerdictCache` so identical content isn't re-judged. Runnable: sample
-**`Gatekeeper/04_GatekeeperBeachhead`**.
 
 ## The honeypot — detect a compromised agent
 
@@ -237,6 +248,10 @@ judge scoring a gold set), and where a well‑aligned model resists an attack th
   **defense in depth against one injection campaign**: the calibrated `IndirectInjectionJudge` (its detection verdict
   on the injected content) alongside `ReferentialIntegrityGate` + `TaintTrackingGate` + `DomainAllowListGate` on a
   defended agent, where a *different* gate catches each step, printed from the trace.
+- [`Gatekeeper/08_GatekeeperOutputPanel`](../../samples/AgentEval.Samples/Gatekeeper/08_GatekeeperOutputPanel.cs) —
+  **the output Panel (Tribunal Stage-2)**: `ExfiltrationIntentJudge` + `SystemPromptExtractionJudge` composed via
+  `ParallelJudgeFanOut` into a run-post Panel, plus the `OverRefusalJudge` utility valve (advisory, `WarnOnly`,
+  never blocking) — calibration, detection, and inline enforcement all end-to-end on a real model.
 
 ## From the CLI
 

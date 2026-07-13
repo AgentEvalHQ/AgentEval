@@ -447,12 +447,32 @@ Example `testcases.yaml`:
   expected: "100"
 ```
 
+## Beyond Evaluation: Gatekeeper and Glass Box
+
+Everything above evaluates an agent *after* a run finishes. AgentEval also ships two runtime capabilities that
+sit alongside those evaluation, benchmark, and red-team workflows:
+
+- **[Gatekeeper](gatekeeper/introduction.md)** — fail-closed runtime enforcement. Gates wrap your MAF agent at
+  the tool-call, run, and session seams and **block** a forbidden tool call, a poisoned argument, or a
+  compromised conversation *before it happens*, instead of only flagging it afterward.
+- **[Glass Box](glass-box.md)** — dual-boundary tracing that records what your agent's model and tools
+  *actually* saw, not just what the framework reports. Attach a trace and see what your agent did after the
+  fact — tool reliability, prompt-injection, and argument-sanitization diagnostics that were previously
+  invisible.
+
+Both plug into the same MAF pipeline you've already built above — no rewrite needed. See Next Steps
+below for the full walkthroughs.
+
 ## Next Steps
 
 - **[Architecture Guide](architecture.md)** — Understand AgentEval's component model
 - **[Benchmarks Guide](benchmarks.md)** — Run performance and agentic benchmarks
 - **[Conversations Guide](conversations.md)** — Evaluate multi-turn agent interactions
 - **[Extensibility Guide](extensibility.md)** — Create custom metrics and plugins
+- **[Gatekeeper Introduction](gatekeeper/introduction.md)** — Add fail-closed runtime enforcement to your agent
+- **[Glass Box](glass-box.md)** — Trace what your agent actually did, not just what it reported
+- **[Red Team Guide](redteam.md)** — Probe your agent for prompt injection, jailbreaks, and other attacks
+- **[CLI Reference](cli.md)** — Run evaluations, benchmarks, gates, and red-team scans from the command line
 
 ## Quick Reference
 

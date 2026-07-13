@@ -115,6 +115,20 @@ the prefilter conservative and grow your gold set with prefilter‑evading attac
 > Its accuracy is **your** measurement on **your** data — this toolkit deliberately makes no blanket accuracy
 > claim for the judge; the harness is how you find out honestly.
 
+### Shipped Tribunal judges
+
+Beyond the flagship `IndirectInjectionJudge` (above), three more single-axis judges ship the same bundle — rubric +
+`CompositeJudgeGate<TRubric>` (optionally cached) + canonical both-directions gold set + keyword-oracle baseline —
+over `AgentEval.Guardrails.Judges`. Each is placed **run-post** (scores the rendered output, via
+`UseAgentEvalGate(post: […])`) and each sits behind the **same calibration bar** as the flagship: don't wire one
+inline until `CalibrateAsync` reports `IsInlineReady`.
+
+| Judge | What it does | Rank | Honest reasoning |
+|---|---|:--:|---|
+| **ExfiltrationIntentJudge** | Scores **exfiltration intent** in the output — reads context a keyword scan can't ("this customer's SSN, dropped here, then told to paste it into a paste site"). Run‑post; **blocks once calibrated**. Ships a 22‑attack / 24‑benign gold set (`ExfiltrationIntentRubric.CalibrationGoldSet()`) and a `DefaultExfilKeywords` keyword‑oracle baseline it must beat. | 🟢 **4** | Same ceiling as `CompositeJudgeGate<TRubric>` above — entirely contingent on calibration; an un‑calibrated instance is a fabrication risk, not a control. Pairs with the deterministic `DomainAllowListGate` (destination) and `TaintTrackingGate` (known‑secret provenance) for defense in depth — this judge covers the "is this data sensitive *in context*" half neither of those two can decide. |
+| **SystemPromptExtractionJudge** | Scores **system‑prompt leakage / paraphrase** in the output. Run‑post; **blocks once calibrated**. Ships a 22‑leak / 24‑benign gold set (`SystemPromptExtractionRubric.CalibrationGoldSet()`) — including the hard‑negative of a *refusal* to reveal the prompt ("I can't reveal my system prompt, but I can explain what I'm able to help with") correctly labeled **benign**, not a leak. | 🟢 **4** | Same calibration‑contingent ceiling. Meant to be **hybridized with a deterministic canary token** planted in the system prompt: the canary catches an exact echo cheaply and deterministically; this judge is what catches the *paraphrased* leak the canary can't see. Ships a `DefaultLeakTells` keyword‑oracle baseline it must beat. |
+| **OverRefusalJudge** | Flags a wrongful **refusal** in the output — the fleet's *utility valve* against a stack of fail‑closed judges/gates trending toward block‑everything. Ships a 22‑over‑refusal / 24‑non‑refusal gold set (`OverRefusalRubric.CalibrationGoldSet()`) and a `DefaultRefusalMarkers` keyword‑oracle baseline. | 🟡 **3** | **Advisory only — must be wired `WarnOnly`** (`UseAgentEvalGate(post: [judge], policy: WarnOnly)`), **never blocking**. A positive verdict is a *flag* (recorded as a `gate.run-post.*.judge:over-refusal` warning, feeding an offline false‑refusal metric or a retry path) — never an enforced block; hard‑blocking a refusal would punish honesty, the opposite of the point. Rank reflects the value of the *signal*, not a blocking capability there is deliberately none of; the same calibration bar applies before you trust the flag. |
+
 ## Session gates
 
 Run before a run and read the run's session — **fail‑closed when the session context is absent**.
