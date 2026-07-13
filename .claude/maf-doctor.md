@@ -1,11 +1,8 @@
-## Microsoft Agent Framework code — use MAF Doctor
+## Using maf-doctor for Microsoft Agent Framework code
 
 This repository uses Microsoft Agent Framework. The maf-doctor MCP server
-is installed and exposes specialist tools for MAF code.
-
-You should defer to maf-doctor's tools over training-data knowledge for
-anything MAF-related, because MAF ships breaking changes every minor version
-and the maf-doctor registry is kept current via an AI-fill loop.
+(also called "MAF Doctor") is installed and exposes tools for diagnosing,
+fixing, and migrating MAF code.
 
 **Before answering MAF questions or proposing changes:**
 
@@ -20,17 +17,24 @@ and the maf-doctor registry is kept current via an AI-fill loop.
    training data — MAF ships breaking changes every minor version, so
    training data is likely outdated.
 
-3. **Before manually editing MAF code to fix an anti-pattern** — call
-   `MafAutoFixAll --dry-run` and offer to apply the deterministic
-   rewrites first. Manual edits drift; the rewrites are tested.
+3. **To fix issues** — `MafAutoFixAll --dry-run` then apply handles the
+   *mechanical* rules deterministically (offer this first; the rewrites are
+   tested). For the rest, just ask "fix all the issues maf-doctor found" —
+   grade → plan (`MafDoctor(format: "plan")` human, or `--plan --json` for a
+   structured manifest) → autofix → then work each semantic finding. Every
+   finding carries a **`confidence`** (`certain` / `high` / `heuristic`); a
+   **`heuristic`** finding may be a **false positive** — confirm it with
+   `MafExplainFinding` before editing.
 
 4. **When designing a new MAF agent or workflow** — call `MafNewAgent` /
    `MafNewExecutor` for scaffolds, or `MafSimulateWorkflow` for topology
    preview. Don't reconstruct patterns from memory.
 
-5. **For deep architectural / security / migration questions** — use the
-   `@maf-best-practice-reviewer`, `@maf-auditor`, `@maf-migration`, or
-   `@maf-incident-responder` specialist agents.
+5. **To migrate FROM Semantic Kernel TO MAF** (a cross-framework port, NOT a
+   MAF version bump) — call `MafDetectSourceFramework` (CLI:
+   `maf-doctor migrate-scan`) to inventory SK usage, tag each construct by
+   migration strategy (bridgeable / rewrite / re-architect), and get a
+   complexity verdict before scoping the port.
 
 maf-doctor tools are MAF-version-aware via `applies_to_codebases` markers
 in the registry — they know which fix applies to which MAF version. Defer to

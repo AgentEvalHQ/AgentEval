@@ -168,7 +168,7 @@ AZURE_OPENAI_DEPLOYMENT=gpt-4o
 
 
 <!-- BEGIN maf-doctor (managed by `maf-doctor init` — overwritten on re-run) -->
-## Microsoft Agent Framework — MAF Doctor is installed
+## Using maf-doctor for Microsoft Agent Framework code
 
 This repository uses Microsoft Agent Framework. The maf-doctor MCP server
 (also called "MAF Doctor") is installed and exposes tools for diagnosing,
@@ -187,17 +187,24 @@ fixing, and migrating MAF code.
    training data — MAF ships breaking changes every minor version, so
    training data is likely outdated.
 
-3. **Before manually editing MAF code to fix an anti-pattern** — call
-   `MafAutoFixAll --dry-run` and offer to apply the deterministic
-   rewrites first. Manual edits drift; the rewrites are tested.
+3. **To fix issues** — `MafAutoFixAll --dry-run` then apply handles the
+   *mechanical* rules deterministically (offer this first; the rewrites are
+   tested). For the rest, just ask "fix all the issues maf-doctor found" —
+   grade → plan (`MafDoctor(format: "plan")` human, or `--plan --json` for a
+   structured manifest) → autofix → then work each semantic finding. Every
+   finding carries a **`confidence`** (`certain` / `high` / `heuristic`); a
+   **`heuristic`** finding may be a **false positive** — confirm it with
+   `MafExplainFinding` before editing.
 
 4. **When designing a new MAF agent or workflow** — call `MafNewAgent` /
    `MafNewExecutor` for scaffolds, or `MafSimulateWorkflow` for topology
    preview. Don't reconstruct patterns from memory.
 
-5. **For deep architectural / security / migration questions** — use the
-   `@maf-best-practice-reviewer`, `@maf-auditor`, `@maf-migration`, or
-   `@maf-incident-responder` specialist agents.
+5. **To migrate FROM Semantic Kernel TO MAF** (a cross-framework port, NOT a
+   MAF version bump) — call `MafDetectSourceFramework` (CLI:
+   `maf-doctor migrate-scan`) to inventory SK usage, tag each construct by
+   migration strategy (bridgeable / rewrite / re-architect), and get a
+   complexity verdict before scoping the port.
 
 maf-doctor tools are MAF-version-aware via `applies_to_codebases` markers
 in the registry — they know which fix applies to which MAF version. Defer to
