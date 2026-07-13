@@ -821,7 +821,7 @@ All packaged projects use `RootNamespace=AgentEval` so consumers see no namespac
 
 > **Architecture established by [ADR-017](adr/017-unified-benchmarks-namespace.md), implemented in v0.10.0-beta.**
 
-AgentEval ships eight benchmark families — **Agentic, GDPR, EU AI Act, OWASP, MITRE, LongMemEval, Memory, Performance** — and is built to absorb future families (HIPAA, PCI-DSS, ISO 42001, NIS2, SOC 2, UK AI Bill, …) without touching the CLI or Mission Control. Every family plugs into a single source of truth: `AgentEval.Core.Benchmarks.BenchmarkFamilyRegistry`.
+AgentEval ships 11 benchmark families — **Agentic, GDPR, EU AI Act, OWASP, MITRE, NIST AI RMF, LongMemEval, Memory, Performance, Trace Fidelity, Workflow Trace Fidelity** — and is built to absorb future families (HIPAA, PCI-DSS, ISO 42001, NIS2, SOC 2, UK AI Bill, …) without touching the CLI or Mission Control. Every family plugs into a single source of truth: `AgentEval.Core.Benchmarks.BenchmarkFamilyRegistry`.
 
 This section documents how to add a benchmark family. Most consumers don't need this — they just `using AgentEval.Benchmarks;` and call the static factories. This section is for AgentEval contributors and third-party plugin authors.
 

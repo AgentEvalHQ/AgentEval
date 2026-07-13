@@ -263,6 +263,7 @@ Beyond the built-in probes, it ships the capabilities that make a red-team resul
 - **Trustworthy verdicts — judge-primary by default + Composite Judges** *(new)* — with a judge configured (`--judge`), the grader that decides whether each attack *succeeded* is now LLM-judge-primary, using **honest-by-construction Composite Judges**: every semantic verdict is split into a positive-only *compromise* detector ⊕ a negative-only *refusal* detector, each structurally clamped so it can only raise its own direction or abstain. (A no-judge scan stays the deterministic keyword oracle, byte-identical to before.) Plus conclusive-only scoring and an explicit *Inconclusive* coverage state — so a green result is never a guess.
 - **5 compliance reporters** — OWASP, MITRE ATLAS, SOC 2, ISO 27001, and **NIST AI RMF** — runnable as first-class benchmarks (`agenteval bench owasp\|mitre\|nist`).
 - **CI-ready** — SARIF + JUnit export, a baseline regression gate (`--save-baseline`/`--baseline`/`--fail-on`), z-score **calibration** (`--calibration`), LLM **`--explain`** rationale, and external **benchmark packs** (`--pack HarmBench\|JailbreakBench\|CyberSecEval`, license-gated, nothing bundled).
+- **Copilot Studio target** *(scaffold)* — `agenteval redteam --sut copilot-studio` red-teams a Microsoft Copilot Studio agent through the same scanner, with its own config + consent gates and a credential-free test seam; the live connector isn't wired yet, so a real config validates end-to-end and then reports "not wired yet" rather than a fabricated result. See [docs/redteam/copilot-studio.md](docs/redteam/copilot-studio.md).
 
 > **Proof, not vibes.** Across **810 held-out stochastic trials** — 81 independently-generated cases (70 composite-oracle + 11 DataPoisoning deny-true) run **K=10×** each through the production graders — the Composite Judges fabricated **0 verdicts**: never a safe reply flagged as a compromise, never a real compromise masked as safe. On a separately-pinned label corpus, judge↔label agreement is **κ = 1.000** (n=92) — where keyword graders typically agree with humans only about half the time. The guiding rule: *fabrications are complete failures; honesty is never punished.* Background: [ADR-021→024](docs/adr/README.md) · [Red Team — What's New](docs/redteam-whats-new.md).
 
@@ -321,7 +322,7 @@ result.Should()
 - **SARIF** for GitHub Security tab integration
 - **PDF** for executive/board-level reporting
 
-**✅ See Samples:** [Sample20_RedTeamBasic.cs](samples/AgentEval.Samples/Sample20_RedTeamBasic.cs) • [Sample21_RedTeamAdvanced.cs](samples/AgentEval.Samples/Sample21_RedTeamAdvanced.cs) • [docs/redteam.md](docs/redteam.md)
+**✅ See Samples:** [02_RedTeamBasic.cs](samples/AgentEval.Samples/SafetyAndSecurity/02_RedTeamBasic.cs) • [03_RedTeamAdvanced.cs](samples/AgentEval.Samples/SafetyAndSecurity/03_RedTeamAdvanced.cs) • [docs/redteam.md](docs/redteam.md)
 
 ---
 
@@ -351,6 +352,11 @@ by design:** a gate that can't prove an action safe *blocks* it, and every decis
 trace evidence (a warn is never counted as a block). Layers span **tool gates**, **run gates**, **session gates**
 (auth / rate-limit / quarantine), the red-team **moat**, **canary honeypots** that flag a compromised agent, an
 async **shadow judge** for expensive checks, and **human-in-the-loop approval** for the borderline actions.
+
+The same policy is also callable from **outside .NET**: the `agenteval gatekeeper` CLI verb group exposes it as a
+language-neutral runtime-policy service — pipe a JSON payload to `agenteval gatekeeper inspect` from Python, Node,
+bash, or a CI step and get back a versioned verdict + exit code, no .NET reference required. See
+[docs/gatekeeper-cli.md](docs/gatekeeper-cli.md).
 
 **✅ See it:** `dotnet run --project samples/AgentEval.Samples` → group **J** (real agents — needs Azure OpenAI), or **credential‑free** via `agenteval redteam --sut gatekeeper-demo` • [docs/gatekeeper/introduction.md](docs/gatekeeper/introduction.md)
 
@@ -514,7 +520,7 @@ await result.ExportHtmlReportAsync("memory-report.html");
 - Single-port deployment via `agenteval mc serve`, `dotnet run --project src/AgentEval.MissionControl`, or `docker compose up`
 - See [`docs/missioncontrol/getting-started.md`](docs/missioncontrol/getting-started.md)
 
-### Benchmark Families (8 families, single-source-of-truth registry)
+### Benchmark Families (11 families, single-source-of-truth registry)
 
 Every family auto-registers via `[ModuleInitializer]` into `BenchmarkFamilyRegistry`.
 `agenteval bench --list` reads from the registry — no hardcoded family lists anywhere
@@ -527,9 +533,12 @@ Every family auto-registers via `[ModuleInitializer]` into `BenchmarkFamilyRegis
 | **Agentic** | 11 presets (`tool-call-accuracy` / `agentic-execution` / `audit-grade` / `--budget-tier {free,low,medium,high}` filter etc.) | ✅ end-to-end | Foundry-equivalent 60-evaluator universe — system / process / UX / quality / safety / adversarial / reasoning / calibration / memory | Medium |
 | **OWASP LLM Top 10** | `top10` / `smoke` / `audit` / `top10-rag` | ✅ end-to-end (`--azure-from-env` for real agents; stub fallback) | 13 attack types covering all 10 OWASP LLM Top 10 v2.0 categories (LLM03/04/08/09 added in Wave D) | Medium |
 | **MITRE ATLAS** | `atlas-baseline` / `atlas-smoke` / `atlas-audit-grade` | ✅ end-to-end | Same 13 attacks mapped via `IAttackType.MitreAtlasIds` covering 8 applicable ATLAS techniques | Medium |
+| **NIST AI RMF** | `rmf-baseline` / `rmf-smoke` / `rmf-audit-grade` | ✅ end-to-end (`--azure-from-env` for real agents; stub fallback) | Same 13 attacks mapped to NIST AI RMF (AI 100-1) MEASURE security/privacy/validity sub-actions (GOVERN/MAP/MANAGE not applicable) | Medium |
 | **LongMemEval** | `subset` / `full` (ICLR 2025) | ✅ end-to-end | Cross-platform memory benchmark — paper-published GPT-4o baseline ≈ 57.7% | Medium |
 | **Memory** | `quick` / `standard` / `full` / `diagnostic` / `overflow` | ✅ end-to-end | Native AgentEval memory benchmark — 3/8/12 categories, weighted grading | Medium |
 | **Performance** | `latency` / `throughput` / `cost` | ✅ end-to-end (`--azure-from-env`) | P99 latency / concurrent throughput / per-prompt cost against your deployment | Low |
+| **Trace Fidelity** | `smoke` / `standard` / `audit-grade` | ✅ end-to-end (pure code, no LLM cost — reconciles two supplied `.trace.json` files) | Agent-boundary vs chat-boundary trace reconciliation — missing/phantom calls, hidden retries, argument drift, token under-reporting, suppressed finish reasons | Free |
+| **Workflow Trace Fidelity** | `smoke` / `standard` / `audit-grade` | ✅ end-to-end (pure code, no LLM cost — reconciles a workflow `.trace.json`) | Per-executor workflow ledger (tokens + finish reason) vs chat-boundary truth — per-executor fidelity (Agree / TokenMismatch / FinishMismatch / NoTruth) | Free |
 
 Every evidence document is cryptographically chained to its source run; `agenteval doctor` re-validates on demand. Per-family `getting-started.md` guides live under [`docs/benchmarks/`](docs/benchmarks/) (OWASP + GDPR + EU AI Act + Memory + LongMemEval + MITRE + Performance + Agentic).
 
@@ -577,7 +586,7 @@ dotnet tool install --global AgentEval.Cli --prerelease
 
 # Use
 agenteval init                                                 # bootstrap .agenteval/ workspace
-agenteval bench --list                                         # discover the 8 benchmark families
+agenteval bench --list                                         # discover the 11 benchmark families
 agenteval bench gdpr --preset smoke --subject MyAgent          # run a GDPR compliance benchmark
 agenteval bench owasp --preset smoke --subject MyAgent --azure-from-env   # OWASP red-team against your real agent
 agenteval mc serve                                             # open Mission Control (requires .NET 10)

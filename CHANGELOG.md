@@ -177,6 +177,10 @@ Microsoft Agent Framework to 1.13.0.
 - CLI reference refresh: a new `agenteval gatekeeper` section, a consolidated `## Exit codes` table (incl.
   the BUG-22 exit-2 overload and the `gatekeeper` 5/6/7 codes), cross-links, and TOC registration for
   `gatekeeper-cli.md`.
+- **`docs/redteam/copilot-studio.md`** — the dedicated guide for this target: what works today vs. the
+  scaffold-not-finished-live-integration callout, prerequisites, the full CLI flag reference, and what's
+  deferred. Linked from a new `--sut` row in `docs/redteam.md`'s options table and a new "Built-in SUT
+  targets" section in `docs/redteam-whats-new.md`, and registered in `docs/toc.yml` under Red Team.
 
 ### Dependencies — Microsoft Agent Framework 1.13.0
 - **MAF 1.12.0 → 1.13.0** (central, via `Directory.Packages.props`): `Microsoft.Agents.AI`,

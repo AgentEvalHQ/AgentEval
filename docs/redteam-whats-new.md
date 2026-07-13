@@ -24,6 +24,9 @@ The grader — the component that decides whether each attack actually *succeede
 - **Compliance crosswalks across five frameworks** — OWASP LLM Top 10, MITRE ATLAS, **NIST AI RMF (AI 100-1)**, ISO/IEC 42001, and SOC 2 — with a `--format nist` report straight from a scan and `bench owasp|mitre|nist` benchmark families.
 - **Bring your own data:** `--import-probes` (CSV/JSON) and external **benchmark packs** via `--pack` (HarmBench / JailbreakBench / CyberSecEval, downloaded on demand under their own licenses — no harmful data bundled).
 
+### Built-in SUT targets
+- **`--sut copilot-studio`** — a new built-in target that points the scanner at a **live Microsoft Copilot Studio agent** instead of an OpenAI-compatible/Azure endpoint, with its own CLI flags (`--copilotstudio-config`, a required consent flag `--i-understand-live-side-effects`, and a `--max-credits` spend cap), a ship-blocking safety gate, and an honest text-only/`Verbal` fidelity ceiling — a tool-dependent probe reports **Inconclusive**, never a fabricated pass, because MCS's server-side tool calls are invisible to the scanner. The live connector itself is still deferred; see [Copilot Studio](redteam/copilot-studio.md) for exactly what works today and what's next.
+
 ### Multi-step & adaptive attacks
 - **Multi-turn conversations** — `Crescendo`-style escalation ladders that build context across turns, folded into a single verdict with a conversation-fidelity label.
 - **Attacker-LLM orchestration** — an attacker model that *generates and adapts* the attack (`PAIR`, `TAP` / tree-of-attacks), while a **separate** judge model scores it (an attack can never grade itself).

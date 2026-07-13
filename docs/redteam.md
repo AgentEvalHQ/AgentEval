@@ -918,6 +918,7 @@ The low-level scanner. **Everything the library can do is reachable from the CLI
 | Group | Options |
 |-------|---------|
 | **Target / auth** | `--endpoint`, `--azure`, `--model`, `--deployment-name`, `--api-key`, `--system-prompt` |
+| **Built-in SUT (`--sut`)** | `--sut gatekeeper-demo\|copilot-studio` — swaps the endpoint/`--azure` path for a self-contained target: `gatekeeper-demo` is a credential-free, deterministic Gatekeeper-gated demo; `copilot-studio` red-teams a **live** Microsoft Copilot Studio agent at text-only/`Verbal` fidelity (`--copilotstudio-config <file.json>`, required consent `--i-understand-live-side-effects`, `--max-credits <n>` spend cap) — see [Copilot Studio](redteam/copilot-studio.md) for the full guide |
 | **Attacks** | `--attacks` (comma-list; default all 13; opt-in `Crescendo,PAIR,TAP,ToolEscalation`), `--intensity quick\|moderate\|comprehensive`, `--max-probes`, `--fail-fast`, `--import-probes <file.json>` (run an imported seed-prompt dataset alongside the built-ins) |
 | **Benchmark packs** | `--pack <name\|list>` (download + run an external pack — HarmBench / JailbreakBench / CyberSecEval — alongside the built-ins; `list` shows the catalog), `--accept-license` (required; no data is bundled, datasets carry harmful content) |
 | **Real attack surface** | `--sut-tier text\|function-calling\|instrumented`, `--system-prompt-canary <token>`, `--package-registry none\|live` (LLM03: `live` queries PyPI/npm/NuGet to flag model-invented hallucinated packages) |
@@ -1232,12 +1233,12 @@ agenteval redteam --endpoint $URL --model $MODEL --attacks ToolEscalation --sut-
 ## Samples
 
 See the sample projects for complete working examples:
-- **Sample 20**: Basic Red Team Evaluation
-- **Sample 21**: Advanced Red Team Evaluation with Pipeline API
+- **02_RedTeamBasic.cs**: Basic Red Team Evaluation
+- **03_RedTeamAdvanced.cs**: Advanced Red Team Evaluation with Pipeline API
 
 ```bash
-dotnet run --project samples/AgentEval.Samples -- 20
-dotnet run --project samples/AgentEval.Samples -- 21
+dotnet run --project samples/AgentEval.Samples -- 23   # Red Team Basic    (E2)
+dotnet run --project samples/AgentEval.Samples -- 24   # Red Team Advanced (E3)
 ```
 
 ## Progress Reporting
@@ -1468,5 +1469,5 @@ public async Task Agent_DoesNotRegress()
 
 - [Assertions](assertions.md) - Fluent assertion API
 - [Export Formats](export.md) - JUnit XML / SARIF / JSON export for CI/CD pipelines
-- [Sample 20](https://github.com/AgentEvalHQ/AgentEval/blob/main/samples/AgentEval.Samples/Sample20_RedTeamBasic.cs) - Basic red team scan with assertions
-- [Sample 21](https://github.com/AgentEvalHQ/AgentEval/blob/main/samples/AgentEval.Samples/Sample21_RedTeamAdvanced.cs) - Advanced pipeline, OWASP compliance, baseline comparison
+- [02_RedTeamBasic.cs](https://github.com/AgentEvalHQ/AgentEval/blob/main/samples/AgentEval.Samples/SafetyAndSecurity/02_RedTeamBasic.cs) - Basic red team scan with assertions
+- [03_RedTeamAdvanced.cs](https://github.com/AgentEvalHQ/AgentEval/blob/main/samples/AgentEval.Samples/SafetyAndSecurity/03_RedTeamAdvanced.cs) - Advanced pipeline, OWASP compliance, baseline comparison

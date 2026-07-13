@@ -39,8 +39,8 @@ is independent and writes to one shared trace.
 The **cost budget** is the load‑bearing constraint. Tool gates and the moat run on the hot path and **reject**
 network / LLM work at construction (via `GateCost`) — an LLM judge on every tool call would stall the agent and
 risk a fabricated verdict. Expensive judgment goes to the **shadow judge**, or — for a *fast, calibrated* judge —
-the run‑pre seam (see The Tribunal, below); run and session gates reuse `IChatGate` (no cost member), so keeping
-those pure‑code is a convention.
+the run‑pre/run‑post seam (see The Tribunal, below); run and session gates reuse `IChatGate` (no cost member), so
+keeping those pure‑code is a convention.
 
 ## The Beachhead and The Tribunal
 
@@ -52,10 +52,14 @@ Two named groupings across those layers capture the arc from "turn it on today" 
   positives, hot‑path safe — it covers two of the highest‑severity agent threats *before any judge exists*.
 
 - **The Tribunal** — fast, **single‑axis LLM judges** as runtime gates (`CompositeJudgeGate<TRubric>`), for the
-  attacks a keyword list can't catch (indirect prompt injection). Its defining rule: a judge must **earn the right
-  to block**. The `GateCalibrationHarness` ("the Bar") scores a judge against a both‑directions gold set and
-  refuses to promote it inline until it beats the baseline — so an un‑calibrated judge stays in the shadow lane.
-  Compose several axes with `ParallelJudgeFanOut`; cache repeats with `JudgeVerdictCache`.
+  attacks a keyword list can't catch. The flagship `IndirectInjectionJudge` sits run‑pre, scoring the *incoming*
+  prompt; three more — `ExfiltrationIntentJudge`, `SystemPromptExtractionJudge`, and `OverRefusalJudge` — sit
+  run‑post, scoring the *rendered output* for leakage, exfiltration intent, and wrongful refusal (the last is
+  advisory‑only, wired `WarnOnly`, never blocking). Its defining rule: a judge must **earn the right to block**.
+  The `GateCalibrationHarness` ("the Bar") scores a judge against a both‑directions gold set and refuses to
+  promote it inline until it beats the baseline — so an un‑calibrated judge stays in the shadow lane. Compose
+  several axes with `ParallelJudgeFanOut`; cache repeats with `JudgeVerdictCache`. See the [gate
+  reference](gate-reference.md#shipped-tribunal-judges) for the full roster.
 
 Start with the Beachhead — it ships value immediately. Add a Tribunal judge only after you've **calibrated it on
 your own data**; its accuracy is your measurement, not a number this toolkit claims for you.

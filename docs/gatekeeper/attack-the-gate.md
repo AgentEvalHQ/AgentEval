@@ -61,4 +61,4 @@ agenteval redteam --endpoint "$URL" --model "$MODEL" --intensity moderate \
   --baseline redteam-baseline.json --fail-on regression
 ```
 
-See [`docs/redteam.md`](../redteam.md) for the full red-team CLI, and the runnable **Gatekeeper — Defense in Depth** sample (`samples/AgentEval.Samples/Gatekeeper/07_GatekeeperDefenseInDepth.cs`) for the gate stack this loop protects.
+See [`docs/redteam.md`](../redteam.md) for the full red-team CLI, and the runnable **Gatekeeper — Defense in Depth** sample (`samples/AgentEval.Samples/Gatekeeper/07_GatekeeperDefenseInDepth.cs`) for the gate stack this loop protects. The **Gatekeeper — Output Panel** sample (`samples/AgentEval.Samples/Gatekeeper/08_GatekeeperOutputPanel.cs`) guards the *output* side with its own Tribunal judges (`ExfiltrationIntentJudge`, `SystemPromptExtractionJudge`, `OverRefusalJudge`) — it is a standalone, hand-run demo today, with no `--sut` wiring into `agenteval redteam` and no baseline of its own.
