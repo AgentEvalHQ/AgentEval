@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.16.0-beta] - 2026-07-13
+
+Gatekeeper reaches production-grade runtime enforcement: a calibrated flagship judge for indirect prompt
+injection, three more Tribunal judges guarding the model's *output* (exfiltration intent, system-prompt
+extraction, and an honesty-preserving over-refusal valve), two deterministic flow-control gates, a
+defense-in-depth sample, a credential-free attack-the-gate CI recipe, and a language-neutral CLI bridge so
+any process — not just .NET — gets a policy verdict. Also ships a `--sut copilot-studio` red-team target
+(credential-free scaffold; live connector deferred) via a new polymorphic built-in-target seam, and bumps
+Microsoft Agent Framework to 1.13.0.
+
 ### Gatekeeper CLI interop bridge — invoke gates from any language (deterministic core + model path & honesty guard)
 
 #### Added
@@ -133,6 +143,55 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Per-tool call caps and per-run monetary caps are **already** provided by `RunBudgetGate` (`maxCallsPerTool` /
   `maxMonetaryPerRun`), checked atomically in one `RunLedger` operation — so no separate per-tool-budget or
   monetary-limit gate is needed.
+
+### Copilot Studio — `--sut copilot-studio` red-team target MVP scaffold
+
+#### Added
+- **`redteam --sut copilot-studio`** — red-teams a live Microsoft Copilot Studio (MCS) agent through the
+  existing `redteam` scan at text-only / `Verbal` fidelity, behind a ship-blocking safety gate. Ships the
+  credential-free scaffold + the architecture to host it; the live connector is deliberately deferred (see
+  Deferred, below).
+- **`IRedTeamBuiltInTarget`** (`Commands/RedTeamTargets/`) — a polymorphic built-in-SUT seam replacing the
+  inline `--sut` conditional in `RedTeamCommand`: one built-in target = one file owning its own options,
+  validation, construction, evidence/tier policy, and post-scan summary, so a new target never grows the
+  command. `GatekeeperDemoRedTeamTarget` is the former inline `gatekeeper-demo` branch, lifted out verbatim
+  (behaviour unchanged); `CopilotStudioRedTeamTarget` is the new Copilot Studio target. Option *binding* is
+  polymorphic too (`RedTeamOptions.TargetOptions`, keyed by `--sut` value) — a future target with its own
+  flags needs zero edits to `RedTeamCommand`/`RedTeamOptions`.
+- **`CopilotStudioConfig` + `CopilotStudioAgentFactory`** (`src/AgentEval.Cli/CopilotStudio/`) — the MCS
+  connection config/loader + agent factory, built on the proven MAF `AIAgent` → `MAFAgentAdapter` seam (the
+  same one the Foundry integration uses). Not red-team-specific, so `eval` can reuse them later.
+- **Safety, all tested credential-free**: `--i-understand-live-side-effects` consent flag (default-refuse,
+  before any network call — MCS connectors can fire real actions); `--parallelism` hard-floored to 1 (a live
+  MCS session is stateful/non-reentrant); evidence capture **off** for this target (live responses can carry
+  real PII); a no-model-of-its-own guard requiring an explicit `--judge-model`/`--attacker-model`;
+  `ExitCodes.BudgetExceeded` (8, reserved) for the future `--max-credits` cap.
+
+#### Deferred
+- The live connector (`CopilotStudioAgentFactory.BuildLive`) throws a clear, actionable error until the
+  `Microsoft.Agents.CopilotStudio.Client` package/API is verified against the current MAF release with a
+  real non-prod agent. Everything up to it is real and tested — a `sutOverride` seam drives a full offline
+  scan against a MAF-adapter-wrapped benign agent with zero credentials.
+
+#### Docs
+- CLI reference refresh: a new `agenteval gatekeeper` section, a consolidated `## Exit codes` table (incl.
+  the BUG-22 exit-2 overload and the `gatekeeper` 5/6/7 codes), cross-links, and TOC registration for
+  `gatekeeper-cli.md`.
+
+### Dependencies — Microsoft Agent Framework 1.13.0
+- **MAF 1.12.0 → 1.13.0** (central, via `Directory.Packages.props`): `Microsoft.Agents.AI`,
+  `Microsoft.Agents.AI.OpenAI`, `Microsoft.Agents.AI.Workflows`, `Microsoft.Agents.AI.Workflows.Generators`;
+  the sample-only `Microsoft.Agents.AI.Foundry` / `.Harness` previews move to the matching `1.13.0-preview`.
+  **No source changes were required** — of the three `[BREAKING]` PRs in the upstream `dotnet-1.13.0`
+  release, only the file-store API rename could plausibly touch AgentEval, and a repo-wide grep confirmed
+  zero usage; the other two live in `Hosting.OpenAI` / `Foundry.Hosting` packages AgentEval doesn't reference.
+- **`Azure.AI.Projects` 2.1.0-beta.3 → 2.1.0-beta.4** (required by the Foundry preview), which in turn raised
+  the floor on **`System.Memory.Data`** and **`Microsoft.Extensions.Hosting.Abstractions`** to **10.0.9**
+  (were 10.0.3) — a transitive cascade no static compatibility check flagged, caught by an actual
+  `dotnet restore` (`NU1109` package downgrade).
+- `Microsoft.Extensions.AI*` stays at **10.6.0** — MAF 1.13.0's declared dependency — and the
+  `OpenTelemetry.Api` **1.15.3** security pin (GHSA-g94r-2vxg-569j) remains valid, since the 1.13.0
+  Workflows packages still declare exactly that version.
 
 ## [0.14.0-beta] - 2026-07-06
 
