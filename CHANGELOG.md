@@ -7,6 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### MAF Agent Skills evaluation — Phase 1 (assertions + progressive-disclosure efficiency metric)
+
+#### Added
+- **Five fluent skill assertions** in `AgentEval.Assertions.SkillUsageAssertions` — `HaveLoadedSkill`,
+  `HaveReadSkillResource`, `HaveRunSkillScript`, `NotHaveRunSkillScript`, `HaveDisclosedProgressively` —
+  thin, additive extension methods over the existing `ToolUsageAssertions` / `ToolCallAssertion` (zero
+  new MAF-type coupling in `AgentEval.Core`, which still does not reference `Microsoft.Agents.AI`).
+  Support value-based argument matching (skill/resource/script name), not just tool-name matching, and
+  degrade gracefully (key-agnostic fallback) if a future MAF version renames an argument.
+- **`SkillDisclosureEfficiencyMetric`** (`code_skill_disclosure_efficiency`, `AgentEval.Metrics.Agentic`)
+  — a free, code-based `IAgenticMetric` scoring the `load_skill` → `read_skill_resource` →
+  `run_skill_script` progressive-disclosure funnel as a weighted product of disclosure-order validity,
+  load precision (redundant-load + "load storm" penalties), and an optional load-selection F1 when the
+  caller supplies `expected_skills` ground truth. Never fabricates a selection score when no ground
+  truth is supplied, and never fabricates an "advertise" stage count (the skill-inventory system-prompt
+  listing is not a tool call and is not observable from a `ToolUsageReport`).
+- **`SkillToolNames`** (`AgentEval.Skills`) — the single shared constant for the three stable GA tool
+  names (`load_skill` / `read_skill_resource` / `run_skill_script`) and their argument parameter names,
+  referenced by the assertions and the metric.
+- **`samples/AgentEval.AgentSkillsEval`** — a live sample: a real `ChatClientAgent` against Azure OpenAI,
+  wrapped with a real `Microsoft.Agents.AI.AgentSkillsProvider` over a real file-based
+  `expense-report` skill fixture (SKILL.md + a resource + an in-process script). Three runs demonstrate
+  different real assertion/metric/output combinations (read-only lookup, script-computed overage,
+  and an off-topic task that both scores a vacuous 100/100 and shows an assertion's real failure
+  path) — all keyed on the actual captured tool-call trace, never a bare success claim.
+- Verified four MAF `AgentSkillsProvider` API details against the live `Microsoft.Agents.AI 1.13.0`
+  assembly (exact tool argument parameter names; the `DisableCaching` builder shape; that there is no
+  provider-level `GetSkillsAsync` convenience; and that `read_skill_resource`'s `resourceName` is a
+  logical name resolved against the skill's discovered resource list, not a live filesystem path).
+
+This is Phase 1 of a 3-phase design
+(`strategy/FutureFeatures/Skills/AgentEval-AgentSkills-Evals-Design-and-Plan.md`, local-only). Phase 2
+(a skill-compliance scanner) and Phase 3 (a skill-description-injection red-team attack plus
+`run_skill_script` code-execution governance gates) are not yet implemented.
+
 ## [0.16.0-beta] - 2026-07-13
 
 Gatekeeper reaches production-grade runtime enforcement: a calibrated flagship judge for indirect prompt

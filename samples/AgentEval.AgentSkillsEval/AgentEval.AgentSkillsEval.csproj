@@ -1,0 +1,37 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <IsPackable>false</IsPackable>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>AgentEval.AgentSkillsEval</RootNamespace>
+    <AssemblyName>AgentEval.AgentSkillsEval</AssemblyName>
+  </PropertyGroup>
+
+  <!-- Consumes AgentEval; does NOT modify it. Versions come from Directory.Packages.props (CPM). -->
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\AgentEval.Abstractions\AgentEval.Abstractions.csproj" />
+    <ProjectReference Include="..\..\src\AgentEval.Core\AgentEval.Core.csproj" />
+  </ItemGroup>
+
+  <!--
+    Phase 1 scope only (assertions + progressive-disclosure efficiency metric): the agent is built
+    directly against Microsoft.Agents.AI (AgentSkillsProvider, ChatClientAgent) + Azure OpenAI. No
+    AgentEval.MAF / AgentEval.RedTeam reference yet — those land with Phase 2 (skill-compliance
+    scanner) and Phase 3 (skill-injection red-team + run_skill_script governance gates), per
+    strategy/FutureFeatures/Skills/AgentEval-AgentSkills-Evals-Design-and-Plan.md.
+  -->
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Agents.AI" />
+    <PackageReference Include="Azure.AI.OpenAI" />
+    <PackageReference Include="Microsoft.Extensions.AI" />
+    <PackageReference Include="Microsoft.Extensions.AI.OpenAI" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="skills\**\*" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+</Project>

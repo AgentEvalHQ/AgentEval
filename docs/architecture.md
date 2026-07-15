@@ -515,6 +515,42 @@ result.Performance!
     .HaveEstimatedCostUnder(0.10m);
 ```
 
+#### MAF Agent Skills assertions
+
+`AgentEval.Assertions.SkillUsageAssertions` adds sugar for MAF's three stable Agent Skills tools
+(`load_skill` / `read_skill_resource` / `run_skill_script` — GA'd 2026-07-07), as thin extension
+methods over the same `ToolUsageAssertions` / `ToolCallAssertion` above (zero new MAF-type coupling;
+`AgentEval.Core` still does not reference `Microsoft.Agents.AI`). The three tool names + their
+argument parameter names live in one place, `AgentEval.Skills.SkillToolNames`:
+
+```csharp
+result.ToolUsage!.Should()
+    .HaveLoadedSkill("expense-report")
+    .And().HaveReadSkillResource("expense-report", "resources/policy.md").AfterTool(SkillToolNames.LoadSkill)
+    .And().HaveDisclosedProgressively()
+    .And().NotHaveRunSkillScript(because: "a policy lookup does not require running the compliance script");
+```
+
+`HaveLoadedSkill` / `HaveReadSkillResource` / `HaveRunSkillScript` match by argument **value**
+(skill/resource/script name), not just tool name, and degrade to a key-agnostic fallback if a future
+MAF version renames a parameter. `HaveDisclosedProgressively()` asserts every
+`read_skill_resource` / `run_skill_script` call is preceded by a `load_skill` for the SAME skill.
+`NotHaveRunSkillScript` is a safety-policy assertion (maps to `NeverCallTool`, required `because`).
+
+A companion metric, `AgentEval.Metrics.Agentic.SkillDisclosureEfficiencyMetric`
+(`code_skill_disclosure_efficiency`), scores the observable `load_skill` → `read_skill_resource` →
+`run_skill_script` funnel — disclosure-order validity, load precision (redundant loads / "load
+storms"), and an optional load-selection F1 when `EvaluationContext.Properties["expected_skills"]` is
+supplied. It never fabricates a selection score without ground truth, and never fabricates an
+"advertise" stage count — the skill-inventory listing injected into the system prompt is not a tool
+call and isn't observable from a `ToolUsageReport`.
+
+See `samples/AgentEval.AgentSkillsEval` for a live, real-agent walkthrough, and
+`strategy/FutureFeatures/Skills/AgentEval-AgentSkills-Evals-Design-and-Plan.md` (local-only) for the
+full 3-phase design — this is Phase 1 (assertions + metric + sample); a skill-compliance scanner
+(Phase 2) and a skill-injection red-team attack + `run_skill_script` governance gates (Phase 3) are
+not yet implemented.
+
 ### 4. Registry Pattern
 
 Centralized metric management:
