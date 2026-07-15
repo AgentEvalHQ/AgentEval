@@ -7,6 +7,61 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Copilot Studio — live connector wired (`redteam --sut copilot-studio` Track 1)
+
+#### Added
+- **`CopilotStudioAgentFactory.BuildLive` now builds a real connector** instead of unconditionally throwing
+  `NotSupportedException`. It constructs a real `Microsoft.Agents.CopilotStudio.Client.CopilotClient` from
+  `CopilotStudioConfig` (`ConnectionSettings` mapped 1:1 — `EnvironmentId`/`SchemaName`/`Cloud`), resolves the
+  token scope via `CopilotClient.ScopeFromSettings` (never hardcoded), and bridges its streaming Bot Framework
+  activity API (`StartConversationAsync` / `AskQuestionAsync` → `IAsyncEnumerable<IActivity>`) into an
+  `IChatClient` (new `CopilotStudioChatClient`), wrapped in a MAF `ChatClientAgent` and handed to the existing
+  `FromAgent` seam — unchanged. `redteam --sut copilot-studio`'s consent gate, config validation, and every
+  existing credential-free test still run and pass before any of this is reached; construction itself makes no
+  network call (the token callback is invoked lazily by `CopilotClient` on the first real request).
+- **`CopilotStudioTokenProvider`** — MSAL device-code auth (`IPublicClientApplication.AcquireTokenWithDeviceCode`)
+  with a persisted, OS-encrypted token cache (`Microsoft.Identity.Client.Extensions.Msal` — DPAPI on Windows,
+  Keychain on macOS, libsecret on Linux) keyed by a SHA-256 hash of `TenantId|AppClientId`, silent-acquisition-first
+  (`AcquireTokenSilent`) with device-code fallback on `MsalUiRequiredException`. New code — no prior token-caching
+  precedent existed in this repo.
+- **`CopilotStudioConfig.Cloud` now resolves to the real `PowerPlatformCloud` enum** (`ResolveCloud()` /
+  `Validate()`), verified against the actual restored `Microsoft.Agents.CopilotStudio.Client` 1.3.171-beta package
+  (not the higher version number a prior planning doc assumed — see the deviation note below). Case-insensitive,
+  defaults to `Prod` when omitted, and a typo'd/unrecognized value now fails config validation with a clear error
+  listing the valid names, before any network call.
+- **`ICopilotStudioConversationClient`** — an AgentEval-owned abstraction over the two `CopilotClient` members the
+  chat-client shim needs. The real package does not publicly export a mockable `ICopilotClient` interface (an
+  earlier decompilation-based design note assumed one existed), so this repo defines its own seam instead —
+  this is also what makes `CopilotStudioChatClient` unit-testable without live credentials.
+- **`SingleNameHttpClientFactory`** — a minimal `IHttpClientFactory` for the one named client `CopilotClient`
+  requires, avoiding a full `Microsoft.Extensions.Http` + `ServiceCollection` registration for a CLI with no
+  ambient DI container.
+- New package references (`AgentEval.Cli`, centrally pinned in `Directory.Packages.props`):
+  `Microsoft.Agents.CopilotStudio.Client` 1.3.171-beta, `Microsoft.Agents.Core` 1.3.171-beta,
+  `Microsoft.Identity.Client` 4.84.2, `Microsoft.Identity.Client.Extensions.Msal` 4.84.2,
+  `Microsoft.Extensions.Http` 10.0.8 (raised `Microsoft.Extensions.DependencyInjection`'s central floor to 10.0.8
+  to match).
+
+#### Deviations from the design doc (`strategy/CopilotStudio/Bench-Eval-Integration-and-Live-Connector-Plan.md`, local-only)
+- The doc cites `Microsoft.Agents.CopilotStudio.Client` "v1.6.150 — latest stable" and a decompiled `ICopilotClient`
+  interface implemented by `CopilotClient`. Neither matches what actually restores from nuget.org: the real latest
+  is **1.3.171-beta**, and reflecting on that exact assembly shows `CopilotClient` implements **no interface at
+  all** (`GetInterfaces()` returns empty) — its full public surface is narrower than the doc's decompilation notes
+  assumed. This CHANGELOG entry and the code's own XML docs are the corrected record; `ICopilotStudioConversationClient`
+  above is the concrete consequence.
+- `--max-credits` enforcement (the doc's Track 1 item 6) is **not implemented** — the SDK's activity/response
+  models expose no Copilot Credit cost field to enforce against, so `--max-credits` remains parsed-but-unenforced
+  exactly as before (`ExitCodes.BudgetExceeded` stays reserved, unused).
+
+#### Not independently live-verified — needs a real Entra app registration + non-prod Copilot Studio agent
+- The MSAL device-code prompt, silent-refresh, and persisted-cache round-trip (`CopilotStudioTokenProvider.GetTokenAsync`).
+- Whether a real agent's `StartConversationAsync`/`AskQuestionAsync` activity stream matches the shape
+  `CopilotStudioChatClient` assumes (in particular, any non-`message` activity worth surfacing, and real
+  multi-activity turns).
+- The end-to-end network round trip (real HTTP call, real response parsing) against a live MCS agent.
+- A gated, `Skip`-by-default manual test (`CopilotStudioLiveConnectorManualTests`, `tests/AgentEval.Tests/Cli/CopilotStudio/`)
+  is ready to run once credentials exist — see its XML doc for setup.
+
 ## [0.16.0-beta] - 2026-07-13
 
 Gatekeeper reaches production-grade runtime enforcement: a calibrated flagship judge for indirect prompt

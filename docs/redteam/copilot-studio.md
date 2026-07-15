@@ -4,12 +4,13 @@ Red-teams a **live Microsoft Copilot Studio (MCS) agent** through the same `agen
 any OpenAI-compatible/Azure endpoint — with its own CLI options, a ship-blocking consent gate, and a fidelity
 ceiling that is reported honestly rather than guessed at.
 
-> **This is a scaffold, not a finished live integration.** The CLI surface, the config schema, every validation
-> rule, and the credential-free test seam are real and enforced today. The one piece that is **not** wired yet is
-> the live connector itself — `CopilotStudioAgentFactory.BuildLive` throws unconditionally (see
-> [What's deferred](#whats-deferred--the-live-connector)). So right now, running `--sut copilot-studio` against a
-> real config will pass every validation check and then fail with a clear "not wired yet" error — it cannot yet
-> complete an actual scan against a live agent.
+> **The live connector is wired but not independently live-verified.** The CLI surface, the config schema, every
+> validation rule, the credential-free test seam, and (as of this release) `CopilotStudioAgentFactory.BuildLive`
+> itself all construct successfully and are covered by tests. What has **not** been exercised against a real
+> Copilot Studio agent is the actual network round trip — the MSAL device-code sign-in, the persisted token cache,
+> and whether a real agent's activity stream matches what the connector shim assumes (see
+> [What's verified vs. what still needs a live check](#whats-verified-vs-what-still-needs-a-live-check)). If you
+> run this against a real config and hit an unexpected error mid-scan, that gap is why — please file it.
 
 ## What it is
 
@@ -20,7 +21,9 @@ ceiling that is reported honestly rather than guessed at.
 - validates a set of MCS-specific safety rules **before any network call**,
 - builds the system-under-test as a MAF `AIAgent` wrapped in `MAFAgentAdapter` — the same adapter seam the
   Foundry integration and `AzureChatAgentFactory` use, per `CopilotStudioAgentFactory.FromAgent`,
-- and — once the live connector ships — will drive a real MCS conversation at **text-only / `Verbal`** fidelity.
+- and drives a real MCS conversation at **text-only / `Verbal`** fidelity via `CopilotStudioAgentFactory.BuildLive`
+  (a real `CopilotClient` bridged into an `IChatClient` by `CopilotStudioChatClient`) — see
+  [What's verified vs. what still needs a live check](#whats-verified-vs-what-still-needs-a-live-check).
 
 Source: `src/AgentEval.Cli/CopilotStudio/CopilotStudioConfig.cs`,
 `src/AgentEval.Cli/CopilotStudio/CopilotStudioRedTeamTarget.cs`,
@@ -28,30 +31,33 @@ Source: `src/AgentEval.Cli/CopilotStudio/CopilotStudioConfig.cs`,
 
 ## Prerequisites
 
-To author and validate a config today, you need:
+To author and validate a config, you need:
 
-- an AgentEval CLI build that includes this target (shipped from `0.16.0-beta`),
+- an AgentEval CLI build that includes the live connector (from this release; `0.16.0-beta` had the credential-free
+  scaffold only),
 - the target agent's **Power Platform environment id** and **schema name** (the MCS bot identifier),
 - the **Entra tenant id** the agent + app registration live in,
-- an **Entra app-registration client id** (a public client — no secret) for the eventual device-code auth,
+- an **Entra app-registration client id** (a public client — no secret) for device-code auth,
 - a **non-production** copy of the agent — the consent flag below exists precisely because there is no sandbox.
 
-None of this currently gets you a completed live scan — see the callout above. The only way to drive
-`--sut copilot-studio` end-to-end today is the `sutOverride` test seam
+The connector is wired and unit-tested, but has not been exercised end-to-end against a real MCS agent (see the
+callout above) — treat a first real run as a smoke test, not a proven-in-production path. You can still drive
+`--sut copilot-studio` fully credential-free via the `sutOverride` test seam
 (`CopilotStudioAgentFactory.FromAgent`), which is how the project's own test suite
-(`tests/AgentEval.Tests/Cli/CopilotStudio/`) exercises the whole path credential-free and offline.
+(`tests/AgentEval.Tests/Cli/CopilotStudio/`) exercises the CLI parsing → validation → gate → scan → reporting path
+offline.
 
 ## Authoring the config JSON
 
-`--copilotstudio-config <file.json>` points at a connection file. It carries **no secret** — the token is meant
-to be acquired at run time (device-code → persisted MSAL cache) once the live connector ships; it is never
-stored in this file.
+`--copilotstudio-config <file.json>` points at a connection file. It carries **no secret** — the token is
+acquired at run time via MSAL device-code auth (first run: sign in via a browser using a printed code; later
+runs: silently, from a persisted OS-encrypted cache) and is never stored in this file.
 
 The CLI help text for the flag says this plainly:
 
 > JSON file with the Copilot Studio connection (environmentId, schemaName, tenantId, appClientId; optional
-> cloud, agentName). No secret is stored here; the live connector (not implemented yet) will acquire the token
-> at run time. Required by `--sut copilot-studio`.
+> cloud, agentName). No secret is stored here; the token is acquired at run time via MSAL device-code auth + a
+> persisted cache. Required by `--sut copilot-studio`.
 
 | Field | Required | Notes |
 |---|:--:|---|
@@ -59,7 +65,7 @@ The CLI help text for the flag says this plainly:
 | `schemaName` | yes | The agent's schema name (the MCS bot identifier), e.g. `cr1a2_myAgent`. |
 | `tenantId` | yes | The Entra tenant id the agent + app registration live in. |
 | `appClientId` | yes | The Entra app-registration client id used for device-code auth (a public client, never a secret). |
-| `cloud` | no | Power Platform cloud, e.g. `Prod` (default), `Gov`, `High`. |
+| `cloud` | no | Power Platform cloud — matches `PowerPlatformCloud`'s member names, case-insensitively: `Prod` (default), `Gov`, `High`, `DoD`, `Mooncake`, `GovFR`, `Ex`, `Rx`, `Local`, `Other` (plus the Microsoft-internal-only `Exp`/`Dev`/`Test`/`Preprod`/`FirstRelease`/`Prv`). An unrecognized value fails validation before any network call. |
 | `agentName` | no | Display name for reports; falls back to `schemaName` if omitted or blank. |
 
 Loading is case-insensitive on property names, but the convention (and every test fixture) uses camelCase:
@@ -112,8 +118,6 @@ The CLI help text for the flag says this plainly:
 
 ## Running a scan
 
-Once the live connector ships, a scan will look like this:
-
 ```bash
 agenteval redteam --sut copilot-studio \
   --copilotstudio-config ./mcs-agent.json \
@@ -121,7 +125,7 @@ agenteval redteam --sut copilot-studio \
   --intensity quick --format sarif -o redteam.sarif
 ```
 
-What the command does with these flags **today**, in order:
+What the command does with these flags, in order:
 
 1. Refuses immediately if `--i-understand-live-side-effects` is absent.
 2. Refuses if `--copilotstudio-config` is absent.
@@ -130,55 +134,67 @@ What the command does with these flags **today**, in order:
    hard-requires the default of 1.
 5. Refuses if you pass `--judge` without `--judge-model`, or `--attacker` without `--attacker-model` — this
    target has no model of its own to fall back to (see [Honest reasoning](#how-it-fits-red-team-fidelity)).
-6. Loads and validates the config JSON (fail fast on a bad file, before the scan starts).
+6. Loads and validates the config JSON, including `cloud` (fail fast on a bad file, before the scan starts).
 7. Prints a one-line note to stderr (unless `--quiet`) if you also passed `--endpoint`, `--azure`, `--model`,
    `--deployment-name`, a non-default `--sut-tier`, `--system-prompt`, or `--system-prompt-canary` — all of
    these are ignored for this target.
-8. Reaches the live build step and throws — see [What's deferred](#whats-deferred--the-live-connector).
+8. Builds the live connector (`ConnectionSettings` + token scope + `CopilotClient`) — still no network call yet.
+9. Starts the scan. The **first** request of the run is where a network call and, if no cached token exists yet,
+   an MSAL device-code prompt actually happen — the console will print a sign-in URL + code; complete it in a
+   browser once, and later runs reuse the persisted cache silently.
 
-Every step through 6 is exercised by the test suite with a fake agent (no config file needed for those tests to
-be meaningful — only for you to reach step 6 yourself). Step 8 is the current, deliberate stop.
+Steps 1–8 are exercised by the test suite with a fake agent or without ever calling `agent.InvokeAsync` (no config
+file needed for those tests to be meaningful — only for you to reach step 6 yourself). Step 9 — the actual network
+round trip — has not been independently live-verified; see the callout at the top of this page.
 
 ## What `--max-credits` does today
 
-`--max-credits <n>` is **parsed and validated, but not yet enforced.** Concretely:
+`--max-credits <n>` is **parsed and validated, but not enforced.** Concretely:
 
 - The option defaults to `0` ("no cap") and must be `>= 0` — a negative value is rejected at validation time,
   before the config even loads.
-- There is no code path today that spends or checks a Copilot Credit budget, because there is no live connector
-  making calls yet.
-- Once the live connector ships, hitting the cap is designed to stop the scan with **exit code 8**
-  (`ExitCodes.BudgetExceeded`) — reserved now, not emitted by any current build. See the
+- There is no code path that spends or checks a Copilot Credit budget: the Copilot Studio SDK's activity/response
+  models expose no credit-cost field to enforce against, so there's nothing to wire this up to yet.
+- Exit code 8 (`ExitCodes.BudgetExceeded`) stays reserved and unemitted until a credit-cost signal exists. See the
   [exit-code table](../cli.md#exit-codes) in the CLI reference.
 
 The CLI help text for the flag says this plainly:
 
-> Cap the Copilot Credits a live `--sut copilot-studio` scan may spend (0 = no cap). Enforcement is deferred
-> with the live connector; once it ships, hitting the cap will stop the scan with exit 8 (BudgetExceeded).
-> Every turn burns credits, and a reasoning turn costs substantially more than a scripted one.
+> Cap the Copilot Credits a live `--sut copilot-studio` scan may spend (0 = no cap). NOT YET ENFORCED — the SDK
+> exposes no credit-cost field to enforce against, so this is parsed/validated only; exit 8 (BudgetExceeded)
+> stays reserved. Every turn burns credits, and a reasoning turn costs substantially more than a scripted one.
 
-Don't rely on `--max-credits` as a real spend guard yet — because the live connector itself isn't wired, there
-is currently no scan that could overspend in the first place.
+Don't rely on `--max-credits` as a real spend guard — track Copilot Credit consumption through Power Platform's
+own admin tooling instead.
 
-## What's deferred — the live connector
+## What's verified vs. what still needs a live check
 
-`CopilotStudioAgentFactory.BuildLive` is the one function standing between this scaffold and a real scan. It
-validates the config (so a bad config surfaces *your* error, not a deferral message), then throws:
+`CopilotStudioAgentFactory.BuildLive` constructs a real `CopilotClient` from your config: `ConnectionSettings`
+mapped 1:1 (`EnvironmentId`/`SchemaName`/`Cloud`), the token scope from `CopilotClient.ScopeFromSettings` (never
+hardcoded), and a `CopilotStudioTokenProvider` (MSAL device-code + persisted cache) wired as the token callback.
+None of this makes a network call — the callback is only invoked lazily, by `CopilotClient` itself, on the first
+real request. The result is wrapped in a `ChatClientAgent` over a new `CopilotStudioChatClient` (bridges the
+SDK's streaming Bot Framework activity API into `IChatClient`), then `CopilotStudioAgentFactory.FromAgent` — the
+same seam the credential-free tests already exercise.
 
-```text
-The live Copilot Studio connector is not wired yet, so --sut copilot-studio cannot run a live scan in this
-release. The scaffold, safety gates, and credential-free CI path are complete; wiring the connector (the
-Microsoft.Agents.CopilotStudio.Client package + device-code auth, verified against the current MAF release)
-is still to come. For now, red-team an OpenAI-compatible or Azure endpoint with --endpoint / --azure, or try
-the credential-free --sut gatekeeper-demo.
-```
+**Unit-tested, credential-free:** the `Cloud` → `PowerPlatformCloud` mapping; `BuildLive`'s construction path
+(proven not to throw and not to touch the network for a valid config); the activity-stream bridging logic in
+`CopilotStudioChatClient` (message-vs-non-message filtering, conversation-id tracking, first-turn vs. subsequent-turn
+behavior) against a hand-rolled fake client.
 
-`CopilotStudioAgentFactory.FromAgent`, by contrast, **is** finished and tested — it wraps any already-constructed
-MAF `AIAgent` as an `IEvaluableAgent` via `MAFAgentAdapter`. It's the seam the live path is designed to reuse once
-the connector exists, and today it's exactly what `tests/AgentEval.Tests/Cli/CopilotStudio/*.cs` uses (a
-`ChatClientAgent` over a fake `IChatClient`) to prove the CLI parsing → validation → gate → scan → reporting path
-end-to-end without any credential or network call. There is no supported way, as a CLI user, to substitute your
-own pre-built agent for `FromAgent` outside of tests — it isn't exposed as a flag.
+**NOT independently live-verified — needs a real Entra app registration + non-prod Copilot Studio agent:** the
+MSAL device-code prompt and silent-refresh path; the persisted-cache round trip across runs; the real HTTP
+round trip and response parsing; whether a real agent's `StartConversationAsync`/`AskQuestionAsync` activity
+stream matches what the shim assumes (in particular, any non-`message` activity worth surfacing). A gated,
+`Skip`-by-default test (`CopilotStudioLiveConnectorManualTests` in `tests/AgentEval.Tests/Cli/CopilotStudio/`) is
+ready to run once you have credentials — see its XML doc for setup.
+
+`CopilotStudioAgentFactory.FromAgent` is unchanged and still the credential-free seam: it wraps any
+already-constructed MAF `AIAgent` as an `IEvaluableAgent` via `MAFAgentAdapter`, and it's exactly what
+`tests/AgentEval.Tests/Cli/CopilotStudio/*.cs` uses (a `ChatClientAgent` over a fake `IChatClient`) to prove the
+CLI parsing → validation → gate → scan → reporting path end-to-end without any credential or network call. There
+is no supported way, as a CLI user, to substitute your own pre-built agent for `FromAgent` outside of tests — it
+isn't exposed as a flag.
 
 Until the connector ships, use `--endpoint`/`--azure` against your own agent, or the credential-free
 `--sut gatekeeper-demo` target, to exercise the rest of the red-team suite.
@@ -220,13 +236,14 @@ AgentEval's red-team scoring is honest about *how much* evidence a verdict is ba
 | `Invalid Copilot Studio config JSON (…)` | The file isn't valid JSON. | Fix the syntax — the wrapped message includes the underlying `JsonException` detail. |
 | `--sut copilot-studio runs at --parallelism 1…` | `--parallelism` was set above 1. | Drop `--parallelism` (default is already 1) or set it explicitly to 1. |
 | `--sut copilot-studio has no model of its own; pass --judge-model <name>…` | `--judge <url>` was passed without `--judge-model`. | Add `--judge-model <name>`. Same fix, with `--attacker-model`, if the message names `--attacker`. |
-| `The live Copilot Studio connector is not wired yet, so --sut copilot-studio cannot run a live scan in this release.` | Expected, for every invocation right now — this is not a bug in your config. | Nothing to fix on your end yet. Use `--endpoint`/`--azure` against your own agent, or `--sut gatekeeper-demo`, in the meantime. |
+| `Copilot Studio config field 'cloud' has an unrecognized value: '…'` | `cloud` in the config JSON doesn't match a `PowerPlatformCloud` member name. | Use one of the values listed in the [config table](#authoring-the-config-json) above (case-insensitive). |
+| A device-code prompt appears and the scan seems to hang | First run against a given (tenant, app) pair with no cached token yet — this is expected MSAL device-code sign-in, not a bug. | Open the printed URL in a browser and enter the printed code. Later runs reuse the persisted cache silently. |
 | `Unknown --sut value: '…'. Valid: gatekeeper-demo, copilot-studio.` | A typo in `--sut` (it's case-insensitive, but must otherwise match). | Use `copilot-studio` (or `gatekeeper-demo`). |
 
 ## See also
 
 - [Red Team Security](../redteam.md) — the full scanner: attacks, evidence fidelity, judge modes, CI baseline gate.
 - [CLI Reference — Exit codes](../cli.md#exit-codes) — the full exit-code table, including the reserved `8`
-  (`BudgetExceeded`) this target will use once `--max-credits` enforcement ships.
+  (`BudgetExceeded`) this target will use once `--max-credits` enforcement has a credit-cost signal to enforce.
 - [Attack the gate](../gatekeeper/attack-the-gate.md) — the credential-free `--sut gatekeeper-demo` closed loop,
-  useful today while the Copilot Studio connector is deferred.
+  useful for CI where a live Copilot Studio agent + credentials aren't available.

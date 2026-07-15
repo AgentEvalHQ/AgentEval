@@ -32,14 +32,14 @@ internal sealed record CopilotStudioTargetOptions : IRedTeamTargetOptions
 /// bloats <c>RedTeamCommand</c>.
 /// </summary>
 /// <remarks>
-/// The live connector is deferred (<see cref="CopilotStudioAgentFactory.BuildLive"/> throws a clear error until it is
-/// implemented). The whole path is testable credential-free via the <c>sutOverride</c> seam.
+/// <see cref="CopilotStudioAgentFactory.BuildLive"/> now wires a real connector (see its own XML doc); the whole
+/// path up to and including this method's gates is still testable credential-free via the <c>sutOverride</c> seam.
 /// </remarks>
 internal sealed class CopilotStudioRedTeamTarget : IRedTeamBuiltInTarget
 {
     private readonly Option<FileInfo?> _configOpt = new("--copilotstudio-config")
     {
-        Description = "JSON file with the Copilot Studio connection (environmentId, schemaName, tenantId, appClientId; optional cloud, agentName). No secret is stored here; the live connector (not implemented yet) will acquire the token at run time. Required by --sut copilot-studio.",
+        Description = "JSON file with the Copilot Studio connection (environmentId, schemaName, tenantId, appClientId; optional cloud, agentName). No secret is stored here; the token is acquired at run time via MSAL device-code auth + a persisted cache. Required by --sut copilot-studio.",
     };
 
     private readonly Option<bool> _ackOpt = new("--i-understand-live-side-effects")
@@ -50,7 +50,7 @@ internal sealed class CopilotStudioRedTeamTarget : IRedTeamBuiltInTarget
     private readonly Option<int> _maxCreditsOpt = new("--max-credits")
     {
         DefaultValueFactory = _ => 0,
-        Description = "Cap the Copilot Credits a live --sut copilot-studio scan may spend (0 = no cap). Enforcement is deferred with the live connector; once it ships, hitting the cap will stop the scan with exit 8 (BudgetExceeded). Every turn burns credits, and a reasoning turn costs substantially more than a scripted one.",
+        Description = "Cap the Copilot Credits a live --sut copilot-studio scan may spend (0 = no cap). NOT YET ENFORCED — the SDK exposes no credit-cost field to enforce against, so this is parsed/validated only; exit 8 (BudgetExceeded) stays reserved. Every turn burns credits, and a reasoning turn costs substantially more than a scripted one.",
     };
 
     private CopilotStudioConfig? _config;   // memoized within one ExecuteAsync call (Validate -> ResolvedName -> Build)
@@ -140,7 +140,7 @@ internal sealed class CopilotStudioRedTeamTarget : IRedTeamBuiltInTarget
             return sutOverride;   // test seam: a pre-built (fake) SUT drives the whole scan credential-free
         }
 
-        // Live path — deferred: BuildLive throws a clear error until the live connector is wired + verified.
+        // Live path: builds a real connector (see BuildLive's own XML doc for what's live-verified vs. not).
         return CopilotStudioAgentFactory.BuildLive(EnsureConfig(opts));
     }
 
