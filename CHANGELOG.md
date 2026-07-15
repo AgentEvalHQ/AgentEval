@@ -7,6 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Gatekeeper — MonetaryLimitGate + PerToolCallBudgetGate (focused deterministic siblings of RunBudgetGate)
+
+#### Added
+- **`MonetaryLimitGate`** (`AgentEval.MAF.Gatekeeper.Gates`) — a dedicated tool gate capping the running sum of a
+  monetary tool-call argument (e.g. `"amount"`) across a run, off the shared `RunLedger`. The economic sibling of
+  `RunBudgetGate`, scoped to a single argument/cap pair with its own `PolicyName` in the evidence trail — for
+  payment/refund/transfer-style tools without wiring `RunBudgetGate`'s combined total/per-tool/monetary
+  constructor. Fails closed on an unparseable amount, clamps a negative amount to zero (can't manufacture
+  headroom), and the block reason never echoes the attempted amount or running sum — only the argument name and
+  the *configured* cap, matching the taint-tracking gate's discipline of never leaking sensitive values into trace
+  evidence.
+- **`PerToolCallBudgetGate`** (`AgentEval.MAF.Gatekeeper.Gates`) — a dedicated tool gate capping how many times
+  specific tools may be called in one run (e.g. `["delete_account"] = 1`, `["send_email"] = 3`), off the shared
+  `RunLedger`. Blunts spray/loop attacks — an injected instruction that tries to fire the same destructive tool
+  repeatedly is stopped at the configured count regardless of phrasing. A tool not named in the caps is
+  unconditionally allowed.
+- **`RunLedger.TryAdmitMonetary` / `TryAdmitPerToolCall`** — new atomic, per-dimension ledger primitives backing
+  the two gates above. Deliberately isolated from `RunBudgetGate`'s own `TryAdmitToolCall` bookkeeping (which
+  always bumps its shared per-tool/total counters on any admit, even for a dimension the caller didn't ask it to
+  check) — so composing either dedicated gate with `RunBudgetGate`, or with each other, over an overlapping
+  tool/argument name can never cross-contaminate a count. Covered by a regression test proving the isolation holds
+  even when `RunBudgetGate` and `PerToolCallBudgetGate` are stacked on the same tool.
+- **`samples/AgentEval.Samples/Gatekeeper/09_GatekeeperMonetaryAndPerCallBudget.cs`** — a live sample (real Azure
+  OpenAI agent, no scripted fakes) with three scenes: a 10-call refund spray capped at 3 by `PerToolCallBudgetGate`,
+  a single $50,000 refund blocked by a $1,000 `MonetaryLimitGate` cap, and both gates stacked against a $300 ×
+  10-order spray — success is keyed on the actual recorded `gate.tool.*` block count, never on "no exception
+  thrown." Wired into the samples menu (Group J).
+- Extracted `AmountArgumentParser` (shared by `RunBudgetGate` and `MonetaryLimitGate`) so the two gates parse a
+  monetary argument (`decimal` / `double` / `int` / `long` / `JsonElement` / numeric `string`) identically —
+  behavior-preserving refactor of `RunBudgetGate`'s previously-private parsing logic, no functional change.
+
 ## [0.16.0-beta] - 2026-07-13
 
 Gatekeeper reaches production-grade runtime enforcement: a calibrated flagship judge for indirect prompt

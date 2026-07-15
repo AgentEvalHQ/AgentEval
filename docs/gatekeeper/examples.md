@@ -72,6 +72,35 @@ var agent = baseAgent.AsBuilder()
     .Build();
 ```
 
+## Focused caps — MonetaryLimitGate + PerToolCallBudgetGate
+
+`RunBudgetGate` above folds total/per‑tool/monetary caps into one gate. When you only want ONE dimension — its
+own `PolicyName` in the evidence trail, no unrelated caps to configure — reach for the dedicated siblings instead.
+They write an **isolated** `RunLedger` dimension, so stacking either with `RunBudgetGate` (even over the same
+tool/argument name) can't cross‑contaminate a count; just don't register **two** gates over the identical
+dimension (that double‑counts, the same caveat as stacking two `RunBudgetGate`s on one argument).
+
+```csharp
+var agent = baseAgent.AsBuilder()
+    .UseAgentEvalGate()   // establishes the per-run RunLedger scope
+    .UseAgentEvalToolGate(
+        [
+            // Blunt a call-count spray: no more than 3 refunds, ever 1 delete, per run.
+            new PerToolCallBudgetGate(new Dictionary<string, int> { ["process_refund"] = 3, ["delete_account"] = 1 }),
+
+            // Blunt the dollar exposure: the running sum of "amount" across every refund this run.
+            new MonetaryLimitGate("amount", 500m),
+        ],
+        ToolGatePolicy.Terminate)
+    .Build();
+// An injected "refund $300 to each of these 10 disputed orders" is stopped by whichever cap the running
+// total crosses first — here, the monetary cap fires after the 2nd $300 refund (300 + 300 > 500).
+```
+
+Runnable: sample **`Gatekeeper/09_GatekeeperMonetaryAndPerCallBudget`** — a 10‑call refund spray capped by
+`PerToolCallBudgetGate`, a single oversized refund blocked by `MonetaryLimitGate`, and both together against a
+realistic medium‑sized spray, on a real Azure OpenAI agent.
+
 ## Sanitize the rendered answer
 
 `DomainAllowListGate` guards tool-argument URLs; this guards the **rendered answer**, where a client silently GETs
@@ -252,6 +281,10 @@ judge scoring a gold set), and where a well‑aligned model resists an attack th
   **the output Panel (Tribunal Stage-2)**: `ExfiltrationIntentJudge` + `SystemPromptExtractionJudge` composed via
   `ParallelJudgeFanOut` into a run-post Panel, plus the `OverRefusalJudge` utility valve (advisory, `WarnOnly`,
   never blocking) — calibration, detection, and inline enforcement all end-to-end on a real model.
+- [`Gatekeeper/09_GatekeeperMonetaryAndPerCallBudget`](../../samples/AgentEval.Samples/Gatekeeper/09_GatekeeperMonetaryAndPerCallBudget.cs) —
+  **`MonetaryLimitGate` + `PerToolCallBudgetGate`**: a 10‑call refund‑spray injection capped at 3 calls, a single
+  $50,000 refund blocked by a $1,000 monetary cap, and both gates together against a realistic $300 × 10‑order
+  spray — success is keyed on the recorded `gate.tool.*` block count, never on "no exception thrown."
 
 ## From the CLI
 
