@@ -3,7 +3,6 @@
 // Licensed under the MIT License.
 
 using System.Globalization;
-using System.Text.Json;
 
 namespace AgentEval.MAF.Gatekeeper;
 
@@ -92,13 +91,13 @@ public sealed class RunBudgetGate : IToolGate
         var amount = 0m;
         if (_monetaryArg is not null)
         {
-            switch (GetAmount(call.Arguments, _monetaryArg, out var raw))
+            switch (AmountArgumentParser.TryGetAmount(call.Arguments, _monetaryArg, out var raw))
             {
-                case AmountParse.Unparseable:
+                case AmountParseResult.Unparseable:
                     // Present but unverifiable ⇒ fail closed (an unparseable amount must not slip under the cap).
                     return new ValueTask<ToolGateVerdict>(ToolGateVerdict.Block(PolicyName,
                         $"monetary argument '{_monetaryArg}' is present but could not be parsed — cannot verify the run budget"));
-                case AmountParse.Parsed:
+                case AmountParseResult.Parsed:
                     amount = Math.Max(0m, raw);   // clamp: a negative amount can never create headroom under the cap
                     break;
                 default:
@@ -123,78 +122,5 @@ public sealed class RunBudgetGate : IToolGate
         };
 
         return new ValueTask<ToolGateVerdict>(verdict);
-    }
-
-    private enum AmountParse
-    {
-        /// <summary>The argument is not present (or null) — no monetary component.</summary>
-        Absent,
-
-        /// <summary>The argument parsed to a usable decimal.</summary>
-        Parsed,
-
-        /// <summary>The argument is present but could not be parsed — the caller must fail closed.</summary>
-        Unparseable,
-    }
-
-    private static AmountParse GetAmount(IReadOnlyDictionary<string, object?>? args, string argName, out decimal amount)
-    {
-        amount = 0m;
-        if (args is null || !args.TryGetValue(argName, out var raw) || raw is null)
-        {
-            return AmountParse.Absent;
-        }
-
-        switch (raw)
-        {
-            case decimal d: amount = d; return AmountParse.Parsed;
-            case double db: return TryFromDouble(db, out amount) ? AmountParse.Parsed : AmountParse.Unparseable;
-            case float f: return TryFromDouble(f, out amount) ? AmountParse.Parsed : AmountParse.Unparseable;
-            case int i: amount = i; return AmountParse.Parsed;
-            case long l: amount = l; return AmountParse.Parsed;
-            case JsonElement je: return TryFromJsonElement(je, out amount) ? AmountParse.Parsed : AmountParse.Unparseable;
-            case string s:
-                return decimal.TryParse(s, NumberStyles.Any, CultureInfo.InvariantCulture, out amount) ? AmountParse.Parsed : AmountParse.Unparseable;
-            default:
-                try
-                {
-                    amount = Convert.ToDecimal(raw, CultureInfo.InvariantCulture);
-                    return AmountParse.Parsed;
-                }
-                catch (Exception ex) when (ex is FormatException or InvalidCastException or OverflowException)
-                {
-                    return AmountParse.Unparseable;   // present but not a usable amount ⇒ fail closed
-                }
-        }
-    }
-
-    private static bool TryFromJsonElement(JsonElement je, out decimal amount)
-    {
-        amount = 0m;
-        return je.ValueKind switch
-        {
-            JsonValueKind.Number => je.TryGetDecimal(out amount),
-            JsonValueKind.String => decimal.TryParse(je.GetString(), NumberStyles.Any, CultureInfo.InvariantCulture, out amount),
-            _ => false,
-        };
-    }
-
-    private static bool TryFromDouble(double d, out decimal amount)
-    {
-        amount = 0m;
-        if (double.IsNaN(d) || double.IsInfinity(d))
-        {
-            return false;
-        }
-
-        try
-        {
-            amount = (decimal)d;   // can overflow for very large magnitudes
-            return true;
-        }
-        catch (OverflowException)
-        {
-            return false;
-        }
     }
 }
