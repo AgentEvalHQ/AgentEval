@@ -60,6 +60,12 @@ public sealed class GatekeeperOptions
     /// <summary>Optional gate-effectiveness telemetry sink (Phase 1, #18), wired into the tool-gate loop.</summary>
     public GateTelemetry? Telemetry { get; set; }
 
+    /// <summary>
+    /// How much of a <see cref="ToolGateAction.Mutate"/> verdict's before/after arguments are captured into
+    /// the trace (Phase 1, #13). Defaults to <see cref="TraceCaptureMode.Redacted"/>.
+    /// </summary>
+    public TraceCaptureMode MutationCaptureMode { get; set; } = TraceCaptureMode.Redacted;
+
     /// <summary>Optional shadow-judge pump (caller-owned) for asynchronous, off-hot-path judgement.</summary>
     public ShadowJudgePump? ShadowJudgePump { get; set; }
 

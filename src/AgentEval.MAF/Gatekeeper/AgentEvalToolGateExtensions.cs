@@ -3,8 +3,6 @@
 // Licensed under the MIT License.
 
 using System.Diagnostics;
-using System.Text.Encodings.Web;
-using System.Text.Json;
 using AgentEval.Tracing;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
@@ -46,12 +44,20 @@ public static class AgentEvalToolGateExtensions
     /// Optional <see cref="GateTelemetry"/> sink (Phase 1, #18) — records which gate fired, its verdict, and
     /// its latency on every invocation. Caller-owned; pass the same instance you read from later.
     /// </param>
+    /// <param name="mutationCaptureMode">
+    /// How much of a <see cref="ToolGateAction.Mutate"/> verdict's before/after arguments are captured into
+    /// the trace (Phase 1, #13). Defaults to <see cref="TraceCaptureMode.Redacted"/> — a prior version always
+    /// captured arguments verbatim, which could put a secret an argument carries into the trace. Pass
+    /// <see cref="TraceCaptureMode.Full"/> explicitly to restore that behavior when you know your arguments
+    /// never carry secrets and want the exact before/after values for debugging.
+    /// </param>
     public static AIAgentBuilder UseAgentEvalToolGate(
         this AIAgentBuilder builder,
         IReadOnlyList<IToolGate> gates,
         ToolGatePolicy policy,
         AgentTrace? trace = null,
-        GateTelemetry? telemetry = null)
+        GateTelemetry? telemetry = null,
+        TraceCaptureMode mutationCaptureMode = TraceCaptureMode.Redacted)
     {
         ArgumentNullException.ThrowIfNull(builder);
         ArgumentNullException.ThrowIfNull(gates);
@@ -131,7 +137,12 @@ public static class AgentEvalToolGateExtensions
 
                     case ToolGateAction.Mutate:
                     {
-                        var before = SerializeArgs(context.Arguments);
+                        // Snapshot BEFORE mutating — a live reference would show the post-mutation values for
+                        // both "before" and "after" once context.Arguments is cleared/rewritten below.
+                        var before = mutationCaptureMode == TraceCaptureMode.None
+                            ? null
+                            : new Dictionary<string, object?>(context.Arguments);
+
                         if (verdict.NewArguments is not null)
                         {
                             // Mutate the AIFunctionArguments in place (it IS an IDictionary<string,object?>).
@@ -142,7 +153,7 @@ public static class AgentEvalToolGateExtensions
                             }
                         }
 
-                        RecordMutate(trace, Interlocked.Increment(ref gateSeq), verdict, before, SerializeArgs(context.Arguments));
+                        RecordMutate(trace, Interlocked.Increment(ref gateSeq), verdict, before, context.Arguments, mutationCaptureMode);
                         continue;   // the (mutated) tool still runs
                     }
 
@@ -188,27 +199,6 @@ public static class AgentEvalToolGateExtensions
         _ => 0,
     };
 
-    // Relaxed encoder so the recorded args are FAITHFUL (not JSON-escaped): default escaping would render < > & '
-    // and non-ASCII as \uXXXX, so the mutation audit would not match the values the tool actually receives.
-    private static readonly JsonSerializerOptions ArgsSerializerOptions = new() { Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping };
-
-    private static string SerializeArgs(IDictionary<string, object?>? args)
-    {
-        if (args is null || args.Count == 0)
-        {
-            return "{}";
-        }
-
-        try
-        {
-            return JsonSerializer.Serialize(args, ArgsSerializerOptions);
-        }
-        catch (NotSupportedException)
-        {
-            return "(unserializable)";
-        }
-    }
-
     // Mirrors EvalGatingChatClient.Record's value shape — stage token "tool" (dot-free), seq via Interlocked,
     // {action,reason,matches,correlationId}. A Terminate is still action="Block" (it blocked) + terminate=true,
     // so the shipped GlassBoxEvidence.CountGateBlocks counts it.
@@ -239,8 +229,12 @@ public static class AgentEvalToolGateExtensions
     }
 
     // A Mutate is recorded (action="Mutate", NOT counted as a block) with before/after args so the change is
-    // auditable/reconstructable (SEC-06). NOTE: args are serialized verbatim — do not put secrets in tool args.
-    private static void RecordMutate(AgentTrace? trace, int seq, ToolGateVerdict verdict, string argsBefore, string argsAfter)
+    // auditable/reconstructable (SEC-06). #13: how MUCH of the args is captured is governed by TraceCaptureMode
+    // (default Redacted) — a prior version always serialized verbatim, which could put an argument's secret
+    // value into the trace.
+    private static void RecordMutate(
+        AgentTrace? trace, int seq, ToolGateVerdict verdict,
+        IReadOnlyDictionary<string, object?>? argsBefore, IReadOnlyDictionary<string, object?>? argsAfter, TraceCaptureMode captureMode)
     {
         if (trace is null)
         {
@@ -251,8 +245,9 @@ public static class AgentEvalToolGateExtensions
         {
             ["action"] = "Mutate",
             ["reason"] = verdict.Reason,
-            ["argsBefore"] = argsBefore,
-            ["argsAfter"] = argsAfter,
+            ["argsBefore"] = MutationEvidenceRenderer.Render(argsBefore, captureMode),
+            ["argsAfter"] = MutationEvidenceRenderer.Render(argsAfter, captureMode),
+            ["captureMode"] = captureMode.ToString(),
             ["correlationId"] = ToolCorrelationScope.Current,
         });
     }

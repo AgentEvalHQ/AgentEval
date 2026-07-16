@@ -159,20 +159,44 @@ public class ToolGateTests
     public async Task MutateArgs_EvidenceRecordsValuesFaithfully_NotJsonEscaped()
     {
         // The before/after args in the Mutate audit must match what the tool actually receives — default JSON
-        // escaping would render < > & as \uXXXX and make the audit misleading.
+        // escaping would render < > & as \uXXXX and make the audit misleading. Only TraceCaptureMode.Full
+        // records raw values at all (the new default, Redacted, never writes a value into the trace — see
+        // MutateArgs_DefaultCaptureMode_IsRedacted_NeverWritesValue below) — opt into Full explicitly here.
         var tool = AIFunctionFactory.Create((string html) => "ok", "render");
         var (agent, _) = BuildAgent(tool, "render", new Dictionary<string, object?> { ["html"] = "x" });
         var trace = new AgentTrace();
         var gated = agent.AsBuilder()
             .UseAgentEvalToolGate(
                 [new MutatingGate("render", new Dictionary<string, object?> { ["html"] = "a<b>&'c" })],
-                ToolGatePolicy.WarnOnly, trace)
+                ToolGatePolicy.WarnOnly, trace, mutationCaptureMode: TraceCaptureMode.Full)
             .Build();
 
         await gated.RunAsync("go");
 
         var value = (IDictionary<string, object?>)trace.Metadata!["gate.tool.1.MutatingGate"];
         Assert.Contains("a<b>&'c", (string)value["argsAfter"]!);   // raw metacharacters, not < etc.
+    }
+
+    [Fact]
+    public async Task MutateArgs_DefaultCaptureMode_IsRedacted_NeverWritesValue()
+    {
+        // #13: Redacted is the new default — the actual argument VALUE must never appear in the trace, even
+        // though the mutation (which keys changed) is still auditable.
+        var tool = AIFunctionFactory.Create((string html) => "ok", "render");
+        var (agent, _) = BuildAgent(tool, "render", new Dictionary<string, object?> { ["html"] = "x" });
+        var trace = new AgentTrace();
+        var gated = agent.AsBuilder()
+            .UseAgentEvalToolGate(
+                [new MutatingGate("render", new Dictionary<string, object?> { ["html"] = "TOP-SECRET-VALUE" })],
+                ToolGatePolicy.WarnOnly, trace)   // no mutationCaptureMode passed — must default to Redacted
+            .Build();
+
+        await gated.RunAsync("go");
+
+        var value = (IDictionary<string, object?>)trace.Metadata!["gate.tool.1.MutatingGate"];
+        Assert.DoesNotContain("TOP-SECRET-VALUE", (string)value["argsAfter"]!);
+        Assert.Contains("html", (string)value["argsAfter"]!);   // the key IS still visible — only the value is redacted
+        Assert.Equal(nameof(TraceCaptureMode.Redacted), value["captureMode"]);
     }
 
     [Fact]

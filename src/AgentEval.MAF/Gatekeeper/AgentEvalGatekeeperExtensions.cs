@@ -109,7 +109,7 @@ public static class AgentEvalGatekeeperExtensions
 
         if (options.ToolGates.Count > 0)
         {
-            result = result.UseAgentEvalToolGate(options.ToolGates.ToArray(), toolPolicy, options.Trace, options.Telemetry);
+            result = result.UseAgentEvalToolGate(options.ToolGates.ToArray(), toolPolicy, options.Trace, options.Telemetry, options.MutationCaptureMode);
         }
 
         if (options.ApprovalGates.Count > 0)
