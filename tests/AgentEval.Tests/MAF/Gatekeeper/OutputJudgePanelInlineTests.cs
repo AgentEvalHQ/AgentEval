@@ -47,7 +47,7 @@ public class OutputJudgePanelInlineTests
 
         var response = await gated.RunAsync("summarize the customer file");
 
-        Assert.Contains("BLOCKED", response.Text);                                   // the exfil answer never reached the caller
+        Assert.Contains("ACTION_NOT_AUTHORIZED", response.Text);                     // the exfil answer never reached the caller
         Assert.Equal(1, GlassBoxEvidence.FromTrace(trace).GateBlockCount);
         var evidence = (IDictionary<string, object?>)trace.Metadata!["gate.run-post.1.judge-panel"];
         Assert.Equal("Block", evidence["action"]);

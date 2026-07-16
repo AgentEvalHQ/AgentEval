@@ -30,6 +30,9 @@ public sealed class RunBudgetGate : IToolGate
     /// <inheritdoc/>
     public GateCost Cost => GateCost.PureCode;
 
+    /// <inheritdoc/>
+    public GateRequirements Requirements => GateRequirements.RunScope;
+
     /// <summary>Creates the gate. At least one budget must be set.</summary>
     /// <param name="maxToolCalls">Cap on total tool calls per run (blocks the call that would exceed it).</param>
     /// <param name="maxCallsPerTool">Per-tool call caps (e.g. <c>["delete_account"] = 1</c>).</param>

@@ -18,7 +18,9 @@ internal static class GateText
     // Relaxed (non-HTML-escaping) encoder so a serialized secret is rendered with the SAME bytes that flow to a
     // string sink — the default encoder escapes < > & ' and non-ASCII to \uXXXX, which would make a tainted token
     // fail to substring-match the raw value the model actually sends (a silent taint miss).
-    private static readonly JsonSerializerOptions SerializerOptions = new()
+    // Internal (not private): MutationEvidenceRenderer reuses this exact instance rather than declaring its own
+    // near-identical copy — one relaxed-encoder JsonSerializerOptions for the folder, not two that can drift.
+    internal static readonly JsonSerializerOptions SerializerOptions = new()
     {
         Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
     };

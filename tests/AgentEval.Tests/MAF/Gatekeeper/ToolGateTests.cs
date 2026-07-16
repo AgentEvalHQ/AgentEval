@@ -57,7 +57,7 @@ public class ToolGateTests
         var tool = AIFunctionFactory.Create((string path) => { received = path; return path; }, "read_file");
         var (agent, _) = BuildAgent(tool, "read_file", new Dictionary<string, object?> { ["path"] = "/original" });
         var gate = new MutatingGate("read_file", new Dictionary<string, object?> { ["path"] = "/sandbox/original" });
-        var gated = agent.AsBuilder().UseAgentEvalToolGate([gate]).Build();
+        var gated = agent.AsBuilder().UseAgentEvalToolGate([gate], ToolGatePolicy.WarnOnly).Build();
 
         await gated.RunAsync("go");
 
@@ -77,7 +77,7 @@ public class ToolGateTests
         });
 
         Assert.Throws<ArgumentException>(() =>
-            agent.AsBuilder().UseAgentEvalToolGate([new NetworkCostGate()]).Build());
+            agent.AsBuilder().UseAgentEvalToolGate([new NetworkCostGate()], ToolGatePolicy.WarnOnly).Build());
     }
 
     // ── Gates ──
@@ -159,14 +159,16 @@ public class ToolGateTests
     public async Task MutateArgs_EvidenceRecordsValuesFaithfully_NotJsonEscaped()
     {
         // The before/after args in the Mutate audit must match what the tool actually receives — default JSON
-        // escaping would render < > & as \uXXXX and make the audit misleading.
+        // escaping would render < > & as \uXXXX and make the audit misleading. Only TraceCaptureMode.Full
+        // records raw values at all (the new default, Redacted, never writes a value into the trace — see
+        // MutateArgs_DefaultCaptureMode_IsRedacted_NeverWritesValue below) — opt into Full explicitly here.
         var tool = AIFunctionFactory.Create((string html) => "ok", "render");
         var (agent, _) = BuildAgent(tool, "render", new Dictionary<string, object?> { ["html"] = "x" });
         var trace = new AgentTrace();
         var gated = agent.AsBuilder()
             .UseAgentEvalToolGate(
                 [new MutatingGate("render", new Dictionary<string, object?> { ["html"] = "a<b>&'c" })],
-                ToolGatePolicy.WarnOnly, trace)
+                ToolGatePolicy.WarnOnly, trace, mutationCaptureMode: TraceCaptureMode.Full)
             .Build();
 
         await gated.RunAsync("go");
@@ -176,12 +178,137 @@ public class ToolGateTests
     }
 
     [Fact]
+    public async Task MutateArgs_DefaultCaptureMode_IsRedacted_NeverWritesValue()
+    {
+        // #13: Redacted is the new default — the actual argument VALUE must never appear in the trace, even
+        // though the mutation (which keys changed) is still auditable.
+        var tool = AIFunctionFactory.Create((string html) => "ok", "render");
+        var (agent, _) = BuildAgent(tool, "render", new Dictionary<string, object?> { ["html"] = "x" });
+        var trace = new AgentTrace();
+        var gated = agent.AsBuilder()
+            .UseAgentEvalToolGate(
+                [new MutatingGate("render", new Dictionary<string, object?> { ["html"] = "TOP-SECRET-VALUE" })],
+                ToolGatePolicy.WarnOnly, trace)   // no mutationCaptureMode passed — must default to Redacted
+            .Build();
+
+        await gated.RunAsync("go");
+
+        var value = (IDictionary<string, object?>)trace.Metadata!["gate.tool.1.MutatingGate"];
+        Assert.DoesNotContain("TOP-SECRET-VALUE", (string)value["argsAfter"]!);
+        Assert.Contains("html", (string)value["argsAfter"]!);   // the key IS still visible — only the value is redacted
+        Assert.Equal(nameof(TraceCaptureMode.Redacted), value["captureMode"]);
+    }
+
+    [Fact]
     public void UseAgentEvalToolGate_NullGateElement_ThrowsDescriptively()
     {
         var agent = new ChatClientAgent(new ScriptedChatClient().AddText("hi"), new ChatClientAgentOptions { Name = "T" });
         var ex = Assert.Throws<ArgumentException>(() =>
             agent.AsBuilder().UseAgentEvalToolGate([new ForbiddenToolGate("x"), null!], ToolGatePolicy.WarnOnly).Build());
         Assert.Equal("gates", ex.ParamName);
+    }
+
+    // ── #4-revisit: best-effort RUNTIME missing-run-scope signal (registration-time cannot detect this) ──
+
+    [Fact]
+    public async Task RunScopeGate_NoScopeEstablished_RecordsOneWarning_OnFirstCallOnly()
+    {
+        var reads = 0;
+        var readTool = AIFunctionFactory.Create(() => { Interlocked.Increment(ref reads); return "ok"; }, "read_data");
+        var scripted = new ScriptedChatClient()
+            .AddToolCall("c1", "read_data", new Dictionary<string, object?>())
+            .AddToolCall("c2", "read_data", new Dictionary<string, object?>())
+            .AddText("done");
+        var agent = new ChatClientAgent(scripted, new ChatClientAgentOptions { Name = "T", ChatOptions = new ChatOptions { Tools = [readTool] } });
+        var trace = new AgentTrace();
+
+        // No UseAgentEvalGate() — RunBudgetGate declares GateRequirements.RunScope but no scope is ever established.
+        var gated = agent.AsBuilder()
+            .UseAgentEvalToolGate([new RunBudgetGate(maxToolCalls: 10)], ToolGatePolicy.WarnOnly, trace)
+            .Build();
+
+        await gated.RunAsync("go");   // 2 tool calls happen in this one run
+
+        Assert.Equal(2, reads);   // WarnOnly never blocks — this is advisory, not enforcement
+        var warnings = trace.Metadata!.Keys.Where(k => k.Contains("MissingRunScope", StringComparison.Ordinal)).ToList();
+        Assert.Single(warnings);   // recorded once, not once per call
+        var value = (IDictionary<string, object?>)trace.Metadata![warnings[0]];
+        Assert.Equal("Warn", value["action"]);
+        Assert.Contains("RunBudgetGate", (string)value["reason"]!, StringComparison.Ordinal);
+        Assert.Equal(0, GlassBoxEvidence.FromTrace(trace).GateBlockCount);   // never counted as a block
+    }
+
+    [Fact]
+    public async Task RunScopeGate_ScopeEstablished_NoWarningRecorded()
+    {
+        var readTool = AIFunctionFactory.Create(() => "ok", "read_data");
+        var scripted = new ScriptedChatClient().AddToolCall("c1", "read_data", new Dictionary<string, object?>()).AddText("done");
+        var agent = new ChatClientAgent(scripted, new ChatClientAgentOptions { Name = "T", ChatOptions = new ChatOptions { Tools = [readTool] } });
+        var trace = new AgentTrace();
+
+        var gated = agent.AsBuilder()
+            .UseAgentEvalGate(trace: trace)   // establishes the scope
+            .UseAgentEvalToolGate([new RunBudgetGate(maxToolCalls: 10)], ToolGatePolicy.WarnOnly, trace)
+            .Build();
+
+        await gated.RunAsync("go");
+
+        // No warning ⇒ nothing was ever recorded at all here (RunBudgetGate under WarnOnly never blocks either).
+        Assert.True(trace.Metadata is null || !trace.Metadata.Keys.Any(k => k.Contains("MissingRunScope", StringComparison.Ordinal)));
+    }
+
+    // ── Chaining TWO SEPARATE UseAgentEvalToolGate registrations inverts the intuitive order ──
+
+    [Fact]
+    public async Task ChainedRegistrations_LaterCallsGatesRunFirst_AndCanStarveTheEarlierCall()
+    {
+        // AgentEvalToolGateExtensions.UseAgentEvalToolGate is built on MAF's
+        // FunctionInvocationDelegatingAgentBuilderExtensions.Use(AIAgentBuilder, callback) — a middleware-chain
+        // seam. Empirically (not assumed): registering TWO SEPARATE UseAgentEvalToolGate calls on the same
+        // builder makes the SECOND (later) registration the OUTERMOST layer, so its gates see the call FIRST —
+        // the opposite of what "register A then B" reads as. If the later registration's gate blocks (without
+        // calling next), the earlier registration's gate is never even invoked. This is why UseAgentEvalToolGate
+        // is documented to require ONE call with ALL gates in ONE list (or UseGatekeeper, which already does
+        // that) — chaining silently inverts precedence.
+        var firstCalled = 0;
+        var secondCalled = 0;
+        var firstGate = new RecordingGate("First", () => Interlocked.Increment(ref firstCalled));
+        var secondGate = new RecordingGate("Second", () => Interlocked.Increment(ref secondCalled));
+
+        var executed = 0;
+        var tool = AIFunctionFactory.Create((string x) => { Interlocked.Increment(ref executed); return "ok"; }, "shared_tool");
+        var (agent, _) = BuildAgent(tool, "shared_tool", new Dictionary<string, object?> { ["x"] = "1" });
+
+        // Registered in order: first, then second — a reader's natural assumption is "first's gate runs first."
+        var gated = agent.AsBuilder()
+            .UseAgentEvalToolGate([firstGate], ToolGatePolicy.Terminate)
+            .UseAgentEvalToolGate([secondGate], ToolGatePolicy.Terminate)
+            .Build();
+
+        await gated.RunAsync("go");
+
+        Assert.Equal(0, executed);       // the call was blocked (by one of the two — Terminate either way)
+        Assert.Equal(1, secondCalled);   // the LATER registration's gate WAS invoked
+        Assert.Equal(0, firstCalled);    // the EARLIER registration's gate was NEVER invoked — starved, not just "ran second"
+    }
+
+    private sealed class RecordingGate : IToolGate
+    {
+        private readonly Action _onCalled;
+        public string PolicyName { get; }
+        public GateCost Cost => GateCost.PureCode;
+
+        public RecordingGate(string policyName, Action onCalled)
+        {
+            PolicyName = policyName;
+            _onCalled = onCalled;
+        }
+
+        public ValueTask<ToolGateVerdict> InspectAsync(GatedToolCall call, CancellationToken ct = default)
+        {
+            _onCalled();
+            return new ValueTask<ToolGateVerdict>(ToolGateVerdict.Block(PolicyName, "always blocks — proves whether InspectAsync ran at all"));
+        }
     }
 
     [Fact]

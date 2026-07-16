@@ -14,7 +14,8 @@ namespace AgentEval.Guardrails.Judges;
 /// <see cref="SystemPromptExtractionRubric"/> in a <see cref="CompositeJudgeGate{TRubric}"/> (optionally
 /// <see cref="JudgeVerdictCache">cached</see>), the canonical both-directions gold set, and the deterministic
 /// <see cref="KeywordOracleGate">keyword-oracle</see> baseline it must beat. Place it <b>run-post</b> on the rendered
-/// output via <c>UseAgentEvalGate(post: […])</c>; for a hybrid, add a deterministic canary token in the system prompt
+/// output via <c>UseAgentEvalGate(post: […], policy: EvalGatePolicy.Redact)</c> once calibrated (no implicit
+/// default — <c>policy</c> is required whenever any gate is registered); for a hybrid, add a deterministic canary token in the system prompt
 /// (the canary catches an exact echo; the judge catches the paraphrased leak).
 /// <para><b>It does not lower the bar.</b> A judge earns the right to block live traffic only when
 /// <see cref="CalibrationReport.IsInlineReady"/> — it beats the baseline with no missed attacks on a gold set large
@@ -40,7 +41,9 @@ public static class SystemPromptExtractionJudge
 
     /// <summary>
     /// Build the system-prompt-extraction judge as an <see cref="IChatGate"/> over a fast model, ready to place
-    /// run-post on the rendered output via <c>UseAgentEvalGate(post: [judge])</c>.
+    /// run-post on the rendered output via <c>UseAgentEvalGate(post: [judge], policy: EvalGatePolicy.Redact)</c>
+    /// once it clears <see cref="CalibrateAsync"/> (no implicit default — <c>policy</c> is required whenever any
+    /// gate is registered).
     /// <para>If you pass custom <paramref name="options"/>, calibrate with the <b>same</b> options via
     /// <see cref="CalibrateAsync"/> — otherwise the report certifies a different config than the one you deploy.</para>
     /// </summary>

@@ -45,7 +45,7 @@ public class ToolGateSpikeTests
         // (b) the refusal is surfaced to the model — as a FunctionResultContent (NOT a TextContent, so .Text won't see it)
         Assert.True(scripted.ReceivedMessages.Any(list =>
             list.Any(m => m.Contents.OfType<FunctionResultContent>()
-                .Any(r => r.Result?.ToString()?.Contains("BLOCKED") == true))));
+                .Any(r => r.Result?.ToString()?.Contains("ACTION_NOT_AUTHORIZED") == true))));
 
         // (c) evidence recorded under the shipped gate.* key shape
         Assert.True(trace.Metadata!.ContainsKey("gate.tool.1.ForbiddenToolGate"));
@@ -96,7 +96,7 @@ public class ToolGateSpikeTests
 
         AIAgent? built = null;
         var ex = Record.Exception(() => built = agent.AsBuilder()
-            .UseAgentEvalToolGate([new ForbiddenToolGate("x")])
+            .UseAgentEvalToolGate([new ForbiddenToolGate("x")], ToolGatePolicy.WarnOnly)
             .Build());
 
         if (ex is null && built is not null)

@@ -123,8 +123,9 @@ the prefilter conservative and grow your gold set with prefilter‑evading attac
 Beyond the flagship `IndirectInjectionJudge` (above), three more single-axis judges ship the same bundle — rubric +
 `CompositeJudgeGate<TRubric>` (optionally cached) + canonical both-directions gold set + keyword-oracle baseline —
 over `AgentEval.Guardrails.Judges`. Each is placed **run-post** (scores the rendered output, via
-`UseAgentEvalGate(post: […])`) and each sits behind the **same calibration bar** as the flagship: don't wire one
-inline until `CalibrateAsync` reports `IsInlineReady`.
+`UseAgentEvalGate(post: […], policy: EvalGatePolicy.Redact)` once calibrated — `policy` has no implicit default;
+it's required whenever any gate is registered) and each sits behind the **same calibration bar** as the flagship:
+don't wire one inline until `CalibrateAsync` reports `IsInlineReady`.
 
 | Judge | What it does | Rank | Honest reasoning |
 |---|---|:--:|---|
