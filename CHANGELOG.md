@@ -279,6 +279,37 @@ This is Phase 1 of a multi-phase design
 - ~100 new tests (deterministic rubric/gate tests + 4 env-gated live calibration checks,
   `AGENTEVAL_RUN_GATEKEEPER_CAL=1`). Full net8.0 suite green (7330/7331, 1 pre-existing skip).
 
+### Copilot Studio — mock backend + Track 2 (shared `--sut` seam, PR 1)
+
+#### Added
+- **`MockCopilotStudioConversationClient`** (test-only) — a realistic, reusable mock Copilot Studio
+  backend (a test double for `ICopilotStudioConversationClient`, since no live Copilot Studio system is
+  available in this environment). Supports scripted MULTI-TURN conversations (fluent builder, mirroring
+  `ScriptedChatClient`'s convention), a SERVER-ASSIGNED conversation id (matching real MCS session
+  semantics), and configurable ERROR INJECTION (auth failure on start, a mid-conversation exception at a
+  chosen turn — e.g. rate-limit-shaped — and a hang-until-cancelled mode for timeout testing). 7 tests
+  proving the mock itself behaves realistically (session-state tracking, activity-type filtering, error
+  propagation, honest "no scripted turn" default that never fabricates a blank success).
+- **Track 2, PR 1 — the shared `--sut` seam** (`strategy/CopilotStudio/Bench-Eval-Integration-and-Live-Connector-Plan.md`
+  §3): `ISutTarget`/`ISutTargetOptions`/`CommonTargetOptions`/`SutTargetResolver`
+  (`src/AgentEval.Cli/Commands/Targets/ISutTarget.cs`) — generalizes the already-shipped `redteam --sut`
+  pattern so `eval`/`bench` can reach the same built-in targets, WITHOUT touching
+  `IRedTeamBuiltInTarget`/`RedTeamOptions`/`RedTeamCommand.cs`. `CopilotStudioRedTeamTarget` gains `ISutTarget`
+  via EXPLICIT interface implementation (same idiom as `IEnumerable`/`IEnumerable<T>`) — its existing
+  `IRedTeamBuiltInTarget` members are byte-for-byte unchanged. A `ValidateDrift` contract test (theory,
+  4 truth-table cases) proves `IRedTeamBuiltInTarget.Validate` and `ISutTarget.Validate` agree on
+  accept/reject for every shared check (consent / config-required / max-credits ≥ 0) — the one real
+  ongoing-sync risk the design doc calls out, since the two method bodies have no compiler-enforced sync.
+  12 new tests. `gatekeeper-demo` deliberately stays `redteam`-only (needs an `AgentTrace`, which
+  `eval`/`bench` have no use for) — only `copilot-studio` gets the shared treatment, per the design doc.
+- **NOT built this session** (explicitly deferred, documented honestly): Track 2 PR 2 (`eval` adoption)
+  and PR 3 (bench Tier 1 `owasp`/`mitre`/`nist` adoption) — the shared types exist and are tested, but no
+  CLI verb wires them in yet; P6 (reports & resilience: fidelity badging, agent-fingerprint drift,
+  429 retry+resume), P3 (`KnowledgeCanaryEvaluator`, Crescendo/PAIR/TAP over the native channel), and P7
+  (OSS polish, Entra app-reg script, NuGet packaging) were not started. See `strategy/TODO.md` for the
+  honest accounting and what's next.
+- Full net8.0 suite green (see the final Stage 5 numbers in this file's next entry).
+
 ## [0.16.0-beta] - 2026-07-13
 
 Gatekeeper reaches production-grade runtime enforcement: a calibrated flagship judge for indirect prompt

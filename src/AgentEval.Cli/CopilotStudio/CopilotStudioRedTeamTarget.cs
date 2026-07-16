@@ -6,6 +6,7 @@ using System.CommandLine;
 using System.CommandLine.Parsing;
 using AgentEval.Cli.Commands;
 using AgentEval.Cli.Commands.RedTeamTargets;
+using AgentEval.Cli.Commands.Targets;
 using AgentEval.Core;
 using AgentEval.RedTeam;
 using AgentTrace = AgentEval.Tracing.AgentTrace;
@@ -26,6 +27,20 @@ internal sealed record CopilotStudioTargetOptions : IRedTeamTargetOptions
 }
 
 /// <summary>
+/// Parsed <c>--sut copilot-studio</c> options under the shared <c>eval</c>/<c>bench</c> seam (Track 2) —
+/// mirrors <see cref="CopilotStudioTargetOptions"/>'s 3 fields exactly. Deliberately duplicated rather than
+/// shared: the two option TYPES (<see cref="IRedTeamTargetOptions"/> vs <see cref="ISutTargetOptions"/>)
+/// are intentionally distinct marker interfaces so `eval`/`bench`'s option shape never implicitly couples
+/// to redteam's — see the design doc's "accepted, deliberate duplication" note.
+/// </summary>
+internal sealed record CopilotStudioSutOptions : ISutTargetOptions
+{
+    public FileInfo? ConfigFile { get; init; }
+    public bool AckLiveSideEffects { get; init; }
+    public int MaxCredits { get; init; }
+}
+
+/// <summary>
 /// The <c>--sut copilot-studio</c> built-in red-team target: red-teams a LIVE Microsoft Copilot Studio agent at
 /// text-only / <c>Verbal</c> fidelity, behind a ship-blocking safety gate. Owns the CS-specific CLI options,
 /// validation, and construction — composing the reusable <see cref="CopilotStudioAgentFactory"/> — so none of it
@@ -35,7 +50,7 @@ internal sealed record CopilotStudioTargetOptions : IRedTeamTargetOptions
 /// <see cref="CopilotStudioAgentFactory.BuildLive"/> now wires a real connector (see its own XML doc); the whole
 /// path up to and including this method's gates is still testable credential-free via the <c>sutOverride</c> seam.
 /// </remarks>
-internal sealed class CopilotStudioRedTeamTarget : IRedTeamBuiltInTarget
+internal sealed class CopilotStudioRedTeamTarget : IRedTeamBuiltInTarget, ISutTarget
 {
     private readonly Option<FileInfo?> _configOpt = new("--copilotstudio-config")
     {
@@ -158,6 +173,77 @@ internal sealed class CopilotStudioRedTeamTarget : IRedTeamBuiltInTarget
 
         var configFile = opts.TargetOptionsFor<CopilotStudioTargetOptions>(Sut)?.ConfigFile
             ?? throw new InvalidOperationException("--sut copilot-studio requires --copilotstudio-config <file.json>.");
-        return _config = CopilotStudioConfig.Load(configFile);
+        return _config = EnsureConfigFromFile(configFile);
+    }
+
+    private CopilotStudioConfig EnsureConfigFromFile(FileInfo configFile) => CopilotStudioConfig.Load(configFile);
+
+    // ────────────────────────────────────────────────────────────────────────────────────────────
+    // ISutTarget — Track 2 (Bench-Eval-Integration-and-Live-Connector-Plan.md §3): the shared --sut
+    // seam reachable from `eval`/`bench`, via EXPLICIT interface implementation so this class's
+    // IRedTeamBuiltInTarget members above stay byte-for-byte unchanged. Deliberately OMITS the
+    // redteam-only checks (Parallelism > 1, judge/attacker-model-required) — those concepts don't
+    // exist in eval's/bench's option shapes today.
+    // ────────────────────────────────────────────────────────────────────────────────────────────
+
+    private CopilotStudioConfig? _sutConfig;   // separate memoization slot from _config (IRedTeamBuiltInTarget's),
+                                                // since a single instance is never driven through both interfaces
+                                                // in practice (SutTargetResolver.BuiltInTargets() and
+                                                // RedTeamCommand.BuildBuiltInTargets() each mint fresh instances),
+                                                // but keeping the slots separate avoids any accidental cross-talk.
+
+    IReadOnlySet<string> ISutTarget.SupportedVerbs { get; } = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "eval", "bench" };
+
+    void ISutTarget.AddOptionsTo(Command command) => AddOptionsTo(command);   // same options, same flags
+
+    ISutTargetOptions? ISutTarget.BindOptions(ParseResult parseResult) => new CopilotStudioSutOptions
+    {
+        ConfigFile = parseResult.GetValue(_configOpt),
+        AckLiveSideEffects = parseResult.GetValue(_ackOpt),
+        MaxCredits = parseResult.GetValue(_maxCreditsOpt),
+    };
+
+    void ISutTarget.Validate(CommonTargetOptions common, ISutTargetOptions? own)
+    {
+        var cs = own as CopilotStudioSutOptions ?? new CopilotStudioSutOptions();
+
+        if (!cs.AckLiveSideEffects)
+        {
+            throw new InvalidOperationException(
+                "--sut copilot-studio drives a LIVE Copilot Studio agent whose connectors/flows can fire REAL " +
+                "production actions and cannot be sandboxed. Re-run against a NON-PROD agent with " +
+                "--i-understand-live-side-effects to proceed (nothing was sent).");
+        }
+
+        if (cs.ConfigFile is null)
+        {
+            throw new InvalidOperationException(
+                "--sut copilot-studio requires --copilotstudio-config <file.json> (environmentId, schemaName, tenantId, appClientId).");
+        }
+
+        if (cs.MaxCredits < 0)
+        {
+            throw new InvalidOperationException("--max-credits must be >= 0 (0 = no cap).");
+        }
+
+        _sutConfig = EnsureConfigFromFile(cs.ConfigFile);   // fail fast on a bad config, before the run; memoized
+    }
+
+    string ISutTarget.ResolvedName(CommonTargetOptions common, ISutTargetOptions? own) => EnsureSutConfig(common, own).DisplayName;
+
+    IEvaluableAgent ISutTarget.Build(CommonTargetOptions common, ISutTargetOptions? own, IEvaluableAgent? sutOverride)
+        => sutOverride ?? CopilotStudioAgentFactory.BuildLive(EnsureSutConfig(common, own));
+
+    private CopilotStudioConfig EnsureSutConfig(CommonTargetOptions common, ISutTargetOptions? own)
+    {
+        if (_sutConfig is not null)
+        {
+            return _sutConfig;
+        }
+
+        var configFile = (own as CopilotStudioSutOptions)?.ConfigFile
+            ?? common.TargetOptionsFor<CopilotStudioSutOptions>(Sut)?.ConfigFile
+            ?? throw new InvalidOperationException("--sut copilot-studio requires --copilotstudio-config <file.json>.");
+        return _sutConfig = EnsureConfigFromFile(configFile);
     }
 }
