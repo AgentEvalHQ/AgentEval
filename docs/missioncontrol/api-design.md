@@ -140,7 +140,7 @@ Query.scenario(runId, scenarioId)              ScenarioResult?
 Query.scenarioTree(runId, scenarioId)          EvalResult?        ← recursive!
 Query.compliance                               [ComplianceRegulationSummary!]!
 Query.complianceMatrix(regulation)             ComplianceMatrix!  ← killer feature
-Query.complianceEvidence(reg, kind, name, ts)  ComplianceEvidence?
+Query.complianceEvidence(reg, kind, name, ts)  ComplianceEvidenceWithChain?
 Query.evaluators(category?, costTier?)         [EvaluatorCard!]!
 Query.evaluator(key)                           EvaluatorCard?
 Query.evaluatorTimeline(key, count = 30)       [EvaluatorTimelinePoint!]!  ← drift / calibration surface
