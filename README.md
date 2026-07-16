@@ -254,7 +254,7 @@ if (faithfulness.Score < 70)
 
 ### Red Team Security Evaluation: Find Vulnerabilities Before Production
 
-AgentEval includes comprehensive red team security evaluation with **258 probes across 13 attack types** (Comprehensive intensity), covering **all 10 OWASP LLM Top 10 2025** categories and **8 MITRE ATLAS** techniques.
+AgentEval includes comprehensive red team security evaluation with **264 probes across 14 attack types** (Comprehensive intensity), covering **all 10 OWASP LLM Top 10 2025** categories and **8 MITRE ATLAS** techniques.
 
 Beyond the built-in probes, it ships the capabilities that make a red-team result *trustworthy* and *CI-ready*:
 
@@ -263,7 +263,7 @@ Beyond the built-in probes, it ships the capabilities that make a red-team resul
 - **Trustworthy verdicts — judge-primary by default + Composite Judges** *(new)* — with a judge configured (`--judge`), the grader that decides whether each attack *succeeded* is now LLM-judge-primary, using **honest-by-construction Composite Judges**: every semantic verdict is split into a positive-only *compromise* detector ⊕ a negative-only *refusal* detector, each structurally clamped so it can only raise its own direction or abstain. (A no-judge scan stays the deterministic keyword oracle, byte-identical to before.) Plus conclusive-only scoring and an explicit *Inconclusive* coverage state — so a green result is never a guess.
 - **5 compliance reporters** — OWASP, MITRE ATLAS, SOC 2, ISO 27001, and **NIST AI RMF** — runnable as first-class benchmarks (`agenteval bench owasp\|mitre\|nist`).
 - **CI-ready** — SARIF + JUnit export, a baseline regression gate (`--save-baseline`/`--baseline`/`--fail-on`), z-score **calibration** (`--calibration`), LLM **`--explain`** rationale, and external **benchmark packs** (`--pack HarmBench\|JailbreakBench\|CyberSecEval`, license-gated, nothing bundled).
-- **Copilot Studio target** *(scaffold)* — `agenteval redteam --sut copilot-studio` red-teams a Microsoft Copilot Studio agent through the same scanner, with its own config + consent gates and a credential-free test seam; the live connector isn't wired yet, so a real config validates end-to-end and then reports "not wired yet" rather than a fabricated result. See [docs/redteam/copilot-studio.md](docs/redteam/copilot-studio.md).
+- **Copilot Studio target** — `agenteval redteam --sut copilot-studio` red-teams a Microsoft Copilot Studio agent through the same scanner, with its own config + consent gates and a credential-free test seam; the live connector is wired and unit/mock-tested, but **not independently live-verified against a real Copilot Studio tenant** (no test credentials available yet) — treat a first real run as a smoke test, not a proven-in-production path. See [docs/redteam/copilot-studio.md](docs/redteam/copilot-studio.md).
 
 > **Proof, not vibes.** Across **810 held-out stochastic trials** — 81 independently-generated cases (70 composite-oracle + 11 DataPoisoning deny-true) run **K=10×** each through the production graders — the Composite Judges fabricated **0 verdicts**: never a safe reply flagged as a compromise, never a real compromise masked as safe. On a separately-pinned label corpus, judge↔label agreement is **κ = 1.000** (n=92) — where keyword graders typically agree with humans only about half the time. The guiding rule: *fabrications are complete failures; honesty is never punished.* Background: [ADR-021→024](docs/adr/README.md) · [Red Team — What's New](docs/redteam-whats-new.md).
 
@@ -447,7 +447,7 @@ await result.ExportHtmlReportAsync("memory-report.html");
 | "Is my RAG hallucinating?" | **Faithfulness metrics** - grounding verification |
 | "What's the latency/cost?" | **Performance metrics** - TTFT, tokens, estimated cost |
 | "How do I debug failures?" | **Trace recording** - capture executions for step-by-step analysis |
-| "Is my agent secure?" | **Red Team evaluation** - 258 probes, full OWASP LLM Top 10 2025 coverage |
+| "Is my agent secure?" | **Red Team evaluation** - 264 probes, full OWASP LLM Top 10 2025 coverage |
 | "Can I stop a bad action at runtime?" | **Gatekeeper** - fail-closed runtime enforcement: block forbidden tool calls before they run, quarantine compromised sessions |
 | "Is content safe and unbiased?" | **ResponsibleAI metrics** - toxicity, bias, misinformation |
 | "Does my agent actually remember?" | **Memory evaluation** - retention, reach-back, temporal, LongMemEval (ICLR 2025) |
@@ -487,7 +487,7 @@ await result.ExportHtmlReportAsync("memory-report.html");
 - Performance assertions - latency, TTFT, tokens, cost
 
 ### Evaluation Coverage
-- Red Team security - 258 probes, full OWASP LLM Top 10 2025, MITRE ATLAS coverage
+- Red Team security - 264 probes, full OWASP LLM Top 10 2025, MITRE ATLAS coverage
 - Gatekeeper runtime enforcement - fail-closed gates that block forbidden tool calls before they run, red-team probes as runtime guards, and an async shadow judge that quarantines compromised sessions ([docs](docs/gatekeeper/introduction.md))
 - Responsible AI - toxicity, bias, misinformation detection
 - **Memory evaluation** - retention, reach-back, temporal, cross-session, HTML pentagon reports, LongMemEval (ICLR 2025)
@@ -531,9 +531,9 @@ Every family auto-registers via `[ModuleInitializer]` into `BenchmarkFamilyRegis
 | **GDPR** | `smoke` / `standard` / `audit` + 3 domain packs (healthcare / HR / children) | ✅ end-to-end | 22 article YAMLs across 5 pillars | Medium |
 | **EU AI Act** | `smoke` / `standard` / `audit` + 3 domain packs (high-risk-employment / -credit / -education) | ✅ end-to-end | 13 article YAMLs across 6 pillars (Reg (EU) 2024/1689) | Medium |
 | **Agentic** | 11 presets (`tool-call-accuracy` / `agentic-execution` / `audit-grade` / `--budget-tier {free,low,medium,high}` filter etc.) | ✅ end-to-end | Foundry-equivalent 60-evaluator universe — system / process / UX / quality / safety / adversarial / reasoning / calibration / memory | Medium |
-| **OWASP LLM Top 10** | `top10` / `smoke` / `audit` / `top10-rag` | ✅ end-to-end (`--azure-from-env` for real agents; stub fallback) | 13 attack types covering all 10 OWASP LLM Top 10 v2.0 categories (LLM03/04/08/09 added in Wave D) | Medium |
-| **MITRE ATLAS** | `atlas-baseline` / `atlas-smoke` / `atlas-audit-grade` | ✅ end-to-end | Same 13 attacks mapped via `IAttackType.MitreAtlasIds` covering 8 applicable ATLAS techniques | Medium |
-| **NIST AI RMF** | `rmf-baseline` / `rmf-smoke` / `rmf-audit-grade` | ✅ end-to-end (`--azure-from-env` for real agents; stub fallback) | Same 13 attacks mapped to NIST AI RMF (AI 100-1) MEASURE security/privacy/validity sub-actions (GOVERN/MAP/MANAGE not applicable) | Medium |
+| **OWASP LLM Top 10** | `top10` / `smoke` / `audit` / `top10-rag` | ✅ end-to-end (`--azure-from-env` for real agents; stub fallback) | 14 attack types covering all 10 OWASP LLM Top 10 v2.0 categories (LLM03/04/08/09 added in Wave D; SkillInjection added for MAF Agent Skills) | Medium |
+| **MITRE ATLAS** | `atlas-baseline` / `atlas-smoke` / `atlas-audit-grade` | ✅ end-to-end | Same 14 attacks mapped via `IAttackType.MitreAtlasIds` covering 8 applicable ATLAS techniques | Medium |
+| **NIST AI RMF** | `rmf-baseline` / `rmf-smoke` / `rmf-audit-grade` | ✅ end-to-end (`--azure-from-env` for real agents; stub fallback) | Same 14 attacks mapped to NIST AI RMF (AI 100-1) MEASURE security/privacy/validity sub-actions (GOVERN/MAP/MANAGE not applicable) | Medium |
 | **LongMemEval** | `subset` / `full` (ICLR 2025) | ✅ end-to-end | Cross-platform memory benchmark — paper-published GPT-4o baseline ≈ 57.7% | Medium |
 | **Memory** | `quick` / `standard` / `full` / `diagnostic` / `overflow` | ✅ end-to-end | Native AgentEval memory benchmark — 3/8/12 categories, weighted grading | Medium |
 | **Performance** | `latency` / `throughput` / `cost` | ✅ end-to-end (`--azure-from-env`) | P99 latency / concurrent throughput / per-prompt cost against your deployment | Low |
@@ -620,6 +620,7 @@ See the **[Getting Started Guide](docs/getting-started.md)** for a complete walk
 | [Benchmarks](docs/benchmarks.md) | Benchmark patterns and best practices |
 | [Tracing](docs/tracing.md) | Record and Replay patterns |
 | [Red Team Security](docs/redteam.md) | Security probes, OWASP/MITRE coverage |
+| [Agent Skills](docs/agent-skills.md) | Evaluate & govern MAF Agent Skills — assertions, disclosure efficiency, compliance scanning, injection red-team |
 | [Responsible AI](docs/ResponsibleAI.md) | Toxicity, bias, misinformation detection |
 | [Memory Evaluation](docs/memory-evaluation.md) | Retention, reach-back, temporal, LongMemEval, HTML reports |
 | [MAF Memory Integration](docs/maf-memory-integration.md) | How AgentEval.Memory maps to MAF pipelines |
