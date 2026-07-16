@@ -25,6 +25,11 @@ public static class SkillComplianceReportRenderer
         sb.AppendLine("========================");
         sb.AppendLine($"Skills scanned: {report.Coverage.SkillCount} | with resources: {report.Coverage.WithResources} | with scripts: {report.Coverage.WithScripts}");
         sb.AppendLine($"Compliant: {(report.IsCompliant ? "YES" : "NO")} ({report.Findings.Count} finding(s))");
+        if (report.Coverage.SilentlyExcludedCount > 0)
+        {
+            sb.AppendLine($"!! SILENTLY EXCLUDED BY MAF: {report.Coverage.SilentlyExcludedCount} skill folder(s) on disk will NEVER load — see SkillExcludedFromDiscovery findings below.");
+        }
+
         sb.AppendLine();
 
         if (report.Findings.Count == 0)
@@ -60,6 +65,11 @@ public static class SkillComplianceReportRenderer
         sb.AppendLine();
         sb.AppendLine($"**Compliant:** {(report.IsCompliant ? "✅ YES" : "❌ NO")} ({report.Findings.Count} finding(s))");
         sb.AppendLine();
+        if (report.Coverage.SilentlyExcludedCount > 0)
+        {
+            sb.AppendLine($"> ⚠️ **SILENTLY EXCLUDED BY MAF:** {report.Coverage.SilentlyExcludedCount} skill folder(s) on disk will NEVER load — see `SkillExcludedFromDiscovery` findings below.");
+            sb.AppendLine();
+        }
 
         sb.AppendLine("## Coverage");
         sb.AppendLine();

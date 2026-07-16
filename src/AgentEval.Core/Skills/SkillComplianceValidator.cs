@@ -56,6 +56,24 @@ public static class SkillComplianceValidator
         return new SkillComplianceReport(findings, coverage);
     }
 
+    /// <summary>
+    /// Runs the full GA rule set (name/description/compatibility) plus AgentEval's governance flags
+    /// against a single <see cref="SkillManifest"/>, without the list-aggregation <see cref="Validate"/>
+    /// otherwise does. This is the SAME rule-checking logic <see cref="ValidateOne"/> has always applied
+    /// per-skill inside <see cref="Validate"/> — extracted as a public entry point so a second, independent
+    /// caller (the silent-discovery-exclusion reconciliation in <c>AgentEval.MAF.Skills.MafSkillScanner</c>)
+    /// can run a raw-parsed, MAF-never-returned manifest through the identical rules rather than
+    /// duplicating them. One rule set, two callers — see
+    /// <c>strategy/FutureFeatures/Skills/Skill-Discovery-Exclusion-Detection-Design.md</c> §2.3.
+    /// </summary>
+    public static IReadOnlyList<SkillComplianceFinding> ValidateSingle(SkillManifest skill, SkillScanOptions? options = null)
+    {
+        options ??= new SkillScanOptions();
+        var findings = new List<SkillComplianceFinding>();
+        ValidateOne(skill, options, findings);
+        return findings;
+    }
+
     private static void ValidateOne(SkillManifest skill, SkillScanOptions options, List<SkillComplianceFinding> findings)
     {
         ArgumentNullException.ThrowIfNull(skill);

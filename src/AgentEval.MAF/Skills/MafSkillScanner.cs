@@ -71,6 +71,27 @@ public static class MafSkillScanner
     /// Convenience: builds an <see cref="AgentFileSkillsSource"/> over <paramref name="skillPath"/> and scans
     /// it, deriving the <see cref="AgentSkillsSourceContext"/> from <paramref name="agent"/>.
     /// </summary>
+    /// <remarks>
+    /// <b>Silent-discovery-exclusion detection (Item 5):</b> unlike <see cref="ScanAsync"/> (unchanged —
+    /// it only ever sees what a live <see cref="AgentSkillsSource"/> hands back), this method additionally
+    /// runs a second, independent raw directory walk (<see cref="RawSkillDirectoryScanner"/>, mirroring
+    /// MAF's own confirmed discovery convention) over <paramref name="skillPath"/> and reconciles it against
+    /// what <see cref="AgentFileSkillsSource.GetSkillsAsync"/> actually returned. Any folder present on disk
+    /// but absent from MAF's returned set is a skill MAF silently excluded — see
+    /// <c>strategy/FutureFeatures/Skills/Skill-Discovery-Exclusion-Detection-Design.md</c>. Each becomes a
+    /// <see cref="SkillComplianceRule.SkillExcludedFromDiscovery"/> High finding whose message is built by
+    /// re-running the raw-parsed frontmatter through the SAME rule set <see cref="SkillComplianceValidator"/>
+    /// applies to every normally-discovered skill (<see cref="SkillComplianceValidator.ValidateSingle"/>) —
+    /// one rule set, two callers, never duplicated.
+    /// <para>
+    /// <b>Bonus defensive fix, found during this same verification (not originally scoped):</b> a SKILL.md
+    /// violating certain GA hard limits (confirmed: <c>compatibility</c> &gt; 500 characters) does not
+    /// silently exclude — it makes <c>GetSkillsAsync()</c> <em>throw</em>, which without this try/catch
+    /// would previously crash the entire scan (and the <c>agenteval skills scan</c> CLI verb) for every
+    /// skill under <paramref name="skillPath"/>, not just the offending one. This is now caught and reported
+    /// as a single, clearly-labeled High finding instead of an unhandled stack trace.
+    /// </para>
+    /// </remarks>
     public static async Task<SkillComplianceReport> ScanFileSkillsAsync(
         string skillPath, AIAgent agent, SkillScanOptions? options = null, CancellationToken cancellationToken = default)
     {
@@ -80,11 +101,124 @@ public static class MafSkillScanner
         }
 
         ArgumentNullException.ThrowIfNull(agent);
+        options ??= new SkillScanOptions();
 
         using var source = new AgentFileSkillsSource(skillPath);
         var context = new AgentSkillsSourceContext(agent, session: null);
-        return await ScanAsync(source, context, options, cancellationToken).ConfigureAwait(false);
+
+        IList<AgentSkill> skills;
+        try
+        {
+            skills = await source.GetSkillsAsync(context, cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            // Discovery crashed entirely for this source — a MAF-enforced hard limit (not a silent
+            // exclusion) somewhere under skillPath. See remarks above.
+            var crashFinding = new SkillComplianceFinding(
+                "(discovery failure)",
+                SkillComplianceRule.SkillExcludedFromDiscovery,
+                Severity.High,
+                $"Skill discovery under '{skillPath}' failed entirely — MAF threw {ex.GetType().Name}: '{ex.Message}'. " +
+                "This usually means one SKILL.md under this path violates a MAF-enforced hard limit (e.g. " +
+                "'compatibility' over 500 characters) that MAF treats as fatal rather than silently excluding. " +
+                "No skills could be validated until the offending file is fixed. This is not a warning; " +
+                "nothing under this path is functional until discovery succeeds.",
+                null);
+            var emptyHistogram = new Dictionary<string, int> { ["load"] = 0, ["read"] = 0, ["run"] = 0 };
+            return new SkillComplianceReport(
+                new[] { crashFinding },
+                new SkillCoverageSummary(0, 0, 0, emptyHistogram, SilentlyExcludedCount: 0));
+        }
+
+        var manifests = new List<SkillManifest>(skills.Count);
+        var returnedDirectories = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var skill in skills)
+        {
+            manifests.Add(ToManifest(skill));
+            if (skill is AgentFileSkill fileSkill && !string.IsNullOrWhiteSpace(fileSkill.Path))
+            {
+                returnedDirectories.Add(NormalizeDirectory(fileSkill.Path));
+            }
+        }
+
+        var baseReport = SkillComplianceValidator.Validate(manifests, options);
+
+        var exclusionFindings = FindSilentExclusions(skillPath, returnedDirectories, options);
+        if (exclusionFindings.Count == 0)
+        {
+            return baseReport;
+        }
+
+        var combinedFindings = new List<SkillComplianceFinding>(baseReport.Findings.Count + exclusionFindings.Count);
+        combinedFindings.AddRange(baseReport.Findings);
+        combinedFindings.AddRange(exclusionFindings);
+        var combinedCoverage = baseReport.Coverage with { SilentlyExcludedCount = exclusionFindings.Count };
+        return new SkillComplianceReport(combinedFindings, combinedCoverage);
     }
+
+    /// <summary>
+    /// Pass 2 + reconciliation: walks <paramref name="skillPath"/> the same way MAF's own discovery would
+    /// (<see cref="RawSkillDirectoryScanner"/>), and for every candidate directory <em>not</em> present in
+    /// <paramref name="returnedDirectories"/> (pass 1's actual result), builds one
+    /// <see cref="SkillComplianceRule.SkillExcludedFromDiscovery"/> finding explaining why.
+    /// </summary>
+    private static List<SkillComplianceFinding> FindSilentExclusions(
+        string skillPath, HashSet<string> returnedDirectories, SkillScanOptions options)
+    {
+        var findings = new List<SkillComplianceFinding>();
+        var candidates = RawSkillDirectoryScanner.FindCandidateSkillDirectories(skillPath);
+
+        foreach (var dir in candidates)
+        {
+            if (returnedDirectories.Contains(NormalizeDirectory(dir)))
+            {
+                continue; // MAF returned it — not a silent exclusion.
+            }
+
+            RawSkillDirectoryScanner.TryFindSkillMdFile(dir, out var skillMdPath);
+            var raw = RawSkillFrontmatterReader.Read(skillMdPath);
+            var (resourceNames, scriptNames) = DiscoverFileSkillAssets(dir);
+            var rawManifest = new SkillManifest(
+                Name: raw.Name ?? string.Empty,
+                Description: raw.Description,
+                ResourceNames: resourceNames,
+                ScriptNames: scriptNames,
+                CompatibilityLength: raw.Compatibility?.Length,
+                AllowedTools: Array.Empty<string>(),
+                SourceKind: SkillSourceKind.File,
+                ParentDirectoryName: SafeDirectoryName(dir));
+
+            var label = string.IsNullOrWhiteSpace(rawManifest.Name) ? "(unnamed skill)" : rawManifest.Name;
+            var granular = SkillComplianceValidator.ValidateSingle(rawManifest, options);
+            var violatedRuleReasons = granular
+                .Where(f => f.Severity == Severity.High)
+                .Select(f => f.Message)
+                .ToList();
+
+            var reasonText = violatedRuleReasons.Count > 0
+                ? string.Join(" ", violatedRuleReasons)
+                : "AgentEval's own rule-checker found no GA violation after reparsing this SKILL.md " +
+                  $"(name='{rawManifest.Name}', description-present={!string.IsNullOrWhiteSpace(rawManifest.Description)}) " +
+                  "— this may indicate a MAF-side parsing difference (e.g. malformed YAML); inspect the file directly.";
+
+            findings.Add(new SkillComplianceFinding(
+                label,
+                SkillComplianceRule.SkillExcludedFromDiscovery,
+                Severity.High,
+                $"Skill folder '{dir}' will NEVER be loaded — MAF excludes it silently because: {reasonText} " +
+                "This is not a warning; the skill is non-functional as authored.",
+                null));
+        }
+
+        return findings;
+    }
+
+    // Case-insensitive on Windows/macOS (matches the observed filesystem); on case-sensitive Linux
+    // filesystems this can only make MORE candidates match pass 1's returned set (never fewer), so it
+    // errs toward NOT reporting a false exclusion rather than toward missing a real one.
+    private static string NormalizeDirectory(string path) =>
+        path.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
 
     /// <summary>
     /// Maps a live <see cref="AgentSkill"/> to the pure <see cref="SkillManifest"/> DTO. Public and testable

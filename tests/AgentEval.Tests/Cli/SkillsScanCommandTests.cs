@@ -112,15 +112,45 @@ public class SkillsScanCommandTests
         finally { dir.Delete(recursive: true); }
     }
 
+    // ── real, on-disk reachability of --fail-on-noncompliant via a genuinely malformed fixture (Item 5) ──
+    // The MAF-silent-exclusion gap documented in SkillsScanCommand.ExecuteAsync's XML remarks used to make
+    // every High-severity NAME rule unreachable via a real on-disk scan (see git history for the prior
+    // "hand-built report only" version of this test group). MafSkillScanner.ScanFileSkillsAsync now detects
+    // and reports the exclusion itself (SkillExcludedFromDiscovery), so this is exercised end-to-end here.
+
+    [Fact]
+    public async Task ExecuteAsync_MalformedFixture_FailOnNoncompliant_ReturnsTestFailure()
+    {
+        var dir = CreateMalformedFixture();
+        try
+        {
+            var exit = await SkillsScanCommand.ExecuteAsync(dir, "console", null, failOnNoncompliant: true, default);
+            Assert.Equal(ExitCodes.TestFailure, exit);
+        }
+        finally { dir.Delete(recursive: true); }
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_MalformedFixture_ConsoleOutput_MentionsExcludedFromDiscovery()
+    {
+        var dir = CreateMalformedFixture();
+        try
+        {
+            var outFile = new FileInfo(Path.Combine(Path.GetTempPath(), "agenteval-skills-scan-malformed-out-" + Guid.NewGuid().ToString("N") + ".txt"));
+            try
+            {
+                await SkillsScanCommand.ExecuteAsync(dir, "console", outFile, failOnNoncompliant: false, default);
+                var content = await File.ReadAllTextAsync(outFile.FullName);
+                Assert.Contains("SkillExcludedFromDiscovery", content, StringComparison.Ordinal);
+                Assert.Contains("SILENTLY EXCLUDED", content, StringComparison.Ordinal);
+            }
+            finally { if (outFile.Exists) outFile.Delete(); }
+        }
+        finally { dir.Delete(recursive: true); }
+    }
+
     // ── ComputeExitCode: the --fail-on-noncompliant gate, tested directly against a hand-built report ──
-    //
-    // See SkillsScanCommand.ExecuteAsync's XML remarks: MAF's OWN AgentFileSkillsSource discovery silently
-    // excludes a directory from the scan whenever its SKILL.md name: field fails the GA name-format rules —
-    // confirmed empirically against 3 separately hand-crafted malformed fixtures (invalid chars, consecutive
-    // hyphens, name/directory mismatch), each producing "0 skills scanned" rather than a High finding. Every
-    // High-severity NAME rule in SkillComplianceValidator is therefore unreachable via a REAL on-disk scan —
-    // so the exit-code CONTRACT is tested here against a manually-built report instead of fighting MAF's own
-    // validation to manufacture one.
+    // (kept as a fast, isolated contract test alongside the real-fixture coverage above).
 
     [Fact]
     public void ComputeExitCode_HighFinding_FailOnTrue_ReturnsTestFailure()
@@ -178,6 +208,23 @@ public class SkillsScanCommandTests
             Directory.CreateDirectory(Path.Combine(skillDir, "scripts"));
             File.WriteAllText(Path.Combine(skillDir, "scripts", "run.csx"), "// test script");
         }
+
+        return new DirectoryInfo(root);
+    }
+
+    /// <summary>
+    /// A real, on-disk skill folder MAF's own discovery will silently exclude (consecutive hyphens in
+    /// <c>name:</c>) — the exact fixture shape that used to produce "0 skills scanned" with no findings
+    /// before Item 5's reconciliation pass, now used to prove <c>--fail-on-noncompliant</c> is genuinely
+    /// reachable end-to-end rather than only via <see cref="ReportWith"/>'s hand-built report.
+    /// </summary>
+    private static DirectoryInfo CreateMalformedFixture()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "agenteval-skills-scan-malformed-" + Guid.NewGuid().ToString("N"));
+        var skillDir = Path.Combine(root, "bad--hyphen");
+        Directory.CreateDirectory(skillDir);
+        File.WriteAllText(Path.Combine(skillDir, "SKILL.md"),
+            "---\nname: bad--hyphen\ndescription: A malformed fixture skill for SkillsScanCommandTests.\n---\n\nBody.\n");
 
         return new DirectoryInfo(root);
     }

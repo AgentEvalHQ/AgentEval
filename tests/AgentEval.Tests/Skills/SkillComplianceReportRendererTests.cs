@@ -60,6 +60,49 @@ public class SkillComplianceReportRendererTests
         Assert.Contains("\"Coverage\"", json);
     }
 
+    // ── Item 5: SilentlyExcludedCount surfaced prominently, not buried ──
+
+    [Fact]
+    public void RenderConsole_SilentlyExcludedCount_Zero_NoBannerLine()
+    {
+        var text = SkillComplianceReportRenderer.RenderConsole(SampleReport());
+        Assert.DoesNotContain("SILENTLY EXCLUDED", text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void RenderConsole_SilentlyExcludedCount_NonZero_ShowsBannerLine()
+    {
+        var finding = new SkillComplianceFinding("bad-skill", SkillComplianceRule.SkillExcludedFromDiscovery, Severity.High, "will never load", null);
+        var coverage = new SkillCoverageSummary(0, 0, 0, new Dictionary<string, int> { ["load"] = 0, ["read"] = 0, ["run"] = 0 }, SilentlyExcludedCount: 1);
+        var report = new SkillComplianceReport([finding], coverage);
+
+        var text = SkillComplianceReportRenderer.RenderConsole(report);
+        Assert.Contains("SILENTLY EXCLUDED", text, StringComparison.Ordinal);
+        Assert.Contains("1 skill folder(s)", text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void RenderMarkdown_SilentlyExcludedCount_NonZero_ShowsWarningBlock()
+    {
+        var finding = new SkillComplianceFinding("bad-skill", SkillComplianceRule.SkillExcludedFromDiscovery, Severity.High, "will never load", null);
+        var coverage = new SkillCoverageSummary(0, 0, 0, new Dictionary<string, int> { ["load"] = 0, ["read"] = 0, ["run"] = 0 }, SilentlyExcludedCount: 2);
+        var report = new SkillComplianceReport([finding], coverage);
+
+        var md = SkillComplianceReportRenderer.RenderMarkdown(report);
+        Assert.Contains("SILENTLY EXCLUDED", md, StringComparison.Ordinal);
+        Assert.Contains("2 skill folder(s)", md, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void RenderJson_IncludesSilentlyExcludedCount()
+    {
+        var coverage = new SkillCoverageSummary(0, 0, 0, new Dictionary<string, int> { ["load"] = 0, ["read"] = 0, ["run"] = 0 }, SilentlyExcludedCount: 3);
+        var report = new SkillComplianceReport([], coverage);
+
+        var json = SkillComplianceReportRenderer.RenderJson(report);
+        Assert.Contains("\"SilentlyExcludedCount\": 3", json, StringComparison.Ordinal);
+    }
+
     [Fact]
     public void Render_Sorts_HighSeverityFirst()
     {

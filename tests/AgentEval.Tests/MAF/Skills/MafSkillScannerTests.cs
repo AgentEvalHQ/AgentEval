@@ -118,4 +118,201 @@ public class MafSkillScannerTests
     {
         Assert.Throws<ArgumentNullException>(() => MafSkillScanner.ToManifest(null!));
     }
+
+    // ── Item 5: silent-discovery-exclusion detection ──
+    // strategy/FutureFeatures/Skills/Skill-Discovery-Exclusion-Detection-Design.md. These replace the
+    // "unreachable via a REAL on-disk scan" honesty finding documented on SkillsScanCommand.ExecuteAsync:
+    // that gap is now CLOSED for ScanFileSkillsAsync specifically (the CLI verb's entry point).
+
+    private static string NewFixtureRoot() =>
+        Path.Combine(Path.GetTempPath(), "agenteval-exclusion-fixture-" + Guid.NewGuid().ToString("N"));
+
+    [Fact]
+    public async Task ScanFileSkillsAsync_MalformedNameFolder_ProducesExcludedFromDiscoveryFinding()
+    {
+        var root = NewFixtureRoot();
+        var badDir = Path.Combine(root, "bad--hyphen");
+        Directory.CreateDirectory(badDir);
+        await File.WriteAllTextAsync(Path.Combine(badDir, "SKILL.md"),
+            "---\nname: bad--hyphen\ndescription: has consecutive hyphens in its name.\n---\n\nBody.\n");
+
+        try
+        {
+            var report = await MafSkillScanner.ScanFileSkillsAsync(root, FakeAgent());
+
+            // The folder vanished from MAF's own count (the original bug)...
+            Assert.Equal(0, report.Coverage.SkillCount);
+            // ...but Item 5 now surfaces it explicitly instead of silence.
+            Assert.Equal(1, report.Coverage.SilentlyExcludedCount);
+            var finding = Assert.Single(report.Findings, f => f.Rule == SkillComplianceRule.SkillExcludedFromDiscovery);
+            Assert.Equal(Severity.High, finding.Severity);
+            Assert.Contains("bad--hyphen", finding.Message, StringComparison.Ordinal);
+            Assert.Contains("NEVER be loaded", finding.Message, StringComparison.Ordinal);
+            Assert.Contains("consecutive hyphens", finding.Message, StringComparison.OrdinalIgnoreCase);
+            Assert.False(report.IsCompliant);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task ScanFileSkillsAsync_MissingDescriptionFolder_ProducesExcludedFromDiscoveryFinding()
+    {
+        // Empirically confirmed this session: MAF silently excludes on a missing/empty description too,
+        // not just name-format violations — a real widening of the design doc's original name-only hypothesis.
+        var root = NewFixtureRoot();
+        var dir = Path.Combine(root, "no-description");
+        Directory.CreateDirectory(dir);
+        await File.WriteAllTextAsync(Path.Combine(dir, "SKILL.md"), "---\nname: no-description\n---\n\nBody.\n");
+
+        try
+        {
+            var report = await MafSkillScanner.ScanFileSkillsAsync(root, FakeAgent());
+
+            Assert.Equal(1, report.Coverage.SilentlyExcludedCount);
+            var finding = Assert.Single(report.Findings, f => f.Rule == SkillComplianceRule.SkillExcludedFromDiscovery);
+            Assert.Contains("description", finding.Message, StringComparison.OrdinalIgnoreCase);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task ScanFileSkillsAsync_MismatchedDirectoryName_ProducesExcludedFromDiscoveryFinding()
+    {
+        var root = NewFixtureRoot();
+        var dir = Path.Combine(root, "mismatched-dir");
+        Directory.CreateDirectory(dir);
+        await File.WriteAllTextAsync(Path.Combine(dir, "SKILL.md"),
+            "---\nname: totally-different\ndescription: the name does not match its folder.\n---\n\nBody.\n");
+
+        try
+        {
+            var report = await MafSkillScanner.ScanFileSkillsAsync(root, FakeAgent());
+
+            Assert.Equal(1, report.Coverage.SilentlyExcludedCount);
+            var finding = Assert.Single(report.Findings, f => f.Rule == SkillComplianceRule.SkillExcludedFromDiscovery);
+            Assert.Contains("totally-different", finding.Message, StringComparison.Ordinal);
+            Assert.Contains("directory", finding.Message, StringComparison.OrdinalIgnoreCase);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task ScanFileSkillsAsync_WellFormedSkillSet_ZeroExclusionFindings_NoFalsePositives()
+    {
+        var root = NewFixtureRoot();
+        for (var i = 0; i < 3; i++)
+        {
+            var name = $"good-skill-{i}";
+            var dir = Path.Combine(root, name);
+            Directory.CreateDirectory(dir);
+            await File.WriteAllTextAsync(Path.Combine(dir, "SKILL.md"),
+                $"---\nname: {name}\ndescription: A well-formed fixture skill number {i}.\n---\n\nBody.\n");
+        }
+
+        try
+        {
+            var report = await MafSkillScanner.ScanFileSkillsAsync(root, FakeAgent());
+
+            Assert.Equal(3, report.Coverage.SkillCount);
+            Assert.Equal(0, report.Coverage.SilentlyExcludedCount);
+            Assert.DoesNotContain(report.Findings, f => f.Rule == SkillComplianceRule.SkillExcludedFromDiscovery);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task ScanFileSkillsAsync_MixedValidAndMalformedSiblings_OnlyMalformedOneExcluded()
+    {
+        var root = NewFixtureRoot();
+        var validDir = Path.Combine(root, "valid-sibling");
+        Directory.CreateDirectory(validDir);
+        await File.WriteAllTextAsync(Path.Combine(validDir, "SKILL.md"),
+            "---\nname: valid-sibling\ndescription: a perfectly fine sibling skill.\n---\n\nBody.\n");
+
+        var badDir = Path.Combine(root, "Invalid_Chars");
+        Directory.CreateDirectory(badDir);
+        await File.WriteAllTextAsync(Path.Combine(badDir, "SKILL.md"),
+            "---\nname: Invalid_Chars\ndescription: uppercase and underscore are not allowed.\n---\n\nBody.\n");
+
+        try
+        {
+            var report = await MafSkillScanner.ScanFileSkillsAsync(root, FakeAgent());
+
+            Assert.Equal(1, report.Coverage.SkillCount); // only valid-sibling was returned by MAF
+            Assert.Equal(1, report.Coverage.SilentlyExcludedCount);
+            Assert.DoesNotContain(report.Findings, f => f.SkillName == "valid-sibling" && f.Rule == SkillComplianceRule.SkillExcludedFromDiscovery);
+            var excluded = Assert.Single(report.Findings, f => f.Rule == SkillComplianceRule.SkillExcludedFromDiscovery);
+            Assert.Equal("Invalid_Chars", excluded.SkillName);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task ScanFileSkillsAsync_CompatibilityOverHardLimit_GracefulHighFinding_NeverThrows()
+    {
+        // Bonus defensive fix found during this same verification: a too-long 'compatibility' field makes
+        // MAF's GetSkillsAsync THROW (not silently exclude) — confirmed empirically. Without the try/catch
+        // in ScanFileSkillsAsync this test would fail with an unhandled ArgumentException instead of
+        // asserting a graceful report.
+        var root = NewFixtureRoot();
+        var dir = Path.Combine(root, "long-compat");
+        Directory.CreateDirectory(dir);
+        var longCompat = new string('c', 600);
+        await File.WriteAllTextAsync(Path.Combine(dir, "SKILL.md"),
+            $"---\nname: long-compat\ndescription: valid desc.\ncompatibility: {longCompat}\n---\n\nBody.\n");
+
+        try
+        {
+            var report = await MafSkillScanner.ScanFileSkillsAsync(root, FakeAgent());
+
+            var finding = Assert.Single(report.Findings);
+            Assert.Equal(Severity.High, finding.Severity);
+            Assert.Equal(SkillComplianceRule.SkillExcludedFromDiscovery, finding.Rule);
+            Assert.Contains("failed entirely", finding.Message, StringComparison.OrdinalIgnoreCase);
+            Assert.False(report.IsCompliant);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task ScanFileSkillsAsync_MalformedFolder_FailOnNoncompliant_IsNoncompliant()
+    {
+        var root = NewFixtureRoot();
+        var badDir = Path.Combine(root, "bad--hyphen");
+        Directory.CreateDirectory(badDir);
+        await File.WriteAllTextAsync(Path.Combine(badDir, "SKILL.md"),
+            "---\nname: bad--hyphen\ndescription: has consecutive hyphens.\n---\n\nBody.\n");
+
+        try
+        {
+            var report = await MafSkillScanner.ScanFileSkillsAsync(root, FakeAgent());
+
+            // A SkillExcludedFromDiscovery finding is High severity, so the existing IsCompliant contract
+            // (Findings.All(f => f.Severity < High)) already treats it as non-compliant — no gate code
+            // change needed, this locks the behavior in.
+            Assert.False(report.IsCompliant);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
 }

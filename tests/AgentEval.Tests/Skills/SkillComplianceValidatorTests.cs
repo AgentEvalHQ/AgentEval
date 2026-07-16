@@ -213,4 +213,40 @@ public class SkillComplianceValidatorTests
     {
         Assert.Throws<ArgumentNullException>(() => SkillComplianceValidator.Validate(null!));
     }
+
+    // ── ValidateSingle: the shared entry point Item 5's raw-frontmatter reconciliation reuses ──
+    // (strategy/FutureFeatures/Skills/Skill-Discovery-Exclusion-Detection-Design.md — "one rule set, two
+    // callers, never duplicate it"). These lock in that ValidateSingle produces EXACTLY the same findings
+    // Validate([skill]) would for the same manifest — a regression here would silently desync the two
+    // callers' explanations.
+
+    [Fact]
+    public void ValidateSingle_CleanSkill_MatchesValidate()
+    {
+        var manifest = Clean();
+        var single = SkillComplianceValidator.ValidateSingle(manifest, new SkillScanOptions { FlagScriptsForGovernance = false });
+        var viaValidate = SkillComplianceValidator.Validate([manifest], new SkillScanOptions { FlagScriptsForGovernance = false }).Findings;
+
+        Assert.Equal(viaValidate, single);
+        Assert.Empty(single);
+    }
+
+    [Fact]
+    public void ValidateSingle_MalformedName_MatchesValidate_SameHighFinding()
+    {
+        var manifest = Clean() with { Name = "bad--hyphen", ParentDirectoryName = "bad--hyphen" };
+        var single = SkillComplianceValidator.ValidateSingle(manifest);
+        var viaValidate = SkillComplianceValidator.Validate([manifest]).Findings;
+
+        Assert.Equal(viaValidate, single);
+        Assert.Contains(single, f => f.Rule == SkillComplianceRule.NameConsecutiveHyphens && f.Severity == Severity.High);
+    }
+
+    [Fact]
+    public void ValidateSingle_DefaultOptions_WhenNullPassed()
+    {
+        var manifest = Clean() with { Name = "" };
+        var single = SkillComplianceValidator.ValidateSingle(manifest, options: null);
+        Assert.Contains(single, f => f.Rule == SkillComplianceRule.NameMissing);
+    }
 }

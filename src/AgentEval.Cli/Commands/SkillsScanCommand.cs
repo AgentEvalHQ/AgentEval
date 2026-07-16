@@ -71,18 +71,19 @@ internal static class SkillsScanCommand
     /// credentials are ever required for this verb.
     /// </summary>
     /// <remarks>
-    /// <b>Honesty finding (verified live this session, not assumed):</b> MAF's own <c>AgentFileSkillsSource</c>
-    /// frontmatter parsing already silently excludes a directory from discovery whenever its <c>SKILL.md</c>
-    /// <c>name:</c> field fails the GA name-format rules (invalid characters, consecutive hyphens, or a
-    /// mismatch against the containing directory name) — confirmed by scanning 3 separately hand-crafted
-    /// malformed fixtures, each returning "Skills scanned: 0" rather than a High-severity finding. In
-    /// practice this means every <see cref="SkillComplianceRule"/> High-severity NAME rule is effectively
-    /// unreachable via a REAL on-disk <c>skills scan</c> — MAF's own discovery is a superset of
-    /// <see cref="SkillComplianceValidator"/>'s name checks for file-sourced skills. This does not affect
-    /// <c>--fail-on-noncompliant</c>'s correctness (see <see cref="ComputeExitCode"/>, tested directly
-    /// against a hand-built <see cref="SkillComplianceReport"/> rather than fighting MAF's own validation to
-    /// manufacture a real High finding) — it is a real, documented gap worth knowing about, not a defect in
-    /// this command.
+    /// <b>Historical honesty finding, now CLOSED (Item 5):</b> MAF's own <c>AgentFileSkillsSource</c>
+    /// frontmatter parsing silently excludes a directory from discovery whenever its <c>SKILL.md</c> fails
+    /// certain GA rules (invalid name characters, consecutive hyphens, a name/directory mismatch, or a
+    /// missing/too-long description — confirmed empirically; the description trigger widens the original
+    /// name-only hypothesis) — confirmed by scanning several separately hand-crafted malformed fixtures,
+    /// each previously returning "Skills scanned: 0" with zero mention of the excluded folder.
+    /// <see cref="MafSkillScanner.ScanFileSkillsAsync"/> now runs a second, independent raw directory walk
+    /// (<see cref="RawSkillDirectoryScanner"/>) reconciled against MAF's actual returned set, so a silently-
+    /// excluded folder produces a <see cref="SkillComplianceRule.SkillExcludedFromDiscovery"/> High finding
+    /// instead of vanishing — see
+    /// <c>strategy/FutureFeatures/Skills/Skill-Discovery-Exclusion-Detection-Design.md</c> and
+    /// <c>MafSkillScannerTests</c>'s "Item 5" test group for real, on-disk, end-to-end coverage (no longer
+    /// only a hand-built-report test, per <see cref="ComputeExitCode"/> below).
     /// </remarks>
     internal static async Task<int> ExecuteAsync(
         DirectoryInfo path, string format, FileInfo? output, bool failOnNoncompliant, CancellationToken ct)

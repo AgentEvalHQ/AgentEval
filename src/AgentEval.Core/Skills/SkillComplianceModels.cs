@@ -56,6 +56,15 @@ public enum SkillComplianceRule
 
     /// <summary>The skill uses the experimental <c>allowed-tools</c> frontmatter field.</summary>
     AllowedToolsExperimental,
+
+    /// <summary>
+    /// A skill folder exists on disk (has its own <c>SKILL.md</c>) but MAF's own
+    /// <c>AgentFileSkillsSource.GetSkillsAsync()</c> silently excluded it from discovery — it will never
+    /// load into any agent. Distinct from every rule above: those describe a problem with an otherwise-
+    /// working skill; this means the skill is <em>non-functional as authored</em>. See
+    /// <c>strategy/FutureFeatures/Skills/Skill-Discovery-Exclusion-Detection-Design.md</c>.
+    /// </summary>
+    SkillExcludedFromDiscovery,
 }
 
 /// <summary>One rule violation (or informational flag) found for one skill.</summary>
@@ -78,8 +87,18 @@ public sealed record SkillComplianceFinding(
 /// consistent with <see cref="AgentEval.Metrics.Agentic.SkillDisclosureEfficiencyMetric"/>'s own
 /// observable-stages-only discipline, this histogram never fabricates an advertise count.
 /// </param>
+/// <param name="SilentlyExcludedCount">
+/// How many on-disk skill folders MAF's own discovery silently excluded before this scan ever saw them
+/// (<see cref="SkillComplianceRule.SkillExcludedFromDiscovery"/>) — surfaced as its own field, not buried
+/// in <see cref="SkillCount"/>, because these folders were never counted as scanned skills in the first
+/// place. Defaults to 0 for any report built the pre-Item-5 way (e.g. hand-built test fixtures).
+/// </param>
 public sealed record SkillCoverageSummary(
-    int SkillCount, int WithResources, int WithScripts, IReadOnlyDictionary<string, int> StageHistogram);
+    int SkillCount,
+    int WithResources,
+    int WithScripts,
+    IReadOnlyDictionary<string, int> StageHistogram,
+    int SilentlyExcludedCount = 0);
 
 /// <summary>The full result of a compliance scan: every finding plus the coverage summary.</summary>
 /// <param name="Findings">Every finding across every scanned skill.</param>
