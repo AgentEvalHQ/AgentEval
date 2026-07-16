@@ -32,6 +32,7 @@ is independent and writes to one shared trace.
 |---|---|---|
 | **Tool gates** | each tool call, pre‑execution | Block / mutate a *specific live tool call* (forbidden / poisoned / out‑of‑sequence) |
 | **Tool RESULT gates** | each tool call, post‑execution | Block / redact what the model gets to see of a result that already happened (injected instructions, secrets, oversized payloads a poisoned fetch/file/API response carries) |
+| **HTTP egress enforcement** | the tool's own outbound HTTP request, on the wire | Catches what an argument‑string scan structurally can't: a redirect to a forbidden host, or a DNS answer resolving an allow‑listed hostname to a private/internal address (SSRF/DNS‑rebind). **Different composition point** — wraps the tool's own `HttpClient` (`GatekeeperHttpMessageHandler.CreateHttpClient`), not registered via `UseGatekeeper` |
 | **The moat** | each tool call | Your *red‑team oracles* + canaries run as runtime gates — your tests become defenses |
 | **Run gates** | the run's input & output text | Reject an incoming attack (run‑pre) or a leaking response (run‑post) |
 | **Session gates** | before a run | Enforce *who* may drive it (auth), *how often* (rate), and *quarantine* |
