@@ -66,9 +66,15 @@ public class EvalCommandCopilotStudioSutTests
     [Fact]
     public async Task Eval_MissingDataset_ThrowsBeforeSutValidation()
     {
-        // Regression guard: the dataset-existence check must still run first, even for a --sut scan
+        // Regression guard: the dataset-existence check must still run first for a --sut scan specifically
         // (a bad --sut config shouldn't mask a typo'd --dataset path, and vice versa — this proves
-        // Dataset.Exists is checked before ISutTarget.Validate, matching the pre-existing endpoint path).
+        // Dataset.Exists is checked before ISutTarget.Validate). This precedence is --sut-ONLY, not shared
+        // with the classic (--endpoint/--azure) path — that path's OWN, deliberately different precedence
+        // (connection-config validation before dataset-existence) is covered separately by
+        // EvalCommandTests.ExecuteAsync_ClassicPath_MissingDatasetAndNoConnectionConfig_ThrowsEndpointErrorFirst
+        // (review: an earlier version of this comment incorrectly claimed the classic path already matched
+        // this ordering — it didn't, and applying --sut's dataset-first requirement to the classic path too
+        // was itself a regression, since fixed).
         var opts = BaseOptions(new FileInfo("/nonexistent/path/to/dataset.yaml"), ackConsent: false, config: null);
         await Assert.ThrowsAsync<FileNotFoundException>(() => EvalCommand.ExecuteAsync(opts, default));
     }
@@ -96,10 +102,39 @@ public class EvalCommandCopilotStudioSutTests
         finally { TryDelete(dataset); TryDelete(cfg); }
     }
 
+    // ── --metrics + --runs > 1 (review): must warn, never throw, even with no evaluator client ──
+
+    [Fact]
+    public async Task Eval_CopilotStudio_RunsGreaterThan1_WithMetricsAndNoJudge_WarnsInsteadOfThrowing()
+    {
+        // Regression guard: --metrics used to be resolved to real IMetric instances BEFORE the --runs > 1
+        // check ran, so `--sut copilot-studio --runs 5 --metrics llm_relevance` (no --judge, and a --sut
+        // target exposes no raw IChatClient to fall back to) threw inside MetricCatalog.Resolve instead of
+        // reaching the graceful "--metrics has no effect combined with --runs > 1" warning-and-ignore path
+        // (--metrics scoring isn't wired to the stochastic path at all, so the instances would never even
+        // have been used). This must complete successfully, not throw.
+        var dataset = CreateTempDataset();
+        var cfg = WriteValidConfig();
+        try
+        {
+            AIAgent inner = new ChatClientAgent(new AlwaysHelpfulChatClient(), new ChatClientAgentOptions { Name = "cs-fake" });
+            IEvaluableAgent sut = CopilotStudioAgentFactory.FromAgent(inner);
+
+            var opts = BaseOptions(dataset, ackConsent: true, config: cfg, runs: 5, metrics: "llm_relevance");
+
+            var exit = await EvalCommand.ExecuteAsync(opts, default, sutOverride: sut);
+
+            // The stochastic path's own pass/fail depends on StochasticRunner's threshold logic, not on
+            // --metrics at all — the point of this test is that it completes (any exit code), not throws.
+            Assert.True(exit is ExitCodes.Success or ExitCodes.TestFailure);
+        }
+        finally { TryDelete(dataset); TryDelete(cfg); }
+    }
+
     // ── helpers ──
 
     private static EvalOptions BaseOptions(
-        FileInfo dataset, bool ackConsent, FileInfo? config, string? sut = "copilot-studio") => new()
+        FileInfo dataset, bool ackConsent, FileInfo? config, string? sut = "copilot-studio", int runs = 1, string? metrics = null) => new()
     {
         Dataset = dataset,
         Sut = sut,
@@ -109,6 +144,8 @@ public class EvalCommandCopilotStudioSutTests
         },
         Format = "json",
         Quiet = true,
+        Runs = runs,
+        Metrics = metrics,
     };
 
     private static FileInfo CreateTempDataset()

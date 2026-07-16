@@ -166,7 +166,15 @@ internal static class EvalCommand
     /// </summary>
     internal static async Task<int> ExecuteAsync(EvalOptions opts, CancellationToken ct, IEvaluableAgent? sutOverride = null)
     {
-        if (!opts.Dataset.Exists)
+        // --sut path ONLY: dataset-existence must be checked before ISutTarget.Validate (called inside
+        // TryResolve below, step 1) — a bad --sut config (e.g. missing consent) shouldn't mask a typo'd
+        // --dataset path, and vice versa (see EvalCommandCopilotStudioSutTests.Eval_MissingDataset_
+        // ThrowsBeforeSutValidation). The classic (--endpoint/--azure) path restores its ORIGINAL
+        // precedence instead — connection-config validation before dataset-existence — via the second
+        // dataset check further down, inside the `else` branch (review: this review-flagged regression
+        // came from a top-of-method dataset check that applied to BOTH paths; only the --sut path's own
+        // test actually needed dataset-first).
+        if (opts.Sut is not null && !opts.Dataset.Exists)
             throw new FileNotFoundException($"Dataset not found: {opts.Dataset.FullName}");
 
         // 0. Parse + validate --metrics NAMES (Item 4, D1 bridge) as early as possible, before any network
@@ -232,6 +240,13 @@ internal static class EvalCommand
                 throw new InvalidOperationException(
                     "--model is required when using --endpoint.");
 
+            // Classic path's dataset-existence check — AFTER connection-config validation, restoring the
+            // original precedence (a typo'd --dataset path must not mask a missing --endpoint/--azure/
+            // --model, which was this path's behavior before the --sut dataset-first requirement above was
+            // added and accidentally moved to the top of the whole method instead of staying --sut-only).
+            if (!opts.Dataset.Exists)
+                throw new FileNotFoundException($"Dataset not found: {opts.Dataset.FullName}");
+
             // Resolved identifier: deployment name for Azure, model name for OpenAI-compatible
             resolvedName = opts.Azure ? opts.DeploymentName! : opts.Model!;
 
@@ -273,9 +288,13 @@ internal static class EvalCommand
         // before the (possibly expensive) scan runs — a metric that needs an LLM judge but has none
         // available fails here, not after wastefully running the whole batch. --judge wins as the
         // evaluator when set; otherwise falls back to the SUT's own chatClient (null for a --sut target).
+        // Skipped entirely for the stochastic path (opts.Runs > 1, step 6b below): that path never
+        // consumes selectedMetricInstances at all (--metrics scoring isn't wired to it yet), so resolving
+        // here was both wasted work AND could THROW for a reason (no evaluator client available) that
+        // --runs > 1 is supposed to just warn-and-ignore, not fail the whole run on (review).
         IReadOnlyList<IMetric>? selectedMetricInstances = null;
         IChatClient? metricsEvaluatorClient = judgeClient ?? chatClient;
-        if (selectedMetrics is not null)
+        if (selectedMetrics is not null && opts.Runs <= 1)
         {
             selectedMetricInstances = selectedMetrics
                 .Select(name => MetricCatalog.Resolve(name, metricsEvaluatorClient))

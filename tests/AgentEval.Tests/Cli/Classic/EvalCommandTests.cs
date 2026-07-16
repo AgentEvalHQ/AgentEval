@@ -195,6 +195,32 @@ public class EvalCommandTests
     }
 
     [Fact]
+    public async Task ExecuteAsync_ClassicPath_MissingDatasetAndNoConnectionConfig_ThrowsEndpointErrorFirst()
+    {
+        // Regression guard (review): restores the classic (non --sut) path's ORIGINAL precedence —
+        // connection-config validation (--endpoint/--azure/--model) BEFORE the dataset-existence check.
+        // ExecuteAsync_MissingDataset_Throws above sets a fully-valid --endpoint/--model, so it can never
+        // actually distinguish "dataset checked first" from "endpoint checked first" (either ordering
+        // throws FileNotFoundException there, since nothing else is wrong). THIS test leaves --endpoint/
+        // --azure/--model unset TOO, so the two possible orderings produce genuinely different exceptions —
+        // proving connection-config validation runs first, matching this path's pre-existing behavior
+        // before a --sut-path-only "dataset-first" requirement was accidentally applied to BOTH paths (see
+        // EvalCommandCopilotStudioSutTests.Eval_MissingDataset_ThrowsBeforeSutValidation for the --sut
+        // path's own, intentionally DIFFERENT precedence).
+        var opts = new EvalOptions
+        {
+            Dataset = new FileInfo("/nonexistent/path/to/dataset.yaml"),
+            Format = "json",
+        };
+
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => EvalCommand.ExecuteAsync(opts, CancellationToken.None));
+
+        Assert.Contains("--endpoint", ex.Message);
+        Assert.Contains("--azure", ex.Message);
+    }
+
+    [Fact]
     public async Task ExecuteAsync_EmptyDataset_Throws()
     {
         var path = CreateTempDataset("examples: []");
