@@ -48,8 +48,9 @@ public class AgentEvalGatekeeperExtensionsTests
         var tool = AIFunctionFactory.Create((string x) => { Interlocked.Increment(ref executed); return "ok"; }, "delete_account");
         var agent = BuildAgent(tool, "delete_account", new Dictionary<string, object?> { ["x"] = "1" });
         var trace = new AgentTrace();
+        using var writer = new StringWriter();   // Observe fires the startup banner — redirect it, don't leak to real stdout in CI.
         var gated = agent.AsBuilder()
-            .UseGatekeeper(GatekeeperEnforcement.Observe, g => { g.Add(new ForbiddenToolGate("delete_account")); g.Trace = trace; })
+            .UseGatekeeper(GatekeeperEnforcement.Observe, g => { g.Add(new ForbiddenToolGate("delete_account")); g.Trace = trace; g.BannerWriter = writer; })
             .Build();
 
         await gated.RunAsync("go");
@@ -151,12 +152,14 @@ public class AgentEvalGatekeeperExtensionsTests
         // Advisory-only mode: the silent fallback is lower-stakes, so it's allowed to remain (per the design doc).
         var tool = AIFunctionFactory.Create((string x) => x, "x");
         var agent = BuildAgent(tool, "x", new Dictionary<string, object?>());
+        using var writer = new StringWriter();   // Observe fires the startup banner — redirect it, don't leak to real stdout in CI.
 
         var ex = Record.Exception(() =>
             agent.AsBuilder().UseGatekeeper(GatekeeperEnforcement.Observe, g =>
             {
                 g.Add(new RunBudgetGate(maxToolCalls: 5));
                 g.EstablishRunScope = false;
+                g.BannerWriter = writer;
             }));
 
         Assert.Null(ex);
@@ -329,6 +332,45 @@ public class AgentEvalGatekeeperExtensionsTests
             }));
 
         Assert.Null(ex);
+    }
+
+    // ── #2: options.CoverageReport is the AUTHORITATIVE report, computed from the SAME snapshot that's registered ──
+
+    [Fact]
+    public void CoverageReport_PopulatedFromTheSameToolGatesSnapshotThatWasActuallyRegistered()
+    {
+        var deleteTool = AIFunctionFactory.Create((string x) => x, "delete_account");
+        var agent = BuildAgent(deleteTool, "delete_account", new Dictionary<string, object?>());
+        var options = new GatekeeperOptions();
+
+        agent.AsBuilder().UseGatekeeper(GatekeeperEnforcement.Terminate, g =>
+        {
+            g.Add(new ForbiddenToolGate("delete_account"));
+            g.KnownTools = [deleteTool];
+            // RefuseUnprotectedHighRiskTools intentionally left false — CoverageReport must populate regardless.
+            options = g;   // capture the SAME GatekeeperOptions instance UseGatekeeper populated
+        });
+
+        Assert.NotNull(options.CoverageReport);
+        Assert.True(options.CoverageReport!.ToolInventoryAvailable);
+        var entry = Assert.Single(options.CoverageReport.Tools);
+        Assert.True(entry.IsGateProtected);   // reflects the ForbiddenToolGate registered in the SAME call — never disconnected
+    }
+
+    [Fact]
+    public void CoverageReport_NullWhenKnownToolsNeverSet()
+    {
+        var tool = AIFunctionFactory.Create((string x) => x, "x");
+        var agent = BuildAgent(tool, "x", new Dictionary<string, object?>());
+        var options = new GatekeeperOptions();
+
+        agent.AsBuilder().UseGatekeeper(GatekeeperEnforcement.Terminate, g =>
+        {
+            g.Add(new ForbiddenToolGate("x"));
+            options = g;
+        });
+
+        Assert.Null(options.CoverageReport);   // nothing to analyze against — no KnownTools was ever provided
     }
 
     // ── Telemetry threads through ──

@@ -46,6 +46,16 @@ public static class AgentEvalGatekeeperExtensions
         var options = new GatekeeperOptions();
         configure(options);
 
+        // #2: compute the AUTHORITATIVE coverage report — against the SAME ToolGates snapshot that is actually
+        // registered below (options.ToolGates.ToArray()), not a separately-tracked list a caller could pass to
+        // GatekeeperCoverageAnalyzer.Analyze themselves and let drift. Populated whenever KnownTools is set,
+        // regardless of RefuseUnprotectedHighRiskTools, so any caller can read options.CoverageReport after
+        // this call returns instead of re-deriving it with their own (possibly stale) gate list.
+        if (options.KnownTools is not null)
+        {
+            options.CoverageReport = GatekeeperCoverageAnalyzer.Analyze(options.KnownTools, options.ToolGates.ToArray(), options.CoverageAnalyzeOptions);
+        }
+
         // P0-1 (bundled): refuse construction now, eagerly, if a high-risk tool has zero protecting gate.
         if (options.RefuseUnprotectedHighRiskTools)
         {
@@ -83,14 +93,6 @@ public static class AgentEvalGatekeeperExtensions
                     "safe for advisory Observe mode, not for enforcement. Set EstablishRunScope = true (the " +
                     "default), or establish AgentRunScope yourself before this middleware runs.");
             }
-        }
-
-        if (enforcement == GatekeeperEnforcement.Observe)
-        {
-            options.BannerWriter?.WriteLine("AGENTEVAL GATEKEEPER IS RUNNING IN OBSERVE-ONLY MODE. NO TOOL CALLS WILL BE BLOCKED.");
-            options.BannerWriter?.WriteLine(
-                $"  ({options.ToolGates.Count} tool gate(s), {options.PreGates.Count + options.PostGates.Count} run gate(s) " +
-                $"registered — findings are recorded to the trace but never enforced.)");
         }
 
         var toolPolicy = ToToolGatePolicy(enforcement);
@@ -140,6 +142,18 @@ public static class AgentEvalGatekeeperExtensions
 #pragma warning disable AEGK001 // validating, not yet composing — same experimental-opt-in reasoning as the actual UseAgentEvalToolApproval call below.
             AgentEvalToolApprovalExtensions.ValidateApprovalGates(options.ApprovalGates.ToArray());
 #pragma warning restore AEGK001
+        }
+
+        // Print the Observe banner only once every validation above has passed — a construction that's about
+        // to throw must never first print "safe, nothing will ever block," which would be actively misleading
+        // output right before the exception. Still strictly before any Use(...) mutation, so the banner reads
+        // "here's what's about to be wired" rather than "here's what just ran."
+        if (enforcement == GatekeeperEnforcement.Observe)
+        {
+            options.BannerWriter?.WriteLine("AGENTEVAL GATEKEEPER IS RUNNING IN OBSERVE-ONLY MODE. NO TOOL CALLS WILL BE BLOCKED.");
+            options.BannerWriter?.WriteLine(
+                $"  ({options.ToolGates.Count} tool gate(s), {options.PreGates.Count + options.PostGates.Count} run gate(s) " +
+                $"registered — findings are recorded to the trace but never enforced.)");
         }
 
         var result = builder;

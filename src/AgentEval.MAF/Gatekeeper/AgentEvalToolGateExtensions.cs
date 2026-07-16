@@ -52,14 +52,31 @@ public static class AgentEvalToolGateExtensions
     /// never carry secrets and want the exact before/after values for debugging.
     /// </param>
     /// <remarks>
-    /// <b>No <see cref="GateRequirements.RunScope"/> guard at this seam.</b> A <paramref name="gates"/> entry
-    /// that declares <see cref="GateRequirements.RunScope"/> (e.g. <see cref="RunBudgetGate"/>,
-    /// <see cref="SequenceGate"/>) still runs here even when no <see cref="AgentRunScope"/> is established —
-    /// this method has no way to know whether <c>UseAgentEvalGate</c> will also be called (in this chain, before
-    /// or after), so it cannot check at registration time. Calling it directly (bypassing <c>UseGatekeeper</c>)
-    /// forfeits the construction-time refusal <c>UseGatekeeper</c> performs for exactly this case — the gate
-    /// silently falls back to its documented single-process-wide shared state instead. Prefer
-    /// <c>UseGatekeeper(...)</c> for RunScope-requiring gates, or call <c>UseAgentEvalGate()</c> yourself first.
+    /// <b>Only a best-effort RUNTIME <see cref="GateRequirements.RunScope"/> signal at this seam, not a
+    /// construction-time guard.</b> A <paramref name="gates"/> entry that declares
+    /// <see cref="GateRequirements.RunScope"/> (e.g. <see cref="RunBudgetGate"/>, <see cref="SequenceGate"/>)
+    /// still runs here even when no <see cref="AgentRunScope"/> is established. This method CANNOT check that
+    /// at registration time — <see cref="AgentRunScope.Current"/> is an <c>AsyncLocal</c> only ever set inside
+    /// an actual run (<c>UseAgentEvalGate</c>'s <c>runFunc</c>), so at registration (before any run has
+    /// happened) it is unconditionally null regardless of whether the pipeline is correctly wired — a
+    /// registration-time check could not distinguish "correctly configured" from "not." Instead, on the FIRST
+    /// tool call actually made through this pipeline, if no scope is established, ONE non-blocking
+    /// <c>gate.warning.*.MissingRunScope</c> trace entry is recorded (never throws, never blocks — a hard
+    /// construction-time refusal for this is <c>UseGatekeeper</c>'s job). That still means: no run at all
+    /// happens ⇒ no warning either. Calling this method directly (bypassing <c>UseGatekeeper</c>) forfeits the
+    /// construction-time refusal <c>UseGatekeeper</c> performs for exactly this case — the gate silently falls
+    /// back to its documented single-process-wide shared state instead. Prefer <c>UseGatekeeper(...)</c> for
+    /// RunScope-requiring gates, or call <c>UseAgentEvalGate()</c> yourself first.
+    /// <para><b>⚠ Never chain two SEPARATE <c>UseAgentEvalToolGate</c> calls on the same builder</b> — register
+    /// every gate in ONE call, in ONE list. This method is built on MAF's function-invocation middleware seam
+    /// (<c>FunctionInvocationDelegatingAgentBuilderExtensions.Use</c>), where each registration wraps the
+    /// pipeline built so far. Empirically confirmed against MAF 1.13.0: the SECOND (later) of two chained
+    /// registrations becomes the OUTERMOST layer and its gates see every call FIRST — the opposite of what
+    /// "register A's gates, then B's" reads as. If the later registration's gate blocks (without forwarding),
+    /// the earlier registration's gates are never even invoked for that call — silently starved, not merely
+    /// "run second." <c>UseGatekeeper(...)</c> already avoids this (it composes exactly one
+    /// <c>UseAgentEvalToolGate</c> call over the full gate list) — use it, or pass every gate to a single
+    /// <c>UseAgentEvalToolGate</c> call yourself.</para>
     /// </remarks>
     public static AIAgentBuilder UseAgentEvalToolGate(
         this AIAgentBuilder builder,
@@ -73,10 +90,40 @@ public static class AgentEvalToolGateExtensions
         ArgumentNullException.ThrowIfNull(gates);
         ValidateGates(gates, policy);
 
+        // Snapshot NOW — gates may be a caller-owned mutable List<IToolGate>. The closure below runs on every
+        // tool call for the lifetime of the built agent; without a defensive copy, a later mutation to the
+        // same list instance would silently change what this pipeline enforces (bypassing the validation
+        // above entirely for anything added afterward) and risks a mid-request "Collection was modified" if
+        // the caller mutates it while a call is in flight (AllowConcurrentInvocation).
+        var frozenGates = gates.ToArray();
+
+        // #4-revisit: a REGISTRATION-time check of AgentRunScope.Current is not just hard but structurally
+        // impossible — Current is an AsyncLocal only ever set inside an actual RunAsync call
+        // (AgentRunScope.Begin, invoked from UseAgentEvalGate's runFunc), so at THIS point (pipeline
+        // construction, before any run has happened) it is unconditionally null for every caller, correctly
+        // configured or not. A registration-time check could only ever "always fire" or "never fire" — it
+        // cannot distinguish the two configurations the check exists to tell apart. This is instead a RUNTIME,
+        // best-effort signal: on the first tool call actually made through this pipeline, if a RunScope-
+        // requiring gate is registered and no scope is established, record ONE non-blocking gate.warning.*
+        // trace entry (never throws or blocks the call — a hard, construction-time refusal for this is already
+        // UseGatekeeper's job; this only helps direct UseAgentEvalToolGate callers who skip it).
+        var scopeRequiringGateNames = frozenGates
+            .Where(g => g.Requirements.HasFlag(GateRequirements.RunScope))
+            .Select(g => g.PolicyName)
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
+        var missingScopeWarned = 0;   // Interlocked-guarded: at most once per pipeline instance, not once per call
+
         var gateSeq = 0;
 
         return builder.Use(async (agent, context, next, ct) =>
         {
+            if (scopeRequiringGateNames.Length > 0 && AgentRunScope.Current is null &&
+                Interlocked.CompareExchange(ref missingScopeWarned, 1, 0) == 0)
+            {
+                RecordMissingScopeWarning(trace, Interlocked.Increment(ref gateSeq), scopeRequiringGateNames);
+            }
+
             var call = new GatedToolCall(
                 FunctionName: context.Function.Name,
                 Arguments: context.Arguments as IReadOnlyDictionary<string, object?>,
@@ -87,7 +134,7 @@ public static class AgentEvalToolGateExtensions
                 IsStreaming: context.IsStreaming,
                 Messages: context.Messages as IReadOnlyList<ChatMessage>);
 
-            foreach (var gate in gates)
+            foreach (var gate in frozenGates)
             {
                 ToolGateVerdict verdict;
                 var stopwatch = telemetry is null ? null : Stopwatch.StartNew();
@@ -250,6 +297,29 @@ public static class AgentEvalToolGateExtensions
         }
 
         trace.SetMetadata($"gate.tool.{seq}.{verdict.PolicyName}", value);
+    }
+
+    // #4-revisit: the best-effort RUNTIME missing-run-scope signal — see the field comment where
+    // scopeRequiringGateNames is computed. Uses the "warning" stage token (not "tool") and action="Warn" so it
+    // reads naturally alongside real gate verdicts in GateVoice/GlassBoxEvidence (never counted as a block —
+    // GlassBoxEvidence.CountGateBlocks only counts action="Block").
+    private static void RecordMissingScopeWarning(AgentTrace? trace, int seq, IReadOnlyList<string> offenders)
+    {
+        if (trace is null)
+        {
+            return;
+        }
+
+        trace.SetMetadata($"gate.warning.{seq}.MissingRunScope", new Dictionary<string, object?>
+        {
+            ["action"] = "Warn",
+            ["reason"] = $"{string.Join(", ", offenders)} declare GateRequirements.RunScope, but no AgentRunScope " +
+                          "is established for this run — they fall back to shared, process-wide state (self-" +
+                          "documented on RunLedger/SequenceGate). Call UseAgentEvalGate() before this middleware, " +
+                          "or prefer UseGatekeeper(...), which refuses construction for this case instead of only warning.",
+            ["matches"] = null,
+            ["correlationId"] = ToolCorrelationScope.Current,
+        });
     }
 
     // A Mutate is recorded (action="Mutate", NOT counted as a block) with before/after args so the change is

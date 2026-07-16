@@ -2,6 +2,8 @@
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 
+using AgentEval.Guardrails;
+
 namespace AgentEval.MAF.Gatekeeper;
 
 /// <summary>
@@ -15,8 +17,8 @@ namespace AgentEval.MAF.Gatekeeper;
 /// </summary>
 internal static class GateReferenceId
 {
-    /// <summary>A short, opaque, unpredictable reference id — correlates the model-visible refusal with the full trace evidence.</summary>
-    public static string New() => "gk_" + Guid.NewGuid().ToString("N")[..12];
+    /// <summary>A short, opaque, unpredictable reference id — correlates the model-visible refusal with the full trace evidence. Delegates to the shared, dependency-free <see cref="GateCorrelationId"/> (also used by <c>EvalGateRefusalException</c> in Core) so the two never drift.</summary>
+    public static string New() => GateCorrelationId.New();
 
     /// <summary>The stable, non-revealing model-visible refusal body for <paramref name="referenceId"/>.</summary>
     public static string RefusalBody(string referenceId) => $$"""{"error":"ACTION_NOT_AUTHORIZED","referenceId":"{{referenceId}}"}""";

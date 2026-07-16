@@ -15,6 +15,12 @@ namespace AgentEval.MAF.Gatekeeper;
 /// short name/description, not arbitrary call arguments, so a regex engine buys nothing here) — override via
 /// <see cref="AnalyzeOptions.IsHighRisk"/> when it misclassifies your tools. A real capability model
 /// (read/write/network/monetary…) is future work — see <see cref="ToolRiskLevel"/> remarks.
+/// <para><b>Blind to the tool's parameter schema.</b> Only <c>Name</c>/<c>Description</c> are inspected —
+/// never an <see cref="AIFunction"/>'s JSON parameter schema. A generically-named dispatch tool (e.g.
+/// <c>manage_resource</c> with an <c>operation</c> enum parameter whose values include <c>"delete"</c>) is
+/// invisible to this heuristic even though invoking it with the right argument is exactly as destructive as a
+/// tool literally named <c>delete_resource</c>. Override <see cref="AnalyzeOptions.IsHighRisk"/> (which
+/// receives the full <see cref="AITool"/>) to inspect schema/parameters for tools shaped this way.</para>
 /// </summary>
 public static class ToolRiskClassifier
 {

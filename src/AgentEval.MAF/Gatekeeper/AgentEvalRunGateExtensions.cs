@@ -48,8 +48,17 @@ public static class AgentEvalRunGateExtensions
         AgentTrace? trace = null)
     {
         ArgumentNullException.ThrowIfNull(builder);
-        var preGates = pre ?? Array.Empty<IChatGate>();
-        var postGates = post ?? Array.Empty<IChatGate>();
+
+        // Snapshot NOW, at registration — pre/post may be a caller-owned mutable List<IChatGate>. Without a
+        // defensive copy, the closure captured below would see any LATER mutation to that same list instance
+        // (a gate added after this call returns), but effectivePolicy is decided ONCE, right here, from the
+        // gate counts AT THIS MOMENT — a gate added afterward would run under a policy decision made before it
+        // existed (e.g. "no gates yet ⇒ inert WarnOnly" locked in, even once a real gate is later added,
+        // silently never enforcing it). A live list also risks a mid-request "Collection was modified" if the
+        // caller mutates it while a run is in flight. ToArray() makes UseAgentEvalGate's contract exactly what
+        // its signature implies: the pipeline is fixed by the gates passed to THIS call.
+        IReadOnlyList<IChatGate> preGates = (pre ?? Array.Empty<IChatGate>()).ToArray();
+        IReadOnlyList<IChatGate> postGates = (post ?? Array.Empty<IChatGate>()).ToArray();
         foreach (var g in preGates)
         {
             ArgumentNullException.ThrowIfNull(g, nameof(pre));
@@ -240,11 +249,19 @@ public static class AgentEvalRunGateExtensions
             return;
         }
 
+        // #6: the two SensitiveJudgeAxes (exfiltration-intent, system-prompt-extraction) can have Reason/
+        // Matches carry the offending phrase verbatim — an LLM judge's own rationale can quote back the exact
+        // secret/leaked-prompt text it detected ("the offending phrase may BE the secret," the same rule
+        // GateVerdictDto.RedactAxes already applies to the CLI verdict JSON). This is otherwise the one
+        // trace-evidence write path TraceCaptureMode (#13) does NOT cover — that only gates Mutate tool-call
+        // arguments. Redact both fields unconditionally for these two axes; audit-visible for every other gate.
+        var sensitive = SensitiveJudgeAxes.IsSensitive(verdict.PolicyName);
+
         trace.SetMetadata($"gate.{stage}.{seq}.{verdict.PolicyName}", new Dictionary<string, object?>
         {
             ["action"] = action,   // "Block" (enforced) or "Warn" (WarnOnly — recorded but the run proceeded)
-            ["reason"] = verdict.Reason,
-            ["matches"] = verdict.Matches,
+            ["reason"] = sensitive ? "[redacted — sensitive judge axis; see SensitiveJudgeAxes.RedactAxes]" : verdict.Reason,
+            ["matches"] = sensitive ? null : verdict.Matches,
             ["correlationId"] = ToolCorrelationScope.Current,
             ["referenceId"] = referenceId,
         });

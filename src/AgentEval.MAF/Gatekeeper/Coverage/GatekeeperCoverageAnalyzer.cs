@@ -75,8 +75,10 @@ public static class GatekeeperCoverageAnalyzer
 
     /// <summary>
     /// Like <see cref="Analyze(AIAgent,IReadOnlyList{IToolGate}?,AnalyzeOptions?)"/>, but throws
-    /// <see cref="UnprotectedHighRiskToolException"/> if any high-risk tool has zero protecting gate. Call this
-    /// right after <c>.Build()</c> to refuse to start an agent with an unprotected high-risk tool.
+    /// <see cref="UnprotectedHighRiskToolException"/> if any high-risk tool has zero protecting gate, or
+    /// <see cref="ToolInventoryUnavailableException"/> if the tool inventory could not be read at all (an
+    /// unverifiable agent must fail the SAME direction as a verified-bad one — see that exception's remarks).
+    /// Call this right after <c>.Build()</c> to refuse to start an agent with an unprotected high-risk tool.
     /// </summary>
     public static GatekeeperCoverageReport AnalyzeOrThrow(AIAgent agent, IReadOnlyList<IToolGate>? toolGates = null, AnalyzeOptions? options = null)
         => ThrowIfUnprotected(Analyze(agent, toolGates, options));
@@ -85,8 +87,12 @@ public static class GatekeeperCoverageAnalyzer
     public static GatekeeperCoverageReport AnalyzeOrThrow(IEnumerable<AITool> tools, IReadOnlyList<IToolGate>? toolGates = null, AnalyzeOptions? options = null)
         => ThrowIfUnprotected(Analyze(tools, toolGates, options));
 
-    private static GatekeeperCoverageReport ThrowIfUnprotected(GatekeeperCoverageReport report)
-        => report.HasUnprotectedHighRiskTools ? throw new UnprotectedHighRiskToolException(report) : report;
+    private static GatekeeperCoverageReport ThrowIfUnprotected(GatekeeperCoverageReport report) => report switch
+    {
+        { ToolInventoryAvailable: false } => throw new ToolInventoryUnavailableException(report),
+        { HasUnprotectedHighRiskTools: true } => throw new UnprotectedHighRiskToolException(report),
+        _ => report,
+    };
 
     private static GatekeeperCoverageReport AnalyzeCore(
         IEnumerable<AITool> tools, IReadOnlyList<IToolGate>? toolGates, AnalyzeOptions? options, bool toolInventoryAvailable)

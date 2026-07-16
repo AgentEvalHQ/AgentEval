@@ -45,11 +45,13 @@ internal static class MutationEvidenceRenderer
 
     // Reuses the shared SHA-256-hex primitive (AgentEval.Guardrails.ManifestFingerprint, already used for
     // skill/tool-manifest drift hashing) instead of a second hand-rolled SHA256+hex implementation. Truncated
-    // to 16 hex chars — this is a "did the value change/repeat" telemetry marker, not a security-critical
-    // digest, so the shorter form is deliberate; truncating a lowercase hex string is position-invariant, so
-    // this is byte-for-byte the same output the previous local implementation produced.
+    // to 32 hex chars (128 bits) — enough that an auditor comparing this against a known-bad value's hash
+    // isn't relying on a weak digest; truncating a lowercase hex string is position-invariant, so this is
+    // still byte-for-byte a prefix of the full SHA-256 digest, not a different hash.
+    private const int HashHexChars = 32;
+
     private static string Hash(object value)
-        => "sha256:" + ManifestFingerprint.Hash(GateText.Stringify(value))[..16];
+        => "sha256:" + ManifestFingerprint.Hash(GateText.Stringify(value))[..HashHexChars];
 
     private static string Serialize(Dictionary<string, object?> projected)
     {

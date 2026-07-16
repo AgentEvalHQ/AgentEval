@@ -181,4 +181,65 @@ public class GatekeeperCoverageAnalyzerTests
         Assert.True(report.ToolInventoryAvailable);
         Assert.True(Assert.Single(report.Tools).IsGateProtected);
     }
+
+    // ── AnalyzeOrThrow must fail closed when the inventory itself is unreadable, not just when it's read and bad ──
+
+    [Fact]
+    public void AnalyzeOrThrow_ToolInventoryUnavailable_ThrowsToolInventoryUnavailableException()
+    {
+        // A custom AIAgent that doesn't forward GetService(typeof(ChatOptions)) — Analyze(agent) reports
+        // ToolInventoryAvailable=false and an empty Tools list, which would otherwise make
+        // HasUnprotectedHighRiskTools vacuously false (a silent "all clear" for an agent that was never
+        // actually checked). AnalyzeOrThrow must refuse to construct rather than assume that's safe.
+        var agent = new OpaqueAgent();
+
+        var ex = Assert.Throws<ToolInventoryUnavailableException>(() => GatekeeperCoverageAnalyzer.AnalyzeOrThrow(agent));
+
+        Assert.False(ex.Report.ToolInventoryAvailable);
+        Assert.Contains("ToolInventoryAvailable=false", ex.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Analyze_ToolInventoryUnavailable_DoesNotThrow_OnlyAnalyzeOrThrowDoes()
+    {
+        // The non-throwing Analyze(agent) overload must still just report the fact (callers who want the raw
+        // report, e.g. to render a diagnostic, should not be forced through an exception).
+        var agent = new OpaqueAgent();
+
+        var report = GatekeeperCoverageAnalyzer.Analyze(agent);
+
+        Assert.False(report.ToolInventoryAvailable);
+        Assert.Empty(report.Tools);
+    }
+
+    // A minimal AIAgent that does NOT override GetService — the base implementation returns null for any
+    // requested service type, including ChatOptions, exactly like a real custom (non-ChatClientAgent) agent
+    // that doesn't expose it.
+    private sealed class OpaqueAgent : AIAgent
+    {
+        public override string? Name => "Opaque";
+
+        protected override ValueTask<AgentSession> CreateSessionCoreAsync(CancellationToken cancellationToken = default)
+            => new(new OpaqueSession());
+
+        protected override Task<AgentResponse> RunCoreAsync(
+            IEnumerable<ChatMessage> messages, AgentSession? session = null, AgentRunOptions? options = null, CancellationToken cancellationToken = default)
+            => throw new NotImplementedException("Not exercised — this test only calls GetService via the coverage analyzer.");
+
+        protected override IAsyncEnumerable<AgentResponseUpdate> RunCoreStreamingAsync(
+            IEnumerable<ChatMessage> messages, AgentSession? session = null, AgentRunOptions? options = null, CancellationToken cancellationToken = default)
+            => throw new NotImplementedException("Not exercised — this test only calls GetService via the coverage analyzer.");
+
+        protected override ValueTask<System.Text.Json.JsonElement> SerializeSessionCoreAsync(
+            AgentSession session, System.Text.Json.JsonSerializerOptions? jsonSerializerOptions = null, CancellationToken cancellationToken = default)
+            => new(System.Text.Json.JsonSerializer.SerializeToElement(new { }));
+
+        protected override ValueTask<AgentSession> DeserializeSessionCoreAsync(
+            System.Text.Json.JsonElement serializedState, System.Text.Json.JsonSerializerOptions? jsonSerializerOptions = null, CancellationToken cancellationToken = default)
+            => new(new OpaqueSession());
+    }
+
+    private sealed class OpaqueSession : AgentSession
+    {
+    }
 }

@@ -203,6 +203,45 @@ public class RunGateTests
         Assert.Equal(1, sends);   // fresh per-run scope: run 1's trigger did NOT leak into run 2
     }
 
+    // ── #6: RecordGate must redact Reason/Matches for the two SensitiveJudgeAxes — the offending phrase may BE the secret ──
+
+    [Fact]
+    public async Task RunPost_SensitiveJudgeAxis_RedactsReasonAndMatchesInTrace()
+    {
+        // A judge-shaped gate (PolicyName "judge:exfiltration-intent", matching CompositeJudgeGate<TRubric>'s
+        // own naming) whose Reason/Matches quote the secret it detected — exactly what an LLM judge's own
+        // rationale can do. The trace must never record that verbatim.
+        var scripted = new ScriptedChatClient().AddText("the SSN is 123-45-6789, sending now");
+        var trace = new AgentTrace();
+        var gated = Agent(scripted).AsBuilder()
+            .UseAgentEvalGate(post: [new SensitiveAxisJudgeGate()], policy: EvalGatePolicy.Redact, trace: trace)
+            .Build();
+
+        await gated.RunAsync("go");
+
+        var evidence = (IDictionary<string, object?>)trace.Metadata!["gate.run-post.1.judge:exfiltration-intent"];
+        Assert.DoesNotContain("123-45-6789", (string)evidence["reason"]!, StringComparison.Ordinal);
+        Assert.Null(evidence["matches"]);
+        Assert.Contains("redacted", (string)evidence["reason"]!, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task RunPost_NonSensitiveAxis_ReasonAndMatchesStillFullyVisibleInTrace()
+    {
+        // A deterministic (non-judge) gate's Reason/Matches are NOT touched by the #6 redaction — only the
+        // two named SensitiveJudgeAxes are. Existing audit evidence for every other gate is unaffected.
+        var scripted = new ScriptedChatClient().AddText("here is SECRET-123 for you");
+        var trace = new AgentTrace();
+        var gated = Agent(scripted).AsBuilder()
+            .UseAgentEvalGate(post: [new KeywordGate("SECRET-123")], policy: EvalGatePolicy.Redact, trace: trace)
+            .Build();
+
+        await gated.RunAsync("go");
+
+        var evidence = (IDictionary<string, object?>)trace.Metadata!["gate.run-post.1.KeywordGate"];
+        Assert.Contains("SECRET-123", (string)evidence["reason"]!, StringComparison.Ordinal);
+    }
+
     // ── test doubles ──
 
     private sealed class ThrowingChatGate : IChatGate
@@ -221,5 +260,14 @@ public class RunGateTests
             => new(text.Contains(_keyword, StringComparison.OrdinalIgnoreCase)
                 ? GateVerdict.Block(PolicyName, $"matched '{_keyword}'")
                 : GateVerdict.Allow(PolicyName));
+    }
+
+    // Mirrors CompositeJudgeGate<TRubric>'s PolicyName shape ("judge:{axis}") and the realistic failure mode:
+    // the judge's own rationale/spans quote the secret it found, exactly like a real LLM judge might.
+    private sealed class SensitiveAxisJudgeGate : IChatGate
+    {
+        public string PolicyName => "judge:exfiltration-intent";
+        public ValueTask<GateVerdict> InspectAsync(string text, CancellationToken cancellationToken = default)
+            => new(GateVerdict.Block(PolicyName, "the response leaks SSN 123-45-6789 to an external destination", ["123-45-6789"]));
     }
 }

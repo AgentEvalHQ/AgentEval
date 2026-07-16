@@ -79,6 +79,15 @@ public sealed class GatekeeperOptions
     /// build that actually exposes an unprotected high-risk tool. It also cannot see a tool an
     /// <see cref="Microsoft.Agents.AI.AIContextProvider"/> contributes dynamically — see
     /// <see cref="GatekeeperCoverageAnalyzer"/> remarks.
+    /// <para><b>This staleness risk cannot be structurally eliminated at THIS call site</b> — re-deriving from
+    /// the live agent instead of trusting <see cref="KnownTools"/> would need a built <see cref="AIAgent"/>,
+    /// which does not exist yet here (same reason <see cref="EstablishRunScope"/>'s companion check cannot
+    /// inspect <see cref="AgentRunScope.Current"/> at this point — see <c>UseAgentEvalToolGate</c> remarks for
+    /// that parallel). The staleness-free version of this check DOES exist — it just cannot run from inside
+    /// <c>UseGatekeeper</c>: call <see cref="GatekeeperCoverageAnalyzer.AnalyzeOrThrow(AIAgent,IReadOnlyList{IToolGate}?,AnalyzeOptions?)"/>
+    /// yourself, on the AGENT overload, right after <c>.Build()</c> — it reads <c>ChatOptions.Tools</c> directly
+    /// off the live agent, with no separately-tracked list to drift. Treat <see cref="RefuseUnprotectedHighRiskTools"/>
+    /// as an early, best-effort warning and that post-<c>.Build()</c> call as the real safety net.</para>
     /// </summary>
     public IReadOnlyList<AITool>? KnownTools { get; set; }
 
@@ -87,11 +96,31 @@ public sealed class GatekeeperOptions
     /// eagerly at registration time and throws <see cref="UnprotectedHighRiskToolException"/> if any high-risk
     /// tool has zero protecting gate. Requires <see cref="KnownTools"/> to be set, and is only as trustworthy as
     /// that list — see the <see cref="KnownTools"/> caveats above.
+    /// <para><b>Deliberately has no <see cref="GatekeeperEnforcement.Observe"/> carve-out</b> (unlike the
+    /// <see cref="EstablishRunScope"/>/<see cref="GateRequirements.RunScope"/> guard, which IS exempt under
+    /// Observe). The two look similar but aren't: a RunScope-requiring gate registered without a run scope
+    /// still produces evidence under Observe — degraded (shared, not per-run, state), but not nothing. A
+    /// high-risk tool with ZERO protecting gate produces NO evidence at all, at any enforcement level — there
+    /// is nothing for Observe to observe for that tool. Since Observe mode's whole purpose is establishing a
+    /// baseline of what a gate WOULD do, a coverage gap this total defeats that purpose regardless of
+    /// enforcement level, so this check applies uniformly across all three <see cref="GatekeeperEnforcement"/>
+    /// values.</para>
     /// </summary>
     public bool RefuseUnprotectedHighRiskTools { get; set; }
 
     /// <summary>Optional override of the coverage analyzer's risk heuristic (see <see cref="AnalyzeOptions.IsHighRisk"/>).</summary>
     public AnalyzeOptions? CoverageAnalyzeOptions { get; set; }
+
+    /// <summary>
+    /// The AUTHORITATIVE coverage report — populated by <c>UseGatekeeper</c> itself, computed from the SAME
+    /// <see cref="ToolGates"/> snapshot that was actually registered (not a separately-supplied list that could
+    /// drift from it), whenever <see cref="KnownTools"/> is set. <see langword="null"/> if <see cref="KnownTools"/>
+    /// was never set (nothing to analyze against). Read this AFTER the <c>UseGatekeeper(...)</c> call returns
+    /// (the <c>configure</c> callback runs before gates are finalized, so it is still <see langword="null"/>
+    /// inside <c>configure</c> itself) — prefer this over calling <see cref="GatekeeperCoverageAnalyzer.Analyze(IEnumerable{AITool},IReadOnlyList{IToolGate}?,AnalyzeOptions?)"/>
+    /// yourself with your own gate list, which has no such guarantee of matching what was actually wired.
+    /// </summary>
+    public GatekeeperCoverageReport? CoverageReport { get; internal set; }
 
     /// <summary>
     /// Where the observe-mode startup banner is written. Defaults to <see cref="Console.Out"/>; set to

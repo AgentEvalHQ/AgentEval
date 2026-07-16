@@ -20,9 +20,15 @@ namespace AgentEval.Cli.Commands.Gatekeeper;
 /// </summary>
 internal sealed record GateVerdictDto
 {
-    /// <summary>The set of axes whose evidence spans / masked text must never be emitted (round-4 security rule).</summary>
-    public static readonly IReadOnlySet<string> RedactAxes =
-        new HashSet<string>(StringComparer.Ordinal) { "exfiltration-intent", "system-prompt-extraction" };
+    /// <summary>
+    /// The set of axes whose evidence spans / masked text must never be emitted (round-4 security rule).
+    /// Delegates to the shared <see cref="SensitiveJudgeAxes.RedactAxes"/> (also used by the runtime
+    /// trace-writing path in <c>AgentEval.MAF.Gatekeeper</c>) so the two can never drift — kept as its own
+    /// property here since <c>GateVerdictDto.RedactAxes</c>/<c>GateVerdictDto.AxisOf</c> are an existing, used
+    /// public surface of this frozen verdict-JSON contract (<see cref="GatekeeperCalibrateCommand"/>,
+    /// <see cref="GatekeeperInspectCommand"/>, <see cref="GateRegistry"/>).
+    /// </summary>
+    public static IReadOnlySet<string> RedactAxes => SensitiveJudgeAxes.RedactAxes;
 
     private static readonly JsonSerializerOptions Compact = new()
     {
@@ -53,8 +59,7 @@ internal sealed record GateVerdictDto
     public object? NewArguments { get; init; }            // reserved for Mutate tool verdicts; null in v1
 
     /// <summary>The axis encoded in a <c>judge:&lt;axis&gt;</c> policy name, else null (a panel is <c>judge-panel</c> → null).</summary>
-    public static string? AxisOf(string policyName) =>
-        policyName.StartsWith("judge:", StringComparison.Ordinal) ? policyName["judge:".Length..] : null;
+    public static string? AxisOf(string policyName) => SensitiveJudgeAxes.AxisOf(policyName);
 
     /// <summary>Map a chat-gate verdict to the DTO, applying the sensitive-span redaction allowlist.</summary>
     public static GateVerdictDto FromChat(GateVerdict v, string gateId)

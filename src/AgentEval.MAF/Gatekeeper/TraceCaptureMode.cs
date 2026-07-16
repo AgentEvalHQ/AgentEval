@@ -29,9 +29,10 @@ public enum TraceCaptureMode
     Redacted,
 
     /// <summary>
-    /// Every non-null value is replaced by a stable hash of its serialized form — lets an auditor confirm
-    /// value equality/reuse across calls (e.g. "the same token was reused," "this matches a known-bad value")
-    /// without ever storing the plaintext.
+    /// Every non-null value is replaced by a stable SHA-256 hash of its serialized form, truncated to 32 hex
+    /// chars (128 bits) — lets an auditor confirm value equality/reuse across calls (e.g. "the same token was
+    /// reused," "this matches a known-bad value") without ever storing the plaintext. 128 bits of a real
+    /// cryptographic digest is not a weak/toy comparison marker — collision search against it is infeasible.
     /// </summary>
     Hashed,
 

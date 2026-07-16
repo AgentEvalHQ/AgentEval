@@ -71,8 +71,12 @@ public sealed record GatekeeperCoverageReport(
             return sb.ToString();
         }
 
+        // Local: ProtectedCount (and the other Tools.Count(...) properties) each do a fresh O(n) scan on every
+        // access — cache the ones used more than once in this single Render() call instead of re-scanning.
+        var protectedCount = ProtectedCount;
+        var coveragePercent = Tools.Count == 0 ? 100.0 : 100.0 * protectedCount / Tools.Count;
         sb.AppendLine(FormattableString.Invariant(
-            $"Gatekeeper coverage report — {Tools.Count} tool(s), {EnforcementCoveragePercent:F0}% enforcement coverage ({ProtectedCount}/{Tools.Count} protected), {HighRiskCount} high-risk, {HighRiskUnprotectedCount} high-risk UNPROTECTED"));
+            $"Gatekeeper coverage report — {Tools.Count} tool(s), {coveragePercent:F0}% enforcement coverage ({protectedCount}/{Tools.Count} protected), {HighRiskCount} high-risk, {HighRiskUnprotectedCount} high-risk UNPROTECTED"));
 
         foreach (var t in Tools.OrderBy(t => t.IsUnprotectedHighRisk ? 0 : t.IsGateProtected ? 2 : 1).ThenBy(t => t.ToolName, StringComparer.Ordinal))
         {

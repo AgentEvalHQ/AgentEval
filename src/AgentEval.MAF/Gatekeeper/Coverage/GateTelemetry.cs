@@ -32,11 +32,12 @@ public sealed class GateTelemetry
 
     /// <summary>
     /// A snapshot of every gate's counters, as of now. Safe to call at any time, including concurrently with
-    /// live traffic. Each counter is updated via its own <see cref="Interlocked"/> operation, not one combined
-    /// atomic update, so under concurrent <see cref="Record"/> calls a snapshot can be transiently torn — e.g.
-    /// <c>InvocationCount</c> incremented but the matching <c>AllowCount</c>/<c>BlockCount</c>/<c>MutateCount</c>
-    /// not yet reflected. The sub-counts are not guaranteed to sum to <c>InvocationCount</c> at every instant;
-    /// they converge once traffic quiesces. Fine for dashboards/telemetry; do not assert exact sums in a
+    /// live traffic. <c>InvocationCount</c> is DERIVED (<c>AllowCount + BlockCount + MutateCount</c>), not a
+    /// separately-tracked counter, so it is structurally impossible for the sub-counts to disagree with it —
+    /// there is no fourth quantity to fall out of sync. The three sub-counts themselves are still independent
+    /// <see cref="Interlocked"/> fields, so a snapshot taken mid-<see cref="Record"/> can catch one updated and
+    /// not another (e.g. a call recorded as Blocked appears fully, one recorded as Allowed hasn't landed yet) —
+    /// fine for dashboards/telemetry; they converge once traffic quiesces. Do not assert exact totals in a
     /// concurrent test without first draining in-flight calls.
     /// </summary>
     public IReadOnlyList<GateTelemetrySnapshot> Snapshot()
@@ -47,7 +48,6 @@ public sealed class GateTelemetry
 
     private sealed class Cell
     {
-        private long _invocations;
         private long _allowed;
         private long _blocked;
         private long _mutated;
@@ -55,7 +55,6 @@ public sealed class GateTelemetry
 
         public void Record(ToolGateAction action, TimeSpan elapsed)
         {
-            Interlocked.Increment(ref _invocations);
             Interlocked.Add(ref _totalElapsedTicks, elapsed.Ticks);
             switch (action)
             {
@@ -77,14 +76,17 @@ public sealed class GateTelemetry
         // gate.tool.* action ("Block" vs "Warn") if you need the enforced/observed split too.
         public GateTelemetrySnapshot ToSnapshot(string policyName)
         {
-            var invocations = Interlocked.Read(ref _invocations);
+            var allowed = Interlocked.Read(ref _allowed);
+            var blocked = Interlocked.Read(ref _blocked);
+            var mutated = Interlocked.Read(ref _mutated);
+            var invocations = allowed + blocked + mutated;   // derived — see Snapshot() remarks
             var totalElapsed = TimeSpan.FromTicks(Interlocked.Read(ref _totalElapsedTicks));
             return new GateTelemetrySnapshot(
                 PolicyName: policyName,
                 InvocationCount: invocations,
-                AllowCount: Interlocked.Read(ref _allowed),
-                BlockCount: Interlocked.Read(ref _blocked),
-                MutateCount: Interlocked.Read(ref _mutated),
+                AllowCount: allowed,
+                BlockCount: blocked,
+                MutateCount: mutated,
                 TotalElapsed: totalElapsed,
                 AverageElapsed: invocations == 0 ? TimeSpan.Zero : totalElapsed / invocations);
         }
