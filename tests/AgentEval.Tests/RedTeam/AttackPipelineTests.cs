@@ -36,7 +36,7 @@ public class AttackPipelineTests
             .WithIntensity(Intensity.Quick)
             .ScanAsync(agent);
 
-        Assert.Equal(13, result.AttackResults.Count);   // Wave D: 10/10 OWASP
+        Assert.Equal(14, result.AttackResults.Count);   // Wave D: 10/10 OWASP; +SkillInjection (Skills Phase 3)
     }
 
     [Fact]

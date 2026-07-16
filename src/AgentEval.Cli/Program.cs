@@ -4,6 +4,7 @@
 
 using System.CommandLine;
 using AgentEval.Cli.Commands;
+using AgentEval.Cli.Commands.Targets;
 
 // ─── init (dataset scaffolder) ───────────────────────────────────────────────
 // v1.1 consolidation: the canonical `init` is the dataset-scaffolding command
@@ -247,12 +248,19 @@ var benchOwaspSubjectOpt = new Option<string?>("--subject") { Description = "Sub
 var benchOwaspRootOpt = new Option<string?>("--root") { Description = "Workspace root path (default: auto-detected)" };
 var benchOwaspInputOpt = new Option<string?>("--input") { Description = "Provenance text for the run (the OWASP attack pipeline generates its own probes; --input is recorded for traceability, not consumed by attacks)." };
 var benchOwaspAzureFromEnvOpt = new Option<bool>("--azure-from-env") { Description = "Build an Azure OpenAI chat agent from AZURE_OPENAI_* env vars instead of scanning the built-in stub. Requires AZURE_OPENAI_ENDPOINT + AZURE_OPENAI_API_KEY + AZURE_OPENAI_DEPLOYMENT." };
-var benchOwaspCmd = new Command("owasp", "Run the OWASP LLM Top 10 red-team benchmark. Target is the built-in stub agent unless --azure-from-env is set (AZURE_OPENAI_* env vars); there is no OpenAI-compatible --endpoint/--model or --judge here — use `agenteval redteam` for a fully-parameterised scan.");
+var benchOwaspEndpointOpt = new Option<string?>("--endpoint") { Description = "OpenAI-compatible API endpoint URL (Ollama, LM Studio, vLLM, Groq, Together.ai, Mistral, etc.) — an alternative to --azure-from-env. Requires --model." };
+var benchOwaspModelOpt = new Option<string?>("--model") { Description = "Model name (required with --endpoint)." };
+var benchOwaspApiKeyOpt = new Option<string?>("--api-key") { Description = "API key for --endpoint (or set OPENAI_API_KEY env var)." };
+var benchOwaspCmd = new Command("owasp", "Run the OWASP LLM Top 10 red-team benchmark. Target is the built-in stub agent unless --sut, --endpoint/--model, or --azure-from-env (AZURE_OPENAI_* env vars) is set; there is still no --judge here — use `agenteval redteam` for a fully-parameterised scan.");
 benchOwaspCmd.Add(benchOwaspPresetOpt);
 benchOwaspCmd.Add(benchOwaspSubjectOpt);
 benchOwaspCmd.Add(benchOwaspRootOpt);
 benchOwaspCmd.Add(benchOwaspInputOpt);
 benchOwaspCmd.Add(benchOwaspAzureFromEnvOpt);
+benchOwaspCmd.Add(benchOwaspEndpointOpt);
+benchOwaspCmd.Add(benchOwaspModelOpt);
+benchOwaspCmd.Add(benchOwaspApiKeyOpt);
+var (benchOwaspSutOpt, benchOwaspSutTargets) = SutTargetResolver.AddOptionsTo(benchOwaspCmd, "bench");
 benchOwaspCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =>
 {
     var preset = parseResult.GetValue(benchOwaspPresetOpt) ?? "top10";
@@ -265,7 +273,23 @@ benchOwaspCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =>
     var root = parseResult.GetValue(benchOwaspRootOpt);
     var input = parseResult.GetValue(benchOwaspInputOpt);
     var azureFromEnv = parseResult.GetValue(benchOwaspAzureFromEnvOpt);
-    return await BenchOwaspCommand.RunAsync(preset, subject, root, input, azureFromEnv, ct);
+
+    var (agentOverride, error) = BenchTier1SutResolver.Resolve(
+        parseResult.GetValue(benchOwaspSutOpt),
+        benchOwaspSutTargets.ToDictionary(t => t.Sut, t => t.BindOptions(parseResult), StringComparer.OrdinalIgnoreCase),
+        benchOwaspSutTargets,
+        parseResult.GetValue(benchOwaspEndpointOpt),
+        parseResult.GetValue(benchOwaspModelOpt),
+        parseResult.GetValue(benchOwaspApiKeyOpt),
+        subject);
+    if (error is not null)
+    {
+        Console.Error.WriteLine($"Error: {error}");
+        return 1;
+    }
+
+    var (exitCode, _) = await BenchOwaspCommand.RunAsync(preset, subject, root, input, evaluatorOverride: null, agentOverride, azureFromEnv, ct);
+    return exitCode;
 });
 benchCmd.Add(benchOwaspCmd);
 
@@ -276,12 +300,19 @@ var benchMitreSubjectOpt = new Option<string?>("--subject") { Description = "Sub
 var benchMitreRootOpt = new Option<string?>("--root") { Description = "Workspace root path (default: auto-detected)" };
 var benchMitreInputOpt = new Option<string?>("--input") { Description = "Provenance text for the run (the MITRE ATLAS attack pipeline generates its own probes; --input is recorded for traceability, not consumed by attacks)." };
 var benchMitreAzureFromEnvOpt = new Option<bool>("--azure-from-env") { Description = "Build an Azure OpenAI chat agent from AZURE_OPENAI_* env vars instead of scanning the built-in stub. Requires AZURE_OPENAI_ENDPOINT + AZURE_OPENAI_API_KEY + AZURE_OPENAI_DEPLOYMENT." };
-var benchMitreCmd = new Command("mitre", "Run the MITRE ATLAS red-team benchmark. Target is the built-in stub agent unless --azure-from-env is set (AZURE_OPENAI_* env vars); there is no OpenAI-compatible --endpoint/--model or --judge here — use `agenteval redteam` for a fully-parameterised scan.");
+var benchMitreEndpointOpt = new Option<string?>("--endpoint") { Description = "OpenAI-compatible API endpoint URL (Ollama, LM Studio, vLLM, Groq, Together.ai, Mistral, etc.) — an alternative to --azure-from-env. Requires --model." };
+var benchMitreModelOpt = new Option<string?>("--model") { Description = "Model name (required with --endpoint)." };
+var benchMitreApiKeyOpt = new Option<string?>("--api-key") { Description = "API key for --endpoint (or set OPENAI_API_KEY env var)." };
+var benchMitreCmd = new Command("mitre", "Run the MITRE ATLAS red-team benchmark. Target is the built-in stub agent unless --sut, --endpoint/--model, or --azure-from-env (AZURE_OPENAI_* env vars) is set; there is still no --judge here — use `agenteval redteam` for a fully-parameterised scan.");
 benchMitreCmd.Add(benchMitrePresetOpt);
 benchMitreCmd.Add(benchMitreSubjectOpt);
 benchMitreCmd.Add(benchMitreRootOpt);
 benchMitreCmd.Add(benchMitreInputOpt);
 benchMitreCmd.Add(benchMitreAzureFromEnvOpt);
+benchMitreCmd.Add(benchMitreEndpointOpt);
+benchMitreCmd.Add(benchMitreModelOpt);
+benchMitreCmd.Add(benchMitreApiKeyOpt);
+var (benchMitreSutOpt, benchMitreSutTargets) = SutTargetResolver.AddOptionsTo(benchMitreCmd, "bench");
 benchMitreCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =>
 {
     var preset = parseResult.GetValue(benchMitrePresetOpt) ?? "atlas-baseline";
@@ -294,7 +325,23 @@ benchMitreCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =>
     var root = parseResult.GetValue(benchMitreRootOpt);
     var input = parseResult.GetValue(benchMitreInputOpt);
     var azureFromEnv = parseResult.GetValue(benchMitreAzureFromEnvOpt);
-    return await BenchMitreCommand.RunAsync(preset, subject, root, input, azureFromEnv, ct);
+
+    var (agentOverride, error) = BenchTier1SutResolver.Resolve(
+        parseResult.GetValue(benchMitreSutOpt),
+        benchMitreSutTargets.ToDictionary(t => t.Sut, t => t.BindOptions(parseResult), StringComparer.OrdinalIgnoreCase),
+        benchMitreSutTargets,
+        parseResult.GetValue(benchMitreEndpointOpt),
+        parseResult.GetValue(benchMitreModelOpt),
+        parseResult.GetValue(benchMitreApiKeyOpt),
+        subject);
+    if (error is not null)
+    {
+        Console.Error.WriteLine($"Error: {error}");
+        return 1;
+    }
+
+    var (exitCode, _) = await BenchMitreCommand.RunAsync(preset, subject, root, input, evaluatorOverride: null, agentOverride, azureFromEnv, ct);
+    return exitCode;
 });
 benchCmd.Add(benchMitreCmd);
 
@@ -304,12 +351,19 @@ var benchNistSubjectOpt = new Option<string?>("--subject") { Description = "Subj
 var benchNistRootOpt = new Option<string?>("--root") { Description = "Workspace root path (default: auto-detected)" };
 var benchNistInputOpt = new Option<string?>("--input") { Description = "Provenance text for the run (the attack pipeline generates its own probes; --input is recorded for traceability, not consumed by attacks)." };
 var benchNistAzureFromEnvOpt = new Option<bool>("--azure-from-env") { Description = "Build an Azure OpenAI chat agent from AZURE_OPENAI_* env vars instead of scanning the built-in stub. Requires AZURE_OPENAI_ENDPOINT + AZURE_OPENAI_API_KEY + AZURE_OPENAI_DEPLOYMENT." };
-var benchNistCmd = new Command("nist", "Run the NIST AI RMF (AI 100-1) red-team benchmark. Target is the built-in stub agent unless --azure-from-env is set (AZURE_OPENAI_* env vars); there is no OpenAI-compatible --endpoint/--model or --judge here — use `agenteval redteam` for a fully-parameterised scan.");
+var benchNistEndpointOpt = new Option<string?>("--endpoint") { Description = "OpenAI-compatible API endpoint URL (Ollama, LM Studio, vLLM, Groq, Together.ai, Mistral, etc.) — an alternative to --azure-from-env. Requires --model." };
+var benchNistModelOpt = new Option<string?>("--model") { Description = "Model name (required with --endpoint)." };
+var benchNistApiKeyOpt = new Option<string?>("--api-key") { Description = "API key for --endpoint (or set OPENAI_API_KEY env var)." };
+var benchNistCmd = new Command("nist", "Run the NIST AI RMF (AI 100-1) red-team benchmark. Target is the built-in stub agent unless --sut, --endpoint/--model, or --azure-from-env (AZURE_OPENAI_* env vars) is set; there is still no --judge here — use `agenteval redteam` for a fully-parameterised scan.");
 benchNistCmd.Add(benchNistPresetOpt);
 benchNistCmd.Add(benchNistSubjectOpt);
 benchNistCmd.Add(benchNistRootOpt);
 benchNistCmd.Add(benchNistInputOpt);
 benchNistCmd.Add(benchNistAzureFromEnvOpt);
+benchNistCmd.Add(benchNistEndpointOpt);
+benchNistCmd.Add(benchNistModelOpt);
+benchNistCmd.Add(benchNistApiKeyOpt);
+var (benchNistSutOpt, benchNistSutTargets) = SutTargetResolver.AddOptionsTo(benchNistCmd, "bench");
 benchNistCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =>
 {
     var preset = parseResult.GetValue(benchNistPresetOpt) ?? "rmf-baseline";
@@ -322,7 +376,23 @@ benchNistCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =>
     var root = parseResult.GetValue(benchNistRootOpt);
     var input = parseResult.GetValue(benchNistInputOpt);
     var azureFromEnv = parseResult.GetValue(benchNistAzureFromEnvOpt);
-    return await BenchNistCommand.RunAsync(preset, subject, root, input, azureFromEnv, ct);
+
+    var (agentOverride, error) = BenchTier1SutResolver.Resolve(
+        parseResult.GetValue(benchNistSutOpt),
+        benchNistSutTargets.ToDictionary(t => t.Sut, t => t.BindOptions(parseResult), StringComparer.OrdinalIgnoreCase),
+        benchNistSutTargets,
+        parseResult.GetValue(benchNistEndpointOpt),
+        parseResult.GetValue(benchNistModelOpt),
+        parseResult.GetValue(benchNistApiKeyOpt),
+        subject);
+    if (error is not null)
+    {
+        Console.Error.WriteLine($"Error: {error}");
+        return 1;
+    }
+
+    var (exitCode, _) = await BenchNistCommand.RunAsync(preset, subject, root, input, evaluatorOverride: null, agentOverride, azureFromEnv, ct);
+    return exitCode;
 });
 benchCmd.Add(benchNistCmd);
 
@@ -605,5 +675,9 @@ rootCmd.Add(mcCmd);
 
 // Gatekeeper CLI interop bridge — invoke gates from any language via a versioned verdict JSON.
 rootCmd.Add(AgentEval.Cli.Commands.Gatekeeper.GatekeeperCommand.Create());
+
+// MAF Agent Skills utilities — `skills scan <path>` reaches the Phase 2 compliance scanner from the CLI
+// (previously library-only; see Skills-Scan-CLI-Verb-Design.md). Credential-free, offline, static scan.
+rootCmd.Add(SkillsScanCommand.Create());
 
 return await rootCmd.Parse(args).InvokeAsync();

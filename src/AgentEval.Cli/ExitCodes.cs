@@ -85,8 +85,9 @@ public static class ExitCodes
     /// live Copilot Studio target burns Copilot Credits on every turn, so the scan is capped to a spend ceiling.
     /// Distinct from a policy/gate outcome (5/6/7) and from <see cref="RuntimeError"/> (3, a crash) so CI can tell
     /// "raise the budget / it cost more than expected" apart from a failure. Deliberately 8, not another overload of 2.
-    /// <b>Reserved</b>: the emitting path (a live scan + <c>--max-credits</c> enforcement) is not implemented yet —
-    /// the current scaffold's <c>BuildLive</c> throws, so nothing returns this yet.
+    /// <b>Reserved</b>: a live scan now runs (<c>BuildLive</c> is wired), but <c>--max-credits</c> enforcement
+    /// itself is not implemented — the Copilot Studio SDK exposes no credit-cost field to enforce against — so
+    /// nothing returns this yet.
     /// </summary>
     public const int BudgetExceeded = 8;
 }

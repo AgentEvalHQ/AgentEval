@@ -10,6 +10,7 @@
 
 using AgentEval.Cli.Commands;
 using AgentEval.Cli.Infrastructure;
+using AgentEval.Core;
 using AgentEval.Models;
 using Microsoft.Extensions.AI;
 using Xunit;
@@ -53,13 +54,15 @@ public class EvalCommandTests
     }
 
     [Fact]
-    public void Create_Has20Options()
+    public void Create_Has24Options()
     {
         // dataset, endpoint, azure, model, deployment-name, api-key, system-prompt, system-prompt-file,
         // temperature, max-tokens, metrics, runs, success-threshold, judge, judge-model,
         // format, output, output-dir, verbose, quiet = 20
+        // + Track 2 PR2 (--sut copilot-studio): sut, copilotstudio-config, i-understand-live-side-effects,
+        // max-credits = 4 (SutTargetResolver.AddOptionsTo("eval")) => 24
         var command = EvalCommand.Create();
-        Assert.Equal(20, command.Options.Count);
+        Assert.Equal(24, command.Options.Count);
     }
 
     [Theory]
@@ -76,6 +79,8 @@ public class EvalCommandTests
     [InlineData("output-dir")]
     [InlineData("temperature")]
     [InlineData("azure")]
+    [InlineData("sut")]
+    [InlineData("copilotstudio-config")]
     public void Create_ContainsExpectedOption(string optionName)
     {
         var command = EvalCommand.Create();
@@ -101,6 +106,8 @@ public class EvalCommandTests
         Assert.Null(opts.Model);
         Assert.Null(opts.DeploymentName);
         Assert.Null(opts.ApiKey);
+        Assert.Null(opts.Sut);
+        Assert.Empty(opts.TargetOptions);
         Assert.Null(opts.Metrics);
         Assert.Equal(1, opts.Runs);
         Assert.Equal(0.8, opts.SuccessThreshold);
@@ -188,6 +195,32 @@ public class EvalCommandTests
     }
 
     [Fact]
+    public async Task ExecuteAsync_ClassicPath_MissingDatasetAndNoConnectionConfig_ThrowsEndpointErrorFirst()
+    {
+        // Regression guard (review): restores the classic (non --sut) path's ORIGINAL precedence —
+        // connection-config validation (--endpoint/--azure/--model) BEFORE the dataset-existence check.
+        // ExecuteAsync_MissingDataset_Throws above sets a fully-valid --endpoint/--model, so it can never
+        // actually distinguish "dataset checked first" from "endpoint checked first" (either ordering
+        // throws FileNotFoundException there, since nothing else is wrong). THIS test leaves --endpoint/
+        // --azure/--model unset TOO, so the two possible orderings produce genuinely different exceptions —
+        // proving connection-config validation runs first, matching this path's pre-existing behavior
+        // before a --sut-path-only "dataset-first" requirement was accidentally applied to BOTH paths (see
+        // EvalCommandCopilotStudioSutTests.Eval_MissingDataset_ThrowsBeforeSutValidation for the --sut
+        // path's own, intentionally DIFFERENT precedence).
+        var opts = new EvalOptions
+        {
+            Dataset = new FileInfo("/nonexistent/path/to/dataset.yaml"),
+            Format = "json",
+        };
+
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => EvalCommand.ExecuteAsync(opts, CancellationToken.None));
+
+        Assert.Contains("--endpoint", ex.Message);
+        Assert.Contains("--azure", ex.Message);
+    }
+
+    [Fact]
     public async Task ExecuteAsync_EmptyDataset_Throws()
     {
         var path = CreateTempDataset("examples: []");
@@ -250,6 +283,113 @@ public class EvalCommandTests
         //     throw new ArgumentException("--metrics was specified but no metric names were provided.");
         // Verify the guard condition matches:
         Assert.True(parsed.Count == 0, "Empty parsed metrics should trigger the validation guard");
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // METRICS CATALOG TESTS (Item 4, D1 bridge — CLI-Custom-Benchmarks-...-Design.md §2 D)
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public async Task ExecuteAsync_MetricsAllCommas_ThrowsEmptyListGuard()
+    {
+        // Unlike the parsing-only test above, this now reaches the REAL guard through ExecuteAsync without
+        // any live endpoint — metric-name validation (step 0) runs before the --endpoint/--azure check.
+        var opts = new EvalOptions
+        {
+            Dataset = new FileInfo(GetTestDatasetPath()),
+            Metrics = ",,,",
+            Format = "json",
+        };
+
+        var ex = await Assert.ThrowsAsync<ArgumentException>(
+            () => EvalCommand.ExecuteAsync(opts, CancellationToken.None));
+        Assert.Contains("no metric names were provided", ex.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_UnknownMetricName_ThrowsBeforeEndpointValidation()
+    {
+        // No --endpoint/--azure/--model set at all — if metric-name validation didn't run FIRST, this
+        // would instead throw "Specify --endpoint <url> or --azure." Proves the ordering (Item 4's "before
+        // any network call" requirement).
+        var opts = new EvalOptions
+        {
+            Dataset = new FileInfo(GetTestDatasetPath()),
+            Metrics = "totally_bogus_metric_name",
+            Format = "json",
+        };
+
+        var ex = await Assert.ThrowsAsync<ArgumentException>(
+            () => EvalCommand.ExecuteAsync(opts, CancellationToken.None));
+        Assert.Contains("Unknown metric name", ex.Message);
+        Assert.Contains("totally_bogus_metric_name", ex.Message);
+        Assert.DoesNotContain("--endpoint", ex.Message);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_OneUnknownAmongKnownMetrics_ThrowsListingOnlyTheUnknownOne()
+    {
+        var opts = new EvalOptions
+        {
+            Dataset = new FileInfo(GetTestDatasetPath()),
+            Metrics = "code_tool_success,bogus_one,llm_relevance,bogus_two",
+            Format = "json",
+        };
+
+        var ex = await Assert.ThrowsAsync<ArgumentException>(
+            () => EvalCommand.ExecuteAsync(opts, CancellationToken.None));
+        // "Unknown metric name(s): bogus_one, bogus_two." lists only the unknown ones (the trailing
+        // "Available: ..." lists every known name, including code_tool_success — that's expected).
+        Assert.Contains("Unknown metric name(s): bogus_one, bogus_two.", ex.Message);
+    }
+
+    [Fact]
+    public void ToMetricsContext_BuildsContextFromTestCaseAndResult()
+    {
+        var testCase = new DatasetTestCase
+        {
+            Id = "t1",
+            Input = "What is 2+2?",
+            ExpectedOutput = "4",
+            Context = ["doc one", "doc two"],
+        };
+        var toolUsage = new ToolUsageReport();
+        var testResult = new TestResult
+        {
+            TestName = "t1",
+            ActualOutput = "The answer is 4.",
+            ToolUsage = toolUsage,
+        };
+
+        var context = EvalCommand.ToMetricsContext(testCase, testResult);
+
+        Assert.Equal("What is 2+2?", context.Input);
+        Assert.Equal("The answer is 4.", context.Output);
+        Assert.Equal("doc one\ndoc two", context.Context);
+        Assert.Equal("4", context.GroundTruth);
+        Assert.Same(toolUsage, context.ToolUsage);
+    }
+
+    [Fact]
+    public void ToMetricsContext_NullActualOutput_BecomesEmptyStringNotNull()
+    {
+        var testCase = new DatasetTestCase { Id = "t1", Input = "hi" };
+        var testResult = new TestResult { TestName = "t1", ActualOutput = null };
+
+        var context = EvalCommand.ToMetricsContext(testCase, testResult);
+
+        Assert.Equal("", context.Output);
+    }
+
+    [Fact]
+    public void ToMetricsContext_NoContextDocuments_ContextIsNull()
+    {
+        var testCase = new DatasetTestCase { Id = "t1", Input = "hi", Context = null };
+        var testResult = new TestResult { TestName = "t1", ActualOutput = "hello" };
+
+        var context = EvalCommand.ToMetricsContext(testCase, testResult);
+
+        Assert.Null(context.Context);
     }
 
     // ═══════════════════════════════════════════════════════════════════════════

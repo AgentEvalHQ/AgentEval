@@ -34,6 +34,15 @@ public enum RunBudgetDecision
 /// isolation requires the run scope.</para>
 /// <para><b>Thread-safe.</b> All reads and mutations are serialized; the compound budget check + record is a
 /// single atomic operation (<see cref="TryAdmitToolCall"/>) so it is correct under concurrent tool invocation.</para>
+/// <para><b>Dimension isolation (<see cref="MonetaryLimitGate"/> / <see cref="PerToolCallBudgetGate"/>).</b>
+/// <see cref="TryAdmitToolCall"/> ALWAYS records a tool-call-count increment on admit — even for a budget
+/// dimension the caller didn't ask it to check — so a second gate sharing the same <c>_toolCalls</c>/<c>_monetary</c>
+/// storage would silently double-count calls <see cref="RunBudgetGate"/> also happens to see. <see cref="TryAdmitMonetary"/>
+/// and <see cref="TryAdmitPerToolCall"/> therefore write to their <b>own, isolated</b> storage — composing
+/// <see cref="RunBudgetGate"/> with either dedicated gate (even over overlapping tools/argument names) can never
+/// cross-contaminate either gate's count. The one caveat that remains (as with any two gates guarding the exact
+/// same dimension) is registering <b>two instances of the same dedicated gate</b> over the identical argument/tool
+/// name — that is a self-inflicted double-count, same as stacking two <see cref="RunBudgetGate"/>s on one argument.</para>
 /// </summary>
 public sealed class RunLedger
 {
@@ -47,6 +56,12 @@ public sealed class RunLedger
     private readonly Dictionary<string, decimal> _monetary = new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<string> _observedIds = new(StringComparer.Ordinal);
     private int _totalToolCalls;
+
+    // Isolated storage for the dedicated sibling gates (MonetaryLimitGate / PerToolCallBudgetGate) — deliberately
+    // NOT the same dictionaries TryAdmitToolCall writes, so composing them with RunBudgetGate (or with each other)
+    // over an overlapping tool/argument name cannot cross-contaminate either gate's count. See the class doc.
+    private readonly Dictionary<string, decimal> _monetaryLimitSums = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, int> _perToolCallBudgetCounts = new(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>The ledger for the current run (keyed by <see cref="AgentRunScope.Current"/>).</summary>
     public static RunLedger ForCurrentRun()
@@ -151,6 +166,74 @@ public sealed class RunLedger
         {
             _toolCalls[toolName] = (_toolCalls.TryGetValue(toolName, out var n) ? n : 0) + 1;
             _totalToolCalls++;
+        }
+    }
+
+    /// <summary>The running sum <see cref="MonetaryLimitGate"/> has admitted for <paramref name="argName"/> this run.</summary>
+    public decimal MonetaryLimitSum(string argName)
+    {
+        ArgumentNullException.ThrowIfNull(argName);
+        lock (_lock)
+        {
+            return _monetaryLimitSums.TryGetValue(argName, out var v) ? v : 0m;
+        }
+    }
+
+    /// <summary>How many times <see cref="PerToolCallBudgetGate"/> has admitted a call to <paramref name="toolName"/> this run.</summary>
+    public int PerToolCallBudgetCount(string toolName)
+    {
+        ArgumentNullException.ThrowIfNull(toolName);
+        lock (_lock)
+        {
+            return _perToolCallBudgetCounts.TryGetValue(toolName, out var n) ? n : 0;
+        }
+    }
+
+    /// <summary>
+    /// Atomically checks and records <b>only</b> the <see cref="MonetaryLimitGate"/> dimension for
+    /// <paramref name="argName"/> — isolated from <see cref="TryAdmitToolCall"/>'s monetary bookkeeping (see the
+    /// class doc). A negative <paramref name="amount"/> is defensively clamped to zero so it can never reduce the
+    /// running sum and manufacture headroom under the cap.
+    /// </summary>
+    public RunBudgetDecision TryAdmitMonetary(string argName, decimal amount, decimal max)
+    {
+        ArgumentNullException.ThrowIfNull(argName);
+        if (amount < 0m)
+        {
+            amount = 0m;
+        }
+
+        lock (_lock)
+        {
+            var cur = _monetaryLimitSums.TryGetValue(argName, out var v) ? v : 0m;
+            if (cur + amount > max)
+            {
+                return RunBudgetDecision.MonetaryExceeded;
+            }
+
+            _monetaryLimitSums[argName] = cur + amount;
+            return RunBudgetDecision.Admitted;
+        }
+    }
+
+    /// <summary>
+    /// Atomically checks and records <b>only</b> the <see cref="PerToolCallBudgetGate"/> dimension for
+    /// <paramref name="toolName"/> — isolated from <see cref="TryAdmitToolCall"/>'s per-tool bookkeeping (see the
+    /// class doc), so it never sees a count inflated by a co-registered <see cref="RunBudgetGate"/> (or vice versa).
+    /// </summary>
+    public RunBudgetDecision TryAdmitPerToolCall(string toolName, int maxPerTool)
+    {
+        ArgumentNullException.ThrowIfNull(toolName);
+        lock (_lock)
+        {
+            var cur = _perToolCallBudgetCounts.TryGetValue(toolName, out var n) ? n : 0;
+            if (cur >= maxPerTool)
+            {
+                return RunBudgetDecision.PerToolExceeded;
+            }
+
+            _perToolCallBudgetCounts[toolName] = cur + 1;
+            return RunBudgetDecision.Admitted;
         }
     }
 

@@ -85,6 +85,15 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- Copilot Studio live connector (the "sut copilot-studio" BuildLive path) — see src/AgentEval.Cli/CopilotStudio/. -->
+    <PackageReference Include="Microsoft.Agents.CopilotStudio.Client" />
+    <PackageReference Include="Microsoft.Agents.Core" />
+    <PackageReference Include="Microsoft.Identity.Client" />
+    <PackageReference Include="Microsoft.Identity.Client.Extensions.Msal" />
+    <PackageReference Include="Microsoft.Extensions.Http" />
+  </ItemGroup>
+
+  <ItemGroup>
     <EmbeddedResource Include="Resources/*" />
   </ItemGroup>
 

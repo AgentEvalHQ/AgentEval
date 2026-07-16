@@ -39,7 +39,7 @@ public class RedTeamCommandTests
     }
 
     [Fact]
-    public void Create_Has46Options()
+    public void Create_Has49Options()
     {
         // 16 base + Wave E (save-baseline, baseline, fail-on) = 19
         // + Wave C′ (attacker, attacker-model) = 21
@@ -56,8 +56,11 @@ public class RedTeamCommandTests
         // + judge grading mode/rubric/timeout (--judge-mode, --judge-rubric, --judge-timeout) = 42 (ADR-021 B.1)
         // + Gatekeeper demo on-ramp (--sut) = 43
         // + Copilot Studio target (--copilotstudio-config, --i-understand-live-side-effects, --max-credits) = 46
+        // + Copilot Studio P6 item A config-fingerprint drift (--copilotstudio-save-config-baseline,
+        //   --copilotstudio-config-baseline, --fail-on-config-drift; redteam-only, not on the shared eval/bench
+        //   --sut seam) = 49
         var command = RedTeamCommand.Create();
-        Assert.Equal(46, command.Options.Count);
+        Assert.Equal(49, command.Options.Count);
     }
 
     [Theory] // ADR-021: --judge-rubric maps strict | lenient | evidence-anchored (case- and alias-tolerant).
@@ -542,9 +545,9 @@ public class RedTeamCommandTests
     }
 
     [Fact]
-    public void Attack_All_Returns13Types()
+    public void Attack_All_Returns14Types()
     {
-        Assert.Equal(13, Attack.All.Count);   // Wave D: 10/10 OWASP
+        Assert.Equal(14, Attack.All.Count);   // Wave D: 10/10 OWASP; +SkillInjection (Skills Phase 3)
     }
 
     [Fact]

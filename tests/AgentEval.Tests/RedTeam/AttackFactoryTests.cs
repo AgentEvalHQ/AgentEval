@@ -30,14 +30,14 @@ public class AttackFactoryTests
         Assert.DoesNotContain(Attack.OptInNames, n => Attack.AvailableNames.Contains(n));   // disjoint
         var union = Attack.AvailableNames.Concat(Attack.OptInNames).ToList();
         Assert.Equal(union.Count, union.Distinct().Count());                                // no dupes
-        Assert.Equal(17, union.Count);                                                       // 13 built-in + 4 opt-in (Crescendo/PAIR/TAP/ToolEscalation)
+        Assert.Equal(18, union.Count);                                                       // 14 built-in + 4 opt-in (Crescendo/PAIR/TAP/ToolEscalation)
         Assert.All(union, n => Assert.NotNull(Attack.ByName(n)));
     }
 
     [Fact]
     public void AvailableNames_ContainsAllBuiltInAttacks()
     {
-        Assert.Equal(13, Attack.AvailableNames.Count);   // Wave D: +LLM03/04/08/09 → 10/10 OWASP
+        Assert.Equal(14, Attack.AvailableNames.Count);   // Wave D: +LLM03/04/08/09 → 10/10 OWASP; +SkillInjection (Skills Phase 3)
         Assert.Contains("SystemPromptExtraction", Attack.AvailableNames);
         Assert.Contains("IndirectInjection", Attack.AvailableNames);
         Assert.Contains("InferenceAPIAbuse", Attack.AvailableNames);
@@ -196,10 +196,10 @@ public class AttackFactoryTests
     }
 
     [Fact]
-    public void All_Returns13Attacks_IncludingWaveD()
+    public void All_Returns14Attacks_IncludingSkillInjection()
     {
         var attacks = Attack.All;
-        Assert.Equal(13, attacks.Count);   // Wave D: 9 + LLM03/04/08/09
+        Assert.Equal(14, attacks.Count);   // Wave D: 9 + LLM03/04/08/09 + Skills Phase 3 SkillInjection
         Assert.Contains(attacks, a => a.Name == "PromptInjection");
         Assert.Contains(attacks, a => a.Name == "Jailbreak");
         Assert.Contains(attacks, a => a.Name == "PIILeakage");
@@ -229,11 +229,12 @@ public class AttackFactoryTests
     public void ByOwaspId_LLM01_ReturnsInjectionAttacks()
     {
         var attacks = Attack.ByOwaspId("LLM01");
-        Assert.Equal(4, attacks.Count);
+        Assert.Equal(5, attacks.Count);
         Assert.Contains(attacks, a => a.Name == "PromptInjection");
         Assert.Contains(attacks, a => a.Name == "Jailbreak");
         Assert.Contains(attacks, a => a.Name == "IndirectInjection");
         Assert.Contains(attacks, a => a.Name == "EncodingEvasion");
+        Assert.Contains(attacks, a => a.Name == "SkillInjection");
     }
 
     [Fact]
@@ -476,10 +477,10 @@ public class AttackFactoryTests
     }
 
     [Fact]
-    public void All_DoesNotThrow_AndReturns13Attacks()
+    public void All_DoesNotThrow_AndReturns14Attacks()
     {
         var all = Attack.All;
-        Assert.Equal(13, all.Count);
+        Assert.Equal(14, all.Count);
         Assert.All(all, Assert.NotNull);
     }
 

@@ -36,6 +36,26 @@ internal static class JudgeAxisRegistry
         ["over-refusal"] = new(
             (m, c) => OverRefusalJudge.Create(m, null, c), OverRefusalJudge.KeywordBaseline,
             OverRefusalJudge.GoldSet, () => new OverRefusalRubric()),
+        // Stage 3 (2026-07-16 marathon session) — all three cleared live calibration this session
+        // (IsInlineReady == true, perfect decisive accuracy on their canonical gold sets; see
+        // strategy/TODO.md for the numbers). Registered exactly like the four axes above: same
+        // Create/KeywordBaseline/GoldSet/Rubric shape, no special-casing.
+        ["intent-action-mismatch"] = new(
+            (m, c) => IntentActionMismatchJudge.Create(m, null, c), IntentActionMismatchJudge.KeywordBaseline,
+            IntentActionMismatchJudge.GoldSet, () => new IntentActionMismatchRubric()),
+        ["goal-hijack-drift"] = new(
+            (m, c) => GoalHijackDriftJudge.Create(m, null, c), GoalHijackDriftJudge.KeywordBaseline,
+            GoalHijackDriftJudge.GoldSet, () => new GoalHijackDriftRubric()),
+        ["ungrounded-claim"] = new(
+            (m, c) => UngroundedClaimJudge.Create(m, null, c), UngroundedClaimJudge.KeywordBaseline,
+            UngroundedClaimJudge.GoldSet, () => new UngroundedClaimRubric()),
+        // NOTE: "hallucinated-citation" is deliberately NOT registered here. HallucinatedCitationJudge is a
+        // bespoke hybrid IChatGate (deterministic citation-existence check + judge support-check) — it does
+        // not implement IJudgeRubric, so it has no BuildPrompt/Parse pair for this registry's
+        // parse-only-inspect path (ParseOnlyJudge.Evaluate(entry.Rubric(), ...) has nothing to call). It is
+        // still fully usable directly (new HallucinatedCitationJudge(fastModel)) and fully calibrated (see
+        // HallucinatedCitationJudge.CalibrationGoldSet + the live check) — just not through this CLI surface
+        // without a registry shape change this session didn't scope.
     };
 
     public static JudgeAxisEntry? For(string axis) => Map.TryGetValue(axis, out var e) ? e : null;

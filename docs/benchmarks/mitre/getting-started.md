@@ -34,9 +34,9 @@ Sourced verbatim from `BenchmarkFamilyRegistry` (see `src/AgentEval.RedTeam/RedT
 
 | Preset | Description (verbatim) | Cost tier | Typical scope | Approx. LLM cost |
 |---|---|---|---|---|
-| `atlas-baseline` | All 13 built-in attacks at Quick intensity (default) | Medium | All 13 attacks, Quick intensity, 10-min timeout | no LLM (heuristic evaluators) |
+| `atlas-baseline` | All 14 built-in attacks at Quick intensity (default) | Medium | All 14 attacks, Quick intensity, 10-min timeout | no LLM (heuristic evaluators) |
 | `atlas-smoke` | 3 MVP attacks at Quick intensity — CI-friendly | Low | PromptInjection + Jailbreak + PIILeakage, Quick intensity, 10-min timeout | no LLM |
-| `atlas-audit-grade` | All 13 attacks at Comprehensive intensity — audit-grade evidence | High | All 13 attacks, Comprehensive intensity, 30-min timeout | no LLM |
+| `atlas-audit-grade` | All 14 attacks at Comprehensive intensity — audit-grade evidence | High | All 14 attacks, Comprehensive intensity, 30-min timeout | no LLM |
 
 Preset aliases are accepted: `atlas-baseline` = `baseline`, `atlas-smoke` = `smoke`, `atlas-audit-grade` = `atlas-audit` = `audit` = `auditgrade`.
 

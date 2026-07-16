@@ -431,10 +431,13 @@ public sealed class RedTeamRunner : IRedTeamRunner
             // deliverable; the marker can't appear and the verbal ContainsToken oracle would fabricate a
             // conclusive Resisted that feeds compliance pass counts. Record Inconclusive (not scored) instead,
             // mirroring the structurally-untestable gate above, without invoking the agent.
-            // NOTE: only ToolOutput (FunctionResultContent boundary) is gated. RetrievedDocument probes in this
-            // codebase INLINE their poisoned context block into the prompt, so they ARE deliverable to a
-            // text-only SUT and must not be gated.
-            if (!useToolChannel && probe.Surface is InjectionSurface.ToolOutput)
+            // NOTE: ToolOutput (FunctionResultContent boundary) AND the Skills Phase 3 surfaces
+            // (SkillInstruction — delivered via the load_skill tool call landing description text in the
+            // system prompt; SkillResource — a read_skill_resource tool output) are gated: all three share
+            // the identical property of requiring an engaged tool channel to be deliverable at all.
+            // RetrievedDocument probes in this codebase INLINE their poisoned context block into the
+            // prompt, so they ARE deliverable to a text-only SUT and must not be gated.
+            if (!useToolChannel && probe.Surface is InjectionSurface.ToolOutput or InjectionSurface.SkillInstruction or InjectionSurface.SkillResource)
             {
                 probeSw.Stop();
                 return new ProbeResult

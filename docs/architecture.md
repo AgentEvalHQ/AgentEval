@@ -515,6 +515,81 @@ result.Performance!
     .HaveEstimatedCostUnder(0.10m);
 ```
 
+#### MAF Agent Skills assertions
+
+> For a user-facing walkthrough of everything in this section (assertions, compliance scanner, red-team
+> attack, governance gates, Security Index), see [MAF Agent Skills Evaluation](agent-skills.md). What
+> follows here is implementation-level detail.
+
+`AgentEval.Assertions.SkillUsageAssertions` adds sugar for MAF's three stable Agent Skills tools
+(`load_skill` / `read_skill_resource` / `run_skill_script` — GA'd 2026-07-07), as thin extension
+methods over the same `ToolUsageAssertions` / `ToolCallAssertion` above (zero new MAF-type coupling;
+`AgentEval.Core` still does not reference `Microsoft.Agents.AI`). The three tool names + their
+argument parameter names live in one place, `AgentEval.Skills.SkillToolNames`:
+
+```csharp
+result.ToolUsage!.Should()
+    .HaveLoadedSkill("expense-report")
+    .And().HaveReadSkillResource("expense-report", "resources/policy.md").AfterTool(SkillToolNames.LoadSkill)
+    .And().HaveDisclosedProgressively()
+    .And().NotHaveRunSkillScript(because: "a policy lookup does not require running the compliance script");
+```
+
+`HaveLoadedSkill` / `HaveReadSkillResource` / `HaveRunSkillScript` match by argument **value**
+(skill/resource/script name), not just tool name, and degrade to a key-agnostic fallback if a future
+MAF version renames a parameter. `HaveDisclosedProgressively()` asserts every
+`read_skill_resource` / `run_skill_script` call is preceded by a `load_skill` for the SAME skill.
+`NotHaveRunSkillScript` is a safety-policy assertion (maps to `NeverCallTool`, required `because`).
+
+A companion metric, `AgentEval.Metrics.Agentic.SkillDisclosureEfficiencyMetric`
+(`code_skill_disclosure_efficiency`), scores the observable `load_skill` → `read_skill_resource` →
+`run_skill_script` funnel — disclosure-order validity, load precision (redundant loads / "load
+storms"), and an optional load-selection F1 when `EvaluationContext.Properties["expected_skills"]` is
+supplied. It never fabricates a selection score without ground truth, and never fabricates an
+"advertise" stage count — the skill-inventory listing injected into the system prompt is not a tool
+call and isn't observable from a `ToolUsageReport`.
+
+**Phase 2 — compliance scanner.** `AgentEval.Skills.SkillComplianceValidator` (pure, MAF-free, in
+`AgentEval.Core`) checks a skill's GA `SKILL.md` rules (name/description/compatibility) plus governance
+flags (`ScriptRequiresGovernanceReview`, `ResourceFromUntrustedSource`, `AllowedToolsExperimental`)
+against an AgentEval-owned `SkillManifest` DTO. `AgentEval.MAF.Skills.MafSkillScanner` is the one
+adapter that touches a live `AgentSkill`/`AgentSkillsSource` (source-level `GetSkillsAsync`), mapping to
+`SkillManifest` — `AgentEval.Core` still never references `Microsoft.Agents.AI`. `SkillComplianceReportRenderer`
+renders console/Markdown/JSON. See the type's XML docs for a real, documented limitation: MAF exposes no
+public resource/script enumeration for file skills, so the scanner re-derives it from the
+`resources/`/`scripts/` directory convention; non-file sources (in-memory/class/MCP) are honestly
+reported with zero resources/scripts rather than guessed.
+
+See `samples/AgentEval.AgentSkillsEval` (Run 4) for a live, real-agent walkthrough of the scanner.
+
+**Phase 3 — skill-description-injection red-team + `run_skill_script` governance.**
+`AgentEval.RedTeam.Attacks.SkillInjectionAttack` (OWASP LLM01, in `Attack.All`) red-teams a malicious
+skill's `description` (spliced into the SYSTEM PROMPT via `{skills}` — a higher-trust position than a
+retrieved document, tagged `InjectionSurface.SkillInstruction`) and `read_skill_resource` output
+(`InjectionSurface.SkillResource`). It reuses the shipped `IndirectInjectionRubric` judge rather than
+inventing a mega-judge — but a **live calibration this session found the reused rubric does NOT clear
+the promotion bar on this new surface** (4 missed attacks / 52 gold cases,
+`AgentEval.Guardrails.Judges.Rubrics.SkillInjectionGoldSet`) — so it ships **shadow-only** for skills,
+documented explicitly rather than silently promoted. `SkillScriptExecutionGate` (deterministic,
+`IToolGate`) and `SkillScriptApprovalGate` (`IToolApprovalGate`) govern `run_skill_script` code
+execution — see `docs/gatekeeper/gate-reference.md` for both, including the composition-ordering note
+(MAF's own approval pause sits BEFORE the FICC seam, so the deterministic gate only fires once
+`run_skill_script` is auto-approved at the MAF layer). See `samples/AgentEval.AgentSkillsEval` (Runs 5–6,
+live-verified against real Azure OpenAI) for the end-to-end demonstration.
+
+**Phase 4a/4b — Skill Health & Security Index + hash-pin drift.** `AgentEval.Skills.SkillSecurityIndex`
+joins the three independently-produced signals (Phase 2 compliance, Phase 1 efficiency, Phase 3 security)
+into one composite 0-100 score — a missing axis is never fabricated as perfect; the score is the mean of
+only the axes actually supplied. `AgentEval.Guardrails.ManifestFingerprint`/`ManifestDriftDetector` (pure,
+MAF-free, reusable for a future MCP-tool-description equivalent) back
+`AgentEval.Skills.SkillManifestPoisoningGate` + `SkillManifestBaseline` — deterministic trust-time drift
+detection for a rug-pulled skill, JSON-persisted (mirrors the RedTeam baseline/diff CI pattern). Phase 4c
+(fuzzing, canary-skill honeypot, typosquat detection, load-storm-as-denial-of-wallet) was deprioritized
+per the design doc's own scoring — see `strategy/TODO.md` for what remains.
+
+See `strategy/FutureFeatures/Skills/AgentEval-AgentSkills-Evals-Design-and-Plan.md` (local-only) for the
+full multi-phase design.
+
 ### 4. Registry Pattern
 
 Centralized metric management:
@@ -861,9 +936,9 @@ internal static class OwaspBenchmarkRegistration
             defaultCostTier: CostTier.Medium,
             presets:
             [
-                new("top10",     "All 13 built-in attacks at Quick intensity (default)", CostTier.Medium),
+                new("top10",     "All 14 built-in attacks at Quick intensity (default)", CostTier.Medium),
                 new("smoke",     "3 MVP attacks — CI-friendly",                          CostTier.Low),
-                new("audit",     "All 13 attacks at Comprehensive intensity",            CostTier.High),
+                new("audit",     "All 14 attacks at Comprehensive intensity",            CostTier.High),
                 new("top10-rag", "Comprehensive intensity, RAG-vector depth",           CostTier.High),
             ],
             runnerType: typeof(OwaspBenchmarkRun),

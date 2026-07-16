@@ -6,14 +6,19 @@ using AgentEval.Cli.CopilotStudio;
 using AgentEval.Core;
 using AgentEval.Testing;
 using Microsoft.Agents.AI;
+using Microsoft.Agents.CopilotStudio.Client.Discovery;
 using Xunit;
 
 namespace AgentEval.Tests.Cli.CopilotStudio;
 
 /// <summary>
 /// Stage 1 of the Copilot Studio MVP scaffold — the credential-free, offline pieces: the connection config + loader
-/// and the agent factory seam (a MAF <c>AIAgent</c> → <c>MAFAgentAdapter</c>). The live connector is deferred; these
-/// exercise everything that does NOT need a live MCS agent, so the whole path is testable with zero credentials.
+/// (including Cloud → <c>PowerPlatformCloud</c> resolution) and the agent factory seam (a MAF <c>AIAgent</c> →
+/// <c>MAFAgentAdapter</c>). <see cref="CopilotStudioAgentFactory.BuildLive"/>'s live-connector wiring is exercised
+/// here too, but only up to the point of construction — it never makes a network call (see the "WithoutNetworkCall"
+/// tests below) — so this whole file stays testable with zero credentials. The activity-stream bridging logic and
+/// the MSAL token-acquisition flow have their own dedicated test files
+/// (<c>CopilotStudioChatClientTests</c> / <c>CopilotStudioTokenProviderTests</c>).
 /// </summary>
 public class CopilotStudioScaffoldTests
 {
@@ -95,7 +100,68 @@ public class CopilotStudioScaffoldTests
         Assert.Equal("cr1a2_agent", cfg.DisplayName);
     }
 
-    // ── CopilotStudioAgentFactory: the seam + the deferred live path ──
+    // ── CopilotStudioConfig: Cloud validation/resolution (Track 1 — real PowerPlatformCloud enum mapping) ──
+
+    [Theory]
+    [InlineData(null, PowerPlatformCloud.Prod)]        // omitted → defaults to Prod
+    [InlineData("", PowerPlatformCloud.Prod)]
+    [InlineData("Prod", PowerPlatformCloud.Prod)]
+    [InlineData("gov", PowerPlatformCloud.Gov)]         // case-insensitive
+    [InlineData("HIGH", PowerPlatformCloud.High)]
+    [InlineData("DoD", PowerPlatformCloud.DoD)]
+    [InlineData("Mooncake", PowerPlatformCloud.Mooncake)]
+    [InlineData("GovFR", PowerPlatformCloud.GovFR)]
+    [InlineData("Ex", PowerPlatformCloud.Ex)]
+    [InlineData("Rx", PowerPlatformCloud.Rx)]
+    [InlineData("Local", PowerPlatformCloud.Local)]
+    [InlineData("Other", PowerPlatformCloud.Other)]
+    public void Config_ResolveCloud_MapsToRealEnum(string? cloud, PowerPlatformCloud expected)
+    {
+        var cfg = ValidConfig() with { Cloud = cloud };
+        Assert.Equal(expected, cfg.ResolveCloud());
+    }
+
+    [Fact]
+    public void Config_ResolveCloud_UnrecognizedValue_Throws()
+    {
+        var cfg = ValidConfig() with { Cloud = "Proood" };
+        var ex = Assert.Throws<InvalidOperationException>(() => cfg.ResolveCloud());
+        Assert.Contains("unrecognized value", ex.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Proood", ex.Message);
+    }
+
+    [Fact]
+    public void Config_ResolveCloud_LiteralUnknown_Throws()
+    {
+        // "Unknown" is a real enum member (-1) but not a valid *input* — a config file never means
+        // "explicitly unresolvable cloud", so it must fail Validate()/ResolveCloud() like any other typo.
+        var cfg = ValidConfig() with { Cloud = "Unknown" };
+        Assert.Throws<InvalidOperationException>(() => cfg.ResolveCloud());
+    }
+
+    [Fact]
+    public void Config_Validate_UnrecognizedCloud_Throws()
+    {
+        var cfg = ValidConfig() with { Cloud = "Prooood" };
+        var ex = Assert.Throws<InvalidOperationException>(cfg.Validate);
+        Assert.Contains("cloud", ex.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void Config_Load_UnrecognizedCloud_Throws()
+    {
+        var f = WriteTempJson(
+            "{ \"environmentId\": \"env-123\", \"schemaName\": \"cr1a2_myAgent\", \"tenantId\": \"tenant-abc\", " +
+            "\"appClientId\": \"app-xyz\", \"cloud\": \"NotACloud\" }");
+        try
+        {
+            var ex = Assert.Throws<InvalidOperationException>(() => CopilotStudioConfig.Load(f));
+            Assert.Contains("cloud", ex.Message, StringComparison.OrdinalIgnoreCase);
+        }
+        finally { TryDelete(f); }
+    }
+
+    // ── CopilotStudioAgentFactory: the seam + the live-wiring path (credential-free — see the "no network call" note below) ──
 
     [Fact]
     public async Task Factory_FromAgent_WrapsAgent_AndResponds()
@@ -118,29 +184,52 @@ public class CopilotStudioScaffoldTests
     }
 
     [Fact]
-    public void Factory_BuildLive_Deferred_ThrowsClearError()
+    public void Factory_BuildLive_ValidConfig_ReturnsAgent_WithoutNetworkCall()
     {
-        var cfg = new CopilotStudioConfig
-        {
-            EnvironmentId = "env-123",
-            SchemaName = "cr1a2_myAgent",
-            TenantId = "tenant-abc",
-            AppClientId = "app-xyz",
-        };
-        var ex = Assert.Throws<NotSupportedException>(() => CopilotStudioAgentFactory.BuildLive(cfg));
-        Assert.Contains("not wired yet", ex.Message, StringComparison.OrdinalIgnoreCase);
+        // Track 1: BuildLive now WIRES the live connector instead of throwing NotSupportedException. Everything
+        // it does to get here — ConnectionSettings mapping, Cloud resolution, ScopeFromSettings, constructing the
+        // CopilotClient + CopilotStudioTokenProvider + SingleNameHttpClientFactory, wrapping in ChatClientAgent ->
+        // MAFAgentAdapter — is local/offline; the token-provider callback is only invoked lazily by CopilotClient
+        // on the FIRST REAL REQUEST, which this test never makes (it never calls agent.InvokeAsync). So this stays
+        // credential-free and network-free while proving the wiring itself doesn't throw.
+        var agent = CopilotStudioAgentFactory.BuildLive(ValidConfig());
+        Assert.NotNull(agent);
+        Assert.IsAssignableFrom<IEvaluableAgent>(agent);
+    }
+
+    [Fact]
+    public void Factory_BuildLive_ValidConfigWithNonDefaultCloud_ReturnsAgent_WithoutNetworkCall()
+    {
+        var agent = CopilotStudioAgentFactory.BuildLive(ValidConfig() with { Cloud = "Gov" });
+        Assert.NotNull(agent);
     }
 
     [Fact]
     public void Factory_BuildLive_InvalidConfig_ThrowsValidationFirst()
     {
-        // A bad config surfaces the caller's own error (missing fields), not the "not wired" deferral.
+        // A bad config surfaces the caller's own error (missing fields) before any connector construction.
         var cfg = new CopilotStudioConfig { EnvironmentId = "env-123" };   // schemaName/tenantId/appClientId missing
         var ex = Assert.Throws<InvalidOperationException>(() => CopilotStudioAgentFactory.BuildLive(cfg));
         Assert.Contains("missing required field", ex.Message, StringComparison.OrdinalIgnoreCase);
     }
 
+    [Fact]
+    public void Factory_BuildLive_InvalidCloud_ThrowsValidationFirst()
+    {
+        var cfg = ValidConfig() with { Cloud = "NotACloud" };
+        var ex = Assert.Throws<InvalidOperationException>(() => CopilotStudioAgentFactory.BuildLive(cfg));
+        Assert.Contains("cloud", ex.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
     // ── helpers ──
+
+    private static CopilotStudioConfig ValidConfig() => new()
+    {
+        EnvironmentId = "env-123",
+        SchemaName = "cr1a2_myAgent",
+        TenantId = "tenant-abc",
+        AppClientId = "app-xyz",
+    };
 
     private static FileInfo WriteTempJson(string json)
     {

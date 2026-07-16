@@ -28,9 +28,10 @@ namespace AgentEval.Benchmarks;
 ///         <see cref="OWASPComplianceReport"/> for compliance evidence packs.</item>
 /// </list>
 /// <para>
-/// <b>Coverage</b>: all 10 OWASP LLM Top 10 v2.0 categories are exercised via 13 attack types (Wave D closed the
+/// <b>Coverage</b>: all 10 OWASP LLM Top 10 v2.0 categories are exercised via 14 attack types (Wave D closed the
 /// last four — LLM03 Supply Chain, LLM04 Data and Model Poisoning, LLM08 Vector / Embedding weaknesses, LLM09
-/// Misinformation — with deterministic, agent-API-layer-testable evaluators). The <see cref="EvalResult"/> produced
+/// Misinformation — with deterministic, agent-API-layer-testable evaluators; Skills Phase 3 later added a 14th,
+/// SkillInjection, also under LLM01). The <see cref="EvalResult"/> produced
 /// by <see cref="OwaspBenchmarkRun.EvaluateAsync"/> therefore has no "skipped" leaves for an in-scope roster; a
 /// category only renders as skipped/NotApplicable when its attack is deliberately omitted from the roster.
 /// </para>

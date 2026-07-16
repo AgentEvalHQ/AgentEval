@@ -137,7 +137,7 @@ var response = await replayer.ReplayNextAsync();  // Identical every time
 
 ## Red Team Security Evaluation
 
-**Is your AI agent secure?** AgentEval's Red Team module evaluates against **258 attack probes** covering **all 10 OWASP LLM Top 10 vulnerabilities** with **MITRE ATLAS** technique mapping.
+**Is your AI agent secure?** AgentEval's Red Team module evaluates against **264 attack probes** covering **all 10 OWASP LLM Top 10 vulnerabilities** with **MITRE ATLAS** technique mapping.
 
 ```csharp
 // One-line security scan
@@ -153,7 +153,7 @@ result.Should()
     .HaveMinimumScore(80);
 ```
 
-**Attack types included (13):** Prompt Injection, Jailbreaks, PII Leakage, System Prompt Extraction, Indirect Injection, Excessive Agency, Insecure Output Handling, Inference API Abuse, Encoding Evasion, Supply Chain, Data & Model Poisoning, Vector & Embedding (RAG), Misinformation — covering all 10 OWASP LLM Top 10 categories. Plus opt-in multi-turn attacks (Crescendo, PAIR, TAP, ToolEscalation).
+**Attack types included (14):** Prompt Injection, Jailbreaks, PII Leakage, System Prompt Extraction, Indirect Injection, Excessive Agency, Insecure Output Handling, Inference API Abuse, Encoding Evasion, Supply Chain, Data & Model Poisoning, Vector & Embedding (RAG), Misinformation, Skill-Description Injection — covering all 10 OWASP LLM Top 10 categories. Plus opt-in multi-turn attacks (Crescendo, PAIR, TAP, ToolEscalation).
 
 ```csharp
 // Advanced: Full pipeline control
@@ -209,8 +209,9 @@ await result.ExportHtmlReportAsync("memory-report.html");
 | "Evaluations fail randomly!" | **stochastic evaluation** - assert on pass *rate*, not single run |
 | "Which model should I use?" | **Model comparison** with cost/quality recommendations |
 | "Is my agent compliant?" | **Behavioral policies** - guardrails as code |
-| "Is my agent secure?" | **Red team evaluation** - 258 OWASP LLM 2025 security probes (all 10 categories) |
+| "Is my agent secure?" | **Red team evaluation** - 264 OWASP LLM 2025 security probes (all 10 categories) |
 | "Can I stop a bad action before it happens?" | **Gatekeeper** - fail-closed runtime gates block a bad tool call or a leaking response before it happens |
+| "Is my agent's use of MAF Agent Skills safe and efficient?" | **Agent Skills evaluation** - disclosure assertions, efficiency metric, compliance scanner, injection red-team, governance gates |
 | "Is content safe/unbiased?" | **ResponsibleAI metrics** - toxicity, bias, misinformation |
 | "Is my RAG hallucinating?" | **Faithfulness metrics** - grounding verification |
 | "How do I debug CI failures?" | **Trace replay** - capture and reproduce executions |
@@ -251,7 +252,11 @@ await result.ExportHtmlReportAsync("memory-report.html");
 
 -   **🔴 Red Team Security**
     
-    258 probes, 13 attack types, full OWASP LLM Top 10 2025 coverage, MITRE ATLAS mapping
+    264 probes, 14 attack types, full OWASP LLM Top 10 2025 coverage, MITRE ATLAS mapping
+
+-   **🧩 Agent Skills**
+    
+    Evaluate & govern MAF Agent Skills — disclosure assertions, efficiency metric, compliance scanning, injection red-team, governance gates
 
 -   **🛡️ Responsible AI**
     
@@ -280,6 +285,10 @@ await result.ExportHtmlReportAsync("memory-report.html");
 -   **🔄 Multi-Turn Evaluation**
     
     Full conversation flow evaluation
+
+-   **🧩 MAF Agent Skills**
+
+    Disclosure assertions + efficiency metric, `SKILL.md` compliance scanner, skill-injection red team, `run_skill_script` governance gates, Skill Security Index
 
 </div>
 
@@ -362,6 +371,7 @@ agenteval mc serve                         # browse runs + evidence at http://lo
 |  | [Agentic Benchmark](benchmarks/agentic/getting-started.md) |  |
 |  | [OWASP / MITRE Benchmarks](benchmarks/owasp/getting-started.md) |  |
 |  | [Performance / Memory / LongMemEval](benchmarks/perf/getting-started.md) |  |
+|  | [MAF Agent Skills Evaluation](agent-skills.md) |  |
 
 ---
 

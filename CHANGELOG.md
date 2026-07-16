@@ -7,6 +7,330 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Copilot Studio — live connector wired (`redteam --sut copilot-studio` Track 1)
+
+#### Added
+- **`CopilotStudioAgentFactory.BuildLive` now builds a real connector** instead of unconditionally throwing
+  `NotSupportedException`. It constructs a real `Microsoft.Agents.CopilotStudio.Client.CopilotClient` from
+  `CopilotStudioConfig` (`ConnectionSettings` mapped 1:1 — `EnvironmentId`/`SchemaName`/`Cloud`), resolves the
+  token scope via `CopilotClient.ScopeFromSettings` (never hardcoded), and bridges its streaming Bot Framework
+  activity API (`StartConversationAsync` / `AskQuestionAsync` → `IAsyncEnumerable<IActivity>`) into an
+  `IChatClient` (new `CopilotStudioChatClient`), wrapped in a MAF `ChatClientAgent` and handed to the existing
+  `FromAgent` seam — unchanged. `redteam --sut copilot-studio`'s consent gate, config validation, and every
+  existing credential-free test still run and pass before any of this is reached; construction itself makes no
+  network call (the token callback is invoked lazily by `CopilotClient` on the first real request).
+- **`CopilotStudioTokenProvider`** — MSAL device-code auth (`IPublicClientApplication.AcquireTokenWithDeviceCode`)
+  with a persisted, OS-encrypted token cache (`Microsoft.Identity.Client.Extensions.Msal` — DPAPI on Windows,
+  Keychain on macOS, libsecret on Linux) keyed by a SHA-256 hash of `TenantId|AppClientId`, silent-acquisition-first
+  (`AcquireTokenSilent`) with device-code fallback on `MsalUiRequiredException`. New code — no prior token-caching
+  precedent existed in this repo.
+- **`CopilotStudioConfig.Cloud` now resolves to the real `PowerPlatformCloud` enum** (`ResolveCloud()` /
+  `Validate()`), verified against the actual restored `Microsoft.Agents.CopilotStudio.Client` 1.3.171-beta package
+  (not the higher version number a prior planning doc assumed — see the deviation note below). Case-insensitive,
+  defaults to `Prod` when omitted, and a typo'd/unrecognized value now fails config validation with a clear error
+  listing the valid names, before any network call.
+- **`ICopilotStudioConversationClient`** — an AgentEval-owned abstraction over the two `CopilotClient` members the
+  chat-client shim needs. The real package does not publicly export a mockable `ICopilotClient` interface (an
+  earlier decompilation-based design note assumed one existed), so this repo defines its own seam instead —
+  this is also what makes `CopilotStudioChatClient` unit-testable without live credentials.
+- **`SingleNameHttpClientFactory`** — a minimal `IHttpClientFactory` for the one named client `CopilotClient`
+  requires, avoiding a full `Microsoft.Extensions.Http` + `ServiceCollection` registration for a CLI with no
+  ambient DI container.
+- New package references (`AgentEval.Cli`, centrally pinned in `Directory.Packages.props`):
+  `Microsoft.Agents.CopilotStudio.Client` 1.3.171-beta, `Microsoft.Agents.Core` 1.3.171-beta,
+  `Microsoft.Identity.Client` 4.84.2, `Microsoft.Identity.Client.Extensions.Msal` 4.84.2,
+  `Microsoft.Extensions.Http` 10.0.8 (raised `Microsoft.Extensions.DependencyInjection`'s central floor to 10.0.8
+  to match).
+
+#### Deviations from the design doc (`strategy/CopilotStudio/Bench-Eval-Integration-and-Live-Connector-Plan.md`, local-only)
+- The doc cites `Microsoft.Agents.CopilotStudio.Client` "v1.6.150 — latest stable" and a decompiled `ICopilotClient`
+  interface implemented by `CopilotClient`. Neither matches what actually restores from nuget.org: the real latest
+  is **1.3.171-beta**, and reflecting on that exact assembly shows `CopilotClient` implements **no interface at
+  all** (`GetInterfaces()` returns empty) — its full public surface is narrower than the doc's decompilation notes
+  assumed. This CHANGELOG entry and the code's own XML docs are the corrected record; `ICopilotStudioConversationClient`
+  above is the concrete consequence.
+- `--max-credits` enforcement (the doc's Track 1 item 6) is **not implemented** — the SDK's activity/response
+  models expose no Copilot Credit cost field to enforce against, so `--max-credits` remains parsed-but-unenforced
+  exactly as before (`ExitCodes.BudgetExceeded` stays reserved, unused).
+
+#### Not independently live-verified — needs a real Entra app registration + non-prod Copilot Studio agent
+- The MSAL device-code prompt, silent-refresh, and persisted-cache round-trip (`CopilotStudioTokenProvider.GetTokenAsync`).
+- Whether a real agent's `StartConversationAsync`/`AskQuestionAsync` activity stream matches the shape
+  `CopilotStudioChatClient` assumes (in particular, any non-`message` activity worth surfacing, and real
+  multi-activity turns).
+- The end-to-end network round trip (real HTTP call, real response parsing) against a live MCS agent.
+- A gated, `Skip`-by-default manual test (`CopilotStudioLiveConnectorManualTests`, `tests/AgentEval.Tests/Cli/CopilotStudio/`)
+  is ready to run once credentials exist — see its XML doc for setup.
+
+### Gatekeeper — MonetaryLimitGate + PerToolCallBudgetGate (focused deterministic siblings of RunBudgetGate)
+
+#### Added
+- **`MonetaryLimitGate`** (`AgentEval.MAF.Gatekeeper.Gates`) — a dedicated tool gate capping the running sum of a
+  monetary tool-call argument (e.g. `"amount"`) across a run, off the shared `RunLedger`. The economic sibling of
+  `RunBudgetGate`, scoped to a single argument/cap pair with its own `PolicyName` in the evidence trail — for
+  payment/refund/transfer-style tools without wiring `RunBudgetGate`'s combined total/per-tool/monetary
+  constructor. Fails closed on an unparseable amount, clamps a negative amount to zero (can't manufacture
+  headroom), and the block reason never echoes the attempted amount or running sum — only the argument name and
+  the *configured* cap, matching the taint-tracking gate's discipline of never leaking sensitive values into trace
+  evidence.
+- **`PerToolCallBudgetGate`** (`AgentEval.MAF.Gatekeeper.Gates`) — a dedicated tool gate capping how many times
+  specific tools may be called in one run (e.g. `["delete_account"] = 1`, `["send_email"] = 3`), off the shared
+  `RunLedger`. Blunts spray/loop attacks — an injected instruction that tries to fire the same destructive tool
+  repeatedly is stopped at the configured count regardless of phrasing. A tool not named in the caps is
+  unconditionally allowed.
+- **`RunLedger.TryAdmitMonetary` / `TryAdmitPerToolCall`** — new atomic, per-dimension ledger primitives backing
+  the two gates above. Deliberately isolated from `RunBudgetGate`'s own `TryAdmitToolCall` bookkeeping (which
+  always bumps its shared per-tool/total counters on any admit, even for a dimension the caller didn't ask it to
+  check) — so composing either dedicated gate with `RunBudgetGate`, or with each other, over an overlapping
+  tool/argument name can never cross-contaminate a count. Covered by a regression test proving the isolation holds
+  even when `RunBudgetGate` and `PerToolCallBudgetGate` are stacked on the same tool.
+- **`samples/AgentEval.Samples/Gatekeeper/09_GatekeeperMonetaryAndPerCallBudget.cs`** — a live sample (real Azure
+  OpenAI agent, no scripted fakes) with three scenes: a 10-call refund spray capped at 3 by `PerToolCallBudgetGate`,
+  a single $50,000 refund blocked by a $1,000 `MonetaryLimitGate` cap, and both gates stacked against a $300 ×
+  10-order spray — success is keyed on the actual recorded `gate.tool.*` block count, never on "no exception
+  thrown." Wired into the samples menu (Group J).
+- Extracted `AmountArgumentParser` (shared by `RunBudgetGate` and `MonetaryLimitGate`) so the two gates parse a
+  monetary argument (`decimal` / `double` / `int` / `long` / `JsonElement` / numeric `string`) identically —
+  behavior-preserving refactor of `RunBudgetGate`'s previously-private parsing logic, no functional change.
+
+### MAF Agent Skills evaluation — Phase 1 (assertions + progressive-disclosure efficiency metric)
+
+#### Added
+- **Five fluent skill assertions** in `AgentEval.Assertions.SkillUsageAssertions` — `HaveLoadedSkill`,
+  `HaveReadSkillResource`, `HaveRunSkillScript`, `NotHaveRunSkillScript`, `HaveDisclosedProgressively` —
+  thin, additive extension methods over the existing `ToolUsageAssertions` / `ToolCallAssertion` (zero
+  new MAF-type coupling in `AgentEval.Core`, which still does not reference `Microsoft.Agents.AI`).
+  Support value-based argument matching (skill/resource/script name), not just tool-name matching, and
+  degrade gracefully (key-agnostic fallback) if a future MAF version renames an argument.
+- **`SkillDisclosureEfficiencyMetric`** (`code_skill_disclosure_efficiency`, `AgentEval.Metrics.Agentic`)
+  — a free, code-based `IAgenticMetric` scoring the `load_skill` → `read_skill_resource` →
+  `run_skill_script` progressive-disclosure funnel as a weighted product of disclosure-order validity,
+  load precision (redundant-load + "load storm" penalties), and an optional load-selection F1 when the
+  caller supplies `expected_skills` ground truth. Never fabricates a selection score when no ground
+  truth is supplied, and never fabricates an "advertise" stage count (the skill-inventory system-prompt
+  listing is not a tool call and is not observable from a `ToolUsageReport`).
+- **`SkillToolNames`** (`AgentEval.Skills`) — the single shared constant for the three stable GA tool
+  names (`load_skill` / `read_skill_resource` / `run_skill_script`) and their argument parameter names,
+  referenced by the assertions and the metric.
+- **`samples/AgentEval.AgentSkillsEval`** — a live sample: a real `ChatClientAgent` against Azure OpenAI,
+  wrapped with a real `Microsoft.Agents.AI.AgentSkillsProvider` over a real file-based
+  `expense-report` skill fixture (SKILL.md + a resource + an in-process script). Three runs demonstrate
+  different real assertion/metric/output combinations (read-only lookup, script-computed overage,
+  and an off-topic task that both scores a vacuous 100/100 and shows an assertion's real failure
+  path) — all keyed on the actual captured tool-call trace, never a bare success claim.
+- Verified four MAF `AgentSkillsProvider` API details against the live `Microsoft.Agents.AI 1.13.0`
+  assembly (exact tool argument parameter names; the `DisableCaching` builder shape; that there is no
+  provider-level `GetSkillsAsync` convenience; and that `read_skill_resource`'s `resourceName` is a
+  logical name resolved against the skill's discovered resource list, not a live filesystem path).
+
+This is Phase 1 of a multi-phase design
+(`strategy/FutureFeatures/Skills/AgentEval-AgentSkills-Evals-Design-and-Plan.md`, local-only).
+
+### MAF Agent Skills evaluation — Phase 3 (skill-description-injection red-team + `run_skill_script` governance)
+
+#### Added
+- **`SkillInjectionAttack`** (`AgentEval.RedTeam.Attacks`, OWASP LLM01) — the 14th built-in red-team attack
+  (roster 13→14, probes 258→264). Two new `InjectionSurface` values, `SkillInstruction` (a malicious
+  skill's `description`/instructions, spliced into the SYSTEM PROMPT via `{skills}` — a higher-trust
+  position than a retrieved document) and `SkillResource` (`read_skill_resource` output). 100% reuse of
+  the shipped Wave-B machinery (`CanaryTool`, `FidelityCompositeEvaluator`, `ToolInvocationEvaluator`,
+  `RefusalGatedEvaluator`) — canary "source" tools are named `load_skill`/`read_skill_resource` (matching
+  MAF's real tool names) so an instrumented SUT's trace is indistinguishable from a real
+  `AgentSkillsProvider` interaction. 6 probes at Comprehensive intensity; registered in `Attack.All`,
+  `ByName`, `ByOwaspId("LLM01")`.
+- **⚠️ HONESTY FINDING — the reused judge does NOT converge on the skill-description surface.** Per the
+  design doc's own documented risk item, this session ran a LIVE calibration of the flagship
+  `IndirectInjectionRubric` against a new both-directions gold set
+  (`AgentEval.Guardrails.Judges.Rubrics.SkillInjectionGoldSet`, 52 skill-flavored cases) via
+  `GateCalibrationHarness`. Result: decisive accuracy 88.5%, **4 missed attacks**, 2 false alarms, κ=0.769
+  vs. gold — `IsInlineReady == false` (the harness requires zero missed attacks by default). The rubric
+  generalizes reasonably (beats the deterministic keyword baseline) but not well enough to promote inline
+  on this NEW surface. **Decision: shipped SHADOW-ONLY for the skill surface**, per the design doc's own
+  contingency — never promoted inline, documented in code, the live sample, and here. Authoring a
+  dedicated `SkillDescriptionInjectionRubric` is deferred (the design doc's own +3–5 dev-day contingency
+  line item).
+- **`SkillScriptExecutionGate`** (`AgentEval.MAF.Gatekeeper`, `IToolGate`, `GateCost.PureCode`,
+  `MinimumPolicy = ReplaceResult`) — deterministic hard gate on `run_skill_script`: blocks a call whose
+  script identifier is not on the allowlist. Value-based, key-agnostic matching (every string-shaped
+  argument value, plus `"/"`-joined pairs, are candidates — never assumes a specific argument key); an
+  unrecognized/missing script identifier fails closed. No calibration needed (deterministic).
+- **`SkillScriptApprovalGate`** (`IToolApprovalGate`) — auto-approves `load_skill`/`read_skill_resource`;
+  escalates `run_skill_script` to a human UNLESS the script is on a per-script trust allowlist — finer
+  grained than MAF's native `ReadOnlyToolsAutoApprovalRule` (tool-granularity only).
+- **Composition-ordering honesty (design doc §6.2, verified live this session):** MAF's skill tools
+  require human approval BY DEFAULT, and that pause happens BEFORE the FICC seam — so
+  `SkillScriptExecutionGate` never fires unless `run_skill_script` is first auto-approved at the MAF
+  layer (Posture A). The live sample (Run 6) demonstrates this exact composition and confirms the gate
+  — not the approval layer — is what blocks the call (`gate.tool.*` count = 1, real trace evidence).
+  `SkillResourcePathGate` was NOT built (dropped per the design doc §3 — `read_skill_resource`'s
+  `resourceName` is a logical name with no traversal surface, confirmed in Phase 1).
+- **Sample Runs 5–6** (`samples/AgentEval.AgentSkillsEval`) — **live-verified against real Azure OpenAI
+  this session**: Run 5 (skill-injection attack) — the agent resisted (0 tool calls on an off-topic-safe
+  prompt), and the shadow-only judge verdict is shown labeled advisory-only, never conflated with the
+  real behavioral verdict. Run 6 (exec-gate demo, Posture A) — the agent DID call `run_skill_script` with
+  an unlisted script, and `SkillScriptExecutionGate` deterministically blocked it (1 real `gate.tool.*`
+  block), with the model falling back to computing the answer manually — the gate, not the approval
+  layer, stopped the call.
+- ~50 new tests across `SkillInjectionAttackTests`, `SkillScriptExecutionGateTests`,
+  `SkillScriptApprovalGateTests`, `SkillInjectionGoldSetCalibrationTests` (deterministic harness-mechanics
+  proof), and the env-gated `SkillInjectionGoldSetCalibrationLiveCheck` (the live calibration check itself,
+  `AGENTEVAL_RUN_SKILLCAL=1`).
+
+### MAF Agent Skills evaluation — Phase 2 (compliance scanner + coverage report)
+
+#### Added
+- **`SkillComplianceValidator`** (`AgentEval.Skills`, `AgentEval.Core` — pure, MAF-free, no I/O) —
+  validates a `SkillManifest` against the GA `SKILL.md` rules (`name` presence/length/charset/no
+  consecutive hyphens/matches parent directory; `description` presence/length; `compatibility` length)
+  plus AgentEval governance flags (`ScriptRequiresGovernanceReview` when a skill exposes scripts,
+  `ResourceFromUntrustedSource` for MCP/Custom-sourced resources, `AllowedToolsExperimental`). Returns a
+  `SkillComplianceReport` (findings + a stage-reachability coverage summary) whose `IsCompliant` flips
+  only on a `High`-severity finding.
+- **`MafSkillScanner`** (`AgentEval.MAF.Skills`) — the one place that touches a live `AgentSkill` /
+  `AgentSkillsSource`. Enumerates skills via the GA source-level `GetSkillsAsync(context, ct)`, maps each
+  to the pure `SkillManifest` DTO, and delegates to the validator. **Honesty note:** `AgentFileSkill`
+  stores its discovered resources/scripts in private fields with no public getter (verified via
+  reflection against the live MAF 1.13.0 assembly), so this scanner independently re-derives a
+  file-sourced skill's resource/script inventory by walking its `resources/`/`scripts/` subdirectories on
+  disk — the same convention MAF's own `AgentFileSkillsSourceOptions` uses. For non-file sources
+  (in-memory/class/MCP/custom) there is no equivalent enumeration API, so `ResourceNames`/`ScriptNames`
+  are honestly reported empty rather than guessed — a documented, real limitation, not hidden.
+- **`SkillComplianceReportRenderer`** — console/Markdown/JSON rendering, severity-sorted findings plus a
+  coverage table.
+- **Sample Run 4** (`samples/AgentEval.AgentSkillsEval`) — `MafSkillScanner.ScanFileSkillsAsync` over the
+  real `expense-report` fixture; **live-verified against real Azure OpenAI this session**: 1 skill
+  scanned, 1 resource + 1 script found on disk, `ScriptRequiresGovernanceReview` correctly flagged
+  (Medium, pointing at Phase 3), `IsCompliant == true`.
+- 44 new tests (`tests/AgentEval.Tests/Skills/*`, `tests/AgentEval.Tests/MAF/Skills/*`) — every GA rule
+  fires exactly once on a violating manifest and not on a clean one; coverage counts never fabricate an
+  "advertise" stage; a regression guard locks in that an undetectable non-file script stays honestly
+  unreported rather than silently "fixed" with a fabricated count.
+
+### MAF Agent Skills evaluation — Phase 4a/4b (Skill Health & Security Index + hash-pin drift detection) + cheap sugar
+
+#### Added
+- **`SkillSecurityIndex`** (`AgentEval.Skills`, pure) — joins the three independently-produced skill
+  quality signals (Phase 2 compliance, Phase 1 efficiency, Phase 3/4b security) into one composite 0-100
+  index. **Never fabricates a missing axis**: the score is the mean of only the axes actually supplied,
+  and `SkillSecurityIndexResult.Explanation` names exactly which axes were/weren't measured.
+- **`ManifestFingerprint`/`ManifestDriftDetector`** (`AgentEval.Guardrails`, pure, MAF-free) — a generic
+  SHA-256 hash-pin-and-diff primitive, reusable for any model-visible artifact definition (a skill
+  manifest here; an MCP tool schema in a future gate — same pattern, different artifact type).
+- **`SkillManifestPoisoningGate`** + **`SkillManifestBaseline`** (`AgentEval.Skills`) — deterministic
+  trust-time drift detection for a rug-pulled skill (content silently changing after approval). No
+  calibration debt (pure hashing). `SkillManifestBaseline` persists to JSON (capture → save → later load
+  → compare → flag drift), mirroring the repo's existing RedTeam baseline/diff CI pattern, scoped to skills.
+- **Cheap assertion sugar** (design catalog §10.4): `WithScriptArgument` (asserts inside
+  `run_skill_script`'s nested `arguments` object), `ForSkill` (scopes a `ToolUsageReport` to one skill's
+  calls when a run exercises multiple skills), `HaveDisclosedEfficiently(minScore)` (metric-backed,
+  synchronous — the metric is `CodeBased` with no real async work), `HaveCorrectlyDeclinedSkill` (positive
+  phrasing for "the agent correctly avoided this skill"). `SkillContractAssertions.AssertSkillWellFormed`
+  — a zero-cost (no agent, no LLM) unit-test assertion wrapping the Phase 2 validator.
+- **Sample Run 7** — live-verified against real Azure OpenAI this session: a real simulated rug-pull
+  (mutating the expense-report skill's description) is correctly caught by the hash-pin drift check
+  (`Changed` finding), and the composite Skill Security Index correctly joins the real Phase 2 compliance
+  scan (85/100, one Medium finding) with the real Phase 3 behavioral outcome from Run 5 (Resisted → 60/100
+  after the drift penalty), honestly reporting the Efficiency axis as `n/a` (not re-measured this run,
+  never assumed perfect) — composite 72/100, 2/3 axes measured.
+- **Phase 4c (expanded red-team surface — fuzzing, canary-skill honeypot, typosquat detection,
+  load-storm-as-DoW) was NOT built this session** — explicitly deprioritized per the design doc's own
+  scoring (4a/4b are cheaper and higher-value) and the marathon session's remaining scope (Stages 2-5).
+  Documented as deferred, not silently dropped — see `strategy/TODO.md`.
+- ~35 new tests. Full net8.0 suite green (7278/7279, 1 pre-existing skip).
+
+### Gatekeeper Tribunal — 4 more calibrated flagship judges + 2 overlooked-seam gates
+
+#### Added
+- **`IntentActionMismatchJudge`** — compares the agent's NARRATED intent against its ACTUAL tool call,
+  vetoes on divergence. 52-case gold set. **Live-calibrated: 100% decisive accuracy, κ=1.000,
+  `IsInlineReady=true`.**
+- **`GoalHijackDriftJudge`** — detects the agent being steered off the user's original stated goal toward
+  an injected objective (distinct from indirect-injection: asks "has direction drifted," not "does this
+  content instruct"). 48-case gold set. **Live-calibrated: 100% decisive accuracy, κ=1.000,
+  `IsInlineReady=true`.**
+- **`UngroundedClaimJudge`** — RAG faithfulness as a runtime gate: flags an answer claim unsupported by
+  retrieved context. 48-case gold set (includes hedged-opinion hard-negatives). **Live-calibrated: 100%
+  decisive accuracy, κ=1.000, `IsInlineReady=true`.**
+- **`HallucinatedCitationJudge`** — hybrid: a deterministic, zero-LLM-cost citation-existence check
+  composed with a judge support-check, only spending a model call when the citation exists. 52-case gold
+  set covering both failure modes (nonexistent source; real source that doesn't support the claim).
+  **Live-calibrated: 100% decisive accuracy, κ=1.000, `IsInlineReady=true`.** Not an `IJudgeRubric` (a
+  bespoke `IChatGate`), so not registered in the CLI bridge's `judge:*` axis registry — fully usable
+  directly.
+- **`MemoryWritePoisoningGate`** — guards the memory/vector-store WRITE side (every other injection judge
+  guards reads). Reuses `IndirectInjectionRubric` verbatim at this new seam per the design backlog's
+  reuse-the-pattern guidance.
+- **`McpToolDescriptionPoisoningGate`** + **`McpToolDefinition`** — deterministic hash-pin-and-diff over an
+  MCP tool's definition (name/description/schema), catching a rug-pull. Reuses the exact
+  `ManifestFingerprint`/`ManifestDriftDetector` generic primitive built for Skills Phase 4b's
+  `SkillManifestPoisoningGate` — confirming the design backlog's own "same pattern, different artifact
+  type" prediction. Schema comparison recursively canonicalizes JSON key order (a reformatted-but-identical
+  schema never false-alarms).
+- All three `IJudgeRubric`-based judges registered in `JudgeAxisRegistry` — live-verified via the CLI
+  bridge this session: `agenteval gatekeeper list-gates` shows all three (`judge:intent-action-mismatch`,
+  `judge:goal-hijack-drift`, `judge:ungrounded-claim` + their keyword baselines);
+  `agenteval gatekeeper calibrate --gate judge:goal-hijack-drift --certify` against real Azure OpenAI wrote
+  a real calibration certificate; `agenteval gatekeeper inspect` then correctly Allowed a benign case and
+  Blocked an attack case, citing the certificate.
+- **Deferred, explicitly NOT built this session:** `ToolArgumentGoalCoherenceJudge` (needs the
+  `IToolApprovalGate` timeout-routing design worked out) and `CrescendoTrajectoryJudge` (stateful — session
+  store + running summary — explicitly flagged as the hardest of the six in the task scope; deferring it
+  matches the task's own suggested fallback). See `strategy/TODO.md` for the honest accounting.
+- ~100 new tests (deterministic rubric/gate tests + 4 env-gated live calibration checks,
+  `AGENTEVAL_RUN_GATEKEEPER_CAL=1`). Full net8.0 suite green (7330/7331, 1 pre-existing skip).
+
+### Copilot Studio — mock backend + Track 2 (shared `--sut` seam, PR 1)
+
+#### Added
+- **`MockCopilotStudioConversationClient`** (test-only) — a realistic, reusable mock Copilot Studio
+  backend (a test double for `ICopilotStudioConversationClient`, since no live Copilot Studio system is
+  available in this environment). Supports scripted MULTI-TURN conversations (fluent builder, mirroring
+  `ScriptedChatClient`'s convention), a SERVER-ASSIGNED conversation id (matching real MCS session
+  semantics), and configurable ERROR INJECTION (auth failure on start, a mid-conversation exception at a
+  chosen turn — e.g. rate-limit-shaped — and a hang-until-cancelled mode for timeout testing). 7 tests
+  proving the mock itself behaves realistically (session-state tracking, activity-type filtering, error
+  propagation, honest "no scripted turn" default that never fabricates a blank success).
+- **Track 2, PR 1 — the shared `--sut` seam** (`strategy/CopilotStudio/Bench-Eval-Integration-and-Live-Connector-Plan.md`
+  §3): `ISutTarget`/`ISutTargetOptions`/`CommonTargetOptions`/`SutTargetResolver`
+  (`src/AgentEval.Cli/Commands/Targets/ISutTarget.cs`) — generalizes the already-shipped `redteam --sut`
+  pattern so `eval`/`bench` can reach the same built-in targets, WITHOUT touching
+  `IRedTeamBuiltInTarget`/`RedTeamOptions`/`RedTeamCommand.cs`. `CopilotStudioRedTeamTarget` gains `ISutTarget`
+  via EXPLICIT interface implementation (same idiom as `IEnumerable`/`IEnumerable<T>`) — its existing
+  `IRedTeamBuiltInTarget` members are byte-for-byte unchanged. A `ValidateDrift` contract test (theory,
+  4 truth-table cases) proves `IRedTeamBuiltInTarget.Validate` and `ISutTarget.Validate` agree on
+  accept/reject for every shared check (consent / config-required / max-credits ≥ 0) — the one real
+  ongoing-sync risk the design doc calls out, since the two method bodies have no compiler-enforced sync.
+  12 new tests. `gatekeeper-demo` deliberately stays `redteam`-only (needs an `AgentTrace`, which
+  `eval`/`bench` have no use for) — only `copilot-studio` gets the shared treatment, per the design doc.
+- **NOT built this session** (explicitly deferred, documented honestly): Track 2 PR 2 (`eval` adoption)
+  and PR 3 (bench Tier 1 `owasp`/`mitre`/`nist` adoption) — the shared types exist and are tested, but no
+  CLI verb wires them in yet; P6 (reports & resilience: fidelity badging, agent-fingerprint drift,
+  429 retry+resume), P3 (`KnowledgeCanaryEvaluator`, Crescendo/PAIR/TAP over the native channel), and P7
+  (OSS polish, Entra app-reg script, NuGet packaging) were not started. See `strategy/TODO.md` for the
+  honest accounting and what's next.
+- Full net8.0 suite green (see the final Stage 5 numbers in this file's next entry).
+
+### Documentation — Stage 5 pass (Agent Skills, Gatekeeper, Copilot Studio) + final build/test verification
+
+#### Added
+- **`docs/agent-skills.md`** — new user-facing feature page for MAF Agent Skills evaluation (assertions,
+  disclosure-efficiency metric, compliance scanner, skill-injection red-team + `run_skill_script` governance
+  gates, Skill Health & Security Index, hash-pin drift detection). Previously this only existed at
+  implementation-detail depth inside `docs/architecture.md`; that section now cross-links here. Linked from
+  `docs/index.md`'s Documentation table and Feature Highlights grid.
+- `docs/redteam/copilot-studio.md` — corrected a stale sentence that still said "until the connector ships"
+  even though `BuildLive` has shipped since this doc was first written; documented the new
+  `MockCopilotStudioConversationClient` test double and the not-yet-CLI-reachable shared `ISutTarget`/
+  `SutTargetResolver` seam (Track 2 PR 1).
+
+#### Verified
+- Full-solution `dotnet build -c Release`: **0 errors** (66 pre-existing warnings, unrelated to this
+  session's changes — nullable-reference-type test scaffolding and xUnit analyzer style suggestions).
+- Full net8.0 test suite (fresh build, not `--no-build`, per this repo's known multi-TFM stale-binary trap):
+  **7349 passed / 0 failed / 1 skipped** (the skip is the pre-existing, intentionally gated
+  `CopilotStudioLiveConnectorManualTests` — needs real Entra credentials this environment does not have) —
+  **no regressions** from any of Stages 1–5.
+
 ## [0.16.0-beta] - 2026-07-13
 
 Gatekeeper reaches production-grade runtime enforcement: a calibrated flagship judge for indirect prompt

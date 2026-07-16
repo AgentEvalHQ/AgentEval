@@ -28,9 +28,9 @@ internal static class NistBenchmarkRegistration
             defaultCostTier: CostTier.Medium,
             presets:
             [
-                new("rmf-baseline", "All 13 built-in attacks at Quick intensity (default)", CostTier.Medium),
+                new("rmf-baseline", "All 14 built-in attacks at Quick intensity (default)", CostTier.Medium),
                 new("rmf-smoke", "3 MVP attacks at Quick intensity — CI-friendly", CostTier.Low),
-                new("rmf-audit-grade", "All 13 attacks at Comprehensive intensity — audit-grade evidence", CostTier.High),
+                new("rmf-audit-grade", "All 14 attacks at Comprehensive intensity — audit-grade evidence", CostTier.High),
             ],
             runnerType: typeof(NistBenchmarkRun),
             runnerFactory: preset => ResolvePresetRun(preset, judge: null),

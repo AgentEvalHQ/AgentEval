@@ -25,7 +25,7 @@ public static partial class NistBenchmark
     private static readonly TimeSpan QuickTimeout = TimeSpan.FromMinutes(10);
     private static readonly TimeSpan ThoroughTimeout = TimeSpan.FromMinutes(30);
 
-    /// <summary>All 13 built-in attacks at <see cref="Intensity.Quick"/> — the default NIST AI RMF preset.</summary>
+    /// <summary>All 14 built-in attacks at <see cref="Intensity.Quick"/> — the default NIST AI RMF preset.</summary>
     /// <param name="judge">Optional LLM judge (accepted for API symmetry; heuristic evaluators are used by default).</param>
     /// <param name="systemPromptCanary">Optional system-prompt canary; instruments SystemPromptExtraction (privacy/2.10).</param>
     public static NistBenchmarkRun RmfBaseline(IEvaluator? judge = null, string? systemPromptCanary = null)
@@ -53,7 +53,7 @@ public static partial class NistBenchmark
         return new NistBenchmarkRun(pipeline, judge, "RmfSmoke", attacks);
     }
 
-    /// <summary>All 13 built-in attacks at <see cref="Intensity.Comprehensive"/> with a 30-minute timeout — audit-grade
+    /// <summary>All 14 built-in attacks at <see cref="Intensity.Comprehensive"/> with a 30-minute timeout — audit-grade
     /// evidence. Same control coverage as <see cref="RmfBaseline"/> with more probes per attack.</summary>
     /// <param name="judge">See <see cref="RmfBaseline"/>.</param>
     /// <param name="systemPromptCanary">See <see cref="RmfBaseline"/>.</param>

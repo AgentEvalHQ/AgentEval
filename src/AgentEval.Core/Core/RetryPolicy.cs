@@ -24,10 +24,22 @@ public sealed class RetryPolicy
     
     /// <summary>Default retry policy (3 retries with exponential backoff).</summary>
     public static RetryPolicy Default { get; } = new();
-    
+
     /// <summary>No retries policy.</summary>
     public static RetryPolicy None { get; } = new() { MaxRetries = 0 };
-    
+
+    /// <summary>
+    /// Optional predicate selecting which exceptions are worth retrying. <see langword="null"/> (the
+    /// default) preserves today's behavior for every existing caller — every exception except
+    /// <see cref="OperationCanceledException"/> is retried. When set and it returns <see langword="false"/>
+    /// for a caught exception, that exception is rethrown IMMEDIATELY (not wrapped in
+    /// <see cref="RetryExhaustedException"/>, and without waiting) instead of wasting the retry budget on a
+    /// failure known to be permanent — e.g. an auth failure should fail fast, not retry into a rate-limit's
+    /// backoff schedule. See <c>AgentEval.Cli.CopilotStudio.CopilotStudioRetryPolicy</c> for the first
+    /// consumer (retry only a 429-shaped <see cref="HttpRequestException"/>).
+    /// </summary>
+    public Func<Exception, bool>? ShouldRetry { get; init; }
+
     /// <summary>
     /// Execute an async function with retry logic.
     /// </summary>
@@ -37,12 +49,12 @@ public sealed class RetryPolicy
     /// <returns>The result of the action.</returns>
     /// <exception cref="RetryExhaustedException">Thrown when all retries are exhausted.</exception>
     public async Task<T> ExecuteAsync<T>(
-        Func<CancellationToken, Task<T>> action, 
+        Func<CancellationToken, Task<T>> action,
         CancellationToken cancellationToken = default)
     {
         var exceptions = new List<Exception>();
         var currentDelay = InitialDelayMs;
-        
+
         for (int attempt = 0; attempt <= MaxRetries; attempt++)
         {
             try
@@ -55,19 +67,24 @@ public sealed class RetryPolicy
             }
             catch (Exception ex)
             {
+                if (ShouldRetry is not null && !ShouldRetry(ex))
+                {
+                    throw; // a permanent failure (e.g. auth) — don't waste the retry budget
+                }
+
                 exceptions.Add(ex);
-                
+
                 if (attempt == MaxRetries)
                 {
                     break; // No more retries
                 }
-                
+
                 // Wait before retry with exponential backoff
                 await Task.Delay(currentDelay, cancellationToken).ConfigureAwait(false);
                 currentDelay = Math.Min((int)(currentDelay * BackoffMultiplier), MaxDelayMs);
             }
         }
-        
+
         throw new RetryExhaustedException(
             $"Operation failed after {MaxRetries + 1} attempt(s).",
             exceptions);

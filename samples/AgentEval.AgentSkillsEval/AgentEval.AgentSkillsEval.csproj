@@ -1,0 +1,40 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <IsPackable>false</IsPackable>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>AgentEval.AgentSkillsEval</RootNamespace>
+    <AssemblyName>AgentEval.AgentSkillsEval</AssemblyName>
+  </PropertyGroup>
+
+  <!-- Consumes AgentEval; does NOT modify it. Versions come from Directory.Packages.props (CPM). -->
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\AgentEval.Abstractions\AgentEval.Abstractions.csproj" />
+    <ProjectReference Include="..\..\src\AgentEval.Core\AgentEval.Core.csproj" />
+    <ProjectReference Include="..\..\src\AgentEval.MAF\AgentEval.MAF.csproj" />
+    <ProjectReference Include="..\..\src\AgentEval.RedTeam\AgentEval.RedTeam.csproj" />
+    <ProjectReference Include="..\..\src\AgentEval.RedTeam.Gatekeeper\AgentEval.RedTeam.Gatekeeper.csproj" />
+  </ItemGroup>
+
+  <!--
+    Phase 1 (assertions + progressive-disclosure efficiency metric) needs only Microsoft.Agents.AI +
+    Azure OpenAI. Phase 2 (compliance scanner, AgentEval.MAF.Skills.MafSkillScanner) adds the
+    AgentEval.MAF reference above. Phase 3 (skill-injection red-team + run_skill_script governance
+    gates) adds AgentEval.RedTeam / AgentEval.RedTeam.Gatekeeper. See
+    strategy/FutureFeatures/Skills/AgentEval-AgentSkills-Evals-Design-and-Plan.md.
+  -->
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Agents.AI" />
+    <PackageReference Include="Azure.AI.OpenAI" />
+    <PackageReference Include="Microsoft.Extensions.AI" />
+    <PackageReference Include="Microsoft.Extensions.AI.OpenAI" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="skills\**\*" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+</Project>

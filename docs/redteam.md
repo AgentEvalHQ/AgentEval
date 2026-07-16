@@ -6,11 +6,11 @@ AgentEval's Red Team module provides **automated security evaluation** for AI ag
 
 ## Capabilities at a glance
 
-**13 built-in attacks · 258 probes · OWASP LLM Top 10 (10/10) · 8 MITRE ATLAS techniques · 5 compliance reporters.** Every capability below is reachable from the [`agenteval redteam` CLI](#agenteval-redteam--cli-reference) and the [`AttackPipeline`](#pipeline-api).
+**14 built-in attacks · 264 probes · OWASP LLM Top 10 (10/10) · 8 MITRE ATLAS techniques · 5 compliance reporters.** Every capability below is reachable from the [`agenteval redteam` CLI](#agenteval-redteam--cli-reference) and the [`AttackPipeline`](#pipeline-api).
 
 | Capability | What it adds | Where |
 |------------|--------------|-------|
-| **Attack roster** | 13 attacks covering all 10 OWASP LLM Top 10 categories | [Attack Types](#attack-types) |
+| **Attack roster** | 14 attacks covering all 10 OWASP LLM Top 10 categories | [Attack Types](#attack-types) |
 | **Multi-turn & attacker-LLM** | Crescendo, PAIR, TAP — escalate/adapt over a conversation | [Attacker-LLM multi-turn](#attacker-llm-multi-turn-crescendo--pair--tap) |
 | **Tool-aware multi-turn** | `ToolEscalation` lures the agent into a forbidden tool call | [Tool-aware escalation](#tool-aware-multi-turn-escalation---attacks-toolescalation) |
 | **Real attack surfaces** | tiered tool harness (`--sut-tier`) — test what the agent *does* | [Real attack surface](#real-attack-surface---sut-tier--system-prompt-canary) |
@@ -47,7 +47,7 @@ AgentEval RedTeam is built on two foundational cybersecurity taxonomies that pro
 
 ### AgentEval's Approach: Original Implementation with Taxonomy Mapping
 
-1. **Original Authorship**: All 258 attack probes (13 attack types) are **originally written** for AgentEval
+1. **Original Authorship**: All 264 attack probes (14 attack types) are **originally written** for AgentEval
 2. **Taxonomy Mapping**: Every attack maps to OWASP ID + MITRE ATLAS techniques for compliance
 3. **Inspiration Sources**: General LLM security research, public jailbreak patterns (DAN, STAN); the **calibration / relative-scoring mechanism is inspired by [NVIDIA garak](https://github.com/NVIDIA/garak) (Apache-2.0)** — see [Relative scoring / calibration](#relative-scoring--calibration---calibration)
 4. **Not Copied From**: We do NOT copy *prompts* or *code* from garak, PyRIT, or specific papers — concepts we adopt (e.g. garak's z-score calibration) are re-implemented natively and credited
@@ -61,7 +61,7 @@ The LLM red-team space is mostly Python/Node. AgentEval is the **.NET-native** o
 |------------|:-------------:|:--------------:|:-----------------:|:--------:|:---------:|
 | Language / runtime | **.NET** | Python | Python | Python | Node.js |
 | OWASP LLM Top 10 coverage | **10/10** | ~8/10 | ~7/10 | ~5/10 | ~6/10 |
-| Probe breadth | 258 built-in (+ imported packs) | **~500+** | ~200+ (×converters) | 50+ vulns | ~100+ |
+| Probe breadth | 264 built-in (+ imported packs) | **~500+** | ~200+ (×converters) | 50+ vulns | ~100+ |
 | Multi-turn (Crescendo / PAIR / TAP) | ✅ | ⚠️ limited | ✅ | ✅ | ⚠️ |
 | Real tool / RAG behavioral testing | ✅ (evidence-fidelity tiers) | ❌ | ⚠️ | ⚠️ | ❌ |
 | Evidence-fidelity labeling (Verbal/IntentToAct/Behavioral) | ✅ **unique** | ❌ | ❌ | ❌ | ❌ |
@@ -95,7 +95,7 @@ result.Should()
 
 ## Attack Types
 
-AgentEval includes **13 built-in attack types** covering **all 10 OWASP LLM Top 10 2025** categories (probe counts shown at `Comprehensive` intensity):
+AgentEval includes **14 built-in attack types** covering **all 10 OWASP LLM Top 10 2025** categories (probe counts shown at `Comprehensive` intensity):
 
 | Attack | OWASP ID | MITRE ATLAS | Description | Probes |
 |--------|-----------|-------------|-------------|--------|
@@ -112,6 +112,7 @@ AgentEval includes **13 built-in attack types** covering **all 10 OWASP LLM Top 
 | **DataPoisoning** | LLM04 | AML.T0020, AML.T0051 | Training/RAG data poisoning and backdoor priming | 12 |
 | **VectorEmbedding** | LLM08 | AML.T0051 | RAG trust-boundary: inlined-context probes + real-retrieval (`retrieve_context` tool) probes | 16 |
 | **Misinformation** | LLM09 | — | Fabrication / overconfident-falsehood elicitation | 16 |
+| **SkillInjection** | LLM01 | AML.T0051 | Injection via a malicious/poisoned MAF Agent Skill's description (system-prompt surface) or `read_skill_resource` output | 6 |
 
 ### Detailed Coverage by Category
 
@@ -179,7 +180,7 @@ AgentEval includes **13 built-in attack types** covering **all 10 OWASP LLM Top 
 - **Overconfident Falsehood**: Detect asserted-as-fact hallucinations
 - **Honesty Evaluator**: Scored for fabricated certainty, not keyword matches
 
-**Total Coverage**: **258 probes** (at `Comprehensive`) across **13 attack types** covering **all 10 OWASP categories** (LLM01–LLM10) and **8 MITRE ATLAS** techniques
+**Total Coverage**: **264 probes** (at `Comprehensive`) across **14 attack types** covering **all 10 OWASP categories** (LLM01–LLM10) and **8 MITRE ATLAS** techniques
 
 ## Intensity Levels
 
@@ -223,7 +224,7 @@ var result = await AttackPipeline
 |--------|-------------|
 | `WithAttack<T>()` | Add a specific attack type |
 | `WithAttack(attack)` | Add a pre-configured attack instance |
-| `WithAllAttacks()` | Add all 13 built-in attack types |
+| `WithAllAttacks()` | Add all 14 built-in attack types |
 | `WithMvpAttacks()` | Add PromptInjection, Jailbreak, PIILeakage |
 | `WithIntensity(level)` | Set probe generation intensity |
 | `WithTimeout(duration)` | Overall scan timeout |
@@ -1121,7 +1122,7 @@ Output (stderr, suppressed by `--quiet`):
 
 ### Benchmark packs (`--pack`) — install & run walkthrough
 
-Beyond the 258 built-in probes, you can run an external **benchmark pack** (HarmBench / JailbreakBench / CyberSecEval) alongside the built-ins. **AgentEval bundles no pack data** — packs are downloaded on demand from their upstream project, and only after you accept their license, because these datasets contain harmful content by design. Here is the full flow, end to end.
+Beyond the 264 built-in probes, you can run an external **benchmark pack** (HarmBench / JailbreakBench / CyberSecEval) alongside the built-ins. **AgentEval bundles no pack data** — packs are downloaded on demand from their upstream project, and only after you accept their license, because these datasets contain harmful content by design. Here is the full flow, end to end.
 
 #### Step 1 — Browse the catalog
 

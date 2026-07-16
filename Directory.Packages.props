@@ -44,7 +44,24 @@
          float. ACTION: upgrade to a stable Azure.AI.OpenAI 2.x as soon as one ships (tracked, vNext). -->
     <PackageVersion Include="Azure.AI.OpenAI" Version="2.8.0-beta.1" />
     <PackageVersion Include="Azure.Identity" Version="1.18.0" />
-    
+
+    <!-- Copilot Studio live connector (Track 1 — strategy/CopilotStudio/Bench-Eval-Integration-and-Live-Connector-Plan.md).
+         1.3.171-beta is the actual latest version published to nuget.org (verified against the local package
+         cache + decompiled source); the plan doc's "v1.6.150" reference does not exist on nuget.org and was a
+         doc error. Microsoft.Agents.Core is CopilotStudio.Client's own required dependency — pinned to the exact
+         version its nuspec declares — because CopilotStudioChatClient.cs consumes its Discovery/Models/IActivity
+         types directly, not just incidentally through CopilotStudio.Client. -->
+    <PackageVersion Include="Microsoft.Agents.CopilotStudio.Client" Version="1.3.171-beta" />
+    <PackageVersion Include="Microsoft.Agents.Core" Version="1.3.171-beta" />
+    <!-- MSAL device-code auth + the officially-recommended cross-platform persisted token cache
+         (DPAPI on Windows / Keychain on macOS / libsecret on Linux) — see CopilotStudioTokenProvider.cs. -->
+    <PackageVersion Include="Microsoft.Identity.Client" Version="4.84.2" />
+    <PackageVersion Include="Microsoft.Identity.Client.Extensions.Msal" Version="4.84.2" />
+    <!-- IHttpClientFactory — required by the CopilotClient constructor. 10.0.8 (not the 9.0.1 floor
+         CopilotStudio.Client's own nuspec declares) to stay on the same 10.x line as the other
+         Microsoft.Extensions.* pins below. -->
+    <PackageVersion Include="Microsoft.Extensions.Http" Version="10.0.8" />
+
     <!-- Core -->
     <PackageVersion Include="System.Numerics.Tensors" Version="10.0.8" /><!-- floor raised by Microsoft.Extensions.AI 10.6.0 (MAF 1.13.0 still depends on Extensions.AI 10.6.0) -->
     <PackageVersion Include="System.Memory.Data" Version="10.0.9" /><!-- floor raised by Azure.Core 1.60.0 (transitive via Azure.AI.Projects 2.1.0-beta.4, required by Microsoft.Agents.AI.Foundry 1.13.0-preview) -->
@@ -54,8 +71,10 @@
     <PackageVersion Include="System.CommandLine" Version="2.0.3" />
     <PackageVersion Include="YamlDotNet" Version="16.3.0" />
     <!-- Abstractions packages target netstandard2.0/net8.0 — safe for net8/9/10 TFMs.
-         10.0.3 required transitively by Azure.Identity 1.18.0. -->
-    <PackageVersion Include="Microsoft.Extensions.DependencyInjection" Version="10.0.3" />
+         10.0.3 required transitively by Azure.Identity 1.18.0; raised further to 10.0.8 — the floor
+         Microsoft.Extensions.Http 10.0.8 imposes via Microsoft.Extensions.Logging 10.0.8 (Copilot Studio
+         live connector's IHttpClientFactory wiring). -->
+    <PackageVersion Include="Microsoft.Extensions.DependencyInjection" Version="10.0.8" />
     <PackageVersion Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.9" /><!-- floor raised by Azure.Core 1.60.0 (transitive via Azure.AI.Projects 2.1.0-beta.4, required by Microsoft.Agents.AI.Foundry 1.13.0-preview) -->
     
     <!-- PDF Generation -->

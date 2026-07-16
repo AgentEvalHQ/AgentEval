@@ -41,6 +41,7 @@ public static class Attack
     private static readonly Lazy<SupplyChainAttack> _supplyChain = new(() => new SupplyChainAttack());
     private static readonly Lazy<DataPoisoningAttack> _dataPoisoning = new(() => new DataPoisoningAttack());
     private static readonly Lazy<ToolEscalationAttack> _toolEscalation = new(() => new ToolEscalationAttack());
+    private static readonly Lazy<SkillInjectionAttack> _skillInjection = new(() => new SkillInjectionAttack());
 
     /// <summary>
     /// Prompt Injection attack (OWASP LLM01).
@@ -138,6 +139,14 @@ public static class Attack
     /// </summary>
     public static IAttackType ToolEscalation => _toolEscalation.Value;
 
+    /// <summary>
+    /// Skill-Description Injection attack (OWASP LLM01, indirect; LLM03-adjacent). Tests resistance to a
+    /// malicious/poisoned MAF Agent Skill's description (system-prompt surface) or
+    /// <c>read_skill_resource</c> output. In the default <see cref="All"/> roster — like
+    /// <see cref="IndirectInjection"/>, it degrades honestly to a verbal-proxy probe on a text-only SUT.
+    /// </summary>
+    public static IAttackType SkillInjection => _skillInjection.Value;
+
     // === Convenience Methods ===
 
     /// <summary>
@@ -151,7 +160,7 @@ public static class Attack
     /// </summary>
     public static IReadOnlyList<IAttackType> All =>
         [PromptInjection, Jailbreak, PIILeakage, SystemPromptExtraction, IndirectInjection, InferenceAPIAbuse, ExcessiveAgency, InsecureOutput, EncodingEvasion,
-         SupplyChain, DataPoisoning, VectorEmbedding, Misinformation];
+         SupplyChain, DataPoisoning, VectorEmbedding, Misinformation, SkillInjection];
 
     /// <summary>
     /// The full built-in roster (<see cref="All"/>), optionally with system-prompt-leakage canary
@@ -195,6 +204,7 @@ public static class Attack
             "SUPPLYCHAIN" or "SUPPLY_CHAIN" => SupplyChain,
             "DATAPOISONING" or "DATA_POISONING" => DataPoisoning,
             "TOOLESCALATION" or "TOOL_ESCALATION" => ToolEscalation,
+            "SKILLINJECTION" or "SKILL_INJECTION" => SkillInjection,
             _ => null
         };
     }
@@ -210,7 +220,7 @@ public static class Attack
         // Mapping based on OWASP LLM Top 10 v2.0 (2025):
         return owaspId?.ToUpperInvariant() switch
         {
-            "LLM01" => [PromptInjection, Jailbreak, IndirectInjection, EncodingEvasion],
+            "LLM01" => [PromptInjection, Jailbreak, IndirectInjection, EncodingEvasion, SkillInjection],
             "LLM02" => [PIILeakage],        // Sensitive Information Disclosure
             "LLM03" => [SupplyChain],       // Supply Chain
             "LLM04" => [DataPoisoning],     // Data and Model Poisoning
@@ -229,7 +239,7 @@ public static class Attack
     /// <summary>Available attack names for autocomplete/validation (the <see cref="All"/> roster).</summary>
     public static IReadOnlyList<string> AvailableNames =>
         ["PromptInjection", "Jailbreak", "PIILeakage", "SystemPromptExtraction", "IndirectInjection", "InferenceAPIAbuse", "ExcessiveAgency", "InsecureOutput", "EncodingEvasion",
-         "SupplyChain", "DataPoisoning", "VectorEmbedding", "Misinformation"];
+         "SupplyChain", "DataPoisoning", "VectorEmbedding", "Misinformation", "SkillInjection"];
 
     /// <summary>Opt-in multi-turn attack names resolvable via <see cref="ByName"/> but excluded from <see cref="All"/>
     /// (non-deterministic / require extra config: PAIR and TAP need <c>ScanOptions.AttackerClient</c>, CLI <c>--attacker</c>).</summary>

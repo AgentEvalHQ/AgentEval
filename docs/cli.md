@@ -167,9 +167,10 @@ LLM-as-judge, custom metrics, and the `--output-dir` ADR-002 directory export.
 | `--endpoint <url>` / `--azure` / `--deployment-name <name>` | Choose OpenAI-compatible or Azure OpenAI mode. |
 | `--model <name>` | Required for non-Azure endpoints. |
 | `--api-key <key>` | API key or environment variable fallback. |
+| `--sut copilot-studio` | Evaluate a live Microsoft Copilot Studio agent instead of `--endpoint`/`--azure` — bring your own dataset (prompts + judge criteria); requires `--copilotstudio-config`/`--i-understand-live-side-effects`. See [Copilot Studio](redteam/copilot-studio.md). |
 | `--system-prompt` / `--system-prompt-file` | Set the agent system prompt inline or from file. |
 | `--temperature` / `--max-tokens` | Sampling and output-length controls. |
-| `--metrics <list>` | Comma-separated metric names to run. |
+| `--metrics <list>` | Comma-separated named metrics to score ADDITIONALLY, alongside the normal pass/fail gate (e.g. `llm_relevance,code_tool_success`) — each is scored against the SAME captured response, never a second agent call. An unknown name fails fast, before any network call. **Resolvable names today** (v1, not the same list `agenteval list --type metrics` prints — that list is broader/aspirational, see the note below): `llm_relevance`, `llm_faithfulness`, `llm_context_precision`, `llm_context_recall`, `llm_answer_correctness`, `llm_groundedness`, `llm_coherence`, `llm_fluency`, `llm_bias`, `llm_misinformation`, `llm_task_completion`, `code_tool_success`, `code_tool_efficiency`, `code_toxicity`, `code_skill_disclosure_efficiency`. LLM-based (`llm_*`) names need `--judge` (or fall back to the SUT's own model on the `--endpoint`/`--azure` path); code-based (`code_*`) names need neither. Not yet wired for `--runs > 1` (stochastic mode warns and ignores it), and a handful of names `agenteval list --type metrics` shows are not yet resolvable via `--metrics` at all — `code_tool_selection`/`code_tool_arguments` (need per-test-case config `--metrics` has no source for), `code_mrr`/`code_recall_at_k`/`embed_*` (parametrized or embedding-only), and `ConversationCompleteness` (a different evaluation shape, not the standard metric interface). |
 | `--runs <N>` / `--success-threshold <N>` | Stochastic evaluation controls. |
 | `--judge` / `--judge-model` | Separate LLM-as-judge endpoint/model. |
 | `--format <fmt>` | Export format. |
@@ -320,6 +321,7 @@ agenteval bench agentic calibrate [--root <path>] [--out <path>]
 - Compliance and agentic families support calibration helpers where available.
 - Family-specific options and presets are documented under [Benchmarks](benchmarks.md) and the family pages in the TOC.
 - For the Trace Fidelity and AutoAudit families, see the GlassBox docs under `docs/GlassBox/` (now linked in the TOC).
+- **`owasp`/`mitre`/`nist` reach a live target** beyond the default built-in stub / `--azure-from-env`: `--sut copilot-studio` (same flags as `eval`/`redteam`) or a generic `--endpoint <url> --model <name> [--api-key <key>]` OpenAI-compatible endpoint. `gdpr`/`eu-ai-act`/`agentic`/`memory`/`perf` do not have this yet.
 
 ---
 
@@ -403,6 +405,45 @@ agenteval gatekeeper serve                                # stub — not impleme
 `judge:*` gates read/write a per-model calibration certificate under `.agenteval/gatekeeper/certs/` (override with
 `--cert-dir`); the deterministic and tool gates are credential-free and CI-safe. For the full flag matrix, the verdict
 JSON contract, and the honesty guard, see [Gatekeeper from any language](gatekeeper-cli.md).
+
+---
+
+### `agenteval skills scan`
+
+Static, offline compliance scan of a directory of MAF Agent Skills — no model call, no credentials. Reaches the
+same `SkillComplianceValidator`/`MafSkillScanner` library code the [Agent Skills](agent-skills.md) evaluation
+suite ships, from the CLI.
+
+**Synopsis**
+
+```
+agenteval skills scan <path> [--format console|markdown|json] [-o|--output <file>] [--fail-on-noncompliant]
+```
+
+**What it does**
+
+Walks `<path>` for `SKILL.md`-rooted skill folders (the same convention MAF's own `AgentFileSkillsSource`
+discovers by), checks each against the GA `SKILL.md` authoring rules (name/description/compatibility) plus
+governance flags (script-execution review, untrusted resource sources, experimental `allowed-tools`), and
+renders a report. v1 is compliance-only — the composite Skill Health & Security Index and hash-pin drift
+detection are library-only for now (see [Agent Skills](agent-skills.md)).
+
+**Options**
+
+| Option | Description |
+|--------|-------------|
+| `<path>` | Required, positional. Directory containing one or more skill folders. |
+| `--format <fmt>` | `console` (default), `markdown`, or `json`. |
+| `-o, --output <path>` | Write the rendered report to a file instead of stdout. |
+| `--fail-on-noncompliant` | Exit `1` when the scan finds a High-severity finding. Default off (informational-only). |
+
+**Exit codes**
+
+| Code | Meaning |
+|------|---------|
+| `0` | Scan completed (compliant, or `--fail-on-noncompliant` not set). |
+| `1` | `--fail-on-noncompliant` was set and a High-severity finding was found. |
+| `3` | Runtime error (e.g. `<path>` does not exist). |
 
 ---
 
@@ -506,12 +547,12 @@ The CLI's exit-code contract, so CI can branch on the outcome. Source of truth: 
 | `5` | `gatekeeper inspect` — a gate **Blocked** on real evidence. |
 | `6` | `gatekeeper inspect` — **fail-closed**: the CLI could not evaluate (e.g. a history gate with no `messages`). Not a policy block. |
 | `7` | `gatekeeper inspect` — **not certified**: the honesty guard refused an un-calibrated judge (run `calibrate --certify`, or pass `--allow-uncalibrated`). |
-| `8` | **Reserved** (not emitted yet) — `redteam --sut copilot-studio` will return this when a live scan hits the `--max-credits` Copilot Credit budget cap (BudgetExceeded). The live connector and `--max-credits` enforcement are not implemented yet, so no current run can produce it. |
+| `8` | **Reserved** (not emitted yet) — `redteam --sut copilot-studio` will return this when a live scan hits the `--max-credits` Copilot Credit budget cap (BudgetExceeded). The live connector itself is wired (see [Copilot Studio](redteam/copilot-studio.md)), but `--max-credits` enforcement is not — the SDK exposes no credit-cost field to enforce against — so no current run can produce it. |
 
 `redteam` uses `1` for failure, `3` for runtime error, and `4` for a `--fail-on regression` gate. Code `8` is
-**reserved** for a live `--sut copilot-studio` scan that hits `--max-credits` (BudgetExceeded); the current scaffold
-defers the live connector and cap enforcement, so it is not emitted yet. `gatekeeper`'s `5/6/7` are deliberately
-distinct from the overloaded `2` — see [Gatekeeper from any language](gatekeeper-cli.md#exit-codes).
+**reserved** for a live `--sut copilot-studio` scan that hits `--max-credits` (BudgetExceeded); `--max-credits`
+enforcement has no credit-cost signal to key off yet, so it is not emitted by any current run. `gatekeeper`'s
+`5/6/7` are deliberately distinct from the overloaded `2` — see [Gatekeeper from any language](gatekeeper-cli.md#exit-codes).
 
 ---
 
