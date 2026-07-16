@@ -167,6 +167,7 @@ LLM-as-judge, custom metrics, and the `--output-dir` ADR-002 directory export.
 | `--endpoint <url>` / `--azure` / `--deployment-name <name>` | Choose OpenAI-compatible or Azure OpenAI mode. |
 | `--model <name>` | Required for non-Azure endpoints. |
 | `--api-key <key>` | API key or environment variable fallback. |
+| `--sut copilot-studio` | Evaluate a live Microsoft Copilot Studio agent instead of `--endpoint`/`--azure` — bring your own dataset (prompts + judge criteria); requires `--copilotstudio-config`/`--i-understand-live-side-effects`. See [Copilot Studio](redteam/copilot-studio.md). |
 | `--system-prompt` / `--system-prompt-file` | Set the agent system prompt inline or from file. |
 | `--temperature` / `--max-tokens` | Sampling and output-length controls. |
 | `--metrics <list>` | Comma-separated metric names to run. |
@@ -320,6 +321,7 @@ agenteval bench agentic calibrate [--root <path>] [--out <path>]
 - Compliance and agentic families support calibration helpers where available.
 - Family-specific options and presets are documented under [Benchmarks](benchmarks.md) and the family pages in the TOC.
 - For the Trace Fidelity and AutoAudit families, see the GlassBox docs under `docs/GlassBox/` (now linked in the TOC).
+- **`owasp`/`mitre`/`nist` reach a live target** beyond the default built-in stub / `--azure-from-env`: `--sut copilot-studio` (same flags as `eval`/`redteam`) or a generic `--endpoint <url> --model <name> [--api-key <key>]` OpenAI-compatible endpoint. `gdpr`/`eu-ai-act`/`agentic`/`memory`/`perf` do not have this yet.
 
 ---
 
@@ -403,6 +405,45 @@ agenteval gatekeeper serve                                # stub — not impleme
 `judge:*` gates read/write a per-model calibration certificate under `.agenteval/gatekeeper/certs/` (override with
 `--cert-dir`); the deterministic and tool gates are credential-free and CI-safe. For the full flag matrix, the verdict
 JSON contract, and the honesty guard, see [Gatekeeper from any language](gatekeeper-cli.md).
+
+---
+
+### `agenteval skills scan`
+
+Static, offline compliance scan of a directory of MAF Agent Skills — no model call, no credentials. Reaches the
+same `SkillComplianceValidator`/`MafSkillScanner` library code the [Agent Skills](agent-skills.md) evaluation
+suite ships, from the CLI.
+
+**Synopsis**
+
+```
+agenteval skills scan <path> [--format console|markdown|json] [-o|--output <file>] [--fail-on-noncompliant]
+```
+
+**What it does**
+
+Walks `<path>` for `SKILL.md`-rooted skill folders (the same convention MAF's own `AgentFileSkillsSource`
+discovers by), checks each against the GA `SKILL.md` authoring rules (name/description/compatibility) plus
+governance flags (script-execution review, untrusted resource sources, experimental `allowed-tools`), and
+renders a report. v1 is compliance-only — the composite Skill Health & Security Index and hash-pin drift
+detection are library-only for now (see [Agent Skills](agent-skills.md)).
+
+**Options**
+
+| Option | Description |
+|--------|-------------|
+| `<path>` | Required, positional. Directory containing one or more skill folders. |
+| `--format <fmt>` | `console` (default), `markdown`, or `json`. |
+| `-o, --output <path>` | Write the rendered report to a file instead of stdout. |
+| `--fail-on-noncompliant` | Exit `1` when the scan finds a High-severity finding. Default off (informational-only). |
+
+**Exit codes**
+
+| Code | Meaning |
+|------|---------|
+| `0` | Scan completed (compliant, or `--fail-on-noncompliant` not set). |
+| `1` | `--fail-on-noncompliant` was set and a High-severity finding was found. |
+| `3` | Runtime error (e.g. `<path>` does not exist). |
 
 ---
 

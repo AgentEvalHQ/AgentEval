@@ -676,4 +676,8 @@ rootCmd.Add(mcCmd);
 // Gatekeeper CLI interop bridge — invoke gates from any language via a versioned verdict JSON.
 rootCmd.Add(AgentEval.Cli.Commands.Gatekeeper.GatekeeperCommand.Create());
 
+// MAF Agent Skills utilities — `skills scan <path>` reaches the Phase 2 compliance scanner from the CLI
+// (previously library-only; see Skills-Scan-CLI-Verb-Design.md). Credential-free, offline, static scan.
+rootCmd.Add(SkillsScanCommand.Create());
+
 return await rootCmd.Parse(args).InvokeAsync();

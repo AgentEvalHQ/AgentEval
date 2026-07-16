@@ -78,6 +78,11 @@ re-derives the inventory from the `resources/`/`scripts/` directory convention o
 (in-memory/class/MCP skills) are honestly reported with **zero** resources/scripts rather than guessed — this
 is locked in by a regression test, not silently swallowed.
 
+**CLI:** the same scanner is reachable without writing any code — `agenteval skills scan <path>` (console/
+markdown/json output, `--fail-on-noncompliant` for a CI gate). Credential-free and offline (no model call in
+the scan itself — a no-op agent satisfies MAF's own `AgentSkillsSourceContext` constructor requirement only).
+See [CLI reference](cli.md#agenteval-skills-scan). v1 is compliance-only, not the full Security Index below.
+
 ## 3 — Skill-injection red-team attack + `run_skill_script` governance
 
 `AgentEval.RedTeam.Attacks.SkillInjectionAttack` (OWASP LLM01, in `Attack.All` — the framework now ships **14**
