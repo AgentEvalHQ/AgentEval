@@ -16,14 +16,19 @@ namespace AgentEval.MAF.Gatekeeper;
 /// consumes the model's output).
 /// <para>Each pattern is compiled with a bounded <see cref="Regex.MatchTimeout"/> (the repo's ReDoS guard —
 /// same discipline as <c>RegexPiiGate</c>/<c>ArgumentPatternGate</c>); a timeout on one pattern is treated as
-/// "no match" for that pattern only — the others still run.</para>
+/// "no match" for that pattern only — the others still run. 300ms (not the 100ms sibling gates use) —
+/// empirically, 100ms occasionally lost the race under CI-runner contention on the multi-line
+/// <c>PrivateKey_Block</c> pattern (a real, non-deterministic timeout on a call that normally completes in
+/// microseconds — pure scheduling jitter under a loaded parallel test run, not a change in the ReDoS threat
+/// model <see cref="Regex.MatchTimeout"/> is bounded against). 300ms is still two orders of magnitude below
+/// the "no network/LLM cost inline" ceiling <see cref="GateCost.PureCode"/> exists to enforce.</para>
 /// <para><b>Always <see cref="ToolResultAction.Redact"/>s, never <see cref="ToolResultAction.Block"/>s</b> — a
 /// secret shape is maskable in place (unlike an injection marker, whose danger is the surrounding instruction
 /// text), so the rest of the result remains useful to the model with just the credential blanked out.</para>
 /// </summary>
 public sealed class ToolResultSecretGate : IToolResultGate
 {
-    private static readonly TimeSpan SecretTimeout = TimeSpan.FromMilliseconds(100);
+    private static readonly TimeSpan SecretTimeout = TimeSpan.FromMilliseconds(300);
 
     private static readonly (string Name, Regex Pattern)[] Patterns =
     {
