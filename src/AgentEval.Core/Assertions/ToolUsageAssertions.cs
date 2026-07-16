@@ -532,7 +532,18 @@ public class ToolCallAssertion
         _call = call;
         _toolName = toolName;
     }
-    
+
+    /// <summary>
+    /// The matched call record, or <see langword="null"/> when the underlying <c>HaveCalledTool</c>-style
+    /// assertion did not find a match (chained assertions short-circuit on null, BUG-15). Internal —
+    /// exposed so same-assembly extension points (e.g. <c>SkillUsageAssertions.WithScriptArgument</c>) can
+    /// build on this class without duplicating the tool-usage matching logic above.
+    /// </summary>
+    internal ToolCallRecord? Call => _call;
+
+    /// <summary>Internal accessor for the tool name this assertion is scoped to (same rationale as <see cref="Call"/>).</summary>
+    internal string ToolName => _toolName;
+
     /// <summary>Assert this tool was called before another tool.</summary>
     /// <param name="otherToolName">The tool that should have been called after.</param>
     /// <param name="because">Optional reason for the assertion (shown in failure message).</param>

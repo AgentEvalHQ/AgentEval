@@ -69,4 +69,12 @@ public static class SkillToolNames
 
     /// <summary>The <c>scriptName</c> argument on <see cref="RunSkillScript"/>. Verified against MAF 1.13.0.</summary>
     public const string ScriptNameArg = "scriptName";
+
+    /// <summary>
+    /// The <c>arguments</c> argument on <see cref="RunSkillScript"/> — the nested object holding the
+    /// script's own parameters (e.g. <c>{"amount": 200}</c>). Confirmed against a live captured trace
+    /// this session (Skills Phase 1 sample, Run 2): <c>run_skill_script({"skillName":...,
+    /// "scriptName":...,"arguments":{"amount":200}})</c>.
+    /// </summary>
+    public const string ScriptArgumentsArg = "arguments";
 }

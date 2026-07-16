@@ -206,6 +206,38 @@ This is Phase 1 of a multi-phase design
   "advertise" stage; a regression guard locks in that an undetectable non-file script stays honestly
   unreported rather than silently "fixed" with a fabricated count.
 
+### MAF Agent Skills evaluation — Phase 4a/4b (Skill Health & Security Index + hash-pin drift detection) + cheap sugar
+
+#### Added
+- **`SkillSecurityIndex`** (`AgentEval.Skills`, pure) — joins the three independently-produced skill
+  quality signals (Phase 2 compliance, Phase 1 efficiency, Phase 3/4b security) into one composite 0-100
+  index. **Never fabricates a missing axis**: the score is the mean of only the axes actually supplied,
+  and `SkillSecurityIndexResult.Explanation` names exactly which axes were/weren't measured.
+- **`ManifestFingerprint`/`ManifestDriftDetector`** (`AgentEval.Guardrails`, pure, MAF-free) — a generic
+  SHA-256 hash-pin-and-diff primitive, reusable for any model-visible artifact definition (a skill
+  manifest here; an MCP tool schema in a future gate — same pattern, different artifact type).
+- **`SkillManifestPoisoningGate`** + **`SkillManifestBaseline`** (`AgentEval.Skills`) — deterministic
+  trust-time drift detection for a rug-pulled skill (content silently changing after approval). No
+  calibration debt (pure hashing). `SkillManifestBaseline` persists to JSON (capture → save → later load
+  → compare → flag drift), mirroring the repo's existing RedTeam baseline/diff CI pattern, scoped to skills.
+- **Cheap assertion sugar** (design catalog §10.4): `WithScriptArgument` (asserts inside
+  `run_skill_script`'s nested `arguments` object), `ForSkill` (scopes a `ToolUsageReport` to one skill's
+  calls when a run exercises multiple skills), `HaveDisclosedEfficiently(minScore)` (metric-backed,
+  synchronous — the metric is `CodeBased` with no real async work), `HaveCorrectlyDeclinedSkill` (positive
+  phrasing for "the agent correctly avoided this skill"). `SkillContractAssertions.AssertSkillWellFormed`
+  — a zero-cost (no agent, no LLM) unit-test assertion wrapping the Phase 2 validator.
+- **Sample Run 7** — live-verified against real Azure OpenAI this session: a real simulated rug-pull
+  (mutating the expense-report skill's description) is correctly caught by the hash-pin drift check
+  (`Changed` finding), and the composite Skill Security Index correctly joins the real Phase 2 compliance
+  scan (85/100, one Medium finding) with the real Phase 3 behavioral outcome from Run 5 (Resisted → 60/100
+  after the drift penalty), honestly reporting the Efficiency axis as `n/a` (not re-measured this run,
+  never assumed perfect) — composite 72/100, 2/3 axes measured.
+- **Phase 4c (expanded red-team surface — fuzzing, canary-skill honeypot, typosquat detection,
+  load-storm-as-DoW) was NOT built this session** — explicitly deprioritized per the design doc's own
+  scoring (4a/4b are cheaper and higher-value) and the marathon session's remaining scope (Stages 2-5).
+  Documented as deferred, not silently dropped — see `strategy/TODO.md`.
+- ~35 new tests. Full net8.0 suite green (7278/7279, 1 pre-existing skip).
+
 ## [0.16.0-beta] - 2026-07-13
 
 Gatekeeper reaches production-grade runtime enforcement: a calibrated flagship judge for indirect prompt

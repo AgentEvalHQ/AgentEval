@@ -60,4 +60,51 @@ internal static class SkillArgumentExtraction
         JsonElement { ValueKind: JsonValueKind.String } je => je.GetString(),
         _ => null,
     };
+
+    /// <summary>
+    /// Views a nested argument value (e.g. <c>run_skill_script</c>'s <c>arguments</c> object) as a flat
+    /// string-keyed dictionary, regardless of whether the captured trace represents it as a
+    /// <see cref="JsonElement"/> (object kind) or an already-materialized <see cref="IDictionary{TKey,TValue}"/>.
+    /// Returns <see langword="null"/> when the value isn't object-shaped.
+    /// </summary>
+    public static IReadOnlyDictionary<string, object?>? AsNestedDictionary(object? value)
+    {
+        switch (value)
+        {
+            case null:
+                return null;
+            case IDictionary<string, object?> dict:
+                return new Dictionary<string, object?>(dict);
+            case JsonElement { ValueKind: JsonValueKind.Object } je:
+            {
+                var result = new Dictionary<string, object?>();
+                foreach (var prop in je.EnumerateObject())
+                {
+                    result[prop.Name] = prop.Value;
+                }
+
+                return result;
+            }
+            default:
+                return null;
+        }
+    }
+
+    /// <summary>
+    /// Renders a value for tolerant equality comparison in assertions — e.g. a captured
+    /// <see cref="JsonElement"/> number <c>200</c> must compare equal to a caller-supplied <c>int</c> or
+    /// <c>double</c> literal <c>200</c>. Uses invariant culture so a locale never changes comparison outcomes.
+    /// </summary>
+    public static string RenderForComparison(object? value) => value switch
+    {
+        null => string.Empty,
+        JsonElement je => je.ValueKind switch
+        {
+            JsonValueKind.String => je.GetString() ?? string.Empty,
+            JsonValueKind.Number => je.GetRawText(),
+            _ => je.GetRawText(),
+        },
+        IFormattable f => f.ToString(null, System.Globalization.CultureInfo.InvariantCulture),
+        _ => value.ToString() ?? string.Empty,
+    };
 }

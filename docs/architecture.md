@@ -573,8 +573,17 @@ execution — see `docs/gatekeeper/gate-reference.md` for both, including the co
 `run_skill_script` is auto-approved at the MAF layer). See `samples/AgentEval.AgentSkillsEval` (Runs 5–6,
 live-verified against real Azure OpenAI) for the end-to-end demonstration.
 
-Phase 4 (skill health/security index) is covered separately, once shipped. See
-`strategy/FutureFeatures/Skills/AgentEval-AgentSkills-Evals-Design-and-Plan.md` (local-only) for the
+**Phase 4a/4b — Skill Health & Security Index + hash-pin drift.** `AgentEval.Skills.SkillSecurityIndex`
+joins the three independently-produced signals (Phase 2 compliance, Phase 1 efficiency, Phase 3 security)
+into one composite 0-100 score — a missing axis is never fabricated as perfect; the score is the mean of
+only the axes actually supplied. `AgentEval.Guardrails.ManifestFingerprint`/`ManifestDriftDetector` (pure,
+MAF-free, reusable for a future MCP-tool-description equivalent) back
+`AgentEval.Skills.SkillManifestPoisoningGate` + `SkillManifestBaseline` — deterministic trust-time drift
+detection for a rug-pulled skill, JSON-persisted (mirrors the RedTeam baseline/diff CI pattern). Phase 4c
+(fuzzing, canary-skill honeypot, typosquat detection, load-storm-as-denial-of-wallet) was deprioritized
+per the design doc's own scoring — see `strategy/TODO.md` for what remains.
+
+See `strategy/FutureFeatures/Skills/AgentEval-AgentSkills-Evals-Design-and-Plan.md` (local-only) for the
 full multi-phase design.
 
 ### 4. Registry Pattern

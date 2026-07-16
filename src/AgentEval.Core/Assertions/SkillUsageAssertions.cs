@@ -3,6 +3,7 @@
 // Licensed under the MIT License.
 
 using System.Diagnostics;
+using AgentEval.Core;
 using AgentEval.Models;
 using AgentEval.Skills;
 
@@ -134,6 +135,147 @@ public static class SkillUsageAssertions
                         ? $"'{SkillToolNames.LoadSkill}' for skill '{skillName}' before '{call.Name}' (#{call.Order})"
                         : $"'{SkillToolNames.LoadSkill}' before '{call.Name}' (#{call.Order})",
                     actual: $"No qualifying '{SkillToolNames.LoadSkill}' call precedes call #{call.Order}",
+                    because: because));
+        }
+
+        return a;
+    }
+
+    /// <summary>
+    /// Assert a value inside <c>run_skill_script</c>'s nested <c>arguments</c> object (the script's OWN
+    /// parameters, e.g. <c>{"amount": 200}</c> — distinct from the outer <c>skillName</c>/<c>scriptName</c>
+    /// arguments <see cref="ToolCallAssertion.WithArgument"/> already covers). Chain off
+    /// <see cref="HaveRunSkillScript"/>. Design catalog §10.4, item 1.
+    /// </summary>
+    /// <param name="assertion">The <c>run_skill_script</c> call assertion to extend.</param>
+    /// <param name="argKey">The parameter name inside the nested <c>arguments</c> object.</param>
+    /// <param name="expectedValue">The expected value (compared via its string rendering — tolerant of JSON-number/JsonElement round-tripping).</param>
+    /// <param name="because">Optional reason for the assertion (shown in failure message).</param>
+    [StackTraceHidden]
+    public static ToolCallAssertion WithScriptArgument(this ToolCallAssertion assertion, string argKey, object expectedValue, string? because = null)
+    {
+        ArgumentNullException.ThrowIfNull(assertion);
+        ArgumentNullException.ThrowIfNull(argKey);
+        var call = assertion.Call;
+        if (call is null)
+        {
+            return assertion;   // not called → soft-fail already recorded upstream (BUG-15 convention)
+        }
+
+        object? nestedRaw = null;
+        var nestedFound = call.Arguments is not null && call.Arguments.TryGetValue(SkillToolNames.ScriptArgumentsArg, out nestedRaw);
+        var nested = nestedFound ? SkillArgumentExtraction.AsNestedDictionary(nestedRaw) : null;
+        var actualValue = nested is not null && nested.TryGetValue(argKey, out var v) ? v : null;
+        var actualText = SkillArgumentExtraction.RenderForComparison(actualValue);
+        var expectedText = SkillArgumentExtraction.RenderForComparison(expectedValue);
+
+        if (nested is null || !nested.ContainsKey(argKey) || !string.Equals(actualText, expectedText, StringComparison.Ordinal))
+        {
+            AgentEvalScope.FailWith(
+                ToolAssertionException.Create(
+                    $"Expected run_skill_script's 'arguments.{argKey}' to equal '{expectedText}', but it was " +
+                    (nested is null || !nested.ContainsKey(argKey) ? "not present." : $"'{actualText}'."),
+                    toolName: call.Name,
+                    expected: $"arguments.{argKey} == '{expectedText}'",
+                    actual: nested is null || !nested.ContainsKey(argKey) ? "arguments key not present" : $"arguments.{argKey} == '{actualText}'",
+                    because: because));
+        }
+
+        return assertion;
+    }
+
+    /// <summary>
+    /// Scopes a <see cref="ToolUsageReport"/> to only the calls attributable to <paramref name="skillName"/>
+    /// (value-matched via the same key-agnostic extraction the other skill assertions use) — lets you write
+    /// <c>toolUsage.ForSkill("expense-report").Should()...</c> when a run exercised MULTIPLE skills and you
+    /// want assertions scoped to just one. Design catalog §10.4, item 2.
+    /// </summary>
+    public static ToolUsageReport ForSkill(this ToolUsageReport report, string skillName)
+    {
+        ArgumentNullException.ThrowIfNull(report);
+        ArgumentNullException.ThrowIfNull(skillName);
+
+        var scoped = new ToolUsageReport();
+        foreach (var call in report.Calls.OrderBy(c => c.Order))
+        {
+            // A skill call whose skillName matches; a NON-skill-tool call is out of scope entirely — this
+            // scopes to one skill's activity, not the whole run.
+            if (!SkillToolNames.All.Contains(call.Name, StringComparer.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            if (SkillArgumentExtraction.ValueMatches(call.Arguments, SkillToolNames.SkillNameArg, skillName))
+            {
+                scoped.AddCall(call);
+            }
+        }
+
+        return scoped;
+    }
+
+    /// <summary>
+    /// Metric-backed assertion: run <see cref="Metrics.Agentic.SkillDisclosureEfficiencyMetric"/> over this
+    /// report and assert its score meets <paramref name="minScore"/>. The metric is <c>CodeBased</c> (no
+    /// LLM call, fully deterministic), so this can run synchronously inside the fluent chain. Design catalog §10.4,
+    /// item 3 (precedent: RedTeam's <c>HaveMinimumScore</c>).
+    /// </summary>
+    /// <param name="a">The tool-usage assertions instance.</param>
+    /// <param name="minScore">Minimum acceptable score (0-100).</param>
+    /// <param name="because">Optional reason for the assertion (shown in failure message).</param>
+    [StackTraceHidden]
+    public static ToolUsageAssertions HaveDisclosedEfficiently(this ToolUsageAssertions a, double minScore, string? because = null)
+    {
+        ArgumentNullException.ThrowIfNull(a);
+        var report = a.Report;
+        var metric = new Metrics.Agentic.SkillDisclosureEfficiencyMetric();
+        var context = new EvaluationContext { Input = "n/a", Output = "n/a", ToolUsage = report };
+        // The metric is purely CodeBased (Task.FromResult all the way down, no real async work) — blocking
+        // here is safe and keeps this assertion synchronous like every other fluent assertion in this class.
+        var result = metric.EvaluateAsync(context).GetAwaiter().GetResult();
+
+        if (result.Score < minScore)
+        {
+            AgentEvalScope.FailWith(
+                ToolAssertionException.Create(
+                    $"Expected skill disclosure efficiency score >= {minScore:F0}, but it was {result.Score:F0}. {result.Explanation}",
+                    calledTools: report.UniqueToolNames.ToList(),
+                    expected: $"code_skill_disclosure_efficiency >= {minScore:F0}",
+                    actual: $"code_skill_disclosure_efficiency == {result.Score:F0}",
+                    because: because));
+        }
+
+        return a;
+    }
+
+    /// <summary>
+    /// Positive-phrasing counterpart to <see cref="NotHaveRunSkillScript"/> for the "the agent correctly
+    /// avoided a specific skill" case — asserts <c>load_skill</c> was NEVER called for
+    /// <paramref name="skillName"/> (e.g. an off-topic task that should never trigger this skill). Design
+    /// catalog §10.4, item 4.
+    /// </summary>
+    /// <param name="a">The tool-usage assertions instance.</param>
+    /// <param name="skillName">The skill that should NOT have been loaded.</param>
+    /// <param name="because">Optional reason for the assertion (shown in failure message).</param>
+    [StackTraceHidden]
+    public static ToolUsageAssertions HaveCorrectlyDeclinedSkill(this ToolUsageAssertions a, string skillName, string? because = null)
+    {
+        ArgumentNullException.ThrowIfNull(a);
+        ArgumentNullException.ThrowIfNull(skillName);
+        var report = a.Report;
+
+        var loaded = report.GetCallsByName(SkillToolNames.LoadSkill)
+            .Any(c => SkillArgumentExtraction.ValueMatches(c.Arguments, SkillToolNames.SkillNameArg, skillName));
+
+        if (loaded)
+        {
+            AgentEvalScope.FailWith(
+                ToolAssertionException.Create(
+                    $"Expected the agent to correctly decline skill '{skillName}' (never call load_skill for it), but it was loaded.",
+                    toolName: SkillToolNames.LoadSkill,
+                    calledTools: report.UniqueToolNames.ToList(),
+                    expected: $"'{SkillToolNames.LoadSkill}' never called for skill '{skillName}'",
+                    actual: $"'{SkillToolNames.LoadSkill}' called for skill '{skillName}'",
                     because: because));
         }
 
