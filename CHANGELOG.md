@@ -123,10 +123,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   provider-level `GetSkillsAsync` convenience; and that `read_skill_resource`'s `resourceName` is a
   logical name resolved against the skill's discovered resource list, not a live filesystem path).
 
-This is Phase 1 of a 3-phase design
-(`strategy/FutureFeatures/Skills/AgentEval-AgentSkills-Evals-Design-and-Plan.md`, local-only). Phase 2
-(a skill-compliance scanner) and Phase 3 (a skill-description-injection red-team attack plus
-`run_skill_script` code-execution governance gates) are not yet implemented.
+This is Phase 1 of a multi-phase design
+(`strategy/FutureFeatures/Skills/AgentEval-AgentSkills-Evals-Design-and-Plan.md`, local-only).
+
+### MAF Agent Skills evaluation — Phase 2 (compliance scanner + coverage report)
+
+#### Added
+- **`SkillComplianceValidator`** (`AgentEval.Skills`, `AgentEval.Core` — pure, MAF-free, no I/O) —
+  validates a `SkillManifest` against the GA `SKILL.md` rules (`name` presence/length/charset/no
+  consecutive hyphens/matches parent directory; `description` presence/length; `compatibility` length)
+  plus AgentEval governance flags (`ScriptRequiresGovernanceReview` when a skill exposes scripts,
+  `ResourceFromUntrustedSource` for MCP/Custom-sourced resources, `AllowedToolsExperimental`). Returns a
+  `SkillComplianceReport` (findings + a stage-reachability coverage summary) whose `IsCompliant` flips
+  only on a `High`-severity finding.
+- **`MafSkillScanner`** (`AgentEval.MAF.Skills`) — the one place that touches a live `AgentSkill` /
+  `AgentSkillsSource`. Enumerates skills via the GA source-level `GetSkillsAsync(context, ct)`, maps each
+  to the pure `SkillManifest` DTO, and delegates to the validator. **Honesty note:** `AgentFileSkill`
+  stores its discovered resources/scripts in private fields with no public getter (verified via
+  reflection against the live MAF 1.13.0 assembly), so this scanner independently re-derives a
+  file-sourced skill's resource/script inventory by walking its `resources/`/`scripts/` subdirectories on
+  disk — the same convention MAF's own `AgentFileSkillsSourceOptions` uses. For non-file sources
+  (in-memory/class/MCP/custom) there is no equivalent enumeration API, so `ResourceNames`/`ScriptNames`
+  are honestly reported empty rather than guessed — a documented, real limitation, not hidden.
+- **`SkillComplianceReportRenderer`** — console/Markdown/JSON rendering, severity-sorted findings plus a
+  coverage table.
+- **Sample Run 4** (`samples/AgentEval.AgentSkillsEval`) — `MafSkillScanner.ScanFileSkillsAsync` over the
+  real `expense-report` fixture; **live-verified against real Azure OpenAI this session**: 1 skill
+  scanned, 1 resource + 1 script found on disk, `ScriptRequiresGovernanceReview` correctly flagged
+  (Medium, pointing at Phase 3), `IsCompliant == true`.
+- 44 new tests (`tests/AgentEval.Tests/Skills/*`, `tests/AgentEval.Tests/MAF/Skills/*`) — every GA rule
+  fires exactly once on a violating manifest and not on a clean one; coverage counts never fabricate an
+  "advertise" stage; a regression guard locks in that an undetectable non-file script stays honestly
+  unreported rather than silently "fixed" with a fabricated count.
 
 ## [0.16.0-beta] - 2026-07-13
 

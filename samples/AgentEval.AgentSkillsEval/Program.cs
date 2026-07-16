@@ -20,6 +20,7 @@
 using System.Text.Json;
 using AgentEval.Assertions;
 using AgentEval.Core;
+using AgentEval.MAF.Skills;
 using AgentEval.Metrics.Agentic;
 using AgentEval.Models;
 using AgentEval.Skills;
@@ -62,8 +63,35 @@ public static class Program
         await Run1_ReadOnlyPolicyLookup(chatClient, skillPath);
         await Run2_ScriptComputedOverage(chatClient, skillPath);
         await Run3_SkillNotNeeded(chatClient, skillPath);
+        await Run4_ComplianceScan(skillPath);
 
-        Console.WriteLine("\n=== Agent Skills Eval — Phase 1 sample complete ===");
+        Console.WriteLine("\n=== Agent Skills Eval — Phase 1 + Phase 2 sample complete ===");
+    }
+
+    // ------------------------------------------------------------------------------------------
+    // Run 4 (Phase 2) — compliance scan: MafSkillScanner.ScanFileSkillsAsync over the real
+    // expense-report fixture. No LLM call — pure static inspection of SKILL.md + the resources/scripts
+    // directories, honestly reporting exactly what MafSkillScanner can see (see its remarks for what it
+    // cannot — non-file skill sources are out of scope for this fixture).
+    // ------------------------------------------------------------------------------------------
+    private static async Task Run4_ComplianceScan(string skillPath)
+    {
+        PrintScene("Run 4 (Phase 2)", "Compliance scan — MafSkillScanner over the real expense-report fixture");
+
+        // ScanFileSkillsAsync needs an AIAgent only to build the AgentSkillsSourceContext MAF's
+        // GetSkillsAsync requires; no model call is made by the scan itself. A minimal agent is enough.
+        var scanAgent = new ChatClientAgent(
+            new AzureOpenAIClient(AIConfig.Endpoint, AIConfig.KeyCredential).GetChatClient(AIConfig.ModelDeployment).AsIChatClient(),
+            new ChatClientAgentOptions { Name = "ScannerAgent" });
+
+        // skillPath is the SAME single-skill directory Run 1-3's AgentSkillsProvider(skillPath, ...) already
+        // uses (".../skills/expense-report") — a proven-working path shape from Phase 1, reused here so
+        // ScanFileSkillsAsync inspects the exact same skill the agent runs actually exercised.
+        var report = await MafSkillScanner.ScanFileSkillsAsync(skillPath, scanAgent);
+
+        Console.WriteLine(SkillComplianceReportRenderer.RenderConsole(report));
+        Console.WriteLine($"  [{(report.IsCompliant ? "PASS" : "FAIL")}] IsCompliant == true "
+            + $"({report.Findings.Count} finding(s), {report.Findings.Count(f => f.Severity == Severity.High)} High)");
     }
 
     // ------------------------------------------------------------------------------------------

@@ -545,11 +545,22 @@ supplied. It never fabricates a selection score without ground truth, and never 
 "advertise" stage count — the skill-inventory listing injected into the system prompt is not a tool
 call and isn't observable from a `ToolUsageReport`.
 
-See `samples/AgentEval.AgentSkillsEval` for a live, real-agent walkthrough, and
+**Phase 2 — compliance scanner.** `AgentEval.Skills.SkillComplianceValidator` (pure, MAF-free, in
+`AgentEval.Core`) checks a skill's GA `SKILL.md` rules (name/description/compatibility) plus governance
+flags (`ScriptRequiresGovernanceReview`, `ResourceFromUntrustedSource`, `AllowedToolsExperimental`)
+against an AgentEval-owned `SkillManifest` DTO. `AgentEval.MAF.Skills.MafSkillScanner` is the one
+adapter that touches a live `AgentSkill`/`AgentSkillsSource` (source-level `GetSkillsAsync`), mapping to
+`SkillManifest` — `AgentEval.Core` still never references `Microsoft.Agents.AI`. `SkillComplianceReportRenderer`
+renders console/Markdown/JSON. See the type's XML docs for a real, documented limitation: MAF exposes no
+public resource/script enumeration for file skills, so the scanner re-derives it from the
+`resources/`/`scripts/` directory convention; non-file sources (in-memory/class/MCP) are honestly
+reported with zero resources/scripts rather than guessed.
+
+See `samples/AgentEval.AgentSkillsEval` (Run 4) for a live, real-agent walkthrough of the scanner, and
 `strategy/FutureFeatures/Skills/AgentEval-AgentSkills-Evals-Design-and-Plan.md` (local-only) for the
-full 3-phase design — this is Phase 1 (assertions + metric + sample); a skill-compliance scanner
-(Phase 2) and a skill-injection red-team attack + `run_skill_script` governance gates (Phase 3) are
-not yet implemented.
+full multi-phase design. Phase 3 (a skill-description-injection red-team attack + `run_skill_script`
+code-execution governance gates) and Phase 4 (skill health/security index) are covered separately —
+see `docs/gatekeeper-gates.md` / `docs/redteam.md` once shipped.
 
 ### 4. Registry Pattern
 

@@ -14,13 +14,16 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\AgentEval.Abstractions\AgentEval.Abstractions.csproj" />
     <ProjectReference Include="..\..\src\AgentEval.Core\AgentEval.Core.csproj" />
+    <ProjectReference Include="..\..\src\AgentEval.MAF\AgentEval.MAF.csproj" />
+    <ProjectReference Include="..\..\src\AgentEval.RedTeam\AgentEval.RedTeam.csproj" />
+    <ProjectReference Include="..\..\src\AgentEval.RedTeam.Gatekeeper\AgentEval.RedTeam.Gatekeeper.csproj" />
   </ItemGroup>
 
   <!--
-    Phase 1 scope only (assertions + progressive-disclosure efficiency metric): the agent is built
-    directly against Microsoft.Agents.AI (AgentSkillsProvider, ChatClientAgent) + Azure OpenAI. No
-    AgentEval.MAF / AgentEval.RedTeam reference yet — those land with Phase 2 (skill-compliance
-    scanner) and Phase 3 (skill-injection red-team + run_skill_script governance gates), per
+    Phase 1 (assertions + progressive-disclosure efficiency metric) needs only Microsoft.Agents.AI +
+    Azure OpenAI. Phase 2 (compliance scanner, AgentEval.MAF.Skills.MafSkillScanner) adds the
+    AgentEval.MAF reference above. Phase 3 (skill-injection red-team + run_skill_script governance
+    gates) adds AgentEval.RedTeam / AgentEval.RedTeam.Gatekeeper. See
     strategy/FutureFeatures/Skills/AgentEval-AgentSkills-Evals-Design-and-Plan.md.
   -->
   <ItemGroup>
