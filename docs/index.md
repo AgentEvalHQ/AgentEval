@@ -281,6 +281,10 @@ await result.ExportHtmlReportAsync("memory-report.html");
     
     Full conversation flow evaluation
 
+-   **🧩 MAF Agent Skills**
+
+    Disclosure assertions + efficiency metric, `SKILL.md` compliance scanner, skill-injection red team, `run_skill_script` governance gates, Skill Security Index
+
 </div>
 
 ---
@@ -362,6 +366,7 @@ agenteval mc serve                         # browse runs + evidence at http://lo
 |  | [Agentic Benchmark](benchmarks/agentic/getting-started.md) |  |
 |  | [OWASP / MITRE Benchmarks](benchmarks/owasp/getting-started.md) |  |
 |  | [Performance / Memory / LongMemEval](benchmarks/perf/getting-started.md) |  |
+|  | [MAF Agent Skills Evaluation](agent-skills.md) |  |
 
 ---
 

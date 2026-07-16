@@ -196,8 +196,25 @@ CLI parsing → validation → gate → scan → reporting path end-to-end witho
 is no supported way, as a CLI user, to substitute your own pre-built agent for `FromAgent` outside of tests — it
 isn't exposed as a flag.
 
-Until the connector ships, use `--endpoint`/`--azure` against your own agent, or the credential-free
-`--sut gatekeeper-demo` target, to exercise the rest of the red-team suite.
+If you don't yet have Entra credentials for a non-prod MCS agent, use `--endpoint`/`--azure` against your own
+agent, or the credential-free `--sut gatekeeper-demo` target, to exercise the rest of the red-team suite in the
+meantime — the connector itself is wired, but the live network path described above still awaits its first
+real-credential run.
+
+**A second, lower-level test double** now backs the connector's own test suite:
+`MockCopilotStudioConversationClient` (`tests/AgentEval.Tests/Cli/CopilotStudio/`) implements
+`ICopilotStudioConversationClient` directly — the seam `CopilotStudioChatClient` talks to — rather than faking
+the higher-level `IChatClient`. It supports scripted multi-turn conversations, server-assigned
+conversation-id tracking, and configurable error injection (auth failure, a mid-conversation
+rate-limit-shaped exception, hang-until-cancelled), so the activity-stream bridging logic itself can be
+exercised credential-free, closer to what a real `CopilotClient` would do, without touching the network.
+
+**The `--sut` seam is also gaining a shared, `eval`/`bench`-reachable form.** `ISutTarget` +
+`SutTargetResolver` (`src/AgentEval.Cli/Commands/Targets/ISutTarget.cs`) let `CopilotStudioRedTeamTarget`
+resolve the same way from `agenteval eval`/`agenteval bench` as it already does from `agenteval redteam` — a
+`Validate`-drift contract test proves the redteam and shared-seam validation paths agree. As of this release,
+the shared types exist and are tested, but no `eval`/`bench` CLI verb calls `SutTargetResolver` yet — `--sut
+copilot-studio` today only works with `agenteval redteam`.
 
 ## How it fits red-team fidelity
 

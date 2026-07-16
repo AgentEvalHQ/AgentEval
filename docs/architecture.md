@@ -517,6 +517,10 @@ result.Performance!
 
 #### MAF Agent Skills assertions
 
+> For a user-facing walkthrough of everything in this section (assertions, compliance scanner, red-team
+> attack, governance gates, Security Index), see [MAF Agent Skills Evaluation](agent-skills.md). What
+> follows here is implementation-level detail.
+
 `AgentEval.Assertions.SkillUsageAssertions` adds sugar for MAF's three stable Agent Skills tools
 (`load_skill` / `read_skill_resource` / `run_skill_script` — GA'd 2026-07-07), as thin extension
 methods over the same `ToolUsageAssertions` / `ToolCallAssertion` above (zero new MAF-type coupling;

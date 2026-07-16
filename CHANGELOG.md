@@ -310,6 +310,27 @@ This is Phase 1 of a multi-phase design
   honest accounting and what's next.
 - Full net8.0 suite green (see the final Stage 5 numbers in this file's next entry).
 
+### Documentation — Stage 5 pass (Agent Skills, Gatekeeper, Copilot Studio) + final build/test verification
+
+#### Added
+- **`docs/agent-skills.md`** — new user-facing feature page for MAF Agent Skills evaluation (assertions,
+  disclosure-efficiency metric, compliance scanner, skill-injection red-team + `run_skill_script` governance
+  gates, Skill Health & Security Index, hash-pin drift detection). Previously this only existed at
+  implementation-detail depth inside `docs/architecture.md`; that section now cross-links here. Linked from
+  `docs/index.md`'s Documentation table and Feature Highlights grid.
+- `docs/redteam/copilot-studio.md` — corrected a stale sentence that still said "until the connector ships"
+  even though `BuildLive` has shipped since this doc was first written; documented the new
+  `MockCopilotStudioConversationClient` test double and the not-yet-CLI-reachable shared `ISutTarget`/
+  `SutTargetResolver` seam (Track 2 PR 1).
+
+#### Verified
+- Full-solution `dotnet build -c Release`: **0 errors** (66 pre-existing warnings, unrelated to this
+  session's changes — nullable-reference-type test scaffolding and xUnit analyzer style suggestions).
+- Full net8.0 test suite (fresh build, not `--no-build`, per this repo's known multi-TFM stale-binary trap):
+  **7349 passed / 0 failed / 1 skipped** (the skip is the pre-existing, intentionally gated
+  `CopilotStudioLiveConnectorManualTests` — needs real Entra credentials this environment does not have) —
+  **no regressions** from any of Stages 1–5.
+
 ## [0.16.0-beta] - 2026-07-13
 
 Gatekeeper reaches production-grade runtime enforcement: a calibrated flagship judge for indirect prompt
