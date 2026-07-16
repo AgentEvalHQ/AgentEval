@@ -242,7 +242,15 @@ public class MafSkillScannerTests
         // candidates could never string-match absolute returned paths). This test uses a path relative to
         // the CURRENT process working directory (via Path.GetRelativePath) rather than mutating
         // Environment.CurrentDirectory, which would be unsafe under parallel test execution.
-        var root = NewFixtureRoot();
+        //
+        // The fixture root is deliberately anchored under Directory.GetCurrentDirectory() rather than
+        // NewFixtureRoot()'s Path.GetTempPath(): on GitHub Actions' Windows runners the repo checkout
+        // (and thus the test process's CWD) lives on a different drive letter than %TEMP%, and
+        // Path.GetRelativePath cannot express a relative path across drives — it returns the input
+        // unchanged, silently rooted, which trips this test's own "must actually be relative"
+        // precondition before the real scanner logic ever runs. Anchoring under CWD guarantees the two
+        // paths always share a volume, by construction, regardless of CI drive layout.
+        var root = Path.Combine(Directory.GetCurrentDirectory(), "agenteval-relpath-fixture-" + Guid.NewGuid().ToString("N"));
         var dir = Path.Combine(root, "relative-path-skill");
         Directory.CreateDirectory(dir);
         await File.WriteAllTextAsync(Path.Combine(dir, "SKILL.md"),
