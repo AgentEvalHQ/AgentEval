@@ -19,7 +19,10 @@ namespace AgentEval.MAF.Gatekeeper;
 /// that does not expose <see cref="Microsoft.Extensions.AI.ChatOptions"/> via <c>GetService</c> (e.g. a
 /// custom, non-<c>ChatClientAgent</c> agent type) — in that case <see cref="Tools"/> is empty and the
 /// coverage percentage is meaningless; call the <c>Analyze(IEnumerable&lt;AITool&gt;, …)</c> overload with an
-/// explicit tool list instead.
+/// explicit tool list instead. NOTE: <see langword="true"/> does NOT mean the inventory is complete — a tool
+/// contributed dynamically by an <see cref="Microsoft.Agents.AI.AIContextProvider"/> (Agent Skills, a memory
+/// provider) never appears in <c>ChatOptions.Tools</c> and so is silently absent from <see cref="Tools"/> even
+/// when this flag is <see langword="true"/>. See <see cref="GatekeeperCoverageAnalyzer"/> remarks.
 /// </param>
 public sealed record GatekeeperCoverageReport(
     IReadOnlyList<ToolCoverageEntry> Tools,

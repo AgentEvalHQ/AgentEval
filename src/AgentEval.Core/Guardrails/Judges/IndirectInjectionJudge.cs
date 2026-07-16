@@ -25,7 +25,9 @@ public static class IndirectInjectionJudge
 
     /// <summary>
     /// Build the indirect-injection judge as an <see cref="IChatGate"/> over a fast model, ready to place run-pre on
-    /// the tool/RAG-return seam via <c>UseAgentEvalGate(pre: [judge])</c>.
+    /// the tool/RAG-return seam via <c>UseAgentEvalGate(pre: [judge], policy: EvalGatePolicy.Redact)</c> once it
+    /// clears <see cref="CalibrateAsync"/> (no implicit default — <c>policy</c> is required whenever any gate is
+    /// registered).
     /// <para>If you pass custom <paramref name="options"/> (e.g. a different timeout, or a fail-open inconclusive
     /// policy), calibrate with the <b>same</b> options via <see cref="CalibrateAsync"/> — otherwise the report
     /// certifies a different config than the one you deploy.</para>

@@ -51,6 +51,16 @@ public static class AgentEvalToolGateExtensions
     /// <see cref="TraceCaptureMode.Full"/> explicitly to restore that behavior when you know your arguments
     /// never carry secrets and want the exact before/after values for debugging.
     /// </param>
+    /// <remarks>
+    /// <b>No <see cref="GateRequirements.RunScope"/> guard at this seam.</b> A <paramref name="gates"/> entry
+    /// that declares <see cref="GateRequirements.RunScope"/> (e.g. <see cref="RunBudgetGate"/>,
+    /// <see cref="SequenceGate"/>) still runs here even when no <see cref="AgentRunScope"/> is established —
+    /// this method has no way to know whether <c>UseAgentEvalGate</c> will also be called (in this chain, before
+    /// or after), so it cannot check at registration time. Calling it directly (bypassing <c>UseGatekeeper</c>)
+    /// forfeits the construction-time refusal <c>UseGatekeeper</c> performs for exactly this case — the gate
+    /// silently falls back to its documented single-process-wide shared state instead. Prefer
+    /// <c>UseGatekeeper(...)</c> for RunScope-requiring gates, or call <c>UseAgentEvalGate()</c> yourself first.
+    /// </remarks>
     public static AIAgentBuilder UseAgentEvalToolGate(
         this AIAgentBuilder builder,
         IReadOnlyList<IToolGate> gates,
@@ -138,8 +148,10 @@ public static class AgentEvalToolGateExtensions
                     case ToolGateAction.Mutate:
                     {
                         // Snapshot BEFORE mutating — a live reference would show the post-mutation values for
-                        // both "before" and "after" once context.Arguments is cleared/rewritten below.
-                        var before = mutationCaptureMode == TraceCaptureMode.None
+                        // both "before" and "after" once context.Arguments is cleared/rewritten below. Skip the
+                        // copy entirely when there's no trace (RecordMutate is a no-op then) or capture is off —
+                        // no point allocating a dictionary nobody will ever render.
+                        var before = trace is null || mutationCaptureMode == TraceCaptureMode.None
                             ? null
                             : new Dictionary<string, object?>(context.Arguments);
 

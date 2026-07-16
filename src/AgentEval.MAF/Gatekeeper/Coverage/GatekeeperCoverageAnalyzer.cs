@@ -23,6 +23,16 @@ namespace AgentEval.MAF.Gatekeeper;
 /// model," not "a gate specifically defends this exact tool." That is still the honest, useful question: it
 /// answers "is the interception seam even reachable for this tool," which is exactly what today's silent gaps
 /// (provider-hosted tools, an agent with zero gates registered) hide.</para>
+/// <para><b>Blind to tools an <see cref="Microsoft.Agents.AI.AIContextProvider"/> injects at invocation time.</b>
+/// <see cref="Analyze(AIAgent,IReadOnlyList{IToolGate}?,AnalyzeOptions?)"/> reads <c>ChatOptions.Tools</c> off
+/// the agent — the STATIC, build-time tool list. A tool an <c>AIContextProvider</c> (e.g. Agent Skills, a memory
+/// provider) contributes via <c>AIContext.Tools</c> is merged into a transient, per-invocation copy of
+/// <c>ChatOptions</c> and is never written back to the property this analyzer reads. An agent that exposes tools
+/// ONLY through such a provider (no <c>ChatOptions.Tools</c> set at all) reports <c>Tools.Count == 0</c> and
+/// <c>EnforcementCoveragePercent == 100</c> — vacuously "fully covered" — even though the model genuinely sees
+/// and can call those tools at runtime. There is no fix for this short of hooking the live invocation path (a
+/// larger change); until then, treat a coverage report as ONLY about statically-declared tools, and do not use
+/// it to conclude an <see cref="AIContextProvider"/>-driven agent has no unprotected high-risk tools.</para>
 /// </summary>
 public static class GatekeeperCoverageAnalyzer
 {
@@ -39,6 +49,8 @@ public static class GatekeeperCoverageAnalyzer
     /// <param name="agent">The (possibly gate-wrapped) agent to inspect.</param>
     /// <param name="toolGates">The tool gates registered via <c>UseAgentEvalToolGate</c> — pass the same list. Null/empty means no tool gate is registered anywhere.</param>
     /// <param name="options">Analysis options (risk heuristic override). Defaults to <see cref="AnalyzeOptions.Default"/>.</param>
+    /// <remarks>Only sees the static <c>ChatOptions.Tools</c> list — a tool contributed dynamically by an
+    /// <see cref="Microsoft.Agents.AI.AIContextProvider"/> is invisible here. See the class remarks.</remarks>
     public static GatekeeperCoverageReport Analyze(AIAgent agent, IReadOnlyList<IToolGate>? toolGates = null, AnalyzeOptions? options = null)
     {
         ArgumentNullException.ThrowIfNull(agent);

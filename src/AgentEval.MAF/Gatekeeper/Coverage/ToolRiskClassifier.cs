@@ -9,11 +9,12 @@ namespace AgentEval.MAF.Gatekeeper;
 /// <summary>
 /// The default <see cref="ToolRiskLevel"/> heuristic used by <see cref="GatekeeperCoverageAnalyzer"/>: a
 /// tool's name/description is flagged <see cref="ToolRiskLevel.HighRisk"/> when it contains a keyword commonly
-/// associated with a mutating, financial, or data-exfiltrating action. Deliberately coarse (a keyword
-/// substring match, the same class of heuristic <c>ArgumentPatternGate</c>/<c>DomainAllowListGate</c> already
-/// use elsewhere in Gatekeeper) — override via <see cref="AnalyzeOptions.IsHighRisk"/> when it misclassifies
-/// your tools. A real capability model (read/write/network/monetary…) is future work — see
-/// <see cref="ToolRiskLevel"/> remarks.
+/// associated with a mutating, financial, or data-exfiltrating action. Deliberately coarse — a plain
+/// case-insensitive substring match, simpler than the compiled-regex scanning <c>ArgumentPatternGate</c>/
+/// <c>DomainAllowListGate</c> use elsewhere in Gatekeeper (this classifier only ever looks at a tool's own
+/// short name/description, not arbitrary call arguments, so a regex engine buys nothing here) — override via
+/// <see cref="AnalyzeOptions.IsHighRisk"/> when it misclassifies your tools. A real capability model
+/// (read/write/network/monetary…) is future work — see <see cref="ToolRiskLevel"/> remarks.
 /// </summary>
 public static class ToolRiskClassifier
 {

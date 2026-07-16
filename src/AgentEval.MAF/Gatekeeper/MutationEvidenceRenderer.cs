@@ -2,10 +2,8 @@
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 
-using System.Security.Cryptography;
-using System.Text;
-using System.Text.Encodings.Web;
 using System.Text.Json;
+using AgentEval.Guardrails;
 
 namespace AgentEval.MAF.Gatekeeper;
 
@@ -16,11 +14,6 @@ namespace AgentEval.MAF.Gatekeeper;
 /// </summary>
 internal static class MutationEvidenceRenderer
 {
-    // Relaxed encoder so a FULL-mode capture is FAITHFUL (not JSON-escaped): default escaping would render
-    // < > & ' and non-ASCII as \uXXXX, so the mutation audit would not match the values the tool actually
-    // receives. SchemaOnly/Redacted/Hashed never emit user-controlled bytes, so this only matters for Full.
-    private static readonly JsonSerializerOptions RelaxedOptions = new() { Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping };
-
     /// <summary>Renders <paramref name="args"/> per <paramref name="mode"/>.</summary>
     public static string Render(IReadOnlyDictionary<string, object?>? args, TraceCaptureMode mode)
     {
@@ -50,19 +43,23 @@ internal static class MutationEvidenceRenderer
         return Serialize(projected);
     }
 
+    // Reuses the shared SHA-256-hex primitive (AgentEval.Guardrails.ManifestFingerprint, already used for
+    // skill/tool-manifest drift hashing) instead of a second hand-rolled SHA256+hex implementation. Truncated
+    // to 16 hex chars — this is a "did the value change/repeat" telemetry marker, not a security-critical
+    // digest, so the shorter form is deliberate; truncating a lowercase hex string is position-invariant, so
+    // this is byte-for-byte the same output the previous local implementation produced.
     private static string Hash(object value)
-    {
-        var bytes = Encoding.UTF8.GetBytes(GateText.Stringify(value));
-        var digest = SHA256.HashData(bytes);
-        // Convert.ToHexStringLower is net9.0+; this project's floor is net8.0, so lower-case explicitly.
-        return "sha256:" + Convert.ToHexString(digest)[..16].ToLowerInvariant();
-    }
+        => "sha256:" + ManifestFingerprint.Hash(GateText.Stringify(value))[..16];
 
     private static string Serialize(Dictionary<string, object?> projected)
     {
         try
         {
-            return JsonSerializer.Serialize(projected, RelaxedOptions);
+            // Relaxed encoder (shared with GateText) so a FULL-mode capture is FAITHFUL (not JSON-escaped):
+            // default escaping would render < > & ' and non-ASCII as \uXXXX, so the mutation audit would not
+            // match the values the tool actually receives. SchemaOnly/Redacted/Hashed never emit user-controlled
+            // bytes, so this only matters for Full.
+            return JsonSerializer.Serialize(projected, GateText.SerializerOptions);
         }
         catch (NotSupportedException)
         {

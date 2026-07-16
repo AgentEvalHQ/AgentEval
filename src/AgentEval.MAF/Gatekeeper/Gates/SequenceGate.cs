@@ -31,7 +31,7 @@ public sealed class SequenceGate : IToolGate
     private readonly object _fallbackKey = new();
 
     /// <inheritdoc/>
-    public string PolicyName => "SequenceGate";
+    public string PolicyName { get; }
 
     /// <inheritdoc/>
     public GateCost Cost => GateCost.PureCode;
@@ -40,12 +40,21 @@ public sealed class SequenceGate : IToolGate
     public GateRequirements Requirements => GateRequirements.RunScope;
 
     /// <summary>Creates the gate: a call to any <paramref name="guardedTools"/> after any <paramref name="triggerTools"/> is blocked.</summary>
-    public SequenceGate(IEnumerable<string> triggerTools, IEnumerable<string> guardedTools)
+    /// <param name="policyName">
+    /// Optional override of the recorded policy name (default <c>"SequenceGate"</c>) — matches the same
+    /// <c>policyName</c> parameter <see cref="PerToolCallBudgetGate"/>/<see cref="MonetaryLimitGate"/> already
+    /// take. Give each instance a distinct name when you register more than one <see cref="SequenceGate"/> (e.g.
+    /// one per trigger/guard pair) under a shared <see cref="GateTelemetry"/> or trace — otherwise their
+    /// invocation/block counters and trace evidence key on the same <c>"SequenceGate"</c> name and silently
+    /// merge, and there is no way to tell which pair actually fired.
+    /// </param>
+    public SequenceGate(IEnumerable<string> triggerTools, IEnumerable<string> guardedTools, string? policyName = null)
     {
         ArgumentNullException.ThrowIfNull(triggerTools);
         ArgumentNullException.ThrowIfNull(guardedTools);
         _triggers = new HashSet<string>(triggerTools, StringComparer.OrdinalIgnoreCase);
         _guarded = new HashSet<string>(guardedTools, StringComparer.OrdinalIgnoreCase);
+        PolicyName = policyName ?? "SequenceGate";
     }
 
     /// <inheritdoc/>

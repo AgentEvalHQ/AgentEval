@@ -72,15 +72,21 @@ public sealed class GatekeeperOptions
     /// <summary>
     /// The tool list to run the Phase-1 coverage check (<see cref="GatekeeperCoverageAnalyzer"/>) against, when
     /// <see cref="RefuseUnprotectedHighRiskTools"/> is set. <c>UseGatekeeper</c> cannot read an agent's tool
-    /// list at registration time (it runs before <c>.Build()</c>) — pass the same list you set on
-    /// <see cref="ChatOptions.Tools"/>.
+    /// list at registration time (it runs before <c>.Build()</c>) — pass the SAME list reference you set on
+    /// <see cref="ChatOptions.Tools"/>, not a separately-maintained copy. There is no validation that the two
+    /// stay in sync: if this list is stale or partial (e.g. missing a tool added to <c>ChatOptions.Tools</c>
+    /// later), <see cref="RefuseUnprotectedHighRiskTools"/> checks only what you passed here and can pass a
+    /// build that actually exposes an unprotected high-risk tool. It also cannot see a tool an
+    /// <see cref="Microsoft.Agents.AI.AIContextProvider"/> contributes dynamically — see
+    /// <see cref="GatekeeperCoverageAnalyzer"/> remarks.
     /// </summary>
     public IReadOnlyList<AITool>? KnownTools { get; set; }
 
     /// <summary>
     /// When <see langword="true"/>, <c>UseGatekeeper</c> runs <see cref="GatekeeperCoverageAnalyzer.AnalyzeOrThrow(IEnumerable{AITool}, IReadOnlyList{IToolGate}?, AnalyzeOptions?)"/>
     /// eagerly at registration time and throws <see cref="UnprotectedHighRiskToolException"/> if any high-risk
-    /// tool has zero protecting gate. Requires <see cref="KnownTools"/> to be set.
+    /// tool has zero protecting gate. Requires <see cref="KnownTools"/> to be set, and is only as trustworthy as
+    /// that list — see the <see cref="KnownTools"/> caveats above.
     /// </summary>
     public bool RefuseUnprotectedHighRiskTools { get; set; }
 

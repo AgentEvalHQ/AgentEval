@@ -30,7 +30,15 @@ public sealed class GateTelemetry
         cell.Record(action, elapsed);
     }
 
-    /// <summary>A snapshot of every gate's counters, as of now. Safe to call at any time, including concurrently with live traffic.</summary>
+    /// <summary>
+    /// A snapshot of every gate's counters, as of now. Safe to call at any time, including concurrently with
+    /// live traffic. Each counter is updated via its own <see cref="Interlocked"/> operation, not one combined
+    /// atomic update, so under concurrent <see cref="Record"/> calls a snapshot can be transiently torn — e.g.
+    /// <c>InvocationCount</c> incremented but the matching <c>AllowCount</c>/<c>BlockCount</c>/<c>MutateCount</c>
+    /// not yet reflected. The sub-counts are not guaranteed to sum to <c>InvocationCount</c> at every instant;
+    /// they converge once traffic quiesces. Fine for dashboards/telemetry; do not assert exact sums in a
+    /// concurrent test without first draining in-flight calls.
+    /// </summary>
     public IReadOnlyList<GateTelemetrySnapshot> Snapshot()
         => _cells.Select(kv => kv.Value.ToSnapshot(kv.Key)).OrderBy(s => s.PolicyName, StringComparer.Ordinal).ToArray();
 

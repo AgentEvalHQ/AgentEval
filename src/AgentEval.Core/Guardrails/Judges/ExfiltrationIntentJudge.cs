@@ -13,8 +13,10 @@ namespace AgentEval.Guardrails.Judges;
 /// same way the flagship <see cref="IndirectInjectionJudge"/> does: the <see cref="ExfiltrationIntentRubric"/> wrapped
 /// in a <see cref="CompositeJudgeGate{TRubric}"/> (optionally <see cref="JudgeVerdictCache">cached</see>), the
 /// canonical both-directions gold set, and the deterministic <see cref="KeywordOracleGate">keyword-oracle</see>
-/// baseline it must beat. Place it <b>run-post</b> (on the rendered output) via <c>UseAgentEvalGate(post: […])</c>,
-/// paired with the deterministic <c>DomainAllowListGate</c> (destination) and <c>TaintTrackingGate</c> (known-secret
+/// baseline it must beat. Place it <b>run-post</b> (on the rendered output) via
+/// <c>UseAgentEvalGate(post: […], policy: EvalGatePolicy.Redact)</c> once calibrated (no implicit default —
+/// <c>policy</c> is required whenever any gate is registered), paired with the deterministic
+/// <c>DomainAllowListGate</c> (destination) and <c>TaintTrackingGate</c> (known-secret
 /// provenance) for defense in depth — the judge covers the "is this data sensitive <i>in context</i>" half those two
 /// can't decide.
 /// <para><b>It does not lower the bar.</b> Calibration still decides: a judge earns the right to block live traffic
@@ -43,7 +45,9 @@ public static class ExfiltrationIntentJudge
 
     /// <summary>
     /// Build the exfiltration-intent judge as an <see cref="IChatGate"/> over a fast model, ready to place run-post on
-    /// the rendered output via <c>UseAgentEvalGate(post: [judge])</c>.
+    /// the rendered output via <c>UseAgentEvalGate(post: [judge], policy: EvalGatePolicy.Redact)</c> once it
+    /// clears <see cref="CalibrateAsync"/> (no implicit default — <c>policy</c> is required whenever any gate is
+    /// registered).
     /// <para>If you pass custom <paramref name="options"/>, calibrate with the <b>same</b> options via
     /// <see cref="CalibrateAsync"/> — otherwise the report certifies a different config than the one you deploy.</para>
     /// </summary>
