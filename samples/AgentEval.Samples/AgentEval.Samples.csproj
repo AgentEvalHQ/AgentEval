@@ -39,4 +39,13 @@
     <PackageReference Include="Microsoft.Extensions.AI.OpenAI" />
   </ItemGroup>
 
+  <!--
+    Group K (Agent Skills) reuses the expense-report skill fixture already authored for
+    samples/AgentEval.AgentSkillsEval instead of duplicating SKILL.md/resources/scripts content —
+    single source of truth, copied into THIS project's own output directory at build time.
+  -->
+  <ItemGroup>
+    <None Include="..\AgentEval.AgentSkillsEval\skills\expense-report\**\*" LinkBase="skills\expense-report" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>

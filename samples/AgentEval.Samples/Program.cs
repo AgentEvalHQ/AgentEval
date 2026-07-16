@@ -62,7 +62,7 @@ public static class Program
         new('E', "Safety & Security", "",
         [
             new("Policy & Safety",           "Enterprise guardrails — NeverCallTool, PII detection, MustConfirmBefore", PolicySafetyEvaluation.RunAsync),
-            new("Red Team Basic",            "One-liner security scan — 13 attack types, OWASP probes",              RedTeamBasic.RunAsync),
+            new("Red Team Basic",            "One-liner security scan — 14 attack types, OWASP probes",              RedTeamBasic.RunAsync),
             new("Red Team Advanced",         "Custom attack pipeline, OWASP compliance, PDF export, baselines",      RedTeamAdvanced.RunAsync),
         ]),
 
@@ -136,6 +136,14 @@ public static class Program
             new("Defense in Depth",          "One injection campaign, a different gate per step: calibrated judge + referential-integrity + taint + allow-list", GatekeeperDefenseInDepth.RunAsync),
             new("Output Panel (Stage-2)",    "Two calibrated run-post judges (exfil-intent ⊕ system-prompt-extract) in a fan-out + the over-refusal utility valve", GatekeeperOutputPanel.RunAsync),
             new("Monetary + Per-Call Budget", "MonetaryLimitGate + PerToolCallBudgetGate vs. a live refund-spray injection attack", GatekeeperMonetaryAndPerCallBudget.RunAsync),
+        ]),
+
+        new('K', "Agent Skills", "🔑 real agents (Azure OpenAI) — evaluate & govern MAF's load_skill/read_skill_resource/run_skill_script",
+        [
+            new("Hello World",               "★ start here — a trivial in-memory skill + ONE assertion (HaveLoadedSkill)", AgentSkillsHelloWorld.RunAsync),
+            new("Disclosure Efficiency",      "Free structural metric scoring the load->read->run funnel (order, redundancy)", AgentSkillsDisclosureEfficiency.RunAsync),
+            new("Compliance Scanner",         "Static SKILL.md + governance-flag scan (MafSkillScanner) — offline, no model call", AgentSkillsComplianceScanner.RunAsync),
+            new("Skill Security Index",       "Compliance + Efficiency joined into one 0-100 score — a missing axis is never faked", AgentSkillsSecurityIndex.RunAsync),
         ]),
     ];
 
@@ -212,7 +220,7 @@ public static class Program
             var group = Groups.FirstOrDefault(g => g.Key.ToString() == raw);
             if (group is not null) return group;
 
-            Console.WriteLine("  Enter a letter A–J or Q to quit.\n");
+            Console.WriteLine("  Enter a letter A–K or Q to quit.\n");
         }
     }
 

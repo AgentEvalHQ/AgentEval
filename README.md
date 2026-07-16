@@ -679,7 +679,7 @@ Run the included samples, organised into groups:
 dotnet run --project samples/AgentEval.Samples
 ```
 
-The interactive menu lets you select a **group** (A–J), then a **sample** within it.
+The interactive menu lets you select a **group** (A–K), then a **sample** within it.
 
 | Group | Focus |
 |-------|-------|
@@ -693,6 +693,7 @@ The interactive menu lets you select a **group** (A–J), then a **sample** with
 | **H — Benchmarks** | Compliance & performance benchmark families → JSON / HTML / PDF reports |
 | **I — Observability (Glass Box)** | Dual-boundary per-turn tracing, trace fidelity, auto-audit |
 | **J — Gatekeeper (Runtime Protection)** 🔑 real agents | Fail-closed runtime enforcement on live agents: the gate-layer walkthrough, a data-exfiltration support agent, human-in-the-loop approval, the Beachhead + Tribunal, and MAF Agent Harness defense |
+| **K — Agent Skills** 🔑 real agents | Evaluate & govern MAF Agent Skills: a Hello World on-ramp, the disclosure-efficiency metric, the compliance scanner, and the composite Skill Security Index |
 
 See [samples/AgentEval.Samples/README.md](samples/AgentEval.Samples/README.md) for the full listing with per-sample descriptions, timing, and credential requirements.
 

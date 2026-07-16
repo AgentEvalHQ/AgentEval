@@ -22,7 +22,7 @@ cd samples/AgentEval.Samples
 dotnet run
 ```
 
-The interactive menu organises samples into **groups (A–J)**. Select a group letter, then a sample number.
+The interactive menu organises samples into **groups (A–K)**. Select a group letter, then a sample number.
 You can also run a specific sample directly from the command line by its **legacy index** (1-based across the flat sample list, A1=1, A7=7, B1=8, …):
 
 ```bash
@@ -31,6 +31,7 @@ dotnet run -- 23   # Red Team Basic          (E2)
 dotnet run -- 43   # Performance benchmark   (H2)
 dotnet run -- 54   # Report Browser          (H13)
 dotnet run -- 59   # Gatekeeper walkthrough  (J1)
+dotnet run -- 69   # Agent Skills Hello World (K1)
 ```
 
 The benchmark samples (H2–H10) also respect a preset tier via `--preset <presetName>` (preset names are
@@ -87,7 +88,7 @@ family-specific — see H1 Registry Discovery or `Benchmarks/README.md` for the 
 | # | Sample | What You'll Learn | Azure? | Time |
 |---|--------|-------------------|--------|------|
 | 1 | **Policy & Safety** | Enterprise guardrails — `NeverCallTool`, PII detection, `MustConfirmBefore` 🛡️ | Yes | 8 min |
-| 2 | **Red Team Basic** | One-liner security scan — 13 attack types, OWASP probes 🛡️ | Yes | 5 min |
+| 2 | **Red Team Basic** | One-liner security scan — 14 attack types, OWASP probes 🛡️ | Yes | 5 min |
 | 3 | **Red Team Advanced** | Custom pipeline, OWASP compliance, PDF export, baseline tracking 🛡️ | Yes | 10 min |
 
 ### F — Data & Infrastructure
@@ -178,6 +179,24 @@ All Gatekeeper samples drive **real agents** on a live model, so they need Azure
 | 5 | **Beachhead + The Tribunal** | `RunBudgetGate` · `DomainAllowListGate` · `RenderedOutputExfilGate` + a **calibrated** indirect-injection judge that earns the right to block | Yes | 3 min |
 | 6 | **Agent Harness — simple** | A **real** MAF `AsHarnessAgent` (planning + todo + mode + an autonomous loop); its runaway loop is capped by `RunBudgetGate` | Yes | 2 min |
 | 7 | **Agent Harness — defended** | A **real** `AsHarnessAgent` behind defense-in-depth (budget + `SequenceGate` + `DomainAllowListGate`) — legit work flows, the read→POST exfiltration is blocked | Yes | 2 min |
+
+---
+
+### K — Agent Skills (MAF Progressive Disclosure)  🔑 real agents — evaluate & govern load_skill/read_skill_resource/run_skill_script
+
+MAF Agent Skills let an agent progressively disclose capabilities through three stable tools instead of
+stuffing every capability into the system prompt. This group is the discoverable on-ramp; the deep-dive
+lives in the standalone [`samples/AgentEval.AgentSkillsEval`](../AgentEval.AgentSkillsEval) project
+(assertions + efficiency + compliance + red-team + governance gates + Security Index, all seven phases).
+K2–K4 reuse the same `expense-report` skill fixture authored there (copied into this project's own output
+directory at build time — see the `.csproj` — never duplicated in source).
+
+| # | Sample | What It Exercises | Azure? | Time |
+|---|--------|-------------------|--------|------|
+| 1 | **Hello World** | Start here — a trivial in-memory skill (`AgentInlineSkill`, no fixture) + ONE assertion (`HaveLoadedSkill`) | Yes | 1 min |
+| 2 | **Disclosure Efficiency** | Free structural metric (`SkillDisclosureEfficiencyMetric`) scoring the load→read→run funnel — order validity, redundant loads | Yes | 2 min |
+| 3 | **Compliance Scanner** | Static `SKILL.md` + governance-flag scan (`MafSkillScanner`) — offline, no model call in the scan itself | Yes | 1 min |
+| 4 | **Skill Security Index** | Compliance + Efficiency joined into one composite 0–100 score (`SkillSecurityIndex`) — a missing axis (security, not exercised here) is never faked as perfect | Yes | 2 min |
 
 ---
 
