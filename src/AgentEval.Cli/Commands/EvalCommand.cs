@@ -169,6 +169,25 @@ internal static class EvalCommand
         if (!opts.Dataset.Exists)
             throw new FileNotFoundException($"Dataset not found: {opts.Dataset.FullName}");
 
+        // 0. Parse + validate --metrics NAMES (Item 4, D1 bridge) as early as possible, before any network
+        // call — an unknown metric name fails fast here, the same way a bad --dataset path already does.
+        // Resolving to actual IMetric INSTANCES happens later (needs an evaluator client, built below).
+        IReadOnlyList<string>? selectedMetrics = null;
+        if (opts.Metrics is not null)
+        {
+            selectedMetrics = opts.Metrics
+                .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .ToList();
+
+            if (selectedMetrics.Count == 0)
+                throw new ArgumentException("--metrics was specified but no metric names were provided.");
+
+            var unknown = selectedMetrics.Where(m => !MetricCatalog.IsKnown(m)).ToList();
+            if (unknown.Count > 0)
+                throw new ArgumentException(
+                    $"Unknown metric name(s): {string.Join(", ", unknown)}. Available: {string.Join(", ", MetricCatalog.AvailableNames)}.");
+        }
+
         // 1. Resolve --sut (Track 2 PR2), if set — the same shared seam `redteam`/`bench` use. Built-in
         // targets own their own validation (consent gates, required config, etc.) via ISutTarget.Validate,
         // invoked inside TryResolve.
@@ -187,11 +206,14 @@ internal static class EvalCommand
 
         string resolvedName;
         IEvaluableAgent agent;
+        IChatClient? chatClient = null;   // hoisted: --metrics' LLM-based fallback evaluator needs this outside the else block
 
         if (sutAgent is not null)
         {
             // A built-in target (e.g. copilot-studio) constructed itself; the --endpoint/--azure/--model
-            // path below is entirely skipped, matching RedTeamCommand's existing --sut branch.
+            // path below is entirely skipped, matching RedTeamCommand's existing --sut branch. No raw
+            // IChatClient is exposed for a --sut target, so chatClient stays null here — an LLM-based
+            // --metrics selection then needs an explicit --judge (see MetricCatalog.Resolve's own error).
             agent = sutAgent;
             resolvedName = sutResolvedName!;
         }
@@ -219,7 +241,7 @@ internal static class EvalCommand
                 systemPrompt = await File.ReadAllTextAsync(opts.SystemPromptFile.FullName, ct);
 
             // 3. Create IChatClient → IStreamableAgent
-            IChatClient chatClient = opts.Azure
+            chatClient = opts.Azure
                 ? EndpointFactory.CreateAzure(opts.Endpoint, opts.DeploymentName!, opts.ApiKey)
                 : EndpointFactory.CreateOpenAICompatible(opts.Endpoint!, opts.Model!, opts.ApiKey);
 
@@ -247,21 +269,22 @@ internal static class EvalCommand
             ? new MAFEvaluationHarness(judgeClient, verbose: opts.Verbose && !opts.Quiet)
             : new MAFEvaluationHarness(verbose: opts.Verbose && !opts.Quiet);
 
+        // 5b. --metrics (Item 4, D1 bridge): resolve every selected name to a real IMetric instance NOW,
+        // before the (possibly expensive) scan runs — a metric that needs an LLM judge but has none
+        // available fails here, not after wastefully running the whole batch. --judge wins as the
+        // evaluator when set; otherwise falls back to the SUT's own chatClient (null for a --sut target).
+        IReadOnlyList<IMetric>? selectedMetricInstances = null;
+        IChatClient? metricsEvaluatorClient = judgeClient ?? chatClient;
+        if (selectedMetrics is not null)
+        {
+            selectedMetricInstances = selectedMetrics
+                .Select(name => MetricCatalog.Resolve(name, metricsEvaluatorClient))
+                .ToList();
+        }
+
         // 6. Run evaluation
         if (!opts.Quiet)
             ConsoleReporter.WriteHeader(resolvedName, opts.Dataset.Name, testCases.Count);
-
-        // Parse --metrics flag
-        IReadOnlyList<string>? selectedMetrics = null;
-        if (opts.Metrics is not null)
-        {
-            selectedMetrics = opts.Metrics
-                .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-                .ToList();
-
-            if (selectedMetrics.Count == 0)
-                throw new ArgumentException("--metrics was specified but no metric names were provided.");
-        }
 
         var evalOptions = new EvaluationOptions
         {
@@ -272,12 +295,40 @@ internal static class EvalCommand
             SelectedMetrics = selectedMetrics,
         };
 
-        // 6b. Stochastic evaluation path (--runs > 1)
+        // 6b. Stochastic evaluation path (--runs > 1) — --metrics scoring is not wired for this path yet;
+        // say so honestly rather than silently dropping the flag.
         if (opts.Runs > 1)
+        {
+            if (selectedMetrics is not null && !opts.Quiet)
+                Console.Error.WriteLine(
+                    "  Warning: --metrics has no effect combined with --runs > 1 in this release " +
+                    "(stochastic scoring is not wired to the named-metric pipeline yet).");
             return await ExecuteStochasticAsync(opts, harness, agent, testCases, evalOptions, ct);
+        }
 
         // 6c. Standard single-run evaluation path
         var summary = await harness.RunBatchAsync(agent, testCases, evalOptions, ct);
+
+        // 6d. --metrics (Item 4, D1 bridge, continued): score every selected metric against each test
+        // case's REAL captured response (never re-invokes the agent) and attach the results to
+        // TestResult.MetricResults — an existing, already-wired field (TestSummaryExtensions.MapTestResult
+        // already projects it into the exported report's MetricScores) that nothing previously populated.
+        // Purely additive: the harness's own pass/fail gate above is completely unchanged.
+        if (selectedMetricInstances is not null)
+        {
+            var metricsBuilder = AgentEvalBuilder.Create();
+            if (metricsEvaluatorClient is not null)
+                metricsBuilder.WithEvaluatorClient(metricsEvaluatorClient);
+            foreach (var metric in selectedMetricInstances)
+                metricsBuilder.AddMetric(metric);
+
+            await using var metricRunner = await metricsBuilder.BuildAsync(ct);
+            for (var i = 0; i < testCases.Count && i < summary.Results.Count; i++)
+            {
+                var metricsContext = ToMetricsContext(testCases[i], summary.Results[i]);
+                summary.Results[i].MetricResults = await metricRunner.EvaluateAsync(selectedMetrics!, metricsContext, ct);
+            }
+        }
 
         // 7. Export
         var report = summary.ToEvaluationReport(
@@ -315,6 +366,23 @@ internal static class EvalCommand
         // 9. Exit code: 0 = all passed, 1 = any failure
         return summary.AllPassed ? ExitCodes.Success : ExitCodes.TestFailure;
     }
+
+    /// <summary>
+    /// Builds the <see cref="EvaluationContext"/> a named <c>--metrics</c> selection is scored against —
+    /// the SAME captured response the harness already produced (never re-invokes the agent). Mirrors
+    /// <c>DatasetTestCaseExtensions.ToEvaluationContext</c> exactly, plus <see cref="TestResult.ToolUsage"/>
+    /// (that extension omits it; agentic metrics like <c>code_tool_success</c> need it and would otherwise
+    /// always see "no tools called").
+    /// </summary>
+    internal static EvaluationContext ToMetricsContext(DatasetTestCase testCase, TestResult testResult) => new()
+    {
+        Input = testCase.Input,
+        Output = testResult.ActualOutput ?? "",
+        Context = testCase.Context is null ? null : string.Join("\n", testCase.Context),
+        GroundTruth = testCase.ExpectedOutput,
+        ToolUsage = testResult.ToolUsage,
+        Performance = testResult.Performance,
+    };
 
     /// <summary>
     /// Stochastic evaluation path — runs each test case N times and reports statistics.
