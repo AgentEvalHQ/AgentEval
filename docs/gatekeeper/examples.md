@@ -33,6 +33,39 @@ judge below.) Runnable: sample **`Gatekeeper/00_GatekeeperHelloWorld`**.
 > the most powerful: if you control the tool list, not granting the tool is stronger. The examples below are the
 > ones that catch what a tool list can't.
 
+## The recommended way to compose more than one gate — `UseGatekeeper`
+
+Every example below chains the low-level builder calls by hand (`.UseAgentEvalGate()` →
+`.UseAgentEvalToolGate(...)`) to keep each one focused on ONE gate at a time. For real code wiring several gates
+together, use `UseGatekeeper(enforcement, configure)` instead — it installs them in the correct order and
+refuses to construct (rather than silently misbehave) if it can prove the composition is unsafe. See the
+[introduction](introduction.md#wiring-it-together-usegatekeeper) for the full explanation; here's the shape:
+
+```csharp
+using AgentEval.MAF.Gatekeeper;
+
+var agent = baseAgent.AsBuilder()
+    .UseGatekeeper(GatekeeperEnforcement.Terminate, g =>
+    {
+        g.Add(new SequenceGate(["read_customer_data"], ["send_email", "http_post"]));
+        g.Add(new RunBudgetGate(maxToolCalls: 20));
+        g.AddPreGate(new TokenInjectionGate());
+        g.Trace = trace;
+    })
+    .Build();
+```
+
+`GatekeeperEnforcement` is **required** — `Observe` (record findings, block nothing — the safe first rollout),
+`ReplaceResult`, or `Terminate`. Start with `.ObserveWithAgentEvalGates(configure)` to see what a gate set
+*would* have blocked with zero behavior change, then switch to `.EnforceAgentEvalGates(configure)` once you
+trust it.
+
+> **⚠ Never chain two separate `UseAgentEvalToolGate(...)` calls on the same builder.** Register every tool
+> gate you want in ONE call, in ONE list (or use `UseGatekeeper`, which already does that for you). MAF's
+> function-invocation middleware wraps each registration around the pipeline built so far — the SECOND (later)
+> call becomes the OUTERMOST layer, so its gates see every call FIRST. If that gate blocks without forwarding,
+> the FIRST call's gates are never even invoked for that call — silently starved, not merely "checked second."
+
 ## Block data exfiltration — a dangerous *sequence*
 
 Each tool is fine on its own — you *want* `read_customer_data`, and you *want* `send_email`. The **combination**
