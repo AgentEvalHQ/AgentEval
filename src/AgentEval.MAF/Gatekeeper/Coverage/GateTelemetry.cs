@@ -31,12 +31,27 @@ public sealed class GateTelemetry
     }
 
     /// <summary>
+    /// Records one RESULT-gate invocation's outcome and elapsed time (Phase 2, P0-3) — shares the same
+    /// per-policy <see cref="Cell"/>/<see cref="GateTelemetrySnapshot"/> counters as call gates, so a caller
+    /// reading <see cref="Snapshot"/> sees ONE unified effectiveness view across both gate kinds, not two
+    /// separate sinks to cross-reference. <see cref="ToolResultAction.Redact"/> maps to <c>MutateCount</c> —
+    /// both mean "the gate rewrote the subject rather than blocking or allowing it outright."
+    /// </summary>
+    public void Record(string policyName, ToolResultAction action, TimeSpan elapsed) => Record(policyName, action switch
+    {
+        ToolResultAction.Allow => ToolGateAction.Allow,
+        ToolResultAction.Block => ToolGateAction.Block,
+        ToolResultAction.Redact => ToolGateAction.Mutate,
+        _ => ToolGateAction.Block,   // defensive: an unrecognized future action counts as a fired gate, not silently dropped
+    }, elapsed);
+
+    /// <summary>
     /// A snapshot of every gate's counters, as of now. Safe to call at any time, including concurrently with
     /// live traffic. <c>InvocationCount</c> is DERIVED (<c>AllowCount + BlockCount + MutateCount</c>), not a
     /// separately-tracked counter, so it is structurally impossible for the sub-counts to disagree with it —
     /// there is no fourth quantity to fall out of sync. The three sub-counts themselves are still independent
-    /// <see cref="Interlocked"/> fields, so a snapshot taken mid-<see cref="Record"/> can catch one updated and
-    /// not another (e.g. a call recorded as Blocked appears fully, one recorded as Allowed hasn't landed yet) —
+    /// <see cref="Interlocked"/> fields, so a snapshot taken mid-<see cref="Record(string, ToolGateAction, TimeSpan)"/>
+    /// can catch one updated and not another (e.g. a call recorded as Blocked appears fully, one recorded as Allowed hasn't landed yet) —
     /// fine for dashboards/telemetry; they converge once traffic quiesces. Do not assert exact totals in a
     /// concurrent test without first draining in-flight calls.
     /// </summary>

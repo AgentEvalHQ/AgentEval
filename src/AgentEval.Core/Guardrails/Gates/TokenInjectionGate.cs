@@ -11,7 +11,13 @@ namespace AgentEval.Guardrails.Gates;
 /// </summary>
 public sealed class TokenInjectionGate : IChatGate
 {
-    private static readonly string[] DefaultTokens =
+    /// <summary>
+    /// The default injection markers this gate scans for. Public (not just an internal default) so a sibling
+    /// detector at a different seam — e.g. <c>AgentEval.MAF.Gatekeeper.ToolResultInjectionGate</c>,
+    /// scanning a tool's RESULT instead of the run's input — can reuse the exact same marker list rather than
+    /// maintaining a second copy that could silently drift out of sync.
+    /// </summary>
+    public static readonly IReadOnlyList<string> DefaultTokens = new[]
     {
         "ignore previous instructions",
         "ignore all previous instructions",

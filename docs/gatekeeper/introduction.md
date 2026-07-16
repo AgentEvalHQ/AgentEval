@@ -30,6 +30,7 @@ is independent and writes to one shared trace.
 | Category | Seam | What it does |
 |---|---|---|
 | **Tool gates** | each tool call, pre‑execution | Block / mutate a *specific live tool call* (forbidden / poisoned / out‑of‑sequence) |
+| **Tool RESULT gates** | each tool call, post‑execution | Block / redact what the model gets to see of a result that already happened (injected instructions, secrets, oversized payloads a poisoned fetch/file/API response carries) |
 | **The moat** | each tool call | Your *red‑team oracles* + canaries run as runtime gates — your tests become defenses |
 | **Run gates** | the run's input & output text | Reject an incoming attack (run‑pre) or a leaking response (run‑post) |
 | **Session gates** | before a run | Enforce *who* may drive it (auth), *how often* (rate), and *quarantine* |

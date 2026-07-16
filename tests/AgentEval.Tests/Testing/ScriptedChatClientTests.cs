@@ -110,4 +110,66 @@ public class ScriptedChatClientTests
         Assert.Equal(ChatFinishReason.Stop, response.FinishReason);
         Assert.Equal(string.Empty, response.Text);
     }
+
+    // ── Gatekeeper Hardening Phase 2 fixture prerequisite: multiple FunctionCallContent in ONE turn ──
+
+    [Fact]
+    public async Task AddParallelToolCalls_YieldsAllCallsInOneMessage_WithFinishReasonToolCalls()
+    {
+        // Arrange
+        var client = new ScriptedChatClient().AddParallelToolCalls(
+            ("c1", "search", new Dictionary<string, object?> { ["query"] = "tokyo" }),
+            ("c2", "search", new Dictionary<string, object?> { ["query"] = "osaka" }),
+            ("c3", "weather", new Dictionary<string, object?> { ["city"] = "tokyo" }));
+
+        // Act
+        var response = await client.GetResponseAsync(new[] { new ChatMessage(ChatRole.User, "plan a trip") });
+
+        // Assert
+        var calls = response.Messages.SelectMany(m => m.Contents).OfType<FunctionCallContent>().ToList();
+        Assert.Equal(3, calls.Count);   // all three land in the SAME assistant message, not three separate turns
+        Assert.Equal(new[] { "c1", "c2", "c3" }, calls.Select(c => c.CallId));
+        Assert.Equal(new[] { "search", "search", "weather" }, calls.Select(c => c.Name));
+        Assert.Equal("tokyo", calls[0].Arguments!["query"]);
+        Assert.Equal("osaka", calls[1].Arguments!["query"]);
+        Assert.Equal(ChatFinishReason.ToolCalls, response.FinishReason);
+    }
+
+    [Fact]
+    public async Task AddParallelToolCalls_CallIdDefaultsToIndexed_WhenNotProvided()
+    {
+        // Arrange
+        var client = new ScriptedChatClient().AddParallelToolCalls(
+            (null!, "a", new Dictionary<string, object?>()),
+            (null!, "b", new Dictionary<string, object?>()));
+
+        // Act
+        var response = await client.GetResponseAsync(new[] { new ChatMessage(ChatRole.User, "go") });
+
+        // Assert
+        var calls = response.Messages.SelectMany(m => m.Contents).OfType<FunctionCallContent>().ToList();
+        Assert.Equal(new[] { "call_0", "call_1" }, calls.Select(c => c.CallId));
+    }
+
+    [Fact]
+    public void AddParallelToolCalls_EmptyArray_ThrowsDescriptively()
+    {
+        var client = new ScriptedChatClient();
+        var ex = Assert.Throws<ArgumentException>(() => client.AddParallelToolCalls());
+        Assert.Equal("calls", ex.ParamName);
+    }
+
+    [Fact]
+    public async Task AddToolCall_SingleCallPath_StillWorksUnchanged_AfterParallelCallSupportAdded()
+    {
+        // Backward-compat guard: the single-call trio (ToolName/ToolCallId/ToolArgs) must still take the
+        // original code path, not accidentally be redirected through the new ToolCalls list.
+        var client = new ScriptedChatClient().AddToolCall("c1", "search", new Dictionary<string, object?> { ["q"] = "x" });
+
+        var response = await client.GetResponseAsync(new[] { new ChatMessage(ChatRole.User, "go") });
+
+        var calls = response.Messages.SelectMany(m => m.Contents).OfType<FunctionCallContent>().ToList();
+        Assert.Single(calls);
+        Assert.Equal("search", calls[0].Name);
+    }
 }

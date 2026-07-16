@@ -114,6 +114,38 @@ var agent = baseAgent.AsBuilder()
 // is neutralized before the client renders it.
 ```
 
+## Sanitize a tool's own RESULT
+
+Every gate above the beacon example inspects the *proposed call*; this inspects what the tool **actually
+returned**, before it re-enters the model's context — the seam a poisoned fetch/file/API response reaches
+that no argument-side gate ever sees.
+
+```csharp
+var agent = baseAgent.AsBuilder()
+    .UseAgentEvalToolGate(
+        gates: [],   // a result-gate-only config is valid — you don't have to also gate the proposed call
+        policy: ToolGatePolicy.ReplaceResult,
+        resultGates: [new ToolResultInjectionGate(), new ToolResultSecretGate(), new ToolResultSizeGate()])
+    .Build();
+// A fetched page carrying "ignore previous instructions" is blocked before the model ever reads it; a config
+// dump with a live AWS key is redacted (████████████████████, the rest of the result still reaches the
+// model); a runaway multi-megabyte response is truncated to the configured limit — the tool ITSELF still ran
+// in all three cases, only what the model gets to see of the result differs.
+```
+
+Or through the composite builder, alongside call gates and everything else:
+
+```csharp
+var gated = agent.AsBuilder()
+    .UseGatekeeper(GatekeeperEnforcement.ReplaceResult, g =>
+    {
+        g.Add(new DomainAllowListGate(["api.mycompany.com"]));      // guards the proposed call
+        g.AddResultGate(new ToolResultSecretGate());                // guards what the call returned
+        g.Trace = trace;
+    })
+    .Build();
+```
+
 ## The Tribunal — a judge that *earns* the right to block
 
 For the axis a fixed keyword list can't catch *reliably* — **indirect prompt injection** (retrieved content trying to
