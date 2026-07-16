@@ -31,7 +31,16 @@ public static class AgentEvalToolGateExtensions
     /// </summary>
     /// <param name="builder">The agent builder.</param>
     /// <param name="gates">The gates to run, in order, on every tool call. Rejected if any has a Network/Llm cost.</param>
-    /// <param name="policy">How a block is enforced. Defaults to <see cref="ToolGatePolicy.WarnOnly"/>.</param>
+    /// <param name="policy">
+    /// How a block is enforced. Phase 1, P0-2: REQUIRED — there is no default. A prior version of this method
+    /// defaulted to <see cref="ToolGatePolicy.WarnOnly"/>, so a gate that returned <c>Block</c> was, by
+    /// default, only logged while the tool still ran — a silent behavior a name like "Gatekeeper" strongly
+    /// implies is enforcement. Pass <see cref="ToolGatePolicy.WarnOnly"/> explicitly to keep that (still
+    /// valid, still useful for staged rollout) behavior; pass <see cref="ToolGatePolicy.ReplaceResult"/> or
+    /// <see cref="ToolGatePolicy.Terminate"/> to actually enforce. Prefer <c>UseGatekeeper(...)</c> /
+    /// <c>ObserveWithAgentEvalGates(...)</c> / <c>EnforceAgentEvalGates(...)</c> for new code — this method
+    /// remains for direct, single-mechanism composition.
+    /// </param>
     /// <param name="trace">Optional Glass Box trace to record <c>gate.tool.*</c> evidence into.</param>
     /// <param name="telemetry">
     /// Optional <see cref="GateTelemetry"/> sink (Phase 1, #18) — records which gate fired, its verdict, and
@@ -40,7 +49,7 @@ public static class AgentEvalToolGateExtensions
     public static AIAgentBuilder UseAgentEvalToolGate(
         this AIAgentBuilder builder,
         IReadOnlyList<IToolGate> gates,
-        ToolGatePolicy policy = ToolGatePolicy.WarnOnly,
+        ToolGatePolicy policy,
         AgentTrace? trace = null,
         GateTelemetry? telemetry = null)
     {

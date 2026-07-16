@@ -32,4 +32,13 @@ public interface IToolGate
     /// forbidden action run). Enforcement strength: WarnOnly &lt; ReplaceResult &lt; Terminate.
     /// </summary>
     ToolGatePolicy MinimumPolicy => ToolGatePolicy.WarnOnly;
+
+    /// <summary>
+    /// What this gate needs from its environment to enforce correctly (Phase 1, P0-6). Defaults to
+    /// <see cref="GateRequirements.None"/>. A gate backed by <see cref="RunLedger"/> or otherwise keyed on
+    /// <see cref="AgentRunScope.Current"/> should override this to <see cref="GateRequirements.RunScope"/> —
+    /// the composite <c>UseGatekeeper</c> builder uses it to refuse construction (in enforcement mode) rather
+    /// than silently accept the shared-fallback-state behavior those gates self-document.
+    /// </summary>
+    GateRequirements Requirements => GateRequirements.None;
 }

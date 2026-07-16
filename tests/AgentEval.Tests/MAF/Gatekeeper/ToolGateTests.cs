@@ -57,7 +57,7 @@ public class ToolGateTests
         var tool = AIFunctionFactory.Create((string path) => { received = path; return path; }, "read_file");
         var (agent, _) = BuildAgent(tool, "read_file", new Dictionary<string, object?> { ["path"] = "/original" });
         var gate = new MutatingGate("read_file", new Dictionary<string, object?> { ["path"] = "/sandbox/original" });
-        var gated = agent.AsBuilder().UseAgentEvalToolGate([gate]).Build();
+        var gated = agent.AsBuilder().UseAgentEvalToolGate([gate], ToolGatePolicy.WarnOnly).Build();
 
         await gated.RunAsync("go");
 
@@ -77,7 +77,7 @@ public class ToolGateTests
         });
 
         Assert.Throws<ArgumentException>(() =>
-            agent.AsBuilder().UseAgentEvalToolGate([new NetworkCostGate()]).Build());
+            agent.AsBuilder().UseAgentEvalToolGate([new NetworkCostGate()], ToolGatePolicy.WarnOnly).Build());
     }
 
     // ── Gates ──

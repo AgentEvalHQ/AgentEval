@@ -32,6 +32,9 @@ public sealed class PerToolCallBudgetGate : IToolGate
     /// <inheritdoc/>
     public GateCost Cost => GateCost.PureCode;
 
+    /// <inheritdoc/>
+    public GateRequirements Requirements => GateRequirements.RunScope;
+
     /// <summary>Creates the gate over one or more per-tool call-count caps.</summary>
     /// <param name="maxCallsPerTool">Per-tool call caps (e.g. <c>["delete_account"] = 1</c>). Required, non-empty.</param>
     /// <param name="policyName">Optional override of the recorded policy name (default <c>"PerToolCallBudgetGate"</c>).</param>

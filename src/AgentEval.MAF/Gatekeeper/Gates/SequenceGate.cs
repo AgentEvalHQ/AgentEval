@@ -36,6 +36,9 @@ public sealed class SequenceGate : IToolGate
     /// <inheritdoc/>
     public GateCost Cost => GateCost.PureCode;
 
+    /// <inheritdoc/>
+    public GateRequirements Requirements => GateRequirements.RunScope;
+
     /// <summary>Creates the gate: a call to any <paramref name="guardedTools"/> after any <paramref name="triggerTools"/> is blocked.</summary>
     public SequenceGate(IEnumerable<string> triggerTools, IEnumerable<string> guardedTools)
     {

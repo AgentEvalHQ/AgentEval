@@ -96,7 +96,7 @@ public class ToolGateSpikeTests
 
         AIAgent? built = null;
         var ex = Record.Exception(() => built = agent.AsBuilder()
-            .UseAgentEvalToolGate([new ForbiddenToolGate("x")])
+            .UseAgentEvalToolGate([new ForbiddenToolGate("x")], ToolGatePolicy.WarnOnly)
             .Build());
 
         if (ex is null && built is not null)

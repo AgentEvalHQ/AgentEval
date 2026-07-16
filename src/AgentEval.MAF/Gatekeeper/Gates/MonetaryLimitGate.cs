@@ -38,6 +38,9 @@ public sealed class MonetaryLimitGate : IToolGate
     /// <inheritdoc/>
     public GateCost Cost => GateCost.PureCode;
 
+    /// <inheritdoc/>
+    public GateRequirements Requirements => GateRequirements.RunScope;
+
     /// <summary>Creates the gate.</summary>
     /// <param name="argName">The tool-call argument that carries the monetary amount (e.g. <c>"amount"</c>).</param>
     /// <param name="maxTotal">The cap on the running sum of <paramref name="argName"/> across the run.</param>

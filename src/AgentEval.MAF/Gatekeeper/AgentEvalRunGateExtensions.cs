@@ -28,13 +28,23 @@ public static class AgentEvalRunGateExtensions
     /// <param name="builder">The agent builder.</param>
     /// <param name="pre">Gates run on the input text before the model sees it (incoming-attack detection).</param>
     /// <param name="post">Gates run on the response text (non-streaming; streaming under a blocking policy throws).</param>
-    /// <param name="policy">How a block is enforced (WarnOnly / ThrowOnFail / Redact). Defaults to WarnOnly.</param>
+    /// <param name="policy">
+    /// How a block is enforced (WarnOnly / ThrowOnFail / Redact). Phase 1, P0-2: no implicit default when any
+    /// <paramref name="pre"/>/<paramref name="post"/> gate is registered — passing <see langword="null"/> then
+    /// throws, forcing an explicit choice (a prior version silently defaulted to WarnOnly, so a gate's Block
+    /// verdict was, by default, only logged). When BOTH <paramref name="pre"/> and <paramref name="post"/> are
+    /// empty/omitted — the common "just establish the run scope for SequenceGate/RunLedger" call shown
+    /// throughout the docs — <paramref name="policy"/> is inert (there is no gate whose verdict it could ever
+    /// enforce), so <see langword="null"/> is accepted and treated as <see cref="EvalGatePolicy.WarnOnly"/>
+    /// without complaint. Prefer <c>UseGatekeeper(...)</c> / <c>ObserveWithAgentEvalGates(...)</c> /
+    /// <c>EnforceAgentEvalGates(...)</c> for new code.
+    /// </param>
     /// <param name="trace">Optional Glass Box trace for <c>gate.run-*.*</c> evidence.</param>
     public static AIAgentBuilder UseAgentEvalGate(
         this AIAgentBuilder builder,
         IReadOnlyList<IChatGate>? pre = null,
         IReadOnlyList<IChatGate>? post = null,
-        EvalGatePolicy policy = EvalGatePolicy.WarnOnly,
+        EvalGatePolicy? policy = null,
         AgentTrace? trace = null)
     {
         ArgumentNullException.ThrowIfNull(builder);
@@ -50,6 +60,24 @@ public static class AgentEvalRunGateExtensions
             ArgumentNullException.ThrowIfNull(g, nameof(post));
         }
 
+        EvalGatePolicy effectivePolicy;
+        if (policy is { } explicitPolicy)
+        {
+            effectivePolicy = explicitPolicy;
+        }
+        else if (preGates.Count == 0 && postGates.Count == 0)
+        {
+            effectivePolicy = EvalGatePolicy.WarnOnly;   // inert: no gate is registered, so no verdict is ever enforced
+        }
+        else
+        {
+            throw new ArgumentException(
+                "policy must be specified explicitly when any pre/post gate is registered — there is no implicit " +
+                "default (a Block verdict must be an explicit choice to warn-only or enforce). Pass " +
+                "EvalGatePolicy.WarnOnly to keep the prior behavior, or ThrowOnFail/Redact to enforce.",
+                nameof(policy));
+        }
+
         var seq = new int[1];   // shared block-seq counter across both branches
 
         return builder.Use(
@@ -57,7 +85,7 @@ public static class AgentEvalRunGateExtensions
             {
                 using var scope = AgentRunScope.Begin(session, innerAgent.Name, trace);
 
-                var preRefusal = await RunGatesAsync(preGates, ConcatText(messages), "run-pre", policy, trace, seq, ct).ConfigureAwait(false);
+                var preRefusal = await RunGatesAsync(preGates, ConcatText(messages), "run-pre", effectivePolicy, trace, seq, ct).ConfigureAwait(false);
                 if (preRefusal is not null)
                 {
                     return Refusal(innerAgent, preRefusal);
@@ -65,11 +93,11 @@ public static class AgentEvalRunGateExtensions
 
                 var response = await innerAgent.RunAsync(messages, session, options, ct).ConfigureAwait(false);
 
-                var postRefusal = await RunGatesAsync(postGates, response.Text, "run-post", policy, trace, seq, ct).ConfigureAwait(false);
+                var postRefusal = await RunGatesAsync(postGates, response.Text, "run-post", effectivePolicy, trace, seq, ct).ConfigureAwait(false);
                 return postRefusal is not null ? Refusal(innerAgent, postRefusal) : response;
             },
             runStreamingFunc: (messages, session, options, innerAgent, ct) =>
-                StreamCore(messages, session, options, innerAgent, preGates, postGates, policy, trace, seq, ct));
+                StreamCore(messages, session, options, innerAgent, preGates, postGates, effectivePolicy, trace, seq, ct));
     }
 
     private static async IAsyncEnumerable<AgentResponseUpdate> StreamCore(
