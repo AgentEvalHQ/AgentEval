@@ -75,6 +75,50 @@ valid — protecting results doesn't require also gating the proposed calls.
 > trace stage (not `gate.tool.*`) so a result‑gate finding is distinguishable from a call‑gate finding while
 > still counted by the same stage‑agnostic `GlassBoxEvidence.CountGateBlocks`.
 
+## HTTP egress enforcement (Phase 2, #10) — `GatekeeperHttpMessageHandler`
+
+`DomainAllowListGate` (below) candidly documents what it *cannot* see: it inspects the URL **string** inside a
+tool call's arguments, never the actual outgoing network request. Two real attacks live exactly in that gap —
+neither is theoretical, both are standard SSRF/exfiltration technique:
+
+- **Redirect bypass.** An allow‑listed URL responds `302 Location: http://internal-service/` — the argument
+  the model wrote was fine; where the request actually ends up isn't.
+- **DNS‑rebinding.** An allow‑listed hostname's DNS answer resolves to a private/internal address (the
+  cloud‑metadata endpoint `169.254.169.254` is the canonical target) — the hostname string was never wrong,
+  the network topology behind it was.
+
+`GatekeeperHttpMessageHandler` is a real `DelegatingHandler` that sits underneath whichever `HttpClient` a
+**tool's own implementation** uses (not the MAF function‑invocation seam `IToolGate`/`IToolResultGate` plug
+into — this is a different composition point, see below) and closes both gaps:
+
+| Mechanism | What it does | Rank | Honest reasoning |
+|---|---|:--:|---|
+| **`GatekeeperHttpMessageHandler`** | Validates the allow‑list (same exact‑or‑subdomain semantics as `DomainAllowListGate`, via the shared `HostAllowList` helper) AND resolves DNS, blocking if any answer is private/loopback/link‑local/reserved (`PrivateNetworkClassifier`) — before every hop, including every redirect. Redirects are followed manually (never delegated to the transport's own auto‑redirect), re‑validating the new target at each hop, bounded by `MaxRedirects`. Every block throws `HttpEgressBlockedException` — fail‑closed, the idiomatic signal for an `HttpMessageHandler`. | 🟢 **4** | A **genuinely unique capability** — no argument‑string scan can ever catch a redirect target or a DNS answer, because neither exists until the request actually goes out. Ceiling relative to a 5: it isn't automatically applied the way a `UseGatekeeper`‑registered gate is — a tool that builds its own `HttpClient` without `CreateHttpClient` below isn't protected. Composition is opt‑in per tool, not per agent. |
+
+**Usage — wrap the tool's own `HttpClient`, don't register it with `UseGatekeeper`:**
+
+```csharp
+var httpClient = GatekeeperHttpMessageHandler.CreateHttpClient(["api.mycompany.com", "stripe.com"]);
+// Build your AIFunction's tool implementation around THIS client, not a bare `new HttpClient()`.
+var fetchTool = AIFunctionFactory.Create(async (string path) =>
+{
+    var response = await httpClient.GetAsync($"https://api.mycompany.com{path}");
+    return await response.Content.ReadAsStringAsync();
+}, "fetch_order");
+```
+
+`CreateHttpClient` builds a `SocketsHttpHandler` with `AllowAutoRedirect = false` for you (required — the
+handler's own redirect re‑validation only ever runs if the transport itself never auto‑follows a 3xx first) and
+wraps it in `GatekeeperHttpMessageHandler`. Pass a `GatekeeperHttpEgressOptions` to tune `MaxRedirects` (default
+5), turn off the private‑network check (`BlockPrivateNetworks = false`, e.g. for a deliberately internal
+allow‑listed service), or substitute `DnsResolver` (mainly for tests — the default wraps the real
+`System.Net.Dns`).
+
+**Composes naturally with `DomainAllowListGate` and the result gates above** — they're the same story at three
+different points: `DomainAllowListGate` catches the URL in the *proposed call*, `GatekeeperHttpMessageHandler`
+catches what actually happens on the wire, and `ToolResultSecretGate`/`ToolResultInjectionGate` catch what came
+back. Registering only one is a real gap the other two would have caught.
+
 ### Budget & egress (off the `RunLedger`)
 
 `RunLedger` is the per‑run **cross‑hop accumulator** (total tool calls, per‑tool counts, monetary sums) that the

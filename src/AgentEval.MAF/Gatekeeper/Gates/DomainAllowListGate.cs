@@ -49,22 +49,7 @@ public sealed class DomainAllowListGate : IToolGate
     /// </summary>
     public DomainAllowListGate(IEnumerable<string> allowedDomains, string? policyName = null)
     {
-        ArgumentNullException.ThrowIfNull(allowedDomains);
-        _allowed = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var d in allowedDomains)
-        {
-            var host = NormalizeHost(d);
-            if (host is not null)
-            {
-                _allowed.Add(host);
-            }
-        }
-
-        if (_allowed.Count == 0)
-        {
-            throw new ArgumentException("At least one allowed domain is required (the gate is default-deny).", nameof(allowedDomains));
-        }
-
+        _allowed = HostAllowList.Build(allowedDomains, nameof(allowedDomains));
         PolicyName = policyName ?? "DomainAllowListGate";
     }
 
@@ -93,8 +78,8 @@ public sealed class DomainAllowListGate : IToolGate
         {
             foreach (Match m in UrlAuthority.Matches(serialized))
             {
-                var host = ExtractHost(m.Groups[1].Value);
-                if (host is not null && !IsAllowed(host))
+                var host = HostAllowList.ExtractHost(m.Groups[1].Value);
+                if (host is not null && !HostAllowList.IsAllowed(host, _allowed))
                 {
                     return Blocked($"tool '{call.FunctionName}' targets a non-allow-listed domain '{host}'");
                 }
@@ -106,80 +91,6 @@ public sealed class DomainAllowListGate : IToolGate
         }
 
         return Allow();
-    }
-
-    private bool IsAllowed(string host)
-    {
-        if (_allowed.Contains(host))
-        {
-            return true;
-        }
-
-        foreach (var a in _allowed)
-        {
-            if (host.EndsWith("." + a, StringComparison.OrdinalIgnoreCase))
-            {
-                return true;   // subdomain of an allowed host
-            }
-        }
-
-        return false;
-    }
-
-    // authority = [userinfo@]host[:port] → host
-    private static string? ExtractHost(string authority)
-    {
-        var at = authority.LastIndexOf('@');
-        if (at >= 0)
-        {
-            authority = authority[(at + 1)..];
-        }
-
-        if (authority.StartsWith('['))
-        {
-            // IPv6 literal [::1] (optionally :port after the ]) → the address inside the brackets.
-            var close = authority.IndexOf(']');
-            if (close > 1)
-            {
-                return authority[1..close].ToLowerInvariant();
-            }
-            // malformed bracket — fall through to general handling
-        }
-        else
-        {
-            var colon = authority.IndexOf(':');
-            if (colon >= 0)
-            {
-                authority = authority[..colon];   // strip :port
-            }
-        }
-
-        authority = authority.TrimEnd('.');   // normalize a trailing dot
-        return authority.Length == 0 ? null : authority.ToLowerInvariant();
-    }
-
-    private static string? NormalizeHost(string domain)
-    {
-        if (string.IsNullOrWhiteSpace(domain))
-        {
-            return null;
-        }
-
-        var d = domain.Trim();
-        // tolerate a user passing a full URL or a scheme
-        var scheme = d.IndexOf("://", StringComparison.Ordinal);
-        if (scheme >= 0)
-        {
-            d = d[(scheme + 3)..];
-        }
-
-        var slash = d.IndexOf('/');
-        if (slash >= 0)
-        {
-            d = d[..slash];
-        }
-
-        return ExtractHost(d);
     }
 
     private ValueTask<ToolGateVerdict> Allow() => new(ToolGateVerdict.Allow(PolicyName));

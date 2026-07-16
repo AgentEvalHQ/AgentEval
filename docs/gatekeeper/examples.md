@@ -179,6 +179,34 @@ var gated = agent.AsBuilder()
     .Build();
 ```
 
+## Real HTTP-egress enforcement — redirect-chasing + DNS-rebind/SSRF defense
+
+`DomainAllowListGate` (above, in the beachhead) inspects the URL *string* in a tool call's arguments — it
+cannot see a redirect target or a DNS answer, because neither exists until the request actually goes out.
+`GatekeeperHttpMessageHandler` sits underneath the tool's own `HttpClient` and closes both gaps: it re-validates
+the allow-list at every redirect hop (never delegating to the transport's own auto-redirect), and resolves DNS
+itself, blocking if any answer is private/loopback/internal (the classic DNS-rebind: an allow-listed hostname
+that resolves to `169.254.169.254` or an internal `10.x` address).
+
+```csharp
+using AgentEval.MAF.Gatekeeper.Egress;
+
+var httpClient = GatekeeperHttpMessageHandler.CreateHttpClient(["api.mycompany.com"]);
+
+var fetchOrderTool = AIFunctionFactory.Create(async (string orderId) =>
+{
+    var response = await httpClient.GetAsync($"https://api.mycompany.com/orders/{orderId}");
+    return await response.Content.ReadAsStringAsync();
+}, "fetch_order");
+// If api.mycompany.com ever redirects to a non-allow-listed host, or its DNS answer resolves to a private
+// address, the GetAsync call throws HttpEgressBlockedException — the request never completes.
+```
+
+**This is a different composition point from every other Gatekeeper mechanism** — it wraps the tool's OWN
+`HttpClient`, not something you register via `UseGatekeeper`/`UseAgentEvalToolGate`. A tool that builds a bare
+`new HttpClient()` instead of using `CreateHttpClient` here is not protected — this is opt-in per tool, not
+automatically applied per agent the way a registered gate is.
+
 ## The Tribunal — a judge that *earns* the right to block
 
 For the axis a fixed keyword list can't catch *reliably* — **indirect prompt injection** (retrieved content trying to

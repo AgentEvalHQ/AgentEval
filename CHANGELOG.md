@@ -7,6 +7,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Gatekeeper Hardening Phase 2 — real HTTP-egress enforcement (#10): redirect-chasing + DNS-rebind/SSRF defense
+
+#### Added
+- **`GatekeeperHttpMessageHandler`** (`AgentEval.MAF.Gatekeeper.Egress`) — a real `DelegatingHandler` closing
+  the gap `DomainAllowListGate` candidly documents about itself: that gate scans the URL *string* inside a
+  tool call's arguments, never the actual outgoing network request, so it cannot catch a redirect to a
+  forbidden host or a DNS answer resolving an allow-listed hostname to a private/internal address (SSRF /
+  DNS-rebinding — the cloud-metadata endpoint `169.254.169.254` is the canonical target). This handler sits
+  underneath whichever `HttpClient` a **tool's own implementation** uses (a different composition point from
+  `IToolGate`/`IToolResultGate` — opt-in per tool via `GatekeeperHttpMessageHandler.CreateHttpClient(...)`, not
+  registered through `UseGatekeeper`) and re-validates the allow-list AND resolves DNS before every hop,
+  including every redirect — redirects are followed manually (the factory disables the transport's own
+  auto-redirect), bounded by `MaxRedirects`, never silently delegated. Every block throws
+  `HttpEgressBlockedException` (the idiomatic fail-closed signal for an `HttpMessageHandler`).
+- **`PrivateNetworkClassifier`** — classifies an `IPAddress` as private/loopback/link-local/reserved (RFC1918,
+  CGNAT, IPv6 unique-local, IPv4-mapped-IPv6 unwrapped to its embedded address, the cloud-metadata range, and
+  more) — the check run against every DNS-resolved address.
+- **`IDnsResolver`/`SystemDnsResolver`** — a seam over DNS resolution so tests can script resolution results
+  (including a DNS-rebind scenario) without real network/DNS access; the default wraps `System.Net.Dns`.
+- **`GatekeeperHttpEgressOptions`** — `MaxRedirects` (default 5), `BlockPrivateNetworks` (default on),
+  `DnsResolutionTimeout` (default 2s, fail-closed on timeout — cannot prove the destination safe), `DnsResolver`.
+- **`HostAllowList`** — the exact-or-subdomain host-matching logic factored out of `DomainAllowListGate`
+  (behavior-preserving extraction, existing tests unchanged) so the new handler shares the IDENTICAL allow-list
+  semantics rather than a second copy that could silently drift out of sync with the argument-level gate.
+- Redirect handling matches `HttpClientHandler`'s own default semantics: 307/308 preserve method and body;
+  301/302/303 downgrade to GET (dropping the body, except a HEAD request stays HEAD). The synchronous
+  `HttpClient.Send(...)` API is explicitly refused (`NotSupportedException`) rather than silently bypassing
+  every check — this handler's validation is inherently async (DNS resolution).
+- 43 new tests (`PrivateNetworkClassifierTests`, `GatekeeperHttpMessageHandlerTests` — scripted inner handler +
+  fake DNS resolver, zero real network access, deterministic). Full suite green on all three TFMs (net8.0
+  7648/7648, net9.0 7648/7648, net10.0 7851/7851).
+- Docs: new "HTTP egress enforcement" sections in `gate-reference.md`/`examples.md`/`introduction.md`.
+
 ### Gatekeeper Hardening Phase 2 — tool RESULT gates (P0-3) + a parallel-tool-call test fixture
 
 #### Added
