@@ -238,6 +238,47 @@ This is Phase 1 of a multi-phase design
   Documented as deferred, not silently dropped — see `strategy/TODO.md`.
 - ~35 new tests. Full net8.0 suite green (7278/7279, 1 pre-existing skip).
 
+### Gatekeeper Tribunal — 4 more calibrated flagship judges + 2 overlooked-seam gates
+
+#### Added
+- **`IntentActionMismatchJudge`** — compares the agent's NARRATED intent against its ACTUAL tool call,
+  vetoes on divergence. 52-case gold set. **Live-calibrated: 100% decisive accuracy, κ=1.000,
+  `IsInlineReady=true`.**
+- **`GoalHijackDriftJudge`** — detects the agent being steered off the user's original stated goal toward
+  an injected objective (distinct from indirect-injection: asks "has direction drifted," not "does this
+  content instruct"). 48-case gold set. **Live-calibrated: 100% decisive accuracy, κ=1.000,
+  `IsInlineReady=true`.**
+- **`UngroundedClaimJudge`** — RAG faithfulness as a runtime gate: flags an answer claim unsupported by
+  retrieved context. 48-case gold set (includes hedged-opinion hard-negatives). **Live-calibrated: 100%
+  decisive accuracy, κ=1.000, `IsInlineReady=true`.**
+- **`HallucinatedCitationJudge`** — hybrid: a deterministic, zero-LLM-cost citation-existence check
+  composed with a judge support-check, only spending a model call when the citation exists. 52-case gold
+  set covering both failure modes (nonexistent source; real source that doesn't support the claim).
+  **Live-calibrated: 100% decisive accuracy, κ=1.000, `IsInlineReady=true`.** Not an `IJudgeRubric` (a
+  bespoke `IChatGate`), so not registered in the CLI bridge's `judge:*` axis registry — fully usable
+  directly.
+- **`MemoryWritePoisoningGate`** — guards the memory/vector-store WRITE side (every other injection judge
+  guards reads). Reuses `IndirectInjectionRubric` verbatim at this new seam per the design backlog's
+  reuse-the-pattern guidance.
+- **`McpToolDescriptionPoisoningGate`** + **`McpToolDefinition`** — deterministic hash-pin-and-diff over an
+  MCP tool's definition (name/description/schema), catching a rug-pull. Reuses the exact
+  `ManifestFingerprint`/`ManifestDriftDetector` generic primitive built for Skills Phase 4b's
+  `SkillManifestPoisoningGate` — confirming the design backlog's own "same pattern, different artifact
+  type" prediction. Schema comparison recursively canonicalizes JSON key order (a reformatted-but-identical
+  schema never false-alarms).
+- All three `IJudgeRubric`-based judges registered in `JudgeAxisRegistry` — live-verified via the CLI
+  bridge this session: `agenteval gatekeeper list-gates` shows all three (`judge:intent-action-mismatch`,
+  `judge:goal-hijack-drift`, `judge:ungrounded-claim` + their keyword baselines);
+  `agenteval gatekeeper calibrate --gate judge:goal-hijack-drift --certify` against real Azure OpenAI wrote
+  a real calibration certificate; `agenteval gatekeeper inspect` then correctly Allowed a benign case and
+  Blocked an attack case, citing the certificate.
+- **Deferred, explicitly NOT built this session:** `ToolArgumentGoalCoherenceJudge` (needs the
+  `IToolApprovalGate` timeout-routing design worked out) and `CrescendoTrajectoryJudge` (stateful — session
+  store + running summary — explicitly flagged as the hardest of the six in the task scope; deferring it
+  matches the task's own suggested fallback). See `strategy/TODO.md` for the honest accounting.
+- ~100 new tests (deterministic rubric/gate tests + 4 env-gated live calibration checks,
+  `AGENTEVAL_RUN_GATEKEEPER_CAL=1`). Full net8.0 suite green (7330/7331, 1 pre-existing skip).
+
 ## [0.16.0-beta] - 2026-07-13
 
 Gatekeeper reaches production-grade runtime enforcement: a calibrated flagship judge for indirect prompt
