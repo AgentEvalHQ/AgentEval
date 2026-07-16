@@ -362,6 +362,42 @@ bash, or a CI step and get back a versioned verdict + exit code, no .NET referen
 
 ---
 
+### 🧩 Agent Skills: Evaluate & Govern Progressive Disclosure
+
+Microsoft Agent Framework's **Agent Skills** (GA'd 2026-07-07) let an agent progressively disclose capabilities through three stable tools — `load_skill`, `read_skill_resource`, `run_skill_script` — instead of stuffing every capability into the system prompt up front. AgentEval evaluates and governs that surface end to end: fluent assertions on the disclosure trace, a free structural efficiency metric, a `SKILL.md` compliance scanner, a dedicated red-team attack for a poisoned skill description, deterministic Gatekeeper gates for `run_skill_script` code execution, and a composite Skill Health & Security Index.
+
+```csharp
+// Assert the disclosure trace like any other tool chain
+result.ToolUsage!.Should()
+    .HaveLoadedSkill("expense-report")
+    .And().HaveReadSkillResource("expense-report", "resources/policy.md")
+        .AfterTool(SkillToolNames.LoadSkill)
+    .And().HaveDisclosedProgressively()
+    .And().NotHaveRunSkillScript(because: "a policy lookup doesn't need the compliance script");
+
+// Score the load -> read -> run funnel (structural, free — no LLM call)
+var efficiency = await new SkillDisclosureEfficiencyMetric().EvaluateAsync(new EvaluationContext
+{
+    Input = "n/a", Output = "n/a", ToolUsage = result.ToolUsage,
+});
+Console.WriteLine($"Disclosure efficiency: {efficiency.Score:F0}/100");
+
+// Scan SKILL.md authoring + governance flags, then roll compliance + efficiency + red-team
+// outcome into one composite score — a missing axis is averaged out, never faked as perfect
+var complianceReport = await MafSkillScanner.ScanFileSkillsAsync(skillPath, agent);
+var index = SkillSecurityIndex.Compute(
+    new SkillSecurityIndexInputs(complianceReport, efficiency, securityOutcome: null));
+Console.WriteLine($"Skill Security Index: {index.Score:F0}/100 ({index.AxesMeasured}/3 axes measured)");
+```
+
+Governance doesn't stop at evaluation time: **`SkillScriptExecutionGate`** and **`SkillScriptApprovalGate`** are deterministic Gatekeeper gates that allowlist/approve `run_skill_script` calls before they execute, and `SkillInjectionAttack` (OWASP LLM01, one of the 14 `Attack.All` types above) red-teams a poisoned skill description or `read_skill_resource` output through the same `AttackPipeline` that scans every other surface.
+
+**Honest by construction:** a skill source MAF gives no public enumeration API for (in-memory/class/MCP skills) reports zero resources rather than a guessed inventory, a missing Security Index axis is never counted as perfect, and the injection judge ships **shadow-only** — advisory only — because live calibration found it doesn't yet clear the promotion bar on this surface. See [docs/agent-skills.md](docs/agent-skills.md) for the full, honestly-labeled rundown.
+
+**✅ See it:** `dotnet run --project samples/AgentEval.Samples` → group **K** (real agent — needs Azure OpenAI), or the standalone deep-dive [`samples/AgentEval.AgentSkillsEval`](samples/AgentEval.AgentSkillsEval) • [docs/agent-skills.md](docs/agent-skills.md)
+
+---
+
 ### Responsible AI: Content Safety Metrics
 
 Complementing security evaluation, AgentEval's ResponsibleAI namespace provides **content safety evaluation**:
@@ -449,6 +485,7 @@ await result.ExportHtmlReportAsync("memory-report.html");
 | "How do I debug failures?" | **Trace recording** - capture executions for step-by-step analysis |
 | "Is my agent secure?" | **Red Team evaluation** - 264 probes, full OWASP LLM Top 10 2025 coverage |
 | "Can I stop a bad action at runtime?" | **Gatekeeper** - fail-closed runtime enforcement: block forbidden tool calls before they run, quarantine compromised sessions |
+| "Is my agent's use of MAF Agent Skills safe and efficient?" | **Agent Skills evaluation** - disclosure assertions, efficiency metric, compliance scanner, injection red-team, governance gates |
 | "Is content safe and unbiased?" | **ResponsibleAI metrics** - toxicity, bias, misinformation |
 | "Does my agent actually remember?" | **Memory evaluation** - retention, reach-back, temporal, LongMemEval (ICLR 2025) |
 
@@ -489,6 +526,7 @@ await result.ExportHtmlReportAsync("memory-report.html");
 ### Evaluation Coverage
 - Red Team security - 264 probes, full OWASP LLM Top 10 2025, MITRE ATLAS coverage
 - Gatekeeper runtime enforcement - fail-closed gates that block forbidden tool calls before they run, red-team probes as runtime guards, and an async shadow judge that quarantines compromised sessions ([docs](docs/gatekeeper/introduction.md))
+- **Agent Skills evaluation** - disclosure assertions, a free efficiency metric, `SKILL.md` compliance scanning, a skill-injection red-team attack, and deterministic `run_skill_script` governance gates ([docs](docs/agent-skills.md))
 - Responsible AI - toxicity, bias, misinformation detection
 - **Memory evaluation** - retention, reach-back, temporal, cross-session, HTML pentagon reports, LongMemEval (ICLR 2025)
 - Multi-turn conversations - full conversation flow evaluation
