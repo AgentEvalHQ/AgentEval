@@ -209,12 +209,49 @@ conversation-id tracking, and configurable error injection (auth failure, a mid-
 rate-limit-shaped exception, hang-until-cancelled), so the activity-stream bridging logic itself can be
 exercised credential-free, closer to what a real `CopilotClient` would do, without touching the network.
 
-**The `--sut` seam is also gaining a shared, `eval`/`bench`-reachable form.** `ISutTarget` +
-`SutTargetResolver` (`src/AgentEval.Cli/Commands/Targets/ISutTarget.cs`) let `CopilotStudioRedTeamTarget`
-resolve the same way from `agenteval eval`/`agenteval bench` as it already does from `agenteval redteam` — a
-`Validate`-drift contract test proves the redteam and shared-seam validation paths agree. As of this release,
-the shared types exist and are tested, but no `eval`/`bench` CLI verb calls `SutTargetResolver` yet — `--sut
-copilot-studio` today only works with `agenteval redteam`.
+**The `--sut` seam also reaches `eval` and `bench` now.** `ISutTarget` + `SutTargetResolver`
+(`src/AgentEval.Cli/Commands/Targets/ISutTarget.cs`) let `CopilotStudioRedTeamTarget` resolve the same way from
+`agenteval eval` and `agenteval bench owasp`/`mitre`/`nist` as it already did from `agenteval redteam` — a
+`Validate`-drift contract test proves the redteam and shared-seam validation paths agree. `agenteval eval --sut
+copilot-studio --dataset <file>` evaluates your dataset's prompts + judge criteria against a live MCS agent;
+`agenteval bench owasp --sut copilot-studio --subject <name>` (and `mitre`/`nist`) run the curated compliance
+scan against one. `bench`'s three Tier-1 families also gained a generic `--endpoint <url> --model <name>
+[--api-key <key>]` option set for a plain OpenAI-compatible endpoint, independent of Copilot Studio. See
+[docs/cli.md](../cli.md#agenteval-eval) for the exact flags. Bench Tier 2 (`gdpr`/`eu-ai-act`) does not have
+this yet — scoped separately.
+
+## Resilience: retry + config-identity drift detection
+
+Two connector-health features (P6) close a real "does it just work" gap for a live scan:
+
+- **429 retry.** `CopilotStudioChatClient`'s `StartConversationAsync`/`AskQuestionAsync` calls are now wrapped
+  in `AgentEval.Core.RetryPolicy` (the same general-purpose retry engine already used elsewhere in this repo —
+  nothing new was built) via a 429-specific classifier (`CopilotStudioRetryPolicy`): a rate-limit-shaped
+  `HttpRequestException` (`StatusCode == 429`) is retried with exponential backoff; a permanent failure (e.g.
+  401 auth) fails immediately instead of wasting the retry budget. Verified against
+  `MockCopilotStudioConversationClient`'s existing rate-limit injection — **not yet against a real Copilot
+  Studio 429 response**, since the exact exception shape a live `CopilotClient` surfaces for a rate limit has
+  not been observed (same "not independently live-verified" boundary as the rest of this connector; see above).
+- **Config-identity drift detection.** `--copilotstudio-save-config-baseline <path>` pins the resolved config's
+  agent identity (`environmentId`/`schemaName`/`cloud` — deliberately excluding `tenantId`/`appClientId`, which
+  are about *how you authenticate*, not *which agent you're talking to*) as a SHA-256 fingerprint, mirroring
+  `AgentEval.Skills.SkillManifestBaseline`'s exact JSON-baseline shape (Skills Phase 4b's hash-pin-and-diff
+  primitive, reused verbatim — `ManifestFingerprint`/`ManifestDriftDetector`, zero new hashing/diffing code).
+  `--copilotstudio-config-baseline <path>` then compares a later run's config against that pin: drift **warns**
+  by default (an agent's identity changing is very likely intentional — pointing at a different/updated agent
+  on purpose), or **hard-stops before any network call** with `--fail-on-config-drift`. The primary use case is
+  data integrity: comparing today's `--baseline` RESULTS against a stale baseline captured under a *different*
+  agent's identity would be meaningless. These three flags are **redteam-only** — not part of the shared
+  `eval`/`bench` `--sut` seam.
+
+## Fidelity badge
+
+Every scan's post-summary now prints an aggregate `EvidenceFidelity` breakdown for this target specifically
+(`WritePostScanSummary` — no longer a no-op): `Verbal N/T · IntentToAct N/T · Behavioral N/T`. Because this
+target is structurally text-only (see below), `Behavioral` is always `0` in practice — the point is making that
+ceiling visible in the CLI's own summary output, not just internally on each `ProbeResult`. This is scoped to
+this target's own output only; it does not touch the shared RedTeam report renderers (JSON/Markdown/SARIF/JUnit/PDF)
+— a broader, all-targets fidelity column across those renderers is a separate, larger change, not done here.
 
 ## How it fits red-team fidelity
 
@@ -233,8 +270,10 @@ AgentEval's red-team scoring is honest about *how much* evidence a verdict is ba
 - **Evidence capture is off** (`IncludeEvidence => false`) — a live MCS response can carry real PII, so raw
   request/response text is never written into a report or CI log for this target, unlike the default
   `IncludeEvidence => true` for `gatekeeper-demo` and the endpoint/`--azure` path.
-- **No gate-trace summary.** `WritePostScanSummary` is a deliberate no-op for this target — there's no local
-  Gatekeeper trace for a live conversational agent; fidelity is reported per-verdict by the evaluators instead.
+- **No gate-trace summary, but an aggregate fidelity badge.** There's no local Gatekeeper trace for a live
+  conversational agent — `WritePostScanSummary` renders nothing gate-related — but it does now print the
+  aggregate `Verbal`/`IntentToAct`/`Behavioral` breakdown across the scan (see "Fidelity badge" above);
+  per-verdict fidelity is still reported by the evaluators independently either way.
 - **No model of its own.** A judge (`--judge`) or attacker (`--attacker`) needs an explicit `--judge-model` /
   `--attacker-model` when paired with this target, because there's no natural "same model as the SUT" to fall
   back to the way there is for an `--endpoint`/`--model` pair.

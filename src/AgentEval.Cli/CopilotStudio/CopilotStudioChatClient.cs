@@ -88,9 +88,14 @@ internal sealed class CopilotStudioChatClient : IChatClient
         {
             if (!_started)
             {
-                await foreach (var startActivity in _client
-                    .StartConversationAsync(emitStartConversationEvent: false, cancellationToken: cancellationToken)
-                    .WithCancellation(cancellationToken).ConfigureAwait(false))
+                // P6 item B: retry the WHOLE call on a 429-shaped failure, not a partially-consumed stream —
+                // materializing before yielding is the only way to retry a stream correctly (activities
+                // already yielded to the caller can't be "un-yielded" on a mid-stream failure).
+                var startActivities = await CopilotStudioRetryPolicy.Default.ExecuteAsync(
+                    ct => DrainAsync(_client.StartConversationAsync(emitStartConversationEvent: false, cancellationToken: ct), ct),
+                    cancellationToken).ConfigureAwait(false);
+
+                foreach (var startActivity in startActivities)
                 {
                     TrackConversationId(startActivity);
                     foreach (var update in AsUpdates(startActivity))
@@ -102,9 +107,11 @@ internal sealed class CopilotStudioChatClient : IChatClient
                 _started = true;
             }
 
-            await foreach (var activity in _client
-                .AskQuestionAsync(question, _conversationId, cancellationToken)
-                .WithCancellation(cancellationToken).ConfigureAwait(false))
+            var askActivities = await CopilotStudioRetryPolicy.Default.ExecuteAsync(
+                ct => DrainAsync(_client.AskQuestionAsync(question, _conversationId, ct), ct),
+                cancellationToken).ConfigureAwait(false);
+
+            foreach (var activity in askActivities)
             {
                 TrackConversationId(activity);
                 foreach (var update in AsUpdates(activity))
@@ -117,6 +124,18 @@ internal sealed class CopilotStudioChatClient : IChatClient
         {
             _turnLock.Release();
         }
+    }
+
+    /// <summary>Materializes an activity stream into a list so <see cref="CopilotStudioRetryPolicy"/> can retry the WHOLE call as one unit.</summary>
+    private static async Task<List<IActivity>> DrainAsync(IAsyncEnumerable<IActivity> source, CancellationToken ct)
+    {
+        var list = new List<IActivity>();
+        await foreach (var item in source.WithCancellation(ct).ConfigureAwait(false))
+        {
+            list.Add(item);
+        }
+
+        return list;
     }
 
     public async Task<ChatResponse> GetResponseAsync(

@@ -8,6 +8,7 @@ using AgentEval.Cli.Commands;
 using AgentEval.Cli.Commands.RedTeamTargets;
 using AgentEval.Cli.Commands.Targets;
 using AgentEval.Core;
+using AgentEval.Guardrails;
 using AgentEval.RedTeam;
 using AgentTrace = AgentEval.Tracing.AgentTrace;
 
@@ -24,6 +25,26 @@ internal sealed record CopilotStudioTargetOptions : IRedTeamTargetOptions
 
     /// <summary><c>--max-credits</c>: Copilot Credit spend cap (0 = no cap). Enforced during a live scan.</summary>
     public int MaxCredits { get; init; }
+
+    /// <summary>
+    /// <c>--copilotstudio-save-config-baseline</c>: P6 item A. After the config resolves, write a trust-time
+    /// agent-identity fingerprint pin to this path (opt-in, always overwrites — mirrors <c>--save-baseline</c>'s
+    /// own "not silent-by-default, no if-missing conditional" convention). Redteam-only (not part of the shared
+    /// eval/bench <c>--sut</c> seam).
+    /// </summary>
+    public FileInfo? SaveConfigBaseline { get; init; }
+
+    /// <summary>
+    /// <c>--copilotstudio-config-baseline</c>: P6 item A. Compare the resolved config's agent-identity
+    /// fingerprint against this pinned baseline file; warns (default) or hard-stops
+    /// (<see cref="FailOnConfigDrift"/>) on drift. Primary use case: a stale/wrong-agent
+    /// <c>redteam --baseline</c> RESULT comparison is meaningless if the underlying agent's identity changed
+    /// since that baseline was captured — this is a data-integrity safeguard, not a security gate.
+    /// </summary>
+    public FileInfo? ConfigBaseline { get; init; }
+
+    /// <summary><c>--fail-on-config-drift</c>: the opt-in hard-stop variant of <see cref="ConfigBaseline"/>'s drift check (default: warn, never block).</summary>
+    public bool FailOnConfigDrift { get; init; }
 }
 
 /// <summary>
@@ -68,6 +89,23 @@ internal sealed class CopilotStudioRedTeamTarget : IRedTeamBuiltInTarget, ISutTa
         Description = "Cap the Copilot Credits a live --sut copilot-studio scan may spend (0 = no cap). NOT YET ENFORCED — the SDK exposes no credit-cost field to enforce against, so this is parsed/validated only; exit 8 (BudgetExceeded) stays reserved. Every turn burns credits, and a reasoning turn costs substantially more than a scripted one.",
     };
 
+    // P6 item A (config-fingerprint drift) — redteam-ONLY, registered by AddOptionsTo (IRedTeamBuiltInTarget)
+    // but deliberately NOT by the shared ISutTarget.AddOptionsTo (eval/bench don't get these flags).
+    private readonly Option<FileInfo?> _saveConfigBaselineOpt = new("--copilotstudio-save-config-baseline")
+    {
+        Description = "After the Copilot Studio config resolves, write a trust-time agent-identity fingerprint pin (JSON) to this path. Opt-in; always overwrites (mirrors --save-baseline's convention).",
+    };
+
+    private readonly Option<FileInfo?> _configBaselineOpt = new("--copilotstudio-config-baseline")
+    {
+        Description = "Compare the resolved Copilot Studio config's agent-identity fingerprint against this pinned baseline file (from --copilotstudio-save-config-baseline). Drift WARNS by default (a stale/wrong-agent --baseline RESULT comparison would be meaningless); pass --fail-on-config-drift to hard-stop instead.",
+    };
+
+    private readonly Option<bool> _failOnConfigDriftOpt = new("--fail-on-config-drift")
+    {
+        Description = "With --copilotstudio-config-baseline: treat a detected agent-identity drift as a hard stop (refuse before any network call) instead of a warning.",
+    };
+
     private CopilotStudioConfig? _config;   // memoized within one ExecuteAsync call (Validate -> ResolvedName -> Build)
 
     public string Sut => "copilot-studio";
@@ -76,6 +114,15 @@ internal sealed class CopilotStudioRedTeamTarget : IRedTeamBuiltInTarget, ISutTa
     public bool IncludeEvidence => false;
 
     public void AddOptionsTo(Command command)
+    {
+        AddCommonOptionsTo(command);
+        // P6 item A: redteam-only — NOT added by ISutTarget.AddOptionsTo (see that explicit override below).
+        command.Options.Add(_saveConfigBaselineOpt);
+        command.Options.Add(_configBaselineOpt);
+        command.Options.Add(_failOnConfigDriftOpt);
+    }
+
+    private void AddCommonOptionsTo(Command command)
     {
         command.Options.Add(_configOpt);
         command.Options.Add(_ackOpt);
@@ -88,6 +135,9 @@ internal sealed class CopilotStudioRedTeamTarget : IRedTeamBuiltInTarget, ISutTa
         ConfigFile = parseResult.GetValue(_configOpt),
         AckLiveSideEffects = parseResult.GetValue(_ackOpt),
         MaxCredits = parseResult.GetValue(_maxCreditsOpt),
+        SaveConfigBaseline = parseResult.GetValue(_saveConfigBaselineOpt),
+        ConfigBaseline = parseResult.GetValue(_configBaselineOpt),
+        FailOnConfigDrift = parseResult.GetValue(_failOnConfigDriftOpt),
     };
 
     public void Validate(RedTeamOptions opts)
@@ -136,6 +186,50 @@ internal sealed class CopilotStudioRedTeamTarget : IRedTeamBuiltInTarget, ISutTa
 
         _config = CopilotStudioConfig.Load(cs.ConfigFile);   // fail fast on a bad config, before the scan; memoized
 
+        // P6 item A: config-fingerprint drift — opt-in, redteam-only. Both still run before any network call.
+        if (cs.SaveConfigBaseline is not null)
+        {
+            var baseline = CopilotStudioConfigBaseline.Capture(_config, notes: $"captured {DateTimeOffset.UtcNow:u}");
+            File.WriteAllText(cs.SaveConfigBaseline.FullName, baseline.ToJson());
+            if (!opts.Quiet)
+            {
+                Console.Error.WriteLine($"  Copilot Studio config baseline written to: {cs.SaveConfigBaseline.FullName}");
+            }
+        }
+
+        if (cs.ConfigBaseline is not null)
+        {
+            if (!cs.ConfigBaseline.Exists)
+            {
+                throw new InvalidOperationException($"Copilot Studio config baseline file not found: {cs.ConfigBaseline.FullName}");
+            }
+
+            var pinned = CopilotStudioConfigBaseline.FromJson(File.ReadAllText(cs.ConfigBaseline.FullName));
+            var drift = CopilotStudioConfigFingerprint.CheckDrift(_config, pinned)
+                .Where(f => f.Kind != ManifestDriftKind.Unchanged)
+                .ToList();
+
+            if (drift.Count > 0)
+            {
+                var summary = string.Join("; ", drift.Select(f => $"{f.Key}: {f.Kind}"));
+                var message = $"Copilot Studio config agent-identity drifted from the pinned baseline ({summary}). " +
+                    "An agent's environmentId/schemaName/cloud changing is very likely intentional (pointing at a " +
+                    "different/updated agent on purpose) — this is a data-integrity safeguard for --baseline RESULT " +
+                    "comparisons, not a security gate. Re-run with --copilotstudio-save-config-baseline to re-pin " +
+                    "the new identity, or without --fail-on-config-drift to proceed with just a warning.";
+
+                if (cs.FailOnConfigDrift)
+                {
+                    throw new InvalidOperationException("--fail-on-config-drift: " + message);
+                }
+
+                if (!opts.Quiet)
+                {
+                    Console.Error.WriteLine("  Warning: " + message);
+                }
+            }
+        }
+
         if (!opts.Quiet && (opts.Endpoint is not null || opts.Azure || opts.Model is not null || opts.DeploymentName is not null
             || !string.Equals(opts.SutTier, "text", StringComparison.OrdinalIgnoreCase)
             || opts.SystemPrompt is not null || opts.SystemPromptCanary is not null))
@@ -161,7 +255,35 @@ internal sealed class CopilotStudioRedTeamTarget : IRedTeamBuiltInTarget, ISutTa
 
     public void WritePostScanSummary(RedTeamResult result, AgentTrace trace, TextWriter err)
     {
-        // No gate trace for a live conversational target — fidelity is reported per-verdict by the evaluators.
+        // No gate trace for a live conversational target — nothing to render there.
+        //
+        // P6 item C1 (narrow cut — strategy/CopilotStudio/Copilot-Studio-P6-Connector-Health-and-Resilience-Design.md
+        // §1C): EvidenceFidelity is already stamped per-verdict on every ProbeResult (RC-1), but that's easy to
+        // miss unless a caller inspects the raw report. This surfaces the AGGREGATE fidelity breakdown once, in
+        // THIS target's own summary line — not a change to the shared RedTeam report renderers (that's C2, a
+        // separate, larger, all-targets change explicitly out of scope here). --sut copilot-studio caps at
+        // text-only fidelity: it never observes whether a live MCS agent's connectors/flows actually fired, only
+        // what the agent's reply SAID — so a "Succeeded" verdict here is proof of what was SAID, never of what
+        // was DONE.
+        var byFidelity = result.AttackResults
+            .SelectMany(a => a.ProbeResults)
+            .GroupBy(p => p.Fidelity)
+            .ToDictionary(g => g.Key, g => g.Count());
+
+        var total = byFidelity.Values.Sum();
+        if (total == 0)
+        {
+            return;
+        }
+
+        var verbal = byFidelity.GetValueOrDefault(EvidenceFidelity.Verbal);
+        var intentToAct = byFidelity.GetValueOrDefault(EvidenceFidelity.IntentToAct);
+        var behavioral = byFidelity.GetValueOrDefault(EvidenceFidelity.Behavioral);
+
+        err.WriteLine(
+            $"  Evidence fidelity (--sut copilot-studio is text-only — a live agent's real connector/flow " +
+            $"actions are not observable): Verbal {verbal}/{total} · IntentToAct {intentToAct}/{total} · " +
+            $"Behavioral {behavioral}/{total}.");
     }
 
     private CopilotStudioConfig EnsureConfig(RedTeamOptions opts)
@@ -194,7 +316,9 @@ internal sealed class CopilotStudioRedTeamTarget : IRedTeamBuiltInTarget, ISutTa
 
     IReadOnlySet<string> ISutTarget.SupportedVerbs { get; } = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "eval", "bench" };
 
-    void ISutTarget.AddOptionsTo(Command command) => AddOptionsTo(command);   // same options, same flags
+    // P6 item A's config-baseline options are redteam-ONLY (design doc's explicit scope) — this calls
+    // AddCommonOptionsTo, NOT the public AddOptionsTo (which also registers those 3 extra flags for redteam).
+    void ISutTarget.AddOptionsTo(Command command) => AddCommonOptionsTo(command);
 
     ISutTargetOptions? ISutTarget.BindOptions(ParseResult parseResult) => new CopilotStudioSutOptions
     {
