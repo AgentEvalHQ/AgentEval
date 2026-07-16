@@ -88,6 +88,72 @@ public class RawSkillFrontmatterReaderTests
         Assert.Equal("never closes.", result.Description);
     }
 
+    // ── YAML block/folded scalar handling (review: fixes a real silent mis-parse) ──
+
+    [Theory]
+    [InlineData("|")]
+    [InlineData("|-")]
+    [InlineData("|+")]
+    [InlineData(">")]
+    [InlineData(">-")]
+    [InlineData("|2")]
+    [InlineData(">2-")]
+    public void Parse_YamlBlockOrFoldedScalarIndicator_DoesNotCaptureTheIndicatorItself(string indicator)
+    {
+        // Regression guard: a genuine YAML block/folded scalar puts its real multi-line value on the
+        // FOLLOWING indented lines, not after the colon — "description: |" previously set Description to
+        // the literal string "|" (the bare indicator character), a silently WRONG value rather than an
+        // honest "could not recover this field." This line-scan parser has no concept of YAML indentation
+        // blocks, so it still can't recover the real multi-line content — but it must not fabricate the
+        // indicator itself as if it WERE the content.
+        var lines = new[]
+        {
+            "---",
+            $"description: {indicator}",
+            "  This is the real multi-line content that a YAML parser would recover.",
+            "  A second continuation line.",
+            "---",
+        };
+
+        var result = RawSkillFrontmatterReader.Parse(lines);
+
+        Assert.Null(result.Description);
+        Assert.NotEqual(indicator, result.Description);
+    }
+
+    [Fact]
+    public void Parse_YamlBlockScalar_NameAndCompatibility_AlsoNotCaptured()
+    {
+        var lines = new[] { "---", "name: |", "  real-name-on-next-line", "compatibility: >", "  folded content", "---" };
+
+        var result = RawSkillFrontmatterReader.Parse(lines);
+
+        Assert.Null(result.Name);
+        Assert.Null(result.Compatibility);
+    }
+
+    [Fact]
+    public void Parse_PlainMultiLineValue_WithoutBlockScalarIndicator_OnlyFirstLineRecovered_DocumentedNarrowerLimitation()
+    {
+        // Distinguishes the FIXED bug (silently capturing a bare "|"/">' indicator as if it were content)
+        // from this parser's remaining, narrower, HONEST limitation: a description continued across lines
+        // without a YAML block-scalar indicator at all (not idiomatic SKILL.md authoring, but not invalid
+        // YAML either) only has its FIRST line recovered — a real but legitimate PARTIAL value, not a wrong
+        // one, since "Our return policy allows 30-day returns" is a true (if incomplete) prefix of the
+        // actual multi-line description, unlike the "|" case which was pure noise.
+        var lines = new[]
+        {
+            "---",
+            "description: Our return policy allows 30-day returns",
+            "  with a receipt for electronics purchased after January 1st.",
+            "---",
+        };
+
+        var result = RawSkillFrontmatterReader.Parse(lines);
+
+        Assert.Equal("Our return policy allows 30-day returns", result.Description);
+    }
+
     [Fact]
     public void Parse_LeadingBlankLines_StillFindsOpeningDelimiter()
     {
