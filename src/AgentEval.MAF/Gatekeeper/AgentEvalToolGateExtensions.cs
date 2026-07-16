@@ -2,6 +2,7 @@
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 
+using System.Diagnostics;
 using System.Text.Encodings.Web;
 using System.Text.Json;
 using AgentEval.Tracing;
@@ -32,11 +33,16 @@ public static class AgentEvalToolGateExtensions
     /// <param name="gates">The gates to run, in order, on every tool call. Rejected if any has a Network/Llm cost.</param>
     /// <param name="policy">How a block is enforced. Defaults to <see cref="ToolGatePolicy.WarnOnly"/>.</param>
     /// <param name="trace">Optional Glass Box trace to record <c>gate.tool.*</c> evidence into.</param>
+    /// <param name="telemetry">
+    /// Optional <see cref="GateTelemetry"/> sink (Phase 1, #18) — records which gate fired, its verdict, and
+    /// its latency on every invocation. Caller-owned; pass the same instance you read from later.
+    /// </param>
     public static AIAgentBuilder UseAgentEvalToolGate(
         this AIAgentBuilder builder,
         IReadOnlyList<IToolGate> gates,
         ToolGatePolicy policy = ToolGatePolicy.WarnOnly,
-        AgentTrace? trace = null)
+        AgentTrace? trace = null,
+        GateTelemetry? telemetry = null)
     {
         ArgumentNullException.ThrowIfNull(builder);
         ArgumentNullException.ThrowIfNull(gates);
@@ -84,12 +90,15 @@ public static class AgentEvalToolGateExtensions
             foreach (var gate in gates)
             {
                 ToolGateVerdict verdict;
+                var stopwatch = telemetry is null ? null : Stopwatch.StartNew();
                 try
                 {
                     verdict = await gate.InspectAsync(call, ct).ConfigureAwait(false);
                 }
                 catch (Exception ex) when (ex is not OperationCanceledException)
                 {
+                    telemetry?.Record(gate.PolicyName, ToolGateAction.Block, stopwatch!.Elapsed);
+
                     // FAIL CLOSED (cannot-inspect ⇒ deny): a gate that throws cannot prove the call safe, so block
                     // it — regardless of policy. FICC would otherwise swallow the exception and run the tool.
                     RecordBlock(trace, Interlocked.Increment(ref gateSeq),
@@ -102,6 +111,8 @@ public static class AgentEvalToolGateExtensions
 
                     return SynthesizedRefusal(gate.PolicyName, "gate evaluation failed");
                 }
+
+                telemetry?.Record(gate.PolicyName, verdict.Action, stopwatch!.Elapsed);
 
                 switch (verdict.Action)
                 {
