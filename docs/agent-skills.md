@@ -156,11 +156,28 @@ This is trust-time drift detection (JSON-persisted, mirrors the RedTeam baseline
 runtime gate that scores every turn — it fires when you re-scan, e.g. in CI before deploying an updated skill
 pack.
 
+## 5 — Detecting MAF's silent skill-discovery exclusions
+
+MAF's own `AgentFileSkillsSource.GetSkillsAsync()` silently **excludes** a skill folder from discovery
+entirely whenever its `SKILL.md` fails certain GA rules (invalid `name:` characters, consecutive hyphens, a
+directory-name mismatch, or a missing/too-long `description:`) — the folder just vanishes from the scan with
+no error and no finding, reported as if it never existed. Confirmed against the live 1.13.0 assembly: the
+exclusion is **recursive** (a malformed `SKILL.md` at any level blanks its entire subtree, not just itself),
+and MAF's own container-mode discovery is bounded to exactly 2 directory levels deep.
+
+`agenteval skills scan` now runs a second, independent raw directory walk (`AgentEval.Core.Skills.RawSkillDirectoryScanner`)
+mirroring MAF's discovery convention, reconciles it against what `GetSkillsAsync()` actually returned, and for
+anything present-on-disk-but-silently-excluded, re-parses the `SKILL.md` directly and reports a
+`SkillExcludedFromDiscovery` (High) finding — worded to make clear the skill is **non-functional as authored**,
+not merely non-compliant. `SkillComplianceReport.Coverage.SilentlyExcludedCount` surfaces the count prominently
+in every renderer. A `compatibility` field over 500 characters, which otherwise makes `GetSkillsAsync()` throw
+and would crash the whole scan, is caught and reported as one clean finding instead.
+
 ## What's not built yet
 
 Phase 4c (skill fuzzing via the transform/codec pipeline, a canary-skill honeypot, skill-name typosquatting,
-load-storm-as-denial-of-wallet) and an `agenteval skills scan` CLI subcommand were deprioritized this session
-in favor of shipping 4a/4b with full rigor — see `strategy/TODO.md` (local-only) for the up-to-date backlog.
+load-storm-as-denial-of-wallet) was deprioritized this session in favor of shipping 4a/4b and the exclusion-
+detection fix (§5) with full rigor — see `strategy/TODO.md` (local-only) for the up-to-date backlog.
 
 ## Related
 
