@@ -153,7 +153,7 @@ result.Should()
     .HaveMinimumScore(80);
 ```
 
-**Attack types included (13):** Prompt Injection, Jailbreaks, PII Leakage, System Prompt Extraction, Indirect Injection, Excessive Agency, Insecure Output Handling, Inference API Abuse, Encoding Evasion, Supply Chain, Data & Model Poisoning, Vector & Embedding (RAG), Misinformation — covering all 10 OWASP LLM Top 10 categories. Plus opt-in multi-turn attacks (Crescendo, PAIR, TAP, ToolEscalation).
+**Attack types included (14):** Prompt Injection, Jailbreaks, PII Leakage, System Prompt Extraction, Indirect Injection, Excessive Agency, Insecure Output Handling, Inference API Abuse, Encoding Evasion, Supply Chain, Data & Model Poisoning, Vector & Embedding (RAG), Misinformation, Skill-Description Injection — covering all 10 OWASP LLM Top 10 categories. Plus opt-in multi-turn attacks (Crescendo, PAIR, TAP, ToolEscalation).
 
 ```csharp
 // Advanced: Full pipeline control
@@ -211,6 +211,7 @@ await result.ExportHtmlReportAsync("memory-report.html");
 | "Is my agent compliant?" | **Behavioral policies** - guardrails as code |
 | "Is my agent secure?" | **Red team evaluation** - 264 OWASP LLM 2025 security probes (all 10 categories) |
 | "Can I stop a bad action before it happens?" | **Gatekeeper** - fail-closed runtime gates block a bad tool call or a leaking response before it happens |
+| "Is my agent's use of MAF Agent Skills safe and efficient?" | **Agent Skills evaluation** - disclosure assertions, efficiency metric, compliance scanner, injection red-team, governance gates |
 | "Is content safe/unbiased?" | **ResponsibleAI metrics** - toxicity, bias, misinformation |
 | "Is my RAG hallucinating?" | **Faithfulness metrics** - grounding verification |
 | "How do I debug CI failures?" | **Trace replay** - capture and reproduce executions |
@@ -252,6 +253,10 @@ await result.ExportHtmlReportAsync("memory-report.html");
 -   **🔴 Red Team Security**
     
     264 probes, 14 attack types, full OWASP LLM Top 10 2025 coverage, MITRE ATLAS mapping
+
+-   **🧩 Agent Skills**
+    
+    Evaluate & govern MAF Agent Skills — disclosure assertions, efficiency metric, compliance scanning, injection red-team, governance gates
 
 -   **🛡️ Responsible AI**
     
