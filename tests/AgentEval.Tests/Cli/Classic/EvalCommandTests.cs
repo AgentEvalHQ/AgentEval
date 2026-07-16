@@ -53,13 +53,15 @@ public class EvalCommandTests
     }
 
     [Fact]
-    public void Create_Has20Options()
+    public void Create_Has24Options()
     {
         // dataset, endpoint, azure, model, deployment-name, api-key, system-prompt, system-prompt-file,
         // temperature, max-tokens, metrics, runs, success-threshold, judge, judge-model,
         // format, output, output-dir, verbose, quiet = 20
+        // + Track 2 PR2 (--sut copilot-studio): sut, copilotstudio-config, i-understand-live-side-effects,
+        // max-credits = 4 (SutTargetResolver.AddOptionsTo("eval")) => 24
         var command = EvalCommand.Create();
-        Assert.Equal(20, command.Options.Count);
+        Assert.Equal(24, command.Options.Count);
     }
 
     [Theory]
@@ -76,6 +78,8 @@ public class EvalCommandTests
     [InlineData("output-dir")]
     [InlineData("temperature")]
     [InlineData("azure")]
+    [InlineData("sut")]
+    [InlineData("copilotstudio-config")]
     public void Create_ContainsExpectedOption(string optionName)
     {
         var command = EvalCommand.Create();
@@ -101,6 +105,8 @@ public class EvalCommandTests
         Assert.Null(opts.Model);
         Assert.Null(opts.DeploymentName);
         Assert.Null(opts.ApiKey);
+        Assert.Null(opts.Sut);
+        Assert.Empty(opts.TargetOptions);
         Assert.Null(opts.Metrics);
         Assert.Equal(1, opts.Runs);
         Assert.Equal(0.8, opts.SuccessThreshold);

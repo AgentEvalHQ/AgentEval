@@ -10,6 +10,7 @@
 
 using System.CommandLine;
 using System.CommandLine.Parsing;
+using AgentEval.Cli.Commands.Targets;
 using AgentEval.Cli.Infrastructure;
 using AgentEval.Cli.Output;
 using AgentEval.Comparison;
@@ -39,6 +40,11 @@ internal static class EvalCommand
         // Endpoint (mutually exclusive group)
         var endpointOpt = new Option<string?>("--endpoint") { Description = "OpenAI-compatible API endpoint URL" };
         var azureFlag = new Option<bool>("--azure") { Description = "Use Azure OpenAI (requires --endpoint and --deployment-name)" };
+
+        // Built-in SUT targets (Track 2 PR2): --sut copilot-studio evaluates a live Copilot Studio agent
+        // with your --dataset's prompts + judge criteria, via the same shared seam `redteam` already uses.
+        // Each target owns its own options/validation/construction (ISutTarget).
+        var (sutOpt, sutTargets) = SutTargetResolver.AddOptionsTo(command, "eval");
 
         // Model / Deployment
         var modelOpt = new Option<string?>("--model")
@@ -116,6 +122,11 @@ internal static class EvalCommand
                 Model = parseResult.GetValue(modelOpt),
                 DeploymentName = parseResult.GetValue(deploymentNameOpt),
                 ApiKey = parseResult.GetValue(apiKeyOpt),
+                Sut = parseResult.GetValue(sutOpt),
+                // Bind every built-in target's own flags polymorphically (keyed by --sut value) — mirrors
+                // RedTeamCommand's convention so a target's flags never need a per-verb special case.
+                TargetOptions = sutTargets.ToDictionary(
+                    t => t.Sut, t => t.BindOptions(parseResult), StringComparer.OrdinalIgnoreCase),
                 SystemPrompt = parseResult.GetValue(systemPromptOpt),
                 SystemPromptFile = parseResult.GetValue(systemPromptFileOpt),
                 Temperature = parseResult.GetValue(temperatureOpt),
@@ -147,47 +158,80 @@ internal static class EvalCommand
     }
 
     /// <summary>
-    /// Core execution logic — separated from command wiring for testability.
+    /// Core execution logic — separated from command wiring for testability. <paramref name="sutOverride"/>,
+    /// when non-null, is forwarded into a built-in <c>--sut</c> target's construction (the credential-free
+    /// test seam — mirrors <see cref="RedTeamCommand.ExecuteAsync"/>); it has no effect when <c>--sut</c>
+    /// is not set.
     /// Returns exit code: 0 = all passed, 1 = test failure, 3 = runtime error.
     /// </summary>
-    internal static async Task<int> ExecuteAsync(EvalOptions opts, CancellationToken ct)
+    internal static async Task<int> ExecuteAsync(EvalOptions opts, CancellationToken ct, IEvaluableAgent? sutOverride = null)
     {
-        // 1. Validate
-        if (opts.Endpoint is null && !opts.Azure)
-            throw new InvalidOperationException("Specify --endpoint <url> or --azure.");
-        if (opts.Azure && opts.Endpoint is null)
-            throw new InvalidOperationException(
-                "--azure requires --endpoint <url> (your Azure OpenAI resource endpoint, e.g. https://myresource.openai.azure.com/).");
-        if (opts.Azure && string.IsNullOrWhiteSpace(opts.DeploymentName))
-            throw new InvalidOperationException(
-                "--azure requires --deployment-name <name> (your Azure OpenAI deployment name).");
-        if (!opts.Azure && string.IsNullOrWhiteSpace(opts.Model))
-            throw new InvalidOperationException(
-                "--model is required when using --endpoint.");
         if (!opts.Dataset.Exists)
             throw new FileNotFoundException($"Dataset not found: {opts.Dataset.FullName}");
 
-        // Resolved identifier: deployment name for Azure, model name for OpenAI-compatible
-        var resolvedName = opts.Azure ? opts.DeploymentName! : opts.Model!;
+        // 1. Resolve --sut (Track 2 PR2), if set — the same shared seam `redteam`/`bench` use. Built-in
+        // targets own their own validation (consent gates, required config, etc.) via ISutTarget.Validate,
+        // invoked inside TryResolve.
+        var sutTargets = SutTargetResolver.BuiltInTargets().Where(t => t.SupportedVerbs.Contains("eval")).ToList();
+        var commonTargetOptions = new CommonTargetOptions
+        {
+            Endpoint = opts.Endpoint,
+            Azure = opts.Azure,
+            Model = opts.Model,
+            DeploymentName = opts.DeploymentName,
+            ApiKey = opts.ApiKey,
+            Sut = opts.Sut,
+            TargetOptions = opts.TargetOptions,
+        };
+        var (sutAgent, sutResolvedName) = SutTargetResolver.TryResolve(commonTargetOptions, sutTargets, sutOverride);
 
-        // 2. Resolve system prompt
-        var systemPrompt = opts.SystemPrompt;
-        if (opts.SystemPromptFile is { Exists: true })
-            systemPrompt = await File.ReadAllTextAsync(opts.SystemPromptFile.FullName, ct);
+        string resolvedName;
+        IEvaluableAgent agent;
 
-        // 3. Create IChatClient → IStreamableAgent
-        IChatClient chatClient = opts.Azure
-            ? EndpointFactory.CreateAzure(opts.Endpoint, opts.DeploymentName!, opts.ApiKey)
-            : EndpointFactory.CreateOpenAICompatible(opts.Endpoint!, opts.Model!, opts.ApiKey);
+        if (sutAgent is not null)
+        {
+            // A built-in target (e.g. copilot-studio) constructed itself; the --endpoint/--azure/--model
+            // path below is entirely skipped, matching RedTeamCommand's existing --sut branch.
+            agent = sutAgent;
+            resolvedName = sutResolvedName!;
+        }
+        else
+        {
+            // 1b. Validate the --endpoint/--azure path — unchanged from before --sut existed.
+            if (opts.Endpoint is null && !opts.Azure)
+                throw new InvalidOperationException("Specify --endpoint <url> or --azure.");
+            if (opts.Azure && opts.Endpoint is null)
+                throw new InvalidOperationException(
+                    "--azure requires --endpoint <url> (your Azure OpenAI resource endpoint, e.g. https://myresource.openai.azure.com/).");
+            if (opts.Azure && string.IsNullOrWhiteSpace(opts.DeploymentName))
+                throw new InvalidOperationException(
+                    "--azure requires --deployment-name <name> (your Azure OpenAI deployment name).");
+            if (!opts.Azure && string.IsNullOrWhiteSpace(opts.Model))
+                throw new InvalidOperationException(
+                    "--model is required when using --endpoint.");
 
-        var chatOptions = new ChatOptions();
-        if (opts.Temperature != 0f) chatOptions.Temperature = opts.Temperature;
-        if (opts.MaxTokens.HasValue) chatOptions.MaxOutputTokens = opts.MaxTokens.Value;
+            // Resolved identifier: deployment name for Azure, model name for OpenAI-compatible
+            resolvedName = opts.Azure ? opts.DeploymentName! : opts.Model!;
 
-        var agent = chatClient.AsEvaluableAgent(
-            name: resolvedName,
-            systemPrompt: systemPrompt,
-            chatOptions: chatOptions);
+            // 2. Resolve system prompt
+            var systemPrompt = opts.SystemPrompt;
+            if (opts.SystemPromptFile is { Exists: true })
+                systemPrompt = await File.ReadAllTextAsync(opts.SystemPromptFile.FullName, ct);
+
+            // 3. Create IChatClient → IStreamableAgent
+            IChatClient chatClient = opts.Azure
+                ? EndpointFactory.CreateAzure(opts.Endpoint, opts.DeploymentName!, opts.ApiKey)
+                : EndpointFactory.CreateOpenAICompatible(opts.Endpoint!, opts.Model!, opts.ApiKey);
+
+            var chatOptions = new ChatOptions();
+            if (opts.Temperature != 0f) chatOptions.Temperature = opts.Temperature;
+            if (opts.MaxTokens.HasValue) chatOptions.MaxOutputTokens = opts.MaxTokens.Value;
+
+            agent = chatClient.AsEvaluableAgent(
+                name: resolvedName,
+                systemPrompt: systemPrompt,
+                chatOptions: chatOptions);
+        }
 
         // 4. Load dataset
         var testCases = await DatasetLoaderFactory.LoadAsync(opts.Dataset.FullName, ct);
@@ -239,7 +283,7 @@ internal static class EvalCommand
         var report = summary.ToEvaluationReport(
             agentName: resolvedName,
             modelName: resolvedName,
-            endpoint: opts.Endpoint ?? "azure");
+            endpoint: opts.Sut is not null ? $"sut:{opts.Sut}" : (opts.Endpoint ?? "azure"));
 
         // Directory format is handled exclusively via --output-dir, not the stream-based export path
         var isDirectoryFormat = opts.Format.Equals("directory", StringComparison.OrdinalIgnoreCase)
@@ -337,6 +381,17 @@ internal sealed class EvalOptions
     public string? Model { get; init; }
     public string? DeploymentName { get; init; }
     public string? ApiKey { get; init; }
+
+    /// <summary>Built-in SUT selector (<c>--sut</c>, Track 2 PR2); <c>copilot-studio</c> is the only built-in target today.</summary>
+    public string? Sut { get; init; }
+
+    /// <summary>
+    /// Per-built-in-target bound options, keyed by <see cref="ISutTarget.Sut"/> — mirrors
+    /// <see cref="RedTeamOptions.TargetOptions"/>'s exact shape/purpose for the `eval` verb.
+    /// </summary>
+    public IReadOnlyDictionary<string, ISutTargetOptions?> TargetOptions { get; init; }
+        = new Dictionary<string, ISutTargetOptions?>(StringComparer.OrdinalIgnoreCase);
+
     public string? Metrics { get; init; }
     public int Runs { get; init; } = 1;
     public double SuccessThreshold { get; init; } = 0.8;
