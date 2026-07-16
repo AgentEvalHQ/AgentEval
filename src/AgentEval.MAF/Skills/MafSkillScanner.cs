@@ -191,8 +191,19 @@ public static class MafSkillScanner
 
             var label = string.IsNullOrWhiteSpace(rawManifest.Name) ? "(unnamed skill)" : rawManifest.Name;
             var granular = SkillComplianceValidator.ValidateSingle(rawManifest, options);
+            // Candidate reasons: every GA-authoring-rule finding (name/description/compatibility), at ANY
+            // severity — NOT just High. DescriptionTooLong is Medium but is a confirmed real MAF silent-
+            // exclusion trigger (see RawSkillDirectoryScanner's remarks), so filtering by severity alone
+            // would wrongly fall through to the generic "might be malformed YAML" fallback for it. Excludes
+            // the three AgentEval-OWNED governance/experimental flags (ScriptRequiresGovernanceReview /
+            // ResourceFromUntrustedSource / AllowedToolsExperimental) explicitly, not by severity threshold
+            // — those are opinions about scripts/resources/allowed-tools, never something MAF's own parser
+            // could plausibly reject a file for, so including them here would be a NEW kind of misleading
+            // reason rather than a fix.
             var violatedRuleReasons = granular
-                .Where(f => f.Severity == Severity.High)
+                .Where(f => f.Rule is not (SkillComplianceRule.ScriptRequiresGovernanceReview
+                    or SkillComplianceRule.ResourceFromUntrustedSource
+                    or SkillComplianceRule.AllowedToolsExperimental))
                 .Select(f => f.Message)
                 .ToList();
 
@@ -214,11 +225,19 @@ public static class MafSkillScanner
         return findings;
     }
 
+    // Canonicalizes to an absolute, fully-qualified form before comparing. This matters because the two
+    // sides being reconciled do NOT start out in the same shape: MAF's own AgentFileSkill.Path is always
+    // absolute, but RawSkillDirectoryScanner's candidates are derived from whatever form the CALLER's
+    // skillPath argument had — if a caller passes a relative path (e.g. "agenteval skills scan ./skills"
+    // from the CLI), every raw-walk candidate stayed relative while returnedDirectories was all-absolute, so
+    // a plain TrimEnd-only comparison never matched ANYTHING and every skill was falsely flagged excluded.
+    // Path.GetFullPath resolves relative segments against the current directory (the same base any relative
+    // path passed to AgentFileSkillsSource's constructor would resolve against) and normalizes separators.
     // Case-insensitive on Windows/macOS (matches the observed filesystem); on case-sensitive Linux
     // filesystems this can only make MORE candidates match pass 1's returned set (never fewer), so it
     // errs toward NOT reporting a false exclusion rather than toward missing a real one.
     private static string NormalizeDirectory(string path) =>
-        path.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        Path.GetFullPath(path).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
 
     /// <summary>
     /// Maps a live <see cref="AgentSkill"/> to the pure <see cref="SkillManifest"/> DTO. Public and testable

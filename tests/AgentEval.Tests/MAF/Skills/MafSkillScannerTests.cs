@@ -233,6 +233,68 @@ public class MafSkillScannerTests
     }
 
     [Fact]
+    public async Task ScanFileSkillsAsync_RelativePath_WellFormedSkillSet_ZeroExclusionFindings()
+    {
+        // Regression guard: returnedDirectories is built from MAF's always-ABSOLUTE AgentFileSkill.Path,
+        // while the raw-scanner's candidates preserved whatever form the caller's skillPath argument had.
+        // Before NormalizeDirectory canonicalized both sides via Path.GetFullPath, passing a genuinely
+        // RELATIVE path here made every well-formed skill falsely flag as excluded (relative-string
+        // candidates could never string-match absolute returned paths). This test uses a path relative to
+        // the CURRENT process working directory (via Path.GetRelativePath) rather than mutating
+        // Environment.CurrentDirectory, which would be unsafe under parallel test execution.
+        var root = NewFixtureRoot();
+        var dir = Path.Combine(root, "relative-path-skill");
+        Directory.CreateDirectory(dir);
+        await File.WriteAllTextAsync(Path.Combine(dir, "SKILL.md"),
+            "---\nname: relative-path-skill\ndescription: reached via a relative skillPath argument.\n---\n\nBody.\n");
+
+        try
+        {
+            var relativeRoot = Path.GetRelativePath(Directory.GetCurrentDirectory(), root);
+            Assert.False(Path.IsPathRooted(relativeRoot), "test precondition: the constructed path must actually be relative");
+
+            var report = await MafSkillScanner.ScanFileSkillsAsync(relativeRoot, FakeAgent());
+
+            Assert.Equal(1, report.Coverage.SkillCount);
+            Assert.Equal(0, report.Coverage.SilentlyExcludedCount);
+            Assert.DoesNotContain(report.Findings, f => f.Rule == SkillComplianceRule.SkillExcludedFromDiscovery);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task ScanFileSkillsAsync_DescriptionTooLong_ReasonIsTheRealDescriptionRule_NotTheGenericFallback()
+    {
+        // Regression guard: FindSilentExclusions used to filter candidate reasons to Severity.High only, so
+        // DescriptionTooLong (Medium — but a CONFIRMED real MAF silent-exclusion trigger) fell through to
+        // the generic "might be malformed YAML, inspect directly" fallback instead of the real, already-
+        // detected reason.
+        var root = NewFixtureRoot();
+        var dir = Path.Combine(root, "long-description");
+        Directory.CreateDirectory(dir);
+        var longDescription = new string('d', 1100); // > SkillComplianceValidator's 1024-char GA limit
+        await File.WriteAllTextAsync(Path.Combine(dir, "SKILL.md"),
+            $"---\nname: long-description\ndescription: {longDescription}\n---\n\nBody.\n");
+
+        try
+        {
+            var report = await MafSkillScanner.ScanFileSkillsAsync(root, FakeAgent());
+
+            Assert.Equal(1, report.Coverage.SilentlyExcludedCount);
+            var finding = Assert.Single(report.Findings, f => f.Rule == SkillComplianceRule.SkillExcludedFromDiscovery);
+            Assert.Contains("1100 characters", finding.Message, StringComparison.Ordinal); // the REAL DescriptionTooLong message
+            Assert.DoesNotContain("malformed YAML", finding.Message, StringComparison.OrdinalIgnoreCase); // not the generic fallback
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task ScanFileSkillsAsync_MixedValidAndMalformedSiblings_OnlyMalformedOneExcluded()
     {
         var root = NewFixtureRoot();
