@@ -46,6 +46,35 @@ result; `Terminate` → stop the loop), so adding a gate never silently changes 
 > silently defeat the trap, so it's excluded from Observe's "zero behavior change" guarantee by design — add it
 > separately once you're ready to enforce at its `MinimumPolicy` or stronger.
 
+## Tool RESULT gates (Phase 2, P0‑3)
+
+Every gate above inspects the **proposed call** *before* it runs. Nothing inspected the tool's own **result**
+before it flowed back into the model's context — a poisoned web page, file, or API response a tool fetches
+can carry an injected instruction, an oversized payload, or a leaked credential that no argument‑side gate
+ever sees, because the danger arrives in the *output*, not the *input*. `IToolResultGate` closes that gap: it
+runs **after** every `IToolGate` has allowed the call and the tool has actually executed, and returns
+**Allow / Block / Redact** over the already‑real result — it can decide what the model gets to see, never
+whether the call itself was allowed (the tool already ran).
+
+Register via `UseAgentEvalToolGate(..., resultGates: [...])` or (preferred) `GatekeeperOptions.ToolResultGates`
+/ `AddResultGate(...)` through `UseGatekeeper`. A result‑gate‑only configuration (no `ToolGates` at all) is
+valid — protecting results doesn't require also gating the proposed calls.
+
+| Gate | What it does | Rank | Honest reasoning |
+|---|---|:--:|---|
+| **ToolResultInjectionGate** | Blocks a result containing a configured injection marker (case‑insensitive substring, shares its default list with `TokenInjectionGate`). Not maskable — always **Block**, never **Redact** (the danger is the surrounding instruction text, not a substring you can blank out). | 🟡 **3** | The direct OWASP LLM01 indirect‑injection countermeasure at the one seam nothing else here watches — the tool's own output. Same honest limit as its chat‑side sibling: keyword matching is evadable/paraphrasable, so treat it as a cheap door‑check, not a robust filter — see [Extending](#extending-the-gatekeeper-llm-backed-detection) for a judge‑backed alternative at this seam too. |
+| **ToolResultSizeGate** | Truncates an oversized result (default 8,000 chars) to a configurable limit; always **Redact** (a large legitimate result is still useful truncated, not a block‑worthy finding). | 🟠 **2** | If you control the tool, truncate inside its own body — simpler and stronger. Earns its keep for a tool you **don't** control (third‑party MCP tool, uninstrumented API) whose response size you can't bound at the source — → rises to ~🟢 **4** for exactly that case, plus it's the only backstop against a single runaway result silently consuming the context/cost budget for the rest of the conversation. |
+| **ToolResultSecretGate** | Detects and masks common credential SHAPES (AWS/GitHub/Slack/Google/Stripe keys, PEM private‑key blocks, bearer tokens, JWTs) in a result; always **Redact** on a match — the rest of the result stays useful with just the credential blanked out. | 🟡 **3** | Same honest ceiling as `RegexPiiGate`: a real, useful deterministic baseline for "a fetched log/config/error dump happens to carry a live secret," but shape‑based regex has known blind spots (a secret in an unrecognized format, or deliberately obfuscated, slips through). Pairs with `DomainAllowListGate`/`TaintTrackingGate` for the *destination* half of the same exfiltration story. |
+
+> **Policy reinterpretation for a post‑execution subject.** `ToolGatePolicy` is reused (not a second enum) but
+> means something adjacent here: `WarnOnly` records the finding but still returns the **real** result (the tool
+> already ran — there's nothing left to "warn instead of run"); `ReplaceResult`/`Terminate` swap in the same
+> non‑revealing `{error, referenceId}` refusal shape call gates use. A `Redact` verdict is **always** applied
+> regardless of policy — mirrors `ToolGateAction.Mutate`'s "always applied" precedent: a gate offering a safer
+> version of real content isn't a decision an enforcement policy should gate. Recorded under the `gate.tool-result.*`
+> trace stage (not `gate.tool.*`) so a result‑gate finding is distinguishable from a call‑gate finding while
+> still counted by the same stage‑agnostic `GlassBoxEvidence.CountGateBlocks`.
+
 ### Budget & egress (off the `RunLedger`)
 
 `RunLedger` is the per‑run **cross‑hop accumulator** (total tool calls, per‑tool counts, monetary sums) that the

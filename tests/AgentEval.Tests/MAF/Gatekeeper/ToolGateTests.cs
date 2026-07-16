@@ -337,6 +337,68 @@ public class ToolGateTests
         Assert.Equal(0, sends);   // but the guarded tool after it was blocked
     }
 
+    // ── Gatekeeper Hardening Phase 2 fixture: parallel tool calls (multiple FunctionCallContent in one turn) ──
+
+    [Fact]
+    public async Task ParallelToolCalls_EachCallGatedIndependently_OneBlockedOneAllowed()
+    {
+        // Proves the fixture actually exercises MAF's FunctionInvokingChatClient invoking N calls from a
+        // SINGLE assistant turn (not N separate scripted turns) — a gate must inspect and decide each of the
+        // N calls on its own, in the same FICC iteration (FunctionCount > 1).
+        var reads = 0;
+        var sends = 0;
+        var readTool = AIFunctionFactory.Create(() => { Interlocked.Increment(ref reads); return "ok"; }, "read_data");
+        var sendTool = AIFunctionFactory.Create((string body) => { Interlocked.Increment(ref sends); return "sent"; }, "send_email");
+        var scripted = new ScriptedChatClient()
+            .AddParallelToolCalls(
+                ("c1", "read_data", new Dictionary<string, object?>()),
+                ("c2", "send_email", new Dictionary<string, object?> { ["body"] = "x" }))
+            .AddText("done");
+        var agent = new ChatClientAgent(scripted, new ChatClientAgentOptions
+        {
+            Name = "T",
+            ChatOptions = new ChatOptions { Tools = [readTool, sendTool] },
+        });
+        var trace = new AgentTrace();
+        var gated = agent.AsBuilder()
+            .UseAgentEvalToolGate([new ForbiddenToolGate("send_email")], ToolGatePolicy.ReplaceResult, trace)
+            .Build();
+
+        await gated.RunAsync("go");
+
+        Assert.Equal(1, reads);   // read_data was allowed and actually ran
+        Assert.Equal(0, sends);   // send_email, in the SAME turn, was independently blocked
+        Assert.Equal(1, GlassBoxEvidence.FromTrace(trace).GateBlockCount);
+    }
+
+    [Fact]
+    public async Task ParallelToolCalls_BothCallsAllowed_BothExecute()
+    {
+        var callCount = 0;
+        var tool = AIFunctionFactory.Create((string city) => { Interlocked.Increment(ref callCount); return $"weather for {city}"; }, "weather");
+        var scripted = new ScriptedChatClient()
+            .AddParallelToolCalls(
+                ("c1", "weather", new Dictionary<string, object?> { ["city"] = "tokyo" }),
+                ("c2", "weather", new Dictionary<string, object?> { ["city"] = "osaka" }))
+            .AddText("done");
+        var agent = new ChatClientAgent(scripted, new ChatClientAgentOptions { Name = "T", ChatOptions = new ChatOptions { Tools = [tool] } });
+        var gated = agent.AsBuilder()
+            .UseAgentEvalToolGate([new AllowAllToolGate()], ToolGatePolicy.WarnOnly)
+            .Build();
+
+        await gated.RunAsync("go");
+
+        Assert.Equal(2, callCount);   // both parallel calls actually reached the tool function
+    }
+
+    private sealed class AllowAllToolGate : IToolGate
+    {
+        public string PolicyName => "AllowAllToolGate";
+        public GateCost Cost => GateCost.PureCode;
+        public ValueTask<ToolGateVerdict> InspectAsync(GatedToolCall call, CancellationToken ct = default)
+            => new(ToolGateVerdict.Allow(PolicyName));
+    }
+
     // ── MCP coverage: a custom (non-factory) AIFunction subclass gates identically by name ──
 
     [Fact]

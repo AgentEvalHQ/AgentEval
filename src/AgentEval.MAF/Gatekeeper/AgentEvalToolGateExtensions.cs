@@ -51,6 +51,16 @@ public static class AgentEvalToolGateExtensions
     /// <see cref="TraceCaptureMode.Full"/> explicitly to restore that behavior when you know your arguments
     /// never carry secrets and want the exact before/after values for debugging.
     /// </param>
+    /// <param name="resultGates">
+    /// Gatekeeper Hardening Phase 2, P0-3 — gates that inspect this call's already-executed RESULT (not the
+    /// proposed call) before it flows back to the model. Run in order, AFTER every <paramref name="gates"/>
+    /// entry has allowed the call and the tool has actually executed. <paramref name="policy"/> is reused for
+    /// enforcement, reinterpreted for a post-execution subject: <see cref="ToolGatePolicy.WarnOnly"/> records a
+    /// <see cref="ToolResultAction.Block"/> finding but still returns the real result;
+    /// <see cref="ToolGatePolicy.ReplaceResult"/>/<see cref="ToolGatePolicy.Terminate"/> swap in the same
+    /// non-revealing <c>{error, referenceId}</c> shape <paramref name="gates"/> blocks use. Null/empty ⇒ no
+    /// result inspection at all (the exact prior behavior — fully backward compatible).
+    /// </param>
     /// <remarks>
     /// <b>Only a best-effort RUNTIME <see cref="GateRequirements.RunScope"/> signal at this seam, not a
     /// construction-time guard.</b> A <paramref name="gates"/> entry that declares
@@ -84,7 +94,8 @@ public static class AgentEvalToolGateExtensions
         ToolGatePolicy policy,
         AgentTrace? trace = null,
         GateTelemetry? telemetry = null,
-        TraceCaptureMode mutationCaptureMode = TraceCaptureMode.Redacted)
+        TraceCaptureMode mutationCaptureMode = TraceCaptureMode.Redacted,
+        IReadOnlyList<IToolResultGate>? resultGates = null)
     {
         ArgumentNullException.ThrowIfNull(builder);
         ArgumentNullException.ThrowIfNull(gates);
@@ -96,6 +107,10 @@ public static class AgentEvalToolGateExtensions
         // above entirely for anything added afterward) and risks a mid-request "Collection was modified" if
         // the caller mutates it while a call is in flight (AllowConcurrentInvocation).
         var frozenGates = gates.ToArray();
+
+        // P0-3: same snapshot-and-validate discipline for result gates.
+        var frozenResultGates = (resultGates ?? Array.Empty<IToolResultGate>()).ToArray();
+        ValidateResultGates(frozenResultGates, policy);
 
         // #4-revisit: a REGISTRATION-time check of AgentRunScope.Current is not just hard but structurally
         // impossible — Current is an AsyncLocal only ever set inside an actual RunAsync call
@@ -220,7 +235,100 @@ public static class AgentEvalToolGateExtensions
                 }
             }
 
-            return await next(context, ct).ConfigureAwait(false);
+            var toolResult = await next(context, ct).ConfigureAwait(false);
+
+            if (frozenResultGates.Length == 0)
+            {
+                return toolResult;   // exact prior behavior — zero overhead when no result gate is registered
+            }
+
+            // P0-3: the tool has now ACTUALLY executed — result gates only ever decide what the model gets to
+            // see of a result that already happened, never whether the call itself was allowed.
+            foreach (var resultGate in frozenResultGates)
+            {
+                ToolResultVerdict resultVerdict;
+                var resultStopwatch = telemetry is null ? null : Stopwatch.StartNew();
+                var resultView = new GatedToolResult(
+                    FunctionName: context.Function.Name,
+                    Arguments: context.Arguments as IReadOnlyDictionary<string, object?>,
+                    Result: toolResult,
+                    AgentName: agent.Name,
+                    Iteration: context.Iteration,
+                    FunctionCallIndex: context.FunctionCallIndex,
+                    FunctionCount: context.FunctionCount,
+                    IsStreaming: context.IsStreaming,
+                    Messages: context.Messages as IReadOnlyList<ChatMessage>);
+
+                try
+                {
+                    resultVerdict = await resultGate.InspectAsync(resultView, ct).ConfigureAwait(false);
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    telemetry?.Record(resultGate.PolicyName, ToolResultAction.Block, resultStopwatch!.Elapsed);
+
+                    // FAIL CLOSED, same rule as the call-gate loop above: cannot-inspect ⇒ deny the RESULT
+                    // (the tool already ran — this only withholds what the model sees of it).
+                    var throwReferenceId = GateReferenceId.New();
+                    RecordResultBlock(trace, Interlocked.Increment(ref gateSeq), resultGate.PolicyName,
+                        $"result gate evaluation threw ({ex.GetType().Name}) — failing closed",
+                        action: policy == ToolGatePolicy.WarnOnly ? "Warn" : "Block",
+                        terminating: policy == ToolGatePolicy.Terminate, referenceId: throwReferenceId);
+
+                    if (policy == ToolGatePolicy.WarnOnly)
+                    {
+                        continue;   // WarnOnly: recorded, but the real result still flows through
+                    }
+
+                    if (policy == ToolGatePolicy.Terminate)
+                    {
+                        context.Terminate = true;
+                    }
+
+                    return GateReferenceId.RefusalBody(throwReferenceId);
+                }
+
+                telemetry?.Record(resultGate.PolicyName, resultVerdict.Action, resultStopwatch!.Elapsed);
+
+                switch (resultVerdict.Action)
+                {
+                    case ToolResultAction.Allow:
+                        continue;
+
+                    case ToolResultAction.Redact:
+                        // Applied regardless of policy — mirrors ToolGateAction.Mutate's precedent (a gate
+                        // offering a safer version of real content is not an enforcement-policy decision).
+                        toolResult = resultVerdict.RedactedResult;
+                        RecordResultRedact(trace, Interlocked.Increment(ref gateSeq), resultVerdict);
+                        continue;
+
+                    case ToolResultAction.Block:
+                    {
+                        var seq = Interlocked.Increment(ref gateSeq);
+                        var enforced = policy != ToolGatePolicy.WarnOnly;
+                        var referenceId = GateReferenceId.New();
+
+                        RecordResultBlock(trace, seq, resultVerdict.PolicyName, resultVerdict.Reason,
+                            action: enforced ? "Block" : "Warn", terminating: policy == ToolGatePolicy.Terminate,
+                            referenceId: referenceId);
+
+                        if (!enforced)
+                        {
+                            continue;   // WarnOnly: recorded as a warning; the real result still flows through
+                        }
+
+                        if (policy == ToolGatePolicy.Terminate)
+                        {
+                            context.Terminate = true;
+                        }
+
+                        // Same non-revealing shape the call-gate loop uses — #12's design applies identically here.
+                        return GateReferenceId.RefusalBody(referenceId);
+                    }
+                }
+            }
+
+            return toolResult;
         });
     }
 
@@ -254,6 +362,37 @@ public static class AgentEvalToolGateExtensions
                     $"Gate '{g.PolicyName}' requires at least policy {g.MinimumPolicy} to enforce, but was registered " +
                     $"under {policy} (which would let a blocked call run). Register it under {g.MinimumPolicy} or stronger.",
                     nameof(policy));
+            }
+        }
+    }
+
+    // P0-3: same validation shape as ValidateGates (null elements, Network/Llm cost rejection, enforcement
+    // floor), for the separate IToolResultGate interface. Not generalized into one shared method over both
+    // interfaces — IToolGate and IToolResultGate are deliberately distinct types (see IToolResultGate's own
+    // remarks), and a generic constraint here would need a common base interface that doesn't otherwise exist
+    // and isn't worth introducing just to save this small a duplication.
+    internal static void ValidateResultGates(IReadOnlyList<IToolResultGate> resultGates, ToolGatePolicy policy)
+    {
+        foreach (var g in resultGates)
+        {
+            if (g is null)
+            {
+                throw new ArgumentException("resultGates contains a null element.", nameof(resultGates));
+            }
+
+            if (g.Cost is GateCost.Network or GateCost.Llm)
+            {
+                throw new ArgumentException(
+                    $"Result gate '{g.PolicyName}' has Cost={g.Cost}, which cannot run inline on the tool-invocation " +
+                    "hot path. Use shadow mode (a later milestone) for network/LLM gates.", nameof(resultGates));
+            }
+
+            if (EnforcementRank(policy) < EnforcementRank(g.MinimumPolicy))
+            {
+                throw new ArgumentException(
+                    $"Result gate '{g.PolicyName}' requires at least policy {g.MinimumPolicy} to enforce, but was " +
+                    $"registered under {policy} (which would let a blocked result reach the model). Register it " +
+                    $"under {g.MinimumPolicy} or stronger.", nameof(policy));
             }
         }
     }
@@ -297,6 +436,55 @@ public static class AgentEvalToolGateExtensions
         }
 
         trace.SetMetadata($"gate.tool.{seq}.{verdict.PolicyName}", value);
+    }
+
+    // P0-3: same shape as RecordBlock, stage token "tool-result" (not "tool") so a result-gate block is
+    // distinguishable from a call-gate block in trace evidence while still being picked up by
+    // GateMetadataReader/GlassBoxEvidence.CountGateBlocks (both are stage-agnostic — any gate.{stage}.{seq}.{policy}
+    // key with action="Block" counts). Reason is passed as a plain string (not a verdict) since this is also
+    // called from the fail-closed catch block, which has no ToolResultVerdict to hand in.
+    private static void RecordResultBlock(AgentTrace? trace, int seq, string policyName, string? reason, string action, bool terminating, string referenceId)
+    {
+        if (trace is null)
+        {
+            return;
+        }
+
+        var value = new Dictionary<string, object?>
+        {
+            ["action"] = action,
+            ["reason"] = reason,
+            ["matches"] = null,
+            ["correlationId"] = ToolCorrelationScope.Current,
+            ["referenceId"] = referenceId,
+        };
+        if (terminating)
+        {
+            value["terminate"] = true;
+        }
+
+        trace.SetMetadata($"gate.tool-result.{seq}.{policyName}", value);
+    }
+
+    // P0-3: a Redact verdict is recorded (action="Redact", NOT counted as a block) — deliberately does NOT
+    // capture the before/after result content itself (unlike RecordMutate's TraceCaptureMode-gated capture of
+    // tool ARGUMENTS). A tool RESULT can be arbitrarily large/shaped content from anywhere (a web page, a file,
+    // a database row) — capturing it into the trace at all, even redacted-by-default, is a bigger surface than
+    // this pass scopes; only the fact that a redaction happened, and why, is recorded. Full result-capture
+    // (mirroring MutationEvidenceRenderer/TraceCaptureMode) is deliberately deferred, not an oversight.
+    private static void RecordResultRedact(AgentTrace? trace, int seq, ToolResultVerdict verdict)
+    {
+        if (trace is null)
+        {
+            return;
+        }
+
+        trace.SetMetadata($"gate.tool-result.{seq}.{verdict.PolicyName}", new Dictionary<string, object?>
+        {
+            ["action"] = "Redact",
+            ["reason"] = verdict.Reason,
+            ["correlationId"] = ToolCorrelationScope.Current,
+        });
     }
 
     // #4-revisit: the best-effort RUNTIME missing-run-scope signal — see the field comment where

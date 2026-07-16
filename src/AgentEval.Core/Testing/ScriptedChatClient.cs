@@ -45,6 +45,32 @@ public sealed class ScriptedChatClient : IChatClient
     public ScriptedChatClient AddToolCall(string callId, string name, IDictionary<string, object?> args)
         => Add(new ScriptedTurn { ToolCallId = callId, ToolName = name, ToolArgs = args, FinishReason = ChatFinishReason.ToolCalls });
 
+    /// <summary>
+    /// Gatekeeper Hardening Phase 2 fixture prerequisite — scripts an assistant turn that emits MULTIPLE tool
+    /// calls in ONE turn (finish reason "tool_calls"), the shape a real provider sends for parallel function
+    /// calling. Before this, <see cref="ScriptedChatClient"/> could only ever emit one
+    /// <see cref="FunctionCallContent"/> per turn, so no test could exercise a gate pipeline against MAF's
+    /// FunctionInvokingChatClient actually invoking N calls from a single assistant message (sequential or
+    /// concurrent under <c>AllowConcurrentInvocation</c>) — only against N single-call turns in a row, which is
+    /// a materially different code path (FICC does not batch those).
+    /// </summary>
+    public ScriptedChatClient AddParallelToolCalls(params (string CallId, string Name, IDictionary<string, object?> Args)[] calls)
+    {
+        ArgumentNullException.ThrowIfNull(calls);
+        if (calls.Length == 0)
+        {
+            throw new ArgumentException("At least one tool call is required.", nameof(calls));
+        }
+
+        return Add(new ScriptedTurn
+        {
+            ToolCalls = calls
+                .Select(c => new ScriptedToolCall { ToolCallId = c.CallId, ToolName = c.Name, ToolArgs = c.Args })
+                .ToList(),
+            FinishReason = ChatFinishReason.ToolCalls,
+        });
+    }
+
     /// <summary>Scripts a turn that throws (simulates a transient/provider error).</summary>
     public ScriptedChatClient AddThrow(string message = "Simulated provider error")
         => Add(new ScriptedTurn { Throw = message });
@@ -63,7 +89,19 @@ public sealed class ScriptedChatClient : IChatClient
         }
 
         var contents = new List<AIContent>();
-        if (turn.ToolName is not null)
+        if (turn.ToolCalls is { Count: > 0 })
+        {
+            // Parallel-call fixture path: emit every scripted call as its own FunctionCallContent in the SAME
+            // assistant message — this is what makes FICC treat them as N calls from one turn (FunctionCount > 1
+            // in FunctionInvocationContext), not N separate single-call turns.
+            var i = 0;
+            foreach (var call in turn.ToolCalls)
+            {
+                contents.Add(new FunctionCallContent(call.ToolCallId ?? $"call_{i}", call.ToolName, call.ToolArgs ?? new Dictionary<string, object?>()));
+                i++;
+            }
+        }
+        else if (turn.ToolName is not null)
         {
             contents.Add(new FunctionCallContent(turn.ToolCallId ?? "call_0", turn.ToolName, turn.ToolArgs ?? new Dictionary<string, object?>()));
         }
@@ -134,6 +172,14 @@ public sealed class ScriptedTurn
     /// <summary>Tool-call arguments (defaults to empty when null).</summary>
     public IDictionary<string, object?>? ToolArgs { get; init; }
 
+    /// <summary>
+    /// Multiple tool calls to emit in ONE turn (parallel function calling) — set via
+    /// <see cref="ScriptedChatClient.AddParallelToolCalls"/>. Takes precedence over the single
+    /// <see cref="ToolCallId"/>/<see cref="ToolName"/>/<see cref="ToolArgs"/> trio above when non-empty; the
+    /// single-call trio remains the simple path for the common one-call-per-turn case.
+    /// </summary>
+    public IReadOnlyList<ScriptedToolCall>? ToolCalls { get; init; }
+
     /// <summary>Finish reason for the turn (e.g. <see cref="ChatFinishReason.Stop"/> / <see cref="ChatFinishReason.ToolCalls"/>).</summary>
     public ChatFinishReason? FinishReason { get; init; }
 
@@ -145,4 +191,17 @@ public sealed class ScriptedTurn
 
     /// <summary>When set, the turn throws an <see cref="InvalidOperationException"/> with this message.</summary>
     public string? Throw { get; init; }
+}
+
+/// <summary>One tool call within a parallel-tool-call <see cref="ScriptedTurn"/> — see <see cref="ScriptedChatClient.AddParallelToolCalls"/>.</summary>
+public sealed class ScriptedToolCall
+{
+    /// <summary>Tool-call id; defaults to <c>call_{index}</c> within the turn when null.</summary>
+    public string? ToolCallId { get; init; }
+
+    /// <summary>Tool name.</summary>
+    public required string ToolName { get; init; }
+
+    /// <summary>Tool-call arguments (defaults to empty when null).</summary>
+    public IDictionary<string, object?>? ToolArgs { get; init; }
 }

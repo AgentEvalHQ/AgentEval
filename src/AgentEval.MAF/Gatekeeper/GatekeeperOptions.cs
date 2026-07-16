@@ -20,6 +20,14 @@ public sealed class GatekeeperOptions
     /// <summary>Tool gates, run in order on every tool call (via <c>UseAgentEvalToolGate</c>).</summary>
     public IList<IToolGate> ToolGates { get; } = new List<IToolGate>();
 
+    /// <summary>
+    /// Tool RESULT gates (Phase 2, P0-3), run in order on every already-executed tool call's result, AFTER
+    /// every <see cref="ToolGates"/> entry has allowed the call and the tool has actually run. See
+    /// <see cref="IToolResultGate"/> for why this is a separate list from <see cref="ToolGates"/> rather than a
+    /// mode on the same gate.
+    /// </summary>
+    public IList<IToolResultGate> ToolResultGates { get; } = new List<IToolResultGate>();
+
     /// <summary>Run-pre chat gates, inspecting the input text before the model sees it.</summary>
     public IList<IChatGate> PreGates { get; } = new List<IChatGate>();
 
@@ -31,6 +39,9 @@ public sealed class GatekeeperOptions
 
     /// <summary>Adds a tool gate. Sugar for <c>ToolGates.Add(gate)</c> — matches the shape shown in the Gatekeeper hardening review's own example.</summary>
     public void Add(IToolGate gate) => ToolGates.Add(gate ?? throw new ArgumentNullException(nameof(gate)));
+
+    /// <summary>Adds a tool RESULT gate (Phase 2, P0-3). Sugar for <c>ToolResultGates.Add(gate)</c>.</summary>
+    public void AddResultGate(IToolResultGate gate) => ToolResultGates.Add(gate ?? throw new ArgumentNullException(nameof(gate)));
 
     /// <summary>Adds a run-pre chat gate. Sugar for <c>PreGates.Add(gate)</c>.</summary>
     public void AddPreGate(IChatGate gate) => PreGates.Add(gate ?? throw new ArgumentNullException(nameof(gate)));

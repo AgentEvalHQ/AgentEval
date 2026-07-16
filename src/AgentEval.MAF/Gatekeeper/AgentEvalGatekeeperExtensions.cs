@@ -104,9 +104,15 @@ public static class AgentEvalGatekeeperExtensions
         // toolPolicy (today, in practice, always a MinimumPolicy=ReplaceResult+ canary/honeypot gate under
         // Observe's WarnOnly) refuses to be silently downgraded — running a honeypot under WarnOnly would let
         // the forbidden action through while only logging it, defeating the trap.
+        // P0-3: result gates share the exact same MinimumPolicy-floor mechanics as tool gates (see
+        // IToolResultGate.MinimumPolicy remarks) — fold them into the same floor check rather than a second,
+        // easy-to-forget copy.
         var flooredGates = options.ToolGates
             .Where(g => AgentEvalToolGateExtensions.EnforcementRank(g.MinimumPolicy) > AgentEvalToolGateExtensions.EnforcementRank(toolPolicy))
             .Select(g => $"{g.PolicyName} (needs {g.MinimumPolicy})")
+            .Concat(options.ToolResultGates
+                .Where(g => AgentEvalToolGateExtensions.EnforcementRank(g.MinimumPolicy) > AgentEvalToolGateExtensions.EnforcementRank(toolPolicy))
+                .Select(g => $"{g.PolicyName} (needs {g.MinimumPolicy})"))
             .Distinct(StringComparer.Ordinal)
             .ToArray();
 
@@ -134,6 +140,12 @@ public static class AgentEvalGatekeeperExtensions
             AgentEvalToolGateExtensions.ValidateGates(options.ToolGates.ToArray(), toolPolicy);
         }
 
+        // P0-3: same preflight-before-any-mutation discipline for result gates.
+        if (options.ToolResultGates.Count > 0)
+        {
+            AgentEvalToolGateExtensions.ValidateResultGates(options.ToolResultGates.ToArray(), toolPolicy);
+        }
+
         // Same reasoning for the approval gates' own validation (malformed PolicyName) — preflight it here too,
         // rather than let UseAgentEvalToolApproval discover it only after the run/tool gates already mutated
         // `result` (== `builder`).
@@ -152,7 +164,8 @@ public static class AgentEvalGatekeeperExtensions
         {
             options.BannerWriter?.WriteLine("AGENTEVAL GATEKEEPER IS RUNNING IN OBSERVE-ONLY MODE. NO TOOL CALLS WILL BE BLOCKED.");
             options.BannerWriter?.WriteLine(
-                $"  ({options.ToolGates.Count} tool gate(s), {options.PreGates.Count + options.PostGates.Count} run gate(s) " +
+                $"  ({options.ToolGates.Count} tool gate(s), {options.ToolResultGates.Count} tool result gate(s), " +
+                $"{options.PreGates.Count + options.PostGates.Count} run gate(s) " +
                 $"registered — findings are recorded to the trace but never enforced.)");
         }
 
@@ -167,9 +180,14 @@ public static class AgentEvalGatekeeperExtensions
                 trace: options.Trace);
         }
 
-        if (options.ToolGates.Count > 0)
+        // P0-3: a result-gate-only configuration (ToolGates empty, ToolResultGates non-empty) is valid —
+        // observing/protecting results doesn't require also gating the proposed calls — so this composes
+        // whenever EITHER list is non-empty, not just when ToolGates is.
+        if (options.ToolGates.Count > 0 || options.ToolResultGates.Count > 0)
         {
-            result = result.UseAgentEvalToolGate(options.ToolGates.ToArray(), toolPolicy, options.Trace, options.Telemetry, options.MutationCaptureMode);
+            result = result.UseAgentEvalToolGate(
+                options.ToolGates.ToArray(), toolPolicy, options.Trace, options.Telemetry, options.MutationCaptureMode,
+                options.ToolResultGates.Count > 0 ? options.ToolResultGates.ToArray() : null);
         }
 
         if (options.ApprovalGates.Count > 0)

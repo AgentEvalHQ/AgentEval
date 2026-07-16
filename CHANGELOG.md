@@ -7,6 +7,53 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Gatekeeper Hardening Phase 2 — tool RESULT gates (P0-3) + a parallel-tool-call test fixture
+
+#### Added
+- **`IToolResultGate`** (`AgentEval.MAF.Gatekeeper`) — a new gate kind inspecting one already-executed tool
+  call's RESULT, at the same MAF function-invocation seam `IToolGate` inspects the *proposed* call, but on the
+  other side of `next(...)`. Closes the "tool output as an injection channel" gap: nothing before this
+  inspected a tool's own return value before it re-entered the model's context (only *prior* results, read out
+  of conversation history, were ever consulted — never *this* call's own result, synchronously, before it flows
+  back). Returns `ToolResultVerdict` (`Allow` / `Block` / `Redact`, via `GatedToolResult`). Wired into
+  `UseAgentEvalToolGate`'s new optional `resultGates` parameter — runs, in order, immediately after `next(...)`
+  returns, only once every `IToolGate` has allowed the call. A `Block`/throw fails closed exactly like the
+  call-gate loop; a `Redact` verdict is applied regardless of `ToolGatePolicy` (mirrors `ToolGateAction.Mutate`'s
+  "always applied" precedent). Recorded under the new `gate.tool-result.*` trace stage — distinguishable from a
+  call-gate block while still counted by the existing, stage-agnostic `GlassBoxEvidence.CountGateBlocks`. Null/
+  empty `resultGates` is the exact prior behavior (zero overhead, fully backward compatible).
+- **Three built-in result gates** (`AgentEval.MAF.Gatekeeper.Gates`):
+  - **`ToolResultInjectionGate`** — blocks a result containing a prompt-injection marker (shares its default
+    marker list with the chat-side `TokenInjectionGate`, now `public` for exactly this reuse). Not maskable —
+    always `Block`, never `Redact`.
+  - **`ToolResultSizeGate`** — truncates an oversized result (default 8,000 chars) via `Redact`, bounding
+    context-window exhaustion and per-turn token cost from a single runaway tool response.
+  - **`ToolResultSecretGate`** — detects and masks common credential shapes (AWS/GitHub/Slack/Google/Stripe
+    keys, full PEM private-key blocks, bearer tokens, JWTs) via `Redact`, mirroring `RegexPiiGate`'s
+    bounded-timeout mask-with-█ approach.
+- **`GatekeeperOptions.ToolResultGates` / `AddResultGate(...)`** — composed by `UseGatekeeper` alongside
+  `ToolGates`; a result-gate-only configuration (no call gates registered) is valid. The `IToolResultGate.
+  MinimumPolicy` floor is folded into the same Observe-mode conflict check `ToolGates` already gets, and the
+  Observe startup banner now reports the result-gate count too.
+- **`GateTelemetry.Record(string, ToolResultAction, TimeSpan)`** — a second overload sharing the same per-policy
+  counters as the call-gate `Record`, so a caller reading `Snapshot()` sees one unified effectiveness view
+  across both gate kinds; `Redact` maps to `MutateCount`.
+- **`ScriptedChatClient.AddParallelToolCalls(...)`** (`AgentEval.Core.Testing`) — the fixture prerequisite this
+  phase needed: scripts MULTIPLE `FunctionCallContent` in one assistant turn (the shape a real provider sends
+  for parallel function calling). Before this, the fixture could only ever emit one tool call per turn, so no
+  test could exercise a gate pipeline against MAF's `FunctionInvokingChatClient` actually invoking N calls from
+  a single turn — only N single-call turns in a row, a materially different code path. Fully additive — the
+  existing single-call `AddToolCall` API is unchanged.
+- `docs/gatekeeper/gate-reference.md` / `examples.md` / `introduction.md` updated with the new "Tool RESULT
+  gates" layer, its policy-reinterpretation rules, and runnable snippets.
+
+#### Deferred (explicitly out of scope this pass)
+- P0-4 (tool-plan/batch gates) — a genuinely new interception point, sized larger, deferred to a separate
+  session.
+- Full result-content capture into the trace (mirroring `MutationEvidenceRenderer`'s `TraceCaptureMode`) — a
+  tool result can be arbitrarily large/shaped content from anywhere; only the fact that a redaction happened,
+  and why, is recorded for now.
+
 ### Copilot Studio — live connector wired (`redteam --sut copilot-studio` Track 1)
 
 #### Added
