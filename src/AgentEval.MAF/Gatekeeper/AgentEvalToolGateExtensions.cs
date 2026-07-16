@@ -110,15 +110,16 @@ public static class AgentEvalToolGateExtensions
 
                     // FAIL CLOSED (cannot-inspect ⇒ deny): a gate that throws cannot prove the call safe, so block
                     // it — regardless of policy. FICC would otherwise swallow the exception and run the tool.
+                    var throwReferenceId = GateReferenceId.New();
                     RecordBlock(trace, Interlocked.Increment(ref gateSeq),
                         ToolGateVerdict.Block(gate.PolicyName, $"gate evaluation threw ({ex.GetType().Name}) — failing closed"),
-                        action: "Block", terminating: policy == ToolGatePolicy.Terminate);
+                        action: "Block", terminating: policy == ToolGatePolicy.Terminate, referenceId: throwReferenceId);
                     if (policy == ToolGatePolicy.Terminate)
                     {
                         context.Terminate = true;
                     }
 
-                    return SynthesizedRefusal(gate.PolicyName, "gate evaluation failed");
+                    return GateReferenceId.RefusalBody(throwReferenceId);
                 }
 
                 telemetry?.Record(gate.PolicyName, verdict.Action, stopwatch!.Elapsed);
@@ -149,11 +150,12 @@ public static class AgentEvalToolGateExtensions
                     {
                         var seq = Interlocked.Increment(ref gateSeq);
                         var enforced = policy != ToolGatePolicy.WarnOnly;
+                        var referenceId = GateReferenceId.New();
 
                         // Honest evidence: only an ENFORCED block records action="Block" (so GlassBoxEvidence's
                         // GateBlockCount never counts a call that actually ran). WarnOnly records action="Warn".
                         RecordBlock(trace, seq, verdict, action: enforced ? "Block" : "Warn",
-                            terminating: policy == ToolGatePolicy.Terminate);
+                            terminating: policy == ToolGatePolicy.Terminate, referenceId: referenceId);
 
                         if (!enforced)
                         {
@@ -166,7 +168,9 @@ public static class AgentEvalToolGateExtensions
                         }
 
                         // ReplaceResult + Terminate: block the tool, surface a non-null refusal (fail-closed).
-                        return SynthesizedRefusal(verdict.PolicyName, verdict.Reason);
+                        // #12: the model sees only a stable, non-revealing {error, referenceId} shape — never the
+                        // policy name or reason (that stays in the trace evidence below, audit-visible only).
+                        return GateReferenceId.RefusalBody(referenceId);
                     }
                 }
             }
@@ -174,9 +178,6 @@ public static class AgentEvalToolGateExtensions
             return await next(context, ct).ConfigureAwait(false);
         });
     }
-
-    private static string SynthesizedRefusal(string policyName, string? reason)
-        => $"BLOCKED by policy '{policyName}': {reason ?? "not permitted"}. Choose a different action.";
 
     // Enforcement strength ordering: WarnOnly (observe) < ReplaceResult (block) < Terminate (block + stop loop).
     private static int EnforcementRank(ToolGatePolicy policy) => policy switch
@@ -211,7 +212,10 @@ public static class AgentEvalToolGateExtensions
     // Mirrors EvalGatingChatClient.Record's value shape — stage token "tool" (dot-free), seq via Interlocked,
     // {action,reason,matches,correlationId}. A Terminate is still action="Block" (it blocked) + terminate=true,
     // so the shipped GlassBoxEvidence.CountGateBlocks counts it.
-    private static void RecordBlock(AgentTrace? trace, int seq, ToolGateVerdict verdict, string action, bool terminating)
+    // #12: the full policy name (the metadata key itself) and reason live ONLY here — audit-visible trace
+    // evidence, never returned to the model. referenceId is the ONLY thing the two are allowed to share, so an
+    // auditor can correlate what the model saw with what actually happened.
+    private static void RecordBlock(AgentTrace? trace, int seq, ToolGateVerdict verdict, string action, bool terminating, string referenceId)
     {
         if (trace is null)
         {
@@ -224,6 +228,7 @@ public static class AgentEvalToolGateExtensions
             ["reason"] = verdict.Reason,
             ["matches"] = null,
             ["correlationId"] = ToolCorrelationScope.Current,
+            ["referenceId"] = referenceId,
         };
         if (terminating)
         {

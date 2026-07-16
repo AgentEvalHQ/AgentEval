@@ -190,8 +190,9 @@ public static class AgentEvalRunGateExtensions
                 // FAIL CLOSED (cannot-inspect ⇒ deny): a gate that throws cannot prove the run safe. Record and
                 // block regardless of policy (mirrors the tool gate).
                 var failVerdict = GateVerdict.Block(gate.PolicyName, $"gate evaluation threw ({ex.GetType().Name}) — failing closed");
-                RecordGate(trace, Interlocked.Increment(ref seq[0]), stage, failVerdict, "Block");
-                return SynthRefusal(failVerdict);
+                var throwReferenceId = GateReferenceId.New();
+                RecordGate(trace, Interlocked.Increment(ref seq[0]), stage, failVerdict, "Block", throwReferenceId);
+                return GateReferenceId.RefusalBody(throwReferenceId);
             }
 
             if (verdict.Action != GateAction.Block)
@@ -202,16 +203,19 @@ public static class AgentEvalRunGateExtensions
             // Honest evidence: only an ENFORCED block records action="Block" (so GateBlockCount never counts a
             // run that proceeded). Under WarnOnly the block is recorded as action="Warn".
             var enforced = policy != EvalGatePolicy.WarnOnly;
-            RecordGate(trace, Interlocked.Increment(ref seq[0]), stage, verdict, enforced ? "Block" : "Warn");
+            var referenceId = GateReferenceId.New();
+            RecordGate(trace, Interlocked.Increment(ref seq[0]), stage, verdict, enforced ? "Block" : "Warn", referenceId);
 
             if (policy == EvalGatePolicy.ThrowOnFail)
             {
-                throw new EvalGateRefusalException(verdict, stage);   // propagates at the run boundary
+                throw new EvalGateRefusalException(verdict, stage);   // propagates at the run boundary — full detail is fine, this is app code, not model-visible content
             }
 
             if (policy == EvalGatePolicy.Redact)
             {
-                return verdict.RedactedText ?? SynthRefusal(verdict);   // short-circuit a refusal/redacted response
+                // #12: RedactedText (when a gate supplies one) IS meant to be seen — it's the SAFE version of the
+                // content, not a refusal. Only the fallback (no redaction available) gets the non-revealing shape.
+                return verdict.RedactedText ?? GateReferenceId.RefusalBody(referenceId);
             }
 
             // WarnOnly: recorded as a warning; let the run proceed.
@@ -223,13 +227,13 @@ public static class AgentEvalRunGateExtensions
     private static AgentResponse Refusal(AIAgent innerAgent, string text)
         => new(new ChatMessage(ChatRole.Assistant, text)) { AgentId = innerAgent.Id };
 
-    private static string SynthRefusal(GateVerdict verdict)
-        => $"BLOCKED by policy '{verdict.PolicyName}': {verdict.Reason ?? "not permitted"}. Choose a different action.";
-
     private static string ConcatText(IEnumerable<ChatMessage> messages)
         => string.Join("\n", messages.Select(m => m.Text).Where(t => !string.IsNullOrEmpty(t)));
 
-    private static void RecordGate(AgentTrace? trace, int seq, string stage, GateVerdict verdict, string action)
+    // #12: the full policy name (the metadata key itself) and reason live ONLY here — audit-visible trace
+    // evidence, never returned as run-refusal content (see GateReferenceId.RefusalBody). referenceId is the
+    // ONLY thing the two are allowed to share, so an auditor can correlate what was returned with what happened.
+    private static void RecordGate(AgentTrace? trace, int seq, string stage, GateVerdict verdict, string action, string referenceId)
     {
         if (trace is null)
         {
@@ -242,6 +246,7 @@ public static class AgentEvalRunGateExtensions
             ["reason"] = verdict.Reason,
             ["matches"] = verdict.Matches,
             ["correlationId"] = ToolCorrelationScope.Current,
+            ["referenceId"] = referenceId,
         });
     }
 }
