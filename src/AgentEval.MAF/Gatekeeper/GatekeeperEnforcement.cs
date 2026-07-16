@@ -24,6 +24,11 @@ public enum GatekeeperEnforcement
     /// existing agent with zero behavior change — the recommended mode for a first rollout, or for a purely
     /// advisory deployment. <c>UseGatekeeper</c> prints a startup banner in this mode so nobody mistakes it for
     /// enforcement (the review's "false assurance" concern).
+    /// <para><b>Exception: gates with a <see cref="IToolGate.MinimumPolicy"/> floor above WarnOnly</b> (a
+    /// canary/honeypot gate — e.g. <c>CanaryToolGate</c> — where running under WarnOnly would silently defeat
+    /// the trap) cannot be composed under Observe at all. <c>UseGatekeeper</c> refuses construction rather than
+    /// silently downgrade them — the "zero behavior change, safe to add anywhere" guarantee does not extend to
+    /// these gates; register them separately once you're ready to enforce.</para>
     /// </summary>
     Observe,
 

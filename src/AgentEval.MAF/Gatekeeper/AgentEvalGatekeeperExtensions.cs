@@ -96,6 +96,52 @@ public static class AgentEvalGatekeeperExtensions
         var toolPolicy = ToToolGatePolicy(enforcement);
         var evalPolicy = ToEvalGatePolicy(enforcement);
 
+        // Give a clear, Gatekeeper-contextualized error for a MinimumPolicy-floor conflict BEFORE the generic
+        // one UseAgentEvalToolGate would throw below. This is the case where Observe's "zero behavior change,
+        // safe to add anywhere" guarantee does NOT hold: a gate whose MinimumPolicy exceeds the resolved
+        // toolPolicy (today, in practice, always a MinimumPolicy=ReplaceResult+ canary/honeypot gate under
+        // Observe's WarnOnly) refuses to be silently downgraded — running a honeypot under WarnOnly would let
+        // the forbidden action through while only logging it, defeating the trap.
+        var flooredGates = options.ToolGates
+            .Where(g => AgentEvalToolGateExtensions.EnforcementRank(g.MinimumPolicy) > AgentEvalToolGateExtensions.EnforcementRank(toolPolicy))
+            .Select(g => $"{g.PolicyName} (needs {g.MinimumPolicy})")
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
+
+        if (flooredGates.Length > 0)
+        {
+            throw new InvalidOperationException(
+                $"UseGatekeeper: {string.Join(", ", flooredGates)} declare a MinimumPolicy stronger than the " +
+                $"resolved enforcement ({enforcement} → {toolPolicy}). A gate with a MinimumPolicy floor cannot " +
+                "be composed under a weaker policy — for Observe specifically, this means its \"safe to add " +
+                "anywhere, zero behavior change\" guarantee does not extend to these gates. Exclude them from " +
+                "this UseGatekeeper(...) call and add them separately (via UseAgentEvalToolGate, or a second, " +
+                "stronger UseGatekeeper call) once you're ready to enforce at their MinimumPolicy or stronger.");
+        }
+
+        // Preflight the REST of UseAgentEvalToolGate's own validation (null elements, Network/Llm cost
+        // rejection — the MinimumPolicy floor is already covered, more actionably, above) before any Use(...)
+        // call below mutates the caller's builder. AIAgentBuilder.Use(...) mutates and returns the SAME
+        // instance, not an immutable copy — a validation failure discovered only once UseAgentEvalToolGate
+        // itself runs (after UseAgentEvalGate has already composed the run gate onto `result`, which IS
+        // `builder`) would leave the caller's original builder half-composed with orphaned middleware and no
+        // way to roll it back. Catching it here, before any mutation starts, means UseGatekeeper either fully
+        // succeeds or leaves the caller's builder completely untouched.
+        if (options.ToolGates.Count > 0)
+        {
+            AgentEvalToolGateExtensions.ValidateGates(options.ToolGates.ToArray(), toolPolicy);
+        }
+
+        // Same reasoning for the approval gates' own validation (malformed PolicyName) — preflight it here too,
+        // rather than let UseAgentEvalToolApproval discover it only after the run/tool gates already mutated
+        // `result` (== `builder`).
+        if (options.ApprovalGates.Count > 0)
+        {
+#pragma warning disable AEGK001 // validating, not yet composing — same experimental-opt-in reasoning as the actual UseAgentEvalToolApproval call below.
+            AgentEvalToolApprovalExtensions.ValidateApprovalGates(options.ApprovalGates.ToArray());
+#pragma warning restore AEGK001
+        }
+
         var result = builder;
 
         if (scopeWillBeEstablished)
@@ -129,7 +175,10 @@ public static class AgentEvalGatekeeperExtensions
 
     /// <summary>
     /// Sugar for <c>UseGatekeeper(builder, GatekeeperEnforcement.Observe, configure)</c> — the review's
-    /// suggested split-API shape (P0-2). Nothing is ever blocked; a startup banner makes that explicit.
+    /// suggested split-API shape (P0-2). Nothing is ever blocked; a startup banner makes that explicit. See
+    /// <see cref="GatekeeperEnforcement.Observe"/> remarks for the one exception: a gate with a
+    /// <see cref="IToolGate.MinimumPolicy"/> floor above WarnOnly cannot be composed here at all — construction
+    /// throws rather than silently downgrading it.
     /// </summary>
     public static AIAgentBuilder ObserveWithAgentEvalGates(this AIAgentBuilder builder, Action<GatekeeperOptions> configure)
         => builder.UseGatekeeper(GatekeeperEnforcement.Observe, configure);

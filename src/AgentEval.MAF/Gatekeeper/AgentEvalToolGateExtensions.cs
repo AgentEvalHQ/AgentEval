@@ -71,32 +71,7 @@ public static class AgentEvalToolGateExtensions
     {
         ArgumentNullException.ThrowIfNull(builder);
         ArgumentNullException.ThrowIfNull(gates);
-
-        // Build-time cost rejection: Network/Llm gates belong in shadow mode, not the inline hot path.
-        foreach (var g in gates)
-        {
-            if (g is null)
-            {
-                throw new ArgumentException("gates contains a null element.", nameof(gates));
-            }
-
-            if (g.Cost is GateCost.Network or GateCost.Llm)
-            {
-                throw new ArgumentException(
-                    $"Gate '{g.PolicyName}' has Cost={g.Cost}, which cannot run inline on the tool-invocation hot path. " +
-                    "Use shadow mode (a later milestone) for network/LLM gates.", nameof(gates));
-            }
-
-            // Build-time enforcement floor: a gate whose purpose is to STOP an action (e.g. a honeypot canary)
-            // must not be silently downgraded to observe-only, which would let the forbidden action run.
-            if (EnforcementRank(policy) < EnforcementRank(g.MinimumPolicy))
-            {
-                throw new ArgumentException(
-                    $"Gate '{g.PolicyName}' requires at least policy {g.MinimumPolicy} to enforce, but was registered " +
-                    $"under {policy} (which would let a blocked call run). Register it under {g.MinimumPolicy} or stronger.",
-                    nameof(policy));
-            }
-        }
+        ValidateGates(gates, policy);
 
         var gateSeq = 0;
 
@@ -202,8 +177,45 @@ public static class AgentEvalToolGateExtensions
         });
     }
 
+    // Build-time gate-list validation: null elements, Network/Llm cost rejection (those belong in shadow mode,
+    // not the inline hot path), and the enforcement-floor check (a gate whose purpose is to STOP an action —
+    // e.g. a honeypot canary — must not be silently downgraded to observe-only, which would let the forbidden
+    // action run). Internal (not private): AgentEvalGatekeeperExtensions.UseGatekeeper calls this as a
+    // PREFLIGHT — before it starts mutating the caller's AIAgentBuilder (Use(...) mutates and returns the same
+    // instance, it does not hand back an immutable copy) — so a validation failure here can never leave
+    // UseGatekeeper's composition half-applied to the caller's builder with no way to roll it back. One
+    // authoritative check, reused by both callers, rather than two copies that can drift.
+    internal static void ValidateGates(IReadOnlyList<IToolGate> gates, ToolGatePolicy policy)
+    {
+        foreach (var g in gates)
+        {
+            if (g is null)
+            {
+                throw new ArgumentException("gates contains a null element.", nameof(gates));
+            }
+
+            if (g.Cost is GateCost.Network or GateCost.Llm)
+            {
+                throw new ArgumentException(
+                    $"Gate '{g.PolicyName}' has Cost={g.Cost}, which cannot run inline on the tool-invocation hot path. " +
+                    "Use shadow mode (a later milestone) for network/LLM gates.", nameof(gates));
+            }
+
+            if (EnforcementRank(policy) < EnforcementRank(g.MinimumPolicy))
+            {
+                throw new ArgumentException(
+                    $"Gate '{g.PolicyName}' requires at least policy {g.MinimumPolicy} to enforce, but was registered " +
+                    $"under {policy} (which would let a blocked call run). Register it under {g.MinimumPolicy} or stronger.",
+                    nameof(policy));
+            }
+        }
+    }
+
     // Enforcement strength ordering: WarnOnly (observe) < ReplaceResult (block) < Terminate (block + stop loop).
-    private static int EnforcementRank(ToolGatePolicy policy) => policy switch
+    // Internal (not private): AgentEvalGatekeeperExtensions.UseGatekeeper reuses this to compose its own,
+    // more actionable message for the MinimumPolicy-floor case specifically, ahead of the general ValidateGates
+    // preflight below.
+    internal static int EnforcementRank(ToolGatePolicy policy) => policy switch
     {
         ToolGatePolicy.WarnOnly => 0,
         ToolGatePolicy.ReplaceResult => 1,

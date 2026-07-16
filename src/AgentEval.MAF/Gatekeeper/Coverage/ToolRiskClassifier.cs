@@ -32,6 +32,11 @@ public static class ToolRiskClassifier
         "execute", "exec", "run_command", "run_script", "runcommand", "runscript", "shell", "eval", "spawn",
         // Privilege / lifecycle
         "revoke", "grant", "admin", "sudo", "terminate", "cancel", "unsubscribe", "shutdown", "restart", "format", "deploy",
+        // Sensitive-data / credential access — nouns, not generic read verbs ("read"/"get"/"fetch" alone would
+        // flag nearly every read-only tool; a keyword confirmed missing entirely, letting the canonical
+        // "read_secrets" example tool used throughout this framework's own tests go unclassified as high-risk).
+        "secret", "credential", "password", "passwd", "token", "apikey", "api_key", "privatekey", "private_key",
+        "ssn", "pii", "confidential",
     ];
 
     /// <summary>Returns whether <paramref name="tool"/>'s name or description matches a high-risk keyword.</summary>

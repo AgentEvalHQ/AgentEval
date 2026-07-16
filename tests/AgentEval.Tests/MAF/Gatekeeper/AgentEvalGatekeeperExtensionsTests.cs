@@ -221,6 +221,48 @@ public class AgentEvalGatekeeperExtensionsTests
         Assert.Equal(0, sends);   // the default EstablishRunScope=true composed scope correctly — no manual UseAgentEvalGate() needed
     }
 
+    // ── MinimumPolicy-floor vs Observe conflict guard: a canary/honeypot gate cannot be silently downgraded ──
+
+    [Fact]
+    public void FlooredGate_UnderObserve_ThrowsWithClearMessage()
+    {
+        // Observe always resolves to WarnOnly — a gate whose MinimumPolicy exceeds WarnOnly (a canary/honeypot
+        // gate, where running under WarnOnly would silently defeat the trap) cannot be composed here at all.
+        var tool = AIFunctionFactory.Create((string x) => x, "x");
+        var agent = BuildAgent(tool, "x", new Dictionary<string, object?>());
+
+        var ex = Assert.Throws<InvalidOperationException>(() =>
+            agent.AsBuilder().UseGatekeeper(GatekeeperEnforcement.Observe, g => g.Add(new FlooredToolGate())));
+
+        Assert.Contains("FlooredToolGate", ex.Message, StringComparison.Ordinal);
+        Assert.Contains("MinimumPolicy", ex.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void FlooredGate_UnderReplaceResult_MeetsTheFloor_DoesNotThrow()
+    {
+        // FlooredToolGate needs ReplaceResult; ReplaceResult meets its own floor exactly.
+        var tool = AIFunctionFactory.Create((string x) => x, "x");
+        var agent = BuildAgent(tool, "x", new Dictionary<string, object?>());
+
+        var ex = Record.Exception(() =>
+            agent.AsBuilder().UseGatekeeper(GatekeeperEnforcement.ReplaceResult, g => g.Add(new FlooredToolGate())));
+
+        Assert.Null(ex);
+    }
+
+    [Fact]
+    public void FlooredGate_UnderTerminate_DoesNotThrow()
+    {
+        var tool = AIFunctionFactory.Create((string x) => x, "x");
+        var agent = BuildAgent(tool, "x", new Dictionary<string, object?>());
+
+        var ex = Record.Exception(() =>
+            agent.AsBuilder().UseGatekeeper(GatekeeperEnforcement.Terminate, g => g.Add(new FlooredToolGate())));
+
+        Assert.Null(ex);
+    }
+
     // ── Approval interop: only wired when a gate is actually registered ──
 
     [Fact]
@@ -343,5 +385,16 @@ public class AgentEvalGatekeeperExtensionsTests
         public string PolicyName => "AlwaysAutoApproveGate";
         public ValueTask<bool> IsAutoApprovableAsync(FunctionCallContent call, CancellationToken cancellationToken = default)
             => new(true);
+    }
+
+    // A minimal stand-in for CanaryToolGate (which lives in AgentEval.RedTeam.Gatekeeper, not referenced here):
+    // any gate that declares a MinimumPolicy floor above WarnOnly, the way a honeypot/canary must.
+    private sealed class FlooredToolGate : IToolGate
+    {
+        public string PolicyName => "FlooredToolGate";
+        public GateCost Cost => GateCost.PureCode;
+        public ToolGatePolicy MinimumPolicy => ToolGatePolicy.ReplaceResult;
+        public ValueTask<ToolGateVerdict> InspectAsync(GatedToolCall call, CancellationToken ct = default)
+            => new(ToolGateVerdict.Allow(PolicyName));
     }
 }

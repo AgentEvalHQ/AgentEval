@@ -67,6 +67,21 @@ public class GatekeeperCoverageAnalyzerTests
     }
 
     [Fact]
+    public void CredentialAccessKeyword_ReadSecrets_IsClassifiedHighRisk()
+    {
+        // read_secrets is the canonical example tool name used throughout this framework's own Gatekeeper
+        // tests (e.g. the SequenceGate composite test) — a read/data-exposure risk, not a destructive-write or
+        // financial one, so it needs its own keyword category rather than the mutation/destructive/financial
+        // ones already present.
+        var tool = AIFunctionFactory.Create(() => "ok", "read_secrets");
+        var report = GatekeeperCoverageAnalyzer.Analyze(BuildAgent(tool));
+
+        var entry = Assert.Single(report.Tools);
+        Assert.Equal(ToolRiskLevel.HighRisk, entry.RiskLevel);
+        Assert.True(report.HasUnprotectedHighRiskTools);
+    }
+
+    [Fact]
     public void HostedTool_IsProviderHostedOpaque_NeverProtected_EvenWithGatesRegistered()
     {
         var hosted = new HostedWebSearchTool();

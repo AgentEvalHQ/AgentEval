@@ -52,34 +52,12 @@ public static class AgentEvalToolApprovalExtensions
     {
         ArgumentNullException.ThrowIfNull(builder);
         ArgumentNullException.ThrowIfNull(gates);
-
-        // FAIL-CLOSED: an empty gate list would make the "all gates agree" rule vacuously true, auto-approving
-        // EVERY .RequiresApproval() tool with no human — strictly more permissive than not calling this at all
-        // (an approval-required tool escalates by default absent any auto-approval rule). Require at least one gate.
-        if (gates.Count == 0)
-        {
-            throw new ArgumentException(
-                "At least one approval gate is required — an empty list would auto-approve every call (fail-open).",
-                nameof(gates));
-        }
+        ValidateApprovalGates(gates);
 
         var frozen = new IToolApprovalGate[gates.Count];
         for (var i = 0; i < gates.Count; i++)
         {
-            var gate = gates[i] ?? throw new ArgumentException("gates contains a null element.", nameof(gates));
-
-            // A malformed PolicyName (empty/whitespace, or dot segments that split empty) would produce a
-            // gate.approval.<seq>.<policy> key that GateMetadataReader rejects — silently dropping the escalation
-            // evidence. Require a well-formed name at registration so evidence is always readable.
-            if (string.IsNullOrWhiteSpace(gate.PolicyName) ||
-                gate.PolicyName.Split('.').Any(static seg => seg.Length == 0))
-            {
-                throw new ArgumentException(
-                    $"Gate at index {i} has an invalid PolicyName ('{gate.PolicyName}') — it must be non-empty with no empty dot-segments.",
-                    nameof(gates));
-            }
-
-            frozen[i] = gate;
+            frozen[i] = gates[i];
         }
 
         var seq = 0;
@@ -121,6 +99,39 @@ public static class AgentEvalToolApprovalExtensions
             AutoApprovalRules = [AutoApproveWhenAllGatesAgree],
         });
 #pragma warning restore MAAI001
+    }
+
+    // Build-time gate-list validation: empty-list fail-closed rejection, null elements, and well-formed
+    // PolicyName (a malformed one would produce a gate.approval.<seq>.<policy> key GateMetadataReader rejects,
+    // silently dropping escalation evidence). Internal (not private): AgentEvalGatekeeperExtensions.UseGatekeeper
+    // calls this as a PREFLIGHT — before any Use(...)/UseToolApproval(...) call mutates the caller's builder
+    // (AIAgentBuilder.Use(...) mutates and returns the SAME instance, not an immutable copy) — so a malformed
+    // approval gate can never be discovered only after UseGatekeeper has already composed the run/tool gates
+    // onto the caller's builder with no way to roll back.
+    internal static void ValidateApprovalGates(IReadOnlyList<IToolApprovalGate> gates)
+    {
+        // FAIL-CLOSED: an empty gate list would make the "all gates agree" rule vacuously true, auto-approving
+        // EVERY .RequiresApproval() tool with no human — strictly more permissive than not calling this at all
+        // (an approval-required tool escalates by default absent any auto-approval rule). Require at least one gate.
+        if (gates.Count == 0)
+        {
+            throw new ArgumentException(
+                "At least one approval gate is required — an empty list would auto-approve every call (fail-open).",
+                nameof(gates));
+        }
+
+        for (var i = 0; i < gates.Count; i++)
+        {
+            var gate = gates[i] ?? throw new ArgumentException("gates contains a null element.", nameof(gates));
+
+            if (string.IsNullOrWhiteSpace(gate.PolicyName) ||
+                gate.PolicyName.Split('.').Any(static seg => seg.Length == 0))
+            {
+                throw new ArgumentException(
+                    $"Gate at index {i} has an invalid PolicyName ('{gate.PolicyName}') — it must be non-empty with no empty dot-segments.",
+                    nameof(gates));
+            }
+        }
     }
 
     // Escalation evidence lives in its OWN namespace (gate.approval.*), distinct from gate.tool.* blocks — an
