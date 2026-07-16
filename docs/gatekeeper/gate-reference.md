@@ -40,7 +40,11 @@ result; `Terminate` → stop the loop), so adding a gate never silently changes 
 
 > **Enforcement floor.** A gate whose purpose is to *stop* an action can declare a `MinimumPolicy`; a honeypot
 > refuses to be registered `WarnOnly`, so `UseAgentEvalToolGate` throws rather than let it be downgraded to
-> observe‑only.
+> observe‑only. This means a `MinimumPolicy`-floored gate (e.g. `CanaryToolGate`) **cannot be composed under
+> `UseGatekeeper(GatekeeperEnforcement.Observe, ...)`** either — `Observe` always resolves to `WarnOnly`, so the
+> same floor check fires there too. That's deliberate, not a bug: running a honeypot under `WarnOnly` would
+> silently defeat the trap, so it's excluded from Observe's "zero behavior change" guarantee by design — add it
+> separately once you're ready to enforce at its `MinimumPolicy` or stronger.
 
 ### Budget & egress (off the `RunLedger`)
 
@@ -181,6 +185,38 @@ gates are supporting parts. Fail‑closed: at least one gate is required, and a 
 *every* gate affirms it routine — a throwing gate, or a call it can't affirm, escalates.
 
 ---
+
+## Composing gates safely — `UseGatekeeper`
+
+Wiring more than one layer by hand (`.UseAgentEvalGate()` → `.UseAgentEvalToolGate(...)` →
+`.UseAgentEvalToolApproval(...)` → `.UseAgentEvalShadowJudge(...)`) means getting the order right yourself, and
+some misconfigurations run silently instead of failing loudly. `UseGatekeeper(enforcement, configure)` installs
+all four in the correct order in one call, and refuses to construct — before any middleware is wired, never
+partially — for the two ways manual composition can silently misbehave: a `GateRequirements.RunScope` gate
+registered without a guaranteed run scope (falls back to shared, process-wide state instead of throwing), and a
+`MinimumPolicy`-floored gate registered under an enforcement level too weak to meet it (see the callout above).
+`GatekeeperEnforcement` (`Observe`/`ReplaceResult`/`Terminate`) is a required parameter — there is no default,
+on purpose. Full walkthrough: [introduction — Wiring it together](introduction.md#wiring-it-together-usegatekeeper).
+
+> **⚠ Never chain two separate `UseAgentEvalToolGate(...)` calls on one builder** — the later registration
+> becomes the outermost middleware layer and can fully starve the earlier one's gates if it blocks without
+> forwarding (empirically confirmed against the underlying MAF seam). Register every tool gate in one call, in
+> one list — `UseGatekeeper` already does this for you.
+
+## Coverage & telemetry
+
+Two capabilities answer "is this actually working," not "did I call the API":
+
+| Capability | What it does | Honest reasoning |
+|---|---|---|
+| **`GatekeeperCoverageAnalyzer`** | Classifies every tool exposed to the agent's model — `InterceptedLocalFunction` (a local `AIFunction`, the only execution model any tool gate can ever see) vs. `ProviderHostedOpaque` (executed by the model provider itself, structurally invisible to every mechanism in this namespace) — and a coarse `ToolRiskLevel` heuristic (`ToolRiskClassifier`, keyword-based, override via `AnalyzeOptions.IsHighRisk`). Reports `EnforcementCoveragePercent`; `AnalyzeOrThrow`/`GatekeeperOptions.RefuseUnprotectedHighRiskTools` refuse construction on an unprotected high-risk tool. | The "false assurance" fix: "Gatekeeper is installed" reads as "my tools are protected," which isn't automatically true. **Honest limits, not just a feature:** blind to a tool an `AIContextProvider` (Agent Skills, memory providers) contributes dynamically — only the static `ChatOptions.Tools` list is inspectable; blind to a tool's parameter schema (a generically-named dispatch tool whose `operation` parameter includes `"delete"` isn't flagged); and `AnalyzeOrThrow` itself throws `ToolInventoryUnavailableException` (not a silent pass) when the tool list can't be read at all — "I couldn't verify" fails the same direction as "I verified and it's bad." |
+| **`GateTelemetry`** | A caller-owned counter/histogram (pass it to `UseAgentEvalToolGate`/`UseGatekeeper`): per-gate invocation count, allow/block/mutate counts, and latency. Records what the gate *found* (its verdict), not whether the enforcing `ToolGatePolicy` actually blocked the call — cross-reference the trace's `gate.tool.*` `action` (`"Block"` vs `"Warn"`) for the enforced/observed split. | Pairs with the coverage analyzer: coverage answers "is this tool structurally reachable by a gate," telemetry answers "when it ran, what did the gate actually do." No I/O, no new subsystem — a thin surface bolted onto the existing per-call gate loop. |
+
+`Mutate` verdict evidence (a tool gate rewriting arguments before the call proceeds) is captured into the trace
+per `TraceCaptureMode` — `None`/`SchemaOnly`/`Redacted`/`Hashed`/`Full`. **`Redacted` is the default** (argument
+names visible, values replaced with a fixed marker) — a prior version always recorded arguments verbatim, which
+could put a secret an argument carries into the trace. Pass `TraceCaptureMode.Full` explicitly only when you
+know your arguments never carry secrets and want the exact before/after values for debugging.
 
 ## Extending the Gatekeeper: LLM-backed detection
 

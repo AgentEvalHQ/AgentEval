@@ -7,9 +7,10 @@ checks **in the request path** so a forbidden tool call, a poisoned argument, or
 **blocked before it happens**. It plugs into the Microsoft Agent Framework agent pipeline — no rewrite — and
 every gate is **fail‑closed**: if a gate cannot prove an action safe, it does not run it.
 
-> **Where to go:** this page is the **introduction** (concepts + the layer categories). The
-> [**Gate reference**](gate-reference.md) is the ranked catalogue — every gate, what it does, and *how much it
-> actually earns its keep*. The [**Examples**](examples.md) page is the runnable cookbook.
+> **Where to go:** this page is the **introduction** (concepts, the layer categories, and how to wire them
+> together with `UseGatekeeper`). The [**Gate reference**](gate-reference.md) is the ranked catalogue — every
+> gate, what it does, and *how much it actually earns its keep*. The [**Examples**](examples.md) page is the
+> runnable cookbook.
 
 ## The design principle: fail closed, and prove it
 
@@ -41,6 +42,78 @@ network / LLM work at construction (via `GateCost`) — an LLM judge on every to
 risk a fabricated verdict. Expensive judgment goes to the **shadow judge**, or — for a *fast, calibrated* judge —
 the run‑pre/run‑post seam (see The Tribunal, below); run and session gates reuse `IChatGate` (no cost member), so
 keeping those pure‑code is a convention.
+
+## Wiring it together: `UseGatekeeper`
+
+Every example on the [examples page](examples.md) that wires more than one layer chains the low‑level builder
+calls by hand: `.UseAgentEvalGate()` → `.UseAgentEvalToolGate(...)` → `.UseAgentEvalToolApproval(...)` →
+`.UseAgentEvalShadowJudge(...)`. That works, but the order matters (run‑scope must be established before the
+tool gate that depends on it) and it's easy to get wrong silently — a stateful gate that needs a run scope
+still *runs* without one, it just falls back to shared, process‑wide state instead of throwing.
+
+**`UseGatekeeper(enforcement, configure)`** is the recommended composite builder for anything beyond a single
+gate: it installs run‑scope, tool gates, approval interop, and the shadow judge together, in the correct order,
+in one call — and it **validates what manual composition can't catch**, at construction time:
+
+```csharp
+using AgentEval.MAF.Gatekeeper;
+
+var agent = baseAgent.AsBuilder()
+    .UseGatekeeper(GatekeeperEnforcement.Terminate, g =>
+    {
+        g.Add(new SequenceGate(["read_customer_data"], ["send_email", "http_post"]));
+        g.Add(new RunBudgetGate(maxToolCalls: 20));
+        g.Trace = trace;               // shared Glass Box trace across every mechanism composed here
+        g.Telemetry = telemetry;       // optional GateTelemetry sink — which gates fire, how often, how long
+    })
+    .Build();
+```
+
+`GatekeeperEnforcement` is a **required** parameter — `Observe` (record every finding, block nothing — the
+recommended safe first rollout), `ReplaceResult` (block the call, keep the loop running), or `Terminate` (block
+and stop the function‑calling loop). There is deliberately no default: the whole point of a name like
+"Gatekeeper" is that developers assume it enforces, so a silent `WarnOnly` default would be the exact false
+assurance this toolkit argues against elsewhere. Two named sugar methods make the choice visible in the call
+site itself: `ObserveWithAgentEvalGates(configure)` and `EnforceAgentEvalGates(configure, level: ...)` (defaults
+to `Terminate`, the strongest level — "enforce" unqualified should mean "actually protect me").
+
+`UseGatekeeper` refuses to construct — throwing before any middleware is wired, never partially — when it can
+prove the composition is unsafe:
+
+- A gate that needs an established run scope (`GateRequirements.RunScope` — `RunBudgetGate`, `MonetaryLimitGate`,
+  `PerToolCallBudgetGate`, `SequenceGate`) is registered without one (`EstablishRunScope = false` and no pre/post
+  gate) under a non‑`Observe` enforcement level.
+- A gate with an enforcement floor above the resolved policy — a canary/honeypot's `MinimumPolicy` — is
+  registered under `Observe` (which always resolves to `WarnOnly`). Running a honeypot under `WarnOnly` would
+  silently defeat the trap, so `UseGatekeeper` refuses rather than downgrade it; exclude such gates from an
+  `Observe`‑mode rollout and add them separately once you're ready to enforce.
+
+**Know what's actually protected — `GatekeeperCoverageAnalyzer`.** "I called `UseGatekeeper`" is not the same
+question as "is every high‑risk tool actually reachable by a gate." The analyzer answers that honestly: it
+classifies every tool exposed to the agent's model (a local `AIFunction` a tool gate can see vs. a
+provider‑hosted tool no Gatekeeper mechanism ever will) and reports an `EnforcementCoveragePercent`.
+
+```csharp
+var options = new GatekeeperOptions();
+var agent = baseAgent.AsBuilder()
+    .UseGatekeeper(GatekeeperEnforcement.Terminate, g =>
+    {
+        g.Add(new ForbiddenToolGate("delete_account"));
+        g.KnownTools = myTools;                    // the SAME list you set on ChatOptions.Tools
+        g.RefuseUnprotectedHighRiskTools = true;    // eager, construction-time refusal
+        options = g;
+    })
+    .Build();
+
+Console.WriteLine(options.CoverageReport!.Render());   // the AUTHORITATIVE report — same gates that were actually wired
+```
+
+`RefuseUnprotectedHighRiskTools` throws `UnprotectedHighRiskToolException` right at registration if a tool a
+coarse keyword heuristic (`ToolRiskClassifier` — override via `AnalyzeOptions.IsHighRisk` when it misclassifies
+yours) flags as high‑risk has zero protecting gate — before the agent ever starts. It's a heuristic safety net,
+not a proof: it's blind to a tool an `AIContextProvider` (e.g. Agent Skills) contributes dynamically, since only
+`ChatOptions.Tools` is inspectable at this point — see the gate reference's [Coverage &
+telemetry](gate-reference.md#coverage--telemetry) section for the full honest limits.
 
 ## The Beachhead and The Tribunal
 
