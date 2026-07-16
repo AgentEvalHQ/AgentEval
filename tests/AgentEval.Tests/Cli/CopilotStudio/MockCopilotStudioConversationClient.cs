@@ -55,9 +55,25 @@ internal sealed class MockCopilotStudioConversationClient : ICopilotStudioConver
     /// <summary>
     /// When set, <see cref="AskQuestionAsync"/> throws this exception on the Nth call (0-indexed, before any
     /// scripted turn is consulted) — simulates a rate-limit (429-shaped), auth expiry mid-conversation, or a
-    /// transient transport failure a caller's retry/backoff logic must handle.
+    /// transient transport failure a caller's retry/backoff logic must handle. ZERO activities are emitted
+    /// first — for a failure AFTER some activities already streamed back, see
+    /// <see cref="ThrowAfterActivitiesOnAskAtCallIndex"/>.
     /// </summary>
     public (int CallIndex, Exception Exception)? ThrowOnAskAtCallIndex { get; set; }
+
+    /// <summary>
+    /// When set, <see cref="AskQuestionAsync"/> emits the given activities on the Nth call (0-indexed) and
+    /// THEN throws — simulates a mid-stream transport failure AFTER the server already sent something, i.e.
+    /// a real side effect may already have happened. Retry-safety code (<c>CopilotStudioRetryPolicy.ExecuteIdempotentAsync</c>)
+    /// must NOT retry this case, unlike <see cref="ThrowOnAskAtCallIndex"/>'s zero-activities case.
+    /// </summary>
+    public (int CallIndex, IReadOnlyList<IActivity> ActivitiesBeforeFailure, Exception Exception)? ThrowAfterActivitiesOnAskAtCallIndex { get; set; }
+
+    /// <summary>
+    /// When set, <see cref="StartConversationAsync"/> emits the given activities and THEN throws — the
+    /// <c>StartConversationAsync</c> analogue of <see cref="ThrowAfterActivitiesOnAskAtCallIndex"/>.
+    /// </summary>
+    public (IReadOnlyList<IActivity> ActivitiesBeforeFailure, Exception Exception)? ThrowAfterActivitiesOnStart { get; set; }
 
     /// <summary>
     /// When true, every <see cref="AskQuestionAsync"/> call blocks until the caller's own cancellation
@@ -111,6 +127,16 @@ internal sealed class MockCopilotStudioConversationClient : ICopilotStudioConver
         await Task.Yield();
         cancellationToken.ThrowIfCancellationRequested();
 
+        if (ThrowAfterActivitiesOnStart is { } midStreamStart)
+        {
+            foreach (var activity in midStreamStart.ActivitiesBeforeFailure)
+            {
+                yield return activity;
+            }
+
+            throw midStreamStart.Exception;
+        }
+
         // The server assigns the conversation id on start — a real MCS agent chooses it, the caller doesn't.
         yield return Message(text: null, overrideConversationId: _conversationId);
         foreach (var activity in _startScript)
@@ -142,6 +168,18 @@ internal sealed class MockCopilotStudioConversationClient : ICopilotStudioConver
         }
 
         cancellationToken.ThrowIfCancellationRequested();
+
+        if (ThrowAfterActivitiesOnAskAtCallIndex is { } midStreamAsk && midStreamAsk.CallIndex == callIndex)
+        {
+            foreach (var activity in midStreamAsk.ActivitiesBeforeFailure)
+            {
+                yield return activity.Conversation?.Id is null or ""
+                    ? WithConversationId(activity, _conversationId)
+                    : activity;
+            }
+
+            throw midStreamAsk.Exception;
+        }
 
         var activities = callIndex < _turnScript.Count
             ? _turnScript[callIndex](question, callIndex)
