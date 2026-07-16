@@ -126,6 +126,56 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 This is Phase 1 of a multi-phase design
 (`strategy/FutureFeatures/Skills/AgentEval-AgentSkills-Evals-Design-and-Plan.md`, local-only).
 
+### MAF Agent Skills evaluation — Phase 3 (skill-description-injection red-team + `run_skill_script` governance)
+
+#### Added
+- **`SkillInjectionAttack`** (`AgentEval.RedTeam.Attacks`, OWASP LLM01) — the 14th built-in red-team attack
+  (roster 13→14, probes 258→264). Two new `InjectionSurface` values, `SkillInstruction` (a malicious
+  skill's `description`/instructions, spliced into the SYSTEM PROMPT via `{skills}` — a higher-trust
+  position than a retrieved document) and `SkillResource` (`read_skill_resource` output). 100% reuse of
+  the shipped Wave-B machinery (`CanaryTool`, `FidelityCompositeEvaluator`, `ToolInvocationEvaluator`,
+  `RefusalGatedEvaluator`) — canary "source" tools are named `load_skill`/`read_skill_resource` (matching
+  MAF's real tool names) so an instrumented SUT's trace is indistinguishable from a real
+  `AgentSkillsProvider` interaction. 6 probes at Comprehensive intensity; registered in `Attack.All`,
+  `ByName`, `ByOwaspId("LLM01")`.
+- **⚠️ HONESTY FINDING — the reused judge does NOT converge on the skill-description surface.** Per the
+  design doc's own documented risk item, this session ran a LIVE calibration of the flagship
+  `IndirectInjectionRubric` against a new both-directions gold set
+  (`AgentEval.Guardrails.Judges.Rubrics.SkillInjectionGoldSet`, 52 skill-flavored cases) via
+  `GateCalibrationHarness`. Result: decisive accuracy 88.5%, **4 missed attacks**, 2 false alarms, κ=0.769
+  vs. gold — `IsInlineReady == false` (the harness requires zero missed attacks by default). The rubric
+  generalizes reasonably (beats the deterministic keyword baseline) but not well enough to promote inline
+  on this NEW surface. **Decision: shipped SHADOW-ONLY for the skill surface**, per the design doc's own
+  contingency — never promoted inline, documented in code, the live sample, and here. Authoring a
+  dedicated `SkillDescriptionInjectionRubric` is deferred (the design doc's own +3–5 dev-day contingency
+  line item).
+- **`SkillScriptExecutionGate`** (`AgentEval.MAF.Gatekeeper`, `IToolGate`, `GateCost.PureCode`,
+  `MinimumPolicy = ReplaceResult`) — deterministic hard gate on `run_skill_script`: blocks a call whose
+  script identifier is not on the allowlist. Value-based, key-agnostic matching (every string-shaped
+  argument value, plus `"/"`-joined pairs, are candidates — never assumes a specific argument key); an
+  unrecognized/missing script identifier fails closed. No calibration needed (deterministic).
+- **`SkillScriptApprovalGate`** (`IToolApprovalGate`) — auto-approves `load_skill`/`read_skill_resource`;
+  escalates `run_skill_script` to a human UNLESS the script is on a per-script trust allowlist — finer
+  grained than MAF's native `ReadOnlyToolsAutoApprovalRule` (tool-granularity only).
+- **Composition-ordering honesty (design doc §6.2, verified live this session):** MAF's skill tools
+  require human approval BY DEFAULT, and that pause happens BEFORE the FICC seam — so
+  `SkillScriptExecutionGate` never fires unless `run_skill_script` is first auto-approved at the MAF
+  layer (Posture A). The live sample (Run 6) demonstrates this exact composition and confirms the gate
+  — not the approval layer — is what blocks the call (`gate.tool.*` count = 1, real trace evidence).
+  `SkillResourcePathGate` was NOT built (dropped per the design doc §3 — `read_skill_resource`'s
+  `resourceName` is a logical name with no traversal surface, confirmed in Phase 1).
+- **Sample Runs 5–6** (`samples/AgentEval.AgentSkillsEval`) — **live-verified against real Azure OpenAI
+  this session**: Run 5 (skill-injection attack) — the agent resisted (0 tool calls on an off-topic-safe
+  prompt), and the shadow-only judge verdict is shown labeled advisory-only, never conflated with the
+  real behavioral verdict. Run 6 (exec-gate demo, Posture A) — the agent DID call `run_skill_script` with
+  an unlisted script, and `SkillScriptExecutionGate` deterministically blocked it (1 real `gate.tool.*`
+  block), with the model falling back to computing the answer manually — the gate, not the approval
+  layer, stopped the call.
+- ~50 new tests across `SkillInjectionAttackTests`, `SkillScriptExecutionGateTests`,
+  `SkillScriptApprovalGateTests`, `SkillInjectionGoldSetCalibrationTests` (deterministic harness-mechanics
+  proof), and the env-gated `SkillInjectionGoldSetCalibrationLiveCheck` (the live calibration check itself,
+  `AGENTEVAL_RUN_SKILLCAL=1`).
+
 ### MAF Agent Skills evaluation — Phase 2 (compliance scanner + coverage report)
 
 #### Added

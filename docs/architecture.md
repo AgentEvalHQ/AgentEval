@@ -556,11 +556,26 @@ public resource/script enumeration for file skills, so the scanner re-derives it
 `resources/`/`scripts/` directory convention; non-file sources (in-memory/class/MCP) are honestly
 reported with zero resources/scripts rather than guessed.
 
-See `samples/AgentEval.AgentSkillsEval` (Run 4) for a live, real-agent walkthrough of the scanner, and
+See `samples/AgentEval.AgentSkillsEval` (Run 4) for a live, real-agent walkthrough of the scanner.
+
+**Phase 3 — skill-description-injection red-team + `run_skill_script` governance.**
+`AgentEval.RedTeam.Attacks.SkillInjectionAttack` (OWASP LLM01, in `Attack.All`) red-teams a malicious
+skill's `description` (spliced into the SYSTEM PROMPT via `{skills}` — a higher-trust position than a
+retrieved document, tagged `InjectionSurface.SkillInstruction`) and `read_skill_resource` output
+(`InjectionSurface.SkillResource`). It reuses the shipped `IndirectInjectionRubric` judge rather than
+inventing a mega-judge — but a **live calibration this session found the reused rubric does NOT clear
+the promotion bar on this new surface** (4 missed attacks / 52 gold cases,
+`AgentEval.Guardrails.Judges.Rubrics.SkillInjectionGoldSet`) — so it ships **shadow-only** for skills,
+documented explicitly rather than silently promoted. `SkillScriptExecutionGate` (deterministic,
+`IToolGate`) and `SkillScriptApprovalGate` (`IToolApprovalGate`) govern `run_skill_script` code
+execution — see `docs/gatekeeper/gate-reference.md` for both, including the composition-ordering note
+(MAF's own approval pause sits BEFORE the FICC seam, so the deterministic gate only fires once
+`run_skill_script` is auto-approved at the MAF layer). See `samples/AgentEval.AgentSkillsEval` (Runs 5–6,
+live-verified against real Azure OpenAI) for the end-to-end demonstration.
+
+Phase 4 (skill health/security index) is covered separately, once shipped. See
 `strategy/FutureFeatures/Skills/AgentEval-AgentSkills-Evals-Design-and-Plan.md` (local-only) for the
-full multi-phase design. Phase 3 (a skill-description-injection red-team attack + `run_skill_script`
-code-execution governance gates) and Phase 4 (skill health/security index) are covered separately —
-see `docs/gatekeeper-gates.md` / `docs/redteam.md` once shipped.
+full multi-phase design.
 
 ### 4. Registry Pattern
 
@@ -908,9 +923,9 @@ internal static class OwaspBenchmarkRegistration
             defaultCostTier: CostTier.Medium,
             presets:
             [
-                new("top10",     "All 13 built-in attacks at Quick intensity (default)", CostTier.Medium),
+                new("top10",     "All 14 built-in attacks at Quick intensity (default)", CostTier.Medium),
                 new("smoke",     "3 MVP attacks — CI-friendly",                          CostTier.Low),
-                new("audit",     "All 13 attacks at Comprehensive intensity",            CostTier.High),
+                new("audit",     "All 14 attacks at Comprehensive intensity",            CostTier.High),
                 new("top10-rag", "Comprehensive intensity, RAG-vector depth",           CostTier.High),
             ],
             runnerType: typeof(OwaspBenchmarkRun),

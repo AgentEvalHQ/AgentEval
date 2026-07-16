@@ -20,7 +20,7 @@ The grader — the component that decides whether each attack actually *succeede
 > **⚠️ Default change.** With a judge configured (`--judge`), Composite Judges now **lead** the verdict (`--judge-mode primary`, the new default; the old judge-as-tiebreaker is `--judge-mode fallback`). The default rubric is now `evidence-anchored`. **A scan with no `--judge` stays byte-identical to the previous keyword oracle.** Reproduce the proof: `AGENTEVAL_RUN_5B=1 AGENTEVAL_STOCHASTIC_K=10 dotnet test --filter "FullyQualifiedName~Stochastic_Composite_Stability|FullyQualifiedName~Stochastic_DenyTrue_Stability"` (both held-out suites = 810 trials; needs Azure OpenAI). A self-contained keyword-vs-single-judge-vs-composite head-to-head ships as [`samples/AgentEval.SampleGraders`](https://github.com/AgentEvalHQ/AgentEval/tree/main/samples/AgentEval.SampleGraders).
 
 ### Coverage
-- **258 built-in probes across 13 attack types** (Comprehensive intensity), covering **all 10 OWASP LLM Top 10 (2025)** and **8 MITRE ATLAS** techniques.
+- **264 built-in probes across 14 attack types** (Comprehensive intensity), covering **all 10 OWASP LLM Top 10 (2025)** and **8 MITRE ATLAS** techniques.
 - **Compliance crosswalks across five frameworks** — OWASP LLM Top 10, MITRE ATLAS, **NIST AI RMF (AI 100-1)**, ISO/IEC 42001, and SOC 2 — with a `--format nist` report straight from a scan and `bench owasp|mitre|nist` benchmark families.
 - **Bring your own data:** `--import-probes` (CSV/JSON) and external **benchmark packs** via `--pack` (HarmBench / JailbreakBench / CyberSecEval, downloaded on demand under their own licenses — no harmful data bundled).
 

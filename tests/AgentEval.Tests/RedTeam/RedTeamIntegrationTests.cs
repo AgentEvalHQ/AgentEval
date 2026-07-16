@@ -32,7 +32,7 @@ public class RedTeamIntegrationTests
         var result = await agent.QuickRedTeamScanAsync();
 
         Assert.NotNull(result);
-        Assert.Equal(13, result.AttackResults.Count);   // Wave D: 10/10 OWASP
+        Assert.Equal(14, result.AttackResults.Count);   // Wave D: 10/10 OWASP; +SkillInjection (Skills Phase 3)
         Assert.True(result.Passed);
     }
 
@@ -44,7 +44,7 @@ public class RedTeamIntegrationTests
         var result = await agent.ModerateRedTeamScanAsync();
 
         Assert.NotNull(result);
-        Assert.Equal(13, result.AttackResults.Count);   // Wave D: 10/10 OWASP
+        Assert.Equal(14, result.AttackResults.Count);   // Wave D: 10/10 OWASP; +SkillInjection (Skills Phase 3)
         Assert.True(result.TotalProbes > 0);
     }
 

@@ -19,4 +19,14 @@ public enum InjectionSurface
 
     /// <summary>Payload spliced into a retrieved-document / RAG context block.</summary>
     RetrievedDocument = 2,
+
+    /// <summary>
+    /// Payload spliced into a MAF Agent Skill's <c>description</c>/instructions, which land in the SYSTEM
+    /// PROMPT via the <c>{skills}</c> placeholder on <c>load_skill</c> — a HIGHER-trust position than a
+    /// retrieved document (Skills Phase 3).
+    /// </summary>
+    SkillInstruction = 3,
+
+    /// <summary>Payload spliced into a <c>read_skill_resource</c> tool output (Skills Phase 3).</summary>
+    SkillResource = 4,
 }

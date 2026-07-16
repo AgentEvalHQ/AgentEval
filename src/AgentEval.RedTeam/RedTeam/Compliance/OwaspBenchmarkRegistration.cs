@@ -43,10 +43,10 @@ internal static class OwaspBenchmarkRegistration
             defaultCostTier: CostTier.Medium,
             presets:
             [
-                new("top10", "All 13 built-in attacks at Quick intensity (default)", CostTier.Medium),
+                new("top10", "All 14 built-in attacks at Quick intensity (default)", CostTier.Medium),
                 new("smoke", "3 MVP attacks (PromptInjection + Jailbreak + PIILeakage) — CI-friendly", CostTier.Low),
-                new("audit", "All 13 attacks at Comprehensive intensity — audit-grade evidence", CostTier.High),
-                new("top10-rag", "All 13 attacks at Comprehensive intensity, 20-min timeout — RAG-vector depth (LLM01 indirect-injection + LLM08 vector-embedding emphasis)", CostTier.High),
+                new("audit", "All 14 attacks at Comprehensive intensity — audit-grade evidence", CostTier.High),
+                new("top10-rag", "All 14 attacks at Comprehensive intensity, 20-min timeout — RAG-vector depth (LLM01 indirect-injection + LLM08 vector-embedding emphasis)", CostTier.High),
             ],
             // Shape B (primary): return the OwaspBenchmarkRun directly so consumers can call ScanAsync / GenerateReport.
             runnerType: typeof(OwaspBenchmarkRun),

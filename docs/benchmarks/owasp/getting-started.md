@@ -6,7 +6,7 @@
 
 ## What this measures
 
-The OWASP benchmark drives the agent under test with curated probes drawn from 13 attack types (PromptInjection, Jailbreak, IndirectInjection, EncodingEvasion, PIILeakage, InsecureOutput, ExcessiveAgency, SystemPromptExtraction, InferenceAPIAbuse, SupplyChain, DataPoisoning, VectorEmbedding, Misinformation) and grades each response with the per-attack heuristic evaluator. The composite `EvalResult` aggregates the ten OWASP categories with a `MinAggregation` so any single category fail caps the verdict.
+The OWASP benchmark drives the agent under test with curated probes drawn from 14 attack types (PromptInjection, Jailbreak, IndirectInjection, EncodingEvasion, PIILeakage, InsecureOutput, ExcessiveAgency, SystemPromptExtraction, InferenceAPIAbuse, SupplyChain, DataPoisoning, VectorEmbedding, Misinformation, SkillInjection) and grades each response with the per-attack heuristic evaluator. The composite `EvalResult` aggregates the ten OWASP categories with a `MinAggregation` so any single category fail caps the verdict.
 
 What IS tested: the agent's runtime dialog behaviour under adversarial prompts across all 10 categories — refusal quality, prompt-injection resistance, output-handling discipline, agency-bounding, system-prompt protection, unbounded-consumption guardrails, plus the Wave D additions (supply-chain recommendation, data/model poisoning, vector/embedding retrieval boundary, and misinformation). What is NOT tested: the deeper, beyond-dialog assurance behind some categories — the model's training-data provenance, third-party plug-in supply-chain attestation, or vector-store internals. Where a category's evidence is only dialog-weak (e.g. SupplyChain's in-context recommendation proxy, or Misinformation's semantic confabulation), the leaf reports `Inconclusive` — never a fabricated pass.
 
@@ -33,10 +33,10 @@ Sourced verbatim from `BenchmarkFamilyRegistry` (see `src/AgentEval.RedTeam/RedT
 
 | Preset | Description (verbatim) | Cost tier | Typical scope | Approx. LLM cost |
 |---|---|---|---|---|
-| `top10` | All 13 built-in attacks at Quick intensity (default) | Medium | All 13 attacks, Quick intensity, 10-min timeout | no LLM (heuristic evaluators) |
+| `top10` | All 14 built-in attacks at Quick intensity (default) | Medium | All 14 attacks, Quick intensity, 10-min timeout | no LLM (heuristic evaluators) |
 | `smoke` | 3 MVP attacks (PromptInjection + Jailbreak + PIILeakage) — CI-friendly | Low | 3 attacks, Quick intensity, 10-min timeout | no LLM |
-| `audit` | All 13 attacks at Comprehensive intensity — audit-grade evidence | High | All 13 attacks, Comprehensive intensity, 30-min timeout | no LLM |
-| `top10-rag` | All 13 attacks at Comprehensive intensity, 20-min timeout — RAG-vector depth (LLM01 indirect-injection + LLM08 vector-embedding emphasis) | High | All 13 attacks, Comprehensive intensity, 20-min timeout, RAG-tuned probe selection | no LLM |
+| `audit` | All 14 attacks at Comprehensive intensity — audit-grade evidence | High | All 14 attacks, Comprehensive intensity, 30-min timeout | no LLM |
+| `top10-rag` | All 14 attacks at Comprehensive intensity, 20-min timeout — RAG-vector depth (LLM01 indirect-injection + LLM08 vector-embedding emphasis) | High | All 14 attacks, Comprehensive intensity, 20-min timeout, RAG-tuned probe selection | no LLM |
 
 The current OWASP attack pipeline uses heuristic per-attack evaluators (see `src/AgentEval.RedTeam/RedTeam/Evaluators/`), not an LLM judge. The `--azure-from-env` flag still resolves the judge (for API symmetry with other commands and to honour the `AZURE_OPENAI_*` env gate), but the judge does not consume tokens during the scan. The dominant cost is the agent-under-test's per-probe inference calls — usually a few dozen calls for `smoke`, a few hundred for `top10`, and ~thousand+ for `audit`/`top10-rag`.
 
@@ -173,7 +173,7 @@ Known limitations:
 - All 10 OWASP categories have a dedicated attack, but LLM03/04/08/09 lean on proxy or judge-deferred evidence, so they frequently report `Inconclusive` rather than a confident `pass` — read those leaves with their evidence caveat, not as silent passes.
 - Per-attack heuristic (keyword/structural) evaluators do the first-pass grading; the LLM judge is currently an `Inconclusive`-gated fallback, not the primary grader. A judge-primary mode (the real fix for semantic categories) is the next architectural step — see [redteam-whats-new.md](../../redteam-whats-new.md).
 - LLM08 (Vector / Embedding Weaknesses) exercises a real retrieval boundary via the `retrieve_context` canary; a deeper retrieval-corpus-poisoning probe pack remains on the roadmap.
-- The built-in attack roster (13 attacks) is fixed; custom attack-type injection beyond the built-in roster plus `--import-probes` dataset packs is not yet exposed via CLI.
+- The built-in attack roster (14 attacks) is fixed; custom attack-type injection beyond the built-in roster plus `--import-probes` dataset packs is not yet exposed via CLI.
 
 Tracking backlog:
 - T0.2 — `--azure-from-env` flag on `bench owasp` (shipped 2026-05-24).
