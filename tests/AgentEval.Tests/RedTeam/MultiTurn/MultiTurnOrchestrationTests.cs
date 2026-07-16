@@ -70,24 +70,6 @@ public class MultiTurnOrchestrationTests
         public Task ResetSessionAsync(CancellationToken ct = default) { ResetCount++; return Task.CompletedTask; }
     }
 
-    private sealed class DelayingConversableAgent(TimeSpan delay) : IConversableAgent
-    {
-        public string Name => "delaying";
-        public async Task<AgentResponse> InvokeAsync(string prompt, CancellationToken ct = default)
-        { await Task.Delay(delay, ct); return new AgentResponse { Text = "late" }; }
-        public Task<IAgentConversation> StartConversationAsync(CancellationToken ct = default)
-            => Task.FromResult<IAgentConversation>(new Convo(delay));
-
-        private sealed class Convo(TimeSpan delay) : IAgentConversation
-        {
-            public ConversationFidelity Fidelity => ConversationFidelity.Native;
-            public IReadOnlyList<Turn> History => [];
-            public async Task<AgentResponse> SendAsync(string userMessage, CancellationToken ct = default)
-            { await Task.Delay(delay, ct); return new AgentResponse { Text = "late" }; }
-            public ValueTask DisposeAsync() => ValueTask.CompletedTask;
-        }
-    }
-
     /// <summary>Conversable agent that ADVANCES a <see cref="FakeTimeProvider"/> by <c>perTurn</c> on each call instead
     /// of really sleeping — so per-turn-timeout / conversation-duration tests are deterministic and instant (no
     /// wall-clock race, no load-sensitive CI flake). Pair with <c>ScanOptions.TimeProvider = clock</c>.</summary>
@@ -105,6 +87,57 @@ public class MultiTurnOrchestrationTests
             public IReadOnlyList<Turn> History => [];
             public Task<AgentResponse> SendAsync(string userMessage, CancellationToken ct = default)
             { clock.Advance(perTurn); return Task.FromResult(new AgentResponse { Text = "ok" }); }
+            public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+        }
+    }
+
+    /// <summary>Conversable agent whose SendAsync call never completes on its own: it advances a <see cref="FakeTimeProvider"/>
+    /// past the per-turn timeout (synchronously firing the orchestrator's per-turn timer) and then awaits cancellation.
+    /// Deterministic stand-in for "the agent hangs longer than the per-turn budget" — no real wall-clock wait, no CI-load
+    /// sensitivity. Pair with <c>ScanOptions.TimeProvider = clock</c>.</summary>
+    private sealed class NeverRespondingConversableAgent(FakeTimeProvider clock, TimeSpan timeoutToExceed) : IConversableAgent
+    {
+        public string Name => "never-responding";
+        public Task<AgentResponse> InvokeAsync(string prompt, CancellationToken ct = default)
+            => throw new NotSupportedException("Only the conversational (StartConversationAsync) path is exercised by this fixture.");
+        public Task<IAgentConversation> StartConversationAsync(CancellationToken ct = default)
+            => Task.FromResult<IAgentConversation>(new Convo(clock, timeoutToExceed));
+
+        private sealed class Convo(FakeTimeProvider clock, TimeSpan timeoutToExceed) : IAgentConversation
+        {
+            public ConversationFidelity Fidelity => ConversationFidelity.Native;
+            public IReadOnlyList<Turn> History => [];
+            public async Task<AgentResponse> SendAsync(string userMessage, CancellationToken ct = default)
+            {
+                clock.Advance(timeoutToExceed);   // synchronously fires the orchestrator's per-turn timer, cancelling ct
+                await Task.Delay(Timeout.InfiniteTimeSpan, ct).ConfigureAwait(false);
+                return new AgentResponse { Text = "unreachable" };
+            }
+            public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+        }
+    }
+
+    /// <summary>Conversable agent whose SendAsync call hangs until externally cancelled, signalling <paramref name="turnStarted"/>
+    /// once the call is actually in flight. Lets a test deterministically cancel an OUTER token exactly "mid-turn" —
+    /// no real wall-clock wait, no CI-load-sensitive race between a timed CancellationTokenSource and a real delay.</summary>
+    private sealed class HangingConversableAgent(TaskCompletionSource turnStarted) : IConversableAgent
+    {
+        public string Name => "hanging";
+        public Task<AgentResponse> InvokeAsync(string prompt, CancellationToken ct = default)
+            => throw new NotSupportedException("Only the conversational (StartConversationAsync) path is exercised by this fixture.");
+        public Task<IAgentConversation> StartConversationAsync(CancellationToken ct = default)
+            => Task.FromResult<IAgentConversation>(new Convo(turnStarted));
+
+        private sealed class Convo(TaskCompletionSource turnStarted) : IAgentConversation
+        {
+            public ConversationFidelity Fidelity => ConversationFidelity.Native;
+            public IReadOnlyList<Turn> History => [];
+            public async Task<AgentResponse> SendAsync(string userMessage, CancellationToken ct = default)
+            {
+                turnStarted.TrySetResult();
+                await Task.Delay(Timeout.InfiniteTimeSpan, ct).ConfigureAwait(false);
+                return new AgentResponse { Text = "unreachable" };
+            }
             public ValueTask DisposeAsync() => ValueTask.CompletedTask;
         }
     }
@@ -496,9 +529,14 @@ public class MultiTurnOrchestrationTests
     [Fact]
     public async Task PerTurnTimeout_FoldsTruncated_NotThrow()
     {
+        // DETERMINISTIC via FakeTimeProvider (no real wall-clock wait): the agent's SendAsync advances the clock past
+        // TimeoutPerTurn before awaiting, synchronously firing the orchestrator's per-turn timer. Previously this used
+        // a real 10s delay racing a real 40ms timer — a genuine wall-clock race that flaked under CI load (observed:
+        // failed after ~11s on a loaded Windows runner — the 40ms timer lost the race to the natural delay).
+        var clock = new FakeTimeProvider();
         var attack = new EndlessAttack();
-        var agent = new DelayingConversableAgent(TimeSpan.FromSeconds(10));
-        var options = new ScanOptions { TimeoutPerTurn = TimeSpan.FromMilliseconds(40) };
+        var agent = new NeverRespondingConversableAgent(clock, TimeSpan.FromMilliseconds(40));
+        var options = new ScanOptions { TimeoutPerTurn = TimeSpan.FromMilliseconds(40), TimeProvider = clock };
 
         var result = await new TurnOrchestrator(agent, options).RunAsync(attack, Seed, attack.GetEvaluator(), CancellationToken.None);
 
@@ -511,13 +549,20 @@ public class MultiTurnOrchestrationTests
     public async Task OuterCancellation_Propagates_NotSwallowedAsTruncation()
     {
         // An OUTER (scan) cancel must propagate, NOT be folded as a per-turn timeout. TimeoutPerTurn stays at its
-        // large default so the per-turn cap can't fire first; the outer token cancels mid-turn.
+        // large default so the per-turn cap can't fire first; the outer token cancels mid-turn. DETERMINISTIC: a
+        // TaskCompletionSource signals once the agent's turn is actually in flight, then the outer token is
+        // cancelled — no real wall-clock wait, no CI-load race (previously a real 40ms CancellationTokenSource
+        // racing a real 10s agent delay — the same class of flake as PerTurnTimeout_FoldsTruncated_NotThrow above).
+        var turnStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var attack = new EndlessAttack();
-        var agent = new DelayingConversableAgent(TimeSpan.FromSeconds(10));
-        using var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(40));
+        var agent = new HangingConversableAgent(turnStarted);
+        using var cts = new CancellationTokenSource();
 
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
-            new TurnOrchestrator(agent, ScanOptions.Default).RunAsync(attack, Seed, attack.GetEvaluator(), cts.Token));
+        var runTask = new TurnOrchestrator(agent, ScanOptions.Default).RunAsync(attack, Seed, attack.GetEvaluator(), cts.Token);
+        await turnStarted.Task;   // wait until the agent call is actually in flight
+        cts.Cancel();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => runTask);
     }
 
     [Fact]
