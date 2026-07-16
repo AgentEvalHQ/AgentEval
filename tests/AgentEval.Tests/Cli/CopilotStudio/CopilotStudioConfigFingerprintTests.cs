@@ -94,30 +94,58 @@ public class CopilotStudioConfigFingerprintTests
     [Fact]
     public void CheckDrift_ChangedSchemaName_ReportsNewAndRemoved()
     {
-        // Different DisplayName -> different dictionary key -> New/Removed rather than Changed (matches
-        // ManifestDriftDetector's own key-based semantics — a renamed agent looks like "old gone, new arrived").
+        // A genuinely different SchemaName is part of identity (CanonicalContent hashes it) AND part of the
+        // stable key (EnvironmentId/SchemaName) — a real schema change correctly shows up as New/Removed,
+        // not a false rename alarm (see the DisplayName-rename tests below for the bug this used to have).
         var original = Config(schema: "agent-1");
         var baseline = CopilotStudioConfigBaseline.Capture(original);
 
         var renamed = Config(schema: "agent-2");
         var drift = CopilotStudioConfigFingerprint.CheckDrift(renamed, baseline);
 
-        Assert.Contains(drift, f => f.Kind == ManifestDriftKind.New && f.Key == "agent-2");
-        Assert.Contains(drift, f => f.Kind == ManifestDriftKind.Removed && f.Key == "agent-1");
+        Assert.Contains(drift, f => f.Kind == ManifestDriftKind.New && f.Key == "env-1/agent-2");
+        Assert.Contains(drift, f => f.Kind == ManifestDriftKind.Removed && f.Key == "env-1/agent-1");
     }
 
     [Fact]
-    public void CheckDrift_SameNameDifferentEnvironment_ReportsChanged()
+    public void CheckDrift_SameNameDifferentEnvironment_ReportsNewAndRemoved_NotSilentlyMissed()
     {
-        // Same DisplayName (AgentName override keeps the key stable) but a different EnvironmentId — a real
-        // rug-pull shape: same reported label, different underlying agent.
+        // A real rug-pull shape: same reported DISPLAY LABEL ("MyAgent"), different underlying agent
+        // (EnvironmentId changed). Under the OLD DisplayName-keyed scheme this reported as one "Changed"
+        // finding for key "MyAgent" (since the key stayed constant while the hash changed); under the fixed
+        // stable-identity key (EnvironmentId/SchemaName) it now reports as New+Removed instead — a different
+        // REPORTING shape, but the drift is still fully caught either way (CopilotStudioRedTeamTarget's
+        // --fail-on-config-drift gate treats every non-Unchanged Kind identically, so this has no
+        // behavioral consequence). The point of this test: a same-label rug-pull must NEVER be silently
+        // missed just because AgentName didn't change.
         var original = new CopilotStudioConfig { EnvironmentId = "env-1", SchemaName = "agent-1", TenantId = "t", AppClientId = "a", AgentName = "MyAgent" };
         var baseline = CopilotStudioConfigBaseline.Capture(original);
 
         var drifted = new CopilotStudioConfig { EnvironmentId = "env-2", SchemaName = "agent-1", TenantId = "t", AppClientId = "a", AgentName = "MyAgent" };
         var drift = CopilotStudioConfigFingerprint.CheckDrift(drifted, baseline);
 
-        Assert.Contains(drift, f => f.Kind == ManifestDriftKind.Changed && f.Key == "MyAgent");
+        Assert.Contains(drift, f => f.Kind == ManifestDriftKind.New && f.Key == "env-2/agent-1");
+        Assert.Contains(drift, f => f.Kind == ManifestDriftKind.Removed && f.Key == "env-1/agent-1");
+        Assert.DoesNotContain(drift, f => f.Kind == ManifestDriftKind.Unchanged);
+    }
+
+    // ── the bug this session fixed: a harmless rename must NOT produce a false drift alarm ──
+
+    [Fact]
+    public void CheckDrift_RenamedAgentName_SameUnderlyingIdentity_ReportsNoDrift()
+    {
+        // Regression guard (review): CheckDrift used to key its comparison dictionary by DisplayName, which
+        // ManifestDriftDetector.Detect compares by KEY match — so a harmless rename (same EnvironmentId +
+        // SchemaName, only the free-text AgentName label changed) produced a false "old name Removed + new
+        // name New" double alarm, even though the fingerprinted identity never actually changed.
+        var original = new CopilotStudioConfig { EnvironmentId = "env-1", SchemaName = "agent-1", TenantId = "t", AppClientId = "a", AgentName = "Old Friendly Name" };
+        var baseline = CopilotStudioConfigBaseline.Capture(original);
+
+        var renamed = new CopilotStudioConfig { EnvironmentId = "env-1", SchemaName = "agent-1", TenantId = "t", AppClientId = "a", AgentName = "New Friendly Name" };
+        var drift = CopilotStudioConfigFingerprint.CheckDrift(renamed, baseline);
+
+        Assert.DoesNotContain(drift, f => f.Kind is ManifestDriftKind.New or ManifestDriftKind.Removed or ManifestDriftKind.Changed);
+        Assert.Contains(drift, f => f.Kind == ManifestDriftKind.Unchanged);
     }
 
     // ── CopilotStudioConfigBaseline: JSON round-trip + file persistence ──
@@ -158,11 +186,22 @@ public class CopilotStudioConfigFingerprintTests
     }
 
     [Fact]
-    public void Capture_KeysBaselineByDisplayName()
+    public void Capture_KeysBaselineByStableIdentity_NotDisplayName()
     {
+        // The free-text AgentName label ("Friendly Name") must NOT be the dictionary key — see
+        // CopilotStudioConfigFingerprint.StableKey's remarks for why a DisplayName-keyed baseline produced
+        // false rename alarms.
         var config = new CopilotStudioConfig { EnvironmentId = "env-1", SchemaName = "schema-1", TenantId = "t", AppClientId = "a", AgentName = "Friendly Name" };
         var baseline = CopilotStudioConfigBaseline.Capture(config);
 
-        Assert.True(baseline.HashesByAgentName.ContainsKey("Friendly Name"));
+        Assert.True(baseline.HashesByAgentName.ContainsKey("env-1/schema-1"));
+        Assert.False(baseline.HashesByAgentName.ContainsKey("Friendly Name"));
+    }
+
+    [Fact]
+    public void StableKey_IsEnvironmentIdSlashSchemaName()
+    {
+        var config = Config(env: "env-9", schema: "schema-9");
+        Assert.Equal("env-9/schema-9", CopilotStudioConfigFingerprint.StableKey(config));
     }
 }

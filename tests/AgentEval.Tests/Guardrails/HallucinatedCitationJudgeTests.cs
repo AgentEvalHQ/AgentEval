@@ -43,6 +43,24 @@ public class HallucinatedCitationJudgeTests
         public void Dispose() { }
     }
 
+    /// <summary>Records the exact prompt sent to the model, always answers "supported" — used to inspect what content actually reached the judge.</summary>
+    private sealed class CapturingChatClient : IChatClient
+    {
+        public string? LastPrompt { get; private set; }
+
+        public Task<ChatResponse> GetResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default)
+        {
+            LastPrompt = messages.Last().Text;
+            return Task.FromResult(new ChatResponse(new ChatMessage(ChatRole.Assistant, """{"supported": true, "confidence": 0.9}""")));
+        }
+
+        public IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default)
+            => throw new NotSupportedException();
+
+        public object? GetService(Type serviceType, object? serviceKey = null) => null;
+        public void Dispose() { }
+    }
+
     [Fact]
     public async Task InspectAsync_CitationToNonexistentSource_BlocksWithoutCallingModel()
     {
@@ -94,6 +112,55 @@ public class HallucinatedCitationJudgeTests
     {
         var gate = new HallucinatedCitationJudge(new ThrowingChatClient());
         var verdict = await gate.InspectAsync("");
+        Assert.Equal(GateAction.Allow, verdict.Action);
+    }
+
+    // ── SourceLine regex: multi-line source content must not be silently truncated (review) ──
+
+    [Fact]
+    public async Task InspectAsync_MultiLineSourceContent_NotTruncated_FullContentReachesJudge()
+    {
+        // Regression guard: SourceLine's regex previously lacked RegexOptions.Singleline, so `.` never
+        // matched `\n` — a source whose content spans multiple lines silently lost every line after the
+        // first before the judge ever saw it, risking a false BLOCK for a claim genuinely supported by the
+        // truncated-away part of the source.
+        var capturing = new CapturingChatClient();
+        var gate = new HallucinatedCitationJudge(capturing);
+        var text = HallucinatedCitationJudge.FormatCase(
+            new Dictionary<string, string>
+            {
+                ["S1"] = "Our return policy allows 30-day returns with a receipt.\n" +
+                         "Exceptions apply for electronics, which have a 14-day window.\n" +
+                         "All other terms follow standard commerce law.",
+            },
+            citedSourceId: "S1", claim: "Electronics have a 14-day return window.");
+
+        await gate.InspectAsync(text);
+
+        Assert.NotNull(capturing.LastPrompt);
+        Assert.Contains("Exceptions apply for electronics, which have a 14-day window.", capturing.LastPrompt);
+        Assert.Contains("All other terms follow standard commerce law.", capturing.LastPrompt);
+    }
+
+    [Fact]
+    public async Task InspectAsync_MultiLineSourceFollowedByAnotherSource_DoesNotBleedAcrossSources()
+    {
+        // Guards the FIX itself, not just the original bug: a naive RegexOptions.Singleline-only change
+        // (verified empirically before choosing this lookahead-bounded regex instead) makes source 1's
+        // multi-line content greedily swallow source 2, CITED SOURCE, and CLAIM too — which would make "S2"
+        // vanish from the parsed sources dictionary entirely and turn this into a false "does not exist"
+        // Block instead of proceeding to the judge.
+        var gate = new HallucinatedCitationJudge(new ScriptedSupportChatClient(supported: true));
+        var text = HallucinatedCitationJudge.FormatCase(
+            new Dictionary<string, string>
+            {
+                ["S1"] = "First line of source one.\nSecond line of source one.",
+                ["S2"] = "Source two is a single line.",
+            },
+            citedSourceId: "S2", claim: "Source two is a single line.");
+
+        var verdict = await gate.InspectAsync(text);
+
         Assert.Equal(GateAction.Allow, verdict.Action);
     }
 

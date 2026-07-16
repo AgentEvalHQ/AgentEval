@@ -37,7 +37,16 @@ namespace AgentEval.Guardrails.Judges;
 /// </remarks>
 public sealed class HallucinatedCitationJudge : IChatGate
 {
-    private static readonly Regex SourceLine = new(@"^\[(?<id>[^\]]+)\]\s*(?<content>.*)$", RegexOptions.Compiled | RegexOptions.Multiline, TimeSpan.FromMilliseconds(100));
+    // Bounded lookahead, NOT a blind RegexOptions.Singleline — empirically verified before choosing this
+    // shape (temporary diagnostic test, deleted before commit): adding Singleline alone (making `.` match
+    // `\n`) fixes the multi-line-content truncation, but a bare `(?<content>.*)$` then greedily swallows
+    // EVERY subsequent source/CITED SOURCE/CLAIM line too, since nothing stops it before end-of-string. The
+    // lookahead `(?=\r?\n\[[^\]]+\]|\r?\nCITED SOURCE:|\z)` bounds a multi-line content capture to stop
+    // exactly at the next `[id]` marker, the `CITED SOURCE:` line, or the end of the text — so a source
+    // spanning multiple lines is captured in FULL without bleeding into the next field.
+    private static readonly Regex SourceLine = new(
+        @"^\[(?<id>[^\]]+)\]\s*(?<content>.*?)(?=\r?\n\[[^\]]+\]|\r?\nCITED SOURCE:|\z)",
+        RegexOptions.Compiled | RegexOptions.Multiline | RegexOptions.Singleline, TimeSpan.FromMilliseconds(100));
     private static readonly Regex CitedSourceLine = new(@"^CITED SOURCE:\s*(?<id>.+)$", RegexOptions.Compiled | RegexOptions.Multiline, TimeSpan.FromMilliseconds(100));
     private static readonly Regex ClaimLine = new(@"^CLAIM:\s*(?<claim>.+)$", RegexOptions.Compiled | RegexOptions.Multiline | RegexOptions.Singleline, TimeSpan.FromMilliseconds(100));
     private static readonly Regex TripleQuote = new("\"{3,}", RegexOptions.Compiled, TimeSpan.FromMilliseconds(50));

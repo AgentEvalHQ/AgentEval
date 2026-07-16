@@ -90,13 +90,46 @@ public static class RawSkillDirectoryScanner
             return false;
         }
 
-        foreach (var file in Directory.EnumerateFiles(directory))
+        IEnumerable<string> files;
+        try
         {
-            if (string.Equals(Path.GetFileName(file), SkillFileName, StringComparison.OrdinalIgnoreCase))
+            files = Directory.EnumerateFiles(directory);
+        }
+        catch (IOException)
+        {
+            skillMdPath = null;
+            return false;
+        }
+        catch (UnauthorizedAccessException)
+        {
+            skillMdPath = null;
+            return false;
+        }
+
+        // The same exceptions can ALSO surface lazily during enumeration (not just on the EnumerateFiles
+        // call itself), so the foreach must be inside the try too — mirrors CollectContainerCandidates'
+        // identical sibling guard below, and this session's own "no single permission-restricted folder
+        // crashes the whole scan" precedent (see MafSkillScanner's discovery-crash handling).
+        try
+        {
+            foreach (var file in files)
             {
-                skillMdPath = file;
-                return true;
+                if (string.Equals(Path.GetFileName(file), SkillFileName, StringComparison.OrdinalIgnoreCase))
+                {
+                    skillMdPath = file;
+                    return true;
+                }
             }
+        }
+        catch (IOException)
+        {
+            skillMdPath = null;
+            return false;
+        }
+        catch (UnauthorizedAccessException)
+        {
+            skillMdPath = null;
+            return false;
         }
 
         skillMdPath = null;

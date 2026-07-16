@@ -42,8 +42,34 @@ internal static class CopilotStudioConfigFingerprint
     public static string Fingerprint(CopilotStudioConfig config) => ManifestFingerprint.Hash(CanonicalContent(config));
 
     /// <summary>
+    /// The stable identity key used to key the drift-detection dictionary — <c>EnvironmentId/SchemaName</c>,
+    /// the SAME identity fields <see cref="CanonicalContent"/> hashes (<c>Cloud</c> omitted here since it
+    /// cannot itself distinguish two different agents the way <c>EnvironmentId</c>/<c>SchemaName</c> do).
+    /// </summary>
+    /// <remarks>
+    /// Deliberately NOT <see cref="CopilotStudioConfig.DisplayName"/> (a free-text label,
+    /// <see cref="CopilotStudioConfig.AgentName"/> if set else <see cref="CopilotStudioConfig.SchemaName"/>).
+    /// <see cref="ManifestDriftDetector.Detect"/> compares by dictionary KEY, not by scanning all values for
+    /// a matching hash — so keying by <c>DisplayName</c> made a harmless rename (same underlying agent,
+    /// different label) look like "the old name's agent was Removed AND a New agent appeared under the new
+    /// name": a false double alarm, since the fingerprint (identity) never actually changed. Keying by the
+    /// SAME fields the fingerprint itself treats as identity closes that gap while still catching a genuine
+    /// rug-pull that happens to keep the same <c>AgentName</c> label (same key, but the hash — and therefore
+    /// the drift <c>Kind</c> — differs, reported as <see cref="ManifestDriftKind.Changed"/> only when
+    /// EnvironmentId/SchemaName ALSO stayed the same; a rug-pull that changes EnvironmentId/SchemaName too
+    /// is still caught, just as New+Removed instead of Changed — <c>CopilotStudioRedTeamTarget</c> treats
+    /// every non-Unchanged <c>Kind</c> identically, so this reporting-shape difference has no behavioral
+    /// consequence for the CLI's <c>--fail-on-config-drift</c> gate).
+    /// </remarks>
+    public static string StableKey(CopilotStudioConfig config)
+    {
+        ArgumentNullException.ThrowIfNull(config);
+        return $"{config.EnvironmentId}/{config.SchemaName}";
+    }
+
+    /// <summary>
     /// Checks the current config against a pinned <paramref name="baseline"/> and reports drift — the
-    /// config's fingerprint compared against its trust-time pin (keyed by <see cref="CopilotStudioConfig.DisplayName"/>).
+    /// config's fingerprint compared against its trust-time pin (keyed by <see cref="StableKey"/>).
     /// </summary>
     public static IReadOnlyList<ManifestDriftFinding> CheckDrift(CopilotStudioConfig currentConfig, CopilotStudioConfigBaseline baseline)
     {
@@ -52,7 +78,7 @@ internal static class CopilotStudioConfigFingerprint
 
         var current = new Dictionary<string, string>(StringComparer.Ordinal)
         {
-            [currentConfig.DisplayName] = Fingerprint(currentConfig),
+            [StableKey(currentConfig)] = Fingerprint(currentConfig),
         };
         return ManifestDriftDetector.Detect(baseline.HashesByAgentName, current);
     }
@@ -68,7 +94,12 @@ internal static class CopilotStudioConfigFingerprint
 /// <c>redteam --sut copilot-studio</c> run only ever targets one agent per invocation today.
 /// </summary>
 /// <param name="CapturedAt">When this baseline was captured.</param>
-/// <param name="HashesByAgentName"><see cref="CopilotStudioConfig.DisplayName"/> → <see cref="CopilotStudioConfigFingerprint.Fingerprint"/> at capture time.</param>
+/// <param name="HashesByAgentName">
+/// <see cref="CopilotStudioConfigFingerprint.StableKey"/> → <see cref="CopilotStudioConfigFingerprint.Fingerprint"/>
+/// at capture time. NOT literally keyed by display name despite the field's name (kept as-is to avoid
+/// churning the persisted JSON schema) — see <see cref="CopilotStudioConfigFingerprint.StableKey"/>'s own
+/// remarks for why a stable identity key, not <see cref="CopilotStudioConfig.DisplayName"/>, is used.
+/// </param>
 /// <param name="Notes">Optional human note (who approved it, why).</param>
 internal sealed record CopilotStudioConfigBaseline(
     DateTimeOffset CapturedAt, IReadOnlyDictionary<string, string> HashesByAgentName, string? Notes = null)
@@ -81,7 +112,7 @@ internal sealed record CopilotStudioConfigBaseline(
         ArgumentNullException.ThrowIfNull(config);
         var hashes = new Dictionary<string, string>(StringComparer.Ordinal)
         {
-            [config.DisplayName] = CopilotStudioConfigFingerprint.Fingerprint(config),
+            [CopilotStudioConfigFingerprint.StableKey(config)] = CopilotStudioConfigFingerprint.Fingerprint(config),
         };
         return new CopilotStudioConfigBaseline(DateTimeOffset.UtcNow, hashes, notes);
     }

@@ -123,6 +123,33 @@ public class IndirectInjectionSurfaceTests
     }
 
     [Fact]
+    public async Task Runner_SkillInjectionBoundaryProbes_OnTextOnlyAgent_ScoredInconclusive_NotFabricatedResisted()
+    {
+        // Widened gate (review): SkillInstruction/SkillResource share the identical "undeliverable without a
+        // tool channel" property ToolOutput has — a poisoned skill description/resource is only ever
+        // injected into context via the load_skill/read_skill_resource canary tools (SkillInjectionAttack's
+        // boundary probes), so a text-only SUT never sees it. Before this fix, the gate above only checked
+        // InjectionSurface.ToolOutput, so these probes fell through to the normal (non-tool) InvokeAsync
+        // path and the RefusalGatedEvaluator/ContainsTokenEvaluator verbal fallback scored a fabricated
+        // conclusive Resisted (the marker can never appear, since the poisoned content was never delivered)
+        // — inflating OWASP/MITRE compliance pass counts on every text-only SUT scan.
+        var result = await new RedTeamRunner().ScanAsync(
+            new TextOnlyAgent("Here is a summary of the skill."),
+            new ScanOptions { AttackTypes = [new SkillInjectionAttack()], Intensity = Intensity.Moderate });
+
+        var boundaryProbes = result.AttackResults.Single().ProbeResults
+            .Where(p => p.Surface is InjectionSurface.SkillInstruction or InjectionSurface.SkillResource)
+            .ToList();
+
+        Assert.NotEmpty(boundaryProbes); // sanity: Moderate intensity must actually include the boundary probes
+        Assert.All(boundaryProbes, p =>
+        {
+            Assert.Equal(EvaluationOutcome.Inconclusive, p.Outcome);
+            Assert.Contains("never delivered", p.Reason);
+        });
+    }
+
+    [Fact]
     public async Task ClassicUserMessageProbe_StillWorks_VerbalFallback()
     {
         var classic = _attack.GetProbes(Intensity.Quick).First();         // IND-001, document injection, marker 41414141
