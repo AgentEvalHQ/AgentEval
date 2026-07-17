@@ -251,7 +251,9 @@ internal sealed class CopilotStudioRedTeamTarget : IRedTeamBuiltInTarget, ISutTa
         }
 
         // Live path: builds a real connector (see BuildLive's own XML doc for what's live-verified vs. not).
-        return CopilotStudioAgentFactory.BuildLive(EnsureConfig(opts));
+        // iUnderstandLiveSideEffects: true is safe here — Validate() (above, in this same class) already
+        // enforced --i-understand-live-side-effects before RedTeamCommand ever reaches this Build call.
+        return CopilotStudioAgentFactory.BuildLive(EnsureConfig(opts), iUnderstandLiveSideEffects: true);
     }
 
     public void WritePostScanSummary(RedTeamResult result, AgentTrace trace, TextWriter err)
@@ -356,8 +358,10 @@ internal sealed class CopilotStudioRedTeamTarget : IRedTeamBuiltInTarget, ISutTa
 
     string ISutTarget.ResolvedName(CommonTargetOptions common, ISutTargetOptions? own) => EnsureSutConfig(common, own).DisplayName;
 
+    // iUnderstandLiveSideEffects: true is safe here — ISutTarget.Validate (above, in this same class)
+    // already enforced --i-understand-live-side-effects before SutTargetResolver ever reaches this Build call.
     IEvaluableAgent ISutTarget.Build(CommonTargetOptions common, ISutTargetOptions? own, IEvaluableAgent? sutOverride)
-        => sutOverride ?? CopilotStudioAgentFactory.BuildLive(EnsureSutConfig(common, own));
+        => sutOverride ?? CopilotStudioAgentFactory.BuildLive(EnsureSutConfig(common, own), iUnderstandLiveSideEffects: true);
 
     private CopilotStudioConfig EnsureSutConfig(CommonTargetOptions common, ISutTargetOptions? own)
     {

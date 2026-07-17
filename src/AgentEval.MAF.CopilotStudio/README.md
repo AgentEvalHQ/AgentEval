@@ -12,12 +12,18 @@ A Microsoft Copilot Studio (MCS) → `IEvaluableAgent`/`IChatClient` bridge for 
 dotnet add package AgentEval.MAF.CopilotStudio --prerelease
 ```
 
+> **Not yet published.** This package builds, packs, and is consumable via `ProjectReference` today, but
+> publishing it to NuGet.org is a separate, not-yet-made release-cut decision — `.github/workflows/release.yml`
+> currently only packs `AgentEval`/`AgentEval.Cli`. Until that lands, reference the project directly or build
+> from source.
+
 This is a separate, opt-in package — installing the main `AgentEval` package does **not** pull in the
 Copilot Studio SDK or MSAL. Add this package only if you need to evaluate a live Copilot Studio agent.
 
 ## Usage
 
 ```csharp
+using AgentEval.Core;              // IEvaluableAgent
 using AgentEval.MAF.CopilotStudio;
 
 var config = new CopilotStudioConfig
@@ -30,8 +36,10 @@ var config = new CopilotStudioConfig
 
 // BuildLive constructs the live connector (MSAL device-code auth, streaming activity bridge) and returns
 // an IEvaluableAgent — the same seam AgentEval's fluent assertions / stochastic runner / benchmarks use
-// for every other agent type.
-IEvaluableAgent agent = CopilotStudioAgentFactory.BuildLive(config);
+// for every other agent type. iUnderstandLiveSideEffects is required and has no default: this agent's
+// connectors/flows can fire REAL production actions and cannot be sandboxed — pass true only once you've
+// confirmed `config` points at a NON-PROD agent.
+IEvaluableAgent agent = CopilotStudioAgentFactory.BuildLive(config, iUnderstandLiveSideEffects: true);
 
 var result = await agent.InvokeAsync("What's the status of order #12345?");
 ```

@@ -3,7 +3,6 @@
 // Licensed under the MIT License.
 
 using AgentEval.Core;
-using AgentEval.MAF;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -53,18 +52,33 @@ public static class CopilotStudioAgentFactory
     /// The LIVE path: build a MAF <see cref="AIAgent"/> from the Copilot Studio connector using
     /// <paramref name="config"/> + device-code/MSAL auth, then wrap it via <see cref="FromAgent"/>.
     /// </summary>
+    /// <param name="config">The target agent's connection settings.</param>
+    /// <param name="iUnderstandLiveSideEffects">
+    /// Required, explicit consent that the returned agent drives a LIVE Copilot Studio agent whose
+    /// connectors/flows can fire REAL production actions and cannot be sandboxed — pass <see langword="true"/>
+    /// only after confirming <paramref name="config"/> points at a non-prod agent. There is deliberately no
+    /// default value: this method is directly callable from code (not just the CLI, which enforces its own
+    /// <c>--i-understand-live-side-effects</c> flag before ever reaching this call), so the same explicit
+    /// acknowledgment must be required of every caller, not just the CLI path.
+    /// </param>
+    /// <exception cref="InvalidOperationException"><paramref name="iUnderstandLiveSideEffects"/> is <see langword="false"/>.</exception>
     /// <remarks>
-    /// Everything this method does is local/offline — constructing <see cref="ConnectionSettings"/>, resolving the
-    /// token scope, and building the <see cref="CopilotClient"/> — makes <b>no network call</b>. The
+    /// Everything else this method does is local/offline — constructing <see cref="ConnectionSettings"/>, resolving
+    /// the token scope, and building the <see cref="CopilotClient"/> — makes <b>no network call</b>. The
     /// <see cref="CopilotStudioTokenProvider"/> callback it wires up is only invoked lazily, by
-    /// <see cref="CopilotClient"/> itself, on the first real request the returned agent makes. This preserves the
-    /// existing "consent gate runs before any network call" guarantee: <c>CopilotStudioRedTeamTarget.Validate</c>'s
-    /// consent/config checks (and any equivalent gate in a future <c>eval</c>/<c>bench</c> caller) run and can
-    /// refuse well before this method — let alone a network call — is ever reached.
+    /// <see cref="CopilotClient"/> itself, on the first real request the returned agent makes.
     /// </remarks>
-    public static IEvaluableAgent BuildLive(CopilotStudioConfig config)
+    public static IEvaluableAgent BuildLive(CopilotStudioConfig config, bool iUnderstandLiveSideEffects)
     {
         ArgumentNullException.ThrowIfNull(config);
+        if (!iUnderstandLiveSideEffects)
+        {
+            throw new InvalidOperationException(
+                "BuildLive drives a LIVE Copilot Studio agent whose connectors/flows can fire REAL production " +
+                "actions and cannot be sandboxed. Pass iUnderstandLiveSideEffects: true only after confirming " +
+                "config points at a NON-PROD agent (nothing was sent).");
+        }
+
         config.Validate();
 
         var settings = new ConnectionSettings

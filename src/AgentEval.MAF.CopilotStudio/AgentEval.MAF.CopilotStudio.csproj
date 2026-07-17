@@ -5,8 +5,15 @@
     <RootNamespace>AgentEval</RootNamespace>
 
     <!-- A separate, opt-in package (not embedded in AgentEval.csproj) so the Copilot Studio SDK +
-         MSAL dependency tree is never forced on every AgentEval consumer — the same "consumers add it
-         themselves" discipline AgentEval.MAF already applies to Azure/OpenAI (see its own csproj comment). -->
+         MSAL dependency tree is never forced on every AgentEval consumer. Same MOTIVE as AgentEval.MAF's own
+         "consumers add it themselves" discipline for Azure/OpenAI (see its csproj comment) — but a bigger
+         instance of it: OpenAI's adapter is a single omitted PackageReference with zero new code, while this
+         is ~830 lines of real bridging logic that has to live somewhere, hence a whole new packable project
+         (own IncludeSubProjectDlls copy, own release-pipeline question — see this project's README) rather
+         than just skipping a line. -->
+    <!-- NOTE: not yet wired into .github/workflows/release.yml's pack/publish steps — that's a separate,
+         deliberate decision left for a release-cut choice, not bundled into whichever change added this
+         project. See this project's README "Not yet published" callout. -->
     <IsPackable>true</IsPackable>
     <PackageId>AgentEval.MAF.CopilotStudio</PackageId>
     <!-- Version is centralized in Directory.Build.props, same lockstep convention as AgentEval/AgentEval.Cli. -->
@@ -45,6 +52,7 @@
     <!-- Re-declared explicitly because PrivateAssets=all above suppresses transitive propagation — same
          discipline AgentEval.csproj already documents for its own embedded sub-projects. -->
     <PackageReference Include="Microsoft.Agents.AI" />
+    <PackageReference Include="Microsoft.Agents.AI.Workflows" />
     <PackageReference Include="Microsoft.Extensions.AI.Evaluation.Quality" />
     <PackageReference Include="OpenTelemetry.Api" />
     <!-- Copilot Studio live connector — moved here from AgentEval.Cli/CopilotStudio/ verbatim. -->

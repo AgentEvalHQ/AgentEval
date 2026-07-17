@@ -35,7 +35,7 @@ public sealed class RetryPolicy
     /// for a caught exception, that exception is rethrown IMMEDIATELY (not wrapped in
     /// <see cref="RetryExhaustedException"/>, and without waiting) instead of wasting the retry budget on a
     /// failure known to be permanent — e.g. an auth failure should fail fast, not retry into a rate-limit's
-    /// backoff schedule. See <c>AgentEval.Cli.CopilotStudio.CopilotStudioRetryPolicy</c> for the first
+    /// backoff schedule. See <c>AgentEval.MAF.CopilotStudio.CopilotStudioRetryPolicy</c> for the first
     /// consumer (retry only a 429-shaped <see cref="HttpRequestException"/>).
     /// </summary>
     public Func<Exception, bool>? ShouldRetry { get; init; }

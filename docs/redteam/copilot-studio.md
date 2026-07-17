@@ -40,7 +40,11 @@ don't use it:
 dotnet add package AgentEval.MAF.CopilotStudio --prerelease
 ```
 
+> **Not yet published to NuGet.org** — the package builds/packs correctly, but `release.yml` doesn't push it
+> yet. Reference the project directly or build from source until that lands.
+
 ```csharp
+using AgentEval.Core;              // IEvaluableAgent
 using AgentEval.MAF.CopilotStudio;
 
 var config = new CopilotStudioConfig
@@ -51,7 +55,9 @@ var config = new CopilotStudioConfig
     AppClientId   = "<entra-app-client-id>",
 };
 
-IEvaluableAgent agent = CopilotStudioAgentFactory.BuildLive(config);
+// iUnderstandLiveSideEffects is required, no default — this agent's connectors/flows can fire REAL
+// production actions and cannot be sandboxed. Pass true only once you've confirmed a NON-PROD target.
+IEvaluableAgent agent = CopilotStudioAgentFactory.BuildLive(config, iUnderstandLiveSideEffects: true);
 var result = await agent.InvokeAsync("What's the status of order #12345?");
 ```
 
@@ -217,7 +223,7 @@ behavior) against a hand-rolled fake client.
 MSAL device-code prompt and silent-refresh path; the persisted-cache round trip across runs; the real HTTP
 round trip and response parsing; whether a real agent's `StartConversationAsync`/`AskQuestionAsync` activity
 stream matches what the shim assumes (in particular, any non-`message` activity worth surfacing). A gated,
-`Skip`-by-default test (`CopilotStudioLiveConnectorManualTests` in `tests/AgentEval.Tests/Cli/CopilotStudio/`) is
+`Skip`-by-default test (`CopilotStudioLiveConnectorManualTests` in `tests/AgentEval.Tests/MAF/CopilotStudio/`) is
 ready to run once you have credentials — see its XML doc for setup.
 
 `CopilotStudioAgentFactory.FromAgent` is unchanged and still the credential-free seam: it wraps any
@@ -233,7 +239,7 @@ meantime — the connector itself is wired, but the live network path described 
 real-credential run.
 
 **A second, lower-level test double** now backs the connector's own test suite:
-`MockCopilotStudioConversationClient` (`tests/AgentEval.Tests/Cli/CopilotStudio/`) implements
+`MockCopilotStudioConversationClient` (`tests/AgentEval.Tests/MAF/CopilotStudio/`) implements
 `ICopilotStudioConversationClient` directly — the seam `CopilotStudioChatClient` talks to — rather than faking
 the higher-level `IChatClient`. It supports scripted multi-turn conversations, server-assigned
 conversation-id tracking, and configurable error injection (auth failure, a mid-conversation
