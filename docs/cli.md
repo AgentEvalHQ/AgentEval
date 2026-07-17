@@ -71,6 +71,23 @@ Honoured **only** when launching Mission Control directly (`dotnet run --project
 
 ---
 
+## Troubleshooting: `--log-file <path>`
+
+A global option — available on **every** command, not just the ones shown below. Writes a human-readable, plain-text log of every LLM round-trip (request + response, including tool calls, usage, and finish reason) to `<path>`, separate from the command's normal stdout/stderr. Also captures the full exception (type + message + stack trace) for any request that fails, not just the short one-line summary the CLI prints to stderr by default.
+
+```bash
+agenteval eval --dataset my-data.jsonl --azure --deployment-name gpt-4o-mini --log-file trace.log
+agenteval gatekeeper calibrate --gate judge:crescendo-trajectory-turn-shift --azure --deployment-name gpt-4o-mini --log-file calibrate-debug.log
+```
+
+Covers every LLM call the CLI makes for the invoked command — the agent/SUT under test, judge, attacker (RedTeam Crescendo/PAIR/TAP), and Copilot Studio's live connector all get logged when active.
+
+**⚠️ Contains raw, unredacted content.** The log file includes the full text of every prompt and response — which can carry secrets, PII, or anything else present in your data or the model's output. `--log-file` is opt-in specifically for troubleshooting: turning it on means you want to see exactly what was sent and received. **Never commit or share the resulting file.** The file is overwritten on each invocation, so a fresh run always starts clean.
+
+An unwritable `--log-file` path (missing parent directory, no permissions) never fails the command — it prints one warning to stderr and the invoked command runs exactly as it would without `--log-file` at all. Verbose logging is a debugging aid; it must never be why an otherwise-successful run fails.
+
+---
+
 ## Commands
 
 ### `agenteval init`

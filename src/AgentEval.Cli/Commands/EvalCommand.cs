@@ -256,9 +256,9 @@ internal static class EvalCommand
                 systemPrompt = await File.ReadAllTextAsync(opts.SystemPromptFile.FullName, ct);
 
             // 3. Create IChatClient → IStreamableAgent
-            chatClient = opts.Azure
+            chatClient = VerboseLog.Wrap(opts.Azure
                 ? EndpointFactory.CreateAzure(opts.Endpoint, opts.DeploymentName!, opts.ApiKey)
-                : EndpointFactory.CreateOpenAICompatible(opts.Endpoint!, opts.Model!, opts.ApiKey);
+                : EndpointFactory.CreateOpenAICompatible(opts.Endpoint!, opts.Model!, opts.ApiKey), "agent");
 
             var chatOptions = new ChatOptions();
             if (opts.Temperature != 0f) chatOptions.Temperature = opts.Temperature;
@@ -277,8 +277,8 @@ internal static class EvalCommand
 
         // 5. Create harness (optionally with LLM judge)
         IChatClient? judgeClient = opts.JudgeEndpoint is not null
-            ? EndpointFactory.CreateOpenAICompatible(
-                opts.JudgeEndpoint, opts.JudgeModel ?? resolvedName, opts.ApiKey)
+            ? VerboseLog.Wrap(EndpointFactory.CreateOpenAICompatible(
+                opts.JudgeEndpoint, opts.JudgeModel ?? resolvedName, opts.ApiKey), "judge")
             : null;
         var harness = judgeClient is not null
             ? new MAFEvaluationHarness(judgeClient, verbose: opts.Verbose && !opts.Quiet)
