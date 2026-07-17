@@ -46,6 +46,34 @@ public static class AgentEvalGatekeeperExtensions
         var options = new GatekeeperOptions();
         configure(options);
 
+        // Next-wave item: prompt-template drift, construction-time-only (a template doesn't change
+        // mid-run, so this needs no runtime seam at all — see PromptTemplateDriftException remarks).
+        // Opt-in: both PromptTemplates and PromptTemplateBaseline must be set together. Checked FIRST,
+        // before any other validation below, for the same fail-fast-before-any-mutation reasoning as the
+        // rest of this method — a tampered prompt template is the most fundamental thing to refuse to
+        // build on. Setting exactly ONE of the two throws rather than silently no-op-ing — same
+        // fail-LOUD-on-half-configuration discipline as RefuseUnprotectedHighRiskTools + missing
+        // KnownTools below: a caller who sets PromptTemplates but forgets PromptTemplateBaseline (or vice
+        // versa) almost certainly meant to enable the check, and a silent no-op would leave them believing
+        // drift protection is active when it is not.
+        if (options.PromptTemplates is null != options.PromptTemplateBaseline is null)
+        {
+            throw new InvalidOperationException(
+                "UseGatekeeper: exactly one of GatekeeperOptions.PromptTemplates / PromptTemplateBaseline is " +
+                "set — both must be set together for the prompt-template drift check to run (or neither, to " +
+                "leave it disabled). Set the missing one, or clear the one you did set.");
+        }
+
+        if (options.PromptTemplates is not null && options.PromptTemplateBaseline is not null)
+        {
+            var driftFindings = PromptTemplateDriftGate.CheckDrift(options.PromptTemplates, options.PromptTemplateBaseline);
+            var changed = driftFindings.Where(f => f.Kind == ManifestDriftKind.Changed).ToArray();
+            if (changed.Length > 0)
+            {
+                throw new PromptTemplateDriftException(changed);
+            }
+        }
+
         // #2: compute the AUTHORITATIVE coverage report — against the SAME ToolGates snapshot that is actually
         // registered below (options.ToolGates.ToArray()), not a separately-tracked list a caller could pass to
         // GatekeeperCoverageAnalyzer.Analyze themselves and let drift. Populated whenever KnownTools is set,

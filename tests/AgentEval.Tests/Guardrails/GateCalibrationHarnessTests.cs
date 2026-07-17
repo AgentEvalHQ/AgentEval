@@ -140,4 +140,69 @@ public class GateCalibrationHarnessTests
     [Fact]
     public void GoldSet_NullEntry_ThrowsArgumentException()   // clear error, not an NRE deep in the ctor
         => Assert.Throws<ArgumentException>(() => new JudgeGoldSet("axis", [new JudgeGoldCase("a", true), null!]));
+
+    // ── Calibration staleness (CapturedAt / IsStale) ──
+
+    private sealed class FakeClock : TimeProvider
+    {
+        public DateTimeOffset Now { get; set; }
+        public override DateTimeOffset GetUtcNow() => Now;
+    }
+
+    [Fact]
+    public async Task CapturedAt_ReflectsInjectedTimeProvider()
+    {
+        var clock = new FakeClock { Now = new DateTimeOffset(2026, 7, 16, 12, 0, 0, TimeSpan.Zero) };
+
+        var r = await GateCalibrationHarness.EvaluateAsync(Perfect, Gold(), new CalibrationOptions { TimeProvider = clock });
+
+        Assert.Equal(clock.Now, r.CapturedAt);
+    }
+
+    [Fact]
+    public async Task CapturedAt_DefaultsToSystemClock_WhenTimeProviderNotSupplied()
+    {
+        var before = DateTimeOffset.UtcNow;
+        var r = await GateCalibrationHarness.EvaluateAsync(Perfect, Gold());
+        var after = DateTimeOffset.UtcNow;
+
+        Assert.InRange(r.CapturedAt, before.AddSeconds(-1), after.AddSeconds(1));
+    }
+
+    [Fact]
+    public async Task IsStale_PastThreshold_ReturnsTrue()
+    {
+        var captureClock = new FakeClock { Now = new DateTimeOffset(2026, 7, 16, 12, 0, 0, TimeSpan.Zero) };
+        var r = await GateCalibrationHarness.EvaluateAsync(Perfect, Gold(), new CalibrationOptions { TimeProvider = captureClock });
+
+        var laterClock = new FakeClock { Now = captureClock.Now.AddDays(31) };
+
+        Assert.True(r.IsStale(TimeSpan.FromDays(30), laterClock));
+    }
+
+    [Fact]
+    public async Task IsStale_WithinThreshold_ReturnsFalse()
+    {
+        var captureClock = new FakeClock { Now = new DateTimeOffset(2026, 7, 16, 12, 0, 0, TimeSpan.Zero) };
+        var r = await GateCalibrationHarness.EvaluateAsync(Perfect, Gold(), new CalibrationOptions { TimeProvider = captureClock });
+
+        var laterClock = new FakeClock { Now = captureClock.Now.AddDays(1) };
+
+        Assert.False(r.IsStale(TimeSpan.FromDays(30), laterClock));
+    }
+
+    [Fact]
+    public async Task IsStale_DoesNotAffectIsInlineReady()
+    {
+        // Staleness is informational (per the Fleet Health Index's "flag, don't auto-demote" framing) —
+        // an old-but-still-passing report stays inline-ready.
+        var captureClock = new FakeClock { Now = new DateTimeOffset(2026, 7, 16, 12, 0, 0, TimeSpan.Zero) };
+        var opts = new CalibrationOptions { MaxDangerousErrors = 0, MinCasesPerDirection = 2, TimeProvider = captureClock };
+        var r = await GateCalibrationHarness.EvaluateAsync(Perfect, Gold(), opts);
+
+        var laterClock = new FakeClock { Now = captureClock.Now.AddYears(1) };
+
+        Assert.True(r.IsStale(TimeSpan.FromDays(30), laterClock));
+        Assert.True(r.IsInlineReady);
+    }
 }

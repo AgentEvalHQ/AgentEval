@@ -6,6 +6,20 @@ using System.Runtime.CompilerServices;
 
 namespace AgentEval.MAF.Gatekeeper;
 
+/// <summary>
+/// A per-tool result-SIZE snapshot from <see cref="RunLedger.RecordToolResultSize"/> — the running state AS IT
+/// WAS BEFORE the call that produced it was recorded (the baseline to compare that call's size against, not
+/// including it). Consumed by <see cref="ToolResultSizeAnomalyGate"/>.
+/// </summary>
+/// <param name="Count">Prior calls to this tool recorded this run.</param>
+/// <param name="Sum">Sum of those prior calls' result sizes (characters).</param>
+/// <param name="Max">Largest of those prior calls' result sizes.</param>
+public readonly record struct ToolResultSizeSnapshot(int Count, long Sum, long Max)
+{
+    /// <summary>Mean result size over <see cref="Count"/> prior calls to this tool this run. 0 when <see cref="Count"/> is 0 (no baseline yet).</summary>
+    public double AverageSize => Count == 0 ? 0.0 : (double)Sum / Count;
+}
+
 /// <summary>The outcome of <see cref="RunLedger.TryAdmitToolCall"/> — which budget (if any) was exceeded.</summary>
 public enum RunBudgetDecision
 {
@@ -62,6 +76,7 @@ public sealed class RunLedger
     // over an overlapping tool/argument name cannot cross-contaminate either gate's count. See the class doc.
     private readonly Dictionary<string, decimal> _monetaryLimitSums = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, int> _perToolCallBudgetCounts = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, (int Count, long Sum, long Max)> _toolResultSizes = new(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>The ledger for the current run (keyed by <see cref="AgentRunScope.Current"/>).</summary>
     public static RunLedger ForCurrentRun()
@@ -234,6 +249,30 @@ public sealed class RunLedger
 
             _perToolCallBudgetCounts[toolName] = cur + 1;
             return RunBudgetDecision.Admitted;
+        }
+    }
+
+    /// <summary>
+    /// Atomically records one tool call's result SIZE (character count) this run and returns the running
+    /// snapshot AS IT WAS <b>BEFORE</b> this call — the baseline <see cref="ToolResultSizeAnomalyGate"/>
+    /// compares this call's size against, not including it (so the very first call for a tool always sees
+    /// <see cref="ToolResultSizeSnapshot.Count"/> 0 — no baseline yet). Isolated storage (own dictionary, not
+    /// shared with any other dimension's bookkeeping) — same no-cross-contamination discipline as every other
+    /// RunLedger dimension (see class doc). A negative <paramref name="size"/> is defensively clamped to zero.
+    /// </summary>
+    public ToolResultSizeSnapshot RecordToolResultSize(string toolName, long size)
+    {
+        ArgumentNullException.ThrowIfNull(toolName);
+        if (size < 0)
+        {
+            size = 0;
+        }
+
+        lock (_lock)
+        {
+            var before = _toolResultSizes.TryGetValue(toolName, out var stats) ? stats : (Count: 0, Sum: 0L, Max: 0L);
+            _toolResultSizes[toolName] = (before.Count + 1, before.Sum + size, Math.Max(before.Max, size));
+            return new ToolResultSizeSnapshot(before.Count, before.Sum, before.Max);
         }
     }
 
