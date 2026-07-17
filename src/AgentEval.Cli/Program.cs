@@ -93,7 +93,7 @@ var benchResponseOpt = new Option<string?>("--response") { Description = "The ag
 var benchResponseFileOpt = new Option<string?>("--response-file") { Description = "Path to a file containing the agent's actual response to grade (alternative to --response, for multi-line output)." };
 var benchRunsOpt = new Option<int?>("--runs") { Description = "Number of stochastic runs (default: 1). When > 1, runs the benchmark N times and aggregates via MajorityVote." };
 var benchGdprAzureFromEnvOpt = new Option<bool>("--azure-from-env") { Description = "Drive a live Azure OpenAI agent (from AZURE_OPENAI_*) per scenario: each scenario's own prompt is sent to the agent and its real answer is graded, instead of grading a single --response. The judge resolves AZURE_OPENAI_JUDGE_* first (falling back to AZURE_OPENAI_*) so agent and judge can target different endpoints." };
-var benchGdprCmd = new Command("gdpr", "Run the GDPR compliance benchmark");
+var benchGdprCmd = new Command("gdpr", "Run the GDPR compliance benchmark. Grades the supplied --response by default; --sut or --azure-from-env drives a live agent per scenario instead.");
 benchGdprCmd.Add(benchPresetOpt);
 benchGdprCmd.Add(benchSubjectOpt);
 benchGdprCmd.Add(benchRootOpt);
@@ -102,6 +102,7 @@ benchGdprCmd.Add(benchResponseOpt);
 benchGdprCmd.Add(benchResponseFileOpt);
 benchGdprCmd.Add(benchRunsOpt);
 benchGdprCmd.Add(benchGdprAzureFromEnvOpt);
+var (benchGdprSutOpt, benchGdprSutTargets) = SutTargetResolver.AddOptionsTo(benchGdprCmd, "bench");
 benchGdprCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =>
 {
     var preset = parseResult.GetValue(benchPresetOpt) ?? "standard";
@@ -115,9 +116,27 @@ benchGdprCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =>
     var input = parseResult.GetValue(benchInputOpt);
     var runs = parseResult.GetValue(benchRunsOpt) ?? 1;
     var azureFromEnv = parseResult.GetValue(benchGdprAzureFromEnvOpt);
+
+    // Bench Tier 2 (§2.2): reuses BenchTier1SutResolver.Resolve verbatim — its logic is verb/tier-agnostic,
+    // nothing Tier-1-specific about it. Only --sut is exposed here (endpoint/model/apiKey null) — a generic
+    // OpenAI-compatible endpoint for bench gdpr/eu-ai-act was not requested; --sut copilot-studio is.
+    var (agentOverride, sutError) = BenchTier1SutResolver.Resolve(
+        parseResult.GetValue(benchGdprSutOpt),
+        benchGdprSutTargets.ToDictionary(t => t.Sut, t => t.BindOptions(parseResult), StringComparer.OrdinalIgnoreCase),
+        benchGdprSutTargets,
+        endpoint: null,
+        model: null,
+        apiKey: null,
+        subject);
+    if (sutError is not null)
+    {
+        Console.Error.WriteLine($"Error: {sutError}");
+        return 1;
+    }
+
     var response = await ResolveBenchResponseAsync(parseResult.GetValue(benchResponseOpt), parseResult.GetValue(benchResponseFileOpt), ct);
     if (response.Error) return 1;
-    return await BenchCommand.RunGdprAsync(preset, subject, root, input, runs: runs, responseText: response.Text, azureFromEnv: azureFromEnv, ct: ct);
+    return await BenchCommand.RunGdprAsync(preset, subject, root, input, evaluatorOverride: null, agentOverride: agentOverride, runs: runs, responseText: response.Text, azureFromEnv: azureFromEnv, ct: ct);
 });
 
 // bench gdpr calibrate
@@ -145,7 +164,7 @@ var benchEuAiActInputOpt = new Option<string?>("--input") { Description = "Agent
 var benchEuAiActResponseOpt = new Option<string?>("--response") { Description = "The agent's actual RESPONSE to grade. If omitted, a built-in fixture is graded and a warning is emitted (the evidence then reflects no real agent)." };
 var benchEuAiActResponseFileOpt = new Option<string?>("--response-file") { Description = "Path to a file containing the agent's actual response to grade (alternative to --response)." };
 var benchEuAiActAzureFromEnvOpt = new Option<bool>("--azure-from-env") { Description = "Drive a live Azure OpenAI agent (from AZURE_OPENAI_*) per scenario: each scenario's own prompt is sent to the agent and its real answer is graded, instead of grading a single --response. The judge resolves AZURE_OPENAI_JUDGE_* first (falling back to AZURE_OPENAI_*) so agent and judge can target different endpoints." };
-var benchEuAiActCmd = new Command("eu-ai-act", "Run the EU AI Act compliance benchmark");
+var benchEuAiActCmd = new Command("eu-ai-act", "Run the EU AI Act compliance benchmark. Grades the supplied --response by default; --sut or --azure-from-env drives a live agent per scenario instead.");
 benchEuAiActCmd.Add(benchEuAiActPresetOpt);
 benchEuAiActCmd.Add(benchEuAiActSubjectOpt);
 benchEuAiActCmd.Add(benchEuAiActRootOpt);
@@ -153,6 +172,7 @@ benchEuAiActCmd.Add(benchEuAiActInputOpt);
 benchEuAiActCmd.Add(benchEuAiActResponseOpt);
 benchEuAiActCmd.Add(benchEuAiActResponseFileOpt);
 benchEuAiActCmd.Add(benchEuAiActAzureFromEnvOpt);
+var (benchEuAiActSutOpt, benchEuAiActSutTargets) = SutTargetResolver.AddOptionsTo(benchEuAiActCmd, "bench");
 benchEuAiActCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =>
 {
     var preset = parseResult.GetValue(benchEuAiActPresetOpt) ?? "standard";
@@ -170,9 +190,25 @@ benchEuAiActCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) 
     }
     var root = parseResult.GetValue(benchEuAiActRootOpt);
     var azureFromEnv = parseResult.GetValue(benchEuAiActAzureFromEnvOpt);
+
+    // Bench Tier 2 (§2.2): same reasoning as bench gdpr above.
+    var (agentOverride, sutError) = BenchTier1SutResolver.Resolve(
+        parseResult.GetValue(benchEuAiActSutOpt),
+        benchEuAiActSutTargets.ToDictionary(t => t.Sut, t => t.BindOptions(parseResult), StringComparer.OrdinalIgnoreCase),
+        benchEuAiActSutTargets,
+        endpoint: null,
+        model: null,
+        apiKey: null,
+        subject);
+    if (sutError is not null)
+    {
+        Console.Error.WriteLine($"Error: {sutError}");
+        return 1;
+    }
+
     var response = await ResolveBenchResponseAsync(parseResult.GetValue(benchEuAiActResponseOpt), parseResult.GetValue(benchEuAiActResponseFileOpt), ct);
     if (response.Error) return 1;
-    return await BenchEuAiActCommand.RunAsync(preset, subject, root, input, responseText: response.Text, azureFromEnv: azureFromEnv, ct: ct);
+    return await BenchEuAiActCommand.RunAsync(preset, subject, root, input, evaluatorOverride: null, agentOverride: agentOverride, responseText: response.Text, azureFromEnv: azureFromEnv, ct: ct);
 });
 // bench eu-ai-act calibrate
 var euCalibrateRootOpt = new Option<string?>("--root") { Description = "Workspace root path (default: current directory)" };

@@ -34,7 +34,7 @@ public static class BenchEuAiActCommand
         string? responseText = null,
         bool azureFromEnv = false,
         CancellationToken ct = default) =>
-        RunAsync(preset, subject, rootOverride, inputText, evaluatorOverride: null, responseText: responseText, azureFromEnv: azureFromEnv, ct: ct);
+        RunAsync(preset, subject, rootOverride, inputText, evaluatorOverride: null, agentOverride: null, responseText: responseText, azureFromEnv: azureFromEnv, ct: ct);
 
     /// <summary>Runs the bench eu-ai-act command with optional overrides (used in tests).</summary>
     internal static async Task<int> RunAsync(
@@ -43,6 +43,7 @@ public static class BenchEuAiActCommand
         string? rootOverride,
         string? inputText,
         IEvaluator? evaluatorOverride,
+        IEvaluableAgent? agentOverride = null,
         string? responseText = null,
         bool azureFromEnv = false,
         CancellationToken ct = default)
@@ -83,11 +84,11 @@ public static class BenchEuAiActCommand
         IEvaluator judge = resolvedJudge;
 
         // ── Agent under test ─────────────────────────────────────────────────
-        // With --azure-from-env, drive the live agent (AZURE_OPENAI_*) per scenario; otherwise grade
-        // the single provided --response. The judge resolves AZURE_OPENAI_JUDGE_* first (see
-        // JudgeFactory) so agent and judge can point at different endpoints.
-        AgentEval.Core.IEvaluableAgent? agent = null;
-        if (azureFromEnv)
+        // Priority: --sut (agentOverride, e.g. copilot-studio) > --azure-from-env > grade the supplied
+        // --response as before. The judge resolves AZURE_OPENAI_JUDGE_* first (see JudgeFactory) so
+        // agent and judge can point at different endpoints.
+        AgentEval.Core.IEvaluableAgent? agent = agentOverride;
+        if (agent is null && azureFromEnv)
         {
             var (builtAgent, agentExit) = AzureChatAgentFactory.TryBuildFromEnv(subject);
             if (builtAgent is null) return agentExit;

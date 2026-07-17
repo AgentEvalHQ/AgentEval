@@ -87,7 +87,7 @@ internal sealed class CopilotStudioRedTeamTarget : IRedTeamBuiltInTarget, ISutTa
     private readonly Option<int> _maxCreditsOpt = new("--max-credits")
     {
         DefaultValueFactory = _ => 0,
-        Description = "Cap the Copilot Credits a live --sut copilot-studio scan may spend (0 = no cap). NOT YET ENFORCED — the SDK exposes no credit-cost field to enforce against, so this is parsed/validated only; exit 8 (BudgetExceeded) stays reserved. Every turn burns credits, and a reasoning turn costs substantially more than a scripted one.",
+        Description = "Cap the Copilot Credits a live --sut copilot-studio scan may spend (0 = no cap). ENFORCED as an ESTIMATE — the SDK exposes no real credit-cost field, so this counts turns (1 estimated credit each), not actual metered spend; a turn that would reach or exceed the cap never fires, and the scan stops with exit 8 (BudgetExceeded). A real reasoning turn likely costs substantially more than this estimate assumes — set the cap conservatively.",
     };
 
     // P6 item A (config-fingerprint drift) — redteam-ONLY, registered by AddOptionsTo (IRedTeamBuiltInTarget)
@@ -253,7 +253,8 @@ internal sealed class CopilotStudioRedTeamTarget : IRedTeamBuiltInTarget, ISutTa
         // Live path: builds a real connector (see BuildLive's own XML doc for what's live-verified vs. not).
         // iUnderstandLiveSideEffects: true is safe here — Validate() (above, in this same class) already
         // enforced --i-understand-live-side-effects before RedTeamCommand ever reaches this Build call.
-        return CopilotStudioAgentFactory.BuildLive(EnsureConfig(opts), iUnderstandLiveSideEffects: true);
+        var maxCredits = (opts.TargetOptionsFor<CopilotStudioTargetOptions>(Sut) ?? new CopilotStudioTargetOptions()).MaxCredits;
+        return CopilotStudioAgentFactory.BuildLive(EnsureConfig(opts), iUnderstandLiveSideEffects: true, maxCredits);
     }
 
     public void WritePostScanSummary(RedTeamResult result, AgentTrace trace, TextWriter err)
@@ -360,8 +361,12 @@ internal sealed class CopilotStudioRedTeamTarget : IRedTeamBuiltInTarget, ISutTa
 
     // iUnderstandLiveSideEffects: true is safe here — ISutTarget.Validate (above, in this same class)
     // already enforced --i-understand-live-side-effects before SutTargetResolver ever reaches this Build call.
+    // `??` short-circuits, so the maxCredits lookup + BuildLive only run when sutOverride is null.
     IEvaluableAgent ISutTarget.Build(CommonTargetOptions common, ISutTargetOptions? own, IEvaluableAgent? sutOverride)
-        => sutOverride ?? CopilotStudioAgentFactory.BuildLive(EnsureSutConfig(common, own), iUnderstandLiveSideEffects: true);
+        => sutOverride ?? CopilotStudioAgentFactory.BuildLive(
+            EnsureSutConfig(common, own),
+            iUnderstandLiveSideEffects: true,
+            (own as CopilotStudioSutOptions ?? common.TargetOptionsFor<CopilotStudioSutOptions>(Sut))?.MaxCredits ?? 0);
 
     private CopilotStudioConfig EnsureSutConfig(CommonTargetOptions common, ISutTargetOptions? own)
     {

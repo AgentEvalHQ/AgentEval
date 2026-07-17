@@ -590,12 +590,12 @@ The CLI's exit-code contract, so CI can branch on the outcome. Source of truth: 
 | `5` | `gatekeeper inspect` — a gate **Blocked** on real evidence. |
 | `6` | `gatekeeper inspect` — **fail-closed**: the CLI could not evaluate (e.g. a history gate with no `messages`). Not a policy block. |
 | `7` | `gatekeeper inspect` — **not certified**: the honesty guard refused an un-calibrated judge (run `calibrate --certify`, or pass `--allow-uncalibrated`). |
-| `8` | **Reserved** (not emitted yet) — `redteam --sut copilot-studio` will return this when a live scan hits the `--max-credits` Copilot Credit budget cap (BudgetExceeded). The live connector itself is wired (see [Copilot Studio](redteam/copilot-studio.md)), but `--max-credits` enforcement is not — the SDK exposes no credit-cost field to enforce against — so no current run can produce it. |
+| `8` | `redteam --sut copilot-studio` — a live scan hit its `--max-credits` cap (BudgetExceeded). Enforced as an ESTIMATE (turns counted, not metered spend — the SDK exposes no real credit-cost field); see [Copilot Studio](redteam/copilot-studio.md#what---max-credits-does-today). |
 
 `redteam` uses `1` for failure, `3` for runtime error, and `4` for a `--fail-on regression` gate. Code `8` is
-**reserved** for a live `--sut copilot-studio` scan that hits `--max-credits` (BudgetExceeded); `--max-credits`
-enforcement has no credit-cost signal to key off yet, so it is not emitted by any current run. `gatekeeper`'s
-`5/6/7` are deliberately distinct from the overloaded `2` — see [Gatekeeper from any language](gatekeeper-cli.md#exit-codes).
+returned by a live `--sut copilot-studio` scan that hits `--max-credits` (BudgetExceeded) — an estimate, not a
+metered value. `gatekeeper`'s `5/6/7` are deliberately distinct from the overloaded `2` — see
+[Gatekeeper from any language](gatekeeper-cli.md#exit-codes).
 
 ---
 

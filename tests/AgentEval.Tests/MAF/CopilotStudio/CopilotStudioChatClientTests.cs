@@ -172,6 +172,42 @@ public class CopilotStudioChatClientTests
             () => client.GetResponseAsync([new ChatMessage(ChatRole.User, "hi")]));
     }
 
+    // ── --max-credits enforcement (P6/§2.1) ──
+
+    [Fact]
+    public async Task MaxCredits_Zero_NeverThrows_RegardlessOfTurnCount()
+    {
+        var fake = new FakeCopilotStudioConversationClient();
+        fake.OnStart = (_, _) => Empty();
+        fake.OnAsk = (_, _, _) => One(Message("ok", "conv-1"));
+
+        using var client = new CopilotStudioChatClient(fake, maxCredits: 0);
+        for (var i = 0; i < 5; i++)
+        {
+            var response = await client.GetResponseAsync([new ChatMessage(ChatRole.User, $"turn {i}")]);
+            Assert.Equal("ok", response.Text);
+        }
+    }
+
+    [Fact]
+    public async Task MaxCredits_ExceededOnThirdTurn_ThrowsBeforeTheNetworkCall()
+    {
+        var fake = new FakeCopilotStudioConversationClient();
+        fake.OnStart = (_, _) => Empty();
+        fake.OnAsk = (_, _, _) => One(Message("ok", "conv-1"));
+
+        using var client = new CopilotStudioChatClient(fake, maxCredits: 2);
+        await client.GetResponseAsync([new ChatMessage(ChatRole.User, "turn 1")]);   // estimated spend: 1
+        await client.GetResponseAsync([new ChatMessage(ChatRole.User, "turn 2")]);   // estimated spend: 2 (== cap)
+
+        var ex = await Assert.ThrowsAsync<CopilotStudioBudgetExceededException>(
+            () => client.GetResponseAsync([new ChatMessage(ChatRole.User, "turn 3")]));
+
+        Assert.Equal(2, ex.EstimatedCreditsUsed);
+        Assert.Equal(2, ex.MaxCredits);
+        Assert.Equal(2, fake.AskCallCount);   // the 3rd turn never reached the conversation client
+    }
+
     // ── activity builders ──
 
     private static Activity Message(string? text, string conversationId) => new()

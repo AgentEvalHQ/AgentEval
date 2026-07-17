@@ -186,23 +186,32 @@ round trip — has not been independently live-verified; see the callout at the 
 
 ## What `--max-credits` does today
 
-`--max-credits <n>` is **parsed and validated, but not enforced.** Concretely:
+`--max-credits <n>` is **enforced, as an ESTIMATE — not a metered value.** The Copilot Studio SDK's
+activity/response models expose no real per-turn cost field, so `CopilotStudioChatClient` counts turns
+instead (1 estimated credit per turn, a fixed constant — not a heuristic weighted by response size).
+Concretely:
 
 - The option defaults to `0` ("no cap") and must be `>= 0` — a negative value is rejected at validation time,
   before the config even loads.
-- There is no code path that spends or checks a Copilot Credit budget: the Copilot Studio SDK's activity/response
-  models expose no credit-cost field to enforce against, so there's nothing to wire this up to yet.
-- Exit code 8 (`ExitCodes.BudgetExceeded`) stays reserved and unemitted until a credit-cost signal exists. See the
-  [exit-code table](../cli.md#exit-codes) in the CLI reference.
+- Once a live scan starts, the check runs **before** each turn: a turn that would push estimated spend at or
+  past the cap never fires — the scan stops instead, so estimated spend never intentionally exceeds the cap.
+- The scan then exits with code 8 (`ExitCodes.BudgetExceeded`) — distinct from a crash (`RuntimeError`, 3) or
+  a policy/gate outcome (5/6/7). See the [exit-code table](../cli.md#exit-codes) in the CLI reference.
+- `eval`/`bench gdpr`/`bench eu-ai-act` also carry `--max-credits`, resolved through the same `--sut` seam —
+  a breach there surfaces as a thrown `CopilotStudioBudgetExceededException` rather than exit code 8
+  specifically (that exit code's mapping is `redteam`-scoped today).
 
 The CLI help text for the flag says this plainly:
 
-> Cap the Copilot Credits a live `--sut copilot-studio` scan may spend (0 = no cap). NOT YET ENFORCED — the SDK
-> exposes no credit-cost field to enforce against, so this is parsed/validated only; exit 8 (BudgetExceeded)
-> stays reserved. Every turn burns credits, and a reasoning turn costs substantially more than a scripted one.
+> Cap the Copilot Credits a live `--sut copilot-studio` scan may spend (0 = no cap). ENFORCED as an ESTIMATE —
+> the SDK exposes no real credit-cost field, so this counts turns (1 estimated credit each), not actual
+> metered spend; a turn that would reach or exceed the cap never fires, and the scan stops with exit 8
+> (BudgetExceeded). A real reasoning turn likely costs substantially more than this estimate assumes — set
+> the cap conservatively.
 
-Don't rely on `--max-credits` as a real spend guard — track Copilot Credit consumption through Power Platform's
-own admin tooling instead.
+Because this is an estimate, don't rely on `--max-credits` as your only spend guard for anything cost-sensitive
+— cross-check real Copilot Credit consumption through Power Platform's own admin tooling, especially before
+raising the cap for a reasoning-heavy agent.
 
 ## What's verified vs. what still needs a live check
 
@@ -366,7 +375,7 @@ AgentEval's red-team scoring is honest about *how much* evidence a verdict is ba
 ## See also
 
 - [Red Team Security](../redteam.md) — the full scanner: attacks, evidence fidelity, judge modes, CI baseline gate.
-- [CLI Reference — Exit codes](../cli.md#exit-codes) — the full exit-code table, including the reserved `8`
-  (`BudgetExceeded`) this target will use once `--max-credits` enforcement has a credit-cost signal to enforce.
+- [CLI Reference — Exit codes](../cli.md#exit-codes) — the full exit-code table, including `8`
+  (`BudgetExceeded`) — returned when a live `redteam --sut copilot-studio` scan hits its `--max-credits` cap.
 - [Attack the gate](../gatekeeper/attack-the-gate.md) — the credential-free `--sut gatekeeper-demo` closed loop,
   useful for CI where a live Copilot Studio agent + credentials aren't available.

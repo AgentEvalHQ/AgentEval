@@ -55,15 +55,31 @@ public sealed class CopilotStudioChatClient : IChatClient
     // enough that a genuinely hung call cannot hang disposal forever.
     private static readonly TimeSpan DisposeLockTimeout = TimeSpan.FromSeconds(10);
 
+    // P6/§2.1: the SDK exposes no real per-turn cost field (confirmed against the decompiled/reflected
+    // assembly — see CopilotStudioAgentFactory's remarks), so credit spend is an ESTIMATE, never a metered
+    // value. Fixed-constant path per the design doc's own recommendation: "ship the fixed-constant version
+    // first... revisit the heuristic path only if a real complaint about its coarseness shows up."
+    internal const int EstimatedCreditsPerTurn = 1;
+
     private readonly ICopilotStudioConversationClient _client;
     private readonly SemaphoreSlim _turnLock = new(1, 1);
+    private readonly int _maxCredits;
     private string? _conversationId;
     private bool _started;
     private bool _disposed;
+    private int _estimatedCreditsUsed;
 
-    public CopilotStudioChatClient(ICopilotStudioConversationClient client)
+    /// <param name="client">The conversation client this bridges into <see cref="IChatClient"/>.</param>
+    /// <param name="maxCredits">
+    /// Estimated Copilot Credit spend cap (0 = no cap, the default). Checked BEFORE each turn — a turn that
+    /// would push estimated spend at or past this cap never fires; <see cref="CopilotStudioBudgetExceededException"/>
+    /// is thrown instead, so the scan never intentionally exceeds the estimate. Credits here are an ESTIMATE
+    /// (<see cref="EstimatedCreditsPerTurn"/> per turn), not a metered value — see the type's own remarks.
+    /// </param>
+    public CopilotStudioChatClient(ICopilotStudioConversationClient client, int maxCredits = 0)
     {
         _client = client ?? throw new ArgumentNullException(nameof(client));
+        _maxCredits = maxCredits;
     }
 
     /// <summary>
@@ -123,6 +139,14 @@ public sealed class CopilotStudioChatClient : IChatClient
         await _turnLock.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
+            // Budget gate (P6/§2.1): checked BEFORE this turn fires, under the same lock every turn takes —
+            // a turn that would push estimated spend at or past _maxCredits never reaches the network call.
+            // _maxCredits == 0 means no cap (the CLI's own "--max-credits 0 = no cap" convention).
+            if (_maxCredits > 0 && _estimatedCreditsUsed + EstimatedCreditsPerTurn > _maxCredits)
+            {
+                throw new CopilotStudioBudgetExceededException(_estimatedCreditsUsed, _maxCredits);
+            }
+
             if (!_started)
             {
                 // Idempotency-safety gate (P6 item B, hardened): a live Copilot Studio agent can execute real
@@ -157,6 +181,7 @@ public sealed class CopilotStudioChatClient : IChatClient
             }
 
             materialized.AddRange(askActivities);
+            _estimatedCreditsUsed += EstimatedCreditsPerTurn;   // only after a fully successful turn
             turnConversationId = _conversationId;
         }
         finally
@@ -315,5 +340,33 @@ public sealed class CopilotStudioChatClient : IChatClient
         }
 
         return string.IsNullOrEmpty(last?.Text) ? null : last.Text;
+    }
+}
+
+/// <summary>
+/// A live Copilot Studio scan hit its <c>--max-credits</c> estimated-spend cap. The turn that would have
+/// crossed the cap never fired — this is thrown BEFORE the network call, not after, so estimated spend
+/// never intentionally exceeds <see cref="MaxCredits"/>. Credit cost is an ESTIMATE
+/// (<see cref="CopilotStudioChatClient.EstimatedCreditsPerTurn"/> per turn), not a metered value — the SDK
+/// exposes no real per-turn cost field.
+/// </summary>
+public sealed class CopilotStudioBudgetExceededException : Exception
+{
+    /// <summary>Estimated credits already spent (across prior turns) when this turn was refused.</summary>
+    public int EstimatedCreditsUsed { get; }
+
+    /// <summary>The configured <c>--max-credits</c> cap that was hit.</summary>
+    public int MaxCredits { get; }
+
+    /// <summary>Creates a new <see cref="CopilotStudioBudgetExceededException"/>.</summary>
+    public CopilotStudioBudgetExceededException(int estimatedCreditsUsed, int maxCredits)
+        : base(
+            $"Copilot Studio scan stopped: estimated credit spend ({estimatedCreditsUsed}) would reach or " +
+            $"exceed --max-credits ({maxCredits}) on the next turn. Credit cost is an ESTIMATE, not a metered " +
+            "value — the Copilot Studio SDK exposes no real per-turn cost field. Re-run with a higher " +
+            "--max-credits if this estimate is too conservative.")
+    {
+        EstimatedCreditsUsed = estimatedCreditsUsed;
+        MaxCredits = maxCredits;
     }
 }
