@@ -3,12 +3,12 @@
 // Licensed under the MIT License.
 
 using System.Net;
-using AgentEval.Cli.CopilotStudio;
+using AgentEval.MAF.CopilotStudio;
 using AgentEval.Core;
 using Microsoft.Extensions.AI;
 using Xunit;
 
-namespace AgentEval.Tests.Cli.CopilotStudio;
+namespace AgentEval.Tests.MAF.CopilotStudio;
 
 /// <summary>
 /// P6 item B (<c>strategy/CopilotStudio/Copilot-Studio-P6-Connector-Health-and-Resilience-Design.md</c> §1B):

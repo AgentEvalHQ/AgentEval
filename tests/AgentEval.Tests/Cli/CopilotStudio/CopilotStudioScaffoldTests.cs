@@ -4,6 +4,7 @@
 
 using AgentEval.Cli.CopilotStudio;
 using AgentEval.Core;
+using AgentEval.MAF.CopilotStudio;
 using AgentEval.Testing;
 using Microsoft.Agents.AI;
 using Microsoft.Agents.CopilotStudio.Client.Discovery;
@@ -192,7 +193,7 @@ public class CopilotStudioScaffoldTests
         // MAFAgentAdapter — is local/offline; the token-provider callback is only invoked lazily by CopilotClient
         // on the FIRST REAL REQUEST, which this test never makes (it never calls agent.InvokeAsync). So this stays
         // credential-free and network-free while proving the wiring itself doesn't throw.
-        var agent = CopilotStudioAgentFactory.BuildLive(ValidConfig());
+        var agent = CopilotStudioAgentFactory.BuildLive(ValidConfig(), iUnderstandLiveSideEffects: true);
         Assert.NotNull(agent);
         Assert.IsAssignableFrom<IEvaluableAgent>(agent);
     }
@@ -200,16 +201,29 @@ public class CopilotStudioScaffoldTests
     [Fact]
     public void Factory_BuildLive_ValidConfigWithNonDefaultCloud_ReturnsAgent_WithoutNetworkCall()
     {
-        var agent = CopilotStudioAgentFactory.BuildLive(ValidConfig() with { Cloud = "Gov" });
+        var agent = CopilotStudioAgentFactory.BuildLive(ValidConfig() with { Cloud = "Gov" }, iUnderstandLiveSideEffects: true);
         Assert.NotNull(agent);
+    }
+
+    [Fact]
+    public void Factory_BuildLive_NoConsent_ThrowsBeforeValidatingConfig()
+    {
+        // The consent gate is the FIRST check — even an invalid config never reaches CopilotStudioConfig.Validate()
+        // without iUnderstandLiveSideEffects: true, so a direct-code caller can never accidentally skip it by,
+        // say, catching and swallowing a validation exception before consent is even checked.
+        var cfg = new CopilotStudioConfig { EnvironmentId = "env-123" };   // schemaName/tenantId/appClientId missing
+        var ex = Assert.Throws<InvalidOperationException>(() => CopilotStudioAgentFactory.BuildLive(cfg, iUnderstandLiveSideEffects: false));
+        Assert.Contains("LIVE Copilot Studio agent", ex.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("missing required field", ex.Message, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
     public void Factory_BuildLive_InvalidConfig_ThrowsValidationFirst()
     {
-        // A bad config surfaces the caller's own error (missing fields) before any connector construction.
+        // A bad config surfaces the caller's own error (missing fields) before any connector construction —
+        // once consent is given.
         var cfg = new CopilotStudioConfig { EnvironmentId = "env-123" };   // schemaName/tenantId/appClientId missing
-        var ex = Assert.Throws<InvalidOperationException>(() => CopilotStudioAgentFactory.BuildLive(cfg));
+        var ex = Assert.Throws<InvalidOperationException>(() => CopilotStudioAgentFactory.BuildLive(cfg, iUnderstandLiveSideEffects: true));
         Assert.Contains("missing required field", ex.Message, StringComparison.OrdinalIgnoreCase);
     }
 
@@ -217,7 +231,7 @@ public class CopilotStudioScaffoldTests
     public void Factory_BuildLive_InvalidCloud_ThrowsValidationFirst()
     {
         var cfg = ValidConfig() with { Cloud = "NotACloud" };
-        var ex = Assert.Throws<InvalidOperationException>(() => CopilotStudioAgentFactory.BuildLive(cfg));
+        var ex = Assert.Throws<InvalidOperationException>(() => CopilotStudioAgentFactory.BuildLive(cfg, iUnderstandLiveSideEffects: true));
         Assert.Contains("cloud", ex.Message, StringComparison.OrdinalIgnoreCase);
     }
 

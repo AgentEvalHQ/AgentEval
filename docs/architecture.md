@@ -624,7 +624,7 @@ var llm01 = attacks.GetByOwaspId("LLM01"); // All attacks for OWASP LLM01
 
 ## Package Structure
 
-The codebase is organized into internal projects shipped as a single NuGet package (`AgentEval`), which embeds its sub-project DLLs (`PrivateAssets="all"`). The CLI and Mission Control server/SPA are separate, non-packaged applications.
+The codebase is organized into internal projects shipped as a single NuGet package (`AgentEval`), which embeds its sub-project DLLs (`PrivateAssets="all"`). The CLI and Mission Control server/SPA are separate, non-packaged applications. One sub-tree — `AgentEval.MAF.CopilotStudio` — ships as its own, separate, opt-in NuGet package instead of being embedded in `AgentEval`, so its Copilot Studio SDK + MSAL dependency tree is never forced on consumers who don't use it.
 
 ```
 src/
@@ -643,6 +643,9 @@ src/
 ├── AgentEval.RedTeam/            # Security testing: attacks, evaluators, OWASP/MITRE compliance reports
 │
 ├── AgentEval/                    # Umbrella — embeds the sub-projects + AddAgentEvalAll()
+│
+│   # Its own, separate opt-in NuGet package (NOT embedded in AgentEval):
+├── AgentEval.MAF.CopilotStudio/  # Copilot Studio live connector — IChatClient/IEvaluableAgent bridge, usable directly in code
 │
 │   # Applications (NOT in the NuGet package):
 ├── AgentEval.Cli/                # `agenteval` CLI (init/eval/list/bench/redteam/mc/doctor)

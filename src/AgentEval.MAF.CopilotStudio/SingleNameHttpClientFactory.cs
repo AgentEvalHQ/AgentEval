@@ -2,7 +2,7 @@
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 
-namespace AgentEval.Cli.CopilotStudio;
+namespace AgentEval.MAF.CopilotStudio;
 
 /// <summary>
 /// A minimal <see cref="IHttpClientFactory"/> for the one named client <c>CopilotClient</c> needs. AgentEval's CLI

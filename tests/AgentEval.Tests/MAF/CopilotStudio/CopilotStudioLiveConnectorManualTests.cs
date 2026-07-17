@@ -2,14 +2,15 @@
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 
-using AgentEval.Cli.CopilotStudio;
+using AgentEval.MAF.CopilotStudio;
 using Xunit;
 
-namespace AgentEval.Tests.Cli.CopilotStudio;
+namespace AgentEval.Tests.MAF.CopilotStudio;
 
 /// <summary>
 /// <b>Manual, credentialed, gated test — SKIPPED by default and never run in CI.</b> Everything else under
-/// <c>tests/AgentEval.Tests/Cli/CopilotStudio/</c> is credential-free (fakes, or proves <c>BuildLive</c>'s
+/// <c>tests/AgentEval.Tests/MAF/CopilotStudio/</c> (and the CLI-specific suite under
+/// <c>tests/AgentEval.Tests/Cli/CopilotStudio/</c>) is credential-free (fakes, or proves <c>BuildLive</c>'s
 /// construction path makes no network call). This is the one test in the suite that actually drives the live
 /// Copilot Studio connector end to end — the thing genuine confidence in this feature still requires and that
 /// nothing else in this repo can substitute for.
@@ -57,7 +58,7 @@ public class CopilotStudioLiveConnectorManualTests
             AgentName = Environment.GetEnvironmentVariable("AGENTEVAL_CS_LIVE_AGENT_NAME"),
         };
 
-        var agent = CopilotStudioAgentFactory.BuildLive(config);
+        var agent = CopilotStudioAgentFactory.BuildLive(config, iUnderstandLiveSideEffects: true);
         var response = await agent.InvokeAsync("Hello — please reply with a short greeting.");
 
         Assert.False(string.IsNullOrWhiteSpace(response.Text));

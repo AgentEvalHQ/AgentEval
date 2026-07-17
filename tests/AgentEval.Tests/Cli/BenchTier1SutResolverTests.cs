@@ -7,6 +7,7 @@ using AgentEval.Cli.Commands;
 using AgentEval.Cli.Commands.Targets;
 using AgentEval.Cli.CopilotStudio;
 using AgentEval.Core;
+using AgentEval.MAF.CopilotStudio;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
 using Xunit;

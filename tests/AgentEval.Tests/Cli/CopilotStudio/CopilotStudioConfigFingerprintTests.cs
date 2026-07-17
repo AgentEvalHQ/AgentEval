@@ -4,6 +4,7 @@
 
 using AgentEval.Cli.CopilotStudio;
 using AgentEval.Guardrails;
+using AgentEval.MAF.CopilotStudio;
 using Xunit;
 
 namespace AgentEval.Tests.Cli.CopilotStudio;

@@ -5,7 +5,7 @@
 using System.Text.Json;
 using Microsoft.Agents.CopilotStudio.Client.Discovery;
 
-namespace AgentEval.Cli.CopilotStudio;
+namespace AgentEval.MAF.CopilotStudio;
 
 /// <summary>
 /// Connection settings for a Microsoft Copilot Studio (MCS) agent evaluated via
@@ -18,7 +18,7 @@ namespace AgentEval.Cli.CopilotStudio;
 /// <c>Microsoft.Agents.CopilotStudio.Client.CopilotClient</c> from this config; this type + loader are what make
 /// the CLI surface, validation, and the (credential-free) CI path testable independent of that wiring.
 /// </remarks>
-internal sealed record CopilotStudioConfig
+public sealed record CopilotStudioConfig
 {
     /// <summary>The Power Platform environment id hosting the agent.</summary>
     public string EnvironmentId { get; init; } = "";

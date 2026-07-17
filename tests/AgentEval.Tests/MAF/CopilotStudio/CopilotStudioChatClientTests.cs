@@ -2,12 +2,12 @@
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 
-using AgentEval.Cli.CopilotStudio;
+using AgentEval.MAF.CopilotStudio;
 using Microsoft.Agents.Core.Models;
 using Microsoft.Extensions.AI;
 using Xunit;
 
-namespace AgentEval.Tests.Cli.CopilotStudio;
+namespace AgentEval.Tests.MAF.CopilotStudio;
 
 /// <summary>
 /// Unit tests for <c>CopilotStudioChatClient</c> — the shim bridging Copilot Studio's streaming Bot Framework

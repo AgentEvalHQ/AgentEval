@@ -7,7 +7,7 @@ using System.Text;
 using Microsoft.Identity.Client;
 using Microsoft.Identity.Client.Extensions.Msal;
 
-namespace AgentEval.Cli.CopilotStudio;
+namespace AgentEval.MAF.CopilotStudio;
 
 /// <summary>
 /// Acquires Entra ID access tokens for the Copilot Studio Direct-to-Engine API using MSAL's public-client
@@ -52,7 +52,7 @@ namespace AgentEval.Cli.CopilotStudio;
 /// production — see the CHANGELOG entry for the full list of what that smoke test must cover.
 /// </para>
 /// </remarks>
-internal sealed class CopilotStudioTokenProvider
+public sealed class CopilotStudioTokenProvider
 {
     private readonly string _tenantId;
     private readonly string _appClientId;
