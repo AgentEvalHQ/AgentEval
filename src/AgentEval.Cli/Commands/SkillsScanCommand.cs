@@ -88,8 +88,8 @@ internal static class SkillsScanCommand
             { Description = "Capture a trust-time hash-pin of every scanned skill's manifest content (name, description, resource/script inventory, allowed-tools, compatibility) to this JSON file. A SINGLE pinned file, distinct from --write-baseline's multi-snapshot ledger — mirrors the RedTeam baseline/diff CI pattern: commit this file, then re-check future scans against it with --manifest-baseline." },
         new Option<FileInfo?>("--manifest-baseline")
             { Description = "Check every scanned skill's manifest content against a file captured by --save-manifest-baseline. A skill whose content changed since the pin was captured is reported as a High-severity ManifestChangedSinceBaseline finding — gated by --fail-on-noncompliant like any other High finding, no separate flag needed. A possible rug-pull: a previously-approved skill silently changing after approval." },
-        new Option<string?>("--baseline-notes")
-            { Description = "Optional human note saved alongside --save-manifest-baseline (e.g. who approved it, why)." });
+        new Option<string?>("--baseline-note")   // singular, matching RedTeamCommand's established --baseline-note precedent
+            { Description = "Optional human note saved alongside --save-manifest-baseline (e.g. who approved it, why). Has no effect without --save-manifest-baseline." });
 
     private static Command BuildScanCommand()
     {
@@ -159,7 +159,7 @@ internal static class SkillsScanCommand
 
         // Agent Skills Wave 2: entries (content hash + structural fingerprint per skill — real disk I/O,
         // SkillContentHasher reads every byte of every file in every skill folder) are needed for
-        // cross-location drift detection, trust-on-first-use matching, persisting a snapshot, and (Phase 3)
+        // cross-location drift detection, trust-on-first-use matching, persisting a snapshot, and
         // the manifest-baseline hash-pin drift gate — the latter reuses StructuralFingerprint (already
         // SkillManifestPoisoningGate.Fingerprint(manifest) under the hood), no raw manifest list needed.
         // --repo builds them unconditionally: drift detection has no opt-out flag, and a repo-wide
@@ -220,10 +220,43 @@ internal static class SkillsScanCommand
             extraFindings.AddRange(DetectPreviouslyVetted(entries, history));
         }
 
-        if (manifestBaseline is not null)
+        // NOT all extraFindings sources are equally severe: DetectCrossLocationDrift (Medium) and
+        // DetectPreviouslyVetted (Low) never trip --fail-on-noncompliant; DetectManifestDrift below is
+        // High and DOES. Don't assume a future addition here is non-blocking by pattern-matching these two
+        // — check the actual Severity you give it.
+
+        // Computed at most once, shared by the drift-check below AND the save block further down — avoids
+        // hashing every entry twice when --manifest-baseline and --save-manifest-baseline are both passed
+        // in the same run (a real workflow this feature explicitly mirrors from the RedTeam CI pattern:
+        // "verify the old pin, then re-pin the new baseline" in one command).
+        Dictionary<string, string>? currentManifestHashes = null;
+
+        // A Changed finding requires the same skill name present in BOTH the baseline and the current scan
+        // — with zero entries, that's mathematically impossible, so skip the file load entirely rather than
+        // risk a spurious error for a --manifest-baseline path that happens to be missing/corrupted on a
+        // scan that had nothing to check in the first place.
+        if (manifestBaseline is not null && entries.Count > 0)
         {
-            var baseline = await SkillManifestBaseline.LoadAsync(manifestBaseline.FullName, ct).ConfigureAwait(false);
-            extraFindings.AddRange(DetectManifestDrift(entries, baseline));
+            currentManifestHashes = ManifestFingerprintsByName(entries);
+            SkillManifestBaseline? baseline;
+            try
+            {
+                baseline = await SkillManifestBaseline.LoadAsync(manifestBaseline.FullName, ct).ConfigureAwait(false);
+            }
+            catch (Exception ex) when (ex is FileNotFoundException or DirectoryNotFoundException)
+            {
+                // Same graceful "nothing to compare against yet" precedent --check-baseline already
+                // establishes for an empty ledger — a --manifest-baseline path that doesn't exist yet is not
+                // fatal, just uninformative. Lets `--save-manifest-baseline x.json --manifest-baseline x.json`
+                // work in ONE command on a first-ever run instead of requiring two separate invocations.
+                baseline = null;
+                Console.Error.WriteLine($"  Note: --manifest-baseline file not found ({manifestBaseline.FullName}) — nothing to compare against yet.");
+            }
+
+            if (baseline is not null)
+            {
+                extraFindings.AddRange(DetectManifestDrift(currentManifestHashes, baseline));
+            }
         }
 
         if (extraFindings.Count > 0)
@@ -253,10 +286,25 @@ internal static class SkillsScanCommand
 
         if (saveManifestBaseline is not null)
         {
-            var hashes = ManifestFingerprintsByName(entries);
+            var hashes = currentManifestHashes ?? ManifestFingerprintsByName(entries);
             var baseline = new SkillManifestBaseline(DateTimeOffset.UtcNow, hashes, baselineNotes);
+            // Unlike --write-baseline's JsonFileSkillBaselineStore (whose constructor creates its root
+            // directory), SkillManifestBaseline.SaveAsync is a bare File.WriteAllTextAsync with no directory
+            // creation — create the parent directory first so a fresh ".agenteval/..."-style path (the same
+            // convention --baseline-root's own default already establishes) doesn't throw
+            // DirectoryNotFoundException on a repo that's never captured a manifest baseline before.
+            var parentDir = saveManifestBaseline.Directory;
+            if (parentDir is not null && !parentDir.Exists)
+            {
+                parentDir.Create();
+            }
+
             await baseline.SaveAsync(saveManifestBaseline.FullName, ct).ConfigureAwait(false);
             Console.Error.WriteLine($"  Manifest baseline saved: {saveManifestBaseline.FullName} ({hashes.Count} skill(s))");
+        }
+        else if (baselineNotes is not null)
+        {
+            Console.Error.WriteLine("  Warning: --baseline-note has no effect without --save-manifest-baseline — ignored.");
         }
 
         return ComputeExitCode(report, failOnNoncompliant);
@@ -632,7 +680,7 @@ internal static class SkillsScanCommand
         return findings;
     }
 
-    // ═══════════════════════════════ manifest-baseline hash-pin drift gate (Phase 3) ═══════════════════════════════
+    // ═══════════════════════════════ manifest-baseline hash-pin drift gate (Phase 4b CLI surface) ═══════════════════════════════
 
     /// <summary>
     /// <c>--manifest-baseline &lt;file&gt;</c>: compares every scanned skill's current
@@ -645,24 +693,39 @@ internal static class SkillsScanCommand
     /// </summary>
     internal static IReadOnlyList<SkillComplianceFinding> DetectManifestDrift(
         IReadOnlyList<SkillBaselineEntry> entries, SkillManifestBaseline baseline)
+        => DetectManifestDrift(ManifestFingerprintsByName(entries), baseline);
+
+    /// <summary>
+    /// Overload accepting an already-computed fingerprint map — lets <see cref="FinishScanAsync"/> compute
+    /// it at most ONCE and share it with the <c>--save-manifest-baseline</c> save block, instead of hashing
+    /// every entry twice when both flags are passed in the same run.
+    /// </summary>
+    internal static IReadOnlyList<SkillComplianceFinding> DetectManifestDrift(
+        IReadOnlyDictionary<string, string> currentHashesByName, SkillManifestBaseline baseline)
     {
-        var currentHashes = ManifestFingerprintsByName(entries);
-        var drift = ManifestDriftDetector.Detect(baseline.HashesBySkillName, currentHashes);
+        var drift = ManifestDriftDetector.Detect(baseline.HashesBySkillName, currentHashesByName);
 
         var findings = new List<SkillComplianceFinding>();
         foreach (var d in drift.Where(d => d.Kind == ManifestDriftKind.Changed))
         {
-            // Changed means both hashes exist (see ManifestDriftDetector.Detect) — non-null by construction.
-            var beforeHash = d.BaselineHash!;
-            var afterHash = d.CurrentHash!;
+            // ManifestDriftDetector.Detect only checks dictionary KEY presence via TryGetValue, not that the
+            // VALUE is non-null — a hand-edited/corrupted --manifest-baseline JSON file can deserialize a
+            // null hash for a present key (System.Text.Json's default options don't enforce NRT
+            // non-nullability at runtime), so "Changed" does NOT actually guarantee non-null hashes. Defend
+            // against that instead of trusting it and null-forgiving into a NullReferenceException.
+            var hashSummary = (d.BaselineHash, d.CurrentHash) switch
+            {
+                (string before, string after) =>
+                    $" (fingerprint {before[..Math.Min(8, before.Length)]}… -> {after[..Math.Min(8, after.Length)]}…)",
+                _ => " (the baseline file has a missing or malformed hash for this skill — re-capture it with --save-manifest-baseline)",
+            };
+
             findings.Add(new SkillComplianceFinding(
                 d.Key,
                 SkillComplianceRule.ManifestChangedSinceBaseline,
                 Severity.High,
-                $"Skill '{d.Key}' manifest content changed since the trust-time baseline was captured " +
-                $"(fingerprint {beforeHash[..Math.Min(8, beforeHash.Length)]}… -> " +
-                $"{afterHash[..Math.Min(8, afterHash.Length)]}…) — verify this change was reviewed " +
-                "and re-approved before trusting it again.",
+                $"Skill '{d.Key}' manifest content changed since the trust-time baseline was captured{hashSummary} — " +
+                "verify this change was reviewed and re-approved before trusting it again.",
                 Field: null));
         }
 
@@ -672,9 +735,18 @@ internal static class SkillsScanCommand
     // Wave 2: a --repo/scan-workspace entries list can legitimately contain 2+ entries sharing the same
     // Name (the exact cross-location-drift scenario) — GroupBy+First (not ToDictionary directly), same
     // tolerance DiffAsync's own baselineBySkill/currentBySkill already use, rather than crashing.
+    // Keys are lowercased, not just grouped with StringComparer.Ordinal — ManifestDriftDetector.Detect's own
+    // key union (ManifestFingerprint.cs) is hardcoded to StringComparer.Ordinal and can't be told to ignore
+    // case, so relying on THIS dictionary's comparer alone wouldn't actually make the comparison
+    // case-insensitive. Lowercasing the key here (both when capturing --save-manifest-baseline and when
+    // checking --manifest-baseline, since both paths call this same method) means the SAME skill differing
+    // only by name casing produces the SAME dictionary key either way, closing what would otherwise be a
+    // real detection bypass: DetectCrossLocationDrift already treats a case-only name difference as GA
+    // requires lowercase-only names, so it's the SAME skill, not two unrelated ones — a rug-pull that also
+    // re-cases the name must not be able to evade this gate by looking like an unrelated New+Removed pair.
     private static Dictionary<string, string> ManifestFingerprintsByName(IReadOnlyList<SkillBaselineEntry> entries) =>
         entries
-            .GroupBy(e => e.Name, StringComparer.Ordinal)
+            .GroupBy(e => e.Name.ToLowerInvariant(), StringComparer.Ordinal)
             .ToDictionary(g => g.Key, g => g.First().StructuralFingerprint, StringComparer.Ordinal);
 
     // ═══════════════════════════════ baseline entry building (§4.1) ═══════════════════════════════

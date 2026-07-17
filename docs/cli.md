@@ -419,7 +419,7 @@ suite ships, from the CLI.
 ```
 agenteval skills scan <path> [--format console|markdown|json] [-o|--output <file>] [--fail-on-noncompliant]
                               [--write-baseline] [--baseline-root <dir>] [--repo] [--check-baseline]
-                              [--save-manifest-baseline <file>] [--manifest-baseline <file>] [--baseline-notes <text>]
+                              [--save-manifest-baseline <file>] [--manifest-baseline <file>] [--baseline-note <text>]
 ```
 
 **What it does**
@@ -447,7 +447,7 @@ matching (`--check-baseline`, opt-in), and manifest hash-pin drift against an ex
 | `--check-baseline` | Trust-on-first-use: compare each scanned skill's content hash against the baseline ledger's history. A match against any prior snapshot for the same name adds an informational `MatchesPreviouslyVettedCopy` finding. Meaningless on a first-ever scan (no history yet) — pair with `--write-baseline` on earlier runs. |
 | `--save-manifest-baseline <file>` | Capture a trust-time hash-pin of every scanned skill's manifest content (name, description, resource/script inventory, allowed-tools, compatibility) to this JSON file. A SINGLE pinned file, distinct from `--write-baseline`'s multi-snapshot ledger — mirrors the RedTeam baseline/diff CI pattern: commit this file, then re-check future scans against it. |
 | `--manifest-baseline <file>` | Check every scanned skill against a `--save-manifest-baseline` file. A skill whose manifest content changed since the pin was captured is reported as a High-severity `ManifestChangedSinceBaseline` finding — a possible rug-pull. |
-| `--baseline-notes <text>` | Optional human note saved alongside `--save-manifest-baseline` (e.g. who approved it, why). |
+| `--baseline-note <text>` | Optional human note saved alongside `--save-manifest-baseline` (e.g. who approved it, why). |
 
 **Exit codes**
 
@@ -472,7 +472,7 @@ outside this verb's trust boundary (contrast with the still-gated, API-driven `s
 ```
 agenteval skills scan-workspace <path> [--format console|markdown|json] [-o|--output <file>] [--fail-on-noncompliant]
                                         [--write-baseline] [--baseline-root <dir>] [--check-baseline]
-                                        [--save-manifest-baseline <file>] [--manifest-baseline <file>] [--baseline-notes <text>]
+                                        [--save-manifest-baseline <file>] [--manifest-baseline <file>] [--baseline-note <text>]
 ```
 
 **What it does**
@@ -501,7 +501,7 @@ agenteval skills scan-workspace ~/audit --write-baseline --format json -o report
 | `--write-baseline` | Capture a timestamped baseline snapshot across all scanned repos into the baseline ledger. |
 | `--baseline-root <dir>` | Baseline ledger root directory. Default `.agenteval/skills-baselines-workspace` — deliberately DIFFERENT from `scan`'s `.agenteval/skills-baselines` default, so a plain `scan --write-baseline` can't accidentally get diffed against a much larger workspace-scale snapshot. Pass the same root to both verbs explicitly if you want one shared ledger. |
 | `--check-baseline` | Trust-on-first-use across the whole workspace — see `scan`'s `--check-baseline` above. |
-| `--save-manifest-baseline <file>` / `--manifest-baseline <file>` / `--baseline-notes <text>` | Same single-pin manifest hash-drift gate as `scan` — see `scan`'s own rows above. A skill name duplicated across repos is deduplicated the same way `--repo` already tolerates it. |
+| `--save-manifest-baseline <file>` / `--manifest-baseline <file>` / `--baseline-note <text>` | Same single-pin manifest hash-drift gate as `scan` — see `scan`'s own rows above. A skill name duplicated across repos is deduplicated the same way `--repo` already tolerates it. |
 
 **Known limitation:** `skills baseline diff`/`history` track only one location per skill name even when a
 single snapshot legitimately has several (a pre-existing Wave 2 shortcut) — at workspace scale, where the

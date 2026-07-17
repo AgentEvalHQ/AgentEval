@@ -231,13 +231,24 @@ a changed skill as a High-severity `ManifestChangedSinceBaseline` finding, gated
 `--write-baseline`'s multi-snapshot ledger above — commit it like the RedTeam CI baseline:
 
 ```bash
-agenteval skills scan ./skills --save-manifest-baseline skills-baseline.json --baseline-notes "reviewed 2026-07-17"
+agenteval skills scan ./skills --save-manifest-baseline skills-baseline.json --baseline-note "reviewed 2026-07-17"
 # ... later, in CI, before deploying an updated skill pack:
 agenteval skills scan ./skills --manifest-baseline skills-baseline.json --fail-on-noncompliant
 ```
 
 Works the same way with `--repo`/`scan-workspace` — a skill name shared across locations is deduplicated the
-same `GroupBy`-first way `baseline diff`/`history` already tolerate it (see §2's known limitations above).
+same `GroupBy`-first way `baseline diff`/`history` already tolerate it (see §2's known limitations above); the
+dictionary key is lowercased before grouping specifically so a rug-pull that also re-cases the skill's `name:`
+can't evade detection by looking like an unrelated new-skill-appeared / old-skill-vanished pair instead of a
+`Changed` skill.
+
+**Two more disclosed limitations:** (1) `--fail-on-noncompliant` is the only gate — there is no dedicated
+`--fail-on-manifest-drift` — so a repo carrying unrelated pre-existing High findings can't isolate "block only
+on a rug-pull" without also fixing/waiving those. (2) `--format json`'s `Rule`/`Severity` fields serialize as
+raw integers, not names (pre-existing behavior for every compliance rule, not new to this feature) — a CI
+script filtering JSON output by rule name (e.g. `jq 'select(.Rule=="ManifestChangedSinceBaseline")'`) will
+silently match nothing; key off the process exit code, or use `--format markdown`/`console` for
+human-readable rule names, until the shared renderer gains enum-name serialization.
 
 ## 5 — Detecting MAF's silent skill-discovery exclusions
 
