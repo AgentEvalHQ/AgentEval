@@ -248,6 +248,151 @@ public class ToolResultGateTests
         Assert.Equal(ToolResultAction.Redact, redacted.Action);
     }
 
+    // ── Built-in gate: ToolResultSizeAnomalyGate — explicitly distinct from ToolResultSizeGate above: a
+    // per-tool, per-session STATISTICAL outlier detector (relative to that tool's own history this run), not a
+    // fixed global threshold. Direct (non-agent) InspectAsync calls go through RunLedger.ForCurrentRun(), which
+    // falls back to a single PROCESS-WIDE shared ledger with no AgentRunScope active — a fresh scope per test
+    // isolates each test's baseline (same discipline as MonetaryLimitAndPerToolCallBudgetGateTests).
+
+    private static IDisposable FreshLedgerScope() => AgentRunScope.Begin(session: null, agentName: "test", trace: null);
+
+    [Fact]
+    public async Task ToolResultSizeAnomalyGate_FirstCallEver_NoBaselineYet_Allows()
+    {
+        using var _ = FreshLedgerScope();
+        var gate = new ToolResultSizeAnomalyGate(minFlagSize: 10);
+        var verdict = await gate.InspectAsync(MakeResult(new string('x', 100_000)));   // huge, but zero baseline
+        Assert.Equal(ToolResultAction.Allow, verdict.Action);
+    }
+
+    [Fact]
+    public async Task ToolResultSizeAnomalyGate_ConsistentSizes_NeverFlags()
+    {
+        using var _ = FreshLedgerScope();
+        var gate = new ToolResultSizeAnomalyGate(minFlagSize: 10);
+        for (var i = 0; i < 10; i++)
+        {
+            var verdict = await gate.InspectAsync(MakeResult(new string('x', 200)));
+            Assert.Equal(ToolResultAction.Allow, verdict.Action);
+        }
+    }
+
+    [Fact]
+    public async Task ToolResultSizeAnomalyGate_SpikeAfterBaselineEstablished_Redacts()
+    {
+        using var _ = FreshLedgerScope();
+        var gate = new ToolResultSizeAnomalyGate(anomalyMultiplier: 5.0, minBaselineCalls: 3, minFlagSize: 10);
+
+        // M=3 normal-sized calls establish the baseline (~200 chars average) — none flagged.
+        for (var i = 0; i < 3; i++)
+        {
+            var normal = await gate.InspectAsync(MakeResult(new string('x', 200)));
+            Assert.Equal(ToolResultAction.Allow, normal.Action);
+        }
+
+        // The 4th call is a 10,000-char spike — far more than 5x the ~200-char running average.
+        var spike = await gate.InspectAsync(MakeResult(new string('x', 10_000)));
+
+        Assert.Equal(ToolResultAction.Redact, spike.Action);
+        Assert.Contains("anomaly threshold", spike.Reason, StringComparison.Ordinal);
+        var redacted = Assert.IsType<string>(spike.RedactedResult);
+        Assert.Contains("statistical outlier", redacted, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task ToolResultSizeAnomalyGate_BelowMinBaselineCalls_NeverFlagsEvenIfHuge()
+    {
+        using var _ = FreshLedgerScope();
+        var gate = new ToolResultSizeAnomalyGate(minBaselineCalls: 5, minFlagSize: 10);
+
+        // Only 2 prior small calls — below the 5-call floor, so even a huge 3rd call isn't flagged yet.
+        await gate.InspectAsync(MakeResult(new string('x', 200)));
+        await gate.InspectAsync(MakeResult(new string('x', 200)));
+        var verdict = await gate.InspectAsync(MakeResult(new string('x', 50_000)));
+
+        Assert.Equal(ToolResultAction.Allow, verdict.Action);
+    }
+
+    [Fact]
+    public async Task ToolResultSizeAnomalyGate_BelowMinFlagSize_NeverFlagsRegardlessOfMultiplier()
+    {
+        using var _ = FreshLedgerScope();
+        var gate = new ToolResultSizeAnomalyGate(anomalyMultiplier: 2.0, minBaselineCalls: 1, minFlagSize: 500);
+
+        await gate.InspectAsync(MakeResult("x"));   // 1 char — establishes a tiny baseline
+        var verdict = await gate.InspectAsync(MakeResult(new string('x', 100)));   // 100x the baseline, but under the 500-char floor
+
+        Assert.Equal(ToolResultAction.Allow, verdict.Action);
+    }
+
+    [Fact]
+    public async Task ToolResultSizeAnomalyGate_DifferentTools_IndependentBaselines()
+    {
+        using var _ = FreshLedgerScope();
+        var gate = new ToolResultSizeAnomalyGate(anomalyMultiplier: 5.0, minBaselineCalls: 3, minFlagSize: 10);
+
+        static GatedToolResult ResultFor(string tool, object raw) => new(
+            FunctionName: tool, Arguments: null, Result: raw, AgentName: "T",
+            Iteration: 0, FunctionCallIndex: 0, FunctionCount: 1, IsStreaming: false, Messages: null);
+
+        // tool_a builds a small-result baseline; tool_b independently builds a large-result baseline.
+        for (var i = 0; i < 3; i++)
+        {
+            await gate.InspectAsync(ResultFor("tool_a", new string('x', 100)));
+            await gate.InspectAsync(ResultFor("tool_b", new string('x', 20_000)));
+        }
+
+        // A size that would be a huge spike for tool_a is entirely normal for tool_b's own baseline.
+        var normalForB = await gate.InspectAsync(ResultFor("tool_b", new string('x', 22_000)));
+        Assert.Equal(ToolResultAction.Allow, normalForB.Action);
+
+        var spikeForA = await gate.InspectAsync(ResultFor("tool_a", new string('x', 5_000)));
+        Assert.Equal(ToolResultAction.Redact, spikeForA.Action);
+    }
+
+    [Fact]
+    public void ToolResultSizeAnomalyGate_InvalidMultiplier_Throws()
+        => Assert.Throws<ArgumentOutOfRangeException>(() => new ToolResultSizeAnomalyGate(anomalyMultiplier: 1.0));
+
+    [Fact]
+    public void ToolResultSizeAnomalyGate_InvalidMinBaselineCalls_Throws()
+        => Assert.Throws<ArgumentOutOfRangeException>(() => new ToolResultSizeAnomalyGate(minBaselineCalls: 0));
+
+    [Fact]
+    public async Task ToolResultSizeAnomalyGate_EndToEnd_ThroughAgentRun_ToolStillExecuted()
+    {
+        var executed = 0;
+        var call = 0;
+        var tool = AIFunctionFactory.Create((string x) =>
+        {
+            Interlocked.Increment(ref executed);
+            call++;
+            return call <= 3 ? new string('x', 100) : new string('x', 50_000);   // 4th call spikes
+        }, "fetch");
+
+        var scripted = new ScriptedChatClient()
+            .AddToolCall("c1", "fetch", new Dictionary<string, object?> { ["x"] = "1" })
+            .AddToolCall("c2", "fetch", new Dictionary<string, object?> { ["x"] = "2" })
+            .AddToolCall("c3", "fetch", new Dictionary<string, object?> { ["x"] = "3" })
+            .AddToolCall("c4", "fetch", new Dictionary<string, object?> { ["x"] = "4" })
+            .AddText("done");
+        var agent = new ChatClientAgent(scripted, new ChatClientAgentOptions { Name = "T", ChatOptions = new ChatOptions { Tools = [tool] } });
+        var trace = new AgentTrace();
+        var gated = agent.AsBuilder()
+            .UseAgentEvalToolGate([], ToolGatePolicy.ReplaceResult, trace, resultGates: [new ToolResultSizeAnomalyGate(minBaselineCalls: 3, minFlagSize: 10)])
+            .Build();
+
+        await gated.RunAsync("go");
+
+        Assert.Equal(4, executed);   // every call ran — a result gate can't prevent execution
+        // Allow verdicts write no trace entry at all (only Redact/Block/Warn do) — so exactly ONE
+        // gate.tool-result.* entry means exactly one of the four calls (the spiking 4th) was flagged.
+        var redactKeys = trace.Metadata!.Keys.Where(k => k.StartsWith("gate.tool-result.", StringComparison.Ordinal)).ToArray();
+        var redactKey = Assert.Single(redactKeys);
+        var value = (IDictionary<string, object?>)trace.Metadata![redactKey];
+        Assert.Equal("Redact", value["action"]);
+    }
+
     // ── Built-in gate: ToolResultSecretGate ──
 
     [Fact]

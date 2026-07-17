@@ -64,6 +64,7 @@ valid — protecting results doesn't require also gating the proposed calls.
 |---|---|:--:|---|
 | **ToolResultInjectionGate** | Blocks a result containing a configured injection marker (case‑insensitive substring, shares its default list with `TokenInjectionGate`). Not maskable — always **Block**, never **Redact** (the danger is the surrounding instruction text, not a substring you can blank out). | 🟡 **3** | The direct OWASP LLM01 indirect‑injection countermeasure at the one seam nothing else here watches — the tool's own output. Same honest limit as its chat‑side sibling: keyword matching is evadable/paraphrasable, so treat it as a cheap door‑check, not a robust filter — see [Extending](#extending-the-gatekeeper-llm-backed-detection) for a judge‑backed alternative at this seam too. |
 | **ToolResultSizeGate** | Truncates an oversized result (default 8,000 chars) to a configurable limit; always **Redact** (a large legitimate result is still useful truncated, not a block‑worthy finding). | 🟠 **2** | If you control the tool, truncate inside its own body — simpler and stronger. Earns its keep for a tool you **don't** control (third‑party MCP tool, uninstrumented API) whose response size you can't bound at the source — → rises to ~🟢 **4** for exactly that case, plus it's the only backstop against a single runaway result silently consuming the context/cost budget for the rest of the conversation. |
+| **ToolResultSizeAnomalyGate** | **Not the same gate as `ToolResultSizeGate` above.** A per‑tool, per‑session STATISTICAL outlier detector — flags a result more than Nx (default 5x) *that same tool's own* running average size this run, once enough prior calls (default 3) establish a baseline. v1: fixed multiplier, no real statistics library. Always **Redact**. | 🟡 **3** | Complements the fixed‑threshold gate rather than replacing it: a 50,000‑char result is unremarkable for a bulk‑file‑read tool but wildly anomalous for a tool that has returned ~200 chars all run — behavioral drift a global threshold can't see. Same honest ceiling as any threshold‑based heuristic: a slow, gradual size creep evades a fixed multiplier; v2 (rolling mean/stddev or median‑absolute‑deviation) is a documented follow‑on, not built here. |
 | **ToolResultSecretGate** | Detects and masks common credential SHAPES (AWS/GitHub/Slack/Google/Stripe keys, PEM private‑key blocks, bearer tokens, JWTs) in a result; always **Redact** on a match — the rest of the result stays useful with just the credential blanked out. | 🟡 **3** | Same honest ceiling as `RegexPiiGate`: a real, useful deterministic baseline for "a fetched log/config/error dump happens to carry a live secret," but shape‑based regex has known blind spots (a secret in an unrecognized format, or deliberately obfuscated, slips through). Pairs with `DomainAllowListGate`/`TaintTrackingGate` for the *destination* half of the same exfiltration story. |
 
 > **Policy reinterpretation for a post‑execution subject.** `ToolGatePolicy` is reused (not a second enum) but
@@ -258,6 +259,21 @@ gates are supporting parts. Fail‑closed: at least one gate is required, and a 
 *every* gate affirms it routine — a throwing gate, or a call it can't affirm, escalates.
 
 ---
+
+## Prompt-template drift — a construction-time-only guard, not a runtime gate
+
+`PromptTemplateDriftGate` is the **third** application of the `ManifestFingerprint`/`ManifestDriftDetector`
+primitive (after `SkillManifestPoisoningGate` for skill manifests and `McpToolDescriptionPoisoningGate` for MCP
+tool schemas), applied to an agent's prompt template files — hash-pins a trusted template's content and diffs
+it against the pin. Unlike every gate above, it is **not** an `IToolGate`/`IChatGate`/`IToolResultGate` at
+all — a prompt template doesn't change mid-run, so a per-turn check would be pure waste. Instead, set
+`GatekeeperOptions.PromptTemplates` (the current content, keyed by a caller-chosen identifier — typically just
+the system-prompt file) and `GatekeeperOptions.PromptTemplateBaseline` (a prior, reviewed
+`PromptTemplateDriftGate.CaptureBaseline(...)` snapshot); when both are set, `UseGatekeeper` checks drift
+**eagerly at construction time** and throws `PromptTemplateDriftException` immediately if any pinned
+template's content changed — fail-closed, the same pattern as `RefuseUnprotectedHighRiskTools`. A template
+present in only one of the two dictionaries (added/removed) is not treated as drift, only a changed
+fingerprint for a template present in both is — that's the actual tamper signal this guard exists to catch.
 
 ## Composing gates safely — `UseGatekeeper`
 

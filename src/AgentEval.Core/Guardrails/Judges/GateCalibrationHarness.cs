@@ -59,9 +59,11 @@ public static class GateCalibrationHarness
             goldSet.AttackCount >= options.MinCasesPerDirection
             && goldSet.BenignCount >= options.MinCasesPerDirection;
 
+        var capturedAt = (options.TimeProvider ?? TimeProvider.System).GetUtcNow();
+
         return new CalibrationReport(
             goldSet.Axis, tp, tn, fp, fn, kappa, baselineAccuracy, beatsBaseline, meetsThresholds,
-            criteriaConfigured, sufficientData, judgeResults);
+            criteriaConfigured, sufficientData, judgeResults, capturedAt);
     }
 
     private static async Task<IReadOnlyList<CalibrationCaseResult>> ScoreAsync(

@@ -33,4 +33,11 @@ public sealed class CalibrationOptions
 
     /// <summary>Max concurrent judge calls while scoring the gold set. Default 4.</summary>
     public int MaxConcurrency { get; init; } = 4;
+
+    /// <summary>
+    /// Clock used to stamp <see cref="CalibrationReport.CapturedAt"/>. Default <see cref="System.TimeProvider.System"/>;
+    /// override in a test to assert staleness (<see cref="CalibrationReport.IsStale"/>) deterministically,
+    /// without a real wall-clock wait — the same injectable-clock convention <c>RateLimitGate</c> already uses.
+    /// </summary>
+    public TimeProvider? TimeProvider { get; init; }
 }

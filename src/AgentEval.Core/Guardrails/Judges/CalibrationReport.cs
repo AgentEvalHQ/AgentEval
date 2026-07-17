@@ -87,10 +87,22 @@ public sealed class CalibrationReport
     /// </summary>
     public bool IsInlineReady => PromotionCriteriaConfigured && SufficientData && MeetsThresholds && (BeatsBaseline ?? true);
 
+    /// <summary>
+    /// When this report was produced (Gatekeeper next-wave item — calibration staleness). Stamped by
+    /// <see cref="GateCalibrationHarness.EvaluateAsync"/> from <see cref="CalibrationOptions.TimeProvider"/>
+    /// (default <see cref="System.TimeProvider.System"/>), so a staleness check can be tested deterministically
+    /// via a fake clock rather than a real wall-clock wait. A judge/gate is re-calibrated on any model/prompt
+    /// change — this field lets a caller (e.g. a future Gatekeeper Fleet Health Index) flag a report that has
+    /// aged past a caller-chosen threshold WITHOUT auto-demoting the judge — staleness is a signal to
+    /// re-calibrate, not itself a promotion-blocking condition (see <see cref="IsStale"/>).
+    /// </summary>
+    public DateTimeOffset CapturedAt { get; }
+
     internal CalibrationReport(
         string axis, int tp, int tn, int fp, int fn, double kappa,
         double? baselineAccuracy, bool? beatsBaseline, bool meetsThresholds,
-        bool promotionCriteriaConfigured, bool sufficientData, IReadOnlyList<CalibrationCaseResult> cases)
+        bool promotionCriteriaConfigured, bool sufficientData, IReadOnlyList<CalibrationCaseResult> cases,
+        DateTimeOffset capturedAt)
     {
         PromotionCriteriaConfigured = promotionCriteriaConfigured;
         SufficientData = sufficientData;
@@ -108,7 +120,17 @@ public sealed class CalibrationReport
         BeatsBaseline = beatsBaseline;
         MeetsThresholds = meetsThresholds;
         Cases = cases;
+        CapturedAt = capturedAt;
     }
+
+    /// <summary>
+    /// Whether this report is older than <paramref name="maxAge"/>, as of <paramref name="clock"/> (default
+    /// <see cref="System.TimeProvider.System"/>). A single, correct place to ask "is this stale" rather than
+    /// every caller (e.g. <see cref="AssertInlineReady"/>'s callers, or a future Fleet Health Index) re-deriving
+    /// the comparison. Does NOT affect <see cref="IsInlineReady"/> — staleness is informational, not a gate.
+    /// </summary>
+    public bool IsStale(TimeSpan maxAge, TimeProvider? clock = null) =>
+        (clock ?? TimeProvider.System).GetUtcNow() - CapturedAt > maxAge;
 
     /// <summary>Throws if the judge is not <see cref="IsInlineReady"/> — call before registering a judge inline.</summary>
     public void AssertInlineReady()

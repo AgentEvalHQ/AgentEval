@@ -46,6 +46,21 @@ public static class AgentEvalGatekeeperExtensions
         var options = new GatekeeperOptions();
         configure(options);
 
+        // Next-wave item: prompt-template drift, construction-time-only (a template doesn't change
+        // mid-run, so this needs no runtime seam at all — see PromptTemplateDriftException remarks).
+        // Opt-in: both PromptTemplates and PromptTemplateBaseline must be set. Checked FIRST, before any
+        // other validation below, for the same fail-fast-before-any-mutation reasoning as the rest of this
+        // method — a tampered prompt template is the most fundamental thing to refuse to build on.
+        if (options.PromptTemplates is not null && options.PromptTemplateBaseline is not null)
+        {
+            var driftFindings = PromptTemplateDriftGate.CheckDrift(options.PromptTemplates, options.PromptTemplateBaseline);
+            var changed = driftFindings.Where(f => f.Kind == ManifestDriftKind.Changed).ToArray();
+            if (changed.Length > 0)
+            {
+                throw new PromptTemplateDriftException(changed);
+            }
+        }
+
         // #2: compute the AUTHORITATIVE coverage report — against the SAME ToolGates snapshot that is actually
         // registered below (options.ToolGates.ToArray()), not a separately-tracked list a caller could pass to
         // GatekeeperCoverageAnalyzer.Analyze themselves and let drift. Populated whenever KnownTools is set,
