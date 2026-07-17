@@ -1,6 +1,9 @@
 # AgentEval Mission Control — Getting Started
 
-> **Status**: Phase 1 — local viewer + workspace aggregator (target v1.2–v1.4). Mode C self-hosted server is Phase 2 (target v1.5).
+> **Status**: Phase 1 — local viewer (Mode A) is shipped and what `agenteval mc serve` gives you today.
+> Mode B (multi-workspace aggregator) and Mode C (self-hosted server) are both **not yet built** — see the
+> Deployment Modes table below. `--workspace <path>` today only re-points the single workspace root Mode A
+> reads from; it does not aggregate multiple repos.
 
 Mission Control is the visualisation, aggregation, and governance layer on top of `.agenteval/`. This guide gets you a working portal in under 30 seconds against a populated solution.
 

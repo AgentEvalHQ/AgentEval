@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { LayoutDashboard, ShieldCheck, ListChecks, Activity, History, Swords } from "lucide-react";
 import { ErrorBoundary } from "./ErrorBoundary";
 import { gqlRequest } from "@/lib/graphql-client";
+import { fetchVersion, formatModeLabel } from "@/lib/rest-client";
 import { queryKeys } from "@/lib/keys";
 import { WorkspaceLandingPage } from "@/pages/WorkspaceLandingPage";
 
@@ -86,6 +87,16 @@ export function AppShell() {
 }
 
 function Header() {
+  // portal-review A16: this used to hard-code "Mode A — Local viewer" regardless of what mode the
+  // server actually reported. Query the same /api/v1/version endpoint DashboardPage already uses
+  // (shared queryKeys.version() cache key, so this doesn't add an extra network round trip on pages
+  // that also render DashboardPage) and render the REAL mode. Show nothing until it resolves rather
+  // than guess — a wrong label is worse than a brief blank.
+  const versionQ = useQuery({
+    queryKey: queryKeys.version(),
+    queryFn: fetchVersion,
+  });
+
   return (
     <header className="border-b border-slate-200 bg-white px-6 py-3 flex items-center justify-between">
       <div className="flex items-center gap-2">
@@ -97,7 +108,7 @@ function Header() {
         </h1>
       </div>
       <span className="text-xs text-slate-500">
-        Mode A — Local viewer
+        {versionQ.data ? formatModeLabel(versionQ.data.mode) : ""}
       </span>
     </header>
   );

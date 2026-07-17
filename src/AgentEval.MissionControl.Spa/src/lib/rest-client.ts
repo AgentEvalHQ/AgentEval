@@ -24,6 +24,25 @@ export async function fetchVersion(): Promise<VersionInfo> {
 }
 
 /**
+ * Human-readable label for the deployment mode reported by `/api/v1/version` (`mode` field —
+ * `"local"` | `"aggregator"` | `"server"`, see McHost.cs). This is the ONE place that maps mode -> display
+ * text — components must never hard-code a mode label, since Mode B/C would then render as "Mode A" even
+ * when the server is honestly reporting otherwise (portal-review A16).
+ */
+export function formatModeLabel(mode: string): string {
+  switch (mode.toLowerCase()) {
+    case "local":
+      return "Mode A — Local viewer";
+    case "aggregator":
+      return "Mode B — Workspace aggregator";
+    case "server":
+      return "Mode C — Server";
+    default:
+      return mode;
+  }
+}
+
+/**
  * Agent trace shape served by `/api/v1/runs/{runId}/trace`. Matches the
  * canonical AgentTrace + TraceEvent records in
  * src/AgentEval.Abstractions/Output/IOutputStore.cs (camelCase via
