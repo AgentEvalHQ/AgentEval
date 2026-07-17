@@ -7,6 +7,125 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Copilot Studio — C2 fidelity-badge audit + P5 correlation-key spike
+
+#### Added
+- **C2 (all-targets fidelity badge) — closed.** `EvidenceFidelity` (Verbal/IntentToAct/Behavioral) now appears
+  in every RedTeam report renderer, not just JSON/SARIF (which already carried it): `Markdown` gets an inline
+  `` `[behavioral]` ``/`` `[verbal]` ``/`` `[intent-to-act]` `` tag next to each compromised probe, `JUnit` gets
+  a `Fidelity:` line in the failure body (plus the label folded into the inconclusive `<error>` message), and
+  `PDF` gets a bracketed label next to each finding. An audit of all 5 renderers found the 3 gaps were
+  genuinely mechanical (the fidelity data was already flowing through the shared model, just not rendered) —
+  shipped the fix for all three rather than stopping at the audit.
+
+#### Investigated (spike concluded without shipping code — by design)
+- **P5 (L2 telemetry enrichment) correlation-key spike.** Investigated whether a client-side `conversationId`
+  can reliably correlate a live Copilot Studio scan against Dataverse session transcripts (`SessionID`,
+  `TopicId`, `ChannelId`) for deeper post-hoc evidence enrichment. Findings: the correlation join is plausible
+  but not publicly confirmed by Microsoft's docs; more importantly, Dataverse transcripts have ~30 minute
+  latency after conversation inactivity before they're queryable — which means the originally-sketched design
+  (an inline `TraceEnrichingChatClient` decorator enriching evidence on the hot path) cannot work at all. Real
+  L2 enrichment needs to be a separate, deferred offline reconciliation command, not a live decorator. P5
+  remains correctly deferred; this is a scoping correction, not a shipped feature. Full write-up in
+  `docs/redteam/copilot-studio.md`'s "How it fits red-team fidelity" section.
+
+### Agent Skills Wave 1 — baseline ledger, repo-wide discovery, provenance pointer
+
+#### Added
+- **`SkillContentHasher`** (`AgentEval.Skills`) — a new full-file-content hash, complementing
+  `SkillManifestPoisoningGate`'s existing structural-only fingerprint (which hashes only the parsed manifest
+  fields, not the raw file bytes). Together they let a baseline snapshot distinguish "the manifest's meaning
+  changed" from "the file changed but parses identically" — two different signals a security-conscious skill
+  reviewer cares about separately.
+- **`ISkillBaselineStore` / `JsonFileSkillBaselineStore`** — a multi-snapshot, never-overwritten skill-scan
+  ledger (a sibling of `AgentEval.Memory`'s `JsonFileBaselineStore` — the same proven pattern, not a shared
+  base type, deliberately: skills and memory baselines have different identity/versioning shapes). Every
+  `agenteval skills scan --write-baseline` call appends a new timestamped snapshot rather than overwriting the
+  last one, so `agenteval skills baseline history <skill-name>` can show how a skill's fingerprint has drifted
+  over time, not just its current state vs. one prior pin.
+- **`AgentSkillDirectoryConventions`** (`--repo` flag on `skills scan`) — scans every directory convention MAF's
+  own `AgentFileSkillsSource` recognizes across an entire repo root in one pass, instead of requiring one
+  invocation per skill directory.
+- **CLI:** `agenteval skills scan --write-baseline [--baseline-root <dir>] [--repo]` captures a snapshot;
+  `agenteval skills baseline list|diff|history` inspects the ledger.
+- A null-safe provenance-pointer parameter on the compliance report renderer (wiring is real and tested; no
+  lock-file source populates it with real data yet — that's Wave 2/3 territory).
+- Self-review before merge caught a real bug the C# compiler doesn't error on: a doc-comment placement mistake
+  in `MafSkillScanner.cs` that silently mis-associated two records' XML docs with the wrong types — confirmed
+  via the generated XML doc file, not just a build check, and fixed.
+- Wave 2 (trust-on-first-use reputation matching, cross-location drift detection) and Wave 3 (org-wide
+  multi-repo scan, live upstream verification) remain unbuilt, per the design doc's own phasing — Wave 3 is
+  explicitly gated on a not-yet-done security/credential-scope review.
+
+### Gatekeeper — the `IToolPlanGate` empirical dispatch-order question, resolved
+
+#### Investigated (empirical finding, not a new gate)
+- Determined, against real MAF 1.13.0 behavior (not assumed from docs), whether `FunctionInvokingChatClient`
+  dispatches sibling tool calls from one model turn sequentially or concurrently — the fact a future
+  `IToolPlanGate` (batch/plan-level gate, e.g. catching `[read_secrets(), send_email()]` issued as siblings in
+  one turn, which `SequenceGate` structurally cannot see) needs settled before its interface shape can be
+  designed. **Finding:** sequential dispatch is MAF's default, and that default is the *only* mode reachable
+  through `ChatClientAgent`'s normal builder surface (confirmed: zero references to
+  `AllowConcurrentInvocation` anywhere in `Microsoft.Agents.AI`). Concurrent dispatch is reachable, but only
+  via manually constructing a `FunctionInvokingChatClient` with `UseProvidedChatClientAsIs = true` — and under
+  that mode, a naively-designed "terminate at the first blocked call" plan gate does **not** reliably stop a
+  sibling call from still executing (empirically confirmed: the sibling ran anyway). `IToolPlanGate` itself is
+  still unbuilt — this pass shipped only the empirical groundwork a correct design now depends on.
+
+### Gatekeeper — 4 next-wave gates: prompt-template drift, calibration staleness, Fleet Health Index, tool-result size anomaly detection
+
+#### Added
+- **`PromptTemplateDriftGate`** — the third application of the `ManifestFingerprint`/`ManifestDriftDetector`
+  hash-pin-and-diff primitive (after skill manifests and MCP tool schemas), applied to an agent's prompt
+  template files. Unlike every other gate, it's not an `IToolGate`/`IChatGate`/`IToolResultGate` at all — a
+  prompt template doesn't change mid-run, so a per-turn check would be pure waste. `UseGatekeeper` checks drift
+  **eagerly at construction time** when both `GatekeeperOptions.PromptTemplates` and `PromptTemplateBaseline`
+  are set, and throws `PromptTemplateDriftException` immediately on a mismatch — fail-closed, matching
+  `RefuseUnprotectedHighRiskTools`'s posture. Setting only one of the two options throws
+  `InvalidOperationException` at construction rather than silently no-op-ing.
+- **`CalibrationReport.CapturedAt` / `IsStale(maxAge, clock?)`** — a calibration report now records when it was
+  captured, and can report whether it's aged past a caller-chosen threshold. Informational only — staleness
+  never affects `IsInlineReady` or auto-demotes an already-promoted judge; it's a signal to re-calibrate, not a
+  promotion-blocking condition.
+- **`ICalibrationReportStore` / `JsonFileCalibrationReportStore`** — the persistence seam `CalibrationReport`
+  needed (it was, until now, a purely in-memory return value of `GateCalibrationHarness.EvaluateAsync`, never
+  persisted between runs). Deliberately minimal: one report per axis (the most recent run), overwritten on each
+  save — not a full historical ledger (see the Agent Skills baseline ledger above for that different shape,
+  deliberately not duplicated here).
+- **`GatekeeperFleetHealthIndex.Compute(reportsByAxis, staleAfter, clock?)`** — joins every tracked judge axis's
+  latest calibration report into one composite fleet-health view, mirroring `SkillSecurityIndex`'s honesty
+  discipline: an axis with no report is never fabricated into a passing score. Reports mean decisive
+  accuracy/kappa (calibrated axes only), total dangerous errors, which axes have never been calibrated, and
+  which are stale. Transport-agnostic (`AgentEval.Core`, no CLI/Mission Control dependency yet) — high value
+  once an ops-facing surface exists to put it on.
+- **`ToolResultSizeAnomalyGate`** — a per-tool, per-session statistical-outlier detector, distinct from the
+  already-shipped `ToolResultSizeGate` (which truncates against one fixed, global character threshold). Flags a
+  result more than Nx (default 5x) *that same tool's own* running average size this run, once enough prior
+  calls establish a baseline (default 3) — catching behavioral drift a global threshold can't see (e.g. a tool
+  that's returned ~200-character results all run suddenly returning 50,000 characters, even though 50,000 might
+  be unremarkable for a different, bulk-read tool). v1: fixed multiplier, no real statistics library — a
+  documented, deferred v2 follow-on.
+- Self-review before merge found and fixed 4 real issues: a filename-collision risk in the calibration store, a
+  label-space inconsistency in the Fleet Health Index, a silent half-configuration security gap in
+  `PromptTemplateDriftGate` (now fails loud instead), and dead code.
+- Docs: new "Calibration staleness & the Gatekeeper Fleet Health Index" section in
+  `docs/gatekeeper/gate-reference.md`.
+- Crucible work and the two remaining flagship judges (`ToolArgumentGoalCoherenceJudge`,
+  `CrescendoTrajectoryJudge`) are explicitly out of scope for this batch.
+
+### Mission Control — prompt-hash provenance display completed, one stale doc claim corrected
+
+#### Fixed
+- **`AdjudicationFlow.tsx`'s judge cards and adjudicator card now render `PromptHashPill`** — the last place
+  in the SPA that didn't show prompt-hash provenance (`EvalResultNode.tsx` and `ScenarioTreePage.tsx` already
+  did, since 2026-05-25). Arguably the highest-stakes place it was missing, since it's the view a human uses to
+  resolve judge disagreement.
+- **`docs/missioncontrol/api-design.md`** corrected: `Query.complianceEvidence`'s documented return type was
+  `ComplianceEvidence?`; the real resolver returns `ComplianceEvidenceWithChain?`.
+- **Corrected a stale "still a live bug" claim** repeated across 3 local strategy/review docs: the compliance
+  matrix's per-cell `auditChainValid` check (tampered evidence rendering as a false green checkmark) was
+  actually fixed 2026-05-24 — the docs describing it as open were simply never updated when the fix landed.
+
 ### Gatekeeper Hardening Phase 2 — real HTTP-egress enforcement (#10): redirect-chasing + DNS-rebind/SSRF defense
 
 #### Added
