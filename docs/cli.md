@@ -418,6 +418,7 @@ suite ships, from the CLI.
 
 ```
 agenteval skills scan <path> [--format console|markdown|json] [-o|--output <file>] [--fail-on-noncompliant]
+                              [--write-baseline] [--baseline-root <dir>] [--repo]
 ```
 
 **What it does**
@@ -425,17 +426,20 @@ agenteval skills scan <path> [--format console|markdown|json] [-o|--output <file
 Walks `<path>` for `SKILL.md`-rooted skill folders (the same convention MAF's own `AgentFileSkillsSource`
 discovers by), checks each against the GA `SKILL.md` authoring rules (name/description/compatibility) plus
 governance flags (script-execution review, untrusted resource sources, experimental `allowed-tools`), and
-renders a report. v1 is compliance-only — the composite Skill Health & Security Index and hash-pin drift
-detection are library-only for now (see [Agent Skills](agent-skills.md)).
+renders a report. v1 is compliance-only — the composite Skill Health & Security Index is library-only for now
+(see [Agent Skills](agent-skills.md)).
 
 **Options**
 
 | Option | Description |
 |--------|-------------|
-| `<path>` | Required, positional. Directory containing one or more skill folders. |
+| `<path>` | Required, positional. Directory containing one or more skill folders (a REPO ROOT when `--repo` is set). |
 | `--format <fmt>` | `console` (default), `markdown`, or `json`. |
 | `-o, --output <path>` | Write the rendered report to a file instead of stdout. |
 | `--fail-on-noncompliant` | Exit `1` when the scan finds a High-severity finding. Default off (informational-only). |
+| `--write-baseline` | Capture a timestamped baseline snapshot (structural fingerprint + full file-content hash per skill) into the baseline ledger. See [`agenteval skills baseline`](#agenteval-skills-baseline) below. |
+| `--baseline-root <dir>` | Baseline ledger root directory. Default `.agenteval/skills-baselines`. |
+| `--repo` | Treat `<path>` as a repo root: scan every known skill-directory convention found under it (`.claude/skills`, `.agents/skills`, `.windsurf/skills`, ...) and aggregate the results into ONE combined report, instead of treating `<path>` itself as one skill directory. Per-convention breakdown (found/not-present, skill/finding counts) prints to stderr. |
 
 **Exit codes**
 
@@ -444,6 +448,45 @@ detection are library-only for now (see [Agent Skills](agent-skills.md)).
 | `0` | Scan completed (compliant, or `--fail-on-noncompliant` not set). |
 | `1` | `--fail-on-noncompliant` was set and a High-severity finding was found. |
 | `3` | Runtime error (e.g. `<path>` does not exist). |
+
+---
+
+### `agenteval skills baseline`
+
+Inspects the multi-snapshot skill baseline ledger `agenteval skills scan --write-baseline` writes to. Each
+snapshot is a full point-in-time capture (structural fingerprint + file-content hash per skill, plus that
+skill's compliance findings at the time) — never overwritten, so the ledger accumulates history across scans.
+
+**Synopsis**
+
+```
+agenteval skills baseline list  [--baseline-root <dir>]
+agenteval skills baseline diff  [--baseline-root <dir>] [--since <id>] [--skill <name>] [--hash structural|content]
+agenteval skills baseline history <skill-name> [--baseline-root <dir>]
+```
+
+**`list`** — every captured snapshot (Id, capture time, scanned root, skill count), oldest listed first.
+
+**`diff`** — compares two snapshots (default: the two most recent; pass `--since <id>` to diff a specific
+snapshot against the latest) using the same `ManifestDriftDetector` primitive `PromptTemplateDriftGate`/
+`McpToolDescriptionPoisoningGate` use, over either the structural fingerprint or the full content hash
+(`--hash`, default `content` — the stronger signal). A `Changed` skill is flagged `CHANGED + NEW HIGH FINDING`
+when the change also introduced a new High-severity compliance finding (vs. `changed, no new High finding`
+for a cosmetic-only edit) — this is the "don't cry wolf on every cosmetic edit" guard.
+
+**`history <skill-name>`** — walks the ledger chronologically and reports every point where that skill's
+content hash changed, with any High-severity findings present at each change point.
+
+**Options common to all three**
+
+| Option | Description |
+|--------|-------------|
+| `--baseline-root <dir>` | Baseline ledger root directory. Default `.agenteval/skills-baselines` (must match what `scan --write-baseline` used). |
+| `--since <id>` (`diff` only) | Diff this snapshot's Id against the most recent snapshot, instead of the two most recent. |
+| `--skill <name>` (`diff` only) | Only show the diff for this skill. |
+| `--hash structural\|content` (`diff` only) | Which hash to diff. Default `content`. |
+
+**Exit codes:** `0` on success (including "nothing to diff yet" — informational, not an error); `3` on a runtime error (e.g. `--since <id>` not found in the ledger).
 
 ---
 

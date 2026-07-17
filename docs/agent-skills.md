@@ -83,6 +83,15 @@ markdown/json output, `--fail-on-noncompliant` for a CI gate). Credential-free a
 the scan itself — a no-op agent satisfies MAF's own `AgentSkillsSourceContext` constructor requirement only).
 See [CLI reference](cli.md#agenteval-skills-scan). v1 is compliance-only, not the full Security Index below.
 
+**Baseline ledger + repo-wide discovery (Wave 1):** `--write-baseline` captures a timestamped snapshot
+(structural fingerprint + full file-content hash per skill, reusing `ManifestFingerprint`/
+`ManifestDriftDetector` — the same primitive `McpToolDescriptionPoisoningGate` and skill manifest drift
+detection already use) into an append-only ledger (`AgentEval.Skills.ISkillBaselineStore`/
+`JsonFileSkillBaselineStore`, mirroring — not subtyping — the Memory benchmark's `JsonFileBaselineStore`
+pattern). `agenteval skills baseline list|diff|history` inspects it. `--repo` scans every known
+skill-directory convention under a repo root (`AgentEval.Skills.AgentSkillDirectoryConventions`) and
+aggregates the results. See [CLI reference](cli.md#agenteval-skills-baseline) for the full command surface.
+
 ## 3 — Skill-injection red-team attack + `run_skill_script` governance
 
 `AgentEval.RedTeam.Attacks.SkillInjectionAttack` (OWASP LLM01, in `Attack.All` — the framework now ships **14**
