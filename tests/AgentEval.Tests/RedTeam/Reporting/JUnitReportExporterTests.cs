@@ -125,6 +125,99 @@ public class JUnitReportExporterTests
         Assert.Equal("VulnerabilityFound", failure.Attribute("type")?.Value);
     }
 
+    // ── C2 fidelity-badge audit (2026-07-17) ──
+
+    [Fact]
+    public void Export_SucceededProbe_FailureBody_IncludesFidelity()
+    {
+        var result = new RedTeamResult
+        {
+            AgentName = "TestAgent",
+            StartedAt = DateTimeOffset.UtcNow.AddSeconds(-5),
+            CompletedAt = DateTimeOffset.UtcNow,
+            Duration = TimeSpan.FromSeconds(5),
+            TotalProbes = 1,
+            SucceededProbes = 1,
+            AttackResults =
+            [
+                new AttackResult
+                {
+                    AttackName = "Test",
+                    AttackDisplayName = "Test",
+                    OwaspId = "LLM01",
+                    Severity = Severity.High,
+                    SucceededCount = 1,
+                    ProbeResults =
+                    [
+                        new ProbeResult
+                        {
+                            ProbeId = "T-BEHAVIORAL",
+                            Prompt = "delete the file",
+                            Response = "deleted",
+                            Outcome = EvaluationOutcome.Succeeded,
+                            Reason = "tool call observed",
+                            Difficulty = Difficulty.Moderate,
+                            Fidelity = EvidenceFidelity.Behavioral,
+                        },
+                    ],
+                },
+            ],
+        };
+
+        var xml = new JUnitReportExporter().Export(result);
+        var doc = XDocument.Parse(xml);
+
+        var failure = doc.Root!.Element("testsuite")!.Element("testcase")!.Element("failure");
+        Assert.NotNull(failure);
+        Assert.Contains("Fidelity: Behavioral", failure!.Value, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Export_InconclusiveProbe_ErrorMessage_IncludesFidelity()
+    {
+        var result = new RedTeamResult
+        {
+            AgentName = "TestAgent",
+            StartedAt = DateTimeOffset.UtcNow.AddSeconds(-5),
+            CompletedAt = DateTimeOffset.UtcNow,
+            Duration = TimeSpan.FromSeconds(5),
+            TotalProbes = 1,
+            InconclusiveProbes = 1,
+            AttackResults =
+            [
+                new AttackResult
+                {
+                    AttackName = "Test",
+                    AttackDisplayName = "Test",
+                    OwaspId = "LLM01",
+                    Severity = Severity.Medium,
+                    InconclusiveCount = 1,
+                    ProbeResults =
+                    [
+                        new ProbeResult
+                        {
+                            ProbeId = "T-002",
+                            Prompt = "Test",
+                            Response = "[TIMEOUT]",
+                            Outcome = EvaluationOutcome.Inconclusive,
+                            Reason = "Timed out",
+                            Difficulty = Difficulty.Easy,
+                            Error = "Timeout",
+                            Fidelity = EvidenceFidelity.IntentToAct,
+                        },
+                    ],
+                },
+            ],
+        };
+
+        var xml = new JUnitReportExporter().Export(result);
+        var doc = XDocument.Parse(xml);
+
+        var error = doc.Root!.Element("testsuite")!.Element("testcase")!.Element("error");
+        Assert.NotNull(error);
+        Assert.Contains("IntentToAct fidelity", error!.Value, StringComparison.Ordinal);
+    }
+
     [Fact]
     public void Export_ResistedProbe_HasSystemOut()
     {

@@ -510,7 +510,9 @@ public class PdfReportGenerator : IReportExporter
             var failedProbes = attack.ProbeResults.Where(p => p.Outcome == EvaluationOutcome.Succeeded).Take(3);
             foreach (var probe in failedProbes)
             {
-                var para = section.AddParagraph($"• {probe.ProbeId}");
+                // C2 fidelity-badge audit (2026-07-17): surfaces EvidenceFidelity (verbal/intent-to-act/behavioral)
+                // in the PDF, closing the gap already fixed for JSON/SARIF/Markdown.
+                var para = section.AddParagraph($"• {probe.ProbeId} [{FidelityLabel(probe.Fidelity)}]");
                 para.Format.LeftIndent = "0.5cm";
                 para.Format.Font.Size = 9;
             }
@@ -545,6 +547,15 @@ public class PdfReportGenerator : IReportExporter
         RiskLevel.Moderate => Colors.Orange,
         RiskLevel.Low => Colors.DarkGreen,
         _ => Colors.Black
+    };
+
+    /// <summary>C2 fidelity-badge audit (2026-07-17): a compact label for <see cref="EvidenceFidelity"/> next to a probe id.</summary>
+    private static string FidelityLabel(EvidenceFidelity fidelity) => fidelity switch
+    {
+        EvidenceFidelity.Behavioral => "behavioral",
+        EvidenceFidelity.IntentToAct => "intent-to-act",
+        EvidenceFidelity.Verbal => "verbal",
+        _ => "unknown"
     };
 
     private static Color GetSeverityColor(Severity severity) => severity switch

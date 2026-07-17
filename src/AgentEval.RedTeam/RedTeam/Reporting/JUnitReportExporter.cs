@@ -134,6 +134,9 @@ public sealed class JUnitReportExporter : IReportExporter
             {
                 case EvaluationOutcome.Succeeded:
                     // A successful attack is a FAILURE from security perspective
+                    // C2 fidelity-badge audit (2026-07-17): "Fidelity:" line closes the gap already fixed for
+                    // JSON/SARIF/Markdown/PDF — distinguishes a verdict backed by an actual tool invocation
+                    // (Behavioral) from one derived only from the assistant's text (Verbal/IntentToAct).
                     testCase.Add(new XElement("failure",
                         new XAttribute("message", $"Security vulnerability: {SanitizeForXml(probe.Reason)}"),
                         new XAttribute("type", $"VulnerabilityFound"),
@@ -141,6 +144,7 @@ public sealed class JUnitReportExporter : IReportExporter
                         Probe: {SanitizeForXml(probe.ProbeId)}
                         Technique: {SanitizeForXml(probe.Technique ?? "unknown")}
                         Difficulty: {probe.Difficulty}
+                        Fidelity: {probe.Fidelity}
 
                         ATTACK SUCCEEDED - Agent was compromised!
 
@@ -156,10 +160,12 @@ public sealed class JUnitReportExporter : IReportExporter
                     break;
 
                 case EvaluationOutcome.Inconclusive:
+                    // SARIF surfaces Fidelity for Inconclusive probes too (a coverage-gap signal, not just a
+                    // compromise one) — matched here for parity.
                     testCase.Add(new XElement("error",
                         new XAttribute("message", SanitizeForXml(probe.Error ?? probe.Reason)),
                         new XAttribute("type", "Inconclusive"),
-                        $"Could not determine outcome: {SanitizeForXml(probe.Reason)}"
+                        $"Could not determine outcome ({probe.Fidelity} fidelity): {SanitizeForXml(probe.Reason)}"
                     ));
                     break;
 

@@ -98,6 +98,62 @@ public class MarkdownReportExporterTests
         Assert.Contains("Compromised Probes", md);
     }
 
+    // ── C2 fidelity-badge audit (2026-07-17) ──
+
+    [Fact]
+    public void Export_CompromisedProbe_ShowsBehavioralFidelityBadge()
+    {
+        var result = new RedTeamResult
+        {
+            AgentName = "TestAgent",
+            StartedAt = DateTimeOffset.UtcNow.AddSeconds(-10),
+            CompletedAt = DateTimeOffset.UtcNow,
+            Duration = TimeSpan.FromSeconds(10),
+            TotalProbes = 1,
+            ResistedProbes = 0,
+            SucceededProbes = 1,
+            AttackResults =
+            [
+                new AttackResult
+                {
+                    AttackName = "PromptInjection",
+                    AttackDisplayName = "Prompt Injection",
+                    OwaspId = "LLM01",
+                    Severity = Severity.High,
+                    ResistedCount = 0,
+                    SucceededCount = 1,
+                    ProbeResults =
+                    [
+                        new ProbeResult
+                        {
+                            ProbeId = "PI-BEHAVIORAL",
+                            Prompt = "delete the file",
+                            Response = "deleted",
+                            Outcome = EvaluationOutcome.Succeeded,
+                            Reason = "tool call observed",
+                            Difficulty = Difficulty.Moderate,
+                            Technique = "direct_override",
+                            Fidelity = EvidenceFidelity.Behavioral,
+                        },
+                    ],
+                },
+            ],
+        };
+
+        var md = new MarkdownReportExporter().Export(result);
+
+        Assert.Contains("[behavioral]", md, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Export_CompromisedProbe_DefaultFidelity_ShowsVerbalBadge()
+    {
+        // CreateTestResult()'s probe never sets Fidelity explicitly -> defaults to EvidenceFidelity.Verbal.
+        var md = new MarkdownReportExporter().Export(CreateTestResult());
+
+        Assert.Contains("[verbal]", md, StringComparison.Ordinal);
+    }
+
     [Fact]
     public void Export_IncludesRecommendations_WhenVulnerabilitiesFound()
     {
