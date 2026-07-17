@@ -18,7 +18,8 @@ internal sealed record JudgeAxisEntry(
 
 /// <summary>
 /// The hand-authored judge-axis registry (no central registry exists in the codebase) — the single source of truth
-/// for the four calibrated axes the CLI's judge <c>inspect</c> and <c>calibrate</c> paths dispatch on.
+/// for the calibrated axes the CLI's judge <c>inspect</c> and <c>calibrate</c> paths dispatch on. Deliberately
+/// doesn't restate a count here (it drifts every time an axis is added) — see <see cref="Axes"/> for the live list.
 /// </summary>
 internal static class JudgeAxisRegistry
 {
@@ -57,6 +58,14 @@ internal static class JudgeAxisRegistry
         ["tool-argument-goal-coherence"] = new(
             (m, c) => ToolArgumentGoalCoherenceJudge.Create(m, null, c), ToolArgumentGoalCoherenceJudge.KeywordBaseline,
             ToolArgumentGoalCoherenceJudge.GoldSet, () => new ToolArgumentGoalCoherenceRubric()),
+        // 2026-07-17 — the 10th calibrated axis. This registers only the calibratable STATELESS core (the
+        // per-turn-shift question) via CrescendoTrajectoryTurnJudge. The multi-turn arm/no-arm behavior lives
+        // in AgentEval.MAF.Gatekeeper.CrescendoTrajectoryJudge (an IShadowJudge with its own StateBag-backed
+        // trajectory tracking and integration-test suite, out of this CLI registry's reach) — same split as
+        // "tool-argument-goal-coherence" above, whose only live-wiring seam is also outside a chat/run-gate.
+        ["crescendo-trajectory-turn-shift"] = new(
+            (m, c) => CrescendoTrajectoryTurnJudge.Create(m, null, c), CrescendoTrajectoryTurnJudge.KeywordBaseline,
+            CrescendoTrajectoryTurnJudge.GoldSet, () => new CrescendoTrajectoryRubric()),
         // NOTE: "hallucinated-citation" is deliberately NOT registered here. HallucinatedCitationJudge is a
         // bespoke hybrid IChatGate (deterministic citation-existence check + judge support-check) — it does
         // not implement IJudgeRubric, so it has no BuildPrompt/Parse pair for this registry's
