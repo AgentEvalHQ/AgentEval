@@ -321,7 +321,7 @@ agenteval bench agentic calibrate [--root <path>] [--out <path>]
 - Compliance and agentic families support calibration helpers where available.
 - Family-specific options and presets are documented under [Benchmarks](benchmarks.md) and the family pages in the TOC.
 - For the Trace Fidelity and AutoAudit families, see the GlassBox docs under `docs/GlassBox/` (now linked in the TOC).
-- **`owasp`/`mitre`/`nist` reach a live target** beyond the default built-in stub / `--azure-from-env`: `--sut copilot-studio` (same flags as `eval`/`redteam`) or a generic `--endpoint <url> --model <name> [--api-key <key>]` OpenAI-compatible endpoint. `gdpr`/`eu-ai-act`/`agentic`/`memory`/`perf` do not have this yet.
+- **`owasp`/`mitre`/`nist` reach a live target** beyond the default built-in stub / `--azure-from-env`: `--sut copilot-studio` (same flags as `eval`/`redteam`) or a generic `--endpoint <url> --model <name> [--api-key <key>]` OpenAI-compatible endpoint. **`gdpr`/`eu-ai-act` also support `--sut copilot-studio`** (drives the live agent per-scenario instead of grading a static `--response`) — no generic `--endpoint` for these two yet. `agentic`/`memory`/`perf` do not have `--sut` at all — whether they ever should is an open product question, not just unbuilt.
 
 ---
 

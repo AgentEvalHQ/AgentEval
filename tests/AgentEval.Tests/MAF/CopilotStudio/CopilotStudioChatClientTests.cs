@@ -208,6 +208,28 @@ public class CopilotStudioChatClientTests
         Assert.Equal(2, fake.AskCallCount);   // the 3rd turn never reached the conversation client
     }
 
+    [Fact]
+    public async Task MaxCredits_Exceeded_ThrowsEagerlyFromGetStreamingResponseAsync_NotOnlyOnFirstEnumeration()
+    {
+        // Matches this class's own documented eager-throw contract for GetStreamingResponseAsync
+        // (ArgumentNullException/ObjectDisposedException throw at the call site, not on first
+        // MoveNextAsync) — the budget check must behave the same way, not just when driven through
+        // GetResponseAsync (which awaits immediately and would mask an iterator-body-only check).
+        var fake = new FakeCopilotStudioConversationClient();
+        fake.OnStart = (_, _) => Empty();
+        fake.OnAsk = (_, _, _) => One(Message("ok", "conv-1"));
+
+        using var client = new CopilotStudioChatClient(fake, maxCredits: 1);
+        await client.GetResponseAsync([new ChatMessage(ChatRole.User, "turn 1")]);   // estimated spend: 1 (== cap)
+
+        // The call itself — not enumeration of its result — must throw.
+        var ex = Assert.Throws<CopilotStudioBudgetExceededException>(
+            () => client.GetStreamingResponseAsync([new ChatMessage(ChatRole.User, "turn 2")]));
+
+        Assert.Equal(1, ex.EstimatedCreditsUsed);
+        Assert.Equal(1, fake.AskCallCount);   // turn 2 never reached the conversation client
+    }
+
     // ── activity builders ──
 
     private static Activity Message(string? text, string conversationId) => new()

@@ -94,6 +94,14 @@ public sealed class AgentScenarioEval : IEval
             // agent error. Let it propagate rather than recording an "error" leaf and continuing.
             throw;
         }
+        catch (FatalEvaluationException)
+        {
+            // A STRUCTURAL condition (e.g. an exhausted spend cap) that will recur identically for every
+            // remaining scenario, since it can never un-trip mid-run. Let it propagate — same rationale as
+            // the OperationCanceledException case above — instead of recording an "error" leaf per
+            // scenario that just repeats the same root cause across the whole remaining scenario list.
+            throw;
+        }
         catch (Exception ex)
         {
             // The agent-under-test could not be reached / errored for this scenario.

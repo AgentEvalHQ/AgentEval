@@ -87,7 +87,14 @@ public static class ExitCodes
     /// "raise the budget / it cost more than expected" apart from a failure. Deliberately 8, not another overload of 2.
     /// <b>Enforced as an estimate</b>: the Copilot Studio SDK exposes no real credit-cost field, so
     /// <c>CopilotStudioChatClient</c> counts turns (1 estimated credit each) rather than metering actual spend — a
-    /// turn that would reach or exceed the cap never fires, and this exit code is returned instead.
+    /// turn that would push spend PAST the cap never fires (spend may legitimately reach exactly the cap).
+    /// <c>CopilotStudioBudgetExceededException</c> extends <c>AgentEval.Core.FatalEvaluationException</c> so the
+    /// probe loop lets it propagate (rather than swallowing it into a per-probe error, which would just repeat
+    /// the same root cause for every remaining probe) and this exit code is returned instead. <b>Scope note</b>:
+    /// this exit code is <c>redteam</c>-specific — <c>eval</c>/<c>bench gdpr</c>/<c>bench eu-ai-act</c> also
+    /// enforce and propagate the same condition (the scan/run stops rather than degrading), but return their own
+    /// existing generic failure codes (<see cref="RuntimeError"/> for <c>eval</c>, <c>1</c> for <c>bench</c>),
+    /// not this one.
     /// </summary>
     public const int BudgetExceeded = 8;
 }

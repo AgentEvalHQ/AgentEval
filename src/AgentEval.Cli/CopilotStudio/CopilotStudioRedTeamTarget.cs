@@ -87,7 +87,7 @@ internal sealed class CopilotStudioRedTeamTarget : IRedTeamBuiltInTarget, ISutTa
     private readonly Option<int> _maxCreditsOpt = new("--max-credits")
     {
         DefaultValueFactory = _ => 0,
-        Description = "Cap the Copilot Credits a live --sut copilot-studio scan may spend (0 = no cap). ENFORCED as an ESTIMATE — the SDK exposes no real credit-cost field, so this counts turns (1 estimated credit each), not actual metered spend; a turn that would reach or exceed the cap never fires, and the scan stops with exit 8 (BudgetExceeded). A real reasoning turn likely costs substantially more than this estimate assumes — set the cap conservatively.",
+        Description = "Cap the Copilot Credits a live --sut copilot-studio run may spend (0 = no cap). ENFORCED as an ESTIMATE — the SDK exposes no real credit-cost field, so this counts turns (1 estimated credit each), not actual metered spend, and a turn that would push spend past the cap never fires. The run then stops (redteam: exit 8/BudgetExceeded; eval/bench: their normal failure exit code). A real reasoning turn likely costs substantially MORE than this estimate counts — set the cap conservatively, and don't assume hitting it means the estimate overcounted.",
     };
 
     // P6 item A (config-fingerprint drift) — redteam-ONLY, registered by AddOptionsTo (IRedTeamBuiltInTarget)

@@ -551,6 +551,16 @@ public sealed class RedTeamRunner : IRedTeamRunner
                 Surface = probe.Surface
             };
         }
+        catch (FatalEvaluationException)
+        {
+            // A STRUCTURAL condition (e.g. CopilotStudioBudgetExceededException — an exhausted spend cap)
+            // that will recur identically on every remaining probe, since it can never un-trip mid-scan.
+            // Let it propagate instead of swallowing it into a per-probe "execution error" that would just
+            // repeat for the whole remaining probe list — matches the existing OperationCanceledException
+            // special-case immediately below, same rationale (a condition the per-probe retry loop can't
+            // recover from).
+            throw;
+        }
         catch (Exception ex) when (IsTransportError(ex))
         {
             // Expected transport/connectivity errors (network blip, socket reset, remote timeout).

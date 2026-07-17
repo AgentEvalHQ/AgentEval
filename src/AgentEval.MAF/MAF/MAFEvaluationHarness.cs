@@ -202,6 +202,14 @@ public class MAFEvaluationHarness : IStreamingEvaluationHarness, IBatchEvaluatio
                 LogFailure(result);
             }
         }
+        catch (FatalEvaluationException)
+        {
+            // A STRUCTURAL condition (e.g. an exhausted spend cap) that will recur identically for every
+            // remaining row in a RunBatchAsync loop, since it can never un-trip mid-run. Let it propagate
+            // instead of recording a per-test-case failure that just repeats the same root cause across
+            // the whole remaining dataset.
+            throw;
+        }
         catch (Exception ex)
         {
             result.Passed = false;
@@ -210,7 +218,7 @@ public class MAFEvaluationHarness : IStreamingEvaluationHarness, IBatchEvaluatio
             result.Error = ex;
             timeline.TotalDuration = DateTimeOffset.UtcNow - timeline.StartedAt;
             result.Timeline = timeline;
-            
+
             // Build failure report for exception
             result.Failure = BuildExceptionFailureReport(ex, testCase, timeline);
             LogFailure(result);

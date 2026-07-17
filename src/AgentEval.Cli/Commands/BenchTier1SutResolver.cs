@@ -9,14 +9,20 @@ using AgentEval.Core;
 namespace AgentEval.Cli.Commands;
 
 /// <summary>
-/// Resolves an optional agent override for `bench owasp`/`mitre`/`nist` (Tier 1) from either the shared
-/// <c>--sut</c> seam (Track 2 PR3 — <c>strategy/CopilotStudio/Bench-Eval-Integration-and-Live-Connector-Plan.md</c>
-/// §3.4 "bench Tier 1") or a generic OpenAI-compatible <c>--endpoint</c>/<c>--model</c>/<c>--api-key</c> set
-/// (Part C — <c>strategy/CLI-Custom-Benchmarks-CopilotStudio-OpenAI-and-Metrics-Remediation-Design.md</c> §2).
-/// Pure/testable — kept out of <c>Program.cs</c>'s top-level statements (which aren't a unit-testable surface)
-/// on purpose. <c>BenchOwaspCommand</c>/<c>BenchMitreCommand</c>/<c>BenchNistCommand</c> are themselves
-/// untouched: their pre-existing <c>agentOverride</c> seam already wins over <c>--azure-from-env</c>/the stub,
-/// so this class only needs to decide WHAT (if anything) to pass as that override.
+/// Resolves an optional agent override for a <c>bench</c> subcommand from either the shared <c>--sut</c> seam
+/// (Track 2 PR3 — <c>strategy/CopilotStudio/Bench-Eval-Integration-and-Live-Connector-Plan.md</c> §3.4 "bench
+/// Tier 1") or a generic OpenAI-compatible <c>--endpoint</c>/<c>--model</c>/<c>--api-key</c> set (Part C —
+/// <c>strategy/CLI-Custom-Benchmarks-CopilotStudio-OpenAI-and-Metrics-Remediation-Design.md</c> §2). Despite
+/// the "Tier1" name (kept for history — it shipped for <c>bench owasp</c>/<c>mitre</c>/<c>nist</c> first), the
+/// <see cref="Resolve"/> logic itself is verb/tier-agnostic and is also reused verbatim by <c>bench gdpr</c>/
+/// <c>eu-ai-act</c> (Tier 2, §2.2 of <c>strategy/CopilotStudio/Remaining-Backlog-Implementation-Plan-2026-07-16.md</c>)
+/// with <c>endpoint</c>/<c>model</c>/<c>apiKey</c> passed as <see langword="null"/> — a separate
+/// <c>BenchTier2SutResolver</c> would have been byte-identical duplication. Pure/testable — kept out of
+/// <c>Program.cs</c>'s top-level statements (which aren't a unit-testable surface) on purpose.
+/// <c>BenchOwaspCommand</c>/<c>BenchMitreCommand</c>/<c>BenchNistCommand</c>/<c>BenchCommand</c>/
+/// <c>BenchEuAiActCommand</c> are themselves untouched by this resolver: each already has its own
+/// <c>agentOverride</c> seam that wins over <c>--azure-from-env</c>/the stub/the supplied response, so this
+/// class only needs to decide WHAT (if anything) to pass as that override.
 /// </summary>
 internal static class BenchTier1SutResolver
 {

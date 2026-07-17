@@ -137,8 +137,9 @@ public static class BenchCommand
             // The response is produced per scenario by the live agent (see AgentScenarioEval),
             // so this placeholder is never graded — each scenario substitutes the agent's real answer.
             agentResponse = "(driven per-scenario by the live agent under test)";
+            var agentSource = agentOverride is not null ? "--sut" : "--azure-from-env";
             Console.Error.WriteLine(
-                $"[bench gdpr] Driving live agent '{subject}' per scenario via --azure-from-env; " +
+                $"[bench gdpr] Driving live agent '{subject}' per scenario via {agentSource}; " +
                 "each scenario's own prompt is sent to the agent and its real answer is graded.");
         }
         else if (!string.IsNullOrWhiteSpace(responseText))

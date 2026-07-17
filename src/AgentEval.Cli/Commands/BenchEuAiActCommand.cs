@@ -144,8 +144,9 @@ public static class BenchEuAiActCommand
             // Response is produced per scenario by the live agent (see AgentScenarioEval);
             // this placeholder is never graded.
             agentResponse = "(driven per-scenario by the live agent under test)";
+            var agentSource = agentOverride is not null ? "--sut" : "--azure-from-env";
             Console.Error.WriteLine(
-                $"[bench eu-ai-act] Driving live agent '{subject}' per scenario via --azure-from-env; " +
+                $"[bench eu-ai-act] Driving live agent '{subject}' per scenario via {agentSource}; " +
                 "each scenario's own prompt is sent to the agent and its real answer is graded.");
         }
         else if (!string.IsNullOrWhiteSpace(responseText))

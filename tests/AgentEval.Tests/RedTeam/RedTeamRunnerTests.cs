@@ -3,6 +3,7 @@
 // Licensed under the MIT License.
 // tests/AgentEval.Tests/RedTeam/RedTeamRunnerTests.cs
 using AgentEval.Core;
+using AgentEval.MAF.CopilotStudio;
 using AgentEval.RedTeam;
 using AgentEval.RedTeam.Attacks;
 
@@ -57,6 +58,27 @@ public class RedTeamRunnerTests
         };
         var result = await new RedTeamRunner().ScanAsync(new FakeResistantAgent(), options);
         Assert.NotNull(result);
+    }
+
+    [Fact]
+    public async Task ScanAsync_AgentThrowsFatalEvaluationException_PropagatesRatherThanSwallowingIntoErrorResult()
+    {
+        // FatalEvaluationException (e.g. CopilotStudioBudgetExceededException — an exhausted spend cap) is a
+        // STRUCTURAL condition that will recur on every remaining probe, unlike a normal per-probe fault.
+        // ExecuteProbeAsync's catch chain special-cases it (mirroring the existing OperationCanceledException
+        // case) to let it propagate instead of converting it into a per-probe "execution error" result — this
+        // proves that propagation actually happens through the real probe loop, not just that the code compiles.
+        var options = new ScanOptions
+        {
+            Intensity = Intensity.Quick,
+            AttackTypes = [Attack.PromptInjection],
+        };
+
+        var ex = await Assert.ThrowsAsync<CopilotStudioBudgetExceededException>(
+            () => new RedTeamRunner().ScanAsync(new FatalThrowingAgent(), options));
+
+        Assert.Equal(1, ex.EstimatedCreditsUsed);
+        Assert.Equal(1, ex.MaxCredits);
     }
 
     [Fact]
@@ -596,6 +618,14 @@ public class RedTeamRunnerTests
             public Task<AgentEval.RedTeam.EvaluationResult> EvaluateAsync(AttackProbe probe, string response, CancellationToken cancellationToken = default)
                 => Task.FromResult(AgentEval.RedTeam.EvaluationResult.Resisted("resisted"));
         }
+    }
+
+    private class FatalThrowingAgent : IEvaluableAgent
+    {
+        public string Name => "FatalThrowingAgent";
+
+        public Task<AgentResponse> InvokeAsync(string prompt, CancellationToken ct = default)
+            => throw new CopilotStudioBudgetExceededException(estimatedCreditsUsed: 1, maxCredits: 1);
     }
 
     private class FakeResistantAgent : IEvaluableAgent
