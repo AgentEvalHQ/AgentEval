@@ -278,6 +278,44 @@ A template present in only one of the two DICTIONARIES (added/removed, once both
 treated as drift, only a changed fingerprint for a template present in both is — that's the actual tamper
 signal this guard exists to catch.
 
+## Calibration staleness & the Gatekeeper Fleet Health Index
+
+Two more next-wave additions, both about the health of the judge fleet itself rather than any single gate
+decision.
+
+**Staleness.** `CalibrationReport` (the output of `GateCalibrationHarness.EvaluateAsync`) now carries
+`CapturedAt` (a `DateTimeOffset`) and `IsStale(maxAge, clock?)` — a report older than the caller-chosen
+threshold is flagged stale. This is **informational only**: staleness never affects `IsInlineReady` or
+auto-demotes an already-promoted judge — it's a signal to re-calibrate, not itself a promotion-blocking
+condition. A judge calibrated once and never re-checked looks identical to a freshly-proven one without this
+field; `IsStale` is what lets a caller (or the Fleet Health Index below) actually notice.
+
+**Persistence.** `CalibrationReport` was, until this addition, a purely in-memory return value — nothing
+persisted it between runs. `ICalibrationReportStore` / `JsonFileCalibrationReportStore` is a small, deliberately
+minimal persistence seam: **one report per axis** (the most recent calibration run), overwritten on each
+`SaveAsync` — not an append-only historical ledger. (A full multi-snapshot history ledger is a separate, larger
+shape — see the Agent Skills baseline ledger for that pattern, deliberately not duplicated here; the Fleet
+Health Index below only ever needs "what does this axis look like right now," not a time series.)
+
+**`GatekeeperFleetHealthIndex.Compute(reportsByAxis, staleAfter, clock?)`** joins every tracked judge axis's
+latest report (typically sourced from `ICalibrationReportStore.LoadLatestAllAsync`) into one composite
+fleet-health view — mirroring `SkillSecurityIndex`'s honesty discipline exactly: an axis with no report at all
+is **never** fabricated into a passing score. Pass the full expected axis set (including axes that have never
+been calibrated) so the report can actually surface the gap:
+
+- `MeanDecisiveAccuracy` / `MeanKappa` — computed only over axes that actually have a report; `null` if zero
+  axes are calibrated, never defaulted to a number.
+- `TotalDangerousErrors` — summed across calibrated axes only, the number that matters most per this repo's
+  grading motto.
+- `NeverCalibratedAxes` — axes present in the input dictionary with a `null` report.
+- `StaleAxes` — axes whose report is older than `staleAfter`, informational, does not affect the means.
+- `Explanation` — a human-readable one-liner stating plainly which axes were/weren't measured.
+
+This type is transport-agnostic (`AgentEval.Core`, no CLI or Mission Control dependency) — high value once an
+ops-facing surface exists to put it on (Mission Control's compliance-matrix GraphQL layer is a real, live
+precedent for exactly this kind of cross-cutting health view), but there's no CLI verb or Mission Control
+wiring for it yet. Compute it directly against `ICalibrationReportStore.LoadLatestAllAsync()`'s result today.
+
 ## Composing gates safely — `UseGatekeeper`
 
 Wiring more than one layer by hand (`.UseAgentEvalGate()` → `.UseAgentEvalToolGate(...)` →
