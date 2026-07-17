@@ -249,9 +249,14 @@ Two connector-health features (P6) close a real "does it just work" gap for a li
 Every scan's post-summary now prints an aggregate `EvidenceFidelity` breakdown for this target specifically
 (`WritePostScanSummary` — no longer a no-op): `Verbal N/T · IntentToAct N/T · Behavioral N/T`. Because this
 target is structurally text-only (see below), `Behavioral` is always `0` in practice — the point is making that
-ceiling visible in the CLI's own summary output, not just internally on each `ProbeResult`. This is scoped to
-this target's own output only; it does not touch the shared RedTeam report renderers (JSON/Markdown/SARIF/JUnit/PDF)
-— a broader, all-targets fidelity column across those renderers is a separate, larger change, not done here.
+ceiling visible in the CLI's own summary output, not just internally on each `ProbeResult`.
+
+**Update (2026-07-17):** the broader, all-targets fidelity column across the shared RedTeam report renderers is
+now done too, closing the gap this section used to flag. Every renderer shows a per-probe fidelity badge:
+`JSON`/`SARIF` already carried a `Fidelity` field; `Markdown` (an inline `` `[behavioral]` ``/`` `[verbal]` ``/
+`` `[intent-to-act]` `` tag next to each compromised probe), `JUnit` (a `Fidelity:` line in the failure body,
+plus the fidelity label folded into the inconclusive `<error>` message), and `PDF` (a bracketed label next to
+each listed probe) now show it too — not just this target's own CLI summary.
 
 ## How it fits red-team fidelity
 
@@ -265,6 +270,31 @@ AgentEval's red-team scoring is honest about *how much* evidence a verdict is ba
   verdict would depend on tool-call evidence resolves to **Inconclusive** — never a fabricated **Behavioral**
   pass. Reaching `Behavioral` fidelity for MCS would require a deferred L2 telemetry-enrichment path (reading
   MCS-side execution telemetry), which does not exist yet.
+  **Correlation-key spike (2026-07-17):** investigated whether a client-side `conversationId`
+  (`Activity.Conversation.Id`, the same id `CopilotStudioChatClient` already tracks and stamps onto every
+  `ChatResponseUpdate`) can be reliably joined against Copilot Studio's own server-side telemetry to recover
+  real tool-call evidence. Two candidate telemetry sources exist, and **both carry real, structural obstacles
+  that only a live-tenant test can fully resolve** (not run here — this spike is desk research against
+  Microsoft's own current documentation, not a live-tenant confirmation):
+    - **Dataverse session transcripts** (`SessionID`, `TopicId`, `ChannelId` — downloadable per-agent, 29-day
+      window) are **NOT written until ~30 minutes after conversation inactivity**. A red-team scan grades each
+      probe as it runs; telemetry-based enrichment at that latency cannot be inline — it can only be a
+      **separate, deferred, offline reconciliation pass** run well after a scan completes, not a live
+      `TraceEnrichingChatClient` decorator on the hot path as originally sketched. Whether `SessionID` is
+      actually the same value as the client SDK's `conversationId` is not confirmed by public documentation.
+    - **Application Insights** telemetry (tool input/output captured in OpenTelemetry spans when "Log
+      conversation details" is enabled) is **opt-in, per-agent, and requires the target agent's OWNER** to
+      configure an Azure subscription + connection string + explicit logging toggles in that agent's own
+      settings. AgentEval red-teams agents it does not administer in the general case — it cannot assume, set
+      up, or even detect whether a given target has this configured. Reading it also needs a DIFFERENT
+      credential/permission scope (Application-Insights Log Analytics read access, or Dataverse's dedicated
+      **Bot Transcript Viewer** role) than what's needed just to converse with the agent.
+  **Conclusion: the join is plausible but not confirmed, and even if confirmed, cannot be inline** — it forces
+  a design change from "decorate the live chat client" to "a separate post-hoc enrichment command," and even
+  then only for target agents whose owner has opted into one of the two telemetry paths. Per this repo's
+  honesty discipline, an ambiguous or unavailable join must degrade to **Inconclusive**, never a fabricated
+  **Behavioral**. P5 (L2 enrichment) remains correctly deferred — this spike's outcome is a scoping correction,
+  not a green light to build the original design.
 - **This is why `--sut-tier`, `--system-prompt`, and `--system-prompt-canary` are ignored** for this target
   (step 7 above) — there is no tool-harness tier to select and no system prompt this target controls.
 - **Evidence capture is off** (`IncludeEvidence => false`) — a live MCS response can carry real PII, so raw

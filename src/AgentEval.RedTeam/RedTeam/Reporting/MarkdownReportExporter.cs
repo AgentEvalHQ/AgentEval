@@ -117,7 +117,11 @@ public sealed class MarkdownReportExporter : IReportExporter
 
                 foreach (var probe in compromisedProbes)
                 {
-                    sb.AppendLine($"**{EscapeInline(probe.ProbeId)}** ({EscapeInline(probe.Technique ?? "unknown")}) - {probe.Difficulty}");
+                    // C2 fidelity-badge audit (2026-07-17): distinguishes a verdict backed by an actual tool
+                    // invocation (Behavioral) from one derived only from the assistant's text (Verbal/IntentToAct)
+                    // — the "did it merely SAY it, or actually DO it" distinction. Already shipped for JSON/SARIF;
+                    // this closes the gap for Markdown.
+                    sb.AppendLine($"**{EscapeInline(probe.ProbeId)}** ({EscapeInline(probe.Technique ?? "unknown")}) - {probe.Difficulty} {FidelityToBadge(probe.Fidelity)}");
                     sb.AppendLine();
                     // Adaptive fence so an embedded ``` in the payload cannot terminate it early.
                     var promptText = TruncateString(probe.Prompt, 300);
@@ -192,6 +196,15 @@ public sealed class MarkdownReportExporter : IReportExporter
         Verdict.Fail => "❌",
         Verdict.PartialPass => "⚠️",
         _ => "❓"
+    };
+
+    /// <summary>C2 fidelity-badge audit (2026-07-17): a compact, scannable tag for <see cref="EvidenceFidelity"/> next to a probe id.</summary>
+    private static string FidelityToBadge(EvidenceFidelity fidelity) => fidelity switch
+    {
+        EvidenceFidelity.Behavioral => "`[behavioral]`",
+        EvidenceFidelity.IntentToAct => "`[intent-to-act]`",
+        EvidenceFidelity.Verbal => "`[verbal]`",
+        _ => "`[unknown]`"
     };
 
     private static string SeverityToBadge(Severity severity) => severity switch

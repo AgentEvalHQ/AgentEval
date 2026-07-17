@@ -78,6 +78,47 @@ public class PdfReportGeneratorTests
         Assert.Equal(0x25, bytes[0]);   // valid %PDF — the !measured branch did not throw
     }
 
+    // C2 fidelity-badge audit (2026-07-17): AddDetailedResultsPage (the per-probe listing, gated on
+    // options.IncludeDetailedResults) now includes a [behavioral]/[verbal]/[intent-to-act] fidelity label.
+    // This test suite has no PDF text-extraction capability (confirmed — no existing test asserts on PDF
+    // TEXT content anywhere in this file, only structural bytes), so — consistent with every other test
+    // in this file — this proves the modified code path renders successfully to valid PDF bytes without
+    // throwing, not that the specific label text is present in the rendered output.
+    [Fact]
+    public void GenerateExecutiveReport_DetailedResultsWithFidelity_RendersValidPdf()
+    {
+        var result = new RedTeamResult
+        {
+            AgentName = "TestAgent",
+            TotalProbes = 1,
+            SucceededProbes = 1,
+            AttackResults =
+            [
+                new AttackResult
+                {
+                    AttackName = "PromptInjection", AttackDisplayName = "Prompt Injection", OwaspId = "LLM01",
+                    Severity = Severity.High, SucceededCount = 1,
+                    ProbeResults =
+                    [
+                        new ProbeResult
+                        {
+                            ProbeId = "PI-BEHAVIORAL", Prompt = "delete the file", Response = "deleted",
+                            Outcome = EvaluationOutcome.Succeeded, Reason = "tool call observed",
+                            Fidelity = EvidenceFidelity.Behavioral,
+                        },
+                    ],
+                },
+            ],
+        };
+        var options = new PdfReportOptions { IncludeDetailedResults = true };
+
+        var bytes = _generator.GenerateExecutiveReport(result, options);
+
+        Assert.NotNull(bytes);
+        Assert.True(bytes.Length > 100);
+        Assert.Equal(0x25, bytes[0]);   // valid %PDF — FidelityLabel did not throw for any EvidenceFidelity value
+    }
+
     [Fact]
     public void GenerateExecutiveReport_WithOptions_IncludesBranding()
     {
