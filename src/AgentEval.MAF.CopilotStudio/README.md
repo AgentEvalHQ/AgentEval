@@ -38,8 +38,9 @@ var config = new CopilotStudioConfig
 // an IEvaluableAgent — the same seam AgentEval's fluent assertions / stochastic runner / benchmarks use
 // for every other agent type. iUnderstandLiveSideEffects is required and has no default: this agent's
 // connectors/flows can fire REAL production actions and cannot be sandboxed — pass true only once you've
-// confirmed `config` points at a NON-PROD agent.
-IEvaluableAgent agent = CopilotStudioAgentFactory.BuildLive(config, iUnderstandLiveSideEffects: true);
+// confirmed `config` points at a NON-PROD agent. maxCredits (default 0 = no cap) enforces an ESTIMATED
+// spend cap — see "Credit-cost enforcement" below.
+IEvaluableAgent agent = CopilotStudioAgentFactory.BuildLive(config, iUnderstandLiveSideEffects: true, maxCredits: 100);
 
 var result = await agent.InvokeAsync("What's the status of order #12345?");
 ```
@@ -53,13 +54,21 @@ var result = await agent.InvokeAsync("What's the status of order #12345?");
 own scripted/fake conversation client to unit-test code that depends on this bridge without a live tenant
 or real credentials.
 
+## Credit-cost enforcement
+
+`maxCredits` **is enforced, as an ESTIMATE — not a metered value.** The Copilot Studio SDK exposes no real
+per-turn cost field, so the connector counts turns instead (1 estimated credit per turn, a fixed constant).
+A turn that would push estimated spend past the cap never fires — it throws
+`CopilotStudioBudgetExceededException` (extends `AgentEval.Core.FatalEvaluationException`) instead. Because
+this is an estimate, don't rely on it as your only spend guard for anything cost-sensitive — cross-check real
+Copilot Credit consumption through Power Platform's own admin tooling.
+
 ## What this does NOT do (yet)
 
 - **Tool-call evidence.** The Copilot Studio conversation channel is structurally text-only — server-side
   tool/connector/knowledge calls are never surfaced to the client. Evidence fidelity tops out at `Verbal`.
 - **Live-tenant verification.** The device-code prompt, silent-refresh, and persisted-cache round trip are
   unit-tested against a fake conversation client but have not been exercised against a real MCS agent.
-- **Credit-cost enforcement.** The underlying SDK exposes no per-turn cost field.
 
 See [`strategy/CopilotStudio/`](https://github.com/AgentEvalHQ/AgentEval) (local-only planning docs, not
 part of this package) in the main repo for the full backlog.
