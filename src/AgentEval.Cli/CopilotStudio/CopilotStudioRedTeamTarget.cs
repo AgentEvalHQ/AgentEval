@@ -9,6 +9,7 @@ using AgentEval.Cli.Commands.RedTeamTargets;
 using AgentEval.Cli.Commands.Targets;
 using AgentEval.Core;
 using AgentEval.Guardrails;
+using AgentEval.MAF.CopilotStudio;
 using AgentEval.RedTeam;
 using AgentTrace = AgentEval.Tracing.AgentTrace;
 

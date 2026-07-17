@@ -5,7 +5,7 @@
 using Microsoft.Agents.Core.Models;
 using CopilotClient = Microsoft.Agents.CopilotStudio.Client.CopilotClient;
 
-namespace AgentEval.Cli.CopilotStudio;
+namespace AgentEval.MAF.CopilotStudio;
 
 /// <summary>
 /// AgentEval-owned abstraction over the two <c>CopilotClient</c> members <see cref="CopilotStudioChatClient"/>
@@ -16,7 +16,7 @@ namespace AgentEval.Cli.CopilotStudio;
 /// makes <see cref="CopilotStudioChatClient"/> unit-testable without a live Copilot Studio agent — see
 /// <c>FakeCopilotStudioConversationClient</c> in <c>CopilotStudioChatClientTests</c>.
 /// </summary>
-internal interface ICopilotStudioConversationClient
+public interface ICopilotStudioConversationClient
 {
     /// <summary>Starts a new Copilot Studio conversation. See <c>CopilotClient.StartConversationAsync</c>.</summary>
     IAsyncEnumerable<IActivity> StartConversationAsync(bool emitStartConversationEvent, CancellationToken cancellationToken);

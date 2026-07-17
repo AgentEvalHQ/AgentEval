@@ -4,6 +4,7 @@
 
 using AgentEval.Cli.CopilotStudio;
 using AgentEval.Core;
+using AgentEval.MAF.CopilotStudio;
 using AgentEval.Testing;
 using Microsoft.Agents.AI;
 using Microsoft.Agents.CopilotStudio.Client.Discovery;

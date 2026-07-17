@@ -2,10 +2,10 @@
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 
-using AgentEval.Cli.CopilotStudio;
+using AgentEval.MAF.CopilotStudio;
 using Microsoft.Agents.Core.Models;
 
-namespace AgentEval.Tests.Cli.CopilotStudio;
+namespace AgentEval.Tests.MAF.CopilotStudio;
 
 /// <summary>
 /// A realistic, reusable mock Copilot Studio backend — a test double for

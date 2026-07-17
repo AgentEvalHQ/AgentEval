@@ -4,6 +4,7 @@
 
 using System.Text.Json;
 using AgentEval.Guardrails;
+using AgentEval.MAF.CopilotStudio;
 
 namespace AgentEval.Cli.CopilotStudio;
 

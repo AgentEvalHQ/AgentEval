@@ -6,11 +6,11 @@
 // (multi-turn state, activity filtering, error injection) and that CopilotStudioChatClient composes with
 // it correctly end-to-end. This is NOT a live Copilot Studio verification — no real Entra app or MCS
 // agent is available in this environment; see the mock's own honesty-boundary doc comment.
-using AgentEval.Cli.CopilotStudio;
+using AgentEval.MAF.CopilotStudio;
 using Microsoft.Extensions.AI;
 using Xunit;
 
-namespace AgentEval.Tests.Cli.CopilotStudio;
+namespace AgentEval.Tests.MAF.CopilotStudio;
 
 public class MockCopilotStudioConversationClientTests
 {

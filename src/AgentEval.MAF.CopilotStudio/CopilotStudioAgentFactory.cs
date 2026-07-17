@@ -10,7 +10,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using CopilotClient = Microsoft.Agents.CopilotStudio.Client.CopilotClient;
 using ConnectionSettings = Microsoft.Agents.CopilotStudio.Client.ConnectionSettings;
 
-namespace AgentEval.Cli.CopilotStudio;
+namespace AgentEval.MAF.CopilotStudio;
 
 /// <summary>
 /// Builds the system-under-test behind <c>redteam --sut copilot-studio</c>: a Microsoft Copilot Studio (MCS) agent
@@ -32,7 +32,7 @@ namespace AgentEval.Cli.CopilotStudio;
 /// independently live-verified; a real Entra app registration + non-prod Copilot Studio agent is still required
 /// for an end-to-end smoke test before this is trusted in production.</para>
 /// </remarks>
-internal static class CopilotStudioAgentFactory
+public static class CopilotStudioAgentFactory
 {
     /// <summary>Logical name of the one <see cref="IHttpClientFactory"/>-named client the live connector uses.</summary>
     internal const string HttpClientName = "copilotstudio";

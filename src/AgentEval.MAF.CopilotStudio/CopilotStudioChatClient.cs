@@ -6,7 +6,7 @@ using System.Runtime.CompilerServices;
 using Microsoft.Agents.Core.Models;
 using Microsoft.Extensions.AI;
 
-namespace AgentEval.Cli.CopilotStudio;
+namespace AgentEval.MAF.CopilotStudio;
 
 /// <summary>
 /// Bridges <c>Microsoft.Agents.CopilotStudio.Client</c>'s conversational, streaming-activity API
@@ -48,7 +48,7 @@ namespace AgentEval.Cli.CopilotStudio;
 /// also be surfaced, and the real shape of multi-activity turns).
 /// </para>
 /// </remarks>
-internal sealed class CopilotStudioChatClient : IChatClient
+public sealed class CopilotStudioChatClient : IChatClient
 {
     // Bounded wait for Dispose() to coordinate with an in-flight call still holding _turnLock (see Dispose's
     // own remarks) — long enough that a normally-slow network call finishes and releases cleanly, short

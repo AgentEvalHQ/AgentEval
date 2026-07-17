@@ -2,10 +2,10 @@
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 
-using AgentEval.Cli.CopilotStudio;
+using AgentEval.MAF.CopilotStudio;
 using Xunit;
 
-namespace AgentEval.Tests.Cli.CopilotStudio;
+namespace AgentEval.Tests.MAF.CopilotStudio;
 
 /// <summary>
 /// Tests for the offline-testable slice of <c>CopilotStudioTokenProvider</c>: construction/argument validation and

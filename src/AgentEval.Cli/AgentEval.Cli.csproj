@@ -67,6 +67,10 @@
          to the harness via DataLoaders / Compliance / RedTeam abstractions and do not need
          this reference directly. -->
     <ProjectReference Include="..\AgentEval.MAF\AgentEval.MAF.csproj" />
+    <!-- The Copilot Studio bridge (CopilotStudioAgentFactory/ChatClient/Config/TokenProvider) now lives in
+         its own public package, AgentEval.MAF.CopilotStudio, so it's usable directly in code without the
+         CLI; CopilotStudioRedTeamTarget still consumes it here for the sut=copilot-studio target. -->
+    <ProjectReference Include="..\AgentEval.MAF.CopilotStudio\AgentEval.MAF.CopilotStudio.csproj" />
   </ItemGroup>
 
   <!-- Plan-08 MC1.7.1: AgentEval.MissionControl is net10-only (Hot Chocolate 16
@@ -82,15 +86,6 @@
     <!-- Real Azure OpenAI judge for `agenteval bench ...` when env vars are set. -->
     <PackageReference Include="Azure.AI.OpenAI" />
     <PackageReference Include="Microsoft.Extensions.AI.OpenAI" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <!-- Copilot Studio live connector (the "sut copilot-studio" BuildLive path) — see src/AgentEval.Cli/CopilotStudio/. -->
-    <PackageReference Include="Microsoft.Agents.CopilotStudio.Client" />
-    <PackageReference Include="Microsoft.Agents.Core" />
-    <PackageReference Include="Microsoft.Identity.Client" />
-    <PackageReference Include="Microsoft.Identity.Client.Extensions.Msal" />
-    <PackageReference Include="Microsoft.Extensions.Http" />
   </ItemGroup>
 
   <ItemGroup>

@@ -630,6 +630,10 @@ dotnet add package AgentEval --prerelease
 - `AgentEval.Memory` — Memory evaluation, benchmarks, LongMemEval, HTML reporting
 - `AgentEval.RedTeam` — Security testing
 
+**Optional add-on package** (not bundled in `AgentEval` — install only if you need it, so its dependency
+tree isn't forced on everyone):
+- `AgentEval.MAF.CopilotStudio` — evaluate a live Microsoft Copilot Studio agent directly in code (`IChatClient`/`IEvaluableAgent`), no CLI required. `dotnet add package AgentEval.MAF.CopilotStudio --prerelease`. See [docs/redteam/copilot-studio.md](docs/redteam/copilot-studio.md#using-it-directly-in-code-no-cli).
+
 **CLI Tool:**
 
 The CLI is published as a [`dotnet tool`](https://learn.microsoft.com/dotnet/core/tools/global-tools) on NuGet:

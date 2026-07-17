@@ -25,9 +25,40 @@ ceiling that is reported honestly rather than guessed at.
   (a real `CopilotClient` bridged into an `IChatClient` by `CopilotStudioChatClient`) — see
   [What's verified vs. what still needs a live check](#whats-verified-vs-what-still-needs-a-live-check).
 
-Source: `src/AgentEval.Cli/CopilotStudio/CopilotStudioConfig.cs`,
+Source: `src/AgentEval.MAF.CopilotStudio/CopilotStudioConfig.cs`,
 `src/AgentEval.Cli/CopilotStudio/CopilotStudioRedTeamTarget.cs`,
-`src/AgentEval.Cli/CopilotStudio/CopilotStudioAgentFactory.cs`.
+`src/AgentEval.MAF.CopilotStudio/CopilotStudioAgentFactory.cs`.
+
+## Using it directly in code (no CLI)
+
+The connector itself — `CopilotStudioConfig`, `CopilotStudioAgentFactory`, `CopilotStudioChatClient`,
+`CopilotStudioTokenProvider` — lives in its own package, **`AgentEval.MAF.CopilotStudio`**, separate from the
+main `AgentEval` package so the Copilot Studio SDK + MSAL dependency tree is never forced on consumers who
+don't use it:
+
+```bash
+dotnet add package AgentEval.MAF.CopilotStudio --prerelease
+```
+
+```csharp
+using AgentEval.MAF.CopilotStudio;
+
+var config = new CopilotStudioConfig
+{
+    EnvironmentId = "Default-xxxxxxxx",
+    SchemaName    = "cr1a2_myAgent",
+    TenantId      = "<tenant-guid>",
+    AppClientId   = "<entra-app-client-id>",
+};
+
+IEvaluableAgent agent = CopilotStudioAgentFactory.BuildLive(config);
+var result = await agent.InvokeAsync("What's the status of order #12345?");
+```
+
+This is the exact same factory the CLI's `--sut copilot-studio` target calls — no functional difference,
+just reachable without going through `agenteval` at all. See the package's own README for the
+`ICopilotStudioConversationClient` seam if you want to unit-test your own code against a fake conversation
+client instead of a live tenant.
 
 ## Prerequisites
 

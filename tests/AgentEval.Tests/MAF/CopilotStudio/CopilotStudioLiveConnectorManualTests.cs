@@ -2,10 +2,10 @@
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 
-using AgentEval.Cli.CopilotStudio;
+using AgentEval.MAF.CopilotStudio;
 using Xunit;
 
-namespace AgentEval.Tests.Cli.CopilotStudio;
+namespace AgentEval.Tests.MAF.CopilotStudio;
 
 /// <summary>
 /// <b>Manual, credentialed, gated test — SKIPPED by default and never run in CI.</b> Everything else under
