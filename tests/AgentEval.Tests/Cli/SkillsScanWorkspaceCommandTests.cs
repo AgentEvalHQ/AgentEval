@@ -171,6 +171,47 @@ public class SkillsScanWorkspaceCommandTests : IDisposable
         finally { Directory.Delete(workspaceRoot, recursive: true); }
     }
 
+    [Fact]
+    public async Task ExecuteWorkspaceAsync_OnlyHiddenSubdirectories_DiscloseSkipCount_NotMisreportedAsEmpty()
+    {
+        // Distinguishes "truly no subdirectories" from "subdirectories exist but were all filtered as
+        // hidden" — an operator pointing scan-workspace at one already-cloned repo (which itself has a
+        // .git folder and no other subdirectory) by mistake must see WHY nothing was scanned, not a message
+        // that reads identically to a genuinely empty folder.
+        var workspaceRoot = CreateWorkspaceRoot();
+        try
+        {
+            Directory.CreateDirectory(Path.Combine(workspaceRoot, ".git"));
+
+            var outFile = NewTempOutputFile();
+            try
+            {
+                var exit = await SkillsScanCommand.ExecuteWorkspaceAsync(
+                    new DirectoryInfo(workspaceRoot), "console", outFile, failOnNoncompliant: false, ct: default);
+
+                Assert.Equal(ExitCodes.Success, exit);
+            }
+            finally { if (outFile.Exists) outFile.Delete(); }
+        }
+        finally { Directory.Delete(workspaceRoot, recursive: true); }
+    }
+
+    [Fact]
+    public void DefaultBaselineRoot_DiffersBetweenScanAndScanWorkspace_PreventsScopeMismatchInDiff()
+    {
+        // scan-workspace's own default baseline root must NOT equal scan's default — sharing one root by
+        // default would let `skills baseline diff` (which always compares "the two most recent snapshots"
+        // with no scope awareness) silently compare a handful-of-skills single-repo snapshot against a
+        // hundreds-of-skills workspace snapshot. Reflection on the two private const fields directly, since
+        // that's the actual single source of truth both ExecuteAsync's and ExecuteWorkspaceAsync's own
+        // default parameter values are compiled from.
+        const System.Reflection.BindingFlags flags = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static;
+        var scanDefault = (string)typeof(SkillsScanCommand).GetField("DefaultBaselineRoot", flags)!.GetValue(null)!;
+        var workspaceDefault = (string)typeof(SkillsScanCommand).GetField("DefaultWorkspaceBaselineRoot", flags)!.GetValue(null)!;
+
+        Assert.NotEqual(scanDefault, workspaceDefault);
+    }
+
     private static string CreateWorkspaceRoot() =>
         Directory.CreateDirectory(Path.Combine(Path.GetTempPath(), "agenteval-skills-workspace-test-" + Guid.NewGuid().ToString("N"))).FullName;
 

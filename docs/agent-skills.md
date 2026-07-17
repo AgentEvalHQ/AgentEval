@@ -130,7 +130,25 @@ agenteval skills scan-workspace ~/audit --write-baseline --format json -o report
 
 Same option surface as `scan --repo` (`--format`, `--fail-on-noncompliant`, `--write-baseline`,
 `--baseline-root`, `--check-baseline`) — deliberately a separate verb rather than a `--workspace` flag bolted
-onto `scan`, to avoid colliding with Mission Control's own, unrelated `--workspace` concept.
+onto `scan`, to avoid colliding with Mission Control's own, unrelated `--workspace` concept. Defaults to its
+own baseline root (`.agenteval/skills-baselines-workspace`, not `scan`'s `.agenteval/skills-baselines`) so a
+later plain `scan --write-baseline` can't accidentally get diffed against a wildly larger workspace-scale
+snapshot (or vice versa) — pass `--baseline-root` explicitly if you genuinely want one shared ledger.
+
+**Two known limitations, disclosed here rather than discovered the hard way:**
+- **`baseline diff`/`history` track only one location per skill name, even when the SAME scan legitimately
+  produced several** (Wave 2's own pre-existing shortcut, `GroupBy(Name).First()`, chosen to avoid crashing on
+  duplicate names rather than to build a full per-location history — see the code's own remarks). At `--repo`
+  scale this rarely bites; at workspace scale, where the same skill name in N repos is the expected case, it
+  means `baseline diff`/`history` can silently miss drift in every repo except whichever one sorts first. The
+  live scan-time `CrossLocationContentDrift` finding (re-run each time) does NOT have this limitation — it
+  checks every location, every scan. For genuine per-repo longitudinal tracking, treat each repo's own
+  baseline separately (`scan --repo <one-repo> --write-baseline`) rather than relying on the workspace ledger.
+- **A skill name shared by two unrelated repos looks identical to real drift.** `DetectCrossLocationDrift` has
+  no concept of "these repos are unrelated" — two different teams both naming a skill `code-review` with
+  legitimately different content will produce the same `Medium`-severity finding as an actual rug-pull. The
+  severity and "verify this is intentional" wording already account for this ambiguity; expect more such
+  findings to triage as workspace size grows.
 
 ## 3 — Skill-injection red-team attack + `run_skill_script` governance
 

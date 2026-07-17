@@ -25,6 +25,17 @@ internal static class SkillsScanCommand
 {
     private const string DefaultBaselineRoot = ".agenteval/skills-baselines";
 
+    // A DIFFERENT default from `scan`/`scan --repo`'s DefaultBaselineRoot, deliberately — `skills baseline
+    // diff`/`history` (unchanged, pre-existing code) always compare "the two most recent snapshots" with no
+    // concept of which verb/scope produced a given snapshot. Sharing one default root across scan-workspace
+    // (which can capture hundreds of skills across dozens of repos) and a plain `scan`/`scan --repo` (a
+    // handful of skills) would let an operator's next `scan` silently get diffed against a wildly
+    // different-scoped workspace snapshot, or vice versa — most of the "diff" would be spurious [new]/
+    // [removed] noise from scope mismatch, not real drift. Separate defaults prevent that footgun for anyone
+    // who doesn't pass --baseline-root explicitly; passing the SAME root to both verbs is still possible if
+    // an operator genuinely wants a unified ledger.
+    private const string DefaultWorkspaceBaselineRoot = ".agenteval/skills-baselines-workspace";
+
     public static Command Create()
     {
         var skillsCmd = new Command("skills", "MAF Agent Skills utilities");
@@ -36,25 +47,35 @@ internal static class SkillsScanCommand
 
     // ═══════════════════════════════════════════ scan ═══════════════════════════════════════════
 
+    /// <summary>
+    /// The 5 options <c>scan</c> and <c>scan-workspace</c> share verbatim (everything except <c>--repo</c>,
+    /// which only <c>scan</c> has, and each command's own default <c>--baseline-root</c>). Built ONCE here so
+    /// the two commands' help text cannot silently drift apart the way it already had before this helper
+    /// existed (the two copies' <c>--check-baseline</c> descriptions had gone out of sync).
+    /// </summary>
+    private static (Option<string> Format, Option<FileInfo?> Output, Option<bool> FailOnNoncompliant,
+        Option<bool> WriteBaseline, Option<string> BaselineRoot, Option<bool> CheckBaseline) BuildCommonScanOptions(
+        string defaultBaselineRoot) => (
+        new Option<string>("--format") { DefaultValueFactory = _ => "console", Description = "Output format: console | markdown | json" },
+        new Option<FileInfo?>("-o", "--output") { Description = "Output file (default: stdout)" },
+        new Option<bool>("--fail-on-noncompliant")
+            { Description = "Exit non-zero (1) when the scan finds a High-severity finding (report.IsCompliant == false). Default off (informational-only)." },
+        new Option<bool>("--write-baseline")
+            { Description = "After scanning, capture a timestamped baseline snapshot (content hash + structural fingerprint per skill) into the baseline ledger. See 'skills baseline list|diff|history'." },
+        new Option<string>("--baseline-root")
+            { DefaultValueFactory = _ => defaultBaselineRoot, Description = "Baseline ledger root directory (used with --write-baseline / --check-baseline)." },
+        new Option<bool>("--check-baseline")
+            { Description = "Trust-on-first-use: compare each scanned skill's content hash against the baseline ledger's history (--baseline-root). A match against ANY prior snapshot for the same skill name is reported as an informational 'matches a previously-vetted copy' finding. Meaningless on a first-ever scan (no history yet) — pair with --write-baseline on earlier runs." });
+
     private static Command BuildScanCommand()
     {
         var scanCmd = new Command("scan", "Scan a directory of MAF Agent Skills for GA compliance + governance findings");
 
         var pathArg = new Argument<DirectoryInfo>("path")
             { Description = "Directory containing one or more SKILL.md-rooted skill folders (a repo root when --repo is set)" };
-        var formatOpt = new Option<string>("--format")
-            { DefaultValueFactory = _ => "console", Description = "Output format: console | markdown | json" };
-        var outputOpt = new Option<FileInfo?>("-o", "--output") { Description = "Output file (default: stdout)" };
-        var failOnOpt = new Option<bool>("--fail-on-noncompliant")
-            { Description = "Exit non-zero (1) when the scan finds a High-severity finding (report.IsCompliant == false). Default off (informational-only)." };
-        var writeBaselineOpt = new Option<bool>("--write-baseline")
-            { Description = "After scanning, capture a timestamped baseline snapshot (content hash + structural fingerprint per skill) into the baseline ledger. See 'skills baseline list|diff|history'." };
+        var (formatOpt, outputOpt, failOnOpt, writeBaselineOpt, baselineRootOpt, checkBaselineOpt) = BuildCommonScanOptions(DefaultBaselineRoot);
         var repoOpt = new Option<bool>("--repo")
             { Description = "Treat <path> as a REPO ROOT: scan every known skill-directory convention found under it (.claude/skills, .agents/skills, ...) and aggregate the results, instead of treating <path> itself as one skill directory. Always content-hashes every skill folder (real file I/O) to check for cross-location drift — the same name resolving to different content in two conventions — even without --write-baseline/--check-baseline." };
-        var baselineRootOpt = new Option<string>("--baseline-root")
-            { DefaultValueFactory = _ => DefaultBaselineRoot, Description = "Baseline ledger root directory (used with --write-baseline / --check-baseline)." };
-        var checkBaselineOpt = new Option<bool>("--check-baseline")
-            { Description = "Trust-on-first-use: compare each scanned skill's content hash against the baseline ledger's history (--baseline-root). A match against ANY prior snapshot for the same skill name is reported as an informational 'matches a previously-vetted copy' finding. Meaningless on a first-ever scan (no history yet) — pair with --write-baseline on earlier runs." };
 
         scanCmd.Arguments.Add(pathArg);
         scanCmd.Options.Add(formatOpt);
@@ -225,17 +246,7 @@ internal static class SkillsScanCommand
 
         var pathArg = new Argument<DirectoryInfo>("path")
             { Description = "A folder whose immediate subdirectories are repo roots (e.g. where you 'gh repo clone'd your org's repos)" };
-        var formatOpt = new Option<string>("--format")
-            { DefaultValueFactory = _ => "console", Description = "Output format: console | markdown | json" };
-        var outputOpt = new Option<FileInfo?>("-o", "--output") { Description = "Output file (default: stdout)" };
-        var failOnOpt = new Option<bool>("--fail-on-noncompliant")
-            { Description = "Exit non-zero (1) when the scan finds a High-severity finding (report.IsCompliant == false). Default off (informational-only)." };
-        var writeBaselineOpt = new Option<bool>("--write-baseline")
-            { Description = "After scanning, capture a timestamped baseline snapshot (content hash + structural fingerprint per skill) into the baseline ledger. See 'skills baseline list|diff|history'." };
-        var baselineRootOpt = new Option<string>("--baseline-root")
-            { DefaultValueFactory = _ => DefaultBaselineRoot, Description = "Baseline ledger root directory (used with --write-baseline / --check-baseline)." };
-        var checkBaselineOpt = new Option<bool>("--check-baseline")
-            { Description = "Trust-on-first-use: compare each scanned skill's content hash against the baseline ledger's history (--baseline-root). A match against ANY prior snapshot for the same skill name is reported as an informational 'matches a previously-vetted copy' finding." };
+        var (formatOpt, outputOpt, failOnOpt, writeBaselineOpt, baselineRootOpt, checkBaselineOpt) = BuildCommonScanOptions(DefaultWorkspaceBaselineRoot);
 
         scanWorkspaceCmd.Arguments.Add(pathArg);
         scanWorkspaceCmd.Options.Add(formatOpt);
@@ -278,7 +289,7 @@ internal static class SkillsScanCommand
     /// </summary>
     internal static async Task<int> ExecuteWorkspaceAsync(
         DirectoryInfo path, string format, FileInfo? output, bool failOnNoncompliant,
-        bool writeBaseline = false, string baselineRoot = DefaultBaselineRoot, bool checkBaseline = false,
+        bool writeBaseline = false, string baselineRoot = DefaultWorkspaceBaselineRoot, bool checkBaseline = false,
         CancellationToken ct = default)
     {
         if (!path.Exists)
@@ -300,6 +311,12 @@ internal static class SkillsScanCommand
             writeBaseline, baselineRoot, checkBaseline, path.FullName, ct).ConfigureAwait(false);
     }
 
+    // Bounded so a workspace of many repos doesn't open unbounded concurrent file handles; matches the same
+    // "cap it, don't leave it unbounded" discipline GateCalibrationHarness's MaxConcurrency already uses
+    // elsewhere in this codebase. Each repo's scan is independent I/O (its own directory tree, its own
+    // content hashing) — safe to run concurrently.
+    private const int MaxConcurrentRepoScans = 4;
+
     /// <summary>
     /// Wave 3a (filesystem multi-repo scan): treats <paramref name="workspaceRoot"/> as a folder of
     /// already-cloned repos — every immediate, non-hidden subdirectory is one repo — and runs the EXISTING
@@ -314,52 +331,121 @@ internal static class SkillsScanCommand
     /// operator's own clone step (their own credentials, their own tooling) is what decides which repos are
     /// visible here — that access-control question is intentionally kept OUTSIDE this verb's trust boundary,
     /// unlike the live, API-driven org-wide scan a security/credential-scope review is still pending for.</para>
+    /// <para><b>Fault-isolated per repo.</b> One repo whose skill folder contains a permission-denied file
+    /// (MafSkillScanner's own file enumeration has no guard against this — a pre-existing gap in shared
+    /// scanning code, not something this method can safely patch without touching every other caller of that
+    /// pipeline) must not lose every OTHER repo's already-computed results — a real risk at workspace scale
+    /// that a single-repo <c>--repo</c> scan rarely hits. Caught, reported as a per-repo "SKIPPED" line plus a
+    /// stderr warning, and the scan continues with the remaining repos.</para>
+    /// <para><b>Known scoping limit, disclosed not hidden:</b> a skill name shared by two UNRELATED repos
+    /// (different teams, coincidentally the same name) is indistinguishable from real drift/poisoning to
+    /// <see cref="DetectCrossLocationDrift"/> — it groups by name only, with no concept of "these repos are
+    /// unrelated." At org scale this is more likely to fire than within one repo's own conventions; the
+    /// finding's <c>Medium</c> severity and "verify this is intentional" wording already account for that
+    /// ambiguity, so this is not a bug, but expect more such findings to review as workspace size grows.</para>
     /// </summary>
     private static async Task<(SkillComplianceReport Report, IReadOnlyList<SkillBaselineEntry> Entries, string WorkspaceSummary)> ScanWorkspaceAsync(
         string workspaceRoot, AIAgent agent, CancellationToken ct)
     {
+        var allSubdirs = Directory.GetDirectories(workspaceRoot);
+        var repoDirs = allSubdirs
+            .Where(d => !Path.GetFileName(d).StartsWith('.'))   // skip .git and similar tooling folders, not repo clones
+            .OrderBy(d => d, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        var hiddenSkipped = allSubdirs.Length - repoDirs.Count;
+
+        var summary = new StringBuilder();
+        summary.AppendLine("  Workspace repos scanned:");
+
+        if (allSubdirs.Length == 0)
+        {
+            summary.AppendLine("    (no subdirectories found)");
+        }
+        else if (repoDirs.Count == 0)
+        {
+            summary.AppendLine($"    (no non-hidden subdirectories — {hiddenSkipped} hidden folder(s) skipped)");
+        }
+
+        // Collect-then-reduce: each task writes only to its own array slot (no shared mutable state during
+        // the parallel phase), and the reduce step below walks repoDirs' own sorted order — so the combined
+        // report/summary is deterministic regardless of which repo's scan actually finished first.
+        var results = new (string RepoName, SkillComplianceReport Report, IReadOnlyList<SkillBaselineEntry> Entries, string? Error)[repoDirs.Count];
+        using var throttle = new SemaphoreSlim(Math.Min(MaxConcurrentRepoScans, Math.Max(1, repoDirs.Count)));
+
+        var scanTasks = repoDirs.Select(async (repoPath, i) =>
+        {
+            var repoName = Path.GetFileName(repoPath);
+            await throttle.WaitAsync(ct).ConfigureAwait(false);
+            try
+            {
+                var (repoReport, repoEntries, _) = await ScanRepoWideAsync(repoPath, agent, ct).ConfigureAwait(false);
+                results[i] = (repoName, repoReport, repoEntries, null);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                results[i] = (repoName, EmptyReport, [], ex.Message);
+            }
+            finally
+            {
+                throttle.Release();
+            }
+        });
+
+        await Task.WhenAll(scanTasks).ConfigureAwait(false);
+
         var allFindings = new List<SkillComplianceFinding>();
         int skillCount = 0, withResources = 0, withScripts = 0, silentlyExcluded = 0;
         var histogram = new Dictionary<string, int>(StringComparer.Ordinal);
         var entries = new List<SkillBaselineEntry>();
-        var summary = new StringBuilder();
-        summary.AppendLine("  Workspace repos scanned:");
 
-        var repoDirs = Directory.GetDirectories(workspaceRoot)
-            .Where(d => !Path.GetFileName(d).StartsWith('.'))   // skip .git and similar tooling folders, not repo clones
-            .OrderBy(d => d, StringComparer.OrdinalIgnoreCase)
-            .ToList();
-
-        if (repoDirs.Count == 0)
+        foreach (var (repoName, repoReport, repoEntries, error) in results)
         {
-            summary.AppendLine("    (no subdirectories found)");
-        }
-
-        foreach (var repoPath in repoDirs)
-        {
-            ct.ThrowIfCancellationRequested();
-            var repoName = Path.GetFileName(repoPath);
-            var (repoReport, repoEntries, _) = await ScanRepoWideAsync(repoPath, agent, ct).ConfigureAwait(false);
+            if (error is not null)
+            {
+                summary.AppendLine($"    {repoName}: SKIPPED — could not scan ({error})");
+                Console.Error.WriteLine($"  Warning: could not scan repo '{repoName}': {error}");
+                continue;
+            }
 
             summary.AppendLine($"    {repoName}: {repoReport.Coverage.SkillCount} skill(s), {repoReport.Findings.Count} finding(s)");
 
             allFindings.AddRange(repoReport.Findings);
-            skillCount += repoReport.Coverage.SkillCount;
-            withResources += repoReport.Coverage.WithResources;
-            withScripts += repoReport.Coverage.WithScripts;
-            silentlyExcluded += repoReport.Coverage.SilentlyExcludedCount;
-            foreach (var (stage, count) in repoReport.Coverage.StageHistogram)
-            {
-                histogram[stage] = histogram.GetValueOrDefault(stage) + count;
-            }
-
+            AccumulateCoverage(repoReport.Coverage, ref skillCount, ref withResources, ref withScripts, ref silentlyExcluded, histogram);
             entries.AddRange(repoEntries.Select(e => e with { RelativePath = $"{repoName}/{e.RelativePath}" }));
+        }
+
+        if (hiddenSkipped > 0)
+        {
+            summary.AppendLine($"    ({hiddenSkipped} hidden folder(s) skipped, e.g. .git)");
         }
 
         var combinedReport = new SkillComplianceReport(
             allFindings, new SkillCoverageSummary(skillCount, withResources, withScripts, histogram, silentlyExcluded));
 
         return (combinedReport, entries, summary.ToString().TrimEnd());
+    }
+
+    private static readonly SkillComplianceReport EmptyReport =
+        new([], new SkillCoverageSummary(0, 0, 0, new Dictionary<string, int>(StringComparer.Ordinal)));
+
+    /// <summary>
+    /// Folds one repo/convention's <see cref="SkillCoverageSummary"/> into the caller's running totals — the
+    /// ONE place this accumulation is defined, shared by <see cref="ScanRepoWideAsync"/> (across conventions)
+    /// and <see cref="ScanWorkspaceAsync"/> (across repos), so a future new <see cref="SkillCoverageSummary"/>
+    /// field only needs threading through here once, not into two independently-hand-rolled loops.
+    /// </summary>
+    private static void AccumulateCoverage(
+        SkillCoverageSummary from, ref int skillCount, ref int withResources, ref int withScripts,
+        ref int silentlyExcluded, Dictionary<string, int> histogram)
+    {
+        skillCount += from.SkillCount;
+        withResources += from.WithResources;
+        withScripts += from.WithScripts;
+        silentlyExcluded += from.SilentlyExcludedCount;
+        foreach (var (stage, count) in from.StageHistogram)
+        {
+            histogram[stage] = histogram.GetValueOrDefault(stage) + count;
+        }
     }
 
     // ═══════════════════════════════ --repo multi-convention discovery (§4.3) ═══════════════════════════════
@@ -400,14 +486,7 @@ internal static class SkillsScanCommand
             summary.AppendLine($"    {convention}: {result.Skills.Count} skill(s), {result.Report.Findings.Count} finding(s)");
 
             allFindings.AddRange(result.Report.Findings);
-            skillCount += result.Report.Coverage.SkillCount;
-            withResources += result.Report.Coverage.WithResources;
-            withScripts += result.Report.Coverage.WithScripts;
-            silentlyExcluded += result.Report.Coverage.SilentlyExcludedCount;
-            foreach (var (stage, count) in result.Report.Coverage.StageHistogram)
-            {
-                histogram[stage] = histogram.GetValueOrDefault(stage) + count;
-            }
+            AccumulateCoverage(result.Report.Coverage, ref skillCount, ref withResources, ref withScripts, ref silentlyExcluded, histogram);
 
             foreach (var info in result.Skills)
             {
@@ -428,11 +507,19 @@ internal static class SkillsScanCommand
     /// GA requires lowercase-only names, so a name differing only by case across two conventions is the
     /// SAME poisoning/drift scenario this rule targets, not two unrelated skills) and flags any name present
     /// with 2+ DISTINCT <see cref="SkillBaselineEntry.ContentHash"/> values — the same skill name resolves
-    /// to different content depending on which convention/agent-tool reads it. Only meaningful for a
-    /// <c>--repo</c> scan (a single-directory scan has exactly one location by definition). Entries with an
-    /// empty/missing name are excluded from grouping entirely — two independently-malformed skills that both
-    /// lack a <c>name:</c> field are NOT "the same skill drifting," and grouping them by their shared empty
-    /// name would produce a misleading finding.
+    /// to different content depending on which convention/agent-tool (or, since Wave 3a, which REPO) reads
+    /// it. Only meaningful when <paramref name="entries"/> spans 2+ locations — a single-directory scan has
+    /// exactly one location by definition, so it never fires there. Location granularity is entirely a
+    /// function of how the caller populated <see cref="SkillBaselineEntry.RelativePath"/>: <c>--repo</c>
+    /// tags by convention, <c>scan-workspace</c> additionally tags by repo folder — this method itself never
+    /// inspects <c>RelativePath</c> for grouping, only for the finding's human-readable location list, so it
+    /// needs no change to work at either granularity. A name shared by two genuinely UNRELATED
+    /// repos/conventions is indistinguishable from real drift to this method (no "these are unrelated"
+    /// signal exists) — the <c>Medium</c> severity and "verify this is intentional" wording below already
+    /// account for that ambiguity, more likely to matter at workspace scale than within one repo. Entries
+    /// with an empty/missing name are excluded from grouping entirely — two independently-malformed skills
+    /// that both lack a <c>name:</c> field are NOT "the same skill drifting," and grouping them by their
+    /// shared empty name would produce a misleading finding.
     /// </summary>
     internal static IReadOnlyList<SkillComplianceFinding> DetectCrossLocationDrift(IReadOnlyList<SkillBaselineEntry> entries)
     {

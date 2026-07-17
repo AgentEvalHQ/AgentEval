@@ -491,10 +491,16 @@ agenteval skills scan-workspace ~/audit --write-baseline --format json -o report
 | `<path>` | Required, positional. A folder whose immediate subdirectories are repo roots. |
 | `--format <fmt>` | `console` (default), `markdown`, or `json`. |
 | `-o, --output <path>` | Write the rendered report to a file instead of stdout. |
-| `--fail-on-noncompliant` | Exit `1` when the scan finds a High-severity finding. |
+| `--fail-on-noncompliant` | Exit `1` when the scan finds a High-severity finding. Cross-location drift (Medium) and previously-vetted matches (Low) never trigger this — only High-severity findings do. |
 | `--write-baseline` | Capture a timestamped baseline snapshot across all scanned repos into the baseline ledger. |
-| `--baseline-root <dir>` | Baseline ledger root directory. Default `.agenteval/skills-baselines`. |
+| `--baseline-root <dir>` | Baseline ledger root directory. Default `.agenteval/skills-baselines-workspace` — deliberately DIFFERENT from `scan`'s `.agenteval/skills-baselines` default, so a plain `scan --write-baseline` can't accidentally get diffed against a much larger workspace-scale snapshot. Pass the same root to both verbs explicitly if you want one shared ledger. |
 | `--check-baseline` | Trust-on-first-use across the whole workspace — see `scan`'s `--check-baseline` above. |
+
+**Known limitation:** `skills baseline diff`/`history` track only one location per skill name even when a
+single snapshot legitimately has several (a pre-existing Wave 2 shortcut) — at workspace scale, where the
+same name across many repos is the expected case, this means the persisted ledger's diff/history can miss
+drift in every repo except whichever sorts first. The live scan-time `CrossLocationContentDrift` finding does
+NOT have this limitation. See [Agent Skills](agent-skills.md#2--compliance-scanner) for the full explanation.
 
 **Exit codes:** same as `scan` above.
 
