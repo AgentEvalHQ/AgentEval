@@ -418,7 +418,7 @@ suite ships, from the CLI.
 
 ```
 agenteval skills scan <path> [--format console|markdown|json] [-o|--output <file>] [--fail-on-noncompliant]
-                              [--write-baseline] [--baseline-root <dir>] [--repo]
+                              [--write-baseline] [--baseline-root <dir>] [--repo] [--check-baseline]
 ```
 
 **What it does**
@@ -427,7 +427,9 @@ Walks `<path>` for `SKILL.md`-rooted skill folders (the same convention MAF's ow
 discovers by), checks each against the GA `SKILL.md` authoring rules (name/description/compatibility) plus
 governance flags (script-execution review, untrusted resource sources, experimental `allowed-tools`), and
 renders a report. v1 is compliance-only — the composite Skill Health & Security Index is library-only for now
-(see [Agent Skills](agent-skills.md)).
+(see [Agent Skills](agent-skills.md)). Two additional governance signals (Wave 2) ride along in the same
+report: cross-location content drift (`--repo` only, always on) and trust-on-first-use reputation matching
+(`--check-baseline`, opt-in) — see [Agent Skills](agent-skills.md#2--compliance-scanner) for how each works.
 
 **Options**
 
@@ -436,10 +438,11 @@ renders a report. v1 is compliance-only — the composite Skill Health & Securit
 | `<path>` | Required, positional. Directory containing one or more skill folders (a REPO ROOT when `--repo` is set). |
 | `--format <fmt>` | `console` (default), `markdown`, or `json`. |
 | `-o, --output <path>` | Write the rendered report to a file instead of stdout. |
-| `--fail-on-noncompliant` | Exit `1` when the scan finds a High-severity finding. Default off (informational-only). |
+| `--fail-on-noncompliant` | Exit `1` when the scan finds a High-severity finding. Default off (informational-only). Cross-location drift (Medium) and previously-vetted matches (Low) never trigger this — only High-severity findings do. |
 | `--write-baseline` | Capture a timestamped baseline snapshot (structural fingerprint + full file-content hash per skill) into the baseline ledger. See [`agenteval skills baseline`](#agenteval-skills-baseline) below. |
-| `--baseline-root <dir>` | Baseline ledger root directory. Default `.agenteval/skills-baselines`. |
-| `--repo` | Treat `<path>` as a repo root: scan every known skill-directory convention found under it (`.claude/skills`, `.agents/skills`, `.windsurf/skills`, ...) and aggregate the results into ONE combined report, instead of treating `<path>` itself as one skill directory. Per-convention breakdown (found/not-present, skill/finding counts) prints to stderr. |
+| `--baseline-root <dir>` | Baseline ledger root directory. Default `.agenteval/skills-baselines`. Used by both `--write-baseline` and `--check-baseline`. |
+| `--repo` | Treat `<path>` as a repo root: scan every known skill-directory convention found under it (`.claude/skills`, `.agents/skills`, `.windsurf/skills`, ...) and aggregate the results into ONE combined report, instead of treating `<path>` itself as one skill directory. Per-convention breakdown (found/not-present, skill/finding counts) prints to stderr. When two or more conventions define the same skill name with DIFFERENT content, a `CrossLocationContentDrift` finding is added automatically. |
+| `--check-baseline` | Trust-on-first-use: compare each scanned skill's content hash against the baseline ledger's history. A match against any prior snapshot for the same name adds an informational `MatchesPreviouslyVettedCopy` finding. Meaningless on a first-ever scan (no history yet) — pair with `--write-baseline` on earlier runs. |
 
 **Exit codes**
 

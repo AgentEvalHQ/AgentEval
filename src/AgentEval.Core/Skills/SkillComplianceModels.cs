@@ -65,6 +65,26 @@ public enum SkillComplianceRule
     /// <c>strategy/FutureFeatures/Skills/Skill-Discovery-Exclusion-Detection-Design.md</c>.
     /// </summary>
     SkillExcludedFromDiscovery,
+
+    /// <summary>
+    /// Agent Skills Wave 2 — <c>agenteval skills scan --repo</c> found the SAME skill name present under two
+    /// or more different directory conventions (e.g. <c>.claude/skills/foo</c> and <c>.cursor/skills/foo</c>)
+    /// with DIFFERENT <see cref="SkillContentHasher.HashSkillFolder"/> content hashes. Which copy actually
+    /// loads depends on which agent tool reads it — could be intentional per-tool customization, or could be
+    /// one location silently drifting (or being poisoned) while another stays trusted. <see cref="Severity.Medium"/>,
+    /// not High — this is a governance signal to investigate, not automatically a defect (the divergence may
+    /// be deliberate).
+    /// </summary>
+    CrossLocationContentDrift,
+
+    /// <summary>
+    /// Agent Skills Wave 2, trust-on-first-use — <c>agenteval skills scan --check-baseline</c> found this
+    /// skill's current <see cref="SkillContentHasher.HashSkillFolder"/> content hash matches a hash already
+    /// present in the baseline ledger (<see cref="ISkillBaselineStore"/>) for the SAME skill name — i.e. this
+    /// exact copy was already captured and vetted in a prior scan. Purely informational
+    /// (<see cref="Severity.Low"/>) — a positive "no drift since last seen" signal, not a problem.
+    /// </summary>
+    MatchesPreviouslyVettedCopy,
 }
 
 /// <summary>One rule violation (or informational flag) found for one skill.</summary>
