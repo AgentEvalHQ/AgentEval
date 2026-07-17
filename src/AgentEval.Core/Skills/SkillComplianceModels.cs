@@ -95,6 +95,20 @@ public enum SkillComplianceRule
     /// (<see cref="Severity.Low"/>) — a positive "no drift since last seen" signal, not a problem.
     /// </summary>
     MatchesPreviouslyVettedCopy,
+
+    /// <summary>
+    /// <c>agenteval skills scan --manifest-baseline &lt;file&gt;</c> found this skill's current
+    /// <see cref="AgentEval.Skills.SkillManifestPoisoningGate.Fingerprint"/> differs from the pin captured
+    /// in a prior <c>--save-manifest-baseline</c> run — the skill's manifest content (name, description,
+    /// resource/script inventory, allowed-tools, compatibility) changed since it was reviewed and trust-time
+    /// pinned. A real rug-pull candidate: a previously-approved skill silently changing after approval is a
+    /// live trust-boundary breach, so this is <see cref="Severity.High"/> — the same severity
+    /// <see cref="AgentEval.Skills.SkillSecurityIndex"/>'s own <c>ChangedManifestPenalty</c> already treats a
+    /// changed manifest with. Distinct from <see cref="CrossLocationContentDrift"/> (compares the SAME scan's
+    /// multiple locations against each other) — this compares ONE scan against an earlier, deliberately
+    /// pinned trust-time snapshot, mirroring the RedTeam baseline/diff CI pattern.
+    /// </summary>
+    ManifestChangedSinceBaseline,
 }
 
 /// <summary>One rule violation (or informational flag) found for one skill.</summary>

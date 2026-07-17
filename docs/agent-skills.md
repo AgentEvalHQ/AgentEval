@@ -223,6 +223,22 @@ This is trust-time drift detection (JSON-persisted, mirrors the RedTeam baseline
 runtime gate that scores every turn — it fires when you re-scan, e.g. in CI before deploying an updated skill
 pack.
 
+**Reachable from the CLI**, not library-only: `agenteval skills scan <path> --save-manifest-baseline
+<file>` captures the pin (reusing the compliance scan's already-computed structural fingerprint — no
+re-hashing); a later `agenteval skills scan <path> --manifest-baseline <file>` checks against it and reports
+a changed skill as a High-severity `ManifestChangedSinceBaseline` finding, gated by the existing
+`--fail-on-noncompliant` (no separate fail flag needed). A SINGLE pinned file, deliberately distinct from
+`--write-baseline`'s multi-snapshot ledger above — commit it like the RedTeam CI baseline:
+
+```bash
+agenteval skills scan ./skills --save-manifest-baseline skills-baseline.json --baseline-notes "reviewed 2026-07-17"
+# ... later, in CI, before deploying an updated skill pack:
+agenteval skills scan ./skills --manifest-baseline skills-baseline.json --fail-on-noncompliant
+```
+
+Works the same way with `--repo`/`scan-workspace` — a skill name shared across locations is deduplicated the
+same `GroupBy`-first way `baseline diff`/`history` already tolerate it (see §2's known limitations above).
+
 ## 5 — Detecting MAF's silent skill-discovery exclusions
 
 MAF's own `AgentFileSkillsSource.GetSkillsAsync()` silently **excludes** a skill folder from discovery

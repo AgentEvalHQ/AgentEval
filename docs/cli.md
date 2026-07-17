@@ -419,6 +419,7 @@ suite ships, from the CLI.
 ```
 agenteval skills scan <path> [--format console|markdown|json] [-o|--output <file>] [--fail-on-noncompliant]
                               [--write-baseline] [--baseline-root <dir>] [--repo] [--check-baseline]
+                              [--save-manifest-baseline <file>] [--manifest-baseline <file>] [--baseline-notes <text>]
 ```
 
 **What it does**
@@ -427,9 +428,10 @@ Walks `<path>` for `SKILL.md`-rooted skill folders (the same convention MAF's ow
 discovers by), checks each against the GA `SKILL.md` authoring rules (name/description/compatibility) plus
 governance flags (script-execution review, untrusted resource sources, experimental `allowed-tools`), and
 renders a report. v1 is compliance-only — the composite Skill Health & Security Index is library-only for now
-(see [Agent Skills](agent-skills.md)). Two additional governance signals (Wave 2) ride along in the same
-report: cross-location content drift (`--repo` only, always on) and trust-on-first-use reputation matching
-(`--check-baseline`, opt-in) — see [Agent Skills](agent-skills.md#2--compliance-scanner) for how each works.
+(see [Agent Skills](agent-skills.md)). Three additional governance signals ride along in the same report:
+cross-location content drift (`--repo`/`scan-workspace` only, always on), trust-on-first-use reputation
+matching (`--check-baseline`, opt-in), and manifest hash-pin drift against an explicit trust-time pin
+(`--manifest-baseline`, opt-in) — see [Agent Skills](agent-skills.md#2--compliance-scanner) for how each works.
 
 **Options**
 
@@ -438,11 +440,14 @@ report: cross-location content drift (`--repo` only, always on) and trust-on-fir
 | `<path>` | Required, positional. Directory containing one or more skill folders (a REPO ROOT when `--repo` is set). |
 | `--format <fmt>` | `console` (default), `markdown`, or `json`. |
 | `-o, --output <path>` | Write the rendered report to a file instead of stdout. |
-| `--fail-on-noncompliant` | Exit `1` when the scan finds a High-severity finding. Default off (informational-only). Cross-location drift (Medium) and previously-vetted matches (Low) never trigger this — only High-severity findings do. |
+| `--fail-on-noncompliant` | Exit `1` when the scan finds a High-severity finding. Default off (informational-only). Cross-location drift (Medium) and previously-vetted matches (Low) never trigger this; a manifest-baseline drift finding (High) DOES. |
 | `--write-baseline` | Capture a timestamped baseline snapshot (structural fingerprint + full file-content hash per skill) into the baseline ledger. See [`agenteval skills baseline`](#agenteval-skills-baseline) below. |
 | `--baseline-root <dir>` | Baseline ledger root directory. Default `.agenteval/skills-baselines`. Used by both `--write-baseline` and `--check-baseline`. |
 | `--repo` | Treat `<path>` as a repo root: scan every known skill-directory convention found under it (`.claude/skills`, `.agents/skills`, `.windsurf/skills`, ...) and aggregate the results into ONE combined report, instead of treating `<path>` itself as one skill directory. Per-convention breakdown (found/not-present, skill/finding counts) prints to stderr. When two or more conventions define the same skill name with DIFFERENT content, a `CrossLocationContentDrift` finding is added automatically. |
 | `--check-baseline` | Trust-on-first-use: compare each scanned skill's content hash against the baseline ledger's history. A match against any prior snapshot for the same name adds an informational `MatchesPreviouslyVettedCopy` finding. Meaningless on a first-ever scan (no history yet) — pair with `--write-baseline` on earlier runs. |
+| `--save-manifest-baseline <file>` | Capture a trust-time hash-pin of every scanned skill's manifest content (name, description, resource/script inventory, allowed-tools, compatibility) to this JSON file. A SINGLE pinned file, distinct from `--write-baseline`'s multi-snapshot ledger — mirrors the RedTeam baseline/diff CI pattern: commit this file, then re-check future scans against it. |
+| `--manifest-baseline <file>` | Check every scanned skill against a `--save-manifest-baseline` file. A skill whose manifest content changed since the pin was captured is reported as a High-severity `ManifestChangedSinceBaseline` finding — a possible rug-pull. |
+| `--baseline-notes <text>` | Optional human note saved alongside `--save-manifest-baseline` (e.g. who approved it, why). |
 
 **Exit codes**
 
@@ -467,6 +472,7 @@ outside this verb's trust boundary (contrast with the still-gated, API-driven `s
 ```
 agenteval skills scan-workspace <path> [--format console|markdown|json] [-o|--output <file>] [--fail-on-noncompliant]
                                         [--write-baseline] [--baseline-root <dir>] [--check-baseline]
+                                        [--save-manifest-baseline <file>] [--manifest-baseline <file>] [--baseline-notes <text>]
 ```
 
 **What it does**
@@ -495,6 +501,7 @@ agenteval skills scan-workspace ~/audit --write-baseline --format json -o report
 | `--write-baseline` | Capture a timestamped baseline snapshot across all scanned repos into the baseline ledger. |
 | `--baseline-root <dir>` | Baseline ledger root directory. Default `.agenteval/skills-baselines-workspace` — deliberately DIFFERENT from `scan`'s `.agenteval/skills-baselines` default, so a plain `scan --write-baseline` can't accidentally get diffed against a much larger workspace-scale snapshot. Pass the same root to both verbs explicitly if you want one shared ledger. |
 | `--check-baseline` | Trust-on-first-use across the whole workspace — see `scan`'s `--check-baseline` above. |
+| `--save-manifest-baseline <file>` / `--manifest-baseline <file>` / `--baseline-notes <text>` | Same single-pin manifest hash-drift gate as `scan` — see `scan`'s own rows above. A skill name duplicated across repos is deduplicated the same way `--repo` already tolerates it. |
 
 **Known limitation:** `skills baseline diff`/`history` track only one location per skill name even when a
 single snapshot legitimately has several (a pre-existing Wave 2 shortcut) — at workspace scale, where the
