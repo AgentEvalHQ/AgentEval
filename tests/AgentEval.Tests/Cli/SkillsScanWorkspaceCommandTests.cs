@@ -197,6 +197,49 @@ public class SkillsScanWorkspaceCommandTests : IDisposable
     }
 
     [Fact]
+    public async Task ExecuteWorkspaceAsync_LockedFileInOneRepo_OtherRepoResultsStillSurvive()
+    {
+        // The real, user-facing fault-isolation guarantee: a permission-denied/locked file in one repo's
+        // skill folder must not lose every OTHER repo's already-computed results. Empirically confirmed
+        // (Windows-only lock semantics — File.OpenRead of an exclusively-locked file throws IOException
+        // cross-platform via .NET's own FileStream, but POSIX doesn't enforce FileShare.None the same way,
+        // so this is skipped on non-Windows) that a locked SKILL.md makes MAF's own GetSkillsAsync() throw —
+        // caught by MafSkillScanner's OWN broad catch-all (never reaching ScanWorkspaceAsync's outer
+        // IOException/UnauthorizedAccessException handler at all) and turned into a "(discovery failure)"
+        // finding for that repo specifically. The end-to-end multi-repo isolation this test asserts on holds
+        // regardless of WHICH layer catches it — that's the guarantee that actually matters to an operator.
+        if (!OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        var workspaceRoot = CreateWorkspaceRoot();
+        try
+        {
+            CreateRepoWithSkill(workspaceRoot, "repo-a", "skill-a", "Present in repo-a.");
+            var lockedFile = CreateRepoWithSkill(workspaceRoot, "repo-b", "skill-b", "Present in repo-b.");
+
+            var outFile = NewTempOutputFile();
+            try
+            {
+                int exit;
+                using (new FileStream(lockedFile, FileMode.Open, FileAccess.ReadWrite, FileShare.None))
+                {
+                    exit = await SkillsScanCommand.ExecuteWorkspaceAsync(
+                        new DirectoryInfo(workspaceRoot), "json", outFile, failOnNoncompliant: false, ct: default);
+                }
+
+                Assert.Equal(ExitCodes.Success, exit);   // the WORKSPACE call itself never crashes
+                var content = await File.ReadAllTextAsync(outFile.FullName);
+                Assert.Contains("\"SkillCount\": 1", content, StringComparison.Ordinal);   // repo-a's skill still counted
+                Assert.Contains("discovery failure", content, StringComparison.Ordinal);   // repo-b's failure surfaced, not silently dropped
+            }
+            finally { if (outFile.Exists) outFile.Delete(); }
+        }
+        finally { Directory.Delete(workspaceRoot, recursive: true); }
+    }
+
+    [Fact]
     public void DefaultBaselineRoot_DiffersBetweenScanAndScanWorkspace_PreventsScopeMismatchInDiff()
     {
         // scan-workspace's own default baseline root must NOT equal scan's default — sharing one root by
@@ -215,11 +258,14 @@ public class SkillsScanWorkspaceCommandTests : IDisposable
     private static string CreateWorkspaceRoot() =>
         Directory.CreateDirectory(Path.Combine(Path.GetTempPath(), "agenteval-skills-workspace-test-" + Guid.NewGuid().ToString("N"))).FullName;
 
-    private static void CreateRepoWithSkill(string workspaceRoot, string repoName, string skillName, string description)
+    /// <summary>Creates a real skill folder + SKILL.md and returns the manifest file's full path.</summary>
+    private static string CreateRepoWithSkill(string workspaceRoot, string repoName, string skillName, string description)
     {
         var skillDir = Path.Combine(workspaceRoot, repoName, ".claude", "skills", skillName);
         Directory.CreateDirectory(skillDir);
-        File.WriteAllText(Path.Combine(skillDir, "SKILL.md"), $"---\nname: {skillName}\ndescription: {description}\n---\n\nBody.\n");
+        var skillMdPath = Path.Combine(skillDir, "SKILL.md");
+        File.WriteAllText(skillMdPath, $"---\nname: {skillName}\ndescription: {description}\n---\n\nBody.\n");
+        return skillMdPath;
     }
 
     private static FileInfo NewTempOutputFile() =>
