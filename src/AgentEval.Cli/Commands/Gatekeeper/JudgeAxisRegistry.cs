@@ -49,6 +49,14 @@ internal static class JudgeAxisRegistry
         ["ungrounded-claim"] = new(
             (m, c) => UngroundedClaimJudge.Create(m, null, c), UngroundedClaimJudge.KeywordBaseline,
             UngroundedClaimJudge.GoldSet, () => new UngroundedClaimRubric()),
+        // 2026-07-17 — the 9th calibrated axis. Registered exactly like the seven above (same Create/
+        // KeywordBaseline/GoldSet/Rubric shape) so it is fully reachable through calibrate/inspect/list-gates
+        // even though its ONLY live-wiring seam is the approval flow (ToolArgumentGoalCoherenceApprovalGate,
+        // AgentEval.MAF), not a chat/run-gate seam like the others — the CLI bridge dispatches on IChatGate
+        // regardless of which seam a caller ultimately wires the calibrated judge into.
+        ["tool-argument-goal-coherence"] = new(
+            (m, c) => ToolArgumentGoalCoherenceJudge.Create(m, null, c), ToolArgumentGoalCoherenceJudge.KeywordBaseline,
+            ToolArgumentGoalCoherenceJudge.GoldSet, () => new ToolArgumentGoalCoherenceRubric()),
         // NOTE: "hallucinated-citation" is deliberately NOT registered here. HallucinatedCitationJudge is a
         // bespoke hybrid IChatGate (deterministic citation-existence check + judge support-check) — it does
         // not implement IJudgeRubric, so it has no BuildPrompt/Parse pair for this registry's
