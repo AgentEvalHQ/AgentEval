@@ -26,7 +26,10 @@ namespace AgentEval.Tests.MAF.Gatekeeper;
 /// </remarks>
 public class CrescendoTrajectoryJudgeTests
 {
-    private static readonly TimeSpan VerdictTimeout = TimeSpan.FromSeconds(5);
+    // 30s, not 5s: matches ShadowJudgeTests's own documented precedent in this same area — a generous ceiling
+    // only guards against a real hang/deadlock, and tolerates thread-pool starvation on a loaded CI runner
+    // (observed flaky at 5s on a Windows CI runner under full-suite parallel load; never flaky locally).
+    private static readonly TimeSpan VerdictTimeout = TimeSpan.FromSeconds(30);
 
     private static ChatClientAgent Agent(ScriptedChatClient scripted)
         => new(scripted, new ChatClientAgentOptions { Name = "T" });
