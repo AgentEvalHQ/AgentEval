@@ -110,6 +110,46 @@ json output automatically, no new schema):
 Neither feature is High severity — both are informational/governance signals, not automatic compliance
 failures, so `--fail-on-noncompliant` is unaffected by either.
 
+**Filesystem multi-repo scan (Wave 3a):** `agenteval skills scan-workspace <path>` treats `<path>` as a folder
+of *already-cloned* repos — each immediate subdirectory is one repo — and runs the existing `--repo` pipeline
+against every one of them, combining the results into one report. Zero new discovery code: it's a fan-out loop
+over the same pipeline `--repo` already uses, per repo. Filesystem-only — no network, no credentials, no new
+trust surface; the operator's own clone step (`git clone` / `gh repo clone`, their own access, their own
+tooling) is what decides which repos are visible here, deliberately kept outside this verb's scope. Every
+entry is tagged with a `{repoFolder}/{conventionPath}` location, so the *existing*, unchanged
+`DetectCrossLocationDrift` (it only ever groups by skill name, never by location) also catches drift **across
+repos** for free — the same "skill X is byte-identical across N repos except M outliers" signal Wave 2 gives
+you within one repo, now at workspace scale:
+
+```bash
+# clone the repos you want to audit yourself first, e.g.:
+#   gh repo clone myorg/service-a ~/audit/service-a
+#   gh repo clone myorg/service-b ~/audit/service-b
+agenteval skills scan-workspace ~/audit --write-baseline --format json -o report.json
+```
+
+Same option surface as `scan --repo` (`--format`, `--fail-on-noncompliant`, `--write-baseline`,
+`--baseline-root`, `--check-baseline`) — deliberately a separate verb rather than a `--workspace` flag bolted
+onto `scan`, to avoid colliding with Mission Control's own, unrelated `--workspace` concept. Defaults to its
+own baseline root (`.agenteval/skills-baselines-workspace`, not `scan`'s `.agenteval/skills-baselines`) so a
+later plain `scan --write-baseline` can't accidentally get diffed against a wildly larger workspace-scale
+snapshot (or vice versa) — pass `--baseline-root` explicitly if you genuinely want one shared ledger.
+
+**Two known limitations, disclosed here rather than discovered the hard way:**
+- **`baseline diff`/`history` track only one location per skill name, even when the SAME scan legitimately
+  produced several** (Wave 2's own pre-existing shortcut, `GroupBy(Name).First()`, chosen to avoid crashing on
+  duplicate names rather than to build a full per-location history — see the code's own remarks). At `--repo`
+  scale this rarely bites; at workspace scale, where the same skill name in N repos is the expected case, it
+  means `baseline diff`/`history` can silently miss drift in every repo except whichever one sorts first. The
+  live scan-time `CrossLocationContentDrift` finding (re-run each time) does NOT have this limitation — it
+  checks every location, every scan. For genuine per-repo longitudinal tracking, treat each repo's own
+  baseline separately (`scan --repo <one-repo> --write-baseline`) rather than relying on the workspace ledger.
+- **A skill name shared by two unrelated repos looks identical to real drift.** `DetectCrossLocationDrift` has
+  no concept of "these repos are unrelated" — two different teams both naming a skill `code-review` with
+  legitimately different content will produce the same `Medium`-severity finding as an actual rug-pull. The
+  severity and "verify this is intentional" wording already account for this ambiguity; expect more such
+  findings to triage as workspace size grows.
+
 ## 3 — Skill-injection red-team attack + `run_skill_script` governance
 
 `AgentEval.RedTeam.Attacks.SkillInjectionAttack` (OWASP LLM01, in `Attack.All` — the framework now ships **14**
@@ -204,9 +244,11 @@ and would crash the whole scan, is caught and reported as one clean finding inst
 
 Phase 4c (skill fuzzing via the transform/codec pipeline, a canary-skill honeypot, skill-name typosquatting,
 load-storm-as-denial-of-wallet) was deprioritized this session in favor of shipping 4a/4b and the exclusion-
-detection fix (§5) with full rigor. Wave 3 (org-wide multi-repo scanning via a new GitHub/GitLab API client;
-live upstream verification against a skill's declared source) is gated on a security/credential-scope review
-not yet held — see `strategy/TODO.md` (local-only) for the up-to-date backlog.
+detection fix (§5) with full rigor. Wave 3a (filesystem multi-repo scan, `scan-workspace`) shipped — see §2
+above. **Wave 3b** (a live, API-driven org-wide scan reaching repos you haven't cloned — `scan-org` — plus live
+upstream verification against a skill's declared source URL) is still gated on a security/credential-scope
+review not yet held, since it needs a real GitHub/GitLab API client and token handling that `scan-workspace`
+deliberately avoids — see `strategy/TODO.md` (local-only) for the up-to-date backlog.
 
 ## Related
 
