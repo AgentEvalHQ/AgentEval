@@ -274,6 +274,10 @@ await result.ExportHtmlReportAsync("memory-report.html");
     
     Universal `IChatClient.AsEvaluableAgent()` one-liner + Semantic Kernel bridge
 
+-   **🎯 Copilot Studio**
+
+    Red-team or evaluate a live Microsoft Copilot Studio agent — via the CLI (`--sut copilot-studio`) or directly in code (`AgentEval.MAF.CopilotStudio`), no CLI required
+
 -   **📦 Dependency Injection**
     
     `services.AddAgentEval()` - interface-first architecture
@@ -368,7 +372,7 @@ agenteval mc serve                         # browse runs + evidence at http://lo
 |  | [Workflows](workflows.md) | [The .agenteval Workspace](agenteval-workspace.md) |
 |  | [GDPR Benchmark](benchmarks/gdpr/getting-started.md) | [Mission Control](missioncontrol/getting-started.md) |
 |  | [EU AI Act Benchmark](benchmarks/eu-ai-act/getting-started.md) | [Gatekeeper](gatekeeper/introduction.md) |
-|  | [Agentic Benchmark](benchmarks/agentic/getting-started.md) |  |
+|  | [Agentic Benchmark](benchmarks/agentic/getting-started.md) | [Copilot Studio Target](redteam/copilot-studio.md) |
 |  | [OWASP / MITRE Benchmarks](benchmarks/owasp/getting-started.md) |  |
 |  | [Performance / Memory / LongMemEval](benchmarks/perf/getting-started.md) |  |
 |  | [MAF Agent Skills Evaluation](agent-skills.md) |  |
