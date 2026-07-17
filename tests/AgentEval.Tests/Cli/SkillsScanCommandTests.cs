@@ -45,7 +45,7 @@ public class SkillsScanCommandTests
     {
         var missing = new DirectoryInfo(Path.Combine(Path.GetTempPath(), "agenteval-skills-scan-missing-" + Guid.NewGuid().ToString("N")));
         await Assert.ThrowsAsync<DirectoryNotFoundException>(
-            () => SkillsScanCommand.ExecuteAsync(missing, "console", null, false, default));
+            () => SkillsScanCommand.ExecuteAsync(missing, "console", null, false, ct: default));
     }
 
     [Fact]
@@ -55,7 +55,7 @@ public class SkillsScanCommandTests
         try
         {
             var ex = await Assert.ThrowsAsync<ArgumentException>(
-                () => SkillsScanCommand.ExecuteAsync(dir, "yaml", null, false, default));
+                () => SkillsScanCommand.ExecuteAsync(dir, "yaml", null, false, ct: default));
             Assert.Contains("--format", ex.Message, StringComparison.OrdinalIgnoreCase);
         }
         finally { dir.Delete(recursive: true); }
@@ -74,7 +74,7 @@ public class SkillsScanCommandTests
             var outFile = new FileInfo(Path.Combine(Path.GetTempPath(), "agenteval-skills-scan-out-" + Guid.NewGuid().ToString("N") + ".txt"));
             try
             {
-                var exit = await SkillsScanCommand.ExecuteAsync(dir, format, outFile, failOnNoncompliant: false, default);
+                var exit = await SkillsScanCommand.ExecuteAsync(dir, format, outFile, failOnNoncompliant: false, ct: default);
 
                 Assert.Equal(ExitCodes.Success, exit);
                 Assert.True(outFile.Exists, "the rendered report should have been written to --output");
@@ -94,7 +94,7 @@ public class SkillsScanCommandTests
         var dir = CreateCompliantFixture(out _, withScript: true);
         try
         {
-            var exit = await SkillsScanCommand.ExecuteAsync(dir, "console", null, failOnNoncompliant: true, default);
+            var exit = await SkillsScanCommand.ExecuteAsync(dir, "console", null, failOnNoncompliant: true, ct: default);
             Assert.Equal(ExitCodes.Success, exit);
         }
         finally { dir.Delete(recursive: true); }
@@ -106,7 +106,7 @@ public class SkillsScanCommandTests
         var dir = CreateCompliantFixture(out _);
         try
         {
-            var exit = await SkillsScanCommand.ExecuteAsync(dir, "console", output: null, failOnNoncompliant: false, default);
+            var exit = await SkillsScanCommand.ExecuteAsync(dir, "console", output: null, failOnNoncompliant: false, ct: default);
             Assert.Equal(ExitCodes.Success, exit);
         }
         finally { dir.Delete(recursive: true); }
@@ -124,7 +124,7 @@ public class SkillsScanCommandTests
         var dir = CreateMalformedFixture();
         try
         {
-            var exit = await SkillsScanCommand.ExecuteAsync(dir, "console", null, failOnNoncompliant: true, default);
+            var exit = await SkillsScanCommand.ExecuteAsync(dir, "console", null, failOnNoncompliant: true, ct: default);
             Assert.Equal(ExitCodes.TestFailure, exit);
         }
         finally { dir.Delete(recursive: true); }
@@ -139,7 +139,7 @@ public class SkillsScanCommandTests
             var outFile = new FileInfo(Path.Combine(Path.GetTempPath(), "agenteval-skills-scan-malformed-out-" + Guid.NewGuid().ToString("N") + ".txt"));
             try
             {
-                await SkillsScanCommand.ExecuteAsync(dir, "console", outFile, failOnNoncompliant: false, default);
+                await SkillsScanCommand.ExecuteAsync(dir, "console", outFile, failOnNoncompliant: false, ct: default);
                 var content = await File.ReadAllTextAsync(outFile.FullName);
                 Assert.Contains("SkillExcludedFromDiscovery", content, StringComparison.Ordinal);
                 Assert.Contains("SILENTLY EXCLUDED", content, StringComparison.Ordinal);

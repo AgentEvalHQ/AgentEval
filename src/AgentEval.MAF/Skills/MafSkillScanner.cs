@@ -8,6 +8,23 @@ using Microsoft.Agents.AI;
 namespace AgentEval.MAF.Skills;
 
 /// <summary>
+/// Agent Skills Wave 1 (§1.2) — one scanned skill's manifest paired with its on-disk absolute folder path
+/// (file-sourced skills only; <see langword="null"/> for non-file sources, which have no folder to hash).
+/// The baseline-ledger builder (<c>SkillsScanCommand</c>'s <c>--write-baseline</c> path) needs this path to
+/// call <c>SkillContentHasher.HashSkillFolder</c> — <see cref="SkillManifest"/> alone does not carry it
+/// (see <see cref="SkillManifest.ParentDirectoryName"/>'s remarks: that field is a bare directory NAME for
+/// the GA name-matches-directory rule, not a usable path).
+/// </summary>
+/// <param name="Manifest">The scanned skill's manifest.</param>
+/// <param name="AbsolutePath">The skill's own folder (containing its <c>SKILL.md</c>), or <see langword="null"/> for a non-file-sourced skill.</param>
+public sealed record ScannedSkillInfo(SkillManifest Manifest, string? AbsolutePath);
+
+/// <summary>Agent Skills Wave 1 (§1.2) — <see cref="MafSkillScanner.ScanFileSkillsWithInfoAsync"/>'s result: the compliance report PLUS enough per-skill metadata to build a <c>SkillBaselineSnapshot</c>.</summary>
+/// <param name="Report">Identical to what <see cref="MafSkillScanner.ScanFileSkillsAsync"/> alone returns.</param>
+/// <param name="Skills">One entry per skill actually returned by MAF's discovery (excludes silently-excluded folders — those have no manifest to pair a path with).</param>
+public sealed record SkillScanResult(SkillComplianceReport Report, IReadOnlyList<ScannedSkillInfo> Skills);
+
+/// <summary>
 /// The ONLY place in this feature that touches a live <c>AgentSkill</c> / <c>AgentSkillsSource</c> — maps
 /// GA MAF Agent Skills types to the pure, MAF-free <see cref="SkillManifest"/> DTO, then delegates to
 /// <see cref="SkillComplianceValidator"/> (which never sees a <c>Microsoft.Agents.AI</c> type; see the design
@@ -95,6 +112,20 @@ public static class MafSkillScanner
     public static async Task<SkillComplianceReport> ScanFileSkillsAsync(
         string skillPath, AIAgent agent, SkillScanOptions? options = null, CancellationToken cancellationToken = default)
     {
+        var result = await ScanFileSkillsWithInfoAsync(skillPath, agent, options, cancellationToken).ConfigureAwait(false);
+        return result.Report;
+    }
+
+    /// <summary>
+    /// Agent Skills Wave 1 (§1.2) — identical scan/validation/exclusion-detection behavior to
+    /// <see cref="ScanFileSkillsAsync"/> (which is now a thin wrapper over this method, discarding the
+    /// extra per-skill path info) — additionally returns each skill's on-disk absolute folder path, which
+    /// <c>SkillsScanCommand</c>'s <c>--write-baseline</c> path needs to compute
+    /// <c>SkillContentHasher.HashSkillFolder</c> per skill.
+    /// </summary>
+    public static async Task<SkillScanResult> ScanFileSkillsWithInfoAsync(
+        string skillPath, AIAgent agent, SkillScanOptions? options = null, CancellationToken cancellationToken = default)
+    {
         if (string.IsNullOrWhiteSpace(skillPath))
         {
             throw new ArgumentException("skillPath must be non-empty.", nameof(skillPath));
@@ -126,20 +157,27 @@ public static class MafSkillScanner
                 "nothing under this path is functional until discovery succeeds.",
                 null);
             var emptyHistogram = new Dictionary<string, int> { ["load"] = 0, ["read"] = 0, ["run"] = 0 };
-            return new SkillComplianceReport(
+            var crashReport = new SkillComplianceReport(
                 new[] { crashFinding },
                 new SkillCoverageSummary(0, 0, 0, emptyHistogram, SilentlyExcludedCount: 0));
+            return new SkillScanResult(crashReport, Array.Empty<ScannedSkillInfo>());
         }
 
         var manifests = new List<SkillManifest>(skills.Count);
+        var scannedInfos = new List<ScannedSkillInfo>(skills.Count);
         var returnedDirectories = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var skill in skills)
         {
-            manifests.Add(ToManifest(skill));
+            var manifest = ToManifest(skill);
+            manifests.Add(manifest);
+            string? absolutePath = null;
             if (skill is AgentFileSkill fileSkill && !string.IsNullOrWhiteSpace(fileSkill.Path))
             {
+                absolutePath = Path.GetFullPath(fileSkill.Path);
                 returnedDirectories.Add(NormalizeDirectory(fileSkill.Path));
             }
+
+            scannedInfos.Add(new ScannedSkillInfo(manifest, absolutePath));
         }
 
         var baseReport = SkillComplianceValidator.Validate(manifests, options);
@@ -147,14 +185,15 @@ public static class MafSkillScanner
         var exclusionFindings = FindSilentExclusions(skillPath, returnedDirectories, options);
         if (exclusionFindings.Count == 0)
         {
-            return baseReport;
+            return new SkillScanResult(baseReport, scannedInfos);
         }
 
         var combinedFindings = new List<SkillComplianceFinding>(baseReport.Findings.Count + exclusionFindings.Count);
         combinedFindings.AddRange(baseReport.Findings);
         combinedFindings.AddRange(exclusionFindings);
         var combinedCoverage = baseReport.Coverage with { SilentlyExcludedCount = exclusionFindings.Count };
-        return new SkillComplianceReport(combinedFindings, combinedCoverage);
+        var combinedReport = new SkillComplianceReport(combinedFindings, combinedCoverage);
+        return new SkillScanResult(combinedReport, scannedInfos);
     }
 
     /// <summary>
