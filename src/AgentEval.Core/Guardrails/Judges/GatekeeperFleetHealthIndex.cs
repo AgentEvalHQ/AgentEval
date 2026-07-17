@@ -2,6 +2,8 @@
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 
+using System.Diagnostics.CodeAnalysis;
+
 namespace AgentEval.Guardrails.Judges;
 
 /// <summary>
@@ -13,7 +15,11 @@ namespace AgentEval.Guardrails.Judges;
 /// <para>High value for an ops/Mission-Control surface once one exists (Mission Control's compliance-matrix
 /// GraphQL layer is a real, live precedent for exactly this kind of cross-cutting health surface) — this type
 /// itself is transport-agnostic, no MC/CLI dependency.</para>
+/// <para><b>Experimental:</b> shipped 2026-07-17, no real-world consumer yet (no CLI verb, no Mission Control
+/// wiring) — the shape may still change once one exists. Suppress via
+/// <c>&lt;NoWarn&gt;$(NoWarn);AGENTEVAL_GATEKEEPER_PREVIEW001&lt;/NoWarn&gt;</c> once you've read this note.</para>
 /// </summary>
+[Experimental("AGENTEVAL_GATEKEEPER_PREVIEW001")]
 public static class GatekeeperFleetHealthIndex
 {
     /// <summary>
@@ -84,6 +90,7 @@ public static class GatekeeperFleetHealthIndex
 /// <param name="StaleAxes">Axes whose report is older than the caller-supplied staleness threshold — informational, does not affect the means.</param>
 /// <param name="NeverCalibratedAxes">Axes with no report at all.</param>
 /// <param name="Explanation">Human-readable summary — states plainly which axes were/weren't measured, never silently treats a missing axis as passing.</param>
+[Experimental("AGENTEVAL_GATEKEEPER_PREVIEW001")]
 public sealed record GatekeeperFleetHealthReport(
     IReadOnlyDictionary<string, CalibrationReport?> ReportsByAxis,
     double? MeanDecisiveAccuracy,

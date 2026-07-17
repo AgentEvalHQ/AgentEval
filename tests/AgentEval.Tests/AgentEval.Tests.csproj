@@ -4,6 +4,11 @@
     <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
     <IsPackable>false</IsPackable>
     <IsTestProject>true</IsTestProject>
+    <!-- Tests deliberately exercise [Experimental("AGENTEVAL_GATEKEEPER_PREVIEW001")]-marked Gatekeeper
+         next-wave types (GatekeeperFleetHealthIndex, ICalibrationReportStore, JsonFileCalibrationReportStore,
+         ToolResultSizeAnomalyGate) — the diagnostic is error-severity by design, so this suppression is a
+         deliberate acknowledgment, not a blanket warning bypass. -->
+    <NoWarn>$(NoWarn);AGENTEVAL_GATEKEEPER_PREVIEW001</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>

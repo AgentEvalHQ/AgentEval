@@ -2,6 +2,8 @@
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 
+using System.Diagnostics.CodeAnalysis;
+
 namespace AgentEval.MAF.Gatekeeper;
 
 /// <summary>
@@ -16,7 +18,11 @@ namespace AgentEval.MAF.Gatekeeper;
 /// <para><b>v1 (this gate): fixed-multiplier-per-tool, no real statistics.</b> Cheap, deterministic, no
 /// statistics library needed — a true rolling mean/stddev or median-absolute-deviation is deferred as a
 /// documented v2 follow-on (more robust to the first few calls skewing a small-N mean), not built here.</para>
+/// <para><b>Experimental:</b> shipped 2026-07-17 as v1 of a heuristic its own doc comment already flags as
+/// likely to be superseded by a real-statistics v2 — the detection approach, not just the implementation, may
+/// still change.</para>
 /// </summary>
+[Experimental("AGENTEVAL_GATEKEEPER_PREVIEW001")]
 public sealed class ToolResultSizeAnomalyGate : IToolResultGate
 {
     /// <summary>Default: a result &gt; 5x this tool's own running average this run is flagged.</summary>

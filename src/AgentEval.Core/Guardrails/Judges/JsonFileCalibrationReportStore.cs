@@ -2,6 +2,7 @@
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 
+using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using AgentEval.Guardrails;
@@ -20,7 +21,10 @@ namespace AgentEval.Guardrails.Judges;
 /// (<c>AgentEval.Core</c>) — this store lives in the SAME assembly/namespace specifically so it can
 /// reconstruct a report directly from persisted data via that constructor, rather than needing a public
 /// settable-everything shape on the type callers actually consume.</para>
+/// <para><b>Experimental:</b> shipped 2026-07-17, no real-world consumer yet — see
+/// <see cref="ICalibrationReportStore"/>'s own experimental note.</para>
 /// </summary>
+[Experimental("AGENTEVAL_GATEKEEPER_PREVIEW001")]
 public sealed partial class JsonFileCalibrationReportStore : ICalibrationReportStore
 {
     private readonly string _rootPath;
