@@ -374,6 +374,42 @@ public class SkillsBaselineCommandTests : IDisposable
         finally { Directory.Delete(repoRoot, recursive: true); }
     }
 
+    [Fact]
+    public async Task ExecuteAsync_RepoWriteBaseline_DuplicateSkillNameAcrossConventions_ThenDiffAndHistory_DoNotThrow()
+    {
+        // Regression: a --repo --write-baseline snapshot can legitimately contain 2+ entries with the SAME
+        // Name (the exact cross-location-drift scenario) — `baseline diff`/`baseline history` must not crash
+        // with an unhandled ArgumentException ("same key already added") when that happens.
+        var repoRoot = Path.Combine(Path.GetTempPath(), "agenteval-skills-dupname-test-" + Guid.NewGuid().ToString("N"));
+        var claudeDir = Path.Combine(repoRoot, ".claude", "skills", "shared-skill");
+        var cursorDir = Path.Combine(repoRoot, ".cursor", "skills", "shared-skill");
+        Directory.CreateDirectory(claudeDir);
+        Directory.CreateDirectory(cursorDir);
+        File.WriteAllText(Path.Combine(claudeDir, "SKILL.md"),
+            "---\nname: shared-skill\ndescription: Present under .claude/skills.\n---\n\nBody variant A.\n");
+        File.WriteAllText(Path.Combine(cursorDir, "SKILL.md"),
+            "---\nname: shared-skill\ndescription: Present under .claude/skills.\n---\n\nBody variant B — DIFFERENT.\n");
+
+        try
+        {
+            // Two --write-baseline runs so `diff`/`history` have real snapshot history to walk, each one
+            // containing the duplicate-Name pair that would previously crash HashesByName/baselineBySkill.
+            await SkillsScanCommand.ExecuteAsync(
+                new DirectoryInfo(repoRoot), "console", null, failOnNoncompliant: false,
+                writeBaseline: true, repo: true, baselineRoot: _baselineRoot, ct: default);
+            await SkillsScanCommand.ExecuteAsync(
+                new DirectoryInfo(repoRoot), "console", null, failOnNoncompliant: false,
+                writeBaseline: true, repo: true, baselineRoot: _baselineRoot, ct: default);
+
+            var diffExit = await SkillsScanCommand.DiffAsync(_baselineRoot, sinceId: null, skillFilter: null, hashKind: "content", default);
+            Assert.Equal(ExitCodes.Success, diffExit);
+
+            var historyExit = await SkillsScanCommand.HistoryAsync(_baselineRoot, "shared-skill", default);
+            Assert.Equal(ExitCodes.Success, historyExit);
+        }
+        finally { Directory.Delete(repoRoot, recursive: true); }
+    }
+
     // ── Wave 2 (§4.2): --check-baseline trust-on-first-use ──
 
     [Fact]

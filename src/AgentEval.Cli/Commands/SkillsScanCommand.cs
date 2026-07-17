@@ -49,7 +49,7 @@ internal static class SkillsScanCommand
         var writeBaselineOpt = new Option<bool>("--write-baseline")
             { Description = "After scanning, capture a timestamped baseline snapshot (content hash + structural fingerprint per skill) into the baseline ledger. See 'skills baseline list|diff|history'." };
         var repoOpt = new Option<bool>("--repo")
-            { Description = "Treat <path> as a REPO ROOT: scan every known skill-directory convention found under it (.claude/skills, .agents/skills, ...) and aggregate the results, instead of treating <path> itself as one skill directory." };
+            { Description = "Treat <path> as a REPO ROOT: scan every known skill-directory convention found under it (.claude/skills, .agents/skills, ...) and aggregate the results, instead of treating <path> itself as one skill directory. Always content-hashes every skill folder (real file I/O) to check for cross-location drift — the same name resolving to different content in two conventions — even without --write-baseline/--check-baseline." };
         var baselineRootOpt = new Option<string>("--baseline-root")
             { DefaultValueFactory = _ => DefaultBaselineRoot, Description = "Baseline ledger root directory (used with --write-baseline / --check-baseline)." };
         var checkBaselineOpt = new Option<bool>("--check-baseline")
@@ -112,10 +112,15 @@ internal static class SkillsScanCommand
         SkillComplianceReport report;
         IReadOnlyList<SkillBaselineEntry> entries;
 
-        // Agent Skills Wave 2: entries (content hash + structural fingerprint per skill) are now built
-        // UNCONDITIONALLY — cross-location drift detection (--repo) and trust-on-first-use matching
-        // (--check-baseline) both need them regardless of whether --write-baseline is also set. Only
-        // PERSISTING a snapshot stays gated behind --write-baseline, below.
+        // Agent Skills Wave 2: entries (content hash + structural fingerprint per skill — real disk I/O,
+        // SkillContentHasher reads every byte of every file in every skill folder) are needed for
+        // cross-location drift detection, trust-on-first-use matching, and persisting a snapshot.
+        // --repo builds them unconditionally: drift detection has no opt-out flag, and a repo-wide
+        // governance scan is expected to cost more than a single-directory one (documented in the --repo
+        // option's own help text). A single-directory scan is NOT --repo-wide, though — a plain
+        // `skills scan <path>` with no flags must keep paying zero extra I/O, exactly like before Wave 2
+        // (previously this cost was gated behind --write-baseline only), so entries are built there ONLY
+        // when something will actually consume them.
         if (repo)
         {
             var (combinedReport, combinedEntries, conventionSummary) =
@@ -128,7 +133,9 @@ internal static class SkillsScanCommand
         {
             var result = await MafSkillScanner.ScanFileSkillsWithInfoAsync(path.FullName, noOpAgent, options: null, ct).ConfigureAwait(false);
             report = result.Report;
-            entries = result.Skills.Select(info => ToBaselineEntry(info, report.Findings, conventionPrefix: null)).ToList();
+            entries = (writeBaseline || checkBaseline)
+                ? result.Skills.Select(info => ToBaselineEntry(info, report.Findings, conventionPrefix: null)).ToList()
+                : [];
         }
 
         // Agent Skills Wave 2 (§4.2): --repo cross-location drift is always checked (no extra flag — a
@@ -253,16 +260,23 @@ internal static class SkillsScanCommand
     // ═══════════════════════════════ cross-location drift + trust-on-first-use (Wave 2) ═══════════════════════════════
 
     /// <summary>
-    /// Groups <paramref name="entries"/> by skill <see cref="SkillBaselineEntry.Name"/> and flags any name
-    /// present with 2+ DISTINCT <see cref="SkillBaselineEntry.ContentHash"/> values — the same skill name
-    /// resolves to different content depending on which convention/agent-tool reads it. Only meaningful for
-    /// a <c>--repo</c> scan (a single-directory scan has exactly one location by definition).
+    /// Groups <paramref name="entries"/> by skill <see cref="SkillBaselineEntry.Name"/> (case-insensitive —
+    /// GA requires lowercase-only names, so a name differing only by case across two conventions is the
+    /// SAME poisoning/drift scenario this rule targets, not two unrelated skills) and flags any name present
+    /// with 2+ DISTINCT <see cref="SkillBaselineEntry.ContentHash"/> values — the same skill name resolves
+    /// to different content depending on which convention/agent-tool reads it. Only meaningful for a
+    /// <c>--repo</c> scan (a single-directory scan has exactly one location by definition). Entries with an
+    /// empty/missing name are excluded from grouping entirely — two independently-malformed skills that both
+    /// lack a <c>name:</c> field are NOT "the same skill drifting," and grouping them by their shared empty
+    /// name would produce a misleading finding.
     /// </summary>
     internal static IReadOnlyList<SkillComplianceFinding> DetectCrossLocationDrift(IReadOnlyList<SkillBaselineEntry> entries)
     {
         var findings = new List<SkillComplianceFinding>();
 
-        foreach (var group in entries.Where(e => e.ContentHash is not null).GroupBy(e => e.Name, StringComparer.Ordinal))
+        foreach (var group in entries
+            .Where(e => e.ContentHash is not null && !string.IsNullOrEmpty(e.Name))
+            .GroupBy(e => e.Name, StringComparer.OrdinalIgnoreCase))
         {
             var distinctHashes = group.Select(e => e.ContentHash!).Distinct(StringComparer.Ordinal).ToList();
             if (distinctHashes.Count <= 1)
@@ -294,22 +308,13 @@ internal static class SkillsScanCommand
     internal static IReadOnlyList<SkillComplianceFinding> DetectPreviouslyVetted(
         IReadOnlyList<SkillBaselineEntry> entries, IReadOnlyList<SkillBaselineSnapshot> history)
     {
-        var mostRecentMatchByNameAndHash = new Dictionary<(string Name, string Hash), DateTimeOffset>();
-        foreach (var snapshot in history.OrderByDescending(s => s.CapturedAt))
-        {
-            foreach (var historicalEntry in snapshot.Skills)
-            {
-                if (historicalEntry.ContentHash is null)
-                {
-                    continue;
-                }
-
-                var key = (historicalEntry.Name, historicalEntry.ContentHash);
-                // OrderByDescending above means the FIRST time a key is seen is already its most recent
-                // sighting — never overwrite with an older snapshot's date.
-                mostRecentMatchByNameAndHash.TryAdd(key, snapshot.CapturedAt);
-            }
-        }
+        // States the invariant directly (Max per key) instead of depending on an implicit
+        // "OrderByDescending + TryAdd keeps the first, which is the newest" ordering trick — a future edit
+        // reordering these calls can't silently start reporting the OLDEST match instead of the newest.
+        var mostRecentMatchByNameAndHash = history
+            .SelectMany(s => s.Skills.Where(e => e.ContentHash is not null).Select(e => (Key: (e.Name, e.ContentHash!), s.CapturedAt)))
+            .GroupBy(x => x.Key)
+            .ToDictionary(g => g.Key, g => g.Max(x => x.CapturedAt));
 
         var findings = new List<SkillComplianceFinding>();
         foreach (var entry in entries)
@@ -344,7 +349,20 @@ internal static class SkillsScanCommand
         string? contentHash = null;
         if (!string.IsNullOrWhiteSpace(info.AbsolutePath) && Directory.Exists(info.AbsolutePath))
         {
-            contentHash = SkillContentHasher.HashSkillFolder(info.AbsolutePath);
+            try
+            {
+                contentHash = SkillContentHasher.HashSkillFolder(info.AbsolutePath);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                // A locked/permission-denied file inside ONE skill's folder must not abort the whole scan
+                // for a reason unrelated to skill compliance (this call is now reachable from every --repo
+                // scan, not just --write-baseline — see this method's own callers). ContentHash stays null
+                // (same value a non-file-sourced skill already legitimately gets) — Wave 2's drift/TOFU
+                // detection already skip null-ContentHash entries, so this skill is simply excluded from
+                // those two checks rather than crashing the run. Surfaced to the operator, not swallowed.
+                Console.Error.WriteLine($"  Warning: could not compute content hash for skill '{manifest.Name}' ({info.AbsolutePath}): {ex.Message}");
+            }
         }
 
         var dirName = manifest.ParentDirectoryName ?? manifest.Name;
@@ -512,8 +530,14 @@ internal static class SkillsScanCommand
         Console.WriteLine($"Diffing {baseline.Id} ({baseline.CapturedAt:yyyy-MM-dd HH:mm:ss} UTC) -> {current.Id} ({current.CapturedAt:yyyy-MM-dd HH:mm:ss} UTC), hash={hashKind}");
         Console.WriteLine();
 
-        var baselineBySkill = baseline.Skills.ToDictionary(e => e.Name, StringComparer.Ordinal);
-        var currentBySkill = current.Skills.ToDictionary(e => e.Name, StringComparer.Ordinal);
+        // Wave 2: a --repo snapshot can legitimately contain 2+ entries with the SAME Name (the exact
+        // cross-location scenario CrossLocationContentDrift exists to surface) — plain ToDictionary(e =>
+        // e.Name) would throw ArgumentException ("same key already added") the first time that happens.
+        // GroupBy + First deterministically keeps the first-encountered location (KnownConventions'
+        // iteration order) instead of crashing; a true per-location diff is a real, larger feature this
+        // fix deliberately does not attempt — see DiffAsync/HistoryAsync's own remarks.
+        var baselineBySkill = baseline.Skills.GroupBy(e => e.Name, StringComparer.Ordinal).ToDictionary(g => g.Key, g => g.First(), StringComparer.Ordinal);
+        var currentBySkill = current.Skills.GroupBy(e => e.Name, StringComparer.Ordinal).ToDictionary(g => g.Key, g => g.First(), StringComparer.Ordinal);
 
         foreach (var f in findings.OrderBy(f => f.Key, StringComparer.Ordinal))
         {
@@ -552,6 +576,11 @@ internal static class SkillsScanCommand
         return ExitCodes.Success;
     }
 
+    // Wave 2 known limitation: a --repo snapshot can contain 2+ entries sharing the same Name (the
+    // cross-location scenario CrossLocationContentDrift surfaces). HistoryAsync's FirstOrDefault below
+    // picks an arbitrary one of them per snapshot (stable within one run, since KnownConventions' order
+    // is fixed, but not a real per-location history) rather than crashing — a true per-location history
+    // view is a real, larger feature this fix deliberately does not attempt.
     internal static async Task<int> HistoryAsync(string baselineRoot, string skillName, CancellationToken ct)
     {
         var store = new JsonFileSkillBaselineStore(baselineRoot);
@@ -603,10 +632,13 @@ internal static class SkillsScanCommand
     // null for them (see SkillBaselineEntry's remarks). With --hash content (the default), such a skill is
     // silently OMITTED from the diff entirely rather than reported as New/Removed/Changed/Unchanged with a
     // fabricated hash — pass --hash structural to diff those skills too (their StructuralFingerprint always exists).
+    // Wave 2: GroupBy + First (not ToDictionary directly) — see baselineBySkill/currentBySkill's own
+    // comment above for why a --repo snapshot can contain duplicate Names and why ToDictionary would crash.
     private static Dictionary<string, string> HashesByName(SkillBaselineSnapshot snapshot, bool useContent) =>
         snapshot.Skills
             .Where(e => !useContent || e.ContentHash is not null)
-            .ToDictionary(e => e.Name, e => useContent ? e.ContentHash! : e.StructuralFingerprint, StringComparer.Ordinal);
+            .GroupBy(e => e.Name, StringComparer.Ordinal)
+            .ToDictionary(g => g.Key, g => useContent ? g.First().ContentHash! : g.First().StructuralFingerprint, StringComparer.Ordinal);
 
     private static string Truncate(string value, int maxLength) =>
         value.Length <= maxLength ? value : value[..(maxLength - 1)] + "…";
