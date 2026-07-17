@@ -5,6 +5,7 @@
 using System.CommandLine;
 using AgentEval.Cli.Commands;
 using AgentEval.Cli.Commands.Targets;
+using AgentEval.Cli.Infrastructure;
 
 // ─── init (dataset scaffolder) ───────────────────────────────────────────────
 // v1.1 consolidation: the canonical `init` is the dataset-scaffolding command
@@ -693,6 +694,20 @@ mcCmd.Add(mcDoctorCmd);
 // ─── root ─────────────────────────────────────────────────────────────────────
 var rootCmd = new RootCommand("AgentEval CLI — evaluate AI agents, run benchmark suites, manage the .agenteval/ output store, and serve Mission Control.");
 
+// --log-file: a RECURSIVE (System.CommandLine 2.0's term for "global") option — visible to every subcommand's
+// own ParseResult without each command needing to redeclare it. Every IChatClient-constructing call site in
+// the CLI reads the ambient VerboseLog.Writer this sets (via VerboseLog.Wrap), not this option directly — see
+// VerboseLog's own remarks for why an ambient static, not threading the option through every command, is the
+// pragmatic choice here (no DI container exists to do this more centrally).
+var logFileOpt = new Option<string?>("--log-file")
+{
+    Description = "Write a human-readable, UNREDACTED log of every LLM request/response (and any judge/attacker/SUT " +
+                   "client) to this file, for troubleshooting. The file can contain secrets/PII carried in prompts " +
+                   "or responses — never share or commit it. Overwritten on each invocation.",
+    Recursive = true,
+};
+rootCmd.Options.Add(logFileOpt);
+
 // Legacy command surface ported from AgentEvalHQ/AgentEval.Cli v0.2.0-alpha
 // (documentation and CI pipelines depend on these exact names and flags):
 rootCmd.Add(datasetInitCmd);                  // init — scaffold an evaluation dataset
@@ -716,4 +731,6 @@ rootCmd.Add(AgentEval.Cli.Commands.Gatekeeper.GatekeeperCommand.Create());
 // (previously library-only; see Skills-Scan-CLI-Verb-Design.md). Credential-free, offline, static scan.
 rootCmd.Add(SkillsScanCommand.Create());
 
-return await rootCmd.Parse(args).InvokeAsync();
+var parseResult = rootCmd.Parse(args);
+using var logWriter = VerboseLog.Initialize(parseResult.GetValue(logFileOpt));
+return await parseResult.InvokeAsync();

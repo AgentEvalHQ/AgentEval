@@ -41,7 +41,7 @@ internal static class GatekeeperModelResolver
                     return new(null, null, ExitCodes.UsageError);
                 }
 
-                var c = EndpointFactory.CreateAzure(azEndpoint, deploymentName!, apiKey);
+                var c = VerboseLog.Wrap(EndpointFactory.CreateAzure(azEndpoint, deploymentName!, apiKey), "judge");
                 return new(c, Fingerprint("azure", azEndpoint, deploymentName!), ExitCodes.Success);
             }
 
@@ -53,7 +53,7 @@ internal static class GatekeeperModelResolver
                     return new(null, null, ExitCodes.UsageError);
                 }
 
-                var c = EndpointFactory.CreateOpenAICompatible(endpoint!, model!, apiKey);
+                var c = VerboseLog.Wrap(EndpointFactory.CreateOpenAICompatible(endpoint!, model!, apiKey), "judge");
                 return new(c, Fingerprint("openai", endpoint, model!), ExitCodes.Success);
             }
 
@@ -66,7 +66,7 @@ internal static class GatekeeperModelResolver
             var envDeployment = Env("AZURE_OPENAI_DEPLOYMENT");
             if (!string.IsNullOrWhiteSpace(envEndpoint) && !string.IsNullOrWhiteSpace(envDeployment))
             {
-                var c = EndpointFactory.CreateAzure(envEndpoint!, envDeployment!, apiKey);   // apiKey ?? env key, resolved inside
+                var c = VerboseLog.Wrap(EndpointFactory.CreateAzure(envEndpoint!, envDeployment!, apiKey), "judge");   // apiKey ?? env key, resolved inside
                 return new(c, Fingerprint("azure", envEndpoint, envDeployment!), ExitCodes.Success);
             }
 

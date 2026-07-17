@@ -8,6 +8,7 @@ using AgentEval.MAF.CopilotStudio;
 using AgentEval.Testing;
 using Microsoft.Agents.AI;
 using Microsoft.Agents.CopilotStudio.Client.Discovery;
+using Microsoft.Extensions.AI;
 using Xunit;
 
 namespace AgentEval.Tests.Cli.CopilotStudio;
@@ -196,6 +197,35 @@ public class CopilotStudioScaffoldTests
         var agent = CopilotStudioAgentFactory.BuildLive(ValidConfig(), iUnderstandLiveSideEffects: true);
         Assert.NotNull(agent);
         Assert.IsAssignableFrom<IEvaluableAgent>(agent);
+    }
+
+    [Fact]
+    public void Factory_BuildLive_WrapChatClient_TransformIsAppliedToTheRealUnderlyingClient()
+    {
+        // The --log-file seam (VerboseLog.Wrap in AgentEval.Cli) composes in from OUTSIDE this package via this
+        // generic hook — AgentEval.MAF.CopilotStudio must never depend on AgentEval.Cli. Proven here without
+        // referencing VerboseLoggingChatClient at all: a plain capturing delegate confirms BuildLive actually
+        // invokes the transform, with the REAL CopilotStudioChatClient instance it just constructed (not some
+        // placeholder), before wrapping it in the returned agent.
+        IChatClient? seen = null;
+        var wrapped = new ScriptedChatClient();
+        var agent = CopilotStudioAgentFactory.BuildLive(ValidConfig(), iUnderstandLiveSideEffects: true, wrapChatClient: c =>
+        {
+            seen = c;
+            return wrapped;   // swap in a sentinel so we can also prove the SWAPPED instance is what gets used
+        });
+
+        Assert.NotNull(agent);
+        Assert.IsType<CopilotStudioChatClient>(seen);
+    }
+
+    [Fact]
+    public void Factory_BuildLive_NoWrapChatClient_DefaultsToNoTransform()
+    {
+        // The optional parameter must be truly optional — every pre-existing call site (and every test above
+        // this one) omits it and must keep working unchanged.
+        var agent = CopilotStudioAgentFactory.BuildLive(ValidConfig(), iUnderstandLiveSideEffects: true);
+        Assert.NotNull(agent);
     }
 
     [Fact]

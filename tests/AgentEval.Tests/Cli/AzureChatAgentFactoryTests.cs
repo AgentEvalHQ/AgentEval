@@ -3,6 +3,7 @@
 // Licensed under the MIT License.
 
 using AgentEval.Cli.Commands;
+using AgentEval.Cli.Infrastructure;
 using Xunit;
 
 namespace AgentEval.Tests.Cli;
@@ -103,6 +104,37 @@ public class AzureChatAgentFactoryTests
         finally
         {
             Console.SetError(prev);
+        }
+    }
+
+    [Fact]
+    public void TryBuildChatClientFromEnv_LogFileActive_ReturnedClientIsVerboseLogWrapped()
+    {
+        // AzureOpenAIClient construction (and .GetChatClient(...).AsIChatClient()) makes no network call — same
+        // premise CopilotStudioAgentFactory's own credential-free construction tests rely on — so this proves
+        // the --log-file wiring at this specific call site without needing real Azure credentials or a live call.
+        using var _ = TempEnvVars(
+            ("AZURE_OPENAI_ENDPOINT", "https://example.openai.azure.com/"),
+            ("AZURE_OPENAI_API_KEY", "fake-key"),
+            ("AZURE_OPENAI_DEPLOYMENT", "fake-deployment"));
+        var path = Path.Combine(Path.GetTempPath(), "agenteval-azurechatagentfactory-logtest-" + Guid.NewGuid().ToString("N") + ".log");
+        try
+        {
+            using var logWriter = VerboseLog.Initialize(path);
+
+            var (chatClient, deployment, exitCode) = AzureChatAgentFactory.TryBuildChatClientFromEnv();
+
+            Assert.Equal(0, exitCode);
+            Assert.Equal("fake-deployment", deployment);
+            Assert.IsType<VerboseLoggingChatClient>(chatClient);
+        }
+        finally
+        {
+            VerboseLog.Initialize(null);
+            if (File.Exists(path))
+            {
+                File.Delete(path);
+            }
         }
     }
 

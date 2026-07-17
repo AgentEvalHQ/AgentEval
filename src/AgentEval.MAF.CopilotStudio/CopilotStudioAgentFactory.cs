@@ -66,6 +66,13 @@ public static class CopilotStudioAgentFactory
     /// <see cref="CopilotStudioChatClient(ICopilotStudioConversationClient, int)"/>'s own remarks for what
     /// "estimated" means here and why.
     /// </param>
+    /// <param name="wrapChatClient">
+    /// Optional transform applied to the underlying <see cref="IChatClient"/> before it's wrapped in the
+    /// returned agent — e.g. a caller-side logging or retry decorator. Deliberately a generic
+    /// <see cref="Func{IChatClient,IChatClient}"/>, not a concrete decorator type: this package takes no
+    /// dependency on any particular consumer, so any caller-owned <c>IChatClient</c> middleware can be composed
+    /// in from the outside via this hook without this package needing to know it exists.
+    /// </param>
     /// <exception cref="InvalidOperationException"><paramref name="iUnderstandLiveSideEffects"/> is <see langword="false"/>.</exception>
     /// <remarks>
     /// Everything else this method does is local/offline — constructing <see cref="ConnectionSettings"/>, resolving
@@ -73,7 +80,8 @@ public static class CopilotStudioAgentFactory
     /// <see cref="CopilotStudioTokenProvider"/> callback it wires up is only invoked lazily, by
     /// <see cref="CopilotClient"/> itself, on the first real request the returned agent makes.
     /// </remarks>
-    public static IEvaluableAgent BuildLive(CopilotStudioConfig config, bool iUnderstandLiveSideEffects, int maxCredits = 0)
+    public static IEvaluableAgent BuildLive(
+        CopilotStudioConfig config, bool iUnderstandLiveSideEffects, int maxCredits = 0, Func<IChatClient, IChatClient>? wrapChatClient = null)
     {
         ArgumentNullException.ThrowIfNull(config);
         if (!iUnderstandLiveSideEffects)
@@ -106,6 +114,11 @@ public static class CopilotStudioAgentFactory
             HttpClientName);
 
         IChatClient chatClient = new CopilotStudioChatClient(new CopilotClientConversationAdapter(copilotClient), maxCredits);
+        if (wrapChatClient is not null)
+        {
+            chatClient = wrapChatClient(chatClient);
+        }
+
         AIAgent innerAgent = new ChatClientAgent(chatClient, new ChatClientAgentOptions { Name = config.DisplayName });
         return FromAgent(innerAgent);
     }

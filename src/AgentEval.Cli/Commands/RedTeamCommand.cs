@@ -369,9 +369,9 @@ internal static class RedTeamCommand
         }
         else
         {
-            IChatClient chatClient = opts.Azure
+            IChatClient chatClient = VerboseLog.Wrap(opts.Azure
                 ? EndpointFactory.CreateAzure(opts.Endpoint, opts.DeploymentName!, opts.ApiKey)
-                : EndpointFactory.CreateOpenAICompatible(opts.Endpoint!, opts.Model!, opts.ApiKey);
+                : EndpointFactory.CreateOpenAICompatible(opts.Endpoint!, opts.Model!, opts.ApiKey), "sut");
 
             // System-prompt canary: embed the secret token into the SUT's system prompt so SystemPromptExtraction
             // can prove a leak (the exact token appearing in a response) rather than guessing from phrasing.
@@ -491,8 +491,8 @@ internal static class RedTeamCommand
         // 5. Create ScanOptions
         // Per-role keys fall back to the target --api-key so the common single-gateway case stays a one-flag setup.
         IChatClient? judgeClient = opts.JudgeEndpoint is not null
-            ? EndpointFactory.CreateOpenAICompatible(
-                opts.JudgeEndpoint, opts.JudgeModel ?? resolvedName, opts.JudgeApiKey ?? opts.ApiKey)
+            ? VerboseLog.Wrap(EndpointFactory.CreateOpenAICompatible(
+                opts.JudgeEndpoint, opts.JudgeModel ?? resolvedName, opts.JudgeApiKey ?? opts.ApiKey), "judge")
             : null;
 
         // --explain needs a judge (it's an LLM call). Surface the no-op honestly rather than silently ignoring the flag.
@@ -501,8 +501,8 @@ internal static class RedTeamCommand
 
         // Wave C′: the attacker LLM drives Crescendo/PAIR/TAP. Distinct from the judge (it generates, the judge scores).
         IChatClient? attackerClient = opts.AttackerEndpoint is not null
-            ? EndpointFactory.CreateOpenAICompatible(
-                opts.AttackerEndpoint, opts.AttackerModel ?? resolvedName, opts.AttackerApiKey ?? opts.ApiKey)
+            ? VerboseLog.Wrap(EndpointFactory.CreateOpenAICompatible(
+                opts.AttackerEndpoint, opts.AttackerModel ?? resolvedName, opts.AttackerApiKey ?? opts.ApiKey), "attacker")
             : null;
 
         // Fail fast: PAIR/TAP are fundamentally attacker-driven and would error mid-scan without an attacker.

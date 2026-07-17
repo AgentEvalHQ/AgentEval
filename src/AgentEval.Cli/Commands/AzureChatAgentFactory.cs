@@ -2,6 +2,7 @@
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 
+using AgentEval.Cli.Infrastructure;
 using AgentEval.Core;
 using Azure;
 using Azure.AI.OpenAI;
@@ -74,7 +75,7 @@ internal static class AzureChatAgentFactory
         try
         {
             var azureClient = new AzureOpenAIClient(new Uri(endpoint!), new AzureKeyCredential(apiKey!), BuildClientOptions());
-            IChatClient chatClient = azureClient.GetChatClient(deployment!).AsIChatClient();
+            IChatClient chatClient = VerboseLog.Wrap(azureClient.GetChatClient(deployment!).AsIChatClient(), "azure-env");
             IEvaluableAgent agent = new ChatClientAgentAdapter(
                 chatClient,
                 name: subject,
@@ -120,7 +121,7 @@ internal static class AzureChatAgentFactory
         try
         {
             var azureClient = new AzureOpenAIClient(new Uri(endpoint!), new AzureKeyCredential(apiKey!), BuildClientOptions());
-            IChatClient chatClient = azureClient.GetChatClient(deployment!).AsIChatClient();
+            IChatClient chatClient = VerboseLog.Wrap(azureClient.GetChatClient(deployment!).AsIChatClient(), "azure-env");
             return (chatClient, deployment, 0);
         }
         catch (Exception ex)

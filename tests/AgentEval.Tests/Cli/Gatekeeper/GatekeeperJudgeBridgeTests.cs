@@ -5,6 +5,7 @@
 using System.Text.Json;
 using AgentEval.Cli;
 using AgentEval.Cli.Commands.Gatekeeper;
+using AgentEval.Cli.Infrastructure;
 using AgentEval.Guardrails.Judges;
 using Microsoft.Extensions.AI;
 using Xunit;
@@ -17,6 +18,13 @@ namespace AgentEval.Tests.Cli.Gatekeeper;
 /// un-certified judge (exit 7) unless <c>--allow-uncalibrated</c>. The certificate-governed <c>inlineReady</c> is the
 /// moat carried across the wire — a judge is never "inline-ready" by omission.
 /// </summary>
+/// <remarks>
+/// Joined to the "ConsoleTests" collection (matches <c>AzureChatAgentFactoryTests</c>' own reasoning) because
+/// <see cref="GatekeeperModelResolver_LogFileActive_ResolvedClientIsVerboseLogWrapped"/> mutates the shared,
+/// process-global <see cref="VerboseLog.Writer"/> — it must not run concurrently with any other test class that
+/// also touches it.
+/// </remarks>
+[Collection("ConsoleTests")]
 public class GatekeeperJudgeBridgeTests
 {
     private static string TempDir() => Path.Combine(Path.GetTempPath(), "gk-cli-" + Guid.NewGuid().ToString("N"));
@@ -111,6 +119,33 @@ public class GatekeeperJudgeBridgeTests
         var r = GatekeeperModelResolver.Resolve(azure: false, endpoint: "not a url", deploymentName: null, model: "m", apiKey: "k", err);
         Assert.Null(r.Client);
         Assert.Equal(ExitCodes.UsageError, r.ExitCode);
+    }
+
+    [Fact]
+    public void Resolve_LogFileActive_ResolvedClientIsVerboseLogWrapped()
+    {
+        // EndpointFactory.CreateOpenAICompatible constructs an OpenAIClient (no network call at construction —
+        // same premise every other credential-free construction test in this repo relies on), so this proves
+        // GatekeeperModelResolver's --log-file wiring without needing a real endpoint or credentials.
+        var path = Path.Combine(Path.GetTempPath(), "agenteval-gkmodelresolver-logtest-" + Guid.NewGuid().ToString("N") + ".log");
+        try
+        {
+            using var logWriter = VerboseLog.Initialize(path);
+            using var err = new StringWriter();
+
+            var r = GatekeeperModelResolver.Resolve(azure: false, endpoint: "https://example.com/v1", deploymentName: null, model: "m", apiKey: "k", err);
+
+            Assert.NotNull(r.Client);
+            Assert.IsType<VerboseLoggingChatClient>(r.Client);
+        }
+        finally
+        {
+            VerboseLog.Initialize(null);
+            if (File.Exists(path))
+            {
+                File.Delete(path);
+            }
+        }
     }
 
     // ── calibrate (fake model → report + certificate) ──

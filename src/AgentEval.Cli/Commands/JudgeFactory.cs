@@ -2,6 +2,7 @@
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 
+using AgentEval.Cli.Infrastructure;
 using AgentEval.Core;
 using Azure;
 using Azure.AI.OpenAI;
@@ -83,7 +84,7 @@ internal static class JudgeFactory
             try
             {
                 var azureClient = new AzureOpenAIClient(new Uri(endpoint!), new AzureKeyCredential(apiKey!));
-                IChatClient chatClient = azureClient.GetChatClient(deployment!).AsIChatClient();
+                IChatClient chatClient = VerboseLog.Wrap(azureClient.GetChatClient(deployment!).AsIChatClient(), "judge");
                 IEvaluator real = new ChatClientEvaluator(chatClient, systemPrompt);
                 Console.Error.WriteLine(
                     $"✔ Azure OpenAI judge configured — endpoint={endpoint}, deployment={deployment} ({judgeKind})" +
