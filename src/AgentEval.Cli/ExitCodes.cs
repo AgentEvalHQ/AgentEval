@@ -85,9 +85,16 @@ public static class ExitCodes
     /// live Copilot Studio target burns Copilot Credits on every turn, so the scan is capped to a spend ceiling.
     /// Distinct from a policy/gate outcome (5/6/7) and from <see cref="RuntimeError"/> (3, a crash) so CI can tell
     /// "raise the budget / it cost more than expected" apart from a failure. Deliberately 8, not another overload of 2.
-    /// <b>Reserved</b>: a live scan now runs (<c>BuildLive</c> is wired), but <c>--max-credits</c> enforcement
-    /// itself is not implemented — the Copilot Studio SDK exposes no credit-cost field to enforce against — so
-    /// nothing returns this yet.
+    /// <b>Enforced as an estimate</b>: the Copilot Studio SDK exposes no real credit-cost field, so
+    /// <c>CopilotStudioChatClient</c> counts turns (1 estimated credit each) rather than metering actual spend — a
+    /// turn that would push spend PAST the cap never fires (spend may legitimately reach exactly the cap).
+    /// <c>CopilotStudioBudgetExceededException</c> extends <c>AgentEval.Core.FatalEvaluationException</c> so the
+    /// probe loop lets it propagate (rather than swallowing it into a per-probe error, which would just repeat
+    /// the same root cause for every remaining probe) and this exit code is returned instead. <b>Scope note</b>:
+    /// this exit code is <c>redteam</c>-specific — <c>eval</c>/<c>bench gdpr</c>/<c>bench eu-ai-act</c> also
+    /// enforce and propagate the same condition (the scan/run stops rather than degrading), but return their own
+    /// existing generic failure codes (<see cref="RuntimeError"/> for <c>eval</c>, <c>1</c> for <c>bench</c>),
+    /// not this one.
     /// </summary>
     public const int BudgetExceeded = 8;
 }

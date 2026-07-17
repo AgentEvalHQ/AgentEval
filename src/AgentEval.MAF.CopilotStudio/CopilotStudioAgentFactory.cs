@@ -61,6 +61,11 @@ public static class CopilotStudioAgentFactory
     /// <c>--i-understand-live-side-effects</c> flag before ever reaching this call), so the same explicit
     /// acknowledgment must be required of every caller, not just the CLI path.
     /// </param>
+    /// <param name="maxCredits">
+    /// Estimated Copilot Credit spend cap (0 = no cap, the default) — see
+    /// <see cref="CopilotStudioChatClient(ICopilotStudioConversationClient, int)"/>'s own remarks for what
+    /// "estimated" means here and why.
+    /// </param>
     /// <exception cref="InvalidOperationException"><paramref name="iUnderstandLiveSideEffects"/> is <see langword="false"/>.</exception>
     /// <remarks>
     /// Everything else this method does is local/offline — constructing <see cref="ConnectionSettings"/>, resolving
@@ -68,7 +73,7 @@ public static class CopilotStudioAgentFactory
     /// <see cref="CopilotStudioTokenProvider"/> callback it wires up is only invoked lazily, by
     /// <see cref="CopilotClient"/> itself, on the first real request the returned agent makes.
     /// </remarks>
-    public static IEvaluableAgent BuildLive(CopilotStudioConfig config, bool iUnderstandLiveSideEffects)
+    public static IEvaluableAgent BuildLive(CopilotStudioConfig config, bool iUnderstandLiveSideEffects, int maxCredits = 0)
     {
         ArgumentNullException.ThrowIfNull(config);
         if (!iUnderstandLiveSideEffects)
@@ -100,7 +105,7 @@ public static class CopilotStudioAgentFactory
             NullLogger.Instance,
             HttpClientName);
 
-        IChatClient chatClient = new CopilotStudioChatClient(new CopilotClientConversationAdapter(copilotClient));
+        IChatClient chatClient = new CopilotStudioChatClient(new CopilotClientConversationAdapter(copilotClient), maxCredits);
         AIAgent innerAgent = new ChatClientAgent(chatClient, new ChatClientAgentOptions { Name = config.DisplayName });
         return FromAgent(innerAgent);
     }

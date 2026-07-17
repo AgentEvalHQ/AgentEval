@@ -35,7 +35,7 @@ public static class BenchCommand
         string? responseText = null,
         bool azureFromEnv = false,
         CancellationToken ct = default) =>
-        RunGdprAsync(preset, subject, rootOverride, inputText, evaluatorOverride: null, runs: runs, responseText: responseText, azureFromEnv: azureFromEnv, ct: ct);
+        RunGdprAsync(preset, subject, rootOverride, inputText, evaluatorOverride: null, agentOverride: null, runs: runs, responseText: responseText, azureFromEnv: azureFromEnv, ct: ct);
 
     /// <summary>Runs the bench gdpr command with optional overrides (used in tests).</summary>
     internal static async Task<int> RunGdprAsync(
@@ -44,6 +44,7 @@ public static class BenchCommand
         string? rootOverride,
         string? inputText,
         IEvaluator? evaluatorOverride,
+        IEvaluableAgent? agentOverride = null,
         int runs = 1,
         string? responseText = null,
         bool azureFromEnv = false,
@@ -87,12 +88,12 @@ public static class BenchCommand
         IEvaluator judge = resolvedJudge;
 
         // ── Agent under test ─────────────────────────────────────────────────
-        // With --azure-from-env, build the live agent from AZURE_OPENAI_* and drive it per scenario
-        // (each scenario's own prompt → real answer → judged). Without it, the benchmark grades the
-        // single provided --response as before. The agent uses AZURE_OPENAI_* while the judge resolves
-        // AZURE_OPENAI_JUDGE_* first (see JudgeFactory), so the two can target different endpoints.
-        AgentEval.Core.IEvaluableAgent? agent = null;
-        if (azureFromEnv)
+        // Priority: --sut (agentOverride, e.g. copilot-studio) > --azure-from-env > grade the supplied
+        // --response as before. Each scenario's own prompt → real answer → judged, once a live agent is
+        // resolved either way. The judge resolves AZURE_OPENAI_JUDGE_* first (see JudgeFactory), so the
+        // agent and judge can target different endpoints.
+        AgentEval.Core.IEvaluableAgent? agent = agentOverride;
+        if (agent is null && azureFromEnv)
         {
             var (builtAgent, agentExit) = AzureChatAgentFactory.TryBuildFromEnv(subject);
             if (builtAgent is null) return agentExit;
@@ -136,8 +137,9 @@ public static class BenchCommand
             // The response is produced per scenario by the live agent (see AgentScenarioEval),
             // so this placeholder is never graded — each scenario substitutes the agent's real answer.
             agentResponse = "(driven per-scenario by the live agent under test)";
+            var agentSource = agentOverride is not null ? "--sut" : "--azure-from-env";
             Console.Error.WriteLine(
-                $"[bench gdpr] Driving live agent '{subject}' per scenario via --azure-from-env; " +
+                $"[bench gdpr] Driving live agent '{subject}' per scenario via {agentSource}; " +
                 "each scenario's own prompt is sent to the agent and its real answer is graded.");
         }
         else if (!string.IsNullOrWhiteSpace(responseText))

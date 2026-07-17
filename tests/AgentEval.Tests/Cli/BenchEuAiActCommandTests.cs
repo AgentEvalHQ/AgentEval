@@ -80,6 +80,36 @@ public class BenchEuAiActCommandTests : IDisposable
         }
     }
 
+    /// <summary>Stub evaluator that records the most recent graded output (the agent response) — mirrors BenchCommandTests' GDPR-side helper.</summary>
+    private sealed class CapturingStubEvaluator : IEvaluator
+    {
+        public string? LastOutput { get; private set; }
+
+        public Task<EvaluationResult> EvaluateAsync(
+            string input, string output, IEnumerable<string> criteria,
+            CancellationToken cancellationToken = default)
+        {
+            LastOutput = output;
+            var list = criteria.ToList();
+            return Task.FromResult(new EvaluationResult
+            {
+                OverallScore = 100,
+                Summary = "stub-capture",
+                CriteriaResults = list.Select(c => new CriterionResult { Criterion = c, Met = true, Explanation = "stub" }).ToList()
+            });
+        }
+    }
+
+    /// <summary>Fixed-answer fake agent — simulates what a resolved --sut target would hand to RunAsync's agentOverride parameter.</summary>
+    private sealed class FixedAnswerAgent : IEvaluableAgent
+    {
+        private readonly string _answer;
+        public string Name { get; }
+        public FixedAnswerAgent(string name, string answer) { Name = name; _answer = answer; }
+        public Task<AgentResponse> InvokeAsync(string prompt, CancellationToken cancellationToken = default)
+            => Task.FromResult(new AgentResponse { Text = _answer });
+    }
+
     // ── Env-gate trio (Phase-4 gate-review follow-up) ────────────────────
 
     [Fact]
@@ -158,6 +188,30 @@ public class BenchEuAiActCommandTests : IDisposable
         Assert.True(File.Exists(Path.Combine(tsDir, "report.pdf")), "report.pdf should be generated");
         Assert.True(new FileInfo(Path.Combine(tsDir, "report.pdf")).Length > 0,
             "report.pdf should be non-empty");
+    }
+
+    [Fact]
+    public async Task BenchEuAiAct_WithAgentOverride_DrivesTheAgentPerScenario_NotAStaticResponse()
+    {
+        // Bench Tier 2 (§2.2): mirrors BenchCommandTests' GDPR-side equivalent — proves the CLI wiring
+        // actually reaches ScenarioToAtomicEval's pre-existing agent parameter for eu-ai-act too, and that
+        // agentOverride wins even when --response text is also supplied.
+        InitWorkspace();
+        var capturing = new CapturingStubEvaluator();
+        const string agentAnswer = "EU-AI-ACT-AGENT-OVERRIDE-DROVE-THIS unique marker";
+        var agent = new FixedAnswerAgent("EuAiActSutAgent", agentAnswer);
+
+        var exitCode = await BenchEuAiActCommand.RunAsync(
+            preset: "smoke",
+            subject: "EuAiActSutAgent",
+            rootOverride: _root,
+            inputText: "Sample EU AI Act bench probe for the smoke preset.",
+            evaluatorOverride: capturing,
+            agentOverride: agent,
+            responseText: "this static text should be ignored — agentOverride takes priority");
+
+        Assert.True(exitCode == 0 || exitCode == 2);
+        Assert.Equal(agentAnswer, capturing.LastOutput);
     }
 
     // ── Phase-2 / Task 2.2 regression — composite preset E2E ─────────────

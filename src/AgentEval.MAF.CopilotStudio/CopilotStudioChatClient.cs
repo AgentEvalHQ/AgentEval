@@ -3,6 +3,7 @@
 // Licensed under the MIT License.
 
 using System.Runtime.CompilerServices;
+using AgentEval.Core;
 using Microsoft.Agents.Core.Models;
 using Microsoft.Extensions.AI;
 
@@ -55,28 +56,47 @@ public sealed class CopilotStudioChatClient : IChatClient
     // enough that a genuinely hung call cannot hang disposal forever.
     private static readonly TimeSpan DisposeLockTimeout = TimeSpan.FromSeconds(10);
 
+    // P6/§2.1: the SDK exposes no real per-turn cost field (confirmed against the decompiled/reflected
+    // assembly — see CopilotStudioAgentFactory's remarks), so credit spend is an ESTIMATE, never a metered
+    // value. Fixed-constant path per the design doc's own recommendation: "ship the fixed-constant version
+    // first... revisit the heuristic path only if a real complaint about its coarseness shows up."
+    internal const int EstimatedCreditsPerTurn = 1;
+
     private readonly ICopilotStudioConversationClient _client;
     private readonly SemaphoreSlim _turnLock = new(1, 1);
+    private readonly int _maxCredits;
     private string? _conversationId;
     private bool _started;
     private bool _disposed;
+    private int _estimatedCreditsUsed;
 
-    public CopilotStudioChatClient(ICopilotStudioConversationClient client)
+    /// <param name="client">The conversation client this bridges into <see cref="IChatClient"/>.</param>
+    /// <param name="maxCredits">
+    /// Estimated Copilot Credit spend cap (0 = no cap, the default). Checked BEFORE each turn — a turn that
+    /// would push estimated spend PAST this cap never fires (spend may legitimately reach exactly the cap);
+    /// <see cref="CopilotStudioBudgetExceededException"/> is thrown instead, so the scan never intentionally
+    /// exceeds the estimate. Credits here are an ESTIMATE (<see cref="EstimatedCreditsPerTurn"/> per turn),
+    /// not a metered value — see the type's own remarks.
+    /// </param>
+    public CopilotStudioChatClient(ICopilotStudioConversationClient client, int maxCredits = 0)
     {
         _client = client ?? throw new ArgumentNullException(nameof(client));
+        _maxCredits = maxCredits;
     }
 
     /// <summary>
     /// Synchronous validating wrapper — <c>async IAsyncEnumerable</c> methods do not run ANY of their body
     /// (including simple argument-validation lines at the top) until the caller's first
-    /// <c>MoveNextAsync()</c>, so putting <see cref="ArgumentNullException"/>/<see cref="ObjectDisposedException"/>
-    /// checks directly in an iterator method makes them surface during enumeration instead of at the call
-    /// site — surprising and easy to miss (e.g. a caller that only ever calls <c>GetResponseAsync</c>, which
-    /// awaits the enumerable, would still observe this correctly, but any caller that captures the
-    /// <see cref="IAsyncEnumerable{T}"/> without enumerating it immediately would not see the error until
-    /// much later, if at all). Validating here — before the real work moves into
-    /// <see cref="GetStreamingResponseCoreAsync"/> — makes these throw eagerly, at the call site, like any
-    /// other precondition check.
+    /// <c>MoveNextAsync()</c>, so putting <see cref="ArgumentNullException"/>/<see cref="ObjectDisposedException"/>/
+    /// <see cref="CopilotStudioBudgetExceededException"/> checks directly in an iterator method makes them
+    /// surface during enumeration instead of at the call site — surprising and easy to miss (e.g. a caller
+    /// that only ever calls <c>GetResponseAsync</c>, which awaits the enumerable, would still observe this
+    /// correctly, but any caller that captures the <see cref="IAsyncEnumerable{T}"/> without enumerating it
+    /// immediately would not see the error until much later, if at all). Validating here — before the real
+    /// work moves into <see cref="GetStreamingResponseCoreAsync"/> — makes these throw eagerly, at the call
+    /// site, like any other precondition check. The budget check reads <see cref="_estimatedCreditsUsed"/>
+    /// without <see cref="_turnLock"/> — safe given this type's own documented single-conversation-at-a-time
+    /// contract (not safe to call concurrently from multiple logical conversations to begin with).
     /// </summary>
     public IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(
         IEnumerable<ChatMessage> messages,
@@ -85,6 +105,13 @@ public sealed class CopilotStudioChatClient : IChatClient
     {
         ArgumentNullException.ThrowIfNull(messages);
         ObjectDisposedException.ThrowIf(_disposed, this);
+
+        // Budget gate (P6/§2.1), checked here (not just inside the iterator body below) so it throws
+        // eagerly at the call site like the other precondition checks above — see this method's own remarks.
+        if (_maxCredits > 0 && _estimatedCreditsUsed + EstimatedCreditsPerTurn > _maxCredits)
+        {
+            throw new CopilotStudioBudgetExceededException(_estimatedCreditsUsed, _maxCredits);
+        }
 
         var question = LastUserText(messages)
             ?? throw new InvalidOperationException(
@@ -123,6 +150,9 @@ public sealed class CopilotStudioChatClient : IChatClient
         await _turnLock.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
+            // Budget gate (P6/§2.1) already ran, eagerly, in GetStreamingResponseAsync (the only caller of
+            // this private method) before this iterator was even constructed — not re-checked here.
+
             if (!_started)
             {
                 // Idempotency-safety gate (P6 item B, hardened): a live Copilot Studio agent can execute real
@@ -157,6 +187,7 @@ public sealed class CopilotStudioChatClient : IChatClient
             }
 
             materialized.AddRange(askActivities);
+            _estimatedCreditsUsed += EstimatedCreditsPerTurn;   // only after a fully successful turn
             turnConversationId = _conversationId;
         }
         finally
@@ -315,5 +346,39 @@ public sealed class CopilotStudioChatClient : IChatClient
         }
 
         return string.IsNullOrEmpty(last?.Text) ? null : last.Text;
+    }
+}
+
+/// <summary>
+/// A live Copilot Studio scan hit its <c>--max-credits</c> estimated-spend cap. The turn that would have
+/// crossed the cap never fired — this is thrown BEFORE the network call, not after, so estimated spend
+/// never EXCEEDS <see cref="MaxCredits"/> (spend may legitimately reach exactly the cap; only the turn that
+/// would push it past that is refused). Credit cost is an ESTIMATE
+/// (<see cref="CopilotStudioChatClient.EstimatedCreditsPerTurn"/> per turn), not a metered value — the SDK
+/// exposes no real per-turn cost field. Extends <see cref="FatalEvaluationException"/> so the orchestration
+/// layers that drive this agent (redteam probe loop, benchmark scenario loop, eval dataset loop) let it
+/// propagate and stop the whole run, instead of swallowing it into a per-item error result that would just
+/// repeat identically for every remaining item — the cap, once hit, can never un-trip mid-run.
+/// </summary>
+public sealed class CopilotStudioBudgetExceededException : FatalEvaluationException
+{
+    /// <summary>Estimated credits already spent (across prior turns) when this turn was refused.</summary>
+    public int EstimatedCreditsUsed { get; }
+
+    /// <summary>The configured <c>--max-credits</c> cap that was hit.</summary>
+    public int MaxCredits { get; }
+
+    /// <summary>Creates a new <see cref="CopilotStudioBudgetExceededException"/>.</summary>
+    public CopilotStudioBudgetExceededException(int estimatedCreditsUsed, int maxCredits)
+        : base(
+            $"Copilot Studio scan stopped: estimated credit spend ({estimatedCreditsUsed}) would exceed " +
+            $"--max-credits ({maxCredits}) on the next turn. Credit cost is an ESTIMATE, not a metered value " +
+            "— the Copilot Studio SDK exposes no real per-turn cost field, and a real reasoning turn likely " +
+            "costs substantially MORE than this estimate counts, so actual spend may already be ahead of " +
+            "this number. Don't reflexively raise --max-credits on seeing this — first confirm via Power " +
+            "Platform's own admin tooling what this scan actually spent before deciding the cap was too low.")
+    {
+        EstimatedCreditsUsed = estimatedCreditsUsed;
+        MaxCredits = maxCredits;
     }
 }

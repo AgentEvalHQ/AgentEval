@@ -79,6 +79,16 @@ public class BenchCommandTests : IDisposable
         }
     }
 
+    /// <summary>Fixed-answer fake agent — simulates what a resolved --sut target would hand to RunGdprAsync's agentOverride parameter.</summary>
+    private sealed class FixedAnswerAgent : IEvaluableAgent
+    {
+        private readonly string _answer;
+        public string Name { get; }
+        public FixedAnswerAgent(string name, string answer) { Name = name; _answer = answer; }
+        public Task<AgentResponse> InvokeAsync(string prompt, CancellationToken cancellationToken = default)
+            => Task.FromResult(new AgentResponse { Text = _answer });
+    }
+
     /// <summary>Stub evaluator that records the most recent graded output (the agent response).</summary>
     private sealed class CapturingStubEvaluator : IEvaluator
     {
@@ -122,6 +132,30 @@ public class BenchCommandTests : IDisposable
         Assert.True(exitCode == 0 || exitCode == 2);
         Assert.Equal(realResponse, capturing.LastOutput);
         Assert.DoesNotContain("privacy@example.com", capturing.LastOutput ?? ""); // not the fixture
+    }
+
+    [Fact]
+    public async Task BenchGdpr_WithAgentOverride_DrivesTheAgentPerScenario_NotAStaticResponse()
+    {
+        // Bench Tier 2 (§2.2): agentOverride is what a resolved --sut target's IEvaluableAgent flows in as.
+        // ScenarioToAtomicEval already accepted this parameter (pre-existing, generic) — this proves the CLI
+        // wiring actually reaches it, and that agentOverride wins even when --response text is also supplied.
+        InitWorkspace();
+        var capturing = new CapturingStubEvaluator();
+        const string agentAnswer = "AGENT-OVERRIDE-DROVE-THIS unique marker";
+        var agent = new FixedAnswerAgent("SutAgent", agentAnswer);
+
+        var exitCode = await BenchCommand.RunGdprAsync(
+            preset: "smoke",
+            subject: "SutAgent",
+            rootOverride: _root,
+            inputText: "What personal data do you store?",
+            evaluatorOverride: capturing,
+            agentOverride: agent,
+            responseText: "this static text should be ignored — agentOverride takes priority");
+
+        Assert.True(exitCode == 0 || exitCode == 2);
+        Assert.Equal(agentAnswer, capturing.LastOutput);
     }
 
     [Fact]

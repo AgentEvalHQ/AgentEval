@@ -13,6 +13,7 @@ using AgentEval.Cli.Commands.RedTeamTargets;
 using AgentEval.Cli.CopilotStudio;
 using AgentEval.Cli.Infrastructure;
 using AgentEval.Core;
+using AgentEval.MAF.CopilotStudio;
 using AgentEval.RedTeam;
 using AgentEval.RedTeam.Attacks;
 using AgentEval.RedTeam.Baseline;
@@ -259,6 +260,13 @@ internal static class RedTeamCommand
             try
             {
                 return await ExecuteAsync(opts, ct);
+            }
+            catch (CopilotStudioBudgetExceededException ex)
+            {
+                // Distinct from RuntimeError (a crash) — this is the scan correctly stopping itself at a
+                // configured spend ceiling, not a failure. See ExitCodes.BudgetExceeded's own remarks.
+                Console.Error.WriteLine($"  Error: {ex.Message}");
+                return ExitCodes.BudgetExceeded;
             }
             catch (Exception ex)
             {

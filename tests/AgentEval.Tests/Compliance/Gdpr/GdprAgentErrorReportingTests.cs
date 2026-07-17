@@ -9,6 +9,7 @@ using AgentEval.Compliance.Gdpr.Articles;
 using AgentEval.Compliance.Gdpr.Articles.Building;
 using AgentEval.Compliance.Gdpr.Articles.Loading;
 using AgentEval.Compliance.Gdpr.Reporting;
+using AgentEval.MAF.CopilotStudio;
 using AgentEval.Output;
 using Xunit;
 
@@ -78,6 +79,39 @@ public class GdprAgentErrorReportingTests
             store, subject, runId, result, new GdprReportOptions(Preset: "smoke"));
 
         Assert.DoesNotContain(evidence.Recommendations, r => r.Severity == "none");
+    }
+
+    private sealed class FatalThrowingAgent : IEvaluableAgent
+    {
+        public string Name => "fatal-throwing-agent";
+
+        public Task<AgentResponse> InvokeAsync(string prompt, CancellationToken cancellationToken = default) =>
+            throw new CopilotStudioBudgetExceededException(estimatedCreditsUsed: 1, maxCredits: 1);
+    }
+
+    [Fact]
+    public async Task RunAsync_AgentThrowsFatalEvaluationException_PropagatesRatherThanProducingErrorLeaves()
+    {
+        // Contrast with SaveReportAsync_AllScenariosAgentError_DoesNotThrowSchemaValidation above: a NORMAL
+        // exception (AlwaysThrowingAgent) correctly degrades into per-scenario "error" leaves so one bad
+        // scenario doesn't abort the whole benchmark. A FatalEvaluationException (e.g. an exhausted
+        // Copilot Studio spend cap) is different — it's structural and will recur identically on every
+        // remaining scenario, so AgentScenarioEval.EvaluateAsync lets it propagate instead, and the WHOLE
+        // run should stop rather than silently producing dozens of identical "error" leaves.
+        var loader = new ArticleScenarioYamlLoader();
+        var scenarioBuilder = new ScenarioToAtomicEval(
+            new StubJudge(), judgeModel: "stub", agent: new FatalThrowingAgent());
+        var articleBuilder = new ArticleCompositeBuilder(scenarioBuilder);
+        var registry = new ArticlesRegistry(loader, articleBuilder);
+
+        var store = new InMemoryOutputStore();
+        var subject = new SubjectIdentity(SubjectKind.Agent, "FatalPropagationTestAgent");
+        var benchmark = GdprBenchmark.Smoke(registry);
+        var runner = new GdprBenchmarkRunner();
+        var input = new EvalInput(Query: "test", Response: "unused — agent drives per scenario");
+
+        await Assert.ThrowsAsync<CopilotStudioBudgetExceededException>(
+            () => runner.RunAsync(store, subject, benchmark, input));
     }
 
     private static IEnumerable<EvalResult> EnumerateLeaves(EvalResult node)

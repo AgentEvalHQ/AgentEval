@@ -186,23 +186,40 @@ round trip — has not been independently live-verified; see the callout at the 
 
 ## What `--max-credits` does today
 
-`--max-credits <n>` is **parsed and validated, but not enforced.** Concretely:
+`--max-credits <n>` is **enforced, as an ESTIMATE — not a metered value.** The Copilot Studio SDK's
+activity/response models expose no real per-turn cost field, so `CopilotStudioChatClient` counts turns
+instead (1 estimated credit per turn, a fixed constant — not a heuristic weighted by response size).
+Concretely:
 
 - The option defaults to `0` ("no cap") and must be `>= 0` — a negative value is rejected at validation time,
   before the config even loads.
-- There is no code path that spends or checks a Copilot Credit budget: the Copilot Studio SDK's activity/response
-  models expose no credit-cost field to enforce against, so there's nothing to wire this up to yet.
-- Exit code 8 (`ExitCodes.BudgetExceeded`) stays reserved and unemitted until a credit-cost signal exists. See the
-  [exit-code table](../cli.md#exit-codes) in the CLI reference.
+- The check runs **before** each turn, at the call site (not deferred to first enumeration): a turn that
+  would push estimated spend PAST the cap never fires — spend may legitimately reach exactly the cap; only
+  the turn that would exceed it is refused.
+- `CopilotStudioBudgetExceededException` extends `AgentEval.Core.FatalEvaluationException` — a marker the
+  `redteam` probe loop, the compliance-benchmark scenario loop, and the `eval` dataset loop all specifically
+  let propagate (the same way they already special-case `OperationCanceledException`) instead of swallowing
+  it into a per-item "execution error" that would just repeat the identical root cause for every remaining
+  probe/scenario/test case — the cap, once hit, can never un-trip mid-run. **The run genuinely stops** for
+  all three verbs.
+- The exit code differs by verb, though: `redteam` returns `8` (`ExitCodes.BudgetExceeded` — distinct from a
+  crash/`RuntimeError`(3) or a policy/gate outcome 5/6/7; see the [exit-code table](../cli.md#exit-codes)).
+  `eval`/`bench gdpr`/`bench eu-ai-act` also enforce and stop on the same condition, but return their own
+  existing generic failure codes instead (`RuntimeError`(3) for `eval`, `1` for `bench`) — exit code 8 is
+  `redteam`-scoped by design (see `ExitCodes.BudgetExceeded`'s own doc comment).
 
 The CLI help text for the flag says this plainly:
 
-> Cap the Copilot Credits a live `--sut copilot-studio` scan may spend (0 = no cap). NOT YET ENFORCED — the SDK
-> exposes no credit-cost field to enforce against, so this is parsed/validated only; exit 8 (BudgetExceeded)
-> stays reserved. Every turn burns credits, and a reasoning turn costs substantially more than a scripted one.
+> Cap the Copilot Credits a live `--sut copilot-studio` run may spend (0 = no cap). ENFORCED as an ESTIMATE —
+> the SDK exposes no real credit-cost field, so this counts turns (1 estimated credit each), not actual
+> metered spend, and a turn that would push spend past the cap never fires. The run then stops (redteam:
+> exit 8/BudgetExceeded; eval/bench: their normal failure exit code). A real reasoning turn likely costs
+> substantially MORE than this estimate counts — set the cap conservatively, and don't assume hitting it
+> means the estimate overcounted.
 
-Don't rely on `--max-credits` as a real spend guard — track Copilot Credit consumption through Power Platform's
-own admin tooling instead.
+Because this is an estimate, don't rely on `--max-credits` as your only spend guard for anything cost-sensitive
+— cross-check real Copilot Credit consumption through Power Platform's own admin tooling, especially before
+raising the cap for a reasoning-heavy agent.
 
 ## What's verified vs. what still needs a live check
 
@@ -246,16 +263,18 @@ conversation-id tracking, and configurable error injection (auth failure, a mid-
 rate-limit-shaped exception, hang-until-cancelled), so the activity-stream bridging logic itself can be
 exercised credential-free, closer to what a real `CopilotClient` would do, without touching the network.
 
-**The `--sut` seam also reaches `eval` and `bench` now.** `ISutTarget` + `SutTargetResolver`
-(`src/AgentEval.Cli/Commands/Targets/ISutTarget.cs`) let `CopilotStudioRedTeamTarget` resolve the same way from
-`agenteval eval` and `agenteval bench owasp`/`mitre`/`nist` as it already did from `agenteval redteam` — a
-`Validate`-drift contract test proves the redteam and shared-seam validation paths agree. `agenteval eval --sut
-copilot-studio --dataset <file>` evaluates your dataset's prompts + judge criteria against a live MCS agent;
-`agenteval bench owasp --sut copilot-studio --subject <name>` (and `mitre`/`nist`) run the curated compliance
-scan against one. `bench`'s three Tier-1 families also gained a generic `--endpoint <url> --model <name>
-[--api-key <key>]` option set for a plain OpenAI-compatible endpoint, independent of Copilot Studio. See
-[docs/cli.md](../cli.md#agenteval-eval) for the exact flags. Bench Tier 2 (`gdpr`/`eu-ai-act`) does not have
-this yet — scoped separately.
+**The `--sut` seam also reaches `eval` and `bench` now — all of it, Tier 1 and Tier 2.** `ISutTarget` +
+`SutTargetResolver` (`src/AgentEval.Cli/Commands/Targets/ISutTarget.cs`) let `CopilotStudioRedTeamTarget`
+resolve the same way from `agenteval eval` and `agenteval bench owasp`/`mitre`/`nist` as it already did from
+`agenteval redteam` — a `Validate`-drift contract test proves the redteam and shared-seam validation paths
+agree. `agenteval eval --sut copilot-studio --dataset <file>` evaluates your dataset's prompts + judge
+criteria against a live MCS agent; `agenteval bench owasp --sut copilot-studio --subject <name>` (and
+`mitre`/`nist`) run the curated compliance scan against one. `bench`'s three Tier-1 families also gained a
+generic `--endpoint <url> --model <name> [--api-key <key>]` option set for a plain OpenAI-compatible
+endpoint, independent of Copilot Studio. **Bench Tier 2 (`bench gdpr`/`bench eu-ai-act --sut copilot-studio`)
+is wired too** — reuses the same resolver (`--sut` only, no generic `--endpoint` for Tier 2 yet), driving the
+live agent per-scenario instead of grading a static `--response`. See
+[docs/cli.md](../cli.md#agenteval-eval) for the exact flags.
 
 ## Resilience: retry + config-identity drift detection
 
@@ -366,7 +385,7 @@ AgentEval's red-team scoring is honest about *how much* evidence a verdict is ba
 ## See also
 
 - [Red Team Security](../redteam.md) — the full scanner: attacks, evidence fidelity, judge modes, CI baseline gate.
-- [CLI Reference — Exit codes](../cli.md#exit-codes) — the full exit-code table, including the reserved `8`
-  (`BudgetExceeded`) this target will use once `--max-credits` enforcement has a credit-cost signal to enforce.
+- [CLI Reference — Exit codes](../cli.md#exit-codes) — the full exit-code table, including `8`
+  (`BudgetExceeded`) — returned when a live `redteam --sut copilot-studio` scan hits its `--max-credits` cap.
 - [Attack the gate](../gatekeeper/attack-the-gate.md) — the credential-free `--sut gatekeeper-demo` closed loop,
   useful for CI where a live Copilot Studio agent + credentials aren't available.
