@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { gqlRequest } from "@/lib/graphql-client";
-import { fetchVersion } from "@/lib/rest-client";
+import { fetchVersion, formatModeLabel } from "@/lib/rest-client";
 import { queryKeys } from "@/lib/keys";
 import { DataState } from "@/components/DataState";
 import { SubjectCard, type SubjectCardData } from "@/components/SubjectCard";
@@ -127,7 +127,7 @@ export function DashboardPage() {
       <header>
         <h2 className="text-2xl font-bold text-slate-900">Dashboard</h2>
         <p className="text-sm text-slate-600">
-          AgentEval Mission Control — Mode A (local viewer).
+          AgentEval Mission Control{versionQ.data ? ` — ${formatModeLabel(versionQ.data.mode)}` : ""}.
         </p>
       </header>
 
