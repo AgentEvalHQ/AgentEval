@@ -47,15 +47,33 @@ internal static class SkillsScanCommand
 
     // ═══════════════════════════════════════════ scan ═══════════════════════════════════════════
 
+    /// <summary>The options <c>scan</c> and <c>scan-workspace</c> share verbatim — see <see cref="BuildCommonScanOptions"/>.</summary>
+    private sealed record CommonScanOptions(
+        Option<string> Format, Option<FileInfo?> Output, Option<bool> FailOnNoncompliant,
+        Option<bool> WriteBaseline, Option<string> BaselineRoot, Option<bool> CheckBaseline,
+        Option<FileInfo?> SaveManifestBaseline, Option<FileInfo?> ManifestBaseline, Option<string?> BaselineNotes)
+    {
+        public void AddAllTo(Command command)
+        {
+            command.Options.Add(Format);
+            command.Options.Add(Output);
+            command.Options.Add(FailOnNoncompliant);
+            command.Options.Add(WriteBaseline);
+            command.Options.Add(BaselineRoot);
+            command.Options.Add(CheckBaseline);
+            command.Options.Add(SaveManifestBaseline);
+            command.Options.Add(ManifestBaseline);
+            command.Options.Add(BaselineNotes);
+        }
+    }
+
     /// <summary>
-    /// The 5 options <c>scan</c> and <c>scan-workspace</c> share verbatim (everything except <c>--repo</c>,
+    /// The options <c>scan</c> and <c>scan-workspace</c> share verbatim (everything except <c>--repo</c>,
     /// which only <c>scan</c> has, and each command's own default <c>--baseline-root</c>). Built ONCE here so
     /// the two commands' help text cannot silently drift apart the way it already had before this helper
     /// existed (the two copies' <c>--check-baseline</c> descriptions had gone out of sync).
     /// </summary>
-    private static (Option<string> Format, Option<FileInfo?> Output, Option<bool> FailOnNoncompliant,
-        Option<bool> WriteBaseline, Option<string> BaselineRoot, Option<bool> CheckBaseline) BuildCommonScanOptions(
-        string defaultBaselineRoot) => (
+    private static CommonScanOptions BuildCommonScanOptions(string defaultBaselineRoot) => new(
         new Option<string>("--format") { DefaultValueFactory = _ => "console", Description = "Output format: console | markdown | json" },
         new Option<FileInfo?>("-o", "--output") { Description = "Output file (default: stdout)" },
         new Option<bool>("--fail-on-noncompliant")
@@ -65,7 +83,13 @@ internal static class SkillsScanCommand
         new Option<string>("--baseline-root")
             { DefaultValueFactory = _ => defaultBaselineRoot, Description = "Baseline ledger root directory (used with --write-baseline / --check-baseline)." },
         new Option<bool>("--check-baseline")
-            { Description = "Trust-on-first-use: compare each scanned skill's content hash against the baseline ledger's history (--baseline-root). A match against ANY prior snapshot for the same skill name is reported as an informational 'matches a previously-vetted copy' finding. Meaningless on a first-ever scan (no history yet) — pair with --write-baseline on earlier runs." });
+            { Description = "Trust-on-first-use: compare each scanned skill's content hash against the baseline ledger's history (--baseline-root). A match against ANY prior snapshot for the same skill name is reported as an informational 'matches a previously-vetted copy' finding. Meaningless on a first-ever scan (no history yet) — pair with --write-baseline on earlier runs." },
+        new Option<FileInfo?>("--save-manifest-baseline")
+            { Description = "Capture a trust-time hash-pin of every scanned skill's manifest content (name, description, resource/script inventory, allowed-tools, compatibility) to this JSON file. A SINGLE pinned file, distinct from --write-baseline's multi-snapshot ledger — mirrors the RedTeam baseline/diff CI pattern: commit this file, then re-check future scans against it with --manifest-baseline." },
+        new Option<FileInfo?>("--manifest-baseline")
+            { Description = "Check every scanned skill's manifest content against a file captured by --save-manifest-baseline. A skill whose content changed since the pin was captured is reported as a High-severity ManifestChangedSinceBaseline finding — gated by --fail-on-noncompliant like any other High finding, no separate flag needed. A possible rug-pull: a previously-approved skill silently changing after approval." },
+        new Option<string?>("--baseline-note")   // singular, matching RedTeamCommand's established --baseline-note precedent
+            { Description = "Optional human note saved alongside --save-manifest-baseline (e.g. who approved it, why). Has no effect without --save-manifest-baseline." });
 
     private static Command BuildScanCommand()
     {
@@ -73,18 +97,13 @@ internal static class SkillsScanCommand
 
         var pathArg = new Argument<DirectoryInfo>("path")
             { Description = "Directory containing one or more SKILL.md-rooted skill folders (a repo root when --repo is set)" };
-        var (formatOpt, outputOpt, failOnOpt, writeBaselineOpt, baselineRootOpt, checkBaselineOpt) = BuildCommonScanOptions(DefaultBaselineRoot);
+        var opts = BuildCommonScanOptions(DefaultBaselineRoot);
         var repoOpt = new Option<bool>("--repo")
             { Description = "Treat <path> as a REPO ROOT: scan every known skill-directory convention found under it (.claude/skills, .agents/skills, ...) and aggregate the results, instead of treating <path> itself as one skill directory. Always content-hashes every skill folder (real file I/O) to check for cross-location drift — the same name resolving to different content in two conventions — even without --write-baseline/--check-baseline." };
 
         scanCmd.Arguments.Add(pathArg);
-        scanCmd.Options.Add(formatOpt);
-        scanCmd.Options.Add(outputOpt);
-        scanCmd.Options.Add(failOnOpt);
-        scanCmd.Options.Add(writeBaselineOpt);
+        opts.AddAllTo(scanCmd);
         scanCmd.Options.Add(repoOpt);
-        scanCmd.Options.Add(baselineRootOpt);
-        scanCmd.Options.Add(checkBaselineOpt);
 
         scanCmd.SetAction(async (parseResult, ct) =>
         {
@@ -92,13 +111,16 @@ internal static class SkillsScanCommand
             {
                 return await ExecuteAsync(
                     parseResult.GetValue(pathArg)!,
-                    parseResult.GetValue(formatOpt)!,
-                    parseResult.GetValue(outputOpt),
-                    parseResult.GetValue(failOnOpt),
-                    parseResult.GetValue(writeBaselineOpt),
+                    parseResult.GetValue(opts.Format)!,
+                    parseResult.GetValue(opts.Output),
+                    parseResult.GetValue(opts.FailOnNoncompliant),
+                    parseResult.GetValue(opts.WriteBaseline),
                     parseResult.GetValue(repoOpt),
-                    parseResult.GetValue(baselineRootOpt)!,
-                    parseResult.GetValue(checkBaselineOpt),
+                    parseResult.GetValue(opts.BaselineRoot)!,
+                    parseResult.GetValue(opts.CheckBaseline),
+                    parseResult.GetValue(opts.SaveManifestBaseline),
+                    parseResult.GetValue(opts.ManifestBaseline),
+                    parseResult.GetValue(opts.BaselineNotes),
                     ct);
             }
             catch (Exception ex)
@@ -122,7 +144,8 @@ internal static class SkillsScanCommand
     internal static async Task<int> ExecuteAsync(
         DirectoryInfo path, string format, FileInfo? output, bool failOnNoncompliant,
         bool writeBaseline = false, bool repo = false, string baselineRoot = DefaultBaselineRoot,
-        bool checkBaseline = false, CancellationToken ct = default)
+        bool checkBaseline = false, FileInfo? saveManifestBaseline = null, FileInfo? manifestBaseline = null,
+        string? baselineNotes = null, CancellationToken ct = default)
     {
         if (!path.Exists)
         {
@@ -136,7 +159,9 @@ internal static class SkillsScanCommand
 
         // Agent Skills Wave 2: entries (content hash + structural fingerprint per skill — real disk I/O,
         // SkillContentHasher reads every byte of every file in every skill folder) are needed for
-        // cross-location drift detection, trust-on-first-use matching, and persisting a snapshot.
+        // cross-location drift detection, trust-on-first-use matching, persisting a snapshot, and
+        // the manifest-baseline hash-pin drift gate — the latter reuses StructuralFingerprint (already
+        // SkillManifestPoisoningGate.Fingerprint(manifest) under the hood), no raw manifest list needed.
         // --repo builds them unconditionally: drift detection has no opt-out flag, and a repo-wide
         // governance scan is expected to cost more than a single-directory one (documented in the --repo
         // option's own help text). A single-directory scan is NOT --repo-wide, though — a plain
@@ -155,7 +180,7 @@ internal static class SkillsScanCommand
         {
             var result = await MafSkillScanner.ScanFileSkillsWithInfoAsync(path.FullName, noOpAgent, options: null, ct).ConfigureAwait(false);
             report = result.Report;
-            entries = (writeBaseline || checkBaseline)
+            entries = (writeBaseline || checkBaseline || saveManifestBaseline is not null || manifestBaseline is not null)
                 ? result.Skills.Select(info => ToBaselineEntry(info, report.Findings, conventionPrefix: null)).ToList()
                 : [];
         }
@@ -164,19 +189,22 @@ internal static class SkillsScanCommand
         // repo-wide scan is the only mode where "cross-location" is even meaningful for a single repo).
         return await FinishScanAsync(
             report, entries, checkCrossLocationDrift: repo, format, output, failOnNoncompliant,
-            writeBaseline, baselineRoot, checkBaseline, path.FullName, ct).ConfigureAwait(false);
+            writeBaseline, baselineRoot, checkBaseline, saveManifestBaseline, manifestBaseline, baselineNotes,
+            path.FullName, ct).ConfigureAwait(false);
     }
 
     /// <summary>
     /// The tail shared by every scan mode (single-directory, <c>--repo</c>, and Wave 3a's
     /// <c>scan-workspace</c>) once discovery has produced a <see cref="SkillComplianceReport"/> and its
-    /// matching <see cref="SkillBaselineEntry"/> list: merge in cross-location-drift / trust-on-first-use
-    /// findings, render, write the output, persist a baseline snapshot if asked, and compute the exit code.
+    /// matching <see cref="SkillBaselineEntry"/> list: merge in cross-location-drift / trust-on-first-use /
+    /// manifest-baseline-drift findings, render, write the output, persist a baseline snapshot if asked, and
+    /// compute the exit code.
     /// </summary>
     private static async Task<int> FinishScanAsync(
         SkillComplianceReport report, IReadOnlyList<SkillBaselineEntry> entries, bool checkCrossLocationDrift,
         string format, FileInfo? output, bool failOnNoncompliant, bool writeBaseline, string baselineRoot,
-        bool checkBaseline, string scannedRoot, CancellationToken ct)
+        bool checkBaseline, FileInfo? saveManifestBaseline, FileInfo? manifestBaseline, string? baselineNotes,
+        string scannedRoot, CancellationToken ct)
     {
         // --check-baseline trust-on-first-use matching is opt-in (meaningless without prior baseline history).
         var extraFindings = new List<SkillComplianceFinding>();
@@ -190,6 +218,45 @@ internal static class SkillsScanCommand
             var historyStore = new JsonFileSkillBaselineStore(baselineRoot);
             var history = await historyStore.ListAsync(ct).ConfigureAwait(false);
             extraFindings.AddRange(DetectPreviouslyVetted(entries, history));
+        }
+
+        // NOT all extraFindings sources are equally severe: DetectCrossLocationDrift (Medium) and
+        // DetectPreviouslyVetted (Low) never trip --fail-on-noncompliant; DetectManifestDrift below is
+        // High and DOES. Don't assume a future addition here is non-blocking by pattern-matching these two
+        // — check the actual Severity you give it.
+
+        // Computed at most once, shared by the drift-check below AND the save block further down — avoids
+        // hashing every entry twice when --manifest-baseline and --save-manifest-baseline are both passed
+        // in the same run (a real workflow this feature explicitly mirrors from the RedTeam CI pattern:
+        // "verify the old pin, then re-pin the new baseline" in one command).
+        Dictionary<string, string>? currentManifestHashes = null;
+
+        // A Changed finding requires the same skill name present in BOTH the baseline and the current scan
+        // — with zero entries, that's mathematically impossible, so skip the file load entirely rather than
+        // risk a spurious error for a --manifest-baseline path that happens to be missing/corrupted on a
+        // scan that had nothing to check in the first place.
+        if (manifestBaseline is not null && entries.Count > 0)
+        {
+            currentManifestHashes = ManifestFingerprintsByName(entries);
+            SkillManifestBaseline? baseline;
+            try
+            {
+                baseline = await SkillManifestBaseline.LoadAsync(manifestBaseline.FullName, ct).ConfigureAwait(false);
+            }
+            catch (Exception ex) when (ex is FileNotFoundException or DirectoryNotFoundException)
+            {
+                // Same graceful "nothing to compare against yet" precedent --check-baseline already
+                // establishes for an empty ledger — a --manifest-baseline path that doesn't exist yet is not
+                // fatal, just uninformative. Lets `--save-manifest-baseline x.json --manifest-baseline x.json`
+                // work in ONE command on a first-ever run instead of requiring two separate invocations.
+                baseline = null;
+                Console.Error.WriteLine($"  Note: --manifest-baseline file not found ({manifestBaseline.FullName}) — nothing to compare against yet.");
+            }
+
+            if (baseline is not null)
+            {
+                extraFindings.AddRange(DetectManifestDrift(currentManifestHashes, baseline));
+            }
         }
 
         if (extraFindings.Count > 0)
@@ -215,6 +282,29 @@ internal static class SkillsScanCommand
             var store = new JsonFileSkillBaselineStore(baselineRoot);
             var id = await store.SaveAsync(snapshot, ct).ConfigureAwait(false);
             Console.Error.WriteLine($"  Baseline snapshot saved: {id} ({snapshot.Skills.Count} skill(s) -> {baselineRoot})");
+        }
+
+        if (saveManifestBaseline is not null)
+        {
+            var hashes = currentManifestHashes ?? ManifestFingerprintsByName(entries);
+            var baseline = new SkillManifestBaseline(DateTimeOffset.UtcNow, hashes, baselineNotes);
+            // Unlike --write-baseline's JsonFileSkillBaselineStore (whose constructor creates its root
+            // directory), SkillManifestBaseline.SaveAsync is a bare File.WriteAllTextAsync with no directory
+            // creation — create the parent directory first so a fresh ".agenteval/..."-style path (the same
+            // convention --baseline-root's own default already establishes) doesn't throw
+            // DirectoryNotFoundException on a repo that's never captured a manifest baseline before.
+            var parentDir = saveManifestBaseline.Directory;
+            if (parentDir is not null && !parentDir.Exists)
+            {
+                parentDir.Create();
+            }
+
+            await baseline.SaveAsync(saveManifestBaseline.FullName, ct).ConfigureAwait(false);
+            Console.Error.WriteLine($"  Manifest baseline saved: {saveManifestBaseline.FullName} ({hashes.Count} skill(s))");
+        }
+        else if (baselineNotes is not null)
+        {
+            Console.Error.WriteLine("  Warning: --baseline-note has no effect without --save-manifest-baseline — ignored.");
         }
 
         return ComputeExitCode(report, failOnNoncompliant);
@@ -246,15 +336,10 @@ internal static class SkillsScanCommand
 
         var pathArg = new Argument<DirectoryInfo>("path")
             { Description = "A folder whose immediate subdirectories are repo roots (e.g. where you 'gh repo clone'd your org's repos)" };
-        var (formatOpt, outputOpt, failOnOpt, writeBaselineOpt, baselineRootOpt, checkBaselineOpt) = BuildCommonScanOptions(DefaultWorkspaceBaselineRoot);
+        var opts = BuildCommonScanOptions(DefaultWorkspaceBaselineRoot);
 
         scanWorkspaceCmd.Arguments.Add(pathArg);
-        scanWorkspaceCmd.Options.Add(formatOpt);
-        scanWorkspaceCmd.Options.Add(outputOpt);
-        scanWorkspaceCmd.Options.Add(failOnOpt);
-        scanWorkspaceCmd.Options.Add(writeBaselineOpt);
-        scanWorkspaceCmd.Options.Add(baselineRootOpt);
-        scanWorkspaceCmd.Options.Add(checkBaselineOpt);
+        opts.AddAllTo(scanWorkspaceCmd);
 
         scanWorkspaceCmd.SetAction(async (parseResult, ct) =>
         {
@@ -262,12 +347,15 @@ internal static class SkillsScanCommand
             {
                 return await ExecuteWorkspaceAsync(
                     parseResult.GetValue(pathArg)!,
-                    parseResult.GetValue(formatOpt)!,
-                    parseResult.GetValue(outputOpt),
-                    parseResult.GetValue(failOnOpt),
-                    parseResult.GetValue(writeBaselineOpt),
-                    parseResult.GetValue(baselineRootOpt)!,
-                    parseResult.GetValue(checkBaselineOpt),
+                    parseResult.GetValue(opts.Format)!,
+                    parseResult.GetValue(opts.Output),
+                    parseResult.GetValue(opts.FailOnNoncompliant),
+                    parseResult.GetValue(opts.WriteBaseline),
+                    parseResult.GetValue(opts.BaselineRoot)!,
+                    parseResult.GetValue(opts.CheckBaseline),
+                    parseResult.GetValue(opts.SaveManifestBaseline),
+                    parseResult.GetValue(opts.ManifestBaseline),
+                    parseResult.GetValue(opts.BaselineNotes),
                     ct);
             }
             catch (Exception ex)
@@ -290,6 +378,7 @@ internal static class SkillsScanCommand
     internal static async Task<int> ExecuteWorkspaceAsync(
         DirectoryInfo path, string format, FileInfo? output, bool failOnNoncompliant,
         bool writeBaseline = false, string baselineRoot = DefaultWorkspaceBaselineRoot, bool checkBaseline = false,
+        FileInfo? saveManifestBaseline = null, FileInfo? manifestBaseline = null, string? baselineNotes = null,
         CancellationToken ct = default)
     {
         if (!path.Exists)
@@ -308,7 +397,8 @@ internal static class SkillsScanCommand
         // for how entries are re-tagged to make this fall out of the EXISTING DetectCrossLocationDrift as-is).
         return await FinishScanAsync(
             report, entries, checkCrossLocationDrift: true, format, output, failOnNoncompliant,
-            writeBaseline, baselineRoot, checkBaseline, path.FullName, ct).ConfigureAwait(false);
+            writeBaseline, baselineRoot, checkBaseline, saveManifestBaseline, manifestBaseline, baselineNotes,
+            path.FullName, ct).ConfigureAwait(false);
     }
 
     // Bounded so a workspace of many repos doesn't open unbounded concurrent file handles; matches the same
@@ -589,6 +679,75 @@ internal static class SkillsScanCommand
 
         return findings;
     }
+
+    // ═══════════════════════════════ manifest-baseline hash-pin drift gate (Phase 4b CLI surface) ═══════════════════════════════
+
+    /// <summary>
+    /// <c>--manifest-baseline &lt;file&gt;</c>: compares every scanned skill's current
+    /// <see cref="SkillManifestPoisoningGate.Fingerprint"/> (already computed once, into
+    /// <see cref="SkillBaselineEntry.StructuralFingerprint"/> — reused here verbatim, no re-hashing) against
+    /// a previously trust-time-pinned <see cref="SkillManifestBaseline"/>. Only a <see cref="ManifestDriftKind.Changed"/>
+    /// skill becomes a finding — the actual rug-pull signal; <see cref="ManifestDriftKind.New"/> (not yet
+    /// pinned) and <see cref="ManifestDriftKind.Removed"/> (no longer present) are housekeeping, not
+    /// poisoning, and are deliberately not surfaced here.
+    /// </summary>
+    internal static IReadOnlyList<SkillComplianceFinding> DetectManifestDrift(
+        IReadOnlyList<SkillBaselineEntry> entries, SkillManifestBaseline baseline)
+        => DetectManifestDrift(ManifestFingerprintsByName(entries), baseline);
+
+    /// <summary>
+    /// Overload accepting an already-computed fingerprint map — lets <see cref="FinishScanAsync"/> compute
+    /// it at most ONCE and share it with the <c>--save-manifest-baseline</c> save block, instead of hashing
+    /// every entry twice when both flags are passed in the same run.
+    /// </summary>
+    internal static IReadOnlyList<SkillComplianceFinding> DetectManifestDrift(
+        IReadOnlyDictionary<string, string> currentHashesByName, SkillManifestBaseline baseline)
+    {
+        var drift = ManifestDriftDetector.Detect(baseline.HashesBySkillName, currentHashesByName);
+
+        var findings = new List<SkillComplianceFinding>();
+        foreach (var d in drift.Where(d => d.Kind == ManifestDriftKind.Changed))
+        {
+            // ManifestDriftDetector.Detect only checks dictionary KEY presence via TryGetValue, not that the
+            // VALUE is non-null — a hand-edited/corrupted --manifest-baseline JSON file can deserialize a
+            // null hash for a present key (System.Text.Json's default options don't enforce NRT
+            // non-nullability at runtime), so "Changed" does NOT actually guarantee non-null hashes. Defend
+            // against that instead of trusting it and null-forgiving into a NullReferenceException.
+            var hashSummary = (d.BaselineHash, d.CurrentHash) switch
+            {
+                (string before, string after) =>
+                    $" (fingerprint {before[..Math.Min(8, before.Length)]}… -> {after[..Math.Min(8, after.Length)]}…)",
+                _ => " (the baseline file has a missing or malformed hash for this skill — re-capture it with --save-manifest-baseline)",
+            };
+
+            findings.Add(new SkillComplianceFinding(
+                d.Key,
+                SkillComplianceRule.ManifestChangedSinceBaseline,
+                Severity.High,
+                $"Skill '{d.Key}' manifest content changed since the trust-time baseline was captured{hashSummary} — " +
+                "verify this change was reviewed and re-approved before trusting it again.",
+                Field: null));
+        }
+
+        return findings;
+    }
+
+    // Wave 2: a --repo/scan-workspace entries list can legitimately contain 2+ entries sharing the same
+    // Name (the exact cross-location-drift scenario) — GroupBy+First (not ToDictionary directly), same
+    // tolerance DiffAsync's own baselineBySkill/currentBySkill already use, rather than crashing.
+    // Keys are lowercased, not just grouped with StringComparer.Ordinal — ManifestDriftDetector.Detect's own
+    // key union (ManifestFingerprint.cs) is hardcoded to StringComparer.Ordinal and can't be told to ignore
+    // case, so relying on THIS dictionary's comparer alone wouldn't actually make the comparison
+    // case-insensitive. Lowercasing the key here (both when capturing --save-manifest-baseline and when
+    // checking --manifest-baseline, since both paths call this same method) means the SAME skill differing
+    // only by name casing produces the SAME dictionary key either way, closing what would otherwise be a
+    // real detection bypass: DetectCrossLocationDrift already treats a case-only name difference as GA
+    // requires lowercase-only names, so it's the SAME skill, not two unrelated ones — a rug-pull that also
+    // re-cases the name must not be able to evade this gate by looking like an unrelated New+Removed pair.
+    private static Dictionary<string, string> ManifestFingerprintsByName(IReadOnlyList<SkillBaselineEntry> entries) =>
+        entries
+            .GroupBy(e => e.Name.ToLowerInvariant(), StringComparer.Ordinal)
+            .ToDictionary(g => g.Key, g => g.First().StructuralFingerprint, StringComparer.Ordinal);
 
     // ═══════════════════════════════ baseline entry building (§4.1) ═══════════════════════════════
 
