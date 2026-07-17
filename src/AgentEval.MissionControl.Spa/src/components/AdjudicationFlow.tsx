@@ -6,6 +6,7 @@ import {
 } from "@/lib/eval-tree";
 import { VerdictBadge } from "@/components/VerdictBadge";
 import { ModelBadge } from "@/components/ModelBadge";
+import { PromptHashPill } from "@/components/ProvenancePills";
 import { formatScore, formatCost } from "@/lib/format";
 
 // Plan-08 Wave 8 (MC1.6.9): visualises a panel of judges + (optionally) an
@@ -99,6 +100,11 @@ export function AdjudicationFlow({ node }: Props) {
                   role="judge"
                 />
               )}
+              {/* Plan-08 portal-review A4 follow-up (2026-07-16): the
+                  adjudicator card is the highest-stakes place to show the
+                  pinned prompt hash — it's where a human is looking at
+                  panel DISAGREEMENT. Matches EvalResultNode.tsx's rendering. */}
+              <PromptHashPill promptHash={adjudicator.provenance.promptHash} />
               <span className="text-slate-500">
                 {formatCost(adjudicator.provenance.estimatedCost)}
               </span>
@@ -130,6 +136,10 @@ function JudgeCard({ judge }: { judge: EvalResultNodeShape }) {
             role="judge"
           />
         )}
+        {/* Plan-08 portal-review A4 follow-up (2026-07-16): panel judge
+            cards were the one place promptHash still didn't render
+            (EvalResultNode.tsx and ScenarioTreePage.tsx already show it). */}
+        <PromptHashPill promptHash={judge.provenance.promptHash} />
         {judge.provenance.estimatedCost > 0 && (
           <span className="text-slate-500">
             {formatCost(judge.provenance.estimatedCost)}
