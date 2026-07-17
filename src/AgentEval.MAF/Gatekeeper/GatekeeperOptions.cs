@@ -146,7 +146,10 @@ public sealed class GatekeeperOptions
     /// primitive). Keyed by a caller-chosen template identifier (typically a file path) — usually just the
     /// agent's system-prompt file, but the dictionary shape supports pinning more than one template (e.g. a
     /// system prompt PLUS a separate tool-use prompt) in one call. Paired with
-    /// <see cref="PromptTemplateBaseline"/>; both must be set for the check to run (opt-in, no-op otherwise).
+    /// <see cref="PromptTemplateBaseline"/>; both must be set TOGETHER for the check to run (leave BOTH
+    /// unset to disable it — setting exactly one throws <see cref="InvalidOperationException"/> rather than
+    /// silently no-op-ing, since that is almost certainly a caller mistake that would otherwise leave drift
+    /// protection silently disabled).
     /// </summary>
     public IReadOnlyDictionary<string, string>? PromptTemplates { get; set; }
 
@@ -156,12 +159,14 @@ public sealed class GatekeeperOptions
     /// by the caller (e.g. committed alongside the prompt file). When both this and <see cref="PromptTemplates"/>
     /// are set, <c>UseGatekeeper</c> computes drift EAGERLY at construction time and throws
     /// <see cref="PromptTemplateDriftException"/> immediately if any template's content changed since it was
-    /// pinned (fail-closed, the same pattern as <see cref="RefuseUnprotectedHighRiskTools"/>). Unlike every
-    /// other Gatekeeper primitive, this is a CONSTRUCTION-TIME-ONLY guard, not a new
-    /// <see cref="IToolGate"/>/<see cref="IChatGate"/> — a template doesn't change mid-run, so a per-turn
-    /// check would be pure waste. A template present in one dictionary but not the other (added/removed) is
-    /// NOT treated as drift — only a CHANGED fingerprint for a template present in both is; that's the actual
-    /// tamper signal this guard exists to catch.
+    /// pinned (fail-closed, the same pattern as <see cref="RefuseUnprotectedHighRiskTools"/>). Setting only
+    /// ONE of this and <see cref="PromptTemplates"/> throws <see cref="InvalidOperationException"/> at
+    /// construction — same fail-loud-on-half-configuration discipline as <see cref="RefuseUnprotectedHighRiskTools"/>
+    /// + a missing <see cref="KnownTools"/>. Unlike every other Gatekeeper primitive, this is a
+    /// CONSTRUCTION-TIME-ONLY guard, not a new <see cref="IToolGate"/>/<see cref="IChatGate"/> — a template
+    /// doesn't change mid-run, so a per-turn check would be pure waste. A template present in one dictionary
+    /// but not the other (added/removed) is NOT treated as drift — only a CHANGED fingerprint for a template
+    /// present in both is; that's the actual tamper signal this guard exists to catch.
     /// </summary>
     public IReadOnlyDictionary<string, string>? PromptTemplateBaseline { get; set; }
 }

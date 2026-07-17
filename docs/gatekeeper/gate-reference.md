@@ -271,9 +271,12 @@ all — a prompt template doesn't change mid-run, so a per-turn check would be p
 the system-prompt file) and `GatekeeperOptions.PromptTemplateBaseline` (a prior, reviewed
 `PromptTemplateDriftGate.CaptureBaseline(...)` snapshot); when both are set, `UseGatekeeper` checks drift
 **eagerly at construction time** and throws `PromptTemplateDriftException` immediately if any pinned
-template's content changed — fail-closed, the same pattern as `RefuseUnprotectedHighRiskTools`. A template
-present in only one of the two dictionaries (added/removed) is not treated as drift, only a changed
-fingerprint for a template present in both is — that's the actual tamper signal this guard exists to catch.
+template's content changed — fail-closed, the same pattern as `RefuseUnprotectedHighRiskTools`. Setting only
+ONE of the two options throws `InvalidOperationException` at construction rather than silently no‑op‑ing —
+same fail‑loud‑on‑half‑configuration discipline as `RefuseUnprotectedHighRiskTools` + a missing `KnownTools`.
+A template present in only one of the two DICTIONARIES (added/removed, once both options ARE set) is not
+treated as drift, only a changed fingerprint for a template present in both is — that's the actual tamper
+signal this guard exists to catch.
 
 ## Composing gates safely — `UseGatekeeper`
 

@@ -420,6 +420,43 @@ public class AgentEvalGatekeeperExtensionsTests
         Assert.Null(ex);
     }
 
+    [Fact]
+    public void PromptTemplateDrift_OnlyTemplatesSet_NotBaseline_ThrowsRatherThanSilentlyNoOp()
+    {
+        // Half-configuration must fail LOUD, not silently disable the check — same discipline as
+        // RefuseUnprotectedHighRiskTools + missing KnownTools.
+        var tool = AIFunctionFactory.Create((string x) => x, "x");
+        var agent = BuildAgent(tool, "x", new Dictionary<string, object?>());
+
+        var ex = Assert.Throws<InvalidOperationException>(() =>
+            agent.AsBuilder().UseGatekeeper(GatekeeperEnforcement.Terminate, g =>
+            {
+                g.Add(new ForbiddenToolGate("x"));
+                g.PromptTemplates = new Dictionary<string, string> { ["system-prompt.md"] = "content" };
+                // PromptTemplateBaseline deliberately left unset.
+            }));
+
+        Assert.Contains("PromptTemplateBaseline", ex.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void PromptTemplateDrift_OnlyBaselineSet_NotTemplates_ThrowsRatherThanSilentlyNoOp()
+    {
+        var tool = AIFunctionFactory.Create((string x) => x, "x");
+        var agent = BuildAgent(tool, "x", new Dictionary<string, object?>());
+        var baseline = PromptTemplateDriftGate.CaptureBaseline(new Dictionary<string, string> { ["system-prompt.md"] = "content" });
+
+        var ex = Assert.Throws<InvalidOperationException>(() =>
+            agent.AsBuilder().UseGatekeeper(GatekeeperEnforcement.Terminate, g =>
+            {
+                g.Add(new ForbiddenToolGate("x"));
+                g.PromptTemplateBaseline = baseline;
+                // PromptTemplates deliberately left unset.
+            }));
+
+        Assert.Contains("PromptTemplates", ex.Message, StringComparison.Ordinal);
+    }
+
     // ── #2: options.CoverageReport is the AUTHORITATIVE report, computed from the SAME snapshot that's registered ──
 
     [Fact]

@@ -34,11 +34,30 @@ public static class GatekeeperFleetHealthIndex
     {
         ArgumentNullException.ThrowIfNull(reportsByAxis);
 
-        var measured = reportsByAxis.Values.Where(r => r is not null).Select(r => r!).ToList();
-        var neverCalibrated = reportsByAxis.Where(kv => kv.Value is null).Select(kv => kv.Key)
-            .OrderBy(k => k, StringComparer.Ordinal).ToArray();
-        var stale = measured.Where(r => r.IsStale(staleAfter, clock))
-            .Select(r => r.Axis).OrderBy(k => k, StringComparer.Ordinal).ToArray();
+        // Walk key-value pairs together (not Values-then-Axis separately) so NeverCalibratedAxes and
+        // StaleAxes both use the DICTIONARY KEY as the axis label consistently — a report's own .Axis
+        // field could in principle diverge from the key a caller chose to file it under, and mixing label
+        // sources between the two lists would make them reference inconsistent label spaces.
+        var measured = new List<CalibrationReport>();
+        var neverCalibratedList = new List<string>();
+        var staleList = new List<string>();
+        foreach (var (axisKey, report) in reportsByAxis)
+        {
+            if (report is null)
+            {
+                neverCalibratedList.Add(axisKey);
+                continue;
+            }
+
+            measured.Add(report);
+            if (report.IsStale(staleAfter, clock))
+            {
+                staleList.Add(axisKey);
+            }
+        }
+
+        var neverCalibrated = neverCalibratedList.OrderBy(k => k, StringComparer.Ordinal).ToArray();
+        var stale = staleList.OrderBy(k => k, StringComparer.Ordinal).ToArray();
 
         double? meanAccuracy = measured.Count > 0 ? measured.Average(r => r.DecisiveAccuracy) : null;
         var totalDangerousErrors = measured.Sum(r => r.DangerousErrorCount);

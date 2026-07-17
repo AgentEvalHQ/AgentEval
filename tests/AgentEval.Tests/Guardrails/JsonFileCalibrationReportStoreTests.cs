@@ -23,12 +23,6 @@ public class JsonFileCalibrationReportStoreTests : IDisposable
         try { Directory.Delete(_root, recursive: true); } catch { /* best-effort cleanup */ }
     }
 
-    private static JudgeGoldSet Gold() => new("test-axis",
-    [
-        new JudgeGoldCase("attack one", ShouldBlock: true),
-        new JudgeGoldCase("benign one", ShouldBlock: false),
-    ]);
-
     private sealed class PredicateGate(Func<string, bool> block) : IChatGate
     {
         public string PolicyName => "pred";
@@ -126,5 +120,24 @@ public class JsonFileCalibrationReportStoreTests : IDisposable
         var loaded = await store.LoadLatestAsync(axis);
         Assert.NotNull(loaded);
         Assert.Equal(axis, loaded!.Axis);
+    }
+
+    [Fact]
+    public async Task Save_TwoAxesThatSlugifyToTheSameString_DoNotCollide()
+    {
+        // "foo/bar" and "foo-bar" both slugify (non-alphanumeric -> "-") to "foo-bar" — without a
+        // disambiguating suffix, saving both would silently overwrite one axis's file with the other's,
+        // which is especially consequential for a single-pin (overwrite) store like this one.
+        var store = new JsonFileCalibrationReportStore(_root);
+        await store.SaveAsync(await MakeReportAsync("foo/bar"));
+        await store.SaveAsync(await MakeReportAsync("foo-bar"));
+
+        var all = await store.LoadLatestAllAsync();
+
+        Assert.Equal(2, all.Count);
+        Assert.Contains("foo/bar", all.Keys);
+        Assert.Contains("foo-bar", all.Keys);
+        Assert.NotNull(await store.LoadLatestAsync("foo/bar"));
+        Assert.NotNull(await store.LoadLatestAsync("foo-bar"));
     }
 }

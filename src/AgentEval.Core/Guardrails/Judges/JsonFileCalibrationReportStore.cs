@@ -4,6 +4,7 @@
 
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using AgentEval.Guardrails;
 
 namespace AgentEval.Guardrails.Judges;
 
@@ -108,7 +109,21 @@ public sealed partial class JsonFileCalibrationReportStore : ICalibrationReportS
         }
 
         var slug = SlugifyRegex().Replace(axis.ToLowerInvariant(), "-").Trim('-');
-        return string.IsNullOrEmpty(slug) ? "unnamed" : slug;
+        if (string.IsNullOrEmpty(slug))
+        {
+            slug = "unnamed";
+        }
+
+        // A short content-hash suffix so two DIFFERENT axis strings that happen to slugify to the same
+        // value (e.g. "foo/bar" and "foo-bar" both -> "foo-bar") resolve to DIFFERENT files instead of
+        // silently colliding — consequential here specifically because this store is single-pin-per-axis
+        // (OVERWRITE, not append): an un-suffixed collision would silently drop one axis's calibration
+        // history, not just produce a duplicate/ambiguous filename the way it would in an append-only
+        // ledger like JsonFileBaselineStore. Reuses the existing ManifestFingerprint primitive rather
+        // than a bespoke hash.
+        var hash = ManifestFingerprint.Hash(axis)[..8];
+        var truncated = slug.Length > 60 ? slug[..60].TrimEnd('-') : slug;
+        return $"{truncated}-{hash}";
     }
 
     [GeneratedRegex(@"[^a-z0-9]+")]
