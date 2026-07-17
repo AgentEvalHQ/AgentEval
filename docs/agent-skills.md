@@ -92,6 +92,24 @@ pattern). `agenteval skills baseline list|diff|history` inspects it. `--repo` sc
 skill-directory convention under a repo root (`AgentEval.Skills.AgentSkillDirectoryConventions`) and
 aggregates the results. See [CLI reference](cli.md#agenteval-skills-baseline) for the full command surface.
 
+**Cross-location drift + trust-on-first-use (Wave 2):** two governance signals built directly on Wave 1's
+content hashing, both surfaced as ordinary `SkillComplianceFinding`s (so they render in console/markdown/
+json output automatically, no new schema):
+- **Cross-location content drift** — always checked on a `--repo` scan (no extra flag; a single-directory
+  scan has only one location by definition). Groups every discovered skill by name across all conventions
+  found under the repo root; if the same name resolves to two or more DIFFERENT content hashes, that's
+  flagged (`Medium` severity — a governance signal to investigate, since the divergence may be deliberate
+  per-tool customization rather than drift or poisoning). `internal static SkillsScanCommand.DetectCrossLocationDrift`.
+- **Trust-on-first-use reputation matching** — opt-in via `--check-baseline`. Loads the baseline ledger's
+  full history (`ISkillBaselineStore.ListAsync`) and checks whether each scanned skill's current content hash
+  already appears in ANY prior snapshot for the same name; a match is reported as an informational (`Low`
+  severity) "✓ matches a previously-vetted copy" finding, naming the most recent match's capture date.
+  Meaningless on a first-ever scan — pair with `--write-baseline` on earlier runs to build the history it
+  reads. `internal static SkillsScanCommand.DetectPreviouslyVetted`.
+
+Neither feature is High severity — both are informational/governance signals, not automatic compliance
+failures, so `--fail-on-noncompliant` is unaffected by either.
+
 ## 3 — Skill-injection red-team attack + `run_skill_script` governance
 
 `AgentEval.RedTeam.Attacks.SkillInjectionAttack` (OWASP LLM01, in `Attack.All` — the framework now ships **14**
@@ -186,7 +204,9 @@ and would crash the whole scan, is caught and reported as one clean finding inst
 
 Phase 4c (skill fuzzing via the transform/codec pipeline, a canary-skill honeypot, skill-name typosquatting,
 load-storm-as-denial-of-wallet) was deprioritized this session in favor of shipping 4a/4b and the exclusion-
-detection fix (§5) with full rigor — see `strategy/TODO.md` (local-only) for the up-to-date backlog.
+detection fix (§5) with full rigor. Wave 3 (org-wide multi-repo scanning via a new GitHub/GitLab API client;
+live upstream verification against a skill's declared source) is gated on a security/credential-scope review
+not yet held — see `strategy/TODO.md` (local-only) for the up-to-date backlog.
 
 ## Related
 

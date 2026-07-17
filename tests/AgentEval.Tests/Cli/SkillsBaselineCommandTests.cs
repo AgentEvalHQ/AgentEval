@@ -55,6 +55,14 @@ public class SkillsBaselineCommandTests : IDisposable
         Assert.Contains(scanCmd.Options, o => o.Name == "--baseline-root");
     }
 
+    [Fact]
+    public void Create_ScanSubcommand_HasCheckBaselineOption()
+    {
+        // Wave 2 (§4.2)
+        var scanCmd = SkillsScanCommand.Create().Subcommands.Single(c => c.Name == "scan");
+        Assert.Contains(scanCmd.Options, o => o.Name == "--check-baseline");
+    }
+
     // ── --write-baseline: scan a real fixture, confirm a snapshot lands in the ledger ──
 
     [Fact]
@@ -296,6 +304,222 @@ public class SkillsBaselineCommandTests : IDisposable
             Assert.Equal(ExitCodes.Success, exit);
         }
         finally { Directory.Delete(repoRoot, recursive: true); }
+    }
+
+    // ── Wave 2 (§4.2): --repo cross-location content drift ──
+
+    [Fact]
+    public async Task ExecuteAsync_Repo_SameSkillName_DifferentContentAcrossConventions_FlagsCrossLocationDrift()
+    {
+        var repoRoot = Path.Combine(Path.GetTempPath(), "agenteval-skills-drift-test-" + Guid.NewGuid().ToString("N"));
+        var claudeDir = Path.Combine(repoRoot, ".claude", "skills", "shared-skill");
+        var cursorDir = Path.Combine(repoRoot, ".cursor", "skills", "shared-skill");
+        Directory.CreateDirectory(claudeDir);
+        Directory.CreateDirectory(cursorDir);
+        // Same skill NAME, deliberately different body content -> different content hash.
+        File.WriteAllText(Path.Combine(claudeDir, "SKILL.md"),
+            "---\nname: shared-skill\ndescription: Present under .claude/skills.\n---\n\nBody variant A.\n");
+        File.WriteAllText(Path.Combine(cursorDir, "SKILL.md"),
+            "---\nname: shared-skill\ndescription: Present under .claude/skills.\n---\n\nBody variant B — DIFFERENT.\n");
+
+        try
+        {
+            var outFile = new FileInfo(Path.Combine(Path.GetTempPath(), "agenteval-skills-drift-out-" + Guid.NewGuid().ToString("N") + ".json"));
+            try
+            {
+                var exit = await SkillsScanCommand.ExecuteAsync(
+                    new DirectoryInfo(repoRoot), "json", outFile, failOnNoncompliant: false,
+                    writeBaseline: false, repo: true, baselineRoot: _baselineRoot, ct: default);
+
+                // Medium severity, not High -> IsCompliant stays true, exit stays Success (informational-only default).
+                // Note: SkillComplianceReportRenderer's JSON has no JsonStringEnumConverter, so Rule serializes
+                // as its raw int value, not the enum name — assert on the human-readable Message text instead.
+                Assert.Equal(ExitCodes.Success, exit);
+                var content = await File.ReadAllTextAsync(outFile.FullName);
+                Assert.Contains("DIFFERENT content across", content, StringComparison.Ordinal);
+                Assert.Contains("shared-skill", content, StringComparison.Ordinal);
+            }
+            finally { if (outFile.Exists) outFile.Delete(); }
+        }
+        finally { Directory.Delete(repoRoot, recursive: true); }
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_Repo_SameSkillName_SameContentAcrossConventions_NoDriftFinding()
+    {
+        // Regression guard: identical content in two locations must NOT be flagged as drift.
+        var repoRoot = Path.Combine(Path.GetTempPath(), "agenteval-skills-nodrift-test-" + Guid.NewGuid().ToString("N"));
+        var claudeDir = Path.Combine(repoRoot, ".claude", "skills", "identical-skill");
+        var cursorDir = Path.Combine(repoRoot, ".cursor", "skills", "identical-skill");
+        Directory.CreateDirectory(claudeDir);
+        Directory.CreateDirectory(cursorDir);
+        const string identicalBody = "---\nname: identical-skill\ndescription: Byte-identical in both locations.\n---\n\nSame body.\n";
+        File.WriteAllText(Path.Combine(claudeDir, "SKILL.md"), identicalBody);
+        File.WriteAllText(Path.Combine(cursorDir, "SKILL.md"), identicalBody);
+
+        try
+        {
+            var outFile = new FileInfo(Path.Combine(Path.GetTempPath(), "agenteval-skills-nodrift-out-" + Guid.NewGuid().ToString("N") + ".json"));
+            try
+            {
+                await SkillsScanCommand.ExecuteAsync(
+                    new DirectoryInfo(repoRoot), "json", outFile, failOnNoncompliant: false,
+                    writeBaseline: false, repo: true, baselineRoot: _baselineRoot, ct: default);
+
+                var content = await File.ReadAllTextAsync(outFile.FullName);
+                Assert.DoesNotContain("DIFFERENT content across", content, StringComparison.Ordinal);
+            }
+            finally { if (outFile.Exists) outFile.Delete(); }
+        }
+        finally { Directory.Delete(repoRoot, recursive: true); }
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_RepoWriteBaseline_DuplicateSkillNameAcrossConventions_ThenDiffAndHistory_DoNotThrow()
+    {
+        // Regression: a --repo --write-baseline snapshot can legitimately contain 2+ entries with the SAME
+        // Name (the exact cross-location-drift scenario) — `baseline diff`/`baseline history` must not crash
+        // with an unhandled ArgumentException ("same key already added") when that happens.
+        var repoRoot = Path.Combine(Path.GetTempPath(), "agenteval-skills-dupname-test-" + Guid.NewGuid().ToString("N"));
+        var claudeDir = Path.Combine(repoRoot, ".claude", "skills", "shared-skill");
+        var cursorDir = Path.Combine(repoRoot, ".cursor", "skills", "shared-skill");
+        Directory.CreateDirectory(claudeDir);
+        Directory.CreateDirectory(cursorDir);
+        File.WriteAllText(Path.Combine(claudeDir, "SKILL.md"),
+            "---\nname: shared-skill\ndescription: Present under .claude/skills.\n---\n\nBody variant A.\n");
+        File.WriteAllText(Path.Combine(cursorDir, "SKILL.md"),
+            "---\nname: shared-skill\ndescription: Present under .claude/skills.\n---\n\nBody variant B — DIFFERENT.\n");
+
+        try
+        {
+            // Two --write-baseline runs so `diff`/`history` have real snapshot history to walk, each one
+            // containing the duplicate-Name pair that would previously crash HashesByName/baselineBySkill.
+            await SkillsScanCommand.ExecuteAsync(
+                new DirectoryInfo(repoRoot), "console", null, failOnNoncompliant: false,
+                writeBaseline: true, repo: true, baselineRoot: _baselineRoot, ct: default);
+            await SkillsScanCommand.ExecuteAsync(
+                new DirectoryInfo(repoRoot), "console", null, failOnNoncompliant: false,
+                writeBaseline: true, repo: true, baselineRoot: _baselineRoot, ct: default);
+
+            var diffExit = await SkillsScanCommand.DiffAsync(_baselineRoot, sinceId: null, skillFilter: null, hashKind: "content", default);
+            Assert.Equal(ExitCodes.Success, diffExit);
+
+            var historyExit = await SkillsScanCommand.HistoryAsync(_baselineRoot, "shared-skill", default);
+            Assert.Equal(ExitCodes.Success, historyExit);
+        }
+        finally { Directory.Delete(repoRoot, recursive: true); }
+    }
+
+    // ── Wave 2 (§4.2): --check-baseline trust-on-first-use ──
+
+    [Fact]
+    public async Task ExecuteAsync_CheckBaseline_UnchangedSinceLastSnapshot_FlagsMatchesPreviouslyVettedCopy()
+    {
+        var dir = CreateCompliantFixture(out var skillName);
+        try
+        {
+            // First run: capture a baseline snapshot.
+            await SkillsScanCommand.ExecuteAsync(
+                dir, "console", output: null, failOnNoncompliant: false,
+                writeBaseline: true, repo: false, baselineRoot: _baselineRoot, ct: default);
+
+            // Second run: unchanged fixture, --check-baseline (no --write-baseline this time).
+            var outFile = new FileInfo(Path.Combine(Path.GetTempPath(), "agenteval-skills-tofu-out-" + Guid.NewGuid().ToString("N") + ".json"));
+            try
+            {
+                var exit = await SkillsScanCommand.ExecuteAsync(
+                    dir, "json", outFile, failOnNoncompliant: false,
+                    writeBaseline: false, repo: false, baselineRoot: _baselineRoot, checkBaseline: true, ct: default);
+
+                Assert.Equal(ExitCodes.Success, exit);
+                var content = await File.ReadAllTextAsync(outFile.FullName);
+                Assert.Contains("byte-identical to a previously-captured baseline snapshot", content, StringComparison.Ordinal);
+                Assert.Contains(skillName, content, StringComparison.Ordinal);
+            }
+            finally { if (outFile.Exists) outFile.Delete(); }
+        }
+        finally { dir.Delete(recursive: true); }
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_CheckBaseline_NoPriorHistory_DoesNotThrow_NoFindingEmitted()
+    {
+        // First-ever scan: --check-baseline is meaningless (nothing to compare against) but must not crash.
+        var dir = CreateCompliantFixture(out _);
+        try
+        {
+            var outFile = new FileInfo(Path.Combine(Path.GetTempPath(), "agenteval-skills-tofu-empty-out-" + Guid.NewGuid().ToString("N") + ".json"));
+            try
+            {
+                var exit = await SkillsScanCommand.ExecuteAsync(
+                    dir, "json", outFile, failOnNoncompliant: false,
+                    writeBaseline: false, repo: false, baselineRoot: _baselineRoot, checkBaseline: true, ct: default);
+
+                Assert.Equal(ExitCodes.Success, exit);
+                var content = await File.ReadAllTextAsync(outFile.FullName);
+                Assert.DoesNotContain("byte-identical to a previously-captured baseline snapshot", content, StringComparison.Ordinal);
+            }
+            finally { if (outFile.Exists) outFile.Delete(); }
+        }
+        finally { dir.Delete(recursive: true); }
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_CheckBaseline_ContentChangedSincePriorSnapshot_NoMatchFinding()
+    {
+        var dir = CreateCompliantFixture(out var skillName);
+        try
+        {
+            await SkillsScanCommand.ExecuteAsync(
+                dir, "console", output: null, failOnNoncompliant: false,
+                writeBaseline: true, repo: false, baselineRoot: _baselineRoot, ct: default);
+
+            // Mutate the skill's content after the baseline was captured.
+            var skillFile = Path.Combine(dir.FullName, skillName, "SKILL.md");
+            File.WriteAllText(skillFile, File.ReadAllText(skillFile) + "\nAn extra line changing the content hash.\n");
+
+            var outFile = new FileInfo(Path.Combine(Path.GetTempPath(), "agenteval-skills-tofu-changed-out-" + Guid.NewGuid().ToString("N") + ".json"));
+            try
+            {
+                await SkillsScanCommand.ExecuteAsync(
+                    dir, "json", outFile, failOnNoncompliant: false,
+                    writeBaseline: false, repo: false, baselineRoot: _baselineRoot, checkBaseline: true, ct: default);
+
+                var content = await File.ReadAllTextAsync(outFile.FullName);
+                Assert.DoesNotContain("byte-identical to a previously-captured baseline snapshot", content, StringComparison.Ordinal);
+            }
+            finally { if (outFile.Exists) outFile.Delete(); }
+        }
+        finally { dir.Delete(recursive: true); }
+    }
+
+    // ── Wave 2: direct unit coverage for the pure detection helpers ──
+
+    [Fact]
+    public void DetectCrossLocationDrift_EmptyEntries_ReturnsEmpty()
+    {
+        Assert.Empty(SkillsScanCommand.DetectCrossLocationDrift([]));
+    }
+
+    [Fact]
+    public void DetectCrossLocationDrift_SingleLocationPerName_ReturnsEmpty()
+    {
+        var entries = new[]
+        {
+            new SkillBaselineEntry("a", SkillSourceKind.File, ".claude/skills/a", "struct-a", "hash-a", null, null, null, []),
+            new SkillBaselineEntry("b", SkillSourceKind.File, ".claude/skills/b", "struct-b", "hash-b", null, null, null, []),
+        };
+        Assert.Empty(SkillsScanCommand.DetectCrossLocationDrift(entries));
+    }
+
+    [Fact]
+    public void DetectPreviouslyVetted_EmptyHistory_ReturnsEmpty()
+    {
+        var entries = new[]
+        {
+            new SkillBaselineEntry("a", SkillSourceKind.File, ".claude/skills/a", "struct-a", "hash-a", null, null, null, []),
+        };
+        Assert.Empty(SkillsScanCommand.DetectPreviouslyVetted(entries, []));
     }
 
     // ── helpers (mirrors SkillsScanCommandTests' fixture builder) ──

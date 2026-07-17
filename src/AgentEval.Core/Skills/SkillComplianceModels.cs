@@ -65,6 +65,36 @@ public enum SkillComplianceRule
     /// <c>strategy/FutureFeatures/Skills/Skill-Discovery-Exclusion-Detection-Design.md</c>.
     /// </summary>
     SkillExcludedFromDiscovery,
+
+    /// <summary>
+    /// Agent Skills Wave 2 — <c>agenteval skills scan --repo</c> found the SAME skill name present under two
+    /// or more different directory conventions (e.g. <c>.claude/skills/foo</c> and <c>.cursor/skills/foo</c>)
+    /// with DIFFERENT <see cref="SkillContentHasher.HashSkillFolder"/> content hashes. Which copy actually
+    /// loads depends on which agent tool reads it — could be intentional per-tool customization, or could be
+    /// one location silently drifting (or being poisoned) while another stays trusted.
+    /// <para><b>Deliberately <see cref="Severity.Medium"/>, not High</b> — a governance signal to
+    /// investigate, not automatically a defect: the divergence may be deliberate per-tool customization,
+    /// which is a legitimate, common pattern this rule must not punish. Matches this same file's own
+    /// precedent (<see cref="ResourceFromUntrustedSource"/> is also Medium despite naming an injection-surface
+    /// risk in its own doc comment) rather than <see cref="SkillExcludedFromDiscovery"/>'s High (which fires
+    /// only when a skill is provably non-functional, not merely ambiguous).</para>
+    /// <para><b>Known scoping limits, not yet closed:</b> the competing locations/hashes are reported only in
+    /// the finding's human-readable <see cref="SkillComplianceFinding.Message"/> (hashes truncated to 8 hex
+    /// chars for display) — a machine consumer (CI script, SARIF tool) cannot extract them without
+    /// string-parsing. A container-mode skill nested 2 directory levels deep under the SAME convention can
+    /// share a bare directory name with an unrelated sibling, producing an ambiguous location label. Both are
+    /// accepted, disclosed gaps for Wave 2, not silently-missed cases.</para>
+    /// </summary>
+    CrossLocationContentDrift,
+
+    /// <summary>
+    /// Agent Skills Wave 2, trust-on-first-use — <c>agenteval skills scan --check-baseline</c> found this
+    /// skill's current <see cref="SkillContentHasher.HashSkillFolder"/> content hash matches a hash already
+    /// present in the baseline ledger (<see cref="ISkillBaselineStore"/>) for the SAME skill name — i.e. this
+    /// exact copy was already captured and vetted in a prior scan. Purely informational
+    /// (<see cref="Severity.Low"/>) — a positive "no drift since last seen" signal, not a problem.
+    /// </summary>
+    MatchesPreviouslyVettedCopy,
 }
 
 /// <summary>One rule violation (or informational flag) found for one skill.</summary>

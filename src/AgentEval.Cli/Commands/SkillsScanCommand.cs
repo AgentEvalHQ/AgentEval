@@ -49,9 +49,11 @@ internal static class SkillsScanCommand
         var writeBaselineOpt = new Option<bool>("--write-baseline")
             { Description = "After scanning, capture a timestamped baseline snapshot (content hash + structural fingerprint per skill) into the baseline ledger. See 'skills baseline list|diff|history'." };
         var repoOpt = new Option<bool>("--repo")
-            { Description = "Treat <path> as a REPO ROOT: scan every known skill-directory convention found under it (.claude/skills, .agents/skills, ...) and aggregate the results, instead of treating <path> itself as one skill directory." };
+            { Description = "Treat <path> as a REPO ROOT: scan every known skill-directory convention found under it (.claude/skills, .agents/skills, ...) and aggregate the results, instead of treating <path> itself as one skill directory. Always content-hashes every skill folder (real file I/O) to check for cross-location drift — the same name resolving to different content in two conventions — even without --write-baseline/--check-baseline." };
         var baselineRootOpt = new Option<string>("--baseline-root")
-            { DefaultValueFactory = _ => DefaultBaselineRoot, Description = "Baseline ledger root directory (used with --write-baseline)." };
+            { DefaultValueFactory = _ => DefaultBaselineRoot, Description = "Baseline ledger root directory (used with --write-baseline / --check-baseline)." };
+        var checkBaselineOpt = new Option<bool>("--check-baseline")
+            { Description = "Trust-on-first-use: compare each scanned skill's content hash against the baseline ledger's history (--baseline-root). A match against ANY prior snapshot for the same skill name is reported as an informational 'matches a previously-vetted copy' finding. Meaningless on a first-ever scan (no history yet) — pair with --write-baseline on earlier runs." };
 
         scanCmd.Arguments.Add(pathArg);
         scanCmd.Options.Add(formatOpt);
@@ -60,6 +62,7 @@ internal static class SkillsScanCommand
         scanCmd.Options.Add(writeBaselineOpt);
         scanCmd.Options.Add(repoOpt);
         scanCmd.Options.Add(baselineRootOpt);
+        scanCmd.Options.Add(checkBaselineOpt);
 
         scanCmd.SetAction(async (parseResult, ct) =>
         {
@@ -73,6 +76,7 @@ internal static class SkillsScanCommand
                     parseResult.GetValue(writeBaselineOpt),
                     parseResult.GetValue(repoOpt),
                     parseResult.GetValue(baselineRootOpt)!,
+                    parseResult.GetValue(checkBaselineOpt),
                     ct);
             }
             catch (Exception ex)
@@ -95,7 +99,8 @@ internal static class SkillsScanCommand
     /// </summary>
     internal static async Task<int> ExecuteAsync(
         DirectoryInfo path, string format, FileInfo? output, bool failOnNoncompliant,
-        bool writeBaseline = false, bool repo = false, string baselineRoot = DefaultBaselineRoot, CancellationToken ct = default)
+        bool writeBaseline = false, bool repo = false, string baselineRoot = DefaultBaselineRoot,
+        bool checkBaseline = false, CancellationToken ct = default)
     {
         if (!path.Exists)
         {
@@ -105,21 +110,53 @@ internal static class SkillsScanCommand
         AIAgent noOpAgent = new ChatClientAgent(new ScriptedChatClient(), new ChatClientAgentOptions { Name = "SkillsScanCommand" });
 
         SkillComplianceReport report;
-        SkillBaselineSnapshot? snapshot;
+        IReadOnlyList<SkillBaselineEntry> entries;
 
+        // Agent Skills Wave 2: entries (content hash + structural fingerprint per skill — real disk I/O,
+        // SkillContentHasher reads every byte of every file in every skill folder) are needed for
+        // cross-location drift detection, trust-on-first-use matching, and persisting a snapshot.
+        // --repo builds them unconditionally: drift detection has no opt-out flag, and a repo-wide
+        // governance scan is expected to cost more than a single-directory one (documented in the --repo
+        // option's own help text). A single-directory scan is NOT --repo-wide, though — a plain
+        // `skills scan <path>` with no flags must keep paying zero extra I/O, exactly like before Wave 2
+        // (previously this cost was gated behind --write-baseline only), so entries are built there ONLY
+        // when something will actually consume them.
         if (repo)
         {
-            var (combinedReport, combinedSnapshot, conventionSummary) =
-                await ScanRepoWideAsync(path.FullName, noOpAgent, writeBaseline, ct).ConfigureAwait(false);
+            var (combinedReport, combinedEntries, conventionSummary) =
+                await ScanRepoWideAsync(path.FullName, noOpAgent, ct).ConfigureAwait(false);
             report = combinedReport;
-            snapshot = combinedSnapshot;
+            entries = combinedEntries;
             Console.Error.WriteLine(conventionSummary);
         }
         else
         {
             var result = await MafSkillScanner.ScanFileSkillsWithInfoAsync(path.FullName, noOpAgent, options: null, ct).ConfigureAwait(false);
             report = result.Report;
-            snapshot = writeBaseline ? BuildSnapshot(path.FullName, result.Skills, report.Findings) : null;
+            entries = (writeBaseline || checkBaseline)
+                ? result.Skills.Select(info => ToBaselineEntry(info, report.Findings, conventionPrefix: null)).ToList()
+                : [];
+        }
+
+        // Agent Skills Wave 2 (§4.2): --repo cross-location drift is always checked (no extra flag — a
+        // repo-wide scan is the only mode where "cross-location" is even meaningful); --check-baseline
+        // trust-on-first-use matching is opt-in (meaningless without prior baseline history).
+        var extraFindings = new List<SkillComplianceFinding>();
+        if (repo)
+        {
+            extraFindings.AddRange(DetectCrossLocationDrift(entries));
+        }
+
+        if (checkBaseline)
+        {
+            var historyStore = new JsonFileSkillBaselineStore(baselineRoot);
+            var history = await historyStore.ListAsync(ct).ConfigureAwait(false);
+            extraFindings.AddRange(DetectPreviouslyVetted(entries, history));
+        }
+
+        if (extraFindings.Count > 0)
+        {
+            report = report with { Findings = [.. report.Findings, .. extraFindings] };
         }
 
         var rendered = RenderReport(report, format);
@@ -134,8 +171,9 @@ internal static class SkillsScanCommand
             Console.WriteLine(rendered);
         }
 
-        if (snapshot is not null)
+        if (writeBaseline)
         {
+            var snapshot = new SkillBaselineSnapshot(Guid.NewGuid().ToString("N"), DateTimeOffset.UtcNow, path.FullName, entries);
             var store = new JsonFileSkillBaselineStore(baselineRoot);
             var id = await store.SaveAsync(snapshot, ct).ConfigureAwait(false);
             Console.Error.WriteLine($"  Baseline snapshot saved: {id} ({snapshot.Skills.Count} skill(s) -> {baselineRoot})");
@@ -171,9 +209,12 @@ internal static class SkillsScanCommand
     /// like a single-root scan); the per-convention breakdown (which conventions existed, which didn't) is
     /// returned separately and printed to stderr — keeping stdout's shape (console/markdown/JSON) identical
     /// across <c>--repo</c> and non-<c>--repo</c> scans, rather than inventing a second JSON schema.
+    /// Entries (content hash + structural fingerprint per skill, tagged with which convention it came from
+    /// via <see cref="SkillBaselineEntry.RelativePath"/>) are now always built (Wave 2) — the caller decides
+    /// whether to persist them as a baseline snapshot and/or run cross-location drift detection over them.
     /// </summary>
-    private static async Task<(SkillComplianceReport Report, SkillBaselineSnapshot? Snapshot, string ConventionSummary)> ScanRepoWideAsync(
-        string repoRoot, AIAgent agent, bool writeBaseline, CancellationToken ct)
+    private static async Task<(SkillComplianceReport Report, IReadOnlyList<SkillBaselineEntry> Entries, string ConventionSummary)> ScanRepoWideAsync(
+        string repoRoot, AIAgent agent, CancellationToken ct)
     {
         var allFindings = new List<SkillComplianceFinding>();
         int skillCount = 0, withResources = 0, withScripts = 0, silentlyExcluded = 0;
@@ -204,32 +245,101 @@ internal static class SkillsScanCommand
                 histogram[stage] = histogram.GetValueOrDefault(stage) + count;
             }
 
-            if (writeBaseline)
+            foreach (var info in result.Skills)
             {
-                foreach (var info in result.Skills)
-                {
-                    entries.Add(ToBaselineEntry(info, result.Report.Findings, convention));
-                }
+                entries.Add(ToBaselineEntry(info, result.Report.Findings, convention));
             }
         }
 
         var combinedReport = new SkillComplianceReport(
             allFindings, new SkillCoverageSummary(skillCount, withResources, withScripts, histogram, silentlyExcluded));
-        var snapshot = writeBaseline
-            ? new SkillBaselineSnapshot(Guid.NewGuid().ToString("N"), DateTimeOffset.UtcNow, repoRoot, entries)
-            : null;
 
-        return (combinedReport, snapshot, summary.ToString().TrimEnd());
+        return (combinedReport, entries, summary.ToString().TrimEnd());
+    }
+
+    // ═══════════════════════════════ cross-location drift + trust-on-first-use (Wave 2) ═══════════════════════════════
+
+    /// <summary>
+    /// Groups <paramref name="entries"/> by skill <see cref="SkillBaselineEntry.Name"/> (case-insensitive —
+    /// GA requires lowercase-only names, so a name differing only by case across two conventions is the
+    /// SAME poisoning/drift scenario this rule targets, not two unrelated skills) and flags any name present
+    /// with 2+ DISTINCT <see cref="SkillBaselineEntry.ContentHash"/> values — the same skill name resolves
+    /// to different content depending on which convention/agent-tool reads it. Only meaningful for a
+    /// <c>--repo</c> scan (a single-directory scan has exactly one location by definition). Entries with an
+    /// empty/missing name are excluded from grouping entirely — two independently-malformed skills that both
+    /// lack a <c>name:</c> field are NOT "the same skill drifting," and grouping them by their shared empty
+    /// name would produce a misleading finding.
+    /// </summary>
+    internal static IReadOnlyList<SkillComplianceFinding> DetectCrossLocationDrift(IReadOnlyList<SkillBaselineEntry> entries)
+    {
+        var findings = new List<SkillComplianceFinding>();
+
+        foreach (var group in entries
+            .Where(e => e.ContentHash is not null && !string.IsNullOrEmpty(e.Name))
+            .GroupBy(e => e.Name, StringComparer.OrdinalIgnoreCase))
+        {
+            var distinctHashes = group.Select(e => e.ContentHash!).Distinct(StringComparer.Ordinal).ToList();
+            if (distinctHashes.Count <= 1)
+            {
+                continue; // same content everywhere it was found — no drift
+            }
+
+            var locations = string.Join(", ", group.Select(e => $"{e.RelativePath} ({e.ContentHash![..Math.Min(8, e.ContentHash.Length)]}…)"));
+            findings.Add(new SkillComplianceFinding(
+                group.Key,
+                SkillComplianceRule.CrossLocationContentDrift,
+                Severity.Medium,
+                $"Skill '{group.Key}' has DIFFERENT content across {group.Count()} location(s): {locations} — " +
+                "the same skill name resolves to different content depending on which agent tool reads it. " +
+                "Verify this is intentional per-tool customization, not drift or poisoning.",
+                Field: null));
+        }
+
+        return findings;
+    }
+
+    /// <summary>
+    /// Trust-on-first-use: for each of <paramref name="entries"/> with a non-null
+    /// <see cref="SkillBaselineEntry.ContentHash"/>, checks whether that exact (name, hash) pair already
+    /// appears somewhere in <paramref name="history"/> — i.e. this exact copy was captured and vetted in a
+    /// prior <c>--write-baseline</c> run. Reports the MOST RECENT matching snapshot's capture date (not the
+    /// first ever seen) so the finding answers "when did I last confirm this," not "when did this first appear."
+    /// </summary>
+    internal static IReadOnlyList<SkillComplianceFinding> DetectPreviouslyVetted(
+        IReadOnlyList<SkillBaselineEntry> entries, IReadOnlyList<SkillBaselineSnapshot> history)
+    {
+        // States the invariant directly (Max per key) instead of depending on an implicit
+        // "OrderByDescending + TryAdd keeps the first, which is the newest" ordering trick — a future edit
+        // reordering these calls can't silently start reporting the OLDEST match instead of the newest.
+        var mostRecentMatchByNameAndHash = history
+            .SelectMany(s => s.Skills.Where(e => e.ContentHash is not null).Select(e => (Key: (e.Name, e.ContentHash!), s.CapturedAt)))
+            .GroupBy(x => x.Key)
+            .ToDictionary(g => g.Key, g => g.Max(x => x.CapturedAt));
+
+        var findings = new List<SkillComplianceFinding>();
+        foreach (var entry in entries)
+        {
+            if (entry.ContentHash is null)
+            {
+                continue;
+            }
+
+            if (mostRecentMatchByNameAndHash.TryGetValue((entry.Name, entry.ContentHash), out var matchedAt))
+            {
+                findings.Add(new SkillComplianceFinding(
+                    entry.Name,
+                    SkillComplianceRule.MatchesPreviouslyVettedCopy,
+                    Severity.Low,
+                    $"✓ Skill '{entry.Name}' is byte-identical to a previously-captured baseline snapshot " +
+                    $"(most recent match: {matchedAt:yyyy-MM-dd}) — no content drift since it was last vetted.",
+                    Field: null));
+            }
+        }
+
+        return findings;
     }
 
     // ═══════════════════════════════ baseline entry building (§4.1) ═══════════════════════════════
-
-    private static SkillBaselineSnapshot BuildSnapshot(
-        string scannedRoot, IReadOnlyList<ScannedSkillInfo> skills, IReadOnlyList<SkillComplianceFinding> findings)
-    {
-        var entries = skills.Select(info => ToBaselineEntry(info, findings, conventionPrefix: null)).ToList();
-        return new SkillBaselineSnapshot(Guid.NewGuid().ToString("N"), DateTimeOffset.UtcNow, scannedRoot, entries);
-    }
 
     private static SkillBaselineEntry ToBaselineEntry(
         ScannedSkillInfo info, IReadOnlyList<SkillComplianceFinding> allFindings, string? conventionPrefix)
@@ -239,7 +349,20 @@ internal static class SkillsScanCommand
         string? contentHash = null;
         if (!string.IsNullOrWhiteSpace(info.AbsolutePath) && Directory.Exists(info.AbsolutePath))
         {
-            contentHash = SkillContentHasher.HashSkillFolder(info.AbsolutePath);
+            try
+            {
+                contentHash = SkillContentHasher.HashSkillFolder(info.AbsolutePath);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                // A locked/permission-denied file inside ONE skill's folder must not abort the whole scan
+                // for a reason unrelated to skill compliance (this call is now reachable from every --repo
+                // scan, not just --write-baseline — see this method's own callers). ContentHash stays null
+                // (same value a non-file-sourced skill already legitimately gets) — Wave 2's drift/TOFU
+                // detection already skip null-ContentHash entries, so this skill is simply excluded from
+                // those two checks rather than crashing the run. Surfaced to the operator, not swallowed.
+                Console.Error.WriteLine($"  Warning: could not compute content hash for skill '{manifest.Name}' ({info.AbsolutePath}): {ex.Message}");
+            }
         }
 
         var dirName = manifest.ParentDirectoryName ?? manifest.Name;
@@ -407,8 +530,14 @@ internal static class SkillsScanCommand
         Console.WriteLine($"Diffing {baseline.Id} ({baseline.CapturedAt:yyyy-MM-dd HH:mm:ss} UTC) -> {current.Id} ({current.CapturedAt:yyyy-MM-dd HH:mm:ss} UTC), hash={hashKind}");
         Console.WriteLine();
 
-        var baselineBySkill = baseline.Skills.ToDictionary(e => e.Name, StringComparer.Ordinal);
-        var currentBySkill = current.Skills.ToDictionary(e => e.Name, StringComparer.Ordinal);
+        // Wave 2: a --repo snapshot can legitimately contain 2+ entries with the SAME Name (the exact
+        // cross-location scenario CrossLocationContentDrift exists to surface) — plain ToDictionary(e =>
+        // e.Name) would throw ArgumentException ("same key already added") the first time that happens.
+        // GroupBy + First deterministically keeps the first-encountered location (KnownConventions'
+        // iteration order) instead of crashing; a true per-location diff is a real, larger feature this
+        // fix deliberately does not attempt — see DiffAsync/HistoryAsync's own remarks.
+        var baselineBySkill = baseline.Skills.GroupBy(e => e.Name, StringComparer.Ordinal).ToDictionary(g => g.Key, g => g.First(), StringComparer.Ordinal);
+        var currentBySkill = current.Skills.GroupBy(e => e.Name, StringComparer.Ordinal).ToDictionary(g => g.Key, g => g.First(), StringComparer.Ordinal);
 
         foreach (var f in findings.OrderBy(f => f.Key, StringComparer.Ordinal))
         {
@@ -447,6 +576,11 @@ internal static class SkillsScanCommand
         return ExitCodes.Success;
     }
 
+    // Wave 2 known limitation: a --repo snapshot can contain 2+ entries sharing the same Name (the
+    // cross-location scenario CrossLocationContentDrift surfaces). HistoryAsync's FirstOrDefault below
+    // picks an arbitrary one of them per snapshot (stable within one run, since KnownConventions' order
+    // is fixed, but not a real per-location history) rather than crashing — a true per-location history
+    // view is a real, larger feature this fix deliberately does not attempt.
     internal static async Task<int> HistoryAsync(string baselineRoot, string skillName, CancellationToken ct)
     {
         var store = new JsonFileSkillBaselineStore(baselineRoot);
@@ -498,10 +632,13 @@ internal static class SkillsScanCommand
     // null for them (see SkillBaselineEntry's remarks). With --hash content (the default), such a skill is
     // silently OMITTED from the diff entirely rather than reported as New/Removed/Changed/Unchanged with a
     // fabricated hash — pass --hash structural to diff those skills too (their StructuralFingerprint always exists).
+    // Wave 2: GroupBy + First (not ToDictionary directly) — see baselineBySkill/currentBySkill's own
+    // comment above for why a --repo snapshot can contain duplicate Names and why ToDictionary would crash.
     private static Dictionary<string, string> HashesByName(SkillBaselineSnapshot snapshot, bool useContent) =>
         snapshot.Skills
             .Where(e => !useContent || e.ContentHash is not null)
-            .ToDictionary(e => e.Name, e => useContent ? e.ContentHash! : e.StructuralFingerprint, StringComparer.Ordinal);
+            .GroupBy(e => e.Name, StringComparer.Ordinal)
+            .ToDictionary(g => g.Key, g => useContent ? g.First().ContentHash! : g.First().StructuralFingerprint, StringComparer.Ordinal);
 
     private static string Truncate(string value, int maxLength) =>
         value.Length <= maxLength ? value : value[..(maxLength - 1)] + "…";
