@@ -2,6 +2,7 @@
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 
+using AgentEval.Guardrails.Judges;
 using AgentEval.MAF.Gatekeeper;
 using AgentEval.Testing;
 using Microsoft.Extensions.AI;
@@ -29,6 +30,25 @@ public class ToolArgumentGoalCoherenceApprovalGateTests
     [InlineData("   ")]
     public void Constructor_BlankGoal_Throws(string? goal) =>
         Assert.Throws<ArgumentException>(() => new ToolArgumentGoalCoherenceApprovalGate(new ScriptedChatClient(), goal!));
+
+    [Fact]
+    public void Constructor_FailClosedOnInconclusiveFalse_Throws()
+    {
+        // This gate's whole safety story is "uncertainty always escalates" — a caller-supplied options that
+        // fails OPEN on inconclusive would silently undermine that (and, since caching defaults to true, make
+        // the mistaken auto-approval sticky). Reject it outright rather than accept it silently.
+        var options = new JudgeGateOptions { FailClosedOnInconclusive = false };
+        var ex = Assert.Throws<ArgumentException>(() => new ToolArgumentGoalCoherenceApprovalGate(new ScriptedChatClient(), "refund $12", options));
+        Assert.Equal("options", ex.ParamName);
+    }
+
+    [Fact]
+    public void Constructor_FailClosedOnInconclusiveTrueOrDefault_Accepted()
+    {
+        // The default JudgeGateOptions (FailClosedOnInconclusive == true) must NOT trip the new guard.
+        _ = new ToolArgumentGoalCoherenceApprovalGate(new ScriptedChatClient(), "refund $12", new JudgeGateOptions());
+        _ = new ToolArgumentGoalCoherenceApprovalGate(new ScriptedChatClient(), "refund $12", options: null);
+    }
 
     [Fact]
     public void PolicyName_DefaultsToJudgeAxisName()
@@ -91,6 +111,26 @@ public class ToolArgumentGoalCoherenceApprovalGateTests
         var approvable = await gate.IsAutoApprovableAsync(Call("get_return_policy"));
 
         Assert.True(approvable);
+    }
+
+    [Fact]
+    public async Task IsAutoApprovableAsync_UnserializableArguments_NonNotSupportedException_StillEscalates()
+    {
+        // The catch around JsonSerializer.Serialize must be broad, not just NotSupportedException — a custom
+        // getter can throw any exception type. The judge is never consulted in this path (would ALSO block if
+        // it were), so the test only needs to prove escalation, not that the model was skipped.
+        var model = new ScriptedChatClient().AddText("""{"incoherent": false, "confidence": 0.9}""");
+        var gate = new ToolArgumentGoalCoherenceApprovalGate(model, "refund $12");
+        var args = new Dictionary<string, object?> { ["value"] = new ThrowingOnSerialize() };
+
+        var approvable = await gate.IsAutoApprovableAsync(Call("process_refund", args));
+
+        Assert.False(approvable);
+    }
+
+    private sealed class ThrowingOnSerialize
+    {
+        public string Boom => throw new InvalidOperationException("getter boom — not NotSupportedException");
     }
 
     [Fact]
