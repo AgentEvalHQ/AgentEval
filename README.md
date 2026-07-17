@@ -598,6 +598,22 @@ Every evidence document is cryptographically chained to its source run; `agentev
 
 ---
 
+## Feature Maturity
+
+AgentEval ships as a single lockstep-versioned package (see [Installation](#installation)) — there is no per-package version to signal maturity the way some multi-package frameworks do. Instead, maturity is tracked per front, here, plus `[Experimental]` attributes on individual volatile APIs (compiler-enforced — referencing one without acknowledging it is a build **error**, not just a warning).
+
+| Front | Maturity | Why |
+|---|---|---|
+| Core eval (assertions, RAG metrics, LLM-as-judge, benchmarks, exporters) | **GA-track** | Stable since early releases, no breaking changes across this project's history, the foundation every other front builds on. |
+| RedTeam core (OWASP LLM Top 10, attacks/probes, Composite Judges) | **GA-track** | Feature-complete for its stated scope; remaining backlog items are additive, not destabilizing to what's shipped. |
+| Compliance benchmarks (GDPR, EU AI Act) | **GA-track** | Calibrated, stable, reproducible evidence figures. |
+| **Gatekeeper** (runtime enforcement) | **Beta** | The most differentiated subsystem and heavily tested (multiple calibrated judge axes) — but also the one still absorbing breaking API changes as it stabilizes. Real, valuable, actively evolving — exactly what "beta" means. A handful of the newest types are individually marked `[Experimental]`. |
+| Agent Skills | **Beta** | Genuinely shipped and tested, but depends on a very recently-GA'd upstream (MAF Agent Skills) and is still actively growing. |
+| Copilot Studio | **Experimental** | The connector has not yet been verified against a real tenant. |
+| Mission Control | **Experimental** | Real and functioning, but with acknowledged gaps and comparatively less investment than Core/RedTeam. |
+
+---
+
 ## Installation
 
 ```bash
