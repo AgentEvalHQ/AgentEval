@@ -454,6 +454,52 @@ report: cross-location content drift (`--repo` only, always on) and trust-on-fir
 
 ---
 
+### `agenteval skills scan-workspace`
+
+Agent Skills Wave 3a — filesystem-only, credential-free scan across a folder of **already-cloned** repos.
+Every immediate (non-hidden) subdirectory of `<path>` is treated as one repo and scanned with the same
+pipeline `scan --repo` uses, then combined into one report. No GitHub/GitLab API, no token — the operator's own
+clone step is what already decides which repos are visible; that access-control question is deliberately kept
+outside this verb's trust boundary (contrast with the still-gated, API-driven `scan-org`, Wave 3b).
+
+**Synopsis**
+
+```
+agenteval skills scan-workspace <path> [--format console|markdown|json] [-o|--output <file>] [--fail-on-noncompliant]
+                                        [--write-baseline] [--baseline-root <dir>] [--check-baseline]
+```
+
+**What it does**
+
+Fans out `scan --repo`'s existing per-repo pipeline over every immediate subdirectory of `<path>`, combining
+findings/coverage into one report (per-repo skill/finding counts print to stderr). Every entry's location is
+tagged `{repoFolder}/{conventionPath}`, so cross-location content drift — the same detector `scan --repo`
+already uses, unchanged — now also fires **across repos**, not just across conventions within one repo: the
+same skill name with different content in two different cloned repos is exactly the drift/poisoning signal
+this is for.
+
+```bash
+gh repo clone myorg/service-a ~/audit/service-a
+gh repo clone myorg/service-b ~/audit/service-b
+agenteval skills scan-workspace ~/audit --write-baseline --format json -o report.json
+```
+
+**Options**
+
+| Option | Description |
+|--------|-------------|
+| `<path>` | Required, positional. A folder whose immediate subdirectories are repo roots. |
+| `--format <fmt>` | `console` (default), `markdown`, or `json`. |
+| `-o, --output <path>` | Write the rendered report to a file instead of stdout. |
+| `--fail-on-noncompliant` | Exit `1` when the scan finds a High-severity finding. |
+| `--write-baseline` | Capture a timestamped baseline snapshot across all scanned repos into the baseline ledger. |
+| `--baseline-root <dir>` | Baseline ledger root directory. Default `.agenteval/skills-baselines`. |
+| `--check-baseline` | Trust-on-first-use across the whole workspace — see `scan`'s `--check-baseline` above. |
+
+**Exit codes:** same as `scan` above.
+
+---
+
 ### `agenteval skills baseline`
 
 Inspects the multi-snapshot skill baseline ledger `agenteval skills scan --write-baseline` writes to. Each

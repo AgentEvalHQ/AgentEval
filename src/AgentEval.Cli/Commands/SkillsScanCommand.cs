@@ -29,6 +29,7 @@ internal static class SkillsScanCommand
     {
         var skillsCmd = new Command("skills", "MAF Agent Skills utilities");
         skillsCmd.Subcommands.Add(BuildScanCommand());
+        skillsCmd.Subcommands.Add(BuildScanWorkspaceCommand());
         skillsCmd.Subcommands.Add(BuildBaselineCommand());
         return skillsCmd;
     }
@@ -139,10 +140,26 @@ internal static class SkillsScanCommand
         }
 
         // Agent Skills Wave 2 (§4.2): --repo cross-location drift is always checked (no extra flag — a
-        // repo-wide scan is the only mode where "cross-location" is even meaningful); --check-baseline
-        // trust-on-first-use matching is opt-in (meaningless without prior baseline history).
+        // repo-wide scan is the only mode where "cross-location" is even meaningful for a single repo).
+        return await FinishScanAsync(
+            report, entries, checkCrossLocationDrift: repo, format, output, failOnNoncompliant,
+            writeBaseline, baselineRoot, checkBaseline, path.FullName, ct).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// The tail shared by every scan mode (single-directory, <c>--repo</c>, and Wave 3a's
+    /// <c>scan-workspace</c>) once discovery has produced a <see cref="SkillComplianceReport"/> and its
+    /// matching <see cref="SkillBaselineEntry"/> list: merge in cross-location-drift / trust-on-first-use
+    /// findings, render, write the output, persist a baseline snapshot if asked, and compute the exit code.
+    /// </summary>
+    private static async Task<int> FinishScanAsync(
+        SkillComplianceReport report, IReadOnlyList<SkillBaselineEntry> entries, bool checkCrossLocationDrift,
+        string format, FileInfo? output, bool failOnNoncompliant, bool writeBaseline, string baselineRoot,
+        bool checkBaseline, string scannedRoot, CancellationToken ct)
+    {
+        // --check-baseline trust-on-first-use matching is opt-in (meaningless without prior baseline history).
         var extraFindings = new List<SkillComplianceFinding>();
-        if (repo)
+        if (checkCrossLocationDrift)
         {
             extraFindings.AddRange(DetectCrossLocationDrift(entries));
         }
@@ -173,7 +190,7 @@ internal static class SkillsScanCommand
 
         if (writeBaseline)
         {
-            var snapshot = new SkillBaselineSnapshot(Guid.NewGuid().ToString("N"), DateTimeOffset.UtcNow, path.FullName, entries);
+            var snapshot = new SkillBaselineSnapshot(Guid.NewGuid().ToString("N"), DateTimeOffset.UtcNow, scannedRoot, entries);
             var store = new JsonFileSkillBaselineStore(baselineRoot);
             var id = await store.SaveAsync(snapshot, ct).ConfigureAwait(false);
             Console.Error.WriteLine($"  Baseline snapshot saved: {id} ({snapshot.Skills.Count} skill(s) -> {baselineRoot})");
@@ -197,6 +214,153 @@ internal static class SkillsScanCommand
     /// </summary>
     internal static int ComputeExitCode(SkillComplianceReport report, bool failOnNoncompliant)
         => (failOnNoncompliant && !report.IsCompliant) ? ExitCodes.TestFailure : ExitCodes.Success;
+
+    // ═══════════════════════════════ scan-workspace: filesystem multi-repo scan (Wave 3a) ═══════════════════════════════
+
+    private static Command BuildScanWorkspaceCommand()
+    {
+        var scanWorkspaceCmd = new Command(
+            "scan-workspace",
+            "Scan a folder of ALREADY-CLONED repos (each immediate subdirectory is one repo) for MAF Agent Skills compliance + cross-repo drift. Filesystem-only — no network, no credentials; the operator's own clone step is what already handles repo access.");
+
+        var pathArg = new Argument<DirectoryInfo>("path")
+            { Description = "A folder whose immediate subdirectories are repo roots (e.g. where you 'gh repo clone'd your org's repos)" };
+        var formatOpt = new Option<string>("--format")
+            { DefaultValueFactory = _ => "console", Description = "Output format: console | markdown | json" };
+        var outputOpt = new Option<FileInfo?>("-o", "--output") { Description = "Output file (default: stdout)" };
+        var failOnOpt = new Option<bool>("--fail-on-noncompliant")
+            { Description = "Exit non-zero (1) when the scan finds a High-severity finding (report.IsCompliant == false). Default off (informational-only)." };
+        var writeBaselineOpt = new Option<bool>("--write-baseline")
+            { Description = "After scanning, capture a timestamped baseline snapshot (content hash + structural fingerprint per skill) into the baseline ledger. See 'skills baseline list|diff|history'." };
+        var baselineRootOpt = new Option<string>("--baseline-root")
+            { DefaultValueFactory = _ => DefaultBaselineRoot, Description = "Baseline ledger root directory (used with --write-baseline / --check-baseline)." };
+        var checkBaselineOpt = new Option<bool>("--check-baseline")
+            { Description = "Trust-on-first-use: compare each scanned skill's content hash against the baseline ledger's history (--baseline-root). A match against ANY prior snapshot for the same skill name is reported as an informational 'matches a previously-vetted copy' finding." };
+
+        scanWorkspaceCmd.Arguments.Add(pathArg);
+        scanWorkspaceCmd.Options.Add(formatOpt);
+        scanWorkspaceCmd.Options.Add(outputOpt);
+        scanWorkspaceCmd.Options.Add(failOnOpt);
+        scanWorkspaceCmd.Options.Add(writeBaselineOpt);
+        scanWorkspaceCmd.Options.Add(baselineRootOpt);
+        scanWorkspaceCmd.Options.Add(checkBaselineOpt);
+
+        scanWorkspaceCmd.SetAction(async (parseResult, ct) =>
+        {
+            try
+            {
+                return await ExecuteWorkspaceAsync(
+                    parseResult.GetValue(pathArg)!,
+                    parseResult.GetValue(formatOpt)!,
+                    parseResult.GetValue(outputOpt),
+                    parseResult.GetValue(failOnOpt),
+                    parseResult.GetValue(writeBaselineOpt),
+                    parseResult.GetValue(baselineRootOpt)!,
+                    parseResult.GetValue(checkBaselineOpt),
+                    ct);
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"  Error: {ex.Message}");
+                return ExitCodes.RuntimeError;
+            }
+        });
+
+        return scanWorkspaceCmd;
+    }
+
+    /// <summary>
+    /// Core execution logic for <c>scan-workspace</c> — separated from command wiring for testability, mirroring
+    /// <see cref="ExecuteAsync"/>. Deliberately a SEPARATE verb from <c>scan --repo</c> rather than a bolted-on
+    /// flag on it (naming a flag <c>--workspace</c> would collide with Mission Control's unrelated
+    /// <c>--workspace</c> concept and its own honesty history — see <c>strategy/AgentEval-Status-and-Plan-Forward.md</c>
+    /// Front D) — so this verb's own name states plainly what it does, without borrowing an already-loaded word.
+    /// </summary>
+    internal static async Task<int> ExecuteWorkspaceAsync(
+        DirectoryInfo path, string format, FileInfo? output, bool failOnNoncompliant,
+        bool writeBaseline = false, string baselineRoot = DefaultBaselineRoot, bool checkBaseline = false,
+        CancellationToken ct = default)
+    {
+        if (!path.Exists)
+        {
+            throw new DirectoryNotFoundException($"Workspace directory not found: {path.FullName}");
+        }
+
+        AIAgent noOpAgent = new ChatClientAgent(new ScriptedChatClient(), new ChatClientAgentOptions { Name = "SkillsScanCommand" });
+
+        var (report, entries, workspaceSummary) = await ScanWorkspaceAsync(path.FullName, noOpAgent, ct).ConfigureAwait(false);
+        Console.Error.WriteLine(workspaceSummary);
+
+        // Cross-location drift is always checked, same as --repo — a multi-repo workspace scan is exactly
+        // the scenario "skill X is byte-identical across 45 repos except 3 outliers" describes; cross-REPO
+        // drift IS cross-location drift, just at one more directory level (see ScanWorkspaceAsync's remarks
+        // for how entries are re-tagged to make this fall out of the EXISTING DetectCrossLocationDrift as-is).
+        return await FinishScanAsync(
+            report, entries, checkCrossLocationDrift: true, format, output, failOnNoncompliant,
+            writeBaseline, baselineRoot, checkBaseline, path.FullName, ct).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Wave 3a (filesystem multi-repo scan): treats <paramref name="workspaceRoot"/> as a folder of
+    /// already-cloned repos — every immediate, non-hidden subdirectory is one repo — and runs the EXISTING
+    /// <see cref="ScanRepoWideAsync"/> (the <c>--repo</c> pipeline, unchanged) against each one, combining
+    /// every repo's findings/entries into one report. Zero new discovery/compliance code: this is a fan-out
+    /// loop over an already-shipped pipeline, not a reimplementation. Entries are re-tagged with a
+    /// <c>"{repoFolderName}/{conventionRelativePath}"</c> <see cref="SkillBaselineEntry.RelativePath"/> so the
+    /// UNCHANGED <see cref="DetectCrossLocationDrift"/> — which only ever groups by
+    /// <see cref="SkillBaselineEntry.Name"/>, never by <c>RelativePath</c> — also catches drift ACROSS repos
+    /// for free, exactly as it already does across conventions within one repo.
+    /// <para>Deliberately filesystem-only: no GitHub/GitLab API client, no token, no network call. The
+    /// operator's own clone step (their own credentials, their own tooling) is what decides which repos are
+    /// visible here — that access-control question is intentionally kept OUTSIDE this verb's trust boundary,
+    /// unlike the live, API-driven org-wide scan a security/credential-scope review is still pending for.</para>
+    /// </summary>
+    private static async Task<(SkillComplianceReport Report, IReadOnlyList<SkillBaselineEntry> Entries, string WorkspaceSummary)> ScanWorkspaceAsync(
+        string workspaceRoot, AIAgent agent, CancellationToken ct)
+    {
+        var allFindings = new List<SkillComplianceFinding>();
+        int skillCount = 0, withResources = 0, withScripts = 0, silentlyExcluded = 0;
+        var histogram = new Dictionary<string, int>(StringComparer.Ordinal);
+        var entries = new List<SkillBaselineEntry>();
+        var summary = new StringBuilder();
+        summary.AppendLine("  Workspace repos scanned:");
+
+        var repoDirs = Directory.GetDirectories(workspaceRoot)
+            .Where(d => !Path.GetFileName(d).StartsWith('.'))   // skip .git and similar tooling folders, not repo clones
+            .OrderBy(d => d, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        if (repoDirs.Count == 0)
+        {
+            summary.AppendLine("    (no subdirectories found)");
+        }
+
+        foreach (var repoPath in repoDirs)
+        {
+            ct.ThrowIfCancellationRequested();
+            var repoName = Path.GetFileName(repoPath);
+            var (repoReport, repoEntries, _) = await ScanRepoWideAsync(repoPath, agent, ct).ConfigureAwait(false);
+
+            summary.AppendLine($"    {repoName}: {repoReport.Coverage.SkillCount} skill(s), {repoReport.Findings.Count} finding(s)");
+
+            allFindings.AddRange(repoReport.Findings);
+            skillCount += repoReport.Coverage.SkillCount;
+            withResources += repoReport.Coverage.WithResources;
+            withScripts += repoReport.Coverage.WithScripts;
+            silentlyExcluded += repoReport.Coverage.SilentlyExcludedCount;
+            foreach (var (stage, count) in repoReport.Coverage.StageHistogram)
+            {
+                histogram[stage] = histogram.GetValueOrDefault(stage) + count;
+            }
+
+            entries.AddRange(repoEntries.Select(e => e with { RelativePath = $"{repoName}/{e.RelativePath}" }));
+        }
+
+        var combinedReport = new SkillComplianceReport(
+            allFindings, new SkillCoverageSummary(skillCount, withResources, withScripts, histogram, silentlyExcluded));
+
+        return (combinedReport, entries, summary.ToString().TrimEnd());
+    }
 
     // ═══════════════════════════════ --repo multi-convention discovery (§4.3) ═══════════════════════════════
 
