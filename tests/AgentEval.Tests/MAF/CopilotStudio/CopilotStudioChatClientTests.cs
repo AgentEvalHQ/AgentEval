@@ -2,6 +2,7 @@
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 
+using AgentEval.Assertions;
 using AgentEval.MAF.CopilotStudio;
 using Microsoft.Agents.Core.Models;
 using Microsoft.Extensions.AI;
@@ -228,6 +229,70 @@ public class CopilotStudioChatClientTests
 
         Assert.Equal(1, ex.EstimatedCreditsUsed);
         Assert.Equal(1, fake.AskCallCount);   // turn 2 never reached the conversation client
+    }
+
+    [Fact]
+    public async Task EstimatedCreditsUsed_PublicAccessor_ReadsTheSameCounterBudgetEnforcementUses()
+    {
+        // The public accessor (added for HaveStayedWithinCreditBudget) must read the identical counter the
+        // --max-credits gate itself uses — not a parallel/duplicated one.
+        var fake = new FakeCopilotStudioConversationClient();
+        fake.OnStart = (_, _) => Empty();
+        fake.OnAsk = (_, _, _) => One(Message("ok", "conv-1"));
+
+        using var client = new CopilotStudioChatClient(fake);
+        Assert.Equal(0, client.EstimatedCreditsUsed);
+
+        await client.GetResponseAsync([new ChatMessage(ChatRole.User, "turn 1")]);
+        Assert.Equal(1, client.EstimatedCreditsUsed);
+
+        await client.GetResponseAsync([new ChatMessage(ChatRole.User, "turn 2")]);
+        Assert.Equal(2, client.EstimatedCreditsUsed);
+    }
+
+    [Fact]
+    public async Task EstimatedCreditsUsed_DoesNotIncrement_OnAFailedTurn()
+    {
+        // GetStreamingResponseCoreAsync only bumps _estimatedCreditsUsed AFTER a fully successful turn (see
+        // its own remarks) — the public accessor must reflect that, not double-count or count a failed attempt.
+        var fake = new FakeCopilotStudioConversationClient();
+        fake.OnStart = (_, _) => Empty();
+        fake.OnAsk = (_, _, _) => throw new InvalidOperationException("simulated transport failure");
+
+        using var client = new CopilotStudioChatClient(fake);
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => client.GetResponseAsync([new ChatMessage(ChatRole.User, "turn 1")]));
+
+        Assert.Equal(0, client.EstimatedCreditsUsed);
+    }
+
+    // ── fluent assertions against the real bridge (CopilotStudioAssertions) ──
+
+    [Fact]
+    public async Task FluentAssertions_HaveContinuedConversation_PassesAcrossARealBridgedMultiTurnFlow()
+    {
+        var mock = new MockCopilotStudioConversationClient("conv-mock-1")
+            .WithReply("first reply")
+            .WithReply("second reply");
+
+        using var client = new CopilotStudioChatClient(mock);
+        var first = await client.GetResponseAsync([new ChatMessage(ChatRole.User, "hi")]);
+        first.Should().HaveStartedNewConversation();
+        first.Text.Should().HaveRespondedWithNonEmptyMessage();
+
+        var second = await client.GetResponseAsync([new ChatMessage(ChatRole.User, "again")]);
+        second.Should().HaveContinuedConversation(first.ConversationId!);
+    }
+
+    [Fact]
+    public async Task FluentAssertions_HaveStayedWithinCreditBudget_ReflectsRealBridgedSpend()
+    {
+        var mock = new MockCopilotStudioConversationClient("conv-mock-2").WithReply("ok");
+        using var client = new CopilotStudioChatClient(mock);
+
+        var response = await client.GetResponseAsync([new ChatMessage(ChatRole.User, "hi")]);
+
+        response.Should().HaveStayedWithinCreditBudget(client.EstimatedCreditsUsed, maxCredits: 5);
     }
 
     // ── activity builders ──
