@@ -73,6 +73,7 @@ public static class PrivateNetworkClassifier
             192 => (b[1] == 168) || (b[1] == 0 && b[2] == 0) || (b[1] == 0 && b[2] == 2),   // 192.168/16, 192.0.0/24, 192.0.2/24
             198 => (b[1] == 18 || b[1] == 19) || (b[1] == 51 && b[2] == 100),               // 198.18/15, 198.51.100/24
             203 => b[1] == 0 && b[2] == 113,                 // 203.0.113/24
+            >= 224 and <= 239 => true,                       // 224.0.0.0/4 multicast (this method's own doc promises it)
             >= 240 => true,                                  // 240.0.0.0/4 reserved + 255.255.255.255 broadcast
             _ => false,
         };

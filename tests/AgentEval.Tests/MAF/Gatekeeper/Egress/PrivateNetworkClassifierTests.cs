@@ -26,6 +26,8 @@ public class PrivateNetworkClassifierTests
     [InlineData("192.0.2.1")]        // TEST-NET-1
     [InlineData("198.51.100.1")]     // TEST-NET-2
     [InlineData("203.0.113.1")]      // TEST-NET-3
+    [InlineData("224.0.0.251")]      // multicast (mDNS) — regression test: this method's own doc already
+    [InlineData("239.255.255.250")]  // multicast (SSDP) — promised multicast is covered, IPv4 silently wasn't
     public void IPv4_PrivateOrReserved_ReturnsTrue(string ip)
         => Assert.True(PrivateNetworkClassifier.IsPrivateOrReserved(IPAddress.Parse(ip)));
 
@@ -35,6 +37,7 @@ public class PrivateNetworkClassifierTests
     [InlineData("172.15.255.255")]   // just below the RFC1918 172.16/12 range
     [InlineData("172.32.0.0")]       // just above the RFC1918 172.16/12 range
     [InlineData("11.0.0.1")]         // just above 10/8
+    [InlineData("223.255.255.255")]  // just below the multicast 224.0.0.0/4 range
     public void IPv4_Public_ReturnsFalse(string ip)
         => Assert.False(PrivateNetworkClassifier.IsPrivateOrReserved(IPAddress.Parse(ip)));
 

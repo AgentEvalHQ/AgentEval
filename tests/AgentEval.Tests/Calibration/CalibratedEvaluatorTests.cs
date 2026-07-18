@@ -634,6 +634,73 @@ public class CalibratedEvaluatorTests
             () => evaluator.EvaluateAsync("input", "output", new[] { "Is accurate" }, cts.Token));
     }
 
+    #endregion
+
+    #region EvaluationFailed judge results must not be voted in as real verdicts
+
+    [Fact]
+    public async Task EvaluateAsync_OneJudgeReturnsEvaluationFailed_NotVotedIntoFinalScore()
+    {
+        // Regression test for a real bug found in review: a judge whose response couldn't be parsed doesn't
+        // throw — ChatClientEvaluator returns a fallback EvaluationResult (OverallScore=50, EvaluationFailed=
+        // true) that previously got voted in as a real verdict indistinguishably from an actual judge score.
+        // With Median across a real 85 and a fabricated 50, the old buggy behavior would report 67.5; the fix
+        // must report 85 — only the real judge's score.
+        var evaluator = new CalibratedEvaluator(
+            new (string Name, IEvaluator Evaluator)[]
+            {
+                ("Real", new StubEvaluator(overallScore: 85)),
+                ("BrokenJudge", new FailedParseEvaluator()),
+            },
+            new CalibratedJudgeOptions
+            {
+                MinimumJudgesRequired = 1,
+                Strategy = VotingStrategy.Median,
+            });
+
+        var result = await evaluator.EvaluateAsync("input", "output", new[] { "Is accurate" });
+
+        Assert.Equal(85, result.OverallScore);
+    }
+
+    [Fact]
+    public async Task EvaluateAsync_EvaluationFailedJudge_CountsAgainstMinimumJudgesRequired()
+    {
+        // The fallback score must count as a JUDGE FAILURE for the "enough judges succeeded" guard too — not
+        // just be excluded from voting. One real judge + one EvaluationFailed judge, with 2 required, must
+        // throw exactly like two thrown exceptions would.
+        var evaluator = new CalibratedEvaluator(
+            new (string Name, IEvaluator Evaluator)[]
+            {
+                ("Real", new StubEvaluator(overallScore: 85)),
+                ("BrokenJudge", new FailedParseEvaluator()),
+            },
+            new CalibratedJudgeOptions
+            {
+                MinimumJudgesRequired = 2,
+                ContinueOnJudgeFailure = true,
+            });
+
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => evaluator.EvaluateAsync("input", "output", new[] { "Is accurate" }));
+        Assert.Contains("1 of 2 judges succeeded", ex.Message, StringComparison.Ordinal);
+    }
+
+    #endregion
+
+    /// <summary>Models ChatClientEvaluator's own fallback on an unparseable judge response — doesn't throw.</summary>
+    private sealed class FailedParseEvaluator : IEvaluator
+    {
+        public Task<EvaluationResult> EvaluateAsync(
+            string input, string output, IEnumerable<string> criteria, CancellationToken ct = default) =>
+            Task.FromResult(new EvaluationResult
+            {
+                OverallScore = AgentEval.Core.EvaluationDefaults.DefaultFailureScore,
+                Summary = "Failed to parse evaluation - no JSON found",
+                EvaluationFailed = true,
+            });
+    }
+
     private sealed class StubEvaluator(int overallScore) : IEvaluator
     {
         public Task<EvaluationResult> EvaluateAsync(
@@ -658,6 +725,4 @@ public class CalibratedEvaluatorTests
             throw new InvalidOperationException("unreachable");
         }
     }
-
-    #endregion
 }

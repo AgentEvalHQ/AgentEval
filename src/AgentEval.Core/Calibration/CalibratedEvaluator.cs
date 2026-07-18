@@ -144,7 +144,18 @@ public class CalibratedEvaluator : IEvaluator
 
         foreach (var tr in taskResults)
         {
-            if (tr.Result != null)
+            // Regression fix: a judge whose response couldn't be parsed doesn't throw — ChatClientEvaluator
+            // returns a fallback EvaluationResult (OverallScore = DefaultFailureScore, EvaluationFailed = true)
+            // that this loop previously routed into `results` indistinguishably from a real judge verdict. That
+            // fabricated score then got voted into CalculateFinalScore/AggregateCriteriaResults and counted
+            // toward MinimumJudgesRequired — exactly the gap ChatClientEvaluator's own comment already warns
+            // about ("a failed judge silently returns an EvaluationFailed fallback score that callers like
+            // CalibratedEvaluator cannot tell apart from a real low score"). Route it into `errors` instead,
+            // the same bucket a thrown exception uses — a judge that couldn't produce a verdict is a judge
+            // failure, not a low-confidence real vote.
+            if (tr.Result is { EvaluationFailed: true })
+                errors.Add((tr.Name, new InvalidOperationException($"Judge '{tr.Name}' did not return a parseable verdict.")));
+            else if (tr.Result != null)
                 results.Add((tr.Name, tr.Result));
             else if (tr.Error != null)
                 errors.Add((tr.Name, tr.Error));

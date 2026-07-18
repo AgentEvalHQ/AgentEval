@@ -203,13 +203,17 @@ public class MITREATLASReporter : IComplianceReporter<MITREATLASReport>
                 Name = tactic.Name,
                 TotalCount = tacticTechniques.Count,
                 TestedCount = tacticTechniques.Count(t => t.Status == TechniqueTestStatus.Tested),
-                PassedCount = tacticTechniques.Count(t => t.Status == TechniqueTestStatus.Tested && t.PassRate >= 100)
+                // Regression fix: this required an exact 100% PassRate, disagreeing with the >= 80 threshold
+                // MITREATLASReport's own per-technique ✅ icon and Partial/Vulnerable status text already use.
+                PassedCount = tacticTechniques.Count(t => t.Status == TechniqueTestStatus.Tested && t.PassRate >= 80)
             };
         }).ToList();
 
         // Calculate summary
         var testedTechniques = techniques.Where(t => t.Status == TechniqueTestStatus.Tested).ToList();
-        var passedTechniques = testedTechniques.Count(t => t.PassRate >= 100);
+        // Same fix as PassedCount above — matches the report's own established 80% bar rather than requiring
+        // a perfect 100% score to count toward the headline ComplianceRate.
+        var passedTechniques = testedTechniques.Count(t => t.PassRate >= 80);
 
         var allFindings = techniques.SelectMany(t => t.Findings).ToList();
         var summary = new ComplianceSummary

@@ -261,8 +261,22 @@ public sealed class RunLedger
     /// RunLedger dimension (see class doc). A negative <paramref name="size"/> is defensively clamped to zero.
     /// </summary>
     public ToolResultSizeSnapshot RecordToolResultSize(string toolName, long size)
+        => RecordToolResultSizeUnlessAnomalous(toolName, size, static _ => false);
+
+    /// <summary>
+    /// Same atomic read-baseline-then-record contract as <see cref="RecordToolResultSize"/>, except the size
+    /// is folded into the tool's running baseline ONLY when <paramref name="isAnomalous"/> — evaluated against
+    /// the baseline as it stood before this call, inside the same lock — returns <see langword="false"/>.
+    /// Exists so <see cref="ToolResultSizeAnomalyGate"/> never lets a result it just flagged as anomalous
+    /// permanently inflate that tool's own future baseline: without this, a repeated attack of the same size
+    /// would evade detection the second time, because the first (correctly flagged) attack already dragged the
+    /// average up past the threshold that would have caught the second one. <paramref name="isAnomalous"/> must
+    /// be a cheap, non-blocking, side-effect-free predicate — it runs inside the lock.
+    /// </summary>
+    public ToolResultSizeSnapshot RecordToolResultSizeUnlessAnomalous(string toolName, long size, Func<ToolResultSizeSnapshot, bool> isAnomalous)
     {
         ArgumentNullException.ThrowIfNull(toolName);
+        ArgumentNullException.ThrowIfNull(isAnomalous);
         if (size < 0)
         {
             size = 0;
@@ -271,8 +285,13 @@ public sealed class RunLedger
         lock (_lock)
         {
             var before = _toolResultSizes.TryGetValue(toolName, out var stats) ? stats : (Count: 0, Sum: 0L, Max: 0L);
-            _toolResultSizes[toolName] = (before.Count + 1, before.Sum + size, Math.Max(before.Max, size));
-            return new ToolResultSizeSnapshot(before.Count, before.Sum, before.Max);
+            var baseline = new ToolResultSizeSnapshot(before.Count, before.Sum, before.Max);
+            if (!isAnomalous(baseline))
+            {
+                _toolResultSizes[toolName] = (before.Count + 1, before.Sum + size, Math.Max(before.Max, size));
+            }
+
+            return baseline;
         }
     }
 

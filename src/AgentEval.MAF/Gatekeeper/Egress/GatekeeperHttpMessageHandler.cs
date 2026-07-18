@@ -22,11 +22,18 @@ namespace AgentEval.MAF.Gatekeeper.Egress;
 /// allow-list + private-network check against every hop's target before following it — an attacker cannot use
 /// an allowed host as an open redirector to a forbidden one. Bounded by <see cref="GatekeeperHttpEgressOptions.MaxRedirects"/>
 /// (fail-closed: exceeding it blocks, it does not silently stop following and return the last response).</para>
-/// <para><b>DNS-rebind / SSRF defense.</b> Before connecting, the target host is resolved via
-/// <see cref="GatekeeperHttpEgressOptions.DnsResolver"/> and every returned address is checked against
-/// <see cref="PrivateNetworkClassifier.IsPrivateOrReserved"/>; a private/loopback/link-local/reserved answer
-/// blocks the request (<see cref="GatekeeperHttpEgressOptions.BlockPrivateNetworks"/>, default on). DNS
-/// resolution failure or timeout is ALSO a block — cannot prove the destination safe.</para>
+/// <para><b>DNS-rebind / SSRF defense — connection PINNED to the validated address.</b> Before connecting,
+/// the target host is resolved via <see cref="GatekeeperHttpEgressOptions.DnsResolver"/> and every returned
+/// address is checked against <see cref="PrivateNetworkClassifier.IsPrivateOrReserved"/>; a private/loopback/
+/// link-local/reserved answer blocks the request (<see cref="GatekeeperHttpEgressOptions.BlockPrivateNetworks"/>,
+/// default on). DNS resolution failure or timeout is ALSO a block — cannot prove the destination safe.
+/// Validating the DNS answer is not enough on its own: a plain SocketsHttpHandler performs its OWN,
+/// independent DNS resolution when it actually opens the socket, moments later — a classic rebinding
+/// attacker returns a safe address to the validating lookup and a private one to that second,
+/// connection-time lookup. <see cref="CreateHttpClient"/> closes this by installing a ConnectCallback that
+/// connects DIRECTLY to the exact address just validated (via a per-request pinned option, so this is
+/// race-safe across concurrent requests on one shared <see cref="HttpClient"/>) — DNS is resolved exactly
+/// once per request, by this handler, never re-resolved by the transport.</para>
 /// <para><b>Fail-closed contract.</b> Every block (non-allow-listed host, DNS failure, private address,
 /// redirect-chain overrun) throws <see cref="HttpEgressBlockedException"/> — the natural, idiomatic
 /// "this request cannot proceed" signal for an <see cref="HttpMessageHandler"/> (mirrors how
@@ -47,10 +54,25 @@ public sealed class GatekeeperHttpMessageHandler : DelegatingHandler
         HttpStatusCode.TemporaryRedirect, HttpStatusCode.PermanentRedirect,
     ];
 
+    // Per-REQUEST (not per-handler/per-instance) pinned address — HttpRequestMessage.Options is a private bag
+    // scoped to that one request object, so concurrent requests on the same shared HttpClient/handler never
+    // see each other's pinned address. Set by ValidateTargetAsync, read by the ConnectCallback CreateHttpClient
+    // installs.
+    private static readonly HttpRequestOptionsKey<IPAddress> PinnedAddressKey = new("AgentEval.Gatekeeper.Egress.PinnedAddress");
+
     private readonly HashSet<string> _allowed;
     private readonly GatekeeperHttpEgressOptions _options;
 
-    /// <summary>Creates the handler over <paramref name="innerHandler"/> — for composing with a caller-supplied handler (e.g. a fake, in tests) or when you are managing redirect settings yourself. Prefer <see cref="CreateHttpClient"/> for the fully-correct, ready-to-use path.</summary>
+    /// <summary>
+    /// Creates the handler over <paramref name="innerHandler"/> — for composing with a caller-supplied handler
+    /// (e.g. a fake, in tests) or when you are managing redirect settings yourself.
+    /// <para><b>The DNS-rebind connection-pinning defense (see the class remarks) only takes effect through
+    /// <see cref="CreateHttpClient"/></b>, which controls its own <see cref="SocketsHttpHandler"/> and can
+    /// install the required <see cref="SocketsHttpHandler.ConnectCallback"/>. An arbitrary caller-supplied
+    /// <paramref name="innerHandler"/> here still gets the allow-list + validated-DNS-answer checks, but if it
+    /// is a real <see cref="SocketsHttpHandler"/> without an equivalent pinning callback of its own, it remains
+    /// exposed to the rebind race this handler otherwise closes.</para>
+    /// </summary>
     public GatekeeperHttpMessageHandler(HttpMessageHandler innerHandler, IEnumerable<string> allowedDomains, GatekeeperHttpEgressOptions? options = null)
         : base(innerHandler)
     {
@@ -61,14 +83,46 @@ public sealed class GatekeeperHttpMessageHandler : DelegatingHandler
     /// <summary>
     /// The recommended entry point: builds a fresh <see cref="SocketsHttpHandler"/> with
     /// <c>AllowAutoRedirect = false</c> (required for this handler's own redirect re-validation to ever see a
-    /// 3xx response at all) wrapped in this handler, and returns a ready-to-use <see cref="HttpClient"/>. Use
-    /// this <see cref="HttpClient"/> for a tool's outbound HTTP calls to get both the allow-list and the
+    /// 3xx response at all) and a <see cref="SocketsHttpHandler.ConnectCallback"/> that connects to the exact
+    /// address <see cref="ValidateTargetAsync"/> just validated (closing the DNS-rebind TOCTOU — see the class
+    /// remarks), wrapped in this handler, and returns a ready-to-use <see cref="HttpClient"/>. Use this
+    /// <see cref="HttpClient"/> for a tool's outbound HTTP calls to get both the allow-list and the
     /// DNS-rebind/SSRF defense.
     /// </summary>
     public static HttpClient CreateHttpClient(IEnumerable<string> allowedDomains, GatekeeperHttpEgressOptions? options = null)
     {
-        var socketsHandler = new SocketsHttpHandler { AllowAutoRedirect = false };
+        var socketsHandler = new SocketsHttpHandler { AllowAutoRedirect = false, ConnectCallback = ConnectToPinnedAddressAsync };
         return new HttpClient(new GatekeeperHttpMessageHandler(socketsHandler, allowedDomains, options));
+    }
+
+    // The other half of the DNS-rebind fix: ValidateTargetAsync already proved this exact IPAddress is safe and
+    // pinned it on the request — connect the raw socket DIRECTLY to it, so there is no second, independent,
+    // unvalidated DNS lookup for an attacker's rebinding nameserver to answer differently on. SocketsHttpHandler
+    // applies TLS on top of the returned stream itself (using the original hostname for SNI/cert validation),
+    // so this only changes which IP the TCP connection targets, never which hostname the cert is checked against.
+    private static async ValueTask<Stream> ConnectToPinnedAddressAsync(SocketsHttpConnectionContext context, CancellationToken cancellationToken)
+    {
+        if (!context.InitialRequestMessage.Options.TryGetValue(PinnedAddressKey, out var pinnedAddress))
+        {
+            // Should never happen — SendAsync always calls ValidateTargetAsync (which pins) before the base
+            // handler ever sees the request. Fail closed rather than silently falling back to an unpinned,
+            // re-resolved DNS lookup.
+            throw new HttpEgressBlockedException(
+                context.DnsEndPoint.Host,
+                "No validated address was pinned for this connection — refusing rather than risk an unvalidated DNS-rebind lookup.");
+        }
+
+        var socket = new Socket(SocketType.Stream, ProtocolType.Tcp) { NoDelay = true };
+        try
+        {
+            await socket.ConnectAsync(pinnedAddress, context.DnsEndPoint.Port, cancellationToken).ConfigureAwait(false);
+            return new NetworkStream(socket, ownsSocket: true);
+        }
+        catch
+        {
+            socket.Dispose();
+            throw;
+        }
     }
 
     /// <inheritdoc/>
@@ -82,7 +136,7 @@ public sealed class GatekeeperHttpMessageHandler : DelegatingHandler
             var uri = currentRequest.RequestUri
                 ?? throw new HttpEgressBlockedException("(none)", "Request has no RequestUri — cannot validate an egress target that doesn't exist.");
 
-            await ValidateTargetAsync(uri, cancellationToken).ConfigureAwait(false);
+            await ValidateTargetAsync(currentRequest, cancellationToken).ConfigureAwait(false);
 
             var response = await base.SendAsync(currentRequest, cancellationToken).ConfigureAwait(false);
 
@@ -113,31 +167,32 @@ public sealed class GatekeeperHttpMessageHandler : DelegatingHandler
             "Its validation (DNS resolution) is inherently async, and silently falling back to the base " +
             "synchronous Send() would bypass every check here rather than fail closed.");
 
-    private async Task ValidateTargetAsync(Uri uri, CancellationToken cancellationToken)
+    private async Task ValidateTargetAsync(HttpRequestMessage request, CancellationToken cancellationToken)
     {
+        var uri = request.RequestUri!;
         var host = uri.Host.ToLowerInvariant();
         if (!HostAllowList.IsAllowed(host, _allowed))
         {
             throw new HttpEgressBlockedException(host, $"Host '{host}' is not on the egress allow-list.");
         }
 
-        if (!_options.BlockPrivateNetworks)
-        {
-            return;
-        }
-
         // A literal IP in the URL (e.g. an allow-listed IP address itself) — classify it directly, no DNS
-        // round trip needed (and none would be meaningful: there's nothing to resolve).
+        // round trip needed (and none would be meaningful: there's nothing to resolve). Still pinned below
+        // (even when BlockPrivateNetworks is off) so the connect callback always has a validated address.
         if (IPAddress.TryParse(uri.Host, out var literalAddress))
         {
-            if (PrivateNetworkClassifier.IsPrivateOrReserved(literalAddress))
+            if (_options.BlockPrivateNetworks && PrivateNetworkClassifier.IsPrivateOrReserved(literalAddress))
             {
                 throw new HttpEgressBlockedException(host, $"Host '{host}' is a private/reserved address.");
             }
 
+            request.Options.Set(PinnedAddressKey, literalAddress);
             return;
         }
 
+        // Resolved UNCONDITIONALLY, even when BlockPrivateNetworks is off — the connect callback needs a
+        // validated address to pin to regardless of whether the private-network check itself runs, or the
+        // (now unpinned) connection would fall through to an unvalidated, independently-re-resolved DNS lookup.
         IPAddress[] addresses;
         using var timeoutCts = new CancellationTokenSource(_options.DnsResolutionTimeout);
         using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
@@ -160,13 +215,22 @@ public sealed class GatekeeperHttpMessageHandler : DelegatingHandler
             throw new HttpEgressBlockedException(host, $"DNS resolution for '{host}' returned no addresses.");
         }
 
-        foreach (var address in addresses)
+        if (_options.BlockPrivateNetworks)
         {
-            if (PrivateNetworkClassifier.IsPrivateOrReserved(address))
+            foreach (var address in addresses)
             {
-                throw new HttpEgressBlockedException(host, $"Host '{host}' resolves to a private/reserved address ({address}) — refusing (SSRF/DNS-rebind guard).");
+                if (PrivateNetworkClassifier.IsPrivateOrReserved(address))
+                {
+                    throw new HttpEgressBlockedException(host, $"Host '{host}' resolves to a private/reserved address ({address}) — refusing (SSRF/DNS-rebind guard).");
+                }
             }
         }
+
+        // Pin the FIRST resolved (and, if checked above, validated-safe) address — the exact address the
+        // connect callback will use, so there is no second, independent DNS lookup for a rebind attacker to
+        // answer differently. No failover across addresses[1..] if the first is unreachable: this defense
+        // connects to A specific validated address, it doesn't retry across several.
+        request.Options.Set(PinnedAddressKey, addresses[0]);
     }
 
     private static bool IsRedirect(HttpStatusCode statusCode) => RedirectStatusCodes.Contains(statusCode);

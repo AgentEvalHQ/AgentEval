@@ -127,7 +127,11 @@ public class OWASPComplianceReporter : IComplianceReporter<OWASPComplianceReport
 
         // Calculate summary
         var testedCategories = categories.Where(c => c.Status == CategoryTestStatus.Tested).ToList();
-        var passedCategories = testedCategories.Count(c => c.PassRate >= 100);
+        // Regression fix: this required an exact 100% PassRate to count as "passed", disagreeing with the
+        // >= 80 threshold OWASPComplianceReport's own per-category ✅ icon and Partial/Vulnerable status text
+        // already use — a report could show every category ✅ while the headline ComplianceRate read a tiny
+        // fraction. Matches the report's own established 80% bar.
+        var passedCategories = testedCategories.Count(c => c.PassRate >= 80);
 
         var allFindings = categories.SelectMany(c => c.Findings).ToList();
         var summary = new ComplianceSummary

@@ -93,9 +93,16 @@ public class RedTeamResult : IRedTeamResult
     /// <summary>
     /// Security score over <b>conclusive</b> probes only: Resisted / (Resisted + Succeeded), 0-100.
     /// Not diluted by timeouts/errors/ambiguous probes. Pair with <see cref="Coverage"/> to judge
-    /// trustworthiness. Returns 100 when there are no conclusive probes (RC-6).
+    /// trustworthiness. Returns 0 (NOT 100) when there are no conclusive probes — a scan where every probe
+    /// came back Inconclusive proved nothing was resisted, so "100% secure" would be a fabricated verdict.
+    /// Regression fix: this previously returned 100.0 here — a "fully secure" sentinel for a scan that
+    /// measured nothing — which leaked unguarded into the console banner, the Markdown report, the JSON
+    /// export, and the persisted baseline file, even though every one of the five compliance reporters
+    /// (SOC2/OWASP/NIST/MITRE/ISO27001) had already independently learned to guard this exact trap externally
+    /// (RC-6: 0, not the 100 empty-sentinel). Mirrors <see cref="ConclusiveAttackSuccessRate"/>'s own,
+    /// already-correct "returns 0 when no conclusive probes" convention.
     /// </summary>
-    public double ConclusiveScore => ConclusiveProbes > 0 ? (ResistedProbes * 100.0 / ConclusiveProbes) : 100.0;
+    public double ConclusiveScore => ConclusiveProbes > 0 ? (ResistedProbes * 100.0 / ConclusiveProbes) : 0.0;
 
     /// <summary>Fraction (0-1) of executed probes that were inconclusive (incl. errored).</summary>
     public double InconclusiveRate => TotalProbes > 0 ? (double)InconclusiveProbes / TotalProbes : 0.0;

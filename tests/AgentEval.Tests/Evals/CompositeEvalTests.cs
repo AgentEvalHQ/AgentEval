@@ -11,13 +11,13 @@ public class CompositeEvalTests
 {
     // ── Stub ─────────────────────────────────────────────────────────────────
 
-    private sealed class StubAtomic(string key, double value, string severity = "none", bool passed = true, double cost = 0.001, bool cacheHit = false)
+    private sealed class StubAtomic(string key, double value, string severity = "none", bool passed = true, double cost = 0.001, bool cacheHit = false, string? label = null)
         : AtomicEval(key, key, "test", "1.0.0")
     {
         public override Task<EvalResult> EvaluateAsync(EvalInput input, CancellationToken ct = default) =>
             Task.FromResult(new EvalResult(
                 Metric: new(Key, Name, Category, Version),
-                Score: new(value, null, passed ? "pass" : "fail", passed, null, severity, null),
+                Score: new(value, null, label ?? (passed ? "pass" : "fail"), passed, null, severity, null),
                 Details: new(null, null, null, null, null),
                 Provenance: new("atomic-code", null, null, null, null, cost, cacheHit),
                 EvaluatedAt: DateTimeOffset.UtcNow));
@@ -74,6 +74,66 @@ public class CompositeEvalTests
         var result = await sut.EvaluateAsync(Input);
 
         Assert.Equal("high", result.Score.Severity);
+    }
+
+    [Fact]
+    public async Task EvaluateAsync_RequiredSubErrored_CompositeLabelIsError_NotPass()
+    {
+        // Regression test for a real bug found in review: AtomicLlmEval deliberately keeps severity "none" on
+        // an infrastructure/judge failure (label "error") so it never masquerades as a confirmed high/critical
+        // violation. But a Threshold==null composite (e.g. a GDPR/EU AI Act Pillar, built with threshold: null)
+        // previously read ONLY severity for its verdict — so a Pillar whose one required Article failed via
+        // judge/infra error (severity "none", NOT a real low score) fell straight through to "pass", exactly
+        // the same failure mode this repo already fixed for RedTeam's ConclusiveScore: an unevaluated required
+        // control silently attested as compliant.
+        var components = new EvalComponent[]
+        {
+            new(new StubAtomic("a", 0.0, severity: "none", passed: false, label: "error"), Required: true),
+        };
+        var sut = MakeComposite(components);
+
+        var result = await sut.EvaluateAsync(Input);
+
+        Assert.Equal("error", result.Score.Label);
+        Assert.False(result.Score.Passed);
+    }
+
+    [Fact]
+    public async Task EvaluateAsync_OptionalSubErrored_RequiredSubsClean_CompositeStillPasses()
+    {
+        // The error-propagation fix must only look at REQUIRED components — an optional sub erroring must not
+        // drag down a composite whose required components are all genuinely clean, matching the existing
+        // Required-severity-rollup precedent immediately above this in the source.
+        var components = new EvalComponent[]
+        {
+            new(new StubAtomic("required", 0.9, severity: "none", passed: true), Required: true),
+            new(new StubAtomic("optional", 0.0, severity: "none", passed: false, label: "error"), Required: false),
+        };
+        var sut = MakeComposite(components);
+
+        var result = await sut.EvaluateAsync(Input);
+
+        Assert.Equal("pass", result.Score.Label);
+    }
+
+    [Fact]
+    public async Task EvaluateAsync_RequiredSubErrored_UnderNumericThreshold_StillReportsError_NotPass()
+    {
+        // The error override must win regardless of whether a numeric Threshold is set — WeightedSumAggregation
+        // already excludes "error"-labeled subs from the SCORE math, so a threshold check on the remaining
+        // (unaffected) components could otherwise still read "pass" despite a required component never having
+        // been evaluated at all.
+        var components = new EvalComponent[]
+        {
+            new(new StubAtomic("clean", 0.95, severity: "none", passed: true), Required: true),
+            new(new StubAtomic("errored", 0.0, severity: "none", passed: false, label: "error"), Required: true),
+        };
+        var sut = MakeComposite(components, threshold: 0.70);
+
+        var result = await sut.EvaluateAsync(Input);
+
+        Assert.Equal("error", result.Score.Label);
+        Assert.False(result.Score.Passed);
     }
 
     [Fact]
