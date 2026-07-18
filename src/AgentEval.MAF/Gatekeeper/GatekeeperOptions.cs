@@ -3,6 +3,7 @@
 // Licensed under the MIT License.
 
 using AgentEval.Guardrails;
+using AgentEval.MAF.Skills;
 using AgentEval.Tracing;
 using Microsoft.Extensions.AI;
 using AgentTrace = AgentEval.Tracing.AgentTrace;
@@ -169,4 +170,54 @@ public sealed class GatekeeperOptions
     /// present in both is; that's the actual tamper signal this guard exists to catch.
     /// </summary>
     public IReadOnlyDictionary<string, string>? PromptTemplateBaseline { get; set; }
+
+    /// <summary>
+    /// SkillGate Tier 1 (runtime governance) — the skills this agent will expose, to check for drift at
+    /// construction time. Typically <c>MafSkillScanner.ScanFileSkillsWithInfoAsync(...).Skills</c>, run by the
+    /// caller BEFORE this call (<c>UseGatekeeper</c> executes before <c>.Build()</c>, so it cannot read a live
+    /// agent's own skill source — same reason <see cref="KnownTools"/> is caller-supplied, see its remarks).
+    /// Paired with <see cref="SkillBaselinePath"/>; both must be set TOGETHER for the check to run (leave BOTH
+    /// unset to disable it — setting exactly one throws <see cref="InvalidOperationException"/>, same
+    /// fail-loud-on-half-configuration discipline as <see cref="PromptTemplates"/>/<see cref="PromptTemplateBaseline"/>).
+    /// </summary>
+    public IReadOnlyList<ScannedSkillInfo>? Skills { get; set; }
+
+    /// <summary>
+    /// Path to the pinned <see cref="AgentEval.Skills.SkillManifestBaseline"/> JSON file to check
+    /// <see cref="Skills"/> against. Unlike <see cref="PromptTemplateBaseline"/> (an in-memory dictionary the
+    /// caller manages), this is a FILE PATH — <see cref="SkillGateMode.Bootstrap"/> needs to write an extended
+    /// baseline back to the same file it read, so a persistent location is load-bearing here, not just a
+    /// convenience. When both this and <see cref="Skills"/> are set, <c>UseGatekeeper</c> computes drift
+    /// EAGERLY at construction time via <see cref="SkillGateConstructionCheck.CheckAndEnforce"/> and throws
+    /// <see cref="SkillDriftException"/> immediately on a blocking finding (fail-closed, the same pattern as
+    /// <see cref="PromptTemplateBaseline"/>). A path that does not exist yet is treated as an EMPTY baseline,
+    /// not an error — under <see cref="SkillGateMode.Strict"/> (the default) that refuses every skill until an
+    /// initial baseline is captured (via <c>agenteval skills baseline approve</c> or a one-time
+    /// <see cref="SkillGateMode.Bootstrap"/> run); under <see cref="SkillGateMode.Bootstrap"/> it seeds the
+    /// file from this first construction.
+    /// </summary>
+    public string? SkillBaselinePath { get; set; }
+
+    /// <summary>
+    /// How <see cref="SkillGateConstructionCheck"/> handles a skill in <see cref="Skills"/> with no entry at
+    /// all in the baseline at <see cref="SkillBaselinePath"/>. Defaults to <see cref="SkillGateMode.Strict"/> —
+    /// see that enum for what each mode does and why Strict is the safe default.
+    /// </summary>
+    public SkillGateMode SkillGateMode { get; set; } = SkillGateMode.Strict;
+
+    /// <summary>
+    /// Fluent sugar for setting <see cref="Skills"/>/<see cref="SkillBaselinePath"/>/<see cref="SkillGateMode"/>
+    /// together — SkillGate Tier 1's one-call configuration entry point, matching the shape shown in its own
+    /// design doc. Returns <see langword="this"/> so it can chain inside the <c>configure</c> callback; not
+    /// required — setting the three properties individually has the identical effect.
+    /// </summary>
+    public GatekeeperOptions WithSkillGate(IReadOnlyList<ScannedSkillInfo> skills, string baselinePath, SkillGateMode mode = SkillGateMode.Strict)
+    {
+        Skills = skills ?? throw new ArgumentNullException(nameof(skills));
+        SkillBaselinePath = string.IsNullOrWhiteSpace(baselinePath)
+            ? throw new ArgumentException("baselinePath must be non-empty.", nameof(baselinePath))
+            : baselinePath;
+        SkillGateMode = mode;
+        return this;
+    }
 }

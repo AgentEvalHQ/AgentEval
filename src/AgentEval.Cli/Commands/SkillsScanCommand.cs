@@ -853,10 +853,100 @@ internal static class SkillsScanCommand
             }
         });
 
+        var approveCmd = new Command(
+            "approve",
+            "SkillGate recapture: re-hash ONE skill's current content and pin it into the SkillManifestBaseline used by UseGatekeeper's SkillGate construction-time check — the 'I reviewed this legitimate update, trust it again' path after a SkillDriftException.");
+        var approveSkillNameArg = new Argument<string>("skill-name") { Description = "The skill to (re)approve." };
+        var approveSkillPathOpt = new Option<DirectoryInfo>("--skill-path") { Required = true, Description = "Directory containing this skill (or a parent directory of many skills — the named skill is located within it)." };
+        var approveBaselineOpt = new Option<FileInfo>("--baseline") { Required = true, Description = "Path to the SkillManifestBaseline JSON file GatekeeperOptions.SkillBaselinePath points at. Created if it does not exist yet." };
+        var approveNoteOpt = new Option<string?>("--note") { Description = "Optional human note recorded on the updated baseline (who approved it, why)." };
+        approveCmd.Arguments.Add(approveSkillNameArg);
+        approveCmd.Options.Add(approveSkillPathOpt);
+        approveCmd.Options.Add(approveBaselineOpt);
+        approveCmd.Options.Add(approveNoteOpt);
+        approveCmd.SetAction(async (parseResult, ct) =>
+        {
+            try
+            {
+                return await ApproveAsync(
+                    parseResult.GetValue(approveSkillNameArg)!,
+                    parseResult.GetValue(approveSkillPathOpt)!,
+                    parseResult.GetValue(approveBaselineOpt)!,
+                    parseResult.GetValue(approveNoteOpt),
+                    ct);
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"  Error: {ex.Message}");
+                return ExitCodes.RuntimeError;
+            }
+        });
+
         baselineCmd.Subcommands.Add(listCmd);
         baselineCmd.Subcommands.Add(diffCmd);
         baselineCmd.Subcommands.Add(historyCmd);
+        baselineCmd.Subcommands.Add(approveCmd);
         return baselineCmd;
+    }
+
+    /// <summary>
+    /// SkillGate P1 recapture path (§5 of the SkillGate design). Scans <paramref name="skillPath"/> the same
+    /// credential-free way <c>skills scan</c> itself does (a no-op <see cref="ChatClientAgent"/> — skill
+    /// discovery never calls the model), locates the ONE named skill, re-hashes it (structural fingerprint
+    /// always; content hash too when its on-disk folder resolves), and updates ONLY that skill's entry in the
+    /// baseline at <paramref name="baselinePath"/> — every other skill's existing pinned hash is left
+    /// untouched, so approving one skill can never silently re-trust an unrelated one.
+    /// </summary>
+    internal static async Task<int> ApproveAsync(string skillName, DirectoryInfo skillPath, FileInfo baselinePath, string? note, CancellationToken ct)
+    {
+        AIAgent noOpAgent = new ChatClientAgent(new ScriptedChatClient(), new ChatClientAgentOptions { Name = "SkillsScanCommand" });
+        var result = await MafSkillScanner.ScanFileSkillsWithInfoAsync(skillPath.FullName, noOpAgent, options: null, ct).ConfigureAwait(false);
+
+        var found = result.Skills.FirstOrDefault(s => string.Equals(s.Manifest.Name, skillName, StringComparison.Ordinal));
+        if (found is null)
+        {
+            Console.Error.WriteLine($"  Error: skill '{skillName}' not found under {skillPath.FullName}.");
+            return ExitCodes.RuntimeError;
+        }
+
+        var existing = baselinePath.Exists
+            ? await SkillManifestBaseline.LoadAsync(baselinePath.FullName, ct).ConfigureAwait(false)
+            : new SkillManifestBaseline(DateTimeOffset.UtcNow, new Dictionary<string, string>());
+
+        var structuralFingerprint = SkillManifestPoisoningGate.Fingerprint(found.Manifest);
+        var updatedHashes = new Dictionary<string, string>(existing.HashesBySkillName, StringComparer.Ordinal)
+        {
+            [skillName] = structuralFingerprint,
+        };
+
+        var updatedContentHashes = new Dictionary<string, string>(
+            existing.ContentHashesBySkillName ?? new Dictionary<string, string>(), StringComparer.Ordinal);
+        var contentHash = found.AbsolutePath is not null ? SkillContentHasher.HashSkillFolder(found.AbsolutePath) : null;
+        if (contentHash is not null)
+        {
+            updatedContentHashes[skillName] = contentHash;
+        }
+
+        var updated = existing with
+        {
+            CapturedAt = DateTimeOffset.UtcNow,
+            HashesBySkillName = updatedHashes,
+            Notes = note ?? existing.Notes,
+            ContentHashesBySkillName = updatedContentHashes.Count > 0 ? updatedContentHashes : existing.ContentHashesBySkillName,
+        };
+
+        var parentDir = baselinePath.Directory;
+        if (parentDir is not null && !parentDir.Exists)
+        {
+            parentDir.Create();
+        }
+
+        await updated.SaveAsync(baselinePath.FullName, ct).ConfigureAwait(false);
+        Console.WriteLine(
+            $"  Approved '{skillName}': structural={structuralFingerprint[..8]}..." +
+            (contentHash is not null ? $" content={contentHash[..8]}..." : " (no on-disk folder — content hash not captured)") +
+            $" -> {baselinePath.FullName}");
+        return ExitCodes.Success;
     }
 
     internal static async Task<int> ListAsync(string baselineRoot, CancellationToken ct)

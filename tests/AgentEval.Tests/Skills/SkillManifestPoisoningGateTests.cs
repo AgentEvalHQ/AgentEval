@@ -107,6 +107,49 @@ public class SkillManifestPoisoningGateTests
     }
 
     [Fact]
+    public void Baseline_ContentHashesBySkillName_DefaultsToNull_NonBreakingForExistingCallers()
+    {
+        // SkillGate addition (additive, optional) — Capture()/every pre-existing constructor call site never
+        // sets it, and must keep compiling and behaving exactly as before.
+        var baseline = SkillManifestBaseline.Capture([Manifest("expense-report", "desc")]);
+        Assert.Null(baseline.ContentHashesBySkillName);
+    }
+
+    [Fact]
+    public void Baseline_JsonRoundTrip_PreservesContentHashes_WhenPresent()
+    {
+        var baseline = new SkillManifestBaseline(
+            DateTimeOffset.UtcNow,
+            new Dictionary<string, string> { ["expense-report"] = "structural-hash" },
+            Notes: "reviewed",
+            ContentHashesBySkillName: new Dictionary<string, string> { ["expense-report"] = "content-hash" });
+
+        var reloaded = SkillManifestBaseline.FromJson(baseline.ToJson());
+
+        Assert.NotNull(reloaded.ContentHashesBySkillName);
+        Assert.Equal("content-hash", reloaded.ContentHashesBySkillName!["expense-report"]);
+    }
+
+    [Fact]
+    public void Baseline_FromJson_OlderJsonWithoutContentHashesField_DeserializesWithNullField()
+    {
+        // A baseline file captured before this field existed (or hand-authored/from an older AgentEval
+        // version) must still load cleanly — the whole point of the field being additive.
+        var olderJson = """
+            {
+              "CapturedAt": "2026-01-01T00:00:00+00:00",
+              "HashesBySkillName": { "expense-report": "structural-hash" },
+              "Notes": null
+            }
+            """;
+
+        var reloaded = SkillManifestBaseline.FromJson(olderJson);
+
+        Assert.Equal("structural-hash", reloaded.HashesBySkillName["expense-report"]);
+        Assert.Null(reloaded.ContentHashesBySkillName);
+    }
+
+    [Fact]
     public async Task Baseline_FileRoundTrip_PreservesHashes()
     {
         var baseline = SkillManifestBaseline.Capture([Manifest("expense-report", "desc")]);

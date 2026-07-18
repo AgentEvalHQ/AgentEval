@@ -65,8 +65,21 @@ public static class SkillManifestPoisoningGate
 /// <param name="CapturedAt">When this baseline was captured.</param>
 /// <param name="HashesBySkillName">Skill name → <see cref="SkillManifestPoisoningGate.Fingerprint"/> at capture time.</param>
 /// <param name="Notes">Optional human note (who approved it, why).</param>
+/// <param name="ContentHashesBySkillName">
+/// SkillGate (runtime governance) addition — optional, additive. Skill name →
+/// <see cref="AgentEval.Skills.SkillContentHasher.HashSkillFolder"/> at capture time, for skills whose
+/// on-disk folder was known when this baseline was captured. <see langword="null"/> for any baseline
+/// captured before this field existed, or for a skill with no resolvable folder (non-file-sourced) — the
+/// structural <see cref="HashesBySkillName"/> fingerprint alone still applies to those. A stronger,
+/// OPTIONAL companion signal: two skills can share an identical structural fingerprint (same name/
+/// description/resource-and-script inventory) while a resource file's actual BYTES silently changed —
+/// this catches that, the structural fingerprint alone cannot.
+/// </param>
 public sealed record SkillManifestBaseline(
-    DateTimeOffset CapturedAt, IReadOnlyDictionary<string, string> HashesBySkillName, string? Notes = null)
+    DateTimeOffset CapturedAt,
+    IReadOnlyDictionary<string, string> HashesBySkillName,
+    string? Notes = null,
+    IReadOnlyDictionary<string, string>? ContentHashesBySkillName = null)
 {
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
 

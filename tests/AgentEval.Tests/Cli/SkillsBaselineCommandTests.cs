@@ -4,7 +4,11 @@
 
 using AgentEval.Cli;
 using AgentEval.Cli.Commands;
+using AgentEval.MAF.Gatekeeper;
+using AgentEval.MAF.Skills;
 using AgentEval.Skills;
+using AgentEval.Testing;
+using Microsoft.Agents.AI;
 using Xunit;
 
 namespace AgentEval.Tests.Cli;
@@ -520,6 +524,111 @@ public class SkillsBaselineCommandTests : IDisposable
             new SkillBaselineEntry("a", SkillSourceKind.File, ".claude/skills/a", "struct-a", "hash-a", null, null, null, []),
         };
         Assert.Empty(SkillsScanCommand.DetectPreviouslyVetted(entries, []));
+    }
+
+    // ── skills baseline approve (SkillGate P1 recapture path) ──
+
+    [Fact]
+    public void Create_BaselineSubcommand_HasApprove()
+    {
+        var baselineCmd = SkillsScanCommand.Create().Subcommands.Single(c => c.Name == "baseline");
+        Assert.Contains(baselineCmd.Subcommands, c => c.Name == "approve");
+    }
+
+    [Fact]
+    public async Task ApproveAsync_NewBaselineFile_CreatesItWithTheSkillsFingerprint()
+    {
+        var dir = CreateCompliantFixture(out var skillName);
+        var baselinePath = new FileInfo(Path.Combine(Path.GetTempPath(), "agenteval-skillgate-approve-" + Guid.NewGuid().ToString("N") + ".json"));
+        try
+        {
+            var exit = await SkillsScanCommand.ApproveAsync(skillName, dir, baselinePath, note: null, default);
+
+            Assert.Equal(ExitCodes.Success, exit);
+            // File.Exists (static, always live), not baselinePath.Exists (FileInfo caches its stat block from
+            // the first read — which happened, correctly returning false, INSIDE ApproveAsync before the file
+            // was written — and never auto-refreshes; asserting on the same cached instance after the write
+            // would silently check stale state).
+            Assert.True(File.Exists(baselinePath.FullName));
+            var baseline = await SkillManifestBaseline.LoadAsync(baselinePath.FullName);
+            Assert.True(baseline.HashesBySkillName.ContainsKey(skillName));
+            Assert.NotNull(baseline.ContentHashesBySkillName);
+            Assert.True(baseline.ContentHashesBySkillName!.ContainsKey(skillName));
+        }
+        finally
+        {
+            dir.Delete(recursive: true);
+            if (File.Exists(baselinePath.FullName)) File.Delete(baselinePath.FullName);
+        }
+    }
+
+    [Fact]
+    public async Task ApproveAsync_UnknownSkillName_ReturnsRuntimeError()
+    {
+        var dir = CreateCompliantFixture(out _);
+        var baselinePath = new FileInfo(Path.Combine(Path.GetTempPath(), "agenteval-skillgate-approve-unknown-" + Guid.NewGuid().ToString("N") + ".json"));
+        try
+        {
+            var exit = await SkillsScanCommand.ApproveAsync("does-not-exist", dir, baselinePath, note: null, default);
+            Assert.Equal(ExitCodes.RuntimeError, exit);
+            Assert.False(File.Exists(baselinePath.FullName));
+        }
+        finally { dir.Delete(recursive: true); }
+    }
+
+    [Fact]
+    public async Task ApproveAsync_ExistingBaseline_UpdatesOnlyTheNamedSkill_LeavesOthersUntouched()
+    {
+        var dir = CreateCompliantFixture(out var skillName);
+        var baselinePath = new FileInfo(Path.Combine(Path.GetTempPath(), "agenteval-skillgate-approve-scoped-" + Guid.NewGuid().ToString("N") + ".json"));
+        try
+        {
+            var untouched = new SkillManifestBaseline(
+                DateTimeOffset.UtcNow.AddDays(-1),
+                new Dictionary<string, string> { ["some-other-skill"] = "unrelated-fingerprint" },
+                ContentHashesBySkillName: new Dictionary<string, string> { ["some-other-skill"] = "unrelated-content-hash" });
+            await untouched.SaveAsync(baselinePath.FullName);
+
+            var exit = await SkillsScanCommand.ApproveAsync(skillName, dir, baselinePath, note: "reviewed by test", default);
+
+            Assert.Equal(ExitCodes.Success, exit);
+            var updated = await SkillManifestBaseline.LoadAsync(baselinePath.FullName);
+            Assert.True(updated.HashesBySkillName.ContainsKey(skillName));
+            Assert.Equal("unrelated-fingerprint", updated.HashesBySkillName["some-other-skill"]);
+            Assert.Equal("unrelated-content-hash", updated.ContentHashesBySkillName!["some-other-skill"]);
+            Assert.Equal("reviewed by test", updated.Notes);
+        }
+        finally
+        {
+            dir.Delete(recursive: true);
+            if (File.Exists(baselinePath.FullName)) File.Delete(baselinePath.FullName);
+        }
+    }
+
+    [Fact]
+    public async Task ApproveAsync_ThenSkillGateConstructionCheck_KnownUnchanged_DoesNotThrow()
+    {
+        // End-to-end proof of the actual recapture story: approve, then SkillGate's own construction check
+        // (Strict mode, the default) must accept the now-approved skill without throwing.
+        var dir = CreateCompliantFixture(out var skillName);
+        var baselinePath = new FileInfo(Path.Combine(Path.GetTempPath(), "agenteval-skillgate-approve-e2e-" + Guid.NewGuid().ToString("N") + ".json"));
+        try
+        {
+            await SkillsScanCommand.ApproveAsync(skillName, dir, baselinePath, note: null, default);
+
+            AIAgent noOpAgent = new ChatClientAgent(new ScriptedChatClient(), new ChatClientAgentOptions { Name = "test" });
+            var scanned = await MafSkillScanner.ScanFileSkillsWithInfoAsync(dir.FullName, noOpAgent, options: null, default);
+
+            var ex = Record.Exception(() =>
+                SkillGateConstructionCheck.CheckAndEnforce(scanned.Skills, baselinePath.FullName, SkillGateMode.Strict));
+
+            Assert.Null(ex);
+        }
+        finally
+        {
+            dir.Delete(recursive: true);
+            if (File.Exists(baselinePath.FullName)) File.Delete(baselinePath.FullName);
+        }
     }
 
     // ── helpers (mirrors SkillsScanCommandTests' fixture builder) ──
