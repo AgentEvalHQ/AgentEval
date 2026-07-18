@@ -70,6 +70,13 @@ public sealed class CopilotStudioChatClient : IChatClient
     private bool _disposed;
     private int _estimatedCreditsUsed;
 
+    /// <summary>
+    /// Estimated Copilot Credit spend so far on this conversation (<see cref="EstimatedCreditsPerTurn"/> per
+    /// completed turn) — the SAME counter the <c>maxCredits</c> budget gate itself reads. An ESTIMATE, never a
+    /// metered value — see this type's own remarks.
+    /// </summary>
+    public int EstimatedCreditsUsed => _estimatedCreditsUsed;
+
     /// <param name="client">The conversation client this bridges into <see cref="IChatClient"/>.</param>
     /// <param name="maxCredits">
     /// Estimated Copilot Credit spend cap (0 = no cap, the default). Checked BEFORE each turn — a turn that
