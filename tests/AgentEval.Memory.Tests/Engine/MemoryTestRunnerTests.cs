@@ -75,6 +75,34 @@ public class MemoryTestRunnerTests
         Assert.True(result.OverallScore > 0);
     }
 
+    [Fact]
+    public async Task RunAsync_ScenarioWithMetadata_PropagatesMetadataToResult()
+    {
+        // Regression test for a real bug found in review: AggregateResults never copied scenario.Metadata
+        // into the returned MemoryEvaluationResult, silently dropping every marker a caller places there —
+        // including the markers 3 of 5 IMemoryMetric implementations (ReachBack/ReducerFidelity/
+        // NoiseResilience) key off to take their precision-scoring branch instead of a coarser fallback.
+        var fakeChatClient = new FakeChatClient();
+        var memoryJudge = new MemoryJudge(fakeChatClient, NullLogger<MemoryJudge>.Instance);
+        var runner = new MemoryTestRunner(memoryJudge, NullLogger<MemoryTestRunner>.Instance);
+        var agent = new TestMemoryAgent();
+        var facts = new[] { MemoryFact.Create("My name is Alice") };
+        var scenario = new MemoryTestScenario
+        {
+            Name = "Metadata propagation test",
+            Description = "Tests that scenario Metadata survives into the result",
+            Steps = facts.Select(f => MemoryStep.Fact($"Remember: {f.Content}")).ToArray(),
+            Queries = [MemoryQuery.Create("What is my name?", facts[0])],
+            Metadata = new Dictionary<string, object> { ["ReachBackTest"] = true, ["ReachBackDepth"] = 5 },
+        };
+
+        var result = await runner.RunAsync(agent, scenario);
+
+        Assert.NotNull(result.Metadata);
+        Assert.True(result.Metadata!.ContainsKey("ReachBackTest"));
+        Assert.Equal(5, result.Metadata["ReachBackDepth"]);
+    }
+
     private static MemoryTestScenario CreateTestScenario()
     {
         var facts = new[]

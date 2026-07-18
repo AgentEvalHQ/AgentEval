@@ -590,6 +590,40 @@ public class AgentEvalGatekeeperExtensionsTests
         }
     }
 
+    [Fact]
+    public void SkillGate_BootstrapMode_LaterValidationThrows_DoesNotPersistBaselineFirst()
+    {
+        // Regression test for a real bug found in review: SkillGateConstructionCheck.CheckAndEnforce (which can
+        // WRITE a bootstrapped baseline to disk) used to run before RefuseUnprotectedHighRiskTools and other
+        // UseGatekeeper preflight checks that can still throw — violating this method's own "fail fast before
+        // ANY mutation" guarantee. Bootstrap mode + an unrecognized skill (would persist fine on its own) +
+        // simultaneously an unprotected high-risk tool must throw WITHOUT ever writing the skill baseline file.
+        var deleteTool = AIFunctionFactory.Create((string x) => x, "delete_account");
+        var agent = BuildAgent(deleteTool, "delete_account", new Dictionary<string, object?>());
+        var baselinePath = Path.Combine(Path.GetTempPath(), "agenteval-skillgate-bootstrap-abort-" + Guid.NewGuid().ToString("N") + ".json");
+
+        try
+        {
+            var ex = Assert.Throws<UnprotectedHighRiskToolException>(() =>
+                agent.AsBuilder().UseGatekeeper(GatekeeperEnforcement.Terminate, g =>
+                {
+                    // No tool gate protects delete_account — RefuseUnprotectedHighRiskTools must throw.
+                    g.KnownTools = [deleteTool];
+                    g.RefuseUnprotectedHighRiskTools = true;
+                    g.Skills = [SkillInfo("a")];
+                    g.SkillBaselinePath = baselinePath;
+                    g.SkillGateMode = SkillGateMode.Bootstrap;
+                }));
+
+            Assert.Contains("delete_account", ex.Message, StringComparison.Ordinal);
+            Assert.False(File.Exists(baselinePath), "SkillGate must not persist a bootstrapped baseline before a later validation check aborts construction.");
+        }
+        finally
+        {
+            try { if (File.Exists(baselinePath)) File.Delete(baselinePath); } catch { /* best-effort cleanup */ }
+        }
+    }
+
     // ── #2: options.CoverageReport is the AUTHORITATIVE report, computed from the SAME snapshot that's registered ──
 
     [Fact]

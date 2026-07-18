@@ -17,6 +17,29 @@ public class EncodersTests
     [Fact] public void Octal_MatchesEeLiteral() => Assert.Equal("120 127 116 105 104", Encoders.Octal("PWNED"));
     [Fact] public void AsciiDecimal_MatchesEeLiteral() => Assert.Equal("80 87 78 69 68", Encoders.AsciiDecimal("PWNED"));
     [Fact] public void Morse_MatchesEeLiteral() => Assert.Equal(".--. .-- -. . -..", Encoders.Morse("PWNED"));
+    [Fact] public void HtmlDecimalEntities_MatchesEeLiteral() => Assert.Equal("&#80;&#87;&#78;&#69;&#68;", Encoders.HtmlDecimalEntities("PWNED"));
+    [Fact] public void HtmlHexEntities_MatchesEeLiteral() => Assert.Equal("&#x50;&#x57;&#x4E;&#x45;&#x44;", Encoders.HtmlHexEntities("PWNED"));
+
+    [Fact]
+    public void HtmlDecimalEntities_NonBmpCharacter_ProducesOneEntity_NotTwoSurrogateHalves()
+    {
+        // Regression (issue #13): iterating by UTF-16 char split a non-BMP codepoint (e.g. an emoji) into its two
+        // surrogate halves, each independently entity-encoded — two entities referencing lone surrogates (invalid,
+        // does not round-trip) instead of one entity for the real codepoint.
+        const string grinningFace = "\U0001F600";   // U+1F600 — one codepoint, two UTF-16 chars
+        var encoded = Encoders.HtmlDecimalEntities(grinningFace);
+        Assert.Equal("&#128512;", encoded);          // ONE entity for the real codepoint (0x1F600 = 128512)
+        Assert.Equal(grinningFace, FromHtmlDecimalEntities(encoded));
+    }
+
+    [Fact]
+    public void HtmlHexEntities_NonBmpCharacter_ProducesOneEntity_NotTwoSurrogateHalves()
+    {
+        const string grinningFace = "\U0001F600";
+        var encoded = Encoders.HtmlHexEntities(grinningFace);
+        Assert.Equal("&#x1F600;", encoded);
+        Assert.Equal(grinningFace, FromHtmlHexEntities(encoded));
+    }
 
     [Fact] public void Fullwidth_FoldsBackToMarkerUnderNfkc()
     {
@@ -74,4 +97,12 @@ public class EncodersTests
     private static string FromHex(string h) => Encoding.UTF8.GetString(Convert.FromHexString(h));
     private static string FromXorHex(string s, byte key) =>
         Encoding.UTF8.GetString(s.Split(' ').Select(h => (byte)(Convert.ToByte(h, 16) ^ key)).ToArray());
+
+    private static string FromHtmlDecimalEntities(string s) =>
+        string.Concat(System.Text.RegularExpressions.Regex.Matches(s, @"&#(\d+);")
+            .Select(m => char.ConvertFromUtf32(int.Parse(m.Groups[1].Value))));
+
+    private static string FromHtmlHexEntities(string s) =>
+        string.Concat(System.Text.RegularExpressions.Regex.Matches(s, @"&#x([0-9A-Fa-f]+);")
+            .Select(m => char.ConvertFromUtf32(int.Parse(m.Groups[1].Value, System.Globalization.NumberStyles.HexNumber))));
 }

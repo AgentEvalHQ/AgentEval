@@ -58,7 +58,10 @@ public sealed class EvaluatingAIFunction : AIFunction
         // Settled (see plan §1.2 / C14): call the PUBLIC InvokeAsync, NOT the protected InvokeCoreAsync —
         // C# CS1540 forbids accessing a protected member through a base-typed (_inner : AIFunction) reference
         // from a sibling derived class. InvokeAsync routes to the inner's InvokeCoreAsync, so behaviour is identical.
-        var index = _trace.Entries.Count;
+        // 14: _trace.Entries.Count was a TOCTOU race under concurrent tool invocation (MEAI AllowConcurrentInvocation)
+        // — two tools racing here could read the same count before either called AddEntry, handing both the same
+        // index. NextToolExecutionIndex() is Interlocked-allocated, like TraceRecordingChatClient's own counter.
+        var index = _trace.NextToolExecutionIndex();
         var correlationId = ToolCorrelationScope.Current;
         var argsJson = SafeSerialize(arguments);
         var sw = Stopwatch.StartNew();

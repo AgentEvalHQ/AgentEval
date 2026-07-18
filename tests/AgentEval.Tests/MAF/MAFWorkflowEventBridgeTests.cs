@@ -143,6 +143,42 @@ public class MAFWorkflowEventBridgeTests
     }
 
     [Fact]
+    public async Task StreamAsAgentEvalEvents_SelfLoopingExecutor_YieldsSelfEdge_NotSilentlyDropped()
+    {
+        // Regression (issue #15): an executor whose own edge routes back to ITSELF (a direct self-loop, e.g. a
+        // retry/refine step) used to hit NEITHER the "flush + emit edge to a NEW executor" branch NOR the
+        // "very first executor" branch on its re-invocation — so no EdgeTraversedEvent(A, A) was ever emitted
+        // for the self-loop transition, and the two invocations' output could silently merge into one step.
+        var count = 0;
+        var a = ((Func<string, ValueTask<string>>)(input =>
+        {
+            count++;
+            return new ValueTask<string>($"A-invocation-{count}");
+        })).BindAsExecutor<string, string>("A");
+        var b = CreateFuncBinding("B", "final-output");
+
+        var workflow = new MAFWorkflows.WorkflowBuilder(a)
+            .AddEdge<string>(a, a, (string? _) => count < 2)    // loop back to itself once
+            .AddEdge<string>(a, b, (string? _) => count >= 2)   // then proceed to B
+            .WithOutputFrom(b)
+            .Build();
+
+        // Act
+        var events = new List<WorkflowEvent>();
+        await foreach (var evt in MAFWorkflowEventBridge.StreamAsAgentEvalEvents(workflow, "start"))
+        {
+            events.Add(evt);
+        }
+
+        // Assert: the self-loop transition must be visible — before the fix, ZERO A→A edges were ever emitted.
+        var edgeEvents = events.OfType<EdgeTraversedEvent>().ToList();
+        Assert.Contains(edgeEvents, e => e.SourceExecutorId == "A" && e.TargetExecutorId == "A");
+        Assert.Contains(edgeEvents, e => e.SourceExecutorId == "A" && e.TargetExecutorId == "B");
+
+        Assert.IsType<WorkflowCompleteEvent>(events.Last());
+    }
+
+    [Fact]
     public async Task StreamAsAgentEvalEvents_CancellationRespected()
     {
         // Arrange: a slow workflow

@@ -63,6 +63,7 @@ public sealed class CopilotStudioChatClient : IChatClient
     internal const int EstimatedCreditsPerTurn = 1;
 
     private readonly ICopilotStudioConversationClient _client;
+    private readonly IDisposable? _additionalDisposable;
     private readonly SemaphoreSlim _turnLock = new(1, 1);
     private readonly int _maxCredits;
     private string? _conversationId;
@@ -85,10 +86,18 @@ public sealed class CopilotStudioChatClient : IChatClient
     /// exceeds the estimate. Credits here are an ESTIMATE (<see cref="EstimatedCreditsPerTurn"/> per turn),
     /// not a metered value — see the type's own remarks.
     /// </param>
-    public CopilotStudioChatClient(ICopilotStudioConversationClient client, int maxCredits = 0)
+    /// <param name="additionalDisposable">
+    /// Optional — disposed alongside <paramref name="client"/> when this instance is disposed. Exists so
+    /// <see cref="CopilotStudioAgentFactory.BuildLive"/> can tie the lifetime of the underlying
+    /// <c>IHttpClientFactory</c> (which <paramref name="client"/> itself has no reference to and cannot
+    /// dispose on our behalf) to this chat client's own lifetime, instead of leaking it — regression fix, see
+    /// that factory method's own remarks.
+    /// </param>
+    public CopilotStudioChatClient(ICopilotStudioConversationClient client, int maxCredits = 0, IDisposable? additionalDisposable = null)
     {
         _client = client ?? throw new ArgumentNullException(nameof(client));
         _maxCredits = maxCredits;
+        _additionalDisposable = additionalDisposable;
     }
 
     /// <summary>
@@ -102,8 +111,10 @@ public sealed class CopilotStudioChatClient : IChatClient
     /// immediately would not see the error until much later, if at all). Validating here — before the real
     /// work moves into <see cref="GetStreamingResponseCoreAsync"/> — makes these throw eagerly, at the call
     /// site, like any other precondition check. The budget check reads <see cref="_estimatedCreditsUsed"/>
-    /// without <see cref="_turnLock"/> — safe given this type's own documented single-conversation-at-a-time
-    /// contract (not safe to call concurrently from multiple logical conversations to begin with).
+    /// without <see cref="_turnLock"/>, so it is a non-atomic PRE-check only, kept purely so the common
+    /// (sequential-misuse) case still throws immediately at the call site — the AUTHORITATIVE, race-safe
+    /// budget check is re-run inside the lock in <see cref="GetStreamingResponseCoreAsync"/>, right before
+    /// the spend is committed.
     /// </summary>
     public IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(
         IEnumerable<ChatMessage> messages,
@@ -115,6 +126,7 @@ public sealed class CopilotStudioChatClient : IChatClient
 
         // Budget gate (P6/§2.1), checked here (not just inside the iterator body below) so it throws
         // eagerly at the call site like the other precondition checks above — see this method's own remarks.
+        // Non-atomic; the authoritative re-check lives inside _turnLock in GetStreamingResponseCoreAsync.
         if (_maxCredits > 0 && _estimatedCreditsUsed + EstimatedCreditsPerTurn > _maxCredits)
         {
             throw new CopilotStudioBudgetExceededException(_estimatedCreditsUsed, _maxCredits);
@@ -132,16 +144,6 @@ public sealed class CopilotStudioChatClient : IChatClient
         ChatOptions? options,
         [EnumeratorCancellation] CancellationToken cancellationToken)
     {
-        // A caller-supplied ChatOptions.ConversationId (the MEAI "stateful client" convention — see
-        // https://learn.microsoft.com/dotnet/ai/microsoft-extensions-ai#stateless-vs-stateful-clients) takes
-        // precedence over this instance's own memoized id: it means the caller is deliberately resuming a specific
-        // server-side conversation rather than continuing whatever this instance last tracked.
-        if (!string.IsNullOrEmpty(options?.ConversationId))
-        {
-            _conversationId = options.ConversationId;
-            _started = true;
-        }
-
         // Materialize the WHOLE turn (start, if needed, plus the ask) into a list while holding _turnLock,
         // then release the lock BEFORE yielding anything. Two independent reasons this matters:
         //   1. Retry safety (#1/#2 below) needs to see each network call's activities/failure as one unit.
@@ -157,8 +159,36 @@ public sealed class CopilotStudioChatClient : IChatClient
         await _turnLock.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
-            // Budget gate (P6/§2.1) already ran, eagerly, in GetStreamingResponseAsync (the only caller of
-            // this private method) before this iterator was even constructed — not re-checked here.
+            // Regression fix: this write used to happen BEFORE the lock was acquired — every OTHER mutation
+            // of _conversationId/_started in this class happens strictly inside _turnLock, and this one is
+            // the exact injection point where two concurrent calls on one instance (a caller violating the
+            // documented single-conversation-at-a-time contract) could silently swap which conversation a
+            // call targets, with no exception raised. A caller-supplied ChatOptions.ConversationId (the MEAI
+            // "stateful client" convention — see
+            // https://learn.microsoft.com/dotnet/ai/microsoft-extensions-ai#stateless-vs-stateful-clients)
+            // takes precedence over this instance's own memoized id: it means the caller is deliberately
+            // resuming a specific server-side conversation rather than continuing whatever this instance last
+            // tracked.
+            if (!string.IsNullOrEmpty(options?.ConversationId))
+            {
+                _conversationId = options.ConversationId;
+                _started = true;
+            }
+
+            // Regression fix: the authoritative budget check. GetStreamingResponseAsync's own check (below)
+            // is a non-atomic pre-lock read, kept only so the common (sequential-misuse) case still throws
+            // eagerly at the call site rather than only once enumeration begins — it is NOT sufficient on its
+            // own: two concurrent calls with maxCredits=1 and 0 spent so far can both pass that check before
+            // either enters this lock, jointly exceeding the cap. Re-checked here, inside the lock, against
+            // the CURRENT (possibly already-incremented-by-a-concurrent-call) _estimatedCreditsUsed, right
+            // before the increment below — this is the check that actually enforces the cap.
+            if (_maxCredits > 0 && _estimatedCreditsUsed + EstimatedCreditsPerTurn > _maxCredits)
+            {
+                throw new CopilotStudioBudgetExceededException(_estimatedCreditsUsed, _maxCredits);
+            }
+
+            // Budget gate (P6/§2.1) also ran, eagerly (non-atomically), in GetStreamingResponseAsync (the
+            // only caller of this private method) before this iterator was even constructed.
 
             if (!_started)
             {
@@ -292,6 +322,8 @@ public sealed class CopilotStudioChatClient : IChatClient
         {
             disposableClient.Dispose();
         }
+
+        _additionalDisposable?.Dispose();
     }
 
     /// <summary>

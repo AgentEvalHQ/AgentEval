@@ -31,7 +31,10 @@ public sealed class MajorityVoteAggregation : IAggregationStrategy
         if (results.Count != components.Count)
             throw new InvalidOperationException("Results and components must align 1:1.");
 
-        var voting = results.Where(r => r.Score.Label != "skipped").ToList();
+        // 17: exclude "error" leaves too (transient provider failure, severity "none" by construction), not
+        // just "skipped" — an "error" leaf never counts as a pass/warn/fail vote (its label matches none of
+        // them), but WITHOUT this exclusion its placeholder score still polluted the returned meanScore below.
+        var voting = results.Where(r => r.Score.Label is not ("skipped" or "error")).ToList();
         if (voting.Count == 0) return (0, "none");
 
         var passCount = voting.Count(r => r.Score.Label == "pass");

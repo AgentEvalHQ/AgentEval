@@ -30,4 +30,16 @@ public class EuAiActPdfRendererPillarDetectionTests
     {
         Assert.Equal(expected, EuAiActPdfRenderer.IsPillarNode(Node(key, category)));
     }
+
+    [Fact]
+    public void Constructor_NullArticlesRegistry_DoesNotThrow()
+    {
+        // Regression test for a real bug found in review: this constructor used to require a non-null
+        // ArticlesRegistry (throwing ArgumentNullException on null), unlike the GDPR sibling renderer, which
+        // has always treated the registry as optional (redaction lookup simply skipped when absent). That
+        // forced ComplianceRenderCommand to hard-fail EU AI Act PDF rendering whenever the registry failed to
+        // load — even though the failure was unrelated to the evidence file actually being rendered.
+        var ex = Record.Exception(() => new EuAiActPdfRenderer(articles: null));
+        Assert.Null(ex);
+    }
 }

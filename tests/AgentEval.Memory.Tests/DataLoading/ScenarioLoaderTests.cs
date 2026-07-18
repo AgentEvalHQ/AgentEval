@@ -57,6 +57,25 @@ public class ScenarioLoaderTests
     }
 
     [Fact]
+    public void ResolvePreset_TemporalReasoning_StandardAndFull_HaveAReferenceDate()
+    {
+        // Regression test for a real bug found in review: temporal-reasoning's "standard"/"full" presets
+        // plant facts with explicit fixed timestamps (e.g. "2026-03-04") whose narrative text bakes in a
+        // relative-time claim ("3 weeks ago") tied to that fixed date — MemoryBenchmarkRunner must anchor
+        // the injected "today" to a matching fixed reference date, not the ever-advancing real wall clock.
+        var scenario = ScenarioLoader.Load("temporal-reasoning");
+
+        var standard = ScenarioLoader.ResolvePreset(scenario, "standard");
+        var full = ScenarioLoader.ResolvePreset(scenario, "full");
+
+        Assert.False(string.IsNullOrEmpty(standard.ReferenceDate));
+        Assert.True(DateTimeOffset.TryParse(standard.ReferenceDate, out _), "standard.ReferenceDate must be a parseable date");
+        // "full" extends "standard" and sets no ReferenceDate of its own — must inherit standard's, the
+        // same override-not-merge convention ContextPressure already uses.
+        Assert.Equal(standard.ReferenceDate, full.ReferenceDate);
+    }
+
+    [Fact]
     public void ResolvePreset_ContextPressureOverride()
     {
         var scenario = ScenarioLoader.Load("basic-retention");

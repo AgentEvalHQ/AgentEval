@@ -259,12 +259,9 @@ public static class BenchAgenticCommand
         var overall = result.Summary.OverallStatus;
         Console.WriteLine($"Overall result: {overall} (score {result.Summary.OverallScore:P0})");
 
-        return overall switch
-        {
-            "PASS" => 0,
-            "FAIL" => 2,
-            _ => 2  // WARN also returns non-zero for CI strictness
-        };
+        // Reuse fix: was an inlined duplicate of BenchExitCodes.FromLabel (identical PASS=>0/else=>2 mapping);
+        // the shared helper exists specifically so a future policy change lands in one place.
+        return BenchExitCodes.FromLabel(overall);
     }
 
     /// <summary>

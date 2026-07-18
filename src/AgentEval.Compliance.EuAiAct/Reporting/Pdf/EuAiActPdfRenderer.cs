@@ -44,17 +44,22 @@ public sealed class EuAiActPdfRenderer
         QuestPDF.Settings.License = LicenseType.Community;
     }
 
-    private readonly EuAiActArticlesRegistry _articles;
+    private readonly EuAiActArticlesRegistry? _articles;
 
     /// <summary>
     /// Initialises a new <see cref="EuAiActPdfRenderer"/>.
     /// </summary>
     /// <param name="articles">
-    /// Registry used to look up scenario sensitive flags for PII redaction.
+    /// Registry used to look up scenario sensitive flags for PII redaction. Optional — every
+    /// <c>_articles.GetSpec(...)</c> call site below is already wrapped in a try/catch that treats a lookup
+    /// failure as "skip redaction," which tolerates a null registry the same way it tolerates a genuine
+    /// registry miss. Regression fix: this constructor used to reject null, unlike the GDPR sibling
+    /// (<c>GDPRPdfRenderer</c>), which forced <c>ComplianceRenderCommand</c> to hard-fail EU AI Act PDF
+    /// rendering on an unrelated registry-load failure that the GDPR path already tolerated.
     /// </param>
-    public EuAiActPdfRenderer(EuAiActArticlesRegistry articles)
+    public EuAiActPdfRenderer(EuAiActArticlesRegistry? articles = null)
     {
-        _articles = articles ?? throw new ArgumentNullException(nameof(articles));
+        _articles = articles;
     }
 
     /// <summary>
@@ -266,7 +271,7 @@ public sealed class EuAiActPdfRenderer
 
                     // Try to get article spec for sensitive-flag + Phase-6 Task 6.9 lookup.
                     ArticleSpec? spec = null;
-                    try { spec = _articles.GetSpec(articleKey); } catch { /* registry miss — skip redaction */ }
+                    try { spec = _articles?.GetSpec(articleKey); } catch { /* registry miss — skip redaction */ }
 
                     // Phase-6 Task 6.9: prefer actual scenario input over judge reasoning.
                     bool anyScenarioHasSpecInput = scenarios.Any(s =>
@@ -319,7 +324,7 @@ public sealed class EuAiActPdfRenderer
                     foreach (var scenario in topFailures)
                     {
                         ArticleSpec? spec = null;
-                        try { spec = _articles.GetSpec(articleKey); } catch { }
+                        try { spec = _articles?.GetSpec(articleKey); } catch { }
                         var scenarioSpec = spec?.Scenarios.FirstOrDefault(s => s.Id == scenario.Metric.Key);
                         bool sensitive = scenarioSpec?.Sensitive ?? false;
 

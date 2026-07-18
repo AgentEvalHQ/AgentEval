@@ -3,6 +3,7 @@
 // Licensed under the MIT License.
 
 using System.Text.Json.Serialization;
+using System.Threading;
 using AgentEval.Models;
 
 namespace AgentEval.Tracing;
@@ -69,6 +70,7 @@ public sealed class AgentTrace
     // mutating writes through these guarded helpers. Reads (serialization, FinalizePerformance) run after
     // recording has completed, so they need no lock.
     private readonly object _writeLock = new();
+    private int _toolExecutionIndex = -1;
 
     /// <summary>Appends an entry to <see cref="Entries"/> under a lock — safe under concurrent recording.</summary>
     public void AddEntry(TraceEntry entry)
@@ -79,6 +81,15 @@ public sealed class AgentTrace
             Entries.Add(entry);
         }
     }
+
+    /// <summary>
+    /// Atomically allocates the next <see cref="TraceEntryScope.ToolExecution"/> index (14). Multiple
+    /// <c>EvaluatingAIFunction</c>-wrapped tools sharing this trace can execute concurrently (MEAI
+    /// AllowConcurrentInvocation); reading a would-be index off <see cref="Entries"/>.Count without
+    /// synchronization is a TOCTOU race that can hand two concurrent tool calls the same index. Mirrors
+    /// <c>TraceRecordingChatClient</c>'s own <c>Interlocked</c>-incremented per-scope counter.
+    /// </summary>
+    public int NextToolExecutionIndex() => Interlocked.Increment(ref _toolExecutionIndex);
 
     /// <summary>Sets a <see cref="Metadata"/> key under a lock, lazily creating the dictionary — safe under concurrent recording.</summary>
     public void SetMetadata(string key, object value)

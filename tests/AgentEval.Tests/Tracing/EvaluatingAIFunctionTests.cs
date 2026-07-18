@@ -88,6 +88,28 @@ public class EvaluatingAIFunctionTests
     }
 
     [Fact]
+    public async Task ConcurrentToolInvocations_SharingOneTrace_GetDistinctIndices()
+    {
+        // Regression (issue #14): the index used to be read as `_trace.Entries.Count` with no synchronization —
+        // a TOCTOU race under MEAI AllowConcurrentInvocation (multiple tools invoked concurrently within one
+        // round-trip, all sharing this trace). Two racing reads before either call's AddEntry could return the
+        // SAME count, so two ToolExecution entries could land with the SAME Index. Drive real concurrency with a
+        // short artificial delay so both wrappers are mid-flight before either finishes.
+        var trace = new AgentTrace();
+        var slowAdd = AIFunctionFactory.Create(async (int a, int b) => { await Task.Delay(20); return a + b; }, name: "SlowAdd");
+        var wrapped = slowAdd.WithEvaluation(trace);
+
+        var tasks = Enumerable.Range(0, 8)
+            .Select(i => wrapped.InvokeAsync(new AIFunctionArguments { ["a"] = i, ["b"] = 1 }).AsTask())
+            .ToArray();
+        await Task.WhenAll(tasks);
+
+        Assert.Equal(8, trace.Entries.Count);
+        var indices = trace.Entries.Select(e => e.Index).ToList();
+        Assert.Equal(indices.Count, indices.Distinct().Count());   // no duplicate index handed to two concurrent calls
+    }
+
+    [Fact]
     public async Task WithoutCorrelationScope_RecordsNullCorrelationId_StillSucceeds()
     {
         // Arrange

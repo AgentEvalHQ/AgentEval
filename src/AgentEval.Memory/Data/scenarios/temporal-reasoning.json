@@ -83,6 +83,7 @@
     },
     "standard": {
       "extends": "quick",
+      "reference_date": "2026-03-25",
       "context_pressure": {
         "corpus": "context-stress",
         "max_turns": 100,

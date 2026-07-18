@@ -34,4 +34,12 @@ public sealed record MultiTurnContext
     /// resolve Inconclusive turns, GAP-19) — an attack generates turns, a judge scores them; they must not be conflated.
     /// </summary>
     public IChatClient? AttackerClient { get; init; }
+
+    /// <summary>
+    /// The real <see cref="EvaluationOutcome"/> of the previous turn (e.g. <c>"Resisted"</c>, <c>"Succeeded"</c>,
+    /// <c>"Inconclusive"</c>), stamped in by <see cref="TurnOrchestrator"/> after each turn's evaluation. <c>null</c>
+    /// on turn 0 (no prior turn exists yet). Mirrors <see cref="TapNode.LastVerdict"/> — an attacker-driven attack
+    /// should feed this back to its attacker LLM instead of assuming a fixed outcome for every prior turn.
+    /// </summary>
+    public string? LastVerdict { get; init; }
 }

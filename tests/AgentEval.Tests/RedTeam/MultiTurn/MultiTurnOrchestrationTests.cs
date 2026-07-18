@@ -188,6 +188,19 @@ public class MultiTurnOrchestrationTests
         public override Task<string?> NextTurnAsync(MultiTurnContext c, CancellationToken ct = default) => Task.FromResult<string?>("keep going");
     }
 
+    /// <summary>Records the LastVerdict it was handed on each call — proves what TurnOrchestrator actually threads.</summary>
+    private sealed class LastVerdictCapturingAttack : TestMultiTurnAttack
+    {
+        public override string Name => "CapturesLastVerdict";
+        public override int MaxTurns => 2;
+        public readonly List<string?> SeenLastVerdicts = [];
+        public override Task<string?> NextTurnAsync(MultiTurnContext c, CancellationToken ct = default)
+        {
+            SeenLastVerdicts.Add(c.LastVerdict);
+            return Task.FromResult<string?>("keep going");
+        }
+    }
+
     /// <summary>Evaluator that always returns Inconclusive — exercises the all-inconclusive multi-turn fold.</summary>
     private sealed class AlwaysInconclusiveEvaluator : IProbeEvaluator
     {
@@ -361,6 +374,24 @@ public class MultiTurnOrchestrationTests
 
         Assert.Equal(EvaluationOutcome.Succeeded, result.Outcome);
         Assert.Equal(1, attacker.CallCount);   // one refinement after the seed was refused
+    }
+
+    [Fact]
+    public async Task TurnOrchestrator_FeedsRealPerTurnOutcome_IntoNextContextsLastVerdict()
+    {
+        // Regression (issue #12): before this fix, MultiTurnContext had no verdict field at all, so PairAttack had
+        // to hardcode LastVerdict = "Resisted" for every attacker-refinement request — even after a turn that
+        // actually scored Succeeded or Inconclusive. TurnOrchestrator must now stamp the REAL EvaluationOutcome of
+        // each turn into the NEXT turn's context (mirroring how TreeOrchestrator already threads TapNode.LastVerdict).
+        var attack = new LastVerdictCapturingAttack();
+        var agent = new ScriptedConversableAgent(_ => Refusal);   // token never present → every turn evaluates Resisted
+
+        await new TurnOrchestrator(agent, ScanOptions.Default)
+            .RunAsync(attack, Seed, attack.GetEvaluator(), CancellationToken.None);
+
+        Assert.Equal(2, attack.SeenLastVerdicts.Count);
+        Assert.Null(attack.SeenLastVerdicts[0]);              // turn 0: no prior turn exists yet
+        Assert.Equal("Resisted", attack.SeenLastVerdicts[1]); // turn 1: the REAL outcome of turn 0, not a fixed literal
     }
 
     [Fact]
