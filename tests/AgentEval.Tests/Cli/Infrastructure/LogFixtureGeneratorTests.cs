@@ -88,6 +88,62 @@ public class LogFixtureGeneratorTests : IDisposable
     }
 
     [Fact]
+    public async Task GenerateAsync_SingleToolCallResponse_WithAccompanyingText_PreservesText()
+    {
+        // Regression test for a real bug found in review: MapResponse's tool-call branches previously left
+        // Text unset, silently dropping any lead-in/reasoning text a real provider attaches alongside a tool
+        // call — even though ScriptedChatClient.GetResponseAsync fully supports Text + a tool call together
+        // (they're not mutually exclusive), so the fixture round-trip lost real captured content for no reason.
+        using (var sink = new StreamWriter(_path))
+        {
+            var client = new FixtureCapturingChatClient(
+                new ScriptedChatClient().Add(new ScriptedTurn
+                {
+                    Text = "Let me look that up.",
+                    ToolCallId = "c1",
+                    ToolName = "SearchFlights",
+                    ToolArgs = new Dictionary<string, object?> { ["to"] = "NRT" },
+                    FinishReason = ChatFinishReason.ToolCalls,
+                }),
+                sink);
+            await client.GetResponseAsync(Conversation());
+        }
+
+        var turns = await LogFixtureGenerator.GenerateAsync(_path);
+
+        var turn = Assert.Single(turns);
+        Assert.Equal("Let me look that up.", turn.Text);
+        Assert.Equal("SearchFlights", turn.ToolName);
+    }
+
+    [Fact]
+    public async Task GenerateAsync_ParallelToolCallResponse_WithAccompanyingText_PreservesText()
+    {
+        using (var sink = new StreamWriter(_path))
+        {
+            var client = new FixtureCapturingChatClient(
+                new ScriptedChatClient().Add(new ScriptedTurn
+                {
+                    Text = "Checking flights and hotels.",
+                    ToolCalls =
+                    [
+                        new ScriptedToolCall { ToolCallId = "c1", ToolName = "SearchFlights", ToolArgs = new Dictionary<string, object?> { ["to"] = "NRT" } },
+                        new ScriptedToolCall { ToolCallId = "c2", ToolName = "SearchHotels", ToolArgs = new Dictionary<string, object?> { ["city"] = "Tokyo" } },
+                    ],
+                    FinishReason = ChatFinishReason.ToolCalls,
+                }),
+                sink);
+            await client.GetResponseAsync(Conversation());
+        }
+
+        var turns = await LogFixtureGenerator.GenerateAsync(_path);
+
+        var turn = Assert.Single(turns);
+        Assert.Equal("Checking flights and hotels.", turn.Text);
+        Assert.Equal(2, turn.ToolCalls!.Count);
+    }
+
+    [Fact]
     public async Task GenerateAsync_ErrorEntry_MapsToThrowTurn_MessageOnly_NotFullStackTrace()
     {
         using (var sink = new StreamWriter(_path))

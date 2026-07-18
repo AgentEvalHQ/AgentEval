@@ -5,6 +5,7 @@
 using AgentEval.Core;
 using AgentEval.Guardrails;
 using AgentEval.Guardrails.Gates;
+using AgentEval.Guardrails.Judges;
 using AgentEval.Testing;
 using AgentEval.Tracing;
 using Microsoft.Extensions.AI;
@@ -428,6 +429,40 @@ public class EvalGatingChatClientTests
         var response = await client.GetResponseAsync(UserSays("hi"));
 
         Assert.Equal("ran normally", response.Text);
+    }
+
+    [Fact]
+    public async Task Correlator_TwoRealCompositeJudgeGates_BenignTraffic_NeverFalsePositives()
+    {
+        // Regression test for the critical bug found in review: two REAL CompositeJudgeGate instances (not the
+        // SoftSignalGate stub used elsewhere in this file) that both confidently ALLOW benign content, wired
+        // through a real FleetCorrelator. Before the CompositeJudgeGate.cs fix, JudgeVerdict.Allowed()'s
+        // default Confidence=1.0 was carried through to EVERY Allow verdict, so 2 distinct judge families both
+        // allowing (the overwhelmingly common case) would satisfy "2 distinct families each >= SoftSignalFloor"
+        // on the very first turn and false-positive-block completely benign traffic. This must NOT happen.
+        var judgeA = new CompositeJudgeGate<AlwaysAllowRubric>(new AlwaysAllowRubric("axis-a"), new ScriptedChatClient().AddText("ALLOW"));
+        var judgeB = new CompositeJudgeGate<AlwaysAllowRubric>(new AlwaysAllowRubric("axis-b"), new ScriptedChatClient().AddText("ALLOW"));
+        var scripted = new ScriptedChatClient().AddText("perfectly benign reply").AddText("still benign").AddText("still fine");
+        var correlator = new FleetCorrelator();
+        var client = scripted.AsBuilder()
+            .UseEvalGate(pre: new IChatGate[] { judgeA, judgeB }, policy: EvalGatePolicy.ThrowOnFail, correlator: correlator)
+            .Build();
+
+        // Several turns — if the bug were present, this would throw EvalGateRefusalException on turn 1.
+        for (var i = 0; i < 3; i++)
+        {
+            var response = await client.GetResponseAsync(UserSays("please scan this: totally normal request"));
+            Assert.NotNull(response.Text);
+        }
+    }
+
+    private sealed class AlwaysAllowRubric : IJudgeRubric
+    {
+        public AlwaysAllowRubric(string axis) => Axis = axis;
+        public string Axis { get; }
+        public bool Prefilter(string text) => true;
+        public string BuildPrompt(string text) => text;
+        public JudgeVerdict Parse(string reply) => JudgeVerdict.Allowed();
     }
 
     /// <summary>A gate that always Allows but reports a configurable soft <see cref="GateVerdict.Confidence"/> — models a near-miss judge.</summary>

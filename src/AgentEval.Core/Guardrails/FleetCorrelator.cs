@@ -133,6 +133,14 @@ public sealed class FleetCorrelator
     {
         lock (_lock)
         {
+            if (_observations.Count == 0)
+            {
+                // The common case (most gates never carry a soft signal, see Observe) — skip the LINQ
+                // chain below entirely rather than allocating for a result that MinDistinctFamilies >= 2
+                // (enforced in the constructor) guarantees can never qualify.
+                return null;
+            }
+
             var windowStart = _currentTurn - _options.WindowTurns + 1;
             _observations.RemoveAll(o => o.Turn < windowStart);
 

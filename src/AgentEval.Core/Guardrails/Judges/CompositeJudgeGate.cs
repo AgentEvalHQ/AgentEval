@@ -72,8 +72,16 @@ public sealed class CompositeJudgeGate<TRubric> : IChatGate
                 GateVerdict.Block(PolicyName, verdict.Rationale ?? $"{_rubric.Axis} detected", verdict.Spans),
             JudgeDecision.Inconclusive when _options.FailClosedOnInconclusive =>
                 GateVerdict.Block(PolicyName, verdict.Rationale ?? $"{_rubric.Axis} judge inconclusive (fail-closed)"),
-            // Allowed, low-confidence Blocked, or fail-open Inconclusive — carry the judge's own confidence through
-            // instead of discarding it, so a fleet-wide correlator can later notice several near-miss verdicts.
+            // A genuine Allowed decision carries NO confidence through, deliberately: JudgeVerdict.Confidence is
+            // confidence IN THE DECISION, not confidence that something is wrong — JudgeVerdict.Allowed()
+            // defaults to Confidence=1.0, meaning "very sure this is fine," the OPPOSITE of a near-miss signal.
+            // Attaching it here would make FleetCorrelator treat every confidently-clean turn from 2+ judges as
+            // a "soft signal" and false-positive-block essentially all benign multi-judge traffic (found in
+            // review: a genuine bug, not a style choice — see CompositeJudgeGateTests for the regression test).
+            JudgeDecision.Allowed => GateVerdict.Allow(PolicyName),
+            // Low-confidence Blocked (would have blocked at a lower threshold) or fail-open Inconclusive — a
+            // GENUINE near-miss/uncertain signal. Carry the judge's own confidence through instead of
+            // discarding it, so a fleet-wide correlator can later notice several near-miss verdicts.
             _ => GateVerdict.Allow(PolicyName) with { Confidence = verdict.Confidence },
         };
     }

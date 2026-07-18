@@ -51,8 +51,25 @@ public static class SkillManifestPoisoningGate
         ArgumentNullException.ThrowIfNull(currentSkills);
         ArgumentNullException.ThrowIfNull(baseline);
 
-        var current = currentSkills.ToDictionary(m => m.Name, Fingerprint, StringComparer.Ordinal);
-        return ManifestDriftDetector.Detect(baseline.HashesBySkillName, current);
+        // Dictionary KEY only is lowercased — Fingerprint still hashes each manifest's own, original-case
+        // Name (CanonicalContent includes it), so this must not touch what's fed to Fingerprint or every
+        // fingerprint would desync from a baseline captured on the original casing. GroupBy+First (not
+        // ToDictionary directly), the same tolerance SkillsScanCommand.ManifestFingerprintsByName uses: two
+        // skills differing only by case is itself the exact rug-pull vector this guards, so it must not
+        // crash the check. Without lowercasing here, a skill renamed "myskill" -> "MySkill" (content
+        // otherwise identical or poisoned) shows up as an unrelated New+Removed pair instead of a Changed
+        // finding, letting a re-cased rug-pull evade drift detection — the exact bypass
+        // SkillsScanCommand's own --save-manifest-baseline path already defends against by lowercasing its
+        // keys the same way (ManifestDriftDetector.Detect's key union is StringComparer.Ordinal and can't be
+        // told to ignore case, so both sides must already match case going in).
+        var current = currentSkills
+            .GroupBy(m => m.Name, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(g => g.Key.ToLowerInvariant(), g => Fingerprint(g.First()), StringComparer.Ordinal);
+        var baselineHashes = baseline.HashesBySkillName
+            .GroupBy(kv => kv.Key, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(g => g.Key.ToLowerInvariant(), g => g.First().Value, StringComparer.Ordinal);
+
+        return ManifestDriftDetector.Detect(baselineHashes, current);
     }
 }
 
