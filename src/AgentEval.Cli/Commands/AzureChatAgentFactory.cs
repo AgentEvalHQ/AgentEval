@@ -75,7 +75,7 @@ internal static class AzureChatAgentFactory
         try
         {
             var azureClient = new AzureOpenAIClient(new Uri(endpoint!), new AzureKeyCredential(apiKey!), BuildClientOptions());
-            IChatClient chatClient = VerboseLog.Wrap(azureClient.GetChatClient(deployment!).AsIChatClient(), "azure-env");
+            IChatClient chatClient = CliChatClientDiagnostics.Wrap(azureClient.GetChatClient(deployment!).AsIChatClient(), "azure-env");
             IEvaluableAgent agent = new ChatClientAgentAdapter(
                 chatClient,
                 name: subject,
@@ -121,7 +121,7 @@ internal static class AzureChatAgentFactory
         try
         {
             var azureClient = new AzureOpenAIClient(new Uri(endpoint!), new AzureKeyCredential(apiKey!), BuildClientOptions());
-            IChatClient chatClient = VerboseLog.Wrap(azureClient.GetChatClient(deployment!).AsIChatClient(), "azure-env");
+            IChatClient chatClient = CliChatClientDiagnostics.Wrap(azureClient.GetChatClient(deployment!).AsIChatClient(), "azure-env");
             return (chatClient, deployment, 0);
         }
         catch (Exception ex)

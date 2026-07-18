@@ -256,7 +256,7 @@ internal static class EvalCommand
                 systemPrompt = await File.ReadAllTextAsync(opts.SystemPromptFile.FullName, ct);
 
             // 3. Create IChatClient → IStreamableAgent
-            chatClient = VerboseLog.Wrap(opts.Azure
+            chatClient = CliChatClientDiagnostics.Wrap(opts.Azure
                 ? EndpointFactory.CreateAzure(opts.Endpoint, opts.DeploymentName!, opts.ApiKey)
                 : EndpointFactory.CreateOpenAICompatible(opts.Endpoint!, opts.Model!, opts.ApiKey), "agent");
 
@@ -277,7 +277,7 @@ internal static class EvalCommand
 
         // 5. Create harness (optionally with LLM judge)
         IChatClient? judgeClient = opts.JudgeEndpoint is not null
-            ? VerboseLog.Wrap(EndpointFactory.CreateOpenAICompatible(
+            ? CliChatClientDiagnostics.Wrap(EndpointFactory.CreateOpenAICompatible(
                 opts.JudgeEndpoint, opts.JudgeModel ?? resolvedName, opts.ApiKey), "judge")
             : null;
         var harness = judgeClient is not null

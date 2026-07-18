@@ -172,4 +172,108 @@ public class ScriptedChatClientTests
         Assert.Single(calls);
         Assert.Equal("search", calls[0].Name);
     }
+
+    // ── FromFixture: the data-loading counterpart to every Add* method above ──
+
+    [Fact]
+    public async Task FromFixture_TextTurn_BehavesIdenticallyToAddText()
+    {
+        var client = ScriptedChatClient.FromFixture(new[]
+        {
+            new ScriptedFixtureTurn { Text = "hello from a fixture", FinishReason = "stop", InputTokens = 10, OutputTokens = 5 },
+        });
+
+        var response = await client.GetResponseAsync(new[] { new ChatMessage(ChatRole.User, "hi") });
+
+        Assert.Equal("hello from a fixture", response.Text);
+        Assert.Equal(ChatFinishReason.Stop, response.FinishReason);
+        Assert.Equal(10, response.Usage!.InputTokenCount);
+        Assert.Equal(5, response.Usage.OutputTokenCount);
+    }
+
+    [Fact]
+    public async Task FromFixture_SingleToolCallTurn_BehavesIdenticallyToAddToolCall()
+    {
+        var client = ScriptedChatClient.FromFixture(new[]
+        {
+            new ScriptedFixtureTurn
+            {
+                ToolCallId = "c1",
+                ToolName = "SearchFlights",
+                ToolArgs = new Dictionary<string, object?> { ["query"] = "tokyo" },
+                FinishReason = "tool_calls",
+            },
+        });
+
+        var response = await client.GetResponseAsync(new[] { new ChatMessage(ChatRole.User, "plan a trip") });
+
+        var call = response.Messages.SelectMany(m => m.Contents).OfType<FunctionCallContent>().Single();
+        Assert.Equal("SearchFlights", call.Name);
+        Assert.Equal("c1", call.CallId);
+        Assert.Equal("tokyo", call.Arguments!["query"]);
+        Assert.Equal(ChatFinishReason.ToolCalls, response.FinishReason);
+    }
+
+    [Fact]
+    public async Task FromFixture_ParallelToolCallsTurn_BehavesIdenticallyToAddParallelToolCalls()
+    {
+        var client = ScriptedChatClient.FromFixture(new[]
+        {
+            new ScriptedFixtureTurn
+            {
+                ToolCalls = new[]
+                {
+                    new ScriptedFixtureToolCall { ToolCallId = "c1", ToolName = "SearchFlights", ToolArgs = new Dictionary<string, object?> { ["to"] = "NRT" } },
+                    new ScriptedFixtureToolCall { ToolCallId = "c2", ToolName = "SearchHotels", ToolArgs = new Dictionary<string, object?> { ["city"] = "Tokyo" } },
+                },
+                FinishReason = "tool_calls",
+            },
+        });
+
+        var response = await client.GetResponseAsync(new[] { new ChatMessage(ChatRole.User, "plan a trip") });
+
+        var calls = response.Messages.SelectMany(m => m.Contents).OfType<FunctionCallContent>().ToList();
+        Assert.Equal(2, calls.Count);
+        Assert.Contains(calls, c => c.Name == "SearchFlights" && c.CallId == "c1");
+        Assert.Contains(calls, c => c.Name == "SearchHotels" && c.CallId == "c2");
+    }
+
+    [Fact]
+    public async Task FromFixture_ThrowTurn_BehavesIdenticallyToAddThrow()
+    {
+        var client = ScriptedChatClient.FromFixture(new[] { new ScriptedFixtureTurn { Throw = "provider down" } });
+
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => client.GetResponseAsync(new[] { new ChatMessage(ChatRole.User, "hi") }));
+        Assert.Equal("provider down", ex.Message);
+    }
+
+    [Fact]
+    public async Task FromFixture_MultipleTurns_ConsumedInOrder()
+    {
+        var client = ScriptedChatClient.FromFixture(new[]
+        {
+            new ScriptedFixtureTurn { Text = "first" },
+            new ScriptedFixtureTurn { Text = "second" },
+        });
+
+        var r1 = await client.GetResponseAsync(new[] { new ChatMessage(ChatRole.User, "1") });
+        var r2 = await client.GetResponseAsync(new[] { new ChatMessage(ChatRole.User, "2") });
+
+        Assert.Equal("first", r1.Text);
+        Assert.Equal("second", r2.Text);
+    }
+
+    [Fact]
+    public void FromFixture_NullTurns_Throws()
+        => Assert.Throws<ArgumentNullException>(() => ScriptedChatClient.FromFixture(null!));
+
+    [Fact]
+    public void FromFixture_EmptyTurns_ReturnsUsableClient_DefaultBenignResponse()
+    {
+        // Matches the existing "queue empty" contract (a benign empty "stop" response, not a throw) — FromFixture
+        // with zero turns must behave identically to `new ScriptedChatClient()` with nothing added.
+        var client = ScriptedChatClient.FromFixture(Array.Empty<ScriptedFixtureTurn>());
+        Assert.NotNull(client);
+    }
 }

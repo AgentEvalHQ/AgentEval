@@ -84,7 +84,7 @@ internal static class JudgeFactory
             try
             {
                 var azureClient = new AzureOpenAIClient(new Uri(endpoint!), new AzureKeyCredential(apiKey!));
-                IChatClient chatClient = VerboseLog.Wrap(azureClient.GetChatClient(deployment!).AsIChatClient(), "judge");
+                IChatClient chatClient = CliChatClientDiagnostics.Wrap(azureClient.GetChatClient(deployment!).AsIChatClient(), "judge");
                 IEvaluator real = new ChatClientEvaluator(chatClient, systemPrompt);
                 Console.Error.WriteLine(
                     $"✔ Azure OpenAI judge configured — endpoint={endpoint}, deployment={deployment} ({judgeKind})" +
