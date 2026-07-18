@@ -35,6 +35,59 @@ public class LogFileCommandTests : IDisposable
     }
 
     [Fact]
+    public void Create_ReturnsLogFileCommand_WithReplaySubcommand()
+    {
+        var command = LogFileCommand.Create();
+        Assert.Contains(command.Subcommands, c => c.Name == "replay");
+    }
+
+    [Fact]
+    public async Task ReplayAsync_MissingCaptureFile_ReturnsRuntimeError()
+    {
+        var missing = new FileInfo(Path.Combine(Path.GetTempPath(), "does-not-exist-" + Guid.NewGuid().ToString("N") + ".jsonl"));
+        var outFile = new FileInfo(Path.Combine(Path.GetTempPath(), "agenteval-replay-out-" + Guid.NewGuid().ToString("N") + ".md"));
+
+        var exit = await LogFileCommand.ReplayAsync(missing, outFile, endpoint: null, model: null, apiKey: null, azureFromEnv: false, strictText: false, default);
+
+        Assert.Equal(ExitCodes.RuntimeError, exit);
+    }
+
+    [Fact]
+    public async Task ReplayAsync_NoTargetSpecified_ReturnsUsageError()
+    {
+        var captured = new FileInfo(Path.Combine(Path.GetTempPath(), "agenteval-replay-captured-" + Guid.NewGuid().ToString("N") + ".jsonl"));
+        File.WriteAllText(captured.FullName, "");
+        var outFile = new FileInfo(Path.Combine(Path.GetTempPath(), "agenteval-replay-out-" + Guid.NewGuid().ToString("N") + ".md"));
+        try
+        {
+            var exit = await LogFileCommand.ReplayAsync(captured, outFile, endpoint: null, model: null, apiKey: null, azureFromEnv: false, strictText: false, default);
+            Assert.Equal(ExitCodes.UsageError, exit);
+        }
+        finally
+        {
+            captured.Delete();
+        }
+    }
+
+    [Fact]
+    public async Task ReplayAsync_EndpointWithoutModel_ReturnsUsageError()
+    {
+        var captured = new FileInfo(Path.Combine(Path.GetTempPath(), "agenteval-replay-captured-" + Guid.NewGuid().ToString("N") + ".jsonl"));
+        File.WriteAllText(captured.FullName, "");
+        var outFile = new FileInfo(Path.Combine(Path.GetTempPath(), "agenteval-replay-out-" + Guid.NewGuid().ToString("N") + ".md"));
+        try
+        {
+            var exit = await LogFileCommand.ReplayAsync(
+                captured, outFile, endpoint: "https://example.test", model: null, apiKey: null, azureFromEnv: false, strictText: false, default);
+            Assert.Equal(ExitCodes.UsageError, exit);
+        }
+        finally
+        {
+            captured.Delete();
+        }
+    }
+
+    [Fact]
     public async Task ToFixtureAsync_RealCapture_WritesFixtureJson_LoadableByScriptedChatClient()
     {
         using (var sink = new StreamWriter(_capturedPath))
