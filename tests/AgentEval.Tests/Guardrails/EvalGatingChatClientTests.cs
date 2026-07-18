@@ -316,4 +316,134 @@ public class EvalGatingChatClientTests
                 ? MetricResult.Pass(Name, 100)
                 : MetricResult.Fail(Name, _explanation ?? "failed"));
     }
+
+    // ── Fleet Correlation Layer — wiring through EvalGatingChatClient/UseEvalGate (P1) ──
+
+    [Fact]
+    public async Task Correlator_TwoDistinctFamiliesAcrossTwoPreGates_ThrowOnFail_Blocks()
+    {
+        var scripted = new ScriptedChatClient().AddText("should never run");
+        var correlator = new FleetCorrelator();
+        var client = scripted.AsBuilder()
+            .UseEvalGate(
+                pre: new IChatGate[] { new SoftSignalGate("judge:a", 0.6), new SoftSignalGate("judge:b", 0.5) },
+                policy: EvalGatePolicy.ThrowOnFail,
+                correlator: correlator)
+            .Build();
+
+        var ex = await Assert.ThrowsAsync<EvalGateRefusalException>(() => client.GetResponseAsync(UserSays("hi")));
+
+        Assert.Equal("fleet-correlation", ex.PolicyName);
+        Assert.Equal(0, scripted.CallCount);   // blocked before the inner model ever ran
+    }
+
+    [Fact]
+    public async Task Correlator_SameFamilyTwice_NeverEscalates_InnerModelRuns()
+    {
+        var scripted = new ScriptedChatClient().AddText("ran normally");
+        var correlator = new FleetCorrelator();
+        var client = scripted.AsBuilder()
+            .UseEvalGate(
+                pre: new IChatGate[] { new SoftSignalGate("judge:a", 0.6), new SoftSignalGate("judge:a", 0.7) },
+                policy: EvalGatePolicy.ThrowOnFail,
+                correlator: correlator)
+            .Build();
+
+        var response = await client.GetResponseAsync(UserSays("hi"));
+
+        Assert.Equal("ran normally", response.Text);
+    }
+
+    [Fact]
+    public async Task Correlator_WarnOnly_RecordsButDoesNotThrow_InnerModelStillRuns()
+    {
+        var scripted = new ScriptedChatClient().AddText("ran normally");
+        var trace = new AgentTrace();
+        var correlator = new FleetCorrelator();
+        var client = scripted.AsBuilder()
+            .UseEvalGate(
+                pre: new IChatGate[] { new SoftSignalGate("judge:a", 0.6), new SoftSignalGate("judge:b", 0.6) },
+                policy: EvalGatePolicy.WarnOnly,
+                trace: trace,
+                correlator: correlator)
+            .Build();
+
+        var response = await client.GetResponseAsync(UserSays("hi"));
+
+        Assert.Equal("ran normally", response.Text);
+        Assert.Contains(trace.Metadata!.Keys, k => k.Contains("fleet-correlation", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task Correlator_CorrelatesAcrossTwoRoundTrips_WithinWindow()
+    {
+        // Turn 1: only family "a" fires (sub-threshold on its own). Turn 2: only family "b" fires. Neither
+        // turn alone has 2 distinct families — only the CORRELATOR, accumulating across turns, sees both.
+        var scripted = new ScriptedChatClient().AddText("turn 1 reply").AddText("should never run");
+        var correlator = new FleetCorrelator();
+        IChatGate[] turn1Gates = { new SoftSignalGate("judge:a", 0.6) };
+        IChatGate[] turn2Gates = { new SoftSignalGate("judge:b", 0.6) };
+
+        // Two independently-built clients sharing the SAME correlator instance — models two calls on one
+        // session where the pre-gate roster can legitimately vary per turn but the correlator persists.
+        var client1 = scripted.AsBuilder().UseEvalGate(pre: turn1Gates, policy: EvalGatePolicy.ThrowOnFail, correlator: correlator).Build();
+        var client2 = scripted.AsBuilder().UseEvalGate(pre: turn2Gates, policy: EvalGatePolicy.ThrowOnFail, correlator: correlator).Build();
+
+        var first = await client1.GetResponseAsync(UserSays("first"));
+        Assert.Equal("turn 1 reply", first.Text);   // turn 1 alone: only 1 family — no escalation yet
+
+        await Assert.ThrowsAsync<EvalGateRefusalException>(() => client2.GetResponseAsync(UserSays("second")));
+    }
+
+    [Fact]
+    public async Task Correlator_Redact_PostSide_SubstitutesPlaceholder_NoRedactedTextToOffer()
+    {
+        var inner = new ChatResponse(new ChatMessage(ChatRole.Assistant, "some response text"));
+        var correlator = new FleetCorrelator();
+        var client = new FixedResponseClient(inner).AsBuilder()
+            .UseEvalGate(
+                post: new IChatGate[] { new SoftSignalGate("judge:a", 0.6), new SoftSignalGate("judge:b", 0.6) },
+                policy: EvalGatePolicy.Redact,
+                correlator: correlator)
+            .Build();
+
+        var response = await client.GetResponseAsync(UserSays("hi"));
+
+        // A correlation Block never has RedactedText (it names a cross-gate pattern, not a single offending
+        // span) — Redact must still never silently pass it through unmodified.
+        Assert.DoesNotContain("some response text", response.Text);
+        Assert.Contains("fleet-correlation", response.Text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Correlator_NotConfigured_NoCorrelationBehavior_ExistingGatesUnaffected()
+    {
+        // Opt-in: omitting the correlator parameter must be a complete no-op — existing UseEvalGate callers
+        // (none of which pass a correlator) see zero behavior change.
+        var scripted = new ScriptedChatClient().AddText("ran normally");
+        var client = scripted.AsBuilder()
+            .UseEvalGate(pre: new IChatGate[] { new SoftSignalGate("judge:a", 0.9) }, policy: EvalGatePolicy.WarnOnly)
+            .Build();
+
+        var response = await client.GetResponseAsync(UserSays("hi"));
+
+        Assert.Equal("ran normally", response.Text);
+    }
+
+    /// <summary>A gate that always Allows but reports a configurable soft <see cref="GateVerdict.Confidence"/> — models a near-miss judge.</summary>
+    private sealed class SoftSignalGate : IChatGate
+    {
+        private readonly double _confidence;
+
+        public SoftSignalGate(string policyName, double confidence)
+        {
+            PolicyName = policyName;
+            _confidence = confidence;
+        }
+
+        public string PolicyName { get; }
+
+        public ValueTask<GateVerdict> InspectAsync(string text, CancellationToken cancellationToken = default)
+            => new(GateVerdict.Allow(PolicyName) with { Confidence = _confidence });
+    }
 }

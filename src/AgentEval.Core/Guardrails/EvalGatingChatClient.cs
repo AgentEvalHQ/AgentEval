@@ -2,6 +2,7 @@
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 
+using System.Diagnostics.CodeAnalysis;
 using System.Threading;
 using AgentEval.Tracing;
 using Microsoft.Extensions.AI;
@@ -19,24 +20,41 @@ namespace AgentEval.Guardrails;
 /// <see cref="GetStreamingResponseAsync"/> in those configurations — the full output cannot be inspected,
 /// blocked, or redacted once bytes are in flight). Streaming with WarnOnly, or pre-gates only, is fine.
 /// </summary>
+// This class is the documented, intended consumption point for the Experimental FleetCorrelator (an optional
+// constructor parameter) — suppressed file-wide rather than sprinkling a pragma pair around every one of the
+// several _correlator?.* call sites below.
+#pragma warning disable AGENTEVAL_GATEKEEPER_PREVIEW001
 public sealed class EvalGatingChatClient : DelegatingChatClient
 {
     private readonly IReadOnlyList<IChatGate> _pre;
     private readonly IReadOnlyList<IChatGate> _post;
     private readonly EvalGatePolicy _policy;
     private readonly AgentTrace? _trace;
+    private readonly FleetCorrelator? _correlator;
     private int _gateSeq;
 
     /// <summary>Wraps <paramref name="inner"/> with pre/post gates enforced per <paramref name="policy"/>.</summary>
+    /// <param name="inner">The chat client to wrap.</param>
+    /// <param name="pre">Run-pre gates, inspecting the input text before the model sees it.</param>
+    /// <param name="post">Run-post gates, inspecting the response text.</param>
+    /// <param name="policy">How a gate's <see cref="GateAction.Block"/> finding is enforced.</param>
+    /// <param name="trace">Optional Glass Box trace every gate verdict is recorded into.</param>
+    /// <param name="correlator">
+    /// Optional, session-scoped Fleet Correlation Layer (Experimental — see <see cref="FleetCorrelator"/>'s own
+    /// remarks). When set, every <paramref name="pre"/>/<paramref name="post"/> gate's verdict is also observed
+    /// by it, and its <see cref="FleetCorrelator.CheckCorrelation"/> result is enforced through the SAME
+    /// <paramref name="policy"/> path as every other gate here — no new enforcement mechanism.
+    /// </param>
     public EvalGatingChatClient(
         IChatClient inner, IReadOnlyList<IChatGate>? pre, IReadOnlyList<IChatGate>? post,
-        EvalGatePolicy policy, AgentTrace? trace = null)
+        EvalGatePolicy policy, AgentTrace? trace = null, FleetCorrelator? correlator = null)
         : base(inner)
     {
         _pre = pre ?? Array.Empty<IChatGate>();
         _post = post ?? Array.Empty<IChatGate>();
         _policy = policy;
         _trace = trace;
+        _correlator = correlator;
     }
 
     /// <inheritdoc />
@@ -89,7 +107,12 @@ public sealed class EvalGatingChatClient : DelegatingChatClient
     // fresh List<>, so the in-place Redact index-set is safe.
     private async Task ApplyPreAsync(List<ChatMessage> msgs, CancellationToken cancellationToken)
     {
-        if (_pre.Count == 0)
+        // Advance unconditionally, before any gate runs this round-trip — the ONE call site both the
+        // streaming and non-streaming paths share (see GetResponseAsync/GetStreamingResponseAsync, both of
+        // which call this method first). A no-op when _correlator is null.
+        _correlator?.AdvanceTurn();
+
+        if (_pre.Count == 0 && _correlator is null)
         {
             return;
         }
@@ -104,6 +127,7 @@ public sealed class EvalGatingChatClient : DelegatingChatClient
         {
             var verdict = await gate.InspectAsync(text, cancellationToken).ConfigureAwait(false);
             Record(verdict, "pre");
+            _correlator?.Observe(verdict, "pre");
             if (verdict.Action == GateAction.Allow)
             {
                 continue;
@@ -122,11 +146,36 @@ public sealed class EvalGatingChatClient : DelegatingChatClient
 
             // WarnOnly (or a non-maskable Block under Redact): recorded, proceed.
         }
+
+        // Fleet Correlation: folded into the SAME EvalGatePolicy enforcement path every gate above already
+        // uses — no new enforcement mechanism. Checked AFTER the per-gate loop so it sees every verdict this
+        // turn contributed, not just a partial view.
+        if (_correlator is not null)
+        {
+            var correlated = _correlator.CheckCorrelation();
+            if (correlated is not null)
+            {
+                Record(correlated, "pre");
+                if (_policy == EvalGatePolicy.ThrowOnFail)
+                {
+                    throw new EvalGateRefusalException(correlated, "pre");
+                }
+
+                if (_policy == EvalGatePolicy.Redact && correlated.RedactedText is not null && targetIdx >= 0)
+                {
+                    msgs[targetIdx] = new ChatMessage(msgs[targetIdx].Role, correlated.RedactedText);
+                }
+
+                // WarnOnly (or, same as any per-gate non-maskable Block above, Redact with no RedactedText —
+                // a correlation Block never has one, it names a cross-gate PATTERN, not a single offending
+                // span to mask): recorded, proceed. Matches the per-gate loop's own established fallthrough.
+            }
+        }
     }
 
     private async Task<ChatResponse> ApplyPostAsync(ChatResponse response, CancellationToken cancellationToken)
     {
-        if (_post.Count == 0)
+        if (_post.Count == 0 && _correlator is null)
         {
             return response;
         }
@@ -136,6 +185,7 @@ public sealed class EvalGatingChatClient : DelegatingChatClient
         {
             var verdict = await gate.InspectAsync(text, cancellationToken).ConfigureAwait(false);
             Record(verdict, "post");
+            _correlator?.Observe(verdict, "post");
             if (verdict.Action == GateAction.Allow)
             {
                 continue;
@@ -148,28 +198,58 @@ public sealed class EvalGatingChatClient : DelegatingChatClient
 
             if (_policy == EvalGatePolicy.Redact)
             {
-                // Redact the response IN PLACE so response-level correlation/threading fields (ResponseId,
-                // ConversationId, CreatedAt, AdditionalProperties, RawRepresentation, …) survive — rebuilding a
-                // fresh ChatResponse silently dropped them. When the gate cannot produce redacted text (a
-                // non-maskable Block, e.g. a toxicity/safety gate), substitute a safe placeholder rather than
-                // delivering the offending content unchanged — Redact must never silently pass a Block.
-                //
-                // Replace only the TEXT with the redacted text and PRESERVE every non-text content (especially
-                // FunctionCallContent): if this gate sits inner of UseFunctionInvocation, dropping the tool calls
-                // on a tool-call turn would desync the tool loop (finish reason says tool_calls but no calls remain).
-                var replacement = verdict.RedactedText ?? BlockedPlaceholder(verdict);
-                var preserved = response.Messages
-                    .SelectMany(m => m.Contents)
-                    .Where(c => c is not TextContent)
-                    .ToList();
-                var contents = new List<AIContent>(preserved.Count + 1) { new TextContent(replacement) };
-                contents.AddRange(preserved);
-                response.Messages = new List<ChatMessage> { new(ChatRole.Assistant, contents) };
-                text = replacement;
+                text = RedactResponseInPlace(response, verdict);
+            }
+        }
+
+        // Fleet Correlation: same "folded into the SAME EvalGatePolicy path" discipline as ApplyPreAsync —
+        // see its matching comment. Post-gates (and therefore this check) never run during streaming; see
+        // GetStreamingResponseAsync's own NotSupportedException guard for why that's already the case for
+        // Redact/ThrowOnFail post-gate configs.
+        if (_correlator is not null)
+        {
+            var correlated = _correlator.CheckCorrelation();
+            if (correlated is not null)
+            {
+                Record(correlated, "post");
+                if (_policy == EvalGatePolicy.ThrowOnFail)
+                {
+                    throw new EvalGateRefusalException(correlated, "post");
+                }
+
+                if (_policy == EvalGatePolicy.Redact)
+                {
+                    RedactResponseInPlace(response, correlated);
+                }
             }
         }
 
         return response;
+    }
+
+    /// <summary>
+    /// Redacts <paramref name="response"/> IN PLACE so response-level correlation/threading fields (ResponseId,
+    /// ConversationId, CreatedAt, AdditionalProperties, RawRepresentation, …) survive — rebuilding a fresh
+    /// <see cref="ChatResponse"/> would silently drop them. When <paramref name="verdict"/> carries no
+    /// maskable text (a non-maskable Block, e.g. a toxicity/safety gate, or a Fleet Correlation verdict, which
+    /// never has one — it names a cross-gate PATTERN, not a single offending span), substitutes a safe
+    /// placeholder rather than delivering the offending content unchanged — Redact must never silently pass a
+    /// Block. Replaces only the TEXT and PRESERVES every non-text content (especially <see cref="FunctionCallContent"/>):
+    /// if this gate sits inner of <c>UseFunctionInvocation</c>, dropping the tool calls on a tool-call turn
+    /// would desync the tool loop (finish reason says tool_calls but no calls remain). Returns the replacement
+    /// text, for the caller to chain subsequent gates over.
+    /// </summary>
+    private static string RedactResponseInPlace(ChatResponse response, GateVerdict verdict)
+    {
+        var replacement = verdict.RedactedText ?? BlockedPlaceholder(verdict);
+        var preserved = response.Messages
+            .SelectMany(m => m.Contents)
+            .Where(c => c is not TextContent)
+            .ToList();
+        var contents = new List<AIContent>(preserved.Count + 1) { new TextContent(replacement) };
+        contents.AddRange(preserved);
+        response.Messages = new List<ChatMessage> { new(ChatRole.Assistant, contents) };
+        return replacement;
     }
 
     /// <summary>Safe stand-in delivered under <see cref="EvalGatePolicy.Redact"/> when a Block cannot be masked.</summary>
@@ -213,3 +293,4 @@ public sealed class EvalGatingChatClient : DelegatingChatClient
         return -1;
     }
 }
+#pragma warning restore AGENTEVAL_GATEKEEPER_PREVIEW001
