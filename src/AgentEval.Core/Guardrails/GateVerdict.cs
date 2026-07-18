@@ -23,12 +23,19 @@ public enum GateAction
 /// <param name="Reason">Human-readable reason (for <see cref="GateAction.Block"/>).</param>
 /// <param name="RedactedText">A masked replacement the client may apply under <see cref="EvalGatePolicy.Redact"/>; null when the finding is not maskable.</param>
 /// <param name="Matches">The offending matches found (e.g. PII categories / injection tokens), if any.</param>
+/// <param name="Confidence">
+/// 0..1 confidence behind this verdict, when the gate has one to report (e.g. a judge's own confidence). Null means
+/// the gate doesn't produce a soft signal (most deterministic/regex gates). Optional and additive — every existing
+/// <see cref="Allow"/>/<see cref="Block"/> call site is unaffected. Intended for cross-gate correlation (a fleet
+/// correlator reading verdicts across a session), not for enforcement by the gate itself.
+/// </param>
 public sealed record GateVerdict(
     GateAction Action,
     string PolicyName,
     string? Reason = null,
     string? RedactedText = null,
-    IReadOnlyList<string>? Matches = null)
+    IReadOnlyList<string>? Matches = null,
+    double? Confidence = null)
 {
     /// <summary>Allow verdict for <paramref name="policy"/>.</summary>
     public static GateVerdict Allow(string policy) => new(GateAction.Allow, policy);
