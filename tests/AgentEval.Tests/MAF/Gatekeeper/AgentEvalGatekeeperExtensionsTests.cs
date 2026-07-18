@@ -4,6 +4,8 @@
 
 using AgentEval.Guardrails;
 using AgentEval.MAF.Gatekeeper;
+using AgentEval.MAF.Skills;
+using AgentEval.Skills;
 using AgentEval.Testing;
 using AgentEval.Tracing;
 using Microsoft.Agents.AI;
@@ -455,6 +457,137 @@ public class AgentEvalGatekeeperExtensionsTests
             }));
 
         Assert.Contains("PromptTemplates", ex.Message, StringComparison.Ordinal);
+    }
+
+    // ── SkillGate Tier 1 (runtime governance), construction-time-only — wiring through UseGatekeeper ──
+    // Core detection-logic coverage lives in SkillGateConstructionCheckTests; these confirm UseGatekeeper
+    // itself wires Skills/SkillBaselinePath/SkillGateMode correctly (half-configuration, opt-in no-op).
+
+    private static ScannedSkillInfo SkillInfo(string name, string description = "desc") =>
+        new(new SkillManifest(name, description, [], [], null, [], SkillSourceKind.File, name), AbsolutePath: null);
+
+    [Fact]
+    public void SkillGate_NotConfigured_DoesNotThrow()
+    {
+        // Opt-in: leaving both Skills and SkillBaselinePath unset must be a complete no-op.
+        var tool = AIFunctionFactory.Create((string x) => x, "x");
+        var agent = BuildAgent(tool, "x", new Dictionary<string, object?>());
+
+        var ex = Record.Exception(() =>
+            agent.AsBuilder().UseGatekeeper(GatekeeperEnforcement.Terminate, g => g.Add(new ForbiddenToolGate("x"))));
+
+        Assert.Null(ex);
+    }
+
+    [Fact]
+    public void SkillGate_OnlySkillsSet_NotBaselinePath_ThrowsRatherThanSilentlyNoOp()
+    {
+        var tool = AIFunctionFactory.Create((string x) => x, "x");
+        var agent = BuildAgent(tool, "x", new Dictionary<string, object?>());
+
+        var ex = Assert.Throws<InvalidOperationException>(() =>
+            agent.AsBuilder().UseGatekeeper(GatekeeperEnforcement.Terminate, g =>
+            {
+                g.Add(new ForbiddenToolGate("x"));
+                g.Skills = [SkillInfo("a")];
+                // SkillBaselinePath deliberately left unset.
+            }));
+
+        Assert.Contains("SkillBaselinePath", ex.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void SkillGate_OnlyBaselinePathSet_NotSkills_ThrowsRatherThanSilentlyNoOp()
+    {
+        var tool = AIFunctionFactory.Create((string x) => x, "x");
+        var agent = BuildAgent(tool, "x", new Dictionary<string, object?>());
+
+        var ex = Assert.Throws<InvalidOperationException>(() =>
+            agent.AsBuilder().UseGatekeeper(GatekeeperEnforcement.Terminate, g =>
+            {
+                g.Add(new ForbiddenToolGate("x"));
+                g.SkillBaselinePath = Path.Combine(Path.GetTempPath(), "does-not-need-to-exist.json");
+                // Skills deliberately left unset.
+            }));
+
+        Assert.Contains("Skills", ex.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void SkillGate_UnknownSkill_StrictDefault_ThrowsAtRegistration_BeforeBuild()
+    {
+        var tool = AIFunctionFactory.Create((string x) => x, "x");
+        var agent = BuildAgent(tool, "x", new Dictionary<string, object?>());
+        var baselinePath = Path.Combine(Path.GetTempPath(), "agenteval-skillgate-wiring-test-" + Guid.NewGuid().ToString("N") + ".json");
+
+        try
+        {
+            var ex = Assert.Throws<SkillDriftException>(() =>
+                agent.AsBuilder().UseGatekeeper(GatekeeperEnforcement.Terminate, g =>
+                {
+                    g.Add(new ForbiddenToolGate("x"));
+                    g.Skills = [SkillInfo("a")];
+                    g.SkillBaselinePath = baselinePath;
+                    // SkillGateMode left at its default — must be Strict.
+                }));
+
+            Assert.Contains("a", ex.Message, StringComparison.Ordinal);
+        }
+        finally
+        {
+            try { if (File.Exists(baselinePath)) File.Delete(baselinePath); } catch { /* best-effort cleanup */ }
+        }
+    }
+
+    [Fact]
+    public void SkillGate_WithSkillGateFluentSugar_WiresTheSamePropertiesAsSettingThemIndividually()
+    {
+        var tool = AIFunctionFactory.Create((string x) => x, "x");
+        var agent = BuildAgent(tool, "x", new Dictionary<string, object?>());
+        var baselinePath = Path.Combine(Path.GetTempPath(), "agenteval-skillgate-fluent-test-" + Guid.NewGuid().ToString("N") + ".json");
+
+        try
+        {
+            var ex = Assert.Throws<SkillDriftException>(() =>
+                agent.AsBuilder().UseGatekeeper(GatekeeperEnforcement.Terminate, g =>
+                {
+                    g.Add(new ForbiddenToolGate("x"));
+                    g.WithSkillGate([SkillInfo("a")], baselinePath);
+                }));
+
+            Assert.Contains("a", ex.Message, StringComparison.Ordinal);
+        }
+        finally
+        {
+            try { if (File.Exists(baselinePath)) File.Delete(baselinePath); } catch { /* best-effort cleanup */ }
+        }
+    }
+
+    [Fact]
+    public void SkillGate_BootstrapMode_UnknownSkill_DoesNotThrow()
+    {
+        var tool = AIFunctionFactory.Create((string x) => x, "x");
+        var agent = BuildAgent(tool, "x", new Dictionary<string, object?>());
+        var baselinePath = Path.Combine(Path.GetTempPath(), "agenteval-skillgate-bootstrap-wiring-" + Guid.NewGuid().ToString("N") + ".json");
+
+        try
+        {
+            var ex = Record.Exception(() =>
+                agent.AsBuilder().UseGatekeeper(GatekeeperEnforcement.Terminate, g =>
+                {
+                    g.Add(new ForbiddenToolGate("x"));
+                    g.Skills = [SkillInfo("a")];
+                    g.SkillBaselinePath = baselinePath;
+                    g.SkillGateMode = SkillGateMode.Bootstrap;
+                }));
+
+            Assert.Null(ex);
+            Assert.True(File.Exists(baselinePath));
+        }
+        finally
+        {
+            try { if (File.Exists(baselinePath)) File.Delete(baselinePath); } catch { /* best-effort cleanup */ }
+        }
     }
 
     // ── #2: options.CoverageReport is the AUTHORITATIVE report, computed from the SAME snapshot that's registered ──

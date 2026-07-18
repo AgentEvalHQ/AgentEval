@@ -74,6 +74,22 @@ public static class AgentEvalGatekeeperExtensions
             }
         }
 
+        // SkillGate Tier 1 (runtime governance) — same fail-fast-before-any-mutation placement and the same
+        // fail-LOUD-on-half-configuration discipline as PromptTemplates/PromptTemplateBaseline immediately
+        // above. Opt-in: both Skills and SkillBaselinePath must be set together.
+        if (options.Skills is null != options.SkillBaselinePath is null)
+        {
+            throw new InvalidOperationException(
+                "UseGatekeeper: exactly one of GatekeeperOptions.Skills / SkillBaselinePath is set — both must " +
+                "be set together for the SkillGate drift check to run (or neither, to leave it disabled). Set " +
+                "the missing one, or clear the one you did set.");
+        }
+
+        if (options.Skills is not null && options.SkillBaselinePath is not null)
+        {
+            SkillGateConstructionCheck.CheckAndEnforce(options.Skills, options.SkillBaselinePath, options.SkillGateMode);
+        }
+
         // #2: compute the AUTHORITATIVE coverage report — against the SAME ToolGates snapshot that is actually
         // registered below (options.ToolGates.ToArray()), not a separately-tracked list a caller could pass to
         // GatekeeperCoverageAnalyzer.Analyze themselves and let drift. Populated whenever KnownTools is set,
