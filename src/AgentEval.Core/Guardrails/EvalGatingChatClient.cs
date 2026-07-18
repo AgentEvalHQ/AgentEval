@@ -138,13 +138,12 @@ public sealed class EvalGatingChatClient : DelegatingChatClient
                 throw new EvalGateRefusalException(verdict, "pre");
             }
 
-            if (_policy == EvalGatePolicy.Redact && verdict.RedactedText is not null && targetIdx >= 0)
+            if (_policy == EvalGatePolicy.Redact && targetIdx >= 0)
             {
-                msgs[targetIdx] = new ChatMessage(msgs[targetIdx].Role, verdict.RedactedText);   // preserve role
-                text = verdict.RedactedText;                                                     // chain over redacted text
+                text = RedactRequestMessageInPlace(msgs, targetIdx, verdict);   // chain over redacted text
             }
 
-            // WarnOnly (or a non-maskable Block under Redact): recorded, proceed.
+            // WarnOnly: recorded, proceed.
         }
 
         // Fleet Correlation: folded into the SAME EvalGatePolicy enforcement path every gate above already
@@ -161,14 +160,15 @@ public sealed class EvalGatingChatClient : DelegatingChatClient
                     throw new EvalGateRefusalException(correlated, "pre");
                 }
 
-                if (_policy == EvalGatePolicy.Redact && correlated.RedactedText is not null && targetIdx >= 0)
+                if (_policy == EvalGatePolicy.Redact && targetIdx >= 0)
                 {
-                    msgs[targetIdx] = new ChatMessage(msgs[targetIdx].Role, correlated.RedactedText);
+                    // A correlation Block never carries RedactedText (it names a cross-gate PATTERN, not a
+                    // single offending span to mask) — RedactRequestMessageInPlace falls back to a safe
+                    // placeholder rather than leaving the prompt unmasked, same as every per-gate Block above.
+                    RedactRequestMessageInPlace(msgs, targetIdx, correlated);
                 }
 
-                // WarnOnly (or, same as any per-gate non-maskable Block above, Redact with no RedactedText —
-                // a correlation Block never has one, it names a cross-gate PATTERN, not a single offending
-                // span to mask): recorded, proceed. Matches the per-gate loop's own established fallthrough.
+                // WarnOnly: recorded, proceed.
             }
         }
     }
@@ -252,6 +252,23 @@ public sealed class EvalGatingChatClient : DelegatingChatClient
         return replacement;
     }
 
+    /// <summary>
+    /// Pre-gate counterpart to <see cref="RedactResponseInPlace"/>: replaces <paramref name="msgs"/>'s
+    /// <paramref name="targetIdx"/> message with <paramref name="verdict"/>'s redacted text, falling back to
+    /// <see cref="BlockedPlaceholder"/> when it carries no maskable span (a non-maskable Block, e.g. a
+    /// toxicity/safety gate, or a Fleet Correlation verdict, which never has one). Regression fix: this
+    /// fallback used to be missing here — a pre-gate Block with no RedactedText, or ANY Fleet Correlation
+    /// Block (which structurally never has one), previously passed through completely unmasked under
+    /// <see cref="EvalGatePolicy.Redact"/>, identical to WarnOnly. Preserves the message's own role. Returns
+    /// the replacement text, for the caller to chain subsequent gates over.
+    /// </summary>
+    private static string RedactRequestMessageInPlace(List<ChatMessage> msgs, int targetIdx, GateVerdict verdict)
+    {
+        var replacement = verdict.RedactedText ?? BlockedPlaceholder(verdict);
+        msgs[targetIdx] = new ChatMessage(msgs[targetIdx].Role, replacement);
+        return replacement;
+    }
+
     /// <summary>Safe stand-in delivered under <see cref="EvalGatePolicy.Redact"/> when a Block cannot be masked.</summary>
     private static string BlockedPlaceholder(GateVerdict verdict)
         => string.IsNullOrEmpty(verdict.Reason)
@@ -271,12 +288,20 @@ public sealed class EvalGatingChatClient : DelegatingChatClient
             return;
         }
 
+        // The two SensitiveJudgeAxes (exfiltration-intent, system-prompt-extraction) can have Reason/Matches
+        // carry the offending phrase verbatim — an LLM judge's own rationale can quote back the exact
+        // secret/leaked-prompt text it detected ("the offending phrase may BE the secret"). Regression fix:
+        // AgentEvalRunGateExtensions.RecordGate (the MAF-layer sibling that writes the identical metadata
+        // shape) already redacts both fields for these two axes; this Core-layer writer previously did not,
+        // so the same judge used as an EvalGatingChatClient pre/post gate leaked the secret into the trace.
+        var sensitive = SensitiveJudgeAxes.IsSensitive(verdict.PolicyName);
+
         var seq = Interlocked.Increment(ref _gateSeq);
         _trace.SetMetadata($"gate.{stage}.{seq}.{verdict.PolicyName}", new Dictionary<string, object?>
         {
             ["action"] = verdict.Action.ToString(),
-            ["reason"] = verdict.Reason,
-            ["matches"] = verdict.Matches,
+            ["reason"] = sensitive ? "[redacted — sensitive judge axis; see SensitiveJudgeAxes.RedactAxes]" : verdict.Reason,
+            ["matches"] = sensitive ? null : verdict.Matches,
             // The same soft signal FleetCorrelator.Observe acts on — without it here, a trace/compliance
             // reviewer looking back at WHY a "fleet-correlation" Block fired has no record of the individual
             // sub-threshold confidences that fed it.

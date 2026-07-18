@@ -99,6 +99,38 @@ public class EvalGatingChatClientTests
     }
 
     [Fact]
+    public async Task SensitiveJudgeAxis_VerdictReasonAndMatches_RedactedInTrace_NotPersistedVerbatim()
+    {
+        // Regression test for a real bug found in review: AgentEvalRunGateExtensions.RecordGate (the MAF-layer
+        // sibling that writes the identical trace-metadata shape) already redacts Reason/Matches for the two
+        // SensitiveJudgeAxes (exfiltration-intent, system-prompt-extraction) — the offending phrase can BE the
+        // secret. This Core-layer writer (EvalGatingChatClient.Record) previously did not, so the same judge
+        // wired as a pre/post gate here leaked the secret verbatim into the trace.
+        var scripted = new ScriptedChatClient().AddText("proceeds anyway");
+        var trace = new AgentTrace();
+        var client = scripted.AsBuilder()
+            .UseEvalGate(pre: new IChatGate[] { new SensitiveAxisGate() }, policy: EvalGatePolicy.WarnOnly, trace: trace)
+            .Build();
+
+        await client.GetResponseAsync(UserSays("hi"));
+
+        var key = trace.Metadata!.Keys.Single(k => k.StartsWith("gate.pre.", StringComparison.Ordinal));
+        var value = (IDictionary<string, object?>)trace.Metadata![key];
+        Assert.Equal("[redacted — sensitive judge axis; see SensitiveJudgeAxes.RedactAxes]", value["reason"]);
+        Assert.Null(value["matches"]);
+        Assert.DoesNotContain("sk-live-the-actual-secret-key", value.Values.Select(v => v?.ToString() ?? string.Empty));
+    }
+
+    /// <summary>Models a judge on a <see cref="SensitiveJudgeAxes.RedactAxes"/> axis whose own rationale quotes the secret it detected.</summary>
+    private sealed class SensitiveAxisGate : IChatGate
+    {
+        public string PolicyName => "judge:exfiltration-intent";
+
+        public ValueTask<GateVerdict> InspectAsync(string text, CancellationToken cancellationToken = default)
+            => new(GateVerdict.Block(PolicyName, "leaked value: sk-live-the-actual-secret-key", ["sk-live-the-actual-secret-key"]));
+    }
+
+    [Fact]
     public void Streaming_WithRedactPostGate_ThrowsEagerly()
     {
         // Arrange
@@ -264,6 +296,47 @@ public class EvalGatingChatClientTests
         var call = response.Messages.SelectMany(m => m.Contents).OfType<FunctionCallContent>().SingleOrDefault();
         Assert.NotNull(call);
         Assert.Equal("SearchFlights", call!.Name);
+    }
+
+    [Fact]
+    public async Task PreGate_NonMaskableBlock_UnderRedact_SubstitutesPlaceholder_NotOriginalContent()
+    {
+        // Regression test for a real bug found in review: a pre-gate that Blocks but cannot mask (RedactedText
+        // null, e.g. a toxicity/safety gate) previously left the outgoing REQUEST message completely
+        // unmodified under Redact — identical to WarnOnly. The post-gate side already substituted a placeholder
+        // in this exact scenario (see PostGate_NonMaskableBlock_UnderRedact_...); the pre-gate side did not.
+        var scripted = new ScriptedChatClient().AddText("ok");
+        var client = scripted.AsBuilder()
+            .UseEvalGate(pre: new IChatGate[] { new AlwaysBlockGate() }, policy: EvalGatePolicy.Redact)
+            .Build();
+
+        await client.GetResponseAsync(UserSays("the actual malicious prompt"));
+
+        var receivedUserText = scripted.ReceivedMessages.Single().Last().Text;
+        Assert.DoesNotContain("the actual malicious prompt", receivedUserText);
+        Assert.Contains("withheld by EvalGate", receivedUserText);
+        Assert.Contains("always_block", receivedUserText);
+    }
+
+    [Fact]
+    public async Task Correlator_Redact_PreSide_SubstitutesPlaceholder_NoRedactedTextToOffer()
+    {
+        var scripted = new ScriptedChatClient().AddText("ok");
+        var correlator = new FleetCorrelator();
+        var client = scripted.AsBuilder()
+            .UseEvalGate(
+                pre: new IChatGate[] { new SoftSignalGate("judge:a", 0.6), new SoftSignalGate("judge:b", 0.6) },
+                policy: EvalGatePolicy.Redact,
+                correlator: correlator)
+            .Build();
+
+        await client.GetResponseAsync(UserSays("the actual malicious prompt"));
+
+        // A correlation Block never has RedactedText (it names a cross-gate pattern, not a single offending
+        // span) — Redact must still never silently pass it through unmodified, on the pre-gate side either.
+        var receivedUserText = scripted.ReceivedMessages.Single().Last().Text;
+        Assert.DoesNotContain("the actual malicious prompt", receivedUserText);
+        Assert.Contains("fleet-correlation", receivedUserText, StringComparison.Ordinal);
     }
 
     /// <summary>A gate that always Blocks and cannot mask (no <c>RedactedText</c>) — models a toxicity/safety gate.</summary>

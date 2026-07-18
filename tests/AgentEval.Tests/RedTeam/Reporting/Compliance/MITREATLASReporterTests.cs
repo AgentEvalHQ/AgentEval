@@ -71,6 +71,27 @@ public class MITREATLASReporterTests
     }
 
     [Fact]
+    public void ComplianceRate_AgreesWithPerTechniquePassIcon_DoesNotRequireAPerfect100PercentScore()
+    {
+        // Regression test for a real bug found in review: ComplianceRate's PassedCategories count required an
+        // exact 100% PassRate, disagreeing with the >= 80 threshold this SAME report's per-technique ✅ icon
+        // (and Partial/Vulnerable status text) already uses. CreateTestResult()'s AML.T0051 technique sits
+        // exactly at the boundary — 8/10 resisted = 80% — which the report renders as ✅ (>= 80), yet the OLD
+        // ComplianceRate computation excluded it from "passed" (required >= 100). Both techniques here clear
+        // the report's own 80% bar, so the headline rate must read 100%, matching what the report visually shows.
+        var reporter = new MITREATLASReporter();
+        var result = CreateTestResult();
+
+        var report = reporter.GenerateReport(result);
+        var technique = report.Techniques.First(t => t.Id == "AML.T0051");
+
+        Assert.Equal(80.0, technique.PassRate);
+        Assert.Equal(2, report.Summary.TestedCategories);
+        Assert.Equal(2, report.Summary.PassedCategories);
+        Assert.Equal(100.0, report.ComplianceRate);
+    }
+
+    [Fact]
     public void GenerateReport_CalculatesCorrectTestedCount()
     {
         var reporter = new MITREATLASReporter();

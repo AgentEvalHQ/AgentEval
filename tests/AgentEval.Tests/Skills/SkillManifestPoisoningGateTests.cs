@@ -47,6 +47,57 @@ public class SkillManifestPoisoningGateTests
     }
 
     [Fact]
+    public void CanonicalContent_FieldSeparatorEmbeddedInResourceName_DoesNotCollideWithDifferentManifest()
+    {
+        // Regression test for a real bug found in review: the outer field separator (U+241E) was joined
+        // between fields WITHOUT escaping — Description is free text and ResourceNames are raw on-disk paths,
+        // neither restricted from containing it, so an attacker could shift a field boundary and make two
+        // structurally different manifests produce the identical canonical string (and therefore the same
+        // SHA-256 fingerprint), defeating the rug-pull detection this type exists to provide.
+        const char separator = '␞';
+        var withSeparatorInDescription = Manifest("x", "A" + separator + "B") with { ResourceNames = [] };
+        var withSeparatorInResourceName = Manifest("x", "A") with { ResourceNames = ["B" + separator] };
+
+        Assert.NotEqual(
+            SkillManifestPoisoningGate.CanonicalContent(withSeparatorInDescription),
+            SkillManifestPoisoningGate.CanonicalContent(withSeparatorInResourceName));
+        Assert.NotEqual(
+            SkillManifestPoisoningGate.Fingerprint(withSeparatorInDescription),
+            SkillManifestPoisoningGate.Fingerprint(withSeparatorInResourceName));
+    }
+
+    [Fact]
+    public void CanonicalContent_CommaEmbeddedInResourceName_DoesNotCollideWithDifferentResourceSet()
+    {
+        // The inner resource/script/tool list-join relies on comma the same way the outer join relies on the
+        // field separator — a resource name containing a literal comma could otherwise make a 1-item list
+        // collide with an unrelated 2-item list (["a,b"] vs. ["a","b"]) via the SAME class of bug.
+        var oneResourceWithEmbeddedComma = Manifest("x", "d") with { ResourceNames = ["a,b"] };
+        var twoSeparateResources = Manifest("x", "d") with { ResourceNames = ["a", "b"] };
+
+        Assert.NotEqual(
+            SkillManifestPoisoningGate.CanonicalContent(oneResourceWithEmbeddedComma),
+            SkillManifestPoisoningGate.CanonicalContent(twoSeparateResources));
+    }
+
+    [Fact]
+    public void CanonicalContent_NoReservedCharacters_ByteIdenticalToUnescapedJoin()
+    {
+        // The escaping fix must be a no-op for ordinary content — changing the canonical encoding (and
+        // therefore the fingerprint) for every already-well-formed skill would silently invalidate every
+        // existing baseline as a side effect of a security fix that shouldn't need to.
+        var manifest = Manifest("expense-report", "Summarizes expense reports, no reserved characters here.");
+        var expected = string.Join('␞',
+            manifest.Name, manifest.Description,
+            string.Join(',', manifest.ResourceNames.OrderBy(n => n, StringComparer.Ordinal)),
+            string.Join(',', manifest.ScriptNames.OrderBy(n => n, StringComparer.Ordinal)),
+            string.Join(',', manifest.AllowedTools.OrderBy(n => n, StringComparer.Ordinal)),
+            manifest.CompatibilityLength?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? string.Empty);
+
+        Assert.Equal(expected, SkillManifestPoisoningGate.CanonicalContent(manifest));
+    }
+
+    [Fact]
     public void CheckDrift_UnchangedSkill_ReportsUnchanged()
     {
         var skill = Manifest("expense-report", "desc");

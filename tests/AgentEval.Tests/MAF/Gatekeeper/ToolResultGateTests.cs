@@ -134,6 +134,32 @@ public class ToolResultGateTests
     }
 
     [Fact]
+    public async Task ResultGate_ThrowingGate_UnderWarnOnly_StillFailsClosed()
+    {
+        // Regression test for a real fail-OPEN bug found in review: a throwing result gate under WarnOnly
+        // previously let the raw, uninspected tool result flow through unchanged, contradicting this file's own
+        // "cannot-inspect ⇒ deny the RESULT... regardless of policy" comment (and the identical, correctly
+        // fail-closed behavior of the call-gate throw handler and this same gate's OWN handling under
+        // ReplaceResult/Terminate, tested above). A gate that cannot even run must never be treated as "warn
+        // and let it through" — it has no verdict to warn about.
+        var tool = AIFunctionFactory.Create((string x) => "the secret the gate was supposed to catch", "fetch");
+        var (agent, _) = BuildAgent(tool, "fetch", new Dictionary<string, object?> { ["x"] = "1" });
+        var trace = new AgentTrace();
+        var gated = agent.AsBuilder()
+            .UseAgentEvalToolGate([], ToolGatePolicy.WarnOnly, trace, resultGates: [new ThrowingResultGate()])
+            .Build();
+
+        var ex = await Record.ExceptionAsync(() => gated.RunAsync("go"));
+
+        Assert.Null(ex);   // fail-closed means a refusal body is returned, not an unhandled throw
+        Assert.Equal(1, GlassBoxEvidence.FromTrace(trace).GateBlockCount);   // recorded as an enforced Block, not a Warn
+
+        var key = trace.Metadata!.Keys.Single(k => k.StartsWith("gate.tool-result.", StringComparison.Ordinal));
+        var value = (IDictionary<string, object?>)trace.Metadata![key];
+        Assert.Equal("Block", value["action"]);
+    }
+
+    [Fact]
     public void ValidateResultGates_NetworkCostGate_RejectedAtConstruction()
     {
         var tool = AIFunctionFactory.Create((string x) => "ok", "fetch");
@@ -297,6 +323,31 @@ public class ToolResultGateTests
         Assert.Contains("anomaly threshold", spike.Reason, StringComparison.Ordinal);
         var redacted = Assert.IsType<string>(spike.RedactedResult);
         Assert.Contains("statistical outlier", redacted, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task ToolResultSizeAnomalyGate_RepeatedIdenticalSpike_FlagsBothTimes_DoesNotSelfPoisonBaseline()
+    {
+        // Regression test for a real bug found in review: a FLAGGED result was still being folded into its
+        // own tool's running baseline, so a repeated attack of the same size would evade detection the second
+        // time — the first (correctly flagged) spike drags the average up past the threshold that should have
+        // caught the second identical one. A detector that defeats itself after exactly one detection.
+        using var _ = FreshLedgerScope();
+        var gate = new ToolResultSizeAnomalyGate(anomalyMultiplier: 5.0, minBaselineCalls: 3, minFlagSize: 10);
+
+        for (var i = 0; i < 3; i++)
+        {
+            var normal = await gate.InspectAsync(MakeResult(new string('x', 200)));
+            Assert.Equal(ToolResultAction.Allow, normal.Action);
+        }
+
+        var firstSpike = await gate.InspectAsync(MakeResult(new string('x', 10_000)));
+        Assert.Equal(ToolResultAction.Redact, firstSpike.Action);
+
+        // If the first spike had been folded into the baseline, the average would now be well over 2,600 chars
+        // and 10,000 would no longer clear the 5x threshold — this second, IDENTICAL spike must still be caught.
+        var secondSpike = await gate.InspectAsync(MakeResult(new string('x', 10_000)));
+        Assert.Equal(ToolResultAction.Redact, secondSpike.Action);
     }
 
     [Fact]

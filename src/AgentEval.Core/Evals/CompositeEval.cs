@@ -133,18 +133,33 @@ public sealed class CompositeEval : IEval
                 : "none";
         }
 
+        // A REQUIRED sub-result that itself errored (an infrastructure/judge failure, not a real low score —
+        // see AtomicLlmEval's own "error" label) must propagate honestly, overriding either verdict path
+        // below. AtomicLlmEval deliberately keeps severity "none" on error specifically so it never masquerades
+        // as a confirmed high/critical violation — but that means the Threshold==null path (which reads ONLY
+        // severity, not label/passed) previously fell straight through to "pass" whenever every required
+        // sub's severity happened to be "none", even though a required Article/Scenario was never actually
+        // evaluated. "An un-evaluated required control cannot be attested as compliant" (AtomicLlmEval's own
+        // words) must hold at every level of the composite tree, not just the leaf.
+        var hasRequiredError = Components
+            .Zip(subs, (c, s) => (Component: c, Sub: s))
+            .Any(pair => pair.Component.Required && pair.Sub.Score.Label == "error");
+
         // Verdict matrix:
-        //   Threshold set       -> score >= threshold ? pass : fail
-        //   Threshold null      -> severity is { high|critical -> fail, medium -> warn, _ -> pass }
+        //   Required sub errored -> error (regardless of score/threshold — nothing was actually evaluated)
+        //   Threshold set        -> score >= threshold ? pass : fail
+        //   Threshold null       -> severity is { high|critical -> fail, medium -> warn, _ -> pass }
         // "warn" is a soft fail: passed = false but label distinguishes from a hard fail.
-        var label = Threshold is { } t
-            ? (score >= t ? "pass" : "fail")
-            : verdictSeverity switch
-            {
-                "critical" or "high" => "fail",
-                "medium" => "warn",
-                _ => "pass"
-            };
+        var label = hasRequiredError
+            ? "error"
+            : Threshold is { } t
+                ? (score >= t ? "pass" : "fail")
+                : verdictSeverity switch
+                {
+                    "critical" or "high" => "fail",
+                    "medium" => "warn",
+                    _ => "pass"
+                };
         var passed = label == "pass";
 
         return new EvalResult(

@@ -299,8 +299,15 @@ public class RedTeamResultTests
     }
 
     [Fact]
-    public void ConclusiveScore_NoConclusiveProbes_Returns100()
+    public void ConclusiveScore_NoConclusiveProbes_Returns0_NotAFabricated100PercentSecureSentinel()
     {
+        // Regression test for a real bug found in review: this test originally asserted ConclusiveScore == 100
+        // here, which was WRONG — a scan where every probe came back Inconclusive proved nothing was resisted,
+        // so "100% secure" is a fabricated verdict for a scan that measured nothing. That fabricated 100 leaked
+        // unguarded into the console banner, the Markdown report, the JSON export, and the persisted baseline
+        // file, even though every compliance reporter (SOC2/OWASP/NIST/MITRE/ISO27001) had already
+        // independently learned to guard this exact trap externally. ConclusiveScore must return 0, mirroring
+        // ConclusiveAttackSuccessRate's own, already-correct "0 when no conclusive probes" convention.
         var result = new RedTeamResult
         {
             AgentName = "TestAgent",
@@ -312,7 +319,7 @@ public class RedTeamResultTests
         };
 
         Assert.Equal(0.0, result.OverallScore);
-        Assert.Equal(100.0, result.ConclusiveScore);
+        Assert.Equal(0.0, result.ConclusiveScore);
         Assert.Equal(0.0, result.Coverage);
     }
 

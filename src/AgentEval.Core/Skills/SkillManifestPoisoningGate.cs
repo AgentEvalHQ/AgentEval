@@ -16,9 +16,17 @@ namespace AgentEval.Skills;
 /// </summary>
 public static class SkillManifestPoisoningGate
 {
-    // Field separator that cannot appear in a skill name/description (U+241E SYMBOL FOR RECORD SEPARATOR) —
-    // avoids a canonical-content collision between e.g. Name="a" Description="b|c" and Name="a|b" Description="c".
+    // Field separator (U+241E SYMBOL FOR RECORD SEPARATOR) between the 6 outer fields, and an escape marker
+    // (U+241F SYMBOL FOR UNIT SEPARATOR) that makes a literal separator/comma WITHIN a field value
+    // unambiguous — see EscapeField/EscapeListItem below. Regression fix: this used to rely on the separator
+    // simply never appearing in real content ("cannot appear in a skill name/description"), which is true for
+    // Name (regex-restricted elsewhere) but NOT for Description (free text) or ResourceNames/ScriptNames (raw
+    // on-disk relative paths) — neither is restricted from containing U+241E. An attacker who embeds it (or a
+    // comma, which the inner resource/script/tool list-join relies on the same way) in one of those fields
+    // could make two manifests with genuinely different content collide on the same canonical string, and
+    // therefore the same SHA-256 fingerprint — defeating the "rug-pull" detection this type exists to provide.
     private const char FieldSeparator = '␞';
+    private const char EscapeMarker = '␟';
 
     /// <summary>
     /// Renders the parts of a <see cref="SkillManifest"/> that matter for trust (name, description,
@@ -30,13 +38,31 @@ public static class SkillManifestPoisoningGate
     {
         ArgumentNullException.ThrowIfNull(manifest);
         return string.Join(FieldSeparator,
-            manifest.Name,
-            manifest.Description ?? string.Empty,
-            string.Join(',', manifest.ResourceNames.OrderBy(n => n, StringComparer.Ordinal)),
-            string.Join(',', manifest.ScriptNames.OrderBy(n => n, StringComparer.Ordinal)),
-            string.Join(',', manifest.AllowedTools.OrderBy(n => n, StringComparer.Ordinal)),
+            EscapeField(manifest.Name),
+            EscapeField(manifest.Description ?? string.Empty),
+            EscapeField(string.Join(',', manifest.ResourceNames.OrderBy(n => n, StringComparer.Ordinal).Select(EscapeListItem))),
+            EscapeField(string.Join(',', manifest.ScriptNames.OrderBy(n => n, StringComparer.Ordinal).Select(EscapeListItem))),
+            EscapeField(string.Join(',', manifest.AllowedTools.OrderBy(n => n, StringComparer.Ordinal).Select(EscapeListItem))),
             manifest.CompatibilityLength?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? string.Empty);
     }
+
+    // Escapes a literal FieldSeparator (and, first, any literal EscapeMarker — so the escaping itself stays
+    // unambiguous) within an OUTER field value. A no-op — byte-identical to `value` — whenever neither
+    // character is present, which is true for virtually every real skill: this is a security fix, not an
+    // intentional fingerprint-format change, and must not silently invalidate every existing baseline.
+    private static string EscapeField(string value) =>
+        value.IndexOf(FieldSeparator) < 0 && value.IndexOf(EscapeMarker) < 0
+            ? value
+            : value.Replace(EscapeMarker.ToString(), $"{EscapeMarker}E").Replace(FieldSeparator.ToString(), $"{EscapeMarker}S");
+
+    // Escapes a literal ',' (the resource/script/tool INNER list-item separator) within one list item, plus
+    // any literal EscapeMarker — the same collision class as EscapeField, one layer down (two different
+    // resource-name sets could otherwise join to the identical comma-separated string, e.g. ["a,b"] vs.
+    // ["a","b"]). Also a no-op for virtually every real skill (item names essentially never contain a comma).
+    private static string EscapeListItem(string value) =>
+        value.IndexOf(',') < 0 && value.IndexOf(EscapeMarker) < 0
+            ? value
+            : value.Replace(EscapeMarker.ToString(), $"{EscapeMarker}E").Replace(",", $"{EscapeMarker}C");
 
     /// <summary>SHA-256 fingerprint of <paramref name="manifest"/>'s canonical content.</summary>
     public static string Fingerprint(SkillManifest manifest) => ManifestFingerprint.Hash(CanonicalContent(manifest));

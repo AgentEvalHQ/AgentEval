@@ -267,18 +267,16 @@ public static class AgentEvalToolGateExtensions
                 {
                     telemetry?.Record(resultGate.PolicyName, ToolResultAction.Block, resultStopwatch!.Elapsed);
 
-                    // FAIL CLOSED, same rule as the call-gate loop above: cannot-inspect ⇒ deny the RESULT
-                    // (the tool already ran — this only withholds what the model sees of it).
+                    // FAIL CLOSED, same rule as the call-gate loop above, and — unlike a normal verdict-based
+                    // Block below — NOT subject to WarnOnly: a gate that throws cannot prove the RESULT safe,
+                    // so it must be withheld regardless of policy, exactly like the call-gate throw handler
+                    // above. This branch previously special-cased WarnOnly to let the raw, uninspected result
+                    // through unchanged — a real fail-OPEN bug found in review, the opposite of every other
+                    // "gate threw" path in this file.
                     var throwReferenceId = GateReferenceId.New();
                     RecordResultBlock(trace, Interlocked.Increment(ref gateSeq), resultGate.PolicyName,
                         $"result gate evaluation threw ({ex.GetType().Name}) — failing closed",
-                        action: policy == ToolGatePolicy.WarnOnly ? "Warn" : "Block",
-                        terminating: policy == ToolGatePolicy.Terminate, referenceId: throwReferenceId);
-
-                    if (policy == ToolGatePolicy.WarnOnly)
-                    {
-                        continue;   // WarnOnly: recorded, but the real result still flows through
-                    }
+                        action: "Block", terminating: policy == ToolGatePolicy.Terminate, referenceId: throwReferenceId);
 
                     if (policy == ToolGatePolicy.Terminate)
                     {

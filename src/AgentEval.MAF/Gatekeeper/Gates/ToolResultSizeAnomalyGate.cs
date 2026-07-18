@@ -77,24 +77,31 @@ public sealed class ToolResultSizeAnomalyGate : IToolResultGate
         var text = GateText.Stringify(result.Result);
         var size = text.Length;
 
-        // Atomically records this call's size AND returns the baseline as it stood BEFORE this call — the
-        // ledger's own locking makes this correct even if MAF dispatches sibling tool calls concurrently.
-        var baseline = RunLedger.ForCurrentRun().RecordToolResultSize(result.FunctionName, size);
+        // Atomically reads the baseline as it stood BEFORE this call AND records this call's size into that
+        // running baseline — UNLESS this call turns out to be anomalous. A flagged result must NOT be folded
+        // into its own tool's future baseline: doing so would let a REPEATED attack of the same size evade
+        // detection the second time, since the first (correctly flagged) call would have already dragged the
+        // average up past the threshold that should have caught the second one — the detector defeating itself
+        // after exactly one detection. The ledger's own locking makes this correct even if MAF dispatches
+        // sibling tool calls concurrently.
+        var flagged = false;
+        var baseline = RunLedger.ForCurrentRun().RecordToolResultSizeUnlessAnomalous(result.FunctionName, size, b =>
+        {
+            flagged = b.Count >= _minBaselineCalls && size >= _minFlagSize && b.AverageSize > 0 && size > b.AverageSize * _anomalyMultiplier;
+            return flagged;
+        });
 
-        if (baseline.Count >= _minBaselineCalls && size >= _minFlagSize)
+        if (flagged)
         {
             var average = baseline.AverageSize;
-            if (average > 0 && size > average * _anomalyMultiplier)
-            {
-                var reason =
-                    $"tool '{result.FunctionName}' result was {size} characters — {size / average:F1}x this tool's " +
-                    $"own running average of {average:F0} characters over its prior {baseline.Count} call(s) this " +
-                    $"run, exceeding the {_anomalyMultiplier:F1}x anomaly threshold";
-                var redacted = text[..Math.Min(text.Length, _minFlagSize)] +
-                    $"…[redacted by Gatekeeper's {PolicyName} gate — this result's size is a statistical outlier " +
-                    "for this tool this run; see trace evidence for detail]";
-                return new ValueTask<ToolResultVerdict>(ToolResultVerdict.Redact(PolicyName, redacted, reason));
-            }
+            var reason =
+                $"tool '{result.FunctionName}' result was {size} characters — {size / average:F1}x this tool's " +
+                $"own running average of {average:F0} characters over its prior {baseline.Count} call(s) this " +
+                $"run, exceeding the {_anomalyMultiplier:F1}x anomaly threshold";
+            var redacted = text[..Math.Min(text.Length, _minFlagSize)] +
+                $"…[redacted by Gatekeeper's {PolicyName} gate — this result's size is a statistical outlier " +
+                "for this tool this run; see trace evidence for detail]";
+            return new ValueTask<ToolResultVerdict>(ToolResultVerdict.Redact(PolicyName, redacted, reason));
         }
 
         return new ValueTask<ToolResultVerdict>(ToolResultVerdict.Allow(PolicyName));

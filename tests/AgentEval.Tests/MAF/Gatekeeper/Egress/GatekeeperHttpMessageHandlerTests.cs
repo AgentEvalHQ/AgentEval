@@ -236,6 +236,49 @@ public class GatekeeperHttpMessageHandlerTests
         await Assert.ThrowsAsync<HttpEgressBlockedException>(() => client.GetAsync("https://not-allowed.example/"));
     }
 
+    [Fact]
+    public async Task CreateHttpClient_ConnectsToThePinnedValidatedAddress_NotAnIndependentlyReResolvedOne()
+    {
+        // Regression test for a real DNS-rebind TOCTOU found in review: a plain SocketsHttpHandler performs its
+        // OWN, independent DNS resolution when it actually opens the socket, moments after this handler's own
+        // validating lookup — an attacker who controls DNS answers could pass validation with a safe address
+        // and then have the ACTUAL connection resolve somewhere private. This test only goes through
+        // CreateHttpClient (the path that installs the pinning ConnectCallback) and targets a hostname under
+        // the reserved .invalid TLD (RFC 2606), which can never resolve via real DNS. If the connection fell
+        // through to an independent, unpinned DNS lookup (the pre-fix behavior), it would fail outright — a
+        // successful response here is proof the raw socket connected directly to the address this handler
+        // already validated, not to whatever a second lookup might have returned.
+        using var listener = new TcpListener(IPAddress.Loopback, 0);
+        listener.Start();
+        var port = ((IPEndPoint)listener.LocalEndpoint).Port;
+        var acceptTask = AcceptOneConnectionAndReplyOkAsync(listener);
+
+        // BlockPrivateNetworks off: the test server is on loopback, which private-network blocking would
+        // (correctly, for a real deployment) refuse — irrelevant to what THIS test is proving. Pinning applies
+        // unconditionally regardless of that flag (see ValidateTargetAsync's own remarks).
+        var dns = new FakeDnsResolver().With("agenteval-pin-test-host.invalid", IPAddress.Loopback);
+        using var client = GatekeeperHttpMessageHandler.CreateHttpClient(["invalid"], Options(dns, blockPrivate: false));
+
+        var response = await client.GetAsync($"http://agenteval-pin-test-host.invalid:{port}/");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        await acceptTask;
+    }
+
+    private static async Task AcceptOneConnectionAndReplyOkAsync(TcpListener listener)
+    {
+        using var socket = await listener.AcceptSocketAsync().ConfigureAwait(false);
+        using var stream = new NetworkStream(socket, ownsSocket: false);
+        using var reader = new StreamReader(stream, leaveOpen: true);
+        while (await reader.ReadLineAsync().ConfigureAwait(false) is { Length: > 0 })
+        {
+            // Drain the request headers until the blank line terminating them.
+        }
+
+        var response = "HTTP/1.1 200 OK\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"u8.ToArray();
+        await stream.WriteAsync(response).ConfigureAwait(false);
+    }
+
     // ── Test doubles ──
 
     private sealed class ScriptedHttpMessageHandler : HttpMessageHandler
