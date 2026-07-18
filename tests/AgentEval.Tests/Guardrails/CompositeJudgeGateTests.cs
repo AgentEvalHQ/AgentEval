@@ -64,6 +64,14 @@ public class CompositeJudgeGateTests
     }
 
     [Fact]
+    public async Task AllowedVerdict_CarriesJudgeConfidenceThrough_ForFleetCorrelation()
+    {
+        // JudgeVerdict.Allowed() defaults to confidence 1.0 — the gate must not discard it once the judge ran.
+        var v = await Gate(new ScriptedChatClient().AddText("ALLOW")).InspectAsync("please scan this input");
+        Assert.Equal(1.0, v.Confidence);
+    }
+
+    [Fact]
     public async Task PrefilterFalse_ShortCircuits_ModelNeverCalled()
     {
         var model = new ScriptedChatClient().AddText("BLOCK");   // would block IF called
@@ -71,6 +79,7 @@ public class CompositeJudgeGateTests
 
         Assert.Equal(GateAction.Allow, v.Action);
         Assert.Empty(model.ReceivedMessages);   // proves the fast model was never invoked (0 tokens)
+        Assert.Null(v.Confidence);   // no judge ran — there is no soft signal to report, not even a fabricated one
     }
 
     [Fact]
@@ -88,6 +97,7 @@ public class CompositeJudgeGateTests
         var opts = new JudgeGateOptions { FailClosedOnInconclusive = false };
         var v = await Gate(new ScriptedChatClient().AddThrow(), opts).InspectAsync("please scan this");
         Assert.Equal(GateAction.Allow, v.Action);
+        Assert.Equal(0.0, v.Confidence);   // JudgeVerdict.Inconclusive's own confidence (0.0) carries through honestly
     }
 
     [Fact]
@@ -116,6 +126,11 @@ public class CompositeJudgeGateTests
         var opts = new JudgeGateOptions { BlockThreshold = 0.95 };
         var v = await Gate(new ScriptedChatClient().AddText("BLOCK"), opts).InspectAsync("please scan this");
         Assert.Equal(GateAction.Allow, v.Action);
+
+        // This is the exact near-miss case Fleet Correlation depends on: a sub-threshold Blocked decision that
+        // becomes an Allow must still surface its real confidence (0.9), not null or a fabricated 1.0 — a fleet
+        // correlator combining several of these across gates needs the true value, not a laundered "clean allow".
+        Assert.Equal(0.9, v.Confidence);
     }
 
     [Fact]

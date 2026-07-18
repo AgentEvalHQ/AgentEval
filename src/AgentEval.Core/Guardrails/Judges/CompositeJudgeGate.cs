@@ -72,7 +72,9 @@ public sealed class CompositeJudgeGate<TRubric> : IChatGate
                 GateVerdict.Block(PolicyName, verdict.Rationale ?? $"{_rubric.Axis} detected", verdict.Spans),
             JudgeDecision.Inconclusive when _options.FailClosedOnInconclusive =>
                 GateVerdict.Block(PolicyName, verdict.Rationale ?? $"{_rubric.Axis} judge inconclusive (fail-closed)"),
-            _ => GateVerdict.Allow(PolicyName),   // Allowed, low-confidence Blocked, or fail-open Inconclusive
+            // Allowed, low-confidence Blocked, or fail-open Inconclusive — carry the judge's own confidence through
+            // instead of discarding it, so a fleet-wide correlator can later notice several near-miss verdicts.
+            _ => GateVerdict.Allow(PolicyName) with { Confidence = verdict.Confidence },
         };
     }
 
