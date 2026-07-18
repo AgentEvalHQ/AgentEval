@@ -78,6 +78,10 @@ public static class LogFixtureGenerator
         {
             return new ScriptedFixtureTurn
             {
+                // ScriptedChatClient.GetResponseAsync emits Text alongside tool calls when both are set (it's
+                // not an either/or) — many real providers attach reasoning/lead-in text to a tool-call turn, so
+                // dropping it here would silently lose real captured content when generating the fixture.
+                Text = response.Text,
                 ToolCalls = response.ToolCalls
                     .Select(c => new ScriptedFixtureToolCall { ToolCallId = c.CallId, ToolName = c.Name, ToolArgs = c.Arguments })
                     .ToList(),
@@ -92,6 +96,7 @@ public static class LogFixtureGenerator
             var call = response.ToolCalls[0];
             return new ScriptedFixtureTurn
             {
+                Text = response.Text,
                 ToolCallId = call.CallId,
                 ToolName = call.Name,
                 ToolArgs = call.Arguments,

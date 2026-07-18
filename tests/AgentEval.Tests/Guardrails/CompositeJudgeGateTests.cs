@@ -64,11 +64,17 @@ public class CompositeJudgeGateTests
     }
 
     [Fact]
-    public async Task AllowedVerdict_CarriesJudgeConfidenceThrough_ForFleetCorrelation()
+    public async Task AllowedVerdict_CarriesNoConfidence_NotAFleetCorrelationSignal()
     {
-        // JudgeVerdict.Allowed() defaults to confidence 1.0 — the gate must not discard it once the judge ran.
+        // Regression test for a real bug found in review: this test originally asserted Confidence == 1.0 here,
+        // which was WRONG — JudgeVerdict.Allowed() defaults to confidence 1.0 ("very sure this is fine"), the
+        // opposite of a near-miss signal. Attaching it made FleetCorrelator treat every confidently-clean turn
+        // from 2+ judges as a "soft signal," false-positive-blocking almost all benign multi-judge traffic. A
+        // genuine Allowed decision must carry NO confidence — only a low-confidence Block or fail-open
+        // Inconclusive is a real near-miss worth correlating (see LowConfidenceBlock_BelowThreshold_Allows and
+        // ModelError_FailOpenOption_Allows below).
         var v = await Gate(new ScriptedChatClient().AddText("ALLOW")).InspectAsync("please scan this input");
-        Assert.Equal(1.0, v.Confidence);
+        Assert.Null(v.Confidence);
     }
 
     [Fact]

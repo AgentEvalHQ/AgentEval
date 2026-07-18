@@ -198,4 +198,78 @@ public class LogFileReplayerTests
         var entries = await CaptureAsync(new ScriptedChatClient().AddText("hi"));
         await Assert.ThrowsAsync<ArgumentNullException>(() => LogFileReplayer.ReplayAsync(entries, null!, false));
     }
+
+    [Fact]
+    public async Task ToolWithNoCapturedSchema_ReplaysWithoutCrashing()
+    {
+        // Regression test for a real bug found in review: a captured tool with no schema (ParametersSchema
+        // null — the capture-side outcome for any non-AIFunction AITool, or an AIFunction whose own JsonSchema
+        // is ValueKind.Undefined) previously became JsonSchema = default(JsonElement) on replay's reconstructed
+        // tool declaration. JsonElement.GetRawText() throws on ValueKind.Undefined — exactly what a real
+        // provider's serializer calls the moment it sees this tool declaration (see the identical documented
+        // gotcha at TraceRecordingChatClient.cs). SchemaProbingChatClient stands in for that serializer.
+        var entries = await CaptureAsync(new ScriptedChatClient().AddText("ok"));
+        var schemalessTool = entries[0] with
+        {
+            Request = entries[0].Request with
+            {
+                Options = new FixtureCaptureOptions(null, null, null,
+                    Tools: new[] { new FixtureCaptureTool("search", "Searches things.", ParametersSchema: null) }),
+            },
+        };
+
+        var probe = new SchemaProbingChatClient();
+        var report = await LogFileReplayer.ReplayAsync(new[] { schemalessTool }, probe, strictText: false);
+
+        Assert.Equal(ReplayVerdict.Pass, Assert.Single(report.Rows).Verdict);
+        Assert.True(probe.SawValidSchema);
+    }
+
+    [Fact]
+    public async Task DuplicateToolCall_CapturedTwiceActualOnce_Fails()
+    {
+        // Regression test for a real bug found in review: comparing tool calls via HashSet.SetEquals loses
+        // call-count multiplicity — captured=[foo(),foo()] vs actual=[foo()] must FAIL (a real divergence),
+        // not silently PASS because the two SETS happen to contain the same tool name.
+        var entries = await CaptureAsync(new ScriptedChatClient().AddParallelToolCalls(
+            ("c1", "search", new Dictionary<string, object?> { ["q"] = "a" }),
+            ("c2", "search", new Dictionary<string, object?> { ["q"] = "b" })));
+        var replayTarget = new ScriptedChatClient().AddToolCall("c1", "search", new Dictionary<string, object?> { ["q"] = "x" });
+
+        var report = await LogFileReplayer.ReplayAsync(entries, replayTarget, strictText: false);
+
+        var row = Assert.Single(report.Rows);
+        Assert.Equal(ReplayVerdict.Fail, row.Verdict);
+        Assert.Contains(row.Details, d => d.Contains("Tool calls differ", StringComparison.Ordinal));
+    }
+
+    // Stands in for a real provider's request serializer: touches JsonSchema.GetRawText() on every declared
+    // AIFunction tool, exactly where ValueKind.Undefined throws InvalidOperationException.
+    private sealed class SchemaProbingChatClient : IChatClient
+    {
+        public bool SawValidSchema { get; private set; }
+
+        public Task<ChatResponse> GetResponseAsync(
+            IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default)
+        {
+            foreach (var tool in options?.Tools ?? [])
+            {
+                if (tool is AIFunction f)
+                {
+                    _ = f.JsonSchema.GetRawText();   // throws on ValueKind.Undefined — the bug this test guards
+                    SawValidSchema = true;
+                }
+            }
+
+            return Task.FromResult(new ChatResponse(new ChatMessage(ChatRole.Assistant, "ok")) { FinishReason = ChatFinishReason.Stop });
+        }
+
+        public IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(
+            IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default)
+            => throw new NotSupportedException();
+
+        public object? GetService(Type serviceType, object? serviceKey = null) => null;
+
+        public void Dispose() { }
+    }
 }

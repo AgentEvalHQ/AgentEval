@@ -204,7 +204,10 @@ internal static class LogFileCommand
             // already solves — not new endpoint-resolution code. A raw IChatClient (not an IEvaluableAgent,
             // which BenchTier1SutResolver returns) is what replay actually needs: it resends the exact
             // captured message array + options, which IEvaluableAgent.InvokeAsync(string prompt) cannot carry.
-            return (EndpointFactory.CreateOpenAICompatible(endpoint, model, apiKey), $"{endpoint} ({model})", null);
+            // Wrapped through CliChatClientDiagnostics like every other endpoint-resolution call site in the
+            // CLI (EvalCommand/RedTeamCommand/BenchTier1SutResolver/GatekeeperModelResolver) — without it,
+            // replay's target calls silently skip --verbose logging and --capture-fixture composition.
+            return (CliChatClientDiagnostics.Wrap(EndpointFactory.CreateOpenAICompatible(endpoint, model, apiKey), "replay-target"), $"{endpoint} ({model})", null);
         }
 
         return (null, string.Empty, "log-file replay needs a target: pass --azure-from-env, or --endpoint/--model.");

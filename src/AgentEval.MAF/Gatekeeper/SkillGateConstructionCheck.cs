@@ -48,6 +48,23 @@ public static class SkillGateConstructionCheck
         ArgumentNullException.ThrowIfNull(skills);
         ArgumentException.ThrowIfNullOrWhiteSpace(baselinePath);
 
+        // Serializes the whole read-check-persist sequence, not just the final write: two agents under
+        // SkillGateMode.Bootstrap constructing concurrently (e.g. a host spinning up several agent instances
+        // at startup) would otherwise both LoadOrEmpty the SAME pre-bootstrap baseline, each compute its own
+        // "newly seen" set, and whichever PersistBootstrappedBaseline call lands last silently overwrites the
+        // other's additions (a lost-update race) — one agent's newly-trusted skill never actually gets
+        // pinned. Construction-time-only (per this class's own remarks), so a process-wide lock costs nothing
+        // on any hot path.
+        lock (s_bootstrapLock)
+        {
+            CheckAndEnforceCore(skills, baselinePath, mode);
+        }
+    }
+
+    private static readonly object s_bootstrapLock = new();
+
+    private static void CheckAndEnforceCore(IReadOnlyList<ScannedSkillInfo> skills, string baselinePath, SkillGateMode mode)
+    {
         var baseline = LoadOrEmpty(baselinePath);
         var manifests = skills.Select(s => s.Manifest).ToList();
         var structural = SkillManifestPoisoningGate.CheckDrift(manifests, baseline);
@@ -56,9 +73,7 @@ public static class SkillGateConstructionCheck
         var unknown = structural.Where(f => f.Kind == ManifestDriftKind.New).ToList();
 
         var contentBaseline = baseline.ContentHashesBySkillName ?? EmptyHashes;
-        var contentCurrent = skills
-            .Where(s => s.AbsolutePath is not null && contentBaseline.ContainsKey(s.Manifest.Name))
-            .ToDictionary(s => s.Manifest.Name, s => SkillContentHasher.HashSkillFolder(s.AbsolutePath!), StringComparer.Ordinal);
+        var contentCurrent = HashCurrentContent(skills, contentBaseline);
         var contentChanged = contentCurrent.Count == 0
             ? Array.Empty<ManifestDriftFinding>()
             : ManifestDriftDetector.Detect(contentBaseline, contentCurrent)
@@ -68,8 +83,11 @@ public static class SkillGateConstructionCheck
         var blocking = new List<ManifestDriftFinding>(changed);
         // A content-only change on a skill the structural pass ALREADY flagged is not reported twice —
         // the structural finding already names the skill and blocks; a second, differently-worded finding
-        // for the same key would be redundant, not additional information.
-        blocking.AddRange(contentChanged.Where(cf => changed.All(f => f.Key != cf.Key)));
+        // for the same key would be redundant, not additional information. OrdinalIgnoreCase: `changed[].Key`
+        // is lowercased (SkillManifestPoisoningGate.CheckDrift), `cf.Key` (content-hash side) is the skill's
+        // original-case name — an Ordinal compare would miss the match for a non-lowercase name and let the
+        // same skill appear twice in `blocking`.
+        blocking.AddRange(contentChanged.Where(cf => changed.All(f => !string.Equals(f.Key, cf.Key, StringComparison.OrdinalIgnoreCase))));
 
         if (mode == SkillGateMode.Strict)
         {
@@ -85,6 +103,38 @@ public static class SkillGateConstructionCheck
         {
             PersistBootstrappedBaseline(baseline, baselinePath, skills, unknown, contentBaseline);
         }
+    }
+
+    /// <summary>
+    /// Hashes the on-disk folder for every skill the baseline captured a content hash for. A skill whose
+    /// folder has since moved/vanished, or whose files can't be read right now (lock/permission race), is
+    /// skipped rather than thrown — matches <c>SkillsScanCommand.ToBaselineEntry</c>'s established guard:
+    /// this runs during agent CONSTRUCTION, and an IO hiccup unrelated to actual skill drift must not crash
+    /// startup. That skill's structural fingerprint check (always computed above) still fully applies; only
+    /// the stronger content-hash comparison is skipped for it this round.
+    /// </summary>
+    private static Dictionary<string, string> HashCurrentContent(
+        IReadOnlyList<ScannedSkillInfo> skills, IReadOnlyDictionary<string, string> contentBaseline)
+    {
+        var contentCurrent = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var skill in skills)
+        {
+            if (skill.AbsolutePath is null || !contentBaseline.ContainsKey(skill.Manifest.Name)
+                || !Directory.Exists(skill.AbsolutePath))
+            {
+                continue;
+            }
+
+            try
+            {
+                contentCurrent[skill.Manifest.Name] = SkillContentHasher.HashSkillFolder(skill.AbsolutePath);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+            }
+        }
+
+        return contentCurrent;
     }
 
     private static SkillManifestBaseline LoadOrEmpty(string baselinePath)
@@ -120,12 +170,28 @@ public static class SkillGateConstructionCheck
         }
 
         var extendedContentHashes = new Dictionary<string, string>(contentBaseline, StringComparer.Ordinal);
-        var unknownNames = new HashSet<string>(unknown.Select(f => f.Key), StringComparer.Ordinal);
+        // OrdinalIgnoreCase: unknown[].Key now comes from SkillManifestPoisoningGate.CheckDrift, which
+        // lowercases its own dictionary keys (see that method's remarks) — skill.Manifest.Name below is the
+        // ORIGINAL casing. Ordinal would silently fail this Contains() check for any skill whose name isn't
+        // already all-lowercase, skipping its content-hash bootstrap for no reason related to the check itself.
+        var unknownNames = new HashSet<string>(unknown.Select(f => f.Key), StringComparer.OrdinalIgnoreCase);
         foreach (var skill in skills)
         {
-            if (unknownNames.Contains(skill.Manifest.Name) && skill.AbsolutePath is not null)
+            if (!unknownNames.Contains(skill.Manifest.Name) || skill.AbsolutePath is null
+                || !Directory.Exists(skill.AbsolutePath))
+            {
+                continue;
+            }
+
+            try
             {
                 extendedContentHashes[skill.Manifest.Name] = SkillContentHasher.HashSkillFolder(skill.AbsolutePath);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                // Same guard as HashCurrentContent above: bootstrap-persisting a NEW skill's content hash must
+                // not crash construction over an IO hiccup — the skill still gets a structural fingerprint
+                // baseline entry (extendedHashes, above); only its content hash is skipped this round.
             }
         }
 

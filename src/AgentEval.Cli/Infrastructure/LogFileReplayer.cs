@@ -40,14 +40,13 @@ public static class LogFileReplayer
                 continue;
             }
 
-            var messages = BuildMessages(entry.Request);
-            var options = BuildOptions(entry.Request);
-
             var sw = Stopwatch.StartNew();
             ChatResponse? actual = null;
             Exception? error = null;
             try
             {
+                var messages = BuildMessages(entry.Request);
+                var options = BuildOptions(entry.Request);
                 actual = await against.GetResponseAsync(messages, options, cancellationToken).ConfigureAwait(false);
             }
             catch (Exception ex)
@@ -110,7 +109,10 @@ public static class LogFileReplayer
 
         var capturedTools = CapturedToolSignatures(entry.Response!.ToolCalls);
         var actualTools = ActualToolSignatures(response);
-        var toolsMatch = capturedTools.SetEquals(actualTools);
+        // SequenceEqual over sorted lists, not a set comparison — a set would treat two calls to the same
+        // tool as equal to one, silently ignoring a real divergence in call count (e.g. captured=[foo(),foo()]
+        // vs actual=[foo()] must FAIL, not pass as "same set of tools called").
+        var toolsMatch = capturedTools.SequenceEqual(actualTools, StringComparer.Ordinal);
         if (!toolsMatch)
         {
             details.Add(
@@ -169,17 +171,19 @@ public static class LogFileReplayer
 
     private static string FormatOrUnknown(long? value) => value?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "?";
 
-    private static HashSet<string> CapturedToolSignatures(IReadOnlyList<FixtureCaptureToolCall>? calls) =>
+    private static List<string> CapturedToolSignatures(IReadOnlyList<FixtureCaptureToolCall>? calls) =>
         (calls ?? Array.Empty<FixtureCaptureToolCall>())
             .Select(c => ToolSignature(c.Name, c.Arguments))
-            .ToHashSet(StringComparer.Ordinal);
+            .OrderBy(s => s, StringComparer.Ordinal)
+            .ToList();
 
-    private static HashSet<string> ActualToolSignatures(ChatResponse response) =>
+    private static List<string> ActualToolSignatures(ChatResponse response) =>
         response.Messages
             .SelectMany(m => m.Contents)
             .OfType<FunctionCallContent>()
             .Select(c => ToolSignature(c.Name, c.Arguments))
-            .ToHashSet(StringComparer.Ordinal);
+            .OrderBy(s => s, StringComparer.Ordinal)
+            .ToList();
 
     // Set of (name, sorted arg KEYS) — did the model choose to call the same tools with recognizably the same
     // shape of arguments? Exact argument VALUES are a diff detail elsewhere, never a pass/fail signal — a
@@ -229,11 +233,18 @@ public static class LogFileReplayer
     /// </summary>
     private sealed class ReplayToolDeclaration : AIFunction
     {
+        // JsonSchema is a non-nullable JsonElement; default(JsonElement) is ValueKind.Undefined, which throws
+        // from GetRawText() the moment a real provider serializes this tool declaration (see the same gotcha
+        // documented at TraceRecordingChatClient.cs). A captured tool with no schema needs a valid, empty
+        // object schema instead — Clone() so it survives independently of the short-lived JsonDocument.
+        private static readonly JsonElement EmptyObjectSchema =
+            JsonDocument.Parse("""{"type":"object","properties":{}}""").RootElement.Clone();
+
         public ReplayToolDeclaration(string name, string? description, JsonElement? schema)
         {
             Name = name;
             Description = description ?? string.Empty;
-            JsonSchema = schema ?? default;
+            JsonSchema = schema ?? EmptyObjectSchema;
         }
 
         public override string Name { get; }

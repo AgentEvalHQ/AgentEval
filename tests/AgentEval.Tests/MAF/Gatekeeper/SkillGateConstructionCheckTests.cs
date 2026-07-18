@@ -243,6 +243,44 @@ public class SkillGateConstructionCheckTests : IDisposable
     }
 
     [Fact]
+    public void ContentHash_AbsolutePathSetButFolderMissing_SkipsContentCheck_DoesNotThrow()
+    {
+        // Regression test for a real bug found in review: HashSkillFolder throws DirectoryNotFoundException
+        // for a non-existent folder, and CheckAndEnforce runs at agent CONSTRUCTION time — a skill folder
+        // moved/deleted since the baseline was captured must not crash startup for a reason unrelated to
+        // actual skill drift. The structural fingerprint check still fully applies.
+        var missingDir = Path.Combine(Path.GetTempPath(), "agenteval-skillgate-missing-" + Guid.NewGuid().ToString("N"));
+        var manifest = Manifest("a");
+        var baseline = new SkillManifestBaseline(
+            DateTimeOffset.UtcNow,
+            new Dictionary<string, string> { ["a"] = SkillManifestPoisoningGate.Fingerprint(manifest) },
+            ContentHashesBySkillName: new Dictionary<string, string> { ["a"] = "irrelevant-since-folder-is-gone" });
+        baseline.SaveAsync(_baselinePath).GetAwaiter().GetResult();
+
+        var ex = Record.Exception(() => SkillGateConstructionCheck.CheckAndEnforce(
+            [new ScannedSkillInfo(manifest, missingDir)], _baselinePath, SkillGateMode.Strict));
+
+        Assert.Null(ex);
+    }
+
+    [Fact]
+    public void Strict_SkillRenamedCaseOnly_ReportsChanged_NotNewPlusRemoved()
+    {
+        // Regression test for a real bug found in review: a skill recased ("a" -> "A") with content otherwise
+        // unchanged must still be recognized as the SAME skill (a Changed finding), not an unrelated New+Removed
+        // pair — a case-only rename is exactly the rug-pull-evasion vector this comparison must not fall for
+        // (mirrors SkillsScanCommand's own --save-manifest-baseline lowercasing convention).
+        var baseline = SkillManifestBaseline.Capture([Manifest("a", "original description")]);
+        baseline.SaveAsync(_baselinePath).GetAwaiter().GetResult();
+
+        var ex = Assert.Throws<SkillDriftException>(() => SkillGateConstructionCheck.CheckAndEnforce(
+            [Scanned("A", "description changed after trust-pinning")], _baselinePath, SkillGateMode.Strict));
+
+        var finding = Assert.Single(ex.Findings);
+        Assert.Equal(ManifestDriftKind.Changed, finding.Kind);
+    }
+
+    [Fact]
     public void NullSkills_Throws()
         => Assert.Throws<ArgumentNullException>(() => SkillGateConstructionCheck.CheckAndEnforce(null!, _baselinePath, SkillGateMode.Strict));
 

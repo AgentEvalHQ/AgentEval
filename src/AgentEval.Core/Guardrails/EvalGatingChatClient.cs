@@ -261,7 +261,8 @@ public sealed class EvalGatingChatClient : DelegatingChatClient
     /// <summary>
     /// Records a gate verdict into the trace's top-level <see cref="AgentTrace.Metadata"/> under a unique
     /// key "gate.{stage}.{seq}.{PolicyName}" (stage = pre|post) — never as a TraceEntry, so gate evidence
-    /// stays out of the Index pairing / replay path. The recorded value carries action/reason/matches/correlationId.
+    /// stays out of the Index pairing / replay path. The recorded value carries
+    /// action/reason/matches/confidence/correlationId.
     /// </summary>
     private void Record(GateVerdict verdict, string stage)
     {
@@ -276,6 +277,10 @@ public sealed class EvalGatingChatClient : DelegatingChatClient
             ["action"] = verdict.Action.ToString(),
             ["reason"] = verdict.Reason,
             ["matches"] = verdict.Matches,
+            // The same soft signal FleetCorrelator.Observe acts on — without it here, a trace/compliance
+            // reviewer looking back at WHY a "fleet-correlation" Block fired has no record of the individual
+            // sub-threshold confidences that fed it.
+            ["confidence"] = verdict.Confidence,
             ["correlationId"] = ToolCorrelationScope.Current,
         });
     }
