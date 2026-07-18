@@ -75,6 +75,27 @@ public sealed class ScriptedChatClient : IChatClient
     public ScriptedChatClient AddThrow(string message = "Simulated provider error")
         => Add(new ScriptedTurn { Throw = message });
 
+    /// <summary>
+    /// Loads a script from data — the counterpart to every <c>Add*</c> method above, which all build the
+    /// queue by hand in C#. Used by <c>agenteval log-file to-fixture</c> (CLI, <c>AgentEval.Cli</c>) to hydrate
+    /// a <see cref="ScriptedChatClient"/> from a captured real conversation
+    /// (<c>--capture-fixture</c> → <see cref="ScriptedFixtureTurn"/>[] JSON), so a real, once-observed
+    /// conversation becomes a deterministic, versionable test fixture. A fresh <see cref="ScriptedChatClient"/>
+    /// is returned (this is a factory, not an instance method) — every existing usage pattern
+    /// (<c>new ScriptedChatClient().AddText(...)</c>) still works unchanged; this is purely additive.
+    /// </summary>
+    public static ScriptedChatClient FromFixture(IEnumerable<ScriptedFixtureTurn> turns)
+    {
+        ArgumentNullException.ThrowIfNull(turns);
+        var client = new ScriptedChatClient();
+        foreach (var turn in turns)
+        {
+            client.Add(turn.ToScriptedTurn());
+        }
+
+        return client;
+    }
+
     /// <inheritdoc />
     public Task<ChatResponse> GetResponseAsync(
         IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default)
@@ -203,5 +224,69 @@ public sealed class ScriptedToolCall
     public required string ToolName { get; init; }
 
     /// <summary>Tool-call arguments (defaults to empty when null).</summary>
+    public IDictionary<string, object?>? ToolArgs { get; init; }
+}
+
+/// <summary>
+/// A 1:1 serializable mirror of <see cref="ScriptedTurn"/>, for <see cref="ScriptedChatClient.FromFixture"/>.
+/// Exists as a SEPARATE type rather than making <see cref="ScriptedTurn"/> itself serializable because
+/// <see cref="ScriptedTurn.FinishReason"/> is a <see cref="ChatFinishReason"/> (a MEAI extensible-enum struct)
+/// — this type stores it as a plain <see cref="string"/> instead, so a fixture JSON file has no dependency on
+/// how that struct happens to (de)serialize.
+/// </summary>
+public sealed class ScriptedFixtureTurn
+{
+    /// <summary>See <see cref="ScriptedTurn.Text"/>.</summary>
+    public string? Text { get; init; }
+
+    /// <summary>See <see cref="ScriptedTurn.ToolCallId"/>.</summary>
+    public string? ToolCallId { get; init; }
+
+    /// <summary>See <see cref="ScriptedTurn.ToolName"/>.</summary>
+    public string? ToolName { get; init; }
+
+    /// <summary>See <see cref="ScriptedTurn.ToolArgs"/>.</summary>
+    public IDictionary<string, object?>? ToolArgs { get; init; }
+
+    /// <summary>See <see cref="ScriptedTurn.ToolCalls"/>.</summary>
+    public IReadOnlyList<ScriptedFixtureToolCall>? ToolCalls { get; init; }
+
+    /// <summary>See <see cref="ScriptedTurn.FinishReason"/> — stored as its raw <see cref="ChatFinishReason.Value"/>.</summary>
+    public string? FinishReason { get; init; }
+
+    /// <summary>See <see cref="ScriptedTurn.InputTokens"/>.</summary>
+    public long? InputTokens { get; init; }
+
+    /// <summary>See <see cref="ScriptedTurn.OutputTokens"/>.</summary>
+    public long? OutputTokens { get; init; }
+
+    /// <summary>See <see cref="ScriptedTurn.Throw"/>.</summary>
+    public string? Throw { get; init; }
+
+    /// <summary>Converts this data-only shape into the real <see cref="ScriptedTurn"/> <see cref="ScriptedChatClient"/> consumes.</summary>
+    public ScriptedTurn ToScriptedTurn() => new()
+    {
+        Text = Text,
+        ToolCallId = ToolCallId,
+        ToolName = ToolName,
+        ToolArgs = ToolArgs,
+        ToolCalls = ToolCalls?.Select(c => new ScriptedToolCall { ToolCallId = c.ToolCallId, ToolName = c.ToolName, ToolArgs = c.ToolArgs }).ToList(),
+        FinishReason = FinishReason is null ? null : new ChatFinishReason(FinishReason),
+        InputTokens = InputTokens,
+        OutputTokens = OutputTokens,
+        Throw = Throw,
+    };
+}
+
+/// <summary>A 1:1 serializable mirror of <see cref="ScriptedToolCall"/> — see <see cref="ScriptedFixtureTurn"/>.</summary>
+public sealed class ScriptedFixtureToolCall
+{
+    /// <summary>See <see cref="ScriptedToolCall.ToolCallId"/>.</summary>
+    public string? ToolCallId { get; init; }
+
+    /// <summary>See <see cref="ScriptedToolCall.ToolName"/>.</summary>
+    public required string ToolName { get; init; }
+
+    /// <summary>See <see cref="ScriptedToolCall.ToolArgs"/>.</summary>
     public IDictionary<string, object?>? ToolArgs { get; init; }
 }

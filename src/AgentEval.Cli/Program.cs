@@ -708,6 +708,19 @@ var logFileOpt = new Option<string?>("--log-file")
 };
 rootCmd.Options.Add(logFileOpt);
 
+// --capture-fixture: a SEPARATE recursive option from --log-file, not a mode of it — --log-file's format is
+// deliberately lossy (newest-message-only, to avoid O(N²) growth in a multi-turn log); this captures full
+// per-round-trip fidelity as JSONL for later replay/fixture generation via `agenteval log-file to-fixture`.
+// Both can be passed together. Same ambient-writer pattern as --log-file — see FixtureCapture's own remarks.
+var captureFixtureOpt = new Option<string?>("--capture-fixture")
+{
+    Description = "Write a structured JSONL capture of every LLM round-trip (full message array, full response) to " +
+                   "this file, for later replay or fixture generation via 'agenteval log-file to-fixture'. Off by " +
+                   "default. Same raw, UNREDACTED content warning as --log-file. Overwritten on each invocation.",
+    Recursive = true,
+};
+rootCmd.Options.Add(captureFixtureOpt);
+
 // Legacy command surface ported from AgentEvalHQ/AgentEval.Cli v0.2.0-alpha
 // (documentation and CI pipelines depend on these exact names and flags):
 rootCmd.Add(datasetInitCmd);                  // init — scaffold an evaluation dataset
@@ -731,6 +744,11 @@ rootCmd.Add(AgentEval.Cli.Commands.Gatekeeper.GatekeeperCommand.Create());
 // (previously library-only; see Skills-Scan-CLI-Verb-Design.md). Credential-free, offline, static scan.
 rootCmd.Add(SkillsScanCommand.Create());
 
+// `log-file to-fixture` — turns a --capture-fixture JSONL capture into a deterministic, versionable test
+// fixture (ScriptedChatClient.FromFixture).
+rootCmd.Add(LogFileCommand.Create());
+
 var parseResult = rootCmd.Parse(args);
 using var logWriter = VerboseLog.Initialize(parseResult.GetValue(logFileOpt));
+using var fixtureWriter = FixtureCapture.Initialize(parseResult.GetValue(captureFixtureOpt));
 return await parseResult.InvokeAsync();

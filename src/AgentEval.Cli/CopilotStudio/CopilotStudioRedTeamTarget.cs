@@ -255,7 +255,7 @@ internal sealed class CopilotStudioRedTeamTarget : IRedTeamBuiltInTarget, ISutTa
         // iUnderstandLiveSideEffects: true is safe here — Validate() (above, in this same class) already
         // enforced --i-understand-live-side-effects before RedTeamCommand ever reaches this Build call.
         var maxCredits = (opts.TargetOptionsFor<CopilotStudioTargetOptions>(Sut) ?? new CopilotStudioTargetOptions()).MaxCredits;
-        return CopilotStudioAgentFactory.BuildLive(EnsureConfig(opts), iUnderstandLiveSideEffects: true, maxCredits, c => VerboseLog.Wrap(c, "sut"));
+        return CopilotStudioAgentFactory.BuildLive(EnsureConfig(opts), iUnderstandLiveSideEffects: true, maxCredits, c => CliChatClientDiagnostics.Wrap(c, "sut"));
     }
 
     public void WritePostScanSummary(RedTeamResult result, AgentTrace trace, TextWriter err)
@@ -368,7 +368,7 @@ internal sealed class CopilotStudioRedTeamTarget : IRedTeamBuiltInTarget, ISutTa
             EnsureSutConfig(common, own),
             iUnderstandLiveSideEffects: true,
             (own as CopilotStudioSutOptions ?? common.TargetOptionsFor<CopilotStudioSutOptions>(Sut))?.MaxCredits ?? 0,
-            c => VerboseLog.Wrap(c, "sut"));
+            c => CliChatClientDiagnostics.Wrap(c, "sut"));
 
     private CopilotStudioConfig EnsureSutConfig(CommonTargetOptions common, ISutTargetOptions? own)
     {
