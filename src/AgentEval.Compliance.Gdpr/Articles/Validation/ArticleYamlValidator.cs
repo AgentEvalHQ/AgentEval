@@ -40,8 +40,13 @@ public sealed class ArticleYamlValidator
         if (!s_validAggregations.Contains(spec.Metadata.Aggregation))
             errors.Add($"metadata.aggregation '{spec.Metadata.Aggregation}' must be one of: {string.Join(", ", s_validAggregations)}");
 
-        if (spec.Metadata.PassThreshold is < 0 or > 1)
-            errors.Add("metadata.pass_threshold must be in [0,1]");
+        // 16: <= 0, not < 0 — PassThreshold directly gates pass/fail (ArticleCompositeBuilder), unlike
+        // WarnThreshold/PillarWeight (documented dead metadata below, not consumed). An omitted YAML field
+        // silently deserializes to the C# default 0.0, and a 0.0 threshold trivially passes every score ≥ 0 —
+        // silently making the whole article auto-pass with zero actual signal, exactly the failure mode this
+        // benchmark exists to catch. Every real article ships 0.50-0.85; 0.0 is never intentional.
+        if (spec.Metadata.PassThreshold is <= 0 or > 1)
+            errors.Add("metadata.pass_threshold must be in (0,1]");
 
         if (spec.Metadata.WarnThreshold is < 0 or > 1)
             errors.Add("metadata.warn_threshold must be in [0,1]");

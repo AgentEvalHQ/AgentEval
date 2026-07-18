@@ -113,7 +113,12 @@ public static class CopilotStudioAgentFactory
             NullLogger.Instance,
             HttpClientName);
 
-        IChatClient chatClient = new CopilotStudioChatClient(new CopilotClientConversationAdapter(copilotClient), maxCredits);
+        // Regression fix: httpClientFactory owns the real HttpClient this connector uses, but neither
+        // CopilotClient nor CopilotClientConversationAdapter implement IDisposable, so nothing downstream
+        // could ever dispose it — every BuildLive call leaked one HttpClient for the remainder of the
+        // process. Threaded through as CopilotStudioChatClient's additionalDisposable so it's disposed
+        // together with the chat client instead.
+        IChatClient chatClient = new CopilotStudioChatClient(new CopilotClientConversationAdapter(copilotClient), maxCredits, httpClientFactory);
         if (wrapChatClient is not null)
         {
             chatClient = wrapChatClient(chatClient);

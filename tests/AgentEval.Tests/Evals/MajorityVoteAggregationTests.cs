@@ -156,4 +156,40 @@ public class MajorityVoteAggregationTests
         Assert.IsType<MajorityVoteAggregation>(MajorityVoteAggregation.Instance);
         Assert.Same(MajorityVoteAggregation.Instance, MajorityVoteAggregation.Instance);
     }
+
+    // ── "error" is neutral (same as "skipped") (17) ────────────────────────────────
+
+    private static EvalResult ErrorResult() => MakeResult(0.0, "none", "error");
+
+    [Fact]
+    public void Aggregate_OneError_ErrorContributionOmitted_FromMeanScore()
+    {
+        // Regression (issue #17): an "error" label never counts as a pass/warn/fail vote (its label matches
+        // none of them), so the winning-label logic was always safe — but WITHOUT excluding it, its
+        // placeholder score=0 still polluted the returned meanScore: (0.9+0.9+0.0)/3=0.6 instead of 0.9.
+        var results = new[]
+        {
+            MakeResult(0.90, "none", "pass"),
+            MakeResult(0.90, "none", "pass"),
+            ErrorResult(),
+        };
+        var components = new[] { Comp(), Comp(), Comp() };
+
+        var (score, severity) = _sut.Aggregate(results, components);
+
+        Assert.Equal(0.90, score, precision: 10);   // error leaf excluded from the mean
+        Assert.Equal("none", severity);             // winning label is still "pass"
+    }
+
+    [Fact]
+    public void Aggregate_AllError_Returns0AndNone()
+    {
+        var results = new[] { ErrorResult(), ErrorResult() };
+        var components = new[] { Comp(), Comp() };
+
+        var (score, severity) = _sut.Aggregate(results, components);
+
+        Assert.Equal(0, score);
+        Assert.Equal("none", severity);
+    }
 }

@@ -227,6 +227,10 @@ public static class ComplianceRenderCommand
         }
 
         // ── Build optional registry for PII redaction ────────────────────────
+        // Regression fix: this used to hard-fail (return 1) when the registry couldn't be loaded,
+        // contradicting its own "Registry is optional" comment and diverging from the GDPR path (above),
+        // which proceeds with a null registry (no redaction lookup) on the identical failure. Matches now —
+        // EuAiActPdfRenderer's constructor and every _articles?.GetSpec(...) call site already tolerate null.
         EuAiActArticlesRegistry? articles = null;
         try
         {
@@ -240,12 +244,6 @@ public static class ComplianceRenderCommand
         {
             // Registry is optional — proceed without redaction on failure
             articles = null;
-        }
-
-        if (articles is null)
-        {
-            Console.Error.WriteLine("EU AI Act registry could not be loaded; PDF rendering requires the registry for PII redaction lookup.");
-            return 1;
         }
 
         // ── Render PDF ───────────────────────────────────────────────────────

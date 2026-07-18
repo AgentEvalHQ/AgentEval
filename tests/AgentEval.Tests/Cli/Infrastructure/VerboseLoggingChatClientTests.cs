@@ -186,4 +186,49 @@ public class VerboseLoggingChatClientTests
             l.Contains("clientA", StringComparison.Ordinal) ^ l.Contains("clientB", StringComparison.Ordinal),
             $"header line belongs to exactly one client, got: {l}"));
     }
+
+    [Fact]
+    public async Task GetResponseAsync_CallerCancels_LogsAbandonedEntry_NotASilentGap()
+    {
+        // Regression test for a real bug found in review: a caller cancellation on THIS (non-streaming) path
+        // used to `throw;` with no matching log entry at all — leaving a REQUEST with no RESPONSE/ERROR/
+        // ABANDONED, silently breaking the pairing the log format promises. The streaming sibling
+        // (GetStreamingResponseAsync_ConsumerBreaksEarly_LogsAbandonedEntry_NotASilentGap, above) already
+        // guarded against exactly this; this path did not.
+        var slow = new DelayingChatClient(TimeSpan.FromSeconds(30));
+        var log = new StringWriter();
+        var client = new VerboseLoggingChatClient(slow, log);
+        using var cts = new CancellationTokenSource();
+        cts.CancelAfter(TimeSpan.FromMilliseconds(20));
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => client.GetResponseAsync(Conversation(), cancellationToken: cts.Token));
+
+        var text = log.ToString();
+        Assert.Contains("REQUEST", text, StringComparison.Ordinal);
+        Assert.Contains("ABANDONED", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("RESPONSE", text, StringComparison.Ordinal);
+    }
+
+    // A fake that honors cancellation but otherwise never returns in time (for the cancellation path above).
+    private sealed class DelayingChatClient : IChatClient
+    {
+        private readonly TimeSpan _delay;
+        public DelayingChatClient(TimeSpan delay) => _delay = delay;
+
+        public async Task<ChatResponse> GetResponseAsync(
+            IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default)
+        {
+            await Task.Delay(_delay, cancellationToken);
+            return new ChatResponse(new ChatMessage(ChatRole.Assistant, "unreachable"));
+        }
+
+        public IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(
+            IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default)
+            => throw new NotSupportedException();
+
+        public object? GetService(Type serviceType, object? serviceKey = null) => null;
+
+        public void Dispose() { }
+    }
 }

@@ -74,6 +74,10 @@ public sealed class TurnOrchestrator
         var reason = "max turns reached without success";
         var truncated = true;
         AgentResponse? last = null;
+        // 12: the real per-turn EvaluationOutcome, fed forward so an attacker-driven attack (e.g. PairAttack) can
+        // learn from what actually happened last turn instead of assuming a fixed outcome. null until turn 0 evaluates
+        // (mirrors TapNode.LastVerdict, which TreeOrchestrator threads the same way for TAP).
+        string? lastVerdict = null;
         var startTs = _options.TimeProvider.GetTimestamp();   // injectable clock (FakeTimeProvider in tests) — see ScanOptions.TimeProvider
         var maxTurns = Math.Max(1, attack.MaxTurns);
 
@@ -90,6 +94,7 @@ public sealed class TurnOrchestrator
                 // the ATTACKER (generates turns), distinct from _options.JudgeClient (the verdict judge, consumed below
                 // for the Inconclusive fallback) — they must never be conflated. null ⇒ the attack uses its scripted path.
                 AttackerClient = _options.AttackerClient,
+                LastVerdict = lastVerdict,
             };
 
             // 5c: one per-turn budget covers attacker generation + the agent call + the judge, so a hung attacker
@@ -179,6 +184,7 @@ public sealed class TurnOrchestrator
             // decorator's (possibly capped) fidelity; ProvenanceOf lifts any judge-primary provenance.
             var turnFidelity = FidelityOf(result);
             var turnGrading = GradingMetadata.ProvenanceOf(result);
+            lastVerdict = result.Outcome.ToString();   // 12: real outcome, fed to the NEXT turn's MultiTurnContext
 
             perTurn.Add(result);
             // 5c: capture the succeeding turn's fidelity + grading (first success) and accumulate fidelity only

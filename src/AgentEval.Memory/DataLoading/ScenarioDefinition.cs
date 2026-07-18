@@ -111,6 +111,18 @@ public class PresetDefinition
 
     [JsonPropertyName("context_pressure")]
     public ContextPressureConfig? ContextPressure { get; set; }
+
+    /// <summary>
+    /// Regression fix: the synthetic "today" a temporal-reasoning query's date arithmetic is anchored
+    /// to (ISO date, e.g. "2026-03-25"), for presets whose <see cref="FactDefinition.PlantedAs"/> narrative
+    /// text bakes in a relative-time claim ("about 6 weeks ago") tied to a FIXED <see cref="FactDefinition.Timestamp"/>.
+    /// Without this, MemoryBenchmarkRunner previously injected the REAL wall-clock date as "today," which
+    /// silently drifts further out of sync with the scenario's own fixed narrative every day past the date
+    /// this preset was authored against. Null (the default) means no fixed anchor — the real wall clock is
+    /// used, which is correct for presets with no explicit <see cref="FactDefinition.Timestamp"/> values.
+    /// </summary>
+    [JsonPropertyName("reference_date")]
+    public string? ReferenceDate { get; set; }
 }
 
 /// <summary>
@@ -228,4 +240,7 @@ public class ResolvedPreset
     public required List<string> NoiseBetweenFacts { get; init; }
     public required List<QueryDefinition> Queries { get; init; }
     public ContextPressureConfig? ContextPressure { get; init; }
+
+    /// <summary>See <see cref="PresetDefinition.ReferenceDate"/> — resolved the same override-not-merge way as <see cref="ContextPressure"/>.</summary>
+    public string? ReferenceDate { get; init; }
 }

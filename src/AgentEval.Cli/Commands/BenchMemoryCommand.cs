@@ -181,8 +181,10 @@ public static class BenchMemoryCommand
 
             // Align with the family convention (PASS=>0, FAIL/WARN=>2). Previously WARN returned 0,
             // so a memory run in the 50–69 band silently passed CI while the identical band failed CI
-            // for every other benchmark family (BUG-23).
-            return verdict == "PASS" ? 0 : 2;
+            // for every other benchmark family (BUG-23). Reuse fix: now calls the shared BenchExitCodes
+            // helper (identical PASS=>0/else=>2 mapping — verdict is always exactly "PASS"/"WARN"/"FAIL")
+            // instead of re-inlining the same convention as a bespoke ternary.
+            return BenchExitCodes.FromLabel(verdict);
         }
         catch (Exception ex)
         {

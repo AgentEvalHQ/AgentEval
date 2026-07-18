@@ -105,13 +105,19 @@ public static class Encoders
     public static string AsciiDecimal(string value) =>
         string.Join(' ', Encoding.UTF8.GetBytes(value).Select(b => b.ToString(CultureInfo.InvariantCulture)));
 
-    /// <summary>HTML decimal character references for each char of <paramref name="value"/>. "P" → "&amp;#80;".</summary>
+    /// <summary>
+    /// HTML decimal character references for each Unicode codepoint of <paramref name="value"/>. "P" → "&amp;#80;".
+    /// Iterates by codepoint (<c>EnumerateRunes</c>), not by UTF-16 <c>char</c> — a non-BMP character (e.g. an emoji)
+    /// is one surrogate PAIR of chars but must produce ONE entity for its real codepoint, else the round-trip through
+    /// an HTML decoder yields two lone-surrogate references instead of the original character (13).
+    /// </summary>
     public static string HtmlDecimalEntities(string value) =>
-        string.Concat(value.Select(c => $"&#{(int)c};"));
+        string.Concat(value.EnumerateRunes().Select(r => $"&#{r.Value};"));
 
-    /// <summary>HTML hex character references for each char of <paramref name="value"/>. "P" → "&amp;#x50;".</summary>
+    /// <summary>HTML hex character references for each Unicode codepoint of <paramref name="value"/>. "P" → "&amp;#x50;".
+    /// Codepoint-aware for the same reason as <see cref="HtmlDecimalEntities"/> (13).</summary>
     public static string HtmlHexEntities(string value) =>
-        string.Concat(value.Select(c => $"&#x{(int)c:X};"));
+        string.Concat(value.EnumerateRunes().Select(r => $"&#x{r.Value:X};"));
 
     /// <summary>C/JSON <c>\uXXXX</c> escapes for each char of <paramref name="value"/>. "P" → "\\u0050".</summary>
     public static string UnicodeEscapes(string value) =>

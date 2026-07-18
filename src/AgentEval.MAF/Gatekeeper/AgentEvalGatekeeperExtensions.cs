@@ -74,20 +74,18 @@ public static class AgentEvalGatekeeperExtensions
             }
         }
 
-        // SkillGate Tier 1 (runtime governance) — same fail-fast-before-any-mutation placement and the same
-        // fail-LOUD-on-half-configuration discipline as PromptTemplates/PromptTemplateBaseline immediately
-        // above. Opt-in: both Skills and SkillBaselinePath must be set together.
+        // SkillGate Tier 1 (runtime governance) — the half-configuration VALIDATION stays here, same
+        // fail-fast-before-any-mutation placement and fail-LOUD-on-half-configuration discipline as
+        // PromptTemplates/PromptTemplateBaseline immediately above. Opt-in: both Skills and SkillBaselinePath
+        // must be set together. The actual CheckAndEnforce call (which can WRITE to disk under
+        // SkillGateMode.Bootstrap) is deliberately deferred to just before the first real mutation, below —
+        // see that call site's own comment for why.
         if (options.Skills is null != options.SkillBaselinePath is null)
         {
             throw new InvalidOperationException(
                 "UseGatekeeper: exactly one of GatekeeperOptions.Skills / SkillBaselinePath is set — both must " +
                 "be set together for the SkillGate drift check to run (or neither, to leave it disabled). Set " +
                 "the missing one, or clear the one you did set.");
-        }
-
-        if (options.Skills is not null && options.SkillBaselinePath is not null)
-        {
-            SkillGateConstructionCheck.CheckAndEnforce(options.Skills, options.SkillBaselinePath, options.SkillGateMode);
         }
 
         // #2: compute the AUTHORITATIVE coverage report — against the SAME ToolGates snapshot that is actually
@@ -198,6 +196,19 @@ public static class AgentEvalGatekeeperExtensions
 #pragma warning disable AEGK001 // validating, not yet composing — same experimental-opt-in reasoning as the actual UseAgentEvalToolApproval call below.
             AgentEvalToolApprovalExtensions.ValidateApprovalGates(options.ApprovalGates.ToArray());
 #pragma warning restore AEGK001
+        }
+
+        // SkillGate Tier 1 enforcement (the actual check-and-possibly-persist-to-disk call) — regression fix:
+        // this used to run immediately after the half-configuration validation above, BEFORE every other
+        // preflight check in this method that can still throw (RefuseUnprotectedHighRiskTools, the run-scope
+        // check, the MinimumPolicy floor check, ValidateGates/ValidateResultGates/ValidateApprovalGates). Under
+        // SkillGateMode.Bootstrap, CheckAndEnforce can WRITE a newly-trusted skill to the baseline file — a
+        // real disk mutation — so it must run LAST among the preflight checks, not first, to honor this
+        // method's own "fail fast before ANY mutation" guarantee: a later validation failure must never leave
+        // a skill trust-pinned to disk for an agent that was never actually built.
+        if (options.Skills is not null && options.SkillBaselinePath is not null)
+        {
+            SkillGateConstructionCheck.CheckAndEnforce(options.Skills, options.SkillBaselinePath, options.SkillGateMode);
         }
 
         // Print the Observe banner only once every validation above has passed — a construction that's about

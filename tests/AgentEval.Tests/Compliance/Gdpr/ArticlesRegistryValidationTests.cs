@@ -27,7 +27,7 @@ public class ArticlesRegistryValidationTests
             ExpectedBehavior: null,
             Tags: []);
 
-    private static ArticleSpec Spec(string controlId, double scenarioWeight) =>
+    private static ArticleSpec Spec(string controlId, double scenarioWeight, double passThreshold = 0.70) =>
         new(
             new ArticleMetadata(
                 Article: "Article-X",
@@ -35,7 +35,7 @@ public class ArticlesRegistryValidationTests
                 ControlId: controlId,
                 Title: "X",
                 Severity: "low",
-                PassThreshold: 0.70,
+                PassThreshold: passThreshold,
                 WarnThreshold: 0.50,
                 PillarWeight: 0.10,
                 Aggregation: "weighted_sum"),
@@ -70,6 +70,20 @@ public class ArticlesRegistryValidationTests
 
         Assert.Contains("Duplicate", ex.Message);
         Assert.Contains("gdpr.dup", ex.Message);
+    }
+
+    [Fact]
+    public void ValidateOrThrow_ZeroPassThreshold_ThrowsNamingPassThreshold()
+    {
+        // Regression (issue #16): an omitted metadata.pass_threshold field silently deserializes to the C#
+        // default 0.0, and 0.0 trivially passes every score >= 0 — auto-passing the whole article with zero
+        // actual signal, exactly the failure mode this benchmark exists to catch. Must be rejected, not just
+        // negative values.
+        var ex = Assert.Throws<InvalidOperationException>(
+            () => ArticlesRegistry.ValidateOrThrow(new[] { Spec("gdpr.zero_threshold", scenarioWeight: 1.0, passThreshold: 0.0) }));
+
+        Assert.Contains("gdpr.zero_threshold", ex.Message);
+        Assert.Contains("pass_threshold", ex.Message);
     }
 
     // Note: the production registry constructor now calls ValidateOrThrow against every embedded

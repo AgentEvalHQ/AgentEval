@@ -55,16 +55,25 @@ public sealed class VerboseLoggingChatClient : DelegatingChatClient
         WriteRequest(i, msgs, options);
 
         var sw = Stopwatch.StartNew();
+        // Regression fix: a caller-cancellation on this path used to `throw;` with no matching log entry —
+        // unlike GetStreamingResponseAsync's own finally-guarded ABANDONED write, built specifically so an
+        // abandoned round-trip never leaves a REQUEST entry with no matching RESPONSE/ERROR/ABANDONED,
+        // silently breaking the pairing the log format promises (see that method's own remarks). This mirrors
+        // the same terminalEntryWritten + finally pattern.
+        var terminalEntryWritten = false;
         try
         {
             var resp = await base.GetResponseAsync(msgs, options, cancellationToken).ConfigureAwait(false);
             sw.Stop();
             WriteResponse(i, resp, sw.ElapsedMilliseconds);
+            terminalEntryWritten = true;
             return resp;
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
-            throw;   // the CALLER's own token fired — a deliberate cancellation, not diagnostically interesting
+            throw;   // the CALLER's own token fired — a deliberate cancellation, not diagnostically
+                      // interesting on its own terms, but still logged as ABANDONED below so the REQUEST
+                      // entry this call already wrote is never left unpaired.
         }
         catch (Exception ex)
         {
@@ -75,7 +84,15 @@ public sealed class VerboseLoggingChatClient : DelegatingChatClient
             // OperationCanceledException; a blanket type-based exclusion silently swallows real timeouts).
             sw.Stop();
             WriteError(i, ex, sw.ElapsedMilliseconds);
+            terminalEntryWritten = true;
             throw;
+        }
+        finally
+        {
+            if (!terminalEntryWritten)
+            {
+                WriteAbandoned(i, sw.ElapsedMilliseconds);
+            }
         }
     }
 

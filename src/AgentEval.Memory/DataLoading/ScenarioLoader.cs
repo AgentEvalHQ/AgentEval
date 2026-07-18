@@ -89,8 +89,9 @@ public static class ScenarioLoader
         var noise = new List<string>();
         var queries = new List<QueryDefinition>();
         ContextPressureConfig? contextPressure = null;
+        string? referenceDate = null;
 
-        ResolveChain(scenario, preset, facts, noise, queries, ref contextPressure);
+        ResolveChain(scenario, preset, facts, noise, queries, ref contextPressure, ref referenceDate);
 
         // Use scenario-level context pressure if preset doesn't override
         contextPressure ??= scenario.ContextPressure;
@@ -100,7 +101,8 @@ public static class ScenarioLoader
             Facts = facts,
             NoiseBetweenFacts = noise,
             Queries = queries,
-            ContextPressure = contextPressure
+            ContextPressure = contextPressure,
+            ReferenceDate = referenceDate
         };
     }
 
@@ -138,13 +140,14 @@ public static class ScenarioLoader
         List<FactDefinition> facts,
         List<string> noise,
         List<QueryDefinition> queries,
-        ref ContextPressureConfig? contextPressure)
+        ref ContextPressureConfig? contextPressure,
+        ref string? referenceDate)
     {
         // Resolve parent first (recursively)
         if (preset.Extends != null &&
             scenario.Presets.TryGetValue(preset.Extends.ToLowerInvariant(), out var parent))
         {
-            ResolveChain(scenario, parent, facts, noise, queries, ref contextPressure);
+            ResolveChain(scenario, parent, facts, noise, queries, ref contextPressure, ref referenceDate);
         }
 
         // Then add this preset's contributions
@@ -152,6 +155,7 @@ public static class ScenarioLoader
         if (preset.NoiseBetweenFacts != null) noise.AddRange(preset.NoiseBetweenFacts);
         if (preset.Queries != null) queries.AddRange(preset.Queries);
         if (preset.ContextPressure != null) contextPressure = preset.ContextPressure;
+        if (preset.ReferenceDate != null) referenceDate = preset.ReferenceDate;
     }
 
     private static string? LoadJsonFromEmbeddedResource(string categoryName)

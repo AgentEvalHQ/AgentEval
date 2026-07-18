@@ -397,49 +397,7 @@ public class MemoryBenchmarkRunner : IMemoryBenchmarkRunner
             }
 
             // Build queries (no setup steps needed — everything is in the text blob)
-            var queries = new List<MemoryQuery>();
-            foreach (var q in preset.Queries)
-            {
-                var queryQuestion = q.Question;
-                if (string.Equals(q.QueryType, "temporal", StringComparison.OrdinalIgnoreCase))
-                    queryQuestion = $"Today's date is {DateTimeOffset.UtcNow:yyyy-MM-dd}.\n\n{queryQuestion}";
-
-                var isAbstention = q.Abstention || string.Equals(q.QueryType, "abstention", StringComparison.OrdinalIgnoreCase);
-
-                if (isAbstention)
-                {
-                    var forbidden = (q.ForbiddenFacts ?? [])
-                        .Select(f => MemoryFact.Create(f)).ToArray();
-                    var absQuery = MemoryQuery.CreateAbstention(queryQuestion, forbidden);
-                    // An abstention query must always be scored with the abstention prompt. Copying a
-                    // stray q.QueryType (e.g. "temporal") here would win GetQueryType's top-priority
-                    // lookup and route to the standard/temporal prompt against an empty expected list,
-                    // skipping hallucination detection (GAP-14). Force "abstention".
-                    absQuery.Metadata!["query_type"] = "abstention";
-                    queries.Add(absQuery);
-                }
-                else
-                {
-                    var expected = q.ExpectedFacts
-                        .Select(f => MemoryFact.Create(f)).ToArray();
-                    var forbidden = (q.ForbiddenFacts ?? [])
-                        .Select(f => MemoryFact.Create(f)).ToArray();
-
-                    Dictionary<string, object>? metadata = null;
-                    if (q.QueryType != null)
-                    {
-                        metadata = new Dictionary<string, object> { ["query_type"] = q.QueryType };
-                    }
-
-                    queries.Add(new MemoryQuery
-                    {
-                        Question = queryQuestion,
-                        ExpectedFacts = expected,
-                        ForbiddenFacts = forbidden,
-                        Metadata = metadata
-                    });
-                }
-            }
+            var queries = BuildQueriesWithAbstentionRouting(preset.Queries, preset.ReferenceDate);
 
             var scenario = new MemoryTestScenario
             {
@@ -457,6 +415,75 @@ public class MemoryBenchmarkRunner : IMemoryBenchmarkRunner
         {
             return null; // JSON not found — caller should fall back
         }
+    }
+
+    /// <summary>
+    /// Builds <see cref="MemoryQuery"/> instances from raw scenario JSON query definitions, routing
+    /// abstention-style queries (empty <c>expected_facts</c> / <c>abstention: true</c> / <c>query_type:
+    /// "abstention"</c>) to <see cref="MemoryQuery.CreateAbstention"/> and anchoring a "temporal" query's
+    /// injected "today" to <paramref name="referenceDate"/> when set. Shared by every JSON-driven benchmark
+    /// path (via <see cref="TryRunFromJsonAsync"/>) — regression fix: <see cref="RunMultiSessionReasoningAsync"/>
+    /// used to build its queries directly, bypassing this routing entirely, so an abstention query added to
+    /// multi-session-reasoning.json would silently get the standard judge prompt instead of the
+    /// hallucination-detection one (GAP-14), the exact failure mode this routing exists to prevent.
+    /// </summary>
+    private static List<MemoryQuery> BuildQueriesWithAbstentionRouting(IReadOnlyList<DataLoading.QueryDefinition> queryDefs, string? referenceDate)
+    {
+        var queries = new List<MemoryQuery>();
+        foreach (var q in queryDefs)
+        {
+            var queryQuestion = q.Question;
+            if (string.Equals(q.QueryType, "temporal", StringComparison.OrdinalIgnoreCase))
+            {
+                // Presets whose planted-fact narrative text bakes in a relative-time claim ("about 6 weeks
+                // ago") tied to a FIXED timestamp must anchor "today" to that same fixed reference date, not
+                // the real wall clock — otherwise the injected "today" drifts further out of sync with the
+                // scenario's own narrative every day past the authoring date. Falls back to the real wall
+                // clock when referenceDate is unset (no fixed-timestamp facts to stay consistent with).
+                var today = DateTimeOffset.TryParse(referenceDate, out var parsedReferenceDate)
+                    ? parsedReferenceDate
+                    : DateTimeOffset.UtcNow;
+                queryQuestion = $"Today's date is {today:yyyy-MM-dd}.\n\n{queryQuestion}";
+            }
+
+            var isAbstention = q.Abstention || string.Equals(q.QueryType, "abstention", StringComparison.OrdinalIgnoreCase);
+
+            if (isAbstention)
+            {
+                var forbidden = (q.ForbiddenFacts ?? [])
+                    .Select(f => MemoryFact.Create(f)).ToArray();
+                var absQuery = MemoryQuery.CreateAbstention(queryQuestion, forbidden);
+                // An abstention query must always be scored with the abstention prompt. Copying a
+                // stray q.QueryType (e.g. "temporal") here would win GetQueryType's top-priority
+                // lookup and route to the standard/temporal prompt against an empty expected list,
+                // skipping hallucination detection (GAP-14). Force "abstention".
+                absQuery.Metadata!["query_type"] = "abstention";
+                queries.Add(absQuery);
+            }
+            else
+            {
+                var expected = q.ExpectedFacts
+                    .Select(f => MemoryFact.Create(f)).ToArray();
+                var forbidden = (q.ForbiddenFacts ?? [])
+                    .Select(f => MemoryFact.Create(f)).ToArray();
+
+                Dictionary<string, object>? metadata = null;
+                if (q.QueryType != null)
+                {
+                    metadata = new Dictionary<string, object> { ["query_type"] = q.QueryType };
+                }
+
+                queries.Add(new MemoryQuery
+                {
+                    Question = queryQuestion,
+                    ExpectedFacts = expected,
+                    ForbiddenFacts = forbidden,
+                    Metadata = metadata
+                });
+            }
+        }
+
+        return queries;
     }
 
     /// <summary>
@@ -879,10 +906,11 @@ public class MemoryBenchmarkRunner : IMemoryBenchmarkRunner
                 await agent.InvokeAsync(text, ct);
             }
 
-            // Now query — requires combining info from both sessions
-            var queries = preset.Queries.Select(q =>
-                MemoryQuery.Create(q.Question,
-                    q.ExpectedFacts.Select(f => MemoryFact.Create(f)).ToArray())).ToList();
+            // Now query — requires combining info from both sessions. Regression fix: this used to build
+            // MemoryQuery instances directly, bypassing the shared abstention/temporal routing every other
+            // JSON-driven benchmark path gets via BuildQueriesWithAbstentionRouting — see that method's own
+            // remarks for the exact failure mode this closes.
+            var queries = BuildQueriesWithAbstentionRouting(preset.Queries, preset.ReferenceDate);
 
             var scenario = new MemoryTestScenario
             {

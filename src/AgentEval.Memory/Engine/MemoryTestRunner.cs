@@ -311,7 +311,11 @@ public class MemoryTestRunner : IMemoryTestRunner
             Duration = totalDuration,
             TokensUsed = totalTokens,
             EstimatedCost = estimatedCost,
-            ScenarioName = scenario.Name
+            ScenarioName = scenario.Name,
+            // Regression fix: this was never set, silently dropping every marker a caller places on
+            // scenario.Metadata (e.g. RunMemoryQueriesAsync's own ["QueryCount"]/["DirectQueryExecution"]
+            // above, or a caller-supplied test-type marker a code-computed IMemoryMetric keys off of).
+            Metadata = scenario.Metadata
         };
     }
 }

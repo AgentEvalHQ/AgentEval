@@ -172,4 +172,34 @@ public class WeightedMedianAggregationTests
         Assert.IsType<WeightedMedianAggregation>(WeightedMedianAggregation.Instance);
         Assert.Same(WeightedMedianAggregation.Instance, WeightedMedianAggregation.Instance);
     }
+
+    // ── "error" is neutral (same as "skipped") (17) ────────────────────────────────
+
+    private static EvalResult ErrorResult() => MakeResult(0.0, "none", "error");
+
+    [Fact]
+    public void Aggregate_HeavilyWeightedError_ErrorContributionOmitted_NotDragTheMedianDown()
+    {
+        // Regression (issue #17): an infra-failure leaf (score=0, label="error") must not skew the median.
+        // Without exclusion, sorted [0.0(error,w=5), 0.9(w=1)] (total=6, half=3): the error's own weight alone
+        // reaches half → median would be 0.0. With exclusion only [0.9] (w=1) participates → median = 0.9.
+        var results = new[] { MakeResult(0.9, "none", "pass"), ErrorResult() };
+        var components = new[] { Comp(1.0), Comp(5.0) };
+
+        var (score, _) = _sut.Aggregate(results, components);
+
+        Assert.Equal(0.9, score, precision: 10);
+    }
+
+    [Fact]
+    public void Aggregate_AllError_Returns0AndNone()
+    {
+        var results = new[] { ErrorResult(), ErrorResult() };
+        var components = new[] { Comp(1.0), Comp(1.0) };
+
+        var (score, severity) = _sut.Aggregate(results, components);
+
+        Assert.Equal(0, score);
+        Assert.Equal("none", severity);
+    }
 }

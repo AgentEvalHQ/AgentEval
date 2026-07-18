@@ -147,4 +147,33 @@ public class MinAggregationTests
         // Assert
         Assert.Equal("Min", _sut.Name);
     }
+
+    // ── "error" is neutral (same as "skipped") (17) ────────────────────────────────
+
+    private static EvalResult ErrorResult() => MakeResult(0.0, "none", "error");
+
+    [Fact]
+    public void Aggregate_OneError_ErrorContributionOmitted_NotFloorTheMin()
+    {
+        // Regression (issue #17): a "min" strategy is maximally exposed to an unexcluded error leaf — its
+        // placeholder score=0 would otherwise floor the ENTIRE composite regardless of every real result.
+        var results = new[] { MakeResult(0.9, "none", "pass"), MakeResult(0.6, "none", "pass"), ErrorResult() };
+        var components = new[] { Comp(1), Comp(1), Comp(1) };
+
+        var (score, _) = _sut.Aggregate(results, components);
+
+        Assert.Equal(0.6, score, precision: 10);   // the error leaf's 0.0 must not become the min
+    }
+
+    [Fact]
+    public void Aggregate_AllError_Returns0AndNone()
+    {
+        var results = new[] { ErrorResult(), ErrorResult() };
+        var components = new[] { Comp(1), Comp(1) };
+
+        var (score, severity) = _sut.Aggregate(results, components);
+
+        Assert.Equal(0, score);
+        Assert.Equal("none", severity);
+    }
 }

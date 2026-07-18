@@ -141,6 +141,27 @@ public static class MAFWorkflowEventBridge
 
                         outputAccumulator.Clear();
                     }
+                    else if (currentExecutorId == normalizedInvokedId)
+                    {
+                        // 15: a DIRECT SELF-LOOP — an executor's own edge routes back to itself (e.g. a
+                        // retry/refine step), so this ExecutorInvokedEvent re-invokes the SAME executor ID.
+                        // Neither branch above fires for this case, which used to silently merge this
+                        // invocation's streaming output into the SAME accumulator as the PRIOR invocation's
+                        // output (folding two steps into one ExecutorOutputEvent) and never emit an
+                        // EdgeTraversedEvent(A, A) — the self-loop transition was invisible. Flush the prior
+                        // invocation's output as its own step (with the self-edge) before starting a clean
+                        // accumulator for this invocation, mirroring the flush-then-edge order above.
+                        yield return new ExecutorOutputEvent(
+                            currentExecutorId,
+                            outputAccumulator.ToString());
+
+                        yield return new EdgeTraversedEvent(
+                            currentExecutorId,
+                            normalizedInvokedId,
+                            EdgeType.Sequential);
+
+                        outputAccumulator.Clear();
+                    }
                     else if (currentExecutorId == null && previousExecutorId == null)
                     {
                         // Very first executor — no edge to emit

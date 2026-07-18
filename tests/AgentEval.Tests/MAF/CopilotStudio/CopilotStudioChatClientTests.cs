@@ -232,6 +232,45 @@ public class CopilotStudioChatClientTests
     }
 
     [Fact]
+    public async Task MaxCredits_ConcurrentCalls_SecondNeverExceedsCapEvenIfBothPassTheEagerPreCheck()
+    {
+        // Regression test for a real bug found in review: GetStreamingResponseAsync's eager budget check is a
+        // non-atomic READ of _estimatedCreditsUsed (kept only so the common sequential-misuse case throws
+        // immediately at the call site — see that method's own remarks) — two concurrent calls can both pass
+        // it before either enters _turnLock, jointly exceeding the cap the class's own doc promises is never
+        // exceeded. Both calls below are INITIATED before either can possibly complete a turn (completing one
+        // requires at least one real await inside _turnLock), so both see _estimatedCreditsUsed == 0 at their
+        // pre-check — the authoritative in-lock re-check must still catch whichever call is second to commit.
+        var fake = new FakeCopilotStudioConversationClient();
+        fake.OnStart = (_, _) => Empty();
+        fake.OnAsk = (_, _, _) => One(Message("ok", "conv-1"));
+
+        using var client = new CopilotStudioChatClient(fake, maxCredits: 1);
+
+        var taskA = client.GetResponseAsync([new ChatMessage(ChatRole.User, "turn A")]);
+        var taskB = client.GetResponseAsync([new ChatMessage(ChatRole.User, "turn B")]);
+
+        var outcomes = await Task.WhenAll(SafeAwait(taskA), SafeAwait(taskB));
+
+        Assert.Single(outcomes, o => o is null);   // exactly one call succeeded
+        Assert.Single(outcomes, o => o is CopilotStudioBudgetExceededException);   // the other was rejected
+        Assert.Equal(1, client.EstimatedCreditsUsed);   // spend never exceeded the cap of 1
+    }
+
+    private static async Task<Exception?> SafeAwait(Task<ChatResponse> task)
+    {
+        try
+        {
+            await task;
+            return null;
+        }
+        catch (CopilotStudioBudgetExceededException ex)
+        {
+            return ex;
+        }
+    }
+
+    [Fact]
     public async Task EstimatedCreditsUsed_PublicAccessor_ReadsTheSameCounterBudgetEnforcementUses()
     {
         // The public accessor (added for HaveStayedWithinCreditBudget) must read the identical counter the
@@ -264,6 +303,29 @@ public class CopilotStudioChatClientTests
             () => client.GetResponseAsync([new ChatMessage(ChatRole.User, "turn 1")]));
 
         Assert.Equal(0, client.EstimatedCreditsUsed);
+    }
+
+    [Fact]
+    public void Dispose_AlsoDisposesTheAdditionalDisposable()
+    {
+        // Regression test for a real bug found in review: CopilotStudioAgentFactory.BuildLive's
+        // SingleNameHttpClientFactory (which owns the real HttpClient the live connector uses) was never
+        // referenced again after construction, so nothing could ever dispose it — a leaked HttpClient per
+        // BuildLive call. additionalDisposable exists so the factory can tie that lifetime to this chat
+        // client's own Dispose().
+        var fake = new FakeCopilotStudioConversationClient();
+        var additional = new DisposeTracker();
+        var client = new CopilotStudioChatClient(fake, additionalDisposable: additional);
+
+        client.Dispose();
+
+        Assert.True(additional.Disposed);
+    }
+
+    private sealed class DisposeTracker : IDisposable
+    {
+        public bool Disposed { get; private set; }
+        public void Dispose() => Disposed = true;
     }
 
     // ── fluent assertions against the real bridge (CopilotStudioAssertions) ──
