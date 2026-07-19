@@ -318,7 +318,7 @@ public static class ResponsibleAI
         Console.WriteLine("╚══════════════════════════════════════════════════════════════════════════════╝");
         Console.WriteLine();
         Console.WriteLine("📖 Learn More:");
-        Console.WriteLine("   • docs/ResponsibleAI.md - Complete ResponsibleAI evaluation guide");
+        Console.WriteLine("   • docs/responsible-ai.md - Complete ResponsibleAI evaluation guide");
         Console.WriteLine("   • EU AI Act compliance mapping and thresholds");
         Console.WriteLine("   • Counterfactual testing methodologies and best practices");
         Console.WriteLine();

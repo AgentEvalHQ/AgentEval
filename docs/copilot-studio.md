@@ -1,5 +1,31 @@
 # Copilot Studio (`--sut copilot-studio`)
 
+## New to this? Start here
+
+**The problem:** you built an agent in Microsoft Copilot Studio — the low-code/no-code agent builder in Power
+Platform — and you want to red-team it or run assertions against it the same way you would a custom-coded
+agent. But a Copilot Studio agent doesn't expose a normal API endpoint you can point an HTTP client at; it
+needs real Entra sign-in and speaks its own conversation protocol.
+
+**What this connector does:** bridges a real Copilot Studio agent into the exact same `IChatClient`/
+`IEvaluableAgent` interfaces every other AgentEval feature already understands. The practical effect: the
+SAME red-team scan, the SAME fluent assertions, the SAME Gatekeeper enforcement you already use on an Azure
+OpenAI agent work here too — nothing new to learn, just a different agent behind the same interface.
+
+**The one honest trade-off:** Copilot Studio's connectors and flows run server-side, so the outside world
+(including this connector) never sees whether a tool actually fired — only what the agent *said*. That
+ceiling, and exactly what it means for scan results, is disclosed in
+[How it fits red-team fidelity](#how-it-fits-red-team-fidelity) below.
+
+New here and just want the fastest path to a working example? Run the
+[Hello World sample](https://github.com/AgentEvalHQ/AgentEval/blob/main/samples/AgentEval.Samples/CopilotStudio/00_CopilotStudioHelloWorld.cs)
+(group **L**, sample 0 — build the connector, send one message, one assertion, nothing else) or jump to
+[Running a scan](#running-a-scan) for the CLI, or [Using it directly in code](#using-it-directly-in-code-no-cli)
+if you'd rather call it from C# yourself. Everything below builds from "here's what it is" toward "here's
+every edge case" — read as far as you need.
+
+---
+
 Red-teams a **live Microsoft Copilot Studio (MCS) agent** through the same `agenteval redteam` scanner used for
 any OpenAI-compatible/Azure endpoint — with its own CLI options, a ship-blocking consent gate, and a fidelity
 ceiling that is reported honestly rather than guessed at.
@@ -241,7 +267,7 @@ Concretely:
   probe/scenario/test case — the cap, once hit, can never un-trip mid-run. **The run genuinely stops** for
   all three verbs.
 - The exit code differs by verb, though: `redteam` returns `8` (`ExitCodes.BudgetExceeded` — distinct from a
-  crash/`RuntimeError`(3) or a policy/gate outcome 5/6/7; see the [exit-code table](../cli.md#exit-codes)).
+  crash/`RuntimeError`(3) or a policy/gate outcome 5/6/7; see the [exit-code table](cli.md#exit-codes)).
   `eval`/`bench gdpr`/`bench eu-ai-act` also enforce and stop on the same condition, but return their own
   existing generic failure codes instead (`RuntimeError`(3) for `eval`, `1` for `bench`) — exit code 8 is
   `redteam`-scoped by design (see `ExitCodes.BudgetExceeded`'s own doc comment).
@@ -312,7 +338,7 @@ generic `--endpoint <url> --model <name> [--api-key <key>]` option set for a pla
 endpoint, independent of Copilot Studio. **Bench Tier 2 (`bench gdpr`/`bench eu-ai-act --sut copilot-studio`)
 is wired too** — reuses the same resolver (`--sut` only, no generic `--endpoint` for Tier 2 yet), driving the
 live agent per-scenario instead of grading a static `--response`. See
-[docs/cli.md](../cli.md#agenteval-eval) for the exact flags.
+[docs/cli.md](cli.md#agenteval-eval) for the exact flags.
 
 ## Resilience: retry + config-identity drift detection
 
@@ -355,7 +381,7 @@ each listed probe) now show it too — not just this target's own CLI summary.
 ## How it fits red-team fidelity
 
 AgentEval's red-team scoring is honest about *how much* evidence a verdict is based on
-(`EvidenceFidelity`: `Verbal` / `IntentToAct` / `Behavioral` — see [Honesty & evidence fidelity](../redteam.md#honesty--evidence-fidelity)). Copilot Studio has a hard, structural ceiling here:
+(`EvidenceFidelity`: `Verbal` / `IntentToAct` / `Behavioral` — see [Honesty & evidence fidelity](redteam.md#honesty--evidence-fidelity)). Copilot Studio has a hard, structural ceiling here:
 
 - **The conversation channel makes server-side tool calls invisible.** MCS agents run their own connectors and
   flows server-side; the red-team scanner only ever sees the text that comes back. There is no way for this
@@ -422,8 +448,8 @@ AgentEval's red-team scoring is honest about *how much* evidence a verdict is ba
 
 ## See also
 
-- [Red Team Security](../redteam.md) — the full scanner: attacks, evidence fidelity, judge modes, CI baseline gate.
-- [CLI Reference — Exit codes](../cli.md#exit-codes) — the full exit-code table, including `8`
+- [Red Team Security](redteam.md) — the full scanner: attacks, evidence fidelity, judge modes, CI baseline gate.
+- [CLI Reference — Exit codes](cli.md#exit-codes) — the full exit-code table, including `8`
   (`BudgetExceeded`) — returned when a live `redteam --sut copilot-studio` scan hits its `--max-credits` cap.
-- [Attack the gate](../gatekeeper/attack-the-gate.md) — the credential-free `--sut gatekeeper-demo` closed loop,
+- [Attack the gate](gatekeeper/attack-the-gate.md) — the credential-free `--sut gatekeeper-demo` closed loop,
   useful for CI where a live Copilot Studio agent + credentials aren't available.

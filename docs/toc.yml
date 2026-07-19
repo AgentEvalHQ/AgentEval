@@ -48,6 +48,8 @@
   items:
   - name: Introduction
     href: gatekeeper/introduction.md
+  - name: What's New
+    href: gatekeeper-whats-new.md
   - name: Gate Reference (ranked)
     href: gatekeeper/gate-reference.md
   - name: CLI (from any language)
@@ -67,11 +69,14 @@
     - name: What's New
       href: redteam-whats-new.md
     - name: Copilot Studio (--sut copilot-studio)
-      href: redteam/copilot-studio.md
+      href: copilot-studio.md
   - name: Agent Skills
     href: agent-skills.md
+    items:
+    - name: What's New
+      href: agent-skills-whats-new.md
   - name: Responsible AI
-    href: ResponsibleAI.md
+    href: responsible-ai.md
   - name: Memory Evaluation
     href: memory-evaluation.md
   - name: Conversations
@@ -203,9 +208,9 @@
   - name: Glass Box (historical)
     items:
     - name: Proposal (v0.11)
-      href: GlassBox/AgentEval-GlassBox-Proposal-v0.11.md
+      href: glassbox-history/AgentEval-GlassBox-Proposal-v0.11.md
     - name: Implementation Plan (v1.0)
-      href: GlassBox/AgentEval-GlassBox-Implementation-Plan-v1.0.md
+      href: glassbox-history/AgentEval-GlassBox-Implementation-Plan-v1.0.md
   - name: GitHub Repository
     href: https://github.com/AgentEvalHQ/AgentEval
   - name: Contributing

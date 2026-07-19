@@ -184,7 +184,7 @@ LLM-as-judge, custom metrics, and the `--output-dir` ADR-002 directory export.
 | `--endpoint <url>` / `--azure` / `--deployment-name <name>` | Choose OpenAI-compatible or Azure OpenAI mode. |
 | `--model <name>` | Required for non-Azure endpoints. |
 | `--api-key <key>` | API key or environment variable fallback. |
-| `--sut copilot-studio` | Evaluate a live Microsoft Copilot Studio agent instead of `--endpoint`/`--azure` — bring your own dataset (prompts + judge criteria); requires `--copilotstudio-config`/`--i-understand-live-side-effects`. See [Copilot Studio](redteam/copilot-studio.md). |
+| `--sut copilot-studio` | Evaluate a live Microsoft Copilot Studio agent instead of `--endpoint`/`--azure` — bring your own dataset (prompts + judge criteria); requires `--copilotstudio-config`/`--i-understand-live-side-effects`. See [Copilot Studio](copilot-studio.md). |
 | `--system-prompt` / `--system-prompt-file` | Set the agent system prompt inline or from file. |
 | `--temperature` / `--max-tokens` | Sampling and output-length controls. |
 | `--metrics <list>` | Comma-separated named metrics to score ADDITIONALLY, alongside the normal pass/fail gate (e.g. `llm_relevance,code_tool_success`) — each is scored against the SAME captured response, never a second agent call. An unknown name fails fast, before any network call. **Resolvable names today** (v1, not the same list `agenteval list --type metrics` prints — that list is broader/aspirational, see the note below): `llm_relevance`, `llm_faithfulness`, `llm_context_precision`, `llm_context_recall`, `llm_answer_correctness`, `llm_groundedness`, `llm_coherence`, `llm_fluency`, `llm_bias`, `llm_misinformation`, `llm_task_completion`, `code_tool_success`, `code_tool_efficiency`, `code_toxicity`, `code_skill_disclosure_efficiency`. LLM-based (`llm_*`) names need `--judge` (or fall back to the SUT's own model on the `--endpoint`/`--azure` path); code-based (`code_*`) names need neither. Not yet wired for `--runs > 1` (stochastic mode warns and ignores it), and a handful of names `agenteval list --type metrics` shows are not yet resolvable via `--metrics` at all — `code_tool_selection`/`code_tool_arguments` (need per-test-case config `--metrics` has no source for), `code_mrr`/`code_recall_at_k`/`embed_*` (parametrized or embedding-only), and `ConversationCompleteness` (a different evaluation shape, not the standard metric interface). |
@@ -337,7 +337,7 @@ agenteval bench agentic calibrate [--root <path>] [--out <path>]
 - **Exit codes:** `bench <family>` and `bench <regulation> calibrate` return **9** (FAIL), **10** (WARN — `bench <family>` only), or **11** (indeterminate) for a benchmark gate outcome, and **3** if the judge fails to configure — see [Exit codes](#exit-codes).
 - Compliance and agentic families support calibration helpers where available.
 - Family-specific options and presets are documented under [Benchmarks](benchmarks.md) and the family pages in the TOC.
-- For the Trace Fidelity and AutoAudit families, see the GlassBox docs under `docs/GlassBox/` (now linked in the TOC).
+- For the Trace Fidelity and AutoAudit families, see the historical design docs under `docs/glassbox-history/` (linked in the TOC under Resources).
 - **`owasp`/`mitre`/`nist` reach a live target** beyond the default built-in stub / `--azure-from-env`: `--sut copilot-studio` (same flags as `eval`/`redteam`) or a generic `--endpoint <url> --model <name> [--api-key <key>]` OpenAI-compatible endpoint. **`gdpr`/`eu-ai-act` also support `--sut copilot-studio`** (drives the live agent per-scenario instead of grading a static `--response`) — no generic `--endpoint` for these two yet. `agentic`/`memory`/`perf` do not have `--sut` at all — whether they ever should is an open product question, not just unbuilt.
 
 ---
@@ -669,7 +669,7 @@ The CLI's exit-code contract, so CI can branch on the outcome. Source of truth: 
 | `5` | `gatekeeper inspect` — a gate **Blocked** on real evidence. |
 | `6` | `gatekeeper inspect` — **fail-closed**: the CLI could not evaluate (e.g. a history gate with no `messages`). Not a policy block. |
 | `7` | `gatekeeper inspect` — **not certified**: the honesty guard refused an un-calibrated judge (run `calibrate --certify`, or pass `--allow-uncalibrated`). |
-| `8` | `redteam --sut copilot-studio` — a live scan hit its `--max-credits` cap (BudgetExceeded). Enforced as an ESTIMATE (turns counted, not metered spend — the SDK exposes no real credit-cost field); see [Copilot Studio](redteam/copilot-studio.md#what---max-credits-does-today). |
+| `8` | `redteam --sut copilot-studio` — a live scan hit its `--max-credits` cap (BudgetExceeded). Enforced as an ESTIMATE (turns counted, not metered spend — the SDK exposes no real credit-cost field); see [Copilot Studio](copilot-studio.md#what---max-credits-does-today). |
 | `9` | `bench <family>` / `bench <reg> calibrate` — the composite/calibration gate is a hard **FAIL**. |
 | `10` | `bench <family>` — the composite gate is a **WARN** (soft finding, below ideal but not a hard failure). Calibration commands never return this — their thresholds are pass/fail binary. |
 | `11` | `bench <family>` — the composite gate could not produce a conclusive verdict (e.g. `skipped`). |

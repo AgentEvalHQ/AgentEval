@@ -1,5 +1,36 @@
 # MAF Agent Skills Evaluation
 
+## New to Agent Skills? Start here
+
+**The problem this solves:** an agent with dozens of capabilities can't cram all of them into its system
+prompt — every tool description costs tokens on *every single turn*, whether the agent needs that capability
+right now or not. **The idea:** let the agent discover and load capabilities *on demand*, mid-conversation,
+the way an app browses its own plugin store instead of shipping every plugin pre-installed. That's what
+Microsoft Agent Framework's **Agent Skills** feature does.
+
+Three tools make it work, and you'll see all three by name throughout this page:
+
+- **`load_skill`** — the agent asks for a capability by name (e.g. "expense-report").
+- **`read_skill_resource`** — the agent reads a skill's supporting reference material (e.g. a policy document).
+- **`run_skill_script`** — the agent executes a skill's bundled code (e.g. a calculation the skill provides).
+
+Once an agent can load its own capabilities at runtime, a natural set of questions follows — and each phase
+below answers one of them, roughly in the order you'd actually care about them as you adopt this:
+
+1. *Did the agent disclose skills in the right order — load before read, load before run?* → [Phase 1](#1--assertions-and-the-disclosure-efficiency-metric)
+2. *Is the skill itself well-formed and correctly authored?* → [Phase 2](#2--compliance-scanner)
+3. *Can a malicious skill description hijack the agent, and can I stop `run_skill_script` from running arbitrary code?* → [Phase 3](#3--skill-injection-red-team-attack--run_skill_script-governance)
+4. *Can I stop an agent from even STARTING if a skill has been tampered with since I last reviewed it?* → [Phase 3b](#3b--skillgate-construction-time-drift-enforcement)
+5. *Can I get ONE health score across all of the above?* → [Phase 4a/4b](#4a4b--skill-health--security-index--hash-pin-drift)
+
+New here and just want to see it work? Jump straight to the
+[live sample](https://github.com/AgentEvalHQ/AgentEval/tree/main/samples/AgentEval.AgentSkillsEval) or the
+[in-repo sample catalog](https://github.com/AgentEvalHQ/AgentEval/tree/main/samples/AgentEval.Samples/AgentSkills)
+(group **K**, `dotnet run` from `samples/AgentEval.Samples`) — both run against a real agent, not a mock.
+Otherwise, keep reading below; nothing after this point assumes you've read anything except this section.
+
+---
+
 Microsoft Agent Framework's **Agent Skills** feature (GA'd 2026‑07‑07) lets an agent progressively disclose
 capabilities through three stable tools — `load_skill`, `read_skill_resource`, `run_skill_script` — instead of
 stuffing every capability into the system prompt up front. AgentEval evaluates and governs that surface end to
@@ -27,6 +58,9 @@ packages you already use, plus one new package-free namespace, `AgentEval.Skills
 | 4c | Skill fuzzing, canary-skill honeypot, typosquat detection | **Not built** — deprioritized, see `strategy/TODO.md` |
 
 ## 1 — Assertions and the disclosure-efficiency metric
+
+*In plain English: did the agent follow the rules of progressive disclosure — load a skill before reading its
+resources or running its scripts — and did it avoid loading skills it never ended up using?*
 
 `AgentEval.Assertions.SkillUsageAssertions` extends the same `ToolUsageAssertions`/`ToolCallAssertion` fluent
 API you already use for ordinary tools — no new MAF-type coupling; `AgentEval.Core` still never references
@@ -58,6 +92,9 @@ skill-inventory listing injected into the system prompt isn't a tool call and is
 `ToolUsageReport`.
 
 ## 2 — Compliance scanner
+
+*In plain English: before an agent even runs, is the skill itself authored correctly — a well-formed
+`SKILL.md`, no missing required fields, no governance red flags like an untrusted resource source?*
 
 `AgentEval.Skills.SkillComplianceValidator` (pure, MAF-free, lives in `AgentEval.Core`) checks a skill's GA
 `SKILL.md` rules (name/description/compatibility) plus governance flags
@@ -152,6 +189,10 @@ snapshot (or vice versa) — pass `--baseline-root` explicitly if you genuinely 
   findings to triage as workspace size grows.
 
 ## 3 — Skill-injection red-team attack + `run_skill_script` governance
+
+*In plain English: a skill's own description text sits in the system prompt — what if that text is
+malicious? And separately: `run_skill_script` executes code the skill author wrote — how do you stop it from
+running a script you don't trust?*
 
 `AgentEval.RedTeam.Attacks.SkillInjectionAttack` (OWASP LLM01, in `Attack.All` — the framework now ships **14**
 attack types / **264** probes) red-teams two surfaces:

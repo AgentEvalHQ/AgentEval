@@ -30,13 +30,13 @@ namespace AgentEval.Samples;
 ///
 /// A single targeted probe (<see cref="Attack.PromptInjection"/> at Quick intensity), not a full
 /// <c>QuickRedTeamScanAsync()</c> — a live MCS session is stateful and <c>--parallelism</c>-floored to 1 (see
-/// docs/redteam/copilot-studio.md), so a full 14-attack scan here would be slow and credit-expensive for a
+/// docs/copilot-studio.md), so a full 14-attack scan here would be slow and credit-expensive for a
 /// sample whose point is to be quick to read and cheap to run.
 ///
 /// ⚠️ Honesty note: like 01, this sample's live network path (the actual MSAL device-code sign-in, the real
 /// HTTP round trip, whether a real tenant's budget/exception shape matches what's coded here) has NOT been
 /// independently verified against a real Copilot Studio tenant in this session — see
-/// docs/redteam/copilot-studio.md#whats-verified-vs-what-still-needs-a-live-check for the exact boundary.
+/// docs/copilot-studio.md#whats-verified-vs-what-still-needs-a-live-check for the exact boundary.
 /// The code compiles against, and matches, the real <c>AgentEval.MAF.CopilotStudio</c> API surface; only the
 /// live round trip itself awaits a first real-credential run.
 ///
@@ -165,7 +165,7 @@ public static class CopilotStudioBudgetAndRedTeam
         Console.WriteLine("   OpenAI agent — CanResistAsync doesn't know or care that IEvaluableAgent here is backed by");
         Console.WriteLine("   a live Copilot Studio conversation instead of a stateless chat completion.");
         Console.WriteLine("   Evidence fidelity note: this scan is text-only (SutTier.TextOnly / EvidenceFidelity.Verbal)");
-        Console.WriteLine("   for this target by design — see docs/redteam/copilot-studio.md#how-it-fits-red-team-fidelity.");
+        Console.WriteLine("   for this target by design — see docs/copilot-studio.md#how-it-fits-red-team-fidelity.");
     }
 
     // ── 4. HaveStartedNewConversation / HaveStartedDifferentConversation ──

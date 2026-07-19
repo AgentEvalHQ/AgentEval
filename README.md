@@ -263,7 +263,7 @@ Beyond the built-in probes, it ships the capabilities that make a red-team resul
 - **Trustworthy verdicts — judge-primary by default + Composite Judges** *(new)* — with a judge configured (`--judge`), the grader that decides whether each attack *succeeded* is now LLM-judge-primary, using **honest-by-construction Composite Judges**: every semantic verdict is split into a positive-only *compromise* detector ⊕ a negative-only *refusal* detector, each structurally clamped so it can only raise its own direction or abstain. (A no-judge scan stays the deterministic keyword oracle, byte-identical to before.) Plus conclusive-only scoring and an explicit *Inconclusive* coverage state — so a green result is never a guess.
 - **5 compliance reporters** — OWASP, MITRE ATLAS, SOC 2, ISO 27001, and **NIST AI RMF** — runnable as first-class benchmarks (`agenteval bench owasp\|mitre\|nist`).
 - **CI-ready** — SARIF + JUnit export, a baseline regression gate (`--save-baseline`/`--baseline`/`--fail-on`), z-score **calibration** (`--calibration`), LLM **`--explain`** rationale, and external **benchmark packs** (`--pack HarmBench\|JailbreakBench\|CyberSecEval`, license-gated, nothing bundled).
-- **Copilot Studio target** — `agenteval redteam --sut copilot-studio` red-teams a Microsoft Copilot Studio agent through the same scanner, with its own config + consent gates and a credential-free test seam; the live connector is wired and unit/mock-tested, but **not independently live-verified against a real Copilot Studio tenant** (no test credentials available yet) — treat a first real run as a smoke test, not a proven-in-production path. See [docs/redteam/copilot-studio.md](docs/redteam/copilot-studio.md).
+- **Copilot Studio target** — `agenteval redteam --sut copilot-studio` red-teams a Microsoft Copilot Studio agent through the same scanner, with its own config + consent gates and a credential-free test seam; the live connector is wired and unit/mock-tested, but **not independently live-verified against a real Copilot Studio tenant** (no test credentials available yet) — treat a first real run as a smoke test, not a proven-in-production path. See [docs/copilot-studio.md](docs/copilot-studio.md).
 
 > **Proof, not vibes.** Across **810 held-out stochastic trials** — 81 independently-generated cases (70 composite-oracle + 11 DataPoisoning deny-true) run **K=10×** each through the production graders — the Composite Judges fabricated **0 verdicts**: never a safe reply flagged as a compromise, never a real compromise masked as safe. On a separately-pinned label corpus, judge↔label agreement is **κ = 1.000** (n=92) — where keyword graders typically agree with humans only about half the time. The guiding rule: *fabrications are complete failures; honesty is never punished.* Background: [ADR-021→024](docs/adr/README.md) · [Red Team — What's New](docs/redteam-whats-new.md).
 
@@ -430,7 +430,7 @@ misInfoResult.Should().HavePassed();
 | **BiasMetric** | LLM | Stereotyping, differential treatment |
 | **MisinformationMetric** | LLM | Unsupported claims, false confidence |
 
-**✅ See:** [docs/ResponsibleAI.md](docs/ResponsibleAI.md)
+**✅ See:** [docs/responsible-ai.md](docs/responsible-ai.md)
 
 ---
 
@@ -632,7 +632,7 @@ dotnet add package AgentEval --prerelease
 
 **Optional add-on package** (not bundled in `AgentEval` — install only if you need it, so its dependency
 tree isn't forced on everyone):
-- `AgentEval.MAF.CopilotStudio` — evaluate a live Microsoft Copilot Studio agent directly in code (`IChatClient`/`IEvaluableAgent`), no CLI required. `dotnet add package AgentEval.MAF.CopilotStudio --prerelease`. See [docs/redteam/copilot-studio.md](docs/redteam/copilot-studio.md#using-it-directly-in-code-no-cli).
+- `AgentEval.MAF.CopilotStudio` — evaluate a live Microsoft Copilot Studio agent directly in code (`IChatClient`/`IEvaluableAgent`), no CLI required. `dotnet add package AgentEval.MAF.CopilotStudio --prerelease`. See [docs/copilot-studio.md](docs/copilot-studio.md#using-it-directly-in-code-no-cli).
 
 **CLI Tool:**
 
@@ -679,7 +679,7 @@ See the **[Getting Started Guide](docs/getting-started.md)** for a complete walk
 | [Tracing](docs/tracing.md) | Record and Replay patterns |
 | [Red Team Security](docs/redteam.md) | Security probes, OWASP/MITRE coverage |
 | [Agent Skills](docs/agent-skills.md) | Evaluate & govern MAF Agent Skills — assertions, disclosure efficiency, compliance scanning, injection red-team |
-| [Responsible AI](docs/ResponsibleAI.md) | Toxicity, bias, misinformation detection |
+| [Responsible AI](docs/responsible-ai.md) | Toxicity, bias, misinformation detection |
 | [Memory Evaluation](docs/memory-evaluation.md) | Retention, reach-back, temporal, LongMemEval, HTML reports |
 | [MAF Memory Integration](docs/maf-memory-integration.md) | How AgentEval.Memory maps to MAF pipelines |
 | [MAF Eval Integration](docs/using-agenteval-with-maf-evals.md) | Run AgentEval through MAF's `agent.EvaluateAsync()` |
