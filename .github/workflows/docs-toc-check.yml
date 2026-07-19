@@ -10,6 +10,9 @@ on:
       - 'docs/toc.yml'
       - 'tools/check_docs_toc.py'
 
+permissions:
+  contents: read
+
 jobs:
   check-toc:
     runs-on: ubuntu-latest
