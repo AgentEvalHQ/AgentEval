@@ -27,18 +27,19 @@
     <ProjectReference Include="../../src/AgentEval/AgentEval.csproj" />
     -->
     
-    <!-- NUGET: For validation — track the LATEST published package (built on MAF 1.11.1). -->
-    <PackageReference Include="AgentEval" Version="0.13.1-beta" />
+    <!-- NUGET: For validation — track the LATEST published package (built on MAF 1.13.0). -->
+    <PackageReference Include="AgentEval" Version="0.16.0-beta" />
 
-    <!-- Supporting packages with explicit versions (CPM disabled) — aligned to AgentEval 0.13.1-beta's
-         dependency baseline (MAF 1.11.1 / Microsoft.Extensions.AI 10.6.0). -->
+    <!-- Supporting packages with explicit versions (CPM disabled) — aligned to AgentEval 0.16.0-beta's
+         dependency baseline (MAF 1.13.0 / Microsoft.Extensions.AI 10.6.0), pinned to exactly what
+         Directory.Packages.props resolved at the v0.16.0-beta tag. -->
     <PackageReference Include="Azure.AI.OpenAI" Version="2.8.0-beta.1" />
-    <PackageReference Include="System.Memory.Data" Version="10.0.3" />
-    <PackageReference Include="Microsoft.Agents.AI" Version="1.11.1" />
+    <PackageReference Include="System.Memory.Data" Version="10.0.9" />
+    <PackageReference Include="Microsoft.Agents.AI" Version="1.13.0" />
     <PackageReference Include="Microsoft.Extensions.AI" Version="10.6.0" />
     <PackageReference Include="Microsoft.Extensions.AI.OpenAI" Version="10.6.0" />
     <!-- Security: explicit transitive pin (GHSA-g94r-2vxg-569j); CPM disabled in this project.
-         MAF 1.11.1 already brings OpenTelemetry.Api 1.15.3 transitively, but a CPM-disabled consumer
+         MAF 1.13.0 already brings OpenTelemetry.Api 1.15.3 transitively, but a CPM-disabled consumer
          won't inherit transitive pinning — keep this explicit so the resolved version is unambiguous. -->
     <PackageReference Include="OpenTelemetry.Api" Version="1.15.3" />
     
