@@ -100,7 +100,9 @@ Per-category interpretation:
 | `50 - 69` | Warning — degradation visible; investigate before shipping memory-critical features |
 | `< 50` | Fail — memory architecture is unable to handle the dimension at the preset's pressure level |
 
-CLI exit codes: `PASS` / `WARN` → exit 0 (pass and warn are treated as non-failing for CI), `FAIL` → exit 2.
+CLI exit codes: `PASS` → exit 0, `WARN` → exit 10 (`GateWarning`), `FAIL` → exit 9 (`GateFailed`) — see
+[CLI Reference — Exit codes](../../cli.md#exit-codes). (This previously said WARN maps to exit 0 alongside
+PASS — that was never accurate; WARN has always been non-zero, distinct from a clean PASS.)
 
 ## How to act on findings
 

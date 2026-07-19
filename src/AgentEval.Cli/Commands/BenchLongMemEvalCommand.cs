@@ -236,6 +236,6 @@ public static class BenchLongMemEvalCommand
             return 1;
         }
 
-        return result.OverallAccuracy >= 0.5 ? 0 : 2;
+        return result.OverallAccuracy >= 0.5 ? ExitCodes.Success : ExitCodes.GateFailed;
     }
 }

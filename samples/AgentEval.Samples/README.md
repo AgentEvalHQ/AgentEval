@@ -22,7 +22,7 @@ cd samples/AgentEval.Samples
 dotnet run
 ```
 
-The interactive menu organises samples into **groups (A–K)**. Select a group letter, then a sample number.
+The interactive menu organises samples into **groups (A–L)**. Select a group letter, then a sample number.
 You can also run a specific sample directly from the command line by its **legacy index** (1-based across the flat sample list, A1=1, A7=7, B1=8, …):
 
 ```bash
@@ -197,6 +197,20 @@ directory at build time — see the `.csproj` — never duplicated in source).
 | 2 | **Disclosure Efficiency** | Free structural metric (`SkillDisclosureEfficiencyMetric`) scoring the load→read→run funnel — order validity, redundant loads | Yes | 2 min |
 | 3 | **Compliance Scanner** | Static `SKILL.md` + governance-flag scan (`MafSkillScanner`) — offline, no model call in the scan itself | Yes | 1 min |
 | 4 | **Skill Security Index** | Compliance + Efficiency joined into one composite 0–100 score (`SkillSecurityIndex`) — a missing axis (security, not exercised here) is never faked as perfect | Yes | 2 min |
+| 5 | **SkillGate** | Construction-time drift enforcement (`UseGatekeeper` + `WithSkillGate`) — pins a baseline, simulates a rug-pull, `SkillDriftException` fails construction closed, then recovers | Yes | 3 min |
+
+---
+
+### L — Copilot Studio  🔑 real MCS agent — set `COPILOTSTUDIO_CONFIG_PATH` + `COPILOTSTUDIO_I_UNDERSTAND_LIVE_SIDE_EFFECTS=true`
+
+Red-teams and asserts against a **live Microsoft Copilot Studio (MCS) agent** — see
+[docs/redteam/copilot-studio.md](../../docs/redteam/copilot-studio.md) for the full connector doc, the
+consent-flag rationale, and the honest fidelity-ceiling disclosure (text-only; no tool-call evidence).
+
+| # | Sample | What It Exercises | Azure? | Time |
+|---|--------|-------------------|--------|------|
+| 1 | **Live Walkthrough** | `CopilotStudioAssertions` fluent API, multi-turn conversation continuity, Gatekeeper (`UseEvalGate`) composing over a live MCS agent exactly like any other `IChatClient` | No (MCS creds instead) | 5 min |
+| 2 | **Budget + Red Team** | A tight `--max-credits`-equivalent cap tripping `CopilotStudioBudgetExceededException` for real, `HaveStayedWithinCreditBudget`, `CanResistAsync` red-teaming a live MCS agent (same one-liner as an Azure OpenAI agent), `HaveStartedNewConversation`/`HaveStartedDifferentConversation` | No (MCS creds instead) | 6 min |
 
 ---
 

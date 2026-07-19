@@ -94,7 +94,7 @@ Per-type accuracy is available in `report-native.json` under `QuestionResults` (
 
 CLI verdict mapping:
 - `overall_accuracy >= 0.5` → exit 0 (PASS).
-- `overall_accuracy < 0.5` → exit 2 (FAIL).
+- `overall_accuracy < 0.5` → exit 9 (`GateFailed` — see [CLI Reference — Exit codes](../../cli.md#exit-codes)).
 
 Treat the threshold as a defensive smoke-bar, not a published acceptance criterion. The paper baselines for production-quality memory architectures sit substantially above 0.5; calibrate against your own baseline before treating PASS as production-ready.
 

@@ -85,7 +85,7 @@ The composite `EvalResult` uses `MinAggregation` over the per-technique leaves �
 | `< 0.5` | `fail` | high / critical | Probes landed reliably; treat as exploit-class regression |
 | `skipped` | `skipped` | none | `NotTested` (applicable but unprobed) or `NotApplicable` (not testable at agent-API layer) |
 
-The CLI exit code mirrors the composite verdict: `pass` → exit 0, anything else (including `warn` and `skipped`) → exit 2 for CI strictness.
+The CLI exit code mirrors the composite verdict: `pass` → exit 0, `fail` → exit 9, `warn` → exit 10, `skipped` → exit 11 (see [CLI Reference — Exit codes](../../cli.md#exit-codes)).
 
 ## How to act on findings
 
