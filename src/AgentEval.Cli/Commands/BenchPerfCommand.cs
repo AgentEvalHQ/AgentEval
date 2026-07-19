@@ -225,12 +225,9 @@ public static class BenchPerfCommand
         Console.WriteLine($"Overall result: composite verdict {result.Score.Label.ToUpperInvariant()} " +
             $"(score {result.Score.Value:F3})");
 
-        return result.Score.Label.ToLowerInvariant() switch
-        {
-            "pass" => 0,
-            "fail" => 2,
-            _ => 2
-        };
+        // Reuse fix (BUG-22 follow-up): was an inlined duplicate of BenchExitCodes.FromLabel
+        // (identical pass=>0/fail=>2/_=>2 mapping, now split 9/10/11 — see that class's own remarks).
+        return BenchExitCodes.FromLabel(result.Score.Label);
     }
 
     /// <summary>

@@ -32,8 +32,8 @@ public class BenchPerfCommandTests
                 agentOverride: stubAgent);
 
             // Assert: exit code is 0 (pass) or 2 (warn/fail), not 1 (CLI error).
-            Assert.True(exitCode == 0 || exitCode == 2,
-                $"Expected exit code 0 (pass) or 2 (warn/fail), got {exitCode}.");
+            Assert.True(exitCode is 0 or 9 or 10 or 11,
+                $"Expected exit code 0 (pass), 9 (FAIL), 10 (WARN) or 11 (indeterminate), got {exitCode}.");
 
             // Confirm a run was persisted into .agenteval/ — runs live under
             // .agenteval/subjects/{subject}/runs/{runId}/.
@@ -69,8 +69,8 @@ public class BenchPerfCommandTests
                 rootOverride: workspace,
                 agentOverride: stubAgent);
 
-            Assert.True(exitCode == 0 || exitCode == 2,
-                $"Expected exit 0/2, got {exitCode} — a divergent report path made the run fail.");
+            Assert.True(exitCode is 0 or 9 or 10 or 11,
+                $"Expected exit 0/9/10/11, got {exitCode} — a divergent report path made the run fail.");
 
             // Exactly one run was persisted; the report must live in that same run dir.
             var subjectsDir = Path.Combine(workspace, ".agenteval", "subjects");

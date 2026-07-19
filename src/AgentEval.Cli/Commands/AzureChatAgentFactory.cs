@@ -69,7 +69,7 @@ internal static class AzureChatAgentFactory
                 "✖ --azure-from-env was passed but the following env vars are not set: " +
                 string.Join(", ", missing) +
                 "\n  Set all three and retry, or drop --azure-from-env to use the built-in stub agent.");
-            return (null, 2);
+            return (null, ExitCodes.RuntimeError);
         }
 
         try
@@ -89,7 +89,7 @@ internal static class AzureChatAgentFactory
             Console.Error.WriteLine(
                 $"✖ Failed to construct Azure OpenAI agent: {ex.Message}\n" +
                 "  Check AZURE_OPENAI_ENDPOINT / AZURE_OPENAI_API_KEY / AZURE_OPENAI_DEPLOYMENT values.");
-            return (null, 2);
+            return (null, ExitCodes.RuntimeError);
         }
     }
 
@@ -115,7 +115,7 @@ internal static class AzureChatAgentFactory
             Console.Error.WriteLine(
                 "✖ Azure OpenAI not configured. Missing: " + string.Join(", ", missing) +
                 "\n  This benchmark requires a real LLM and cannot fall back to a stub.");
-            return (null, null, 2);
+            return (null, null, ExitCodes.RuntimeError);
         }
 
         try
@@ -127,7 +127,7 @@ internal static class AzureChatAgentFactory
         catch (Exception ex)
         {
             Console.Error.WriteLine($"✖ Failed to construct Azure OpenAI chat client: {ex.Message}");
-            return (null, null, 2);
+            return (null, null, ExitCodes.RuntimeError);
         }
     }
 

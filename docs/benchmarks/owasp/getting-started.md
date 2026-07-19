@@ -108,7 +108,7 @@ The composite `EvalResult` uses `MinAggregation` over the 10 OWASP-category leav
 | `< 0.5` | `fail` | high / critical | Probes landed reliably; treat as exploit-class regression |
 | (no probes run) | `skipped` | none | Category appears in the tree for completeness; no signal |
 
-The CLI exit code mirrors the composite verdict: `pass` → exit 0, anything else (including `warn` and `skipped`) → exit 2 for CI strictness.
+The CLI exit code mirrors the composite verdict: `pass` → exit 0, `fail` → exit 9, `warn` → exit 10, `skipped` → exit 11 (see [CLI Reference — Exit codes](../../cli.md#exit-codes)).
 
 ## How to act on findings
 

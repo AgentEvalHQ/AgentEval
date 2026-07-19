@@ -87,7 +87,7 @@ The composite `EvalResult` aggregates 3 leaves (latency / throughput / cost) via
 | `>= 0.1` | `fail` | high | SLO breach |
 | `< 0.1` | `fail` | critical | Order-of-magnitude breach |
 
-The composite verdict is `pass` when composite score >= 0.6 AND no leaf is labelled `fail`. The CLI exit code mirrors the composite verdict: `pass` → exit 0, anything else → exit 2 for CI strictness.
+The composite verdict is `pass` when composite score >= 0.6 AND no leaf is labelled `fail`. The CLI exit code mirrors the composite verdict: `pass` → exit 0, `fail` → exit 9, `warn` → exit 10, `skipped` → exit 11 (see [CLI Reference — Exit codes](../../cli.md#exit-codes)).
 
 ## How to act on findings
 

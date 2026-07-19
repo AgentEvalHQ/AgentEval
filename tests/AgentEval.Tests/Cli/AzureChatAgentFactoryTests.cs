@@ -10,7 +10,7 @@ namespace AgentEval.Tests.Cli;
 
 /// <summary>
 /// Pins the T0.2 honest fix for the "CLI scans stub agents" gap. The factory must:
-/// 1) refuse to build when any of the 3 required env vars is missing (returns exit code 2);
+/// 1) refuse to build when any of the 3 required env vars is missing (returns exit code 3, RuntimeError — BUG-22);
 /// 2) print a precise error naming the missing vars;
 /// 3) document its env-var convention identical to <see cref="JudgeFactory"/>'s.
 /// </summary>
@@ -28,7 +28,7 @@ namespace AgentEval.Tests.Cli;
 public class AzureChatAgentFactoryTests
 {
     [Fact]
-    public void TryBuildFromEnv_AllVarsMissing_ReturnsExitCode2WithFriendlyError()
+    public void TryBuildFromEnv_AllVarsMissing_ReturnsExitCode3WithFriendlyError()
     {
         // Arrange — clear all 3 vars
         using var _ = TempEnvVars(("AZURE_OPENAI_ENDPOINT", null), ("AZURE_OPENAI_API_KEY", null), ("AZURE_OPENAI_DEPLOYMENT", null));
@@ -42,7 +42,7 @@ public class AzureChatAgentFactoryTests
 
             // Assert — null agent, exit 2, error names all 3 missing vars
             Assert.Null(agent);
-            Assert.Equal(2, exitCode);
+            Assert.Equal(3, exitCode);
             var err = stderr.ToString();
             Assert.Contains("AZURE_OPENAI_ENDPOINT", err);
             Assert.Contains("AZURE_OPENAI_API_KEY", err);
@@ -70,7 +70,7 @@ public class AzureChatAgentFactoryTests
             var (agent, exitCode) = AzureChatAgentFactory.TryBuildFromEnv("TestSubject");
 
             Assert.Null(agent);
-            Assert.Equal(2, exitCode);
+            Assert.Equal(3, exitCode);
             var err = stderr.ToString();
             Assert.DoesNotContain("AZURE_OPENAI_ENDPOINT", err); // endpoint IS set, so should NOT be in the missing list
             Assert.Contains("AZURE_OPENAI_API_KEY", err);

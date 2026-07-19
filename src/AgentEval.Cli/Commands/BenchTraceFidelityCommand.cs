@@ -130,7 +130,7 @@ public static class BenchTraceFidelityCommand
             Console.WriteLine();
             Console.WriteLine($"   Run ID: {runId}");
             Console.WriteLine($"   Canonical: {runDir}");
-            return result.Score.Passed ? 0 : 2;
+            return result.Score.Passed ? ExitCodes.Success : ExitCodes.GateFailed;
         }
         catch (Exception ex)
         {

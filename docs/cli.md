@@ -54,12 +54,12 @@ Opt-in escape valve for running benchmarks **without** an Azure OpenAI endpoint.
 | Windows (cmd) | `set AGENTEVAL_ALLOW_STUB_JUDGE=1` |
 | GitHub Actions | `env: AGENTEVAL_ALLOW_STUB_JUDGE: "1"` *(don't — set the AZURE_OPENAI_* secrets instead)* |
 
-**Resolution order** (as of v0.8.1-beta):
+**Resolution order** (as of v0.8.1-beta; exit codes updated for BUG-22, see [Exit codes](#exit-codes)):
 1. Test override (programmatic; not user-visible).
 2. All three `AZURE_OPENAI_*` set → real Azure OpenAI judge.
-3. Any of the three set but not all three → exit 2 with diagnostic.
+3. Any of the three set but not all three → exit 3 (`RuntimeError`) with diagnostic.
 4. None set + `AGENTEVAL_ALLOW_STUB_JUDGE=1` → stub judge (with stderr warning).
-5. None set + no opt-in → exit 2 ("Set AZURE_OPENAI_… or AGENTEVAL_ALLOW_STUB_JUDGE=1").
+5. None set + no opt-in → exit 3 ("Set AZURE_OPENAI_… or AGENTEVAL_ALLOW_STUB_JUDGE=1").
 
 ### `AgentEval__Root`
 
