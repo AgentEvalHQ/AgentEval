@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.17.0-beta] - 2026-07-19
+
+The biggest release by PR count so far (43 merged since 0.16.0-beta). Full MAF Agent Skills evaluation and
+governance ships end-to-end: assertions, a disclosure-efficiency metric, a compliance scanner with a
+multi-repo baseline ledger, a skill-injection red-team attack, deterministic `run_skill_script` governance
+gates, **SkillGate** construction-time drift enforcement, and a composite Skill Health & Security Index. The
+Gatekeeper Tribunal gains its remaining flagship judges (intent-action mismatch, goal-hijack drift,
+ungrounded claims, hallucinated citations — all κ=1.000 against their gold sets) plus two new gate layers:
+tool RESULT gates (inspecting an already-executed call's output, not just the proposed call) and real
+HTTP-egress enforcement closing an SSRF/DNS-rebind gap `DomainAllowListGate` could never see. The Microsoft
+Copilot Studio live connector ships (real MSAL device-code auth, a real activity-stream bridge — still not
+independently verified against a live tenant, honestly disclosed throughout). And the newest theme,
+**Explainability & Trust**, ships as tested library code with a runnable sample: reconstructable gate
+provenance, counterfactual gate-config replay, and a unified Trust Score.
+
+Also resolves the long-deferred **BUG-22** exit-code overload (a breaking CLI-contract fix — see below),
+closes a doc-lag pattern that hit twice this cycle (a capability shipping with zero matching documentation)
+with two new "what's new" pages and a CI check that now prevents it recurring in either direction, and
+refreshes every downstream sample — including the NuGet consumer validation project — to track this release.
+
 ### Docs/samples hardening follow-up + NuGetConsumer refresh to 0.16.0-beta
 
 A self-review of the BUG-22/Explainability & Trust batch below found real gaps and closed them, then a
