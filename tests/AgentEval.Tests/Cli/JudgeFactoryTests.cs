@@ -91,7 +91,7 @@ public class JudgeFactoryTests : IDisposable
         Assert.Equal(0, exit);
     }
 
-    // ── Branch 3: partial Azure config → exit 2 ──────────────────────────
+    // ── Branch 3: partial Azure config → exit 3 (RuntimeError, BUG-22) ──────────────────────────
 
     [Theory]
     [InlineData("endpoint-only", true,  false, false)]
@@ -100,7 +100,7 @@ public class JudgeFactoryTests : IDisposable
     [InlineData("endpoint+key",  true,  true,  false)]
     [InlineData("endpoint+deployment", true, false, true)]
     [InlineData("key+deployment", false, true, true)]
-    public void Resolve_PartialAzureConfig_ReturnsExitCode2(string scenario, bool setEndpoint, bool setKey, bool setDeployment)
+    public void Resolve_PartialAzureConfig_ReturnsExitCode3(string scenario, bool setEndpoint, bool setKey, bool setDeployment)
     {
         if (setEndpoint)   Environment.SetEnvironmentVariable("AZURE_OPENAI_ENDPOINT",   "https://example.openai.azure.com/");
         if (setKey)        Environment.SetEnvironmentVariable("AZURE_OPENAI_API_KEY",    "test-key");
@@ -109,21 +109,21 @@ public class JudgeFactoryTests : IDisposable
         var (judge, model, exit) = JudgeFactory.Resolve(evaluatorOverride: null, judgeKind: scenario);
 
         Assert.Null(judge);
-        Assert.Equal(2, exit);
+        Assert.Equal(3, exit);
         Assert.Equal("", model);
     }
 
-    // ── Branch 4: no config + no opt-in → exit 2 ─────────────────────────
+    // ── Branch 4: no config + no opt-in → exit 3 (RuntimeError, BUG-22) ─────────────────────────
 
     [Fact]
-    public void Resolve_NoConfig_NoStubOptIn_ReturnsExitCode2()
+    public void Resolve_NoConfig_NoStubOptIn_ReturnsExitCode3()
     {
         // env already scrubbed by ctor
 
         var (judge, model, exit) = JudgeFactory.Resolve(evaluatorOverride: null, judgeKind: "no-config-test");
 
         Assert.Null(judge);
-        Assert.Equal(2, exit);
+        Assert.Equal(3, exit);
         Assert.Equal("", model);
     }
 
@@ -157,14 +157,14 @@ public class JudgeFactoryTests : IDisposable
     [InlineData("yes")]
     [InlineData("")]
     [InlineData("anything-else")]
-    public void Resolve_NoConfig_InvalidStubOptInValue_ReturnsExitCode2(string optInValue)
+    public void Resolve_NoConfig_InvalidStubOptInValue_ReturnsExitCode3(string optInValue)
     {
         Environment.SetEnvironmentVariable("AGENTEVAL_ALLOW_STUB_JUDGE", optInValue);
 
         var (judge, _, exit) = JudgeFactory.Resolve(evaluatorOverride: null, judgeKind: "invalid-opt-in");
 
         Assert.Null(judge);
-        Assert.Equal(2, exit);
+        Assert.Equal(3, exit);
     }
 
     // ── Stub evaluator behaviour ─────────────────────────────────────────

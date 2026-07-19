@@ -96,7 +96,7 @@ internal static class JudgeFactory
                 Console.Error.WriteLine(
                     $"✖ Failed to construct Azure OpenAI judge: {ex.Message}\n" +
                     "  Check AZURE_OPENAI_ENDPOINT / AZURE_OPENAI_API_KEY / AZURE_OPENAI_DEPLOYMENT values.");
-                return (null, "", 2);
+                return (null, "", ExitCodes.RuntimeError);
             }
         }
 
@@ -117,7 +117,7 @@ internal static class JudgeFactory
                 $"✖ Azure OpenAI judge partially configured — missing: {string.Join(", ", missing)}.\n" +
                 "  Set all three of AZURE_OPENAI_ENDPOINT + AZURE_OPENAI_API_KEY + AZURE_OPENAI_DEPLOYMENT,\n" +
                 "  or unset all three and use AGENTEVAL_ALLOW_STUB_JUDGE=1 for stub mode.");
-            return (null, "", 2);
+            return (null, "", ExitCodes.RuntimeError);
         }
 
         // No real-judge config — gate the stub behind an explicit opt-in so CI
@@ -134,7 +134,7 @@ internal static class JudgeFactory
                 "  Set AZURE_OPENAI_ENDPOINT + AZURE_OPENAI_API_KEY + AZURE_OPENAI_DEPLOYMENT\n" +
                 "  to enable real judging, or set AGENTEVAL_ALLOW_STUB_JUDGE=1 to run with\n" +
                 "  a deterministic stub (results are not meaningful — CI must NOT do this).");
-            return (null, "", 2);
+            return (null, "", ExitCodes.RuntimeError);
         }
 
         Console.Error.WriteLine(

@@ -334,7 +334,7 @@ agenteval bench agentic calibrate [--root <path>] [--out <path>]
 **Notes**
 
 - `agenteval bench --list` prints the registry-backed family catalog.
-- **Exit codes:** `bench <family>` and `bench <regulation> calibrate` return **2** for a benchmark gate FAIL/WARN as well as for bad arguments (the BUG-22 overload — see [Exit codes](#exit-codes)); do not treat a `2` from these commands as only "invoked wrong".
+- **Exit codes:** `bench <family>` and `bench <regulation> calibrate` return **9** (FAIL), **10** (WARN — `bench <family>` only), or **11** (indeterminate) for a benchmark gate outcome, and **3** if the judge fails to configure — see [Exit codes](#exit-codes).
 - Compliance and agentic families support calibration helpers where available.
 - Family-specific options and presets are documented under [Benchmarks](benchmarks.md) and the family pages in the TOC.
 - For the Trace Fidelity and AutoAudit families, see the GlassBox docs under `docs/GlassBox/` (now linked in the TOC).
@@ -663,18 +663,29 @@ The CLI's exit-code contract, so CI can branch on the outcome. Source of truth: 
 |---|---|
 | `0` | Success — passed / allowed / no gate blocked. |
 | `1` | Test failure — one or more evaluations failed (`eval`, `redteam`). |
-| `2` | Usage error (bad flags). **Also** returned by `bench`/`bench <reg> calibrate` for a benchmark gate FAIL/WARN — the BUG-22 overload; `2` from those commands is not only "invoked wrong". |
-| `3` | Runtime error (connection/model/IO failure). |
+| `2` | Usage error (bad flags, malformed input). Reserved strictly for bad-argument paths — see BUG-22 below. |
+| `3` | Runtime error (connection/model/IO failure). **Also** returned when a judge fails to build (`JudgeFactory` — missing or partial Azure OpenAI credentials, or a thrown exception constructing the client): that's a runtime/config problem, not a bad CLI argument. |
 | `4` | Regression vs a supplied `--baseline` — `redteam --fail-on regression` gate (a NEW finding vs pre-existing). |
 | `5` | `gatekeeper inspect` — a gate **Blocked** on real evidence. |
 | `6` | `gatekeeper inspect` — **fail-closed**: the CLI could not evaluate (e.g. a history gate with no `messages`). Not a policy block. |
 | `7` | `gatekeeper inspect` — **not certified**: the honesty guard refused an un-calibrated judge (run `calibrate --certify`, or pass `--allow-uncalibrated`). |
 | `8` | `redteam --sut copilot-studio` — a live scan hit its `--max-credits` cap (BudgetExceeded). Enforced as an ESTIMATE (turns counted, not metered spend — the SDK exposes no real credit-cost field); see [Copilot Studio](redteam/copilot-studio.md#what---max-credits-does-today). |
+| `9` | `bench <family>` / `bench <reg> calibrate` — the composite/calibration gate is a hard **FAIL**. |
+| `10` | `bench <family>` — the composite gate is a **WARN** (soft finding, below ideal but not a hard failure). Calibration commands never return this — their thresholds are pass/fail binary. |
+| `11` | `bench <family>` — the composite gate could not produce a conclusive verdict (e.g. `skipped`). |
 
 `redteam` uses `1` for failure, `3` for runtime error, and `4` for a `--fail-on regression` gate. Code `8` is
 returned by a live `--sut copilot-studio` scan that hits `--max-credits` (BudgetExceeded) — an estimate, not a
-metered value. `gatekeeper`'s `5/6/7` are deliberately distinct from the overloaded `2` — see
+metered value. `gatekeeper`'s `5/6/7` are deliberately distinct exit codes — see
 [Gatekeeper from any language](gatekeeper-cli.md#exit-codes).
+
+**BUG-22 (resolved 2026-07-19):** code `2` used to be overloaded — `bench`/`calibrate` returned it for gate
+FAIL/WARN as well as bad arguments, and `JudgeFactory` config failures also returned it, so CI could not tell
+"invoked wrong" from "agent failed the gate" from "judge misconfigured". This is now split across `2` (bad
+arguments only), `3` (judge/runtime config problems), and `9`/`10`/`11` (gate outcomes) as documented above.
+**This is a breaking change** for any external CI pipeline that branched on exit code `2` from `bench`/
+`calibrate` commands — update those pipelines to check the new codes. See `src/AgentEval.Cli/ExitCodes.cs`
+and CHANGELOG.md.
 
 ---
 

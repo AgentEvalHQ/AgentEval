@@ -15,7 +15,8 @@ namespace AgentEval.Cli.Commands;
 /// <c>AgentEval.MissionControl</c> targets net10-only because Hot Chocolate 16
 /// + the SPA static-asset pipeline depend on net10 features (<c>MapStaticAssets</c>).
 /// On net8 / net9 builds, <see cref="RunAsync"/> prints a short help message
-/// and returns exit code 2.
+/// and returns <see cref="ExitCodes.RuntimeError"/> (3) — the wrong runtime is a runtime/environment
+/// problem, not a bad CLI argument (BUG-22).
 /// </para>
 /// <para>
 /// <b>Why a subprocess and not in-process hosting?</b>
@@ -207,7 +208,7 @@ public static class McServeCommand
         Console.Error.WriteLine("✖ `agenteval mc serve` requires .NET 10 or newer.");
         Console.Error.WriteLine("    Run with `dotnet --version` to check; install from https://dot.net.");
         _ = port; _ = workspaceRoot;
-        return 2;
+        return ExitCodes.RuntimeError;
 #endif
     }
 

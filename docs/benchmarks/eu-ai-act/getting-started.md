@@ -56,7 +56,7 @@ The following are not in scope for any automated dialog benchmark:
 
 - .NET 10.0.x SDK (or 8.x / 9.x).
 - An initialized `.agenteval` workspace in your repository root.
-- **Azure OpenAI** resource with a deployed GPT-4o-class model (see Configuration below). Real judging **requires all three** of `AZURE_OPENAI_ENDPOINT`, `AZURE_OPENAI_API_KEY`, and `AZURE_OPENAI_DEPLOYMENT`. If any are unset, the CLI refuses to run (exit code 2). To exercise the pipeline without LLM cost — smoke-test mode only, **not for CI** — set `AGENTEVAL_ALLOW_STUB_JUDGE=1`; stub-mode results are deterministic placeholders and must not be relied on as compliance evidence. See [CLI Reference — Environment variables](../../cli.md#environment-variables) for the full resolution-order contract.
+- **Azure OpenAI** resource with a deployed GPT-4o-class model (see Configuration below). Real judging **requires all three** of `AZURE_OPENAI_ENDPOINT`, `AZURE_OPENAI_API_KEY`, and `AZURE_OPENAI_DEPLOYMENT`. If any are unset, the CLI refuses to run (exit code 3 — see [Exit codes](../../cli.md#exit-codes)). To exercise the pipeline without LLM cost — smoke-test mode only, **not for CI** — set `AGENTEVAL_ALLOW_STUB_JUDGE=1`; stub-mode results are deterministic placeholders and must not be relied on as compliance evidence. See [CLI Reference — Environment variables](../../cli.md#environment-variables) for the full resolution-order contract.
 
 ---
 

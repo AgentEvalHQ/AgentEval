@@ -15,21 +15,28 @@ namespace AgentEval.Cli;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>Known overload of code 2 (BUG-22).</b> System.CommandLine automatically returns
-/// <see cref="UsageError"/> (2) for bad arguments, but the <c>bench</c>/<c>calibrate</c> command
-/// family also returns 2 to mean "benchmark gate FAIL/WARN". CI therefore cannot distinguish
-/// "invoked wrong" from "agent failed the gate" purely from code 2. The eval/red-team commands
-/// correctly use 1 for failure and 3 for runtime errors.
+/// <b>BUG-22 — RESOLVED 2026-07-19.</b> Code 2 used to be overloaded: System.CommandLine
+/// automatically returns <see cref="UsageError"/> (2) for bad arguments, but the
+/// <c>bench</c>/<c>calibrate</c> command family also returned 2 to mean "benchmark gate
+/// FAIL/WARN", AND <c>JudgeFactory</c> config failures also returned 2. CI could not
+/// distinguish "invoked wrong" from "agent failed the gate" from "judge misconfigured"
+/// purely from code 2.
 /// </para>
 /// <para>
-/// The recommended cleanup is to map benchmark gate FAIL→1 / WARN→(a dedicated code) and route
-/// judge build/config failures (JudgeFactory) to <see cref="RuntimeError"/> (3), reserving 2
-/// strictly for argument-parse errors. However, both are BREAKING changes to the
-/// verbatim-preserved CI contract above — the bench/calibrate gate-FAIL=2 and the
-/// JudgeFactory-config-failure=2 behaviours are each relied upon by ~28+ tests and by external
-/// CI — so the behavioural remap is intentionally DEFERRED pending explicit sign-off (BUG-22).
-/// Until then, treat code 2 from a bench/calibrate command as
-/// "gate not passed (FAIL/WARN) OR judge-config failure OR bad arguments".
+/// <b>Resolution:</b> judge build/config failures (<c>JudgeFactory.Resolve</c> — missing/partial
+/// Azure OpenAI credentials, or a thrown exception constructing the client) now return
+/// <see cref="RuntimeError"/> (3) — it's a runtime/environment problem, not a bad CLI argument.
+/// Benchmark/calibration gate outcomes now return one of three dedicated codes:
+/// <see cref="GateFailed"/> (9), <see cref="GateWarning"/> (10), or
+/// <see cref="GateIndeterminate"/> (11) — see those members for exactly which command paths
+/// return which. <see cref="UsageError"/> (2) is now reserved strictly for actual bad-argument
+/// paths (unknown flags, malformed input files, unresolvable judge axis, etc.).
+/// </para>
+/// <para>
+/// <b>This is a breaking change to the CI contract</b> documented above: a <c>bench</c>/
+/// <c>calibrate</c> command that used to exit 2 on gate FAIL/WARN or judge-config failure now
+/// exits 9/10/11 or 3 respectively. External CI pipelines that branch on exit code 2 from these
+/// commands must be updated to check the new codes. See CHANGELOG.md.
 /// </para>
 /// </remarks>
 public static class ExitCodes
@@ -97,4 +104,31 @@ public static class ExitCodes
     /// not this one.
     /// </summary>
     public const int BudgetExceeded = 8;
+
+    // ── bench/calibrate gate outcomes (BUG-22 resolution; 9-11 are genuinely free) ──
+
+    /// <summary>
+    /// <c>bench &lt;family&gt;</c> / <c>bench &lt;regulation&gt; calibrate</c>: the composite gate (or, for
+    /// calibration, one or more pillar's accuracy/kappa thresholds) evaluated to a hard <b>FAIL</b>. Distinct
+    /// from <see cref="UsageError"/> (2, bad arguments) and <see cref="GateWarning"/> (10, a soft finding) —
+    /// see <see cref="ExitCodes"/>'s BUG-22 remarks. Also returned by <c>bench workflow-trace-fidelity</c>
+    /// (a binary pass/fail gate with no WARN state).
+    /// </summary>
+    public const int GateFailed = 9;
+
+    /// <summary>
+    /// <c>bench &lt;family&gt;</c>: the composite gate evaluated to <b>WARN</b> — below the ideal bar but not a
+    /// hard failure. Distinct from <see cref="GateFailed"/> (9) so CI can choose to treat WARN as non-blocking
+    /// while still surfacing it separately from a clean PASS (0). Calibration commands never return this code —
+    /// their pillar thresholds are pass/fail binary.
+    /// </summary>
+    public const int GateWarning = 10;
+
+    /// <summary>
+    /// <c>bench &lt;family&gt;</c>: the composite gate could not produce a conclusive PASS/WARN/FAIL verdict
+    /// (e.g. label <c>"skipped"</c> — no scoreable criteria matched). Distinct from <see cref="GateFailed"/> (9,
+    /// a real failure) and mirrors <see cref="GateInconclusive"/> (6)'s "we couldn't evaluate" semantics for the
+    /// gatekeeper bridge.
+    /// </summary>
+    public const int GateIndeterminate = 11;
 }

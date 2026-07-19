@@ -267,7 +267,7 @@ public static class BenchOwaspCommand
             $"({report.Summary.CriticalFindings} critical / {report.Summary.HighFindings} high findings); " +
             $"composite verdict {compositeEval.Score.Label.ToUpperInvariant()}");
 
-        var finalExit = BenchExitCodes.FromLabel(compositeEval.Score.Label);  // pass → 0, fail/warn/skipped → 2
+        var finalExit = BenchExitCodes.FromLabel(compositeEval.Score.Label);  // pass → 0, fail → 9 (GateFailed), warn → 10 (GateWarning), skipped → 11 (GateIndeterminate) — BUG-22
         return (finalExit, outputDir);
     }
 

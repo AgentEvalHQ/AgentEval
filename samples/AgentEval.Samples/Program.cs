@@ -144,11 +144,13 @@ public static class Program
             new("Disclosure Efficiency",      "Free structural metric scoring the load->read->run funnel (order, redundancy)", AgentSkillsDisclosureEfficiency.RunAsync),
             new("Compliance Scanner",         "Static SKILL.md + governance-flag scan (MafSkillScanner) — offline, no model call", AgentSkillsComplianceScanner.RunAsync),
             new("Skill Security Index",       "Compliance + Efficiency joined into one 0-100 score — a missing axis is never faked", AgentSkillsSecurityIndex.RunAsync),
+            new("SkillGate",                  "Construction-time drift enforcement — a rug-pull fails agent construction closed", AgentSkillsSkillGate.RunAsync),
         ]),
 
         new('L', "Copilot Studio", "🔑 real MCS agent — set COPILOTSTUDIO_CONFIG_PATH + COPILOTSTUDIO_I_UNDERSTAND_LIVE_SIDE_EFFECTS=true",
         [
             new("Live Walkthrough",          "CS-flavored fluent assertions + conversation continuity + Gatekeeper over a live MCS agent", CopilotStudioWalkthrough.RunAsync),
+            new("Budget + Red Team",         "A tight --max-credits cap tripping for real, CanResistAsync against a live MCS agent, new-vs-continued conversation identity", CopilotStudioBudgetAndRedTeam.RunAsync),
         ]),
     ];
 

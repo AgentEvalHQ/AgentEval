@@ -50,7 +50,7 @@ public static class BenchCalibrateCommand
     /// <param name="outPathOverride">Optional output path override (used by tests).</param>
     /// <param name="evaluatorOverride">Optional evaluator override (used by tests).</param>
     /// <param name="ct">Cancellation token.</param>
-    /// <returns>0 on success, 2 if thresholds not met, 1 on internal error.</returns>
+    /// <returns>0 on success, <see cref="ExitCodes.GateFailed"/> (9) if thresholds not met, 1 on internal error.</returns>
     public static Task<int> RunAsync(
         string? rootOverride = null,
         string? outPathOverride = null,
@@ -191,7 +191,7 @@ public static class BenchCalibrateCommand
             ? "Calibration gate PASSED — all pillars meet thresholds with zero evaluation failures."
             : $"Calibration gate FAILED — one or more pillars below accuracy>={AccuracyThreshold:P0} or kappa>={KappaThreshold:F2}, or had non-zero evaluation_failures.");
 
-        return allPass ? 0 : 2;
+        return allPass ? ExitCodes.Success : ExitCodes.GateFailed;
     }
 
     // F-004 honest surface: NaN comes from CalibrationMetrics.CohensKappa when the dataset

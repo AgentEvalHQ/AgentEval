@@ -65,7 +65,7 @@ public class BenchMitreCommandTests : IDisposable
     // ── Env-gate parity with the other bench commands ─────────────────────────
 
     [Fact]
-    public async Task BenchMitre_NoEnvVars_NoStubOptIn_ReturnsExitCode2()
+    public async Task BenchMitre_NoEnvVars_NoStubOptIn_ReturnsExitCode3()
     {
         InitWorkspace();
         var result = await BenchMitreCommand.RunAsync(
@@ -75,11 +75,11 @@ public class BenchMitreCommandTests : IDisposable
             inputText: null,
             evaluatorOverride: null,
             agentOverride: null);
-        Assert.Equal(2, result.ExitCode);
+        Assert.Equal(3, result.ExitCode);
     }
 
     [Fact]
-    public async Task BenchMitre_PartialAzureConfig_ReturnsExitCode2()
+    public async Task BenchMitre_PartialAzureConfig_ReturnsExitCode3()
     {
         InitWorkspace();
         Environment.SetEnvironmentVariable("AZURE_OPENAI_ENDPOINT", "https://example.openai.azure.com/");
@@ -92,7 +92,7 @@ public class BenchMitreCommandTests : IDisposable
             inputText: null,
             evaluatorOverride: null,
             agentOverride: null);
-        Assert.Equal(2, result.ExitCode);
+        Assert.Equal(3, result.ExitCode);
     }
 
     [Fact]
@@ -156,8 +156,8 @@ public class BenchMitreCommandTests : IDisposable
 
         // 0 (PASS) or 2 (WARN/FAIL) both indicate the pipeline executed cleanly;
         // 1 would indicate a workspace / preset / config error.
-        Assert.True(exit == 0 || exit == 2,
-            $"Expected exit 0 (PASS) or 2 (WARN/FAIL verdict); got {exit}.");
+        Assert.True(exit is 0 or 9 or 10 or 11,
+            $"Expected exit 0 (PASS), 9 (FAIL), 10 (WARN) or 11 (indeterminate); got {exit}.");
 
         // The command returns the absolute path of the timestamped report
         // directory; using it directly avoids the second-precision-timestamp
