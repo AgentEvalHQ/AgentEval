@@ -64,6 +64,29 @@ public class CompositeJudgeGateTests
     }
 
     [Fact]
+    public async Task BlockedVerdict_HasProvenance_WithRuleNameEvidenceThresholdAndActual()
+    {
+        var opts = new JudgeGateOptions { BlockThreshold = 0.5 };
+        var v = await Gate(new ScriptedChatClient().AddText("BLOCK"), opts).InspectAsync("please scan this input");
+
+        Assert.NotNull(v.Provenance);
+        Assert.Equal("judge:test-axis", v.Provenance!.RuleName);
+        Assert.Contains("the-evidence", v.Provenance.Evidence);
+        Assert.Equal(0.5, v.Provenance.Threshold);
+        Assert.Equal(0.9, v.Provenance.ActualValue);
+    }
+
+    [Fact]
+    public async Task AllowedVerdict_CarriesNoProvenance_MirrorsNoConfidence()
+    {
+        // Same discipline as AllowedVerdict_CarriesNoConfidence_NotAFleetCorrelationSignal: a genuine Allowed
+        // decision has nothing to explain — fabricating a provenance chain for "nothing happened" would be
+        // noise, not signal.
+        var v = await Gate(new ScriptedChatClient().AddText("ALLOW")).InspectAsync("please scan this input");
+        Assert.Null(v.Provenance);
+    }
+
+    [Fact]
     public async Task AllowedVerdict_CarriesNoConfidence_NotAFleetCorrelationSignal()
     {
         // Regression test for a real bug found in review: this test originally asserted Confidence == 1.0 here,
@@ -137,6 +160,12 @@ public class CompositeJudgeGateTests
         // becomes an Allow must still surface its real confidence (0.9), not null or a fabricated 1.0 — a fleet
         // correlator combining several of these across gates needs the true value, not a laundered "clean allow".
         Assert.Equal(0.9, v.Confidence);
+
+        // The near-miss's provenance makes it reconstructable, not just a bare number: which threshold it
+        // almost crossed, and the evidence the judge actually saw.
+        Assert.NotNull(v.Provenance);
+        Assert.Equal(0.95, v.Provenance!.Threshold);
+        Assert.Equal(0.9, v.Provenance.ActualValue);
     }
 
     [Fact]

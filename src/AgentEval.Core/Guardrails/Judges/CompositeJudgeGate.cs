@@ -64,14 +64,22 @@ public sealed class CompositeJudgeGate<TRubric> : IChatGate
         }
 
         var verdict = await JudgeAsync(text, cancellationToken).ConfigureAwait(false);
+        var ruleName = $"judge:{_rubric.Axis}";
+        var evidence = verdict.Spans ?? Array.Empty<string>();
 
         return verdict.Decision switch
         {
             // !(<) rather than (>=) so a NaN confidence BLOCKS (fail-closed) instead of falling through to Allow.
             JudgeDecision.Blocked when !(verdict.Confidence < _options.BlockThreshold) =>
-                GateVerdict.Block(PolicyName, verdict.Rationale ?? $"{_rubric.Axis} detected", verdict.Spans),
+                GateVerdict.Block(PolicyName, verdict.Rationale ?? $"{_rubric.Axis} detected", verdict.Spans) with
+                {
+                    Provenance = new GateProvenance(ruleName, evidence, Threshold: _options.BlockThreshold, ActualValue: verdict.Confidence),
+                },
             JudgeDecision.Inconclusive when _options.FailClosedOnInconclusive =>
-                GateVerdict.Block(PolicyName, verdict.Rationale ?? $"{_rubric.Axis} judge inconclusive (fail-closed)"),
+                GateVerdict.Block(PolicyName, verdict.Rationale ?? $"{_rubric.Axis} judge inconclusive (fail-closed)") with
+                {
+                    Provenance = new GateProvenance(ruleName, evidence, Threshold: _options.BlockThreshold, ActualValue: verdict.Confidence),
+                },
             // A genuine Allowed decision carries NO confidence through, deliberately: JudgeVerdict.Confidence is
             // confidence IN THE DECISION, not confidence that something is wrong — JudgeVerdict.Allowed()
             // defaults to Confidence=1.0, meaning "very sure this is fine," the OPPOSITE of a near-miss signal.
@@ -81,8 +89,14 @@ public sealed class CompositeJudgeGate<TRubric> : IChatGate
             JudgeDecision.Allowed => GateVerdict.Allow(PolicyName),
             // Low-confidence Blocked (would have blocked at a lower threshold) or fail-open Inconclusive — a
             // GENUINE near-miss/uncertain signal. Carry the judge's own confidence through instead of
-            // discarding it, so a fleet-wide correlator can later notice several near-miss verdicts.
-            _ => GateVerdict.Allow(PolicyName) with { Confidence = verdict.Confidence },
+            // discarding it, so a fleet-wide correlator can later notice several near-miss verdicts. Provenance
+            // makes that near-miss reconstructable too (threshold it almost crossed, evidence it saw), not just
+            // a bare number.
+            _ => GateVerdict.Allow(PolicyName) with
+            {
+                Confidence = verdict.Confidence,
+                Provenance = new GateProvenance(ruleName, evidence, Threshold: _options.BlockThreshold, ActualValue: verdict.Confidence),
+            },
         };
     }
 

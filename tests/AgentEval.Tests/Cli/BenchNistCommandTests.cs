@@ -63,13 +63,13 @@ public class BenchNistCommandTests : IDisposable
     // ── Env-gate parity ───────────────────────────────────────────────────────
 
     [Fact]
-    public async Task BenchNist_NoEnvVars_NoStubOptIn_ReturnsExitCode2()
+    public async Task BenchNist_NoEnvVars_NoStubOptIn_ReturnsExitCode3()
     {
         InitWorkspace();
         var result = await BenchNistCommand.RunAsync(
             preset: "rmf-smoke", subject: "NistGateAgent", rootOverride: _root, inputText: null,
             evaluatorOverride: null, agentOverride: null);
-        Assert.Equal(2, result.ExitCode);
+        Assert.Equal(3, result.ExitCode);
     }
 
     [Fact]
@@ -116,7 +116,7 @@ public class BenchNistCommandTests : IDisposable
             evaluatorOverride: new PassingStubEvaluator(),
             agentOverride: new SafeRefusalAgent("NistSmokeAgent"));
 
-        Assert.True(exit == 0 || exit == 2, $"Expected exit 0 (PASS) or 2 (WARN/FAIL); got {exit}.");
+        Assert.True(exit is 0 or 9 or 10 or 11, $"Expected exit 0 (PASS), 9 (FAIL), 10 (WARN) or 11 (indeterminate); got {exit}.");
 
         Assert.NotNull(reportDir);
         Assert.True(Directory.Exists(reportDir));

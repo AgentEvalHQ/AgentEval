@@ -7,6 +7,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### BUG-22 resolution + Explainability & Trust (gate provenance, counterfactual replay, unified Trust Score) + docs/samples
+
+#### Changed (BREAKING — CLI exit-code contract)
+- **BUG-22 resolved**: `ExitCodes` code `2` was overloaded — `bench`/`calibrate` returned it for both a
+  benchmark gate FAIL/WARN and bad CLI arguments, and `JudgeFactory` config failures (missing/partial Azure
+  OpenAI credentials) also returned it. Now: `2` is reserved strictly for bad arguments; judge/runtime config
+  failures return `3` (`RuntimeError`); benchmark/calibration gate outcomes return dedicated new codes
+  `9` (`GateFailed`), `10` (`GateWarning`, `bench <family>` only), `11` (`GateIndeterminate`). External CI
+  pipelines branching on exit code `2` from `bench`/`calibrate` must be updated. See `ExitCodes.cs` and
+  [Exit codes](docs/cli.md#exit-codes).
+
+#### Added — Explainability & Trust (0.17.0-beta theme, analysis in `strategy/ExplainabilityAndTrust-AnalysisAndPlan.md`)
+- **Gate provenance chains** — `AgentEval.Guardrails.GateProvenance` (rule name, evidence, threshold vs.
+  actual, contributing sub-chains) attached via a new optional `GateVerdict.Provenance` field (additive, same
+  precedent as `Confidence`). Wired into `CompositeJudgeGate<TRubric>` for both the Block path and the
+  near-miss-Allow-with-Confidence path Fleet Correlation already reads.
+- **Counterfactual gate replay** — `AgentEval.MAF.Gatekeeper.GateReplayer.CompareAsync` runs a baseline and a
+  candidate `IToolGate` list against the SAME captured `GatedToolCall`s (the real gate objects, no
+  simulation; first-Block/Mutate-wins, matching the live `AgentEvalToolGateExtensions` pipeline) and reports
+  which calls would have diverged under the candidate configuration. Library API this session; a
+  `agenteval log-file gate-replay` CLI wrapper is a natural mechanical follow-on.
+- **Unified Trust Score** — `AgentEval.Trust.TrustScoreCalculator.Compute` combines `TrustSignal`s (gate
+  verdicts, eval scores, anything 0..1) into one honest 0-100 composite, excluding `"skipped"`/`"error"`
+  labeled signals from the weighted math entirely (the same discipline as `WeightedSumAggregation` et al. —
+  "including them at 0.0 would incorrectly drag the composite below threshold").
+
+#### Documentation
+- `docs/redteam/copilot-studio.md` — added the `CopilotStudioAssertions` fluent-assertion section (was
+  shipped but undocumented) and cross-referenced `EstimatedCreditsUsed`.
+- `docs/agent-skills.md` — added §3b documenting **SkillGate** (construction-time drift enforcement, shipped
+  but undocumented since it landed) — `WithSkillGate`/`SkillGateMode`/`SkillDriftException`/
+  `agenteval skills baseline approve`.
+
+#### Samples
+- `samples/AgentEval.Samples/AgentSkills/04_AgentSkillsSkillGate.cs` (new) — live-verified against real Azure
+  OpenAI: pins a baseline, simulates a rug-pull, shows `SkillDriftException` fail-closed, then recovers.
+- `samples/AgentEval.Samples/CopilotStudio/02_CopilotStudioBudgetAndRedTeam.cs` (new) — `--max-credits`
+  enforcement tripping `CopilotStudioBudgetExceededException` for real, `HaveStayedWithinCreditBudget`,
+  `CanResistAsync` red-teaming a live MCS agent, `HaveStartedNewConversation`/`HaveStartedDifferentConversation`.
+
 ### Copilot Studio — C2 fidelity-badge audit + P5 correlation-key spike
 
 #### Added

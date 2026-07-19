@@ -13,9 +13,9 @@ public class BenchExitCodesTests
     [Theory]
     [InlineData("pass", 0)]
     [InlineData("PASS", 0)]
-    [InlineData("fail", 2)]
-    [InlineData("warn", 2)]
-    [InlineData("skipped", 2)]
+    [InlineData("fail", 9)]
+    [InlineData("warn", 10)]
+    [InlineData("skipped", 11)]
     public void FromLabel_MapsToCiExitCode(string label, int expected)
         => Assert.Equal(expected, BenchExitCodes.FromLabel(label));
 }

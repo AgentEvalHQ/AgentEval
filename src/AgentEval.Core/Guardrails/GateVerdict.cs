@@ -29,13 +29,19 @@ public enum GateAction
 /// <see cref="Allow"/>/<see cref="Block"/> call site is unaffected. Intended for cross-gate correlation (a fleet
 /// correlator reading verdicts across a session), not for enforcement by the gate itself.
 /// </param>
+/// <param name="Provenance">
+/// A reconstructable "why" behind this verdict — see <see cref="GateProvenance"/>. Optional and additive, same
+/// precedent as <see cref="Confidence"/>: null means the gate hasn't been updated to populate it, not that
+/// there is no reason (fall back to <see cref="Reason"/>'s free-text string in that case).
+/// </param>
 public sealed record GateVerdict(
     GateAction Action,
     string PolicyName,
     string? Reason = null,
     string? RedactedText = null,
     IReadOnlyList<string>? Matches = null,
-    double? Confidence = null)
+    double? Confidence = null,
+    GateProvenance? Provenance = null)
 {
     /// <summary>Allow verdict for <paramref name="policy"/>.</summary>
     public static GateVerdict Allow(string policy) => new(GateAction.Allow, policy);

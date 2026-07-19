@@ -66,21 +66,21 @@ public class BenchEuAiActCalibrateCommandTests : IDisposable
     }
 
     [Fact]
-    public async Task BenchEuAiActCalibrate_NoEnvVars_NoStubOptIn_ReturnsExitCode2()
+    public async Task BenchEuAiActCalibrate_NoEnvVars_NoStubOptIn_ReturnsExitCode3()
     {
         // env already scrubbed by ctor
         var exit = await BenchEuAiActCalibrateCommand.RunAsync(_root, outPathOverride: null);
-        Assert.Equal(2, exit);
+        Assert.Equal(3, exit);
     }
 
     [Fact]
-    public async Task BenchEuAiActCalibrate_PartialAzureConfig_ReturnsExitCode2()
+    public async Task BenchEuAiActCalibrate_PartialAzureConfig_ReturnsExitCode3()
     {
         Environment.SetEnvironmentVariable("AZURE_OPENAI_ENDPOINT", "https://example.openai.azure.com/");
         // Missing key + deployment
 
         var exit = await BenchEuAiActCalibrateCommand.RunAsync(_root, outPathOverride: null);
-        Assert.Equal(2, exit);
+        Assert.Equal(3, exit);
     }
 
     [Fact]
@@ -96,7 +96,7 @@ public class BenchEuAiActCalibrateCommandTests : IDisposable
             outPathOverride: null,
             evaluatorOverride: new AlwaysPassEvaluator());
 
-        Assert.True(exit == 0 || exit == 2,
-            $"Expected exit 0 (calibration passed) or 2 (calibration failed); got {exit}.");
+        Assert.True(exit is 0 or 9,
+            $"Expected exit 0 (calibration passed) or 9 (GateFailed); got {exit}.");
     }
 }

@@ -96,21 +96,21 @@ public class BenchCalibrateCommandTests : IDisposable
     // ── Env-gate trio (Phase-4 gate-review follow-up) ─────────────────────────
 
     [Fact]
-    public async Task Calibrate_NoEnvVars_NoStubOptIn_ReturnsExitCode2()
+    public async Task Calibrate_NoEnvVars_NoStubOptIn_ReturnsExitCode3()
     {
         // env already scrubbed by ctor.
         var exit = await BenchCalibrateCommand.RunAsync(_root, outPathOverride: null);
-        Assert.Equal(2, exit);
+        Assert.Equal(3, exit);
     }
 
     [Fact]
-    public async Task Calibrate_PartialAzureConfig_ReturnsExitCode2()
+    public async Task Calibrate_PartialAzureConfig_ReturnsExitCode3()
     {
         Environment.SetEnvironmentVariable("AZURE_OPENAI_ENDPOINT", "https://example.openai.azure.com/");
         // Missing key + deployment — JudgeFactory should refuse to construct an Azure client.
 
         var exit = await BenchCalibrateCommand.RunAsync(_root, outPathOverride: null);
-        Assert.Equal(2, exit);
+        Assert.Equal(3, exit);
     }
 
     // ── Tests ─────────────────────────────────────────────────────────────────
@@ -127,9 +127,9 @@ public class BenchCalibrateCommandTests : IDisposable
             outPathOverride: outPath,
             evaluatorOverride: new AlwaysPassEvaluator());
 
-        // Assert — command completes without exception; exit code is 0 or 2 (never 1)
-        Assert.True(exitCode == 0 || exitCode == 2,
-            $"Expected exit code 0 or 2 but got {exitCode}");
+        // Assert — command completes without exception; exit code is 0 or 9 (GateFailed) (never 1)
+        Assert.True(exitCode is 0 or 9,
+            $"Expected exit code 0 or 9 (GateFailed) but got {exitCode}");
     }
 
     [Fact]
@@ -153,7 +153,7 @@ public class BenchCalibrateCommandTests : IDisposable
     }
 
     [Fact]
-    public async Task Calibrate_AlwaysFailStub_ReturnsExitCode2()
+    public async Task Calibrate_AlwaysFailStub_ReturnsExitCode9()
     {
         // Arrange — always-fail judge will produce "fail" for every entry;
         // the golden datasets have many "pass"-expected entries so accuracy will be
@@ -166,7 +166,7 @@ public class BenchCalibrateCommandTests : IDisposable
             outPathOverride: outPath,
             evaluatorOverride: new AlwaysFailEvaluator());
 
-        // Assert — at least one pillar fails thresholds → exit 2
-        Assert.Equal(2, exitCode);
+        // Assert — at least one pillar fails thresholds → exit 9 (GateFailed)
+        Assert.Equal(9, exitCode);
     }
 }

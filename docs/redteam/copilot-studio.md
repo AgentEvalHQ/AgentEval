@@ -66,6 +66,44 @@ just reachable without going through `agenteval` at all. See the package's own R
 `ICopilotStudioConversationClient` seam if you want to unit-test your own code against a fake conversation
 client instead of a live tenant.
 
+### Fluent assertions for your own Copilot Studio tests
+
+`AgentEval.Assertions.CopilotStudioAssertions` (in `AgentEval.Core`, zero dependency on the Copilot Studio
+package) extends the same `ResponseAssertions`/`ChatResponseAssertions` fluent API you already use for plain
+`IChatClient` responses, with Copilot Studio-flavored checks:
+
+```csharp
+using AgentEval.Assertions;
+
+var first = await agent.InvokeAsync("What's the status of order #12345?");
+first.Text.Should().HaveRespondedWithNonEmptyMessage();
+
+var chatResponse = /* the underlying ChatResponse, if you're calling CopilotStudioChatClient directly */;
+chatResponse.Should().HaveStartedNewConversation();
+
+var second = /* a follow-up turn */;
+second.Should().HaveContinuedConversation(chatResponse.ConversationId!);
+// ...or, to prove a NEW conversation started instead of the old one resuming:
+second.Should().HaveStartedDifferentConversation(chatResponse.ConversationId!);
+
+second.Should().HaveStayedWithinCreditBudget(copilotStudioClient.EstimatedCreditsUsed, maxCredits: 50);
+```
+
+- `HaveRespondedWithNonEmptyMessage()` fails with a message that explains the text-only fidelity ceiling
+  (an empty reply can legitimately mean the agent responded with a non-text activity — adaptive card,
+  suggested action — that the bridge silently drops), not a generic empty-string complaint.
+- `HaveContinuedConversation` / `HaveStartedNewConversation` / `HaveStartedDifferentConversation` assert on
+  `ChatResponse.ConversationId` — there's no equivalent concept for a stateless Azure OpenAI call, so these
+  are Copilot Studio-specific.
+- `HaveStayedWithinCreditBudget(estimatedCreditsUsed, maxCredits)` is the fluent counterpart to
+  `--max-credits` enforcement — it reads the exact same estimate `CopilotStudioChatClient.EstimatedCreditsUsed`
+  exposes (turns counted, not metered spend; see [What `--max-credits` does today](#what---max-credits-does-today)),
+  not a second, parallel accounting.
+- Deliberately **not** provided: connector/topic/fallback assertions. Topic routing and connector/flow
+  invocations happen server-side and are invisible to `CopilotStudioChatClient.AsUpdates()` (only
+  `Type == "message"` activity text ever surfaces) — building an assertion for data that isn't captured would
+  mean inventing signal, which this repo's honesty discipline refuses to do.
+
 ## Prerequisites
 
 To author and validate a config, you need:

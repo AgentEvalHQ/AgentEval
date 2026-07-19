@@ -63,20 +63,20 @@ public class BenchAgenticCalibrateCommandTests : IDisposable
     }
 
     [Fact]
-    public async Task BenchAgenticCalibrate_NoEnvVars_NoStubOptIn_ReturnsExitCode2()
+    public async Task BenchAgenticCalibrate_NoEnvVars_NoStubOptIn_ReturnsExitCode3()
     {
         var exit = await BenchAgenticCalibrateCommand.RunAsync(_root, outPathOverride: null);
-        Assert.Equal(2, exit);
+        Assert.Equal(3, exit);
     }
 
     [Fact]
-    public async Task BenchAgenticCalibrate_PartialAzureConfig_ReturnsExitCode2()
+    public async Task BenchAgenticCalibrate_PartialAzureConfig_ReturnsExitCode3()
     {
         Environment.SetEnvironmentVariable("AZURE_OPENAI_API_KEY", "test-key-only");
         // Missing endpoint + deployment → partial config → exit 2
 
         var exit = await BenchAgenticCalibrateCommand.RunAsync(_root, outPathOverride: null);
-        Assert.Equal(2, exit);
+        Assert.Equal(3, exit);
     }
 
     [Fact]
@@ -90,7 +90,7 @@ public class BenchAgenticCalibrateCommandTests : IDisposable
             outPathOverride: null,
             evaluatorOverride: new AlwaysPassEvaluator());
 
-        Assert.True(exit == 0 || exit == 2,
-            $"Expected exit 0 or 2; got {exit}.");
+        Assert.True(exit is 0 or 9,
+            $"Expected exit 0 or 9 (GateFailed); got {exit}.");
     }
 }

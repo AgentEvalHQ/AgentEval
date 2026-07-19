@@ -227,7 +227,7 @@ public static class BenchNistCommand
             $"({report.Summary.CriticalFindings} needs-improvement / {report.Summary.HighFindings} partially-effective); " +
             $"composite verdict {compositeEval.Score.Label.ToUpperInvariant()}");
 
-        var finalExit = BenchExitCodes.FromLabel(compositeEval.Score.Label);  // pass → 0, fail/warn/skipped → 2
+        var finalExit = BenchExitCodes.FromLabel(compositeEval.Score.Label);  // pass → 0, fail → 9 (GateFailed), warn → 10 (GateWarning), skipped → 11 (GateIndeterminate) — BUG-22
         return (finalExit, outputDir);
     }
 

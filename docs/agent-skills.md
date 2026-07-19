@@ -22,6 +22,7 @@ packages you already use, plus one new package-free namespace, `AgentEval.Skills
 | 2 | Compliance scanner (`SKILL.md` authoring + governance rules) | Inline-ready |
 | 3 | Skill-injection red-team attack | **Shadow-only** (judge did not clear calibration on this surface — see below) |
 | 3 | `run_skill_script` governance gates | Inline-ready (deterministic, no calibration debt) |
+| 3b | SkillGate — construction-time drift enforcement | Inline-ready (deterministic, Tier 1) |
 | 4a/4b | Skill Health & Security Index + hash-pin drift detection | Inline-ready (both deterministic) |
 | 4c | Skill fuzzing, canary-skill honeypot, typosquat detection | **Not built** — deprioritized, see `strategy/TODO.md` |
 
@@ -185,6 +186,58 @@ To demonstrate (or test) the deterministic gate specifically, auto-approve at th
 (`AgentSkillsProviderOptions.DisableRunSkillScriptApproval = true`) so the call reaches the FICC seam — see
 Run 6 of the sample for the full, live-verified walkthrough.
 
+## 3b — SkillGate: construction-time drift enforcement
+
+Everything in §2 is audit-time — you run `agenteval skills scan` when you choose to. **SkillGate Tier 1**
+(`AgentEval.MAF.Gatekeeper.SkillGateConstructionCheck`) moves the same drift check to **enforcement time**:
+`UseGatekeeper` refuses to let an agent construct at all if a skill it will expose has drifted from its
+pinned baseline — or, under strict mode, is not recognized at all.
+
+```csharp
+using AgentEval.MAF.Gatekeeper;
+
+var scanned = await MafSkillScanner.ScanFileSkillsWithInfoAsync(skillPath, scanAgent);
+
+var agent = baseAgent.AsBuilder()
+    .UseGatekeeper(GatekeeperEnforcement.Terminate, g => g.WithSkillGate(
+        scanned.Skills,
+        baselinePath: "skills-baseline.json",
+        mode: SkillGateMode.Strict))   // default; Bootstrap trusts-on-first-sight instead
+    .Build();
+// throws SkillDriftException at construction time if any skill drifted from the pinned baseline
+```
+
+- **Two independent hash signals, both optional per skill.** The structural fingerprint (name/description/
+  resource-and-script inventory/allowed-tools/compatibility-length — the same `ManifestFingerprint` §2 and §4b
+  use) always applies. The stronger *content* hash (every file's actual bytes, via `SkillContentHasher`)
+  additionally applies when the baseline captured one for that skill AND its on-disk folder resolves
+  (file-sourced skills only) — this catches a resource file's body changing with nothing in the frontmatter
+  touched, which the structural fingerprint alone would miss.
+- **`SkillGateMode.Strict`** (default, recommended for CI/production) — an unrecognized skill (no baseline
+  entry at all) refuses construction. Fail-closed: an unknown skill is not innocent until proven guilty, the
+  same doctrine `CompositeJudgeGate`'s calibration bar already applies elsewhere in this repo.
+- **`SkillGateMode.Bootstrap`** (explicit opt-in) — an unrecognized skill is trusted on first sight and the
+  baseline file is extended and written back, so the *next* construction can detect drift against it. Real
+  disk I/O during agent construction, no file locking — intended for local development or a controlled
+  first-ever rollout, not a production process with concurrent/frequent re-construction against the same file.
+- A baseline path that doesn't exist yet is treated as an **empty** baseline, not an error — under `Strict`
+  that refuses every skill until you capture an initial one (see below); under `Bootstrap` it seeds the file.
+- **Construction-time-only, deliberately — not a per-turn runtime seam.** An `AgentSkillsSource` is wired once
+  at agent construction and doesn't change mid-run, so a per-turn check would be pure waste. A long-running
+  server whose skill folder is modified on disk *while already constructed* is a narrower threat this check
+  cannot catch — a future, opt-in, per-call Tier 2 gate, not built here.
+
+**Recovering from a `SkillDriftException`** — after you've reviewed a legitimate skill update and want to
+re-trust it, re-pin it from the CLI rather than hand-editing the baseline JSON:
+
+```bash
+agenteval skills baseline approve <skill-name> --skill-path ./skills --baseline skills-baseline.json \
+  --note "reviewed and approved 2026-07-19"
+```
+
+This re-hashes the one named skill's current content and structural fingerprint and pins both into the same
+`SkillManifestBaseline` file `GatekeeperOptions.SkillBaselinePath` points at — created if it doesn't exist yet.
+
 ## 4a/4b — Skill Health & Security Index + hash-pin drift
 
 `AgentEval.Skills.SkillSecurityIndex` joins three independently-produced signals into one composite 0–100
@@ -284,5 +337,7 @@ deliberately avoids — see `strategy/TODO.md` (local-only) for the up-to-date b
 - [Gatekeeper — gate reference](gatekeeper/gate-reference.md) — the general gate/judge calibration bar, and
   the two other gates (`MemoryWritePoisoningGate`, `McpToolDescriptionPoisoningGate`) that reuse the same
   patterns introduced here.
+- [Gatekeeper — examples](gatekeeper/examples.md) — the general `UseGatekeeper(enforcement, configure)` wiring
+  pattern §3b's `WithSkillGate` plugs into.
 - [Architecture](architecture.md#maf-agent-skills-assertions) — implementation-level detail (file layout, MAF
   API constraints discovered this session).

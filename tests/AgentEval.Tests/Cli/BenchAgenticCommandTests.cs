@@ -76,7 +76,7 @@ public class BenchAgenticCommandTests : IDisposable
     }
 
     [Fact]
-    public async Task BenchAgentic_NoEnvVars_NoStubOptIn_ReturnsExitCode2()
+    public async Task BenchAgentic_NoEnvVars_NoStubOptIn_ReturnsExitCode3()
     {
         InitWorkspace();
         var exit = await BenchAgenticCommand.RunAsync(
@@ -87,11 +87,11 @@ public class BenchAgenticCommandTests : IDisposable
             responseText: null,
             evaluatorOverride: null,                            // exercise the env-gate path
             budgetTier: null);
-        Assert.Equal(2, exit);
+        Assert.Equal(3, exit);
     }
 
     [Fact]
-    public async Task BenchAgentic_PartialAzureConfig_ReturnsExitCode2()
+    public async Task BenchAgentic_PartialAzureConfig_ReturnsExitCode3()
     {
         InitWorkspace();
         Environment.SetEnvironmentVariable("AZURE_OPENAI_ENDPOINT", "https://example.openai.azure.com/");
@@ -105,7 +105,7 @@ public class BenchAgenticCommandTests : IDisposable
             responseText: null,
             evaluatorOverride: null,
             budgetTier: null);
-        Assert.Equal(2, exit);
+        Assert.Equal(3, exit);
     }
 
     [Fact]
@@ -130,8 +130,8 @@ public class BenchAgenticCommandTests : IDisposable
             evaluatorOverride: new PassingStubEvaluator(),
             budgetTier: null);
 
-        Assert.True(exit == 0 || exit == 2,
-            $"Expected exit 0 (PASS) or 2 (FAIL verdict); got {exit}. Exit code 1 would indicate a workspace/preset/config error which the smoke-test setup is meant to rule out.");
+        Assert.True(exit is 0 or 9 or 10 or 11,
+            $"Expected exit 0 (PASS), 9 (FAIL), 10 (WARN) or 11 (indeterminate); got {exit}. Exit code 1 would indicate a workspace/preset/config error which the smoke-test setup is meant to rule out.");
 
         // Report files MUST be present regardless of pass/fail verdict.
         var reportsRoot = Path.Combine(_root, ".agenteval", "benchmarks", "agentic", "AgenticTelemetryAgent");

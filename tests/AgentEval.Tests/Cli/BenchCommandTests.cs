@@ -129,7 +129,7 @@ public class BenchCommandTests : IDisposable
             evaluatorOverride: capturing,
             responseText: realResponse);
 
-        Assert.True(exitCode == 0 || exitCode == 2);
+        Assert.True(exitCode == 0 || exitCode == 9 || exitCode == 10 || exitCode == 11); // gate PASS, or FAIL/WARN/indeterminate (BUG-22 split)
         Assert.Equal(realResponse, capturing.LastOutput);
         Assert.DoesNotContain("privacy@example.com", capturing.LastOutput ?? ""); // not the fixture
     }
@@ -154,7 +154,7 @@ public class BenchCommandTests : IDisposable
             agentOverride: agent,
             responseText: "this static text should be ignored — agentOverride takes priority");
 
-        Assert.True(exitCode == 0 || exitCode == 2);
+        Assert.True(exitCode == 0 || exitCode == 9 || exitCode == 10 || exitCode == 11); // gate PASS, or FAIL/WARN/indeterminate (BUG-22 split)
         Assert.Equal(agentAnswer, capturing.LastOutput);
     }
 
@@ -172,7 +172,7 @@ public class BenchCommandTests : IDisposable
             evaluatorOverride: capturing,
             responseText: null);
 
-        Assert.True(exitCode == 0 || exitCode == 2);
+        Assert.True(exitCode == 0 || exitCode == 9 || exitCode == 10 || exitCode == 11); // gate PASS, or FAIL/WARN/indeterminate (BUG-22 split)
         Assert.Contains("privacy@example.com", capturing.LastOutput ?? ""); // the built-in fixture
     }
 
@@ -345,7 +345,7 @@ public class BenchCommandTests : IDisposable
     // don't race with parallel tests that also touch env vars.
 
     [Fact]
-    public async Task RunGdprAsync_NoEnvVars_NoStubOptIn_ReturnsExitCode2()
+    public async Task RunGdprAsync_NoEnvVars_NoStubOptIn_ReturnsExitCode3()
     {
         InitWorkspace();
 
@@ -368,7 +368,7 @@ public class BenchCommandTests : IDisposable
                 inputText: null,
                 evaluatorOverride: null);
 
-            Assert.Equal(2, exit);
+            Assert.Equal(3, exit);
         }
         finally
         {
@@ -380,7 +380,7 @@ public class BenchCommandTests : IDisposable
     }
 
     [Fact]
-    public async Task RunGdprAsync_PartialAzureConfig_ReturnsExitCode2()
+    public async Task RunGdprAsync_PartialAzureConfig_ReturnsExitCode3()
     {
         // Endpoint set but API key + deployment missing — must NOT fall through
         // to the stub silently. The resolver flags partial config explicitly.
@@ -404,7 +404,7 @@ public class BenchCommandTests : IDisposable
                 inputText: null,
                 evaluatorOverride: null);
 
-            Assert.Equal(2, exit);
+            Assert.Equal(3, exit);
         }
         finally
         {

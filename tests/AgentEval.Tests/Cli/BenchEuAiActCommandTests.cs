@@ -113,7 +113,7 @@ public class BenchEuAiActCommandTests : IDisposable
     // ── Env-gate trio (Phase-4 gate-review follow-up) ────────────────────
 
     [Fact]
-    public async Task BenchEuAiAct_NoEnvVars_NoStubOptIn_ReturnsExitCode2()
+    public async Task BenchEuAiAct_NoEnvVars_NoStubOptIn_ReturnsExitCode3()
     {
         // env already scrubbed by ctor — no override path, no stub opt-in.
         InitWorkspace();
@@ -124,11 +124,11 @@ public class BenchEuAiActCommandTests : IDisposable
             rootOverride: _root,
             inputText: null);
 
-        Assert.Equal(2, exit);
+        Assert.Equal(3, exit);
     }
 
     [Fact]
-    public async Task BenchEuAiAct_PartialAzureConfig_ReturnsExitCode2()
+    public async Task BenchEuAiAct_PartialAzureConfig_ReturnsExitCode3()
     {
         InitWorkspace();
         Environment.SetEnvironmentVariable("AZURE_OPENAI_ENDPOINT", "https://example.openai.azure.com/");
@@ -140,7 +140,7 @@ public class BenchEuAiActCommandTests : IDisposable
             rootOverride: _root,
             inputText: null);
 
-        Assert.Equal(2, exit);
+        Assert.Equal(3, exit);
     }
 
     // ── Smoke tests ──────────────────────────────────────────────────────
@@ -210,7 +210,7 @@ public class BenchEuAiActCommandTests : IDisposable
             agentOverride: agent,
             responseText: "this static text should be ignored — agentOverride takes priority");
 
-        Assert.True(exitCode == 0 || exitCode == 2);
+        Assert.True(exitCode == 0 || exitCode == 9 || exitCode == 10 || exitCode == 11); // gate PASS, or FAIL/WARN/indeterminate (BUG-22 split)
         Assert.Equal(agentAnswer, capturing.LastOutput);
     }
 

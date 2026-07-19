@@ -466,7 +466,7 @@ public static class BenchAgenticCalibrateCommand
             : $"Agentic calibration gate FAILED — one or more categories below " +
               $"accuracy>={AccuracyThreshold:P0} or kappa>={KappaThreshold:F2}, or had non-zero evaluation_failures.");
 
-        return allPass ? 0 : 2;
+        return allPass ? ExitCodes.Success : ExitCodes.GateFailed;
     }
 
     // F-004 honest surface: NaN comes from CalibrationMetrics.CohensKappa when the dataset

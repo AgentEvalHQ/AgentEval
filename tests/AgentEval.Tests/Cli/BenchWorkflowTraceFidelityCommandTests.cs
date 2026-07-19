@@ -84,7 +84,7 @@ public class BenchWorkflowTraceFidelityCommandTests : IDisposable
     }
 
     [Fact]
-    public async Task TokenMismatch_ReturnsExitCode2()
+    public async Task TokenMismatch_ReturnsExitCode9()
     {
         var trace = new WorkflowTrace
         {
@@ -96,6 +96,6 @@ public class BenchWorkflowTraceFidelityCommandTests : IDisposable
 
         var code = await BenchWorkflowTraceFidelityCommand.RunAsync(path, "standard", "wf", _root);
 
-        Assert.Equal(2, code); // TokenMismatch → score 0.5 < 0.8 → FAIL
+        Assert.Equal(9, code); // TokenMismatch → score 0.5 < 0.8 → FAIL (GateFailed)
     }
 }
