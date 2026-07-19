@@ -1,8 +1,10 @@
 name: Docs nav completeness
 
 # Catches the exact bug found 2026-07-19: a new docs/**/*.md file that's never added to docs/toc.yml (the
-# real docfx site navigation) ships invisible in the sidebar. Deliberately separate from docs.yml (which
-# builds + deploys the site) so this stays fast and runs on every PR, not just pushes to main.
+# real docfx site navigation) ships invisible in the sidebar. Also catches the reverse drift: docs/index.md's
+# landing page linking to a page that's since been removed from toc.yml, or never added. Deliberately
+# separate from docs.yml (which builds + deploys the site) so this stays fast and runs on every PR, not just
+# pushes to main.
 on:
   pull_request:
     paths:

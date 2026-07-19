@@ -7,6 +7,65 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Docs/samples hardening follow-up + NuGetConsumer refresh to 0.16.0-beta
+
+A self-review of the BUG-22/Explainability & Trust batch below found real gaps and closed them, then a
+follow-on pass brought the Skills/Copilot Studio/Explainability & Trust docs and samples to full parity and
+refreshed the NuGet consumer samples.
+
+#### Fixed — completing the BUG-22 remap
+- **`BenchTraceFidelityCommand.cs`** and **`BenchPerfCommand.cs`** each independently hardcoded the exact
+  same gate-fail-as-exit-2 pattern the BUG-22 fix below was supposed to have unified everywhere — missed in
+  the first pass. `BenchPerfCommand` now delegates to the shared `BenchExitCodes.FromLabel` instead of
+  reimplementing it; both return `GateFailed` (9) on a hard fail.
+- **`AzureChatAgentFactory.cs`** — the SUT-agent-resolution counterpart to `JudgeFactory.cs` — had the
+  identical config-resolution-conflated-with-usage-error bug across 4 return sites, also missed. Now returns
+  `RuntimeError` (3).
+- 8 more docs described the old exit-code contract and were never updated: `docs/cli.md`'s resolution-order
+  prose, `docs/gatekeeper-cli.md`'s cross-reference, and 6 getting-started pages (gdpr/memory/longmemeval/
+  mitre/owasp/perf). One (`memory`) was actually wrong even *before* BUG-22 — it claimed WARN mapped to exit
+  0 alongside PASS, which was never true.
+
+#### Added — docs, mirroring the missing coverage
+- `docs/gatekeeper/explainability-and-trust.md` — the docs page the Explainability & Trust library code below
+  had shipped without any `docs/` coverage at all.
+- `docs/agent-skills-whats-new.md` and `docs/gatekeeper-whats-new.md` — capability-history pages mirroring
+  the existing `docs/redteam-whats-new.md` pattern, so a shipped-but-undocumented capability (this happened
+  twice in the same area: SkillGate, then Explainability & Trust itself) is easier to catch next time.
+- **"New to this? Start here"** plain-English concept sections added to `docs/agent-skills.md`,
+  `docs/copilot-studio.md`, and `docs/gatekeeper/explainability-and-trust.md`, plus short "in plain English"
+  framing on Agent Skills' three densest phases — docs read as progressive, not front-loaded with jargon.
+
+#### Added — samples
+- `samples/AgentEval.Samples/Gatekeeper/10_GatekeeperExplainabilityAndTrust.cs` (new) — 3 gradual scenes:
+  `GateProvenance` (a real judge call) → `GateReplayer` (deterministic) → `TrustScoreCalculator` (combines
+  both). Live-verified against real Azure OpenAI.
+- `samples/AgentEval.Samples/CopilotStudio/00_CopilotStudioHelloWorld.cs` (new) — a true one-concept on-ramp
+  before the existing multi-concept walkthroughs (which each covered 4-5 concepts at once).
+
+#### Changed — docs structure hygiene
+- Moved `docs/redteam/copilot-studio.md` → top-level `docs/copilot-studio.md`: it covers eval/bench
+  integration, fluent assertions, and Gatekeeper composition, not just red-teaming — inconsistent with the
+  `AgentEval.MAF.CopilotStudio` package and the samples menu, both of which already treat it as its own
+  top-level area (matching Agent Skills' precedent). All inbound references updated.
+- Renamed `ResponsibleAI.md` → `responsible-ai.md` and `docs/GlassBox/` → `docs/glassbox-history/` for
+  kebab-case consistency with every other doc file/folder.
+- **New CI check**: `tools/check_docs_toc.py` + `.github/workflows/docs-toc-check.yml` fails a PR if any
+  `docs/**/*.md` file isn't reachable from `docs/toc.yml` (the real site navigation, not `docs/index.md`'s
+  separately-maintained landing-page list) — the exact mechanism that let two doc pages ship invisible in the
+  sidebar this session, found only by manual audit. **Extended** to also catch the reverse drift: a local
+  link in `docs/index.md`'s landing page pointing at a page that isn't (or is no longer) in `docs/toc.yml` —
+  one-directional by design, since most nav pages aren't meant to be landing-page-highlighted.
+
+#### Changed — NuGet consumer samples refreshed to the latest released package
+- `samples/AgentEval.NuGetConsumer` / `AgentEval.NuGetConsumer.Tests` were pinned to `AgentEval 0.13.1-beta`
+  (built on MAF 1.11.1) — three releases stale. Bumped to `0.16.0-beta` (the actual latest published version
+  on NuGet.org — confirmed via the NuGet API, not assumed from `main`), with the full dependency baseline
+  (`Microsoft.Agents.AI` 1.13.0, `System.Memory.Data` 10.0.9) updated to match exactly what
+  `Directory.Packages.props` resolved at the `v0.16.0-beta` tag. Restored, built, and tested clean end-to-end
+  against the real published package (one transient Azure content-filter rejection on first run, confirmed
+  non-reproducible on re-run — a live-service flake, not a regression).
+
 ### BUG-22 resolution + Explainability & Trust (gate provenance, counterfactual replay, unified Trust Score) + docs/samples
 
 #### Changed (BREAKING — CLI exit-code contract)
