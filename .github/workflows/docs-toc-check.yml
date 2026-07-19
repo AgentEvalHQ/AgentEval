@@ -1,0 +1,25 @@
+name: Docs nav completeness
+
+# Catches the exact bug found 2026-07-19: a new docs/**/*.md file that's never added to docs/toc.yml (the
+# real docfx site navigation) ships invisible in the sidebar. Deliberately separate from docs.yml (which
+# builds + deploys the site) so this stays fast and runs on every PR, not just pushes to main.
+on:
+  pull_request:
+    paths:
+      - 'docs/**/*.md'
+      - 'docs/toc.yml'
+      - 'tools/check_docs_toc.py'
+
+permissions:
+  contents: read
+
+jobs:
+  check-toc:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Check every doc file is reachable from toc.yml
+        run: python3 tools/check_docs_toc.py

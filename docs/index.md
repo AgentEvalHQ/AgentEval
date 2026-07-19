@@ -365,14 +365,14 @@ agenteval mc serve                         # browse runs + evidence at http://lo
 |-----------------|----------|----------|
 | [Installation](installation.md) | [Assertions](assertions.md) | [stochastic evaluation](stochastic-evaluation.md) |
 | [Quick Start](getting-started.md) | [Red Team Security](redteam.md) | [Model Comparison](model-comparison.md) |
-|  | [Responsible AI](ResponsibleAI.md) | [Trace Record/Replay](tracing.md) |
+|  | [Responsible AI](responsible-ai.md) | [Trace Record/Replay](tracing.md) |
 | [Walkthrough](walkthrough.md) | [Memory Evaluation](memory-evaluation.md) | [Architecture](architecture.md) |
 |  | [Metrics Reference](metrics-reference.md) | [MAF 1.10.0 Upgrade Notes](maf-1.10.0-upgrade-plan.md) |
 |  | [Benchmarks](benchmarks.md) | [Composite Evaluations](composite-evals.md) |
 |  | [Workflows](workflows.md) | [The .agenteval Workspace](agenteval-workspace.md) |
 |  | [GDPR Benchmark](benchmarks/gdpr/getting-started.md) | [Mission Control](missioncontrol/getting-started.md) |
 |  | [EU AI Act Benchmark](benchmarks/eu-ai-act/getting-started.md) | [Gatekeeper](gatekeeper/introduction.md) |
-|  | [Agentic Benchmark](benchmarks/agentic/getting-started.md) | [Copilot Studio Target](redteam/copilot-studio.md) |
+|  | [Agentic Benchmark](benchmarks/agentic/getting-started.md) | [Copilot Studio Target](copilot-studio.md) |
 |  | [OWASP / MITRE Benchmarks](benchmarks/owasp/getting-started.md) |  |
 |  | [Performance / Memory / LongMemEval](benchmarks/perf/getting-started.md) |  |
 |  | [MAF Agent Skills Evaluation](agent-skills.md) |  |

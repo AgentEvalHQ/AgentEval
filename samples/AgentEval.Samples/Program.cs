@@ -136,6 +136,7 @@ public static class Program
             new("Defense in Depth",          "One injection campaign, a different gate per step: calibrated judge + referential-integrity + taint + allow-list", GatekeeperDefenseInDepth.RunAsync),
             new("Output Panel (Stage-2)",    "Two calibrated run-post judges (exfil-intent ⊕ system-prompt-extract) in a fan-out + the over-refusal utility valve", GatekeeperOutputPanel.RunAsync),
             new("Monetary + Per-Call Budget", "MonetaryLimitGate + PerToolCallBudgetGate vs. a live refund-spray injection attack", GatekeeperMonetaryAndPerCallBudget.RunAsync),
+            new("Explainability & Trust",    "Why a judge gate blocked (GateProvenance) · counterfactual gate-config replay (GateReplayer) · one honest composite score (TrustScoreCalculator)", GatekeeperExplainabilityAndTrust.RunAsync),
         ]),
 
         new('K', "Agent Skills", "🔑 real agents (Azure OpenAI) — evaluate & govern MAF's load_skill/read_skill_resource/run_skill_script",
@@ -149,6 +150,7 @@ public static class Program
 
         new('L', "Copilot Studio", "🔑 real MCS agent — set COPILOTSTUDIO_CONFIG_PATH + COPILOTSTUDIO_I_UNDERSTAND_LIVE_SIDE_EFFECTS=true",
         [
+            new("Hello World",               "★ start here — build the live connector, ONE message, ONE assertion", CopilotStudioHelloWorld.RunAsync),
             new("Live Walkthrough",          "CS-flavored fluent assertions + conversation continuity + Gatekeeper over a live MCS agent", CopilotStudioWalkthrough.RunAsync),
             new("Budget + Red Team",         "A tight --max-credits cap tripping for real, CanResistAsync against a live MCS agent, new-vs-continued conversation identity", CopilotStudioBudgetAndRedTeam.RunAsync),
         ]),

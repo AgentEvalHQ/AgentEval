@@ -179,6 +179,10 @@ All Gatekeeper samples drive **real agents** on a live model, so they need Azure
 | 5 | **Beachhead + The Tribunal** | `RunBudgetGate` · `DomainAllowListGate` · `RenderedOutputExfilGate` + a **calibrated** indirect-injection judge that earns the right to block | Yes | 3 min |
 | 6 | **Agent Harness — simple** | A **real** MAF `AsHarnessAgent` (planning + todo + mode + an autonomous loop); its runaway loop is capped by `RunBudgetGate` | Yes | 2 min |
 | 7 | **Agent Harness — defended** | A **real** `AsHarnessAgent` behind defense-in-depth (budget + `SequenceGate` + `DomainAllowListGate`) — legit work flows, the read→POST exfiltration is blocked | Yes | 2 min |
+| 8 | **Defense in Depth** | One injection campaign, a different gate per step: calibrated judge + referential-integrity + taint-tracking + allow-list | Yes | 3 min |
+| 9 | **Output Panel (Stage-2)** | Two calibrated run-post judges (exfil-intent ⊕ system-prompt-extract) fanned out + the over-refusal utility valve | Yes | 3 min |
+| 10 | **Monetary + Per-Call Budget** | `MonetaryLimitGate` + `PerToolCallBudgetGate` vs. a live refund-spray injection attack | Yes | 2 min |
+| 11 | **Explainability & Trust** | `GateProvenance` (why a real judge blocked) → `GateReplayer` (counterfactual: what a different gate config would do — deterministic, no model) → `TrustScoreCalculator` (one honest composite score) — see [docs/gatekeeper/explainability-and-trust.md](../../docs/gatekeeper/explainability-and-trust.md) | Scene 1 only | 4 min |
 
 ---
 
@@ -204,11 +208,12 @@ directory at build time — see the `.csproj` — never duplicated in source).
 ### L — Copilot Studio  🔑 real MCS agent — set `COPILOTSTUDIO_CONFIG_PATH` + `COPILOTSTUDIO_I_UNDERSTAND_LIVE_SIDE_EFFECTS=true`
 
 Red-teams and asserts against a **live Microsoft Copilot Studio (MCS) agent** — see
-[docs/redteam/copilot-studio.md](../../docs/redteam/copilot-studio.md) for the full connector doc, the
+[docs/copilot-studio.md](../../docs/copilot-studio.md) for the full connector doc, the
 consent-flag rationale, and the honest fidelity-ceiling disclosure (text-only; no tool-call evidence).
 
 | # | Sample | What It Exercises | Azure? | Time |
 |---|--------|-------------------|--------|------|
+| 0 | **Hello World** | Build the live connector, send ONE message, ONE assertion (`HaveRespondedWithNonEmptyMessage`) — the on-ramp | No (MCS creds instead) | 1 min |
 | 1 | **Live Walkthrough** | `CopilotStudioAssertions` fluent API, multi-turn conversation continuity, Gatekeeper (`UseEvalGate`) composing over a live MCS agent exactly like any other `IChatClient` | No (MCS creds instead) | 5 min |
 | 2 | **Budget + Red Team** | A tight `--max-credits`-equivalent cap tripping `CopilotStudioBudgetExceededException` for real, `HaveStayedWithinCreditBudget`, `CanResistAsync` red-teaming a live MCS agent (same one-liner as an Azure OpenAI agent), `HaveStartedNewConversation`/`HaveStartedDifferentConversation` | No (MCS creds instead) | 6 min |
 
