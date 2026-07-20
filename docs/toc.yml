@@ -68,8 +68,8 @@
     items:
     - name: What's New
       href: redteam-whats-new.md
-    - name: Copilot Studio (--sut copilot-studio)
-      href: copilot-studio.md
+  - name: Copilot Studio
+    href: copilot-studio.md
   - name: Agent Skills
     href: agent-skills.md
     items:

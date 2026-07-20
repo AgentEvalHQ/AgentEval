@@ -256,7 +256,7 @@ await result.ExportHtmlReportAsync("memory-report.html");
 
 -   **🧩 Agent Skills**
     
-    Evaluate & govern MAF Agent Skills — disclosure assertions, efficiency metric, compliance scanning, injection red-team, governance gates
+    Evaluate & govern MAF Agent Skills — disclosure assertions, efficiency metric, `SKILL.md` compliance scanning, skill-injection red-team, `run_skill_script` governance gates, Skill Security Index
 
 -   **🛡️ Responsible AI**
     
@@ -289,10 +289,6 @@ await result.ExportHtmlReportAsync("memory-report.html");
 -   **🔄 Multi-Turn Evaluation**
     
     Full conversation flow evaluation
-
--   **🧩 MAF Agent Skills**
-
-    Disclosure assertions + efficiency metric, `SKILL.md` compliance scanner, skill-injection red team, `run_skill_script` governance gates, Skill Security Index
 
 </div>
 
