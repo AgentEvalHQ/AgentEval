@@ -489,6 +489,29 @@ public class ToolResultGateTests
     }
 
     [Fact]
+    public async Task ToolResultSecretGate_ScanTimeout_FailsClosed_DoesNotLeakSecret()
+    {
+        // Fail-open regression (Fable 5 review): before the fix, a RegexMatchTimeoutException was swallowed and
+        // treated as "no match" — so a PEM private key in a result that timed out the scan flowed to the model
+        // UNMASKED. Force the timeout deterministically with a 1-tick budget over a large input, and assert the
+        // gate fails CLOSED: the key never appears in what the model would see, and the verdict is not Allow.
+        var pemKey = "-----BEGIN RSA PRIVATE KEY-----\n" + new string('M', 2048) + "\n-----END RSA PRIVATE KEY-----";
+        var bigResult = new string('x', 200_000) + "\n" + pemKey + "\n" + new string('y', 200_000);
+
+        var gate = new ToolResultSecretGate(matchTimeout: TimeSpan.FromTicks(1));
+        var verdict = await gate.InspectAsync(MakeResult(bigResult));
+
+        Assert.NotEqual(ToolResultAction.Allow, verdict.Action);   // must NOT pass the secret through
+        var shown = verdict.RedactedResult as string ?? string.Empty;
+        Assert.DoesNotContain("-----BEGIN RSA PRIVATE KEY-----", shown, StringComparison.Ordinal);
+        Assert.DoesNotContain(new string('M', 2048), shown, StringComparison.Ordinal);   // the key body itself
+    }
+
+    [Fact]
+    public void ToolResultSecretGate_NonPositiveMatchTimeout_Throws()
+        => Assert.Throws<ArgumentOutOfRangeException>(() => new ToolResultSecretGate(matchTimeout: TimeSpan.Zero));
+
+    [Fact]
     public async Task ToolResultSecretGate_EndToEnd_MasksSecretBeforeItReachesFinalResponse_ToolStillExecuted()
     {
         var executed = 0;

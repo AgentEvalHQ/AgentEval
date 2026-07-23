@@ -104,7 +104,8 @@ public static class GatekeeperCoverageAnalyzer
         foreach (var tool in tools)
         {
             var model = Classify(tool);
-            var risk = options.IsHighRisk(tool) ? ToolRiskLevel.HighRisk : ToolRiskLevel.Standard;
+            var risk = options.IsHighRisk(tool) || IsArbitraryCapabilityOpaque(tool, options)
+                ? ToolRiskLevel.HighRisk : ToolRiskLevel.Standard;
             var isProtected = model == ToolExecutionModel.InterceptedLocalFunction && hasToolGate;
             entries.Add(new ToolCoverageEntry(tool.Name, tool.Description, model, risk, isProtected, NoteFor(model, isProtected)));
         }
@@ -129,6 +130,13 @@ public static class GatekeeperCoverageAnalyzer
             or HostedFileSearchTool or HostedImageGenerationTool or HostedToolSearchTool => ToolExecutionModel.ProviderHostedOpaque,
         _ => ToolExecutionModel.UnknownExecutionModel,
     };
+
+    // A provider-hosted opaque tool that is ALSO arbitrary-capability (runs arbitrary code, or fronts an
+    // arbitrary MCP tool surface) — the class that is both uninterceptable AND maximally dangerous. Narrowed to
+    // these two on purpose: hosted web/file/image search are opaque too but far narrower, so they stay on the
+    // keyword heuristic and don't over-trip AnalyzeOrThrow.
+    private static bool IsArbitraryCapabilityOpaque(AITool tool, AnalyzeOptions options)
+        => options.TreatArbitraryCapabilityOpaqueToolsAsHighRisk && tool is HostedCodeInterpreterTool or HostedMcpServerTool;
 #pragma warning restore MEAI001
 
     private static IReadOnlyList<string> GateNames(IReadOnlyList<IToolGate>? toolGates)

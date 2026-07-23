@@ -87,6 +87,54 @@ public class SessionGateTests
         Assert.Equal("b", r3.Text);   // 2nd scripted turn (the blocked run never reached the model)
     }
 
+    private const string TestSessionIdKey = "test.session.id";
+
+    private static string? StableIdFromStateBag(AgentSession s)
+        => s.StateBag.TryGetValue<string>(TestSessionIdKey, out var id, JsonSerializerOptions.Default) ? id : null;
+
+    [Fact]
+    public async Task Rate_StableKeySelector_CounterSurvivesSessionReload()
+    {
+        // Fable 5 security fix: with a stable-id selector, the cap must survive a persisted-session reload
+        // (a fresh AgentSession OBJECT carrying the same logical id) instead of resetting.
+        const string stableId = "logical-session-42";
+        var clock = new FakeClock { Now = DateTimeOffset.UnixEpoch };
+        var scripted = new ScriptedChatClient().AddText("a").AddText("b").AddText("c");
+        var gate = new RateLimitGate(maxRuns: 1, window: TimeSpan.FromMinutes(1), timeProvider: clock,
+            sessionKeySelector: StableIdFromStateBag);
+        var agent = GatedWith(scripted, gate);
+
+        var session1 = await agent.CreateSessionAsync();
+        session1.StateBag.SetValue(TestSessionIdKey, stableId, JsonSerializerOptions.Default);
+        var r1 = await agent.RunAsync("go", session1);
+        Assert.Equal("a", r1.Text);   // first run of the logical session → allowed
+
+        // "reload": a brand-new session object, same logical id → the counter carried over → blocked.
+        var session2 = await agent.CreateSessionAsync();
+        session2.StateBag.SetValue(TestSessionIdKey, stableId, JsonSerializerOptions.Default);
+        var ex = await Record.ExceptionAsync(() => agent.RunAsync("go", session2));
+        Assert.IsType<EvalGateRefusalException>(ex);
+    }
+
+    [Fact]
+    public async Task Rate_DefaultObjectIdentity_ReloadResetsCounter_KnownLimit()
+    {
+        // Documents the DEFAULT (no selector) behavior the fix preserves: object-identity keying, so a fresh
+        // session object resets the counter. This is exactly why the selector above exists for persisted sessions.
+        var clock = new FakeClock { Now = DateTimeOffset.UnixEpoch };
+        var scripted = new ScriptedChatClient().AddText("a").AddText("b").AddText("c");
+        var gate = new RateLimitGate(maxRuns: 1, window: TimeSpan.FromMinutes(1), timeProvider: clock);
+        var agent = GatedWith(scripted, gate);
+
+        var session1 = await agent.CreateSessionAsync();
+        var r1 = await agent.RunAsync("go", session1);
+        Assert.Equal("a", r1.Text);
+
+        var session2 = await agent.CreateSessionAsync();   // fresh object → counter resets (default behavior)
+        var r2 = await agent.RunAsync("go", session2);
+        Assert.Equal("b", r2.Text);   // allowed — NOT blocked, because object identity differs
+    }
+
     // ── streaming path: session gates must see the run scope on the streaming branch too ──
 
     [Fact]

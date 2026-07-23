@@ -127,6 +127,34 @@ public class GatekeeperCoverageAnalyzerTests
     }
 
     [Fact]
+    public void AnalyzeOrThrow_UnprotectedHostedCodeInterpreter_Throws_ByDefault()
+    {
+        // Fable 5 fix: a hosted code interpreter is uninterceptable AND arbitrary-capability, so it must be
+        // treated as unprotected-high-risk by default — the old behavior classified it Standard and admitted it.
+        var report = GatekeeperCoverageAnalyzer.Analyze(BuildAgent(new HostedCodeInterpreterTool()));
+        Assert.True(report.HasUnprotectedHighRiskTools);
+        Assert.Throws<UnprotectedHighRiskToolException>(
+            () => GatekeeperCoverageAnalyzer.AnalyzeOrThrow(BuildAgent(new HostedCodeInterpreterTool())));
+    }
+
+    [Fact]
+    public void HostedCodeInterpreter_OptOut_NotFlaggedHighRisk()
+    {
+        var options = new AnalyzeOptions { TreatArbitraryCapabilityOpaqueToolsAsHighRisk = false };
+        var report = GatekeeperCoverageAnalyzer.Analyze(BuildAgent(new HostedCodeInterpreterTool()), options: options);
+        Assert.False(report.HasUnprotectedHighRiskTools);   // explicit opt-out restores the lenient behavior
+    }
+
+    [Fact]
+    public void HostedWebSearch_NotAutoHighRisk_NarrowingPreserved()
+    {
+        // Narrowing: only arbitrary-capability opaque tools auto-escalate. A hosted web search (far narrower)
+        // stays on the keyword heuristic and does NOT trip AnalyzeOrThrow.
+        var report = GatekeeperCoverageAnalyzer.AnalyzeOrThrow(BuildAgent(new HostedWebSearchTool()));
+        Assert.False(report.HasUnprotectedHighRiskTools);
+    }
+
+    [Fact]
     public void CustomRiskHeuristic_OverridesDefault()
     {
         var tool = AIFunctionFactory.Create((string x) => x, "lookup_order");   // Standard by default
