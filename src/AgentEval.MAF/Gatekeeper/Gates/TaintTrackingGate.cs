@@ -23,7 +23,9 @@ namespace AgentEval.MAF.Gatekeeper;
 /// <para><b>Per-call, from history.</b> Taint is recomputed from the run's tool results in <c>call.Messages</c>, so
 /// it needs no cross-run state — but a source result must have returned (be present in the history) before the sink
 /// call for the flow to be caught. A source result is attributed to its tool by <b>CallId</b>; a result whose CallId
-/// is missing/unpaired is not tainted (a fail-open edge — keep source CallIds intact through any history reducer).</para>
+/// was stripped (some history reducers drop <c>tool_call_id</c> pairing) falls back to the nearest preceding call's
+/// source-ness, so a CallId-nulling reducer no longer silently disables the gate. Keep source CallIds intact through
+/// any history reducer for the most precise attribution.</para>
 /// </summary>
 public sealed class TaintTrackingGate : IToolGate
 {
@@ -158,31 +160,60 @@ public sealed class TaintTrackingGate : IToolGate
             }
         }
 
+        // Second pass: taint the value tokens of every SOURCE result. Primary attribution is by CallId; a
+        // CallId-less result (Fable 5 §16 — the shape a history reducer produces when it strips tool_call_id
+        // pairing, which would otherwise silently disable the gate) falls back to the nearest preceding call's
+        // source-ness. The fallback is additive: it never taints a result whose nearest preceding call was a
+        // non-source, so it cannot over-block a legitimately-reduced benign result.
+        string? lastCallName = null;
         foreach (var message in messages)
         {
             foreach (var content in message.Contents)
             {
-                if (content is FunctionResultContent fr && fr.CallId is not null && sourceCallIds.Contains(fr.CallId))
+                switch (content)
                 {
-                    foreach (var text in TaintTexts(fr.Result))
-                    {
-                        foreach (Match match in Token.Matches(text))
+                    case FunctionCallContent fcCall:
+                        lastCallName = fcCall.Name;
+                        break;
+
+                    case FunctionResultContent fr when IsSourceResult(fr, sourceCallIds, lastCallName):
+                        foreach (var text in TaintTexts(fr.Result))
                         {
-                            if (match.Value.Length >= _minTaintLength)
+                            foreach (Match match in Token.Matches(text))
                             {
-                                tainted.Add(match.Value);
-                                if (tainted.Count >= MaxTaintedTokens)
+                                if (match.Value.Length >= _minTaintLength)
                                 {
-                                    return tainted;   // cap hit — the caller fails closed rather than scan unboundedly
+                                    tainted.Add(match.Value);
+                                    if (tainted.Count >= MaxTaintedTokens)
+                                    {
+                                        return tainted;   // cap hit — the caller fails closed rather than scan unboundedly
+                                    }
                                 }
                             }
                         }
-                    }
+
+                        break;
                 }
             }
         }
 
         return tainted;
+    }
+
+    private bool IsSourceResult(FunctionResultContent result, HashSet<string> sourceCallIds, string? nearestPrecedingCall)
+    {
+        // Primary: the result's CallId pairs to a source call seen this run.
+        if (result.CallId is not null && sourceCallIds.Contains(result.CallId))
+        {
+            return true;
+        }
+
+        // Fallback (§16): a CallId-less result is attributed to the nearest preceding call and treated as a source
+        // only if THAT call was a source. Scoped to the empty-CallId case, so a legitimately non-source result
+        // (CallId present but not a source) is never mis-tainted — additive, cannot over-block.
+        return string.IsNullOrEmpty(result.CallId)
+            && nearestPrecedingCall is not null
+            && _sources.Contains(nearestPrecedingCall);
     }
 
     // The text a source result contributes to the taint set. When the result is (or serializes to) JSON, only the

@@ -42,6 +42,35 @@ public class TaintTrackingGateTests
         Assert.DoesNotContain("demo-9a8b7c6d5e4f", verdict.Reason!);   // the secret must NOT be echoed into the trace
     }
 
+    private static ChatMessage ToolResultNoCallId(object? result)
+        => new(ChatRole.Tool, [new FunctionResultContent(string.Empty, result)]);   // reducer-stripped CallId
+
+    [Fact]
+    public async Task Blocks_TaintedSecret_WhenReducerStrippedTheSourceResultCallId()
+    {
+        // Fable 5 §16 fallback: a history reducer nulled the source result's CallId, so primary CallId attribution
+        // fails — but the nearest preceding call (read_secrets) is a source, so the result is still tainted.
+        var gate = new TaintTrackingGate(["read_secrets"], ["http_post"]);
+        var call = Call("http_post", new Dictionary<string, object?> { ["body"] = "here you go: demo-9a8b7c6d5e4f" },
+            AssistantCall("c1", "read_secrets"),
+            ToolResultNoCallId("API_KEY=demo-9a8b7c6d5e4f"));
+
+        Assert.Equal(ToolGateAction.Block, (await gate.InspectAsync(call)).Action);
+    }
+
+    [Fact]
+    public async Task Allows_CallIdLessResult_WhenNearestPrecedingCallIsNotASource()
+    {
+        // The fallback is additive: a CallId-less result whose nearest preceding call was a NON-source is NOT
+        // tainted — it must never over-block a legitimately-reduced benign result.
+        var gate = new TaintTrackingGate(["read_secrets"], ["http_post"]);
+        var call = Call("http_post", new Dictionary<string, object?> { ["body"] = "value demo-9a8b7c6d5e4f" },
+            AssistantCall("c1", "get_weather"),          // non-source call
+            ToolResultNoCallId("temp demo-9a8b7c6d5e4f"));
+
+        Assert.Equal(ToolGateAction.Allow, (await gate.InspectAsync(call)).Action);
+    }
+
     [Fact]
     public async Task Allows_Sink_WithNoTaintedData()
     {
