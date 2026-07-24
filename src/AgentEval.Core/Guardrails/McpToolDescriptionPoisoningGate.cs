@@ -93,6 +93,24 @@ public sealed record McpToolDefinition(string Name, string? Description, string?
 /// Deterministic hash-pin-and-diff drift detection over a set of MCP tool definitions — catches a
 /// "rug-pull" (a previously-trusted tool's description/schema silently changing after registration/approval).
 /// </summary>
+/// <remarks>
+/// <b>Honest limits (Fable 5 §15) — this is a helper, not enforcement.</b>
+/// <list type="bullet">
+/// <item><b>Trust-on-first-use.</b> <see cref="CaptureBaseline"/> pins whatever definitions are present at capture
+/// time; it cannot flag a tool that ships a malicious description on FIRST use, and a baseline captured AFTER
+/// poisoning yields a clean diff. Capture from a trusted source, before the model ever sees the tools.</item>
+/// <item><b>Integrity, not authenticity.</b> The baseline is an unsigned, caller-held dictionary — it detects
+/// CHANGE relative to a pin, not that the pin itself is genuine. Cryptographic signing is a separate capability,
+/// not provided here.</item>
+/// <item><b>Not wired to a runtime seam.</b> Nothing invokes this automatically — a caller must remember to call
+/// <see cref="CheckDrift"/>; a caller who never does, or who rug-pulls a tool between capture and the next check,
+/// is unprotected. A construction-time enforcement wrapper (mirroring <c>PromptTemplateDriftGate</c>) is planned
+/// for when MCP tool discovery is actually wired into the runtime — no MCP client is integrated in this repo yet.
+/// </item>
+/// </list>
+/// A NEW tool absent from the baseline is already surfaced by <see cref="CheckDrift"/> as an "added" finding, so a
+/// caller can treat an unexpected addition as suspicious.
+/// </remarks>
 public static class McpToolDescriptionPoisoningGate
 {
     /// <summary>SHA-256 fingerprint of <paramref name="tool"/>'s canonical content.</summary>
