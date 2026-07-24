@@ -155,6 +155,47 @@ public class GatekeeperCoverageAnalyzerTests
     }
 
     [Fact]
+    public void AcknowledgeProviderHostedTools_ExemptsNamedOpaqueTool()
+    {
+        // P1-3: the sanctioned escape hatch — an explicitly acknowledged code-interpreter is admitted.
+        var tool = new HostedCodeInterpreterTool();
+        var options = new AnalyzeOptions { AcknowledgeProviderHostedTools = new HashSet<string> { tool.Name } };
+        var report = GatekeeperCoverageAnalyzer.AnalyzeOrThrow(BuildAgent(tool), options: options);
+        Assert.False(report.HasUnprotectedHighRiskTools);
+    }
+
+    [Fact]
+    public void UnacknowledgedOpaqueTool_StillThrows()
+    {
+        var options = new AnalyzeOptions { AcknowledgeProviderHostedTools = new HashSet<string> { "a-different-tool" } };
+        Assert.Throws<UnprotectedHighRiskToolException>(
+            () => GatekeeperCoverageAnalyzer.AnalyzeOrThrow(BuildAgent(new HostedCodeInterpreterTool()), options: options));
+    }
+
+    [Fact]
+    public void DynamicToolProvider_EmptyStaticTools_FailsClosed_NotVacuous100()
+    {
+        // P1-12 (§1): an agent whose tools come only from an AIContextProvider (declared here) must NOT be
+        // certified as vacuously 100%-covered — AnalyzeOrThrow refuses rather than green-light an unverified agent.
+        var options = new AnalyzeOptions { HasDynamicToolProvider = true };
+        var report = GatekeeperCoverageAnalyzer.Analyze(BuildAgent(), options: options);   // no static tools
+        Assert.False(report.ToolInventoryAvailable);
+        Assert.Throws<ToolInventoryUnavailableException>(() => GatekeeperCoverageAnalyzer.AnalyzeOrThrow(BuildAgent(), options: options));
+    }
+
+    [Fact]
+    public void DynamicToolProvider_WithStaticTools_StillAnalyzedNormally()
+    {
+        // The flag only fails closed when the static list is EMPTY; a declared provider alongside static tools does
+        // not disable ordinary analysis of those static tools.
+        var options = new AnalyzeOptions { HasDynamicToolProvider = true };
+        var tool = AIFunctionFactory.Create((string x) => x, "lookup");
+        var report = GatekeeperCoverageAnalyzer.Analyze(BuildAgent(tool), [new ForbiddenToolGate("x")], options);
+        Assert.True(report.ToolInventoryAvailable);
+        Assert.Single(report.Tools);
+    }
+
+    [Fact]
     public void CustomRiskHeuristic_OverridesDefault()
     {
         var tool = AIFunctionFactory.Create((string x) => x, "lookup_order");   // Standard by default
