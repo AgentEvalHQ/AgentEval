@@ -3,6 +3,7 @@
 // Licensed under the MIT License.
 
 using AgentEval.Guardrails;
+using AgentEval.Guardrails.Judges;
 using AgentEval.MAF.Skills;
 using AgentEval.Tracing;
 using Microsoft.Extensions.AI;
@@ -52,6 +53,60 @@ public sealed class GatekeeperOptions
 
     /// <summary>Adds a tool-approval gate. Sugar for <c>ApprovalGates.Add(gate)</c>.</summary>
     public void AddApprovalGate(IToolApprovalGate gate) => ApprovalGates.Add(gate ?? throw new ArgumentNullException(nameof(gate)));
+
+#pragma warning disable AGENTEVAL_GATEKEEPER_PREVIEW001 // ICalibrationReportStore/CalibrationReport are preview; P1-1 opts into them deliberately.
+
+    /// <summary>Optional calibration-report store used by <see cref="ValidateInlineJudgesAsync"/> to prove an inline
+    /// LLM judge (any <see cref="IRequiresCalibration"/> pre/post gate) has earned the right to block.</summary>
+    public ICalibrationReportStore? CalibrationReportStore { get; set; }
+
+    /// <summary>Escape hatch (Fable 5 §9 / P1-1): when <see langword="true"/>, <see cref="ValidateInlineJudgesAsync"/>
+    /// skips the inline-judge calibration check. A loud, greppable opt-out — the fabrication-prone default is to
+    /// REFUSE an un-proven inline judge.</summary>
+    public bool AllowUncalibratedInlineJudge { get; set; }
+
+    /// <summary>
+    /// Refuses to promote an inline LLM judge that has not earned the right to block. For every registered pre/post
+    /// gate implementing <see cref="IRequiresCalibration"/>, loads its axis's latest report from
+    /// <see cref="CalibrationReportStore"/> and throws <see cref="UncalibratedInlineJudgeException"/> unless the
+    /// report exists and is <see cref="CalibrationReport.IsInlineReady"/>. Async by design (the store is I/O-bound,
+    /// so this is NOT folded into the synchronous <c>UseGatekeeper</c> preflight) — call it before you trust a judge
+    /// fleet inline. A no-op when <see cref="AllowUncalibratedInlineJudge"/> is set or no such judge is registered.
+    /// </summary>
+    public async Task ValidateInlineJudgesAsync(CancellationToken cancellationToken = default)
+    {
+        if (AllowUncalibratedInlineJudge)
+        {
+            return;
+        }
+
+        foreach (var gate in PreGates.Concat(PostGates))
+        {
+            if (gate is not IRequiresCalibration calibratable)
+            {
+                continue;
+            }
+
+            if (CalibrationReportStore is null)
+            {
+                throw new UncalibratedInlineJudgeException(calibratable.AxisName,
+                    "no CalibrationReportStore is configured, so this inline judge cannot be proven calibration-ready");
+            }
+
+            var report = await CalibrationReportStore.LoadLatestAsync(calibratable.AxisName, cancellationToken).ConfigureAwait(false);
+            if (report is null)
+            {
+                throw new UncalibratedInlineJudgeException(calibratable.AxisName, "no calibration report was found for this axis");
+            }
+
+            if (!report.IsInlineReady)
+            {
+                throw new UncalibratedInlineJudgeException(calibratable.AxisName,
+                    "the latest calibration report is not inline-ready (it has not beaten its deterministic baseline on a gold set)");
+            }
+        }
+    }
+#pragma warning restore AGENTEVAL_GATEKEEPER_PREVIEW001
 
     /// <summary>
     /// Whether to establish an <see cref="AgentRunScope"/> for every run (via <c>UseAgentEvalGate</c>), even

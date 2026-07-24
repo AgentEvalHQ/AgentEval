@@ -14,16 +14,20 @@ namespace AgentEval.MAF.Gatekeeper;
 /// tool (e.g. <c>http_post</c>, <c>send_email</c>). It taints the value-like tokens in each source tool's result
 /// and blocks a sink call whose arguments carry any of them — closing the exfiltration path that is the payoff of
 /// most indirect injection, without a keyword list.
-/// <para><b>Coarse — a tripwire, not a proof.</b> It matches tainted <i>tokens</i> by <b>case-sensitive substring</b>,
-/// so a value that is transformed (re-encoded, summarized, split, or case-folded) before the sink can slip past, and
-/// an incidental long token shared between a source result and a benign sink argument can false-alarm. Tune
-/// <c>minTaintLength</c> to trade recall for precision, and run it <see cref="ToolGatePolicy.WarnOnly"/> first to
-/// measure false alarms before enforcing. The block reason never echoes the tainted value (that would itself leak
-/// the secret into the trace).</para>
+/// <para><b>Coarse — a tripwire, not a proof.</b> It matches tainted <i>tokens</i> by <b>case-INsensitive
+/// substring</b> — a re-cased copy of a tainted value no longer slips past (Fable 5 §6). Set <c>canonicalize</c> to
+/// also scan decoded projections (percent / HTML-entity / unicode-escape / base64) of each sink argument, catching
+/// a <i>re-encoded</i> copy too. A value transformed in other ways (summarized, split) before the sink can still
+/// slip past, and an incidental long token shared between a source result and a benign sink argument can
+/// false-alarm. Tune <c>minTaintLength</c> to trade recall for precision, and run it
+/// <see cref="ToolGatePolicy.WarnOnly"/> first to measure false alarms before enforcing. The block reason never
+/// echoes the tainted value (that would itself leak the secret into the trace).</para>
 /// <para><b>Per-call, from history.</b> Taint is recomputed from the run's tool results in <c>call.Messages</c>, so
 /// it needs no cross-run state — but a source result must have returned (be present in the history) before the sink
 /// call for the flow to be caught. A source result is attributed to its tool by <b>CallId</b>; a result whose CallId
-/// is missing/unpaired is not tainted (a fail-open edge — keep source CallIds intact through any history reducer).</para>
+/// was stripped (some history reducers drop <c>tool_call_id</c> pairing) falls back to the nearest preceding call's
+/// source-ness, so a CallId-nulling reducer no longer silently disables the gate. Keep source CallIds intact through
+/// any history reducer for the most precise attribution.</para>
 /// </summary>
 public sealed class TaintTrackingGate : IToolGate
 {
@@ -40,6 +44,7 @@ public sealed class TaintTrackingGate : IToolGate
     private readonly HashSet<string> _sources;
     private readonly HashSet<string> _sinks;
     private readonly int _minTaintLength;
+    private readonly bool _canonicalize;
 
     /// <inheritdoc/>
     public string PolicyName => "TaintTrackingGate";
@@ -54,10 +59,11 @@ public sealed class TaintTrackingGate : IToolGate
     /// Minimum length of a tainted token to track. Shorter tokens (trivial numbers, short words) are ignored to
     /// curb false alarms. Default 8. Lower it for shorter secrets at the cost of precision.
     /// </param>
-    public TaintTrackingGate(IEnumerable<string> sourceTools, IEnumerable<string> sinkTools, int minTaintLength = 8)
+    public TaintTrackingGate(IEnumerable<string> sourceTools, IEnumerable<string> sinkTools, int minTaintLength = 8, bool canonicalize = false)
     {
         ArgumentNullException.ThrowIfNull(sourceTools);
         ArgumentNullException.ThrowIfNull(sinkTools);
+        _canonicalize = canonicalize;
         _sources = new HashSet<string>(sourceTools, StringComparer.OrdinalIgnoreCase);
         _sinks = new HashSet<string>(sinkTools, StringComparer.OrdinalIgnoreCase);
         if (_sources.Count == 0)
@@ -122,13 +128,23 @@ public sealed class TaintTrackingGate : IToolGate
                 continue;
             }
 
-            foreach (var token in tainted)
+            // Default: the raw arg surface. With canonicalize: also its decoded projections, so a re-encoded copy
+            // of a tainted value (base64/percent/…) is caught too. Matching is case-INsensitive (§6): a re-cased
+            // copy must not slip past.
+            var surfaces = _canonicalize
+                ? ArgumentCanonicalizer.Canonicalize(argText)
+                : (IReadOnlyList<string>)new[] { argText };
+
+            foreach (var surface in surfaces)
             {
-                if (argText.Contains(token, StringComparison.Ordinal))
+                foreach (var token in tainted)
                 {
-                    // Deliberately does NOT include the tainted value — echoing it would leak the secret into the trace.
-                    return new ValueTask<ToolGateVerdict>(ToolGateVerdict.Block(PolicyName,
-                        $"argument '{kv.Key}' carries data tainted by a confidential source tool to external sink '{call.FunctionName}'"));
+                    if (surface.Contains(token, StringComparison.OrdinalIgnoreCase))
+                    {
+                        // Deliberately does NOT include the tainted value — echoing it would leak the secret into the trace.
+                        return new ValueTask<ToolGateVerdict>(ToolGateVerdict.Block(PolicyName,
+                            $"argument '{kv.Key}' carries data tainted by a confidential source tool to external sink '{call.FunctionName}'"));
+                    }
                 }
             }
         }
@@ -158,31 +174,60 @@ public sealed class TaintTrackingGate : IToolGate
             }
         }
 
+        // Second pass: taint the value tokens of every SOURCE result. Primary attribution is by CallId; a
+        // CallId-less result (Fable 5 §16 — the shape a history reducer produces when it strips tool_call_id
+        // pairing, which would otherwise silently disable the gate) falls back to the nearest preceding call's
+        // source-ness. The fallback is additive: it never taints a result whose nearest preceding call was a
+        // non-source, so it cannot over-block a legitimately-reduced benign result.
+        string? lastCallName = null;
         foreach (var message in messages)
         {
             foreach (var content in message.Contents)
             {
-                if (content is FunctionResultContent fr && fr.CallId is not null && sourceCallIds.Contains(fr.CallId))
+                switch (content)
                 {
-                    foreach (var text in TaintTexts(fr.Result))
-                    {
-                        foreach (Match match in Token.Matches(text))
+                    case FunctionCallContent fcCall:
+                        lastCallName = fcCall.Name;
+                        break;
+
+                    case FunctionResultContent fr when IsSourceResult(fr, sourceCallIds, lastCallName):
+                        foreach (var text in TaintTexts(fr.Result))
                         {
-                            if (match.Value.Length >= _minTaintLength)
+                            foreach (Match match in Token.Matches(text))
                             {
-                                tainted.Add(match.Value);
-                                if (tainted.Count >= MaxTaintedTokens)
+                                if (match.Value.Length >= _minTaintLength)
                                 {
-                                    return tainted;   // cap hit — the caller fails closed rather than scan unboundedly
+                                    tainted.Add(match.Value);
+                                    if (tainted.Count >= MaxTaintedTokens)
+                                    {
+                                        return tainted;   // cap hit — the caller fails closed rather than scan unboundedly
+                                    }
                                 }
                             }
                         }
-                    }
+
+                        break;
                 }
             }
         }
 
         return tainted;
+    }
+
+    private bool IsSourceResult(FunctionResultContent result, HashSet<string> sourceCallIds, string? nearestPrecedingCall)
+    {
+        // Primary: the result's CallId pairs to a source call seen this run.
+        if (result.CallId is not null && sourceCallIds.Contains(result.CallId))
+        {
+            return true;
+        }
+
+        // Fallback (§16): a CallId-less result is attributed to the nearest preceding call and treated as a source
+        // only if THAT call was a source. Scoped to the empty-CallId case, so a legitimately non-source result
+        // (CallId present but not a source) is never mis-tainted — additive, cannot over-block.
+        return string.IsNullOrEmpty(result.CallId)
+            && nearestPrecedingCall is not null
+            && _sources.Contains(nearestPrecedingCall);
     }
 
     // The text a source result contributes to the taint set. When the result is (or serializes to) JSON, only the

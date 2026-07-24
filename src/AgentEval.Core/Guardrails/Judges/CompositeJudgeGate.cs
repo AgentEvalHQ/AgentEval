@@ -19,7 +19,7 @@ namespace AgentEval.Guardrails.Judges;
 /// <para><b>Trust before deployment.</b> A judge should be calibrated against a per-axis gold set (the
 /// calibration harness) before it goes inline — an uncalibrated inline judge is a fabrication risk.</para>
 /// </summary>
-public sealed class CompositeJudgeGate<TRubric> : IChatGate
+public sealed class CompositeJudgeGate<TRubric> : IChatGate, IRequiresCalibration
     where TRubric : IJudgeRubric
 {
     private readonly TRubric _rubric;
@@ -28,6 +28,9 @@ public sealed class CompositeJudgeGate<TRubric> : IChatGate
 
     /// <inheritdoc/>
     public string PolicyName { get; }
+
+    /// <inheritdoc/>
+    public string AxisName => _rubric.Axis;
 
     /// <summary>Creates the gate from a single-axis rubric and the fast model that answers it.</summary>
     public CompositeJudgeGate(TRubric rubric, IChatClient fastModel, JudgeGateOptions? options = null)

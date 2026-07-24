@@ -56,6 +56,33 @@ public class FixtureCapturingChatClientTests
     }
 
     [Fact]
+    public async Task GetResponseAsync_MasksSecretShapes_ByDefault()
+    {
+        // Fable 5 §12 / P1-5: a captured fixture must not persist a live secret in plaintext.
+        var scripted = new ScriptedChatClient().AddText("here is the key AKIAABCDEFGHIJKLMNOP for you");
+        var sink = new StringWriter();
+        var client = new FixtureCapturingChatClient(scripted, sink);
+
+        await client.GetResponseAsync(Conversation());
+
+        var raw = sink.ToString();
+        Assert.DoesNotContain("AKIAABCDEFGHIJKLMNOP", raw);   // the AWS-key shape was masked before writing
+        Assert.Contains("here is the key", raw);               // surrounding text preserved
+    }
+
+    [Fact]
+    public async Task GetResponseAsync_RedactSecretsFalse_KeepsRawValues()
+    {
+        var scripted = new ScriptedChatClient().AddText("here is the key AKIAABCDEFGHIJKLMNOP for you");
+        var sink = new StringWriter();
+        var client = new FixtureCapturingChatClient(scripted, sink, redactSecrets: false);
+
+        await client.GetResponseAsync(Conversation());
+
+        Assert.Contains("AKIAABCDEFGHIJKLMNOP", sink.ToString());   // explicit opt-out preserves raw values
+    }
+
+    [Fact]
     public async Task GetResponseAsync_ToolCall_CapturesCallIdNameAndArguments()
     {
         var scripted = new ScriptedChatClient().AddToolCall("c1", "SearchFlights", new Dictionary<string, object?> { ["to"] = "NRT" });

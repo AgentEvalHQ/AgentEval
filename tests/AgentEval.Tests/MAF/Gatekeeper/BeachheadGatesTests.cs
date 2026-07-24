@@ -234,4 +234,60 @@ public class BeachheadGatesTests
         var v = await gate.InspectAsync(Call("fetch", new Dictionary<string, object?> { ["url"] = "https://api.example.com?token=abc" }));
         Assert.Equal(ToolGateAction.Allow, v.Action);
     }
+
+    // ─────────── DomainAllowListGate — bare hosts & data: URIs (Fable 5 §14 / P1-8) ───────────
+
+    [Fact]
+    public async Task DomainAllowList_BareHostArgument_OffList_Blocks()
+    {
+        // A tool that takes a bare host (no "//") and adds the scheme itself: the URL scan misses it, so the
+        // caller declares it via hostArguments and its VALUE is validated against the same allow-list.
+        var gate = new DomainAllowListGate(["example.com"], hostArguments: ["host"]);
+        var v = await gate.InspectAsync(Call("connect", new Dictionary<string, object?> { ["host"] = "attacker.example" }));
+        Assert.Equal(ToolGateAction.Block, v.Action);
+    }
+
+    [Fact]
+    public async Task DomainAllowList_BareHostArgument_OnList_Allows()
+    {
+        var gate = new DomainAllowListGate(["example.com"], hostArguments: ["host"]);
+        var v = await gate.InspectAsync(Call("connect", new Dictionary<string, object?> { ["host"] = "api.example.com" }));
+        Assert.Equal(ToolGateAction.Allow, v.Action);
+    }
+
+    [Fact]
+    public async Task DomainAllowList_BareHostArgument_WithPort_ExtractsHost()
+    {
+        var gate = new DomainAllowListGate(["example.com"], hostArguments: ["host"]);
+        Assert.Equal(ToolGateAction.Allow, (await gate.InspectAsync(Call("connect", new Dictionary<string, object?> { ["host"] = "api.example.com:8443" }))).Action);
+        Assert.Equal(ToolGateAction.Block, (await gate.InspectAsync(Call("connect", new Dictionary<string, object?> { ["host"] = "evil.example:8443" }))).Action);
+    }
+
+    [Fact]
+    public async Task DomainAllowList_BareHost_WithoutHostArguments_Allows_PreservesDefault()
+    {
+        // Default (no hostArguments): a bare host with no "//" is NOT scanned — the pre-P1-8 behavior, preserved
+        // so the change is non-breaking. This documents exactly why hostArguments must be opt-in.
+        var gate = new DomainAllowListGate(["example.com"]);
+        var v = await gate.InspectAsync(Call("connect", new Dictionary<string, object?> { ["host"] = "attacker.example" }));
+        Assert.Equal(ToolGateAction.Allow, v.Action);
+    }
+
+    [Fact]
+    public async Task DomainAllowList_DataUri_Blocks()
+    {
+        var gate = new DomainAllowListGate(["example.com"]);
+        Assert.Equal(ToolGateAction.Block, (await gate.InspectAsync(Call("render", new Dictionary<string, object?> { ["src"] = "data:text/html,<script>steal()</script>" }))).Action);
+        Assert.Equal(ToolGateAction.Block, (await gate.InspectAsync(Call("render", new Dictionary<string, object?> { ["src"] = "data:;base64,SGVsbG8=" }))).Action);
+    }
+
+    [Fact]
+    public async Task DomainAllowList_LiteralDataWordInProse_DoesNotFalsePositive()
+    {
+        // The conservative data: matcher requires a real data-URI comma directly after the (optional) mediatype;
+        // the word "data:" in prose must NOT block.
+        var gate = new DomainAllowListGate(["example.com"]);
+        var v = await gate.InspectAsync(Call("note", new Dictionary<string, object?> { ["text"] = "see the data: section below, then continue" }));
+        Assert.Equal(ToolGateAction.Allow, v.Action);
+    }
 }

@@ -54,13 +54,26 @@ public static class GatekeeperCoverageAnalyzer
     public static GatekeeperCoverageReport Analyze(AIAgent agent, IReadOnlyList<IToolGate>? toolGates = null, AnalyzeOptions? options = null)
     {
         ArgumentNullException.ThrowIfNull(agent);
+        options ??= AnalyzeOptions.Default;
 
         if (agent.GetService(typeof(ChatOptions)) is not ChatOptions chatOptions)
         {
             return new GatekeeperCoverageReport(Array.Empty<ToolCoverageEntry>(), GateNames(toolGates), ToolInventoryAvailable: false);
         }
 
-        return AnalyzeCore(chatOptions.Tools ?? Array.Empty<AITool>(), toolGates, options, toolInventoryAvailable: true);
+        var tools = chatOptions.Tools ?? (IList<AITool>)Array.Empty<AITool>();
+
+        // P1-12 (§1): an AIContextProvider can inject tools at invocation time that never appear in the static
+        // Tools list. If the agent has one (caller-declared, or detected) and the static list is empty, we cannot
+        // enumerate the real inventory — fail closed (inventory-unavailable) so AnalyzeOrThrow refuses to certify a
+        // vacuous 100% rather than silently green-light an unverified agent.
+        var hasDynamicProvider = options.HasDynamicToolProvider || agent.GetService(typeof(AIContextProvider)) is not null;
+        if (hasDynamicProvider && tools.Count == 0)
+        {
+            return new GatekeeperCoverageReport(Array.Empty<ToolCoverageEntry>(), GateNames(toolGates), ToolInventoryAvailable: false);
+        }
+
+        return AnalyzeCore(tools, toolGates, options, toolInventoryAvailable: true);
     }
 
     /// <summary>Analyzes an explicit tool list (the same list you passed to <see cref="ChatOptions.Tools"/>).</summary>
@@ -104,7 +117,8 @@ public static class GatekeeperCoverageAnalyzer
         foreach (var tool in tools)
         {
             var model = Classify(tool);
-            var risk = options.IsHighRisk(tool) ? ToolRiskLevel.HighRisk : ToolRiskLevel.Standard;
+            var risk = options.IsHighRisk(tool) || IsArbitraryCapabilityOpaque(tool, options)
+                ? ToolRiskLevel.HighRisk : ToolRiskLevel.Standard;
             var isProtected = model == ToolExecutionModel.InterceptedLocalFunction && hasToolGate;
             entries.Add(new ToolCoverageEntry(tool.Name, tool.Description, model, risk, isProtected, NoteFor(model, isProtected)));
         }
@@ -129,6 +143,15 @@ public static class GatekeeperCoverageAnalyzer
             or HostedFileSearchTool or HostedImageGenerationTool or HostedToolSearchTool => ToolExecutionModel.ProviderHostedOpaque,
         _ => ToolExecutionModel.UnknownExecutionModel,
     };
+
+    // A provider-hosted opaque tool that is ALSO arbitrary-capability (runs arbitrary code, or fronts an
+    // arbitrary MCP tool surface) — the class that is both uninterceptable AND maximally dangerous. Narrowed to
+    // these two on purpose: hosted web/file/image search are opaque too but far narrower, so they stay on the
+    // keyword heuristic and don't over-trip AnalyzeOrThrow.
+    private static bool IsArbitraryCapabilityOpaque(AITool tool, AnalyzeOptions options)
+        => options.TreatArbitraryCapabilityOpaqueToolsAsHighRisk
+           && tool is HostedCodeInterpreterTool or HostedMcpServerTool
+           && !(options.AcknowledgeProviderHostedTools?.Contains(tool.Name) ?? false);   // P1-3: explicit opt-out
 #pragma warning restore MEAI001
 
     private static IReadOnlyList<string> GateNames(IReadOnlyList<IToolGate>? toolGates)
