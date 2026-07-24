@@ -5,6 +5,7 @@
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
+using AgentEval.MAF.Gatekeeper;
 using Microsoft.Extensions.AI;
 
 namespace AgentEval.Cli.Infrastructure;
@@ -35,6 +36,7 @@ public sealed class FixtureCapturingChatClient : DelegatingChatClient
 
     private readonly TextWriter _sink;
     private readonly string? _label;
+    private readonly bool _redactSecrets;
     private int _index;
     private bool _writeFailureReported;
 
@@ -42,11 +44,15 @@ public sealed class FixtureCapturingChatClient : DelegatingChatClient
     /// <param name="inner">The chat client to observe.</param>
     /// <param name="sink">Where to write. See this class's remarks for the thread-safety contract.</param>
     /// <param name="label">An optional short role label recorded in every entry from this client (e.g. "sut").</param>
-    public FixtureCapturingChatClient(IChatClient inner, TextWriter sink, string? label = null)
+    /// <param name="redactSecrets">When <see langword="true"/> (default) recognized credential shapes are masked
+    /// before writing, so a captured fixture doesn't persist a live secret in plaintext (Fable 5 §12). Set
+    /// <see langword="false"/> only for a trusted local debugging session where you need the raw values.</param>
+    public FixtureCapturingChatClient(IChatClient inner, TextWriter sink, string? label = null, bool redactSecrets = true)
         : base(inner)
     {
         _sink = sink ?? throw new ArgumentNullException(nameof(sink));
         _label = string.IsNullOrWhiteSpace(label) ? null : label;
+        _redactSecrets = redactSecrets;
     }
 
     /// <inheritdoc/>
@@ -147,7 +153,8 @@ public sealed class FixtureCapturingChatClient : DelegatingChatClient
             response is null ? null : BuildResponse(response),
             error?.ToString());
 
-        Write(JsonSerializer.Serialize(entry, JsonOptions));
+        var json = JsonSerializer.Serialize(entry, JsonOptions);
+        Write(_redactSecrets ? ToolResultSecretGate.MaskSecrets(json) : json);
     }
 
     private static FixtureCaptureRequest BuildRequest(IList<ChatMessage> messages, ChatOptions? options)

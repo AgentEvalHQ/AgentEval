@@ -149,6 +149,34 @@ public sealed class ToolResultSecretGate : IToolResultGate
         return new ValueTask<ToolResultVerdict>(verdict);
     }
 
+    /// <summary>Masks any recognized credential SHAPE (the same patterns this gate applies to a tool result) in
+    /// <paramref name="text"/> with block characters — exposed for reuse by diagnostic capture sinks (Fable 5 §12 /
+    /// P1-5) so a captured fixture doesn't persist a live secret in plaintext. Best-effort: a per-pattern timeout
+    /// skips that pattern rather than throwing (a diagnostic sink must never throw); pair with owner-only file
+    /// permissions for defense in depth.</summary>
+    public static string MaskSecrets(string text)
+    {
+        if (string.IsNullOrEmpty(text))
+        {
+            return text;
+        }
+
+        var masked = text;
+        foreach (var (_, pattern) in DefaultPatterns)
+        {
+            try
+            {
+                masked = pattern.Replace(masked, m => new string('█', m.Length));
+            }
+            catch (RegexMatchTimeoutException)
+            {
+                // Diagnostic capture, not an enforcement gate — skip a slow pattern rather than throw.
+            }
+        }
+
+        return masked;
+    }
+
     // ReDoS-immune (pure IndexOf, no backtracking) complete detector/masker for PEM PRIVATE KEY blocks — the
     // fail-closed fallback when the regex-based PrivateKey_Block scan times out. Masks the full span from
     // "-----BEGIN" through the closing "…PRIVATE KEY-----" so the key body is masked, not just the header label.
