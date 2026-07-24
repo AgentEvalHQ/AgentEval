@@ -14,12 +14,14 @@ namespace AgentEval.MAF.Gatekeeper;
 /// tool (e.g. <c>http_post</c>, <c>send_email</c>). It taints the value-like tokens in each source tool's result
 /// and blocks a sink call whose arguments carry any of them — closing the exfiltration path that is the payoff of
 /// most indirect injection, without a keyword list.
-/// <para><b>Coarse — a tripwire, not a proof.</b> It matches tainted <i>tokens</i> by <b>case-sensitive substring</b>,
-/// so a value that is transformed (re-encoded, summarized, split, or case-folded) before the sink can slip past, and
-/// an incidental long token shared between a source result and a benign sink argument can false-alarm. Tune
-/// <c>minTaintLength</c> to trade recall for precision, and run it <see cref="ToolGatePolicy.WarnOnly"/> first to
-/// measure false alarms before enforcing. The block reason never echoes the tainted value (that would itself leak
-/// the secret into the trace).</para>
+/// <para><b>Coarse — a tripwire, not a proof.</b> It matches tainted <i>tokens</i> by <b>case-INsensitive
+/// substring</b> — a re-cased copy of a tainted value no longer slips past (Fable 5 §6). Set <c>canonicalize</c> to
+/// also scan decoded projections (percent / HTML-entity / unicode-escape / base64) of each sink argument, catching
+/// a <i>re-encoded</i> copy too. A value transformed in other ways (summarized, split) before the sink can still
+/// slip past, and an incidental long token shared between a source result and a benign sink argument can
+/// false-alarm. Tune <c>minTaintLength</c> to trade recall for precision, and run it
+/// <see cref="ToolGatePolicy.WarnOnly"/> first to measure false alarms before enforcing. The block reason never
+/// echoes the tainted value (that would itself leak the secret into the trace).</para>
 /// <para><b>Per-call, from history.</b> Taint is recomputed from the run's tool results in <c>call.Messages</c>, so
 /// it needs no cross-run state — but a source result must have returned (be present in the history) before the sink
 /// call for the flow to be caught. A source result is attributed to its tool by <b>CallId</b>; a result whose CallId
@@ -42,6 +44,7 @@ public sealed class TaintTrackingGate : IToolGate
     private readonly HashSet<string> _sources;
     private readonly HashSet<string> _sinks;
     private readonly int _minTaintLength;
+    private readonly bool _canonicalize;
 
     /// <inheritdoc/>
     public string PolicyName => "TaintTrackingGate";
@@ -56,10 +59,11 @@ public sealed class TaintTrackingGate : IToolGate
     /// Minimum length of a tainted token to track. Shorter tokens (trivial numbers, short words) are ignored to
     /// curb false alarms. Default 8. Lower it for shorter secrets at the cost of precision.
     /// </param>
-    public TaintTrackingGate(IEnumerable<string> sourceTools, IEnumerable<string> sinkTools, int minTaintLength = 8)
+    public TaintTrackingGate(IEnumerable<string> sourceTools, IEnumerable<string> sinkTools, int minTaintLength = 8, bool canonicalize = false)
     {
         ArgumentNullException.ThrowIfNull(sourceTools);
         ArgumentNullException.ThrowIfNull(sinkTools);
+        _canonicalize = canonicalize;
         _sources = new HashSet<string>(sourceTools, StringComparer.OrdinalIgnoreCase);
         _sinks = new HashSet<string>(sinkTools, StringComparer.OrdinalIgnoreCase);
         if (_sources.Count == 0)
@@ -124,13 +128,23 @@ public sealed class TaintTrackingGate : IToolGate
                 continue;
             }
 
-            foreach (var token in tainted)
+            // Default: the raw arg surface. With canonicalize: also its decoded projections, so a re-encoded copy
+            // of a tainted value (base64/percent/…) is caught too. Matching is case-INsensitive (§6): a re-cased
+            // copy must not slip past.
+            var surfaces = _canonicalize
+                ? ArgumentCanonicalizer.Canonicalize(argText)
+                : (IReadOnlyList<string>)new[] { argText };
+
+            foreach (var surface in surfaces)
             {
-                if (argText.Contains(token, StringComparison.Ordinal))
+                foreach (var token in tainted)
                 {
-                    // Deliberately does NOT include the tainted value — echoing it would leak the secret into the trace.
-                    return new ValueTask<ToolGateVerdict>(ToolGateVerdict.Block(PolicyName,
-                        $"argument '{kv.Key}' carries data tainted by a confidential source tool to external sink '{call.FunctionName}'"));
+                    if (surface.Contains(token, StringComparison.OrdinalIgnoreCase))
+                    {
+                        // Deliberately does NOT include the tainted value — echoing it would leak the secret into the trace.
+                        return new ValueTask<ToolGateVerdict>(ToolGateVerdict.Block(PolicyName,
+                            $"argument '{kv.Key}' carries data tainted by a confidential source tool to external sink '{call.FunctionName}'"));
+                    }
                 }
             }
         }

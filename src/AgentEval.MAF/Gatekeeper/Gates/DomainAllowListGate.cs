@@ -44,6 +44,7 @@ public sealed class DomainAllowListGate : IToolGate
 
     private readonly HashSet<string> _allowed;
     private readonly string[] _hostArguments;
+    private readonly bool _canonicalize;
 
     /// <inheritdoc/>
     public string PolicyName { get; }
@@ -56,13 +57,17 @@ public sealed class DomainAllowListGate : IToolGate
     /// be bracketed, e.g. <c>"[::1]"</c>; a bare <c>"::1"</c> is mis-parsed as host:port and ignored). Default-deny:
     /// at least one is required. Pass <paramref name="hostArguments"/> to also validate the VALUE of the named
     /// arguments as a bare hostname (no <c>"//"</c>) against the same allow-list — for a tool whose parameter is a
-    /// host rather than a full URL.
+    /// host rather than a full URL. Set <paramref name="canonicalize"/> to also scan decoded projections
+    /// (percent / HTML-entity / unicode-escape / base64) of the arguments via <see cref="ArgumentCanonicalizer"/>,
+    /// so an encoded URL the tool later decodes cannot evade the allow-list (Fable 5 §13).
     /// </summary>
-    public DomainAllowListGate(IEnumerable<string> allowedDomains, string? policyName = null, IEnumerable<string>? hostArguments = null)
+    public DomainAllowListGate(
+        IEnumerable<string> allowedDomains, string? policyName = null, IEnumerable<string>? hostArguments = null, bool canonicalize = false)
     {
         _allowed = HostAllowList.Build(allowedDomains, nameof(allowedDomains));
         PolicyName = policyName ?? "DomainAllowListGate";
         _hostArguments = hostArguments?.Where(a => !string.IsNullOrEmpty(a)).ToArray() ?? Array.Empty<string>();
+        _canonicalize = canonicalize;
     }
 
     /// <inheritdoc/>
@@ -86,19 +91,27 @@ public sealed class DomainAllowListGate : IToolGate
             return Blocked($"tool '{call.FunctionName}' arguments could not be serialized for URL inspection");
         }
 
+        // Default: scan the raw serialized surface (the first projection). With canonicalize: also scan decoded
+        // projections so an encoded URL the tool later decodes cannot evade the allow-list.
+        var surfaces = _canonicalize
+            ? ArgumentCanonicalizer.Canonicalize(serialized)
+            : (IReadOnlyList<string>)new[] { serialized };
         try
         {
-            if (DataUri.IsMatch(serialized))
+            foreach (var surface in surfaces)
             {
-                return Blocked($"tool '{call.FunctionName}' targets a data: URI, which has no host and cannot be domain-allow-listed");
-            }
-
-            foreach (Match m in UrlAuthority.Matches(serialized))
-            {
-                var host = HostAllowList.ExtractHost(m.Groups[1].Value);
-                if (host is not null && !HostAllowList.IsAllowed(host, _allowed))
+                if (DataUri.IsMatch(surface))
                 {
-                    return Blocked($"tool '{call.FunctionName}' targets a non-allow-listed domain '{host}'");
+                    return Blocked($"tool '{call.FunctionName}' targets a data: URI, which has no host and cannot be domain-allow-listed");
+                }
+
+                foreach (Match m in UrlAuthority.Matches(surface))
+                {
+                    var host = HostAllowList.ExtractHost(m.Groups[1].Value);
+                    if (host is not null && !HostAllowList.IsAllowed(host, _allowed))
+                    {
+                        return Blocked($"tool '{call.FunctionName}' targets a non-allow-listed domain '{host}'");
+                    }
                 }
             }
         }
