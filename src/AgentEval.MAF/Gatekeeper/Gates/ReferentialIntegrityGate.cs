@@ -25,7 +25,10 @@ namespace AgentEval.MAF.Gatekeeper;
 /// <para><b>A tripwire, not a proof.</b> "Is this token an id" is a heuristic — the default (<c>isIdentifier</c>)
 /// only flags tokens that contain a <b>digit</b>, so an <b>all-letter</b> id (a username / slug / <c>admin_backup</c>
 /// your backend accepts) is <i>not</i> validated by default, and since the attacker chooses the injected id this is
-/// a deterministic gap — supply a custom <c>isIdentifier</c> when your guarded ids can be alpha-only. Run
+/// a deterministic gap. Close it by passing a ready-made recogniser from <see cref="IdentifierRecognizers"/> —
+/// <see cref="IdentifierRecognizers.Matching"/> with your id's real shape (recommended), or
+/// <see cref="IdentifierRecognizers.AlphanumericMinLength"/> when you can't express the shape. The default is left
+/// unchanged deliberately: flagging every alpha token by default would false-alarm on ordinary words. Run
 /// <see cref="ToolGatePolicy.WarnOnly"/> first to measure false alarms, then promote to <c>ReplaceResult</c> /
 /// <c>Terminate</c>.</para>
 /// <para><b>Stateless.</b> Observed ids are recomputed per call from <c>call.Messages</c> (the run's history) — no
@@ -58,9 +61,11 @@ public sealed class ReferentialIntegrityGate : IToolGate
     /// must come from the <b>user</b> only. Do NOT list web/RAG tools an injection can poison.
     /// </param>
     /// <param name="isIdentifier">
-    /// Predicate deciding whether a token is an id worth validating. Default: length ≥ 4 and contains at least one
-    /// digit (fires on <c>A-1042</c> / <c>FAKE-9931</c>, not on plain words). Supply your own if guarded ids can be
-    /// all-letter — the default does NOT validate alpha-only ids.
+    /// Predicate deciding whether a token is an id worth validating. Default:
+    /// <see cref="IdentifierRecognizers.ContainsDigit"/> (length ≥ 4 and contains a digit — fires on <c>A-1042</c> /
+    /// <c>FAKE-9931</c>, not on plain words). The default does NOT validate alpha-only ids; pass a recogniser from
+    /// <see cref="IdentifierRecognizers"/> (e.g. <see cref="IdentifierRecognizers.Matching"/>) when your guarded ids
+    /// can be all-letter.
     /// </param>
     public ReferentialIntegrityGate(
         IEnumerable<string> idArgNames,
@@ -77,7 +82,7 @@ public sealed class ReferentialIntegrityGate : IToolGate
 
         _guarded = ToSetOrNull(guardedTools);        // null ⇒ apply to every tool
         _trusted = ToSetOrNull(trustedSourceTools);  // null ⇒ only user turns confer legitimacy
-        _isId = isIdentifier ?? DefaultIsIdentifier;
+        _isId = isIdentifier ?? IdentifierRecognizers.ContainsDigit();   // single source of truth for the default
     }
 
     private static HashSet<string>? ToSetOrNull(IEnumerable<string>? values)
@@ -90,8 +95,6 @@ public sealed class ReferentialIntegrityGate : IToolGate
         var set = new HashSet<string>(values, StringComparer.OrdinalIgnoreCase);
         return set.Count > 0 ? set : null;
     }
-
-    private static bool DefaultIsIdentifier(string token) => token.Length >= 4 && token.Any(char.IsDigit);
 
     /// <inheritdoc/>
     public ValueTask<ToolGateVerdict> InspectAsync(GatedToolCall call, CancellationToken cancellationToken = default)

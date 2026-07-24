@@ -54,6 +54,41 @@ public class ReferentialIntegrityGateTests
         Assert.Equal(ToolGateAction.Allow, (await gate.InspectAsync(call)).Action);
     }
 
+    // ── P1-9 / §7 — alpha-only id coverage via IdentifierRecognizers (default deliberately unchanged) ──
+
+    [Fact]
+    public async Task Default_DoesNotValidateAlphaOnlyId_GapPreserved()
+    {
+        // The default recogniser (ContainsDigit) does NOT flag an all-letter id — the deliberate, non-breaking
+        // default (flagging every alpha token would false-alarm on ordinary words).
+        var gate = new ReferentialIntegrityGate(["user"], ["promote"]);
+        var call = Call("promote", new Dictionary<string, object?> { ["user"] = "admin_backup" },
+            User("Promote alice please."));
+        Assert.Equal(ToolGateAction.Allow, (await gate.InspectAsync(call)).Action);
+    }
+
+    [Fact]
+    public async Task MatchingRecognizer_BlocksInventedAlphaId_AllowsObserved()
+    {
+        var idShape = new System.Text.RegularExpressions.Regex(
+            "^(usr|adm)_[a-z0-9]{3,}$", System.Text.RegularExpressions.RegexOptions.None, TimeSpan.FromMilliseconds(100));
+        var gate = new ReferentialIntegrityGate(["user"], ["promote"], isIdentifier: IdentifierRecognizers.Matching(idShape));
+
+        var invented = Call("promote", new Dictionary<string, object?> { ["user"] = "adm_backup" }, User("Promote usr_alice."));
+        Assert.Equal(ToolGateAction.Block, (await gate.InspectAsync(invented)).Action);   // adm_backup never surfaced
+
+        var observed = Call("promote", new Dictionary<string, object?> { ["user"] = "usr_alice" }, User("Promote usr_alice."));
+        Assert.Equal(ToolGateAction.Allow, (await gate.InspectAsync(observed)).Action);    // usr_alice came from the user
+    }
+
+    [Fact]
+    public async Task AlphanumericMinLengthRecognizer_ValidatesLongAlphaIds()
+    {
+        var gate = new ReferentialIntegrityGate(["user"], ["promote"], isIdentifier: IdentifierRecognizers.AlphanumericMinLength(6));
+        var call = Call("promote", new Dictionary<string, object?> { ["user"] = "adminbackup" }, User("Promote someoneelse."));
+        Assert.Equal(ToolGateAction.Block, (await gate.InspectAsync(call)).Action);   // long alpha token, never observed
+    }
+
     [Fact]
     public async Task Allows_Id_FromTrustedLookupResult()
     {
