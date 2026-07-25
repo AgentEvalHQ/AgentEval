@@ -32,4 +32,15 @@ public sealed record GatedToolResult(
     int FunctionCallIndex,
     int FunctionCount,
     bool IsStreaming,
-    IReadOnlyList<ChatMessage>? Messages);
+    IReadOnlyList<ChatMessage>? Messages)
+{
+    private string? _resultText;
+
+    /// <summary>
+    /// The <see cref="Result"/> serialized to text ONCE and cached (Phase 5, P5-5). Result gates read THIS instead
+    /// of each calling <c>GateText.Stringify(Result)</c> — the tool-gate loop reuses one <see cref="GatedToolResult"/>
+    /// across gates while the result is unchanged, so a large result is serialized once, not once per gate. (The
+    /// cache field is excluded from record equality, which is over the ctor members only.)
+    /// </summary>
+    public string ResultText => _resultText ??= GateText.Stringify(Result);
+}

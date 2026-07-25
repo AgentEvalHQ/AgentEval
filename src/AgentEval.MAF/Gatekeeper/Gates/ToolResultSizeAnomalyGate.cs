@@ -74,7 +74,7 @@ public sealed class ToolResultSizeAnomalyGate : IToolResultGate
     public ValueTask<ToolResultVerdict> InspectAsync(GatedToolResult result, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(result);
-        var text = GateText.Stringify(result.Result);
+        var text = result.ResultText;
         var size = text.Length;
 
         // Atomically reads the baseline as it stood BEFORE this call AND records this call's size into that

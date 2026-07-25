@@ -43,6 +43,18 @@ public class CompositeJudgeGateTests
         public JudgeVerdict Parse(string reply) => reply.Contains("BLOCK") ? JudgeVerdict.Blocked("x", null, 0.9) : JudgeVerdict.Allowed();
     }
 
+    // Captures exactly what text Prefilter and BuildPrompt each receive — used to prove P5-3 bounds only the
+    // model prompt, never the prefilter.
+    private sealed class CapturingRubric : IJudgeRubric
+    {
+        public string? PrefilterSaw { get; private set; }
+        public string? PromptSaw { get; private set; }
+        public string Axis => "capture-axis";
+        public bool Prefilter(string text) { PrefilterSaw = text; return true; }
+        public string BuildPrompt(string text) { PromptSaw = text; return text; }
+        public JudgeVerdict Parse(string reply) => JudgeVerdict.Allowed();
+    }
+
     private static CompositeJudgeGate<KeywordRubric> Gate(IChatClient model, JudgeGateOptions? opts = null)
         => new(new KeywordRubric(), model, opts);
 
@@ -228,6 +240,124 @@ public class CompositeJudgeGateTests
     [Fact]
     public void NullModel_Throws()
         => Assert.Throws<ArgumentNullException>(() => new CompositeJudgeGate<KeywordRubric>(new KeywordRubric(), null!));
+
+    // ── P5-2: shared spend governor ──
+
+    [Fact]
+    public async Task SpendGovernor_BudgetExhausted_FailOpen_Allows_AndSkipsModel()
+    {
+        // maxTokens=1 is smaller than any real estimate (chars/4 + 256 output cap), so the first reservation is
+        // already refused — the model must be skipped and the turn allowed (fail-open default), with provenance.
+        var model = new ScriptedChatClient().AddText("BLOCK");   // would block IF called
+        var gov = new JudgeSpendGovernor(maxCalls: 100, maxTokens: 1);
+        var v = await Gate(model, new JudgeGateOptions { SpendGovernor = gov }).InspectAsync("please scan this");
+
+        Assert.Equal(GateAction.Allow, v.Action);
+        Assert.Empty(model.ReceivedMessages);   // proves the model was never called — spend was refused
+        Assert.NotNull(v.Provenance);
+        Assert.Contains("budget-exhausted", v.Provenance!.RuleName, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task SpendGovernor_BudgetExhausted_FailClosed_Blocks_AndSkipsModel()
+    {
+        var model = new ScriptedChatClient().AddText("ALLOW");   // would allow IF called
+        var gov = new JudgeSpendGovernor(maxCalls: 100, maxTokens: 1);
+        var opts = new JudgeGateOptions { SpendGovernor = gov, FailClosedOnBudgetExhausted = true };
+
+        var v = await Gate(model, opts).InspectAsync("please scan this");
+
+        Assert.Equal(GateAction.Block, v.Action);
+        Assert.Contains("budget", v.Reason!, StringComparison.OrdinalIgnoreCase);
+        Assert.Empty(model.ReceivedMessages);   // fail-closed still skips the (unaffordable) model call
+    }
+
+    [Fact]
+    public async Task SpendGovernor_WithinBudget_JudgeRunsNormally()
+    {
+        var model = new ScriptedChatClient().AddText("BLOCK");
+        var gov = new JudgeSpendGovernor(maxCalls: 100, maxTokens: 1_000_000);
+
+        var v = await Gate(model, new JudgeGateOptions { SpendGovernor = gov }).InspectAsync("please scan this");
+
+        Assert.Equal(GateAction.Block, v.Action);      // budget ok ⇒ the judge actually ran
+        Assert.NotEmpty(model.ReceivedMessages);
+    }
+
+    [Fact]
+    public async Task SpendGovernor_PrefilterSkip_DoesNotConsumeBudget()
+    {
+        // A turn that never reaches the model (prefilter false) must not spend the wallet — otherwise benign
+        // traffic would starve the budget before any judge-worthy turn arrives.
+        var gov = new JudgeSpendGovernor(maxCalls: 1, maxTokens: 1_000_000);
+        var opts = new JudgeGateOptions { SpendGovernor = gov };
+
+        _ = await Gate(new ScriptedChatClient().AddText("BLOCK"), opts).InspectAsync("nothing interesting");   // no "scan"
+
+        // The single call in the budget is still available — a real (scanned) turn now runs the model.
+        var model = new ScriptedChatClient().AddText("BLOCK");
+        var v = await Gate(model, opts).InspectAsync("please scan this");
+        Assert.Equal(GateAction.Block, v.Action);
+        Assert.NotEmpty(model.ReceivedMessages);
+    }
+
+    // ── P5-3: bound judge input ──
+
+    [Fact]
+    public async Task InputBound_UnderCap_PassesFullTextToModel()
+    {
+        var rubric = new CapturingRubric();
+        var text = "please scan this " + new string('x', 100);
+        var gate = new CompositeJudgeGate<CapturingRubric>(rubric, new ScriptedChatClient().AddText("ALLOW"),
+            new JudgeGateOptions { MaxInputChars = 16_000 });
+
+        await gate.InspectAsync(text);
+
+        Assert.Equal(text, rubric.PromptSaw);   // well under the cap ⇒ untouched
+    }
+
+    [Fact]
+    public async Task InputBound_OverCap_TruncatesToHeadTailSandwich_ButPrefilterSeesFullText()
+    {
+        var rubric = new CapturingRubric();
+        var text = "HEADSTART " + new string('x', 5000) + " TAILEND";
+        var gate = new CompositeJudgeGate<CapturingRubric>(rubric, new ScriptedChatClient().AddText("ALLOW"),
+            new JudgeGateOptions { MaxInputChars = 400 });
+
+        await gate.InspectAsync(text);
+
+        // Prefilter saw the FULL text (it decides whether to invoke the judge at all).
+        Assert.Equal(text, rubric.PrefilterSaw);
+
+        // The MODEL saw a bounded head+tail sandwich: both boundaries survive, the middle is dropped + marked.
+        Assert.NotNull(rubric.PromptSaw);
+        Assert.StartsWith("HEADSTART", rubric.PromptSaw);
+        Assert.EndsWith("TAILEND", rubric.PromptSaw);
+        Assert.Contains("truncated", rubric.PromptSaw, StringComparison.Ordinal);
+        Assert.True(rubric.PromptSaw!.Length < text.Length);
+        // Head + tail ≈ MaxInputChars (400) plus the short marker — nowhere near the 5000-char original.
+        Assert.True(rubric.PromptSaw.Length < 600);
+    }
+
+    [Fact]
+    public async Task InputBound_Zero_MeansUnbounded()
+    {
+        var rubric = new CapturingRubric();
+        var text = "please scan this " + new string('y', 5000);
+        var gate = new CompositeJudgeGate<CapturingRubric>(rubric, new ScriptedChatClient().AddText("ALLOW"),
+            new JudgeGateOptions { MaxInputChars = 0 });
+
+        await gate.InspectAsync(text);
+
+        Assert.Equal(text, rubric.PromptSaw);   // 0 = unbounded ⇒ full text through
+    }
+
+    [Theory]
+    [InlineData(-1)]     // negative
+    [InlineData(1)]      // positive but below the floor — would collapse the head+tail sandwich (audit LOW)
+    [InlineData(255)]    // just under the 256 floor
+    public void InvalidMaxInputChars_Throws(int maxInputChars)
+        => Assert.Throws<ArgumentOutOfRangeException>(() => Gate(new ScriptedChatClient(), new JudgeGateOptions { MaxInputChars = maxInputChars }));
 
     // A fast model that respects cancellation but otherwise never returns in time (for the timeout path).
     private sealed class DelayingChatClient : IChatClient

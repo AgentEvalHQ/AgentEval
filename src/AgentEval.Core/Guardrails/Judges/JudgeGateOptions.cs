@@ -25,10 +25,44 @@ public sealed class JudgeGateOptions
     public int MaxOutputTokens { get; init; } = 256;
 
     /// <summary>
+    /// Cap on the number of input characters the judge sends to the model (Phase 5, P5-3 — bounds cost, latency,
+    /// and context-overflow risk on a pathologically large turn). Over the cap, the text is reduced to a
+    /// head + tail sandwich with a truncation marker so an injection payload at <i>either</i> boundary is still
+    /// seen. The <see cref="IJudgeRubric.Prefilter"/> always runs on the FULL text — only the model prompt is
+    /// bounded. Default 16000 (≈4k tokens). <c>0</c> means unbounded (the pre-P5-3 behavior); any other value must
+    /// be at least 256 (a floor, so a fat-fingered tiny cap can't collapse the head+tail sandwich and blind the
+    /// judge) — the gate constructor throws otherwise.
+    /// </summary>
+    public int MaxInputChars { get; init; } = 16_000;
+
+    /// <summary>
     /// When the judge is <see cref="JudgeDecision.Inconclusive"/> (timeout / model error / unparseable reply),
     /// whether to block (fail-closed) or allow (fail-open, observe-only). Default <c>true</c> (fail-closed) — a
     /// gate that cannot prove a turn safe should not pass it under a blocking policy. Enforcement is still gated
     /// by the run gate's <see cref="EvalGatePolicy"/> (a block only stops the run under a blocking policy).
     /// </summary>
     public bool FailClosedOnInconclusive { get; init; } = true;
+
+    /// <summary>
+    /// Optional shared token + call budget across judges (Phase 5, P5-2 — a denial-of-wallet / runaway-cost bound).
+    /// When set, the gate reserves against it before calling the model; if the budget for the current window is
+    /// exhausted the model call is SKIPPED and the turn degrades per <see cref="FailClosedOnBudgetExhausted"/>.
+    /// Share one instance across every <see cref="CompositeJudgeGate{TRubric}"/> that draws on the same wallet.
+    /// Default <c>null</c> (no budget cap — the pre-P5-2 behavior).
+    /// </summary>
+    public JudgeSpendGovernor? SpendGovernor { get; init; }
+
+    /// <summary>
+    /// When <see cref="SpendGovernor"/> refuses a reservation (budget exhausted), whether the un-run judge blocks
+    /// (fail-closed) or allows (fail-open, recorded as "unjudged — budget exhausted"). Default <c>false</c>
+    /// (fail-open): a spent <i>cost</i> budget must not turn into a full traffic outage — exhaustion is a resource
+    /// limit, not a detection failure, so the judge degrades to advisory rather than blocking everything. Set
+    /// <c>true</c> only where an unjudged turn is unacceptable and a judge outage blocking all traffic is preferred.
+    /// <para><b>Attack note:</b> with the default (fail-open) and a <i>shared</i> <see cref="SpendGovernor"/>, an
+    /// adversary who first floods the window's budget with junk turns can then push a payload turn past this judge
+    /// un-inspected. This judge is one layer — deterministic gates still run — but if the semantic judge is
+    /// load-bearing for your threat model, either give it an isolated (not shared) governor, size the budget above
+    /// plausible adversarial volume, or set this <c>true</c> and accept the self-DoS tradeoff.</para>
+    /// </summary>
+    public bool FailClosedOnBudgetExhausted { get; init; }
 }

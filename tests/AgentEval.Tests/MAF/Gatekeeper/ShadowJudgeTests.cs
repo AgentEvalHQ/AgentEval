@@ -92,6 +92,23 @@ public class ShadowJudgeTests
         Assert.NotNull(reported);   // the failure was reported, not thrown into the run
     }
 
+    [Fact]
+    public async Task ShadowJudge_FullQueue_CountsDropsVisibly()
+    {
+        // P5-7: a full bounded queue drops items VISIBLY — every enqueue is accounted for as Accepted or Dropped,
+        // and DroppedCount surfaces the backpressure. The single-consumer ordering guarantee is unchanged.
+        await using var pump = new ShadowJudgePump(new HangingShadowJudge(), queueCapacity: 1, drainTimeout: TimeSpan.FromMilliseconds(50));
+
+        const int total = 200;
+        for (var i = 0; i < total; i++)
+        {
+            pump.Enqueue(new ShadowJudgeContext($"r{i}", InputText: null, AgentName: null, Session: null));
+        }
+
+        Assert.Equal(total, pump.AcceptedCount + pump.DroppedCount);   // every enqueue is accounted for
+        Assert.True(pump.DroppedCount > 0);                            // backpressure was visible, not silent
+    }
+
     // ── streaming seam ──
 
     [Fact]

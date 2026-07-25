@@ -391,6 +391,137 @@ public class EvalGatingChatClientTests
                 : MetricResult.Fail(Name, _explanation ?? "failed"));
     }
 
+    // ── P5-6: concurrent WarnOnly gate panel ──
+
+    [Fact]
+    public async Task WarnOnly_MultiPreGatePanel_RunsConcurrently()
+    {
+        // Three WarnOnly pre-gates each hold for a moment; if the panel overlaps them, at least two are inside
+        // InspectAsync at once. Sequential execution would only ever see one.
+        var tracker = new ConcurrencyTracker();
+        var scripted = new ScriptedChatClient().AddText("ok");
+        var gates = new IChatGate[]
+        {
+            new ConcurrencyProbeGate(tracker, "probe-a"),
+            new ConcurrencyProbeGate(tracker, "probe-b"),
+            new ConcurrencyProbeGate(tracker, "probe-c"),
+        };
+        var client = scripted.AsBuilder().UseEvalGate(pre: gates, policy: EvalGatePolicy.WarnOnly).Build();
+
+        await client.GetResponseAsync(UserSays("hi"));
+
+        Assert.True(tracker.MaxConcurrent >= 2, $"expected overlap, saw max {tracker.MaxConcurrent}");
+    }
+
+    [Fact]
+    public async Task ThrowOnFail_MultiPreGatePanel_StaysSequential()
+    {
+        // Contrast: ThrowOnFail short-circuits in list order, so its gates must NOT overlap (the sequential path).
+        // All probes Allow, so nothing throws — the point is only that they ran one at a time.
+        var tracker = new ConcurrencyTracker();
+        var scripted = new ScriptedChatClient().AddText("ok");
+        var gates = new IChatGate[]
+        {
+            new ConcurrencyProbeGate(tracker, "probe-a"),
+            new ConcurrencyProbeGate(tracker, "probe-b"),
+            new ConcurrencyProbeGate(tracker, "probe-c"),
+        };
+        var client = scripted.AsBuilder().UseEvalGate(pre: gates, policy: EvalGatePolicy.ThrowOnFail).Build();
+
+        await client.GetResponseAsync(UserSays("hi"));
+
+        Assert.Equal(1, tracker.MaxConcurrent);   // strictly one gate at a time
+    }
+
+    [Fact]
+    public async Task WarnOnly_ConcurrentPanel_RecordsEveryVerdict_IncludingABlock()
+    {
+        // Concurrency must not lose evidence: every gate's verdict is still recorded (in list order), and a
+        // WarnOnly Block is still observe-only — the run proceeds.
+        var trace = new AgentTrace();
+        var scripted = new ScriptedChatClient().AddText("proceeds anyway");
+        var gates = new IChatGate[]
+        {
+            new AllowNamedGate("gate-1"),
+            new AlwaysBlockGate(),          // blocks, but WarnOnly ⇒ recorded, not enforced
+            new AllowNamedGate("gate-3"),
+        };
+        var client = scripted.AsBuilder().UseEvalGate(pre: gates, policy: EvalGatePolicy.WarnOnly, trace: trace).Build();
+
+        var response = await client.GetResponseAsync(UserSays("hi"));
+
+        Assert.Equal("proceeds anyway", response.Text);   // WarnOnly never blocks
+        Assert.Equal(3, trace.Metadata!.Keys.Count(k => k.StartsWith("gate.pre.", StringComparison.Ordinal)));
+    }
+
+    [Fact]
+    public async Task WarnOnly_MultiPostGatePanel_RunsConcurrently()
+    {
+        var tracker = new ConcurrencyTracker();
+        var scripted = new ScriptedChatClient().AddText("some response text");
+        var gates = new IChatGate[]
+        {
+            new ConcurrencyProbeGate(tracker, "post-a"),
+            new ConcurrencyProbeGate(tracker, "post-b"),
+        };
+        var client = scripted.AsBuilder().UseEvalGate(post: gates, policy: EvalGatePolicy.WarnOnly).Build();
+
+        await client.GetResponseAsync(UserSays("hi"));
+
+        Assert.True(tracker.MaxConcurrent >= 2, $"expected overlap, saw max {tracker.MaxConcurrent}");
+    }
+
+    /// <summary>Tracks the peak number of gates concurrently inside <see cref="ConcurrencyProbeGate.InspectAsync"/>.</summary>
+    private sealed class ConcurrencyTracker
+    {
+        private int _current;
+        private int _max;
+        public int MaxConcurrent => Volatile.Read(ref _max);
+
+        public void Enter()
+        {
+            var now = Interlocked.Increment(ref _current);
+            int seen;
+            while (now > (seen = Volatile.Read(ref _max)))
+            {
+                Interlocked.CompareExchange(ref _max, now, seen);
+            }
+        }
+
+        public void Exit() => Interlocked.Decrement(ref _current);
+    }
+
+    /// <summary>Allows, but holds inside InspectAsync long enough for a concurrent panel to overlap.</summary>
+    private sealed class ConcurrencyProbeGate : IChatGate
+    {
+        private readonly ConcurrencyTracker _tracker;
+        public ConcurrencyProbeGate(ConcurrencyTracker tracker, string name) { _tracker = tracker; PolicyName = name; }
+        public string PolicyName { get; }
+
+        public async ValueTask<GateVerdict> InspectAsync(string text, CancellationToken cancellationToken = default)
+        {
+            _tracker.Enter();
+            try
+            {
+                await Task.Delay(60, cancellationToken).ConfigureAwait(false);
+                return GateVerdict.Allow(PolicyName);
+            }
+            finally
+            {
+                _tracker.Exit();
+            }
+        }
+    }
+
+    /// <summary>Allows under a caller-chosen policy name (so several distinct verdicts can be recorded).</summary>
+    private sealed class AllowNamedGate : IChatGate
+    {
+        public AllowNamedGate(string name) => PolicyName = name;
+        public string PolicyName { get; }
+        public ValueTask<GateVerdict> InspectAsync(string text, CancellationToken cancellationToken = default)
+            => new(GateVerdict.Allow(PolicyName));
+    }
+
     // ── Fleet Correlation Layer — wiring through EvalGatingChatClient/UseEvalGate (P1) ──
 
     [Fact]

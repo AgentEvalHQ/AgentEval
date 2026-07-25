@@ -228,6 +228,147 @@ public class TaintTrackingGateTests
         Assert.Equal(1, GlassBoxEvidence.FromTrace(trace).GateBlockCount);
     }
 
+    // ── P5-1: incremental per-run taint ledger (kicks in under a run scope) ──
+
+    [Fact]
+    public async Task Incremental_WithinScope_BlocksReadThenPostInOneCall()
+    {
+        // Parity: with a run scope in effect, the incremental path must reach the same verdict as the stateless one.
+        var gate = new TaintTrackingGate(["read_secrets"], ["http_post"]);
+        using var scope = AgentRunScope.Begin(null, "T", null);
+        var call = Call("http_post", new Dictionary<string, object?> { ["body"] = "here you go: demo-9a8b7c6d5e4f" },
+            AssistantCall("c1", "read_secrets"),
+            ToolResult("c1", "API_KEY=demo-9a8b7c6d5e4f"));
+
+        Assert.Equal(ToolGateAction.Block, (await gate.InspectAsync(call)).Action);
+    }
+
+    [Fact]
+    public async Task Incremental_TaintPersists_AfterSourceResultDroppedFromLaterHistory()
+    {
+        // The core reducer-can't-launder property: an earlier call folds the secret into the run ledger; a later
+        // sink call whose OWN history no longer contains the source is STILL blocked (taint only accumulates).
+        var gate = new TaintTrackingGate(["read_secrets"], ["http_post"]);
+        using var scope = AgentRunScope.Begin(null, "T", null);
+
+        var seed = Call("log", new Dictionary<string, object?> { ["msg"] = "ok" },   // non-sink, folds the source result
+            AssistantCall("c1", "read_secrets"),
+            ToolResult("c1", "API_KEY=demo-9a8b7c6d5e4f"));
+        Assert.Equal(ToolGateAction.Allow, (await gate.InspectAsync(seed)).Action);
+
+        var sink = Call("http_post", new Dictionary<string, object?> { ["body"] = "leak: demo-9a8b7c6d5e4f" });   // empty history
+        Assert.Equal(ToolGateAction.Block, (await gate.InspectAsync(sink)).Action);
+    }
+
+    [Fact]
+    public async Task Incremental_FoldsMultipleSources_AcrossGrowingHistory()
+    {
+        // Append-only growth across calls: each call folds only the newly-appeared source; both end up tainted.
+        var gate = new TaintTrackingGate(["read_secrets"], ["http_post"]);
+        using var scope = AgentRunScope.Begin(null, "T", null);
+
+        await gate.InspectAsync(Call("log", new Dictionary<string, object?> { ["msg"] = "ok" },
+            AssistantCall("c1", "read_secrets"),
+            ToolResult("c1", "API_KEY=secretone-11112222")));
+
+        await gate.InspectAsync(Call("log", new Dictionary<string, object?> { ["msg"] = "ok" },
+            AssistantCall("c1", "read_secrets"),
+            ToolResult("c1", "API_KEY=secretone-11112222"),
+            AssistantCall("c2", "read_secrets"),
+            ToolResult("c2", "API_KEY=secrettwo-33334444")));
+
+        Assert.Equal(ToolGateAction.Block, (await gate.InspectAsync(
+            Call("http_post", new Dictionary<string, object?> { ["body"] = "leak secretone-11112222" }))).Action);
+        Assert.Equal(ToolGateAction.Block, (await gate.InspectAsync(
+            Call("http_post", new Dictionary<string, object?> { ["body"] = "leak secrettwo-33334444" }))).Action);
+    }
+
+    [Fact]
+    public async Task Incremental_TaintDoesNotBleedAcrossRuns()
+    {
+        // Per-run keying: a secret folded in run 1 must not taint run 2's sink (which never called the source).
+        var gate = new TaintTrackingGate(["read_secrets"], ["http_post"]);
+
+        using (var run1 = AgentRunScope.Begin(null, "T", null))
+        {
+            await gate.InspectAsync(Call("log", new Dictionary<string, object?> { ["msg"] = "ok" },
+                AssistantCall("c1", "read_secrets"),
+                ToolResult("c1", "API_KEY=demo-9a8b7c6d5e4f")));
+        }
+
+        using (var run2 = AgentRunScope.Begin(null, "T", null))
+        {
+            var sink = Call("http_post", new Dictionary<string, object?> { ["body"] = "value demo-9a8b7c6d5e4f" });
+            Assert.Equal(ToolGateAction.Allow, (await gate.InspectAsync(sink)).Action);   // run1's taint stays in run1
+        }
+    }
+
+    [Fact]
+    public async Task Incremental_ShrunkHistory_RetainsPriorTaint_AndFoldsRemaining()
+    {
+        // A reducer summarizes the prefix, shrinking the list (Count drops below the cursor). The stale cursor
+        // triggers a from-top reprocess: prior taint is retained AND whatever remains is re-folded.
+        var gate = new TaintTrackingGate(["read_secrets"], ["http_post"]);
+        using var scope = AgentRunScope.Begin(null, "T", null);
+
+        await gate.InspectAsync(Call("log", new Dictionary<string, object?> { ["msg"] = "ok" },
+            AssistantCall("c1", "read_secrets"),
+            ToolResult("c1", "API_KEY=secretone-11112222"),
+            AssistantCall("c2", "read_secrets"),
+            ToolResult("c2", "API_KEY=secrettwo-33334444")));   // cursor advances to 4
+
+        // History shrank to a single summary message (Count 1 < cursor 4) that still contains secret #2.
+        await gate.InspectAsync(Call("log", new Dictionary<string, object?> { ["msg"] = "ok" },
+            AssistantCall("c9", "read_secrets"),
+            ToolResult("c9", "API_KEY=secrettwo-33334444")));
+
+        // Secret #1 (only ever seen pre-shrink) is retained; secret #2 (present post-shrink) is still tainted.
+        Assert.Equal(ToolGateAction.Block, (await gate.InspectAsync(
+            Call("http_post", new Dictionary<string, object?> { ["body"] = "leak secretone-11112222" }))).Action);
+        Assert.Equal(ToolGateAction.Block, (await gate.InspectAsync(
+            Call("http_post", new Dictionary<string, object?> { ["body"] = "leak secrettwo-33334444" }))).Action);
+    }
+
+    [Fact]
+    public async Task Incremental_SlidingWindowReducer_ConstantCount_StillTaints()
+    {
+        // Regression for the P5-1 audit HIGH: a keep-last-N reducer keeps the message Count constant while rotating a
+        // NEW source result into the window. A positional cursor would skip it (fail open); the full re-walk catches it.
+        var gate = new TaintTrackingGate(["read_secrets"], ["http_post"]);
+        using var scope = AgentRunScope.Begin(null, "T", null);
+
+        // Call 1: a 4-message window with NO source — this is what advanced the old cursor to 4.
+        await gate.InspectAsync(Call("http_post", new Dictionary<string, object?> { ["body"] = "nothing to see" },
+            new ChatMessage(ChatRole.User, "hi"),
+            AssistantCall("a1", "get_weather"),
+            ToolResult("a1", "sunny"),
+            new ChatMessage(ChatRole.Assistant, "ok")));
+
+        // Call 2: SAME Count (4), but the window slid — read_secrets and its SECRET result rotated in at the tail.
+        var sink = Call("http_post", new Dictionary<string, object?> { ["body"] = "leak: demo-9a8b7c6d5e4f" },
+            ToolResult("a1", "sunny"),
+            new ChatMessage(ChatRole.Assistant, "ok"),
+            AssistantCall("c2", "read_secrets"),
+            ToolResult("c2", "API_KEY=demo-9a8b7c6d5e4f"));
+
+        Assert.Equal(ToolGateAction.Block, (await gate.InspectAsync(sink)).Action);   // must NOT fail open
+    }
+
+    [Fact]
+    public async Task Incremental_ResultBeforeItsSourceCall_StillTaints()
+    {
+        // Regression for the P5-1 audit MEDIUM: a reordered history where the source RESULT precedes its CALL. The
+        // two-pass fold collects all source CallIds first, so the result is still attributed and tainted.
+        var gate = new TaintTrackingGate(["read_secrets"], ["http_post"]);
+        using var scope = AgentRunScope.Begin(null, "T", null);
+
+        var sink = Call("http_post", new Dictionary<string, object?> { ["body"] = "leak: demo-9a8b7c6d5e4f" },
+            ToolResult("c1", "API_KEY=demo-9a8b7c6d5e4f"),   // result appears BEFORE its call
+            AssistantCall("c1", "read_secrets"));
+
+        Assert.Equal(ToolGateAction.Block, (await gate.InspectAsync(sink)).Action);
+    }
+
     private sealed class Cyclic
     {
         public Cyclic? Self { get; set; }

@@ -166,6 +166,60 @@ public class JudgeCompositionTests
     }
 
     [Fact]
+    public async Task Cache_TtlExpiry_ReJudgesAfterLifetime()
+    {
+        // P5-4: a memoized allow expires after the TTL, so a later-improved judge gets to re-evaluate.
+        var clock = new FakeClock(new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero));
+        var inner = new StubGate(GateVerdict.Allow("j"));
+        var cache = new JudgeVerdictCache(inner, timeProvider: clock, ttl: TimeSpan.FromMinutes(10));
+
+        await cache.InspectAsync("x");   // miss → cached
+        await cache.InspectAsync("x");   // hit
+        Assert.Equal(1, inner.Calls);
+
+        clock.Advance(TimeSpan.FromMinutes(11));
+        await cache.InspectAsync("x");   // expired → re-judged
+        Assert.Equal(2, inner.Calls);
+    }
+
+    [Fact]
+    public async Task Cache_Lru_EvictsLeastRecentlyUsed_WhenFull()
+    {
+        // P5-4: a full cache evicts the LRU entry (not "stop admitting"). Touching "a" spares it; "b" is evicted.
+        var inner = new StubGate(GateVerdict.Allow("j"));
+        var cache = new JudgeVerdictCache(inner, maxEntries: 2);
+
+        await cache.InspectAsync("a");   // cache a       (inner calls: 1)
+        await cache.InspectAsync("b");   // cache b, full (2)
+        await cache.InspectAsync("a");   // hit → a is now MRU, b is LRU
+        await cache.InspectAsync("c");   // cache c → evicts LRU (b) (3)
+        Assert.Equal(2, cache.Count);
+
+        var calls = inner.Calls;
+        await cache.InspectAsync("a");   // still cached → hit
+        Assert.Equal(calls, inner.Calls);
+        await cache.InspectAsync("b");   // was evicted → miss (re-judged)
+        Assert.Equal(calls + 1, inner.Calls);
+    }
+
+    [Fact]
+    public async Task Cache_InvalidationKey_IsFoldedIntoTheCacheKey()
+    {
+        // P5-4: the same text under different invalidation keys hashes differently, so a judge/prompt/model change
+        // never serves a stale precedent. (Each cache still memoizes correctly under its own key.)
+        var innerV1 = new StubGate(GateVerdict.Allow("j"));
+        var innerV2 = new StubGate(GateVerdict.Allow("j"));
+        var v1 = new JudgeVerdictCache(innerV1, invalidationKey: "judge@v1");
+        var v2 = new JudgeVerdictCache(innerV2, invalidationKey: "judge@v2");
+
+        await v1.InspectAsync("same"); await v1.InspectAsync("same");   // v1: miss then hit
+        await v2.InspectAsync("same");                                   // v2: independent miss
+
+        Assert.Equal(1, innerV1.Calls);   // v1 memoized under its own key
+        Assert.Equal(1, innerV2.Calls);   // v2 did not see v1's precedent
+    }
+
+    [Fact]
     public async Task Cache_ThrowingOnLookup_DoesNotTurnAllowIntoBlock()
     {
         // Phase 3 review #2: the precedent hook is pure observability — a throw must not propagate out of

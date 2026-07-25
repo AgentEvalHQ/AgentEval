@@ -22,6 +22,10 @@ namespace AgentEval.Guardrails.Judges;
 public sealed class CompositeJudgeGate<TRubric> : IChatGate, IRequiresCalibration
     where TRubric : IJudgeRubric
 {
+    // Floor for a bounded (non-zero) MaxInputChars — below this the head+tail sandwich carries too little signal to
+    // judge with. 256 chars ≈ 64 tokens of head + 64 of tail.
+    private const int MinBoundedInputChars = 256;
+
     private readonly TRubric _rubric;
     private readonly IChatClient _fastModel;
     private readonly JudgeGateOptions _options;
@@ -55,6 +59,14 @@ public sealed class CompositeJudgeGate<TRubric> : IChatGate, IRequiresCalibratio
             throw new ArgumentOutOfRangeException(nameof(options), "JudgeGateOptions.BlockThreshold must be in [0, 1].");
         }
 
+        // 0 = unbounded; otherwise a floor so a fat-fingered tiny cap can't collapse the head+tail sandwich to just
+        // the truncation marker and blind the judge (audit LOW).
+        if (_options.MaxInputChars < 0 || (_options.MaxInputChars > 0 && _options.MaxInputChars < MinBoundedInputChars))
+        {
+            throw new ArgumentOutOfRangeException(nameof(options),
+                $"JudgeGateOptions.MaxInputChars must be 0 (unbounded) or at least {MinBoundedInputChars}.");
+        }
+
         PolicyName = $"judge:{rubric.Axis}";
     }
 
@@ -66,8 +78,20 @@ public sealed class CompositeJudgeGate<TRubric> : IChatGate, IRequiresCalibratio
             return GateVerdict.Allow(PolicyName);   // cheap short-circuit — most turns never reach the model
         }
 
-        var verdict = await JudgeAsync(text, cancellationToken).ConfigureAwait(false);
         var ruleName = $"judge:{_rubric.Axis}";
+
+        // P5-2: reserve against the shared token+call wallet BEFORE the model call. On exhaustion, skip the model
+        // and degrade to a recorded "unjudged — budget exhausted" verdict (fail-open advisory by default).
+        if (_options.SpendGovernor is { } governor && !governor.TryReserve(EstimateTokens(text)))
+        {
+            var exhaustedReason = $"{_rubric.Axis} judge unjudged — spend budget exhausted";
+            var exhaustedProvenance = new GateProvenance($"{ruleName}:budget-exhausted", Array.Empty<string>());
+            return _options.FailClosedOnBudgetExhausted
+                ? GateVerdict.Block(PolicyName, $"{exhaustedReason} (fail-closed)") with { Provenance = exhaustedProvenance }
+                : GateVerdict.Allow(PolicyName) with { Provenance = exhaustedProvenance };
+        }
+
+        var verdict = await JudgeAsync(text, cancellationToken).ConfigureAwait(false);
         var evidence = verdict.Spans ?? Array.Empty<string>();
 
         return verdict.Decision switch
@@ -103,6 +127,36 @@ public sealed class CompositeJudgeGate<TRubric> : IChatGate, IRequiresCalibratio
         };
     }
 
+    // P5-3: bound the text the model sees to a head + tail sandwich when it exceeds MaxInputChars, so a
+    // pathologically large turn can't blow up cost/latency/context — while an injection payload at EITHER
+    // boundary is still visible. The prefilter has already run on the full text; only the prompt is bounded.
+    private string BoundInput(string text)
+    {
+        var max = _options.MaxInputChars;
+        if (max <= 0 || text.Length <= max)
+        {
+            return text;   // unbounded, or already within the cap
+        }
+
+        var half = max / 2;
+        var droppedCount = text.Length - (half * 2);
+        return string.Concat(
+            text.AsSpan(0, half),
+            $"\n…[judge input truncated: {droppedCount} chars omitted]…\n",
+            text.AsSpan(text.Length - half));
+    }
+
+    // P5-2: a deliberately cheap, dependency-free token estimate for the spend reservation — input chars/4 (the
+    // usual rough chars-per-token ratio) plus the output-token cap. It only needs to bound spend, not be exact;
+    // the reservation is a ceiling, so over-estimating is the safe direction. The input length is capped at
+    // MaxInputChars (P5-3) because that is all the model actually sees — otherwise a huge benign turn would
+    // over-reserve on chars that BoundInput will drop, and could falsely exhaust the wallet.
+    private long EstimateTokens(string text)
+    {
+        var chars = _options.MaxInputChars > 0 ? Math.Min(text.Length, _options.MaxInputChars) : text.Length;
+        return ((long)chars / 4) + _options.MaxOutputTokens;
+    }
+
     private bool SafePrefilter(string text)
     {
         try
@@ -122,7 +176,7 @@ public sealed class CompositeJudgeGate<TRubric> : IChatGate, IRequiresCalibratio
         try
         {
             cts.CancelAfter(_options.Timeout);   // inside the try so a bad value degrades to Inconclusive, never escapes
-            var messages = new List<ChatMessage> { new(ChatRole.User, _rubric.BuildPrompt(text)) };
+            var messages = new List<ChatMessage> { new(ChatRole.User, _rubric.BuildPrompt(BoundInput(text))) };
             var options = new ChatOptions { MaxOutputTokens = _options.MaxOutputTokens, Temperature = 0f };
             var response = await _fastModel.GetResponseAsync(messages, options, cts.Token).ConfigureAwait(false);
             return _rubric.Parse(response.Text ?? string.Empty) ?? JudgeVerdict.Inconclusive($"{_rubric.Axis} rubric returned null");
