@@ -123,6 +123,7 @@ public static class AgentEvalRunGateExtensions
                     return Refusal(innerAgent, postOutcome.ReturnBody);
                 }
 
+                EmitRunReceipt(trace, seq, evidenceContext);   // P3-11: summarize the completed run
                 return response;
             },
             runStreamingFunc: (messages, session, options, innerAgent, ct) =>
@@ -374,6 +375,28 @@ public static class AgentEvalRunGateExtensions
     {
         evidence.Emit(record, seq);
         trace?.SetMetadata(record.TraceKey(seq), record.ToMetadata());
+    }
+
+    // P3-11: at the end of a completed (non-refused) run, summarize the run's RunLedger into a receipt and emit it
+    // as a gate.receipt.* record on the same F-C stream. Skipped entirely when there is nowhere to record it.
+    private static void EmitRunReceipt(AgentTrace? trace, int[] seq, GateEvidenceContext evidence)
+    {
+        if (trace is null && !evidence.HasSink)
+        {
+            return;
+        }
+
+        var scope = AgentRunScope.Current;
+        var receipt = RunLedger.ForCurrentRun().Summarize(scope?.RunId, scope?.AgentName, evidence.ConfigFingerprint, DateTimeOffset.UtcNow);
+        var record = evidence.Build(
+            stage: "receipt", policy: "run", action: "Receipt", referenceId: GateReferenceId.New(), reason: null,
+            severity: GateSeverity.Routine,
+            extra: new Dictionary<string, object?>
+            {
+                ["totalToolCalls"] = receipt.TotalToolCalls,
+                ["toolCallCounts"] = receipt.ToolCallCounts,
+            });
+        EmitEvidence(trace, evidence, Interlocked.Increment(ref seq[0]), record);
     }
 
     private static void RecordGate(AgentTrace? trace, int seq, string stage, GateVerdict verdict, string action, string referenceId, GateEvidenceContext evidence, bool failedClosedOnThrow = false)

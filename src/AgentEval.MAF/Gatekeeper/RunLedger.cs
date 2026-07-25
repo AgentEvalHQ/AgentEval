@@ -104,6 +104,19 @@ public sealed class RunLedger
         get { lock (_lock) { return _totalToolCalls; } }
     }
 
+    /// <summary>
+    /// Snapshots this run's accumulated tool-call activity into a <see cref="RunReceipt"/> (P3-11) — an atomic
+    /// copy under the ledger lock, so it is consistent even if a concurrent tool call is in flight.
+    /// </summary>
+    public RunReceipt Summarize(string? runId, string? agentName, string? configFingerprint, DateTimeOffset endedAtUtc)
+    {
+        lock (_lock)
+        {
+            return new RunReceipt(runId, agentName, configFingerprint, endedAtUtc, _totalToolCalls,
+                new Dictionary<string, int>(_toolCalls, StringComparer.OrdinalIgnoreCase));
+        }
+    }
+
     /// <summary>How many times a given tool has been recorded this run.</summary>
     public int ToolCallCount(string toolName)
     {
