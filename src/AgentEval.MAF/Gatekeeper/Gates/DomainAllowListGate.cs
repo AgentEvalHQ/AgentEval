@@ -5,6 +5,7 @@
 using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using AgentEval.Guardrails;
 
 namespace AgentEval.MAF.Gatekeeper;
 
@@ -33,14 +34,14 @@ public sealed class DomainAllowListGate : IToolGate
     // AND scheme-relative "//attacker.example" are all caught, not just http(s). Stops at the next delimiter
     // (including ? and #, so a query/fragment isn't folded into the host). Bounded (ReDoS-safe).
     private static readonly Regex UrlAuthority = new(
-        @"(?:[a-z][a-z0-9+.\-]*:)?//([^/\s""'<>\\)}?#]+)", RegexOptions.Compiled | RegexOptions.IgnoreCase, TimeSpan.FromMilliseconds(100));
+        @"(?:[a-z][a-z0-9+.\-]*:)?//([^/\s""'<>\\)}?#]+)", RegexOptions.Compiled | RegexOptions.IgnoreCase, GateRegexTimeouts.Standard);
 
     // A data: URI (data:[<mediatype>][;base64],<data>) has no host and so can never be host-allow-listed — in an
     // egress-controlled context it is un-vettable inline/exfil content. Conservative: requires the trailing comma
     // of a real data URI, so the literal word "data:" in prose does not false-positive. Bounded (ReDoS-safe).
     private static readonly Regex DataUri = new(
         @"\bdata:(?:[a-z][a-z0-9.+\-]*/[a-z0-9.+\-]+)?(?:;[a-z0-9\-]+(?:=[a-z0-9.\-]+)?)*,",
-        RegexOptions.Compiled | RegexOptions.IgnoreCase, TimeSpan.FromMilliseconds(100));
+        RegexOptions.Compiled | RegexOptions.IgnoreCase, GateRegexTimeouts.Standard);
 
     private readonly HashSet<string> _allowed;
     private readonly string[] _hostArguments;

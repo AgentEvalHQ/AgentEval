@@ -3,6 +3,7 @@
 // Licensed under the MIT License.
 
 using System.Text.RegularExpressions;
+using AgentEval.Guardrails;
 
 namespace AgentEval.MAF.Gatekeeper;
 
@@ -31,7 +32,7 @@ namespace AgentEval.MAF.Gatekeeper;
 /// </summary>
 public sealed class ToolResultSecretGate : IToolResultGate
 {
-    private static readonly TimeSpan DefaultSecretTimeout = TimeSpan.FromMilliseconds(300);
+    private static readonly TimeSpan DefaultSecretTimeout = GateRegexTimeouts.Extended;
 
     private static readonly (string Name, Regex Pattern)[] DefaultPatterns = BuildPatterns(DefaultSecretTimeout);
 

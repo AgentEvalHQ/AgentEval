@@ -6,6 +6,7 @@ using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using AgentEval.Assertions;
+using AgentEval.Guardrails;
 using Microsoft.Extensions.AI;
 
 namespace AgentEval.MAF.Gatekeeper;
@@ -34,7 +35,7 @@ public sealed class ArgumentPatternApprovalGate : IToolApprovalGate
 
     /// <summary>Creates the gate from a pattern, compiled with a bounded (100 ms) match timeout (ReDoS-safe).</summary>
     public ArgumentPatternApprovalGate(string escalateWhenArgumentsMatch, string? policyName = null)
-        : this(new Regex(escalateWhenArgumentsMatch, RegexOptions.CultureInvariant, TimeSpan.FromMilliseconds(100)), policyName)
+        : this(new Regex(escalateWhenArgumentsMatch, RegexOptions.CultureInvariant, GateRegexTimeouts.Standard), policyName)
     {
     }
 
