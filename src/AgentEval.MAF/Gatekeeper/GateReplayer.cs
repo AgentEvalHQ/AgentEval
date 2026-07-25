@@ -36,17 +36,41 @@ public static class GateReplayer
         ArgumentNullException.ThrowIfNull(baseline);
         ArgumentNullException.ThrowIfNull(candidate);
 
-        var rows = new List<GateReplayRow>(calls.Count);
-        foreach (var call in calls)
-        {
-            var baselineResult = await EvaluateSequential(baseline, call, cancellationToken).ConfigureAwait(false);
-            var candidateResult = await EvaluateSequential(candidate, call, cancellationToken).ConfigureAwait(false);
+        var baselineResults = await EvaluateConfigurationAsync(
+            calls, baseline, "gate-replay-baseline", cancellationToken).ConfigureAwait(false);
+        var candidateResults = await EvaluateConfigurationAsync(
+            calls, candidate, "gate-replay-candidate", cancellationToken).ConfigureAwait(false);
 
-            var diverged = baselineResult.Action != candidateResult.Action;
-            rows.Add(new GateReplayRow(call, baselineResult, candidateResult, diverged));
+        var rows = new List<GateReplayRow>(calls.Count);
+        for (var i = 0; i < calls.Count; i++)
+        {
+            var baselineResult = baselineResults[i];
+            var candidateResult = candidateResults[i];
+            rows.Add(new GateReplayRow(
+                calls[i],
+                baselineResult,
+                candidateResult,
+                baselineResult.Action != candidateResult.Action));
         }
 
         return new GateReplayComparison(rows);
+    }
+
+    private static async Task<IReadOnlyList<ToolGateVerdict>> EvaluateConfigurationAsync(
+        IReadOnlyList<GatedToolCall> calls,
+        IReadOnlyList<IToolGate> gates,
+        string scopeName,
+        CancellationToken cancellationToken)
+    {
+        using var scope = AgentRunScope.BeginDetached(session: null, agentName: scopeName, trace: null);
+        var results = new List<ToolGateVerdict>(calls.Count);
+        foreach (var call in calls)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            results.Add(await EvaluateSequential(gates, call, cancellationToken).ConfigureAwait(false));
+        }
+
+        return results;
     }
 
     /// <summary>
