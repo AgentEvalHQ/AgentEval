@@ -258,7 +258,7 @@ public static class AgentEvalRunGateExtensions
                 var failVerdict = GateVerdict.Block(gate.PolicyName, $"gate evaluation threw ({ex.GetType().Name}) — failing closed");
                 var throwReferenceId = GateReferenceId.New();
                 RecordGate(trace, Interlocked.Increment(ref seq[0]), stage, failVerdict, "Block", throwReferenceId, evidence, failedClosedOnThrow: true);
-                return GateStageOutcome.Return(GateReferenceId.RefusalBody(throwReferenceId));
+                return GateStageOutcome.Return(GateReferenceId.RefusalBody(throwReferenceId, RefusalDispositionClassifier.Classify(gate.PolicyName, failedClosedOnThrow: true)));
             }
 
             if (verdict.Action != GateAction.Block)
@@ -282,7 +282,7 @@ public static class AgentEvalRunGateExtensions
                 // No safe version supplied ⇒ a hard block: the non-revealing refusal shape, both stages.
                 if (verdict.RedactedText is null)
                 {
-                    return GateStageOutcome.Return(GateReferenceId.RefusalBody(referenceId));
+                    return GateStageOutcome.Return(GateReferenceId.RefusalBody(referenceId, RefusalDispositionClassifier.Classify(verdict.PolicyName)));
                 }
 
                 // #12 / P2-1: RedactedText IS the SAFE version of the content, not a refusal. On run-POST it

@@ -838,7 +838,7 @@ public class AgentEvalGatekeeperExtensionsTests
         var resultText = scripted.ReceivedMessages[1]
             .SelectMany(m => m.Contents).OfType<FunctionResultContent>().Single().Result?.ToString();
         Assert.NotNull(resultText);
-        Assert.Contains("ACTION_NOT_AUTHORIZED", resultText, StringComparison.Ordinal);
+        Assert.Contains("_gatekeeper", resultText, StringComparison.Ordinal);
         Assert.DoesNotContain("the-real-secret-result", resultText, StringComparison.Ordinal);
 
         var key = trace.Metadata!.Keys.Single(k => k.StartsWith("gate.tool-result.", StringComparison.Ordinal));
