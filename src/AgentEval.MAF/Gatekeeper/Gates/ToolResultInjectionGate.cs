@@ -39,7 +39,7 @@ public sealed class ToolResultInjectionGate : IToolResultGate
     public ValueTask<ToolResultVerdict> InspectAsync(GatedToolResult result, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(result);
-        var text = GateText.Stringify(result.Result);
+        var text = result.ResultText;
         if (string.IsNullOrEmpty(text))
         {
             return new ValueTask<ToolResultVerdict>(ToolResultVerdict.Allow(PolicyName));

@@ -363,20 +363,19 @@ public static class AgentEvalToolGateExtensions
 
             // P0-3: the tool has now ACTUALLY executed — result gates only ever decide what the model gets to
             // see of a result that already happened, never whether the call itself was allowed.
+            // P5-5: ONE shared view whose ResultText is serialized lazily and reused across result gates while the
+            // result is unchanged (serialize once, not once per gate); re-created only when a Redact rewrites the
+            // result (a genuinely new value to serialize).
+            GatedToolResult MakeResultView() => new(
+                context.Function.Name, context.Arguments as IReadOnlyDictionary<string, object?>, toolResult,
+                agent.Name, context.Iteration, context.FunctionCallIndex, context.FunctionCount, context.IsStreaming,
+                context.Messages as IReadOnlyList<ChatMessage>);
+            var resultView = MakeResultView();
+
             foreach (var resultGate in frozenResultGates)
             {
                 ToolResultVerdict resultVerdict;
                 var resultStopwatch = telemetry is null ? null : Stopwatch.StartNew();
-                var resultView = new GatedToolResult(
-                    FunctionName: context.Function.Name,
-                    Arguments: context.Arguments as IReadOnlyDictionary<string, object?>,
-                    Result: toolResult,
-                    AgentName: agent.Name,
-                    Iteration: context.Iteration,
-                    FunctionCallIndex: context.FunctionCallIndex,
-                    FunctionCount: context.FunctionCount,
-                    IsStreaming: context.IsStreaming,
-                    Messages: context.Messages as IReadOnlyList<ChatMessage>);
 
                 try
                 {
@@ -446,6 +445,7 @@ public static class AgentEvalToolGateExtensions
                             RecordResultRedact(trace, Interlocked.Increment(ref gateSeq), resultVerdict, applied: true, evidence);
                         }
 
+                        resultView = MakeResultView();   // P5-5: the result changed — the next gate needs a fresh view + serialization
                         continue;
 
                     case ToolResultAction.Block:

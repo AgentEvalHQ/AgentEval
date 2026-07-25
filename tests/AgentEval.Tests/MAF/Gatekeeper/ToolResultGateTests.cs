@@ -579,6 +579,35 @@ public class ToolResultGateTests
         IsStreaming: false,
         Messages: null);
 
+    // ── P5-5: dedup result serialization ──
+
+    private sealed class CountingResult : IFormattable
+    {
+        public int SerializeCount;
+        public string ToString(string? format, IFormatProvider? formatProvider)
+        {
+            SerializeCount++;
+            return "the-result";
+        }
+    }
+
+    [Fact]
+    public void ResultText_SerializesOnce_AndCachesAcrossAccesses()
+    {
+        // P5-5: multiple result gates reading result.ResultText serialize the result ONCE, not once per gate.
+        var counter = new CountingResult();
+        var view = new GatedToolResult("f", null, counter, "A", 0, 0, 1, false, null);
+
+        var a = view.ResultText;
+        var b = view.ResultText;
+        var c = view.ResultText;
+
+        Assert.Equal("the-result", a);
+        Assert.Same(a, b);
+        Assert.Same(b, c);
+        Assert.Equal(1, counter.SerializeCount);   // three reads, one serialization
+    }
+
     private sealed class AllowAllResultGate : IToolResultGate
     {
         public string PolicyName => "AllowAllResultGate";
