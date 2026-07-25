@@ -35,6 +35,14 @@ public sealed class ShadowJudgePump : IAsyncDisposable
     private readonly TimeSpan _drainTimeout;
     private volatile bool _completed;   // writer completed (drained/disposed) — distinguishes "full" from "closed"
     private bool _disposed;
+    private long _accepted;   // P5-7: visible backpressure counters
+    private long _dropped;
+
+    /// <summary>Runs accepted into the shadow queue so far (P5-7).</summary>
+    public long AcceptedCount => Interlocked.Read(ref _accepted);
+
+    /// <summary>Runs DROPPED because the bounded queue was full (or the pump was completed) — a visible backpressure signal (P5-7). The single-consumer ordering guarantee is unchanged; this only counts what a full queue already discarded.</summary>
+    public long DroppedCount => Interlocked.Read(ref _dropped);
 
     /// <summary>Creates the pump and starts its background consumer.</summary>
     /// <param name="judge">The (possibly expensive) judge to run off the hot path.</param>
@@ -71,15 +79,20 @@ public sealed class ShadowJudgePump : IAsyncDisposable
     public void Enqueue(ShadowJudgeContext context)
     {
         ArgumentNullException.ThrowIfNull(context);
-        if (!_channel.Writer.TryWrite(context))
+        if (_channel.Writer.TryWrite(context))
         {
-            // Distinguish a legitimately-full queue from a race with completion/dispose, so the reported cause
-            // (and the operator's remedy) is accurate.
-            SafeReport(_completed
-                ? new InvalidOperationException("Shadow-judge pump is completed/disposed — dropped a run's verdict.")
-                : new InvalidOperationException(
-                    "Shadow-judge queue is full — dropped a run's verdict. Increase queueCapacity or speed up the judge."));
+            Interlocked.Increment(ref _accepted);
+            return;
         }
+
+        Interlocked.Increment(ref _dropped);   // P5-7: count the drop before reporting it
+
+        // Distinguish a legitimately-full queue from a race with completion/dispose, so the reported cause
+        // (and the operator's remedy) is accurate.
+        SafeReport(_completed
+            ? new InvalidOperationException("Shadow-judge pump is completed/disposed — dropped a run's verdict.")
+            : new InvalidOperationException(
+                "Shadow-judge queue is full — dropped a run's verdict. Increase queueCapacity or speed up the judge."));
     }
 
     /// <summary>Completes the queue and awaits the consumer draining all pending items (deterministic for tests).</summary>
