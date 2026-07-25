@@ -27,12 +27,12 @@ namespace AgentEval.MAF.Gatekeeper;
 /// session (so a partial deployment degrades gracefully rather than throwing).</para>
 /// <para>Time comes from an injectable <see cref="TimeProvider"/> so tests are deterministic (no wall-clock flake).</para>
 /// </summary>
-public sealed class RateLimitGate : SessionContextGate
+public sealed class RateLimitGate : SessionContextGate, ISessionIdentityAware
 {
     private readonly int _maxRuns;
     private readonly TimeSpan _window;
     private readonly TimeProvider _time;
-    private readonly Func<AgentSession, string?>? _sessionKeySelector;
+    private Func<AgentSession, string?>? _sessionKeySelector;   // mutable so UseSessionIdentityDefault (F-A) can fill it
     private readonly ConditionalWeakTable<AgentSession, Cell> _cells = new();                             // object-identity path (GC-evicted)
     private readonly ConcurrentDictionary<string, Cell> _keyedCells = new(StringComparer.Ordinal);        // stable-id path (survives reload)
 
@@ -60,6 +60,16 @@ public sealed class RateLimitGate : SessionContextGate
         _window = window;
         _time = timeProvider ?? TimeProvider.System;
         _sessionKeySelector = sessionKeySelector;
+    }
+
+    /// <inheritdoc/>
+    /// <remarks>F-A: adopts the shared <see cref="GatekeeperOptions.SessionIdentity"/> resolver as the default,
+    /// unless this gate was constructed with its own explicit <c>sessionKeySelector</c> (which wins). Called once by
+    /// <c>UseGatekeeper</c> at wiring time (single-threaded, before <c>.Build()</c>), so the set-once is safe.</remarks>
+    void ISessionIdentityAware.UseSessionIdentityDefault(Func<AgentSession, string?> resolver)
+    {
+        ArgumentNullException.ThrowIfNull(resolver);
+        _sessionKeySelector ??= resolver;
     }
 
     /// <inheritdoc/>

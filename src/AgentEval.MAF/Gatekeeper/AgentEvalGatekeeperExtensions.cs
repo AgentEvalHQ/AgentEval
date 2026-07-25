@@ -244,6 +244,25 @@ public static class AgentEvalGatekeeperExtensions
                 $"registered — findings are recorded to the trace but never enforced.)");
         }
 
+        // F-A (P1-4): inject the shared session-identity resolver into every ISessionIdentityAware gate, so a
+        // deployment configures durable session identity ONCE (GatekeeperOptions.SessionIdentity) instead of per
+        // gate. A gate with its own explicit resolver keeps it (UseSessionIdentityDefault is set-once). Done after
+        // all preflight has passed but before any Use(...) mutation, same fail-fast-before-mutation placement.
+        if (options.SessionIdentity is { } sessionIdentity)
+        {
+            foreach (var gate in options.PreGates.Cast<object>()
+                .Concat(options.PostGates)
+                .Concat(options.ToolGates)
+                .Concat(options.ToolResultGates)
+                .Concat(options.ApprovalGates))
+            {
+                if (gate is ISessionIdentityAware aware)
+                {
+                    aware.UseSessionIdentityDefault(sessionIdentity);
+                }
+            }
+        }
+
         var result = builder;
 
         if (scopeWillBeEstablished)
