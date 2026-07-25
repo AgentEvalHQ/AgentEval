@@ -2,7 +2,6 @@
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 
-using System.Collections.Concurrent;
 using System.Security.Cryptography;
 using System.Text;
 
@@ -15,20 +14,30 @@ namespace AgentEval.Guardrails.Judges;
 /// <para><b>Only <see cref="GateAction.Allow"/> verdicts are cached.</b> A block is re-evaluated every time — so a
 /// transient fail-closed block (a judge timeout / model error) can never be cached into a permanent block, and a
 /// real detection is always re-confirmed.</para>
-/// <para><b>Tradeoffs (by design).</b> There is no TTL: an allow is memoized for the process lifetime, so if the
-/// judge is nondeterministic a first-time allow sticks and a later-improved judge won't re-block that exact
-/// content — clear/rebuild the cache on a judge change. The bound is a <i>soft</i> cap (check-then-add), so under
-/// heavy concurrency it may overshoot slightly. Both are acceptable for a same-content dedup cache.</para>
+/// <para><b>Bounded LRU + TTL (Phase 5, P5-4).</b> The cache holds at most <c>maxEntries</c> allows, evicting the
+/// LEAST-RECENTLY-USED when full (a full cache still admits hot new content — evicting only forces a cheap
+/// re-judge, never a wrong verdict). An optional <c>ttl</c> expires a memoized allow after a fixed lifetime so a
+/// later-improved judge is not shadowed forever by an old allow; with no TTL an allow is memoized for the process
+/// lifetime. An optional <c>invalidationKey</c> (a hash of the judge / prompt / model) is folded into the cache key
+/// so a config change never serves a stale precedent. The bound is a <i>hard</i> cap under a lock, so it cannot
+/// overshoot.</para>
 /// </summary>
 public sealed class JudgeVerdictCache : IChatGate
 {
     private readonly IChatGate _inner;
     private readonly int _maxEntries;
+    private readonly TimeSpan? _ttl;
+    private readonly string _invalidationKey;
     private readonly TimeProvider _timeProvider;
     private readonly Action<JudgeCacheEvent>? _onLookup;
-    private readonly ConcurrentDictionary<string, (GateVerdict Verdict, DateTimeOffset FirstSeenUtc)> _allowed = new(StringComparer.Ordinal);
+
+    private readonly object _lock = new();
+    private readonly Dictionary<string, LinkedListNode<Entry>> _map = new(StringComparer.Ordinal);
+    private readonly LinkedList<Entry> _lru = new();   // First = most-recently-used, Last = least-recently-used
     private long _hits;
     private long _misses;
+
+    private sealed record Entry(string Key, GateVerdict Verdict, DateTimeOffset FirstSeenUtc);
 
     /// <inheritdoc/>
     public string PolicyName => _inner.PolicyName;
@@ -39,13 +48,26 @@ public sealed class JudgeVerdictCache : IChatGate
     /// <summary>Lookups that missed and re-litigated the inner judge (P3-7).</summary>
     public long Misses => Interlocked.Read(ref _misses);
 
+    /// <summary>Entries currently cached.</summary>
+    public int Count
+    {
+        get { lock (_lock) { return _map.Count; } }
+    }
+
     /// <summary>Wraps <paramref name="inner"/> with an allow-verdict cache.</summary>
     /// <param name="inner">The judge whose Allow verdicts are memoized.</param>
-    /// <param name="maxEntries">Soft cap on cached entries (default 4096).</param>
-    /// <param name="onLookup">Optional cache-precedent hook (P3-7) invoked on every lookup — a caller wires it to
-    /// emit <c>gate.cache.*</c> evidence (AllowCached, the original timestamp, hit/miss).</param>
-    /// <param name="timeProvider">Clock stamped onto a first-seen allow (testability); defaults to <see cref="TimeProvider.System"/>.</param>
-    public JudgeVerdictCache(IChatGate inner, int maxEntries = 4096, Action<JudgeCacheEvent>? onLookup = null, TimeProvider? timeProvider = null)
+    /// <param name="maxEntries">Hard cap on cached entries; the least-recently-used is evicted past this (default 4096).</param>
+    /// <param name="onLookup">Optional cache-precedent hook (P3-7) invoked on every lookup — a caller wires it to emit <c>gate.cache.*</c> evidence.</param>
+    /// <param name="timeProvider">Clock (testability); defaults to <see cref="TimeProvider.System"/>.</param>
+    /// <param name="ttl">Optional lifetime for a memoized allow (P5-4); null keeps it for the process lifetime.</param>
+    /// <param name="invalidationKey">Optional judge/prompt/model version folded into the cache key (P5-4) so a config change never serves a stale precedent.</param>
+    public JudgeVerdictCache(
+        IChatGate inner,
+        int maxEntries = 4096,
+        Action<JudgeCacheEvent>? onLookup = null,
+        TimeProvider? timeProvider = null,
+        TimeSpan? ttl = null,
+        string? invalidationKey = null)
     {
         ArgumentNullException.ThrowIfNull(inner);
         if (maxEntries < 1)
@@ -53,10 +75,17 @@ public sealed class JudgeVerdictCache : IChatGate
             throw new ArgumentOutOfRangeException(nameof(maxEntries), "must be at least 1.");
         }
 
+        if (ttl is { } t && t <= TimeSpan.Zero)
+        {
+            throw new ArgumentOutOfRangeException(nameof(ttl), "must be positive when set.");
+        }
+
         _inner = inner;
         _maxEntries = maxEntries;
         _onLookup = onLookup;
         _timeProvider = timeProvider ?? TimeProvider.System;
+        _ttl = ttl;
+        _invalidationKey = invalidationKey ?? string.Empty;
     }
 
     /// <inheritdoc/>
@@ -64,24 +93,73 @@ public sealed class JudgeVerdictCache : IChatGate
     {
         var safe = text ?? string.Empty;
         var key = HashOf(safe);
-        if (_allowed.TryGetValue(key, out var cached))
+
+        if (TryGetCached(key, out var cachedVerdict, out var firstSeen))
         {
             Interlocked.Increment(ref _hits);
-            NotifyLookup(new JudgeCacheEvent(PolicyName, Hit: true, cached.FirstSeenUtc));   // precedent: served the original allow
-            return cached.Verdict;
+            NotifyLookup(new JudgeCacheEvent(PolicyName, Hit: true, firstSeen));   // precedent: served the original allow
+            return cachedVerdict;
         }
 
         Interlocked.Increment(ref _misses);
         var verdict = await _inner.InspectAsync(safe, cancellationToken).ConfigureAwait(false);
 
-        // Cache only Allow (see class remarks). Stop admitting once full — never evict a proven-safe entry.
-        if (verdict.Action == GateAction.Allow && _allowed.Count < _maxEntries)
+        // Cache only Allow (see class remarks).
+        if (verdict.Action == GateAction.Allow)
         {
-            _allowed.TryAdd(key, (verdict, _timeProvider.GetUtcNow()));
+            Admit(key, verdict);
         }
 
         NotifyLookup(new JudgeCacheEvent(PolicyName, Hit: false, OriginalTimestampUtc: null));
         return verdict;
+    }
+
+    private bool TryGetCached(string key, out GateVerdict verdict, out DateTimeOffset firstSeenUtc)
+    {
+        lock (_lock)
+        {
+            if (_map.TryGetValue(key, out var node))
+            {
+                if (_ttl is { } ttl && _timeProvider.GetUtcNow() - node.Value.FirstSeenUtc >= ttl)
+                {
+                    _lru.Remove(node);   // expired — drop it (a later-improved judge gets to re-judge)
+                    _map.Remove(key);
+                }
+                else
+                {
+                    _lru.Remove(node);   // touch: promote to most-recently-used
+                    _lru.AddFirst(node);
+                    verdict = node.Value.Verdict;
+                    firstSeenUtc = node.Value.FirstSeenUtc;
+                    return true;
+                }
+            }
+
+            verdict = null!;
+            firstSeenUtc = default;
+            return false;
+        }
+    }
+
+    private void Admit(string key, GateVerdict verdict)
+    {
+        lock (_lock)
+        {
+            if (_map.ContainsKey(key))
+            {
+                return;   // already cached (a concurrent miss admitted it first) — leave its recency/first-seen intact
+            }
+
+            var node = _lru.AddFirst(new Entry(key, verdict, _timeProvider.GetUtcNow()));
+            _map[key] = node;
+
+            while (_map.Count > _maxEntries)
+            {
+                var lru = _lru.Last!;   // least-recently-used
+                _lru.RemoveLast();
+                _map.Remove(lru.Value.Key);
+            }
+        }
     }
 
     // The precedent hook is pure observability — a throw from it must never propagate out of InspectAsync, where
@@ -103,9 +181,10 @@ public sealed class JudgeVerdictCache : IChatGate
         }
     }
 
-    private static string HashOf(string text)
+    private string HashOf(string text)
     {
-        var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(text));
+        // Fold the invalidation key in so a judge/prompt/model change never collides with a stale precedent (P5-4).
+        var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(_invalidationKey + "\n" + text));
         return Convert.ToHexString(bytes);
     }
 }
