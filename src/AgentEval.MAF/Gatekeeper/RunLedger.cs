@@ -78,6 +78,8 @@ public sealed class RunLedger
     private readonly Dictionary<string, int> _perToolCallBudgetCounts = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, (int Count, long Sum, long Max)> _toolResultSizes = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, int> _denials = new(StringComparer.Ordinal);   // P4-3: per-(tool+arg-shape) denial tally (F-B dimension)
+    private int _treeDenials;          // P6-1: enforced-block volume, aggregated at the run-tree ROOT (see RecordTreeDenial)
+    private bool _blockStormAlerted;   // P6-1: one-shot latch so a block-storm incident alert fires once per run tree
 
     /// <summary>The ledger for the current run (keyed by <see cref="AgentRunScope.Current"/>).</summary>
     public static RunLedger ForCurrentRun()
@@ -336,6 +338,48 @@ public sealed class RunLedger
             var count = (_denials.TryGetValue(denialKey, out var n) ? n : 0) + 1;
             _denials[denialKey] = count;
             return count;
+        }
+    }
+
+    /// <summary>
+    /// Records one ENFORCED block toward the run-TREE's block-storm total (Phase 6, P6-1 / F-B), returning the new
+    /// total. Unlike <see cref="DenialCount"/> (retries of one specific action), this is the whole run's
+    /// enforced-block volume, so a sentinel can spot an agent probing MANY different denied actions. <b>Call on
+    /// <see cref="ForRootRun"/></b> so every nested sub-agent run accumulates into ONE total at the tree root —
+    /// otherwise a block-storm could be laundered across nested runs, each staying under the sentinel's threshold
+    /// (the same nested-run vector P2-8 closed for budget gates).
+    /// </summary>
+    public int RecordTreeDenial()
+    {
+        lock (_lock)
+        {
+            return ++_treeDenials;
+        }
+    }
+
+    /// <summary>The run-tree's ENFORCED-block total (P6-1). Read on <see cref="ForRootRun"/> to see the whole tree.</summary>
+    public int TreeDenialCount
+    {
+        get { lock (_lock) { return _treeDenials; } }
+    }
+
+    /// <summary>
+    /// Atomically claims the one-shot block-storm alert for this run tree (P6-1): returns <see langword="true"/>
+    /// exactly once — to the first caller — and <see langword="false"/> forever after, so a sentinel fires its
+    /// incident alert once even under concurrent tool calls or a tally that jumps past the threshold between checks.
+    /// Call on <see cref="ForRootRun"/> so one alert covers the whole tree.
+    /// </summary>
+    public bool TryLatchBlockStorm()
+    {
+        lock (_lock)
+        {
+            if (_blockStormAlerted)
+            {
+                return false;
+            }
+
+            _blockStormAlerted = true;
+            return true;
         }
     }
 

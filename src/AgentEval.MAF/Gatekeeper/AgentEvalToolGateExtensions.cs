@@ -320,7 +320,13 @@ public static class AgentEvalToolGateExtensions
                             // so a good agent sees it's looping — without leaking why. Review #2: only tally when a
                             // run scope is established — a scopeless caller would otherwise accumulate denials in the
                             // process-wide fallback ledger, bleeding the count across runs/sessions; omit attempts then.
-                            int? attempts = AgentRunScope.Current is null ? null : RunLedger.ForCurrentRun().RecordDenial(DenialKey(call));
+                            int? attempts = null;
+                            if (AgentRunScope.Current is not null)
+                            {
+                                attempts = RunLedger.ForCurrentRun().RecordDenial(DenialKey(call));   // P4-3 per-(tool+arg-shape) retry tally
+                                RunLedger.ForRootRun().RecordTreeDenial();   // P6-1 block-storm total, aggregated at the run-tree root
+                            }
+
                             return GateReferenceId.RefusalBody(referenceId, RefusalDispositionClassifier.Classify(verdict.PolicyName), attempts);
                         }
                     }
@@ -582,6 +588,14 @@ public static class AgentEvalToolGateExtensions
             extra["terminate"] = true;
         }
 
+        // P6-2: a non-enforced (WarnOnly/Observe) block records action="Warn"; capture what it WOULD have done so an
+        // Observe→Enforce dry-run diff can count would-have-blocks (GlassBoxEvidence.WouldBlockCount) without
+        // inflating the enforced GateBlockCount.
+        if (action != "Block")
+        {
+            extra["wouldAction"] = "Block";
+        }
+
         // F-C: one canonical record, projected to the same superset trace value the readers parse.
         var record = evidence.Build(
             stage: "tool", policy: verdict.PolicyName, action: action, referenceId: referenceId, reason: verdict.Reason,
@@ -606,6 +620,12 @@ public static class AgentEvalToolGateExtensions
         if (terminating)
         {
             extra["terminate"] = true;
+        }
+
+        // P6-2: same counterfactual marker as RecordBlock (see there) — a non-enforced result-gate block is a would-block.
+        if (action != "Block")
+        {
+            extra["wouldAction"] = "Block";
         }
 
         var record = evidence.Build(

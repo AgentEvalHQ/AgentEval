@@ -3,6 +3,7 @@
 // Licensed under the MIT License.
 
 using System.Text.RegularExpressions;
+using AgentEval.Guardrails;
 using Microsoft.Extensions.AI;
 
 namespace AgentEval.MAF.Gatekeeper;
@@ -36,7 +37,7 @@ namespace AgentEval.MAF.Gatekeeper;
 /// </summary>
 public sealed class ReferentialIntegrityGate : IToolGate
 {
-    private static readonly TimeSpan MatchTimeout = TimeSpan.FromMilliseconds(100);
+    private static readonly TimeSpan MatchTimeout = GateRegexTimeouts.Standard;
 
     // Maximal runs of identifier characters. The "is this an id" decision (length + contains-a-digit) is done in
     // code, so the regex stays a simple linear character-class scan — no backtracking, ReDoS-safe.

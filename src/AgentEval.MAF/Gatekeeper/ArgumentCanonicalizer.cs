@@ -5,6 +5,7 @@
 using System.Net;
 using System.Text;
 using System.Text.RegularExpressions;
+using AgentEval.Guardrails;
 
 namespace AgentEval.MAF.Gatekeeper;
 
@@ -32,8 +33,8 @@ public static class ArgumentCanonicalizer
     /// <summary>Hard cap on the number of projections returned (raw included), bounding fan-out.</summary>
     public const int DefaultMaxProjections = 24;
 
-    private static readonly Regex UnicodeEscape = new(@"\\u([0-9A-Fa-f]{4})", RegexOptions.Compiled, TimeSpan.FromMilliseconds(100));
-    private static readonly Regex Base64Candidate = new(@"[A-Za-z0-9+/]{16,}={0,2}", RegexOptions.Compiled, TimeSpan.FromMilliseconds(100));
+    private static readonly Regex UnicodeEscape = new(@"\\u([0-9A-Fa-f]{4})", RegexOptions.Compiled, GateRegexTimeouts.Standard);
+    private static readonly Regex Base64Candidate = new(@"[A-Za-z0-9+/]{16,}={0,2}", RegexOptions.Compiled, GateRegexTimeouts.Standard);
 
     /// <summary>
     /// Returns <paramref name="raw"/> and its decoded projections. The first element is always <paramref name="raw"/>.

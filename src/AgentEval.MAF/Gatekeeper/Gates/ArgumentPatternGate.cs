@@ -6,6 +6,7 @@ using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using AgentEval.Assertions;
+using AgentEval.Guardrails;
 
 namespace AgentEval.MAF.Gatekeeper;
 
@@ -32,7 +33,7 @@ public sealed class ArgumentPatternGate : IToolGate
 
     /// <summary>Creates the gate from a pattern, compiled with a bounded (100 ms) match timeout (ReDoS-safe).</summary>
     public ArgumentPatternGate(string forbiddenPattern, string? policyName = null, bool canonicalize = false)
-        : this(new Regex(forbiddenPattern, RegexOptions.CultureInvariant, TimeSpan.FromMilliseconds(100)), policyName, canonicalize)
+        : this(new Regex(forbiddenPattern, RegexOptions.CultureInvariant, GateRegexTimeouts.Standard), policyName, canonicalize)
     {
     }
 

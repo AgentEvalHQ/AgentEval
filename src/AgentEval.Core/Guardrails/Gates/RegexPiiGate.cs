@@ -15,7 +15,7 @@ namespace AgentEval.Guardrails.Gates;
 /// </summary>
 public sealed class RegexPiiGate : IChatGate
 {
-    private static readonly TimeSpan PiiTimeout = TimeSpan.FromMilliseconds(100);
+    private static readonly TimeSpan PiiTimeout = GateRegexTimeouts.Standard;
 
     private static readonly (string Name, Regex Pattern)[] Patterns =
     {

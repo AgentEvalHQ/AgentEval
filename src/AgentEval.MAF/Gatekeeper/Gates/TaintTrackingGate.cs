@@ -5,6 +5,7 @@
 using System.Runtime.CompilerServices;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using AgentEval.Guardrails;
 using Microsoft.Extensions.AI;
 
 namespace AgentEval.MAF.Gatekeeper;
@@ -32,7 +33,7 @@ namespace AgentEval.MAF.Gatekeeper;
 /// </summary>
 public sealed class TaintTrackingGate : IToolGate
 {
-    private static readonly TimeSpan MatchTimeout = TimeSpan.FromMilliseconds(100);
+    private static readonly TimeSpan MatchTimeout = GateRegexTimeouts.Standard;
 
     // Value-like tokens (secrets, keys, emails, ids, SSNs): runs of value characters, incl. '_' (env-style
     // SECRET_TOKEN / base64url). Linear ⇒ ReDoS-safe.

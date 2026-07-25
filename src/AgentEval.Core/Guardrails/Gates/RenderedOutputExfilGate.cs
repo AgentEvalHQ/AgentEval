@@ -22,7 +22,7 @@ namespace AgentEval.Guardrails.Gates;
 /// </summary>
 public sealed class RenderedOutputExfilGate : IChatGate
 {
-    private static readonly TimeSpan MatchTimeout = TimeSpan.FromMilliseconds(100);
+    private static readonly TimeSpan MatchTimeout = GateRegexTimeouts.Standard;
 
     private static readonly (string Name, Regex Pattern, string Replacement)[] Channels =
     {
