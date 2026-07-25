@@ -45,7 +45,7 @@ public sealed class GateReferenceLedger : IGateEvidenceSink
             var line = JsonSerializer.Serialize(
                 new GateReferenceIndexEntry(
                     evidence.ReferenceId, evidence.TimestampUtc, evidence.RunId, evidence.Policy, evidence.Stage,
-                    evidence.ToolName, evidence.AgentName, evidence.Severity.ToString()),
+                    evidence.ToolName, evidence.AgentName, evidence.Severity.ToString(), evidence.ConfigFingerprint),
                 JsonOptions);
             lock (_writeLock)
             {
@@ -55,7 +55,7 @@ public sealed class GateReferenceLedger : IGateEvidenceSink
         }
     }
 
-    /// <summary>One line of the refusal index — the minimum an operator needs to correlate and triage a reference id.</summary>
+    /// <summary>One line of the refusal index — the minimum an operator needs to correlate and triage a reference id, plus the config fingerprint for cross-run aggregation (P3-8).</summary>
     public sealed record GateReferenceIndexEntry(
         string ReferenceId,
         DateTimeOffset TsUtc,
@@ -64,5 +64,6 @@ public sealed class GateReferenceLedger : IGateEvidenceSink
         string Stage,
         string? ToolName,
         string? AgentName,
-        string Severity);
+        string Severity,
+        string? ConfigFingerprint = null);
 }
