@@ -128,6 +128,13 @@ public sealed class GatekeeperOptions
     public GateTelemetry? Telemetry { get; set; }
 
     /// <summary>
+    /// Optional extra <see cref="IGateEvidenceSink"/> (Phase 3, F-C) fanned every gate finding — beyond the trace —
+    /// so a <see cref="GateReferenceLedger"/> (P3-1 reference resolution) or an alerting sink (P3-4) can be
+    /// registered. Wired into both the tool-gate and run-gate seams; works with <see cref="Trace"/> off.
+    /// </summary>
+    public IGateEvidenceSink? EvidenceSink { get; set; }
+
+    /// <summary>
     /// How much of a <see cref="ToolGateAction.Mutate"/> verdict's before/after arguments are captured into
     /// the trace (Phase 1, #13). Defaults to <see cref="TraceCaptureMode.Redacted"/>.
     /// </summary>

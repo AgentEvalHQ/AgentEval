@@ -843,7 +843,9 @@ public class AgentEvalGatekeeperExtensionsTests
 
         var key = trace.Metadata!.Keys.Single(k => k.StartsWith("gate.tool-result.", StringComparison.Ordinal));
         var entry = (IDictionary<string, object?>)trace.Metadata![key];
-        Assert.Equal("Redact", entry["action"]);
+        // Phase 3 review (#3): a null-redact fallback withholds the result and returns a REFUSAL, so it is
+        // recorded as a Block — counted by GateBlockCount and persisted to the durable reference index.
+        Assert.Equal("Block", entry["action"]);
         Assert.False(string.IsNullOrEmpty((string?)entry["referenceId"]));
     }
 

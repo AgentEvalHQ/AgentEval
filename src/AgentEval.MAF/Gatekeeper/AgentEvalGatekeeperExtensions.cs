@@ -252,7 +252,8 @@ public static class AgentEvalGatekeeperExtensions
                 pre: options.PreGates.Count > 0 ? options.PreGates.ToArray() : null,
                 post: options.PostGates.Count > 0 ? options.PostGates.ToArray() : null,
                 policy: evalPolicy,
-                trace: options.Trace);
+                trace: options.Trace,
+                evidenceSink: options.EvidenceSink);
         }
 
         // P0-3: a result-gate-only configuration (ToolGates empty, ToolResultGates non-empty) is valid —
@@ -262,7 +263,8 @@ public static class AgentEvalGatekeeperExtensions
         {
             result = result.UseAgentEvalToolGate(
                 options.ToolGates.ToArray(), toolPolicy, options.Trace, options.Telemetry, options.MutationCaptureMode,
-                options.ToolResultGates.Count > 0 ? options.ToolResultGates.ToArray() : null);
+                options.ToolResultGates.Count > 0 ? options.ToolResultGates.ToArray() : null,
+                options.EvidenceSink);
         }
 
         if (options.ApprovalGates.Count > 0)
