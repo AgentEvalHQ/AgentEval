@@ -5,6 +5,7 @@
 using System.Diagnostics;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 using AgentEval.Tracing;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
@@ -316,8 +317,10 @@ public static class AgentEvalToolGateExtensions
                             // #12: the model sees only a stable, non-revealing {error, referenceId} shape — never the
                             // policy name or reason (that stays in the trace evidence below, audit-visible only).
                             // P4-3: tally this denial by (tool + arg-shape); an equivalent retry surfaces "attempts":N
-                            // so a good agent sees it's looping — without leaking why.
-                            var attempts = RunLedger.ForCurrentRun().RecordDenial(DenialKey(call));
+                            // so a good agent sees it's looping — without leaking why. Review #2: only tally when a
+                            // run scope is established — a scopeless caller would otherwise accumulate denials in the
+                            // process-wide fallback ledger, bleeding the count across runs/sessions; omit attempts then.
+                            int? attempts = AgentRunScope.Current is null ? null : RunLedger.ForCurrentRun().RecordDenial(DenialKey(call));
                             return GateReferenceId.RefusalBody(referenceId, RefusalDispositionClassifier.Classify(verdict.PolicyName), attempts);
                         }
                     }
@@ -660,21 +663,23 @@ public static class AgentEvalToolGateExtensions
     // auditable/reconstructable (SEC-06). #13: how MUCH of the args is captured is governed by TraceCaptureMode
     // (default Redacted) — a prior version always serialized verbatim, which could put an argument's secret
     // value into the trace.
-    // P4-3: a stable signature of a tool call (name + sorted argument key=value pairs, hashed) so an EQUIVALENT
-    // retry — same tool, same argument shape — shares the key and increments the denial tally. Hashed so argument
-    // VALUES never linger verbatim in an in-memory key.
+    // P4-3: a stable signature of a tool call (name + sorted arguments, JSON-serialized) so an EQUIVALENT retry —
+    // same tool, same argument shape — shares the key. Review #4: JSON serialization (not key=value string-join)
+    // distinguishes structured values (["/a"] vs ["/b"] — a bare ToString() would render both to the same type
+    // name) and can't be spoofed by a '\n'/'=' in a value. Hashed so argument VALUES never linger in the key.
     private static string DenialKey(GatedToolCall call)
     {
-        var sb = new StringBuilder(call.FunctionName).Append('\n');
+        var sorted = new SortedDictionary<string, object?>(StringComparer.Ordinal);
         if (call.Arguments is not null)
         {
-            foreach (var kv in call.Arguments.OrderBy(k => k.Key, StringComparer.Ordinal))
+            foreach (var kv in call.Arguments)
             {
-                sb.Append(kv.Key).Append('=').Append(kv.Value).Append('\n');
+                sorted[kv.Key] = kv.Value;
             }
         }
 
-        return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(sb.ToString())));
+        var payload = call.FunctionName + "\n" + JsonSerializer.Serialize(sorted);
+        return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(payload)));
     }
 
     // P2-4: structural equality over two argument sets — tells a REAL mutation (re-scan) from a no-op / idempotent

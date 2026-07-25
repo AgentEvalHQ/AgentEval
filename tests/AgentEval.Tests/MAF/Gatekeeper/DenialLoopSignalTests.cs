@@ -73,4 +73,26 @@ public class DenialLoopSignalTests
 
         Assert.Equal(new int?[] { 1, 1 }, AttemptsInOrder(model));   // each distinct arg-shape starts its own count
     }
+
+    [Fact]
+    public async Task NoRunScope_OmitsAttempts_NoCrossRunBleed()
+    {
+        // Review #2: a direct tool-gate caller with NO run scope must not tally denials in the process-wide
+        // fallback ledger (which would bleed the count across runs/sessions). The refusal simply omits "attempts".
+        var tool = AIFunctionFactory.Create((string path) => "ok", "delete_file");
+        var model = new ScriptedChatClient()
+            .AddToolCall("c1", "delete_file", new Dictionary<string, object?> { ["path"] = "/etc" })
+            .AddText("done");
+        var agent = new ChatClientAgent(model, new ChatClientAgentOptions { Name = "A", ChatOptions = new ChatOptions { Tools = [tool] } });
+
+        // NO UseAgentEvalGate → no AgentRunScope established.
+        var gated = agent.AsBuilder().UseAgentEvalToolGate([new ForbiddenToolGate("delete_file")], ToolGatePolicy.ReplaceResult).Build();
+
+        await gated.RunAsync("go");
+
+        var refusal = model.ReceivedMessages[^1].SelectMany(m => m.Contents.OfType<FunctionResultContent>())
+            .Select(r => r.Result?.ToString()).First(t => t is not null && GatekeeperRefusalContract.TryParse(t, out _, out _, out _));
+        Assert.True(GatekeeperRefusalContract.TryParse(refusal, out _, out _, out var attempts));
+        Assert.Null(attempts);   // no scope → no attempts
+    }
 }

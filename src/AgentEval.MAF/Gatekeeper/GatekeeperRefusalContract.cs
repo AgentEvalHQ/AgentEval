@@ -84,24 +84,33 @@ public static class GatekeeperRefusalContract
         try
         {
             using var doc = JsonDocument.Parse(body);
+            // Defensive on EVERY field's ValueKind (review #1): a hostile but valid-JSON body — e.g.
+            // {"_gatekeeper":{"schema":123}} or {..,"attempts":1.5} — must return false, never throw. Reading
+            // .GetString() on a non-string or .GetInt32() on a fractional/overflow number would otherwise throw.
             if (doc.RootElement.ValueKind != JsonValueKind.Object
                 || !doc.RootElement.TryGetProperty(EnvelopeKey, out var env)
                 || env.ValueKind != JsonValueKind.Object
                 || !env.TryGetProperty("schema", out var schema)
+                || schema.ValueKind != JsonValueKind.String
                 || schema.GetString() != Schema)
             {
                 return false;
             }
 
-            referenceId = env.TryGetProperty("referenceId", out var r) ? r.GetString() ?? string.Empty : string.Empty;
-            if (env.TryGetProperty("disposition", out var d) && Enum.TryParse<RefusalDisposition>(d.GetString(), ignoreCase: true, out var parsed))
+            if (env.TryGetProperty("referenceId", out var r) && r.ValueKind == JsonValueKind.String)
+            {
+                referenceId = r.GetString() ?? string.Empty;
+            }
+
+            if (env.TryGetProperty("disposition", out var d) && d.ValueKind == JsonValueKind.String
+                && Enum.TryParse<RefusalDisposition>(d.GetString(), ignoreCase: true, out var parsed))
             {
                 disposition = parsed;
             }
 
-            if (env.TryGetProperty("attempts", out var a) && a.ValueKind == JsonValueKind.Number)
+            if (env.TryGetProperty("attempts", out var a) && a.ValueKind == JsonValueKind.Number && a.TryGetInt32(out var n))
             {
-                attempts = a.GetInt32();
+                attempts = n;
             }
 
             return true;
@@ -131,12 +140,17 @@ public static class RefusalDispositionClassifier
 
         var policy = policyName ?? string.Empty;
 
-        if (ContainsAny(policy, "Budget", "Rate", "Monetary", "PerToolCall", "Quota"))
+        // "RateLimit", not "Rate" (review #3): a bare "Rate" substring mis-maps ModerateContentGate / AggregateGate
+        // etc. to Quota, telling the model "retry later might work" for an action that is actually a hard Denied.
+        if (ContainsAny(policy, "Budget", "RateLimit", "Monetary", "PerToolCall", "Quota"))
         {
             return RefusalDisposition.Quota;
         }
 
-        if (ContainsAny(policy, "Canary", "Honeypot", "Quarantine"))
+        // A quarantined session should knowingly stop → Escalate. A canary/honeypot deliberately does NOT (review
+        // #5): surfacing Escalate would tip off an attacker-controlled model that it tripped a trap, defeating the
+        // trap's whole purpose (silent detection). A canary block therefore blends in as an ordinary Denied.
+        if (policy.Contains("Quarantine", StringComparison.OrdinalIgnoreCase))
         {
             return RefusalDisposition.Escalate;
         }

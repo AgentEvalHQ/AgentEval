@@ -55,11 +55,25 @@ public class GatekeeperRefusalContractTests
     }
 
     [Theory]
+    [InlineData("""{"_gatekeeper":{"schema":123}}""")]                                          // non-string schema
+    [InlineData("""{"_gatekeeper":{"schema":"gatekeeper.refusal/1","referenceId":123}}""")]     // non-string referenceId
+    [InlineData("""{"_gatekeeper":{"schema":"gatekeeper.refusal/1","disposition":true}}""")]    // non-string disposition
+    [InlineData("""{"_gatekeeper":{"schema":"gatekeeper.refusal/1","attempts":1.5}}""")]        // fractional attempts
+    [InlineData("""{"_gatekeeper":{"schema":"gatekeeper.refusal/1","attempts":99999999999999}}""")]  // overflow attempts
+    [InlineData("""{"_gatekeeper":"not-an-object"}""")]                                         // envelope not an object
+    public void TryParse_NeverThrows_OnHostileTypedInput(string body)
+    {
+        // Review #1: a valid-JSON-but-hostile-typed body must return false-or-true but NEVER throw.
+        Assert.Null(Record.Exception(() => GatekeeperRefusalContract.TryParse(body, out _, out _, out _)));
+    }
+
+    [Theory]
     [InlineData("RunBudgetGate", RefusalDisposition.Quota)]
     [InlineData("MonetaryLimitGate", RefusalDisposition.Quota)]
     [InlineData("PerToolCallBudgetGate", RefusalDisposition.Quota)]
-    [InlineData("CanaryToolGate", RefusalDisposition.Escalate)]
     [InlineData("QuarantineLeaseGate", RefusalDisposition.Escalate)]
+    [InlineData("CanaryToolGate", RefusalDisposition.Denied)]     // review #5: a canary blends in as an ordinary Denied — never reveals the trap fired
+    [InlineData("ModerateContentGate", RefusalDisposition.Denied)] // review #3: "Rate" substring must NOT map this to Quota
     [InlineData("ForbiddenToolGate", RefusalDisposition.Denied)]
     public void Classify_MapsGateClassToDisposition(string policy, RefusalDisposition expected)
         => Assert.Equal(expected, RefusalDispositionClassifier.Classify(policy));
