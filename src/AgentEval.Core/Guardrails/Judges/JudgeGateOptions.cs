@@ -25,6 +25,15 @@ public sealed class JudgeGateOptions
     public int MaxOutputTokens { get; init; } = 256;
 
     /// <summary>
+    /// Cap on the number of input characters the judge sends to the model (Phase 5, P5-3 — bounds cost, latency,
+    /// and context-overflow risk on a pathologically large turn). Over the cap, the text is reduced to a
+    /// head + tail sandwich with a truncation marker so an injection payload at <i>either</i> boundary is still
+    /// seen. The <see cref="IJudgeRubric.Prefilter"/> always runs on the FULL text — only the model prompt is
+    /// bounded. Default 16000 (≈4k tokens). <c>0</c> means unbounded (the pre-P5-3 behavior).
+    /// </summary>
+    public int MaxInputChars { get; init; } = 16_000;
+
+    /// <summary>
     /// When the judge is <see cref="JudgeDecision.Inconclusive"/> (timeout / model error / unparseable reply),
     /// whether to block (fail-closed) or allow (fail-open, observe-only). Default <c>true</c> (fail-closed) — a
     /// gate that cannot prove a turn safe should not pass it under a blocking policy. Enforcement is still gated

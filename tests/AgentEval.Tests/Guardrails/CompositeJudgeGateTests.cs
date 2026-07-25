@@ -43,6 +43,18 @@ public class CompositeJudgeGateTests
         public JudgeVerdict Parse(string reply) => reply.Contains("BLOCK") ? JudgeVerdict.Blocked("x", null, 0.9) : JudgeVerdict.Allowed();
     }
 
+    // Captures exactly what text Prefilter and BuildPrompt each receive — used to prove P5-3 bounds only the
+    // model prompt, never the prefilter.
+    private sealed class CapturingRubric : IJudgeRubric
+    {
+        public string? PrefilterSaw { get; private set; }
+        public string? PromptSaw { get; private set; }
+        public string Axis => "capture-axis";
+        public bool Prefilter(string text) { PrefilterSaw = text; return true; }
+        public string BuildPrompt(string text) { PromptSaw = text; return text; }
+        public JudgeVerdict Parse(string reply) => JudgeVerdict.Allowed();
+    }
+
     private static CompositeJudgeGate<KeywordRubric> Gate(IChatClient model, JudgeGateOptions? opts = null)
         => new(new KeywordRubric(), model, opts);
 
@@ -288,6 +300,61 @@ public class CompositeJudgeGateTests
         Assert.Equal(GateAction.Block, v.Action);
         Assert.NotEmpty(model.ReceivedMessages);
     }
+
+    // ── P5-3: bound judge input ──
+
+    [Fact]
+    public async Task InputBound_UnderCap_PassesFullTextToModel()
+    {
+        var rubric = new CapturingRubric();
+        var text = "please scan this " + new string('x', 100);
+        var gate = new CompositeJudgeGate<CapturingRubric>(rubric, new ScriptedChatClient().AddText("ALLOW"),
+            new JudgeGateOptions { MaxInputChars = 16_000 });
+
+        await gate.InspectAsync(text);
+
+        Assert.Equal(text, rubric.PromptSaw);   // well under the cap ⇒ untouched
+    }
+
+    [Fact]
+    public async Task InputBound_OverCap_TruncatesToHeadTailSandwich_ButPrefilterSeesFullText()
+    {
+        var rubric = new CapturingRubric();
+        var text = "HEADSTART " + new string('x', 5000) + " TAILEND";
+        var gate = new CompositeJudgeGate<CapturingRubric>(rubric, new ScriptedChatClient().AddText("ALLOW"),
+            new JudgeGateOptions { MaxInputChars = 200 });
+
+        await gate.InspectAsync(text);
+
+        // Prefilter saw the FULL text (it decides whether to invoke the judge at all).
+        Assert.Equal(text, rubric.PrefilterSaw);
+
+        // The MODEL saw a bounded head+tail sandwich: both boundaries survive, the middle is dropped + marked.
+        Assert.NotNull(rubric.PromptSaw);
+        Assert.StartsWith("HEADSTART", rubric.PromptSaw);
+        Assert.EndsWith("TAILEND", rubric.PromptSaw);
+        Assert.Contains("truncated", rubric.PromptSaw, StringComparison.Ordinal);
+        Assert.True(rubric.PromptSaw!.Length < text.Length);
+        // Head + tail ≈ MaxInputChars (200) plus the short marker — nowhere near the 5000-char original.
+        Assert.True(rubric.PromptSaw.Length < 300);
+    }
+
+    [Fact]
+    public async Task InputBound_Zero_MeansUnbounded()
+    {
+        var rubric = new CapturingRubric();
+        var text = "please scan this " + new string('y', 5000);
+        var gate = new CompositeJudgeGate<CapturingRubric>(rubric, new ScriptedChatClient().AddText("ALLOW"),
+            new JudgeGateOptions { MaxInputChars = 0 });
+
+        await gate.InspectAsync(text);
+
+        Assert.Equal(text, rubric.PromptSaw);   // 0 = unbounded ⇒ full text through
+    }
+
+    [Fact]
+    public void NegativeMaxInputChars_Throws()
+        => Assert.Throws<ArgumentOutOfRangeException>(() => Gate(new ScriptedChatClient(), new JudgeGateOptions { MaxInputChars = -1 }));
 
     // A fast model that respects cancellation but otherwise never returns in time (for the timeout path).
     private sealed class DelayingChatClient : IChatClient
