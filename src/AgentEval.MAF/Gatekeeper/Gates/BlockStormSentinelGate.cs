@@ -15,20 +15,27 @@ namespace AgentEval.MAF.Gatekeeper;
 public sealed record BlockStormIncident(string? RunId, int EnforcedBlockCount, int Threshold, GateSeverity Severity);
 
 /// <summary>
-/// A meta-gate (Phase 6, P6-1) that watches the run's ENFORCED-block volume — <see cref="RunLedger.TotalDenials"/>
-/// (the F-B block-storm dimension) — rather than any single call. Once <c>threshold</c> enforced blocks have been
-/// recorded this run, it blocks every subsequent call: repeated denials across a run are how probing looks (an agent
-/// hammering many <c>ACTION_NOT_AUTHORIZED</c>s). It reads no arguments, so it is <see cref="GateCost.PureCode"/>.
-/// <para><b>Escalate to Terminate.</b> A gate can't override the registration's <see cref="ToolGatePolicy"/>, so to
-/// turn a block-storm into a run <i>halt</i> register this sentinel in its OWN <see cref="ToolGatePolicy.Terminate"/>
-/// layer (a second <c>UseAgentEvalToolGate</c> call), leaving your ordinary gates on their own policy. Under a
-/// non-terminating policy it still blocks each further probe.</para>
-/// <para><b>Scope.</b> The tally is per-run (it reads <see cref="RunLedger.ForCurrentRun"/>, where enforced blocks are
-/// recorded); a block-storm spread across separate nested sub-agent runs is each counted on its own run. With no run
-/// scope the sentinel is a no-op (there is no per-run tally to read) — register the run gate for it to work.</para>
-/// <para>The optional <paramref name="onBlockStorm"/> callback fires once, on the call the threshold is first crossed,
-/// with an <see cref="BlockStormIncident"/> for alerting/incident routing; it is exception-isolated (an alert sink
-/// must never break the gate).</para>
+/// A meta-gate (Phase 6, P6-1) that watches the run tree's ENFORCED-block volume —
+/// <see cref="RunLedger.TreeDenialCount"/> (the F-B block-storm dimension) — rather than any single call. Once
+/// <c>threshold</c> enforced blocks have been recorded, it blocks every subsequent call: repeated denials are how
+/// probing looks (an agent hammering many <c>ACTION_NOT_AUTHORIZED</c>s). It reads no arguments, so it is
+/// <see cref="GateCost.PureCode"/>.
+/// <para><b>Escalate to Terminate.</b> A gate can't override the registration's <see cref="ToolGatePolicy"/>, so a
+/// block-storm becomes a run <i>halt</i> only when the sentinel is registered under
+/// <see cref="ToolGatePolicy.Terminate"/> — add it to the SAME <c>UseAgentEvalToolGate</c> list as your other gates
+/// (do NOT add a second, separate <c>UseAgentEvalToolGate</c> call: a later registration becomes OUTERMOST and can
+/// silently starve the earlier one — see the warning on <c>UseAgentEvalToolGate</c>). Under a non-terminating policy
+/// (Observe / ReplaceResult) the sentinel still BLOCKS each further probe but cannot itself force termination; put the
+/// whole gate list on Terminate if you want a probing run stopped.</para>
+/// <para><b>Scope.</b> The tally is aggregated at the run-tree ROOT (via <see cref="RunLedger.ForRootRun"/>), so a
+/// block-storm spread across nested sub-agent runs still accumulates into one total and cannot be laundered under the
+/// threshold — matching the P2-8 nested-run hardening the budget gates use. Separate <i>top-level</i> runs each have
+/// their own tree and do not share. With no run scope the sentinel is a no-op (there is no tally to read) — register
+/// the run gate for it to work.</para>
+/// <para>The optional <paramref name="onBlockStorm"/> callback fires <b>exactly once per run tree</b>, the first time
+/// the threshold is crossed (via an atomic latch, so it is race-free under concurrent tool calls), with an
+/// <see cref="BlockStormIncident"/> for alerting/incident routing; it is exception-isolated (an alert sink must never
+/// break the gate).</para>
 /// </summary>
 public sealed class BlockStormSentinelGate : IToolGate
 {
@@ -66,15 +73,17 @@ public sealed class BlockStormSentinelGate : IToolGate
             return new ValueTask<ToolGateVerdict>(ToolGateVerdict.Allow(PolicyName));   // no per-run tally to read
         }
 
-        var enforcedBlocks = RunLedger.ForCurrentRun().TotalDenials;
+        // Tree-wide total (ForRootRun) so a storm can't be laundered across nested sub-runs. Blocking is monotonic
+        // (>= threshold), so it never fails open even if the tally jumps past the exact threshold value.
+        var enforcedBlocks = RunLedger.ForRootRun().TreeDenialCount;
         if (enforcedBlocks < _threshold)
         {
             return new ValueTask<ToolGateVerdict>(ToolGateVerdict.Allow(PolicyName));
         }
 
-        // Alert once, on the transition (TotalDenials is monotonic and increments by at most one between the
-        // sentinel's per-call checks, so it equals the threshold on exactly the call that first crosses it).
-        if (enforcedBlocks == _threshold && _onBlockStorm is not null)
+        // Alert exactly once per run tree via an atomic latch — race-free under concurrent tool calls and correct
+        // even when the tally jumps past the threshold (a naive "== threshold" check would miss or double-fire).
+        if (_onBlockStorm is not null && RunLedger.ForRootRun().TryLatchBlockStorm())
         {
             try
             {
