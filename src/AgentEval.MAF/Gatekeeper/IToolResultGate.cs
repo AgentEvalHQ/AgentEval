@@ -38,4 +38,15 @@ public interface IToolResultGate
     /// <see cref="IToolGate.MinimumPolicy"/>.
     /// </summary>
     ToolGatePolicy MinimumPolicy => ToolGatePolicy.WarnOnly;
+
+    /// <summary>
+    /// What this gate needs from its environment to enforce correctly (Phase 2, P2-6). Defaults to
+    /// <see cref="GateRequirements.None"/>. A result gate backed by <see cref="RunLedger"/> or otherwise keyed
+    /// on <see cref="AgentRunScope.Current"/> should override this to <see cref="GateRequirements.RunScope"/>,
+    /// exactly like <see cref="IToolGate.Requirements"/> — the composite <c>UseGatekeeper</c> construction-time
+    /// preflight and the runtime missing-scope warning both honor it for result gates too, so a RunLedger-backed
+    /// result gate registered without a guaranteed run scope is refused (enforcement mode) rather than silently
+    /// falling back to process-wide shared state.
+    /// </summary>
+    GateRequirements Requirements => GateRequirements.None;
 }

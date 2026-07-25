@@ -23,6 +23,7 @@ public sealed class RunBudgetGate : IToolGate
     private readonly Dictionary<string, int>? _maxPerTool;
     private readonly string? _monetaryArg;
     private readonly decimal _maxMonetary;
+    private readonly RunBudgetScope _budgetScope;
 
     /// <inheritdoc/>
     public string PolicyName => "RunBudgetGate";
@@ -37,11 +38,15 @@ public sealed class RunBudgetGate : IToolGate
     /// <param name="maxToolCalls">Cap on total tool calls per run (blocks the call that would exceed it).</param>
     /// <param name="maxCallsPerTool">Per-tool call caps (e.g. <c>["delete_account"] = 1</c>).</param>
     /// <param name="maxMonetaryPerRun">Cap on the running sum of a monetary argument, e.g. <c>("amount", 1000m)</c>.</param>
+    /// <param name="budgetScope">Which run's ledger to charge (P2-8). Defaults to <see cref="RunBudgetScope.Current"/>;
+    /// pass <see cref="RunBudgetScope.Root"/> so a fan-out of nested sub-agent runs shares this one budget.</param>
     public RunBudgetGate(
         int? maxToolCalls = null,
         IReadOnlyDictionary<string, int>? maxCallsPerTool = null,
-        (string argName, decimal max)? maxMonetaryPerRun = null)
+        (string argName, decimal max)? maxMonetaryPerRun = null,
+        RunBudgetScope budgetScope = RunBudgetScope.Current)
     {
+        _budgetScope = budgetScope;
         if (maxToolCalls is < 1)
         {
             throw new ArgumentOutOfRangeException(nameof(maxToolCalls), "must be at least 1 when set.");
@@ -89,7 +94,7 @@ public sealed class RunBudgetGate : IToolGate
     public ValueTask<ToolGateVerdict> InspectAsync(GatedToolCall call, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(call);
-        var ledger = RunLedger.ForCurrentRun();
+        var ledger = _budgetScope == RunBudgetScope.Root ? RunLedger.ForRootRun() : RunLedger.ForCurrentRun();
 
         var amount = 0m;
         if (_monetaryArg is not null)

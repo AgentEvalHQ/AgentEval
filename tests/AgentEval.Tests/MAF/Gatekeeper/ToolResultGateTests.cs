@@ -100,10 +100,14 @@ public class ToolResultGateTests
     }
 
     [Fact]
-    public async Task ResultGate_Redact_AppliesRegardlessOfPolicy_EvenUnderWarnOnly()
+    public async Task ResultGate_Redact_UnderWarnOnly_IsRecordedButNotApplied_ModelSeesOriginalResult()
     {
+        // P2-2 (breaking, was ResultGate_Redact_AppliesRegardlessOfPolicy_EvenUnderWarnOnly): observe-only
+        // WarnOnly must NOT change behavior. A Redact verdict is recorded (action=Redact, applied=false) but the
+        // real, un-redacted result flows through to the model — replacing it is a behavior change reserved for
+        // enforcement. Under ReplaceResult/Terminate the same gate WOULD mask the secret (covered elsewhere).
         var tool = AIFunctionFactory.Create((string x) => "AKIA1234567890ABCDEF leaked", "fetch");
-        var (agent, _) = BuildAgent(tool, "fetch", new Dictionary<string, object?> { ["x"] = "1" });
+        var (agent, scripted) = BuildAgent(tool, "fetch", new Dictionary<string, object?> { ["x"] = "1" });
         var trace = new AgentTrace();
         var gated = agent.AsBuilder()
             .UseAgentEvalToolGate([], ToolGatePolicy.WarnOnly, trace, resultGates: [new ToolResultSecretGate()])
@@ -114,7 +118,37 @@ public class ToolResultGateTests
         var key = trace.Metadata!.Keys.Single(k => k.StartsWith("gate.tool-result.", StringComparison.Ordinal));
         var value = (IDictionary<string, object?>)trace.Metadata![key];
         Assert.Equal("Redact", value["action"]);
+        Assert.Equal(false, value["applied"]);   // recorded as a dry-run, not enforced
         Assert.Equal(0, GlassBoxEvidence.FromTrace(trace).GateBlockCount);   // a redact is never counted as a block
+
+        // The model saw the ORIGINAL result — observe-only left it untouched.
+        var resultText = scripted.ReceivedMessages[1]
+            .SelectMany(m => m.Contents).OfType<FunctionResultContent>().Single().Result?.ToString();
+        Assert.Contains("AKIA1234567890ABCDEF", resultText!, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task ResultGate_Redact_UnderEnforcement_IsApplied_ModelSeesMaskedResult()
+    {
+        // The enforcement counterpart to the observe-only test above — under ReplaceResult the same secret gate
+        // DOES replace the result, so the model never sees the raw credential.
+        var tool = AIFunctionFactory.Create((string x) => "AKIA1234567890ABCDEF leaked", "fetch");
+        var (agent, scripted) = BuildAgent(tool, "fetch", new Dictionary<string, object?> { ["x"] = "1" });
+        var trace = new AgentTrace();
+        var gated = agent.AsBuilder()
+            .UseAgentEvalToolGate([], ToolGatePolicy.ReplaceResult, trace, resultGates: [new ToolResultSecretGate()])
+            .Build();
+
+        await gated.RunAsync("go");
+
+        var key = trace.Metadata!.Keys.Single(k => k.StartsWith("gate.tool-result.", StringComparison.Ordinal));
+        var value = (IDictionary<string, object?>)trace.Metadata![key];
+        Assert.Equal("Redact", value["action"]);
+        Assert.Equal(true, value["applied"]);
+
+        var resultText = scripted.ReceivedMessages[1]
+            .SelectMany(m => m.Contents).OfType<FunctionResultContent>().Single().Result?.ToString();
+        Assert.DoesNotContain("AKIA1234567890ABCDEF", resultText!, StringComparison.Ordinal);   // masked before the model saw it
     }
 
     [Fact]

@@ -31,6 +31,34 @@ public sealed class AgentRunScope : IDisposable
     /// <summary>The Glass Box trace for this run, if any.</summary>
     public AgentTrace? Trace { get; }
 
+    /// <summary>
+    /// The scope of the ENCLOSING run (P2-8) — the scope that was <see cref="Current"/> when this one began,
+    /// which for a sub-agent / nested run IS the parent run's scope; null for a top-level run. Distinct in intent
+    /// from the private restore target even though they coincide by construction: budget gates walk this chain
+    /// (see <see cref="Root"/>) so a fan-out of nested runs cannot each start a fresh budget and launder past a
+    /// parent cap.
+    /// </summary>
+    public AgentRunScope? Parent => _previous;
+
+    /// <summary>
+    /// The OUTERMOST scope in this run's parent chain — this scope itself when it has no <see cref="Parent"/>
+    /// (P2-8). A budget gate keyed on the root's ledger accumulates across the whole run tree, so every nested
+    /// sub-agent run shares one budget instead of resetting it.
+    /// </summary>
+    public AgentRunScope Root
+    {
+        get
+        {
+            var scope = this;
+            while (scope._previous is { } parent)
+            {
+                scope = parent;
+            }
+
+            return scope;
+        }
+    }
+
     private readonly AgentRunScope? _previous;
     private bool _disposed;
 

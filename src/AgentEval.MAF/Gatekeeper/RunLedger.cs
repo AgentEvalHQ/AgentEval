@@ -85,6 +85,19 @@ public sealed class RunLedger
         return PerRun.GetValue(key, static _ => new RunLedger());
     }
 
+    /// <summary>
+    /// The ledger for the ROOT of the current run's parent chain (P2-8, <see cref="AgentRunScope.Root"/>) — the
+    /// single ledger every nested sub-agent run resolves to, so a budget gate keyed here accumulates across the
+    /// whole run tree instead of resetting per nested run. For a top-level (un-nested) run the root IS the current
+    /// scope, so this is identical to <see cref="ForCurrentRun"/>; with no run scope at all, both fall back to the
+    /// one shared process-wide ledger.
+    /// </summary>
+    public static RunLedger ForRootRun()
+    {
+        var key = (object?)AgentRunScope.Current?.Root ?? FallbackKey;
+        return PerRun.GetValue(key, static _ => new RunLedger());
+    }
+
     /// <summary>Total tool calls recorded across every tool this run.</summary>
     public int TotalToolCalls
     {

@@ -25,6 +25,7 @@ namespace AgentEval.MAF.Gatekeeper;
 public sealed class PerToolCallBudgetGate : IToolGate
 {
     private readonly Dictionary<string, int> _maxPerTool;
+    private readonly RunBudgetScope _budgetScope;
 
     /// <inheritdoc/>
     public string PolicyName { get; }
@@ -38,9 +39,12 @@ public sealed class PerToolCallBudgetGate : IToolGate
     /// <summary>Creates the gate over one or more per-tool call-count caps.</summary>
     /// <param name="maxCallsPerTool">Per-tool call caps (e.g. <c>["delete_account"] = 1</c>). Required, non-empty.</param>
     /// <param name="policyName">Optional override of the recorded policy name (default <c>"PerToolCallBudgetGate"</c>).</param>
-    public PerToolCallBudgetGate(IReadOnlyDictionary<string, int> maxCallsPerTool, string? policyName = null)
+    /// <param name="budgetScope">Which run's ledger to charge (P2-8). Defaults to <see cref="RunBudgetScope.Current"/>;
+    /// pass <see cref="RunBudgetScope.Root"/> so a fan-out of nested sub-agent runs shares these per-tool caps.</param>
+    public PerToolCallBudgetGate(IReadOnlyDictionary<string, int> maxCallsPerTool, string? policyName = null, RunBudgetScope budgetScope = RunBudgetScope.Current)
     {
         ArgumentNullException.ThrowIfNull(maxCallsPerTool);
+        _budgetScope = budgetScope;
         if (maxCallsPerTool.Count == 0)
         {
             throw new ArgumentException("At least one tool call-count cap is required.", nameof(maxCallsPerTool));
@@ -75,7 +79,7 @@ public sealed class PerToolCallBudgetGate : IToolGate
             return new ValueTask<ToolGateVerdict>(ToolGateVerdict.Allow(PolicyName));   // not a guarded tool
         }
 
-        var ledger = RunLedger.ForCurrentRun();
+        var ledger = _budgetScope == RunBudgetScope.Root ? RunLedger.ForRootRun() : RunLedger.ForCurrentRun();
         var decision = ledger.TryAdmitPerToolCall(call.FunctionName, cap);
 
         var verdict = decision == RunBudgetDecision.PerToolExceeded

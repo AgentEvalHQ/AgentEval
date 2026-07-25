@@ -88,13 +88,45 @@ public class AgentEvalGatekeeperExtensionsTests
         var agent = BuildAgent(tool, "delete_account", new Dictionary<string, object?> { ["x"] = "1" });
         using var writer = new StringWriter();
         var gated = agent.AsBuilder()
-            .ObserveWithAgentEvalGates(g => { g.Add(new ForbiddenToolGate("delete_account")); g.BannerWriter = writer; })
+            .ObserveWithAgentEvalGates(g => { g.Add(new ForbiddenToolGate("delete_account")); g.Trace = new AgentTrace(); g.BannerWriter = writer; })   // P2-7: Observe needs an evidence sink
             .Build();
 
         await gated.RunAsync("go");
 
         Assert.Contains("OBSERVE-ONLY MODE", writer.ToString(), StringComparison.Ordinal);
         Assert.Contains("NO TOOL CALLS WILL BE BLOCKED", writer.ToString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Observe_WithNoEvidenceSink_IsRefused_AndBannerNeverPrinted()
+    {
+        // P2-7: Observe promises to record findings, so a config with neither Trace nor Telemetry — every finding
+        // silently discarded while the banner claims otherwise — is refused at construction, before the (lying)
+        // banner is ever printed.
+        var tool = AIFunctionFactory.Create((string x) => x, "delete_account");
+        var agent = BuildAgent(tool, "delete_account", new Dictionary<string, object?> { ["x"] = "1" });
+        using var writer = new StringWriter();
+
+        var ex = Assert.Throws<InvalidOperationException>(() =>
+            agent.AsBuilder().ObserveWithAgentEvalGates(g => { g.Add(new ForbiddenToolGate("delete_account")); g.BannerWriter = writer; }));
+
+        Assert.Contains("Observe", ex.Message, StringComparison.Ordinal);
+        Assert.Contains("Trace", ex.Message, StringComparison.Ordinal);
+        Assert.Equal(string.Empty, writer.ToString());   // the misleading "findings are recorded" banner was NOT printed
+    }
+
+    [Fact]
+    public void Observe_WithTelemetrySinkOnly_IsAccepted()
+    {
+        // Either sink satisfies P2-7 — Telemetry alone is enough (tool-gate findings land there).
+        var tool = AIFunctionFactory.Create((string x) => x, "delete_account");
+        var agent = BuildAgent(tool, "delete_account", new Dictionary<string, object?> { ["x"] = "1" });
+        using var writer = new StringWriter();
+
+        var ex = Record.Exception(() =>
+            agent.AsBuilder().ObserveWithAgentEvalGates(g => { g.Add(new ForbiddenToolGate("delete_account")); g.Telemetry = new GateTelemetry(); g.BannerWriter = writer; }));
+
+        Assert.Null(ex);
     }
 
     [Fact]
@@ -161,6 +193,7 @@ public class AgentEvalGatekeeperExtensionsTests
             {
                 g.Add(new RunBudgetGate(maxToolCalls: 5));
                 g.EstablishRunScope = false;
+                g.Trace = new AgentTrace();   // P2-7: Observe needs an evidence sink; the run-scope exemption under test is unrelated
                 g.BannerWriter = writer;
             }));
 
@@ -779,6 +812,61 @@ public class AgentEvalGatekeeperExtensionsTests
         Assert.Contains("MinimumPolicy", ex.Message, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public async Task ResultGate_RedactWithNullResult_FailsClosedToRefusal_ModelNeverSeesNull()
+    {
+        // P2-5 / HAZARD-1: a Redact verdict with a null RedactedResult must NOT blank the result to null — which
+        // downstream renders as the "Success: Function completed." fabrication the result-gate family exists to
+        // prevent. The model must instead receive the stable, non-revealing refusal body, and the trace must
+        // record it with a correlatable referenceId (which the old null-blank path never wrote).
+        var tool = AIFunctionFactory.Create((string x) => "the-real-secret-result", "fetch");
+        var scripted = new ScriptedChatClient().AddToolCall("call_1", "fetch", new Dictionary<string, object?> { ["x"] = "1" }).AddText("done");
+        var agent = new ChatClientAgent(scripted, new ChatClientAgentOptions { Name = "T", ChatOptions = new ChatOptions { Tools = [tool] } });
+        var trace = new AgentTrace();
+
+        var gated = agent.AsBuilder()
+            .UseGatekeeper(GatekeeperEnforcement.ReplaceResult, g =>
+            {
+                g.AddResultGate(new NullRedactResultGate());
+                g.Trace = trace;
+            })
+            .Build();
+
+        await gated.RunAsync("go");
+
+        // The second model call carries the tool result; it must be the refusal body — never null, never the secret.
+        var resultText = scripted.ReceivedMessages[1]
+            .SelectMany(m => m.Contents).OfType<FunctionResultContent>().Single().Result?.ToString();
+        Assert.NotNull(resultText);
+        Assert.Contains("ACTION_NOT_AUTHORIZED", resultText, StringComparison.Ordinal);
+        Assert.DoesNotContain("the-real-secret-result", resultText, StringComparison.Ordinal);
+
+        var key = trace.Metadata!.Keys.Single(k => k.StartsWith("gate.tool-result.", StringComparison.Ordinal));
+        var entry = (IDictionary<string, object?>)trace.Metadata![key];
+        Assert.Equal("Redact", entry["action"]);
+        Assert.False(string.IsNullOrEmpty((string?)entry["referenceId"]));
+    }
+
+    [Fact]
+    public void ResultGate_DeclaringRunScope_WithoutScope_UnderEnforcement_IsRefused()
+    {
+        // P2-6: result gates declare GateRequirements.RunScope the same way call gates do, and fall back to the
+        // same process-wide shared state without one. UseGatekeeper must refuse construction (enforcement mode,
+        // no scope established) for a scope-requiring RESULT gate, exactly as it already does for a call gate.
+        var tool = AIFunctionFactory.Create((string x) => x, "x");
+        var agent = BuildAgent(tool, "x", new Dictionary<string, object?>());
+
+        var ex = Assert.Throws<InvalidOperationException>(() =>
+            agent.AsBuilder().UseGatekeeper(GatekeeperEnforcement.ReplaceResult, g =>
+            {
+                g.EstablishRunScope = false;   // no scope, and no pre/post gate to implicitly establish one
+                g.AddResultGate(new ScopeRequiringResultGate());
+            }));
+
+        Assert.Contains("ScopeRequiringResultGate", ex.Message, StringComparison.Ordinal);
+        Assert.Contains("RunScope", ex.Message, StringComparison.Ordinal);
+    }
+
     private sealed class AllowAllAsCallGate : IToolGate
     {
         public string PolicyName => "AllowAllAsCallGate";
@@ -792,6 +880,26 @@ public class AgentEvalGatekeeperExtensionsTests
         public string PolicyName => "FlooredResultGateForCompositeTest";
         public GateCost Cost => GateCost.PureCode;
         public ToolGatePolicy MinimumPolicy => ToolGatePolicy.ReplaceResult;
+        public ValueTask<ToolResultVerdict> InspectAsync(GatedToolResult result, CancellationToken ct = default)
+            => new(ToolResultVerdict.Allow(PolicyName));
+    }
+
+    // P2-5: a result gate that redacts but supplies NO replacement (RedactedResult stays null).
+    private sealed class NullRedactResultGate : IToolResultGate
+    {
+        public string PolicyName => "NullRedactResultGate";
+        public GateCost Cost => GateCost.PureCode;
+        public ToolGatePolicy MinimumPolicy => ToolGatePolicy.ReplaceResult;
+        public ValueTask<ToolResultVerdict> InspectAsync(GatedToolResult result, CancellationToken ct = default)
+            => new(new ToolResultVerdict(ToolResultAction.Redact, PolicyName, "withholding result, no replacement supplied", RedactedResult: null));
+    }
+
+    // P2-6: a result gate whose correctness needs a run scope (RunLedger-backed, in practice).
+    private sealed class ScopeRequiringResultGate : IToolResultGate
+    {
+        public string PolicyName => "ScopeRequiringResultGate";
+        public GateCost Cost => GateCost.PureCode;
+        public GateRequirements Requirements => GateRequirements.RunScope;
         public ValueTask<ToolResultVerdict> InspectAsync(GatedToolResult result, CancellationToken ct = default)
             => new(ToolResultVerdict.Allow(PolicyName));
     }

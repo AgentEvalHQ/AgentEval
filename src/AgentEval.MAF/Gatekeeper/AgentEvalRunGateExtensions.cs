@@ -3,6 +3,7 @@
 // Licensed under the MIT License.
 
 using System.Runtime.CompilerServices;
+using System.Security.Cryptography;
 using System.Text;
 using AgentEval.Guardrails;
 using AgentEval.Tracing;
@@ -94,16 +95,29 @@ public static class AgentEvalRunGateExtensions
             {
                 using var scope = AgentRunScope.Begin(session, innerAgent.Name, trace);
 
-                var preRefusal = await RunGatesAsync(preGates, ConcatText(messages), "run-pre", effectivePolicy, trace, seq, ct).ConfigureAwait(false);
-                if (preRefusal is not null)
+                var preOutcome = await RunGatesAsync(preGates, ConcatText(messages), "run-pre", isPreStage: true, effectivePolicy, trace, seq, ct).ConfigureAwait(false);
+                if (preOutcome.ReturnBody is not null)
                 {
-                    return Refusal(innerAgent, preRefusal);
+                    return Refusal(innerAgent, preOutcome.ReturnBody);
                 }
 
-                var response = await innerAgent.RunAsync(messages, session, options, ct).ConfigureAwait(false);
+                // P2-1: a run-pre Redact rewrites the (flattened) input; the model STILL RUNS, on the redacted text.
+                var effectiveMessages = RewrittenOrOriginal(preOutcome, messages);
 
-                var postRefusal = await RunGatesAsync(postGates, response.Text, "run-post", effectivePolicy, trace, seq, ct).ConfigureAwait(false);
-                return postRefusal is not null ? Refusal(innerAgent, postRefusal) : response;
+                var response = await innerAgent.RunAsync(effectiveMessages, session, options, ct).ConfigureAwait(false);
+
+                var postOutcome = await RunGatesAsync(postGates, response.Text, "run-post", isPreStage: false, effectivePolicy, trace, seq, ct).ConfigureAwait(false);
+                if (postOutcome.ReturnBody is not null)
+                {
+                    // P2-3: an enforced run-post Block/Redact swapped what the CALLER sees, but the model's original
+                    // (unsafe) response is already persisted in the session and would re-enter context next turn.
+                    // Reconcile the persisted turn to the caller-safe text (for sessions that expose the seam) and
+                    // emit divergence evidence either way.
+                    ReconcileSession(session, safeText: postOutcome.ReturnBody, withheldText: response.Text, trace, seq);
+                    return Refusal(innerAgent, postOutcome.ReturnBody);
+                }
+
+                return response;
             },
             runStreamingFunc: (messages, session, options, innerAgent, ct) =>
                 StreamCore(messages, session, options, innerAgent, preGates, postGates, effectivePolicy, trace, seq, ct));
@@ -137,10 +151,10 @@ public static class AgentEvalRunGateExtensions
         // SessionContextGate pre-gate sees the session, exactly as on the non-streaming path).
         using var runScope = AgentRunScope.Begin(session, innerAgent.Name, trace);
 
-        var preRefusal = await RunGatesAsync(preGates, ConcatText(messages), "run-pre", policy, trace, seq, ct).ConfigureAwait(false);
-        if (preRefusal is not null)
+        var preOutcome = await RunGatesAsync(preGates, ConcatText(messages), "run-pre", isPreStage: true, policy, trace, seq, ct).ConfigureAwait(false);
+        if (preOutcome.ReturnBody is not null)
         {
-            var synth = new AgentResponse(new ChatMessage(ChatRole.Assistant, preRefusal)) { AgentId = innerAgent.Id };
+            var synth = new AgentResponse(new ChatMessage(ChatRole.Assistant, preOutcome.ReturnBody)) { AgentId = innerAgent.Id };
             foreach (var update in synth.ToAgentResponseUpdates())
             {
                 yield return update;
@@ -149,13 +163,16 @@ public static class AgentEvalRunGateExtensions
             yield break;
         }
 
+        // P2-1: a run-pre Redact rewrites the streamed input; the model STILL STREAMS, over the redacted text.
+        var effectiveMessages = RewrittenOrOriginal(preOutcome, messages);
+
         // Accumulate the response ONLY when WarnOnly post-gates need to inspect it (no allocation otherwise, so
         // TTFT and the gate-less path are untouched).
         var accumulated = postGates.Count > 0 ? new StringBuilder() : null;
 
         // PERF-01: an AsyncLocal set once atop an async iterator does not survive the first yield (later
         // MoveNext runs on the consumer's context) — so RE-ENTER the SAME scope instance inside each segment.
-        await using var e = innerAgent.RunStreamingAsync(messages, session, options, ct).GetAsyncEnumerator(ct);
+        await using var e = innerAgent.RunStreamingAsync(effectiveMessages, session, options, ct).GetAsyncEnumerator(ct);
         while (true)
         {
             bool has;
@@ -179,13 +196,35 @@ public static class AgentEvalRunGateExtensions
         {
             using (runScope.Enter())
             {
-                await RunGatesAsync(postGates, accumulated.ToString(), "run-post", policy, trace, seq, ct).ConfigureAwait(false);
+                await RunGatesAsync(postGates, accumulated.ToString(), "run-post", isPreStage: false, policy, trace, seq, ct).ConfigureAwait(false);
             }
         }
     }
 
-    private static async ValueTask<string?> RunGatesAsync(
-        IReadOnlyList<IChatGate> gates, string text, string stage, EvalGatePolicy policy, AgentTrace? trace, int[] seq, CancellationToken ct)
+    // The outcome of running one stage's chat gates (P2-1). A stage either PROCEEDS (both fields null), RETURNS a
+    // body instead of proceeding (ReturnBody — a refusal, or on run-post a redacted replacement response), or —
+    // run-pre Redact only — REWRITES the model input and continues (RewrittenInput).
+    private readonly record struct GateStageOutcome(string? ReturnBody, string? RewrittenInput)
+    {
+        public static readonly GateStageOutcome Proceed = default;
+        public static GateStageOutcome Return(string body) => new(body, null);
+        public static GateStageOutcome Rewrite(string input) => new(null, input);
+    }
+
+    // P2-1: a run-pre Redact only ever saw ConcatText(messages) — the flattened conversation — so the honest
+    // representation of the redacted input is a single user message carrying the sanitized text. Message ROLES /
+    // multi-turn structure and non-text parts are not reconstructable from the flattened view, so they are
+    // intentionally collapsed; this is a narrow redaction (strip a secret/PII from the incoming prompt), not a
+    // faithful history rewrite. NOTE: an agent's own system/developer INSTRUCTIONS live on the agent
+    // (ChatClientAgentOptions.Instructions), NOT in the `messages` passed to a run, so they are UNAFFECTED by this
+    // collapse in the common case. A caller who instead passes a system message INSIDE the run input, or relies on
+    // multi-turn structure/tool-call parts, should treat a run-pre Redact as lossy for those and prefer a run-POST
+    // gate (or a per-message redactor upstream) when that structure must survive.
+    private static IEnumerable<ChatMessage> RewrittenOrOriginal(GateStageOutcome outcome, IEnumerable<ChatMessage> original)
+        => outcome.RewrittenInput is null ? original : [new ChatMessage(ChatRole.User, outcome.RewrittenInput)];
+
+    private static async ValueTask<GateStageOutcome> RunGatesAsync(
+        IReadOnlyList<IChatGate> gates, string text, string stage, bool isPreStage, EvalGatePolicy policy, AgentTrace? trace, int[] seq, CancellationToken ct)
     {
         foreach (var gate in gates)
         {
@@ -201,7 +240,7 @@ public static class AgentEvalRunGateExtensions
                 var failVerdict = GateVerdict.Block(gate.PolicyName, $"gate evaluation threw ({ex.GetType().Name}) — failing closed");
                 var throwReferenceId = GateReferenceId.New();
                 RecordGate(trace, Interlocked.Increment(ref seq[0]), stage, failVerdict, "Block", throwReferenceId);
-                return GateReferenceId.RefusalBody(throwReferenceId);
+                return GateStageOutcome.Return(GateReferenceId.RefusalBody(throwReferenceId));
             }
 
             if (verdict.Action != GateAction.Block)
@@ -222,15 +261,26 @@ public static class AgentEvalRunGateExtensions
 
             if (policy == EvalGatePolicy.Redact)
             {
-                // #12: RedactedText (when a gate supplies one) IS meant to be seen — it's the SAFE version of the
-                // content, not a refusal. Only the fallback (no redaction available) gets the non-revealing shape.
-                return verdict.RedactedText ?? GateReferenceId.RefusalBody(referenceId);
+                // No safe version supplied ⇒ a hard block: the non-revealing refusal shape, both stages.
+                if (verdict.RedactedText is null)
+                {
+                    return GateStageOutcome.Return(GateReferenceId.RefusalBody(referenceId));
+                }
+
+                // #12 / P2-1: RedactedText IS the SAFE version of the content, not a refusal. On run-POST it
+                // REPLACES the response the caller sees. On run-PRE it REWRITES the input and the model STILL
+                // RUNS on the redacted text — a prior version returned it as the final answer, short-circuiting
+                // the model entirely (objectively a bug: run-pre Redact is sanitize-then-continue, not
+                // sanitize-and-answer).
+                return isPreStage
+                    ? GateStageOutcome.Rewrite(verdict.RedactedText)
+                    : GateStageOutcome.Return(verdict.RedactedText);
             }
 
             // WarnOnly: recorded as a warning; let the run proceed.
         }
 
-        return null;
+        return GateStageOutcome.Proceed;
     }
 
     private static AgentResponse Refusal(AIAgent innerAgent, string text)
@@ -238,6 +288,73 @@ public static class AgentEvalRunGateExtensions
 
     private static string ConcatText(IEnumerable<ChatMessage> messages)
         => string.Join("\n", messages.Select(m => m.Text).Where(t => !string.IsNullOrEmpty(t)));
+
+    // P2-3: after an enforced run-post Block/Redact, reconcile the session's persisted turn with what the caller
+    // actually saw and record the divergence. The scrub itself is only possible for a session that opts into the
+    // IReconcilableSession seam (directly or via GetService) — MAF's built-in session exposes no mutable history,
+    // so it is left untouched and the evidence honestly records scrubbed=false (never a false success).
+    private static void ReconcileSession(AgentSession? session, string safeText, string withheldText, AgentTrace? trace, int[] seq)
+    {
+        var reconciler = session as IReconcilableSession;
+        if (reconciler is null && session is not null)
+        {
+            // A custom session's GetService could throw; a decided, enforced refusal must not be turned into a
+            // propagating exception at the run boundary just because the reconciliation lookup failed.
+            try
+            {
+                reconciler = session.GetService(typeof(IReconcilableSession), null) as IReconcilableSession;
+            }
+            catch
+            {
+                reconciler = null;
+            }
+        }
+
+        var scrubbed = false;
+        string? reason = null;
+        if (reconciler is null)
+        {
+            reason = session is null
+                ? "no session on the run — nothing to reconcile"
+                : "session does not implement IReconcilableSession — its persisted turn still diverges from what the caller "
+                  + "saw; rotate the session/thread if that turn must not re-enter the model's context next turn";
+        }
+        else
+        {
+            try
+            {
+                scrubbed = reconciler.TryReconcileLastAssistantMessage(safeText);
+                if (!scrubbed)
+                {
+                    reason = "IReconcilableSession found no assistant turn to reconcile";
+                }
+            }
+            catch (Exception ex)
+            {
+                reason = $"IReconcilableSession.TryReconcileLastAssistantMessage threw ({ex.GetType().Name}) — persisted turn NOT scrubbed";
+            }
+        }
+
+        if (trace is null)
+        {
+            return;
+        }
+
+        // Per-turn hash-divergence record: the caller-safe text vs. the withheld model text, so an auditor can
+        // confirm a scrub happened (or see, honestly, that it could not) without either text stored verbatim.
+        trace.SetMetadata($"gate.session.{Interlocked.Increment(ref seq[0])}.reconciliation", new Dictionary<string, object?>
+        {
+            ["action"] = "Reconcile",
+            ["scrubbed"] = scrubbed,
+            ["safeHash"] = ShortHash(safeText),
+            ["withheldHash"] = ShortHash(withheldText),
+            ["diverged"] = !string.Equals(safeText, withheldText, StringComparison.Ordinal),
+            ["reason"] = reason,
+        });
+    }
+
+    private static string ShortHash(string text)
+        => "sha256:" + Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(text)), 0, 8).ToLowerInvariant();
 
     // #12: the full policy name (the metadata key itself) and reason live ONLY here — audit-visible trace
     // evidence, never returned as run-refusal content (see GateReferenceId.RefusalBody). referenceId is the

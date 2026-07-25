@@ -57,11 +57,115 @@ public class ToolGateTests
         var tool = AIFunctionFactory.Create((string path) => { received = path; return path; }, "read_file");
         var (agent, _) = BuildAgent(tool, "read_file", new Dictionary<string, object?> { ["path"] = "/original" });
         var gate = new MutatingGate("read_file", new Dictionary<string, object?> { ["path"] = "/sandbox/original" });
-        var gated = agent.AsBuilder().UseAgentEvalToolGate([gate], ToolGatePolicy.WarnOnly).Build();
+        // P2-2: a Mutate is applied only under enforcement (ReplaceResult/Terminate), not observe-only WarnOnly.
+        var gated = agent.AsBuilder().UseAgentEvalToolGate([gate], ToolGatePolicy.ReplaceResult).Build();
 
         await gated.RunAsync("go");
 
         Assert.Equal("/sandbox/original", received);   // the tool ran with the MUTATED argument
+    }
+
+    [Fact]
+    public async Task MutateArgs_UnderWarnOnly_IsRecordedButNotApplied_ToolReceivesOriginalArgs()
+    {
+        // P2-2 (breaking): observe-only WarnOnly must not change behavior. A Mutate is recorded (with the
+        // counterfactual argsAfter, applied=false) but the tool receives the ORIGINAL, un-rewritten arguments.
+        string? received = null;
+        var tool = AIFunctionFactory.Create((string? path) => { received = path; return path ?? "<null>"; }, "read_file");
+        var (agent, _) = BuildAgent(tool, "read_file", new Dictionary<string, object?> { ["path"] = "/original" });
+        var trace = new AgentTrace();
+        var gated = agent.AsBuilder()
+            .UseAgentEvalToolGate(
+                [new MutatingGate("read_file", new Dictionary<string, object?> { ["path"] = "/sandbox/rewritten" })],
+                ToolGatePolicy.WarnOnly, trace, mutationCaptureMode: TraceCaptureMode.Full)
+            .Build();
+
+        await gated.RunAsync("go");
+
+        Assert.Equal("/original", received);   // the tool ran with the ORIGINAL argument — mutation not applied
+        var value = (IDictionary<string, object?>)trace.Metadata!["gate.tool.1.MutatingGate"];
+        Assert.Equal("Mutate", value["action"]);
+        Assert.Equal(false, value["applied"]);
+        Assert.Contains("/sandbox/rewritten", (string)value["argsAfter"]!);   // the dry-run still shows what WOULD have happened
+    }
+
+    [Fact]
+    public async Task Mutate_IntroducingForbiddenPattern_IsCaughtByAnEarlierGate_OnRevalidation()
+    {
+        // P2-4: a pattern gate ORDERED BEFORE a mutator Allowed the original args; the mutator then rewrites them
+        // into a forbidden path. Revalidation re-runs that earlier gate against the NEW args, so the mutation
+        // cannot smuggle a pattern past a gate that would have blocked it — the tool never runs.
+        var executed = 0;
+        var tool = AIFunctionFactory.Create((string? path) => { Interlocked.Increment(ref executed); return "ok"; }, "read_file");
+        var (agent, _) = BuildAgent(tool, "read_file", new Dictionary<string, object?> { ["path"] = "safe.txt" });
+        var gated = agent.AsBuilder()
+            .UseAgentEvalToolGate(
+                [new ArgumentPatternGate("/etc/passwd"), new MutatingGate("read_file", new Dictionary<string, object?> { ["path"] = "../../etc/passwd" })],
+                ToolGatePolicy.ReplaceResult)
+            .Build();
+
+        await gated.RunAsync("go");
+
+        Assert.Equal(0, executed);   // the mutated traversal was caught on revalidation by the earlier gate
+    }
+
+    [Fact]
+    public async Task Mutate_ThatNeverConverges_FailsClosed_AfterTheRevalidationCap()
+    {
+        // P2-4: a gate that changes the arguments to something new on EVERY pass never reaches a fixed point.
+        // Rather than loop forever, the pipeline fails closed after the bounded revalidation cap.
+        var executed = 0;
+        var tool = AIFunctionFactory.Create((string? path) => { Interlocked.Increment(ref executed); return "ok"; }, "read_file");
+        var (agent, _) = BuildAgent(tool, "read_file", new Dictionary<string, object?> { ["path"] = "0" });
+        var gated = agent.AsBuilder()
+            .UseAgentEvalToolGate([new EverChangingMutatingGate("read_file")], ToolGatePolicy.ReplaceResult)
+            .Build();
+
+        await gated.RunAsync("go");
+
+        Assert.Equal(0, executed);   // non-convergence fails closed — the tool never runs
+    }
+
+    [Fact]
+    public async Task Mutate_Revalidation_DoesNotDoubleChargeAStatefulBudgetGate()
+    {
+        // P2-4: revalidation re-runs only PURE gates. A RunScope-declaring budget gate is charged exactly ONCE
+        // (first pass); if the revalidation re-invoked it, the second charge would exhaust a maxToolCalls=1 budget
+        // and wrongly block the single real call. That the tool DOES run proves there was no double-charge.
+        var executed = 0;
+        var tool = AIFunctionFactory.Create((string? path) => { Interlocked.Increment(ref executed); return "ok"; }, "read_file");
+        var (agent, _) = BuildAgent(tool, "read_file", new Dictionary<string, object?> { ["path"] = "raw" });
+        var gated = agent.AsBuilder()
+            .UseGatekeeper(GatekeeperEnforcement.ReplaceResult, g =>
+            {
+                g.Add(new RunBudgetGate(maxToolCalls: 1));
+                g.Add(new MutatingGate("read_file", new Dictionary<string, object?> { ["path"] = "normalized" }));
+            })
+            .Build();
+
+        await gated.RunAsync("go");
+
+        Assert.Equal(1, executed);   // charged once; the mutation revalidation did not re-charge the budget
+    }
+
+    [Fact]
+    public async Task MutateArgs_GateReturnsAliasedCallArguments_ArgsSurviveClear_ToolStillReceivesThem()
+    {
+        // P2-4a / WM-5: call.Arguments IS a read-only view over the live context.Arguments, so a gate can hand
+        // that very dictionary back as NewArguments (e.g. a normalizer that tweaks one key in place). The apply
+        // path does context.Arguments.Clear() then copies FROM NewArguments — if the two alias, Clear() empties
+        // the copy source first and every argument is wiped, so the tool runs argument-less. The fix snapshots
+        // NewArguments before clearing; this test fails (received is null) without it.
+        string? received = "SENTINEL";
+        var tool = AIFunctionFactory.Create((string? path) => { received = path; return path ?? "<null>"; }, "read_file");
+        var (agent, _) = BuildAgent(tool, "read_file", new Dictionary<string, object?> { ["path"] = "/original" });
+        // ReplaceResult so the mutation is actually APPLIED (P2-2) — that is the only path that runs the
+        // Clear()+copy this aliasing guard protects; under observe-only WarnOnly nothing would be cleared.
+        var gated = agent.AsBuilder().UseAgentEvalToolGate([new AliasingMutatingGate("read_file")], ToolGatePolicy.ReplaceResult).Build();
+
+        await gated.RunAsync("go");
+
+        Assert.Equal("/original", received);   // the aliased arguments survived the in-place Clear()
     }
 
     // ── Build-time cost rejection ──
@@ -168,7 +272,7 @@ public class ToolGateTests
         var gated = agent.AsBuilder()
             .UseAgentEvalToolGate(
                 [new MutatingGate("render", new Dictionary<string, object?> { ["html"] = "a<b>&'c" })],
-                ToolGatePolicy.WarnOnly, trace, mutationCaptureMode: TraceCaptureMode.Full)
+                ToolGatePolicy.ReplaceResult, trace, mutationCaptureMode: TraceCaptureMode.Full)   // P2-2: enforce so the mutation IS applied and argsAfter == what the tool receives
             .Build();
 
         await gated.RunAsync("go");
@@ -436,6 +540,33 @@ public class ToolGateTests
         public GateCost Cost => GateCost.Network;
         public ValueTask<ToolGateVerdict> InspectAsync(GatedToolCall call, CancellationToken ct = default)
             => new(ToolGateVerdict.Allow(PolicyName));
+    }
+
+    // P2-4: mutates to a DIFFERENT value on every inspection, so the arguments never converge to a fixed point.
+    private sealed class EverChangingMutatingGate : IToolGate
+    {
+        private readonly string _target;
+        private int _n;
+        public string PolicyName => "EverChangingMutatingGate";
+        public GateCost Cost => GateCost.PureCode;
+        public EverChangingMutatingGate(string target) => _target = target;
+        public ValueTask<ToolGateVerdict> InspectAsync(GatedToolCall call, CancellationToken ct = default)
+            => new(call.FunctionName == _target
+                ? ToolGateVerdict.Mutate(PolicyName, new Dictionary<string, object?> { ["path"] = (++_n).ToString() }, "churn")
+                : ToolGateVerdict.Allow(PolicyName));
+    }
+
+    // P2-4a: hands the call's OWN argument dictionary straight back as the mutation — the aliasing case.
+    private sealed class AliasingMutatingGate : IToolGate
+    {
+        private readonly string _target;
+        public string PolicyName => "AliasingMutatingGate";
+        public GateCost Cost => GateCost.PureCode;
+        public AliasingMutatingGate(string target) => _target = target;
+        public ValueTask<ToolGateVerdict> InspectAsync(GatedToolCall call, CancellationToken ct = default)
+            => new(call.FunctionName == _target && call.Arguments is not null
+                ? ToolGateVerdict.Mutate(PolicyName, call.Arguments, "aliased passthrough")
+                : ToolGateVerdict.Allow(PolicyName));
     }
 
     private sealed class ThrowingGate : IToolGate
