@@ -132,4 +132,36 @@ public class JudgeCompositionTests
     [Fact]
     public void Cache_ZeroMaxEntries_Throws()
         => Assert.Throws<ArgumentOutOfRangeException>(() => new JudgeVerdictCache(new StubGate(GateVerdict.Allow("x")), 0));
+
+    private sealed class FakeClock(DateTimeOffset start) : TimeProvider
+    {
+        private DateTimeOffset _now = start;
+        public override DateTimeOffset GetUtcNow() => _now;
+        public void Advance(TimeSpan by) => _now += by;
+    }
+
+    [Fact]
+    public async Task Cache_EmitsPrecedentEvents_HitCarriesOriginalTimestamp()
+    {
+        // P3-7: the cache surfaces hit/miss precedent events; a HIT reports when the served allow was FIRST
+        // evaluated (its precedent age), so a caller can emit gate.cache.* evidence instead of a silent memoize.
+        var clock = new FakeClock(new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero));
+        var events = new List<JudgeCacheEvent>();
+        var inner = new StubGate(GateVerdict.Allow("j"), "judge:x");
+        var cache = new JudgeVerdictCache(inner, onLookup: events.Add, timeProvider: clock);
+
+        await cache.InspectAsync("same");                 // miss → evaluates, stamps the original timestamp
+        clock.Advance(TimeSpan.FromMinutes(5));
+        await cache.InspectAsync("same");                 // hit → served from cache
+
+        Assert.Equal(1, inner.Calls);                     // the inner judge ran exactly once
+        Assert.Equal(1, cache.Hits);
+        Assert.Equal(1, cache.Misses);
+
+        Assert.Equal(2, events.Count);
+        Assert.False(events[0].Hit);
+        Assert.Null(events[0].OriginalTimestampUtc);
+        Assert.True(events[1].Hit);
+        Assert.Equal(new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero), events[1].OriginalTimestampUtc);
+    }
 }
