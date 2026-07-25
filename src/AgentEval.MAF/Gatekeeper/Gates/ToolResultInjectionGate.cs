@@ -24,10 +24,32 @@ namespace AgentEval.MAF.Gatekeeper;
 public sealed class ToolResultInjectionGate : IToolResultGate
 {
     private readonly string[] _tokens;
+    private readonly HashSet<string>? _functionNames;
 
-    /// <summary>Creates the gate with the default injection markers (shared with <see cref="TokenInjectionGate"/>), or a custom set when provided.</summary>
+    /// <summary>
+    /// Creates an inspect-all gate with the default injection markers (shared with
+    /// <see cref="TokenInjectionGate"/>), or a custom set when provided.
+    /// </summary>
     public ToolResultInjectionGate(IEnumerable<string>? tokens = null)
         => _tokens = (tokens ?? TokenInjectionGate.DefaultTokens).ToArray();
+
+    /// <summary>
+    /// Creates a gate that inspects only results from the supplied exact <paramref name="functionNames"/>. Pass
+    /// <see langword="null"/> for <paramref name="tokens"/> to use the shared default injection markers.
+    /// </summary>
+    public ToolResultInjectionGate(IEnumerable<string>? tokens, IEnumerable<string> functionNames)
+        : this(tokens)
+    {
+        ArgumentNullException.ThrowIfNull(functionNames);
+
+        var names = functionNames.ToArray();
+        if (names.Length == 0 || names.Any(string.IsNullOrWhiteSpace))
+        {
+            throw new ArgumentException("functionNames must contain at least one non-empty function name.", nameof(functionNames));
+        }
+
+        _functionNames = new HashSet<string>(names, StringComparer.Ordinal);
+    }
 
     /// <inheritdoc/>
     public string PolicyName => "tool-result-prompt-injection";
@@ -39,6 +61,11 @@ public sealed class ToolResultInjectionGate : IToolResultGate
     public ValueTask<ToolResultVerdict> InspectAsync(GatedToolResult result, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(result);
+        if (_functionNames is not null && !_functionNames.Contains(result.FunctionName))
+        {
+            return new ValueTask<ToolResultVerdict>(ToolResultVerdict.Allow(PolicyName));
+        }
+
         var text = result.ResultText;
         if (string.IsNullOrEmpty(text))
         {

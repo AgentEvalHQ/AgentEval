@@ -143,7 +143,9 @@ public static class GatekeeperDefenseInDepth
                     new TaintTrackingGate(["read_secrets"], ["http_post"]),   // a secret must not reach an external sink
                     new DomainAllowListGate(["mycompany.com"]),               // off-host egress
                 ],
-                ToolGatePolicy.Terminate, trace)
+                ToolGatePolicy.Terminate, trace,
+                // Scan the untrusted read_ticket payload before it re-enters the model.
+                resultGates: [new ToolResultInjectionGate(tokens: null, functionNames: ["read_ticket"])])
             .Build();
 
         return (agent, trace, tools);
