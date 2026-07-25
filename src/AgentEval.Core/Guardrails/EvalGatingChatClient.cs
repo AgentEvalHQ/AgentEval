@@ -126,9 +126,10 @@ public sealed class EvalGatingChatClient : DelegatingChatClient
         if (_policy == EvalGatePolicy.WarnOnly && _pre.Count > 1)
         {
             // P5-6: WarnOnly pre-gates are independent — no Redact text-chaining, no ThrowOnFail short-circuit —
-            // so their (often LLM-backed) inspections overlap. Record/Observe afterward IN LIST ORDER, so
-            // evidence and correlation are byte-identical to the sequential path; only wall-clock shrinks
-            // (sum of judge latencies → slowest judge).
+            // so their (often LLM-backed) inspections overlap. Record/Observe afterward IN LIST ORDER, so on the
+            // normal (no gate throws) path evidence and correlation are byte-identical to the sequential path; only
+            // wall-clock shrinks (sum of judge latencies → slowest judge). If a gate throws, the turn faults (as an
+            // uncaught throw on the sequential path also would) before this Record/Observe loop — see the helper.
             var verdicts = await InspectConcurrentlyAsync(_pre, text, cancellationToken).ConfigureAwait(false);
             foreach (var verdict in verdicts)
             {
@@ -347,6 +348,9 @@ public sealed class EvalGatingChatClient : DelegatingChatClient
     // Used ONLY under WarnOnly, where gates neither chain redacted text nor short-circuit — so overlapping them
     // changes nothing but wall-clock. (Gates are already required to be thread-safe: this client is itself invoked
     // concurrently across in-flight requests, sharing the same gate instances.)
+    // Exception behavior: if a gate throws, Task.WhenAll faults and this rethrows BEFORE the caller records any
+    // verdict — so a faulting WarnOnly gate yields no evidence for that turn (vs. the sequential path, whose uncaught
+    // throw records verdicts up to the thrower). Either way the turn faults; only the partial-evidence trail differs.
     private static async Task<GateVerdict[]> InspectConcurrentlyAsync(
         IReadOnlyList<IChatGate> gates, string text, CancellationToken cancellationToken)
     {

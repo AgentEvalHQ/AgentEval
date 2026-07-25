@@ -329,6 +329,46 @@ public class TaintTrackingGateTests
             Call("http_post", new Dictionary<string, object?> { ["body"] = "leak secrettwo-33334444" }))).Action);
     }
 
+    [Fact]
+    public async Task Incremental_SlidingWindowReducer_ConstantCount_StillTaints()
+    {
+        // Regression for the P5-1 audit HIGH: a keep-last-N reducer keeps the message Count constant while rotating a
+        // NEW source result into the window. A positional cursor would skip it (fail open); the full re-walk catches it.
+        var gate = new TaintTrackingGate(["read_secrets"], ["http_post"]);
+        using var scope = AgentRunScope.Begin(null, "T", null);
+
+        // Call 1: a 4-message window with NO source — this is what advanced the old cursor to 4.
+        await gate.InspectAsync(Call("http_post", new Dictionary<string, object?> { ["body"] = "nothing to see" },
+            new ChatMessage(ChatRole.User, "hi"),
+            AssistantCall("a1", "get_weather"),
+            ToolResult("a1", "sunny"),
+            new ChatMessage(ChatRole.Assistant, "ok")));
+
+        // Call 2: SAME Count (4), but the window slid — read_secrets and its SECRET result rotated in at the tail.
+        var sink = Call("http_post", new Dictionary<string, object?> { ["body"] = "leak: demo-9a8b7c6d5e4f" },
+            ToolResult("a1", "sunny"),
+            new ChatMessage(ChatRole.Assistant, "ok"),
+            AssistantCall("c2", "read_secrets"),
+            ToolResult("c2", "API_KEY=demo-9a8b7c6d5e4f"));
+
+        Assert.Equal(ToolGateAction.Block, (await gate.InspectAsync(sink)).Action);   // must NOT fail open
+    }
+
+    [Fact]
+    public async Task Incremental_ResultBeforeItsSourceCall_StillTaints()
+    {
+        // Regression for the P5-1 audit MEDIUM: a reordered history where the source RESULT precedes its CALL. The
+        // two-pass fold collects all source CallIds first, so the result is still attributed and tainted.
+        var gate = new TaintTrackingGate(["read_secrets"], ["http_post"]);
+        using var scope = AgentRunScope.Begin(null, "T", null);
+
+        var sink = Call("http_post", new Dictionary<string, object?> { ["body"] = "leak: demo-9a8b7c6d5e4f" },
+            ToolResult("c1", "API_KEY=demo-9a8b7c6d5e4f"),   // result appears BEFORE its call
+            AssistantCall("c1", "read_secrets"));
+
+        Assert.Equal(ToolGateAction.Block, (await gate.InspectAsync(sink)).Action);
+    }
+
     private sealed class Cyclic
     {
         public Cyclic? Self { get; set; }

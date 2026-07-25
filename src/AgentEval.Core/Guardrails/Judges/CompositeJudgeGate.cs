@@ -22,6 +22,10 @@ namespace AgentEval.Guardrails.Judges;
 public sealed class CompositeJudgeGate<TRubric> : IChatGate, IRequiresCalibration
     where TRubric : IJudgeRubric
 {
+    // Floor for a bounded (non-zero) MaxInputChars — below this the head+tail sandwich carries too little signal to
+    // judge with. 256 chars ≈ 64 tokens of head + 64 of tail.
+    private const int MinBoundedInputChars = 256;
+
     private readonly TRubric _rubric;
     private readonly IChatClient _fastModel;
     private readonly JudgeGateOptions _options;
@@ -55,9 +59,12 @@ public sealed class CompositeJudgeGate<TRubric> : IChatGate, IRequiresCalibratio
             throw new ArgumentOutOfRangeException(nameof(options), "JudgeGateOptions.BlockThreshold must be in [0, 1].");
         }
 
-        if (_options.MaxInputChars < 0)
+        // 0 = unbounded; otherwise a floor so a fat-fingered tiny cap can't collapse the head+tail sandwich to just
+        // the truncation marker and blind the judge (audit LOW).
+        if (_options.MaxInputChars < 0 || (_options.MaxInputChars > 0 && _options.MaxInputChars < MinBoundedInputChars))
         {
-            throw new ArgumentOutOfRangeException(nameof(options), "JudgeGateOptions.MaxInputChars must be non-negative (0 = unbounded).");
+            throw new ArgumentOutOfRangeException(nameof(options),
+                $"JudgeGateOptions.MaxInputChars must be 0 (unbounded) or at least {MinBoundedInputChars}.");
         }
 
         PolicyName = $"judge:{rubric.Axis}";

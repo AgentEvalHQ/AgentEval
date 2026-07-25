@@ -322,7 +322,7 @@ public class CompositeJudgeGateTests
         var rubric = new CapturingRubric();
         var text = "HEADSTART " + new string('x', 5000) + " TAILEND";
         var gate = new CompositeJudgeGate<CapturingRubric>(rubric, new ScriptedChatClient().AddText("ALLOW"),
-            new JudgeGateOptions { MaxInputChars = 200 });
+            new JudgeGateOptions { MaxInputChars = 400 });
 
         await gate.InspectAsync(text);
 
@@ -335,8 +335,8 @@ public class CompositeJudgeGateTests
         Assert.EndsWith("TAILEND", rubric.PromptSaw);
         Assert.Contains("truncated", rubric.PromptSaw, StringComparison.Ordinal);
         Assert.True(rubric.PromptSaw!.Length < text.Length);
-        // Head + tail ≈ MaxInputChars (200) plus the short marker — nowhere near the 5000-char original.
-        Assert.True(rubric.PromptSaw.Length < 300);
+        // Head + tail ≈ MaxInputChars (400) plus the short marker — nowhere near the 5000-char original.
+        Assert.True(rubric.PromptSaw.Length < 600);
     }
 
     [Fact]
@@ -352,9 +352,12 @@ public class CompositeJudgeGateTests
         Assert.Equal(text, rubric.PromptSaw);   // 0 = unbounded ⇒ full text through
     }
 
-    [Fact]
-    public void NegativeMaxInputChars_Throws()
-        => Assert.Throws<ArgumentOutOfRangeException>(() => Gate(new ScriptedChatClient(), new JudgeGateOptions { MaxInputChars = -1 }));
+    [Theory]
+    [InlineData(-1)]     // negative
+    [InlineData(1)]      // positive but below the floor — would collapse the head+tail sandwich (audit LOW)
+    [InlineData(255)]    // just under the 256 floor
+    public void InvalidMaxInputChars_Throws(int maxInputChars)
+        => Assert.Throws<ArgumentOutOfRangeException>(() => Gate(new ScriptedChatClient(), new JudgeGateOptions { MaxInputChars = maxInputChars }));
 
     // A fast model that respects cancellation but otherwise never returns in time (for the timeout path).
     private sealed class DelayingChatClient : IChatClient

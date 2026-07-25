@@ -53,16 +53,17 @@ public sealed class TaintTrackingGate : IToolGate
     // CollectTaintedTokens fallback runs (see InspectAsync).
     private readonly ConditionalWeakTable<AgentRunScope, RunTaintState> _perRun = new();
 
-    // The accumulating taint ledger for one run: the tainted-token set, the source CallIds seen, a monotonic cursor
-    // into the run's history (how many messages have been folded in), the nearest-preceding-call name for the
-    // CallId-less fallback, and a sticky cap flag. All access is under Lock.
+    // The accumulating taint ledger for one run: the tainted-token set, every source CallId seen so far, and the
+    // CallIds of source results already tokenized (so re-walking the current history each call does not re-tokenize
+    // an already-seen result — the expensive part). A sticky cap flag. All access is under Lock. Deliberately has NO
+    // positional cursor: a positional cursor is unsafe against a sliding-window / keep-last-N history reducer, which
+    // keeps the message count constant while rotating a NEW source result into an already-passed index (audit HIGH).
     private sealed class RunTaintState
     {
         public readonly object Lock = new();
         public readonly HashSet<string> Tainted = new(StringComparer.Ordinal);
         public readonly HashSet<string> SourceCallIds = new(StringComparer.Ordinal);
-        public int ProcessedCount;
-        public string? LastCallName;
+        public readonly HashSet<string> TokenizedResultCallIds = new(StringComparer.Ordinal);
         public bool CapHit;
     }
 
@@ -124,7 +125,7 @@ public sealed class TaintTrackingGate : IToolGate
             {
                 try
                 {
-                    IngestIncremental(state, call.Messages);
+                    FoldHistory(state, call.Messages);
                 }
                 catch (RegexMatchTimeoutException)
                 {
@@ -227,40 +228,56 @@ public sealed class TaintTrackingGate : IToolGate
         return new ValueTask<ToolGateVerdict>(ToolGateVerdict.Allow(PolicyName));
     }
 
-    // P5-1: fold the messages the run has produced since the last call into the ledger, in a single forward pass (a
-    // source CALL always precedes its RESULT, so one pass suffices where the stateless path used two). Tokens and
-    // source CallIds only accumulate. If the history shrank (a reducer rewrote the prefix), the cursor is stale, so
-    // reprocess from the top — re-adds are idempotent and previously-tainted tokens are retained.
-    private void IngestIncremental(RunTaintState state, IReadOnlyList<ChatMessage>? messages)
+    // P5-1: fold the run's CURRENT history into the ledger. The message walk is redone each call (so a sliding-window
+    // reducer that rotates a new source result into an already-passed index can never hide it — the audit-HIGH
+    // fail-open a positional cursor had), but the EXPENSIVE work — tokenizing each source result (regex + JSON parse)
+    // — is done at most ONCE per result via the TokenizedResultCallIds dedup. That is what kills the quadratic cost:
+    // the old code re-tokenized every result on every sink call; here each result is tokenized once across the run.
+    // Two passes (like the stateless original): collect ALL source CallIds first, then taint — so a result that
+    // appears before its own source call (a reordering reducer) is still attributed (audit-MEDIUM). The ledger only
+    // accumulates, so a result later rotated OUT of the window keeps the taint it already contributed.
+    private void FoldHistory(RunTaintState state, IReadOnlyList<ChatMessage>? messages)
     {
         if (messages is null || state.CapHit)
         {
             return;
         }
 
-        var start = state.ProcessedCount;
-        if (messages.Count < start)
+        // Pass 1: every source CALL's id in the current history (accumulates across calls; conservative under reuse).
+        foreach (var message in messages)
         {
-            start = 0;
-            state.LastCallName = null;   // prefix changed — rebuild the nearest-preceding-call name from scratch
+            foreach (var content in message.Contents)
+            {
+                if (content is FunctionCallContent fc && !string.IsNullOrEmpty(fc.CallId) && _sources.Contains(fc.Name))
+                {
+                    state.SourceCallIds.Add(fc.CallId);
+                }
+            }
         }
 
-        for (var i = start; i < messages.Count; i++)
+        // Pass 2: taint each source RESULT once. lastCallName drives the CallId-less fallback (§16), recomputed each
+        // walk since we no longer carry a positional cursor.
+        string? lastCallName = null;
+        foreach (var message in messages)
         {
-            foreach (var content in messages[i].Contents)
+            foreach (var content in message.Contents)
             {
                 switch (content)
                 {
                     case FunctionCallContent fcCall:
-                        state.LastCallName = fcCall.Name;
-                        if (!string.IsNullOrEmpty(fcCall.CallId) && _sources.Contains(fcCall.Name))
-                        {
-                            state.SourceCallIds.Add(fcCall.CallId);
-                        }
-
+                        lastCallName = fcCall.Name;
                         break;
 
-                    case FunctionResultContent fr when IsSourceResult(fr, state.SourceCallIds, state.LastCallName):
+                    case FunctionResultContent fr when IsSourceResult(fr, state.SourceCallIds, lastCallName):
+                        // Dedup on the CallId (cheap, stable across reducer re-clones): a source result already
+                        // tokenized this run is skipped, so re-walking never re-tokenizes it. A CallId-less result
+                        // (the §16 reducer-stripped case) has no stable id, so it is re-tokenized each call — rare,
+                        // and its tokens dedup in the Tainted set anyway.
+                        if (!string.IsNullOrEmpty(fr.CallId) && !state.TokenizedResultCallIds.Add(fr.CallId))
+                        {
+                            break;   // already tokenized this exact result — skip the expensive re-tokenization
+                        }
+
                         foreach (var text in TaintTexts(fr.Result))
                         {
                             foreach (Match match in Token.Matches(text))
@@ -270,8 +287,7 @@ public sealed class TaintTrackingGate : IToolGate
                                     state.Tainted.Add(match.Value);
                                     if (state.Tainted.Count >= MaxTaintedTokens)
                                     {
-                                        state.CapHit = true;      // saturated — the caller fails closed
-                                        state.ProcessedCount = messages.Count;
+                                        state.CapHit = true;   // saturated — the caller fails closed
                                         return;
                                     }
                                 }
@@ -282,8 +298,6 @@ public sealed class TaintTrackingGate : IToolGate
                 }
             }
         }
-
-        state.ProcessedCount = messages.Count;
     }
 
     private HashSet<string> CollectTaintedTokens(IReadOnlyList<ChatMessage>? messages)

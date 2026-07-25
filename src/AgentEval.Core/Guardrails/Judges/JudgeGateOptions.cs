@@ -29,7 +29,9 @@ public sealed class JudgeGateOptions
     /// and context-overflow risk on a pathologically large turn). Over the cap, the text is reduced to a
     /// head + tail sandwich with a truncation marker so an injection payload at <i>either</i> boundary is still
     /// seen. The <see cref="IJudgeRubric.Prefilter"/> always runs on the FULL text — only the model prompt is
-    /// bounded. Default 16000 (≈4k tokens). <c>0</c> means unbounded (the pre-P5-3 behavior).
+    /// bounded. Default 16000 (≈4k tokens). <c>0</c> means unbounded (the pre-P5-3 behavior); any other value must
+    /// be at least 256 (a floor, so a fat-fingered tiny cap can't collapse the head+tail sandwich and blind the
+    /// judge) — the gate constructor throws otherwise.
     /// </summary>
     public int MaxInputChars { get; init; } = 16_000;
 
@@ -56,6 +58,11 @@ public sealed class JudgeGateOptions
     /// (fail-open): a spent <i>cost</i> budget must not turn into a full traffic outage — exhaustion is a resource
     /// limit, not a detection failure, so the judge degrades to advisory rather than blocking everything. Set
     /// <c>true</c> only where an unjudged turn is unacceptable and a judge outage blocking all traffic is preferred.
+    /// <para><b>Attack note:</b> with the default (fail-open) and a <i>shared</i> <see cref="SpendGovernor"/>, an
+    /// adversary who first floods the window's budget with junk turns can then push a payload turn past this judge
+    /// un-inspected. This judge is one layer — deterministic gates still run — but if the semantic judge is
+    /// load-bearing for your threat model, either give it an isolated (not shared) governor, size the budget above
+    /// plausible adversarial volume, or set this <c>true</c> and accept the self-DoS tradeoff.</para>
     /// </summary>
     public bool FailClosedOnBudgetExhausted { get; init; }
 }
