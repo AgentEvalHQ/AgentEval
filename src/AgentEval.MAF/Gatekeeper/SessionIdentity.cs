@@ -20,8 +20,12 @@ public static class SessionIdentity
 {
     /// <summary>
     /// Resolves the id from the session's <c>StateBag</c> under <paramref name="key"/> — where a host stashes the
-    /// durable id it already knows (an auth claim, a request header, a persistence store key). Returns
-    /// <see langword="null"/> when the key is absent or not a string.
+    /// durable id it already knows. Returns <see langword="null"/> when the key is absent or not a string.
+    /// <para>⚠️ <b>Use a server-attested id only.</b> When this feeds a <i>rate limit</i> or budget, the id source
+    /// must be something the client cannot freely choose — an auth-claim subject, a server-issued session key, a
+    /// tenant id — NOT a client-supplied header/correlation id. A client that can rotate the id mints a fresh
+    /// zero counter per request and defeats the cap (and a high-cardinality rotation grows the gate's per-id table
+    /// unboundedly). Keying on a rotatable client value is no better than the object-identity default it replaces.</para>
     /// </summary>
     public static Func<AgentSession, string?> FromStateBag(string key)
     {

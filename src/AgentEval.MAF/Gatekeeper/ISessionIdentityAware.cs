@@ -18,8 +18,14 @@ public interface ISessionIdentityAware
 {
     /// <summary>
     /// Adopt <paramref name="resolver"/> as the session-identity resolver <b>unless this gate already has an
-    /// explicit one of its own</b> (an explicit per-gate resolver always wins). Idempotent: calling it again is a
-    /// no-op once a resolver is set.
+    /// explicit one of its own</b> (an explicit per-gate resolver always wins). Idempotent and <b>first-write-wins</b>:
+    /// once a resolver is set — by an explicit constructor selector or an earlier call — every later call is a no-op.
+    /// <para>⚠️ <b>One gate instance per configuration.</b> Because the resolver is stored on the gate, a SINGLE gate
+    /// instance shared across two <c>UseGatekeeper</c> configurations that set <i>different</i>
+    /// <see cref="GatekeeperOptions.SessionIdentity"/> resolvers keeps only the FIRST — the second is silently
+    /// dropped, so that configuration's gate would fall back to object identity (a per-session cap that resets on
+    /// reload). Construct a separate gate instance per agent/configuration (the normal pattern), or pass each its own
+    /// explicit constructor selector, when their session identities differ.</para>
     /// </summary>
     void UseSessionIdentityDefault(Func<AgentSession, string?> resolver);
 }
