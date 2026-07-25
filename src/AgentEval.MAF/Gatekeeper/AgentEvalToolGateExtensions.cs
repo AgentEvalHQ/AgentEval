@@ -95,7 +95,8 @@ public static class AgentEvalToolGateExtensions
         AgentTrace? trace = null,
         GateTelemetry? telemetry = null,
         TraceCaptureMode mutationCaptureMode = TraceCaptureMode.Redacted,
-        IReadOnlyList<IToolResultGate>? resultGates = null)
+        IReadOnlyList<IToolResultGate>? resultGates = null,
+        IGateEvidenceSink? evidenceSink = null)
     {
         ArgumentNullException.ThrowIfNull(builder);
         ArgumentNullException.ThrowIfNull(gates);
@@ -143,7 +144,7 @@ public static class AgentEvalToolGateExtensions
         return builder.Use(async (agent, context, next, ct) =>
         {
             // F-C / P3-2: the per-call enrichment context stamped onto every record from this invocation.
-            var evidence = new GateEvidenceContext(agent.Name, context.Function.Name, context.Iteration, configFingerprint);
+            var evidence = new GateEvidenceContext(agent.Name, context.Function.Name, context.Iteration, configFingerprint, evidenceSink);
 
             if (scopeRequiringGateNames.Length > 0 && AgentRunScope.Current is null &&
                 Interlocked.CompareExchange(ref missingScopeWarned, 1, 0) == 0)
@@ -549,9 +550,17 @@ public static class AgentEvalToolGateExtensions
     // #12: the full policy name (the metadata key itself) and reason live ONLY here — audit-visible trace
     // evidence, never returned to the model. referenceId is the ONLY thing the two are allowed to share, so an
     // auditor can correlate what the model saw with what actually happened.
+    // F-C: write one record to the trace (audit projection) AND fan it out to any registered extra sink
+    // (ledger / alerting). The trace write is null-safe so evidence still reaches the sink with tracing off.
+    private static void EmitEvidence(AgentTrace? trace, GateEvidenceContext evidence, int seq, GateEvidence record)
+    {
+        evidence.Emit(record, seq);
+        trace?.SetMetadata(record.TraceKey(seq), record.ToMetadata());
+    }
+
     private static void RecordBlock(AgentTrace? trace, int seq, ToolGateVerdict verdict, string action, bool terminating, string referenceId, GateEvidenceContext evidence, bool failedClosedOnThrow = false)
     {
-        if (trace is null)
+        if (trace is null && !evidence.HasSink)
         {
             return;
         }
@@ -567,7 +576,7 @@ public static class AgentEvalToolGateExtensions
             stage: "tool", policy: verdict.PolicyName, action: action, referenceId: referenceId, reason: verdict.Reason,
             severity: GateSeverityClassifier.Classify(verdict.PolicyName, failedClosedOnThrow),
             correlationId: ToolCorrelationScope.Current, extra: extra);
-        trace.SetMetadata(record.TraceKey(seq), record.ToMetadata());
+        EmitEvidence(trace, evidence, seq, record);
     }
 
     // P0-3: same shape as RecordBlock, stage token "tool-result" (not "tool") so a result-gate block is
@@ -577,7 +586,7 @@ public static class AgentEvalToolGateExtensions
     // called from the fail-closed catch block, which has no ToolResultVerdict to hand in.
     private static void RecordResultBlock(AgentTrace? trace, int seq, string policyName, string? reason, string action, bool terminating, string referenceId, GateEvidenceContext evidence, bool failedClosedOnThrow = false)
     {
-        if (trace is null)
+        if (trace is null && !evidence.HasSink)
         {
             return;
         }
@@ -592,7 +601,7 @@ public static class AgentEvalToolGateExtensions
             stage: "tool-result", policy: policyName, action: action, referenceId: referenceId, reason: reason,
             severity: GateSeverityClassifier.Classify(policyName, failedClosedOnThrow),
             correlationId: ToolCorrelationScope.Current, extra: extra);
-        trace.SetMetadata(record.TraceKey(seq), record.ToMetadata());
+        EmitEvidence(trace, evidence, seq, record);
     }
 
     // P0-3: a Redact verdict is recorded (action="Redact", NOT counted as a block) — deliberately does NOT
@@ -603,7 +612,7 @@ public static class AgentEvalToolGateExtensions
     // (mirroring MutationEvidenceRenderer/TraceCaptureMode) is deliberately deferred, not an oversight.
     private static void RecordResultRedact(AgentTrace? trace, int seq, ToolResultVerdict verdict, bool applied, GateEvidenceContext evidence)
     {
-        if (trace is null)
+        if (trace is null && !evidence.HasSink)
         {
             return;
         }
@@ -614,7 +623,7 @@ public static class AgentEvalToolGateExtensions
             reason: verdict.Reason, severity: GateSeverityClassifier.Classify(verdict.PolicyName),
             correlationId: ToolCorrelationScope.Current,
             extra: new Dictionary<string, object?> { ["applied"] = applied });
-        trace.SetMetadata(record.TraceKey(seq), record.ToMetadata());
+        EmitEvidence(trace, evidence, seq, record);
     }
 
     // #4-revisit: the best-effort RUNTIME missing-run-scope signal — see the field comment where
@@ -623,7 +632,7 @@ public static class AgentEvalToolGateExtensions
     // GlassBoxEvidence.CountGateBlocks only counts action="Block").
     private static void RecordMissingScopeWarning(AgentTrace? trace, int seq, IReadOnlyList<string> offenders, GateEvidenceContext evidence)
     {
-        if (trace is null)
+        if (trace is null && !evidence.HasSink)
         {
             return;
         }
@@ -636,7 +645,7 @@ public static class AgentEvalToolGateExtensions
             stage: "warning", policy: "MissingRunScope", action: "Warn", referenceId: GateReferenceId.New(), reason: reason,
             severity: GateSeverity.Suspicious, correlationId: ToolCorrelationScope.Current,
             extra: new Dictionary<string, object?> { ["matches"] = null });
-        trace.SetMetadata(record.TraceKey(seq), record.ToMetadata());
+        EmitEvidence(trace, evidence, seq, record);
     }
 
     // A Mutate is recorded (action="Mutate", NOT counted as a block) with before/after args so the change is
@@ -680,7 +689,7 @@ public static class AgentEvalToolGateExtensions
         AgentTrace? trace, int seq, ToolGateVerdict verdict,
         IReadOnlyDictionary<string, object?>? argsBefore, IReadOnlyDictionary<string, object?>? argsAfter, TraceCaptureMode captureMode, bool applied, GateEvidenceContext evidence)
     {
-        if (trace is null)
+        if (trace is null && !evidence.HasSink)
         {
             return;
         }
@@ -698,6 +707,6 @@ public static class AgentEvalToolGateExtensions
                 ["argsAfter"] = MutationEvidenceRenderer.Render(argsAfter, captureMode),
                 ["captureMode"] = captureMode.ToString(),
             });
-        trace.SetMetadata(record.TraceKey(seq), record.ToMetadata());
+        EmitEvidence(trace, evidence, seq, record);
     }
 }

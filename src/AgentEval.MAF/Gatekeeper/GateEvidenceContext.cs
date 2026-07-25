@@ -11,8 +11,14 @@ namespace AgentEval.MAF.Gatekeeper;
 /// record helpers so the "complete block evidence" (agent / tool / iteration / config fingerprint) is filled in
 /// uniformly rather than each writer re-deriving it. The timestamp is stamped at <see cref="Build"/> time.
 /// </summary>
-internal readonly record struct GateEvidenceContext(string? AgentName, string? ToolName, int? Iteration, string? ConfigFingerprint)
+internal readonly record struct GateEvidenceContext(string? AgentName, string? ToolName, int? Iteration, string? ConfigFingerprint, IGateEvidenceSink? Sink = null)
 {
+    /// <summary>Whether a record must be BUILT even with no trace — true when an extra sink (ledger / alerting) is registered, so evidence still flows with tracing off (P3-1).</summary>
+    public bool HasSink => Sink is not null;
+
+    /// <summary>Fan a built record out to the registered extra sink (ledger / alerting), if any. The trace write is done separately by the writer, so this never double-writes the trace.</summary>
+    public void Emit(GateEvidence record, int sequence) => Sink?.Record(record, sequence);
+
     /// <summary>Assembles a full <see cref="GateEvidence"/> record from this context plus the per-finding fields (timestamp stamped now).</summary>
     public GateEvidence Build(
         string stage,

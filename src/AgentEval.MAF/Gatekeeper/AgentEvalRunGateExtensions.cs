@@ -46,7 +46,8 @@ public static class AgentEvalRunGateExtensions
         IReadOnlyList<IChatGate>? pre = null,
         IReadOnlyList<IChatGate>? post = null,
         EvalGatePolicy? policy = null,
-        AgentTrace? trace = null)
+        AgentTrace? trace = null,
+        IGateEvidenceSink? evidenceSink = null)
     {
         ArgumentNullException.ThrowIfNull(builder);
 
@@ -93,7 +94,7 @@ public static class AgentEvalRunGateExtensions
         // F-C / P3-6: fingerprint the pre/post gate configuration once; every run-gate evidence record is stamped
         // with it. AgentName / RunId are filled from AgentRunScope at record time (the run gate establishes it).
         var evidenceContext = new GateEvidenceContext(null, null, null,
-            GateConfigFingerprint.Compute(chatGates: preGates.Concat(postGates).ToArray()));
+            GateConfigFingerprint.Compute(chatGates: preGates.Concat(postGates).ToArray()), evidenceSink);
 
         return builder.Use(
             runFunc: async (messages, session, options, innerAgent, ct) =>
@@ -341,7 +342,7 @@ public static class AgentEvalRunGateExtensions
             }
         }
 
-        if (trace is null)
+        if (trace is null && !evidence.HasSink)
         {
             return;
         }
@@ -358,7 +359,7 @@ public static class AgentEvalRunGateExtensions
                 ["withheldHash"] = ShortHash(withheldText),
                 ["diverged"] = !string.Equals(safeText, withheldText, StringComparison.Ordinal),
             });
-        trace.SetMetadata(record.TraceKey(Interlocked.Increment(ref seq[0])), record.ToMetadata());
+        EmitEvidence(trace, evidence, Interlocked.Increment(ref seq[0]), record);
     }
 
     private static string ShortHash(string text)
@@ -367,9 +368,17 @@ public static class AgentEvalRunGateExtensions
     // #12: the full policy name (the metadata key itself) and reason live ONLY here — audit-visible trace
     // evidence, never returned as run-refusal content (see GateReferenceId.RefusalBody). referenceId is the
     // ONLY thing the two are allowed to share, so an auditor can correlate what was returned with what happened.
+    // F-C: write one record to the trace (audit projection) AND fan it out to any registered extra sink
+    // (ledger / alerting). The trace write is null-safe so evidence still reaches the sink with tracing off.
+    private static void EmitEvidence(AgentTrace? trace, GateEvidenceContext evidence, int seq, GateEvidence record)
+    {
+        evidence.Emit(record, seq);
+        trace?.SetMetadata(record.TraceKey(seq), record.ToMetadata());
+    }
+
     private static void RecordGate(AgentTrace? trace, int seq, string stage, GateVerdict verdict, string action, string referenceId, GateEvidenceContext evidence, bool failedClosedOnThrow = false)
     {
-        if (trace is null)
+        if (trace is null && !evidence.HasSink)
         {
             return;
         }
@@ -392,6 +401,6 @@ public static class AgentEvalRunGateExtensions
             severity: GateSeverityClassifier.Classify(verdict.PolicyName, failedClosedOnThrow),
             correlationId: ToolCorrelationScope.Current, provenance: provenance,
             extra: new Dictionary<string, object?> { ["matches"] = sensitive ? null : verdict.Matches });
-        trace.SetMetadata(record.TraceKey(seq), record.ToMetadata());
+        EmitEvidence(trace, evidence, seq, record);
     }
 }
