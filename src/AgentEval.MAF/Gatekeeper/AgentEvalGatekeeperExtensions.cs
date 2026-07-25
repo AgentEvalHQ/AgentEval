@@ -122,6 +122,11 @@ public static class AgentEvalGatekeeperExtensions
             var offenders = options.ToolGates
                 .Where(g => g.Requirements.HasFlag(GateRequirements.RunScope))
                 .Select(g => g.PolicyName)
+                // P2-6: result gates declare RunScope the same way and fall back to the same shared state — hold
+                // them to the same construction-time refusal, not just the call gates.
+                .Concat(options.ToolResultGates
+                    .Where(g => g.Requirements.HasFlag(GateRequirements.RunScope))
+                    .Select(g => g.PolicyName))
                 .Distinct(StringComparer.Ordinal)
                 .ToArray();
 
@@ -209,6 +214,21 @@ public static class AgentEvalGatekeeperExtensions
         if (options.Skills is not null && options.SkillBaselinePath is not null)
         {
             SkillGateConstructionCheck.CheckAndEnforce(options.Skills, options.SkillBaselinePath, options.SkillGateMode);
+        }
+
+        // P2-7 (F-E preflight): Observe's entire purpose is to RECORD gate findings as evidence. With neither a
+        // Trace nor a Telemetry sink, every gate still runs but every finding is silently discarded — while the
+        // banner below claims "findings are recorded to the trace." Refuse that misleading, silently-useless
+        // configuration (fail-loud, like the rest of this preflight) rather than print a banner that lies. Real
+        // enforcement modes are exempt: there, gates change behavior whether or not any evidence is captured.
+        if (enforcement == GatekeeperEnforcement.Observe && options.Trace is null && options.Telemetry is null)
+        {
+            throw new InvalidOperationException(
+                "UseGatekeeper: Observe mode records gate findings as evidence, but neither GatekeeperOptions.Trace " +
+                "nor GatekeeperOptions.Telemetry is set — every finding would be silently discarded while the startup " +
+                "banner claims they are recorded. Set Trace (an AgentTrace) and/or Telemetry (a GateTelemetry) so the " +
+                "findings have somewhere to go, or use an enforcement mode (ReplaceResult/Terminate) if you want gates " +
+                "to actually act.");
         }
 
         // Print the Observe banner only once every validation above has passed — a construction that's about

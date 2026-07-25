@@ -50,24 +50,111 @@ public static class GateReplayer
     }
 
     /// <summary>
-    /// Evaluates <paramref name="gates"/> in order against <paramref name="call"/> and returns the FIRST
-    /// non-Allow verdict (Block or Mutate), or an Allow verdict if every gate allows — the same short-circuit
-    /// contract <c>AgentEvalToolGateExtensions</c>'s live pipeline applies to a <c>foreach</c> over its own
-    /// frozen gate list. An empty gate list allows (no gate to object).
+    /// Evaluates <paramref name="gates"/> in order against <paramref name="call"/> and returns the effective
+    /// verdict, mirroring <c>AgentEvalToolGateExtensions</c>'s live pipeline EXACTLY (P2-4b / WM-4):
+    /// <list type="bullet">
+    /// <item>A <see cref="ToolGateAction.Block"/> short-circuits and wins immediately.</item>
+    /// <item>A <see cref="ToolGateAction.Mutate"/> does NOT short-circuit — it rewrites the call's arguments and
+    /// later gates evaluate against the mutated call, so a mutation that introduces a pattern an earlier-ordered
+    /// gate ignored is seen by every gate after the mutator, just as it would be live. If no gate then blocks,
+    /// the effective action is the (final) Mutate — distinct from a plain Allow because the call runs rewritten.</item>
+    /// <item>A gate that THROWS fails closed to a synthetic Block (the live loop's cannot-inspect ⇒ deny rule) —
+    /// it never propagates, which would abort the whole replay and silently drop every later captured call from
+    /// the comparison.</item>
+    /// <item>An arg-CHANGING Mutate re-validates from the top (P2-4 fixed point): a gate that would block the
+    /// NEW arguments still gets its say, and the run fails closed if the arguments never converge. Revalidation
+    /// passes skip <see cref="GateRequirements.RunScope"/> gates, exactly as the live loop does.</item>
+    /// </list>
+    /// An empty gate list allows (no gate to object).
     /// </summary>
     private static async ValueTask<ToolGateVerdict> EvaluateSequential(
         IReadOnlyList<IToolGate> gates, GatedToolCall call, CancellationToken cancellationToken)
     {
-        foreach (var gate in gates)
+        const int maxMutationRevalidations = 8;
+        var current = call;
+        ToolGateVerdict? lastMutate = null;
+        var revalidations = 0;
+        var statefulGateInvoked = new bool[gates.Count];
+
+        while (true)
         {
-            var verdict = await gate.InspectAsync(call, cancellationToken).ConfigureAwait(false);
-            if (verdict.Action != ToolGateAction.Allow)
+            var argumentsChanged = false;
+
+            for (var gateIndex = 0; gateIndex < gates.Count; gateIndex++)
             {
-                return verdict;
+                var gate = gates[gateIndex];
+
+                // Parity with the live loop: a stateful RunScope gate runs exactly once (first reach) — re-running
+                // it would double-charge the shared fallback ledger — but a stateful gate ordered AFTER a mutator
+                // must still run once, so track per gate rather than blanket-skipping every revalidation pass.
+                if (gate.Requirements.HasFlag(GateRequirements.RunScope))
+                {
+                    if (statefulGateInvoked[gateIndex])
+                    {
+                        continue;
+                    }
+
+                    statefulGateInvoked[gateIndex] = true;
+                }
+
+                ToolGateVerdict verdict;
+                try
+                {
+                    verdict = await gate.InspectAsync(current, cancellationToken).ConfigureAwait(false);
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    // Mirror the live throw handler: a gate that throws cannot prove the call safe ⇒ Block.
+                    return ToolGateVerdict.Block(gate.PolicyName, $"gate evaluation threw ({ex.GetType().Name}) — failing closed");
+                }
+
+                switch (verdict.Action)
+                {
+                    case ToolGateAction.Allow:
+                        continue;
+
+                    case ToolGateAction.Mutate:
+                    {
+                        // Rewrite the arguments (fully replaced, like the live Clear()+copy) only when the mutation
+                        // actually CHANGES them — an idempotent/no-op Mutate is a fixed point, and re-scanning it
+                        // would spin to the cap. Snapshot into an independent dictionary so a mutator aliasing the
+                        // call's own arguments can't be corrupted (the replay analogue of P2-4a). GatedToolCall is
+                        // immutable, so rebuild it.
+                        if (verdict.NewArguments is not null
+                            && !AgentEvalToolGateExtensions.ArgumentsEqual(current.Arguments, verdict.NewArguments))
+                        {
+                            current = current with { Arguments = new Dictionary<string, object?>(verdict.NewArguments) };
+                            argumentsChanged = true;
+                        }
+
+                        lastMutate = verdict;
+                        break;   // out of the switch; the post-switch check decides continue vs. revalidate
+                    }
+
+                    default:   // Block
+                        return verdict;
+                }
+
+                if (argumentsChanged)
+                {
+                    break;   // restart the scan against the new arguments
+                }
+            }
+
+            if (!argumentsChanged)
+            {
+                // No gate blocked and no arg-changing mutation this pass ⇒ fixed point. If any gate mutated, the
+                // effective verdict is that (last) Mutate — the final rewritten arguments the tool would have
+                // received; otherwise a plain Allow.
+                return lastMutate ?? ToolGateVerdict.Allow("(no gate objected)");
+            }
+
+            if (++revalidations > maxMutationRevalidations)
+            {
+                return ToolGateVerdict.Block("MutationRevalidation",
+                    $"tool-call arguments did not converge after {maxMutationRevalidations} mutation re-validations — failing closed");
             }
         }
-
-        return ToolGateVerdict.Allow("(no gate objected)");
     }
 }
 

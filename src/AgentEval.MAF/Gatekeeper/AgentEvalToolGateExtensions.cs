@@ -125,6 +125,11 @@ public static class AgentEvalToolGateExtensions
         var scopeRequiringGateNames = frozenGates
             .Where(g => g.Requirements.HasFlag(GateRequirements.RunScope))
             .Select(g => g.PolicyName)
+            // P2-6: a RunLedger-backed RESULT gate falls back to the same shared, process-wide state when no scope
+            // is established — surface it in the same best-effort runtime warning as the call gates.
+            .Concat(frozenResultGates
+                .Where(g => g.Requirements.HasFlag(GateRequirements.RunScope))
+                .Select(g => g.PolicyName))
             .Distinct(StringComparer.Ordinal)
             .ToArray();
         var missingScopeWarned = 0;   // Interlocked-guarded: at most once per pipeline instance, not once per call
@@ -149,89 +154,185 @@ public static class AgentEvalToolGateExtensions
                 IsStreaming: context.IsStreaming,
                 Messages: context.Messages as IReadOnlyList<ChatMessage>);
 
-            foreach (var gate in frozenGates)
-            {
-                ToolGateVerdict verdict;
-                var stopwatch = telemetry is null ? null : Stopwatch.StartNew();
-                try
-                {
-                    verdict = await gate.InspectAsync(call, ct).ConfigureAwait(false);
-                }
-                catch (Exception ex) when (ex is not OperationCanceledException)
-                {
-                    telemetry?.Record(gate.PolicyName, ToolGateAction.Block, stopwatch!.Elapsed);
+            // P2-4: the call-gate pass runs to a FIXED POINT. When an (enforced) Mutate actually CHANGES the
+            // arguments, the tool call is re-validated from the top so a gate that would have blocked the NEW
+            // arguments still gets its say — a mutation must never smuggle in a pattern an earlier gate rejects
+            // (e.g. a "normalize path" mutator producing a "../.." traversal a path gate would have blocked).
+            // A GateRequirements.RunScope (stateful) gate is invoked EXACTLY ONCE — the FIRST time it is reached —
+            // because re-invoking it would double-count its ledger, and its verdict keys on accumulated state or
+            // tool IDENTITY, not the mutated ARGUMENT VALUES a re-scan surfaces. It must still run once even when an
+            // earlier mutation short-circuited the pass before reaching it — tracked per gate below, NOT by a
+            // blanket "skip on every revalidation pass" (which would let a stateful gate ordered AFTER a mutator be
+            // bypassed on every pass — a fail-open). A run that never converges fails closed after a bounded cap.
+            const int maxMutationRevalidations = 8;
+            var revalidations = 0;
+            var statefulGateInvoked = new bool[frozenGates.Length];
 
-                    // FAIL CLOSED (cannot-inspect ⇒ deny): a gate that throws cannot prove the call safe, so block
-                    // it — regardless of policy. FICC would otherwise swallow the exception and run the tool.
-                    var throwReferenceId = GateReferenceId.New();
+            while (true)
+            {
+                var argumentsChanged = false;
+
+                for (var gateIndex = 0; gateIndex < frozenGates.Length; gateIndex++)
+                {
+                    var gate = frozenGates[gateIndex];
+
+                    // Run a stateful gate once (first reach), then skip it on later passes; run pure gates every pass.
+                    if (gate.Requirements.HasFlag(GateRequirements.RunScope))
+                    {
+                        if (statefulGateInvoked[gateIndex])
+                        {
+                            continue;
+                        }
+
+                        statefulGateInvoked[gateIndex] = true;
+                    }
+
+                    ToolGateVerdict verdict;
+                    var stopwatch = telemetry is null ? null : Stopwatch.StartNew();
+                    try
+                    {
+                        verdict = await gate.InspectAsync(call, ct).ConfigureAwait(false);
+                    }
+                    catch (Exception ex) when (ex is not OperationCanceledException)
+                    {
+                        telemetry?.Record(gate.PolicyName, ToolGateAction.Block, stopwatch!.Elapsed);
+
+                        // FAIL CLOSED (cannot-inspect ⇒ deny): a gate that throws cannot prove the call safe, so
+                        // block it — regardless of policy. FICC would otherwise swallow the exception and run the tool.
+                        var throwReferenceId = GateReferenceId.New();
+                        RecordBlock(trace, Interlocked.Increment(ref gateSeq),
+                            ToolGateVerdict.Block(gate.PolicyName, $"gate evaluation threw ({ex.GetType().Name}) — failing closed"),
+                            action: "Block", terminating: policy == ToolGatePolicy.Terminate, referenceId: throwReferenceId);
+                        if (policy == ToolGatePolicy.Terminate)
+                        {
+                            context.Terminate = true;
+                        }
+
+                        return GateReferenceId.RefusalBody(throwReferenceId);
+                    }
+
+                    telemetry?.Record(gate.PolicyName, verdict.Action, stopwatch!.Elapsed);
+
+                    switch (verdict.Action)
+                    {
+                        case ToolGateAction.Allow:
+                            continue;
+
+                        case ToolGateAction.Mutate:
+                        {
+                            // P2-2: under WarnOnly (the policy Observe maps to) a Mutate is RECORDED but NOT applied —
+                            // rewriting the live arguments the tool receives is a behavior change, and observe-only
+                            // must never change behavior. Only real enforcement (ReplaceResult/Terminate) rewrites
+                            // them. The evidence still shows what the gate WOULD have done (argsAfter = the proposed
+                            // NewArguments), so observe mode is a faithful dry-run, never a silent no-op.
+                            var applied = policy != ToolGatePolicy.WarnOnly;
+
+                            // A mutation only triggers revalidation (and only actually rewrites) when it CHANGES the
+                            // arguments. An idempotent / no-op Mutate — proposed == current, e.g. a normalizer re-run
+                            // on already-normalized args — is a fixed point, not a new state to re-scan, so it neither
+                            // rewrites nor restarts (which also stops an always-Mutate-with-identical-args gate from
+                            // spinning to the cap). ArgumentsEqual short-circuits the alias case (P2-4a) too.
+                            var changesArgs = applied && verdict.NewArguments is not null
+                                && !ArgumentsEqual(call.Arguments, verdict.NewArguments);
+
+                            // Snapshot BEFORE mutating — a live reference would show the post-mutation values for
+                            // both "before" and "after" once context.Arguments is cleared/rewritten below. Skip the
+                            // copy entirely when there's no trace (RecordMutate is a no-op then) or capture is off.
+                            var before = trace is null || mutationCaptureMode == TraceCaptureMode.None
+                                ? null
+                                : new Dictionary<string, object?>(context.Arguments);
+
+                            if (changesArgs)
+                            {
+                                // P2-4a (WM-5): snapshot NewArguments into an independent dictionary BEFORE clearing.
+                                // A gate may return the very dictionary it was handed — context.Arguments is exposed
+                                // to gates as call.Arguments (an IReadOnlyDictionary view over THIS same instance), so
+                                // a gate that rewrites a key on that view and hands it back aliases context.Arguments.
+                                // Without the snapshot, Clear() below wipes the entries we are about to copy.
+                                var replacement = new Dictionary<string, object?>(verdict.NewArguments!);
+
+                                // Mutate the AIFunctionArguments in place (it IS an IDictionary<string,object?>).
+                                context.Arguments.Clear();
+                                foreach (var kv in replacement)
+                                {
+                                    context.Arguments[kv.Key] = kv.Value;
+                                }
+                            }
+
+                            // Record a Mutate that either actually rewrote the arguments (changesArgs) or was a
+                            // WarnOnly dry-run (!applied, a genuine observed finding). A no-op ENFORCEMENT Mutate —
+                            // NewArguments == current, which is what an idempotent normalizer returns once its
+                            // fixed point is reached on a revalidation pass — is neither, so it is not re-recorded
+                            // (that would bloat the trace with a redundant fixed-point confirmation every pass).
+                            // argsAfter is what the gate PROPOSED, applied or not — when applied it equals the
+                            // now-live context.Arguments; when observed it is the counterfactual "would have been".
+                            if (changesArgs || !applied)
+                            {
+                                RecordMutate(trace, Interlocked.Increment(ref gateSeq), verdict, before,
+                                    verdict.NewArguments ?? context.Arguments, mutationCaptureMode, applied);
+                            }
+
+                            if (changesArgs)
+                            {
+                                argumentsChanged = true;   // re-validate from the top against the new arguments
+                            }
+
+                            break;   // out of the switch; the post-switch check decides continue vs. revalidate
+                        }
+
+                        case ToolGateAction.Block:
+                        {
+                            var seq = Interlocked.Increment(ref gateSeq);
+                            var enforced = policy != ToolGatePolicy.WarnOnly;
+                            var referenceId = GateReferenceId.New();
+
+                            // Honest evidence: only an ENFORCED block records action="Block" (so GlassBoxEvidence's
+                            // GateBlockCount never counts a call that actually ran). WarnOnly records action="Warn".
+                            RecordBlock(trace, seq, verdict, action: enforced ? "Block" : "Warn",
+                                terminating: policy == ToolGatePolicy.Terminate, referenceId: referenceId);
+
+                            if (!enforced)
+                            {
+                                continue;   // WarnOnly: recorded as a warning; let the tool run
+                            }
+
+                            if (policy == ToolGatePolicy.Terminate)
+                            {
+                                context.Terminate = true;   // stop the function-calling loop after this
+                            }
+
+                            // ReplaceResult + Terminate: block the tool, surface a non-null refusal (fail-closed).
+                            // #12: the model sees only a stable, non-revealing {error, referenceId} shape — never the
+                            // policy name or reason (that stays in the trace evidence below, audit-visible only).
+                            return GateReferenceId.RefusalBody(referenceId);
+                        }
+                    }
+
+                    if (argumentsChanged)
+                    {
+                        break;   // an arg-changing mutation this pass ⇒ restart the scan against the new arguments
+                    }
+                }
+
+                if (!argumentsChanged)
+                {
+                    break;   // a full pass with no arg-changing mutation ⇒ fixed point reached, proceed to the tool
+                }
+
+                if (++revalidations > maxMutationRevalidations)
+                {
+                    // Non-convergence: a gate keeps changing the arguments. Fail closed rather than loop forever.
+                    var refId = GateReferenceId.New();
                     RecordBlock(trace, Interlocked.Increment(ref gateSeq),
-                        ToolGateVerdict.Block(gate.PolicyName, $"gate evaluation threw ({ex.GetType().Name}) — failing closed"),
-                        action: "Block", terminating: policy == ToolGatePolicy.Terminate, referenceId: throwReferenceId);
+                        ToolGateVerdict.Block("MutationRevalidation",
+                            $"tool-call arguments did not converge after {maxMutationRevalidations} mutation re-validations — failing closed"),
+                        action: "Block", terminating: policy == ToolGatePolicy.Terminate, referenceId: refId);
                     if (policy == ToolGatePolicy.Terminate)
                     {
                         context.Terminate = true;
                     }
 
-                    return GateReferenceId.RefusalBody(throwReferenceId);
-                }
-
-                telemetry?.Record(gate.PolicyName, verdict.Action, stopwatch!.Elapsed);
-
-                switch (verdict.Action)
-                {
-                    case ToolGateAction.Allow:
-                        continue;
-
-                    case ToolGateAction.Mutate:
-                    {
-                        // Snapshot BEFORE mutating — a live reference would show the post-mutation values for
-                        // both "before" and "after" once context.Arguments is cleared/rewritten below. Skip the
-                        // copy entirely when there's no trace (RecordMutate is a no-op then) or capture is off —
-                        // no point allocating a dictionary nobody will ever render.
-                        var before = trace is null || mutationCaptureMode == TraceCaptureMode.None
-                            ? null
-                            : new Dictionary<string, object?>(context.Arguments);
-
-                        if (verdict.NewArguments is not null)
-                        {
-                            // Mutate the AIFunctionArguments in place (it IS an IDictionary<string,object?>).
-                            context.Arguments.Clear();
-                            foreach (var kv in verdict.NewArguments)
-                            {
-                                context.Arguments[kv.Key] = kv.Value;
-                            }
-                        }
-
-                        RecordMutate(trace, Interlocked.Increment(ref gateSeq), verdict, before, context.Arguments, mutationCaptureMode);
-                        continue;   // the (mutated) tool still runs
-                    }
-
-                    case ToolGateAction.Block:
-                    {
-                        var seq = Interlocked.Increment(ref gateSeq);
-                        var enforced = policy != ToolGatePolicy.WarnOnly;
-                        var referenceId = GateReferenceId.New();
-
-                        // Honest evidence: only an ENFORCED block records action="Block" (so GlassBoxEvidence's
-                        // GateBlockCount never counts a call that actually ran). WarnOnly records action="Warn".
-                        RecordBlock(trace, seq, verdict, action: enforced ? "Block" : "Warn",
-                            terminating: policy == ToolGatePolicy.Terminate, referenceId: referenceId);
-
-                        if (!enforced)
-                        {
-                            continue;   // WarnOnly: recorded as a warning; let the tool run
-                        }
-
-                        if (policy == ToolGatePolicy.Terminate)
-                        {
-                            context.Terminate = true;   // stop the function-calling loop after this
-                        }
-
-                        // ReplaceResult + Terminate: block the tool, surface a non-null refusal (fail-closed).
-                        // #12: the model sees only a stable, non-revealing {error, referenceId} shape — never the
-                        // policy name or reason (that stays in the trace evidence below, audit-visible only).
-                        return GateReferenceId.RefusalBody(referenceId);
-                    }
+                    return GateReferenceId.RefusalBody(refId);
                 }
             }
 
@@ -294,10 +395,35 @@ public static class AgentEvalToolGateExtensions
                         continue;
 
                     case ToolResultAction.Redact:
-                        // Applied regardless of policy — mirrors ToolGateAction.Mutate's precedent (a gate
-                        // offering a safer version of real content is not an enforcement-policy decision).
-                        toolResult = resultVerdict.RedactedResult;
-                        RecordResultRedact(trace, Interlocked.Increment(ref gateSeq), resultVerdict);
+                        // P2-2: under WarnOnly (the policy Observe maps to) a Redact is RECORDED but NOT applied —
+                        // replacing a live result is a behavior change, and observe-only must not change behavior.
+                        // The real result flows through unchanged; the evidence shows a redaction WOULD have fired.
+                        if (policy == ToolGatePolicy.WarnOnly)
+                        {
+                            RecordResultRedact(trace, Interlocked.Increment(ref gateSeq), resultVerdict, applied: false);
+                            continue;
+                        }
+
+                        // Enforcement (ReplaceResult/Terminate): the redaction IS applied.
+                        if (resultVerdict.RedactedResult is null)
+                        {
+                            // P2-5 / HAZARD-1: a null RedactedResult would blank the result to null, which the
+                            // model-facing layer renders as the "Success: Function completed." fabrication this whole
+                            // result-gate family exists to prevent (a withheld result must never read as a successful
+                            // empty one). Fall back to the same stable, non-revealing refusal body a Block uses —
+                            // never null — and record the referenceId embedded in it so an auditor can correlate.
+                            var redactReferenceId = GateReferenceId.New();
+                            RecordResultBlock(trace, Interlocked.Increment(ref gateSeq), resultVerdict.PolicyName,
+                                resultVerdict.Reason ?? "result redacted with no replacement supplied — failing closed to a non-revealing refusal",
+                                action: "Redact", terminating: false, referenceId: redactReferenceId);
+                            toolResult = GateReferenceId.RefusalBody(redactReferenceId);
+                        }
+                        else
+                        {
+                            toolResult = resultVerdict.RedactedResult;
+                            RecordResultRedact(trace, Interlocked.Increment(ref gateSeq), resultVerdict, applied: true);
+                        }
+
                         continue;
 
                     case ToolResultAction.Block:
@@ -470,7 +596,7 @@ public static class AgentEvalToolGateExtensions
     // a database row) — capturing it into the trace at all, even redacted-by-default, is a bigger surface than
     // this pass scopes; only the fact that a redaction happened, and why, is recorded. Full result-capture
     // (mirroring MutationEvidenceRenderer/TraceCaptureMode) is deliberately deferred, not an oversight.
-    private static void RecordResultRedact(AgentTrace? trace, int seq, ToolResultVerdict verdict)
+    private static void RecordResultRedact(AgentTrace? trace, int seq, ToolResultVerdict verdict, bool applied)
     {
         if (trace is null)
         {
@@ -480,6 +606,8 @@ public static class AgentEvalToolGateExtensions
         trace.SetMetadata($"gate.tool-result.{seq}.{verdict.PolicyName}", new Dictionary<string, object?>
         {
             ["action"] = "Redact",
+            // P2-2: false under WarnOnly, where the redaction is recorded but the real result was NOT replaced.
+            ["applied"] = applied,
             ["reason"] = verdict.Reason,
             ["correlationId"] = ToolCorrelationScope.Current,
         });
@@ -512,9 +640,42 @@ public static class AgentEvalToolGateExtensions
     // auditable/reconstructable (SEC-06). #13: how MUCH of the args is captured is governed by TraceCaptureMode
     // (default Redacted) — a prior version always serialized verbatim, which could put an argument's secret
     // value into the trace.
+    // P2-4: structural equality over two argument sets — tells a REAL mutation (re-scan) from a no-op / idempotent
+    // one (fixed point). Null is treated as empty. Cheap: reference short-circuit, count check, then a key+value
+    // comparison via the CURRENT dictionary's own lookup (so it honors that dictionary's key comparer).
+    internal static bool ArgumentsEqual(IReadOnlyDictionary<string, object?>? current, IReadOnlyDictionary<string, object?>? proposed)
+    {
+        if (ReferenceEquals(current, proposed))
+        {
+            return true;
+        }
+
+        var currentCount = current?.Count ?? 0;
+        var proposedCount = proposed?.Count ?? 0;
+        if (currentCount != proposedCount)
+        {
+            return false;
+        }
+
+        if (currentCount == 0)
+        {
+            return true;
+        }
+
+        foreach (var kv in proposed!)
+        {
+            if (!current!.TryGetValue(kv.Key, out var currentValue) || !Equals(currentValue, kv.Value))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
     private static void RecordMutate(
         AgentTrace? trace, int seq, ToolGateVerdict verdict,
-        IReadOnlyDictionary<string, object?>? argsBefore, IReadOnlyDictionary<string, object?>? argsAfter, TraceCaptureMode captureMode)
+        IReadOnlyDictionary<string, object?>? argsBefore, IReadOnlyDictionary<string, object?>? argsAfter, TraceCaptureMode captureMode, bool applied)
     {
         if (trace is null)
         {
@@ -524,6 +685,9 @@ public static class AgentEvalToolGateExtensions
         trace.SetMetadata($"gate.tool.{seq}.{verdict.PolicyName}", new Dictionary<string, object?>
         {
             ["action"] = "Mutate",
+            // P2-2: honest observe evidence — false under WarnOnly, where argsAfter is the counterfactual the
+            // gate proposed but the tool did NOT receive (the live arguments were left unchanged).
+            ["applied"] = applied,
             ["reason"] = verdict.Reason,
             ["argsBefore"] = MutationEvidenceRenderer.Render(argsBefore, captureMode),
             ["argsAfter"] = MutationEvidenceRenderer.Render(argsAfter, captureMode),

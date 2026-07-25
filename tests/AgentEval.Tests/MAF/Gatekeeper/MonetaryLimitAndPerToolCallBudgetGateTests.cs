@@ -340,4 +340,53 @@ public class MonetaryLimitAndPerToolCallBudgetGateTests
         Assert.Equal(1, executed);   // the single refund must be ADMITTED, not spuriously blocked
         Assert.Equal(0, GlassBoxEvidence.FromTrace(trace)?.GateBlockCount ?? 0);
     }
+
+    [Fact]
+    public async Task Integration_BudgetGateOrderedAfterMutator_IsStillEnforced()
+    {
+        // P2-4 review Finding 1 (fail-open regression): a RunScope budget gate ordered AFTER a mutating gate must
+        // still be evaluated. Each call trips the normalizer (which changes the args and short-circuits pass 0
+        // before the budget gate is reached); the budget gate must then run on the revalidation pass. A blanket
+        // "skip RunScope gates on revalidation" would bypass the cap entirely and let BOTH calls through.
+        var executed = 0;
+        var read = AIFunctionFactory.Create((string path) => { Interlocked.Increment(ref executed); return "ok"; }, "read");
+        var model = new ScriptedChatClient()
+            .AddToolCall("c1", "read", new Dictionary<string, object?> { ["path"] = "a" })
+            .AddToolCall("c2", "read", new Dictionary<string, object?> { ["path"] = "b" })
+            .AddText("done");
+        var trace = new AgentTrace();
+
+        var gates = new IToolGate[]
+        {
+            new NormalizeGate("read"),         // pure, arg-changing mutator
+            new RunBudgetGate(maxToolCalls: 1),   // RunScope gate ORDERED AFTER the mutator
+        };
+
+        await GatedAgent(gates, model, read, trace).RunAsync("go");
+
+        Assert.Equal(1, executed);   // 2nd call blocked by the budget despite the preceding mutation
+        Assert.Equal(1, GlassBoxEvidence.FromTrace(trace)?.GateBlockCount);
+    }
+
+    // A pure, idempotent "normalize path" mutator: prefixes an un-normalized path, allows an already-normalized one.
+    private sealed class NormalizeGate : IToolGate
+    {
+        private readonly string _target;
+        public string PolicyName => "NormalizeGate";
+        public GateCost Cost => GateCost.PureCode;
+        public NormalizeGate(string target) => _target = target;
+
+        public ValueTask<ToolGateVerdict> InspectAsync(GatedToolCall call, CancellationToken ct = default)
+        {
+            if (call.FunctionName != _target || call.Arguments is null)
+            {
+                return new(ToolGateVerdict.Allow(PolicyName));
+            }
+
+            var path = call.Arguments.TryGetValue("path", out var p) ? p?.ToString() ?? string.Empty : string.Empty;
+            return path.StartsWith("/norm/", StringComparison.Ordinal)
+                ? new(ToolGateVerdict.Allow(PolicyName))   // already normalized → fixed point
+                : new(ToolGateVerdict.Mutate(PolicyName, new Dictionary<string, object?> { ["path"] = "/norm/" + path }, "normalize"));
+        }
+    }
 }

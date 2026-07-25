@@ -31,6 +31,7 @@ public sealed class MonetaryLimitGate : IToolGate
 {
     private readonly string _argName;
     private readonly decimal _max;
+    private readonly RunBudgetScope _budgetScope;
 
     /// <inheritdoc/>
     public string PolicyName { get; }
@@ -45,7 +46,9 @@ public sealed class MonetaryLimitGate : IToolGate
     /// <param name="argName">The tool-call argument that carries the monetary amount (e.g. <c>"amount"</c>).</param>
     /// <param name="maxTotal">The cap on the running sum of <paramref name="argName"/> across the run.</param>
     /// <param name="policyName">Optional override of the recorded policy name (default <c>"MonetaryLimitGate"</c>).</param>
-    public MonetaryLimitGate(string argName, decimal maxTotal, string? policyName = null)
+    /// <param name="budgetScope">Which run's ledger to charge (P2-8). Defaults to <see cref="RunBudgetScope.Current"/>;
+    /// pass <see cref="RunBudgetScope.Root"/> so a fan-out of nested sub-agent runs shares this one monetary cap.</param>
+    public MonetaryLimitGate(string argName, decimal maxTotal, string? policyName = null, RunBudgetScope budgetScope = RunBudgetScope.Current)
     {
         if (string.IsNullOrWhiteSpace(argName))
         {
@@ -59,6 +62,7 @@ public sealed class MonetaryLimitGate : IToolGate
 
         _argName = argName;
         _max = maxTotal;
+        _budgetScope = budgetScope;
         PolicyName = policyName ?? "MonetaryLimitGate";
     }
 
@@ -79,7 +83,7 @@ public sealed class MonetaryLimitGate : IToolGate
 
             default:   // Parsed
                 var amount = Math.Max(0m, raw);   // clamp: a negative amount can never create headroom under the cap
-                var ledger = RunLedger.ForCurrentRun();
+                var ledger = _budgetScope == RunBudgetScope.Root ? RunLedger.ForRootRun() : RunLedger.ForCurrentRun();
                 var decision = ledger.TryAdmitMonetary(_argName, amount, _max);
                 var verdict = decision == RunBudgetDecision.MonetaryExceeded
                     ? ToolGateVerdict.Block(PolicyName,

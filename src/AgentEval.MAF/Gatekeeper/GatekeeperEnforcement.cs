@@ -24,6 +24,12 @@ public enum GatekeeperEnforcement
     /// existing agent with zero behavior change — the recommended mode for a first rollout, or for a purely
     /// advisory deployment. <c>UseGatekeeper</c> prints a startup banner in this mode so nobody mistakes it for
     /// enforcement (the review's "false assurance" concern).
+    /// <para><b>Observe applies nothing (P2-2).</b> A <see cref="ToolGateAction.Mutate"/> and a
+    /// <see cref="ToolResultAction.Redact"/> are RECORDED (argsAfter / the redaction are captured as a faithful
+    /// dry-run, with <c>applied=false</c>) but never applied — the tool receives the original arguments and the
+    /// model sees the original result. <b>The one exception is a gate that THROWS:</b> a crashing gate is a
+    /// defect, not a finding, so it still fails closed (blocks) even under Observe — the "zero behavior change"
+    /// guarantee deliberately does not extend to covering up a broken gate.</para>
     /// <para><b>Exception: gates with a <see cref="IToolGate.MinimumPolicy"/> floor above WarnOnly</b> (a
     /// canary/honeypot gate — e.g. <c>CanaryToolGate</c> — where running under WarnOnly would silently defeat
     /// the trap) cannot be composed under Observe at all. <c>UseGatekeeper</c> refuses construction rather than
