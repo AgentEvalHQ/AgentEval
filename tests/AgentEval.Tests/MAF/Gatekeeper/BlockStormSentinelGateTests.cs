@@ -1,0 +1,123 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 AgentEval Contributors
+// Licensed under the MIT License.
+
+using AgentEval.MAF.Gatekeeper;
+using Microsoft.Extensions.AI;
+using Xunit;
+
+namespace AgentEval.Tests.MAF.Gatekeeper;
+
+/// <summary>
+/// P6-1 BlockStormSentinelGate — a meta-gate that trips once a run's ENFORCED-block volume (RunLedger.TotalDenials)
+/// crosses a threshold, turning repeated denials (probing) into a block/terminate + one incident alert.
+/// </summary>
+public class BlockStormSentinelGateTests
+{
+    private static GatedToolCall Call(string tool = "any_tool")
+        => new(tool, new Dictionary<string, object?>(), "T", 0, 0, 1, false, Array.Empty<ChatMessage>());
+
+    private static void RecordDenials(int n)
+    {
+        for (var i = 0; i < n; i++)
+        {
+            RunLedger.ForCurrentRun().RecordDenial($"key-{i}");   // distinct keys → whole-run volume, not one retry
+        }
+    }
+
+    [Fact]
+    public async Task BelowThreshold_Allows()
+    {
+        using var scope = AgentRunScope.Begin(null, "T", null);
+        RecordDenials(3);
+        var gate = new BlockStormSentinelGate(threshold: 5);
+
+        Assert.Equal(ToolGateAction.Allow, (await gate.InspectAsync(Call())).Action);
+    }
+
+    [Fact]
+    public async Task AtThreshold_Blocks()
+    {
+        using var scope = AgentRunScope.Begin(null, "T", null);
+        RecordDenials(5);
+        var gate = new BlockStormSentinelGate(threshold: 5);
+
+        var verdict = await gate.InspectAsync(Call());
+        Assert.Equal(ToolGateAction.Block, verdict.Action);
+        Assert.Equal("BlockStormSentinel", verdict.PolicyName);
+    }
+
+    [Fact]
+    public async Task AboveThreshold_Blocks()
+    {
+        using var scope = AgentRunScope.Begin(null, "T", null);
+        RecordDenials(9);
+        var gate = new BlockStormSentinelGate(threshold: 5);
+
+        Assert.Equal(ToolGateAction.Block, (await gate.InspectAsync(Call())).Action);
+    }
+
+    [Fact]
+    public async Task Alert_FiresOnce_OnTheTransition_WithIncidentSeverity()
+    {
+        using var scope = AgentRunScope.Begin(null, "T", null);
+        var incidents = new List<BlockStormIncident>();
+        var gate = new BlockStormSentinelGate(threshold: 5, onBlockStorm: incidents.Add);
+
+        RecordDenials(4);
+        await gate.InspectAsync(Call());   // 4 < 5 → allow, no alert
+
+        RecordDenials(1);                  // now 5
+        await gate.InspectAsync(Call());   // == threshold → block + alert
+        RecordDenials(1);                  // now 6
+        await gate.InspectAsync(Call());   // > threshold → block, NO second alert
+
+        Assert.Single(incidents);
+        Assert.Equal(5, incidents[0].EnforcedBlockCount);
+        Assert.Equal(5, incidents[0].Threshold);
+        Assert.Equal(GateSeverity.Incident, incidents[0].Severity);
+        Assert.Equal(scope.RunId, incidents[0].RunId);
+    }
+
+    [Fact]
+    public async Task ThrowingAlertSink_DoesNotBreakTheGate()
+    {
+        using var scope = AgentRunScope.Begin(null, "T", null);
+        RecordDenials(5);
+        var gate = new BlockStormSentinelGate(threshold: 5, onBlockStorm: _ => throw new InvalidOperationException("sink boom"));
+
+        var verdict = await gate.InspectAsync(Call());   // must still block, not propagate the sink's throw
+        Assert.Equal(ToolGateAction.Block, verdict.Action);
+    }
+
+    [Fact]
+    public async Task NoRunScope_IsNoOp_Allows()
+    {
+        // No AgentRunScope ⇒ no per-run tally to read ⇒ the sentinel can't observe a storm ⇒ allow.
+        var gate = new BlockStormSentinelGate(threshold: 1);
+        Assert.Equal(ToolGateAction.Allow, (await gate.InspectAsync(Call())).Action);
+    }
+
+    [Fact]
+    public async Task Tally_IsPerRun_DoesNotBleedAcrossRuns()
+    {
+        using (var run1 = AgentRunScope.Begin(null, "T", null))
+        {
+            RecordDenials(9);
+        }
+
+        using (var run2 = AgentRunScope.Begin(null, "T", null))
+        {
+            var gate = new BlockStormSentinelGate(threshold: 5);
+            Assert.Equal(ToolGateAction.Allow, (await gate.InspectAsync(Call())).Action);   // run1's storm stays in run1
+        }
+    }
+
+    [Fact]
+    public void Threshold_MustBePositive()
+        => Assert.Throws<ArgumentOutOfRangeException>(() => new BlockStormSentinelGate(threshold: 0));
+
+    [Fact]
+    public void PureCode_Cost()
+        => Assert.Equal(GateCost.PureCode, new BlockStormSentinelGate().Cost);
+}

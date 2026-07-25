@@ -78,6 +78,7 @@ public sealed class RunLedger
     private readonly Dictionary<string, int> _perToolCallBudgetCounts = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, (int Count, long Sum, long Max)> _toolResultSizes = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, int> _denials = new(StringComparer.Ordinal);   // P4-3: per-(tool+arg-shape) denial tally (F-B dimension)
+    private int _totalDenials;   // P6-1: whole-run enforced-block volume (block-storm dimension)
 
     /// <summary>The ledger for the current run (keyed by <see cref="AgentRunScope.Current"/>).</summary>
     public static RunLedger ForCurrentRun()
@@ -335,8 +336,19 @@ public sealed class RunLedger
         {
             var count = (_denials.TryGetValue(denialKey, out var n) ? n : 0) + 1;
             _denials[denialKey] = count;
+            _totalDenials++;
             return count;
         }
+    }
+
+    /// <summary>
+    /// Total ENFORCED blocks recorded across every denial key this run (Phase 6, P6-1 / F-B) — the block-storm
+    /// dimension. Unlike <see cref="DenialCount"/> (which counts retries of one specific action), this is the whole
+    /// run's enforced-block volume, so a sentinel can spot an agent probing MANY different denied actions.
+    /// </summary>
+    public int TotalDenials
+    {
+        get { lock (_lock) { return _totalDenials; } }
     }
 
     /// <summary>The number of denials recorded so far for <paramref name="denialKey"/> this run (0 if none).</summary>
