@@ -123,27 +123,44 @@ public sealed class EvalGatingChatClient : DelegatingChatClient
         var targetIdx = userIdx >= 0 ? userIdx : msgs.Count - 1;
         var text = targetIdx >= 0 ? msgs[targetIdx].Text ?? string.Empty : string.Empty;
 
-        foreach (var gate in _pre)
+        if (_policy == EvalGatePolicy.WarnOnly && _pre.Count > 1)
         {
-            var verdict = await gate.InspectAsync(text, cancellationToken).ConfigureAwait(false);
-            Record(verdict, "pre");
-            _correlator?.Observe(verdict, "pre");
-            if (verdict.Action == GateAction.Allow)
+            // P5-6: WarnOnly pre-gates are independent — no Redact text-chaining, no ThrowOnFail short-circuit —
+            // so their (often LLM-backed) inspections overlap. Record/Observe afterward IN LIST ORDER, so
+            // evidence and correlation are byte-identical to the sequential path; only wall-clock shrinks
+            // (sum of judge latencies → slowest judge).
+            var verdicts = await InspectConcurrentlyAsync(_pre, text, cancellationToken).ConfigureAwait(false);
+            foreach (var verdict in verdicts)
             {
-                continue;
+                Record(verdict, "pre");
+                _correlator?.Observe(verdict, "pre");
+                // WarnOnly: recorded, proceed (no throw, no redact).
             }
-
-            if (_policy == EvalGatePolicy.ThrowOnFail)
+        }
+        else
+        {
+            foreach (var gate in _pre)
             {
-                throw new EvalGateRefusalException(verdict, "pre");
-            }
+                var verdict = await gate.InspectAsync(text, cancellationToken).ConfigureAwait(false);
+                Record(verdict, "pre");
+                _correlator?.Observe(verdict, "pre");
+                if (verdict.Action == GateAction.Allow)
+                {
+                    continue;
+                }
 
-            if (_policy == EvalGatePolicy.Redact && targetIdx >= 0)
-            {
-                text = RedactRequestMessageInPlace(msgs, targetIdx, verdict);   // chain over redacted text
-            }
+                if (_policy == EvalGatePolicy.ThrowOnFail)
+                {
+                    throw new EvalGateRefusalException(verdict, "pre");
+                }
 
-            // WarnOnly: recorded, proceed.
+                if (_policy == EvalGatePolicy.Redact && targetIdx >= 0)
+                {
+                    text = RedactRequestMessageInPlace(msgs, targetIdx, verdict);   // chain over redacted text
+                }
+
+                // WarnOnly with a single gate: recorded, proceed.
+            }
         }
 
         // Fleet Correlation: folded into the SAME EvalGatePolicy enforcement path every gate above already
@@ -181,24 +198,38 @@ public sealed class EvalGatingChatClient : DelegatingChatClient
         }
 
         var text = response.Text ?? string.Empty;
-        foreach (var gate in _post)
+        if (_policy == EvalGatePolicy.WarnOnly && _post.Count > 1)
         {
-            var verdict = await gate.InspectAsync(text, cancellationToken).ConfigureAwait(false);
-            Record(verdict, "post");
-            _correlator?.Observe(verdict, "post");
-            if (verdict.Action == GateAction.Allow)
+            // P5-6: WarnOnly post-gates are independent (see ApplyPreAsync's matching note) — overlap them,
+            // then Record/Observe in list order for byte-identical evidence.
+            var verdicts = await InspectConcurrentlyAsync(_post, text, cancellationToken).ConfigureAwait(false);
+            foreach (var verdict in verdicts)
             {
-                continue;
+                Record(verdict, "post");
+                _correlator?.Observe(verdict, "post");
             }
-
-            if (_policy == EvalGatePolicy.ThrowOnFail)
+        }
+        else
+        {
+            foreach (var gate in _post)
             {
-                throw new EvalGateRefusalException(verdict, "post");
-            }
+                var verdict = await gate.InspectAsync(text, cancellationToken).ConfigureAwait(false);
+                Record(verdict, "post");
+                _correlator?.Observe(verdict, "post");
+                if (verdict.Action == GateAction.Allow)
+                {
+                    continue;
+                }
 
-            if (_policy == EvalGatePolicy.Redact)
-            {
-                text = RedactResponseInPlace(response, verdict);
+                if (_policy == EvalGatePolicy.ThrowOnFail)
+                {
+                    throw new EvalGateRefusalException(verdict, "post");
+                }
+
+                if (_policy == EvalGatePolicy.Redact)
+                {
+                    text = RedactResponseInPlace(response, verdict);
+                }
             }
         }
 
@@ -308,6 +339,24 @@ public sealed class EvalGatingChatClient : DelegatingChatClient
             ["confidence"] = verdict.Confidence,
             ["correlationId"] = ToolCorrelationScope.Current,
         });
+    }
+
+    // P5-6: run an independent (WarnOnly) gate panel's inspections concurrently. Each InspectAsync is started
+    // before any is awaited, so the (typically LLM-bound) calls overlap; Task.WhenAll preserves input order, so
+    // the returned verdicts align 1:1 with the gate list and the caller can Record/Observe them deterministically.
+    // Used ONLY under WarnOnly, where gates neither chain redacted text nor short-circuit — so overlapping them
+    // changes nothing but wall-clock. (Gates are already required to be thread-safe: this client is itself invoked
+    // concurrently across in-flight requests, sharing the same gate instances.)
+    private static async Task<GateVerdict[]> InspectConcurrentlyAsync(
+        IReadOnlyList<IChatGate> gates, string text, CancellationToken cancellationToken)
+    {
+        var tasks = new Task<GateVerdict>[gates.Count];
+        for (var i = 0; i < gates.Count; i++)
+        {
+            tasks[i] = gates[i].InspectAsync(text, cancellationToken).AsTask();
+        }
+
+        return await Task.WhenAll(tasks).ConfigureAwait(false);
     }
 
     private static int LastIndexOfRole(IList<ChatMessage> messages, ChatRole role)
