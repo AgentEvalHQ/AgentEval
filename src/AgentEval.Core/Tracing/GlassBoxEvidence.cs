@@ -30,6 +30,23 @@ public sealed record GlassBoxEvidence
     [JsonPropertyName("gateBlockPolicies")]
     public IReadOnlyList<string> GateBlockPolicies { get; init; } = Array.Empty<string>();
 
+    /// <summary>
+    /// Number of gate verdicts that WOULD have blocked but did not, because the gate ran under a non-enforcing policy
+    /// (Observe / WarnOnly) — Phase 6, P6-2. Counted separately from <see cref="GateBlockCount"/> (which stays
+    /// enforced-only), this is the counterfactual that turns an Observe-mode dry run into a data-driven
+    /// Observe→Enforce decision: "flipping to Enforce would have blocked this many calls."
+    /// </summary>
+    [JsonPropertyName("wouldBlockCount")]
+    public int WouldBlockCount { get; init; }
+
+    /// <summary>Number of gate verdicts that WOULD have mutated a call's arguments but did not (non-enforcing policy) — P6-2.</summary>
+    [JsonPropertyName("wouldMutateCount")]
+    public int WouldMutateCount { get; init; }
+
+    /// <summary>Number of gate verdicts that WOULD have redacted a tool result but did not (non-enforcing policy) — P6-2.</summary>
+    [JsonPropertyName("wouldRedactCount")]
+    public int WouldRedactCount { get; init; }
+
     /// <summary>Number of chat turns whose finish reason was content_filter or length (provider-side intervention).</summary>
     [JsonPropertyName("suppressedFinishTurns")]
     public int SuppressedFinishTurns { get; init; }
@@ -64,6 +81,7 @@ public sealed record GlassBoxEvidence
         }
 
         var (gateBlocks, policies) = CountGateBlocks(trace);
+        var (wouldBlock, wouldMutate, wouldRedact) = CountCounterfactuals(trace);
 
         return new GlassBoxEvidence
         {
@@ -71,6 +89,9 @@ public sealed record GlassBoxEvidence
             ToolExecutionCount = toolExecutions,
             GateBlockCount = gateBlocks,
             GateBlockPolicies = policies,
+            WouldBlockCount = wouldBlock,
+            WouldMutateCount = wouldMutate,
+            WouldRedactCount = wouldRedact,
             SuppressedFinishTurns = chatResponses.Count(r =>
                 string.Equals(r.FinishReason, "content_filter", StringComparison.OrdinalIgnoreCase) ||
                 string.Equals(r.FinishReason, "length", StringComparison.OrdinalIgnoreCase)),
@@ -104,5 +125,52 @@ public sealed record GlassBoxEvidence
         }
 
         return (count, policies.OrderBy(p => p, StringComparer.Ordinal).ToList());
+    }
+
+    // P6-2: count the Observe/WarnOnly counterfactuals recorded alongside real verdicts. A would-block carries the
+    // explicit "wouldAction":"Block" marker (a non-enforced block records action="Warn", which alone can't be told
+    // from a genuine warning); a would-mutate/would-redact is an action="Mutate"/"Redact" record with applied=false
+    // (the P2-2 recorded-not-applied flag). None of these are enforced, so none inflate GateBlockCount.
+    private static (int WouldBlock, int WouldMutate, int WouldRedact) CountCounterfactuals(AgentTrace trace)
+    {
+        if (trace.Metadata is null)
+        {
+            return (0, 0, 0);
+        }
+
+        int wouldBlock = 0, wouldMutate = 0, wouldRedact = 0;
+        foreach (var kv in trace.Metadata)
+        {
+            if (!GateMetadataReader.IsGateKey(kv.Key))
+            {
+                continue;
+            }
+
+            if (string.Equals(GateMetadataReader.ReadField(kv.Value, "wouldAction"), "Block", StringComparison.Ordinal))
+            {
+                wouldBlock++;
+                continue;
+            }
+
+            // applied is a bool: the in-memory dict renders "False", a reloaded JsonElement renders "false" — compare
+            // case-insensitively so the counterfactual survives serialization.
+            var notApplied = string.Equals(GateMetadataReader.ReadField(kv.Value, "applied"), "false", StringComparison.OrdinalIgnoreCase);
+            if (!notApplied)
+            {
+                continue;
+            }
+
+            switch (GateMetadataReader.ReadField(kv.Value, "action"))
+            {
+                case "Mutate":
+                    wouldMutate++;
+                    break;
+                case "Redact":
+                    wouldRedact++;
+                    break;
+            }
+        }
+
+        return (wouldBlock, wouldMutate, wouldRedact);
     }
 }

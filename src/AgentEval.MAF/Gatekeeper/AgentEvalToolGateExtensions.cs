@@ -582,6 +582,14 @@ public static class AgentEvalToolGateExtensions
             extra["terminate"] = true;
         }
 
+        // P6-2: a non-enforced (WarnOnly/Observe) block records action="Warn"; capture what it WOULD have done so an
+        // Observe→Enforce dry-run diff can count would-have-blocks (GlassBoxEvidence.WouldBlockCount) without
+        // inflating the enforced GateBlockCount.
+        if (action != "Block")
+        {
+            extra["wouldAction"] = "Block";
+        }
+
         // F-C: one canonical record, projected to the same superset trace value the readers parse.
         var record = evidence.Build(
             stage: "tool", policy: verdict.PolicyName, action: action, referenceId: referenceId, reason: verdict.Reason,
@@ -606,6 +614,12 @@ public static class AgentEvalToolGateExtensions
         if (terminating)
         {
             extra["terminate"] = true;
+        }
+
+        // P6-2: same counterfactual marker as RecordBlock (see there) — a non-enforced result-gate block is a would-block.
+        if (action != "Block")
+        {
+            extra["wouldAction"] = "Block";
         }
 
         var record = evidence.Build(
