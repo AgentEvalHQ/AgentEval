@@ -124,4 +124,35 @@ public class GateReferenceLedgerTests
         Assert.Equal("ForbiddenToolGate", evidence.Policy);
         Assert.False(string.IsNullOrEmpty(evidence.RunId));   // run scope stamped
     }
+
+    private sealed class NullRedactGate : IToolResultGate
+    {
+        public string PolicyName => "NullRedactGate";
+        public GateCost Cost => GateCost.PureCode;
+        public ToolGatePolicy MinimumPolicy => ToolGatePolicy.ReplaceResult;
+        public ValueTask<ToolResultVerdict> InspectAsync(GatedToolResult result, CancellationToken ct = default)
+            => new(new ToolResultVerdict(ToolResultAction.Redact, PolicyName, "no replacement supplied", RedactedResult: null));
+    }
+
+    [Fact]
+    public async Task NullRedactFallback_IsIndexedInDurableJsonl_AsARefusal()
+    {
+        // Phase 3 review #3: a null-redact fallback withholds the result and returns a model-facing refusal, so it
+        // must be persisted to the durable index (which only records refusals) — not just resolvable in memory.
+        var tool = AIFunctionFactory.Create((string x) => "the-secret", "fetch");
+        var scripted = new ScriptedChatClient().AddToolCall("c1", "fetch", new Dictionary<string, object?> { ["x"] = "1" }).AddText("done");
+        var agent = new ChatClientAgent(scripted, new ChatClientAgentOptions { Name = "A", ChatOptions = new ChatOptions { Tools = [tool] } });
+        var index = new StringBuilder();
+        var ledger = new GateReferenceLedger(new GateVerdictResolver(), new StringWriter(index));
+
+        var gated = agent.AsBuilder()
+            .UseGatekeeper(GatekeeperEnforcement.ReplaceResult, g => { g.AddResultGate(new NullRedactGate()); g.EvidenceSink = ledger; })
+            .Build();
+
+        await gated.RunAsync("go");
+
+        var lines = index.ToString().Split('\n', StringSplitOptions.RemoveEmptyEntries);
+        Assert.Single(lines);   // the withheld-result refusal IS in the durable index
+        Assert.Contains("NullRedactGate", lines[0]);
+    }
 }

@@ -69,15 +69,14 @@ public sealed class GateVerdictResolver
         ArgumentNullException.ThrowIfNull(referenceId);
         lock (_lock)
         {
-            if (_byReference.TryGetValue(referenceId, out var entry))
+            // Do NOT remove an expired entry here: the dictionary and the FIFO queue are kept 1:1 in sync (a key is
+            // dropped ONLY via eviction, which dequeues in order), so a lazy removal would leave a phantom queue
+            // entry that could later evict a live re-inserted id (Phase 3 review #5). Expired entries are simply
+            // reported unresolvable and reclaimed in FIFO order under capacity pressure.
+            if (_byReference.TryGetValue(referenceId, out var entry) && _timeProvider.GetUtcNow() < entry.ExpiresAtUtc)
             {
-                if (_timeProvider.GetUtcNow() < entry.ExpiresAtUtc)
-                {
-                    evidence = entry.Evidence;
-                    return true;
-                }
-
-                _byReference.Remove(referenceId);   // lazily drop the expired entry
+                evidence = entry.Evidence;
+                return true;
             }
 
             evidence = null!;

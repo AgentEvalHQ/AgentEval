@@ -40,9 +40,18 @@ public sealed class ObserverEvidenceSink : IGateEvidenceSink
     public void Record(GateEvidence evidence, int sequence)
     {
         ArgumentNullException.ThrowIfNull(evidence);
-        if (IsActionable(evidence))
+        if (!IsActionable(evidence))
+        {
+            return;
+        }
+
+        try
         {
             _observer.OnFinding(evidence);
+        }
+        catch
+        {
+            // A throwing observer must never break enforcement (the emission path also isolates, belt-and-braces).
         }
     }
 

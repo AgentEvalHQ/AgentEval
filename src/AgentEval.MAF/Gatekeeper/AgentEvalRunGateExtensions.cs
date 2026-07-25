@@ -92,9 +92,13 @@ public static class AgentEvalRunGateExtensions
         var seq = new int[1];   // shared block-seq counter across both branches
 
         // F-C / P3-6: fingerprint the pre/post gate configuration once; every run-gate evidence record is stamped
-        // with it. AgentName / RunId are filled from AgentRunScope at record time (the run gate establishes it).
-        var evidenceContext = new GateEvidenceContext(null, null, null,
-            GateConfigFingerprint.Compute(chatGates: preGates.Concat(postGates).ToArray()), evidenceSink);
+        // with it. Pre and post are fingerprinted SEPARATELY and combined (Phase 3 review #7) so that moving a gate
+        // across the pre/post boundary — a different configuration — yields a different fingerprint. AgentName /
+        // RunId are filled from AgentRunScope at record time (the run gate establishes it).
+        var runConfigFingerprint = ManifestFingerprint.Hash(
+            "pre|" + GateConfigFingerprint.Compute(chatGates: preGates.Count > 0 ? preGates : null) +
+            "|post|" + GateConfigFingerprint.Compute(chatGates: postGates.Count > 0 ? postGates : null));
+        var evidenceContext = new GateEvidenceContext(null, null, null, runConfigFingerprint, evidenceSink);
 
         return builder.Use(
             runFunc: async (messages, session, options, innerAgent, ct) =>
@@ -206,6 +210,12 @@ public static class AgentEvalRunGateExtensions
             {
                 await RunGatesAsync(postGates, accumulated.ToString(), "run-post", isPreStage: false, policy, trace, seq, evidence, ct).ConfigureAwait(false);
             }
+        }
+
+        // P3-11 (Phase 3 review #4): a streamed run must emit the same end-of-run receipt as a non-streaming one.
+        using (runScope.Enter())
+        {
+            EmitRunReceipt(trace, seq, evidence);
         }
     }
 

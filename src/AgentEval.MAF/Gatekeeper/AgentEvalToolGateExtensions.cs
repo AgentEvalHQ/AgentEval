@@ -423,10 +423,13 @@ public static class AgentEvalToolGateExtensions
                             // result-gate family exists to prevent (a withheld result must never read as a successful
                             // empty one). Fall back to the same stable, non-revealing refusal body a Block uses —
                             // never null — and record the referenceId embedded in it so an auditor can correlate.
+                            // Recorded as action="Block" (Phase 3 review): the model receives a REFUSAL here (the
+                            // result is withheld), so this is a block — counted by GateBlockCount and, crucially,
+                            // written to the durable reference index (which only persists model-facing refusals).
                             var redactReferenceId = GateReferenceId.New();
                             RecordResultBlock(trace, Interlocked.Increment(ref gateSeq), resultVerdict.PolicyName,
                                 resultVerdict.Reason ?? "result redacted with no replacement supplied — failing closed to a non-revealing refusal",
-                                action: "Redact", terminating: false, referenceId: redactReferenceId, evidence);
+                                action: "Block", terminating: false, referenceId: redactReferenceId, evidence);
                             toolResult = GateReferenceId.RefusalBody(redactReferenceId);
                         }
                         else

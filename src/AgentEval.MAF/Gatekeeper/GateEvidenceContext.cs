@@ -16,8 +16,23 @@ internal readonly record struct GateEvidenceContext(string? AgentName, string? T
     /// <summary>Whether a record must be BUILT even with no trace — true when an extra sink (ledger / alerting) is registered, so evidence still flows with tracing off (P3-1).</summary>
     public bool HasSink => Sink is not null;
 
-    /// <summary>Fan a built record out to the registered extra sink (ledger / alerting), if any. The trace write is done separately by the writer, so this never double-writes the trace.</summary>
-    public void Emit(GateEvidence record, int sequence) => Sink?.Record(record, sequence);
+    /// <summary>
+    /// Fan a built record out to the registered extra sink (ledger / alerting), if any. This runs INLINE on the
+    /// enforcement path (right before a Block returns its refusal), so a throwing sink is ISOLATED here — a broken
+    /// evidence destination must never propagate out of the gate middleware and destroy the controlled refusal or
+    /// fail the run open. The trace write is done separately by the writer, so this never double-writes the trace.
+    /// </summary>
+    public void Emit(GateEvidence record, int sequence)
+    {
+        try
+        {
+            Sink?.Record(record, sequence);
+        }
+        catch
+        {
+            // An evidence sink failing must never break enforcement — the refusal/verdict still stands.
+        }
+    }
 
     /// <summary>Assembles a full <see cref="GateEvidence"/> record from this context plus the per-finding fields (timestamp stamped now).</summary>
     public GateEvidence Build(

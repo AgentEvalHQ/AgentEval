@@ -164,4 +164,20 @@ public class JudgeCompositionTests
         Assert.True(events[1].Hit);
         Assert.Equal(new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero), events[1].OriginalTimestampUtc);
     }
+
+    [Fact]
+    public async Task Cache_ThrowingOnLookup_DoesNotTurnAllowIntoBlock()
+    {
+        // Phase 3 review #2: the precedent hook is pure observability — a throw must not propagate out of
+        // InspectAsync (where the gate loop would fail-close it into a Block) and refuse a genuine cached Allow.
+        var inner = new StubGate(GateVerdict.Allow("j"), "judge:x");
+        var cache = new JudgeVerdictCache(inner, onLookup: _ => throw new InvalidOperationException("hook boom"));
+
+        var miss = await cache.InspectAsync("same");   // miss — hook throws
+        var hit = await cache.InspectAsync("same");    // hit — hook throws
+
+        Assert.Equal(GateAction.Allow, miss.Action);
+        Assert.Equal(GateAction.Allow, hit.Action);
+        Assert.Equal(1, cache.Hits);
+    }
 }

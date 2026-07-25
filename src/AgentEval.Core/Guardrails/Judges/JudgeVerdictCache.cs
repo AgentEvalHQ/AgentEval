@@ -67,7 +67,7 @@ public sealed class JudgeVerdictCache : IChatGate
         if (_allowed.TryGetValue(key, out var cached))
         {
             Interlocked.Increment(ref _hits);
-            _onLookup?.Invoke(new JudgeCacheEvent(PolicyName, Hit: true, cached.FirstSeenUtc));   // precedent: served the original allow
+            NotifyLookup(new JudgeCacheEvent(PolicyName, Hit: true, cached.FirstSeenUtc));   // precedent: served the original allow
             return cached.Verdict;
         }
 
@@ -80,8 +80,27 @@ public sealed class JudgeVerdictCache : IChatGate
             _allowed.TryAdd(key, (verdict, _timeProvider.GetUtcNow()));
         }
 
-        _onLookup?.Invoke(new JudgeCacheEvent(PolicyName, Hit: false, OriginalTimestampUtc: null));
+        NotifyLookup(new JudgeCacheEvent(PolicyName, Hit: false, OriginalTimestampUtc: null));
         return verdict;
+    }
+
+    // The precedent hook is pure observability — a throw from it must never propagate out of InspectAsync, where
+    // the gate loop would convert it into a fail-closed Block and turn a genuine cached Allow into a refusal.
+    private void NotifyLookup(JudgeCacheEvent cacheEvent)
+    {
+        if (_onLookup is null)
+        {
+            return;
+        }
+
+        try
+        {
+            _onLookup(cacheEvent);
+        }
+        catch
+        {
+            // Swallow — observability must not change the verdict.
+        }
     }
 
     private static string HashOf(string text)

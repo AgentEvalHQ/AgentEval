@@ -96,4 +96,70 @@ public class GatekeeperObserverAndReceiptTests
         Assert.Equal(0, value["totalToolCalls"]);   // no tools called this run
         Assert.False(string.IsNullOrEmpty((string?)value["runId"]));
     }
+
+    [Fact]
+    public async Task RunGate_EmitsReceipt_OnStreamingRun_Too()
+    {
+        // Phase 3 review #4: a streamed run must emit the same end-of-run receipt as a non-streaming one.
+        var scripted = new ScriptedChatClient().AddText("done");
+        var agent = new ChatClientAgent(scripted, new ChatClientAgentOptions { Name = "Agatha" });
+        var trace = new AgentTrace();
+        var gated = agent.AsBuilder().UseAgentEvalGate(trace: trace).Build();
+
+        await foreach (var _ in gated.RunStreamingAsync("go")) { }
+
+        Assert.Contains(trace.Metadata!.Keys, k => k.StartsWith("gate.receipt.", StringComparison.Ordinal));
+    }
+
+    // ── Phase 3 review #1: a throwing evidence sink must never break enforcement ──
+
+    private sealed class ThrowingSink : IGateEvidenceSink
+    {
+        public void Record(GateEvidence evidence, int sequence) => throw new InvalidOperationException("sink boom");
+    }
+
+    [Fact]
+    public async Task ThrowingEvidenceSink_DoesNotBreakEnforcement_NorPropagate()
+    {
+        var executed = 0;
+        var tool = AIFunctionFactory.Create((string x) => { Interlocked.Increment(ref executed); return "ok"; }, "delete_account");
+        var scripted = new ScriptedChatClient().AddToolCall("c1", "delete_account", new Dictionary<string, object?> { ["x"] = "1" }).AddText("done");
+        var agent = new ChatClientAgent(scripted, new ChatClientAgentOptions { Name = "A", ChatOptions = new ChatOptions { Tools = [tool] } });
+
+        var gated = agent.AsBuilder()
+            .UseGatekeeper(GatekeeperEnforcement.Terminate, g =>
+            {
+                g.Add(new ForbiddenToolGate("delete_account"));
+                g.EvidenceSink = new ThrowingSink();   // every emission throws
+            })
+            .Build();
+
+        var ex = await Record.ExceptionAsync(() => gated.RunAsync("go"));
+
+        Assert.Null(ex);            // the throwing sink was isolated — no propagation out of the middleware
+        Assert.Equal(0, executed);  // and enforcement still held: the forbidden tool never ran (no fail-open)
+    }
+
+    [Fact]
+    public async Task ThrowingObserver_IsIsolated()
+    {
+        var tool = AIFunctionFactory.Create((string x) => "ok", "delete_account");
+        var scripted = new ScriptedChatClient().AddToolCall("c1", "delete_account", new Dictionary<string, object?> { ["x"] = "1" }).AddText("done");
+        var agent = new ChatClientAgent(scripted, new ChatClientAgentOptions { Name = "A", ChatOptions = new ChatOptions { Tools = [tool] } });
+
+        var gated = agent.AsBuilder()
+            .UseGatekeeper(GatekeeperEnforcement.Terminate, g =>
+            {
+                g.Add(new ForbiddenToolGate("delete_account"));
+                g.EvidenceSink = new ObserverEvidenceSink(new ThrowingObserver());
+            })
+            .Build();
+
+        Assert.Null(await Record.ExceptionAsync(() => gated.RunAsync("go")));
+    }
+
+    private sealed class ThrowingObserver : IGatekeeperObserver
+    {
+        public void OnFinding(GateEvidence evidence) => throw new InvalidOperationException("observer boom");
+    }
 }
