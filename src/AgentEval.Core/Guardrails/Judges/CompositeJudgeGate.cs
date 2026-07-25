@@ -66,8 +66,20 @@ public sealed class CompositeJudgeGate<TRubric> : IChatGate, IRequiresCalibratio
             return GateVerdict.Allow(PolicyName);   // cheap short-circuit — most turns never reach the model
         }
 
-        var verdict = await JudgeAsync(text, cancellationToken).ConfigureAwait(false);
         var ruleName = $"judge:{_rubric.Axis}";
+
+        // P5-2: reserve against the shared token+call wallet BEFORE the model call. On exhaustion, skip the model
+        // and degrade to a recorded "unjudged — budget exhausted" verdict (fail-open advisory by default).
+        if (_options.SpendGovernor is { } governor && !governor.TryReserve(EstimateTokens(text)))
+        {
+            var exhaustedReason = $"{_rubric.Axis} judge unjudged — spend budget exhausted";
+            var exhaustedProvenance = new GateProvenance($"{ruleName}:budget-exhausted", Array.Empty<string>());
+            return _options.FailClosedOnBudgetExhausted
+                ? GateVerdict.Block(PolicyName, $"{exhaustedReason} (fail-closed)") with { Provenance = exhaustedProvenance }
+                : GateVerdict.Allow(PolicyName) with { Provenance = exhaustedProvenance };
+        }
+
+        var verdict = await JudgeAsync(text, cancellationToken).ConfigureAwait(false);
         var evidence = verdict.Spans ?? Array.Empty<string>();
 
         return verdict.Decision switch
@@ -102,6 +114,11 @@ public sealed class CompositeJudgeGate<TRubric> : IChatGate, IRequiresCalibratio
             },
         };
     }
+
+    // P5-2: a deliberately cheap, dependency-free token estimate for the spend reservation — input chars/4 (the
+    // usual rough chars-per-token ratio) plus the output-token cap. It only needs to bound spend, not be exact;
+    // the reservation is a ceiling, so over-estimating is the safe direction.
+    private long EstimateTokens(string text) => ((long)text.Length / 4) + _options.MaxOutputTokens;
 
     private bool SafePrefilter(string text)
     {

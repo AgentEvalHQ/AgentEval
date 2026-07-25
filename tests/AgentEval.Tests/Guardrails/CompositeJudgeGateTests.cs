@@ -229,6 +229,66 @@ public class CompositeJudgeGateTests
     public void NullModel_Throws()
         => Assert.Throws<ArgumentNullException>(() => new CompositeJudgeGate<KeywordRubric>(new KeywordRubric(), null!));
 
+    // ── P5-2: shared spend governor ──
+
+    [Fact]
+    public async Task SpendGovernor_BudgetExhausted_FailOpen_Allows_AndSkipsModel()
+    {
+        // maxTokens=1 is smaller than any real estimate (chars/4 + 256 output cap), so the first reservation is
+        // already refused — the model must be skipped and the turn allowed (fail-open default), with provenance.
+        var model = new ScriptedChatClient().AddText("BLOCK");   // would block IF called
+        var gov = new JudgeSpendGovernor(maxCalls: 100, maxTokens: 1);
+        var v = await Gate(model, new JudgeGateOptions { SpendGovernor = gov }).InspectAsync("please scan this");
+
+        Assert.Equal(GateAction.Allow, v.Action);
+        Assert.Empty(model.ReceivedMessages);   // proves the model was never called — spend was refused
+        Assert.NotNull(v.Provenance);
+        Assert.Contains("budget-exhausted", v.Provenance!.RuleName, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task SpendGovernor_BudgetExhausted_FailClosed_Blocks_AndSkipsModel()
+    {
+        var model = new ScriptedChatClient().AddText("ALLOW");   // would allow IF called
+        var gov = new JudgeSpendGovernor(maxCalls: 100, maxTokens: 1);
+        var opts = new JudgeGateOptions { SpendGovernor = gov, FailClosedOnBudgetExhausted = true };
+
+        var v = await Gate(model, opts).InspectAsync("please scan this");
+
+        Assert.Equal(GateAction.Block, v.Action);
+        Assert.Contains("budget", v.Reason!, StringComparison.OrdinalIgnoreCase);
+        Assert.Empty(model.ReceivedMessages);   // fail-closed still skips the (unaffordable) model call
+    }
+
+    [Fact]
+    public async Task SpendGovernor_WithinBudget_JudgeRunsNormally()
+    {
+        var model = new ScriptedChatClient().AddText("BLOCK");
+        var gov = new JudgeSpendGovernor(maxCalls: 100, maxTokens: 1_000_000);
+
+        var v = await Gate(model, new JudgeGateOptions { SpendGovernor = gov }).InspectAsync("please scan this");
+
+        Assert.Equal(GateAction.Block, v.Action);      // budget ok ⇒ the judge actually ran
+        Assert.NotEmpty(model.ReceivedMessages);
+    }
+
+    [Fact]
+    public async Task SpendGovernor_PrefilterSkip_DoesNotConsumeBudget()
+    {
+        // A turn that never reaches the model (prefilter false) must not spend the wallet — otherwise benign
+        // traffic would starve the budget before any judge-worthy turn arrives.
+        var gov = new JudgeSpendGovernor(maxCalls: 1, maxTokens: 1_000_000);
+        var opts = new JudgeGateOptions { SpendGovernor = gov };
+
+        _ = await Gate(new ScriptedChatClient().AddText("BLOCK"), opts).InspectAsync("nothing interesting");   // no "scan"
+
+        // The single call in the budget is still available — a real (scanned) turn now runs the model.
+        var model = new ScriptedChatClient().AddText("BLOCK");
+        var v = await Gate(model, opts).InspectAsync("please scan this");
+        Assert.Equal(GateAction.Block, v.Action);
+        Assert.NotEmpty(model.ReceivedMessages);
+    }
+
     // A fast model that respects cancellation but otherwise never returns in time (for the timeout path).
     private sealed class DelayingChatClient : IChatClient
     {

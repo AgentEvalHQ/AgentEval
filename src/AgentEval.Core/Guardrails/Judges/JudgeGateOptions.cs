@@ -31,4 +31,22 @@ public sealed class JudgeGateOptions
     /// by the run gate's <see cref="EvalGatePolicy"/> (a block only stops the run under a blocking policy).
     /// </summary>
     public bool FailClosedOnInconclusive { get; init; } = true;
+
+    /// <summary>
+    /// Optional shared token + call budget across judges (Phase 5, P5-2 — a denial-of-wallet / runaway-cost bound).
+    /// When set, the gate reserves against it before calling the model; if the budget for the current window is
+    /// exhausted the model call is SKIPPED and the turn degrades per <see cref="FailClosedOnBudgetExhausted"/>.
+    /// Share one instance across every <see cref="CompositeJudgeGate{TRubric}"/> that draws on the same wallet.
+    /// Default <c>null</c> (no budget cap — the pre-P5-2 behavior).
+    /// </summary>
+    public JudgeSpendGovernor? SpendGovernor { get; init; }
+
+    /// <summary>
+    /// When <see cref="SpendGovernor"/> refuses a reservation (budget exhausted), whether the un-run judge blocks
+    /// (fail-closed) or allows (fail-open, recorded as "unjudged — budget exhausted"). Default <c>false</c>
+    /// (fail-open): a spent <i>cost</i> budget must not turn into a full traffic outage — exhaustion is a resource
+    /// limit, not a detection failure, so the judge degrades to advisory rather than blocking everything. Set
+    /// <c>true</c> only where an unjudged turn is unacceptable and a judge outage blocking all traffic is preferred.
+    /// </summary>
+    public bool FailClosedOnBudgetExhausted { get; init; }
 }
