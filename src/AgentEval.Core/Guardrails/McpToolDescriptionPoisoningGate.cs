@@ -28,9 +28,34 @@ public sealed record McpToolDefinition(string Name, string? Description, string?
     // canonical-content collision between e.g. Name="a" Description="b|c" and Name="a|b" Description="c".
     private const char FieldSeparator = '␞';
 
-    /// <summary>Canonical content for hashing — name + description + a normalized schema rendering.</summary>
-    public string CanonicalContent() =>
-        string.Join(FieldSeparator, Name, Description ?? string.Empty, NormalizeSchema(InputSchemaJson));
+    /// <summary>
+    /// Stable logical identity of the MCP server that supplied this tool, populated by the caller from its
+    /// explicit MCP connection registration. Never infer this value from the tool name or description.
+    /// </summary>
+    /// <remarks>
+    /// This property is deliberately non-positional so the original three-argument constructor and
+    /// deconstruction surface remain intact.
+    /// </remarks>
+    public string? ServerId { get; init; }
+
+    /// <summary>
+    /// Canonical content for hashing — server identity (when supplied) + name + description + a normalized
+    /// schema rendering.
+    /// </summary>
+    public string CanonicalContent()
+    {
+        var legacyContent =
+            string.Join(FieldSeparator, Name, Description ?? string.Empty, NormalizeSchema(InputSchemaJson));
+        if (ServerId is null)
+        {
+            return legacyContent;
+        }
+
+        // A JSON tuple is collision-safe even if an identifier contains FieldSeparator. Keep the original
+        // rendering only for unscoped definitions so existing description-only baseline hashes remain stable.
+        return JsonSerializer.Serialize(
+            new[] { ServerId, Name, Description ?? string.Empty, NormalizeSchema(InputSchemaJson) });
+    }
 
     // Re-serializes the schema with RECURSIVELY SORTED object keys so semantically-identical JSON that
     // merely differs in whitespace/property order does not register as a "rug-pull" — a real content
