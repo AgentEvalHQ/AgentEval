@@ -20,6 +20,12 @@ internal static class GateReferenceId
     /// <summary>A short, opaque, unpredictable reference id — correlates the model-visible refusal with the full trace evidence. Delegates to the shared, dependency-free <see cref="GateCorrelationId"/> (also used by <c>EvalGateRefusalException</c> in Core) so the two never drift.</summary>
     public static string New() => GateCorrelationId.New();
 
-    /// <summary>The stable, non-revealing model-visible refusal body for <paramref name="referenceId"/>.</summary>
-    public static string RefusalBody(string referenceId) => $$"""{"error":"ACTION_NOT_AUTHORIZED","referenceId":"{{referenceId}}"}""";
+    /// <summary>
+    /// The stable, non-revealing model-visible refusal body for <paramref name="referenceId"/> — the versioned
+    /// <see cref="GatekeeperRefusalContract"/> envelope (Phase 4, P4-1/P4-2/P4-3), namespaced under
+    /// <c>_gatekeeper</c> so the model can tell a gate refusal from a tool's own error, carrying a coarse
+    /// <paramref name="disposition"/> and — when tracked — how many equivalent <paramref name="attempts"/> were denied.
+    /// </summary>
+    public static string RefusalBody(string referenceId, RefusalDisposition disposition = RefusalDisposition.Denied, int? attempts = null)
+        => GatekeeperRefusalContract.Build(referenceId, disposition, attempts);
 }

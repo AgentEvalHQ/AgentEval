@@ -2,7 +2,6 @@
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 
-using System.Text.Json;
 using AgentEval.Guardrails;
 using AgentEval.MAF.Gatekeeper;
 using AgentEval.Testing;
@@ -43,10 +42,9 @@ public class GateRefusalMessageTests
         Assert.DoesNotContain("forbidden list", resultText, StringComparison.Ordinal);            // reason not leaked
         Assert.DoesNotContain("BLOCKED", resultText, StringComparison.Ordinal);                   // old shape gone
 
-        // Stable, parseable, non-revealing shape.
-        using var doc = JsonDocument.Parse(resultText!);
-        Assert.Equal("ACTION_NOT_AUTHORIZED", doc.RootElement.GetProperty("error").GetString());
-        var referenceId = doc.RootElement.GetProperty("referenceId").GetString();
+        // Stable, parseable, non-revealing envelope — distinguishable from a tool's own error (P4-1).
+        Assert.True(GatekeeperRefusalContract.TryParse(resultText, out var referenceId, out var disposition, out _));
+        Assert.Equal(RefusalDisposition.Denied, disposition);   // a plain policy block
         Assert.StartsWith("gk_", referenceId, StringComparison.Ordinal);
 
         // The full policy name + reason DO still live in the trace — audit-visible, keyed by the SAME referenceId
@@ -73,8 +71,8 @@ public class GateRefusalMessageTests
             .Select(r => r.Result?.ToString())
             .FirstOrDefault(t => t is not null);
 
-        using var doc = JsonDocument.Parse(resultText!);
-        var referenceId = doc.RootElement.GetProperty("referenceId").GetString();
+        Assert.True(GatekeeperRefusalContract.TryParse(resultText, out var referenceId, out var disposition, out _));
+        Assert.Equal(RefusalDisposition.Transient, disposition);   // a gate that threw failed closed — retry may succeed
 
         var evidence = (IDictionary<string, object?>)trace.Metadata!["gate.tool.1.ThrowingGate"];
         Assert.Equal(referenceId, evidence["referenceId"]);
@@ -98,9 +96,8 @@ public class GateRefusalMessageTests
         Assert.DoesNotContain("KeywordChatGate", response.Text, StringComparison.Ordinal);
         Assert.DoesNotContain("BLOCKED", response.Text, StringComparison.Ordinal);
 
-        using var doc = JsonDocument.Parse(response.Text);
-        Assert.Equal("ACTION_NOT_AUTHORIZED", doc.RootElement.GetProperty("error").GetString());
-        var referenceId = doc.RootElement.GetProperty("referenceId").GetString();
+        Assert.True(GatekeeperRefusalContract.TryParse(response.Text, out var referenceId, out _, out _));
+        Assert.StartsWith("gk_", referenceId, StringComparison.Ordinal);
 
         var evidence = (IDictionary<string, object?>)trace.Metadata!["gate.run-pre.1.KeywordChatGate"];
         Assert.Equal(referenceId, evidence["referenceId"]);
@@ -120,7 +117,7 @@ public class GateRefusalMessageTests
         var response = await gated.RunAsync("go");
 
         Assert.Equal("[REDACTED]", response.Text);
-        Assert.DoesNotContain("ACTION_NOT_AUTHORIZED", response.Text, StringComparison.Ordinal);
+        Assert.False(GatekeeperRefusalContract.TryParse(response.Text, out _, out _, out _));   // the safe redacted text is NOT a refusal envelope
     }
 
     [Fact]
@@ -139,8 +136,8 @@ public class GateRefusalMessageTests
 
             var resultText = scripted.ReceivedMessages.SelectMany(l => l).SelectMany(m => m.Contents.OfType<FunctionResultContent>())
                 .Select(r => r.Result?.ToString()).First(t => t is not null);
-            using var doc = JsonDocument.Parse(resultText!);
-            ids.Add(doc.RootElement.GetProperty("referenceId").GetString()!);
+            Assert.True(GatekeeperRefusalContract.TryParse(resultText, out var referenceId, out _, out _));
+            ids.Add(referenceId);
         }
 
         Assert.Equal(5, ids.Count);   // no collisions

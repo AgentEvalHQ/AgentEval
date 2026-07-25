@@ -77,6 +77,7 @@ public sealed class RunLedger
     private readonly Dictionary<string, decimal> _monetaryLimitSums = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, int> _perToolCallBudgetCounts = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, (int Count, long Sum, long Max)> _toolResultSizes = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, int> _denials = new(StringComparer.Ordinal);   // P4-3: per-(tool+arg-shape) denial tally (F-B dimension)
 
     /// <summary>The ledger for the current run (keyed by <see cref="AgentRunScope.Current"/>).</summary>
     public static RunLedger ForCurrentRun()
@@ -318,6 +319,33 @@ public sealed class RunLedger
             }
 
             return baseline;
+        }
+    }
+
+    /// <summary>
+    /// Records one denial for <paramref name="denialKey"/> (a tool + arg-shape signature) and returns the running
+    /// count INCLUDING this one (Phase 4, P4-3 / F-B). An equivalent retry — same tool, same argument shape —
+    /// shares the key, so the returned count is "how many times this same denied action has been tried". Surfaced
+    /// as the refusal envelope's <c>attempts</c>; also the dimension the Bulkhead RepeatedBlockEscalationGate reads.
+    /// </summary>
+    public int RecordDenial(string denialKey)
+    {
+        ArgumentNullException.ThrowIfNull(denialKey);
+        lock (_lock)
+        {
+            var count = (_denials.TryGetValue(denialKey, out var n) ? n : 0) + 1;
+            _denials[denialKey] = count;
+            return count;
+        }
+    }
+
+    /// <summary>The number of denials recorded so far for <paramref name="denialKey"/> this run (0 if none).</summary>
+    public int DenialCount(string denialKey)
+    {
+        ArgumentNullException.ThrowIfNull(denialKey);
+        lock (_lock)
+        {
+            return _denials.TryGetValue(denialKey, out var n) ? n : 0;
         }
     }
 
